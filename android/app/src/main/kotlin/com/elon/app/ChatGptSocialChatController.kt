@@ -261,7 +261,8 @@ internal class ChatGptSocialChatController(
 
     override fun conversationIndex() = session.conversationIndex()
 
-    override fun requestConversationIndex(): Boolean = session.requestConversationIndex()
+    override fun requestConversationIndex(projectId: String?): Boolean =
+        session.requestConversationIndex(projectId)
 
     override fun openConversation(path: String): Boolean {
         realtimeVoiceTranscript.reset()

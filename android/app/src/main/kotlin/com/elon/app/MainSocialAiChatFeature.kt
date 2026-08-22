@@ -438,8 +438,8 @@ internal class MainSocialAiChatFeature(
         return coordinator
     }
 
-    fun refreshWebChatConversationIndex(): Boolean =
-        isChatModeActive() && webChatNavigationSession()?.refresh() == true
+    fun refreshWebChatConversationIndex(projectId: String? = null): Boolean =
+        isChatModeActive() && webChatNavigationSession()?.refresh(projectId) == true
 
     fun startNewWebChatConversation(): Boolean {
         if (!isChatModeActive()) return false

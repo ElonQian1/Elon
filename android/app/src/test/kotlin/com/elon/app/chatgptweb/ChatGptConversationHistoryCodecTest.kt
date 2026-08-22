@@ -22,6 +22,7 @@ class ChatGptConversationHistoryCodecTest {
                     ChatGptWebConversation("two", "第二场会话", "/c/two", active = false),
                 ),
                 savedAtMs = 1234L,
+                projectCachedAtMs = mapOf("g-p-demo" to 1200L),
             ),
         )
 
@@ -32,6 +33,7 @@ class ChatGptConversationHistoryCodecTest {
         assertFalse(decoded.conversations.any { it.active })
         assertEquals("今天", decoded.conversations.first().groupLabel)
         assertEquals(setOf("2026-08-14"), decoded.conversations.first().activityDates)
+        assertEquals(mapOf("g-p-demo" to 1200L), decoded.projectCachedAtMs)
     }
 
     @Test

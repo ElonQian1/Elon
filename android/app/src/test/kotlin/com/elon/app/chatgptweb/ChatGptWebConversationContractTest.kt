@@ -97,7 +97,9 @@ class ChatGptWebConversationContractTest {
 
         assertTrue(pageAdapter.contains("projectHints.take(MAX_PROJECT_HINTS)"))
         assertTrue(pageAdapter.contains("chatgpt_web_adapter_project_hints.js"))
-        assertTrue(background.contains("adapter.listConversations(projects)"))
+        assertTrue(background.contains("scopeProjectId = refreshRequest.scopeProjectId"))
+        assertTrue(pageAdapter.contains("put(\"projectScopeId\", it)"))
+        assertTrue(conversations.contains("scopeProjectId: scopeProjectId || null"))
     }
 
     @Test

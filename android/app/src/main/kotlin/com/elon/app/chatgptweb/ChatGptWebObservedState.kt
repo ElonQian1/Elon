@@ -27,9 +27,16 @@ internal class ChatGptWebObservedState(
         val observedAtMs = nowMs()
         when (event) {
             is ChatGptWebEvent.ConversationList -> {
-                conversations = ChatGptWebConversationIndex.mergeOfficialHistory(
-                    conversations,
-                    event.conversations,
+                conversations = event.scopeProjectId?.let { projectId ->
+                    ChatGptWebConversationIndex.mergeProjectHistory(
+                        previous = conversations,
+                        observed = event.conversations,
+                        projectId = projectId,
+                        collectionComplete = event.collection.isComplete,
+                    )
+                } ?: ChatGptWebConversationIndex.mergeOfficialHistory(
+                    previous = conversations,
+                    observed = event.conversations,
                     collectionComplete = event.collection.isComplete,
                 )
                 projects = ChatGptWebConversationIndex.mergeObservedProjects(
@@ -37,12 +44,14 @@ internal class ChatGptWebObservedState(
                     previous = projects,
                     observed = event.projects,
                 )
-                conversationCollection = event.collection.copy(
-                    source = ChatGptWebConversationCollection.SOURCE_OFFICIAL,
-                    stale = false,
-                    officialLoadState = ChatGptWebConversationCollection.LOAD_READY,
-                    cachedAtMs = observedAtMs,
-                )
+                if (event.scopeProjectId == null) {
+                    conversationCollection = event.collection.copy(
+                        source = ChatGptWebConversationCollection.SOURCE_OFFICIAL,
+                        stale = false,
+                        officialLoadState = ChatGptWebConversationCollection.LOAD_READY,
+                        cachedAtMs = observedAtMs,
+                    )
+                }
             }
             is ChatGptWebEvent.Snapshot -> updateActiveConversation(event.value.url)
             is ChatGptWebEvent.FeatureNavigation -> features = event.features

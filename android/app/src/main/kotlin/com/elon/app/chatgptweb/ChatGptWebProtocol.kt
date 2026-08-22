@@ -111,6 +111,7 @@ internal sealed interface ChatGptWebEvent {
         val collection: ChatGptWebConversationCollection =
             ChatGptWebConversationCollection.official(conversations.size),
         val projects: List<ChatGptWebProject> = emptyList(),
+        val scopeProjectId: String? = null,
     ) : ChatGptWebEvent
 
     data class ComposerControls(
@@ -170,6 +171,9 @@ internal object ChatGptWebProtocol {
                         conversations = conversations,
                         projects = parseProjects(event),
                         collection = parseConversationCollection(event, conversations.size),
+                        scopeProjectId = ChatGptWebConversationPath.canonicalProjectId(
+                            event.optString("scopeProjectId"),
+                        ),
                     )
                 }
                 "composer_controls_snapshot" -> parseComposerControls(event)

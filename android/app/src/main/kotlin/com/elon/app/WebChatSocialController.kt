@@ -39,7 +39,7 @@ internal interface WebChatSocialController {
     fun showNativeMirror(): Boolean = false
     fun presentationMode(): String = "native"
     fun conversationIndex(): ChatGptWebConversationIndexState
-    fun requestConversationIndex(): Boolean
+    fun requestConversationIndex(projectId: String? = null): Boolean
     fun openConversation(path: String): Boolean
     fun openProject(path: String): Boolean
     fun supportsLocalProjects(): Boolean = false

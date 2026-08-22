@@ -13,6 +13,7 @@
   const PROJECT_ID = /^g-p-[A-Za-z0-9_-]{1,160}$/;
   const PROJECT_PATH = /^\/g\/(g-p-[A-Za-z0-9_-]{1,160})(?:\/project)?$/;
   const PRODUCTION_PROJECT_ID = /^(g-p-[A-Fa-f0-9]{32})(?:-[A-Za-z0-9_-]{1,124})?$/;
+  const RESERVED_TITLE = /^(?:chat|chatgpt|\u804a\u5929|projects?|\u9879\u76ee|new project|create project|\u65b0\u5efa\u9879\u76ee|\u65b0\u9879\u76ee)$/i;
 
   function cleanText(value) {
     return String(value || '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
@@ -38,7 +39,7 @@
       const sourceId = cleanText(value && value.id);
       const id = sourceId ? canonicalId(sourceId) : canonicalId(path);
       const title = cleanText(value && value.title).slice(0, 160);
-      if (!match || !id || canonicalId(match[1]) !== id || !title) return;
+      if (!match || !id || canonicalId(match[1]) !== id || !title || RESERVED_TITLE.test(title)) return;
       projects.set(id, {
         id,
         title,
@@ -52,7 +53,9 @@
   function merge(observed, hinted) {
     const byPath = new Map();
     sanitize(hinted).forEach((project) => byPath.set(project.id, project));
-    sanitize(observed).forEach((project) => byPath.set(project.id, project));
+    sanitize(observed).forEach((project) => {
+      if (!byPath.has(project.id)) byPath.set(project.id, project);
+    });
     return Array.from(byPath.values()).slice(0, MAX_PROJECTS);
   }
 

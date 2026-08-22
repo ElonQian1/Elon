@@ -287,6 +287,7 @@ class ChatGptWebProtocolTest {
               "schema":"yilong.ai.ui.v1",
               "event":{
                 "type":"conversation_snapshot",
+                "scopeProjectId":"g-p-demo",
                 "collection":{
                   "scrollerFound":true,
                   "scrolled":true,
@@ -314,6 +315,7 @@ class ChatGptWebProtocolTest {
         assertEquals("今天", event.conversations.first().groupLabel)
         assertEquals(setOf("2026-08-14"), event.conversations.first().activityDates)
         assertEquals("g-p-demo", event.conversations.last().projectId)
+        assertEquals("g-p-demo", event.scopeProjectId)
         assertTrue(event.collection.scrollerFound)
         assertTrue(event.collection.scrolled)
         assertTrue(event.collection.scrollRestored)

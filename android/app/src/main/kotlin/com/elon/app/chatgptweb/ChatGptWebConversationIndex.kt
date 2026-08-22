@@ -45,10 +45,26 @@ internal object ChatGptWebConversationIndex {
         previous: List<ChatGptWebProject>,
         observed: List<ChatGptWebProject>,
         retainMissing: Boolean,
-    ): List<ChatGptWebProject> = projects(
-        conversations,
-        canonicalProjects(observed) + if (retainMissing) canonicalProjects(previous) else emptyList(),
-    )
+    ): List<ChatGptWebProject> {
+        val previousById = canonicalProjects(previous).associateBy { it.id }
+        val explicitReadableTitles = observed.mapNotNull { value ->
+            val canonical = sanitizeProject(value) ?: return@mapNotNull null
+            val hasReadableRoute = value.id.trim() != canonical.id || value.path.trim() != canonical.path
+            if (hasReadableRoute) canonical.id to canonical.title else null
+        }.toMap()
+        val observedProjects = canonicalProjects(observed).map { next ->
+            val old = previousById[next.id]
+            next.copy(
+                title = explicitReadableTitles[next.id]
+                    ?: ChatGptWebProjectTitlePolicy.prefer(old?.title, next.title)
+                    ?: next.title,
+            )
+        }
+        return projects(
+            conversations,
+            observedProjects + if (retainMissing) previousById.values else emptyList(),
+        )
+    }
 
     fun mergeObservedProjects(
         conversations: List<ChatGptWebConversation>,
@@ -142,13 +158,33 @@ internal object ChatGptWebConversationIndex {
         return merged + cachedProjectConversations
     }
 
+    fun mergeProjectHistory(
+        previous: List<ChatGptWebConversation>,
+        observed: List<ChatGptWebConversation>,
+        projectId: String,
+        collectionComplete: Boolean,
+    ): List<ChatGptWebConversation> {
+        val canonicalId = ChatGptWebConversationPath.canonicalProjectId(projectId) ?: return previous
+        val outsideProject = previous.filter { it.projectId != canonicalId }
+        val cachedProject = previous.filter { it.projectId == canonicalId }
+        val scopedObserved = observed
+            .map(::sanitize)
+            .filter { it.projectId == canonicalId }
+        val projectValues = merge(
+            cachedProject,
+            scopedObserved,
+            retainMissing = !collectionComplete,
+        )
+        return outsideProject + projectValues
+    }
+
     fun sanitize(value: ChatGptWebConversation): ChatGptWebConversation {
         val projectId = ChatGptWebConversationPath.canonicalProjectId(value.projectId)
             ?: ChatGptWebConversationPath.projectId(value.path)
         return value.copy(
             groupLabel = groupLabel(value.groupLabel).orEmpty(),
             projectId = projectId,
-            projectTitle = metadataLabel(value.projectTitle),
+            projectTitle = ChatGptWebProjectTitlePolicy.normalize(value.projectTitle),
             projectPath = projectId?.let { "/g/$it/project" },
         )
     }
@@ -174,8 +210,10 @@ internal object ChatGptWebConversationIndex {
                 ?: groupLabel(previous.groupLabel)
                 .orEmpty(),
             projectId = next.projectId ?: previous.projectId,
-            projectTitle = metadataLabel(next.projectTitle)
-                ?: metadataLabel(previous.projectTitle),
+            projectTitle = ChatGptWebProjectTitlePolicy.prefer(
+                previous.projectTitle,
+                next.projectTitle,
+            ),
             projectPath = next.projectPath ?: previous.projectPath,
             activityDates = previous.activityDates + next.activityDates,
         )
@@ -185,7 +223,7 @@ internal object ChatGptWebConversationIndex {
         val id = ChatGptWebConversationPath.canonicalProjectId(value.id)
             ?: ChatGptWebConversationPath.projectId(value.path)
             ?: return null
-        val title = metadataLabel(value.title) ?: return null
+        val title = ChatGptWebProjectTitlePolicy.normalize(value.title) ?: return null
         return value.copy(id = id, title = title, path = "/g/$id/project")
     }
 

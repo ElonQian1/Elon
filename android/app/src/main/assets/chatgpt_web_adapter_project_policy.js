@@ -12,7 +12,7 @@
   const PROJECT_PATH = /(?:^|https:\/\/chatgpt\.com)?\/g\/(g-p-[A-Za-z0-9_-]{1,160})(?:\/project)?(?:[/?#]|$)/i;
   const CONVERSATION_PATH = /(?:^|https:\/\/chatgpt\.com)?\/(?:c\/[A-Za-z0-9_-]{1,160}|g\/g-p-[A-Za-z0-9_-]{1,160}\/c\/[A-Za-z0-9_-]{1,160})(?:[/?#]|$)/i;
   const PROJECT_OPTIONS = /(?:project|\u9879\u76ee).*(?:options?|menu|\u9009\u9879|\u64cd\u4f5c|\u83dc\u5355)|(?:open|\u6253\u5f00).*(?:options?|\u9009\u9879)/i;
-  const RESERVED_TITLE = /^(?:projects?|\u9879\u76ee|new project|create project|\u65b0\u5efa\u9879\u76ee|\u65b0\u9879\u76ee|view more|\u67e5\u770b\u66f4\u591a)$/i;
+  const RESERVED_TITLE = /^(?:chat|chatgpt|\u804a\u5929|projects?|\u9879\u76ee|new project|create project|\u65b0\u5efa\u9879\u76ee|\u65b0\u9879\u76ee|view more|\u67e5\u770b\u66f4\u591a)$/i;
 
   function clean(value) {
     return String(value || '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();

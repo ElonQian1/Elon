@@ -27,7 +27,7 @@ internal data class ChatGptWebSideMenuState(
 internal class ChatGptWebSideMenuCoordinator(
     private val activity: AppCompatActivity,
     private val index: () -> ChatGptWebConversationIndexState,
-    private val refreshIndex: () -> Boolean,
+    private val refreshIndex: (String?) -> Boolean,
     private val newConversation: () -> Unit,
     private val openConversation: (String) -> Unit,
     private val openProject: (String) -> Unit,

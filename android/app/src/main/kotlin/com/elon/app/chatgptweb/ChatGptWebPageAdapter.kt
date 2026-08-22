@@ -154,9 +154,13 @@ internal class ChatGptWebPageAdapter(
 
     fun startNewConversation(requestId: String) = runCommand("new_conversation", requestId = requestId)
 
-    fun listConversations(projectHints: List<ChatGptWebProject> = emptyList()) = runCommand(
+    fun listConversations(
+        projectHints: List<ChatGptWebProject> = emptyList(),
+        scopeProjectId: String? = null,
+    ) = runCommand(
         action = "list_conversations",
         projectHints = projectHints,
+        projectScopeId = scopeProjectId,
     )
 
     fun listConversations(requestId: String) = runCommand("list_conversations", requestId = requestId)
@@ -349,6 +353,7 @@ internal class ChatGptWebPageAdapter(
         numericValue: Double? = null,
         expanded: Boolean? = null,
         projectHints: List<ChatGptWebProject> = emptyList(),
+        projectScopeId: String? = null,
     ) {
         if (!listenerInstalled || !ChatGptWebNavigationPolicy.supportsEnhancedMode(webView.url)) return
         onWebExecutionRequested()
@@ -364,6 +369,9 @@ internal class ChatGptWebPageAdapter(
                 if (choiceIndex != null) put("choiceIndex", choiceIndex)
                 if (numericValue != null && numericValue.isFinite()) put("numericValue", numericValue)
                 if (expanded != null) put("expanded", expanded)
+                ChatGptWebConversationPath.canonicalProjectId(projectScopeId)?.let {
+                    put("projectScopeId", it)
+                }
                 if (projectHints.isNotEmpty()) put("projectHints", JSONArray().apply {
                     projectHints.take(MAX_PROJECT_HINTS).forEach { project ->
                         put(JSONObject()
@@ -389,7 +397,7 @@ internal class ChatGptWebPageAdapter(
         origin.scheme == "https" && origin.host == "chatgpt.com" && origin.port == -1
 
     companion object {
-        internal const val ADAPTER_VERSION = 140
+        internal const val ADAPTER_VERSION = 141
 
         private val ADAPTER_ASSETS = listOf(
             "chatgpt_web_adapter_bootstrap.js",

@@ -11,6 +11,7 @@ internal data class ChatGptConversationHistoryCache(
     val conversations: List<ChatGptWebConversation>,
     val savedAtMs: Long,
     val projects: List<ChatGptWebProject> = emptyList(),
+    val projectCachedAtMs: Map<String, Long> = emptyMap(),
 )
 
 internal class ChatGptConversationHistoryStore(
@@ -31,6 +32,7 @@ internal class ChatGptConversationHistoryStore(
     fun save(
         conversations: List<ChatGptWebConversation>,
         projects: List<ChatGptWebProject> = emptyList(),
+        projectCachedAtMs: Map<String, Long> = emptyMap(),
     ) {
         if (conversations.isEmpty() && projects.isEmpty()) {
             clear()
@@ -41,6 +43,10 @@ internal class ChatGptConversationHistoryStore(
                 conversations.take(MAX_ITEMS),
                 nowMs(),
                 projects.take(MAX_PROJECTS),
+                projectCachedAtMs.entries
+                    .filter { (id, savedAtMs) -> PROJECT_ID.matches(id) && savedAtMs >= 0L }
+                    .take(MAX_PROJECTS)
+                    .associate { it.toPair() },
             ),
         ).toByteArray(Charsets.UTF_8)
         if (payload.size > MAX_BYTES) return
@@ -100,6 +106,13 @@ internal object ChatGptConversationHistoryCodec {
                 )
             }
         })
+        .put("project_cache", JSONArray().apply {
+            cache.projectCachedAtMs.entries.take(MAX_PROJECTS).forEach { (projectId, cachedAtMs) ->
+                put(JSONObject()
+                    .put("project_id", projectId)
+                    .put("cached_at_ms", cachedAtMs))
+            }
+        })
         .toString()
 
     fun decode(raw: String): ChatGptConversationHistoryCache? {
@@ -156,8 +169,17 @@ internal object ChatGptConversationHistoryCodec {
             }
         }
         val projects = ChatGptWebConversationIndex.projects(conversations, decodedProjects)
+        val projectCachedAtMs = buildMap {
+            val values = root.optJSONArray("project_cache") ?: return@buildMap
+            for (index in 0 until minOf(values.length(), MAX_PROJECTS)) {
+                val value = values.optJSONObject(index) ?: continue
+                val projectId = value.optString("project_id").takeIf(PROJECT_ID::matches) ?: continue
+                val cachedAtMs = value.optLong("cached_at_ms", -1L)
+                if (cachedAtMs >= 0L) put(projectId, cachedAtMs)
+            }
+        }
         if (conversations.isEmpty() && projects.isEmpty()) return null
-        return ChatGptConversationHistoryCache(conversations, savedAtMs, projects)
+        return ChatGptConversationHistoryCache(conversations, savedAtMs, projects, projectCachedAtMs)
     }
 
     private fun JSONObject.optionalString(key: String): String? =

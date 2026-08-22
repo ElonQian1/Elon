@@ -25,7 +25,7 @@ import java.time.LocalDate
 internal class ChatGptWebSideMenuView(
     private val activity: AppCompatActivity,
     private val index: () -> ChatGptWebConversationIndexState,
-    private val refreshIndex: () -> Boolean,
+    private val refreshIndex: (String?) -> Boolean,
     private val newConversation: () -> Unit,
     private val openConversation: (String) -> Unit,
     private val openProject: (String) -> Unit,
@@ -105,7 +105,7 @@ internal class ChatGptWebSideMenuView(
             )
         ) {
             lastRefreshRequestedAtMs = nowMs
-            refreshIndex()
+            refreshIndex(selectedProjectId)
         }
     }
 
@@ -357,7 +357,8 @@ internal class ChatGptWebSideMenuView(
             query.isBlank() || conversation.title.contains(query, ignoreCase = true)
         }
         val contentStatus = WebChatSideMenuContentState.resolve(
-            collection = state.collection,
+            collection = state.projectCollections[project.id]
+                ?: ChatGptWebConversationCollection(),
             availableCount = all.size,
             visibleCount = visible.size,
         )
@@ -511,7 +512,7 @@ internal class ChatGptWebSideMenuView(
 
     private fun requestIndexRefresh() {
         lastRefreshRequestedAtMs = System.currentTimeMillis()
-        refreshIndex()
+        refreshIndex(selectedProjectId)
         render()
     }
 

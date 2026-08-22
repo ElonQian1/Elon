@@ -160,7 +160,7 @@ internal class GoogleWebSocialChatController(
 
     override fun conversationIndex() = session.conversationIndex()
 
-    override fun requestConversationIndex(): Boolean = session.requestConversationIndex()
+    override fun requestConversationIndex(projectId: String?): Boolean = session.requestConversationIndex()
 
     override fun openConversation(path: String): Boolean {
         clearPendingSend()

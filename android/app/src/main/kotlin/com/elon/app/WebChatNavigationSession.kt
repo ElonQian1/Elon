@@ -6,14 +6,14 @@ internal class WebChatNavigationSession(
     val providerId: WebChatProviderId,
     val capabilities: Set<WebChatProviderCapability>,
     private val indexSource: () -> ChatGptWebConversationIndexState,
-    private val refreshSource: () -> Boolean,
+    private val refreshSource: (String?) -> Boolean,
     private val newConversationSource: () -> Boolean,
     private val openConversationSource: (String) -> Boolean,
     private val openProjectSource: (String) -> Boolean,
 ) {
     fun index(): ChatGptWebConversationIndexState = indexSource()
 
-    fun refresh(): Boolean = refreshSource()
+    fun refresh(projectId: String? = null): Boolean = refreshSource(projectId)
 
     fun newConversation(): Boolean = newConversationSource()
 

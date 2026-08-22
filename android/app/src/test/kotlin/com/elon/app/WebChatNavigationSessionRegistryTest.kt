@@ -110,7 +110,7 @@ class WebChatNavigationSessionRegistryTest {
             calls += "index"
             ChatGptWebConversationIndexState()
         },
-        refreshSource = {
+        refreshSource = { _ ->
             calls += "refresh"
             true
         },

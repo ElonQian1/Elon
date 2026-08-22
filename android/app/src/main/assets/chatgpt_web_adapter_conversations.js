@@ -428,12 +428,32 @@
       : observedProjects;
   }
 
+  function projectScopeFor(command) {
+    const value = cleanText(command && command.projectScopeId);
+    if (!value) return '';
+    return projectPolicy && typeof projectPolicy.projectId === 'function'
+      ? projectPolicy.projectId(value)
+      : (PROJECT_PATH.test('/g/' + value + '/project') ? value : '');
+  }
+
+  function conversationsForScope(values, scopeProjectId) {
+    if (!scopeProjectId) return values;
+    return values.filter((conversation) => conversation.projectId === scopeProjectId);
+  }
+
+  function collectionForScope(collection, conversations) {
+    return Object.assign({}, collection, { observedCount: conversations.length });
+  }
+
   function emitFastDirectorySnapshots(initial, command, emitEvent, result, closeAfter) {
     const initialProjects = initialProjectsFor(command);
+    const scopeProjectId = projectScopeFor(command);
+    const scopedInitial = conversationsForScope(initial, scopeProjectId);
     emitEvent({
       type: 'conversation_snapshot',
-      conversations: enrichProjectConversations(initial, initialProjects),
+      conversations: enrichProjectConversations(scopedInitial, initialProjects),
       projects: initialProjects,
+      scopeProjectId: scopeProjectId || null,
       collection: {
         scrollerFound: !!findConversationScroller(),
         scrolled: false,
@@ -441,18 +461,35 @@
         reachedEnd: false,
         truncated: false,
         timedOut: false,
-        observedCount: initial.length,
+        observedCount: scopedInitial.length,
         steps: 0,
         complete: false
       }
     });
     result('list_conversations', true, '官网当前可见目录已同步，完整历史继续在后台加载。');
     collectConversationHistory(initial, (snapshot) => {
+      if (scopeProjectId) {
+        const scoped = conversationsForScope(snapshot.conversations, scopeProjectId);
+        emitEvent({
+          type: 'conversation_snapshot',
+          conversations: enrichProjectConversations(scoped, initialProjects),
+          projects: initialProjects,
+          scopeProjectId,
+          collection: collectionForScope(snapshot.collection, scoped)
+        });
+        if (closeAfter) {
+          const close = findSidebarButton(false);
+          if (close) close.click();
+          sidebarOpenedByAdapter = false;
+        }
+        return;
+      }
       collectProjectHistory(initialProjects, (projects) => {
         emitEvent({
           type: 'conversation_snapshot',
           conversations: enrichProjectConversations(snapshot.conversations, projects),
           projects,
+          scopeProjectId: null,
           collection: snapshot.collection
         });
         if (closeAfter) {
@@ -466,12 +503,31 @@
 
   function emitConversationSnapshot(snapshot, command, emitEvent, result, closeAfter) {
     const initialProjects = initialProjectsFor(command);
+    const scopeProjectId = projectScopeFor(command);
+    if (scopeProjectId) {
+      const scoped = conversationsForScope(snapshot.conversations, scopeProjectId);
+      emitEvent({
+        type: 'conversation_snapshot',
+        conversations: enrichProjectConversations(scoped, initialProjects),
+        projects: initialProjects,
+        scopeProjectId,
+        collection: collectionForScope(snapshot.collection, scoped)
+      });
+      result('list_conversations', true, '');
+      if (closeAfter) {
+        const close = findSidebarButton(false);
+        if (close) close.click();
+        sidebarOpenedByAdapter = false;
+      }
+      return;
+    }
     collectProjectHistory(initialProjects, (observedProjects) => {
       collectProjects(observedProjects, (projects) => {
         emitEvent({
           type: 'conversation_snapshot',
           conversations: enrichProjectConversations(snapshot.conversations, projects),
           projects,
+          scopeProjectId: null,
           collection: snapshot.collection
         });
         result('list_conversations', true, '');

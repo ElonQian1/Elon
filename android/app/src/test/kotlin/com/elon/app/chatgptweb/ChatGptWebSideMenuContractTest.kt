@@ -39,6 +39,7 @@ class ChatGptWebSideMenuContractTest {
         assertTrue(actions.contains("LinearLayout.LayoutParams(dp(48)"))
         assertTrue(view.contains("ChatGptNativeNavigationSelector::date"))
         assertTrue(view.contains("WebChatSideMenuContentState.resolve("))
+        assertTrue(view.contains("state.projectCollections[project.id]"))
         assertTrue(view.contains("WebChatSideMenuStateViews.create("))
         assertTrue(view.contains("onRetry = ::requestIndexRefresh"))
         val stateView = read(

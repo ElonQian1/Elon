@@ -102,6 +102,7 @@ internal class ChatGptBackgroundSession(
     private var attachmentSendTracker: ChatGptWebAttachmentSendTracker? = null
     private var lastAttachmentSendPhase = ATTACHMENT_PHASE_IDLE
     private var forceConversationRefreshAfterVoice = false
+    private var requestedConversationProjectId: String? = null
     private var reloadAfterPause = false
     private val realtimeVoiceBacking: ChatGptRealtimeVoiceBackingController by
         lazy(LazyThreadSafetyMode.NONE) {
@@ -166,16 +167,21 @@ internal class ChatGptBackgroundSession(
     fun warmSessionAvailable(): Boolean = warmSessionAvailable
     fun conversationNavigationActive(): Boolean = conversationNavigation.isNavigating()
     fun conversationIndex(): ChatGptWebConversationIndexState = conversationDirectory.index()
-    fun requestConversationIndex(): Boolean {
-        return conversationRefresh.requestNow()
+    fun requestConversationIndex(projectId: String? = null): Boolean {
+        requestedConversationProjectId = ChatGptWebConversationPath.canonicalProjectId(projectId)
+        return conversationRefresh.requestAfterCurrent()
     }
 
     private fun dispatchConversationIndexRequest(): Boolean {
         val adapter = pageAdapter ?: return false
         if (state != State.READY) return false
-        val projectHints = conversationDirectory.beginRefresh()
+        val refreshRequest = conversationDirectory.beginRefresh(requestedConversationProjectId)
+        requestedConversationProjectId = null
         onConversationIndexChanged(conversationIndex())
-        adapter.listConversations(projectHints)
+        adapter.listConversations(
+            projectHints = refreshRequest.projectHints,
+            scopeProjectId = refreshRequest.scopeProjectId,
+        )
         return true
     }
 
@@ -265,7 +271,10 @@ internal class ChatGptBackgroundSession(
     fun openProject(path: String): Boolean {
         val normalized = ChatGptWebConversationPath.normalizeProject(path) ?: return false
         if (state != State.READY) return false
-        pageAdapter?.openProject(normalized) ?: return false
+        val adapter = pageAdapter ?: return false
+        if (!conversationDirectory.requestProject(normalized)) return false
+        onConversationIndexChanged(conversationIndex())
+        adapter.openProject(normalized)
         return true
     }
 
@@ -508,6 +517,11 @@ internal class ChatGptBackgroundSession(
                             snapshot.capabilities.supports(ChatGptWebCapabilityId.CONVERSATION_LIST)
                         ) {
                             forceConversationRefreshAfterVoice = false
+                            conversationRefresh.requestAfterCurrent()
+                        } else if (
+                            snapshot.capabilities.supports(ChatGptWebCapabilityId.CONVERSATION_LIST) &&
+                            conversationDirectory.needsProjectRefresh(snapshot.url)
+                        ) {
                             conversationRefresh.requestAfterCurrent()
                         } else if (
                             snapshot.capabilities.supports(ChatGptWebCapabilityId.CONVERSATION_LIST) &&
