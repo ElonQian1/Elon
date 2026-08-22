@@ -2,6 +2,7 @@ const ALLOWED_ORIGIN: &str = "https://chatgpt.com";
 pub(super) const ADAPTER_VERSION: u32 = 142;
 
 const WIN_RICH_CONTENT_ADAPTER: &str = include_str!("chatgpt_rich_content_adapter.js");
+const WIN_COMMON_RICH_CONTENT_ADAPTER: &str = include_str!("rich_content_dom_adapter.js");
 
 const ADAPTER_ASSETS: &[(&str, &str)] = &[
     (
@@ -148,8 +149,8 @@ pub(super) fn initialization_script() -> String {
             );
             if *name == "chatgpt_web_adapter_messages.js" {
                 format!(
-                    "window.__elonChatGptBootstrapStage = 'chatgpt_rich_content_adapter.js';\n{}\n{}",
-                    WIN_RICH_CONTENT_ADAPTER, shared
+                    "window.__elonChatGptBootstrapStage = 'rich_content_dom_adapter.js';\n{}\nwindow.__elonChatGptBootstrapStage = 'chatgpt_rich_content_adapter.js';\n{}\n{}",
+                    WIN_COMMON_RICH_CONTENT_ADAPTER, WIN_RICH_CONTENT_ADAPTER, shared
                 )
             } else {
                 shared

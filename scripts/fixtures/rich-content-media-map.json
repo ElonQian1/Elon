@@ -1,0 +1,29 @@
+{
+  "schema": "yilong.sanitized-rich-content-fixture.v1",
+  "description": "Synthetic, sanitized fixture. It contains no raw vendor response, request headers, cookies, tokens, coordinates, or signed URLs.",
+  "mediaGallery": {
+    "title": "回答图片",
+    "items": [
+      {
+        "url": "https://images.example.com/market/chart.png",
+        "alt": "市场走势图",
+        "width": 1280,
+        "height": 720,
+        "sourceUrl": "https://example.com/market-report"
+      },
+      {
+        "url": "https://images.example.com/market/chart.png",
+        "alt": "重复图片"
+      },
+      {
+        "url": "https://images.example.com/private/chart.png?signature=removed",
+        "alt": "含签名查询的图片"
+      }
+    ]
+  },
+  "map": {
+    "title": "附近地点",
+    "summary": "官网回答中可见的地点摘要",
+    "places": ["人民广场", "外滩", "南京东路"]
+  }
+}

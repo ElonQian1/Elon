@@ -56,4 +56,38 @@ export interface WeatherRichContent {
   }
 }
 
-export type YilongRichContent = FinanceRichContent | WeatherRichContent
+export interface MediaGalleryRichContentItem {
+  url: string
+  alt: string
+  mediaType?: string
+  width?: number
+  height?: number
+  sourceUrl?: string
+}
+
+export interface MediaGalleryRichContent {
+  schema: typeof YILONG_RICH_CONTENT_SCHEMA
+  kind: 'media_gallery'
+  source: 'official_dom' | 'private_response' | 'cache'
+  payload: {
+    title: string
+    items: MediaGalleryRichContentItem[]
+  }
+}
+
+export interface MapRichContent {
+  schema: typeof YILONG_RICH_CONTENT_SCHEMA
+  kind: 'map'
+  source: 'official_dom' | 'private_response' | 'cache'
+  payload: {
+    title: string
+    summary?: string
+    places: string[]
+  }
+}
+
+export type YilongRichContent =
+  | FinanceRichContent
+  | WeatherRichContent
+  | MediaGalleryRichContent
+  | MapRichContent

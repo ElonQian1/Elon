@@ -21,17 +21,17 @@ const STRUCTURED_TYPES: &[&str] = &[
     "interactive",
 ];
 
-pub(super) fn sanitize_parts(value: Option<&Value>) -> Vec<Value> {
+pub(super) fn sanitize_parts(provider_id: &str, value: Option<&Value>) -> Vec<Value> {
     value
         .and_then(Value::as_array)
         .into_iter()
         .flatten()
         .take(MAX_CONTENT_PARTS)
-        .filter_map(sanitize_part)
+        .filter_map(|value| sanitize_part(provider_id, value))
         .collect()
 }
 
-fn sanitize_part(value: &Value) -> Option<Value> {
+fn sanitize_part(provider_id: &str, value: &Value) -> Option<Value> {
     let part = value.as_object()?;
     let part_type = part.get("type")?.as_str()?;
     if matches!(part_type, "text" | "markdown") {
@@ -39,7 +39,10 @@ fn sanitize_part(value: &Value) -> Option<Value> {
         return (!text.is_empty()).then(|| json!({"type": part_type, "text": text}));
     }
     if part_type == "rich_card" {
-        return rich_content::sanitize_rich_card(part);
+        return rich_content::sanitize_rich_card(provider_id, part).or_else(|| {
+            let text = clean_string(part.get("text"), MAX_STRUCTURED_LABEL_CHARS);
+            (!text.is_empty()).then(|| json!({"type": "text", "text": text}))
+        });
     }
     if !STRUCTURED_TYPES.contains(&part_type) {
         return None;
@@ -127,7 +130,7 @@ fn valid_host(value: &str) -> bool {
             .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'-'))
 }
 
-fn sanitize_public_url(value: Option<&Value>) -> String {
+pub(super) fn sanitize_public_url(value: Option<&Value>) -> String {
     let Some(raw) = value.and_then(Value::as_str) else {
         return String::new();
     };
@@ -171,7 +174,7 @@ mod tests {
             {"type":"citation","text":"Docs","url":"https://example.com/docs?token=secret","iconUrl":"https://cdn.example.com/icons/docs.png?signature=secret","targetHost":"example.com"},
             {"type":"credential","text":"secret"}
         ]);
-        let sanitized = sanitize_parts(Some(&parts));
+        let sanitized = sanitize_parts("chatgpt", Some(&parts));
         assert_eq!(sanitized.len(), 3);
         assert_eq!(sanitized[0]["type"], "markdown");
         assert_eq!(sanitized[1]["lineCount"], 12);
@@ -206,7 +209,7 @@ mod tests {
                 "privateDebugField":"secret"
             }
         }]);
-        let sanitized = sanitize_parts(Some(&parts));
+        let sanitized = sanitize_parts("chatgpt", Some(&parts));
         assert_eq!(sanitized.len(), 1);
         assert_eq!(sanitized[0]["type"], "rich_card");
         assert_eq!(
@@ -238,12 +241,75 @@ mod tests {
                 }
             }
         }]);
-        let sanitized = sanitize_parts(Some(&parts));
+        let sanitized = sanitize_parts("google-ai-mode", Some(&parts));
         assert_eq!(sanitized[0]["kind"], "weather");
         assert_eq!(
             sanitized[0]["richContent"]["payload"]["rows"][0]["temperature"],
             "33°C"
         );
         assert!(!sanitized[0].to_string().contains("secret"));
+    }
+
+    #[test]
+    fn media_and_map_rich_cards_keep_only_safe_visible_content() {
+        let parts = json!([
+            {
+                "type":"rich_card",
+                "text":"回答图片",
+                "kind":"media_gallery",
+                "richContent":{
+                    "schema":"yilong.rich-content.v1",
+                    "kind":"media_gallery",
+                    "source":"official_dom",
+                    "payload":{
+                        "title":"回答图片",
+                        "items":[
+                            {"url":"https://images.example.com/chart.png?signature=secret","alt":"行情图","mediaType":"image/png","width":640,"height":360,"sourceUrl":"https://example.com/report?tracking=secret"},
+                            {"url":"http://unsafe.example.com/image.png","alt":"不安全图片"}
+                        ]
+                    }
+                }
+            },
+            {
+                "type":"rich_card",
+                "text":"附近地点",
+                "kind":"map",
+                "richContent":{
+                    "schema":"yilong.rich-content.v1",
+                    "kind":"map",
+                    "source":"official_dom",
+                    "payload":{"title":"附近地点","summary":"官网地图中的可见摘要","places":["人民广场","外滩"],"coordinates":"secret"}
+                }
+            }
+        ]);
+        let sanitized = sanitize_parts("chatgpt", Some(&parts));
+        assert_eq!(sanitized.len(), 2);
+        assert_eq!(
+            sanitized[0]["richContent"]["payload"]["items"][0]["url"],
+            "https://images.example.com/chart.png"
+        );
+        assert_eq!(
+            sanitized[0]["richContent"]["payload"]["items"][0]["sourceUrl"],
+            "https://example.com/report"
+        );
+        assert_eq!(sanitized[1]["richContent"]["payload"]["places"][1], "外滩");
+        assert!(!Value::Array(sanitized).to_string().contains("secret"));
+    }
+
+    #[test]
+    fn private_response_rich_cards_fail_closed_without_a_registered_grant() {
+        let parts = json!([{
+            "type":"rich_card",
+            "text":"回答图片",
+            "kind":"media_gallery",
+            "richContent":{
+                "schema":"yilong.rich-content.v1",
+                "kind":"media_gallery",
+                "source":"private_response",
+                "payload":{"title":"回答图片","items":[{"url":"https://images.example.com/chart.png","alt":"行情图"}]}
+            }
+        }]);
+        let sanitized = sanitize_parts("chatgpt", Some(&parts));
+        assert_eq!(sanitized, vec![json!({"type":"text","text":"回答图片"})]);
     }
 }

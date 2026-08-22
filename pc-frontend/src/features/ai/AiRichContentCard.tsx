@@ -1,6 +1,8 @@
-import { Activity, CloudSun, ExternalLink } from 'lucide-react'
+import { Activity, CloudSun, ExternalLink, Images, MapPinned, Navigation } from 'lucide-react'
 import type {
   FinanceRichContent,
+  MapRichContent,
+  MediaGalleryRichContent,
   RichContentChartPoint,
   WeatherRichContent,
   YilongRichContent,
@@ -9,6 +11,8 @@ import styles from './AiRichContentCard.module.css'
 
 export default function AiRichContentCard({ content }: { content: YilongRichContent }) {
   if (content.kind === 'weather') return <WeatherCard content={content} />
+  if (content.kind === 'media_gallery') return <MediaGalleryCard content={content} />
+  if (content.kind === 'map') return <MapCard content={content} />
   return <FinanceCard content={content} />
 }
 
@@ -97,6 +101,84 @@ function WeatherCard({ content }: { content: WeatherRichContent }) {
             )}
           </div>
         ))}
+      </div>
+    </article>
+  )
+}
+
+function MediaGalleryCard({ content }: { content: MediaGalleryRichContent }) {
+  const { payload } = content
+  return (
+    <article className={styles.card} aria-label="官方回答图片">
+      <header>
+        <span className={[styles.providerIcon, styles.mediaIcon].join(' ')}>
+          <Images size={19} aria-hidden="true" />
+        </span>
+        <div>
+          <span className={styles.eyebrow}>回答媒体</span>
+          <h3>{payload.title}</h3>
+        </div>
+      </header>
+      <div className={styles.gallery} data-count={Math.min(payload.items.length, 4)}>
+        {payload.items.map((item, index) => {
+          const image = (
+            <img
+              src={item.url}
+              alt={item.alt}
+              loading="lazy"
+              decoding="async"
+              referrerPolicy="no-referrer"
+              width={item.width}
+              height={item.height}
+            />
+          )
+          return item.sourceUrl ? (
+            <a
+              href={item.sourceUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              title={`${item.alt} · 打开来源`}
+              key={`${item.url}:${index}`}
+            >
+              {image}
+              <span><ExternalLink size={13} aria-hidden="true" />{item.alt}</span>
+            </a>
+          ) : (
+            <figure key={`${item.url}:${index}`}>
+              {image}
+              <figcaption>{item.alt}</figcaption>
+            </figure>
+          )
+        })}
+      </div>
+    </article>
+  )
+}
+
+function MapCard({ content }: { content: MapRichContent }) {
+  const { payload } = content
+  return (
+    <article className={styles.card} aria-label="官方地图摘要">
+      <header>
+        <span className={[styles.providerIcon, styles.mapIcon].join(' ')}>
+          <MapPinned size={19} aria-hidden="true" />
+        </span>
+        <div>
+          <span className={styles.eyebrow}>地图结果</span>
+          <h3>{payload.title}</h3>
+        </div>
+      </header>
+      {payload.summary && <p className={styles.summary}>{payload.summary}</p>}
+      {payload.places.length > 0 && (
+        <ul className={styles.places}>
+          {payload.places.map((place, index) => (
+            <li key={`${place}:${index}`}><MapPinned size={14} aria-hidden="true" />{place}</li>
+          ))}
+        </ul>
+      )}
+      <div className={styles.mapFallback}>
+        <Navigation size={15} aria-hidden="true" />
+        <span>交互地图在官网回答中保留；缓存仅保存可见地点摘要</span>
       </div>
     </article>
   )

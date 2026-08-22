@@ -22,6 +22,8 @@ mod google_ai_mode;
 mod guest_identity;
 #[path = "local_ai_browser/owner_profile.rs"]
 mod owner_profile;
+#[path = "local_ai_browser/private_response_authorization.rs"]
+mod private_response_authorization;
 #[path = "local_ai_browser/provider_adapter.rs"]
 mod provider_adapter;
 #[path = "local_ai_browser/semantic_context.rs"]

@@ -5,6 +5,7 @@
 
   const SCHEMA = 'yilong.rich-content.v1';
   const ROOT_ATTRIBUTE = 'data-elon-rich-content-root';
+  const commonRichContent = window.__elonRichContentDomAdapter;
   const PERIOD = /^(?:1D|5D|1M|3M|6M|YTD|1Y|5Y|MAX)$/i;
   const MONEY = /^(?:(?:US|CA|AU|HK|NT)\s*)?[$€£¥]\s*[0-9][0-9,.]*(?:\.[0-9]+)?$/i;
   const METRIC_LABELS = [
@@ -168,7 +169,7 @@
   }
 
   function parts(content) {
-    return financeRoots(content).map((root) => {
+    const finance = financeRoots(content).map((root) => {
       const payload = payloadFor(root);
       root.setAttribute(ROOT_ATTRIBUTE, 'finance');
       return {
@@ -183,10 +184,15 @@
         }
       };
     }).filter((part) => part.richContent.payload.primaryValue);
+    const common = commonRichContent && typeof commonRichContent.parts === 'function'
+      ? commonRichContent.parts(content)
+      : [];
+    return finance.concat(common).slice(0, 16);
   }
 
   function owns(node) {
-    return node instanceof Element && Boolean(node.closest('[' + ROOT_ATTRIBUTE + ']'));
+    return node instanceof Element && (Boolean(node.closest('[' + ROOT_ATTRIBUTE + ']')) ||
+      Boolean(commonRichContent && commonRichContent.owns(node)));
   }
 
   window.__elonChatGptRichContent = Object.freeze({
@@ -195,6 +201,7 @@
     parts,
     owns,
     financeRoots,
-    normalizeFinancePayload
+    normalizeFinancePayload,
+    fromAuthorizedEnvelope: commonRichContent && commonRichContent.fromAuthorizedEnvelope
   });
 })();

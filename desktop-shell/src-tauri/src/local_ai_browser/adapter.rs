@@ -177,7 +177,7 @@ fn sanitize_messages(value: Option<&Value>) -> Vec<Value> {
             if !matches!(role, "user" | "assistant") {
                 return None;
             }
-            let content = adapter_content::sanitize_parts(message.get("content"));
+            let content = adapter_content::sanitize_parts("chatgpt", message.get("content"));
             if content.is_empty() {
                 return None;
             }

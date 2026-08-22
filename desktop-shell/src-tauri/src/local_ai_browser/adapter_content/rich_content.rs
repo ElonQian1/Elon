@@ -2,20 +2,28 @@ use serde_json::{Map, Number, Value};
 
 const RICH_SCHEMA: &str = "yilong.rich-content.v1";
 
-pub(super) fn sanitize_rich_card(part: &Map<String, Value>) -> Option<Value> {
+pub(super) fn sanitize_rich_card(provider_id: &str, part: &Map<String, Value>) -> Option<Value> {
     let rich = part.get("richContent")?.as_object()?;
     if rich.get("schema").and_then(Value::as_str) != Some(RICH_SCHEMA) {
         return None;
     }
     let kind = rich.get("kind").and_then(Value::as_str)?;
     let source = rich.get("source").and_then(Value::as_str)?;
-    if !matches!(source, "official_dom" | "private_response" | "cache") {
+    if !matches!(source, "official_dom" | "private_response" | "cache")
+        || (source == "private_response"
+            && !crate::local_ai_browser::private_response_authorization::allows_rich_kind(
+                provider_id,
+                kind,
+            ))
+    {
         return None;
     }
     let payload_source = rich.get("payload")?.as_object()?;
     let payload = match kind {
         "finance" => sanitize_finance_payload(payload_source),
         "weather" => sanitize_weather_payload(payload_source),
+        "media_gallery" => sanitize_media_gallery_payload(payload_source),
+        "map" => sanitize_map_payload(payload_source),
         _ => None,
     }?;
     let text = super::clean_string(part.get("text"), 180);
@@ -38,6 +46,103 @@ pub(super) fn sanitize_rich_card(part: &Map<String, Value>) -> Option<Value> {
         ("kind".into(), Value::String(kind.into())),
         ("richContent".into(), Value::Object(sanitized_rich)),
     ])))
+}
+
+fn sanitize_media_gallery_payload(source: &Map<String, Value>) -> Option<Map<String, Value>> {
+    let title = super::clean_string(source.get("title"), 120);
+    if title.is_empty() {
+        return None;
+    }
+    let mut seen = std::collections::HashSet::new();
+    let items = source
+        .get("items")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .take(8)
+        .filter_map(|value| {
+            let item = value.as_object()?;
+            let url = super::sanitize_public_url(item.get("url"));
+            let alt = super::clean_string(item.get("alt"), 180);
+            if url.is_empty() || alt.is_empty() || !seen.insert(url.clone()) {
+                return None;
+            }
+            let mut sanitized = Map::from_iter([
+                ("url".into(), Value::String(url)),
+                ("alt".into(), Value::String(alt)),
+            ]);
+            let media_type = super::clean_string(item.get("mediaType"), 48);
+            if matches!(
+                media_type.as_str(),
+                "image/*"
+                    | "image/jpeg"
+                    | "image/png"
+                    | "image/gif"
+                    | "image/webp"
+                    | "image/avif"
+                    | "image/svg+xml"
+            ) {
+                sanitized.insert("mediaType".into(), Value::String(media_type));
+            }
+            insert_bounded_dimension(&mut sanitized, item, "width");
+            insert_bounded_dimension(&mut sanitized, item, "height");
+            let source_url = super::sanitize_public_url(item.get("sourceUrl"));
+            if !source_url.is_empty() {
+                sanitized.insert("sourceUrl".into(), Value::String(source_url));
+            }
+            Some(Value::Object(sanitized))
+        })
+        .collect::<Vec<_>>();
+    if items.is_empty() {
+        return None;
+    }
+    Some(Map::from_iter([
+        ("title".into(), Value::String(title)),
+        ("items".into(), Value::Array(items)),
+    ]))
+}
+
+fn sanitize_map_payload(source: &Map<String, Value>) -> Option<Map<String, Value>> {
+    let title = super::clean_string(source.get("title"), 120);
+    if title.is_empty() {
+        return None;
+    }
+    let summary = super::clean_string(source.get("summary"), 500);
+    let places = source
+        .get("places")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .take(12)
+        .map(|value| super::clean_string(Some(value), 120))
+        .filter(|value| !value.is_empty())
+        .map(Value::String)
+        .collect::<Vec<_>>();
+    if summary.is_empty() && places.is_empty() {
+        return None;
+    }
+    let mut payload = Map::from_iter([
+        ("title".into(), Value::String(title)),
+        ("places".into(), Value::Array(places)),
+    ]);
+    if !summary.is_empty() {
+        payload.insert("summary".into(), Value::String(summary));
+    }
+    Some(payload)
+}
+
+fn insert_bounded_dimension(
+    target: &mut Map<String, Value>,
+    source: &Map<String, Value>,
+    key: &str,
+) {
+    if let Some(value) = source
+        .get(key)
+        .and_then(Value::as_u64)
+        .filter(|value| *value > 0 && *value <= 8_192)
+    {
+        target.insert(key.into(), Value::Number(value.into()));
+    }
 }
 
 fn sanitize_weather_payload(source: &Map<String, Value>) -> Option<Map<String, Value>> {

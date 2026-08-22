@@ -9141,39 +9141,65 @@
       ],
       "created_at_ms": 1786702015741,
       "updated_at_ms": 1786705060526
+    },
+    {
+      "id": "win-web-ai-structured-rich-content-v1",
+      "title": "Win 网页 AI 结构化富内容 V1",
+      "summary": "以官网回答节点为在线视觉真值，并把可见富内容规范化为可清洗、缓存和跨端复现的统一 AST；生产结构化响应观察严格受逐厂商授权清单约束。",
+      "status": "in_progress",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/win-web-ai-structured-rich-content-v1.md",
+        "content_hash": "f0308d898485e16ea18db6845f1aa768a30055bc6fcb03ee74c7b1769b39de21",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "0e22fcb75d76a6a8bab34e262cc81d37d528f5a7",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "964286b63ad9f09678c32cae8e2569ec87a8ee0a",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "windows-web-ai",
+      "tags": [
+        "windows",
+        "webview2",
+        "chatgpt",
+        "google-ai",
+        "rich-content",
+        "cache"
+      ],
+      "task_paths": [
+        "android/app/src/main/assets",
+        "desktop-shell/src-tauri/src/local_ai_browser",
+        "docs/user-browser-module-integration.md",
+        "pc-frontend/scripts",
+        "pc-frontend/src/features/user-browser",
+        "scripts/fixtures"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "官网最后一条完成回答优先原样显示，缓存首帧不阻塞输入",
+        "RichContent AST 严格版本化、清洗和安全降级",
+        "行情、天气、引用与来源 Logo 有 fixture 和回归",
+        "结构化响应映射受逐厂商生产授权清单约束",
+        "持久缓存只保存可供 Win/手机端复现的清洗 AST",
+        "完整 Win Web AI 验证与正式发布健康回读通过"
+      ],
+      "implementation_evidence": [],
+      "claim": {
+        "claim_id": "claim_c7114e5ad24d477ab6e7b07cf9ba85cd",
+        "agent_id": "codex-root-goal",
+        "claimed_at_ms": 1787428343082,
+        "expires_at_ms": 1787442743082
+      },
+      "created_at_ms": 1787428343067,
+      "updated_at_ms": 1787428357391
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_af86ed92a8564591b73113af90f84486",
-      "feature_id": "sqlite-safe-snapshot-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "需求和边界已评审。",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1786877696439
-    },
-    {
-      "id": "feature_event_ee46419199484a978b79e65d91a8f5f6",
-      "feature_id": "sqlite-safe-snapshot-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "当前提交已具备独立实现和验收路径。",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1786877696466
-    },
-    {
-      "id": "feature_event_a4baff29a9d8494ba1d1f637aa2aa00e",
-      "feature_id": "sqlite-safe-snapshot-v1",
-      "action": "claimed",
-      "actor": "codex-019f3b86-da2f-7c72-9a22-2f711c2ec892",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1786877696493
-    },
     {
       "id": "feature_event_d4df58b3917f4fcb9a34f8155c68a04e",
       "feature_id": "sqlite-safe-snapshot-v1",
@@ -11143,6 +11169,36 @@
       "from_status": "in_progress",
       "to_status": "implemented",
       "at_ms": 1787310311513
+    },
+    {
+      "id": "feature_event_3716246f8d5646568ad979e1c9e90139",
+      "feature_id": "win-web-ai-structured-rich-content-v1",
+      "action": "registered",
+      "actor": "codex-root-goal",
+      "reason": "用户确认继续 Goal，厂商要求快速精准分析并渲染富内容，现有条目不覆盖该范围。",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1787428343067
+    },
+    {
+      "id": "feature_event_354cded2ab47402e9e56ec6027187884",
+      "feature_id": "win-web-ai-structured-rich-content-v1",
+      "action": "claimed",
+      "actor": "codex-root-goal",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1787428343082
+    },
+    {
+      "id": "feature_event_d08b30ed78654b9f99b082813da9c5c4",
+      "feature_id": "win-web-ai-structured-rich-content-v1",
+      "action": "transitioned",
+      "actor": "codex-root-goal",
+      "reason": "开始实现生产授权清单、结构化响应映射与更多 RichContent AST 覆盖。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1787428357391
     }
   ]
 }

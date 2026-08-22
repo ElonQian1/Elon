@@ -5,7 +5,7 @@ use super::{adapter::SanitizedAdapterEvent, adapter_content, semantic_context, s
 const MAX_EVENT_BYTES: usize = 512 * 1024;
 const MAX_MESSAGES: usize = 80;
 const MAX_DRAFT_CHARS: usize = 20_000;
-const ADAPTER_VERSION: u32 = 13;
+const ADAPTER_VERSION: u32 = 14;
 
 pub fn initialization_script() -> String {
     let answer_candidate_policy = include_str!(
@@ -13,6 +13,8 @@ pub fn initialization_script() -> String {
     );
     let rich_content =
         include_str!("../../../../android/app/src/main/assets/google_web_rich_content.js");
+    let common_rich_content = include_str!("rich_content_dom_adapter.js");
+    let win_rich_content = include_str!("google_rich_content_adapter.js");
     let message_extractor =
         include_str!("../../../../android/app/src/main/assets/google_web_message_extractor.js");
     let composer_bridge =
@@ -82,6 +84,8 @@ pub fn initialization_script() -> String {
       window.__elonGoogleWebAdapterVersion = __ADAPTER_VERSION__;
       __ANSWER_CANDIDATE_POLICY_SOURCE__
       __RICH_CONTENT_SOURCE__
+      __COMMON_RICH_CONTENT_SOURCE__
+      __WIN_RICH_CONTENT_SOURCE__
       __MESSAGE_EXTRACTOR_SOURCE__
       __COMPOSER_BRIDGE_SOURCE__
       __SEND_POLICY_SOURCE__
@@ -122,6 +126,8 @@ pub fn initialization_script() -> String {
         answer_candidate_policy,
     )
     .replace("__RICH_CONTENT_SOURCE__", rich_content)
+    .replace("__COMMON_RICH_CONTENT_SOURCE__", common_rich_content)
+    .replace("__WIN_RICH_CONTENT_SOURCE__", win_rich_content)
     .replace("__MESSAGE_EXTRACTOR_SOURCE__", message_extractor)
     .replace("__COMPOSER_BRIDGE_SOURCE__", composer_bridge)
     .replace("__SEND_POLICY_SOURCE__", send_policy)
@@ -252,7 +258,7 @@ fn sanitize_messages(value: Option<&Value>) -> Vec<Value> {
             if !matches!(role, "user" | "assistant") {
                 return None;
             }
-            let content = adapter_content::sanitize_parts(message.get("content"));
+            let content = adapter_content::sanitize_parts("google-ai-mode", message.get("content"));
             if content.is_empty() {
                 return None;
             }
