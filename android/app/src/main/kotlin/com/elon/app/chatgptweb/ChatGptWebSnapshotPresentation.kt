@@ -19,6 +19,13 @@ internal object ChatGptWebSnapshotPresentation {
         pageKind = "home",
     )
 
+    fun revalidating(current: ChatGptWebSnapshot): ChatGptWebSnapshot = passive(
+        base = current,
+        modelFallback = current.currentModel,
+        url = current.url,
+        pageKind = current.pageKind,
+    )
+
     private fun passive(
         base: ChatGptWebSnapshot?,
         modelFallback: String,

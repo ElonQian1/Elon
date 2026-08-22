@@ -44,6 +44,17 @@ class ChatGptWebSnapshotPresentationTest {
         assertPassive(loading)
     }
 
+    @Test
+    fun revalidationKeepsMessagesButDropsLiveAuthority() {
+        val cached = ChatGptWebSnapshotPresentation.revalidating(
+            snapshot("本地内容", "https://chatgpt.com/c/target", "自动"),
+        )
+
+        assertEquals(listOf("本地内容"), cached.messages.map { it.content })
+        assertEquals("https://chatgpt.com/c/target", cached.url)
+        assertPassive(cached)
+    }
+
     private fun assertPassive(value: ChatGptWebSnapshot) {
         assertFalse(value.authenticated)
         assertFalse(value.composerReady)

@@ -474,9 +474,19 @@ internal class ChatGptBackgroundSession(
             is ChatGptWebEvent.Snapshot -> {
                 if (!conversationNavigation.shouldAccept(event.value)) return
                 val reconciliation = sessionContinuity.reconcileWithDecision(event.value)
-                val snapshot = ChatGptWebTransientComposerReadiness.reconcile(
-                    previous = latestSnapshot,
+                val previous = latestSnapshot
+                val previousIdentity = ChatGptWebConversationPath.fromUrl(previous?.url)
+                    ?.let(ChatGptWebConversationPath::identity)
+                val incomingIdentity = ChatGptWebConversationPath.fromUrl(reconciliation.snapshot.url)
+                    ?.let(ChatGptWebConversationPath::identity)
+                val merged = WebChatSnapshotWindowMerger.merge(
+                    previous = previous,
                     incoming = reconciliation.snapshot,
+                    sameConversation = previousIdentity != null && previousIdentity == incomingIdentity,
+                )
+                val snapshot = ChatGptWebTransientComposerReadiness.reconcile(
+                    previous = previous,
+                    incoming = merged,
                     composerInteractionActive = ChatGptWebTransientComposerReadiness.interactionActive(
                         composerOptionRequests.isActive(), observedMcpState.snapshot().commandRequests,
                     ),
@@ -591,11 +601,9 @@ internal class ChatGptBackgroundSession(
     }
 
     private fun handleDocumentChanged(document: com.elon.app.WebBridgeDocumentSession.Snapshot) {
-        if (
-            document.pageGeneration > observedMcpState.snapshot().pageGeneration &&
-            !conversationNavigation.hasPending()
-        ) {
-            latestSnapshot = null
+        if (document.pageGeneration > observedMcpState.snapshot().pageGeneration) {
+            latestSnapshot = latestSnapshot?.let(ChatGptWebSnapshotPresentation::revalidating)
+            latestSnapshot?.let(onSnapshot)
             latestUiManifest = null
         }
         observedMcpState.updateDocument(document)
