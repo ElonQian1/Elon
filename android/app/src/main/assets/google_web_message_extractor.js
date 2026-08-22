@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  const extractorVersion = 25;
+  const extractorVersion = 26;
   if (window.__elonGoogleWebMessageExtractor &&
       window.__elonGoogleWebMessageExtractor.version === extractorVersion) return;
 
@@ -142,20 +142,6 @@
     }
   }
 
-  function externalLinkTextLength(container) {
-    if (!container) return 0;
-    let length = 0;
-    for (const link of container.querySelectorAll('a[href^="https://"]')) {
-      if (!isVisible(link)) continue;
-      try {
-        const url = new URL(link.href);
-        if (allowedOrigins.has(url.origin)) continue;
-        length += cleanText(link.innerText || link.textContent || link.getAttribute('aria-label')).length;
-      } catch (_) {}
-    }
-    return Math.min(length, 40000);
-  }
-
   function narrativeBlockCount(container) {
     if (!container) return 0;
     let count = 0;
@@ -163,23 +149,10 @@
       if (!isVisible(block)) continue;
       const text = cleanText(block.innerText || block.textContent);
       if (text.length < 80) continue;
-      const linkedLength = externalLinkTextLength(block);
+      const linkedLength = richContent && typeof richContent.externalLinkTextLength === 'function'
+        ? richContent.externalLinkTextLength(block)
+        : 0;
       if (linkedLength / text.length > 0.45) continue;
-      count += 1;
-      if (count >= 12) break;
-    }
-    return count;
-  }
-
-  function sourceResultItemCount(container) {
-    if (!container) return 0;
-    let count = 0;
-    for (const item of container.querySelectorAll('li, [role="listitem"]')) {
-      if (!isVisible(item)) continue;
-      const text = cleanText(item.innerText || item.textContent);
-      if (text.length < 60 || text.length > 400) continue;
-      const linkedLength = externalLinkTextLength(item);
-      if (linkedLength < 12 || linkedLength / text.length < 0.08) continue;
       count += 1;
       if (count >= 12) break;
     }
@@ -274,9 +247,13 @@
     const semanticBlocks = node.querySelectorAll('p, li, blockquote, pre, table, h2, h3').length;
     const controls = node.querySelectorAll('button, [role="button"], input, textarea').length;
     const links = node.querySelectorAll('a[href]').length;
-    const linkedTextLength = externalLinkTextLength(node);
+    const linkedTextLength = richContent && typeof richContent.externalLinkTextLength === 'function'
+      ? richContent.externalLinkTextLength(node)
+      : 0;
     const narrativeBlocks = narrativeBlockCount(node);
-    const sourceResultItems = sourceResultItemCount(node);
+    const sourceResultItems = richContent && typeof richContent.sourceResultItemCount === 'function'
+      ? richContent.sourceResultItemCount(node)
+      : 0;
     const queryAligned = alignedWithQuery(node, queryAnchor);
     const answerActionRelation = boundaryRelation(node, answerActionAnchor);
     const citationTextRatio = text.length ? Math.min(linkedTextLength, text.length) / text.length : 0;

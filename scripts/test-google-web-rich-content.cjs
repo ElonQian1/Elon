@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict')
 const richContent = require('../android/app/src/main/assets/google_web_rich_content.js')
 
-assert.equal(richContent.version, 2)
+assert.equal(richContent.version, 3)
 
 const markdown = richContent.renderBlocks([
   { type: 'heading', level: 2, text: '天气概览' },
@@ -42,6 +42,45 @@ assert.deepEqual(
   richContent.partsFromBlocks([], '普通回退内容', ''),
   [{ type: 'text', text: '普通回退内容' }],
 )
+
+const sourceRailPruned = richContent.partsFromBlocks([
+  { type: 'heading', level: 2, text: '主回答' },
+  {
+    type: 'list',
+    ordered: true,
+    items: [
+      { text: '正文第一点，并附少量行内引用' },
+      { text: '正文第二点' },
+    ],
+  },
+  {
+    type: 'list',
+    ordered: false,
+    sourceCollection: true,
+    items: [
+      { text: 'YouTube 来源标题与摘要' },
+      { text: 'Yahoo 来源标题与摘要' },
+      { text: '来源网页 Table_content: | 时间 | 指数 |' },
+    ],
+  },
+], '', '')
+assert.equal(sourceRailPruned.length, 1)
+assert.match(sourceRailPruned[0].text, /正文第一点/)
+assert.match(sourceRailPruned[0].text, /正文第二点/)
+assert.doesNotMatch(sourceRailPruned[0].text, /YouTube|Yahoo|Table_content/)
+
+assert.equal(richContent.sourceResultCollection({
+  itemCount: 3,
+  sourceItemCount: 3,
+  dominantSourceItemCount: 3,
+  textLength: 540,
+}), true)
+assert.equal(richContent.sourceResultCollection({
+  itemCount: 3,
+  sourceItemCount: 1,
+  dominantSourceItemCount: 1,
+  textLength: 540,
+}), false, 'a narrative list with one inline citation must remain in the answer')
 
 const weather = richContent.partsFromBlocks([
   { type: 'heading', level: 2, text: '彰化县今晚天气' },

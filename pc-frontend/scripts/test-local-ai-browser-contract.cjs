@@ -204,6 +204,9 @@ assert.match(sharedGoogleAdapterScript, /window\.__elonGoogleWebBridge/)
 assert.match(sharedGoogleMessageExtractorScript, /window\.__elonGoogleWebMessageExtractor/)
 assert.match(sharedGoogleRichContentScript, /root\.__elonGoogleWebRichContent/)
 assert.match(sharedGoogleMessageExtractorScript, /narrativeBlocks/)
+assert.match(sharedGoogleMessageExtractorScript, /richContent\.sourceResultItemCount\(node\)/)
+assert.match(sharedGoogleRichContentScript, /sourceResultCollection/)
+assert.match(sharedGoogleRichContentScript, /sourceCollection/)
 assert.equal(sharedGoogleAnswerCandidatePolicy.sourceCollection({
   citations: 6,
   links: 6,

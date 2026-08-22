@@ -7699,6 +7699,133 @@
       "updated_at_ms": 1786710654944
     },
     {
+      "id": "win-google-ai-source-rail-narrative-pruning-v3",
+      "title": "Win Google AI 来源栏正文分层 V3",
+      "summary": "复用现有完整回答根和来源 UI，在共享 Google 富内容解析器中把外部来源结果列表从正文 Markdown 分层剔除，同时保留正文列表、真实表格、行内引用和结构化来源面板。",
+      "status": "verified",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/win-google-ai-source-rail-narrative-pruning-v3.md",
+        "content_hash": "b34ffbe1015cc513552bc4cce1160bd42b533d56142fb7cbafd89f68f8dc29ce",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "ddc6b6db664e368b39ed6da84608f9304940eb8c",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "f7f4f564da023987970842091d79f96aa03b24b0",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "win-web-ai",
+      "tags": [
+        "win",
+        "google-ai",
+        "rich-content",
+        "citations",
+        "source-rail"
+      ],
+      "task_paths": [
+        "android/app/src/main/assets/google_web_message_extractor.js",
+        "android/app/src/main/assets/google_web_rich_content.js",
+        "pc-frontend/scripts/test-local-ai-browser-contract.cjs",
+        "scripts/test-google-web-message-extractor-contract.cjs",
+        "scripts/test-google-web-rich-content.cjs"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "外部链接主导的多条来源结果列表不进入回答 Markdown。",
+        "正文编号/项目列表、真实表格与稀疏行内引用继续保留。",
+        "来源列表中的公开链接继续作为 citation 进入现有来源面板。",
+        "来源摘要中的 Table_content 不再污染原生正文，结构不确定时保留内容。",
+        "Win 与 Android 复用同一 Google 富内容资产，不建立分叉解析器。",
+        "合同、PC 构建、Win 验证与正式发布精确身份验收通过。"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "android/app/src/main/assets/google_web_message_extractor.js",
+          "content_hash": "2fb5a5de40cd8e171cbd5ddb12306d0f168e932471713c9495029bbe54e442b4",
+          "locator": "extractorVersion 26 shared metrics",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ddc6b6db664e368b39ed6da84608f9304940eb8c",
+            "head_blob_oid": "9b6787a174100ee0d6fad50517f504285c3372d7",
+            "worktree_blob_oid": "32cb0f567deb7e3b80acdcb2973da2b198e8629d",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/main/assets/google_web_rich_content.js",
+          "content_hash": "125b1ee0a556668de411ba6e3ede3fe4b7177a373a49003beace4b0c5ce89eb1",
+          "locator": "sourceResultCollection/trimBlocks",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ddc6b6db664e368b39ed6da84608f9304940eb8c",
+            "head_blob_oid": "62e685dc1476bee56e2ae72bd99aed97d4772f46",
+            "worktree_blob_oid": "b28ee808cb1073a545491a5d4067e78255fccb3d",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "docs/requirements/win-google-ai-source-rail-narrative-pruning-v3.md",
+          "content_hash": "b34ffbe1015cc513552bc4cce1160bd42b533d56142fb7cbafd89f68f8dc29ce",
+          "locator": "acceptance criteria",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ddc6b6db664e368b39ed6da84608f9304940eb8c",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "f7f4f564da023987970842091d79f96aa03b24b0",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "pc-frontend/scripts/test-local-ai-browser-contract.cjs",
+          "content_hash": "e982e7458d9211b1a6112a0d7b96786ad51f70a4e37d16cf8f28be7521c4d737",
+          "locator": "shared Google source rail contract",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ddc6b6db664e368b39ed6da84608f9304940eb8c",
+            "head_blob_oid": "0c66001b238f561aca9a785684023073b2b31ac2",
+            "worktree_blob_oid": "30e7da9116ccb315ab1bd17305fb1812779646c0",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "scripts/test-google-web-message-extractor-contract.cjs",
+          "content_hash": "bab10a406516e6297d4ee4a145ca2f3fda12afcc1e89917b90e41915853a7d9c",
+          "locator": "shared rich content contract",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ddc6b6db664e368b39ed6da84608f9304940eb8c",
+            "head_blob_oid": "6b2850a0f64ea7b56ec98f568b702ad79d5edbed",
+            "worktree_blob_oid": "4b4fa93c6c1e8ce5eb2050a61c47c66088c264b6",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "scripts/test-google-web-rich-content.cjs",
+          "content_hash": "2e64894bdfbb108b8f020a27a9d3cab9766106479f83acaff2d001a87be88a14",
+          "locator": "sourceRailPruned",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ddc6b6db664e368b39ed6da84608f9304940eb8c",
+            "head_blob_oid": "9e7627cff408c5264361c99776361d7ce226f0cb",
+            "worktree_blob_oid": "5547fc4c4b8307c0640ef7675ad96d9caed0700f",
+            "state": "tracked_modified"
+          }
+        }
+      ],
+      "created_at_ms": 1787440868272,
+      "updated_at_ms": 1787441330225
+    },
+    {
       "id": "win-hidden-ai-webview-input-hit-test-v1",
       "title": "Win 后台官方 AI WebView 输入命中隔离 V1",
       "summary": "修复官方 AI WebView 收起后仍拦截原生聊天输入框和新对话点击的问题，保留同一 WebView2 会话与手动官网显示能力。",
@@ -9849,66 +9976,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_181a5907efc94efa8d1028dfa1ff8a22",
-      "feature_id": "win-full-size-parked-ai-webview-input-hit-test-v3",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "完整视口后台停放实现完成，PC构建、浏览器合同和Rust定向测试均通过。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1787221728327
-    },
-    {
-      "id": "feature_event_bb9ae7c50253422cb9793ae5024c4de6",
-      "feature_id": "win-full-size-parked-ai-webview-input-hit-test-v3",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "静态契约、PC生产构建与Rust定向测试通过，等待发布后的真实Win端消息验收。",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1787221739704
-    },
-    {
-      "id": "feature_event_a929a96b7fe747c0a8651a5ce82ad999",
-      "feature_id": "win-google-ai-dismiss-blocking-menu-before-send-v4",
-      "action": "registered",
-      "actor": "codex",
-      "reason": "真实 Win 验收确认残留导出菜单阻止发送；手动关闭后同一草稿立即成功。",
-      "from_status": "",
-      "to_status": "accepted",
-      "at_ms": 1787223014214
-    },
-    {
-      "id": "feature_event_95343d21d05a4174a38d5e041f2d61a6",
-      "feature_id": "win-google-ai-dismiss-blocking-menu-before-send-v4",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "真实故障证据、最小适配范围和验收标准已明确。",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1787223029875
-    },
-    {
-      "id": "feature_event_103ba50b474e472680f476672ca6cf43",
-      "feature_id": "win-google-ai-dismiss-blocking-menu-before-send-v4",
-      "action": "claimed",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1787223040048
-    },
-    {
-      "id": "feature_event_48bf2667afc44e83b7813edd9f93b25a",
-      "feature_id": "win-google-ai-dismiss-blocking-menu-before-send-v4",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "开始实现发送前阻塞菜单清理并补充回归契约。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1787223050262
-    },
-    {
       "id": "feature_event_8c5a78c709ea4e8da3037ceb19a2729d",
       "feature_id": "win-google-ai-dismiss-blocking-menu-before-send-v4",
       "action": "evidence_recorded",
@@ -11847,6 +11914,66 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1787439860633
+    },
+    {
+      "id": "feature_event_2a04404c39354c7ba9662894d2723c2c",
+      "feature_id": "win-google-ai-source-rail-narrative-pruning-v3",
+      "action": "registered",
+      "actor": "codex-root",
+      "reason": "真实 Win 生产会话显示完整正文根内仍混入三条来源结果和 Table_content；已有来源面板已重复展示同一批 citation，需要在共享富内容解析层分层。",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1787440868272
+    },
+    {
+      "id": "feature_event_0f2670a4b4974350ac27c288b1a6aac3",
+      "feature_id": "win-google-ai-source-rail-narrative-pruning-v3",
+      "action": "claimed",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1787440878882
+    },
+    {
+      "id": "feature_event_da01d2af6b1d43338330b75b4c09dbdf",
+      "feature_id": "win-google-ai-source-rail-narrative-pruning-v3",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "已完成真实 Win 会话取证与代码查重，确认完整回答根内的来源列表在共享富内容解析层被当作正文列表序列化。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1787440890318
+    },
+    {
+      "id": "feature_event_600046fdffa04d16a3dd0c3a51f90cb1",
+      "feature_id": "win-google-ai-source-rail-narrative-pruning-v3",
+      "action": "evidence_recorded",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1787441307268
+    },
+    {
+      "id": "feature_event_c41b27c3f06a4a0abd1cf56cc07593fc",
+      "feature_id": "win-google-ai-source-rail-narrative-pruning-v3",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "共享富内容解析器已完成来源栏正文分层，定向与完整 Win 网页 AI 回归通过。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1787441318761
+    },
+    {
+      "id": "feature_event_b94760a419254c15b057d459ba520408",
+      "feature_id": "win-google-ai-source-rail-narrative-pruning-v3",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "定向契约、完整 user-browser、类型检查、Lint、生产构建、Win 专项验证及源码规模门禁均通过。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1787441330225
     }
   ]
 }

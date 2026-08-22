@@ -133,6 +133,7 @@
     const blocks = [];
     const normalizedQuery = cleanInline(query);
     for (const original of Array.isArray(input) ? input : []) {
+      if (original && original.sourceCollection === true) continue;
       const plain = blockPlainText(original);
       if (boundaryText(plain)) break;
       if (!plain) continue;
@@ -235,6 +236,55 @@
     }
   }
 
+  function externalLinkTextLength(container) {
+    if (!container || typeof container.querySelectorAll !== 'function') return 0;
+    let length = 0;
+    for (const link of container.querySelectorAll('a[href^="https://"]')) {
+      if (!elementVisible(link) || !safePublicUrl(link.href || link.getAttribute('href'))) continue;
+      length += cleanInline(
+        link.innerText || link.textContent || link.getAttribute('aria-label')
+      ).length;
+    }
+    return Math.min(length, MAX_MARKDOWN_CHARS);
+  }
+
+  function sourceResultItemMetrics(item) {
+    const textLength = cleanInline(item && (item.innerText || item.textContent)).length;
+    const linkedTextLength = externalLinkTextLength(item);
+    const linkRatio = textLength ? Math.min(linkedTextLength, textLength) / textLength : 0;
+    return {
+      textLength,
+      linkedTextLength,
+      sourceLike: textLength >= 60 && textLength <= 400 &&
+        linkedTextLength >= 12 && linkRatio >= 0.08,
+      linkDominated: textLength >= 60 && textLength <= 600 &&
+        linkedTextLength >= 24 && linkRatio >= 0.22
+    };
+  }
+
+  function sourceResultItemCount(container) {
+    if (!container || typeof container.querySelectorAll !== 'function') return 0;
+    let count = 0;
+    for (const item of container.querySelectorAll('li, [role="listitem"]')) {
+      if (!elementVisible(item) || !sourceResultItemMetrics(item).sourceLike) continue;
+      count += 1;
+      if (count >= 12) break;
+    }
+    return count;
+  }
+
+  function sourceResultCollection(metrics) {
+    const itemCount = Math.max(0, Number(metrics && metrics.itemCount) || 0);
+    const sourceItemCount = Math.max(0, Number(metrics && metrics.sourceItemCount) || 0);
+    const dominantSourceItemCount = Math.max(
+      0, Number(metrics && metrics.dominantSourceItemCount) || 0
+    );
+    const textLength = Math.max(0, Number(metrics && metrics.textLength) || 0);
+    return itemCount >= 2 && sourceItemCount >= 2 && dominantSourceItemCount >= 2 &&
+      dominantSourceItemCount / itemCount >= 0.6 &&
+      textLength <= Math.min(1800, sourceItemCount * 600);
+  }
+
   function inlineMarkdown(node, skipNestedLists) {
     if (!node) return '';
     if (node.nodeType === 3) return escapeInlineFragment(node.nodeValue);
@@ -315,11 +365,24 @@
       return;
     }
     if (tag === 'UL' || tag === 'OL' || role === 'list') {
-      const items = directListItems(element).map((item) => ({
+      const itemNodes = directListItems(element);
+      const itemMetrics = itemNodes.map(sourceResultItemMetrics);
+      const sourceCollection = sourceResultCollection({
+        itemCount: itemNodes.length,
+        sourceItemCount: itemMetrics.filter((item) => item.sourceLike).length,
+        dominantSourceItemCount: itemMetrics.filter((item) => item.linkDominated).length,
+        textLength: cleanInline(element.innerText || element.textContent).length
+      });
+      const items = itemNodes.map((item) => ({
         markdown: inlineMarkdown(item, true),
         text: cleanInline(item.innerText || item.textContent)
       })).filter((item) => item.markdown || item.text);
-      addBlock(blocks, { type: 'list', ordered: tag === 'OL', items });
+      addBlock(blocks, {
+        type: 'list',
+        ordered: tag === 'OL',
+        items,
+        ...(sourceCollection ? { sourceCollection: true } : {})
+      });
       return;
     }
     if (tag === 'TABLE' || role === 'table') {
@@ -365,10 +428,13 @@
   }
 
   return Object.freeze({
-    version: 2,
+    version: 3,
     renderBlocks,
     partsFromBlocks,
     weatherPart,
+    externalLinkTextLength,
+    sourceResultItemCount,
+    sourceResultCollection,
     parts
   });
 });
