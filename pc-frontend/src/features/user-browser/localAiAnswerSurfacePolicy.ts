@@ -7,16 +7,18 @@ export function selectLocalAiAnswerRenderMode(input: {
   ready: boolean
   browserSurface: AiBrowserSurface
   busy: boolean
+  responseStreaming?: boolean
   session: LocalAiWebSessionState | null
   snapshot: LocalAiMessageSnapshot | null
 }): LocalAiAnswerRenderMode {
-  const { ready, browserSurface, busy, session, snapshot } = input
+  const { ready, browserSurface, busy, responseStreaming, session, snapshot } = input
   if (session?.semanticCacheStatus === 'cached') return 'native_cache'
   if (!ready || browserSurface !== 'chat' || busy || !session || !snapshot) return 'native'
   if (session.semanticCacheStatus !== 'live'
     || session.loading
     || ['opening', 'loading', 'blocked', 'error', 'closed'].includes(session.windowStatus)
-    || snapshot.streaming) return 'native'
+    || snapshot.streaming
+    || responseStreaming) return 'native'
   const completedAssistant = snapshot.messages.some(
     (message) => message.role === 'assistant' && message.state === 'completed',
   )

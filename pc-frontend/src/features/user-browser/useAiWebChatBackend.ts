@@ -94,7 +94,7 @@ export default function useAiWebChatBackend(mode: AiHomeMode, ownerKey: string) 
   const ready = capability.state === 'ready' && Boolean(ownerKey && provider)
   const canEdit = ready && controller.canEditDraft
   const canCompose = ready && controller.canSubmitDraft
-  const streamingMessageId = [...(controller.snapshot?.messages ?? [])]
+  const streamingMessageId = [...controller.visibleMessages]
     .reverse()
     .find((item) => item.state === 'streaming')?.id
   const contextTurnCount = (controller.snapshot?.messages ?? [])

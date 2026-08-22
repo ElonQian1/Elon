@@ -25,9 +25,12 @@ import {
 import { deriveLocalAiUserState, type LocalAiClientState } from './localAiUserState'
 import useLocalAiSessionPolling from './useLocalAiSessionPolling'
 import {
+  beginPendingLocalAiResponse,
   beginOptimisticLocalAiSend,
   mergeOptimisticLocalAiMessages,
+  pendingLocalAiResponseObserved,
   pendingLocalAiSendObserved,
+  type PendingLocalAiResponse,
   type PendingLocalAiSend,
 } from './localAiOptimisticSend'
 import { requestOfficialAiTab, requestReturnToAiChat } from './internalBrowserApi'
@@ -56,6 +59,7 @@ export default function useLocalAiWebChatController(
   const [draft, setDraft] = useState('')
   const [draftTouched, setDraftTouched] = useState(false)
   const [pendingSends, setPendingSends] = useState<PendingLocalAiSend[]>([])
+  const [pendingResponses, setPendingResponses] = useState<PendingLocalAiResponse[]>([])
   const [queuedSend, setQueuedSend] = useState<QueuedLocalAiSend | null>(null)
   const [busyAction, setBusyAction] = useState('')
   const [message, setMessage] = useState('')
@@ -85,8 +89,12 @@ export default function useLocalAiWebChatController(
   )
   const snapshot = newConversationRecoveryStartedAtMs ? null : liveSnapshot
   const visibleMessages = useMemo(
-    () => mergeOptimisticLocalAiMessages(snapshot?.messages ?? [], pendingSends),
-    [pendingSends, snapshot?.messages],
+    () => mergeOptimisticLocalAiMessages(
+      snapshot?.messages ?? [],
+      pendingSends,
+      pendingResponses,
+    ),
+    [pendingResponses, pendingSends, snapshot?.messages],
   )
   const navigationSnapshot = useMemo(
     () => isLocalAiConversationSnapshot(visibleSessionState?.navigationEvent)
@@ -147,6 +155,7 @@ export default function useLocalAiWebChatController(
     draftRef.current = ''
     setDraftTouched(false)
     setPendingSends([])
+    setPendingResponses([])
     setQueuedSend(null)
     queuedSendRef.current = null
     queuedSendDispatching.current = false
@@ -290,6 +299,14 @@ export default function useLocalAiWebChatController(
   }, [pendingSends, snapshot])
 
   useEffect(() => {
+    if (!snapshot || pendingResponses.length === 0) return
+    const remaining = pendingResponses.filter((pending) => (
+      !pendingLocalAiResponseObserved(snapshot.messages, pending)
+    ))
+    if (remaining.length !== pendingResponses.length) setPendingResponses(remaining)
+  }, [pendingResponses, snapshot])
+
+  useEffect(() => {
     const expected = normalizePrompt(expectedResponsePrompt.current)
     if (!expected || !snapshot || snapshot.streaming) return
     const messages = snapshot.messages
@@ -342,6 +359,7 @@ export default function useLocalAiWebChatController(
     if (!provider || !ownerKey || busyAction) return
     setBusyAction('open_cached_conversation')
     setPendingSends([])
+    setPendingResponses([])
     cancelResponseRefresh()
     setMessage('正在从本机缓存恢复会话，并在后台连接官方上下文…')
     try {
@@ -426,6 +444,7 @@ export default function useLocalAiWebChatController(
     )
     if (!pending) return null
     setPendingSends((current) => current.concat(pending))
+    setPendingResponses((current) => current.concat(beginPendingLocalAiResponse(pending)))
     draftRef.current = ''
     setDraft('')
     setDraftTouched(true)
@@ -493,6 +512,7 @@ export default function useLocalAiWebChatController(
     newConversationBaselineId.current = visibleSessionState?.activeConversationId ?? ''
     setNewConversationRecoveryStartedAtMs(Date.now())
     setPendingSends([])
+    setPendingResponses([])
     setQueuedSend(null)
     queuedSendRef.current = null
     queuedSendDispatching.current = false
@@ -582,6 +602,7 @@ export default function useLocalAiWebChatController(
   function rollbackPendingSend(pending: PendingLocalAiSend | null) {
     if (!pending) return
     setPendingSends((current) => current.filter((item) => item.id !== pending.id))
+    setPendingResponses((current) => current.filter((item) => item.sendId !== pending.id))
     if (!draftRef.current) {
       draftRef.current = pending.prompt
       setDraft(pending.prompt)

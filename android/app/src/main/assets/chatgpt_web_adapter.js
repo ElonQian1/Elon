@@ -134,8 +134,7 @@
     if (isVisible(direct)) return true;
     const composer = findComposer();
     const scope = composer && composer.closest('form');
-    if (!scope) return false;
-    return Array.from(scope.querySelectorAll('button')).some((button) => {
+    const stopControlVisible = !!scope && Array.from(scope.querySelectorAll('button')).some((button) => {
       if (!isVisible(button)) return false;
       const label = cleanText([
         button.getAttribute('aria-label'),
@@ -144,6 +143,10 @@
       ].filter(Boolean).join(' ')).toLowerCase();
       return /stop generating|停止生成/.test(label);
     });
+    if (stopControlVisible) return true;
+    return !!(messageAdapter
+      && typeof messageAdapter.lastAssistantPending === 'function'
+      && messageAdapter.lastAssistantPending());
   }
 
   function detectCapabilities(composer) {

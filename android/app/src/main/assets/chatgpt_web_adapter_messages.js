@@ -10,6 +10,8 @@
   const COMPLEX_PART_TYPES = new Set([
     'code', 'table', 'artifact', 'audio', 'video', 'math', 'chart', 'map', 'interactive'
   ]);
+  const INVISIBLE_PLACEHOLDERS = /[\u00ad\u034f\u061c\u180e\u200b-\u200f\u202a-\u202e\u2060-\u206f\ufeff]/gu;
+  const THINKING_CURSOR_PLACEHOLDERS = /[\u2022\u2026\u22ef\u25cf\u25cb\u2580-\u259f\ue000-\uf8ff]/gu;
   const messageActionPolicy = window.__elonChatGptMessageActionPolicy;
   let lastStructuredTypes = new Set();
   let lastComplexOutput = false;
@@ -368,6 +370,22 @@
     return messageNodes().reverse().find((node) => messageRole(node) === 'assistant') || null;
   }
 
+  function lastAssistantPending() {
+    const turn = lastAssistantTurn();
+    if (!turn) return false;
+    const content = contentNode(turn);
+    const text = messageContent(turn, 'assistant')
+      .replace(INVISIBLE_PLACEHOLDERS, '')
+      .replace(THINKING_CURSOR_PLACEHOLDERS, '')
+      .trim();
+    if (text) return false;
+    if (content.querySelector(
+      'table, pre, blockquote, ol, ul, img, video, audio, canvas, iframe, '
+      + '[data-testid*="artifact" i], [data-testid*="code-interpreter" i]'
+    )) return false;
+    return true;
+  }
+
   function regenerateButton() {
     const turn = lastAssistantTurn();
     if (!turn) return null;
@@ -469,6 +487,7 @@
 
   window.__elonChatGptMessages = Object.freeze({
     capabilities,
+    lastAssistantPending,
     readMessages,
     readMessageWindow,
     regenerate

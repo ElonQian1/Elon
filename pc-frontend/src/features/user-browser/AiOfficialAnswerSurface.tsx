@@ -30,6 +30,7 @@ export default function AiOfficialAnswerSurface({ web }: { web: AiWebChatBackend
     ready: web.ready,
     browserSurface,
     busy: Boolean(web.controller.busyAction),
+    responseStreaming: Boolean(web.streamingMessageId),
     session: web.controller.sessionState,
     snapshot,
   })
