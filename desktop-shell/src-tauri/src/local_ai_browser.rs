@@ -28,6 +28,8 @@ mod private_response_authorization;
 mod provider_adapter;
 #[path = "local_ai_browser/semantic_context.rs"]
 mod semantic_context;
+#[path = "local_ai_browser/session_identity.rs"]
+mod session_identity;
 #[path = "local_ai_browser/snapshot_cache.rs"]
 mod snapshot_cache;
 #[path = "local_ai_browser/state.rs"]
@@ -36,7 +38,7 @@ mod state;
 #[path = "local_ai_browser/tests.rs"]
 mod tests;
 
-use std::{fs, path::PathBuf, process::Command};
+use std::{fs, process::Command};
 
 use serde::Serialize;
 use tauri::{
@@ -48,6 +50,7 @@ use tauri::{
 pub use guest_identity::LocalAiGuestOwnerIdentity;
 use owner_profile::resolve as resolve_owner_fingerprint;
 use provider_adapter::ProviderAdapter;
+use session_identity::{ensure_runtime_session, profile_directory, window_label};
 pub use state::LocalAiBrowserRuntime;
 use state::LocalAiWebSessionState;
 
@@ -637,45 +640,6 @@ fn restorable_start_url(
     let restorable =
         snapshot_cache::normalize_restorable_url(provider.id, cached.as_str()).is_some();
     Ok(if restorable { cached } else { fallback })
-}
-
-fn window_label(provider: &ProviderDefinition, fingerprint: &str) -> String {
-    format!("{LOCAL_AI_WINDOW_PREFIX}{}-{fingerprint}", provider.id)
-}
-
-fn profile_directory(
-    app: &AppHandle,
-    provider: &ProviderDefinition,
-    fingerprint: &str,
-) -> Result<PathBuf, String> {
-    app.path()
-        .app_local_data_dir()
-        .map(|root| root.join(PROFILE_ROOT).join(fingerprint).join(provider.id))
-        .map_err(display_error)
-}
-
-fn snapshot_cache_path(
-    app: &AppHandle,
-    provider: &ProviderDefinition,
-    fingerprint: &str,
-) -> Result<PathBuf, String> {
-    profile_directory(app, provider, fingerprint).map(|profile| profile.join(SNAPSHOT_CACHE_FILE))
-}
-
-fn ensure_runtime_session(
-    app: &AppHandle,
-    runtime: &LocalAiBrowserRuntime,
-    provider: &ProviderDefinition,
-    fingerprint: &str,
-    label: &str,
-) -> Result<(), String> {
-    runtime.ensure_session_with_cache(
-        label,
-        provider.id,
-        initial_renderer_status(provider),
-        snapshot_cache_path(app, provider, fingerprint)?,
-    );
-    Ok(())
 }
 
 fn session_response(
