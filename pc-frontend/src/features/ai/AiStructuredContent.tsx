@@ -10,9 +10,11 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import styles from './AiStructuredContent.module.css'
+import AiRichContentCard from './AiRichContentCard'
+import type { YilongRichContent } from '../user-browser/richContentProtocol'
 
 export interface AiStructuredPart {
-  type: 'image' | 'file' | 'code' | 'table' | 'artifact' | 'audio' | 'video' | 'math' | 'chart' | 'map' | 'interactive'
+  type: 'image' | 'file' | 'code' | 'table' | 'artifact' | 'audio' | 'video' | 'math' | 'chart' | 'map' | 'interactive' | 'rich_card'
   label: string
   kind?: string
   language?: string
@@ -21,30 +23,39 @@ export interface AiStructuredPart {
   lineCount?: number
   rowCount?: number
   columnCount?: number
+  richContent?: YilongRichContent
 }
 
 export default function AiStructuredContent({ parts }: { parts?: AiStructuredPart[] }) {
+  const richParts = parts?.filter((part) => part.type === 'rich_card' && part.richContent) ?? []
   const visibleParts = parts?.filter((part) => (
-    part.type !== 'image' && Boolean(part.label.trim() || metadataFor(part))
+    part.type !== 'image' && part.type !== 'rich_card' && Boolean(part.label.trim() || metadataFor(part))
   )) ?? []
-  if (!visibleParts.length) return null
+  if (!visibleParts.length && !richParts.length) return null
   return (
-    <div className={styles.grid} aria-label="官方回复中的结构化内容">
-      {visibleParts.map((part, index) => {
-        const presentation = presentationFor(part.type)
-        const Icon = presentation.icon
-        const metadata = metadataFor(part)
-        return (
-          <article className={styles.card} key={`${part.type}:${part.label}:${index}`}>
-            <span className={styles.icon}><Icon size={16} aria-hidden="true" /></span>
-            <span className={styles.copy}>
-              <strong>{part.label || presentation.label}</strong>
-              <small>{metadata || presentation.label}</small>
-            </span>
-          </article>
-        )
-      })}
-    </div>
+    <>
+      {richParts.map((part, index) => (
+        <AiRichContentCard content={part.richContent!} key={`${part.label}:${index}`} />
+      ))}
+      {visibleParts.length > 0 && (
+        <div className={styles.grid} aria-label="官方回复中的结构化内容">
+          {visibleParts.map((part, index) => {
+            const presentation = presentationFor(part.type)
+            const Icon = presentation.icon
+            const metadata = metadataFor(part)
+            return (
+              <article className={styles.card} key={`${part.type}:${part.label}:${index}`}>
+                <span className={styles.icon}><Icon size={16} aria-hidden="true" /></span>
+                <span className={styles.copy}>
+                  <strong>{part.label || presentation.label}</strong>
+                  <small>{metadata || presentation.label}</small>
+                </span>
+              </article>
+            )
+          })}
+        </div>
+      )}
+    </>
   )
 }
 

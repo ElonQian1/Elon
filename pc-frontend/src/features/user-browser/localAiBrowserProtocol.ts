@@ -1,3 +1,5 @@
+import type { YilongRichContent } from './richContentProtocol'
+
 export type LocalAiStructuredPartType =
   | 'image'
   | 'file'
@@ -11,6 +13,7 @@ export type LocalAiStructuredPartType =
   | 'chart'
   | 'map'
   | 'interactive'
+  | 'rich_card'
 
 interface LocalAiStructuredContentMetadata {
   text: string
@@ -24,6 +27,7 @@ interface LocalAiStructuredContentMetadata {
   lineCount?: number
   rowCount?: number
   columnCount?: number
+  richContent?: YilongRichContent
 }
 
 export type LocalAiStructuredContentPart = {

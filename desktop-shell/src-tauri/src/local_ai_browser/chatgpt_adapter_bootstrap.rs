@@ -1,6 +1,8 @@
 const ALLOWED_ORIGIN: &str = "https://chatgpt.com";
 pub(super) const ADAPTER_VERSION: u32 = 142;
 
+const WIN_RICH_CONTENT_ADAPTER: &str = include_str!("chatgpt_rich_content_adapter.js");
+
 const ADAPTER_ASSETS: &[(&str, &str)] = &[
     (
         "chatgpt_web_adapter_bootstrap.js",
@@ -140,10 +142,18 @@ pub(super) fn initialization_script() -> String {
     let adapters = ADAPTER_ASSETS
         .iter()
         .map(|(name, source)| {
-            format!(
+            let shared = format!(
                 "window.__elonChatGptBootstrapStage = '{}';\n{}",
                 name, source
-            )
+            );
+            if *name == "chatgpt_web_adapter_messages.js" {
+                format!(
+                    "window.__elonChatGptBootstrapStage = 'chatgpt_rich_content_adapter.js';\n{}\n{}",
+                    WIN_RICH_CONTENT_ADAPTER, shared
+                )
+            } else {
+                shared
+            }
         })
         .collect::<Vec<_>>()
         .join("\n");

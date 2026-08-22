@@ -13,14 +13,13 @@ import {
 } from './localAiAnswerSurfacePolicy'
 import styles from './AiOfficialAnswerSurface.module.css'
 
-const MAX_PRESENT_ATTEMPTS = 4
 const PRESENT_RETRY_BASE_MS = 450
+const PRESENT_RETRY_MAX_MS = 8_000
 
 export default function AiOfficialAnswerSurface({ web }: { web: AiWebChatBackend }) {
   const viewportRef = useRef<HTMLDivElement>(null)
   const generationRef = useRef(0)
   const [browserSurface, setBrowserSurface] = useState<AiBrowserSurface>('chat')
-  const [failedKey, setFailedKey] = useState('')
   const snapshot = web.controller.snapshot
   const answerKey = useMemo(
     () => localAiAnswerSurfaceKey(web.provider?.id, snapshot),
@@ -41,15 +40,11 @@ export default function AiOfficialAnswerSurface({ web }: { web: AiWebChatBackend
   ].join(':')
   const shouldPresent = renderMode === 'official_live'
     && Boolean(answerKey && web.officialRequest)
-    && failedKey !== presentationKey
 
   useEffect(() => {
     const surfaceChanged = (event: Event) => {
       const next = (event as CustomEvent<AiBrowserSurface>).detail
       if (next === 'chat' || next === 'official' || next === 'source') {
-        if (next === 'chat') {
-          setFailedKey('')
-        }
         setBrowserSurface(next)
       }
     }
@@ -58,10 +53,6 @@ export default function AiOfficialAnswerSurface({ web }: { web: AiWebChatBackend
       window.removeEventListener(AI_BROWSER_SURFACE_CHANGED_EVENT, surfaceChanged)
     }
   }, [])
-
-  useEffect(() => {
-    setFailedKey('')
-  }, [presentationKey])
 
   useLayoutEffect(() => {
     const request = web.officialRequest
@@ -88,15 +79,14 @@ export default function AiOfficialAnswerSurface({ web }: { web: AiWebChatBackend
       } catch {
         if (generation === generationRef.current) {
           attempts += 1
-          if (attempts < MAX_PRESENT_ATTEMPTS) {
-            const delay = PRESENT_RETRY_BASE_MS * attempts
-            retryTimer = window.setTimeout(() => {
-              retryTimer = 0
-              void synchronize()
-            }, delay)
-          } else {
-            setFailedKey(presentationKey)
-          }
+          const delay = Math.min(
+            PRESENT_RETRY_MAX_MS,
+            PRESENT_RETRY_BASE_MS * (2 ** Math.min(attempts - 1, 5)),
+          )
+          retryTimer = window.setTimeout(() => {
+            retryTimer = 0
+            void synchronize()
+          }, delay)
         }
         await hideLocalAiWebSessionEmbedded(request).catch(() => null)
       } finally {

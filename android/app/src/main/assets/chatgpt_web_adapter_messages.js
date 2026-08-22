@@ -8,11 +8,12 @@
   const MAX_STRUCTURED_PARTS = 16;
   const FILE_PATH_EXTENSION = /\.(?:pdf|docx?|xlsx?|csv|pptx?|txt|md|json|xml|ya?ml|zip|rar|7z|tar|gz|png|jpe?g|gif|webp|svg|mp3|wav|m4a|ogg|mp4|mov|webm)$/i;
   const COMPLEX_PART_TYPES = new Set([
-    'code', 'table', 'artifact', 'audio', 'video', 'math', 'chart', 'map', 'interactive'
+    'code', 'table', 'artifact', 'audio', 'video', 'math', 'chart', 'map', 'interactive', 'rich_card'
   ]);
   const INVISIBLE_PLACEHOLDERS = /[\u00ad\u034f\u061c\u180e\u200b-\u200f\u202a-\u202e\u2060-\u206f\ufeff]/gu;
   const THINKING_CURSOR_PLACEHOLDERS = /[\u2022\u2026\u22ef\u25cf\u25cb\u2580-\u259f\ue000-\uf8ff]/gu;
   const messageActionPolicy = window.__elonChatGptMessageActionPolicy;
+  const richContent = window.__elonChatGptRichContent;
   let lastStructuredTypes = new Set();
   let lastComplexOutput = false;
 
@@ -82,6 +83,7 @@
   function markdown(node, context) {
     if (node.nodeType === Node.TEXT_NODE) return escapeMarkdown(node.nodeValue);
     if (node.nodeType !== Node.ELEMENT_NODE) return '';
+    if (richContent && richContent.owns(node)) return '';
     const tag = node.tagName;
     if (tag === 'BR') return '\n';
     if (tag === 'HR') return '\n\n---\n\n';
@@ -259,7 +261,8 @@
   function structuredParts(content) {
     const parts = [];
     function add(type, label, node, metadata) {
-      if (parts.length >= MAX_STRUCTURED_PARTS || !isVisible(node)) return;
+      if (parts.length >= MAX_STRUCTURED_PARTS || !isVisible(node) ||
+          (richContent && richContent.owns(node))) return;
       parts.push(Object.assign({ type, text: label }, metadata || {}));
       lastStructuredTypes.add(type);
       if (COMPLEX_PART_TYPES.has(type)) lastComplexOutput = true;
@@ -347,8 +350,12 @@
     lastComplexOutput = false;
     const messages = nodes.slice(startIndex).map((node, index) => {
       const role = messageRole(node);
+      const content = contentNode(node);
+      const richParts = role === 'assistant' && richContent ? richContent.parts(content) : [];
       const text = messageContent(node, role);
-      const parts = structuredParts(contentNode(node));
+      const parts = richParts.concat(structuredParts(content));
+      richParts.forEach((part) => lastStructuredTypes.add(part.type));
+      if (richParts.length) lastComplexOutput = true;
       const globalIndex = startIndex + index;
       const baseId = messageIdentity(node, role, globalIndex);
       const id = seen.has(baseId) ? baseId + '-' + globalIndex : baseId;
@@ -381,6 +388,7 @@
       const turn = nodes[index];
       if (messageRole(turn) !== 'assistant') continue;
       const content = contentNode(turn);
+      const richParts = richContent ? richContent.parts(content) : [];
       const text = messageContent(turn, 'assistant')
         .replace(INVISIBLE_PLACEHOLDERS, '')
         .replace(THINKING_CURSOR_PLACEHOLDERS, '')
@@ -388,7 +396,7 @@
       const richCount = content.querySelectorAll(
         'table, pre, blockquote, ol, ul, img, video, audio, canvas, iframe, '
         + '[data-testid*="artifact" i], [data-testid*="code-interpreter" i]'
-      ).length;
+      ).length + richParts.length;
       return {
         key: messageIdentity(turn, 'assistant', index),
         fingerprint: text + '\u0000' + richCount,

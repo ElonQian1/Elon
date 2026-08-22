@@ -1,3 +1,5 @@
+import type { YilongRichContent } from './richContentProtocol'
+
 /** 一龙原生 AI UI 与厂商适配器之间的去凭证化语义协议。 */
 export const UNIFIED_AI_PROTOCOL = 'yilong.ai.ui.v1' as const
 
@@ -11,7 +13,7 @@ export interface UnifiedAiTextPart {
 }
 
 export interface UnifiedAiStructuredPart {
-  type: 'code' | 'table' | 'artifact' | 'audio' | 'video' | 'math' | 'chart' | 'map' | 'interactive'
+  type: 'code' | 'table' | 'artifact' | 'audio' | 'video' | 'math' | 'chart' | 'map' | 'interactive' | 'rich_card'
   text: string
   kind?: string
   language?: string
@@ -20,6 +22,7 @@ export interface UnifiedAiStructuredPart {
   lineCount?: number
   rowCount?: number
   columnCount?: number
+  richContent?: YilongRichContent
 }
 
 export interface UnifiedAiImagePart {

@@ -70,6 +70,7 @@ export default function useAiWebChatBackend(mode: AiHomeMode, ownerKey: string) 
           lineCount: 'lineCount' in part ? part.lineCount : undefined,
           rowCount: 'rowCount' in part ? part.rowCount : undefined,
           columnCount: 'columnCount' in part ? part.columnCount : undefined,
+          richContent: 'richContent' in part ? part.richContent : undefined,
         }))
       if (!shouldKeepAiWebMessage({
         content,

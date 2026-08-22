@@ -1,5 +1,8 @@
 use serde_json::{json, Map, Value};
 
+#[path = "adapter_content/rich_content.rs"]
+mod rich_content;
+
 const MAX_CONTENT_PARTS: usize = 24;
 const MAX_MESSAGE_CHARS: usize = 40_000;
 const MAX_STRUCTURED_LABEL_CHARS: usize = 180;
@@ -34,6 +37,9 @@ fn sanitize_part(value: &Value) -> Option<Value> {
     if matches!(part_type, "text" | "markdown") {
         let text = clean_string(part.get("text"), MAX_MESSAGE_CHARS);
         return (!text.is_empty()).then(|| json!({"type": part_type, "text": text}));
+    }
+    if part_type == "rich_card" {
+        return rich_content::sanitize_rich_card(part);
     }
     if !STRUCTURED_TYPES.contains(&part_type) {
         return None;
@@ -170,7 +176,47 @@ mod tests {
         assert_eq!(sanitized[0]["type"], "markdown");
         assert_eq!(sanitized[1]["lineCount"], 12);
         assert_eq!(sanitized[2]["url"], "https://example.com/docs");
-        assert_eq!(sanitized[2]["iconUrl"], "https://cdn.example.com/icons/docs.png");
+        assert_eq!(
+            sanitized[2]["iconUrl"],
+            "https://cdn.example.com/icons/docs.png"
+        );
         assert!(!Value::Array(sanitized).to_string().contains("token"));
+    }
+
+    #[test]
+    fn finance_rich_card_keeps_versioned_visible_data_and_bounds_chart_points() {
+        let parts = json!([{
+            "type":"rich_card",
+            "text":"Bitcoin (BTC)",
+            "kind":"finance",
+            "richContent":{
+                "schema":"yilong.rich-content.v1",
+                "kind":"finance",
+                "source":"official_dom",
+                "payload":{
+                    "title":"Bitcoin (BTC)",
+                    "symbol":"BTC",
+                    "primaryValue":"US$77,274.00",
+                    "secondaryValue":"+US$123.00 (0.16%)",
+                    "trend":"positive",
+                    "periods":[{"id":"1d","label":"1D","selected":true}],
+                    "metrics":[{"label":"当日最低价","value":"76,601"}],
+                    "chart":{"kind":"line","points":[{"x":"12:00","y":77274.0},{"x":"13:00","y":77301.5}]}
+                },
+                "privateDebugField":"secret"
+            }
+        }]);
+        let sanitized = sanitize_parts(Some(&parts));
+        assert_eq!(sanitized.len(), 1);
+        assert_eq!(sanitized[0]["type"], "rich_card");
+        assert_eq!(
+            sanitized[0]["richContent"]["schema"],
+            "yilong.rich-content.v1"
+        );
+        assert_eq!(
+            sanitized[0]["richContent"]["payload"]["chart"]["points"][1]["y"],
+            77301.5
+        );
+        assert!(!sanitized[0].to_string().contains("secret"));
     }
 }

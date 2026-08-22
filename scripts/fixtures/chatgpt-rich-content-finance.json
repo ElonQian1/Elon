@@ -1,0 +1,23 @@
+{
+  "title": "Bitcoin (BTC)",
+  "symbol": "BTC",
+  "primaryValue": "US$77,274.00",
+  "secondaryValue": "+US$123.00 (0.16%)",
+  "trend": "positive",
+  "periods": [
+    { "id": "1d", "label": "1D", "selected": true },
+    { "id": "5d", "label": "5D", "selected": false },
+    { "id": "1m", "label": "1M", "selected": false },
+    { "id": "6m", "label": "6M", "selected": false },
+    { "id": "ytd", "label": "YTD", "selected": false },
+    { "id": "1y", "label": "1Y", "selected": false },
+    { "id": "5y", "label": "5Y", "selected": false },
+    { "id": "max", "label": "MAX", "selected": false }
+  ],
+  "metrics": [
+    { "label": "当日最低价", "value": "76,601" },
+    { "label": "当日最高价", "value": "78,763" },
+    { "label": "年度最低价", "value": "57,945" },
+    { "label": "年度最高价", "value": "126,080" }
+  ]
+}
