@@ -130,7 +130,7 @@ class AiWorkSummaryActivity : AppCompatActivity() {
             addView(label("AI 已分析你的 21 个项目", 14f, "#CDD2D1", regular).apply {
                 setPadding(0, dp(6), 0, 0)
             })
-        }, FrameLayout.LayoutParams(WRAP, WRAP, Gravity.CENTER_VERTICAL).apply { marginStart = dp(94) })
+        }, FrameLayout.LayoutParams(WRAP, WRAP, Gravity.CENTER_VERTICAL).apply { marginStart = dp(106) })
     }
 
     private fun createMetrics(): View = LinearLayout(this).apply {

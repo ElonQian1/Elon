@@ -22,7 +22,7 @@ class AiWorkSummaryContractTest {
         assertTrue("指标卡间距必须使用设计稿的 16dp 节奏", source.contains("weighted(dp(16))"))
         assertTrue("分区数量胶囊必须使用设计稿 20dp 宽度", source.contains("LinearLayout.LayoutParams(dp(20), dp(21))"))
         assertTrue("日期选择组必须按整屏居中，日历独立贴右", source.contains("FrameLayout.LayoutParams(dp(96), dp(48), Gravity.CENTER)"))
-        assertTrue("问候文字必须使用固定设计对齐线，禁止负边距", source.contains("marginStart = dp(94)") && !source.contains("marginStart = dp(-7)"))
+        assertTrue("问候文字必须与头像保留设计稿横向留白，禁止负边距", source.contains("marginStart = dp(106)") && !source.contains("marginStart = dp(-7)"))
         assertTrue("AI 头像必须放大到设计容器而不是保留 nodpi 原始像素", source.contains("scaleType = ImageView.ScaleType.FIT_CENTER"))
         assertTrue("指标卡数字和标题必须真正居中", source.contains("label(number, 16f, color, regular).apply { gravity = Gravity.CENTER }") && source.contains("label(caption, 13f, \"#E5E8E7\", regular).apply"))
         assertTrue("进展行项目图标必须使用设计稿 29dp 起点", source.contains("setPadding(dp(29), dp(14), dp(4), dp(14))"))
