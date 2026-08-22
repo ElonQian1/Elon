@@ -82,16 +82,16 @@ internal class HomeConversationHeaderView(
                     setTextColor(Color.parseColor("#DDDBD5"))
                 })
                 addView(TextView(activity).apply {
-                    minWidth = dp(28)
-                    layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, dp(24)).apply {
+                    minWidth = dp(24)
+                    layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, dp(20)).apply {
                         marginStart = dp(4)
                     }
-                    background = rounded("#9CBAD5", 12)
+                    background = rounded("#9CBAD5", 10)
                     gravity = Gravity.CENTER
                     includeFontPadding = false
-                    setPadding(dp(6), 0, dp(6), 0)
+                    setPadding(dp(5), 0, dp(5), 0)
                     text = count.coerceAtMost(99).toString()
-                    textSize = 13f
+                    textSize = 12f
                     typeface = medium
                     fontFeatureSettings = "tnum"
                     setTextColor(Color.parseColor("#111820"))

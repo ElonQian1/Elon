@@ -21,6 +21,8 @@ class HomeConversationHeaderContractTest {
         assertTrue(androidHeader.contains("HomeListFilterMode.Conversations to"))
         assertTrue(androidHeader.contains("createFilterTab"))
         assertTrue(androidHeader.contains("if (selected) \"#9CBAD5\" else \"#00000000\""))
+        assertTrue(androidHeader.contains("LinearLayout.LayoutParams.WRAP_CONTENT, dp(20)"))
+        assertTrue(androidHeader.contains("minWidth = dp(24)"))
         assertFalse(androidHeader.contains("pillBackground"))
 
         val web = readRepositoryFile("server/src/assets/web_page.html")
@@ -30,6 +32,7 @@ class HomeConversationHeaderContractTest {
         assertTrue(web.contains("['all', '全部', counts.all]"))
         assertTrue(web.contains("['conversations', '对话', counts.conversations]"))
         assertTrue(web.contains(".home-filter-tab.active::after { background: #9cbad5; }"))
+        assertTrue(web.contains(".home-filter-count { min-width: 24px; height: 20px;"))
     }
 
     private fun readRepositoryFile(relativePath: String): String {
