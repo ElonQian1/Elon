@@ -9054,7 +9054,7 @@
       "id": "win-web-ai-rich-session-continuity-v2",
       "title": "Win 网页 AI 富内容会话连续性 V2",
       "summary": "消除 ChatGPT/Google AI 后台连接的同标签 WebView2 创建竞态，复用持久会话并保持官网回答节点与原生富内容缓存的连续切换。",
-      "status": "claimed",
+      "status": "verified",
       "priority": "p0",
       "requirement": {
         "path": "docs/requirements/win-web-ai-rich-session-continuity-v2.md",
@@ -9092,15 +9092,75 @@
         "现有缓存首帧、官网回答节点和原生 AST 行为兼容，相关前端/Rust/Win 验证通过。",
         "正式发布身份匹配目标提交，重启后实机切换 Google AI 不再出现重复 WebView2 错误。"
       ],
-      "implementation_evidence": [],
-      "claim": {
-        "claim_id": "claim_4e8e5a935d824c03a6069ec7969154a6",
-        "agent_id": "codex-root",
-        "claimed_at_ms": 1787436512226,
-        "expires_at_ms": 1787450912226
-      },
+      "implementation_evidence": [
+        {
+          "path": "desktop-shell/src-tauri/src/local_ai_browser.rs",
+          "content_hash": "3a20e9a838e9ee4ecb09c0d8d6bfb4411f038a33f4683e73ff830774cd0ff735",
+          "locator": "open_local_ai_web_session",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "8dcbafc3a225abff77b6a6cfd94fa50372e1c0ed",
+            "head_blob_oid": "2be6d570c27fe8c54bcfc91d1726923508524fa4",
+            "worktree_blob_oid": "2be6d570c27fe8c54bcfc91d1726923508524fa4",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "desktop-shell/src-tauri/src/local_ai_browser/session_identity.rs",
+          "content_hash": "b17cd53238f93602c9b324fc7290e53d2f9b4fd736b24a7031d95463df749069",
+          "locator": "lock_webview_creation",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "8dcbafc3a225abff77b6a6cfd94fa50372e1c0ed",
+            "head_blob_oid": "f2ec5e34844add3eade023538a206e74c6b43f5d",
+            "worktree_blob_oid": "f2ec5e34844add3eade023538a206e74c6b43f5d",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "docs/requirements/win-web-ai-rich-session-continuity-v2.md",
+          "content_hash": "2bad3072bbf65f567768402ee5b29d5940cd3e4ae4e129a7f7640123d4d35297",
+          "locator": "验收标准",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "8dcbafc3a225abff77b6a6cfd94fa50372e1c0ed",
+            "head_blob_oid": "9f9269e91c02e43fca5fd8a2510586f61eac7dcd",
+            "worktree_blob_oid": "9f9269e91c02e43fca5fd8a2510586f61eac7dcd",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "pc-frontend/scripts/test-local-ai-browser-contract.cjs",
+          "content_hash": "98b0d34aeab9ef1f58812af4e1dd1f02e0a0756dfa4ecafd25d67792276588a5",
+          "locator": "LOCAL_AI_WEBVIEW_CREATION",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "8dcbafc3a225abff77b6a6cfd94fa50372e1c0ed",
+            "head_blob_oid": "0c66001b238f561aca9a785684023073b2b31ac2",
+            "worktree_blob_oid": "0c66001b238f561aca9a785684023073b2b31ac2",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/user-browser/localAiBrowserApi.ts",
+          "content_hash": "3e1fbe58bef2bd8078c9e63b3f140c4b1380febe16a97bb8f10e0a3f5b923147",
+          "locator": "localAiOpenCoalesceKey",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "8dcbafc3a225abff77b6a6cfd94fa50372e1c0ed",
+            "head_blob_oid": "20e09e7da3524c45ad72c654251c18910b59149e",
+            "worktree_blob_oid": "20e09e7da3524c45ad72c654251c18910b59149e",
+            "state": "tracked_clean"
+          }
+        }
+      ],
       "created_at_ms": 1787436124298,
-      "updated_at_ms": 1787436512226
+      "updated_at_ms": 1787436832408
     },
     {
       "id": "win-web-ai-rich-structure-observability-v1",
@@ -9620,46 +9680,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_755c046a415b4c8695cbe938a2609e70",
-      "feature_id": "win-live-parked-ai-webview-input-hit-test-v2",
-      "action": "registered",
-      "actor": "codex",
-      "reason": "V1 真实发送证明完全隐藏会暂停官网会话恢复，需在不覆盖可见 UI 的前提下保持 WebView2 脚本活跃。",
-      "from_status": "",
-      "to_status": "accepted",
-      "at_ms": 1787220615062
-    },
-    {
-      "id": "feature_event_212cbdc3c1974ee189ce72be45244bff",
-      "feature_id": "win-live-parked-ai-webview-input-hit-test-v2",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "V2 需求和真实验收标准已接受。",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1787220630290
-    },
-    {
-      "id": "feature_event_8355e08a7f9b49ba8d7dda950734d002",
-      "feature_id": "win-live-parked-ai-webview-input-hit-test-v2",
-      "action": "claimed",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1787220630320
-    },
-    {
-      "id": "feature_event_76d6ec76c2d44c77b496c2de486aea45",
-      "feature_id": "win-live-parked-ai-webview-input-hit-test-v2",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "实现 1×1 可视区外活跃停放并重新发布验收。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1787220630343
-    },
     {
       "id": "feature_event_094cbddf8b9949eeb57733986806240c",
       "feature_id": "win-live-parked-ai-webview-input-hit-test-v2",
@@ -11619,6 +11639,46 @@
       "from_status": "ready",
       "to_status": "claimed",
       "at_ms": 1787436512227
+    },
+    {
+      "id": "feature_event_82bbebfb4b194792b754165cc838d118",
+      "feature_id": "win-web-ai-rich-session-continuity-v2",
+      "action": "evidence_recorded",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "claimed",
+      "to_status": "claimed",
+      "at_ms": 1787436796220
+    },
+    {
+      "id": "feature_event_59bba2c7dca54e0291842b8500c883e8",
+      "feature_id": "win-web-ai-rich-session-continuity-v2",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "实现与定向测试已完成，进入验收状态推进。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1787436809616
+    },
+    {
+      "id": "feature_event_a66a489141f046f9901c919f6f1dae23",
+      "feature_id": "win-web-ai-rich-session-continuity-v2",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "前端合并与 Rust 最终创建门禁已实现，证据已绑定当前提交。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1787436821495
+    },
+    {
+      "id": "feature_event_6188316ff9e64328bdfc4b0ccfd4afa7",
+      "feature_id": "win-web-ai-rich-session-continuity-v2",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "网页 AI 契约、Rust 定向测试、PC typecheck/lint/build 与 Win Web AI 全量验证均通过。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1787436832408
     }
   ]
 }
