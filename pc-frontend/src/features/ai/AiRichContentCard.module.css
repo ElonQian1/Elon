@@ -27,6 +27,11 @@
   color: #68d99f;
 }
 
+.weatherIcon {
+  color: #ffcb66;
+  background: rgba(255, 193, 77, .12);
+}
+
 .eyebrow {
   display: block;
   margin-bottom: 2px;
@@ -60,6 +65,13 @@
 
 .quote span[data-trend="positive"] { color: #45ce82; }
 .quote span[data-trend="negative"] { color: #ff6473; }
+
+.summary {
+  margin: 4px 20px 12px;
+  color: #b8bbc1;
+  font-size: 12px;
+  line-height: 1.55;
+}
 
 .periods {
   display: grid;
@@ -123,7 +135,31 @@
 .metrics dt { color: #969ba3; font-size: 10px; }
 .metrics dd { margin: 4px 0 0; color: #f4f4f5; font-size: 12px; font-weight: 620; }
 
+.weatherRows {
+  display: grid;
+  margin-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, .09);
+}
+
+.weatherRow {
+  min-height: 50px;
+  display: grid;
+  grid-template-columns: minmax(72px, .7fr) minmax(120px, 1.5fr) minmax(56px, .6fr) minmax(72px, .8fr);
+  align-items: center;
+  gap: 10px;
+  padding: 7px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, .07);
+}
+
+.weatherRow:last-child { border-bottom: 0; }
+.weatherRow strong { font-size: 11px; }
+.weatherRow span { color: #d9dbe0; font-size: 12px; }
+.weatherRow b { font-size: 13px; text-align: right; }
+.weatherRow small { color: #92969e; font-size: 10px; text-align: right; }
+
 @media (max-width: 680px) {
   .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .periods { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .weatherRow { grid-template-columns: 66px minmax(100px, 1fr) 52px; padding-inline: 14px; }
+  .weatherRow small { display: none; }
 }

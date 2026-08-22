@@ -35,9 +35,11 @@ assert.match(protocol, /YILONG_RICH_CONTENT_SCHEMA/)
 assert.match(backend, /richContent:/)
 assert.match(structuredContent, /<AiRichContentCard/)
 assert.match(renderer, /aria-label="官方行情卡片"/)
+assert.match(renderer, /aria-label="官方天气卡片"/)
 assert.match(renderer, /periods\.map/)
 assert.match(renderer, /metrics\.map/)
 assert.match(renderer, /chart\?\.points/)
+assert.match(renderer, /payload\.rows\.map/)
 
 const context = {
   window: {},

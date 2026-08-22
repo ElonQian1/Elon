@@ -219,4 +219,31 @@ mod tests {
         );
         assert!(!sanitized[0].to_string().contains("secret"));
     }
+
+    #[test]
+    fn weather_rich_card_preserves_rows_and_discards_unknown_fields() {
+        let parts = json!([{
+            "type":"rich_card",
+            "text":"彰化县今晚天气",
+            "kind":"weather",
+            "richContent":{
+                "schema":"yilong.rich-content.v1",
+                "kind":"weather",
+                "source":"official_dom",
+                "payload":{
+                    "title":"彰化县今晚天气",
+                    "rows":[
+                        {"period":"17:00","condition":"多云时阴","temperature":"33°C","precipitation":"20%","private":"secret"}
+                    ]
+                }
+            }
+        }]);
+        let sanitized = sanitize_parts(Some(&parts));
+        assert_eq!(sanitized[0]["kind"], "weather");
+        assert_eq!(
+            sanitized[0]["richContent"]["payload"]["rows"][0]["temperature"],
+            "33°C"
+        );
+        assert!(!sanitized[0].to_string().contains("secret"));
+    }
 }

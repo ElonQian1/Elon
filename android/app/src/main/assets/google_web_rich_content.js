@@ -12,6 +12,7 @@
 
   const MAX_BLOCKS = 160;
   const MAX_MARKDOWN_CHARS = 40000;
+  const RICH_SCHEMA = 'yilong.rich-content.v1';
   const BLOCK_TAGS = new Set([
     'ARTICLE', 'ASIDE', 'BLOCKQUOTE', 'DIV', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6',
     'LI', 'OL', 'P', 'PRE', 'SECTION', 'TABLE', 'UL'
@@ -149,10 +150,59 @@
 
   function partsFromBlocks(blocks, fallbackText, query) {
     const trimmed = trimBlocks(blocks, query);
-    const markdown = renderBlocks(trimmed);
-    if (markdown) return [{ type: 'markdown', text: markdown }];
+    const richPart = weatherPart(trimmed);
+    const proseBlocks = richPart
+      ? trimmed.filter((block) => block !== richPart.sourceBlock)
+      : trimmed;
+    const markdown = renderBlocks(proseBlocks);
+    const parts = markdown ? [{ type: 'markdown', text: markdown }] : [];
+    if (richPart) parts.push(richPart.part);
+    if (parts.length) return parts;
     const fallback = cleanText(fallbackText).slice(0, MAX_MARKDOWN_CHARS);
     return fallback ? [{ type: 'text', text: fallback }] : [];
+  }
+
+  function weatherPart(blocks) {
+    const tableIndex = blocks.findIndex((block) => {
+      if (!block || block.type !== 'table' || !Array.isArray(block.rows) || !block.rows.length) return false;
+      const header = block.rows[0].map(cleanInline).join(' ').toLowerCase();
+      return /(?:时间|時間|time)/.test(header) &&
+        /(?:天气|天氣|weather|condition)/.test(header) &&
+        /(?:气温|氣溫|温度|溫度|temperature|temp)/.test(header);
+    });
+    if (tableIndex < 0) return null;
+    const table = blocks[tableIndex];
+    const header = table.rows[0].map((value) => cleanInline(value).toLowerCase());
+    const indexFor = (pattern) => header.findIndex((value) => pattern.test(value));
+    const periodIndex = indexFor(/时间|時間|time/);
+    const conditionIndex = indexFor(/天气|天氣|weather|condition/);
+    const temperatureIndex = indexFor(/气温|氣溫|温度|溫度|temperature|temp/);
+    const precipitationIndex = indexFor(/降水|降雨|precipitation|rain/);
+    const windIndex = indexFor(/风|風|wind/);
+    const rows = table.rows.slice(1, 25).map((row) => ({
+      period: cleanInline(row[periodIndex]),
+      condition: cleanInline(row[conditionIndex]),
+      temperature: cleanInline(row[temperatureIndex]),
+      precipitation: precipitationIndex >= 0 ? cleanInline(row[precipitationIndex]) : '',
+      wind: windIndex >= 0 ? cleanInline(row[windIndex]) : ''
+    })).filter((row) => row.period && row.condition && row.temperature);
+    if (!rows.length) return null;
+    const heading = blocks.slice(0, tableIndex).reverse().find((block) => block.type === 'heading');
+    const title = cleanInline(heading && (heading.text || heading.markdown)) || '天气预报';
+    return {
+      sourceBlock: table,
+      part: {
+        type: 'rich_card',
+        text: title,
+        kind: 'weather',
+        richContent: {
+          schema: RICH_SCHEMA,
+          kind: 'weather',
+          source: 'official_dom',
+          payload: { title, rows }
+        }
+      }
+    };
   }
 
   function elementVisible(element) {
@@ -315,9 +365,10 @@
   }
 
   return Object.freeze({
-    version: 1,
+    version: 2,
     renderBlocks,
     partsFromBlocks,
+    weatherPart,
     parts
   });
 });

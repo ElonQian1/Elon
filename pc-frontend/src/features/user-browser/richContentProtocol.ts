@@ -37,4 +37,23 @@ export interface FinanceRichContent {
   payload: FinanceRichContentPayload
 }
 
-export type YilongRichContent = FinanceRichContent
+export interface WeatherRichContentRow {
+  period: string
+  condition: string
+  temperature: string
+  precipitation?: string
+  wind?: string
+}
+
+export interface WeatherRichContent {
+  schema: typeof YILONG_RICH_CONTENT_SCHEMA
+  kind: 'weather'
+  source: 'official_dom' | 'private_response' | 'cache'
+  payload: {
+    title: string
+    summary?: string
+    rows: WeatherRichContentRow[]
+  }
+}
+
+export type YilongRichContent = FinanceRichContent | WeatherRichContent

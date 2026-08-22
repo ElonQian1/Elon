@@ -4,16 +4,20 @@ const RICH_SCHEMA: &str = "yilong.rich-content.v1";
 
 pub(super) fn sanitize_rich_card(part: &Map<String, Value>) -> Option<Value> {
     let rich = part.get("richContent")?.as_object()?;
-    if rich.get("schema").and_then(Value::as_str) != Some(RICH_SCHEMA)
-        || rich.get("kind").and_then(Value::as_str) != Some("finance")
-    {
+    if rich.get("schema").and_then(Value::as_str) != Some(RICH_SCHEMA) {
         return None;
     }
+    let kind = rich.get("kind").and_then(Value::as_str)?;
     let source = rich.get("source").and_then(Value::as_str)?;
     if !matches!(source, "official_dom" | "private_response" | "cache") {
         return None;
     }
-    let payload = sanitize_finance_payload(rich.get("payload")?.as_object()?)?;
+    let payload_source = rich.get("payload")?.as_object()?;
+    let payload = match kind {
+        "finance" => sanitize_finance_payload(payload_source),
+        "weather" => sanitize_weather_payload(payload_source),
+        _ => None,
+    }?;
     let text = super::clean_string(part.get("text"), 180);
     let title = payload
         .get("title")
@@ -22,7 +26,7 @@ pub(super) fn sanitize_rich_card(part: &Map<String, Value>) -> Option<Value> {
         .to_string();
     let mut sanitized_rich = Map::new();
     sanitized_rich.insert("schema".into(), Value::String(RICH_SCHEMA.into()));
-    sanitized_rich.insert("kind".into(), Value::String("finance".into()));
+    sanitized_rich.insert("kind".into(), Value::String(kind.into()));
     sanitized_rich.insert("source".into(), Value::String(source.into()));
     sanitized_rich.insert("payload".into(), Value::Object(payload));
     Some(Value::Object(Map::from_iter([
@@ -31,9 +35,49 @@ pub(super) fn sanitize_rich_card(part: &Map<String, Value>) -> Option<Value> {
             "text".into(),
             Value::String(if text.is_empty() { title } else { text }),
         ),
-        ("kind".into(), Value::String("finance".into())),
+        ("kind".into(), Value::String(kind.into())),
         ("richContent".into(), Value::Object(sanitized_rich)),
     ])))
+}
+
+fn sanitize_weather_payload(source: &Map<String, Value>) -> Option<Map<String, Value>> {
+    let title = super::clean_string(source.get("title"), 120);
+    if title.is_empty() {
+        return None;
+    }
+    let rows = source
+        .get("rows")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .take(24)
+        .filter_map(|value| {
+            let row = value.as_object()?;
+            let period = super::clean_string(row.get("period"), 48);
+            let condition = super::clean_string(row.get("condition"), 64);
+            let temperature = super::clean_string(row.get("temperature"), 32);
+            if period.is_empty() || condition.is_empty() || temperature.is_empty() {
+                return None;
+            }
+            let mut sanitized = Map::from_iter([
+                ("period".into(), Value::String(period)),
+                ("condition".into(), Value::String(condition)),
+                ("temperature".into(), Value::String(temperature)),
+            ]);
+            insert_optional_text(&mut sanitized, row, "precipitation", 32);
+            insert_optional_text(&mut sanitized, row, "wind", 48);
+            Some(Value::Object(sanitized))
+        })
+        .collect::<Vec<_>>();
+    if rows.is_empty() {
+        return None;
+    }
+    let mut payload = Map::from_iter([
+        ("title".into(), Value::String(title)),
+        ("rows".into(), Value::Array(rows)),
+    ]);
+    insert_optional_text(&mut payload, source, "summary", 240);
+    Some(payload)
 }
 
 fn sanitize_finance_payload(source: &Map<String, Value>) -> Option<Map<String, Value>> {

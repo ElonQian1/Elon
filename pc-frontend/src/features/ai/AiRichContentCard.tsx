@@ -1,11 +1,18 @@
-import { Activity, ExternalLink } from 'lucide-react'
+import { Activity, CloudSun, ExternalLink } from 'lucide-react'
 import type {
+  FinanceRichContent,
   RichContentChartPoint,
+  WeatherRichContent,
   YilongRichContent,
 } from '../user-browser/richContentProtocol'
 import styles from './AiRichContentCard.module.css'
 
 export default function AiRichContentCard({ content }: { content: YilongRichContent }) {
+  if (content.kind === 'weather') return <WeatherCard content={content} />
+  return <FinanceCard content={content} />
+}
+
+function FinanceCard({ content }: { content: FinanceRichContent }) {
   const { payload } = content
   const periods = payload.periods ?? []
   const metrics = payload.metrics ?? []
@@ -63,6 +70,45 @@ export default function AiRichContentCard({ content }: { content: YilongRichCont
       )}
     </article>
   )
+}
+
+function WeatherCard({ content }: { content: WeatherRichContent }) {
+  const { payload } = content
+  return (
+    <article className={styles.card} aria-label="官方天气卡片">
+      <header>
+        <span className={[styles.providerIcon, styles.weatherIcon].join(' ')}>
+          <CloudSun size={19} aria-hidden="true" />
+        </span>
+        <div>
+          <span className={styles.eyebrow}>天气预报</span>
+          <h3>{payload.title}</h3>
+        </div>
+      </header>
+      {payload.summary && <p className={styles.summary}>{payload.summary}</p>}
+      <div className={styles.weatherRows} role="table" aria-label="逐时天气">
+        {payload.rows.map((row) => (
+          <div className={styles.weatherRow} role="row" key={`${row.period}:${row.condition}`}>
+            <strong role="cell">{row.period}</strong>
+            <span role="cell">{weatherGlyph(row.condition)} {row.condition}</span>
+            <b role="cell">{row.temperature}</b>
+            {(row.precipitation || row.wind) && (
+              <small role="cell">{[row.precipitation, row.wind].filter(Boolean).join(' · ')}</small>
+            )}
+          </div>
+        ))}
+      </div>
+    </article>
+  )
+}
+
+function weatherGlyph(condition: string) {
+  if (/雷/.test(condition)) return '⛈️'
+  if (/雨|阵雨|陣雨/.test(condition)) return '🌧️'
+  if (/雪/.test(condition)) return '🌨️'
+  if (/晴/.test(condition)) return '☀️'
+  if (/阴|陰/.test(condition)) return '☁️'
+  return '🌤️'
 }
 
 function chartPath(points: RichContentChartPoint[] | undefined) {
