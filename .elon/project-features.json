@@ -9054,7 +9054,7 @@
       "id": "win-web-ai-rich-session-continuity-v2",
       "title": "Win 网页 AI 富内容会话连续性 V2",
       "summary": "消除 ChatGPT/Google AI 后台连接的同标签 WebView2 创建竞态，复用持久会话并保持官网回答节点与原生富内容缓存的连续切换。",
-      "status": "verified",
+      "status": "released",
       "priority": "p0",
       "requirement": {
         "path": "docs/requirements/win-web-ai-rich-session-continuity-v2.md",
@@ -9160,7 +9160,7 @@
         }
       ],
       "created_at_ms": 1787436124298,
-      "updated_at_ms": 1787436832408
+      "updated_at_ms": 1787437913448
     },
     {
       "id": "win-web-ai-rich-structure-observability-v1",
@@ -9680,16 +9680,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_094cbddf8b9949eeb57733986806240c",
-      "feature_id": "win-live-parked-ai-webview-input-hit-test-v2",
-      "action": "evidence_recorded",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1787220731557
-    },
     {
       "id": "feature_event_a483cd27c79341f583c1883656a89e00",
       "feature_id": "win-live-parked-ai-webview-input-hit-test-v2",
@@ -11679,6 +11669,16 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1787436832408
+    },
+    {
+      "id": "feature_event_fbe32573dbe245ec8c0ead5ba18a2360",
+      "feature_id": "win-web-ai-rich-session-continuity-v2",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "Win 正式节点已精确激活 0.3.69+83984e6051cc686a1cf748f0220731de6a80eddc；实机反复切换 ChatGPT/Google AI 后两侧均 phase=ready、composer/context ready、无重复 WebView 或错误码，历史正文与引用保持。",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1787437913448
     }
   ]
 }
