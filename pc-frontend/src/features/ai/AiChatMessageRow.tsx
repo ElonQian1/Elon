@@ -9,6 +9,7 @@ import AiWebProviderAvatar, { aiWebProviderDisplayName } from '../user-browser/A
 import styles from './AiChatPage.module.css'
 import AiStructuredContent, { type AiStructuredPart } from './AiStructuredContent'
 import AiSourceLinks from './AiSourceLinks'
+import { hasVisibleAiMessageContent } from './aiMessageVisibility'
 
 export interface AiMessage {
   id?: string
@@ -73,6 +74,7 @@ export default function AiChatMessageRow({
   const isUser = message.role === 'user'
   const isNode = !isUser && message.node_exec === true
   const content = displayMessageContentOrAttachment(message.content)
+  const hasVisibleContent = hasVisibleAiMessageContent(content)
   const hasMarkdown = !isUser && (
     message.content_format === 'markdown' || /[#*`\[\]>|]/.test(content)
   )
@@ -109,14 +111,16 @@ export default function AiChatMessageRow({
             <span className={styles.toolTag}>{message.tool_used === 'web_search' ? '已联网查询' : message.tool_used === 'calculator' ? '计算器' : message.tool_used === 'current_datetime' ? '实时时间' : '已使用工具'}</span>
           )}
         </div>
-        {streaming && !content.trim()
+        {streaming && !hasVisibleContent
           ? <div className={styles.typing} aria-live="polite">
             <span className={styles.typingText}>{streamingStatus}</span>
             <span className={styles.typingDot} /><span className={styles.typingDot} /><span className={styles.typingDot} />
           </div>
-          : hasMarkdown
-          ? <div id={copySourceId} className={styles.msgContent}><MarkdownContent content={content} copy /></div>
-          : <div id={copySourceId} className={styles.msgContent}>{content}</div>}
+          : hasVisibleContent && (hasMarkdown
+          ? <div id={copySourceId} className={styles.msgContent}>
+            <MarkdownContent content={content} copy citations={message.sources} />
+          </div>
+          : <div id={copySourceId} className={styles.msgContent}>{content}</div>)}
         {!isUser && <AiSourceLinks sources={message.sources} />}
         {!isUser && <AiStructuredContent parts={message.structured_parts} />}
         {!isUser && message.handoff && (
@@ -142,7 +146,7 @@ export default function AiChatMessageRow({
             )}
           </div>
         )}
-        <MessageActions
+        {!streaming && hasVisibleContent && <MessageActions
           content={content}
           messageKey={messageActionKey}
           storageScope="ai-chat"
@@ -153,7 +157,7 @@ export default function AiChatMessageRow({
             await onConversationForked?.(fork.conversation_id)
           } : undefined}
           onRegenerate={!isUser ? onRegenerate : undefined}
-        />
+        />}
       </div>
     </div>
   )

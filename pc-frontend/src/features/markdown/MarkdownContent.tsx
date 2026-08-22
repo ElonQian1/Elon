@@ -11,6 +11,13 @@ interface Props {
   content: string
   /** 是否显示代码块复制按钮（AI 消息默认开启）*/
   copy?: boolean
+  citations?: MarkdownCitation[]
+}
+
+interface MarkdownCitation {
+  title?: string
+  url: string
+  icon_url?: string
 }
 
 interface MarkdownImage extends MediaViewerImage {
@@ -21,10 +28,11 @@ interface MarkdownImage extends MediaViewerImage {
 
 type OpenImageViewer = (image: MarkdownImage) => void
 
-function MarkdownContent({ content, copy = true }: Props) {
+function MarkdownContent({ content, copy = true, citations = [] }: Props) {
   const [viewerIndex, setViewerIndex] = useState<number | null>(null)
   const normalizedContent = useMemo(() => normalizeBareImageUrls(content), [content])
   const mediaImages = useMemo(() => extractMarkdownImages(normalizedContent), [normalizedContent])
+  const citationByUrl = useMemo(() => buildCitationMap(citations), [citations])
 
   useEffect(() => {
     if (viewerIndex !== null && viewerIndex >= mediaImages.length) setViewerIndex(null)
@@ -35,8 +43,8 @@ function MarkdownContent({ content, copy = true }: Props) {
   }, [mediaImages])
 
   const components = useMemo(
-    () => buildComponents(copy, openImageViewer),
-    [copy, openImageViewer],
+    () => buildComponents(copy, openImageViewer, citationByUrl),
+    [citationByUrl, copy, openImageViewer],
   )
 
   return (
@@ -60,6 +68,7 @@ export default memo(MarkdownContent)
 function buildComponents(
   showCopy: boolean,
   openImageViewer: OpenImageViewer,
+  citationByUrl: Map<string, MarkdownCitation>,
 ): Components {
   return {
     // 代码块（fenced code）
@@ -76,6 +85,21 @@ function buildComponents(
     // 链接：强制新标签，防止 javascript: 等危险协议
     a({ href, children }) {
       const safe = safeMarkdownUrl(href, { image: false })
+      const citation = safe ? citationByUrl.get(normalizedCitationUrl(safe)) : undefined
+      if (safe && citation) {
+        return (
+          <a
+            href={safe}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={styles.citationLink}
+            title={citation.title || '打开引用来源'}
+          >
+            <CitationIcon citation={citation} />
+            <span>{children}</span>
+          </a>
+        )
+      }
       return safe
         ? <a href={safe} target="_blank" rel="noopener noreferrer" className={styles.link}>{children}</a>
         : <span className={styles.link}>{children}</span>
@@ -133,6 +157,43 @@ function buildComponents(
     th({ children }) { return <th className={styles.th}>{children}</th> },
     td({ children }) { return <td className={styles.td}>{children}</td> },
     // 段落、标题等保持原有样式，通过 CSS 控制
+  }
+}
+
+function CitationIcon({ citation }: { citation: MarkdownCitation }) {
+  const [failed, setFailed] = useState(false)
+  const icon = safeMarkdownUrl(citation.icon_url, { image: true })
+  if (!icon || failed) return null
+  return (
+    <img
+      className={styles.citationIcon}
+      src={icon}
+      alt=""
+      loading="lazy"
+      decoding="async"
+      referrerPolicy="no-referrer"
+      onError={() => setFailed(true)}
+    />
+  )
+}
+
+function buildCitationMap(citations: MarkdownCitation[]) {
+  const values = new Map<string, MarkdownCitation>()
+  for (const citation of citations) {
+    const key = normalizedCitationUrl(citation.url)
+    if (key && !values.has(key)) values.set(key, citation)
+  }
+  return values
+}
+
+function normalizedCitationUrl(value: string) {
+  try {
+    const url = new URL(value)
+    url.search = ''
+    url.hash = ''
+    return url.toString()
+  } catch {
+    return value.trim()
   }
 }
 

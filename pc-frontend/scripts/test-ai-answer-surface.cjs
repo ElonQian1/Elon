@@ -14,6 +14,10 @@ const surface = read('pc-frontend/src/features/user-browser/AiOfficialAnswerSurf
 const backend = read('pc-frontend/src/features/user-browser/useAiWebChatBackend.ts')
 const structuredPolicy = read('pc-frontend/src/features/user-browser/localAiStructuredPartPolicy.ts')
 const structuredContent = read('pc-frontend/src/features/ai/AiStructuredContent.tsx')
+const messageRow = read('pc-frontend/src/features/ai/AiChatMessageRow.tsx')
+const markdownContent = read('pc-frontend/src/features/markdown/MarkdownContent.tsx')
+const markdownStyles = read('pc-frontend/src/features/markdown/MarkdownContent.module.css')
+const visibility = read('pc-frontend/src/features/ai/aiMessageVisibility.ts')
 const api = read('pc-frontend/src/features/user-browser/internalBrowserApi.ts')
 const fullPage = read('pc-frontend/src/features/user-browser/AiBrowserExperience.tsx')
 const embedded = read('desktop-shell/src-tauri/src/local_ai_browser/embedded_view.rs')
@@ -82,6 +86,29 @@ assert.match(surface, /if \(next === 'chat'\) \{[\s\S]*setFailedKey\(''\)/)
 assert.match(backend, /\.filter\(shouldRenderNativeStructuredPart\)/)
 assert.match(structuredContent, /part\.type !== 'image'/)
 assert.match(structuredContent, /visibleParts\.map/)
+assert.match(messageRow, /hasVisibleAiMessageContent\(content\)/)
+assert.match(messageRow, /!streaming && hasVisibleContent/)
+assert.match(markdownContent, /citationByUrl/)
+assert.match(markdownContent, /className=\{styles\.citationLink\}/)
+assert.match(markdownStyles, /\.citationLink\s*\{/)
+
+const visibilityFilename = path.join(root, 'pc-frontend/src/features/ai/aiMessageVisibility.ts')
+const visibilityOutput = ts.transpileModule(visibility, {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+  fileName: visibilityFilename,
+}).outputText
+const compiledVisibility = new Module(visibilityFilename, module)
+compiledVisibility.filename = visibilityFilename
+compiledVisibility.paths = module.paths
+compiledVisibility._compile(visibilityOutput, visibilityFilename)
+const { hasVisibleAiMessageContent, shouldKeepAiWebMessage } = compiledVisibility.exports
+assert.equal(hasVisibleAiMessageContent(''), false)
+assert.equal(hasVisibleAiMessageContent(' \n\t\u200b\u200c\u200d\u2060\ufeff '), false)
+assert.equal(hasVisibleAiMessageContent('正在回答'), true)
+assert.equal(hasVisibleAiMessageContent('**正文**'), true)
+assert.equal(shouldKeepAiWebMessage({ content: '\u200b', state: 'streaming' }), true)
+assert.equal(shouldKeepAiWebMessage({ content: '\u200b', state: 'completed' }), false)
+assert.equal(shouldKeepAiWebMessage({ content: '', state: 'completed', sourceCount: 1 }), true)
 
 const structuredPolicyFilename = path.join(root, 'pc-frontend/src/features/user-browser/localAiStructuredPartPolicy.ts')
 const structuredPolicyOutput = ts.transpileModule(structuredPolicy, {

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { AiMessage, AiSource } from '../ai/AiChatMessageRow'
+import { hasVisibleAiMessageContent, shouldKeepAiWebMessage } from '../ai/aiMessageVisibility'
 import type { AiStructuredPart } from '../ai/AiStructuredContent'
 import type { AiHomeMode } from '../ai/AiHomeModeSwitch'
 import {
@@ -53,6 +54,7 @@ export default function useAiWebChatBackend(mode: AiHomeMode, ownerKey: string) 
       const contentFormat = item.content.some((part) => part.type === 'markdown')
         ? 'markdown' as const
         : 'plain' as const
+      const hasVisibleContent = hasVisibleAiMessageContent(content)
       const structuredParts = item.content
         .filter((part): part is LocalAiStructuredContentPart => (
           !['text', 'markdown', 'citation'].includes(part.type)
@@ -69,11 +71,18 @@ export default function useAiWebChatBackend(mode: AiHomeMode, ownerKey: string) 
           rowCount: 'rowCount' in part ? part.rowCount : undefined,
           columnCount: 'columnCount' in part ? part.columnCount : undefined,
         }))
-      if (!content && sources.length === 0 && structuredParts.length === 0) return []
+      if (!shouldKeepAiWebMessage({
+        content,
+        state: item.state,
+        sourceCount: sources.length,
+        structuredCount: structuredParts.length,
+      })) {
+        return []
+      }
       return [{
         id: `web:${provider?.id || 'ai'}:${item.id}`,
         role: item.role,
-        content: content || '相关来源',
+        content: hasVisibleContent ? content : '',
         content_format: contentFormat,
         assistant_provider_id: provider?.id,
         tool_used: item.role === 'assistant' && provider?.id === 'google-ai-mode' ? 'web_search' : null,
