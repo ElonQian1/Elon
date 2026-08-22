@@ -50,7 +50,8 @@ assert.match(styles, /@media \(max-width: 560px\)/, 'source cards need a narrow-
 assert.doesNotMatch(component, /stylesheet|dangerouslySetInnerHTML/i, 'native cards must not import or execute official-page presentation code')
 assert.match(protocol, /iconUrl\?: string/, 'the local AI protocol must carry a sanitized source logo URL')
 assert.match(backend, /icon_url: part\.iconUrl/, 'citation logo metadata must reach the source-card model')
-assert.match(markdown, /citationByUrl\.get\(normalizedAiSourceUrl\(safe\)\)/, 'inline citation matching must use the public source URL instead of visible label text')
+assert.match(markdown, /findCitation\(citationIndex, safe\)/, 'inline citation matching must use the structured citation index instead of visible label text')
+assert.match(markdown, /byHost/, 'inline citation matching needs an unambiguous host fallback for vendor redirect links')
 assert.match(markdown, /aiInlineCitationLabel\(citation, inlineText\(children\)\)/, 'inline links must render a stable provider label and source count')
 assert.match(markdown, /<AiSourceMark source=\{citation\} variant="inline" \/>/, 'inline citation pills must reuse the bounded source-logo fallback')
 assert.match(messageRow, /citations=\{message\.sources\}/, 'AI messages must join markdown links to their semantic citation metadata')
@@ -68,13 +69,24 @@ const presentationModule = new Module('aiSourcePresentation.fixture.cjs')
 presentationModule.filename = path.join(root, 'src/features/ai/aiSourcePresentation.fixture.cjs')
 presentationModule.paths = module.paths
 presentationModule._compile(compiledPresentation, presentationModule.filename)
-const { aiSourceIconCandidates, normalizedAiSourceUrl } = presentationModule.exports
+const { aiSiteIdentity, aiSourceIconCandidates, normalizedAiSourceUrl } = presentationModule.exports
 const liveReutersMarkdownUrl = 'https://www.reuters.com/business/us-stock-futures-rise-after-sharp-losses-prior-session-2026-08-21/'
 const liveReutersCitationUrl = 'https://www.reuters.com/business/us-stock-futures-rise-after-sharp-losses-prior-session-2026-08-21/?utm_source=chatgpt.com'
 assert.equal(
   normalizedAiSourceUrl(liveReutersMarkdownUrl),
   normalizedAiSourceUrl(liveReutersCitationUrl),
   'the real ChatGPT Reuters citation shape must join after public query sanitization',
+)
+const googleReutersRedirect = `https://www.google.com/url?sa=t&url=${encodeURIComponent(liveReutersCitationUrl)}`
+assert.equal(
+  normalizedAiSourceUrl(googleReutersRedirect),
+  normalizedAiSourceUrl(liveReutersMarkdownUrl),
+  'known Google redirect links must join the structured public citation before tracking data is dropped',
+)
+assert.equal(
+  aiSiteIdentity(googleReutersRedirect).host,
+  'reuters.com',
+  'source identity and favicon fallback must use the public publisher rather than the redirect host',
 )
 assert.match(
   aiSourceIconCandidates({

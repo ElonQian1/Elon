@@ -112,8 +112,13 @@ function uniqueSourcesFor(sources?: AiSource[]) {
       unique.push(source)
       continue
     }
-    if (!unique[existingIndex].icon_url && source.icon_url) {
-      unique[existingIndex] = { ...unique[existingIndex], icon_url: source.icon_url }
+    const existing = unique[existingIndex]
+    const existingTitle = aiSourceDisplayTitle(existing)
+    const nextTitle = aiSourceDisplayTitle(source)
+    unique[existingIndex] = {
+      ...existing,
+      title: nextTitle.length > existingTitle.length ? source.title : existing.title,
+      icon_url: existing.icon_url || source.icon_url,
     }
   }
   return unique

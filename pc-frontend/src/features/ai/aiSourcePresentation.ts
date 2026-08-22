@@ -12,19 +12,19 @@ export interface AiSiteIdentity {
 }
 
 export function normalizedAiSourceUrl(value: string) {
-  try {
-    const url = new URL(value)
-    url.search = ''
-    url.hash = ''
-    return url.toString()
-  } catch {
-    return value.trim()
-  }
+  const url = publicAiSourceUrl(value)
+  if (!url) return value.trim()
+  url.search = ''
+  url.hash = ''
+  url.hostname = url.hostname.toLowerCase().replace(/^www\./, '')
+  if (url.pathname.length > 1) url.pathname = url.pathname.replace(/\/+$/, '')
+  return url.toString()
 }
 
 export function aiSiteIdentity(value: string): AiSiteIdentity {
   try {
-    const host = new URL(value).hostname.toLowerCase().replace(/^www\./, '')
+    const host = publicAiSourceUrl(value)?.hostname.toLowerCase().replace(/^www\./, '') ?? ''
+    if (!host) throw new Error('missing public source host')
     const segments = host.split('.').filter(Boolean)
     const secondLevel = segments[segments.length - 2] || ''
     const suffixIndex = ['co', 'com', 'net', 'org'].includes(secondLevel) ? 3 : 2
@@ -40,18 +40,41 @@ export function aiSiteIdentity(value: string): AiSiteIdentity {
   }
 }
 
+/**
+ * Vendor pages sometimes wrap a public citation in a Google redirect. Resolve only
+ * that known public wrapper before dropping tracking data so the native UI can join
+ * the visible marker to its structured citation record and publisher favicon.
+ */
+function publicAiSourceUrl(value: string): URL | undefined {
+  try {
+    const url = new URL(value)
+    if (!isPublicHttpUrl(url)) return undefined
+    const host = url.hostname.toLowerCase().replace(/^www\./, '')
+    if (host === 'google.com' && url.pathname === '/url') {
+      const target = url.searchParams.get('url') || url.searchParams.get('q')
+      if (target) {
+        const targetUrl = new URL(target)
+        if (isPublicHttpUrl(targetUrl)) return targetUrl
+      }
+    }
+    return url
+  } catch {
+    return undefined
+  }
+}
+
+function isPublicHttpUrl(url: URL) {
+  return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password
+}
+
 export function aiSourceIconCandidates(source: AiSourcePresentationInput, host?: string) {
   const sourceHost = host ?? aiSiteIdentity(source.url).host
   const candidates: string[] = []
   const official = safeIconUrl(source.icon_url)
   if (official && !isIncompleteGoogleFavicon(official)) candidates.push(official)
   if (sourceHost) candidates.push(googleFaviconUrl(sourceHost))
-  try {
-    const origin = new URL(source.url).origin
-    if (origin.startsWith('https://')) candidates.push(`${origin}/favicon.ico`)
-  } catch {
-    // Invalid source URLs are filtered before the presentation boundary.
-  }
+  const origin = publicAiSourceUrl(source.url)?.origin
+  if (origin?.startsWith('https://')) candidates.push(`${origin}/favicon.ico`)
   return [...new Set(candidates)]
 }
 

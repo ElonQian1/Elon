@@ -5,7 +5,7 @@ import remarkGfm from 'remark-gfm'
 import type { Components } from 'react-markdown'
 import { copyTextToClipboard } from '../../lib/clipboard'
 import AiSourceMark from '../ai/AiSourceMark'
-import { aiInlineCitationLabel, normalizedAiSourceUrl } from '../ai/aiSourcePresentation'
+import { aiInlineCitationLabel, aiSiteIdentity, normalizedAiSourceUrl } from '../ai/aiSourcePresentation'
 import { MediaViewer, type MediaViewerImage } from './MediaViewer'
 import styles from './MarkdownContent.module.css'
 
@@ -22,6 +22,11 @@ interface MarkdownCitation {
   icon_url?: string
 }
 
+interface MarkdownCitationIndex {
+  byUrl: Map<string, MarkdownCitation>
+  byHost: Map<string, MarkdownCitation | null>
+}
+
 interface MarkdownImage extends MediaViewerImage {
   src: string
   alt: string
@@ -34,7 +39,7 @@ function MarkdownContent({ content, copy = true, citations = [] }: Props) {
   const [viewerIndex, setViewerIndex] = useState<number | null>(null)
   const normalizedContent = useMemo(() => normalizeBareImageUrls(content), [content])
   const mediaImages = useMemo(() => extractMarkdownImages(normalizedContent), [normalizedContent])
-  const citationByUrl = useMemo(() => buildCitationMap(citations), [citations])
+  const citationIndex = useMemo(() => buildCitationIndex(citations), [citations])
 
   useEffect(() => {
     if (viewerIndex !== null && viewerIndex >= mediaImages.length) setViewerIndex(null)
@@ -45,8 +50,8 @@ function MarkdownContent({ content, copy = true, citations = [] }: Props) {
   }, [mediaImages])
 
   const components = useMemo(
-    () => buildComponents(copy, openImageViewer, citationByUrl),
-    [citationByUrl, copy, openImageViewer],
+    () => buildComponents(copy, openImageViewer, citationIndex),
+    [citationIndex, copy, openImageViewer],
   )
 
   return (
@@ -70,7 +75,7 @@ export default memo(MarkdownContent)
 function buildComponents(
   showCopy: boolean,
   openImageViewer: OpenImageViewer,
-  citationByUrl: Map<string, MarkdownCitation>,
+  citationIndex: MarkdownCitationIndex,
 ): Components {
   return {
     // 代码块（fenced code）
@@ -87,7 +92,7 @@ function buildComponents(
     // 链接：强制新标签，防止 javascript: 等危险协议
     a({ href, children }) {
       const safe = safeMarkdownUrl(href, { image: false })
-      const citation = safe ? citationByUrl.get(normalizedAiSourceUrl(safe)) : undefined
+      const citation = safe ? findCitation(citationIndex, safe) : undefined
       if (safe && citation) {
         const label = aiInlineCitationLabel(citation, inlineText(children))
         return (
@@ -164,13 +169,26 @@ function buildComponents(
   }
 }
 
-function buildCitationMap(citations: MarkdownCitation[]) {
-  const values = new Map<string, MarkdownCitation>()
+function buildCitationIndex(citations: MarkdownCitation[]): MarkdownCitationIndex {
+  const byUrl = new Map<string, MarkdownCitation>()
+  const byHost = new Map<string, MarkdownCitation | null>()
   for (const citation of citations) {
     const key = normalizedAiSourceUrl(citation.url)
-    if (key && !values.has(key)) values.set(key, citation)
+    if (key && !byUrl.has(key)) byUrl.set(key, citation)
+    const host = aiSiteIdentity(citation.url).host
+    if (!host) continue
+    const existing = byHost.get(host)
+    if (!byHost.has(host)) byHost.set(host, citation)
+    else if (existing && normalizedAiSourceUrl(existing.url) !== key) byHost.set(host, null)
   }
-  return values
+  return { byUrl, byHost }
+}
+
+function findCitation(index: MarkdownCitationIndex, value: string) {
+  const exact = index.byUrl.get(normalizedAiSourceUrl(value))
+  if (exact) return exact
+  const host = aiSiteIdentity(value).host
+  return host ? index.byHost.get(host) ?? undefined : undefined
 }
 
 function inlineText(value: ReactNode): string {

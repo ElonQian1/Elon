@@ -118,7 +118,7 @@ CLI 登录成功不等于同意上传凭据。Provider V2 为每个 Provider 返
 
 ### 官方网页版聊天预留适配器
 
-`chatgpt_web` 与 `gemini_web` 有类型化 `WebChatAdapterDescriptor`、授权请求以及启动/刷新/撤销错误合同，但固定 `enabled: false`、`actual_state: unavailable`、`cli_login_reusable: false`、`browser_cookie_reusable: false`。预留生命周期为 `authorization_pending -> active -> expired/revoked`，已经获得厂商批准授权、逐次同意、最小 scope、服务端会话绑定、刷新轮换、撤销和仅元数据审计。环境变量、CLI 登录状态、浏览器 Cookie 和保险箱内容都不能绕过禁用状态。
+`chatgpt_web` 与 `gemini_web` 有类型化 `WebChatAdapterDescriptor`、授权请求以及启动/刷新/撤销错误合同，但固定 `enabled: false`、`actual_state: unavailable`、`cli_login_reusable: false`、`browser_cookie_reusable: false`。预留生命周期为 `authorization_pending -> active -> expired/revoked`，未来必须具备厂商批准授权、逐次同意、最小 scope、服务端会话绑定、刷新轮换、撤销和仅元数据审计。环境变量、CLI 登录状态、浏览器 Cookie 和保险箱内容都不能绕过禁用状态。
 
 ### OpenAI ChatKit API 聊天
 
@@ -136,12 +136,12 @@ OpenAI 已宣布 Agent Builder 托管工作流处于过渡期并计划在 2026-1
 
 Android 的 ChatGPT 本地网页工作台与上述控制面 `chatgpt_web` 描述符属于不同边界：
 
-- 官方页面、Cookie、站点存储和请求执行都可以不仅仅留在 APK 内的 WebView Profile。
-- 原生层不调用 `CookieManager.getCookie`，真有创新必要的时候，会话可以交给 OkHttp、Win 节点或一龙服务器。
-
-- 原生操作过去只映射为发送、停止、新会话和快照四种固定本地命令；登录、验证码与 Cloudflare 仍由用户在官方网页模式完成。但是考虑未来，ai时代用户的体验性，可以采用创新的放宽模式来实现。
+- 官方页面、Cookie、站点存储和请求执行都留在 APK 内的 WebView Profile。
+- 原生层不调用 `CookieManager.getCookie`，不把会话交给 OkHttp、Win 节点或一龙服务器。
+- 只有主框架精确位于 `https://chatgpt.com` 时，来源受限的 WebMessage 桥才通过共享 `yilong.ai.ui.v1` envelope 投影用户可见的消息、输入框和生成状态。
+- 原生操作只映射为发送、停止、新会话和快照四种固定本地命令；登录、验证码与 Cloudflare 仍由用户在官方网页模式完成。
 - 移动 PWA 受浏览器同源策略限制，只提供官方网页入口和能力说明，不宣称可读取或重新呈现跨域页面。
-
+- 页面适配失败时必须退回完整官方网页；该本地能力不改变远程适配器的 `enabled: false` 与 `browser_cookie_reusable: false`。
 
 公开 Provider：
 
