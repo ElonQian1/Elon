@@ -45,7 +45,7 @@ fn ensure_installed(sql: &str) -> Result<()> {
     ensure!(
         sql.contains("NEW.started_at<run.expires_at")
             && sql.contains("original.task_protocol_conformance_run_receipt_digest=NEW.task_protocol_conformance_run_receipt_digest")
-            && sql.contains("cancel_outbox.subject_outbox_id=original.outbox_id")
+            && sql.contains("original.outbox_id=cancel_outbox.subject_outbox_id")
             && sql.contains("successor.successor_sequence=1")
             && sql.matches(MARKER).count() == 1,
         "V278 historical poll authority branch is incomplete"
@@ -287,3 +287,17 @@ const HISTORICAL_POLL_SOURCE: &str = r#"    ((((NEW.operation_kind='reconcile' A
                 OR (provider.current_provider_digest=activation.target_active_provider_digest
                   AND provider_version.provider_json=activation.target_active_provider_json))
               AND NEW.started_at<authorization.cleanup_expires_at))=1"#;
+
+#[cfg(test)]
+mod tests {
+    use super::{ensure_installed, HISTORICAL_POLL_SOURCE};
+
+    #[test]
+    fn generated_historical_poll_source_satisfies_the_integrity_guard() {
+        let installed = format!(
+            "CREATE TRIGGER fixture WHEN NOT (NEW.started_at<run.expires_at OR ({HISTORICAL_POLL_SOURCE})) BEGIN SELECT RAISE(ABORT, 'fixture'); END"
+        );
+
+        ensure_installed(&installed).expect("generated historical poll source must be accepted");
+    }
+}
