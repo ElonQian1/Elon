@@ -1,0 +1,62 @@
+{
+  "schema": "yilong.synthetic-rich-content-fixture.v1",
+  "notice": "Synthetic, sanitized fixture only. It contains no vendor response, credential, signed URL, user text, or private endpoint data.",
+  "citation": {
+    "markerText": "Reuters +2",
+    "url": "https://www.reuters.com/technology/example-article?tracking=discarded",
+    "iconUrl": "https://www.reuters.com/favicon.ico"
+  },
+  "chatgptEnvelope": {
+    "schema": "yilong.authorized-provider-response.v1",
+    "providerId": "chatgpt",
+    "authorizationId": "synthetic-test-only",
+    "parts": [
+      {
+        "kind": "finance",
+        "payload": {
+          "title": "Synthetic Asset (SYN)",
+          "symbol": "SYN",
+          "primaryValue": "US$123.45",
+          "secondaryValue": "+US$1.23 (1.01%)",
+          "trend": "positive",
+          "periods": [
+            { "id": "1d", "label": "1D", "selected": true }
+          ],
+          "metrics": [
+            { "label": "Volume", "value": "1,234" }
+          ],
+          "chart": {
+            "kind": "line",
+            "points": [
+              { "x": "09:00", "y": 121.5 },
+              { "x": "10:00", "y": 123.45 }
+            ]
+          }
+        }
+      }
+    ]
+  },
+  "googleEnvelope": {
+    "schema": "yilong.authorized-provider-response.v1",
+    "providerId": "google-ai-mode",
+    "authorizationId": "synthetic-test-only",
+    "parts": [
+      {
+        "kind": "weather",
+        "payload": {
+          "title": "Synthetic City Weather",
+          "summary": "Visible synthetic forecast summary",
+          "rows": [
+            {
+              "period": "17:00",
+              "condition": "Cloudy",
+              "temperature": "23°C",
+              "precipitation": "20%",
+              "wind": "NE 8 km/h"
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

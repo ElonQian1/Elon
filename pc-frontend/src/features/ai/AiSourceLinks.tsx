@@ -119,6 +119,9 @@ function uniqueSourcesFor(sources?: AiSource[]) {
       ...existing,
       title: nextTitle.length > existingTitle.length ? source.title : existing.title,
       icon_url: existing.icon_url || source.icon_url,
+      marker_text: existing.marker_text || source.marker_text,
+      citation_id: existing.citation_id || source.citation_id,
+      group_size: Math.max(existing.group_size || 1, source.group_size || 1),
     }
   }
   return unique

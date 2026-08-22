@@ -3,6 +3,7 @@ pub(super) const ADAPTER_VERSION: u32 = 142;
 
 const WIN_RICH_CONTENT_ADAPTER: &str = include_str!("chatgpt_rich_content_adapter.js");
 const WIN_COMMON_RICH_CONTENT_ADAPTER: &str = include_str!("rich_content_dom_adapter.js");
+const WIN_CITATION_ADAPTER: &str = include_str!("chatgpt_citation_adapter.js");
 
 const ADAPTER_ASSETS: &[(&str, &str)] = &[
     (
@@ -149,8 +150,11 @@ pub(super) fn initialization_script() -> String {
             );
             if *name == "chatgpt_web_adapter_messages.js" {
                 format!(
-                    "window.__elonChatGptBootstrapStage = 'rich_content_dom_adapter.js';\n{}\nwindow.__elonChatGptBootstrapStage = 'chatgpt_rich_content_adapter.js';\n{}\n{}",
-                    WIN_COMMON_RICH_CONTENT_ADAPTER, WIN_RICH_CONTENT_ADAPTER, shared
+                    "window.__elonChatGptBootstrapStage = 'rich_content_dom_adapter.js';\n{}\nwindow.__elonChatGptBootstrapStage = 'chatgpt_rich_content_adapter.js';\n{}\n{}\nwindow.__elonChatGptBootstrapStage = 'chatgpt_citation_adapter.js';\n{}",
+                    WIN_COMMON_RICH_CONTENT_ADAPTER,
+                    WIN_RICH_CONTENT_ADAPTER,
+                    shared,
+                    WIN_CITATION_ADAPTER
                 )
             } else {
                 shared
@@ -318,5 +322,7 @@ mod tests {
         assert!(script.contains("chatgpt_web_adapter_composer_submenu.js"));
         assert!(script.contains("chatgpt_web_adapter_message_portal_policy.js"));
         assert!(script.contains("chatgpt_web_adapter_project_hints.js"));
+        assert!(script.contains("chatgpt_citation_adapter.js"));
+        assert!(script.contains("__elonChatGptCitationAdapter"));
     }
 }

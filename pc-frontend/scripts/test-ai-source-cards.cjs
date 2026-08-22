@@ -49,7 +49,12 @@ assert.match(answerStyles, /\.msgContent\s*\{[\s\S]*font-size:\s*15px/, 'native 
 assert.match(styles, /@media \(max-width: 560px\)/, 'source cards need a narrow-layout contract')
 assert.doesNotMatch(component, /stylesheet|dangerouslySetInnerHTML/i, 'native cards must not import or execute official-page presentation code')
 assert.match(protocol, /iconUrl\?: string/, 'the local AI protocol must carry a sanitized source logo URL')
+assert.match(protocol, /markerText\?: string/, 'the local AI protocol must preserve an exact structurally linked citation marker')
+assert.match(protocol, /citationId\?: string/, 'the local AI protocol must preserve a bounded local citation identity')
+assert.match(protocol, /groupSize\?: number/, 'the local AI protocol must preserve the official citation group size')
 assert.match(backend, /icon_url: part\.iconUrl/, 'citation logo metadata must reach the source-card model')
+assert.match(backend, /marker_text: part\.markerText/, 'structured citation markers must reach the source-card model')
+assert.match(backend, /group_size: part\.groupSize/, 'structured citation group counts must reach the inline label')
 assert.match(markdown, /findCitation\(citationIndex, safe\)/, 'inline citation matching must use the structured citation index instead of visible label text')
 assert.match(markdown, /byHost/, 'inline citation matching needs an unambiguous host fallback for vendor redirect links')
 assert.match(markdown, /aiInlineCitationLabel\(citation, inlineText\(children\)\)/, 'inline links must render a stable provider label and source count')
@@ -61,6 +66,9 @@ assert.match(adapter, /metadata\.iconUrl = iconUrl/, 'citation extraction must a
 assert.match(adapter, /if \(node\.closest\('a\[href\]'\)\) return '';/, 'citation logos must not leak into answer markdown as image placeholders')
 assert.match(adapter, /if \(node\.closest\('a\[href\]'\)\) return;[\s\S]*add\('image'/, 'citation logos must not be emitted as image attachments')
 assert.match(sanitizer, /part_type == "citation"[\s\S]*"iconUrl"/, 'the Rust boundary must keep only citation logo URLs')
+assert.match(sanitizer, /"markerText"/, 'the Rust boundary must preserve only bounded citation marker text')
+assert.match(sanitizer, /"citationId"/, 'the Rust boundary must preserve only bounded citation identities')
+assert.match(sanitizer, /"groupSize"/, 'the Rust boundary must preserve only bounded citation group counts')
 
 const compiledPresentation = ts.transpileModule(presentation, {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
@@ -69,7 +77,7 @@ const presentationModule = new Module('aiSourcePresentation.fixture.cjs')
 presentationModule.filename = path.join(root, 'src/features/ai/aiSourcePresentation.fixture.cjs')
 presentationModule.paths = module.paths
 presentationModule._compile(compiledPresentation, presentationModule.filename)
-const { aiSiteIdentity, aiSourceIconCandidates, normalizedAiSourceUrl } = presentationModule.exports
+const { aiInlineCitationLabel, aiSiteIdentity, aiSourceIconCandidates, normalizedAiSourceUrl } = presentationModule.exports
 const liveReutersMarkdownUrl = 'https://www.reuters.com/business/us-stock-futures-rise-after-sharp-losses-prior-session-2026-08-21/'
 const liveReutersCitationUrl = 'https://www.reuters.com/business/us-stock-futures-rise-after-sharp-losses-prior-session-2026-08-21/?utm_source=chatgpt.com'
 assert.equal(
@@ -96,6 +104,16 @@ assert.match(
   })[0],
   /google\.com\/s2\/favicons\?domain=reuters\.com&sz=64/,
   'a sanitized incomplete ChatGPT favicon must be reconstructed from the real source host',
+)
+assert.equal(
+  aiInlineCitationLabel({
+    title: 'Reuters',
+    url: liveReutersMarkdownUrl,
+    marker_text: 'Reuters',
+    group_size: 3,
+  }),
+  'Reuters +2',
+  'the structured group size must render even when the visible link marker omits the suffix',
 )
 
 console.log('PASS: AI source links render as responsive native cards while preserving both browser-opening paths')

@@ -190,6 +190,34 @@
     return finance.concat(common).slice(0, 16);
   }
 
+  function fromAuthorizedEnvelope(envelope, authorize) {
+    if (!envelope || envelope.schema !== 'yilong.authorized-provider-response.v1' ||
+        envelope.providerId !== 'chatgpt' || typeof authorize !== 'function') return [];
+    const common = commonRichContent && typeof commonRichContent.fromAuthorizedEnvelope === 'function'
+      ? commonRichContent.fromAuthorizedEnvelope(envelope, authorize)
+      : [];
+    const finance = (Array.isArray(envelope.parts) ? envelope.parts : []).slice(0, 16)
+      .filter((part) => part && cleanText(part.kind, 48).toLowerCase() === 'finance')
+      .filter(() => authorize(envelope.providerId, envelope.authorizationId, 'finance'))
+      .map((part) => {
+        const payload = normalizeFinancePayload(part.payload);
+        return payload.title && payload.primaryValue
+          ? {
+              type: 'rich_card',
+              text: payload.title,
+              kind: 'finance',
+              richContent: {
+                schema: SCHEMA,
+                kind: 'finance',
+                source: 'private_response',
+                payload
+              }
+            }
+          : null;
+      }).filter(Boolean);
+    return finance.concat(common).slice(0, 16);
+  }
+
   function owns(node) {
     return node instanceof Element && (Boolean(node.closest('[' + ROOT_ATTRIBUTE + ']')) ||
       Boolean(commonRichContent && commonRichContent.owns(node)));
@@ -202,6 +230,6 @@
     owns,
     financeRoots,
     normalizeFinancePayload,
-    fromAuthorizedEnvelope: commonRichContent && commonRichContent.fromAuthorizedEnvelope
+    fromAuthorizedEnvelope
   });
 })();

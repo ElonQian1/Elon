@@ -15,6 +15,8 @@ use super::{conversation_directory, semantic_context, snapshot_cache};
 mod cache;
 #[path = "state/context.rs"]
 mod context;
+#[path = "state/diagnostics.rs"]
+mod diagnostics;
 
 #[derive(Clone, Default)]
 pub struct LocalAiBrowserRuntime {
@@ -560,6 +562,7 @@ impl LocalAiBrowserRuntime {
         let collection = navigation
             .and_then(|event| event.get("collection"))
             .and_then(Value::as_object);
+        let coverage = diagnostics::content_coverage(snapshot);
         Some(serde_json::json!({
             "present": true,
             "window_status": record.window_status,
@@ -591,6 +594,11 @@ impl LocalAiBrowserRuntime {
             "last_command_ok": record.last_command_ok,
             "message_count": record.message_count,
             "assistant_message_count": record.assistant_message_count,
+            "content_part_counts": coverage.part_counts,
+            "rich_card_kind_counts": coverage.rich_kind_counts,
+            "citation_count": coverage.citation_count,
+            "linked_citation_count": coverage.linked_citation_count,
+            "citation_logo_count": coverage.citation_logo_count,
             "streaming": record.streaming,
             "updated_at_ms": record.updated_at_ms,
         }))
@@ -704,6 +712,7 @@ impl From<SessionRecord> for LocalAiWebSessionState {
 }
 
 fn diagnostic_summary(record: &SessionRecord) -> Value {
+    let coverage = diagnostics::content_coverage(record.semantic_event.as_ref());
     serde_json::json!({
         "lastEventKind": record.last_event_kind,
         "lastCommandAction": record.last_command_action,
@@ -711,6 +720,11 @@ fn diagnostic_summary(record: &SessionRecord) -> Value {
         "lastCommandOk": record.last_command_ok,
         "messageCount": record.message_count,
         "assistantMessageCount": record.assistant_message_count,
+        "contentPartCounts": coverage.part_counts,
+        "richCardKindCounts": coverage.rich_kind_counts,
+        "citationCount": coverage.citation_count,
+        "linkedCitationCount": coverage.linked_citation_count,
+        "citationLogoCount": coverage.citation_logo_count,
         "streaming": record.streaming,
         "semanticUpdatedAtMs": record.semantic_updated_at_ms,
         "updatedAtMs": record.updated_at_ms,

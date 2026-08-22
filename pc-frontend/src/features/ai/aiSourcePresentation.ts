@@ -2,6 +2,8 @@ export interface AiSourcePresentationInput {
   title?: string
   url: string
   icon_url?: string
+  marker_text?: string
+  group_size?: number
 }
 
 export interface AiSiteIdentity {
@@ -92,7 +94,12 @@ export function aiSourceDisplayTitle(
 
 export function aiInlineCitationLabel(source: AiSourcePresentationInput, visibleText = '') {
   const identity = aiSiteIdentity(source.url)
-  const suffix = citationCountSuffix(visibleText) || citationCountSuffix(source.title)
+  const suffix = citationCountSuffix(visibleText)
+    || citationCountSuffix(source.marker_text)
+    || citationCountSuffix(source.title)
+    || (Number.isInteger(source.group_size) && Number(source.group_size) > 1
+      ? ` +${Math.min(31, Number(source.group_size) - 1)}`
+      : '')
   return `${identity.brand || identity.host || '来源'}${suffix}`
 }
 

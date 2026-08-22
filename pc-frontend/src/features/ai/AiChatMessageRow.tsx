@@ -34,6 +34,9 @@ export interface AiSource {
   title: string
   url: string
   icon_url?: string
+  marker_text?: string
+  citation_id?: string
+  group_size?: number
 }
 
 export interface AiProjectCandidate {

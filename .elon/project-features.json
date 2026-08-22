@@ -8938,6 +8938,63 @@
       "updated_at_ms": 1786876824902
     },
     {
+      "id": "win-web-ai-rich-structure-observability-v1",
+      "title": "Win 网页 AI 富结构观测与引用关联 V1",
+      "summary": "为 ChatGPT/Google 官方 WebView 增加不含正文和 URL 的富结构覆盖诊断、确定性引用控件关联，以及受生产授权控制的 finance/weather 结构化响应映射，复用现有来源 UI，不改 PWA。",
+      "status": "in_progress",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/win-web-ai-rich-structure-observability-v1.md",
+        "content_hash": "c1f7e9af880fd9c910738ba31bed23db310e733bc75aba97978300d46a6e7d5c",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "9eda8c22fefc11ee383dc793addce53063b191ce",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "6c746dadde959fbc1dbbf370b5001461cf8b9b20",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "win-web-ai",
+      "tags": [
+        "win",
+        "webview2",
+        "rich-content",
+        "citations",
+        "privacy"
+      ],
+      "task_paths": [
+        "android/app/src/main/assets/chatgpt_web_adapter_messages.js",
+        "desktop-shell/src-tauri/src/local_ai_browser",
+        "pc-frontend/scripts",
+        "pc-frontend/src/features/ai",
+        "pc-frontend/src/features/user-browser",
+        "scripts/fixtures"
+      ],
+      "dependencies": [
+        "win-web-ai-structured-rich-content-v1"
+      ],
+      "acceptance_criteria": [
+        "有确定 DOM 关联的引用控件序列化为来源链接，无关联不猜测",
+        "引用关联元数据通过 Rust、缓存和 TypeScript 白名单",
+        "已授权 finance/weather envelope 映射现有 AST，未授权失败关闭",
+        "脱敏诊断只报告类型和数量，不含正文、URL、域名或凭证",
+        "复用现有来源徽标与来源面板，不建立第二套 UI",
+        "合成 fixture、Win Web AI 契约、PC 构建、lint 和 Rust 验证通过"
+      ],
+      "implementation_evidence": [],
+      "claim": {
+        "claim_id": "claim_61867097cdd54a99bc6eaa556b215be9",
+        "agent_id": "codex-desktop-root",
+        "claimed_at_ms": 1787431627368,
+        "expires_at_ms": 1787446027368
+      },
+      "created_at_ms": 1787431617943,
+      "updated_at_ms": 1787432435030
+    },
+    {
       "id": "win-web-ai-snapshot-cache-v1",
       "title": "Win 网页 AI 快照缓存 V1",
       "summary": "ChatGPT 与 Google AI 厂商切换、PC 页面刷新或客户端重启时，按一龙账号和厂商隔离地即时回显最近语义快照，再后台重验证官方页面；缓存不解锁实时动作。",
@@ -9286,36 +9343,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_fdd3bf2194b6463cb94cc6e67cf5d71d",
-      "feature_id": "merchant-runtime-http-host-v1",
-      "action": "registered",
-      "actor": "codex-http-host-20260816",
-      "reason": "rebase 后从远端权威注册表重新生成，源码和需求已在当前工作树。",
-      "from_status": "",
-      "to_status": "proposed",
-      "at_ms": 1786879543465
-    },
-    {
-      "id": "feature_event_b9c3c3177f9544ae8f913ea7ab49f82f",
-      "feature_id": "merchant-runtime-http-host-v1",
-      "action": "transitioned",
-      "actor": "codex-http-host-20260816",
-      "reason": "需求、安全边界与既有运行时依赖已复核。",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1786879543489
-    },
-    {
-      "id": "feature_event_ecbb98ace7d84fb0a5068d6fe6b1d6ca",
-      "feature_id": "merchant-runtime-http-host-v1",
-      "action": "transitioned",
-      "actor": "codex-http-host-20260816",
-      "reason": "依赖均 verified，当前源码不存在重叠实现。",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1786879543513
-    },
     {
       "id": "feature_event_6108a025a303487faef7ad6ba5d3c5e9",
       "feature_id": "merchant-runtime-http-host-v1",
@@ -11285,6 +11312,36 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1787431017596
+    },
+    {
+      "id": "feature_event_a520a1e4a88f4aa4903762b1161eacfa",
+      "feature_id": "win-web-ai-rich-structure-observability-v1",
+      "action": "registered",
+      "actor": "Codex",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1787431617943
+    },
+    {
+      "id": "feature_event_8fc1c7d56bda49a39b3bf82047d977e9",
+      "feature_id": "win-web-ai-rich-structure-observability-v1",
+      "action": "claimed",
+      "actor": "codex-desktop-root",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1787431627368
+    },
+    {
+      "id": "feature_event_b8929cd10f1f41ffb960bc47473eca4a",
+      "feature_id": "win-web-ai-rich-structure-observability-v1",
+      "action": "transitioned",
+      "actor": "Codex",
+      "reason": "实现与全量 Win Web AI 验证已完成，进入证据登记与发布阶段。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1787432435030
     }
   ]
 }

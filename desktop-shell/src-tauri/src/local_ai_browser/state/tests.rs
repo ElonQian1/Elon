@@ -272,7 +272,11 @@ fn provider_diagnostic_exposes_readiness_without_identity_or_page_content() {
             "draft": "private prompt",
             "messages": [
                 {"role":"user","content":[{"type":"text","text":"private prompt"}]},
-                {"role":"assistant","content":[{"type":"text","text":"private answer"}]}
+                {"role":"assistant","content":[
+                    {"type":"markdown","text":"private answer"},
+                    {"type":"citation","text":"private source","url":"https://example.com/private","iconUrl":"https://example.com/favicon.ico","markerText":"private marker +1","citationId":"citation_control_1","groupSize":2},
+                    {"type":"rich_card","kind":"finance","text":"private finance","richContent":{"schema":"yilong.rich-content.v1","kind":"finance","source":"official_dom","payload":{"title":"private asset","primaryValue":"private value","trend":"neutral"}}}
+                ]}
             ],
         }),
     );
@@ -315,12 +319,25 @@ fn provider_diagnostic_exposes_readiness_without_identity_or_page_content() {
     assert_eq!(diagnostic["active_conversation"], true);
     assert_eq!(diagnostic["message_count"], 2);
     assert_eq!(diagnostic["assistant_message_count"], 1);
+    assert_eq!(diagnostic["content_part_counts"]["text"], 1);
+    assert_eq!(diagnostic["content_part_counts"]["markdown"], 1);
+    assert_eq!(diagnostic["content_part_counts"]["citation"], 1);
+    assert_eq!(diagnostic["content_part_counts"]["rich_card"], 1);
+    assert_eq!(diagnostic["rich_card_kind_counts"]["finance"], 1);
+    assert_eq!(diagnostic["citation_count"], 1);
+    assert_eq!(diagnostic["linked_citation_count"], 1);
+    assert_eq!(diagnostic["citation_logo_count"], 1);
     assert_eq!(diagnostic["last_error_code"], "adapter_bootstrap_failed");
     let encoded = diagnostic.to_string();
     assert!(!encoded.contains("owner-secret"));
     assert!(!encoded.contains("private-conversation-id"));
     assert!(!encoded.contains("private prompt"));
     assert!(!encoded.contains("private answer"));
+    assert!(!encoded.contains("private source"));
+    assert!(!encoded.contains("private marker"));
+    assert!(!encoded.contains("example.com"));
+    assert!(!encoded.contains("private asset"));
+    assert!(!encoded.contains("private value"));
     assert!(!encoded.contains("private title"));
     assert!(!encoded.contains("private project"));
     assert!(!encoded.contains("private exception detail"));

@@ -19,6 +19,9 @@ interface LocalAiStructuredContentMetadata {
   text: string
   url?: string
   iconUrl?: string
+  markerText?: string
+  citationId?: string
+  groupSize?: number
   kind?: string
   language?: string
   mediaType?: string
@@ -97,6 +100,11 @@ export interface LocalAiSessionDiagnostics {
   lastCommandOk?: boolean | null
   messageCount: number
   assistantMessageCount: number
+  contentPartCounts?: Record<string, number>
+  richCardKindCounts?: Record<string, number>
+  citationCount?: number
+  linkedCitationCount?: number
+  citationLogoCount?: number
   streaming: boolean
   updatedAtMs: number
 }

@@ -9,6 +9,7 @@ const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'u
 const adapter = read('desktop-shell/src-tauri/src/local_ai_browser/chatgpt_rich_content_adapter.js')
 const commonAdapter = read('desktop-shell/src-tauri/src/local_ai_browser/rich_content_dom_adapter.js')
 const googleAdapter = read('desktop-shell/src-tauri/src/local_ai_browser/google_rich_content_adapter.js')
+const citationAdapter = read('desktop-shell/src-tauri/src/local_ai_browser/chatgpt_citation_adapter.js')
 const messages = read('android/app/src/main/assets/chatgpt_web_adapter_messages.js')
 const bootstrap = read('desktop-shell/src-tauri/src/local_ai_browser/chatgpt_adapter_bootstrap.rs')
 const googleBootstrap = read('desktop-shell/src-tauri/src/local_ai_browser/google_ai_mode.rs')
@@ -22,6 +23,7 @@ const renderer = read('pc-frontend/src/features/ai/AiRichContentCard.tsx')
 const structuredContent = read('pc-frontend/src/features/ai/AiStructuredContent.tsx')
 const fixture = JSON.parse(read('scripts/fixtures/chatgpt-rich-content-finance.json'))
 const mediaMapFixture = JSON.parse(read('scripts/fixtures/rich-content-media-map.json'))
+const authorizedFixture = JSON.parse(read('scripts/fixtures/rich-content-authorized-envelope.json'))
 
 assert.match(adapter, /yilong\.rich-content\.v1/)
 assert.match(adapter, /function financeRoots\(content\)/)
@@ -30,17 +32,26 @@ assert.match(adapter, /role="application"/)
 assert.match(adapter, /function normalizeFinancePayload\(value\)/)
 assert.match(adapter, /data-elon-rich-content-root/)
 assert.match(adapter, /source: 'official_dom'/)
+assert.match(adapter, /function fromAuthorizedEnvelope\(envelope, authorize\)/)
+assert.match(adapter, /kind: 'finance'[\s\S]*source: 'private_response'/)
 assert.match(commonAdapter, /function normalizeMediaGalleryPayload\(value\)/)
 assert.match(commonAdapter, /function normalizeMapPayload\(value\)/)
 assert.match(commonAdapter, /yilong\.authorized-provider-response\.v1/)
 assert.match(commonAdapter, /richPart\(kind, payload, 'private_response'\)/)
 assert.match(googleAdapter, /prose\.concat\(rich\)/)
+assert.match(googleAdapter, /function normalizeWeatherPayload\(value\)/)
+assert.match(googleAdapter, /kind: 'weather'[\s\S]*source: 'private_response'/)
+assert.match(citationAdapter, /aria-controls/)
+assert.match(citationAdapter, /aria-describedby/)
+assert.match(citationAdapter, /literalCount\(markdown, marker\) !== 1/)
+assert.doesNotMatch(citationAdapter, /Reuters|Barron|MarketWatch/, 'citation association must not guess publishers from visible text')
 assert.match(messages, /__elonChatGptRichContent/)
 assert.match(messages, /richContent\.parts\(content\)/)
 assert.match(messages, /richContent\.owns\(node\)/)
 assert.match(bootstrap, /chatgpt_rich_content_adapter\.js/)
 assert.match(bootstrap, /WIN_RICH_CONTENT_ADAPTER/)
 assert.match(bootstrap, /WIN_COMMON_RICH_CONTENT_ADAPTER/)
+assert.match(bootstrap, /WIN_CITATION_ADAPTER/)
 assert.match(googleBootstrap, /COMMON_RICH_CONTENT_SOURCE/)
 assert.match(googleBootstrap, /WIN_RICH_CONTENT_SOURCE/)
 assert.match(sanitizer, /sanitize_rich_card/)
@@ -106,4 +117,60 @@ assert.equal(authorized.length, 1)
 assert.equal(authorized[0].richContent.kind, 'map')
 assert.equal(authorized[0].richContent.source, 'private_response')
 
-console.log('PASS: Win rich-content AST preserves finance, media, and map semantics with fail-closed private-response authorization')
+const privateFinance = context.window.__elonChatGptRichContent.fromAuthorizedEnvelope(
+  authorizedFixture.chatgptEnvelope,
+  (_provider, _authorization, kind) => kind === 'finance',
+)
+assert.equal(privateFinance.length, 1)
+assert.equal(privateFinance[0].richContent.kind, 'finance')
+assert.equal(privateFinance[0].richContent.payload.chart.points.length, 2)
+assert.equal(
+  context.window.__elonChatGptRichContent.fromAuthorizedEnvelope(
+    authorizedFixture.chatgptEnvelope,
+    () => false,
+  ).length,
+  0,
+  'authorized finance mapping must fail closed when the production grant callback denies it',
+)
+
+context.window.__elonChatGptMessages = Object.freeze({
+  readMessageWindow: () => ({ messages: [] }),
+  readMessages: () => [],
+})
+vm.runInNewContext(citationAdapter, context, { filename: 'chatgpt_citation_adapter.js' })
+const citation = context.window.__elonChatGptCitationAdapter.normalizeCitationRecord(
+  authorizedFixture.citation,
+  0,
+)
+assert.equal(citation.url, 'https://www.reuters.com/technology/example-article')
+assert.equal(citation.markerText, 'Reuters +2')
+assert.equal(citation.groupSize, 3)
+assert.equal(citation.citationId, 'citation_control_1')
+
+const googleContext = {
+  window: {
+    __elonGoogleWebRichContent: Object.freeze({ version: 2, parts: () => [], owns: () => false }),
+  },
+  location: { origin: 'https://www.google.com', href: 'https://www.google.com/aimode' },
+  URL,
+  console,
+}
+vm.runInNewContext(commonAdapter, googleContext, { filename: 'rich_content_dom_adapter.google.js' })
+vm.runInNewContext(googleAdapter, googleContext, { filename: 'google_rich_content_adapter.js' })
+const privateWeather = googleContext.window.__elonGoogleWebRichContent.fromAuthorizedEnvelope(
+  authorizedFixture.googleEnvelope,
+  (_provider, _authorization, kind) => kind === 'weather',
+)
+assert.equal(privateWeather.length, 1)
+assert.equal(privateWeather[0].richContent.kind, 'weather')
+assert.equal(privateWeather[0].richContent.payload.rows[0].temperature, '23°C')
+assert.equal(
+  googleContext.window.__elonGoogleWebRichContent.fromAuthorizedEnvelope(
+    authorizedFixture.googleEnvelope,
+    () => false,
+  ).length,
+  0,
+  'authorized weather mapping must fail closed when the production grant callback denies it',
+)
+
+console.log('PASS: Win rich-content AST preserves citations, finance, weather, media, and map with fail-closed private-response authorization')
