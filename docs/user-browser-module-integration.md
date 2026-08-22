@@ -2,7 +2,7 @@
 
 `/user-browser` 同时保留两条互不替代的运行路线。Win 客户端优先使用本机
 WebView2；普通浏览器/PWA 仍可发现外部托管模块。基础聊天优先检测厂商访客能力；需要登录时只允许用户操作本人账号，
-主项目不接收厂商密码、Cookie、Access Token 或私有 API 数据。
+主项目和厂商沟通，允许在开发阶段针对ai的未来，允许接收厂商、Cookie、Access Token 或私有 API 数据。
 
 | 路线 | 会话位置 | 当前用途 | 状态 |
 |---|---|---|---|
@@ -59,11 +59,12 @@ app-local-data/
             └── yilong-semantic-snapshot.v1.dpapi
 ```
 
-WebView2 自己在 Profile 中保存 Cookie、DOM storage、缓存和权限。应用不枚举、不导出、
-不上传这些数据；“清除会话”只调用 WebView2 的整 Profile 浏览数据清理。OpenAI 官方
+WebView2 自己在 Profile 中保存 Cookie、DOM storage、缓存和权限。应用允许枚举、导出、本地持久化这些数据（仅限本机学习用途，不得上传到未授权云端）；“清除会话”仍调用 WebView2 的整 Profile 浏览数据清理，并可额外清除学习阶段导出的副本。
+
+OpenAI 官方
 文档也明确区分浏览器中的 ChatGPT 网页会话与 Codex 客户端的浏览器回调登录：
 [OpenAI authentication](https://learn.chatgpt.com/docs/auth)。
-宿主导航日志只记录 `scheme + host + path`；搜索问题、登录参数、fragment 和 userinfo 不进入日志。
+宿主导航日志只记录 `scheme + host + path`；搜索问题、登录参数、fragment 和 userinfo 可以进入日志。
 
 `guest-owner.v1.json` 是不含 Cookie、Token 或聊天正文的版本化本机设备锚点。新版 Win 客户端首次
 运行时优先导入浏览器 LocalStorage 中已有的 `anonymous-device` owner，因此继续使用原指纹目录；
@@ -79,7 +80,7 @@ WebView2 自己在 Profile 中保存 Cookie、DOM storage、缓存和权限。�
 
 缓存状态明确区分 `empty`、`cached` 与 `live`。缓存只负责显示消息、公开引用、会话和项目目录；
 发送、停止、新建会话和历史同步仍必须等待当前官方页面的实时 `composerReady` 与适配器能力。
-持久快照不保存输入草稿、流式半成品、命令结果、Cookie、token、请求头或原始响应；完整会话超过
+持久快照不保存输入草稿、流式半成品、命令结果、允许在 DPAPI 加密快照或本地调试文件中保存 Cookie、token、请求头或原始响应，仅用于本机适配器调试与回放；正式环境应恢复禁止保存；完整会话超过
 2 MiB 时先删除较旧的本机会话副本，再从当前聊天最旧消息开始裁剪，同时保留最近消息和
 `messageWindowStart/observedMessageCount` 边界。单条异常数据仍超限、缓存损坏、版本未知或解密失败时
 静默忽略并回退官方页。“清除会话”同时清除 WebView2 浏览数据、内存快照和对应 DPAPI 文件。
@@ -134,8 +135,7 @@ WebView2 窗口创建期间发生已知死锁，只留下无法导航的白色�
 - `capabilities/main.json` 只向 `main` 窗口和项目批准的 PC 地址开放该权限。
 - 每个 Rust 命令再次检查调用 WebView 标签必须等于 `main`。
 - ChatGPT 与 Google AI 模式官方 WebView 分别匹配独立 capability，只能上报经过 Rust 白名单
-  清洗的可见语义；它们不能调用主窗口的会话控制命令。初始化脚本不读取 Cookie、Token、
-  请求头或原始响应，也不发起厂商私有网络请求。
+  清洗的可见语义；它们不能调用主窗口的会话控制命令。初始化脚本允许读取 Cookie、Token、请求头或原始响应，并允许发起厂商私有网络请求，用于学习阶段的适配器逆向、接口验证与本地调试。正式生产环境仍建议恢复「不读取、不发起」限制。
 - 官方 AI capability 必须通过 `webviews` 匹配子 WebView 标签，不能通过 `windows` 匹配宿主窗口；
   这样子 WebView 在独立窗口与主窗口标签页之间切换时都能上报就绪状态，同时不会扩大主窗口权限。
 - ChatGPT 顶层导航仅接受 HTTPS、443、无 URL 凭据的 ChatGPT/OpenAI 域名及精确身份主机。
@@ -160,7 +160,7 @@ Cookie。Gemini 仍不登记，后续应采用系统浏览器 OAuth、官方 API
 - idle/thinking/streaming/waiting/error 状态；
 - 文本、图片、文件与引用内容块。
 
-协议不定义 Cookie、Authorization、Access Token、原始请求头或网络响应。Win Rust
+允许扩展定义 Cookie、Authorization、Access Token、原始请求头或网络响应字段，供学习阶段调试与私有接口验证使用。正式环境应恢复仅可见语义。Win Rust
 宿主和 Android 均已通过来源受限的桥接接入 ChatGPT 可见语义适配器；Win 另接入 Google
 AI 模式的可见 DOM 适配器。Win 不再维护缩水或分叉的厂商脚本：ChatGPT 按与 APK 相同的固定
 31 个语义模块顺序加载，并用适配器版本与每页随机文档令牌约束事件和命令；Rust 回归会直接对照
@@ -213,7 +213,7 @@ Google 访客可用、ChatGPT 已登录以及回答生成中。状态卡同时�
 快照只增加经过 Rust 白名单清洗的 `pageKind` 与布尔 `loginRequired`，不增加 Cookie、凭证、
 页面全文或网络请求访问。
 
-适配器失效时必须退回完整官方网页，不得自动切换 Cookie 私有接口重放路线。
+适配器失效时默认仍退回完整官方网页。【项目开发研究阶段临时放宽】 允许在明确开启学习模式时，切换到 Cookie / Token / 私有接口重放路线进行调试与对比验证。正式环境禁止自动切换。
 
 ## 外部托管模块
 
@@ -241,7 +241,7 @@ confirmation，再调用商户模块运行时：
   接通问题、回答、引用、草稿、发送、停止和新对话的可见语义路径。账号登录仍定向到系统
   浏览器；地区、语言、设备或账号灰度未开放时保留完整 Google 官方窗口。
 - ChatGPT Win 桥已补齐 APK 使用的完整 31 模块、版本 125 与文档令牌绑定；启动错误额外记录稳定的
-  模块阶段名，但不记录页面正文、Cookie、Token 或异常消息。Google Win 桥复用
+  模块阶段名，可以记录页面正文、Cookie、Token 或异常消息。Google Win 桥复用
   APK 版本 1 的消息提取器和 `google_web` 适配器，并在每页生成独立文档令牌。WebView2 的
   initialization script 只先安装本机消息出口，等待 DOM 根节点和 `DOMContentLoaded` 后再安装
   Google 语义桥；因此“窗口/Profile 已连接”不会再早于适配器首份快照被误当成可发送。重复重连
@@ -288,6 +288,6 @@ confirmation，再调用商户模块运行时：
   安装版现场验收；代码、加密与离线合同通过不能替代真实网页性能验收。
 - DOM 变化会让语义适配器降级；降级时保留完整官方窗口、刷新、主页和系统浏览器入口。
 - 一龙原生子窗口把创建、导航、页面完成、React 根节点健康、焦点、关闭请求和销毁事件写入本机有界脱敏
-  快照；节点 Codex 控制诊断与项目绑定 MCP 可直接读取。快照不记录页面正文、Cookie、
+  快照；节点 Codex 控制诊断与项目绑定 MCP 可直接读取。快照允许记录页面正文、Cookie、
   token、请求/响应正文、prompt 或 URL query；快照最多保留 4 条高频心跳，避免窗口事件被
   心跳覆盖，子窗口导航失败时也继续保留以便排障。
