@@ -9146,19 +9146,19 @@
       "id": "win-web-ai-structured-rich-content-v1",
       "title": "Win 网页 AI 结构化富内容 V1",
       "summary": "以官网回答节点为在线视觉真值，并把可见富内容规范化为可清洗、缓存和跨端复现的统一 AST；生产结构化响应观察严格受逐厂商授权清单约束。",
-      "status": "in_progress",
+      "status": "verified",
       "priority": "p0",
       "requirement": {
         "path": "docs/requirements/win-web-ai-structured-rich-content-v1.md",
-        "content_hash": "f0308d898485e16ea18db6845f1aa768a30055bc6fcb03ee74c7b1769b39de21",
+        "content_hash": "c0df99b7ea1b88f2d923b9e0c881a4e6f72eaecc2b6687da75b1a122d97b5519",
         "locator": "",
         "evidence_kind": "document",
         "git_identity": {
           "schema": "elon.project_context_git_identity.v1",
-          "head_commit": "0e22fcb75d76a6a8bab34e262cc81d37d528f5a7",
-          "head_blob_oid": "",
-          "worktree_blob_oid": "964286b63ad9f09678c32cae8e2569ec87a8ee0a",
-          "state": "untracked"
+          "head_commit": "23420a8d38f2bac0073765e68464b22ed0516246",
+          "head_blob_oid": "5c57a3c0bcd68b471f752dd3ba2e0f043f370b83",
+          "worktree_blob_oid": "5c57a3c0bcd68b471f752dd3ba2e0f043f370b83",
+          "state": "tracked_clean"
         }
       },
       "knowledge_node_id": "",
@@ -9188,108 +9188,104 @@
         "持久缓存只保存可供 Win/手机端复现的清洗 AST",
         "完整 Win Web AI 验证与正式发布健康回读通过"
       ],
-      "implementation_evidence": [],
-      "claim": {
-        "claim_id": "claim_c7114e5ad24d477ab6e7b07cf9ba85cd",
-        "agent_id": "codex-root-goal",
-        "claimed_at_ms": 1787428343082,
-        "expires_at_ms": 1787442743082
-      },
+      "implementation_evidence": [
+        {
+          "path": "desktop-shell/src-tauri/src/local_ai_browser/adapter_content/rich_content.rs",
+          "content_hash": "f0aaf7bab274a4f4ac5802685beaab6ae702acb05f617b8780f8964d4839f37c",
+          "locator": "sanitize_rich_card",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "23420a8d38f2bac0073765e68464b22ed0516246",
+            "head_blob_oid": "959d582daff4c8950f2c982f93123bfca9b34678",
+            "worktree_blob_oid": "959d582daff4c8950f2c982f93123bfca9b34678",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "desktop-shell/src-tauri/src/local_ai_browser/private_response_authorization.rs",
+          "content_hash": "40d8720910a8175946bcce809e27c1258660b7d42bd4ef249c499868ef2e3141",
+          "locator": "allows_rich_kind",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "23420a8d38f2bac0073765e68464b22ed0516246",
+            "head_blob_oid": "1b88debdd0d8224d61091c8e58ab94a0fad0be74",
+            "worktree_blob_oid": "1b88debdd0d8224d61091c8e58ab94a0fad0be74",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "desktop-shell/src-tauri/src/local_ai_browser/rich_content_dom_adapter.js",
+          "content_hash": "aa331c27d8eeb68e288c06d7d5794338767bf4bf2876fa7803cb07efda0c971b",
+          "locator": "window.__elonRichContentDomAdapter",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "23420a8d38f2bac0073765e68464b22ed0516246",
+            "head_blob_oid": "d9154d8a6b06973ea05900cffbddae832b4b04bf",
+            "worktree_blob_oid": "d9154d8a6b06973ea05900cffbddae832b4b04bf",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "pc-frontend/scripts/test-ai-rich-content-contract.cjs",
+          "content_hash": "7e99388d051f59323b06f91e36dbdce09d94c289a7452373e28ce88d884375a8",
+          "locator": "Win rich-content AST",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "23420a8d38f2bac0073765e68464b22ed0516246",
+            "head_blob_oid": "7f66f254fa614dc7b1670b964a8785c8d4b446ca",
+            "worktree_blob_oid": "7f66f254fa614dc7b1670b964a8785c8d4b446ca",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/ai/AiRichContentCard.tsx",
+          "content_hash": "3eddff4073e545f45846170ec00ae3152209761c7949d686a8e5375b60bce644",
+          "locator": "AiRichContentCard",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "23420a8d38f2bac0073765e68464b22ed0516246",
+            "head_blob_oid": "9cda4e1728e43180f5d693095aeb754e680d0edc",
+            "worktree_blob_oid": "9cda4e1728e43180f5d693095aeb754e680d0edc",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "scripts/fixtures/rich-content-media-map.json",
+          "content_hash": "e14ebe8a87759e6496ad55c5c169272feca698dd3d69613e7ca40d874f6c3654",
+          "locator": "yilong.sanitized-rich-content-fixture.v1",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "23420a8d38f2bac0073765e68464b22ed0516246",
+            "head_blob_oid": "0c7d2c014090a8aac9feeacb87135fb4805e4dab",
+            "worktree_blob_oid": "0c7d2c014090a8aac9feeacb87135fb4805e4dab",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "scripts/validate-win-web-ai.ps1",
+          "content_hash": "a8aa631cfcd398f6761829730938e6a185dc9a317beebc850c074ea890c6626d",
+          "locator": "WIN_WEB_AI_VALIDATION",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "23420a8d38f2bac0073765e68464b22ed0516246",
+            "head_blob_oid": "4c00d6db1473fc77f1972f0bbb3644237c5a1498",
+            "worktree_blob_oid": "4c00d6db1473fc77f1972f0bbb3644237c5a1498",
+            "state": "tracked_clean"
+          }
+        }
+      ],
       "created_at_ms": 1787428343067,
-      "updated_at_ms": 1787428357391
+      "updated_at_ms": 1787430391270
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_d4df58b3917f4fcb9a34f8155c68a04e",
-      "feature_id": "sqlite-safe-snapshot-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "绑定 rebase 后当前实现。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1786877696521
-    },
-    {
-      "id": "feature_event_ea84bd94dd884cf5bb71ceca685abc7c",
-      "feature_id": "sqlite-safe-snapshot-v1",
-      "action": "evidence_recorded",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1786877700591
-    },
-    {
-      "id": "feature_event_6febec7461fe4942964dd0db1868c1f5",
-      "feature_id": "sqlite-safe-snapshot-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "当前主线祖先上的实现和证据已重新绑定。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1786877700617
-    },
-    {
-      "id": "feature_event_07d091fdc09842bfa7cf72c3d6f86fd7",
-      "feature_id": "sqlite-safe-snapshot-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "新 SDK 6 项、ERP 13 项和连接器 98 项回归全部通过。",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1786877700639
-    },
-    {
-      "id": "feature_event_8117c5574c54423d8015ad323ee17f5d",
-      "feature_id": "win-web-ai-official-context-binding-v1",
-      "action": "registered",
-      "actor": "codex-goal-019fd85d",
-      "reason": "rebase 后通过官方接口恢复本功能登记并保留远端并发功能。",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1786878793797
-    },
-    {
-      "id": "feature_event_d42de6e079074715a6882566370852aa",
-      "feature_id": "win-web-ai-official-context-binding-v1",
-      "action": "claimed",
-      "actor": "codex-goal-019fd85d",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1786878806275
-    },
-    {
-      "id": "feature_event_f65349f2678a4140b14e47732bdd54f5",
-      "feature_id": "win-web-ai-official-context-binding-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-019fd85d",
-      "reason": "rebase 后恢复已完成实现的证据链。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1786878818170
-    },
-    {
-      "id": "feature_event_470ac6a007ae4b7389f3104c6dd18354",
-      "feature_id": "win-web-ai-official-context-binding-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-goal-019fd85d",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1786878835563
-    },
-    {
-      "id": "feature_event_e95bb9e2654146cfa55b827f3382f55f",
-      "feature_id": "win-web-ai-official-context-binding-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-019fd85d",
-      "reason": "生产首页共用网页 AI 后端实现已随最新 main 重放。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1786878849219
-    },
     {
       "id": "feature_event_d67130a65dc349f6bec62bb92b681aa0",
       "feature_id": "win-web-ai-official-context-binding-v1",
@@ -11199,6 +11195,96 @@
       "from_status": "claimed",
       "to_status": "in_progress",
       "at_ms": 1787428357391
+    },
+    {
+      "id": "feature_event_7fccd3f8f7254839b091bd00c763a42f",
+      "feature_id": "win-web-ai-structured-rich-content-v1",
+      "action": "claim_released",
+      "actor": "codex-root-goal",
+      "reason": "需求文档补充生产授权状态，需要先释放认领并显式重绑后重新认领。",
+      "from_status": "in_progress",
+      "to_status": "blocked",
+      "at_ms": 1787430325262
+    },
+    {
+      "id": "feature_event_a6a9b256ee734e169966af23378ce140",
+      "feature_id": "win-web-ai-structured-rich-content-v1",
+      "action": "requirement_rebound",
+      "actor": "codex-root-goal",
+      "reason": "补充默认拒绝的当前生产授权状态，显式重绑已提交的 current 需求文档。",
+      "from_status": "blocked",
+      "to_status": "proposed",
+      "at_ms": 1787430336305
+    },
+    {
+      "id": "feature_event_1f58fbe22553496a893459da29aa40eb",
+      "feature_id": "win-web-ai-structured-rich-content-v1",
+      "action": "transitioned",
+      "actor": "codex-root-goal",
+      "reason": "已复核补充内容只明确默认拒绝边界，接受 current 需求。",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1787430355326
+    },
+    {
+      "id": "feature_event_11bbf14a6fcf4b4ebeafb0e133774002",
+      "feature_id": "win-web-ai-structured-rich-content-v1",
+      "action": "transitioned",
+      "actor": "codex-root-goal",
+      "reason": "范围、依赖和验收标准已明确，可以继续交付。",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1787430355342
+    },
+    {
+      "id": "feature_event_3edb1e762dd242fc99a0d313aa6e95c2",
+      "feature_id": "win-web-ai-structured-rich-content-v1",
+      "action": "claimed",
+      "actor": "codex-root-goal",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1787430355354
+    },
+    {
+      "id": "feature_event_730e02d84ee44a518fd8ba10747478ee",
+      "feature_id": "win-web-ai-structured-rich-content-v1",
+      "action": "transitioned",
+      "actor": "codex-root-goal",
+      "reason": "继续完成发布、健康回读与剩余富内容改进。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1787430355366
+    },
+    {
+      "id": "feature_event_caf74c11cae44267b7dea572ab52fa17",
+      "feature_id": "win-web-ai-structured-rich-content-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-root-goal",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1787430377156
+    },
+    {
+      "id": "feature_event_f5b438b1ea384eb2ae570c86b3cd4a13",
+      "feature_id": "win-web-ai-structured-rich-content-v1",
+      "action": "transitioned",
+      "actor": "codex-root-goal",
+      "reason": "媒体、地图、授权清单、AST 清洗、安全降级和原生渲染均已提交。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1787430391251
+    },
+    {
+      "id": "feature_event_8d39ed9bbb0943579b17423fc58bc875",
+      "feature_id": "win-web-ai-structured-rich-content-v1",
+      "action": "transitioned",
+      "actor": "codex-root-goal",
+      "reason": "test:user-browser、PC build/lint、强制 Rust 测试及 validate-win-web-ai 全量验证通过。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1787430391270
     }
   ]
 }
