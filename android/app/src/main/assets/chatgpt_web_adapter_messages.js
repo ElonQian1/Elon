@@ -332,7 +332,14 @@
     return turns.length ? turns : Array.from(main.querySelectorAll('[data-message-author-role]'));
   }
 
-  function readMessageWindow(streaming) {
+  function messageIdentity(node, role, globalIndex) {
+    return node.getAttribute('data-message-id')
+      || node.getAttribute('data-testid')
+      || node.id
+      || role + '-' + globalIndex;
+  }
+
+  function readMessageWindow(streaming, streamingAssistantKey) {
     const nodes = messageNodes();
     const startIndex = Math.max(0, nodes.length - MAX_MESSAGES);
     const seen = new Set();
@@ -343,10 +350,7 @@
       const text = messageContent(node, role);
       const parts = structuredParts(contentNode(node));
       const globalIndex = startIndex + index;
-      const baseId = node.getAttribute('data-message-id')
-        || node.getAttribute('data-testid')
-        || node.id
-        || role + '-' + globalIndex;
+      const baseId = messageIdentity(node, role, globalIndex);
       const id = seen.has(baseId) ? baseId + '-' + globalIndex : baseId;
       seen.add(id);
       return {
@@ -356,7 +360,8 @@
         content: [{ type: role === 'assistant' ? 'markdown' : 'text', text }].concat(parts)
       };
     }).filter((message) => message.role && (message.content[0].text || message.content.length > 1));
-    if (streaming && messages.length && messages[messages.length - 1].role === 'assistant') {
+    if (streaming && messages.length && messages[messages.length - 1].role === 'assistant' &&
+        (streamingAssistantKey === undefined || messages[messages.length - 1].id === streamingAssistantKey)) {
       messages[messages.length - 1].state = 'streaming';
     }
     return { messages, observedCount: nodes.length, startIndex };
@@ -370,20 +375,32 @@
     return messageNodes().reverse().find((node) => messageRole(node) === 'assistant') || null;
   }
 
+  function lastAssistantObservation() {
+    const nodes = messageNodes();
+    for (let index = nodes.length - 1; index >= 0; index -= 1) {
+      const turn = nodes[index];
+      if (messageRole(turn) !== 'assistant') continue;
+      const content = contentNode(turn);
+      const text = messageContent(turn, 'assistant')
+        .replace(INVISIBLE_PLACEHOLDERS, '')
+        .replace(THINKING_CURSOR_PLACEHOLDERS, '')
+        .trim();
+      const richCount = content.querySelectorAll(
+        'table, pre, blockquote, ol, ul, img, video, audio, canvas, iframe, '
+        + '[data-testid*="artifact" i], [data-testid*="code-interpreter" i]'
+      ).length;
+      return {
+        key: messageIdentity(turn, 'assistant', index),
+        fingerprint: text + '\u0000' + richCount,
+        pending: !text && richCount === 0,
+        completionVisible: !!regenerateButton()
+      };
+    }
+    return { key: '', fingerprint: '', pending: false, completionVisible: false };
+  }
+
   function lastAssistantPending() {
-    const turn = lastAssistantTurn();
-    if (!turn) return false;
-    const content = contentNode(turn);
-    const text = messageContent(turn, 'assistant')
-      .replace(INVISIBLE_PLACEHOLDERS, '')
-      .replace(THINKING_CURSOR_PLACEHOLDERS, '')
-      .trim();
-    if (text) return false;
-    if (content.querySelector(
-      'table, pre, blockquote, ol, ul, img, video, audio, canvas, iframe, '
-      + '[data-testid*="artifact" i], [data-testid*="code-interpreter" i]'
-    )) return false;
-    return true;
+    return lastAssistantObservation().pending;
   }
 
   function regenerateButton() {
@@ -487,6 +504,7 @@
 
   window.__elonChatGptMessages = Object.freeze({
     capabilities,
+    lastAssistantObservation,
     lastAssistantPending,
     readMessages,
     readMessageWindow,

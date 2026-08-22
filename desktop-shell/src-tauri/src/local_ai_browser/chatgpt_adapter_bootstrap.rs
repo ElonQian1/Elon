@@ -1,5 +1,5 @@
 const ALLOWED_ORIGIN: &str = "https://chatgpt.com";
-pub(super) const ADAPTER_VERSION: u32 = 140;
+pub(super) const ADAPTER_VERSION: u32 = 142;
 
 const ADAPTER_ASSETS: &[(&str, &str)] = &[
     (
@@ -117,6 +117,10 @@ const ADAPTER_ASSETS: &[(&str, &str)] = &[
     (
         "chatgpt_web_adapter_snapshot_scheduler.js",
         include_str!("../../../../android/app/src/main/assets/chatgpt_web_adapter_snapshot_scheduler.js"),
+    ),
+    (
+        "chatgpt_web_adapter_streaming_policy.js",
+        include_str!("../../../../android/app/src/main/assets/chatgpt_web_adapter_streaming_policy.js"),
     ),
     (
         "chatgpt_web_adapter_skin.js",
@@ -290,7 +294,7 @@ mod tests {
 
         assert_eq!(win_assets, android_assets);
         assert_eq!(ADAPTER_VERSION, android_version);
-        assert!(script.contains("__elonChatGptAdapterTargetVersion = 140"));
+        assert!(script.contains("__elonChatGptAdapterTargetVersion = 142"));
         assert!(script.contains("__elonChatGptDocumentToken"));
         assert!(script.contains("__elonChatGptSnapshotScheduler"));
         assert!(script.contains("__elonChatGptLayout"));

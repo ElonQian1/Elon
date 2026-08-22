@@ -10,6 +10,7 @@
   const navigationAdapter = window.__elonChatGptNavigation;
   const layoutAdapter = window.__elonChatGptLayout;
   const snapshotSchedulerModule = window.__elonChatGptSnapshotScheduler;
+  const streamingPolicyModule = window.__elonChatGptStreamingPolicy;
   const skinAdapter = window.__elonChatGptSkin;
   const authenticationPolicy = window.__elonChatGptAuthenticationPolicy;
   const adapterVersion = Number(window.__elonChatGptAdapterVersion || 0);
@@ -27,7 +28,11 @@
   const SEND_BUTTON_SETTLE_MS = 180;
   const SEND_BUTTON_TIMEOUT_MS = 4000;
   const SEND_ACCEPT_TIMEOUT_MS = 3000;
-
+  const streamingPolicy = streamingPolicyModule && streamingPolicyModule.create({
+    now: Date.now,
+    scheduleTimer: (delayMs, action) => window.setTimeout(action, delayMs),
+    cancelTimer: (timer) => clearTimeout(timer)
+  });
   function emitEvent(event) {
     if (disposed) return;
     nativeBridge.postMessage(JSON.stringify({
@@ -129,26 +134,11 @@
     }) || null;
   }
 
-  function isStreaming() {
-    const direct = document.querySelector('[data-testid="stop-button"]');
-    if (isVisible(direct)) return true;
-    const composer = findComposer();
-    const scope = composer && composer.closest('form');
-    const stopControlVisible = !!scope && Array.from(scope.querySelectorAll('button')).some((button) => {
-      if (!isVisible(button)) return false;
-      const label = cleanText([
-        button.getAttribute('aria-label'),
-        button.getAttribute('title'),
-        button.textContent
-      ].filter(Boolean).join(' ')).toLowerCase();
-      return /stop generating|停止生成/.test(label);
-    });
-    if (stopControlVisible) return true;
-    return !!(messageAdapter
-      && typeof messageAdapter.lastAssistantPending === 'function'
-      && messageAdapter.lastAssistantPending());
+  function readStreamingState() {
+    return streamingPolicyModule
+      ? streamingPolicyModule.readState(streamingPolicy, messageAdapter, document, findComposer(), isVisible)
+      : { active: false, assistantKey: '' };
   }
-
   function detectCapabilities(composer) {
     const capabilities = [
       'streaming',
@@ -168,11 +158,12 @@
     if (disposed) return;
     const composer = findComposer();
     const dictationActive = optional(false, () => composerAdapter ? composerAdapter.dictationActive(composer) : false);
-    const streaming = optional(false, isStreaming);
+    const streamingState = optional({ active: false, assistantKey: '' }, readStreamingState);
+    const streaming = streamingState.active;
     streamingSnapshotMode = streaming;
     const messageWindow = optional({ messages: [], observedCount: 0, startIndex: 0 }, () =>
       messageAdapter && typeof messageAdapter.readMessageWindow === 'function'
-        ? messageAdapter.readMessageWindow(streaming)
+        ? messageAdapter.readMessageWindow(streaming, streamingState.assistantKey)
         : { messages: messageAdapter ? messageAdapter.readMessages(streaming) : [], observedCount: 0, startIndex: 0 }
     );
     const messages = Array.isArray(messageWindow.messages) ? messageWindow.messages : [];
@@ -204,6 +195,7 @@
       emitEvent(event);
     }
     optional(undefined, () => layoutAdapter && layoutAdapter.emitSnapshot(emitEvent));
+    if (streamingPolicy) streamingPolicy.scheduleNext(streaming, () => scheduleSnapshot(true));
   }
 
   function scheduleSnapshot(recordsOrActive) {
@@ -299,7 +291,7 @@
     const started = Date.now();
     function poll() {
       const currentValue = comparableText(composerValue(composer));
-      if (!currentValue || currentValue !== comparableText(expectedValue) || isStreaming()) {
+      if (!currentValue || currentValue !== comparableText(expectedValue) || readStreamingState().active) {
         return onAccepted();
       }
       if (Date.now() - started >= SEND_ACCEPT_TIMEOUT_MS) return onTimeout();
@@ -310,6 +302,7 @@
 
   function sendPrompt(value, expectedDraft, respond) {
     const composer = findComposer();
+    const assistantBeforeSend = streamingPolicyModule && streamingPolicyModule.messageObservation(messageAdapter);
     if (!composer) return respond('send_prompt', false, '未找到输入框，请切换网页模式。');
     if (comparableText(composerValue(composer)) !== comparableText(expectedDraft)) {
       return respond('send_prompt', false, '网页草稿已变化，请返回官网确认后重试。');
@@ -327,6 +320,7 @@
           composer,
           value,
           () => {
+            if (streamingPolicy) streamingPolicy.begin(assistantBeforeSend);
             respond('send_prompt', true, '官方网页已确认发送。');
             scheduleSnapshot();
           },
@@ -389,6 +383,7 @@
       }
       skinMode = enabled;
       if (skinMode) {
+        if (streamingPolicy) streamingPolicy.scheduleNext(false);
         if (observer) observer.disconnect();
         if (snapshotScheduler && typeof snapshotScheduler.cancelPending === 'function') {
           snapshotScheduler.cancelPending();
@@ -520,6 +515,9 @@
       return conversationAdapter.openProject(String(command.value || ''), respond);
     }
     if (action === 'regenerate_response' && messageAdapter) {
+      if (streamingPolicyModule) streamingPolicyModule.begin(
+        streamingPolicy, messageAdapter, { allowSameTurn: true }
+      );
       return messageAdapter.regenerate(emitEvent, respond);
     }
     if (action === 'stop_generation') {
@@ -532,7 +530,7 @@
             button.getAttribute('title'),
             button.textContent
           ].filter(Boolean).join(' ')).toLowerCase();
-          return isVisible(button) && /stop generating|停止生成/.test(label);
+          return isVisible(button) && /stop (?:generating|streaming|response)|停止(?:生成|產生|回答|回覆)/.test(label);
         }));
       if (!stop) return respond(action, false, '当前没有正在生成的回复。');
       stop.click();
@@ -544,6 +542,7 @@
         return respond(action, false, '网页中有未发送草稿，请先处理草稿。');
       }
       if (!conversationAdapter) return respond(action, false, '会话适配器尚未就绪。');
+      if (streamingPolicy) streamingPolicy.reset();
       return conversationAdapter.newConversation(respond);
     }
     respond(action || 'unknown', false, '不支持的本地命令。');
@@ -555,6 +554,7 @@
       skinAdapter.setEnabled(false);
     }
     disposed = true;
+    if (streamingPolicy) streamingPolicy.dispose();
     if (snapshotScheduler) snapshotScheduler.dispose();
     if (observer) observer.disconnect();
     window.removeEventListener('popstate', scheduleSnapshot);

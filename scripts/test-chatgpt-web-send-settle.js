@@ -8,6 +8,9 @@ const vm = require('node:vm');
 const source = fs.readFileSync(path.join(
   __dirname, '..', 'android', 'app', 'src', 'main', 'assets', 'chatgpt_web_adapter.js'
 ), 'utf8');
+const streamingPolicySource = fs.readFileSync(path.join(
+  __dirname, '..', 'android', 'app', 'src', 'main', 'assets', 'chatgpt_web_adapter_streaming_policy.js'
+), 'utf8');
 const events = [];
 
 class NodeElement {}
@@ -31,6 +34,9 @@ class InputElement extends NodeElement {
 
 const composer = new InputElement('');
 let clickedAt = 0;
+let assistantObservation = {
+  key: 'assistant-old', fingerprint: 'old answer', pending: false, completionVisible: true
+};
 const sendButton = {
   disabled: true,
   getAttribute(name) { return name === 'aria-disabled' ? String(this.disabled) : null; },
@@ -38,6 +44,9 @@ const sendButton = {
   click() {
     clickedAt = Date.now();
     composer.value = '';
+    assistantObservation = {
+      key: 'assistant-new', fingerprint: 'first streamed token', pending: false, completionVisible: false
+    };
   }
 };
 const form = {
@@ -62,6 +71,23 @@ const window = {
   elonChatGptNative: { postMessage: (payload) => events.push(JSON.parse(payload)) },
   __elonChatGptAdapterVersion: 118,
   __elonChatGptDocumentToken: 'doc_send_settle',
+  __elonChatGptMessages: {
+    capabilities() { return []; },
+    lastAssistantObservation() { return assistantObservation; },
+    lastAssistantPending() { return assistantObservation.pending; },
+    readMessageWindow(streaming, assistantKey) {
+      return {
+        observedCount: 1,
+        startIndex: 0,
+        messages: [{
+          id: assistantObservation.key,
+          role: 'assistant',
+          state: streaming && assistantKey === assistantObservation.key ? 'streaming' : 'completed',
+          content: [{ type: 'markdown', text: assistantObservation.fingerprint }]
+        }]
+      };
+    }
+  },
   __elonChatGptSnapshotScheduler: {
     create() { return { schedule() {}, dispose() {} }; }
   },
@@ -84,7 +110,7 @@ Object.defineProperty(InputElement.prototype, 'value', {
 });
 window.window = window;
 
-vm.runInNewContext(source, {
+const sandbox = {
   window,
   document,
   location: window.location,
@@ -96,7 +122,11 @@ vm.runInNewContext(source, {
   Node: window.Node,
   setTimeout,
   clearTimeout
-}, { filename: 'chatgpt_web_adapter.js' });
+};
+vm.runInNewContext(streamingPolicySource, sandbox, {
+  filename: 'chatgpt_web_adapter_streaming_policy.js'
+});
+vm.runInNewContext(source, sandbox, { filename: 'chatgpt_web_adapter.js' });
 
 const startedAt = Date.now();
 window.__elonChatGptBridge.command(JSON.stringify({
@@ -114,5 +144,13 @@ setTimeout(() => {
   assert.equal(result.requestId, 'mcp_send');
   assert.equal(composer.value, '');
   assert.ok(clickedAt - startedAt >= 180, 'send must wait for a stable enabled button');
+  window.__elonChatGptBridge.command(JSON.stringify({
+    action: 'snapshot',
+    documentToken: 'doc_send_settle'
+  }));
+  const streamingSnapshot = events.filter((event) => event.event?.type === 'message_snapshot').at(-1);
+  assert.equal(streamingSnapshot.event.streaming, true);
+  assert.equal(streamingSnapshot.event.messages[0].state, 'streaming');
+  assert.equal(streamingSnapshot.event.messages[0].content[0].text, 'first streamed token');
   console.log('CHATGPT_SEND_SETTLE_POLICY=passed');
 }, 650);
