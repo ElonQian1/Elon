@@ -273,6 +273,27 @@
     return count;
   }
 
+  function sourceResultRailBoundary(container) {
+    if (!container) return false;
+    let sibling = container.nextElementSibling;
+    for (let distance = 0; sibling && distance < 3; distance += 1) {
+      const controls = [sibling];
+      if (typeof sibling.querySelectorAll === 'function') {
+        controls.push(...sibling.querySelectorAll('button, [role="button"], a'));
+      }
+      if (controls.some((control) => {
+        const label = cleanInline(
+          control && (control.innerText || control.textContent ||
+            (typeof control.getAttribute === 'function' &&
+              (control.getAttribute('aria-label') || control.getAttribute('title'))))
+        );
+        return /(?:显示|查看)(?:所有|全部)?(?:相关)?结果|show (?:all|more) (?:related )?results|more results/i.test(label);
+      })) return true;
+      sibling = sibling.nextElementSibling;
+    }
+    return false;
+  }
+
   function sourceResultCollection(metrics) {
     const itemCount = Math.max(0, Number(metrics && metrics.itemCount) || 0);
     const sourceItemCount = Math.max(0, Number(metrics && metrics.sourceItemCount) || 0);
@@ -280,6 +301,7 @@
       0, Number(metrics && metrics.dominantSourceItemCount) || 0
     );
     const textLength = Math.max(0, Number(metrics && metrics.textLength) || 0);
+    if (metrics && metrics.railBoundary === true && itemCount >= 2) return true;
     return itemCount >= 2 && sourceItemCount >= 2 && dominantSourceItemCount >= 2 &&
       dominantSourceItemCount / itemCount >= 0.6 &&
       textLength <= Math.min(1800, sourceItemCount * 600);
@@ -371,7 +393,8 @@
         itemCount: itemNodes.length,
         sourceItemCount: itemMetrics.filter((item) => item.sourceLike).length,
         dominantSourceItemCount: itemMetrics.filter((item) => item.linkDominated).length,
-        textLength: cleanInline(element.innerText || element.textContent).length
+        textLength: cleanInline(element.innerText || element.textContent).length,
+        railBoundary: sourceResultRailBoundary(element)
       });
       const items = itemNodes.map((item) => ({
         markdown: inlineMarkdown(item, true),
@@ -428,12 +451,13 @@
   }
 
   return Object.freeze({
-    version: 3,
+    version: 4,
     renderBlocks,
     partsFromBlocks,
     weatherPart,
     externalLinkTextLength,
     sourceResultItemCount,
+    sourceResultRailBoundary,
     sourceResultCollection,
     parts
   });

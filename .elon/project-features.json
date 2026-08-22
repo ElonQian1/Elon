@@ -7702,7 +7702,7 @@
       "id": "win-google-ai-source-rail-narrative-pruning-v3",
       "title": "Win Google AI 来源栏正文分层 V3",
       "summary": "复用现有完整回答根和来源 UI，在共享 Google 富内容解析器中把外部来源结果列表从正文 Markdown 分层剔除，同时保留正文列表、真实表格、行内引用和结构化来源面板。",
-      "status": "verified",
+      "status": "implemented",
       "priority": "p0",
       "requirement": {
         "path": "docs/requirements/win-google-ai-source-rail-narrative-pruning-v3.md",
@@ -7750,22 +7750,22 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "ddc6b6db664e368b39ed6da84608f9304940eb8c",
-            "head_blob_oid": "9b6787a174100ee0d6fad50517f504285c3372d7",
+            "head_commit": "426239f26a4722f46c69ec0c16f1ef838993299f",
+            "head_blob_oid": "32cb0f567deb7e3b80acdcb2973da2b198e8629d",
             "worktree_blob_oid": "32cb0f567deb7e3b80acdcb2973da2b198e8629d",
-            "state": "tracked_modified"
+            "state": "tracked_clean"
           }
         },
         {
           "path": "android/app/src/main/assets/google_web_rich_content.js",
-          "content_hash": "125b1ee0a556668de411ba6e3ede3fe4b7177a373a49003beace4b0c5ce89eb1",
-          "locator": "sourceResultCollection/trimBlocks",
+          "content_hash": "40e72610590143e55e56b101ca9ca3278fec9f3b8412b28d7754b1a9995c46a1",
+          "locator": "sourceResultRailBoundary/sourceResultCollection",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "ddc6b6db664e368b39ed6da84608f9304940eb8c",
-            "head_blob_oid": "62e685dc1476bee56e2ae72bd99aed97d4772f46",
-            "worktree_blob_oid": "b28ee808cb1073a545491a5d4067e78255fccb3d",
+            "head_commit": "426239f26a4722f46c69ec0c16f1ef838993299f",
+            "head_blob_oid": "b28ee808cb1073a545491a5d4067e78255fccb3d",
+            "worktree_blob_oid": "bdd94df4b7ca4a9c0030f2e398b1ce67fe99cf47",
             "state": "tracked_modified"
           }
         },
@@ -7776,10 +7776,10 @@
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "ddc6b6db664e368b39ed6da84608f9304940eb8c",
-            "head_blob_oid": "",
+            "head_commit": "426239f26a4722f46c69ec0c16f1ef838993299f",
+            "head_blob_oid": "f7f4f564da023987970842091d79f96aa03b24b0",
             "worktree_blob_oid": "f7f4f564da023987970842091d79f96aa03b24b0",
-            "state": "untracked"
+            "state": "tracked_clean"
           }
         },
         {
@@ -7789,10 +7789,10 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "ddc6b6db664e368b39ed6da84608f9304940eb8c",
-            "head_blob_oid": "0c66001b238f561aca9a785684023073b2b31ac2",
+            "head_commit": "426239f26a4722f46c69ec0c16f1ef838993299f",
+            "head_blob_oid": "30e7da9116ccb315ab1bd17305fb1812779646c0",
             "worktree_blob_oid": "30e7da9116ccb315ab1bd17305fb1812779646c0",
-            "state": "tracked_modified"
+            "state": "tracked_clean"
           }
         },
         {
@@ -7802,28 +7802,28 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "ddc6b6db664e368b39ed6da84608f9304940eb8c",
-            "head_blob_oid": "6b2850a0f64ea7b56ec98f568b702ad79d5edbed",
+            "head_commit": "426239f26a4722f46c69ec0c16f1ef838993299f",
+            "head_blob_oid": "4b4fa93c6c1e8ce5eb2050a61c47c66088c264b6",
             "worktree_blob_oid": "4b4fa93c6c1e8ce5eb2050a61c47c66088c264b6",
-            "state": "tracked_modified"
+            "state": "tracked_clean"
           }
         },
         {
           "path": "scripts/test-google-web-rich-content.cjs",
-          "content_hash": "2e64894bdfbb108b8f020a27a9d3cab9766106479f83acaff2d001a87be88a14",
-          "locator": "sourceRailPruned",
+          "content_hash": "e10f6ba13f4d93875ab7c8bfabab37cb13d0fc2e7177fac481ca11ca4bf3e111",
+          "locator": "source rail boundary and pruning",
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "ddc6b6db664e368b39ed6da84608f9304940eb8c",
-            "head_blob_oid": "9e7627cff408c5264361c99776361d7ce226f0cb",
-            "worktree_blob_oid": "5547fc4c4b8307c0640ef7675ad96d9caed0700f",
+            "head_commit": "426239f26a4722f46c69ec0c16f1ef838993299f",
+            "head_blob_oid": "5547fc4c4b8307c0640ef7675ad96d9caed0700f",
+            "worktree_blob_oid": "18143f3f84c9c60d8375b93a823ebaf7ab4eb09f",
             "state": "tracked_modified"
           }
         }
       ],
       "created_at_ms": 1787440868272,
-      "updated_at_ms": 1787441330225
+      "updated_at_ms": 1787442251936
     },
     {
       "id": "win-hidden-ai-webview-input-hit-test-v1",
@@ -9976,56 +9976,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_8c5a78c709ea4e8da3037ceb19a2729d",
-      "feature_id": "win-google-ai-dismiss-blocking-menu-before-send-v4",
-      "action": "evidence_recorded",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1787223188685
-    },
-    {
-      "id": "feature_event_26bf2ad4d2e74437a7a3a78059e482ce",
-      "feature_id": "win-google-ai-dismiss-blocking-menu-before-send-v4",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "阻塞菜单清理、有限重试与回归契约已实现。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1787223207885
-    },
-    {
-      "id": "feature_event_4ea73a58e6084fb3a73ffcf79b980790",
-      "feature_id": "win-google-ai-dismiss-blocking-menu-before-send-v4",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "完整用户浏览器测试、PC生产构建、Rust定向验证均通过；等待发布后真实Win复验。",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1787223222811
-    },
-    {
-      "id": "feature_event_f5a2cb2dcdd7428bbe51e0bd2b4f976c",
-      "feature_id": "win-google-ai-dismiss-blocking-menu-before-send-v4",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "Win版本37c508a45已安装；真实制造Google导出菜单残留后，原生消息不跳官网、不回滚，菜单自动关闭并同步回复“通过”。",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1787224119819
-    },
-    {
-      "id": "feature_event_eb3aa7b41f3a43339349629bc53af64f",
-      "feature_id": "win-background-ai-webview-resize-parking-v1",
-      "action": "registered",
-      "actor": "codex",
-      "reason": "用户在本机最大化后可稳定复现，阻断新对话输入；需求范围与验收标准已明确。",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1787225006617
-    },
-    {
       "id": "feature_event_81ba8e63831144f68ca0b8ee25500b32",
       "feature_id": "win-background-ai-webview-resize-parking-v1",
       "action": "claimed",
@@ -11974,6 +11924,56 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1787441330225
+    },
+    {
+      "id": "feature_event_c6ca1a5303eb49dcafee1aad5c535eae",
+      "feature_id": "win-google-ai-source-rail-narrative-pruning-v3",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "真实 Win 历史回答验收发现官网来源链接包装未命中比例判定，回退继续修复，不保留错误的 verified 结论。",
+      "from_status": "verified",
+      "to_status": "ready",
+      "at_ms": 1787442194533
+    },
+    {
+      "id": "feature_event_99cf0297564f433da0cb36843640653a",
+      "feature_id": "win-google-ai-source-rail-narrative-pruning-v3",
+      "action": "claimed",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1787442207371
+    },
+    {
+      "id": "feature_event_6e3b7a252ca04593bc000028ad0926d6",
+      "feature_id": "win-google-ai-source-rail-narrative-pruning-v3",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "按真实 Google 来源栏边界信号继续修复。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1787442218508
+    },
+    {
+      "id": "feature_event_1d25662b9e0e4ddaa292e7940813ece1",
+      "feature_id": "win-google-ai-source-rail-narrative-pruning-v3",
+      "action": "evidence_recorded",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1787442236372
+    },
+    {
+      "id": "feature_event_0a9bc5f4908c48cb9ee86afde82ee3d6",
+      "feature_id": "win-google-ai-source-rail-narrative-pruning-v3",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "加入 Google 显示所有相关结果边界判定并完成第二轮代码回归，等待正式包真实界面验收。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1787442251936
     }
   ]
 }

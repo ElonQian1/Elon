@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict')
 const richContent = require('../android/app/src/main/assets/google_web_rich_content.js')
 
-assert.equal(richContent.version, 3)
+assert.equal(richContent.version, 4)
 
 const markdown = richContent.renderBlocks([
   { type: 'heading', level: 2, text: '天气概览' },
@@ -81,6 +81,27 @@ assert.equal(richContent.sourceResultCollection({
   dominantSourceItemCount: 1,
   textLength: 540,
 }), false, 'a narrative list with one inline citation must remain in the answer')
+assert.equal(richContent.sourceResultCollection({
+  itemCount: 3,
+  sourceItemCount: 0,
+  dominantSourceItemCount: 0,
+  textLength: 640,
+  railBoundary: true,
+}), true, 'Google source rail boundary must survive wrapped or indirect result links')
+assert.equal(richContent.sourceResultRailBoundary({
+  nextElementSibling: {
+    innerText: '显示所有相关结果',
+    nextElementSibling: null,
+    querySelectorAll: () => [],
+  },
+}), true)
+assert.equal(richContent.sourceResultRailBoundary({
+  nextElementSibling: {
+    innerText: '继续阅读正文',
+    nextElementSibling: null,
+    querySelectorAll: () => [],
+  },
+}), false)
 
 const weather = richContent.partsFromBlocks([
   { type: 'heading', level: 2, text: '彰化县今晚天气' },
