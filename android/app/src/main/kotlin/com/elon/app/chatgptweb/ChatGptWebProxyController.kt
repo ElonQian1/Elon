@@ -3,6 +3,8 @@ package com.elon.app.chatgptweb
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
+import android.os.Handler
+import android.os.Looper
 import androidx.core.content.ContextCompat
 import androidx.webkit.ProxyConfig
 import androidx.webkit.ProxyController
@@ -21,13 +23,22 @@ internal class ChatGptWebProxyController(context: Context) {
     private val connectivityManager =
         appContext.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
     private val mainExecutor = ContextCompat.getMainExecutor(appContext)
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     fun prepare(onReady: (ChatGptWebProxyStatus) -> Unit) {
+        val gate = ChatGptWebProxyPrepareGate(
+            schedule = { task, delayMs -> mainHandler.postDelayed(task, delayMs) },
+            cancel = mainHandler::removeCallbacks,
+            timeoutMs = PREPARE_TIMEOUT_MS,
+            fallback = ::currentStatus,
+            onReady = onReady,
+        )
+        gate.start()
         val manualEndpoint = savedManualEndpoint()
         if (manualEndpoint != null) {
-            applyManualEndpoint(manualEndpoint, persist = false, onReady = onReady)
+            applyManualEndpoint(manualEndpoint, persist = false, onReady = gate::complete)
         } else {
-            clearOverride(onReady)
+            clearOverride(gate::complete)
         }
     }
 
@@ -119,6 +130,7 @@ internal class ChatGptWebProxyController(context: Context) {
     internal companion object {
         private const val PREFERENCES_NAME = "chatgpt_web_proxy"
         private const val KEY_MANUAL_ENDPOINT = "manual_http_proxy"
+        internal const val PREPARE_TIMEOUT_MS = 750L
 
         fun normalizeEndpoint(rawEndpoint: String): String? {
             val raw = rawEndpoint.trim()
