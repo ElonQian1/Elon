@@ -5,6 +5,16 @@ const path = require('node:path')
 const ts = require('typescript')
 
 const filename = path.resolve(__dirname, '../src/features/user-browser/localAiHistoryWindow.ts')
+const qualityFilename = path.resolve(__dirname, '../src/features/user-browser/localAiAssistantContentQuality.ts')
+const qualitySource = fs.readFileSync(qualityFilename, 'utf8')
+const qualityOutput = ts.transpileModule(qualitySource, {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+  fileName: qualityFilename,
+}).outputText
+const qualityModule = new Module(qualityFilename, module)
+qualityModule.filename = qualityFilename
+qualityModule.paths = module.paths
+qualityModule._compile(qualityOutput, qualityFilename)
 const source = fs.readFileSync(filename, 'utf8')
 const output = ts.transpileModule(source, {
   compilerOptions: {
@@ -17,6 +27,10 @@ const output = ts.transpileModule(source, {
 const compiled = new Module(filename, module)
 compiled.filename = filename
 compiled.paths = module.paths
+const defaultRequire = compiled.require.bind(compiled)
+compiled.require = (id) => id === './localAiAssistantContentQuality'
+  ? qualityModule.exports
+  : defaultRequire(id)
 compiled._compile(output, filename)
 const { localAiHistoryWindow } = compiled.exports
 
@@ -40,6 +54,15 @@ assert.match(partial.label, /160 \/ 官网观察 248/)
 const repaired = localAiHistoryWindow(snapshot(6, 2, 4))
 assert.equal(repaired.observedCount, 10)
 assert.equal(repaired.windowStart, 4)
+
+const incompleteSnapshot = snapshot(2, 2, 0)
+incompleteSnapshot.messages[1].content = [
+  { type: 'markdown', text: '提供反馈' },
+  { type: 'rich_card', text: 'Ethereum (ETH)' },
+]
+const incomplete = localAiHistoryWindow(incompleteSnapshot)
+assert.equal(incomplete.complete, false)
+assert.match(incomplete.label, /结构已变化/)
 
 process.stdout.write('PASS local AI history window summary\n')
 

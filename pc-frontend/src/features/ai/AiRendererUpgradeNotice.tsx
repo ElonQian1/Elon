@@ -12,12 +12,15 @@ export default function AiRendererUpgradeNotice({
   onCheckUpdates?: () => void
 }) {
   if (!compatibility) return null
+  const extractionIncomplete = compatibility.reason === 'incomplete_extraction'
   return (
     <aside className={styles.rendererUpgradeNotice} role="status">
       <AlertTriangle size={17} aria-hidden="true" />
       <div>
-        <strong>官网富内容结构已变化</strong>
-        <span>正文和已识别内容已保留；当前 Win 渲染器尚不能完整复现这部分卡片或交互内容。</span>
+        <strong>{extractionIncomplete ? '官网回答结构已升级' : '官网富内容结构已变化'}</strong>
+        <span>{extractionIncomplete
+          ? '当前 Win 端只识别到部分卡片或操作控件，未把这条消息误报为完整正文；可更新后重试或查看官网完整内容。'
+          : '正文和已识别内容已保留；当前 Win 渲染器尚不能完整复现这部分卡片或交互内容。'}</span>
         <div>
           {onOpenOfficial && <button type="button" onClick={onOpenOfficial}><ExternalLink size={13} />查看官网完整内容</button>}
           {onCheckUpdates && <button type="button" onClick={onCheckUpdates}><RefreshCw size={13} />检查 Win 端更新</button>}

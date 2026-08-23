@@ -14,6 +14,7 @@ import { shouldRenderNativeStructuredPart } from './localAiStructuredPartPolicy'
 import type { LocalAiStructuredContentPart } from './localAiBrowserProtocol'
 import { isYilongRichContent } from './richContentProtocol'
 import { localAiRendererCompatibility } from './localAiRendererCompatibility'
+import { localAiAssistantExtractionIncomplete } from './localAiAssistantContentQuality'
 
 const PROVIDER_STORAGE_KEY = 'elon.pc.aiChatProvider'
 
@@ -45,6 +46,7 @@ export default function useAiWebChatBackend(mode: AiHomeMode, ownerKey: string) 
         item.content.filter((part): part is LocalAiStructuredContentPart => (
           !['text', 'markdown', 'citation'].includes(part.type)
         )),
+        localAiAssistantExtractionIncomplete(item),
       ))
     }
     const latestAffectedAssistantId = [...controller.visibleMessages]

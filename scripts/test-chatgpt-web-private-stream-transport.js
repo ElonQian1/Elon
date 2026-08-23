@@ -133,6 +133,13 @@ function context(enabled, response) {
   assert.equal(merged[0].state, 'completed');
   assert.equal(merged[0].content[0].text, 'hello world');
 
+  await enabled.window.fetch({
+    method: 'POST',
+    url: 'https://chatgpt.com/backend-api/f/conversation/stream'
+  }, { method: 'POST' });
+  await tick();
+  assert.equal(enabled.calls(), 2, 'versioned stream paths use the same single official request');
+
   enabled.window.__elonChatGptPrivateStreamTransport.dispose();
   assert.equal(enabled.window.fetch, enabled.originalFetch);
 

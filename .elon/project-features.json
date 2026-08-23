@@ -6947,6 +6947,57 @@
       "updated_at_ms": 1787228653680
     },
     {
+      "id": "win-chatgpt-composite-answer-extraction-v1",
+      "title": "Win ChatGPT 组合回答原生提取 V1",
+      "summary": "修复 ChatGPT 新版同回合行情卡、正文和反馈控件组合结构被错误提取为‘提供反馈’，保持原生聊天前台并阻止不完整回答误报完整同步。",
+      "status": "in_progress",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/win-chatgpt-composite-answer-extraction-v1.md",
+        "content_hash": "514200de4c2b2e55e9482dfcfa87eaf3ce9e607de6b336005a16d12ac88ae56f",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "18e2e59be994438d243f0ee784f4a6ccb478757b",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "d219e59b0637d7bf6b3ba24ad24a147c485ee966",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "codex-root",
+      "tags": [
+        "win",
+        "chatgpt",
+        "webview2",
+        "rich-content",
+        "production-fix"
+      ],
+      "task_paths": [
+        "android/app/src/main/assets/chatgpt_web_adapter_messages.js",
+        "desktop-shell/src-tauri/src/local_ai_browser",
+        "pc-frontend/scripts",
+        "pc-frontend/src/features/user-browser"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "组合回答同时显示正文和行情卡，操作栏文本不作为正文",
+        "完成后停留原生聊天且不自动显示官网整页",
+        "不完整提取不得误报完整同步",
+        "真实本机快照和 Win 发布身份验证通过"
+      ],
+      "implementation_evidence": [],
+      "claim": {
+        "claim_id": "claim_e109ed4eb8a24c10ade0225f4053ca51",
+        "agent_id": "codex-root",
+        "claimed_at_ms": 1787489218696,
+        "expires_at_ms": 1787503618696
+      },
+      "created_at_ms": 1787489171043,
+      "updated_at_ms": 1787489275978
+    },
+    {
       "id": "win-chatgpt-visible-finance-chart-v1",
       "title": "Win ChatGPT 可见行情折线复现 V1",
       "summary": "复用现有 finance AST 与原生行情卡，把 ChatGPT 回答节点中可见且可信的 SVG 折线几何有界采样为缓存图表；未知 Canvas/异常结构继续官网回退，不启用私有响应。",
@@ -11290,36 +11341,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_1f393b441df14286a3a5660e64584b5f",
-      "feature_id": "open-commerce-native-edge-acme-v2",
-      "action": "transitioned",
-      "actor": "codex-commerce-edge",
-      "reason": "Refresh implementation evidence after final ACME SNI normalization.",
-      "from_status": "verified",
-      "to_status": "ready",
-      "at_ms": 1787306992683
-    },
-    {
-      "id": "feature_event_66687e614a734a31a8e9544757f1fe04",
-      "feature_id": "open-commerce-native-edge-acme-v2",
-      "action": "claimed",
-      "actor": "codex-commerce-edge",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1787306992711
-    },
-    {
-      "id": "feature_event_924a973635af46cab451b097c83f93fe",
-      "feature_id": "open-commerce-native-edge-acme-v2",
-      "action": "transitioned",
-      "actor": "codex-commerce-edge",
-      "reason": "Bind final implementation evidence.",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1787306992741
-    },
-    {
       "id": "feature_event_e6e20fc3e13b4a209e1eb280cf1e7bcd",
       "feature_id": "open-commerce-native-edge-acme-v2",
       "action": "evidence_recorded",
@@ -13288,6 +13309,36 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1787486654149
+    },
+    {
+      "id": "feature_event_f63b883522d6436b82a3b1ad7ca8230d",
+      "feature_id": "win-chatgpt-composite-answer-extraction-v1",
+      "action": "registered",
+      "actor": "codex-root",
+      "reason": "用户已在当前 Win 正式界面重复复现，官网完整正文存在但原生仅保留反馈文本和通用卡片。",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1787489171043
+    },
+    {
+      "id": "feature_event_31502120a29a454aaa5f08fde6155426",
+      "feature_id": "win-chatgpt-composite-answer-extraction-v1",
+      "action": "claimed",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1787489218697
+    },
+    {
+      "id": "feature_event_b179b671a3414cb7bacf39025f26dc60",
+      "feature_id": "win-chatgpt-composite-answer-extraction-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "已用真实本机 DPAPI 快照确认正文被错误提取为‘提供反馈’，开始修复组合回答选择与完成态判定。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1787489275978
     }
   ]
 }

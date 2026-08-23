@@ -1,5 +1,5 @@
 const ALLOWED_ORIGIN: &str = "https://chatgpt.com";
-pub(super) const ADAPTER_VERSION: u32 = 157;
+pub(super) const ADAPTER_VERSION: u32 = 167;
 
 const WIN_RICH_CONTENT_ADAPTER: &str = include_str!("chatgpt_rich_content_adapter.js");
 const WIN_COMMON_RICH_CONTENT_ADAPTER: &str = include_str!("rich_content_dom_adapter.js");
@@ -140,8 +140,20 @@ const ADAPTER_ASSETS: &[(&str, &str)] = &[
         include_str!("../../../../android/app/src/main/assets/chatgpt_web_private_research_probe.js"),
     ),
     (
+        "chatgpt_web_private_transport_policy.js",
+        include_str!("../../../../android/app/src/main/assets/chatgpt_web_private_transport_policy.js"),
+    ),
+    (
         "chatgpt_web_private_transport.js",
         include_str!("../../../../android/app/src/main/assets/chatgpt_web_private_transport.js"),
+    ),
+    (
+        "chatgpt_web_private_stream_policy.js",
+        include_str!("../../../../android/app/src/main/assets/chatgpt_web_private_stream_policy.js"),
+    ),
+    (
+        "chatgpt_web_private_stream_transport.js",
+        include_str!("../../../../android/app/src/main/assets/chatgpt_web_private_stream_transport.js"),
     ),
     (
         "chatgpt_web_adapter.js",
@@ -177,6 +189,12 @@ pub(super) fn initialization_script() -> String {
   'use strict';
   if (location.origin !== '__ALLOWED_ORIGIN__') return;
   __RESPONSE_RESEARCH_CAPTURE__
+  // The current Win channel is a pre-launch development cohort. Enable the
+  // already-reviewed same-origin read-only research paths so the stable native
+  // AST can learn from the official stream before the DOM finishes composing.
+  window.__elonChatGptPrivateResearchEnabled = true;
+  window.__elonChatGptPrivateStreamObserverEnabled = true;
+  window.__elonChatGptPrivateConversationPrefetchEnabled = true;
 
   var touchPurposes = new Set([
     'list_model_options', 'list_composer_tools', 'select_model_option', 'select_composer_tool',
@@ -340,5 +358,7 @@ mod tests {
         assert!(script.contains("__elonChatGptCitationAdapter"));
         assert!(script.contains("publish_local_ai_web_research_capture"));
         assert!(script.contains("conversation_stream"));
+        assert!(script.contains("__elonChatGptPrivateStreamObserverEnabled = true"));
+        assert!(script.contains("chatgpt_web_private_stream_transport.js"));
     }
 }

@@ -47,5 +47,8 @@ assert.deepEqual(compatibility.localAiRendererCompatibility([{
   text: 'future card',
   richContent: { schema: 'vendor.future.v2', kind: 'finance', payload: {} },
 }]), { reason: 'unsupported_schema' })
+assert.deepEqual(compatibility.localAiRendererCompatibility([], true), {
+  reason: 'incomplete_extraction',
+})
 
 console.log('AI renderer compatibility tests passed')

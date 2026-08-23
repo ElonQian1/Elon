@@ -637,6 +637,14 @@ export default function useLocalAiWebChatController(
     let delayIndex = 0
     const request = () => {
       if (generation !== responseRefreshGeneration.current || !provider || !ownerKey) return
+      // The native conversation is the production foreground for the full response
+      // lifecycle. Upstream navigation/focus changes must not resurrect a previously
+      // requested official child tab while polling the generated answer.
+      requestReturnToAiChat({
+        providerId: provider.id,
+        providerName: provider.displayName,
+        ownerKey,
+      })
       void requestLocalAiWebSnapshot(provider.id, ownerKey)
         .then(refreshSessionState, () => {})
       const delay = RESPONSE_REFRESH_DELAYS_MS[delayIndex++]

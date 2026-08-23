@@ -9,6 +9,7 @@ export type LocalAiRendererCompatibilityReason =
   | 'unsupported_kind'
   | 'invalid_payload'
   | 'unsupported_rich_part'
+  | 'incomplete_extraction'
 
 export interface LocalAiRendererCompatibilityNotice {
   reason: LocalAiRendererCompatibilityReason
@@ -27,7 +28,9 @@ const NATIVE_FALLBACK_GAPS = new Set([
 
 export function localAiRendererCompatibility(
   parts: LocalAiStructuredContentPart[],
+  extractionIncomplete = false,
 ): LocalAiRendererCompatibilityNotice | undefined {
+  if (extractionIncomplete) return { reason: 'incomplete_extraction' }
   for (const part of parts) {
     if (part.type === 'rich_card') {
       if (isYilongRichContent(part.richContent)) continue

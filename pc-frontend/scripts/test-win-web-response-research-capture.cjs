@@ -57,10 +57,17 @@ async function main() {
   assert.match(captures[0].args.capture.body, /visible answer/)
   assert.doesNotMatch(JSON.stringify(captures[0]), /request-secret/)
 
+  await window.fetch('https://chatgpt.com/backend-api/f/conversation/stream', {
+    method: 'POST',
+  })
+  await new Promise((resolve) => setTimeout(resolve, 20))
+  assert.equal(captures.length, 2, 'versioned conversation stream paths must remain observable')
+  assert.equal(captures[1].args.capture.endpointFamily, 'conversation_stream')
+
   await window.fetch('https://chatgpt.com/backend-api/accounts/check', { method: 'GET' })
   await new Promise((resolve) => setTimeout(resolve, 5))
-  assert.equal(fetchCalls, 2)
-  assert.equal(captures.length, 1, 'unregistered endpoint families must not enter local capture')
+  assert.equal(fetchCalls, 3)
+  assert.equal(captures.length, 2, 'unregistered endpoint families must not enter local capture')
   console.log('Win Web response research capture tests passed')
 }
 

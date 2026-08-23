@@ -161,9 +161,47 @@
       : node.querySelector('[data-message-author-role]') || node;
   }
 
-  function contentNode(node) {
+  const ASSISTANT_ACTION_TEXT = new Set([
+    '提供反馈', '反馈', '复制', '复制回答', '重新生成', '重试', '点赞', '点踩', '分享',
+    '朗读', '编辑', '更多', 'good response', 'bad response', 'provide feedback',
+    'copy', 'copy response', 'regenerate', 'retry', 'share', 'read aloud', 'more'
+  ]);
+
+  function isAssistantActionText(value) {
+    const normalized = cleanText(value).toLowerCase().replace(/[：:。.!！?？]+$/g, '');
+    if (!normalized) return false;
+    if (ASSISTANT_ACTION_TEXT.has(normalized)) return true;
+    const tokens = normalized.split(/[\s·|/]+/).filter(Boolean);
+    return tokens.length > 0 && tokens.length <= 8 && tokens.every((token) =>
+      ASSISTANT_ACTION_TEXT.has(token)
+    );
+  }
+
+  function isActionContainer(node) {
+    return Boolean(node.closest(
+      'button, [role="button"], [role="toolbar"], [data-testid*="action" i], '
+      + '[data-testid*="feedback" i]'
+    ));
+  }
+
+  function contentNodes(node, role) {
     const owner = roleNode(node);
-    return owner.querySelector('.markdown, [data-message-content], .whitespace-pre-wrap') || owner;
+    const selector = role === 'assistant'
+      ? '.markdown, [data-message-content]'
+      : '.whitespace-pre-wrap, [data-message-content], .markdown';
+    const candidates = Array.from(owner.querySelectorAll(
+      selector
+    )).filter((candidate) => isVisible(candidate) && !isActionContainer(candidate));
+    // ChatGPT now renders one assistant turn as multiple sibling content islands
+    // (for example finance card, prose and source controls). Keep the leaf islands
+    // in DOM order so a wrapper and its nested markdown are not serialized twice.
+    const leaves = candidates.filter((candidate) => !candidates.some((nested) =>
+      nested !== candidate && candidate.contains(nested)
+    ));
+    if (leaves.length) return leaves;
+    return role === 'assistant' && isAssistantActionText(owner.innerText || owner.textContent)
+      ? []
+      : [owner];
   }
 
   function structuredLabel(node, fallback) {
@@ -318,13 +356,17 @@
   }
 
   function messageContent(node, role) {
-    const content = contentNode(node);
-    if (role === 'assistant' && content.querySelector('table, pre, blockquote, ol, ul')) {
+    const contents = contentNodes(node, role);
+    if (role === 'assistant' && contents.some((content) =>
+      content.querySelector('table, pre, blockquote, ol, ul')
+    )) {
       lastComplexOutput = true;
     }
-    const value = role === 'assistant'
+    const fragments = contents.map((content) => role === 'assistant'
       ? cleanText(childrenMarkdown(content, {}))
-      : cleanText(content.innerText || content.textContent);
+      : cleanText(content.innerText || content.textContent)
+    ).filter((value) => value && (role !== 'assistant' || !isAssistantActionText(value)));
+    const value = fragments.filter((value, index) => fragments.indexOf(value) === index).join('\n\n');
     return value.slice(0, MAX_MESSAGE_LENGTH);
   }
 
@@ -350,7 +392,7 @@
     lastComplexOutput = false;
     const messages = nodes.slice(startIndex).map((node, index) => {
       const role = messageRole(node);
-      const content = contentNode(node);
+      const content = roleNode(node);
       const richParts = role === 'assistant' && richContent ? richContent.parts(content) : [];
       const text = messageContent(node, role);
       const parts = richParts.concat(structuredParts(content));
@@ -387,7 +429,7 @@
     for (let index = nodes.length - 1; index >= 0; index -= 1) {
       const turn = nodes[index];
       if (messageRole(turn) !== 'assistant') continue;
-      const content = contentNode(turn);
+      const content = roleNode(turn);
       const richParts = richContent ? richContent.parts(content) : [];
       const text = messageContent(turn, 'assistant')
         .replace(INVISIBLE_PLACEHOLDERS, '')
@@ -512,6 +554,9 @@
 
   window.__elonChatGptMessages = Object.freeze({
     capabilities,
+    contentNodes,
+    isAssistantActionText,
+    messageContent,
     lastAssistantObservation,
     lastAssistantPending,
     readMessages,

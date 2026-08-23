@@ -1,4 +1,5 @@
 import type { LocalAiMessageSnapshot } from './localAiBrowserApi'
+import { localAiAssistantExtractionIncomplete } from './localAiAssistantContentQuality'
 
 export interface LocalAiHistoryWindow {
   syncedCount: number
@@ -15,12 +16,16 @@ export function localAiHistoryWindow(snapshot: LocalAiMessageSnapshot | null): L
     nonNegativeInteger(snapshot?.observedMessageCount),
     windowStart + syncedCount,
   )
+  const extractionIncomplete = snapshot?.messages.some(localAiAssistantExtractionIncomplete) ?? false
   const complete = snapshot !== null && windowStart === 0 && syncedCount >= observedCount
+    && !extractionIncomplete
   const label = !snapshot
     ? '当前会话历史待同步'
     : complete
       ? `当前会话已完整同步 · ${syncedCount} 条`
-      : `当前显示最近窗口 · 已同步 ${syncedCount} / 官网观察 ${observedCount} 条`
+      : extractionIncomplete
+        ? '官网回答结构已变化 · 当前原生内容待适配'
+        : `当前显示最近窗口 · 已同步 ${syncedCount} / 官网观察 ${observedCount} 条`
   return { syncedCount, observedCount, windowStart, complete, label }
 }
 

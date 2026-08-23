@@ -53,7 +53,8 @@
 
   function isOfficialConversationStream(method, url, response) {
     if (String(method || 'GET').toUpperCase() !== 'POST') return false;
-    if (url.origin !== location.origin || url.pathname !== '/backend-api/f/conversation') return false;
+    if (url.origin !== location.origin ||
+        !/^\/backend-api\/(?:f\/)?conversation(?:\/|$)/.test(url.pathname)) return false;
     if (!response || !response.ok || !response.headers || typeof response.headers.get !== 'function') return false;
     return String(response.headers.get('content-type') || '').toLowerCase()
       .includes('text/event-stream');

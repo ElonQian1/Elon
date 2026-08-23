@@ -31,6 +31,11 @@ assert.match(backend, /\.filter\(shouldRenderNativeStructuredPart\)/)
 assert.match(backend, /\[\.\.\.controller\.visibleMessages\]/)
 assert.match(controller, /beginPendingLocalAiResponse/)
 assert.match(controller, /pendingLocalAiResponseObserved/)
+const responseRefreshBranch = controller.slice(
+  controller.indexOf('function startResponseRefresh'),
+  controller.indexOf('function cancelResponseRefresh'),
+)
+assert.match(responseRefreshBranch, /requestReturnToAiChat/)
 assert.match(chatGptAdapter, /streamingPolicyModule\.readState/)
 assert.match(chatGptStreamingPolicy, /messageAdapter\.lastAssistantPending\(\)/)
 assert.match(chatGptStreamingPolicy, /completionQuietMs/)
