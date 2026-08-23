@@ -53,6 +53,14 @@ const LOCAL_CODEX_CONTROL_ITEM: RailItem = {
   path: '/codex-control', Icon: TerminalSquare, label: 'Codex 控制台', color: '#26342d', hoverColor: '#30463a',
 }
 
+const LOCAL_AI_CHAT_ITEM: RailItem = {
+  path: '/ai',
+  Icon: Bot,
+  label: '一龙 AI（ChatGPT / Google）',
+  color: '#26342f',
+  hoverColor: '#315046',
+}
+
 const SETTLEMENT_ITEM: RailItem = {
   path: '/compute-settlement', Icon: Landmark, label: '算力结算', color: '#2d3431', hoverColor: '#37433e',
 }
@@ -133,7 +141,9 @@ export default function ServerRail() {
 
   return (
     <nav className={styles.rail}>
-      {(localMode ? [LOCAL_TASK_ITEM, LOCAL_CODEX_CONTROL_ITEM, OFFICIAL_AI_ITEM] : railItems).map((item) => {
+      {(localMode
+        ? [LOCAL_TASK_ITEM, LOCAL_CODEX_CONTROL_ITEM, LOCAL_AI_CHAT_ITEM, OFFICIAL_AI_ITEM]
+        : railItems).map((item) => {
         const active = isActive(item.path)
         const Icon = item.Icon
         return (

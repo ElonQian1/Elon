@@ -445,7 +445,12 @@ assert.match(aiModeSwitch, />\s*工作\s*</)
 assert.match(app, /features\/ai\/AiHomePage/)
 assert.doesNotMatch(app, /NativeAiWebChatWindow|user-browser\/native/)
 assert.match(serverRail, /const OFFICIAL_AI_ITEM/)
-assert.match(serverRail, /localMode \? \[LOCAL_TASK_ITEM, LOCAL_CODEX_CONTROL_ITEM, OFFICIAL_AI_ITEM\]/)
+assert.match(
+  serverRail,
+  /\? \[LOCAL_TASK_ITEM, LOCAL_CODEX_CONTROL_ITEM, LOCAL_AI_CHAT_ITEM, OFFICIAL_AI_ITEM\]/,
+)
+assert.match(serverRail, /const LOCAL_AI_CHAT_ITEM[\s\S]*path: '\/ai'/)
+assert.match(serverRail, /一龙 AI（ChatGPT \/ Google）/)
 for (const removedPath of [
   'pc-frontend/src/features/user-browser/NativeAiWebChat.tsx',
   'pc-frontend/src/features/user-browser/NativeAiWebChatWindow.tsx',

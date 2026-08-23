@@ -8234,6 +8234,93 @@
       "updated_at_ms": 1787220731639
     },
     {
+      "id": "win-local-mode-production-ai-entry-v1",
+      "title": "Win 本地模式生产 AI 聊天入口 V1",
+      "summary": "为 Win 本地工作台补回可见的 /ai 生产聊天入口，继续复用现有 ChatGPT/Google AI 原生聊天、游客身份、缓存和官网回答节点；保留本机任务默认首页与官方 AI 诊断页，不改 PWA。",
+      "status": "verified",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/win-local-mode-production-ai-entry-v1.md",
+        "content_hash": "a3171aab078854e2eaab6a7241809b2c2ddc52d756299475a2d7427560ae3830",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "b928b23c737fb8c3f46330565874c53c893e7a07",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "ee3d8bc882c7093e807b641444c8fdfde26a8f9d",
+          "state": "index_only"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "win-web-ai",
+      "tags": [
+        "win",
+        "local-mode",
+        "ai-chat",
+        "navigation",
+        "ux"
+      ],
+      "task_paths": [
+        "pc-frontend/scripts/test-local-ai-browser-contract.cjs",
+        "pc-frontend/scripts/test-local-tasks.cjs",
+        "pc-frontend/src/features/shell/ServerRail.tsx"
+      ],
+      "dependencies": [
+        "win-web-ai-structured-rich-content-v1"
+      ],
+      "acceptance_criteria": [
+        "Win 本地模式侧栏同时显示本机任务、Codex 控制台、生产 AI 聊天和官方 AI 会话检查四个入口。",
+        "点击生产 AI 聊天进入 /ai 并复用现有游客会话、输入框、缓存与官网回答节点生产链路。",
+        "/user-browser 继续作为诊断与登录检查页存在，不替代或遮蔽 /ai。",
+        "本地模式根路由仍为 /local-tasks，不因新增入口在启动时主动等待第三方网页。",
+        "PC 本地模式合同、网页 AI 合同、typecheck、lint、build 与 Win 验证通过；不改 PWA。"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "pc-frontend/scripts/test-local-ai-browser-contract.cjs",
+          "content_hash": "56725e68a0b21daaa5d154fbaf0737cf030fdb272135013d8d00ec1addec0194",
+          "locator": "production AI route visibility contract",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "b928b23c737fb8c3f46330565874c53c893e7a07",
+            "head_blob_oid": "b9d47286491828732f3631a64d1c9eb2f910539b",
+            "worktree_blob_oid": "f8549e0ba9c6cd979af09778593af492cd6beedf",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "pc-frontend/scripts/test-local-tasks.cjs",
+          "content_hash": "bccc935735de36d6b85202aa89dde5eb027e75058145e0081b5b8dfc2c2b0a63",
+          "locator": "local workbench navigation contract",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "b928b23c737fb8c3f46330565874c53c893e7a07",
+            "head_blob_oid": "fc33717349267dc27db34ac442c00dfc961e3f6e",
+            "worktree_blob_oid": "08c2792143d259d15a82ec943f7cba0775bccff6",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/shell/ServerRail.tsx",
+          "content_hash": "fd22d73bbcc877edbaf2400038c007e94ec4217e4c4c56aba51063004047e789",
+          "locator": "LOCAL_AI_CHAT_ITEM and localMode rail entries",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "b928b23c737fb8c3f46330565874c53c893e7a07",
+            "head_blob_oid": "fa017fbb157d9312fe4e32fffe3b5882cb47fa8b",
+            "worktree_blob_oid": "d6022d94988066d0e394597c2688c01ffe08bf3c",
+            "state": "tracked_modified"
+          }
+        }
+      ],
+      "created_at_ms": 1787451699771,
+      "updated_at_ms": 1787452770114
+    },
+    {
       "id": "win-native-ai-send-surface-continuity-v1",
       "title": "Win 原生 AI 发送界面连续性 V1",
       "summary": "修复原生发送成功后被前端策略强制切换到 Google AI 或 ChatGPT 官方标签页的问题，保留后台回复同步与手动官网入口。",
@@ -10431,156 +10518,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_a5cb35f711574deabb9d9d584af33d22",
-      "feature_id": "win-google-ai-primary-answer-continuity-v1",
-      "action": "claimed",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1787233550410
-    },
-    {
-      "id": "feature_event_e7cf54c5903547e287cc44f3bab7bb25",
-      "feature_id": "win-google-ai-primary-answer-continuity-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "已完成代码修复并进入完整复验。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1787233550442
-    },
-    {
-      "id": "feature_event_e134a235652545b1bb2b0ef150143c09",
-      "feature_id": "win-google-ai-primary-answer-continuity-v1",
-      "action": "evidence_recorded",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1787233585718
-    },
-    {
-      "id": "feature_event_cbbe4639128246929bed47b1ced5ea6e",
-      "feature_id": "win-google-ai-primary-answer-continuity-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "后台焦点、新会话与主回答正文修复均已实现，14 条证据已绑定。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1787233610999
-    },
-    {
-      "id": "feature_event_1610e825009f4f4791d87e93b863a38d",
-      "feature_id": "win-google-ai-primary-answer-continuity-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "WIN_WEB_AI_VALIDATION=passed，前端合同、构建、ESLint、Rust 定向测试和源码红线均通过。",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1787233611050
-    },
-    {
-      "id": "feature_event_6c1f4a9400f54e52a6ca723cd2fd9e70",
-      "feature_id": "win-google-ai-primary-answer-continuity-v1",
-      "action": "transitioned",
-      "actor": "codex/root",
-      "reason": "最新版真机复测发现 Google 多段正文仅同步首句，继续修复答案容器选择并重新验收。",
-      "from_status": "verified",
-      "to_status": "ready",
-      "at_ms": 1787235390302
-    },
-    {
-      "id": "feature_event_231845a93c9f4685ae540b05427b63da",
-      "feature_id": "win-google-ai-primary-answer-continuity-v1",
-      "action": "claimed",
-      "actor": "codex/root",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1787235403530
-    },
-    {
-      "id": "feature_event_9fa45a3bfe2544869e232aa46e46ec26",
-      "feature_id": "win-google-ai-primary-answer-continuity-v1",
-      "action": "transitioned",
-      "actor": "codex/root",
-      "reason": "修复多段叙述正文被短介绍句和来源卡片压过的候选评分。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1787235415522
-    },
-    {
-      "id": "feature_event_61abf25334b24775b00b6cf97029c51e",
-      "feature_id": "win-google-ai-primary-answer-continuity-v1",
-      "action": "evidence_recorded",
-      "actor": "codex/root",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1787235763072
-    },
-    {
-      "id": "feature_event_c7b33146d7f143049a12be3346660240",
-      "feature_id": "win-google-ai-primary-answer-continuity-v1",
-      "action": "transitioned",
-      "actor": "codex/root",
-      "reason": "多段正文识别、来源卡片排除和 Win 全量验证完成。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1787235794753
-    },
-    {
-      "id": "feature_event_b5028a64cc6149d38db996744c47dd3f",
-      "feature_id": "win-google-ai-primary-answer-continuity-v1",
-      "action": "transitioned",
-      "actor": "codex/root",
-      "reason": "回归测试、构建、ESLint、Rust 定向测试和源码规模门禁全部通过；等待正式发布后真机复验。",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1787235794778
-    },
-    {
-      "id": "feature_event_7fb3c23a19fb4aa4b0371e1f09f2c77d",
-      "feature_id": "win-google-ai-primary-answer-continuity-v1",
-      "action": "transitioned",
-      "actor": "codex/root",
-      "reason": "发布后真机复杂回答仍只同步首句，且 Google 新会话首次导航偶发需手动刷新，继续修复并重验。",
-      "from_status": "verified",
-      "to_status": "ready",
-      "at_ms": 1787237491943
-    },
-    {
-      "id": "feature_event_d7840b61861f4e0687199caf1c9178de",
-      "feature_id": "win-google-ai-primary-answer-continuity-v1",
-      "action": "claimed",
-      "actor": "codex/root",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1787237559690
-    },
-    {
-      "id": "feature_event_cd576025d2ad44c09855b22c456a1807",
-      "feature_id": "win-google-ai-primary-answer-continuity-v1",
-      "action": "transitioned",
-      "actor": "codex/root",
-      "reason": "实施叙述容器优先选择与 Google 新会话一次性后台自动重载。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1787237589852
-    },
-    {
-      "id": "feature_event_e81953519d264e5bb0081114625f041b",
-      "feature_id": "win-google-ai-primary-answer-continuity-v1",
-      "action": "evidence_recorded",
-      "actor": "codex/root",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1787238212894
-    },
-    {
       "id": "feature_event_5a4012e3a2024386b3ae37726d5abd4e",
       "feature_id": "win-google-ai-primary-answer-continuity-v1",
       "action": "transitioned",
@@ -12429,6 +12366,156 @@
       "from_status": "implemented",
       "to_status": "implemented",
       "at_ms": 1787450588560
+    },
+    {
+      "id": "feature_event_205dcc0a0fe54bd49f1621116bf1493d",
+      "feature_id": "win-local-mode-production-ai-entry-v1",
+      "action": "registered",
+      "actor": "codex-goal-rich-content",
+      "reason": "现场 Win 验收发现本地模式隐藏 /ai，用户只能进入官方 AI 会话检查页，生产聊天功能缺少可发现入口。",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1787451699771
+    },
+    {
+      "id": "feature_event_4c528b4510db435b9754dc850bb448ff",
+      "feature_id": "win-local-mode-production-ai-entry-v1",
+      "action": "claimed",
+      "actor": "codex-goal-rich-content",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1787451734711
+    },
+    {
+      "id": "feature_event_87653b9de6c246428bd727c5d56f2291",
+      "feature_id": "win-local-mode-production-ai-entry-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-rich-content",
+      "reason": "开始补回 Win 本地模式生产 AI 聊天入口并增加回归合同。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1787451745721
+    },
+    {
+      "id": "feature_event_14819722a1de4f1cb841baa9e10ca71a",
+      "feature_id": "win-local-mode-production-ai-entry-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-goal-rich-content",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1787451990189
+    },
+    {
+      "id": "feature_event_a9ea73431f9e496a8d63dfd5ffdcb8f6",
+      "feature_id": "win-local-mode-production-ai-entry-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-rich-content",
+      "reason": "已在本地模式侧栏增加复用 /ai 的生产聊天入口，并补充本地任务与网页 AI 静态合同。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1787452000743
+    },
+    {
+      "id": "feature_event_2a8ab3868e124ce184e509868dff6009",
+      "feature_id": "win-local-mode-production-ai-entry-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-rich-content",
+      "reason": "定向合同、test:local-tasks、test:user-browser、typecheck、lint、build 与 validate-win-web-ai 全部通过。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1787452011666
+    },
+    {
+      "id": "feature_event_9f14fa9059464c488eecb4aee9da93ad",
+      "feature_id": "win-local-mode-production-ai-entry-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-agent",
+      "reason": "Reopen the not-yet-released feature before its first commit so the requirement binding can be corrected for the repository EOF hygiene rule.",
+      "from_status": "verified",
+      "to_status": "ready",
+      "at_ms": 1787452486688
+    },
+    {
+      "id": "feature_event_bc43910ae89c45b9bb1c90f250e38bd8",
+      "feature_id": "win-local-mode-production-ai-entry-v1",
+      "action": "requirement_rebound",
+      "actor": "codex-goal-agent",
+      "reason": "Bind the repository-compliant requirement content after removing the trailing blank line rejected by pre-commit.",
+      "from_status": "ready",
+      "to_status": "proposed",
+      "at_ms": 1787452537593
+    },
+    {
+      "id": "feature_event_7b191b8a46b34c03b4c7a0306b1ecab1",
+      "feature_id": "win-local-mode-production-ai-entry-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-agent",
+      "reason": "Re-reviewed the unchanged feature scope after the EOF-only requirement hygiene correction.",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1787452555042
+    },
+    {
+      "id": "feature_event_f962d334431d4e3a85bb2b28feb0f8e3",
+      "feature_id": "win-local-mode-production-ai-entry-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-agent",
+      "reason": "The reviewed scope is ready and its dependency is already verified.",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1787452610057
+    },
+    {
+      "id": "feature_event_3bc6888a723248f5af818cff87a407e9",
+      "feature_id": "win-local-mode-production-ai-entry-v1",
+      "action": "claimed",
+      "actor": "codex-goal-agent",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1787452658601
+    },
+    {
+      "id": "feature_event_0a0d8b48da554104b81677d7f3686c4e",
+      "feature_id": "win-local-mode-production-ai-entry-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-agent",
+      "reason": "Continue the already validated implementation after requirement hash rebinding.",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1787452682817
+    },
+    {
+      "id": "feature_event_e3c4a3e5110e4251b7d62086482a0503",
+      "feature_id": "win-local-mode-production-ai-entry-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-goal-agent",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1787452722481
+    },
+    {
+      "id": "feature_event_1f33e760b5274736ba59c60bdfa5f729",
+      "feature_id": "win-local-mode-production-ai-entry-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-agent",
+      "reason": "The production AI entry and its regression contracts are implemented.",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1787452750610
+    },
+    {
+      "id": "feature_event_51e77aef952f41bb8de54525570b2eca",
+      "feature_id": "win-local-mode-production-ai-entry-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-agent",
+      "reason": "Targeted navigation tests, full frontend checks, and the complete Win Web AI validation passed.",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1787452770114
     }
   ]
 }

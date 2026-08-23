@@ -210,7 +210,12 @@ try {
   assert.ok(shellSource.includes('useNotifications(!localMode)'), 'local mode must disable cloud websocket notifications')
   assert.ok(shellSource.includes('!duplicateTab && !localMode'), 'local mode must disable project prewarm')
   assert.ok(appSource.includes("isLocalWorkbench() ? '/local-tasks' : '/ai'"), 'local workbench root must open local tasks without mounting cloud AI')
-  assert.ok(railSource.includes('localMode ? [LOCAL_TASK_ITEM] : RAIL_ITEMS'), 'local mode must hide cloud-only navigation')
+  assert.ok(
+    railSource.includes('? [LOCAL_TASK_ITEM, LOCAL_CODEX_CONTROL_ITEM, LOCAL_AI_CHAT_ITEM, OFFICIAL_AI_ITEM]'),
+    'local mode must expose local tasks, Codex controls, production AI chat, and official-session diagnostics',
+  )
+  assert.ok(railSource.includes("path: '/ai'"), 'local mode must expose the production AI chat route')
+  assert.ok(railSource.includes('一龙 AI（ChatGPT / Google）'), 'the local AI entry must name its real providers')
   assert.ok(apiSource.includes("'/api/local-tasks'"), 'local tasks must use the node-local endpoint')
   assert.ok(apiSource.includes('/cancel`'), 'local task cancel endpoint must be explicit')
   assert.ok(apiSource.includes("source: 'pc_ui'"), 'local cancel must submit its audit source')
