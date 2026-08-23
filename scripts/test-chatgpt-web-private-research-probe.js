@@ -27,6 +27,14 @@ assert.match(
 );
 assert.match(
   buildGradle,
+  /buildConfigField "boolean", "CHATGPT_PRIVATE_CONVERSATION_PREFETCH_ENABLED"/
+);
+assert.match(
+  buildGradle,
+  /private conversation prefetch requires ELON_CHATGPT_PRIVATE_RESEARCH=true/
+);
+assert.match(
+  buildGradle,
   /private research version overrides require ELON_CHATGPT_PRIVATE_RESEARCH=true/
 );
 assert.match(
@@ -36,6 +44,10 @@ assert.match(
 assert.match(
   pageAdapter,
   /window\.__elonChatGptPrivateResearchEnabled =[\s\S]*?BuildConfig\.CHATGPT_PRIVATE_RESEARCH_ENABLED/
+);
+assert.match(
+  pageAdapter,
+  /window\.__elonChatGptPrivateConversationPrefetchEnabled =[\s\S]*?BuildConfig\.CHATGPT_PRIVATE_CONVERSATION_PREFETCH_ENABLED/
 );
 
 function response(status, contentType) {
@@ -82,7 +94,7 @@ async function run(enabled) {
   vm.runInNewContext(source, context, { filename: 'chatgpt_web_private_research_probe.js' });
 
   await window.fetch('https://chatgpt.com/backend-api/conversations?offset=0&limit=1');
-  await window.fetch('https://chatgpt.com/backend-api/conversations/private-chat-id', {
+  await window.fetch('https://chatgpt.com/backend-api/conversations/private-chat-id-12345', {
     headers: { Authorization: 'must-not-be-observed' },
     __elonPrivateResearch: 'conversation_prefetch'
   });
@@ -108,6 +120,12 @@ async function run(enabled) {
   });
   await window.fetch('https://chatgpt.com/_next/static/chunk.js');
   await window.fetch('https://example.com/backend-api/conversations');
+  if (window.__elonChatGptPrivateResearchProbe) {
+    window.__elonChatGptPrivateResearchProbe.recordPrivateOutcome('success', 12, 345);
+    window.__elonChatGptPrivateResearchProbe.recordPrivatePayloadShape({
+      data: { conversation: { current_node: 'node', mapping: { one: {}, two: {} } } }
+    });
+  }
   return { events, requests, window };
 }
 
@@ -118,23 +136,29 @@ async function run(enabled) {
 
   const enabled = await run(true);
   assert.equal(enabled.requests.length, 6);
-  assert.equal(enabled.events.length, 10);
-  assert.equal(enabled.window.__elonChatGptPrivateResearchProbe.version, 3);
+  assert.equal(enabled.events.length, 13);
+  assert.equal(enabled.window.__elonChatGptPrivateResearchProbe.version, 7);
   assert.equal(
     enabled.window.__elonChatGptPrivateResearchProbe
-      .copyRequestContext('conversation_detail').Authorization,
+      .copyRequestContext('conversation_content').Authorization,
     'must-not-be-observed'
   );
   assert.match(enabled.events[0].detail, /^v1\|fetch\|GET\|\/backend-api\/conversations\|200\|json\|\d+$/);
-  assert.match(enabled.events[1].detail, /^v1\|headers\|\/backend-api\/conversations\/private-chat-id\|authorization$/);
-  assert.match(enabled.events[2].detail, /^v1\|fetch\|GET\|\/backend-api\/conversations\/private-chat-id\|200\|json\|\d+$/);
-  assert.match(enabled.events[3].detail, /^v1\|private_prefetch\|GET\|\/backend-api\/conversations\/private-chat-id\|200\|json\|\d+$/);
+  assert.match(enabled.events[1].detail, /^v1\|headers\|\/backend-api\/conversations\/\{id\}\|authorization$/);
+  assert.match(enabled.events[2].detail, /^v1\|fetch\|GET\|\/backend-api\/conversations\/\{id\}\|200\|json\|\d+$/);
+  assert.match(enabled.events[3].detail, /^v1\|private_prefetch\|GET\|\/backend-api\/conversations\/\{id\}\|200\|json\|\d+$/);
   assert.match(enabled.events[4].detail, /^v1\|fetch\|POST\|\/backend-api\/conversation\/\{id\}\|200\|json\|\d+$/);
   assert.match(enabled.events[5].detail, /^v1\|headers\|\/backend-api\/f\/conversation\|content-type\.openai-sentinel-proof-token$/);
   assert.match(enabled.events[6].detail, /^v1\|body\|\/backend-api\/f\/conversation\|action\.messages\.model$/);
   assert.match(enabled.events[7].detail, /^v1\|message\|\/backend-api\/f\/conversation\|author\.content\.id$/);
   assert.match(enabled.events[8].detail, /^v1\|content\|\/backend-api\/f\/conversation\|content_type\.parts$/);
   assert.match(enabled.events[9].detail, /^v1\|fetch\|POST\|\/backend-api\/f\/conversation\|200\|json\|\d+$/);
+  assert.equal(enabled.events[10].detail, 'v1|private_outcome|success|12|345');
+  assert.equal(enabled.events[11].detail, 'v1|private_keys|0|data');
+  assert.equal(
+    enabled.events[12].detail,
+    'v1|private_shape|data_conversation|2|0|0|0|0|0'
+  );
   const emitted = JSON.stringify(enabled.events);
   assert.doesNotMatch(emitted, /offset|limit|must-not-be-observed|123e4567|\bnext\b/);
   assert.ok(enabled.events.every((event) => event.action === 'research_network_observation'));

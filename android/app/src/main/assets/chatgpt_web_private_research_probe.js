@@ -4,7 +4,7 @@
   if (window.__elonChatGptPrivateResearchEnabled !== true) return;
   if (location.origin !== 'https://chatgpt.com') return;
   const existingProbe = window.__elonChatGptPrivateResearchProbe;
-  if (existingProbe && Number(existingProbe.version) >= 3) return;
+  if (existingProbe && Number(existingProbe.version) >= 7) return;
 
   const nativeBridge = window.elonChatGptNative;
   const adapterVersion = Number(window.__elonChatGptAdapterTargetVersion || 0);
@@ -61,12 +61,13 @@
     return contentType ? 'other' : 'unknown';
   }
 
-  function safeKeys(value) {
+  function safeKeys(value, maximum) {
     if (!value || typeof value !== 'object') return [];
+    const limit = Math.max(1, Math.min(80, Number(maximum) || 24));
     return Object.keys(value)
       .filter((key) => /^[A-Za-z][A-Za-z0-9_]{0,39}$/.test(key))
       .sort()
-      .slice(0, 24);
+      .slice(0, limit);
   }
 
   function safeHeaderNames(headers) {
@@ -91,7 +92,7 @@
 
   function requestFamily(url) {
     if (/^\/backend-api\/conversations\/[A-Za-z0-9_-]{1,160}$/.test(url.pathname)) {
-      return 'conversation_detail';
+      return 'conversation_content';
     }
     if (/^\/backend-api\/gizmos\/g-p-[A-Za-z0-9_-]{1,160}\/conversations$/.test(url.pathname)) {
       return 'project_conversations';
@@ -142,7 +143,8 @@
   function observeRequestShape(input, init, url) {
     captureRequestContext(input, init, url);
     const headers = safeHeaderNames(init && init.headers || input && input.headers);
-    if (/^\/backend-api\/conversations\/[A-Za-z0-9_-]{1,160}$/.test(url.pathname) ||
+    if (/^\/backend-api\/[A-Za-z0-9_-]{17,160}$/.test(url.pathname) ||
+        /^\/backend-api\/conversations\/[A-Za-z0-9_-]{1,160}$/.test(url.pathname) ||
         /^\/backend-api\/gizmos\/.+\/conversations$/.test(url.pathname) ||
         url.pathname === '/backend-api/gizmos/snorlax/sidebar') {
       emitShape('headers', url, headers);
@@ -205,6 +207,98 @@
         String(responseType || 'unknown').replace(/[^a-z]/g, '').slice(0, 10) || 'unknown',
         String(Math.max(0, Math.min(999999, Math.round(elapsedMs || 0))))
       ].join('|').slice(0, 160)
+    }));
+  }
+
+  function emitPrivateOutcome(outcome, messageCount, elapsedMs) {
+    if (Date.now() > expiresAt || privateObservationCount >= 32) return;
+    const safeOutcome = String(outcome || '').toLowerCase();
+    if (!/^(success|empty|timeout|auth|context|http|network|parse)$/.test(safeOutcome)) return;
+    privateObservationCount += 1;
+    nativeBridge.postMessage(JSON.stringify({
+      type: 'command_result',
+      adapterVersion,
+      documentToken,
+      action: 'research_network_observation',
+      ok: true,
+      detail: [
+        'v1',
+        'private_outcome',
+        safeOutcome,
+        String(Math.max(0, Math.min(80, Math.round(messageCount || 0)))),
+        String(Math.max(0, Math.min(999999, Math.round(elapsedMs || 0))))
+      ].join('|')
+    }));
+  }
+
+  function emitPrivatePayloadShape(payload) {
+    if (Date.now() > expiresAt || privateObservationCount >= 32) return;
+    const candidates = [
+      ['root', payload],
+      ['conversation', payload && payload.conversation],
+      ['data', payload && payload.data],
+      ['data_conversation', payload && payload.data && payload.data.conversation],
+      ['result', payload && payload.result],
+      ['result_conversation', payload && payload.result && payload.result.conversation]
+    ];
+    const selected = candidates.find((entry) => entry[1] && typeof entry[1] === 'object' &&
+      entry[1].mapping && typeof entry[1].mapping === 'object');
+    const arrayCandidates = [
+      ['root_messages', payload && payload.messages],
+      ['root_linear', payload && payload.linear_conversation],
+      ['root_items', payload && payload.items],
+      ['data_messages', payload && payload.data && payload.data.messages],
+      ['data_linear', payload && payload.data && payload.data.linear_conversation],
+      ['result_messages', payload && payload.result && payload.result.messages]
+    ];
+    const selectedArray = arrayCandidates.find((entry) => Array.isArray(entry[1]));
+    const mapping = selected ? selected[1].mapping : null;
+    const nodes = mapping ? Object.values(mapping) : (selectedArray ? selectedArray[1] : []);
+    const messages = nodes.map((node) => node && (
+      mapping ? node.message : (node.message || node)
+    )).filter(Boolean);
+    const roleMessages = messages.filter((message) =>
+      message.author && (message.author.role === 'user' || message.author.role === 'assistant'));
+    const stringPartMessages = roleMessages.filter((message) =>
+      message.content && Array.isArray(message.content.parts) &&
+      message.content.parts.some((part) => typeof part === 'string'));
+    const objectPartMessages = roleMessages.filter((message) =>
+      message.content && Array.isArray(message.content.parts) &&
+      message.content.parts.some((part) => part && typeof part === 'object'));
+    const directTextMessages = roleMessages.filter((message) => message.content && (
+      typeof message.content.text === 'string' || typeof message.content.content === 'string'));
+    const rootKeys = safeKeys(payload, 60);
+    for (let index = 0; index < rootKeys.length && privateObservationCount < 32; index += 10) {
+      privateObservationCount += 1;
+      nativeBridge.postMessage(JSON.stringify({
+        type: 'command_result',
+        adapterVersion,
+        documentToken,
+        action: 'research_network_observation',
+        ok: true,
+        detail: ['v1', 'private_keys', String(index / 10), rootKeys.slice(index, index + 10).join('.')]
+          .join('|').slice(0, 160)
+      }));
+    }
+    if (privateObservationCount >= 32) return;
+    privateObservationCount += 1;
+    nativeBridge.postMessage(JSON.stringify({
+      type: 'command_result',
+      adapterVersion,
+      documentToken,
+      action: 'research_network_observation',
+      ok: true,
+      detail: [
+        'v1',
+        'private_shape',
+        selected ? selected[0] : (selectedArray ? selectedArray[0] : 'none'),
+        String(Math.min(9999, nodes.length)),
+        String(Math.min(9999, messages.length)),
+        String(Math.min(9999, roleMessages.length)),
+        String(Math.min(9999, stringPartMessages.length)),
+        String(Math.min(9999, objectPartMessages.length)),
+        String(Math.min(9999, directTextMessages.length))
+      ].join('|')
     }));
   }
 
@@ -283,11 +377,13 @@
   }
 
   window.__elonChatGptPrivateResearchProbe = Object.freeze({
-    version: 3,
+    version: 7,
     enabled: true,
     expiresAt,
     observationCount: () => observationCount,
     privateObservationCount: () => privateObservationCount,
+    recordPrivateOutcome: emitPrivateOutcome,
+    recordPrivatePayloadShape: emitPrivatePayloadShape,
     copyRequestContext: (family) => Object.assign({}, requestContexts.get(String(family || '')) || {})
   });
 })();

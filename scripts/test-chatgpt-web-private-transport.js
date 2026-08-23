@@ -9,21 +9,46 @@ const source = fs.readFileSync(path.join(
   __dirname, '..', 'android', 'app', 'src', 'main', 'assets',
   'chatgpt_web_private_transport.js'
 ), 'utf8');
+const policySource = fs.readFileSync(path.join(
+  __dirname, '..', 'android', 'app', 'src', 'main', 'assets',
+  'chatgpt_web_private_transport_policy.js'
+), 'utf8');
 
 function jsonResponse(value) {
   return { ok: true, status: 200, json: async () => value };
 }
 
-function createContext(fetchImpl, enabled = true) {
+class MemoryStorage {
+  constructor() { this.values = new Map(); }
+  getItem(key) { return this.values.has(key) ? this.values.get(key) : null; }
+  setItem(key, value) { this.values.set(key, String(value)); }
+}
+
+function createContext(
+  fetchImpl,
+  researchEnabled = true,
+  prefetchEnabled = true,
+  storage = new MemoryStorage()
+) {
   const timers = new Set();
+  const outcomes = [];
+  const shapes = [];
   const location = {
     origin: 'https://chatgpt.com',
     pathname: '/',
     href: 'https://chatgpt.com/'
   };
   const window = {
-    __elonChatGptPrivateResearchEnabled: enabled,
+    __elonChatGptPrivateResearchEnabled: researchEnabled,
+    __elonChatGptPrivateConversationPrefetchEnabled: prefetchEnabled,
+    __elonChatGptPrivateResearchProbe: {
+      recordPrivateOutcome: (outcome, messageCount, elapsedMs) => {
+        outcomes.push({ outcome, messageCount, elapsedMs });
+      },
+      recordPrivatePayloadShape: (payload) => { shapes.push(payload); }
+    },
     fetch: fetchImpl,
+    sessionStorage: storage,
     setTimeout: (callback) => {
       const id = setTimeout(callback, 10000);
       timers.add(id);
@@ -33,7 +58,7 @@ function createContext(fetchImpl, enabled = true) {
   };
   window.window = window;
   window.location = location;
-  vm.runInNewContext(source, {
+  const context = {
     window,
     location,
     URL,
@@ -49,8 +74,12 @@ function createContext(fetchImpl, enabled = true) {
     Math,
     JSON,
     encodeURIComponent
-  }, { filename: 'chatgpt_web_private_transport.js' });
-  return { window, timers };
+  };
+  vm.runInNewContext(policySource, context, {
+    filename: 'chatgpt_web_private_transport_policy.js'
+  });
+  vm.runInNewContext(source, context, { filename: 'chatgpt_web_private_transport.js' });
+  return { window, timers, storage, outcomes, shapes };
 }
 
 async function flush() {
@@ -86,6 +115,11 @@ const detailPayload = {
   const disabled = createContext(async () => jsonResponse(detailPayload), false);
   assert.equal(disabled.window.__elonChatGptPrivateTransport, undefined);
 
+  const gated = createContext(async () => jsonResponse(detailPayload), true, false);
+  assert.equal(gated.window.__elonChatGptPrivateTransport.version, 9);
+  assert.equal(gated.window.__elonChatGptPrivateTransport.conversationPrefetchEnabled, false);
+  assert.equal(gated.window.__elonChatGptPrivateTransport.conversationPrefetchReady(), false);
+
   const requests = [];
   const snapshots = [];
   let navigated = 0;
@@ -94,8 +128,8 @@ const detailPayload = {
     return jsonResponse(detailPayload);
   });
   const transport = detail.window.__elonChatGptPrivateTransport;
-  assert.equal(transport.version, 6);
-  assert.equal(transport.conversationPrefetchEnabled, false);
+  assert.equal(transport.version, 9);
+  assert.equal(transport.conversationPrefetchEnabled, true);
   assert.equal(transport.experimentalConversationPrefetchAvailable, true);
   assert.equal(transport.conversationPrefetchReady(), false);
   assert.equal(transport.prefetchConversation(
@@ -104,7 +138,7 @@ const detailPayload = {
     () => assert.fail('cold prefetch leaves navigation to the adapter')
   ), false);
 
-  await detail.window.fetch('/backend-api/conversations/current-chat', {
+  await detail.window.fetch('/backend-api/conversations/current-chat-id-12345', {
     headers: { Authorization: 'page-scoped-value' }
   });
   assert.equal(transport.conversationPrefetchReady(), true);
@@ -117,36 +151,31 @@ const detailPayload = {
   assert.equal(navigated, 1);
   assert.equal(snapshots.length, 1);
   assert.equal(requests.length, 2);
+  assert.equal(requests[1].url, '/backend-api/conversations/plain-chat');
   assert.equal(requests[1].options.headers.Authorization, 'page-scoped-value');
   assert.equal(requests[1].options.__elonPrivateResearch, 'conversation_prefetch');
   assert.equal(snapshots[0].composerReady, false);
+  assert.equal(transport.health().successes, 1);
+  assert.equal(transport.health().lastOutcome, 'success');
+  assert.equal(detail.outcomes.length, 1);
+  assert.equal(detail.outcomes[0].outcome, 'success');
+  assert.equal(detail.outcomes[0].messageCount, 2);
+  assert.equal(detail.shapes[0], detailPayload);
   assert.deepEqual(
     Array.from(snapshots[0].messages, (value) => [value.role, value.content]),
     [['user', 'hello'], ['assistant', 'hi']]
   );
 
-  const brokerRequests = [];
-  const broker = createContext(async (url, options) => {
-    brokerRequests.push({ url, options });
-    return jsonResponse(detailPayload);
-  });
-  broker.window.__elonChatGptPrivateResearchProbe = {
-    copyRequestContext: () => ({ Authorization: 'broker-value' })
-  };
-  assert.equal(broker.window.__elonChatGptPrivateTransport.conversationPrefetchReady(), true);
-  broker.window.__elonChatGptPrivateTransport.prefetchConversation(
-    '/c/broker-chat',
-    () => undefined,
-    () => undefined
-  );
-  await flush();
-  assert.equal(brokerRequests[0].options.headers.Authorization, 'broker-value');
-
   let failedNavigation = 0;
-  const failed = createContext(async () => { throw new Error('offline'); });
-  await failed.window.fetch('/backend-api/conversations/current-chat', {
+  let failedCalls = 0;
+  const failed = createContext(async () => {
+    failedCalls += 1;
+    if (failedCalls === 1) return jsonResponse(detailPayload);
+    throw new Error('offline');
+  });
+  await failed.window.fetch('/backend-api/conversations/current-chat-id-12345', {
     headers: { Authorization: 'page-scoped-value' }
-  }).catch(() => undefined);
+  });
   assert.equal(failed.window.__elonChatGptPrivateTransport.prefetchConversation(
     '/c/plain-chat',
     () => assert.fail('failed prefetch must not emit a snapshot'),
@@ -154,6 +183,44 @@ const detailPayload = {
   ), true);
   await flush();
   assert.equal(failedNavigation, 1);
+  assert.equal(failed.window.__elonChatGptPrivateTransport.health().failures, 1);
+  assert.equal(failed.outcomes[0].outcome, 'network');
+
+  const wrappedSnapshots = [];
+  const wrapped = createContext(async () => jsonResponse({ data: { conversation: detailPayload } }));
+  await wrapped.window.fetch('/backend-api/conversations/current-chat-id-12345', {
+    headers: { Authorization: 'page-scoped-value' }
+  });
+  assert.equal(wrapped.window.__elonChatGptPrivateTransport.prefetchConversation(
+    '/c/wrapped-chat',
+    (event) => wrappedSnapshots.push(event),
+    () => {}
+  ), true);
+  await flush();
+  assert.equal(wrappedSnapshots.length, 1);
+  assert.equal(wrappedSnapshots[0].messages.length, 2);
+
+  const linearPayload = {
+    title: 'Linear title',
+    linear_conversation: [
+      detailPayload.mapping['user-node'].message,
+      detailPayload.mapping['assistant-node'].message
+    ]
+  };
+  const linearSnapshots = [];
+  const linear = createContext(async () => jsonResponse(linearPayload));
+  await linear.window.fetch('/backend-api/conversations/current-chat-id-12345', {
+    headers: { Authorization: 'page-scoped-value' }
+  });
+  assert.equal(linear.window.__elonChatGptPrivateTransport.prefetchConversation(
+    '/c/linear-chat',
+    (event) => linearSnapshots.push(event),
+    () => {}
+  ), true);
+  await flush();
+  assert.equal(linearSnapshots.length, 1);
+  assert.equal(linearSnapshots[0].messages.length, 2);
+  assert.equal(failed.window.__elonChatGptPrivateTransport.conversationPrefetchReady(), false);
 
   console.log('CHATGPT_WEB_PRIVATE_TRANSPORT_TESTS=passed');
 })().catch((error) => {

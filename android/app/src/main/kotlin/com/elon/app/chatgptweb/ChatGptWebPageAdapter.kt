@@ -33,6 +33,8 @@ internal class ChatGptWebPageAdapter(
             window.__elonChatGptAdapterTargetVersion = $ADAPTER_VERSION;
             window.__elonChatGptPrivateResearchEnabled =
                 ${BuildConfig.CHATGPT_PRIVATE_RESEARCH_ENABLED};
+            window.__elonChatGptPrivateConversationPrefetchEnabled =
+                ${BuildConfig.CHATGPT_PRIVATE_CONVERSATION_PREFETCH_ENABLED};
             if (!/^doc_[a-z0-9_]{3,80}$/.test(String(window.__elonChatGptDocumentToken || ""))) {
                 window.__elonChatGptDocumentToken =
                     "doc_android_" + Math.random().toString(36).slice(2) + Date.now().toString(36);
@@ -400,7 +402,7 @@ internal class ChatGptWebPageAdapter(
         origin.scheme == "https" && origin.host == "chatgpt.com" && origin.port == -1
 
     companion object {
-        internal const val ADAPTER_VERSION = 157
+        internal const val ADAPTER_VERSION = 164
 
         private val ADAPTER_ASSETS = listOf(
             "chatgpt_web_adapter_bootstrap.js",
@@ -436,6 +438,7 @@ internal class ChatGptWebPageAdapter(
             "chatgpt_web_adapter_skin.js",
             "chatgpt_web_adapter_layout.js",
             "chatgpt_web_private_research_probe.js",
+            "chatgpt_web_private_transport_policy.js",
             "chatgpt_web_private_transport.js",
             "chatgpt_web_adapter.js",
         )

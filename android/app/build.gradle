@@ -120,6 +120,10 @@ def debugAppLabel = signingValue("ELON_DEBUG_APP_LABEL", localNodeName)
 def chatGptPrivateResearchEnabled = project.findProperty("ELON_CHATGPT_PRIVATE_RESEARCH")
     ?.toString()
     ?.toBoolean() ?: false
+def chatGptPrivateConversationPrefetchEnabled =
+    project.findProperty("ELON_CHATGPT_PRIVATE_CONVERSATION_PREFETCH")
+        ?.toString()
+        ?.toBoolean() ?: false
 def chatGptPrivateResearchVersionCode = project.findProperty("ELON_CHATGPT_PRIVATE_RESEARCH_VERSION_CODE")
     ?.toString()
     ?.trim()
@@ -128,6 +132,9 @@ def chatGptPrivateResearchVersionName = project.findProperty("ELON_CHATGPT_PRIVA
     ?.trim()
 if ((chatGptPrivateResearchVersionCode || chatGptPrivateResearchVersionName) && !chatGptPrivateResearchEnabled) {
     throw new GradleException("ChatGPT private research version overrides require ELON_CHATGPT_PRIVATE_RESEARCH=true")
+}
+if (chatGptPrivateConversationPrefetchEnabled && !chatGptPrivateResearchEnabled) {
+    throw new GradleException("ChatGPT private conversation prefetch requires ELON_CHATGPT_PRIVATE_RESEARCH=true")
 }
 if (chatGptPrivateResearchVersionCode && !(chatGptPrivateResearchVersionCode ==~ /^[1-9][0-9]{0,8}$/)) {
     throw new GradleException("ELON_CHATGPT_PRIVATE_RESEARCH_VERSION_CODE must be a positive integer")
@@ -192,6 +199,7 @@ android {
         buildConfigField "int", "CHATGPT_WEB_VERIFIED_APK_VERSION_CODE", "${project.ext.chatGptWebVerifiedApkVersionCode}"
         buildConfigField "String", "CHATGPT_WEB_VERIFIED_SOURCE_COMMIT", "\"${project.ext.chatGptWebVerifiedSourceCommit}\""
         buildConfigField "boolean", "CHATGPT_PRIVATE_RESEARCH_ENABLED", "${chatGptPrivateResearchEnabled}"
+        buildConfigField "boolean", "CHATGPT_PRIVATE_CONVERSATION_PREFETCH_ENABLED", "${chatGptPrivateConversationPrefetchEnabled}"
         manifestPlaceholders += [
             elonAppLabel        : "@string/app_name",
             elonLauncherIcon     : projectIconEnabled ? "@mipmap/elon_project_launcher" : "@mipmap/ic_launcher",
