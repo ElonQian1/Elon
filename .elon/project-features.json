@@ -9523,7 +9523,7 @@
       "id": "win-web-ai-rich-content-runtime-guard-v1",
       "title": "Win 网页 AI 富内容运行时门禁 V1",
       "summary": "在 Rust 清洗之后为 PC 原生聊天增加 yilong.rich-content.v1 轻量运行时门禁，使旧缓存、上游结构漂移或残缺富卡只降级对应卡片，不影响正文、来源或整个聊天界面；不改 PWA。",
-      "status": "ready",
+      "status": "in_progress",
       "priority": "p1",
       "requirement": {
         "path": "docs/requirements/win-web-ai-rich-content-runtime-guard-v1.md",
@@ -9566,8 +9566,14 @@
         "真实 TypeScript 门禁逻辑契约和完整 Win/前端门禁通过。"
       ],
       "implementation_evidence": [],
+      "claim": {
+        "claim_id": "claim_85392699534e48d7a17c0e8f07c823c9",
+        "agent_id": "codex-root",
+        "claimed_at_ms": 1787449349094,
+        "expires_at_ms": 1787460149094
+      },
       "created_at_ms": 1787449323325,
-      "updated_at_ms": 1787449323325
+      "updated_at_ms": 1787449361035
     },
     {
       "id": "win-web-ai-rich-diagnostic-transport-v1",
@@ -10312,26 +10318,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_d8031717bef14f0aa5a16266c17f8a98",
-      "feature_id": "win-google-ai-primary-answer-continuity-v1",
-      "action": "evidence_recorded",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1787230930147
-    },
-    {
-      "id": "feature_event_4f29d4c1b93a40cc9fa8731c499f8b9a",
-      "feature_id": "win-google-ai-primary-answer-continuity-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "根因修复和失败契约均已提交。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1787230930165
-    },
     {
       "id": "feature_event_6b4c2e6b23404f5a945fb97072802913",
       "feature_id": "win-google-ai-primary-answer-continuity-v1",
@@ -12311,6 +12297,26 @@
       "from_status": "",
       "to_status": "ready",
       "at_ms": 1787449323325
+    },
+    {
+      "id": "feature_event_510985882fb44b1d97001c7e162f57c2",
+      "feature_id": "win-web-ai-rich-content-runtime-guard-v1",
+      "action": "claimed",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1787449349095
+    },
+    {
+      "id": "feature_event_00ff55ad7945475cb3a411347ea08258",
+      "feature_id": "win-web-ai-rich-content-runtime-guard-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "开始实现前端运行时协议门禁与异常缓存回归。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1787449361035
     }
   ]
 }
