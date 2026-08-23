@@ -33,6 +33,7 @@ assert.match(adapter, /role="radiogroup"/)
 assert.match(adapter, /role="application"/)
 assert.match(adapter, /function normalizeFinancePayload\(value\)/)
 assert.match(adapter, /function sampleChartGeometry\(geometry\)/)
+assert.match(adapter, /function visibleCandlestickChart\(root\)/)
 assert.match(adapter, /function visibleChart\(root\)/)
 assert.match(adapter, /MAX_VISIBLE_CHART_POINTS = 96/)
 assert.match(adapter, /data-elon-rich-content-root/)
@@ -84,7 +85,9 @@ assert.match(renderer, /aria-label="官方地图摘要"/)
 assert.match(renderer, /referrerPolicy="no-referrer"/)
 assert.match(renderer, /periods\.map/)
 assert.match(renderer, /metrics\.map/)
-assert.match(renderer, /chart\?\.points/)
+assert.match(renderer, /payload\.chart\.points/)
+assert.match(renderer, /payload\.chart\?\.kind === 'candlestick'/)
+assert.match(renderer, /aria-label="缓存行情 K 线图"/)
 assert.match(renderer, /useId\(\)/)
 assert.match(renderer, /url\(#\$\{gradientId\}\)/)
 assert.match(renderer, /payload\.rows\.map/)
@@ -92,6 +95,7 @@ assert.match(renderer, /payload\.rows\.map/)
 const context = {
   window: {},
   location: { origin: 'https://chatgpt.com', href: 'https://chatgpt.com/' },
+  Element: Object,
   URL,
   console,
 }
@@ -106,6 +110,30 @@ assert.equal(normalized.periods.length, 8)
 assert.equal(normalized.periods.filter((period) => period.selected).length, 1)
 assert.equal(normalized.metrics.length, 4)
 assert.equal(normalized.chart, undefined, 'DOM extraction must not fabricate unavailable chart points')
+
+const candlestickPayload = context.window.__elonChatGptRichContent.normalizeFinancePayload({
+  title: 'Apple Inc. (AAPL)',
+  primaryValue: 'US$231.59',
+  trend: 'positive',
+  chart: {
+    kind: 'candlestick',
+    candles: [
+      { x: '2026-08-20', open: 228.1, high: 232.4, low: 227.7, close: 231.2 },
+      { x: '2026-08-21', open: 231.2, high: 233.1, low: 229.8, close: 230.4 },
+    ],
+  },
+})
+assert.equal(candlestickPayload.chart.kind, 'candlestick')
+assert.equal(candlestickPayload.chart.candles.length, 2)
+assert.equal(candlestickPayload.chart.candles[0].close, 231.2)
+const visibleCandlesticks = context.window.__elonChatGptRichContent.visibleCandlestickChart({
+  querySelectorAll: () => [
+    { getAttribute: () => '2026-08-20 Open 228.1 High 232.4 Low 227.7 Close 231.2', textContent: '' },
+    { getAttribute: () => '2026-08-21 Open 231.2 High 233.1 Low 229.8 Close 230.4', textContent: '' },
+  ],
+})
+assert.equal(visibleCandlesticks.kind, 'candlestick')
+assert.equal(visibleCandlesticks.candles[1].low, 229.8)
 
 const sampledChart = context.window.__elonChatGptRichContent.sampleChartGeometry({
   getBBox: () => ({ width: 100, height: 20 }),
@@ -257,6 +285,8 @@ const validFinance = {
   source: 'official_dom',
   payload: authorizedFixture.chatgptEnvelope.parts[0].payload,
 }
+const validCandlestickFinance = structuredClone(validFinance)
+validCandlestickFinance.payload.chart = candlestickPayload.chart
 const validWeather = {
   schema: 'yilong.rich-content.v1',
   kind: 'weather',
@@ -276,6 +306,7 @@ const validMap = {
   payload: map,
 }
 assert.equal(isYilongRichContent(validFinance), true)
+assert.equal(isYilongRichContent(validCandlestickFinance), true)
 assert.equal(isYilongRichContent(validWeather), true)
 assert.equal(isYilongRichContent(validMedia), true)
 assert.equal(isYilongRichContent(validMap), true)
@@ -287,6 +318,9 @@ assert.equal(isYilongRichContent({ ...validFinance, payload: { title: 'BTC' } })
 const invalidChart = structuredClone(validFinance)
 invalidChart.payload.chart.points[0].y = Number.NaN
 assert.equal(isYilongRichContent(invalidChart), false)
+const invalidCandle = structuredClone(validCandlestickFinance)
+invalidCandle.payload.chart.candles[0].high = 227
+assert.equal(isYilongRichContent(invalidCandle), false, 'high must contain the candle body')
 const oversizedMetrics = structuredClone(validFinance)
 oversizedMetrics.payload.metrics = Array.from({ length: 17 }, (_, index) => ({ label: `L${index}`, value: '1' }))
 assert.equal(isYilongRichContent(oversizedMetrics), false)

@@ -115,8 +115,23 @@
   color: #ff4961;
 }
 
+.chart[data-trend="positive"] { color: #45ce82; }
+.chart[data-trend="negative"] { color: #ff6473; }
+.chart[data-trend="neutral"] { color: #a9adb5; }
+
 .area { fill: currentColor; }
 .line { fill: none; stroke: currentColor; stroke-width: 2.3; vector-effect: non-scaling-stroke; }
+
+.candleWick { stroke: currentColor; stroke-width: 1.25; vector-effect: non-scaling-stroke; }
+.candleBody { fill: currentColor; stroke: currentColor; stroke-width: .6; vector-effect: non-scaling-stroke; }
+.candleUp { color: #45ce82; }
+.candleDown { color: #ff6473; }
+.candleFlat { color: #a9adb5; }
+.chartAxisLabel {
+  fill: #8f949c;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
 
 .chartFallback {
   min-height: 64px;

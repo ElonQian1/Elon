@@ -284,9 +284,17 @@ fn insert_chart(target: &mut Map<String, Value>, value: Option<&Value>) {
     let Some(chart) = value.and_then(Value::as_object) else {
         return;
     };
-    if chart.get("kind").and_then(Value::as_str) != Some("line") {
-        return;
+    let sanitized = match chart.get("kind").and_then(Value::as_str) {
+        Some("line") => sanitize_line_chart(chart),
+        Some("candlestick") => sanitize_candlestick_chart(chart),
+        _ => None,
+    };
+    if let Some(chart) = sanitized {
+        target.insert("chart".into(), Value::Object(chart));
     }
+}
+
+fn sanitize_line_chart(chart: &Map<String, Value>) -> Option<Map<String, Value>> {
     let points = chart
         .get("points")
         .and_then(Value::as_array)
@@ -306,13 +314,51 @@ fn insert_chart(target: &mut Map<String, Value>, value: Option<&Value>) {
             })
         })
         .collect::<Vec<_>>();
-    if points.len() > 1 {
-        target.insert(
-            "chart".into(),
-            Value::Object(Map::from_iter([
-                ("kind".into(), Value::String("line".into())),
-                ("points".into(), Value::Array(points)),
-            ])),
-        );
-    }
+    (points.len() > 1).then(|| {
+        Map::from_iter([
+            ("kind".into(), Value::String("line".into())),
+            ("points".into(), Value::Array(points)),
+        ])
+    })
+}
+
+fn sanitize_candlestick_chart(chart: &Map<String, Value>) -> Option<Map<String, Value>> {
+    let candles = chart
+        .get("candles")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .take(512)
+        .filter_map(|value| {
+            let candle = value.as_object()?;
+            let x = super::clean_string(candle.get("x"), 64);
+            let open = candle.get("open").and_then(Value::as_f64)?;
+            let high = candle.get("high").and_then(Value::as_f64)?;
+            let low = candle.get("low").and_then(Value::as_f64)?;
+            let close = candle.get("close").and_then(Value::as_f64)?;
+            if x.is_empty()
+                || !open.is_finite()
+                || !high.is_finite()
+                || !low.is_finite()
+                || !close.is_finite()
+                || high < open.max(close)
+                || low > open.min(close)
+            {
+                return None;
+            }
+            Some(Value::Object(Map::from_iter([
+                ("x".into(), Value::String(x)),
+                ("open".into(), Value::Number(Number::from_f64(open)?)),
+                ("high".into(), Value::Number(Number::from_f64(high)?)),
+                ("low".into(), Value::Number(Number::from_f64(low)?)),
+                ("close".into(), Value::Number(Number::from_f64(close)?)),
+            ])))
+        })
+        .collect::<Vec<_>>();
+    (candles.len() > 1).then(|| {
+        Map::from_iter([
+            ("kind".into(), Value::String("candlestick".into())),
+            ("candles".into(), Value::Array(candles)),
+        ])
+    })
 }

@@ -6989,13 +6989,72 @@
       ],
       "implementation_evidence": [],
       "claim": {
-        "claim_id": "claim_e109ed4eb8a24c10ade0225f4053ca51",
+        "claim_id": "claim_666e693be5164df2aa9abd365556b579",
         "agent_id": "codex-root",
-        "claimed_at_ms": 1787489218696,
-        "expires_at_ms": 1787503618696
+        "claimed_at_ms": 1787509158192,
+        "expires_at_ms": 1787523558192
       },
       "created_at_ms": 1787489171043,
-      "updated_at_ms": 1787489275978
+      "updated_at_ms": 1787509167084
+    },
+    {
+      "id": "win-chatgpt-finance-candlestick-v1",
+      "title": "Win ChatGPT 行情 K 线富内容 V1",
+      "summary": "在现有 finance AST 内加入可信 OHLC K 线分支，并随 Win 适配器升级交付游客 stream-status 同步修复；未知或不完整结构失败关闭。",
+      "status": "in_progress",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/win-chatgpt-finance-candlestick-v1.md",
+        "content_hash": "deb701638eef87a07bb072b325ec80e1ba1c3b2a8b74b85a85ea7165da1f0ae9",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "c9e4056e2e545625497a41c72963b1bdbce1d237",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "00a85245e6d31e6e55d088ad2ef680831d2ce6c0",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "win-web-ai",
+      "tags": [
+        "win",
+        "chatgpt",
+        "finance",
+        "candlestick",
+        "rich-content"
+      ],
+      "task_paths": [
+        "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebPageAdapter.kt",
+        "desktop-shell/src-tauri/src/local_ai_browser/adapter_content/rich_content.rs",
+        "desktop-shell/src-tauri/src/local_ai_browser/chatgpt_adapter_bootstrap.rs",
+        "desktop-shell/src-tauri/src/local_ai_browser/chatgpt_rich_content_adapter.js",
+        "pc-frontend/scripts/test-ai-rich-content-contract.cjs",
+        "pc-frontend/src/features/ai/AiRichContentCard.module.css",
+        "pc-frontend/src/features/ai/AiRichContentCard.tsx",
+        "pc-frontend/src/features/user-browser/richContentProtocol.ts"
+      ],
+      "dependencies": [
+        "win-web-ai-structured-rich-content-v1"
+      ],
+      "acceptance_criteria": [
+        "finance AST 支持 2–512 根合法 OHLC K 线并校验 high/low 包住开收盘。",
+        "ChatGPT DOM 只从公开 aria-label 或 SVG title 提取中英文 OHLC，未知结构失败关闭。",
+        "Rust 与 TypeScript 双层清洗拒绝异常数据，DPAPI 只保存稳定 AST。",
+        "Win 原生卡绘制红跌绿涨灰平的 K 线并提供无障碍逐根数据。",
+        "游客 stream-status、前端、Rust 与源码大小验证通过。",
+        "发布安装后真实游客历史回答可同步，有官方 OHLC 时显示 K 线，否则不伪造。"
+      ],
+      "implementation_evidence": [],
+      "claim": {
+        "claim_id": "claim_9df78aeb4ba84654a26f8714dad67114",
+        "agent_id": "codex-root",
+        "claimed_at_ms": 1787509872132,
+        "expires_at_ms": 1787524272132
+      },
+      "created_at_ms": 1787509865878,
+      "updated_at_ms": 1787509881390
     },
     {
       "id": "win-chatgpt-visible-finance-chart-v1",
@@ -11341,66 +11400,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_e6e20fc3e13b4a209e1eb280cf1e7bcd",
-      "feature_id": "open-commerce-native-edge-acme-v2",
-      "action": "evidence_recorded",
-      "actor": "codex-commerce-edge",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1787306995931
-    },
-    {
-      "id": "feature_event_78f8fa60b455421d859ab6766055e67f",
-      "feature_id": "open-commerce-native-edge-acme-v2",
-      "action": "transitioned",
-      "actor": "codex-commerce-edge",
-      "reason": "Native ACME edge implementation and operations artifacts are complete.",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1787306995968
-    },
-    {
-      "id": "feature_event_ff6c5e10819f4ffc8487d9e4ac3eba08",
-      "feature_id": "open-commerce-native-edge-acme-v2",
-      "action": "transitioned",
-      "actor": "codex-commerce-edge",
-      "reason": "Focused Rust tests, independent build, configuration checks, TLS smoke, script syntax and repository guards passed.",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1787306995997
-    },
-    {
-      "id": "feature_event_13081236262e45c999c89a288b1761e3",
-      "feature_id": "erp-managed-rollout-plan-v1",
-      "action": "registered",
-      "actor": "codex-erp-rollout",
-      "reason": "Create the next independent managed hosting control-plane slice.",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1787307928782
-    },
-    {
-      "id": "feature_event_4bc64bb3e29242f996d2ca9182affa66",
-      "feature_id": "erp-managed-rollout-plan-v1",
-      "action": "claimed",
-      "actor": "codex-erp-rollout",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1787307928810
-    },
-    {
-      "id": "feature_event_c28cacf92e474a31bc34f64eaee04edf",
-      "feature_id": "erp-managed-rollout-plan-v1",
-      "action": "transitioned",
-      "actor": "codex-erp-rollout",
-      "reason": "Begin modular implementation.",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1787307928838
-    },
-    {
       "id": "feature_event_b5a445f55cd0405e9e14c63802f1d94d",
       "feature_id": "erp-managed-rollout-plan-v1",
       "action": "claim_released",
@@ -13339,6 +13338,66 @@
       "from_status": "claimed",
       "to_status": "in_progress",
       "at_ms": 1787489275978
+    },
+    {
+      "id": "feature_event_3e39f02681044c8aac0291cfda3e38ec",
+      "feature_id": "win-chatgpt-composite-answer-extraction-v1",
+      "action": "claim_released",
+      "actor": "codex-root",
+      "reason": "过期认领由同一 Codex 根任务清理，继续处理用户提供的真实 Win 游客回答同步故障",
+      "from_status": "in_progress",
+      "to_status": "ready",
+      "at_ms": 1787509149938
+    },
+    {
+      "id": "feature_event_fa59e20b2ad64746aa600740a473e43a",
+      "feature_id": "win-chatgpt-composite-answer-extraction-v1",
+      "action": "claimed",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1787509158675
+    },
+    {
+      "id": "feature_event_0c6fcae0d922405fad268e0edfabf23e",
+      "feature_id": "win-chatgpt-composite-answer-extraction-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "复现用户真实 Win 游客会话中官网已有组合行情回答但原生消息快照为空",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1787509167084
+    },
+    {
+      "id": "feature_event_713bc4905a4e406a95351b2f0b3267f1",
+      "feature_id": "win-chatgpt-finance-candlestick-v1",
+      "action": "registered",
+      "actor": "codex-root",
+      "reason": "用户明确要求修复游客回答卡住并补足 Win 行情 K 线富内容。",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1787509865878
+    },
+    {
+      "id": "feature_event_f8f472ba24224a63a87911978fa5df51",
+      "feature_id": "win-chatgpt-finance-candlestick-v1",
+      "action": "claimed",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1787509872132
+    },
+    {
+      "id": "feature_event_be72d084969b45d3af7ad8d4cdf5e49f",
+      "feature_id": "win-chatgpt-finance-candlestick-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "已补充失败回归并开始实现游客同步版本失效保护与 OHLC 富内容链路。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1787509881390
     }
   ]
 }

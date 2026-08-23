@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  const API_VERSION = 2;
+  const API_VERSION = 3;
   if (location.origin !== 'https://chatgpt.com' ||
       Number(window.__elonChatGptRichContent && window.__elonChatGptRichContent.version || 0) >= API_VERSION) return;
 
@@ -63,13 +63,27 @@
       periods,
       metrics
     };
-    const points = source.chart && Array.isArray(source.chart.points)
-      ? source.chart.points.slice(0, 512).map((point) => ({
+    const chart = source.chart && typeof source.chart === 'object' ? source.chart : {};
+    const candles = chart.kind === 'candlestick' && Array.isArray(chart.candles)
+      ? chart.candles.slice(0, 512).map((candle) => ({
+          x: cleanText(candle && candle.x, 64),
+          open: Number(candle && candle.open),
+          high: Number(candle && candle.high),
+          low: Number(candle && candle.low),
+          close: Number(candle && candle.close)
+        })).filter((candle) => candle.x &&
+          [candle.open, candle.high, candle.low, candle.close].every(Number.isFinite) &&
+          candle.high >= Math.max(candle.open, candle.close) &&
+          candle.low <= Math.min(candle.open, candle.close))
+      : [];
+    const points = chart.kind !== 'candlestick' && Array.isArray(chart.points)
+      ? chart.points.slice(0, 512).map((point) => ({
           x: cleanText(point && point.x, 64),
           y: Number(point && point.y)
         })).filter((point) => point.x && Number.isFinite(point.y))
       : [];
-    if (points.length > 1) payload.chart = { kind: 'line', points };
+    if (candles.length > 1) payload.chart = { kind: 'candlestick', candles };
+    else if (points.length > 1) payload.chart = { kind: 'line', points };
     return payload;
   }
 
@@ -167,8 +181,56 @@
     }
   }
 
+  function candleMetric(label, aliases) {
+    const pattern = new RegExp(
+      '(?:^|[\\s,;，；])(?:' + aliases + ')\\s*[:：]?\\s*([-+]?\\d[\\d,]*(?:\\.\\d+)?)',
+      'i'
+    );
+    const match = cleanText(label, 320).match(pattern);
+    if (!match) return undefined;
+    const parsed = Number(String(match[1]).replace(/,/g, ''));
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+
+  function candleLabel(label, index) {
+    const text = cleanText(label, 320);
+    const isoDate = text.match(/\b20\d{2}[-/.]\d{1,2}[-/.]\d{1,2}(?:[ T]\d{1,2}:\d{2})?\b/);
+    if (isoDate) return cleanText(isoDate[0], 64);
+    const chineseDate = text.match(/20\d{2}年\d{1,2}月\d{1,2}日(?:\s*\d{1,2}:\d{2})?/);
+    if (chineseDate) return cleanText(chineseDate[0], 64);
+    const prefix = cleanText(text.split(/\bOpen\b|开盘价?|開盤價?/i)[0], 64)
+      .replace(/[,:，：;；-]+$/g, '').trim();
+    return prefix || String(index + 1);
+  }
+
+  function visibleCandlestickChart(root) {
+    if (!(root instanceof Element) || typeof root.querySelectorAll !== 'function') return undefined;
+    const candles = [];
+    const seen = new Set();
+    Array.from(root.querySelectorAll('[aria-label], svg title')).slice(0, 1500).forEach((node, index) => {
+      const label = cleanText(
+        typeof node.getAttribute === 'function' && node.getAttribute('aria-label') || node.textContent,
+        320
+      );
+      const open = candleMetric(label, 'Open|开盘价?|開盤價?');
+      const high = candleMetric(label, 'High|最高价?|最高價?');
+      const low = candleMetric(label, 'Low|最低价?|最低價?');
+      const close = candleMetric(label, 'Close|收盘价?|收盤價?');
+      if (![open, high, low, close].every(Number.isFinite) ||
+          high < Math.max(open, close) || low > Math.min(open, close)) return;
+      const x = candleLabel(label, index);
+      const identity = [x, open, high, low, close].join(':');
+      if (seen.has(identity)) return;
+      seen.add(identity);
+      candles.push({ x, open, high, low, close });
+    });
+    return candles.length > 1 ? { kind: 'candlestick', candles: candles.slice(0, 512) } : undefined;
+  }
+
   function visibleChart(root) {
     if (!(root instanceof Element)) return undefined;
+    const candlesticks = visibleCandlestickChart(root);
+    if (candlesticks) return candlesticks;
     let selected = [];
     let selectedRange = 0;
     Array.from(root.querySelectorAll('svg path[d], svg polyline[points]')).forEach((geometry) => {
@@ -307,6 +369,7 @@
     owns,
     financeRoots,
     sampleChartGeometry,
+    visibleCandlestickChart,
     visibleChart,
     normalizeFinancePayload,
     fromAuthorizedEnvelope

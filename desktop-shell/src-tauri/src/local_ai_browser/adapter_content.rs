@@ -240,6 +240,35 @@ mod tests {
     }
 
     #[test]
+    fn finance_rich_card_keeps_valid_candlesticks_and_drops_invalid_values() {
+        let parts = json!([{
+            "type":"rich_card",
+            "kind":"finance",
+            "richContent":{
+                "schema":"yilong.rich-content.v1",
+                "kind":"finance",
+                "source":"official_dom",
+                "payload":{
+                    "title":"Apple Inc. (AAPL)",
+                    "primaryValue":"US$231.59",
+                    "trend":"positive",
+                    "chart":{"kind":"candlestick","candles":[
+                        {"x":"2026-08-20","open":228.1,"high":232.4,"low":227.7,"close":231.2},
+                        {"x":"invalid","open":231.2,"high":229.0,"low":228.0,"close":230.4},
+                        {"x":"2026-08-21","open":231.2,"high":233.1,"low":229.8,"close":230.4}
+                    ]}
+                }
+            }
+        }]);
+        let sanitized = sanitize_parts("chatgpt", Some(&parts));
+        let candles = sanitized[0]["richContent"]["payload"]["chart"]["candles"]
+            .as_array()
+            .expect("valid OHLC data should survive the sanitizer");
+        assert_eq!(candles.len(), 2);
+        assert_eq!(candles[1]["close"], 230.4);
+    }
+
+    #[test]
     fn weather_rich_card_preserves_rows_and_discards_unknown_fields() {
         let parts = json!([{
             "type":"rich_card",

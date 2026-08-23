@@ -16,6 +16,22 @@ export interface RichContentChartPoint {
   y: number
 }
 
+export interface RichContentCandlestick {
+  x: string
+  open: number
+  high: number
+  low: number
+  close: number
+}
+
+export type RichContentFinanceChart = {
+  kind: 'line'
+  points: RichContentChartPoint[]
+} | {
+  kind: 'candlestick'
+  candles: RichContentCandlestick[]
+}
+
 export interface FinanceRichContentPayload {
   title: string
   symbol?: string
@@ -24,10 +40,7 @@ export interface FinanceRichContentPayload {
   trend: 'positive' | 'negative' | 'neutral'
   periods?: RichContentPeriod[]
   metrics?: RichContentMetric[]
-  chart?: {
-    kind: 'line'
-    points: RichContentChartPoint[]
-  }
+  chart?: RichContentFinanceChart
 }
 
 export interface FinanceRichContent {
@@ -136,17 +149,29 @@ function isFinancePayload(payload: Record<string, unknown>) {
     isRecord(value) && boundedText(value.label, 64) && boundedText(value.value, 96)
   ))) return false
   if (payload.chart === undefined) return true
-  if (!isRecord(payload.chart)
-      || payload.chart.kind !== 'line'
-      || !Array.isArray(payload.chart.points)
-      || payload.chart.points.length < 2
-      || payload.chart.points.length > 512) return false
-  return payload.chart.points.every((value) => (
-    isRecord(value)
-      && boundedText(value.x, 64)
-      && typeof value.y === 'number'
-      && Number.isFinite(value.y)
-  ))
+  if (!isRecord(payload.chart)) return false
+  if (payload.chart.kind === 'line') {
+    if (!Array.isArray(payload.chart.points) || payload.chart.points.length < 2) return false
+    return requiredArray(payload.chart.points, 512, (value) => (
+      isRecord(value)
+        && boundedText(value.x, 64)
+        && finiteNumber(value.y)
+    ))
+  }
+  if (payload.chart.kind === 'candlestick') {
+    if (!Array.isArray(payload.chart.candles) || payload.chart.candles.length < 2) return false
+    return requiredArray(payload.chart.candles, 512, (value) => {
+      if (!isRecord(value)
+          || !boundedText(value.x, 64)
+          || !finiteNumber(value.open)
+          || !finiteNumber(value.high)
+          || !finiteNumber(value.low)
+          || !finiteNumber(value.close)) return false
+      return value.high >= Math.max(value.open, value.close)
+        && value.low <= Math.min(value.open, value.close)
+    })
+  }
+  return false
 }
 
 function isWeatherPayload(payload: Record<string, unknown>) {
@@ -219,6 +244,10 @@ function optionalArray(
 function optionalDimension(value: unknown) {
   return value === undefined
     || (typeof value === 'number' && Number.isInteger(value) && value > 0 && value <= 8_192)
+}
+
+function finiteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value)
 }
 
 function publicHttpsUrl(value: unknown) {

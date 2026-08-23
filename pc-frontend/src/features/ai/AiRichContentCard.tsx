@@ -4,6 +4,7 @@ import type {
   FinanceRichContent,
   MapRichContent,
   MediaGalleryRichContent,
+  RichContentCandlestick,
   RichContentChartPoint,
   WeatherRichContent,
   YilongRichContent,
@@ -21,7 +22,8 @@ function FinanceCard({ content }: { content: FinanceRichContent }) {
   const { payload } = content
   const periods = payload.periods ?? []
   const metrics = payload.metrics ?? []
-  const path = chartPath(payload.chart?.points)
+  const candles = payload.chart?.kind === 'candlestick' ? payload.chart.candles : undefined
+  const path = chartPath(payload.chart?.kind === 'line' ? payload.chart.points : undefined)
   const gradientId = useId()
   return (
     <article className={styles.card} aria-label="官方行情卡片">
@@ -47,8 +49,10 @@ function FinanceCard({ content }: { content: FinanceRichContent }) {
           ))}
         </div>
       )}
-      {path ? (
-        <svg className={styles.chart} viewBox="0 0 640 180" role="img" aria-label="缓存行情走势">
+      {candles ? (
+        <CandlestickChart candles={candles} />
+      ) : path ? (
+        <svg className={styles.chart} data-trend={payload.trend} viewBox="0 0 640 180" role="img" aria-label="缓存行情走势">
           <defs>
             <linearGradient id={gradientId} x1="0" x2="0" y1="0" y2="1">
               <stop offset="0" stopColor="currentColor" stopOpacity=".28" />
@@ -75,6 +79,48 @@ function FinanceCard({ content }: { content: FinanceRichContent }) {
         </dl>
       )}
     </article>
+  )
+}
+
+function CandlestickChart({ candles }: { candles: RichContentCandlestick[] }) {
+  const visibleCandles = candles.slice(-96)
+  const values = visibleCandles.flatMap((candle) => [candle.high, candle.low])
+  const minimum = Math.min(...values)
+  const maximum = Math.max(...values)
+  const range = maximum - minimum || 1
+  const step = 640 / visibleCandles.length
+  const bodyWidth = Math.max(2, Math.min(8, step * .58))
+  const yFor = (value: number) => 166 - ((value - minimum) / range) * 146
+  return (
+    <svg className={styles.chart} viewBox="0 0 640 180" role="img" aria-label="缓存行情 K 线图">
+      <title>{`K 线图，共 ${visibleCandles.length} 根，区间 ${formatChartValue(minimum)} 至 ${formatChartValue(maximum)}`}</title>
+      <text className={styles.chartAxisLabel} x="4" y="13">{formatChartValue(maximum)}</text>
+      <text className={styles.chartAxisLabel} x="4" y="177">{formatChartValue(minimum)}</text>
+      {visibleCandles.map((candle, index) => {
+        const x = (index + .5) * step
+        const openY = yFor(candle.open)
+        const closeY = yFor(candle.close)
+        const highY = yFor(candle.high)
+        const lowY = yFor(candle.low)
+        const trendClass = candle.close > candle.open
+          ? styles.candleUp
+          : candle.close < candle.open ? styles.candleDown : styles.candleFlat
+        return (
+          <g className={trendClass} key={`${candle.x}:${index}`}>
+            <title>{`${candle.x} 开 ${candle.open} 高 ${candle.high} 低 ${candle.low} 收 ${candle.close}`}</title>
+            <line className={styles.candleWick} x1={x} x2={x} y1={highY} y2={lowY} />
+            <rect
+              className={styles.candleBody}
+              x={x - bodyWidth / 2}
+              y={Math.min(openY, closeY)}
+              width={bodyWidth}
+              height={Math.max(1.5, Math.abs(closeY - openY))}
+              rx={Math.min(1.2, bodyWidth / 4)}
+            />
+          </g>
+        )
+      })}
+    </svg>
   )
 }
 
@@ -207,4 +253,8 @@ function chartPath(points: RichContentChartPoint[] | undefined) {
     const y = 166 - ((point.y - minimum) / range) * 146
     return `${index ? 'L' : 'M'} ${x.toFixed(2)} ${y.toFixed(2)}`
   }).join(' ')
+}
+
+function formatChartValue(value: number) {
+  return new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 2 }).format(value)
 }
