@@ -266,6 +266,32 @@ mod tests {
             .expect("valid OHLC data should survive the sanitizer");
         assert_eq!(candles.len(), 2);
         assert_eq!(candles[1]["close"], 230.4);
+
+        let single_day = json!([{
+            "type":"rich_card",
+            "kind":"finance",
+            "richContent":{
+                "schema":"yilong.rich-content.v1",
+                "kind":"finance",
+                "source":"official_dom",
+                "payload":{
+                    "title":"Apple Inc. (AAPL)",
+                    "primaryValue":"309.35 美元",
+                    "trend":"negative",
+                    "chart":{"kind":"candlestick","candles":[
+                        {"x":"最新交易日","open":312.15,"high":312.6,"low":307.03,"close":309.35}
+                    ]}
+                }
+            }
+        }]);
+        let sanitized_single_day = sanitize_parts("chatgpt", Some(&single_day));
+        assert_eq!(
+            sanitized_single_day[0]["richContent"]["payload"]["chart"]["candles"]
+                .as_array()
+                .expect("one visible OHLC table row should produce one candle")
+                .len(),
+            1
+        );
     }
 
     #[test]

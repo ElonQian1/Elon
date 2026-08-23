@@ -34,6 +34,8 @@ assert.match(adapter, /role="application"/)
 assert.match(adapter, /function normalizeFinancePayload\(value\)/)
 assert.match(adapter, /function sampleChartGeometry\(geometry\)/)
 assert.match(adapter, /function visibleCandlestickChart\(root\)/)
+assert.match(adapter, /function financePayloadFromPairs\(pairs, title\)/)
+assert.match(adapter, /function ohlcTableParts\(content\)/)
 assert.match(adapter, /function visibleChart\(root\)/)
 assert.match(adapter, /MAX_VISIBLE_CHART_POINTS = 96/)
 assert.match(adapter, /data-elon-rich-content-root/)
@@ -126,6 +128,20 @@ const candlestickPayload = context.window.__elonChatGptRichContent.normalizeFina
 assert.equal(candlestickPayload.chart.kind, 'candlestick')
 assert.equal(candlestickPayload.chart.candles.length, 2)
 assert.equal(candlestickPayload.chart.candles[0].close, 231.2)
+const tableFinancePayload = context.window.__elonChatGptRichContent.financePayloadFromPairs([
+  { label: '股票代码', value: 'AAPL（NASDAQ）' },
+  { label: '最新价', value: '309.35 美元' },
+  { label: '涨跌', value: '-1.88 美元（-0.60%）' },
+  { label: '开盘（Open）', value: '312.15 美元' },
+  { label: '最高（High）', value: '312.60 美元' },
+  { label: '最低（Low）', value: '307.03 美元' },
+], 'Apple Inc.（AAPL）最新行情')
+assert.equal(tableFinancePayload.chart.kind, 'candlestick')
+assert.equal(tableFinancePayload.chart.candles.length, 1)
+assert.equal(
+  JSON.stringify(tableFinancePayload.chart.candles[0]),
+  JSON.stringify({ x: '最新交易日', open: 312.15, high: 312.6, low: 307.03, close: 309.35 }),
+)
 const visibleCandlesticks = context.window.__elonChatGptRichContent.visibleCandlestickChart({
   querySelectorAll: () => [
     { getAttribute: () => '2026-08-20 Open 228.1 High 232.4 Low 227.7 Close 231.2', textContent: '' },
@@ -287,6 +303,8 @@ const validFinance = {
 }
 const validCandlestickFinance = structuredClone(validFinance)
 validCandlestickFinance.payload.chart = candlestickPayload.chart
+const validSingleCandlestickFinance = structuredClone(validFinance)
+validSingleCandlestickFinance.payload.chart = tableFinancePayload.chart
 const validWeather = {
   schema: 'yilong.rich-content.v1',
   kind: 'weather',
@@ -307,6 +325,7 @@ const validMap = {
 }
 assert.equal(isYilongRichContent(validFinance), true)
 assert.equal(isYilongRichContent(validCandlestickFinance), true)
+assert.equal(isYilongRichContent(validSingleCandlestickFinance), true)
 assert.equal(isYilongRichContent(validWeather), true)
 assert.equal(isYilongRichContent(validMedia), true)
 assert.equal(isYilongRichContent(validMap), true)

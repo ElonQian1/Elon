@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  const API_VERSION = 3;
+  const API_VERSION = 4;
   if (location.origin !== 'https://chatgpt.com' ||
       Number(window.__elonChatGptRichContent && window.__elonChatGptRichContent.version || 0) >= API_VERSION) return;
 
@@ -82,7 +82,7 @@
           y: Number(point && point.y)
         })).filter((point) => point.x && Number.isFinite(point.y))
       : [];
-    if (candles.length > 1) payload.chart = { kind: 'candlestick', candles };
+    if (candles.length > 0) payload.chart = { kind: 'candlestick', candles };
     else if (points.length > 1) payload.chart = { kind: 'line', points };
     return payload;
   }
@@ -123,6 +123,94 @@
 
   function firstPrice(lines) {
     return lines.find((line) => MONEY.test(line.replace(/\s+/g, ''))) || '';
+  }
+
+  function pairFor(pairs, pattern) {
+    return pairs.find((pair) => pattern.test(cleanText(pair && pair.label, 64)));
+  }
+
+  function numericValue(value) {
+    const match = cleanText(value, 96).match(/[-+]?\d[\d,]*(?:\.\d+)?/);
+    if (!match) return undefined;
+    const parsed = Number(match[0].replace(/,/g, ''));
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+
+  function financePayloadFromPairs(pairs, title) {
+    const values = Array.isArray(pairs) ? pairs.slice(0, 32).map((pair) => ({
+      label: cleanText(pair && pair.label, 64),
+      value: cleanText(pair && pair.value, 96)
+    })).filter((pair) => pair.label && pair.value) : [];
+    const symbolPair = pairFor(values, /^(?:股票代码|证券代码|代码|symbol|ticker)(?:\s|$|[（(])/i);
+    const primaryPair = pairFor(values, /^(?:最新价(?:格)?|现价|last(?: price)?|latest price|price)(?:\s|$|[（(])/i)
+      || pairFor(values, /^(?:收盘(?:价)?|close)(?:\s|$|[（(])/i);
+    const changePair = pairFor(values, /^(?:涨跌(?:额|幅)?|change)(?:\s|$|[（(])/i);
+    const openPair = pairFor(values, /^(?:开盘(?:价)?|open)(?:\s|$|[（(])/i);
+    const highPair = pairFor(values, /^(?:最高(?:价)?|high)(?:\s|$|[（(])/i);
+    const lowPair = pairFor(values, /^(?:最低(?:价)?|low)(?:\s|$|[（(])/i);
+    const closePair = pairFor(values, /^(?:收盘(?:价)?|close)(?:\s|$|[（(])/i) || primaryPair;
+    const datePair = pairFor(values, /^(?:日期|交易日|date|trading date)(?:\s|$|[（(])/i);
+    const open = numericValue(openPair && openPair.value);
+    const high = numericValue(highPair && highPair.value);
+    const low = numericValue(lowPair && lowPair.value);
+    const close = numericValue(closePair && closePair.value);
+    const validCandle = [open, high, low, close].every(Number.isFinite)
+      && high >= Math.max(open, close) && low <= Math.min(open, close);
+    const symbolMatch = cleanText(symbolPair && symbolPair.value, 32).match(/[A-Z][A-Z0-9._-]{0,11}/i);
+    const normalizedTitle = cleanText(title, 120)
+      || (symbolMatch ? symbolMatch[0].toUpperCase() + ' 最新行情' : '最新行情');
+    return normalizeFinancePayload({
+      title: normalizedTitle,
+      symbol: symbolMatch ? symbolMatch[0].toUpperCase() : '',
+      primaryValue: cleanText(primaryPair && primaryPair.value, 64),
+      secondaryValue: cleanText(changePair && changePair.value, 96),
+      trend: trendFor(primaryPair && primaryPair.value, changePair && changePair.value),
+      periods: [],
+      metrics: values.filter((pair) => !/^(?:项目|数值|item|value)$/i.test(pair.label)),
+      chart: validCandle ? {
+        kind: 'candlestick',
+        candles: [{
+          x: cleanText(datePair && datePair.value, 64) || '最新交易日',
+          open,
+          high,
+          low,
+          close
+        }]
+      } : undefined
+    });
+  }
+
+  function ohlcTableParts(content) {
+    if (!(content instanceof Element) || typeof content.querySelectorAll !== 'function') return [];
+    const title = Array.from(content.querySelectorAll('h1, h2, h3, h4, h5, h6'))
+      .find((heading) => visible(heading));
+    return Array.from(content.querySelectorAll('table')).slice(0, 8).map((table) => {
+      if (!visible(table) || table.closest('[' + ROOT_ATTRIBUTE + ']')) return null;
+      const pairs = Array.from(table.querySelectorAll('tr')).map((row) => {
+        const cells = Array.from(row.querySelectorAll(':scope > th, :scope > td'));
+        return cells.length === 2 ? {
+          label: cleanText(cells[0].innerText || cells[0].textContent, 64),
+          value: cleanText(cells[1].innerText || cells[1].textContent, 96)
+        } : null;
+      }).filter(Boolean);
+      const payload = financePayloadFromPairs(
+        pairs,
+        cleanText(title && (title.innerText || title.textContent), 120)
+      );
+      if (!payload.primaryValue || !payload.chart || payload.chart.kind !== 'candlestick') return null;
+      table.setAttribute(ROOT_ATTRIBUTE, 'finance');
+      return {
+        type: 'rich_card',
+        text: payload.title,
+        kind: 'finance',
+        richContent: {
+          schema: SCHEMA,
+          kind: 'finance',
+          source: 'official_dom',
+          payload
+        }
+      };
+    }).filter(Boolean).slice(0, 4);
   }
 
   function sampleChartGeometry(geometry) {
@@ -323,10 +411,11 @@
         }
       };
     }).filter((part) => part.richContent.payload.primaryValue);
+    const tableFinance = ohlcTableParts(content);
     const common = commonRichContent && typeof commonRichContent.parts === 'function'
       ? commonRichContent.parts(content)
       : [];
-    return finance.concat(common).slice(0, 16);
+    return finance.concat(tableFinance, common).slice(0, 16);
   }
 
   function fromAuthorizedEnvelope(envelope, authorize) {
@@ -368,6 +457,8 @@
     parts,
     owns,
     financeRoots,
+    financePayloadFromPairs,
+    ohlcTableParts,
     sampleChartGeometry,
     visibleCandlestickChart,
     visibleChart,

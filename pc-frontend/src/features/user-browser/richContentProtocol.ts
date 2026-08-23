@@ -159,7 +159,7 @@ function isFinancePayload(payload: Record<string, unknown>) {
     ))
   }
   if (payload.chart.kind === 'candlestick') {
-    if (!Array.isArray(payload.chart.candles) || payload.chart.candles.length < 2) return false
+    if (!Array.isArray(payload.chart.candles) || payload.chart.candles.length < 1) return false
     return requiredArray(payload.chart.candles, 512, (value) => {
       if (!isRecord(value)
           || !boundedText(value.x, 64)

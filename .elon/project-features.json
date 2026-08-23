@@ -7169,6 +7169,147 @@
       "updated_at_ms": 1787510420580
     },
     {
+      "id": "win-chatgpt-ohlc-table-candlestick-v1",
+      "title": "Win ChatGPT OHLC 表格 K 线降级 V1",
+      "summary": "把游客态官网回答中字段明确的可见 OHLC 两列表格转换为单日 finance K 线卡；缺字段或矛盾数据失败关闭。",
+      "status": "verified",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/win-chatgpt-ohlc-table-candlestick-v1.md",
+        "content_hash": "06fd8a168e41497a13fb33c0fe7bf203f132e6c2bdc5da60ec0713821c5c0bd4",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "dd0be0982b94944c208ad5b7688b1a9d6728fdf6",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "bc979823b8aa5feb9c2ea4b87883450f90340a07",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "win-web-ai",
+      "tags": [
+        "win",
+        "chatgpt",
+        "finance",
+        "ohlc",
+        "candlestick",
+        "rich-content"
+      ],
+      "task_paths": [
+        "desktop-shell/src-tauri/src/local_ai_browser/adapter_content.rs",
+        "desktop-shell/src-tauri/src/local_ai_browser/adapter_content/rich_content.rs",
+        "desktop-shell/src-tauri/src/local_ai_browser/chatgpt_rich_content_adapter.js",
+        "pc-frontend/scripts/test-ai-rich-content-contract.cjs",
+        "pc-frontend/src/features/ai/AiRichContentCard.tsx",
+        "pc-frontend/src/features/user-browser/richContentProtocol.ts"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "Finance AST、Rust 与 TypeScript 接受 1–512 根合法 K 线并拒绝空或矛盾数据",
+        "可见最新价/开盘/最高/最低两列表格生成单日 K 线行情卡",
+        "普通、缺字段和矛盾表格失败关闭",
+        "原生 UI 显示可访问单根 K 线及 OHLC 描述",
+        "合同、构建、Rust 与真实游客 Win 验收通过"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "desktop-shell/src-tauri/src/local_ai_browser/adapter_content.rs",
+          "content_hash": "1764d8e44e2aaa2252e7b8e06db818ae2de4fdbbb18911de08039e3f67473a42",
+          "locator": "finance_rich_card_keeps_valid_candlesticks_and_drops_invalid_values",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "dd0be0982b94944c208ad5b7688b1a9d6728fdf6",
+            "head_blob_oid": "c42293137a93a3edfd50eda367e046eca14e899d",
+            "worktree_blob_oid": "e3bf4089838e1dd8ed6fc768c428645839a26c8f",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "desktop-shell/src-tauri/src/local_ai_browser/adapter_content/rich_content.rs",
+          "content_hash": "a25b4fab766ab9bb2c2147163a01a832f86dbbf8bb7a06feec9b77af0af9e3e2",
+          "locator": "sanitize_candlestick_chart",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "dd0be0982b94944c208ad5b7688b1a9d6728fdf6",
+            "head_blob_oid": "2cfd70302e7f68e77f236ef1cffb23cfed236fe1",
+            "worktree_blob_oid": "067c5f105c18364065e8f3c5835f3759c42c4cd7",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "desktop-shell/src-tauri/src/local_ai_browser/chatgpt_rich_content_adapter.js",
+          "content_hash": "001df01ec2fc41e9e523be2e53ea5b15e6253c3ff8d051cd9168605f27fe4b67",
+          "locator": "financePayloadFromPairs / ohlcTableParts",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "dd0be0982b94944c208ad5b7688b1a9d6728fdf6",
+            "head_blob_oid": "7686c40814286fd5c01017a7620af10e8142929a",
+            "worktree_blob_oid": "db02398acf318b86b3322ad44fbf4bec19e23644",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "docs/requirements/win-chatgpt-ohlc-table-candlestick-v1.md",
+          "content_hash": "06fd8a168e41497a13fb33c0fe7bf203f132e6c2bdc5da60ec0713821c5c0bd4",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "dd0be0982b94944c208ad5b7688b1a9d6728fdf6",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "bc979823b8aa5feb9c2ea4b87883450f90340a07",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "pc-frontend/scripts/test-ai-rich-content-contract.cjs",
+          "content_hash": "491d301961b48f81789954aaa77a66950930d1938f281dc6d14f81f3604b7408",
+          "locator": "tableFinancePayload",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "dd0be0982b94944c208ad5b7688b1a9d6728fdf6",
+            "head_blob_oid": "16d4b816ef0293ed769373ac149f3962f224eebd",
+            "worktree_blob_oid": "320887851d93b857ed554e6d66a9d82a1439e148",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/ai/AiRichContentCard.tsx",
+          "content_hash": "fde27f099e0509e845a41ce56e725dde4e82f3d768e8cbe89f1fc2a2d783eca1",
+          "locator": "CandlestickChart",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "dd0be0982b94944c208ad5b7688b1a9d6728fdf6",
+            "head_blob_oid": "5d9925b6789a504f820fa66018b8ee024f2d5dca",
+            "worktree_blob_oid": "5d9925b6789a504f820fa66018b8ee024f2d5dca",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/user-browser/richContentProtocol.ts",
+          "content_hash": "7e012073b48019c1f7a962915c73b5272b3e882754bf01bcfc52175f357e8dab",
+          "locator": "isFinancePayload candlestick",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "dd0be0982b94944c208ad5b7688b1a9d6728fdf6",
+            "head_blob_oid": "a18b378f5b57f9b891d3f6a24d7d79b01c128eb1",
+            "worktree_blob_oid": "4454e7a2206bb9066e6fda3834e9d833706dc7d1",
+            "state": "tracked_modified"
+          }
+        }
+      ],
+      "created_at_ms": 1787513415313,
+      "updated_at_ms": 1787513477067
+    },
+    {
       "id": "win-chatgpt-visible-finance-chart-v1",
       "title": "Win ChatGPT 可见行情折线复现 V1",
       "summary": "复用现有 finance AST 与原生行情卡，把 ChatGPT 回答节点中可见且可信的 SVG 折线几何有界采样为缓存图表；未知 Canvas/异常结构继续官网回退，不启用私有响应。",
@@ -11512,66 +11653,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_f2c9e272c6c3470dbee93e89e9e02715",
-      "feature_id": "erp-managed-rollout-plan-v1",
-      "action": "metadata_updated",
-      "actor": "codex-erp-rollout",
-      "reason": "让登记范围与已评审 V1 边界及实际模块一致",
-      "from_status": "proposed",
-      "to_status": "proposed",
-      "at_ms": 1787310233393
-    },
-    {
-      "id": "feature_event_a8c276660eb74448968ddbfb45869007",
-      "feature_id": "erp-managed-rollout-plan-v1",
-      "action": "transitioned",
-      "actor": "codex-erp-rollout",
-      "reason": "已复核新需求，计划生成与远程执行边界清晰",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1787310233473
-    },
-    {
-      "id": "feature_event_27a160b0758e4c0e9f39e0589a909656",
-      "feature_id": "erp-managed-rollout-plan-v1",
-      "action": "transitioned",
-      "actor": "codex-erp-rollout",
-      "reason": "范围、验收标准和依赖已明确，可以重新认领",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1787310233504
-    },
-    {
-      "id": "feature_event_c73fe62242b747199d9d67e0aaa01d9b",
-      "feature_id": "erp-managed-rollout-plan-v1",
-      "action": "claimed",
-      "actor": "codex-erp-rollout",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1787310233535
-    },
-    {
-      "id": "feature_event_f2814662b95447ea976e67d3533f1967",
-      "feature_id": "erp-managed-rollout-plan-v1",
-      "action": "transitioned",
-      "actor": "codex-erp-rollout",
-      "reason": "继续完成实现证据和静态验收",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1787310233577
-    },
-    {
-      "id": "feature_event_e809b033c33c4b529081b2c71fd22563",
-      "feature_id": "erp-managed-rollout-plan-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-erp-rollout",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1787310311464
-    },
-    {
       "id": "feature_event_82792a7a16654535becc19e94cd58e10",
       "feature_id": "erp-managed-rollout-plan-v1",
       "action": "transitioned",
@@ -13510,6 +13591,66 @@
       "from_status": "in_progress",
       "to_status": "implemented",
       "at_ms": 1787510420580
+    },
+    {
+      "id": "feature_event_7d1524331a454e0190ec75325d97755d",
+      "feature_id": "win-chatgpt-ohlc-table-candlestick-v1",
+      "action": "registered",
+      "actor": "codex-root",
+      "reason": "真实游客 Win 验收发现官网仅输出 OHLC 两列表格，建立独立可追溯降级功能。",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1787513415313
+    },
+    {
+      "id": "feature_event_9a313fa328b44f588987b7927f98e7df",
+      "feature_id": "win-chatgpt-ohlc-table-candlestick-v1",
+      "action": "claimed",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1787513423436
+    },
+    {
+      "id": "feature_event_de796fa8024c459fb8e3eb4117a8b726",
+      "feature_id": "win-chatgpt-ohlc-table-candlestick-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "实现并验证官网可见 OHLC 两列表格到单日 K 线的安全降级。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1787513430588
+    },
+    {
+      "id": "feature_event_d3a7460068aa4c5caa78d85b67fa5d37",
+      "feature_id": "win-chatgpt-ohlc-table-candlestick-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1787513457592
+    },
+    {
+      "id": "feature_event_0a22f79d94714faaab146ae6e9c41e5c",
+      "feature_id": "win-chatgpt-ohlc-table-candlestick-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "OHLC 两列表格提取、单根 K 线协议/清洗/渲染链路和合同测试已实现。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1787513465261
+    },
+    {
+      "id": "feature_event_e37b11e8bc554737a9fee9684ba1a828",
+      "feature_id": "win-chatgpt-ohlc-table-candlestick-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "富内容合同、全量用户浏览器测试、TypeScript、lint、生产构建、Rust 定向测试与源码/文档门禁全部通过。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1787513477067
     }
   ]
 }

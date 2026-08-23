@@ -355,7 +355,7 @@ fn sanitize_candlestick_chart(chart: &Map<String, Value>) -> Option<Map<String, 
             ])))
         })
         .collect::<Vec<_>>();
-    (candles.len() > 1).then(|| {
+    (!candles.is_empty()).then(|| {
         Map::from_iter([
             ("kind".into(), Value::String("candlestick".into())),
             ("candles".into(), Value::Array(candles)),
