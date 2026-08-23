@@ -9523,7 +9523,7 @@
       "id": "win-web-ai-rich-content-runtime-guard-v1",
       "title": "Win 网页 AI 富内容运行时门禁 V1",
       "summary": "在 Rust 清洗之后为 PC 原生聊天增加 yilong.rich-content.v1 轻量运行时门禁，使旧缓存、上游结构漂移或残缺富卡只降级对应卡片，不影响正文、来源或整个聊天界面；不改 PWA。",
-      "status": "verified",
+      "status": "released",
       "priority": "p1",
       "requirement": {
         "path": "docs/requirements/win-web-ai-rich-content-runtime-guard-v1.md",
@@ -9620,7 +9620,7 @@
         }
       ],
       "created_at_ms": 1787449323325,
-      "updated_at_ms": 1787449846973
+      "updated_at_ms": 1787450383520
     },
     {
       "id": "win-web-ai-rich-diagnostic-transport-v1",
@@ -10365,16 +10365,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_86b4b9e0b9aa4b34b6dd988a1b37c3ff",
-      "feature_id": "win-google-ai-primary-answer-continuity-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "补充范围与原始用户诉求一致，接受后台焦点、新会话和正文连续性标准。",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1787233536032
-    },
     {
       "id": "feature_event_6d765f44fa654a4980c5b432bcb002c0",
       "feature_id": "win-google-ai-primary-answer-continuity-v1",
@@ -12364,6 +12354,16 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1787449846973
+    },
+    {
+      "id": "feature_event_33ac7976741b4fac838b9bb8e100ed19",
+      "feature_id": "win-web-ai-rich-content-runtime-guard-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "实现与验证提交已推送，Win 正式版 0.3.69+b83f7fb9d861bf0d2f34956e6fca4be107d6d5ad 已发布、激活并确认 ChatGPT 会话重连就绪。",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1787450383520
     }
   ]
 }
