@@ -20,6 +20,7 @@ internal object ChatGptWebProjectTitlePolicy {
         "projects",
         "project",
         "new project",
+        "null",
         "聊天",
         "项目",
         "新建项目",

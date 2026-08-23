@@ -20,9 +20,13 @@ internal class ChatGptConversationNavigationCoordinator(
 
     fun beginOpen(path: String, previous: ChatGptWebSnapshot?): ChatGptWebSnapshot {
         begin(previous, targetPath = path, newConversation = false)
+        return previewOpen(path, previousSnapshot)
+    }
+
+    fun previewOpen(path: String, previous: ChatGptWebSnapshot?): ChatGptWebSnapshot {
         return ChatGptWebSnapshotPresentation.loadingConversation(
             cached = snapshotStore.restore(path),
-            previous = previousSnapshot,
+            previous = previous,
             path = path,
         )
     }

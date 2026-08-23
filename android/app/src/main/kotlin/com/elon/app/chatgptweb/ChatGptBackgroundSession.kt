@@ -140,6 +140,24 @@ internal class ChatGptBackgroundSession(
         composerReady = { latestSnapshot?.composerReady == true },
         interactionRequested = webExecution::interactionRequested,
     )
+    private val navigationActions by lazy(LazyThreadSafetyMode.NONE) {
+        ChatGptSessionNavigationActions(
+            { state == State.READY }, { state == State.IDLE || state == State.LOADING },
+            { latestBridgeState == ChatGptWebPageAdapter.State.READY }, { pageAdapter != null },
+            { pageAdapter?.startNewConversation() }, { path -> pageAdapter?.openConversation(path) },
+            { path ->
+                if (!conversationDirectory.requestProject(path)) false else {
+                    onConversationIndexChanged(conversationIndex())
+                    pageAdapter?.openProject(path)
+                    true
+                }
+            },
+            { latestSnapshot }, { snapshot -> latestSnapshot = snapshot; onSnapshot(snapshot) },
+            { updateState(State.LOADING) }, ::ensureInitialized,
+            newConversationRecovery::cancel, newConversationRecovery::schedule,
+            conversationNavigation,
+        )
+    }
 
     fun activate() {
         latestSnapshot?.let(onSnapshot)
@@ -245,44 +263,16 @@ internal class ChatGptBackgroundSession(
         pageAdapter?.stopGeneration()
     }
 
-    fun startNewConversation() {
-        if (state != State.READY) return
-        val adapter = pageAdapter ?: return
-        newConversationRecovery.cancel()
-        latestSnapshot = conversationNavigation.beginNew(latestSnapshot)
-        latestSnapshot?.let(onSnapshot)
-        updateState(State.LOADING)
-        adapter.startNewConversation()
-        newConversationRecovery.schedule()
-    }
+    fun startNewConversation() = navigationActions.startNewConversation()
 
     fun currentConversationPath(): String? = ChatGptWebConversationPath.fromUrl(latestSnapshot?.url)
 
     fun currentOfficialUrl(): String? = latestSnapshot?.url
         ?.takeIf(ChatGptWebNavigationPolicy::allows)
 
-    fun openConversation(path: String): Boolean {
-        val normalized = ChatGptWebConversationPath.normalize(path) ?: return false
-        if (state != State.READY) return false
-        val adapter = pageAdapter ?: return false
-        newConversationRecovery.cancel()
-        val previous = latestSnapshot
-        latestSnapshot = conversationNavigation.beginOpen(normalized, previous)
-        latestSnapshot?.let(onSnapshot)
-        updateState(State.LOADING)
-        adapter.openConversation(normalized)
-        return true
-    }
+    fun openConversation(path: String): Boolean = navigationActions.openConversation(path)
 
-    fun openProject(path: String): Boolean {
-        val normalized = ChatGptWebConversationPath.normalizeProject(path) ?: return false
-        if (state != State.READY) return false
-        val adapter = pageAdapter ?: return false
-        if (!conversationDirectory.requestProject(normalized)) return false
-        onConversationIndexChanged(conversationIndex())
-        adapter.openProject(normalized)
-        return true
-    }
+    fun openProject(path: String): Boolean = navigationActions.openProject(path)
 
     fun createMcpPort(
         inputText: () -> String,
@@ -366,6 +356,7 @@ internal class ChatGptBackgroundSession(
         recoveryHandler.removeCallbacksAndMessages(null)
         newConversationRecovery.cancel()
         conversationNavigation.clear()
+        navigationActions.clearDeferred()
         composerOptionRequests.reset()
         pageAdapter?.dispose()
         attachmentHandler.removeCallbacksAndMessages(null)
@@ -437,10 +428,12 @@ internal class ChatGptBackgroundSession(
                 }
             },
             onBlockedNavigation = { hostName ->
+                navigationActions.clearDeferred()
                 recovery.onTerminal()
                 updateState(State.ERROR, "官网导航被拦截：$hostName")
             },
             onPageError = { detail ->
+                navigationActions.clearDeferred()
                 updateState(State.ERROR, detail)
                 if (ChatGptWebNavigationPolicy.supportsEnhancedMode(view.url)) recovery.onFailure() else recovery.onTerminal()
             },
@@ -524,6 +517,7 @@ internal class ChatGptBackgroundSession(
                 }
                 when {
                     ChatGptWebAccessPolicy.requiresLogin(snapshot) -> {
+                        navigationActions.clearDeferred()
                         newConversationRecovery.cancel()
                         conversationNavigation.complete()
                         snapshotStore.clear()
@@ -567,6 +561,7 @@ internal class ChatGptBackgroundSession(
                 }
                 processAttachmentSnapshot(snapshot)
                 onSnapshot(snapshot)
+                if (state == State.READY) navigationActions.onSessionReady()
             }
             is ChatGptWebEvent.ComposerControls -> {
                 composerOptionInteraction.release()

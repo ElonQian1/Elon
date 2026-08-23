@@ -28,6 +28,18 @@ class ChatGptConversationNavigationCoordinatorTest {
     }
 
     @Test
+    fun previewingHistoryUsesTargetCacheWithoutStartingANavigationBoundary() {
+        val previous = snapshot("old", "/c/old")
+        repository.values["/c/target"] = snapshot("cached target", "/c/target")
+
+        val preview = coordinator.previewOpen("/c/target", previous)
+
+        assertEquals(listOf("cached target"), preview.messages.map { it.content })
+        assertFalse(coordinator.hasPending())
+        assertFalse(coordinator.isNavigating())
+    }
+
+    @Test
     fun openingHistoryWithoutCacheNeverDisplaysPreviousMessages() {
         val loading = coordinator.beginOpen("/c/target", snapshot("private old", "/c/old"))
 
