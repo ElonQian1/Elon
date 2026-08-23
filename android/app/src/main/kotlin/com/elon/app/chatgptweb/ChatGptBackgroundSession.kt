@@ -90,6 +90,7 @@ internal class ChatGptBackgroundSession(
         schedule = { task, delayMs -> recoveryHandler.postDelayed(task, delayMs) },
         cancel = recoveryHandler::removeCallbacks,
         retry = ::reloadRestorablePage,
+        repair = { repairChatGptCurrentDocument(webView, pageAdapter, webExecution::interactionRequested) },
         onExhausted = { updateState(State.ERROR, "网页 AI 自动重连多次失败，请检查网络后重试") },
     )
     private var webView: WebView? = null
@@ -106,7 +107,7 @@ internal class ChatGptBackgroundSession(
     private var lastAttachmentSendPhase = ATTACHMENT_PHASE_IDLE
     private var forceConversationRefreshAfterVoice = false
     private var requestedConversationProjectId: String? = null
-    private var reloadAfterPause = false
+    private var loadPendingAfterPause = false
     private val realtimeVoiceBacking: ChatGptRealtimeVoiceBackingController by
         lazy(LazyThreadSafetyMode.NONE) {
             ChatGptRealtimeVoiceBackingController(
@@ -119,7 +120,7 @@ internal class ChatGptBackgroundSession(
         }
     private val webExecution: ChatGptBackgroundExecutionController =
         chatGptBackgroundExecutionController({ webView }) {
-            surfaceMode.isSkin() || realtimeVoiceBacking.isActive() || state == State.LOADING ||
+            surfaceMode.isSkin() || realtimeVoiceBacking.isActive() ||
                 latestSnapshot?.streaming == true ||
                 conversationNavigation.hasPending() || attachmentSendTracker != null
         }
@@ -392,7 +393,9 @@ internal class ChatGptBackgroundSession(
     private fun ensureInitialized() {
         if (webView != null) return
         WebView.setWebContentsDebuggingEnabled(false)
-        val view = createChatGptBackgroundWebView(activity, audioPermissionController) { callback ->
+        val view = createChatGptBackgroundWebView(
+            activity, audioPermissionController, recovery::onNavigationProgress,
+        ) { callback ->
             val values = queuedUploadUris
             queuedUploadUris = emptyList()
             callback.onReceiveValue(values.takeIf { it.isNotEmpty() }?.toTypedArray())
@@ -418,7 +421,6 @@ internal class ChatGptBackgroundSession(
                 adapter.onPageStarted(url)
                 updateState(State.LOADING)
                 if (!recovery.isActive()) {
-                    reloadAfterPause = true
                     adapter.onHostPaused()
                 } else if (ChatGptWebNavigationPolicy.supportsEnhancedMode(url)) recovery.onNavigationStarted()
                 else recovery.onTerminal()
@@ -427,7 +429,6 @@ internal class ChatGptBackgroundSession(
                 cookieManager.flush()
                 sessionRestorer.onPageReady(url)
                 if (!recovery.isActive()) {
-                    reloadAfterPause = false
                     adapter.onHostPaused()
                 } else {
                     adapter.onPageReady(url)
@@ -461,7 +462,7 @@ internal class ChatGptBackgroundSession(
         surfaceMode.apply()
         proxyController.prepare { status ->
             if (activity.isFinishing || activity.isDestroyed || webView !== view) return@prepare
-            if (!recovery.isActive()) { reloadAfterPause = true; return@prepare }
+            if (!recovery.isActive()) { loadPendingAfterPause = true; return@prepare }
             status.error?.let {
                 updateState(State.ERROR, it)
                 recovery.onFailure()
@@ -673,24 +674,20 @@ internal class ChatGptBackgroundSession(
         composerOptionRequests.reset()
         sessionContinuityHandler.removeCallbacksAndMessages(null)
         pageAdapter?.onHostPaused()
-        webView?.let { view ->
-            if (state == State.LOADING && ChatGptWebNavigationPolicy.supportsEnhancedMode(view.url)) {
-                view.stopLoading()
-                reloadAfterPause = true
-            }
-            cookieManager.flush()
-        }
+        cookieManager.flush()
     }
 
     private fun resumeRecovery() {
+        val view = webView ?: return
         when {
-            reloadAfterPause -> {
-                reloadAfterPause = false
+            loadPendingAfterPause -> {
+                loadPendingAfterPause = false
                 recovery.retryNow()
             }
-            state == State.ERROR && ChatGptWebNavigationPolicy.supportsEnhancedMode(webView?.url) -> recovery.onFailure()
-            state == State.LOADING && ChatGptWebNavigationPolicy.supportsEnhancedMode(webView?.url) ->
-                recovery.onPageFinished()
+            state == State.ERROR && ChatGptWebNavigationPolicy.supportsEnhancedMode(view.url) -> recovery.onFailure()
+            state == State.LOADING && ChatGptWebNavigationPolicy.supportsEnhancedMode(view.url) -> {
+                if (view.progress >= 100) recovery.onPageFinished() else recovery.onNavigationStarted()
+            }
         }
     }
 

@@ -94,8 +94,6 @@ internal class ChatGptWebObservedState(
                 ChatGptWebConversationCollection()
             } else {
                 conversationCollection.copy(
-                    source = ChatGptWebConversationCollection.SOURCE_CACHE,
-                    stale = true,
                     officialLoadState = ChatGptWebConversationCollection.LOAD_IDLE,
                 )
             }

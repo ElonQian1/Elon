@@ -41,6 +41,21 @@ class WebChatBackgroundWebViewContractTest {
         assertFalse(google.contains("alpha = 0.01f"))
     }
 
+    @Test
+    fun providerSwitchKeepsAnInFlightChatGptNavigationAlive() {
+        val chatGpt = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptBackgroundSession.kt",
+        )
+        val pauseSession = chatGpt.substringAfter("private fun pauseSession()")
+            .substringBefore("private fun resumeRecovery()")
+        val resumeRecovery = chatGpt.substringAfter("private fun resumeRecovery()")
+            .substringBefore("private fun reloadRestorablePage()")
+
+        assertFalse(pauseSession.contains("stopLoading()"))
+        assertTrue(resumeRecovery.contains("view.progress >= 100"))
+        assertTrue(resumeRecovery.contains("recovery.onNavigationStarted()"))
+    }
+
     private fun readRepositoryFile(relativePath: String): String =
         String(Files.readAllBytes(repositoryRoot().resolve(relativePath)))
 

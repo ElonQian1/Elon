@@ -14,6 +14,7 @@ import com.elon.app.configureWebChatBackgroundSurface
 internal fun createChatGptBackgroundWebView(
     activity: AppCompatActivity,
     audioPermissionController: ChatGptWebAudioPermissionController,
+    onPageProgress: (Int) -> Unit,
     onFileChooser: (ValueCallback<Array<Uri>>) -> Unit,
 ): WebView = WebView(activity).apply {
     configureWebChatBackgroundSurface()
@@ -31,6 +32,8 @@ internal fun createChatGptBackgroundWebView(
         displayZoomControls = false
     }
     webChromeClient = object : WebChromeClient() {
+        override fun onProgressChanged(view: WebView, newProgress: Int) = onPageProgress(newProgress)
+
         override fun onShowFileChooser(
             webView: WebView,
             filePathCallback: ValueCallback<Array<Uri>>,

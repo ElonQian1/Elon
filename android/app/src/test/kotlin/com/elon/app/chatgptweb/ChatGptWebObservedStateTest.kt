@@ -210,7 +210,7 @@ class ChatGptWebObservedStateTest {
     }
 
     @Test
-    fun pageGenerationClearsDocumentObservationsAndFailsPendingCommands() {
+    fun pageGenerationKeepsFreshDirectoryAndFailsPendingDocumentCommands() {
         var now = 30_000L
         val state = ChatGptWebObservedState { now }
         state.updateDocument(document(page = 1, adapter = 1))
@@ -225,8 +225,12 @@ class ChatGptWebObservedStateTest {
 
         val reloading = state.snapshot()
         assertEquals(1, reloading.conversations.size)
-        assertTrue(reloading.conversationCollection.stale)
-        assertEquals(ChatGptWebConversationCollection.SOURCE_CACHE, reloading.conversationCollection.source)
+        assertFalse(reloading.conversationCollection.stale)
+        assertEquals(ChatGptWebConversationCollection.SOURCE_OFFICIAL, reloading.conversationCollection.source)
+        assertEquals(
+            ChatGptWebConversationCollection.LOAD_IDLE,
+            reloading.conversationCollection.officialLoadState,
+        )
         assertTrue(reloading.composerSections.isEmpty())
         assertEquals(2L, reloading.pageGeneration)
         assertEquals(0L, reloading.adapterGeneration)
