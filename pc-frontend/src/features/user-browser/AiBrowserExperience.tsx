@@ -140,7 +140,7 @@ export default function AiBrowserExperience() {
       try {
         const bounds = boundsFor(viewport)
         if (surface === 'official' && official) {
-          await presentLocalAiWebSessionEmbedded(official, bounds, { contentOnly: false })
+          await presentLocalAiWebSessionEmbedded(official, bounds)
           if (generation !== generationRef.current) {
             await hideOfficialSurface(official)
             return

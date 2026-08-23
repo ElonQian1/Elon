@@ -9631,7 +9631,7 @@
       "id": "win-web-ai-native-conversation-primary-v1",
       "title": "Win 网页 AI 原生会话主界面 V1",
       "summary": "撤除正常聊天画布上仅保留最后助手回答的官方 WebView 覆盖层，恢复原生完整回合、上下文和 composer；完整官网保真改为显式内部标签。",
-      "status": "proposed",
+      "status": "verified",
       "priority": "p0",
       "requirement": {
         "path": "docs/requirements/win-web-ai-native-conversation-primary-v1.md",
@@ -9674,9 +9674,88 @@
         "复用原生富卡、缓存、来源和游客身份，不改 PWA",
         "PC/Tauri 契约、构建和 Win 本机更新通过"
       ],
-      "implementation_evidence": [],
+      "implementation_evidence": [
+        {
+          "path": "desktop-shell/src-tauri/src/local_ai_browser/embedded_view.rs",
+          "content_hash": "c430df05dd9241343e511f9abe45911d582cc2ecc7ff118b9837acd59fd0ca76",
+          "locator": "present_local_ai_web_session_embedded",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "36970ab3ac79493aa58b15ca89f99ca6430504c6",
+            "head_blob_oid": "d853bccca0db462aedb696b4ced1b20eb68c800b",
+            "worktree_blob_oid": "30c44cf5ed6cf061bb0f22e0bbc75707decd8550",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "pc-frontend/scripts/test-ai-answer-surface.cjs",
+          "content_hash": "61db5bf0c2dd5a2f742c0f7550889837c2b73a45b8ace80530e52fe92922f65d",
+          "locator": "native conversation turns primary",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "36970ab3ac79493aa58b15ca89f99ca6430504c6",
+            "head_blob_oid": "8bf35f259ebcb60fa301f9f2a34976f3e46aec28",
+            "worktree_blob_oid": "0bc7061322a31d4e935529337642e176207ff3b5",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "pc-frontend/scripts/test-ai-browser-tabs.cjs",
+          "content_hash": "7165bdd134dcc55bc0e629fe3b0b7419f27776e19f0bba1bb0eb54e53e11b16f",
+          "locator": "contentOnly",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "36970ab3ac79493aa58b15ca89f99ca6430504c6",
+            "head_blob_oid": "87a87e20e3fbe3d28730be9f4bdd2114c0668c98",
+            "worktree_blob_oid": "71992799f631086cc1df51e053727865fef4fa54",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/ai/AiChatPage.tsx",
+          "content_hash": "2eed9733868517cc76dafb60fb6e80659eed840e3878eb1a92a8599275d04a08",
+          "locator": "visibleMessages.filter",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "36970ab3ac79493aa58b15ca89f99ca6430504c6",
+            "head_blob_oid": "dd84beb72622a08e7f4441beb9ce5c87eb82a360",
+            "worktree_blob_oid": "3f770b462c50a72c80c5a11465fe109e0425bb95",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/user-browser/AiBrowserExperience.tsx",
+          "content_hash": "6e7d3d531b0cab9ca145110e6e720e7c3090fb8c96bd9104f09ebc58eead4563",
+          "locator": "presentLocalAiWebSessionEmbedded",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "36970ab3ac79493aa58b15ca89f99ca6430504c6",
+            "head_blob_oid": "d6e328a2b06020bd39ca6cf83b66b1f26b4e747f",
+            "worktree_blob_oid": "6959554465e275986a365a250a6a3f1fff5a7fcb",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/user-browser/internalBrowserApi.ts",
+          "content_hash": "715eefab811323042fac8925abaecd2f8c1da9ec93ddfb774891feae73f4f005",
+          "locator": "presentLocalAiWebSessionEmbedded",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "36970ab3ac79493aa58b15ca89f99ca6430504c6",
+            "head_blob_oid": "99e36967f0ff174dbc324e19e22f8203fbb71514",
+            "worktree_blob_oid": "ca0071f2e23522677e5ee202b53a57a643013d22",
+            "state": "tracked_modified"
+          }
+        }
+      ],
       "created_at_ms": 1787462176841,
-      "updated_at_ms": 1787462176841
+      "updated_at_ms": 1787462905819
     },
     {
       "id": "win-web-ai-official-context-binding-v1",
@@ -10982,76 +11061,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_a19b518c137e4ac68d7db13958d724b2",
-      "feature_id": "open-commerce-native-edge-v1",
-      "action": "requirement_rebound",
-      "actor": "codex-desktop",
-      "reason": "提交前移除需求文档末尾多余空行，显式重绑当前内容哈希。",
-      "from_status": "blocked",
-      "to_status": "proposed",
-      "at_ms": 1787299981111
-    },
-    {
-      "id": "feature_event_e1fd95740db34b40a7cf644fb3db45be",
-      "feature_id": "open-commerce-native-edge-v1",
-      "action": "transitioned",
-      "actor": "codex-desktop",
-      "reason": "需求仅移除末尾空行，范围与验收标准未变化，完成显式复核。",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1787299997819
-    },
-    {
-      "id": "feature_event_446a2ff1f31a4cbebab094040fcf4b4f",
-      "feature_id": "open-commerce-native-edge-v1",
-      "action": "transitioned",
-      "actor": "codex-desktop",
-      "reason": "依赖为空且需求边界已复核，可重新认领当前实现。",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1787300016632
-    },
-    {
-      "id": "feature_event_c830fd68512b45c790c94ce3b79fe021",
-      "feature_id": "open-commerce-native-edge-v1",
-      "action": "claimed",
-      "actor": "codex-desktop-native-edge",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1787300032415
-    },
-    {
-      "id": "feature_event_0b66a5cacfd74d4094eec5cb6903ea0b",
-      "feature_id": "open-commerce-native-edge-v1",
-      "action": "transitioned",
-      "actor": "codex-desktop",
-      "reason": "重新认领后绑定当前实现与验证证据。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1787300049798
-    },
-    {
-      "id": "feature_event_c5e5a34251344079b741f63ff7fb85c4",
-      "feature_id": "open-commerce-native-edge-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-desktop",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1787300103144
-    },
-    {
-      "id": "feature_event_424d8a4fcf6040f89ba55ca6127fd810",
-      "feature_id": "open-commerce-native-edge-v1",
-      "action": "transitioned",
-      "actor": "codex-desktop",
-      "reason": "独立二进制、合同、路由代理、TLS、热切换、systemd 和运行文档已完成。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1787300115269
-    },
     {
       "id": "feature_event_2b6005aaef9f43cf90610c9b94a98208",
       "feature_id": "open-commerce-native-edge-v1",
@@ -12981,6 +12990,76 @@
       "from_status": "",
       "to_status": "proposed",
       "at_ms": 1787462176841
+    },
+    {
+      "id": "feature_event_cecd483b9f0b4f469db32caad135471d",
+      "feature_id": "win-web-ai-native-conversation-primary-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-native-conversation",
+      "reason": "已核对真实 Win 截图、自动官方覆盖层和 composer 可见性实现，范围与验收明确。",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1787462328718
+    },
+    {
+      "id": "feature_event_ef35be70d84747ef855c937ad0ffe12b",
+      "feature_id": "win-web-ai-native-conversation-primary-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-native-conversation",
+      "reason": "P0 回归修复范围已评审，依赖富内容 V1 已发布，可认领实现。",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1787462350924
+    },
+    {
+      "id": "feature_event_eacc1b3bca3f4d519f2c783cd80f112f",
+      "feature_id": "win-web-ai-native-conversation-primary-v1",
+      "action": "claimed",
+      "actor": "codex-goal-native-conversation",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1787462379468
+    },
+    {
+      "id": "feature_event_3c0f51222fea44e1a223e49b555ac756",
+      "feature_id": "win-web-ai-native-conversation-primary-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-native-conversation",
+      "reason": "开始移除自动最后答案 WebView 覆盖层并保留显式完整官网标签。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1787462454919
+    },
+    {
+      "id": "feature_event_30a21907af394206a539fc6357bcb83d",
+      "feature_id": "win-web-ai-native-conversation-primary-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-goal-native-conversation",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1787462821030
+    },
+    {
+      "id": "feature_event_133b95a23f154266806c0c646804a032",
+      "feature_id": "win-web-ai-native-conversation-primary-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-native-conversation",
+      "reason": "已删除自动 contentOnly 最后答案覆盖层，正常聊天恢复原生完整回合，显式官网标签保留。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1787462866937
+    },
+    {
+      "id": "feature_event_850085b2edd141d28db7feafade89e39",
+      "feature_id": "win-web-ai-native-conversation-primary-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-native-conversation",
+      "reason": "test:user-browser 全部通过，PC TypeScript/Vite 生产构建通过；Tauri embedded_view Rust 定向测试通过，validation fingerprint 7b3f06a65187c62b1b4e3bac4f8afc3ce4bf10baca70ec0edd6e818240715db0。按并发协调暂不发布或重启 Win。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1787462905819
     }
   ]
 }

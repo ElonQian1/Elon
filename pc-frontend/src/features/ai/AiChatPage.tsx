@@ -29,7 +29,7 @@ import { safeNodeAdminUrl } from '../../lib/utils'
 import { DEFAULT_POPOVER_ANCHOR, popoverAnchorFromRect, type PopoverAnchor } from '../../lib/popoverPosition'
 import AiWebChatSidebar from '../user-browser/AiWebChatSidebar'
 import AiWebProviderPopover from '../user-browser/AiWebProviderPopover'
-import AiWebComposerControls, { AiBrowserExperience, AiOfficialAnswerSurface } from '../user-browser/AiWebComposerControls'
+import AiWebComposerControls, { AiBrowserExperience } from '../user-browser/AiWebComposerControls'
 import useAiWebChatBackend from '../user-browser/useAiWebChatBackend'
 import useLocalAiOwnerIdentity from '../user-browser/useLocalAiOwnerIdentity'
 import NodeStatusBanner from './NodeStatusBanner'
@@ -924,7 +924,6 @@ export default function AiChatPage({ mode, onModeChange }: { mode: AiHomeMode; o
                 : undefined}
             />
           ))}
-          {chatMode && <AiOfficialAnswerSurface web={web} />}
         </div>
 
         {chatMode && <AiWebComposerControls web={web} />}

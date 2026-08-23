@@ -66,18 +66,14 @@ export function openInternalBrowserLink(request: InternalBrowserLinkRequest) {
 export async function presentLocalAiWebSessionEmbedded(
   request: OfficialAiTabRequest,
   bounds: EmbeddedWebviewBounds,
-  options: { contentOnly?: boolean } = {},
 ): Promise<LocalAiWebSessionState> {
   return queueOfficialSurface(async () => {
-    if (!options.contentOnly) {
-      await openLocalAiWebSession(request.providerId, request.ownerKey, { showWindow: false })
-      await waitForOfficialPage(request)
-    }
+    await openLocalAiWebSession(request.providerId, request.ownerKey, { showWindow: false })
+    await waitForOfficialPage(request)
     return invoke<LocalAiWebSessionState>('present_local_ai_web_session_embedded', {
       providerId: request.providerId,
       ownerKey: request.ownerKey,
       bounds: safeBounds(bounds),
-      contentOnly: options.contentOnly === true,
     })
   })
 }

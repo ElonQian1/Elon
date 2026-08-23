@@ -3,11 +3,6 @@ use tauri::{AppHandle, LogicalPosition, LogicalSize, Manager, PhysicalPosition, 
 
 use crate::{internal_browser::raise_webview, MAIN_WINDOW_LABEL};
 
-#[path = "embedded_view/answer_surface.rs"]
-mod answer_surface;
-
-use answer_surface::{answer_surface_ready, set_content_surface_mode};
-
 use super::{
     ensure_runtime_session, ensure_session_webview, provider, resolve_owner_fingerprint,
     window_label, LocalAiBrowserRuntime, LocalAiWebSessionState,
@@ -57,23 +52,13 @@ pub(crate) async fn present_local_ai_web_session_embedded(
     provider_id: String,
     owner_key: String,
     bounds: EmbeddedWebviewBounds,
-    content_only: Option<bool>,
 ) -> Result<LocalAiWebSessionState, String> {
     let provider = provider(&provider_id)?;
     let fingerprint = resolve_owner_fingerprint(&app, provider, &owner_key)?;
     ensure_session_webview(&webview, provider, &fingerprint)?;
     let label = window_label(provider, &fingerprint);
     ensure_runtime_session(&app, runtime.inner(), provider, &fingerprint, &label)?;
-    let content_only = content_only.unwrap_or(false);
-    if content_only {
-        let state = runtime
-            .snapshot(&label)
-            .ok_or_else(|| format!("{} 本地会话状态不可用。", provider.display_name))?;
-        if !answer_surface_ready(&state) {
-            return Err("官网回答区域尚未就绪，已继续显示本机缓存。".to_string());
-        }
-    }
-    present(&app, &label, bounds, content_only)?;
+    present(&app, &label, bounds)?;
     runtime.mark_window_status(&label, "ready");
     runtime.mark_window_visible(&label, true);
     runtime
@@ -137,7 +122,6 @@ pub(crate) fn present(
     app: &AppHandle,
     webview_label: &str,
     bounds: EmbeddedWebviewBounds,
-    content_only: bool,
 ) -> Result<(), String> {
     let bounds = bounds.validate()?;
     let webview = app
@@ -153,23 +137,17 @@ pub(crate) fn present(
     if let Some(popout) = app.get_window(webview_label) {
         popout.hide().map_err(display_error)?;
     }
-    set_content_surface_mode(&webview, content_only)?;
     webview
         .set_position(bounds.position())
         .map_err(display_error)?;
     webview.set_size(bounds.size()).map_err(display_error)?;
     webview.show().map_err(display_error)?;
     raise_webview(&webview)?;
-    if content_only {
-        Ok(())
-    } else {
-        webview.set_focus().map_err(display_error)
-    }
+    webview.set_focus().map_err(display_error)
 }
 
 pub(crate) fn hide(app: &AppHandle, webview_label: &str) -> Result<(), String> {
     if let Some(webview) = app.get_webview(webview_label) {
-        set_content_surface_mode(&webview, false)?;
         park(&webview)?;
     }
     if let Some(popout) = app.get_window(webview_label) {

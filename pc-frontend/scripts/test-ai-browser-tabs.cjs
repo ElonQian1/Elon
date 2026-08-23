@@ -73,8 +73,11 @@ assert.match(experienceStyles, /grid-template-rows:\s*38px 40px minmax\(0, 1fr\)
 assert.match(experience, /await hideLocalAiWebSessionEmbedded/)
 assert.match(
   experience,
-  /await presentLocalAiWebSessionEmbedded\(official, bounds, \{ contentOnly: false \}\)[\s\S]*?if \(generation !== generationRef\.current\) \{[\s\S]*?await hideOfficialSurface\(official\)/,
+  /await presentLocalAiWebSessionEmbedded\(official, bounds\)[\s\S]*?if \(generation !== generationRef\.current\) \{[\s\S]*?await hideOfficialSurface\(official\)/,
 )
+assert.doesNotMatch(experience, /contentOnly/)
+assert.doesNotMatch(api, /contentOnly/)
+assert.doesNotMatch(embedded, /content_only|answer_surface/)
 assert.match(experience, /if \(next === 'chat'\) \{[\s\S]*?generationRef\.current \+= 1[\s\S]*?activateSurface\('chat'\)/)
 assert.match(experience, /announceAiBrowserSurface\(next\)[\s\S]*?setSurface\(next\)/)
 assert.match(experience, /windowVisible/)
@@ -96,6 +99,7 @@ assert.match(topbar, /onOpenOfficial/)
 assert.match(chat, /AiBrowserExperience/)
 assert.match(chat, /data-ai-chat-main/)
 assert.match(chat, /chatMode && web\.ready/)
+assert.doesNotMatch(chat, /AiOfficialAnswerSurface/)
 assert.match(sendSuccessBranch, /startResponseRefresh/)
 assert.doesNotMatch(sendSuccessBranch, /requestOfficialAiTab|showOfficialAfterSend|openOfficial/)
 assert.doesNotMatch(controller, /showOfficialAfterSend/)

@@ -9,8 +9,6 @@ const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'u
 
 const page = read('pc-frontend/src/features/ai/AiChatPage.tsx')
 const pageStyles = read('pc-frontend/src/features/ai/AiChatPage.module.css')
-const policy = read('pc-frontend/src/features/user-browser/localAiAnswerSurfacePolicy.ts')
-const surface = read('pc-frontend/src/features/user-browser/AiOfficialAnswerSurface.tsx')
 const backend = read('pc-frontend/src/features/user-browser/useAiWebChatBackend.ts')
 const controller = read('pc-frontend/src/features/user-browser/useLocalAiWebChatController.ts')
 const chatGptAdapter = read('android/app/src/main/assets/chatgpt_web_adapter.js')
@@ -25,77 +23,10 @@ const visibility = read('pc-frontend/src/features/ai/aiMessageVisibility.ts')
 const api = read('pc-frontend/src/features/user-browser/internalBrowserApi.ts')
 const fullPage = read('pc-frontend/src/features/user-browser/AiBrowserExperience.tsx')
 const embedded = read('desktop-shell/src-tauri/src/local_ai_browser/embedded_view.rs')
-const embeddedAnswerSurface = read(
-  'desktop-shell/src-tauri/src/local_ai_browser/embedded_view/answer_surface.rs',
-)
-
-assert.match(page, /<AiOfficialAnswerSurface web=\{web\} \/>/)
+assert.doesNotMatch(page, /AiOfficialAnswerSurface/)
 assert.match(pageStyles, /\.feed\s*\{[^}]*position:\s*relative;/s)
-
-assert.match(policy, /semanticCacheStatus === 'cached'/)
-assert.match(policy, /semanticCacheStatus !== 'live'/)
-assert.match(policy, /browserSurface !== 'chat'/)
-assert.doesNotMatch(policy, /contextReady !== true/)
-assert.match(policy, /snapshot\.streaming/)
-assert.match(policy, /responseStreaming/)
-assert.match(policy, /message\.role === 'assistant' && message\.state === 'completed'/)
-
-const policyFilename = path.join(root, 'pc-frontend/src/features/user-browser/localAiAnswerSurfacePolicy.ts')
-const policyOutput = ts.transpileModule(policy, {
-  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
-  fileName: policyFilename,
-}).outputText
-const compiledPolicy = new Module(policyFilename, module)
-compiledPolicy.filename = policyFilename
-compiledPolicy.paths = module.paths
-compiledPolicy._compile(policyOutput, policyFilename)
-const { selectLocalAiAnswerRenderMode } = compiledPolicy.exports
-const liveSnapshot = {
-  streaming: false,
-  messages: [{ id: 'answer-1', role: 'assistant', state: 'completed', content: [] }],
-}
-const liveSession = {
-  semanticCacheStatus: 'live', contextReady: true, loading: false, lastError: '', windowStatus: 'ready',
-}
-assert.equal(selectLocalAiAnswerRenderMode({
-  ready: true, browserSurface: 'chat', busy: false, session: liveSession, snapshot: liveSnapshot,
-}), 'official_live')
-assert.equal(selectLocalAiAnswerRenderMode({
-  ready: true, browserSurface: 'chat', busy: false,
-  session: { ...liveSession, semanticCacheStatus: 'cached' }, snapshot: liveSnapshot,
-}), 'native_cache')
-assert.equal(selectLocalAiAnswerRenderMode({
-  ready: true, browserSurface: 'official', busy: false, session: liveSession, snapshot: liveSnapshot,
-}), 'native')
-assert.equal(selectLocalAiAnswerRenderMode({
-  ready: true, browserSurface: 'chat', busy: false,
-  session: { ...liveSession, contextReady: undefined }, snapshot: liveSnapshot,
-}), 'official_live')
-assert.equal(selectLocalAiAnswerRenderMode({
-  ready: true, browserSurface: 'chat', busy: false,
-  session: { ...liveSession, lastError: '上一次展示区域的瞬时错误' }, snapshot: liveSnapshot,
-}), 'official_live')
-assert.equal(selectLocalAiAnswerRenderMode({
-  ready: true, browserSurface: 'chat', busy: false, session: liveSession,
-  snapshot: { ...liveSnapshot, streaming: true },
-}), 'native')
-assert.equal(selectLocalAiAnswerRenderMode({
-  ready: true, browserSurface: 'chat', busy: false, responseStreaming: true,
-  session: liveSession, snapshot: liveSnapshot,
-}), 'native')
-
-assert.match(surface, /\{ contentOnly: true \}/)
-assert.match(surface, /responseStreaming: Boolean\(web\.streamingMessageId\)/)
-assert.match(surface, /ResizeObserver/)
-assert.match(surface, /PRESENT_RETRY_MAX_MS\s*=\s*8_000/)
-assert.match(surface, /Math\.min\(\s*PRESENT_RETRY_MAX_MS,/)
-assert.doesNotMatch(surface, /setFailedKey|MAX_PRESENT_ATTEMPTS/)
-assert.doesNotMatch(surface, /web\.controller\.sessionState\?\.updatedAtMs/)
-assert.match(surface, /void synchronize\(\)/)
-assert.match(surface, /window\.clearTimeout\(retryTimer\)/)
-assert.match(surface, /hideLocalAiWebSessionEmbedded/)
-assert.match(surface, /AI_BROWSER_SURFACE_CHANGED_EVENT/)
-assert.doesNotMatch(surface, /dismissedKey|REQUEST_RETURN_TO_AI_CHAT_EVENT/)
+assert.match(page, /visibleMessages\.filter\(\(m\) => m\.role !== 'system'\)\.map/)
+assert.match(page, /<AiChatMessageRow/)
 assert.match(backend, /\.filter\(shouldRenderNativeStructuredPart\)/)
 assert.match(backend, /\[\.\.\.controller\.visibleMessages\]/)
 assert.match(controller, /beginPendingLocalAiResponse/)
@@ -148,43 +79,18 @@ assert.equal(shouldRenderNativeStructuredPart({ type: 'image', text: ' 图片\u2
 assert.equal(shouldRenderNativeStructuredPart({ type: 'image', text: 'NVIDIA 盘前走势图' }), false)
 assert.equal(shouldRenderNativeStructuredPart({ type: 'table', text: '行情表格' }), true)
 
-const contentOnlyBranch = api.slice(
+const officialPageBranch = api.slice(
   api.indexOf('export async function presentLocalAiWebSessionEmbedded'),
   api.indexOf('export function announceAiBrowserSurface'),
 )
-assert.match(contentOnlyBranch, /if \(!options\.contentOnly\)/)
-assert.match(contentOnlyBranch, /await waitForOfficialPage\(request\)/)
-assert.match(contentOnlyBranch, /contentOnly: options\.contentOnly === true/)
+assert.match(officialPageBranch, /await waitForOfficialPage\(request\)/)
+assert.doesNotMatch(officialPageBranch, /contentOnly/)
 assert.match(api, /officialSurfaceQueue\.then\(work, work\)/)
 assert.match(api, /return queueOfficialSurface\(\(\) => invoke<LocalAiWebSessionState>\('hide_local_ai_web_session_embedded'/)
-assert.match(fullPage, /\{ contentOnly: false \}/)
+assert.match(fullPage, /presentLocalAiWebSessionEmbedded\(official, bounds\)/)
+assert.doesNotMatch(fullPage, /contentOnly/)
 
-assert.match(embedded, /content_only: Option<bool>/)
-assert.match(embedded, /if content_only[\s\S]*answer_surface_ready/)
-const answerSurfaceGate = embedded.slice(
-  embedded.indexOf('fn answer_surface_ready'),
-  embedded.indexOf('fn semantic_event_has_completed_assistant'),
-)
-assert.equal(answerSurfaceGate, '', 'answer surface policy moved into its own bounded module')
-assert.match(embeddedAnswerSurface, /fn answer_surface_ready/)
-assert.doesNotMatch(embeddedAnswerSurface.slice(
-  embeddedAnswerSurface.indexOf('fn answer_surface_ready'),
-  embeddedAnswerSurface.indexOf('fn answer_surface_script'),
-), /context_ready/)
-assert.match(embeddedAnswerSurface, /__elonChatGptMessagePortalPolicy/)
-assert.match(embeddedAnswerSurface, /__elonGoogleWebMessageExtractor/)
-assert.match(embeddedAnswerSurface, /lastAnswerNode/)
-assert.match(embeddedAnswerSurface, /data-elon-official-answer-root/)
-assert.match(embeddedAnswerSurface, /data-elon-official-answer-path/)
-assert.match(embeddedAnswerSurface, /data-elon-official-answer-provider/)
-assert.match(embeddedAnswerSurface, /chatgpt\\\.com/)
-assert.match(embeddedAnswerSurface, /max-width: 48rem/)
-const embeddedAnswerSurfaceApply = embeddedAnswerSurface.slice(
-  embeddedAnswerSurface.indexOf('fn answer_surface_script'),
-  embeddedAnswerSurface.indexOf('fn restore_surface_script'),
-)
-assert.doesNotMatch(embeddedAnswerSurfaceApply, /cloneNode/)
-assert.match(embedded, /set_content_surface_mode\(&webview, false\)/)
-assert.doesNotMatch(surface, /android|pwa/i)
+assert.doesNotMatch(embedded, /content_only|answer_surface|set_content_surface_mode/)
+assert.match(embedded, /present\(&app, &label, bounds\)/)
 
-console.log('PASS: Win chat automatically uses the live official answer surface with native cache fallback')
+console.log('PASS: Win chat keeps native conversation turns primary and opens the full official page explicitly')
