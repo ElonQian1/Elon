@@ -4,7 +4,7 @@
   if (window.__elonChatGptPrivateResearchEnabled !== true) return;
   if (location.origin !== 'https://chatgpt.com') return;
   const existingProbe = window.__elonChatGptPrivateResearchProbe;
-  if (existingProbe && Number(existingProbe.version) >= 7) return;
+  if (existingProbe && Number(existingProbe.version) >= 8) return;
 
   const nativeBridge = window.elonChatGptNative;
   const adapterVersion = Number(window.__elonChatGptAdapterTargetVersion || 0);
@@ -231,6 +231,27 @@
     }));
   }
 
+  function emitPrivateStreamOutcome(outcome, frameCount, elapsedMs) {
+    if (Date.now() > expiresAt || privateObservationCount >= 32) return;
+    const safeOutcome = String(outcome || '').toLowerCase();
+    if (!/^(first|success|empty|error)$/.test(safeOutcome)) return;
+    privateObservationCount += 1;
+    nativeBridge.postMessage(JSON.stringify({
+      type: 'command_result',
+      adapterVersion,
+      documentToken,
+      action: 'research_network_observation',
+      ok: true,
+      detail: [
+        'v1',
+        'private_stream',
+        safeOutcome,
+        String(Math.max(0, Math.min(9999, Math.round(frameCount || 0)))),
+        String(Math.max(0, Math.min(999999, Math.round(elapsedMs || 0))))
+      ].join('|')
+    }));
+  }
+
   function emitPrivatePayloadShape(payload) {
     if (Date.now() > expiresAt || privateObservationCount >= 32) return;
     const candidates = [
@@ -379,12 +400,13 @@
   }
 
   window.__elonChatGptPrivateResearchProbe = Object.freeze({
-    version: 7,
+    version: 8,
     enabled: true,
     expiresAt,
     observationCount: () => observationCount,
     privateObservationCount: () => privateObservationCount,
     recordPrivateOutcome: emitPrivateOutcome,
+    recordPrivateStreamOutcome: emitPrivateStreamOutcome,
     recordPrivatePayloadShape: emitPrivatePayloadShape,
     copyRequestContext: (family) => Object.assign({}, requestContexts.get(String(family || '')) || {})
   });

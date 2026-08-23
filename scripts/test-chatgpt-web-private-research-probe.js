@@ -126,6 +126,8 @@ async function run(enabled) {
   await window.fetch('https://example.com/backend-api/conversations');
   if (window.__elonChatGptPrivateResearchProbe) {
     window.__elonChatGptPrivateResearchProbe.recordPrivateOutcome('success', 12, 345);
+    window.__elonChatGptPrivateResearchProbe.recordPrivateStreamOutcome('first', 1, 123);
+    window.__elonChatGptPrivateResearchProbe.recordPrivateStreamOutcome('success', 4, 456);
     window.__elonChatGptPrivateResearchProbe.recordPrivatePayloadShape({
       data: { conversation: { current_node: 'node', mapping: { one: {}, two: {} } } }
     });
@@ -140,8 +142,8 @@ async function run(enabled) {
 
   const enabled = await run(true);
   assert.equal(enabled.requests.length, 6);
-  assert.equal(enabled.events.length, 13);
-  assert.equal(enabled.window.__elonChatGptPrivateResearchProbe.version, 7);
+  assert.equal(enabled.events.length, 15);
+  assert.equal(enabled.window.__elonChatGptPrivateResearchProbe.version, 8);
   assert.equal(
     enabled.window.__elonChatGptPrivateResearchProbe
       .copyRequestContext('conversation_content').Authorization,
@@ -158,9 +160,11 @@ async function run(enabled) {
   assert.match(enabled.events[8].detail, /^v1\|content\|\/backend-api\/f\/conversation\|content_type\.parts$/);
   assert.match(enabled.events[9].detail, /^v1\|fetch\|POST\|\/backend-api\/f\/conversation\|200\|json\|\d+$/);
   assert.equal(enabled.events[10].detail, 'v1|private_outcome|success|12|345');
-  assert.equal(enabled.events[11].detail, 'v1|private_keys|0|data');
+  assert.equal(enabled.events[11].detail, 'v1|private_stream|first|1|123');
+  assert.equal(enabled.events[12].detail, 'v1|private_stream|success|4|456');
+  assert.equal(enabled.events[13].detail, 'v1|private_keys|0|data');
   assert.equal(
-    enabled.events[12].detail,
+    enabled.events[14].detail,
     'v1|private_shape|data_conversation|2|0|0|0|0|0'
   );
   const emitted = JSON.stringify(enabled.events);

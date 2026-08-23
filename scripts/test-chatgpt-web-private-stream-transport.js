@@ -57,12 +57,17 @@ function createResponse(chunks) {
 
 function context(enabled, response) {
   let calls = 0;
+  const outcomes = [];
   const originalFetch = async () => {
     calls += 1;
     return response;
   };
   const window = {
     __elonChatGptPrivateStreamObserverEnabled: enabled,
+    __elonChatGptPrivateResearchProbe: {
+      recordPrivateStreamOutcome: (outcome, frames, elapsedMs) =>
+        outcomes.push({ outcome, frames, elapsedMs })
+    },
     fetch: originalFetch
   };
   window.window = window;
@@ -83,7 +88,7 @@ function context(enabled, response) {
   };
   vm.runInNewContext(policySource, sandbox, { filename: 'chatgpt_web_private_stream_policy.js' });
   vm.runInNewContext(transportSource, sandbox, { filename: 'chatgpt_web_private_stream_transport.js' });
-  return { window, originalFetch, calls: () => calls };
+  return { window, originalFetch, calls: () => calls, outcomes };
 }
 
 (async () => {
@@ -109,6 +114,10 @@ function context(enabled, response) {
   assert.equal(returned, response);
   assert.equal(enabled.calls(), 1);
   assert.ok(notifications >= 2);
+  assert.deepEqual(enabled.outcomes.map((item) => [item.outcome, item.frames]), [
+    ['first', 1],
+    ['success', 2]
+  ]);
   assert.equal(
     enabled.window.__elonChatGptPrivateStreamTransport.current('/c/conversation-one').text,
     'hello world'

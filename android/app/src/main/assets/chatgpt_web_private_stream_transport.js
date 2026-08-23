@@ -10,6 +10,7 @@
   if (!policy || !originalFetch || typeof TextDecoder !== 'function') return;
 
   const session = policy.createSession({ now: Date.now });
+  const researchProbe = window.__elonChatGptPrivateResearchProbe;
   const listeners = new Set();
   let disposed = false;
 
@@ -29,6 +30,14 @@
   }
 
   async function observe(response) {
+    const startedAt = Date.now();
+    let frames = 0;
+    let firstReported = false;
+    function report(outcome) {
+      if (researchProbe && typeof researchProbe.recordPrivateStreamOutcome === 'function') {
+        researchProbe.recordPrivateStreamOutcome(outcome, frames, Date.now() - startedAt);
+      }
+    }
     let clone;
     try { clone = response.clone(); }
     catch (_) { return; }
@@ -40,10 +49,18 @@
     const decoder = new TextDecoder();
     const sse = policy.createSseDecoder(
       (payload) => {
-        if (session.accept(payload)) notify();
+        if (!session.accept(payload)) return;
+        frames += 1;
+        if (!firstReported) {
+          firstReported = true;
+          report('first');
+        }
+        notify();
       },
       () => {
-        if (session.finish()) notify();
+        const completed = session.finish();
+        report(completed ? 'success' : 'empty');
+        if (completed) notify();
       }
     );
     try {
@@ -56,6 +73,7 @@
       sse.finish();
     } catch (_) {
       session.reset();
+      report('error');
       notify();
     } finally {
       try { reader.releaseLock(); }
