@@ -9251,6 +9251,59 @@
       "updated_at_ms": 1786878849243
     },
     {
+      "id": "win-web-ai-private-response-research-fixture-v1",
+      "title": "Win 网页 AI 私有响应结构研究 Fixture V1",
+      "summary": "新增离线、失败关闭的研究响应脱敏器，把开发者显式提供的 JSON/NDJSON/SSE 样本转换为无正文、无凭证、无 URL/数值的版本化结构形状，供 ChatGPT/Google 富内容适配回归使用；不接入生产 WebView，不修改 PWA。",
+      "status": "ready",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/win-web-ai-private-response-research-fixture-v1.md",
+        "content_hash": "ac0f3d1196b99caff167107ec15efb1fcc786b4c567d183a98c45c3e73ff2c56",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "994bf691df9b11a1b7142b0c4ad8c2a58d42df9b",
+          "head_blob_oid": "062dd0d298da691e70ea1bb25bc9f616577a34c7",
+          "worktree_blob_oid": "062dd0d298da691e70ea1bb25bc9f616577a34c7",
+          "state": "tracked_clean"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "win-web-ai",
+      "tags": [
+        "win",
+        "tauri",
+        "chatgpt",
+        "google-ai",
+        "rich-content",
+        "research",
+        "fixture",
+        "privacy"
+      ],
+      "task_paths": [
+        "docs/user-browser-module-integration.md",
+        "pc-frontend/package.json",
+        "pc-frontend/scripts/test-web-ai-response-fixture-sanitizer.cjs",
+        "scripts/fixtures/web-ai-response-shape-synthetic.json",
+        "scripts/sanitize-web-ai-response-fixture.cjs"
+      ],
+      "dependencies": [
+        "win-web-ai-structured-rich-content-v1"
+      ],
+      "acceptance_criteria": [
+        "离线读取 JSON、NDJSON、SSE data 帧并输出确定性的 yilong.web-ai-response-shape.v1。",
+        "正文、URL、域名、Cookie、Authorization、Token、签名值、身份字段与数值不进入输出。",
+        "深度、宽度、数组与输入大小有界，异常输入失败关闭并报告截断统计。",
+        "同结构不同内容结构指纹一致，结构变化指纹不同。",
+        "纯合成 ChatGPT finance 与 Google weather/source fixture 覆盖脱敏和漂移回归。",
+        "PC user-browser 契约、Win Web AI 验证、前端检查与源码体积门禁通过。"
+      ],
+      "implementation_evidence": [],
+      "created_at_ms": 1787448253854,
+      "updated_at_ms": 1787448253854
+    },
+    {
       "id": "win-web-ai-production-session-diagnostics-v1",
       "title": "Win 网页 AI 生产会话结构诊断 V1",
       "summary": "让 Win Codex 控制区分测试子窗口与生产首页后台官方会话，并以双重白名单清洗公开上下文、目录、缓存和流式结构状态。",
@@ -10143,16 +10196,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_512b4c390dea46d69297049d2e8ece95",
-      "feature_id": "win-background-ai-webview-resize-parking-v1",
-      "action": "transitioned",
-      "actor": "codex-root",
-      "reason": "复用主分支窗口重排修复并补齐 Win 适配器合同",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1787227078567
-    },
     {
       "id": "feature_event_cc9847fc1bba4b3fbdba44b191d30860",
       "feature_id": "win-background-ai-webview-resize-parking-v1",
@@ -12142,6 +12185,16 @@
       "from_status": "in_progress",
       "to_status": "implemented",
       "at_ms": 1787446931189
+    },
+    {
+      "id": "feature_event_6f5ca11a71384b89b367dfcd83eba59c",
+      "feature_id": "win-web-ai-private-response-research-fixture-v1",
+      "action": "registered",
+      "actor": "codex-root",
+      "reason": "现有代码只有手写合成 envelope，没有可审计的原始研究样本脱敏与结构漂移回归链路，容易重复猜字段。",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1787448253854
     }
   ]
 }
