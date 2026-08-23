@@ -9520,6 +9520,56 @@
       "updated_at_ms": 1786876824902
     },
     {
+      "id": "win-web-ai-rich-content-runtime-guard-v1",
+      "title": "Win 网页 AI 富内容运行时门禁 V1",
+      "summary": "在 Rust 清洗之后为 PC 原生聊天增加 yilong.rich-content.v1 轻量运行时门禁，使旧缓存、上游结构漂移或残缺富卡只降级对应卡片，不影响正文、来源或整个聊天界面；不改 PWA。",
+      "status": "ready",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/win-web-ai-rich-content-runtime-guard-v1.md",
+        "content_hash": "5e42609b7ae98c3f89f061172999fedc209fd20eb909e203fcc9b4731f8fff3d",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "88144ad7714966186171d3b7a79e5c888dcf2ecf",
+          "head_blob_oid": "b710edd91f225d9a0c172737fbfad018e484bd36",
+          "worktree_blob_oid": "b710edd91f225d9a0c172737fbfad018e484bd36",
+          "state": "tracked_clean"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "win-web-ai",
+      "tags": [
+        "win",
+        "pc",
+        "rich-content",
+        "cache",
+        "runtime-guard",
+        "stability"
+      ],
+      "task_paths": [
+        "pc-frontend/scripts/test-ai-rich-content-contract.cjs",
+        "pc-frontend/src/features/ai/AiStructuredContent.tsx",
+        "pc-frontend/src/features/user-browser/localAiStructuredPartPolicy.ts",
+        "pc-frontend/src/features/user-browser/richContentProtocol.ts",
+        "pc-frontend/src/features/user-browser/useAiWebChatBackend.ts"
+      ],
+      "dependencies": [
+        "win-web-ai-structured-rich-content-v1"
+      ],
+      "acceptance_criteria": [
+        "运行时识别四类合法 yilong.rich-content.v1 富卡。",
+        "未知版本/kind/source、残缺 payload、非法图表点、非 HTTPS 媒体和超限集合失败关闭。",
+        "消息映射丢弃坏富卡但保留同消息正文和 citation。",
+        "AiStructuredContent 组件边界再次失败关闭。",
+        "真实 TypeScript 门禁逻辑契约和完整 Win/前端门禁通过。"
+      ],
+      "implementation_evidence": [],
+      "created_at_ms": 1787449323325,
+      "updated_at_ms": 1787449323325
+    },
+    {
       "id": "win-web-ai-rich-diagnostic-transport-v1",
       "title": "Win 网页 AI 富结构诊断传输 V1",
       "summary": "补齐节点控制回执的第二层固定白名单，使富内容类型与引用计数可脱敏实机回读，不传输正文、URL、域名或凭证。",
@@ -10262,16 +10312,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_976baa19beb0452dafff34135e33d6b6",
-      "feature_id": "win-google-ai-primary-answer-continuity-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "根因已定位，开始补失败契约并修复。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1787230184872
-    },
     {
       "id": "feature_event_d8031717bef14f0aa5a16266c17f8a98",
       "feature_id": "win-google-ai-primary-answer-continuity-v1",
@@ -12261,6 +12301,16 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1787448898341
+    },
+    {
+      "id": "feature_event_94c52a5e90ea455289d9ca58f2700c07",
+      "feature_id": "win-web-ai-rich-content-runtime-guard-v1",
+      "action": "registered",
+      "actor": "codex-root",
+      "reason": "现有 TypeScript 层直接信任缓存恢复数据，异常旧缓存或上游结构漂移存在空卡/渲染异常风险。",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1787449323325
     }
   ]
 }
