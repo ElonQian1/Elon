@@ -103,7 +103,9 @@ class WebChatProductionVoiceEntryContractTest {
 
         assertTrue(surface.contains("text = \"语音 AI\""))
         assertFalse(surface.contains("text = \"ChatGPT 网页 AI\""))
-        assertTrue(backing.contains("if (!gracefulExit) view.reload()"))
+        assertFalse(backing.contains("if (!gracefulExit) view.reload()"))
+        assertTrue(backing.contains("conversationRecoveredSince(recoveryToken.snapshotRevision)"))
+        assertTrue(backing.contains("recoveryGate.shouldReload"))
         assertFalse(backing.contains("view.stopLoading()"))
         assertTrue(controller.contains("WebChatRealtimeVoiceTranscriptContinuity()"))
         assertTrue(controller.contains("realtimeVoiceTranscript.end(session.currentSnapshot())"))

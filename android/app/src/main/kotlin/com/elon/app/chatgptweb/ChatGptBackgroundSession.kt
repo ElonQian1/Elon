@@ -96,6 +96,7 @@ internal class ChatGptBackgroundSession(
     private var pageAdapter: ChatGptWebPageAdapter? = null
     private var touchDispatcher: ChatGptWebTouchDispatcher? = null
     private var latestSnapshot: ChatGptWebSnapshot? = restoredSnapshot
+    private val realtimeVoiceRecovery = ChatGptRealtimeVoiceConversationRecovery(restoredSnapshot)
     private var warmSessionAvailable = restoredSnapshot != null
     private var latestUiManifest: ChatGptWebUiManifest? = null
     private var latestBridgeState = ChatGptWebPageAdapter.State.WEB_ONLY
@@ -111,7 +112,8 @@ internal class ChatGptBackgroundSession(
             ChatGptRealtimeVoiceBackingController(
                 ::ensureInitialized, { webView }, surfaceMode, { webExecution.interactionRequested() },
                 { task, delay -> recoveryHandler.postDelayed(task, delay) },
-                { latestSnapshot?.pageKind == "conversation" && latestSnapshot?.composerReady == true },
+                realtimeVoiceRecovery::revision,
+                realtimeVoiceRecovery::recoveredSince,
             )
         }
     private val webExecution: ChatGptBackgroundExecutionController =
@@ -512,6 +514,7 @@ internal class ChatGptBackgroundSession(
                 scheduleSessionContinuityRecheck(reconciliation.recheckAfterMs)
                 if (reconciliation.clearConversationHistory) clearConversationHistory()
                 latestSnapshot = snapshot
+                realtimeVoiceRecovery.accept(snapshot)
                 ChatGptWebConversationPath.fromUrl(snapshot.url)?.let {
                     conversationDirectory.observeCurrent(snapshot, LocalDate.now())
                     conversationDirectory.save(conversationHistoryStore)
