@@ -6950,7 +6950,7 @@
       "id": "win-chatgpt-composite-answer-extraction-v1",
       "title": "Win ChatGPT 组合回答原生提取 V1",
       "summary": "修复 ChatGPT 新版同回合行情卡、正文和反馈控件组合结构被错误提取为‘提供反馈’，保持原生聊天前台并阻止不完整回答误报完整同步。",
-      "status": "in_progress",
+      "status": "released",
       "priority": "p0",
       "requirement": {
         "path": "docs/requirements/win-chatgpt-composite-answer-extraction-v1.md",
@@ -6987,15 +6987,62 @@
         "不完整提取不得误报完整同步",
         "真实本机快照和 Win 发布身份验证通过"
       ],
-      "implementation_evidence": [],
-      "claim": {
-        "claim_id": "claim_666e693be5164df2aa9abd365556b579",
-        "agent_id": "codex-root",
-        "claimed_at_ms": 1787509158192,
-        "expires_at_ms": 1787523558192
-      },
+      "implementation_evidence": [
+        {
+          "path": "android/app/src/main/assets/chatgpt_web_adapter_messages.js",
+          "content_hash": "3dbbfab476422ea588f259d27ee13bf08be71a57ee41496f2ab2c688be00edb6",
+          "locator": "messageRole / messageNodes",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "dbd62a18eed7796c11177dd14db06cbfd1bfa680",
+            "head_blob_oid": "3a74e6704359136f2dc88e8eac31e8491a1c58a0",
+            "worktree_blob_oid": "3a74e6704359136f2dc88e8eac31e8491a1c58a0",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "desktop-shell/src-tauri/src/local_ai_browser/chatgpt_adapter_bootstrap.rs",
+          "content_hash": "71ab9ddb0360aac3e62c681088bc4676dba4fd180f9218b8040f7c54a0bf1361",
+          "locator": "shared adapter v173 bootstrap",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "dbd62a18eed7796c11177dd14db06cbfd1bfa680",
+            "head_blob_oid": "3b5103cdb2577de5324b28433b3c71f724cd31d1",
+            "worktree_blob_oid": "3b5103cdb2577de5324b28433b3c71f724cd31d1",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "pc-frontend/scripts/test-local-ai-browser-contract.cjs",
+          "content_hash": "0c21cbfa0cf8ced769e5397d481835d6d66e9fe1ade00119853c477de732d6e9",
+          "locator": "ChatGPT adapter contract",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "dbd62a18eed7796c11177dd14db06cbfd1bfa680",
+            "head_blob_oid": "99676898c9d830ba8f027d9082e16d906ad276aa",
+            "worktree_blob_oid": "99676898c9d830ba8f027d9082e16d906ad276aa",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "scripts/test-chatgpt-composite-answer-extraction.js",
+          "content_hash": "535d680a1a314d707911ca81f21240c4ba168bec8dc72e287e38810956257571",
+          "locator": "guest accessible message turns regression",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "dbd62a18eed7796c11177dd14db06cbfd1bfa680",
+            "head_blob_oid": "fa8781cd77ac071f66790dd3a02a965d553e1254",
+            "worktree_blob_oid": "fa8781cd77ac071f66790dd3a02a965d553e1254",
+            "state": "tracked_clean"
+          }
+        }
+      ],
       "created_at_ms": 1787489171043,
-      "updated_at_ms": 1787509167084
+      "updated_at_ms": 1787515366932
     },
     {
       "id": "win-chatgpt-finance-candlestick-v1",
@@ -7313,7 +7360,7 @@
       "id": "win-chatgpt-ohlc-table-snapshot-stability-v1",
       "title": "Win ChatGPT OHLC 富卡连续快照稳定性 V1",
       "summary": "修复 OHLC 表格被自身富内容标记后在下一语义快照消失的问题，同时继续跳过真正嵌套的重复表格。",
-      "status": "verified",
+      "status": "released",
       "priority": "p0",
       "requirement": {
         "path": "docs/requirements/win-chatgpt-ohlc-table-snapshot-stability-v1.md",
@@ -7419,7 +7466,7 @@
         }
       ],
       "created_at_ms": 1787514370554,
-      "updated_at_ms": 1787514419007
+      "updated_at_ms": 1787515375220
     },
     {
       "id": "win-chatgpt-visible-finance-chart-v1",
@@ -11765,56 +11812,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_11bbf14a6fcf4b4ebeafb0e133774002",
-      "feature_id": "win-web-ai-structured-rich-content-v1",
-      "action": "transitioned",
-      "actor": "codex-root-goal",
-      "reason": "范围、依赖和验收标准已明确，可以继续交付。",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1787430355342
-    },
-    {
-      "id": "feature_event_3edb1e762dd242fc99a0d313aa6e95c2",
-      "feature_id": "win-web-ai-structured-rich-content-v1",
-      "action": "claimed",
-      "actor": "codex-root-goal",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1787430355354
-    },
-    {
-      "id": "feature_event_730e02d84ee44a518fd8ba10747478ee",
-      "feature_id": "win-web-ai-structured-rich-content-v1",
-      "action": "transitioned",
-      "actor": "codex-root-goal",
-      "reason": "继续完成发布、健康回读与剩余富内容改进。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1787430355366
-    },
-    {
-      "id": "feature_event_caf74c11cae44267b7dea572ab52fa17",
-      "feature_id": "win-web-ai-structured-rich-content-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-root-goal",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1787430377156
-    },
-    {
-      "id": "feature_event_f5b438b1ea384eb2ae570c86b3cd4a13",
-      "feature_id": "win-web-ai-structured-rich-content-v1",
-      "action": "transitioned",
-      "actor": "codex-root-goal",
-      "reason": "媒体、地图、授权清单、AST 清洗、安全降级和原生渲染均已提交。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1787430391251
-    },
-    {
       "id": "feature_event_8d39ed9bbb0943579b17423fc58bc875",
       "feature_id": "win-web-ai-structured-rich-content-v1",
       "action": "transitioned",
@@ -13763,6 +13760,56 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1787514419007
+    },
+    {
+      "id": "feature_event_4d15284fe4a24fb3a9afeec35b58c779",
+      "feature_id": "win-chatgpt-composite-answer-extraction-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1787515331595
+    },
+    {
+      "id": "feature_event_cb2386f3f50e499cbff1d90075ecf487",
+      "feature_id": "win-chatgpt-composite-answer-extraction-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "游客态可访问语义回合提取修复已通过定向回归、完整浏览器契约和真实 Windows 游客会话验证。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1787515353448
+    },
+    {
+      "id": "feature_event_188dfb83551f48c7bc864a355b9fda1f",
+      "feature_id": "win-chatgpt-composite-answer-extraction-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "定向回归、完整 user-browser 契约、类型检查、lint、生产构建及真实 Windows 游客行情会话均通过。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1787515359918
+    },
+    {
+      "id": "feature_event_9eda155524cb4da8905bc3d507f042c3",
+      "feature_id": "win-chatgpt-composite-answer-extraction-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "包含该修复的 Windows 版本 0.3.69+dbd62a18eed7796c11177dd14db06cbfd1bfa680 已激活并真实启动验收。",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1787515366932
+    },
+    {
+      "id": "feature_event_614f6057e7ed4b1aaa913e415c563deb",
+      "feature_id": "win-chatgpt-ohlc-table-snapshot-stability-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "连续快照稳定性修复已包含在已激活 Windows 版本 0.3.69+dbd62a18eed7796c11177dd14db06cbfd1bfa680，并通过延时二次快照验证。",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1787515375220
     }
   ]
 }
