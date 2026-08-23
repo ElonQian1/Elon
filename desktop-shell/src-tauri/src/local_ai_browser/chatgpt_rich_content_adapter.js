@@ -185,7 +185,8 @@
     const title = Array.from(content.querySelectorAll('h1, h2, h3, h4, h5, h6'))
       .find((heading) => visible(heading));
     return Array.from(content.querySelectorAll('table')).slice(0, 8).map((table) => {
-      if (!visible(table) || table.closest('[' + ROOT_ATTRIBUTE + ']')) return null;
+      const existingRoot = table.closest('[' + ROOT_ATTRIBUTE + ']');
+      if (!visible(table) || (existingRoot && existingRoot !== table)) return null;
       const pairs = Array.from(table.querySelectorAll('tr')).map((row) => {
         const cells = Array.from(row.querySelectorAll(':scope > th, :scope > td'));
         return cells.length === 2 ? {

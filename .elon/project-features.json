@@ -7172,7 +7172,7 @@
       "id": "win-chatgpt-ohlc-table-candlestick-v1",
       "title": "Win ChatGPT OHLC 表格 K 线降级 V1",
       "summary": "把游客态官网回答中字段明确的可见 OHLC 两列表格转换为单日 finance K 线卡；缺字段或矛盾数据失败关闭。",
-      "status": "verified",
+      "status": "retired",
       "priority": "p0",
       "requirement": {
         "path": "docs/requirements/win-chatgpt-ohlc-table-candlestick-v1.md",
@@ -7307,7 +7307,119 @@
         }
       ],
       "created_at_ms": 1787513415313,
-      "updated_at_ms": 1787513477067
+      "updated_at_ms": 1787514345803
+    },
+    {
+      "id": "win-chatgpt-ohlc-table-snapshot-stability-v1",
+      "title": "Win ChatGPT OHLC 富卡连续快照稳定性 V1",
+      "summary": "修复 OHLC 表格被自身富内容标记后在下一语义快照消失的问题，同时继续跳过真正嵌套的重复表格。",
+      "status": "verified",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/win-chatgpt-ohlc-table-snapshot-stability-v1.md",
+        "content_hash": "631c8a5d13f5e166dc02f70e37c5ce63c9e7f49612e571d8df067f271c15a200",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "4c976acb2ee983a7810509f595732a1e97529d3e",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "f620ef19ae25ac00e73e8ee791826a3474b585d1",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "win-web-ai",
+      "tags": [
+        "win",
+        "chatgpt",
+        "ohlc",
+        "snapshot",
+        "rich-content"
+      ],
+      "task_paths": [
+        "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebPageAdapter.kt",
+        "desktop-shell/src-tauri/src/local_ai_browser/chatgpt_adapter_bootstrap.rs",
+        "desktop-shell/src-tauri/src/local_ai_browser/chatgpt_rich_content_adapter.js",
+        "pc-frontend/scripts/test-ai-rich-content-contract.cjs",
+        "pc-frontend/scripts/test-local-ai-browser-contract.cjs"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "同一合法 OHLC 表连续两次提取均返回 finance K 线卡",
+        "嵌套表格不重复生成富卡",
+        "全量游客浏览器测试、类型、lint、构建和门禁通过",
+        "正式 Win 游客运行保持 finance 富卡与可访问 K 线图"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebPageAdapter.kt",
+          "content_hash": "61164a2140fda391e012da56c3c4ceeda60626f4c1ecb023cb5b6314fc45fa69",
+          "locator": "ADAPTER_VERSION",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "4c976acb2ee983a7810509f595732a1e97529d3e",
+            "head_blob_oid": "2c1271989f9ffc5adc71746e32b883d9a94c0b1b",
+            "worktree_blob_oid": "870d59d3667776fb6e20c1165aa27cb8678bcaeb",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "desktop-shell/src-tauri/src/local_ai_browser/chatgpt_adapter_bootstrap.rs",
+          "content_hash": "71ab9ddb0360aac3e62c681088bc4676dba4fd180f9218b8040f7c54a0bf1361",
+          "locator": "ADAPTER_VERSION",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "4c976acb2ee983a7810509f595732a1e97529d3e",
+            "head_blob_oid": "f814b39eb689da0396a033721a2c883a363eaa6c",
+            "worktree_blob_oid": "3b5103cdb2577de5324b28433b3c71f724cd31d1",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "desktop-shell/src-tauri/src/local_ai_browser/chatgpt_rich_content_adapter.js",
+          "content_hash": "ee6c1d724699aa7c433f55646fa2783773fde6778d7170150c1568c68aee83e1",
+          "locator": "ohlcTableParts existingRoot",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "4c976acb2ee983a7810509f595732a1e97529d3e",
+            "head_blob_oid": "db02398acf318b86b3322ad44fbf4bec19e23644",
+            "worktree_blob_oid": "63e915affb8b19a8cd953d00fde20917afaf72fe",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "docs/requirements/win-chatgpt-ohlc-table-snapshot-stability-v1.md",
+          "content_hash": "631c8a5d13f5e166dc02f70e37c5ce63c9e7f49612e571d8df067f271c15a200",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "4c976acb2ee983a7810509f595732a1e97529d3e",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "f620ef19ae25ac00e73e8ee791826a3474b585d1",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "pc-frontend/scripts/test-ai-rich-content-contract.cjs",
+          "content_hash": "8499135c59073679a64ba2cd5188fa46f9ae1c3bd8ac89bc794689d412935b71",
+          "locator": "consecutive semantic snapshots",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "4c976acb2ee983a7810509f595732a1e97529d3e",
+            "head_blob_oid": "320887851d93b857ed554e6d66a9d82a1439e148",
+            "worktree_blob_oid": "5f47fc059f6820143f1fb5ab39506842300bbf4b",
+            "state": "tracked_modified"
+          }
+        }
+      ],
+      "created_at_ms": 1787514370554,
+      "updated_at_ms": 1787514419007
     },
     {
       "id": "win-chatgpt-visible-finance-chart-v1",
@@ -11653,76 +11765,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_82792a7a16654535becc19e94cd58e10",
-      "feature_id": "erp-managed-rollout-plan-v1",
-      "action": "transitioned",
-      "actor": "codex-erp-rollout",
-      "reason": "合同编译、校验、不可变存储、API、测试源码和验收文档已完成；全目标测试被无关基线编译错误阻断，暂不标 verified",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1787310311513
-    },
-    {
-      "id": "feature_event_3716246f8d5646568ad979e1c9e90139",
-      "feature_id": "win-web-ai-structured-rich-content-v1",
-      "action": "registered",
-      "actor": "codex-root-goal",
-      "reason": "用户确认继续 Goal，厂商要求快速精准分析并渲染富内容，现有条目不覆盖该范围。",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1787428343067
-    },
-    {
-      "id": "feature_event_354cded2ab47402e9e56ec6027187884",
-      "feature_id": "win-web-ai-structured-rich-content-v1",
-      "action": "claimed",
-      "actor": "codex-root-goal",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1787428343082
-    },
-    {
-      "id": "feature_event_d08b30ed78654b9f99b082813da9c5c4",
-      "feature_id": "win-web-ai-structured-rich-content-v1",
-      "action": "transitioned",
-      "actor": "codex-root-goal",
-      "reason": "开始实现生产授权清单、结构化响应映射与更多 RichContent AST 覆盖。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1787428357391
-    },
-    {
-      "id": "feature_event_7fccd3f8f7254839b091bd00c763a42f",
-      "feature_id": "win-web-ai-structured-rich-content-v1",
-      "action": "claim_released",
-      "actor": "codex-root-goal",
-      "reason": "需求文档补充生产授权状态，需要先释放认领并显式重绑后重新认领。",
-      "from_status": "in_progress",
-      "to_status": "blocked",
-      "at_ms": 1787430325262
-    },
-    {
-      "id": "feature_event_a6a9b256ee734e169966af23378ce140",
-      "feature_id": "win-web-ai-structured-rich-content-v1",
-      "action": "requirement_rebound",
-      "actor": "codex-root-goal",
-      "reason": "补充默认拒绝的当前生产授权状态，显式重绑已提交的 current 需求文档。",
-      "from_status": "blocked",
-      "to_status": "proposed",
-      "at_ms": 1787430336305
-    },
-    {
-      "id": "feature_event_1f58fbe22553496a893459da29aa40eb",
-      "feature_id": "win-web-ai-structured-rich-content-v1",
-      "action": "transitioned",
-      "actor": "codex-root-goal",
-      "reason": "已复核补充内容只明确默认拒绝边界，接受 current 需求。",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1787430355326
-    },
-    {
       "id": "feature_event_11bbf14a6fcf4b4ebeafb0e133774002",
       "feature_id": "win-web-ai-structured-rich-content-v1",
       "action": "transitioned",
@@ -13651,6 +13693,76 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1787513477067
+    },
+    {
+      "id": "feature_event_62288ca0f636476f8bfeb0cf060363df",
+      "feature_id": "win-chatgpt-ohlc-table-candlestick-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "真实连续快照验收发现 V1 富卡标记后会在下一快照消失；由幂等快照修复功能取代，避免把一次性快照误报为完成。",
+      "from_status": "verified",
+      "to_status": "retired",
+      "at_ms": 1787514345803
+    },
+    {
+      "id": "feature_event_ad2489214d164908898a460d393c85b0",
+      "feature_id": "win-chatgpt-ohlc-table-snapshot-stability-v1",
+      "action": "registered",
+      "actor": "codex-root",
+      "reason": "真实游客连续快照验收定位到自身标记导致富卡消失，建立独立生产修复追踪。",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1787514370554
+    },
+    {
+      "id": "feature_event_945b7e64aec24c5bab3e3dc9a7dfabc8",
+      "feature_id": "win-chatgpt-ohlc-table-snapshot-stability-v1",
+      "action": "claimed",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1787514380641
+    },
+    {
+      "id": "feature_event_330a0903ce8f489291b13155a23a3be7",
+      "feature_id": "win-chatgpt-ohlc-table-snapshot-stability-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "实现 OHLC 富卡跨连续语义快照的幂等保留。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1787514388478
+    },
+    {
+      "id": "feature_event_ea659c84a8664efc96a2d505e4d7b227",
+      "feature_id": "win-chatgpt-ohlc-table-snapshot-stability-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1787514404036
+    },
+    {
+      "id": "feature_event_b08ba967e44a414eb72cb03895c68a7f",
+      "feature_id": "win-chatgpt-ohlc-table-snapshot-stability-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "幂等解析与连续两次语义快照回归测试已实现。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1787514411374
+    },
+    {
+      "id": "feature_event_e698682f3ad249c8ac8fddcdbe8f4897",
+      "feature_id": "win-chatgpt-ohlc-table-snapshot-stability-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "连续快照回归、全量用户浏览器测试、TypeScript、lint 与生产构建均通过。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1787514419007
     }
   ]
 }

@@ -95,9 +95,10 @@ assert.match(renderer, /url\(#\$\{gradientId\}\)/)
 assert.match(renderer, /payload\.rows\.map/)
 
 const context = {
-  window: {},
+  window: { getComputedStyle: () => ({ display: 'block', visibility: 'visible' }) },
   location: { origin: 'https://chatgpt.com', href: 'https://chatgpt.com/' },
   Element: Object,
+  HTMLElement: Object,
   URL,
   console,
 }
@@ -141,6 +142,42 @@ assert.equal(tableFinancePayload.chart.candles.length, 1)
 assert.equal(
   JSON.stringify(tableFinancePayload.chart.candles[0]),
   JSON.stringify({ x: '最新交易日', open: 312.15, high: 312.6, low: 307.03, close: 309.35 }),
+)
+const pairRows = [
+  ['股票代码', 'AAPL（NASDAQ）'],
+  ['最新价', '309.35 美元'],
+  ['涨跌', '-1.88 美元（-0.60%）'],
+  ['开盘（Open）', '312.15 美元'],
+  ['最高（High）', '312.60 美元'],
+  ['最低（Low）', '307.03 美元'],
+].map((values) => ({
+  querySelectorAll: () => values.map((innerText) => ({ innerText, textContent: innerText })),
+}))
+let tableMarker = ''
+const visibleTable = {
+  isConnected: true,
+  getBoundingClientRect: () => ({ width: 480, height: 240 }),
+  closest: () => tableMarker ? visibleTable : null,
+  setAttribute: (_name, value) => { tableMarker = value },
+  querySelectorAll: (selector) => selector === 'tr' ? pairRows : [],
+}
+const visibleHeading = {
+  isConnected: true,
+  innerText: 'Apple Inc.（AAPL）最新行情',
+  getBoundingClientRect: () => ({ width: 360, height: 32 }),
+}
+const visibleTableContent = {
+  querySelectorAll(selector) {
+    if (selector === 'table') return [visibleTable]
+    if (selector.startsWith('h1')) return [visibleHeading]
+    return []
+  },
+}
+assert.equal(context.window.__elonChatGptRichContent.ohlcTableParts(visibleTableContent).length, 1)
+assert.equal(
+  context.window.__elonChatGptRichContent.ohlcTableParts(visibleTableContent).length,
+  1,
+  'a marked OHLC table must remain present in consecutive semantic snapshots',
 )
 const visibleCandlesticks = context.window.__elonChatGptRichContent.visibleCandlestickChart({
   querySelectorAll: () => [
