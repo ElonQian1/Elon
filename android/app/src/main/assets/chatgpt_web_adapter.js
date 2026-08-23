@@ -12,6 +12,7 @@
   const snapshotSchedulerModule = window.__elonChatGptSnapshotScheduler;
   const streamingPolicyModule = window.__elonChatGptStreamingPolicy;
   const skinAdapter = window.__elonChatGptSkin;
+  const privateTransport = window.__elonChatGptPrivateTransport;
   const authenticationPolicy = window.__elonChatGptAuthenticationPolicy;
   const adapterVersion = Number(window.__elonChatGptAdapterVersion || 0);
   const documentToken = String(window.__elonChatGptDocumentToken || '');
@@ -506,7 +507,14 @@
       if (comparableText(composerValue(findComposer()))) {
         return respond(action, false, '网页中有未发送草稿，请先处理草稿。');
       }
-      return conversationAdapter.openConversation(String(command.value || ''), respond);
+      const path = String(command.value || '');
+      const navigate = () => conversationAdapter.openConversation(path, respond);
+      if (privateTransport && privateTransport.conversationPrefetchEnabled === true &&
+          typeof privateTransport.prefetchConversation === 'function') {
+        const handled = privateTransport.prefetchConversation(path, emitEvent, navigate);
+        if (handled) return;
+      }
+      return navigate();
     }
     if (action === 'open_project' && conversationAdapter) {
       if (comparableText(composerValue(findComposer()))) {

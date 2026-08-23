@@ -1,0 +1,293 @@
+(function () {
+  'use strict';
+
+  if (window.__elonChatGptPrivateResearchEnabled !== true) return;
+  if (location.origin !== 'https://chatgpt.com') return;
+  const existingProbe = window.__elonChatGptPrivateResearchProbe;
+  if (existingProbe && Number(existingProbe.version) >= 3) return;
+
+  const nativeBridge = window.elonChatGptNative;
+  const adapterVersion = Number(window.__elonChatGptAdapterTargetVersion || 0);
+  const documentToken = String(window.__elonChatGptDocumentToken || '');
+  if (!nativeBridge || typeof nativeBridge.postMessage !== 'function') return;
+  if (!/^doc_[a-z0-9_]{3,80}$/.test(documentToken)) return;
+
+  const startedAt = Date.now();
+  const expiresAt = startedAt + (10 * 60 * 1000);
+  const maxObservations = 160;
+  let observationCount = 0;
+  let privateObservationCount = 0;
+  const requestContexts = new Map();
+
+  function nowMs() {
+    return window.performance && typeof window.performance.now === 'function'
+      ? window.performance.now()
+      : Date.now();
+  }
+
+  function endpointCandidate(url) {
+    return url.origin === location.origin && (
+      url.pathname.startsWith('/backend-api/') ||
+      url.pathname.startsWith('/api/') ||
+      url.pathname.startsWith('/ces/')
+    );
+  }
+
+  function safeSegment(segment) {
+    if (!segment) return '';
+    if (segment.includes('%')) return '{segment}';
+    if (/^[0-9a-f]{8}-[0-9a-f-]{20,}$/i.test(segment)) return '{id}';
+    if (/^[0-9]{7,}$/.test(segment)) return '{id}';
+    if (/^[A-Za-z0-9_-]{17,}$/.test(segment)) return '{id}';
+    if (!/^[A-Za-z0-9._-]{1,40}$/.test(segment)) return '{segment}';
+    return segment;
+  }
+
+  function safePath(url) {
+    const value = url.pathname
+      .split('/')
+      .map(safeSegment)
+      .join('/')
+      .slice(0, 96);
+    return value || '/';
+  }
+
+  function responseKind(response) {
+    if (!response || !response.headers || typeof response.headers.get !== 'function') return 'unknown';
+    const contentType = String(response.headers.get('content-type') || '').toLowerCase();
+    if (contentType.includes('text/event-stream')) return 'sse';
+    if (contentType.includes('json')) return 'json';
+    if (contentType.startsWith('text/')) return 'text';
+    return contentType ? 'other' : 'unknown';
+  }
+
+  function safeKeys(value) {
+    if (!value || typeof value !== 'object') return [];
+    return Object.keys(value)
+      .filter((key) => /^[A-Za-z][A-Za-z0-9_]{0,39}$/.test(key))
+      .sort()
+      .slice(0, 24);
+  }
+
+  function safeHeaderNames(headers) {
+    if (!headers) return [];
+    const names = [];
+    try {
+      if (typeof headers.forEach === 'function') {
+        headers.forEach((_, name) => names.push(String(name).toLowerCase()));
+      } else if (Array.isArray(headers)) {
+        headers.forEach((entry) => names.push(String(entry && entry[0] || '').toLowerCase()));
+      } else if (typeof headers === 'object') {
+        Object.keys(headers).forEach((name) => names.push(String(name).toLowerCase()));
+      }
+    } catch (_) {
+      return [];
+    }
+    return Array.from(new Set(names))
+      .filter((name) => /^[a-z][a-z0-9-]{0,50}$/.test(name))
+      .sort()
+      .slice(0, 16);
+  }
+
+  function requestFamily(url) {
+    if (/^\/backend-api\/conversations\/[A-Za-z0-9_-]{1,160}$/.test(url.pathname)) {
+      return 'conversation_detail';
+    }
+    if (/^\/backend-api\/gizmos\/g-p-[A-Za-z0-9_-]{1,160}\/conversations$/.test(url.pathname)) {
+      return 'project_conversations';
+    }
+    if (url.pathname === '/backend-api/gizmos/snorlax/sidebar') return 'project_sidebar';
+    return '';
+  }
+
+  function captureRequestContext(input, init, url) {
+    const family = requestFamily(url);
+    if (!family) return;
+    const values = {};
+    function read(headers) {
+      if (!headers) return;
+      try {
+        if (typeof headers.forEach === 'function') {
+          headers.forEach((value, name) => { values[String(name)] = String(value); });
+        } else if (Array.isArray(headers)) {
+          headers.forEach((entry) => {
+            if (Array.isArray(entry) && entry.length >= 2) values[String(entry[0])] = String(entry[1]);
+          });
+        } else if (typeof headers === 'object') {
+          Object.keys(headers).forEach((name) => { values[name] = String(headers[name]); });
+        }
+      } catch (_) {
+        // Browser-managed values that cannot be read are intentionally ignored.
+      }
+    }
+    read(input && input.headers);
+    read(init && init.headers);
+    if (Object.keys(values).length) requestContexts.set(family, values);
+  }
+
+  function emitShape(kind, url, names) {
+    if (Date.now() > expiresAt || observationCount >= maxObservations) return;
+    if (!endpointCandidate(url) || !names.length) return;
+    observationCount += 1;
+    nativeBridge.postMessage(JSON.stringify({
+      type: 'command_result',
+      adapterVersion,
+      documentToken,
+      action: 'research_network_observation',
+      ok: true,
+      detail: ['v1', kind, safePath(url), names.join('.')].join('|').slice(0, 160)
+    }));
+  }
+
+  function observeRequestShape(input, init, url) {
+    captureRequestContext(input, init, url);
+    const headers = safeHeaderNames(init && init.headers || input && input.headers);
+    if (/^\/backend-api\/conversations\/[A-Za-z0-9_-]{1,160}$/.test(url.pathname) ||
+        /^\/backend-api\/gizmos\/.+\/conversations$/.test(url.pathname) ||
+        url.pathname === '/backend-api/gizmos/snorlax/sidebar') {
+      emitShape('headers', url, headers);
+      return;
+    }
+    if (url.pathname !== '/backend-api/f/conversation') return;
+    emitShape('headers', url, headers);
+    const body = init && init.body;
+    if (typeof body !== 'string' || body.length > 262144) return;
+    try {
+      const parsed = JSON.parse(body);
+      emitShape('body', url, safeKeys(parsed));
+      const message = Array.isArray(parsed.messages) ? parsed.messages[0] : null;
+      emitShape('message', url, safeKeys(message));
+      emitShape('content', url, safeKeys(message && message.content));
+    } catch (_) {
+      // A non-JSON body is intentionally not inspected or reported.
+    }
+  }
+
+  function emit(transport, method, url, status, kind, elapsedMs) {
+    if (Date.now() > expiresAt || observationCount >= maxObservations) return;
+    if (!endpointCandidate(url)) return;
+    observationCount += 1;
+    const fields = [
+      'v1',
+      transport,
+      String(method || 'GET').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 10) || 'GET',
+      safePath(url),
+      String(Number.isFinite(status) ? Math.max(0, Math.min(999, Math.round(status))) : 0),
+      String(kind || 'unknown').replace(/[^a-z]/g, '').slice(0, 10) || 'unknown',
+      String(Math.max(0, Math.min(999999, Math.round(elapsedMs || 0))))
+    ];
+    nativeBridge.postMessage(JSON.stringify({
+      type: 'command_result',
+      adapterVersion,
+      documentToken,
+      action: 'research_network_observation',
+      ok: true,
+      detail: fields.join('|').slice(0, 160)
+    }));
+  }
+
+  function emitPrivate(kind, method, url, status, responseType, elapsedMs) {
+    if (Date.now() > expiresAt || privateObservationCount >= 32) return;
+    if (kind !== 'conversation_prefetch' || !endpointCandidate(url)) return;
+    privateObservationCount += 1;
+    nativeBridge.postMessage(JSON.stringify({
+      type: 'command_result',
+      adapterVersion,
+      documentToken,
+      action: 'research_network_observation',
+      ok: true,
+      detail: [
+        'v1',
+        'private_prefetch',
+        String(method || 'GET').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 10) || 'GET',
+        safePath(url),
+        String(Math.max(0, Math.min(999, Math.round(status || 0)))),
+        String(responseType || 'unknown').replace(/[^a-z]/g, '').slice(0, 10) || 'unknown',
+        String(Math.max(0, Math.min(999999, Math.round(elapsedMs || 0))))
+      ].join('|').slice(0, 160)
+    }));
+  }
+
+  const originalFetch = typeof window.fetch === 'function' ? window.fetch : null;
+  if (originalFetch) {
+    window.fetch = function () {
+      const args = arguments;
+      const input = args[0];
+      const init = args[1] || {};
+      let url;
+      try {
+        url = new URL(typeof input === 'string' ? input : input.url, location.href);
+      } catch (_) {
+        return originalFetch.apply(this, args);
+      }
+      if (!endpointCandidate(url)) return originalFetch.apply(this, args);
+      const method = init.method || (input && input.method) || 'GET';
+      const privateKind = String(init.__elonPrivateResearch || '');
+      observeRequestShape(input, init, url);
+      const requestStartedAt = nowMs();
+      try {
+        return Promise.resolve(originalFetch.apply(this, args)).then(
+          (response) => {
+            emit('fetch', method, url, response.status, responseKind(response), nowMs() - requestStartedAt);
+            emitPrivate(
+              privateKind,
+              method,
+              url,
+              response.status,
+              responseKind(response),
+              nowMs() - requestStartedAt
+            );
+            return response;
+          },
+          (error) => {
+            emit('fetch', method, url, 0, 'error', nowMs() - requestStartedAt);
+            emitPrivate(privateKind, method, url, 0, 'error', nowMs() - requestStartedAt);
+            throw error;
+          }
+        );
+      } catch (error) {
+        emit('fetch', method, url, 0, 'error', nowMs() - requestStartedAt);
+        emitPrivate(privateKind, method, url, 0, 'error', nowMs() - requestStartedAt);
+        throw error;
+      }
+    };
+  }
+
+  const xhrPrototype = window.XMLHttpRequest && window.XMLHttpRequest.prototype;
+  const originalOpen = xhrPrototype && xhrPrototype.open;
+  const originalSend = xhrPrototype && xhrPrototype.send;
+  const xhrMetadata = new WeakMap();
+  if (originalOpen && originalSend) {
+    xhrPrototype.open = function (method, rawUrl) {
+      try {
+        xhrMetadata.set(this, { method, url: new URL(rawUrl, location.href) });
+      } catch (_) {
+        xhrMetadata.delete(this);
+      }
+      return originalOpen.apply(this, arguments);
+    };
+    xhrPrototype.send = function () {
+      const metadata = xhrMetadata.get(this);
+      if (metadata && endpointCandidate(metadata.url)) {
+        const requestStartedAt = nowMs();
+        this.addEventListener('loadend', () => {
+          const contentType = String(this.getResponseHeader('content-type') || '').toLowerCase();
+          const kind = contentType.includes('text/event-stream')
+            ? 'sse'
+            : contentType.includes('json') ? 'json' : contentType.startsWith('text/') ? 'text' : 'unknown';
+          emit('xhr', metadata.method, metadata.url, this.status, kind, nowMs() - requestStartedAt);
+        }, { once: true });
+      }
+      return originalSend.apply(this, arguments);
+    };
+  }
+
+  window.__elonChatGptPrivateResearchProbe = Object.freeze({
+    version: 3,
+    enabled: true,
+    expiresAt,
+    observationCount: () => observationCount,
+    privateObservationCount: () => privateObservationCount,
+    copyRequestContext: (family) => Object.assign({}, requestContexts.get(String(family || '')) || {})
+  });
+})();

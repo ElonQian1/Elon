@@ -117,6 +117,24 @@ def releaseKeystoreFile = file(releaseKeystorePath)
 def debugApplicationIdSuffix = signingValue("ELON_DEBUG_APPLICATION_ID_SUFFIX")
 def localNodeName = System.getenv("COMPUTERNAME") ?: System.getenv("HOSTNAME") ?: "一龙调试"
 def debugAppLabel = signingValue("ELON_DEBUG_APP_LABEL", localNodeName)
+def chatGptPrivateResearchEnabled = project.findProperty("ELON_CHATGPT_PRIVATE_RESEARCH")
+    ?.toString()
+    ?.toBoolean() ?: false
+def chatGptPrivateResearchVersionCode = project.findProperty("ELON_CHATGPT_PRIVATE_RESEARCH_VERSION_CODE")
+    ?.toString()
+    ?.trim()
+def chatGptPrivateResearchVersionName = project.findProperty("ELON_CHATGPT_PRIVATE_RESEARCH_VERSION_NAME")
+    ?.toString()
+    ?.trim()
+if ((chatGptPrivateResearchVersionCode || chatGptPrivateResearchVersionName) && !chatGptPrivateResearchEnabled) {
+    throw new GradleException("ChatGPT private research version overrides require ELON_CHATGPT_PRIVATE_RESEARCH=true")
+}
+if (chatGptPrivateResearchVersionCode && !(chatGptPrivateResearchVersionCode ==~ /^[1-9][0-9]{0,8}$/)) {
+    throw new GradleException("ELON_CHATGPT_PRIVATE_RESEARCH_VERSION_CODE must be a positive integer")
+}
+if (chatGptPrivateResearchVersionName && !(chatGptPrivateResearchVersionName ==~ /^[0-9]+(?:\.[0-9]+){2}$/)) {
+    throw new GradleException("ELON_CHATGPT_PRIVATE_RESEARCH_VERSION_NAME must contain three numeric parts")
+}
 def chatGptVerificationCaseJson = project.ext.chatGptWebVerificationCaseInputSha256Json
     .replace('\\', '\\\\')
     .replace('"', '\\"')
@@ -155,6 +173,12 @@ android {
         targetSdk 34
         versionCode 462
         versionName "1.1.454"
+        if (chatGptPrivateResearchVersionCode) {
+            versionCode chatGptPrivateResearchVersionCode.toInteger()
+        }
+        if (chatGptPrivateResearchVersionName) {
+            versionName chatGptPrivateResearchVersionName
+        }
         // 服务器地址：可通过环境变量 ELON_SERVER_URL 覆盖，默认指向生产服务器
         def serverUrl = signingValue("ELON_SERVER_URL", "http://43.139.149.158:8080")
         buildConfigField "String", "SERVER_URL", "\"${serverUrl}\""
@@ -167,6 +191,7 @@ android {
         buildConfigField "String", "CHATGPT_WEB_VERIFIED_APK_VERSION_NAME", "\"${project.ext.chatGptWebVerifiedApkVersionName}\""
         buildConfigField "int", "CHATGPT_WEB_VERIFIED_APK_VERSION_CODE", "${project.ext.chatGptWebVerifiedApkVersionCode}"
         buildConfigField "String", "CHATGPT_WEB_VERIFIED_SOURCE_COMMIT", "\"${project.ext.chatGptWebVerifiedSourceCommit}\""
+        buildConfigField "boolean", "CHATGPT_PRIVATE_RESEARCH_ENABLED", "${chatGptPrivateResearchEnabled}"
         manifestPlaceholders += [
             elonAppLabel        : "@string/app_name",
             elonLauncherIcon     : projectIconEnabled ? "@mipmap/elon_project_launcher" : "@mipmap/ic_launcher",
