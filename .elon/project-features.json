@@ -6790,6 +6790,19 @@
         {
           "path": "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebPageAdapter.kt",
           "content_hash": "b2af0ed288e85cbd74f537c9996ca954fb957f45b7989e1af8f701e7ca935626",
+          "locator": "adapter version 143 parity",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "5b55ad709c22e64a73c622013fde9eb9d3742420",
+            "head_blob_oid": "172de9b6b4ce5e2f4e9328ef8229488d13c47fd8",
+            "worktree_blob_oid": "172de9b6b4ce5e2f4e9328ef8229488d13c47fd8",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebPageAdapter.kt",
+          "content_hash": "b2af0ed288e85cbd74f537c9996ca954fb957f45b7989e1af8f701e7ca935626",
           "locator": "shared ADAPTER_VERSION 143",
           "evidence_kind": "source",
           "git_identity": {
@@ -6814,6 +6827,19 @@
           }
         },
         {
+          "path": "desktop-shell/src-tauri/src/local_ai_browser/chatgpt_adapter_bootstrap.rs",
+          "content_hash": "8f6731ed1dbc17a1eadb96b53fcf69257bcc6a7561e4499633af8725b0de155a",
+          "locator": "adapter version 143",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "5b55ad709c22e64a73c622013fde9eb9d3742420",
+            "head_blob_oid": "931337b02f8421cf7bca50e90df47122e288ac99",
+            "worktree_blob_oid": "931337b02f8421cf7bca50e90df47122e288ac99",
+            "state": "tracked_clean"
+          }
+        },
+        {
           "path": "desktop-shell/src-tauri/src/local_ai_browser/chatgpt_rich_content_adapter.js",
           "content_hash": "84b4d70a08885e4b09c6b714cd86d5466183c6cab3c6ef6604972844ab329489",
           "locator": "API_VERSION 2 sampleChartGeometry visibleChart",
@@ -6821,6 +6847,19 @@
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
             "head_commit": "2546b4aed849b1ff502fe1a97bf166a0e1fcca27",
+            "head_blob_oid": "b2391b7bc0f796d019c83f3d49863edd1ece9d34",
+            "worktree_blob_oid": "b2391b7bc0f796d019c83f3d49863edd1ece9d34",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "desktop-shell/src-tauri/src/local_ai_browser/chatgpt_rich_content_adapter.js",
+          "content_hash": "84b4d70a08885e4b09c6b714cd86d5466183c6cab3c6ef6604972844ab329489",
+          "locator": "visibleChart/sampleChartGeometry",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "5b55ad709c22e64a73c622013fde9eb9d3742420",
             "head_blob_oid": "b2391b7bc0f796d019c83f3d49863edd1ece9d34",
             "worktree_blob_oid": "b2391b7bc0f796d019c83f3d49863edd1ece9d34",
             "state": "tracked_clean"
@@ -6836,6 +6875,19 @@
             "head_commit": "2546b4aed849b1ff502fe1a97bf166a0e1fcca27",
             "head_blob_oid": "8e1a090eb0de1df7862df8fe45cc01b37b908f51",
             "worktree_blob_oid": "8e1a090eb0de1df7862df8fe45cc01b37b908f51",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "pc-frontend/scripts/test-ai-rich-content-contract.cjs",
+          "content_hash": "be6f4657a910cbbf3dd0282e53a5ec0b93c2150d1eab3985af9b0b4c624a0a68",
+          "locator": "visible SVG chart geometry and runtime guard contract",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "5b55ad709c22e64a73c622013fde9eb9d3742420",
+            "head_blob_oid": "19ebf4d504ffaba19b8d6f19aec3276b0faf017f",
+            "worktree_blob_oid": "19ebf4d504ffaba19b8d6f19aec3276b0faf017f",
             "state": "tracked_clean"
           }
         },
@@ -6881,6 +6933,19 @@
         {
           "path": "pc-frontend/src/features/ai/AiRichContentCard.tsx",
           "content_hash": "c984a749442681daaaebd88afaa11aecb332ce132f60ff2804778e23d4753463",
+          "locator": "FinanceCard chartPath",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "5b55ad709c22e64a73c622013fde9eb9d3742420",
+            "head_blob_oid": "80a622ccc13160c3a6bde2492b446dc42e954cea",
+            "worktree_blob_oid": "80a622ccc13160c3a6bde2492b446dc42e954cea",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/ai/AiRichContentCard.tsx",
+          "content_hash": "c984a749442681daaaebd88afaa11aecb332ce132f60ff2804778e23d4753463",
           "locator": "unique gradient finance chart renderer",
           "evidence_kind": "source",
           "git_identity": {
@@ -6893,7 +6958,7 @@
         }
       ],
       "created_at_ms": 1787446436513,
-      "updated_at_ms": 1787446931189
+      "updated_at_ms": 1787450588560
     },
     {
       "id": "win-full-size-parked-ai-webview-input-hit-test-v3",
@@ -10366,16 +10431,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_6d765f44fa654a4980c5b432bcb002c0",
-      "feature_id": "win-google-ai-primary-answer-continuity-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "范围明确、依赖为空，进入重新认领。",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1787233536482
-    },
-    {
       "id": "feature_event_a5cb35f711574deabb9d9d584af33d22",
       "feature_id": "win-google-ai-primary-answer-continuity-v1",
       "action": "claimed",
@@ -12364,6 +12419,16 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1787450383520
+    },
+    {
+      "id": "feature_event_756df664f11146fdaa12c0cac9d9bfb8",
+      "feature_id": "win-chatgpt-visible-finance-chart-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "implemented",
+      "to_status": "implemented",
+      "at_ms": 1787450588560
     }
   ]
 }
