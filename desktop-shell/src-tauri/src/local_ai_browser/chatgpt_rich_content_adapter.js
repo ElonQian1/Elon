@@ -1,10 +1,13 @@
 (function () {
   'use strict';
 
-  if (window.__elonChatGptRichContent || location.origin !== 'https://chatgpt.com') return;
+  const API_VERSION = 2;
+  if (location.origin !== 'https://chatgpt.com' ||
+      Number(window.__elonChatGptRichContent && window.__elonChatGptRichContent.version || 0) >= API_VERSION) return;
 
   const SCHEMA = 'yilong.rich-content.v1';
   const ROOT_ATTRIBUTE = 'data-elon-rich-content-root';
+  const MAX_VISIBLE_CHART_POINTS = 96;
   const commonRichContent = window.__elonRichContentDomAdapter;
   const PERIOD = /^(?:1D|5D|1M|3M|6M|YTD|1Y|5Y|MAX)$/i;
   const MONEY = /^(?:(?:US|CA|AU|HK|NT)\s*)?[$€£¥]\s*[0-9][0-9,.]*(?:\.[0-9]+)?$/i;
@@ -108,6 +111,79 @@
     return lines.find((line) => MONEY.test(line.replace(/\s+/g, ''))) || '';
   }
 
+  function sampleChartGeometry(geometry) {
+    try {
+      if (!geometry || typeof geometry.getBBox !== 'function' ||
+          typeof geometry.getTotalLength !== 'function' ||
+          typeof geometry.getPointAtLength !== 'function') return [];
+      const box = geometry.getBBox();
+      const width = Number(box && box.width);
+      const height = Number(box && box.height);
+      const length = Number(geometry.getTotalLength());
+      const rect = typeof geometry.getBoundingClientRect === 'function'
+        ? geometry.getBoundingClientRect()
+        : null;
+      const displayWidth = rect ? Number(rect.width) : width;
+      const displayHeight = rect ? Number(rect.height) : height;
+      const style = typeof window.getComputedStyle === 'function'
+        ? window.getComputedStyle(geometry)
+        : null;
+      if (!Number.isFinite(width) || !Number.isFinite(height) || !Number.isFinite(length) ||
+          !Number.isFinite(displayWidth) || !Number.isFinite(displayHeight) ||
+          width < 20 || height < 2 || displayWidth < 120 || displayHeight < 12 ||
+          length < width * 0.8 || length > 1000000 ||
+          (style && (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) === 0))) return [];
+      const count = Math.max(24, Math.min(MAX_VISIBLE_CHART_POINTS, Math.ceil(displayWidth / 6)));
+      const sampled = [];
+      for (let index = 0; index < count; index += 1) {
+        const point = geometry.getPointAtLength(length * index / (count - 1));
+        const x = Number(point && point.x);
+        const y = Number(point && point.y);
+        if (Number.isFinite(x) && Number.isFinite(y) && Math.abs(x) <= 1000000 && Math.abs(y) <= 1000000) {
+          sampled.push({ x, y });
+        }
+      }
+      if (sampled.length < 20) return [];
+      let forward = 0;
+      let backward = 0;
+      for (let index = 1; index < sampled.length; index += 1) {
+        const delta = sampled[index].x - sampled[index - 1].x;
+        if (delta > width * 0.001) forward += 1;
+        if (delta < width * -0.001) backward += 1;
+      }
+      const xValues = sampled.map((point) => point.x);
+      const yValues = sampled.map((point) => point.y);
+      const xSpan = Math.max(...xValues) - Math.min(...xValues);
+      const minimumY = Math.min(...yValues);
+      const maximumY = Math.max(...yValues);
+      if (forward < sampled.length * 0.55 || backward > sampled.length * 0.2 ||
+          xSpan < width * 0.75 || maximumY - minimumY < 10) return [];
+      return sampled.map((point, index) => ({
+        x: String(index),
+        y: Number((maximumY - point.y).toFixed(4))
+      }));
+    } catch (_) {
+      return [];
+    }
+  }
+
+  function visibleChart(root) {
+    if (!(root instanceof Element)) return undefined;
+    let selected = [];
+    let selectedRange = 0;
+    Array.from(root.querySelectorAll('svg path[d], svg polyline[points]')).forEach((geometry) => {
+      const points = sampleChartGeometry(geometry);
+      if (points.length < 2) return;
+      const values = points.map((point) => point.y);
+      const range = Math.max(...values) - Math.min(...values);
+      if (range > selectedRange) {
+        selected = points;
+        selectedRange = range;
+      }
+    });
+    return selected.length > 1 ? { kind: 'line', points: selected } : undefined;
+  }
+
   function qualifiesAsFinance(root) {
     const lines = cleanLines(root.innerText || root.textContent);
     const controls = periodControls(root);
@@ -164,7 +240,8 @@
       secondaryValue,
       trend: trendFor(primaryValue, secondaryValue),
       periods,
-      metrics: metricPairs(lines)
+      metrics: metricPairs(lines),
+      chart: visibleChart(root)
     });
   }
 
@@ -224,11 +301,13 @@
   }
 
   window.__elonChatGptRichContent = Object.freeze({
-    version: 1,
+    version: API_VERSION,
     schema: SCHEMA,
     parts,
     owns,
     financeRoots,
+    sampleChartGeometry,
+    visibleChart,
     normalizeFinancePayload,
     fromAuthorizedEnvelope
   });

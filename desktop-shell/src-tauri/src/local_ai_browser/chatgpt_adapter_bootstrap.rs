@@ -1,5 +1,5 @@
 const ALLOWED_ORIGIN: &str = "https://chatgpt.com";
-pub(super) const ADAPTER_VERSION: u32 = 142;
+pub(super) const ADAPTER_VERSION: u32 = 143;
 
 const WIN_RICH_CONTENT_ADAPTER: &str = include_str!("chatgpt_rich_content_adapter.js");
 const WIN_COMMON_RICH_CONTENT_ADAPTER: &str = include_str!("rich_content_dom_adapter.js");
@@ -309,7 +309,7 @@ mod tests {
 
         assert_eq!(win_assets, android_assets);
         assert_eq!(ADAPTER_VERSION, android_version);
-        assert!(script.contains("__elonChatGptAdapterTargetVersion = 142"));
+        assert!(script.contains("__elonChatGptAdapterTargetVersion = 143"));
         assert!(script.contains("__elonChatGptDocumentToken"));
         assert!(script.contains("__elonChatGptSnapshotScheduler"));
         assert!(script.contains("__elonChatGptLayout"));

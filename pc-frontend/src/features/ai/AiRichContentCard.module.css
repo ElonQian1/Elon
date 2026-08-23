@@ -115,7 +115,7 @@
   color: #ff4961;
 }
 
-.area { fill: url(#elon-finance-chart-fill); }
+.area { fill: currentColor; }
 .line { fill: none; stroke: currentColor; stroke-width: 2.3; vector-effect: non-scaling-stroke; }
 
 .chartFallback {

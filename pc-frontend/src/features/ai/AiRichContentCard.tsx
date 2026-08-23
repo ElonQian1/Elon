@@ -1,4 +1,5 @@
 import { Activity, CloudSun, ExternalLink, Images, MapPinned, Navigation } from 'lucide-react'
+import { useId } from 'react'
 import type {
   FinanceRichContent,
   MapRichContent,
@@ -21,6 +22,7 @@ function FinanceCard({ content }: { content: FinanceRichContent }) {
   const periods = payload.periods ?? []
   const metrics = payload.metrics ?? []
   const path = chartPath(payload.chart?.points)
+  const gradientId = useId()
   return (
     <article className={styles.card} aria-label="官方行情卡片">
       <header>
@@ -48,12 +50,12 @@ function FinanceCard({ content }: { content: FinanceRichContent }) {
       {path ? (
         <svg className={styles.chart} viewBox="0 0 640 180" role="img" aria-label="缓存行情走势">
           <defs>
-            <linearGradient id="elon-finance-chart-fill" x1="0" x2="0" y1="0" y2="1">
+            <linearGradient id={gradientId} x1="0" x2="0" y1="0" y2="1">
               <stop offset="0" stopColor="currentColor" stopOpacity=".28" />
               <stop offset="1" stopColor="currentColor" stopOpacity="0" />
             </linearGradient>
           </defs>
-          <path className={styles.area} d={`${path} L 640 180 L 0 180 Z`} />
+          <path className={styles.area} d={`${path} L 640 180 L 0 180 Z`} style={{ fill: `url(#${gradientId})` }} />
           <path className={styles.line} d={path} />
         </svg>
       ) : (

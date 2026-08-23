@@ -30,6 +30,9 @@ assert.match(adapter, /function financeRoots\(content\)/)
 assert.match(adapter, /role="radiogroup"/)
 assert.match(adapter, /role="application"/)
 assert.match(adapter, /function normalizeFinancePayload\(value\)/)
+assert.match(adapter, /function sampleChartGeometry\(geometry\)/)
+assert.match(adapter, /function visibleChart\(root\)/)
+assert.match(adapter, /MAX_VISIBLE_CHART_POINTS = 96/)
 assert.match(adapter, /data-elon-rich-content-root/)
 assert.match(adapter, /source: 'official_dom'/)
 assert.match(adapter, /function fromAuthorizedEnvelope\(envelope, authorize\)/)
@@ -73,6 +76,8 @@ assert.match(renderer, /referrerPolicy="no-referrer"/)
 assert.match(renderer, /periods\.map/)
 assert.match(renderer, /metrics\.map/)
 assert.match(renderer, /chart\?\.points/)
+assert.match(renderer, /useId\(\)/)
+assert.match(renderer, /url\(#\$\{gradientId\}\)/)
 assert.match(renderer, /payload\.rows\.map/)
 
 const context = {
@@ -92,6 +97,44 @@ assert.equal(normalized.periods.length, 8)
 assert.equal(normalized.periods.filter((period) => period.selected).length, 1)
 assert.equal(normalized.metrics.length, 4)
 assert.equal(normalized.chart, undefined, 'DOM extraction must not fabricate unavailable chart points')
+
+const sampledChart = context.window.__elonChatGptRichContent.sampleChartGeometry({
+  getBBox: () => ({ width: 100, height: 20 }),
+  getBoundingClientRect: () => ({ width: 640, height: 128 }),
+  getTotalLength: () => 100,
+  getPointAtLength: (position) => ({ x: position, y: 10 + Math.sin(position / 8) * 9 }),
+})
+assert.equal(sampledChart.length, 96, 'visible SVG chart sampling must stay bounded')
+assert.equal(sampledChart[0].x, '0')
+assert.ok(Math.max(...sampledChart.map((point) => point.y)) > 15)
+assert.equal(
+  context.window.__elonChatGptRichContent.sampleChartGeometry({
+    getBBox: () => ({ width: 640, height: 0 }),
+    getTotalLength: () => 640,
+    getPointAtLength: (position) => ({ x: position, y: 10 }),
+  }).length,
+  0,
+  'horizontal grid lines must not become finance charts',
+)
+assert.equal(
+  context.window.__elonChatGptRichContent.sampleChartGeometry({
+    getBBox: () => ({ width: 640, height: 80 }),
+    getTotalLength: () => 640,
+    getPointAtLength: (position) => ({
+      x: position <= 320 ? position * 2 : 640 - (position - 320) * 2,
+      y: 40 + Math.sin(position / 40) * 35,
+    }),
+  }).length,
+  0,
+  'closed or strongly backtracking area paths must fail closed',
+)
+assert.equal(
+  context.window.__elonChatGptRichContent.sampleChartGeometry({
+    getBBox: () => { throw new Error('detached') },
+  }).length,
+  0,
+  'detached SVG geometry must not break the message snapshot',
+)
 
 const common = context.window.__elonRichContentDomAdapter
 const media = common.normalizeMediaGalleryPayload(mediaMapFixture.mediaGallery)
