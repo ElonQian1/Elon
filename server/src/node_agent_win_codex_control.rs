@@ -11,6 +11,8 @@ use std::{
 #[path = "node_agent_win_codex_control_api.rs"]
 mod api;
 pub(crate) use api::{routes, tauri_diagnostic_snapshot, timeline_payload};
+#[path = "node_agent_win_codex_control/action_queue.rs"]
+mod action_queue;
 #[path = "node_agent_win_codex_control/ai_session_diagnostic.rs"]
 mod ai_session_diagnostic;
 
@@ -113,17 +115,6 @@ impl WinCodexControlHub {
         event
     }
 
-    pub(crate) fn enqueue_action(
-        &self,
-        trace_id: &str,
-        kind: &str,
-        route: Option<&str>,
-        provider_id: Option<&str>,
-        requested_by: &str,
-    ) -> Result<WinControlAction, String> {
-        self.enqueue_action_with_target(trace_id, kind, route, provider_id, None, requested_by)
-    }
-
     pub(crate) fn enqueue_action_with_target(
         &self,
         trace_id: &str,
@@ -133,41 +124,16 @@ impl WinCodexControlHub {
         target_release_identity: Option<&str>,
         requested_by: &str,
     ) -> Result<WinControlAction, String> {
-        let kind = validate_action_kind(kind)?;
-        let route = validate_action_route(kind, route)?;
-        let provider_id = validate_action_provider(kind, provider_id)?;
-        let target_release_identity =
-            validate_action_target(kind, target_release_identity, requested_by)?;
-        let now = now_ms();
-        let action = WinControlAction {
-            action_id: format!("win_act_{}", uuid::Uuid::new_v4().simple()),
-            trace_id: clean_identifier(trace_id, "win_action"),
-            kind: kind.to_string(),
+        action_queue::enqueue(
+            self,
+            trace_id,
+            kind,
             route,
             provider_id,
             target_release_identity,
-            requested_by: clean_identifier(requested_by, "local_admin"),
-            requested_at_ms: now,
-            expires_at_ms: now.saturating_add(ACTION_TTL_MS),
-            status: "queued".to_string(),
-            receipt: None,
-        };
-        let mut state = lock(&self.inner);
-        expire_actions(&mut state, now);
-        state.actions.push_back(action.clone());
-        while state.actions.len() > MAX_ACTIONS {
-            state.actions.pop_front();
-        }
-        drop(state);
-        self.record(
-            &action.trace_id,
-            "control",
-            "info",
-            "action.queued",
-            &format!("已排队 Win 语义动作 {}", action.kind),
-            json!({"action_id": action.action_id, "kind": action.kind, "route": action.route, "provider_id": action.provider_id, "target_release_identity": action.target_release_identity}),
-        );
-        Ok(action)
+            requested_by,
+            &crate::node_agent_release_identity::current(),
+        )
     }
 
     pub(crate) fn pending_actions(&self, limit: usize) -> Vec<WinControlAction> {

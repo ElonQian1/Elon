@@ -5,11 +5,10 @@ use std::marker::PhantomData;
 
 use rusqlite::Transaction;
 
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+use crate::compute_federation::external_pool_adapter_broker_tls::VerifiedExternalPoolAdapterBrokerTaskExchange;
 use crate::compute_federation::{
-    external_pool_adapter_broker_tls::{
-        ExternalPoolAdapterBrokerTaskVerifiedObservation,
-        VerifiedExternalPoolAdapterBrokerTaskExchange,
-    },
+    external_pool_adapter_broker_tls::ExternalPoolAdapterBrokerTaskVerifiedObservation,
     external_pool_adapter_task_protocol_production::{
         canonical_task_production_exchange_receipt_json_and_digest,
         ExternalPoolAdapterTaskExchangeReceiptEnvelope,
@@ -78,6 +77,7 @@ impl<'tx, 'conn, T> PendingExternalPoolAdapterTaskReceiptIngress<'tx, 'conn, T> 
 }
 
 #[allow(clippy::too_many_arguments)]
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 pub(in crate::store) fn insert_external_pool_adapter_task_receipt_ingress_on<
     'tx,
     'conn,

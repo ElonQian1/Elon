@@ -1,6 +1,7 @@
 //! Cross-platform sealed semantic boundary for one authenticated task exchange.
 
 use anyhow::Result;
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 use elon_external_pool_adapter_session_core::ExternalPoolAdapterTaskProtocolHostReceipt;
 
 use crate::compute_federation::{
@@ -60,6 +61,7 @@ pub(crate) trait ExternalPoolAdapterBrokerTaskObservationValidator:
 }
 
 /// The HostReceipt and its typed semantic observation cannot be split and recombined by a caller.
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 pub(crate) struct VerifiedExternalPoolAdapterBrokerTaskExchange<
     Observation: ExternalPoolAdapterBrokerTaskVerifiedObservation,
 > {
@@ -67,6 +69,7 @@ pub(crate) struct VerifiedExternalPoolAdapterBrokerTaskExchange<
     observation: Observation,
 }
 
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 impl<Observation: ExternalPoolAdapterBrokerTaskVerifiedObservation>
     VerifiedExternalPoolAdapterBrokerTaskExchange<Observation>
 {

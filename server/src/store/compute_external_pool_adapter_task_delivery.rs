@@ -69,10 +69,9 @@ pub(in crate::store) use reachability_pending_plan::{
     ExternalPoolAdapterTaskReachabilityPendingWrite,
     ExternalPoolAdapterTaskReachabilityPendingWriteKind,
 };
-pub(in crate::store) use receipt_ingress::{
-    insert_external_pool_adapter_task_receipt_ingress_on,
-    PendingExternalPoolAdapterTaskReceiptIngress,
-};
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+pub(in crate::store) use receipt_ingress::insert_external_pool_adapter_task_receipt_ingress_on;
+pub(in crate::store) use receipt_ingress::PendingExternalPoolAdapterTaskReceiptIngress;
 pub(in crate::store) use reconcile_ingress::{
     close_external_pool_adapter_task_reconcile_ingress_on,
     ExternalPoolAdapterTaskReconcileIngressFactory, ExternalPoolAdapterTaskReconcileIngressOutcome,

@@ -15,10 +15,11 @@ pub(crate) use no_work::exchange_external_pool_adapter_broker_no_work;
 pub(crate) use target::ExternalPoolAdapterBrokerTlsTarget;
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 pub(crate) use task_protocol::exchange_external_pool_adapter_broker_task;
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+pub(crate) use task_protocol_types::VerifiedExternalPoolAdapterBrokerTaskExchange;
 pub(crate) use task_protocol_types::{
     ExternalPoolAdapterBrokerTaskObservationValidator,
     ExternalPoolAdapterBrokerTaskVerifiedObservation,
-    VerifiedExternalPoolAdapterBrokerTaskExchange,
 };
 pub(crate) use transport::{
     connect_external_pool_adapter_broker_tls, ExternalPoolAdapterBrokerTlsChannel,

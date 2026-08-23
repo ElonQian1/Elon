@@ -78,7 +78,7 @@ fn definitions() -> Vec<Value> {
         }),
         json!({
             "name":"win_control_action",
-            "description":"排队白名单 Win 语义动作。queued 不等于成功；update_and_restart 还必须提供精确发布身份，并在 Win 重连后重新读取 status 核对版本。",
+            "description":"提交白名单 Win 语义动作。queued 不等于成功；同版本 update_and_restart 会立即 no-op 成功，其他更新必须提供精确发布身份并在 Win 重连后核对版本。",
             "inputSchema":{
                 "type":"object","required":["kind"],"additionalProperties":false,
                 "properties":{
@@ -150,10 +150,13 @@ fn call_tool(runtime: &NodeRuntime, workspace: &Path, params: Value) -> Result<V
                     "codex_mcp",
                 )
                 .map_err(anyhow::Error::msg)?;
+            let (completion_mode, completion_rule) =
+                completion_contract(&action.kind, &action.status);
             json!({
                 "schema":"elon.win_codex_action.v1",
                 "action":action,
-                "completion_rule":"queued is not success; wait for a succeeded Tauri scheduling receipt, then after reconnect verify capabilities.release_identity equals the requested target",
+                "completion_mode": completion_mode,
+                "completion_rule": completion_rule,
             })
         }
         "win_control_action_status" => {
@@ -171,6 +174,19 @@ fn call_tool(runtime: &NodeRuntime, workspace: &Path, params: Value) -> Result<V
         _ => bail!("Win 控制 profile 不支持工具：{name}"),
     };
     Ok(tool_result(name, value))
+}
+
+fn completion_contract(kind: &str, status: &str) -> (&'static str, &'static str) {
+    if kind == "update_and_restart" && status == "succeeded" {
+        return (
+            "already_current_noop",
+            "already terminal: exact target already runs locally; no Tauri restart was queued",
+        );
+    }
+    (
+        "await_tauri_receipt",
+        "queued is not success; wait for a succeeded Tauri scheduling receipt, then after reconnect verify capabilities.release_identity equals the requested target",
+    )
 }
 
 fn tool_result(name: &str, value: Value) -> Value {
@@ -210,5 +226,17 @@ mod tests {
         assert!(!serialized.contains("eval_javascript"));
         assert!(!serialized.contains("window_label"));
         assert!(!serialized.contains("cookie"));
+    }
+
+    #[test]
+    fn completion_contract_distinguishes_noop_from_queued_restart() {
+        assert_eq!(
+            completion_contract("update_and_restart", "succeeded").0,
+            "already_current_noop"
+        );
+        assert_eq!(
+            completion_contract("update_and_restart", "queued").0,
+            "await_tauri_receipt"
+        );
     }
 }

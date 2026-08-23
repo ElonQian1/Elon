@@ -382,6 +382,143 @@
       "updated_at_ms": 1787457080433
     },
     {
+      "id": "backend-linux-task-receipt-boundary-v1",
+      "title": "后端 Linux 任务回执边界 v1",
+      "summary": "将依赖 Linux-only session core 的 HostReceipt 包装器和持久化入口限定到 Linux x86_64，恢复 Windows 正式编译。",
+      "status": "verified",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/backend-linux-task-receipt-boundary-v1.md",
+        "content_hash": "c1f0f79fdf51662f13fe8f9464876bee7b27dd5375ce0169bcab04aba2063b89",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "ba08973c234c83b040477e7d72ce7c688716dcc4",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "2b6e5e4b5e25e337abc74643daa515ec8ae15857",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "backend-runtime",
+      "tags": [
+        "backend",
+        "rust",
+        "windows",
+        "linux",
+        "compile"
+      ],
+      "task_paths": [
+        "server/src/compute_federation/external_pool_adapter_broker_tls.rs",
+        "server/src/compute_federation/external_pool_adapter_broker_tls/task_protocol_types.rs",
+        "server/src/store/compute_external_pool_adapter_task_delivery.rs",
+        "server/src/store/compute_external_pool_adapter_task_delivery/receipt_ingress.rs"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "Windows 构建不再导入 Linux-only HostReceipt",
+        "Linux x86_64 保留交换包装器与入库路径",
+        "跨平台语义验证 trait 保持可用",
+        "既有任务协议源码契约测试通过"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "docs/requirements/backend-linux-task-receipt-boundary-v1.md",
+          "content_hash": "c1f0f79fdf51662f13fe8f9464876bee7b27dd5375ce0169bcab04aba2063b89",
+          "locator": "验收标准",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ba08973c234c83b040477e7d72ce7c688716dcc4",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "2b6e5e4b5e25e337abc74643daa515ec8ae15857",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/external_pool_adapter_broker_tls.rs",
+          "content_hash": "5740bc29b02a840ddc44688bfb17d85553d9ed078ba621bf33ed74350484878d",
+          "locator": "VerifiedExternalPoolAdapterBrokerTaskExchange",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ba08973c234c83b040477e7d72ce7c688716dcc4",
+            "head_blob_oid": "799df9b4793680376bf0745b50dd48c6eacef406",
+            "worktree_blob_oid": "bb0b392d1e42000c1816877df49d5ad56632eaa4",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/external_pool_adapter_broker_tls/task_protocol_types.rs",
+          "content_hash": "53d28b8915b9b056177d5d522befdb41c239b6452db7b9beb47a10472dbb56f5",
+          "locator": "VerifiedExternalPoolAdapterBrokerTaskExchange",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ba08973c234c83b040477e7d72ce7c688716dcc4",
+            "head_blob_oid": "8773fecd41aea4fd0d59de6c257d4946efea83f4",
+            "worktree_blob_oid": "51079992c9b4399076e23d68111bf068fe75e501",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/external_pool_adapter_release_api_tests/task_protocol_production_session_source_contract_test.rs",
+          "content_hash": "5e3c79761564f8c26fd66b29939217c1d2aec3a5f06a1ec4c4097cea2da4b3ad",
+          "locator": "task_protocol_production_reuses_exact_eltp_v1_and_bounded_receipt_only_tls",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ba08973c234c83b040477e7d72ce7c688716dcc4",
+            "head_blob_oid": "afcdcf67d7d0f27b8ae60e371a8e72352c186f85",
+            "worktree_blob_oid": "afcdcf67d7d0f27b8ae60e371a8e72352c186f85",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/external_pool_adapter_release_api_tests/task_reachability_source_contract_test.rs",
+          "content_hash": "7ca0ca05cef00e0592fdfb31535bec44f87ae9df0c7c64f8c5adea80f363a131",
+          "locator": "relay_returns_only_typed_semantics_and_worker_remains_honestly_ineligible",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ba08973c234c83b040477e7d72ce7c688716dcc4",
+            "head_blob_oid": "3bd0e36226cc8ffc1c2da97206b85f56b8aa5061",
+            "worktree_blob_oid": "3bd0e36226cc8ffc1c2da97206b85f56b8aa5061",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/store/compute_external_pool_adapter_task_delivery.rs",
+          "content_hash": "a292a2bcc7c14a3a61635cf10348f6708528255ecc0742ad7233b2f1c81f465c",
+          "locator": "insert_external_pool_adapter_task_receipt_ingress_on",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ba08973c234c83b040477e7d72ce7c688716dcc4",
+            "head_blob_oid": "31cd317e7151d5eab8b5b7fbee173553e75f7fd3",
+            "worktree_blob_oid": "f369469860e6420d823167b9a5b36b85656e2a35",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/store/compute_external_pool_adapter_task_delivery/receipt_ingress.rs",
+          "content_hash": "bf0b992febbc658d7e34d5a1cbaf332c0bbfb10d7e74f63328a9c3c8487531c6",
+          "locator": "insert_external_pool_adapter_task_receipt_ingress_on",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ba08973c234c83b040477e7d72ce7c688716dcc4",
+            "head_blob_oid": "295ae991ffe00c98e6a74e20235f5e61ec9c7f55",
+            "worktree_blob_oid": "0a7fec7eab3c0c7b42d6451cbf295f89e2870151",
+            "state": "tracked_modified"
+          }
+        }
+      ],
+      "created_at_ms": 1787459571280,
+      "updated_at_ms": 1787461920923
+    },
+    {
       "id": "compute-attempt-final-usage-fence-verification-v1",
       "title": "Attempt 最终声明用量栅栏动态验收 V1",
       "summary": "动态验证 V226 在终态候选处原子封口 Provider 声明用量流，并阻止下游消费过时流头。",
@@ -7030,6 +7167,116 @@
       "updated_at_ms": 1787450588560
     },
     {
+      "id": "win-control-already-current-update-noop-v1",
+      "title": "Win 控制层同版本更新 No-op v1",
+      "summary": "精确更新目标等于当前 release identity 时在语义控制层直接形成可查询成功终态，避免 Tauri 桌面壳无意义重启。",
+      "status": "verified",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/win-control-already-current-update-noop-v1.md",
+        "content_hash": "4eb52717cc173ddeb4ac3f862600a7e6df3085357f714b84f9fe5b784ce5e2c6",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "ba08973c234c83b040477e7d72ce7c688716dcc4",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "e70ad8342b5da019e1e0345068be0c4328d8a257",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "win-release",
+      "tags": [
+        "win",
+        "tauri",
+        "release",
+        "idempotency"
+      ],
+      "task_paths": [
+        "server/src/node_agent_win_codex_control.rs",
+        "server/src/node_agent_win_codex_control/action_queue.rs",
+        "server/src/node_agent_win_codex_control_mcp.rs",
+        "server/src/node_agent_win_codex_control_tests.rs"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "同版本 update_and_restart 立即 succeeded 且不进入 pending_actions",
+        "不同精确版本仍进入 queued",
+        "MCP 明确区分已完成 no-op 与待 Tauri 完成",
+        "Win 实机重复同版本动作前后桌面 PID 不变且 runtime_online"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "docs/requirements/win-control-already-current-update-noop-v1.md",
+          "content_hash": "4eb52717cc173ddeb4ac3f862600a7e6df3085357f714b84f9fe5b784ce5e2c6",
+          "locator": "验收标准",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ba08973c234c83b040477e7d72ce7c688716dcc4",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "e70ad8342b5da019e1e0345068be0c4328d8a257",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/node_agent_win_codex_control/action_queue.rs",
+          "content_hash": "a1df7b88115e45fff028f811df534b863e85172fac9d2767f45397e7f4bc209a",
+          "locator": "enqueue",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ba08973c234c83b040477e7d72ce7c688716dcc4",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "3890c3cc898becf134f02f95f4d4cb7c8c0c82c4",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/node_agent_win_codex_control_mcp.rs",
+          "content_hash": "ea4c03160ab90f326c07cac7031b0f2ff5a424b8041d7b414b0d38930bf8b15f",
+          "locator": "completion_contract",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ba08973c234c83b040477e7d72ce7c688716dcc4",
+            "head_blob_oid": "7d8b248e440f51978cb9660940f618b2f00ebee0",
+            "worktree_blob_oid": "a05207ae22dbacb48d410851af0de4fee6b6ff67",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/node_agent_win_codex_control_tests.rs",
+          "content_hash": "34b1689bb33ca32fcb2d7b7df482572eef64d8222c0d33dca30171c4a16a76be",
+          "locator": "update_restart_for_a_different_exact_release_remains_queued",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ba08973c234c83b040477e7d72ce7c688716dcc4",
+            "head_blob_oid": "22cbc0e78c407cba47389662249d653744dadcd6",
+            "worktree_blob_oid": "848669714955e05373944f0708314fbdd22c1fc6",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/node_agent_win_codex_control_tests.rs",
+          "content_hash": "34b1689bb33ca32fcb2d7b7df482572eef64d8222c0d33dca30171c4a16a76be",
+          "locator": "update_restart_for_current_exact_release_is_a_terminal_noop",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ba08973c234c83b040477e7d72ce7c688716dcc4",
+            "head_blob_oid": "22cbc0e78c407cba47389662249d653744dadcd6",
+            "worktree_blob_oid": "848669714955e05373944f0708314fbdd22c1fc6",
+            "state": "tracked_modified"
+          }
+        }
+      ],
+      "created_at_ms": 1787458407514,
+      "updated_at_ms": 1787461854399
+    },
+    {
       "id": "win-full-size-parked-ai-webview-input-hit-test-v3",
       "title": "Win 完整视口后台官方 AI WebView 输入命中隔离 V3",
       "summary": "保持 Google/ChatGPT 完整官网视口尺寸并将控制器整体停放到父窗口右下可见边界之外，同时满足原生输入命中和后台会话发送。",
@@ -10685,246 +10932,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_13af34cf0b8d4b04a5057738bb91a63c",
-      "feature_id": "win-node-agent-background-repair-file-lock-v1",
-      "action": "transitioned",
-      "actor": "codex-root",
-      "reason": "Explicitly retries Windows raw sharing and lock violation codes 32/33 for 30 seconds.",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1787247073978
-    },
-    {
-      "id": "feature_event_5c24a5619268430d9724607fdea3d4cb",
-      "feature_id": "win-node-agent-background-repair-file-lock-v1",
-      "action": "transitioned",
-      "actor": "codex-root",
-      "reason": "Raw OS code unit test, elon-pc-node launcher suite, local-first release contract, and source-size guard passed.",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1787247073998
-    },
-    {
-      "id": "feature_event_9e6c3f54924e43629ac46454df050a4b",
-      "feature_id": "win-google-ai-native-complete-answer-root-v1",
-      "action": "registered",
-      "actor": "codex",
-      "reason": "真实 Win 对照发现旧边界只剩末尾追问，作为已验证 V2 的后续生产修复登记。",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1787256653031
-    },
-    {
-      "id": "feature_event_2261fde2c12743db9d986a76177e4c9e",
-      "feature_id": "win-google-ai-native-complete-answer-root-v1",
-      "action": "claimed",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1787256664103
-    },
-    {
-      "id": "feature_event_88123bdf90544191927ef2f69c3e1069",
-      "feature_id": "win-google-ai-native-complete-answer-root-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "实现、发布和真实 Win 验收已完成，补录当前提交证据。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1787256677056
-    },
-    {
-      "id": "feature_event_36467413da5a4ab7b9bbab7c3c6c20fb",
-      "feature_id": "win-google-ai-native-complete-answer-root-v1",
-      "action": "evidence_recorded",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1787256698520
-    },
-    {
-      "id": "feature_event_e58e675b6d0942bf87a6f0cd0a5bee71",
-      "feature_id": "win-google-ai-native-complete-answer-root-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "完整回答根节点策略、版本门和回归测试已在 cc73a1a15 实现。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1787256712951
-    },
-    {
-      "id": "feature_event_e455d8fe29d649379940ddc15c0ca983",
-      "feature_id": "win-google-ai-native-complete-answer-root-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "前端合同、lint/typecheck、Rust 定向测试和 Google 原生烟测通过。",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1787256727468
-    },
-    {
-      "id": "feature_event_eaa08614adc64a66ad58faf627e6a7ed",
-      "feature_id": "win-google-ai-native-complete-answer-root-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "Win 0.3.69+cc73a1a15 已激活，真实 Google 游客会话原生页显示完整三点正文和行内引用，语义状态 ready/live。",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1787256740088
-    },
-    {
-      "id": "feature_event_4bf3669826e04f2b8ca7734fbdd2f0a6",
-      "feature_id": "erp-managed-hosting-node-v1",
-      "action": "registered",
-      "actor": "codex",
-      "reason": "用户确认优先把咖啡店项目演进为所有商户可安装的电商子服务器能力。",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1787285096574
-    },
-    {
-      "id": "feature_event_9a44d12a11e742ba96acf7a0798539cf",
-      "feature_id": "erp-managed-hosting-node-v1",
-      "action": "claimed",
-      "actor": "codex-current-task",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1787285106830
-    },
-    {
-      "id": "feature_event_928ae7407d274b6399d787ddcf1b1daa",
-      "feature_id": "erp-managed-hosting-node-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "开始实现跨仓合同、隔离实例工具和验收文档。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1787285117489
-    },
-    {
-      "id": "feature_event_9fe0f42d5ce04ac0b11e43185d812455",
-      "feature_id": "erp-managed-hosting-node-v1",
-      "action": "claim_released",
-      "actor": "codex-current-task",
-      "reason": "需求在实现中补充平台浏览器隔离验收项，先释放认领后显式重绑。",
-      "from_status": "in_progress",
-      "to_status": "blocked",
-      "at_ms": 1787285523063
-    },
-    {
-      "id": "feature_event_cfc24a64ab884efd96cc7c3b20a0fc6a",
-      "feature_id": "erp-managed-hosting-node-v1",
-      "action": "requirement_rebound",
-      "actor": "codex",
-      "reason": "确认当前需求页新增隔离验收项有效，重新绑定当前内容。",
-      "from_status": "blocked",
-      "to_status": "proposed",
-      "at_ms": 1787285535416
-    },
-    {
-      "id": "feature_event_bca2b18118864b8b96294ea380758fe4",
-      "feature_id": "erp-managed-hosting-node-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "当前需求与已实现安全边界一致，验收标准已复核。",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1787285545109
-    },
-    {
-      "id": "feature_event_048946b731e64a368ea5ba73f2799b76",
-      "feature_id": "erp-managed-hosting-node-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "需求已接受且无依赖阻塞，准备重新绑定实现证据。",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1787285554362
-    },
-    {
-      "id": "feature_event_c1fc87f085b048ea8bd51addbe718f8f",
-      "feature_id": "erp-managed-hosting-node-v1",
-      "action": "claimed",
-      "actor": "codex-current-task",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1787285564216
-    },
-    {
-      "id": "feature_event_0c41f16b9e394ded82831fb6c27d8f73",
-      "feature_id": "erp-managed-hosting-node-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "重新认领后绑定当前实现和测试证据。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1787285577468
-    },
-    {
-      "id": "feature_event_e02a01ed72e74ca9833962f1ba1ca095",
-      "feature_id": "erp-managed-hosting-node-v1",
-      "action": "evidence_recorded",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1787285592883
-    },
-    {
-      "id": "feature_event_2b85b43c822e4070ab30409fb3b2c824",
-      "feature_id": "erp-managed-hosting-node-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "跨仓合同、商户实例工具、示例、隔离门禁和验收文档已完成。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1787285603663
-    },
-    {
-      "id": "feature_event_e583688d4a414ed4a71052d52da53423",
-      "feature_id": "erp-managed-hosting-node-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "10 项合同与隔离测试通过，Bash 语法、跨仓 Schema 一致性、源码和文档门禁通过。",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1787285617481
-    },
-    {
-      "id": "feature_event_cb2babadafed422687751909eff2a641",
-      "feature_id": "open-commerce-native-edge-v1",
-      "action": "registered",
-      "actor": "codex-desktop",
-      "reason": "",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1787298339966
-    },
-    {
-      "id": "feature_event_42960ba43ddc4da09af73313f4732516",
-      "feature_id": "open-commerce-native-edge-v1",
-      "action": "claimed",
-      "actor": "codex-desktop-native-edge",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1787298351639
-    },
-    {
-      "id": "feature_event_ee47468400584e56bd70c3558f3fefbe",
-      "feature_id": "open-commerce-native-edge-v1",
-      "action": "transitioned",
-      "actor": "codex-desktop",
-      "reason": "需求和安全边界已固化，开始实现独立 Rust 入口。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1787298363396
-    },
-    {
       "id": "feature_event_819fb2461982469ca231cf9b89ca197b",
       "feature_id": "open-commerce-native-edge-v1",
       "action": "claim_released",
@@ -12683,6 +12690,246 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1787457184215
+    },
+    {
+      "id": "feature_event_d5166fcb89b54b0599874a3a5098f53b",
+      "feature_id": "win-control-already-current-update-noop-v1",
+      "action": "registered",
+      "actor": "codex-root",
+      "reason": "实机重复更新验收发现后台已收敛但桌面壳仍重启一次。",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1787458407514
+    },
+    {
+      "id": "feature_event_5cc7e4db4e254a7d8f5c38235b76358b",
+      "feature_id": "win-control-already-current-update-noop-v1",
+      "action": "claimed",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1787458457302
+    },
+    {
+      "id": "feature_event_83e9edb2ef58451889e8f29b089d3235",
+      "feature_id": "win-control-already-current-update-noop-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "开始修复同版本更新仍排队并触发 Tauri 重启的问题。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1787458516590
+    },
+    {
+      "id": "feature_event_6a2c87dbb8b74173bb3d3444df81f4f6",
+      "feature_id": "win-control-already-current-update-noop-v1",
+      "action": "claim_released",
+      "actor": "codex-root",
+      "reason": "源码体积门禁要求扩充 task_paths 后重新认领。",
+      "from_status": "in_progress",
+      "to_status": "ready",
+      "at_ms": 1787458984328
+    },
+    {
+      "id": "feature_event_21f5f82d00944fa689bb9769ae012c8a",
+      "feature_id": "win-control-already-current-update-noop-v1",
+      "action": "metadata_updated",
+      "actor": "codex-root",
+      "reason": "源码体积门禁要求将动作入队与同版本准入抽成聚焦模块。",
+      "from_status": "ready",
+      "to_status": "proposed",
+      "at_ms": 1787459002893
+    },
+    {
+      "id": "feature_event_0f83cc314d3c4b41aa2cfc1c4fff3222",
+      "feature_id": "win-control-already-current-update-noop-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "模块化任务路径与验收范围已复核。",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1787459044568
+    },
+    {
+      "id": "feature_event_35fefe7dfabc435ab6bd0feb585b6d9e",
+      "feature_id": "win-control-already-current-update-noop-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "需求、任务路径与验收标准已确认，可重新认领。",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1787459088902
+    },
+    {
+      "id": "feature_event_8be771e54d5a411a96a811cd03c6d844",
+      "feature_id": "win-control-already-current-update-noop-v1",
+      "action": "claimed",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1787459139993
+    },
+    {
+      "id": "feature_event_687ca762e4e64343aae9672a9e389da7",
+      "feature_id": "win-control-already-current-update-noop-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "模块化后继续实现与验证。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1787459172782
+    },
+    {
+      "id": "feature_event_cba587ba9f3d4a7b8d29bfbead512cff",
+      "feature_id": "backend-linux-task-receipt-boundary-v1",
+      "action": "registered",
+      "actor": "codex-root",
+      "reason": "Win 定向验证暴露无条件导入 Linux-only session core 的 E0432 正式编译阻塞。",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1787459571280
+    },
+    {
+      "id": "feature_event_7b194d630b0749218c512496d3d9c13b",
+      "feature_id": "backend-linux-task-receipt-boundary-v1",
+      "action": "claimed",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1787459596703
+    },
+    {
+      "id": "feature_event_ec9d30ece4134c13b55ffe69d339052c",
+      "feature_id": "backend-linux-task-receipt-boundary-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "开始修复 Windows 无条件导入 Linux-only HostReceipt 的编译阻塞。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1787459631837
+    },
+    {
+      "id": "feature_event_d440df1d73a944c1bb6702f8bdb21b9d",
+      "feature_id": "backend-linux-task-receipt-boundary-v1",
+      "action": "claim_released",
+      "actor": "codex-root",
+      "reason": "父模块还需同步条件导出，先扩充 task_paths 后重新认领。",
+      "from_status": "in_progress",
+      "to_status": "ready",
+      "at_ms": 1787459888089
+    },
+    {
+      "id": "feature_event_6d46f513dc5b440aa1be579bfd4bd64c",
+      "feature_id": "backend-linux-task-receipt-boundary-v1",
+      "action": "metadata_updated",
+      "actor": "codex-root",
+      "reason": "父模块必须同步 cfg 条件导出 Linux-only 入库函数。",
+      "from_status": "ready",
+      "to_status": "proposed",
+      "at_ms": 1787459920491
+    },
+    {
+      "id": "feature_event_d063414466ba47b093be9106655167f5",
+      "feature_id": "backend-linux-task-receipt-boundary-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "父导出与子实现的 Linux 边界范围已复核。",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1787459946342
+    },
+    {
+      "id": "feature_event_b1f4bfc1552c4e40bb6d936e0b0a2820",
+      "feature_id": "backend-linux-task-receipt-boundary-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "需求与完整 task_paths 已确认。",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1787459973635
+    },
+    {
+      "id": "feature_event_8db07cf4ef3e48f7b7587bf66e83bfdb",
+      "feature_id": "backend-linux-task-receipt-boundary-v1",
+      "action": "claimed",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1787460000924
+    },
+    {
+      "id": "feature_event_78938e9cb3a14778a156fa11ae52fa1b",
+      "feature_id": "backend-linux-task-receipt-boundary-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "继续实现父模块 Linux 条件导出。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1787460035805
+    },
+    {
+      "id": "feature_event_02904a4eab1d4a448c827fd5bede866f",
+      "feature_id": "win-control-already-current-update-noop-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1787461555559
+    },
+    {
+      "id": "feature_event_7252340cbaf64f3dbe0ee09a70ca5d65",
+      "feature_id": "backend-linux-task-receipt-boundary-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1787461590992
+    },
+    {
+      "id": "feature_event_4989795ec17f4309b57cb462a581747d",
+      "feature_id": "win-control-already-current-update-noop-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "同版本终态 no-op、MCP 完成模式及不同版本排队行为已实现。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1787461617841
+    },
+    {
+      "id": "feature_event_04810e9ea2fd423ab77b638008320ca7",
+      "feature_id": "backend-linux-task-receipt-boundary-v1",
+      "action": "transitioned",
+      "actor": "codex/root",
+      "reason": "Windows compile blocker fixed by cfg-gating Linux-only external adapter receipt/session boundary; targeted Windows Rust tests, Linux source contracts, release contract, source-size and format/diff gates pass.",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1787461807914
+    },
+    {
+      "id": "feature_event_bfc018d14e7144b688a66da69f9c43f7",
+      "feature_id": "win-control-already-current-update-noop-v1",
+      "action": "transitioned",
+      "actor": "codex/root",
+      "reason": "Targeted Rust tests, release-contract validation, source-size, rustfmt and diff gates all pass; semantic acceptance will be repeated against the published Win release.",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1787461854399
+    },
+    {
+      "id": "feature_event_b6ee77163bfc465b9e67f04817e91812",
+      "feature_id": "backend-linux-task-receipt-boundary-v1",
+      "action": "transitioned",
+      "actor": "codex/root",
+      "reason": "Windows targeted Rust suite and relevant Linux x86_64 source-contract tests pass; cross-platform semantic traits remain available and release contract passes.",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1787461920923
     }
   ]
 }

@@ -4,40 +4,63 @@ use super::*;
 fn action_contract_rejects_arbitrary_urls_scripts_and_routes() {
     let hub = WinCodexControlHub::default();
     assert!(hub
-        .enqueue_action("trace", "navigate", Some("/codex-control"), None, "test")
+        .enqueue_action_with_target(
+            "trace",
+            "navigate",
+            Some("/codex-control"),
+            None,
+            None,
+            "test"
+        )
         .is_ok());
     assert!(hub
-        .enqueue_action(
+        .enqueue_action_with_target(
             "trace",
             "navigate",
             Some("https://example.com"),
+            None,
             None,
             "test"
         )
         .is_err());
     assert!(hub
-        .enqueue_action("trace", "navigate", Some("/unknown"), None, "test")
+        .enqueue_action_with_target("trace", "navigate", Some("/unknown"), None, None, "test")
         .is_err());
     assert!(hub
-        .enqueue_action("trace", "eval_javascript", None, None, "test")
+        .enqueue_action_with_target("trace", "eval_javascript", None, None, None, "test")
         .is_err());
     assert!(hub
-        .enqueue_action("trace", "focus_ai_window", None, Some("chatgpt"), "test",)
+        .enqueue_action_with_target(
+            "trace",
+            "focus_ai_window",
+            None,
+            Some("chatgpt"),
+            None,
+            "test",
+        )
         .is_ok());
     assert!(hub
-        .enqueue_action("trace", "focus_ai_window", None, None, "test")
+        .enqueue_action_with_target("trace", "focus_ai_window", None, None, None, "test")
         .is_err());
     assert!(hub
-        .enqueue_action(
+        .enqueue_action_with_target(
             "trace",
             "capture_ai_window_state",
             None,
             Some("arbitrary-window-label-secret"),
+            None,
             "test",
         )
         .is_err());
     assert!(hub
-        .enqueue_action("trace", "list_ai_windows", None, Some("chatgpt"), "test",)
+        .enqueue_action_with_target(
+            "trace",
+            "list_ai_windows",
+            None,
+            Some("chatgpt"),
+            None,
+            "test",
+        )
         .is_err());
 }
 
@@ -87,6 +110,55 @@ fn update_restart_requires_codex_and_an_exact_release_identity() {
 }
 
 #[test]
+fn update_restart_for_current_exact_release_is_a_terminal_noop() {
+    let hub = WinCodexControlHub::default();
+    let current = format!("0.3.69+{}", "a".repeat(40));
+    let action = action_queue::enqueue(
+        &hub,
+        "trace",
+        "update_and_restart",
+        None,
+        None,
+        Some(&current),
+        "codex_mcp",
+        &current,
+    )
+    .unwrap();
+
+    assert_eq!(action.status, "succeeded");
+    assert!(action
+        .receipt
+        .as_ref()
+        .and_then(|receipt| receipt.message.as_deref())
+        .is_some_and(|message| message.contains("already_current_noop")));
+    assert!(hub.pending_actions(10).is_empty());
+    assert!(hub.claim_action(&action.action_id).is_err());
+    assert_eq!(hub.action(&action.action_id).unwrap().status, "succeeded");
+}
+
+#[test]
+fn update_restart_for_a_different_exact_release_remains_queued() {
+    let hub = WinCodexControlHub::default();
+    let current = format!("0.3.69+{}", "a".repeat(40));
+    let target = format!("0.3.69+{}", "b".repeat(40));
+    let action = action_queue::enqueue(
+        &hub,
+        "trace",
+        "update_and_restart",
+        None,
+        None,
+        Some(&target),
+        "codex_mcp",
+        &current,
+    )
+    .unwrap();
+
+    assert_eq!(action.status, "queued");
+    assert!(action.receipt.is_none());
+    assert_eq!(hub.pending_actions(10).len(), 1);
+}
+
+#[test]
 fn capabilities_expose_the_current_release_and_pinned_restart_policy() {
     let capabilities = WinCodexControlHub::default().capabilities();
     assert!(capabilities["actions"]
@@ -121,7 +193,7 @@ fn event_fields_and_sensitive_summaries_are_redacted() {
 fn receipts_are_idempotent_but_conflicting_terminal_states_fail() {
     let hub = WinCodexControlHub::default();
     let action = hub
-        .enqueue_action("trace", "focus_window", None, None, "test")
+        .enqueue_action_with_target("trace", "focus_window", None, None, None, "test")
         .unwrap();
     let receipt = WinControlReceipt {
         status: "succeeded".to_string(),
@@ -156,7 +228,7 @@ fn receipts_are_idempotent_but_conflicting_terminal_states_fail() {
 fn claiming_an_action_removes_it_from_the_pending_queue() {
     let hub = WinCodexControlHub::default();
     let action = hub
-        .enqueue_action("trace", "reload_page", None, None, "test")
+        .enqueue_action_with_target("trace", "reload_page", None, None, None, "test")
         .unwrap();
     assert_eq!(hub.pending_actions(10).len(), 1);
     hub.claim_action(&action.action_id).unwrap();
@@ -171,7 +243,7 @@ fn claiming_an_action_removes_it_from_the_pending_queue() {
 fn action_lookup_returns_only_sanitized_ai_window_receipts() {
     let hub = WinCodexControlHub::default();
     let action = hub
-        .enqueue_action("trace", "list_ai_windows", None, None, "test")
+        .enqueue_action_with_target("trace", "list_ai_windows", None, None, None, "test")
         .unwrap();
     hub.claim_action(&action.action_id).unwrap();
     hub.record_receipt(
@@ -306,11 +378,12 @@ fn action_lookup_returns_only_sanitized_ai_window_receipts() {
 fn ai_window_receipts_are_bound_to_action_kind_and_provider() {
     let hub = WinCodexControlHub::default();
     let action = hub
-        .enqueue_action(
+        .enqueue_action_with_target(
             "trace",
             "capture_ai_window_state",
             None,
             Some("google-ai-mode"),
+            None,
             "test",
         )
         .unwrap();
