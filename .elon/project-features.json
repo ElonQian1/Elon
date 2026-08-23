@@ -9628,6 +9628,57 @@
       "updated_at_ms": 1786874485287
     },
     {
+      "id": "win-web-ai-native-conversation-primary-v1",
+      "title": "Win 网页 AI 原生会话主界面 V1",
+      "summary": "撤除正常聊天画布上仅保留最后助手回答的官方 WebView 覆盖层，恢复原生完整回合、上下文和 composer；完整官网保真改为显式内部标签。",
+      "status": "proposed",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/win-web-ai-native-conversation-primary-v1.md",
+        "content_hash": "26e7d2c4da60fc9db400d1baf99fe4f8e42e885cd7b4aa0a63d940d9c1d7dc0f",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "7835835e8a9c84b81b69bf77c133c63a135b8793",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "6199cbdaef8eb822109d18c30caf9f983a7d1551",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "windows-web-ai",
+      "tags": [
+        "windows",
+        "webview2",
+        "chatgpt",
+        "google-ai",
+        "conversation",
+        "ux"
+      ],
+      "task_paths": [
+        "desktop-shell/src-tauri/src/local_ai_browser/embedded_view.rs",
+        "desktop-shell/src-tauri/src/local_ai_browser/embedded_view/answer_surface.rs",
+        "pc-frontend/scripts/test-ai-answer-surface.cjs",
+        "pc-frontend/scripts/test-ai-browser-tabs.cjs",
+        "pc-frontend/src/features/ai/AiChatPage.tsx",
+        "pc-frontend/src/features/user-browser"
+      ],
+      "dependencies": [
+        "win-web-ai-structured-rich-content-v1"
+      ],
+      "acceptance_criteria": [
+        "正常聊天不再自动叠加 contentOnly WebView，用户/助手完整回合可见",
+        "答案投影不再隐藏官网 composer，既有上下文发送链保持可用",
+        "官网完整内容继续通过显式内部标签显示并可返回聊天",
+        "复用原生富卡、缓存、来源和游客身份，不改 PWA",
+        "PC/Tauri 契约、构建和 Win 本机更新通过"
+      ],
+      "implementation_evidence": [],
+      "created_at_ms": 1787462176841,
+      "updated_at_ms": 1787462176841
+    },
+    {
       "id": "win-web-ai-official-context-binding-v1",
       "title": "Win 网页 AI 官方上下文绑定 V1",
       "summary": "让 Windows 生产首页只在消息快照、官方页面和厂商会话完成实时绑定后发送，并恢复 Google AI Mode 查询会话及 ChatGPT SPA 路由上下文。",
@@ -10931,16 +10982,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_819fb2461982469ca231cf9b89ca197b",
-      "feature_id": "open-commerce-native-edge-v1",
-      "action": "claim_released",
-      "actor": "codex-desktop-native-edge",
-      "reason": "提交前显式重绑需求排版哈希，完成后重新认领。",
-      "from_status": "in_progress",
-      "to_status": "blocked",
-      "at_ms": 1787299966507
-    },
     {
       "id": "feature_event_a19b518c137e4ac68d7db13958d724b2",
       "feature_id": "open-commerce-native-edge-v1",
@@ -12930,6 +12971,16 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1787461920923
+    },
+    {
+      "id": "feature_event_fe641e6e6e47422e9901de8728b3e653",
+      "feature_id": "win-web-ai-native-conversation-primary-v1",
+      "action": "registered",
+      "actor": "codex-goal-native-conversation",
+      "reason": "真实 Win 截图证明自动最后答案覆盖层遮挡气泡并使官网 composerReady 失效，需要以原生完整会话为生产主界面。",
+      "from_status": "",
+      "to_status": "proposed",
+      "at_ms": 1787462176841
     }
   ]
 }
