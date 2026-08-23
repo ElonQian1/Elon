@@ -9950,7 +9950,7 @@
       "id": "win-web-ai-prelaunch-raw-response-research-v1",
       "title": "Win 网页 AI 上线前原始响应研究 V1",
       "summary": "在尚未公开上线、当前用户均为开发测试人员的阶段，为 ChatGPT 与 Google AI 官方 WebView2 默认旁路采样受控接口原始响应；不重放生成请求，本机有界留存并可打开和随会话清除。",
-      "status": "verified",
+      "status": "released",
       "priority": "p1",
       "requirement": {
         "path": "docs/requirements/win-web-ai-prelaunch-raw-response-research-v1.md",
@@ -10059,7 +10059,7 @@
         }
       ],
       "created_at_ms": 1787485049335,
-      "updated_at_ms": 1787485610371
+      "updated_at_ms": 1787486654149
     },
     {
       "id": "win-web-ai-private-response-research-fixture-v1",
@@ -10334,7 +10334,7 @@
       "id": "win-web-ai-renderer-upgrade-notice-v1",
       "title": "Win 网页 AI 富内容渲染升级提示 V1",
       "summary": "当 ChatGPT 或 Google 官方回复出现当前 Win 渲染器未知或不完整支持的富内容结构时，保留正文与已识别内容，并在最新受影响回答上提供官网完整内容和 Win 更新入口。",
-      "status": "verified",
+      "status": "released",
       "priority": "p1",
       "requirement": {
         "path": "docs/requirements/win-web-ai-renderer-upgrade-notice-v1.md",
@@ -10441,7 +10441,7 @@
         }
       ],
       "created_at_ms": 1787484888972,
-      "updated_at_ms": 1787485570541
+      "updated_at_ms": 1787486556126
     },
     {
       "id": "win-web-ai-rich-content-runtime-guard-v1",
@@ -11289,26 +11289,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_d9523170b9ad495e9bb44f46fef45946",
-      "feature_id": "open-commerce-native-edge-acme-v2",
-      "action": "transitioned",
-      "actor": "codex-commerce-edge",
-      "reason": "V1-compatible PEM, native ACME TLS-ALPN-01, bounded drain, V2 contract, hardened systemd, preview installer and rollback path are implemented.",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1787306577496
-    },
-    {
-      "id": "feature_event_6aea803083c844d9b76761a84f7a961f",
-      "feature_id": "open-commerce-native-edge-acme-v2",
-      "action": "transitioned",
-      "actor": "codex-commerce-edge",
-      "reason": "12 focused tests, independent build, schema and shell checks, real local TLS 1.3 smoke, offline V2 check and installer preview passed; production deployment remains explicitly deferred.",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1787306591044
-    },
     {
       "id": "feature_event_1f393b441df14286a3a5660e64584b5f",
       "feature_id": "open-commerce-native-edge-acme-v2",
@@ -13288,6 +13268,26 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1787485610371
+    },
+    {
+      "id": "feature_event_a55bdef6dedd435897bad71c76c5d30b",
+      "feature_id": "win-web-ai-renderer-upgrade-notice-v1",
+      "action": "transitioned",
+      "actor": "codex ai助手",
+      "reason": "Windows 节点版本 0.3.69+9f808f257 已发布、激活并通过本机精确版本健康检查。",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1787486556126
+    },
+    {
+      "id": "feature_event_f452f0f8adf94af296666d3bbf2d011d",
+      "feature_id": "win-web-ai-prelaunch-raw-response-research-v1",
+      "action": "transitioned",
+      "actor": "codex ai助手",
+      "reason": "Windows 节点版本 0.3.69+9f808f257 已发布、激活并通过本机精确版本健康检查。",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1787486654149
     }
   ]
 }
