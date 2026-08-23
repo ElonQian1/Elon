@@ -9254,7 +9254,7 @@
       "id": "win-web-ai-private-response-research-fixture-v1",
       "title": "Win 网页 AI 私有响应结构研究 Fixture V1",
       "summary": "新增离线、失败关闭的研究响应脱敏器，把开发者显式提供的 JSON/NDJSON/SSE 样本转换为无正文、无凭证、无 URL/数值的版本化结构形状，供 ChatGPT/Google 富内容适配回归使用；不接入生产 WebView，不修改 PWA。",
-      "status": "verified",
+      "status": "released",
       "priority": "p1",
       "requirement": {
         "path": "docs/requirements/win-web-ai-private-response-research-fixture-v1.md",
@@ -9367,7 +9367,7 @@
         }
       ],
       "created_at_ms": 1787448253854,
-      "updated_at_ms": 1787448807362
+      "updated_at_ms": 1787448898341
     },
     {
       "id": "win-web-ai-production-session-diagnostics-v1",
@@ -10262,16 +10262,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_52f568b4b782474a935932a8bc348856",
-      "feature_id": "win-google-ai-primary-answer-continuity-v1",
-      "action": "claimed",
-      "actor": "codex-root",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1787230184860
-    },
     {
       "id": "feature_event_976baa19beb0452dafff34135e33d6b6",
       "feature_id": "win-google-ai-primary-answer-continuity-v1",
@@ -12261,6 +12251,16 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1787448807362
+    },
+    {
+      "id": "feature_event_d50f0820028748cca0411e1441aeeff5",
+      "feature_id": "win-web-ai-private-response-research-fixture-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "实现与验证提交已 fast-forward 推送到 origin/main；该离线研究工具无需 Win 客户端运行时重启。",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1787448898341
     }
   ]
 }
