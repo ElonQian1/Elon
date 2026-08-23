@@ -128,6 +128,9 @@ async function run(enabled) {
     window.__elonChatGptPrivateResearchProbe.recordPrivateOutcome('success', 12, 345);
     window.__elonChatGptPrivateResearchProbe.recordPrivateStreamOutcome('first', 1, 123);
     window.__elonChatGptPrivateResearchProbe.recordPrivateStreamOutcome('success', 4, 456);
+    window.__elonChatGptPrivateResearchProbe.recordPrivateStreamShape(
+      't:delta/k:data.type/dt:model_response/dk:delta.type/mk:none/ck:none'
+    );
     window.__elonChatGptPrivateResearchProbe.recordPrivatePayloadShape({
       data: { conversation: { current_node: 'node', mapping: { one: {}, two: {} } } }
     });
@@ -142,8 +145,8 @@ async function run(enabled) {
 
   const enabled = await run(true);
   assert.equal(enabled.requests.length, 6);
-  assert.equal(enabled.events.length, 15);
-  assert.equal(enabled.window.__elonChatGptPrivateResearchProbe.version, 8);
+  assert.equal(enabled.events.length, 16);
+  assert.equal(enabled.window.__elonChatGptPrivateResearchProbe.version, 9);
   assert.equal(
     enabled.window.__elonChatGptPrivateResearchProbe
       .copyRequestContext('conversation_content').Authorization,
@@ -162,9 +165,13 @@ async function run(enabled) {
   assert.equal(enabled.events[10].detail, 'v1|private_outcome|success|12|345');
   assert.equal(enabled.events[11].detail, 'v1|private_stream|first|1|123');
   assert.equal(enabled.events[12].detail, 'v1|private_stream|success|4|456');
-  assert.equal(enabled.events[13].detail, 'v1|private_keys|0|data');
   assert.equal(
-    enabled.events[14].detail,
+    enabled.events[13].detail,
+    'v1|private_stream_shape|t:delta/k:data.type/dt:model_response/dk:delta.type/mk:none/ck:none'
+  );
+  assert.equal(enabled.events[14].detail, 'v1|private_keys|0|data');
+  assert.equal(
+    enabled.events[15].detail,
     'v1|private_shape|data_conversation|2|0|0|0|0|0'
   );
   const emitted = JSON.stringify(enabled.events);

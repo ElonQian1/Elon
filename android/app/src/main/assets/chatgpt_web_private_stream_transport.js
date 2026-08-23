@@ -4,7 +4,7 @@
   if (window.__elonChatGptPrivateStreamObserverEnabled !== true) return;
   if (location.origin !== 'https://chatgpt.com') return;
   const existing = window.__elonChatGptPrivateStreamTransport;
-  if (existing && Number(existing.version) >= 1) return;
+  if (existing && Number(existing.version) >= 2) return;
   const policy = window.__elonChatGptPrivateStreamPolicy;
   const originalFetch = typeof window.fetch === 'function' ? window.fetch : null;
   if (!policy || !originalFetch || typeof TextDecoder !== 'function') return;
@@ -19,6 +19,36 @@
       try { listener(); }
       catch (_) { /* Native snapshot fallback remains active. */ }
     });
+  }
+
+  function schemaKeys(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return 'none';
+    const keys = Object.keys(value)
+      .filter((key) => /^[A-Za-z][A-Za-z0-9_]{0,39}$/.test(key))
+      .sort()
+      .slice(0, 10);
+    return keys.length ? keys.join('.') : 'none';
+  }
+
+  function schemaType(value) {
+    const token = String(value || '').toLowerCase();
+    return /^[a-z][a-z0-9_-]{0,39}$/.test(token) ? token : 'none';
+  }
+
+  function reportShape(payload) {
+    if (!researchProbe || typeof researchProbe.recordPrivateStreamShape !== 'function') return;
+    const data = payload && typeof payload.data === 'object' ? payload.data : null;
+    const message = payload && typeof payload.message === 'object' ? payload.message :
+      (data && typeof data.message === 'object' ? data.message : null);
+    const content = message && typeof message.content === 'object' ? message.content : null;
+    researchProbe.recordPrivateStreamShape([
+      't:' + schemaType(payload && payload.type),
+      'k:' + schemaKeys(payload),
+      'dt:' + schemaType(data && data.type),
+      'dk:' + schemaKeys(data),
+      'mk:' + schemaKeys(message),
+      'ck:' + schemaKeys(content)
+    ].join('/'));
   }
 
   function isOfficialConversationStream(method, url, response) {
@@ -49,6 +79,7 @@
     const decoder = new TextDecoder();
     const sse = policy.createSseDecoder(
       (payload) => {
+        reportShape(payload);
         if (!session.accept(payload)) return;
         frames += 1;
         if (!firstReported) {
@@ -97,7 +128,7 @@
   window.fetch = wrappedFetch;
 
   window.__elonChatGptPrivateStreamTransport = Object.freeze({
-    version: 1,
+    version: 2,
     enabled: true,
     current: (pathname) => session.current(pathname),
     mergeMessages: (messages, pathname) => session.merge(messages, pathname),

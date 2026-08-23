@@ -4,7 +4,7 @@
   if (window.__elonChatGptPrivateResearchEnabled !== true) return;
   if (location.origin !== 'https://chatgpt.com') return;
   const existingProbe = window.__elonChatGptPrivateResearchProbe;
-  if (existingProbe && Number(existingProbe.version) >= 8) return;
+  if (existingProbe && Number(existingProbe.version) >= 9) return;
 
   const nativeBridge = window.elonChatGptNative;
   const adapterVersion = Number(window.__elonChatGptAdapterTargetVersion || 0);
@@ -17,6 +17,7 @@
   const maxObservations = 160;
   let observationCount = 0;
   let privateObservationCount = 0;
+  const privateStreamShapes = new Set();
   const requestContexts = new Map();
 
   function nowMs() {
@@ -252,6 +253,23 @@
     }));
   }
 
+  function emitPrivateStreamShape(shape) {
+    if (Date.now() > expiresAt || privateObservationCount >= 32 ||
+        privateStreamShapes.size >= 6) return;
+    const safeShape = String(shape || '').toLowerCase();
+    if (!/^[a-z0-9._:/|-]{1,120}$/.test(safeShape) || privateStreamShapes.has(safeShape)) return;
+    privateStreamShapes.add(safeShape);
+    privateObservationCount += 1;
+    nativeBridge.postMessage(JSON.stringify({
+      type: 'command_result',
+      adapterVersion,
+      documentToken,
+      action: 'research_network_observation',
+      ok: true,
+      detail: ['v1', 'private_stream_shape', safeShape].join('|')
+    }));
+  }
+
   function emitPrivatePayloadShape(payload) {
     if (Date.now() > expiresAt || privateObservationCount >= 32) return;
     const candidates = [
@@ -400,13 +418,14 @@
   }
 
   window.__elonChatGptPrivateResearchProbe = Object.freeze({
-    version: 8,
+    version: 9,
     enabled: true,
     expiresAt,
     observationCount: () => observationCount,
     privateObservationCount: () => privateObservationCount,
     recordPrivateOutcome: emitPrivateOutcome,
     recordPrivateStreamOutcome: emitPrivateStreamOutcome,
+    recordPrivateStreamShape: emitPrivateStreamShape,
     recordPrivatePayloadShape: emitPrivatePayloadShape,
     copyRequestContext: (family) => Object.assign({}, requestContexts.get(String(family || '')) || {})
   });
