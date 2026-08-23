@@ -1,6 +1,6 @@
 ---
 version_status: current
-reviewed_at: 2026-08-21
+reviewed_at: 2026-08-23
 ---
 
 # 一龙项目当前事实
@@ -8,9 +8,9 @@ reviewed_at: 2026-08-21
 
 ## 当前产品主链
 
-- Android ChatGPT 网页 AI 的 `android_chatgpt_private_conversation_prefetch_v1`
-  已完成真机验证并改为生产默认开启：原生会话切换可优先读取同源会话快照，失败时受限超时、冷却并自动继续官方 WebView 导航；研究观测默认关闭，Cookie、Token、请求头和聊天内容不落本地状态。该能力已完成，不再重复研究或另写一套实现；发送、流式回复、目录和实时语音仍是独立能力。
-- Android ChatGPT 网页 AI 的 `android_chatgpt_private_stream_observer_v1` 已在小米真机用 `1.1.1237 (1247)`、adapter `166` 完成定向观察：生产原生聊天约 10.7 秒出现回复并恢复原会话，DOM 兜底正常；私有响应已变为包含 `resume_conversation_token`、`input_message`、`conversation_async_status` 与紧凑 `c/o/p/v` 字段的新协议，旧 message-shaped SSE 解析器回执为 `empty/0 frames`。因此安全响应克隆框架保留，但生产开关继续关闭；不要重复旧 SSE 实验，后续仅研究受限紧凑协议解码与 DOM 等价性。
+- Android ChatGPT 网页 AI 的 `android_chatgpt_private_conversation_prefetch_v1` 已真机验证并默认开启；同源快照失败会限时熔断并回退官方 WebView，不保存凭证或聊天内容。该能力不再重复实现，详见 `docs/chatgpt-private-transport-research.md`。
+- `android_chatgpt_private_stream_observer_v1` 已确认官网改用紧凑协议，旧 SSE 解析器不兼容；DOM 兜底正常，生产开关保持关闭。不要重复旧实验，详见 `docs/chatgpt-private-stream-observer.md`。
+- `android_chatgpt_conversation_project_directory_cache_v1` 已默认生效并通过真机冷启动验收：会话和项目目录约 0.3 秒从有界缓存恢复，官网仅后台刷新，失败保留缓存。该能力不再重复实现，详见 `docs/chatgpt-conversation-project-directory-cache.md`。
 - 多 PC Rust 缓存平台已具备可安装工具与 Skill、脱敏 Fleet 观测，以及不上传路径、绑定精确摘要并由目标节点复扫加锁的远程 GC 审批。远程只覆盖机器级普通/老化策略；项目级治理与高风险操作仍在本机。生产 TLS、节点发布升级和真实多 PC 验收未完成，边界见 `docs/rust-cache-fleet-operations.md`。
 - 已实现：用户通过 Android APK 或 PC 工作台描述需求，AI CLI/API 代理在真实 Git 工作区开发、验证、构建和发布应用。
 - 已实现：项目、频道、多人/多 AI 协作、Windows 节点执行、上下文编译、项目文档治理与版本恢复等基础能力。
