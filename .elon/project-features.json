@@ -6741,6 +6741,62 @@
       "updated_at_ms": 1787228653680
     },
     {
+      "id": "win-chatgpt-visible-finance-chart-v1",
+      "title": "Win ChatGPT 可见行情折线复现 V1",
+      "summary": "复用现有 finance AST 与原生行情卡，把 ChatGPT 回答节点中可见且可信的 SVG 折线几何有界采样为缓存图表；未知 Canvas/异常结构继续官网回退，不启用私有响应。",
+      "status": "in_progress",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/win-chatgpt-visible-finance-chart-v1.md",
+        "content_hash": "5d8e1623569ab2c480e12130d2d1b7089bc4f8bbda910c6afec996f7856737ba",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "75594374fe2945f5347a54727e11f48d27292d91",
+          "head_blob_oid": "8e1a090eb0de1df7862df8fe45cc01b37b908f51",
+          "worktree_blob_oid": "8e1a090eb0de1df7862df8fe45cc01b37b908f51",
+          "state": "tracked_clean"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "win-web-ai",
+      "tags": [
+        "win",
+        "chatgpt",
+        "rich-content",
+        "finance",
+        "chart"
+      ],
+      "task_paths": [
+        "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebPageAdapter.kt",
+        "desktop-shell/src-tauri/src/local_ai_browser/chatgpt_adapter_bootstrap.rs",
+        "desktop-shell/src-tauri/src/local_ai_browser/chatgpt_rich_content_adapter.js",
+        "pc-frontend/scripts/test-ai-rich-content-contract.cjs",
+        "pc-frontend/src/features/ai/AiRichContentCard.tsx"
+      ],
+      "dependencies": [
+        "win-web-ai-structured-rich-content-v1"
+      ],
+      "acceptance_criteria": [
+        "可见且有明显横向跨度、纵向变化的 SVG 折线路径被确定性采样到现有 finance chart points，点数与数值有界。",
+        "水平网格线、短装饰路径、异常几何和未知结构失败关闭，不影响其他正文与富内容。",
+        "Rust 清洗、DPAPI 快照和 TypeScript 继续复用 yilong.rich-content.v1，多个卡片渐变标识不冲突。",
+        "合成几何 fixture 覆盖有效折线、水平线、异常路径与采样上限，生产私有响应授权继续失败关闭。",
+        "test:user-browser、PC typecheck/build/lint、Win Web AI 验证和源码大小检查通过。",
+        "正式发布与本机精确身份验收通过，并在真实 ChatGPT 行情回答验证可识别 SVG 或稳定回退。"
+      ],
+      "implementation_evidence": [],
+      "claim": {
+        "claim_id": "claim_46f7b2c6cd9b41668914062b653f6c0e",
+        "agent_id": "codex-root",
+        "claimed_at_ms": 1787446436535,
+        "expires_at_ms": 1787460836535
+      },
+      "created_at_ms": 1787446436513,
+      "updated_at_ms": 1787446436560
+    },
+    {
       "id": "win-full-size-parked-ai-webview-input-hit-test-v3",
       "title": "Win 完整视口后台官方 AI WebView 输入命中隔离 V3",
       "summary": "保持 Google/ChatGPT 完整官网视口尺寸并将控制器整体停放到父窗口右下可见边界之外，同时满足原生输入命中和后台会话发送。",
@@ -9989,36 +10045,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_9a3c61d72dea4f929372172469e0292e",
-      "feature_id": "win-background-ai-webview-resize-parking-v1",
-      "action": "requirement_rebound",
-      "actor": "codex-root",
-      "reason": "需求补充 PC 合同测试 v138 文件范围",
-      "from_status": "blocked",
-      "to_status": "proposed",
-      "at_ms": 1787227037446
-    },
-    {
-      "id": "feature_event_13c27ac002024a34991d6d8e3b3d9436",
-      "feature_id": "win-background-ai-webview-resize-parking-v1",
-      "action": "metadata_updated",
-      "actor": "codex-root",
-      "reason": "纳入 Win ChatGPT v138 bootstrap 与 PC 合同测试",
-      "from_status": "proposed",
-      "to_status": "proposed",
-      "at_ms": 1787227058026
-    },
-    {
-      "id": "feature_event_5aca38e5d8634b78969d4553262cb8b8",
-      "feature_id": "win-background-ai-webview-resize-parking-v1",
-      "action": "transitioned",
-      "actor": "codex-root",
-      "reason": "最新代码复核后确认范围与验收标准",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1787227078503
-    },
-    {
       "id": "feature_event_c424f344ac824031acde372a384619f2",
       "feature_id": "win-background-ai-webview-resize-parking-v1",
       "action": "transitioned",
@@ -11987,6 +12013,36 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1787445972007
+    },
+    {
+      "id": "feature_event_7c3c3c7d36e4489f9d374d8099ed5f93",
+      "feature_id": "win-chatgpt-visible-finance-chart-v1",
+      "action": "registered",
+      "actor": "codex-root",
+      "reason": "现有生产 finance 卡缺少官网可见折线几何，用户仍看到图表占位。",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1787446436513
+    },
+    {
+      "id": "feature_event_e36d92a41dd349a89b8e209d7845c0cf",
+      "feature_id": "win-chatgpt-visible-finance-chart-v1",
+      "action": "claimed",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1787446436536
+    },
+    {
+      "id": "feature_event_15ff456aecf54ebfbbfe0b4595687860",
+      "feature_id": "win-chatgpt-visible-finance-chart-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "开始复用现有 finance AST 补齐可见 SVG 几何采样和原生卡验证。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1787446436560
     }
   ]
 }
