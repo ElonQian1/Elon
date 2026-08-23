@@ -1,7 +1,7 @@
 ---
 version_status: current
 reviewed_at: 2026-08-23
-implementation_status: released
+implementation_status: in_progress
 ---
 
 # Win 网页 AI 结构化富内容 V1
