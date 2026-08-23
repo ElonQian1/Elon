@@ -6744,7 +6744,7 @@
       "id": "win-chatgpt-visible-finance-chart-v1",
       "title": "Win ChatGPT 可见行情折线复现 V1",
       "summary": "复用现有 finance AST 与原生行情卡，把 ChatGPT 回答节点中可见且可信的 SVG 折线几何有界采样为缓存图表；未知 Canvas/异常结构继续官网回退，不启用私有响应。",
-      "status": "in_progress",
+      "status": "implemented",
       "priority": "p0",
       "requirement": {
         "path": "docs/requirements/win-chatgpt-visible-finance-chart-v1.md",
@@ -6786,15 +6786,114 @@
         "test:user-browser、PC typecheck/build/lint、Win Web AI 验证和源码大小检查通过。",
         "正式发布与本机精确身份验收通过，并在真实 ChatGPT 行情回答验证可识别 SVG 或稳定回退。"
       ],
-      "implementation_evidence": [],
-      "claim": {
-        "claim_id": "claim_46f7b2c6cd9b41668914062b653f6c0e",
-        "agent_id": "codex-root",
-        "claimed_at_ms": 1787446436535,
-        "expires_at_ms": 1787460836535
-      },
+      "implementation_evidence": [
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebPageAdapter.kt",
+          "content_hash": "b2af0ed288e85cbd74f537c9996ca954fb957f45b7989e1af8f701e7ca935626",
+          "locator": "shared ADAPTER_VERSION 143",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "2546b4aed849b1ff502fe1a97bf166a0e1fcca27",
+            "head_blob_oid": "172de9b6b4ce5e2f4e9328ef8229488d13c47fd8",
+            "worktree_blob_oid": "172de9b6b4ce5e2f4e9328ef8229488d13c47fd8",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "desktop-shell/src-tauri/src/local_ai_browser/chatgpt_adapter_bootstrap.rs",
+          "content_hash": "8f6731ed1dbc17a1eadb96b53fcf69257bcc6a7561e4499633af8725b0de155a",
+          "locator": "ADAPTER_VERSION 143",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "2546b4aed849b1ff502fe1a97bf166a0e1fcca27",
+            "head_blob_oid": "931337b02f8421cf7bca50e90df47122e288ac99",
+            "worktree_blob_oid": "931337b02f8421cf7bca50e90df47122e288ac99",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "desktop-shell/src-tauri/src/local_ai_browser/chatgpt_rich_content_adapter.js",
+          "content_hash": "84b4d70a08885e4b09c6b714cd86d5466183c6cab3c6ef6604972844ab329489",
+          "locator": "API_VERSION 2 sampleChartGeometry visibleChart",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "2546b4aed849b1ff502fe1a97bf166a0e1fcca27",
+            "head_blob_oid": "b2391b7bc0f796d019c83f3d49863edd1ece9d34",
+            "worktree_blob_oid": "b2391b7bc0f796d019c83f3d49863edd1ece9d34",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "docs/requirements/win-chatgpt-visible-finance-chart-v1.md",
+          "content_hash": "5d8e1623569ab2c480e12130d2d1b7089bc4f8bbda910c6afec996f7856737ba",
+          "locator": "acceptance criteria",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "2546b4aed849b1ff502fe1a97bf166a0e1fcca27",
+            "head_blob_oid": "8e1a090eb0de1df7862df8fe45cc01b37b908f51",
+            "worktree_blob_oid": "8e1a090eb0de1df7862df8fe45cc01b37b908f51",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "pc-frontend/scripts/test-ai-rich-content-contract.cjs",
+          "content_hash": "80d2cbde9f1762b7c13e50148a3ca97a13e4eb4275f2860a4bfdf5d92ff5cb59",
+          "locator": "visible SVG geometry regression contract",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "2546b4aed849b1ff502fe1a97bf166a0e1fcca27",
+            "head_blob_oid": "b675d392c5cbb62f43a898cc59268ff4ae854b7d",
+            "worktree_blob_oid": "b675d392c5cbb62f43a898cc59268ff4ae854b7d",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "pc-frontend/scripts/test-local-ai-browser-contract.cjs",
+          "content_hash": "fd7caef70ed51e4bca147db55ec986d857f41c1675a76d0a957d5aa1a04e938d",
+          "locator": "shared adapter version contract",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "2546b4aed849b1ff502fe1a97bf166a0e1fcca27",
+            "head_blob_oid": "b9d47286491828732f3631a64d1c9eb2f910539b",
+            "worktree_blob_oid": "b9d47286491828732f3631a64d1c9eb2f910539b",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/ai/AiRichContentCard.module.css",
+          "content_hash": "e49998511f11e03af31eadd769933cfda34fb2f127044ddc5fbfc2b0807974ae",
+          "locator": "finance chart presentation",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "2546b4aed849b1ff502fe1a97bf166a0e1fcca27",
+            "head_blob_oid": "243d53a741b53060469e6e0059d514e92cf8bb7a",
+            "worktree_blob_oid": "243d53a741b53060469e6e0059d514e92cf8bb7a",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/ai/AiRichContentCard.tsx",
+          "content_hash": "c984a749442681daaaebd88afaa11aecb332ce132f60ff2804778e23d4753463",
+          "locator": "unique gradient finance chart renderer",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "2546b4aed849b1ff502fe1a97bf166a0e1fcca27",
+            "head_blob_oid": "80a622ccc13160c3a6bde2492b446dc42e954cea",
+            "worktree_blob_oid": "80a622ccc13160c3a6bde2492b446dc42e954cea",
+            "state": "tracked_clean"
+          }
+        }
+      ],
       "created_at_ms": 1787446436513,
-      "updated_at_ms": 1787446436560
+      "updated_at_ms": 1787446931189
     },
     {
       "id": "win-full-size-parked-ai-webview-input-hit-test-v3",
@@ -10045,26 +10144,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_c424f344ac824031acde372a384619f2",
-      "feature_id": "win-background-ai-webview-resize-parking-v1",
-      "action": "transitioned",
-      "actor": "codex-root",
-      "reason": "最新代码复核后确认范围与验收标准",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1787227078530
-    },
-    {
-      "id": "feature_event_c0f9d0024496471b95e2067c3b89b884",
-      "feature_id": "win-background-ai-webview-resize-parking-v1",
-      "action": "claimed",
-      "actor": "codex-root",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1787227078542
-    },
-    {
       "id": "feature_event_512b4c390dea46d69297049d2e8ece95",
       "feature_id": "win-background-ai-webview-resize-parking-v1",
       "action": "transitioned",
@@ -12043,6 +12122,26 @@
       "from_status": "claimed",
       "to_status": "in_progress",
       "at_ms": 1787446436560
+    },
+    {
+      "id": "feature_event_06bf469f245c4a098a769a5d8fda0e99",
+      "feature_id": "win-chatgpt-visible-finance-chart-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1787446931149
+    },
+    {
+      "id": "feature_event_63294a9b51bc4f309c429ae01d594af9",
+      "feature_id": "win-chatgpt-visible-finance-chart-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "提交 2546b4aed 实现可见 SVG 折线采样、版本热替换与多卡渐变隔离；全量 user-browser、typecheck、lint、build、Win Web AI 验证和源码大小检查通过。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1787446931189
     }
   ]
 }
