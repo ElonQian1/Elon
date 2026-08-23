@@ -152,7 +152,24 @@
     const own = node.getAttribute('data-message-author-role');
     const nested = node.querySelector('[data-message-author-role]');
     const role = own || (nested && nested.getAttribute('data-message-author-role')) || '';
-    return role === 'user' || role === 'assistant' ? role : '';
+    if (role === 'user' || role === 'assistant') return role;
+
+    // The current signed-out ChatGPT shell renders the conversation as an
+    // accessible list. Its turn nodes have UUID ids and a direct screen-reader
+    // heading ("你说：" / "ChatGPT 说："), but no legacy data-message role.
+    // Restrict the fallback to that explicit speaker heading so ordinary list
+    // items inside an answer can never become standalone messages.
+    const headings = Array.from(node.querySelectorAll(
+      ':scope > h1, :scope > h2, :scope > h3, :scope > h4, :scope > h5, :scope > h6'
+    ));
+    const speaker = headings.map((heading) =>
+      cleanText(heading.innerText || heading.textContent)
+    ).find(Boolean) || '';
+    if (/^(?:you said|你说|您说)\s*[:：]?\s*$/i.test(speaker)) return 'user';
+    if (/^(?:chatgpt said|chatgpt 说|assistant said|助理说)\s*[:：]?\s*$/i.test(speaker)) {
+      return 'assistant';
+    }
+    return '';
   }
 
   function roleNode(node) {
@@ -189,7 +206,7 @@
   function isActionContainer(node) {
     return Boolean(node.closest(
       'button, [role="button"], [role="toolbar"], [data-testid*="action" i], '
-      + '[data-testid*="feedback" i]'
+      + '[data-testid*="feedback" i], [class*="messageActions"]'
     ));
   }
 
@@ -200,8 +217,8 @@
     // Always scan the complete turn when it is available.
     const owner = messageScope(node);
     const selector = role === 'assistant'
-      ? '.markdown, [data-message-content]'
-      : '.whitespace-pre-wrap, [data-message-content], .markdown';
+      ? '.markdown, [data-message-content], [class*="assistantMessage"]'
+      : '.whitespace-pre-wrap, [data-message-content], .markdown, [class*="userMessage"]';
     const candidates = Array.from(owner.querySelectorAll(
       selector
     )).filter((candidate) => isVisible(candidate) && !isActionContainer(candidate));
@@ -379,7 +396,10 @@
       ? cleanText(childrenMarkdown(content, {}))
       : cleanText(content.innerText || content.textContent)
     ).filter((value) => value && (role !== 'assistant' || !isAssistantActionText(value)));
-    const value = fragments.filter((value, index) => fragments.indexOf(value) === index).join('\n\n');
+    const value = fragments.filter((value, index) => fragments.indexOf(value) === index).join('\n\n')
+      .replace(role === 'user'
+        ? /^(?:you said|你说|您说)\s*[:：]?\s*/i
+        : /^(?:chatgpt said|chatgpt 说|assistant said|助理说)\s*[:：]?\s*/i, '');
     return value.slice(0, MAX_MESSAGE_LENGTH);
   }
 
@@ -387,7 +407,11 @@
     const main = document.querySelector('main');
     if (!main) return [];
     const turns = Array.from(main.querySelectorAll('[data-testid^="conversation-turn-"]'));
-    return turns.length ? turns : Array.from(main.querySelectorAll('[data-message-author-role]'));
+    if (turns.length) return turns;
+    const roleNodes = Array.from(main.querySelectorAll('[data-message-author-role]'));
+    if (roleNodes.length) return roleNodes;
+    return Array.from(main.querySelectorAll('[role="listitem"], li, article'))
+      .filter((node) => messageRole(node));
   }
 
   function messageIdentity(node, role, globalIndex) {
