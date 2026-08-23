@@ -263,6 +263,13 @@ function context(enabled, response) {
     'stream status answer'
   );
   assert.ok(status.shapes.some((shape) => shape.startsWith('status/')));
+  await status.window.fetch(
+    'https://chatgpt.com/backend-api/conversation/conversation-one/stream_status',
+    { method: 'GET' }
+  );
+  await tick();
+  await tick();
+  assert.deepEqual(status.outcomes.map((item) => item.outcome), ['first', 'success']);
   assert.equal(
     enabled.window.__elonChatGptPrivateStreamTransport.current('/c/conversation-one').text,
     'hello world'

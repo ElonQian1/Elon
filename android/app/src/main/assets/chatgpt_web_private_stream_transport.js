@@ -20,6 +20,7 @@
   let socketUnsubscribe = null;
   let socketFrames = 0;
   let socketFirstReported = false;
+  let socketSuccessReported = false;
 
   function notify() {
     listeners.forEach((listener) => {
@@ -98,6 +99,20 @@
     if (researchProbe && typeof researchProbe.recordPrivateStreamOutcome === 'function') {
       researchProbe.recordPrivateStreamOutcome(outcome, socketFrames, 0);
     }
+  }
+
+  function reportAcceptedRealtimeSnapshot() {
+    socketFrames += 1;
+    if (!socketFirstReported) {
+      socketFirstReported = true;
+      reportSocketOutcome('first');
+    }
+    const active = session.current(location.pathname);
+    if (active && active.state === 'completed' && !socketSuccessReported) {
+      socketSuccessReported = true;
+      reportSocketOutcome('success');
+    }
+    notify();
   }
 
   function socketLengthBucket(length) {
@@ -245,14 +260,7 @@
       if (acceptObservedPayload(payload, 'socket')) accepted = true;
     });
     if (!accepted) return;
-    socketFrames += 1;
-    if (!socketFirstReported) {
-      socketFirstReported = true;
-      reportSocketOutcome('first');
-    }
-    const active = session.current(location.pathname);
-    if (active && active.state === 'completed') reportSocketOutcome('success');
-    notify();
+    reportAcceptedRealtimeSnapshot();
   }
 
   function isOfficialConversationStream(method, url, response) {
@@ -283,14 +291,7 @@
     if (!clone || typeof clone.json !== 'function') return;
     Promise.resolve(clone.json()).then((payload) => {
       if (disposed || !acceptObservedPayload(payload, 'status', true)) return;
-      socketFrames += 1;
-      if (!socketFirstReported) {
-        socketFirstReported = true;
-        reportSocketOutcome('first');
-      }
-      const active = session.current(location.pathname);
-      if (active && active.state === 'completed') reportSocketOutcome('success');
-      notify();
+      reportAcceptedRealtimeSnapshot();
     }).catch(function () {
       recordShape('status/parse_error');
     });
