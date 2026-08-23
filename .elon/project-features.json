@@ -9947,6 +9947,121 @@
       "updated_at_ms": 1786878849243
     },
     {
+      "id": "win-web-ai-prelaunch-raw-response-research-v1",
+      "title": "Win 网页 AI 上线前原始响应研究 V1",
+      "summary": "在尚未公开上线、当前用户均为开发测试人员的阶段，为 ChatGPT 与 Google AI 官方 WebView2 默认旁路采样受控接口原始响应；不重放生成请求，本机有界留存并可打开和随会话清除。",
+      "status": "verified",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/win-web-ai-prelaunch-raw-response-research-v1.md",
+        "content_hash": "8dcc3e179bd071c57fc59ef8513699180db2a0117cbfb06c8146e51dfd2cd2cb",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "5769198088643b9fa26b5e81c1de3a84fc1616b6",
+          "head_blob_oid": "31d25736e88d073fa96f66e7ec63e5706f2b8e0e",
+          "worktree_blob_oid": "31d25736e88d073fa96f66e7ec63e5706f2b8e0e",
+          "state": "tracked_clean"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "win-web-ai",
+      "tags": [
+        "win",
+        "tauri",
+        "webview2",
+        "research",
+        "raw-response"
+      ],
+      "task_paths": [
+        "desktop-shell/src-tauri/permissions",
+        "desktop-shell/src-tauri/src/local_ai_browser/research_capture.rs",
+        "desktop-shell/src-tauri/src/local_ai_browser/win_web_response_research_capture.js",
+        "pc-frontend/src/features/user-browser"
+      ],
+      "dependencies": [
+        "win-web-ai-private-response-research-fixture-v1"
+      ],
+      "acceptance_criteria": [
+        "原请求只执行一次且响应可旁路采样",
+        "只接受受控厂商窗口和固定接口族",
+        "采样失败不影响官网响应和原生聊天",
+        "本机 SHA-256 去重并受 30 天、256 MiB、256 样本限制",
+        "PC 明示上线前采样并可打开目录",
+        "清除本机会话同步删除样本"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "desktop-shell/src-tauri/permissions/local-ai-web-adapter-event.toml",
+          "content_hash": "a45eaa30d172068c269e0283a8895e92b2b350ca4e1d905e4c68cda11562b2f2",
+          "locator": "",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "5769198088643b9fa26b5e81c1de3a84fc1616b6",
+            "head_blob_oid": "2698d935b7ea1f61dbedc38a0caa1956e9721c98",
+            "worktree_blob_oid": "2698d935b7ea1f61dbedc38a0caa1956e9721c98",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "desktop-shell/src-tauri/src/local_ai_browser/research_capture.rs",
+          "content_hash": "d490726a29f4664ff713ad740b90fb12a586727aa3fd086cffccd926e68593e1",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "5769198088643b9fa26b5e81c1de3a84fc1616b6",
+            "head_blob_oid": "f7a4f40211050038fde085c2d82473ca8f41ba89",
+            "worktree_blob_oid": "f7a4f40211050038fde085c2d82473ca8f41ba89",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "desktop-shell/src-tauri/src/local_ai_browser/win_web_response_research_capture.js",
+          "content_hash": "ba204876753c6c792a0ed508807a5b5b51fe8dcf87be6dfaab8ebf7064897a9c",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "5769198088643b9fa26b5e81c1de3a84fc1616b6",
+            "head_blob_oid": "47fba4231b57c8ff29246a350c5ad2a89bd27a56",
+            "worktree_blob_oid": "47fba4231b57c8ff29246a350c5ad2a89bd27a56",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "docs/requirements/win-web-ai-prelaunch-raw-response-research-v1.md",
+          "content_hash": "8dcc3e179bd071c57fc59ef8513699180db2a0117cbfb06c8146e51dfd2cd2cb",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "5769198088643b9fa26b5e81c1de3a84fc1616b6",
+            "head_blob_oid": "31d25736e88d073fa96f66e7ec63e5706f2b8e0e",
+            "worktree_blob_oid": "31d25736e88d073fa96f66e7ec63e5706f2b8e0e",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "pc-frontend/scripts/test-win-web-response-research-capture.cjs",
+          "content_hash": "09b0f12e858b6646014b12b2c1fe7f0b1ca8f3f7dc3f95caa15998729ccbefec",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "5769198088643b9fa26b5e81c1de3a84fc1616b6",
+            "head_blob_oid": "64bd141d78248a60ddf8dcabbe2b9dc7b815dbd5",
+            "worktree_blob_oid": "64bd141d78248a60ddf8dcabbe2b9dc7b815dbd5",
+            "state": "tracked_clean"
+          }
+        }
+      ],
+      "created_at_ms": 1787485049335,
+      "updated_at_ms": 1787485610371
+    },
+    {
       "id": "win-web-ai-private-response-research-fixture-v1",
       "title": "Win 网页 AI 私有响应结构研究 Fixture V1",
       "summary": "新增离线、失败关闭的研究响应脱敏器，把开发者显式提供的 JSON/NDJSON/SSE 样本转换为无正文、无凭证、无 URL/数值的版本化结构形状，供 ChatGPT/Google 富内容适配回归使用；不接入生产 WebView，不修改 PWA。",
@@ -10214,6 +10329,119 @@
       ],
       "created_at_ms": 1786875988368,
       "updated_at_ms": 1786876824902
+    },
+    {
+      "id": "win-web-ai-renderer-upgrade-notice-v1",
+      "title": "Win 网页 AI 富内容渲染升级提示 V1",
+      "summary": "当 ChatGPT 或 Google 官方回复出现当前 Win 渲染器未知或不完整支持的富内容结构时，保留正文与已识别内容，并在最新受影响回答上提供官网完整内容和 Win 更新入口。",
+      "status": "verified",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/win-web-ai-renderer-upgrade-notice-v1.md",
+        "content_hash": "b5043b0529c290c6b1df9e94c6e40418793bfa987ce10f289700f5ce55204da5",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "5769198088643b9fa26b5e81c1de3a84fc1616b6",
+          "head_blob_oid": "fbbb9d6bec324c5e58cb67db005b7150b6725c56",
+          "worktree_blob_oid": "fbbb9d6bec324c5e58cb67db005b7150b6725c56",
+          "state": "tracked_clean"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "win-web-ai",
+      "tags": [
+        "win",
+        "tauri",
+        "web-ai",
+        "rich-content",
+        "compatibility"
+      ],
+      "task_paths": [
+        "desktop-shell/src-tauri/src/local_ai_browser/adapter_content.rs",
+        "pc-frontend/src/features/ai",
+        "pc-frontend/src/features/user-browser"
+      ],
+      "dependencies": [
+        "win-web-ai-rich-content-runtime-guard-v1"
+      ],
+      "acceptance_criteria": [
+        "仅在完成态且最新受影响的助手回答显示非阻塞升级提示",
+        "正文、来源和已识别富卡继续渲染",
+        "普通 Markdown、代码、表格、公式和合法 V1 富卡不误报",
+        "查看官网按钮复用现有官方标签控制器",
+        "检查更新按钮进入 Win 节点更新页面"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "docs/requirements/win-web-ai-renderer-upgrade-notice-v1.md",
+          "content_hash": "b5043b0529c290c6b1df9e94c6e40418793bfa987ce10f289700f5ce55204da5",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "5769198088643b9fa26b5e81c1de3a84fc1616b6",
+            "head_blob_oid": "fbbb9d6bec324c5e58cb67db005b7150b6725c56",
+            "worktree_blob_oid": "fbbb9d6bec324c5e58cb67db005b7150b6725c56",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "pc-frontend/scripts/test-ai-renderer-compatibility.cjs",
+          "content_hash": "5c51990e63400eabd4f6aa5304c766aa2165f93cc7020e3e71a540588167eaa8",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "5769198088643b9fa26b5e81c1de3a84fc1616b6",
+            "head_blob_oid": "e34080d3431ed4019fd32fa04fa74ba3235c93f0",
+            "worktree_blob_oid": "e34080d3431ed4019fd32fa04fa74ba3235c93f0",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/ai/AiRendererUpgradeNotice.tsx",
+          "content_hash": "18d9c27ed94fab2355131d74f801af10db93df5212f3375e6c33c9c7b2702cb0",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "5769198088643b9fa26b5e81c1de3a84fc1616b6",
+            "head_blob_oid": "ecd7005ce66f846eae09756fd172031842f76f6a",
+            "worktree_blob_oid": "ecd7005ce66f846eae09756fd172031842f76f6a",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/user-browser/localAiRendererCompatibility.ts",
+          "content_hash": "097e5eae9708cba8eb6c306d4ecc25f91c4a0743937d33f70dda4f3d2e6b83a7",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "5769198088643b9fa26b5e81c1de3a84fc1616b6",
+            "head_blob_oid": "1ffb3a2d7b127c928fd5b5c800ae80124e6d507f",
+            "worktree_blob_oid": "1ffb3a2d7b127c928fd5b5c800ae80124e6d507f",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/user-browser/useAiWebChatBackend.ts",
+          "content_hash": "bc24deee7258f192a4afa0a896baa6f07739d9561ffca94602f40d328b4fcd6b",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "5769198088643b9fa26b5e81c1de3a84fc1616b6",
+            "head_blob_oid": "80fa9c0e070795387afafee5e5b5b8452deebfb2",
+            "worktree_blob_oid": "80fa9c0e070795387afafee5e5b5b8452deebfb2",
+            "state": "tracked_clean"
+          }
+        }
+      ],
+      "created_at_ms": 1787484888972,
+      "updated_at_ms": 1787485570541
     },
     {
       "id": "win-web-ai-rich-content-runtime-guard-v1",
@@ -11061,126 +11289,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_2b6005aaef9f43cf90610c9b94a98208",
-      "feature_id": "open-commerce-native-edge-v1",
-      "action": "transitioned",
-      "actor": "codex-desktop",
-      "reason": "7 项 Rust 测试、独立构建和真实临时 TLS 1.3 纵向检查通过；生产部署明确未执行。",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1787300129711
-    },
-    {
-      "id": "feature_event_e16c97194b1749ea9e8ccf4ba1ab621e",
-      "feature_id": "open-commerce-native-edge-v1",
-      "action": "transitioned",
-      "actor": "codex-desktop",
-      "reason": "提交前补充验收标准覆盖并刷新验证指纹，显式重新打开后更新证据。",
-      "from_status": "verified",
-      "to_status": "ready",
-      "at_ms": 1787300316263
-    },
-    {
-      "id": "feature_event_7398aaf1dc0e43d089b7107c26685bbc",
-      "feature_id": "open-commerce-native-edge-v1",
-      "action": "claimed",
-      "actor": "codex-native-edge",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1787300424580
-    },
-    {
-      "id": "feature_event_cb629b95dfea4f69b599e590f67820e0",
-      "feature_id": "open-commerce-native-edge-v1",
-      "action": "transitioned",
-      "actor": "codex-native-edge",
-      "reason": "刷新最终测试与验收证据。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1787300437270
-    },
-    {
-      "id": "feature_event_9d00c3113e3b47658d3fe83b207d4f6a",
-      "feature_id": "open-commerce-native-edge-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-native-edge",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1787300462331
-    },
-    {
-      "id": "feature_event_33a93fba74b0460f92ec320ab6da7074",
-      "feature_id": "open-commerce-native-edge-v1",
-      "action": "transitioned",
-      "actor": "codex-native-edge",
-      "reason": "实现、运行手册和本地验证证据已齐备。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1787300474826
-    },
-    {
-      "id": "feature_event_6dac587577ab4240bf7b289b1f92c3d1",
-      "feature_id": "open-commerce-native-edge-v1",
-      "action": "transitioned",
-      "actor": "codex-native-edge",
-      "reason": "7 个定向测试、独立构建及真实本地 TLS 冒烟验证均通过。",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1787300493584
-    },
-    {
-      "id": "feature_event_f1f8b68500284368a9112a55060e8615",
-      "feature_id": "open-commerce-native-edge-acme-v2",
-      "action": "registered",
-      "actor": "codex-commerce-edge",
-      "reason": "",
-      "from_status": "",
-      "to_status": "accepted",
-      "at_ms": 1787303828137
-    },
-    {
-      "id": "feature_event_b897666237fe43ddb56caaaade830549",
-      "feature_id": "open-commerce-native-edge-acme-v2",
-      "action": "transitioned",
-      "actor": "codex-commerce-edge",
-      "reason": "需求范围、安全边界和验收标准已明确，依赖 V1 已验证。",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1787303847623
-    },
-    {
-      "id": "feature_event_f97e13e37d494a62ac8923514ff69dc8",
-      "feature_id": "open-commerce-native-edge-acme-v2",
-      "action": "claimed",
-      "actor": "codex-commerce-edge",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1787303864160
-    },
-    {
-      "id": "feature_event_7af87caaaf824d018c6cdc12b603e520",
-      "feature_id": "open-commerce-native-edge-acme-v2",
-      "action": "transitioned",
-      "actor": "codex-commerce-edge",
-      "reason": "开始实现 V2 ACME、安装和优雅停机纵向切片。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1787303878830
-    },
-    {
-      "id": "feature_event_4ed7d51a166c448a90343f2c5c515037",
-      "feature_id": "open-commerce-native-edge-acme-v2",
-      "action": "evidence_recorded",
-      "actor": "codex-commerce-edge",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1787306558130
-    },
     {
       "id": "feature_event_d9523170b9ad495e9bb44f46fef45946",
       "feature_id": "open-commerce-native-edge-acme-v2",
@@ -13060,6 +13168,126 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1787462905819
+    },
+    {
+      "id": "feature_event_fe625417a20a4e849668c2af58e9b3aa",
+      "feature_id": "win-web-ai-renderer-upgrade-notice-v1",
+      "action": "registered",
+      "actor": "codex ai助手",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1787484888972
+    },
+    {
+      "id": "feature_event_67cd40336696486e92de858a092b01eb",
+      "feature_id": "win-web-ai-prelaunch-raw-response-research-v1",
+      "action": "registered",
+      "actor": "codex ai助手",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1787485049335
+    },
+    {
+      "id": "feature_event_e0e61bcb4be8423c8782f694d57a0244",
+      "feature_id": "win-web-ai-renderer-upgrade-notice-v1",
+      "action": "claimed",
+      "actor": "codex-desktop",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1787485090528
+    },
+    {
+      "id": "feature_event_41683aeef6dd4ea6a7ba3114b2892868",
+      "feature_id": "win-web-ai-prelaunch-raw-response-research-v1",
+      "action": "claimed",
+      "actor": "codex-desktop",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1787485386780
+    },
+    {
+      "id": "feature_event_48e37ce971ed4053849bccdbd8bae363",
+      "feature_id": "win-web-ai-renderer-upgrade-notice-v1",
+      "action": "transitioned",
+      "actor": "codex ai助手",
+      "reason": "实现与自动化验证已完成，进入证据登记。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1787485408103
+    },
+    {
+      "id": "feature_event_57e33b99a195458795605dcaa46943f2",
+      "feature_id": "win-web-ai-prelaunch-raw-response-research-v1",
+      "action": "transitioned",
+      "actor": "codex ai助手",
+      "reason": "实现与自动化验证已完成，进入证据登记。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1787485453605
+    },
+    {
+      "id": "feature_event_978c2eb64762400988209798cce91b6f",
+      "feature_id": "win-web-ai-renderer-upgrade-notice-v1",
+      "action": "evidence_recorded",
+      "actor": "codex ai助手",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1787485492326
+    },
+    {
+      "id": "feature_event_a0b4b4d4a64f4c938320e39a71297f2b",
+      "feature_id": "win-web-ai-prelaunch-raw-response-research-v1",
+      "action": "evidence_recorded",
+      "actor": "codex ai助手",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1787485506052
+    },
+    {
+      "id": "feature_event_1ba12d57ed574dee99b9a3fdc281795f",
+      "feature_id": "win-web-ai-renderer-upgrade-notice-v1",
+      "action": "transitioned",
+      "actor": "codex ai助手",
+      "reason": "代码、前端构建、类型检查和定向测试均通过。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1787485548390
+    },
+    {
+      "id": "feature_event_8d79f37ee34e4dbb83cd730845d47913",
+      "feature_id": "win-web-ai-prelaunch-raw-response-research-v1",
+      "action": "transitioned",
+      "actor": "codex ai助手",
+      "reason": "原始响应旁路采样、权限、保留策略和单请求测试均完成。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1787485560423
+    },
+    {
+      "id": "feature_event_d79672a7fb9d4a4fbfa6ad62554c396d",
+      "feature_id": "win-web-ai-renderer-upgrade-notice-v1",
+      "action": "transitioned",
+      "actor": "codex ai助手",
+      "reason": "定向契约测试、TypeScript 类型检查、前端生产构建和 Rust 测试均通过。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1787485570541
+    },
+    {
+      "id": "feature_event_419841d31b1d4238843e1299001b8879",
+      "feature_id": "win-web-ai-prelaunch-raw-response-research-v1",
+      "action": "transitioned",
+      "actor": "codex ai助手",
+      "reason": "单请求无重放、原文保留、去重清理、权限与 Rust 测试均通过。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1787485610371
     }
   ]
 }
