@@ -27,9 +27,13 @@ assert.match(
 );
 assert.match(
   buildGradle,
-  /buildConfigField "boolean", "CHATGPT_PRIVATE_CONVERSATION_PREFETCH_ENABLED"/
+  /findProperty\("ELON_CHATGPT_PRIVATE_CONVERSATION_PREFETCH"\)[\s\S]*?\?\.toBoolean\(\) \?: true/
 );
 assert.match(
+  buildGradle,
+  /buildConfigField "boolean", "CHATGPT_PRIVATE_CONVERSATION_PREFETCH_ENABLED"/
+);
+assert.doesNotMatch(
   buildGradle,
   /private conversation prefetch requires ELON_CHATGPT_PRIVATE_RESEARCH=true/
 );
@@ -96,7 +100,7 @@ async function run(enabled) {
   await window.fetch('https://chatgpt.com/backend-api/conversations?offset=0&limit=1');
   await window.fetch('https://chatgpt.com/backend-api/conversations/private-chat-id-12345', {
     headers: { Authorization: 'must-not-be-observed' },
-    __elonPrivateResearch: 'conversation_prefetch'
+    __elonPrivateTransport: 'conversation_prefetch'
   });
   await window.fetch('https://chatgpt.com/backend-api/conversation/123e4567-e89b-12d3-a456-426614174000', {
     method: 'POST',

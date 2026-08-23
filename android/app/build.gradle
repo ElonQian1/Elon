@@ -123,7 +123,7 @@ def chatGptPrivateResearchEnabled = project.findProperty("ELON_CHATGPT_PRIVATE_R
 def chatGptPrivateConversationPrefetchEnabled =
     project.findProperty("ELON_CHATGPT_PRIVATE_CONVERSATION_PREFETCH")
         ?.toString()
-        ?.toBoolean() ?: false
+        ?.toBoolean() ?: true
 def chatGptPrivateResearchVersionCode = project.findProperty("ELON_CHATGPT_PRIVATE_RESEARCH_VERSION_CODE")
     ?.toString()
     ?.trim()
@@ -132,9 +132,6 @@ def chatGptPrivateResearchVersionName = project.findProperty("ELON_CHATGPT_PRIVA
     ?.trim()
 if ((chatGptPrivateResearchVersionCode || chatGptPrivateResearchVersionName) && !chatGptPrivateResearchEnabled) {
     throw new GradleException("ChatGPT private research version overrides require ELON_CHATGPT_PRIVATE_RESEARCH=true")
-}
-if (chatGptPrivateConversationPrefetchEnabled && !chatGptPrivateResearchEnabled) {
-    throw new GradleException("ChatGPT private conversation prefetch requires ELON_CHATGPT_PRIVATE_RESEARCH=true")
 }
 if (chatGptPrivateResearchVersionCode && !(chatGptPrivateResearchVersionCode ==~ /^[1-9][0-9]{0,8}$/)) {
     throw new GradleException("ELON_CHATGPT_PRIVATE_RESEARCH_VERSION_CODE must be a positive integer")

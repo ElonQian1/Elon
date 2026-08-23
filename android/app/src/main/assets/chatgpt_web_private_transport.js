@@ -2,8 +2,10 @@
   'use strict';
 
   const existingTransport = window.__elonChatGptPrivateTransport;
-  if ((existingTransport && Number(existingTransport.version) >= 9) ||
-      window.__elonChatGptPrivateResearchEnabled !== true ||
+  const prefetchEnabled = window.__elonChatGptPrivateConversationPrefetchEnabled === true;
+  const researchEnabled = window.__elonChatGptPrivateResearchEnabled === true;
+  if ((existingTransport && Number(existingTransport.version) >= 10) ||
+      (!prefetchEnabled && !researchEnabled) ||
       location.origin !== 'https://chatgpt.com') return;
 
   const policyModule = window.__elonChatGptPrivateTransportPolicy;
@@ -22,7 +24,7 @@
   }
 
   const policy = policyModule.create({
-    enabled: window.__elonChatGptPrivateConversationPrefetchEnabled === true,
+    enabled: prefetchEnabled,
     now: Date.now,
     storage: optionalSessionStorage()
   });
@@ -131,7 +133,7 @@
         cache: 'default',
         headers,
         signal: controller ? controller.signal : undefined,
-        __elonPrivateResearch: 'conversation_prefetch'
+        __elonPrivateTransport: 'conversation_prefetch'
       });
       if (!response || !response.ok) throw new Error('http_' + Number(response && response.status));
       return { payload: await response.json(), elapsedMs: Date.now() - startedAt };
@@ -286,9 +288,9 @@
   }
 
   window.__elonChatGptPrivateTransport = Object.freeze({
-    version: 9,
-    conversationPrefetchEnabled:
-      window.__elonChatGptPrivateConversationPrefetchEnabled === true,
+    version: 10,
+    conversationPrefetchEnabled: prefetchEnabled,
+    conversationPrefetchAvailable: true,
     experimentalConversationPrefetchAvailable: true,
     conversationPrefetchReady,
     prefetchConversation,

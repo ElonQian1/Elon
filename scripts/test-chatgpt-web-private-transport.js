@@ -41,12 +41,6 @@ function createContext(
   const window = {
     __elonChatGptPrivateResearchEnabled: researchEnabled,
     __elonChatGptPrivateConversationPrefetchEnabled: prefetchEnabled,
-    __elonChatGptPrivateResearchProbe: {
-      recordPrivateOutcome: (outcome, messageCount, elapsedMs) => {
-        outcomes.push({ outcome, messageCount, elapsedMs });
-      },
-      recordPrivatePayloadShape: (payload) => { shapes.push(payload); }
-    },
     fetch: fetchImpl,
     sessionStorage: storage,
     setTimeout: (callback) => {
@@ -56,6 +50,14 @@ function createContext(
     },
     clearTimeout: (id) => { clearTimeout(id); timers.delete(id); }
   };
+  if (researchEnabled) {
+    window.__elonChatGptPrivateResearchProbe = {
+      recordPrivateOutcome: (outcome, messageCount, elapsedMs) => {
+        outcomes.push({ outcome, messageCount, elapsedMs });
+      },
+      recordPrivatePayloadShape: (payload) => { shapes.push(payload); }
+    };
+  }
   window.window = window;
   window.location = location;
   const context = {
@@ -112,11 +114,11 @@ const detailPayload = {
 };
 
 (async () => {
-  const disabled = createContext(async () => jsonResponse(detailPayload), false);
+  const disabled = createContext(async () => jsonResponse(detailPayload), false, false);
   assert.equal(disabled.window.__elonChatGptPrivateTransport, undefined);
 
   const gated = createContext(async () => jsonResponse(detailPayload), true, false);
-  assert.equal(gated.window.__elonChatGptPrivateTransport.version, 9);
+  assert.equal(gated.window.__elonChatGptPrivateTransport.version, 10);
   assert.equal(gated.window.__elonChatGptPrivateTransport.conversationPrefetchEnabled, false);
   assert.equal(gated.window.__elonChatGptPrivateTransport.conversationPrefetchReady(), false);
 
@@ -126,10 +128,11 @@ const detailPayload = {
   const detail = createContext(async (url, options) => {
     requests.push({ url, options });
     return jsonResponse(detailPayload);
-  });
+  }, false, true);
   const transport = detail.window.__elonChatGptPrivateTransport;
-  assert.equal(transport.version, 9);
+  assert.equal(transport.version, 10);
   assert.equal(transport.conversationPrefetchEnabled, true);
+  assert.equal(transport.conversationPrefetchAvailable, true);
   assert.equal(transport.experimentalConversationPrefetchAvailable, true);
   assert.equal(transport.conversationPrefetchReady(), false);
   assert.equal(transport.prefetchConversation(
@@ -153,14 +156,12 @@ const detailPayload = {
   assert.equal(requests.length, 2);
   assert.equal(requests[1].url, '/backend-api/conversations/plain-chat');
   assert.equal(requests[1].options.headers.Authorization, 'page-scoped-value');
-  assert.equal(requests[1].options.__elonPrivateResearch, 'conversation_prefetch');
+  assert.equal(requests[1].options.__elonPrivateTransport, 'conversation_prefetch');
   assert.equal(snapshots[0].composerReady, false);
   assert.equal(transport.health().successes, 1);
   assert.equal(transport.health().lastOutcome, 'success');
-  assert.equal(detail.outcomes.length, 1);
-  assert.equal(detail.outcomes[0].outcome, 'success');
-  assert.equal(detail.outcomes[0].messageCount, 2);
-  assert.equal(detail.shapes[0], detailPayload);
+  assert.equal(detail.outcomes.length, 0);
+  assert.equal(detail.shapes.length, 0);
   assert.deepEqual(
     Array.from(snapshots[0].messages, (value) => [value.role, value.content]),
     [['user', 'hello'], ['assistant', 'hi']]

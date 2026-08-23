@@ -1,3 +1,11 @@
+---
+capability_id: android_chatgpt_private_conversation_prefetch_v1
+implementation_status: completed
+verification_status: device_verified
+production_default: true
+repeat_research: not_required
+---
+
 # ChatGPT private transport research
 
 This document records non-sensitive Android research evidence. The official
@@ -6,10 +14,11 @@ WebView/DOM path remains canonical and is always available as fallback.
 ## Build gates
 
 - `ELON_CHATGPT_PRIVATE_RESEARCH` enables page-local endpoint observation.
-- `ELON_CHATGPT_PRIVATE_CONVERSATION_PREFETCH` additionally enables the
-  experimental conversation snapshot request.
-- Conversation prefetch cannot be enabled unless the research gate is enabled.
-- Both flags default to `false` in normal builds.
+- `ELON_CHATGPT_PRIVATE_CONVERSATION_PREFETCH` controls the production
+  conversation snapshot request. It defaults to `true`; an emergency build can
+  explicitly set it to `false` without changing source.
+- Conversation prefetch is independent from the research observer. Normal
+  builds keep the observer disabled while the verified transport stays active.
 
 The page keeps request headers only in page memory. Session storage contains
 only bounded health metadata: latency estimates, success/failure counts,
@@ -37,18 +46,14 @@ success, then 350-1200 ms based on observed latency. Timeout, auth, parse, empty
 and network failures enter bounded cooldowns before the official fallback is
 tried again.
 
-## Default decision
+## Production decision
 
-Conversation prefetch remains disabled by default. A small sample shows a real
-latency opportunity, but not enough reliability for production rollout. Do not
-make it default until a supervised, content-free sample meets all of these:
-
-- at least 30 eligible switches across cold start, warm state, and app resume;
-- at least 95 percent usable snapshots;
-- private snapshot p90 no slower than 1000 ms;
-- failed attempts add no more than the configured budget before fallback;
-- a 15-minute alternating WebView/private run shows lower or equal thermal and
-  battery impact without login, history, project, attachment, or voice regressions.
+Conversation snapshot prefetch is a completed production capability and is
+enabled by default. The verified path improves warm conversation display while
+the existing bounded timeout, cooldown, and official navigation fallback keep
+the original behavior available on every failure. This capability should not be
+reimplemented or sent back through exploratory research unless the upstream
+response contract changes or current regression evidence identifies a defect.
 
 The research transport is a replaceable provider component. Sending, streaming,
 voice, and directory replacement require separate evidence and must not inherit

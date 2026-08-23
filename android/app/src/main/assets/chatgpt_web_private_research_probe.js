@@ -316,7 +316,9 @@
       }
       if (!endpointCandidate(url)) return originalFetch.apply(this, args);
       const method = init.method || (input && input.method) || 'GET';
-      const privateKind = String(init.__elonPrivateResearch || '');
+      const privateKind = String(
+        init.__elonPrivateTransport || init.__elonPrivateResearch || ''
+      );
       observeRequestShape(input, init, url);
       const requestStartedAt = nowMs();
       try {
