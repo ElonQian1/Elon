@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  var VERSION = 2;
+  var VERSION = 3;
   var PROVIDER_ID = '__PROVIDER_ID__';
   var MAX_BODY_BYTES = 2 * 1024 * 1024;
   if (window.__elonWinWebResponseResearchCaptureVersion >= VERSION) return;
@@ -34,10 +34,10 @@
     if (url.origin !== location.origin || (method !== 'GET' && method !== 'POST')) return null;
     var path = url.pathname;
     if (PROVIDER_ID === 'chatgpt') {
-      if (method === 'POST' && /^\/backend-api\/(?:f\/)?conversation(?:\/|$)/.test(path)) {
+      if (method === 'POST' && /^\/(?:backend-api|backend-anon)\/(?:f\/)?conversation(?:\/|$)/.test(path)) {
         return { endpointFamily: 'conversation_stream', method: method };
       }
-      if (method === 'GET' && (/^\/backend-api\/(?:f\/)?conversations?\/[^/]+$/.test(path))) {
+      if (method === 'GET' && (/^\/(?:backend-api|backend-anon)\/(?:f\/)?conversations?\/[^/]+$/.test(path))) {
         return { endpointFamily: 'conversation_detail', method: method };
       }
       return null;

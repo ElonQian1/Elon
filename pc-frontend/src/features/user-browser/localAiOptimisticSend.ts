@@ -1,4 +1,5 @@
 import type { LocalAiVisibleMessage } from './localAiBrowserApi'
+import { localAiAssistantExtractionIncomplete } from './localAiAssistantContentQuality'
 
 export interface PendingLocalAiSend {
   id: string
@@ -60,7 +61,10 @@ export function pendingLocalAiResponseObserved(
 ): boolean {
   const assistant = officialAssistantForPendingResponse(officialMessages, pending)
   return Boolean(assistant && (
-    assistant.state === 'streaming' || hasSubstantiveAssistantContent(assistant)
+    assistant.state === 'streaming' || (
+      hasSubstantiveAssistantContent(assistant)
+      && !localAiAssistantExtractionIncomplete(assistant)
+    )
   ))
 }
 
@@ -76,7 +80,10 @@ export function mergeOptimisticLocalAiMessages(
     const pending = pendingResponses.find((candidate) => (
       officialAssistantForPendingResponse(officialMessages, candidate) === message
     ))
-    if (!pending || message.state === 'streaming' || hasSubstantiveAssistantContent(message)) {
+    if (!pending || message.state === 'streaming' || (
+      hasSubstantiveAssistantContent(message)
+      && !localAiAssistantExtractionIncomplete(message)
+    )) {
       return message
     }
     return {

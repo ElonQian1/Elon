@@ -25,5 +25,5 @@ export function localAiAssistantExtractionIncomplete(message: LocalAiVisibleMess
   const structuredCount = message.content.filter((part) => (
     !['text', 'markdown', 'citation'].includes(part.type)
   )).length
-  return structuredCount > 0 && isLocalAiActionOnlyText(text)
+  return structuredCount > 0 && (!text.trim() || isLocalAiActionOnlyText(text))
 }

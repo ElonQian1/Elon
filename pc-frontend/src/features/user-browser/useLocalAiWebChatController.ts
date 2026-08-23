@@ -34,6 +34,7 @@ import {
   type PendingLocalAiResponse,
   type PendingLocalAiSend,
 } from './localAiOptimisticSend'
+import { localAiAssistantExtractionIncomplete } from './localAiAssistantContentQuality'
 import { requestOfficialAiTab, requestReturnToAiChat } from './internalBrowserApi'
 import {
   googleNewConversationNeedsReload,
@@ -313,7 +314,11 @@ export default function useLocalAiWebChatController(
     const messages = snapshot.messages
     const userIndex = lastMatchingUserIndex(messages, expected)
     if (userIndex < 0) return
-    if (messages.slice(userIndex + 1).some((item) => item.role === 'assistant' && item.state !== 'streaming')) {
+    if (messages.slice(userIndex + 1).some((item) => (
+      item.role === 'assistant'
+      && item.state !== 'streaming'
+      && !localAiAssistantExtractionIncomplete(item)
+    ))) {
       cancelResponseRefresh()
     }
   }, [snapshot])

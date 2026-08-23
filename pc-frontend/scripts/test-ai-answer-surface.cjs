@@ -36,6 +36,7 @@ const responseRefreshBranch = controller.slice(
   controller.indexOf('function cancelResponseRefresh'),
 )
 assert.match(responseRefreshBranch, /requestReturnToAiChat/)
+assert.match(controller, /!localAiAssistantExtractionIncomplete\(item\)/)
 assert.match(chatGptAdapter, /streamingPolicyModule\.readState/)
 assert.match(chatGptStreamingPolicy, /messageAdapter\.lastAssistantPending\(\)/)
 assert.match(chatGptStreamingPolicy, /completionQuietMs/)
@@ -93,6 +94,8 @@ assert.doesNotMatch(officialPageBranch, /contentOnly/)
 assert.match(api, /officialSurfaceQueue\.then\(work, work\)/)
 assert.match(api, /return queueOfficialSurface\(\(\) => invoke<LocalAiWebSessionState>\('hide_local_ai_web_session_embedded'/)
 assert.match(fullPage, /presentLocalAiWebSessionEmbedded\(official, bounds\)/)
+assert.match(fullPage, /foreground ownership command/)
+assert.match(fullPage, /hideOfficialSurface\(activeOfficial\)/)
 assert.doesNotMatch(fullPage, /contentOnly/)
 
 assert.doesNotMatch(embedded, /content_only|answer_surface|set_content_surface_mode/)

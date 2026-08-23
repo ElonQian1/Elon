@@ -161,6 +161,15 @@
       : node.querySelector('[data-message-author-role]') || node;
   }
 
+  function messageScope(node) {
+    const testId = cleanText(node && node.getAttribute && node.getAttribute('data-testid'));
+    if (/^conversation-turn-/.test(testId)) return node;
+    const turn = node && typeof node.closest === 'function'
+      ? node.closest('[data-testid^="conversation-turn-"]')
+      : null;
+    return turn || roleNode(node);
+  }
+
   const ASSISTANT_ACTION_TEXT = new Set([
     '提供反馈', '反馈', '复制', '复制回答', '重新生成', '重试', '点赞', '点踩', '分享',
     '朗读', '编辑', '更多', 'good response', 'bad response', 'provide feedback',
@@ -185,7 +194,11 @@
   }
 
   function contentNodes(node, role) {
-    const owner = roleNode(node);
+    // The role marker is no longer guaranteed to wrap the whole answer. Current
+    // ChatGPT finance/search turns can render the rich card inside the role node
+    // and append the prose as a sibling under the conversation-turn container.
+    // Always scan the complete turn when it is available.
+    const owner = messageScope(node);
     const selector = role === 'assistant'
       ? '.markdown, [data-message-content]'
       : '.whitespace-pre-wrap, [data-message-content], .markdown';
@@ -392,7 +405,7 @@
     lastComplexOutput = false;
     const messages = nodes.slice(startIndex).map((node, index) => {
       const role = messageRole(node);
-      const content = roleNode(node);
+      const content = messageScope(node);
       const richParts = role === 'assistant' && richContent ? richContent.parts(content) : [];
       const text = messageContent(node, role);
       const parts = richParts.concat(structuredParts(content));
@@ -429,7 +442,7 @@
     for (let index = nodes.length - 1; index >= 0; index -= 1) {
       const turn = nodes[index];
       if (messageRole(turn) !== 'assistant') continue;
-      const content = roleNode(turn);
+      const content = messageScope(turn);
       const richParts = richContent ? richContent.parts(content) : [];
       const text = messageContent(turn, 'assistant')
         .replace(INVISIBLE_PLACEHOLDERS, '')
@@ -556,6 +569,7 @@
     capabilities,
     contentNodes,
     isAssistantActionText,
+    messageScope,
     messageContent,
     lastAssistantObservation,
     lastAssistantPending,

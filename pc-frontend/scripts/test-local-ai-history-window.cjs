@@ -64,6 +64,15 @@ const incomplete = localAiHistoryWindow(incompleteSnapshot)
 assert.equal(incomplete.complete, false)
 assert.match(incomplete.label, /结构已变化/)
 
+const emptyProseSnapshot = snapshot(2, 2, 0)
+emptyProseSnapshot.messages[1].content = [
+  { type: 'markdown', text: '' },
+  { type: 'rich_card', text: 'Bitcoin (BTC)' },
+]
+const emptyProse = localAiHistoryWindow(emptyProseSnapshot)
+assert.equal(emptyProse.complete, false)
+assert.match(emptyProse.label, /结构已变化/)
+
 process.stdout.write('PASS local AI history window summary\n')
 
 function snapshot(messageCount, observedMessageCount, messageWindowStart) {

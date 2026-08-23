@@ -5,6 +5,16 @@ const path = require('node:path')
 const ts = require('typescript')
 
 const filename = path.resolve(__dirname, '../src/features/user-browser/localAiOptimisticSend.ts')
+const qualityFilename = path.resolve(__dirname, '../src/features/user-browser/localAiAssistantContentQuality.ts')
+const qualitySource = fs.readFileSync(qualityFilename, 'utf8')
+const qualityOutput = ts.transpileModule(qualitySource, {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+  fileName: qualityFilename,
+}).outputText
+const qualityModule = new Module(qualityFilename, module)
+qualityModule.filename = qualityFilename
+qualityModule.paths = module.paths
+qualityModule._compile(qualityOutput, qualityFilename)
 const source = fs.readFileSync(filename, 'utf8')
 const output = ts.transpileModule(source, {
   compilerOptions: {
@@ -17,6 +27,10 @@ const output = ts.transpileModule(source, {
 const compiled = new Module(filename, module)
 compiled.filename = filename
 compiled.paths = module.paths
+const defaultRequire = compiled.require.bind(compiled)
+compiled.require = (id) => id === './localAiAssistantContentQuality'
+  ? qualityModule.exports
+  : defaultRequire(id)
 compiled._compile(output, filename)
 const {
   beginOptimisticLocalAiSend,
@@ -81,6 +95,26 @@ assert.deepEqual(
   mergeOptimisticLocalAiMessages(officialAnswer, [first], [firstResponse]).map((item) => item.id),
   ['u-1', 'a-1', 'u-2', 'a-2'],
 )
+
+const prematureRichCard = [
+  ...afterFirstOfficialSend,
+  {
+    ...message('a-2', 'assistant', ''),
+    content: [
+      { type: 'markdown', text: '' },
+      { type: 'rich_card', text: 'Bitcoin (BTC)' },
+    ],
+  },
+]
+assert.equal(
+  pendingLocalAiResponseObserved(prematureRichCard, firstResponse),
+  false,
+  'a rich card rendered before sibling prose must not end native response polling',
+)
+const pendingRichCard = mergeOptimisticLocalAiMessages(prematureRichCard, [first], [firstResponse]).at(-1)
+assert.equal(pendingRichCard.id, 'a-2')
+assert.equal(pendingRichCard.state, 'streaming')
+assert.equal(pendingRichCard.content.length, 1)
 
 const second = beginOptimisticLocalAiSend(initial, [first], '重复问题', 'pending-2')
 assert.equal(second.baselineMatchingUserCount, 2)

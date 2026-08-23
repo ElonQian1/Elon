@@ -64,10 +64,17 @@ async function main() {
   assert.equal(captures.length, 2, 'versioned conversation stream paths must remain observable')
   assert.equal(captures[1].args.capture.endpointFamily, 'conversation_stream')
 
+  await window.fetch('https://chatgpt.com/backend-anon/conversation', {
+    method: 'POST',
+  })
+  await new Promise((resolve) => setTimeout(resolve, 20))
+  assert.equal(captures.length, 3, 'guest conversation streams must enter the local research capture')
+  assert.equal(captures[2].args.capture.endpointFamily, 'conversation_stream')
+
   await window.fetch('https://chatgpt.com/backend-api/accounts/check', { method: 'GET' })
   await new Promise((resolve) => setTimeout(resolve, 5))
-  assert.equal(fetchCalls, 3)
-  assert.equal(captures.length, 2, 'unregistered endpoint families must not enter local capture')
+  assert.equal(fetchCalls, 4)
+  assert.equal(captures.length, 3, 'unregistered endpoint families must not enter local capture')
   console.log('Win Web response research capture tests passed')
 }
 

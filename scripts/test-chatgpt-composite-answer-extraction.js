@@ -28,6 +28,7 @@ class ElementNode {
     this.candidates = options.candidates || [];
     this.visible = options.visible !== false;
     this.actionContainer = Boolean(options.actionContainer);
+    this.roleChild = options.roleChild || null;
     this.id = '';
   }
 
@@ -39,7 +40,7 @@ class ElementNode {
   getAttribute(name) { return this.attributes[name] || null; }
   matches(selector) { return selector === '[data-message-author-role]' && Boolean(this.attributes['data-message-author-role']); }
   querySelector(selector) {
-    if (selector === '[data-message-author-role]') return null;
+    if (selector === '[data-message-author-role]') return this.roleChild;
     return null;
   }
   querySelectorAll(selector) {
@@ -109,5 +110,21 @@ assert.deepEqual(
 const toolbar = new ElementNode('复制', { actionContainer: true });
 owner.candidates = [toolbar, prose];
 assert.deepEqual(messages.contentNodes(owner, 'assistant'), [prose]);
+
+const roleIsland = new ElementNode('', {
+  attributes: { 'data-message-author-role': 'assistant' },
+  candidates: [feedback],
+});
+const turn = new ElementNode('', {
+  attributes: { 'data-testid': 'conversation-turn-2' },
+  candidates: [feedback, prose],
+  roleChild: roleIsland,
+});
+assert.equal(messages.messageScope(turn), turn);
+assert.equal(
+  messages.messageContent(turn, 'assistant'),
+  '以太坊当前走势震荡，以下是完整分析。',
+  'the whole conversation turn must include prose rendered beside the nested role island',
+);
 
 console.log('CHATGPT_COMPOSITE_ANSWER_EXTRACTION=passed');

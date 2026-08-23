@@ -104,11 +104,19 @@ export default function AiBrowserExperience() {
     }
     const returnToChat = (event: Event) => {
       const request = (event as CustomEvent<OfficialAiTabRequest | undefined>).detail
-      if (surface === 'chat' && request) {
-        void runTransition(() => hideOfficialSurface(request))
-        return
+      // A return-to-chat request is a foreground ownership command. Never drop it
+      // behind the ordinary transition lock: a rich card may complete before the
+      // sibling prose arrives, and an older official-page transition can otherwise
+      // remain visible after native response polling stops.
+      generationRef.current += 1
+      activateSurface('chat')
+      if (openedSourceUrlRef.current) {
+        void controlInternalBrowserTab('hide').catch(() => null)
       }
-      void switchSurface('chat')
+      const activeOfficial = request || officialRef.current
+      if (activeOfficial) {
+        void hideOfficialSurface(activeOfficial).catch((cause) => setError(messageFor(cause)))
+      }
     }
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && surface !== 'chat') {
@@ -126,7 +134,7 @@ export default function AiBrowserExperience() {
       window.removeEventListener(REQUEST_RETURN_TO_AI_CHAT_EVENT, returnToChat)
       window.removeEventListener('keydown', handleKeyDown)
     }
-  }, [runTransition, surface, switchSurface])
+  }, [activateSurface, switchSurface])
 
   useLayoutEffect(() => {
     const generation = ++generationRef.current
