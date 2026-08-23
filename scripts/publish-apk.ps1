@@ -45,6 +45,7 @@ param(
 $ErrorActionPreference = "Stop"; if (-not $SkipBuild) { & (Join-Path $PSScriptRoot "check-build-prerequisites.ps1") -Scope Android; if ($LASTEXITCODE -ne 0) { throw "Android build prerequisites failed; APK release was not started." } }
 . (Join-Path $PSScriptRoot 'release-publish-lease.ps1')
 . (Join-Path $PSScriptRoot 'apk-release-freshness.ps1')
+. (Join-Path $PSScriptRoot 'apk-device-version-floor.ps1')
 . (Join-Path $PSScriptRoot "direct-network.ps1")
 $nativeCommandHelper = Join-Path $PSScriptRoot 'native-command-timeout.ps1'
 $apkTransportHelper = Join-Path $PSScriptRoot 'apk-publish-transport.ps1'
@@ -749,6 +750,7 @@ Write-Host "   build.gradle 兜底: v$oldName (build $oldCode) — 不会被本�
 $serverBaseline = Get-ServerApkVersionBaseline
 $serverCurrentCode = [int]$serverBaseline.VersionCode
 $serverCurrentName = [string]$serverBaseline.VersionName
+$serverPublishedCode = $serverCurrentCode
 
 if ($CurrentInstalledVersionCode -gt $serverCurrentCode) {
     $serverCurrentCode = $CurrentInstalledVersionCode
@@ -764,16 +766,12 @@ if ([string]::IsNullOrWhiteSpace($builderId) -or $builderId -eq "-") {
 }
 $builderLabel = "publish-apk.ps1 @ $builderId"
 
+$claimBody = New-ElonApkReleaseClaimBody -Sha $BuildBaseSha -BuilderId $builderId `
+    -BuilderLabel $builderLabel -CurrentVersionName $serverCurrentName -CurrentVersionCode $serverCurrentCode `
+    -PublishedVersionCode $serverPublishedCode -InstalledVersionCode $CurrentInstalledVersionCode
+
 try {
-    $claim = Invoke-ReleaseApi -Endpoint 'claim' -Body (@{
-        kind               = 'apk'
-        sha                = $BuildBaseSha
-        builderId          = $builderId
-        builderLabel       = $builderLabel
-        bump               = 'patch'
-        currentVersionName = $serverCurrentName
-        currentVersionCode = $serverCurrentCode
-    })
+    $claim = Invoke-ReleaseApi -Endpoint 'claim' -Body $claimBody
 } catch {
     Write-Error "❌ /api/release/claim 失败：$_"
 }

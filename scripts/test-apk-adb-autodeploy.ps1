@@ -4,6 +4,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 . (Join-Path $PSScriptRoot 'apk-adb-autodeploy.ps1')
+. (Join-Path $PSScriptRoot 'apk-device-version-floor.ps1')
 
 function Assert-True {
     param([bool]$Condition, [string]$Message)
@@ -19,6 +20,16 @@ $parseErrors = $null
     [ref]$parseErrors
 )
 Assert-True (@($parseErrors).Count -eq 0) 'publish-apk.ps1 must remain valid in Windows PowerShell 5.1'
+$normalClaim = New-ElonApkReleaseClaimBody -Sha 'abc123' -BuilderId 'builder' -BuilderLabel 'test' `
+    -CurrentVersionName '1.0.1' -CurrentVersionCode 10 -PublishedVersionCode 10 -InstalledVersionCode 10
+Assert-True (-not $normalClaim.ContainsKey('batchId')) `
+    'Ordinary same-SHA releases must keep server coalescing'
+$recoveryClaim = New-ElonApkReleaseClaimBody -Sha 'abc123' -BuilderId 'builder' -BuilderLabel 'test' `
+    -CurrentVersionName '1.0.8' -CurrentVersionCode 18 -PublishedVersionCode 10 -InstalledVersionCode 18
+Assert-True ($recoveryClaim.batchId -eq 'apk-device-floor-abc123-18') `
+    'A higher installed APK must use a stable recovery batch'
+Assert-True ($recoveryClaim.stage -eq 'android_apk') `
+    'The recovery batch must retain the Android release stage'
 $postflightScript = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'apk-publish-postflight.ps1') -Raw
 Assert-True ($postflightScript.Contains('Invoke-ElonApkAdbAutodeploy -ApkPath $ApkPath')) `
     'The Windows APK postflight must invoke unattended ADB deployment after publishing'
