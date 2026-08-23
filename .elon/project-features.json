@@ -8237,7 +8237,7 @@
       "id": "win-local-mode-production-ai-entry-v1",
       "title": "Win 本地模式生产 AI 聊天入口 V1",
       "summary": "为 Win 本地工作台补回可见的 /ai 生产聊天入口，继续复用现有 ChatGPT/Google AI 原生聊天、游客身份、缓存和官网回答节点；保留本机任务默认首页与官方 AI 诊断页，不改 PWA。",
-      "status": "verified",
+      "status": "released",
       "priority": "p0",
       "requirement": {
         "path": "docs/requirements/win-local-mode-production-ai-entry-v1.md",
@@ -8318,7 +8318,7 @@
         }
       ],
       "created_at_ms": 1787451699771,
-      "updated_at_ms": 1787452770114
+      "updated_at_ms": 1787454046703
     },
     {
       "id": "win-native-ai-send-surface-continuity-v1",
@@ -10518,16 +10518,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_5a4012e3a2024386b3ae37726d5abd4e",
-      "feature_id": "win-google-ai-primary-answer-continuity-v1",
-      "action": "transitioned",
-      "actor": "codex/root",
-      "reason": "正文候选优先、游客新会话后台重试与 WebView 停靠修复完成，定向及全量验证通过。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1787238230217
-    },
-    {
       "id": "feature_event_87680a818d3a41dca25a08dc234c5d94",
       "feature_id": "win-google-ai-primary-answer-continuity-v1",
       "action": "transitioned",
@@ -12516,6 +12506,16 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1787452770114
+    },
+    {
+      "id": "feature_event_ecc90743324f4f8c9d03c0ac16435bc4",
+      "feature_id": "win-local-mode-production-ai-entry-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-agent",
+      "reason": "Published and activated 0.3.69+34f05dd2ee26fb99857296a233350e7a7b4a4a1e; live Win UI shows four local-mode entries, /ai opens the production ChatGPT/Google page, and the ChatGPT composer becomes ready without a black screen.",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1787454046703
     }
   ]
 }
