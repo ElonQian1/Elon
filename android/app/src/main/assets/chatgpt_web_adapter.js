@@ -13,6 +13,7 @@
   const streamingPolicyModule = window.__elonChatGptStreamingPolicy;
   const skinAdapter = window.__elonChatGptSkin;
   const privateTransport = window.__elonChatGptPrivateTransport;
+  const privateStreamTransport = window.__elonChatGptPrivateStreamTransport;
   const authenticationPolicy = window.__elonChatGptAuthenticationPolicy;
   const adapterVersion = Number(window.__elonChatGptAdapterVersion || 0);
   const documentToken = String(window.__elonChatGptDocumentToken || '');
@@ -23,6 +24,7 @@
   let disposed = false;
   let observer = null;
   let snapshotScheduler = null;
+  let privateStreamUnsubscribe = null;
   let streamingSnapshotMode = false;
   let skinMode = false;
   const SEND_BUTTON_POLL_MS = 60;
@@ -160,14 +162,22 @@
     const composer = findComposer();
     const dictationActive = optional(false, () => composerAdapter ? composerAdapter.dictationActive(composer) : false);
     const streamingState = optional({ active: false, assistantKey: '' }, readStreamingState);
-    const streaming = streamingState.active;
+    const privateStream = optional(null, () => privateStreamTransport &&
+      typeof privateStreamTransport.current === 'function'
+      ? privateStreamTransport.current(location.pathname)
+      : null);
+    const streaming = streamingState.active || !!(privateStream && privateStream.state === 'streaming');
     streamingSnapshotMode = streaming;
     const messageWindow = optional({ messages: [], observedCount: 0, startIndex: 0 }, () =>
       messageAdapter && typeof messageAdapter.readMessageWindow === 'function'
         ? messageAdapter.readMessageWindow(streaming, streamingState.assistantKey)
         : { messages: messageAdapter ? messageAdapter.readMessages(streaming) : [], observedCount: 0, startIndex: 0 }
     );
-    const messages = Array.isArray(messageWindow.messages) ? messageWindow.messages : [];
+    const domMessages = Array.isArray(messageWindow.messages) ? messageWindow.messages : [];
+    const messages = optional(domMessages, () => privateStreamTransport &&
+      typeof privateStreamTransport.mergeMessages === 'function'
+      ? privateStreamTransport.mergeMessages(domMessages, location.pathname)
+      : domMessages);
     const pageKind = optional('unknown', () => layoutAdapter && typeof layoutAdapter.pageKind === 'function'
       ? layoutAdapter.pageKind()
       : 'unknown');
@@ -564,6 +574,8 @@
     disposed = true;
     if (streamingPolicy) streamingPolicy.dispose();
     if (snapshotScheduler) snapshotScheduler.dispose();
+    if (typeof privateStreamUnsubscribe === 'function') privateStreamUnsubscribe();
+    privateStreamUnsubscribe = null;
     if (observer) observer.disconnect();
     window.removeEventListener('popstate', scheduleSnapshot);
   }
@@ -586,6 +598,10 @@
     activeQuietDelayMs: 80,
     activeMaxDelayMs: 700
   }));
+  privateStreamUnsubscribe = optional(null, () => privateStreamTransport &&
+    typeof privateStreamTransport.subscribe === 'function'
+    ? privateStreamTransport.subscribe(() => scheduleSnapshot(true))
+    : null);
   observer = new MutationObserver(scheduleSnapshot);
   const observeDocument = () => {
     const root = document.documentElement;

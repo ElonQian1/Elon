@@ -10,6 +10,7 @@ reviewed_at: 2026-08-21
 
 - Android ChatGPT 网页 AI 的 `android_chatgpt_private_conversation_prefetch_v1`
   已完成真机验证并改为生产默认开启：原生会话切换可优先读取同源会话快照，失败时受限超时、冷却并自动继续官方 WebView 导航；研究观测默认关闭，Cookie、Token、请求头和聊天内容不落本地状态。该能力已完成，不再重复研究或另写一套实现；发送、流式回复、目录和实时语音仍是独立能力。
+- Android ChatGPT 网页 AI 的 `android_chatgpt_private_stream_observer_v1` 已完成页面内响应副本、SSE 分片解析、原生消息合并和 DOM 自动接管的离线实现与协议测试；它不复制发送请求、不读取请求头或请求体，异常时继续使用现有 DOM 流式路径。真机首字、稳定性和资源 A/B 尚未验收，因此生产开关保持关闭，手机可用后只需做一次定向灰度，不再重复实现解析器。
 - 多 PC Rust 缓存平台已具备可安装工具与 Skill、脱敏 Fleet 观测，以及不上传路径、绑定精确摘要并由目标节点复扫加锁的远程 GC 审批。远程只覆盖机器级普通/老化策略；项目级治理与高风险操作仍在本机。生产 TLS、节点发布升级和真实多 PC 验收未完成，边界见 `docs/rust-cache-fleet-operations.md`。
 - 已实现：用户通过 Android APK 或 PC 工作台描述需求，AI CLI/API 代理在真实 Git 工作区开发、验证、构建和发布应用。
 - 已实现：项目、频道、多人/多 AI 协作、Windows 节点执行、上下文编译、项目文档治理与版本恢复等基础能力。

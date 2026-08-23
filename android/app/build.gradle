@@ -124,6 +124,10 @@ def chatGptPrivateConversationPrefetchEnabled =
     project.findProperty("ELON_CHATGPT_PRIVATE_CONVERSATION_PREFETCH")
         ?.toString()
         ?.toBoolean() ?: true
+def chatGptPrivateStreamObserverEnabled =
+    project.findProperty("ELON_CHATGPT_PRIVATE_STREAM_OBSERVER")
+        ?.toString()
+        ?.toBoolean() ?: false
 def chatGptPrivateResearchVersionCode = project.findProperty("ELON_CHATGPT_PRIVATE_RESEARCH_VERSION_CODE")
     ?.toString()
     ?.trim()
@@ -197,6 +201,7 @@ android {
         buildConfigField "String", "CHATGPT_WEB_VERIFIED_SOURCE_COMMIT", "\"${project.ext.chatGptWebVerifiedSourceCommit}\""
         buildConfigField "boolean", "CHATGPT_PRIVATE_RESEARCH_ENABLED", "${chatGptPrivateResearchEnabled}"
         buildConfigField "boolean", "CHATGPT_PRIVATE_CONVERSATION_PREFETCH_ENABLED", "${chatGptPrivateConversationPrefetchEnabled}"
+        buildConfigField "boolean", "CHATGPT_PRIVATE_STREAM_OBSERVER_ENABLED", "${chatGptPrivateStreamObserverEnabled}"
         manifestPlaceholders += [
             elonAppLabel        : "@string/app_name",
             elonLauncherIcon     : projectIconEnabled ? "@mipmap/elon_project_launcher" : "@mipmap/ic_launcher",
