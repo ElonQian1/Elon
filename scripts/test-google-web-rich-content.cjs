@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict')
 const richContent = require('../android/app/src/main/assets/google_web_rich_content.js')
 
-assert.equal(richContent.version, 5)
+assert.equal(richContent.version, 6)
 
 const markdown = richContent.renderBlocks([
   { type: 'heading', level: 2, text: '天气概览' },
@@ -88,6 +88,20 @@ assert.equal(richContent.sourceResultCollection({
   textLength: 640,
   railBoundary: true,
 }), true, 'Google source rail boundary must survive wrapped or indirect result links')
+assert.equal(richContent.sourceResultCollection({
+  itemCount: 3,
+  sourceItemCount: 0,
+  dominantSourceItemCount: 0,
+  textLength: 720,
+  serializedSourceArtifact: true,
+}), true, 'serialized Table_content source snippets must not leak into native prose')
+assert.equal(richContent.sourceResultCollection({
+  itemCount: 1,
+  sourceItemCount: 0,
+  dominantSourceItemCount: 0,
+  textLength: 160,
+  serializedSourceArtifact: true,
+}), false, 'a single narrative mention of a content marker is not a source rail')
 assert.equal(richContent.sourceResultRailBoundary({
   nextElementSibling: {
     innerText: '显示所有相关结果',

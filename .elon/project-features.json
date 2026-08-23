@@ -7758,14 +7758,14 @@
         },
         {
           "path": "android/app/src/main/assets/google_web_rich_content.js",
-          "content_hash": "131959bb5d6d92fa705852dc47c9a9ba1b7fd8dd950f73770d1841c355793bbe",
+          "content_hash": "c10c6a847f6988f04cb3b5e90f973d56029b804b08b657523381e1461dd1d0fb",
           "locator": "sourceResultRailBoundary/sourceResultCollection",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "1a063755422aa0c806d3f664189cb2e375eedd56",
-            "head_blob_oid": "bdd94df4b7ca4a9c0030f2e398b1ce67fe99cf47",
-            "worktree_blob_oid": "58378e8bc1be7289f0cfc88cb3b469affae2530f",
+            "head_commit": "1c202bf6755944cbb289b9f0d90309b36939f06e",
+            "head_blob_oid": "58378e8bc1be7289f0cfc88cb3b469affae2530f",
+            "worktree_blob_oid": "5f7fc197dcc7f6613d57433d24bf85d58f737a28",
             "state": "tracked_modified"
           }
         },
@@ -7810,20 +7810,20 @@
         },
         {
           "path": "scripts/test-google-web-rich-content.cjs",
-          "content_hash": "1e262fe4bd56e8a8d348b950be398f7fa06c1e77a3de9d7fdff5f6cb107ade8d",
+          "content_hash": "97923e3087b49e64873ecfac21bf4ef439306e55fa446732e242f5d4f1232c60",
           "locator": "source rail boundary and pruning",
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "1a063755422aa0c806d3f664189cb2e375eedd56",
-            "head_blob_oid": "18143f3f84c9c60d8375b93a823ebaf7ab4eb09f",
-            "worktree_blob_oid": "46a230927517dcfb77f92195dda362113c0381c4",
+            "head_commit": "1c202bf6755944cbb289b9f0d90309b36939f06e",
+            "head_blob_oid": "46a230927517dcfb77f92195dda362113c0381c4",
+            "worktree_blob_oid": "75c33f7638fa42d6dedafbe9f1af9605ff1de59e",
             "state": "tracked_modified"
           }
         }
       ],
       "created_at_ms": 1787440868272,
-      "updated_at_ms": 1787442734199
+      "updated_at_ms": 1787443311448
     },
     {
       "id": "win-hidden-ai-webview-input-hit-test-v1",
@@ -9976,16 +9976,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_873fc032e6de4d38964ad31d1e641d3d",
-      "feature_id": "win-background-ai-webview-resize-parking-v1",
-      "action": "transitioned",
-      "actor": "codex-root",
-      "reason": "已复现并定位到后台 WebView 固定旧边界坐标，开始实现主窗口 resize/DPI 事件重新停放。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1787225038783
-    },
-    {
       "id": "feature_event_19c549ad80ea44ff94c1e5ff82b77793",
       "feature_id": "win-background-ai-webview-resize-parking-v1",
       "action": "claim_released",
@@ -11974,6 +11964,16 @@
       "from_status": "implemented",
       "to_status": "implemented",
       "at_ms": 1787442734199
+    },
+    {
+      "id": "feature_event_6fb0be3c51f040efb3dc3c319539c8b2",
+      "feature_id": "win-google-ai-source-rail-narrative-pruning-v3",
+      "action": "evidence_recorded",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "implemented",
+      "to_status": "implemented",
+      "at_ms": 1787443311448
     }
   ]
 }

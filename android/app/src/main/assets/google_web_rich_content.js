@@ -321,6 +321,8 @@
     );
     const textLength = Math.max(0, Number(metrics && metrics.textLength) || 0);
     if (metrics && metrics.railBoundary === true && itemCount >= 2) return true;
+    if (metrics && metrics.serializedSourceArtifact === true && itemCount >= 2 &&
+        textLength <= 1800) return true;
     return itemCount >= 2 && sourceItemCount >= 2 && dominantSourceItemCount >= 2 &&
       dominantSourceItemCount / itemCount >= 0.6 &&
       textLength <= Math.min(1800, sourceItemCount * 600);
@@ -413,7 +415,11 @@
         sourceItemCount: itemMetrics.filter((item) => item.sourceLike).length,
         dominantSourceItemCount: itemMetrics.filter((item) => item.linkDominated).length,
         textLength: cleanInline(element.innerText || element.textContent).length,
-        railBoundary: sourceResultRailBoundary(element)
+        railBoundary: sourceResultRailBoundary(element),
+        serializedSourceArtifact: itemNodes.some((item) =>
+          /(?:table|image|video|map)_content\s*:/i.test(
+            cleanInline(item.innerText || item.textContent)
+          ))
       });
       const items = itemNodes.map((item) => ({
         markdown: inlineMarkdown(item, true),
@@ -470,7 +476,7 @@
   }
 
   return Object.freeze({
-    version: 5,
+    version: 6,
     renderBlocks,
     partsFromBlocks,
     weatherPart,
