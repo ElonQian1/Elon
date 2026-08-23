@@ -66,8 +66,7 @@ function Wait-ApkMcpHealth {
     } while ([DateTimeOffset]::UtcNow -lt $deadline)
 
     if ($OpenAppOnFailure) {
-        Invoke-Adb shell am start -n com.elon.app/.MainActivity | Out-Null
-        Start-Sleep -Milliseconds 600
+        Start-ApkMainActivity -SettleMilliseconds 600
         $retryDeadline = [DateTimeOffset]::UtcNow.AddSeconds(3)
         do {
             try {
@@ -91,10 +90,15 @@ function Get-ApkMcpHealthIfAvailable {
 }
 
 function Start-ApkMainActivity {
-    Invoke-Adb shell am start -n com.elon.app/.MainActivity | Out-Null
+    param([int]$SettleMilliseconds = 700)
+
+    # Mirror McpNativeControlBridge.openMainActivity so repeated MCP bootstrap
+    # reuses the existing task instead of stacking another MainActivity.
+    Invoke-Adb shell am start -f 0x34000000 `
+        -n com.elon.app/.MainActivity --ez mcp_open_main true | Out-Null
     Assert-ElonNativeCommand -Result $script:LastAdbResult `
         -FailureMessage "Unable to start APK MainActivity"
-    Start-Sleep -Milliseconds 700
+    Start-Sleep -Milliseconds ([Math]::Max(0, $SettleMilliseconds))
 }
 
 $health = if ($NoBootstrap -and -not $EnsureMainActivity) {

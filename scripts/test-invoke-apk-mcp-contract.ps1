@@ -33,11 +33,17 @@ foreach ($token in @(
     'Assert-ElonNativeCommand',
     'Unable to create APK MCP adb forward',
     'function Get-ApkMcpHealthIfAvailable',
-    'if ($NoBootstrap -and -not $EnsureMainActivity)'
+    'if ($NoBootstrap -and -not $EnsureMainActivity)',
+    'Start-ApkMainActivity -SettleMilliseconds 600',
+    'Invoke-Adb shell am start -f 0x34000000',
+    '-n com.elon.app/.MainActivity --ez mcp_open_main true'
 )) {
     if (-not $source.Contains($token)) {
         throw "APK MCP adb timeout contract is missing token: $token"
     }
+}
+if ($source.Contains('Invoke-Adb shell am start -n com.elon.app/.MainActivity')) {
+    throw "APK MCP must not use a bare MainActivity start that stacks duplicate Activity instances."
 }
 
 Write-Output "APK_MCP_LIFECYCLE_CONTRACT=passed"
