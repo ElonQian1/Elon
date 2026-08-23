@@ -4,6 +4,7 @@ internal class ChatGptRealtimeVoiceRecoveryGate {
     internal data class Token(
         val generation: Long,
         val snapshotRevision: Long,
+        val reloadAllowed: Boolean,
     )
 
     private var generation = 0L
@@ -12,13 +13,15 @@ internal class ChatGptRealtimeVoiceRecoveryGate {
         generation += 1
     }
 
-    fun arm(snapshotRevision: Long): Token {
+    fun arm(snapshotRevision: Long, reloadAllowed: Boolean): Token {
         generation += 1
-        return Token(generation, snapshotRevision)
+        return Token(generation, snapshotRevision, reloadAllowed)
     }
 
     fun shouldReload(token: Token, conversationRecoveredSince: Boolean): Boolean =
-        token.generation == generation && !conversationRecoveredSince
+        token.generation == generation && token.reloadAllowed && !conversationRecoveredSince
+
+    fun isCurrent(token: Token): Boolean = token.generation == generation
 }
 
 internal class ChatGptRealtimeVoiceConversationRecovery(initialSnapshot: ChatGptWebSnapshot?) {

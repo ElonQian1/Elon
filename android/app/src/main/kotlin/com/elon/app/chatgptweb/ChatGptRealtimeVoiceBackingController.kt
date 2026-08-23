@@ -9,6 +9,7 @@ internal class ChatGptRealtimeVoiceBackingController(
     private val webView: () -> WebView?,
     private val surfaceMode: ChatGptWebSurfaceModeController,
     private val requestExecution: () -> Unit,
+    private val requestConversationSnapshot: () -> Unit,
     private val schedule: (Runnable, Long) -> Unit,
     private val conversationSnapshotRevision: () -> Long,
     private val conversationRecoveredSince: (Long) -> Boolean,
@@ -37,9 +38,19 @@ internal class ChatGptRealtimeVoiceBackingController(
         if (!active) return
         active = false
         val view = webView() ?: return
-        val recoveryToken = recoveryGate.arm(conversationSnapshotRevision())
+        val recoveryToken = recoveryGate.arm(
+            snapshotRevision = conversationSnapshotRevision(),
+            reloadAllowed = !gracefulExit,
+        )
         view.showWebChatBackgroundSurface()
         requestExecution()
+        requestConversationSnapshot()
+        schedule(Runnable {
+            if (active || !recoveryGate.isCurrent(recoveryToken)) return@Runnable
+            requestExecution()
+            requestConversationSnapshot()
+        }, SNAPSHOT_SETTLE_DELAY_MS)
+        if (gracefulExit) return
         schedule(Runnable {
             if (
                 active ||
@@ -50,7 +61,7 @@ internal class ChatGptRealtimeVoiceBackingController(
             ) return@Runnable
             webView()?.reload()
             requestExecution()
-        }, recoveryTimeoutMs(gracefulExit))
+        }, INTERRUPTED_RECOVERY_TIMEOUT_MS)
     }
 
     fun release() {
@@ -59,10 +70,7 @@ internal class ChatGptRealtimeVoiceBackingController(
     }
 
     private companion object {
-        const val GRACEFUL_RECOVERY_TIMEOUT_MS = 2_500L
+        const val SNAPSHOT_SETTLE_DELAY_MS = 600L
         const val INTERRUPTED_RECOVERY_TIMEOUT_MS = 3_000L
-
-        fun recoveryTimeoutMs(gracefulExit: Boolean): Long =
-            if (gracefulExit) GRACEFUL_RECOVERY_TIMEOUT_MS else INTERRUPTED_RECOVERY_TIMEOUT_MS
     }
 }

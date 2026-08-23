@@ -111,6 +111,7 @@ internal class ChatGptBackgroundSession(
         lazy(LazyThreadSafetyMode.NONE) {
             ChatGptRealtimeVoiceBackingController(
                 ::ensureInitialized, { webView }, surfaceMode, { webExecution.interactionRequested() },
+                { pageAdapter?.requestSnapshot() },
                 { task, delay -> recoveryHandler.postDelayed(task, delay) },
                 realtimeVoiceRecovery::revision,
                 realtimeVoiceRecovery::recoveredSince,

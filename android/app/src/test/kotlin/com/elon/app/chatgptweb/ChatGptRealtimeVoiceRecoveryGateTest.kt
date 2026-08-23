@@ -9,7 +9,7 @@ class ChatGptRealtimeVoiceRecoveryGateTest {
     @Test
     fun reloadsOnlyWhenTheArmedExitDidNotReceiveAFreshConversationSnapshot() {
         val gate = ChatGptRealtimeVoiceRecoveryGate()
-        val token = gate.arm(snapshotRevision = 8L)
+        val token = gate.arm(snapshotRevision = 8L, reloadAllowed = true)
 
         assertTrue(gate.shouldReload(token, conversationRecoveredSince = false))
         assertFalse(gate.shouldReload(token, conversationRecoveredSince = true))
@@ -18,7 +18,7 @@ class ChatGptRealtimeVoiceRecoveryGateTest {
     @Test
     fun aNewVoiceCycleInvalidatesAnOlderExitCallback() {
         val gate = ChatGptRealtimeVoiceRecoveryGate()
-        val oldExit = gate.arm(snapshotRevision = 8L)
+        val oldExit = gate.arm(snapshotRevision = 8L, reloadAllowed = true)
 
         gate.invalidate()
 
@@ -28,11 +28,20 @@ class ChatGptRealtimeVoiceRecoveryGateTest {
     @Test
     fun onlyTheLatestExitCanRequestRecovery() {
         val gate = ChatGptRealtimeVoiceRecoveryGate()
-        val oldExit = gate.arm(snapshotRevision = 8L)
-        val latestExit = gate.arm(snapshotRevision = 9L)
+        val oldExit = gate.arm(snapshotRevision = 8L, reloadAllowed = true)
+        val latestExit = gate.arm(snapshotRevision = 9L, reloadAllowed = true)
 
         assertFalse(gate.shouldReload(oldExit, conversationRecoveredSince = false))
         assertTrue(gate.shouldReload(latestExit, conversationRecoveredSince = false))
+    }
+
+    @Test
+    fun gracefulExitNeverReloadsAnAlreadySettledConversation() {
+        val gate = ChatGptRealtimeVoiceRecoveryGate()
+        val token = gate.arm(snapshotRevision = 8L, reloadAllowed = false)
+
+        assertTrue(gate.isCurrent(token))
+        assertFalse(gate.shouldReload(token, conversationRecoveredSince = false))
     }
 
     @Test
