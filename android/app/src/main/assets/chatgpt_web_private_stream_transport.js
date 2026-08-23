@@ -4,7 +4,7 @@
   if (window.__elonChatGptPrivateStreamObserverEnabled !== true) return;
   if (location.origin !== 'https://chatgpt.com') return;
   const existing = window.__elonChatGptPrivateStreamTransport;
-  if (existing && Number(existing.version) >= 3) return;
+  if (existing && Number(existing.version) >= 4) return;
   const policy = window.__elonChatGptPrivateStreamPolicy;
   const originalFetch = typeof window.fetch === 'function' ? window.fetch : null;
   const socketTap = window.__elonChatGptPrivateSocketTap;
@@ -81,7 +81,7 @@
     const message = payload && typeof payload.message === 'object' ? payload.message :
       (data && typeof data.message === 'object' ? data.message : null);
     const content = message && typeof message.content === 'object' ? message.content : null;
-    const prefix = source === 'socket' ? 'socket/' : '';
+    const prefix = source ? source + '/' : '';
     recordShape(prefix + [
       't:' + schemaType(payload && payload.type),
       'k:' + schemaKeys(payload),
@@ -104,6 +104,18 @@
     if (length < 256) return 'small';
     if (length < 4096) return 'medium';
     return 'large';
+  }
+
+  function nestedFieldShape(value) {
+    if (value === null) return 'null';
+    if (Array.isArray(value)) {
+      const types = value.slice(0, 8).map((item) => item === null ? 'null' : typeof item);
+      return 'array/count:' + Math.min(value.length, 99) + '/types:' +
+        (Array.from(new Set(types)).map(schemaType).join('.') || 'none');
+    }
+    if (typeof value === 'object') return 'object/k:' + schemaKeys(value);
+    if (typeof value === 'string') return 'string/size:' + socketLengthBucket(value.length);
+    return schemaType(typeof value);
   }
 
   function parseSocketText(text) {
@@ -140,8 +152,9 @@
     return values.some((value) => /^(completed|finished|finished_successfully|done|message_stream_complete)$/.test(value));
   }
 
-  function acceptSocketPayload(root) {
-    const queue = [{ value: root, depth: 0 }];
+  function acceptObservedPayload(root, source, exploreAll) {
+    const sourcePrefix = source ? source + '/' : '';
+    const queue = [{ value: root, depth: 0, exploreAll: exploreAll === true }];
     const seen = new Set();
     let accepted = false;
     let inspected = 0;
@@ -154,18 +167,22 @@
       if (typeof value === 'string') {
         if (entry.depth < MAX_SOCKET_DEPTH) {
           parseSocketText(value).forEach((item) =>
-            queue.push({ value: item, depth: entry.depth + 1 }));
+            queue.push({ value: item, depth: entry.depth + 1, exploreAll: entry.exploreAll }));
         }
         continue;
       }
       if (typeof value !== 'object') continue;
-      reportShape(value, 'socket');
+      reportShape(value, source);
       if (session.accept(value)) accepted = true;
       if (value.author && value.author.role === 'assistant' &&
           session.accept({ message: value })) accepted = true;
       if (entry.depth >= MAX_SOCKET_DEPTH) continue;
       if (Array.isArray(value)) {
-        value.slice(0, 24).forEach((item) => queue.push({ value: item, depth: entry.depth + 1 }));
+        value.slice(0, 24).forEach((item) => queue.push({
+          value: item,
+          depth: entry.depth + 1,
+          exploreAll: entry.exploreAll
+        }));
         continue;
       }
       [
@@ -184,14 +201,33 @@
         if ((key === 'reply' || key === 'update_content') && nested != null) {
           const kind = Array.isArray(nested) ? 'array' : typeof nested;
           const size = typeof nested === 'string' ? socketLengthBucket(nested.length) : 'none';
-          recordShape('socket/field:' + key + '/type:' + schemaType(kind) + '/size:' + size);
+          recordShape(sourcePrefix + 'field:' + key + '/type:' + schemaType(kind) + '/size:' + size);
+          if (key === 'update_content') {
+            recordShape(sourcePrefix + 'field:update_content/shape:' + nestedFieldShape(nested));
+          }
         }
         if (nested && typeof nested === 'object') {
-          queue.push({ value: nested, depth: entry.depth + 1 });
+          queue.push({
+            value: nested,
+            depth: entry.depth + 1,
+            exploreAll: entry.exploreAll || key === 'update_content'
+          });
         } else if (typeof nested === 'string') {
-          queue.push({ value: nested, depth: entry.depth + 1 });
+          queue.push({
+            value: nested,
+            depth: entry.depth + 1,
+            exploreAll: entry.exploreAll || key === 'update_content'
+          });
         }
       });
+      if (entry.exploreAll) {
+        Object.keys(value).slice(0, 24).forEach((key) => {
+          const nested = value[key];
+          if ((nested && typeof nested === 'object') || typeof nested === 'string') {
+            queue.push({ value: nested, depth: entry.depth + 1, exploreAll: true });
+          }
+        });
+      }
       if (isCompletedPayload(value) && session.finish()) accepted = true;
     }
     return accepted;
@@ -206,7 +242,7 @@
     }
     let accepted = false;
     parsed.forEach((payload) => {
-      if (acceptSocketPayload(payload)) accepted = true;
+      if (acceptObservedPayload(payload, 'socket')) accepted = true;
     });
     if (!accepted) return;
     socketFrames += 1;
@@ -226,6 +262,38 @@
     if (!response || !response.ok || !response.headers || typeof response.headers.get !== 'function') return false;
     return String(response.headers.get('content-type') || '').toLowerCase()
       .includes('text/event-stream');
+  }
+
+  function isOfficialStreamStatus(method, url, response) {
+    if (String(method || 'GET').toUpperCase() !== 'GET') return false;
+    if (url.origin !== location.origin ||
+        !/^\/backend-api\/conversation\/[A-Za-z0-9_-]{1,160}\/stream_status$/.test(url.pathname)) {
+      return false;
+    }
+    if (!response || !response.ok || !response.headers || typeof response.headers.get !== 'function') {
+      return false;
+    }
+    return String(response.headers.get('content-type') || '').toLowerCase().includes('json');
+  }
+
+  function observeStreamStatus(response) {
+    let clone;
+    try { clone = response.clone(); }
+    catch (_) { return; }
+    if (!clone || typeof clone.json !== 'function') return;
+    Promise.resolve(clone.json()).then((payload) => {
+      if (disposed || !acceptObservedPayload(payload, 'status', true)) return;
+      socketFrames += 1;
+      if (!socketFirstReported) {
+        socketFirstReported = true;
+        reportSocketOutcome('first');
+      }
+      const active = session.current(location.pathname);
+      if (active && active.state === 'completed') reportSocketOutcome('success');
+      notify();
+    }).catch(function () {
+      recordShape('status/parse_error');
+    });
   }
 
   async function observe(response) {
@@ -291,6 +359,7 @@
     const method = init.method || input && input.method || 'GET';
     return Promise.resolve(originalFetch.apply(this, args)).then((response) => {
       if (isOfficialConversationStream(method, url, response)) observe(response);
+      else if (isOfficialStreamStatus(method, url, response)) observeStreamStatus(response);
       return response;
     });
   };
@@ -301,7 +370,7 @@
   }
 
   window.__elonChatGptPrivateStreamTransport = Object.freeze({
-    version: 3,
+    version: 4,
     enabled: true,
     current: (pathname) => session.current(pathname),
     mergeMessages: (messages, pathname) => session.merge(messages, pathname),

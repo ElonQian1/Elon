@@ -9,7 +9,7 @@ reviewed_at: 2026-08-23
 ## 当前产品主链
 
 - Android ChatGPT `android_chatgpt_private_conversation_prefetch_v1` 已真机验证并默认开启，失败会熔断并回退官方 WebView；不再重复实现，详见 `docs/chatgpt-private-transport-research.md`。
-- `android_chatgpt_private_stream_observer_v1` 已适配官网紧凑协议但待真机确认，生产仍关闭；`android_chatgpt_realtime_voice_exit_snapshot_recovery_v1` 已通过定向测试，正常退出不再强制刷新，待用户监督真机验收。详见 `docs/chatgpt-private-stream-observer.md`、`docs/chatgpt-realtime-voice-exit-recovery.md`。
+- `android_chatgpt_private_stream_observer_v1` 已真机验证并默认开启，只克隆官网响应且失败回退 DOM；`android_chatgpt_realtime_voice_exit_snapshot_recovery_v1` 已通过定向测试，正常退出不再强制刷新，待用户监督真机验收。详见 `docs/chatgpt-private-stream-observer.md`、`docs/chatgpt-realtime-voice-exit-recovery.md`。
 - Android ChatGPT 已完成并默认启用 `android_chatgpt_conversation_project_directory_cache_v1` 与 `android_chatgpt_webview_proxy_prepare_fail_open_v1`：目录约 0.3 秒从有界缓存恢复；代理回调超过 750ms 会一次性放行，正式版 `v1.1.1240 (1250)` 冷启动约 2.2 秒、后台返回约 1.9 秒恢复可输入。两项均已真机验收且不再重复研究，详见 `docs/chatgpt-conversation-project-directory-cache.md`、`docs/chatgpt-webview-proxy-prepare-recovery.md`。
 - 多 PC Rust 缓存平台已具备可安装工具与 Skill、脱敏 Fleet 观测，以及不上传路径、绑定精确摘要并由目标节点复扫加锁的远程 GC 审批。远程只覆盖机器级普通/老化策略；项目级治理与高风险操作仍在本机。生产 TLS、节点发布升级和真实多 PC 验收未完成，边界见 `docs/rust-cache-fleet-operations.md`。
 - 已实现：用户通过 Android APK 或 PC 工作台描述需求，AI CLI/API 代理在真实 Git 工作区开发、验证、构建和发布应用。

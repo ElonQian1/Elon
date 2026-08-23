@@ -21,7 +21,7 @@ const pageAdapter = fs.readFileSync(path.join(
 
 assert.match(
   buildGradle,
-  /findProperty\("ELON_CHATGPT_PRIVATE_STREAM_OBSERVER"\)[\s\S]*?\?\.toBoolean\(\) \?: false/
+  /findProperty\("ELON_CHATGPT_PRIVATE_STREAM_OBSERVER"\)[\s\S]*?\?\.toBoolean\(\) \?: true/
 );
 assert.match(buildGradle, /buildConfigField "boolean", "CHATGPT_PRIVATE_STREAM_OBSERVER_ENABLED"/);
 assert.match(pageAdapter, /BuildConfig\.CHATGPT_PRIVATE_STREAM_OBSERVER_ENABLED/);
@@ -58,6 +58,15 @@ function createResponse(chunks) {
         }
       }
     })
+  };
+}
+
+function createJsonResponse(payload) {
+  return {
+    ok: true,
+    status: 200,
+    headers: { get: (name) => name === 'content-type' ? 'application/json' : null },
+    clone: () => ({ json: async () => payload })
   };
 }
 
@@ -124,7 +133,7 @@ function context(enabled, response) {
     'data: [DONE]\n\n'
   ]);
   const enabled = context(true, response);
-  assert.equal(enabled.window.__elonChatGptPrivateStreamTransport.version, 3);
+  assert.equal(enabled.window.__elonChatGptPrivateStreamTransport.version, 4);
   assert.equal(enabled.socketListenerCount(), 1);
   let notifications = 0;
   enabled.window.__elonChatGptPrivateStreamTransport.subscribe(() => { notifications += 1; });
@@ -202,6 +211,58 @@ function context(enabled, response) {
     compact.window.__elonChatGptPrivateStreamTransport.current('/c/conversation-one').text,
     'conversation update answer'
   );
+  compact.emitSocket(JSON.stringify({
+    type: 'conversation-update',
+    payload: {
+      conversation_id: 'conversation-one',
+      update_type: 'message',
+      update_content: {
+        opaque_wrapper: {
+          nested_items: [{
+            message: {
+              id: 'assistant-wrapped-update',
+              author: { role: 'assistant' },
+              status: 'finished_successfully',
+              content: { parts: ['wrapped conversation update answer'] }
+            }
+          }]
+        }
+      }
+    }
+  }));
+  assert.equal(
+    compact.window.__elonChatGptPrivateStreamTransport.current('/c/conversation-one').text,
+    'wrapped conversation update answer'
+  );
+  assert.ok(compact.shapes.includes(
+    'socket/field:update_content/shape:object/k:opaque_wrapper'
+  ));
+
+  const statusResponse = createJsonResponse({
+    result: {
+      updates: [{
+        message: {
+          id: 'assistant-stream-status',
+          author: { role: 'assistant' },
+          status: 'finished_successfully',
+          content: { parts: ['stream status answer'] }
+        }
+      }]
+    }
+  });
+  const status = context(true, statusResponse);
+  await status.window.fetch(
+    'https://chatgpt.com/backend-api/conversation/conversation-one/stream_status',
+    { method: 'GET' }
+  );
+  await tick();
+  await tick();
+  assert.equal(status.calls(), 1, 'stream status observation never duplicates the official request');
+  assert.equal(
+    status.window.__elonChatGptPrivateStreamTransport.current('/c/conversation-one').text,
+    'stream status answer'
+  );
+  assert.ok(status.shapes.some((shape) => shape.startsWith('status/')));
   assert.equal(
     enabled.window.__elonChatGptPrivateStreamTransport.current('/c/conversation-one').text,
     'hello world'

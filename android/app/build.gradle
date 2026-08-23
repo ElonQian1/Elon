@@ -127,7 +127,7 @@ def chatGptPrivateConversationPrefetchEnabled =
 def chatGptPrivateStreamObserverEnabled =
     project.findProperty("ELON_CHATGPT_PRIVATE_STREAM_OBSERVER")
         ?.toString()
-        ?.toBoolean() ?: false
+        ?.toBoolean() ?: true
 def chatGptPrivateResearchVersionCode = project.findProperty("ELON_CHATGPT_PRIVATE_RESEARCH_VERSION_CODE")
     ?.toString()
     ?.trim()

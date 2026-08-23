@@ -1,8 +1,8 @@
 ---
 capability_id: android_chatgpt_private_stream_observer_v1
-implementation_status: websocket_compact_envelope_adapter_device_pending
-verification_status: device_observed_websocket_envelope
-production_default: false
+implementation_status: completed
+verification_status: device_verified
+production_default: true
 repeat_implementation: legacy_sse_and_websocket_discovery_not_required
 ---
 
@@ -66,11 +66,17 @@ or request body was emitted. The tested parser now handles bounded JSON/SSE
 strings inside `reply`, `payload`, and `update_content` arrays without replaying
 the request.
 
-Research APK `1.1.1245 (1255)` contains that final `update_content` decoder and
-passed the release build plus deterministic single-request, bounded-buffer,
-envelope, completion, and fallback tests. Device installation was deferred
-because both USB and the remembered wireless ADB address went offline. Keep the
-production flag off until one controlled response verifies canonical assistant
-text from this decoder; after that single verification, record the APK and
-adapter evidence here and enable the guarded default rather than repeating
-protocol discovery.
+Research APK `1.1.1248 (1258)`, adapter `168`, established the production path
+on Xiaomi `e0d909c3`. The official page sent the controlled prompt once and the
+native observer received both `private_stream first` and `private_stream
+success` from the page's existing `GET /backend-api/conversation/{id}/stream_status`
+response before DOM completion. The native message snapshot contained the
+expected controlled marker; no cookie, header value, request body, prompt, or
+unrelated conversation content was emitted by the diagnostic evidence.
+
+The completed transport observes only clones of official responses. It supports
+legacy SSE, bounded official WebSocket envelopes, and the current JSON stream
+status response. It never creates another request or replays a prompt; parse,
+timeout, protocol, or merge failures leave the DOM path authoritative. The
+production default is now enabled, and adapter `169` invalidates older page
+generations. Do not repeat protocol discovery without a current regression.
