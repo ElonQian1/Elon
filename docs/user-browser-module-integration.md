@@ -144,6 +144,21 @@ WebView2 窗口创建期间发生已知死锁，只留下无法导航的白色�
 - Cloudflare 或身份提供商验证由用户本人完成；应用不绕过、不自动点击。
 - 身份提供商可以拒绝嵌入式浏览器，应用不得伪装 User-Agent 或转移 Cookie 规避。
 
+### 私有响应结构研究 Fixture
+
+获许可的开发研究与正式运行分层处理。研究人员可以把本人已获许可并已保存到本机的 JSON、NDJSON 或
+SSE 调试响应显式交给 `scripts/sanitize-web-ai-response-fixture.cjs`。该脚本不连接网络、不读取 WebView
+Profile，也不保留响应值；它只输出 `yilong.web-ai-response-shape.v1` 的字段形状、类型、长度分桶、
+输入指纹和结构指纹。Cookie、Authorization、Token、请求头、签名、账号身份等字段整棵子树丢弃，
+正文、数值、URL 与域名都不会进入 fixture。使用示例：
+
+```powershell
+node scripts/sanitize-web-ai-response-fixture.cjs --input D:\private\response.sse --output D:\private\response.shape.json --provider chatgpt
+```
+
+生成物可用于比较上游结构漂移和编写纯合成回归样本，但不会自动写入生产授权清单、不会注入生产
+WebView，也不能替代官网可见回答节点或 `yilong.rich-content.v1` 清洗 AST。
+
 本地模式当前登记 `chatgpt` 与 `google-ai-mode`。Google AI 模式适配器只替换呈现层，
 搜索、回答、来源和开放策略仍由 Google 官方页面决定；它不等于 Gemini 网页版，也不意味
 客户端获得 Google OAuth 授权。Google OAuth 官方政策禁止应用把授权请求导向开发者可控制

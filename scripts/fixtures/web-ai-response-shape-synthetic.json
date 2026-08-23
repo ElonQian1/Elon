@@ -1,0 +1,46 @@
+{
+  "schema": "yilong.synthetic-web-ai-response-research.v1",
+  "notice": "Purely synthetic research input. Values intentionally exercise the sanitizer and are not vendor data or credentials.",
+  "chatgpt": {
+    "conversation_id": "synthetic-conversation-000001",
+    "authorization": "Bearer synthetic-secret-must-disappear",
+    "headers": {
+      "cookie": "session=synthetic-cookie-must-disappear"
+    },
+    "message": {
+      "author": { "role": "assistant", "user_id": "synthetic-user-must-disappear" },
+      "content": {
+        "content_type": "finance_card",
+        "title": "Synthetic Bitcoin answer must disappear",
+        "symbol": "BTC",
+        "price": 77274,
+        "source_url": "https://chatgpt.example.invalid/private?sig=must-disappear",
+        "chart": {
+          "period": "1D",
+          "points": [
+            { "timestamp": "2026-08-23T09:00:00Z", "value": 77120.5 },
+            { "timestamp": "2026-08-23T10:00:00Z", "value": 77274 }
+          ]
+        }
+      }
+    }
+  },
+  "google": {
+    "requestToken": "synthetic-google-token-must-disappear",
+    "response": {
+      "type": "weather",
+      "answer": "Synthetic weather answer must disappear",
+      "forecast": [
+        { "time": "17:00", "condition": "Cloudy", "temperature": 23 },
+        { "time": "18:00", "condition": "Rain", "temperature": 22 }
+      ],
+      "sources": [
+        {
+          "title": "Synthetic source title must disappear",
+          "url": "https://weather.example.invalid/article?tracking=must-disappear",
+          "favicon": "https://weather.example.invalid/favicon.ico"
+        }
+      ]
+    }
+  }
+}
