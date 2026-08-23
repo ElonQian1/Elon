@@ -9254,7 +9254,7 @@
       "id": "win-web-ai-private-response-research-fixture-v1",
       "title": "Win 网页 AI 私有响应结构研究 Fixture V1",
       "summary": "新增离线、失败关闭的研究响应脱敏器，把开发者显式提供的 JSON/NDJSON/SSE 样本转换为无正文、无凭证、无 URL/数值的版本化结构形状，供 ChatGPT/Google 富内容适配回归使用；不接入生产 WebView，不修改 PWA。",
-      "status": "in_progress",
+      "status": "verified",
       "priority": "p1",
       "requirement": {
         "path": "docs/requirements/win-web-ai-private-response-research-fixture-v1.md",
@@ -9299,15 +9299,75 @@
         "纯合成 ChatGPT finance 与 Google weather/source fixture 覆盖脱敏和漂移回归。",
         "PC user-browser 契约、Win Web AI 验证、前端检查与源码体积门禁通过。"
       ],
-      "implementation_evidence": [],
-      "claim": {
-        "claim_id": "claim_6100c261be4f491ebb44aed330699540",
-        "agent_id": "codex-root",
-        "claimed_at_ms": 1787448282171,
-        "expires_at_ms": 1787462682171
-      },
+      "implementation_evidence": [
+        {
+          "path": "docs/user-browser-module-integration.md",
+          "content_hash": "47b05862308087bf10bd3336c7b576a5d857ce12946224e4300fdb1781372f9b",
+          "locator": "私有响应结构研究 Fixture",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "4ff85850dedc00081cdd467b341863119318dc46",
+            "head_blob_oid": "b5c1c816dfaef3ede22b1a55f814dea39a98aa3a",
+            "worktree_blob_oid": "b5c1c816dfaef3ede22b1a55f814dea39a98aa3a",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "pc-frontend/package.json",
+          "content_hash": "aefe3ef6dd2e77e9f91ffc204b5996ed498803a1ff493e47b67fc06300b38759",
+          "locator": "test:user-browser",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "4ff85850dedc00081cdd467b341863119318dc46",
+            "head_blob_oid": "1dfef7296980167aad12cf316f8ba4e11aadfb21",
+            "worktree_blob_oid": "1dfef7296980167aad12cf316f8ba4e11aadfb21",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "pc-frontend/scripts/test-web-ai-response-fixture-sanitizer.cjs",
+          "content_hash": "01ee9d28f4396cbe56e940db8aa246df87a45b1dddb222df1533ea5cfa124405",
+          "locator": "shape-only sanitizer contract",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "4ff85850dedc00081cdd467b341863119318dc46",
+            "head_blob_oid": "2e58ed2766a8b521324465889a39c407d440fa90",
+            "worktree_blob_oid": "2e58ed2766a8b521324465889a39c407d440fa90",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "scripts/fixtures/web-ai-response-shape-synthetic.json",
+          "content_hash": "5fbcaedd7bf0793c88c4b5160123cdc96f7678835d2830c500b6bdbfe98c9600",
+          "locator": "synthetic ChatGPT and Google inputs",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "4ff85850dedc00081cdd467b341863119318dc46",
+            "head_blob_oid": "47ab876bb8298603f7e9e52ce7e51b52b4d0221f",
+            "worktree_blob_oid": "47ab876bb8298603f7e9e52ce7e51b52b4d0221f",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "scripts/sanitize-web-ai-response-fixture.cjs",
+          "content_hash": "048c4fca81c2f2b4ee2e8e7e32823ad3ea27dc3ee8432e085c3b2f4149969b65",
+          "locator": "sanitizeResearchResponse",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "4ff85850dedc00081cdd467b341863119318dc46",
+            "head_blob_oid": "ce422c0f50489076871eb4ffcd8e413cf6a67c11",
+            "worktree_blob_oid": "ce422c0f50489076871eb4ffcd8e413cf6a67c11",
+            "state": "tracked_clean"
+          }
+        }
+      ],
       "created_at_ms": 1787448253854,
-      "updated_at_ms": 1787448294243
+      "updated_at_ms": 1787448807362
     },
     {
       "id": "win-web-ai-production-session-diagnostics-v1",
@@ -10202,36 +10262,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_f556f598e9604b5fbd58b776999c499f",
-      "feature_id": "win-background-ai-webview-resize-parking-v1",
-      "action": "transitioned",
-      "actor": "codex-root",
-      "reason": "validate-win-web-ai 全量通过：用户浏览器合同、TypeScript/Vite、ESLint、66 项本地 AI Rust 测试",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1787227534468
-    },
-    {
-      "id": "feature_event_89ec291178904ac7b1ab666a986a1ba6",
-      "feature_id": "win-background-ai-webview-resize-parking-v1",
-      "action": "transitioned",
-      "actor": "codex-root",
-      "reason": "Win 0.3.69+9b60610e5 已发布安装；最大化、新聊天、输入发送、回复同步与官网页返回均通过真实验收",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1787228653680
-    },
-    {
-      "id": "feature_event_7fdf2dbaa39144c983fe64d96ef71734",
-      "feature_id": "win-google-ai-primary-answer-continuity-v1",
-      "action": "registered",
-      "actor": "codex",
-      "reason": "用户在生产 Win 端复现发送后跳官方页，返回原生 UI 只显示来源摘要；按现有共享模块修复，不建立重复聊天实现。",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1787230184845
-    },
     {
       "id": "feature_event_52f568b4b782474a935932a8bc348856",
       "feature_id": "win-google-ai-primary-answer-continuity-v1",
@@ -12201,6 +12231,36 @@
       "from_status": "claimed",
       "to_status": "in_progress",
       "at_ms": 1787448294243
+    },
+    {
+      "id": "feature_event_ef2dc925a3d2443dac1df8194cc6af0e",
+      "feature_id": "win-web-ai-private-response-research-fixture-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1787448781558
+    },
+    {
+      "id": "feature_event_e6672877dcc24d558f023cb6147529eb",
+      "feature_id": "win-web-ai-private-response-research-fixture-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "离线 JSON/NDJSON/SSE 结构脱敏器、结构指纹、合成 fixture 和回归测试已实现。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1787448796043
+    },
+    {
+      "id": "feature_event_586a8f45efc84afd966d3869a3ec42ee",
+      "feature_id": "win-web-ai-private-response-research-fixture-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "定向 sanitizer 契约、完整 test:user-browser、typecheck、lint、build、validate-win-web-ai 与源码体积门禁全部通过。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1787448807362
     }
   ]
 }
