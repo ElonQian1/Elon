@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict')
 const richContent = require('../android/app/src/main/assets/google_web_rich_content.js')
 
-assert.equal(richContent.version, 6)
+assert.equal(richContent.version, 7)
 
 const markdown = richContent.renderBlocks([
   { type: 'heading', level: 2, text: '天气概览' },
@@ -160,5 +160,49 @@ assert.equal(weather[1].richContent.schema, 'yilong.rich-content.v1')
 assert.equal(weather[1].richContent.kind, 'weather')
 assert.equal(weather[1].richContent.payload.rows[0].temperature, '33°C')
 assert.ok(!weather[0].text.includes('| 时间 |'), 'the native weather card must replace the duplicate markdown table')
+
+const liveSourceCitations = [
+  { text: 'Yahoo股市（另有 1 个）- 美股新闻。相关结果', targetHost: 'tw.stock.yahoo.com' },
+  { text: '钜亨网（另有 2 个）- 美股股市。相关结果', targetHost: 'www.cnyes.com' },
+  { text: 'YouTube（另有 2 个）- 财经节目。相关结果', targetHost: 'www.youtube.com' },
+]
+const sourceTailPruned = richContent.pruneSerializedSourceTail([{
+  type: 'markdown',
+  text: [
+    '### 投资操作战略框架',
+    '',
+    '这是应该保留的回答正文。',
+    '',
+    '- YouTube·财经节目与摘要...',
+    '- Yahoo股市美股新闻与摘要...',
+    '- 钜亨网美股股市\\| 钜亨网Table\\_content: \\| 时间 \\| 指数 \\|',
+  ].join('\n'),
+}], liveSourceCitations)
+assert.equal(sourceTailPruned.length, 1)
+assert.match(sourceTailPruned[0].text, /投资操作战略框架/)
+assert.match(sourceTailPruned[0].text, /应该保留的回答正文/)
+assert.doesNotMatch(sourceTailPruned[0].text, /YouTube|Yahoo|Table\\_content/)
+
+const narrativeTailPreserved = richContent.pruneSerializedSourceTail([{
+  type: 'markdown',
+  text: [
+    '### 正文结论',
+    '',
+    '- 利率回落可能支持成长股，参考 Reuters。',
+    '- 盈利改善仍是第二个判断条件。',
+    '- 仓位管理是第三个判断条件。',
+  ].join('\n'),
+}], [
+  { text: 'Reuters - 市场报道', targetHost: 'www.reuters.com' },
+  { text: 'MarketWatch - 市场数据', targetHost: 'www.marketwatch.com' },
+])
+assert.match(narrativeTailPreserved[0].text, /利率回落/)
+assert.match(narrativeTailPreserved[0].text, /仓位管理/)
+
+const tableAndSparseCitationPreserved = richContent.pruneSerializedSourceTail([{
+  type: 'markdown',
+  text: '| 时间 | 天气 |\n| --- | --- |\n| 上午 | 晴 |',
+}], [{ text: '气象局', targetHost: 'weather.example.com' }])
+assert.match(tableAndSparseCitationPreserved[0].text, /\| 上午 \| 晴 \|/)
 
 console.log('google web rich content tests passed')

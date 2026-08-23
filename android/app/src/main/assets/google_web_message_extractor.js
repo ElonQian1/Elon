@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  const extractorVersion = 26;
+  const extractorVersion = 27;
   if (window.__elonGoogleWebMessageExtractor &&
       window.__elonGoogleWebMessageExtractor.version === extractorVersion) return;
 
@@ -430,9 +430,12 @@
         content: [{ type: 'text', text: entry.text }]
       });
       if (!answer) return;
-      const content = richContent && typeof richContent.parts === 'function'
+      let content = richContent && typeof richContent.parts === 'function'
         ? richContent.parts(answer.node, answer.text, entry.text)
         : (answer.text ? [{ type: 'text', text: answer.text }] : []);
+      if (richContent && typeof richContent.pruneSerializedSourceTail === 'function') {
+        content = richContent.pruneSerializedSourceTail(content, answer.citations);
+      }
       content.push(...answer.citations);
       if (content.length) messages.push({
         id: 'google-answer-' + index,

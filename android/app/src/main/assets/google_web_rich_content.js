@@ -163,6 +163,59 @@
     return fallback ? [{ type: 'text', text: fallback }] : [];
   }
 
+  function markdownSourceLabel(value) {
+    return cleanInline(value)
+      .replace(/\\([\\`*_[\]<>|])/g, '$1')
+      .replace(/[（(](?:另有|还有|含有|with)\s*\d+[^）)]*[）)]/ig, '')
+      .split(/\s*(?:[-–—·|｜]|(?:related|相关)\s+results?)\s*/i)[0]
+      .replace(/[^\p{L}\p{N}.]+/gu, ' ')
+      .trim()
+      .toLowerCase()
+      .slice(0, 48);
+  }
+
+  function citationSourceLabels(citations) {
+    const labels = new Set();
+    for (const citation of Array.isArray(citations) ? citations : []) {
+      const label = markdownSourceLabel(citation && (citation.title || citation.text));
+      if (label.length >= 2) labels.add(label);
+      const host = cleanInline(citation && citation.targetHost).toLowerCase();
+      const hostLabel = host.replace(/^www\./, '').split('.')[0];
+      if (hostLabel.length >= 3) labels.add(hostLabel);
+    }
+    return Array.from(labels).slice(0, 24);
+  }
+
+  function terminalSourceListBlock(markdown, citations) {
+    const blocks = cleanText(markdown).split(/\n{2,}/);
+    const terminal = blocks[blocks.length - 1] || '';
+    const lines = terminal.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+    if (lines.length < 2 || !lines.every((line) => /^(?:[-*+] |\d+[.)] )/.test(line))) {
+      return null;
+    }
+    if (!Array.isArray(citations) || citations.length < 2) return null;
+    const unescaped = terminal.replace(/\\([\\`*_[\]<>|])/g, '$1');
+    const serializedArtifact = /(?:table|image|video|map)_content\s*:/i.test(unescaped);
+    const labels = citationSourceLabels(citations);
+    const matchedLines = lines.filter((line) => {
+      const prefix = markdownSourceLabel(line.replace(/^(?:[-*+] |\d+[.)] )/, '')).slice(0, 64);
+      return labels.some((label) => prefix.startsWith(label) || label.startsWith(prefix));
+    }).length;
+    if (!serializedArtifact && (matchedLines < 2 || matchedLines / lines.length < 0.6)) return null;
+    return { blocks, terminal };
+  }
+
+  function pruneSerializedSourceTail(parts, citations) {
+    if (!Array.isArray(parts) || !Array.isArray(citations) || citations.length < 2) return parts;
+    return parts.flatMap((part) => {
+      if (!part || part.type !== 'markdown' || !part.text) return [part];
+      const match = terminalSourceListBlock(part.text, citations);
+      if (!match) return [part];
+      const text = match.blocks.slice(0, -1).join('\n\n').trim();
+      return text ? [{ ...part, text }] : [];
+    });
+  }
+
   function weatherPart(blocks) {
     const tableIndex = blocks.findIndex((block) => {
       if (!block || block.type !== 'table' || !Array.isArray(block.rows) || !block.rows.length) return false;
@@ -476,9 +529,10 @@
   }
 
   return Object.freeze({
-    version: 6,
+    version: 7,
     renderBlocks,
     partsFromBlocks,
+    pruneSerializedSourceTail,
     weatherPart,
     externalLinkTextLength,
     sourceResultItemCount,
