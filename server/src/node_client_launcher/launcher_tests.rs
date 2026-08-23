@@ -140,6 +140,19 @@ fn desktop_shell_repeated_start_focuses_the_existing_window() {
 }
 
 #[test]
+fn desktop_shell_shortcut_conflict_does_not_abort_startup() {
+    let source = include_str!("../../../desktop-shell/src-tauri/src/main.rs");
+    assert!(
+        source.contains("if let Err(error) = app.global_shortcut().register(toggle_shortcut())"),
+        "desktop shell must degrade when the optional global shortcut is already occupied"
+    );
+    assert!(
+        !source.contains("app.global_shortcut().register(toggle_shortcut())?;"),
+        "shortcut registration failure must not propagate into the fatal Tauri startup expect"
+    );
+}
+
+#[test]
 fn runtime_start_refreshes_existing_windows_icon_integrations() {
     let source = include_str!("mod.rs");
 

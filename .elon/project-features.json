@@ -7799,6 +7799,89 @@
       "updated_at_ms": 1787461854399
     },
     {
+      "id": "win-desktop-shortcut-startup-fallback-v1",
+      "title": "Win 桌面壳快捷键启动降级 V1",
+      "summary": "全局快捷键被占用时记录诊断并继续启动桌面壳，避免可选 Ctrl+Alt+E 注册失败触发 Tauri fast-fail。",
+      "status": "verified",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/win-desktop-shortcut-startup-fallback-v1.md",
+        "content_hash": "8b61f4dab2e108da6425dbc0cc1ead26483f910daec4a6fd7239f6711183e2a6",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "8246890e54205f4d0ace6ad332f28a1e71cfbb1c",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "8ada37d9c1ec133622e2207ae8609097246ea198",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "win-platform",
+      "tags": [
+        "win",
+        "desktop",
+        "startup",
+        "global-shortcut",
+        "production-fix"
+      ],
+      "task_paths": [
+        "desktop-shell/src-tauri/src/main.rs",
+        "server/src/node_client_launcher/launcher_tests.rs"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "快捷键注册失败时仍显示桌面主窗口",
+        "快捷键可用时保持 Ctrl+Alt+E 行为",
+        "源码合同禁止错误传播为 Tauri 启动失败",
+        "发布后进程、窗口和精确版本健康回读通过"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "desktop-shell/src-tauri/src/main.rs",
+          "content_hash": "2493292d61afda3b4dc12af4b062af4d1a509d5d5b2d40af48531db604e93b56",
+          "locator": "optional global shortcut registration fallback",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "8246890e54205f4d0ace6ad332f28a1e71cfbb1c",
+            "head_blob_oid": "7ba0a551b46ab39fa81711e91610c47dba92305a",
+            "worktree_blob_oid": "cf7c35ac924bd5cc12f1634c84c235a99856ce5e",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "docs/requirements/win-desktop-shortcut-startup-fallback-v1.md",
+          "content_hash": "8b61f4dab2e108da6425dbc0cc1ead26483f910daec4a6fd7239f6711183e2a6",
+          "locator": "acceptance criteria",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "8246890e54205f4d0ace6ad332f28a1e71cfbb1c",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "8ada37d9c1ec133622e2207ae8609097246ea198",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/node_client_launcher/launcher_tests.rs",
+          "content_hash": "6e4e774d54d22fdd704a9b8818105ed9ae7f44965a44c12d3d62a6506d59be96",
+          "locator": "desktop_shell_shortcut_conflict_does_not_abort_startup",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "8246890e54205f4d0ace6ad332f28a1e71cfbb1c",
+            "head_blob_oid": "d7e5f8149c4ff2d4b3efb73aa6ce96a87825dbaf",
+            "worktree_blob_oid": "b5c45196ef982e7c0f5b6f38610c10a40ee1f558",
+            "state": "tracked_modified"
+          }
+        }
+      ],
+      "created_at_ms": 1787516427798,
+      "updated_at_ms": 1787517155735
+    },
+    {
       "id": "win-full-size-parked-ai-webview-input-hit-test-v3",
       "title": "Win 完整视口后台官方 AI WebView 输入命中隔离 V3",
       "summary": "保持 Google/ChatGPT 完整官网视口尺寸并将控制器整体停放到父窗口右下可见边界之外，同时满足原生输入命中和后台会话发送。",
@@ -11812,66 +11895,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_8d39ed9bbb0943579b17423fc58bc875",
-      "feature_id": "win-web-ai-structured-rich-content-v1",
-      "action": "transitioned",
-      "actor": "codex-root-goal",
-      "reason": "test:user-browser、PC build/lint、强制 Rust 测试及 validate-win-web-ai 全量验证通过。",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1787430391270
-    },
-    {
-      "id": "feature_event_0646929830244d009f04e7f31d77ea37",
-      "feature_id": "win-web-ai-structured-rich-content-v1",
-      "action": "transitioned",
-      "actor": "codex-root-goal",
-      "reason": "正式 Win 包 0.3.69+23210f9a 已激活；本机节点精确回读目标 SHA，Tauri 窗口可见、语义桥持续心跳且无错误。",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1787431017596
-    },
-    {
-      "id": "feature_event_a520a1e4a88f4aa4903762b1161eacfa",
-      "feature_id": "win-web-ai-rich-structure-observability-v1",
-      "action": "registered",
-      "actor": "Codex",
-      "reason": "",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1787431617943
-    },
-    {
-      "id": "feature_event_8fc1c7d56bda49a39b3bf82047d977e9",
-      "feature_id": "win-web-ai-rich-structure-observability-v1",
-      "action": "claimed",
-      "actor": "codex-desktop-root",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1787431627368
-    },
-    {
-      "id": "feature_event_b8929cd10f1f41ffb960bc47473eca4a",
-      "feature_id": "win-web-ai-rich-structure-observability-v1",
-      "action": "transitioned",
-      "actor": "Codex",
-      "reason": "实现与全量 Win Web AI 验证已完成，进入证据登记与发布阶段。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1787432435030
-    },
-    {
-      "id": "feature_event_8d6683dce71240e8b1305269d89ae624",
-      "feature_id": "win-web-ai-rich-structure-observability-v1",
-      "action": "evidence_recorded",
-      "actor": "Codex",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1787432488519
-    },
-    {
       "id": "feature_event_964d7a58c2c64a5cb63cbd302bfb40a7",
       "feature_id": "win-web-ai-rich-structure-observability-v1",
       "action": "transitioned",
@@ -13810,6 +13833,66 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1787515375220
+    },
+    {
+      "id": "feature_event_7398e10665014eb0b03047346808d7c7",
+      "feature_id": "win-desktop-shortcut-startup-fallback-v1",
+      "action": "registered",
+      "actor": "codex-root",
+      "reason": "安装后稳定复现桌面壳 BEX64 fast-fail，按正式生产修复流程登记。",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1787516427798
+    },
+    {
+      "id": "feature_event_af187d78ee38495fa63ab8e00c5bcc55",
+      "feature_id": "win-desktop-shortcut-startup-fallback-v1",
+      "action": "claimed",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1787516434178
+    },
+    {
+      "id": "feature_event_e803d3670a024e3b80d1c38d1565eb94",
+      "feature_id": "win-desktop-shortcut-startup-fallback-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "实现可选全局快捷键失败关闭的启动降级并验证 Windows 实机。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1787516457905
+    },
+    {
+      "id": "feature_event_4306ed9042e14d348a4af38b5579c1d6",
+      "feature_id": "win-desktop-shortcut-startup-fallback-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1787517140216
+    },
+    {
+      "id": "feature_event_15a0d6857ca545a1ba5e20882b5f1cb7",
+      "feature_id": "win-desktop-shortcut-startup-fallback-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "快捷键注册错误已降级为诊断告警；定向合同测试与 release 构建通过。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1787517147618
+    },
+    {
+      "id": "feature_event_6afae6afbef94a0780d93f8fdf4fc037",
+      "feature_id": "win-desktop-shortcut-startup-fallback-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "定向 Rust 合同测试、release 构建和同机冲突环境真实启动均通过，主窗口标题为一龙工作台。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1787517155735
     }
   ]
 }

@@ -230,7 +230,12 @@ fn main() {
             #[cfg(debug_assertions)]
             window.open_devtools();
 
-            app.global_shortcut().register(toggle_shortcut())?;
+            // 全局快捷键可能已被系统或其他应用占用。它只是窗口的便捷入口，
+            // 注册失败不应把已经创建成功的工作台窗口一起终止；托盘菜单仍可
+            // 正常唤回窗口。保留诊断信息，方便用户释放冲突后下次启动恢复。
+            if let Err(error) = app.global_shortcut().register(toggle_shortcut()) {
+                eprintln!("[elon-desktop] 全局快捷键 Ctrl+Alt+E 注册失败，继续启动: {error:#}");
+            }
 
             // 关闭按钮只隐藏窗口，真正退出走托盘菜单——这样它才像一个“一直在”
             // 的 agent 客户端，而不是一个关掉就没了的网页标签。首次隐藏顺带
