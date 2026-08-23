@@ -6,6 +6,19 @@ use super::{
     classification, drain_admission_lock, load_checkpoint, now_ms, save_checkpoint, DRAIN_POLL_SECS,
 };
 
+pub(super) fn auto_resume_state(
+    state: crate::node_agent_update_recovery::UpdateRecoveryState,
+) -> bool {
+    use crate::node_agent_update_recovery::UpdateRecoveryState;
+    matches!(
+        state,
+        UpdateRecoveryState::Reattaching
+            | UpdateRecoveryState::ResumeCreated
+            | UpdateRecoveryState::Resumed
+            | UpdateRecoveryState::Verified
+    )
+}
+
 pub(super) fn spawn_startup_checkpoint_reconciler(runtime: Arc<NodeRuntime>, update_id: String) {
     tokio::spawn(async move {
         loop {

@@ -1,6 +1,12 @@
 use std::collections::BTreeSet;
 
-use super::{case_key::CaseKey, model::Case};
+use super::{
+    case_key::CaseKey,
+    model::{
+        CallbackKind, Case, FailureClass, NodePrecondition, Path, Phase, Timing, TopologyKind,
+        UnmapMode,
+    },
+};
 
 pub(super) fn validate(cases: &[Case]) -> Result<(), &'static str> {
     let mut actual = BTreeSet::new();

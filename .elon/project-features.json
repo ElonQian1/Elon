@@ -313,6 +313,75 @@
       "updated_at_ms": 1786762799336
     },
     {
+      "id": "backend-a2b2-fixture-compile-import-v1",
+      "title": "后端 A2b2 fixture 编译导入修复 V1",
+      "summary": "修复 elon-pc-node 测试目标中 A2b2 frozen inventory 缺失八种 model 枚举导入造成的 E0432 编译阻塞；只恢复测试 fixture 类型可见性，不改变 117 个静态 case、动态证据计数或生产 VFS 边界。",
+      "status": "verified",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/backend-a2b2-fixture-compile-import-v1.md",
+        "content_hash": "ce9526d988daa4d6a706b0a39c2f048d9de2506e7c1e073c81365773cd440425",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "bf14fd8d29a2d71cbe18bf009a13a2296ee5c19c",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "d25bc73fa33be6d67d648e77b7b42f1d810a5217",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "node-runtime",
+      "tags": [
+        "backend",
+        "rust",
+        "windows",
+        "compile",
+        "a2b2"
+      ],
+      "task_paths": [
+        "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b2_cases/expected.rs"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "expected.rs explicitly imports the eight model enum types used by frozen_inventory.",
+        "The frozen 117-key inventory and all dynamic evidence counts remain unchanged.",
+        "The elon-pc-node targeted Rust validation no longer reports these E0432 errors.",
+        "Win node release contract validation passes without PWA, task, credential, or production VFS changes."
+      ],
+      "implementation_evidence": [
+        {
+          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b2_cases.rs",
+          "content_hash": "97a99f9c8c6d7319107cda92b227a785c04faf91f81fb5c01b3fbebd111a46e8",
+          "locator": "a2b2_declared_static_inventory_is_exact_and_self_consistent",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "bf14fd8d29a2d71cbe18bf009a13a2296ee5c19c",
+            "head_blob_oid": "8c97623fc83f00589ea9e9cd7f8fd9b0d521da5d",
+            "worktree_blob_oid": "8c97623fc83f00589ea9e9cd7f8fd9b0d521da5d",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b2_cases/expected.rs",
+          "content_hash": "bb3fc34d0bc4665aa7c6af53b79f59b7b9247cfb4d3eec688b9298f8bb90ed08",
+          "locator": "explicit model enum imports",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "bf14fd8d29a2d71cbe18bf009a13a2296ee5c19c",
+            "head_blob_oid": "2f4142ec1981a8aa7ecf44fb357c60ea813f9495",
+            "worktree_blob_oid": "2bbe42d4aa8ae7e27ba2dd5301d4e76efff92ec3",
+            "state": "tracked_modified"
+          }
+        }
+      ],
+      "created_at_ms": 1787456234262,
+      "updated_at_ms": 1787457080433
+    },
+    {
       "id": "compute-attempt-final-usage-fence-verification-v1",
       "title": "Attempt 最终声明用量栅栏动态验收 V1",
       "summary": "动态验证 V226 在终态候选处原子封口 Provider 声明用量流，并阻止下游消费过时流头。",
@@ -8701,6 +8770,104 @@
       "updated_at_ms": 1787247073998
     },
     {
+      "id": "win-update-exact-target-recovery-v1",
+      "title": "Win 精确版本更新状态收敛 V1",
+      "summary": "当 Win 节点已经运行请求中的精确发布身份时，让重复广播或 Codex 更新立即收敛为 runtime_online，清除仅属于待重启事务的陈旧阻塞列表，并阻止旧排空循环把状态写回 draining；不取消历史任务、不放宽更新门禁、不改 PWA。",
+      "status": "verified",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/win-update-exact-target-recovery-v1.md",
+        "content_hash": "50ffad2bde85a3c7c58af3d707304941e71e84e7d5bda6565761e80355ebac16",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "bf14fd8d29a2d71cbe18bf009a13a2296ee5c19c",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "e9df955220c080b61cb4c4b2d2ec72de5d9a261d",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "win-release",
+      "tags": [
+        "win",
+        "update",
+        "restart",
+        "recovery",
+        "idempotency"
+      ],
+      "task_paths": [
+        "server/src/node_agent_restart_drain.rs",
+        "server/src/node_agent_restart_drain/admission.rs",
+        "server/src/node_agent_restart_drain/startup.rs"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "schedule_update detects an exact target already running before task classification or download and returns already_current=true.",
+        "A same-target checkpoint becomes runtime_online and clears restart-transaction task lists.",
+        "A different old target is superseded with an auditable superseded_update_id.",
+        "The drain loop exits when the checkpoint is no longer draining and cannot repopulate stale blockers.",
+        "Targeted Rust tests and Win node release contract validation pass; PWA and user task data are unchanged."
+      ],
+      "implementation_evidence": [
+        {
+          "path": "server/src/node_agent_restart_drain.rs",
+          "content_hash": "3022479df9abf323e2c135c04096a3b08e13d1b255f725e8c7fee8a8482ee235",
+          "locator": "schedule_update preflight and drain-loop exit",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "bf14fd8d29a2d71cbe18bf009a13a2296ee5c19c",
+            "head_blob_oid": "07afa0e08e7ada45b158d52c89bed63cab4746e5",
+            "worktree_blob_oid": "eb19a2df1b3c284dc75c73a3de7dcf58ec5d71a8",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/node_agent_restart_drain/admission.rs",
+          "content_hash": "5bf9689fc63ccc80fd0835b7b772eb82cbceb64b3e4049074f8db9ee27d15c8e",
+          "locator": "exact_target and drain_loop regression tests",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "bf14fd8d29a2d71cbe18bf009a13a2296ee5c19c",
+            "head_blob_oid": "367e38b41a8f584f01f7e763fb004155175fd4c1",
+            "worktree_blob_oid": "e92a9f3df25428cbeb2c37e86ac7dfdc46d22e47",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/node_agent_restart_drain/admission.rs",
+          "content_hash": "5bf9689fc63ccc80fd0835b7b772eb82cbceb64b3e4049074f8db9ee27d15c8e",
+          "locator": "handle_already_current_update and convergence policy",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "bf14fd8d29a2d71cbe18bf009a13a2296ee5c19c",
+            "head_blob_oid": "367e38b41a8f584f01f7e763fb004155175fd4c1",
+            "worktree_blob_oid": "e92a9f3df25428cbeb2c37e86ac7dfdc46d22e47",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/node_agent_restart_drain/startup.rs",
+          "content_hash": "f3e641ff9804d2e3013f7ebaa080ca235e817d0db3927f34d194e614923f3b26",
+          "locator": "auto_resume_state extraction",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "bf14fd8d29a2d71cbe18bf009a13a2296ee5c19c",
+            "head_blob_oid": "44819eee6f5bddebe942aa8514e5f96539a0a8be",
+            "worktree_blob_oid": "ae58c9fa590e6c57195787f1326f7ae5e7257f6e",
+            "state": "tracked_modified"
+          }
+        }
+      ],
+      "created_at_ms": 1787454344519,
+      "updated_at_ms": 1787457184215
+    },
+    {
       "id": "win-web-ai-citation-logo-resilience-v1",
       "title": "Win 网页 AI 引用 Logo 韧性 V1",
       "summary": "复用现有来源卡片，在官方图标缺失或远程 favicon 服务挂起时优先站点同源图标、有界超时并始终保留字母标识，同时补齐 ChatGPT/Google 可见引用图标提取。",
@@ -10517,186 +10684,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_87680a818d3a41dca25a08dc234c5d94",
-      "feature_id": "win-google-ai-primary-answer-continuity-v1",
-      "action": "transitioned",
-      "actor": "codex/root",
-      "reason": "validate-win-web-ai 全量验证及三项新增回归合同通过。",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1787238230232
-    },
-    {
-      "id": "feature_event_4cd6ae4fce93475daa4e849376c19b19",
-      "feature_id": "win-google-ai-primary-answer-continuity-v1",
-      "action": "transitioned",
-      "actor": "codex/root",
-      "reason": "Win 版本 0.3.69+a13567732 已发布并在本机更新重启；实机确认原生 UI 显示三段正文，新游客会话 composer/context live 且官方页保持后台。",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1787239415844
-    },
-    {
-      "id": "feature_event_b91d7c2bad0a400bb29b720acc413594",
-      "feature_id": "win-google-ai-native-primary-answer-routing-v2",
-      "action": "registered",
-      "actor": "codex-root",
-      "reason": "用户在当前发布版按真实发送闭环复现，截图同时提供官方完整正文与原生来源卡误判证据。",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1787241699763
-    },
-    {
-      "id": "feature_event_7cfe35168a2645a595147c84fce89da6",
-      "feature_id": "win-google-ai-native-primary-answer-routing-v2",
-      "action": "claimed",
-      "actor": "codex-root",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1787241720596
-    },
-    {
-      "id": "feature_event_1b37698672ae40929aa83ee5b7884a3c",
-      "feature_id": "win-google-ai-native-primary-answer-routing-v2",
-      "action": "transitioned",
-      "actor": "codex-root",
-      "reason": "已固化用户截图中的来源卡误判与官方页抢前台组合回归，开始定向实现。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1787241746393
-    },
-    {
-      "id": "feature_event_fc952e2a6bc74385901503cadfedbcec",
-      "feature_id": "win-google-ai-native-primary-answer-routing-v2",
-      "action": "evidence_recorded",
-      "actor": "codex-root",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1787242902086
-    },
-    {
-      "id": "feature_event_99652fcf02134e509c6330390837248f",
-      "feature_id": "win-google-ai-native-primary-answer-routing-v2",
-      "action": "transitioned",
-      "actor": "codex-root",
-      "reason": "来源集合防线、原生发送停放和过期官方显示取消已实现，定向 JS/PC build/Rust 验证通过。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1787242944867
-    },
-    {
-      "id": "feature_event_dea0988e4b2b4c438077f06435d8aab4",
-      "feature_id": "win-google-ai-native-primary-answer-routing-v2",
-      "action": "transitioned",
-      "actor": "codex-root",
-      "reason": "用户浏览器合同、ESLint、TypeScript/Vite 生产构建与 Tauri local_ai_browser 定向测试全部通过。",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1787242968669
-    },
-    {
-      "id": "feature_event_018712cc89324e16abfff5d237eafab3",
-      "feature_id": "win-node-agent-background-repair-file-lock-v1",
-      "action": "registered",
-      "actor": "codex-root",
-      "reason": "Exact local activation of the user-approved Google AI fix failed with Windows os error 32 while replacing the installed launcher.",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1787244462582
-    },
-    {
-      "id": "feature_event_bc7d28e2fbf7432b848eb839fcdbdb43",
-      "feature_id": "win-node-agent-background-repair-file-lock-v1",
-      "action": "claimed",
-      "actor": "codex-root",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1787244472911
-    },
-    {
-      "id": "feature_event_afe6b1130ba64b76a6e584a61f909fd5",
-      "feature_id": "win-node-agent-background-repair-file-lock-v1",
-      "action": "transitioned",
-      "actor": "codex-root",
-      "reason": "Diagnosed exact activation failure from client-launcher.jsonl: installed launcher copy hit os error 32 while the old client image remained mapped.",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1787244483783
-    },
-    {
-      "id": "feature_event_d08d02fd434043f9a2f4013a419e1885",
-      "feature_id": "win-node-agent-background-repair-file-lock-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-root",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1787245292028
-    },
-    {
-      "id": "feature_event_7f375f6eee0e4390a54c73bde0824919",
-      "feature_id": "win-node-agent-background-repair-file-lock-v1",
-      "action": "transitioned",
-      "actor": "codex-root",
-      "reason": "Implemented fail-closed installed-process termination and bounded Windows sharing-violation retry.",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1787245305569
-    },
-    {
-      "id": "feature_event_e508a198f17448f18d5272bf577d087a",
-      "feature_id": "win-node-agent-background-repair-file-lock-v1",
-      "action": "transitioned",
-      "actor": "codex-root",
-      "reason": "Focused elon-pc-node launcher tests, node-agent local-first release tests, source-size guard, and Google AI user-browser regressions passed.",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1787245305621
-    },
-    {
-      "id": "feature_event_4a5878e03105438590d0cf071b46d8a7",
-      "feature_id": "win-node-agent-background-repair-file-lock-v1",
-      "action": "transitioned",
-      "actor": "codex-root",
-      "reason": "Real Win activation proved ERROR_SHARING_VIOLATION raw OS code 32 was not classified as PermissionDenied, so runtime acceptance remains open.",
-      "from_status": "verified",
-      "to_status": "ready",
-      "at_ms": 1787246626359
-    },
-    {
-      "id": "feature_event_db28c4d85b1043ff9650313c957464a1",
-      "feature_id": "win-node-agent-background-repair-file-lock-v1",
-      "action": "claimed",
-      "actor": "codex-root",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1787246626959
-    },
-    {
-      "id": "feature_event_72089664029c435db861af6e410f1dae",
-      "feature_id": "win-node-agent-background-repair-file-lock-v1",
-      "action": "transitioned",
-      "actor": "codex-root",
-      "reason": "Refining bounded retry to match Windows raw sharing and lock violation codes 32 and 33.",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1787246626986
-    },
-    {
-      "id": "feature_event_4261cc65919f44758a4bc4a38ade4062",
-      "feature_id": "win-node-agent-background-repair-file-lock-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-root",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1787247073955
-    },
     {
       "id": "feature_event_13af34cf0b8d4b04a5057738bb91a63c",
       "feature_id": "win-node-agent-background-repair-file-lock-v1",
@@ -12516,6 +12503,186 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1787454046703
+    },
+    {
+      "id": "feature_event_71d22e76fef447bc861ba8d88fc8892c",
+      "feature_id": "win-update-exact-target-recovery-v1",
+      "action": "registered",
+      "actor": "codex-goal-agent",
+      "reason": "Live acceptance proved the target runtime was active while a repeated cloud update recreated a stale draining checkpoint.",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1787454344519
+    },
+    {
+      "id": "feature_event_1d6e08cf176a4b9db4d875fc555ad2a6",
+      "feature_id": "win-update-exact-target-recovery-v1",
+      "action": "claimed",
+      "actor": "codex-goal-agent",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1787454382094
+    },
+    {
+      "id": "feature_event_e8a93c57ab054f4aa6a65d63c7c1fb81",
+      "feature_id": "win-update-exact-target-recovery-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-agent",
+      "reason": "Implement exact-target idempotent convergence and drain-loop termination with targeted regression coverage.",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1787454414713
+    },
+    {
+      "id": "feature_event_f22a3152fadb4ed2a0edcd6352d9f2c6",
+      "feature_id": "win-update-exact-target-recovery-v1",
+      "action": "claim_released",
+      "actor": "codex-goal-agent",
+      "reason": "Expand the registered task paths after the mandatory source-size modularization.",
+      "from_status": "in_progress",
+      "to_status": "ready",
+      "at_ms": 1787455623316
+    },
+    {
+      "id": "feature_event_c51560d01f0d48209d8368b4e89d7d70",
+      "feature_id": "win-update-exact-target-recovery-v1",
+      "action": "metadata_updated",
+      "actor": "codex-goal-agent",
+      "reason": "The source-size gate required extracting exact-target admission and recovery-state helpers into focused existing modules.",
+      "from_status": "ready",
+      "to_status": "proposed",
+      "at_ms": 1787455856193
+    },
+    {
+      "id": "feature_event_19c835c1f1e941b497123b1b33b06eb6",
+      "feature_id": "win-update-exact-target-recovery-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-agent",
+      "reason": "Reviewed the modularized scope against the unchanged requirement and acceptance criteria.",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1787455894669
+    },
+    {
+      "id": "feature_event_bd9ad5dd6f6c46c9b2c1d5066c2393ec",
+      "feature_id": "win-update-exact-target-recovery-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-agent",
+      "reason": "The modularized implementation scope is ready for renewed claim and validation.",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1787455958025
+    },
+    {
+      "id": "feature_event_54885f1d21524a279d0269547bfddb19",
+      "feature_id": "backend-a2b2-fixture-compile-import-v1",
+      "action": "registered",
+      "actor": "codex-goal-agent",
+      "reason": "The mandatory Win node Rust validation is blocked before target tests by eight missing model enum imports in the committed A2b2 fixture.",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1787456234262
+    },
+    {
+      "id": "feature_event_f844e45bd49e4e4e8ee1e9f1f9ed55f8",
+      "feature_id": "backend-a2b2-fixture-compile-import-v1",
+      "action": "claimed",
+      "actor": "codex-goal-agent",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1787456388389
+    },
+    {
+      "id": "feature_event_3b3d8933d1a443b4a89d11db4c004b75",
+      "feature_id": "backend-a2b2-fixture-compile-import-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-agent",
+      "reason": "Add only the missing explicit model imports, then rerun the blocked Win node validation.",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1787456448608
+    },
+    {
+      "id": "feature_event_1007e49dfb75477c87c8e843af7464c3",
+      "feature_id": "win-update-exact-target-recovery-v1",
+      "action": "claimed",
+      "actor": "codex-goal-agent",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1787456494455
+    },
+    {
+      "id": "feature_event_b09770f7ea9d47a5bdbb0e8c19b36225",
+      "feature_id": "win-update-exact-target-recovery-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-agent",
+      "reason": "Continue the modularized exact-target convergence implementation and validation.",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1787456539888
+    },
+    {
+      "id": "feature_event_71823d8b211b47659479e398eb534cd0",
+      "feature_id": "backend-a2b2-fixture-compile-import-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-goal-agent",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1787456901134
+    },
+    {
+      "id": "feature_event_a501bb8df5344243819012037f1d29fd",
+      "feature_id": "win-update-exact-target-recovery-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-goal-agent",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1787456950009
+    },
+    {
+      "id": "feature_event_69ea537c40444e8d97fb8253347ec1df",
+      "feature_id": "backend-a2b2-fixture-compile-import-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-agent",
+      "reason": "The explicit model imports are implemented and the frozen inventory source is unchanged.",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1787457015244
+    },
+    {
+      "id": "feature_event_ef934ea5696b4658b95e8a42ea4eb5f0",
+      "feature_id": "backend-a2b2-fixture-compile-import-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-agent",
+      "reason": "A2b2 frozen inventory test passed 1/1, the Win update suite compiled and passed 17/17, and the Win node release contract passed.",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1787457080433
+    },
+    {
+      "id": "feature_event_3c956c578fb04db1b90b529f2d596f34",
+      "feature_id": "win-update-exact-target-recovery-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-agent",
+      "reason": "Exact-target preflight convergence, stale-loop termination, and modular regression coverage are implemented.",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1787457137209
+    },
+    {
+      "id": "feature_event_ef432593009b43f8ba136daccb308278",
+      "feature_id": "win-update-exact-target-recovery-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-agent",
+      "reason": "The exact-target Rust suite passed 17/17 with persisted validation receipt, and the Win node release contract passed.",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1787457184215
     }
   ]
 }

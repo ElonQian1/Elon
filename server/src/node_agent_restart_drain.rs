@@ -125,6 +125,13 @@ pub(crate) async fn schedule_update(
     download_url: Option<String>,
     target_release_identity: Option<String>,
 ) -> Result<Value, String> {
+    if let Some(response) = admission::handle_already_current_update(
+        source,
+        download_url.as_deref(),
+        target_release_identity.as_deref(),
+    )? {
+        return Ok(response);
+    }
     let classification =
         classify_supervised_tasks(runtime.as_ref(), target_release_identity.as_deref())
             .await
@@ -193,6 +200,10 @@ pub(crate) async fn schedule_update(
                     _ => continue,
                 }
             };
+            if !admission::checkpoint_should_continue_draining(&observed) {
+                drain_running().store(false, Ordering::Release);
+                return;
+            }
             let observed_update_id = observed.update_id.clone();
             let classification = match classify_supervised_tasks(
                 runtime_for_drain.as_ref(),
@@ -278,7 +289,7 @@ pub(crate) fn recover_checkpoint_after_startup(runtime: Arc<NodeRuntime>) {
                 .receipt_for_task(task_id)
                 .ok()
                 .flatten()
-                .filter(|receipt| auto_resume_state(receipt.state))
+                .filter(|receipt| startup::auto_resume_state(receipt.state))
                 .map(|receipt| (task_id.clone(), receipt.active_task_id().to_string()))
         })
         .collect::<std::collections::HashMap<_, _>>();
@@ -300,17 +311,6 @@ fn checkpoint_needs_startup_reconciler(checkpoint: &RestartCheckpoint) -> bool {
     checkpoint.state == "resume_required"
 }
 
-fn auto_resume_state(state: crate::node_agent_update_recovery::UpdateRecoveryState) -> bool {
-    use crate::node_agent_update_recovery::UpdateRecoveryState;
-    matches!(
-        state,
-        UpdateRecoveryState::Reattaching
-            | UpdateRecoveryState::ResumeCreated
-            | UpdateRecoveryState::Resumed
-            | UpdateRecoveryState::Verified
-    )
-}
-
 fn recover_checkpoint_state(
     checkpoint: &mut RestartCheckpoint,
     recovered: &std::collections::HashMap<String, String>,
@@ -322,7 +322,9 @@ fn recover_checkpoint_state(
             .as_deref()
             .map(str::trim)
             .filter(|value| !value.is_empty())
-            .is_some_and(|target| !restart_target_matches(target, current_release_identity))
+            .is_some_and(|target| {
+                !admission::restart_target_matches(target, current_release_identity)
+            })
     {
         checkpoint.message = format!(
             "from_release 运行时已重新启动，仍等待目标版本 {} 安装；未将旧进程标记为目标版本在线。",
@@ -367,12 +369,6 @@ fn recover_checkpoint_state(
         _ => return false,
     }
     true
-}
-
-fn restart_target_matches(target: &str, current: &str) -> bool {
-    let target = target.trim();
-    let current = current.trim();
-    current == target || current.starts_with(&format!("{target}+"))
 }
 
 pub(crate) fn status_payload() -> Value {
