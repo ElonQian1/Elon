@@ -1,7 +1,7 @@
 ---
 version_status: current
 reviewed_at: 2026-08-23
-implementation_status: planned
+implementation_status: implemented
 ---
 
 # Win ChatGPT 可见行情折线复现 V1

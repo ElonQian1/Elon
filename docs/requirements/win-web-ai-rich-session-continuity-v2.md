@@ -1,7 +1,7 @@
 ---
 version_status: current
 reviewed_at: 2026-08-23
-implementation_status: in_progress
+implementation_status: released
 ---
 
 # Win 网页 AI 富内容会话连续性 V2
