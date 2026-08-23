@@ -7702,7 +7702,7 @@
       "id": "win-google-ai-source-rail-narrative-pruning-v3",
       "title": "Win Google AI 来源栏正文分层 V3",
       "summary": "复用现有完整回答根和来源 UI，在共享 Google 富内容解析器中把外部来源结果列表从正文 Markdown 分层剔除，同时保留正文列表、真实表格、行内引用和结构化来源面板。",
-      "status": "implemented",
+      "status": "released",
       "priority": "p0",
       "requirement": {
         "path": "docs/requirements/win-google-ai-source-rail-narrative-pruning-v3.md",
@@ -7745,28 +7745,41 @@
       "implementation_evidence": [
         {
           "path": "android/app/src/main/assets/google_web_message_extractor.js",
-          "content_hash": "2fb5a5de40cd8e171cbd5ddb12306d0f168e932471713c9495029bbe54e442b4",
-          "locator": "extractorVersion 26 shared metrics",
+          "content_hash": "6de99504e11fe797701d7f6f5a1e13b886e4bf85ae9e3d95b8a6f0f1111bb602",
+          "locator": "extractorVersion 27 pruneSerializedSourceTail",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "426239f26a4722f46c69ec0c16f1ef838993299f",
-            "head_blob_oid": "32cb0f567deb7e3b80acdcb2973da2b198e8629d",
-            "worktree_blob_oid": "32cb0f567deb7e3b80acdcb2973da2b198e8629d",
+            "head_commit": "e8b2b0e62c23ce6b6d30cec20f5cfc904951f46e",
+            "head_blob_oid": "c4e340a4f2128ffc144c6e2693bedbabcce147b8",
+            "worktree_blob_oid": "c4e340a4f2128ffc144c6e2693bedbabcce147b8",
             "state": "tracked_clean"
           }
         },
         {
           "path": "android/app/src/main/assets/google_web_rich_content.js",
-          "content_hash": "c10c6a847f6988f04cb3b5e90f973d56029b804b08b657523381e1461dd1d0fb",
-          "locator": "sourceResultRailBoundary/sourceResultCollection",
+          "content_hash": "b4f34d6ad4ef6adcf448a7189741ba73ad0abb1047eacfae8cfbba575e7a16a6",
+          "locator": "richContentVersion 7 terminal source tail classifier",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "1c202bf6755944cbb289b9f0d90309b36939f06e",
-            "head_blob_oid": "58378e8bc1be7289f0cfc88cb3b469affae2530f",
-            "worktree_blob_oid": "5f7fc197dcc7f6613d57433d24bf85d58f737a28",
-            "state": "tracked_modified"
+            "head_commit": "e8b2b0e62c23ce6b6d30cec20f5cfc904951f46e",
+            "head_blob_oid": "3b6c931b70fb338c946cdeb6b87dc29dfebce530",
+            "worktree_blob_oid": "3b6c931b70fb338c946cdeb6b87dc29dfebce530",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "desktop-shell/src-tauri/src/local_ai_browser/google_ai_mode.rs",
+          "content_hash": "c6219f68d6553dc14c0d6336c1d2d071e4bb92dff46cd5518de2462787a53481",
+          "locator": "ADAPTER_VERSION 15 shared asset delivery",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e8b2b0e62c23ce6b6d30cec20f5cfc904951f46e",
+            "head_blob_oid": "5b7c91b7eb50f54013b7396d33a4876f8d7df3fb",
+            "worktree_blob_oid": "5b7c91b7eb50f54013b7396d33a4876f8d7df3fb",
+            "state": "tracked_clean"
           }
         },
         {
@@ -7776,7 +7789,7 @@
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "426239f26a4722f46c69ec0c16f1ef838993299f",
+            "head_commit": "e8b2b0e62c23ce6b6d30cec20f5cfc904951f46e",
             "head_blob_oid": "f7f4f564da023987970842091d79f96aa03b24b0",
             "worktree_blob_oid": "f7f4f564da023987970842091d79f96aa03b24b0",
             "state": "tracked_clean"
@@ -7785,11 +7798,11 @@
         {
           "path": "pc-frontend/scripts/test-local-ai-browser-contract.cjs",
           "content_hash": "e982e7458d9211b1a6112a0d7b96786ad51f70a4e37d16cf8f28be7521c4d737",
-          "locator": "shared Google source rail contract",
+          "locator": "Win shared Google rich content contract",
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "426239f26a4722f46c69ec0c16f1ef838993299f",
+            "head_commit": "e8b2b0e62c23ce6b6d30cec20f5cfc904951f46e",
             "head_blob_oid": "30e7da9116ccb315ab1bd17305fb1812779646c0",
             "worktree_blob_oid": "30e7da9116ccb315ab1bd17305fb1812779646c0",
             "state": "tracked_clean"
@@ -7797,33 +7810,33 @@
         },
         {
           "path": "scripts/test-google-web-message-extractor-contract.cjs",
-          "content_hash": "bab10a406516e6297d4ee4a145ca2f3fda12afcc1e89917b90e41915853a7d9c",
-          "locator": "shared rich content contract",
+          "content_hash": "b9972073da1e1a4a579889883595ab01cdaa2b9708a749000ce5fb7352fad54c",
+          "locator": "serialized source tail extractor contract",
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "426239f26a4722f46c69ec0c16f1ef838993299f",
-            "head_blob_oid": "4b4fa93c6c1e8ce5eb2050a61c47c66088c264b6",
-            "worktree_blob_oid": "4b4fa93c6c1e8ce5eb2050a61c47c66088c264b6",
+            "head_commit": "e8b2b0e62c23ce6b6d30cec20f5cfc904951f46e",
+            "head_blob_oid": "7ca4d16585d167e31924fdcdb83ab4256c0d1faf",
+            "worktree_blob_oid": "7ca4d16585d167e31924fdcdb83ab4256c0d1faf",
             "state": "tracked_clean"
           }
         },
         {
           "path": "scripts/test-google-web-rich-content.cjs",
-          "content_hash": "97923e3087b49e64873ecfac21bf4ef439306e55fa446732e242f5d4f1232c60",
-          "locator": "source rail boundary and pruning",
+          "content_hash": "804b8a86c48e19a56bda647e1304b29b8be1589e4c817b0e0fc151fd33a85827",
+          "locator": "terminal source list pruning regression cases",
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "1c202bf6755944cbb289b9f0d90309b36939f06e",
-            "head_blob_oid": "46a230927517dcfb77f92195dda362113c0381c4",
-            "worktree_blob_oid": "75c33f7638fa42d6dedafbe9f1af9605ff1de59e",
-            "state": "tracked_modified"
+            "head_commit": "e8b2b0e62c23ce6b6d30cec20f5cfc904951f46e",
+            "head_blob_oid": "338d20d38dddac2066b176f04019aea56e6dc9c0",
+            "worktree_blob_oid": "338d20d38dddac2066b176f04019aea56e6dc9c0",
+            "state": "tracked_clean"
           }
         }
       ],
       "created_at_ms": 1787440868272,
-      "updated_at_ms": 1787443311448
+      "updated_at_ms": 1787445972007
     },
     {
       "id": "win-hidden-ai-webview-input-hit-test-v1",
@@ -9976,86 +9989,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_19c549ad80ea44ff94c1e5ff82b77793",
-      "feature_id": "win-background-ai-webview-resize-parking-v1",
-      "action": "claim_released",
-      "actor": "codex-root",
-      "reason": "验证发现需把现有 ChatGPT skin 适配器清单缺口纳入当前需求，先释放认领后按合同重绑。",
-      "from_status": "in_progress",
-      "to_status": "blocked",
-      "at_ms": 1787225463636
-    },
-    {
-      "id": "feature_event_847f286ad6f845b7838ebe0ca53f3996",
-      "feature_id": "win-background-ai-webview-resize-parking-v1",
-      "action": "requirement_rebound",
-      "actor": "codex-root",
-      "reason": "纳入验证发现的 Win ChatGPT 适配器 skin 清单缺口，复用 Android 现有模块并保持主交付边界。",
-      "from_status": "blocked",
-      "to_status": "proposed",
-      "at_ms": 1787225480064
-    },
-    {
-      "id": "feature_event_7c511f13e91b40f4bf6a7dbf6e75ef0c",
-      "feature_id": "win-background-ai-webview-resize-parking-v1",
-      "action": "metadata_updated",
-      "actor": "codex-root",
-      "reason": "把验证发现并修复的 Win ChatGPT skin 清单文件加入正式任务边界。",
-      "from_status": "proposed",
-      "to_status": "proposed",
-      "at_ms": 1787225495198
-    },
-    {
-      "id": "feature_event_0589fc12b7a24c568e1753cbb5febc01",
-      "feature_id": "win-background-ai-webview-resize-parking-v1",
-      "action": "transitioned",
-      "actor": "codex-root",
-      "reason": "已复核扩展范围：只复用既有 Android skin 资产补齐 Win 清单，不引入新实现或扩大 PWA/Android 改动。",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1787225512013
-    },
-    {
-      "id": "feature_event_de2186cd2b574a7e9b5b5af50606e105",
-      "feature_id": "win-background-ai-webview-resize-parking-v1",
-      "action": "transitioned",
-      "actor": "codex-root",
-      "reason": "扩展需求已评审且无依赖阻塞，继续同一 Windows 生产修复。",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1787225529150
-    },
-    {
-      "id": "feature_event_45646616f12f4979a3f210efe49d0073",
-      "feature_id": "win-background-ai-webview-resize-parking-v1",
-      "action": "claimed",
-      "actor": "codex-root",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1787225544333
-    },
-    {
-      "id": "feature_event_a7adf07610b44b94a3be01d2fe1ac707",
-      "feature_id": "win-background-ai-webview-resize-parking-v1",
-      "action": "transitioned",
-      "actor": "codex-root",
-      "reason": "扩展范围已重新认领，继续定向验证和 Windows 发布。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1787225556558
-    },
-    {
-      "id": "feature_event_f88506c195f743d28acbef949ab9044a",
-      "feature_id": "win-background-ai-webview-resize-parking-v1",
-      "action": "claim_released",
-      "actor": "codex-root",
-      "reason": "同步 Win 适配器 v138 合同测试文件范围",
-      "from_status": "in_progress",
-      "to_status": "blocked",
-      "at_ms": 1787227024654
-    },
-    {
       "id": "feature_event_9a3c61d72dea4f929372172469e0292e",
       "feature_id": "win-background-ai-webview-resize-parking-v1",
       "action": "requirement_rebound",
@@ -11974,6 +11907,86 @@
       "from_status": "implemented",
       "to_status": "implemented",
       "at_ms": 1787443311448
+    },
+    {
+      "id": "feature_event_b2f1ca85f01e44a99ae99785c9f499b3",
+      "feature_id": "win-google-ai-source-rail-narrative-pruning-v3",
+      "action": "evidence_recorded",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "implemented",
+      "to_status": "implemented",
+      "at_ms": 1787445888489
+    },
+    {
+      "id": "feature_event_0184e20dc16c4baa9daab17b8fe63768",
+      "feature_id": "win-google-ai-source-rail-narrative-pruning-v3",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "清除真实 Win 验收前积累的中间实现证据；以 e8b2b0e 最终源码、回归测试、语义快照和已激活发布身份重新建立可审计验收。",
+      "from_status": "implemented",
+      "to_status": "ready",
+      "at_ms": 1787445923434
+    },
+    {
+      "id": "feature_event_f175c570704b4821b48448cb20de68e8",
+      "feature_id": "win-google-ai-source-rail-narrative-pruning-v3",
+      "action": "claimed",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1787445938215
+    },
+    {
+      "id": "feature_event_122970d699a74a00ac523d881f8cd872",
+      "feature_id": "win-google-ai-source-rail-narrative-pruning-v3",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "以最终实现和真实 Win 运行结果重新完成生产验收。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1787445969535
+    },
+    {
+      "id": "feature_event_97a3931ede534a8483a4faeefa15a338",
+      "feature_id": "win-google-ai-source-rail-narrative-pruning-v3",
+      "action": "evidence_recorded",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1787445971957
+    },
+    {
+      "id": "feature_event_5f4ca92c53d94f00979e5d735fb25cfa",
+      "feature_id": "win-google-ai-source-rail-narrative-pruning-v3",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "最终源码与共享 Win/Android 富内容测试已绑定到 e8b2b0e；完整 user-browser、typecheck、lint、build、validate-win-web-ai 与 source-size 均通过。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1787445971978
+    },
+    {
+      "id": "feature_event_74935d368dcc417eaf765c77fdb2cd5c",
+      "feature_id": "win-google-ai-source-rail-narrative-pruning-v3",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "真实 Win 原生聊天树确认 Table_content、YouTube/Yahoo 来源尾表均消失，正文标题与叙述列表保留，来源面板仍含 7 条 citation；DPAPI 语义快照同步验证相同结构。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1787445971992
+    },
+    {
+      "id": "feature_event_abcdc3c0648c453eb87148df66967383",
+      "feature_id": "win-google-ai-source-rail-narrative-pruning-v3",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "正式版本 0.3.69+e8b2b0e62c23ce6b6d30cec20f5cfc904951f46e 已在本机激活，远端发布事件 synced，激活回执 complete 且无需回滚。",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1787445972007
     }
   ]
 }
