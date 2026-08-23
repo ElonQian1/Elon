@@ -148,7 +148,26 @@ pub(crate) fn present(
 
 pub(crate) fn hide(app: &AppHandle, webview_label: &str) -> Result<(), String> {
     if let Some(webview) = app.get_webview(webview_label) {
-        park(&webview)?;
+        if let Some(popout) = app.get_window(webview_label) {
+            // A large child WebView parked just outside the main window can become
+            // visible again after maximize/DPI changes or WebView2 coordinate
+            // clamping. Keep the provider page alive inside its hidden native host
+            // instead; present() reparents the same WebView back into the tab area.
+            popout.hide().map_err(display_error)?;
+            webview.hide().map_err(display_error)?;
+            if webview.window().label() != webview_label {
+                webview.reparent(&popout).map_err(display_error)?;
+            }
+            webview
+                .set_position(PhysicalPosition::new(0, 0))
+                .map_err(display_error)?;
+            webview
+                .set_size(popout.inner_size().map_err(display_error)?)
+                .map_err(display_error)?;
+            webview.show().map_err(display_error)?;
+        } else {
+            park(&webview)?;
+        }
     }
     if let Some(popout) = app.get_window(webview_label) {
         popout.hide().map_err(display_error)?;

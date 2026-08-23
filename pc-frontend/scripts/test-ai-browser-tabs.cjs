@@ -56,6 +56,11 @@ assert.match(embedded, /\.set_position\(/)
 assert.match(embedded, /\.set_size\(/)
 assert.match(embedded, /\.hide\(\)/)
 assert.match(embedded, /\.show\(\)/)
+assert.match(
+  embedded,
+  /popout\.hide\(\)[\s\S]*?webview\.hide\(\)[\s\S]*?webview\.reparent\(&popout\)[\s\S]*?webview\.show\(\)/,
+)
+assert.match(embedded, /webview\.window\(\)\.label\(\) != webview_label/)
 assert.match(embedded, /present_local_ai_web_session_embedded/)
 assert.match(embedded, /hide_local_ai_web_session_embedded/)
 assert.match(main, /internal_browser::open_internal_browser_tab/)
