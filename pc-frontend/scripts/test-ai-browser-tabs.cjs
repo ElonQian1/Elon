@@ -23,6 +23,10 @@ const sendSuccessBranch = controller.slice(
   controller.indexOf('async function dispatchPreparedPrompt'),
   controller.indexOf('function restoreQueuedSend'),
 )
+const nativeCommandBranch = localBrowser.slice(
+  localBrowser.indexOf('pub async fn run_local_ai_web_adapter_command'),
+  localBrowser.indexOf('pub async fn open_local_ai_cached_conversation'),
+)
 
 assert.match(host, /WebviewBuilder::new/)
 assert.match(host, /\.incognito\(true\)/)
@@ -35,6 +39,13 @@ assert.doesNotMatch(localBrowser, /webview:\s*WebviewWindow/)
 assert.match(localBrowser, /WebviewBuilder::new/)
 assert.match(localBrowser, /WindowBuilder::new/)
 assert.match(localBrowser, /main_window\s*\.add_child/)
+assert.ok(
+  (nativeCommandBranch.match(/embedded_view::hide\(&app, &label\)/g) || []).length >= 2,
+  'the Win shell must park the provider page before and after native send evaluation',
+)
+assert.ok(
+  nativeCommandBranch.indexOf('embedded_view::hide(&app, &label)') < nativeCommandBranch.indexOf('page.eval('),
+)
 assert.doesNotMatch(localBrowser, /WebviewWindowBuilder::new/)
 assert.doesNotMatch(embedded, /webview:\s*WebviewWindow/)
 assert.doesNotMatch(semanticBridge, /(?:window|webview):\s*WebviewWindow/)
@@ -84,6 +95,8 @@ assert.match(experience, /windowVisible/)
 assert.match(experience, /event\.key === 'Escape'/)
 assert.match(api, /REQUEST_RETURN_TO_AI_CHAT_EVENT/)
 assert.match(api, /CustomEvent<OfficialAiTabRequest \| undefined>/)
+assert.match(api, /officialSurfaceRequestedVisible = false/)
+assert.match(api, /officialSurfaceIntentVersion === version/)
 assert.match(sidebar, /requestReturnToAiChat/)
 assert.doesNotMatch(sidebar, /controller\.control\('background'\)/)
 assert.doesNotMatch(
@@ -105,6 +118,10 @@ assert.doesNotMatch(sendSuccessBranch, /requestOfficialAiTab|showOfficialAfterSe
 assert.doesNotMatch(controller, /showOfficialAfterSend/)
 assert.match(controller, /requestReturnToAiChat/)
 assert.match(controller, /controlLocalAiWebSession\(provider\.id, ownerKey, 'background'\)/)
+assert.ok(
+  (controller.match(/controlLocalAiWebSession\(provider\.id, ownerKey, 'background'\)/g) || []).length >= 2,
+  'native send must park the official page before dispatch and after its matching receipt',
+)
 assert.match(controller, /消息已交给官方网页发送；正在一龙聊天界面同步回复/)
 
 process.stdout.write('PASS Win AI internal browser tab contract\n')

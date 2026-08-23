@@ -14,6 +14,8 @@ export const AI_BROWSER_SURFACE_CHANGED_EVENT = 'elon:ai-browser-surface-changed
 export type AiBrowserSurface = 'chat' | 'official' | 'source'
 
 let officialSurfaceQueue: Promise<void> = Promise.resolve()
+let officialSurfaceIntentVersion = 0
+let officialSurfaceRequestedVisible = false
 
 export interface EmbeddedWebviewBounds {
   x: number
@@ -67,14 +69,25 @@ export async function presentLocalAiWebSessionEmbedded(
   request: OfficialAiTabRequest,
   bounds: EmbeddedWebviewBounds,
 ): Promise<LocalAiWebSessionState> {
+  officialSurfaceRequestedVisible = true
+  const intentVersion = ++officialSurfaceIntentVersion
   return queueOfficialSurface(async () => {
+    if (!officialSurfaceIntentIsCurrent(intentVersion, true)) {
+      return getLocalAiWebSessionState(request.providerId, request.ownerKey)
+    }
     await openLocalAiWebSession(request.providerId, request.ownerKey, { showWindow: false })
     await waitForOfficialPage(request)
-    return invoke<LocalAiWebSessionState>('present_local_ai_web_session_embedded', {
+    if (!officialSurfaceIntentIsCurrent(intentVersion, true)) {
+      return hideOfficialSessionNow(request)
+    }
+    const presented = await invoke<LocalAiWebSessionState>('present_local_ai_web_session_embedded', {
       providerId: request.providerId,
       ownerKey: request.ownerKey,
       bounds: safeBounds(bounds),
     })
+    return officialSurfaceIntentIsCurrent(intentVersion, true)
+      ? presented
+      : hideOfficialSessionNow(request)
   })
 }
 
@@ -104,10 +117,20 @@ async function waitForOfficialPage(request: OfficialAiTabRequest) {
 export async function hideLocalAiWebSessionEmbedded(
   request: OfficialAiTabRequest,
 ): Promise<LocalAiWebSessionState> {
-  return queueOfficialSurface(() => invoke<LocalAiWebSessionState>('hide_local_ai_web_session_embedded', {
+  officialSurfaceRequestedVisible = false
+  ++officialSurfaceIntentVersion
+  return queueOfficialSurface(() => hideOfficialSessionNow(request))
+}
+
+function hideOfficialSessionNow(request: OfficialAiTabRequest) {
+  return invoke<LocalAiWebSessionState>('hide_local_ai_web_session_embedded', {
     providerId: request.providerId,
     ownerKey: request.ownerKey,
-  }))
+  })
+}
+
+function officialSurfaceIntentIsCurrent(version: number, visible: boolean) {
+  return officialSurfaceIntentVersion === version && officialSurfaceRequestedVisible === visible
 }
 
 function queueOfficialSurface<T>(work: () => Promise<T>): Promise<T> {

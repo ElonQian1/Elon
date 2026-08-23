@@ -508,7 +508,21 @@ export default function useLocalAiWebChatController(
         setMessage('没有收到当前发送的匹配回执；消息没有标记为成功，草稿已保留。')
         return null
       }
-      setSessionState(next)
+      // The official page may accept the prompt by navigating or focusing after the
+      // initial background command has completed. Reassert native foreground ownership
+      // after the matching receipt so that late WebView focus cannot cover the reply.
+      requestReturnToAiChat({
+        providerId: provider.id,
+        providerName: provider.displayName,
+        ownerKey,
+      })
+      let foregroundState = next
+      try {
+        foregroundState = await controlLocalAiWebSession(provider.id, ownerKey, 'background')
+      } catch {
+        // Response polling below continues to reassert the same bounded foreground intent.
+      }
+      setSessionState(foregroundState)
       const result = next.commandResult
       if (result?.action === 'send_prompt' && !result.ok) {
         restoreQueuedSend(prepared)

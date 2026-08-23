@@ -84,7 +84,10 @@ export default function AiChatMessageRow({
   const isUser = message.role === 'user'
   const isNode = !isUser && message.node_exec === true
   const content = displayMessageContentOrAttachment(message.content)
-  const hasVisibleContent = hasVisibleAiMessageContent(content)
+  const hasVisibleText = hasVisibleAiMessageContent(content)
+  const hasVisibleContent = hasVisibleText
+    || Boolean(message.structured_parts?.length)
+    || Boolean(message.sources?.length)
   const hasMarkdown = !isUser && (
     message.content_format === 'markdown' || /[#*`\[\]>|]/.test(content)
   )
@@ -125,13 +128,16 @@ export default function AiChatMessageRow({
             <span className={styles.typingText}>{streamingStatus}</span>
             <span className={styles.typingDot} /><span className={styles.typingDot} /><span className={styles.typingDot} />
           </div>
-          : hasVisibleContent && (hasMarkdown
-          ? <div id={copySourceId} className={styles.msgContent}>
-            <MarkdownContent content={content} copy citations={message.sources} />
-          </div>
-          : <div id={copySourceId} className={styles.msgContent}>{content}</div>)}
+          : <>
+            {!isUser && <AiStructuredContent parts={message.structured_parts} placement="primary" />}
+            {hasVisibleText && (hasMarkdown
+              ? <div id={copySourceId} className={styles.msgContent}>
+                <MarkdownContent content={content} copy citations={message.sources} />
+              </div>
+              : <div id={copySourceId} className={styles.msgContent}>{content}</div>)}
+          </>}
         {!isUser && <AiSourceLinks sources={message.sources} />}
-        {!isUser && <AiStructuredContent parts={message.structured_parts} />}
+        {!isUser && <AiStructuredContent parts={message.structured_parts} placement="supplementary" />}
         {!isUser && !streaming && <AiRendererUpgradeNotice
           compatibility={message.renderer_compatibility}
           onOpenOfficial={onOpenOfficial}
@@ -160,7 +166,7 @@ export default function AiChatMessageRow({
             )}
           </div>
         )}
-        {!streaming && hasVisibleContent && <MessageActions
+        {!streaming && hasVisibleText && <MessageActions
           content={content}
           messageKey={messageActionKey}
           storageScope="ai-chat"

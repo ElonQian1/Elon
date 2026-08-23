@@ -10,6 +10,9 @@ const asset = (name) => fs.readFileSync(path.join(
 ), 'utf8');
 const policySource = asset('chatgpt_web_private_stream_policy.js');
 const transportSource = asset('chatgpt_web_private_stream_transport.js');
+const compactFixture = JSON.parse(fs.readFileSync(path.join(
+  __dirname, 'fixtures', 'chatgpt-private-stream-compact.json'
+), 'utf8'));
 const buildGradle = fs.readFileSync(path.join(__dirname, '..', 'android', 'app', 'build.gradle'), 'utf8');
 const pageAdapter = fs.readFileSync(path.join(
   __dirname, '..', 'android', 'app', 'src', 'main', 'kotlin',
@@ -207,6 +210,31 @@ function context(enabled, response) {
   assert.equal(merged.length, 1);
   assert.equal(merged[0].state, 'completed');
   assert.equal(merged[0].content[0].text, 'hello world');
+
+  assert.equal(compactFixture.sourceShapeSha256.length, 64);
+  const compactFrame = enabled.window.__elonChatGptPrivateStreamPolicy.assistantFrame(
+    compactFixture.completed.payload
+  );
+  assert.equal(compactFrame.state, 'completed');
+  assert.match(compactFrame.text, /\[Reuters \+1\]\(https:\/\/www\.reuters\.com\/markets\/example\)/);
+  assert.equal(compactFrame.citations.length, 1);
+  assert.equal(compactFrame.citations[0].type, 'citation');
+  assert.equal(compactFrame.citations[0].text, 'Reuters');
+  assert.equal(compactFrame.citations[0].url, 'https://www.reuters.com/markets/example');
+  assert.equal(compactFrame.citations[0].markerText, 'Reuters +1');
+  assert.equal(compactFrame.citations[0].citationId, 'private-ref-0');
+  assert.equal(compactFrame.citations[0].groupSize, 2);
+  assert.equal(compactFrame.citations[0].targetHost, 'reuters.com');
+  assert.equal(
+    enabled.window.__elonChatGptPrivateStreamPolicy.assistantFrame(
+      compactFixture.nonVisibleToolFrame.payload
+    ),
+    null,
+    'compact tool-call frames must not leak into the visible assistant reply'
+  );
+  const compactMerged = enabled.window.__elonChatGptPrivateStreamPolicy.mergeMessages([], compactFrame);
+  assert.equal(compactMerged[0].content.map((part) => part.type).join(','), 'markdown,citation');
+  assert.equal(compactMerged[0].content[1].url, 'https://www.reuters.com/markets/example');
 
   await enabled.window.fetch({
     method: 'POST',

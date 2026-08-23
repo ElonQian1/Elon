@@ -461,6 +461,10 @@ pub async fn run_local_ai_web_adapter_command(
         .ok_or_else(|| format!("请先打开 {} 官方网页。", provider.display_name))?;
     if action == "send_prompt" {
         runtime.require_bound_context(&label)?;
+        // Native chat owns the foreground for sends. The provider page can focus its
+        // composer while accepting the prompt, so park it both before and after eval.
+        embedded_view::hide(&app, &label)?;
+        runtime.mark_window_visible(&label, false);
     }
     if action != "snapshot" {
         runtime.mark_command_pending_with_value(
@@ -481,7 +485,12 @@ pub async fn run_local_ai_web_adapter_command(
     let raw = serde_json::to_string(&command).map_err(display_error)?;
     page.eval(adapter.page_invocation_script(&raw)?)
         .map_err(display_error)?;
-    embedded_view::park_if_background(&app, runtime.inner(), &label)?;
+    if action == "send_prompt" {
+        embedded_view::hide(&app, &label)?;
+        runtime.mark_window_visible(&label, false);
+    } else {
+        embedded_view::park_if_background(&app, runtime.inner(), &label)?;
+    }
     Ok(())
 }
 

@@ -1,0 +1,51 @@
+{
+  "schema": "yilong.chatgpt-private-stream-fixture.v1",
+  "providerId": "chatgpt",
+  "sourceShapeSha256": "927b46b78cbbdd0315eebb5e52ce7fab91483c326264d68767b8ba12e6cef589",
+  "completed": {
+    "event": "delta",
+    "payload": {
+      "c": 17,
+      "v": {
+        "conversation_id": "conversation-compact",
+        "message": {
+          "id": "assistant-compact",
+          "author": { "role": "assistant" },
+          "status": "finished_successfully",
+          "content": {
+            "content_type": "text",
+            "parts": ["BTC remains volatile. \ue200citation-marker\ue201 Risk stays elevated."]
+          },
+          "metadata": {
+            "content_references": [{
+              "type": "grouped_webpages",
+              "start_idx": 22,
+              "end_idx": 39,
+              "matched_text": "\ue200citation-marker\ue201",
+              "items": [{
+                "title": "Market report",
+                "attribution": "Reuters",
+                "url": "https://www.reuters.com/markets/example?tracking=removed",
+                "refs": ["primary", "supporting"],
+                "supporting_websites": [{}]
+              }]
+            }]
+          }
+        }
+      }
+    }
+  },
+  "nonVisibleToolFrame": {
+    "event": "delta",
+    "payload": {
+      "c": 7,
+      "v": {
+        "message": {
+          "author": { "role": "assistant" },
+          "status": "finished_successfully",
+          "content": { "content_type": "code", "text": "private tool instruction" }
+        }
+      }
+    }
+  }
+}

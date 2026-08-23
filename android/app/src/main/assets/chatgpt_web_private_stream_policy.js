@@ -15,6 +15,88 @@
     return String(value || '').replace(/\u00a0/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
   }
 
+  function compactEnvelope(payload) {
+    if (!payload || typeof payload !== 'object') return payload;
+    return Number.isFinite(payload.c) && payload.v && typeof payload.v === 'object'
+      ? payload.v
+      : payload;
+  }
+
+  function publicSourceUrl(value) {
+    try {
+      const url = new URL(String(value || ''));
+      if (!/^https?:$/.test(url.protocol) || url.username || url.password) return '';
+      url.search = '';
+      url.hash = '';
+      return url.toString();
+    } catch (_) {
+      return '';
+    }
+  }
+
+  function sourceHost(value) {
+    try { return new URL(value).hostname.toLowerCase().replace(/^www\./, ''); }
+    catch (_) { return ''; }
+  }
+
+  function sourceLabel(item) {
+    return cleanText(item && (item.attribution || item.title)).replace(/[\[\]()]/g, '').slice(0, 80);
+  }
+
+  function citationRecords(metadata) {
+    const references = metadata && Array.isArray(metadata.content_references)
+      ? metadata.content_references
+      : [];
+    return references.slice(0, 32).flatMap((reference, referenceIndex) => {
+      if (!reference || reference.type !== 'grouped_webpages' || !Array.isArray(reference.items)) return [];
+      const primary = reference.items[0];
+      const url = publicSourceUrl(primary && primary.url);
+      const label = sourceLabel(primary);
+      if (!url || !label) return [];
+      const refs = primary && Array.isArray(primary.refs) ? primary.refs.length : 0;
+      const supporting = primary && Array.isArray(primary.supporting_websites)
+        ? primary.supporting_websites.length
+        : 0;
+      const groupSize = Math.max(1, refs, supporting + 1);
+      return [{
+        start: Number(reference.start_idx),
+        end: Number(reference.end_idx),
+        matchedText: String(reference.matched_text || ''),
+        part: {
+          type: 'citation',
+          text: label,
+          url,
+          markerText: label + (groupSize > 1 ? ' +' + (groupSize - 1) : ''),
+          citationId: 'private-ref-' + referenceIndex,
+          groupSize,
+          targetHost: sourceHost(url)
+        }
+      }];
+    });
+  }
+
+  function linkedText(value, citations) {
+    let text = String(value || '');
+    const replacements = citations.map((citation) => {
+      let start = citation.start;
+      let end = citation.end;
+      const marker = citation.matchedText;
+      const exact = Number.isInteger(start) && Number.isInteger(end) && start >= 0 && end >= start &&
+        end <= text.length && text.slice(start, end) === marker;
+      if (!exact) {
+        start = marker && text.indexOf(marker) === text.lastIndexOf(marker) ? text.indexOf(marker) : -1;
+        end = start >= 0 ? start + marker.length : -1;
+      }
+      return { citation, start, end };
+    }).filter((item) => item.start >= 0 && item.end > item.start)
+      .sort((left, right) => right.start - left.start);
+    replacements.forEach(({ citation, start, end }) => {
+      const label = citation.part.markerText.replace(/[\[\]()]/g, '');
+      text = text.slice(0, start) + '[' + label + '](' + citation.part.url + ')' + text.slice(end);
+    });
+    return cleanText(text);
+  }
+
   function contentText(content) {
     if (!content || typeof content !== 'object') return '';
     if (Array.isArray(content.parts)) {
@@ -31,18 +113,23 @@
   }
 
   function assistantFrame(payload) {
-    if (!payload || typeof payload !== 'object') return null;
-    const message = payload.message || payload.data && payload.data.message;
+    const envelope = compactEnvelope(payload);
+    if (!envelope || typeof envelope !== 'object') return null;
+    const message = envelope.message || envelope.data && envelope.data.message;
     if (!message || typeof message !== 'object' ||
         !message.author || message.author.role !== 'assistant') return null;
-    const text = contentText(message.content).slice(0, MAX_TEXT_LENGTH);
+    const contentType = String(message.content && message.content.content_type || '').toLowerCase();
+    if (contentType && contentType !== 'text') return null;
+    const citations = citationRecords(message.metadata);
+    const text = linkedText(contentText(message.content), citations).slice(0, MAX_TEXT_LENGTH);
     if (!text) return null;
-    const rawStatus = String(message.status || payload.status || '').toLowerCase();
+    const rawStatus = String(message.status || envelope.status || '').toLowerCase();
     const completed = /^(completed|finished_successfully|finished)$/.test(rawStatus);
     return {
       id: String(message.id || '').slice(0, 180),
-      conversationId: String(payload.conversation_id || payload.conversationId || '').slice(0, 180),
+      conversationId: String(envelope.conversation_id || envelope.conversationId || '').slice(0, 180),
       text,
+      citations: citations.map((citation) => citation.part),
       state: completed ? 'completed' : 'streaming'
     };
   }
@@ -113,11 +200,14 @@
   }
 
   function mergedMessage(message, stream) {
-    const content = Array.isArray(message.content) ? message.content.slice() : [];
+    const content = Array.isArray(message.content)
+      ? message.content.filter((part) => part && part.type !== 'citation').slice()
+      : [];
     const index = content.findIndex((item) => item && (item.type === 'markdown' || item.type === 'text'));
     const part = { type: 'markdown', text: stream.text };
     if (index >= 0) content[index] = Object.assign({}, content[index], part);
     else content.unshift(part);
+    (stream.citations || []).forEach((citation) => content.push(Object.assign({}, citation)));
     return Object.assign({}, message, { state: stream.state, content });
   }
 
@@ -149,7 +239,9 @@
       id: stream.id ? 'private-stream:' + stream.id : 'private-stream:assistant',
       role: 'assistant',
       state: stream.state,
-      content: [{ type: 'markdown', text: stream.text }]
+      content: [{ type: 'markdown', text: stream.text }].concat(
+        (stream.citations || []).map((citation) => Object.assign({}, citation))
+      )
     }]);
   }
 

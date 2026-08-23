@@ -29,11 +29,22 @@ export interface AiStructuredPart {
   richContent?: YilongRichContent
 }
 
-export default function AiStructuredContent({ parts }: { parts?: AiStructuredPart[] }) {
-  const richParts = parts?.filter((part) => (
+type AiStructuredContentPlacement = 'all' | 'primary' | 'supplementary'
+
+export default function AiStructuredContent({
+  parts,
+  placement = 'all',
+}: {
+  parts?: AiStructuredPart[]
+  placement?: AiStructuredContentPlacement
+}) {
+  const allRichParts = parts?.filter((part) => (
     part.type === 'rich_card' && isYilongRichContent(part.richContent)
   )) ?? []
-  const visibleParts = parts?.filter((part) => (
+  const richParts = allRichParts.filter((part) => (
+    placement === 'all' || (placement === 'primary') === isPrimaryRichCard(part.richContent!)
+  ))
+  const visibleParts = placement === 'primary' ? [] : parts?.filter((part) => (
     part.type !== 'image' && part.type !== 'rich_card' && Boolean(part.label.trim() || metadataFor(part))
   )) ?? []
   if (!visibleParts.length && !richParts.length) return null
@@ -62,6 +73,10 @@ export default function AiStructuredContent({ parts }: { parts?: AiStructuredPar
       )}
     </>
   )
+}
+
+function isPrimaryRichCard(content: YilongRichContent) {
+  return content.kind === 'finance' || content.kind === 'weather' || content.kind === 'map'
 }
 
 function metadataFor(part: AiStructuredPart) {
