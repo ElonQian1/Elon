@@ -7,6 +7,7 @@ import {
   isLocalAiMessageSnapshot,
   localAiBrowserErrorMessage,
   openLocalAiCachedConversation,
+  openLocalAiWebResearchDirectory,
   openLocalAiWebSession,
   requestLocalAiWebSnapshot,
   runLocalAiWebAdapterCommand,
@@ -330,6 +331,20 @@ export default function useLocalAiWebChatController(
       }
       requestOfficialAiTab({ providerId: provider.id, providerName: provider.displayName, ownerKey })
       setMessage(`已切换到 ${provider.displayName} 官方原生标签；天气、地图、图标和交互内容由官网直接显示。`)
+    } catch (error) {
+      setMessage(localAiBrowserErrorMessage(error))
+    } finally {
+      setBusyAction('')
+    }
+  }
+
+  async function openResearchDirectory() {
+    if (!provider || !ownerKey || busyAction) return
+    setBusyAction('research-directory')
+    setMessage('')
+    try {
+      await openLocalAiWebResearchDirectory(provider.id, ownerKey)
+      setMessage('已打开当前厂商的本机原始响应研究目录。')
     } catch (error) {
       setMessage(localAiBrowserErrorMessage(error))
     } finally {
@@ -710,6 +725,7 @@ export default function useLocalAiWebChatController(
     queuedSendActive: Boolean(queuedSend),
     newConversationRecoveryActive: Boolean(newConversationRecoveryStartedAtMs),
     openOfficial,
+    openResearchDirectory,
     control,
     openCachedConversation,
     run,

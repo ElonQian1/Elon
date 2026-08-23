@@ -410,6 +410,35 @@
   cursor: pointer;
 }
 .handoffCard button:hover { background: rgba(50,96,140,.55); }
+.rendererUpgradeNotice {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 9px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  max-width: 720px;
+  border: 1px solid rgba(235, 177, 72, .3);
+  border-radius: 8px;
+  color: #e9b95d;
+  background: rgba(91, 62, 15, .22);
+}
+.rendererUpgradeNotice > div { display: flex; min-width: 0; flex-direction: column; gap: 4px; }
+.rendererUpgradeNotice strong { color: #f5dfb2; font-size: 12px; }
+.rendererUpgradeNotice span { color: #bcae91; font-size: 11px; line-height: 1.5; }
+.rendererUpgradeNotice > div > div { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 3px; }
+.rendererUpgradeNotice button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border: 1px solid rgba(235, 177, 72, .28);
+  border-radius: 5px;
+  color: #f1d69d;
+  background: rgba(235, 177, 72, .08);
+  cursor: pointer;
+  font-size: 10px;
+}
+.rendererUpgradeNotice button:hover { background: rgba(235, 177, 72, .16); }
 .nodeOutput {
   font-family: 'Cascadia Code', 'Consolas', 'SF Mono', monospace;
   font-size: 12.5px;

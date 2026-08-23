@@ -41,7 +41,11 @@ fn sanitize_part(provider_id: &str, value: &Value) -> Option<Value> {
     if part_type == "rich_card" {
         return rich_content::sanitize_rich_card(provider_id, part).or_else(|| {
             let text = clean_string(part.get("text"), MAX_STRUCTURED_LABEL_CHARS);
-            (!text.is_empty()).then(|| json!({"type": "text", "text": text}))
+            (!text.is_empty()).then(|| json!({
+                "type": "interactive",
+                "text": text,
+                "kind": "renderer_upgrade_required",
+            }))
         });
     }
     if !STRUCTURED_TYPES.contains(&part_type) {
@@ -309,7 +313,7 @@ mod tests {
     }
 
     #[test]
-    fn private_response_rich_cards_fail_closed_without_a_registered_grant() {
+    fn private_response_rich_cards_fail_closed_and_signal_renderer_upgrade() {
         let parts = json!([{
             "type":"rich_card",
             "text":"回答图片",
@@ -322,6 +326,10 @@ mod tests {
             }
         }]);
         let sanitized = sanitize_parts("chatgpt", Some(&parts));
-        assert_eq!(sanitized, vec![json!({"type":"text","text":"回答图片"})]);
+        assert_eq!(sanitized, vec![json!({
+            "type":"interactive",
+            "text":"回答图片",
+            "kind":"renderer_upgrade_required"
+        })]);
     }
 }

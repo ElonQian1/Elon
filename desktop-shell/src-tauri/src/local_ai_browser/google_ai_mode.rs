@@ -5,9 +5,11 @@ use super::{adapter::SanitizedAdapterEvent, adapter_content, semantic_context, s
 const MAX_EVENT_BYTES: usize = 512 * 1024;
 const MAX_MESSAGES: usize = 80;
 const MAX_DRAFT_CHARS: usize = 20_000;
-const ADAPTER_VERSION: u32 = 15;
+const ADAPTER_VERSION: u32 = 16;
 
 pub fn initialization_script() -> String {
+    let response_research_capture = include_str!("win_web_response_research_capture.js")
+        .replace("__PROVIDER_ID__", "google-ai-mode");
     let answer_candidate_policy = include_str!(
         "../../../../android/app/src/main/assets/google_web_answer_candidate_policy.js"
     );
@@ -29,6 +31,9 @@ pub fn initialization_script() -> String {
   function allowedOrigin() {
     return location.origin === 'https://google.com' || location.origin === 'https://www.google.com';
   }
+
+  if (!allowedOrigin()) return;
+  __RESPONSE_RESEARCH_CAPTURE__
 
   function invoke(payload) {
     if (!allowedOrigin()) return;
@@ -121,6 +126,7 @@ pub fn initialization_script() -> String {
 })();
 "#
     .replace("__ADAPTER_VERSION__", &ADAPTER_VERSION.to_string())
+    .replace("__RESPONSE_RESEARCH_CAPTURE__", &response_research_capture)
     .replace(
         "__ANSWER_CANDIDATE_POLICY_SOURCE__",
         answer_candidate_policy,
@@ -434,5 +440,7 @@ mod tests {
         assert!(script.contains("document.documentElement instanceof Node"));
         assert!(script.contains("DOMContentLoaded"));
         assert!(script.contains("adapter_bootstrap_failed"));
+        assert!(script.contains("publish_local_ai_web_research_capture"));
+        assert!(script.contains("endpointFamily: 'ai_rpc'"));
     }
 }

@@ -1,4 +1,4 @@
 [[permission]]
 identifier = "local-ai-web-adapter-event"
-description = "只允许受控 ChatGPT WebView2 窗口向本机宿主上报去凭证化的可见页面语义。"
-commands.allow = ["publish_local_ai_web_event"]
+description = "允许受控 AI WebView2 窗口上报可见页面语义，并在上线前开发阶段把受控接口原始响应保存到本机 Profile。"
+commands.allow = ["publish_local_ai_web_event", "publish_local_ai_web_research_capture"]

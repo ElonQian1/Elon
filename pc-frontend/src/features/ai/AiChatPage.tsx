@@ -55,7 +55,6 @@ import {
 } from './aiConversationPresentation'
 import styles from './AiChatPage.module.css'
 import { v4 as uuidv4 } from 'uuid'
-
 interface RemoteNodeInfo {
   node_id?: string
   agent_id?: string
@@ -922,6 +921,7 @@ export default function AiChatPage({ mode, onModeChange }: { mode: AiHomeMode; o
               onRegenerate={chatMode && m.id === lastVisibleAssistantId && web.provider?.adapterActions.includes('regenerate_response')
                 ? async () => { await web.controller.run('regenerate_response') }
                 : undefined}
+              onOpenOfficial={chatMode && m.renderer_compatibility ? () => { void web.controller.openOfficial() } : undefined} onCheckUpdates={chatMode && m.renderer_compatibility ? () => navigate('/pc/node') : undefined}
             />
           ))}
         </div>

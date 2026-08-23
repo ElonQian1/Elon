@@ -2,7 +2,8 @@
 //!
 //! WebView2 自己持有 Cookie、DOM storage 与缓存；本模块只按一龙账号和厂商
 //! 隔离 Profile、限制导航，并把官方网页中用户可见的语义转换为受限本机事件。
-//! Cookie、Token、请求头、原始响应与任意 URL 始终不进入 IPC。
+//! 上线前开发阶段还会把受控接口的原始响应旁路保存到对应本机 Profile；Cookie、
+//! Token、请求头、请求正文和任意 URL 不进入该研究通道，也不会上传云端。
 
 #[path = "local_ai_browser/adapter.rs"]
 mod adapter;
@@ -26,6 +27,8 @@ mod owner_profile;
 mod private_response_authorization;
 #[path = "local_ai_browser/provider_adapter.rs"]
 mod provider_adapter;
+#[path = "local_ai_browser/research_capture.rs"]
+pub(crate) mod research_capture;
 #[path = "local_ai_browser/semantic_context.rs"]
 mod semantic_context;
 #[path = "local_ai_browser/session_identity.rs"]
@@ -136,6 +139,8 @@ pub struct LocalAiWebProvider {
     profile_scope: &'static str,
     renderer_protocol: &'static str,
     renderer_status: &'static str,
+    research_capture_status: &'static str,
+    research_capture_retention_days: u16,
     adapter_actions: &'static [&'static str],
 }
 
@@ -554,6 +559,9 @@ pub async fn clear_local_ai_web_session(
         .ok_or_else(|| "请先打开本地网页会话，再清除它的本地数据。".to_string())?;
     page.clear_all_browsing_data().map_err(display_error)?;
     runtime.clear_snapshots(&label);
+    let research_root = profile_directory(&app, provider, &fingerprint)?
+        .join(research_capture::DIRECTORY_NAME);
+    research_capture::clear(&research_root)?;
     page.navigate(parse_start_url(provider)?)
         .map_err(display_error)?;
     let window_visible = runtime
@@ -575,6 +583,8 @@ fn provider_summary(provider: &ProviderDefinition) -> LocalAiWebProvider {
         profile_scope: "local_owner_provider",
         renderer_protocol: RENDERER_PROTOCOL,
         renderer_status: provider.renderer_status,
+        research_capture_status: "local_raw_prelaunch",
+        research_capture_retention_days: 30,
         adapter_actions: provider.adapter.map_or(
             &[] as &'static [&'static str],
             ProviderAdapter::supported_actions,

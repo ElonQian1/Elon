@@ -152,6 +152,8 @@ fn main() {
             local_ai_browser::run_local_ai_web_adapter_command,
             local_ai_browser::open_local_ai_cached_conversation,
             local_ai_browser::publish_local_ai_web_event,
+            local_ai_browser::research_capture::publish_local_ai_web_research_capture,
+            local_ai_browser::research_capture::open_local_ai_web_research_directory,
             local_ai_browser::clear_local_ai_web_session,
             internal_browser::open_internal_browser_tab,
             internal_browser::resize_internal_browser_tab,

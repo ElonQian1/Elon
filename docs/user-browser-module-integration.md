@@ -144,20 +144,27 @@ WebView2 窗口创建期间发生已知死锁，只留下无法导航的白色�
 - Cloudflare 或身份提供商验证由用户本人完成；应用不绕过、不自动点击。
 - 身份提供商可以拒绝嵌入式浏览器，应用不得伪装 User-Agent 或转移 Cookie 规避。
 
-### 私有响应结构研究 Fixture
+### 上线前原始响应采样与研究 Fixture
 
-获许可的开发研究与正式运行分层处理。研究人员可以把本人已获许可并已保存到本机的 JSON、NDJSON 或
-SSE 调试响应显式交给 `scripts/sanitize-web-ai-response-fixture.cjs`。该脚本不连接网络、不读取 WebView
-Profile，也不保留响应值；它只输出 `yilong.web-ai-response-shape.v1` 的字段形状、类型、长度分桶、
-输入指纹和结构指纹。Cookie、Authorization、Token、请求头、签名、账号身份等字段整棵子树丢弃，
-正文、数值、URL 与域名都不会进入 fixture。使用示例：
+当前产品尚未正式公开上线，现有使用者均为开发测试人员，因此 Win 构建默认开启本机原始响应研究
+采样，不再维护“研究包/生产包”两套行为。采样器只旁路读取官方页面已经发起的受控 fetch/XHR 响应，
+不会重放生成回答的 POST；原始 JSON、NDJSON、SSE 或文本保存在当前 owner/provider 的 WebView2
+Profile 下，默认保留 30 天，并受 256 个样本、256 MiB 总量和单样本 2 MiB 上限约束。“清除会话”
+同时清除这些样本。请求正文、Cookie、Authorization、Token、请求头和完整请求 URL 不进入采样文件，
+样本也不上传一龙云端、不写 Git、不写应用日志。
+
+原始响应用于研究上游流式协议、引用关联和富卡结构；版本化 AST 仍是 React 渲染的稳定中间层，不能
+直接把厂商原始对象交给组件树。正式公开上线前必须重新评审默认开关、用户告知、加密、保留期和撤销
+策略。研究人员也可以把本机样本显式交给 `scripts/sanitize-web-ai-response-fixture.cjs` 生成可提交的
+结构 Fixture。该脚本不连接网络、不读取 WebView Profile，只输出
+`yilong.web-ai-response-shape.v1` 的字段形状、类型、长度分桶、输入指纹和结构指纹。使用示例：
 
 ```powershell
 node scripts/sanitize-web-ai-response-fixture.cjs --input D:\private\response.sse --output D:\private\response.shape.json --provider chatgpt
 ```
 
-生成物可用于比较上游结构漂移和编写纯合成回归样本，但不会自动写入生产授权清单、不会注入生产
-WebView，也不能替代官网可见回答节点或 `yilong.rich-content.v1` 清洗 AST。
+生成物可用于比较上游结构漂移和编写纯合成回归样本，但不会自动写入正式公开发布的授权清单，也
+不能替代官网可见回答节点或 `yilong.rich-content.v1` 渲染 AST。
 
 本地模式当前登记 `chatgpt` 与 `google-ai-mode`。Google AI 模式适配器只替换呈现层，
 搜索、回答、来源和开放策略仍由 Google 官方页面决定；它不等于 Gemini 网页版，也不意味
@@ -234,9 +241,10 @@ Google 访客可用、ChatGPT 已登录以及回答生成中。状态卡同时�
 快照只增加经过 Rust 白名单清洗的 `pageKind` 与布尔 `loginRequired`，不增加 Cookie、凭证、
 页面全文或网络请求访问。
 
-适配器失效时默认仍退回完整官方网页。【项目开发研究阶段临时放宽】 允许在明确开启学习模式时，切换到 Cookie / Token / 私有接口重放路线进行调试与对比验证。正式环境禁止自动切换。
+适配器失效时默认仍退回完整官方网页。【当前上线前开发阶段】所有用户均按学习模式运行，本机原始
+响应采样默认开启；生成回答请求不主动重放，只允许对明确只读的历史 GET 做单独、可审计的实验。
 
-研究许可不等于生产授权。任何超出可见语义的生产能力都必须按厂商分别登记产品、域名、端点、
+当前研究构建不自动等同于未来正式公开发布授权。正式公开上线前，任何超出可见语义的能力都必须按厂商分别登记产品、域名、端点、
 数据类别、保存/上传范围、用户同意、保留期、到期日与撤销方式，并在对应代码、开关、审计和回退
 测试同时完成后才能启用；口头许可或研究文档不能绕过该门禁。密码永远不属于适配器协议。
 

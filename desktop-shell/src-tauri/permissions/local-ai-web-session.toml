@@ -11,6 +11,7 @@ commands.allow = [
   "control_local_ai_web_session",
   "run_local_ai_web_adapter_command",
   "open_local_ai_cached_conversation",
+  "open_local_ai_web_research_directory",
   "clear_local_ai_web_session",
   "open_internal_browser_tab",
   "resize_internal_browser_tab",

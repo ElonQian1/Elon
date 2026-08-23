@@ -1,9 +1,10 @@
 const ALLOWED_ORIGIN: &str = "https://chatgpt.com";
-pub(super) const ADAPTER_VERSION: u32 = 143;
+pub(super) const ADAPTER_VERSION: u32 = 157;
 
 const WIN_RICH_CONTENT_ADAPTER: &str = include_str!("chatgpt_rich_content_adapter.js");
 const WIN_COMMON_RICH_CONTENT_ADAPTER: &str = include_str!("rich_content_dom_adapter.js");
 const WIN_CITATION_ADAPTER: &str = include_str!("chatgpt_citation_adapter.js");
+const WIN_RESPONSE_RESEARCH_CAPTURE: &str = include_str!("win_web_response_research_capture.js");
 
 const ADAPTER_ASSETS: &[(&str, &str)] = &[
     (
@@ -135,12 +136,21 @@ const ADAPTER_ASSETS: &[(&str, &str)] = &[
         include_str!("../../../../android/app/src/main/assets/chatgpt_web_adapter_layout.js"),
     ),
     (
+        "chatgpt_web_private_research_probe.js",
+        include_str!("../../../../android/app/src/main/assets/chatgpt_web_private_research_probe.js"),
+    ),
+    (
+        "chatgpt_web_private_transport.js",
+        include_str!("../../../../android/app/src/main/assets/chatgpt_web_private_transport.js"),
+    ),
+    (
         "chatgpt_web_adapter.js",
         include_str!("../../../../android/app/src/main/assets/chatgpt_web_adapter.js"),
     ),
 ];
 
 pub(super) fn initialization_script() -> String {
+    let research_capture = WIN_RESPONSE_RESEARCH_CAPTURE.replace("__PROVIDER_ID__", "chatgpt");
     let adapters = ADAPTER_ASSETS
         .iter()
         .map(|(name, source)| {
@@ -166,6 +176,7 @@ pub(super) fn initialization_script() -> String {
 (function () {
   'use strict';
   if (location.origin !== '__ALLOWED_ORIGIN__') return;
+  __RESPONSE_RESEARCH_CAPTURE__
 
   var touchPurposes = new Set([
     'list_model_options', 'list_composer_tools', 'select_model_option', 'select_composer_tool',
@@ -270,6 +281,7 @@ pub(super) fn initialization_script() -> String {
 "#
     .replace("__ALLOWED_ORIGIN__", ALLOWED_ORIGIN)
     .replace("__ADAPTER_VERSION__", &ADAPTER_VERSION.to_string())
+    .replace("__RESPONSE_RESEARCH_CAPTURE__", &research_capture)
     .replace("__ADAPTER_ASSETS__", &adapters)
 }
 
@@ -309,7 +321,9 @@ mod tests {
 
         assert_eq!(win_assets, android_assets);
         assert_eq!(ADAPTER_VERSION, android_version);
-        assert!(script.contains("__elonChatGptAdapterTargetVersion = 143"));
+        assert!(script.contains(&format!(
+            "__elonChatGptAdapterTargetVersion = {ADAPTER_VERSION}"
+        )));
         assert!(script.contains("__elonChatGptDocumentToken"));
         assert!(script.contains("__elonChatGptSnapshotScheduler"));
         assert!(script.contains("__elonChatGptLayout"));
@@ -324,5 +338,7 @@ mod tests {
         assert!(script.contains("chatgpt_web_adapter_project_hints.js"));
         assert!(script.contains("chatgpt_citation_adapter.js"));
         assert!(script.contains("__elonChatGptCitationAdapter"));
+        assert!(script.contains("publish_local_ai_web_research_capture"));
+        assert!(script.contains("conversation_stream"));
     }
 }

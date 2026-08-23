@@ -10,6 +10,8 @@ import styles from './AiChatPage.module.css'
 import AiStructuredContent, { type AiStructuredPart } from './AiStructuredContent'
 import AiSourceLinks from './AiSourceLinks'
 import { hasVisibleAiMessageContent } from './aiMessageVisibility'
+import AiRendererUpgradeNotice from './AiRendererUpgradeNotice'
+import type { LocalAiRendererCompatibilityNotice } from '../user-browser/localAiRendererCompatibility'
 
 export interface AiMessage {
   id?: string
@@ -28,6 +30,7 @@ export interface AiMessage {
   sources?: AiSource[]
   handoff?: AiHandoff | null
   structured_parts?: AiStructuredPart[]
+  renderer_compatibility?: LocalAiRendererCompatibilityNotice
 }
 
 export interface AiSource {
@@ -61,6 +64,8 @@ interface AiChatMessageRowProps {
   onConversationForked?: (conversationId: string) => void | Promise<void>
   onProjectHandoff?: (handoff: AiHandoff, candidate?: AiProjectCandidate) => void | Promise<void>
   onRegenerate?: () => void | Promise<void>
+  onOpenOfficial?: () => void
+  onCheckUpdates?: () => void
 }
 
 export default function AiChatMessageRow({
@@ -73,6 +78,8 @@ export default function AiChatMessageRow({
   onConversationForked,
   onProjectHandoff,
   onRegenerate,
+  onOpenOfficial,
+  onCheckUpdates,
 }: AiChatMessageRowProps) {
   const isUser = message.role === 'user'
   const isNode = !isUser && message.node_exec === true
@@ -125,6 +132,11 @@ export default function AiChatMessageRow({
           : <div id={copySourceId} className={styles.msgContent}>{content}</div>)}
         {!isUser && <AiSourceLinks sources={message.sources} />}
         {!isUser && <AiStructuredContent parts={message.structured_parts} />}
+        {!isUser && !streaming && <AiRendererUpgradeNotice
+          compatibility={message.renderer_compatibility}
+          onOpenOfficial={onOpenOfficial}
+          onCheckUpdates={onCheckUpdates}
+        />}
         {!isUser && message.handoff && (
           <div className={styles.handoffCard}>
             <strong>继续到项目 AI</strong>

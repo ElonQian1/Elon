@@ -13,6 +13,7 @@ import { localAiHistoryWindow } from './localAiHistoryWindow'
 import { shouldRenderNativeStructuredPart } from './localAiStructuredPartPolicy'
 import type { LocalAiStructuredContentPart } from './localAiBrowserProtocol'
 import { isYilongRichContent } from './richContentProtocol'
+import { localAiRendererCompatibility } from './localAiRendererCompatibility'
 
 const PROVIDER_STORAGE_KEY = 'elon.pc.aiChatProvider'
 
@@ -36,8 +37,20 @@ export default function useAiWebChatBackend(mode: AiHomeMode, ownerKey: string) 
     setProviderId(provider.id)
   }, [provider, providerId])
 
-  const messages = useMemo<AiMessage[]>(() => (
-    controller.visibleMessages.flatMap((item): AiMessage[] => {
+  const messages = useMemo<AiMessage[]>(() => {
+    const compatibilityByMessage = new Map<string, ReturnType<typeof localAiRendererCompatibility>>()
+    for (const item of controller.visibleMessages) {
+      if (item.role !== 'assistant' || item.state !== 'completed') continue
+      compatibilityByMessage.set(item.id, localAiRendererCompatibility(
+        item.content.filter((part): part is LocalAiStructuredContentPart => (
+          !['text', 'markdown', 'citation'].includes(part.type)
+        )),
+      ))
+    }
+    const latestAffectedAssistantId = [...controller.visibleMessages]
+      .reverse()
+      .find((item) => compatibilityByMessage.get(item.id))?.id
+    return controller.visibleMessages.flatMap((item): AiMessage[] => {
       const sources = item.content
         .filter((part): part is Extract<typeof part, { type: 'citation' }> => part.type === 'citation' && Boolean(part.url))
         .map<AiSource>((part) => ({
@@ -99,9 +112,12 @@ export default function useAiWebChatBackend(mode: AiHomeMode, ownerKey: string) 
         tool_used: item.role === 'assistant' && provider?.id === 'google-ai-mode' ? 'web_search' : null,
         sources,
         structured_parts: structuredParts,
+        renderer_compatibility: item.id === latestAffectedAssistantId
+          ? compatibilityByMessage.get(item.id)
+          : undefined,
       }]
     })
-  ), [controller.visibleMessages, provider?.id])
+  }, [controller.visibleMessages, provider?.id])
   const ready = capability.state === 'ready' && Boolean(ownerKey && provider)
   const canEdit = ready && controller.canEditDraft
   const canCompose = ready && controller.canSubmitDraft

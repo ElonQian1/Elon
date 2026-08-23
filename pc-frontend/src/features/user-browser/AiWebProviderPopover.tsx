@@ -1,6 +1,6 @@
 import { useEffect, useState, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
-import { ExternalLink, EyeOff, MonitorUp, RefreshCw } from 'lucide-react'
+import { ExternalLink, EyeOff, FolderOpen, MonitorUp, RefreshCw } from 'lucide-react'
 import type { AiWebChatBackend } from './useAiWebChatBackend'
 import AiProviderSessionStatus from './AiProviderSessionStatus'
 import styles from './AiWebProviderPopover.module.css'
@@ -67,11 +67,12 @@ export default function AiWebProviderPopover({
         <button type="button" onClick={() => void web.controller.control('background')} disabled={!web.ready || !web.controller.sessionState?.windowVisible || busy}><EyeOff size={14} />收起后台</button>
         <button type="button" onClick={() => void web.controller.control('reload')} disabled={!web.ready || !web.controller.sessionOpen || busy}><RefreshCw size={14} />刷新官方页</button>
         <button type="button" onClick={() => void web.controller.control('external')} disabled={busy}><ExternalLink size={14} />系统浏览器</button>
+        <button type="button" onClick={() => void web.controller.openResearchDirectory()} disabled={!web.ready || busy}><FolderOpen size={14} />打开研究采样</button>
         {web.provider?.id === 'chatgpt' && web.userState.canStartGoogleLogin && (
           <button type="button" onClick={() => void web.controller.run('start_google_login')} disabled={busy}>使用 Google 登录 ChatGPT</button>
         )}
       </div>
-      <footer>访客模式无需厂商账号；登录后的 Cookie 也只在本机 WebView2 Profile 中使用，不上传一龙云端。</footer>
+      <footer>上线前开发采样默认开启：受控接口原始响应保存到本机 Profile，最多保留 {web.provider?.researchCaptureRetentionDays || 30} 天；Cookie、Token、请求头和采样内容均不上传一龙云端。</footer>
     </section>
   </>, document.body)
 }

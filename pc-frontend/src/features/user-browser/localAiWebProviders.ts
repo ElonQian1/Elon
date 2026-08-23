@@ -9,6 +9,8 @@ export const LOCAL_AI_PROVIDER_FALLBACKS: Record<string, LocalAiWebProvider> = {
     profileScope: 'local_owner_provider',
     rendererProtocol: 'yilong.ai.ui.v1',
     rendererStatus: 'active',
+    researchCaptureStatus: 'local_raw_prelaunch',
+    researchCaptureRetentionDays: 30,
     adapterActions: ['snapshot', 'send_prompt', 'stop_generation', 'new_conversation'],
   },
   chatgpt: {
@@ -19,6 +21,8 @@ export const LOCAL_AI_PROVIDER_FALLBACKS: Record<string, LocalAiWebProvider> = {
     profileScope: 'local_owner_provider',
     rendererProtocol: 'yilong.ai.ui.v1',
     rendererStatus: 'active',
+    researchCaptureStatus: 'local_raw_prelaunch',
+    researchCaptureRetentionDays: 30,
     adapterActions: [
       'snapshot',
       'send_prompt',

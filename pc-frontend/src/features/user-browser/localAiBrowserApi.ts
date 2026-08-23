@@ -32,6 +32,8 @@ export interface LocalAiWebProvider {
   profileScope: 'local_owner_provider'
   rendererProtocol: typeof UNIFIED_AI_PROTOCOL
   rendererStatus: 'reserved' | 'active'
+  researchCaptureStatus: 'local_raw_prelaunch'
+  researchCaptureRetentionDays: number
   adapterActions: LocalAiAdapterAction[]
 }
 
@@ -302,6 +304,17 @@ export async function clearLocalAiWebSession(
   return cleared
 }
 
+export async function openLocalAiWebResearchDirectory(
+  providerId: string,
+  ownerKey: string,
+): Promise<void> {
+  assertIdentity(providerId, ownerKey)
+  await invokeDesktop<void>('open_local_ai_web_research_directory', {
+    providerId,
+    ownerKey,
+  }, LOCAL_AI_INVOKE_TIMEOUTS.action)
+}
+
 export function getCachedLocalAiWebSessionState(
   providerId: string,
   ownerKey: string,
@@ -525,7 +538,10 @@ function normalizeProvider(provider: LocalAiWebProvider): void {
     || !provider.displayName
     || !['manual_web', 'guest_web_system_login'].includes(provider.loginMode)
     || provider.profileScope !== 'local_owner_provider'
-    || provider.rendererProtocol !== UNIFIED_AI_PROTOCOL) {
+    || provider.rendererProtocol !== UNIFIED_AI_PROTOCOL
+    || provider.researchCaptureStatus !== 'local_raw_prelaunch'
+    || !Number.isInteger(provider.researchCaptureRetentionDays)
+    || provider.researchCaptureRetentionDays < 1) {
     throw new Error('桌面壳返回了不受支持的 AI 网页厂商协议。')
   }
   const rawActions = Array.isArray(provider.adapterActions) ? provider.adapterActions : []
