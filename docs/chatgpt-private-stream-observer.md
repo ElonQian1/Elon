@@ -1,9 +1,9 @@
 ---
 capability_id: android_chatgpt_private_stream_observer_v1
-implementation_status: compact_protocol_adapter_pending
-verification_status: device_observed_incompatible
+implementation_status: websocket_compact_envelope_adapter_device_pending
+verification_status: device_observed_websocket_envelope
 production_default: false
-repeat_implementation: legacy_sse_parser_not_required
+repeat_implementation: legacy_sse_and_websocket_discovery_not_required
 ---
 
 # ChatGPT private stream observer
@@ -48,3 +48,29 @@ tested compact-protocol decoder can produce the same canonical assistant
 message without replaying the request. Do not repeat the legacy SSE parser
 experiment; the next work item is specifically compact-protocol decoding and
 DOM equivalence testing.
+
+## WebSocket envelope evidence
+
+Adapter `168` installs a document-start, same-origin WebSocket tap before the
+official page creates its connection. The tap observes only
+`wss://ws.chatgpt.com` and `wss://chatgpt.com`, keeps at most 24 frames and 256
+KiB in page memory, never changes outbound calls, and does not persist data.
+The existing fetch observer remains available for older page contracts.
+
+Xiaomi research APKs `1.1.1242 (1252)` through `1.1.1244 (1254)` confirmed the
+official socket and its structural envelopes. Assistant delivery uses a
+`conversation-update` frame with `payload`, then `conversation_id`,
+`update_type`, and `update_content`. The native DOM fallback continued to show
+the controlled assistant response, while no private text, cookie, header value,
+or request body was emitted. The tested parser now handles bounded JSON/SSE
+strings inside `reply`, `payload`, and `update_content` arrays without replaying
+the request.
+
+Research APK `1.1.1245 (1255)` contains that final `update_content` decoder and
+passed the release build plus deterministic single-request, bounded-buffer,
+envelope, completion, and fallback tests. Device installation was deferred
+because both USB and the remembered wireless ADB address went offline. Keep the
+production flag off until one controlled response verifies canonical assistant
+text from this decoder; after that single verification, record the APK and
+adapter evidence here and enable the guarded default rather than repeating
+protocol discovery.

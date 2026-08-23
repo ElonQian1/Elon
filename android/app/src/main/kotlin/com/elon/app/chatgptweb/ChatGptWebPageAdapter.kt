@@ -47,6 +47,12 @@ internal class ChatGptWebPageAdapter(
             input.reader(StandardCharsets.UTF_8).readText()
         }
     }
+    private val privateSocketTapScript = """
+        window.__elonChatGptPrivateStreamObserverEnabled =
+            ${BuildConfig.CHATGPT_PRIVATE_STREAM_OBSERVER_ENABLED};
+    """.trimIndent() + "\n" + context.assets.open(PRIVATE_SOCKET_TAP_ASSET).use { input ->
+        input.reader(StandardCharsets.UTF_8).readText()
+    }
     private val mainHandler = Handler(Looper.getMainLooper())
     private val documentSession = WebBridgeDocumentSession()
     private val handshake = ChatGptWebBridgeHandshake(
@@ -76,6 +82,16 @@ internal class ChatGptWebPageAdapter(
             if (!wasCurrent) onDocumentChanged(document)
             if (parsed.event.completesHandshake()) handshake.acknowledge()
             onEvent(parsed.event)
+        }
+        if (
+            BuildConfig.CHATGPT_PRIVATE_STREAM_OBSERVER_ENABLED &&
+            WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)
+        ) {
+            WebViewCompat.addDocumentStartJavaScript(
+                webView,
+                privateSocketTapScript,
+                setOf(ALLOWED_ORIGIN),
+            )
         }
         listenerInstalled = true
         onStateChanged(State.WEB_ONLY)
@@ -448,6 +464,7 @@ internal class ChatGptWebPageAdapter(
         )
         private const val BRIDGE_OBJECT = "elonChatGptNative"
         private const val ALLOWED_ORIGIN = "https://chatgpt.com"
+        private const val PRIVATE_SOCKET_TAP_ASSET = "chatgpt_web_private_socket_tap.js"
         private const val MAX_PROMPT_LENGTH = 20_000
         private const val MAX_CONVERSATION_PATH_LENGTH = 256
         private const val MAX_PROJECT_HINTS = 40

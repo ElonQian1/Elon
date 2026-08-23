@@ -131,6 +131,9 @@ async function run(enabled) {
     window.__elonChatGptPrivateResearchProbe.recordPrivateStreamShape(
       't:delta/k:data.type/dt:model_response/dk:delta.type/mk:none/ck:none'
     );
+    window.__elonChatGptPrivateResearchProbe.recordPrivateStreamShape(
+      'compact/c:patch/o:replace/p:/messages/{index}/content/v:object/vk:text'
+    );
     window.__elonChatGptPrivateResearchProbe.recordPrivatePayloadShape({
       data: { conversation: { current_node: 'node', mapping: { one: {}, two: {} } } }
     });
@@ -145,8 +148,8 @@ async function run(enabled) {
 
   const enabled = await run(true);
   assert.equal(enabled.requests.length, 6);
-  assert.equal(enabled.events.length, 16);
-  assert.equal(enabled.window.__elonChatGptPrivateResearchProbe.version, 9);
+  assert.equal(enabled.events.length, 17);
+  assert.equal(enabled.window.__elonChatGptPrivateResearchProbe.version, 10);
   assert.equal(
     enabled.window.__elonChatGptPrivateResearchProbe
       .copyRequestContext('conversation_content').Authorization,
@@ -169,9 +172,13 @@ async function run(enabled) {
     enabled.events[13].detail,
     'v1|private_stream_shape|t:delta/k:data.type/dt:model_response/dk:delta.type/mk:none/ck:none'
   );
-  assert.equal(enabled.events[14].detail, 'v1|private_keys|0|data');
   assert.equal(
-    enabled.events[15].detail,
+    enabled.events[14].detail,
+    'v1|private_stream_shape|compact/c:patch/o:replace/p:/messages/{index}/content/v:object/vk:text'
+  );
+  assert.equal(enabled.events[15].detail, 'v1|private_keys|0|data');
+  assert.equal(
+    enabled.events[16].detail,
     'v1|private_shape|data_conversation|2|0|0|0|0|0'
   );
   const emitted = JSON.stringify(enabled.events);

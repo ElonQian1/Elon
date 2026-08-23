@@ -22,6 +22,9 @@ assert.match(
 );
 assert.match(buildGradle, /buildConfigField "boolean", "CHATGPT_PRIVATE_STREAM_OBSERVER_ENABLED"/);
 assert.match(pageAdapter, /BuildConfig\.CHATGPT_PRIVATE_STREAM_OBSERVER_ENABLED/);
+assert.match(pageAdapter, /WebViewFeature\.DOCUMENT_START_SCRIPT/);
+assert.match(pageAdapter, /WebViewCompat\.addDocumentStartJavaScript/);
+assert.match(pageAdapter, /chatgpt_web_private_socket_tap\.js/);
 assert.ok(
   pageAdapter.indexOf('chatgpt_web_private_stream_policy.js') <
   pageAdapter.indexOf('chatgpt_web_private_stream_transport.js')
@@ -59,6 +62,7 @@ function context(enabled, response) {
   let calls = 0;
   const outcomes = [];
   const shapes = [];
+  const socketListeners = new Set();
   const originalFetch = async () => {
     calls += 1;
     return response;
@@ -69,6 +73,13 @@ function context(enabled, response) {
       recordPrivateStreamOutcome: (outcome, frames, elapsedMs) =>
         outcomes.push({ outcome, frames, elapsedMs }),
       recordPrivateStreamShape: (shape) => shapes.push(shape)
+    },
+    __elonChatGptPrivateSocketTap: {
+      version: 1,
+      subscribe: (listener) => {
+        socketListeners.add(listener);
+        return () => socketListeners.delete(listener);
+      }
     },
     fetch: originalFetch
   };
@@ -90,7 +101,15 @@ function context(enabled, response) {
   };
   vm.runInNewContext(policySource, sandbox, { filename: 'chatgpt_web_private_stream_policy.js' });
   vm.runInNewContext(transportSource, sandbox, { filename: 'chatgpt_web_private_stream_transport.js' });
-  return { window, originalFetch, calls: () => calls, outcomes, shapes };
+  return {
+    window,
+    originalFetch,
+    calls: () => calls,
+    outcomes,
+    shapes,
+    emitSocket: (value) => socketListeners.forEach((listener) => listener(value)),
+    socketListenerCount: () => socketListeners.size
+  };
 }
 
 (async () => {
@@ -102,7 +121,8 @@ function context(enabled, response) {
     'data: [DONE]\n\n'
   ]);
   const enabled = context(true, response);
-  assert.equal(enabled.window.__elonChatGptPrivateStreamTransport.version, 2);
+  assert.equal(enabled.window.__elonChatGptPrivateStreamTransport.version, 3);
+  assert.equal(enabled.socketListenerCount(), 1);
   let notifications = 0;
   enabled.window.__elonChatGptPrivateStreamTransport.subscribe(() => { notifications += 1; });
 
@@ -124,6 +144,61 @@ function context(enabled, response) {
     't:none/k:conversation_id.message/dt:none/dk:none/mk:author.content.id.status/ck:parts',
     't:none/k:conversation_id.message/dt:none/dk:none/mk:author.content.id.status/ck:parts'
   ]);
+
+  const compactResponse = createResponse([
+    'data: {"c":"patch","o":"replace","p":"/messages/2/content/parts/0","v":{"text":"sentinel"}}\n\n',
+    'data: [DONE]\n\n'
+  ]);
+  const compact = context(true, compactResponse);
+  await compact.window.fetch(request, init);
+  await tick();
+  await tick();
+  assert.ok(compact.shapes.includes(
+    'compact/c:patch/o:replace/p:/messages/{index}/content/parts/{index}/v:object/vk:text'
+  ));
+  compact.emitSocket(JSON.stringify({
+    type: 'reply',
+    id: 'official-request-id',
+    reply: JSON.stringify({
+      c: 'patch',
+      o: 'replace',
+      p: '/messages/2',
+      v: {
+        conversation_id: 'conversation-one',
+        message: {
+          id: 'assistant-socket',
+          author: { role: 'assistant' },
+          status: 'finished_successfully',
+          content: { parts: ['socket answer'] }
+        }
+      }
+    })
+  }));
+  assert.equal(compact.calls(), 1, 'socket observation never duplicates the official request');
+  assert.equal(
+    compact.window.__elonChatGptPrivateStreamTransport.current('/c/conversation-one').text,
+    'socket answer'
+  );
+  assert.ok(compact.shapes.some((shape) => shape.startsWith('socket/compact/')));
+  compact.emitSocket(JSON.stringify({
+    type: 'conversation-update',
+    payload: {
+      conversation_id: 'conversation-one',
+      update_type: 'message',
+      update_content: [JSON.stringify({
+        message: {
+          id: 'assistant-conversation-update',
+          author: { role: 'assistant' },
+          status: 'finished_successfully',
+          content: { parts: ['conversation update answer'] }
+        }
+      })]
+    }
+  }));
+  assert.equal(
+    compact.window.__elonChatGptPrivateStreamTransport.current('/c/conversation-one').text,
+    'conversation update answer'
+  );
   assert.equal(
     enabled.window.__elonChatGptPrivateStreamTransport.current('/c/conversation-one').text,
     'hello world'
@@ -149,6 +224,7 @@ function context(enabled, response) {
 
   enabled.window.__elonChatGptPrivateStreamTransport.dispose();
   assert.equal(enabled.window.fetch, enabled.originalFetch);
+  assert.equal(enabled.socketListenerCount(), 0);
 
   const disabled = context(false, response);
   assert.equal(disabled.window.__elonChatGptPrivateStreamTransport, undefined);

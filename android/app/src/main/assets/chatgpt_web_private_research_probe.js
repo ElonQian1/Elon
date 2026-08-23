@@ -4,7 +4,7 @@
   if (window.__elonChatGptPrivateResearchEnabled !== true) return;
   if (location.origin !== 'https://chatgpt.com') return;
   const existingProbe = window.__elonChatGptPrivateResearchProbe;
-  if (existingProbe && Number(existingProbe.version) >= 9) return;
+  if (existingProbe && Number(existingProbe.version) >= 10) return;
 
   const nativeBridge = window.elonChatGptNative;
   const adapterVersion = Number(window.__elonChatGptAdapterTargetVersion || 0);
@@ -14,7 +14,7 @@
 
   const startedAt = Date.now();
   const expiresAt = startedAt + (10 * 60 * 1000);
-  const maxObservations = 160;
+  const maxObservations = 200;
   let observationCount = 0;
   let privateObservationCount = 0;
   const privateStreamShapes = new Set();
@@ -190,7 +190,7 @@
   }
 
   function emitPrivate(kind, method, url, status, responseType, elapsedMs) {
-    if (Date.now() > expiresAt || privateObservationCount >= 32) return;
+    if (Date.now() > expiresAt || privateObservationCount >= 64) return;
     if (kind !== 'conversation_prefetch' || !endpointCandidate(url)) return;
     privateObservationCount += 1;
     nativeBridge.postMessage(JSON.stringify({
@@ -212,7 +212,7 @@
   }
 
   function emitPrivateOutcome(outcome, messageCount, elapsedMs) {
-    if (Date.now() > expiresAt || privateObservationCount >= 32) return;
+    if (Date.now() > expiresAt || privateObservationCount >= 64) return;
     const safeOutcome = String(outcome || '').toLowerCase();
     if (!/^(success|empty|timeout|auth|context|http|network|parse)$/.test(safeOutcome)) return;
     privateObservationCount += 1;
@@ -233,7 +233,7 @@
   }
 
   function emitPrivateStreamOutcome(outcome, frameCount, elapsedMs) {
-    if (Date.now() > expiresAt || privateObservationCount >= 32) return;
+    if (Date.now() > expiresAt || privateObservationCount >= 64) return;
     const safeOutcome = String(outcome || '').toLowerCase();
     if (!/^(first|success|empty|error)$/.test(safeOutcome)) return;
     privateObservationCount += 1;
@@ -254,10 +254,10 @@
   }
 
   function emitPrivateStreamShape(shape) {
-    if (Date.now() > expiresAt || privateObservationCount >= 32 ||
-        privateStreamShapes.size >= 6) return;
+    if (Date.now() > expiresAt || privateObservationCount >= 64 ||
+        privateStreamShapes.size >= 16) return;
     const safeShape = String(shape || '').toLowerCase();
-    if (!/^[a-z0-9._:/|-]{1,120}$/.test(safeShape) || privateStreamShapes.has(safeShape)) return;
+    if (!/^[a-z0-9._:{}\/|-]{1,120}$/.test(safeShape) || privateStreamShapes.has(safeShape)) return;
     privateStreamShapes.add(safeShape);
     privateObservationCount += 1;
     nativeBridge.postMessage(JSON.stringify({
@@ -418,7 +418,7 @@
   }
 
   window.__elonChatGptPrivateResearchProbe = Object.freeze({
-    version: 9,
+    version: 10,
     enabled: true,
     expiresAt,
     observationCount: () => observationCount,
