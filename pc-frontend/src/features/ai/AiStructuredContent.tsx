@@ -11,7 +11,10 @@ import {
 } from 'lucide-react'
 import styles from './AiStructuredContent.module.css'
 import AiRichContentCard from './AiRichContentCard'
-import type { YilongRichContent } from '../user-browser/richContentProtocol'
+import {
+  isYilongRichContent,
+  type YilongRichContent,
+} from '../user-browser/richContentProtocol'
 
 export interface AiStructuredPart {
   type: 'image' | 'file' | 'code' | 'table' | 'artifact' | 'audio' | 'video' | 'math' | 'chart' | 'map' | 'interactive' | 'rich_card'
@@ -27,7 +30,9 @@ export interface AiStructuredPart {
 }
 
 export default function AiStructuredContent({ parts }: { parts?: AiStructuredPart[] }) {
-  const richParts = parts?.filter((part) => part.type === 'rich_card' && part.richContent) ?? []
+  const richParts = parts?.filter((part) => (
+    part.type === 'rich_card' && isYilongRichContent(part.richContent)
+  )) ?? []
   const visibleParts = parts?.filter((part) => (
     part.type !== 'image' && part.type !== 'rich_card' && Boolean(part.label.trim() || metadataFor(part))
   )) ?? []

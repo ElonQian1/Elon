@@ -12,6 +12,7 @@ import useLocalAiWebChatController from './useLocalAiWebChatController'
 import { localAiHistoryWindow } from './localAiHistoryWindow'
 import { shouldRenderNativeStructuredPart } from './localAiStructuredPartPolicy'
 import type { LocalAiStructuredContentPart } from './localAiBrowserProtocol'
+import { isYilongRichContent } from './richContentProtocol'
 
 const PROVIDER_STORAGE_KEY = 'elon.pc.aiChatProvider'
 
@@ -63,18 +64,24 @@ export default function useAiWebChatBackend(mode: AiHomeMode, ownerKey: string) 
           !['text', 'markdown', 'citation'].includes(part.type)
         ))
         .filter(shouldRenderNativeStructuredPart)
-        .map<AiStructuredPart>((part) => ({
-          type: part.type as AiStructuredPart['type'],
-          label: part.text,
-          kind: 'kind' in part ? part.kind : undefined,
-          language: 'language' in part ? part.language : undefined,
-          mediaType: 'mediaType' in part ? part.mediaType : undefined,
-          targetHost: 'targetHost' in part ? part.targetHost : undefined,
-          lineCount: 'lineCount' in part ? part.lineCount : undefined,
-          rowCount: 'rowCount' in part ? part.rowCount : undefined,
-          columnCount: 'columnCount' in part ? part.columnCount : undefined,
-          richContent: 'richContent' in part ? part.richContent : undefined,
-        }))
+        .map<AiStructuredPart>((part) => {
+          const richContent = 'richContent' in part && isYilongRichContent(part.richContent)
+            ? part.richContent
+            : undefined
+          return {
+            type: part.type as AiStructuredPart['type'],
+            label: part.text,
+            kind: 'kind' in part ? part.kind : undefined,
+            language: 'language' in part ? part.language : undefined,
+            mediaType: 'mediaType' in part ? part.mediaType : undefined,
+            targetHost: 'targetHost' in part ? part.targetHost : undefined,
+            lineCount: 'lineCount' in part ? part.lineCount : undefined,
+            rowCount: 'rowCount' in part ? part.rowCount : undefined,
+            columnCount: 'columnCount' in part ? part.columnCount : undefined,
+            richContent,
+          }
+        })
+        .filter((part) => part.type !== 'rich_card' || Boolean(part.richContent))
       if (!shouldKeepAiWebMessage({
         content,
         state: item.state,

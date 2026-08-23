@@ -2,6 +2,7 @@ const assert = require('node:assert/strict')
 const fs = require('node:fs')
 const path = require('node:path')
 const vm = require('node:vm')
+const ts = require('typescript')
 
 const root = path.resolve(__dirname, '..', '..')
 const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'utf8')
@@ -21,6 +22,7 @@ const localProtocol = read('pc-frontend/src/features/user-browser/localAiBrowser
 const backend = read('pc-frontend/src/features/user-browser/useAiWebChatBackend.ts')
 const renderer = read('pc-frontend/src/features/ai/AiRichContentCard.tsx')
 const structuredContent = read('pc-frontend/src/features/ai/AiStructuredContent.tsx')
+const structuredPolicy = read('pc-frontend/src/features/user-browser/localAiStructuredPartPolicy.ts')
 const fixture = JSON.parse(read('scripts/fixtures/chatgpt-rich-content-finance.json'))
 const mediaMapFixture = JSON.parse(read('scripts/fixtures/rich-content-media-map.json'))
 const authorizedFixture = JSON.parse(read('scripts/fixtures/rich-content-authorized-envelope.json'))
@@ -66,7 +68,12 @@ assert.match(authorization, /sanitized_ast_only/)
 assert.deepEqual(authorizationRegistry.authorizations, [], 'private responses must fail closed until a production authorization entry is registered')
 assert.match(localProtocol, /'rich_card'/)
 assert.match(protocol, /YILONG_RICH_CONTENT_SCHEMA/)
-assert.match(backend, /richContent:/)
+assert.match(protocol, /function isYilongRichContent\(value: unknown\)/)
+assert.match(backend, /isYilongRichContent\(part\.richContent\)/)
+assert.match(structuredContent, /isYilongRichContent\(part\.richContent\)/)
+assert.match(structuredPolicy, /Boolean\(part\.richContent\)/)
+assert.match(backend, /part\.type !== 'rich_card' \|\| Boolean\(part\.richContent\)/)
+assert.match(backend, /richContent[,\s]/)
 assert.match(structuredContent, /<AiRichContentCard/)
 assert.match(renderer, /aria-label="官方行情卡片"/)
 assert.match(renderer, /aria-label="官方天气卡片"/)
@@ -226,5 +233,68 @@ assert.equal(
   0,
   'authorized weather mapping must fail closed when the production grant callback denies it',
 )
+
+const protocolModule = { exports: {} }
+const compiledProtocol = ts.transpileModule(protocol, {
+  compilerOptions: {
+    module: ts.ModuleKind.CommonJS,
+    target: ts.ScriptTarget.ES2022,
+  },
+  fileName: 'richContentProtocol.ts',
+}).outputText
+new Function('exports', 'module', 'require', compiledProtocol)(
+  protocolModule.exports,
+  protocolModule,
+  require,
+)
+const { isYilongRichContent } = protocolModule.exports
+
+const validFinance = {
+  schema: 'yilong.rich-content.v1',
+  kind: 'finance',
+  source: 'official_dom',
+  payload: authorizedFixture.chatgptEnvelope.parts[0].payload,
+}
+const validWeather = {
+  schema: 'yilong.rich-content.v1',
+  kind: 'weather',
+  source: 'cache',
+  payload: authorizedFixture.googleEnvelope.parts[0].payload,
+}
+const validMedia = {
+  schema: 'yilong.rich-content.v1',
+  kind: 'media_gallery',
+  source: 'official_dom',
+  payload: media,
+}
+const validMap = {
+  schema: 'yilong.rich-content.v1',
+  kind: 'map',
+  source: 'cache',
+  payload: map,
+}
+assert.equal(isYilongRichContent(validFinance), true)
+assert.equal(isYilongRichContent(validWeather), true)
+assert.equal(isYilongRichContent(validMedia), true)
+assert.equal(isYilongRichContent(validMap), true)
+assert.equal(isYilongRichContent({ ...validFinance, schema: 'yilong.rich-content.v2' }), false)
+assert.equal(isYilongRichContent({ ...validFinance, kind: 'unknown' }), false)
+assert.equal(isYilongRichContent({ ...validFinance, source: 'raw_response' }), false)
+assert.equal(isYilongRichContent({ ...validFinance, payload: { title: 'BTC' } }), false)
+
+const invalidChart = structuredClone(validFinance)
+invalidChart.payload.chart.points[0].y = Number.NaN
+assert.equal(isYilongRichContent(invalidChart), false)
+const oversizedMetrics = structuredClone(validFinance)
+oversizedMetrics.payload.metrics = Array.from({ length: 17 }, (_, index) => ({ label: `L${index}`, value: '1' }))
+assert.equal(isYilongRichContent(oversizedMetrics), false)
+const httpMedia = structuredClone(validMedia)
+httpMedia.payload.items[0].url = 'http://example.com/chart.png'
+assert.equal(isYilongRichContent(httpMedia), false)
+const credentialMedia = structuredClone(validMedia)
+credentialMedia.payload.items[0].url = 'https://user:password@example.com/chart.png'
+assert.equal(isYilongRichContent(credentialMedia), false)
+assert.equal(isYilongRichContent({ ...validWeather, payload: { title: '天气', rows: [] } }), false)
+assert.equal(isYilongRichContent({ ...validMap, payload: { title: '地图', places: [] } }), false)
 
 console.log('PASS: Win rich-content AST preserves citations, finance, weather, media, and map with fail-closed private-response authorization')
