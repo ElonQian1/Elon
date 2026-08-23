@@ -44,4 +44,17 @@ class GoogleWebConversationIndexPolicyTest {
             record.restorableUrl,
         ))
     }
+
+    @Test
+    fun officialDirectoryRowsDoNotPretendToBeActiveToday() {
+        val imported = GoogleWebConversationIndexPolicy.upsert(
+            records = emptyList(),
+            restorableUrl = "https://www.google.com/search?q=official&udm=50&csuir=thread-123",
+            title = "official",
+            date = null,
+            preferredPath = null,
+        )
+
+        assertEquals(emptySet<String>(), imported.records.single().activityDates)
+    }
 }

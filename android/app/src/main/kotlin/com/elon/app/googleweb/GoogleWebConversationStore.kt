@@ -63,6 +63,26 @@ internal class GoogleWebConversationStore(context: Context) {
         return projectStore.assignConversation(path, projectId)
     }
 
+    fun acceptOfficial(conversations: List<ChatGptWebConversation>): Boolean {
+        var next = records
+        conversations.take(MAX_ITEMS).asReversed().forEach { conversation ->
+            val url = GoogleWebNavigationPolicy.sanitizeRestorableUrl(conversation.providerUrl)
+                ?: return@forEach
+            val title = conversation.title.trim().takeIf(String::isNotBlank) ?: return@forEach
+            next = GoogleWebConversationIndexPolicy.upsert(
+                records = next,
+                restorableUrl = url,
+                title = title,
+                date = null,
+                preferredPath = null,
+            ).records
+        }
+        if (next == records) return false
+        records = next.take(MAX_ITEMS)
+        save()
+        return true
+    }
+
     fun observe(
         url: String,
         title: String,

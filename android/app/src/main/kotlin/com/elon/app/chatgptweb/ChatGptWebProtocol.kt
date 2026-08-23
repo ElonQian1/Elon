@@ -473,6 +473,8 @@ internal object ChatGptWebProtocol {
                             ?.take(MAX_TITLE_LENGTH),
                         projectPath = projectPath,
                         activityDates = parseActivityDates(item),
+                        providerUrl = item.optionalString("providerUrl")
+                            ?.take(MAX_PROVIDER_URL_LENGTH),
                     )),
                 )
             }
@@ -627,6 +629,7 @@ internal object ChatGptWebProtocol {
     private const val MAX_TITLE_LENGTH = 160
     private const val MAX_PATH_LENGTH = 256
     private const val MAX_ID_LENGTH = 160
+    private const val MAX_PROVIDER_URL_LENGTH = 8_192
     private const val MAX_UI_CONTROLS = 512
     private const val MAX_DISCOVERED_UI_CONTROLS = 10_000
     private const val MAX_UI_CONTROL_ID_LENGTH = 72

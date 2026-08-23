@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict')
 const policy = require('../android/app/src/main/assets/google_web_answer_candidate_policy.js')
 
-assert.equal(policy.version, 19)
+assert.equal(policy.version, 21)
 
 assert.equal(policy.accepts({
   hasQuery: true,
@@ -129,6 +129,40 @@ assert.equal(policy.accepts({
   tabControls: 0,
   explicit: true,
 }), true)
+
+assert.equal(policy.accepts({
+  hasQuery: true,
+  text: 'ELONGOOGLEPRIVATEOK2',
+  textLength: 20,
+  citations: 0,
+  semanticBlocks: 0,
+  controls: 0,
+  links: 0,
+  tabControls: 0,
+  liveRegion: false,
+  afterQuery: true,
+  queryAligned: false,
+  inMain: true,
+  interactive: false,
+  explicit: false,
+}), true, 'a concise AI reply in the question column is accepted')
+
+assert.equal(policy.accepts({
+  hasQuery: true,
+  text: 'unrelated compact chrome',
+  textLength: 24,
+  citations: 0,
+  semanticBlocks: 0,
+  controls: 0,
+  links: 0,
+  tabControls: 0,
+  liveRegion: false,
+  afterQuery: true,
+  queryAligned: false,
+  inMain: false,
+  interactive: false,
+  explicit: false,
+}), false, 'compact text outside the answer column remains rejected')
 
 assert.equal(policy.accepts({
   hasQuery: true,

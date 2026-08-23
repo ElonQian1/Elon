@@ -50,7 +50,7 @@ internal object GoogleWebNavigationPolicy {
             .associateBy { it.substringBefore('=') }
         val keys = when (path) {
             "/webhp" -> listOf("aep", "q", "hl")
-            "/search" -> listOf("q", "udm", "aep", "hl")
+            "/search" -> listOf("q", "udm", "aep", "hl", "csuir")
             else -> emptyList()
         }
         return keys.mapNotNull(values::get).joinToString("&")

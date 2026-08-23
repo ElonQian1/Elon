@@ -39,6 +39,7 @@ internal data class ChatGptWebConversation(
     val projectTitle: String? = null,
     val projectPath: String? = null,
     val activityDates: Set<String> = emptySet(),
+    val providerUrl: String? = null,
 )
 
 internal data class ChatGptWebProject(

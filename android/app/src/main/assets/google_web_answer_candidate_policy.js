@@ -153,6 +153,16 @@
     return controls === 0 || (metrics.explicit === true && controls <= 8);
   }
 
+  function conciseAnswerAllowed(metrics) {
+    if (!metrics || metrics.afterQuery !== true ||
+        (metrics.queryAligned !== true && metrics.inMain !== true) ||
+        metrics.interactive === true || metrics.liveRegion === true ||
+        metrics.resultListItem === true || metrics.sourceCollection === true ||
+        nonNegative(metrics.links) !== 0 || nonNegative(metrics.tabControls) !== 0) return false;
+    const controls = nonNegative(metrics.controls);
+    return controls === 0 || (metrics.explicit === true && controls <= 2);
+  }
+
   function accepts(metrics) {
     const hasQuery = metrics && metrics.hasQuery === true;
     const textLength = nonNegative(metrics && metrics.textLength);
@@ -178,7 +188,9 @@
     if (liveRegion && semanticBlocks === 0 && citations === 0) return false;
     if (tabControls > 0 && semanticBlocks === 0 && citations === 0) return false;
     if (links >= 3 && semanticBlocks === 0 && citations === 0) return false;
-    if (!explicit && semanticBlocks === 0 && citations === 0 && textLength < 80) return false;
+    if (!explicit && semanticBlocks === 0 && citations === 0 && textLength < 80) {
+      return conciseAnswerAllowed(metrics);
+    }
     return true;
   }
 
@@ -235,7 +247,7 @@
   }
 
   return Object.freeze({
-    version: 19,
+    version: 21,
     accepts,
     penalty,
     select,
@@ -245,6 +257,7 @@
     shareSurfaceText,
     disclosureOnlyText,
     pageChromeText,
-    shortAnswerAllowed
+    shortAnswerAllowed,
+    conciseAnswerAllowed
   });
 });

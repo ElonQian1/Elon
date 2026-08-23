@@ -7,6 +7,7 @@ import android.os.Looper
 import android.webkit.WebView
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
+import com.elon.app.BuildConfig
 import com.elon.app.WebBridgeConnectionState
 import com.elon.app.WebBridgeDocumentSession
 import com.elon.app.WebBridgeReadinessPolicy
@@ -28,6 +29,14 @@ internal class GoogleWebPageAdapter(
             input.reader(StandardCharsets.UTF_8).readText()
         }
     }
+    private val privateResearchTapScript = """
+        window.__elonGoogleWebPrivateResearchEnabled =
+            ${BuildConfig.GOOGLE_WEB_PRIVATE_RESEARCH_ENABLED};
+    """.trimIndent() + "\n" + context.assets.open(PRIVATE_RESEARCH_TAP_ASSET).use { input ->
+        input.reader(StandardCharsets.UTF_8).readText()
+    }
+    private val privateThreadDirectoryScript = context.assets.open(PRIVATE_THREAD_DIRECTORY_ASSET)
+        .use { input -> input.reader(StandardCharsets.UTF_8).readText() }
     private val handler = Handler(Looper.getMainLooper())
     private val documentSession = WebBridgeDocumentSession()
     private var listenerInstalled = false
@@ -55,6 +64,23 @@ internal class GoogleWebPageAdapter(
             documentSession.accept(token) ?: return@addWebMessageListener
             if (!wasCurrent) onStateChanged(State.READY)
             onEvent(parsed.event)
+        }
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
+            WebViewCompat.addDocumentStartJavaScript(
+                webView,
+                privateThreadDirectoryScript,
+                ALLOWED_ORIGINS,
+            )
+        }
+        if (
+            BuildConfig.GOOGLE_WEB_PRIVATE_RESEARCH_ENABLED &&
+            WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)
+        ) {
+            WebViewCompat.addDocumentStartJavaScript(
+                webView,
+                privateResearchTapScript,
+                ALLOWED_ORIGINS,
+            )
         }
         listenerInstalled = true
         onStateChanged(State.WEB_ONLY)
@@ -149,9 +175,11 @@ internal class GoogleWebPageAdapter(
         origin.scheme == "https" && origin.port == -1 && origin.host?.lowercase() in ALLOWED_HOSTS
 
     companion object {
-        const val ADAPTER_VERSION = 26
+        const val ADAPTER_VERSION = 37
         private val ADAPTER_ASSETS = listOf(
             "google_web_answer_candidate_policy.js",
+            "google_web_private_reply_observer.js",
+            "google_web_private_thread_directory.js",
             "google_web_query_policy.js",
             "google_web_rich_content.js",
             "google_web_message_extractor.js",
@@ -160,6 +188,8 @@ internal class GoogleWebPageAdapter(
             "google_web_adapter.js",
         )
         private const val BRIDGE_OBJECT = "elonGoogleWebNative"
+        private const val PRIVATE_RESEARCH_TAP_ASSET = "google_web_private_response_tap.js"
+        private const val PRIVATE_THREAD_DIRECTORY_ASSET = "google_web_private_thread_directory.js"
         private const val PROVIDER_ID = "google_web"
         private const val MAX_PROMPT_LENGTH = 20_000
         private val ALLOWED_HOSTS = setOf("google.com", "www.google.com")

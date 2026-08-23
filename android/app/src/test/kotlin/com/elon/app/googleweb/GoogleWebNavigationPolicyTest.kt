@@ -22,9 +22,9 @@ class GoogleWebNavigationPolicyTest {
     @Test
     fun stripsVolatileTrackingParametersFromRestorableUrls() {
         assertEquals(
-            "https://www.google.com/search?q=hello%20world&udm=50&aep=11&hl=zh-CN",
+            "https://www.google.com/search?q=hello%20world&udm=50&aep=11&hl=zh-CN&csuir=thread-123",
             GoogleWebNavigationPolicy.sanitizeRestorableUrl(
-                "https://google.com/search?sei=volatile&q=hello%20world&udm=50&ved=tracking&aep=11&hl=zh-CN",
+                "https://google.com/search?sei=volatile&q=hello%20world&udm=50&ved=tracking&aep=11&hl=zh-CN&csuir=thread-123&mstk=volatile",
             ),
         )
         assertEquals(

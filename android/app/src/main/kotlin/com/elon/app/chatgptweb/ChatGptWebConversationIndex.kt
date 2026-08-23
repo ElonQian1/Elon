@@ -216,6 +216,7 @@ internal object ChatGptWebConversationIndex {
             ),
             projectPath = next.projectPath ?: previous.projectPath,
             activityDates = previous.activityDates + next.activityDates,
+            providerUrl = next.providerUrl ?: previous.providerUrl,
         )
     }
 

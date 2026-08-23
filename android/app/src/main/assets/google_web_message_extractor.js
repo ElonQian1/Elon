@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  const extractorVersion = 27;
+  const extractorVersion = 31;
   if (window.__elonGoogleWebMessageExtractor &&
       window.__elonGoogleWebMessageExtractor.version === extractorVersion) return;
 
@@ -189,12 +189,25 @@
 
   function findQueryAnchor(query) {
     if (!query) return null;
-    const nodes = uniqueNodes([
-      ...QUERY_SELECTORS,
-      'body div',
-      'body span',
-      'body p'
-    ]).slice(0, 2400).filter((node) =>
+    const explicit = uniqueNodes(QUERY_SELECTORS).filter((node) =>
+      isVisible(node) && cleanText(node.innerText || node.textContent) === query
+    );
+    if (explicit.length) return explicit[explicit.length - 1];
+    if (document.body && typeof document.createTreeWalker === 'function' &&
+        typeof NodeFilter !== 'undefined') {
+      const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+      let current;
+      let inspected = 0;
+      let match = null;
+      while ((current = walker.nextNode()) && inspected < 8000) {
+        inspected += 1;
+        if (cleanText(current.nodeValue) !== query) continue;
+        const parent = current.parentElement;
+        if (parent && isVisible(parent)) match = parent;
+      }
+      if (match) return match;
+    }
+    const nodes = uniqueNodes(['body div', 'body span', 'body p']).filter((node) =>
       isVisible(node) && cleanText(node.innerText || node.textContent) === query
     );
     return nodes[nodes.length - 1] || null;
@@ -202,7 +215,7 @@
 
   function answerActionLabel(value) {
     const label = cleanText(value).replace(/\s+/g, ' ').replace(/[.!。！]+$/, '');
-    return /^(?:copy (?:text|response|answer)|复制(?:文字|回答|回复))$/i.test(label);
+    return /^(?:copy(?: (?:text|response|answer))?|复制(?:文字|回答|回复)?)$/i.test(label);
   }
 
   function findAnswerActionAnchor(queryAnchor, nextQueryAnchor, composer) {
@@ -273,6 +286,7 @@
     const tabControls = node.querySelectorAll('[role="tab"], [role="tablist"], [role="toolbar"]').length +
       (node.matches('[role="tab"], [role="tablist"], [role="toolbar"]') ? 1 : 0);
     const liveRegion = node.matches('[aria-live], [role="status"], [role="alert"]');
+    const conciseLeaf = node.matches('span, p') && node.children.length === 0 && text.length < 80;
     const metrics = {
       hasQuery: !!query,
       text,
@@ -286,6 +300,7 @@
       liveRegion,
       controls,
       afterQuery: followsQuery(node, queryAnchor),
+      inMain: !!node.closest('main, [role="main"]'),
       queryAligned,
       answerActionRelation,
       trustedAnswerContainer: node.matches(TRUSTED_ANSWER_SELECTOR),
@@ -297,6 +312,7 @@
         'a[href], button, input, textarea, select, [role="button"], [role="link"], ' +
         '[role="menuitem"], [role="tab"]'
       ),
+      conciseLeaf,
       explicit
     };
     if (candidatePolicy && !candidatePolicy.accepts(metrics)) return null;
@@ -304,6 +320,7 @@
     const score = Math.min(text.length, 8000) + Math.min(citations.length, 3) * 180 +
       Math.min(semanticBlocks, 20) * 90 + Math.min(narrativeBlocks, 8) * 520 +
       (explicit ? 1400 : 0) + (queryAligned ? 2200 : 0) +
+      (conciseLeaf ? 1800 : 0) +
       (answerActionRelation === 'before' ? 2600 : 0) + depth * 30 -
       Math.min(controls, 20) * 120 -
       (candidatePolicy ? candidatePolicy.penalty(metrics) : 0);
@@ -344,6 +361,7 @@
       'body [aria-live="polite"]',
       'body [aria-live="assertive"]'
     ];
+    const conciseSelectors = ['main span', 'main p', '[role="main"] span', '[role="main"] p'];
     const genericSelectors = ['body div'];
     const explicit = uniqueNodes(explicitSelectors)
       .map((node) => candidateFrom(
@@ -355,7 +373,21 @@
         node, composer, query, queryAnchor, nextQueryAnchor, answerActionAnchor, true
       ))
       .filter(Boolean);
-    const generic = uniqueNodes(genericSelectors).slice(0, 1200)
+    const concise = uniqueNodes(conciseSelectors)
+      .filter((node) => Array.from(node.childNodes).some((child) =>
+        child.nodeType === Node.TEXT_NODE && cleanText(child.nodeValue)
+      ))
+      .filter((node) => followsQuery(node, queryAnchor))
+      .slice(0, 600)
+      .map((node) => candidateFrom(
+        node, composer, query, queryAnchor, nextQueryAnchor, answerActionAnchor, false
+      ))
+      .filter(Boolean);
+    const genericNodes = uniqueNodes(genericSelectors);
+    const scopedGenericNodes = queryAnchor
+      ? genericNodes.filter((node) => followsQuery(node, queryAnchor))
+      : genericNodes.slice(-1200);
+    const generic = scopedGenericNodes.slice(0, 1200)
       .map((node) => candidateFrom(
         node, composer, query, queryAnchor, nextQueryAnchor, answerActionAnchor, false
       ))
@@ -371,7 +403,7 @@
         return !child || child.text.length < candidate.text.length * 0.92;
       });
     const candidatesByNode = new Map();
-    explicit.concat(semantic, generic).forEach((candidate) => {
+    explicit.concat(semantic, concise, generic).forEach((candidate) => {
       const current = candidatesByNode.get(candidate.node);
       if (!current || candidate.score > current.score) candidatesByNode.set(candidate.node, candidate);
     });

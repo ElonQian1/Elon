@@ -8,6 +8,9 @@
   const messageExtractor = window.__elonGoogleWebMessageExtractor;
   const composerBridge = window.__elonGoogleWebComposerBridge;
   const sendPolicy = window.__elonGoogleWebSendPolicy;
+  const privateReplyObserver = window.__elonGoogleWebPrivateReplyObserver;
+  const privateThreadDirectory = window.__elonGoogleWebPrivateThreadDirectory;
+  const privateResearchTap = window.__elonGoogleWebPrivateResponseTap;
   if (!allowedOrigins.has(location.origin) || !adapterVersion ||
       !/^doc_[a-z0-9_]{3,80}$/.test(documentToken) || !nativeBridge ||
       typeof nativeBridge.postMessage !== 'function' || !messageExtractor || !composerBridge || !sendPolicy ||
@@ -23,6 +26,8 @@
   let emitTimer = 0;
   let lastSnapshot = '';
   let lastDiagnostics = '';
+  let lastPrivateReplyDiagnostics = '';
+  let lastPrivateDirectorySnapshot = '';
   let observer = null;
   let disposed = false;
   const SUBMIT_READY_TIMEOUT_MS = 1600;
@@ -63,6 +68,33 @@
     };
     if (/^mcp_[a-z0-9]{1,32}$/.test(String(requestId || ''))) event.requestId = requestId;
     nativeBridge.postMessage(JSON.stringify(event));
+  }
+
+  function emitPrivateDirectorySnapshot() {
+    if (!privateThreadDirectory || typeof privateThreadDirectory.snapshot !== 'function') return;
+    const conversations = privateThreadDirectory.snapshot();
+    if (!Array.isArray(conversations) || !conversations.length) return;
+    const fingerprint = JSON.stringify(conversations);
+    if (fingerprint === lastPrivateDirectorySnapshot) return;
+    lastPrivateDirectorySnapshot = fingerprint;
+    emitEvent({
+      type: 'conversation_snapshot',
+      conversations: conversations.map((value) => ({
+        id: value.id,
+        title: value.title,
+        path: value.path,
+        providerUrl: value.providerUrl,
+        active: location.href === value.providerUrl,
+        groupLabel: 'Google AI 搜索',
+        activityDates: []
+      })),
+      projects: [],
+      collection: {
+        observedCount: conversations.length,
+        source: 'official_private',
+        officialLoadState: 'ready'
+      }
+    });
   }
 
   function isVisible(node) {
@@ -153,6 +185,29 @@
     const composer = findComposer();
     const streaming = isStreaming();
     const extraction = messageExtractor.extract(composer, streaming);
+    const privateReply = privateReplyObserver && typeof privateReplyObserver.snapshot === 'function'
+      ? privateReplyObserver.snapshot()
+      : null;
+    if (privateReply && privateReply.prompt && privateReply.text) {
+      const userIndex = extraction.messages.findIndex((message) =>
+        message.role === 'user' && message.content && message.content.some((part) =>
+          part.type === 'text' && cleanText(part.text) === privateReply.prompt
+        )
+      );
+      const hasAssistant = userIndex >= 0 && extraction.messages.slice(userIndex + 1)
+        .some((message) => message.role === 'assistant');
+      if (userIndex >= 0 && !hasAssistant) {
+        extraction.messages.splice(userIndex + 1, 0, {
+          id: 'google-private-answer-' + userIndex,
+          role: 'assistant',
+          state: privateReply.streaming ? 'streaming' : 'completed',
+          content: [{ type: 'text', text: privateReply.text }]
+        });
+        extraction.answerFound = true;
+        extraction.observedMessageCount = extraction.messages.length;
+      }
+    }
+    const effectiveStreaming = streaming || !!(privateReply && privateReply.streaming);
     const event = {
       type: 'message_snapshot',
       title: cleanText(document.title.replace(/\s*[-|]\s*Google.*$/i, '')).slice(0, 160),
@@ -165,21 +220,35 @@
       pageKind: isAiModePage() ? 'conversation' : 'unknown',
       loginRequired: false,
       composerReady: !!composer,
-      streaming,
+      streaming: effectiveStreaming,
       currentModel: 'Google AI 模式',
       attachments: [],
       dictationActive: false,
       capabilities: ['streaming', 'citations', 'rich_text', 'new_conversation', 'conversation_history']
     };
     const fingerprint = JSON.stringify(event);
-    if (fingerprint === lastSnapshot) return;
-    lastSnapshot = fingerprint;
-    emitEvent(event);
-    const diagnostics = messageExtractor.diagnostics(composer, extraction) + '|' +
-      composerBridge.diagnostics();
-    if (diagnostics && diagnostics !== lastDiagnostics) {
-      lastDiagnostics = diagnostics;
-      emitResult('dom_diagnostics', true, diagnostics);
+    if (fingerprint !== lastSnapshot) {
+      lastSnapshot = fingerprint;
+      emitEvent(event);
+      const diagnostics = messageExtractor.diagnostics(composer, extraction) + '|' +
+        composerBridge.diagnostics();
+      if (diagnostics && diagnostics !== lastDiagnostics) {
+        lastDiagnostics = diagnostics;
+        emitResult('dom_diagnostics', true, diagnostics);
+      }
+    }
+    if (privateResearchTap && typeof privateResearchTap.drain === 'function') {
+      privateResearchTap.drain().forEach((detail) => {
+        emitResult('research_network_observation', true, detail);
+      });
+    }
+    if (privateResearchTap && privateReplyObserver &&
+        typeof privateReplyObserver.diagnostics === 'function') {
+      const privateDiagnostics = privateReplyObserver.diagnostics();
+      if (privateDiagnostics && privateDiagnostics !== lastPrivateReplyDiagnostics) {
+        lastPrivateReplyDiagnostics = privateDiagnostics;
+        emitResult('research_network_observation', true, 'v1|reply|' + privateDiagnostics);
+      }
     }
   }
 
@@ -201,6 +270,12 @@
     const composer = findComposer();
     if (!composer) return emitResult('send_prompt', false, 'Google AI 输入框尚未就绪。', requestId);
     const prompt = cleanText(value);
+    if (privateResearchTap && typeof privateResearchTap.observePrompt === 'function') {
+      privateResearchTap.observePrompt(prompt);
+    }
+    if (privateReplyObserver && typeof privateReplyObserver.observePrompt === 'function') {
+      privateReplyObserver.observePrompt(prompt);
+    }
     const draft = cleanText(composerValue(composer));
     const reconciliation = sendPolicy.reconcile(
       draft,
@@ -358,5 +433,12 @@
     }, { once: true });
   }
   window.addEventListener('popstate', scheduleSnapshot);
+  if (privateReplyObserver && typeof privateReplyObserver.setListener === 'function') {
+    privateReplyObserver.setListener(scheduleSnapshot);
+  }
+  if (privateThreadDirectory && typeof privateThreadDirectory.setListener === 'function') {
+    privateThreadDirectory.setListener(emitPrivateDirectorySnapshot);
+    emitPrivateDirectorySnapshot();
+  }
   snapshot();
 })();

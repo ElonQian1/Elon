@@ -11,6 +11,7 @@ import android.webkit.WebView
 import android.webkit.WebChromeClient
 import android.widget.FrameLayout
 import androidx.appcompat.app.AppCompatActivity
+import com.elon.app.BuildConfig
 import com.elon.app.WebChatSessionRecoveryCoordinator
 import com.elon.app.configureWebChatBackgroundSurface
 import com.elon.app.chatgptweb.ChatGptWebConversationIndexState
@@ -361,7 +362,17 @@ internal class GoogleWebBackgroundSession(
                 onConversationIndexChanged(conversationIndex())
                 onSnapshot(nextSnapshot)
             }
+            is ChatGptWebEvent.ConversationList -> {
+                conversationStore.acceptOfficial(event.conversations)
+                onConversationIndexChanged(conversationIndex())
+            }
             is ChatGptWebEvent.CommandResult -> {
+                if (event.action == PRIVATE_RESEARCH_ACTION) {
+                    if (BuildConfig.GOOGLE_WEB_PRIVATE_RESEARCH_ENABLED) {
+                        Log.i(PRIVATE_RESEARCH_TAG, event.detail.take(160))
+                    }
+                    return
+                }
                 if (event.action == DOM_DIAGNOSTICS_ACTION) {
                     Log.i(DOM_DIAGNOSTICS_TAG, event.detail.take(160))
                     return
@@ -444,5 +455,7 @@ internal class GoogleWebBackgroundSession(
         const val KEY_LAST_URL = "last_ai_mode_url"
         const val DOM_DIAGNOSTICS_ACTION = "dom_diagnostics"
         const val DOM_DIAGNOSTICS_TAG = "ElonGoogleWebDom"
+        const val PRIVATE_RESEARCH_ACTION = "research_network_observation"
+        const val PRIVATE_RESEARCH_TAG = "ElonGoogleWebPrivate"
     }
 }

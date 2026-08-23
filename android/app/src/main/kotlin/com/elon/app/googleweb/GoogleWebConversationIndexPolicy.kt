@@ -13,7 +13,7 @@ internal object GoogleWebConversationIndexPolicy {
         records: List<GoogleWebConversationRecord>,
         restorableUrl: String,
         title: String,
-        date: LocalDate,
+        date: LocalDate?,
         preferredPath: String?,
     ): GoogleWebConversationUpsert {
         val previous = records.firstOrNull { it.path == preferredPath }
@@ -27,7 +27,7 @@ internal object GoogleWebConversationIndexPolicy {
             title = previous?.title?.takeUnless { it == "Google AI 搜索" } ?: cleanTitle,
             path = path,
             restorableUrl = restorableUrl,
-            activityDates = previous?.activityDates.orEmpty() + date.toString(),
+            activityDates = previous?.activityDates.orEmpty() + listOfNotNull(date?.toString()),
         )
         return GoogleWebConversationUpsert(
             records = listOf(next) + records.filterNot { it.id == id },
