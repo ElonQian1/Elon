@@ -42,6 +42,7 @@ import {
   selectLocalAiNewConversationPath,
 } from './localAiNewConversation'
 import { localAiComposerAvailability } from './localAiComposerAvailability'
+import { lastMatchingLocalAiUserIndex, normalizeLocalAiResponsePrompt } from './localAiResponseTracking'
 
 export default function useLocalAiWebChatController(
   provider: LocalAiWebProvider | undefined,
@@ -309,10 +310,10 @@ export default function useLocalAiWebChatController(
   }, [pendingResponses, snapshot])
 
   useEffect(() => {
-    const expected = normalizePrompt(expectedResponsePrompt.current)
+    const expected = normalizeLocalAiResponsePrompt(expectedResponsePrompt.current)
     if (!expected || !snapshot || snapshot.streaming) return
     const messages = snapshot.messages
-    const userIndex = lastMatchingUserIndex(messages, expected)
+    const userIndex = lastMatchingLocalAiUserIndex(messages, expected)
     if (userIndex < 0) return
     if (messages.slice(userIndex + 1).some((item) => (
       item.role === 'assistant'
@@ -650,7 +651,7 @@ export default function useLocalAiWebChatController(
 
   function startResponseRefresh(prompt: string) {
     cancelResponseRefresh()
-    if (!provider || !ownerKey || !normalizePrompt(prompt)) return
+    if (!provider || !ownerKey || !normalizeLocalAiResponsePrompt(prompt)) return
     expectedResponsePrompt.current = prompt
     const generation = responseRefreshGeneration.current
     let delayIndex = 0
@@ -775,25 +776,3 @@ const BACKGROUND_RECONNECT_MAX_ATTEMPTS = 3
 // 新建会话后等待官网给出可信实时快照的上限；超过就不再无限期把输入框清空。
 const GOOGLE_NEW_CONVERSATION_RELOAD_DELAY_MS = 2_000
 const NEW_CONVERSATION_RECOVERY_TIMEOUT_MS = 24_000
-
-function normalizePrompt(value: string): string {
-  return value.trim().replace(/\s+/g, ' ')
-}
-
-function visibleMessageText(message: { content: Array<{ type: string; text?: string }> }): string {
-  return message.content
-    .filter((part) => part.type === 'text' || part.type === 'markdown')
-    .map((part) => part.text ?? '')
-    .join('\n')
-}
-
-function lastMatchingUserIndex(
-  messages: Array<{ role: string; content: Array<{ type: string; text?: string }> }>,
-  expected: string,
-): number {
-  for (let index = messages.length - 1; index >= 0; index -= 1) {
-    const message = messages[index]
-    if (message.role === 'user' && normalizePrompt(visibleMessageText(message)) === expected) return index
-  }
-  return -1
-}
