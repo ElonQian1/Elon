@@ -598,6 +598,13 @@
     if (action === 'list_conversations' && conversationAdapter) {
       return conversationAdapter.requestList(command, emitEvent, respond);
     }
+    if (action === 'refresh_current_conversation') {
+      if (privateTransport && privateTransport.conversationPrefetchEnabled === true &&
+          typeof privateTransport.refreshCurrentConversation === 'function') {
+        privateTransport.refreshCurrentConversation(location.pathname, emitEvent);
+      }
+      return;
+    }
     if (action === 'open_conversation' && conversationAdapter) {
       if (comparableText(composerValue(findComposer()))) {
         return respond(action, false, '网页中有未发送草稿，请先处理草稿。');

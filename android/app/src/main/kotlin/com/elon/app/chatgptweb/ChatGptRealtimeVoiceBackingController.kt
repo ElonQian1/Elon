@@ -9,6 +9,7 @@ internal class ChatGptRealtimeVoiceBackingController(
     private val webView: () -> WebView?,
     private val surfaceMode: ChatGptWebSurfaceModeController,
     private val requestExecution: () -> Unit,
+    private val requestPrivateConversationSnapshot: () -> Unit,
     private val requestConversationSnapshot: () -> Unit,
     private val schedule: (Runnable, Long) -> Unit,
     private val conversationSnapshotRevision: () -> Long,
@@ -44,6 +45,7 @@ internal class ChatGptRealtimeVoiceBackingController(
         )
         view.showWebChatBackgroundSurface()
         requestExecution()
+        requestPrivateConversationSnapshot()
         requestConversationSnapshot()
         schedule(Runnable {
             if (active || !recoveryGate.isCurrent(recoveryToken)) return@Runnable

@@ -118,7 +118,7 @@ const detailPayload = {
   assert.equal(disabled.window.__elonChatGptPrivateTransport, undefined);
 
   const gated = createContext(async () => jsonResponse(detailPayload), true, false);
-  assert.equal(gated.window.__elonChatGptPrivateTransport.version, 10);
+  assert.equal(gated.window.__elonChatGptPrivateTransport.version, 11);
   assert.equal(gated.window.__elonChatGptPrivateTransport.conversationPrefetchEnabled, false);
   assert.equal(gated.window.__elonChatGptPrivateTransport.conversationPrefetchReady(), false);
 
@@ -130,7 +130,7 @@ const detailPayload = {
     return jsonResponse(detailPayload);
   }, false, true);
   const transport = detail.window.__elonChatGptPrivateTransport;
-  assert.equal(transport.version, 10);
+  assert.equal(transport.version, 11);
   assert.equal(transport.conversationPrefetchEnabled, true);
   assert.equal(transport.conversationPrefetchAvailable, true);
   assert.equal(transport.experimentalConversationPrefetchAvailable, true);
@@ -166,6 +166,47 @@ const detailPayload = {
     Array.from(snapshots[0].messages, (value) => [value.role, value.content]),
     [['user', 'hello'], ['assistant', 'hi']]
   );
+
+  detail.window.location.pathname = '/c/voice-chat';
+  assert.equal(transport.refreshCurrentConversation(
+    '/c/other-chat',
+    () => assert.fail('refresh cannot read a different conversation')
+  ), false);
+  assert.equal(transport.refreshCurrentConversation(
+    '/c/voice-chat',
+    (event) => snapshots.push(event)
+  ), true);
+  await flush();
+  assert.equal(requests.length, 3);
+  assert.equal(requests[2].url, '/backend-api/conversations/voice-chat');
+  assert.equal(snapshots.length, 2);
+
+  let resolveSingleFlight;
+  let singleFlightCalls = 0;
+  const singleFlightSnapshots = [];
+  const singleFlight = createContext(async () => {
+    singleFlightCalls += 1;
+    if (singleFlightCalls === 1) return jsonResponse(detailPayload);
+    return new Promise((resolve) => { resolveSingleFlight = resolve; });
+  });
+  await singleFlight.window.fetch('/backend-api/conversations/current-chat-id-12345', {
+    headers: { Authorization: 'page-scoped-value' }
+  });
+  singleFlight.window.location.pathname = '/c/voice-chat';
+  const singleFlightTransport = singleFlight.window.__elonChatGptPrivateTransport;
+  assert.equal(singleFlightTransport.refreshCurrentConversation(
+    '/c/voice-chat',
+    (event) => singleFlightSnapshots.push(event)
+  ), true);
+  assert.equal(singleFlightTransport.refreshCurrentConversation(
+    '/c/voice-chat',
+    () => assert.fail('a duplicate refresh must reuse the active request')
+  ), true);
+  assert.equal(singleFlightCalls, 2);
+  resolveSingleFlight(jsonResponse(detailPayload));
+  await flush();
+  assert.equal(singleFlightCalls, 2);
+  assert.equal(singleFlightSnapshots.length, 1);
 
   let failedNavigation = 0;
   let failedCalls = 0;

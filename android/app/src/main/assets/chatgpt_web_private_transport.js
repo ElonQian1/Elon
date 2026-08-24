@@ -4,7 +4,7 @@
   const existingTransport = window.__elonChatGptPrivateTransport;
   const prefetchEnabled = window.__elonChatGptPrivateConversationPrefetchEnabled === true;
   const researchEnabled = window.__elonChatGptPrivateResearchEnabled === true;
-  if ((existingTransport && Number(existingTransport.version) >= 10) ||
+  if ((existingTransport && Number(existingTransport.version) >= 11) ||
       (!prefetchEnabled && !researchEnabled) ||
       location.origin !== 'https://chatgpt.com') return;
 
@@ -12,6 +12,7 @@
   if (!policyModule || typeof policyModule.create !== 'function') return;
   const MAX_MESSAGES = 80;
   const inheritedHeaders = new Map();
+  const activeConversationRequests = new Map();
   const delegateFetch = typeof window.fetch === 'function' ? window.fetch.bind(window) : null;
   let privateFetchDepth = 0;
 
@@ -246,54 +247,88 @@
     }
   }
 
-  function prefetchConversation(path, emitEvent, navigate) {
+  function conversationTarget(path) {
     const match = String(path || '').match(/\/c\/([A-Za-z0-9_-]{1,160})$/);
-    if (!match) return false;
+    return match ? { path: '/c/' + match[1], id: match[1] } : null;
+  }
+
+  function emitConversationSnapshot(target, result, emitEvent) {
+    recordPrivatePayloadShape(result.payload);
+    const payload = normalizedConversationPayload(result.payload);
+    const messages = conversationMessages(payload);
+    if (!messages.length) {
+      policy.recordFailure('empty');
+      recordPrivateOutcome('empty', 0, result.elapsedMs);
+      return;
+    }
+    policy.recordSuccess(result.elapsedMs);
+    recordPrivateOutcome('success', messages.length, result.elapsedMs);
+    emitEvent({
+      type: 'message_snapshot',
+      title: cleanText(payload && payload.title, 120),
+      url: location.origin + target.path,
+      draft: '',
+      messages,
+      observedMessageCount: messages.length,
+      messageWindowStart: 0,
+      authenticated: true,
+      pageKind: 'conversation',
+      loginRequired: false,
+      composerReady: false,
+      streaming: false,
+      currentModel: cleanText(payload && (payload.default_model_slug || payload.model), 80),
+      attachments: [],
+      dictationActive: false,
+      capabilities: ['conversation_history']
+    });
+  }
+
+  function settle(action) {
+    if (typeof action !== 'function') return;
+    try { action(); } catch (_) { /* The official navigation fallback owns its errors. */ }
+  }
+
+  function requestConversationSnapshot(path, emitEvent, onSettled) {
+    const target = conversationTarget(path);
+    if (!target || typeof emitEvent !== 'function') return false;
     if (!conversationPrefetchReady()) return false;
-    fetchConversation(match[1]).then((result) => {
-      recordPrivatePayloadShape(result.payload);
-      const payload = normalizedConversationPayload(result.payload);
-      const messages = conversationMessages(payload);
-      if (!messages.length) {
-        policy.recordFailure('empty');
-        recordPrivateOutcome('empty', 0, result.elapsedMs);
-        return;
-      }
-      policy.recordSuccess(result.elapsedMs);
-      recordPrivateOutcome('success', messages.length, result.elapsedMs);
-      emitEvent({
-        type: 'message_snapshot',
-        title: cleanText(payload && payload.title, 120),
-        url: location.origin + path,
-        draft: '',
-        messages,
-        observedMessageCount: messages.length,
-        messageWindowStart: 0,
-        authenticated: true,
-        pageKind: 'conversation',
-        loginRequired: false,
-        composerReady: false,
-        streaming: false,
-        currentModel: cleanText(payload && (payload.default_model_slug || payload.model), 80),
-        attachments: [],
-        dictationActive: false,
-        capabilities: ['conversation_history']
+    let request = activeConversationRequests.get(target.id);
+    if (!request) {
+      request = fetchConversation(target.id).then((result) => {
+        emitConversationSnapshot(target, result, emitEvent);
+      }).catch((error) => {
+        const outcome = failureKind(error);
+        policy.recordFailure(outcome);
+        recordPrivateOutcome(outcome, 0, 0);
+      }).finally(() => {
+        if (activeConversationRequests.get(target.id) === request) {
+          activeConversationRequests.delete(target.id);
+        }
       });
-    }).catch((error) => {
-      const outcome = failureKind(error);
-      policy.recordFailure(outcome);
-      recordPrivateOutcome(outcome, 0, 0);
-    }).finally(navigate);
+      activeConversationRequests.set(target.id, request);
+    }
+    request.then(() => settle(onSettled));
     return true;
   }
 
+  function prefetchConversation(path, emitEvent, navigate) {
+    return requestConversationSnapshot(path, emitEvent, navigate);
+  }
+
+  function refreshCurrentConversation(path, emitEvent) {
+    const target = conversationTarget(path);
+    if (!target || target.path !== location.pathname) return false;
+    return requestConversationSnapshot(target.path, emitEvent, null);
+  }
+
   window.__elonChatGptPrivateTransport = Object.freeze({
-    version: 10,
+    version: 11,
     conversationPrefetchEnabled: prefetchEnabled,
     conversationPrefetchAvailable: true,
     experimentalConversationPrefetchAvailable: true,
     conversationPrefetchReady,
     prefetchConversation,
+    refreshCurrentConversation,
     health: policy.snapshot
   });
 })();

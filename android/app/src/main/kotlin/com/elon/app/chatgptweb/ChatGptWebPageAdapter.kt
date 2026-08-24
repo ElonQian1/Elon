@@ -338,6 +338,8 @@ internal class ChatGptWebPageAdapter(
 
     fun requestSnapshot() = runCommand("snapshot")
 
+    fun requestConversationRefresh() = runCommand("refresh_current_conversation")
+
     fun markReady() {
         if (documentSession.snapshot().adapterCurrent) onStateChanged(State.READY)
     }

@@ -123,6 +123,7 @@ class WebChatProductionVoiceEntryContractTest {
         assertFalse(surface.contains("root.requestFocus()"))
         assertFalse(backing.contains("if (!gracefulExit) view.reload()"))
         assertTrue(backing.contains("requestConversationSnapshot()"))
+        assertTrue(backing.contains("requestPrivateConversationSnapshot()"))
         assertTrue(backing.contains("if (gracefulExit) return"))
         assertTrue(backing.contains("conversationRecoveredSince(recoveryToken.snapshotRevision)"))
         assertTrue(backing.contains("recoveryGate.shouldReload"))
@@ -137,6 +138,7 @@ class WebChatProductionVoiceEntryContractTest {
         assertTrue(feature.contains("resolveConversationContext = { resolveRealtimeVoiceContext"))
         assertTrue(feature.contains("openRealtimeVoiceConversation(it"))
         assertTrue(session.contains("if (realtimeVoiceBacking.isActive())"))
+        assertTrue(session.contains("pageAdapter?.requestConversationRefresh()"))
     }
 
     @Test
