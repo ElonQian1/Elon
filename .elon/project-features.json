@@ -7472,7 +7472,7 @@
       "id": "win-chatgpt-private-finance-widget-v1",
       "title": "Win ChatGPT 私有金融组件与回答去重 V1",
       "summary": "合并私有流与 DOM 完成消息，并把获准响应中的结构化金融组件转换为现有富内容协议，消除重复答案和交互内容占位。",
-      "status": "verified",
+      "status": "released",
       "priority": "p0",
       "requirement": {
         "path": "docs/requirements/win-chatgpt-private-finance-widget-v1.md",
@@ -7618,7 +7618,7 @@
         }
       ],
       "created_at_ms": 1787561609305,
-      "updated_at_ms": 1787563222951
+      "updated_at_ms": 1787564300584
     },
     {
       "id": "win-chatgpt-search-streaming-state-v1",
@@ -12213,16 +12213,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_05fff9d9975746138c6de4c486f18fad",
-      "feature_id": "win-web-ai-rich-diagnostic-transport-v1",
-      "action": "transitioned",
-      "actor": "codex-desktop-root",
-      "reason": "轻量 harness 仅用于隔离执行已登记的 Rust 回归。",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1787434032909
-    },
-    {
       "id": "feature_event_329fda6d013446bdb282cd67d3aa8cbf",
       "feature_id": "win-web-ai-rich-diagnostic-transport-v1",
       "action": "transitioned",
@@ -14211,6 +14201,16 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1787563222951
+    },
+    {
+      "id": "feature_event_2b9e1df2cd9b46aea43222c46dba1c74",
+      "feature_id": "win-chatgpt-private-finance-widget-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "Win 正式版 0.3.69+f6d382cb4c7e07a1ad240df7788cfd4d9661d3cd 已激活，节点精确身份在线且回滚未触发。",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1787564300584
     }
   ]
 }
