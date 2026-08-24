@@ -657,8 +657,11 @@ internal class MainSocialAiChatFeature(
                 attachmentSupported = controller.attachmentSupported(),
                 warmSessionAvailable = controller.warmSessionAvailable(),
             )
+            val dictationActive = runCatching {
+                controller.consumerPort()?.state()?.dictationActive == true
+            }.getOrDefault(false)
             binding.inputEdit.hint = WebChatProductionComposerContext.inputHint(
-                state.inputHint,
+                if (dictationActive) "正在听写，完成后不会自动发送" else state.inputHint,
                 WebChatProductionComposerContext.projectTitle(
                     webChatConversationIndex(),
                     controller.currentConversationPath(),
@@ -670,6 +673,7 @@ internal class MainSocialAiChatFeature(
                     provider = provider,
                     attachmentPhase = controller.attachmentSendPhase(),
                     feedback = composerOperationFeedback,
+                    dictationActive = dictationActive,
                 ),
             )
             inputComposerViews()?.let { views ->
@@ -684,9 +688,6 @@ internal class MainSocialAiChatFeature(
                 }
                 views.activeWebToolChip.render(activeQuickComposerAction, ::clearQuickComposerAction)
             }
-            val dictationActive = runCatching {
-                controller.consumerPort()?.state()?.dictationActive == true
-            }.getOrDefault(false)
             productionVoiceControls.render(
                 provider = provider,
                 streaming = controller.streaming(),

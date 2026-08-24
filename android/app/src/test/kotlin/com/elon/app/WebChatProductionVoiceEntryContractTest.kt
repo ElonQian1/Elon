@@ -57,6 +57,8 @@ class WebChatProductionVoiceEntryContractTest {
         assertTrue(tools.contains("pendingSessionCommand"))
         assertTrue(controls.contains("REALTIME_VOICE_BLUE"))
         assertTrue(controls.contains("views.webDictationButton"))
+        assertTrue(controls.contains("ic_web_chat_dictation_cancel"))
+        assertTrue(controls.contains("ic_web_chat_dictation_done"))
         assertTrue(composer.contains("inputBarContainer.addView(webDictationButton)"))
     }
 
@@ -77,6 +79,7 @@ class WebChatProductionVoiceEntryContractTest {
             dictationActive = true,
         )
         assertEquals("chatgpt_submit_dictation", active.dictation?.action)
+        assertEquals("chatgpt_cancel_dictation", active.dictationCancel?.action)
         assertNull(active.realtimeVoice)
 
         val google = WebChatProductionVoicePresentationPolicy.resolve(
@@ -85,6 +88,7 @@ class WebChatProductionVoiceEntryContractTest {
             dictationActive = false,
         )
         assertNull(google.dictation)
+        assertNull(google.dictationCancel)
         assertNull(google.realtimeVoice)
     }
 

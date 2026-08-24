@@ -123,6 +123,19 @@ class WebChatConsumerStatusBannerTest {
     }
 
     @Test
+    fun activeDictationKeepsAVisibleCompletionAndCancellationHint() {
+        val state = WebChatConsumerComposerOperationPolicy.resolve(
+            provider = chatGpt,
+            attachmentPhase = "idle",
+            feedback = null,
+            dictationActive = true,
+        )
+
+        assertTrue(state.visible)
+        assertEquals("正在听写，点蓝色勾完成，点×取消", state.message)
+    }
+
+    @Test
     fun commandFeedbackIsScopedToTheProviderThatAcceptedIt() {
         val feedback = WebChatConsumerComposerOperationPolicy.commandAccepted(
             chatGpt,

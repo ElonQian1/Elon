@@ -10,13 +10,16 @@ internal object WebChatConsumerComposerOperationPolicy {
         provider: WebChatProviderIdentity,
         attachmentPhase: String,
         feedback: WebChatConsumerComposerFeedback?,
+        dictationActive: Boolean = false,
     ): WebChatConsumerRecoveryState = when (attachmentPhase) {
         "uploading", "sending" -> status("附件上传中，完成后会自动发送")
         "failed" -> status("附件发送失败，附件已保留，可重新发送")
-        else -> feedback
-            ?.takeIf { it.providerId == provider.id }
-            ?.let { status(it.message) }
-            ?: hidden()
+        else -> feedback?.takeIf { it.providerId == provider.id }?.let { status(it.message) }
+            ?: if (dictationActive) {
+                status("正在听写，点蓝色勾完成，点×取消")
+            } else {
+                hidden()
+            }
     }
 
     fun commandAccepted(
@@ -24,8 +27,9 @@ internal object WebChatConsumerComposerOperationPolicy {
         action: String,
     ): WebChatConsumerComposerFeedback? {
         val message = when (action) {
-            "chatgpt_start_dictation" -> "网页听写已开始，再点“工具”可完成"
-            "chatgpt_submit_dictation" -> "网页听写已提交"
+            "chatgpt_start_dictation" -> "正在听写，点蓝色勾完成，点×取消"
+            "chatgpt_submit_dictation" -> "正在完成网页听写"
+            "chatgpt_cancel_dictation" -> "正在取消网页听写"
             "chatgpt_stop_generation" -> "已停止生成"
             "chatgpt_start_realtime_voice" -> "正在进入网页实时语音"
             else -> return null

@@ -17,10 +17,26 @@ internal object WebChatProductionComposerCommandCatalog {
             commands += command(provider, "chatgpt_stop_generation", "停止生成", "stop-generation")
         }
         if (provider.supports(WebChatProviderCapability.DICTATION) && !streaming) {
-            commands += if (dictationActive) {
-                command(provider, "chatgpt_submit_dictation", "完成网页听写", "submit-dictation")
+            if (dictationActive) {
+                commands += command(
+                    provider,
+                    "chatgpt_submit_dictation",
+                    "完成网页听写",
+                    "submit-dictation",
+                )
+                commands += command(
+                    provider,
+                    "chatgpt_cancel_dictation",
+                    "取消网页听写",
+                    "cancel-dictation",
+                )
             } else {
-                command(provider, "chatgpt_start_dictation", "网页听写", "start-dictation")
+                commands += command(
+                    provider,
+                    "chatgpt_start_dictation",
+                    "网页听写",
+                    "start-dictation",
+                )
             }
         }
         if (
