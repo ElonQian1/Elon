@@ -136,6 +136,12 @@ internal class MainMcpNativeControlActions(
                 }
                 uiState()
             }
+            "start_web_chat_realtime_voice" -> {
+                if (socialAiChatFeature()?.startWebChatRealtimeVoice() != true) {
+                    return errorJson(action, "web_chat_realtime_voice_unavailable")
+                }
+                uiState()
+            }
             "start_new_web_chat_conversation" -> {
                 if (socialAiChatFeature()?.startNewWebChatConversation() != true) {
                     return errorJson(action, "web_chat_not_ready")

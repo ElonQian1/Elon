@@ -2,6 +2,8 @@ $ErrorActionPreference = "Stop"
 
 $path = Join-Path $PSScriptRoot "smoke-chatgpt-web-audio-lifecycle.ps1"
 $source = Get-Content -LiteralPath $path -Raw
+$nativeActionPath = Join-Path $PSScriptRoot "..\android\app\src\main\kotlin\com\elon\app\MainMcpNativeControlActions.kt"
+$nativeActionSource = Get-Content -LiteralPath $nativeActionPath -Raw
 $tokens = $null
 $errors = $null
 [System.Management.Automation.Language.Parser]::ParseFile(
@@ -59,8 +61,9 @@ foreach ($required in @(
     'completed non-empty ChatGPT dictation draft',
     'finally {',
     '-AllowNonEmptyDraft',
-    '-Action "chatgpt_start_realtime_voice"',
-    '-ExpectedAction "invoke_ui_control"',
+    '-Action "start_web_chat_realtime_voice"',
+    '$state.view_mode -eq "native"',
+    '$_.expected_web_action -eq "invoke_ui_control"',
     '[string]$state.audio.request_state -eq "web_permission_granted"',
     '[int]$state.input.text_length -gt 0',
     '-Action "set_input_text" -Arguments @{ text = "" }',
@@ -102,11 +105,19 @@ foreach ($required in @(
     Assert-Contains $required
 }
 
+if (
+    -not $nativeActionSource.Contains('"start_web_chat_realtime_voice"') -or
+    -not $nativeActionSource.Contains('startWebChatRealtimeVoice()')
+) {
+    throw "Audio lifecycle smoke must enter realtime voice through the production native UI route."
+}
+
 if ($source.Contains('-Action "open_chatgpt_web"')) {
     throw "Audio lifecycle phases must preserve the isolated conversation instead of reopening the entry route."
 }
 
 foreach ($forbidden in @(
+    '-Action "chatgpt_start_realtime_voice"',
     'send_input',
     'pm clear',
     'removeAllCookies',

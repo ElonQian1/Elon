@@ -417,19 +417,33 @@ try {
                 throw "Complete, verify, and clear dictation before starting realtime voice."
             }
             Assert-IdleComposer -State $ready -Checkpoint $checkpoint
-            $voice = Invoke-ReceiptAction -Action "chatgpt_start_realtime_voice" `
-                -ExpectedAction "invoke_ui_control"
-            $official = Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $TimeoutSec `
-                -Description "official ChatGPT realtime voice surface" -Predicate {
+            $beforeVoiceRequestIds = @($ready.command_requests | ForEach-Object { $_.request_id })
+            $voice = Invoke-ChatGptWebSmokeAction -Runtime $runtime `
+                -Action "start_web_chat_realtime_voice"
+            if ($voice.control_ok -ne $true) {
+                throw "Production native realtime voice entry did not accept the request."
+            }
+            $activeVoice = Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $TimeoutSec `
+                -Description "native ChatGPT realtime voice entry" -Predicate {
                     param($state)
-                    [string]$state.view_mode -eq "web"
+                    $newVoiceRequest = @($state.command_requests | Where-Object {
+                        $_.request_id -notin $beforeVoiceRequestIds -and
+                            $_.expected_web_action -eq "invoke_ui_control" -and
+                            $_.status -eq "succeeded"
+                    } | Select-Object -Last 1)
+                    $state.view_mode -eq "native" -and $newVoiceRequest.Count -eq 1
                 }
-            Assert-ConversationUnchanged -State $official -Checkpoint $checkpoint
+            Assert-ConversationUnchanged -State $activeVoice -Checkpoint $checkpoint
+            $voiceRequest = @($activeVoice.command_requests | Where-Object {
+                $_.request_id -notin $beforeVoiceRequestIds -and
+                    $_.expected_web_action -eq "invoke_ui_control" -and
+                    $_.status -eq "succeeded"
+            } | Select-Object -Last 1)[0]
             $checkpoint.phase = "realtime_voice_started"
             $checkpoint.updated_utc = [DateTimeOffset]::UtcNow.ToString("o")
-            $checkpoint.realtime_voice_request_id = [string]$voice.request_id
+            $checkpoint.realtime_voice_request_id = [string]$voiceRequest.request_id
             Write-Checkpoint $checkpoint
-            Write-Report -ReportPhase "realtime_voice_started" -State $official `
+            Write-Report -ReportPhase "realtime_voice_started" -State $activeVoice `
                 -Status "waiting_for_user_realtime_voice_confirmation"
         }
         "VerifyRealtimeVoice" {
@@ -444,7 +458,7 @@ try {
             $activeVoice = Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $TimeoutSec `
                 -RequireChatGptForeground -Description "granted ChatGPT realtime voice permission" -Predicate {
                     param($state)
-                    [string]$state.view_mode -eq "web" -and
+                    [string]$state.view_mode -eq "native" -and
                         [string]$state.audio.android_permission -eq "granted" -and
                         [string]$state.audio.request_state -eq "web_permission_granted"
                 }

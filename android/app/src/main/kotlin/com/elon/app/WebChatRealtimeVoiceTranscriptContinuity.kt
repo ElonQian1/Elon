@@ -1,6 +1,7 @@
 package com.elon.app
 
 import com.elon.app.chatgptweb.ChatGptWebConversationPath
+import com.elon.app.chatgptweb.ChatGptWebMessage
 import com.elon.app.chatgptweb.ChatGptWebSnapshot
 
 internal class WebChatRealtimeVoiceTranscriptContinuity {
@@ -61,19 +62,65 @@ internal class WebChatRealtimeVoiceTranscriptContinuity {
         if (conversationPath == null) conversationPath = candidatePath
 
         val retained = retainedSnapshot
-        retainedSnapshot = when {
-            retained == null -> candidate
-            candidate.messageWindowStart + candidate.messages.size >=
-                retained.messageWindowStart + retained.messages.size -> candidate
-            else -> retained.copy(
-                authenticated = candidate.authenticated,
-                composerReady = candidate.composerReady,
-                streaming = candidate.streaming,
-                currentModel = candidate.currentModel.ifBlank { retained.currentModel },
-                capabilities = candidate.capabilities,
-                loginRequired = candidate.loginRequired,
-            )
+        retainedSnapshot = retained?.let {
+            val retainedEnd = it.messageWindowStart + it.messages.size
+            val candidateEnd = candidate.messageWindowStart + candidate.messages.size
+            if (candidateEnd < retainedEnd) mergeStatus(it, candidate) else mergeSnapshots(it, candidate)
+        } ?: candidate
+    }
+
+    private fun mergeStatus(
+        retained: ChatGptWebSnapshot,
+        incoming: ChatGptWebSnapshot,
+    ): ChatGptWebSnapshot = retained.copy(
+        authenticated = incoming.authenticated,
+        composerReady = incoming.composerReady,
+        streaming = incoming.streaming,
+        currentModel = incoming.currentModel.ifBlank { retained.currentModel },
+        capabilities = incoming.capabilities,
+        loginRequired = incoming.loginRequired,
+    )
+
+    private fun mergeSnapshots(
+        retained: ChatGptWebSnapshot,
+        incoming: ChatGptWebSnapshot,
+    ): ChatGptWebSnapshot {
+        val incomingById = incoming.messages.associateBy { it.id }
+        val retainedIds = retained.messages.mapTo(mutableSetOf()) { it.id }
+        val messages = buildList {
+            retained.messages.forEach { previous ->
+                add(incomingById[previous.id]?.let { mergeMessage(previous, it) } ?: previous)
+            }
+            incoming.messages.filterNot { it.id in retainedIds }.forEach(::add)
         }
+        return incoming.copy(
+            messages = messages,
+            messageWindowStart = minOf(retained.messageWindowStart, incoming.messageWindowStart),
+            observedMessageCount = maxOf(
+                retained.observedMessageCount,
+                incoming.observedMessageCount,
+                messages.size,
+            ),
+            currentModel = incoming.currentModel.ifBlank { retained.currentModel },
+        )
+    }
+
+    private fun mergeMessage(
+        retained: ChatGptWebMessage,
+        incoming: ChatGptWebMessage,
+    ): ChatGptWebMessage {
+        if (retained.role != incoming.role) return incoming
+        val content = if (incoming.content.length >= retained.content.length) {
+            incoming.content
+        } else {
+            retained.content
+        }
+        val retainedPartsSize = retained.parts.sumOf { it.label.length }
+        val incomingPartsSize = incoming.parts.sumOf { it.label.length }
+        return incoming.copy(
+            content = content,
+            parts = if (incomingPartsSize >= retainedPartsSize) incoming.parts else retained.parts,
+        )
     }
 
     private fun isConversationTranscript(snapshot: ChatGptWebSnapshot): Boolean =

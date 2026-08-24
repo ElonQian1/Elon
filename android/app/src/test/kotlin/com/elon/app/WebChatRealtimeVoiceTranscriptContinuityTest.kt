@@ -106,6 +106,29 @@ class WebChatRealtimeVoiceTranscriptContinuityTest {
         assertEquals(complete.messages, continuity.resolve(partial)?.messages)
     }
 
+    @Test
+    fun sameMessageCountCannotReplaceACompleteVoiceAnswerWithATruncatedBubble() {
+        val continuity = WebChatRealtimeVoiceTranscriptContinuity()
+        val beforeVoice = snapshot("/c/origin", "old question", "old answer")
+        val complete = snapshot(
+            "/c/origin",
+            "voice question",
+            "the complete voice answer remains visible after voice closes",
+        )
+        val truncated = snapshot(
+            "/c/origin",
+            "voice question",
+            "the complete voice answer",
+        )
+        continuity.begin(beforeVoice)
+        continuity.resolve(complete)
+        continuity.end(complete)
+
+        val restored = continuity.resolve(truncated)
+
+        assertEquals(complete.messages, restored?.messages)
+    }
+
     private fun snapshot(path: String, vararg content: String): ChatGptWebSnapshot {
         val messages = content.mapIndexed { index, value ->
             ChatGptWebMessage(
