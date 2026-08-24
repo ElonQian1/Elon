@@ -34,6 +34,7 @@ internal class WebChatRealtimeVoiceCoordinator(
     private var startedAtElapsedMs = 0L
     private var conversationContext: WebChatRealtimeVoiceContext? = null
     private var lastState: WebChatRealtimeVoiceState? = null
+    private val closeSettlement = WebChatRealtimeVoiceCloseSettlement()
 
     fun start(candidate: WebChatProviderIdentity): Boolean {
         if (
@@ -76,52 +77,51 @@ internal class WebChatRealtimeVoiceCoordinator(
 
     fun close() {
         if (closePending) return
-        val port = consumerPort()
-        val endControl = WebChatRealtimeVoiceEndPolicy.resolve(port?.state()?.controls.orEmpty())
-        if (endControl != null) {
-            val result = port?.invokeControl(endControl.id, userConfirmed = true)
-            if (result?.accepted == true) {
-                closePending = true
-                render(WebChatRealtimeVoiceLifecycle.ENDING, "正在结束语音并保留当前对话")
-                port.requestControls()
-                scheduleCloseSettlement(generation, attempt = 0)
-                return
-            }
+        if (
+            lastState?.lifecycle == WebChatRealtimeVoiceLifecycle.FAILED ||
+            lastState?.lifecycle == WebChatRealtimeVoiceLifecycle.CONNECTING && commandRequestId == null
+        ) {
+            finishClose(gracefulExit = false)
+            return
         }
-        finishClose(gracefulExit = false)
+        closePending = true
+        closeSettlement.begin()
+        render(WebChatRealtimeVoiceLifecycle.ENDING, "正在结束语音并保留当前对话")
+        advanceCloseSettlement(generation)
     }
 
-    private fun scheduleCloseSettlement(expectedGeneration: Int, attempt: Int) {
+    private fun scheduleCloseSettlement(expectedGeneration: Int) {
         schedule(
-            Runnable { pollCloseSettlement(expectedGeneration, attempt) },
+            Runnable { advanceCloseSettlement(expectedGeneration) },
             CLOSE_POLL_DELAY_MS,
         )
     }
 
-    private fun pollCloseSettlement(expectedGeneration: Int, attempt: Int) {
+    private fun advanceCloseSettlement(expectedGeneration: Int) {
         if (!closePending || expectedGeneration != generation) return
         val port = consumerPort()
-        val state = port?.state()
-        val controls = state?.controls.orEmpty()
-        val endControlVisible = WebChatRealtimeVoiceEndPolicy.resolve(controls) != null
-        val voiceEntryReady = controls.any { descriptor ->
-            descriptor.control.semantic == REALTIME_VOICE_SEMANTIC &&
-                descriptor.control.enabled && descriptor.control.inViewport
+        when (val decision = closeSettlement.observe(port?.state())) {
+            is WebChatRealtimeVoiceCloseDecision.InvokeEnd -> {
+                val result = port?.invokeControl(decision.control.id, userConfirmed = true)
+                if (result?.accepted != true) {
+                    finishClose(gracefulExit = false)
+                    return
+                }
+                closeSettlement.endInvocationAccepted()
+                port.requestControls()
+                scheduleCloseSettlement(expectedGeneration)
+            }
+            is WebChatRealtimeVoiceCloseDecision.Wait -> {
+                if (decision.refreshControls) port?.requestControls()
+                scheduleCloseSettlement(expectedGeneration)
+            }
+            WebChatRealtimeVoiceCloseDecision.CompleteGracefully -> {
+                port?.state()?.let { state -> provider?.let { launchCache.observe(it.id, state) } }
+                finishClose(gracefulExit = true)
+            }
+            WebChatRealtimeVoiceCloseDecision.CompleteInterrupted ->
+                finishClose(gracefulExit = false)
         }
-        if (
-            state?.adapterCurrent == true && state.pageKind == "conversation" &&
-            !endControlVisible && voiceEntryReady
-        ) {
-            provider?.let { launchCache.observe(it.id, state) }
-            finishClose(gracefulExit = true)
-            return
-        }
-        if (attempt >= MAX_CLOSE_SETTLE_POLLS) {
-            finishClose(gracefulExit = false)
-            return
-        }
-        if (attempt > 0 && attempt % CONTROL_REFRESH_INTERVAL == 0) port?.requestControls()
-        scheduleCloseSettlement(expectedGeneration, attempt + 1)
     }
 
     private fun finishClose(gracefulExit: Boolean) {
@@ -132,6 +132,7 @@ internal class WebChatRealtimeVoiceCoordinator(
         prepareRequestId = null
         preparedGeneration = null
         commandRequestId = null
+        closeSettlement.reset()
         backControl.setEnabled(false)
         surface.hide()
         endWebBacking(gracefulExit)
@@ -192,7 +193,7 @@ internal class WebChatRealtimeVoiceCoordinator(
     }
 
     private fun openFallback() {
-        close()
+        finishClose(gracefulExit = false)
         openOfficialFallback()
     }
 
@@ -485,7 +486,6 @@ internal class WebChatRealtimeVoiceCoordinator(
         const val COMMAND_SETTLE_MS = 1_000L
         const val CONTROL_SETTLE_MS = 400L
         const val CLOSE_POLL_DELAY_MS = 250L
-        const val MAX_CLOSE_SETTLE_POLLS = 40
         const val AUTHENTICATION_POLL_DELAY_MS = 400L
         const val MAX_AUTHENTICATION_POLLS = 30
         const val CONTEXT_REFRESH_DELAY_MS = 1_000L

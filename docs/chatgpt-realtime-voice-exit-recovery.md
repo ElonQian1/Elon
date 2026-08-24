@@ -11,6 +11,8 @@ production_default: enabled_after_release
 
 当前逻辑把正常退出和异常中断分开：
 
+- 用户点击挂断时，短暂缺少官网控件会进入有界等待并异步刷新 controls，不再立即按异常中断处理。
+- 挂断命令成功后，只要连续确认已回到同一会话且结束控件消失，就按正常退出处理；不再强制等待语音入口重新渲染。
 - 正常退出立即隐藏官网语音界面，保留原生消息，并主动请求当前会话快照；600 毫秒后仍属于同一恢复周期时再请求一次。
 - 正常退出禁止强制刷新 WebView。快照到达后只增量更新原生消息。
 - 异常中断保留 3 秒兜底；只有恢复周期仍有效且没有新会话快照时才重载。
@@ -25,6 +27,7 @@ production_default: enabled_after_release
 已通过：
 
 - `ChatGptRealtimeVoiceRecoveryGateTest`
+- `WebChatRealtimeVoiceCoordinatorTest`
 - `WebChatProductionVoiceEntryContractTest`
 
 真机仍需用户监督完成一次“进入实时语音、说话、正常挂断、立即看到原生消息、再次进入”的敏感验收。验收不得清理 Cookie 或应用数据，也不得记录音频或会话正文。

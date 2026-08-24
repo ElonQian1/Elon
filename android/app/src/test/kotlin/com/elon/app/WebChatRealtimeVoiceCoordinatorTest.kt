@@ -99,6 +99,18 @@ class WebChatRealtimeVoiceCoordinatorTest {
     }
 
     @Test
+    fun closingAFailedSurfaceDoesNotWaitForAnOfficialHangupControl() {
+        val fixture = Fixture(sessionReady = false)
+        fixture.coordinator.start(fixture.provider)
+        fixture.scheduler.runAll()
+
+        fixture.surface.closeVoice()
+
+        assertFalse(fixture.surface.visible)
+        assertFalse(fixture.scheduler.hasPendingTasks())
+    }
+
+    @Test
     fun tappingVoiceAgainAfterFailureRetriesTheReadySessionWithoutRecovery() {
         val fixture = Fixture(sessionReady = false)
         fixture.coordinator.start(fixture.provider)
@@ -191,7 +203,44 @@ class WebChatRealtimeVoiceCoordinatorTest {
         assertTrue(fixture.surface.visible)
 
         fixture.port.endControlAvailable = false
+        fixture.scheduler.runNext(4)
+        assertFalse(fixture.surface.visible)
+        assertEquals(listOf(true), fixture.endBackingGraceful)
+    }
+
+    @Test
+    fun waitsForALateOfficialHangupControlInsteadOfReloadingImmediately() {
+        val fixture = Fixture()
+        fixture.completeVoiceStart()
+        fixture.port.voiceEntryAvailable = false
+
+        fixture.surface.closeVoice()
+
+        assertTrue(fixture.surface.visible)
+        assertTrue(fixture.port.requestControlsCount >= 1)
+        assertEquals(emptyList<Boolean>(), fixture.endBackingGraceful)
+
+        fixture.port.endControlAvailable = true
         fixture.scheduler.runNext()
+        assertEquals("control_voice_end", fixture.port.invokedControlId)
+
+        fixture.port.endControlAvailable = false
+        fixture.scheduler.runNext(4)
+        assertFalse(fixture.surface.visible)
+        assertEquals(listOf(true), fixture.endBackingGraceful)
+    }
+
+    @Test
+    fun completedHangupDoesNotWaitForTheVoiceEntryToRenderAgain() {
+        val fixture = Fixture()
+        fixture.completeVoiceStart()
+        fixture.port.endControlAvailable = true
+
+        fixture.surface.closeVoice()
+        fixture.port.endControlAvailable = false
+        fixture.port.voiceEntryAvailable = false
+        fixture.scheduler.runNext(4)
+
         assertFalse(fixture.surface.visible)
         assertEquals(listOf(true), fixture.endBackingGraceful)
     }
@@ -216,9 +265,9 @@ class WebChatRealtimeVoiceCoordinatorTest {
         fixture.port.endControlAvailable = true
 
         fixture.surface.closeVoice()
-        fixture.scheduler.runNext()
+        fixture.scheduler.runNext(2)
         fixture.port.endControlAvailable = false
-        fixture.scheduler.runNext()
+        fixture.scheduler.runNext(4)
 
         fixture.completeVoiceStart()
 
@@ -419,6 +468,7 @@ class WebChatRealtimeVoiceCoordinatorTest {
         var prepareReturnsReceipt = true
         var voiceStatus = WebChatConsumerCommandStatus.PENDING
         var endControlAvailable = false
+        var voiceEntryAvailable = true
         var invokedControlId: String? = null
         var invokedControlCount = 0
         var requestControlsCount = 0
@@ -437,7 +487,9 @@ class WebChatRealtimeVoiceCoordinatorTest {
                     presentation = WebChatConsumerControlPresentation.DIRECT,
                     nativeSelector = WebChatProductionSelectors.REALTIME_VOICE_CLOSE,
                 ))
-            } else if (prepareStatus == WebChatConsumerCommandStatus.SUCCEEDED) {
+            } else if (
+                voiceEntryAvailable && prepareStatus == WebChatConsumerCommandStatus.SUCCEEDED
+            ) {
                 listOf(WebChatConsumerControlDescriptor(
                     control = VoiceControl,
                     requiresUserConfirmation = false,
@@ -522,6 +574,10 @@ class WebChatRealtimeVoiceCoordinatorTest {
 
         fun runNext() {
             tasks.removeFirstOrNull()?.run()
+        }
+
+        fun runNext(count: Int) {
+            repeat(count) { runNext() }
         }
 
         fun runAll() {
