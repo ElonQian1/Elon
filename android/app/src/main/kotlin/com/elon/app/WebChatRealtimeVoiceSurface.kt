@@ -36,6 +36,51 @@ internal interface WebChatRealtimeVoiceSurface {
     fun isVisible(): Boolean
 }
 
+internal data class WebChatRealtimeVoiceLayoutMetrics(
+    val compact: Boolean,
+    val horizontalPadding: Int,
+    val verticalPadding: Int,
+    val titleHeight: Int,
+    val orbSize: Int,
+    val statusTopMargin: Int,
+    val detailTopMargin: Int,
+    val closeSize: Int,
+)
+
+internal object WebChatRealtimeVoiceLayoutPolicy {
+    fun resolve(widthPx: Int, heightPx: Int, density: Float): WebChatRealtimeVoiceLayoutMetrics {
+        fun dp(value: Int): Int = (value * density).toInt()
+        val compact = heightPx < dp(560)
+        if (!compact) {
+            return WebChatRealtimeVoiceLayoutMetrics(
+                compact = false,
+                horizontalPadding = dp(28),
+                verticalPadding = dp(28),
+                titleHeight = dp(48),
+                orbSize = dp(220),
+                statusTopMargin = dp(34),
+                detailTopMargin = dp(10),
+                closeSize = dp(64),
+            )
+        }
+        val orbSize = minOf(
+            dp(128),
+            (heightPx / 3).coerceAtLeast(dp(84)),
+            (widthPx * 0.62f).toInt(),
+        )
+        return WebChatRealtimeVoiceLayoutMetrics(
+            compact = true,
+            horizontalPadding = dp(16),
+            verticalPadding = dp(8),
+            titleHeight = dp(36),
+            orbSize = orbSize,
+            statusTopMargin = dp(8),
+            detailTopMargin = dp(4),
+            closeSize = dp(52),
+        )
+    }
+}
+
 internal class WebChatRealtimeVoiceOverlay(
     private val activity: AppCompatActivity,
     private val host: FrameLayout,
@@ -85,7 +130,18 @@ internal class WebChatRealtimeVoiceOverlay(
         background = rounded(Color.parseColor("#D83A45"), 32)
         contentDescription = WebChatProductionSelectors.REALTIME_VOICE_CLOSE
     }
+    private val title = textView(16f, Color.parseColor("#E8ECF4"), bold = true).apply {
+        text = "语音 AI"
+        gravity = Gravity.CENTER
+        maxLines = 1
+    }
+    private val column = LinearLayout(activity).apply {
+        orientation = LinearLayout.VERTICAL
+        gravity = Gravity.CENTER_HORIZONTAL
+    }
     private var pulse: AnimatorSet? = null
+    private var compactLayout = false
+    private var currentStage = WebChatRealtimeVoiceStage.PREPARING
 
     init {
         buildContent()
@@ -116,6 +172,7 @@ internal class WebChatRealtimeVoiceOverlay(
     }
 
     override fun render(stage: WebChatRealtimeVoiceStage, detail: String) {
+        currentStage = stage
         status.text = when (stage) {
             WebChatRealtimeVoiceStage.PREPARING -> "正在连接语音 AI"
             WebChatRealtimeVoiceStage.STARTING -> "正在启动实时语音"
@@ -123,9 +180,8 @@ internal class WebChatRealtimeVoiceOverlay(
             WebChatRealtimeVoiceStage.FAILED -> "实时语音未能启动"
         }
         this.detail.text = detail
+        updateStageVisibility()
         val failed = stage == WebChatRealtimeVoiceStage.FAILED
-        retry.visibility = if (failed) View.VISIBLE else View.GONE
-        officialFallback.visibility = if (failed) View.VISIBLE else View.GONE
         if (failed) stopPulse() else startPulse()
     }
 
@@ -140,17 +196,8 @@ internal class WebChatRealtimeVoiceOverlay(
     override fun isVisible(): Boolean = root.visibility == View.VISIBLE
 
     private fun buildContent() {
-        val column = LinearLayout(activity).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(dp(28), dp(28), dp(28), dp(34))
-        }
         column.addView(
-            textView(16f, Color.parseColor("#E8ECF4"), bold = true).apply {
-                text = "语音 AI"
-                gravity = Gravity.CENTER
-                maxLines = 1
-            },
+            title,
             LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(48)),
         )
         column.addView(Space(activity), LinearLayout.LayoutParams(1, 0, 0.9f))
@@ -184,6 +231,50 @@ internal class WebChatRealtimeVoiceOverlay(
             ViewGroup.LayoutParams.MATCH_PARENT,
             ViewGroup.LayoutParams.MATCH_PARENT,
         ))
+        root.addOnLayoutChangeListener { _, left, top, right, bottom, _, _, _, _ ->
+            applyLayout(right - left, bottom - top)
+        }
+    }
+
+    private fun applyLayout(widthPx: Int, heightPx: Int) {
+        if (widthPx <= 0 || heightPx <= 0) return
+        val metrics = WebChatRealtimeVoiceLayoutPolicy.resolve(
+            widthPx = widthPx,
+            heightPx = heightPx,
+            density = activity.resources.displayMetrics.density,
+        )
+        compactLayout = metrics.compact
+        column.setPadding(
+            metrics.horizontalPadding,
+            metrics.verticalPadding,
+            metrics.horizontalPadding,
+            metrics.verticalPadding,
+        )
+        title.layoutParams = (title.layoutParams as LinearLayout.LayoutParams).apply {
+            height = metrics.titleHeight
+        }
+        orb.layoutParams = (orb.layoutParams as LinearLayout.LayoutParams).apply {
+            width = metrics.orbSize
+            height = metrics.orbSize
+        }
+        status.layoutParams = (status.layoutParams as LinearLayout.LayoutParams).apply {
+            topMargin = metrics.statusTopMargin
+        }
+        detail.layoutParams = (detail.layoutParams as LinearLayout.LayoutParams).apply {
+            topMargin = metrics.detailTopMargin
+        }
+        close.layoutParams = (close.layoutParams as LinearLayout.LayoutParams).apply {
+            width = metrics.closeSize
+            height = metrics.closeSize
+        }
+        updateStageVisibility()
+    }
+
+    private fun updateStageVisibility() {
+        val failed = currentStage == WebChatRealtimeVoiceStage.FAILED
+        retry.visibility = if (failed) View.VISIBLE else View.GONE
+        officialFallback.visibility = if (failed) View.VISIBLE else View.GONE
+        orb.visibility = if (failed && compactLayout) View.GONE else View.VISIBLE
     }
 
     private fun startPulse() {
