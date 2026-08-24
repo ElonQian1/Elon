@@ -135,16 +135,16 @@ internal class MainSocialAiChatFeature(
                 if (isChatModeActive()) providerId() else null
             },
             consumerPort = {
-                if (isChatModeActive()) activeController().consumerPort() else null
+                chatGptController.consumerPort()
             },
             sessionReady = {
-                isChatModeActive() && activeController().stateWireValue() == "ready" &&
-                    activeController().composerReady()
+                chatGptController.stateWireValue() == "ready" &&
+                    chatGptController.composerReady()
             },
-            authenticated = { isChatModeActive() && activeController().authenticated() },
-            sessionState = { if (isChatModeActive()) activeController().stateWireValue() else "idle" },
+            authenticated = chatGptController::authenticated,
+            sessionState = chatGptController::stateWireValue,
             beginWebBacking = {
-                isChatModeActive() && activeController().beginRealtimeVoiceBacking()
+                chatGptController.beginRealtimeVoiceBacking()
             },
             endWebBacking = { gracefulExit ->
                 if (chatGptControllerDelegate.isInitialized()) {
@@ -152,7 +152,7 @@ internal class MainSocialAiChatFeature(
                 }
             },
             requestSessionRecovery = {
-                if (isChatModeActive()) activeController().onHostResumed()
+                chatGptController.onHostResumed()
             },
             openOfficialLogin = modeController::openOfficialLogin,
             openOfficialFallback = modeController::openOfficialRealtimeVoice,
@@ -544,7 +544,6 @@ internal class MainSocialAiChatFeature(
         if (productionCapabilityPrewarmerDelegate.isInitialized()) {
             productionCapabilityPrewarmer.cancel()
         }
-        if (realtimeVoiceDelegate.isInitialized()) realtimeVoice.close()
         if (chatGptControllerDelegate.isInitialized()) chatGptController.deactivate()
         if (googleControllerDelegate.isInitialized()) googleController.deactivate()
         if (consumerStatusBannerDelegate.isInitialized()) consumerStatusBanner.hide()

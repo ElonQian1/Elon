@@ -50,7 +50,8 @@ internal class WebChatRealtimeVoiceCoordinator(
         preparedGeneration = null
         commandRequestId = null
         surface.show(::close, ::retry, ::openFallback)
-        backControl.setEnabled(true)
+        // The floating voice control owns hangup while back keeps normal app navigation.
+        backControl.setEnabled(false)
         surface.render(
             WebChatRealtimeVoiceStage.PREPARING,
             "正在恢复本机网页会话，不会跳转到官网页面",

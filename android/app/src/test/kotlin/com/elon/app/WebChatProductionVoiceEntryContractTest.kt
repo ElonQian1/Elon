@@ -104,9 +104,18 @@ class WebChatProductionVoiceEntryContractTest {
         val controller = read(
             "android/app/src/main/kotlin/com/elon/app/ChatGptSocialChatController.kt",
         )
+        val feature = read(
+            "android/app/src/main/kotlin/com/elon/app/MainSocialAiChatFeature.kt",
+        )
+        val session = read(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptBackgroundSession.kt",
+        )
 
-        assertTrue(surface.contains("text = \"语音 AI\""))
+        assertTrue(surface.contains("\"语音 AI · 通话中\""))
         assertFalse(surface.contains("text = \"ChatGPT 网页 AI\""))
+        assertTrue(surface.contains("setBackgroundColor(Color.TRANSPARENT)"))
+        assertTrue(surface.contains("isClickable = false"))
+        assertFalse(surface.contains("root.requestFocus()"))
         assertFalse(backing.contains("if (!gracefulExit) view.reload()"))
         assertTrue(backing.contains("requestConversationSnapshot()"))
         assertTrue(backing.contains("if (gracefulExit) return"))
@@ -115,7 +124,12 @@ class WebChatProductionVoiceEntryContractTest {
         assertFalse(backing.contains("view.stopLoading()"))
         assertTrue(controller.contains("WebChatRealtimeVoiceTranscriptContinuity()"))
         assertTrue(controller.contains("realtimeVoiceTranscript.end(session.currentSnapshot())"))
+        assertTrue(controller.contains("if (!session.realtimeVoiceActive())"))
         assertFalse(controller.contains("renderStatusMessage(\"正在同步语音会话…\")"))
+        val deactivate = feature.substringAfter("private fun deactivateChatProvider")
+            .substringBefore("private fun activateChatProvider")
+        assertFalse(deactivate.contains("realtimeVoice.close()"))
+        assertTrue(session.contains("if (realtimeVoiceBacking.isActive())"))
     }
 
     @Test
@@ -126,7 +140,7 @@ class WebChatProductionVoiceEntryContractTest {
         val mode = read("android/app/src/main/kotlin/com/elon/app/SocialAiChatModeController.kt")
         val strings = read("android/app/src/main/res/values/strings.xml")
 
-        assertTrue(feature.contains("authenticated = { isChatModeActive() && activeController().authenticated() }"))
+        assertTrue(feature.contains("authenticated = chatGptController::authenticated"))
         assertTrue(feature.contains("sessionState ="))
         assertTrue(feature.contains("openOfficialLogin = modeController::openOfficialLogin"))
         assertTrue(coordinator.contains("WebChatRealtimeVoiceAuthenticationState.GUEST"))

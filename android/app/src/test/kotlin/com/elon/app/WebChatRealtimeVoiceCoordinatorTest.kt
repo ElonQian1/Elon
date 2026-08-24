@@ -29,7 +29,7 @@ class WebChatRealtimeVoiceCoordinatorTest {
         fixture.scheduler.runNext()
         assertEquals(WebChatRealtimeVoiceStage.ACTIVE, fixture.surface.stage)
         assertEquals(0, fixture.officialFallbackCount)
-        assertTrue(fixture.back.backEnabled)
+        assertFalse(fixture.back.backEnabled)
     }
 
     @Test

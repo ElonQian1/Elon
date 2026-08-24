@@ -1,21 +1,22 @@
 package com.elon.app
 
-import android.animation.AnimatorSet
-import android.animation.ObjectAnimator
-import android.animation.ValueAnimator
+import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import android.view.ViewGroup
-import android.view.animation.AccelerateDecelerateInterpolator
 import android.widget.FrameLayout
 import android.widget.ImageButton
+import android.widget.ImageView
 import android.widget.LinearLayout
-import android.widget.Space
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
+import kotlin.math.abs
 
 internal enum class WebChatRealtimeVoiceStage {
     PREPARING,
@@ -36,115 +37,98 @@ internal interface WebChatRealtimeVoiceSurface {
     fun isVisible(): Boolean
 }
 
-internal data class WebChatRealtimeVoiceLayoutMetrics(
-    val compact: Boolean,
-    val horizontalPadding: Int,
-    val verticalPadding: Int,
-    val titleHeight: Int,
-    val orbSize: Int,
-    val statusTopMargin: Int,
-    val detailTopMargin: Int,
-    val closeSize: Int,
-)
-
-internal object WebChatRealtimeVoiceLayoutPolicy {
-    fun resolve(widthPx: Int, heightPx: Int, density: Float): WebChatRealtimeVoiceLayoutMetrics {
-        fun dp(value: Int): Int = (value * density).toInt()
-        val compact = heightPx < dp(560)
-        if (!compact) {
-            return WebChatRealtimeVoiceLayoutMetrics(
-                compact = false,
-                horizontalPadding = dp(28),
-                verticalPadding = dp(28),
-                titleHeight = dp(48),
-                orbSize = dp(220),
-                statusTopMargin = dp(34),
-                detailTopMargin = dp(10),
-                closeSize = dp(64),
-            )
-        }
-        val orbSize = minOf(
-            dp(128),
-            (heightPx / 3).coerceAtLeast(dp(84)),
-            (widthPx * 0.62f).toInt(),
-        )
-        return WebChatRealtimeVoiceLayoutMetrics(
-            compact = true,
-            horizontalPadding = dp(16),
-            verticalPadding = dp(8),
-            titleHeight = dp(36),
-            orbSize = orbSize,
-            statusTopMargin = dp(8),
-            detailTopMargin = dp(4),
-            closeSize = dp(52),
-        )
-    }
-}
-
 internal class WebChatRealtimeVoiceOverlay(
     private val activity: AppCompatActivity,
     private val host: FrameLayout,
 ) : WebChatRealtimeVoiceSurface {
     private val root = FrameLayout(activity).apply {
-        setBackgroundColor(Color.parseColor("#05070A"))
+        setBackgroundColor(Color.TRANSPARENT)
         visibility = View.GONE
+        isClickable = false
+        isFocusable = false
+        importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+        clipChildren = false
+        clipToPadding = false
+    }
+    private val panel = FrameLayout(activity).apply {
         isClickable = true
         isFocusable = true
+        elevation = dp(10).toFloat()
         contentDescription = WebChatProductionSelectors.REALTIME_VOICE_SURFACE
     }
-    private val orb = View(activity).apply {
-        background = GradientDrawable(
-            GradientDrawable.Orientation.TL_BR,
-            intArrayOf(
-                Color.parseColor("#4C6FFF"),
-                Color.parseColor("#9EB4FF"),
-                Color.parseColor("#F2F6FF"),
-            ),
-        ).apply { shape = GradientDrawable.OVAL }
-        contentDescription = "实时语音状态"
+    private val collapsedOrb = FrameLayout(activity).apply {
+        isClickable = false
+        isFocusable = false
     }
-    private val status = textView(22f, Color.WHITE, bold = true).apply {
-        gravity = Gravity.CENTER
-        text = "正在准备实时语音"
+    private val collapsedIcon = ImageView(activity).apply {
+        setImageResource(R.drawable.ic_input_voice)
+        scaleType = ImageView.ScaleType.CENTER
+        isClickable = false
+        isFocusable = false
+    }
+    private val expandedCard = LinearLayout(activity).apply {
+        orientation = LinearLayout.VERTICAL
+        setPadding(dp(12), dp(10), dp(10), dp(10))
+        visibility = View.GONE
+        background = rounded(color(R.color.elon_surface_float), 18)
+    }
+    private val expandedHeader = LinearLayout(activity).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+    }
+    private val expandedIcon = ImageView(activity).apply {
+        setImageResource(R.drawable.ic_input_voice)
+        scaleType = ImageView.ScaleType.CENTER
+        isClickable = false
+        isFocusable = false
+    }
+    private val textColumn = LinearLayout(activity).apply {
+        orientation = LinearLayout.VERTICAL
+        gravity = Gravity.CENTER_VERTICAL
+        setPadding(dp(10), 0, dp(8), 0)
+    }
+    private val status = textView(15f, color(R.color.elon_text_primary), bold = true).apply {
+        maxLines = 1
         contentDescription = WebChatProductionSelectors.REALTIME_VOICE_STATUS
     }
-    private val detail = textView(14f, Color.parseColor("#AAB2C0")).apply {
-        gravity = Gravity.CENTER
-        maxLines = 3
-    }
-    private val retry = actionButton("重试").apply {
-        contentDescription = WebChatProductionSelectors.REALTIME_VOICE_RETRY
-        visibility = View.GONE
-    }
-    private val officialFallback = textView(15f, Color.parseColor("#AAB2C0"), bold = true).apply {
-        text = "打开官网语音"
-        gravity = Gravity.CENTER
-        background = rounded(Color.parseColor("#171B22"), 24)
-        contentDescription = WebChatProductionSelectors.REALTIME_VOICE_OFFICIAL_FALLBACK
-        visibility = View.GONE
+    private val detail = textView(12f, color(R.color.elon_text_secondary)).apply {
+        maxLines = 2
     }
     private val close = ImageButton(activity).apply {
         setImageResource(R.drawable.ic_voice_call_hangup)
-        scaleType = android.widget.ImageView.ScaleType.CENTER
-        setPadding(dp(17), dp(17), dp(17), dp(17))
-        background = rounded(Color.parseColor("#D83A45"), 32)
+        scaleType = ImageView.ScaleType.CENTER
+        setPadding(dp(11), dp(11), dp(11), dp(11))
+        background = oval(color(R.color.elon_status_danger))
         contentDescription = WebChatProductionSelectors.REALTIME_VOICE_CLOSE
     }
-    private val title = textView(16f, Color.parseColor("#E8ECF4"), bold = true).apply {
-        text = "语音 AI"
-        gravity = Gravity.CENTER
-        maxLines = 1
+    private val failureActions = LinearLayout(activity).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+        setPadding(0, dp(10), 0, 0)
+        visibility = View.GONE
     }
-    private val column = LinearLayout(activity).apply {
-        orientation = LinearLayout.VERTICAL
-        gravity = Gravity.CENTER_HORIZONTAL
+    private val retry = actionButton("重试").apply {
+        contentDescription = WebChatProductionSelectors.REALTIME_VOICE_RETRY
     }
-    private var pulse: AnimatorSet? = null
-    private var compactLayout = false
-    private var currentStage = WebChatRealtimeVoiceStage.PREPARING
+    private val officialFallback = actionButton("官网语音", secondary = true).apply {
+        contentDescription = WebChatProductionSelectors.REALTIME_VOICE_OFFICIAL_FALLBACK
+    }
+    private val touchSlop = ViewConfiguration.get(activity).scaledTouchSlop
+    private var metrics = WebChatRealtimeVoiceFloatingLayoutPolicy.resolve(
+        activity.resources.displayMetrics.widthPixels,
+        activity.resources.displayMetrics.density,
+    )
+    private var expanded = false
+    private var positioned = false
+    private var dragging = false
+    private var downRawX = 0f
+    private var downRawY = 0f
+    private var downLeft = 0f
+    private var downTop = 0f
 
     init {
         buildContent()
+        installInteraction()
     }
 
     override fun show(
@@ -165,28 +149,38 @@ internal class WebChatRealtimeVoiceOverlay(
                 ),
             )
         }
+        setExpanded(false)
         root.visibility = View.VISIBLE
         root.bringToFront()
-        root.requestFocus()
-        startPulse()
+        root.post(::positionPanel)
     }
 
     override fun render(stage: WebChatRealtimeVoiceStage, detail: String) {
-        currentStage = stage
         status.text = when (stage) {
-            WebChatRealtimeVoiceStage.PREPARING -> "正在连接语音 AI"
-            WebChatRealtimeVoiceStage.STARTING -> "正在启动实时语音"
-            WebChatRealtimeVoiceStage.ACTIVE -> "实时语音已打开"
-            WebChatRealtimeVoiceStage.FAILED -> "实时语音未能启动"
+            WebChatRealtimeVoiceStage.PREPARING -> "语音 AI · 连接中"
+            WebChatRealtimeVoiceStage.STARTING -> "语音 AI · 启动中"
+            WebChatRealtimeVoiceStage.ACTIVE -> "语音 AI · 通话中"
+            WebChatRealtimeVoiceStage.FAILED -> "语音 AI · 连接失败"
         }
         this.detail.text = detail
-        updateStageVisibility()
-        val failed = stage == WebChatRealtimeVoiceStage.FAILED
-        if (failed) stopPulse() else startPulse()
+        val stageColor = when (stage) {
+            WebChatRealtimeVoiceStage.PREPARING -> color(R.color.elon_signal_mist)
+            WebChatRealtimeVoiceStage.STARTING -> color(R.color.elon_status_info)
+            WebChatRealtimeVoiceStage.ACTIVE -> color(R.color.elon_status_success)
+            WebChatRealtimeVoiceStage.FAILED -> color(R.color.elon_status_danger)
+        }
+        applyVoiceIconStyle(collapsedOrb, collapsedIcon, stageColor, strokeWidth = 2)
+        applyVoiceIconStyle(expandedIcon, expandedIcon, stageColor, strokeWidth = 1)
+        failureActions.visibility = if (stage == WebChatRealtimeVoiceStage.FAILED) {
+            View.VISIBLE
+        } else {
+            View.GONE
+        }
+        if (stage == WebChatRealtimeVoiceStage.FAILED) setExpanded(true)
+        panel.announceForAccessibility(status.text)
     }
 
     override fun hide() {
-        stopPulse()
         root.visibility = View.GONE
         close.setOnClickListener(null)
         retry.setOnClickListener(null)
@@ -196,133 +190,197 @@ internal class WebChatRealtimeVoiceOverlay(
     override fun isVisible(): Boolean = root.visibility == View.VISIBLE
 
     private fun buildContent() {
-        column.addView(
-            title,
-            LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(48)),
+        collapsedOrb.addView(
+            collapsedIcon,
+            FrameLayout.LayoutParams(dp(34), dp(34), Gravity.CENTER),
         )
-        column.addView(Space(activity), LinearLayout.LayoutParams(1, 0, 0.9f))
-        column.addView(
-            orb,
-            LinearLayout.LayoutParams(dp(220), dp(220)).apply {
-                gravity = Gravity.CENTER_HORIZONTAL
-            },
+        panel.addView(
+            collapsedOrb,
+            FrameLayout.LayoutParams(metrics.collapsedSize, metrics.collapsedSize),
         )
-        column.addView(status, LinearLayout.LayoutParams(
+        textColumn.addView(status)
+        textColumn.addView(detail, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT,
             ViewGroup.LayoutParams.WRAP_CONTENT,
-        ).apply { topMargin = dp(34) })
-        column.addView(detail, LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT,
-            ViewGroup.LayoutParams.WRAP_CONTENT,
-        ).apply { topMargin = dp(10) })
-        column.addView(Space(activity), LinearLayout.LayoutParams(1, 0, 1f))
-        column.addView(retry, LinearLayout.LayoutParams(dp(176), dp(50)).apply {
-            gravity = Gravity.CENTER_HORIZONTAL
-            bottomMargin = dp(12)
-        })
-        column.addView(officialFallback, LinearLayout.LayoutParams(dp(176), dp(48)).apply {
-            gravity = Gravity.CENTER_HORIZONTAL
-            bottomMargin = dp(18)
-        })
-        column.addView(close, LinearLayout.LayoutParams(dp(64), dp(64)).apply {
-            gravity = Gravity.CENTER_HORIZONTAL
-        })
-        root.addView(column, FrameLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT,
-            ViewGroup.LayoutParams.MATCH_PARENT,
-        ))
+        ).apply { topMargin = dp(3) })
+        expandedHeader.addView(expandedIcon, LinearLayout.LayoutParams(dp(44), dp(44)))
+        expandedHeader.addView(
+            textColumn,
+            LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f),
+        )
+        expandedHeader.addView(close, LinearLayout.LayoutParams(dp(48), dp(48)))
+        expandedCard.addView(expandedHeader)
+        failureActions.addView(
+            retry,
+            LinearLayout.LayoutParams(0, dp(48), 1f).apply { marginEnd = dp(6) },
+        )
+        failureActions.addView(
+            officialFallback,
+            LinearLayout.LayoutParams(0, dp(48), 1f).apply { marginStart = dp(6) },
+        )
+        expandedCard.addView(failureActions)
+        panel.addView(
+            expandedCard,
+            FrameLayout.LayoutParams(metrics.expandedWidth, ViewGroup.LayoutParams.WRAP_CONTENT),
+        )
+        root.addView(
+            panel,
+            FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                Gravity.TOP or Gravity.START,
+            ),
+        )
         root.addOnLayoutChangeListener { _, left, top, right, bottom, _, _, _, _ ->
-            applyLayout(right - left, bottom - top)
+            if (right > left && bottom > top) root.post(::positionPanel)
         }
+        panel.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+            if (root.visibility == View.VISIBLE) root.post(::positionPanel)
+        }
+        render(WebChatRealtimeVoiceStage.PREPARING, "正在恢复本机网页会话")
     }
 
-    private fun applyLayout(widthPx: Int, heightPx: Int) {
-        if (widthPx <= 0 || heightPx <= 0) return
-        val metrics = WebChatRealtimeVoiceLayoutPolicy.resolve(
-            widthPx = widthPx,
-            heightPx = heightPx,
-            density = activity.resources.displayMetrics.density,
-        )
-        compactLayout = metrics.compact
-        column.setPadding(
-            metrics.horizontalPadding,
-            metrics.verticalPadding,
-            metrics.horizontalPadding,
-            metrics.verticalPadding,
-        )
-        title.layoutParams = (title.layoutParams as LinearLayout.LayoutParams).apply {
-            height = metrics.titleHeight
-        }
-        orb.layoutParams = (orb.layoutParams as LinearLayout.LayoutParams).apply {
-            width = metrics.orbSize
-            height = metrics.orbSize
-        }
-        status.layoutParams = (status.layoutParams as LinearLayout.LayoutParams).apply {
-            topMargin = metrics.statusTopMargin
-        }
-        detail.layoutParams = (detail.layoutParams as LinearLayout.LayoutParams).apply {
-            topMargin = metrics.detailTopMargin
-        }
-        close.layoutParams = (close.layoutParams as LinearLayout.LayoutParams).apply {
-            width = metrics.closeSize
-            height = metrics.closeSize
-        }
-        updateStageVisibility()
-    }
-
-    private fun updateStageVisibility() {
-        val failed = currentStage == WebChatRealtimeVoiceStage.FAILED
-        retry.visibility = if (failed) View.VISIBLE else View.GONE
-        officialFallback.visibility = if (failed) View.VISIBLE else View.GONE
-        orb.visibility = if (failed && compactLayout) View.GONE else View.VISIBLE
-    }
-
-    private fun startPulse() {
-        if (pulse?.isRunning == true) return
-        pulse = AnimatorSet().apply {
-            playTogether(
-                ObjectAnimator.ofFloat(orb, View.SCALE_X, 0.96f, 1.03f),
-                ObjectAnimator.ofFloat(orb, View.SCALE_Y, 0.96f, 1.03f),
-                ObjectAnimator.ofFloat(orb, View.ALPHA, 0.82f, 1f),
-            )
-            duration = 2_200L
-            interpolator = AccelerateDecelerateInterpolator()
-            childAnimations.forEach {
-                (it as ObjectAnimator).repeatCount = ValueAnimator.INFINITE
-                it.repeatMode = ObjectAnimator.REVERSE
+    private fun installInteraction() {
+        panel.setOnClickListener { setExpanded(!expanded) }
+        panel.setOnTouchListener { view, event ->
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    dragging = false
+                    downRawX = event.rawX
+                    downRawY = event.rawY
+                    downLeft = panel.x
+                    downTop = panel.y
+                    true
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    val deltaX = event.rawX - downRawX
+                    val deltaY = event.rawY - downRawY
+                    if (!dragging && (abs(deltaX) > touchSlop || abs(deltaY) > touchSlop)) {
+                        dragging = true
+                    }
+                    if (dragging) movePanel(downLeft + deltaX, downTop + deltaY)
+                    true
+                }
+                MotionEvent.ACTION_UP -> {
+                    if (!dragging) view.performClick()
+                    dragging = false
+                    true
+                }
+                MotionEvent.ACTION_CANCEL -> {
+                    dragging = false
+                    true
+                }
+                else -> false
             }
-            start()
         }
     }
 
-    private fun stopPulse() {
-        pulse?.cancel()
-        pulse = null
-        orb.scaleX = 1f
-        orb.scaleY = 1f
-        orb.alpha = 1f
+    private fun setExpanded(value: Boolean) {
+        if (expanded == value && panel.isLaidOut) return
+        expanded = value
+        collapsedOrb.visibility = if (value) View.GONE else View.VISIBLE
+        expandedCard.visibility = if (value) View.VISIBLE else View.GONE
+        panel.isSelected = value
+        panel.post(::positionPanel)
     }
 
-    private fun actionButton(label: String): TextView =
-        textView(16f, Color.parseColor("#07111F"), bold = true).apply {
+    private fun positionPanel() {
+        if (root.width <= 0 || root.height <= 0 || panel.width <= 0 || panel.height <= 0) return
+        metrics = WebChatRealtimeVoiceFloatingLayoutPolicy.resolve(
+            root.width,
+            activity.resources.displayMetrics.density,
+        )
+        if (expandedCard.layoutParams.width != metrics.expandedWidth) {
+            expandedCard.layoutParams = (expandedCard.layoutParams as FrameLayout.LayoutParams).apply {
+                width = metrics.expandedWidth
+            }
+        }
+        val position = if (!positioned) {
+            positioned = true
+            WebChatRealtimeVoiceFloatingLayoutPolicy.initialPosition(
+                root.width,
+                root.height,
+                panel.width,
+                panel.height,
+                metrics.edgeInset,
+            )
+        } else {
+            WebChatRealtimeVoiceFloatingLayoutPolicy.clamp(
+                panel.x,
+                panel.y,
+                root.width,
+                root.height,
+                panel.width,
+                panel.height,
+                metrics.edgeInset,
+            )
+        }
+        panel.x = position.left
+        panel.y = position.top
+    }
+
+    private fun movePanel(left: Float, top: Float) {
+        val position = WebChatRealtimeVoiceFloatingLayoutPolicy.clamp(
+            left,
+            top,
+            root.width,
+            root.height,
+            panel.width,
+            panel.height,
+            metrics.edgeInset,
+        )
+        panel.x = position.left
+        panel.y = position.top
+        positioned = true
+    }
+
+    private fun applyVoiceIconStyle(
+        container: View,
+        icon: ImageView,
+        stageColor: Int,
+        strokeWidth: Int,
+    ) {
+        container.background = oval(color(R.color.elon_surface_float), stageColor, strokeWidth)
+        icon.imageTintList = ColorStateList.valueOf(stageColor)
+    }
+
+    private fun actionButton(label: String, secondary: Boolean = false): TextView =
+        textView(
+            14f,
+            if (secondary) color(R.color.elon_text_primary) else color(R.color.elon_titanium_ink),
+            true,
+        ).apply {
             text = label
             gravity = Gravity.CENTER
-            background = rounded(Color.parseColor("#EAF1FF"), 24)
+            background = rounded(
+                if (secondary) color(R.color.elon_surface_soft) else color(R.color.elon_titanium),
+                24,
+            )
         }
 
-    private fun textView(size: Float, color: Int, bold: Boolean = false): TextView =
+    private fun textView(size: Float, textColor: Int, bold: Boolean = false): TextView =
         TextView(activity).apply {
             textSize = size
-            setTextColor(color)
+            setTextColor(textColor)
             includeFontPadding = false
             if (bold) typeface = Typeface.DEFAULT_BOLD
         }
 
-    private fun rounded(color: Int, radiusDp: Int): GradientDrawable = GradientDrawable().apply {
+    private fun rounded(fillColor: Int, radiusDp: Int): GradientDrawable = GradientDrawable().apply {
         shape = GradientDrawable.RECTANGLE
         cornerRadius = dp(radiusDp).toFloat()
-        setColor(color)
+        setColor(fillColor)
+        setStroke(dp(1), color(R.color.elon_border_subtle))
     }
+
+    private fun oval(fillColor: Int, strokeColor: Int? = null, strokeWidth: Int = 0): GradientDrawable =
+        GradientDrawable().apply {
+            shape = GradientDrawable.OVAL
+            setColor(fillColor)
+            if (strokeColor != null && strokeWidth > 0) setStroke(dp(strokeWidth), strokeColor)
+        }
+
+    private fun color(resource: Int): Int = ContextCompat.getColor(activity, resource)
 
     private fun dp(value: Int): Int =
         (value * activity.resources.displayMetrics.density).toInt()

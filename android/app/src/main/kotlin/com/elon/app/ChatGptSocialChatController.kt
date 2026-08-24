@@ -110,7 +110,7 @@ internal class ChatGptSocialChatController(
     override fun deactivate() {
         active = false
         cancelPendingSendWatchdog()
-        realtimeVoiceTranscript.reset()
+        if (!session.realtimeVoiceActive()) realtimeVoiceTranscript.reset()
         skinPresentation.exit()
         modelPopup?.dismiss()
         modelPopup = null

@@ -168,7 +168,14 @@ internal class ChatGptBackgroundSession(
         pageAdapter?.onHostResumed(webView?.url)
         resumeRecovery()
     }
-    fun deactivate() = pauseSession()
+    fun deactivate() {
+        if (realtimeVoiceBacking.isActive()) {
+            webExecution.interactionRequested()
+            cookieManager.flush()
+        } else {
+            pauseSession()
+        }
+    }
     fun onHostResumed() {
         if (webView == null) return
         recovery.activate()
@@ -339,6 +346,7 @@ internal class ChatGptBackgroundSession(
         )
 
     fun beginRealtimeVoiceBacking(): Boolean = realtimeVoiceBacking.begin()
+    fun realtimeVoiceActive(): Boolean = realtimeVoiceBacking.isActive()
     fun endRealtimeVoiceBacking(gracefulExit: Boolean) {
         if (!realtimeVoiceBacking.isActive()) return
         if (latestSnapshot?.capabilities?.supports(ChatGptWebCapabilityId.CONVERSATION_LIST) == true) {
