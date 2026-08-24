@@ -111,7 +111,9 @@ class WebChatProductionVoiceEntryContractTest {
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptBackgroundSession.kt",
         )
 
-        assertTrue(surface.contains("\"语音 AI · 通话中\""))
+        assertTrue(surface.contains("\"语音 AI · ${'$'}{visibleState.label}\""))
+        assertTrue(surface.contains("\"记录到：${'$'}{it.label}\""))
+        assertTrue(surface.contains("WebChatRealtimeVoiceOverlayHost.resolve(activity)"))
         assertFalse(surface.contains("text = \"ChatGPT 网页 AI\""))
         assertTrue(surface.contains("setBackgroundColor(Color.TRANSPARENT)"))
         assertTrue(surface.contains("isClickable = false"))
@@ -129,6 +131,8 @@ class WebChatProductionVoiceEntryContractTest {
         val deactivate = feature.substringAfter("private fun deactivateChatProvider")
             .substringBefore("private fun activateChatProvider")
         assertFalse(deactivate.contains("realtimeVoice.close()"))
+        assertTrue(feature.contains("resolveConversationContext = { resolveRealtimeVoiceContext"))
+        assertTrue(feature.contains("openRealtimeVoiceConversation(it"))
         assertTrue(session.contains("if (realtimeVoiceBacking.isActive())"))
     }
 

@@ -16,6 +16,8 @@ internal class WebChatRealtimeVoiceCoordinator(
     private val loginGate: WebChatRealtimeVoiceLoginGate,
     private val openOfficialLogin: () -> Unit,
     private val openOfficialFallback: () -> Unit,
+    private val resolveConversationContext: () -> WebChatRealtimeVoiceContext,
+    private val openConversation: (WebChatRealtimeVoiceContext) -> Unit,
     private val schedule: (Runnable, Long) -> Unit,
     private val backControl: WebChatRealtimeVoiceBackControl,
     private val launchCache: WebChatRealtimeVoiceLaunchCache = WebChatRealtimeVoiceLaunchCache(),
@@ -30,6 +32,8 @@ internal class WebChatRealtimeVoiceCoordinator(
     private var pendingLoginProvider: WebChatProviderIdentity? = null
     private var waitingForLoginReturn = false
     private var startedAtElapsedMs = 0L
+    private var conversationContext: WebChatRealtimeVoiceContext? = null
+    private var lastState: WebChatRealtimeVoiceState? = null
 
     fun start(candidate: WebChatProviderIdentity): Boolean {
         if (
@@ -42,20 +46,21 @@ internal class WebChatRealtimeVoiceCoordinator(
             requireLogin(candidate, stopBacking = false)
             return true
         }
-        if (surface.isVisible() && provider?.id == candidate.id) return true
+        if (surface.isVisible() && provider?.id == candidate.id) {
+            surface.ensureVisibleOnTop()
+            return true
+        }
         generation += 1
         startedAtElapsedMs = monotonicTimeMs()
         provider = candidate
         prepareRequestId = null
         preparedGeneration = null
         commandRequestId = null
-        surface.show(::close, ::retry, ::openFallback)
+        conversationContext = resolveConversationContext()
+        surface.show(::close, ::retry, ::openFallback, ::openVoiceConversation)
         // The floating voice control owns hangup while back keeps normal app navigation.
         backControl.setEnabled(false)
-        surface.render(
-            WebChatRealtimeVoiceStage.PREPARING,
-            "正在恢复本机网页会话，不会跳转到官网页面",
-        )
+        render(WebChatRealtimeVoiceLifecycle.CONNECTING, "正在恢复本机网页会话，不会跳转到官网页面")
         if (!beginWebBacking()) {
             fail("后台网页会话尚未建立，请重试")
             return true
@@ -63,12 +68,10 @@ internal class WebChatRealtimeVoiceCoordinator(
         val launchPlan = launchCache.plan(candidate.id, consumerPort()?.state(), sessionReady())
         log("voice_start provider=${candidate.id.wireValue} plan=$launchPlan")
         when (launchPlan) {
-            WebChatRealtimeVoiceLaunchPlan.DIRECT -> surface.render(
-                WebChatRealtimeVoiceStage.PREPARING,
-                "正在启动当前会话的实时语音",
-            )
+            WebChatRealtimeVoiceLaunchPlan.DIRECT ->
+                render(WebChatRealtimeVoiceLifecycle.CONNECTING, "正在启动当前会话的实时语音")
             WebChatRealtimeVoiceLaunchPlan.REFRESH_CONTROLS -> {
-                surface.render(WebChatRealtimeVoiceStage.PREPARING, "正在刷新当前会话的语音入口")
+                render(WebChatRealtimeVoiceLifecycle.CONNECTING, "正在刷新当前会话的语音入口")
                 consumerPort()?.requestControls()
             }
             WebChatRealtimeVoiceLaunchPlan.RECOVER_SESSION -> requestSessionRecovery()
@@ -85,7 +88,7 @@ internal class WebChatRealtimeVoiceCoordinator(
             val result = port?.invokeControl(endControl.id, userConfirmed = true)
             if (result?.accepted == true) {
                 closePending = true
-                surface.render(WebChatRealtimeVoiceStage.STARTING, "正在结束语音并返回对话")
+                render(WebChatRealtimeVoiceLifecycle.ENDING, "正在结束语音并保留当前对话")
                 port.requestControls()
                 scheduleCloseSettlement(generation, attempt = 0)
                 return
@@ -138,6 +141,8 @@ internal class WebChatRealtimeVoiceCoordinator(
         backControl.setEnabled(false)
         surface.hide()
         endWebBacking(gracefulExit)
+        conversationContext = null
+        lastState = null
     }
 
     fun destroy() {
@@ -148,6 +153,11 @@ internal class WebChatRealtimeVoiceCoordinator(
     }
 
     fun onHostResumed() {
+        val state = lastState
+        if (provider != null && state != null) {
+            surface.ensureVisibleOnTop()
+            surface.render(state)
+        }
         val candidate = pendingLoginProvider ?: return
         if (!waitingForLoginReturn) return
         generation += 1
@@ -158,10 +168,11 @@ internal class WebChatRealtimeVoiceCoordinator(
     private fun retry() {
         val current = provider ?: return
         generation += 1
+        closePending = false
         prepareRequestId = null
         preparedGeneration = null
         commandRequestId = null
-        surface.render(WebChatRealtimeVoiceStage.PREPARING, "正在重新连接后台网页会话")
+        render(WebChatRealtimeVoiceLifecycle.CONNECTING, "正在重新连接后台网页会话")
         if (!beginWebBacking()) {
             fail("后台网页会话尚未建立，请稍后重试")
             return
@@ -217,7 +228,7 @@ internal class WebChatRealtimeVoiceCoordinator(
             return
         }
         provider?.let { launchCache.observe(it.id, port.state()) }
-        surface.render(WebChatRealtimeVoiceStage.STARTING, "正在由后台网页启动官方语音连接")
+        render(WebChatRealtimeVoiceLifecycle.CONNECTING, "正在由后台网页启动官方语音连接")
         val result = port.executeSessionCommand(REALTIME_VOICE_ACTION)
         if (!result.accepted) {
             if (attempt < MAX_START_ATTEMPTS && result.error in RETRYABLE_ERRORS) {
@@ -242,7 +253,7 @@ internal class WebChatRealtimeVoiceCoordinator(
         port: WebChatConsumerPort,
     ) {
         if (prepareRequestId != null) return
-        surface.render(WebChatRealtimeVoiceStage.PREPARING, "正在同步输入状态并准备官方语音入口")
+        render(WebChatRealtimeVoiceLifecycle.CONNECTING, "正在同步输入状态并准备官方语音入口")
         val result = port.executeSessionCommand(PREPARE_REALTIME_VOICE_ACTION)
         if (!result.accepted) {
             if (attempt < MAX_START_ATTEMPTS && result.error in RETRYABLE_ERRORS) {
@@ -322,9 +333,10 @@ internal class WebChatRealtimeVoiceCoordinator(
     private fun markActive(expectedGeneration: Int) {
         if (!isCurrent(expectedGeneration)) return
         log("voice_active elapsed_ms=${monotonicTimeMs() - startedAtElapsedMs}")
-        surface.render(
-            WebChatRealtimeVoiceStage.ACTIVE,
-            "官方语音界面已在后台启动，连接成功后可以直接说话",
+        render(
+            lifecycle = WebChatRealtimeVoiceLifecycle.ACTIVE,
+            detail = "语音已连接，可继续使用当前页面",
+            turn = WebChatRealtimeVoiceTurn.IDLE,
         )
     }
 
@@ -335,7 +347,27 @@ internal class WebChatRealtimeVoiceCoordinator(
         preparedGeneration = null
         commandRequestId = null
         endWebBacking(false)
-        surface.render(WebChatRealtimeVoiceStage.FAILED, detail)
+        render(WebChatRealtimeVoiceLifecycle.FAILED, detail)
+    }
+
+    private fun render(
+        lifecycle: WebChatRealtimeVoiceLifecycle,
+        detail: String,
+        turn: WebChatRealtimeVoiceTurn = WebChatRealtimeVoiceTurn.UNKNOWN,
+    ) {
+        val state = WebChatRealtimeVoiceState(
+            lifecycle = lifecycle,
+            detail = detail,
+            turn = turn,
+            context = conversationContext,
+        )
+        lastState = state
+        surface.render(state)
+    }
+
+    private fun openVoiceConversation() {
+        conversationContext?.let(openConversation)
+        surface.ensureVisibleOnTop()
     }
 
     private fun requireLogin(candidate: WebChatProviderIdentity, stopBacking: Boolean) {
@@ -440,6 +472,8 @@ internal fun createWebChatRealtimeVoiceCoordinator(
     requestSessionRecovery: () -> Unit,
     openOfficialLogin: () -> Unit,
     openOfficialFallback: () -> Unit,
+    resolveConversationContext: () -> WebChatRealtimeVoiceContext,
+    openConversation: (WebChatRealtimeVoiceContext) -> Unit,
     launchCache: WebChatRealtimeVoiceLaunchCache = WebChatRealtimeVoiceLaunchCache(),
 ): WebChatRealtimeVoiceCoordinator {
     lateinit var coordinator: WebChatRealtimeVoiceCoordinator
@@ -461,6 +495,8 @@ internal fun createWebChatRealtimeVoiceCoordinator(
         loginGate = WebChatRealtimeVoiceLoginDialog(activity),
         openOfficialLogin = openOfficialLogin,
         openOfficialFallback = openOfficialFallback,
+        resolveConversationContext = resolveConversationContext,
+        openConversation = openConversation,
         schedule = { task, delayMs -> activity.window.decorView.postDelayed(task, delayMs) },
         backControl = object : WebChatRealtimeVoiceBackControl {
             override fun setEnabled(enabled: Boolean) {

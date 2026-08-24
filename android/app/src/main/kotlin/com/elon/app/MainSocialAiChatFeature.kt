@@ -130,7 +130,7 @@ internal class MainSocialAiChatFeature(
     private val realtimeVoiceDelegate = lazy {
         createWebChatRealtimeVoiceCoordinator(
             activity = activity,
-            surface = WebChatRealtimeVoiceOverlay(activity, binding.root),
+            surface = WebChatRealtimeVoiceOverlay(activity),
             activeProvider = {
                 if (isChatModeActive()) providerId() else null
             },
@@ -156,6 +156,8 @@ internal class MainSocialAiChatFeature(
             },
             openOfficialLogin = modeController::openOfficialLogin,
             openOfficialFallback = modeController::openOfficialRealtimeVoice,
+            resolveConversationContext = { resolveRealtimeVoiceContext(chatGptController) },
+            openConversation = { openRealtimeVoiceConversation(it, modeController, binding.root, chatGptController) },
             launchCache = realtimeVoiceLaunchCache,
         )
     }
@@ -488,11 +490,11 @@ internal class MainSocialAiChatFeature(
     fun onHostResumed(resumeWorkChat: () -> Unit) {
         if (isChatModeActive()) {
             activeController().onHostResumed()
-            if (realtimeVoiceDelegate.isInitialized()) realtimeVoice.onHostResumed()
             productionCapabilityPrewarmer.schedule(WebChatProviderRegistry.get(providerId()))
         } else {
             resumeWorkChat()
         }
+        if (realtimeVoiceDelegate.isInitialized()) realtimeVoice.onHostResumed()
         sessionPrewarmer.onHostResumed()
     }
 

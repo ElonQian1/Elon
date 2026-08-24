@@ -8,6 +8,8 @@ internal object WebChatProductionSelectors {
     const val WORK_ATTACHMENT = "展开更多输入功能"
     const val REALTIME_VOICE_SURFACE = "web-chat-realtime-voice:surface"
     const val REALTIME_VOICE_STATUS = "web-chat-realtime-voice:status"
+    const val REALTIME_VOICE_CONTEXT = "web-chat-realtime-voice:context"
+    const val REALTIME_VOICE_OPEN_CONVERSATION = "web-chat-realtime-voice:open-conversation"
     const val REALTIME_VOICE_CLOSE = "web-chat-realtime-voice:close"
     const val REALTIME_VOICE_RETRY = "web-chat-realtime-voice:retry"
     const val REALTIME_VOICE_OFFICIAL_FALLBACK = "web-chat-realtime-voice:official-fallback"

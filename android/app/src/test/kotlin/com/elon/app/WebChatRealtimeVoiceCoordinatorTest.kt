@@ -12,22 +12,23 @@ class WebChatRealtimeVoiceCoordinatorTest {
 
         assertTrue(fixture.coordinator.start(fixture.provider))
         assertTrue(fixture.surface.visible)
-        assertEquals(WebChatRealtimeVoiceStage.PREPARING, fixture.surface.stage)
+        assertEquals(WebChatRealtimeVoiceLifecycle.CONNECTING, fixture.surface.state?.lifecycle)
         assertEquals(1, fixture.beginBackingCount)
 
         fixture.scheduler.runNext()
         assertEquals(1, fixture.port.executeCount)
-        assertEquals(WebChatRealtimeVoiceStage.PREPARING, fixture.surface.stage)
+        assertEquals(WebChatRealtimeVoiceLifecycle.CONNECTING, fixture.surface.state?.lifecycle)
 
         fixture.port.prepareStatus = WebChatConsumerCommandStatus.SUCCEEDED
         fixture.scheduler.runNext()
         fixture.scheduler.runNext()
         assertEquals(2, fixture.port.executeCount)
-        assertEquals(WebChatRealtimeVoiceStage.STARTING, fixture.surface.stage)
+        assertEquals(WebChatRealtimeVoiceLifecycle.CONNECTING, fixture.surface.state?.lifecycle)
 
         fixture.port.voiceStatus = WebChatConsumerCommandStatus.SUCCEEDED
         fixture.scheduler.runNext()
-        assertEquals(WebChatRealtimeVoiceStage.ACTIVE, fixture.surface.stage)
+        assertEquals(WebChatRealtimeVoiceLifecycle.ACTIVE, fixture.surface.state?.lifecycle)
+        assertEquals(WebChatRealtimeVoiceTurn.IDLE, fixture.surface.state?.turn)
         assertEquals(0, fixture.officialFallbackCount)
         assertFalse(fixture.back.backEnabled)
     }
@@ -73,7 +74,7 @@ class WebChatRealtimeVoiceCoordinatorTest {
         assertTrue(fixture.coordinator.start(fixture.provider))
         fixture.scheduler.runAll()
 
-        assertEquals(WebChatRealtimeVoiceStage.FAILED, fixture.surface.stage)
+        assertEquals(WebChatRealtimeVoiceLifecycle.FAILED, fixture.surface.state?.lifecycle)
         assertTrue(fixture.surface.visible)
         assertEquals(0, fixture.officialFallbackCount)
         assertTrue(fixture.endBackingCount >= 1)
@@ -120,7 +121,7 @@ class WebChatRealtimeVoiceCoordinatorTest {
         fixture.scheduler.runNext()
 
         assertTrue(fixture.surface.visible)
-        assertEquals(WebChatRealtimeVoiceStage.PREPARING, fixture.surface.stage)
+        assertEquals(WebChatRealtimeVoiceLifecycle.CONNECTING, fixture.surface.state?.lifecycle)
         assertEquals(1, fixture.beginBackingCount)
     }
 
@@ -152,6 +153,7 @@ class WebChatRealtimeVoiceCoordinatorTest {
 
         assertTrue(fixture.surface.visible)
         assertEquals("control_voice_end", fixture.port.invokedControlId)
+        assertEquals(WebChatRealtimeVoiceLifecycle.ENDING, fixture.surface.state?.lifecycle)
         fixture.scheduler.runNext()
         assertTrue(fixture.surface.visible)
 
@@ -159,6 +161,19 @@ class WebChatRealtimeVoiceCoordinatorTest {
         fixture.scheduler.runNext()
         assertFalse(fixture.surface.visible)
         assertEquals(listOf(true), fixture.endBackingGraceful)
+    }
+
+    @Test
+    fun endingVoiceIgnoresRepeatedHangupRequests() {
+        val fixture = Fixture()
+        fixture.completeVoiceStart()
+        fixture.port.endControlAvailable = true
+
+        fixture.surface.closeVoice()
+        fixture.surface.closeVoice()
+
+        assertEquals(1, fixture.port.invokedControlCount)
+        assertEquals(WebChatRealtimeVoiceLifecycle.ENDING, fixture.surface.state?.lifecycle)
     }
 
     @Test
@@ -175,7 +190,7 @@ class WebChatRealtimeVoiceCoordinatorTest {
         fixture.completeVoiceStart()
 
         assertTrue(fixture.surface.visible)
-        assertEquals(WebChatRealtimeVoiceStage.ACTIVE, fixture.surface.stage)
+        assertEquals(WebChatRealtimeVoiceLifecycle.ACTIVE, fixture.surface.state?.lifecycle)
         assertEquals(2, fixture.beginBackingCount)
         assertEquals(listOf(true), fixture.endBackingGraceful)
     }
@@ -192,6 +207,30 @@ class WebChatRealtimeVoiceCoordinatorTest {
         assertFalse(fixture.surface.visible)
         assertEquals(listOf(false), fixture.endBackingGraceful)
         assertFalse(fixture.scheduler.hasPendingTasks())
+    }
+
+    @Test
+    fun hostResumeRestoresTheFloatingControlAboveTheCurrentActivitySurface() {
+        val fixture = Fixture()
+        fixture.completeVoiceStart()
+        fixture.surface.visible = false
+
+        fixture.coordinator.onHostResumed()
+
+        assertTrue(fixture.surface.visible)
+        assertEquals(1, fixture.surface.ensureVisibleCount)
+        assertEquals(WebChatRealtimeVoiceLifecycle.ACTIVE, fixture.surface.state?.lifecycle)
+    }
+
+    @Test
+    fun expandedVoiceControlOpensTheConversationCapturedAtVoiceStart() {
+        val fixture = Fixture()
+        fixture.completeVoiceStart()
+
+        fixture.surface.openConversation()
+
+        assertEquals("/c/test", fixture.openedContext?.conversationPath)
+        assertEquals("测试会话", fixture.openedContext?.label)
     }
 
     private class Fixture(
@@ -213,6 +252,7 @@ class WebChatRealtimeVoiceCoordinatorTest {
         var officialFallbackCount = 0
         var officialLoginCount = 0
         var sessionRecoveryCount = 0
+        var openedContext: WebChatRealtimeVoiceContext? = null
         val launchCache = WebChatRealtimeVoiceLaunchCache()
         val coordinator = WebChatRealtimeVoiceCoordinator(
             surface = surface,
@@ -231,6 +271,10 @@ class WebChatRealtimeVoiceCoordinatorTest {
             loginGate = loginGate,
             openOfficialLogin = { officialLoginCount += 1 },
             openOfficialFallback = { officialFallbackCount += 1 },
+            resolveConversationContext = {
+                WebChatRealtimeVoiceContext("/c/test", "测试会话", savedToHistory = true)
+            },
+            openConversation = { openedContext = it },
             schedule = scheduler::schedule,
             backControl = back,
             launchCache = launchCache,
@@ -270,32 +314,42 @@ class WebChatRealtimeVoiceCoordinatorTest {
 
     private class FakeSurface : WebChatRealtimeVoiceSurface {
         var visible = false
-        var stage: WebChatRealtimeVoiceStage? = null
+        var state: WebChatRealtimeVoiceState? = null
+        var ensureVisibleCount = 0
         private var fallback: () -> Unit = {}
         private var close: () -> Unit = {}
+        private var openConversation: () -> Unit = {}
 
         override fun show(
             onClose: () -> Unit,
             onRetry: () -> Unit,
             onOfficialFallback: () -> Unit,
+            onOpenConversation: () -> Unit,
         ) {
             visible = true
             close = onClose
             fallback = onOfficialFallback
+            openConversation = onOpenConversation
         }
 
-        override fun render(stage: WebChatRealtimeVoiceStage, detail: String) {
-            this.stage = stage
+        override fun render(state: WebChatRealtimeVoiceState) {
+            this.state = state
         }
 
         override fun hide() {
             visible = false
         }
 
+        override fun ensureVisibleOnTop() {
+            ensureVisibleCount += 1
+            visible = true
+        }
+
         override fun isVisible(): Boolean = visible
 
         fun openOfficialFallback() = fallback()
         fun closeVoice() = close()
+        fun openConversation() = openConversation.invoke()
     }
 
     private class FakePort : WebChatConsumerPort {
@@ -304,6 +358,7 @@ class WebChatRealtimeVoiceCoordinatorTest {
         var voiceStatus = WebChatConsumerCommandStatus.PENDING
         var endControlAvailable = false
         var invokedControlId: String? = null
+        var invokedControlCount = 0
         var requestControlsCount = 0
 
         override fun state() = WebChatConsumerState(
@@ -347,6 +402,7 @@ class WebChatRealtimeVoiceCoordinatorTest {
         }
         override fun invokeControl(controlId: String, userConfirmed: Boolean): WebChatConsumerCommandResult {
             invokedControlId = controlId
+            invokedControlCount += 1
             return if (controlId == VoiceEndControl.id && userConfirmed) accepted() else rejected()
         }
         override fun updateControl(controlId: String, mutation: WebChatConsumerControlMutation) = rejected()

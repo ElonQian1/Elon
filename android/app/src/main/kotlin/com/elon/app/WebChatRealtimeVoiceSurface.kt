@@ -4,6 +4,7 @@ import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.text.TextUtils
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
@@ -18,28 +19,23 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import kotlin.math.abs
 
-internal enum class WebChatRealtimeVoiceStage {
-    PREPARING,
-    STARTING,
-    ACTIVE,
-    FAILED,
-}
-
 internal interface WebChatRealtimeVoiceSurface {
     fun show(
         onClose: () -> Unit,
         onRetry: () -> Unit,
         onOfficialFallback: () -> Unit,
+        onOpenConversation: () -> Unit,
     )
 
-    fun render(stage: WebChatRealtimeVoiceStage, detail: String)
+    fun render(state: WebChatRealtimeVoiceState)
+    fun ensureVisibleOnTop()
     fun hide()
     fun isVisible(): Boolean
 }
 
 internal class WebChatRealtimeVoiceOverlay(
     private val activity: AppCompatActivity,
-    private val host: FrameLayout,
+    private val host: FrameLayout = WebChatRealtimeVoiceOverlayHost.resolve(activity),
 ) : WebChatRealtimeVoiceSurface {
     private val root = FrameLayout(activity).apply {
         setBackgroundColor(Color.TRANSPARENT)
@@ -65,6 +61,11 @@ internal class WebChatRealtimeVoiceOverlay(
         scaleType = ImageView.ScaleType.CENTER
         isClickable = false
         isFocusable = false
+    }
+    private val collapsedStatus = View(activity).apply {
+        isClickable = false
+        isFocusable = false
+        importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
     }
     private val expandedCard = LinearLayout(activity).apply {
         orientation = LinearLayout.VERTICAL
@@ -94,6 +95,14 @@ internal class WebChatRealtimeVoiceOverlay(
     private val detail = textView(12f, color(R.color.elon_text_secondary)).apply {
         maxLines = 2
     }
+    private val conversationTarget = textView(13f, color(R.color.elon_text_primary), bold = true).apply {
+        gravity = Gravity.CENTER_VERTICAL
+        minHeight = dp(48)
+        maxLines = 1
+        ellipsize = TextUtils.TruncateAt.END
+        setPadding(dp(4), dp(6), dp(4), dp(6))
+        contentDescription = WebChatProductionSelectors.REALTIME_VOICE_OPEN_CONVERSATION
+    }
     private val close = ImageButton(activity).apply {
         setImageResource(R.drawable.ic_voice_call_hangup)
         scaleType = ImageView.ScaleType.CENTER
@@ -121,24 +130,83 @@ internal class WebChatRealtimeVoiceOverlay(
     private var expanded = false
     private var positioned = false
     private var dragging = false
+    private var requestedVisible = false
     private var downRawX = 0f
     private var downRawY = 0f
     private var downLeft = 0f
     private var downTop = 0f
+    private var lastVisibleState: WebChatRealtimeVoiceVisibleState? = null
 
     init {
         buildContent()
         installInteraction()
+        host.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+            if (requestedVisible) ensureVisibleOnTop()
+        }
     }
 
     override fun show(
         onClose: () -> Unit,
         onRetry: () -> Unit,
         onOfficialFallback: () -> Unit,
+        onOpenConversation: () -> Unit,
     ) {
         close.setOnClickListener { onClose() }
         retry.setOnClickListener { onRetry() }
         officialFallback.setOnClickListener { onOfficialFallback() }
+        conversationTarget.setOnClickListener { onOpenConversation() }
+        requestedVisible = true
+        setExpanded(false)
+        ensureVisibleOnTop()
+    }
+
+    override fun render(state: WebChatRealtimeVoiceState) {
+        val visibleState = WebChatRealtimeVoiceStatePolicy.visibleState(state)
+        status.text = "语音 AI · ${visibleState.label}"
+        detail.text = state.detail
+        val context = state.context
+        conversationTarget.text = context?.let { "记录到：${it.label}" } ?: "记录到：当前 ChatGPT 会话"
+        conversationTarget.isEnabled = context?.conversationPath != null && context.savedToHistory
+        conversationTarget.alpha = if (conversationTarget.isEnabled) 1f else 0.72f
+        conversationTarget.contentDescription = buildString {
+            append(WebChatProductionSelectors.REALTIME_VOICE_OPEN_CONVERSATION)
+            append('：')
+            append(context?.label ?: "当前 ChatGPT 会话")
+        }
+        val stageColor = when (visibleState) {
+            WebChatRealtimeVoiceVisibleState.CONNECTING -> color(R.color.elon_signal_mist)
+            WebChatRealtimeVoiceVisibleState.IDLE -> color(R.color.elon_status_success)
+            WebChatRealtimeVoiceVisibleState.LISTENING -> color(R.color.elon_signal_mist)
+            WebChatRealtimeVoiceVisibleState.THINKING -> color(R.color.elon_status_info)
+            WebChatRealtimeVoiceVisibleState.SPEAKING -> color(R.color.elon_status_success)
+            WebChatRealtimeVoiceVisibleState.ENDING -> color(R.color.elon_status_info)
+            WebChatRealtimeVoiceVisibleState.FAILED -> color(R.color.elon_status_danger)
+        }
+        applyVoiceIconStyle(collapsedOrb, collapsedIcon, stageColor, strokeWidth = 2)
+        applyVoiceIconStyle(expandedIcon, expandedIcon, stageColor, strokeWidth = 1)
+        collapsedStatus.background = oval(stageColor, color(R.color.elon_surface_float), 2)
+        close.isEnabled = visibleState != WebChatRealtimeVoiceVisibleState.ENDING
+        close.alpha = if (close.isEnabled) 1f else 0.4f
+        failureActions.visibility = if (visibleState == WebChatRealtimeVoiceVisibleState.FAILED) {
+            View.VISIBLE
+        } else {
+            View.GONE
+        }
+        if (visibleState == WebChatRealtimeVoiceVisibleState.FAILED) setExpanded(true)
+        panel.contentDescription = buildString {
+            append(WebChatProductionSelectors.REALTIME_VOICE_SURFACE)
+            append('：')
+            append(visibleState.label)
+            append("，记录到")
+            append(context?.label ?: "当前 ChatGPT 会话")
+            append("，点按展开")
+        }
+        if (lastVisibleState != visibleState) panel.announceForAccessibility(status.text)
+        lastVisibleState = visibleState
+    }
+
+    override fun ensureVisibleOnTop() {
+        if (!requestedVisible) return
         if (root.parent !== host) {
             (root.parent as? ViewGroup)?.removeView(root)
             host.addView(
@@ -149,50 +217,33 @@ internal class WebChatRealtimeVoiceOverlay(
                 ),
             )
         }
-        setExpanded(false)
         root.visibility = View.VISIBLE
-        root.bringToFront()
+        if (host.indexOfChild(root) != host.childCount - 1) root.bringToFront()
         root.post(::positionPanel)
     }
 
-    override fun render(stage: WebChatRealtimeVoiceStage, detail: String) {
-        status.text = when (stage) {
-            WebChatRealtimeVoiceStage.PREPARING -> "语音 AI · 连接中"
-            WebChatRealtimeVoiceStage.STARTING -> "语音 AI · 启动中"
-            WebChatRealtimeVoiceStage.ACTIVE -> "语音 AI · 通话中"
-            WebChatRealtimeVoiceStage.FAILED -> "语音 AI · 连接失败"
-        }
-        this.detail.text = detail
-        val stageColor = when (stage) {
-            WebChatRealtimeVoiceStage.PREPARING -> color(R.color.elon_signal_mist)
-            WebChatRealtimeVoiceStage.STARTING -> color(R.color.elon_status_info)
-            WebChatRealtimeVoiceStage.ACTIVE -> color(R.color.elon_status_success)
-            WebChatRealtimeVoiceStage.FAILED -> color(R.color.elon_status_danger)
-        }
-        applyVoiceIconStyle(collapsedOrb, collapsedIcon, stageColor, strokeWidth = 2)
-        applyVoiceIconStyle(expandedIcon, expandedIcon, stageColor, strokeWidth = 1)
-        failureActions.visibility = if (stage == WebChatRealtimeVoiceStage.FAILED) {
-            View.VISIBLE
-        } else {
-            View.GONE
-        }
-        if (stage == WebChatRealtimeVoiceStage.FAILED) setExpanded(true)
-        panel.announceForAccessibility(status.text)
-    }
-
     override fun hide() {
+        requestedVisible = false
         root.visibility = View.GONE
         close.setOnClickListener(null)
         retry.setOnClickListener(null)
         officialFallback.setOnClickListener(null)
+        conversationTarget.setOnClickListener(null)
     }
 
-    override fun isVisible(): Boolean = root.visibility == View.VISIBLE
+    override fun isVisible(): Boolean = requestedVisible
 
     private fun buildContent() {
         collapsedOrb.addView(
             collapsedIcon,
             FrameLayout.LayoutParams(dp(34), dp(34), Gravity.CENTER),
+        )
+        collapsedOrb.addView(
+            collapsedStatus,
+            FrameLayout.LayoutParams(dp(12), dp(12), Gravity.END or Gravity.BOTTOM).apply {
+                marginEnd = dp(5)
+                bottomMargin = dp(5)
+            },
         )
         panel.addView(
             collapsedOrb,
@@ -210,6 +261,13 @@ internal class WebChatRealtimeVoiceOverlay(
         )
         expandedHeader.addView(close, LinearLayout.LayoutParams(dp(48), dp(48)))
         expandedCard.addView(expandedHeader)
+        expandedCard.addView(
+            conversationTarget,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ).apply { topMargin = dp(4) },
+        )
         failureActions.addView(
             retry,
             LinearLayout.LayoutParams(0, dp(48), 1f).apply { marginEnd = dp(6) },
@@ -237,7 +295,10 @@ internal class WebChatRealtimeVoiceOverlay(
         panel.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
             if (root.visibility == View.VISIBLE) root.post(::positionPanel)
         }
-        render(WebChatRealtimeVoiceStage.PREPARING, "正在恢复本机网页会话")
+        render(WebChatRealtimeVoiceState(
+            lifecycle = WebChatRealtimeVoiceLifecycle.CONNECTING,
+            detail = "正在恢复本机网页会话",
+        ))
     }
 
     private fun installInteraction() {
