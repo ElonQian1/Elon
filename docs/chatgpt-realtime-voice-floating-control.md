@@ -2,7 +2,7 @@
 
 capability_id: android_chatgpt_realtime_voice_floating_control_v1
 status: implementation_completed
-verification: targeted_tests_passed_device_partial
+verification: targeted_tests_passed_device_core_actions
 production_default: enabled_after_release
 
 ## 交互边界
@@ -36,4 +36,6 @@ production_default: enabled_after_release
 
 ## 验证
 
-已通过状态模型、全局恢复、会话归属和协调器定向测试。`v1.1.1276 (1286)` 小米真机已验证进入语音后悬浮球可见、离开“一龙 AI”后仍留在普通消息首页、展开后具备状态/归属/挂断语义；系统来电打断了正常挂断与返回原生对话验收，这两项仍需补测。
+已通过状态模型、全局恢复、会话归属、动作分发和协调器定向测试。`v1.1.1278 (1288)` 小米真机已验证两条结束路径：在原生聊天页展开并挂断，以及离开“一龙 AI”回到普通消息首页后展开并挂断；两次均在结束后移除悬浮层并保留当前原生页面。悬浮球在语音期间跨页面保持可见。
+
+本轮从新空会话启动，官方尚未生成可归档的会话路径，所以“返回会话”入口按设计禁用；已有正式会话路径时的点击返回仍需独立真机样本。新会话生成路径后的低频归属更新已通过协调器定向测试，尚未把离线证据写成真机通过。
