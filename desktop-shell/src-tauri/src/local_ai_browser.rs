@@ -297,7 +297,14 @@ pub async fn open_local_ai_web_session(
             );
             match payload.event() {
                 PageLoadEvent::Started => {
-                    page_state.mark_navigation(&page_label, payload.url(), true, None)
+                    page_state.mark_navigation(&page_label, payload.url(), true, None);
+                    // WebView2 can momentarily restore a child WebView to its creation
+                    // bounds when a provider navigates from the new-chat page to the
+                    // freshly created conversation. Waiting for `Finished` leaves the
+                    // official page covering the native chat for the whole response.
+                    // Re-park at navigation start as well as finish whenever React has
+                    // not explicitly granted the official surface foreground ownership.
+                    let _ = embedded_view::park_if_background(&page_app, &page_state, &page_label);
                 }
                 PageLoadEvent::Finished => {
                     page_state.mark_page_finished(&page_label, payload.url());
@@ -568,8 +575,8 @@ pub async fn clear_local_ai_web_session(
         .ok_or_else(|| "请先打开本地网页会话，再清除它的本地数据。".to_string())?;
     page.clear_all_browsing_data().map_err(display_error)?;
     runtime.clear_snapshots(&label);
-    let research_root = profile_directory(&app, provider, &fingerprint)?
-        .join(research_capture::DIRECTORY_NAME);
+    let research_root =
+        profile_directory(&app, provider, &fingerprint)?.join(research_capture::DIRECTORY_NAME);
     research_capture::clear(&research_root)?;
     page.navigate(parse_start_url(provider)?)
         .map_err(display_error)?;
