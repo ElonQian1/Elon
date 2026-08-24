@@ -81,6 +81,12 @@ pub(super) fn has_same_last_user(previous: Option<&Value>, incoming: &Value) -> 
     previous.is_some() && previous == incoming
 }
 
+pub(super) fn last_user_fingerprint(snapshot: &Value) -> Option<String> {
+    last_user_text(snapshot)
+        .filter(|value| !value.is_empty())
+        .map(|value| opaque_id(&value))
+}
+
 pub(super) fn has_last_user_text(snapshot: &Value, expected: &str) -> bool {
     let expected = expected.split_whitespace().collect::<Vec<_>>().join(" ");
     last_user_text(snapshot).as_deref() == Some(expected.as_str())

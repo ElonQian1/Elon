@@ -56,6 +56,7 @@ impl SessionRecord {
         self.pending_context_action.clear();
         self.pending_context_since_ms = 0;
         self.pending_send_prompt = None;
+        self.new_conversation_baseline_user = None;
         self.preserve_conversation_on_navigation = false;
         self.last_event_kind = "context_transition_timed_out".to_string();
     }
@@ -71,11 +72,18 @@ impl SessionRecord {
         if !BOUNDARY_ACTIONS.contains(&action) {
             return;
         }
+        if action != "new_conversation" {
+            self.new_conversation_baseline_user = None;
+        }
         self.pending_send_prompt = None;
         self.pending_context_action = action.to_string();
         self.pending_context_since_ms = super::now_ms();
         self.preserve_conversation_on_navigation = false;
         if action == "new_conversation" {
+            self.new_conversation_baseline_user = self
+                .semantic_event
+                .as_ref()
+                .and_then(semantic_context::last_user_fingerprint);
             self.active_conversation_id =
                 Some(semantic_context::fresh_conversation_id(&self.provider_id));
             return;
@@ -89,6 +97,7 @@ impl SessionRecord {
     }
 
     pub(super) fn begin_cached_conversation(&mut self, id: String, restorable_url: &str) {
+        self.new_conversation_baseline_user = None;
         self.pending_context_action = "open_cached_conversation".to_string();
         self.pending_context_since_ms = super::now_ms();
         self.preserve_conversation_on_navigation = false;
@@ -145,6 +154,8 @@ impl SessionRecord {
         page_context_key: Option<&str>,
     ) -> bool {
         let mut boundary = self.pending_context_action.clone();
+        let page_changed = page_context_key.is_some()
+            && page_context_key != self.semantic_page_context_key.as_deref();
         if boundary == "send_prompt"
             && self.pending_send_prompt.as_deref().is_some_and(|expected| {
                 !semantic_context::has_last_user_text(&payload, expected)
@@ -152,6 +163,21 @@ impl SessionRecord {
         {
             self.last_event_kind = "pending_send_snapshot_ignored".to_string();
             return false;
+        }
+        if self.new_conversation_baseline_user.is_some()
+            && boundary != "send_prompt"
+            && semantic_context::has_visible_messages(&payload)
+        {
+            let repeats_previous_user = semantic_context::last_user_fingerprint(&payload)
+                == self.new_conversation_baseline_user;
+            if repeats_previous_user {
+                self.last_event_kind = "stale_new_conversation_snapshot_ignored".to_string();
+                return false;
+            }
+            self.new_conversation_baseline_user = None;
+        }
+        if boundary == "send_prompt" {
+            self.new_conversation_baseline_user = None;
         }
         if let (Some(expected), Some(actual)) =
             (self.active_page_context_key.as_deref(), page_context_key)
@@ -177,8 +203,6 @@ impl SessionRecord {
             }
         }
         if boundary == "new_conversation" {
-            let page_changed = page_context_key.is_some()
-                && page_context_key != self.semantic_page_context_key.as_deref();
             if !page_changed
                 && semantic_context::has_same_last_user(self.semantic_event.as_ref(), &payload)
             {
@@ -241,6 +265,9 @@ impl SessionRecord {
             self.pending_context_action.clear();
             self.pending_context_since_ms = 0;
             self.pending_send_prompt = None;
+            if action == "new_conversation" {
+                self.new_conversation_baseline_user = None;
+            }
         }
         if action == "send_prompt" && !ok {
             self.preserve_conversation_on_navigation = false;
@@ -255,6 +282,7 @@ impl SessionRecord {
         self.pending_context_action.clear();
         self.pending_context_since_ms = 0;
         self.pending_send_prompt = None;
+        self.new_conversation_baseline_user = None;
         self.preserve_conversation_on_navigation = false;
     }
 }

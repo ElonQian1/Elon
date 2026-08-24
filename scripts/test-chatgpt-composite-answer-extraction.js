@@ -30,6 +30,8 @@ class ElementNode {
     this.actionContainer = Boolean(options.actionContainer);
     this.roleChild = options.roleChild || null;
     this.speakerHeading = options.speakerHeading || null;
+    this.querySelectorMap = options.querySelectorMap || {};
+    this.querySelectorAllMap = options.querySelectorAllMap || {};
     this.id = options.id || '';
   }
 
@@ -45,10 +47,12 @@ class ElementNode {
     return false;
   }
   querySelector(selector) {
+    if (Object.hasOwn(this.querySelectorMap, selector)) return this.querySelectorMap[selector];
     if (selector === '[data-message-author-role]') return this.roleChild;
     return null;
   }
   querySelectorAll(selector) {
+    if (Object.hasOwn(this.querySelectorAllMap, selector)) return this.querySelectorAllMap[selector];
     if (selector.startsWith(':scope > h1')) return this.speakerHeading ? [this.speakerHeading] : [];
     if (selector.includes('.markdown') || selector.includes('[data-message-content]')) return this.candidates;
     return [];
@@ -86,6 +90,25 @@ const messages = window.__elonChatGptMessages;
 assert.equal(messages.isAssistantActionText('提供反馈'), true);
 assert.equal(messages.isAssistantActionText('复制 分享 重新生成'), true);
 assert.equal(messages.isAssistantActionText('提供反馈，但正文必须保留。'), false);
+
+const sourceSummary = new ElementNode('来源', { tagName: 'SUMMARY' });
+const sourceLink = new ElementNode('Reuters', { tagName: 'A', attributes: { href: 'https://www.reuters.com/example' } });
+const sourceDetails = new ElementNode('', {
+  tagName: 'DETAILS',
+  querySelectorMap: { ':scope > summary': sourceSummary },
+  querySelectorAllMap: { 'a[href]': [sourceLink] },
+});
+assert.equal(
+  messages.isCitationDisclosure(sourceDetails),
+  true,
+  'the official sources disclosure is citation UI, not an unsupported answer widget',
+);
+const unknownDetails = new ElementNode('', {
+  tagName: 'DETAILS',
+  querySelectorMap: { ':scope > summary': new ElementNode('交互分析', { tagName: 'SUMMARY' }) },
+  querySelectorAllMap: { 'a[href]': [sourceLink] },
+});
+assert.equal(messages.isCitationDisclosure(unknownDetails), false);
 
 const feedback = new ElementNode('提供反馈');
 const prose = new ElementNode('以太坊当前走势震荡，以下是完整分析。');

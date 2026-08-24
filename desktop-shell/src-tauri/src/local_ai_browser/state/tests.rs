@@ -626,6 +626,36 @@ fn new_conversations_on_the_same_home_url_keep_distinct_context_and_cache_ids() 
         json!({"type":"message_snapshot","messages":[]}),
         home_key.as_deref(),
     );
+    runtime.mark_page_finished("session", &home);
+    let blank = runtime.snapshot("session").unwrap();
+    assert!(blank.context_ready);
+    assert!(blank.semantic_event.unwrap()["messages"]
+        .as_array()
+        .unwrap()
+        .is_empty());
+
+    // A DOM observer or an already queued poll may report the previous turn after the
+    // empty home snapshot. The new-conversation generation must keep that stale copy
+    // from rehydrating the native UI while the user is already typing the first prompt.
+    runtime.record_adapter_event_with_context(
+        "session",
+        "message_snapshot",
+        json!({"type":"message_snapshot","messages":[
+            {"id":"late-after-home-user","role":"user","state":"completed","content":[{"type":"text","text":"first"}]},
+            {"id":"late-after-home-answer","role":"assistant","state":"completed","content":[{"type":"text","text":"late first answer"}]}
+        ]}),
+        home_key.as_deref(),
+    );
+    let still_blank = runtime.snapshot("session").unwrap();
+    assert!(still_blank.semantic_event.unwrap()["messages"]
+        .as_array()
+        .unwrap()
+        .is_empty());
+    assert_eq!(
+        still_blank.diagnostics["lastEventKind"],
+        "stale_new_conversation_snapshot_ignored"
+    );
+
     runtime.mark_command_pending_with_value(
         "session",
         "send_prompt",

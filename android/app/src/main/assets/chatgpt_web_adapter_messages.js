@@ -386,9 +386,26 @@
       'details, [role="tree"], [role="grid"], [data-testid*="interactive" i], '
       + '[data-testid*="output" i], [data-testid*="viewer" i], [data-testid*="preview" i]'
     )).forEach((node) => {
+      if (isCitationDisclosure(node)) return;
       add('interactive', structuredLabel(node, '交互内容'), node, { kind: 'interactive' });
     });
     return parts;
+  }
+
+  function isCitationDisclosure(node) {
+    if (!(node instanceof Element) || node.tagName !== 'DETAILS') return false;
+    const summary = node.querySelector(':scope > summary');
+    const identity = cleanText([
+      summary && (summary.innerText || summary.textContent),
+      node.getAttribute('aria-label'),
+      node.getAttribute('data-testid')
+    ].filter(Boolean).join(' ')).toLowerCase();
+    const sourceDisclosure = /(?:sources?|citations?|references?|来源|引用|参考)/i.test(identity);
+    if (!sourceDisclosure || node.querySelectorAll('a[href]').length === 0) return false;
+    return !node.querySelector(
+      'form, input, textarea, select, canvas, iframe, [role="grid"], [role="tree"], '
+      + '[data-testid*="artifact" i], [data-testid*="code-interpreter" i]'
+    );
   }
 
   function messageContent(node, role) {
@@ -604,6 +621,7 @@
     isAssistantActionText,
     messageScope,
     messageContent,
+    isCitationDisclosure,
     lastAssistantObservation,
     lastAssistantPending,
     readMessages,

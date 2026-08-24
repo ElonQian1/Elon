@@ -218,6 +218,18 @@
     };
   }
 
+  function financePartsFromMetadata(metadata) {
+    const references = metadata && Array.isArray(metadata.content_references)
+      ? metadata.content_references
+      : [];
+    return references.slice(0, MAX_FINANCE_WIDGETS * 2).map((reference) => {
+      const initialState = reference && reference.dil && reference.dil.initialState;
+      return initialState && typeof initialState === 'object' && !Array.isArray(initialState)
+        ? financePartFromWidget(initialState)
+        : null;
+    }).filter(Boolean).slice(0, MAX_FINANCE_WIDGETS);
+  }
+
   function visibleContentText(value) {
     const text = String(value || '');
     const marker = '\ue200genui\ue202';
@@ -630,6 +642,18 @@
         else if (richParts.length < MAX_FINANCE_WIDGETS) richParts.push(chartPart);
         stream.richParts = richParts;
       }
+      const financeParts = financePartsFromMetadata(visible.message.metadata);
+      if (financeParts.length) {
+        const richParts = Array.isArray(stream.richParts)
+          ? stream.richParts.filter((part) => part && part.kind !== 'finance')
+          : [];
+        financeParts.forEach((part) => {
+          const duplicate = richParts.some((candidate) => candidate &&
+            candidate.kind === part.kind && cleanText(candidate.text) === cleanText(part.text));
+          if (!duplicate && richParts.length < MAX_FINANCE_WIDGETS) richParts.push(part);
+        });
+        stream.richParts = richParts;
+      }
       return true;
     }
 
@@ -728,6 +752,7 @@
     createSession,
     createSseDecoder,
     financePartFromWidget,
+    financePartsFromMetadata,
     mergeMessages,
     packedFinanceWidgets,
     progressFrame

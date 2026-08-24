@@ -167,6 +167,15 @@ assert.equal(financePart.richContent.payload.chart.kind, 'line');
 assert.equal(financePart.richContent.payload.chart.points.length, 2);
 assert.equal(financePart.richContent.payload.periods[0].selected, true);
 assert.equal(financePart.richContent.payload.metrics.length, 2);
+const metadataFinanceParts = policy.financePartsFromMetadata({
+  content_references: [{
+    type: 'dil',
+    dil: { initialState: financeWidget }
+  }]
+});
+assert.equal(metadataFinanceParts.length, 1);
+assert.equal(metadataFinanceParts[0].richContent.kind, 'finance');
+assert.equal(metadataFinanceParts[0].richContent.payload.chart.points.length, 2);
 
 const chartMetadata = {
   content_references: [{
@@ -219,6 +228,35 @@ const richMerged = richSession.merge([user, {
 assert.equal(richMerged.length, 2);
 assert.equal(richMerged[1].content.filter((part) => part.type === 'rich_card').length, 1);
 assert.equal(richMerged[1].content.some((part) => part.type === 'interactive'), false);
+
+const metadataFinanceSession = policy.createSession({ now: () => 3200 });
+metadataFinanceSession.begin();
+assert.equal(metadataFinanceSession.accept({
+  conversation_id: 'conversation-one',
+  message: {
+    id: 'assistant-metadata-finance',
+    author: { role: 'assistant' },
+    status: 'finished_successfully',
+    content: { content_type: 'text', parts: ['finance answer'] },
+    metadata: {
+      content_references: [{ type: 'dil', dil: { initialState: financeWidget } }]
+    }
+  }
+}), true);
+const metadataFinanceCurrent = metadataFinanceSession.current('/c/conversation-one');
+assert.equal(metadataFinanceCurrent.richParts.length, 1);
+assert.equal(metadataFinanceCurrent.richParts[0].richContent.kind, 'finance');
+const metadataFinanceMerged = metadataFinanceSession.merge([user, {
+  id: 'assistant-metadata-finance',
+  role: 'assistant',
+  state: 'completed',
+  content: [
+    { type: 'markdown', text: 'finance answer' },
+    { type: 'interactive', text: '交互内容', kind: 'interactive' }
+  ]
+}], '/c/conversation-one');
+assert.equal(metadataFinanceMerged[1].content.filter((part) => part.type === 'rich_card').length, 1);
+assert.equal(metadataFinanceMerged[1].content.some((part) => part.type === 'interactive'), false);
 
 session.begin();
 session.accept(payload('stale'));
