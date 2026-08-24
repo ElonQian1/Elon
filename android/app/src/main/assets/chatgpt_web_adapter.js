@@ -14,6 +14,7 @@
   const skinAdapter = window.__elonChatGptSkin;
   const privateTransport = window.__elonChatGptPrivateTransport;
   const privateStreamTransport = window.__elonChatGptPrivateStreamTransport;
+  const privateSendObserver = window.__elonChatGptPrivateSendObserver;
   const authenticationPolicy = window.__elonChatGptAuthenticationPolicy;
   const adapterVersion = Number(window.__elonChatGptAdapterVersion || 0);
   const documentToken = String(window.__elonChatGptDocumentToken || '');
@@ -336,12 +337,16 @@
     poll();
   }
 
-  function waitForSendAccepted(composer, expectedValue, onAccepted, onTimeout) {
+  function waitForSendAccepted(composer, expectedValue, sendMarker, onAccepted, onTimeout) {
     const started = Date.now();
     function poll() {
+      if (privateSendObserver && typeof privateSendObserver.dispatchedAfter === 'function' &&
+          privateSendObserver.dispatchedAfter(sendMarker)) {
+        return onAccepted('official_request_dispatched');
+      }
       const currentValue = comparableText(composerValue(composer));
       if (!currentValue || currentValue !== comparableText(expectedValue) || readStreamingState().active) {
-        return onAccepted();
+        return onAccepted('official_page_accepted');
       }
       if (Date.now() - started >= SEND_ACCEPT_TIMEOUT_MS) return onTimeout();
       window.setTimeout(poll, SEND_BUTTON_POLL_MS);
@@ -363,14 +368,24 @@
       composer,
       value,
       (button) => {
+        const sendMarker = privateSendObserver && typeof privateSendObserver.marker === 'function'
+          ? privateSendObserver.marker()
+          : null;
         button.click();
         scheduleSnapshot(true);
         waitForSendAccepted(
           composer,
           value,
-          () => {
+          sendMarker,
+          (acceptance) => {
             if (streamingPolicy) streamingPolicy.begin(assistantBeforeSend);
-            respond('send_prompt', true, '官方网页已确认发送。');
+            respond(
+              'send_prompt',
+              true,
+              acceptance === 'official_request_dispatched'
+                ? '官网发送请求已提交。'
+                : '官方网页已确认发送。'
+            );
             scheduleSnapshot();
           },
           () => respond('send_prompt', false, '官方网页未确认发送，请重试。')

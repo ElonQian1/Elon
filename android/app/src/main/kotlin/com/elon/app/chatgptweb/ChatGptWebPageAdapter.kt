@@ -420,7 +420,7 @@ internal class ChatGptWebPageAdapter(
         origin.scheme == "https" && origin.host == "chatgpt.com" && origin.port == -1
 
     companion object {
-        internal const val ADAPTER_VERSION = 177
+        internal const val ADAPTER_VERSION = 178
 
         private val ADAPTER_ASSETS = listOf(
             "chatgpt_web_adapter_bootstrap.js",
@@ -460,6 +460,7 @@ internal class ChatGptWebPageAdapter(
             "chatgpt_web_private_transport.js",
             "chatgpt_web_private_stream_policy.js",
             "chatgpt_web_private_stream_transport.js",
+            "chatgpt_web_private_send_observer.js",
             "chatgpt_web_adapter.js",
         )
         private const val BRIDGE_OBJECT = "elonChatGptNative"
