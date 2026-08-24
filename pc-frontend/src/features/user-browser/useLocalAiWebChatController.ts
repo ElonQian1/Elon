@@ -37,6 +37,10 @@ import {
 import { localAiAssistantExtractionIncomplete } from './localAiAssistantContentQuality'
 import { requestOfficialAiTab, requestReturnToAiChat } from './internalBrowserApi'
 import {
+  keepLocalAiNewConversationInNativeForeground,
+  requestLocalAiNewConversationNativeForeground,
+} from './localAiNewConversationForeground'
+import {
   googleNewConversationNeedsReload,
   localAiNewConversationNativeReady,
   selectLocalAiNewConversationPath,
@@ -576,6 +580,7 @@ export default function useLocalAiWebChatController(
     if (!provider || !ownerKey) return null
     const path = selectLocalAiNewConversationPath(provider.id, visibleSessionState, snapshot)
     const previousDraft = beginLocalNewConversation()
+    requestLocalAiNewConversationNativeForeground(provider, ownerKey)
     const retry = createLocalAiAccessRetry(
       requestedSessionIdentity, retryPrompt,
       `optimistic-${provider.id}-${Date.now()}-${optimisticSendSequence.current++}`,
@@ -601,12 +606,14 @@ export default function useLocalAiWebChatController(
             requestId,
           )
           if (next) {
-            setSessionState(next)
             const result = next.commandResult
             if (result?.action !== 'new_conversation' || result.ok) {
+              const background = await keepLocalAiNewConversationInNativeForeground(provider, ownerKey, next)
+              setSessionState(background)
               setMessage(`已进入 ${provider.displayName} 新会话；可以立即输入，官网上下文正在后台确认。`)
-              return next
+              return background
             }
+            setSessionState(next)
           }
         } catch {
           // 活跃适配器偶发失效时复用同一个本地新会话边界，静默切到首页恢复。
@@ -630,12 +637,13 @@ export default function useLocalAiWebChatController(
     if (!provider || !ownerKey) return null
     try {
       const next = await controlLocalAiWebSession(provider.id, ownerKey, 'home')
-      setSessionState(next)
+      const background = await keepLocalAiNewConversationInNativeForeground(provider, ownerKey, next)
+      setSessionState(background)
       setMessage([
         recoveryMessage,
         `已进入 ${provider.displayName} 新会话；可以立即输入，提前发送的消息会在绑定确认后自动提交。`,
       ].filter(Boolean).join(' '))
-      return next
+      return background
     } catch (error) {
       failLocalNewConversation(previousDraft, error)
       return null

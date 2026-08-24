@@ -14,6 +14,10 @@ const welcomeSource = fs.readFileSync(
   path.resolve(__dirname, '../src/features/ai/AiChatWelcome.tsx'),
   'utf8',
 )
+const foregroundSource = fs.readFileSync(
+  path.resolve(__dirname, '../src/features/user-browser/localAiNewConversationForeground.ts'),
+  'utf8',
+)
 const output = ts.transpileModule(source, {
   compilerOptions: {
     module: ts.ModuleKind.CommonJS,
@@ -169,6 +173,22 @@ assert.match(controllerSource, /const path = selectLocalAiNewConversationPath\(/
 assert.match(controllerSource, /if \(path === 'adapter'\)/)
 assert.match(controllerSource, /waitForLocalAiAdapterResult\([\s\S]*?'new_conversation'/)
 assert.match(controllerSource, /return openNewConversationHome\(/)
+assert.match(
+  controllerSource,
+  /startNewConversation[\s\S]*?requestLocalAiNewConversationNativeForeground\(provider, ownerKey\)[\s\S]*?runLocalAiWebAdapterCommand/,
+)
+assert.match(
+  controllerSource,
+  /result\?\.action !== 'new_conversation' \|\| result\.ok[\s\S]*?keepLocalAiNewConversationInNativeForeground\(provider, ownerKey, next\)/,
+)
+assert.match(
+  foregroundSource,
+  /requestReturnToAiChat\([\s\S]*?controlLocalAiWebSession\(provider\.id, ownerKey, 'background'\)/,
+)
+assert.match(
+  controllerSource,
+  /controlLocalAiWebSession\(provider\.id, ownerKey, 'home'\)[\s\S]*?keepLocalAiNewConversationInNativeForeground\(provider, ownerKey, next\)/,
+)
 assert.doesNotMatch(
   controllerSource,
   /action === 'new_conversation'[\s\S]{0,160}selectLocalAiNewConversationPath[\s\S]{0,80}recoverNewConversation/,
