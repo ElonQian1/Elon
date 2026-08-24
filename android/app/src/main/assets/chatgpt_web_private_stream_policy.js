@@ -12,6 +12,9 @@
   const MAX_AGE_MS = 5 * 60 * 1000;
   const MAX_PROGRESS_LENGTH = 220;
   const MAX_PATCH_ARRAY_LENGTH = 128;
+  const MAX_FINANCE_WIDGETS = 4;
+  const MAX_PACKED_WIDGET_LENGTH = 1024 * 1024;
+  const MAX_FINANCE_POINTS = 256;
 
   function cleanText(value) {
     return String(value || '').replace(/\u00a0/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
@@ -75,6 +78,115 @@
 
   function sourceLabel(item) {
     return cleanText(item && (item.attribution || item.title)).replace(/[\[\]()]/g, '').slice(0, 80);
+  }
+
+  function safeToken(value, limit) {
+    return cleanText(value).replace(/[^A-Za-z0-9._-]/g, '').slice(0, limit || 24);
+  }
+
+  function boundedSamples(values, limit) {
+    const source = Array.isArray(values) ? values : [];
+    if (source.length <= limit) return source.slice();
+    return Array.from({ length: limit }, (_, index) =>
+      source[Math.round(index * (source.length - 1) / (limit - 1))]
+    );
+  }
+
+  function financeTrend(summary) {
+    const color = cleanText(summary && summary.price_change_color).toLowerCase();
+    const change = cleanText(summary && summary.price_change_text);
+    if (/^(?:success|positive|green)$/.test(color) || /^\+/.test(change)) return 'positive';
+    if (/^(?:danger|negative|error|red)$/.test(color) || /^(?:-|−)/.test(change)) return 'negative';
+    return 'neutral';
+  }
+
+  function financePartFromWidget(value) {
+    const widget = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+    const order = Array.isArray(widget.timeframe_order) ? widget.timeframe_order.slice(0, 12) : [];
+    const configs = widget.timeframe_configs && typeof widget.timeframe_configs === 'object'
+      ? widget.timeframe_configs
+      : {};
+    const selectedLabel = cleanText(widget.default_range).slice(0, 16);
+    const selected = configs[selectedLabel] && typeof configs[selectedLabel] === 'object'
+      ? configs[selectedLabel]
+      : configs[order.find((label) => configs[label])] || {};
+    const summary = selected.summary && typeof selected.summary === 'object'
+      ? selected.summary
+      : widget.fallback_summary && typeof widget.fallback_summary === 'object'
+        ? widget.fallback_summary
+        : {};
+    const chart = selected.chart && typeof selected.chart === 'object' ? selected.chart : {};
+    const points = boundedSamples(chart.data, MAX_FINANCE_POINTS).map((point, index) => ({
+      x: cleanText(point && (point.formatted || point.timestamp || index)).slice(0, 64),
+      y: Number(point && point.close)
+    })).filter((point) => point.x && Number.isFinite(point.y));
+    const metrics = (Array.isArray(widget.metrics_display) ? widget.metrics_display : [])
+      .slice(0, 8)
+      .flatMap((row) => Array.isArray(row && row.cols) ? row.cols.slice(0, 8) : [])
+      .map((metric) => ({
+        label: cleanText(metric && metric.label).slice(0, 64),
+        value: cleanText(metric && metric.value).slice(0, 96)
+      }))
+      .filter((metric) => metric.label && metric.value)
+      .slice(0, 16);
+    const title = cleanText(widget.asset_display_name).slice(0, 120);
+    const primaryValue = cleanText(
+      widget.current_price_text || summary.price_text ||
+      widget.fallback_summary && widget.fallback_summary.price_text
+    ).slice(0, 64);
+    if (!title || !primaryValue || points.length < 2) return null;
+    const symbolMatch = title.match(/\(([A-Za-z0-9._-]{1,24})\)\s*$/);
+    const payload = {
+      title,
+      symbol: symbolMatch ? safeToken(symbolMatch[1], 24) : '',
+      primaryValue,
+      secondaryValue: cleanText(summary.price_change_text).slice(0, 96),
+      trend: financeTrend(summary),
+      periods: order.map((label) => ({
+        id: safeToken(label, 16).toLowerCase(),
+        label: cleanText(label).slice(0, 16),
+        selected: label === selectedLabel
+      })).filter((period) => period.id && period.label && configs[period.label]),
+      metrics,
+      chart: { kind: 'line', points }
+    };
+    return {
+      type: 'rich_card',
+      text: title,
+      kind: 'finance',
+      richContent: {
+        schema: 'yilong.rich-content.v1',
+        kind: 'finance',
+        source: 'private_response',
+        payload
+      }
+    };
+  }
+
+  function packedFinanceWidgets(payload) {
+    const visible = assistantEnvelope(payload);
+    const metadata = visible && visible.message && visible.message.metadata;
+    const widgets = metadata && metadata.view_state && metadata.view_state.widgets;
+    if (!widgets || typeof widgets !== 'object' || Array.isArray(widgets)) return [];
+    return Object.entries(widgets).slice(0, MAX_FINANCE_WIDGETS).map(([widgetId, packed]) => {
+      const compressed = packed && typeof packed.__compressed === 'string'
+        ? packed.__compressed
+        : '';
+      const encoding = cleanText(packed && packed.__encoding);
+      if (encoding !== 'gzip-json-base64url-v1' || !compressed ||
+          compressed.length > MAX_PACKED_WIDGET_LENGTH || !/^[A-Za-z0-9_-]+$/.test(compressed)) {
+        return null;
+      }
+      return {
+        widgetId: cleanText(widgetId).slice(0, 180),
+        messageId: String(visible.message.id || '').slice(0, 180),
+        conversationId: String(
+          visible.envelope.conversation_id || visible.envelope.conversationId || ''
+        ).slice(0, 180),
+        encoding,
+        compressed
+      };
+    }).filter(Boolean);
   }
 
   function citationRecords(metadata) {
@@ -233,14 +345,22 @@
 
   function mergedMessage(message, stream) {
     const replaceCitations = Array.isArray(stream.citations) && stream.citations.length > 0;
+    const replaceFinance = Array.isArray(stream.richParts) && stream.richParts.length > 0;
     const content = Array.isArray(message.content)
-      ? message.content.filter((part) => part && (!replaceCitations || part.type !== 'citation')).slice()
+      ? message.content.filter((part) => part &&
+        (!replaceCitations || part.type !== 'citation') &&
+        (!replaceFinance || !(
+          (part.type === 'rich_card' && (part.kind === 'finance' ||
+            part.richContent && part.richContent.kind === 'finance')) ||
+          ['artifact', 'chart', 'interactive'].includes(part.type)
+        ))).slice()
       : [];
     const index = content.findIndex((item) => item && (item.type === 'markdown' || item.type === 'text'));
     const part = { type: 'markdown', text: stream.text || '' };
     if (index >= 0) content[index] = Object.assign({}, content[index], part);
     else content.unshift(part);
     (stream.citations || []).forEach((citation) => content.push(Object.assign({}, citation)));
+    (stream.richParts || []).forEach((richPart) => content.push(Object.assign({}, richPart)));
     return Object.assign({}, message, { state: stream.state, content });
   }
 
@@ -256,9 +376,18 @@
     }
     const assistant = assistantIndex >= 0 ? values[assistantIndex] : null;
     const text = primaryText(assistant);
+    let latestUserIndex = -1;
+    for (let index = values.length - 1; index >= 0; index -= 1) {
+      if (values[index] && values[index].role === 'user') {
+        latestUserIndex = index;
+        break;
+      }
+    }
+    const sameTurn = !!assistant && latestUserIndex >= 0 && assistantIndex > latestUserIndex;
     const sameMessage = !!assistant && (
       (stream.id && (assistant.id === stream.id || assistant.id === 'private-stream:' + stream.id)) ||
-      (text && stream.text && (stream.text.startsWith(text) || text.startsWith(stream.text)))
+      (text && stream.text && (stream.text.startsWith(text) || text.startsWith(stream.text))) ||
+      sameTurn
     );
     if (sameMessage) {
       if (text.length > stream.text.length) {
@@ -273,7 +402,8 @@
       role: 'assistant',
       state: stream.state,
       content: [{ type: 'markdown', text: stream.text }].concat(
-        (stream.citations || []).map((citation) => Object.assign({}, citation))
+        (stream.citations || []).map((citation) => Object.assign({}, citation)),
+        (stream.richParts || []).map((richPart) => Object.assign({}, richPart))
       )
     }]);
   }
@@ -415,7 +545,7 @@
     function begin() {
       stream = {
         id: '', conversationId: '', text: '', progressLabel: '',
-        state: 'streaming', updatedAt: now()
+        state: 'streaming', richParts: [], updatedAt: now()
       };
       compactDocument = null;
       compactContinuation = null;
@@ -432,6 +562,33 @@
       return true;
     }
 
+    function acceptRichParts(parts, identity) {
+      const values = Array.isArray(parts) ? parts.filter(Boolean).slice(0, MAX_FINANCE_WIDGETS) : [];
+      if (!values.length) return false;
+      const context = identity && typeof identity === 'object' ? identity : {};
+      if (stream && stream.id && context.messageId && stream.id !== context.messageId) return false;
+      if (stream && stream.conversationId && context.conversationId &&
+          stream.conversationId !== context.conversationId) return false;
+      if (!stream) begin();
+      const existing = Array.isArray(stream.richParts) ? stream.richParts.slice() : [];
+      values.forEach((part) => {
+        const kind = cleanText(part && part.kind);
+        const title = cleanText(part && part.text);
+        const index = existing.findIndex((candidate) =>
+          cleanText(candidate && candidate.kind) === kind && cleanText(candidate && candidate.text) === title
+        );
+        if (index >= 0) existing[index] = part;
+        else if (existing.length < MAX_FINANCE_WIDGETS) existing.push(part);
+      });
+      stream = Object.assign({}, stream, {
+        id: String(stream.id || context.messageId || '').slice(0, 180),
+        conversationId: String(stream.conversationId || context.conversationId || '').slice(0, 180),
+        richParts: existing.map((part) => JSON.parse(JSON.stringify(part))),
+        updatedAt: now()
+      });
+      return true;
+    }
+
     function reset() {
       stream = null;
       compactDocument = null;
@@ -439,7 +596,7 @@
     }
 
     function current(pathname) {
-      if (!stream || (!stream.text && !stream.progressLabel && !stream.id) ||
+      if (!stream || (!stream.text && !stream.progressLabel && !stream.id && !stream.richParts.length) ||
           now() - stream.updatedAt > MAX_AGE_MS ||
           !conversationMatches(pathname, stream.conversationId)) return null;
       return Object.assign({}, stream);
@@ -448,17 +605,32 @@
     function merge(values, pathname) {
       const active = current(pathname);
       if (!active) return values;
-      const result = mergeMessages(values, active);
-      if (active.state === 'completed') {
-        const lastAssistant = Array.from(values || []).reverse()
-          .find((message) => message && message.role === 'assistant');
-        if (primaryText(lastAssistant).length >= active.text.length) reset();
-      }
-      return result;
+      return mergeMessages(values, active);
     }
 
-    return Object.freeze({ begin, accept, finish, reset, current, merge });
+    function packedWidgets() {
+      return packedFinanceWidgets(compactDocument);
+    }
+
+    return Object.freeze({
+      begin,
+      accept,
+      acceptRichParts,
+      finish,
+      reset,
+      current,
+      merge,
+      packedWidgets
+    });
   }
 
-  return Object.freeze({ assistantFrame, createSession, createSseDecoder, mergeMessages, progressFrame });
+  return Object.freeze({
+    assistantFrame,
+    createSession,
+    createSseDecoder,
+    financePartFromWidget,
+    mergeMessages,
+    packedFinanceWidgets,
+    progressFrame
+  });
 });

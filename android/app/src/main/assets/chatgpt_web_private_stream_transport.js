@@ -4,7 +4,11 @@
   if (window.__elonChatGptPrivateStreamObserverEnabled !== true) return;
   if (location.origin !== 'https://chatgpt.com') return;
   const existing = window.__elonChatGptPrivateStreamTransport;
-  if (existing && Number(existing.version) >= 5) return;
+  if (existing && Number(existing.version) >= 6) return;
+  if (existing && typeof existing.dispose === 'function') {
+    try { existing.dispose(); }
+    catch (_) { /* A stale transport must not block the upgraded observer. */ }
+  }
   const policy = window.__elonChatGptPrivateStreamPolicy;
   const originalFetch = typeof window.fetch === 'function' ? window.fetch : null;
   const socketTap = window.__elonChatGptPrivateSocketTap;
@@ -16,6 +20,9 @@
   const MAX_SOCKET_DEPTH = 6;
   const MAX_SOCKET_VALUES = 80;
   const MAX_SOCKET_TEXT_LENGTH = 65536;
+  const MAX_PACKED_WIDGET_BYTES = 768 * 1024;
+  const MAX_UNPACKED_WIDGET_BYTES = 2 * 1024 * 1024;
+  const observedWidgets = new Set();
   let disposed = false;
   let socketUnsubscribe = null;
   let socketFrames = 0;
@@ -28,6 +35,88 @@
     listeners.forEach((listener) => {
       try { listener(); }
       catch (_) { /* Native snapshot fallback remains active. */ }
+    });
+  }
+
+  function packedWidgetKey(widget) {
+    const value = String(widget && widget.compressed || '');
+    return [
+      String(widget && widget.messageId || ''),
+      String(widget && widget.widgetId || ''),
+      value.length,
+      value.slice(0, 16),
+      value.slice(-16)
+    ].join(':').slice(0, 460);
+  }
+
+  function base64UrlBytes(value) {
+    const source = String(value || '');
+    if (!source || source.length > 1024 * 1024 || !/^[A-Za-z0-9_-]+$/.test(source) ||
+        typeof atob !== 'function') return null;
+    const padding = source.length % 4 ? '='.repeat(4 - source.length % 4) : '';
+    let decoded;
+    try { decoded = atob(source.replace(/-/g, '+').replace(/_/g, '/') + padding); }
+    catch (_) { return null; }
+    if (!decoded || decoded.length > MAX_PACKED_WIDGET_BYTES) return null;
+    const bytes = new Uint8Array(decoded.length);
+    for (let index = 0; index < decoded.length; index += 1) bytes[index] = decoded.charCodeAt(index);
+    return bytes;
+  }
+
+  async function decodePackedFinance(widget) {
+    if (!widget || widget.encoding !== 'gzip-json-base64url-v1' ||
+        typeof DecompressionStream !== 'function' || typeof Blob !== 'function') return null;
+    const compressed = base64UrlBytes(widget.compressed);
+    if (!compressed) return null;
+    let reader;
+    try {
+      reader = new Blob([compressed]).stream()
+        .pipeThrough(new DecompressionStream('gzip')).getReader();
+      const decoder = new TextDecoder();
+      let json = '';
+      let total = 0;
+      while (true) {
+        const chunk = await reader.read();
+        if (chunk.done) break;
+        total += Number(chunk.value && chunk.value.byteLength || 0);
+        if (total > MAX_UNPACKED_WIDGET_BYTES) {
+          try { await reader.cancel(); }
+          catch (_) { /* The bounded decoder may already be closed. */ }
+          return null;
+        }
+        json += decoder.decode(chunk.value, { stream: true });
+      }
+      json += decoder.decode();
+      const value = JSON.parse(json);
+      return typeof policy.financePartFromWidget === 'function'
+        ? policy.financePartFromWidget(value)
+        : null;
+    } catch (_) {
+      return null;
+    } finally {
+      if (reader) {
+        try { reader.releaseLock(); }
+        catch (_) { /* The decompression stream may already be closed. */ }
+      }
+    }
+  }
+
+  function observePackedFinance(payload) {
+    if (typeof policy.packedFinanceWidgets !== 'function' ||
+        typeof session.acceptRichParts !== 'function') return;
+    const widgets = policy.packedFinanceWidgets(payload).concat(
+      typeof session.packedWidgets === 'function' ? session.packedWidgets() : []
+    );
+    widgets.forEach((widget) => {
+      const key = packedWidgetKey(widget);
+      if (!key || observedWidgets.has(key)) return;
+      if (observedWidgets.size >= 32) observedWidgets.clear();
+      observedWidgets.add(key);
+      Promise.resolve(decodePackedFinance(widget)).then((part) => {
+        if (disposed || !part || !session.acceptRichParts([part], widget)) return;
+        recordShape('widget/finance/decoded');
+        notify();
+      }).catch(() => recordShape('widget/finance/decode_error'));
     });
   }
 
@@ -191,8 +280,12 @@
       if (typeof value !== 'object') continue;
       reportShape(value, source);
       if (session.accept(value)) accepted = true;
+      observePackedFinance(value);
       if (value.author && value.author.role === 'assistant' &&
-          session.accept({ message: value })) accepted = true;
+          session.accept({ message: value })) {
+        accepted = true;
+        observePackedFinance({ message: value });
+      }
       if (entry.depth >= MAX_SOCKET_DEPTH) continue;
       if (Array.isArray(value)) {
         value.slice(0, 24).forEach((item) => queue.push({
@@ -348,6 +441,7 @@
       (payload) => {
         reportShape(payload);
         if (!session.accept(payload)) return;
+        observePackedFinance(payload);
         frames += 1;
         if (!firstReported) {
           firstReported = true;
@@ -401,7 +495,7 @@
   }
 
   window.__elonChatGptPrivateStreamTransport = Object.freeze({
-    version: 5,
+    version: 6,
     enabled: true,
     current: (pathname) => session.current(pathname),
     access: currentAccess,
@@ -415,6 +509,7 @@
       if (disposed) return;
       disposed = true;
       listeners.clear();
+      observedWidgets.clear();
       if (typeof socketUnsubscribe === 'function') socketUnsubscribe();
       socketUnsubscribe = null;
       accessSignal = null;

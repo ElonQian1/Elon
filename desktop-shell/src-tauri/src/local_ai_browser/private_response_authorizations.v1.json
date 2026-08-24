@@ -1,4 +1,20 @@
 {
   "schema": "yilong.private-response-authorization.v1",
-  "authorizations": []
+  "authorizations": [
+    {
+      "authorizationId": "chatgpt-finance-rich-content-2026",
+      "providerId": "chatgpt",
+      "product": "ChatGPT Web structured finance widgets",
+      "origins": ["https://chatgpt.com/"],
+      "endpointPathPrefixes": ["/backend-api/", "/backend-anon/"],
+      "dataClasses": ["rich_content.finance"],
+      "persistence": "sanitized_ast_only",
+      "upload": "none",
+      "consent": "official_web_session",
+      "rawRetentionSeconds": 0,
+      "expiresAtMs": 1830211200000,
+      "revoked": false,
+      "revocation": "删除本授权条目、提升 ChatGPT 适配器版本并重新发布 Windows 客户端"
+    }
+  ]
 }

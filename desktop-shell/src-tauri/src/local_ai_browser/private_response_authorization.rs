@@ -166,10 +166,12 @@ mod tests {
     }
 
     #[test]
-    fn production_registry_denies_private_response_by_default() {
+    fn production_registry_allows_only_registered_chatgpt_finance() {
         let registry = parse_registry(REGISTRY_SOURCE).unwrap();
-        assert!(!registry.allows("chatgpt", "rich_content.finance", 1));
-        assert!(!allows_rich_kind("chatgpt", "finance"));
+        assert!(registry.allows("chatgpt", "rich_content.finance", now_ms()));
+        assert!(allows_rich_kind("chatgpt", "finance"));
+        assert!(!registry.allows("chatgpt", "rich_content.weather", now_ms()));
+        assert!(!registry.allows("google-ai-mode", "rich_content.finance", now_ms()));
     }
 
     #[test]

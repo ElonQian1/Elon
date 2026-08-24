@@ -105,7 +105,88 @@ merged = session.merge([user, {
   content: [{ type: 'markdown', text: 'hello world' }]
 }], '/c/conversation-one');
 assert.equal(merged.length, 2);
-assert.equal(session.current('/c/conversation-one'), null);
+assert.equal(session.current('/c/conversation-one').state, 'completed');
+
+const positionalMerged = policy.mergeMessages([user, {
+  id: 'conversation-turn-2',
+  role: 'assistant',
+  state: 'completed',
+  content: [{ type: 'markdown', text: 'hello world [Reuters](https://reuters.com/example)' }]
+}], {
+  id: 'assistant-private-id',
+  text: 'hello world',
+  state: 'completed'
+});
+assert.equal(positionalMerged.length, 2, 'the DOM and private stream for the current turn are merged');
+assert.equal(positionalMerged[1].id, 'conversation-turn-2');
+
+const nextTurnMerged = policy.mergeMessages([{
+  id: 'assistant-previous',
+  role: 'assistant',
+  state: 'completed',
+  content: [{ type: 'markdown', text: 'previous answer' }]
+}, user], {
+  id: 'assistant-current',
+  text: 'current answer',
+  state: 'streaming'
+});
+assert.equal(nextTurnMerged.length, 3, 'an assistant before the latest user is not overwritten');
+assert.equal(nextTurnMerged[2].id, 'private-stream:assistant-current');
+
+const financeWidget = {
+  default_range: '1D',
+  timeframe_order: ['1D', '5D'],
+  timeframe_configs: {
+    '1D': {
+      chart: {
+        data: [
+          { timestamp: 1, close: 77000, formatted: '12:00 上午' },
+          { timestamp: 2, close: 77100, formatted: '12:05 上午' }
+        ]
+      },
+      summary: {
+        price_text: 'US$77,100.00',
+        price_change_text: '+US$100.00 (0.13%)',
+        price_change_color: 'success'
+      }
+    },
+    '5D': { chart: { data: [] }, summary: {} }
+  },
+  asset_display_name: 'Bitcoin (BTC)',
+  current_price_text: 'US$77,100.00',
+  metrics_display: [{ cols: [
+    { label: '当日最低价', value: '75,853' },
+    { label: '当日最高价', value: '78,003' }
+  ] }]
+};
+const financePart = policy.financePartFromWidget(financeWidget);
+assert.equal(financePart.type, 'rich_card');
+assert.equal(financePart.richContent.source, 'private_response');
+assert.equal(financePart.richContent.payload.symbol, 'BTC');
+assert.equal(financePart.richContent.payload.chart.kind, 'line');
+assert.equal(financePart.richContent.payload.chart.points.length, 2);
+assert.equal(financePart.richContent.payload.periods[0].selected, true);
+assert.equal(financePart.richContent.payload.metrics.length, 2);
+
+const richSession = policy.createSession({ now: () => 3000 });
+richSession.begin();
+richSession.accept(payload('finance answer', 'finished_successfully'));
+assert.equal(richSession.acceptRichParts([financePart], {
+  messageId: 'assistant-one',
+  conversationId: 'conversation-one'
+}), true);
+const richMerged = richSession.merge([user, {
+  id: 'conversation-turn-finance',
+  role: 'assistant',
+  state: 'completed',
+  content: [
+    { type: 'markdown', text: 'finance answer' },
+    { type: 'interactive', text: '交互内容', kind: 'interactive' }
+  ]
+}], '/c/conversation-one');
+assert.equal(richMerged.length, 2);
+assert.equal(richMerged[1].content.filter((part) => part.type === 'rich_card').length, 1);
+assert.equal(richMerged[1].content.some((part) => part.type === 'interactive'), false);
 
 session.begin();
 session.accept(payload('stale'));

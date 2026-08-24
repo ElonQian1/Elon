@@ -7469,6 +7469,158 @@
       "updated_at_ms": 1787515375220
     },
     {
+      "id": "win-chatgpt-private-finance-widget-v1",
+      "title": "Win ChatGPT 私有金融组件与回答去重 V1",
+      "summary": "合并私有流与 DOM 完成消息，并把获准响应中的结构化金融组件转换为现有富内容协议，消除重复答案和交互内容占位。",
+      "status": "verified",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/win-chatgpt-private-finance-widget-v1.md",
+        "content_hash": "afe2685bedd87576aac51d92c607eb45f0ec3e00cb392b432e7d70a594d01091",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "92553cbf2b73396b88bafb9edc95121c981e1a2e",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "114b4550d1e2fda0a00a64f4ef174be2732f8c51",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "win-ai-chat",
+      "tags": [
+        "win",
+        "chatgpt",
+        "finance",
+        "rich-content",
+        "webview2"
+      ],
+      "task_paths": [
+        "android/app/src/main/assets/chatgpt_web_private_stream_policy.js",
+        "android/app/src/main/assets/chatgpt_web_private_stream_transport.js",
+        "desktop-shell/src-tauri/src/local_ai_browser/chatgpt_rich_content_adapter.js",
+        "pc-frontend/scripts",
+        "scripts"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "同一轮私有流与 DOM 完成结果只显示一条助手消息",
+        "结构化金融组件显示价格、涨跌、周期、折线和指标",
+        "未知或超限私有组件安全忽略",
+        "旧 Markdown、引用和官方页回退保持可用",
+        "Win Web AI 全量验证和正式构建通过"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "android/app/src/main/assets/chatgpt_web_private_stream_policy.js",
+          "content_hash": "44df8f32a5fb0c6cce07fac87fbbb80386700c4066a955dc2e4ee52ab17c382b",
+          "locator": "financePartFromWidget/mergeMessages",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "92553cbf2b73396b88bafb9edc95121c981e1a2e",
+            "head_blob_oid": "67b7bd0da69a18eeaff408af76c459dcd2354124",
+            "worktree_blob_oid": "288536a6cecdcd47a893b6958f99117433b1bf08",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/main/assets/chatgpt_web_private_stream_transport.js",
+          "content_hash": "9de3fa6dc74d606872ef9a2c6ce81cc7729ad6861df25bcd213ca50503db7a5a",
+          "locator": "decodePackedFinance/observePackedFinance",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "92553cbf2b73396b88bafb9edc95121c981e1a2e",
+            "head_blob_oid": "3ccba5db114cb1e1aba0441e348e056910abcffe",
+            "worktree_blob_oid": "63d79abdfe8e724447481ce88aeabbe42aa7e9d7",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "desktop-shell/src-tauri/src/local_ai_browser/chatgpt_rich_content_adapter.js",
+          "content_hash": "3535b529ece2cb59da6e6e51d4f0f5caa21036edd6dadd435727fd04eb40b3dc",
+          "locator": "financeRoots",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "92553cbf2b73396b88bafb9edc95121c981e1a2e",
+            "head_blob_oid": "63e915affb8b19a8cd953d00fde20917afaf72fe",
+            "worktree_blob_oid": "181dfed48df0e98dd140018cf93c0ae03d381bb7",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "desktop-shell/src-tauri/src/local_ai_browser/private_response_authorizations.v1.json",
+          "content_hash": "011ba6d235498eed75d8d0c77c70e84121528916decb6d0052e4b2f8299a2639",
+          "locator": "chatgpt-finance-rich-content-2026",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "92553cbf2b73396b88bafb9edc95121c981e1a2e",
+            "head_blob_oid": "f8a268c4b327a213f770b18dfdda4dcd3e7d1d14",
+            "worktree_blob_oid": "ea5d295770125cd66cbd0082248ef80ac77a045a",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "docs/requirements/win-chatgpt-private-finance-widget-v1.md",
+          "content_hash": "afe2685bedd87576aac51d92c607eb45f0ec3e00cb392b432e7d70a594d01091",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "92553cbf2b73396b88bafb9edc95121c981e1a2e",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "114b4550d1e2fda0a00a64f4ef174be2732f8c51",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "pc-frontend/scripts/test-ai-rich-content-contract.cjs",
+          "content_hash": "ded7b0c3d1caad8e42c5f53d4c1aa25af92f6959925c2ca3c52cc62ec77be105",
+          "locator": "production authorization and finance renderer contract",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "92553cbf2b73396b88bafb9edc95121c981e1a2e",
+            "head_blob_oid": "5f47fc059f6820143f1fb5ab39506842300bbf4b",
+            "worktree_blob_oid": "c45fff42b49b87ddc9d8d3ce7c11fa4051fbbc15",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "scripts/test-chatgpt-web-private-stream-policy.js",
+          "content_hash": "ed7d6fa1c59fa4ec99d6427c6b7603b133cde98f9e0951b09bca940bd173c731",
+          "locator": "finance widget and duplicate turn assertions",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "92553cbf2b73396b88bafb9edc95121c981e1a2e",
+            "head_blob_oid": "aa361b2def079ca6ded9a9e9bc0779da90ccda54",
+            "worktree_blob_oid": "0f16ddff05b82421c4681451e7fac35a9b221446",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "scripts/test-chatgpt-web-private-stream-transport.js",
+          "content_hash": "b0e39cdf9e0eb18dad329c9b93be0bc8d31842e93c52f31a0eb676c573c34f32",
+          "locator": "gzip finance widget transport fixture",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "92553cbf2b73396b88bafb9edc95121c981e1a2e",
+            "head_blob_oid": "4f8330f94b86e6da91e74f849fcc7b1445590107",
+            "worktree_blob_oid": "fc683b774289e4f03889b201e9f1e48de662d9df",
+            "state": "tracked_modified"
+          }
+        }
+      ],
+      "created_at_ms": 1787561609305,
+      "updated_at_ms": 1787563222951
+    },
+    {
       "id": "win-chatgpt-search-streaming-state-v1",
       "title": "Win ChatGPT 搜索流状态同步 V1",
       "summary": "重建 ChatGPT 紧凑流的搜索进度与正文增量，过滤无障碍说话人外壳，使原生 Win 聊天在搜索、生成和完成阶段保持同一助手消息。",
@@ -12061,66 +12213,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_a7aaee0ffc5e463e98c14cd6174f2a9b",
-      "feature_id": "win-web-ai-rich-diagnostic-transport-v1",
-      "action": "metadata_updated",
-      "actor": "codex-desktop-root",
-      "reason": "纳入独立集成测试目标，直接验证本模块的固定白名单、上限与秘密字段剥离。",
-      "from_status": "ready",
-      "to_status": "proposed",
-      "at_ms": 1787433765169
-    },
-    {
-      "id": "feature_event_38f19d7dc0414c88bd3dd50c3c300047",
-      "feature_id": "win-web-ai-rich-diagnostic-transport-v1",
-      "action": "transitioned",
-      "actor": "codex-desktop-root",
-      "reason": "测试路径扩展已评审，范围仍仅限 Win 节点诊断传输。",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1787433765192
-    },
-    {
-      "id": "feature_event_03a0d152155745528fddfb5e7db7f36d",
-      "feature_id": "win-web-ai-rich-diagnostic-transport-v1",
-      "action": "transitioned",
-      "actor": "codex-desktop-root",
-      "reason": "依赖已发布，需求、验收与测试路径明确，可继续实现。",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1787433765202
-    },
-    {
-      "id": "feature_event_bcd2cce791934d77bc5b2d1ca6de72d4",
-      "feature_id": "win-web-ai-rich-diagnostic-transport-v1",
-      "action": "claimed",
-      "actor": "codex-desktop-root",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1787433765213
-    },
-    {
-      "id": "feature_event_f71b2105482d40f2a1720dfb6e640ce8",
-      "feature_id": "win-web-ai-rich-diagnostic-transport-v1",
-      "action": "claim_released",
-      "actor": "codex-desktop-root",
-      "reason": "隔离测试仍触发主 package 全二进制链接，增加轻量 Rust harness 以避免无关构建与磁盘放大。",
-      "from_status": "claimed",
-      "to_status": "ready",
-      "at_ms": 1787434032875
-    },
-    {
-      "id": "feature_event_be1fdb8b6f83482ea6ae7a5610dca9ab",
-      "feature_id": "win-web-ai-rich-diagnostic-transport-v1",
-      "action": "metadata_updated",
-      "actor": "codex-desktop-root",
-      "reason": "增加只依赖 serde_json 的轻量测试 manifest，精准运行诊断模块回归。",
-      "from_status": "ready",
-      "to_status": "proposed",
-      "at_ms": 1787434032896
-    },
-    {
       "id": "feature_event_05fff9d9975746138c6de4c486f18fad",
       "feature_id": "win-web-ai-rich-diagnostic-transport-v1",
       "action": "transitioned",
@@ -14059,6 +14151,66 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1787545100240
+    },
+    {
+      "id": "feature_event_e55345b9e3304edc8cb144fc43fa691f",
+      "feature_id": "win-chatgpt-private-finance-widget-v1",
+      "action": "registered",
+      "actor": "codex-root",
+      "reason": "用户在最新 Win 正式版复现重复回答和比特币图表缺失，已确认私有响应包含完整结构化金融组件。",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1787561609305
+    },
+    {
+      "id": "feature_event_9571a143ba0e472ca7b92e5acaffaa72",
+      "feature_id": "win-chatgpt-private-finance-widget-v1",
+      "action": "claimed",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1787561645364
+    },
+    {
+      "id": "feature_event_bc90b3fdb9d9451d9fa5391393ef8070",
+      "feature_id": "win-chatgpt-private-finance-widget-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "开始修复私有金融组件解析和同轮回答去重。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1787561671147
+    },
+    {
+      "id": "feature_event_8b4fb84f9060490492997793da90cb41",
+      "feature_id": "win-chatgpt-private-finance-widget-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1787563175440
+    },
+    {
+      "id": "feature_event_0d551e47ce15407b8478ca5666197bde",
+      "feature_id": "win-chatgpt-private-finance-widget-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "私有金融组件解析、同轮回答去重、DOM 回退和生产授权门禁均已实现。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1787563191477
+    },
+    {
+      "id": "feature_event_536e9965889f4aa489feec73705eb5a5",
+      "feature_id": "win-chatgpt-private-finance-widget-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "真实捕获映射验证通过，私有流/传输/富内容合同及 Win Web AI 全量验证通过。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1787563222951
     }
   ]
 }

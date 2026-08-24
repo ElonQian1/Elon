@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  const API_VERSION = 4;
+  const API_VERSION = 5;
   if (location.origin !== 'https://chatgpt.com' ||
       Number(window.__elonChatGptRichContent && window.__elonChatGptRichContent.version || 0) >= API_VERSION) return;
 
@@ -338,7 +338,9 @@
   function qualifiesAsFinance(root) {
     const lines = cleanLines(root.innerText || root.textContent);
     const controls = periodControls(root);
-    const chart = root.querySelector('[role="application"], canvas, [aria-label*="chart" i]');
+    const chart = root.querySelector(
+      '[role="application"], canvas, [aria-label*="chart" i], svg path[d], svg polyline[points]'
+    );
     return controls.length >= 4 && Boolean(firstPrice(lines)) && Boolean(chart);
   }
 
@@ -354,7 +356,8 @@
   function financeRoots(content) {
     if (!(content instanceof HTMLElement)) return [];
     const seeds = Array.from(content.querySelectorAll(
-      '[role="radiogroup"], [role="application"], canvas, [aria-label*="chart" i]'
+      '[role="radiogroup"], [role="application"], canvas, [aria-label*="chart" i], '
+      + '[data-testid*="finance" i], [data-testid*="chart" i], svg path[d], svg polyline[points]'
     ));
     const roots = [];
     seeds.forEach((seed) => {

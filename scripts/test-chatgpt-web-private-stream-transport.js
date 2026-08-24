@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+const zlib = require('node:zlib');
 
 const asset = (name) => fs.readFileSync(path.join(
   __dirname, '..', 'android', 'app', 'src', 'main', 'assets', name
@@ -113,6 +114,10 @@ function context(enabled, response) {
     Date,
     JSON,
     TextDecoder,
+    DecompressionStream,
+    Blob,
+    Uint8Array,
+    atob,
     Set,
     Object,
     String,
@@ -142,7 +147,7 @@ function context(enabled, response) {
     'data: [DONE]\n\n'
   ]);
   const enabled = context(true, response);
-  assert.equal(enabled.window.__elonChatGptPrivateStreamTransport.version, 5);
+  assert.equal(enabled.window.__elonChatGptPrivateStreamTransport.version, 6);
   assert.equal(enabled.socketListenerCount(), 1);
   let notifications = 0;
   enabled.window.__elonChatGptPrivateStreamTransport.subscribe(() => { notifications += 1; });
@@ -312,6 +317,58 @@ function context(enabled, response) {
   const compactMerged = enabled.window.__elonChatGptPrivateStreamPolicy.mergeMessages([], compactFrame);
   assert.equal(compactMerged[0].content.map((part) => part.type).join(','), 'markdown,citation');
   assert.equal(compactMerged[0].content[1].url, 'https://www.reuters.com/markets/example');
+
+  const widget = {
+    default_range: '1D',
+    timeframe_order: ['1D'],
+    timeframe_configs: {
+      '1D': {
+        chart: { data: [
+          { timestamp: 1, close: 77000, formatted: '12:00 上午' },
+          { timestamp: 2, close: 77100, formatted: '12:05 上午' }
+        ] },
+        summary: {
+          price_text: 'US$77,100.00',
+          price_change_text: '+US$100.00 (0.13%)',
+          price_change_color: 'success'
+        }
+      }
+    },
+    asset_display_name: 'Bitcoin (BTC)',
+    current_price_text: 'US$77,100.00',
+    metrics_display: [{ cols: [{ label: '当日最低价', value: '75,853' }] }]
+  };
+  const compressedWidget = zlib.gzipSync(Buffer.from(JSON.stringify(widget))).toString('base64url');
+  const widgetPayload = {
+    conversation_id: 'conversation-one',
+    message: {
+      id: 'assistant-widget',
+      author: { role: 'assistant' },
+      status: 'finished_successfully',
+      content: { content_type: 'text', parts: ['finance answer'] },
+      metadata: { view_state: { widgets: {
+        'finance-widget:0': {
+          __encoding: 'gzip-json-base64url-v1',
+          __compressed: compressedWidget
+        }
+      } } }
+    }
+  };
+  const finance = context(true, createResponse([
+    'data: ' + JSON.stringify(widgetPayload) + '\n\n',
+    'data: [DONE]\n\n'
+  ]));
+  await finance.window.fetch(request, init);
+  for (let index = 0; index < 30; index += 1) {
+    const active = finance.window.__elonChatGptPrivateStreamTransport.current('/c/conversation-one');
+    if (active && active.richParts && active.richParts.length) break;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  const financeCurrent = finance.window.__elonChatGptPrivateStreamTransport.current('/c/conversation-one');
+  assert.equal(financeCurrent.richParts.length, 1);
+  assert.equal(financeCurrent.richParts[0].richContent.kind, 'finance');
+  assert.equal(financeCurrent.richParts[0].richContent.payload.chart.points.length, 2);
+  assert.ok(finance.shapes.includes('widget/finance/decoded'));
 
   await enabled.window.fetch({
     method: 'POST',
