@@ -47,6 +47,10 @@ internal class WebChatRealtimeVoiceCoordinator(
             return true
         }
         if (surface.isVisible() && provider?.id == candidate.id) {
+            if (WebChatRealtimeVoiceFastPath.shouldRetryVisibleSurface(lastState?.lifecycle)) {
+                retry()
+                return true
+            }
             surface.ensureVisibleOnTop()
             return true
         }
@@ -65,17 +69,7 @@ internal class WebChatRealtimeVoiceCoordinator(
             fail("后台网页会话尚未建立，请重试")
             return true
         }
-        val launchPlan = launchCache.plan(candidate.id, consumerPort()?.state(), sessionReady())
-        log("voice_start provider=${candidate.id.wireValue} plan=$launchPlan")
-        when (launchPlan) {
-            WebChatRealtimeVoiceLaunchPlan.DIRECT ->
-                render(WebChatRealtimeVoiceLifecycle.CONNECTING, "正在启动当前会话的实时语音")
-            WebChatRealtimeVoiceLaunchPlan.REFRESH_CONTROLS -> {
-                render(WebChatRealtimeVoiceLifecycle.CONNECTING, "正在刷新当前会话的语音入口")
-                consumerPort()?.requestControls()
-            }
-            WebChatRealtimeVoiceLaunchPlan.RECOVER_SESSION -> requestSessionRecovery()
-        }
+        applyLaunchPlan(candidate, isRetry = false)
         scheduleStart(generation, attempt = 0, delayMs = 0L)
         return true
     }
@@ -169,6 +163,7 @@ internal class WebChatRealtimeVoiceCoordinator(
     private fun retry() {
         val current = provider ?: return
         generation += 1
+        startedAtElapsedMs = monotonicTimeMs()
         closePending = false
         prepareRequestId = null
         preparedGeneration = null
@@ -178,9 +173,22 @@ internal class WebChatRealtimeVoiceCoordinator(
             fail("后台网页会话尚未建立，请稍后重试")
             return
         }
-        requestSessionRecovery()
+        applyLaunchPlan(current, isRetry = true)
         scheduleStart(generation, attempt = 0, delayMs = 0L)
-        provider = current
+    }
+
+    private fun applyLaunchPlan(candidate: WebChatProviderIdentity, isRetry: Boolean) {
+        val launchPlan = launchCache.plan(candidate.id, consumerPort()?.state(), sessionReady())
+        log("voice_${if (isRetry) "retry" else "start"} provider=${candidate.id.wireValue} plan=$launchPlan")
+        when (launchPlan) {
+            WebChatRealtimeVoiceLaunchPlan.DIRECT ->
+                render(WebChatRealtimeVoiceLifecycle.CONNECTING, "正在启动当前会话的实时语音")
+            WebChatRealtimeVoiceLaunchPlan.REFRESH_CONTROLS -> {
+                render(WebChatRealtimeVoiceLifecycle.CONNECTING, "正在刷新当前会话的语音入口")
+                consumerPort()?.requestControls()
+            }
+            WebChatRealtimeVoiceLaunchPlan.RECOVER_SESSION -> requestSessionRecovery()
+        }
     }
 
     private fun openFallback() {
@@ -272,7 +280,7 @@ internal class WebChatRealtimeVoiceCoordinator(
         }
         val requestId = result.requestId
         if (requestId == null) {
-            finishPreparation(expectedGeneration, port)
+            finishPreparation(expectedGeneration, port, controlsAlreadyCurrent = true)
         } else {
             prepareRequestId = requestId
             pollPreparation(expectedGeneration, requestId, attempt = 0)
@@ -303,10 +311,18 @@ internal class WebChatRealtimeVoiceCoordinator(
         }, COMMAND_POLL_DELAY_MS)
     }
 
-    private fun finishPreparation(expectedGeneration: Int, port: WebChatConsumerPort) {
+    private fun finishPreparation(
+        expectedGeneration: Int,
+        port: WebChatConsumerPort,
+        controlsAlreadyCurrent: Boolean = false,
+    ) {
         if (!isCurrent(expectedGeneration)) return
         prepareRequestId = null
         preparedGeneration = expectedGeneration
+        if (WebChatRealtimeVoiceFastPath.canStartAfterPreparation(controlsAlreadyCurrent, port.state())) {
+            attemptStart(expectedGeneration, attempt = 0)
+            return
+        }
         port.requestControls()
         scheduleStart(expectedGeneration, attempt = 0, delayMs = CONTROL_SETTLE_MS)
     }

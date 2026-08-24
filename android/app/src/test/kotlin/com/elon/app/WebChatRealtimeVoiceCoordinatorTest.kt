@@ -46,6 +46,20 @@ class WebChatRealtimeVoiceCoordinatorTest {
     }
 
     @Test
+    fun directReadyVoiceStartsWithoutRefreshingControlsAgain() {
+        val fixture = Fixture()
+        fixture.port.prepareStatus = WebChatConsumerCommandStatus.SUCCEEDED
+        fixture.port.prepareReturnsReceipt = false
+
+        fixture.coordinator.start(fixture.provider)
+        fixture.scheduler.runNext()
+
+        assertEquals(2, fixture.port.executeCount)
+        assertEquals(0, fixture.port.requestControlsCount)
+        assertEquals(WebChatRealtimeVoiceLifecycle.CONNECTING, fixture.surface.state?.lifecycle)
+    }
+
+    @Test
     fun coldConversationStillRequestsSessionRecovery() {
         val fixture = Fixture(sessionReady = false)
 
@@ -82,6 +96,25 @@ class WebChatRealtimeVoiceCoordinatorTest {
         fixture.surface.openOfficialFallback()
         assertEquals(1, fixture.officialFallbackCount)
         assertFalse(fixture.surface.visible)
+    }
+
+    @Test
+    fun tappingVoiceAgainAfterFailureRetriesTheReadySessionWithoutRecovery() {
+        val fixture = Fixture(sessionReady = false)
+        fixture.coordinator.start(fixture.provider)
+        fixture.scheduler.runAll()
+        val recoveryCountAfterFailure = fixture.sessionRecoveryCount
+
+        fixture.sessionReady = true
+        fixture.port.prepareStatus = WebChatConsumerCommandStatus.SUCCEEDED
+        fixture.port.prepareReturnsReceipt = false
+        fixture.coordinator.start(fixture.provider)
+
+        assertEquals(2, fixture.beginBackingCount)
+        assertEquals(recoveryCountAfterFailure, fixture.sessionRecoveryCount)
+        assertEquals(WebChatRealtimeVoiceLifecycle.CONNECTING, fixture.surface.state?.lifecycle)
+        fixture.scheduler.runNext()
+        assertEquals(2, fixture.port.executeCount)
     }
 
     @Test
@@ -268,6 +301,7 @@ class WebChatRealtimeVoiceCoordinatorTest {
         val scheduler = Scheduler()
         val port = FakePort()
         val back = FakeBackControl()
+        var sessionReady = sessionReady
         var authenticated = authenticated
         var sessionState = sessionState
         var beginBackingCount = 0
@@ -287,7 +321,7 @@ class WebChatRealtimeVoiceCoordinatorTest {
             surface = surface,
             activeProvider = { WebChatProviderId.CHATGPT_WEB },
             consumerPort = { port },
-            sessionReady = { sessionReady },
+            sessionReady = { this.sessionReady },
             authenticationState = {
                 WebChatRealtimeVoiceAuthenticationPolicy.resolve(
                     this.authenticated,
@@ -382,6 +416,7 @@ class WebChatRealtimeVoiceCoordinatorTest {
     private class FakePort : WebChatConsumerPort {
         var executeCount = 0
         var prepareStatus = WebChatConsumerCommandStatus.PENDING
+        var prepareReturnsReceipt = true
         var voiceStatus = WebChatConsumerCommandStatus.PENDING
         var endControlAvailable = false
         var invokedControlId: String? = null
@@ -437,7 +472,8 @@ class WebChatRealtimeVoiceCoordinatorTest {
         override fun executeSessionCommand(action: String): WebChatConsumerCommandResult {
             executeCount += 1
             return when (action) {
-                "chatgpt_prepare_realtime_voice" -> accepted("prepare_1")
+                "chatgpt_prepare_realtime_voice" ->
+                    accepted("prepare_1".takeIf { prepareReturnsReceipt })
                 "chatgpt_start_realtime_voice" -> accepted("voice_1")
                 else -> rejected()
             }
