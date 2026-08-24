@@ -47,14 +47,14 @@ internal class WebChatRealtimeVoiceOverlay(
         clipToPadding = false
     }
     private val panel = FrameLayout(activity).apply {
-        isClickable = true
-        isFocusable = true
+        isClickable = false
+        isFocusable = false
         elevation = dp(10).toFloat()
         contentDescription = WebChatProductionSelectors.REALTIME_VOICE_SURFACE
     }
     private val collapsedOrb = FrameLayout(activity).apply {
-        isClickable = false
-        isFocusable = false
+        isClickable = true
+        isFocusable = true
     }
     private val collapsedIcon = ImageView(activity).apply {
         setImageResource(R.drawable.ic_input_voice)
@@ -80,8 +80,8 @@ internal class WebChatRealtimeVoiceOverlay(
     private val expandedIcon = ImageView(activity).apply {
         setImageResource(R.drawable.ic_input_voice)
         scaleType = ImageView.ScaleType.CENTER
-        isClickable = false
-        isFocusable = false
+        isClickable = true
+        isFocusable = true
     }
     private val textColumn = LinearLayout(activity).apply {
         orientation = LinearLayout.VERTICAL
@@ -302,8 +302,13 @@ internal class WebChatRealtimeVoiceOverlay(
     }
 
     private fun installInteraction() {
-        panel.setOnClickListener { setExpanded(!expanded) }
-        panel.setOnTouchListener { view, event ->
+        installDragInteraction(collapsedOrb) { setExpanded(true) }
+        installDragInteraction(expandedIcon) { setExpanded(false) }
+    }
+
+    private fun installDragInteraction(view: View, onClick: () -> Unit) {
+        view.setOnClickListener { onClick() }
+        view.setOnTouchListener { target, event ->
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
                     dragging = false
@@ -323,7 +328,7 @@ internal class WebChatRealtimeVoiceOverlay(
                     true
                 }
                 MotionEvent.ACTION_UP -> {
-                    if (!dragging) view.performClick()
+                    if (!dragging) target.performClick()
                     dragging = false
                     true
                 }
