@@ -23,6 +23,25 @@ class ChatGptWebTransientComposerReadinessTest {
     }
 
     @Test
+    fun activeDictationKeepsTheNativeConversationReadyAfterTheCommandCompletes() {
+        val previous = snapshot(composerReady = true)
+        val officialDictationSurface = snapshot(composerReady = false).copy(
+            dictationActive = true,
+            capabilities = ChatGptWebCapabilities.EMPTY,
+        )
+
+        val result = ChatGptWebTransientComposerReadiness.reconcile(
+            previous,
+            officialDictationSurface,
+            composerInteractionActive = false,
+        )
+
+        assertTrue(result.composerReady)
+        assertTrue(result.dictationActive)
+        assertTrue(result.capabilities.supports(ChatGptWebCapabilityId.COMPOSER_TOOLS))
+    }
+
+    @Test
     fun normalNavigationAndAuthenticationPagesStillCloseTheComposer() {
         val previous = snapshot(composerReady = true)
         val feature = snapshot(composerReady = false).copy(

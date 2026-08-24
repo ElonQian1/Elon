@@ -15,7 +15,9 @@ internal object ChatGptWebTransientComposerReadiness {
         incoming: ChatGptWebSnapshot,
         composerInteractionActive: Boolean,
     ): ChatGptWebSnapshot {
-        if (!composerInteractionActive || incoming.composerReady) return incoming
+        if (incoming.composerReady) return incoming
+        val preserveForNativeInteraction = composerInteractionActive || incoming.dictationActive
+        if (!preserveForNativeInteraction) return incoming
         if (previous?.let(ChatGptWebAccessPolicy::canChat) != true) return incoming
         if (ChatGptWebAccessPolicy.requiresLogin(incoming)) return incoming
         if (!sameConversationSurface(previous, incoming)) return incoming
