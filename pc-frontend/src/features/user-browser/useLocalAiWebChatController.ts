@@ -9,7 +9,6 @@ import {
   openLocalAiCachedConversation,
   openLocalAiWebResearchDirectory,
   openLocalAiWebSession,
-  requestLocalAiWebSnapshot,
   runLocalAiWebAdapterCommand,
   waitForLocalAiAdapterResult,
   type LocalAiAdapterAction,
@@ -34,7 +33,6 @@ import {
   type PendingLocalAiResponse,
   type PendingLocalAiSend,
 } from './localAiOptimisticSend'
-import { localAiAssistantExtractionIncomplete } from './localAiAssistantContentQuality'
 import { requestOfficialAiTab, requestReturnToAiChat } from './internalBrowserApi'
 import {
   keepLocalAiNewConversationInNativeForeground,
@@ -46,15 +44,14 @@ import {
   selectLocalAiNewConversationPath,
 } from './localAiNewConversation'
 import { localAiComposerAvailability } from './localAiComposerAvailability'
-import { lastMatchingLocalAiUserIndex, normalizeLocalAiResponsePrompt } from './localAiResponseTracking'
 import {
   BACKGROUND_RECONNECT_MAX_ATTEMPTS,
   GOOGLE_NEW_CONVERSATION_RELOAD_DELAY_MS,
   NEW_CONVERSATION_RECOVERY_TIMEOUT_MS,
-  RESPONSE_REFRESH_DELAYS_MS,
   type QueuedLocalAiSend,
 } from './localAiWebChatControllerConfig'
 import useLocalAiAccessRecovery, { createLocalAiAccessRetry } from './useLocalAiAccessRecovery'
+import useLocalAiResponseRefresh from './useLocalAiResponseRefresh'
 
 export default function useLocalAiWebChatController(
   provider: LocalAiWebProvider | undefined,
@@ -82,9 +79,6 @@ export default function useLocalAiWebChatController(
   const autoStartKey = useRef('')
   const backgroundReconnectAttempts = useRef(0)
   const backgroundReconnectInFlight = useRef(false)
-  const responseRefreshGeneration = useRef(0)
-  const responseRefreshTimer = useRef(0)
-  const expectedResponsePrompt = useRef('')
   const optimisticSendSequence = useRef(0)
   const queuedSendDispatching = useRef(false)
   const queuedSendRef = useRef<QueuedLocalAiSend | null>(null)
@@ -103,6 +97,18 @@ export default function useLocalAiWebChatController(
     [visibleSessionState?.semanticEvent],
   )
   const snapshot = newConversationRecoveryStartedAtMs ? null : liveSnapshot
+  const refreshSessionState = useLocalAiSessionPolling({
+    enabled: Boolean(providerId && ownerKey),
+    providerId,
+    ownerKey,
+    state: visibleSessionState,
+    onState: setSessionState,
+  })
+  const {
+    expectedResponsePrompt,
+    startResponseRefresh,
+    cancelResponseRefresh,
+  } = useLocalAiResponseRefresh({ provider, ownerKey, snapshot, refreshSessionState })
   const accessRecovery = useLocalAiAccessRecovery(
     requestedSessionIdentity, snapshot, pendingResponses, expectedResponsePrompt.current,
     setPendingResponses, cancelResponseRefresh, setMessage,
@@ -159,14 +165,6 @@ export default function useLocalAiWebChatController(
     setSessionEntry({ identity: requestedSessionIdentity, state })
   }
 
-  const refreshSessionState = useLocalAiSessionPolling({
-    enabled: Boolean(providerId && ownerKey),
-    providerId,
-    ownerKey,
-    state: visibleSessionState,
-    onState: setSessionState,
-  })
-
   useEffect(() => {
     setSessionState(providerId && ownerKey
       ? getCachedLocalAiWebSessionState(providerId, ownerKey)
@@ -188,8 +186,6 @@ export default function useLocalAiWebChatController(
     backgroundReconnectInFlight.current = false
     cancelResponseRefresh()
   }, [ownerKey, providerId, requestedSessionIdentity])
-
-  useEffect(() => () => cancelResponseRefresh(), [])
 
   useEffect(() => {
     if (!newConversationRecoveryStartedAtMs) return
@@ -325,21 +321,6 @@ export default function useLocalAiWebChatController(
     ))
     if (remaining.length !== pendingResponses.length) setPendingResponses(remaining)
   }, [pendingResponses, snapshot])
-
-  useEffect(() => {
-    const expected = normalizeLocalAiResponsePrompt(expectedResponsePrompt.current)
-    if (!expected || !snapshot || snapshot.streaming) return
-    const messages = snapshot.messages
-    const userIndex = lastMatchingLocalAiUserIndex(messages, expected)
-    if (userIndex < 0) return
-    if (messages.slice(userIndex + 1).some((item) => (
-      item.role === 'assistant'
-      && item.state !== 'streaming'
-      && !localAiAssistantExtractionIncomplete(item)
-    ))) {
-      cancelResponseRefresh()
-    }
-  }, [snapshot])
 
   async function openOfficial() {
     if (!provider || !ownerKey || busyAction) return
@@ -681,37 +662,6 @@ export default function useLocalAiWebChatController(
 
   function restoreQueuedSend(queued: QueuedLocalAiSend) {
     rollbackPendingSend(queued.pending)
-  }
-
-  function startResponseRefresh(prompt: string) {
-    cancelResponseRefresh()
-    if (!provider || !ownerKey || !normalizeLocalAiResponsePrompt(prompt)) return
-    expectedResponsePrompt.current = prompt
-    const generation = responseRefreshGeneration.current
-    let delayIndex = 0
-    const request = () => {
-      if (generation !== responseRefreshGeneration.current || !provider || !ownerKey) return
-      // The native conversation is the production foreground for the full response
-      // lifecycle. Upstream navigation/focus changes must not resurrect a previously
-      // requested official child tab while polling the generated answer.
-      requestReturnToAiChat({
-        providerId: provider.id,
-        providerName: provider.displayName,
-        ownerKey,
-      })
-      void requestLocalAiWebSnapshot(provider.id, ownerKey)
-        .then(refreshSessionState, () => {})
-      const delay = RESPONSE_REFRESH_DELAYS_MS[delayIndex++]
-      if (delay !== undefined) responseRefreshTimer.current = window.setTimeout(request, delay)
-    }
-    responseRefreshTimer.current = window.setTimeout(request, RESPONSE_REFRESH_DELAYS_MS[delayIndex++] ?? 400)
-  }
-
-  function cancelResponseRefresh() {
-    responseRefreshGeneration.current += 1
-    window.clearTimeout(responseRefreshTimer.current)
-    responseRefreshTimer.current = 0
-    expectedResponsePrompt.current = ''
   }
 
   async function refreshComposerControls(section: LocalAiComposerControlsSnapshot['section']) {

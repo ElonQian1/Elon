@@ -370,6 +370,67 @@ function context(enabled, response) {
   assert.equal(financeCurrent.richParts[0].richContent.payload.chart.points.length, 2);
   assert.ok(finance.shapes.includes('widget/finance/decoded'));
 
+  const chartTurnId = 'turn-client-chart-live';
+  const chartInitialPayload = {
+    c: 17,
+    v: {
+      conversation_id: 'conversation-one',
+      message: {
+        id: 'assistant-client-chart',
+        author: { role: 'assistant' },
+        status: 'in_progress',
+        content: {
+          content_type: 'text',
+          parts: ['走势怎么判断\n\n\ue200genui\ue202chart\ue201']
+        },
+        metadata: {
+          turn_exchange_id: chartTurnId,
+          content_references: [{
+            type: 'client_defined_widget',
+            category: 'visualization',
+            data: {
+              language: 'recharts-json',
+              widget_type: 'charts_widget_v2',
+              content: {
+                chartType: 'line',
+                meta: { title: 'BTC/USD · 最近 1 天', description: 'BTC/USD' },
+                xKey: 'time',
+                series: [{ dataKey: 'price', label: 'BTC/USD', valuePrefix: '$' }],
+                data: [{ time: '12:00', price: 77000 }]
+              }
+            }
+          }]
+        }
+      }
+    }
+  };
+  const chartPatchPayload = {
+    v: [
+      {
+        p: '/message/metadata/content_references/0/data/content/data',
+        o: 'append',
+        v: [{ time: '13:00', price: 77200 }, { time: '14:00', price: 77100 }]
+      },
+      { p: '/message/content/parts/0', o: 'replace', v: '短线偏强震荡。' },
+      { p: '/message/status', o: 'replace', v: 'finished_successfully' }
+    ]
+  };
+  const clientChart = context(true, createResponse([
+    'data: ' + JSON.stringify(chartInitialPayload) + '\n\n',
+    'data: ' + JSON.stringify(chartPatchPayload) + '\n\n',
+    'data: [DONE]\n\n'
+  ]));
+  await clientChart.window.fetch(request, init);
+  await tick();
+  await tick();
+  const clientChartCurrent = clientChart.window.__elonChatGptPrivateStreamTransport
+    .current('/c/conversation-one');
+  assert.equal(clientChartCurrent.state, 'completed');
+  assert.equal(clientChartCurrent.richParts.length, 1,
+    'the live transport must retain a completed client-defined chart patch');
+  assert.equal(clientChartCurrent.richParts[0].richContent.kind, 'chart');
+  assert.equal(clientChartCurrent.richParts[0].richContent.payload.points.length, 3);
+
   const largeTurnId = 'turn-finance-live';
   const largeWidgetPayload = {
     c: 10,
