@@ -53,6 +53,15 @@ assert.deepEqual(localAiComposerAvailability({ ...base, directSendReady: true })
 assert.deepEqual(localAiComposerAvailability({
   ...base,
   directSendReady: true,
+  newConversationRecoveryActive: true,
+}), {
+  canEdit: true,
+  canSubmit: true,
+  shouldQueue: true,
+})
+assert.deepEqual(localAiComposerAvailability({
+  ...base,
+  directSendReady: true,
   busyAction: 'send_prompt',
 }), {
   canEdit: true,
