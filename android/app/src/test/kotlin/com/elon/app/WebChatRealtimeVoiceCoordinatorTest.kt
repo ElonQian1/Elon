@@ -233,6 +233,30 @@ class WebChatRealtimeVoiceCoordinatorTest {
         assertEquals("测试会话", fixture.openedContext?.label)
     }
 
+    @Test
+    fun newVoiceConversationUpdatesItsAttributionWhenTheOfficialPathAppears() {
+        val fixture = Fixture()
+        fixture.context = WebChatRealtimeVoiceContext(
+            conversationPath = null,
+            label = "新会话（发送后自动归档）",
+            savedToHistory = true,
+        )
+        fixture.completeVoiceStart()
+
+        fixture.context = WebChatRealtimeVoiceContext(
+            conversationPath = "/c/generated",
+            label = "语音生成的会话",
+            savedToHistory = true,
+        )
+        fixture.scheduler.runNext()
+
+        assertEquals("/c/generated", fixture.surface.state?.context?.conversationPath)
+        assertEquals("语音生成的会话", fixture.surface.state?.context?.label)
+        fixture.surface.openConversation()
+        assertEquals("/c/generated", fixture.openedContext?.conversationPath)
+        assertFalse(fixture.scheduler.hasPendingTasks())
+    }
+
     private class Fixture(
         sessionReady: Boolean = true,
         authenticated: Boolean = true,
@@ -253,6 +277,11 @@ class WebChatRealtimeVoiceCoordinatorTest {
         var officialLoginCount = 0
         var sessionRecoveryCount = 0
         var openedContext: WebChatRealtimeVoiceContext? = null
+        var context = WebChatRealtimeVoiceContext(
+            "/c/test",
+            "测试会话",
+            savedToHistory = true,
+        )
         val launchCache = WebChatRealtimeVoiceLaunchCache()
         val coordinator = WebChatRealtimeVoiceCoordinator(
             surface = surface,
@@ -271,9 +300,7 @@ class WebChatRealtimeVoiceCoordinatorTest {
             loginGate = loginGate,
             openOfficialLogin = { officialLoginCount += 1 },
             openOfficialFallback = { officialFallbackCount += 1 },
-            resolveConversationContext = {
-                WebChatRealtimeVoiceContext("/c/test", "测试会话", savedToHistory = true)
-            },
+            resolveConversationContext = { context },
             openConversation = { openedContext = it },
             schedule = scheduler::schedule,
             backControl = back,

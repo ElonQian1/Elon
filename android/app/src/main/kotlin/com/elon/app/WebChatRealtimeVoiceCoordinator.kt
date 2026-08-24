@@ -153,6 +153,7 @@ internal class WebChatRealtimeVoiceCoordinator(
     }
 
     fun onHostResumed() {
+        if (provider != null) refreshConversationContext()
         val state = lastState
         if (provider != null && state != null) {
             surface.ensureVisibleOnTop()
@@ -338,6 +339,33 @@ internal class WebChatRealtimeVoiceCoordinator(
             detail = "语音已连接，可继续使用当前页面",
             turn = WebChatRealtimeVoiceTurn.IDLE,
         )
+        scheduleConversationContextRefresh(expectedGeneration, attempt = 0)
+    }
+
+    private fun scheduleConversationContextRefresh(expectedGeneration: Int, attempt: Int) {
+        if (!isCurrent(expectedGeneration) || !conversationContextNeedsRefresh()) return
+        schedule(Runnable {
+            if (!isCurrent(expectedGeneration)) return@Runnable
+            if (refreshConversationContext()) lastState?.let(surface::render)
+            if (attempt < MAX_CONTEXT_REFRESH_POLLS && conversationContextNeedsRefresh()) {
+                scheduleConversationContextRefresh(expectedGeneration, attempt + 1)
+            }
+        }, CONTEXT_REFRESH_DELAY_MS)
+    }
+
+    private fun refreshConversationContext(): Boolean {
+        val next = resolveConversationContext()
+        if (next == conversationContext) return false
+        conversationContext = next
+        lastState = lastState?.copy(context = next)
+        return true
+    }
+
+    private fun conversationContextNeedsRefresh(): Boolean {
+        val context = conversationContext ?: return false
+        return context.savedToHistory && (
+            context.conversationPath == null || context.label == CURRENT_CONVERSATION_LABEL
+        )
     }
 
     private fun fail(detail: String) {
@@ -366,6 +394,7 @@ internal class WebChatRealtimeVoiceCoordinator(
     }
 
     private fun openVoiceConversation() {
+        if (provider != null) refreshConversationContext()
         conversationContext?.let(openConversation)
         surface.ensureVisibleOnTop()
     }
@@ -443,6 +472,9 @@ internal class WebChatRealtimeVoiceCoordinator(
         const val MAX_CLOSE_SETTLE_POLLS = 40
         const val AUTHENTICATION_POLL_DELAY_MS = 400L
         const val MAX_AUTHENTICATION_POLLS = 30
+        const val CONTEXT_REFRESH_DELAY_MS = 1_000L
+        const val MAX_CONTEXT_REFRESH_POLLS = 90
+        const val CURRENT_CONVERSATION_LABEL = "当前 ChatGPT 会话"
         val RETRYABLE_ERRORS = setOf(
             "bridge_not_ready",
             "adapter_generation_not_ready",
