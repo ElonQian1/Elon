@@ -319,6 +319,38 @@
     poll();
   }
 
+  function conversationSurface(inspect) {
+    if (typeof inspect !== 'function') return null;
+    try {
+      const value = inspect();
+      if (!value || typeof value !== 'object') return null;
+      return {
+        messageCount: Math.max(0, Number(value.messageCount) || 0),
+        composerReady: value.composerReady === true
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  function waitForFreshConversation(inspect, onReady, onTimeout) {
+    const started = Date.now();
+    let freshSince = 0;
+    function poll() {
+      const surface = conversationSurface(inspect);
+      const fresh = !!surface && surface.messageCount === 0 && surface.composerReady;
+      if (fresh) {
+        if (!freshSince) freshSince = Date.now();
+        if (Date.now() - freshSince >= 160) return onReady();
+      } else {
+        freshSince = 0;
+      }
+      if (Date.now() - started >= 5000) return onTimeout();
+      window.setTimeout(poll, 80);
+    }
+    poll();
+  }
+
   function waitForConversations(onReady, onTimeout) {
     const started = Date.now();
     let stableSince = started;
@@ -577,23 +609,33 @@
     collectAndEmitDirectory(existing, command, emitEvent, result, false);
   }
 
-  function newConversation(result) {
-    if (location.pathname === '/') return result('new_conversation', true, '');
+  function newConversation(inspect, result) {
+    const initial = conversationSurface(inspect);
+
+    function activate(target) {
+      try {
+        target.click();
+      } catch {
+        return result('new_conversation', false, '官网新建会话入口无法操作。');
+      }
+      waitForFreshConversation(
+        inspect,
+        () => result('new_conversation', true, ''),
+        () => result('new_conversation', false, '官网没有确认进入空白新会话。')
+      );
+    }
+
     const existing = findNewConversationNode();
-    if (existing) {
-      result('new_conversation', true, '');
-      existing.click();
-      return;
+    if (existing) return activate(existing);
+    if (initial && initial.messageCount === 0 && initial.composerReady) {
+      return result('new_conversation', true, '');
     }
 
     const open = findSidebarButton(true);
     if (!open) return result('new_conversation', false, '未找到新建会话入口。');
     open.click();
     waitForNewConversation(
-      (target) => {
-        result('new_conversation', true, '');
-        target.click();
-      },
+      activate,
       () => result('new_conversation', false, '官网新建会话入口尚未加载完成。')
     );
   }

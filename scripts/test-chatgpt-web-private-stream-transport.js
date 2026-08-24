@@ -147,7 +147,7 @@ function context(enabled, response) {
     'data: [DONE]\n\n'
   ]);
   const enabled = context(true, response);
-  assert.equal(enabled.window.__elonChatGptPrivateStreamTransport.version, 8);
+  assert.equal(enabled.window.__elonChatGptPrivateStreamTransport.version, 9);
   assert.equal(enabled.socketListenerCount(), 1);
   let notifications = 0;
   enabled.window.__elonChatGptPrivateStreamTransport.subscribe(() => { notifications += 1; });
@@ -292,6 +292,37 @@ function context(enabled, response) {
   assert.equal(merged.length, 1);
   assert.equal(merged[0].state, 'completed');
   assert.equal(merged[0].content[0].text, 'hello world');
+
+  enabled.window.__elonChatGptPrivateStreamTransport.reset();
+  assert.equal(enabled.window.__elonChatGptPrivateStreamTransport.current('/'), null);
+  enabled.emitSocket(JSON.stringify({
+    conversation_id: 'conversation-one',
+    message: {
+      id: 'assistant-stale',
+      author: { role: 'assistant' },
+      status: 'finished_successfully',
+      content: { parts: ['stale answer'] }
+    }
+  }));
+  assert.equal(
+    enabled.window.__elonChatGptPrivateStreamTransport.current('/'),
+    null,
+    'the previous official conversation cannot repopulate a fresh native chat'
+  );
+  enabled.emitSocket(JSON.stringify({
+    conversation_id: 'conversation-two',
+    message: {
+      id: 'assistant-fresh',
+      author: { role: 'assistant' },
+      status: 'finished_successfully',
+      content: { parts: ['fresh answer'] }
+    }
+  }));
+  assert.equal(
+    enabled.window.__elonChatGptPrivateStreamTransport.current('/').text,
+    'fresh answer'
+  );
+  assert.ok(enabled.shapes.includes('socket/conversation_boundary/stale_rejected'));
 
   assert.equal(compactFixture.sourceShapeSha256.length, 64);
   const compactFrame = enabled.window.__elonChatGptPrivateStreamPolicy.assistantFrame(

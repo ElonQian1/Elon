@@ -4,7 +4,7 @@
   if (window.__elonChatGptPrivateStreamObserverEnabled !== true) return;
   if (location.origin !== 'https://chatgpt.com') return;
   const existing = window.__elonChatGptPrivateStreamTransport;
-  if (existing && Number(existing.version) >= 8) return;
+  if (existing && Number(existing.version) >= 9) return;
   if (existing && typeof existing.dispose === 'function') {
     try { existing.dispose(); }
     catch (_) { /* A stale transport must not block the upgraded observer. */ }
@@ -29,6 +29,8 @@
   let socketFirstReported = false;
   let socketSuccessReported = false;
   let accessSignal = null;
+  let conversationGeneration = 0;
+  let blockedConversationId = '';
   const ACCESS_SIGNAL_TTL_MS = 2 * 60 * 1000;
 
   function notify() {
@@ -36,6 +38,36 @@
       try { listener(); }
       catch (_) { /* Native snapshot fallback remains active. */ }
     });
+  }
+
+  function payloadConversationId(payload) {
+    if (!payload || typeof payload !== 'object') return '';
+    const data = payload.data && typeof payload.data === 'object' ? payload.data : null;
+    const nested = payload.payload && typeof payload.payload === 'object' ? payload.payload : null;
+    const value = payload.v && typeof payload.v === 'object' ? payload.v : null;
+    return String(
+      payload.conversation_id || payload.conversationId ||
+      data && (data.conversation_id || data.conversationId) ||
+      nested && (nested.conversation_id || nested.conversationId) ||
+      value && (value.conversation_id || value.conversationId) || ''
+    ).slice(0, 180);
+  }
+
+  function isStaleConversationPayload(payload) {
+    const conversationId = payloadConversationId(payload);
+    return !!blockedConversationId && conversationId === blockedConversationId;
+  }
+
+  function resetConversationBoundary() {
+    const active = session.current(location.pathname);
+    blockedConversationId = String(active && active.conversationId || '').slice(0, 180);
+    conversationGeneration += 1;
+    observedWidgets.clear();
+    socketFrames = 0;
+    socketFirstReported = false;
+    socketSuccessReported = false;
+    session.reset();
+    notify();
   }
 
   function packedWidgetKey(widget) {
@@ -278,6 +310,10 @@
         continue;
       }
       if (typeof value !== 'object') continue;
+      if (isStaleConversationPayload(value)) {
+        recordShape((sourcePrefix || '') + 'conversation_boundary/stale_rejected');
+        continue;
+      }
       reportShape(value, source);
       if (session.accept(value)) accepted = true;
       observePackedFinance(value);
@@ -420,6 +456,7 @@
   }
 
   async function observe(response) {
+    const observedGeneration = conversationGeneration;
     const startedAt = Date.now();
     let frames = 0;
     let firstReported = false;
@@ -439,6 +476,11 @@
     const decoder = new TextDecoder();
     const sse = policy.createSseDecoder(
       (payload) => {
+        if (observedGeneration !== conversationGeneration) return;
+        if (isStaleConversationPayload(payload)) {
+          recordShape('conversation_boundary/stale_rejected');
+          return;
+        }
         reportShape(payload);
         if (!session.accept(payload)) return;
         observePackedFinance(payload);
@@ -450,6 +492,7 @@
         notify();
       },
       () => {
+        if (observedGeneration !== conversationGeneration) return;
         const completed = session.finish();
         report(completed ? 'success' : 'empty');
         if (completed) notify();
@@ -457,6 +500,7 @@
     );
     try {
       while (!disposed) {
+        if (observedGeneration !== conversationGeneration) break;
         const value = await reader.read();
         if (value.done) break;
         sse.push(decoder.decode(value.value, { stream: true }));
@@ -464,7 +508,7 @@
       sse.push(decoder.decode());
       sse.finish();
     } catch (_) {
-      session.reset();
+      if (observedGeneration === conversationGeneration) session.reset();
       report('error');
       notify();
     } finally {
@@ -495,11 +539,12 @@
   }
 
   window.__elonChatGptPrivateStreamTransport = Object.freeze({
-    version: 8,
+    version: 9,
     enabled: true,
     current: (pathname) => session.current(pathname),
     access: currentAccess,
     mergeMessages: (messages, pathname) => session.merge(messages, pathname),
+    reset: resetConversationBoundary,
     subscribe: (listener) => {
       if (typeof listener !== 'function') return function () {};
       listeners.add(listener);

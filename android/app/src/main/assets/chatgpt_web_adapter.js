@@ -614,7 +614,23 @@
       }
       if (!conversationAdapter) return respond(action, false, '会话适配器尚未就绪。');
       if (streamingPolicy) streamingPolicy.reset();
-      return conversationAdapter.newConversation(respond);
+      if (privateStreamTransport && typeof privateStreamTransport.reset === 'function') {
+        privateStreamTransport.reset();
+      }
+      const inspect = () => {
+        const composer = findComposer();
+        const messages = messageAdapter && typeof messageAdapter.readMessages === 'function'
+          ? messageAdapter.readMessages(false)
+          : [];
+        return {
+          messageCount: Array.isArray(messages) ? messages.length : 0,
+          composerReady: !!composer
+        };
+      };
+      return conversationAdapter.newConversation(inspect, (resultAction, ok, detail) => {
+        respond(resultAction, ok, detail);
+        if (ok) scheduleSnapshot(true);
+      });
     }
     respond(action || 'unknown', false, '不支持的本地命令。');
   }
