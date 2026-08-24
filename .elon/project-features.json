@@ -7469,6 +7469,172 @@
       "updated_at_ms": 1787515375220
     },
     {
+      "id": "win-chatgpt-search-streaming-state-v1",
+      "title": "Win ChatGPT 搜索流状态同步 V1",
+      "summary": "重建 ChatGPT 紧凑流的搜索进度与正文增量，过滤无障碍说话人外壳，使原生 Win 聊天在搜索、生成和完成阶段保持同一助手消息。",
+      "status": "verified",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/win-chatgpt-search-streaming-state-v1.md",
+        "content_hash": "5ca2a0894e47048c7511cb3445b18cf6adfc1b51a195d5f559db2f8930b8c58c",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "5602fcc964c9787dff5ec6e80be1fdc70b139525",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "be14119c482a1222903669efc2c15fabeb1bf3d2",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "win-ai-chat",
+      "tags": [
+        "win",
+        "chatgpt",
+        "streaming",
+        "webview2",
+        "rich-content"
+      ],
+      "task_paths": [
+        "android/app/src/main/assets/chatgpt_web_adapter_messages.js",
+        "android/app/src/main/assets/chatgpt_web_private_stream_policy.js",
+        "desktop-shell/src-tauri/src/local_ai_browser/adapter.rs",
+        "pc-frontend/src/features/ai",
+        "pc-frontend/src/features/user-browser",
+        "scripts"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "搜索阶段显示有界进度且不显示 ChatGPT 说：或空方块正文。",
+        "紧凑流连续文本在同一助手消息增量显示并正确完成。",
+        "工具代码与思考内容不进入可见回答，公开引用继续受清洗。",
+        "DOM 回退、普通完整帧、Google AI、历史快照和富内容兼容。",
+        "定向测试、PC 构建、Tauri 与 Win Web AI 门禁通过。"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "android/app/src/main/assets/chatgpt_web_adapter_messages.js",
+          "content_hash": "9b01ef6b895ac360d0e9da07d66731c86b2330322c0e7369ba317b364c3c0378",
+          "locator": "extractMessageText",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "5602fcc964c9787dff5ec6e80be1fdc70b139525",
+            "head_blob_oid": "3a74e6704359136f2dc88e8eac31e8491a1c58a0",
+            "worktree_blob_oid": "23b4c679875f21cf9199b4104b1a1596ae43a292",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/main/assets/chatgpt_web_private_stream_policy.js",
+          "content_hash": "47499444377a66dd4b1b305e1f7cc3a0d78a1627481d9d313c4aaace7c4213e3",
+          "locator": "createSession",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "5602fcc964c9787dff5ec6e80be1fdc70b139525",
+            "head_blob_oid": "5dcb314552d7ddfa76dbc260934610865e4cf68f",
+            "worktree_blob_oid": "67b7bd0da69a18eeaff408af76c459dcd2354124",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "desktop-shell/src-tauri/src/local_ai_browser/adapter.rs",
+          "content_hash": "b437c36d7a3628652c069812c9f6cb334bf7517402c2bf1e6c6184ab4668063f",
+          "locator": "sanitize_protocol_event",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "5602fcc964c9787dff5ec6e80be1fdc70b139525",
+            "head_blob_oid": "ad8b6ba23b98d5857e0734d58643e652215a4f58",
+            "worktree_blob_oid": "76e0afa6ff96da0868df3c41ff9b2aeb61dd5334",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "docs/requirements/win-chatgpt-search-streaming-state-v1.md",
+          "content_hash": "5ca2a0894e47048c7511cb3445b18cf6adfc1b51a195d5f559db2f8930b8c58c",
+          "locator": "acceptance",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "5602fcc964c9787dff5ec6e80be1fdc70b139525",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "be14119c482a1222903669efc2c15fabeb1bf3d2",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "pc-frontend/scripts/test-ai-answer-surface.cjs",
+          "content_hash": "1347c72e383a8915d4c7f35247d697c7369419bd0c76ee72fbdf15fc826764b0",
+          "locator": "native conversation",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "5602fcc964c9787dff5ec6e80be1fdc70b139525",
+            "head_blob_oid": "1a2f611115c378acf7477529dced706ff473fd39",
+            "worktree_blob_oid": "34aa3e380d0dc822e4c2688743b69d2637f7f043",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/ai/aiMessageVisibility.ts",
+          "content_hash": "aab35d617cfa6696958374a16bfbc9e264cb76712f2dae401164548524c8d605",
+          "locator": "hasVisibleAiMessageContent",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "5602fcc964c9787dff5ec6e80be1fdc70b139525",
+            "head_blob_oid": "99fbd4db33309c4da4bfed6a479c559b2e9ed337",
+            "worktree_blob_oid": "e01a6945dea9f4de0b88e9d0f994701ede174e1e",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/user-browser/useAiWebChatBackend.ts",
+          "content_hash": "0b656ff839454e475e7e8521ed24b32cd7fad92b25a685d5c0e1597d3e7f3294",
+          "locator": "streamingStatus",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "5602fcc964c9787dff5ec6e80be1fdc70b139525",
+            "head_blob_oid": "2cd2c409bab377a2f937fea01387825179229292",
+            "worktree_blob_oid": "bb0041e072275878d9443a914e5205df4b7170ba",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "scripts/test-chatgpt-composite-answer-extraction.js",
+          "content_hash": "41aecc21dca4ed56e697447d8b013cdba457ae71c0140e42487694a88ad2bd41",
+          "locator": "speaker shell",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "5602fcc964c9787dff5ec6e80be1fdc70b139525",
+            "head_blob_oid": "fa8781cd77ac071f66790dd3a02a965d553e1254",
+            "worktree_blob_oid": "e59c96476ae115f746330814acf27b5671b93045",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "scripts/test-chatgpt-web-private-stream-policy.js",
+          "content_hash": "fda6dfbf8b38e1d3455e96eaf873203e2c38a5b33007f5d129b3083960fd2253",
+          "locator": "compact stream",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "5602fcc964c9787dff5ec6e80be1fdc70b139525",
+            "head_blob_oid": "53ac4b190c04edcdd5a08032150d91ce8f826b79",
+            "worktree_blob_oid": "aa361b2def079ca6ded9a9e9bc0779da90ccda54",
+            "state": "tracked_modified"
+          }
+        }
+      ],
+      "created_at_ms": 1787543878323,
+      "updated_at_ms": 1787545100240
+    },
+    {
       "id": "win-chatgpt-visible-finance-chart-v1",
       "title": "Win ChatGPT 可见行情折线复现 V1",
       "summary": "复用现有 finance AST 与原生行情卡，把 ChatGPT 回答节点中可见且可信的 SVG 折线几何有界采样为缓存图表；未知 Canvas/异常结构继续官网回退，不启用私有响应。",
@@ -11895,66 +12061,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_964d7a58c2c64a5cb63cbd302bfb40a7",
-      "feature_id": "win-web-ai-rich-structure-observability-v1",
-      "action": "transitioned",
-      "actor": "Codex",
-      "reason": "代码、协议、合成 fixture 与隐私诊断已经实现并提交。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1787432513723
-    },
-    {
-      "id": "feature_event_739d0247b9a24fa8b8b1aa7a8ec0a483",
-      "feature_id": "win-web-ai-rich-structure-observability-v1",
-      "action": "transitioned",
-      "actor": "Codex",
-      "reason": "Win Web AI 总验收、PC build/lint 与定向 Rust 全部通过。",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1787432513738
-    },
-    {
-      "id": "feature_event_5a2f6f37e0c249a284f4f3de7987ca1a",
-      "feature_id": "win-web-ai-rich-structure-observability-v1",
-      "action": "transitioned",
-      "actor": "Codex",
-      "reason": "客户端 0.3.69+e1701a1b6 已激活，内部富结构计数、引用桥与授权映射均通过；节点控制回执传输白名单作为独立后续功能补齐。",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1787433094225
-    },
-    {
-      "id": "feature_event_30f59c8f8d7e48229b5050292f3e77a1",
-      "feature_id": "win-web-ai-rich-diagnostic-transport-v1",
-      "action": "registered",
-      "actor": "Codex",
-      "reason": "",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1787433123249
-    },
-    {
-      "id": "feature_event_55fa766b131a4144992c1ca051634ca7",
-      "feature_id": "win-web-ai-rich-diagnostic-transport-v1",
-      "action": "claimed",
-      "actor": "codex-desktop-root",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1787433123263
-    },
-    {
-      "id": "feature_event_09601673c72e40c1921f3dbafbcc0177",
-      "feature_id": "win-web-ai-rich-diagnostic-transport-v1",
-      "action": "claim_released",
-      "actor": "codex-desktop-root",
-      "reason": "增加独立可执行的诊断白名单集成测试，避免被仓库既有全量测试构建阻塞掩盖。",
-      "from_status": "claimed",
-      "to_status": "ready",
-      "at_ms": 1787433765150
-    },
-    {
       "id": "feature_event_a7aaee0ffc5e463e98c14cd6174f2a9b",
       "feature_id": "win-web-ai-rich-diagnostic-transport-v1",
       "action": "metadata_updated",
@@ -13893,6 +13999,66 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1787517155735
+    },
+    {
+      "id": "feature_event_6f0d2262489b47bf95b38351d62acd60",
+      "feature_id": "win-chatgpt-search-streaming-state-v1",
+      "action": "registered",
+      "actor": "codex-root",
+      "reason": "用户实机截图证明官网搜索阶段在原生 UI 被误显示为空回答。",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1787543878323
+    },
+    {
+      "id": "feature_event_189b34f959b04a569d1918d4d7ecc998",
+      "feature_id": "win-chatgpt-search-streaming-state-v1",
+      "action": "claimed",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1787543890015
+    },
+    {
+      "id": "feature_event_5d7a3929869047c69693ad4cc590d09b",
+      "feature_id": "win-chatgpt-search-streaming-state-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "已核对最新真实 SSE：官网使用 c/v 完整帧后接 append、无路径连续 v 与 patch 批次，当前策略只解析完整帧。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1787543917925
+    },
+    {
+      "id": "feature_event_2329bcef283240e88f14f5789821fd17",
+      "feature_id": "win-chatgpt-search-streaming-state-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1787545077055
+    },
+    {
+      "id": "feature_event_d233a896e422466da66d1de212de0651",
+      "feature_id": "win-chatgpt-search-streaming-state-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "ChatGPT 搜索状态、紧凑流正文重建和空壳过滤已实现，Win Web AI 统一验收通过。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1787545088898
+    },
+    {
+      "id": "feature_event_bdf15b9882a94156bf24e2319f815dba",
+      "feature_id": "win-chatgpt-search-streaming-state-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "validate-win-web-ai、PC 用户浏览器回归、构建、lint、Rust/Tauri、源码尺寸与文档模块化门禁全部通过。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1787545100240
     }
   ]
 }

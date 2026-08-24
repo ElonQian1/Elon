@@ -175,4 +175,17 @@ assert.deepEqual(
   'guest message-list turns are recognized from their accessible speaker headings',
 );
 
+const shellHeading = new ElementNode('ChatGPT 说：', { tagName: 'H5' });
+const pendingGuestAssistantTurn = new ElementNode('', {
+  attributes: { role: 'listitem' },
+  id: 'pending-assistant',
+  speakerHeading: shellHeading,
+});
+pendingGuestAssistantTurn.childNodes = [shellHeading, new TextNode('\ue000')];
+assert.equal(
+  messages.messageContent(pendingGuestAssistantTurn, 'assistant'),
+  '',
+  'accessible speaker heading and private-use cursor must not become answer text',
+);
+
 console.log('CHATGPT_COMPOSITE_ANSWER_EXTRACTION=passed');

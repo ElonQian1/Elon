@@ -94,6 +94,7 @@ export interface LocalAiMessageSnapshot {
   accessSource?: 'visible_page' | 'private_response' | ''
   composerReady: boolean
   streaming: boolean
+  streamingStatus?: string
   currentModel: string
   attachments?: LocalAiAttachment[]
   dictationActive?: boolean

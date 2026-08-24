@@ -915,7 +915,7 @@ export default function AiChatPage({ mode, onModeChange }: { mode: AiHomeMode; o
               message={m}
               user={user}
               streaming={m.id === (chatMode ? web.streamingMessageId : streamingMessageId)}
-              streamingStatus={chatMode ? `${web.provider?.displayName || '网页 AI'} 正在回答…` : streamStatus || '正在处理…'}
+              streamingStatus={chatMode ? web.streamingStatus : streamStatus || '正在处理…'}
               onConversationForked={chatMode ? undefined : openForkedConversation}
               onProjectHandoff={chatMode ? undefined : handleProjectHandoff}
               onRegenerate={chatMode && m.id === lastVisibleAssistantId && web.provider?.adapterActions.includes('regenerate_response')

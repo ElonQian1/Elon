@@ -159,6 +159,8 @@ export default function useAiWebChatBackend(mode: AiHomeMode, ownerKey: string) 
     canCompose,
     title: controller.snapshot?.title || '新对话',
     streamingMessageId: streamingMessageId ? `web:${provider?.id || 'ai'}:${streamingMessageId}` : null,
+    streamingStatus: controller.snapshot?.streamingStatus?.trim()
+      || `${provider?.displayName || '网页 AI'} 正在回答…`,
     contextReady,
     contextStatus,
     contextTurnCount,

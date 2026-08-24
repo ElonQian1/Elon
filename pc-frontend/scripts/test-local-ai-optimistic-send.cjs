@@ -15,6 +15,16 @@ const qualityModule = new Module(qualityFilename, module)
 qualityModule.filename = qualityFilename
 qualityModule.paths = module.paths
 qualityModule._compile(qualityOutput, qualityFilename)
+const visibilityFilename = path.resolve(__dirname, '../src/features/ai/aiMessageVisibility.ts')
+const visibilitySource = fs.readFileSync(visibilityFilename, 'utf8')
+const visibilityOutput = ts.transpileModule(visibilitySource, {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+  fileName: visibilityFilename,
+}).outputText
+const visibilityModule = new Module(visibilityFilename, module)
+visibilityModule.filename = visibilityFilename
+visibilityModule.paths = module.paths
+visibilityModule._compile(visibilityOutput, visibilityFilename)
 const source = fs.readFileSync(filename, 'utf8')
 const output = ts.transpileModule(source, {
   compilerOptions: {
@@ -30,6 +40,8 @@ compiled.paths = module.paths
 const defaultRequire = compiled.require.bind(compiled)
 compiled.require = (id) => id === './localAiAssistantContentQuality'
   ? qualityModule.exports
+  : id === '../ai/aiMessageVisibility'
+    ? visibilityModule.exports
   : defaultRequire(id)
 compiled._compile(output, filename)
 const {

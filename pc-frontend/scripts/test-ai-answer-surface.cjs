@@ -65,6 +65,8 @@ const { hasVisibleAiMessageContent, shouldKeepAiWebMessage } = compiledVisibilit
 assert.equal(hasVisibleAiMessageContent(''), false)
 assert.equal(hasVisibleAiMessageContent(' \n\t\u200b\u200c\u200d\u2060\ufeff '), false)
 assert.equal(hasVisibleAiMessageContent('\u258d\u2026\ue000'), false)
+assert.equal(hasVisibleAiMessageContent('###### ChatGPT 说：\ue000'), false)
+assert.equal(hasVisibleAiMessageContent('ChatGPT said:'), false)
 assert.equal(hasVisibleAiMessageContent('正在回答'), true)
 assert.equal(hasVisibleAiMessageContent('**正文**'), true)
 assert.equal(shouldKeepAiWebMessage({ content: '\u200b', state: 'streaming' }), true)

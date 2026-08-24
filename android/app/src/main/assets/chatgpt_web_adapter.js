@@ -232,6 +232,7 @@
       accessSource: access.source || '',
       composerReady: !!composer,
       streaming,
+      streamingStatus: cleanText(privateStream && privateStream.progressLabel).slice(0, 220),
       currentModel: optional('', () => composerAdapter ? composerAdapter.currentModel(composer) : ''),
       attachments: optional([], () => composerAdapter ? composerAdapter.readAttachments(composer) : []),
       dictationActive,

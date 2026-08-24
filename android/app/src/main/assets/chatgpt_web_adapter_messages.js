@@ -36,6 +36,15 @@
     return Array.from(node.childNodes).map((child) => markdown(child, context)).join('');
   }
 
+  function speakerHeadingRole(value) {
+    const speaker = cleanText(value).replace(/^#{1,6}\s*/, '');
+    if (/^(?:you said|你说|您说)\s*[:：]?\s*$/i.test(speaker)) return 'user';
+    if (/^(?:chatgpt said|chatgpt 说|assistant said|助理说)\s*[:：]?\s*$/i.test(speaker)) {
+      return 'assistant';
+    }
+    return '';
+  }
+
   function fencedCode(value, language) {
     const longest = Math.max(0, ...Array.from(String(value).matchAll(/`+/g), (match) => match[0].length));
     const fence = '`'.repeat(Math.max(3, longest + 1));
@@ -110,6 +119,7 @@
       return href ? '[' + text + '](' + href + ')' : text;
     }
     if (/^H[1-6]$/.test(tag)) {
+      if (speakerHeadingRole(node.innerText || node.textContent)) return '';
       return '\n\n' + '#'.repeat(Number(tag.slice(1))) + ' ' + childrenMarkdown(node, context).trim() + '\n\n';
     }
     if (tag === 'UL') return listMarkdown(node, false);
@@ -165,11 +175,7 @@
     const speaker = headings.map((heading) =>
       cleanText(heading.innerText || heading.textContent)
     ).find(Boolean) || '';
-    if (/^(?:you said|你说|您说)\s*[:：]?\s*$/i.test(speaker)) return 'user';
-    if (/^(?:chatgpt said|chatgpt 说|assistant said|助理说)\s*[:：]?\s*$/i.test(speaker)) {
-      return 'assistant';
-    }
-    return '';
+    return speakerHeadingRole(speaker);
   }
 
   function roleNode(node) {
@@ -396,10 +402,13 @@
       ? cleanText(childrenMarkdown(content, {}))
       : cleanText(content.innerText || content.textContent)
     ).filter((value) => value && (role !== 'assistant' || !isAssistantActionText(value)));
-    const value = fragments.filter((value, index) => fragments.indexOf(value) === index).join('\n\n')
+    let value = fragments.filter((value, index) => fragments.indexOf(value) === index).join('\n\n')
       .replace(role === 'user'
-        ? /^(?:you said|你说|您说)\s*[:：]?\s*/i
-        : /^(?:chatgpt said|chatgpt 说|assistant said|助理说)\s*[:：]?\s*/i, '');
+        ? /^(?:#{1,6}\s*)?(?:you said|你说|您说)\s*[:：]?\s*/i
+        : /^(?:#{1,6}\s*)?(?:chatgpt said|chatgpt 说|assistant said|助理说)\s*[:：]?\s*/i, '');
+    if (role === 'assistant') {
+      value = value.replace(INVISIBLE_PLACEHOLDERS, '').replace(THINKING_CURSOR_PLACEHOLDERS, '').trim();
+    }
     return value.slice(0, MAX_MESSAGE_LENGTH);
   }
 

@@ -1,5 +1,6 @@
 import type { LocalAiVisibleMessage } from './localAiBrowserApi'
 import { localAiAssistantExtractionIncomplete } from './localAiAssistantContentQuality'
+import { hasVisibleAiMessageContent } from '../ai/aiMessageVisibility'
 
 export interface PendingLocalAiSend {
   id: string
@@ -163,15 +164,9 @@ function isSubstantiveStructuredPart(part: LocalAiVisibleMessage['content'][numb
 }
 
 function substantiveText(value: string): boolean {
-  return String(value ?? '')
-    .replace(INVISIBLE_PLACEHOLDERS, '')
-    .replace(THINKING_CURSOR_PLACEHOLDERS, '')
-    .trim().length > 0
+  return hasVisibleAiMessageContent(value)
 }
 
 function normalizeLocalAiPrompt(value: string): string {
   return value.trim().replace(/\s+/g, ' ')
 }
-
-const INVISIBLE_PLACEHOLDERS = /[\u00ad\u034f\u061c\u180e\u200b-\u200f\u202a-\u202e\u2060-\u206f\ufeff]/gu
-const THINKING_CURSOR_PLACEHOLDERS = /[\u2022\u2026\u22ef\u25cf\u25cb\u2580-\u259f\ue000-\uf8ff]/gu

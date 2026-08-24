@@ -10,6 +10,8 @@
   const MAX_TEXT_LENGTH = 40000;
   const MAX_BUFFER_LENGTH = 524288;
   const MAX_AGE_MS = 5 * 60 * 1000;
+  const MAX_PROGRESS_LENGTH = 220;
+  const MAX_PATCH_ARRAY_LENGTH = 128;
 
   function cleanText(value) {
     return String(value || '').replace(/\u00a0/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
@@ -20,6 +22,38 @@
     return Number.isFinite(payload.c) && payload.v && typeof payload.v === 'object'
       ? payload.v
       : payload;
+  }
+
+  function assistantEnvelope(payload) {
+    const envelope = compactEnvelope(payload);
+    if (!envelope || typeof envelope !== 'object') return null;
+    const message = envelope.message || envelope.data && envelope.data.message;
+    if (!message || typeof message !== 'object' ||
+        !message.author || message.author.role !== 'assistant') return null;
+    return { envelope, message };
+  }
+
+  function safeProgressLabel(value) {
+    const label = cleanText(value).replace(/[\u0000-\u001f\u007f]/g, ' ').slice(0, MAX_PROGRESS_LENGTH);
+    if (!label) return '';
+    return /^(?:正在(?:搜索|查询|浏览)|searching|browsing|looking up)\b/i.test(label) ||
+      /^(?:正在(?:搜索|查询|浏览))/.test(label)
+      ? label
+      : '';
+  }
+
+  function progressFrame(payload) {
+    const envelope = compactEnvelope(payload);
+    if (!envelope || typeof envelope !== 'object') return null;
+    const message = envelope.message || envelope.data && envelope.data.message;
+    const metadata = message && message.metadata;
+    const label = safeProgressLabel(metadata && metadata.reasoning_title);
+    if (!label) return null;
+    return {
+      conversationId: String(envelope.conversation_id || envelope.conversationId || '').slice(0, 180),
+      progressLabel: label,
+      state: 'streaming'
+    };
   }
 
   function publicSourceUrl(value) {
@@ -113,11 +147,9 @@
   }
 
   function assistantFrame(payload) {
-    const envelope = compactEnvelope(payload);
-    if (!envelope || typeof envelope !== 'object') return null;
-    const message = envelope.message || envelope.data && envelope.data.message;
-    if (!message || typeof message !== 'object' ||
-        !message.author || message.author.role !== 'assistant') return null;
+    const visible = assistantEnvelope(payload);
+    if (!visible) return null;
+    const { envelope, message } = visible;
     const contentType = String(message.content && message.content.content_type || '').toLowerCase();
     if (contentType && contentType !== 'text') return null;
     const citations = citationRecords(message.metadata);
@@ -200,11 +232,12 @@
   }
 
   function mergedMessage(message, stream) {
+    const replaceCitations = Array.isArray(stream.citations) && stream.citations.length > 0;
     const content = Array.isArray(message.content)
-      ? message.content.filter((part) => part && part.type !== 'citation').slice()
+      ? message.content.filter((part) => part && (!replaceCitations || part.type !== 'citation')).slice()
       : [];
     const index = content.findIndex((item) => item && (item.type === 'markdown' || item.type === 'text'));
-    const part = { type: 'markdown', text: stream.text };
+    const part = { type: 'markdown', text: stream.text || '' };
     if (index >= 0) content[index] = Object.assign({}, content[index], part);
     else content.unshift(part);
     (stream.citations || []).forEach((citation) => content.push(Object.assign({}, citation)));
@@ -213,7 +246,7 @@
 
   function mergeMessages(messages, stream) {
     const values = Array.isArray(messages) ? messages : [];
-    if (!stream || !stream.text) return values;
+    if (!stream || (!stream.text && stream.state !== 'streaming')) return values;
     let assistantIndex = -1;
     for (let index = values.length - 1; index >= 0; index -= 1) {
       if (values[index] && values[index].role === 'assistant') {
@@ -225,7 +258,7 @@
     const text = primaryText(assistant);
     const sameMessage = !!assistant && (
       (stream.id && (assistant.id === stream.id || assistant.id === 'private-stream:' + stream.id)) ||
-      (text && (stream.text.startsWith(text) || text.startsWith(stream.text)))
+      (text && stream.text && (stream.text.startsWith(text) || text.startsWith(stream.text)))
     );
     if (sameMessage) {
       if (text.length > stream.text.length) {
@@ -248,17 +281,149 @@
   function createSession(options) {
     const now = typeof options.now === 'function' ? options.now : Date.now;
     let stream = null;
+    let compactDocument = null;
+    let compactContinuation = null;
+
+    function clonePatchValue(value) {
+      if (value === undefined) return undefined;
+      try { return JSON.parse(JSON.stringify(value)); }
+      catch (_) { return null; }
+    }
+
+    function pointerSegments(path) {
+      const value = String(path || '');
+      if (!value || value.length > 320 || value[0] !== '/') return null;
+      const segments = value.slice(1).split('/').map((segment) =>
+        segment.replace(/~1/g, '/').replace(/~0/g, '~')
+      );
+      if (!segments.length || segments.length > 16 || segments[0] !== 'message' ||
+          segments.some((segment) => !segment ||
+            segment === '__proto__' || segment === 'prototype' || segment === 'constructor')) return null;
+      return segments;
+    }
+
+    function patchContainer(root, segments) {
+      let owner = root;
+      for (let index = 0; index < segments.length - 1; index += 1) {
+        const segment = segments[index];
+        if (!owner || typeof owner !== 'object' || !Object.prototype.hasOwnProperty.call(owner, segment)) {
+          return null;
+        }
+        owner = owner[segment];
+      }
+      return owner && typeof owner === 'object'
+        ? { owner, key: segments[segments.length - 1] }
+        : null;
+    }
+
+    function applyPatchOperation(root, operation) {
+      if (!root || typeof root !== 'object' || !operation || typeof operation !== 'object') return false;
+      const kind = String(operation.o || '').toLowerCase();
+      if (!/^(?:add|append|replace|remove)$/.test(kind)) return false;
+      const segments = pointerSegments(operation.p);
+      if (!segments) return false;
+      const target = patchContainer(root, segments);
+      if (!target) return false;
+      const { owner, key } = target;
+      if (kind === 'remove') {
+        if (Array.isArray(owner) && /^\d+$/.test(key)) owner.splice(Number(key), 1);
+        else delete owner[key];
+        return true;
+      }
+      const value = clonePatchValue(operation.v);
+      if (kind === 'append') {
+        const existing = owner[key];
+        if (typeof existing === 'string' && typeof value === 'string') {
+          owner[key] = (existing + value).slice(0, MAX_BUFFER_LENGTH);
+          return true;
+        }
+        if (Array.isArray(existing)) {
+          const additions = Array.isArray(value) ? value : [value];
+          owner[key] = existing.concat(additions).slice(0, MAX_PATCH_ARRAY_LENGTH);
+          return true;
+        }
+        if (existing && typeof existing === 'object' && value && typeof value === 'object' &&
+            !Array.isArray(value)) {
+          Object.assign(existing, value);
+          return true;
+        }
+      }
+      if (Array.isArray(owner) && key === '-') owner.push(value);
+      else owner[key] = value;
+      return true;
+    }
+
+    function applyCompactPayload(payload) {
+      if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return false;
+      if (Number.isFinite(payload.c) && payload.v && typeof payload.v === 'object') {
+        compactDocument = clonePatchValue(payload.v);
+        compactContinuation = null;
+        return compactDocument ? acceptVisiblePayload(compactDocument) : false;
+      }
+      if (!compactDocument) return false;
+      let changed = false;
+      if (payload.o === 'patch' && Array.isArray(payload.v)) {
+        payload.v.slice(0, MAX_PATCH_ARRAY_LENGTH).forEach((operation) => {
+          if (applyPatchOperation(compactDocument, operation)) changed = true;
+        });
+        const last = payload.v[payload.v.length - 1];
+        compactContinuation = last && last.o === 'append'
+          ? { o: last.o, p: last.p }
+          : null;
+      } else if (payload.o && payload.p) {
+        changed = applyPatchOperation(compactDocument, payload);
+        compactContinuation = payload.o === 'append'
+          ? { o: payload.o, p: payload.p }
+          : null;
+      } else if (compactContinuation && Object.keys(payload).length === 1 &&
+          Object.prototype.hasOwnProperty.call(payload, 'v')) {
+        changed = applyPatchOperation(compactDocument, Object.assign({}, compactContinuation, {
+          v: payload.v
+        }));
+      }
+      return changed && acceptVisiblePayload(compactDocument);
+    }
+
+    function acceptVisiblePayload(payload) {
+      let accepted = false;
+      const progress = progressFrame(payload);
+      if (progress) {
+        if (!stream) begin();
+        stream = Object.assign({}, stream, progress, { updatedAt: now() });
+        accepted = true;
+      }
+      const visible = assistantEnvelope(payload);
+      if (!visible) return accepted;
+      const contentType = String(visible.message.content && visible.message.content.content_type || '').toLowerCase();
+      if (contentType && contentType !== 'text') return accepted;
+      if (!stream) begin();
+      const frame = assistantFrame(payload);
+      const rawStatus = String(visible.message.status || visible.envelope.status || '').toLowerCase();
+      stream = Object.assign({}, stream, {
+        id: String(visible.message.id || stream.id || '').slice(0, 180),
+        conversationId: String(
+          visible.envelope.conversation_id || visible.envelope.conversationId || stream.conversationId || ''
+        ).slice(0, 180),
+        state: /^(completed|finished_successfully|finished)$/.test(rawStatus)
+          ? 'completed'
+          : 'streaming',
+        updatedAt: now()
+      }, frame || {});
+      return true;
+    }
 
     function begin() {
-      stream = { id: '', conversationId: '', text: '', state: 'streaming', updatedAt: now() };
+      stream = {
+        id: '', conversationId: '', text: '', progressLabel: '',
+        state: 'streaming', updatedAt: now()
+      };
+      compactDocument = null;
+      compactContinuation = null;
     }
 
     function accept(payload) {
-      const frame = assistantFrame(payload);
-      if (!frame) return false;
-      if (!stream) begin();
-      stream = Object.assign({}, stream, frame, { updatedAt: now() });
-      return true;
+      if (applyCompactPayload(payload)) return true;
+      return acceptVisiblePayload(payload);
     }
 
     function finish() {
@@ -269,10 +434,13 @@
 
     function reset() {
       stream = null;
+      compactDocument = null;
+      compactContinuation = null;
     }
 
     function current(pathname) {
-      if (!stream || !stream.text || now() - stream.updatedAt > MAX_AGE_MS ||
+      if (!stream || (!stream.text && !stream.progressLabel && !stream.id) ||
+          now() - stream.updatedAt > MAX_AGE_MS ||
           !conversationMatches(pathname, stream.conversationId)) return null;
       return Object.assign({}, stream);
     }
@@ -292,5 +460,5 @@
     return Object.freeze({ begin, accept, finish, reset, current, merge });
   }
 
-  return Object.freeze({ assistantFrame, createSession, createSseDecoder, mergeMessages });
+  return Object.freeze({ assistantFrame, createSession, createSseDecoder, mergeMessages, progressFrame });
 });

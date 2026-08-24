@@ -105,6 +105,7 @@ fn sanitize_protocol_event(event: &Map<String, Value>) -> Result<SanitizedAdapte
             "accessSource": sanitize_access_source(event.get("accessSource")),
             "composerReady": event.get("composerReady").and_then(Value::as_bool).unwrap_or(false),
             "streaming": event.get("streaming").and_then(Value::as_bool).unwrap_or(false),
+            "streamingStatus": clean_string(event.get("streamingStatus"), 220),
             "currentModel": clean_string(event.get("currentModel"), 80),
             "attachments": sanitize_attachments(event.get("attachments")),
             "dictationActive": event.get("dictationActive").and_then(Value::as_bool).unwrap_or(false),
@@ -563,6 +564,8 @@ mod tests {
                 "loginRequired": true,
                 "accessReason": "login_required",
                 "accessSource": "visible_page",
+                "streaming": true,
+                "streamingStatus": "正在搜索 South Korea stock market",
                 "draft": "hello",
                 "messages": [{
                     "id": "m1",
@@ -584,6 +587,10 @@ mod tests {
         assert_eq!(event.payload["loginRequired"], true);
         assert_eq!(event.payload["accessReason"], "login_required");
         assert_eq!(event.payload["accessSource"], "visible_page");
+        assert_eq!(
+            event.payload["streamingStatus"],
+            "正在搜索 South Korea stock market"
+        );
         assert!(!event.payload.to_string().contains("secret"));
         assert!(event.payload.to_string().contains("visible"));
     }
