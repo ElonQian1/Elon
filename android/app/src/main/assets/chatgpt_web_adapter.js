@@ -15,6 +15,7 @@
   const privateTransport = window.__elonChatGptPrivateTransport;
   const privateStreamTransport = window.__elonChatGptPrivateStreamTransport;
   const privateSendObserver = window.__elonChatGptPrivateSendObserver;
+  const privateConversationDirectory = window.__elonChatGptPrivateConversationDirectory;
   const authenticationPolicy = window.__elonChatGptAuthenticationPolicy;
   const adapterVersion = Number(window.__elonChatGptAdapterVersion || 0);
   const documentToken = String(window.__elonChatGptDocumentToken || '');
@@ -26,6 +27,7 @@
   let observer = null;
   let snapshotScheduler = null;
   let privateStreamUnsubscribe = null;
+  let lastPrivateDirectorySnapshot = '';
   let streamingSnapshotMode = false;
   let skinMode = false;
   const SEND_BUTTON_POLL_MS = 60;
@@ -50,6 +52,36 @@
       emittedAt: new Date().toISOString(),
       event
     }));
+  }
+
+  function emitPrivateDirectorySnapshot() {
+    if (!privateConversationDirectory ||
+        typeof privateConversationDirectory.snapshot !== 'function') return;
+    const value = optional(null, () => privateConversationDirectory.snapshot());
+    if (!value || !Array.isArray(value.conversations) || !Array.isArray(value.projects) ||
+        (!value.conversations.length && !value.projects.length)) return;
+    const fingerprint = JSON.stringify(value);
+    if (fingerprint === lastPrivateDirectorySnapshot) return;
+    lastPrivateDirectorySnapshot = fingerprint;
+    emitEvent({
+      type: 'conversation_snapshot',
+      conversations: value.conversations,
+      projects: value.projects,
+      scopeProjectId: null,
+      collection: {
+        scrollerFound: false,
+        scrolled: false,
+        scrollRestored: true,
+        reachedEnd: false,
+        truncated: value.conversations.length >= 200,
+        timedOut: false,
+        observedCount: value.conversations.length,
+        steps: 0,
+        complete: false,
+        source: 'official_private',
+        officialLoadState: 'ready'
+      }
+    });
   }
 
   function cleanText(value) {
@@ -645,6 +677,10 @@
     if (snapshotScheduler) snapshotScheduler.dispose();
     if (typeof privateStreamUnsubscribe === 'function') privateStreamUnsubscribe();
     privateStreamUnsubscribe = null;
+    if (privateConversationDirectory &&
+        typeof privateConversationDirectory.setListener === 'function') {
+      privateConversationDirectory.setListener(null);
+    }
     if (observer) observer.disconnect();
     window.removeEventListener('popstate', scheduleSnapshot);
   }
@@ -671,6 +707,11 @@
     typeof privateStreamTransport.subscribe === 'function'
     ? privateStreamTransport.subscribe(() => scheduleSnapshot(true))
     : null);
+  if (privateConversationDirectory &&
+      typeof privateConversationDirectory.setListener === 'function') {
+    privateConversationDirectory.setListener(emitPrivateDirectorySnapshot);
+    emitPrivateDirectorySnapshot();
+  }
   observer = new MutationObserver(scheduleSnapshot);
   const observeDocument = () => {
     const root = document.documentElement;

@@ -53,6 +53,10 @@ internal class ChatGptWebPageAdapter(
     """.trimIndent() + "\n" + context.assets.open(PRIVATE_SOCKET_TAP_ASSET).use { input ->
         input.reader(StandardCharsets.UTF_8).readText()
     }
+    private val privateConversationDirectoryScript =
+        context.assets.open(PRIVATE_CONVERSATION_DIRECTORY_ASSET).use { input ->
+            input.reader(StandardCharsets.UTF_8).readText()
+        }
     private val mainHandler = Handler(Looper.getMainLooper())
     private val documentSession = WebBridgeDocumentSession()
     private val handshake = ChatGptWebBridgeHandshake(
@@ -90,6 +94,13 @@ internal class ChatGptWebPageAdapter(
             WebViewCompat.addDocumentStartJavaScript(
                 webView,
                 privateSocketTapScript,
+                setOf(ALLOWED_ORIGIN),
+            )
+        }
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
+            WebViewCompat.addDocumentStartJavaScript(
+                webView,
+                privateConversationDirectoryScript,
                 setOf(ALLOWED_ORIGIN),
             )
         }
@@ -425,6 +436,7 @@ internal class ChatGptWebPageAdapter(
         private val ADAPTER_ASSETS = listOf(
             "chatgpt_web_adapter_bootstrap.js",
             "chatgpt_web_adapter_authentication_policy.js",
+            "chatgpt_web_private_conversation_directory.js",
             "chatgpt_web_adapter_project_policy.js",
             "chatgpt_web_adapter_project_hints.js",
             "chatgpt_web_adapter_context_menu_policy.js",
@@ -466,6 +478,8 @@ internal class ChatGptWebPageAdapter(
         private const val BRIDGE_OBJECT = "elonChatGptNative"
         private const val ALLOWED_ORIGIN = "https://chatgpt.com"
         private const val PRIVATE_SOCKET_TAP_ASSET = "chatgpt_web_private_socket_tap.js"
+        private const val PRIVATE_CONVERSATION_DIRECTORY_ASSET =
+            "chatgpt_web_private_conversation_directory.js"
         private const val MAX_PROMPT_LENGTH = 20_000
         private const val MAX_CONVERSATION_PATH_LENGTH = 256
         private const val MAX_PROJECT_HINTS = 40

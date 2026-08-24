@@ -118,7 +118,7 @@ internal class ChatGptConversationDirectory(
             observed = event.projects,
         )
         val acceptedCollection = event.collection.copy(
-            source = ChatGptWebConversationCollection.SOURCE_OFFICIAL,
+            source = ChatGptWebConversationCollection.acceptedOfficialSource(event.collection.source),
             stale = false,
             officialLoadState = ChatGptWebConversationCollection.LOAD_READY,
             cachedAtMs = nowMs(),

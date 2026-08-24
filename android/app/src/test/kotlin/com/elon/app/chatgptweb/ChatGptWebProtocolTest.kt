@@ -298,7 +298,8 @@ class ChatGptWebProtocolTest {
                   "truncated":false,
                   "timedOut":false,
                   "observedCount":3,
-                  "steps":4
+                  "steps":4,
+                  "source":"official_private"
                 },
                 "conversations":[
                   {"id":"one","title":"第一场会话","path":"/c/one","active":true,"groupLabel":"今天","activityDates":["2026-08-14"],"providerUrl":"https://www.google.com/search?q=one&udm=50&csuir=thread-one"},
@@ -330,6 +331,16 @@ class ChatGptWebProtocolTest {
         assertFalse(event.collection.timedOut)
         assertEquals(2, event.collection.observedCount)
         assertEquals(4, event.collection.steps)
+        assertEquals(ChatGptWebConversationCollection.SOURCE_PRIVATE, event.collection.source)
+    }
+
+    @Test
+    fun rejectsUnknownConversationCollectionSources() {
+        val event = ChatGptWebProtocol.parse(
+            """{"schema":"yilong.ai.ui.v1","event":{"type":"conversation_snapshot","conversations":[],"projects":[],"collection":{"source":"untrusted"}}}""",
+        ) as ChatGptWebEvent.ConversationList
+
+        assertEquals(ChatGptWebConversationCollection.SOURCE_OFFICIAL, event.collection.source)
     }
 
     @Test

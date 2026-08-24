@@ -46,7 +46,9 @@ internal class ChatGptWebObservedState(
                 )
                 if (event.scopeProjectId == null) {
                     conversationCollection = event.collection.copy(
-                        source = ChatGptWebConversationCollection.SOURCE_OFFICIAL,
+                        source = ChatGptWebConversationCollection.acceptedOfficialSource(
+                            event.collection.source,
+                        ),
                         stale = false,
                         officialLoadState = ChatGptWebConversationCollection.LOAD_READY,
                         cachedAtMs = observedAtMs,

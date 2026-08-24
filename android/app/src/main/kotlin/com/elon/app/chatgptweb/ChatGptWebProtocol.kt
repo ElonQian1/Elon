@@ -77,6 +77,7 @@ internal data class ChatGptWebConversationCollection(
     companion object {
         const val SOURCE_NONE = "none"
         const val SOURCE_OFFICIAL = "official_dom"
+        const val SOURCE_PRIVATE = "official_private"
         const val SOURCE_CACHE = "local_cache"
         const val LOAD_IDLE = "idle"
         const val LOAD_LOADING = "loading"
@@ -89,6 +90,9 @@ internal data class ChatGptWebConversationCollection(
                 source = SOURCE_OFFICIAL,
                 officialLoadState = LOAD_READY,
             )
+
+        fun acceptedOfficialSource(value: String): String =
+            if (value == SOURCE_PRIVATE) SOURCE_PRIVATE else SOURCE_OFFICIAL
 
         fun cached(count: Int, savedAtMs: Long): ChatGptWebConversationCollection =
             ChatGptWebConversationCollection(
@@ -535,7 +539,9 @@ internal object ChatGptWebProtocol {
             timedOut = collection.optBoolean("timedOut"),
             observedCount = conversationCount,
             steps = collection.optInt("steps", 0).coerceIn(0, MAX_CONVERSATION_COLLECTION_STEPS),
-            source = ChatGptWebConversationCollection.SOURCE_OFFICIAL,
+            source = ChatGptWebConversationCollection.acceptedOfficialSource(
+                collection.optString("source"),
+            ),
             officialLoadState = ChatGptWebConversationCollection.LOAD_READY,
         )
     }
