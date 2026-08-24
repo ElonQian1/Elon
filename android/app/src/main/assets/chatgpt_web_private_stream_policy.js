@@ -8,7 +8,8 @@
   'use strict';
 
   const MAX_TEXT_LENGTH = 40000;
-  const MAX_BUFFER_LENGTH = 524288;
+  const MAX_BUFFER_LENGTH = 2 * 1024 * 1024;
+  const MAX_PATCH_TEXT_LENGTH = 524288;
   const MAX_AGE_MS = 5 * 60 * 1000;
   const MAX_PROGRESS_LENGTH = 220;
   const MAX_PATCH_ARRAY_LENGTH = 128;
@@ -180,6 +181,9 @@
       return {
         widgetId: cleanText(widgetId).slice(0, 180),
         messageId: String(visible.message.id || '').slice(0, 180),
+        turnId: String(
+          metadata.turn_exchange_id || metadata.working_turn_id || ''
+        ).slice(0, 180),
         conversationId: String(
           visible.envelope.conversation_id || visible.envelope.conversationId || ''
         ).slice(0, 180),
@@ -464,7 +468,7 @@
       if (kind === 'append') {
         const existing = owner[key];
         if (typeof existing === 'string' && typeof value === 'string') {
-          owner[key] = (existing + value).slice(0, MAX_BUFFER_LENGTH);
+          owner[key] = (existing + value).slice(0, MAX_PATCH_TEXT_LENGTH);
           return true;
         }
         if (Array.isArray(existing)) {
@@ -531,6 +535,12 @@
       const rawStatus = String(visible.message.status || visible.envelope.status || '').toLowerCase();
       stream = Object.assign({}, stream, {
         id: String(visible.message.id || stream.id || '').slice(0, 180),
+        turnId: String(
+          visible.message.metadata && (
+            visible.message.metadata.turn_exchange_id ||
+            visible.message.metadata.working_turn_id
+          ) || stream.turnId || ''
+        ).slice(0, 180),
         conversationId: String(
           visible.envelope.conversation_id || visible.envelope.conversationId || stream.conversationId || ''
         ).slice(0, 180),
@@ -544,7 +554,7 @@
 
     function begin() {
       stream = {
-        id: '', conversationId: '', text: '', progressLabel: '',
+        id: '', turnId: '', conversationId: '', text: '', progressLabel: '',
         state: 'streaming', richParts: [], updatedAt: now()
       };
       compactDocument = null;
@@ -566,9 +576,15 @@
       const values = Array.isArray(parts) ? parts.filter(Boolean).slice(0, MAX_FINANCE_WIDGETS) : [];
       if (!values.length) return false;
       const context = identity && typeof identity === 'object' ? identity : {};
-      if (stream && stream.id && context.messageId && stream.id !== context.messageId) return false;
       if (stream && stream.conversationId && context.conversationId &&
           stream.conversationId !== context.conversationId) return false;
+      if (stream && stream.turnId && context.turnId && stream.turnId !== context.turnId) return false;
+      const messageMismatch = stream && stream.id && context.messageId && stream.id !== context.messageId;
+      const sameTurn = stream && stream.turnId && context.turnId && stream.turnId === context.turnId;
+      const sameConversationWithoutTurn = stream && !stream.turnId && !context.turnId &&
+        stream.conversationId && context.conversationId &&
+        stream.conversationId === context.conversationId;
+      if (messageMismatch && !sameTurn && !sameConversationWithoutTurn) return false;
       if (!stream) begin();
       const existing = Array.isArray(stream.richParts) ? stream.richParts.slice() : [];
       values.forEach((part) => {
@@ -582,6 +598,7 @@
       });
       stream = Object.assign({}, stream, {
         id: String(stream.id || context.messageId || '').slice(0, 180),
+        turnId: String(stream.turnId || context.turnId || '').slice(0, 180),
         conversationId: String(stream.conversationId || context.conversationId || '').slice(0, 180),
         richParts: existing.map((part) => JSON.parse(JSON.stringify(part))),
         updatedAt: now()

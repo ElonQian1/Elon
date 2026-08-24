@@ -147,7 +147,7 @@ function context(enabled, response) {
     'data: [DONE]\n\n'
   ]);
   const enabled = context(true, response);
-  assert.equal(enabled.window.__elonChatGptPrivateStreamTransport.version, 6);
+  assert.equal(enabled.window.__elonChatGptPrivateStreamTransport.version, 7);
   assert.equal(enabled.socketListenerCount(), 1);
   let notifications = 0;
   enabled.window.__elonChatGptPrivateStreamTransport.subscribe(() => { notifications += 1; });
@@ -369,6 +369,74 @@ function context(enabled, response) {
   assert.equal(financeCurrent.richParts[0].richContent.kind, 'finance');
   assert.equal(financeCurrent.richParts[0].richContent.payload.chart.points.length, 2);
   assert.ok(finance.shapes.includes('widget/finance/decoded'));
+
+  const largeTurnId = 'turn-finance-live';
+  const largeWidgetPayload = {
+    c: 10,
+    v: {
+      conversation_id: 'conversation-one',
+      message: {
+        id: 'assistant-widget-prefetch',
+        author: { role: 'assistant' },
+        status: 'finished_partial_completion',
+        content: { content_type: 'text', parts: ['\ue200genui\ue202chart\ue201'] },
+        metadata: {
+          turn_exchange_id: largeTurnId,
+          view_state: { widgets: {
+            'assistant-widget-prefetch:0': {
+              __encoding: 'gzip-json-base64url-v1',
+              __compressed: compressedWidget
+            }
+          } }
+        }
+      }
+    }
+  };
+  const largeFinalPayload = {
+    c: 16,
+    v: {
+      conversation_id: 'conversation-one',
+      message: {
+        id: 'assistant-visible-final',
+        author: { role: 'assistant' },
+        status: 'finished_successfully',
+        content: { content_type: 'text', parts: ['visible finance answer'] },
+        metadata: { turn_exchange_id: largeTurnId }
+      }
+    }
+  };
+  const paddingPayload = {
+    c: 15,
+    v: {
+      conversation_id: 'conversation-one',
+      message: {
+        id: 'assistant-padding',
+        author: { role: 'assistant' },
+        status: 'finished_partial_completion',
+        content: { content_type: 'text', parts: ['x'.repeat(600000)] },
+        metadata: { turn_exchange_id: largeTurnId }
+      }
+    }
+  };
+  const large = context(true, createResponse([
+    'data: ' + JSON.stringify(largeWidgetPayload) + '\n\n' +
+      'data: ' + JSON.stringify(paddingPayload) + '\n\n' +
+      'data: ' + JSON.stringify(largeFinalPayload) + '\n\n' +
+      'data: [DONE]\n\n'
+  ]));
+  await large.window.fetch(request, init);
+  for (let index = 0; index < 50; index += 1) {
+    const active = large.window.__elonChatGptPrivateStreamTransport.current('/c/conversation-one');
+    if (active && active.richParts && active.richParts.length) break;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  const largeCurrent = large.window.__elonChatGptPrivateStreamTransport.current('/c/conversation-one');
+  assert.equal(largeCurrent.id, 'assistant-visible-final');
+  assert.equal(largeCurrent.turnId, largeTurnId);
+  assert.equal(largeCurrent.richParts.length, 1,
+    'an async widget from the same turn survives later assistant message ids');
+  assert.equal(largeCurrent.richParts[0].richContent.payload.chart.points.length, 2);
+  assert.ok(large.shapes.includes('widget/finance/decoded'));
 
   await enabled.window.fetch({
     method: 'POST',
