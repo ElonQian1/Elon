@@ -78,6 +78,17 @@ internal object WebAiPrivateTransportCatalog {
             fallback = "official_dom_reply_snapshot",
         ),
         Entry(
+            id = "android_web_ai_background_navigation_continuity_v1",
+            provider = "chatgpt_and_google_web_ai",
+            status = "completed",
+            verification = "device_structural_verified",
+            productionDefault = true,
+            runtimeEnabled = true,
+            requestMode = "preserve_inflight_official_navigation",
+            healthPolicy = "reattach_adapter_then_bounded_watchdog_and_reload",
+            fallback = "official_webview_bounded_recovery",
+        ),
+        Entry(
             id = "android_chatgpt_private_transport_research_v1",
             provider = "chatgpt",
             status = "research_only",

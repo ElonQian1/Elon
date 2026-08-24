@@ -12,6 +12,8 @@ import android.webkit.WebChromeClient
 import android.widget.FrameLayout
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.BuildConfig
+import com.elon.app.WebChatBackgroundResumeAction
+import com.elon.app.WebChatBackgroundResumePolicy
 import com.elon.app.WebChatSessionRecoveryCoordinator
 import com.elon.app.configureWebChatBackgroundSurface
 import com.elon.app.chatgptweb.ChatGptWebConversationIndexState
@@ -64,7 +66,7 @@ internal class GoogleWebBackgroundSession(
     private var activePath: String? = null
     private var awaitingNewConversationBoundary = false
     private var state = State.IDLE
-    private var reloadAfterPause = false
+    private var loadPendingAfterPause = false
     private val webExecution = webChatBackgroundExecutionController({ webView }) {
         state == State.LOADING || latestSnapshot?.streaming == true ||
             conversationNavigation.hasPending() || responseRefresh.isActive
@@ -228,7 +230,6 @@ internal class GoogleWebBackgroundSession(
                 adapter.onPageStarted(url)
                 updateState(State.LOADING)
                 if (!recovery.isActive()) {
-                    reloadAfterPause = true
                     adapter.onHostPaused()
                 } else if (GoogleWebNavigationPolicy.supportsAiMode(url)) {
                     recovery.onNavigationStarted()
@@ -239,7 +240,6 @@ internal class GoogleWebBackgroundSession(
             onPageReady = { url ->
                 cookieManager.flush()
                 if (!recovery.isActive()) {
-                    reloadAfterPause = false
                     adapter.onHostPaused()
                 } else {
                     adapter.onPageReady(url)
@@ -275,7 +275,7 @@ internal class GoogleWebBackgroundSession(
         proxyController.prepare { status ->
             if (activity.isFinishing || activity.isDestroyed || webView !== view) return@prepare
             if (!recovery.isActive()) {
-                reloadAfterPause = true
+                loadPendingAfterPause = true
                 return@prepare
             }
             status.error?.let {
@@ -414,25 +414,26 @@ internal class GoogleWebBackgroundSession(
         responseRefresh.stop()
         handler.removeCallbacksAndMessages(null)
         pageAdapter?.onHostPaused()
-        webView?.let { view ->
-            if (state == State.LOADING && GoogleWebNavigationPolicy.supportsAiMode(view.url)) {
-                view.stopLoading()
-                reloadAfterPause = true
-            }
-            cookieManager.flush()
-        }
+        if (webView != null) cookieManager.flush()
     }
 
     private fun resumeRecovery() {
-        when {
-            reloadAfterPause -> {
-                reloadAfterPause = false
+        val view = webView ?: return
+        when (WebChatBackgroundResumePolicy.decide(
+            loadDeferred = loadPendingAfterPause,
+            pageSupported = GoogleWebNavigationPolicy.supportsAiMode(view.url),
+            pageFailed = state == State.ERROR,
+            pageLoading = state == State.LOADING,
+            pageProgress = view.progress,
+        )) {
+            WebChatBackgroundResumeAction.RETRY_DEFERRED_LOAD -> {
+                loadPendingAfterPause = false
                 recovery.retryNow()
             }
-            state == State.ERROR && GoogleWebNavigationPolicy.supportsAiMode(webView?.url) ->
-                recovery.onFailure()
-            state == State.LOADING && GoogleWebNavigationPolicy.supportsAiMode(webView?.url) ->
-                recovery.onPageFinished()
+            WebChatBackgroundResumeAction.RETRY_FAILED_PAGE -> recovery.onFailure()
+            WebChatBackgroundResumeAction.REPAIR_FINISHED_PAGE -> recovery.onPageFinished()
+            WebChatBackgroundResumeAction.WATCH_IN_FLIGHT_PAGE -> recovery.onNavigationStarted()
+            WebChatBackgroundResumeAction.NONE -> Unit
         }
     }
 

@@ -37,23 +37,33 @@ class WebChatBackgroundWebViewContractTest {
         assertTrue(composerInteraction.contains("backgroundLease.run(action)"))
         assertTrue(composerInteraction.contains("backgroundLease.release()"))
         assertTrue(google.contains("configureWebChatBackgroundSurface()"))
+        val googlePause = google.substringAfter("private fun pauseSession()")
+            .substringBefore("private fun resumeRecovery()")
+        assertFalse(googlePause.contains("stopLoading()"))
+        assertFalse(googlePause.contains("loadPendingAfterPause = true"))
+        assertTrue(google.contains("WebChatBackgroundResumePolicy.decide("))
         assertFalse(chatGpt.contains("alpha = 0.01f"))
         assertFalse(google.contains("alpha = 0.01f"))
     }
 
     @Test
-    fun providerSwitchKeepsAnInFlightChatGptNavigationAlive() {
+    fun providerSwitchKeepsInFlightProviderNavigationAlive() {
         val chatGpt = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptBackgroundSession.kt",
         )
-        val pauseSession = chatGpt.substringAfter("private fun pauseSession()")
+        val google = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/googleweb/GoogleWebBackgroundSession.kt",
+        )
+        val chatGptPause = chatGpt.substringAfter("private fun pauseSession()")
             .substringBefore("private fun resumeRecovery()")
-        val resumeRecovery = chatGpt.substringAfter("private fun resumeRecovery()")
-            .substringBefore("private fun reloadRestorablePage()")
+        val googlePause = google.substringAfter("private fun pauseSession()")
+            .substringBefore("private fun resumeRecovery()")
 
-        assertFalse(pauseSession.contains("stopLoading()"))
-        assertTrue(resumeRecovery.contains("view.progress >= 100"))
-        assertTrue(resumeRecovery.contains("recovery.onNavigationStarted()"))
+        assertFalse(chatGptPause.contains("stopLoading()"))
+        assertFalse(googlePause.contains("stopLoading()"))
+        assertTrue(chatGpt.contains("if (view.progress >= 100)"))
+        assertTrue(chatGpt.contains("recovery.onNavigationStarted()"))
+        assertTrue(google.contains("WebChatBackgroundResumePolicy.decide("))
     }
 
     private fun readRepositoryFile(relativePath: String): String =

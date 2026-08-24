@@ -20,6 +20,7 @@ class WebAiPrivateTransportCatalogTest {
         assertTrue("android_chatgpt_private_stream_observer_v1" in enabledIds)
         assertTrue("android_google_web_private_conversation_directory_v1" in enabledIds)
         assertTrue("android_google_web_private_reply_observer_v1" in enabledIds)
+        assertTrue("android_web_ai_background_navigation_continuity_v1" in enabledIds)
 
         values.forEach { row ->
             assertFalse(row.getBoolean("direct_post_enabled"))

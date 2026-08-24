@@ -14,11 +14,17 @@ installed build; individual capability documents retain implementation evidence.
 | Streaming reply observer | ChatGPT | Completed and enabled | Official DOM snapshot |
 | Conversation directory | Google Web AI | Completed and enabled | Local cache and official page |
 | Reply completion observer | Google Web AI | Completed and enabled | Official DOM snapshot |
+| Background navigation continuity | ChatGPT and Google Web AI | Completed, enabled, and device verified | Bounded official WebView recovery |
 
 All production transports keep the official page authoritative. They do not export
 cookies, credentials, request headers, or private conversation content outside the
 device. Every observer is bounded and emits nothing on malformed or unsuccessful
 responses.
+
+Background provider switching keeps one already-started official navigation alive.
+On resume, the APK first reattaches the versioned page adapter and cached snapshot;
+only a failed or stalled document consumes the bounded full-page reload budget. It
+does not add a new request path or keep an idle polling loop alive.
 
 ## Audited non-capabilities
 
