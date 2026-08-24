@@ -5,6 +5,10 @@ status: implementation_completed
 verification: targeted_tests_passed_device_core_actions
 production_default: enabled_after_release
 
+The current floating overlay supersedes the earlier full-screen compact-layout branch.
+Do not merge title-height or full-screen padding patches from that obsolete surface;
+the active overlay intentionally has no full-screen title and does not block chat.
+
 ## 交互边界
 
 实时语音继续由官方网页会话执行，APK 的 Activity 全局层显示一个可拖动、可折叠的控制球。控制球不遮挡聊天，不拦截返回键，也不要求用户停留在官网全屏语音页；离开“一龙 AI”聊天页后仍保持可见并可结束语音。

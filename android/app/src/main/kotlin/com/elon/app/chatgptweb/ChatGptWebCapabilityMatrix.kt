@@ -80,7 +80,7 @@ internal object ChatGptWebCapabilityMatrix {
         return JSONObject()
             .put("control_ok", true)
             .put("action", "chatgpt_get_capability_matrix")
-            .put("schema", "elon.chatgpt_web.capability_matrix.v3")
+            .put("schema", "elon.chatgpt_web.capability_matrix.v4")
             .put("adapter_version", ChatGptWebPageAdapter.ADAPTER_VERSION)
             .put("page_generation", document?.pageGeneration ?: 0L)
             .put("adapter_generation", document?.adapterGeneration ?: 0L)
@@ -130,6 +130,7 @@ internal object ChatGptWebCapabilityMatrix {
                 .put("unexpected_official_fallback_control_count", unexpectedFallbackControls.size)
             )
             .put("capabilities", JSONArray(rows))
+            .put("private_transports", WebAiPrivateTransportCatalog.describe())
             .put(
                 "product_capabilities",
                 ChatGptWebProductCapabilityCatalog.describe(
