@@ -58,9 +58,11 @@ assert.match(embedded, /\.hide\(\)/)
 assert.match(embedded, /\.show\(\)/)
 assert.match(
   embedded,
-  /popout\.hide\(\)[\s\S]*?webview\.hide\(\)[\s\S]*?webview\.reparent\(&popout\)[\s\S]*?webview\.show\(\)/,
+  /if webview\.window\(\)\.label\(\) == MAIN_WINDOW_LABEL \{[\s\S]*?park\(&webview\)\?/,
 )
-assert.match(embedded, /webview\.window\(\)\.label\(\) != webview_label/)
+const hideBranch = embedded.slice(embedded.indexOf('pub(crate) fn hide('), embedded.indexOf('pub(crate) fn park_if_background'))
+assert.doesNotMatch(hideBranch, /\.reparent\(/, 'hiding an active provider page must not synchronously reparent WebView2')
+assert.match(embedded, /const PARK_OFFSET: i32 = 20_000/)
 assert.match(embedded, /present_local_ai_web_session_embedded/)
 assert.match(embedded, /hide_local_ai_web_session_embedded/)
 assert.match(main, /internal_browser::open_internal_browser_tab/)

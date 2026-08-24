@@ -87,8 +87,7 @@ pub(crate) async fn hide_local_ai_web_session_embedded(
 }
 
 pub(crate) fn park(webview: &Webview) -> Result<(), String> {
-    let parent_size = webview.window().inner_size().map_err(display_error)?;
-    let (parked_x, parked_y) = parked_position(parent_size.width, parent_size.height);
+    let (parked_x, parked_y) = parked_position();
     webview.hide().map_err(display_error)?;
     webview
         .set_position(PhysicalPosition::new(parked_x, parked_y))
@@ -96,26 +95,12 @@ pub(crate) fn park(webview: &Webview) -> Result<(), String> {
     webview.show().map_err(display_error)
 }
 
-// 主窗口最小化或调整过程中偶发的瞬时尺寸；小于这个阈值一律视为不可信。
-const PARK_MIN_TRUSTED_SIZE: u32 = 100;
-// 停放坐标额外留出的安全边距，避免四舍五入或多显示器缩放导致贴边穿帮。
-const PARK_MARGIN: i32 = 64;
-// 尺寸不可信或换算溢出时使用的固定兜底坐标，足够远离任何真实屏幕范围。
-const PARK_FALLBACK_OFFSET: i32 = 20_000;
+// 嵌入区域的最大允许尺寸是 16_384；使用更远的固定坐标，窗口最大化、DPI
+// 切换和随后 resize 都不会把后台官网页重新带回可见区域。
+const PARK_OFFSET: i32 = 20_000;
 
-// 窗口最小化、DPI 切换瞬间或尺寸溢出时不能信任这次测量，否则会把停放坐标
-// 算回 (0,0) 附近，让本该隐藏的完整官方页面重新盖住原生界面。
-fn parked_position(width: u32, height: u32) -> (i32, i32) {
-    if width < PARK_MIN_TRUSTED_SIZE || height < PARK_MIN_TRUSTED_SIZE {
-        return (PARK_FALLBACK_OFFSET, PARK_FALLBACK_OFFSET);
-    }
-    let x = i32::try_from(width)
-        .unwrap_or(PARK_FALLBACK_OFFSET)
-        .saturating_add(PARK_MARGIN);
-    let y = i32::try_from(height)
-        .unwrap_or(PARK_FALLBACK_OFFSET)
-        .saturating_add(PARK_MARGIN);
-    (x, y)
+fn parked_position() -> (i32, i32) {
+    (PARK_OFFSET, PARK_OFFSET)
 }
 
 pub(crate) fn present(
@@ -148,16 +133,18 @@ pub(crate) fn present(
 
 pub(crate) fn hide(app: &AppHandle, webview_label: &str) -> Result<(), String> {
     if let Some(webview) = app.get_webview(webview_label) {
-        if let Some(popout) = app.get_window(webview_label) {
-            // A large child WebView parked just outside the main window can become
-            // visible again after maximize/DPI changes or WebView2 coordinate
-            // clamping. Keep the provider page alive inside its hidden native host
-            // instead; present() reparents the same WebView back into the tab area.
+        if webview.window().label() == MAIN_WINDOW_LABEL {
+            // Do not reparent a live WebView2 while handling a frontend command.
+            // Tauri's Windows reparent dispatcher waits synchronously for the UI
+            // event loop; moving an actively streaming provider page into the
+            // hidden popout can therefore deadlock the whole desktop window.
+            park(&webview)?;
+        } else if let Some(popout) = app.get_window(webview_label) {
+            // A page already hosted by the popout can stay there. Keeping its
+            // complete viewport visible inside a hidden native host preserves the
+            // provider DOM and background controller without another reparent.
             popout.hide().map_err(display_error)?;
             webview.hide().map_err(display_error)?;
-            if webview.window().label() != webview_label {
-                webview.reparent(&popout).map_err(display_error)?;
-            }
             webview
                 .set_position(PhysicalPosition::new(0, 0))
                 .map_err(display_error)?;
@@ -235,27 +222,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn parked_position_uses_measured_size_with_a_safety_margin() {
-        assert_eq!(
-            parked_position(1280, 800),
-            (1280 + PARK_MARGIN, 800 + PARK_MARGIN)
-        );
-    }
-
-    #[test]
-    fn parked_position_falls_back_to_a_fixed_offset_for_untrusted_sizes() {
-        assert_eq!(
-            parked_position(0, 0),
-            (PARK_FALLBACK_OFFSET, PARK_FALLBACK_OFFSET)
-        );
-        assert_eq!(
-            parked_position(PARK_MIN_TRUSTED_SIZE - 1, 800),
-            (PARK_FALLBACK_OFFSET, PARK_FALLBACK_OFFSET)
-        );
-        assert_eq!(
-            parked_position(1280, PARK_MIN_TRUSTED_SIZE - 1),
-            (PARK_FALLBACK_OFFSET, PARK_FALLBACK_OFFSET)
-        );
+    fn parked_position_stays_beyond_the_largest_embedded_surface() {
+        assert_eq!(parked_position(), (PARK_OFFSET, PARK_OFFSET));
+        assert!(PARK_OFFSET > 16_384);
     }
 
     #[test]
