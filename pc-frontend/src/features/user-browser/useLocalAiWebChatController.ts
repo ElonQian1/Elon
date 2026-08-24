@@ -50,6 +50,7 @@ import {
   RESPONSE_REFRESH_DELAYS_MS,
   type QueuedLocalAiSend,
 } from './localAiWebChatControllerConfig'
+import useLocalAiAccessRecovery, { createLocalAiAccessRetry } from './useLocalAiAccessRecovery'
 
 export default function useLocalAiWebChatController(
   provider: LocalAiWebProvider | undefined,
@@ -98,13 +99,18 @@ export default function useLocalAiWebChatController(
     [visibleSessionState?.semanticEvent],
   )
   const snapshot = newConversationRecoveryStartedAtMs ? null : liveSnapshot
+  const accessRecovery = useLocalAiAccessRecovery(
+    requestedSessionIdentity, snapshot, pendingResponses, expectedResponsePrompt.current,
+    setPendingResponses, cancelResponseRefresh, setMessage,
+  )
   const visibleMessages = useMemo(
     () => mergeOptimisticLocalAiMessages(
       snapshot?.messages ?? [],
       pendingSends,
       pendingResponses,
+      accessRecovery.blocked,
     ),
-    [pendingResponses, pendingSends, snapshot?.messages],
+    [accessRecovery.blocked, pendingResponses, pendingSends, snapshot?.messages],
   )
   const navigationSnapshot = useMemo(
     () => isLocalAiConversationSnapshot(visibleSessionState?.navigationEvent)
@@ -566,10 +572,19 @@ export default function useLocalAiWebChatController(
     return previousDraft
   }
 
-  async function startNewConversation(): Promise<LocalAiWebSessionState | null> {
+  async function startNewConversation(retryPrompt = ''): Promise<LocalAiWebSessionState | null> {
     if (!provider || !ownerKey) return null
     const path = selectLocalAiNewConversationPath(provider.id, visibleSessionState, snapshot)
     const previousDraft = beginLocalNewConversation()
+    const retry = createLocalAiAccessRetry(
+      requestedSessionIdentity, retryPrompt,
+      `optimistic-${provider.id}-${Date.now()}-${optimisticSendSequence.current++}`,
+    )
+    if (retry) {
+      setPendingSends([retry.pending]); setPendingResponses([retry.response])
+      setQueuedSend(retry.queued); queuedSendRef.current = retry.queued
+      accessRecovery.dismiss()
+    }
     setBusyAction('new_conversation')
     try {
       if (path === 'adapter') {
@@ -602,6 +617,10 @@ export default function useLocalAiWebChatController(
     } finally {
       setBusyAction('')
     }
+  }
+
+  function retryLoginBlockedPrompt() {
+    return !accessRecovery.prompt.trim() || busyAction ? null : startNewConversation(accessRecovery.prompt)
   }
 
   async function openNewConversationHome(
@@ -759,6 +778,9 @@ export default function useLocalAiWebChatController(
     canSubmitDraft: composerAvailability.canSubmit,
     queuedSendActive: Boolean(queuedSend),
     newConversationRecoveryActive: Boolean(newConversationRecoveryStartedAtMs),
+    loginRecoveryPrompt: accessRecovery.prompt,
+    retryLoginBlockedPrompt,
+    dismissLoginRecovery: accessRecovery.dismiss,
     openOfficial,
     openResearchDirectory,
     control,

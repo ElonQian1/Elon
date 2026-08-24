@@ -101,6 +101,8 @@ fn sanitize_protocol_event(event: &Map<String, Value>) -> Result<SanitizedAdapte
             "authenticated": event.get("authenticated").and_then(Value::as_bool).unwrap_or(false),
             "pageKind": sanitize_page_kind(event.get("pageKind")),
             "loginRequired": event.get("loginRequired").and_then(Value::as_bool).unwrap_or(false),
+            "accessReason": sanitize_access_reason(event.get("accessReason")),
+            "accessSource": sanitize_access_source(event.get("accessSource")),
             "composerReady": event.get("composerReady").and_then(Value::as_bool).unwrap_or(false),
             "streaming": event.get("streaming").and_then(Value::as_bool).unwrap_or(false),
             "currentModel": clean_string(event.get("currentModel"), 80),
@@ -502,6 +504,22 @@ fn sanitize_page_kind(value: Option<&Value>) -> &'static str {
     }
 }
 
+fn sanitize_access_reason(value: Option<&Value>) -> &'static str {
+    match value.and_then(Value::as_str) {
+        Some("login_required") => "login_required",
+        Some("rate_limited") => "rate_limited",
+        _ => "",
+    }
+}
+
+fn sanitize_access_source(value: Option<&Value>) -> &'static str {
+    match value.and_then(Value::as_str) {
+        Some("visible_page") => "visible_page",
+        Some("private_response") => "private_response",
+        _ => "",
+    }
+}
+
 fn clean_string(value: Option<&Value>, max: usize) -> String {
     value
         .and_then(Value::as_str)
@@ -543,6 +561,8 @@ mod tests {
                 "url": "https://chatgpt.com/c/test?token=secret",
                 "pageKind": "auth",
                 "loginRequired": true,
+                "accessReason": "login_required",
+                "accessSource": "visible_page",
                 "draft": "hello",
                 "messages": [{
                     "id": "m1",
@@ -562,6 +582,8 @@ mod tests {
         assert!(event.restorable_url.is_none());
         assert_eq!(event.payload["pageKind"], "auth");
         assert_eq!(event.payload["loginRequired"], true);
+        assert_eq!(event.payload["accessReason"], "login_required");
+        assert_eq!(event.payload["accessSource"], "visible_page");
         assert!(!event.payload.to_string().contains("secret"));
         assert!(event.payload.to_string().contains("visible"));
     }

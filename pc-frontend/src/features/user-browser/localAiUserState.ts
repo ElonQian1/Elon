@@ -17,6 +17,7 @@ export type LocalAiUserPhase =
   | 'adapter_waiting'
   | 'context_restoring'
   | 'login_required'
+  | 'access_limited'
   | 'provider_unavailable'
   | 'ready_guest'
   | 'ready_authenticated'
@@ -60,7 +61,9 @@ export function deriveLocalAiUserState(
   const officialOpen = Boolean(session && session.windowStatus !== 'closed')
   const officialVisible = Boolean(session?.windowVisible)
   const authenticated = Boolean(snapshot?.authenticated)
-  const guestMode = Boolean(snapshot?.composerReady && !authenticated && !snapshot?.loginRequired)
+  const loginRequired = Boolean(snapshot?.loginRequired || snapshot?.accessReason === 'login_required')
+  const accessBlocked = Boolean(loginRequired || snapshot?.accessReason === 'rate_limited')
+  const guestMode = Boolean(snapshot?.composerReady && !authenticated && !accessBlocked)
   const supportedActions = new Set<LocalAiAdapterAction>(provider?.adapterActions ?? [])
   const liveCapabilities = new Set(snapshot?.capabilities ?? [])
   const accountReady = authenticated || guestMode
@@ -77,6 +80,7 @@ export function deriveLocalAiUserState(
       && livePageReady
       && snapshot?.composerReady
       && accountReady
+      && !accessBlocked
       && supportedActions.has('send_prompt'),
   )
   const canNewConversation = Boolean(
@@ -103,7 +107,7 @@ export function deriveLocalAiUserState(
     authenticated,
     guestMode,
     canSend,
-    canStop: Boolean(snapshot?.streaming && supportedActions.has('stop_generation')),
+    canStop: Boolean(!accessBlocked && snapshot?.streaming && supportedActions.has('stop_generation')),
     canNewConversation,
     canConversationHistory,
     canStartGoogleLogin,
@@ -145,11 +149,32 @@ export function deriveLocalAiUserState(
   if (!adapterConnected) {
     return result('adapter_waiting', 'attention', '等待同步', '官方页已打开，原生界面仍在连接', '可以显示官方窗口继续操作；一龙只等待页面可见语义，不读取网络请求或 Cookie。', true, true, shared)
   }
+  if (loginRequired) {
+    return result(
+      'login_required',
+      'attention',
+      '需登录',
+      `${provider.displayName} 官方页要求登录后继续`,
+      '官方访客会话当前不能继续；这不等于一龙账号退出。上一条问题会保留，可新建游客对话重试，或由本人在官方窗口登录。',
+      true,
+      false,
+      shared,
+    )
+  }
+  if (snapshot?.accessReason === 'rate_limited') {
+    return result(
+      'access_limited',
+      'attention',
+      '请求受限',
+      `${provider.displayName} 暂时限制了当前请求`,
+      '官方响应返回请求受限；可能是访客频率或服务策略，稍后可新建对话重试，或在官方窗口登录后继续。',
+      true,
+      true,
+      shared,
+    )
+  }
   if (snapshot?.streaming) {
     return result('streaming', 'ready', '回答中', `${provider.displayName} 正在回答`, '回答和公开来源正在同步到一龙聊天界面。', false, false, shared)
-  }
-  if (snapshot?.loginRequired) {
-    return result('login_required', 'attention', '需登录', `请在 ${provider.displayName} 官方窗口登录`, '登录、真人验证和账号选择必须由本人在官方窗口完成；完成后本页会自动更新。', true, false, shared)
   }
   if (!snapshot?.composerReady) {
     if (provider.loginMode !== 'guest_web_system_login' && !authenticated) {

@@ -90,6 +90,8 @@ export interface LocalAiMessageSnapshot {
   authenticated: boolean
   pageKind?: 'auth' | 'conversation' | 'home' | 'feature' | 'ai_mode' | 'unsupported' | 'unknown'
   loginRequired?: boolean
+  accessReason?: 'login_required' | 'rate_limited' | ''
+  accessSource?: 'visible_page' | 'private_response' | ''
   composerReady: boolean
   streaming: boolean
   currentModel: string

@@ -1,0 +1,95 @@
+.card {
+  width: min(720px, calc(100% - 32px));
+  margin: 14px auto 4px;
+  display: flex;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid rgba(232, 173, 78, .32);
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(94, 67, 25, .28), rgba(39, 40, 46, .96) 48%);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, .2);
+  color: #f2f3f5;
+}
+
+.icon {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: rgba(232, 173, 78, .13);
+  color: #f0bd68;
+}
+
+.body {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+}
+
+.eyebrow {
+  color: #e8b963;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .08em;
+}
+
+.body strong {
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.body p {
+  margin: 0;
+  color: #b7bac2;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.body .retained {
+  color: #8fd8a8;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 5px;
+}
+
+.actions button {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 11px;
+  border: 1px solid #454851;
+  border-radius: 8px;
+  background: #2c2e34;
+  color: #dfe1e6;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.actions button:hover:not(:disabled) {
+  border-color: #686d79;
+  background: #34373e;
+}
+
+.actions .primary {
+  border-color: rgba(77, 190, 116, .48);
+  background: rgba(65, 158, 96, .18);
+  color: #9ce3b3;
+}
+
+.actions button:disabled {
+  opacity: .48;
+  cursor: default;
+}
+
+@media (max-width: 640px) {
+  .card { width: calc(100% - 20px); padding: 12px; }
+  .actions button { flex: 1 1 auto; }
+}

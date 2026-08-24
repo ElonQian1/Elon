@@ -74,6 +74,16 @@ assert.equal(
   false,
   'a cursor-only official placeholder is not a completed answer',
 )
+assert.deepEqual(
+  mergeOptimisticLocalAiMessages(officialCursor, [first], [firstResponse], true).map((item) => item.id),
+  ['u-1', 'a-1', 'u-2', 'a-2'],
+  'an access block must remove the synthetic thinking row while retaining the submitted user turn',
+)
+assert.equal(
+  mergeOptimisticLocalAiMessages(afterFirstOfficialSend, [first], [firstResponse], true).at(-1).role,
+  'user',
+  'a login wall must never leave an empty native assistant shell',
+)
 
 const officialStreaming = [
   ...afterFirstOfficialSend,

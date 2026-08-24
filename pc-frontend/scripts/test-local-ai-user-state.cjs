@@ -62,6 +62,31 @@ assert.equal(login.phase, 'login_required')
 assert.equal(login.canSend, false)
 assert.equal(login.canStartGoogleLogin, true)
 
+const loginOutranksStreaming = deriveLocalAiUserState('ready', chatgpt, readySession, snapshot({
+  authenticated: false,
+  loginRequired: true,
+  accessReason: 'login_required',
+  streaming: true,
+}))
+assert.equal(loginOutranksStreaming.phase, 'login_required')
+assert.equal(loginOutranksStreaming.canStop, false)
+
+assert.equal(deriveLocalAiUserState('ready', chatgpt, readySession, snapshot({
+  accessReason: 'login_required',
+  accessSource: 'private_response',
+})).phase, 'login_required', 'a sanitized private 401/403 hint is sufficient while the DOM catches up')
+
+const rateLimited = deriveLocalAiUserState('ready', chatgpt, readySession, snapshot({
+  composerReady: true,
+  accessReason: 'rate_limited',
+  accessSource: 'private_response',
+  streaming: true,
+}))
+assert.equal(rateLimited.phase, 'access_limited')
+assert.equal(rateLimited.canSend, false)
+assert.equal(rateLimited.canStop, false)
+assert.match(rateLimited.detail, /请求受限/)
+
 const unavailable = deriveLocalAiUserState('ready', google, {
   ...readySession,
   providerId: google.id,

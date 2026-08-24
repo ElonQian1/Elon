@@ -31,11 +31,30 @@ class ChatGptWebAccessPolicyTest {
         assertFalse(ChatGptWebAccessPolicy.canChat(auth))
     }
 
+    @Test
+    fun rateLimitedResponseCannotReuseAStillVisibleComposer() {
+        assertFalse(
+            ChatGptWebAccessPolicy.canChat(
+                snapshot(authenticated = false, composerReady = true, accessReason = "rate_limited"),
+            ),
+        )
+    }
+
+    @Test
+    fun privateAuthenticationHintRequiresLoginWhileVisiblePageCatchesUp() {
+        assertTrue(
+            ChatGptWebAccessPolicy.requiresLogin(
+                snapshot(authenticated = false, composerReady = false, accessReason = "login_required"),
+            ),
+        )
+    }
+
     private fun snapshot(
         authenticated: Boolean,
         composerReady: Boolean,
         loginRequired: Boolean = false,
         pageKind: String = "conversation",
+        accessReason: String = "",
     ) = ChatGptWebSnapshot(
         title = "",
         url = "https://chatgpt.com/",
@@ -50,5 +69,6 @@ class ChatGptWebAccessPolicyTest {
         dictationActive = false,
         pageKind = pageKind,
         loginRequired = loginRequired,
+        accessReason = accessReason,
     )
 }

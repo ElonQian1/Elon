@@ -33,6 +33,8 @@ internal data class ChatGptWebSnapshot(
     val capabilities: ChatGptWebCapabilities,
     val pageKind: String = "unknown",
     val loginRequired: Boolean = false,
+    val accessReason: String = "",
+    val accessSource: String = "",
     val messageWindowStart: Int = 0,
     val observedMessageCount: Int = messages.size,
 )
@@ -243,6 +245,8 @@ internal object ChatGptWebProtocol {
             capabilities = ChatGptWebCapabilities(parseStringSet(event, "capabilities")),
             pageKind = event.optString("pageKind").takeIf { it in PAGE_KINDS } ?: "unknown",
             loginRequired = event.optBoolean("loginRequired"),
+            accessReason = event.optString("accessReason").takeIf { it in ACCESS_REASONS }.orEmpty(),
+            accessSource = event.optString("accessSource").takeIf { it in ACCESS_SOURCES }.orEmpty(),
             messageWindowStart = messageWindowStart,
             observedMessageCount = observedMessageCount,
         )
@@ -581,6 +585,8 @@ internal object ChatGptWebProtocol {
     private val SUPPORTED_CONTENT_TYPES = setOf("text", "markdown")
     private val SUPPORTED_COMPOSER_SECTIONS = setOf("model", "tools")
     private val PAGE_KINDS = setOf("auth", "conversation", "home", "feature")
+    private val ACCESS_REASONS = setOf("login_required", "rate_limited")
+    private val ACCESS_SOURCES = setOf("visible_page", "private_response")
     private val SUPPORTED_TOUCH_PURPOSES = setOf(
         "list_model_options",
         "list_composer_tools",

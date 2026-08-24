@@ -162,11 +162,13 @@ class ChatGptWebProtocolTest {
     @Test
     fun boundsAuthenticationEvidenceFromSnapshots() {
         val event = ChatGptWebProtocol.parse(
-            """{"schema":"yilong.ai.ui.v1","event":{"type":"message_snapshot","url":"https://chatgpt.com/tasks","pageKind":"unsupported","loginRequired":true}}""",
+            """{"schema":"yilong.ai.ui.v1","event":{"type":"message_snapshot","url":"https://chatgpt.com/tasks","pageKind":"unsupported","loginRequired":true,"accessReason":"rate_limited","accessSource":"private_response"}}""",
         ) as ChatGptWebEvent.Snapshot
 
         assertEquals("unknown", event.value.pageKind)
         assertTrue(event.value.loginRequired)
+        assertEquals("rate_limited", event.value.accessReason)
+        assertEquals("private_response", event.value.accessSource)
     }
 
     @Test

@@ -112,6 +112,33 @@
     return !!profile && profile.isConnected !== false;
   }
 
+  function visibleAccessText() {
+    const scope = document.querySelector('main') || document.body;
+    if (!scope) return '';
+    return Array.from(scope.querySelectorAll('h1, h2, h3, p, [role="alert"], [role="dialog"], button, a'))
+      .filter(isVisible)
+      .slice(0, 80)
+      .map((element) => cleanText(element.textContent).slice(0, 240))
+      .filter(Boolean)
+      .join(' ')
+      .slice(0, 4000);
+  }
+
+  function accessDecision(pageKind, composer, privateAccess) {
+    const signals = {
+      pageKind,
+      composerReady: !!composer,
+      hasLoginEntry: hasLoginEntry(),
+      visibleText: visibleAccessText(),
+      privateStatus: privateAccess && privateAccess.status
+    };
+    if (authenticationPolicy && typeof authenticationPolicy.accessDecision === 'function') {
+      return authenticationPolicy.accessDecision(signals);
+    }
+    const loginRequired = pageKind === 'auth';
+    return { blocked: loginRequired, loginRequired, reason: loginRequired ? 'login_required' : '', source: loginRequired ? 'visible_page' : '' };
+  }
+
   function isAuthenticated(loginRequired, composerReady) {
     const signals = {
       loginRequired,
@@ -160,13 +187,25 @@
   function snapshot() {
     if (disposed) return;
     const composer = findComposer();
+    const pageKind = optional('unknown', () => layoutAdapter && typeof layoutAdapter.pageKind === 'function'
+      ? layoutAdapter.pageKind()
+      : 'unknown');
+    const privateAccess = optional(null, () => privateStreamTransport &&
+      typeof privateStreamTransport.access === 'function'
+      ? privateStreamTransport.access()
+      : null);
+    const access = optional({ blocked: false, loginRequired: false, reason: '', source: '' }, () =>
+      accessDecision(pageKind, composer, privateAccess));
+    const loginRequired = access.loginRequired === true;
     const dictationActive = optional(false, () => composerAdapter ? composerAdapter.dictationActive(composer) : false);
     const streamingState = optional({ active: false, assistantKey: '' }, readStreamingState);
     const privateStream = optional(null, () => privateStreamTransport &&
       typeof privateStreamTransport.current === 'function'
       ? privateStreamTransport.current(location.pathname)
       : null);
-    const streaming = streamingState.active || !!(privateStream && privateStream.state === 'streaming');
+    const streaming = access.blocked !== true &&
+      (streamingState.active || !!(privateStream && privateStream.state === 'streaming'));
+    if (access.blocked === true && streamingPolicy) streamingPolicy.reset();
     streamingSnapshotMode = streaming;
     const messageWindow = optional({ messages: [], observedCount: 0, startIndex: 0 }, () =>
       messageAdapter && typeof messageAdapter.readMessageWindow === 'function'
@@ -178,10 +217,6 @@
       typeof privateStreamTransport.mergeMessages === 'function'
       ? privateStreamTransport.mergeMessages(domMessages, location.pathname)
       : domMessages);
-    const pageKind = optional('unknown', () => layoutAdapter && typeof layoutAdapter.pageKind === 'function'
-      ? layoutAdapter.pageKind()
-      : 'unknown');
-    const loginRequired = pageKind === 'auth';
     const event = {
       type: 'message_snapshot',
       title: cleanText(document.title.replace(/\s*[-|]\s*ChatGPT.*$/i, '')),
@@ -193,6 +228,8 @@
       authenticated: isAuthenticated(loginRequired, !!composer),
       pageKind,
       loginRequired,
+      accessReason: access.reason || '',
+      accessSource: access.source || '',
       composerReady: !!composer,
       streaming,
       currentModel: optional('', () => composerAdapter ? composerAdapter.currentModel(composer) : ''),

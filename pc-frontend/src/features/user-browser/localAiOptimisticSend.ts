@@ -11,6 +11,7 @@ export interface PendingLocalAiSend {
 export interface PendingLocalAiResponse {
   id: string
   sendId: string
+  prompt: string
   normalizedPrompt: string
   baselineMatchingUserCount: number
 }
@@ -50,6 +51,7 @@ export function beginPendingLocalAiResponse(
   return {
     id: `${pending.id}:assistant`,
     sendId: pending.id,
+    prompt: pending.prompt,
     normalizedPrompt: pending.normalizedPrompt,
     baselineMatchingUserCount: pending.baselineMatchingUserCount,
   }
@@ -72,11 +74,12 @@ export function mergeOptimisticLocalAiMessages(
   officialMessages: LocalAiVisibleMessage[],
   pendingSends: PendingLocalAiSend[],
   pendingResponses: PendingLocalAiResponse[] = [],
+  responseBlocked = false,
 ): LocalAiVisibleMessage[] {
   const unresolved = pendingSends.filter((pending) => (
     !pendingLocalAiSendObserved(officialMessages, pending)
   ))
-  const normalizedOfficial = officialMessages.map((message) => {
+  const normalizedOfficial = responseBlocked ? officialMessages : officialMessages.map((message) => {
     const pending = pendingResponses.find((candidate) => (
       officialAssistantForPendingResponse(officialMessages, candidate) === message
     ))
@@ -98,7 +101,7 @@ export function mergeOptimisticLocalAiMessages(
     state: 'completed' as const,
     content: [{ type: 'text' as const, text: pending.prompt }],
   }))
-  const optimisticResponses = pendingResponses
+  const optimisticResponses = (responseBlocked ? [] : pendingResponses)
     .filter((pending) => !officialAssistantForPendingResponse(officialMessages, pending))
     .map((pending) => ({
       id: pending.id,

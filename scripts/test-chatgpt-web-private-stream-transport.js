@@ -70,6 +70,15 @@ function createJsonResponse(payload) {
   };
 }
 
+function createAccessResponse(status) {
+  return {
+    ok: false,
+    status,
+    headers: { get: () => 'application/json' },
+    clone: () => ({ json: async () => ({}) })
+  };
+}
+
 function context(enabled, response) {
   let calls = 0;
   const outcomes = [];
@@ -133,7 +142,7 @@ function context(enabled, response) {
     'data: [DONE]\n\n'
   ]);
   const enabled = context(true, response);
-  assert.equal(enabled.window.__elonChatGptPrivateStreamTransport.version, 4);
+  assert.equal(enabled.window.__elonChatGptPrivateStreamTransport.version, 5);
   assert.equal(enabled.socketListenerCount(), 1);
   let notifications = 0;
   enabled.window.__elonChatGptPrivateStreamTransport.subscribe(() => { notifications += 1; });
@@ -317,6 +326,18 @@ function context(enabled, response) {
   }, { method: 'POST' });
   await tick();
   assert.equal(enabled.calls(), 3, 'guest conversation streams are observed without request replay');
+
+  const denied = context(true, createAccessResponse(403));
+  await denied.window.fetch(request, init);
+  const deniedAccess = denied.window.__elonChatGptPrivateStreamTransport.access();
+  assert.equal(deniedAccess.reason, 'login_required');
+  assert.equal(deniedAccess.status, 403);
+  assert.ok(deniedAccess.observedAt > 0, 'a passive 401/403 response adds a bounded login hint');
+  assert.equal(denied.calls(), 1, 'access classification must not replay the official request');
+
+  const limited = context(true, createAccessResponse(429));
+  await limited.window.fetch(request, init);
+  assert.equal(limited.window.__elonChatGptPrivateStreamTransport.access().reason, 'rate_limited');
 
   enabled.window.__elonChatGptPrivateStreamTransport.dispose();
   assert.equal(enabled.window.fetch, enabled.originalFetch);

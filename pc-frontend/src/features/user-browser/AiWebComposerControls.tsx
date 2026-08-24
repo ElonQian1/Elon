@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { ChevronDown, Clock3, Grid3X3, Mic, Paperclip, StopCircle, Wrench } from 'lucide-react'
 import type { LocalAiComposerOption, LocalAiFeatureNavigationItem } from './localAiBrowserProtocol'
 import type { AiWebChatBackend } from './useAiWebChatBackend'
+import AiWebAccessRecoveryCard from './AiWebAccessRecoveryCard'
 import styles from './AiWebComposerControls.module.css'
 
 export { default as AiBrowserExperience } from './AiBrowserExperience'
@@ -64,6 +65,7 @@ export default function AiWebComposerControls({ web }: { web: AiWebChatBackend }
 
   return (
     <section className={styles.host} aria-label={`${web.provider.displayName} 原生聊天能力`}>
+      <AiWebAccessRecoveryCard web={web} />
       <div className={styles.toolbar}>
         {actions.has('list_model_options') && (
           <button type="button" data-active={panel === 'model'} onClick={() => void openComposerPanel('model')} disabled={busy}>

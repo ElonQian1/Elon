@@ -4,7 +4,7 @@
   if (window.__elonChatGptPrivateStreamObserverEnabled !== true) return;
   if (location.origin !== 'https://chatgpt.com') return;
   const existing = window.__elonChatGptPrivateStreamTransport;
-  if (existing && Number(existing.version) >= 4) return;
+  if (existing && Number(existing.version) >= 5) return;
   const policy = window.__elonChatGptPrivateStreamPolicy;
   const originalFetch = typeof window.fetch === 'function' ? window.fetch : null;
   const socketTap = window.__elonChatGptPrivateSocketTap;
@@ -21,6 +21,8 @@
   let socketFrames = 0;
   let socketFirstReported = false;
   let socketSuccessReported = false;
+  let accessSignal = null;
+  const ACCESS_SIGNAL_TTL_MS = 2 * 60 * 1000;
 
   function notify() {
     listeners.forEach((listener) => {
@@ -272,6 +274,33 @@
       .includes('text/event-stream');
   }
 
+  function isOfficialConversationRequest(method, url) {
+    return String(method || 'GET').toUpperCase() === 'POST' &&
+      url.origin === location.origin &&
+      /^\/(?:backend-api|backend-anon)\/(?:f\/)?conversation(?:\/|$)/.test(url.pathname);
+  }
+
+  function observeAccessResponse(method, url, response) {
+    if (!isOfficialConversationRequest(method, url) || !response) return;
+    const status = Number(response.status) || 0;
+    const reason = status === 401 || status === 403
+      ? 'login_required'
+      : status === 429 ? 'rate_limited' : '';
+    const next = reason ? { reason, status, observedAt: Date.now() } : null;
+    const changed = JSON.stringify(next) !== JSON.stringify(accessSignal);
+    accessSignal = next;
+    if (changed) notify();
+  }
+
+  function currentAccess() {
+    if (!accessSignal) return null;
+    if (Date.now() - accessSignal.observedAt > ACCESS_SIGNAL_TTL_MS) {
+      accessSignal = null;
+      return null;
+    }
+    return Object.assign({}, accessSignal);
+  }
+
   function isOfficialStreamStatus(method, url, response) {
     if (String(method || 'GET').toUpperCase() !== 'GET') return false;
     if (url.origin !== location.origin ||
@@ -359,6 +388,7 @@
     catch (_) { return originalFetch.apply(this, args); }
     const method = init.method || input && input.method || 'GET';
     return Promise.resolve(originalFetch.apply(this, args)).then((response) => {
+      observeAccessResponse(method, url, response);
       if (isOfficialConversationStream(method, url, response)) observe(response);
       else if (isOfficialStreamStatus(method, url, response)) observeStreamStatus(response);
       return response;
@@ -371,9 +401,10 @@
   }
 
   window.__elonChatGptPrivateStreamTransport = Object.freeze({
-    version: 4,
+    version: 5,
     enabled: true,
     current: (pathname) => session.current(pathname),
+    access: currentAccess,
     mergeMessages: (messages, pathname) => session.merge(messages, pathname),
     subscribe: (listener) => {
       if (typeof listener !== 'function') return function () {};
@@ -386,6 +417,7 @@
       listeners.clear();
       if (typeof socketUnsubscribe === 'function') socketUnsubscribe();
       socketUnsubscribe = null;
+      accessSignal = null;
       session.reset();
       if (window.fetch === wrappedFetch) window.fetch = originalFetch;
     }
