@@ -16,6 +16,8 @@
   const MAX_FINANCE_WIDGETS = 4;
   const MAX_PACKED_WIDGET_LENGTH = 1024 * 1024;
   const MAX_FINANCE_POINTS = 256;
+  const MAX_CHART_SERIES = 4;
+  const MAX_CHART_POINTS = 256;
 
   function cleanText(value) {
     return String(value || '').replace(/\u00a0/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
@@ -164,6 +166,74 @@
     };
   }
 
+  function clientChartPartFromMetadata(metadata) {
+    const references = metadata && Array.isArray(metadata.content_references)
+      ? metadata.content_references
+      : [];
+    const reference = references.find((item) => item &&
+      item.type === 'client_defined_widget' &&
+      item.category === 'visualization' &&
+      item.data && item.data.widget_type === 'charts_widget_v2' &&
+      item.data.language === 'recharts-json' &&
+      item.data.content && typeof item.data.content === 'object');
+    if (!reference) return null;
+    const content = reference.data.content;
+    if (cleanText(content.chartType).toLowerCase() !== 'line') return null;
+    const title = cleanText(content.meta && content.meta.title).slice(0, 120);
+    const xKey = safeToken(content.xKey, 48);
+    const series = (Array.isArray(content.series) ? content.series : [])
+      .slice(0, MAX_CHART_SERIES)
+      .map((item) => ({
+        key: safeToken(item && item.dataKey, 48),
+        label: cleanText(item && item.label).slice(0, 64),
+        valuePrefix: cleanText(item && item.valuePrefix).slice(0, 16),
+        valueSuffix: cleanText(item && item.valueSuffix).slice(0, 16)
+      }))
+      .filter((item) => item.key && item.label);
+    if (!title || !xKey || !series.length) return null;
+    const points = boundedSamples(content.data, MAX_CHART_POINTS).map((item) => ({
+      x: cleanText(item && item[xKey]).slice(0, 64),
+      values: series.map((entry) => typeof (item && item[entry.key]) === 'number'
+        ? item[entry.key]
+        : Number.NaN)
+    })).filter((point) => point.x && point.values.every(Number.isFinite));
+    if (points.length < 2) return null;
+    const payload = {
+      title,
+      description: cleanText(content.meta && content.meta.description).slice(0, 240),
+      chartType: 'line',
+      series,
+      points
+    };
+    return {
+      type: 'rich_card',
+      text: title,
+      kind: 'chart',
+      richContent: {
+        schema: 'yilong.rich-content.v1',
+        kind: 'chart',
+        source: 'private_response',
+        payload
+      }
+    };
+  }
+
+  function visibleContentText(value) {
+    const text = String(value || '');
+    const marker = '\ue200genui\ue202';
+    let result = '';
+    let offset = 0;
+    while (offset < text.length) {
+      const start = text.indexOf(marker, offset);
+      if (start < 0) return result + text.slice(offset);
+      result += text.slice(offset, start);
+      const end = text.indexOf('\ue201', start + marker.length);
+      if (end < 0) return result;
+      offset = end + 1;
+    }
+    return result;
+  }
+
   function packedFinanceWidgets(payload) {
     const visible = assistantEnvelope(payload);
     const metadata = visible && visible.message && visible.message.metadata;
@@ -255,10 +325,10 @@
         if (!part || typeof part !== 'object') return '';
         return typeof part.text === 'string' ? part.text :
           (typeof part.content === 'string' ? part.content : '');
-      }).filter(Boolean).join('\n'));
+      }).filter(Boolean).map(visibleContentText).join('\n'));
     }
-    if (typeof content.text === 'string') return cleanText(content.text);
-    if (typeof content.content === 'string') return cleanText(content.content);
+    if (typeof content.text === 'string') return cleanText(visibleContentText(content.text));
+    if (typeof content.content === 'string') return cleanText(visibleContentText(content.content));
     return '';
   }
 
@@ -496,7 +566,10 @@
       }
       if (!compactDocument) return false;
       let changed = false;
-      if (payload.o === 'patch' && Array.isArray(payload.v)) {
+      const patchBatch = Array.isArray(payload.v) && payload.v.length > 0 &&
+        payload.v.every((operation) => operation && typeof operation === 'object' &&
+          operation.o && operation.p);
+      if ((payload.o === 'patch' || patchBatch) && Array.isArray(payload.v)) {
         payload.v.slice(0, MAX_PATCH_ARRAY_LENGTH).forEach((operation) => {
           if (applyPatchOperation(compactDocument, operation)) changed = true;
         });
@@ -549,6 +622,14 @@
           : 'streaming',
         updatedAt: now()
       }, frame || {});
+      const chartPart = clientChartPartFromMetadata(visible.message.metadata);
+      if (chartPart) {
+        const richParts = Array.isArray(stream.richParts) ? stream.richParts.slice() : [];
+        const existing = richParts.findIndex((part) => part && part.kind === 'chart');
+        if (existing >= 0) richParts[existing] = chartPart;
+        else if (richParts.length < MAX_FINANCE_WIDGETS) richParts.push(chartPart);
+        stream.richParts = richParts;
+      }
       return true;
     }
 
@@ -643,6 +724,7 @@
 
   return Object.freeze({
     assistantFrame,
+    clientChartPartFromMetadata,
     createSession,
     createSseDecoder,
     financePartFromWidget,

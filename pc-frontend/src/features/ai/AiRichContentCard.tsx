@@ -1,7 +1,8 @@
-import { Activity, CloudSun, ExternalLink, Images, MapPinned, Navigation } from 'lucide-react'
+import { Activity, ChartNoAxesCombined, CloudSun, ExternalLink, Images, MapPinned, Navigation } from 'lucide-react'
 import { useId } from 'react'
 import type {
   FinanceRichContent,
+  ChartRichContent,
   MapRichContent,
   MediaGalleryRichContent,
   RichContentCandlestick,
@@ -12,10 +13,68 @@ import type {
 import styles from './AiRichContentCard.module.css'
 
 export default function AiRichContentCard({ content }: { content: YilongRichContent }) {
+  if (content.kind === 'chart') return <LineChartCard content={content} />
   if (content.kind === 'weather') return <WeatherCard content={content} />
   if (content.kind === 'media_gallery') return <MediaGalleryCard content={content} />
   if (content.kind === 'map') return <MapCard content={content} />
   return <FinanceCard content={content} />
+}
+
+function LineChartCard({ content }: { content: ChartRichContent }) {
+  const { payload } = content
+  const gradientId = useId()
+  const values = payload.points.flatMap((point) => point.values)
+  const minimum = Math.min(...values)
+  const maximum = Math.max(...values)
+  const range = maximum - minimum || 1
+  const paths = payload.series.map((series, seriesIndex) => ({
+    series,
+    path: payload.points.map((point, pointIndex) => {
+      const x = 34 + (pointIndex / (payload.points.length - 1)) * 632
+      const y = 190 - ((point.values[seriesIndex] - minimum) / range) * 156
+      return `${pointIndex ? 'L' : 'M'} ${x.toFixed(2)} ${y.toFixed(2)}`
+    }).join(' '),
+  }))
+  const firstSeries = payload.series[0]
+  return (
+    <article className={styles.card} aria-label="官方回答图表">
+      <header>
+        <span className={[styles.providerIcon, styles.chartIcon].join(' ')}>
+          <ChartNoAxesCombined size={19} aria-hidden="true" />
+        </span>
+        <div>
+          <span className={styles.eyebrow}>数据图表</span>
+          <h3>{payload.title}</h3>
+        </div>
+      </header>
+      {payload.description && <p className={styles.summary}>{payload.description}</p>}
+      <div className={styles.chartLegend} aria-label="图表图例">
+        {payload.series.map((series, index) => (
+          <span data-series={index} key={series.key}>{series.label}</span>
+        ))}
+      </div>
+      <svg className={[styles.chart, styles.genericChart].join(' ')} viewBox="0 0 700 230" role="img" aria-label={`${payload.title}折线图`}>
+        <title>{`${payload.title}，${payload.points.length} 个数据点`}</title>
+        <defs>
+          <linearGradient id={gradientId} x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0" stopColor="#55c986" stopOpacity=".24" />
+            <stop offset="1" stopColor="#55c986" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        {[34, 86, 138, 190].map((y) => <line className={styles.chartGrid} x1="34" x2="666" y1={y} y2={y} key={y} />)}
+        <text className={styles.chartAxisLabel} x="34" y="18">{formatSeriesValue(maximum, firstSeries)}</text>
+        <text className={styles.chartAxisLabel} x="34" y="216">{formatSeriesValue(minimum, firstSeries)}</text>
+        {paths.length === 1 && (
+          <path className={styles.genericArea} d={`${paths[0].path} L 666 190 L 34 190 Z`} style={{ fill: `url(#${gradientId})` }} />
+        )}
+        {paths.map(({ series, path }, index) => (
+          <path className={styles.genericLine} d={path} data-series={index} key={series.key} />
+        ))}
+        <text className={styles.chartAxisLabel} x="34" y="207">{payload.points[0].x}</text>
+        <text className={[styles.chartAxisLabel, styles.chartAxisEnd].join(' ')} x="666" y="207">{payload.points[payload.points.length - 1].x}</text>
+      </svg>
+    </article>
+  )
 }
 
 function FinanceCard({ content }: { content: FinanceRichContent }) {
@@ -257,4 +316,8 @@ function chartPath(points: RichContentChartPoint[] | undefined) {
 
 function formatChartValue(value: number) {
   return new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 2 }).format(value)
+}
+
+function formatSeriesValue(value: number, series: ChartRichContent['payload']['series'][number]) {
+  return `${series.valuePrefix ?? ''}${formatChartValue(value)}${series.valueSuffix ?? ''}`
 }

@@ -29,7 +29,7 @@ pub(super) fn content_coverage(snapshot: Option<&Value>) -> ContentCoverage {
         "interactive",
         "rich_card",
     ];
-    const RICH_KINDS: &[&str] = &["finance", "weather", "media_gallery", "map"];
+    const RICH_KINDS: &[&str] = &["finance", "chart", "weather", "media_gallery", "map"];
     let mut coverage = ContentCoverage::default();
     let messages = snapshot
         .and_then(|value| value.get("messages"))

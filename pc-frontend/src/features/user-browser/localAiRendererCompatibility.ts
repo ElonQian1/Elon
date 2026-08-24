@@ -15,7 +15,7 @@ export interface LocalAiRendererCompatibilityNotice {
   reason: LocalAiRendererCompatibilityReason
 }
 
-const KNOWN_RICH_KINDS = new Set(['finance', 'weather', 'media_gallery', 'map'])
+const KNOWN_RICH_KINDS = new Set(['finance', 'chart', 'weather', 'media_gallery', 'map'])
 const NATIVE_FALLBACK_GAPS = new Set([
   'image',
   'audio',

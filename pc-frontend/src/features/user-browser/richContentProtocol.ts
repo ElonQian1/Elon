@@ -50,6 +50,31 @@ export interface FinanceRichContent {
   payload: FinanceRichContentPayload
 }
 
+export interface ChartRichContentSeries {
+  key: string
+  label: string
+  valuePrefix?: string
+  valueSuffix?: string
+}
+
+export interface ChartRichContentPoint {
+  x: string
+  values: number[]
+}
+
+export interface ChartRichContent {
+  schema: typeof YILONG_RICH_CONTENT_SCHEMA
+  kind: 'chart'
+  source: 'official_dom' | 'private_response' | 'cache'
+  payload: {
+    title: string
+    description?: string
+    chartType: 'line'
+    series: ChartRichContentSeries[]
+    points: ChartRichContentPoint[]
+  }
+}
+
 export interface WeatherRichContentRow {
   period: string
   condition: string
@@ -101,6 +126,7 @@ export interface MapRichContent {
 
 export type YilongRichContent =
   | FinanceRichContent
+  | ChartRichContent
   | WeatherRichContent
   | MediaGalleryRichContent
   | MapRichContent
@@ -128,10 +154,34 @@ export function isYilongRichContent(value: unknown): value is YilongRichContent 
       || !isRecord(value.payload)) return false
 
   if (value.kind === 'finance') return isFinancePayload(value.payload)
+  if (value.kind === 'chart') return isChartPayload(value.payload)
   if (value.kind === 'weather') return isWeatherPayload(value.payload)
   if (value.kind === 'media_gallery') return isMediaGalleryPayload(value.payload)
   if (value.kind === 'map') return isMapPayload(value.payload)
   return false
+}
+
+function isChartPayload(payload: Record<string, unknown>) {
+  const series = Array.isArray(payload.series) ? payload.series : []
+  const points = Array.isArray(payload.points) ? payload.points : []
+  if (!boundedText(payload.title, 120)
+      || !optionalText(payload.description, 240)
+      || payload.chartType !== 'line'
+      || !requiredArray(series, 4, (value) => (
+        isRecord(value)
+          && boundedText(value.key, 48)
+          && boundedText(value.label, 64)
+          && optionalText(value.valuePrefix, 16)
+          && optionalText(value.valueSuffix, 16)
+      ))) return false
+  const seriesCount = series.length
+  return requiredArray(points, 256, (value) => (
+    isRecord(value)
+      && boundedText(value.x, 64)
+      && Array.isArray(value.values)
+      && value.values.length === seriesCount
+      && value.values.every(finiteNumber)
+  )) && points.length >= 2
 }
 
 function isFinancePayload(payload: Record<string, unknown>) {

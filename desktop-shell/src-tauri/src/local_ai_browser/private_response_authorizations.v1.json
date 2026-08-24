@@ -4,10 +4,10 @@
     {
       "authorizationId": "chatgpt-finance-rich-content-2026",
       "providerId": "chatgpt",
-      "product": "ChatGPT Web structured finance widgets",
+      "product": "ChatGPT Web structured finance and chart widgets",
       "origins": ["https://chatgpt.com/"],
       "endpointPathPrefixes": ["/backend-api/", "/backend-anon/"],
-      "dataClasses": ["rich_content.finance"],
+      "dataClasses": ["rich_content.finance", "rich_content.chart"],
       "persistence": "sanitized_ast_only",
       "upload": "none",
       "consent": "official_web_session",

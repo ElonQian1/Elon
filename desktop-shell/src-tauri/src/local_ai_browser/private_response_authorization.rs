@@ -166,10 +166,12 @@ mod tests {
     }
 
     #[test]
-    fn production_registry_allows_only_registered_chatgpt_finance() {
+    fn production_registry_allows_registered_chatgpt_finance_and_charts() {
         let registry = parse_registry(REGISTRY_SOURCE).unwrap();
         assert!(registry.allows("chatgpt", "rich_content.finance", now_ms()));
         assert!(allows_rich_kind("chatgpt", "finance"));
+        assert!(registry.allows("chatgpt", "rich_content.chart", now_ms()));
+        assert!(allows_rich_kind("chatgpt", "chart"));
         assert!(!registry.allows("chatgpt", "rich_content.weather", now_ms()));
         assert!(!registry.allows("google-ai-mode", "rich_content.finance", now_ms()));
     }

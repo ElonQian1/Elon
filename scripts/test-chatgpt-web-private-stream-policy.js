@@ -168,6 +168,38 @@ assert.equal(financePart.richContent.payload.chart.points.length, 2);
 assert.equal(financePart.richContent.payload.periods[0].selected, true);
 assert.equal(financePart.richContent.payload.metrics.length, 2);
 
+const chartMetadata = {
+  content_references: [{
+    type: 'client_defined_widget',
+    category: 'visualization',
+    data: {
+      language: 'recharts-json',
+      widget_type: 'charts_widget_v2',
+      content: {
+        chartType: 'line',
+        meta: { title: '比特币近期走势', description: 'BTC/USD 日内收盘价参考。' },
+        xKey: 'date',
+        series: [{ dataKey: 'price', label: 'BTC/USD', valuePrefix: '$' }],
+        data: [
+          { date: '8/20', price: 69268 },
+          { date: '8/21', price: 73031 },
+          { date: '8/22', price: 78333 },
+          { date: '8/24', price: 77728 }
+        ]
+      }
+    }
+  }]
+};
+const clientChart = policy.clientChartPartFromMetadata(chartMetadata);
+assert.equal(clientChart.type, 'rich_card');
+assert.equal(clientChart.richContent.kind, 'chart');
+assert.equal(clientChart.richContent.payload.series[0].label, 'BTC/USD');
+assert.equal(clientChart.richContent.payload.points.length, 4);
+assert.equal(clientChart.richContent.payload.points[3].values[0], 77728);
+assert.equal(policy.assistantFrame(payload(
+  '正文前\ue200genui\ue202{"chart":{"content":{}}}\ue201正文后'
+)).text, '正文前正文后');
+
 const richSession = policy.createSession({ now: () => 3000 });
 richSession.begin();
 richSession.accept(payload('finance answer', 'finished_successfully'));
@@ -239,6 +271,51 @@ assert.equal(
   compactSession.current('/c/conversation-compact').text,
   'KOSPI opened higher and remained volatile.'
 );
+
+const chartSession = policy.createSession({ now: () => 2500 });
+chartSession.begin();
+assert.equal(chartSession.accept({
+  c: 17,
+  v: {
+    conversation_id: 'conversation-chart',
+    message: {
+      id: 'assistant-chart',
+      author: { role: 'assistant' },
+      status: 'in_progress',
+      content: { content_type: 'text', parts: ['走势怎么判断\n\n\ue200genui\ue202{"chart":'] },
+      metadata: { content_references: [{
+        type: 'client_defined_widget',
+        category: 'visualization',
+        data: {
+          language: 'recharts-json',
+          widget_type: 'charts_widget_v2',
+          content: {
+            chartType: 'line',
+            meta: { title: '比特币近期走势', description: 'BTC/USD' },
+            xKey: 'date',
+            series: [{ dataKey: 'price', label: 'BTC/USD', valuePrefix: '$' }],
+            data: [{ date: '8/20' }]
+          }
+        }
+      }] }
+    }
+  }
+}), true);
+assert.equal(chartSession.accept({
+  v: [
+    { p: '/message/metadata/content_references/0/data/content/data/0/price', o: 'add', v: 69268 },
+    { p: '/message/metadata/content_references/0/data/content/data', o: 'append', v: [
+      { date: '8/21', price: 73031 }, { date: '8/24', price: 77728 }
+    ] },
+    { p: '/message/content/parts/0', o: 'append', v: '}\ue201\n\n短线偏强。' },
+    { p: '/message/status', o: 'replace', v: 'finished_successfully' }
+  ]
+}), true);
+const chartCurrent = chartSession.current('/c/conversation-chart');
+assert.equal(chartCurrent.text, '走势怎么判断\n\n短线偏强。');
+assert.equal(chartCurrent.richParts.length, 1);
+assert.equal(chartCurrent.richParts[0].richContent.kind, 'chart');
+assert.equal(chartCurrent.richParts[0].richContent.payload.points.length, 3);
 assert.equal(compactSession.accept({
   o: 'patch',
   p: '',

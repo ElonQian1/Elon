@@ -113,6 +113,7 @@ const sourceIndex = messageRow.indexOf('<AiSourceLinks')
 const supplementaryCardIndex = messageRow.indexOf('placement="supplementary"')
 assert.ok(primaryCardIndex >= 0 && primaryCardIndex < markdownIndex)
 assert.ok(markdownIndex < sourceIndex && sourceIndex < supplementaryCardIndex)
-assert.match(structuredContent, /content\.kind === 'finance' \|\| content\.kind === 'weather' \|\| content\.kind === 'map'/)
+assert.match(structuredContent, /content\.kind === 'finance' \|\| content\.kind === 'chart'/)
+assert.match(structuredContent, /content\.kind === 'weather' \|\| content\.kind === 'map'/)
 
 console.log('PASS: Win chat keeps native conversation turns primary and opens the full official page explicitly')

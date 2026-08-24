@@ -76,7 +76,8 @@ export default function AiStructuredContent({
 }
 
 function isPrimaryRichCard(content: YilongRichContent) {
-  return content.kind === 'finance' || content.kind === 'weather' || content.kind === 'map'
+  return content.kind === 'finance' || content.kind === 'chart'
+    || content.kind === 'weather' || content.kind === 'map'
 }
 
 function metadataFor(part: AiStructuredPart) {

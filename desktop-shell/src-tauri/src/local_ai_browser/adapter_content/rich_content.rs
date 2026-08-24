@@ -21,6 +21,7 @@ pub(super) fn sanitize_rich_card(provider_id: &str, part: &Map<String, Value>) -
     let payload_source = rich.get("payload")?.as_object()?;
     let payload = match kind {
         "finance" => sanitize_finance_payload(payload_source),
+        "chart" => sanitize_chart_payload(payload_source),
         "weather" => sanitize_weather_payload(payload_source),
         "media_gallery" => sanitize_media_gallery_payload(payload_source),
         "map" => sanitize_map_payload(payload_source),
@@ -46,6 +47,79 @@ pub(super) fn sanitize_rich_card(provider_id: &str, part: &Map<String, Value>) -
         ("kind".into(), Value::String(kind.into())),
         ("richContent".into(), Value::Object(sanitized_rich)),
     ])))
+}
+
+fn sanitize_chart_payload(source: &Map<String, Value>) -> Option<Map<String, Value>> {
+    let title = super::clean_string(source.get("title"), 120);
+    if title.is_empty() || source.get("chartType").and_then(Value::as_str) != Some("line") {
+        return None;
+    }
+    let series = source
+        .get("series")
+        .and_then(Value::as_array)?
+        .iter()
+        .take(4)
+        .filter_map(|value| {
+            let item = value.as_object()?;
+            let key = super::clean_string(item.get("key"), 48);
+            let label = super::clean_string(item.get("label"), 64);
+            if key.is_empty()
+                || label.is_empty()
+                || !key.bytes().all(|byte| {
+                    byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-')
+                })
+            {
+                return None;
+            }
+            let mut sanitized = Map::from_iter([
+                ("key".into(), Value::String(key)),
+                ("label".into(), Value::String(label)),
+            ]);
+            insert_optional_text(&mut sanitized, item, "valuePrefix", 16);
+            insert_optional_text(&mut sanitized, item, "valueSuffix", 16);
+            Some(Value::Object(sanitized))
+        })
+        .collect::<Vec<_>>();
+    if series.is_empty() {
+        return None;
+    }
+    let series_count = series.len();
+    let points = source
+        .get("points")
+        .and_then(Value::as_array)?
+        .iter()
+        .take(256)
+        .filter_map(|value| {
+            let point = value.as_object()?;
+            let x = super::clean_string(point.get("x"), 64);
+            let values = point.get("values").and_then(Value::as_array)?;
+            if x.is_empty() || values.len() != series_count {
+                return None;
+            }
+            let values = values
+                .iter()
+                .map(|value| Number::from_f64(value.as_f64()?))
+                .collect::<Option<Vec<_>>>()?;
+            Some(Value::Object(Map::from_iter([
+                ("x".into(), Value::String(x)),
+                (
+                    "values".into(),
+                    Value::Array(values.into_iter().map(Value::Number).collect()),
+                ),
+            ])))
+        })
+        .collect::<Vec<_>>();
+    if points.len() < 2 {
+        return None;
+    }
+    let mut payload = Map::from_iter([
+        ("title".into(), Value::String(title)),
+        ("chartType".into(), Value::String("line".into())),
+        ("series".into(), Value::Array(series)),
+        ("points".into(), Value::Array(points)),
+    ]);
+    insert_optional_text(&mut payload, source, "description", 240);
+    Some(payload)
 }
 
 fn sanitize_media_gallery_payload(source: &Map<String, Value>) -> Option<Map<String, Value>> {

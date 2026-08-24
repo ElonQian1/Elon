@@ -240,6 +240,39 @@ mod tests {
     }
 
     #[test]
+    fn authorized_client_chart_keeps_bounded_series_and_numeric_points() {
+        let parts = json!([{
+            "type":"rich_card",
+            "text":"比特币近期走势",
+            "kind":"chart",
+            "richContent":{
+                "schema":"yilong.rich-content.v1",
+                "kind":"chart",
+                "source":"private_response",
+                "payload":{
+                    "title":"比特币近期走势",
+                    "description":"BTC/USD 日内收盘价参考。",
+                    "chartType":"line",
+                    "series":[{"key":"price","label":"BTC/USD","valuePrefix":"$","private":"secret"}],
+                    "points":[
+                        {"x":"8/20","values":[69268],"private":"secret"},
+                        {"x":"8/21","values":[73031]},
+                        {"x":"8/24","values":[77728]}
+                    ]
+                }
+            }
+        }]);
+        let sanitized = sanitize_parts("chatgpt", Some(&parts));
+        assert_eq!(sanitized.len(), 1);
+        assert_eq!(sanitized[0]["kind"], "chart");
+        assert_eq!(
+            sanitized[0]["richContent"]["payload"]["points"][2]["values"][0],
+            77728.0
+        );
+        assert!(!sanitized[0].to_string().contains("secret"));
+    }
+
+    #[test]
     fn finance_rich_card_keeps_valid_candlesticks_and_drops_invalid_values() {
         let parts = json!([{
             "type":"rich_card",

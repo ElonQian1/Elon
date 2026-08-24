@@ -42,6 +42,11 @@
   background: rgba(255, 88, 103, .12);
 }
 
+.chartIcon {
+  color: #79d9a0;
+  background: rgba(69, 206, 130, .12);
+}
+
 .eyebrow {
   display: block;
   margin-bottom: 2px;
@@ -132,6 +137,53 @@
   font-size: 10px;
   font-variant-numeric: tabular-nums;
 }
+
+.genericChart {
+  height: auto;
+  min-height: 220px;
+  color: #55c986;
+}
+
+.chartGrid {
+  stroke: rgba(255, 255, 255, .08);
+  stroke-width: 1;
+  stroke-dasharray: 3 4;
+  vector-effect: non-scaling-stroke;
+}
+
+.genericArea { fill: currentColor; }
+.genericLine {
+  fill: none;
+  stroke: #55c986;
+  stroke-width: 2.4;
+  vector-effect: non-scaling-stroke;
+}
+.genericLine[data-series="1"] { stroke: #68a8ff; }
+.genericLine[data-series="2"] { stroke: #ffbf5f; }
+.genericLine[data-series="3"] { stroke: #d98dff; }
+.chartAxisEnd { text-anchor: end; }
+
+.chartLegend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px 14px;
+  margin: 2px 20px 0;
+  color: #b8bbc1;
+  font-size: 11px;
+}
+
+.chartLegend span::before {
+  width: 8px;
+  height: 8px;
+  display: inline-block;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: #55c986;
+  content: '';
+}
+.chartLegend span[data-series="1"]::before { background: #68a8ff; }
+.chartLegend span[data-series="2"]::before { background: #ffbf5f; }
+.chartLegend span[data-series="3"]::before { background: #d98dff; }
 
 .chartFallback {
   min-height: 64px;
