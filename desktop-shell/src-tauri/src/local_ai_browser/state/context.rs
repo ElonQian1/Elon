@@ -51,6 +51,18 @@ impl SessionRecord {
         if elapsed < PENDING_CONTEXT_TIMEOUT_MS {
             return;
         }
+        if self.pending_context_action == "new_conversation" {
+            // Do not roll a timed-out new-chat generation back onto the previous
+            // semantic conversation. The frontend may stop showing its recovery
+            // spinner, but the old snapshot must stay unaligned and therefore hidden
+            // until a fresh empty page (or a deliberate first user turn) is observed.
+            self.pending_context_action.clear();
+            self.pending_context_since_ms = 0;
+            self.pending_send_prompt = None;
+            self.preserve_conversation_on_navigation = false;
+            self.last_event_kind = "new_conversation_transition_timed_out".to_string();
+            return;
+        }
         self.active_conversation_id = self.semantic_conversation_id.clone();
         self.active_page_context_key = self.semantic_page_context_key.clone();
         self.pending_context_action.clear();
@@ -168,13 +180,23 @@ impl SessionRecord {
             self.last_event_kind = "pending_send_snapshot_ignored".to_string();
             return false;
         }
+        if boundary == "new_conversation" && semantic_context::has_visible_messages(&payload) {
+            // A fresh conversation is empty until its first prompt is deliberately sent.
+            // Private-stream and DOM observers can still finish an assistant-only snapshot
+            // from the previous turn after the new-chat command starts. Such a snapshot has
+            // no user fingerprint, so comparing only the last user would incorrectly accept
+            // it as the replacement conversation.
+            self.last_event_kind = "stale_new_conversation_snapshot_ignored".to_string();
+            return false;
+        }
         if self.new_conversation_baseline_user.is_some()
             && boundary != "send_prompt"
             && semantic_context::has_visible_messages(&payload)
         {
-            let repeats_previous_user = semantic_context::last_user_fingerprint(&payload)
-                == self.new_conversation_baseline_user;
-            if repeats_previous_user {
+            let incoming_user = semantic_context::last_user_fingerprint(&payload);
+            let lacks_new_user_identity = incoming_user.is_none();
+            let repeats_previous_user = incoming_user == self.new_conversation_baseline_user;
+            if lacks_new_user_identity || repeats_previous_user {
                 self.last_event_kind = "stale_new_conversation_snapshot_ignored".to_string();
                 return false;
             }

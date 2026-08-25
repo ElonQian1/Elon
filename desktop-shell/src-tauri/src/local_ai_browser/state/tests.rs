@@ -1,6 +1,9 @@
 use super::*;
 use serde_json::json;
 
+#[path = "tests/new_conversation.rs"]
+mod new_conversation;
+
 #[test]
 fn parked_session_labels_excludes_visible_and_closed_sessions() {
     let runtime = LocalAiBrowserRuntime::default();
@@ -634,115 +637,6 @@ fn late_snapshot_from_previous_page_cannot_replace_opened_conversation() {
         "second"
     );
     assert!(opened.context_ready);
-}
-
-#[test]
-fn new_conversations_on_the_same_home_url_keep_distinct_context_and_cache_ids() {
-    let runtime = LocalAiBrowserRuntime::default();
-    runtime.ensure_session("session", "chatgpt", "active");
-    let first_url = Url::parse("https://chatgpt.com/c/first").unwrap();
-    let first_key = semantic_context::page_context_key("chatgpt", first_url.as_str());
-    runtime.mark_navigation("session", &first_url, true, None);
-    runtime.record_adapter_event_with_context(
-        "session",
-        "message_snapshot",
-        json!({"type":"message_snapshot","messages":[
-            {"id":"first-user","role":"user","state":"completed","content":[{"type":"text","text":"first"}]},
-            {"id":"first-answer","role":"assistant","state":"completed","content":[{"type":"text","text":"first answer"}]}
-        ]}),
-        first_key.as_deref(),
-    );
-    let first_id = runtime
-        .snapshot("session")
-        .unwrap()
-        .active_conversation_id
-        .unwrap();
-
-    runtime.mark_command_pending_with_value("session", "new_conversation", Some("mcp_new"), None);
-    runtime.record_adapter_event_with_context(
-        "session",
-        "message_snapshot",
-        json!({"type":"message_snapshot","messages":[
-            {"id":"late-user","role":"user","state":"completed","content":[{"type":"text","text":"first"}]},
-            {"id":"late-answer","role":"assistant","state":"completed","content":[{"type":"text","text":"late first answer"}]}
-        ]}),
-        first_key.as_deref(),
-    );
-    assert!(!runtime.snapshot("session").unwrap().context_ready);
-
-    let home = Url::parse("https://chatgpt.com/").unwrap();
-    let home_key = semantic_context::page_context_key("chatgpt", home.as_str());
-    runtime.mark_navigation("session", &home, true, None);
-    runtime.record_adapter_event_with_context(
-        "session",
-        "message_snapshot",
-        json!({"type":"message_snapshot","messages":[]}),
-        home_key.as_deref(),
-    );
-    runtime.mark_page_finished("session", &home);
-    let blank = runtime.snapshot("session").unwrap();
-    assert!(blank.context_ready);
-    assert!(blank.semantic_event.unwrap()["messages"]
-        .as_array()
-        .unwrap()
-        .is_empty());
-
-    // A DOM observer or an already queued poll may report the previous turn after the
-    // empty home snapshot. The new-conversation generation must keep that stale copy
-    // from rehydrating the native UI while the user is already typing the first prompt.
-    runtime.record_adapter_event_with_context(
-        "session",
-        "message_snapshot",
-        json!({"type":"message_snapshot","messages":[
-            {"id":"late-after-home-user","role":"user","state":"completed","content":[{"type":"text","text":"first"}]},
-            {"id":"late-after-home-answer","role":"assistant","state":"completed","content":[{"type":"text","text":"late first answer"}]}
-        ]}),
-        home_key.as_deref(),
-    );
-    let still_blank = runtime.snapshot("session").unwrap();
-    assert!(still_blank.semantic_event.unwrap()["messages"]
-        .as_array()
-        .unwrap()
-        .is_empty());
-    assert_eq!(
-        still_blank.diagnostics["lastEventKind"],
-        "stale_new_conversation_snapshot_ignored"
-    );
-
-    runtime.mark_command_pending_with_value(
-        "session",
-        "send_prompt",
-        Some("mcp_second"),
-        Some("second"),
-    );
-    runtime.record_adapter_event_with_context(
-        "session",
-        "message_snapshot",
-        json!({"type":"message_snapshot","messages":[
-            {"id":"second-user","role":"user","state":"completed","content":[{"type":"text","text":"second"}]},
-            {"id":"second-answer","role":"assistant","state":"completed","content":[{"type":"text","text":"second answer"}]}
-        ]}),
-        home_key.as_deref(),
-    );
-    let second_url = Url::parse("https://chatgpt.com/c/second").unwrap();
-    runtime.mark_navigation("session", &second_url, true, None);
-    runtime.record_adapter_event_with_context(
-        "session",
-        "message_snapshot",
-        json!({"type":"message_snapshot","messages":[
-            {"id":"second-user","role":"user","state":"completed","content":[{"type":"text","text":"second"}]},
-            {"id":"second-answer","role":"assistant","state":"completed","content":[{"type":"text","text":"second answer"}]}
-        ]}),
-        semantic_context::page_context_key("chatgpt", second_url.as_str()).as_deref(),
-    );
-    let second = runtime.snapshot("session").unwrap();
-    let second_id = second.active_conversation_id.unwrap();
-    assert_ne!(first_id, second_id);
-    assert_eq!(second.local_conversations.len(), 2);
-    assert_eq!(
-        second.semantic_event.unwrap()["messages"][0]["id"],
-        "second-user"
-    );
 }
 
 #[test]

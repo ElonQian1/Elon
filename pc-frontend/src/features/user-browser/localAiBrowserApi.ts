@@ -198,6 +198,7 @@ export interface LocalAiWebSessionState {
   navigationCacheStatus: 'empty' | 'cached' | 'live'
   localConversations?: LocalAiCachedConversation[]
   activeConversationId?: string | null
+  semanticConversationAligned?: boolean
   contextReady?: boolean
   contextStatus?: 'empty' | 'cached' | 'restoring' | 'bound' | 'unbound'
   cacheUpdatedAtMs: number

@@ -92,6 +92,7 @@ pub struct LocalAiWebSessionState {
     pub navigation_cache_status: String,
     pub local_conversations: Vec<LocalAiCachedConversation>,
     pub active_conversation_id: Option<String>,
+    pub semantic_conversation_aligned: bool,
     pub context_ready: bool,
     pub context_status: String,
     pub cache_updated_at_ms: u64,
@@ -671,6 +672,9 @@ impl From<SessionRecord> for LocalAiWebSessionState {
         let diagnostics = diagnostic_summary(&record);
         let context_ready = record.context_ready();
         let context_status = record.context_binding_status().to_string();
+        let semantic_conversation_aligned = record.active_conversation_id.is_none()
+            || record.semantic_conversation_id.is_none()
+            || record.active_conversation_id == record.semantic_conversation_id;
         let local_conversations = record
             .conversation_snapshots
             .iter()
@@ -704,6 +708,7 @@ impl From<SessionRecord> for LocalAiWebSessionState {
             navigation_cache_status,
             local_conversations,
             active_conversation_id: record.active_conversation_id,
+            semantic_conversation_aligned,
             context_ready,
             context_status,
             cache_updated_at_ms: record.cache_updated_at_ms,

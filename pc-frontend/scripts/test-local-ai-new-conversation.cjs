@@ -194,6 +194,8 @@ assert.match(controllerSource, /if \(action === 'new_conversation'\) \{\s*return
 assert.match(controllerSource, /function beginLocalNewConversation\(\)/)
 assert.match(controllerSource, /setNewConversationRecoveryStartedAtMs\(Date\.now\(\)\)/)
 assert.match(controllerSource, /newConversationBaselineId\.current = visibleSessionState\?\.activeConversationId \?\? ''/)
+assert.match(controllerSource, /visibleSessionState\?\.semanticConversationAligned === false/)
+assert.match(controllerSource, /deriveLocalAiUserState\(clientState, provider, visibleSessionState, liveSnapshot\)/)
 assert.match(controllerSource, /localAiNewConversationNativeReady\(/)
 assert.match(controllerSource, /const path = selectLocalAiNewConversationPath\(/)
 assert.match(controllerSource, /if \(path === 'adapter'\)/)

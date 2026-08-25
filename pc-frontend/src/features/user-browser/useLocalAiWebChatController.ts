@@ -98,7 +98,10 @@ export default function useLocalAiWebChatController(
       : null,
     [visibleSessionState?.semanticEvent],
   )
-  const snapshot = newConversationRecoveryStartedAtMs ? null : liveSnapshot
+  const snapshot = newConversationRecoveryStartedAtMs
+    || visibleSessionState?.semanticConversationAligned === false
+    ? null
+    : liveSnapshot
   const refreshSessionState = useLocalAiSessionPolling({
     enabled: Boolean(providerId && ownerKey),
     providerId,
@@ -150,8 +153,8 @@ export default function useLocalAiWebChatController(
   )
   const sessionOpen = Boolean(visibleSessionState && visibleSessionState.windowStatus !== 'closed')
   const userState = useMemo(
-    () => deriveLocalAiUserState(clientState, provider, visibleSessionState, snapshot),
-    [clientState, provider, snapshot, visibleSessionState],
+    () => deriveLocalAiUserState(clientState, provider, visibleSessionState, liveSnapshot),
+    [clientState, liveSnapshot, provider, visibleSessionState],
   )
   const composerAvailability = localAiComposerAvailability({
     clientReady: clientState === 'ready',
