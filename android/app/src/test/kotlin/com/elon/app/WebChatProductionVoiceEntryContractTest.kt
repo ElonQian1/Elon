@@ -51,9 +51,9 @@ class WebChatProductionVoiceEntryContractTest {
         assertTrue(feature.contains("WebChatRealtimeVoiceOverlay"))
         assertTrue(feature.contains("createWebChatRealtimeVoiceCoordinator"))
         assertEquals(
+            "provider changes must hand voice control between the native and system overlays",
             2,
             "realtimeVoice.onActiveSurfaceChanged()".toRegex().findAll(feature).count(),
-            "provider changes must hand voice control between the native and system overlays",
         )
         assertTrue(feature.contains("openOfficialFallback = modeController::openOfficialRealtimeVoice"))
         assertTrue(feature.contains("beginRealtimeVoiceBacking"))

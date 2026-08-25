@@ -34,6 +34,7 @@ internal class WebChatRealtimeVoiceCoordinator(
     private var commandRequestId: String? = null
     private var closePending = false
     private var closeFailed = false
+    private var closeCommandAccepted = false
     private var delayedCloseReconciliationActive = false
     private var automaticCloseRetries = 0
     private var interactiveActivation = false
@@ -84,6 +85,7 @@ internal class WebChatRealtimeVoiceCoordinator(
         preparedGeneration = null
         commandRequestId = null
         closeFailed = false
+        closeCommandAccepted = false
         delayedCloseReconciliationActive = false
         delayedCloseReconciler.begin()
         automaticCloseRetries = 0
@@ -125,6 +127,7 @@ internal class WebChatRealtimeVoiceCoordinator(
         delayedCloseReconciler.begin()
         closePending = true
         closeFailed = false
+        closeCommandAccepted = false
         automaticCloseRetries = 0
         pauseController.reset()
         finishInteractiveActivation()
@@ -150,6 +153,7 @@ internal class WebChatRealtimeVoiceCoordinator(
                     finishClose(gracefulExit = false)
                     return
                 }
+                closeCommandAccepted = true
                 closeSettlement.endInvocationAccepted()
                 port.requestControls()
                 scheduleCloseSettlement(expectedGeneration)
@@ -191,9 +195,13 @@ internal class WebChatRealtimeVoiceCoordinator(
             WebChatRealtimeVoiceLifecycle.HANGUP_UNCONFIRMED,
             "挂断尚未生效，语音仍在进行。可再次挂断，或打开官网语音确认关闭",
         )
-        delayedCloseReconciliationActive = true
-        delayedCloseReconciler.begin()
-        scheduleDelayedCloseReconciliation(generation)
+        // A missing end control is not proof that voice stopped. Only reconcile a
+        // late page transition after the official hangup command was accepted.
+        delayedCloseReconciliationActive = closeCommandAccepted
+        if (delayedCloseReconciliationActive) {
+            delayedCloseReconciler.begin()
+            scheduleDelayedCloseReconciliation(generation)
+        }
     }
 
     private fun scheduleDelayedCloseReconciliation(expectedGeneration: Int) {
@@ -229,6 +237,7 @@ internal class WebChatRealtimeVoiceCoordinator(
         generation += 1
         closePending = false
         closeFailed = false
+        closeCommandAccepted = false
         delayedCloseReconciliationActive = false
         delayedCloseReconciler.begin()
         automaticCloseRetries = 0
@@ -305,6 +314,7 @@ internal class WebChatRealtimeVoiceCoordinator(
         startedAtElapsedMs = monotonicTimeMs()
         closePending = false
         closeFailed = false
+        closeCommandAccepted = false
         automaticCloseRetries = 0
         prepareRequestId = null
         preparedGeneration = null
@@ -626,6 +636,7 @@ internal class WebChatRealtimeVoiceCoordinator(
         commandRequestId = null
         closePending = false
         closeFailed = false
+        closeCommandAccepted = false
         finishInteractiveActivation()
         pauseController.reset()
         backgroundBridge.stop()

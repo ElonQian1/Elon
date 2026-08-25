@@ -375,6 +375,11 @@ class WebChatRealtimeVoiceCoordinatorTest {
         fixture.surface.closeVoice()
         fixture.scheduler.runAll()
 
+        assertTrue(fixture.surface.visible)
+        assertEquals(
+            WebChatRealtimeVoiceLifecycle.HANGUP_UNCONFIRMED,
+            fixture.surface.state?.lifecycle,
+        )
         fixture.port.endControlAvailable = true
         fixture.surface.retry()
         assertEquals("control_voice_end", fixture.port.invokedControlId)
@@ -391,11 +396,12 @@ class WebChatRealtimeVoiceCoordinatorTest {
         val fixture = Fixture()
         fixture.completeVoiceStart()
         fixture.surface.visible = false
+        val previousEnsureCount = fixture.surface.ensureVisibleCount
 
         fixture.coordinator.onHostResumed()
 
         assertTrue(fixture.surface.visible)
-        assertEquals(1, fixture.surface.ensureVisibleCount)
+        assertEquals(previousEnsureCount + 1, fixture.surface.ensureVisibleCount)
         assertEquals(WebChatRealtimeVoiceLifecycle.ACTIVE, fixture.surface.state?.lifecycle)
     }
 
@@ -428,13 +434,13 @@ class WebChatRealtimeVoiceCoordinatorTest {
         fixture.activeProviderId = WebChatProviderId.GOOGLE_WEB
         fixture.coordinator.onActiveSurfaceChanged()
 
-        assertFalse(fixture.surface.hostVisible)
+        assertFalse(fixture.surface.lastHostVisibility)
         assertFalse(fixture.background.lastHostVisibility)
 
         fixture.activeProviderId = WebChatProviderId.CHATGPT_WEB
         fixture.coordinator.onActiveSurfaceChanged()
 
-        assertTrue(fixture.surface.hostVisible)
+        assertTrue(fixture.surface.lastHostVisibility)
         assertTrue(fixture.background.lastHostVisibility)
         assertEquals(WebChatRealtimeVoiceLifecycle.ACTIVE, fixture.surface.state?.lifecycle)
     }
@@ -607,7 +613,7 @@ class WebChatRealtimeVoiceCoordinatorTest {
 
     private class FakeSurface : WebChatRealtimeVoiceSurface {
         var visible = false
-        var hostVisible = true
+        var lastHostVisibility = true
         var state: WebChatRealtimeVoiceState? = null
         var ensureVisibleCount = 0
         private var fallback: () -> Unit = {}
@@ -633,7 +639,7 @@ class WebChatRealtimeVoiceCoordinatorTest {
         }
 
         override fun setHostVisible(visible: Boolean) {
-            hostVisible = visible
+            lastHostVisibility = visible
             if (visible) ensureVisibleOnTop()
         }
 
