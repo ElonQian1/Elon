@@ -15,7 +15,10 @@ export interface PendingLocalAiResponse {
   prompt: string
   normalizedPrompt: string
   baselineMatchingUserCount: number
+  startedAtMs: number
 }
+
+export const PENDING_LOCAL_AI_RESPONSE_SLOW_MS = 36_000
 
 export function beginOptimisticLocalAiSend(
   officialMessages: LocalAiVisibleMessage[],
@@ -48,6 +51,7 @@ export function pendingLocalAiSendObserved(
 
 export function beginPendingLocalAiResponse(
   pending: PendingLocalAiSend,
+  nowMs = Date.now(),
 ): PendingLocalAiResponse {
   return {
     id: `${pending.id}:assistant`,
@@ -55,7 +59,15 @@ export function beginPendingLocalAiResponse(
     prompt: pending.prompt,
     normalizedPrompt: pending.normalizedPrompt,
     baselineMatchingUserCount: pending.baselineMatchingUserCount,
+    startedAtMs: nowMs,
   }
+}
+
+export function pendingLocalAiResponseSyncSlow(
+  pending: PendingLocalAiResponse,
+  nowMs = Date.now(),
+): boolean {
+  return nowMs - pending.startedAtMs >= PENDING_LOCAL_AI_RESPONSE_SLOW_MS
 }
 
 export function pendingLocalAiResponseObserved(

@@ -54,6 +54,7 @@ import {
 } from './localAiWebChatControllerConfig'
 import useLocalAiAccessRecovery, { createLocalAiAccessRetry } from './useLocalAiAccessRecovery'
 import useLocalAiResponseRefresh from './useLocalAiResponseRefresh'
+import useLocalAiPendingResponseWatchdog from './useLocalAiPendingResponseWatchdog'
 
 export default function useLocalAiWebChatController(
   provider: LocalAiWebProvider | undefined,
@@ -78,6 +79,7 @@ export default function useLocalAiWebChatController(
   const [busyAction, setBusyAction] = useState('')
   const [message, setMessage] = useState('')
   const [newConversationRecoveryStartedAtMs, setNewConversationRecoveryStartedAtMs] = useState(0)
+  const pendingResponseSlow = useLocalAiPendingResponseWatchdog(requestedSessionIdentity, pendingResponses)
   const autoStartKey = useRef('')
   const backgroundReconnectAttempts = useRef(0)
   const backgroundReconnectInFlight = useRef(false)
@@ -774,6 +776,7 @@ export default function useLocalAiWebChatController(
     canEditDraft: composerAvailability.canEdit,
     canSubmitDraft: composerAvailability.canSubmit,
     queuedSendActive: Boolean(queuedSend),
+    pendingResponseSlow,
     newConversationRecoveryActive: Boolean(newConversationRecoveryStartedAtMs),
     loginRecoveryPrompt: accessRecovery.prompt,
     retryLoginBlockedPrompt,

@@ -26,6 +26,10 @@ visibilityModule.filename = visibilityFilename
 visibilityModule.paths = module.paths
 visibilityModule._compile(visibilityOutput, visibilityFilename)
 const source = fs.readFileSync(filename, 'utf8')
+const watchdogSource = fs.readFileSync(path.resolve(
+  __dirname,
+  '../src/features/user-browser/useLocalAiPendingResponseWatchdog.ts',
+), 'utf8')
 const output = ts.transpileModule(source, {
   compilerOptions: {
     module: ts.ModuleKind.CommonJS,
@@ -50,6 +54,7 @@ const {
   mergeOptimisticLocalAiMessages,
   pendingLocalAiSendObserved,
   pendingLocalAiResponseObserved,
+  pendingLocalAiResponseSyncSlow,
 } = compiled.exports
 
 const initial = [message('u-1', 'user', '重复问题'), message('a-1', 'assistant', '旧回答')]
@@ -57,6 +62,12 @@ const first = beginOptimisticLocalAiSend(initial, [], '重复问题', 'pending-1
 const firstResponse = beginPendingLocalAiResponse(first)
 assert.equal(first.baselineMatchingUserCount, 1)
 assert.equal(firstResponse.id, 'pending-1:assistant')
+const timedResponse = beginPendingLocalAiResponse(first, 1_000)
+assert.equal(pendingLocalAiResponseSyncSlow(timedResponse, 36_999), false)
+assert.equal(pendingLocalAiResponseSyncSlow(timedResponse, 37_000), true)
+assert.match(watchdogSource, /const generation = useRef\(0\)/)
+assert.match(watchdogSource, /activeGeneration !== generation\.current/)
+assert.match(watchdogSource, /return \(\) => window\.clearTimeout\(timer\)/)
 assert.deepEqual(
   mergeOptimisticLocalAiMessages(initial, [first], [firstResponse]).map((item) => item.id),
   ['u-1', 'a-1', 'pending-1', 'pending-1:assistant'],

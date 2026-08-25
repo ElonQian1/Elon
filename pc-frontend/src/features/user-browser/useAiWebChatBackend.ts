@@ -168,7 +168,9 @@ export default function useAiWebChatBackend(mode: AiHomeMode, ownerKey: string) 
     canCompose,
     title: controller.snapshot?.title || '新对话',
     streamingMessageId: streamingMessageId ? `web:${provider?.id || 'ai'}:${streamingMessageId}` : null,
-    streamingStatus: controller.snapshot?.streamingStatus?.trim()
+    streamingStatus: controller.pendingResponseSlow
+      ? `${provider?.displayName || '网页 AI'} 已发送 · 回答同步较慢，可继续等待或打开官方页确认`
+      : controller.snapshot?.streamingStatus?.trim()
       || `${provider?.displayName || '网页 AI'} 正在回答…`,
     contextReady,
     contextStatus,
