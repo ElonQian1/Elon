@@ -4,6 +4,7 @@ pub(super) const ADAPTER_VERSION: u32 = 179;
 const WIN_RICH_CONTENT_ADAPTER: &str = include_str!("chatgpt_rich_content_adapter.js");
 const WIN_COMMON_RICH_CONTENT_ADAPTER: &str = include_str!("rich_content_dom_adapter.js");
 const WIN_CITATION_ADAPTER: &str = include_str!("chatgpt_citation_adapter.js");
+const WIN_NEW_CONVERSATION_GUARD: &str = include_str!("chatgpt_win_new_conversation_guard.js");
 const WIN_RESPONSE_RESEARCH_CAPTURE: &str = include_str!("win_web_response_research_capture.js");
 const PRIVATE_SOCKET_TAP: &str =
     include_str!("../../../../android/app/src/main/assets/chatgpt_web_private_socket_tap.js");
@@ -185,11 +186,12 @@ pub(super) fn initialization_script() -> String {
             );
             if *name == "chatgpt_web_adapter_messages.js" {
                 format!(
-                    "window.__elonChatGptBootstrapStage = 'rich_content_dom_adapter.js';\n{}\nwindow.__elonChatGptBootstrapStage = 'chatgpt_rich_content_adapter.js';\n{}\n{}\nwindow.__elonChatGptBootstrapStage = 'chatgpt_citation_adapter.js';\n{}",
+                    "window.__elonChatGptBootstrapStage = 'rich_content_dom_adapter.js';\n{}\nwindow.__elonChatGptBootstrapStage = 'chatgpt_rich_content_adapter.js';\n{}\n{}\nwindow.__elonChatGptBootstrapStage = 'chatgpt_citation_adapter.js';\n{}\nwindow.__elonChatGptBootstrapStage = 'chatgpt_win_new_conversation_guard.js';\n{}",
                     WIN_COMMON_RICH_CONTENT_ADAPTER,
                     WIN_RICH_CONTENT_ADAPTER,
                     shared,
-                    WIN_CITATION_ADAPTER
+                    WIN_CITATION_ADAPTER,
+                    WIN_NEW_CONVERSATION_GUARD
                 )
             } else {
                 shared
@@ -378,6 +380,8 @@ mod tests {
         assert!(script.contains("chatgpt_web_adapter_project_hints.js"));
         assert!(script.contains("chatgpt_citation_adapter.js"));
         assert!(script.contains("__elonChatGptCitationAdapter"));
+        assert!(script.contains("__elonWinChatGptNewConversationGuard"));
+        assert!(script.contains("官网未离开上一会话，已转入安全恢复。"));
         assert!(script.contains("publish_local_ai_web_research_capture"));
         assert!(script.contains("conversation_stream"));
         assert!(script.contains("__elonChatGptPrivateStreamObserverEnabled = true"));
