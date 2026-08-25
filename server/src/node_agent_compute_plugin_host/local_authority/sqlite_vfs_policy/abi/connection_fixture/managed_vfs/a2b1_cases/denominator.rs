@@ -16,6 +16,7 @@ mod invariants;
 mod projection;
 mod raw_map_fragment;
 mod raw_state_fragment;
+mod route_callback_fragment;
 mod source_owner_graph;
 mod typed_map_fragment;
 

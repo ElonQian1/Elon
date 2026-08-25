@@ -59,6 +59,13 @@ pub(super) fn validate(steps: &[MapSourceStep]) -> Result<(), &'static str> {
     Ok(())
 }
 
+pub(super) fn source_symbol_span<'source>(
+    source: &'source str,
+    symbol: &str,
+) -> Option<&'source str> {
+    symbol_span(source, symbol)
+}
+
 fn validate_anchor(anchor: super::super::model::SourceAnchor) -> Result<(), &'static str> {
     if anchor.symbol.is_empty() || anchor.needle.is_empty() || anchor.occurrence == 0 {
         return Err("Map review anchor has an empty symbol/needle or zero occurrence");

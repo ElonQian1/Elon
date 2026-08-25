@@ -2,6 +2,9 @@ mod abi;
 mod graph;
 mod raw;
 mod raw_fragment;
+mod route_callback_fragment;
+mod route_callback_source_shapes;
+mod route_callback_witnesses;
 mod shared;
 mod source;
 mod typed_fragment;
@@ -15,5 +18,6 @@ pub(super) fn validate(steps: &[MapSourceStep]) -> Result<(), &'static str> {
     raw::validate()?;
     raw_fragment::validate()?;
     typed_fragment::validate(steps)?;
+    route_callback_fragment::validate(steps)?;
     graph::validate(steps)
 }
