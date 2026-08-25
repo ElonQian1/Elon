@@ -1,5 +1,5 @@
 const ALLOWED_ORIGIN: &str = "https://chatgpt.com";
-pub(super) const ADAPTER_VERSION: u32 = 180;
+pub(super) const ADAPTER_VERSION: u32 = 181;
 
 const WIN_RICH_CONTENT_ADAPTER: &str = include_str!("chatgpt_rich_content_adapter.js");
 const WIN_COMMON_RICH_CONTENT_ADAPTER: &str = include_str!("rich_content_dom_adapter.js");
@@ -407,6 +407,9 @@ mod tests {
         assert!(script.contains("__elonChatGptPrivateSocketTap"));
         assert!(script.contains("__elonChatGptPrivateConversationDirectory"));
         assert!(script.contains("chatgpt_web_private_stream_transport.js"));
+        assert!(script.contains("privateStreamingSnapshotMode"));
+        assert!(script.contains("privateStreamWatchdogMs"));
+        assert!(script.contains("privateStreamObserved"));
         assert!(script.contains("chatgpt_win_private_conversation_refresh.js"));
         assert!(script.contains("__elonWinConversationRefreshWrapped"));
         assert!(
