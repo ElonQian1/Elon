@@ -1,6 +1,7 @@
 mod callback;
 mod fault;
 mod lock;
+mod map;
 mod prefix;
 mod raw;
 mod structural;
@@ -15,6 +16,7 @@ pub(super) fn validate(nodes: &[SourceNode], edges: &[SourceEdge]) -> Result<(),
     callback::validate(edges)?;
     fault::validate(edges)?;
     lock::validate(edges)?;
+    map::validate(nodes, edges)?;
     prefix::validate(edges)?;
     validate_region_loop(edges)?;
     validate_failure_cleanup(edges)?;

@@ -93,8 +93,8 @@ fn validate_connection_entry(edges: &[SourceEdge]) -> Result<(), &'static str> {
     }
     require_edge_shape(
         edges,
-        "map.validate.granularity",
-        SourceNodeId::ManagedMapValidation,
+        "map.logical-end.granularity",
+        SourceNodeId::ManagedLogicalEndValidation,
         SourceNodeId::WindowsAllocationGranularity,
         EdgeKind::Call,
         MAP_OPS,
@@ -349,8 +349,8 @@ fn validate_cold_lock_witness(edges: &[SourceEdge]) -> Result<(), &'static str> 
     )?;
     require_edge_shape(
         edges,
-        "map.validate.cold-witness",
-        SourceNodeId::ManagedMapValidation,
+        "map.coordinator.pre-ensure-return.cold-witness",
+        SourceNodeId::ManagedMapCoordinator,
         SourceNodeId::WalMainColdNodeWitness,
         EdgeKind::TerminalReturn,
         MAP_OPS,

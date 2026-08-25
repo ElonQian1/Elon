@@ -1,7 +1,7 @@
 use super::super::model::{SourceNodeId, SourceOwnerId};
 use super::model::{
     source_anchor, MapBoundaryReviewStatus, MapOpenReviewBoundary, MapPendingBoundaryRecord,
-    MapReviewGate, MapReviewGateRecord, MapSourceStepId,
+    MapResolvedBoundaryRecord, MapReviewGate, MapReviewGateRecord, MapSourceStepId,
 };
 
 /// The review ledger stops at repository-owned typed `Result` seams for platform file I/O,
@@ -269,24 +269,6 @@ pub(super) const PENDING_BOUNDARIES: &[MapPendingBoundaryRecord] = &[
         ],
     },
     MapPendingBoundaryRecord {
-        node: SourceNodeId::ManagedMapValidation,
-        status: MapBoundaryReviewStatus::BudgetOwnerGraphGap,
-        witnesses: &[
-            MapSourceStepId::RegionSizeBudgetRejected,
-            MapSourceStepId::LogicalEndBudgetRejected,
-            MapSourceStepId::ExistingSizeBudgetRejected,
-            MapSourceStepId::MappingBudgetRejected,
-        ],
-    },
-    MapPendingBoundaryRecord {
-        node: SourceNodeId::ManagedFileSizeGrow,
-        status: MapBoundaryReviewStatus::FileSizeGrowGraphConflated,
-        witnesses: &[
-            MapSourceStepId::FileSizeNativeFailure,
-            MapSourceStepId::FileGrowNativeFailure,
-        ],
-    },
-    MapPendingBoundaryRecord {
         node: SourceNodeId::ManagedRegionLoop,
         status: MapBoundaryReviewStatus::AnchoredButGraphPending,
         witnesses: &[
@@ -307,8 +289,51 @@ pub(super) const PENDING_BOUNDARIES: &[MapPendingBoundaryRecord] = &[
         node: SourceNodeId::WalMainColdNodeWitness,
         status: MapBoundaryReviewStatus::CrossLedgerStateWitnessPending,
         witnesses: &[
+            MapSourceStepId::RegionSizeBudgetRejected,
+            MapSourceStepId::RegionCountBudgetRejected,
+            MapSourceStepId::LogicalEndBudgetRejected,
+            MapSourceStepId::AllocationGranularityFailure,
+        ],
+    },
+];
+
+pub(super) const RESOLVED_GRAPH_BOUNDARIES: &[MapResolvedBoundaryRecord] = &[
+    MapResolvedBoundaryRecord {
+        node: SourceNodeId::ManagedRegionSizeValidation,
+        witnesses: &[MapSourceStepId::RegionSizeBudgetRejected],
+    },
+    MapResolvedBoundaryRecord {
+        node: SourceNodeId::ManagedLogicalEndValidation,
+        witnesses: &[
+            MapSourceStepId::RegionCountBudgetRejected,
+            MapSourceStepId::LogicalEndOverflowRejected,
+            MapSourceStepId::LogicalEndBudgetRejected,
+        ],
+    },
+    MapResolvedBoundaryRecord {
+        node: SourceNodeId::ManagedExistingSizeValidation,
+        witnesses: &[MapSourceStepId::ExistingSizeBudgetRejected],
+    },
+    MapResolvedBoundaryRecord {
+        node: SourceNodeId::ManagedMappedTotalValidation,
+        witnesses: &[MapSourceStepId::MappingBudgetRejected],
+    },
+    MapResolvedBoundaryRecord {
+        node: SourceNodeId::ManagedFileSize,
+        witnesses: &[
+            MapSourceStepId::FileSizeFaultBefore,
+            MapSourceStepId::FileSizeAfterSelectorRejected,
+            MapSourceStepId::FileSizeNativeFailure,
             MapSourceStepId::ObserveNotPresent,
-            MapSourceStepId::FirstProcessInitialized,
+        ],
+    },
+    MapResolvedBoundaryRecord {
+        node: SourceNodeId::ManagedFileGrow,
+        witnesses: &[
+            MapSourceStepId::FileGrowFaultBefore,
+            MapSourceStepId::FileGrowNativeFailure,
+            MapSourceStepId::FileGrowFaultAfterKnown,
+            MapSourceStepId::FileGrowFaultAfterUncertain,
         ],
     },
 ];

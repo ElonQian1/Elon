@@ -1,5 +1,6 @@
 mod anchors;
 mod effects;
+mod graph;
 mod partition;
 mod traces;
 
@@ -10,6 +11,7 @@ pub(super) fn validate() -> Result<(), &'static str> {
     anchors::validate(&steps)?;
     partition::validate(&steps)?;
     effects::validate(&steps)?;
+    graph::validate(&steps)?;
     traces::validate(&steps)?;
     Ok(())
 }

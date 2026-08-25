@@ -60,7 +60,7 @@ fn validate_unlock_does_not_initialize(edges: &[SourceEdge]) -> Result<(), &'sta
 
 fn validate_cold_witness(nodes: &[SourceNode], edges: &[SourceEdge]) -> Result<(), &'static str> {
     let cold_witness_edge_ids = [
-        "map.validate.cold-witness",
+        "map.coordinator.pre-ensure-return.cold-witness",
         "map.promotion.cold-witness",
         "lock.cold.prior-map",
     ];

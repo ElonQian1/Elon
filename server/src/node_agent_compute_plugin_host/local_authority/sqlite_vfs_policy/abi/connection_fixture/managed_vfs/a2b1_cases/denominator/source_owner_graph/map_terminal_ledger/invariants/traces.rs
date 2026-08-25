@@ -3,18 +3,15 @@ use std::collections::BTreeSet;
 use super::super::{
     map,
     model::{
-        MapBoundaryReviewStatus, MapExit, MapReviewGate, MapSourceStep, MapSourceStepId,
-        MapSuccessFamily, MapSuccessFamilyRecord, MAP_EXTEND, MAP_OBSERVE,
+        MapExit, MapReviewGate, MapSourceStep, MapSourceStepId, MapSuccessFamily,
+        MapSuccessFamilyRecord, MAP_EXTEND, MAP_OBSERVE,
     },
-    scope::{
-        DEEPEST_TYPED_BOUNDARY, OPEN_SOURCE_REVIEW_BOUNDARIES, PENDING_BOUNDARIES, REVIEW_GATES,
-    },
+    scope::{DEEPEST_TYPED_BOUNDARY, OPEN_SOURCE_REVIEW_BOUNDARIES, REVIEW_GATES},
 };
 
 pub(super) fn validate(steps: &[MapSourceStep]) -> Result<(), &'static str> {
     let ids = steps.iter().map(|step| step.id).collect::<BTreeSet<_>>();
     validate_gates(&ids)?;
-    validate_pending_boundaries(&ids)?;
     validate_open_source_review_boundaries()?;
     validate_success_family_candidates(&ids, map::SUCCESS_FAMILY_CANDIDATES)?;
     if DEEPEST_TYPED_BOUNDARY.is_empty() {
@@ -68,37 +65,6 @@ fn validate_gates(ids: &BTreeSet<MapSourceStepId>) -> Result<(), &'static str> {
     for gate in REVIEW_GATES {
         if gate.witnesses.is_empty() || gate.witnesses.iter().any(|id| !ids.contains(id)) {
             return Err("Map review gate has an empty or detached witness set");
-        }
-    }
-    Ok(())
-}
-
-fn validate_pending_boundaries(ids: &BTreeSet<MapSourceStepId>) -> Result<(), &'static str> {
-    let nodes = PENDING_BOUNDARIES
-        .iter()
-        .map(|record| record.node)
-        .collect::<BTreeSet<_>>();
-    if nodes.len() != PENDING_BOUNDARIES.len() || PENDING_BOUNDARIES.len() != 10 {
-        return Err("Map pending graph-boundary closure set is not exact");
-    }
-    let statuses = PENDING_BOUNDARIES
-        .iter()
-        .map(|record| record.status)
-        .collect::<BTreeSet<_>>();
-    let required = [
-        MapBoundaryReviewStatus::AnchoredButGraphPending,
-        MapBoundaryReviewStatus::BudgetOwnerGraphGap,
-        MapBoundaryReviewStatus::FileSizeGrowGraphConflated,
-        MapBoundaryReviewStatus::CrossLedgerStateWitnessPending,
-    ]
-    .into_iter()
-    .collect::<BTreeSet<_>>();
-    if statuses != required {
-        return Err("Map pending graph-boundary statuses lost a known closure gap");
-    }
-    for boundary in PENDING_BOUNDARIES {
-        if boundary.witnesses.is_empty() || boundary.witnesses.iter().any(|id| !ids.contains(id)) {
-            return Err("Map pending graph boundary has an empty or detached witness set");
         }
     }
     Ok(())

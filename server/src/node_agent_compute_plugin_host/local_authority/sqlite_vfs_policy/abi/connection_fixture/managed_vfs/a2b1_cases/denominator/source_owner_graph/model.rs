@@ -9,6 +9,7 @@ pub(super) enum PathOp {
 }
 
 pub(super) const MAP_OPS: &[PathOp] = &[PathOp::MapObserve, PathOp::MapExtend];
+pub(super) const MAP_EXTEND_OPS: &[PathOp] = &[PathOp::MapExtend];
 pub(super) const LOCK_OPS: &[PathOp] = &[
     PathOp::LockShared,
     PathOp::LockExclusive,
@@ -261,8 +262,12 @@ pub(super) enum SourceNodeId {
     ManagedFaultActivateAfter,
     ManagedFaultTriggerAfter,
     ManagedFaultTerminalize,
-    ManagedMapValidation,
-    ManagedFileSizeGrow,
+    ManagedRegionSizeValidation,
+    ManagedLogicalEndValidation,
+    ManagedExistingSizeValidation,
+    ManagedMappedTotalValidation,
+    ManagedFileSize,
+    ManagedFileGrow,
     ManagedRegionLoop,
     ManagedRegionSelect,
     ManagedMappingCleanup,

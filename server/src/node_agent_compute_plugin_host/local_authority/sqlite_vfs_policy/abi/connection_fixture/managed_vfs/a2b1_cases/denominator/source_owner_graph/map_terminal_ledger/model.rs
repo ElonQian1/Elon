@@ -434,8 +434,6 @@ pub(super) struct MapSuccessFamilyRecord {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(super) enum MapBoundaryReviewStatus {
     AnchoredButGraphPending,
-    BudgetOwnerGraphGap,
-    FileSizeGrowGraphConflated,
     CrossLedgerStateWitnessPending,
 }
 
@@ -443,5 +441,13 @@ pub(super) enum MapBoundaryReviewStatus {
 pub(super) struct MapPendingBoundaryRecord {
     pub(super) node: SourceNodeId,
     pub(super) status: MapBoundaryReviewStatus,
+    pub(super) witnesses: &'static [MapSourceStepId],
+}
+
+/// Closes a reviewed owner/boundary identity gap only. Witnesses remain ledger steps; this record
+/// does not materialize them as graph nodes or claim a successor/terminal trace.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) struct MapResolvedBoundaryRecord {
+    pub(super) node: SourceNodeId,
     pub(super) witnesses: &'static [MapSourceStepId],
 }
