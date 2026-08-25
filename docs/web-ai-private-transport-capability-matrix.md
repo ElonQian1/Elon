@@ -15,7 +15,7 @@ installed build; individual capability documents retain implementation evidence.
 | Realtime voice transcript refresh | ChatGPT | Completed and enabled; supervised voice exit pending | Retained native transcript and official DOM snapshot |
 | Realtime voice background continuity | ChatGPT | Completed and enabled; native/system overlay handoff and media auto-pause device verified, manual overlay actions pending | Official WebView voice and foreground notification |
 | Conversation directory | Google Web AI | Completed and enabled | Local cache and official page |
-| Visited conversation body cache | Google Web AI | Completed and enabled; device acceptance pending | Official WebView navigation |
+| Visited conversation body cache | Google Web AI | Completed, enabled, and device verified | Official WebView navigation |
 | Reply stream and completion observer | Google Web AI | Completed and enabled; adaptive-watchdog device regression pending | Official DOM snapshot |
 | Background navigation continuity | ChatGPT and Google Web AI | Completed, enabled, and device verified | Bounded official WebView recovery |
 
@@ -34,6 +34,14 @@ Previously visited Google conversation bodies use a provider-scoped, URL-validat
 snapshot before official navigation starts. The cache is bounded to 30 days, 128 files,
 24 MiB total, and 2 MiB per conversation. A missing, expired, corrupt, or mismatched
 snapshot renders an empty loading state and continues through the official page.
+
+Device acceptance on APK `v1.1.1297 (1307)` verified the cache-first path without reading
+or exporting conversation text: reopening the active visited Google conversation returned
+four cached message records while the official page was still `loading`; the official page
+became composer-ready about 1.1 seconds later with the same four records. Provider switching
+also restored the 14-row cached directory before the official composer was ready. This
+capability is complete and must not be researched or reimplemented again without current
+regression evidence.
 
 Google reply observation keeps fast bounded snapshots only until the matching assistant
 reply appears. Once streaming is visible, MutationObserver and the passive same-origin

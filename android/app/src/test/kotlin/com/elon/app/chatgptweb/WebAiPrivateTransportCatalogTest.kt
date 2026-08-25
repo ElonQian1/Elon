@@ -45,6 +45,25 @@ class WebAiPrivateTransportCatalogTest {
             voiceRefresh.getString("fallback"),
         )
 
+        val googleSnapshotCache = values.first {
+            it.getString("capability_id") ==
+                "android_google_web_conversation_snapshot_cache_v1"
+        }
+        assertEquals("completed", googleSnapshotCache.getString("implementation_status"))
+        assertEquals(
+            "device_verified_cache_first_then_official_navigation",
+            googleSnapshotCache.getString("verification_status"),
+        )
+        assertTrue(googleSnapshotCache.getBoolean("production_default"))
+        assertEquals(
+            "validated_conversation_url_30d_128_items_24mib",
+            googleSnapshotCache.getString("health_policy"),
+        )
+        assertEquals(
+            "official_webview_navigation",
+            googleSnapshotCache.getString("fallback"),
+        )
+
         val voiceOverlay = values.first {
             it.getString("capability_id") ==
                 "android_chatgpt_realtime_voice_background_overlay_v1"

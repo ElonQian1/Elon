@@ -81,7 +81,7 @@ internal object WebAiPrivateTransportCatalog {
             id = "android_google_web_conversation_snapshot_cache_v1",
             provider = "google_web_ai",
             status = "completed",
-            verification = "targeted_tests_passed_device_pending",
+            verification = "device_verified_cache_first_then_official_navigation",
             productionDefault = true,
             runtimeEnabled = true,
             requestMode = "passive_official_snapshot_cache",
