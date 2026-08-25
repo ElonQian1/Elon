@@ -304,6 +304,8 @@ class ChatGptWebComposerContractTest {
         assertTrue(dispatcher.contains("supportsEnhancedMode(webView.url)"))
         assertTrue(dispatcher.contains("webView.dispatchTouchEvent(down)"))
         assertTrue(dispatcher.contains("webView.dispatchTouchEvent(up)"))
+        assertTrue(dispatcher.contains("InputDevice.SOURCE_TOUCHSCREEN"))
+        assertTrue(dispatcher.contains("webView.postDelayed"))
         assertTrue(dispatcher.contains("open_model_submenu"))
         assertTrue(dispatcher.contains("open_composer_tools_submenu"))
         assertFalse(dispatcher.contains("Instrumentation"))

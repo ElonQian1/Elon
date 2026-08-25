@@ -13,5 +13,15 @@ internal class MainChatGptWebLifecycle(activity: AppCompatActivity) {
         ).show()
     }
 
+    fun realtimeVoiceActivationEvidence(): WebChatRealtimeVoiceActivationEvidence =
+        audioPermissionController.snapshot().let { snapshot ->
+            WebChatRealtimeVoiceActivationEvidence(
+                androidPermissionGranted = snapshot.androidPermissionGranted,
+                webPermissionGrantRevision = snapshot.webPermissionGrantRevision,
+                webRequestPending = snapshot.webRequestPending,
+                requestState = snapshot.requestState.wireName,
+            )
+        }
+
     fun dispose() = audioPermissionController.dispose()
 }

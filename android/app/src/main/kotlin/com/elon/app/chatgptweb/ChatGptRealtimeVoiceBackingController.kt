@@ -1,7 +1,7 @@
 package com.elon.app.chatgptweb
 
 import android.webkit.WebView
-import com.elon.app.beginWebChatBackgroundInteraction
+import com.elon.app.beginWebChatRealtimeVoiceInteraction
 import com.elon.app.showWebChatBackgroundSurface
 
 internal class ChatGptRealtimeVoiceBackingController(
@@ -26,13 +26,18 @@ internal class ChatGptRealtimeVoiceBackingController(
         recoveryGate.invalidate()
         active = true
         surfaceMode.select(ChatGptWebPresentationMode.NATIVE)
-        view.beginWebChatBackgroundInteraction()
+        view.beginWebChatRealtimeVoiceInteraction()
         requestExecution()
         return true
     }
 
     fun restoreAfterHostResume() {
-        if (active) webView()?.beginWebChatBackgroundInteraction()
+        if (!active) return
+        if (surfaceMode.isSkin()) {
+            surfaceMode.apply()
+        } else {
+            webView()?.beginWebChatRealtimeVoiceInteraction()
+        }
     }
 
     fun end(gracefulExit: Boolean) {

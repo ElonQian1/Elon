@@ -13,6 +13,7 @@ installed build; individual capability documents retain implementation evidence.
 | Send dispatch acknowledgement | ChatGPT | Completed and enabled | Official DOM confirmation |
 | Streaming reply observer | ChatGPT | Completed and enabled | Official DOM snapshot |
 | Realtime voice transcript refresh | ChatGPT | Completed and enabled; supervised voice exit pending | Retained native transcript and official DOM snapshot |
+| Realtime voice background continuity | ChatGPT | Completed and enabled; native/system overlay handoff and media auto-pause device verified, manual overlay actions pending | Official WebView voice and foreground notification |
 | Conversation directory | Google Web AI | Completed and enabled | Local cache and official page |
 | Reply completion observer | Google Web AI | Completed and enabled | Official DOM snapshot |
 | Background navigation continuity | ChatGPT and Google Web AI | Completed, enabled, and device verified | Bounded official WebView recovery |
@@ -32,6 +33,15 @@ transport for a non-navigating refresh of the current `/c/{id}` only. Requests a
 single-flight and inherit the existing timeout, cooldown, and circuit breaker. The
 native transcript stays visible while the private snapshot and official DOM snapshot
 race; failure emits no unsupported-capability error and the DOM path continues.
+
+Realtime voice remains owned by the official WebView and WebRTC session. A microphone
+foreground service keeps the session eligible while the user opens another app. The
+native chat orb is shown only while the owning ChatGPT conversation surface is active;
+otherwise a system overlay and foreground notification provide continuity. Audio focus
+automatically pauses for other media and resumes afterward. No WebRTC credential is
+persisted or replayed. Device acceptance verified first-start handoff, Settings and
+provider round trips, continuous recording, and media-focus pause/resume; direct human
+touches on the system overlay pause and hang-up actions remain supervised acceptance.
 
 ## Audited non-capabilities
 

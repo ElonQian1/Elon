@@ -20,6 +20,7 @@ internal data class WebChatRealtimeVoiceState(
     val detail: String,
     val turn: WebChatRealtimeVoiceTurn = WebChatRealtimeVoiceTurn.UNKNOWN,
     val context: WebChatRealtimeVoiceContext? = null,
+    val paused: Boolean = false,
 )
 
 internal enum class WebChatRealtimeVoiceVisibleState(val label: String) {
@@ -28,6 +29,7 @@ internal enum class WebChatRealtimeVoiceVisibleState(val label: String) {
     LISTENING("正在聆听"),
     THINKING("思考中"),
     SPEAKING("回答中"),
+    PAUSED("已暂停"),
     ENDING("结束中"),
     FAILED("连接异常"),
 }
@@ -38,7 +40,9 @@ internal object WebChatRealtimeVoiceStatePolicy {
             WebChatRealtimeVoiceLifecycle.CONNECTING -> WebChatRealtimeVoiceVisibleState.CONNECTING
             WebChatRealtimeVoiceLifecycle.ENDING -> WebChatRealtimeVoiceVisibleState.ENDING
             WebChatRealtimeVoiceLifecycle.FAILED -> WebChatRealtimeVoiceVisibleState.FAILED
-            WebChatRealtimeVoiceLifecycle.ACTIVE -> when (state.turn) {
+            WebChatRealtimeVoiceLifecycle.ACTIVE -> if (state.paused) {
+                WebChatRealtimeVoiceVisibleState.PAUSED
+            } else when (state.turn) {
                 WebChatRealtimeVoiceTurn.LISTENING -> WebChatRealtimeVoiceVisibleState.LISTENING
                 WebChatRealtimeVoiceTurn.THINKING -> WebChatRealtimeVoiceVisibleState.THINKING
                 WebChatRealtimeVoiceTurn.SPEAKING -> WebChatRealtimeVoiceVisibleState.SPEAKING

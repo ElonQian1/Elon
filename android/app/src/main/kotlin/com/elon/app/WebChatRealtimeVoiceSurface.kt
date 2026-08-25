@@ -28,6 +28,7 @@ internal interface WebChatRealtimeVoiceSurface {
     )
 
     fun render(state: WebChatRealtimeVoiceState)
+    fun setHostVisible(visible: Boolean)
     fun ensureVisibleOnTop()
     fun hide()
     fun isVisible(): Boolean
@@ -131,6 +132,7 @@ internal class WebChatRealtimeVoiceOverlay(
     private var positioned = false
     private var dragging = false
     private var requestedVisible = false
+    private var hostVisible = true
     private var downRawX = 0f
     private var downRawY = 0f
     private var downLeft = 0f
@@ -179,6 +181,7 @@ internal class WebChatRealtimeVoiceOverlay(
             WebChatRealtimeVoiceVisibleState.LISTENING -> color(R.color.elon_signal_mist)
             WebChatRealtimeVoiceVisibleState.THINKING -> color(R.color.elon_status_info)
             WebChatRealtimeVoiceVisibleState.SPEAKING -> color(R.color.elon_status_success)
+            WebChatRealtimeVoiceVisibleState.PAUSED -> color(R.color.elon_text_secondary)
             WebChatRealtimeVoiceVisibleState.ENDING -> color(R.color.elon_status_info)
             WebChatRealtimeVoiceVisibleState.FAILED -> color(R.color.elon_status_danger)
         }
@@ -206,7 +209,7 @@ internal class WebChatRealtimeVoiceOverlay(
     }
 
     override fun ensureVisibleOnTop() {
-        if (!requestedVisible) return
+        if (!requestedVisible || !hostVisible) return
         if (root.parent !== host) {
             (root.parent as? ViewGroup)?.removeView(root)
             host.addView(
@@ -220,6 +223,15 @@ internal class WebChatRealtimeVoiceOverlay(
         root.visibility = View.VISIBLE
         if (host.indexOfChild(root) != host.childCount - 1) root.bringToFront()
         root.post(::positionPanel)
+    }
+
+    override fun setHostVisible(visible: Boolean) {
+        hostVisible = visible
+        if (visible) {
+            ensureVisibleOnTop()
+        } else {
+            root.visibility = View.GONE
+        }
     }
 
     override fun hide() {

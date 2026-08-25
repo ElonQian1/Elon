@@ -1,6 +1,7 @@
 package com.elon.app.chatgptweb
 
 import android.os.SystemClock
+import android.view.InputDevice
 import android.view.MotionEvent
 import android.webkit.WebView
 
@@ -19,17 +20,33 @@ internal class ChatGptWebTouchDispatcher(
             val x = (request.xRatio * webView.width).toFloat().coerceIn(1f, webView.width - 1f)
             val y = (request.yRatio * webView.height).toFloat().coerceIn(1f, webView.height - 1f)
             val downAt = SystemClock.uptimeMillis()
-            val down = MotionEvent.obtain(downAt, downAt, MotionEvent.ACTION_DOWN, x, y, 0)
-            val up = MotionEvent.obtain(downAt, downAt + TAP_DURATION_MS, MotionEvent.ACTION_UP, x, y, 0)
-            val dispatched = try {
+            val down = touchEvent(downAt, downAt, MotionEvent.ACTION_DOWN, x, y)
+            val downDispatched = try {
                 webView.dispatchTouchEvent(down)
-                webView.dispatchTouchEvent(up)
             } finally {
                 down.recycle()
-                up.recycle()
             }
-            onComplete(dispatched)
+            webView.postDelayed({
+                val upAt = SystemClock.uptimeMillis()
+                val up = touchEvent(downAt, upAt, MotionEvent.ACTION_UP, x, y)
+                val upDispatched = try {
+                    webView.dispatchTouchEvent(up)
+                } finally {
+                    up.recycle()
+                }
+                onComplete(downDispatched && upDispatched)
+            }, TAP_DURATION_MS)
         }
+    }
+
+    private fun touchEvent(
+        downAt: Long,
+        eventAt: Long,
+        action: Int,
+        x: Float,
+        y: Float,
+    ): MotionEvent = MotionEvent.obtain(downAt, eventAt, action, x, y, 0).apply {
+        source = InputDevice.SOURCE_TOUCHSCREEN
     }
 
     private companion object {

@@ -194,7 +194,7 @@ internal class ChatGptBackgroundSession(
         return true
     }
     fun retryConnection(): Boolean = recovery.retryNow()
-    fun onHostPaused() = pauseSession()
+    fun onHostPaused() = if (realtimeVoiceBacking.isActive()) cookieManager.flush() else pauseSession()
     fun currentSnapshot(): ChatGptWebSnapshot? = latestSnapshot
     fun warmSessionAvailable(): Boolean = warmSessionAvailable
     fun conversationNavigationActive(): Boolean = conversationNavigation.isNavigating()

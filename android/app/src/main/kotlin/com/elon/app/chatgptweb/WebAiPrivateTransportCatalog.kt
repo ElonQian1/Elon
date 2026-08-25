@@ -100,6 +100,17 @@ internal object WebAiPrivateTransportCatalog {
             fallback = "official_webview_bounded_recovery",
         ),
         Entry(
+            id = "android_chatgpt_realtime_voice_background_overlay_v1",
+            provider = "chatgpt",
+            status = "completed",
+            verification = "device_handoff_verified_manual_overlay_actions_pending",
+            productionDefault = true,
+            runtimeEnabled = true,
+            requestMode = "official_webrtc_foreground_service_and_local_overlay",
+            healthPolicy = "audio_focus_auto_pause_and_provider_scoped_surface_handoff",
+            fallback = "official_webview_voice_and_foreground_notification",
+        ),
+        Entry(
             id = "android_chatgpt_private_transport_research_v1",
             provider = "chatgpt",
             status = "research_only",

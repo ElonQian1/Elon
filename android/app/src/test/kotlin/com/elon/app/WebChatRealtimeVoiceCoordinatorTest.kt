@@ -27,10 +27,55 @@ class WebChatRealtimeVoiceCoordinatorTest {
 
         fixture.port.voiceStatus = WebChatConsumerCommandStatus.SUCCEEDED
         fixture.scheduler.runNext()
+        assertEquals(WebChatRealtimeVoiceLifecycle.CONNECTING, fixture.surface.state?.lifecycle)
+        fixture.webPermissionGrantRevision += 1
+        fixture.scheduler.runNext()
         assertEquals(WebChatRealtimeVoiceLifecycle.ACTIVE, fixture.surface.state?.lifecycle)
         assertEquals(WebChatRealtimeVoiceTurn.IDLE, fixture.surface.state?.turn)
         assertEquals(0, fixture.officialFallbackCount)
         assertFalse(fixture.back.backEnabled)
+    }
+
+    @Test
+    fun doesNotShowStandbyWhenThePageNeverRequestsTheMicrophone() {
+        val fixture = Fixture()
+        fixture.coordinator.start(fixture.provider)
+        fixture.scheduler.runNext()
+        fixture.port.prepareStatus = WebChatConsumerCommandStatus.SUCCEEDED
+        fixture.scheduler.runNext()
+        fixture.scheduler.runNext()
+        fixture.port.voiceStatus = WebChatConsumerCommandStatus.SUCCEEDED
+
+        fixture.scheduler.runAll()
+
+        assertEquals(WebChatRealtimeVoiceLifecycle.FAILED, fixture.surface.state?.lifecycle)
+        assertEquals(WebChatRealtimeVoiceTurn.UNKNOWN, fixture.surface.state?.turn)
+        assertTrue(fixture.surface.visible)
+        assertEquals(1, fixture.interactiveActivationCount)
+        assertEquals(1, fixture.nativeRestoreCount)
+    }
+
+    @Test
+    fun realPageGestureCompletesTheInteractiveActivationHandoff() {
+        val fixture = Fixture()
+        fixture.coordinator.start(fixture.provider)
+        fixture.scheduler.runNext()
+        fixture.port.prepareStatus = WebChatConsumerCommandStatus.SUCCEEDED
+        fixture.scheduler.runNext()
+        fixture.scheduler.runNext()
+        fixture.port.voiceStatus = WebChatConsumerCommandStatus.SUCCEEDED
+
+        repeat(20) {
+            if (fixture.interactiveActivationCount == 0) fixture.scheduler.runNext()
+        }
+        assertEquals(1, fixture.interactiveActivationCount)
+        assertEquals(WebChatRealtimeVoiceLifecycle.CONNECTING, fixture.surface.state?.lifecycle)
+
+        fixture.webPermissionGrantRevision += 1
+        fixture.scheduler.runNext()
+
+        assertEquals(WebChatRealtimeVoiceLifecycle.ACTIVE, fixture.surface.state?.lifecycle)
+        assertEquals(1, fixture.nativeRestoreCount)
     }
 
     @Test
@@ -278,7 +323,7 @@ class WebChatRealtimeVoiceCoordinatorTest {
     }
 
     @Test
-    fun fallsBackOnceWhenTheOfficialVoicePageNeverFinishesClosing() {
+    fun keepsTheVoiceSurfaceVisibleWhenHangupCannotBeConfirmed() {
         val fixture = Fixture()
         fixture.completeVoiceStart()
         fixture.port.endControlAvailable = true
@@ -286,9 +331,28 @@ class WebChatRealtimeVoiceCoordinatorTest {
         fixture.surface.closeVoice()
         fixture.scheduler.runAll()
 
-        assertFalse(fixture.surface.visible)
-        assertEquals(listOf(false), fixture.endBackingGraceful)
+        assertTrue(fixture.surface.visible)
+        assertEquals(WebChatRealtimeVoiceLifecycle.FAILED, fixture.surface.state?.lifecycle)
+        assertEquals(emptyList<Boolean>(), fixture.endBackingGraceful)
         assertFalse(fixture.scheduler.hasPendingTasks())
+    }
+
+    @Test
+    fun retriesHangupAfterAnUnconfirmedCloseWithoutRestartingVoice() {
+        val fixture = Fixture()
+        fixture.completeVoiceStart()
+        fixture.surface.closeVoice()
+        fixture.scheduler.runAll()
+
+        fixture.port.endControlAvailable = true
+        fixture.surface.retry()
+        assertEquals("control_voice_end", fixture.port.invokedControlId)
+        fixture.port.endControlAvailable = false
+        fixture.scheduler.runNext(4)
+
+        assertFalse(fixture.surface.visible)
+        assertEquals(listOf(true), fixture.endBackingGraceful)
+        assertEquals(1, fixture.beginBackingCount)
     }
 
     @Test
@@ -301,6 +365,46 @@ class WebChatRealtimeVoiceCoordinatorTest {
 
         assertTrue(fixture.surface.visible)
         assertEquals(1, fixture.surface.ensureVisibleCount)
+        assertEquals(WebChatRealtimeVoiceLifecycle.ACTIVE, fixture.surface.state?.lifecycle)
+    }
+
+    @Test
+    fun activeVoiceKeepsBackgroundServiceAndHostVisibilityInSync() {
+        val fixture = Fixture()
+        fixture.completeVoiceStart()
+
+        assertEquals(1, fixture.background.startCount)
+        assertEquals(WebChatRealtimeVoiceLifecycle.ACTIVE, fixture.background.states.last().lifecycle)
+
+        fixture.coordinator.onHostPaused()
+        assertFalse(fixture.background.lastHostVisibility)
+
+        fixture.coordinator.onHostResumed()
+        assertTrue(fixture.background.lastHostVisibility)
+
+        fixture.port.endControlAvailable = true
+        fixture.surface.closeVoice()
+        fixture.port.endControlAvailable = false
+        fixture.scheduler.runNext(4)
+        assertTrue(fixture.background.stopCount >= 1)
+    }
+
+    @Test
+    fun switchingAwayFromTheOwningProviderHandsControlToTheSystemOverlay() {
+        val fixture = Fixture()
+        fixture.completeVoiceStart()
+
+        fixture.activeProviderId = WebChatProviderId.GOOGLE_WEB
+        fixture.coordinator.onActiveSurfaceChanged()
+
+        assertFalse(fixture.surface.hostVisible)
+        assertFalse(fixture.background.lastHostVisibility)
+
+        fixture.activeProviderId = WebChatProviderId.CHATGPT_WEB
+        fixture.coordinator.onActiveSurfaceChanged()
+
+        assertTrue(fixture.surface.hostVisible)
+        assertTrue(fixture.background.lastHostVisibility)
         assertEquals(WebChatRealtimeVoiceLifecycle.ACTIVE, fixture.surface.state?.lifecycle)
     }
 
@@ -350,6 +454,7 @@ class WebChatRealtimeVoiceCoordinatorTest {
         val scheduler = Scheduler()
         val port = FakePort()
         val back = FakeBackControl()
+        val background = FakeBackgroundPort()
         var sessionReady = sessionReady
         var authenticated = authenticated
         var sessionState = sessionState
@@ -358,8 +463,12 @@ class WebChatRealtimeVoiceCoordinatorTest {
         val endBackingCount: Int get() = endBackingGraceful.size
         var officialFallbackCount = 0
         var officialLoginCount = 0
+        var interactiveActivationCount = 0
+        var nativeRestoreCount = 0
         var sessionRecoveryCount = 0
+        var webPermissionGrantRevision = 0L
         var openedContext: WebChatRealtimeVoiceContext? = null
+        var activeProviderId: WebChatProviderId? = WebChatProviderId.CHATGPT_WEB
         var context = WebChatRealtimeVoiceContext(
             "/c/test",
             "测试会话",
@@ -368,9 +477,17 @@ class WebChatRealtimeVoiceCoordinatorTest {
         val launchCache = WebChatRealtimeVoiceLaunchCache()
         val coordinator = WebChatRealtimeVoiceCoordinator(
             surface = surface,
-            activeProvider = { WebChatProviderId.CHATGPT_WEB },
+            activeProvider = { activeProviderId },
             consumerPort = { port },
             sessionReady = { this.sessionReady },
+            audioActivationEvidence = {
+                WebChatRealtimeVoiceActivationEvidence(
+                    androidPermissionGranted = true,
+                    webPermissionGrantRevision = webPermissionGrantRevision,
+                    webRequestPending = false,
+                    requestState = "idle",
+                )
+            },
             authenticationState = {
                 WebChatRealtimeVoiceAuthenticationPolicy.resolve(
                     this.authenticated,
@@ -379,6 +496,11 @@ class WebChatRealtimeVoiceCoordinatorTest {
             },
             beginWebBacking = { beginBackingCount += 1; true },
             endWebBacking = { graceful -> endBackingGraceful += graceful },
+            showInteractiveActivation = {
+                interactiveActivationCount += 1
+                true
+            },
+            restoreNativeSurface = { nativeRestoreCount += 1 },
             requestSessionRecovery = { sessionRecoveryCount += 1 },
             loginGate = loginGate,
             openOfficialLogin = { officialLoginCount += 1 },
@@ -387,6 +509,7 @@ class WebChatRealtimeVoiceCoordinatorTest {
             openConversation = { openedContext = it },
             schedule = scheduler::schedule,
             backControl = back,
+            backgroundBridge = background,
             launchCache = launchCache,
             log = {},
         )
@@ -399,7 +522,36 @@ class WebChatRealtimeVoiceCoordinatorTest {
             scheduler.runNext()
             port.voiceStatus = WebChatConsumerCommandStatus.SUCCEEDED
             scheduler.runNext()
+            webPermissionGrantRevision += 1
+            scheduler.runNext()
         }
+    }
+
+    private class FakeBackgroundPort : WebChatRealtimeVoiceBackgroundPort {
+        val states = mutableListOf<WebChatRealtimeVoiceState>()
+        var startCount = 0
+        var stopCount = 0
+        var lastHostVisibility = false
+
+        override fun start(state: WebChatRealtimeVoiceState): Boolean {
+            startCount += 1
+            states += state
+            return true
+        }
+
+        override fun update(state: WebChatRealtimeVoiceState) {
+            states += state
+        }
+
+        override fun setPaused(paused: Boolean, detail: String) = Unit
+        override fun reportControlFailure(detail: String) = Unit
+        override fun setHostVisible(visible: Boolean) {
+            lastHostVisibility = visible
+        }
+        override fun stop() {
+            stopCount += 1
+        }
+        override fun dispose() = Unit
     }
 
     private class FakeLoginGate : WebChatRealtimeVoiceLoginGate {
@@ -424,10 +576,12 @@ class WebChatRealtimeVoiceCoordinatorTest {
 
     private class FakeSurface : WebChatRealtimeVoiceSurface {
         var visible = false
+        var hostVisible = true
         var state: WebChatRealtimeVoiceState? = null
         var ensureVisibleCount = 0
         private var fallback: () -> Unit = {}
         private var close: () -> Unit = {}
+        private var retry: () -> Unit = {}
         private var openConversation: () -> Unit = {}
 
         override fun show(
@@ -438,12 +592,18 @@ class WebChatRealtimeVoiceCoordinatorTest {
         ) {
             visible = true
             close = onClose
+            retry = onRetry
             fallback = onOfficialFallback
             openConversation = onOpenConversation
         }
 
         override fun render(state: WebChatRealtimeVoiceState) {
             this.state = state
+        }
+
+        override fun setHostVisible(visible: Boolean) {
+            hostVisible = visible
+            if (visible) ensureVisibleOnTop()
         }
 
         override fun hide() {
@@ -459,6 +619,7 @@ class WebChatRealtimeVoiceCoordinatorTest {
 
         fun openOfficialFallback() = fallback()
         fun closeVoice() = close()
+        fun retry() = retry.invoke()
         fun openConversation() = openConversation.invoke()
     }
 

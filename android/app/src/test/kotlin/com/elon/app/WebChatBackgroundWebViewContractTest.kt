@@ -28,12 +28,20 @@ class WebChatBackgroundWebViewContractTest {
 
         assertTrue(presentation.contains("visibility = View.INVISIBLE"))
         assertTrue(presentation.contains("beginWebChatBackgroundInteraction()"))
+        assertTrue(presentation.contains("beginWebChatRealtimeVoiceInteraction()"))
+        assertTrue(presentation.contains("isFocusableInTouchMode = true"))
         assertTrue(presentation.contains("endWebChatBackgroundInteraction()"))
         assertTrue(presentation.contains("const val MAX_LEASE_MS = 2_500L"))
         assertFalse(presentation.contains("View.GONE"))
         assertFalse(presentation.contains("pauseTimers"))
         assertTrue(chatGptWebView.contains("configureWebChatBackgroundSurface()"))
         assertTrue(chatGpt.contains("composerOptionInteraction::dispatch"))
+        val voiceBacking = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptRealtimeVoiceBackingController.kt",
+        )
+        assertTrue(voiceBacking.contains("view.beginWebChatRealtimeVoiceInteraction()"))
+        assertTrue(voiceBacking.contains("if (surfaceMode.isSkin())"))
+        assertTrue(voiceBacking.contains("surfaceMode.apply()"))
         assertTrue(composerInteraction.contains("backgroundLease.run(action)"))
         assertTrue(composerInteraction.contains("backgroundLease.release()"))
         assertTrue(google.contains("configureWebChatBackgroundSurface()"))

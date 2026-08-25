@@ -9,6 +9,7 @@
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_REMOTE_MESSAGING" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
@@ -160,6 +161,10 @@
             android:name=".ChatRealtimeService"
             android:exported="false"
             android:foregroundServiceType="remoteMessaging" />
+        <service
+            android:name=".WebChatRealtimeVoiceBackgroundService"
+            android:exported="false"
+            android:foregroundServiceType="microphone" />
         <!-- 后台聊天保活服务，让 APK 在后台也能像微信一样收到好友/群消息提醒 -->
         <service
             android:name=".ChatBackgroundService"

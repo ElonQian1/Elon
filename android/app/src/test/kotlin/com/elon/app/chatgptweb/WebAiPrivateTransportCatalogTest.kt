@@ -22,6 +22,7 @@ class WebAiPrivateTransportCatalogTest {
         assertTrue("android_google_web_private_conversation_directory_v1" in enabledIds)
         assertTrue("android_google_web_private_reply_observer_v1" in enabledIds)
         assertTrue("android_web_ai_background_navigation_continuity_v1" in enabledIds)
+        assertTrue("android_chatgpt_realtime_voice_background_overlay_v1" in enabledIds)
 
         values.forEach { row ->
             assertFalse(row.getBoolean("direct_post_enabled"))
@@ -41,6 +42,16 @@ class WebAiPrivateTransportCatalogTest {
         assertEquals(
             "retained_native_transcript_and_official_dom_snapshot",
             voiceRefresh.getString("fallback"),
+        )
+
+        val voiceOverlay = values.first {
+            it.getString("capability_id") ==
+                "android_chatgpt_realtime_voice_background_overlay_v1"
+        }
+        assertEquals("completed", voiceOverlay.getString("implementation_status"))
+        assertEquals(
+            "device_handoff_verified_manual_overlay_actions_pending",
+            voiceOverlay.getString("verification_status"),
         )
     }
 

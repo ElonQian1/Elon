@@ -17,6 +17,14 @@ internal fun WebView.beginWebChatBackgroundInteraction() {
     visibility = View.VISIBLE
 }
 
+internal fun WebView.beginWebChatRealtimeVoiceInteraction() {
+    beginWebChatBackgroundInteraction()
+    isClickable = true
+    isFocusable = true
+    isFocusableInTouchMode = true
+    requestFocusFromTouch()
+}
+
 internal fun WebView.endWebChatBackgroundInteraction() {
     visibility = View.INVISIBLE
     alpha = 1f

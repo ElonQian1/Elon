@@ -42,6 +42,7 @@ class ChatGptWebAudioPermissionStateTest {
             ChatGptWebAudioPermissionState.RequestState.WEB_PERMISSION_GRANTED,
             state.snapshot(true).requestState,
         )
+        assertEquals(1L, state.snapshot(true).webPermissionGrantRevision)
 
         state.webRequestRejected()
         assertEquals(
@@ -95,6 +96,7 @@ class ChatGptWebAudioPermissionStateTest {
                 requestState = ChatGptWebAudioPermissionState.RequestState.WEB_PERMISSION_PENDING,
                 localRequestPending = false,
                 webRequestPending = true,
+                webPermissionGrantRevision = 0L,
             ),
         )
 

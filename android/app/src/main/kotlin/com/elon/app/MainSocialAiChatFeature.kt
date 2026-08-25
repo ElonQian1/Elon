@@ -134,26 +134,21 @@ internal class MainSocialAiChatFeature(
             activeProvider = {
                 if (isChatModeActive()) providerId() else null
             },
-            consumerPort = {
-                chatGptController.consumerPort()
-            },
-            sessionReady = {
-                chatGptController.stateWireValue() == "ready" &&
-                    chatGptController.composerReady()
-            },
+            consumerPort = chatGptController::consumerPort,
+            sessionReady = { chatGptController.stateWireValue() == "ready" &&
+                chatGptController.composerReady() },
+            audioActivationEvidence = chatGptWebLifecycle::realtimeVoiceActivationEvidence,
             authenticated = chatGptController::authenticated,
             sessionState = chatGptController::stateWireValue,
-            beginWebBacking = {
-                chatGptController.beginRealtimeVoiceBacking()
-            },
+            beginWebBacking = chatGptController::beginRealtimeVoiceBacking,
             endWebBacking = { gracefulExit ->
                 if (chatGptControllerDelegate.isInitialized()) {
                     chatGptController.endRealtimeVoiceBacking(gracefulExit)
                 }
             },
-            requestSessionRecovery = {
-                chatGptController.onHostResumed()
-            },
+            showInteractiveActivation = chatGptController::showWebSkin,
+            restoreNativeSurface = { chatGptController.showNativeMirror(); Unit },
+            requestSessionRecovery = chatGptController::onHostResumed,
             openOfficialLogin = modeController::openOfficialLogin,
             openOfficialFallback = modeController::openOfficialRealtimeVoice,
             resolveConversationContext = { resolveRealtimeVoiceContext(chatGptController) },
@@ -505,6 +500,7 @@ internal class MainSocialAiChatFeature(
             productionCapabilityPrewarmer.cancel()
         }
         if (sessionPrewarmerDelegate.isInitialized()) sessionPrewarmer.cancel()
+        if (realtimeVoiceDelegate.isInitialized()) realtimeVoice.onHostPaused()
         if (chatGptControllerDelegate.isInitialized()) chatGptController.onHostPaused()
         if (googleControllerDelegate.isInitialized()) googleController.onHostPaused()
     }
@@ -570,6 +566,7 @@ internal class MainSocialAiChatFeature(
         }
         updateWorkModel()
         refreshInputComposerVisual()
+        if (realtimeVoiceDelegate.isInitialized()) realtimeVoice.onActiveSurfaceChanged()
     }
 
     private fun activateChatProvider(provider: WebChatProviderIdentity) {
@@ -635,6 +632,7 @@ internal class MainSocialAiChatFeature(
         binding.root.post { controller.refreshComposerModel() }
         refreshConsumerComposerUi()
         productionCapabilityPrewarmer.schedule(provider)
+        if (realtimeVoiceDelegate.isInitialized()) realtimeVoice.onActiveSurfaceChanged()
     }
 
     private fun renderToolbarVoiceAction(webChatModeActive: Boolean) {

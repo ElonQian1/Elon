@@ -12,6 +12,7 @@
   const disclosureAdapter = window.__elonChatGptDisclosureControls;
   const composerToolStatePolicy = window.__elonChatGptComposerToolStatePolicy;
   const temporaryChatAdapter = window.__elonChatGptTemporaryChat;
+  const realtimeVoicePolicy = window.__elonChatGptRealtimeVoicePolicy;
   const overlayPolicy = window.__elonChatGptOverlayPolicy; const contextMenuPolicy = window.__elonChatGptContextMenuPolicy;
   let controlsById = new Map();
   let controlMetadataById = new Map();
@@ -254,7 +255,8 @@
     if (/previous.response|previous.answer|上一回复|上一答案/.test(signal)) return 'previous_response';
     if (/next.response|next.answer|下一回复|下一答案/.test(signal)) return 'next_response';
     if (/dictat|听写|语音输入/.test(signal)) return 'dictation';
-    if (/voice.mode|start.voice|microphone|启动语音|语音功能|麦克风/.test(signal)) return 'voice_mode';
+    const realtimeVoiceSemantic = realtimeVoicePolicy && realtimeVoicePolicy.classify(signal);
+    if (realtimeVoiceSemantic) return realtimeVoiceSemantic;
     if (/thought.for|reasoning|思考了|思考过程|推理过程/.test(signal)) return 'reasoning_details';
     if (/send|submit|发送/.test(signal)) return 'send';
     if (/stop|停止/.test(signal)) return 'stop';

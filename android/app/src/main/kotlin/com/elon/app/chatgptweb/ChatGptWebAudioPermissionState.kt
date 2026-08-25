@@ -20,17 +20,20 @@ internal class ChatGptWebAudioPermissionState {
         val requestState: RequestState,
         val localRequestPending: Boolean,
         val webRequestPending: Boolean,
+        val webPermissionGrantRevision: Long,
     )
 
     private var requestState = RequestState.IDLE
     private var localRequestPending = false
     private var webRequestPending = false
+    private var webPermissionGrantRevision = 0L
 
     fun snapshot(androidPermissionGranted: Boolean): Snapshot = Snapshot(
         androidPermissionGranted = androidPermissionGranted,
         requestState = requestState,
         localRequestPending = localRequestPending,
         webRequestPending = webRequestPending,
+        webPermissionGrantRevision = webPermissionGrantRevision,
     )
 
     fun localPermissionPending() {
@@ -50,6 +53,7 @@ internal class ChatGptWebAudioPermissionState {
 
     fun webPermissionGranted() {
         webRequestPending = false
+        webPermissionGrantRevision += 1
         requestState = RequestState.WEB_PERMISSION_GRANTED
     }
 
@@ -83,6 +87,7 @@ internal class ChatGptWebAudioPermissionState {
             requestState = RequestState.IDLE,
             localRequestPending = false,
             webRequestPending = false,
+            webPermissionGrantRevision = 0L,
         )
     }
 }
