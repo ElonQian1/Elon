@@ -122,6 +122,30 @@ fn composer_feature_and_command_receipts_remain_independent() {
 }
 
 #[test]
+fn interleaved_command_receipts_remain_available_by_request_id() {
+    let runtime = LocalAiBrowserRuntime::default();
+    runtime.ensure_session("session", "chatgpt", "active");
+    for index in 0..10 {
+        let request_id = format!("mcp_receipt{index}");
+        runtime.mark_command_pending("session", "collect_model_options", Some(&request_id));
+        runtime.record_adapter_event(
+            "session",
+            "command_result",
+            json!({"type":"command_result","action":"collect_model_options","requestId":request_id,"ok":true}),
+        );
+    }
+
+    let snapshot = runtime.snapshot("session").unwrap();
+    assert_eq!(snapshot.command_results.len(), 8);
+    assert_eq!(snapshot.command_results[0]["requestId"], "mcp_receipt2");
+    assert_eq!(snapshot.command_results[7]["requestId"], "mcp_receipt9");
+    assert_eq!(
+        snapshot.command_result.unwrap()["requestId"],
+        "mcp_receipt9"
+    );
+}
+
+#[test]
 fn background_opening_never_reports_a_visible_official_window() {
     let runtime = LocalAiBrowserRuntime::default();
     runtime.ensure_session("session", "chatgpt", "connecting");
@@ -230,7 +254,10 @@ fn send_snapshot_can_advance_a_chatgpt_spa_route_without_losing_context() {
     );
     let pending = runtime.snapshot("session").unwrap();
     assert!(!pending.context_ready);
-    assert_eq!(pending.diagnostics["lastEventKind"], "pending_send_snapshot_ignored");
+    assert_eq!(
+        pending.diagnostics["lastEventKind"],
+        "pending_send_snapshot_ignored"
+    );
 
     let conversation = Url::parse("https://chatgpt.com/c/first").unwrap();
     let conversation_key = semantic_context::page_context_key("chatgpt", conversation.as_str());
@@ -404,7 +431,9 @@ fn google_cached_conversation_rejects_a_partial_live_history_overwrite() {
         .id
         .clone();
 
-    assert!(runtime.activate_cached_conversation("session", &id).is_some());
+    assert!(runtime
+        .activate_cached_conversation("session", &id)
+        .is_some());
     runtime.record_adapter_event_with_context(
         "session",
         "message_snapshot",
@@ -576,8 +605,14 @@ fn google_private_directory_open_rebinds_instead_of_merging_the_previous_thread(
     );
 
     let opened = runtime.snapshot("session").unwrap();
-    assert_ne!(opened.active_conversation_id.as_deref(), Some(first_id.as_str()));
-    assert_eq!(opened.active_conversation_id.as_deref(), second_key.as_deref());
+    assert_ne!(
+        opened.active_conversation_id.as_deref(),
+        Some(first_id.as_str())
+    );
+    assert_eq!(
+        opened.active_conversation_id.as_deref(),
+        second_key.as_deref()
+    );
     let messages = opened.semantic_event.unwrap()["messages"]
         .as_array()
         .unwrap()

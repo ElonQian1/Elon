@@ -17,6 +17,23 @@ export function isLocalAiRequestId(value: unknown): value is string {
   return typeof value === 'string' && REQUEST_ID_PATTERN.test(value)
 }
 
+interface LocalAiCommandReceiptLike {
+  action: string
+  requestId?: string | null
+}
+
+export function findMatchingLocalAiCommandReceipt<T extends LocalAiCommandReceiptLike>(
+  latest: T | null | undefined,
+  recent: readonly T[] | undefined,
+  action: string,
+  requestId: string,
+): T | undefined {
+  if (latest?.action === action && latest.requestId === requestId) return latest
+  return [...(recent ?? [])].reverse().find((item) => (
+    item.action === action && item.requestId === requestId
+  ))
+}
+
 function randomToken(length: number): string {
   const bytes = new Uint8Array(length)
   try {

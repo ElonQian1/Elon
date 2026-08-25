@@ -1,7 +1,11 @@
 import { getDesktopInvoke } from '../shell/desktopShell'
 import { localAiSnapshotCache } from './localAiSnapshotCache'
 import { UNIFIED_AI_PROTOCOL } from './unifiedAiProtocol'
-import { createLocalAiRequestId, isLocalAiRequestId } from './localAiCommandReceipt'
+import {
+  createLocalAiRequestId,
+  findMatchingLocalAiCommandReceipt,
+  isLocalAiRequestId,
+} from './localAiCommandReceipt'
 import { requiredLocalAiAdapterVersion } from './localAiAdapterCompatibility'
 import {
   LOCAL_AI_RESULT_POLL_INTERVAL_MS,
@@ -192,6 +196,7 @@ export interface LocalAiWebSessionState {
   featureEvent?: LocalAiFeatureNavigationSnapshot | Record<string, unknown> | null
   uiManifestEvent?: LocalAiUiManifestSnapshot | Record<string, unknown> | null
   commandResult?: LocalAiCommandResult | null
+  commandResults?: LocalAiCommandResult[]
   diagnostics?: LocalAiSessionDiagnostics
   cacheStatus: 'empty' | 'cached' | 'live'
   semanticCacheStatus: 'empty' | 'cached' | 'live'
@@ -478,7 +483,13 @@ export async function waitForLocalAiAdapterResult(
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     await new Promise((resolve) => window.setTimeout(resolve, LOCAL_AI_RESULT_POLL_INTERVAL_MS))
     const state = await getLocalAiWebSessionState(providerId, ownerKey)
-    if (state.commandResult?.action === action && state.commandResult.requestId === requestId) return state
+    const receipt = findMatchingLocalAiCommandReceipt(
+      state.commandResult,
+      state.commandResults,
+      action,
+      requestId,
+    )
+    if (receipt) return state.commandResult === receipt ? state : { ...state, commandResult: receipt }
   }
   return null
 }

@@ -11,6 +11,8 @@ use tauri::Url;
 
 use super::{conversation_directory, semantic_context, snapshot_cache};
 
+const COMMAND_RESULT_HISTORY_LIMIT: usize = 8;
+
 #[path = "state/cache.rs"]
 mod cache;
 #[path = "state/context.rs"]
@@ -41,6 +43,7 @@ struct SessionRecord {
     feature_event: Option<Value>,
     ui_manifest_event: Option<Value>,
     command_result: Option<Value>,
+    command_results: Vec<Value>,
     last_event_kind: String,
     last_command_action: String,
     last_command_request_id: Option<String>,
@@ -86,6 +89,7 @@ pub struct LocalAiWebSessionState {
     pub feature_event: Option<Value>,
     pub ui_manifest_event: Option<Value>,
     pub command_result: Option<Value>,
+    pub command_results: Vec<Value>,
     pub diagnostics: Value,
     pub cache_status: String,
     pub semantic_cache_status: String,
@@ -216,6 +220,7 @@ impl LocalAiBrowserRuntime {
                 feature_event: None,
                 ui_manifest_event: None,
                 command_result: None,
+                command_results: Vec::new(),
                 last_event_kind: "session_created".to_string(),
                 last_command_action: String::new(),
                 last_command_request_id: None,
@@ -253,6 +258,7 @@ impl LocalAiBrowserRuntime {
             record.last_error = None;
             record.last_error_code = None;
             record.command_result = None;
+            record.command_results.clear();
             record.mark_snapshot_cached();
         });
     }
@@ -290,6 +296,7 @@ impl LocalAiBrowserRuntime {
                 record.last_error = None;
                 record.last_error_code = None;
                 record.command_result = None;
+                record.command_results.clear();
                 record.mark_snapshot_cached();
             } else {
                 record.window_status = "blocked".to_string();
@@ -463,6 +470,15 @@ impl LocalAiBrowserRuntime {
                         .and_then(Value::as_str)
                         .map(|value| truncate(value.to_string(), 36));
                     record.last_command_ok = payload.get("ok").and_then(Value::as_bool);
+                    if let Some(request_id) = payload.get("requestId").and_then(Value::as_str) {
+                        record.command_results.retain(|entry| {
+                            entry.get("requestId").and_then(Value::as_str) != Some(request_id)
+                        });
+                    }
+                    record.command_results.push(payload.clone());
+                    if record.command_results.len() > COMMAND_RESULT_HISTORY_LIMIT {
+                        record.command_results.remove(0);
+                    }
                     record.command_result = Some(payload);
                 }
                 "browser_diagnostic" => {
@@ -497,6 +513,7 @@ impl LocalAiBrowserRuntime {
             record.feature_event = None;
             record.ui_manifest_event = None;
             record.command_result = None;
+            record.command_results.clear();
             record.last_event_kind = "session_cleared".to_string();
             record.last_command_action.clear();
             record.last_command_request_id = None;
@@ -702,6 +719,7 @@ impl From<SessionRecord> for LocalAiWebSessionState {
             feature_event: record.feature_event,
             ui_manifest_event: record.ui_manifest_event,
             command_result: record.command_result,
+            command_results: record.command_results,
             diagnostics,
             cache_status,
             semantic_cache_status,
