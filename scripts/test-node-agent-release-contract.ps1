@@ -265,12 +265,22 @@ Assert-NodeAgentBackgroundGitLaunchPolicy -RepoRoot $repoRoot
 
 $fixtureRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("elon-node-agent-git-gate-" + [Guid]::NewGuid().ToString("N"))
 try {
-    $fixtureSource = Join-Path $fixtureRoot "server\src"
-    New-Item -ItemType Directory -Force -Path $fixtureSource | Out-Null
+    & git -c core.longpaths=true init $fixtureRoot *> $null
+    if ($LASTEXITCODE -ne 0) { throw 'Could not initialize the long-path release fixture.' }
+    $deepSegments = @(1..12 | ForEach-Object { "source_owner_segment_$($_.ToString('00'))" })
+    $fixtureSource = Join-Path $fixtureRoot ("server\src\" + ($deepSegments -join '\'))
+    [System.IO.Directory]::CreateDirectory(
+        (ConvertTo-NodeAgentExtendedPath -Path $fixtureSource)
+    ) | Out-Null
+    $fixtureFile = Join-Path $fixtureSource "regression.rs"
+    Assert-True ($fixtureFile.Length -gt 260) `
+        "The release fixture must exceed the legacy Windows MAX_PATH boundary"
     [System.IO.File]::WriteAllText(
-        (Join-Path $fixtureSource "regression.rs"),
+        (ConvertTo-NodeAgentExtendedPath -Path $fixtureFile),
         'fn regression() { let _ = std::process::Command::new("git").output(); }'
     )
+    & git -c core.longpaths=true -C $fixtureRoot add --all
+    if ($LASTEXITCODE -ne 0) { throw 'Could not stage the long-path release fixture.' }
     $blocked = $false
     try {
         Assert-NodeAgentBackgroundGitLaunchPolicy -RepoRoot $fixtureRoot | Out-Null
@@ -279,8 +289,16 @@ try {
     }
     Assert-True $blocked "The release gate must reject a newly added bare Git launch"
 } finally {
-    if (Test-Path -LiteralPath $fixtureRoot) {
-        Remove-Item -LiteralPath $fixtureRoot -Recurse -Force
+    $extendedFixtureRoot = ConvertTo-NodeAgentExtendedPath -Path $fixtureRoot
+    if ([System.IO.Directory]::Exists($extendedFixtureRoot)) {
+        foreach ($file in [System.IO.Directory]::EnumerateFiles(
+            $extendedFixtureRoot,
+            '*',
+            [System.IO.SearchOption]::AllDirectories
+        )) {
+            [System.IO.File]::SetAttributes($file, [System.IO.FileAttributes]::Normal)
+        }
+        [System.IO.Directory]::Delete($extendedFixtureRoot, $true)
     }
 }
 

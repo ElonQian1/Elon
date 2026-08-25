@@ -1,3 +1,5 @@
+. (Join-Path $PSScriptRoot 'node-agent-long-path-source-scan.ps1')
+
 function Enter-NodeAgentPublishLock {
     param(
         [Parameter(Mandatory = $true)][string]$Path
@@ -336,32 +338,24 @@ function Assert-NodeAgentBackgroundGitLaunchPolicy {
     )
 
     $root = [System.IO.Path]::GetFullPath($RepoRoot)
-    $sourceRoots = @(
-        (Join-Path $root "server\src"),
-        (Join-Path $root "server\pc-dev-runtime\src")
-    )
     $bareGitPattern = '(?m)\b(?:[A-Za-z_][A-Za-z0-9_]*\s*::\s*)*[A-Za-z_]*Command\s*::\s*new\s*\(\s*"git"\s*\)'
     $cmdGitPattern = '(?i)\bcmd(?:\.exe)?\s+/(?:c|k)\s+git(?:\.exe)?\b'
     $violations = New-Object System.Collections.Generic.List[string]
-    $sourceCount = 0
+    $sources = @(Get-NodeAgentTrackedRustSources -RepoRoot $root -Pathspecs @(
+        'server/src/*.rs',
+        'server/pc-dev-runtime/src/*.rs'
+    ))
+    $sourceCount = $sources.Count
 
-    foreach ($sourceRoot in $sourceRoots) {
-        if (-not (Test-Path -LiteralPath $sourceRoot -PathType Container)) {
-            continue
+    foreach ($source in $sources) {
+        $body = [System.IO.File]::ReadAllText($source.ReadPath)
+        foreach ($match in [System.Text.RegularExpressions.Regex]::Matches($body, $bareGitPattern)) {
+            $line = 1 + ($body.Substring(0, $match.Index).Split("`n").Count - 1)
+            $violations.Add("$($source.RelativePath):${line}: $($match.Value)")
         }
-        foreach ($source in Get-ChildItem -LiteralPath $sourceRoot -Recurse -Filter "*.rs" -File) {
-            $sourceCount++
-            $body = [System.IO.File]::ReadAllText($source.FullName)
-            foreach ($match in [System.Text.RegularExpressions.Regex]::Matches($body, $bareGitPattern)) {
-                $line = 1 + ($body.Substring(0, $match.Index).Split("`n").Count - 1)
-                $relative = $source.FullName.Substring($root.Length).TrimStart('\', '/')
-                $violations.Add("${relative}:${line}: $($match.Value)")
-            }
-            foreach ($match in [System.Text.RegularExpressions.Regex]::Matches($body, $cmdGitPattern)) {
-                $line = 1 + ($body.Substring(0, $match.Index).Split("`n").Count - 1)
-                $relative = $source.FullName.Substring($root.Length).TrimStart('\', '/')
-                $violations.Add("${relative}:${line}: $($match.Value)")
-            }
+        foreach ($match in [System.Text.RegularExpressions.Regex]::Matches($body, $cmdGitPattern)) {
+            $line = 1 + ($body.Substring(0, $match.Index).Split("`n").Count - 1)
+            $violations.Add("$($source.RelativePath):${line}: $($match.Value)")
         }
     }
 

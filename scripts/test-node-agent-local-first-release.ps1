@@ -295,11 +295,11 @@ try {
     $activationRoot = Join-Path $root 'activation'
     $old = Register-NodeAgentVerifiedLocalRelease -StateRoot $activationRoot `
         -GitSha ('b' * 40) -Version '0.3.69' -ReleaseIdentity ("0.3.69+" + ('b' * 40)) `
-        -WindowsClientPackage $zip -WindowsClientSha256 ((Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()) `
+        -WindowsClientPackage $zip -WindowsClientSha256 (Get-NodeAgentFileSha256 -Path $zip) `
         -VerifiedAtMs 100
     $new = Register-NodeAgentVerifiedLocalRelease -StateRoot $activationRoot `
         -GitSha ('c' * 40) -Version '0.3.69' -ReleaseIdentity ("0.3.69+" + ('c' * 40)) `
-        -WindowsClientPackage $zip -WindowsClientSha256 ((Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()) `
+        -WindowsClientPackage $zip -WindowsClientSha256 (Get-NodeAgentFileSha256 -Path $zip) `
         -VerifiedAtMs 200
     $oldState = Get-Content -Raw -LiteralPath $old.StatePath | ConvertFrom-Json
     Assert-Equal $oldState.activation_state 'superseded' 'new verified release must supersede stale scheduled target'
