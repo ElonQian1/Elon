@@ -27,6 +27,8 @@ export function localAiCapabilityPrewarmEligible({
   snapshot,
   foregroundBlocked,
 }: LocalAiCapabilityPrewarmEligibility): boolean {
+  const supportsManifest = adapterActions.includes('snapshot_ui_manifest')
+  const supportsModel = REQUIRED_MODEL_ACTIONS.every((action) => adapterActions.includes(action))
   return Boolean(
     providerId
       && sessionState?.providerId === providerId
@@ -37,8 +39,14 @@ export function localAiCapabilityPrewarmEligible({
       && snapshot?.composerReady
       && !snapshot.streaming
       && !foregroundBlocked
-      && REQUIRED_MODEL_ACTIONS.every((action) => adapterActions.includes(action)),
+      && (supportsManifest || supportsModel),
   )
+}
+
+export function localAiCapabilityPrewarmSupportsModel(
+  adapterActions: readonly LocalAiAdapterAction[],
+): boolean {
+  return REQUIRED_MODEL_ACTIONS.every((action) => adapterActions.includes(action))
 }
 
 export class LocalAiCapabilityPrewarmCooldown {

@@ -424,6 +424,12 @@ assert.match(capabilityPrewarm, /maxEntries = 32/)
 assert.match(deferredMenuSync, /inFlightMenuSyncs/)
 assert.match(deferredMenuSync, /waitForLocalAiAdapterResults/)
 assert.doesNotMatch(capabilityPrewarmHook, /openLocalAiWebSession/)
+assert.match(capabilityPrewarmHook, /snapshot_ui_manifest/)
+assert.ok(capabilityPrewarmHook.includes('`${sessionIdentity}:ui_manifest`'))
+assert.ok(
+  capabilityPrewarmHook.indexOf("'snapshot_ui_manifest'")
+    < capabilityPrewarmHook.indexOf("'list_model_options'"),
+)
 assert.doesNotMatch(api, /startUrl|launchUrl|document\.cookie/)
 assert.match(panel, /访客模式优先/)
 assert.match(panel, /下载新版 Win 客户端/)

@@ -49,6 +49,7 @@ const {
   LOCAL_AI_CAPABILITY_PREWARM_COOLDOWN_MS,
   LocalAiCapabilityPrewarmCooldown,
   localAiCapabilityPrewarmEligible,
+  localAiCapabilityPrewarmSupportsModel,
 } = prewarmModule.exports
 
 assert.equal(LOCAL_AI_RESULT_POLL_INTERVAL_MS, 200)
@@ -77,6 +78,12 @@ assert.equal(localAiCapabilityPrewarmEligible({
   providerId: 'chatgpt', adapterActions: modelActions, sessionState: readySession,
   snapshot: readySnapshot, foregroundBlocked: false,
 }), true)
+assert.equal(localAiCapabilityPrewarmEligible({
+  providerId: 'chatgpt', adapterActions: ['snapshot_ui_manifest'], sessionState: readySession,
+  snapshot: readySnapshot, foregroundBlocked: false,
+}), true)
+assert.equal(localAiCapabilityPrewarmSupportsModel(modelActions), true)
+assert.equal(localAiCapabilityPrewarmSupportsModel(['list_model_options']), false)
 for (const override of [
   { foregroundBlocked: true },
   { sessionState: { ...readySession, loading: true } },
