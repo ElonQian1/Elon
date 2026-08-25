@@ -108,7 +108,7 @@ internal object WebAiPrivateTransportCatalog {
             runtimeEnabled = true,
             requestMode = "official_webrtc_foreground_service_and_local_overlay",
             healthPolicy =
-                "audio_focus_auto_pause_surface_handoff_and_accepted_hangup_only_reconciliation",
+                "fresh_grant_or_current_official_voice_control_activation_and_accepted_hangup_only_reconciliation",
             fallback = "official_webview_voice_and_foreground_notification",
         ),
         Entry(

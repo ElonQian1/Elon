@@ -5,12 +5,23 @@ internal data class WebChatRealtimeVoiceActivationEvidence(
     val webPermissionGrantRevision: Long,
     val webRequestPending: Boolean,
     val requestState: String,
+    val officialVoiceActive: Boolean = false,
 )
 
 internal sealed interface WebChatRealtimeVoiceActivationDecision {
     data class Wait(val detail: String) : WebChatRealtimeVoiceActivationDecision
     data object Active : WebChatRealtimeVoiceActivationDecision
     data class Failed(val detail: String) : WebChatRealtimeVoiceActivationDecision
+}
+
+internal object WebChatRealtimeVoiceActivationEvidencePolicy {
+    fun resolve(
+        permission: WebChatRealtimeVoiceActivationEvidence,
+        state: WebChatConsumerState?,
+    ): WebChatRealtimeVoiceActivationEvidence = permission.copy(
+        officialVoiceActive = state?.adapterCurrent == true &&
+            WebChatRealtimeVoiceEndPolicy.resolve(state.controls) != null,
+    )
 }
 
 internal class WebChatRealtimeVoiceActivationGate(
@@ -31,6 +42,9 @@ internal class WebChatRealtimeVoiceActivationGate(
             return WebChatRealtimeVoiceActivationDecision.Failed(
                 "麦克风权限未开启，请授权后重试",
             )
+        }
+        if (evidence.officialVoiceActive) {
+            return WebChatRealtimeVoiceActivationDecision.Active
         }
         if (evidence.webPermissionGrantRevision > grantRevisionBeforeStart) {
             return WebChatRealtimeVoiceActivationDecision.Active

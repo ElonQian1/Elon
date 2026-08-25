@@ -28,6 +28,20 @@ class WebChatRealtimeVoiceActivationGateTest {
     }
 
     @Test
+    fun anOfficialActiveVoiceControlReusesAnExistingMicrophoneGrant() {
+        val gate = WebChatRealtimeVoiceActivationGate()
+        gate.begin(evidence(revision = 4))
+
+        assertEquals(
+            WebChatRealtimeVoiceActivationDecision.Active,
+            gate.observe(
+                evidence(revision = 4, officialVoiceActive = true),
+                attempt = 1,
+            ),
+        )
+    }
+
+    @Test
     fun deniedAndroidPermissionFailsImmediately() {
         val gate = WebChatRealtimeVoiceActivationGate()
         gate.begin(evidence(revision = 0))
@@ -43,10 +57,12 @@ class WebChatRealtimeVoiceActivationGateTest {
     private fun evidence(
         revision: Long,
         permissionGranted: Boolean = true,
+        officialVoiceActive: Boolean = false,
     ) = WebChatRealtimeVoiceActivationEvidence(
         androidPermissionGranted = permissionGranted,
         webPermissionGrantRevision = revision,
         webRequestPending = false,
         requestState = "idle",
+        officialVoiceActive = officialVoiceActive,
     )
 }

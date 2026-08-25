@@ -391,7 +391,7 @@ internal class WebChatRealtimeVoiceCoordinator(
         }
         provider?.let { launchCache.observe(it.id, port.state()) }
         render(WebChatRealtimeVoiceLifecycle.CONNECTING, "正在由后台网页启动官方语音连接")
-        activationGate.begin(audioActivationEvidence())
+        activationGate.begin(currentActivationEvidence())
         val result = port.executeSessionCommand(REALTIME_VOICE_ACTION)
         if (!result.accepted) {
             if (attempt < MAX_START_ATTEMPTS && result.error in RETRYABLE_ERRORS) {
@@ -508,7 +508,7 @@ internal class WebChatRealtimeVoiceCoordinator(
         } else {
             MAX_BACKGROUND_ACTIVATION_POLLS
         }
-        when (val decision = activationGate.observe(audioActivationEvidence(), attempt, pollLimit)) {
+        when (val decision = activationGate.observe(currentActivationEvidence(), attempt, pollLimit)) {
             WebChatRealtimeVoiceActivationDecision.Active -> markActive(expectedGeneration)
             is WebChatRealtimeVoiceActivationDecision.Failed -> {
                 if (!interactiveActivation && beginInteractiveActivation(expectedGeneration)) return
@@ -586,7 +586,7 @@ internal class WebChatRealtimeVoiceCoordinator(
     private fun beginInteractiveActivation(expectedGeneration: Int): Boolean {
         if (!isCurrent(expectedGeneration) || !showInteractiveActivation()) return false
         interactiveActivation = true
-        activationGate.begin(audioActivationEvidence())
+        activationGate.begin(currentActivationEvidence())
         render(
             WebChatRealtimeVoiceLifecycle.CONNECTING,
             "请点页面右下角蓝色语音按钮，连接后自动返回原生聊天",
@@ -603,6 +603,11 @@ internal class WebChatRealtimeVoiceCoordinator(
         interactiveActivation = false
         restoreNativeSurface()
     }
+
+    private fun currentActivationEvidence() = WebChatRealtimeVoiceActivationEvidencePolicy.resolve(
+        audioActivationEvidence(),
+        consumerPort()?.state(),
+    )
 
     private fun render(
         lifecycle: WebChatRealtimeVoiceLifecycle,

@@ -34,6 +34,12 @@ and the official call actually settling. Late reconciliation runs only after the
 hangup control accepted the command. A missing or temporarily unreadable control keeps
 the compact surface in `still in call` state and cannot silently close the backing session.
 
+Realtime voice activation also separates permission from current-call evidence. A fresh
+WebView microphone grant still confirms first launch, while a reused grant is accepted only
+when the current adapter exposes the official hangup control. This avoids waiting for a
+permission counter that cannot change on later starts without treating permission alone as
+proof that a call is active.
+
 Background provider switching keeps one already-started official navigation alive.
 On resume, the APK first reattaches the versioned page adapter and cached snapshot;
 only a failed or stalled document consumes the bounded full-page reload budget. It
