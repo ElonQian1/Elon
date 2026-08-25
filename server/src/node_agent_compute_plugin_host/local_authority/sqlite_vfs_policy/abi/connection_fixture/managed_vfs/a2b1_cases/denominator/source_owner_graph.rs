@@ -7,10 +7,16 @@
 mod invariants;
 mod lock;
 mod map;
+mod map_terminal_ledger;
 mod model;
 mod owners;
 mod shared;
 
 pub(super) fn validate_source_owner_graph() -> Result<(), &'static str> {
     invariants::validate()
+}
+
+pub(super) fn validate_map_terminal_review_ledger() -> Result<(), &'static str> {
+    invariants::validate()?;
+    map_terminal_ledger::validate()
 }

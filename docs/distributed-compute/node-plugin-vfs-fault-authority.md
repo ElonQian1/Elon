@@ -1,7 +1,7 @@
 ---
 title: 节点插件测试 VFS 故障合同权威
 status: current
-reviewed_at: 2026-08-22
+reviewed_at: 2026-08-25
 owners: node, security
 ---
 
@@ -74,11 +74,13 @@ A2 fixture 必须保持以下所有权拓扑：
 
 ### 5.1 A2a/A2b1 map/lock quotient 与 typed inventory
 
-当前有 candidate quotient/typed-key schema、一份显式不完整的 branch-atom scaffold，以及独立 `SourceOwnerGraph v1`。owner 图以基线 commit literal `623bec6ed0fde7360d1f8ed7e0eb40d1b543e1ac` 标识本次审查快照；每个 production/test owner 同时保存 Git blob OID、规范化 LF 后的 SHA-256 与 symbol sentinel，validator 从同一份规范化源码重算 Git blob OID 与 SHA-256，并拒绝 symbol 缺失。validator 不读取 `.git`，因此 baseline literal 不声称自动证明当前 checkout HEAD 等于该 commit；实际提交收尾仍须在仓库侧复核 commit→blob 映射。图节点只声明 source owner、symbol、role、operation scope、epoch、expanded/typed-outcome/pending boundary 与极少数显式 state witness，edge 只声明 call、continuation、terminal return、cleanup rewrite、quarantine、abandon、callback completion/error precedence、loop back 与跨调用 state prerequisite；它不提供 `Excluded`，也不能构造 `CaseKey`、`Expected` 或计数。
+当前有 candidate quotient/typed-key schema、一份显式不完整的 branch-atom scaffold、独立 `SourceOwnerGraph v1`，以及在 owner 图之后单独接线的 Map source-terminal template review ledger v1。owner 图以基线 commit literal `623bec6ed0fde7360d1f8ed7e0eb40d1b543e1ac` 标识本次审查快照；每个 production/test owner 同时保存 Git blob OID、规范化 LF 后的 SHA-256 与 symbol sentinel，validator 从同一份规范化源码重算 Git blob OID 与 SHA-256，并拒绝 symbol 缺失。validator 不读取 `.git`，因此 baseline literal 不声称自动证明当前 checkout HEAD 等于该 commit；实际提交收尾仍须在仓库侧复核 commit→blob 映射。图节点只声明 source owner、symbol、role、operation scope、epoch、expanded/typed-outcome/pending boundary 与极少数显式 state witness，edge 只声明 call、continuation、terminal return、cleanup rewrite、quarantine、abandon、callback completion/error precedence、loop back 与跨调用 state prerequisite；它不提供 `Excluded`，也不能构造 `CaseKey`、`Expected` 或计数。
 
-该图已固定以下顺序边界：ABI map 先把 output 清为 null且只有 audited `Mapped` 投影可写指针；raw state reject/panic 的 fallback 与成功 pointer/Acquired/Busy 投影分节点，并绑定 `result_codes` owner；outer callback-fault wrapper 先于 route；每次 main map 都先执行 route preparation，并对有 plan 与无 plan 分支执行独立的 promotion callback lease（无 plan 既可能是首个 Map，也可能是既有 WalMain 的幂等路径）；promotion completion 后才允许可选 fault-plan install/record，随后真实 map operation 再取得另一份 `with_shm` callback lease；两份 callback 不共享 process/owner/state completion 节点。unsafe SHM failure 先 retain/quarantine，再尝试 completion，operation error 始终优先 completion error。cold Lock acquire 的 `WalMain promoted + node absent + prior Map pre-ensure return` 只登记为 `ScopePending` typed state prerequisite，并同时要求 promotion-complete 与 early-Map-return 两个输入；它尚不证明该场景已形成 terminal trace。Unlock 不得进入 node initialization；region MappingCreate/ViewMap success 是 `1..k` continuation/loop，最终 region selection 才返回；exact-open failure custody、DMS close 与 ViewMap before/native cleanup rewrite 必须分 owner/边记录。Windows seam 只冻结 typed outcome boundary，`PlatformUnsupported` 与具体 OS error 等价类仍未裁决。
+该图已固定以下顺序边界：ABI map 会先尝试把 output 清为 null，且只有 audited `Mapped` 投影可写非空指针；若 output slot 本身为 null则清零是 no-op，invalid-argument 与 null-slot 的交叉形状仍须分支复核。非 null output 还以前置 C callback 合同保证 allocation、alignment、lifetime 与可写性；dangling、wrong-layout、unaligned 或 read-only 指针属于 UB premise，不是有限 terminal leaf。raw state reject/panic 的 fallback 与成功 pointer/Acquired/Busy 投影分节点，并绑定 `result_codes` owner；outer callback-fault wrapper 先于 route；每次 main map 都先执行 route preparation，并对有 plan 与无 plan分支执行独立的 promotion callback lease（无 plan 既可能是首个 Map，也可能是既有 WalMain 的幂等路径）；promotion completion 后才允许可选 fault-plan install/record，随后真实 map operation 再取得另一份 `with_shm` callback lease；两份 callback 不共享 process/owner/state completion 节点。unsafe SHM failure 先 retain/quarantine，再尝试 completion，operation error 始终优先 completion error。cold Lock acquire 的 `WalMain promoted + node absent + prior Map pre-ensure return` 只登记为 `ScopePending` typed state prerequisite，并同时要求 promotion-complete 与 early-Map-return 两个输入；它尚不证明该场景已形成 terminal trace。Unlock 不得进入 node initialization；region MappingCreate/ViewMap success 是 `1..k` continuation/loop，最终 region selection 才返回；exact-open failure custody、DMS close 与 ViewMap before/native cleanup rewrite 必须分 owner/边记录。Windows seam 只冻结 typed outcome boundary，`PlatformUnsupported` 与具体 OS error等价类仍未裁决。
 
-raw source universe 和 terminal leaves仍未冻结；owner 图不证明它已把每条 owner branch 组合为端到端 terminal trace。未来 source review 必须按 test-only exact VFS、受支持 Windows、非默认 exact registration、live WAL-main、exact route/callback owner 及 canonical region/range/pre-state 重建完整边界，但这些边界当前都不得冒充已审定 source universe。
+Map review ledger 目前只把已审阅分支保存为 commit-bound owner/symbol/needle occurrence；复用 generic converter 或 cleanup helper 的记录还必须携带 caller context。它把 continuation、structural join、candidate terminal、cleanup rewrite、candidate exclusion 与 Pending 分开，并独立保存 original cause、returned terminal、stored poison phase、route marker、retention 与 occurrence/multiplicity；typed pointer create/carry 与真正 ABI output write也分开。该表的六个 authority success family 仍只是 prestate-partition-pending candidate，不是六条 frozen Case。raw source universe 和 terminal leaves仍未冻结；ledger 没有 successor/trace relation，也不证明它已把每条 owner branch 组合为端到端 terminal trace。
+
+当前明确开放的 source review 至少包含：ABI input/null-slot 与 C pointer premise；raw rejection/panic/abandon subbranch；每个 managed phase 的 controller-internal error cross-product；Windows/non-Windows cfg 与 typed platform outcome；cold/warm、first/joiner、prefix mutation、symbolic region loop 和 lifetime occurrence；DMS acquire native-error/shared-busy 的 cleanup caller×close-outcome；callback/retention/physical-domain/route-marker closure；managed node-presence defensive leaves；native cleanup rewrite 的动态可观察性。owner 图另有十个 Map pending boundary，其中 `ManagedTypes` 四类 budget validator 尚未由 `ManagedMapValidation` 正确拥有，`ManagedFileSizeGrow` 仍混合 FileSize 与 Extend-only FileGrow。未来 source review 必须按 test-only exact VFS、受支持 Windows、非默认 exact registration、live WAL-main、exact route/callback owner 及 canonical region/range/pre-state 重建完整边界，但这些边界当前都不得冒充已审定 source universe。
 
 candidate quotient 拟只消去不改变权威可观察结果的 scalar instance：registration/route/runtime/Connection 的具体值、同一 range-shape 内等价 offset、同一 topology class 内等价 region index，以及产生相同终态/custody 的等价 OS errno。以下合并轴仍待 source/red-team review：
 
@@ -91,16 +93,17 @@ candidate quotient 拟只消去不改变权威可观察结果的 scalar instance
 
 当前 source-written 的只是 candidate `CaseKey` schema，可表达 path、branch group、operation/mode、request/range shape、topology/prefix-mutation class、initialization path、sibling relation、cause/terminal phase、timing/class 与 occurrence，且不保存真实 registration、route、runtime、Connection、PID、path、pointer 或 handle。该 schema 仍为 `source_review_pending`；源码没有已冻结的 `CaseKey` 实例集合，也没有完整 `SourceBranch`、`Expected` 或 `StaticContract`。未来这三类材料必须分开保存 source terminal identity、完整预期结果，以及 key→source→expected 的线性关联；runner、Debug、默认计数器或调用方布尔值不得在运行时拼装 expected。
 
-新 candidate branch-atom scaffold 只允许声称一个内部性质：对它自己已 materialize 的不完整 atom 列表，每个 atom 在该表内只出现一次并获得一个 candidate disposition。这不证明 atom 列表覆盖 production source，不证明 atom 是 terminal leaf，也不证明 disposition/reachability/exclusion 判定或 candidate axes 正确。当前已知 gaps 至少包括：
+candidate branch-atom scaffold 仍只允许声称一个内部性质：对它自己已 materialize 的不完整 atom 列表，每个 atom 在该表内只出现一次并获得一个 candidate disposition。新增 Map review ledger 进一步要求自己声明的 step ID 全部 materialize、commit-bound anchor 位于对应 symbol span、共享源码分支携带 caller context，并保留非空 Pending/open-boundary 集合。这些自一致性不证明记录覆盖 production source，不证明记录是 terminal leaf，也不证明 disposition/reachability/exclusion 判定或 candidate axes 正确。当前已知 gaps 至少包括：
 
 - cold `xShmLock` 也穿过完整 node-initialization 图，尚未与 lock action 完成可达性交叉投影；
 - `Observe|Extend` 的 operation-specific reachability 尚未分清，single-Connection 与 multi-Connection/sibling topology 也尚未分开；
-- owner/symbol 与调用顺序已有 commit-bound 图，但 ABI validation/output、raw file-state、registry/callback、fault controller 与 inactive/terminal route 的具体 branch 尚未组合成端到端 terminal trace；
-- 当前 atoms 同时含有 intermediate continuation 与候选 terminal 结果，二者尚未分类；一个 atom 不能被当成一个 Case 或 denominator 单元。
+- owner/symbol 与调用顺序已有 commit-bound 图，Map review ledger 也已分类一批具体 branch，但没有显式 successor/trace edge，ABI/raw/registry/controller/managed/cleanup/projection 尚未组合成端到端 terminal trace；
+- candidate exclusion 仍缺 exact fixture predicate 与完整 proof witness；任一 review step、success candidate 或 cleanup template都不能被当成一个 Case 或 denominator 单元。
 
 | Artifact | 当前状态 |
 |---|---|
 | `SourceScope/SourceOwnerGraph v1` | design-frozen/source-written/source-review-only/validator-uncompiled/unrun |
+| Map source-terminal template review ledger v1 | source-written/source-review-only/validator-uncompiled/unrun; Pending nonempty |
 | candidate quotient/key schema | source-written/source_review_pending |
 | candidate branch-atom scaffold | source-written/incomplete/self-partition-only |
 | raw source universe 与 terminal projection | source_review_pending/not counted |
@@ -113,13 +116,13 @@ candidate quotient 拟只消去不改变权威可观察结果的 scalar instance
 Extend reuse、Observe warm-create、Observe reuse、Observe not-present；另须覆盖 cold initialization 与 warm mapping prefix，
 mapping/view 的 before/native/after 结果，以及 shared/exclusive acquire/release 的本地成功、同 Connection
 transition、shared coalescing、sibling shared/exclusive contention、OS acquire/release success/contended/error。normal contention 仍是
-`SQLITE_BUSY` 且 fault count 为零；map 任一失败都必须证明 output 为 null。`PlatformUnsupported`、defensive 与 inactive 分支只有在端到端可达性复核后才可进入 exclusion ledger；当前 scaffold 的 disposition 不是冻结排除结论。具体 family 数与 denominator 只可在 raw source trace、terminal projection、`Expected` 和 exclusion review 全部 clean 后，
+`SQLITE_BUSY` 且 fault count 为零；对满足 C memory contract 的非 null output slot，map 任一失败都必须证明 slot 保持 null；null slot没有写入位置，不能虚报一次 null write。`PlatformUnsupported`、defensive 与 inactive 分支只有在端到端可达性复核后才可进入 exclusion ledger；当前 scaffold 和 Map review ledger 的 disposition 都不是冻结排除结论。具体 family 数与 denominator 只可在 raw source trace、terminal projection、`Expected` 和 exclusion review 全部 clean 后，
 由本页和[`动态验收`](node-plugin-vfs-fault-acceptance.md)共同冻结；中间候选数不是 authority。
 
 错误后的 native cleanup 是独立 terminal leaf，不能按最初失败 phase 合并：DMS truncate 失败后的 unlock 若不确定，terminal
 phase 是 `DmsExclusiveRelease` 且 custody 为 `ExclusiveOutcomeUncertain`；DMS exclusive/shared acquire 失败后的 close 若失败，
 terminal phase 是 `FileClose` 并保留 quarantined handle；ViewMap before/native 失败后的 mapping close 若失败，terminal phase 是
-`MappingClose` 并保留 mapping；ExactSiblingOpen 失败后的 file close 若失败，terminal phase 同样是 `FileClose`。未来 terminal projection 必须保留这些 cleanup rewrite 及原始 cause phase；当前 scaffold 尚未完成该工作，不得据此宣称 map/lock denominator。
+`MappingClose` 并保留 mapping；ExactSiblingOpen 失败后的 file close 若失败，terminal phase 同样是 `FileClose`。Map review ledger 已能分别记录 original cause、returned terminal、stored poison 与 route marker，并为已审分支保存若干 cleanup rewrite；仍为 Pending 的 stored/route projection、未展开分支和缺失 trace 不允许据此宣称 terminal universe 或 map/lock denominator。
 
 现有 `a2b1_cases` 的 18 个 map + 10 个 lock 记录只允许标记为 `static_subset/non_denominator`。它们只覆盖 phase presence、
 部分 exclusive lock shape 与局部 custody，不能因数量 28、源码存在或历史 targeted 通过而升级为 frozen denominator、
@@ -140,7 +143,7 @@ registration/route/runtime/Connection、真实 pre/post state、平台结果、�
 `server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases.rs` 与其
 `a2b1_cases/` 子模块；`managed_vfs.rs` 只允许保留 `cfg(test)` 模块 wiring。现有
 `a2_dynamic_evidence` 是 RegistrationShutdown-specific child/record，不得因命名通用而冒充 map/lock actual。除上述 test-only
-inventory 外，本批不修改 ABI、managed-fs、route bridge、production open 或任何 Host 调用边。
+inventory 外，本批 Map review ledger 只修改 test-only `a2b1_cases` 子树与文档，不修改 ABI、managed-fs、route bridge、production open 或任何 Host 调用边。
 
 ### 5.2 A2b2 typed case schema 与完整 inventory
 
@@ -188,6 +191,6 @@ WAL-main 若仍持有 SHM connection，关闭顺序固定为：验证无 SHM 锁
 
 ## 9. 静态验收与后续门槛
 
-当前可接受的结论仅是：test-only API 不可从生产构造；exact registration/route 只能经 live WAL-main 私有 delegate 取得低层 target；commit-bound `SourceOwnerGraph v1` 已 source-written/source-review-only，map/lock candidate typed schema 与不完整 branch-atom scaffold 也已 source-written，但 terminal universe、quotient、exact key set、`Expected`、exclusion ledger 和 denominator 仍为 `source_review_pending/implementation_uncompiled/implementation_unrun`，不能记 `StaticContract` 或 `WindowsDynamic`；barrier/unmap/joint close/registry/registration 具备 one-shot/fenced 静态形状；after-success 只在平台或 registry mutation 成功并同步 custody 后终态化；新增 registration runner/evidence envelope 仍是未编译、未运行的 source；生产 `open()`、A1 producer 与协议均保持不可达。历史完整目标编译和 5 项局部通过不得被重记为当前新增源码或 A2 动态验收。
+当前可接受的结论仅是：test-only API 不可从生产构造；exact registration/route 只能经 live WAL-main 私有 delegate 取得低层 target；commit-bound `SourceOwnerGraph v1` 与 Map source-terminal template review ledger v1 已 source-written/source-review-only，map/lock candidate typed schema 与不完整 branch-atom scaffold 也已 source-written，但 ledger Pending/open boundaries 非空且没有 successor trace，terminal universe、quotient、exact key set、`Expected`、exclusion ledger 和 denominator 仍为 `source_review_pending/implementation_uncompiled/implementation_unrun`，不能记 `StaticContract` 或 `WindowsDynamic`；barrier/unmap/joint close/registry/registration 具备 one-shot/fenced 静态形状；after-success 只在平台或 registry mutation 成功并同步 custody 后终态化；新增 registration runner/evidence envelope 仍是未编译、未运行的 source；生产 `open()`、A1 producer 与协议均保持不可达。历史完整目标编译和 5 项局部通过不得被重记为当前新增源码或 A2 动态验收。
 
 进入 A1 依赖顺序的生产 process owner/VFS 注册/open 阶段之前，仍必须按[`动态验收`](node-plugin-vfs-fault-acceptance.md)另批实际执行 Windows SHM map/lock/unmap、联合关闭平台故障矩阵和同 namespace 多 Connection 竞争，并把每条动态观察与静态 case key 一一对应。当前 map/lock denominator 尚未 source-review clean，因此 dynamic 尚未开放；新 registration runner 未编译未运行、Registration 仍为 0/8，A2b2 仍为 0/117，宽范围回归仍失败；静态源码和 Windows 动态证据任一缺失，都不得把 A2 标记完成或推进生产入口。
