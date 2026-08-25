@@ -12,8 +12,10 @@ class WebChatRealtimeVoiceActivationGateTest {
 
         assertTrue(gate.observe(evidence(revision = 4), attempt = 0) is
             WebChatRealtimeVoiceActivationDecision.Wait)
-        assertTrue(gate.observe(evidence(revision = 4), attempt = 2) is
-            WebChatRealtimeVoiceActivationDecision.Failed)
+        assertEquals(
+            WebChatRealtimeVoiceActivationDecision.Unconfirmed,
+            gate.observe(evidence(revision = 4), attempt = 2),
+        )
     }
 
     @Test
@@ -50,7 +52,7 @@ class WebChatRealtimeVoiceActivationGateTest {
             gate.observe(
                 evidence(revision = 0, permissionGranted = false),
                 attempt = 0,
-            ) is WebChatRealtimeVoiceActivationDecision.Failed,
+            ) is WebChatRealtimeVoiceActivationDecision.Rejected,
         )
     }
 

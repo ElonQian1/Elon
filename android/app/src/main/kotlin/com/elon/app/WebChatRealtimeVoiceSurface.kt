@@ -181,6 +181,7 @@ internal class WebChatRealtimeVoiceOverlay(
             WebChatRealtimeVoiceVisibleState.LISTENING -> color(R.color.elon_signal_mist)
             WebChatRealtimeVoiceVisibleState.THINKING -> color(R.color.elon_status_info)
             WebChatRealtimeVoiceVisibleState.SPEAKING -> color(R.color.elon_status_success)
+            WebChatRealtimeVoiceVisibleState.SYNCING -> color(R.color.elon_status_info)
             WebChatRealtimeVoiceVisibleState.PAUSED -> color(R.color.elon_text_secondary)
             WebChatRealtimeVoiceVisibleState.ENDING -> color(R.color.elon_status_info)
             WebChatRealtimeVoiceVisibleState.HANGUP_UNCONFIRMED -> color(R.color.elon_status_info)

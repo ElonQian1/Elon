@@ -1,8 +1,6 @@
 package com.elon.app
 
 import android.util.Log
-import androidx.activity.OnBackPressedCallback
-import androidx.appcompat.app.AppCompatActivity
 
 internal class WebChatRealtimeVoiceCoordinator(
     private val surface: WebChatRealtimeVoiceSurface,
@@ -58,13 +56,27 @@ internal class WebChatRealtimeVoiceCoordinator(
         onExpired = { log("voice_close_delayed_confirmation_expired") },
     )
     private val activationGate = WebChatRealtimeVoiceActivationGate()
+    private val activationMonitor = WebChatRealtimeVoiceActivationMonitor(
+        schedule = schedule,
+        observeActivation = {
+            activationGate.observe(
+                currentActivationEvidence(),
+                attempt = 0,
+                pollLimit = Int.MAX_VALUE,
+            )
+        },
+        requestControls = { consumerPort()?.requestControls() },
+        onConfirmed = { markActive(generation) },
+        onRejected = ::fail,
+        onWatchdogExhausted = { log("voice_activation_observation_still_stale") },
+    )
     private val pauseController = WebChatRealtimeVoicePauseController(
         consumerPort = consumerPort,
         schedule = schedule,
         onCompleted = { paused, detail ->
             backgroundBridge.setPaused(paused, detail)
             lastState?.takeIf { it.lifecycle.isVoiceOngoing() }?.let {
-                render(it.lifecycle, detail, it.turn, paused)
+                render(it.lifecycle, detail, it.turn, paused, it.observation)
             }
         },
         onFailed = backgroundBridge::reportControlFailure,
@@ -97,6 +109,7 @@ internal class WebChatRealtimeVoiceCoordinator(
         commandRequestId = null
         closeFailed = false
         closeCommandAccepted = false
+        activationMonitor.cancel()
         delayedCloseMonitor.cancel()
         automaticCloseRetries = 0
         interactiveActivation = false
@@ -133,6 +146,7 @@ internal class WebChatRealtimeVoiceCoordinator(
     }
 
     private fun beginClose() {
+        activationMonitor.cancel()
         delayedCloseMonitor.cancel()
         closePending = true
         closeFailed = false
@@ -211,6 +225,7 @@ internal class WebChatRealtimeVoiceCoordinator(
 
     fun onConsumerStateChanged(state: WebChatConsumerState) {
         provider?.let { launchCache.observe(it.id, state) }
+        activationMonitor.observeEvent()
         delayedCloseMonitor.observe(state)
     }
 
@@ -228,6 +243,7 @@ internal class WebChatRealtimeVoiceCoordinator(
         preparedGeneration = null
         commandRequestId = null
         closeSettlement.reset()
+        activationMonitor.cancel()
         backControl.setEnabled(false)
         surface.hide()
         backgroundBridge.stop()
@@ -296,6 +312,7 @@ internal class WebChatRealtimeVoiceCoordinator(
         closePending = false
         closeFailed = false
         closeCommandAccepted = false
+        activationMonitor.cancel()
         automaticCloseRetries = 0
         prepareRequestId = null
         preparedGeneration = null
@@ -468,13 +485,14 @@ internal class WebChatRealtimeVoiceCoordinator(
             val request = consumerPort()?.state()?.commandRequests?.lastOrNull { it.id == requestId }
             when (request?.status) {
                 WebChatConsumerCommandStatus.SUCCEEDED -> pollAudioActivation(expectedGeneration, attempt = 0)
-                WebChatConsumerCommandStatus.FAILED,
-                WebChatConsumerCommandStatus.TIMED_OUT ->
+                WebChatConsumerCommandStatus.FAILED ->
                     fail("官网未能启动实时语音，可重试或打开官网语音")
+                WebChatConsumerCommandStatus.TIMED_OUT ->
+                    markActivationUnconfirmed(expectedGeneration)
                 WebChatConsumerCommandStatus.PENDING,
                 WebChatConsumerCommandStatus.UNKNOWN,
                 null -> if (attempt >= MAX_COMMAND_POLLS) {
-                    fail("等待官网语音响应超时，可重试或打开官网语音")
+                    markActivationUnconfirmed(expectedGeneration)
                 } else {
                     pollCommand(expectedGeneration, requestId, attempt + 1)
                 }
@@ -491,9 +509,13 @@ internal class WebChatRealtimeVoiceCoordinator(
         }
         when (val decision = activationGate.observe(currentActivationEvidence(), attempt, pollLimit)) {
             WebChatRealtimeVoiceActivationDecision.Active -> markActive(expectedGeneration)
-            is WebChatRealtimeVoiceActivationDecision.Failed -> {
+            is WebChatRealtimeVoiceActivationDecision.Rejected -> {
                 if (!interactiveActivation && beginInteractiveActivation(expectedGeneration)) return
                 fail(decision.detail)
+            }
+            WebChatRealtimeVoiceActivationDecision.Unconfirmed -> {
+                if (!interactiveActivation && beginInteractiveActivation(expectedGeneration)) return
+                markActivationUnconfirmed(expectedGeneration)
             }
             is WebChatRealtimeVoiceActivationDecision.Wait -> {
                 render(WebChatRealtimeVoiceLifecycle.CONNECTING, decision.detail)
@@ -507,6 +529,8 @@ internal class WebChatRealtimeVoiceCoordinator(
 
     private fun markActive(expectedGeneration: Int) {
         if (!isCurrent(expectedGeneration)) return
+        val backgroundAlreadyStarted = lastState?.lifecycle.isVoiceOngoing()
+        activationMonitor.cancel()
         finishInteractiveActivation()
         log("voice_active elapsed_ms=${monotonicClockMs() - startedAtElapsedMs}")
         render(
@@ -515,12 +539,32 @@ internal class WebChatRealtimeVoiceCoordinator(
             turn = WebChatRealtimeVoiceTurn.IDLE,
         )
         lastState?.let { state ->
-            if (!backgroundBridge.start(state)) log("voice_background_service_unavailable")
+            if (!backgroundAlreadyStarted && !backgroundBridge.start(state)) {
+                log("voice_background_service_unavailable")
+            }
         }
         // Permission and official voice UI handoffs may temporarily pause the Activity.
         // Reconcile once activation settles so the correct native/system surface wins.
         syncHostSurface()
         scheduleConversationContextRefresh(expectedGeneration, attempt = 0)
+    }
+
+    private fun markActivationUnconfirmed(expectedGeneration: Int) {
+        if (!isCurrent(expectedGeneration)) return
+        finishInteractiveActivation()
+        log("voice_activation_observation_stale elapsed_ms=${monotonicClockMs() - startedAtElapsedMs}")
+        render(
+            lifecycle = WebChatRealtimeVoiceLifecycle.ACTIVE,
+            detail = "语音仍可继续，正在后台同步通话状态",
+            turn = WebChatRealtimeVoiceTurn.UNKNOWN,
+            observation = WebChatRealtimeVoiceObservation.STALE,
+        )
+        lastState?.let { state ->
+            if (!backgroundBridge.start(state)) log("voice_background_service_unavailable")
+        }
+        syncHostSurface()
+        scheduleConversationContextRefresh(expectedGeneration, attempt = 0)
+        activationMonitor.begin()
     }
 
     private fun scheduleConversationContextRefresh(expectedGeneration: Int, attempt: Int) {
@@ -556,6 +600,7 @@ internal class WebChatRealtimeVoiceCoordinator(
         preparedGeneration = null
         commandRequestId = null
         finishInteractiveActivation()
+        activationMonitor.cancel()
         pauseController.reset()
         delayedCloseMonitor.cancel()
         backgroundBridge.stop()
@@ -594,6 +639,7 @@ internal class WebChatRealtimeVoiceCoordinator(
         detail: String,
         turn: WebChatRealtimeVoiceTurn = WebChatRealtimeVoiceTurn.UNKNOWN,
         paused: Boolean = lastState?.paused ?: false,
+        observation: WebChatRealtimeVoiceObservation = WebChatRealtimeVoiceObservation.CONFIRMED,
     ) {
         val state = WebChatRealtimeVoiceState(
             lifecycle = lifecycle,
@@ -601,6 +647,7 @@ internal class WebChatRealtimeVoiceCoordinator(
             turn = turn,
             context = conversationContext,
             paused = paused,
+            observation = observation,
         )
         lastState = state
         surface.render(state)
@@ -622,6 +669,7 @@ internal class WebChatRealtimeVoiceCoordinator(
         closePending = false
         closeFailed = false
         closeCommandAccepted = false
+        activationMonitor.cancel()
         finishInteractiveActivation()
         pauseController.reset()
         backgroundBridge.stop()
@@ -714,64 +762,4 @@ private fun WebChatRealtimeVoiceLifecycle?.isVoiceOngoing(): Boolean =
 internal interface WebChatRealtimeVoiceBackControl {
     fun setEnabled(enabled: Boolean)
     fun dispose()
-}
-
-internal fun createWebChatRealtimeVoiceCoordinator(
-    activity: AppCompatActivity,
-    surface: WebChatRealtimeVoiceSurface,
-    activeProvider: () -> WebChatProviderId?,
-    consumerPort: () -> WebChatConsumerPort?,
-    sessionReady: () -> Boolean,
-    audioActivationEvidence: () -> WebChatRealtimeVoiceActivationEvidence,
-    authenticated: () -> Boolean,
-    sessionState: () -> String,
-    beginWebBacking: () -> Boolean,
-    endWebBacking: (Boolean) -> Unit,
-    showInteractiveActivation: () -> Boolean,
-    restoreNativeSurface: () -> Unit,
-    requestSessionRecovery: () -> Unit,
-    openOfficialLogin: () -> Unit,
-    openOfficialFallback: () -> Unit,
-    resolveConversationContext: () -> WebChatRealtimeVoiceContext,
-    openConversation: (WebChatRealtimeVoiceContext) -> Unit,
-    launchCache: WebChatRealtimeVoiceLaunchCache = WebChatRealtimeVoiceLaunchCache(),
-): WebChatRealtimeVoiceCoordinator {
-    lateinit var coordinator: WebChatRealtimeVoiceCoordinator
-    val backgroundBridge = WebChatRealtimeVoiceBackgroundBridge(activity)
-    val callback = object : OnBackPressedCallback(false) {
-        override fun handleOnBackPressed() = coordinator.close()
-    }
-    activity.onBackPressedDispatcher.addCallback(activity, callback)
-    coordinator = WebChatRealtimeVoiceCoordinator(
-        surface = surface,
-        activeProvider = activeProvider,
-        consumerPort = consumerPort,
-        sessionReady = sessionReady,
-        audioActivationEvidence = audioActivationEvidence,
-        authenticationState = {
-            WebChatRealtimeVoiceAuthenticationPolicy.resolve(authenticated(), sessionState())
-        },
-        beginWebBacking = beginWebBacking,
-        endWebBacking = endWebBacking,
-        showInteractiveActivation = showInteractiveActivation,
-        restoreNativeSurface = restoreNativeSurface,
-        requestSessionRecovery = requestSessionRecovery,
-        loginGate = WebChatRealtimeVoiceLoginDialog(activity),
-        openOfficialLogin = openOfficialLogin,
-        openOfficialFallback = openOfficialFallback,
-        resolveConversationContext = resolveConversationContext,
-        openConversation = openConversation,
-        schedule = { task, delayMs -> activity.window.decorView.postDelayed(task, delayMs) },
-        backControl = object : WebChatRealtimeVoiceBackControl {
-            override fun setEnabled(enabled: Boolean) {
-                callback.isEnabled = enabled
-            }
-
-            override fun dispose() = callback.remove()
-        },
-        backgroundBridge = backgroundBridge,
-        launchCache = launchCache,
-    )
-    backgroundBridge.attach(coordinator)
-    return coordinator
 }

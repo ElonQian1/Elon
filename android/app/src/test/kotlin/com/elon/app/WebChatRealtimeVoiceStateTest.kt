@@ -40,6 +40,26 @@ class WebChatRealtimeVoiceStateTest {
     }
 
     @Test
+    fun staleObservationKeepsTheCallActiveWithoutShowingAnErrorCard() {
+        val state = WebChatRealtimeVoiceState(
+            lifecycle = WebChatRealtimeVoiceLifecycle.ACTIVE,
+            detail = "syncing",
+            observation = WebChatRealtimeVoiceObservation.STALE,
+        )
+
+        assertEquals(
+            WebChatRealtimeVoiceVisibleState.SYNCING,
+            WebChatRealtimeVoiceStatePolicy.visibleState(state),
+        )
+        assertEquals(
+            WebChatRealtimeVoiceExpansionDecision.COLLAPSE,
+            WebChatRealtimeVoiceStatePolicy.expansionDecision(
+                WebChatRealtimeVoiceVisibleState.SYNCING,
+            ),
+        )
+    }
+
+    @Test
     fun endingCannotBeConfusedWithConnecting() {
         val state = WebChatRealtimeVoiceState(
             lifecycle = WebChatRealtimeVoiceLifecycle.ENDING,

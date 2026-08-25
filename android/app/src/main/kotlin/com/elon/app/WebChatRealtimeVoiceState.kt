@@ -16,12 +16,18 @@ internal enum class WebChatRealtimeVoiceTurn {
     SPEAKING,
 }
 
+internal enum class WebChatRealtimeVoiceObservation {
+    CONFIRMED,
+    STALE,
+}
+
 internal data class WebChatRealtimeVoiceState(
     val lifecycle: WebChatRealtimeVoiceLifecycle,
     val detail: String,
     val turn: WebChatRealtimeVoiceTurn = WebChatRealtimeVoiceTurn.UNKNOWN,
     val context: WebChatRealtimeVoiceContext? = null,
     val paused: Boolean = false,
+    val observation: WebChatRealtimeVoiceObservation = WebChatRealtimeVoiceObservation.CONFIRMED,
 )
 
 internal enum class WebChatRealtimeVoiceVisibleState(val label: String) {
@@ -30,6 +36,7 @@ internal enum class WebChatRealtimeVoiceVisibleState(val label: String) {
     LISTENING("正在聆听"),
     THINKING("思考中"),
     SPEAKING("回答中"),
+    SYNCING("通话中"),
     PAUSED("已暂停"),
     ENDING("结束中"),
     HANGUP_UNCONFIRMED("仍在通话"),
@@ -52,6 +59,8 @@ internal object WebChatRealtimeVoiceStatePolicy {
             WebChatRealtimeVoiceLifecycle.FAILED -> WebChatRealtimeVoiceVisibleState.FAILED
             WebChatRealtimeVoiceLifecycle.ACTIVE -> if (state.paused) {
                 WebChatRealtimeVoiceVisibleState.PAUSED
+            } else if (state.observation == WebChatRealtimeVoiceObservation.STALE) {
+                WebChatRealtimeVoiceVisibleState.SYNCING
             } else when (state.turn) {
                 WebChatRealtimeVoiceTurn.LISTENING -> WebChatRealtimeVoiceVisibleState.LISTENING
                 WebChatRealtimeVoiceTurn.THINKING -> WebChatRealtimeVoiceVisibleState.THINKING
@@ -67,6 +76,7 @@ internal object WebChatRealtimeVoiceStatePolicy {
         WebChatRealtimeVoiceVisibleState.FAILED -> WebChatRealtimeVoiceExpansionDecision.EXPAND
         WebChatRealtimeVoiceVisibleState.HANGUP_UNCONFIRMED ->
             WebChatRealtimeVoiceExpansionDecision.COLLAPSE
+        WebChatRealtimeVoiceVisibleState.SYNCING -> WebChatRealtimeVoiceExpansionDecision.COLLAPSE
         else -> WebChatRealtimeVoiceExpansionDecision.PRESERVE
     }
 }

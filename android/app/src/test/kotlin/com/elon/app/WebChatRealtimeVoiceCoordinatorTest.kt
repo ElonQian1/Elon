@@ -37,7 +37,7 @@ class WebChatRealtimeVoiceCoordinatorTest {
     }
 
     @Test
-    fun doesNotShowStandbyWhenThePageNeverRequestsTheMicrophone() {
+    fun keepsAnAcceptedVoiceLaunchAliveWhenPageEvidenceArrivesLate() {
         val fixture = Fixture()
         fixture.coordinator.start(fixture.provider)
         fixture.scheduler.runNext()
@@ -48,11 +48,34 @@ class WebChatRealtimeVoiceCoordinatorTest {
 
         fixture.scheduler.runAll()
 
-        assertEquals(WebChatRealtimeVoiceLifecycle.FAILED, fixture.surface.state?.lifecycle)
+        assertEquals(WebChatRealtimeVoiceLifecycle.ACTIVE, fixture.surface.state?.lifecycle)
         assertEquals(WebChatRealtimeVoiceTurn.UNKNOWN, fixture.surface.state?.turn)
+        assertEquals(WebChatRealtimeVoiceObservation.STALE, fixture.surface.state?.observation)
         assertTrue(fixture.surface.visible)
         assertEquals(1, fixture.interactiveActivationCount)
         assertEquals(1, fixture.nativeRestoreCount)
+        assertEquals(1, fixture.background.startCount)
+        assertEquals(0, fixture.endBackingCount)
+    }
+
+    @Test
+    fun lateOfficialVoiceEvidencePromotesTheCallWithoutRestartingTheBackgroundSession() {
+        val fixture = Fixture()
+        fixture.coordinator.start(fixture.provider)
+        fixture.scheduler.runNext()
+        fixture.port.prepareStatus = WebChatConsumerCommandStatus.SUCCEEDED
+        fixture.scheduler.runNext()
+        fixture.scheduler.runNext()
+        fixture.port.voiceStatus = WebChatConsumerCommandStatus.SUCCEEDED
+        fixture.scheduler.runAll()
+
+        assertEquals(WebChatRealtimeVoiceObservation.STALE, fixture.surface.state?.observation)
+        fixture.port.endControlAvailable = true
+        fixture.coordinator.onConsumerStateChanged(fixture.port.state())
+
+        assertEquals(WebChatRealtimeVoiceLifecycle.ACTIVE, fixture.surface.state?.lifecycle)
+        assertEquals(WebChatRealtimeVoiceObservation.CONFIRMED, fixture.surface.state?.observation)
+        assertEquals(1, fixture.background.startCount)
     }
 
     @Test

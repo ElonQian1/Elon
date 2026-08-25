@@ -11,7 +11,8 @@ internal data class WebChatRealtimeVoiceActivationEvidence(
 internal sealed interface WebChatRealtimeVoiceActivationDecision {
     data class Wait(val detail: String) : WebChatRealtimeVoiceActivationDecision
     data object Active : WebChatRealtimeVoiceActivationDecision
-    data class Failed(val detail: String) : WebChatRealtimeVoiceActivationDecision
+    data class Rejected(val detail: String) : WebChatRealtimeVoiceActivationDecision
+    data object Unconfirmed : WebChatRealtimeVoiceActivationDecision
 }
 
 internal object WebChatRealtimeVoiceActivationEvidencePolicy {
@@ -39,7 +40,7 @@ internal class WebChatRealtimeVoiceActivationGate(
         pollLimit: Int = maxPolls,
     ): WebChatRealtimeVoiceActivationDecision {
         if (evidence.androidPermissionGranted == false || evidence.requestState in DENIED_STATES) {
-            return WebChatRealtimeVoiceActivationDecision.Failed(
+            return WebChatRealtimeVoiceActivationDecision.Rejected(
                 "麦克风权限未开启，请授权后重试",
             )
         }
@@ -50,9 +51,7 @@ internal class WebChatRealtimeVoiceActivationGate(
             return WebChatRealtimeVoiceActivationDecision.Active
         }
         if (attempt >= pollLimit) {
-            return WebChatRealtimeVoiceActivationDecision.Failed(
-                "没有检测到官网麦克风启动，可重试或打开官网语音",
-            )
+            return WebChatRealtimeVoiceActivationDecision.Unconfirmed
         }
         val detail = if (evidence.webRequestPending) {
             "正在授权官网麦克风"

@@ -43,6 +43,20 @@ class WebChatRealtimeVoiceBackgroundContractTest {
     }
 
     @Test
+    fun stalePageObservationDoesNotMarkAnActiveCallAsAnError() {
+        val state = WebChatRealtimeVoiceState(
+            lifecycle = WebChatRealtimeVoiceLifecycle.ACTIVE,
+            detail = "syncing",
+            observation = WebChatRealtimeVoiceObservation.STALE,
+        )
+
+        assertEquals(
+            WebChatRealtimeVoiceBackgroundStatus.LISTENING,
+            WebChatRealtimeVoiceBackgroundStatusPolicy.from(state),
+        )
+    }
+
+    @Test
     fun manifestAndServiceKeepBackgroundMicrophoneExplicitAndUserControlled() {
         val manifest = readRepositoryFile("android/app/src/main/AndroidManifest.xml")
         val service = readRepositoryFile(
