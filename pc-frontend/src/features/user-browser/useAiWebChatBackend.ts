@@ -129,7 +129,7 @@ export default function useAiWebChatBackend(mode: AiHomeMode, ownerKey: string) 
     ownerKey,
     selectedState: controller.sessionState,
   })
-  const canEdit = ready && controller.canEditDraft
+  const canEdit = capability.state === 'ready' && Boolean(provider) && controller.canEditDraft
   const canCompose = ready && controller.canSubmitDraft
   const streamingMessageId = [...controller.visibleMessages]
     .reverse()

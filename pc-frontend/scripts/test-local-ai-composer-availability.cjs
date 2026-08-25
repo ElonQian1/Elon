@@ -16,6 +16,25 @@ compiled.paths = module.paths
 compiled._compile(output, filename)
 const { localAiComposerAvailability } = compiled.exports
 
+function loadTypeScriptModule(relativePath) {
+  const target = path.resolve(__dirname, relativePath)
+  const result = ts.transpileModule(fs.readFileSync(target, 'utf8'), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+    fileName: target,
+  }).outputText
+  const loaded = new Module(target, module)
+  loaded.filename = target
+  loaded.paths = module.paths
+  loaded._compile(result, target)
+  return loaded.exports
+}
+
+const {
+  LocalAiProviderDraftCache,
+  LOCAL_AI_PROVIDER_DRAFT_MAX_LENGTH,
+  localAiProviderDraftIdentity,
+} = loadTypeScriptModule('../src/features/user-browser/localAiProviderDraftCache.ts')
+
 const base = {
   clientReady: true,
   providerAvailable: true,
@@ -70,11 +89,33 @@ assert.deepEqual(localAiComposerAvailability({
 })
 assert.equal(localAiComposerAvailability({ ...base, clientReady: false }).canEdit, false)
 
+const drafts = new LocalAiProviderDraftCache(2)
+const pendingChatGpt = localAiProviderDraftIdentity('chatgpt-web', '')
+const ownedChatGpt = localAiProviderDraftIdentity('chatgpt-web', 'owner-a')
+const ownedGoogle = localAiProviderDraftIdentity('google-ai-mode', 'owner-a')
+drafts.remember(pendingChatGpt, 'typed before identity recovery')
+assert.equal(drafts.claimPending('chatgpt-web', 'owner-a'), 'typed before identity recovery')
+assert.equal(drafts.read(pendingChatGpt), '')
+drafts.remember(ownedGoogle, 'Google draft')
+assert.equal(drafts.read(ownedChatGpt), 'typed before identity recovery')
+assert.equal(drafts.read(ownedGoogle), 'Google draft')
+drafts.remember(ownedGoogle, 'x'.repeat(LOCAL_AI_PROVIDER_DRAFT_MAX_LENGTH + 20))
+assert.equal(drafts.read(ownedGoogle).length, LOCAL_AI_PROVIDER_DRAFT_MAX_LENGTH)
+
+const composerDraft = fs.readFileSync(
+  path.resolve(__dirname, '../src/features/user-browser/useLocalAiComposerDraft.ts'),
+  'utf8',
+)
+assert.match(composerDraft, /claimPending\(providerId, ownerKey\)/)
+assert.match(composerDraft, /localAiProviderDraftCache\.remember\(activeIdentity\.current, next\)/)
+
 const page = fs.readFileSync(path.resolve(__dirname, '../src/features/ai/AiChatPage.tsx'), 'utf8')
 const backend = fs.readFileSync(path.resolve(__dirname, '../src/features/user-browser/useAiWebChatBackend.ts'), 'utf8')
 assert.match(page, /disabled=\{chatMode \? !web\.canEdit : visibleSending\}/)
 assert.match(page, /busyAction !== 'new_conversation'/)
-assert.match(backend, /const canEdit = ready && controller\.canEditDraft/)
+assert.match(page, /requestAnimationFrame\(\(\) => textareaRef\.current\?\.focus\(\)\)/)
+assert.match(page, /className=\{styles\.newBtn\} onClick=\{newConversation\}/)
+assert.match(backend, /const canEdit = capability\.state === 'ready' && Boolean\(provider\) && controller\.canEditDraft/)
 assert.match(backend, /const canCompose = ready && controller\.canSubmitDraft/)
 assert.match(backend, /官网页面正在后台异步同步/)
 

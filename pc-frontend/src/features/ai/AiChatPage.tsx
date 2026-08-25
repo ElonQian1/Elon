@@ -443,7 +443,7 @@ export default function AiChatPage({ mode, onModeChange }: { mode: AiHomeMode; o
   async function openForkedConversation(convId: string) { await loadConversations(); await selectConversation(convId) }
   function newConversation() {
     if (chatMode) {
-      void web.controller.run('new_conversation')
+      void web.controller.run('new_conversation'); window.requestAnimationFrame(() => textareaRef.current?.focus())
       return
     }
     const id = uuidv4()
@@ -810,7 +810,7 @@ export default function AiChatPage({ mode, onModeChange }: { mode: AiHomeMode; o
       <aside className={styles.sidebar}>
         <div className={styles.sideHeader}>
           <span>一龙 AI</span>
-          <button className={styles.newBtn} onClick={() => chatMode ? void web.controller.run('new_conversation') : newConversation()} title="新对话" type="button" disabled={visibleSending || (chatMode && !web.userState.canNewConversation)}>+</button>
+          <button className={styles.newBtn} onClick={newConversation} title="新对话" type="button" disabled={visibleSending || (chatMode && !web.userState.canNewConversation)}>+</button>
         </div>
         {chatMode ? <AiWebChatSidebar web={web} /> : <><AiPinnedTools
           sending={sending}

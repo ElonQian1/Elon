@@ -55,6 +55,7 @@ import {
 import useLocalAiAccessRecovery, { createLocalAiAccessRetry } from './useLocalAiAccessRecovery'
 import useLocalAiResponseRefresh from './useLocalAiResponseRefresh'
 import useLocalAiPendingResponseWatchdog from './useLocalAiPendingResponseWatchdog'
+import useLocalAiComposerDraft from './useLocalAiComposerDraft'
 
 export default function useLocalAiWebChatController(
   provider: LocalAiWebProvider | undefined,
@@ -71,8 +72,7 @@ export default function useLocalAiWebChatController(
     identity: requestedSessionIdentity,
     state: provider && ownerKey ? getCachedLocalAiWebSessionState(provider.id, ownerKey) : null,
   }))
-  const [draft, setDraft] = useState('')
-  const [draftTouched, setDraftTouched] = useState(false)
+  const { draft, draftRef, draftTouched, setDraft, setDraftTouched } = useLocalAiComposerDraft(providerId, ownerKey)
   const [pendingSends, setPendingSends] = useState<PendingLocalAiSend[]>([])
   const [pendingResponses, setPendingResponses] = useState<PendingLocalAiResponse[]>([])
   const [queuedSend, setQueuedSend] = useState<QueuedLocalAiSend | null>(null)
@@ -87,7 +87,6 @@ export default function useLocalAiWebChatController(
   const queuedSendDispatching = useRef(false)
   const queuedSendRef = useRef<QueuedLocalAiSend | null>(null)
   const newConversationBaselineId = useRef('')
-  const draftRef = useRef('')
   const visibleSessionState = provider && ownerKey
     ? sessionEntry.identity === requestedSessionIdentity
       && sessionEntry.state?.providerId === provider.id
@@ -160,7 +159,7 @@ export default function useLocalAiWebChatController(
   )
   const composerAvailability = localAiComposerAvailability({
     clientReady: clientState === 'ready',
-    providerAvailable: Boolean(provider && ownerKey),
+    providerAvailable: Boolean(provider),
     sendSupported: Boolean(provider?.adapterActions.includes('send_prompt')),
     directSendReady: userState.canSend,
     newConversationRecoveryActive: Boolean(newConversationRecoveryStartedAtMs),
@@ -176,9 +175,6 @@ export default function useLocalAiWebChatController(
     setSessionState(providerId && ownerKey
       ? getCachedLocalAiWebSessionState(providerId, ownerKey)
       : null)
-    setDraft('')
-    draftRef.current = ''
-    setDraftTouched(false)
     setPendingSends([])
     setPendingResponses([])
     setQueuedSend(null)
@@ -338,7 +334,6 @@ export default function useLocalAiWebChatController(
   useEffect(() => {
     if (!draftTouched) {
       const nextDraft = snapshot?.draft ?? ''
-      draftRef.current = nextDraft
       setDraft(nextDraft)
     }
   }, [draftTouched, snapshot?.draft])
@@ -505,7 +500,6 @@ export default function useLocalAiWebChatController(
     if (!pending) return null
     setPendingSends((current) => current.concat(pending))
     setPendingResponses((current) => current.concat(beginPendingLocalAiResponse(pending)))
-    draftRef.current = ''
     setDraft('')
     setDraftTouched(true)
     return pending
@@ -591,7 +585,6 @@ export default function useLocalAiWebChatController(
     queuedSendRef.current = null
     queuedSendDispatching.current = false
     cancelResponseRefresh()
-    draftRef.current = ''
     setDraft('')
     setDraftTouched(false)
     setMessage(`已在本机进入 ${provider?.displayName ?? '网页 AI'} 新会话；官网正在后台同步。`)
@@ -681,7 +674,6 @@ export default function useLocalAiWebChatController(
       queuedSendRef.current = null
       setQueuedSend(null)
     } else if (!draftRef.current && previousDraft) {
-      draftRef.current = previousDraft
       setDraft(previousDraft)
       setDraftTouched(true)
     }
@@ -695,7 +687,6 @@ export default function useLocalAiWebChatController(
     setPendingSends((current) => current.filter((item) => item.id !== pending.id))
     setPendingResponses((current) => current.filter((item) => item.sendId !== pending.id))
     if (!draftRef.current) {
-      draftRef.current = pending.prompt
       setDraft(pending.prompt)
       setDraftTouched(true)
     }
@@ -767,7 +758,6 @@ export default function useLocalAiWebChatController(
     sessionOpen,
     draft,
     setDraft: (value: string) => {
-      draftRef.current = value
       setDraft(value)
       setDraftTouched(true)
     },
