@@ -18,6 +18,14 @@ const foregroundSource = fs.readFileSync(
   path.resolve(__dirname, '../src/features/user-browser/localAiNewConversationForeground.ts'),
   'utf8',
 )
+const chatGptRecoverySource = fs.readFileSync(
+  path.resolve(__dirname, '../src/features/user-browser/useChatGptNewConversationRecovery.ts'),
+  'utf8',
+)
+const controllerConfigSource = fs.readFileSync(
+  path.resolve(__dirname, '../src/features/user-browser/localAiWebChatControllerConfig.ts'),
+  'utf8',
+)
 const output = ts.transpileModule(source, {
   compilerOptions: {
     module: ts.ModuleKind.CommonJS,
@@ -186,10 +194,13 @@ assert.match(controllerSource, /GOOGLE_NEW_CONVERSATION_RELOAD_DELAY_MS/)
 assert.match(controllerSource, /providerId !== 'google-ai-mode'/)
 assert.match(controllerSource, /googleNewConversationNeedsReload\(current, currentSnapshot\)/)
 assert.match(controllerSource, /controlLocalAiWebSession\(providerId, ownerKey, 'reload'\)/)
-assert.match(controllerSource, /CHATGPT_NEW_CONVERSATION_RECOVERY_DELAY_MS/)
-assert.match(controllerSource, /providerId !== 'chatgpt'/)
-assert.match(controllerSource, /chatGptNewConversationRecoveryAction\(/)
-assert.match(controllerSource, /controlLocalAiWebSession\(providerId, ownerKey, recoveryAction\)/)
+assert.match(controllerSource, /useChatGptNewConversationRecovery\(/)
+assert.match(chatGptRecoverySource, /CHATGPT_NEW_CONVERSATION_RECOVERY_DELAYS_MS/)
+assert.match(chatGptRecoverySource, /providerId !== 'chatgpt'/)
+assert.match(chatGptRecoverySource, /chatGptNewConversationRecoveryAction\(/)
+assert.match(chatGptRecoverySource, /'new_conversation_home'/)
+assert.match(chatGptRecoverySource, /CHATGPT_NEW_CONVERSATION_RECOVERY_DELAYS_MS\.map/)
+assert.match(controllerConfigSource, /\[6_000, 12_000, 18_000\]/)
 assert.match(controllerSource, /if \(action === 'new_conversation'\) \{\s*return startNewConversation\(\)/)
 assert.match(controllerSource, /function beginLocalNewConversation\(\)/)
 assert.match(controllerSource, /setNewConversationRecoveryStartedAtMs\(Date\.now\(\)\)/)
@@ -215,7 +226,7 @@ assert.match(
 )
 assert.match(
   controllerSource,
-  /controlLocalAiWebSession\(provider\.id, ownerKey, 'home'\)[\s\S]*?keepLocalAiNewConversationInNativeForeground\(provider, ownerKey, next\)/,
+  /provider\.id === 'chatgpt' \? 'new_conversation_home' : 'home'[\s\S]*?keepLocalAiNewConversationInNativeForeground\(provider, ownerKey, next\)/,
 )
 assert.doesNotMatch(
   controllerSource,

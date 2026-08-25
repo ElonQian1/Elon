@@ -56,7 +56,8 @@ export const BACKGROUND_RECONNECT_MAX_ATTEMPTS = 3
 
 // 新建会话后等待官网给出可信实时快照的上限；超过就不再无限期把输入框清空。
 export const GOOGLE_NEW_CONVERSATION_RELOAD_DELAY_MS = 2_000
-// 与 APK ChatGptNewConversationRecoveryCoordinator 保持同一恢复窗口：
-// 官网命令三秒后仍未形成可信空白会话时，主动离开旧会话或重载首页。
-export const CHATGPT_NEW_CONVERSATION_RECOVERY_DELAY_MS = 3_000
+// Win 会先给页面适配器最多约五秒确认 DOM 与路由边界，恢复计时必须晚于这个
+// 窗口，避免在匹配回执返回前重载 WebView2。随后在总超时内做三次有界恢复；
+// 每次都重新读取宿主状态，已经形成可信新会话时不会再导航。
+export const CHATGPT_NEW_CONVERSATION_RECOVERY_DELAYS_MS = [6_000, 12_000, 18_000] as const
 export const NEW_CONVERSATION_RECOVERY_TIMEOUT_MS = 24_000

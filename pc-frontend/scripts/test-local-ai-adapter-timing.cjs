@@ -55,6 +55,7 @@ const {
 assert.equal(LOCAL_AI_RESULT_POLL_INTERVAL_MS, 200)
 assert.equal(localAiAdapterResultTimeoutMs('snapshot'), 5_000)
 assert.equal(localAiAdapterResultTimeoutMs('send_prompt'), 12_000)
+assert.equal(localAiAdapterResultTimeoutMs('new_conversation'), 12_000)
 assert.equal(localAiAdapterResultTimeoutMs('list_conversations'), 12_000)
 assert.equal(localAiAdapterResultAttempts('send_prompt'), 60)
 assert.ok(localAiAdapterResultTimeoutMs('send_prompt') > 7_000)

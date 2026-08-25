@@ -2,6 +2,7 @@ const DEFAULT_RESULT_TIMEOUT_MS = 5_000
 
 const RESULT_TIMEOUTS_MS: Record<string, number> = {
   send_prompt: 12_000,
+  new_conversation: 12_000,
   list_conversations: 12_000,
   request_attachment_upload: 12_000,
   list_model_options: 8_000,

@@ -1,5 +1,5 @@
 const ALLOWED_ORIGIN: &str = "https://chatgpt.com";
-pub(super) const ADAPTER_VERSION: u32 = 181;
+pub(super) const ADAPTER_VERSION: u32 = 183;
 
 const WIN_RICH_CONTENT_ADAPTER: &str = include_str!("chatgpt_rich_content_adapter.js");
 const WIN_COMMON_RICH_CONTENT_ADAPTER: &str = include_str!("rich_content_dom_adapter.js");
@@ -11,6 +11,8 @@ const WIN_PRIVATE_CONVERSATION_REFRESH: &str =
     include_str!("chatgpt_win_private_conversation_refresh.js");
 const WIN_PRIVATE_CONVERSATION_RICH_CACHE: &str =
     include_str!("chatgpt_win_private_conversation_rich_cache.js");
+const PRIVATE_FETCH_TAP: &str =
+    include_str!("../../../../android/app/src/main/assets/chatgpt_web_private_fetch_tap.js");
 const PRIVATE_SOCKET_TAP: &str =
     include_str!("../../../../android/app/src/main/assets/chatgpt_web_private_socket_tap.js");
 const PRIVATE_CONVERSATION_DIRECTORY: &str = include_str!(
@@ -228,6 +230,8 @@ pub(super) fn initialization_script() -> String {
   window.__elonChatGptPrivateResearchEnabled = true;
   window.__elonChatGptPrivateStreamObserverEnabled = true;
   window.__elonChatGptPrivateConversationPrefetchEnabled = true;
+  window.__elonChatGptBootstrapStage = 'chatgpt_web_private_fetch_tap.js';
+  __PRIVATE_FETCH_TAP__
   window.__elonChatGptBootstrapStage = 'chatgpt_web_private_socket_tap.js';
   __PRIVATE_SOCKET_TAP__
   window.__elonChatGptBootstrapStage = 'chatgpt_web_private_conversation_directory.js';
@@ -337,6 +341,7 @@ pub(super) fn initialization_script() -> String {
 "#
     .replace("__ALLOWED_ORIGIN__", ALLOWED_ORIGIN)
     .replace("__ADAPTER_VERSION__", &ADAPTER_VERSION.to_string())
+    .replace("__PRIVATE_FETCH_TAP__", PRIVATE_FETCH_TAP)
     .replace("__PRIVATE_SOCKET_TAP__", PRIVATE_SOCKET_TAP)
     .replace(
         "__PRIVATE_CONVERSATION_DIRECTORY__",
@@ -404,7 +409,12 @@ mod tests {
         assert!(script.contains("publish_local_ai_web_research_capture"));
         assert!(script.contains("conversation_stream"));
         assert!(script.contains("__elonChatGptPrivateStreamObserverEnabled = true"));
+        assert!(script.contains("__elonChatGptPrivateFetchTap"));
         assert!(script.contains("__elonChatGptPrivateSocketTap"));
+        assert!(
+            script.find("chatgpt_web_private_fetch_tap.js").unwrap()
+                < script.find("chatgpt_web_private_stream_transport.js").unwrap()
+        );
         assert!(script.contains("__elonChatGptPrivateConversationDirectory"));
         assert!(script.contains("chatgpt_web_private_stream_transport.js"));
         assert!(script.contains("privateStreamingSnapshotMode"));

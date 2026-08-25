@@ -431,7 +431,10 @@ pub async fn control_local_ai_web_session(
         }
         "reload" => embedded_view::reload_after_stop(&page)?,
         "back" => page.eval("history.back();").map_err(display_error)?,
-        "home" => {
+        "home" | "new_conversation_home" if action == "home" || provider.id == "chatgpt" => {
+            if action == "new_conversation_home" && provider.id == "chatgpt" {
+                runtime.mark_command_pending(&label, "new_conversation", None);
+            }
             embedded_view::navigate_after_stop(&page, parse_start_url(provider)?)?;
         }
         _ => return Err("不支持的本地 AI 浏览器控制动作。".to_string()),

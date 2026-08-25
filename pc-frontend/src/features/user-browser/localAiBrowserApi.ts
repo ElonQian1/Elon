@@ -218,7 +218,14 @@ export interface LocalAiCachedConversation {
   updatedAtMs: number
 }
 
-export type LocalAiBrowserControlAction = 'restore' | 'background' | 'reload' | 'back' | 'home' | 'external'
+export type LocalAiBrowserControlAction =
+  | 'restore'
+  | 'background'
+  | 'reload'
+  | 'back'
+  | 'home'
+  | 'new_conversation_home'
+  | 'external'
 
 export type LocalAiAdapterAction =
   | 'snapshot'

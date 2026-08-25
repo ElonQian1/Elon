@@ -178,3 +178,76 @@ fn timed_out_new_conversation_never_rebinds_or_reveals_the_previous_snapshot() {
         "stale_new_conversation_snapshot_ignored"
     );
 }
+
+#[test]
+fn failed_page_action_can_reestablish_a_safe_home_boundary() {
+    let runtime = LocalAiBrowserRuntime::default();
+    runtime.ensure_session("session", "chatgpt", "active");
+    let previous_url = Url::parse("https://chatgpt.com/").unwrap();
+    let previous_key = semantic_context::page_context_key("chatgpt", previous_url.as_str());
+    runtime.mark_navigation("session", &previous_url, true, None);
+    runtime.mark_page_finished("session", &previous_url);
+    runtime.record_adapter_event_with_context(
+        "session",
+        "message_snapshot",
+        json!({"type":"message_snapshot","messages":[
+            {"id":"previous-user","role":"user","state":"completed","content":[{"type":"text","text":"previous"}]},
+            {"id":"previous-answer","role":"assistant","state":"completed","content":[{"type":"text","text":"previous answer"}]}
+        ]}),
+        previous_key.as_deref(),
+    );
+    let previous_id = runtime
+        .snapshot("session")
+        .unwrap()
+        .active_conversation_id
+        .unwrap();
+
+    runtime.mark_command_pending_with_value("session", "new_conversation", Some("page"), None);
+    runtime.record_adapter_event(
+        "session",
+        "command_result",
+        json!({
+            "type":"command_result",
+            "action":"new_conversation",
+            "ok":false,
+            "detail":"stale root",
+            "requestId":"page"
+        }),
+    );
+    assert_eq!(
+        runtime
+            .snapshot("session")
+            .unwrap()
+            .active_conversation_id
+            .as_deref(),
+        Some(previous_id.as_str())
+    );
+
+    // `new_conversation_home` performs this host transition before navigating.
+    runtime.mark_command_pending("session", "new_conversation", None);
+    let recovering = runtime.snapshot("session").unwrap();
+    assert_ne!(recovering.active_conversation_id.as_deref(), Some(previous_id.as_str()));
+    assert!(!recovering.context_ready);
+
+    runtime.record_adapter_event_with_context(
+        "session",
+        "message_snapshot",
+        json!({"type":"message_snapshot","messages":[
+            {"id":"late-user","role":"user","state":"completed","content":[{"type":"text","text":"previous"}]},
+            {"id":"late-answer","role":"assistant","state":"completed","content":[{"type":"text","text":"late previous answer"}]}
+        ]}),
+        previous_key.as_deref(),
+    );
+    assert_eq!(
+        runtime.snapshot("session").unwrap().diagnostics["lastEventKind"],
+        "stale_new_conversation_snapshot_ignored"
+    );
+
+    runtime.record_adapter_event_with_context(
+        "session",
+        "message_snapshot",
+        json!({"type":"message_snapshot","messages":[],"composerReady":true}),
+        previous_key.as_deref(),
+    );
+    assert!(runtime.snapshot("session").unwrap().context_ready);
+}
