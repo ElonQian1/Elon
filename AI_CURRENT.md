@@ -65,8 +65,7 @@ reviewed_at: 2026-08-26
 - 分布式算力各层成熟度不同，不能统称“开放算力市场已完成”；统一状态见 `docs/distributed-compute/current-implementation-status.md`。
 - 外部矿池：V277/V278 uncompiled/unrun、#13-18 deny、eligible=0；V280 仅 ABI。
 - V279 UserNode Binding：Domain/Store/API/activation 源码已写但未编译/运行，零下游与经济效果；见 `docs/distributed-compute/user-node-provider-binding-authority.md`。
-- UserNode Ready 源谱系是未登记 source draft：Node owner adapter 只把 v217 work-admission、局部 Ready-health 与明确不受信的 Host observation 投影为六键 JCS lineage；固定缺 local currentness、runtime transition、Host runtime 与 v15 session 四项权威，未编译/运行，不生成 Ready、route、Offer、Attempt、Lease 或下游效果；见 `docs/distributed-compute/user-node-ready-source-lineage-authority.md`。
-- UserNode Windows Runner 进程监管前置也是未登记 source draft：私有 backend 只写入无 producer 的 sealed loader load-set/launch-security 边界、restricted-token `CreateProcessAsUserW(CREATE_SUSPENDED)`、atomic Job-list set/query/membership、process/thread identity 与失败 custody；owned loader transition、launch-security producer、resume/IPC/完整 enforcement/Store 均缺，未编译/运行，不关闭上述四 gap 或产生任何下游效果；见 `docs/distributed-compute/user-node-windows-runner-process-custody-authority.md`。
+- UserNode Ready 源谱系与 Windows Runner 监管前置均为未登记、未编译/未运行、零效果草案；后者默认不可达，四项 authority gap 不变。权威入口见 `AI_INDEX.md`。
 - `capacity_future` bridge 是未登记 source draft：仅 Domain/source equations，v192/v195 摘要分域且不判等；未编译/运行，无 Store/API/effect；见 `docs/distributed-compute/capacity-future-settlement-lineage-authority.md`。
 
 ## 已接受的产品方向
