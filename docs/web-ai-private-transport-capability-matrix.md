@@ -42,6 +42,9 @@ automatically pauses for other media and resumes afterward. No WebRTC credential
 persisted or replayed. Device acceptance verified first-start handoff, Settings and
 provider round trips, continuous recording, and media-focus pause/resume; direct human
 touches on the system overlay pause and hang-up actions remain supervised acceptance.
+An unconfirmed official hang-up remains an ongoing call, receives one bounded automatic
+retry, and collapses to the non-blocking native orb instead of being misreported as a
+connection failure or leaving a large action card over the conversation.
 
 ## Audited non-capabilities
 

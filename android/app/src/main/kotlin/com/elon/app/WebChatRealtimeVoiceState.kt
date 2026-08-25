@@ -36,6 +36,12 @@ internal enum class WebChatRealtimeVoiceVisibleState(val label: String) {
     FAILED("连接异常"),
 }
 
+internal enum class WebChatRealtimeVoiceExpansionDecision {
+    PRESERVE,
+    EXPAND,
+    COLLAPSE,
+}
+
 internal object WebChatRealtimeVoiceStatePolicy {
     fun visibleState(state: WebChatRealtimeVoiceState): WebChatRealtimeVoiceVisibleState =
         when (state.lifecycle) {
@@ -54,4 +60,13 @@ internal object WebChatRealtimeVoiceStatePolicy {
                 WebChatRealtimeVoiceTurn.IDLE -> WebChatRealtimeVoiceVisibleState.IDLE
             }
         }
+
+    fun expansionDecision(
+        state: WebChatRealtimeVoiceVisibleState,
+    ): WebChatRealtimeVoiceExpansionDecision = when (state) {
+        WebChatRealtimeVoiceVisibleState.FAILED -> WebChatRealtimeVoiceExpansionDecision.EXPAND
+        WebChatRealtimeVoiceVisibleState.HANGUP_UNCONFIRMED ->
+            WebChatRealtimeVoiceExpansionDecision.COLLAPSE
+        else -> WebChatRealtimeVoiceExpansionDecision.PRESERVE
+    }
 }

@@ -203,7 +203,11 @@ internal class WebChatRealtimeVoiceOverlay(
         } else {
             View.GONE
         }
-        if (actionRequired) setExpanded(true)
+        when (WebChatRealtimeVoiceStatePolicy.expansionDecision(visibleState)) {
+            WebChatRealtimeVoiceExpansionDecision.PRESERVE -> Unit
+            WebChatRealtimeVoiceExpansionDecision.EXPAND -> setExpanded(true)
+            WebChatRealtimeVoiceExpansionDecision.COLLAPSE -> setExpanded(false)
+        }
         panel.contentDescription = buildString {
             append(WebChatProductionSelectors.REALTIME_VOICE_SURFACE)
             append('：')

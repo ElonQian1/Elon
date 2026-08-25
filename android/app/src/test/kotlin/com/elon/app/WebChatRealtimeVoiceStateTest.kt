@@ -51,4 +51,30 @@ class WebChatRealtimeVoiceStateTest {
             WebChatRealtimeVoiceStatePolicy.visibleState(state),
         )
     }
+
+    @Test
+    fun unconfirmedHangupCollapsesToTheNonBlockingOrb() {
+        assertEquals(
+            WebChatRealtimeVoiceExpansionDecision.COLLAPSE,
+            WebChatRealtimeVoiceStatePolicy.expansionDecision(
+                WebChatRealtimeVoiceVisibleState.HANGUP_UNCONFIRMED,
+            ),
+        )
+    }
+
+    @Test
+    fun onlyARealFailureForcesTheActionCardOpen() {
+        assertEquals(
+            WebChatRealtimeVoiceExpansionDecision.EXPAND,
+            WebChatRealtimeVoiceStatePolicy.expansionDecision(
+                WebChatRealtimeVoiceVisibleState.FAILED,
+            ),
+        )
+        assertEquals(
+            WebChatRealtimeVoiceExpansionDecision.PRESERVE,
+            WebChatRealtimeVoiceStatePolicy.expansionDecision(
+                WebChatRealtimeVoiceVisibleState.SPEAKING,
+            ),
+        )
+    }
 }
