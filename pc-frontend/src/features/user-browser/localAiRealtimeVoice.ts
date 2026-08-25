@@ -1,5 +1,7 @@
 import type { LocalAiUiControl } from './localAiBrowserProtocol'
 
+export type LocalAiRealtimeVoiceAction = 'start' | 'mute' | 'unmute' | 'end'
+
 export interface LocalAiRealtimeVoiceControls {
   start?: LocalAiUiControl
   mute?: LocalAiUiControl
