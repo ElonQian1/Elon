@@ -121,7 +121,7 @@ export default function AiWebComposerControls({ web }: { web: AiWebChatBackend }
           <button
             type="button"
             onClick={() => void realtimeVoiceControl.run('start', realtimeVoice.start?.id ?? '')}
-            disabled={busy || !realtimeVoice.start.enabled}
+            disabled={busy || realtimeVoiceControl.hangupStatus === 'confirming' || !realtimeVoice.start.enabled}
             title="使用 ChatGPT 官网实时语音；首次使用时 WebView2 可能请求麦克风权限"
           >
             <AudioLines size={13} /><span>实时语音</span>
@@ -131,7 +131,7 @@ export default function AiWebComposerControls({ web }: { web: AiWebChatBackend }
           <button
             type="button"
             onClick={() => void realtimeVoiceControl.run('mute', realtimeVoice.mute?.id ?? '')}
-            disabled={busy || !realtimeVoice.mute.enabled}
+            disabled={busy || realtimeVoiceControl.hangupStatus === 'confirming' || !realtimeVoice.mute.enabled}
             title="使用 ChatGPT 官网控件将实时语音静音"
           >
             <MicOff size={13} /><span>静音</span>
@@ -141,7 +141,7 @@ export default function AiWebComposerControls({ web }: { web: AiWebChatBackend }
           <button
             type="button"
             onClick={() => void realtimeVoiceControl.run('unmute', realtimeVoice.unmute?.id ?? '')}
-            disabled={busy || !realtimeVoice.unmute.enabled}
+            disabled={busy || realtimeVoiceControl.hangupStatus === 'confirming' || !realtimeVoice.unmute.enabled}
             title="使用 ChatGPT 官网控件恢复麦克风"
           >
             <Mic size={13} /><span>取消静音</span>
@@ -152,15 +152,21 @@ export default function AiWebComposerControls({ web }: { web: AiWebChatBackend }
             type="button"
             data-active
             onClick={() => void realtimeVoiceControl.run('end', realtimeVoice.end?.id ?? '')}
-            disabled={busy || !realtimeVoice.end.enabled}
+            disabled={busy || realtimeVoiceControl.hangupStatus === 'confirming' || !realtimeVoice.end.enabled}
             title="使用 ChatGPT 官网控件结束实时语音"
           >
-            <PhoneOff size={13} /><span>结束语音</span>
+            <PhoneOff size={13} /><span>{realtimeVoiceControl.hangupStatus === 'unconfirmed'
+              ? '再次挂断'
+              : realtimeVoiceControl.hangupStatus === 'confirming' ? '正在确认挂断' : '结束语音'}</span>
           </button>
         )}
-        <span className={styles.source}>{realtimeVoiceControl.transcriptSyncing
-          ? '正在同步语音转写与回复…'
-          : `${web.provider.displayName} 官方网页会话`}</span>
+        <span className={styles.source}>{realtimeVoiceControl.hangupStatus === 'confirming'
+          ? '正在确认官网语音已结束…'
+          : realtimeVoiceControl.hangupStatus === 'unconfirmed'
+            ? '官网语音可能仍在通话，请再次挂断或打开官方页确认'
+            : realtimeVoiceControl.transcriptSyncing
+              ? '正在同步语音转写与回复…'
+              : `${web.provider.displayName} 官方网页会话`}</span>
       </div>
 
       {snapshot?.attachments?.length ? (

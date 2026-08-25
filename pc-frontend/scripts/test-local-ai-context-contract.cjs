@@ -25,6 +25,10 @@ const realtimeVoicePath = path.join(
   root,
   'pc-frontend/src/features/user-browser/localAiRealtimeVoice.ts',
 )
+const realtimeVoiceHangupPath = path.join(
+  root,
+  'pc-frontend/src/features/user-browser/localAiRealtimeVoiceHangup.ts',
+)
 const realtimeVoiceControl = read('pc-frontend/src/features/user-browser/useLocalAiRealtimeVoiceControl.ts')
 const responseTracking = read('pc-frontend/src/features/user-browser/localAiResponseTracking.ts')
 const backend = read('pc-frontend/src/features/user-browser/useAiWebChatBackend.ts')
@@ -85,7 +89,9 @@ assert.match(controls, /menuNeedsRefresh/)
 assert.match(controls, /findLocalAiRealtimeVoiceControls/)
 assert.match(controls, /realtimeVoiceControl\.run\('end'/)
 assert.match(controls, /<span>实时语音<\/span>/)
-assert.match(controls, /<span>结束语音<\/span>/)
+assert.match(controls, /正在确认挂断/)
+assert.match(controls, /再次挂断/)
+assert.match(controls, /'结束语音'/)
 assert.match(backend, /官方网页尚未恢复到对应会话/)
 assert.match(userState, /context_restoring/)
 assert.match(userState, /缓存会话与当前官方页面不一致/)
@@ -93,6 +99,8 @@ assert.match(realtimeVoiceControl, /REALTIME_VOICE_TRANSCRIPT_REFRESH_GAPS_MS = 
 assert.match(realtimeVoiceControl, /requestLocalAiCurrentConversationRefresh/)
 assert.match(realtimeVoiceControl, /requestLocalAiWebSnapshot/)
 assert.match(realtimeVoiceControl, /controlLocalAiWebSession/)
+assert.match(realtimeVoiceControl, /snapshot_ui_manifest/)
+assert.match(controls, /官网语音可能仍在通话，请再次挂断或打开官方页确认/)
 assert.match(directory, /official_partial/)
 assert.match(directory, /is_project_conversation/)
 assert.match(api, /localAiAdapterResultAttempts/)
@@ -139,6 +147,30 @@ const genericDialog = findLocalAiRealtimeVoiceControls([
 ])
 assert.equal(genericDialog.end, undefined)
 assert.equal(genericDialog.active, false)
+
+const hangup = loadTypeScriptModule(realtimeVoiceHangupPath)
+assert.deepEqual(hangup.LOCAL_AI_REALTIME_VOICE_HANGUP_WATCHDOG_DELAYS_MS, [
+  1_000, 1_000, 2_000, 3_000, 5_000, 8_000, 15_000, 25_000, 30_000, 30_000,
+])
+let hangupObservation = hangup.beginLocalAiRealtimeVoiceHangupObservation()
+let hangupResult = hangup.observeLocalAiRealtimeVoiceHangup(hangupObservation, {
+  conversationPage: true, manifestHealthy: true, controlsTruncated: false,
+  startAvailable: true, voiceActive: false,
+}, 1_000)
+assert.equal(hangupResult.confirmed, false)
+hangupResult = hangup.observeLocalAiRealtimeVoiceHangup(hangupResult.observation, {
+  conversationPage: true, manifestHealthy: true, controlsTruncated: false,
+  startAvailable: true, voiceActive: false,
+}, 3_000)
+assert.equal(hangupResult.confirmed, true)
+hangupResult = hangup.observeLocalAiRealtimeVoiceHangup(hangupResult.observation, {
+  conversationPage: true, manifestHealthy: false, controlsTruncated: false,
+  startAvailable: true, voiceActive: false,
+}, 4_000)
+assert.equal(hangupResult.confirmed, false)
+assert.deepEqual(hangupResult.observation, { stableSinceMs: 0, stableObservations: 0 })
+assert.equal(hangup.shouldRefreshLocalAiRealtimeVoiceHangupControls(0), true)
+assert.equal(hangup.shouldRefreshLocalAiRealtimeVoiceHangupControls(2), false)
 
 process.stdout.write('PASS local AI stable context and response refresh contract\n')
 
