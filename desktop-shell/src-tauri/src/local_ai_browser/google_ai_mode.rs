@@ -336,6 +336,9 @@ mod tests {
         assert!(script.contains("adapter_bootstrap_failed"));
         assert!(script.contains("publish_local_ai_web_research_capture"));
         assert!(script.contains("endpointFamily: 'ai_rpc'"));
+        assert!(script.contains("window.__elonGoogleWebPrivateResearchEnabled = true"));
+        assert!(script.contains("window.__elonGoogleWebPrivateResponseTap"));
+        assert!(script.contains("research_network_observation"));
         assert!(script.contains("__elonGoogleWebPrivateReplyObserver"));
         assert!(script.contains("__elonGoogleWebPrivateThreadDirectory"));
         assert!(script.contains("__elonGoogleWebQueryPolicy"));
@@ -348,5 +351,13 @@ mod tests {
                 .unwrap()
                 < dom_ready
         );
+        let private_tap = script
+            .find("window.__elonGoogleWebPrivateResponseTap")
+            .expect("Win bootstrap should install the APK private response tap");
+        let full_capture = script
+            .find("window.__elonWinWebResponseResearchCaptureVersion")
+            .expect("Win bootstrap should retain the bounded full response capture");
+        assert!(private_tap < full_capture);
+        assert!(full_capture < dom_ready);
     }
 }

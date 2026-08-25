@@ -1,5 +1,7 @@
 const WIN_COMMON_RICH_CONTENT_ADAPTER: &str = include_str!("rich_content_dom_adapter.js");
 const WIN_RICH_CONTENT_ADAPTER: &str = include_str!("google_rich_content_adapter.js");
+const PRIVATE_RESPONSE_TAP: &str =
+    include_str!("../../../../android/app/src/main/assets/google_web_private_response_tap.js");
 const PRIVATE_THREAD_DIRECTORY: &str =
     include_str!("../../../../android/app/src/main/assets/google_web_private_thread_directory.js");
 
@@ -79,6 +81,9 @@ pub(super) fn initialization_script(adapter_version: u32) -> String {
   if (!allowedOrigin()) return;
   window.__elonGoogleWebBootstrapStage = 'google_web_private_thread_directory.js';
   __PRIVATE_THREAD_DIRECTORY_SOURCE__
+  window.__elonGoogleWebBootstrapStage = 'google_web_private_response_tap.js';
+  window.__elonGoogleWebPrivateResearchEnabled = true;
+  __PRIVATE_RESPONSE_TAP_SOURCE__
   __RESPONSE_RESEARCH_CAPTURE__
 
   function invoke(payload) {
@@ -160,6 +165,7 @@ pub(super) fn initialization_script(adapter_version: u32) -> String {
 "#
     .replace("__ADAPTER_VERSION__", &adapter_version.to_string())
     .replace("__PRIVATE_THREAD_DIRECTORY_SOURCE__", PRIVATE_THREAD_DIRECTORY)
+    .replace("__PRIVATE_RESPONSE_TAP_SOURCE__", PRIVATE_RESPONSE_TAP)
     .replace("__RESPONSE_RESEARCH_CAPTURE__", &response_research_capture)
     .replace("__ADAPTER_ASSETS__", &adapters)
 }
