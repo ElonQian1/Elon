@@ -44,7 +44,10 @@ provider round trips, continuous recording, and media-focus pause/resume; direct
 touches on the system overlay pause and hang-up actions remain supervised acceptance.
 An unconfirmed official hang-up remains an ongoing call, receives one bounded automatic
 retry, and collapses to the non-blocking native orb instead of being misreported as a
-connection failure or leaving a large action card over the conversation.
+connection failure or leaving a large action card over the conversation. A bounded,
+one-second read-only reconciliation tail then observes the official page for at most
+two minutes without clicking hang-up again; a late official exit automatically closes
+the orb and reuses the existing conversation refresh path.
 
 ## Audited non-capabilities
 

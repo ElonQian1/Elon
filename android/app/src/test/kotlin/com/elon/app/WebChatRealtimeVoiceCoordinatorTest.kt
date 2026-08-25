@@ -342,6 +342,33 @@ class WebChatRealtimeVoiceCoordinatorTest {
     }
 
     @Test
+    fun reconcilesALateOfficialHangupWithoutInvokingTheControlAgain() {
+        val fixture = Fixture()
+        fixture.completeVoiceStart()
+        fixture.port.endControlAvailable = true
+
+        fixture.surface.closeVoice()
+        var guard = 0
+        while (
+            fixture.surface.state?.lifecycle != WebChatRealtimeVoiceLifecycle.HANGUP_UNCONFIRMED &&
+            guard < 100
+        ) {
+            fixture.scheduler.runNext()
+            guard += 1
+        }
+
+        assertEquals(WebChatRealtimeVoiceLifecycle.HANGUP_UNCONFIRMED, fixture.surface.state?.lifecycle)
+        assertEquals(2, fixture.port.invokedControlCount)
+
+        fixture.port.endControlAvailable = false
+        fixture.scheduler.runNext(4)
+
+        assertFalse(fixture.surface.visible)
+        assertEquals(2, fixture.port.invokedControlCount)
+        assertEquals(listOf(true), fixture.endBackingGraceful)
+    }
+
+    @Test
     fun retriesHangupAfterAnUnconfirmedCloseWithoutRestartingVoice() {
         val fixture = Fixture()
         fixture.completeVoiceStart()
@@ -746,7 +773,7 @@ class WebChatRealtimeVoiceCoordinatorTest {
         }
 
         fun runAll() {
-            repeat(100) {
+            repeat(300) {
                 if (tasks.isEmpty()) return
                 runNext()
             }

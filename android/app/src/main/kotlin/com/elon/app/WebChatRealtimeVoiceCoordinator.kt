@@ -34,6 +34,7 @@ internal class WebChatRealtimeVoiceCoordinator(
     private var commandRequestId: String? = null
     private var closePending = false
     private var closeFailed = false
+    private var delayedCloseReconciliationActive = false
     private var automaticCloseRetries = 0
     private var interactiveActivation = false
     private var pendingLoginProvider: WebChatProviderIdentity? = null
@@ -43,6 +44,7 @@ internal class WebChatRealtimeVoiceCoordinator(
     private var lastState: WebChatRealtimeVoiceState? = null
     private var hostResumed = true
     private val closeSettlement = WebChatRealtimeVoiceCloseSettlement()
+    private val delayedCloseReconciler = WebChatRealtimeVoiceDelayedCloseReconciler()
     private val activationGate = WebChatRealtimeVoiceActivationGate()
     private val pauseController = WebChatRealtimeVoicePauseController(
         consumerPort = consumerPort,
@@ -82,6 +84,8 @@ internal class WebChatRealtimeVoiceCoordinator(
         preparedGeneration = null
         commandRequestId = null
         closeFailed = false
+        delayedCloseReconciliationActive = false
+        delayedCloseReconciler.begin()
         automaticCloseRetries = 0
         interactiveActivation = false
         pauseController.reset()
@@ -117,6 +121,8 @@ internal class WebChatRealtimeVoiceCoordinator(
     }
 
     private fun beginClose() {
+        delayedCloseReconciliationActive = false
+        delayedCloseReconciler.begin()
         closePending = true
         closeFailed = false
         automaticCloseRetries = 0
@@ -185,6 +191,37 @@ internal class WebChatRealtimeVoiceCoordinator(
             WebChatRealtimeVoiceLifecycle.HANGUP_UNCONFIRMED,
             "挂断尚未生效，语音仍在进行。可再次挂断，或打开官网语音确认关闭",
         )
+        delayedCloseReconciliationActive = true
+        delayedCloseReconciler.begin()
+        scheduleDelayedCloseReconciliation(generation)
+    }
+
+    private fun scheduleDelayedCloseReconciliation(expectedGeneration: Int) {
+        schedule(
+            Runnable { advanceDelayedCloseReconciliation(expectedGeneration) },
+            DELAYED_CLOSE_RECONCILIATION_MS,
+        )
+    }
+
+    private fun advanceDelayedCloseReconciliation(expectedGeneration: Int) {
+        if (!delayedCloseReconciliationActive || expectedGeneration != generation) return
+        val port = consumerPort()
+        when (val decision = delayedCloseReconciler.observe(port?.state())) {
+            is WebChatRealtimeVoiceDelayedCloseDecision.Wait -> {
+                if (decision.refreshControls) port?.requestControls()
+                scheduleDelayedCloseReconciliation(expectedGeneration)
+            }
+            WebChatRealtimeVoiceDelayedCloseDecision.Complete -> {
+                delayedCloseReconciliationActive = false
+                log("voice_close_delayed_confirmation")
+                port?.state()?.let { state -> provider?.let { launchCache.observe(it.id, state) } }
+                finishClose(gracefulExit = true)
+            }
+            WebChatRealtimeVoiceDelayedCloseDecision.Expired -> {
+                delayedCloseReconciliationActive = false
+                log("voice_close_delayed_confirmation_expired")
+            }
+        }
     }
 
     private fun finishClose(gracefulExit: Boolean) {
@@ -192,6 +229,8 @@ internal class WebChatRealtimeVoiceCoordinator(
         generation += 1
         closePending = false
         closeFailed = false
+        delayedCloseReconciliationActive = false
+        delayedCloseReconciler.begin()
         automaticCloseRetries = 0
         finishInteractiveActivation()
         provider = null
@@ -527,6 +566,8 @@ internal class WebChatRealtimeVoiceCoordinator(
         commandRequestId = null
         finishInteractiveActivation()
         pauseController.reset()
+        delayedCloseReconciliationActive = false
+        delayedCloseReconciler.begin()
         backgroundBridge.stop()
         endWebBacking(false)
         render(WebChatRealtimeVoiceLifecycle.FAILED, detail)
@@ -655,6 +696,7 @@ internal class WebChatRealtimeVoiceCoordinator(
         const val MAX_AUTOMATIC_CLOSE_RETRIES = 1
         const val CONTROL_SETTLE_MS = 400L
         const val CLOSE_POLL_DELAY_MS = 250L
+        const val DELAYED_CLOSE_RECONCILIATION_MS = 1_000L
         const val AUTHENTICATION_POLL_DELAY_MS = 400L
         const val MAX_AUTHENTICATION_POLLS = 30
         const val CONTEXT_REFRESH_DELAY_MS = 1_000L
