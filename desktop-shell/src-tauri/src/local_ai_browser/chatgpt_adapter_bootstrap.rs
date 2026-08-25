@@ -5,6 +5,11 @@ const WIN_RICH_CONTENT_ADAPTER: &str = include_str!("chatgpt_rich_content_adapte
 const WIN_COMMON_RICH_CONTENT_ADAPTER: &str = include_str!("rich_content_dom_adapter.js");
 const WIN_CITATION_ADAPTER: &str = include_str!("chatgpt_citation_adapter.js");
 const WIN_RESPONSE_RESEARCH_CAPTURE: &str = include_str!("win_web_response_research_capture.js");
+const PRIVATE_SOCKET_TAP: &str =
+    include_str!("../../../../android/app/src/main/assets/chatgpt_web_private_socket_tap.js");
+const PRIVATE_CONVERSATION_DIRECTORY: &str = include_str!(
+    "../../../../android/app/src/main/assets/chatgpt_web_private_conversation_directory.js"
+);
 
 const ADAPTER_ASSETS: &[(&str, &str)] = &[
     (
@@ -14,6 +19,10 @@ const ADAPTER_ASSETS: &[(&str, &str)] = &[
     (
         "chatgpt_web_adapter_authentication_policy.js",
         include_str!("../../../../android/app/src/main/assets/chatgpt_web_adapter_authentication_policy.js"),
+    ),
+    (
+        "chatgpt_web_private_conversation_directory.js",
+        include_str!("../../../../android/app/src/main/assets/chatgpt_web_private_conversation_directory.js"),
     ),
     (
         "chatgpt_web_adapter_project_policy.js",
@@ -192,13 +201,17 @@ pub(super) fn initialization_script() -> String {
 (function () {
   'use strict';
   if (location.origin !== '__ALLOWED_ORIGIN__') return;
-  __RESPONSE_RESEARCH_CAPTURE__
   // The current Win channel is a pre-launch development cohort. Enable the
   // already-reviewed same-origin read-only research paths so the stable native
   // AST can learn from the official stream before the DOM finishes composing.
   window.__elonChatGptPrivateResearchEnabled = true;
   window.__elonChatGptPrivateStreamObserverEnabled = true;
   window.__elonChatGptPrivateConversationPrefetchEnabled = true;
+  window.__elonChatGptBootstrapStage = 'chatgpt_web_private_socket_tap.js';
+  __PRIVATE_SOCKET_TAP__
+  window.__elonChatGptBootstrapStage = 'chatgpt_web_private_conversation_directory.js';
+  __PRIVATE_CONVERSATION_DIRECTORY__
+  __RESPONSE_RESEARCH_CAPTURE__
 
   var touchPurposes = new Set([
     'list_model_options', 'list_composer_tools', 'select_model_option', 'select_composer_tool',
@@ -303,6 +316,11 @@ pub(super) fn initialization_script() -> String {
 "#
     .replace("__ALLOWED_ORIGIN__", ALLOWED_ORIGIN)
     .replace("__ADAPTER_VERSION__", &ADAPTER_VERSION.to_string())
+    .replace("__PRIVATE_SOCKET_TAP__", PRIVATE_SOCKET_TAP)
+    .replace(
+        "__PRIVATE_CONVERSATION_DIRECTORY__",
+        PRIVATE_CONVERSATION_DIRECTORY,
+    )
     .replace("__RESPONSE_RESEARCH_CAPTURE__", &research_capture)
     .replace("__ADAPTER_ASSETS__", &adapters)
 }
@@ -363,6 +381,18 @@ mod tests {
         assert!(script.contains("publish_local_ai_web_research_capture"));
         assert!(script.contains("conversation_stream"));
         assert!(script.contains("__elonChatGptPrivateStreamObserverEnabled = true"));
+        assert!(script.contains("__elonChatGptPrivateSocketTap"));
+        assert!(script.contains("__elonChatGptPrivateConversationDirectory"));
         assert!(script.contains("chatgpt_web_private_stream_transport.js"));
+        let dom_ready = script
+            .find("DOMContentLoaded")
+            .expect("Win bootstrap should retain its DOM-ready semantic install");
+        assert!(script.find("__elonChatGptPrivateSocketTap").unwrap() < dom_ready);
+        assert!(
+            script
+                .find("__elonChatGptPrivateConversationDirectory")
+                .unwrap()
+                < dom_ready
+        );
     }
 }

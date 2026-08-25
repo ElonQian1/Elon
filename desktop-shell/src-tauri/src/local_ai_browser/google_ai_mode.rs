@@ -5,139 +5,10 @@ use super::{adapter::SanitizedAdapterEvent, adapter_content, semantic_context, s
 const MAX_EVENT_BYTES: usize = 512 * 1024;
 const MAX_MESSAGES: usize = 80;
 const MAX_DRAFT_CHARS: usize = 20_000;
-const ADAPTER_VERSION: u32 = 16;
+const ADAPTER_VERSION: u32 = 37;
 
 pub fn initialization_script() -> String {
-    let response_research_capture = include_str!("win_web_response_research_capture.js")
-        .replace("__PROVIDER_ID__", "google-ai-mode");
-    let answer_candidate_policy = include_str!(
-        "../../../../android/app/src/main/assets/google_web_answer_candidate_policy.js"
-    );
-    let rich_content =
-        include_str!("../../../../android/app/src/main/assets/google_web_rich_content.js");
-    let common_rich_content = include_str!("rich_content_dom_adapter.js");
-    let win_rich_content = include_str!("google_rich_content_adapter.js");
-    let message_extractor =
-        include_str!("../../../../android/app/src/main/assets/google_web_message_extractor.js");
-    let composer_bridge =
-        include_str!("../../../../android/app/src/main/assets/google_web_composer_bridge.js");
-    let send_policy =
-        include_str!("../../../../android/app/src/main/assets/google_web_send_policy.js");
-    let adapter = include_str!("../../../../android/app/src/main/assets/google_web_adapter.js");
-    r#"
-(function () {
-  'use strict';
-
-  function allowedOrigin() {
-    return location.origin === 'https://google.com' || location.origin === 'https://www.google.com';
-  }
-
-  if (!allowedOrigin()) return;
-  __RESPONSE_RESEARCH_CAPTURE__
-
-  function invoke(payload) {
-    if (!allowedOrigin()) return;
-    var internalInvoke = window.__TAURI_INTERNALS__ && window.__TAURI_INTERNALS__.invoke;
-    var publicInvoke = window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke;
-    var call = internalInvoke || publicInvoke;
-    if (typeof call === 'function') {
-      Promise.resolve(call('publish_local_ai_web_event', { payload: String(payload || '') })).catch(function () {});
-    }
-  }
-
-  window.elonGoogleWebNative = Object.freeze({ postMessage: invoke });
-  if (!window.__elonWinGoogleWebDiagnosticsInstalled) {
-    window.__elonWinGoogleWebDiagnosticsInstalled = true;
-    window.addEventListener('error', function (event) {
-      invoke(JSON.stringify({
-        type: 'browser_diagnostic',
-        kind: 'page_error',
-        detail: String(event && event.message || 'Google AI 页面脚本加载失败。').slice(0, 240),
-        url: location.origin + location.pathname
-      }));
-    });
-    window.addEventListener('unhandledrejection', function () {
-      invoke(JSON.stringify({
-        type: 'browser_diagnostic',
-        kind: 'promise_rejection',
-        detail: 'Google AI 页面尚未完成初始化，可显示官方窗口确认。',
-        url: location.origin + location.pathname
-      }));
-    });
-  }
-
-  function documentToken() {
-    var words = new Uint32Array(4);
-    if (window.crypto && typeof window.crypto.getRandomValues === 'function') {
-      window.crypto.getRandomValues(words);
-    } else {
-      for (var index = 0; index < words.length; index += 1) {
-        words[index] = Math.floor(Math.random() * 0xffffffff) >>> 0;
-      }
-    }
-    return 'doc_win_' + Array.from(words, function (word) {
-      return word.toString(16).padStart(8, '0');
-    }).join('');
-  }
-
-  if (!/^doc_[a-z0-9_]{3,80}$/.test(String(window.__elonGoogleWebDocumentToken || ''))) {
-    window.__elonGoogleWebDocumentToken = documentToken();
-  }
-
-  function installAdapter() {
-    try {
-      window.__elonGoogleWebAdapterVersion = __ADAPTER_VERSION__;
-      __ANSWER_CANDIDATE_POLICY_SOURCE__
-      __RICH_CONTENT_SOURCE__
-      __COMMON_RICH_CONTENT_SOURCE__
-      __WIN_RICH_CONTENT_SOURCE__
-      __MESSAGE_EXTRACTOR_SOURCE__
-      __COMPOSER_BRIDGE_SOURCE__
-      __SEND_POLICY_SOURCE__
-      __ADAPTER_SOURCE__
-      if (!window.__elonGoogleWebBridge ||
-          typeof window.__elonGoogleWebBridge.command !== 'function') {
-        throw new Error('bridge_missing');
-      }
-    } catch (error) {
-      var errorName = String(error && error.name || 'Error').replace(/[^A-Za-z0-9_]/g, '').slice(0, 40);
-      invoke(JSON.stringify({
-        type: 'browser_diagnostic',
-        kind: 'adapter_bootstrap_failed',
-        detail: 'Google AI 语义桥初始化失败（' + (errorName || 'Error') + '）。',
-        url: location.origin + location.pathname
-      }));
-    }
-  }
-
-  function installWhenReady() {
-    if (!(document.documentElement instanceof Node)) {
-      window.setTimeout(installWhenReady, 0);
-      return;
-    }
-    installAdapter();
-  }
-
-  if (document.readyState === 'loading') {
-    window.addEventListener('DOMContentLoaded', installWhenReady, { once: true });
-  } else {
-    installWhenReady();
-  }
-})();
-"#
-    .replace("__ADAPTER_VERSION__", &ADAPTER_VERSION.to_string())
-    .replace("__RESPONSE_RESEARCH_CAPTURE__", &response_research_capture)
-    .replace(
-        "__ANSWER_CANDIDATE_POLICY_SOURCE__",
-        answer_candidate_policy,
-    )
-    .replace("__RICH_CONTENT_SOURCE__", rich_content)
-    .replace("__COMMON_RICH_CONTENT_SOURCE__", common_rich_content)
-    .replace("__WIN_RICH_CONTENT_SOURCE__", win_rich_content)
-    .replace("__MESSAGE_EXTRACTOR_SOURCE__", message_extractor)
-    .replace("__COMPOSER_BRIDGE_SOURCE__", composer_bridge)
-    .replace("__SEND_POLICY_SOURCE__", send_policy)
-    .replace("__ADAPTER_SOURCE__", adapter)
+    super::google_ai_mode_adapter_bootstrap::initialization_script(ADAPTER_VERSION)
 }
 
 pub fn sanitize_event(raw: &str) -> Result<SanitizedAdapterEvent, String> {
@@ -293,10 +164,7 @@ fn clean_identifiers(value: Option<&Value>, max: usize) -> Vec<String> {
 }
 
 fn bounded_u64(value: Option<&Value>, default: u64, max: u64) -> u64 {
-    value
-        .and_then(Value::as_u64)
-        .unwrap_or(default)
-        .min(max)
+    value.and_then(Value::as_u64).unwrap_or(default).min(max)
 }
 
 fn clean_identifier(value: Option<&Value>, max: usize) -> String {
@@ -423,6 +291,32 @@ mod tests {
     #[test]
     fn desktop_bootstrap_reuses_the_android_google_adapter() {
         let script = initialization_script();
+        let android_page_adapter = include_str!(
+            "../../../../android/app/src/main/kotlin/com/elon/app/googleweb/GoogleWebPageAdapter.kt"
+        );
+        let android_assets = android_page_adapter
+            .split("private val ADAPTER_ASSETS = listOf(")
+            .nth(1)
+            .and_then(|tail| tail.split("\n        )").next())
+            .expect("Android Google adapter asset list should remain readable")
+            .lines()
+            .filter_map(|line| {
+                let value = line.trim().trim_end_matches(',');
+                value
+                    .strip_prefix('"')
+                    .and_then(|value| value.strip_suffix('"'))
+            })
+            .collect::<Vec<_>>();
+        let android_version = android_page_adapter
+            .split("const val ADAPTER_VERSION = ")
+            .nth(1)
+            .and_then(|tail| tail.lines().next())
+            .and_then(|value| value.trim().parse::<u32>().ok())
+            .expect("Android Google adapter version should remain readable");
+        let win_assets = super::super::google_ai_mode_adapter_bootstrap::adapter_asset_names();
+
+        assert_eq!(win_assets, android_assets);
+        assert_eq!(ADAPTER_VERSION, android_version);
         assert!(script.contains(&format!(
             "window.__elonGoogleWebAdapterVersion = {ADAPTER_VERSION}"
         )));
@@ -442,5 +336,17 @@ mod tests {
         assert!(script.contains("adapter_bootstrap_failed"));
         assert!(script.contains("publish_local_ai_web_research_capture"));
         assert!(script.contains("endpointFamily: 'ai_rpc'"));
+        assert!(script.contains("__elonGoogleWebPrivateReplyObserver"));
+        assert!(script.contains("__elonGoogleWebPrivateThreadDirectory"));
+        assert!(script.contains("__elonGoogleWebQueryPolicy"));
+        let dom_ready = script
+            .find("DOMContentLoaded")
+            .expect("Win bootstrap should retain its DOM-ready semantic install");
+        assert!(
+            script
+                .find("__elonGoogleWebPrivateThreadDirectory")
+                .unwrap()
+                < dom_ready
+        );
     }
 }

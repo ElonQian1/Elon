@@ -23,10 +23,14 @@ const adapterContent = read('desktop-shell/src-tauri/src/local_ai_browser/adapte
 const adapterCommand = read('desktop-shell/src-tauri/src/local_ai_browser/adapter_command.rs')
 const providerAdapter = read('desktop-shell/src-tauri/src/local_ai_browser/provider_adapter.rs')
 const chatGptBootstrap = read('desktop-shell/src-tauri/src/local_ai_browser/chatgpt_adapter_bootstrap.rs')
+const chatGptPageAdapter = read('android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebPageAdapter.kt')
 const chatGptAdapter = read('android/app/src/main/assets/chatgpt_web_adapter.js')
 const chatGptConversationAdapter = read('android/app/src/main/assets/chatgpt_web_adapter_conversations.js')
 const chatGptAuthenticationPolicy = read('android/app/src/main/assets/chatgpt_web_adapter_authentication_policy.js')
-const googleAdapter = read('desktop-shell/src-tauri/src/local_ai_browser/google_ai_mode.rs')
+const googleAdapter = [
+  read('desktop-shell/src-tauri/src/local_ai_browser/google_ai_mode.rs'),
+  read('desktop-shell/src-tauri/src/local_ai_browser/google_ai_mode_adapter_bootstrap.rs'),
+].join('\n')
 const sharedGoogleAdapterScript = read('android/app/src/main/assets/google_web_adapter.js')
 const sharedGoogleMessageExtractorScript = read('android/app/src/main/assets/google_web_message_extractor.js')
 const sharedGoogleAnswerCandidatePolicy = require(path.join(root, 'android/app/src/main/assets/google_web_answer_candidate_policy.js'))
@@ -167,7 +171,9 @@ assert.match(providerAdapter, /enum ProviderAdapter/)
 assert.match(providerAdapter, /ChatGpt/)
 assert.match(providerAdapter, /GoogleWeb/)
 assert.match(providerAdapter, /page_invocation_script/)
-assert.match(chatGptBootstrap, /ADAPTER_VERSION: u32 = 177/)
+const chatGptAndroidVersion = chatGptPageAdapter.match(/internal const val ADAPTER_VERSION = (\d+)/)?.[1]
+assert.ok(chatGptAndroidVersion, 'Android ChatGPT adapter version should remain readable')
+assert.match(chatGptBootstrap, new RegExp(`ADAPTER_VERSION: u32 = ${chatGptAndroidVersion}`))
 assert.match(chatGptBootstrap, /__elonChatGptAdapterTargetVersion/)
 assert.match(chatGptBootstrap, /__elonChatGptDocumentToken/)
 assert.match(chatGptBootstrap, /chatgpt_web_adapter_bootstrap\.js/)
