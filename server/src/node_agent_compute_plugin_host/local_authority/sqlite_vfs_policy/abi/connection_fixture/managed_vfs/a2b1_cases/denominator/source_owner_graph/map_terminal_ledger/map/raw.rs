@@ -56,6 +56,15 @@ const fn map_run_code_context() -> SourceAnchor {
     )
 }
 
+const fn run_code_abandon_context() -> SourceAnchor {
+    source_anchor(
+        SourceOwnerId::AbiFileState,
+        "unsafe fn run_code",
+        "abandon_without_unwind(file)",
+        1,
+    )
+}
+
 const fn validate_step(
     id: MapSourceStepId,
     site: MapSiteId,
@@ -93,6 +102,21 @@ pub(in super::super) const STEPS: &[MapSourceStep] = &[
         Epoch::AbiInput,
         SourceEffect::None,
         MapStepKind::Continuation,
+    ),
+    with_call_context(
+        step(
+            MapSourceStepId::RawNormalCodeProjection,
+            MapSiteId::AbiProjection,
+            SourceOwnerId::AbiFileState,
+            "unsafe fn run_code",
+            "Ok(Ok(code)) => code",
+            1,
+            MAP_BOTH,
+            Epoch::AbiInput,
+            SourceEffect::None,
+            MapStepKind::StructuralJoin,
+        ),
+        map_run_code_context(),
     ),
     with_call_context(
         step(
@@ -167,6 +191,21 @@ pub(in super::super) const STEPS: &[MapSourceStep] = &[
             raw_pending(MapRetention::BranchDependent),
         ),
         map_run_code_context(),
+    ),
+    with_call_context(
+        step(
+            MapSourceStepId::RawAbandonUnwindFence,
+            MapSiteId::AbiProjection,
+            SourceOwnerId::AbiFileState,
+            "unsafe fn abandon_without_unwind",
+            "let _ = catch_unwind(AssertUnwindSafe(||",
+            1,
+            MAP_BOTH,
+            Epoch::AbiInput,
+            SourceEffect::None,
+            MapStepKind::StructuralJoin,
+        ),
+        run_code_abandon_context(),
     ),
     step(
         MapSourceStepId::FileStateInnerMissing,

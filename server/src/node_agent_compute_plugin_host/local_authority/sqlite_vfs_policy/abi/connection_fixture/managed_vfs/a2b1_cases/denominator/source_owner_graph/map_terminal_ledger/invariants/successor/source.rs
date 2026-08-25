@@ -14,6 +14,12 @@ pub(super) fn validate(steps: &[MapSourceStep]) -> Result<(), &'static str> {
     require_kind(steps, MapSourceStepId::RawStateAccepted, |kind| {
         matches!(kind, MapStepKind::Continuation)
     })?;
+    require_kind(steps, MapSourceStepId::RawNormalCodeProjection, |kind| {
+        matches!(kind, MapStepKind::StructuralJoin)
+    })?;
+    require_kind(steps, MapSourceStepId::RawAbandonUnwindFence, |kind| {
+        matches!(kind, MapStepKind::StructuralJoin)
+    })?;
     require_kind(steps, MapSourceStepId::RawFallbackProjection, |kind| {
         matches!(kind, MapStepKind::StructuralJoin)
     })?;
@@ -78,6 +84,15 @@ fn validate_source_shapes(steps: &[MapSourceStep]) -> Result<(), &'static str> {
             SourceEffect::None,
         ),
         (
+            MapSourceStepId::RawNormalCodeProjection,
+            MapSiteId::AbiProjection,
+            SourceOwnerId::AbiFileState,
+            "unsafe fn run_code",
+            "Ok(Ok(code)) => code",
+            1,
+            SourceEffect::None,
+        ),
+        (
             MapSourceStepId::RawStateNullFile,
             MapSiteId::RawGate,
             SourceOwnerId::AbiRawState,
@@ -137,6 +152,15 @@ fn validate_source_shapes(steps: &[MapSourceStep]) -> Result<(), &'static str> {
             SourceOwnerId::AbiFileState,
             "unsafe fn run_code",
             "| Err(_) =>",
+            1,
+            SourceEffect::None,
+        ),
+        (
+            MapSourceStepId::RawAbandonUnwindFence,
+            MapSiteId::AbiProjection,
+            SourceOwnerId::AbiFileState,
+            "unsafe fn abandon_without_unwind",
+            "let _ = catch_unwind(AssertUnwindSafe(||",
             1,
             SourceEffect::None,
         ),
@@ -274,10 +298,22 @@ fn validate_call_contexts(steps: &[MapSourceStep]) -> Result<(), &'static str> {
     require_contexts(
         steps,
         &[
+            MapSourceStepId::RawNormalCodeProjection,
             MapSourceStepId::RawStateCaughtPanic,
             MapSourceStepId::RawFallbackProjection,
         ],
         map_run_code,
+    )?;
+
+    require_contexts(
+        steps,
+        &[MapSourceStepId::RawAbandonUnwindFence],
+        source_anchor(
+            SourceOwnerId::AbiFileState,
+            "unsafe fn run_code",
+            "abandon_without_unwind(file)",
+            1,
+        ),
     )
 }
 
