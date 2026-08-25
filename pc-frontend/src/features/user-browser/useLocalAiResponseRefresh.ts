@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react'
 import {
   controlLocalAiWebSession,
+  requestLocalAiCurrentConversationRefresh,
   requestLocalAiWebSnapshot,
   type LocalAiMessageSnapshot,
   type LocalAiWebProvider,
@@ -8,6 +9,7 @@ import {
 import { localAiAssistantExtractionIncomplete } from './localAiAssistantContentQuality'
 import { requestReturnToAiChat } from './internalBrowserApi'
 import { lastMatchingLocalAiUserIndex, normalizeLocalAiResponsePrompt } from './localAiResponseTracking'
+import { shouldRequestLocalAiPrivateConversationRefresh } from './localAiPrivateConversationRefreshPolicy'
 import {
   RESPONSE_COMPLETION_REFRESH_MS,
   RESPONSE_COMPLETION_SETTLE_MS,
@@ -32,6 +34,10 @@ export default function useLocalAiResponseRefresh({
   const requestRef = useRef<() => void>(() => {})
   const completionObservedAt = useRef(0)
   const expectedPrompt = useRef('')
+  const startedAt = useRef(0)
+  const privateRefreshAttempted = useRef(false)
+  const snapshotRef = useRef(snapshot)
+  snapshotRef.current = snapshot
 
   const cancel = useCallback(() => {
     generation.current += 1
@@ -40,6 +46,8 @@ export default function useLocalAiResponseRefresh({
     requestRef.current = () => {}
     completionObservedAt.current = 0
     expectedPrompt.current = ''
+    startedAt.current = 0
+    privateRefreshAttempted.current = false
   }, [])
 
   const start = useCallback((prompt: string) => {
@@ -48,6 +56,7 @@ export default function useLocalAiResponseRefresh({
     const normalizedPrompt = normalizeLocalAiResponsePrompt(prompt)
     if (!activeProvider || !ownerKey || !normalizedPrompt) return
     expectedPrompt.current = prompt
+    startedAt.current = Date.now()
     const activeGeneration = generation.current
     let delayIndex = 0
     const request = () => {
@@ -64,6 +73,17 @@ export default function useLocalAiResponseRefresh({
         .then(() => {}, () => {})
       void requestLocalAiWebSnapshot(activeProvider.id, ownerKey)
         .then(refreshSessionState, () => {})
+      if (shouldRequestLocalAiPrivateConversationRefresh({
+        providerId: activeProvider.id,
+        snapshot: snapshotRef.current,
+        expectedPrompt: prompt,
+        elapsedMs: Date.now() - startedAt.current,
+        attempted: privateRefreshAttempted.current,
+      })) {
+        privateRefreshAttempted.current = true
+        void requestLocalAiCurrentConversationRefresh(activeProvider.id, ownerKey)
+          .then(refreshSessionState, () => {})
+      }
       const delay = completionObservedAt.current
         ? RESPONSE_COMPLETION_REFRESH_MS
         : RESPONSE_REFRESH_DELAYS_MS[delayIndex++]

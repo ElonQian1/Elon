@@ -214,6 +214,7 @@ export type LocalAiBrowserControlAction = 'restore' | 'background' | 'reload' | 
 
 export type LocalAiAdapterAction =
   | 'snapshot'
+  | 'refresh_current_conversation'
   | 'send_prompt'
   | 'stop_generation'
   | 'regenerate_response'
@@ -432,6 +433,18 @@ export async function requestLocalAiWebSnapshot(
     ownerKey,
     action: 'snapshot',
   }, LOCAL_AI_INVOKE_TIMEOUTS.state, `snapshot:${providerId}:${ownerKey}`)
+}
+
+export async function requestLocalAiCurrentConversationRefresh(
+  providerId: string,
+  ownerKey: string,
+): Promise<void> {
+  assertIdentity(providerId, ownerKey)
+  await invokeDesktop<void>('run_local_ai_web_adapter_command', {
+    providerId,
+    ownerKey,
+    action: 'refresh_current_conversation',
+  }, LOCAL_AI_INVOKE_TIMEOUTS.action, `conversation-refresh:${providerId}:${ownerKey}`)
 }
 
 export function isLocalAiMessageSnapshot(value: unknown): value is LocalAiMessageSnapshot {

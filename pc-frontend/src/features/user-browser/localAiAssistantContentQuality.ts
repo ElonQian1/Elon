@@ -27,3 +27,10 @@ export function localAiAssistantExtractionIncomplete(message: LocalAiVisibleMess
   )).length
   return structuredCount > 0 && (!text.trim() || isLocalAiActionOnlyText(text))
 }
+
+export function localAiAssistantHasRendererPlaceholder(message: LocalAiVisibleMessage): boolean {
+  return message.role === 'assistant' && message.content.some((part) => (
+    part.type === 'interactive'
+    && ['interactive', 'renderer_upgrade_required'].includes(String(part.kind || ''))
+  ))
+}
