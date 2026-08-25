@@ -15,6 +15,7 @@ import type { LocalAiStructuredContentPart } from './localAiBrowserProtocol'
 import { isYilongRichContent } from './richContentProtocol'
 import { localAiRendererCompatibility } from './localAiRendererCompatibility'
 import { localAiAssistantExtractionIncomplete } from './localAiAssistantContentQuality'
+import useLocalAiProviderActivity from './useLocalAiProviderActivity'
 
 const PROVIDER_STORAGE_KEY = 'elon.pc.aiChatProvider'
 
@@ -121,6 +122,13 @@ export default function useAiWebChatBackend(mode: AiHomeMode, ownerKey: string) 
     })
   }, [controller.visibleMessages, provider?.id])
   const ready = capability.state === 'ready' && Boolean(ownerKey && provider)
+  const providerActivities = useLocalAiProviderActivity({
+    enabled: mode === 'chat' && ready,
+    providers,
+    selectedProviderId: provider?.id,
+    ownerKey,
+    selectedState: controller.sessionState,
+  })
   const canEdit = ready && controller.canEditDraft
   const canCompose = ready && controller.canSubmitDraft
   const streamingMessageId = [...controller.visibleMessages]
@@ -148,6 +156,7 @@ export default function useAiWebChatBackend(mode: AiHomeMode, ownerKey: string) 
   return {
     capability,
     providers,
+    providerActivities,
     provider,
     selectProvider,
     controller,

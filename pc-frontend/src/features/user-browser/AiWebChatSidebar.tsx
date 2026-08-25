@@ -128,7 +128,22 @@ export default function AiWebChatSidebar({ web }: { web: AiWebChatBackend }) {
               onClick={() => web.selectProvider(provider.id)}
             >
               <span className={styles.logo}>{provider.id === 'chatgpt' ? '◎' : 'G'}</span>
-              <span><strong>{provider.id === 'chatgpt' ? 'ChatGPT' : 'Google AI'}</strong></span>
+              <span className={styles.providerLabel}>
+                <strong>{provider.id === 'chatgpt' ? 'ChatGPT' : 'Google AI'}</strong>
+                {web.providerActivities[provider.id]?.label && (
+                  <small data-phase={web.providerActivities[provider.id].phase}>
+                    {web.providerActivities[provider.id].label}
+                  </small>
+                )}
+              </span>
+              {web.providerActivities[provider.id]?.phase !== 'idle' && (
+                <i
+                  className={styles.providerActivity}
+                  data-phase={web.providerActivities[provider.id].phase}
+                  aria-label={web.providerActivities[provider.id].label}
+                  title={web.providerActivities[provider.id].label}
+                />
+              )}
             </button>
           ))}
         </div>
