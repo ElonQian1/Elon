@@ -27,6 +27,7 @@
   let observer = null;
   let snapshotScheduler = null;
   let privateStreamUnsubscribe = null;
+  let privateStreamRevision = 0;
   let lastPrivateDirectorySnapshot = '';
   let streamingSnapshotMode = false;
   let privateStreamingSnapshotMode = false;
@@ -237,6 +238,9 @@
       typeof privateStreamTransport.current === 'function'
       ? privateStreamTransport.current(location.pathname)
       : null);
+    const privateStreamState = ['streaming', 'completed'].includes(
+      String(privateStream && privateStream.state || '')
+    ) ? String(privateStream.state) : 'idle';
     const streaming = access.blocked !== true &&
       (streamingState.active || !!(privateStream && privateStream.state === 'streaming'));
     if (access.blocked === true && streamingPolicy) streamingPolicy.reset();
@@ -269,6 +273,9 @@
       composerReady: !!composer,
       streaming,
       streamingStatus: cleanText(privateStream && privateStream.progressLabel).slice(0, 220),
+      privateStreamObserved: privateStreamRevision > 0,
+      privateStreamRevision,
+      privateStreamState,
       currentModel: optional('', () => composerAdapter ? composerAdapter.currentModel(composer) : ''),
       attachments: optional([], () => composerAdapter ? composerAdapter.readAttachments(composer) : []),
       dictationActive,
@@ -721,7 +728,10 @@
   }));
   privateStreamUnsubscribe = optional(null, () => privateStreamTransport &&
     typeof privateStreamTransport.subscribe === 'function'
-    ? privateStreamTransport.subscribe(() => scheduleSnapshot(true))
+    ? privateStreamTransport.subscribe(() => {
+      privateStreamRevision += 1;
+      scheduleSnapshot(true);
+    })
     : null);
   if (privateConversationDirectory &&
       typeof privateConversationDirectory.setListener === 'function') {

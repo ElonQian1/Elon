@@ -124,6 +124,9 @@ Assert-Contains 'private_content_emitted = $false'
 Assert-Contains '[switch]$VerifyStop'
 Assert-Contains 'VerifyStop requires -SendProbe'
 Assert-Contains 'Wait-ChatGptStreamingState -Expected $true'
+Assert-Contains '-PrivateRevisionGreaterThan $privateRevisionBefore'
+Assert-Contains 'Add-Check "private_stream_observed"'
+Assert-Contains 'Test-ChatGptPrivateStreamState -State $streamingState'
 Assert-Contains 'Invoke-UiAction -Action "chatgpt_stop_generation"'
 Assert-Contains 'Wait-ChatGptCommandReceipt -RequestId $stopRequestId'
 Assert-Contains '-ExpectedAction "stop_generation"'
@@ -227,6 +230,29 @@ $streamingState = Wait-ChatGptStreamingState -Expected $true -TimeoutSec 1 `
     -PollIntervalMilliseconds 1 -InvokeUiState { [pscustomobject]@{ streaming = $true } }
 if ($streamingState.streaming -ne $true) {
     throw "Streaming state evidence did not observe the requested state."
+}
+$privateStreamingState = Wait-ChatGptStreamingState -Expected $true -TimeoutSec 1 `
+    -PrivateRevisionGreaterThan 3 -PollIntervalMilliseconds 1 -InvokeUiState {
+        [pscustomobject]@{
+            streaming = $true
+            private_stream_observer = [pscustomobject]@{
+                observed = $true
+                revision = 4
+                state = "streaming"
+            }
+        }
+    }
+if ([long]$privateStreamingState.private_stream_observer.revision -ne 4L) {
+    throw "Private streaming evidence did not require an advanced observer revision."
+}
+if (-not (Test-ChatGptPrivateStreamState -State $privateStreamingState -RevisionGreaterThan 3)) {
+    throw "Private streaming evidence did not validate its structural state."
+}
+$streamingStopEvidence = New-ChatGptStreamingStopEvidence `
+    -StopResult ([pscustomobject]@{ receipt = [pscustomobject]@{ status = "succeeded" } }) `
+    -StoppedState ([pscustomobject]@{ streaming = $false })
+if (-not $streamingStopEvidence.stop_receipt_succeeded -or -not $streamingStopEvidence.streaming_stopped) {
+    throw "Streaming stop evidence did not preserve its structural result."
 }
 $commandReceipt = Wait-ChatGptCommandReceipt -RequestId "request-stop" `
     -ExpectedAction "stop_generation" -TimeoutSec 1 -PollIntervalSec 1 -InvokeUiState {

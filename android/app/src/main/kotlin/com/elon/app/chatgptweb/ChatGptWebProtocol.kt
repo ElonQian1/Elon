@@ -27,6 +27,9 @@ internal data class ChatGptWebSnapshot(
     val authenticated: Boolean,
     val composerReady: Boolean,
     val streaming: Boolean,
+    val privateStreamObserved: Boolean = false,
+    val privateStreamRevision: Long = 0L,
+    val privateStreamState: String = "idle",
     val currentModel: String,
     val attachments: List<ChatGptWebAttachment>,
     val dictationActive: Boolean,
@@ -243,6 +246,12 @@ internal object ChatGptWebProtocol {
             authenticated = event.optBoolean("authenticated"),
             composerReady = event.optBoolean("composerReady"),
             streaming = event.optBoolean("streaming"),
+            privateStreamObserved = event.optBoolean("privateStreamObserved"),
+            privateStreamRevision = event.optLong("privateStreamRevision")
+                .coerceIn(0L, MAX_PRIVATE_STREAM_REVISION),
+            privateStreamState = event.optString("privateStreamState")
+                .takeIf { it in PRIVATE_STREAM_STATES }
+                ?: "idle",
             currentModel = event.optString("currentModel").trim().take(MAX_MODEL_LABEL_LENGTH),
             attachments = parseAttachments(event),
             dictationActive = event.optBoolean("dictationActive"),
@@ -593,6 +602,8 @@ internal object ChatGptWebProtocol {
     private val PAGE_KINDS = setOf("auth", "conversation", "home", "feature")
     private val ACCESS_REASONS = setOf("login_required", "rate_limited")
     private val ACCESS_SOURCES = setOf("visible_page", "private_response")
+    private const val MAX_PRIVATE_STREAM_REVISION = 1_000_000_000L
+    private val PRIVATE_STREAM_STATES = setOf("idle", "streaming", "completed")
     private val SUPPORTED_TOUCH_PURPOSES = setOf(
         "list_model_options",
         "list_composer_tools",

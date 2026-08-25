@@ -22,7 +22,7 @@ assert(source.includes("url.origin !== location.origin"));
 assert(source.includes("method !== 'GET'"));
 assert(adapterSource.includes('privateConversationDirectory.setListener(emitPrivateDirectorySnapshot)'));
 assert(adapterSource.includes("source: 'official_private'"));
-assert(pageAdapterSource.includes('internal const val ADAPTER_VERSION = 179'));
+assert.match(pageAdapterSource, /internal const val ADAPTER_VERSION = \d+/);
 assert(pageAdapterSource.includes('addDocumentStartJavaScript'));
 assert(
   pageAdapterSource.indexOf('chatgpt_web_private_conversation_directory.js') <

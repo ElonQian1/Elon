@@ -92,16 +92,47 @@ function Wait-ChatGptStreamingState {
         [Parameter(Mandatory = $true)][scriptblock]$InvokeUiState,
         [Parameter(Mandatory = $true)][bool]$Expected,
         [Parameter(Mandatory = $true)][int]$TimeoutSec,
-        [int]$PollIntervalMilliseconds = 250
+        [int]$PollIntervalMilliseconds = 250,
+        [long]$PrivateRevisionGreaterThan = -1L
     )
 
     $deadline = [DateTimeOffset]::UtcNow.AddSeconds($TimeoutSec)
     do {
         $state = & $InvokeUiState
-        if ([bool]$state.streaming -eq $Expected) { return $state }
+        $privateObserved = $PrivateRevisionGreaterThan -lt 0L -or (
+            $state.private_stream_observer.observed -eq $true -and
+            [long]$state.private_stream_observer.revision -gt $PrivateRevisionGreaterThan
+        )
+        if ([bool]$state.streaming -eq $Expected -and $privateObserved) { return $state }
         Start-Sleep -Milliseconds $PollIntervalMilliseconds
     } while ([DateTimeOffset]::UtcNow -lt $deadline)
     throw "Timed out waiting for ChatGPT streaming state: $Expected"
+}
+
+function Test-ChatGptPrivateStreamState {
+    param(
+        [Parameter(Mandatory = $true)]$State,
+        [Parameter(Mandatory = $true)][long]$RevisionGreaterThan
+    )
+
+    return $State.private_stream_observer.observed -eq $true -and
+        [long]$State.private_stream_observer.revision -gt $RevisionGreaterThan -and
+        [string]$State.private_stream_observer.state -eq "streaming"
+}
+
+function New-ChatGptStreamingStopEvidence {
+    param(
+        [Parameter(Mandatory = $true)]$StopResult,
+        [Parameter(Mandatory = $true)]$StoppedState
+    )
+
+    return [ordered]@{
+        streaming_observed = $true
+        private_stream_observed = $true
+        stop_receipt_succeeded = [string]$StopResult.receipt.status -eq "succeeded"
+        streaming_stopped = -not [bool]$StoppedState.streaming
+        private_content_emitted = $false
+    }
 }
 
 function Wait-ChatGptCommandReceipt {

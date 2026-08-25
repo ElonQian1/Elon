@@ -82,6 +82,9 @@ class ChatGptWebProtocolTest {
                 "loginRequired":false,
                 "composerReady":true,
                 "streaming":false,
+                "privateStreamObserved":true,
+                "privateStreamRevision":7,
+                "privateStreamState":"completed",
                 "currentModel":"5.6 Sol 轻度",
                 "dictationActive":true,
                 "observedMessageCount":43,
@@ -118,6 +121,9 @@ class ChatGptWebProtocolTest {
         assertFalse(event.value.loginRequired)
         assertTrue(event.value.composerReady)
         assertFalse(event.value.streaming)
+        assertTrue(event.value.privateStreamObserved)
+        assertEquals(7L, event.value.privateStreamRevision)
+        assertEquals("completed", event.value.privateStreamState)
         assertEquals("5.6 Sol 轻度", event.value.currentModel)
         assertTrue(event.value.dictationActive)
         assertEquals("需求.txt", event.value.attachments.single().name)

@@ -650,6 +650,7 @@ if ($SendProbe) {
 
     $streamingStop = $null
     if ($VerifyStop) {
+        $privateRevisionBefore = [long]$blankState.private_stream_observer.revision
         $streamingPrompt = "Write 200 short numbered lines, one item per line."
         Invoke-UiAction -Action "set_input_text" -Arguments @{ text = $streamingPrompt } | Out-Null
         $streamDispatch = Invoke-UiAction -Action "send_input"
@@ -658,8 +659,12 @@ if ($SendProbe) {
             throw "Streaming probe send_input did not return a command receipt request_id."
         }
         $streamingState = Wait-ChatGptStreamingState -Expected $true -TimeoutSec 30 `
+            -PrivateRevisionGreaterThan $privateRevisionBefore `
             -InvokeUiState { Invoke-ApkMcp -Tool "ui_state" }
         Add-Check "streaming_observed" ([bool]$streamingState.streaming) "active=True"
+        Add-Check "private_stream_observed" `
+            (Test-ChatGptPrivateStreamState -State $streamingState -RevisionGreaterThan $privateRevisionBefore) `
+            "revision_advanced=True,state=streaming"
 
         $stopDispatch = Invoke-UiAction -Action "chatgpt_stop_generation"
         $stopRequestId = [string]$stopDispatch.command_receipt.request_id
@@ -673,12 +678,7 @@ if ($SendProbe) {
             -InvokeUiState { Invoke-ApkMcp -Tool "ui_state" }
         Add-Check "streaming_stopped" (-not [bool]$stoppedState.streaming) `
             ([string]$stopResult.receipt.status)
-        $streamingStop = [ordered]@{
-            streaming_observed = $true
-            stop_receipt_succeeded = [string]$stopResult.receipt.status -eq "succeeded"
-            streaming_stopped = -not [bool]$stoppedState.streaming
-            private_content_emitted = $false
-        }
+        $streamingStop = New-ChatGptStreamingStopEvidence -StopResult $stopResult -StoppedState $stoppedState
     }
 
     $prompt = "Reply only with: $ProbeMarker"
