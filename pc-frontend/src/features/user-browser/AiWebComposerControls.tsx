@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import { ChevronDown, Clock3, Grid3X3, Mic, Paperclip, StopCircle, Wrench } from 'lucide-react'
+import { AudioLines, ChevronDown, Clock3, Grid3X3, Mic, MicOff, Paperclip, PhoneOff, StopCircle, Wrench } from 'lucide-react'
 import type { LocalAiComposerOption, LocalAiFeatureNavigationItem } from './localAiBrowserProtocol'
+import { findLocalAiRealtimeVoiceControls } from './localAiRealtimeVoice'
 import type { AiWebChatBackend } from './useAiWebChatBackend'
 import AiWebAccessRecoveryCard from './AiWebAccessRecoveryCard'
 import styles from './AiWebComposerControls.module.css'
@@ -26,6 +27,7 @@ export default function AiWebComposerControls({ web }: { web: AiWebChatBackend }
   const composerOptions = panel === 'model' || panel === 'tools' ? composerCache[panel].options : []
   const featureOptions = panel === 'features' ? featureCache.options : []
   const temporaryChat = web.controller.uiManifest?.controls.find((control) => control.semantic === 'temporary_chat')
+  const realtimeVoice = findLocalAiRealtimeVoiceControls(web.controller.uiManifest?.controls ?? [])
 
   useEffect(() => {
     setPanel(null)
@@ -111,6 +113,47 @@ export default function AiWebComposerControls({ web }: { web: AiWebChatBackend }
             title="使用 ChatGPT 官网当前的临时聊天开关"
           >
             <Clock3 size={13} /><span>{temporaryChat.selected ? '临时聊天已开' : '临时聊天'}</span>
+          </button>
+        )}
+        {actions.has('invoke_ui_control') && realtimeVoice.start && !realtimeVoice.active && (
+          <button
+            type="button"
+            onClick={() => void web.controller.run('invoke_ui_control', realtimeVoice.start?.id)}
+            disabled={busy || !realtimeVoice.start.enabled}
+            title="使用 ChatGPT 官网实时语音；首次使用时 WebView2 可能请求麦克风权限"
+          >
+            <AudioLines size={13} /><span>实时语音</span>
+          </button>
+        )}
+        {actions.has('invoke_ui_control') && realtimeVoice.mute && (
+          <button
+            type="button"
+            onClick={() => void web.controller.run('invoke_ui_control', realtimeVoice.mute?.id)}
+            disabled={busy || !realtimeVoice.mute.enabled}
+            title="使用 ChatGPT 官网控件将实时语音静音"
+          >
+            <MicOff size={13} /><span>静音</span>
+          </button>
+        )}
+        {actions.has('invoke_ui_control') && realtimeVoice.unmute && (
+          <button
+            type="button"
+            onClick={() => void web.controller.run('invoke_ui_control', realtimeVoice.unmute?.id)}
+            disabled={busy || !realtimeVoice.unmute.enabled}
+            title="使用 ChatGPT 官网控件恢复麦克风"
+          >
+            <Mic size={13} /><span>取消静音</span>
+          </button>
+        )}
+        {actions.has('invoke_ui_control') && realtimeVoice.end && (
+          <button
+            type="button"
+            data-active
+            onClick={() => void web.controller.run('invoke_ui_control', realtimeVoice.end?.id)}
+            disabled={busy || !realtimeVoice.end.enabled}
+            title="使用 ChatGPT 官网控件结束实时语音"
+          >
+            <PhoneOff size={13} /><span>结束语音</span>
           </button>
         )}
         <span className={styles.source}>{web.provider.displayName} 官方网页会话</span>

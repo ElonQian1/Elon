@@ -21,6 +21,10 @@ const responseRefreshConfigPath = path.join(
   root,
   'pc-frontend/src/features/user-browser/localAiWebChatControllerConfig.ts',
 )
+const realtimeVoicePath = path.join(
+  root,
+  'pc-frontend/src/features/user-browser/localAiRealtimeVoice.ts',
+)
 const responseTracking = read('pc-frontend/src/features/user-browser/localAiResponseTracking.ts')
 const backend = read('pc-frontend/src/features/user-browser/useAiWebChatBackend.ts')
 const userState = read('pc-frontend/src/features/user-browser/localAiUserState.ts')
@@ -77,6 +81,9 @@ assert.match(backend, /localAiHistoryWindow/)
 assert.match(sidebar, /historyWindow\.label/)
 assert.match(controls, /MENU_CACHE_TTL_MS/)
 assert.match(controls, /menuNeedsRefresh/)
+assert.match(controls, /findLocalAiRealtimeVoiceControls/)
+assert.match(controls, /<span>实时语音<\/span>/)
+assert.match(controls, /<span>结束语音<\/span>/)
 assert.match(backend, /官方网页尚未恢复到对应会话/)
 assert.match(userState, /context_restoring/)
 assert.match(userState, /缓存会话与当前官方页面不一致/)
@@ -104,6 +111,28 @@ assert.equal(responseRefreshConfig.localAiResponseRefreshPhase({
   providerId: 'google-ai-mode', current: 'streaming_watchdog', assistantObserved: true,
   streaming: false, completed: true,
 }), 'completed')
+
+const { findLocalAiRealtimeVoiceControls } = loadTypeScriptModule(realtimeVoicePath)
+const baseControl = {
+  region: 'composer', role: 'button', enabled: true, selected: false,
+}
+const idleVoice = findLocalAiRealtimeVoiceControls([
+  { ...baseControl, id: 'voice-start', semantic: 'voice_mode', label: 'Start voice mode' },
+])
+assert.equal(idleVoice.start.id, 'voice-start')
+assert.equal(idleVoice.active, false)
+const activeVoice = findLocalAiRealtimeVoiceControls([
+  { ...baseControl, id: 'mute', semantic: 'voice_mute', label: 'Mute microphone', region: 'overlay' },
+  { ...baseControl, id: 'end', semantic: 'close', label: 'End voice call', region: 'overlay' },
+])
+assert.equal(activeVoice.mute.id, 'mute')
+assert.equal(activeVoice.end.id, 'end')
+assert.equal(activeVoice.active, true)
+const genericDialog = findLocalAiRealtimeVoiceControls([
+  { ...baseControl, id: 'close', semantic: 'close', label: '关闭', region: 'overlay' },
+])
+assert.equal(genericDialog.end, undefined)
+assert.equal(genericDialog.active, false)
 
 process.stdout.write('PASS local AI stable context and response refresh contract\n')
 
