@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  var VERSION = 5;
+  var VERSION = 6;
   var PROVIDER_ID = '__PROVIDER_ID__';
   var MAX_BODY_BYTES = 2 * 1024 * 1024;
   var ANALYSIS_SCHEMA = 'yilong.web-ai.capture-analysis.v1';
@@ -54,10 +54,12 @@
   function responseFormat(contentType, bodyPrefix) {
     var value = String(contentType || '').toLowerCase();
     if (value.indexOf('text/event-stream') >= 0) return 'sse';
+    var prefix = String(bodyPrefix || '').trimStart();
+    // Some official fetch layers preserve the SSE body while normalizing the
+    // response header to JSON or plain text. The framed body is authoritative.
+    if (prefix.indexOf('data:') === 0 || prefix.indexOf('event:') === 0) return 'sse';
     if (value.indexOf('ndjson') >= 0 || value.indexOf('jsonl') >= 0) return 'ndjson';
     if (value.indexOf('json') >= 0) return 'json';
-    var prefix = String(bodyPrefix || '').trimStart();
-    if (prefix.indexOf('data:') === 0 || prefix.indexOf('event:') === 0) return 'sse';
     if (prefix.charAt(0) === '{' || prefix.charAt(0) === '[') return 'json';
     return 'text';
   }
@@ -92,7 +94,7 @@
     return '';
   }
 
-  function chatGptStreamAnalysis(body, format) {
+  function chatGptStreamAnalysis(body, format, recoveryGeneration) {
     if (PROVIDER_ID !== 'chatgpt' || format !== 'sse') return null;
     var policy = window.__elonChatGptPrivateStreamPolicy;
     var base = {
@@ -155,6 +157,8 @@
             messageId: snapshot.id || '',
             turnId: snapshot.turnId || '',
             conversationId: snapshot.conversationId || conversationId || '',
+            text: snapshot.text || '',
+            generation: recoveryGeneration,
             richParts: snapshot.richParts
           });
         }
@@ -183,7 +187,7 @@
       body: bounded.body,
       truncated: bounded.truncated
     };
-    var analysis = chatGptStreamAnalysis(bounded.body, format);
+    var analysis = chatGptStreamAnalysis(bounded.body, format, meta.recoveryGeneration);
     if (analysis) capture.analysis = analysis;
     invokeCapture(capture);
   }
@@ -230,6 +234,10 @@
     var originalFetch = window.fetch;
     var wrappedFetch = function (input, init) {
       var meta = classify(requestUrl(input), requestMethod(input, init));
+      var recovery = window.__elonWinChatGptPrivateStreamRecovery;
+      if (meta && recovery && typeof recovery.generation === 'function') {
+        try { meta.recoveryGeneration = recovery.generation(); } catch (_) {}
+      }
       return originalFetch.apply(this, arguments).then(function (response) {
         if (meta) void observeFetchResponse(response, meta);
         return response;
@@ -251,6 +259,10 @@
       var xhr = this;
       var meta = xhrMeta.get(xhr);
       if (meta) {
+        var recovery = window.__elonWinChatGptPrivateStreamRecovery;
+        if (recovery && typeof recovery.generation === 'function') {
+          try { meta.recoveryGeneration = recovery.generation(); } catch (_) {}
+        }
         xhr.addEventListener('loadend', function () {
           if (xhr.status < 100 || xhr.status > 599) return;
           var contentType = '';

@@ -19,6 +19,7 @@ FakeXhr.prototype.send = function () {}
 async function main() {
   const captures = []
   const recovered = []
+  const recoveryGeneration = 7
   let fetchCalls = 0
   const richStream = [
     'data: ' + JSON.stringify({
@@ -53,6 +54,7 @@ async function main() {
   const window = {
     __elonChatGptPrivateStreamPolicy: privateStreamPolicy,
     __elonWinChatGptPrivateStreamRecovery: {
+      generation: () => recoveryGeneration,
       accept: (snapshot) => recovered.push(snapshot),
     },
     __TAURI_INTERNALS__: {
@@ -65,7 +67,11 @@ async function main() {
         : richStream
       return new Response(body, {
         status: 200,
-        headers: { 'content-type': 'text/event-stream' },
+        headers: {
+          'content-type': String(input).includes('mislabeled=1')
+            ? 'application/json'
+            : 'text/event-stream',
+        },
       })
     },
     XMLHttpRequest: FakeXhr,
@@ -110,29 +116,39 @@ async function main() {
   assert.equal(recovered.length, 1)
   assert.equal(recovered[0].messageId, 'assistant-one')
   assert.equal(recovered[0].conversationId, 'conversation-one')
+  assert.equal(recovered[0].text, 'visible answer')
+  assert.equal(recovered[0].generation, recoveryGeneration)
   assert.equal(recovered[0].richParts[0].richContent.source, 'private_response')
   assert.doesNotMatch(JSON.stringify(captures[0]), /request-secret/)
+
+  await window.fetch('https://chatgpt.com/backend-api/f/conversation?mislabeled=1', {
+    method: 'POST',
+  })
+  await new Promise((resolve) => setTimeout(resolve, 20))
+  assert.equal(captures[1].args.capture.format, 'sse')
+  assert.deepEqual(Array.from(captures[1].args.capture.analysis.richKinds), ['chart'])
+  assert.equal(recovered[1].generation, recoveryGeneration)
 
   await window.fetch('https://chatgpt.com/backend-api/f/conversation/stream', {
     method: 'POST',
   })
   await new Promise((resolve) => setTimeout(resolve, 20))
-  assert.equal(captures.length, 2, 'versioned conversation stream paths must remain observable')
-  assert.equal(captures[1].args.capture.endpointFamily, 'conversation_stream')
+  assert.equal(captures.length, 3, 'versioned conversation stream paths must remain observable')
+  assert.equal(captures[2].args.capture.endpointFamily, 'conversation_stream')
 
   await window.fetch('https://chatgpt.com/backend-anon/conversation', {
     method: 'POST',
   })
   await new Promise((resolve) => setTimeout(resolve, 20))
-  assert.equal(captures.length, 3, 'guest conversation streams must enter the local research capture')
-  assert.equal(captures[2].args.capture.endpointFamily, 'conversation_stream')
-  assert.equal(captures[2].args.capture.analysis.decodedFrameCount, 1)
-  assert.equal(captures[2].args.capture.analysis.acceptedFrameCount, 0)
+  assert.equal(captures.length, 4, 'guest conversation streams must enter the local research capture')
+  assert.equal(captures[3].args.capture.endpointFamily, 'conversation_stream')
+  assert.equal(captures[3].args.capture.analysis.decodedFrameCount, 1)
+  assert.equal(captures[3].args.capture.analysis.acceptedFrameCount, 0)
 
   await window.fetch('https://chatgpt.com/backend-api/accounts/check', { method: 'GET' })
   await new Promise((resolve) => setTimeout(resolve, 5))
-  assert.equal(fetchCalls, 4)
-  assert.equal(captures.length, 3, 'unregistered endpoint families must not enter local capture')
+  assert.equal(fetchCalls, 5)
+  assert.equal(captures.length, 4, 'unregistered endpoint families must not enter local capture')
   console.log('Win Web response research capture tests passed')
 }
 

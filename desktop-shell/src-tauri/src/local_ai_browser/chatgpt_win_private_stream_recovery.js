@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  var VERSION = 3;
+  var VERSION = 4;
   var MAX_AGE_MS = 5 * 60 * 1000;
   var OFFICIAL_COMPLETION_SETTLE_MS = 3000;
   var MAX_RICH_PARTS = 4;
@@ -24,6 +24,7 @@
   var completionOverride = null;
   var disposed = false;
   var baseUnsubscribe = null;
+  var conversationGeneration = 0;
 
   function cleanText(value, limit) {
     return String(value || '').replace(/\s+/g, ' ').trim().slice(0, limit || 240);
@@ -278,7 +279,8 @@
     if (routeConversationId && recovered.conversationId &&
         routeConversationId !== recovered.conversationId) return null;
     var active = currentBase(pathname);
-    if (!routeConversationId && !identityMatches(recovered, active)) return null;
+    if (!routeConversationId && !active && recovered.detached !== true) return null;
+    if (!routeConversationId && active && !identityMatches(recovered, active)) return null;
     if (active && !identityMatches(recovered, active)) return null;
     return recovered;
   }
@@ -293,18 +295,30 @@
     if (disposed || !snapshot || typeof snapshot !== 'object') return false;
     var values = sanitizeRichParts(snapshot.richParts);
     if (!values.length) return false;
+    var suppliedGeneration = Number(snapshot.generation);
+    var generationBound = Number.isSafeInteger(suppliedGeneration) &&
+      suppliedGeneration === conversationGeneration;
+    if (Number.isSafeInteger(suppliedGeneration) && !generationBound) return false;
     var candidate = {
       messageId: cleanText(snapshot.messageId || snapshot.id, 180),
       turnId: cleanText(snapshot.turnId, 180),
       conversationId: cleanText(snapshot.conversationId, 180),
+      text: cleanText(snapshot.text, 8000),
       richParts: values,
-      updatedAt: Date.now()
+      updatedAt: Date.now(),
+      detached: false
     };
     var routeConversationId = activeConversationId(location.pathname);
     var active = currentBase(location.pathname);
     if (routeConversationId && candidate.conversationId &&
         routeConversationId !== candidate.conversationId) return false;
-    if (!routeConversationId && !identityMatches(candidate, active)) return false;
+    if (!routeConversationId && !active) {
+      if (!generationBound || !candidate.messageId || !candidate.conversationId || !candidate.text) {
+        return false;
+      }
+      candidate.detached = true;
+    }
+    if (!routeConversationId && active && !identityMatches(candidate, active)) return false;
     if (active && !identityMatches(candidate, active)) return false;
     recovered = candidate;
     notify();
@@ -348,7 +362,8 @@
     if (!recovery || !Array.isArray(messages)) return messages;
     var assistantIndex = -1;
     for (var index = messages.length - 1; index >= 0; index -= 1) {
-      if (messages[index] && messages[index].role === 'assistant') {
+      if (messages[index] && messages[index].role === 'assistant' &&
+          (recovery.detached !== true || completionTextMatches(recovery, messages[index]))) {
         assistantIndex = index;
         break;
       }
@@ -385,6 +400,7 @@
       return applyMergedCompletion(enrichMessages(merged, pathname), pathname);
     },
     reset: function () {
+      conversationGeneration += 1;
       recovered = null;
       completionOverride = null;
       try { if (typeof base.reset === 'function') base.reset(); } catch (_) {}
@@ -398,6 +414,7 @@
     dispose: function () {
       if (disposed) return;
       disposed = true;
+      conversationGeneration += 1;
       recovered = null;
       completionOverride = null;
       listeners.clear();
@@ -414,6 +431,7 @@
     version: VERSION,
     transport: transport,
     baseTransport: base,
+    generation: function () { return conversationGeneration; },
     accept: accept,
     detach: function () {
       if (typeof baseUnsubscribe === 'function') baseUnsubscribe();

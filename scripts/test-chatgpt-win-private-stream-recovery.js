@@ -202,13 +202,37 @@ assert.equal(recovery.accept({
 
 context.location.pathname = '/'
 active = null
+const detachedGeneration = recovery.generation()
 assert.equal(recovery.accept({
   messageId: 'stale-assistant',
   conversationId: 'conversation-one',
+  text: 'BTC answer',
+  generation: detachedGeneration,
   richParts: [financePart()],
-}), false, 'a reset root route requires matching live-stream identity')
+}), true, 'a generation-bound research response can recover when the live observer missed the stream')
+const detachedMerged = transport.mergeMessages(messages, '/')
+assert.equal(detachedMerged[0].content.filter((part) => part.type === 'rich_card').length, 1)
+const unrelated = transport.mergeMessages([{
+  id: 'other-assistant',
+  role: 'assistant',
+  state: 'completed',
+  content: [{ type: 'markdown', text: 'unrelated answer' }],
+}], '/')
+assert.equal(
+  unrelated[0].content.some((part) => part.type === 'rich_card'),
+  false,
+  'detached recovery must match the official answer text before enrichment',
+)
 
 transport.reset()
 assert.equal(baseResetCount, 1)
+assert.equal(recovery.generation(), detachedGeneration + 1)
+assert.equal(recovery.accept({
+  messageId: 'late-assistant',
+  conversationId: 'conversation-one',
+  text: 'BTC answer',
+  generation: detachedGeneration,
+  richParts: [financePart()],
+}), false, 'an old response must not cross a new-conversation generation boundary')
 assert.equal(transport.mergeMessages(messages, '/'), messages)
 console.log('ChatGPT Win private stream recovery tests passed')
