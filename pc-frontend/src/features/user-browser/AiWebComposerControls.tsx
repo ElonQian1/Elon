@@ -121,10 +121,10 @@ export default function AiWebComposerControls({ web }: { web: AiWebChatBackend }
           <button
             type="button"
             onClick={() => void realtimeVoiceControl.run('start', realtimeVoice.start?.id ?? '')}
-            disabled={busy || realtimeVoiceControl.hangupStatus === 'confirming' || !realtimeVoice.start.enabled}
+            disabled={busy || realtimeVoiceControl.activationStatus === 'confirming' || realtimeVoiceControl.hangupStatus === 'confirming' || !realtimeVoice.start.enabled}
             title="使用 ChatGPT 官网实时语音；首次使用时 WebView2 可能请求麦克风权限"
           >
-            <AudioLines size={13} /><span>实时语音</span>
+            <AudioLines size={13} /><span>{realtimeVoiceControl.activationStatus === 'confirming' ? '正在连接' : '实时语音'}</span>
           </button>
         )}
         {actions.has('invoke_ui_control') && realtimeVoice.mute && (
@@ -162,8 +162,14 @@ export default function AiWebComposerControls({ web }: { web: AiWebChatBackend }
         )}
         <span className={styles.source}>{realtimeVoiceControl.hangupStatus === 'confirming'
           ? '正在确认官网语音已结束…'
-          : realtimeVoiceControl.hangupStatus === 'unconfirmed'
-            ? '官网语音可能仍在通话，请再次挂断或打开官方页确认'
+            : realtimeVoiceControl.hangupStatus === 'unconfirmed'
+              ? '官网语音可能仍在通话，请再次挂断或打开官方页确认'
+            : realtimeVoiceControl.activationStatus === 'confirming'
+              ? '正在确认官网实时语音已连接…'
+            : realtimeVoiceControl.activationStatus === 'unconfirmed'
+              ? '官网语音连接尚未确认，可再次尝试或显示官方页'
+            : realtimeVoiceControl.activationStatus === 'active'
+              ? '官网实时语音已连接'
             : realtimeVoiceControl.transcriptSyncing
               ? '正在同步语音转写与回复…'
               : `${web.provider.displayName} 官方网页会话`}</span>

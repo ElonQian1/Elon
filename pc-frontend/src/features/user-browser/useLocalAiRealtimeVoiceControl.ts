@@ -7,6 +7,11 @@ import {
 } from './localAiBrowserApi'
 import { findLocalAiRealtimeVoiceControls, type LocalAiRealtimeVoiceAction } from './localAiRealtimeVoice'
 import {
+  LOCAL_AI_REALTIME_VOICE_ACTIVATION_WATCHDOG_DELAYS_MS,
+  localAiRealtimeVoiceActivationConfirmed,
+  shouldRefreshLocalAiRealtimeVoiceActivationControls,
+} from './localAiRealtimeVoiceActivation'
+import {
   LOCAL_AI_REALTIME_VOICE_HANGUP_WATCHDOG_DELAYS_MS,
   beginLocalAiRealtimeVoiceHangupObservation,
   observeLocalAiRealtimeVoiceHangup,
@@ -22,11 +27,16 @@ const REALTIME_VOICE_TRANSCRIPT_REFRESH_GAPS_MS = [250, 750, 1_500] as const
 export default function useLocalAiRealtimeVoiceControl(web: AiWebChatBackend) {
   const generation = useRef(0)
   const timer = useRef(0)
+  const activationGeneration = useRef(0)
+  const activationTimer = useRef(0)
+  const activationWatchdogIndex = useRef(0)
+  const officialVoiceActive = useRef(false)
   const hangupGeneration = useRef(0)
   const hangupTimer = useRef(0)
   const hangupWatchdogIndex = useRef(0)
   const hangupObservation = useRef(beginLocalAiRealtimeVoiceHangupObservation())
   const manifestRef = useRef(web.controller.uiManifest)
+  const [activationStatus, setActivationStatus] = useState<'idle' | 'confirming' | 'active' | 'unconfirmed'>('idle')
   const [transcriptSyncing, setTranscriptSyncing] = useState(false)
   const [hangupStatus, setHangupStatus] = useState<'idle' | 'confirming' | 'unconfirmed'>('idle')
   const sessionIdentity = web.controller.sessionIdentity
@@ -35,19 +45,89 @@ export default function useLocalAiRealtimeVoiceControl(web: AiWebChatBackend) {
   useEffect(() => {
     generation.current += 1
     window.clearTimeout(timer.current)
+    activationGeneration.current += 1
+    window.clearTimeout(activationTimer.current)
     hangupGeneration.current += 1
     window.clearTimeout(hangupTimer.current)
     timer.current = 0
+    activationTimer.current = 0
+    officialVoiceActive.current = false
     hangupTimer.current = 0
+    setActivationStatus('idle')
     setTranscriptSyncing(false)
     setHangupStatus('idle')
     return () => {
       generation.current += 1
+      activationGeneration.current += 1
       hangupGeneration.current += 1
       window.clearTimeout(timer.current)
+      window.clearTimeout(activationTimer.current)
       window.clearTimeout(hangupTimer.current)
     }
   }, [sessionIdentity])
+
+  const evaluateActivation = useCallback((expectedGeneration: number) => {
+    if (expectedGeneration !== activationGeneration.current) return false
+    const manifest = manifestRef.current
+    const voice = findLocalAiRealtimeVoiceControls(manifest?.controls ?? [])
+    if (!localAiRealtimeVoiceActivationConfirmed({
+      manifestHealthy: manifest?.compatibility === 'healthy',
+      controlsTruncated: manifest?.controlsTruncated === true,
+      voiceActive: voice.active,
+    })) return false
+    activationGeneration.current += 1
+    window.clearTimeout(activationTimer.current)
+    setActivationStatus('active')
+    return true
+  }, [])
+
+  const startActivationConfirmation = useCallback(() => {
+    const expectedGeneration = ++activationGeneration.current
+    window.clearTimeout(activationTimer.current)
+    activationWatchdogIndex.current = 0
+    setActivationStatus('confirming')
+    if (evaluateActivation(expectedGeneration)) return
+    const scheduleNext = (): void => {
+      const checkIndex = activationWatchdogIndex.current
+      const delay = LOCAL_AI_REALTIME_VOICE_ACTIVATION_WATCHDOG_DELAYS_MS[checkIndex]
+      if (delay === undefined) {
+        setActivationStatus('unconfirmed')
+        return
+      }
+      activationTimer.current = window.setTimeout(() => {
+        if (expectedGeneration !== activationGeneration.current) return
+        if (evaluateActivation(expectedGeneration)) return
+        const request = web.officialRequest
+        if (request && shouldRefreshLocalAiRealtimeVoiceActivationControls(checkIndex)) {
+          void runLocalAiWebAdapterCommand(
+            request.providerId, request.ownerKey, 'snapshot_ui_manifest',
+          ).then(() => {}, () => {})
+        }
+        activationWatchdogIndex.current += 1
+        scheduleNext()
+      }, delay)
+    }
+    scheduleNext()
+  }, [evaluateActivation, web.officialRequest])
+
+  useEffect(() => {
+    const manifest = web.controller.uiManifest
+    const voice = findLocalAiRealtimeVoiceControls(manifest?.controls ?? [])
+    if (activationStatus === 'confirming') {
+      evaluateActivation(activationGeneration.current)
+    } else if (localAiRealtimeVoiceActivationConfirmed({
+      manifestHealthy: manifest?.compatibility === 'healthy',
+      controlsTruncated: manifest?.controlsTruncated === true,
+      voiceActive: voice.active,
+    })) {
+      setActivationStatus('active')
+    } else if (activationStatus === 'active'
+      && manifest?.compatibility === 'healthy'
+      && manifest.controlsTruncated !== true
+      && Boolean(voice.start)) {
+      setActivationStatus('idle')
+    }
+  }, [activationStatus, evaluateActivation, web.controller.uiManifest])
 
   const startTranscriptRefresh = useCallback(() => {
     const request = web.officialRequest
@@ -78,6 +158,23 @@ export default function useLocalAiRealtimeVoiceControl(web: AiWebChatBackend) {
     timer.current = window.setTimeout(refresh, REALTIME_VOICE_TRANSCRIPT_REFRESH_GAPS_MS[0])
   }, [web.officialRequest])
 
+  useEffect(() => {
+    const manifest = web.controller.uiManifest
+    const voice = findLocalAiRealtimeVoiceControls(manifest?.controls ?? [])
+    const current = localAiRealtimeVoiceActivationConfirmed({
+      manifestHealthy: manifest?.compatibility === 'healthy',
+      controlsTruncated: manifest?.controlsTruncated === true,
+      voiceActive: voice.active,
+    })
+    const endedOnOfficialSurface = officialVoiceActive.current
+      && !current
+      && manifest?.compatibility === 'healthy'
+      && manifest.controlsTruncated !== true
+      && Boolean(voice.start)
+    officialVoiceActive.current = current
+    if (endedOnOfficialSurface && hangupStatus !== 'confirming') startTranscriptRefresh()
+  }, [hangupStatus, startTranscriptRefresh, web.controller.uiManifest])
+
   const evaluateHangup = useCallback((expectedGeneration: number) => {
     if (expectedGeneration !== hangupGeneration.current) return false
     const manifest = manifestRef.current
@@ -98,6 +195,7 @@ export default function useLocalAiRealtimeVoiceControl(web: AiWebChatBackend) {
     hangupGeneration.current += 1
     window.clearTimeout(hangupTimer.current)
     setHangupStatus('idle')
+    setActivationStatus('idle')
     startTranscriptRefresh()
     return true
   }, [startTranscriptRefresh])
@@ -153,19 +251,26 @@ export default function useLocalAiRealtimeVoiceControl(web: AiWebChatBackend) {
     if (!controlId.trim()) return null
     if (action === 'start') {
       generation.current += 1
+      activationGeneration.current += 1
       hangupGeneration.current += 1
       window.clearTimeout(timer.current)
+      window.clearTimeout(activationTimer.current)
       window.clearTimeout(hangupTimer.current)
+      setActivationStatus('confirming')
       setTranscriptSyncing(false)
       setHangupStatus('idle')
     }
     const next = await web.controller.run('invoke_ui_control', controlId)
     const result = next?.commandResult
+    if (action === 'start') {
+      if (result?.action === 'invoke_ui_control' && result.ok) startActivationConfirmation()
+      else setActivationStatus('unconfirmed')
+    }
     if (action === 'end' && result?.action === 'invoke_ui_control' && result.ok) {
       startHangupConfirmation()
     }
     return next
-  }, [startHangupConfirmation, web.controller])
+  }, [startActivationConfirmation, startHangupConfirmation, web.controller])
 
-  return { run, transcriptSyncing, hangupStatus }
+  return { run, activationStatus, transcriptSyncing, hangupStatus }
 }

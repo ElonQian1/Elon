@@ -33,6 +33,10 @@ const realtimeVoiceHangupPath = path.join(
   root,
   'pc-frontend/src/features/user-browser/localAiRealtimeVoiceHangup.ts',
 )
+const realtimeVoiceActivationPath = path.join(
+  root,
+  'pc-frontend/src/features/user-browser/localAiRealtimeVoiceActivation.ts',
+)
 const realtimeVoiceControl = read('pc-frontend/src/features/user-browser/useLocalAiRealtimeVoiceControl.ts')
 const responseTracking = read('pc-frontend/src/features/user-browser/localAiResponseTracking.ts')
 const backend = read('pc-frontend/src/features/user-browser/useAiWebChatBackend.ts')
@@ -94,7 +98,9 @@ assert.match(controls, /MENU_CACHE_TTL_MS/)
 assert.match(controls, /menuNeedsRefresh/)
 assert.match(controls, /findLocalAiRealtimeVoiceControls/)
 assert.match(controls, /realtimeVoiceControl\.run\('end'/)
-assert.match(controls, /<span>实时语音<\/span>/)
+assert.match(controls, /'正在连接' : '实时语音'/)
+assert.match(controls, /activationStatus === 'confirming'/)
+assert.match(controls, /官网实时语音已连接/)
 assert.match(controls, /正在确认挂断/)
 assert.match(controls, /再次挂断/)
 assert.match(controls, /'结束语音'/)
@@ -106,6 +112,9 @@ assert.match(realtimeVoiceControl, /requestLocalAiCurrentConversationRefresh/)
 assert.match(realtimeVoiceControl, /requestLocalAiWebSnapshot/)
 assert.match(realtimeVoiceControl, /controlLocalAiWebSession/)
 assert.match(realtimeVoiceControl, /snapshot_ui_manifest/)
+assert.match(realtimeVoiceControl, /startActivationConfirmation/)
+assert.match(realtimeVoiceControl, /endedOnOfficialSurface/)
+assert.match(realtimeVoiceControl, /hangupStatus !== 'confirming'/)
 assert.match(controls, /官网语音可能仍在通话，请再次挂断或打开官方页确认/)
 assert.match(directory, /official_partial/)
 assert.match(directory, /is_project_conversation/)
@@ -188,6 +197,22 @@ assert.equal(hangupResult.confirmed, false)
 assert.deepEqual(hangupResult.observation, { stableSinceMs: 0, stableObservations: 0 })
 assert.equal(hangup.shouldRefreshLocalAiRealtimeVoiceHangupControls(0), true)
 assert.equal(hangup.shouldRefreshLocalAiRealtimeVoiceHangupControls(2), false)
+
+const activation = loadTypeScriptModule(realtimeVoiceActivationPath)
+assert.deepEqual(activation.LOCAL_AI_REALTIME_VOICE_ACTIVATION_WATCHDOG_DELAYS_MS, [
+  500, 1_000, 2_000, 4_000, 8_000, 12_000,
+])
+assert.equal(activation.localAiRealtimeVoiceActivationConfirmed({
+  manifestHealthy: true, controlsTruncated: false, voiceActive: true,
+}), true)
+assert.equal(activation.localAiRealtimeVoiceActivationConfirmed({
+  manifestHealthy: false, controlsTruncated: false, voiceActive: true,
+}), false)
+assert.equal(activation.localAiRealtimeVoiceActivationConfirmed({
+  manifestHealthy: true, controlsTruncated: true, voiceActive: true,
+}), false)
+assert.equal(activation.shouldRefreshLocalAiRealtimeVoiceActivationControls(0), true)
+assert.equal(activation.shouldRefreshLocalAiRealtimeVoiceActivationControls(2), false)
 
 process.stdout.write('PASS local AI stable context and response refresh contract\n')
 
