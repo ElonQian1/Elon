@@ -26,20 +26,84 @@ class GoogleWebResponseRefreshCoordinatorTest {
     }
 
     @Test
-    fun streamingAssistantKeepsTheBoundedPollingActive() {
-        val harness = Harness(listOf(10L, 20L))
+    fun streamingAssistantSwitchesFromDensePollingToSparseWatchdogs() {
+        val harness = Harness(
+            delays = listOf(10L, 20L),
+            streamingWatchdogDelays = listOf(100L, 200L),
+        )
 
         harness.start("new question")
         harness.runNext()
+        assertEquals(20L, harness.scheduled.single().delayMs)
         harness.coordinator.onSnapshot(
             latestUserPrompt = "new question",
             assistantObserved = true,
             streaming = true,
         )
+        assertEquals(100L, harness.scheduled.single().delayMs)
+        harness.runNext()
+        assertEquals(200L, harness.scheduled.single().delayMs)
         harness.runNext()
 
-        assertEquals(2, harness.snapshots)
+        assertEquals(3, harness.snapshots)
         assertFalse(harness.coordinator.isActive)
+    }
+
+    @Test
+    fun repeatedStreamingSnapshotsDoNotStackWatchdogs() {
+        val harness = Harness(
+            delays = listOf(10L, 20L),
+            streamingWatchdogDelays = listOf(100L),
+        )
+
+        harness.start("new question")
+        repeat(3) {
+            harness.coordinator.onSnapshot(
+                latestUserPrompt = "new question",
+                assistantObserved = true,
+                streaming = true,
+            )
+        }
+
+        assertEquals(1, harness.scheduled.size)
+        assertEquals(100L, harness.scheduled.single().delayMs)
+    }
+
+    @Test
+    fun completedReplyCancelsTheStreamingWatchdog() {
+        val harness = Harness(
+            delays = listOf(10L),
+            streamingWatchdogDelays = listOf(100L),
+        )
+
+        harness.start("new question")
+        harness.coordinator.onSnapshot("new question", assistantObserved = true, streaming = true)
+        harness.coordinator.onSnapshot("new question", assistantObserved = true, streaming = false)
+
+        assertFalse(harness.coordinator.isActive)
+        assertTrue(harness.scheduled.isEmpty())
+    }
+
+    @Test
+    fun synchronousStreamingObservationCannotLeaveDenseAndSparseTimersTogether() {
+        val scheduled = mutableListOf<Scheduled>()
+        lateinit var coordinator: GoogleWebResponseRefreshCoordinator
+        coordinator = GoogleWebResponseRefreshCoordinator(
+            requestSnapshot = {
+                coordinator.onSnapshot("new question", assistantObserved = true, streaming = true)
+            },
+            schedule = { task, delayMs -> scheduled += Scheduled(task, delayMs) },
+            cancel = { task -> scheduled.removeAll { it.task === task } },
+            delaysMs = listOf(10L, 20L),
+            streamingWatchdogDelaysMs = listOf(100L),
+        )
+
+        coordinator.onSendStarted("new question")
+        coordinator.onSendConfirmed()
+        scheduled.removeAt(0).task.run()
+
+        assertEquals(1, scheduled.size)
+        assertEquals(100L, scheduled.single().delayMs)
     }
 
     @Test
@@ -96,7 +160,10 @@ class GoogleWebResponseRefreshCoordinatorTest {
         assertEquals(1, harness.snapshots)
     }
 
-    private class Harness(delays: List<Long>) {
+    private class Harness(
+        delays: List<Long>,
+        streamingWatchdogDelays: List<Long> = listOf(100L),
+    ) {
         var snapshots = 0
         val scheduled = mutableListOf<Scheduled>()
         val coordinator = GoogleWebResponseRefreshCoordinator(
@@ -104,6 +171,7 @@ class GoogleWebResponseRefreshCoordinatorTest {
             schedule = { task, delayMs -> scheduled += Scheduled(task, delayMs) },
             cancel = { task -> scheduled.removeAll { it.task === task } },
             delaysMs = delays,
+            streamingWatchdogDelaysMs = streamingWatchdogDelays,
         )
 
         fun start(prompt: String) {

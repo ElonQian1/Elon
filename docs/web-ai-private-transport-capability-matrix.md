@@ -16,7 +16,7 @@ installed build; individual capability documents retain implementation evidence.
 | Realtime voice background continuity | ChatGPT | Completed and enabled; native/system overlay handoff and media auto-pause device verified, manual overlay actions pending | Official WebView voice and foreground notification |
 | Conversation directory | Google Web AI | Completed and enabled | Local cache and official page |
 | Visited conversation body cache | Google Web AI | Completed and enabled; device acceptance pending | Official WebView navigation |
-| Reply completion observer | Google Web AI | Completed and enabled | Official DOM snapshot |
+| Reply stream and completion observer | Google Web AI | Completed and enabled; adaptive-watchdog device regression pending | Official DOM snapshot |
 | Background navigation continuity | ChatGPT and Google Web AI | Completed, enabled, and device verified | Bounded official WebView recovery |
 
 All production transports keep the official page authoritative. They do not export
@@ -34,6 +34,12 @@ Previously visited Google conversation bodies use a provider-scoped, URL-validat
 snapshot before official navigation starts. The cache is bounded to 30 days, 128 files,
 24 MiB total, and 2 MiB per conversation. A missing, expired, corrupt, or mismatched
 snapshot renders an empty loading state and continues through the official page.
+
+Google reply observation keeps fast bounded snapshots only until the matching assistant
+reply appears. Once streaming is visible, MutationObserver and the passive same-origin
+completion signal remain primary while dense polling is replaced by four sparse watchdogs
+over 68 seconds. Repeated streaming snapshots cannot stack timers, completion cancels the
+remaining watchdog immediately, and the official DOM snapshot remains the fallback.
 
 Realtime voice hangup has two separate states: the APK requesting the official action,
 and the official call actually settling. Late reconciliation runs only after the official

@@ -92,11 +92,11 @@ internal object WebAiPrivateTransportCatalog {
             id = "android_google_web_private_reply_observer_v1",
             provider = "google_web_ai",
             status = "completed",
-            verification = "device_verified",
+            verification = "targeted_tests_passed_device_regression_pending",
             productionDefault = true,
             runtimeEnabled = true,
             requestMode = "passive_completion_signal",
-            healthPolicy = "bounded_probe_then_dom_reconciliation",
+            healthPolicy = "fast_initial_probe_then_sparse_stream_watchdog_and_dom_reconciliation",
             fallback = "official_dom_reply_snapshot",
         ),
         Entry(
