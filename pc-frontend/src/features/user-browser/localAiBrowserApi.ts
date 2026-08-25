@@ -478,18 +478,30 @@ export async function waitForLocalAiAdapterResult(
   action: string,
   requestId: string,
 ): Promise<LocalAiWebSessionState | null> {
-  if (!isLocalAiRequestId(requestId)) throw new Error('本地 AI 命令回执标识无效。')
-  const attempts = localAiAdapterResultAttempts(action)
+  return waitForLocalAiAdapterResults(providerId, ownerKey, [{ action, requestId }])
+}
+
+export async function waitForLocalAiAdapterResults(
+  providerId: string,
+  ownerKey: string,
+  requests: ReadonlyArray<{ action: string; requestId: string }>,
+): Promise<LocalAiWebSessionState | null> {
+  if (!requests.length || requests.some(({ requestId }) => !isLocalAiRequestId(requestId))) {
+    throw new Error('本地 AI 命令回执标识无效。')
+  }
+  const attempts = Math.max(...requests.map(({ action }) => localAiAdapterResultAttempts(action)))
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     await new Promise((resolve) => window.setTimeout(resolve, LOCAL_AI_RESULT_POLL_INTERVAL_MS))
     const state = await getLocalAiWebSessionState(providerId, ownerKey)
-    const receipt = findMatchingLocalAiCommandReceipt(
-      state.commandResult,
-      state.commandResults,
-      action,
-      requestId,
-    )
-    if (receipt) return state.commandResult === receipt ? state : { ...state, commandResult: receipt }
+    for (const { action, requestId } of requests) {
+      const receipt = findMatchingLocalAiCommandReceipt(
+        state.commandResult,
+        state.commandResults,
+        action,
+        requestId,
+      )
+      if (receipt) return state.commandResult === receipt ? state : { ...state, commandResult: receipt }
+    }
   }
   return null
 }

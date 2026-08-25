@@ -58,6 +58,8 @@ import useLocalAiPendingResponseWatchdog from './useLocalAiPendingResponseWatchd
 import useLocalAiComposerDraft from './useLocalAiComposerDraft'
 import { localAiWarmSessionReusable } from './localAiWarmSessionPolicy'
 import { resumeLocalAiWebSession } from './resumeLocalAiWebSession'
+import useLocalAiCapabilityPrewarm from './useLocalAiCapabilityPrewarm'
+import { syncLocalAiDeferredMenu } from './localAiDeferredMenuSync'
 
 export default function useLocalAiWebChatController(
   provider: LocalAiWebProvider | undefined,
@@ -168,6 +170,10 @@ export default function useLocalAiWebChatController(
     queuedSendActive: Boolean(queuedSend),
     busyAction,
   })
+  const capabilityPrewarmBlocked = Boolean(
+    busyAction || draft.trim() || pendingSends.length || pendingResponses.length
+      || queuedSend || newConversationRecoveryStartedAtMs,
+  )
 
   function setSessionState(state: LocalAiWebSessionState | null) {
     setSessionEntry({ identity: requestedSessionIdentity, state })
@@ -717,21 +723,20 @@ export default function useLocalAiWebChatController(
     setBusyAction(listAction)
     setMessage('正在读取官网可见选项…')
     try {
-      const requestId = await runLocalAiWebAdapterCommand(provider.id, ownerKey, listAction)
-      await new Promise((resolve) => window.setTimeout(resolve, 180))
-      let next = await getLocalAiWebSessionState(provider.id, ownerKey)
-      // 首轮 180ms 内常常还没等到 list 回执；second 命令是 collect，回执的 action 也是
-      // collect，必须换成它自己的 action/requestId 去等，否则会一直等一个不会出现的匹配。
-      let resultAction: LocalAiAdapterAction = listAction
-      let resultRequestId = requestId
-      if (next.commandResult?.requestId !== requestId) {
-        resultAction = collectAction
-        resultRequestId = await runLocalAiWebAdapterCommand(provider.id, ownerKey, collectAction)
-        next = await waitForLocalAiAdapterResult(provider.id, ownerKey, resultAction, resultRequestId) ?? next
+      const next = await syncLocalAiDeferredMenu({
+        providerId: provider.id,
+        ownerKey,
+        sessionIdentity: requestedSessionIdentity,
+        listAction,
+        collectAction,
+      })
+      if (!next) {
+        setMessage('官网菜单没有返回匹配回执；已保留现有选项，不会把旧菜单当成当前结果。')
+        return
       }
       setSessionState(next)
       const result = next.commandResult
-      if (result?.action !== resultAction || result?.requestId !== resultRequestId) {
+      if (result?.action !== listAction && result?.action !== collectAction) {
         setMessage('官网菜单没有返回匹配回执；已保留现有选项，不会把旧菜单当成当前结果。')
       } else if (!result.ok) {
         setMessage(result.detail || '官网菜单尚未返回可用选项。')
@@ -745,7 +750,18 @@ export default function useLocalAiWebChatController(
     }
   }
 
+  useLocalAiCapabilityPrewarm({
+    provider,
+    ownerKey,
+    sessionIdentity: requestedSessionIdentity,
+    sessionState: visibleSessionState,
+    snapshot: liveSnapshot,
+    foregroundBlocked: capabilityPrewarmBlocked,
+    onState: setSessionState,
+  })
+
   return {
+    sessionIdentity: requestedSessionIdentity,
     sessionState: visibleSessionState,
     snapshot,
     visibleMessages,

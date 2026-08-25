@@ -31,7 +31,7 @@ export default function AiWebComposerControls({ web }: { web: AiWebChatBackend }
     setPanel(null)
     setComposerCache({ model: { options: [], updatedAt: 0 }, tools: { options: [], updatedAt: 0 } })
     setFeatureCache({ options: [], updatedAt: 0 })
-  }, [web.provider?.id])
+  }, [web.controller.sessionIdentity, web.provider?.id])
 
   useEffect(() => {
     const current = web.controller.composerSnapshot
