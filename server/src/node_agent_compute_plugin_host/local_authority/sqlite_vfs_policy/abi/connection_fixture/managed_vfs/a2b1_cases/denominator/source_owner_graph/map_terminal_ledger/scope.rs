@@ -16,18 +16,36 @@ pub(super) const REVIEW_GATES: &[MapReviewGateRecord] = &[
             MapSourceStepId::AbiNullFirst,
             MapSourceStepId::AbiInputRejected,
             MapSourceStepId::AbiNullOutputRejected,
+            MapSourceStepId::AbiRawDispatch,
         ],
     },
     MapReviewGateRecord {
-        gate: MapReviewGate::RawRejectionVsPanicSplit,
-        witnesses: &[MapSourceStepId::RawStateRejectedOrPanicked],
+        gate: MapReviewGate::AbiPointerPremise,
+        witnesses: &[MapSourceStepId::AbiNullFirst],
     },
     MapReviewGateRecord {
-        gate: MapReviewGate::RawStateExactFixtureExclusion,
+        gate: MapReviewGate::RawRejectionVsPanicSplit,
+        witnesses: &[
+            MapSourceStepId::RawStateAccepted,
+            MapSourceStepId::RawStateNullFile,
+            MapSourceStepId::RawStateUninstalled,
+            MapSourceStepId::RawStateForeignMethodsNullTable,
+            MapSourceStepId::RawStateForeignMethodsForeignTable,
+            MapSourceStepId::RawStateMissing,
+            MapSourceStepId::RawStateTypeMismatch,
+            MapSourceStepId::RawStateCaughtPanic,
+        ],
+    },
+    MapReviewGateRecord {
+        gate: MapReviewGate::RawAbandonOutcomeSplit,
         witnesses: &[
             MapSourceStepId::RawAbandonEmpty,
             MapSourceStepId::RawAbandonInstalled,
-            MapSourceStepId::RawAbandonRejected,
+            MapSourceStepId::RawAbandonNullFileRejected,
+            MapSourceStepId::RawAbandonForeignMethodsNullTableRejected,
+            MapSourceStepId::RawAbandonForeignMethodsForeignTableRejected,
+            MapSourceStepId::RawAbandonStateMissingRejected,
+            MapSourceStepId::RawFallbackProjection,
         ],
     },
     MapReviewGateRecord {
@@ -111,7 +129,7 @@ pub(super) const REVIEW_GATES: &[MapReviewGateRecord] = &[
 /// terminal records. Their presence is a fail-closed boundary, not an exclusion proof.
 pub(super) const OPEN_SOURCE_REVIEW_BOUNDARIES: &[MapOpenReviewBoundary] = &[
     MapOpenReviewBoundary {
-        gate: MapReviewGate::AbiInputShapeSplit,
+        gate: MapReviewGate::AbiPointerPremise,
         anchors: &[
             source_anchor(
                 SourceOwnerId::AbiBoundary,
@@ -125,8 +143,20 @@ pub(super) const OPEN_SOURCE_REVIEW_BOUNDARIES: &[MapOpenReviewBoundary] = &[
                 "if output.is_null()",
                 1,
             ),
+            source_anchor(
+                SourceOwnerId::AbiRawState,
+                "unsafe fn with_installed_state",
+                "installed_envelope(file)?",
+                1,
+            ),
+            source_anchor(
+                SourceOwnerId::AbiRawState,
+                "unsafe fn installed_envelope",
+                "NonNull::new(file.cast::<InertHandleBoundSqliteFile>())",
+                1,
+            ),
         ],
-        note: "dangling, unaligned, read-only or wrong-layout C pointers are UB premises, not finite terminal leaves",
+        note: "output must be callback-owned/non-alias/aligned/writable/live; non-null file must be live/aligned/initialized/serialized and exact methods plus state must identify this module's live envelope; forged, dangling or wrong-layout pointers are UB premises, not finite leaves",
     },
     MapOpenReviewBoundary {
         gate: MapReviewGate::PlatformCfgAndControllerInternals,
@@ -230,7 +260,13 @@ pub(super) const PENDING_BOUNDARIES: &[MapPendingBoundaryRecord] = &[
         status: MapBoundaryReviewStatus::AnchoredButGraphPending,
         witnesses: &[
             MapSourceStepId::RawStateAccepted,
-            MapSourceStepId::RawStateRejectedOrPanicked,
+            MapSourceStepId::RawStateNullFile,
+            MapSourceStepId::RawStateUninstalled,
+            MapSourceStepId::RawStateForeignMethodsNullTable,
+            MapSourceStepId::RawStateForeignMethodsForeignTable,
+            MapSourceStepId::RawStateMissing,
+            MapSourceStepId::RawStateTypeMismatch,
+            MapSourceStepId::RawStateCaughtPanic,
         ],
     },
     MapPendingBoundaryRecord {
@@ -239,7 +275,10 @@ pub(super) const PENDING_BOUNDARIES: &[MapPendingBoundaryRecord] = &[
         witnesses: &[
             MapSourceStepId::RawAbandonEmpty,
             MapSourceStepId::RawAbandonInstalled,
-            MapSourceStepId::RawAbandonRejected,
+            MapSourceStepId::RawAbandonNullFileRejected,
+            MapSourceStepId::RawAbandonForeignMethodsNullTableRejected,
+            MapSourceStepId::RawAbandonForeignMethodsForeignTableRejected,
+            MapSourceStepId::RawAbandonStateMissingRejected,
         ],
     },
     MapPendingBoundaryRecord {

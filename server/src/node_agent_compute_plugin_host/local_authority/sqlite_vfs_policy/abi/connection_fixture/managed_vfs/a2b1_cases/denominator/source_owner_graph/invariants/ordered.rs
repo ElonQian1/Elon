@@ -20,7 +20,7 @@ pub(super) fn validate(nodes: &[SourceNode], edges: &[SourceEdge]) -> Result<(),
     prefix::validate(edges)?;
     validate_region_loop(edges)?;
     validate_failure_cleanup(edges)?;
-    raw::validate(edges)?;
+    raw::validate(nodes, edges)?;
     structural::validate(nodes, edges)
 }
 

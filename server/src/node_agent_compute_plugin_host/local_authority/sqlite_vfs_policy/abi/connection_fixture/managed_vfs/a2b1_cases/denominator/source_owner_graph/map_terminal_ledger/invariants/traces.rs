@@ -26,7 +26,7 @@ fn validate_open_source_review_boundaries() -> Result<(), &'static str> {
         .map(|boundary| boundary.gate)
         .collect::<BTreeSet<_>>();
     let expected = [
-        MapReviewGate::AbiInputShapeSplit,
+        MapReviewGate::AbiPointerPremise,
         MapReviewGate::PlatformCfgAndControllerInternals,
         MapReviewGate::PrefixMutationAndInitializationCrossProduct,
         MapReviewGate::ManagedDefensiveLeafExpansion,
@@ -46,8 +46,9 @@ fn validate_gates(ids: &BTreeSet<MapSourceStepId>) -> Result<(), &'static str> {
         .collect::<BTreeSet<_>>();
     let expected = [
         MapReviewGate::AbiInputShapeSplit,
+        MapReviewGate::AbiPointerPremise,
         MapReviewGate::RawRejectionVsPanicSplit,
-        MapReviewGate::RawStateExactFixtureExclusion,
+        MapReviewGate::RawAbandonOutcomeSplit,
         MapReviewGate::RouteAndPromotionExactFixtureExclusion,
         MapReviewGate::TypedPlatformOutcomeExpansion,
         MapReviewGate::PrefixMutationAndInitializationCrossProduct,

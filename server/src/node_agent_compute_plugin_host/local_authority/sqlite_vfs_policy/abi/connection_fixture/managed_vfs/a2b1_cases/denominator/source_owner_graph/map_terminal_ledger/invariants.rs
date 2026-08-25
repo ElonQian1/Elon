@@ -2,6 +2,7 @@ mod anchors;
 mod effects;
 mod graph;
 mod partition;
+mod successor;
 mod traces;
 
 use super::{map, model::MapSourceStep};
@@ -12,6 +13,7 @@ pub(super) fn validate() -> Result<(), &'static str> {
     partition::validate(&steps)?;
     effects::validate(&steps)?;
     graph::validate(&steps)?;
+    successor::validate(&steps)?;
     traces::validate(&steps)?;
     Ok(())
 }

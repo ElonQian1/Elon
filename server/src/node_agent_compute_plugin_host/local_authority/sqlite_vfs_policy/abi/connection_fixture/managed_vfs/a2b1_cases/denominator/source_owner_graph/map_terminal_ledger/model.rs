@@ -84,6 +84,7 @@ pub(super) enum MapMultiplicity {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(super) enum MapRetention {
     None,
+    UnvalidatedRawStateSlot,
     ExistingCustody,
     NodeCustody,
     FileCloseCustody,
@@ -113,8 +114,7 @@ pub(super) enum MapExclusionReason {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(super) enum MapPendingReason {
-    AbiInputShapeSplit,
-    RawAbandonSubbranch,
+    RawFallbackCustodyProjection,
     RouteOrPlanPrecondition,
     PromotionCustodyVariant,
     CallbackOwnerVariant,
@@ -180,11 +180,21 @@ pub(super) enum MapSourceStepId {
     AbiNullOutputRejected,
     AbiRawDispatch,
     RawStateAccepted,
-    RawStateRejectedOrPanicked,
+    RawStateNullFile,
+    RawStateUninstalled,
+    RawStateForeignMethodsNullTable,
+    RawStateForeignMethodsForeignTable,
+    RawStateMissing,
+    RawStateTypeMismatch,
+    RawStateCaughtPanic,
     FileStateInnerMissing,
     RawAbandonEmpty,
     RawAbandonInstalled,
-    RawAbandonRejected,
+    RawAbandonNullFileRejected,
+    RawAbandonForeignMethodsNullTableRejected,
+    RawAbandonForeignMethodsForeignTableRejected,
+    RawAbandonStateMissingRejected,
+    RawFallbackProjection,
     OuterFaultControllerRejected,
     OuterFaultSelected,
     OuterInnerMissing,
@@ -386,8 +396,9 @@ pub(super) const fn with_call_context(
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(super) enum MapReviewGate {
     AbiInputShapeSplit,
+    AbiPointerPremise,
     RawRejectionVsPanicSplit,
-    RawStateExactFixtureExclusion,
+    RawAbandonOutcomeSplit,
     RouteAndPromotionExactFixtureExclusion,
     TypedPlatformOutcomeExpansion,
     PrefixMutationAndInitializationCrossProduct,

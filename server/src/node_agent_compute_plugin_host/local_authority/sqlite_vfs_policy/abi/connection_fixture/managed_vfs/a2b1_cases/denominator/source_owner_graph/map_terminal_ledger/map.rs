@@ -2,6 +2,7 @@ mod abi;
 mod cleanup;
 mod initialization;
 mod mapping;
+mod raw;
 mod route;
 mod success;
 mod validation;
@@ -10,6 +11,7 @@ use super::model::{MapSourceStep, MapSuccessFamilyRecord};
 
 pub(super) const STEP_TABLES: &[&[MapSourceStep]] = &[
     abi::STEPS,
+    raw::STEPS,
     route::STEPS,
     validation::STEPS,
     initialization::STEPS,

@@ -42,7 +42,13 @@ const PENDING_EXPECTATIONS: &[PendingExpectation] = &[
         status: MapBoundaryReviewStatus::AnchoredButGraphPending,
         witnesses: &[
             MapSourceStepId::RawStateAccepted,
-            MapSourceStepId::RawStateRejectedOrPanicked,
+            MapSourceStepId::RawStateNullFile,
+            MapSourceStepId::RawStateUninstalled,
+            MapSourceStepId::RawStateForeignMethodsNullTable,
+            MapSourceStepId::RawStateForeignMethodsForeignTable,
+            MapSourceStepId::RawStateMissing,
+            MapSourceStepId::RawStateTypeMismatch,
+            MapSourceStepId::RawStateCaughtPanic,
         ],
     },
     PendingExpectation {
@@ -51,7 +57,10 @@ const PENDING_EXPECTATIONS: &[PendingExpectation] = &[
         witnesses: &[
             MapSourceStepId::RawAbandonEmpty,
             MapSourceStepId::RawAbandonInstalled,
-            MapSourceStepId::RawAbandonRejected,
+            MapSourceStepId::RawAbandonNullFileRejected,
+            MapSourceStepId::RawAbandonForeignMethodsNullTableRejected,
+            MapSourceStepId::RawAbandonForeignMethodsForeignTableRejected,
+            MapSourceStepId::RawAbandonStateMissingRejected,
         ],
     },
     PendingExpectation {

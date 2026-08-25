@@ -34,14 +34,14 @@ pub(in super::super) const EDGES: &[SourceEdge] = &[
         SourceEffect::None,
     ),
     edge(
-        "raw.reject.abandon",
+        "raw.failure.abandon",
         SourceNodeId::AbiRawGate,
         SourceNodeId::AbiRawAbandon,
         EdgeKind::Abandon,
         ALL_OPS,
         Epoch::AbiInput,
         Reachability::Conditional,
-        SourceEffect::RetainCustody,
+        SourceEffect::None,
     ),
     edge(
         "raw.abandon.raw-state",
@@ -51,7 +51,7 @@ pub(in super::super) const EDGES: &[SourceEdge] = &[
         ALL_OPS,
         Epoch::AbiInput,
         Reachability::Required,
-        SourceEffect::RetainCustody,
+        SourceEffect::None,
     ),
     edge(
         "registry.begin.process",

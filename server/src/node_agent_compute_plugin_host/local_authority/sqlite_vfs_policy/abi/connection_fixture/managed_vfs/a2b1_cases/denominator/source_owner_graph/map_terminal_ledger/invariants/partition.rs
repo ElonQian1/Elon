@@ -45,14 +45,13 @@ pub(super) fn validate(steps: &[MapSourceStep]) -> Result<(), &'static str> {
         })
         .collect::<BTreeSet<_>>();
     let expected_pending = [
-        MapPendingReason::RawAbandonSubbranch,
+        MapPendingReason::RawFallbackCustodyProjection,
         MapPendingReason::RouteOrPlanPrecondition,
         MapPendingReason::PromotionCustodyVariant,
         MapPendingReason::CallbackOwnerVariant,
         MapPendingReason::PlatformTypedOutcome,
         MapPendingReason::PrefixMutationSplit,
         MapPendingReason::SymbolicLoopOrOccurrence,
-        MapPendingReason::AbiInputShapeSplit,
         MapPendingReason::ControllerInternalFailure,
         MapPendingReason::ManagedStateInvariant,
         MapPendingReason::PlatformCfgScope,
@@ -81,7 +80,6 @@ pub(super) fn validate(steps: &[MapSourceStep]) -> Result<(), &'static str> {
             } if matches!(
                 reason,
                 MapPendingReason::DynamicObservableMissing
-                    | MapPendingReason::AbiInputShapeSplit
                     | MapPendingReason::SuccessPrestatePartition
             ) => {}
             MapStepKind::Pending { terminal: None, .. } => {
