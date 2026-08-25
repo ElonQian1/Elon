@@ -154,10 +154,11 @@ internal class GoogleWebBackgroundSession(
         conversationNavigation.beginOpen(path, url)
         activePath = path
         latestSnapshotPath = path
-        latestSnapshot = conversationSnapshotStore.restore(path)?.takeIf { cached ->
-            GoogleWebNavigationPolicy.sanitizeRestorableUrl(cached.url) == url
-        }
-            ?: GoogleWebSnapshotPresentation.loading(latestSnapshot, url)
+        latestSnapshot = GoogleWebSnapshotPresentation.opening(
+            cached = conversationSnapshotStore.restore(path),
+            previous = latestSnapshot,
+            url = url,
+        )
         latestSnapshot?.let(onSnapshot)
         onConversationIndexChanged(conversationIndex())
         updateState(State.LOADING)

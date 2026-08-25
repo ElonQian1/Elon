@@ -78,6 +78,17 @@ internal object WebAiPrivateTransportCatalog {
             fallback = "local_directory_cache_and_official_page",
         ),
         Entry(
+            id = "android_google_web_conversation_snapshot_cache_v1",
+            provider = "google_web_ai",
+            status = "completed",
+            verification = "targeted_tests_passed_device_pending",
+            productionDefault = true,
+            runtimeEnabled = true,
+            requestMode = "passive_official_snapshot_cache",
+            healthPolicy = "validated_conversation_url_30d_128_items_24mib",
+            fallback = "official_webview_navigation",
+        ),
+        Entry(
             id = "android_google_web_private_reply_observer_v1",
             provider = "google_web_ai",
             status = "completed",

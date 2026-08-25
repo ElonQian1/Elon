@@ -121,7 +121,14 @@ class GoogleWebAdapterContractTest {
         assertTrue(session.contains("GoogleWebConversationStore"))
         assertTrue(session.contains("conversationStore.acceptOfficial(event.conversations)"))
         assertTrue(session.contains("GoogleWebConversationSnapshotStore"))
-        assertTrue(session.contains("GoogleWebSnapshotPresentation.loading"))
+        assertTrue(session.contains("GoogleWebSnapshotPresentation.opening"))
+        val openConversation = session.substringAfter("fun openConversation(path: String): Boolean")
+            .substringBefore("fun openProject(path: String): Boolean")
+        assertTrue(
+            openConversation.indexOf("conversationSnapshotStore.restore(path)") <
+                openConversation.indexOf("onSnapshot"),
+        )
+        assertTrue(openConversation.indexOf("onSnapshot") < openConversation.indexOf("loadUrl"))
         assertTrue(session.contains("ChatGptWebProxyController"))
         assertTrue(session.contains("nextSnapshot.composerReady && !nextSnapshot.streaming"))
         assertTrue(session.contains("event.ok || event.action == \"send_prompt\""))

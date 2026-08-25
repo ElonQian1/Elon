@@ -10,6 +10,32 @@ import org.junit.Test
 
 class GoogleWebSnapshotPresentationTest {
     @Test
+    fun openingAVisitedConversationShowsItsCachedBodyImmediately() {
+        val cached = previous()
+
+        val opening = GoogleWebSnapshotPresentation.opening(
+            cached = cached,
+            previous = null,
+            url = cached.url,
+        )
+
+        assertEquals(cached.messages, opening.messages)
+        assertTrue(opening.composerReady)
+    }
+
+    @Test
+    fun openingAnotherConversationNeverShowsAMismatchedCachedBody() {
+        val opening = GoogleWebSnapshotPresentation.opening(
+            cached = previous(),
+            previous = previous(),
+            url = "https://www.google.com/search?q=another&udm=50",
+        )
+
+        assertTrue(opening.messages.isEmpty())
+        assertFalse(opening.composerReady)
+    }
+
+    @Test
     fun loadingAnotherConversationNeverDisplaysOrAuthorizesThePreviousOne() {
         val loading = GoogleWebSnapshotPresentation.loading(previous(), "https://www.google.com/new")
 

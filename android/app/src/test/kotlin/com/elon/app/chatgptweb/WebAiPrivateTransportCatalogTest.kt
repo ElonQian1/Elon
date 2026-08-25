@@ -20,6 +20,7 @@ class WebAiPrivateTransportCatalogTest {
         assertTrue("android_chatgpt_private_stream_observer_v1" in enabledIds)
         assertTrue("android_chatgpt_realtime_voice_private_transcript_refresh_v1" in enabledIds)
         assertTrue("android_google_web_private_conversation_directory_v1" in enabledIds)
+        assertTrue("android_google_web_conversation_snapshot_cache_v1" in enabledIds)
         assertTrue("android_google_web_private_reply_observer_v1" in enabledIds)
         assertTrue("android_web_ai_background_navigation_continuity_v1" in enabledIds)
         assertTrue("android_chatgpt_realtime_voice_background_overlay_v1" in enabledIds)

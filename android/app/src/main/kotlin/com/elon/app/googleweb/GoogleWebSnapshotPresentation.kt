@@ -4,6 +4,14 @@ import com.elon.app.chatgptweb.ChatGptWebCapabilities
 import com.elon.app.chatgptweb.ChatGptWebSnapshot
 
 internal object GoogleWebSnapshotPresentation {
+    fun opening(
+        cached: ChatGptWebSnapshot?,
+        previous: ChatGptWebSnapshot?,
+        url: String,
+    ): ChatGptWebSnapshot = cached?.takeIf {
+        GoogleWebNavigationPolicy.sanitizeRestorableUrl(it.url) == url
+    } ?: loading(previous, url)
+
     fun loading(previous: ChatGptWebSnapshot?, url: String): ChatGptWebSnapshot =
         (previous ?: empty(url)).copy(
             title = "",

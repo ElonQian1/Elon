@@ -15,6 +15,7 @@ installed build; individual capability documents retain implementation evidence.
 | Realtime voice transcript refresh | ChatGPT | Completed and enabled; supervised voice exit pending | Retained native transcript and official DOM snapshot |
 | Realtime voice background continuity | ChatGPT | Completed and enabled; native/system overlay handoff and media auto-pause device verified, manual overlay actions pending | Official WebView voice and foreground notification |
 | Conversation directory | Google Web AI | Completed and enabled | Local cache and official page |
+| Visited conversation body cache | Google Web AI | Completed and enabled; device acceptance pending | Official WebView navigation |
 | Reply completion observer | Google Web AI | Completed and enabled | Official DOM snapshot |
 | Background navigation continuity | ChatGPT and Google Web AI | Completed, enabled, and device verified | Bounded official WebView recovery |
 
@@ -28,6 +29,11 @@ official directory response. Cached rows render immediately; a legacy or expired
 is then refreshed in the background, while a recently verified cache does not trigger
 another DOM read every time the side menu opens. The version 1 cache remains readable
 and migrates as stale instead of being discarded or misreported as freshly verified.
+
+Previously visited Google conversation bodies use a provider-scoped, URL-validated
+snapshot before official navigation starts. The cache is bounded to 30 days, 128 files,
+24 MiB total, and 2 MiB per conversation. A missing, expired, corrupt, or mismatched
+snapshot renders an empty loading state and continues through the official page.
 
 Realtime voice hangup has two separate states: the APK requesting the official action,
 and the official call actually settling. Late reconciliation runs only after the official
@@ -71,9 +77,9 @@ the orb and reuses the existing conversation refresh path.
 - Google direct send is not implemented. The official form/navigation path already
   confirms dispatch from navigation, composer, query, or streaming state; a second
   request could split official page state from server state.
-- Google conversation-body prefetch is not implemented because controlled endpoint
-  inventory has not identified a safe same-origin detail endpoint. Existing per-thread
-  snapshots remain stale-while-revalidate cache, followed by official navigation.
+- Google direct conversation-body prefetch is not implemented because controlled endpoint
+  inventory has not identified a safe same-origin detail endpoint. The completed visited-body
+  cache remains stale-while-revalidate and is always followed by official navigation.
 - ChatGPT realtime voice does not persist or replay live WebRTC credentials. The APK
   caches the loaded WebView session and per-conversation launch hints, then lets the
   official page create a fresh connection for each start.
