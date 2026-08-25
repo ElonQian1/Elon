@@ -1,3 +1,5 @@
+#[path = "semantic_context/chatgpt_rich_preservation.rs"]
+mod chatgpt_rich_preservation;
 #[path = "semantic_context/chatgpt_window.rs"]
 mod chatgpt_window;
 

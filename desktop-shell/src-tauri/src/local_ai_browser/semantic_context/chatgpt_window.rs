@@ -1,6 +1,10 @@
 use serde_json::Value;
 use std::collections::{BTreeMap, HashSet};
 
+use super::chatgpt_rich_preservation::{
+    preserve_message_rich_content, preserve_private_rich_content,
+};
+
 const HISTORY_LIMIT: usize = 160;
 
 pub(super) fn merge(
@@ -28,6 +32,9 @@ pub(super) fn merge(
         && incoming_observed >= previous_observed
         && incoming_observed as usize <= incoming_messages.len()
     {
+        let mut enriched = incoming_messages;
+        preserve_private_rich_content(&previous_messages, &mut enriched);
+        replace_messages(&mut incoming, enriched, incoming_start, incoming_observed);
         return incoming;
     }
 
@@ -96,7 +103,7 @@ fn merge_by_stable_id(
     for (incoming_index, message) in incoming.iter().enumerate() {
         let id = stable_id(message).expect("stable IDs were validated");
         if let Some(index) = position_of(&merged, id) {
-            merged[index] = message.clone();
+            merged[index] = preserve_message_rich_content(&merged[index], message.clone());
             cursor = Some(index + 1);
             continue;
         }
@@ -258,6 +265,33 @@ mod tests {
     }
 
     #[test]
+    fn complete_dom_snapshot_cannot_downgrade_private_finance_card() {
+        let previous = snapshot(
+            0,
+            2,
+            vec![message("u1"), finance_message("a1", "US$78,805.00")],
+        );
+        let mut incoming = snapshot(0, 2, vec![message("u1"), message("a1")]);
+        incoming["messages"][1]["content"] = json!([
+            {"type":"markdown","text":"行情正文"},
+            {"type":"interactive","text":"Bitcoin (BTC)","kind":"interactive"}
+        ]);
+
+        let merged = merge(Some(&previous), incoming, true);
+        let content = merged["messages"][1]["content"].as_array().unwrap();
+
+        assert!(content.iter().any(|part| part["type"] == "rich_card"));
+        assert!(!content.iter().any(|part| part["type"] == "interactive"));
+        assert_eq!(
+            content
+                .iter()
+                .find(|part| part["type"] == "rich_card")
+                .unwrap()["richContent"]["payload"]["primaryValue"],
+            "US$78,805.00"
+        );
+    }
+
+    #[test]
     fn position_only_short_window_is_not_treated_as_stable_identity() {
         let previous = snapshot(
             0,
@@ -311,6 +345,34 @@ mod tests {
 
     fn message(id: &str) -> Value {
         json!({"id": id, "role": "assistant", "state": "completed", "content": []})
+    }
+
+    fn finance_message(id: &str, price: &str) -> Value {
+        json!({
+            "id": id,
+            "role": "assistant",
+            "state": "completed",
+            "content": [
+                {"type":"markdown","text":"行情正文"},
+                {
+                    "type":"rich_card",
+                    "text":"Bitcoin (BTC)",
+                    "kind":"finance",
+                    "richContent":{
+                        "schema":"yilong.rich-content.v1",
+                        "kind":"finance",
+                        "source":"private_response",
+                        "payload":{
+                            "title":"Bitcoin (BTC)",
+                            "primaryValue":price,
+                            "trend":"positive",
+                            "periods":[],
+                            "metrics":[]
+                        }
+                    }
+                }
+            ]
+        })
     }
 
     fn ids(snapshot: &Value) -> Vec<&str> {
