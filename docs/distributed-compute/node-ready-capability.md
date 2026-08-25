@@ -1,7 +1,7 @@
 ---
 title: 节点 ReadyCapability 健康证明边界
 status: current
-reviewed_at: 2026-08-25
+reviewed_at: 2026-08-26
 owners: node, compute
 ---
 
@@ -79,6 +79,8 @@ v217 源码新增 `reauthorize_existing`：Control-signed InstallPlan 只能精�
 这些数值是签名 grant 的授权上限，不是测得容量、设备分配、OS 限制或 v212 `ResourceCeiling`。合同不生成 accelerator count、输出上限、并发上限、runtime/model 摘要或 enforcement receipt，也不启动 Sidecar、不复制 candidate health、不构造 Ready。CPU-only 节点可诚实保留 VRAM=0；服务端现有 accelerator>0 合同必须在后续显式解决，不能用虚构 accelerator 填平。v217 增量虽随完整目标编译，仍未专项运行、迁移或接入生产 Host。
 
 2026-08-25 新增的未登记 source-lineage 草案只把上述 work-admission、局部 Ready-health 与明确 `Untrusted` 的 Host observation 投影为六键 JCS 谱系，并固定缺 local currentness、runtime transition、Host runtime 与 v15 session 四项权威。它保留 CPU-only、signed grant 与结构时间等式，但不生成 `ComputeReadyCapability` 或服务端 execution capability；源码未编译、测试或运行。精确边界见 `user-node-ready-source-lineage-authority.md` 与 `user-node-ready-source-lineage-acceptance.md`。
+
+2026-08-26 又新增未登记、未编译/未运行的 Windows Runner 进程监管前置 source draft：私有 Win32 backend 固定 sealed restricted/AppContainer launch-security、Job set/query、`PROC_THREAD_ATTRIBUTE_JOB_LIST` atomic attach、`CreateProcessAsUserW` suspended child、membership 与 PID/TID/creation-time identity、失败句柄 retention；但 share-none→locked loader load-set owned producer 和 launch-security producer 均故意缺失，源码也没有 `ResumeThread`。它不改变 runtime phase/generation，不形成 IPC、完整 enforcement、health、Ready 或 Store receipt，四项 source authority gap 原样保留。精确边界见 `user-node-windows-runner-process-custody-authority.md` 与对应 acceptance。
 
 ## 10. 尚未实现
 

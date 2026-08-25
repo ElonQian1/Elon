@@ -1,7 +1,7 @@
 ---
 title: UserNode Ready 源谱系 V1 权威草案
 status: draft
-reviewed_at: 2026-08-25
+reviewed_at: 2026-08-26
 owners: node, compute
 proposed_feature_id: compute-user-node-ready-source-lineage-v1
 registration_status: unregistered_feature_workflow_unavailable
@@ -135,6 +135,11 @@ CAS/fencing 与主动失效链关闭。Runtime transition 缺口只能由未来�
 authenticated session、append-only ledger、重放与撤销闭环关闭。v14 永久是 blocked-only compatibility profile，不得添加
 Ready 分支。
 
+2026-08-26 新增的 Windows Runner 进程监管前置草案只写入一个无 load-set/launch-security producer、默认不可达的
+restricted-token suspended-child/atomic-Job 私有 backend：它没有 owned Runner loader transition、`ResumeThread`、IPC、完整 enforcement 或 runtime
+Store，因此 `runtime_transition_authority` 与 `host_runtime_authority` 仍均为 `missing`。精确边界见
+[`user-node-windows-runner-process-custody-authority.md`](user-node-windows-runner-process-custody-authority.md)。
+
 只有四项 source authority 均形成后，服务端 verifier 才可在 current V279 binding、current consent/credential、节点签名
 和 session witness 上重新验证，并生成新的 server-owned Ready authority。它也仍不会自动创建 route、Offer、容量、
 Attempt 或 Lease。
@@ -158,7 +163,8 @@ Attempt 或 Lease。
 
 ## 11. 后续顺序
 
-1. 实现真实 Host runtime authority：进程 custody、IPC、enforcement、探针、活动健康、撤销和跨重启恢复；
+1. 沿 Windows Runner 进程监管前置草案依次补齐 owned loader load-set transition、launch-security producer、IPC、完整 enforcement、runtime Store、
+   受控 resume、探针、活动健康、撤销和跨重启恢复，形成真实 Host runtime authority；
 2. 新建 v15 endpoint session，不修改 v14 blocked-only；
 3. 由 Node owner 对本谱系做 fresh authority read、fencing 与签名发布；
 4. 服务端在 current V279 binding/session/credential 下验证并封存短 TTL Ready authority；

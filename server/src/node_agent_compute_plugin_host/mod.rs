@@ -35,9 +35,13 @@ mod ready_source_lineage_projection;
 mod rollback_anchor;
 mod root_lock;
 pub(crate) mod runner_events;
+mod runtime_process_custody;
 mod signed_artifact_verification;
 mod trusted_time;
 mod work_admission_contract;
+
+#[cfg(test)]
+mod runtime_process_custody_source_contract_tests;
 
 #[path = "../compute_federation/user_node_ready_source_lineage.rs"]
 mod user_node_ready_source_lineage_contract;
