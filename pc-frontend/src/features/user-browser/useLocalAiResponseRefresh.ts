@@ -11,9 +11,10 @@ import { requestReturnToAiChat } from './internalBrowserApi'
 import { lastMatchingLocalAiUserIndex, normalizeLocalAiResponsePrompt } from './localAiResponseTracking'
 import { shouldRequestLocalAiPrivateConversationRefresh } from './localAiPrivateConversationRefreshPolicy'
 import {
-  RESPONSE_COMPLETION_REFRESH_MS,
   RESPONSE_COMPLETION_SETTLE_MS,
-  RESPONSE_REFRESH_DELAYS_MS,
+  localAiResponseRefreshDelay,
+  localAiResponseRefreshPhase,
+  type LocalAiResponseRefreshPhase,
 } from './localAiWebChatControllerConfig'
 
 interface LocalAiResponseRefreshOptions {
@@ -32,6 +33,9 @@ export default function useLocalAiResponseRefresh({
   const generation = useRef(0)
   const timer = useRef(0)
   const requestRef = useRef<() => void>(() => {})
+  const scheduleRef = useRef<() => void>(() => {})
+  const refreshPhase = useRef<LocalAiResponseRefreshPhase>('initial')
+  const delayIndex = useRef(0)
   const completionObservedAt = useRef(0)
   const expectedPrompt = useRef('')
   const startedAt = useRef(0)
@@ -44,6 +48,9 @@ export default function useLocalAiResponseRefresh({
     window.clearTimeout(timer.current)
     timer.current = 0
     requestRef.current = () => {}
+    scheduleRef.current = () => {}
+    refreshPhase.current = 'initial'
+    delayIndex.current = 0
     completionObservedAt.current = 0
     expectedPrompt.current = ''
     startedAt.current = 0
@@ -58,8 +65,11 @@ export default function useLocalAiResponseRefresh({
     expectedPrompt.current = prompt
     startedAt.current = Date.now()
     const activeGeneration = generation.current
-    let delayIndex = 0
-    const request = () => {
+    const scheduleNext = (): void => {
+      const delay = localAiResponseRefreshDelay(refreshPhase.current, delayIndex.current++)
+      if (delay !== undefined) timer.current = window.setTimeout(request, delay)
+    }
+    const request = (): void => {
       if (activeGeneration !== generation.current) return
       requestReturnToAiChat({
         providerId: activeProvider.id,
@@ -84,28 +94,36 @@ export default function useLocalAiResponseRefresh({
         void requestLocalAiCurrentConversationRefresh(activeProvider.id, ownerKey)
           .then(refreshSessionState, () => {})
       }
-      const delay = completionObservedAt.current
-        ? RESPONSE_COMPLETION_REFRESH_MS
-        : RESPONSE_REFRESH_DELAYS_MS[delayIndex++]
-      if (delay !== undefined) timer.current = window.setTimeout(request, delay)
+      scheduleNext()
     }
     requestRef.current = request
-    timer.current = window.setTimeout(
-      request,
-      RESPONSE_REFRESH_DELAYS_MS[delayIndex++] ?? RESPONSE_COMPLETION_REFRESH_MS,
-    )
+    scheduleRef.current = scheduleNext
+    scheduleNext()
   }, [cancel, ownerKey, provider, refreshSessionState])
 
   useEffect(() => {
     const expected = normalizeLocalAiResponsePrompt(expectedPrompt.current)
-    if (!expected || !provider || !ownerKey || !snapshot || snapshot.streaming) return
+    if (!expected || !provider || !ownerKey || !snapshot) return
     const userIndex = lastMatchingLocalAiUserIndex(snapshot.messages, expected)
     if (userIndex < 0) return
-    const completed = snapshot.messages.slice(userIndex + 1).some((item) => (
-      item.role === 'assistant'
-      && item.state !== 'streaming'
-      && !localAiAssistantExtractionIncomplete(item)
-    ))
+    const assistant = snapshot.messages.slice(userIndex + 1)
+      .find((item) => item.role === 'assistant')
+    const streaming = Boolean(assistant && (assistant.state === 'streaming' || snapshot.streaming))
+    const completed = Boolean(assistant && !streaming && !localAiAssistantExtractionIncomplete(assistant))
+    const nextPhase = localAiResponseRefreshPhase({
+      providerId: provider.id,
+      current: refreshPhase.current,
+      assistantObserved: Boolean(assistant),
+      streaming,
+      completed,
+    })
+    if (nextPhase !== refreshPhase.current) {
+      refreshPhase.current = nextPhase
+      delayIndex.current = 0
+      window.clearTimeout(timer.current)
+      timer.current = 0
+      if (nextPhase === 'streaming_watchdog') scheduleRef.current()
+    }
     if (!completed) return
 
     requestReturnToAiChat({
@@ -121,10 +139,7 @@ export default function useLocalAiResponseRefresh({
       return
     }
     window.clearTimeout(timer.current)
-    timer.current = window.setTimeout(
-      () => requestRef.current(),
-      RESPONSE_COMPLETION_REFRESH_MS,
-    )
+    scheduleRef.current()
   }, [cancel, ownerKey, provider, snapshot])
 
   useEffect(() => cancel, [cancel])

@@ -1,6 +1,8 @@
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
+const Module = require('node:module')
 const path = require('node:path')
+const ts = require('typescript')
 
 const root = path.resolve(__dirname, '..', '..')
 const state = read('desktop-shell/src-tauri/src/local_ai_browser/state.rs')
@@ -15,6 +17,10 @@ const googleAdapter = read('desktop-shell/src-tauri/src/local_ai_browser/google_
 const api = read('pc-frontend/src/features/user-browser/localAiBrowserApi.ts')
 const controller = read('pc-frontend/src/features/user-browser/useLocalAiWebChatController.ts')
 const responseRefresh = read('pc-frontend/src/features/user-browser/useLocalAiResponseRefresh.ts')
+const responseRefreshConfigPath = path.join(
+  root,
+  'pc-frontend/src/features/user-browser/localAiWebChatControllerConfig.ts',
+)
 const responseTracking = read('pc-frontend/src/features/user-browser/localAiResponseTracking.ts')
 const backend = read('pc-frontend/src/features/user-browser/useAiWebChatBackend.ts')
 const userState = read('pc-frontend/src/features/user-browser/localAiUserState.ts')
@@ -55,8 +61,9 @@ assert.match(api, /activeConversationId\?:/)
 assert.match(api, /contextReady\?:/)
 assert.match(api, /contextStatus\?:/)
 assert.match(api, /requestLocalAiWebSnapshot/)
-assert.match(responseRefresh, /RESPONSE_REFRESH_DELAYS_MS/)
-assert.match(responseRefresh, /RESPONSE_COMPLETION_REFRESH_MS/)
+assert.match(responseRefresh, /localAiResponseRefreshDelay/)
+assert.match(responseRefresh, /localAiResponseRefreshPhase/)
+assert.match(responseRefresh, /streaming_watchdog/)
 assert.match(responseRefresh, /RESPONSE_COMPLETION_SETTLE_MS/)
 assert.match(responseRefresh, /requestLocalAiWebSnapshot/)
 assert.match(responseRefresh, /lastMatchingLocalAiUserIndex/)
@@ -78,8 +85,40 @@ assert.match(directory, /is_project_conversation/)
 assert.match(api, /localAiAdapterResultAttempts/)
 assert.doesNotMatch(api, /attempt < 12/)
 
+const responseRefreshConfig = loadTypeScriptModule(responseRefreshConfigPath)
+assert.deepEqual(responseRefreshConfig.RESPONSE_REFRESH_DELAYS_MS, [400, 800, 1_500, 2_500, 4_000, 6_000, 8_000, 10_000])
+assert.deepEqual(responseRefreshConfig.RESPONSE_STREAMING_WATCHDOG_DELAYS_MS, [6_000, 12_000, 20_000, 30_000])
+assert.equal(responseRefreshConfig.localAiResponseRefreshDelay('initial', 0), 400)
+assert.equal(responseRefreshConfig.localAiResponseRefreshDelay('streaming_watchdog', 0), 6_000)
+assert.equal(responseRefreshConfig.localAiResponseRefreshDelay('streaming_watchdog', 4), undefined)
+assert.equal(responseRefreshConfig.localAiResponseRefreshDelay('completed', 99), 600)
+assert.equal(responseRefreshConfig.localAiResponseRefreshPhase({
+  providerId: 'google-ai-mode', current: 'initial', assistantObserved: true,
+  streaming: true, completed: false,
+}), 'streaming_watchdog')
+assert.equal(responseRefreshConfig.localAiResponseRefreshPhase({
+  providerId: 'chatgpt', current: 'initial', assistantObserved: true,
+  streaming: true, completed: false,
+}), 'initial')
+assert.equal(responseRefreshConfig.localAiResponseRefreshPhase({
+  providerId: 'google-ai-mode', current: 'streaming_watchdog', assistantObserved: true,
+  streaming: false, completed: true,
+}), 'completed')
+
 process.stdout.write('PASS local AI stable context and response refresh contract\n')
 
 function read(relativePath) {
   return fs.readFileSync(path.join(root, relativePath), 'utf8')
+}
+
+function loadTypeScriptModule(filename) {
+  const output = ts.transpileModule(fs.readFileSync(filename, 'utf8'), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+    fileName: filename,
+  }).outputText
+  const compiled = new Module(filename, module)
+  compiled.filename = filename
+  compiled.paths = module.paths
+  compiled._compile(output, filename)
+  return compiled.exports
 }
