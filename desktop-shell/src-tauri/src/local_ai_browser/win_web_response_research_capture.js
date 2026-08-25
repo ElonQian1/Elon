@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  var VERSION = 4;
+  var VERSION = 5;
   var PROVIDER_ID = '__PROVIDER_ID__';
   var MAX_BODY_BYTES = 2 * 1024 * 1024;
   var ANALYSIS_SCHEMA = 'yilong.web-ai.capture-analysis.v1';
@@ -148,6 +148,16 @@
           }).filter(function (kind) {
             return /^[a-z][a-z0-9_-]{0,31}$/.test(kind);
           }))).slice(0, 16);
+        var recovery = window.__elonWinChatGptPrivateStreamRecovery;
+        if (recovery && typeof recovery.accept === 'function' &&
+            Array.isArray(snapshot.richParts) && snapshot.richParts.length) {
+          recovery.accept({
+            messageId: snapshot.id || '',
+            turnId: snapshot.turnId || '',
+            conversationId: snapshot.conversationId || conversationId || '',
+            richParts: snapshot.richParts
+          });
+        }
       }
       base.contentTypes = Array.from(contentTypes).slice(0, 16);
       return base;

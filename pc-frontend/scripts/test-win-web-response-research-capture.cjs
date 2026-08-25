@@ -18,6 +18,7 @@ FakeXhr.prototype.send = function () {}
 
 async function main() {
   const captures = []
+  const recovered = []
   let fetchCalls = 0
   const richStream = [
     'data: ' + JSON.stringify({
@@ -51,6 +52,9 @@ async function main() {
   ].join('\n\n')
   const window = {
     __elonChatGptPrivateStreamPolicy: privateStreamPolicy,
+    __elonWinChatGptPrivateStreamRecovery: {
+      accept: (snapshot) => recovered.push(snapshot),
+    },
     __TAURI_INTERNALS__: {
       invoke: async (command, args) => captures.push({ command, args }),
     },
@@ -103,6 +107,10 @@ async function main() {
   assert.equal(captures[0].args.capture.analysis.assistantFrameCount, 1)
   assert.equal(captures[0].args.capture.analysis.textLength, 'visible answer'.length)
   assert.deepEqual(Array.from(captures[0].args.capture.analysis.richKinds), ['chart'])
+  assert.equal(recovered.length, 1)
+  assert.equal(recovered[0].messageId, 'assistant-one')
+  assert.equal(recovered[0].conversationId, 'conversation-one')
+  assert.equal(recovered[0].richParts[0].richContent.source, 'private_response')
   assert.doesNotMatch(JSON.stringify(captures[0]), /request-secret/)
 
   await window.fetch('https://chatgpt.com/backend-api/f/conversation/stream', {

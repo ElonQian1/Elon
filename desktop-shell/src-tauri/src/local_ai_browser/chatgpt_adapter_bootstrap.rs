@@ -6,6 +6,7 @@ const WIN_COMMON_RICH_CONTENT_ADAPTER: &str = include_str!("rich_content_dom_ada
 const WIN_CITATION_ADAPTER: &str = include_str!("chatgpt_citation_adapter.js");
 const WIN_NEW_CONVERSATION_GUARD: &str = include_str!("chatgpt_win_new_conversation_guard.js");
 const WIN_RESPONSE_RESEARCH_CAPTURE: &str = include_str!("win_web_response_research_capture.js");
+const WIN_PRIVATE_STREAM_RECOVERY: &str = include_str!("chatgpt_win_private_stream_recovery.js");
 const PRIVATE_SOCKET_TAP: &str =
     include_str!("../../../../android/app/src/main/assets/chatgpt_web_private_socket_tap.js");
 const PRIVATE_CONVERSATION_DIRECTORY: &str = include_str!(
@@ -192,6 +193,11 @@ pub(super) fn initialization_script() -> String {
                     shared,
                     WIN_CITATION_ADAPTER,
                     WIN_NEW_CONVERSATION_GUARD
+                )
+            } else if *name == "chatgpt_web_private_stream_transport.js" {
+                format!(
+                    "{}\nwindow.__elonChatGptBootstrapStage = 'chatgpt_win_private_stream_recovery.js';\n{}",
+                    shared, WIN_PRIVATE_STREAM_RECOVERY
                 )
             } else {
                 shared
@@ -388,6 +394,16 @@ mod tests {
         assert!(script.contains("__elonChatGptPrivateSocketTap"));
         assert!(script.contains("__elonChatGptPrivateConversationDirectory"));
         assert!(script.contains("chatgpt_web_private_stream_transport.js"));
+        assert!(script.contains("chatgpt_win_private_stream_recovery.js"));
+        assert!(script.contains("__elonWinChatGptPrivateStreamRecovery"));
+        assert!(
+            script.find("chatgpt_web_private_stream_transport.js").unwrap()
+                < script.find("chatgpt_win_private_stream_recovery.js").unwrap()
+        );
+        assert!(
+            script.find("chatgpt_win_private_stream_recovery.js").unwrap()
+                < script.find("chatgpt_web_adapter.js").unwrap()
+        );
         let dom_ready = script
             .find("DOMContentLoaded")
             .expect("Win bootstrap should retain its DOM-ready semantic install");
