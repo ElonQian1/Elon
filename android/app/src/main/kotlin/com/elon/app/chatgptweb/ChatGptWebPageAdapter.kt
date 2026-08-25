@@ -47,11 +47,13 @@ internal class ChatGptWebPageAdapter(
             input.reader(StandardCharsets.UTF_8).readText()
         }
     }
-    private val privateSocketTapScript = """
+    private val privateEarlyTapScript = """
         window.__elonChatGptPrivateStreamObserverEnabled =
             ${BuildConfig.CHATGPT_PRIVATE_STREAM_OBSERVER_ENABLED};
-    """.trimIndent() + "\n" + context.assets.open(PRIVATE_SOCKET_TAP_ASSET).use { input ->
-        input.reader(StandardCharsets.UTF_8).readText()
+    """.trimIndent() + "\n" + listOf(PRIVATE_FETCH_TAP_ASSET, PRIVATE_SOCKET_TAP_ASSET)
+        .joinToString("\n") { asset -> context.assets.open(asset).use { input ->
+            input.reader(StandardCharsets.UTF_8).readText()
+        }
     }
     private val privateConversationDirectoryScript =
         context.assets.open(PRIVATE_CONVERSATION_DIRECTORY_ASSET).use { input ->
@@ -93,7 +95,7 @@ internal class ChatGptWebPageAdapter(
         ) {
             WebViewCompat.addDocumentStartJavaScript(
                 webView,
-                privateSocketTapScript,
+                privateEarlyTapScript,
                 setOf(ALLOWED_ORIGIN),
             )
         }
@@ -433,7 +435,7 @@ internal class ChatGptWebPageAdapter(
         origin.scheme == "https" && origin.host == "chatgpt.com" && origin.port == -1
 
     companion object {
-        internal const val ADAPTER_VERSION = 182
+        internal const val ADAPTER_VERSION = 183
 
         private val ADAPTER_ASSETS = listOf(
             "chatgpt_web_adapter_bootstrap.js",
@@ -480,6 +482,7 @@ internal class ChatGptWebPageAdapter(
         )
         private const val BRIDGE_OBJECT = "elonChatGptNative"
         private const val ALLOWED_ORIGIN = "https://chatgpt.com"
+        private const val PRIVATE_FETCH_TAP_ASSET = "chatgpt_web_private_fetch_tap.js"
         private const val PRIVATE_SOCKET_TAP_ASSET = "chatgpt_web_private_socket_tap.js"
         private const val PRIVATE_CONVERSATION_DIRECTORY_ASSET =
             "chatgpt_web_private_conversation_directory.js"

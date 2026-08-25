@@ -4,13 +4,14 @@
   if (window.__elonChatGptPrivateStreamObserverEnabled !== true) return;
   if (location.origin !== 'https://chatgpt.com') return;
   const existing = window.__elonChatGptPrivateStreamTransport;
-  if (existing && Number(existing.version) >= 9) return;
+  if (existing && Number(existing.version) >= 10) return;
   if (existing && typeof existing.dispose === 'function') {
     try { existing.dispose(); }
     catch (_) { /* A stale transport must not block the upgraded observer. */ }
   }
   const policy = window.__elonChatGptPrivateStreamPolicy;
   const originalFetch = typeof window.fetch === 'function' ? window.fetch : null;
+  const fetchTap = window.__elonChatGptPrivateFetchTap;
   const socketTap = window.__elonChatGptPrivateSocketTap;
   if (!policy || !originalFetch || typeof TextDecoder !== 'function') return;
 
@@ -24,6 +25,7 @@
   const MAX_UNPACKED_WIDGET_BYTES = 2 * 1024 * 1024;
   const observedWidgets = new Set();
   let disposed = false;
+  let fetchUnsubscribe = null;
   let socketUnsubscribe = null;
   let socketFrames = 0;
   let socketFirstReported = false;
@@ -455,6 +457,16 @@
     });
   }
 
+  function observeTappedFetch(event) {
+    if (!event || !event.response) return;
+    let url;
+    try { url = new URL(String(event.url || ''), location.href); }
+    catch (_) { return; }
+    observeAccessResponse(event.method, url, event.response);
+    if (isOfficialConversationStream(event.method, url, event.response)) observe(event.response);
+    else if (isOfficialStreamStatus(event.method, url, event.response)) observeStreamStatus(event.response);
+  }
+
   async function observe(response) {
     const observedGeneration = conversationGeneration;
     const startedAt = Date.now();
@@ -526,20 +538,25 @@
     catch (_) { return originalFetch.apply(this, args); }
     const method = init.method || input && input.method || 'GET';
     return Promise.resolve(originalFetch.apply(this, args)).then((response) => {
-      observeAccessResponse(method, url, response);
-      if (isOfficialConversationStream(method, url, response)) observe(response);
-      else if (isOfficialStreamStatus(method, url, response)) observeStreamStatus(response);
+      if (!fetchUnsubscribe) {
+        observeAccessResponse(method, url, response);
+        if (isOfficialConversationStream(method, url, response)) observe(response);
+        else if (isOfficialStreamStatus(method, url, response)) observeStreamStatus(response);
+      }
       return response;
     });
   };
   window.fetch = wrappedFetch;
 
+  if (fetchTap && typeof fetchTap.subscribe === 'function') {
+    fetchUnsubscribe = fetchTap.subscribe(observeTappedFetch);
+  }
   if (socketTap && typeof socketTap.subscribe === 'function') {
     socketUnsubscribe = socketTap.subscribe(observeSocket, true);
   }
 
   window.__elonChatGptPrivateStreamTransport = Object.freeze({
-    version: 9,
+    version: 10,
     enabled: true,
     current: (pathname) => session.current(pathname),
     access: currentAccess,
@@ -555,6 +572,8 @@
       disposed = true;
       listeners.clear();
       observedWidgets.clear();
+      if (typeof fetchUnsubscribe === 'function') fetchUnsubscribe();
+      fetchUnsubscribe = null;
       if (typeof socketUnsubscribe === 'function') socketUnsubscribe();
       socketUnsubscribe = null;
       accessSignal = null;
