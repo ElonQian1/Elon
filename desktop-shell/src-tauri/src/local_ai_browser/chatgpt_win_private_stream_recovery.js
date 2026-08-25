@@ -1,8 +1,9 @@
 (function () {
   'use strict';
 
-  var VERSION = 2;
+  var VERSION = 3;
   var MAX_AGE_MS = 5 * 60 * 1000;
+  var OFFICIAL_COMPLETION_SETTLE_MS = 3000;
   var MAX_RICH_PARTS = 4;
   var MAX_SERIALIZED_BYTES = 512 * 1024;
   var base = window.__elonChatGptPrivateStreamTransport;
@@ -20,6 +21,7 @@
 
   var listeners = new Set();
   var recovered = null;
+  var completionOverride = null;
   var disposed = false;
   var baseUnsubscribe = null;
 
@@ -89,6 +91,85 @@
     catch (_) { return null; }
   }
 
+  function streamIdentity(value) {
+    if (!value) return '';
+    var conversation = cleanText(value.conversationId, 180);
+    var turn = cleanText(value.turnId, 180);
+    var message = cleanText(value.id || value.messageId, 180);
+    if (!turn && !message) return '';
+    return [conversation, turn, message].join(':');
+  }
+
+  function primaryMessageText(message) {
+    var content = message && Array.isArray(message.content) ? message.content : [];
+    return cleanText(content.filter(function (part) {
+      return part && (part.type === 'markdown' || part.type === 'text');
+    }).map(function (part) { return part.text || ''; }).join(' '), 8000);
+  }
+
+  function latestCompletedAssistant(messages) {
+    var values = Array.isArray(messages) ? messages : [];
+    for (var index = values.length - 1; index >= 0; index -= 1) {
+      var message = values[index];
+      if (!message || message.role !== 'assistant' || message.state === 'streaming') continue;
+      if (primaryMessageText(message)) return message;
+    }
+    return null;
+  }
+
+  function completionTextMatches(active, official) {
+    var privateText = cleanText(active && active.text, 8000);
+    var officialText = primaryMessageText(official);
+    if (!officialText) return false;
+    if (!privateText) return Array.isArray(active && active.richParts) && active.richParts.length > 0;
+    return privateText === officialText ||
+      (Math.min(privateText.length, officialText.length) >= 12 &&
+        (privateText.indexOf(officialText) === 0 || officialText.indexOf(privateText) === 0));
+  }
+
+  function completedActiveStream(active) {
+    if (!active || active.state !== 'streaming' || !completionOverride) return active;
+    if (streamIdentity(active) !== completionOverride.identity ||
+        Number(active.updatedAt || 0) > completionOverride.streamUpdatedAt ||
+        officialStreamingActive()) {
+      completionOverride = null;
+      return active;
+    }
+    return Object.assign({}, active, { state: 'completed' });
+  }
+
+  function observeOfficialCompletion(messages, pathname) {
+    var active = currentBase(pathname);
+    if (!active || active.state !== 'streaming') {
+      completionOverride = null;
+      return;
+    }
+    var identity = streamIdentity(active);
+    var updatedAt = Number(active.updatedAt || 0);
+    var official = latestCompletedAssistant(messages);
+    if (!identity || !official || officialStreamingActive() ||
+        !updatedAt || Date.now() - updatedAt < OFFICIAL_COMPLETION_SETTLE_MS ||
+        !completionTextMatches(active, official)) return;
+    var changed = !completionOverride || completionOverride.identity !== identity ||
+      completionOverride.streamUpdatedAt !== updatedAt;
+    completionOverride = { identity: identity, streamUpdatedAt: updatedAt };
+    if (changed) notify();
+  }
+
+  function applyMergedCompletion(messages, pathname) {
+    var active = completedActiveStream(currentBase(pathname));
+    if (!active || active.state !== 'completed' || !completionOverride || !Array.isArray(messages)) {
+      return messages;
+    }
+    var result = messages.slice();
+    for (var index = result.length - 1; index >= 0; index -= 1) {
+      if (!result[index] || result[index].role !== 'assistant') continue;
+      result[index] = Object.assign({}, result[index], { state: 'completed' });
+      break;
+    }
+    return result;
+  }
+
   function visibleNode(node) {
     if (!node) return false;
     try {
@@ -148,7 +229,7 @@
   }
 
   function currentWithProgress(pathname) {
-    var active = currentBase(pathname);
+    var active = completedActiveStream(currentBase(pathname));
     if (active && (active.state !== 'streaming' || cleanText(active.progressLabel, 220))) return active;
     var label = domProgressLabel();
     if (!label) return active;
@@ -298,12 +379,14 @@
       catch (_) { return null; }
     },
     mergeMessages: function (messages, pathname) {
+      observeOfficialCompletion(messages, pathname);
       var merged = messages;
       try { merged = base.mergeMessages(messages, pathname); } catch (_) {}
-      return enrichMessages(merged, pathname);
+      return applyMergedCompletion(enrichMessages(merged, pathname), pathname);
     },
     reset: function () {
       recovered = null;
+      completionOverride = null;
       try { if (typeof base.reset === 'function') base.reset(); } catch (_) {}
       notify();
     },
@@ -316,6 +399,7 @@
       if (disposed) return;
       disposed = true;
       recovered = null;
+      completionOverride = null;
       listeners.clear();
       if (typeof baseUnsubscribe === 'function') baseUnsubscribe();
       baseUnsubscribe = null;

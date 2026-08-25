@@ -123,6 +123,41 @@ assert.equal(merged[0].content.at(-1).richContent.payload.chart.points.length, 2
 assert.equal(transport.current('/c/conversation-one').richParts.length, 1)
 
 active = {
+  id: 'assistant-stale-stream',
+  turnId: 'turn-stale-stream',
+  conversationId: 'conversation-one',
+  text: 'BTC completed answer',
+  state: 'streaming',
+  richParts: [],
+  updatedAt: Date.now() - 4_000,
+}
+const completedDom = [{
+  id: 'dom-completed-answer',
+  role: 'assistant',
+  state: 'completed',
+  content: [{ type: 'markdown', text: 'BTC completed answer with sources' }],
+}]
+const completedMerge = transport.mergeMessages(completedDom, '/c/conversation-one')
+assert.equal(completedMerge[0].state, 'completed')
+assert.equal(
+  transport.current('/c/conversation-one').state,
+  'completed',
+  'a matching completed DOM answer must close a stale private streaming state',
+)
+
+active = {
+  ...active,
+  text: 'BTC completed answer with a new live continuation',
+  state: 'streaming',
+  updatedAt: Date.now(),
+}
+assert.equal(
+  transport.current('/c/conversation-one').state,
+  'streaming',
+  'a newer private frame must clear the prior completion override',
+)
+
+active = {
   id: 'assistant-progress',
   turnId: 'turn-progress',
   conversationId: 'conversation-one',

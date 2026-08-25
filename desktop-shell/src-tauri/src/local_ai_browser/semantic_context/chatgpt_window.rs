@@ -250,6 +250,46 @@ mod tests {
     }
 
     #[test]
+    fn short_official_window_replaces_matching_private_stream_turn() {
+        let previous = snapshot(
+            0,
+            4,
+            vec![
+                user_message("old-user", "旧问题"),
+                assistant_message("old-assistant", "旧回答"),
+                user_message("private-user", "比特币走势图现在怎么样"),
+                private_answer("private-stream:reply-1", "这是比特币走势图的正式回答"),
+            ],
+        );
+        let incoming = snapshot(
+            0,
+            2,
+            vec![
+                user_message("official-user", "比特币走势图现在怎么样"),
+                assistant_message("official-assistant", "这是比特币走势图的正式回答，并附来源"),
+            ],
+        );
+
+        let merged = merge(Some(&previous), incoming, true);
+
+        assert_eq!(
+            ids(&merged),
+            vec![
+                "old-user",
+                "old-assistant",
+                "official-user",
+                "official-assistant"
+            ]
+        );
+        assert_eq!(merged["observedMessageCount"], 4);
+        assert!(merged["messages"][3]["content"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|part| part["type"] == "rich_card"));
+    }
+
+    #[test]
     fn stable_old_subset_updates_metadata_without_erasing_known_turns() {
         let mut previous = snapshot(
             0,
@@ -310,7 +350,10 @@ mod tests {
         let incoming = snapshot(
             0,
             2,
-            vec![user_message("conversation-turn-0", "比特币走势图"), official],
+            vec![
+                user_message("conversation-turn-0", "比特币走势图"),
+                official,
+            ],
         );
 
         let merged = merge(Some(&previous), incoming, true);
@@ -416,6 +459,21 @@ mod tests {
                 }
             ]
         })
+    }
+
+    fn assistant_message(id: &str, text: &str) -> Value {
+        json!({
+            "id": id,
+            "role": "assistant",
+            "state": "completed",
+            "content": [{"type":"markdown","text":text}]
+        })
+    }
+
+    fn private_answer(id: &str, text: &str) -> Value {
+        let mut message = finance_message(id, "US$78,805.00");
+        message["content"][0]["text"] = Value::String(text.to_string());
+        message
     }
 
     fn ids(snapshot: &Value) -> Vec<&str> {

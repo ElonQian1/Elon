@@ -29,6 +29,7 @@ pub(super) fn preserve_private_stream_turn_content(previous: &[Value], incoming:
 }
 
 pub(super) fn reconcile_private_stream_shadows(messages: Vec<Value>) -> Vec<Value> {
+    let messages = reconcile_duplicate_private_stream_turns(messages);
     let turns = assistant_turns(&messages);
     if turns.is_empty() {
         return messages;
@@ -69,6 +70,144 @@ pub(super) fn reconcile_private_stream_shadows(messages: Vec<Value>) -> Vec<Valu
             }
         })
         .collect()
+}
+
+fn reconcile_duplicate_private_stream_turns(mut messages: Vec<Value>) -> Vec<Value> {
+    let turns = message_turns(&messages);
+    if turns.len() < 2 {
+        return messages;
+    }
+    let mut replacements = BTreeMap::new();
+    let mut removed = HashSet::new();
+    for adjacent in turns.windows(2) {
+        let earlier = &adjacent[0];
+        let later = &adjacent[1];
+        if normalized_message_text(&messages[earlier.user]).is_empty()
+            || normalized_message_text(&messages[earlier.user])
+                != normalized_message_text(&messages[later.user])
+            || earlier.assistants.is_empty()
+            || !earlier
+                .assistants
+                .iter()
+                .all(|&index| is_private_stream_message(&messages[index]))
+        {
+            continue;
+        }
+        let Some(&official_index) = later
+            .assistants
+            .iter()
+            .rev()
+            .find(|&&index| !is_private_stream_message(&messages[index]))
+        else {
+            continue;
+        };
+        if !assistant_turns_match(&messages, &earlier.assistants, official_index) {
+            continue;
+        }
+        let mut official = replacements
+            .remove(&official_index)
+            .unwrap_or_else(|| messages[official_index].clone());
+        for &private_index in &earlier.assistants {
+            official = preserve_message_rich_content(&messages[private_index], official);
+            removed.insert(private_index);
+        }
+        replacements.insert(official_index, official);
+        removed.insert(earlier.user);
+    }
+    for (index, replacement) in replacements {
+        messages[index] = replacement;
+    }
+    messages
+        .into_iter()
+        .enumerate()
+        .filter_map(|(index, message)| (!removed.contains(&index)).then_some(message))
+        .collect()
+}
+
+struct MessageTurn {
+    user: usize,
+    assistants: Vec<usize>,
+}
+
+fn message_turns(messages: &[Value]) -> Vec<MessageTurn> {
+    let mut turns = Vec::new();
+    for (index, message) in messages.iter().enumerate() {
+        match message.get("role").and_then(Value::as_str) {
+            Some("user") => turns.push(MessageTurn {
+                user: index,
+                assistants: Vec::new(),
+            }),
+            Some("assistant") => {
+                if let Some(turn) = turns.last_mut() {
+                    turn.assistants.push(index);
+                }
+            }
+            _ => {}
+        }
+    }
+    turns
+}
+
+fn assistant_turns_match(
+    messages: &[Value],
+    private_indices: &[usize],
+    official_index: usize,
+) -> bool {
+    let private_text = private_indices
+        .iter()
+        .map(|&index| normalized_message_text(&messages[index]))
+        .filter(|text| !text.is_empty())
+        .collect::<Vec<_>>()
+        .join(" ");
+    let official_text = normalized_message_text(&messages[official_index]);
+    if private_text.is_empty() {
+        return private_indices
+            .iter()
+            .any(|&index| has_structured_content(&messages[index]));
+    }
+    if official_text.is_empty() {
+        return false;
+    }
+    private_text == official_text
+        || (private_text
+            .chars()
+            .count()
+            .min(official_text.chars().count())
+            >= 12
+            && (private_text.starts_with(&official_text)
+                || official_text.starts_with(&private_text)))
+}
+
+fn normalized_message_text(message: &Value) -> String {
+    message
+        .get("content")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter(|part| {
+            matches!(
+                part.get("type").and_then(Value::as_str),
+                Some("text" | "markdown")
+            )
+        })
+        .filter_map(|part| part.get("text").and_then(Value::as_str))
+        .flat_map(str::split_whitespace)
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn has_structured_content(message: &Value) -> bool {
+    message
+        .get("content")
+        .and_then(Value::as_array)
+        .is_some_and(|content| {
+            content.iter().any(|part| {
+                !matches!(
+                    part.get("type").and_then(Value::as_str),
+                    Some("text" | "markdown" | "citation") | None
+                )
+            })
+        })
 }
 
 fn assistant_turns(messages: &[Value]) -> Vec<Vec<usize>> {
@@ -180,7 +319,45 @@ mod tests {
 
         let reconciled = reconcile_private_stream_shadows(messages);
 
-        assert_eq!(ids(&reconciled), vec!["u1", "private-stream:reply-1", "u2", "a2"]);
+        assert_eq!(
+            ids(&reconciled),
+            vec!["u1", "private-stream:reply-1", "u2", "a2"]
+        );
+    }
+
+    #[test]
+    fn duplicate_private_turn_is_replaced_by_matching_official_turn() {
+        let messages = vec![
+            user_message("private-user", "比特币走势图现在怎么样"),
+            private_answer("private-stream:reply-1", "这是比特币走势图的正式回答"),
+            user_message("official-user", "比特币走势图现在怎么样"),
+            assistant_message("official-assistant", "这是比特币走势图的正式回答，并附来源"),
+        ];
+
+        let reconciled = reconcile_private_stream_shadows(messages);
+
+        assert_eq!(
+            ids(&reconciled),
+            vec!["official-user", "official-assistant"]
+        );
+        assert_eq!(reconciled[1]["content"][1]["type"], "rich_card");
+    }
+
+    #[test]
+    fn deliberate_repeated_prompt_with_different_answers_is_retained() {
+        let messages = vec![
+            user_message("u1", "再分析一次"),
+            private_answer("private-stream:reply-1", "第一次回答内容明显不同"),
+            user_message("u2", "再分析一次"),
+            assistant_message("a2", "第二次重新分析后的另一份结论"),
+        ];
+
+        let reconciled = reconcile_private_stream_shadows(messages);
+
+        assert_eq!(
+            ids(&reconciled),
+            vec!["u1", "private-stream:reply-1", "u2", "a2"]
+        );
     }
 
     fn user_message(id: &str, text: &str) -> Value {
@@ -224,6 +401,15 @@ mod tests {
                 }
             }]
         })
+    }
+
+    fn private_answer(id: &str, text: &str) -> Value {
+        let mut message = finance_message(id, "US$78,805.00");
+        message["content"]
+            .as_array_mut()
+            .unwrap()
+            .insert(0, json!({"type":"markdown","text":text}));
+        message
     }
 
     fn ids(messages: &[Value]) -> Vec<&str> {
