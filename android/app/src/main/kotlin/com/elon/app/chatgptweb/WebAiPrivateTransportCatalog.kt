@@ -48,11 +48,11 @@ internal object WebAiPrivateTransportCatalog {
             id = "android_chatgpt_private_stream_observer_v1",
             provider = "chatgpt",
             status = "completed",
-            verification = "device_verified",
+            verification = "device_verified_protocol_adaptive_watchdog_regression_pending",
             productionDefault = true,
             runtimeEnabled = BuildConfig.CHATGPT_PRIVATE_STREAM_OBSERVER_ENABLED,
             requestMode = "passive_official_response_clone",
-            healthPolicy = "bounded_stream_observer_with_dom_reconciliation",
+            healthPolicy = "private_event_driven_stream_with_sparse_dom_watchdog",
             fallback = "official_dom_stream_snapshot",
         ),
         Entry(

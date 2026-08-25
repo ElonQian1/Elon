@@ -13,6 +13,10 @@
     const waitTimeoutMs = Math.max(settleMs, Number(options.waitTimeoutMs) || 30000);
     const completionQuietMs = Math.max(200, Number(options.completionQuietMs) || 400);
     const heartbeatMs = Math.max(200, Number(options.heartbeatMs) || 400);
+    const privateStreamWatchdogMs = Math.max(
+      heartbeatMs,
+      Number(options.privateStreamWatchdogMs) || 4000
+    );
     const scheduleTimer = options.scheduleTimer;
     const cancelTimer = options.cancelTimer;
     let heartbeatTimer = 0;
@@ -104,11 +108,14 @@
       return current();
     }
 
-    function scheduleNext(shouldSchedule, next) {
+    function scheduleNext(shouldSchedule, next, scheduleOptions) {
       if (heartbeatTimer && typeof cancelTimer === 'function') cancelTimer(heartbeatTimer);
       heartbeatTimer = 0;
       if (shouldSchedule !== true || typeof scheduleTimer !== 'function' || typeof next !== 'function') return;
-      heartbeatTimer = scheduleTimer(heartbeatMs, function () {
+      const delayMs = scheduleOptions && scheduleOptions.privateStreamObserved === true
+        ? privateStreamWatchdogMs
+        : heartbeatMs;
+      heartbeatTimer = scheduleTimer(delayMs, function () {
         heartbeatTimer = 0;
         next();
       });

@@ -29,6 +29,7 @@
   let privateStreamUnsubscribe = null;
   let lastPrivateDirectorySnapshot = '';
   let streamingSnapshotMode = false;
+  let privateStreamingSnapshotMode = false;
   let skinMode = false;
   const SEND_BUTTON_POLL_MS = 60;
   const SEND_BUTTON_SETTLE_MS = 180;
@@ -240,6 +241,8 @@
       (streamingState.active || !!(privateStream && privateStream.state === 'streaming'));
     if (access.blocked === true && streamingPolicy) streamingPolicy.reset();
     streamingSnapshotMode = streaming;
+    privateStreamingSnapshotMode = access.blocked !== true &&
+      !!(privateStream && privateStream.state === 'streaming');
     const messageWindow = optional({ messages: [], observedCount: 0, startIndex: 0 }, () =>
       messageAdapter && typeof messageAdapter.readMessageWindow === 'function'
         ? messageAdapter.readMessageWindow(streaming, streamingState.assistantKey)
@@ -277,12 +280,18 @@
       emitEvent(event);
     }
     optional(undefined, () => layoutAdapter && layoutAdapter.emitSnapshot(emitEvent));
-    if (streamingPolicy) streamingPolicy.scheduleNext(streaming, () => scheduleSnapshot(true));
+    if (streamingPolicy) streamingPolicy.scheduleNext(
+      streaming,
+      () => scheduleSnapshot(true),
+      { privateStreamObserved: privateStreamingSnapshotMode }
+    );
   }
 
   function scheduleSnapshot(recordsOrActive) {
     if (disposed || skinMode || !snapshotScheduler) return;
-    const active = recordsOrActive === true || streamingSnapshotMode;
+    const forced = recordsOrActive === true;
+    if (!forced && privateStreamingSnapshotMode) return;
+    const active = forced || streamingSnapshotMode;
     snapshotScheduler.schedule(active);
   }
 

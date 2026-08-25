@@ -1,7 +1,7 @@
 ---
 capability_id: android_chatgpt_private_stream_observer_v1
 implementation_status: completed
-verification_status: device_verified
+verification_status: device_verified_protocol_adaptive_watchdog_regression_pending
 production_default: true
 repeat_implementation: legacy_sse_and_websocket_discovery_not_required
 ---
@@ -80,3 +80,14 @@ status response. It never creates another request or replays a prompt; parse,
 timeout, protocol, or merge failures leave the DOM path authoritative. The
 production default is now enabled, and adapter `169` invalidates older page
 generations. Do not repeat protocol discovery without a current regression.
+
+## Adaptive native snapshot scheduling
+
+Adapter `181` keeps the completed private observer as the primary streaming signal.
+Each accepted private update schedules the native snapshot directly. While that signal is
+active, duplicate DOM mutations no longer trigger another snapshot and the fixed 400 ms
+heartbeat becomes a four-second read-only watchdog. If no private stream is available, the
+original DOM heartbeat is unchanged; completion, parsing failure, timeout, or protocol drift
+therefore continues through the official DOM fallback. Targeted policy and Android contract
+tests cover watchdog selection, timer replacement, and adapter wiring. Device regression is
+pending and does not invalidate the earlier private-stream protocol verification.

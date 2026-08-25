@@ -11,7 +11,7 @@ installed build; individual capability documents retain implementation evidence.
 | Conversation and project directory | ChatGPT | Completed and enabled | Official DOM directory |
 | Conversation body prefetch | ChatGPT | Completed and enabled | Official WebView navigation |
 | Send dispatch acknowledgement | ChatGPT | Completed and enabled | Official DOM confirmation |
-| Streaming reply observer | ChatGPT | Completed and enabled | Official DOM snapshot |
+| Streaming reply observer | ChatGPT | Completed and enabled; adaptive-watchdog device regression pending | Official DOM snapshot |
 | Realtime voice transcript refresh | ChatGPT | Completed and enabled; supervised voice exit pending | Retained native transcript and official DOM snapshot |
 | Realtime voice background continuity | ChatGPT | Completed and enabled; native/system overlay handoff and media auto-pause device verified, manual overlay actions pending | Official WebView voice and foreground notification |
 | Conversation directory | Google Web AI | Completed and enabled | Local cache and official page |
@@ -40,6 +40,12 @@ reply appears. Once streaming is visible, MutationObserver and the passive same-
 completion signal remain primary while dense polling is replaced by four sparse watchdogs
 over 68 seconds. Repeated streaming snapshots cannot stack timers, completion cancels the
 remaining watchdog immediately, and the official DOM snapshot remains the fallback.
+
+ChatGPT streaming remains event-driven while the verified private response observer is
+producing the current turn. Private progress schedules the native snapshot directly,
+duplicate DOM mutations are ignored during that interval, and a four-second read-only
+watchdog preserves official DOM reconciliation if private progress stalls. When no private
+stream is available, the existing 400 ms bounded DOM heartbeat remains unchanged.
 
 Realtime voice hangup has two separate states: the APK requesting the official action,
 and the official call actually settling. Late reconciliation runs only after the official

@@ -106,11 +106,18 @@ assert.equal(
     now: () => now,
     scheduleTimer(delay, action) {
       const id = ++timerId;
-      timers.set(id, { delay, action });
+      timers.set(id, {
+        delay,
+        action() {
+          timers.delete(id);
+          action();
+        }
+      });
       return id;
     },
     cancelTimer(id) { timers.delete(id); },
-    heartbeatMs: 400
+    heartbeatMs: 400,
+    privateStreamWatchdogMs: 4000
   });
   heartbeatPolicy.scheduleNext(true, () => { heartbeats += 1; });
   assert.equal(Array.from(timers.values())[0].delay, 400);
@@ -119,6 +126,17 @@ assert.equal(
   const timer = Array.from(timers.values())[0];
   timer.action();
   assert.equal(heartbeats, 1);
+  heartbeatPolicy.scheduleNext(true, () => { heartbeats += 1; }, {
+    privateStreamObserved: true
+  });
+  assert.equal(Array.from(timers.values())[0].delay, 4000,
+    'an observed private stream replaces dense DOM heartbeats with a sparse watchdog');
+  heartbeatPolicy.scheduleNext(true, () => { heartbeats += 1; }, {
+    privateStreamObserved: true
+  });
+  assert.equal(timers.size, 1, 'private-stream progress cannot stack watchdog timers');
+  Array.from(timers.values())[0].action();
+  assert.equal(heartbeats, 2);
   heartbeatPolicy.dispose();
 }
 
