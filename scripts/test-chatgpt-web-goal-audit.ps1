@@ -24,6 +24,7 @@ foreach ($required in @(
     'pending_verification_feature_ids',
     'unknown_capability_count',
     'unknown_semantic_count',
+    '-Tool "ui_state" -MainState',
     'private_content_emitted = $false',
     'CHATGPT_WEB_GOAL_AUDIT_STATUS='
 )) {

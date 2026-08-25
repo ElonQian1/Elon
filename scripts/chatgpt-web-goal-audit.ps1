@@ -146,7 +146,7 @@ if ($DeviceSerial) {
         $runtime = New-ChatGptWebSmokeRuntime -Adb $Adb -DeviceSerial $DeviceSerial `
             -ExpectedHardwareSerial $ExpectedHardwareSerial -PollIntervalSec 1
         Assert-ChatGptWebSmokeTrustedDevice -Runtime $runtime
-        $state = Invoke-ChatGptWebSmokeMcp -Runtime $runtime -Tool "ui_state"
+        $state = Invoke-ChatGptWebSmokeMcp -Runtime $runtime -Tool "ui_state" -MainState
         if (
             [string]$state.active_surface -ne "social_ai" -or
             [string]$state.social_chat.interaction_mode -ne "chat" -or
