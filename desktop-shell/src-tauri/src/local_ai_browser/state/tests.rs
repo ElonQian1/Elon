@@ -531,6 +531,59 @@ fn google_visible_page_followup_keeps_context_without_a_native_send_receipt() {
 }
 
 #[test]
+fn google_private_directory_open_rebinds_instead_of_merging_the_previous_thread() {
+    let runtime = LocalAiBrowserRuntime::default();
+    runtime.ensure_session("session", "google-ai-mode", "active");
+    let first_url = Url::parse("https://www.google.com/search?udm=50&q=first").unwrap();
+    runtime.mark_navigation("session", &first_url, true, None);
+    runtime.record_adapter_event_with_context(
+        "session",
+        "message_snapshot",
+        json!({"type":"message_snapshot","messages":[
+            {"role":"user","state":"completed","content":[{"type":"text","text":"first"}]},
+            {"role":"assistant","state":"completed","content":[{"type":"text","text":"first answer"}]}
+        ]}),
+        semantic_context::page_context_key("google-ai-mode", first_url.as_str()).as_deref(),
+    );
+    let first_id = runtime
+        .snapshot("session")
+        .unwrap()
+        .active_conversation_id
+        .unwrap();
+
+    runtime.mark_command_pending_with_value(
+        "session",
+        "open_conversation",
+        Some("mcp_google_open"),
+        Some("/c/thread_1234567890"),
+    );
+    let second_url =
+        Url::parse("https://www.google.com/search?udm=50&q=second&csuir=thread_1234567890")
+            .unwrap();
+    let second_key = semantic_context::page_context_key("google-ai-mode", second_url.as_str());
+    runtime.mark_navigation("session", &second_url, true, None);
+    runtime.record_adapter_event_with_context(
+        "session",
+        "message_snapshot",
+        json!({"type":"message_snapshot","messages":[
+            {"role":"user","state":"completed","content":[{"type":"text","text":"second"}]},
+            {"role":"assistant","state":"completed","content":[{"type":"text","text":"second answer"}]}
+        ]}),
+        second_key.as_deref(),
+    );
+
+    let opened = runtime.snapshot("session").unwrap();
+    assert_ne!(opened.active_conversation_id.as_deref(), Some(first_id.as_str()));
+    assert_eq!(opened.active_conversation_id.as_deref(), second_key.as_deref());
+    let messages = opened.semantic_event.unwrap()["messages"]
+        .as_array()
+        .unwrap()
+        .clone();
+    assert_eq!(messages.len(), 2);
+    assert_eq!(messages[0]["content"][0]["text"], "second");
+}
+
+#[test]
 fn late_snapshot_from_previous_page_cannot_replace_opened_conversation() {
     let runtime = LocalAiBrowserRuntime::default();
     runtime.ensure_session("session", "chatgpt", "active");

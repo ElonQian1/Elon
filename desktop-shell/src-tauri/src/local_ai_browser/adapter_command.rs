@@ -38,6 +38,8 @@ pub(super) const GOOGLE_AI_MODE_ACTIONS: &[&str] = &[
     "send_prompt",
     "stop_generation",
     "new_conversation",
+    "list_conversations",
+    "open_conversation",
 ];
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -213,7 +215,8 @@ mod tests {
         assert!(CHATGPT_ACTIONS.contains(&"refresh_current_conversation"));
         assert!(!GOOGLE_AI_MODE_ACTIONS.contains(&"refresh_current_conversation"));
         assert!(CHATGPT_ACTIONS.contains(&"start_google_login"));
-        assert!(!GOOGLE_AI_MODE_ACTIONS.contains(&"list_conversations"));
+        assert!(GOOGLE_AI_MODE_ACTIONS.contains(&"list_conversations"));
+        assert!(GOOGLE_AI_MODE_ACTIONS.contains(&"open_conversation"));
         assert!(CHATGPT_ACTIONS.contains(&"request_attachment_upload"));
         assert!(CHATGPT_ACTIONS.contains(&"start_dictation"));
     }

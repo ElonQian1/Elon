@@ -1,6 +1,9 @@
 use serde_json::{json, Map, Value};
 
-use super::{adapter::SanitizedAdapterEvent, adapter_content, semantic_context, snapshot_cache};
+use super::{
+    adapter::{self, SanitizedAdapterEvent},
+    adapter_content, semantic_context, snapshot_cache,
+};
 
 const MAX_EVENT_BYTES: usize = 512 * 1024;
 const MAX_MESSAGES: usize = 80;
@@ -97,6 +100,12 @@ fn sanitize_protocol_event(event: &Map<String, Value>) -> Result<SanitizedAdapte
             "currentModel": clean_string(event.get("currentModel"), 80),
             "capabilities": clean_identifiers(event.get("capabilities"), 20),
         }),
+        "conversation_snapshot" => json!({
+            "type": kind,
+            "conversations": adapter::sanitize_conversations(event.get("conversations")),
+            "projects": [],
+            "collection": adapter::sanitize_conversation_collection(event.get("collection")),
+        }),
         _ => return Err("不支持的 Google AI 模式可见语义事件类型。".to_string()),
     };
     let page_context_key = (kind == "message_snapshot")
@@ -191,6 +200,7 @@ fn sanitize_request_id(value: Option<&Value>) -> Option<String> {
 
 fn sanitize_page_kind(value: Option<&Value>) -> &'static str {
     match value.and_then(Value::as_str) {
+        Some("conversation") => "conversation",
         Some("ai_mode") => "ai_mode",
         Some("unsupported") => "unsupported",
         _ => "unknown",
@@ -339,6 +349,8 @@ mod tests {
         assert!(script.contains("window.__elonGoogleWebPrivateResearchEnabled = true"));
         assert!(script.contains("window.__elonGoogleWebPrivateResponseTap"));
         assert!(script.contains("research_network_observation"));
+        assert!(script.contains("google_win_private_conversation_bridge.js"));
+        assert!(script.contains("__elonWinGooglePrivateConversationBridgeVersion"));
         assert!(script.contains("__elonGoogleWebPrivateReplyObserver"));
         assert!(script.contains("__elonGoogleWebPrivateThreadDirectory"));
         assert!(script.contains("__elonGoogleWebQueryPolicy"));
@@ -359,5 +371,37 @@ mod tests {
             .expect("Win bootstrap should retain the bounded full response capture");
         assert!(private_tap < full_capture);
         assert!(full_capture < dom_ready);
+    }
+
+    #[test]
+    fn private_google_directory_is_sanitized_for_win_navigation() {
+        let raw = serde_json::to_string(&json!({
+            "schema": "yilong.ai.ui.v1",
+            "adapterVersion": ADAPTER_VERSION,
+            "providerId": "google_web",
+            "event": {
+                "type": "conversation_snapshot",
+                "conversations": [{
+                    "id": "thread_1234567890",
+                    "title": "BTC 走势",
+                    "path": "/c/thread_1234567890",
+                    "providerUrl": "https://www.google.com/search?udm=50&csuir=secret"
+                }, {
+                    "id": "bad",
+                    "title": "bad",
+                    "path": "https://example.com/private"
+                }],
+                "projects": [{"id": "private", "path": "/private"}],
+                "collection": {"observedCount": 2, "complete": false}
+            }
+        }))
+        .unwrap();
+        let event = sanitize_event(&raw).unwrap();
+        assert_eq!(event.kind, "conversation_snapshot");
+        assert_eq!(event.payload["conversations"].as_array().unwrap().len(), 1);
+        assert_eq!(event.payload["conversations"][0]["path"], "/c/thread_1234567890");
+        assert_eq!(event.payload["projects"].as_array().unwrap().len(), 0);
+        assert!(!event.payload.to_string().contains("csuir"));
+        assert_eq!(event.payload["collection"]["observedCount"], 2);
     }
 }

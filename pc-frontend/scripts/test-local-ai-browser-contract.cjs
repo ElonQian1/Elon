@@ -35,6 +35,7 @@ const googleAdapter = [
   read('desktop-shell/src-tauri/src/local_ai_browser/google_ai_mode.rs'),
   read('desktop-shell/src-tauri/src/local_ai_browser/google_ai_mode_adapter_bootstrap.rs'),
 ].join('\n')
+const googleWinPrivateConversationBridge = read('desktop-shell/src-tauri/src/local_ai_browser/google_win_private_conversation_bridge.js')
 const sharedGoogleAdapterScript = read('android/app/src/main/assets/google_web_adapter.js')
 const sharedGoogleMessageExtractorScript = read('android/app/src/main/assets/google_web_message_extractor.js')
 const sharedGoogleAnswerCandidatePolicy = require(path.join(root, 'android/app/src/main/assets/google_web_answer_candidate_policy.js'))
@@ -233,6 +234,11 @@ assert.match(googleAdapter, /function installWhenReady\(\)/)
 assert.match(googleAdapter, /document\.documentElement instanceof Node/)
 assert.match(googleAdapter, /DOMContentLoaded/)
 assert.match(googleAdapter, /adapter_bootstrap_failed/)
+assert.match(googleAdapter, /google_win_private_conversation_bridge\.js/)
+assert.match(googleWinPrivateConversationBridge, /list_conversations/)
+assert.match(googleWinPrivateConversationBridge, /open_conversation/)
+assert.match(googleWinPrivateConversationBridge, /__elonGoogleWebPrivateThreadDirectory/)
+assert.doesNotMatch(googleWinPrivateConversationBridge, /document\.cookie|authorization|access[_-]?token|fetch\s*\(/i)
 assert.match(googleAdapter, /Some\("google_web"\)/)
 assert.match(sharedGoogleAdapterScript, /window\.__elonGoogleWebBridge/)
 assert.match(sharedGoogleMessageExtractorScript, /window\.__elonGoogleWebMessageExtractor/)
@@ -241,6 +247,8 @@ assert.match(sharedGoogleMessageExtractorScript, /narrativeBlocks/)
 assert.match(sharedGoogleMessageExtractorScript, /richContent\.sourceResultItemCount\(node\)/)
 assert.match(sharedGoogleRichContentScript, /sourceResultCollection/)
 assert.match(sharedGoogleRichContentScript, /sourceCollection/)
+assert.match(chatSidebar, /Google AI 官网会话/)
+assert.match(chatSidebar, /同步 Google AI 官网会话/)
 assert.equal(sharedGoogleAnswerCandidatePolicy.sourceCollection({
   citations: 6,
   links: 6,

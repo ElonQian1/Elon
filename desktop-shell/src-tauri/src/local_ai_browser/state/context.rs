@@ -117,7 +117,11 @@ impl SessionRecord {
         }
         if !self.pending_context_action.is_empty() {
             self.active_page_context_key = Some(context_key.clone());
-            if self.active_conversation_id.is_none() {
+            if self.provider_id == "google-ai-mode"
+                && self.pending_context_action == "open_conversation"
+            {
+                self.active_conversation_id = Some(context_key);
+            } else if self.active_conversation_id.is_none() {
                 self.active_conversation_id = Some(context_key);
             }
             return;

@@ -57,7 +57,8 @@ mod tests {
         let chatgpt = ProviderAdapter::ChatGpt;
         let google = ProviderAdapter::GoogleWeb;
         assert!(chatgpt.supported_actions().contains(&"list_conversations"));
-        assert!(!google.supported_actions().contains(&"list_conversations"));
+        assert!(google.supported_actions().contains(&"list_conversations"));
+        assert!(google.supported_actions().contains(&"open_conversation"));
         assert!(chatgpt
             .page_invocation_script(r#"{"action":"snapshot"}"#)
             .unwrap()

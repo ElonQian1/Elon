@@ -198,12 +198,44 @@ export default function AiWebChatSidebar({ web }: { web: AiWebChatBackend }) {
             )}
           </nav>
         ) : (
-          <section className={styles.googleSession} aria-label="Google AI 搜索会话">
-            <div className={styles.sectionHeading}><MessageSquare size={13} /><span>搜索会话</span></div>
-            <button type="button" data-active disabled>
-              <strong>{web.controller.snapshot?.title || '新 AI 搜索'}</strong>
-              <small>Google AI 模式当前网页会话</small>
-            </button>
+          <section className={[styles.googleSession, styles.directory].join(' ')} aria-label="Google AI 搜索会话">
+            <div className={styles.directoryTitle}>
+              <span>Google AI 官网会话</span>
+              {directory?.collection && (
+                <small>{directory.collection.complete ? '已完整同步' : '后台同步中'}</small>
+              )}
+              <button
+                type="button"
+                title="同步 Google AI 官网会话"
+                aria-label="同步 Google AI 官网会话"
+                onClick={() => syncDirectory(true)}
+                disabled={!web.userState.canConversationHistory || busy}
+              >
+                <RefreshCw size={13} className={web.controller.busyAction === 'list_conversations' ? styles.spinning : ''} />
+              </button>
+            </div>
+            {conversations.length ? (
+              <>
+                <label className={styles.search}>
+                  <Search size={13} aria-hidden="true" />
+                  <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索 Google AI 官网会话" />
+                  {query && <button type="button" onClick={() => setQuery('')} aria-label="清除聊天搜索">×</button>}
+                </label>
+                <DirectorySection
+                  icon={<MessageSquare size={13} />}
+                  title="搜索记录"
+                  items={recent}
+                  empty="Google AI 官网暂无可恢复会话"
+                  action="open_conversation"
+                  web={web}
+                />
+              </>
+            ) : (
+              <button type="button" data-active disabled>
+                <strong>{web.controller.snapshot?.title || '新 AI 搜索'}</strong>
+                <small>{web.userState.canConversationHistory ? '正在后台同步官网会话' : 'Google AI 模式当前网页会话'}</small>
+              </button>
+            )}
             <CachedConversationSection items={cachedConversations} web={web} />
           </section>
         )}

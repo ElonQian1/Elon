@@ -288,7 +288,7 @@ fn sanitize_compatibility(value: Option<&Value>) -> &'static str {
     }
 }
 
-fn sanitize_conversations(value: Option<&Value>) -> Vec<Value> {
+pub(super) fn sanitize_conversations(value: Option<&Value>) -> Vec<Value> {
     value
         .and_then(Value::as_array)
         .into_iter()
@@ -318,7 +318,7 @@ fn sanitize_conversations(value: Option<&Value>) -> Vec<Value> {
         .collect()
 }
 
-fn sanitize_conversation_collection(value: Option<&Value>) -> Value {
+pub(super) fn sanitize_conversation_collection(value: Option<&Value>) -> Value {
     let collection = value.and_then(Value::as_object);
     let boolean = |key: &str| {
         collection

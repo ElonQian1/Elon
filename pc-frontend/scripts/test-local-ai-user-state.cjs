@@ -26,7 +26,11 @@ const chatgpt = provider('chatgpt', 'manual_web', [
   'list_conversations',
   'start_google_login',
 ])
-const google = provider('google-ai-mode', 'guest_web_system_login', sharedActions)
+const google = provider('google-ai-mode', 'guest_web_system_login', [
+  ...sharedActions,
+  'list_conversations',
+  'open_conversation',
+])
 const readySession = {
   providerId: 'chatgpt',
   windowLabel: 'local-ai-chatgpt-test',
@@ -109,6 +113,18 @@ assert.equal(guest.phase, 'ready_guest')
 assert.equal(guest.canSend, true)
 assert.equal(guest.canNewConversation, true)
 assert.equal(guest.canConversationHistory, false)
+
+const authenticatedGoogle = deriveLocalAiUserState('ready', google, {
+  ...readySession,
+  providerId: google.id,
+  currentHost: 'google.com',
+}, snapshot({
+  authenticated: true,
+  composerReady: true,
+  pageKind: 'conversation',
+  capabilities: ['new_conversation', 'conversation_history'],
+}))
+assert.equal(authenticatedGoogle.canConversationHistory, true)
 
 const disconnectedGuest = deriveLocalAiUserState('ready', google, {
   ...readySession,
