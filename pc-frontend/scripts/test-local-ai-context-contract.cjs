@@ -21,6 +21,10 @@ const responseRefreshConfigPath = path.join(
   root,
   'pc-frontend/src/features/user-browser/localAiWebChatControllerConfig.ts',
 )
+const directoryAutoSyncPath = path.join(
+  root,
+  'pc-frontend/src/features/user-browser/localAiDirectoryAutoSync.ts',
+)
 const realtimeVoicePath = path.join(
   root,
   'pc-frontend/src/features/user-browser/localAiRealtimeVoice.ts',
@@ -84,6 +88,8 @@ assert.match(backend, /contextTurnCount/)
 assert.match(backend, /contextSummary/)
 assert.match(backend, /localAiHistoryWindow/)
 assert.match(sidebar, /historyWindow\.label/)
+assert.match(sidebar, /localAiDirectoryAutoSyncKey/)
+assert.match(sidebar, /web\.controller\.sessionIdentity/)
 assert.match(controls, /MENU_CACHE_TTL_MS/)
 assert.match(controls, /menuNeedsRefresh/)
 assert.match(controls, /findLocalAiRealtimeVoiceControls/)
@@ -125,6 +131,17 @@ assert.equal(responseRefreshConfig.localAiResponseRefreshPhase({
   providerId: 'google-ai-mode', current: 'streaming_watchdog', assistantObserved: true,
   streaming: false, completed: true,
 }), 'completed')
+
+const { localAiDirectoryAutoSyncKey } = loadTypeScriptModule(directoryAutoSyncPath)
+assert.equal(localAiDirectoryAutoSyncKey({
+  sessionIdentity: 'chatgpt:owner-a', windowLabel: 'chatgpt-window', sessionOpen: true,
+}), 'chatgpt:owner-a:chatgpt-window')
+assert.equal(localAiDirectoryAutoSyncKey({
+  sessionIdentity: 'chatgpt:owner-b', windowLabel: 'chatgpt-window', sessionOpen: true,
+}), 'chatgpt:owner-b:chatgpt-window')
+assert.equal(localAiDirectoryAutoSyncKey({
+  sessionIdentity: 'chatgpt:owner-a', windowLabel: 'chatgpt-window', sessionOpen: false,
+}), '')
 
 const { findLocalAiRealtimeVoiceControls } = loadTypeScriptModule(realtimeVoicePath)
 const baseControl = {

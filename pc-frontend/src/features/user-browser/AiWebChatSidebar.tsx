@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import type { AiWebChatBackend } from './useAiWebChatBackend'
 import { requestReturnToAiChat } from './internalBrowserApi'
+import { localAiDirectoryAutoSyncKey } from './localAiDirectoryAutoSync'
 import styles from './AiWebChatSidebar.module.css'
 
 export default function AiWebChatSidebar({ web }: { web: AiWebChatBackend }) {
@@ -68,24 +69,33 @@ export default function AiWebChatSidebar({ web }: { web: AiWebChatBackend }) {
     cancelSyncRetry()
     autoSyncKey.current = ''
     syncRetryAttempt.current = 0
-  }, [cancelSyncRetry, web.provider?.id])
+  }, [cancelSyncRetry, web.controller.sessionIdentity])
 
   useEffect(() => () => cancelSyncRetry(), [cancelSyncRetry])
 
   useEffect(() => {
-    if (!web.userState.canConversationHistory
-      || !web.controller.sessionOpen
-      || busy) return
-    const key = web.controller.sessionState?.windowLabel || web.provider.id
+    const key = localAiDirectoryAutoSyncKey({
+      sessionIdentity: web.controller.sessionIdentity,
+      windowLabel: web.controller.sessionState?.windowLabel,
+      sessionOpen: web.controller.sessionOpen,
+    })
+    if (!key) {
+      autoSyncKey.current = ''
+      syncRetryAttempt.current = 0
+      cancelSyncRetry()
+      return
+    }
+    if (!web.userState.canConversationHistory || busy) return
     if (autoSyncKey.current === key) return
     autoSyncKey.current = key
     syncDirectory()
   }, [
     busy,
+    cancelSyncRetry,
     syncDirectory,
+    web.controller.sessionIdentity,
     web.controller.sessionOpen,
     web.controller.sessionState?.windowLabel,
-    web.provider.id,
     web.userState.canConversationHistory,
   ])
 
