@@ -18,11 +18,11 @@ verification_status: targeted_local_tests_partially_passed
 - `design_frozen / source_written / implementation_not_dynamically_accepted`；本批新增 registration runner 为 `source_review_only / implementation_uncompiled / implementation_unrun`；
 - `elon-pc-node` 完整测试目标在 2026-08-12 基线修复后可编译；
 - 与可见性修复直接相关的 targeted fault matrix 已运行并通过 5 项；
-- A2a/A2b1 map/lock 只有 candidate typed schema 与显式不完整的 branch-atom scaffold 已 source-written；quotient、exact key set、`Expected`、exclusion ledger 与 denominator 仍为 `source_review_pending/implementation_uncompiled/implementation_unrun`，复核 clean 前不得记 `StaticContract` 或开放 `WindowsDynamic`；
+- A2a/A2b1 map/lock 的 commit-bound `SourceScope/SourceOwnerGraph v1` 已 `design_frozen/source_written/source_review_only/validator_uncompiled/unrun`；candidate typed schema 与显式不完整的 branch-atom scaffold也已 source-written，但 terminal universe、quotient、exact key set、`Expected`、exclusion ledger 与 denominator 仍为 `source_review_pending/implementation_uncompiled/implementation_unrun`，不得记 `StaticContract` 或开放 `WindowsDynamic`；
 - A2b2 的 117 项 source-exhaustive inventory 全部仍是 `StaticContract`，`WindowsDynamic=0/117`；
 - 宽范围 `sqlite_vfs_policy` 回归仍有失败，不能把 5 项局部通过写成 A2 完成。
 
-本批只新增 map/lock candidate typed schema 与显式不完整的 branch-atom review scaffold；它不是 exact source inventory。严格 test-only 的 RegistrationShutdown 8-selector actual/validator、进程隔离 runner 与线性 evidence envelope 保持既有 source-review 状态。两部分都没有在本批编译或运行；历史编译和 5 项局部测试证据不得被重记为本批新证据，也不覆盖本批新增源码。
+本批新增的 owner 图只验证 baseline commit literal 形状、从 reviewed owner bytes 重算的 Git blob OID/规范化 SHA-256、symbol presence、ABI roots、逐 operation scope 可达性，以及 wrapper/promotion/callback/cold-prefix/loop/cleanup/quarantine/result projection 的有序结构；它不读取 `.git`，不能自动证明当前 checkout HEAD 等于 baseline，也不是 exact terminal inventory。candidate typed schema 与不完整 branch-atom scaffold、以及严格 test-only 的 RegistrationShutdown 8-selector actual/validator、进程隔离 runner与线性 evidence envelope保持既有边界。以上新增源码都没有在本批编译或运行；历史编译和 5 项局部测试证据不得被重记为本批新证据。
 
 ### 历史证据元组
 
@@ -50,12 +50,14 @@ map/lock denominator 的唯一 quotient、scope、`CaseKey`、`SourceBranch`、`
 [`authority §5.1`](node-plugin-vfs-fault-authority.md) 维护。本验收以后只消费 source/red-team review clean 的 frozen typed set，
 不从 runner、历史 targeted 名称、intermediate candidate count 或实际可运行子集反推 denominator。
 
+`SourceOwnerGraph v1` 是进入 terminal ledger 之前的结构门：它必须逐字匹配 reviewed owner blob/SHA/symbol，并保持两条 ABI root、逐 operation scope endpoint 可达、Map output fail-null、独立 fallback/result-code、outer wrapper-before-route、promotion callback-before-operation callback、`ScopePending` cold Lock prior-Map witness、Unlock no-init、region loop、cause-separated cleanup rewrite、unsafe retention-before-completion 与 operation/completion error precedence。通过该结构门仍只允许写 `owner_graph=source_written/source_review_only`；不能据此产生 terminal count、`StaticContract` 或 `WindowsDynamic`。
+
 当前 denominator 计数尚未冻结：
 
 | Case family | Source review | StaticContract | WindowsDynamic | 完成条件 |
 |---|---|---|---|---|
-| Map | exact-set review pending | not counted | not opened | 每个 frozen Map `CaseKey` 各有且只有一个通过的 Windows dynamic record，且 actual 与 expected 逐字段相等。 |
-| Lock | exact-set review pending | not counted | not opened | 每个 frozen Lock `CaseKey` 各有且只有一个通过的 Windows dynamic record，且 actual 与 expected 逐字段相等。 |
+| Map | owner graph written; exact-set review pending | not counted | not opened | 每个 frozen Map `CaseKey` 各有且只有一个通过的 Windows dynamic record，且 actual 与 expected 逐字段相等。 |
+| Lock | owner graph written; exact-set review pending | not counted | not opened | 每个 frozen Lock `CaseKey` 各有且只有一个通过的 Windows dynamic record，且 actual 与 expected 逐字段相等。 |
 | **A2a/A2b1 map/lock 总计** | **exact-set review pending** | **not counted** | **not opened** | static/dynamic 两次集合比较均与最终 frozen key set 精确相等。 |
 
 只有 authority frozen typed key、source-branch projection、expected record 与 exclusion ledger 在源码中存在并通过 exact-set review，
@@ -196,4 +198,4 @@ A2 完成必须同时满足：
   `implementation_not_dynamically_accepted` 升级；
 - 任何证据缺失、环境不明、case key漂移、观察不完整或生产入口变化都维持失败关闭。
 
-当前正式结论仍是：历史完整目标可编译且 5 项 targeted fault matrix 曾通过；本批 map/lock exact inventory 为 `source_review_pending/implementation_uncompiled/implementation_unrun`，尚不能记 `StaticContract` 或开放 `WindowsDynamic`；registration runner 为 `source_review_only/implementation_uncompiled/implementation_unrun`。Registration `WindowsDynamic=0/8`、A2b2 `WindowsDynamic=0/117`，A2 仍为 `implementation_not_dynamically_accepted`。生产 open、A1、v15、Runtime 与 Ready 均未改变。
+当前正式结论仍是：历史完整目标可编译且 5 项 targeted fault matrix 曾通过；本批 map/lock owner 图为 `source_written/source_review_only/validator_uncompiled/unrun`，terminal inventory仍为 `source_review_pending/implementation_uncompiled/implementation_unrun`，尚不能记 `StaticContract` 或开放 `WindowsDynamic`；registration runner 为 `source_review_only/implementation_uncompiled/implementation_unrun`。Registration `WindowsDynamic=0/8`、A2b2 `WindowsDynamic=0/117`，A2 仍为 `implementation_not_dynamically_accepted`。生产 open、A1、v15、Runtime 与 Ready 均未改变。

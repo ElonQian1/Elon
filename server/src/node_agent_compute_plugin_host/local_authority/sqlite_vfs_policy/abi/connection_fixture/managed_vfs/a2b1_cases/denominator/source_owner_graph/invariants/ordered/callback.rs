@@ -1,0 +1,309 @@
+use super::super::super::model::{
+    EdgeKind, Epoch, Reachability, SourceEdge, SourceEffect, SourceNodeId, ALL_OPS, LOCK_OPS,
+    MAP_OPS,
+};
+use super::require_edge_shape;
+
+pub(super) fn validate(edges: &[SourceEdge]) -> Result<(), &'static str> {
+    validate_promotion(edges)?;
+    validate_operation_begin(edges)?;
+    validate_operation_completion(edges)?;
+    validate_quarantine(edges)
+}
+
+fn validate_promotion(edges: &[SourceEdge]) -> Result<(), &'static str> {
+    for (id, from, to, kind, reachability, effect) in [
+        (
+            "map.promotion.callback-begin",
+            SourceNodeId::RegistryPromotionAdapter,
+            SourceNodeId::PromotionCallbackBegin,
+            EdgeKind::Call,
+            Reachability::Required,
+            SourceEffect::CallbackLease,
+        ),
+        (
+            "map.promotion.process-begin",
+            SourceNodeId::PromotionCallbackBegin,
+            SourceNodeId::PromotionProcessBegin,
+            EdgeKind::Call,
+            Reachability::Required,
+            SourceEffect::CallbackLease,
+        ),
+        (
+            "map.promotion.owner-begin",
+            SourceNodeId::PromotionProcessBegin,
+            SourceNodeId::PromotionOwnerBegin,
+            EdgeKind::Call,
+            Reachability::Conditional,
+            SourceEffect::CallbackLease,
+        ),
+        (
+            "map.promotion.state-begin",
+            SourceNodeId::PromotionOwnerBegin,
+            SourceNodeId::PromotionStateBegin,
+            EdgeKind::Call,
+            Reachability::Conditional,
+            SourceEffect::CallbackLease,
+        ),
+        (
+            "map.promotion.state-owner",
+            SourceNodeId::PromotionStateBegin,
+            SourceNodeId::RegistryPromotionOwner,
+            EdgeKind::Continuation,
+            Reachability::Conditional,
+            SourceEffect::CustodyMutation,
+        ),
+        (
+            "map.promotion.result-complete",
+            SourceNodeId::RegistryPromotionOwner,
+            SourceNodeId::PromotionCallbackComplete,
+            EdgeKind::CallbackCompletion,
+            Reachability::Required,
+            SourceEffect::CallbackLease,
+        ),
+        (
+            "map.promotion.complete-process",
+            SourceNodeId::PromotionCallbackComplete,
+            SourceNodeId::PromotionProcessComplete,
+            EdgeKind::CallbackCompletion,
+            Reachability::Required,
+            SourceEffect::CallbackLease,
+        ),
+        (
+            "map.promotion.complete-owner",
+            SourceNodeId::PromotionProcessComplete,
+            SourceNodeId::PromotionOwnerFinish,
+            EdgeKind::Call,
+            Reachability::Conditional,
+            SourceEffect::CallbackLease,
+        ),
+        (
+            "map.promotion.complete-state",
+            SourceNodeId::PromotionOwnerFinish,
+            SourceNodeId::PromotionStateFinish,
+            EdgeKind::Call,
+            Reachability::Conditional,
+            SourceEffect::CallbackLease,
+        ),
+    ] {
+        require_edge_shape(
+            edges,
+            id,
+            from,
+            to,
+            kind,
+            MAP_OPS,
+            Epoch::MapRoutePreparation,
+            reachability,
+            effect,
+        )?;
+    }
+    require_edge_shape(
+        edges,
+        "map.no-plan.route-delegate",
+        SourceNodeId::PromotionStateFinish,
+        SourceNodeId::RouteMapDelegate,
+        EdgeKind::Continuation,
+        MAP_OPS,
+        Epoch::MapRoutePreparation,
+        Reachability::Conditional,
+        SourceEffect::None,
+    )
+}
+
+fn validate_operation_begin(edges: &[SourceEdge]) -> Result<(), &'static str> {
+    for (id, from, to, ops, reachability, effect) in [
+        (
+            "map.operation.callback",
+            SourceNodeId::RegistryMapOperation,
+            SourceNodeId::RegistryCallbackBegin,
+            MAP_OPS,
+            Reachability::Required,
+            SourceEffect::CallbackLease,
+        ),
+        (
+            "lock.operation.callback",
+            SourceNodeId::RegistryLockOperation,
+            SourceNodeId::RegistryCallbackBegin,
+            LOCK_OPS,
+            Reachability::Required,
+            SourceEffect::CallbackLease,
+        ),
+        (
+            "registry.begin.process",
+            SourceNodeId::RegistryCallbackBegin,
+            SourceNodeId::RegistryProcessBegin,
+            ALL_OPS,
+            Reachability::Required,
+            SourceEffect::CallbackLease,
+        ),
+        (
+            "registry.begin.owner",
+            SourceNodeId::RegistryProcessBegin,
+            SourceNodeId::RegistryOwnerBegin,
+            ALL_OPS,
+            Reachability::Conditional,
+            SourceEffect::CallbackLease,
+        ),
+        (
+            "registry.begin.state",
+            SourceNodeId::RegistryOwnerBegin,
+            SourceNodeId::RegistryStateBegin,
+            ALL_OPS,
+            Reachability::Conditional,
+            SourceEffect::CallbackLease,
+        ),
+        (
+            "registry.begin.custody",
+            SourceNodeId::RegistryStateBegin,
+            SourceNodeId::RegistryShmCustodyGate,
+            ALL_OPS,
+            Reachability::Conditional,
+            SourceEffect::None,
+        ),
+    ] {
+        require_edge_shape(
+            edges,
+            id,
+            from,
+            to,
+            if id == "registry.begin.custody" {
+                EdgeKind::Continuation
+            } else {
+                EdgeKind::Call
+            },
+            ops,
+            Epoch::WalMainSteady,
+            reachability,
+            effect,
+        )?;
+    }
+    Ok(())
+}
+
+fn validate_operation_completion(edges: &[SourceEdge]) -> Result<(), &'static str> {
+    for (id, from, ops) in [
+        (
+            "registry.custody.error-complete-precedence",
+            SourceNodeId::RegistryShmCustodyGate,
+            ALL_OPS,
+        ),
+        (
+            "map.error.complete-precedence",
+            SourceNodeId::ManagedMapCoordinator,
+            MAP_OPS,
+        ),
+        (
+            "lock.error.complete-precedence",
+            SourceNodeId::ManagedLockCoordinator,
+            LOCK_OPS,
+        ),
+    ] {
+        require_edge_shape(
+            edges,
+            id,
+            from,
+            SourceNodeId::RegistryCallbackComplete,
+            EdgeKind::ErrorPrecedence,
+            ops,
+            Epoch::WalMainSteady,
+            Reachability::Conditional,
+            SourceEffect::CallbackLease,
+        )?;
+    }
+    for (id, from, to, reachability) in [
+        (
+            "registry.complete.process",
+            SourceNodeId::RegistryCallbackComplete,
+            SourceNodeId::RegistryProcessComplete,
+            Reachability::Required,
+        ),
+        (
+            "registry.complete.owner",
+            SourceNodeId::RegistryProcessComplete,
+            SourceNodeId::RegistryOwnerFinish,
+            Reachability::Conditional,
+        ),
+        (
+            "registry.complete.state",
+            SourceNodeId::RegistryOwnerFinish,
+            SourceNodeId::RegistryStateFinish,
+            Reachability::Conditional,
+        ),
+    ] {
+        require_edge_shape(
+            edges,
+            id,
+            from,
+            to,
+            if id == "registry.complete.process" {
+                EdgeKind::CallbackCompletion
+            } else {
+                EdgeKind::Call
+            },
+            ALL_OPS,
+            Epoch::WalMainSteady,
+            reachability,
+            SourceEffect::CallbackLease,
+        )?;
+    }
+    Ok(())
+}
+
+fn validate_quarantine(edges: &[SourceEdge]) -> Result<(), &'static str> {
+    for (id, from, to, kind, reachability, effect) in [
+        (
+            "registry.unsafe.retain",
+            SourceNodeId::RegistryUnsafeRetention,
+            SourceNodeId::RegistryRetainTerminal,
+            EdgeKind::Quarantine,
+            Reachability::Conditional,
+            SourceEffect::RetainCustody,
+        ),
+        (
+            "registry.retain.apply-route",
+            SourceNodeId::RegistryRetainTerminal,
+            SourceNodeId::RegistryQuarantineApplyRoute,
+            EdgeKind::Call,
+            Reachability::Required,
+            SourceEffect::RetainCustody,
+        ),
+        (
+            "registry.apply-route.quarantine",
+            SourceNodeId::RegistryQuarantineApplyRoute,
+            SourceNodeId::RegistryOwnerQuarantine,
+            EdgeKind::Quarantine,
+            Reachability::Conditional,
+            SourceEffect::RetainCustody,
+        ),
+        (
+            "registry.quarantine.state",
+            SourceNodeId::RegistryOwnerQuarantine,
+            SourceNodeId::RegistryStateQuarantine,
+            EdgeKind::Call,
+            Reachability::Conditional,
+            SourceEffect::RetainCustody,
+        ),
+        (
+            "registry.quarantine.complete",
+            SourceNodeId::RegistryStateQuarantine,
+            SourceNodeId::RegistryCallbackComplete,
+            EdgeKind::CallbackCompletion,
+            Reachability::Conditional,
+            SourceEffect::CallbackLease,
+        ),
+    ] {
+        require_edge_shape(
+            edges,
+            id,
+            from,
+            to,
+            kind,
+            ALL_OPS,
+            Epoch::WalMainSteady,
+            reachability,
+            effect,
+        )?;
+    }
+    Ok(())
+}

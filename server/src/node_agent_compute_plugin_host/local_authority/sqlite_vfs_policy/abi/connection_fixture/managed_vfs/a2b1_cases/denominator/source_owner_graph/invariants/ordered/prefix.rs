@@ -1,0 +1,372 @@
+use super::super::super::model::{
+    EdgeKind, Epoch, Reachability, SourceEdge, SourceEffect, SourceNodeId, ACQUIRE_OPS, ALL_OPS,
+    INITIALIZING_OPS, LOCK_OPS, MAP_OPS,
+};
+use super::{require_edge, require_edge_shape};
+
+pub(super) fn validate(edges: &[SourceEdge]) -> Result<(), &'static str> {
+    validate_promotion_claim(edges)?;
+    validate_fault_plan_install(edges)?;
+    validate_operation_callback_entry(edges)?;
+    validate_connection_entry(edges)?;
+    validate_initialization_entry(edges)?;
+    validate_platform_binding(edges)?;
+    validate_cold_lock_witness(edges)
+}
+
+fn validate_initialization_entry(edges: &[SourceEdge]) -> Result<(), &'static str> {
+    for (id, from, to, kind, reachability, effect) in [
+        (
+            "init.ensure.open",
+            SourceNodeId::ManagedEnsureNode,
+            SourceNodeId::ManagedOpenNode,
+            EdgeKind::ConditionalCall,
+            Reachability::Conditional,
+            SourceEffect::None,
+        ),
+        (
+            "init.open.shm",
+            SourceNodeId::ManagedOpenNode,
+            SourceNodeId::ManagedOpenShm,
+            EdgeKind::Call,
+            Reachability::Conditional,
+            SourceEffect::None,
+        ),
+        (
+            "init.shm.exact",
+            SourceNodeId::ManagedOpenShm,
+            SourceNodeId::ManagedOpenExact,
+            EdgeKind::Call,
+            Reachability::Required,
+            SourceEffect::PlatformMutation,
+        ),
+        (
+            "init.open.dms",
+            SourceNodeId::ManagedOpenExact,
+            SourceNodeId::ManagedDmsInitialization,
+            EdgeKind::Continuation,
+            Reachability::Conditional,
+            SourceEffect::CustodyMutation,
+        ),
+    ] {
+        require_edge_shape(
+            edges,
+            id,
+            from,
+            to,
+            kind,
+            INITIALIZING_OPS,
+            Epoch::ColdNodeAcquirePrefix,
+            reachability,
+            effect,
+        )?;
+    }
+    Ok(())
+}
+
+fn validate_connection_entry(edges: &[SourceEdge]) -> Result<(), &'static str> {
+    for (id, from, to, ops) in [
+        (
+            "map.connection.coordinator",
+            SourceNodeId::ManagedConnectionMap,
+            SourceNodeId::ManagedMapCoordinator,
+            MAP_OPS,
+        ),
+        (
+            "lock.connection.coordinator",
+            SourceNodeId::ManagedConnectionLock,
+            SourceNodeId::ManagedLockCoordinator,
+            LOCK_OPS,
+        ),
+    ] {
+        require_edge_shape(
+            edges,
+            id,
+            from,
+            to,
+            EdgeKind::Call,
+            ops,
+            Epoch::WalMainSteady,
+            Reachability::Conditional,
+            SourceEffect::None,
+        )?;
+    }
+    require_edge_shape(
+        edges,
+        "map.validate.granularity",
+        SourceNodeId::ManagedMapValidation,
+        SourceNodeId::WindowsAllocationGranularity,
+        EdgeKind::Call,
+        MAP_OPS,
+        Epoch::WalMainSteady,
+        Reachability::Conditional,
+        SourceEffect::None,
+    )
+}
+
+fn validate_promotion_claim(edges: &[SourceEdge]) -> Result<(), &'static str> {
+    for (id, from, to, kind, reachability, effect) in [
+        (
+            "map.promotion.claim-shm-process",
+            SourceNodeId::RegistryPromotionOwner,
+            SourceNodeId::PromotionClaimShmProcess,
+            EdgeKind::Call,
+            Reachability::Conditional,
+            SourceEffect::CustodyMutation,
+        ),
+        (
+            "map.claim-shm.apply-route",
+            SourceNodeId::PromotionClaimShmProcess,
+            SourceNodeId::PromotionClaimShmApplyRoute,
+            EdgeKind::Call,
+            Reachability::Required,
+            SourceEffect::CustodyMutation,
+        ),
+        (
+            "map.claim-shm.owner",
+            SourceNodeId::PromotionClaimShmApplyRoute,
+            SourceNodeId::PromotionClaimShmOwner,
+            EdgeKind::Call,
+            Reachability::Conditional,
+            SourceEffect::CustodyMutation,
+        ),
+        (
+            "map.claim-shm.state",
+            SourceNodeId::PromotionClaimShmOwner,
+            SourceNodeId::PromotionClaimShmState,
+            EdgeKind::Call,
+            Reachability::Conditional,
+            SourceEffect::CustodyMutation,
+        ),
+        (
+            "map.claim-shm.bind-main",
+            SourceNodeId::PromotionClaimShmState,
+            SourceNodeId::RuntimeBindMain,
+            EdgeKind::Continuation,
+            Reachability::Conditional,
+            SourceEffect::CustodyMutation,
+        ),
+    ] {
+        require_edge_shape(
+            edges,
+            id,
+            from,
+            to,
+            kind,
+            MAP_OPS,
+            Epoch::FirstMapBootstrap,
+            reachability,
+            effect,
+        )?;
+    }
+    Ok(())
+}
+
+fn validate_fault_plan_install(edges: &[SourceEdge]) -> Result<(), &'static str> {
+    for (id, from, to, kind, reachability) in [
+        (
+            "map.promotion.plan-install",
+            SourceNodeId::PromotionStateFinish,
+            SourceNodeId::RegistryAbiFaultInstall,
+            EdgeKind::ConditionalCall,
+            Reachability::Conditional,
+        ),
+        (
+            "map.abi-fault.registry-install",
+            SourceNodeId::RegistryAbiFaultInstall,
+            SourceNodeId::RegistryFaultInstall,
+            EdgeKind::Call,
+            Reachability::Required,
+        ),
+        (
+            "map.registry-fault.managed-install",
+            SourceNodeId::RegistryFaultInstall,
+            SourceNodeId::ManagedFaultInstall,
+            EdgeKind::Call,
+            Reachability::Conditional,
+        ),
+        (
+            "map.managed-fault.controller-install",
+            SourceNodeId::ManagedFaultInstall,
+            SourceNodeId::ManagedFaultControllerInstall,
+            EdgeKind::Call,
+            Reachability::Conditional,
+        ),
+        (
+            "map.controller-install.record",
+            SourceNodeId::ManagedFaultControllerInstall,
+            SourceNodeId::RoutePlanRecord,
+            EdgeKind::Continuation,
+            Reachability::Conditional,
+        ),
+        (
+            "map.plan.route-delegate",
+            SourceNodeId::RoutePlanRecord,
+            SourceNodeId::RouteMapDelegate,
+            EdgeKind::Continuation,
+            Reachability::Conditional,
+        ),
+    ] {
+        require_edge_shape(
+            edges,
+            id,
+            from,
+            to,
+            kind,
+            MAP_OPS,
+            Epoch::FirstMapBootstrap,
+            reachability,
+            SourceEffect::None,
+        )?;
+    }
+    Ok(())
+}
+
+fn validate_operation_callback_entry(edges: &[SourceEdge]) -> Result<(), &'static str> {
+    require_edge(
+        edges,
+        SourceNodeId::RegistryMapOperation,
+        SourceNodeId::RegistryCallbackBegin,
+        EdgeKind::Call,
+    )?;
+    require_edge(
+        edges,
+        SourceNodeId::RegistryLockOperation,
+        SourceNodeId::RegistryCallbackBegin,
+        EdgeKind::Call,
+    )?;
+    require_edge(
+        edges,
+        SourceNodeId::ManagedLockAcquire,
+        SourceNodeId::ManagedEnsureNode,
+        EdgeKind::ConditionalCall,
+    )
+}
+
+fn validate_platform_binding(edges: &[SourceEdge]) -> Result<(), &'static str> {
+    for (id, from, to) in [
+        (
+            "map.coordinator.platform-module",
+            SourceNodeId::ManagedMapCoordinator,
+            SourceNodeId::ManagedShmPlatformModuleSelect,
+        ),
+        (
+            "map.platform-module.granularity",
+            SourceNodeId::ManagedShmPlatformModuleSelect,
+            SourceNodeId::WindowsAllocationGranularity,
+        ),
+        (
+            "map.platform-module.create",
+            SourceNodeId::ManagedShmPlatformModuleSelect,
+            SourceNodeId::WindowsCreateMapping,
+        ),
+        (
+            "map.platform-module.view",
+            SourceNodeId::ManagedShmPlatformModuleSelect,
+            SourceNodeId::WindowsMapView,
+        ),
+    ] {
+        require_edge_shape(
+            edges,
+            id,
+            from,
+            to,
+            EdgeKind::StatePrerequisite,
+            MAP_OPS,
+            Epoch::PlatformBinding,
+            Reachability::Required,
+            SourceEffect::None,
+        )?;
+    }
+    require_edge_shape(
+        edges,
+        "lock.coordinator.platform-module",
+        SourceNodeId::ManagedLockCoordinator,
+        SourceNodeId::ManagedPlatformModuleSelect,
+        EdgeKind::StatePrerequisite,
+        LOCK_OPS,
+        Epoch::PlatformBinding,
+        Reachability::Required,
+        SourceEffect::None,
+    )?;
+    require_edge_shape(
+        edges,
+        "init.dms.platform-module",
+        SourceNodeId::ManagedDmsInitialization,
+        SourceNodeId::ManagedPlatformModuleSelect,
+        EdgeKind::StatePrerequisite,
+        INITIALIZING_OPS,
+        Epoch::PlatformBinding,
+        Reachability::Required,
+        SourceEffect::None,
+    )?;
+    require_edge_shape(
+        edges,
+        "lock.platform-module.export",
+        SourceNodeId::ManagedPlatformModuleSelect,
+        SourceNodeId::ManagedWindowsLockingExport,
+        EdgeKind::StatePrerequisite,
+        ALL_OPS,
+        Epoch::PlatformBinding,
+        Reachability::Required,
+        SourceEffect::None,
+    )?;
+    require_edge_shape(
+        edges,
+        "lock.platform-export.acquire",
+        SourceNodeId::ManagedWindowsLockingExport,
+        SourceNodeId::WindowsByteLock,
+        EdgeKind::StatePrerequisite,
+        INITIALIZING_OPS,
+        Epoch::PlatformBinding,
+        Reachability::Required,
+        SourceEffect::None,
+    )?;
+    require_edge_shape(
+        edges,
+        "lock.platform-export.release",
+        SourceNodeId::ManagedWindowsLockingExport,
+        SourceNodeId::WindowsByteUnlock,
+        EdgeKind::StatePrerequisite,
+        ALL_OPS,
+        Epoch::PlatformBinding,
+        Reachability::Required,
+        SourceEffect::None,
+    )
+}
+
+fn validate_cold_lock_witness(edges: &[SourceEdge]) -> Result<(), &'static str> {
+    require_edge_shape(
+        edges,
+        "map.promotion.cold-witness",
+        SourceNodeId::PromotionStateFinish,
+        SourceNodeId::WalMainColdNodeWitness,
+        EdgeKind::StatePrerequisite,
+        MAP_OPS,
+        Epoch::ColdNodeAcquirePrefix,
+        Reachability::ScopePending,
+        SourceEffect::None,
+    )?;
+    require_edge_shape(
+        edges,
+        "map.validate.cold-witness",
+        SourceNodeId::ManagedMapValidation,
+        SourceNodeId::WalMainColdNodeWitness,
+        EdgeKind::TerminalReturn,
+        MAP_OPS,
+        Epoch::ColdNodeAcquirePrefix,
+        Reachability::ScopePending,
+        SourceEffect::None,
+    )?;
+    require_edge_shape(
+        edges,
+        "lock.cold.prior-map",
+        SourceNodeId::WalMainColdNodeWitness,
+        SourceNodeId::ManagedLockAcquire,
+        EdgeKind::StatePrerequisite,
+        ACQUIRE_OPS,
+        Epoch::ColdNodeAcquirePrefix,
+        Reachability::ScopePending,
+        SourceEffect::None,
+    )
+}
