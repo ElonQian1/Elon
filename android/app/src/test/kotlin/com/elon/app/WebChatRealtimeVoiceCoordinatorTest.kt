@@ -369,6 +369,36 @@ class WebChatRealtimeVoiceCoordinatorTest {
     }
 
     @Test
+    fun snapshotEventsConfirmALateHangupWithoutWaitingForTheWatchdog() {
+        val fixture = Fixture()
+        fixture.completeVoiceStart()
+        fixture.port.endControlAvailable = true
+
+        fixture.surface.closeVoice()
+        var guard = 0
+        while (
+            fixture.surface.state?.lifecycle != WebChatRealtimeVoiceLifecycle.HANGUP_UNCONFIRMED &&
+            guard < 100
+        ) {
+            fixture.scheduler.runNext()
+            guard += 1
+        }
+
+        fixture.port.endControlAvailable = false
+        val pendingWatchdogs = fixture.scheduler.pendingTaskCount()
+        fixture.coordinator.onConsumerStateChanged(fixture.port.state())
+        assertEquals(pendingWatchdogs, fixture.scheduler.pendingTaskCount())
+        fixture.scheduler.advanceBy(2_000L)
+        fixture.coordinator.onConsumerStateChanged(fixture.port.state())
+
+        assertFalse(fixture.surface.visible)
+        assertEquals(2, fixture.port.invokedControlCount)
+        assertEquals(listOf(true), fixture.endBackingGraceful)
+        fixture.scheduler.runAll()
+        assertEquals(listOf(true), fixture.endBackingGraceful)
+    }
+
+    @Test
     fun retriesHangupAfterAnUnconfirmedCloseWithoutRestartingVoice() {
         val fixture = Fixture()
         fixture.completeVoiceStart()
@@ -548,6 +578,7 @@ class WebChatRealtimeVoiceCoordinatorTest {
             backControl = back,
             backgroundBridge = background,
             launchCache = launchCache,
+            monotonicClockMs = { scheduler.nowMs },
             log = {},
         )
 
@@ -764,14 +795,24 @@ class WebChatRealtimeVoiceCoordinatorTest {
     }
 
     private class Scheduler {
-        private val tasks = ArrayDeque<Runnable>()
+        private data class ScheduledTask(
+            val task: Runnable,
+            val delayMs: Long,
+        )
 
-        fun schedule(task: Runnable, @Suppress("UNUSED_PARAMETER") delayMs: Long) {
-            tasks.addLast(task)
+        private val tasks = ArrayDeque<ScheduledTask>()
+        var nowMs = 0L
+            private set
+
+        fun schedule(task: Runnable, delayMs: Long) {
+            tasks.addLast(ScheduledTask(task, delayMs))
         }
 
         fun runNext() {
-            tasks.removeFirstOrNull()?.run()
+            tasks.removeFirstOrNull()?.let { scheduled ->
+                nowMs += scheduled.delayMs
+                scheduled.task.run()
+            }
         }
 
         fun runNext(count: Int) {
@@ -787,6 +828,12 @@ class WebChatRealtimeVoiceCoordinatorTest {
         }
 
         fun hasPendingTasks(): Boolean = tasks.isNotEmpty()
+
+        fun pendingTaskCount(): Int = tasks.size
+
+        fun advanceBy(durationMs: Long) {
+            nowMs += durationMs
+        }
     }
 
     private class FakeBackControl : WebChatRealtimeVoiceBackControl {

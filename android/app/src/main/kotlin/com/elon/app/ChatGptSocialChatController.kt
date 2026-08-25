@@ -29,6 +29,7 @@ internal class ChatGptSocialChatController(
     private val openOfficialFallback: () -> Unit,
     private val onConversationIndexChanged: () -> Unit,
     private val onComposerStateChanged: () -> Unit,
+    private val onConsumerStateObserved: (WebChatConsumerState) -> Unit,
     private val interactionCache: WebChatProductionInteractionCache,
     audioPermissionController: ChatGptWebAudioPermissionController,
 ) : WebChatSocialController {
@@ -420,6 +421,7 @@ internal class ChatGptSocialChatController(
     }
 
     private fun renderSnapshot(snapshot: ChatGptWebSnapshot) {
+        onConsumerStateObserved(socialConsumerPort.state())
         val voicePresentation = realtimeVoiceTranscript.resolve(snapshot)
         if (voicePresentation == null) {
             if (active) {

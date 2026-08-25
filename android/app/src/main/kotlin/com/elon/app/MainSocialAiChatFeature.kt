@@ -49,7 +49,7 @@ internal class MainSocialAiChatFeature(
         },
         onProviderDraftChanged = ::scheduleProviderDraftSave,
     )
-    private val chatGptControllerDelegate = lazy {
+    private val chatGptControllerDelegate: Lazy<ChatGptSocialChatController> = lazy {
         ChatGptSocialChatController(
             activity = activity,
             binding = binding,
@@ -61,6 +61,7 @@ internal class MainSocialAiChatFeature(
             openOfficialFallback = { modeController.openOfficialFallback() },
             onConversationIndexChanged = ::handleConversationIndexChanged,
             onComposerStateChanged = ::refreshConsumerComposerUi,
+            onConsumerStateObserved = ::handleChatGptConsumerStateObserved,
             interactionCache = webChatInteractionCache,
             audioPermissionController = chatGptWebLifecycle.audioPermissionController,
         )
@@ -127,36 +128,27 @@ internal class MainSocialAiChatFeature(
         WebChatProductionSuggestionsCoordinator(activity)
     }
     private val productionSuggestions by productionSuggestionsDelegate
-    private val realtimeVoiceDelegate = lazy {
-        createWebChatRealtimeVoiceCoordinator(
+    private val realtimeVoiceDelegate: Lazy<WebChatRealtimeVoiceCoordinator> = lazy {
+        createMainRealtimeVoiceCoordinator(
             activity = activity,
-            surface = WebChatRealtimeVoiceOverlay(activity),
             activeProvider = {
                 if (isChatModeActive()) providerId() else null
             },
-            consumerPort = chatGptController::consumerPort,
-            sessionReady = { chatGptController.stateWireValue() == "ready" &&
-                chatGptController.composerReady() },
-            audioActivationEvidence = chatGptWebLifecycle::realtimeVoiceActivationEvidence,
-            authenticated = chatGptController::authenticated,
-            sessionState = chatGptController::stateWireValue,
-            beginWebBacking = chatGptController::beginRealtimeVoiceBacking,
-            endWebBacking = { gracefulExit ->
-                if (chatGptControllerDelegate.isInitialized()) {
-                    chatGptController.endRealtimeVoiceBacking(gracefulExit)
-                }
-            },
-            showInteractiveActivation = chatGptController::showWebSkin,
-            restoreNativeSurface = { chatGptController.showNativeMirror(); Unit },
-            requestSessionRecovery = chatGptController::onHostResumed,
-            openOfficialLogin = modeController::openOfficialLogin,
-            openOfficialFallback = modeController::openOfficialRealtimeVoice,
-            resolveConversationContext = { resolveRealtimeVoiceContext(chatGptController) },
-            openConversation = { openRealtimeVoiceConversation(it, modeController, binding.root, chatGptController) },
+            controller = chatGptController,
+            webLifecycle = chatGptWebLifecycle,
+            modeController = modeController,
+            nativeRoot = binding.root,
             launchCache = realtimeVoiceLaunchCache,
         )
     }
     private val realtimeVoice by realtimeVoiceDelegate
+
+    private fun handleChatGptConsumerStateObserved(state: WebChatConsumerState) {
+        realtimeVoiceLaunchCache.observe(WebChatProviderId.CHATGPT_WEB, state)
+        if (realtimeVoiceDelegate.isInitialized()) {
+            realtimeVoice.onConsumerStateChanged(state)
+        }
+    }
     private val productionComposerToolsDelegate = lazy {
         WebChatProductionComposerToolsCoordinator(
             activity = activity,

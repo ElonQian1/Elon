@@ -7,43 +7,85 @@ class WebChatRealtimeVoiceDelayedCloseReconcilerTest {
     @Test
     fun completesOnlyAfterStableConversationEvidence() {
         val reconciler = WebChatRealtimeVoiceDelayedCloseReconciler(
-            maxPolls = 8,
+            watchdogDelaysMs = longArrayOf(100L, 200L),
             stableConversationPolls = 2,
+            stableConversationMs = 100L,
             controlRefreshInterval = 2,
         )
         reconciler.begin()
 
         assertEquals(
-            WebChatRealtimeVoiceDelayedCloseDecision.Wait(refreshControls = true),
-            reconciler.observe(state(endControlAvailable = false)),
+            WebChatRealtimeVoiceDelayedCloseDecision.Wait(refreshControls = false),
+            reconciler.observeEvent(state(endControlAvailable = false), observedAtMs = 1_000L),
         )
         assertEquals(
             WebChatRealtimeVoiceDelayedCloseDecision.Complete,
-            reconciler.observe(state(endControlAvailable = false)),
+            reconciler.observeEvent(state(endControlAvailable = false), observedAtMs = 1_100L),
         )
+    }
+
+    @Test
+    fun rapidDuplicateEventsCannotConfirmAnOfficialHangup() {
+        val reconciler = WebChatRealtimeVoiceDelayedCloseReconciler(
+            watchdogDelaysMs = longArrayOf(100L, 200L),
+            stableConversationPolls = 2,
+            stableConversationMs = 100L,
+            controlRefreshInterval = 2,
+        )
+        reconciler.begin()
+
+        assertEquals(
+            WebChatRealtimeVoiceDelayedCloseDecision.Wait(refreshControls = false),
+            reconciler.observeEvent(state(endControlAvailable = false), observedAtMs = 1_000L),
+        )
+        assertEquals(
+            WebChatRealtimeVoiceDelayedCloseDecision.Wait(refreshControls = false),
+            reconciler.observeEvent(state(endControlAvailable = false), observedAtMs = 1_001L),
+        )
+        assertEquals(
+            WebChatRealtimeVoiceDelayedCloseDecision.Complete,
+            reconciler.observeEvent(state(endControlAvailable = false), observedAtMs = 1_100L),
+        )
+    }
+
+    @Test
+    fun eventObservationsDoNotConsumeTheSparseWatchdogBudget() {
+        val reconciler = WebChatRealtimeVoiceDelayedCloseReconciler(
+            watchdogDelaysMs = longArrayOf(100L, 200L),
+            stableConversationPolls = 2,
+            stableConversationMs = 100L,
+            controlRefreshInterval = 2,
+        )
+        reconciler.begin()
+
+        assertEquals(100L, reconciler.nextWatchdogDelayMs())
+        assertEquals(
+            WebChatRealtimeVoiceDelayedCloseDecision.Wait(refreshControls = false),
+            reconciler.observeEvent(state(endControlAvailable = true), observedAtMs = 1_000L),
+        )
+        assertEquals(100L, reconciler.nextWatchdogDelayMs())
     }
 
     @Test
     fun activeVoiceEvidenceNeverCompletesAndEventuallyExpires() {
         val reconciler = WebChatRealtimeVoiceDelayedCloseReconciler(
-            maxPolls = 2,
+            watchdogDelaysMs = longArrayOf(100L, 200L),
             stableConversationPolls = 2,
+            stableConversationMs = 100L,
             controlRefreshInterval = 2,
         )
         reconciler.begin()
 
         assertEquals(
             WebChatRealtimeVoiceDelayedCloseDecision.Wait(refreshControls = true),
-            reconciler.observe(state(endControlAvailable = true)),
+            reconciler.observeWatchdog(state(endControlAvailable = true), observedAtMs = 1_000L),
         )
-        assertEquals(
-            WebChatRealtimeVoiceDelayedCloseDecision.Wait(refreshControls = true),
-            reconciler.observe(state(endControlAvailable = true)),
-        )
+        assertEquals(200L, reconciler.nextWatchdogDelayMs())
         assertEquals(
             WebChatRealtimeVoiceDelayedCloseDecision.Expired,
-            reconciler.observe(state(endControlAvailable = true)),
+            reconciler.observeWatchdog(state(endControlAvailable = true), observedAtMs = 1_200L),
         )
+        assertEquals(null, reconciler.nextWatchdogDelayMs())
     }
 
     private fun state(endControlAvailable: Boolean) = WebChatConsumerState(

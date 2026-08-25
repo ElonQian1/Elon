@@ -25,6 +25,7 @@ internal class WebChatRealtimeVoiceCoordinator(
     private val backControl: WebChatRealtimeVoiceBackControl,
     private val backgroundBridge: WebChatRealtimeVoiceBackgroundPort,
     private val launchCache: WebChatRealtimeVoiceLaunchCache = WebChatRealtimeVoiceLaunchCache(),
+    private val monotonicClockMs: () -> Long = { System.nanoTime() / 1_000_000L },
     private val log: (String) -> Unit = { message -> Log.i(TAG, message) },
 ) : WebChatRealtimeVoiceBackgroundControlSink {
     private var generation = 0
@@ -35,7 +36,6 @@ internal class WebChatRealtimeVoiceCoordinator(
     private var closePending = false
     private var closeFailed = false
     private var closeCommandAccepted = false
-    private var delayedCloseReconciliationActive = false
     private var automaticCloseRetries = 0
     private var interactiveActivation = false
     private var pendingLoginProvider: WebChatProviderIdentity? = null
@@ -45,7 +45,18 @@ internal class WebChatRealtimeVoiceCoordinator(
     private var lastState: WebChatRealtimeVoiceState? = null
     private var hostResumed = true
     private val closeSettlement = WebChatRealtimeVoiceCloseSettlement()
-    private val delayedCloseReconciler = WebChatRealtimeVoiceDelayedCloseReconciler()
+    private val delayedCloseMonitor = WebChatRealtimeVoiceDelayedCloseMonitor(
+        schedule = schedule,
+        currentState = { consumerPort()?.state() },
+        requestControls = { consumerPort()?.requestControls() },
+        nowMs = monotonicClockMs,
+        onConfirmed = { state ->
+            log("voice_close_delayed_confirmation")
+            state?.let { current -> provider?.let { launchCache.observe(it.id, current) } }
+            finishClose(gracefulExit = true)
+        },
+        onExpired = { log("voice_close_delayed_confirmation_expired") },
+    )
     private val activationGate = WebChatRealtimeVoiceActivationGate()
     private val pauseController = WebChatRealtimeVoicePauseController(
         consumerPort = consumerPort,
@@ -79,15 +90,14 @@ internal class WebChatRealtimeVoiceCoordinator(
             return true
         }
         generation += 1
-        startedAtElapsedMs = monotonicTimeMs()
+        startedAtElapsedMs = monotonicClockMs()
         provider = candidate
         prepareRequestId = null
         preparedGeneration = null
         commandRequestId = null
         closeFailed = false
         closeCommandAccepted = false
-        delayedCloseReconciliationActive = false
-        delayedCloseReconciler.begin()
+        delayedCloseMonitor.cancel()
         automaticCloseRetries = 0
         interactiveActivation = false
         pauseController.reset()
@@ -123,8 +133,7 @@ internal class WebChatRealtimeVoiceCoordinator(
     }
 
     private fun beginClose() {
-        delayedCloseReconciliationActive = false
-        delayedCloseReconciler.begin()
+        delayedCloseMonitor.cancel()
         closePending = true
         closeFailed = false
         closeCommandAccepted = false
@@ -197,39 +206,12 @@ internal class WebChatRealtimeVoiceCoordinator(
         )
         // A missing end control is not proof that voice stopped. Only reconcile a
         // late page transition after the official hangup command was accepted.
-        delayedCloseReconciliationActive = closeCommandAccepted
-        if (delayedCloseReconciliationActive) {
-            delayedCloseReconciler.begin()
-            scheduleDelayedCloseReconciliation(generation)
-        }
+        if (closeCommandAccepted) delayedCloseMonitor.begin()
     }
 
-    private fun scheduleDelayedCloseReconciliation(expectedGeneration: Int) {
-        schedule(
-            Runnable { advanceDelayedCloseReconciliation(expectedGeneration) },
-            DELAYED_CLOSE_RECONCILIATION_MS,
-        )
-    }
-
-    private fun advanceDelayedCloseReconciliation(expectedGeneration: Int) {
-        if (!delayedCloseReconciliationActive || expectedGeneration != generation) return
-        val port = consumerPort()
-        when (val decision = delayedCloseReconciler.observe(port?.state())) {
-            is WebChatRealtimeVoiceDelayedCloseDecision.Wait -> {
-                if (decision.refreshControls) port?.requestControls()
-                scheduleDelayedCloseReconciliation(expectedGeneration)
-            }
-            WebChatRealtimeVoiceDelayedCloseDecision.Complete -> {
-                delayedCloseReconciliationActive = false
-                log("voice_close_delayed_confirmation")
-                port?.state()?.let { state -> provider?.let { launchCache.observe(it.id, state) } }
-                finishClose(gracefulExit = true)
-            }
-            WebChatRealtimeVoiceDelayedCloseDecision.Expired -> {
-                delayedCloseReconciliationActive = false
-                log("voice_close_delayed_confirmation_expired")
-            }
-        }
+    fun onConsumerStateChanged(state: WebChatConsumerState) {
+        provider?.let { launchCache.observe(it.id, state) }
+        delayedCloseMonitor.observe(state)
     }
 
     private fun finishClose(gracefulExit: Boolean) {
@@ -238,8 +220,7 @@ internal class WebChatRealtimeVoiceCoordinator(
         closePending = false
         closeFailed = false
         closeCommandAccepted = false
-        delayedCloseReconciliationActive = false
-        delayedCloseReconciler.begin()
+        delayedCloseMonitor.cancel()
         automaticCloseRetries = 0
         finishInteractiveActivation()
         provider = null
@@ -311,7 +292,7 @@ internal class WebChatRealtimeVoiceCoordinator(
         }
         val current = provider ?: return
         generation += 1
-        startedAtElapsedMs = monotonicTimeMs()
+        startedAtElapsedMs = monotonicClockMs()
         closePending = false
         closeFailed = false
         closeCommandAccepted = false
@@ -527,7 +508,7 @@ internal class WebChatRealtimeVoiceCoordinator(
     private fun markActive(expectedGeneration: Int) {
         if (!isCurrent(expectedGeneration)) return
         finishInteractiveActivation()
-        log("voice_active elapsed_ms=${monotonicTimeMs() - startedAtElapsedMs}")
+        log("voice_active elapsed_ms=${monotonicClockMs() - startedAtElapsedMs}")
         render(
             lifecycle = WebChatRealtimeVoiceLifecycle.ACTIVE,
             detail = "语音已连接，可继续使用当前页面",
@@ -576,8 +557,7 @@ internal class WebChatRealtimeVoiceCoordinator(
         commandRequestId = null
         finishInteractiveActivation()
         pauseController.reset()
-        delayedCloseReconciliationActive = false
-        delayedCloseReconciler.begin()
+        delayedCloseMonitor.cancel()
         backgroundBridge.stop()
         endWebBacking(false)
         render(WebChatRealtimeVoiceLifecycle.FAILED, detail)
@@ -712,7 +692,6 @@ internal class WebChatRealtimeVoiceCoordinator(
         const val MAX_AUTOMATIC_CLOSE_RETRIES = 1
         const val CONTROL_SETTLE_MS = 400L
         const val CLOSE_POLL_DELAY_MS = 250L
-        const val DELAYED_CLOSE_RECONCILIATION_MS = 1_000L
         const val AUTHENTICATION_POLL_DELAY_MS = 400L
         const val MAX_AUTHENTICATION_POLLS = 30
         const val CONTEXT_REFRESH_DELAY_MS = 1_000L
@@ -725,7 +704,6 @@ internal class WebChatRealtimeVoiceCoordinator(
             "realtime_voice_unavailable",
         )
 
-        fun monotonicTimeMs(): Long = System.nanoTime() / 1_000_000L
     }
 }
 
