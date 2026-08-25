@@ -4,6 +4,9 @@ use std::collections::{BTreeMap, HashSet};
 use super::chatgpt_rich_preservation::{
     preserve_message_rich_content, preserve_private_rich_content,
 };
+use super::chatgpt_stream_shadow::{
+    preserve_private_stream_turn_content, reconcile_private_stream_shadows,
+};
 
 const HISTORY_LIMIT: usize = 160;
 
@@ -34,6 +37,7 @@ pub(super) fn merge(
     {
         let mut enriched = incoming_messages;
         preserve_private_rich_content(&previous_messages, &mut enriched);
+        preserve_private_stream_turn_content(&previous_messages, &mut enriched);
         replace_messages(&mut incoming, enriched, incoming_start, incoming_observed);
         return incoming;
     }
@@ -64,7 +68,7 @@ pub(super) fn merge(
 
     replace_messages(
         &mut incoming,
-        merged,
+        reconcile_private_stream_shadows(merged),
         merged_start,
         previous_observed.max(incoming_observed),
     );
@@ -292,6 +296,36 @@ mod tests {
     }
 
     #[test]
+    fn complete_dom_snapshot_adopts_private_stream_card_for_the_same_turn() {
+        let previous = snapshot(
+            0,
+            2,
+            vec![
+                user_message("u1", "比特币走势图"),
+                finance_message("private-stream:reply-1", "US$78,805.00"),
+            ],
+        );
+        let mut official = message("conversation-turn-1");
+        official["content"] = json!([{"type":"markdown","text":"官方正文"}]);
+        let incoming = snapshot(
+            0,
+            2,
+            vec![user_message("conversation-turn-0", "比特币走势图"), official],
+        );
+
+        let merged = merge(Some(&previous), incoming, true);
+        let messages = merged["messages"].as_array().unwrap();
+
+        assert_eq!(messages.len(), 2);
+        assert_eq!(messages[1]["id"], "conversation-turn-1");
+        assert!(messages[1]["content"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|part| part["type"] == "rich_card"));
+    }
+
+    #[test]
     fn position_only_short_window_is_not_treated_as_stable_identity() {
         let previous = snapshot(
             0,
@@ -345,6 +379,15 @@ mod tests {
 
     fn message(id: &str) -> Value {
         json!({"id": id, "role": "assistant", "state": "completed", "content": []})
+    }
+
+    fn user_message(id: &str, text: &str) -> Value {
+        json!({
+            "id": id,
+            "role": "user",
+            "state": "completed",
+            "content": [{"type":"text","text":text}]
+        })
     }
 
     fn finance_message(id: &str, price: &str) -> Value {
