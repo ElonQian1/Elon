@@ -1,0 +1,67 @@
+.notice {
+  width: min(760px, calc(100% - 12px));
+  margin: 0 auto 14px;
+  padding: 12px 14px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid rgba(235, 177, 72, .36);
+  border-radius: 10px;
+  background: rgba(91, 62, 15, .28);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, .12);
+}
+
+.icon { color: #edbd60; }
+
+.copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.copy strong {
+  color: #f6dfb1;
+  font-size: 13px;
+}
+
+.copy span {
+  color: #c8b99d;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.actions a,
+.actions button {
+  min-height: 32px;
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid rgba(235, 177, 72, .32);
+  border-radius: 7px;
+  color: #f4dca9;
+  background: rgba(235, 177, 72, .09);
+  font: inherit;
+  font-size: 12px;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.actions a:hover,
+.actions button:hover {
+  background: rgba(235, 177, 72, .18);
+}
+
+@media (max-width: 720px) {
+  .notice { grid-template-columns: auto minmax(0, 1fr); }
+  .actions { grid-column: 1 / -1; padding-left: 32px; }
+}

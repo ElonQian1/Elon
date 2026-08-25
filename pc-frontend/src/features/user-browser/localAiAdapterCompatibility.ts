@@ -1,5 +1,5 @@
 export const LOCAL_AI_REQUIRED_ADAPTER_VERSIONS = {
-  chatgpt: 179,
+  chatgpt: 180,
   'google-ai-mode': 37,
 } as const
 

@@ -35,6 +35,7 @@ import useLocalAiOwnerIdentity from '../user-browser/useLocalAiOwnerIdentity'
 import NodeStatusBanner from './NodeStatusBanner'
 import AiChatTopbar from './AiChatTopbar'
 import AiChatWelcome from './AiChatWelcome'
+import AiWebClientUpgradeNotice from './AiWebClientUpgradeNotice'
 import type { AiHomeMode } from './AiHomeModeSwitch'
 import AiPinnedTools from './AiPinnedTools'
 import AiUserProfilePopover, { type AiChatFriend } from './AiUserProfilePopover'
@@ -66,11 +67,9 @@ interface RemoteNodeInfo {
   route_a_ready?: boolean
   allowed_clis?: string[]
 }
-
 function remoteNodeId(node: RemoteNodeInfo) {
   return String(node.node_id ?? node.agent_id ?? '').trim()
 }
-
 function remoteNodeName(node: RemoteNodeInfo) {
   const id = remoteNodeId(node)
   return String(node.display_name ?? node.device_name ?? id.slice(0, 8) ?? '远程节点').trim()
@@ -892,6 +891,7 @@ export default function AiChatPage({ mode, onModeChange }: { mode: AiHomeMode; o
             if (el) atBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80
           }}
         >
+          {chatMode && <AiWebClientUpgradeNotice web={web} />}
           {!chatMode && onlineNodeId && (
             <NodeStatusBanner onlineNodeId={onlineNodeId} onlineNodeName={onlineNodeName} />
           )}
