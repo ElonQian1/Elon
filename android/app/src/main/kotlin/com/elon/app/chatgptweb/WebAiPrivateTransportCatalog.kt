@@ -74,7 +74,7 @@ internal object WebAiPrivateTransportCatalog {
             productionDefault = true,
             runtimeEnabled = true,
             requestMode = "passive_official_response_observer",
-            healthPolicy = "emit_success_only_bounded_payload",
+            healthPolicy = "bounded_payload_with_durable_official_freshness",
             fallback = "local_directory_cache_and_official_page",
         ),
         Entry(
@@ -108,7 +108,7 @@ internal object WebAiPrivateTransportCatalog {
             runtimeEnabled = true,
             requestMode = "official_webrtc_foreground_service_and_local_overlay",
             healthPolicy =
-                "audio_focus_auto_pause_surface_handoff_and_bounded_late_hangup_reconciliation",
+                "audio_focus_auto_pause_surface_handoff_and_accepted_hangup_only_reconciliation",
             fallback = "official_webview_voice_and_foreground_notification",
         ),
         Entry(

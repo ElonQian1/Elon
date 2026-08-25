@@ -8,7 +8,7 @@ reviewed_at: 2026-08-25
 
 ## 当前产品主链
 
-- Android Web AI 默认启用已验证的 ChatGPT/Google 私有观察与有界缓存，失败回退官网且不导出凭证或重放 POST；后台切源、语音悬浮层交接和媒体自动暂停恢复已真机验证。语音退出复用当前会话私有刷新与 DOM 兜底；挂断未确认时收起为悬浮球，并用最多两分钟的低频只读确认承接官网延迟退出，不重复点击挂断。系统悬浮层人工暂停/挂断仍待监督验收；完成、禁用和无安全收益项统一登记在 `docs/web-ai-private-transport-capability-matrix.md`，禁止无回归证据重复实现。
+- Android Web AI 默认启用已验证的 ChatGPT/Google 私有观察与有界缓存，失败回退官网且不导出凭证或重放 POST；Google 目录记录真实官网刷新时间，旧缓存先显示再异步更新。后台切源、语音悬浮层交接和媒体自动暂停恢复已真机验证；语音挂断未确认时保留悬浮球，仅官网接受挂断后低频确认退出，缺失按钮不等同结束。系统悬浮层人工暂停/挂断仍待监督验收；能力状态见 `docs/web-ai-private-transport-capability-matrix.md`，禁止重复实现。
 - Android ChatGPT 已完成并默认启用 `android_chatgpt_conversation_project_directory_cache_v1` 与 `android_chatgpt_webview_proxy_prepare_fail_open_v1`：目录约 0.3 秒从有界缓存恢复；代理回调超过 750ms 会一次性放行，正式版 `v1.1.1240 (1250)` 冷启动约 2.2 秒、后台返回约 1.9 秒恢复可输入。两项均已真机验收且不再重复研究，详见 `docs/chatgpt-conversation-project-directory-cache.md`、`docs/chatgpt-webview-proxy-prepare-recovery.md`。
 - 多 PC Rust 缓存平台已具备可安装工具与 Skill、脱敏 Fleet 观测，以及不上传路径、绑定精确摘要并由目标节点复扫加锁的远程 GC 审批。远程只覆盖机器级普通/老化策略；项目级治理与高风险操作仍在本机。生产 TLS、节点发布升级和真实多 PC 验收未完成，边界见 `docs/rust-cache-fleet-operations.md`。
 - 已实现：用户通过 Android APK 或 PC 工作台描述需求，AI CLI/API 代理在真实 Git 工作区开发、验证、构建和发布应用。

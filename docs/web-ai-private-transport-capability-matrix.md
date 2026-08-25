@@ -23,6 +23,17 @@ cookies, credentials, request headers, or private conversation content outside t
 device. Every observer is bounded and emits nothing on malformed or unsuccessful
 responses.
 
+The Google conversation directory persists the timestamp of the last successful
+official directory response. Cached rows render immediately; a legacy or expired cache
+is then refreshed in the background, while a recently verified cache does not trigger
+another DOM read every time the side menu opens. The version 1 cache remains readable
+and migrates as stale instead of being discarded or misreported as freshly verified.
+
+Realtime voice hangup has two separate states: the APK requesting the official action,
+and the official call actually settling. Late reconciliation runs only after the official
+hangup control accepted the command. A missing or temporarily unreadable control keeps
+the compact surface in `still in call` state and cannot silently close the backing session.
+
 Background provider switching keeps one already-started official navigation alive.
 On resume, the APK first reattaches the versioned page adapter and cached snapshot;
 only a failed or stalled document consumes the bounded full-page reload budget. It
