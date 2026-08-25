@@ -403,7 +403,8 @@ fn validate_host_within_grant(
             observed.accelerator_count > 0,
             "accelerator target must explicitly observe a positive accelerator count"
         ),
-    }
+    };
+    Ok(())
 }
 
 fn validate_model_bindings(values: &[ComputeUserNodeReadyModelBindingV1]) -> Result<()> {
