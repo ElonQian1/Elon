@@ -67,7 +67,8 @@ pub(super) struct ReviewedMapRouteCallbackProvenanceFragment {
     pub(super) route_promotion_fault_internals_and_custody: ReviewedMapRouteCallbackPendingAxis,
     pub(super) callback_owner_and_route_custody: ReviewedMapRouteCallbackPendingAxis,
     pub(super) managed_cause_prestate_and_retention: ReviewedMapRouteCallbackPendingAxis,
-    pub(super) adapter_projection_and_payload_custody: ReviewedMapRouteCallbackPendingAxis,
+    pub(super) adapter_projection_control_flow: ReviewedMapRouteCallbackPendingAxis,
+    pub(super) adapter_payload_custody: ReviewedMapRouteCallbackPendingAxis,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -204,6 +205,7 @@ const fn route_only_provenance() -> ReviewedMapRouteCallbackProvenanceFragment {
         ReviewedMapRouteCallbackPendingAxis::NotReached,
         ReviewedMapRouteCallbackPendingAxis::NotReached,
         ReviewedMapRouteCallbackPendingAxis::NotReached,
+        ReviewedMapRouteCallbackPendingAxis::NotReached,
     )
 }
 
@@ -211,6 +213,7 @@ const fn route_callback_provenance() -> ReviewedMapRouteCallbackProvenanceFragme
     provenance(
         ReviewedMapRouteCallbackPendingAxis::Pending,
         ReviewedMapRouteCallbackPendingAxis::NotReached,
+        ReviewedMapRouteCallbackPendingAxis::Pending,
         ReviewedMapRouteCallbackPendingAxis::Pending,
     )
 }
@@ -220,18 +223,21 @@ const fn full_pending_provenance() -> ReviewedMapRouteCallbackProvenanceFragment
         ReviewedMapRouteCallbackPendingAxis::Pending,
         ReviewedMapRouteCallbackPendingAxis::Pending,
         ReviewedMapRouteCallbackPendingAxis::Pending,
+        ReviewedMapRouteCallbackPendingAxis::Pending,
     )
 }
 
 const fn provenance(
     callback_owner_and_route_custody: ReviewedMapRouteCallbackPendingAxis,
     managed_cause_prestate_and_retention: ReviewedMapRouteCallbackPendingAxis,
-    adapter_projection_and_payload_custody: ReviewedMapRouteCallbackPendingAxis,
+    adapter_projection_control_flow: ReviewedMapRouteCallbackPendingAxis,
+    adapter_payload_custody: ReviewedMapRouteCallbackPendingAxis,
 ) -> ReviewedMapRouteCallbackProvenanceFragment {
     ReviewedMapRouteCallbackProvenanceFragment {
         route_promotion_fault_internals_and_custody: ReviewedMapRouteCallbackPendingAxis::Pending,
         callback_owner_and_route_custody,
         managed_cause_prestate_and_retention,
-        adapter_projection_and_payload_custody,
+        adapter_projection_control_flow,
+        adapter_payload_custody,
     }
 }

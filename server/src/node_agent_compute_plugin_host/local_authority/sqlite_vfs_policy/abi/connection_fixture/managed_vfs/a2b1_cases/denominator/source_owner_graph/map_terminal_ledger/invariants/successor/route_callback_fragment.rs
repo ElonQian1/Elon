@@ -362,6 +362,7 @@ fn provenance(
         route_promotion_fault_internals_and_custody: ReviewedMapRouteCallbackPendingAxis::Pending,
         callback_owner_and_route_custody,
         managed_cause_prestate_and_retention,
-        adapter_projection_and_payload_custody,
+        adapter_projection_control_flow: adapter_projection_and_payload_custody,
+        adapter_payload_custody: adapter_projection_and_payload_custody,
     }
 }

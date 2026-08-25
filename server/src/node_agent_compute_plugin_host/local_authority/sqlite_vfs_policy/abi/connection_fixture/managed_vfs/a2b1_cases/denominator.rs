@@ -5,11 +5,13 @@
 //! denominator count remain pending. This module validates the typed schema, this table's internal
 //! partition/projection consistency, the commit-bound source-owner graph, and a separate Map-only
 //! terminal-template review ledger. Separate ABI, source-neutral raw-state, Map raw-projection,
-//! and typed Map outer-result fragments freeze only their local quotients; route/managed
-//! provenance and all later axes remain pending. The ledger preserves its own pending closure
-//! gates and does not establish source-universe equality or terminal-leaf coverage.
+//! typed Map outer-result, route/callback, and adapter-projection fragments freeze only their
+//! local quotients; managed provenance and all later custody axes remain pending. The ledger
+//! preserves its own pending closure gates and does not establish source-universe equality or
+//! terminal-leaf coverage.
 
 mod abi_map_fragment;
+mod adapter_projection_fragment;
 mod branch_atoms;
 mod case_key;
 mod invariants;
