@@ -18,7 +18,23 @@ class GoogleWebConversationCodecTest {
             ),
         )
 
-        assertEquals(source, GoogleWebConversationCodec.decode(GoogleWebConversationCodec.encode(source)))
+        val decoded = GoogleWebConversationCodec.decodeCache(
+            GoogleWebConversationCodec.encode(source, officialCachedAtMs = 123_456L),
+        )
+
+        assertEquals(source, decoded.records)
+        assertEquals(123_456L, decoded.officialCachedAtMs)
+    }
+
+    @Test
+    fun migratesLegacyDirectoryAsNeedingAnOfficialRefresh() {
+        val id = "c".repeat(64)
+        val decoded = GoogleWebConversationCodec.decodeCache(
+            """{"schema":"elon.google_web.conversation_index.v1","conversations":[{"id":"$id","title":"legacy","path":"/google-ai-mode/conversation/$id","url":"https://www.google.com/search?q=legacy&udm=50","activity_dates":[]}]}""",
+        )
+
+        assertEquals(1, decoded.records.size)
+        assertEquals(0L, decoded.officialCachedAtMs)
     }
 
     @Test

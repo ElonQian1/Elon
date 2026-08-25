@@ -20,10 +20,20 @@ internal data class GoogleWebConversationRecord(
     val activityDates: Set<String>,
 )
 
-internal class GoogleWebConversationStore(context: Context) {
+internal data class GoogleWebConversationCache(
+    val records: List<GoogleWebConversationRecord>,
+    val officialCachedAtMs: Long,
+)
+
+internal class GoogleWebConversationStore(
+    context: Context,
+    private val nowMs: () -> Long = System::currentTimeMillis,
+) {
     private val file = AtomicFile(File(context.noBackupFilesDir, FILE_NAME))
     private val projectStore = GoogleWebProjectStore(context)
-    private var records = restore()
+    private val restored = restore()
+    private var records = restored.records
+    private var officialCachedAtMs = restored.officialCachedAtMs
 
     fun index(activePath: String?): ChatGptWebConversationIndexState {
         val organization = projectStore.snapshot()
@@ -46,12 +56,9 @@ internal class GoogleWebConversationStore(context: Context) {
             projects = organization.projects.map { project ->
                 ChatGptWebProject(project.id, project.title, project.path)
             },
-            collection = ChatGptWebConversationCollection(
-                observedCount = records.size,
-                source = ChatGptWebConversationCollection.SOURCE_CACHE,
-                stale = false,
-                officialLoadState = ChatGptWebConversationCollection.LOAD_READY,
-                cachedAtMs = System.currentTimeMillis(),
+            collection = GoogleWebConversationCachePolicy.collection(
+                recordCount = records.size,
+                officialCachedAtMs = officialCachedAtMs,
             ),
         )
     }
@@ -77,10 +84,11 @@ internal class GoogleWebConversationStore(context: Context) {
                 preferredPath = null,
             ).records
         }
-        if (next == records) return false
+        val changed = next != records
         records = next.take(MAX_ITEMS)
+        officialCachedAtMs = nowMs().coerceAtLeast(0L)
         save()
-        return true
+        return changed
     }
 
     fun observe(
@@ -115,13 +123,17 @@ internal class GoogleWebConversationStore(context: Context) {
         return GoogleWebConversationIndexPolicy.currentPath(records, safeUrl)
     }
 
-    private fun restore(): List<GoogleWebConversationRecord> {
-        val raw = runCatching { file.readFully().toString(Charsets.UTF_8) }.getOrNull() ?: return emptyList()
-        return GoogleWebConversationCodec.decode(raw)
+    private fun restore(): GoogleWebConversationCache {
+        val raw = runCatching { file.readFully().toString(Charsets.UTF_8) }.getOrNull()
+            ?: return GoogleWebConversationCache(emptyList(), 0L)
+        return GoogleWebConversationCodec.decodeCache(raw)
     }
 
     private fun save() {
-        val payload = GoogleWebConversationCodec.encode(records.take(MAX_ITEMS)).toByteArray(Charsets.UTF_8)
+        val payload = GoogleWebConversationCodec.encode(
+            records = records.take(MAX_ITEMS),
+            officialCachedAtMs = officialCachedAtMs,
+        ).toByteArray(Charsets.UTF_8)
         if (payload.size > MAX_BYTES) return
         val output: FileOutputStream = runCatching { file.startWrite() }.getOrNull() ?: return
         try {
@@ -139,16 +151,43 @@ internal class GoogleWebConversationStore(context: Context) {
     }
 }
 
+internal object GoogleWebConversationCachePolicy {
+    fun collection(
+        recordCount: Int,
+        officialCachedAtMs: Long,
+    ): ChatGptWebConversationCollection {
+        val safeCount = recordCount.coerceAtLeast(0)
+        val safeCachedAtMs = officialCachedAtMs.coerceAtLeast(0L)
+        val neverRefreshed = safeCachedAtMs == 0L
+        return ChatGptWebConversationCollection(
+            observedCount = safeCount,
+            source = if (safeCount == 0 && neverRefreshed) {
+                ChatGptWebConversationCollection.SOURCE_NONE
+            } else {
+                ChatGptWebConversationCollection.SOURCE_CACHE
+            },
+            stale = safeCount > 0 && neverRefreshed,
+            officialLoadState = ChatGptWebConversationCollection.LOAD_READY,
+            cachedAtMs = safeCachedAtMs,
+        )
+    }
+}
+
 internal object GoogleWebConversationCodec {
-    private const val SCHEMA = "elon.google_web.conversation_index.v1"
+    private const val SCHEMA = "elon.google_web.conversation_index.v2"
+    private const val LEGACY_SCHEMA = "elon.google_web.conversation_index.v1"
     private const val MAX_ITEMS = 200
     private const val MAX_TITLE_LENGTH = 160
     private const val PATH_PREFIX = "/google-ai-mode/conversation/"
     private val ID = Regex("[a-f0-9]{64}")
     private val DATE = Regex("\\d{4}-\\d{2}-\\d{2}")
 
-    fun encode(records: List<GoogleWebConversationRecord>): String = JSONObject()
+    fun encode(
+        records: List<GoogleWebConversationRecord>,
+        officialCachedAtMs: Long = 0L,
+    ): String = JSONObject()
         .put("schema", SCHEMA)
+        .put("official_cached_at_ms", officialCachedAtMs.coerceAtLeast(0L))
         .put("conversations", JSONArray().apply {
             records.take(MAX_ITEMS).forEach { record ->
                 put(JSONObject()
@@ -161,11 +200,18 @@ internal object GoogleWebConversationCodec {
         })
         .toString()
 
-    fun decode(raw: String): List<GoogleWebConversationRecord> {
-        val root = runCatching { JSONObject(raw) }.getOrNull() ?: return emptyList()
-        if (root.optString("schema") != SCHEMA) return emptyList()
-        val values = root.optJSONArray("conversations") ?: return emptyList()
-        return buildList {
+    fun decode(raw: String): List<GoogleWebConversationRecord> = decodeCache(raw).records
+
+    fun decodeCache(raw: String): GoogleWebConversationCache {
+        val root = runCatching { JSONObject(raw) }.getOrNull()
+            ?: return GoogleWebConversationCache(emptyList(), 0L)
+        val schema = root.optString("schema")
+        if (schema != SCHEMA && schema != LEGACY_SCHEMA) {
+            return GoogleWebConversationCache(emptyList(), 0L)
+        }
+        val values = root.optJSONArray("conversations")
+            ?: return GoogleWebConversationCache(emptyList(), 0L)
+        val records = buildList {
             val seen = mutableSetOf<String>()
             val seenUrls = mutableSetOf<String>()
             for (index in 0 until minOf(values.length(), MAX_ITEMS)) {
@@ -186,5 +232,11 @@ internal object GoogleWebConversationCodec {
                 add(GoogleWebConversationRecord(id, title, path, url, dates))
             }
         }
+        val cachedAtMs = if (schema == SCHEMA) {
+            root.optLong("official_cached_at_ms", 0L).coerceAtLeast(0L)
+        } else {
+            0L
+        }
+        return GoogleWebConversationCache(records, cachedAtMs)
     }
 }
