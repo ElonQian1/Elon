@@ -1,22 +1,7 @@
 use super::super::super::model::SourceEffect;
 use super::super::model::{MapExit, MapSourceStepId, MapSourceStepId::*};
 use super::model::*;
-
-pub(in super::super) const ABI_SCALAR_INVALIDITY_SHAPES: &[AbiScalarInvalidityShape] = &[
-    AbiScalarInvalidityShape::Valid,
-    AbiScalarInvalidityShape::Region,
-    AbiScalarInvalidityShape::RegionSize,
-    AbiScalarInvalidityShape::RegionAndRegionSize,
-    AbiScalarInvalidityShape::Extend,
-    AbiScalarInvalidityShape::RegionAndExtend,
-    AbiScalarInvalidityShape::RegionSizeAndExtend,
-    AbiScalarInvalidityShape::RegionAndRegionSizeAndExtend,
-];
-
-pub(in super::super) const ABI_OUTPUT_SLOT_SHAPES: &[AbiOutputSlotShape] = &[
-    AbiOutputSlotShape::ValidCallbackOwnedNonAliasing,
-    AbiOutputSlotShape::AbsentNull,
-];
+use super::{AbiNullWriteOutcome, AbiOutputSlotShape, AbiScalarInvalidityShape};
 
 const fn abi_cell(
     scalar_invalidity: AbiScalarInvalidityShape,

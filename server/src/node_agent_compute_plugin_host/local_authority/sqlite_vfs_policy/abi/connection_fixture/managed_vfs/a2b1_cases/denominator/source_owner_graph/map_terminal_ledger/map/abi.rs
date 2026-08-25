@@ -59,7 +59,7 @@ pub(in super::super) const STEPS: &[MapSourceStep] = &[
     ),
     step(
         MapSourceStepId::AbiInputRejected,
-        MapSiteId::AbiInput,
+        MapSiteId::AbiValidation,
         SourceOwnerId::AbiIoShm,
         "unsafe extern \"C\" fn map",
         "return result_codes::SHM_MAP_UNAVAILABLE;",
@@ -72,7 +72,7 @@ pub(in super::super) const STEPS: &[MapSourceStep] = &[
     with_value_flow(
         step(
             MapSourceStepId::AbiNullOutputRejected,
-            MapSiteId::AbiInput,
+            MapSiteId::AbiValidation,
             SourceOwnerId::AbiIoShm,
             "unsafe extern \"C\" fn map",
             "if output.is_null()",

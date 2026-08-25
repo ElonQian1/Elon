@@ -64,14 +64,6 @@ const PENDING_EXPECTATIONS: &[PendingExpectation] = &[
         ],
     },
     PendingExpectation {
-        node: SourceNodeId::AbiMapValidation,
-        status: MapBoundaryReviewStatus::AnchoredButGraphPending,
-        witnesses: &[
-            MapSourceStepId::AbiInputRejected,
-            MapSourceStepId::AbiNullOutputRejected,
-        ],
-    },
-    PendingExpectation {
         node: SourceNodeId::ManagedDmsInitialization,
         status: MapBoundaryReviewStatus::AnchoredButGraphPending,
         witnesses: &[
@@ -119,6 +111,19 @@ const PENDING_EXPECTATIONS: &[PendingExpectation] = &[
 ];
 
 const RESOLVED_EXPECTATIONS: &[ResolvedExpectation] = &[
+    ResolvedExpectation {
+        node: SourceNodeId::AbiMapValidation,
+        owner: SourceOwnerId::AbiIoShm,
+        symbol: "unsafe extern \"C\" fn map",
+        role: NodeRole::ManagedValidation,
+        ops: MAP_OPS,
+        boundary: Boundary::Expanded,
+        selector: LedgerSelector::Site(MapSiteId::AbiValidation),
+        witnesses: &[
+            MapSourceStepId::AbiInputRejected,
+            MapSourceStepId::AbiNullOutputRejected,
+        ],
+    },
     ResolvedExpectation {
         node: SourceNodeId::ManagedRegionSizeValidation,
         owner: SourceOwnerId::ManagedTypes,

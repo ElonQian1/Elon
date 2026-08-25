@@ -16,6 +16,7 @@ pub(super) fn validate(steps: &[MapSourceStep]) -> Result<(), &'static str> {
     let sites = steps.iter().map(|step| step.site).collect::<BTreeSet<_>>();
     let expected_sites = [
         MapSiteId::AbiInput,
+        MapSiteId::AbiValidation,
         MapSiteId::RawState,
         MapSiteId::OuterFault,
         MapSiteId::RoutePlan,

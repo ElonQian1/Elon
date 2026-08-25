@@ -4,9 +4,11 @@
 //! graph. Consequently the schema, quotient, exact key set, Expected vectors, StaticContract, and
 //! denominator count remain pending. This module validates the typed schema, this table's internal
 //! partition/projection consistency, the commit-bound source-owner graph, and a separate Map-only
-//! terminal-template review ledger. The ledger preserves its own pending closure gates and does not
-//! establish source-universe equality or terminal-leaf coverage.
+//! terminal-template review ledger. A separate ABI fragment freezes only the local 8-by-2
+//! validation quotient; all later axes remain pending. The ledger preserves its own pending closure
+//! gates and does not establish source-universe equality or terminal-leaf coverage.
 
+mod abi_map_fragment;
 mod branch_atoms;
 mod case_key;
 mod invariants;

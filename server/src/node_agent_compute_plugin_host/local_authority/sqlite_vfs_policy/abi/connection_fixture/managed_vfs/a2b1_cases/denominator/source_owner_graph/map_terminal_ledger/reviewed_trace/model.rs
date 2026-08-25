@@ -1,36 +1,8 @@
+use super::super::super::super::abi_map_fragment::{
+    AbiNullWriteOutcome, AbiOutputSlotShape, AbiScalarInvalidityShape,
+};
 use super::super::super::model::SourceEffect;
 use super::super::model::{MapExit, MapSourceStepId, MapSourceStepId::*};
-
-/// The three scalar ABI validations encoded as an exact three-bit invalidity partition.
-///
-/// `Valid` is the zero mask; every other variant is one non-empty subset of invalid `region`,
-/// `region_size`, and `extend` inputs.
-#[repr(u8)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub(in super::super) enum AbiScalarInvalidityShape {
-    Valid = 0,
-    Region = 1,
-    RegionSize = 2,
-    RegionAndRegionSize = 3,
-    Extend = 4,
-    RegionAndExtend = 5,
-    RegionSizeAndExtend = 6,
-    RegionAndRegionSizeAndExtend = 7,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub(in super::super) enum AbiOutputSlotShape {
-    /// SQLite supplies an aligned, writable, callback-long allocation whose null write cannot
-    /// alias `sqlite3_file`/raw-state storage in a way that changes subsequent control flow.
-    ValidCallbackOwnedNonAliasing,
-    AbsentNull,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub(in super::super) enum AbiNullWriteOutcome {
-    NullWritten,
-    NoSlotNoWrite,
-}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(in super::super) enum ReviewedTerminal {

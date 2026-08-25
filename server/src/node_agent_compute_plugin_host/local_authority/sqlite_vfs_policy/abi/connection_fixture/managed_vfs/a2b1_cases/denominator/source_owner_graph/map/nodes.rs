@@ -48,10 +48,10 @@ pub(in super::super) const NODES: &[SourceNode] = &[
     node(
         SourceNodeId::AbiMapValidation,
         SourceOwnerId::AbiIoShm,
-        "fn sqlite_bool",
+        "unsafe extern \"C\" fn map",
         NodeRole::ManagedValidation,
         Epoch::AbiInput,
-        Boundary::PendingExpansion,
+        Boundary::Expanded,
     ),
     node(
         SourceNodeId::FileStateMap,

@@ -1,5 +1,7 @@
 //! Reviewed successor prefix for Map ABI validation and raw-state admission.
 //!
+//! The canonical denominator-facing ABI fragment is a separate 15-terminal/one-continuation local
+//! quotient. Its continuation is `AbiRawDispatch`, not the later typed-operation open frontier.
 //! This inventory deliberately stops at the typed Map operation and at fallback custody/route
 //! projection. It is not the complete Map `SourceBranch`, `Expected`, terminal universe,
 //! `CaseKey`, static denominator, or dynamic-observation inventory.
@@ -13,15 +15,19 @@
 mod model;
 mod prefix;
 
+pub(super) use super::super::super::abi_map_fragment::{
+    AbiNullWriteOutcome, AbiOutputSlotShape, AbiScalarInvalidityShape,
+    ReviewedMapAbiDecisionFragment, ReviewedMapAbiDispositionFragment,
+    ReviewedMapAbiDownstreamFragment, ReviewedMapAbiExitFragment, ReviewedMapAbiTerminalFragment,
+    ABI_OUTPUT_SLOT_SHAPES, ABI_SCALAR_INVALIDITY_SHAPES, REVIEWED_MAP_ABI_FRAGMENTS,
+};
 pub(super) use model::{
-    AbiInputCell, AbiNullWriteOutcome, AbiOutputSlotShape, AbiScalarInvalidityShape,
-    RawAbandonCause, RawAbandonCauseDisposition, RawAbandonOutcome, RawAbandonOutcomeRecord,
-    RawCustodyRetention, RawSlotRetention, RawStateCase, RawStateOutcome, RawStateOutcomeRecord,
-    RawStateTraceDisposition, ReviewedFrontierIngress, ReviewedOpenFrontier,
+    AbiInputCell, RawAbandonCause, RawAbandonCauseDisposition, RawAbandonOutcome,
+    RawAbandonOutcomeRecord, RawCustodyRetention, RawSlotRetention, RawStateCase, RawStateOutcome,
+    RawStateOutcomeRecord, RawStateTraceDisposition, ReviewedFrontierIngress, ReviewedOpenFrontier,
     ReviewedOpenFrontierRecord, ReviewedSuccessorEdge, ReviewedTerminal, ReviewedTraceCondition,
     ReviewedTraceEndpoint, ReviewedTraceRelation, RAW_ABANDON_OUTCOMES, RAW_STATE_OUTCOMES,
 };
 pub(super) use prefix::{
-    ABI_INPUT_CELLS, ABI_OUTPUT_SLOT_SHAPES, ABI_SCALAR_INVALIDITY_SHAPES, OPEN_FRONTIERS,
-    OPEN_FRONTIER_RECORDS, SUCCESSOR_EDGES, TERMINALS,
+    ABI_INPUT_CELLS, OPEN_FRONTIERS, OPEN_FRONTIER_RECORDS, SUCCESSOR_EDGES, TERMINALS,
 };

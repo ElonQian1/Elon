@@ -282,14 +282,6 @@ pub(super) const PENDING_BOUNDARIES: &[MapPendingBoundaryRecord] = &[
         ],
     },
     MapPendingBoundaryRecord {
-        node: SourceNodeId::AbiMapValidation,
-        status: MapBoundaryReviewStatus::AnchoredButGraphPending,
-        witnesses: &[
-            MapSourceStepId::AbiInputRejected,
-            MapSourceStepId::AbiNullOutputRejected,
-        ],
-    },
-    MapPendingBoundaryRecord {
         node: SourceNodeId::ManagedDmsInitialization,
         status: MapBoundaryReviewStatus::AnchoredButGraphPending,
         witnesses: &[
@@ -337,6 +329,13 @@ pub(super) const PENDING_BOUNDARIES: &[MapPendingBoundaryRecord] = &[
 ];
 
 pub(super) const RESOLVED_GRAPH_BOUNDARIES: &[MapResolvedBoundaryRecord] = &[
+    MapResolvedBoundaryRecord {
+        node: SourceNodeId::AbiMapValidation,
+        witnesses: &[
+            MapSourceStepId::AbiInputRejected,
+            MapSourceStepId::AbiNullOutputRejected,
+        ],
+    },
     MapResolvedBoundaryRecord {
         node: SourceNodeId::ManagedRegionSizeValidation,
         witnesses: &[MapSourceStepId::RegionSizeBudgetRejected],

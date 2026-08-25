@@ -7,6 +7,7 @@ pub(super) const MAP_BOTH: &[PathOp] = &[PathOp::MapObserve, PathOp::MapExtend];
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(super) enum MapSiteId {
     AbiInput,
+    AbiValidation,
     RawState,
     OuterFault,
     RoutePlan,
