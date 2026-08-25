@@ -52,6 +52,30 @@ export interface ClearedLocalAiWebSession {
   status: 'cleared'
 }
 
+export interface LocalAiResearchCaptureStatus {
+  captureCount: number
+  analyzedCaptureCount: number
+  latestAnalyzedAtMs: number
+  compatibility:
+    | 'not_available'
+    | 'truncated'
+    | 'analyzer_unavailable'
+    | 'parse_error'
+    | 'empty_stream'
+    | 'upstream_changed'
+    | 'incomplete'
+    | 'text_compatible'
+    | 'rich_compatible'
+  decodedFrameCount: number
+  acceptedFrameCount: number
+  assistantFrameCount: number
+  textLength: number
+  richKinds: string[]
+  contentTypes: string[]
+  completed: boolean
+  truncated: boolean
+}
+
 export interface LocalAiGuestOwnerIdentity {
   ownerKey: string
   persistence: 'native_device'
@@ -316,6 +340,17 @@ export async function openLocalAiWebResearchDirectory(
     providerId,
     ownerKey,
   }, LOCAL_AI_INVOKE_TIMEOUTS.action)
+}
+
+export async function getLocalAiWebResearchCaptureStatus(
+  providerId: string,
+  ownerKey: string,
+): Promise<LocalAiResearchCaptureStatus> {
+  assertIdentity(providerId, ownerKey)
+  return invokeDesktop<LocalAiResearchCaptureStatus>('get_local_ai_web_research_capture_status', {
+    providerId,
+    ownerKey,
+  }, LOCAL_AI_INVOKE_TIMEOUTS.state, `research:${providerId}:${ownerKey}`)
 }
 
 export function getCachedLocalAiWebSessionState(

@@ -1,9 +1,10 @@
 (function () {
   'use strict';
 
-  var VERSION = 3;
+  var VERSION = 4;
   var PROVIDER_ID = '__PROVIDER_ID__';
   var MAX_BODY_BYTES = 2 * 1024 * 1024;
+  var ANALYSIS_SCHEMA = 'yilong.web-ai.capture-analysis.v1';
   if (window.__elonWinWebResponseResearchCaptureVersion >= VERSION) return;
   window.__elonWinWebResponseResearchCaptureVersion = VERSION;
 
@@ -73,20 +74,108 @@
     };
   }
 
+  function contentTypeFrom(payload) {
+    if (!payload || typeof payload !== 'object') return '';
+    var candidates = [
+      payload.message,
+      payload.v && payload.v.message,
+      payload.data && payload.data.message,
+      payload.result && payload.result.message
+    ];
+    for (var index = 0; index < candidates.length; index += 1) {
+      var message = candidates[index];
+      var value = message && message.content && message.content.content_type;
+      if (/^[a-z][a-z0-9_-]{0,39}$/i.test(String(value || ''))) {
+        return String(value).toLowerCase();
+      }
+    }
+    return '';
+  }
+
+  function chatGptStreamAnalysis(body, format) {
+    if (PROVIDER_ID !== 'chatgpt' || format !== 'sse') return null;
+    var policy = window.__elonChatGptPrivateStreamPolicy;
+    var base = {
+      schema: ANALYSIS_SCHEMA,
+      analyzerVersion: 1,
+      policyAvailable: Boolean(policy),
+      decodedFrameCount: 0,
+      acceptedFrameCount: 0,
+      assistantFrameCount: 0,
+      progressFrameCount: 0,
+      textLength: 0,
+      richKinds: [],
+      contentTypes: [],
+      completed: false,
+      parseError: false
+    };
+    if (!policy || typeof policy.createSession !== 'function' ||
+        typeof policy.createSseDecoder !== 'function') return base;
+    var session = policy.createSession({ now: function () { return Date.now(); } });
+    var conversationId = '';
+    var contentTypes = new Set();
+    try {
+      session.begin();
+      var decoder = policy.createSseDecoder(function (payload) {
+        base.decodedFrameCount += 1;
+        var contentType = contentTypeFrom(payload);
+        if (contentType && contentTypes.size < 16) contentTypes.add(contentType);
+        if (typeof policy.assistantFrame === 'function') {
+          var assistant = policy.assistantFrame(payload);
+          if (assistant) {
+            base.assistantFrameCount += 1;
+            base.textLength = Math.max(base.textLength, String(assistant.text || '').length);
+            conversationId = String(assistant.conversationId || conversationId || '').slice(0, 180);
+          }
+        }
+        if (typeof policy.progressFrame === 'function' && policy.progressFrame(payload)) {
+          base.progressFrameCount += 1;
+        }
+        if (session.accept(payload)) base.acceptedFrameCount += 1;
+      }, function () {
+        base.completed = Boolean(session.finish());
+      });
+      decoder.push(String(body || ''));
+      decoder.finish();
+      var snapshot = session.current(location.pathname);
+      if (!snapshot && conversationId) snapshot = session.current('/c/' + conversationId);
+      if (snapshot) {
+        base.textLength = Math.max(base.textLength, String(snapshot.text || '').length);
+        base.completed = base.completed || snapshot.state === 'completed';
+        base.richKinds = Array.from(new Set((Array.isArray(snapshot.richParts)
+          ? snapshot.richParts : []).map(function (part) {
+            return String(part && part.kind || '').toLowerCase();
+          }).filter(function (kind) {
+            return /^[a-z][a-z0-9_-]{0,31}$/.test(kind);
+          }))).slice(0, 16);
+      }
+      base.contentTypes = Array.from(contentTypes).slice(0, 16);
+      return base;
+    } catch (_) {
+      base.parseError = true;
+      base.contentTypes = Array.from(contentTypes).slice(0, 16);
+      return base;
+    }
+  }
+
   function publish(meta, transport, status, contentType, body, truncated) {
     var bounded = boundedUtf8(body, truncated);
     if (!bounded.body) return;
-    invokeCapture({
+    var format = responseFormat(contentType, bounded.body.slice(0, 80));
+    var capture = {
       providerId: PROVIDER_ID,
       method: meta.method,
       endpointFamily: meta.endpointFamily,
       transport: transport,
       status: Number(status || 0),
-      format: responseFormat(contentType, bounded.body.slice(0, 80)),
+      format: format,
       capturedAtMs: Date.now(),
       body: bounded.body,
       truncated: bounded.truncated
-    });
+    };
+    var analysis = chatGptStreamAnalysis(bounded.body, format);
+    if (analysis) capture.analysis = analysis;
+    invokeCapture(capture);
   }
 
   async function observeFetchResponse(response, meta) {

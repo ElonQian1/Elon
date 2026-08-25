@@ -9,6 +9,9 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use tauri::{AppHandle, Webview};
 
+#[path = "research_capture/analysis.rs"]
+mod analysis;
+
 use super::{
     ensure_main_webview, profile_directory, provider, provider_for_window_label,
     resolve_owner_fingerprint, ProviderDefinition, LOCAL_AI_WINDOW_PREFIX,
@@ -52,6 +55,20 @@ pub(crate) fn open_local_ai_web_research_directory(
     open_directory(&root)
 }
 
+#[tauri::command]
+pub(crate) fn get_local_ai_web_research_capture_status(
+    app: AppHandle,
+    webview: Webview,
+    provider_id: String,
+    owner_key: String,
+) -> Result<analysis::ResearchCaptureStatus, String> {
+    ensure_main_webview(&webview)?;
+    let provider = provider(&provider_id)?;
+    let fingerprint = resolve_owner_fingerprint(&app, provider, &owner_key)?;
+    let root = profile_directory(&app, provider, &fingerprint)?.join(DIRECTORY_NAME);
+    analysis::read_status(&root)
+}
+
 #[derive(Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ResearchCapture {
@@ -64,6 +81,7 @@ pub struct ResearchCapture {
     pub captured_at_ms: u64,
     pub body: String,
     pub truncated: bool,
+    pub analysis: Option<analysis::CaptureAnalysis>,
 }
 
 #[derive(Serialize)]
@@ -92,6 +110,7 @@ struct CaptureMetadata<'a> {
     body_sha256: &'a str,
     size_bytes: usize,
     truncated: bool,
+    analysis: Option<&'a analysis::CaptureAnalysis>,
 }
 
 struct StoredBody {
@@ -145,6 +164,7 @@ pub(super) fn store(
         body_sha256: &body_sha256,
         size_bytes: stored.body.len(),
         truncated: stored.truncated,
+        analysis: capture.analysis.as_ref(),
     };
     if !metadata_path.is_file() {
         let encoded = serde_json::to_vec_pretty(&metadata).map_err(display_error)?;
@@ -189,6 +209,7 @@ fn validate(expected_provider_id: &str, capture: &ResearchCapture) -> Result<(),
     if !family_allowed {
         return Err("研究响应接口族不在当前开发范围内。".to_string());
     }
+    analysis::validate(capture.analysis.as_ref())?;
     Ok(())
 }
 
@@ -339,6 +360,33 @@ mod tests {
         clear(&root).unwrap();
     }
 
+    #[test]
+    fn stored_rich_analysis_is_visible_to_the_win_status_command() {
+        let root = temporary_root("analysis");
+        let mut capture = sample("data: rich response");
+        capture.analysis = Some(analysis::CaptureAnalysis {
+            schema: "yilong.web-ai.capture-analysis.v1".to_string(),
+            analyzer_version: 1,
+            policy_available: true,
+            decoded_frame_count: 3,
+            accepted_frame_count: 2,
+            assistant_frame_count: 1,
+            progress_frame_count: 0,
+            text_length: 128,
+            rich_kinds: vec!["finance".to_string()],
+            content_types: vec!["text".to_string()],
+            completed: true,
+            parse_error: false,
+        });
+        store(&root, "chatgpt", capture).unwrap();
+
+        let status = serde_json::to_value(analysis::read_status(&root).unwrap()).unwrap();
+        assert_eq!(status["compatibility"], "rich_compatible");
+        assert_eq!(status["acceptedFrameCount"], 2);
+        assert_eq!(status["richKinds"][0], "finance");
+        clear(&root).unwrap();
+    }
+
     fn sample(body: &str) -> ResearchCapture {
         ResearchCapture {
             provider_id: "chatgpt".to_string(),
@@ -350,6 +398,7 @@ mod tests {
             captured_at_ms: 1,
             body: body.to_string(),
             truncated: false,
+            analysis: None,
         }
     }
 
