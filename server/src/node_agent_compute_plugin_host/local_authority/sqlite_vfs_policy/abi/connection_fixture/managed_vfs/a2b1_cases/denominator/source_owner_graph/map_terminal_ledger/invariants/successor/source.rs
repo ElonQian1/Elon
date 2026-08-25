@@ -70,7 +70,7 @@ fn validate_source_shapes(steps: &[MapSourceStep]) -> Result<(), &'static str> {
     for (id, site, owner, symbol, needle, occurrence, effect) in [
         (
             MapSourceStepId::RawStateAccepted,
-            MapSiteId::RawState,
+            MapSiteId::RawGate,
             SourceOwnerId::AbiRawState,
             "unsafe fn with_installed_state",
             "Ok(unsafe { envelope.with_typed(operation) })",
@@ -79,7 +79,7 @@ fn validate_source_shapes(steps: &[MapSourceStep]) -> Result<(), &'static str> {
         ),
         (
             MapSourceStepId::RawStateNullFile,
-            MapSiteId::RawState,
+            MapSiteId::RawGate,
             SourceOwnerId::AbiRawState,
             "unsafe fn installed_envelope",
             "RawSqliteFileStateRejection::NullFile",
@@ -88,7 +88,7 @@ fn validate_source_shapes(steps: &[MapSourceStep]) -> Result<(), &'static str> {
         ),
         (
             MapSourceStepId::RawStateUninstalled,
-            MapSiteId::RawState,
+            MapSiteId::RawGate,
             SourceOwnerId::AbiRawState,
             "fn validate_installed",
             "RawSqliteFileStateRejection::Uninstalled",
@@ -97,7 +97,7 @@ fn validate_source_shapes(steps: &[MapSourceStep]) -> Result<(), &'static str> {
         ),
         (
             MapSourceStepId::RawStateForeignMethodsNullTable,
-            MapSiteId::RawState,
+            MapSiteId::RawGate,
             SourceOwnerId::AbiRawState,
             "fn validate_installed",
             "RawSqliteFileStateRejection::ForeignMethods",
@@ -106,7 +106,7 @@ fn validate_source_shapes(steps: &[MapSourceStep]) -> Result<(), &'static str> {
         ),
         (
             MapSourceStepId::RawStateForeignMethodsForeignTable,
-            MapSiteId::RawState,
+            MapSiteId::RawGate,
             SourceOwnerId::AbiRawState,
             "fn validate_installed",
             "RawSqliteFileStateRejection::ForeignMethods",
@@ -115,7 +115,7 @@ fn validate_source_shapes(steps: &[MapSourceStep]) -> Result<(), &'static str> {
         ),
         (
             MapSourceStepId::RawStateMissing,
-            MapSiteId::RawState,
+            MapSiteId::RawGate,
             SourceOwnerId::AbiRawState,
             "fn validate_installed",
             "RawSqliteFileStateRejection::StateMissing",
@@ -124,7 +124,7 @@ fn validate_source_shapes(steps: &[MapSourceStep]) -> Result<(), &'static str> {
         ),
         (
             MapSourceStepId::RawStateTypeMismatch,
-            MapSiteId::RawState,
+            MapSiteId::RawGate,
             SourceOwnerId::AbiRawState,
             "unsafe fn with_installed_state",
             "RawSqliteFileStateRejection::TypeMismatch",
@@ -133,7 +133,7 @@ fn validate_source_shapes(steps: &[MapSourceStep]) -> Result<(), &'static str> {
         ),
         (
             MapSourceStepId::RawStateCaughtPanic,
-            MapSiteId::RawState,
+            MapSiteId::RawGate,
             SourceOwnerId::AbiFileState,
             "unsafe fn run_code",
             "| Err(_) =>",
@@ -142,7 +142,7 @@ fn validate_source_shapes(steps: &[MapSourceStep]) -> Result<(), &'static str> {
         ),
         (
             MapSourceStepId::RawAbandonEmpty,
-            MapSiteId::RawState,
+            MapSiteId::RawAbandon,
             SourceOwnerId::AbiRawState,
             "unsafe fn abandon_installed_state",
             "return Ok(false);",
@@ -151,7 +151,7 @@ fn validate_source_shapes(steps: &[MapSourceStep]) -> Result<(), &'static str> {
         ),
         (
             MapSourceStepId::RawAbandonInstalled,
-            MapSiteId::RawState,
+            MapSiteId::RawAbandon,
             SourceOwnerId::AbiRawState,
             "unsafe fn abandon_installed_state",
             "drop(Box::from_raw",
@@ -160,7 +160,7 @@ fn validate_source_shapes(steps: &[MapSourceStep]) -> Result<(), &'static str> {
         ),
         (
             MapSourceStepId::RawAbandonNullFileRejected,
-            MapSiteId::RawState,
+            MapSiteId::RawAbandon,
             SourceOwnerId::AbiRawState,
             "unsafe fn abandon_installed_state",
             "RawSqliteFileStateRejection::NullFile",
@@ -169,7 +169,7 @@ fn validate_source_shapes(steps: &[MapSourceStep]) -> Result<(), &'static str> {
         ),
         (
             MapSourceStepId::RawAbandonForeignMethodsNullTableRejected,
-            MapSiteId::RawState,
+            MapSiteId::RawAbandon,
             SourceOwnerId::AbiRawState,
             "fn validate_installed",
             "RawSqliteFileStateRejection::ForeignMethods",
@@ -178,7 +178,7 @@ fn validate_source_shapes(steps: &[MapSourceStep]) -> Result<(), &'static str> {
         ),
         (
             MapSourceStepId::RawAbandonForeignMethodsForeignTableRejected,
-            MapSiteId::RawState,
+            MapSiteId::RawAbandon,
             SourceOwnerId::AbiRawState,
             "fn validate_installed",
             "RawSqliteFileStateRejection::ForeignMethods",
@@ -187,7 +187,7 @@ fn validate_source_shapes(steps: &[MapSourceStep]) -> Result<(), &'static str> {
         ),
         (
             MapSourceStepId::RawAbandonStateMissingRejected,
-            MapSiteId::RawState,
+            MapSiteId::RawAbandon,
             SourceOwnerId::AbiRawState,
             "fn validate_installed",
             "RawSqliteFileStateRejection::StateMissing",

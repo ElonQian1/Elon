@@ -256,32 +256,6 @@ pub(super) const OPEN_SOURCE_REVIEW_BOUNDARIES: &[MapOpenReviewBoundary] = &[
 
 pub(super) const PENDING_BOUNDARIES: &[MapPendingBoundaryRecord] = &[
     MapPendingBoundaryRecord {
-        node: SourceNodeId::AbiRawGate,
-        status: MapBoundaryReviewStatus::AnchoredButGraphPending,
-        witnesses: &[
-            MapSourceStepId::RawStateAccepted,
-            MapSourceStepId::RawStateNullFile,
-            MapSourceStepId::RawStateUninstalled,
-            MapSourceStepId::RawStateForeignMethodsNullTable,
-            MapSourceStepId::RawStateForeignMethodsForeignTable,
-            MapSourceStepId::RawStateMissing,
-            MapSourceStepId::RawStateTypeMismatch,
-            MapSourceStepId::RawStateCaughtPanic,
-        ],
-    },
-    MapPendingBoundaryRecord {
-        node: SourceNodeId::AbiRawStateAbandon,
-        status: MapBoundaryReviewStatus::AnchoredButGraphPending,
-        witnesses: &[
-            MapSourceStepId::RawAbandonEmpty,
-            MapSourceStepId::RawAbandonInstalled,
-            MapSourceStepId::RawAbandonNullFileRejected,
-            MapSourceStepId::RawAbandonForeignMethodsNullTableRejected,
-            MapSourceStepId::RawAbandonForeignMethodsForeignTableRejected,
-            MapSourceStepId::RawAbandonStateMissingRejected,
-        ],
-    },
-    MapPendingBoundaryRecord {
         node: SourceNodeId::ManagedDmsInitialization,
         status: MapBoundaryReviewStatus::AnchoredButGraphPending,
         witnesses: &[
@@ -334,6 +308,30 @@ pub(super) const RESOLVED_GRAPH_BOUNDARIES: &[MapResolvedBoundaryRecord] = &[
         witnesses: &[
             MapSourceStepId::AbiInputRejected,
             MapSourceStepId::AbiNullOutputRejected,
+        ],
+    },
+    MapResolvedBoundaryRecord {
+        node: SourceNodeId::AbiMapRawGate,
+        witnesses: &[
+            MapSourceStepId::RawStateAccepted,
+            MapSourceStepId::RawStateNullFile,
+            MapSourceStepId::RawStateUninstalled,
+            MapSourceStepId::RawStateForeignMethodsNullTable,
+            MapSourceStepId::RawStateForeignMethodsForeignTable,
+            MapSourceStepId::RawStateMissing,
+            MapSourceStepId::RawStateTypeMismatch,
+            MapSourceStepId::RawStateCaughtPanic,
+        ],
+    },
+    MapResolvedBoundaryRecord {
+        node: SourceNodeId::AbiMapRawStateAbandon,
+        witnesses: &[
+            MapSourceStepId::RawAbandonEmpty,
+            MapSourceStepId::RawAbandonInstalled,
+            MapSourceStepId::RawAbandonNullFileRejected,
+            MapSourceStepId::RawAbandonForeignMethodsNullTableRejected,
+            MapSourceStepId::RawAbandonForeignMethodsForeignTableRejected,
+            MapSourceStepId::RawAbandonStateMissingRejected,
         ],
     },
     MapResolvedBoundaryRecord {

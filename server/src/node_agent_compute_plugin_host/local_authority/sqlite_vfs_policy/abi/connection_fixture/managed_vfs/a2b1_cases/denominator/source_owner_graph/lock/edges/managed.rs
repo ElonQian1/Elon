@@ -425,7 +425,7 @@ pub(in super::super::super) const EDGES: &[SourceEdge] = &[
     ),
     edge(
         "lock.raw-abandon.fallback",
-        SourceNodeId::AbiRawStateAbandon,
+        SourceNodeId::AbiLockRawStateAbandon,
         SourceNodeId::AbiLockFallbackProjection,
         EdgeKind::ResultProjection,
         LOCK_OPS,

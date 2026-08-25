@@ -55,7 +55,7 @@ pub(in super::super::super) const EDGES: &[SourceEdge] = &[
     ),
     edge(
         "lock.raw.dispatch",
-        SourceNodeId::AbiRawGate,
+        SourceNodeId::AbiLockRawGate,
         SourceNodeId::FileStateLock,
         EdgeKind::Continuation,
         LOCK_OPS,

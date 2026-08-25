@@ -4,15 +4,17 @@
 //! graph. Consequently the schema, quotient, exact key set, Expected vectors, StaticContract, and
 //! denominator count remain pending. This module validates the typed schema, this table's internal
 //! partition/projection consistency, the commit-bound source-owner graph, and a separate Map-only
-//! terminal-template review ledger. Separate ABI and source-neutral raw-state fragments freeze
-//! only their local quotients; all later axes remain pending. The ledger preserves its own pending
-//! closure gates and does not establish source-universe equality or terminal-leaf coverage.
+//! terminal-template review ledger. Separate ABI, source-neutral raw-state, and Map raw-projection
+//! fragments freeze only their local quotients; all later axes remain pending. The ledger preserves
+//! its own pending closure gates and does not establish source-universe equality or terminal-leaf
+//! coverage.
 
 mod abi_map_fragment;
 mod branch_atoms;
 mod case_key;
 mod invariants;
 mod projection;
+mod raw_map_fragment;
 mod raw_state_fragment;
 mod source_owner_graph;
 

@@ -18,6 +18,8 @@ pub(super) fn validate(steps: &[MapSourceStep]) -> Result<(), &'static str> {
         MapSiteId::AbiInput,
         MapSiteId::AbiValidation,
         MapSiteId::RawState,
+        MapSiteId::RawGate,
+        MapSiteId::RawAbandon,
         MapSiteId::OuterFault,
         MapSiteId::RoutePlan,
         MapSiteId::Promotion,

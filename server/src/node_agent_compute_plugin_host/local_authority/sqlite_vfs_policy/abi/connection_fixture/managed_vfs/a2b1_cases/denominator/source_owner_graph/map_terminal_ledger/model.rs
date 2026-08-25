@@ -9,6 +9,8 @@ pub(super) enum MapSiteId {
     AbiInput,
     AbiValidation,
     RawState,
+    RawGate,
+    RawAbandon,
     OuterFault,
     RoutePlan,
     Promotion,

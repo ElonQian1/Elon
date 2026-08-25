@@ -38,32 +38,6 @@ struct PendingExpectation {
 
 const PENDING_EXPECTATIONS: &[PendingExpectation] = &[
     PendingExpectation {
-        node: SourceNodeId::AbiRawGate,
-        status: MapBoundaryReviewStatus::AnchoredButGraphPending,
-        witnesses: &[
-            MapSourceStepId::RawStateAccepted,
-            MapSourceStepId::RawStateNullFile,
-            MapSourceStepId::RawStateUninstalled,
-            MapSourceStepId::RawStateForeignMethodsNullTable,
-            MapSourceStepId::RawStateForeignMethodsForeignTable,
-            MapSourceStepId::RawStateMissing,
-            MapSourceStepId::RawStateTypeMismatch,
-            MapSourceStepId::RawStateCaughtPanic,
-        ],
-    },
-    PendingExpectation {
-        node: SourceNodeId::AbiRawStateAbandon,
-        status: MapBoundaryReviewStatus::AnchoredButGraphPending,
-        witnesses: &[
-            MapSourceStepId::RawAbandonEmpty,
-            MapSourceStepId::RawAbandonInstalled,
-            MapSourceStepId::RawAbandonNullFileRejected,
-            MapSourceStepId::RawAbandonForeignMethodsNullTableRejected,
-            MapSourceStepId::RawAbandonForeignMethodsForeignTableRejected,
-            MapSourceStepId::RawAbandonStateMissingRejected,
-        ],
-    },
-    PendingExpectation {
         node: SourceNodeId::ManagedDmsInitialization,
         status: MapBoundaryReviewStatus::AnchoredButGraphPending,
         witnesses: &[
@@ -122,6 +96,42 @@ const RESOLVED_EXPECTATIONS: &[ResolvedExpectation] = &[
         witnesses: &[
             MapSourceStepId::AbiInputRejected,
             MapSourceStepId::AbiNullOutputRejected,
+        ],
+    },
+    ResolvedExpectation {
+        node: SourceNodeId::AbiMapRawGate,
+        owner: SourceOwnerId::AbiRawState,
+        symbol: "unsafe fn with_installed_state",
+        role: NodeRole::RawStateGate,
+        ops: MAP_OPS,
+        boundary: Boundary::Expanded,
+        selector: LedgerSelector::Site(MapSiteId::RawGate),
+        witnesses: &[
+            MapSourceStepId::RawStateAccepted,
+            MapSourceStepId::RawStateNullFile,
+            MapSourceStepId::RawStateUninstalled,
+            MapSourceStepId::RawStateForeignMethodsNullTable,
+            MapSourceStepId::RawStateForeignMethodsForeignTable,
+            MapSourceStepId::RawStateMissing,
+            MapSourceStepId::RawStateTypeMismatch,
+            MapSourceStepId::RawStateCaughtPanic,
+        ],
+    },
+    ResolvedExpectation {
+        node: SourceNodeId::AbiMapRawStateAbandon,
+        owner: SourceOwnerId::AbiRawState,
+        symbol: "unsafe fn abandon_installed_state",
+        role: NodeRole::RawStateGate,
+        ops: MAP_OPS,
+        boundary: Boundary::Expanded,
+        selector: LedgerSelector::Site(MapSiteId::RawAbandon),
+        witnesses: &[
+            MapSourceStepId::RawAbandonEmpty,
+            MapSourceStepId::RawAbandonInstalled,
+            MapSourceStepId::RawAbandonNullFileRejected,
+            MapSourceStepId::RawAbandonForeignMethodsNullTableRejected,
+            MapSourceStepId::RawAbandonForeignMethodsForeignTableRejected,
+            MapSourceStepId::RawAbandonStateMissingRejected,
         ],
     },
     ResolvedExpectation {

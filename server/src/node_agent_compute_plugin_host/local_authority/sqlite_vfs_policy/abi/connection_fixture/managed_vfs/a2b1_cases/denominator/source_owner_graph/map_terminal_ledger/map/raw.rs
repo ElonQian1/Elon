@@ -58,6 +58,7 @@ const fn map_run_code_context() -> SourceAnchor {
 
 const fn validate_step(
     id: MapSourceStepId,
+    site: MapSiteId,
     needle: &'static str,
     occurrence: u8,
     retention: MapRetention,
@@ -66,7 +67,7 @@ const fn validate_step(
     with_call_context(
         step(
             id,
-            MapSiteId::RawState,
+            site,
             SourceOwnerId::AbiRawState,
             "fn validate_installed",
             needle,
@@ -83,7 +84,7 @@ const fn validate_step(
 pub(in super::super) const STEPS: &[MapSourceStep] = &[
     step(
         MapSourceStepId::RawStateAccepted,
-        MapSiteId::RawState,
+        MapSiteId::RawGate,
         SourceOwnerId::AbiRawState,
         "unsafe fn with_installed_state",
         "Ok(unsafe { envelope.with_typed(operation) })",
@@ -96,7 +97,7 @@ pub(in super::super) const STEPS: &[MapSourceStep] = &[
     with_call_context(
         step(
             MapSourceStepId::RawStateNullFile,
-            MapSiteId::RawState,
+            MapSiteId::RawGate,
             SourceOwnerId::AbiRawState,
             "unsafe fn installed_envelope",
             "RawSqliteFileStateRejection::NullFile",
@@ -110,6 +111,7 @@ pub(in super::super) const STEPS: &[MapSourceStep] = &[
     ),
     validate_step(
         MapSourceStepId::RawStateUninstalled,
+        MapSiteId::RawGate,
         "RawSqliteFileStateRejection::Uninstalled",
         1,
         MapRetention::None,
@@ -117,6 +119,7 @@ pub(in super::super) const STEPS: &[MapSourceStep] = &[
     ),
     validate_step(
         MapSourceStepId::RawStateForeignMethodsNullTable,
+        MapSiteId::RawGate,
         "RawSqliteFileStateRejection::ForeignMethods",
         1,
         MapRetention::UnvalidatedRawStateSlot,
@@ -124,6 +127,7 @@ pub(in super::super) const STEPS: &[MapSourceStep] = &[
     ),
     validate_step(
         MapSourceStepId::RawStateForeignMethodsForeignTable,
+        MapSiteId::RawGate,
         "RawSqliteFileStateRejection::ForeignMethods",
         2,
         MapRetention::BranchDependent,
@@ -131,6 +135,7 @@ pub(in super::super) const STEPS: &[MapSourceStep] = &[
     ),
     validate_step(
         MapSourceStepId::RawStateMissing,
+        MapSiteId::RawGate,
         "RawSqliteFileStateRejection::StateMissing",
         1,
         MapRetention::None,
@@ -138,7 +143,7 @@ pub(in super::super) const STEPS: &[MapSourceStep] = &[
     ),
     step(
         MapSourceStepId::RawStateTypeMismatch,
-        MapSiteId::RawState,
+        MapSiteId::RawGate,
         SourceOwnerId::AbiRawState,
         "unsafe fn with_installed_state",
         "RawSqliteFileStateRejection::TypeMismatch",
@@ -151,7 +156,7 @@ pub(in super::super) const STEPS: &[MapSourceStep] = &[
     with_call_context(
         step(
             MapSourceStepId::RawStateCaughtPanic,
-            MapSiteId::RawState,
+            MapSiteId::RawGate,
             SourceOwnerId::AbiFileState,
             "unsafe fn run_code",
             "| Err(_) =>",
@@ -181,7 +186,7 @@ pub(in super::super) const STEPS: &[MapSourceStep] = &[
     ),
     step(
         MapSourceStepId::RawAbandonEmpty,
-        MapSiteId::RawState,
+        MapSiteId::RawAbandon,
         SourceOwnerId::AbiRawState,
         "unsafe fn abandon_installed_state",
         "return Ok(false);",
@@ -193,7 +198,7 @@ pub(in super::super) const STEPS: &[MapSourceStep] = &[
     ),
     step(
         MapSourceStepId::RawAbandonInstalled,
-        MapSiteId::RawState,
+        MapSiteId::RawAbandon,
         SourceOwnerId::AbiRawState,
         "unsafe fn abandon_installed_state",
         "drop(Box::from_raw",
@@ -205,7 +210,7 @@ pub(in super::super) const STEPS: &[MapSourceStep] = &[
     ),
     step(
         MapSourceStepId::RawAbandonNullFileRejected,
-        MapSiteId::RawState,
+        MapSiteId::RawAbandon,
         SourceOwnerId::AbiRawState,
         "unsafe fn abandon_installed_state",
         "RawSqliteFileStateRejection::NullFile",
@@ -217,6 +222,7 @@ pub(in super::super) const STEPS: &[MapSourceStep] = &[
     ),
     validate_step(
         MapSourceStepId::RawAbandonForeignMethodsNullTableRejected,
+        MapSiteId::RawAbandon,
         "RawSqliteFileStateRejection::ForeignMethods",
         1,
         MapRetention::UnvalidatedRawStateSlot,
@@ -224,6 +230,7 @@ pub(in super::super) const STEPS: &[MapSourceStep] = &[
     ),
     validate_step(
         MapSourceStepId::RawAbandonForeignMethodsForeignTableRejected,
+        MapSiteId::RawAbandon,
         "RawSqliteFileStateRejection::ForeignMethods",
         2,
         MapRetention::BranchDependent,
@@ -231,6 +238,7 @@ pub(in super::super) const STEPS: &[MapSourceStep] = &[
     ),
     validate_step(
         MapSourceStepId::RawAbandonStateMissingRejected,
+        MapSiteId::RawAbandon,
         "RawSqliteFileStateRejection::StateMissing",
         1,
         MapRetention::None,

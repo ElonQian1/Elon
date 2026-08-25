@@ -60,7 +60,7 @@ pub(in super::super::super) const EDGES: &[SourceEdge] = &[
     ),
     edge(
         "map.raw.dispatch",
-        SourceNodeId::AbiRawGate,
+        SourceNodeId::AbiMapRawGate,
         SourceNodeId::FileStateMap,
         EdgeKind::Continuation,
         Epoch::AbiInput,

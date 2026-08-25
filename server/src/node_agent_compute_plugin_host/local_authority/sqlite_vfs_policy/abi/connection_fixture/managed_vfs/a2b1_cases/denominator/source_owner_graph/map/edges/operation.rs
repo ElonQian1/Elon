@@ -466,7 +466,7 @@ pub(in super::super::super) const EDGES: &[SourceEdge] = &[
     ),
     edge(
         "map.raw-abandon.fallback",
-        SourceNodeId::AbiRawStateAbandon,
+        SourceNodeId::AbiMapRawStateAbandon,
         SourceNodeId::AbiMapFallbackProjection,
         EdgeKind::ResultProjection,
         Epoch::AbiInput,
