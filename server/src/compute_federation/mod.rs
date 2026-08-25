@@ -11,6 +11,9 @@ pub(crate) mod capacity;
 pub(crate) mod capacity_commitment;
 pub(crate) mod capacity_commitment_api;
 pub(crate) mod capacity_commitment_service;
+pub(crate) mod capacity_future_settlement_lineage;
+#[cfg(test)]
+mod capacity_future_settlement_lineage_source_contract_tests;
 pub(crate) mod capacity_instrument;
 pub(crate) mod capacity_instrument_api;
 pub(crate) mod capacity_instrument_service;

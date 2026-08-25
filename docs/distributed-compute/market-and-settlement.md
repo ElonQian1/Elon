@@ -141,6 +141,8 @@ v238 [`CapacityInstrument`](capacity-instrument-authority.md) 把本节原先只
 
 v228 [`Delivery Allocation`](delivery-allocation-authority.md) 当前为 `design_frozen/implementation_partially_verified`：编译、临时 SQLite 新库 migration 及 3 项 Store/Service 成功、回滚和 Decline 专项已通过。一份 Commitment 最多一份双边 Grant；exact consumer 只能 whole-only 行权给一个 quoted Job。行权在一个 IMMEDIATE 事务内冻结既有 Broker 预算、全量释放父 Commitment Claim、以相同 lines 建立带 `parent_claim_id` 的标准 Reservation Claim，并登记 Reservation、Job、Broker receipt 与 immutable exercised receipt；Commitment current view 派生 `allocated`。行权后 Reservation due-expiry 的管理员有界恢复可手动调用；v234 又以 Store cutoff、持久 keyset checkpoint 和每 tick 最多 100 项的 server-owned worker 提供公平扫描，blocked/failed 也推进当前 sweep，空页后才开启新 sweep。v234 已通过完整服务端测试目标编译、fresh/repeat checkpoint migration 和 7 项管理员/Store/HTTP、worker、公平扫描本地专项；真实并发 CAS、进程崩溃、历史升级、真实 TCP 和生产周期仍缺。它不是 admin actor，也不新增经济权威，只退款预授权、归还 child Claim 容量并结束 Job/Reservation，不改写 `exercised/allocated`，也不产生 Position、第二份 Allocation Claim、verified usage、Provider 收益、真实价格或结算真源。
 
+[`capacity_future` pricing-mode settlement lineage bridge 草案](capacity-future-settlement-lineage-authority.md) 记录独立、API-free 的 reference-only source projection，把 Instrument/activation/adoption、Commitment、exercised Allocation 与既有 execution、verification、settlement/release carrier 相连。v192 verification-role 与 v195 settlement-role digest 的 owner 域不同，草案分字段保存并禁止直接判相等；两套公式到同一 v193 readings 的证明后移 Store。它当前未登记，只有 `source_draft_written/source_review_only` Domain 与来源等式，未编译、未运行、无 Store resolver/API/migration/writer；也不计算 Commitment quantities 对 Instrument contract units 的共同 multiplier，不创建 ClearingReceipt、短缺或处罚。因此它只铺设“未来交付锁价结算可追溯性”草案，不能把当前市场升级为交付清算已实现。
+
 ## 10. 从期货价格到任务结算
 
 1. Planner 把任务需求归一为 SKU 与交付窗口；
@@ -172,9 +174,10 @@ Provider 收益不能在收到节点自报终态时立即成为可提取余额�
 4. 标准 CapacityInstrument 与 exact Offer adoption（v238 已编译并通过全新文件迁移冒烟，专属行为专项仍为 `passed=0`）；
 5. Provider Capacity Commitment（v225 旧纵切面部分验证；v238 fresh-admission/currentness 接入未验证）；
 6. whole-only 双边 Delivery Allocation（v228 主纵切面与 v234 到期公平恢复已部分验证；v238 Instrument 门以其专题验收状态为准）；
-7. 限价订单簿、成交、持仓和净额；
-8. YCI 指数、标记价、替代交付和自动清算；
-9. 跨公司、跨矿池的统一容量市场。
+7. `capacity_future` 交付结算 source-projection lineage（本批只写未登记 API-free bridge 草案；Store owner resolver 与动态验收仍缺）；
+8. 限价订单簿、成交、持仓和净额；
+9. YCI 指数、标记价、替代交付和自动清算；
+10. 跨公司、跨矿池的统一容量市场。
 
 前一步生成的 Job、Receipt 和 Snapshot 必须能被后一步继续读取，不能为了市场升级重写历史账本。
 
@@ -185,3 +188,5 @@ Provider 收益不能在收到节点自报终态时立即成为可提取余额�
 v225 CapacityCommitment 已写入领域、v225 migration、Store、通用 Claim seam、Service 与 HTTP Router，当前为 `implementation_partially_verified`：生产目标、临时 SQLite 全量迁移、Store/Service/进程内 HTTP 和磁盘重开定向测试已通过。v228 DeliveryAllocation 也为 `design_frozen/implementation_partially_verified`：原 Grant/Exercise 已有生产编译、临时 SQLite 新库 migration 与 3 项 Store/Service 专项；行权后 Reservation 到期恢复及 v234 checkpoint migration/server-owned worker 又通过完整测试目标编译、fresh/repeat migration 和 7 项本地专项。真实并发 CAS、进程崩溃、历史升级、真实 TCP、价格真实性、执行、verified usage、Provider 收益与资金结算仍未闭合，不得把局部验收描述为整条容量市场生产可用。
 
 v238 CapacityInstrument 的实际状态以其专题验收页为准。v225/v228/v234 的指纹不能证明 v238 lifecycle/adoption、数据库 trigger、共同合约倍数、退休 currentness 或历史收尾兼容；不得用 Delivery Allocation 到期恢复的通过证据替代 v238 专项。
+
+`capacity_future` settlement lineage bridge 草案同样不继承上述任一运行证据；其 Domain/source equations 当前为 `unregistered/implementation_uncompiled/implementation_unrun`、`passed=0/failed=0`。没有 Store owner resolver、历史 owner audit、共同合约倍数验证、编译与定向运行前，不能把 reference bridge 解释为真实计量、交付清算、Provider 收益或资金结算已闭合。
