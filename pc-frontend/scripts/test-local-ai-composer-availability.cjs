@@ -34,6 +34,9 @@ const {
   LOCAL_AI_PROVIDER_DRAFT_MAX_LENGTH,
   localAiProviderDraftIdentity,
 } = loadTypeScriptModule('../src/features/user-browser/localAiProviderDraftCache.ts')
+const { localAiWarmSessionReusable } = loadTypeScriptModule(
+  '../src/features/user-browser/localAiWarmSessionPolicy.ts',
+)
 
 const base = {
   clientReady: true,
@@ -102,6 +105,17 @@ assert.equal(drafts.read(ownedGoogle), 'Google draft')
 drafts.remember(ownedGoogle, 'x'.repeat(LOCAL_AI_PROVIDER_DRAFT_MAX_LENGTH + 20))
 assert.equal(drafts.read(ownedGoogle).length, LOCAL_AI_PROVIDER_DRAFT_MAX_LENGTH)
 
+const warmState = {
+  providerId: 'chatgpt',
+  windowStatus: 'minimized',
+  lastError: null,
+}
+assert.equal(localAiWarmSessionReusable(warmState, 'chatgpt'), true)
+assert.equal(localAiWarmSessionReusable({ ...warmState, providerId: 'google-ai-mode' }, 'chatgpt'), false)
+assert.equal(localAiWarmSessionReusable({ ...warmState, windowStatus: 'closed' }, 'chatgpt'), false)
+assert.equal(localAiWarmSessionReusable({ ...warmState, windowStatus: 'blocked' }, 'chatgpt'), false)
+assert.equal(localAiWarmSessionReusable({ ...warmState, lastError: 'page failed' }, 'chatgpt'), false)
+
 const composerDraft = fs.readFileSync(
   path.resolve(__dirname, '../src/features/user-browser/useLocalAiComposerDraft.ts'),
   'utf8',
@@ -111,6 +125,10 @@ assert.match(composerDraft, /localAiProviderDraftCache\.remember\(activeIdentity
 
 const page = fs.readFileSync(path.resolve(__dirname, '../src/features/ai/AiChatPage.tsx'), 'utf8')
 const backend = fs.readFileSync(path.resolve(__dirname, '../src/features/user-browser/useAiWebChatBackend.ts'), 'utf8')
+const controller = fs.readFileSync(
+  path.resolve(__dirname, '../src/features/user-browser/useLocalAiWebChatController.ts'),
+  'utf8',
+)
 assert.match(page, /disabled=\{chatMode \? !web\.canEdit : visibleSending\}/)
 assert.match(page, /busyAction !== 'new_conversation'/)
 assert.match(page, /requestAnimationFrame\(\(\) => textareaRef\.current\?\.focus\(\)\)/)
@@ -118,5 +136,7 @@ assert.match(page, /className=\{styles\.newBtn\} onClick=\{newConversation\}/)
 assert.match(backend, /const canEdit = capability\.state === 'ready' && Boolean\(provider\) && controller\.canEditDraft/)
 assert.match(backend, /const canCompose = ready && controller\.canSubmitDraft/)
 assert.match(backend, /官网页面正在后台异步同步/)
+assert.match(controller, /resumeLocalAiWebSession\(providerId, ownerKey, cachedState\)/)
+assert.match(controller, /if \(!warmSession\) setMessage/)
 
 process.stdout.write('PASS local AI non-blocking composer availability\n')

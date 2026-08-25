@@ -56,6 +56,8 @@ import useLocalAiAccessRecovery, { createLocalAiAccessRetry } from './useLocalAi
 import useLocalAiResponseRefresh from './useLocalAiResponseRefresh'
 import useLocalAiPendingResponseWatchdog from './useLocalAiPendingResponseWatchdog'
 import useLocalAiComposerDraft from './useLocalAiComposerDraft'
+import { localAiWarmSessionReusable } from './localAiWarmSessionPolicy'
+import { resumeLocalAiWebSession } from './resumeLocalAiWebSession'
 
 export default function useLocalAiWebChatController(
   provider: LocalAiWebProvider | undefined,
@@ -293,16 +295,13 @@ export default function useLocalAiWebChatController(
     if (autoStartKey.current === key) return
     autoStartKey.current = key
     let active = true
-    setMessage(`正在后台连接 ${providerDisplayName}；官网允许时可直接使用访客模式。`)
-    void openLocalAiWebSession(providerId, ownerKey, { showWindow: false })
-      .then(async () => {
-        try {
-          const next = await getLocalAiWebSessionState(providerId, ownerKey)
-          if (active) setSessionState(next)
-        } catch {
-          // 后续共享状态同步会恢复，不重复创建窗口。
-        }
-        if (active) setMessage(`${providerDisplayName} 已在本机后台连接；登录是历史与增强能力的可选项。`)
+    const cachedState = getCachedLocalAiWebSessionState(providerId, ownerKey)
+    const warmSession = localAiWarmSessionReusable(cachedState, providerId)
+    if (!warmSession) setMessage(`正在后台连接 ${providerDisplayName}；官网允许时可直接使用访客模式。`)
+    void resumeLocalAiWebSession(providerId, ownerKey, cachedState)
+      .then(({ state, reused }) => {
+        if (active && state) setSessionState(state)
+        if (active && !reused) setMessage(`${providerDisplayName} 已在本机后台连接；登录是历史与增强能力的可选项。`)
       })
       .catch((error) => {
         if (active) setMessage(localAiBrowserErrorMessage(error))
