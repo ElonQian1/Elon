@@ -167,4 +167,7 @@ pub(crate) mod start_outbox;
 pub(crate) mod user_node_provider_binding;
 #[cfg(test)]
 mod user_node_provider_binding_source_contract_tests;
+pub(crate) mod user_node_ready_source_lineage;
+#[cfg(test)]
+mod user_node_ready_source_lineage_source_contract_tests;
 pub(crate) mod workload;

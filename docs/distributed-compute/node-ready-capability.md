@@ -1,7 +1,7 @@
 ---
 title: 节点 ReadyCapability 健康证明边界
 status: current
-reviewed_at: 2026-08-21
+reviewed_at: 2026-08-25
 owners: node, compute
 ---
 
@@ -78,6 +78,8 @@ v217 源码新增 `reauthorize_existing`：Control-signed InstallPlan 只能精�
 
 这些数值是签名 grant 的授权上限，不是测得容量、设备分配、OS 限制或 v212 `ResourceCeiling`。合同不生成 accelerator count、输出上限、并发上限、runtime/model 摘要或 enforcement receipt，也不启动 Sidecar、不复制 candidate health、不构造 Ready。CPU-only 节点可诚实保留 VRAM=0；服务端现有 accelerator>0 合同必须在后续显式解决，不能用虚构 accelerator 填平。v217 增量虽随完整目标编译，仍未专项运行、迁移或接入生产 Host。
 
+2026-08-25 新增的未登记 source-lineage 草案只把上述 work-admission、局部 Ready-health 与明确 `Untrusted` 的 Host observation 投影为六键 JCS 谱系，并固定缺 local currentness、runtime transition、Host runtime 与 v15 session 四项权威。它保留 CPU-only、signed grant 与结构时间等式，但不生成 `ComputeReadyCapability` 或服务端 execution capability；源码未编译、测试或运行。精确边界见 `user-node-ready-source-lineage-authority.md` 与 `user-node-ready-source-lineage-acceptance.md`。
+
 ## 10. 尚未实现
 
 - Sidecar 启动、预热和动态健康探针；
@@ -85,7 +87,7 @@ v217 源码新增 `reauthorize_existing`：Control-signed InstallPlan 只能精�
 - 失败候选的清理完成 Store、目录耐久闭包、重试授权与跨重启 custody 治理；
 - Host enforcement profile、Runtime 启动/激活和活动健康回执；
 - 发布 Ready 前的 fresh Store read、CAS/fencing 和主动失效链；
-- `ComputeReadyCapability` 的规范短 TTL 构建、认证上报和服务端验证；
+- 在 source-lineage 之后完成 `ComputeReadyCapability` 的规范短 TTL 构建、节点签名、v15 认证上报和服务端验证；
 - 共享关闭、排水、崩溃和撤销后的主动失效通知；
 - 从技术就绪事实到 Provider、CapacityPool、Offer 和 Attempt 的生产接线。
 

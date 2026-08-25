@@ -65,6 +65,7 @@ reviewed_at: 2026-08-25
 - 分布式算力各层成熟度不同，不能统称“开放算力市场已完成”；统一状态见 `docs/distributed-compute/current-implementation-status.md`。
 - 外部矿池：V277/V278 uncompiled/unrun、#13-18 deny、eligible=0；V280 仅 ABI。
 - V279 UserNode Binding：Domain/Store/API/activation 源码已写但未编译/运行，零下游与经济效果；见 `docs/distributed-compute/user-node-provider-binding-authority.md`。
+- UserNode Ready 源谱系是未登记 source draft：Node owner adapter 只把 v217 work-admission、局部 Ready-health 与明确不受信的 Host observation 投影为六键 JCS lineage；固定缺 local currentness、runtime transition、Host runtime 与 v15 session 四项权威，未编译/运行，不生成 Ready、route、Offer、Attempt、Lease 或下游效果；见 `docs/distributed-compute/user-node-ready-source-lineage-authority.md`。
 - `capacity_future` bridge 是未登记 source draft：仅 Domain/source equations，v192/v195 摘要分域且不判等；未编译/运行，无 Store/API/effect；见 `docs/distributed-compute/capacity-future-settlement-lineage-authority.md`。
 
 ## 已接受的产品方向

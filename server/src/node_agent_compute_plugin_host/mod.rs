@@ -31,12 +31,16 @@ mod manifest_catalog;
 pub(crate) mod manifest_validation;
 pub(crate) mod plugin_manifest;
 pub(crate) mod ready_capability;
+mod ready_source_lineage_projection;
 mod rollback_anchor;
 mod root_lock;
 pub(crate) mod runner_events;
 mod signed_artifact_verification;
 mod trusted_time;
 mod work_admission_contract;
+
+#[path = "../compute_federation/user_node_ready_source_lineage.rs"]
+mod user_node_ready_source_lineage_contract;
 
 pub(crate) use bootstrap::{
     endpoint_provenance::ComputePluginEndpointSessionWitness, ComputePluginBootstrap,
