@@ -1,5 +1,9 @@
 use std::collections::BTreeSet;
 
+pub(super) use super::super::super::super::super::raw_state_fragment::{
+    DROP_UNWIND_CUSTODY_PENDING, FOREIGN_METHODS_AND_OPAQUE_STATE, INSTALLED_RAW_VALUES,
+    METHODS_VALUE_ONLY, NO_RAW_VALUES, OPAQUE_STATE_VALUE,
+};
 use super::super::super::super::model::SourceEffect;
 use super::super::super::{
     model::{
@@ -7,8 +11,8 @@ use super::super::super::{
         MapSourceStep, MapSourceStepId, MapStepKind, MapTerminalTemplate, MapTiming,
     },
     reviewed_trace::{
-        RawCustodyRetention, RawSlotRetention, ReviewedSuccessorEdge, ReviewedTraceCondition,
-        ReviewedTraceEndpoint, ReviewedTraceRelation,
+        RawSlotRetention, ReviewedSuccessorEdge, ReviewedTraceCondition, ReviewedTraceEndpoint,
+        ReviewedTraceRelation,
     },
 };
 
@@ -20,30 +24,6 @@ pub(super) type EdgeKey = (
     SourceEffect,
     Option<RawSlotRetention>,
 );
-
-pub(super) const NO_RAW_VALUES: RawSlotRetention = slots(false, false, RawCustodyRetention::None);
-pub(super) const INSTALLED_RAW_VALUES: RawSlotRetention =
-    slots(true, true, RawCustodyRetention::InstalledEnvelope);
-pub(super) const OPAQUE_STATE_VALUE: RawSlotRetention =
-    slots(false, true, RawCustodyRetention::OpaqueStatePossible);
-pub(super) const METHODS_VALUE_ONLY: RawSlotRetention =
-    slots(true, false, RawCustodyRetention::None);
-pub(super) const FOREIGN_METHODS_AND_OPAQUE_STATE: RawSlotRetention =
-    slots(true, true, RawCustodyRetention::OpaqueStatePossible);
-pub(super) const DROP_UNWIND_CUSTODY_PENDING: RawSlotRetention =
-    slots(false, false, RawCustodyRetention::DropUnwindPending);
-
-const fn slots(
-    methods_value_retained: bool,
-    state_value_retained: bool,
-    custody: RawCustodyRetention,
-) -> RawSlotRetention {
-    RawSlotRetention {
-        methods_value_retained,
-        state_value_retained,
-        custody,
-    }
-}
 
 pub(super) fn edge_key(successor: &ReviewedSuccessorEdge) -> EdgeKey {
     edge(

@@ -1,6 +1,11 @@
 use super::super::super::super::abi_map_fragment::{
     AbiNullWriteOutcome, AbiOutputSlotShape, AbiScalarInvalidityShape,
 };
+pub(in super::super) use super::super::super::super::raw_state_fragment::{
+    RawAbandonOutcome, RawSlotRetention, DROP_UNWIND_CUSTODY_PENDING,
+    FOREIGN_METHODS_AND_OPAQUE_STATE, INSTALLED_RAW_VALUES, METHODS_VALUE_ONLY, NO_RAW_VALUES,
+    OPAQUE_STATE_VALUE,
+};
 use super::super::super::model::SourceEffect;
 use super::super::model::{MapExit, MapSourceStepId, MapSourceStepId::*};
 
@@ -81,22 +86,6 @@ pub(in super::super) enum RawStateCase {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub(in super::super) enum RawCustodyRetention {
-    /// No raw envelope/opaque-state custody; downstream managed custody is not decided here.
-    None,
-    InstalledEnvelope,
-    OpaqueStatePossible,
-    DropUnwindPending,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub(in super::super) struct RawSlotRetention {
-    pub(in super::super) methods_value_retained: bool,
-    pub(in super::super) state_value_retained: bool,
-    pub(in super::super) custody: RawCustodyRetention,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(in super::super) enum RawStateTraceDisposition {
     PrefixSuccessor(ReviewedTraceEndpoint),
     /// The source step is observable only after entering this unresolved operation.
@@ -110,19 +99,6 @@ pub(in super::super) struct RawStateOutcomeRecord {
     pub(in super::super) step: MapSourceStepId,
     pub(in super::super) slots: RawSlotRetention,
     pub(in super::super) trace: RawStateTraceDisposition,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub(in super::super) enum RawAbandonOutcome {
-    Empty,
-    InstalledDropCompleted,
-    /// The inner Drop began after both raw slots were cleared, then unwound into the outer catch.
-    InstalledDropUnwindCaught,
-    NullFileRejected,
-    ForeignMethodsNullTableRejected,
-    ForeignMethodsForeignTableStateNullRejected,
-    ForeignMethodsForeignTableStatePresentRejected,
-    StateMissingRejected,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -180,37 +156,6 @@ pub(in super::super) struct ReviewedSuccessorEdge {
     pub(in super::super) effect: SourceEffect,
     pub(in super::super) raw_slots: Option<RawSlotRetention>,
 }
-
-pub(in super::super) const NO_RAW_VALUES: RawSlotRetention = RawSlotRetention {
-    methods_value_retained: false,
-    state_value_retained: false,
-    custody: RawCustodyRetention::None,
-};
-pub(in super::super) const INSTALLED_RAW_VALUES: RawSlotRetention = RawSlotRetention {
-    methods_value_retained: true,
-    state_value_retained: true,
-    custody: RawCustodyRetention::InstalledEnvelope,
-};
-pub(in super::super) const OPAQUE_STATE_VALUE: RawSlotRetention = RawSlotRetention {
-    methods_value_retained: false,
-    state_value_retained: true,
-    custody: RawCustodyRetention::OpaqueStatePossible,
-};
-pub(in super::super) const METHODS_VALUE_ONLY: RawSlotRetention = RawSlotRetention {
-    methods_value_retained: true,
-    state_value_retained: false,
-    custody: RawCustodyRetention::None,
-};
-pub(in super::super) const FOREIGN_METHODS_AND_OPAQUE_STATE: RawSlotRetention = RawSlotRetention {
-    methods_value_retained: true,
-    state_value_retained: true,
-    custody: RawCustodyRetention::OpaqueStatePossible,
-};
-pub(in super::super) const DROP_UNWIND_CUSTODY_PENDING: RawSlotRetention = RawSlotRetention {
-    methods_value_retained: false,
-    state_value_retained: false,
-    custody: RawCustodyRetention::DropUnwindPending,
-};
 
 const fn raw_state(
     case: RawStateCase,

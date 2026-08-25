@@ -21,12 +21,13 @@ pub(super) use super::super::super::abi_map_fragment::{
     ReviewedMapAbiDownstreamFragment, ReviewedMapAbiExitFragment, ReviewedMapAbiTerminalFragment,
     ABI_OUTPUT_SLOT_SHAPES, ABI_SCALAR_INVALIDITY_SHAPES, REVIEWED_MAP_ABI_FRAGMENTS,
 };
+pub(super) use super::super::super::raw_state_fragment::{RawAbandonOutcome, RawSlotRetention};
 pub(super) use model::{
-    AbiInputCell, RawAbandonCause, RawAbandonCauseDisposition, RawAbandonOutcome,
-    RawAbandonOutcomeRecord, RawCustodyRetention, RawSlotRetention, RawStateCase, RawStateOutcome,
-    RawStateOutcomeRecord, RawStateTraceDisposition, ReviewedFrontierIngress, ReviewedOpenFrontier,
-    ReviewedOpenFrontierRecord, ReviewedSuccessorEdge, ReviewedTerminal, ReviewedTraceCondition,
-    ReviewedTraceEndpoint, ReviewedTraceRelation, RAW_ABANDON_OUTCOMES, RAW_STATE_OUTCOMES,
+    AbiInputCell, RawAbandonCause, RawAbandonCauseDisposition, RawAbandonOutcomeRecord,
+    RawStateCase, RawStateOutcome, RawStateOutcomeRecord, RawStateTraceDisposition,
+    ReviewedFrontierIngress, ReviewedOpenFrontier, ReviewedOpenFrontierRecord,
+    ReviewedSuccessorEdge, ReviewedTerminal, ReviewedTraceCondition, ReviewedTraceEndpoint,
+    ReviewedTraceRelation, RAW_ABANDON_OUTCOMES, RAW_STATE_OUTCOMES,
 };
 pub(super) use prefix::{
     ABI_INPUT_CELLS, OPEN_FRONTIERS, OPEN_FRONTIER_RECORDS, SUCCESSOR_EDGES, TERMINALS,
