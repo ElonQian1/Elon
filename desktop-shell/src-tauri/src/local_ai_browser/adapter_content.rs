@@ -41,11 +41,13 @@ fn sanitize_part(provider_id: &str, value: &Value) -> Option<Value> {
     if part_type == "rich_card" {
         return rich_content::sanitize_rich_card(provider_id, part).or_else(|| {
             let text = clean_string(part.get("text"), MAX_STRUCTURED_LABEL_CHARS);
-            (!text.is_empty()).then(|| json!({
-                "type": "interactive",
-                "text": text,
-                "kind": "renderer_upgrade_required",
-            }))
+            (!text.is_empty()).then(|| {
+                json!({
+                    "type": "interactive",
+                    "text": text,
+                    "kind": "renderer_upgrade_required",
+                })
+            })
         });
     }
     if !STRUCTURED_TYPES.contains(&part_type) {
@@ -219,6 +221,18 @@ mod tests {
                     "secondaryValue":"+US$123.00 (0.16%)",
                     "trend":"positive",
                     "periods":[{"id":"1d","label":"1D","selected":true}],
+                    "periodViews":[
+                        {
+                            "id":"1d","label":"1D","selected":true,
+                            "primaryValue":"US$77,274.00",
+                            "secondaryValue":"+US$123.00 (0.16%)","trend":"positive",
+                            "chart":{"kind":"line","points":[{"x":"12:00","y":77274.0},{"x":"13:00","y":77301.5}]}
+                        },
+                        {
+                            "id":"5d","label":"5D","selected":false,"trend":"negative",
+                            "chart":{"kind":"line","points":[{"x":"8/20","y":79000.0},{"x":"8/25","y":77274.0}]}
+                        }
+                    ],
                     "metrics":[{"label":"当日最低价","value":"76,601"}],
                     "chart":{"kind":"line","points":[{"x":"12:00","y":77274.0},{"x":"13:00","y":77301.5}]}
                 },
@@ -235,6 +249,14 @@ mod tests {
         assert_eq!(
             sanitized[0]["richContent"]["payload"]["chart"]["points"][1]["y"],
             77301.5
+        );
+        assert_eq!(
+            sanitized[0]["richContent"]["payload"]["periodViews"][1]["chart"]["points"][0]["y"],
+            79000.0
+        );
+        assert_eq!(
+            sanitized[0]["richContent"]["payload"]["periodViews"][1]["trend"],
+            "negative"
         );
         assert!(!sanitized[0].to_string().contains("secret"));
     }
@@ -414,10 +436,13 @@ mod tests {
             }
         }]);
         let sanitized = sanitize_parts("chatgpt", Some(&parts));
-        assert_eq!(sanitized, vec![json!({
-            "type":"interactive",
-            "text":"回答图片",
-            "kind":"renderer_upgrade_required"
-        })]);
+        assert_eq!(
+            sanitized,
+            vec![json!({
+                "type":"interactive",
+                "text":"回答图片",
+                "kind":"renderer_upgrade_required"
+            })]
+        );
     }
 }

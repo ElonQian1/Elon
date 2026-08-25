@@ -65,9 +65,9 @@ fn sanitize_chart_payload(source: &Map<String, Value>) -> Option<Map<String, Val
             let label = super::clean_string(item.get("label"), 64);
             if key.is_empty()
                 || label.is_empty()
-                || !key.bytes().all(|byte| {
-                    byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-')
-                })
+                || !key
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-'))
             {
                 return None;
             }
@@ -277,9 +277,61 @@ fn sanitize_finance_payload(source: &Map<String, Value>) -> Option<Map<String, V
         .unwrap_or("neutral");
     payload.insert("trend".into(), Value::String(trend.into()));
     insert_periods(&mut payload, source.get("periods"));
+    insert_period_views(&mut payload, source.get("periodViews"));
     insert_metrics(&mut payload, source.get("metrics"));
     insert_chart(&mut payload, source.get("chart"));
     Some(payload)
+}
+
+fn insert_period_views(target: &mut Map<String, Value>, value: Option<&Value>) {
+    let views = value
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .take(12)
+        .filter_map(|value| {
+            let item = value.as_object()?;
+            let id = super::clean_string(item.get("id"), 16);
+            let label = super::clean_string(item.get("label"), 16);
+            if id.is_empty()
+                || label.is_empty()
+                || !id
+                    .bytes()
+                    .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_')
+            {
+                return None;
+            }
+            let mut chart = sanitize_line_chart(item.get("chart")?.as_object()?)?;
+            if let Some(points) = chart.get_mut("points").and_then(Value::as_array_mut) {
+                points.truncate(256);
+            }
+            let mut sanitized = Map::from_iter([
+                ("id".into(), Value::String(id)),
+                ("label".into(), Value::String(label)),
+                (
+                    "selected".into(),
+                    Value::Bool(
+                        item.get("selected")
+                            .and_then(Value::as_bool)
+                            .unwrap_or(false),
+                    ),
+                ),
+                ("chart".into(), Value::Object(chart)),
+            ]);
+            insert_optional_text(&mut sanitized, item, "primaryValue", 64);
+            insert_optional_text(&mut sanitized, item, "secondaryValue", 96);
+            let trend = item
+                .get("trend")
+                .and_then(Value::as_str)
+                .filter(|value| matches!(*value, "positive" | "negative" | "neutral"))
+                .unwrap_or("neutral");
+            sanitized.insert("trend".into(), Value::String(trend.into()));
+            Some(Value::Object(sanitized))
+        })
+        .collect::<Vec<_>>();
+    if !views.is_empty() {
+        target.insert("periodViews".into(), Value::Array(views));
+    }
 }
 
 fn insert_optional_text(

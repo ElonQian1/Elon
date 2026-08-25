@@ -97,17 +97,26 @@
   border-block: 1px solid rgba(255, 255, 255, .09);
 }
 
-.periods span {
+.periods span,
+.periods button {
   min-height: 28px;
   display: grid;
   place-items: center;
+  border: 0;
   border-radius: 999px;
+  background: transparent;
   color: #9da1a8;
+  font: inherit;
   font-size: 11px;
   font-weight: 650;
 }
 
-.periods span[aria-current="true"] {
+.periods button { cursor: pointer; }
+.periods button:hover { background: rgba(255, 255, 255, .055); color: #d9dbe0; }
+.periods button:focus-visible { outline: 2px solid #55c986; outline-offset: 2px; }
+
+.periods span[aria-current="true"],
+.periods button[aria-pressed="true"] {
   background: #111214;
   color: #fff;
 }

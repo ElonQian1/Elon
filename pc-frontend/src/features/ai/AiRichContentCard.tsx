@@ -1,5 +1,5 @@
 import { Activity, ChartNoAxesCombined, CloudSun, ExternalLink, Images, MapPinned, Navigation } from 'lucide-react'
-import { useId } from 'react'
+import { useId, useState } from 'react'
 import type {
   FinanceRichContent,
   ChartRichContent,
@@ -7,6 +7,7 @@ import type {
   MediaGalleryRichContent,
   RichContentCandlestick,
   RichContentChartPoint,
+  RichContentFinanceChart,
   WeatherRichContent,
   YilongRichContent,
 } from '../user-browser/richContentProtocol'
@@ -80,9 +81,23 @@ function LineChartCard({ content }: { content: ChartRichContent }) {
 function FinanceCard({ content }: { content: FinanceRichContent }) {
   const { payload } = content
   const periods = payload.periods ?? []
+  const periodViews = payload.periodViews ?? []
+  const initialPeriodId = periods.find((period) => period.selected)?.id
+    ?? periodViews.find((period) => period.selected)?.id
+    ?? periodViews[0]?.id
+    ?? ''
+  const [requestedPeriodId, setRequestedPeriodId] = useState(initialPeriodId)
+  const activePeriod = periodViews.find((period) => period.id === requestedPeriodId)
+    ?? periodViews.find((period) => period.selected)
+    ?? periodViews[0]
+  const activePeriodId = activePeriod?.id ?? initialPeriodId
   const metrics = payload.metrics ?? []
-  const candles = payload.chart?.kind === 'candlestick' ? payload.chart.candles : undefined
-  const path = chartPath(payload.chart?.kind === 'line' ? payload.chart.points : undefined)
+  const activeChart: RichContentFinanceChart | undefined = activePeriod
+    ? activePeriod.chart
+    : payload.chart
+  const activeTrend = activePeriod?.trend ?? payload.trend
+  const candles = activeChart?.kind === 'candlestick' ? activeChart.candles : undefined
+  const path = chartPath(activeChart?.kind === 'line' ? activeChart.points : undefined)
   const gradientId = useId()
   return (
     <article className={styles.card} aria-label="官方行情卡片">
@@ -94,24 +109,36 @@ function FinanceCard({ content }: { content: FinanceRichContent }) {
         </div>
       </header>
       <div className={styles.quote}>
-        <strong>{payload.primaryValue}</strong>
-        {payload.secondaryValue && (
-          <span data-trend={payload.trend}>{payload.secondaryValue}</span>
+        <strong>{activePeriod?.primaryValue || payload.primaryValue}</strong>
+        {(activePeriod?.secondaryValue || payload.secondaryValue) && (
+          <span data-trend={activeTrend}>{activePeriod?.secondaryValue || payload.secondaryValue}</span>
         )}
       </div>
       {periods.length > 0 && (
         <div className={styles.periods} aria-label="行情周期">
           {periods.map((period) => (
-            <span key={period.id} aria-current={period.selected ? 'true' : undefined}>
-              {period.label}
-            </span>
+            periodViews.some((view) => view.id === period.id) ? (
+              <button
+                type="button"
+                aria-pressed={period.id === activePeriodId}
+                onClick={() => setRequestedPeriodId(period.id)}
+                title={`切换到 ${period.label} 行情`}
+                key={period.id}
+              >
+                {period.label}
+              </button>
+            ) : (
+              <span key={period.id} aria-current={period.id === activePeriodId ? 'true' : undefined}>
+                {period.label}
+              </span>
+            )
           ))}
         </div>
       )}
       {candles ? (
         <CandlestickChart candles={candles} />
       ) : path ? (
-        <svg className={styles.chart} data-trend={payload.trend} viewBox="0 0 640 180" role="img" aria-label="缓存行情走势">
+        <svg className={styles.chart} data-trend={activeTrend} viewBox="0 0 640 180" role="img" aria-label={`${activePeriod?.label ?? ''}缓存行情走势`}>
           <defs>
             <linearGradient id={gradientId} x1="0" x2="0" y1="0" y2="1">
               <stop offset="0" stopColor="currentColor" stopOpacity=".28" />

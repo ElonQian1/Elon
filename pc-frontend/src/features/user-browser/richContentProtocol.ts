@@ -32,6 +32,13 @@ export type RichContentFinanceChart = {
   candles: RichContentCandlestick[]
 }
 
+export interface RichContentFinancePeriodView extends RichContentPeriod {
+  primaryValue?: string
+  secondaryValue?: string
+  trend: 'positive' | 'negative' | 'neutral'
+  chart: Extract<RichContentFinanceChart, { kind: 'line' }>
+}
+
 export interface FinanceRichContentPayload {
   title: string
   symbol?: string
@@ -39,6 +46,7 @@ export interface FinanceRichContentPayload {
   secondaryValue?: string
   trend: 'positive' | 'negative' | 'neutral'
   periods?: RichContentPeriod[]
+  periodViews?: RichContentFinancePeriodView[]
   metrics?: RichContentMetric[]
   chart?: RichContentFinanceChart
 }
@@ -195,18 +203,23 @@ function isFinancePayload(payload: Record<string, unknown>) {
       && boundedText(value.label, 16)
       && typeof value.selected === 'boolean'
   ))) return false
+  if (!optionalArray(payload.periodViews, 12, (value) => (
+    isRecord(value)
+      && boundedText(value.id, 16)
+      && boundedText(value.label, 16)
+      && typeof value.selected === 'boolean'
+      && optionalText(value.primaryValue, 64)
+      && optionalText(value.secondaryValue, 96)
+      && ['positive', 'negative', 'neutral'].includes(String(value.trend))
+      && isFinanceLineChart(value.chart, 256)
+  ))) return false
   if (!optionalArray(payload.metrics, 16, (value) => (
     isRecord(value) && boundedText(value.label, 64) && boundedText(value.value, 96)
   ))) return false
   if (payload.chart === undefined) return true
   if (!isRecord(payload.chart)) return false
   if (payload.chart.kind === 'line') {
-    if (!Array.isArray(payload.chart.points) || payload.chart.points.length < 2) return false
-    return requiredArray(payload.chart.points, 512, (value) => (
-      isRecord(value)
-        && boundedText(value.x, 64)
-        && finiteNumber(value.y)
-    ))
+    return isFinanceLineChart(payload.chart, 512)
   }
   if (payload.chart.kind === 'candlestick') {
     if (!Array.isArray(payload.chart.candles) || payload.chart.candles.length < 1) return false
@@ -222,6 +235,18 @@ function isFinancePayload(payload: Record<string, unknown>) {
     })
   }
   return false
+}
+
+function isFinanceLineChart(value: unknown, maximum: number) {
+  return isRecord(value)
+    && value.kind === 'line'
+    && Array.isArray(value.points)
+    && value.points.length >= 2
+    && requiredArray(value.points, maximum, (point) => (
+      isRecord(point)
+        && boundedText(point.x, 64)
+        && finiteNumber(point.y)
+    ))
 }
 
 function isWeatherPayload(payload: Record<string, unknown>) {
