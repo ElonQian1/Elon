@@ -39,6 +39,27 @@ let active = {
   richParts: [],
 }
 let baseResetCount = 0
+let domStreaming = false
+let progressNodes = []
+const visibleNode = (text = '') => ({
+  innerText: text,
+  textContent: text,
+  getBoundingClientRect: () => ({ width: 120, height: 24 }),
+})
+const latestTurn = {
+  querySelectorAll: () => progressNodes,
+}
+const main = {
+  querySelectorAll: () => progressNodes.length ? [latestTurn] : [],
+}
+const document = {
+  querySelector: (selector) => {
+    if (selector === 'main') return main
+    if (selector.includes('stop-button') && domStreaming) return visibleNode('停止生成')
+    return null
+  },
+  querySelectorAll: () => progressNodes,
+}
 const baseListeners = new Set()
 const base = {
   version: 9,
@@ -54,9 +75,13 @@ const base = {
   dispose: () => {},
 }
 
-const window = { __elonChatGptPrivateStreamTransport: base }
+const window = {
+  __elonChatGptPrivateStreamTransport: base,
+  getComputedStyle: () => ({ display: 'block', visibility: 'visible' }),
+}
 const context = {
   window,
+  document,
   location: { origin: 'https://chatgpt.com', pathname: '/c/conversation-one' },
   Set,
   Date,
@@ -68,6 +93,7 @@ const recovery = window.__elonWinChatGptPrivateStreamRecovery
 const transport = window.__elonChatGptPrivateStreamTransport
 assert.ok(recovery)
 assert.notEqual(transport, base)
+assert.equal(recovery.baseTransport, base)
 assert.equal(transport.__elonWinRichRecoveryWrapped, true)
 
 let notifications = 0
@@ -95,6 +121,34 @@ assert.equal(merged[0].content.filter((part) => part.type === 'rich_card').lengt
 assert.equal(merged[0].content.some((part) => part.type === 'interactive'), false)
 assert.equal(merged[0].content.at(-1).richContent.payload.chart.points.length, 2)
 assert.equal(transport.current('/c/conversation-one').richParts.length, 1)
+
+active = {
+  id: 'assistant-progress',
+  turnId: 'turn-progress',
+  conversationId: 'conversation-one',
+  text: '',
+  progressLabel: '',
+  state: 'streaming',
+  richParts: [],
+}
+progressNodes = [visibleNode('正在搜索 KOSPI today')]
+assert.equal(
+  transport.current('/c/conversation-one').progressLabel,
+  '正在搜索 KOSPI today',
+  'Win should recover the visible official search status when the private frame omits it',
+)
+
+active = null
+domStreaming = true
+const progressOnly = transport.current('/c/conversation-one')
+assert.equal(
+  progressOnly.progressLabel,
+  '正在搜索 KOSPI today',
+  'visible official progress should bridge a private-stream startup gap',
+)
+assert.equal(progressOnly.richParts.length, 0, 'a new progress-only turn must not inherit an old rich card')
+domStreaming = false
+assert.equal(transport.current('/c/conversation-one'), null)
 
 const privateBase = financePart('Bitcoin (BTC)')
 const privateWins = transport.mergeMessages([{

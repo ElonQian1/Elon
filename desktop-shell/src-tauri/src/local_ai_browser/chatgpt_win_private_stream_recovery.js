@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  var VERSION = 1;
+  var VERSION = 2;
   var MAX_AGE_MS = 5 * 60 * 1000;
   var MAX_RICH_PARTS = 4;
   var MAX_SERIALIZED_BYTES = 512 * 1024;
@@ -10,7 +10,10 @@
 
   var previous = window.__elonWinChatGptPrivateStreamRecovery;
   if (previous && Number(previous.version) >= VERSION && previous.transport === base) return;
-  if (base.__elonWinRichRecoveryWrapped === true) return;
+  if (base.__elonWinRichRecoveryWrapped === true) {
+    if (!previous || !previous.baseTransport) return;
+    base = previous.baseTransport;
+  }
   if (previous && typeof previous.detach === 'function') {
     try { previous.detach(); } catch (_) {}
   }
@@ -84,6 +87,84 @@
   function currentBase(pathname) {
     try { return typeof base.current === 'function' ? base.current(pathname) : null; }
     catch (_) { return null; }
+  }
+
+  function visibleNode(node) {
+    if (!node) return false;
+    try {
+      var rect = node.getBoundingClientRect();
+      var style = window.getComputedStyle(node);
+      return rect.width > 0 && rect.height > 0 &&
+        style.display !== 'none' && style.visibility !== 'hidden';
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function safeProgressLabel(value) {
+    var label = cleanText(value, 220).replace(/^[\s🌐🔍]+/u, '');
+    if (!label) return '';
+    return /^(?:正在(?:搜索|查询|浏览)|searching|browsing|looking up)\b/i.test(label) ||
+      /^(?:正在(?:搜索|查询|浏览))/.test(label)
+      ? label
+      : '';
+  }
+
+  function officialStreamingActive() {
+    try {
+      var direct = document.querySelector(
+        '[data-testid="stop-button"], button[data-testid*="stop" i], ' +
+        'main [data-is-streaming="true"], main [data-streaming="true"], main .result-streaming'
+      );
+      return visibleNode(direct);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function domProgressLabel() {
+    var candidates = [];
+    try {
+      candidates = Array.from(document.querySelectorAll(
+        'main [role="status"], main [aria-live], main [data-testid*="reason" i], ' +
+        'main [data-testid*="search" i]'
+      )).slice(-80);
+      var main = document.querySelector('main');
+      var turns = main ? Array.from(main.querySelectorAll('[data-testid^="conversation-turn-"]')) : [];
+      var latest = turns.length ? turns[turns.length - 1] : null;
+      if (latest) {
+        candidates = candidates.concat(Array.from(latest.querySelectorAll('div, p, span')).slice(-160));
+      }
+    } catch (_) {
+      return '';
+    }
+    for (var index = candidates.length - 1; index >= 0; index -= 1) {
+      var node = candidates[index];
+      if (!visibleNode(node)) continue;
+      var label = safeProgressLabel(node.innerText || node.textContent);
+      if (label) return label;
+    }
+    return '';
+  }
+
+  function currentWithProgress(pathname) {
+    var active = currentBase(pathname);
+    if (active && (active.state !== 'streaming' || cleanText(active.progressLabel, 220))) return active;
+    var label = domProgressLabel();
+    if (!label) return active;
+    if (active) return Object.assign({}, active, { progressLabel: label });
+    if (!officialStreamingActive()) return null;
+    return {
+      id: '',
+      turnId: '',
+      conversationId: activeConversationId(pathname),
+      text: '',
+      progressLabel: label,
+      state: 'streaming',
+      richParts: [],
+      __elonWinProgressOnly: true,
+      updatedAt: Date.now()
+    };
   }
 
   function identityMatches(candidate, reference) {
@@ -204,7 +285,8 @@
     enabled: base.enabled !== false,
     __elonWinRichRecoveryWrapped: true,
     current: function (pathname) {
-      var active = currentBase(pathname);
+      var active = currentWithProgress(pathname);
+      if (active && active.__elonWinProgressOnly === true) return active;
       var recovery = usable(pathname);
       if (!active || !recovery) return active;
       var value = Object.assign({}, active);
@@ -247,6 +329,7 @@
   var recoveryApi = Object.freeze({
     version: VERSION,
     transport: transport,
+    baseTransport: base,
     accept: accept,
     detach: function () {
       if (typeof baseUnsubscribe === 'function') baseUnsubscribe();
