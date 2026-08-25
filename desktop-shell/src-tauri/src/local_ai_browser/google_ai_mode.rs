@@ -8,7 +8,7 @@ use super::{
 const MAX_EVENT_BYTES: usize = 512 * 1024;
 const MAX_MESSAGES: usize = 80;
 const MAX_DRAFT_CHARS: usize = 20_000;
-const ADAPTER_VERSION: u32 = 37;
+pub(super) const ADAPTER_VERSION: u32 = 37;
 
 pub fn initialization_script() -> String {
     super::google_ai_mode_adapter_bootstrap::initialization_script(ADAPTER_VERSION)

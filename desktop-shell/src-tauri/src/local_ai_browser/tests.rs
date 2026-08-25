@@ -53,7 +53,21 @@ fn google_ai_mode_is_registered_with_semantic_adapter() {
     assert_eq!(summary.login_mode, "guest_web_system_login");
     assert_eq!(summary.renderer_status, "active");
     assert_eq!(GOOGLE_AI_MODE.adapter, Some(ProviderAdapter::GoogleWeb));
+    assert_eq!(summary.adapter_version, google_ai_mode::ADAPTER_VERSION);
     assert!(summary.adapter_actions.contains(&"send_prompt"));
+}
+
+#[test]
+fn provider_summaries_expose_exact_native_adapter_versions() {
+    let chatgpt = provider_summary(&CHATGPT);
+    let google = provider_summary(&GOOGLE_AI_MODE);
+    assert_eq!(
+        chatgpt.adapter_version,
+        chatgpt_adapter_bootstrap::ADAPTER_VERSION
+    );
+    assert_eq!(google.adapter_version, google_ai_mode::ADAPTER_VERSION);
+    assert!(chatgpt.adapter_version > 0);
+    assert!(google.adapter_version > 0);
 }
 
 #[test]

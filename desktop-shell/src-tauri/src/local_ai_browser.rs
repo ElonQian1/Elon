@@ -143,6 +143,7 @@ pub struct LocalAiWebProvider {
     renderer_status: &'static str,
     research_capture_status: &'static str,
     research_capture_retention_days: u16,
+    adapter_version: u32,
     adapter_actions: &'static [&'static str],
 }
 
@@ -602,6 +603,7 @@ fn provider_summary(provider: &ProviderDefinition) -> LocalAiWebProvider {
         renderer_status: provider.renderer_status,
         research_capture_status: "local_raw_prelaunch",
         research_capture_retention_days: 30,
+        adapter_version: provider.adapter.map_or(0, ProviderAdapter::version),
         adapter_actions: provider.adapter.map_or(
             &[] as &'static [&'static str],
             ProviderAdapter::supported_actions,

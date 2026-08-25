@@ -11,6 +11,13 @@ pub(super) enum ProviderAdapter {
 }
 
 impl ProviderAdapter {
+    pub(super) const fn version(self) -> u32 {
+        match self {
+            Self::ChatGpt => chatgpt_adapter_bootstrap::ADAPTER_VERSION,
+            Self::GoogleWeb => google_ai_mode::ADAPTER_VERSION,
+        }
+    }
+
     pub(super) fn initialization_script(self) -> String {
         match self {
             Self::ChatGpt => chatgpt_adapter_bootstrap::initialization_script(),
@@ -59,6 +66,8 @@ mod tests {
         assert!(chatgpt.supported_actions().contains(&"list_conversations"));
         assert!(google.supported_actions().contains(&"list_conversations"));
         assert!(google.supported_actions().contains(&"open_conversation"));
+        assert_eq!(chatgpt.version(), chatgpt_adapter_bootstrap::ADAPTER_VERSION);
+        assert_eq!(google.version(), google_ai_mode::ADAPTER_VERSION);
         assert!(chatgpt
             .page_invocation_script(r#"{"action":"snapshot"}"#)
             .unwrap()

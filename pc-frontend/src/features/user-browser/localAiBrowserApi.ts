@@ -2,6 +2,7 @@ import { getDesktopInvoke } from '../shell/desktopShell'
 import { localAiSnapshotCache } from './localAiSnapshotCache'
 import { UNIFIED_AI_PROTOCOL } from './unifiedAiProtocol'
 import { createLocalAiRequestId, isLocalAiRequestId } from './localAiCommandReceipt'
+import { requiredLocalAiAdapterVersion } from './localAiAdapterCompatibility'
 import {
   LOCAL_AI_RESULT_POLL_INTERVAL_MS,
   localAiAdapterResultAttempts,
@@ -34,6 +35,7 @@ export interface LocalAiWebProvider {
   rendererStatus: 'reserved' | 'active'
   researchCaptureStatus: 'local_raw_prelaunch'
   researchCaptureRetentionDays: number
+  adapterVersion: number
   adapterActions: LocalAiAdapterAction[]
 }
 
@@ -594,6 +596,15 @@ function normalizeProvider(provider: LocalAiWebProvider): void {
     || !Number.isInteger(provider.researchCaptureRetentionDays)
     || provider.researchCaptureRetentionDays < 1) {
     throw new Error('桌面壳返回了不受支持的 AI 网页厂商协议。')
+  }
+  const requiredAdapterVersion = requiredLocalAiAdapterVersion(provider.id)
+  if (!Number.isInteger(provider.adapterVersion)
+      || provider.adapterVersion < requiredAdapterVersion) {
+    const current = Number.isInteger(provider.adapterVersion) ? provider.adapterVersion : 0
+    throw new LocalAiBrowserError(
+      'upgrade_required',
+      `当前 Win 客户端的 ${provider.displayName} 适配器版本 ${current || '未知'}，新版界面至少需要 ${requiredAdapterVersion}。请更新并完全退出旧客户端后重新打开。`,
+    )
   }
   const rawActions = Array.isArray(provider.adapterActions) ? provider.adapterActions : []
   const actions = rawActions.filter((action): action is LocalAiAdapterAction => (
