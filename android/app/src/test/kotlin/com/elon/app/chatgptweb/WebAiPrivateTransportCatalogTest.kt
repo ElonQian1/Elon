@@ -18,6 +18,7 @@ class WebAiPrivateTransportCatalogTest {
         assertTrue("android_chatgpt_private_conversation_prefetch_v1" in enabledIds)
         assertTrue("android_chatgpt_private_send_dispatch_observer_v1" in enabledIds)
         assertTrue("android_chatgpt_private_stream_observer_v1" in enabledIds)
+        assertTrue("android_chatgpt_realtime_voice_private_transcript_refresh_v1" in enabledIds)
         assertTrue("android_google_web_private_conversation_directory_v1" in enabledIds)
         assertTrue("android_google_web_private_reply_observer_v1" in enabledIds)
         assertTrue("android_web_ai_background_navigation_continuity_v1" in enabledIds)
@@ -27,6 +28,20 @@ class WebAiPrivateTransportCatalogTest {
             assertTrue(row.getBoolean("official_page_authoritative"))
             assertTrue(row.getString("fallback").isNotBlank())
         }
+
+        val voiceRefresh = values.first {
+            it.getString("capability_id") ==
+                "android_chatgpt_realtime_voice_private_transcript_refresh_v1"
+        }
+        assertEquals("completed", voiceRefresh.getString("implementation_status"))
+        assertEquals(
+            "targeted_tests_passed_device_pending",
+            voiceRefresh.getString("verification_status"),
+        )
+        assertEquals(
+            "retained_native_transcript_and_official_dom_snapshot",
+            voiceRefresh.getString("fallback"),
+        )
     }
 
     @Test

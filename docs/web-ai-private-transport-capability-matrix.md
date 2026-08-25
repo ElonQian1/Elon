@@ -12,6 +12,7 @@ installed build; individual capability documents retain implementation evidence.
 | Conversation body prefetch | ChatGPT | Completed and enabled | Official WebView navigation |
 | Send dispatch acknowledgement | ChatGPT | Completed and enabled | Official DOM confirmation |
 | Streaming reply observer | ChatGPT | Completed and enabled | Official DOM snapshot |
+| Realtime voice transcript refresh | ChatGPT | Completed and enabled; supervised voice exit pending | Retained native transcript and official DOM snapshot |
 | Conversation directory | Google Web AI | Completed and enabled | Local cache and official page |
 | Reply completion observer | Google Web AI | Completed and enabled | Official DOM snapshot |
 | Background navigation continuity | ChatGPT and Google Web AI | Completed, enabled, and device verified | Bounded official WebView recovery |
@@ -25,6 +26,12 @@ Background provider switching keeps one already-started official navigation aliv
 On resume, the APK first reattaches the versioned page adapter and cached snapshot;
 only a failed or stalled document consumes the bounded full-page reload budget. It
 does not add a new request path or keep an idle polling loop alive.
+
+Normal and interrupted realtime-voice exits now reuse the verified conversation-body
+transport for a non-navigating refresh of the current `/c/{id}` only. Requests are
+single-flight and inherit the existing timeout, cooldown, and circuit breaker. The
+native transcript stays visible while the private snapshot and official DOM snapshot
+race; failure emits no unsupported-capability error and the DOM path continues.
 
 ## Audited non-capabilities
 
