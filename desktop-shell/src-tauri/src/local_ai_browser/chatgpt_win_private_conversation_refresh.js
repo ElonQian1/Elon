@@ -38,10 +38,13 @@
   function normalizeSnapshot(event, requestedPath) {
     if (!event || event.type !== 'message_snapshot') return event;
     const path = safeConversationPath(requestedPath);
+    const richCache = window.__elonWinChatGptConversationRichCache;
     const messages = Array.isArray(event.messages) ? event.messages.map((message) => ({
       ...message,
       content: normalizedContent(message),
-    })).filter((message) => message.content.length > 0) : [];
+    })).map((message) => richCache && typeof richCache.enrichMessage === 'function'
+      ? richCache.enrichMessage(message, path)
+      : message).filter((message) => message.content.length > 0) : [];
     return {
       ...event,
       url: path ? location.origin + path : event.url,

@@ -24,7 +24,21 @@ const delegate = Object.freeze({
     return true
   },
 })
-const window = { __elonChatGptPrivateTransport: delegate }
+const window = {
+  __elonChatGptPrivateTransport: delegate,
+  __elonWinChatGptConversationRichCache: {
+    enrichMessage(message) {
+      return {
+        ...message,
+        content: message.content.concat([{
+          type: 'rich_card',
+          text: 'Bitcoin (BTC)',
+          kind: 'finance',
+        }]),
+      }
+    },
+  },
+}
 const location = {
   origin: 'https://chatgpt.com',
   pathname: '/g/g-p-roadmap/c/conversation-one',
@@ -44,6 +58,7 @@ assert.equal(emitted.url, 'https://chatgpt.com/g/g-p-roadmap/c/conversation-one'
 assert.equal(emitted.accessSource, 'private_response')
 assert.equal(JSON.stringify(emitted.messages[0].content), JSON.stringify([
   { type: 'markdown', text: '完整历史正文' },
+  { type: 'rich_card', text: 'Bitcoin (BTC)', kind: 'finance' },
 ]))
 assert.equal(emitted.observedMessageCount, 1)
 

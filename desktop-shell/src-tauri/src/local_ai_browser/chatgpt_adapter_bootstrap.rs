@@ -9,6 +9,8 @@ const WIN_RESPONSE_RESEARCH_CAPTURE: &str = include_str!("win_web_response_resea
 const WIN_PRIVATE_STREAM_RECOVERY: &str = include_str!("chatgpt_win_private_stream_recovery.js");
 const WIN_PRIVATE_CONVERSATION_REFRESH: &str =
     include_str!("chatgpt_win_private_conversation_refresh.js");
+const WIN_PRIVATE_CONVERSATION_RICH_CACHE: &str =
+    include_str!("chatgpt_win_private_conversation_rich_cache.js");
 const PRIVATE_SOCKET_TAP: &str =
     include_str!("../../../../android/app/src/main/assets/chatgpt_web_private_socket_tap.js");
 const PRIVATE_CONVERSATION_DIRECTORY: &str = include_str!(
@@ -202,8 +204,8 @@ pub(super) fn initialization_script() -> String {
                 )
             } else if *name == "chatgpt_web_private_transport.js" {
                 format!(
-                    "{}\nwindow.__elonChatGptBootstrapStage = 'chatgpt_win_private_conversation_refresh.js';\n{}",
-                    shared, WIN_PRIVATE_CONVERSATION_REFRESH
+                    "window.__elonChatGptBootstrapStage = 'chatgpt_win_private_conversation_rich_cache.js';\n{}\n{}\nwindow.__elonChatGptBootstrapStage = 'chatgpt_win_private_conversation_refresh.js';\n{}",
+                    WIN_PRIVATE_CONVERSATION_RICH_CACHE, shared, WIN_PRIVATE_CONVERSATION_REFRESH
                 )
             } else if *name == "chatgpt_web_private_stream_transport.js" {
                 format!(
