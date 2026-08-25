@@ -32,6 +32,7 @@ compiled.paths = module.paths
 compiled._compile(output, filename)
 
 const {
+  chatGptNewConversationRecoveryAction,
   googleNewConversationNeedsReload,
   localAiNewConversationContextReady,
   localAiNewConversationNativeReady,
@@ -134,6 +135,27 @@ assert.equal(localAiNewConversationNativeReady(
   1_000,
   'old-conversation',
 ), false)
+assert.equal(chatGptNewConversationRecoveryAction(
+  { ...bindingSession, currentUrl: 'https://chatgpt.com/c/old-conversation' },
+  { messages: [], composerReady: false, authenticated: false, loginRequired: false },
+  1_000,
+  'old-conversation',
+  5_000,
+), 'home')
+assert.equal(chatGptNewConversationRecoveryAction(
+  { ...bindingSession, currentUrl: 'https://chatgpt.com/' },
+  { messages: [], composerReady: false, authenticated: false, loginRequired: false },
+  1_000,
+  'old-conversation',
+  5_000,
+), 'reload')
+assert.equal(chatGptNewConversationRecoveryAction(
+  { ...bindingSession, currentUrl: 'https://chatgpt.com/' },
+  { messages: [], composerReady: true, authenticated: false, loginRequired: false },
+  1_000,
+  'old-conversation',
+  2_800,
+), null)
 assert.equal(localAiNewConversationNativeReady(
   bindingSession,
   { messages: [], composerReady: true, authenticated: false, loginRequired: false },
@@ -164,6 +186,10 @@ assert.match(controllerSource, /GOOGLE_NEW_CONVERSATION_RELOAD_DELAY_MS/)
 assert.match(controllerSource, /providerId !== 'google-ai-mode'/)
 assert.match(controllerSource, /googleNewConversationNeedsReload\(current, currentSnapshot\)/)
 assert.match(controllerSource, /controlLocalAiWebSession\(providerId, ownerKey, 'reload'\)/)
+assert.match(controllerSource, /CHATGPT_NEW_CONVERSATION_RECOVERY_DELAY_MS/)
+assert.match(controllerSource, /providerId !== 'chatgpt'/)
+assert.match(controllerSource, /chatGptNewConversationRecoveryAction\(/)
+assert.match(controllerSource, /controlLocalAiWebSession\(providerId, ownerKey, recoveryAction\)/)
 assert.match(controllerSource, /if \(action === 'new_conversation'\) \{\s*return startNewConversation\(\)/)
 assert.match(controllerSource, /function beginLocalNewConversation\(\)/)
 assert.match(controllerSource, /setNewConversationRecoveryStartedAtMs\(Date\.now\(\)\)/)

@@ -1,6 +1,7 @@
 import type { LocalAiMessageSnapshot, LocalAiWebSessionState } from './localAiBrowserApi'
 
 export type LocalAiNewConversationPath = 'adapter' | 'home'
+export type ChatGptNewConversationRecoveryAction = 'home' | 'reload' | null
 
 const NEW_CONVERSATION_NATIVE_SETTLE_MS = 750
 
@@ -37,6 +38,48 @@ export function googleNewConversationNeedsReload(
     || session.semanticCacheStatus !== 'live'
     || session.contextReady !== true
     || snapshot?.composerReady !== true
+}
+
+export function chatGptNewConversationRecoveryAction(
+  session: Pick<
+    LocalAiWebSessionState,
+    | 'currentUrl'
+    | 'windowStatus'
+    | 'loading'
+    | 'rendererStatus'
+    | 'semanticCacheStatus'
+    | 'contextReady'
+    | 'activeConversationId'
+    | 'cacheUpdatedAtMs'
+    | 'semanticUpdatedAtMs'
+    | 'updatedAtMs'
+  > | null,
+  snapshot: Pick<
+    LocalAiMessageSnapshot,
+    'messages' | 'composerReady' | 'authenticated' | 'loginRequired'
+  > | null,
+  startedAtMs: number,
+  baselineConversationId: string,
+  observedAtMs: number = Date.now(),
+): ChatGptNewConversationRecoveryAction {
+  if (localAiNewConversationNativeReady(
+    session,
+    snapshot,
+    startedAtMs,
+    baselineConversationId,
+    observedAtMs,
+  )) return null
+
+  try {
+    const current = new URL(session?.currentUrl || 'https://chatgpt.com/')
+    return current.protocol === 'https:'
+      && current.hostname === 'chatgpt.com'
+      && current.pathname === '/'
+      ? 'reload'
+      : 'home'
+  } catch {
+    return 'home'
+  }
 }
 
 export function localAiNewConversationContextReady(

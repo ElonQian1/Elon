@@ -22,4 +22,7 @@ export const BACKGROUND_RECONNECT_MAX_ATTEMPTS = 3
 
 // 新建会话后等待官网给出可信实时快照的上限；超过就不再无限期把输入框清空。
 export const GOOGLE_NEW_CONVERSATION_RELOAD_DELAY_MS = 2_000
+// 与 APK ChatGptNewConversationRecoveryCoordinator 保持同一恢复窗口：
+// 官网命令三秒后仍未形成可信空白会话时，主动离开旧会话或重载首页。
+export const CHATGPT_NEW_CONVERSATION_RECOVERY_DELAY_MS = 3_000
 export const NEW_CONVERSATION_RECOVERY_TIMEOUT_MS = 24_000

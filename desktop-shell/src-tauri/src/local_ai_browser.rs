@@ -428,11 +428,10 @@ pub async fn control_local_ai_web_session(
             runtime.mark_window_status(&label, "ready");
             runtime.mark_window_visible(&label, true);
         }
-        "reload" => page.reload().map_err(display_error)?,
+        "reload" => embedded_view::reload_after_stop(&page)?,
         "back" => page.eval("history.back();").map_err(display_error)?,
         "home" => {
-            page.navigate(parse_start_url(provider)?)
-                .map_err(display_error)?;
+            embedded_view::navigate_after_stop(&page, parse_start_url(provider)?)?;
         }
         _ => return Err("不支持的本地 AI 浏览器控制动作。".to_string()),
     }

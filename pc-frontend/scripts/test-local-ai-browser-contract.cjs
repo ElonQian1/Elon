@@ -114,6 +114,14 @@ assert.match(stateRust, /cached_restorable_url/)
 assert.doesNotMatch(rust, /LocalAiNative|native_window|local-ai-native|open_local_ai_native/)
 assert.match(rust, /pub async fn get_local_ai_web_session_state/)
 assert.match(rust, /pub async fn control_local_ai_web_session/)
+assert.match(
+  `${rust}\n${embeddedViewRust}`,
+  /"reload"\s*=>\s*embedded_view::reload_after_stop\(&page\)[\s\S]*?fn reload_after_stop[\s\S]*?webview\.eval\("window\.stop\(\);"\)[\s\S]*?webview\.reload\(\)/,
+)
+assert.match(
+  `${rust}\n${embeddedViewRust}`,
+  /"home"\s*=>\s*\{[\s\S]*?embedded_view::navigate_after_stop\(&page, parse_start_url\(provider\)\?\)[\s\S]*?fn navigate_after_stop[\s\S]*?webview\.eval\("window\.stop\(\);"\)[\s\S]*?webview\.navigate\(url\)/,
+)
 assert.match(rust, /pub async fn run_local_ai_web_adapter_command/)
 assert.match(rust, /pub async fn open_local_ai_cached_conversation/)
 assert.doesNotMatch(rust, /\.is_minimized\(\)|window\.url\(\)/)

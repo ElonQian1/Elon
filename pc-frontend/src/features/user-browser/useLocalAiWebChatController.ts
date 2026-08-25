@@ -39,6 +39,7 @@ import {
   requestLocalAiNewConversationNativeForeground,
 } from './localAiNewConversationForeground'
 import {
+  chatGptNewConversationRecoveryAction,
   googleNewConversationNeedsReload,
   localAiNewConversationNativeReady,
   selectLocalAiNewConversationPath,
@@ -46,6 +47,7 @@ import {
 import { localAiComposerAvailability } from './localAiComposerAvailability'
 import {
   BACKGROUND_RECONNECT_MAX_ATTEMPTS,
+  CHATGPT_NEW_CONVERSATION_RECOVERY_DELAY_MS,
   GOOGLE_NEW_CONVERSATION_RELOAD_DELAY_MS,
   NEW_CONVERSATION_RECOVERY_TIMEOUT_MS,
   type QueuedLocalAiSend,
@@ -244,6 +246,40 @@ export default function useLocalAiWebChatController(
           // 最终恢复超时仍会释放输入框，不让官网偶发加载失败永久阻塞原生 UI。
         })
     }, GOOGLE_NEW_CONVERSATION_RELOAD_DELAY_MS)
+    return () => {
+      active = false
+      window.clearTimeout(timer)
+    }
+  }, [newConversationRecoveryStartedAtMs, ownerKey, providerId])
+
+  useEffect(() => {
+    if (!newConversationRecoveryStartedAtMs || providerId !== 'chatgpt' || !ownerKey) return
+    let active = true
+    const baselineConversationId = newConversationBaselineId.current
+    const timer = window.setTimeout(() => {
+      void getLocalAiWebSessionState(providerId, ownerKey)
+        .then(async (current) => {
+          const currentSnapshot = isLocalAiMessageSnapshot(current.semanticEvent)
+            ? current.semanticEvent
+            : null
+          const recoveryAction = chatGptNewConversationRecoveryAction(
+            current,
+            currentSnapshot,
+            newConversationRecoveryStartedAtMs,
+            baselineConversationId,
+          )
+          if (!active || !recoveryAction) return
+          const next = await controlLocalAiWebSession(providerId, ownerKey, recoveryAction)
+          if (!active) return
+          setSessionState(next)
+          setMessage(recoveryAction === 'reload'
+            ? 'ChatGPT 新会话首页未完成初始化，已在后台自动重载。'
+            : 'ChatGPT 仍停留在上一会话，已在后台自动切回新会话首页。')
+        })
+        .catch(() => {
+          // 24 秒总超时仍会安全恢复草稿；这里不把瞬时 WebView2 错误升级为阻断。
+        })
+    }, CHATGPT_NEW_CONVERSATION_RECOVERY_DELAY_MS)
     return () => {
       active = false
       window.clearTimeout(timer)

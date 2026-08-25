@@ -1,5 +1,7 @@
 use serde::Deserialize;
-use tauri::{AppHandle, LogicalPosition, LogicalSize, Manager, PhysicalPosition, State, Webview};
+use tauri::{
+    AppHandle, LogicalPosition, LogicalSize, Manager, PhysicalPosition, State, Url, Webview,
+};
 
 use crate::{internal_browser::raise_webview, MAIN_WINDOW_LABEL};
 
@@ -93,6 +95,18 @@ pub(crate) fn park(webview: &Webview) -> Result<(), String> {
         .set_position(PhysicalPosition::new(parked_x, parked_y))
         .map_err(display_error)?;
     webview.show().map_err(display_error)
+}
+
+pub(crate) fn reload_after_stop(webview: &Webview) -> Result<(), String> {
+    // 与 APK WebView 的新会话恢复一致：先终止可能仍占用旧会话的导航，
+    // 再重载首页。忽略 stop 的瞬时错误，真正的 reload 结果仍严格返回。
+    let _ = webview.eval("window.stop();");
+    webview.reload().map_err(display_error)
+}
+
+pub(crate) fn navigate_after_stop(webview: &Webview, url: Url) -> Result<(), String> {
+    let _ = webview.eval("window.stop();");
+    webview.navigate(url).map_err(display_error)
 }
 
 // 嵌入区域的最大允许尺寸是 16_384；使用更远的固定坐标，窗口最大化、DPI
