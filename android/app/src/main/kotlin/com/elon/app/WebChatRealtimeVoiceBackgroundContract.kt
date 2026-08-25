@@ -53,7 +53,8 @@ internal object WebChatRealtimeVoiceBackgroundStatusPolicy {
             WebChatRealtimeVoiceLifecycle.CONNECTING,
             WebChatRealtimeVoiceLifecycle.ENDING -> WebChatRealtimeVoiceBackgroundStatus.CONNECTING
             WebChatRealtimeVoiceLifecycle.FAILED -> WebChatRealtimeVoiceBackgroundStatus.ERROR
-            WebChatRealtimeVoiceLifecycle.ACTIVE -> if (state.paused) {
+            WebChatRealtimeVoiceLifecycle.ACTIVE,
+            WebChatRealtimeVoiceLifecycle.HANGUP_UNCONFIRMED -> if (state.paused) {
                 WebChatRealtimeVoiceBackgroundStatus.PAUSED
             } else when (state.turn) {
                 WebChatRealtimeVoiceTurn.LISTENING -> WebChatRealtimeVoiceBackgroundStatus.LISTENING

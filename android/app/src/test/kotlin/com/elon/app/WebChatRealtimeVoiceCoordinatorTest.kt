@@ -332,7 +332,11 @@ class WebChatRealtimeVoiceCoordinatorTest {
         fixture.scheduler.runAll()
 
         assertTrue(fixture.surface.visible)
-        assertEquals(WebChatRealtimeVoiceLifecycle.FAILED, fixture.surface.state?.lifecycle)
+        assertEquals(
+            WebChatRealtimeVoiceLifecycle.HANGUP_UNCONFIRMED,
+            fixture.surface.state?.lifecycle,
+        )
+        assertEquals(2, fixture.port.invokedControlCount)
         assertEquals(emptyList<Boolean>(), fixture.endBackingGraceful)
         assertFalse(fixture.scheduler.hasPendingTasks())
     }

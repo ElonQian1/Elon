@@ -4,6 +4,7 @@ internal enum class WebChatRealtimeVoiceLifecycle {
     CONNECTING,
     ACTIVE,
     ENDING,
+    HANGUP_UNCONFIRMED,
     FAILED,
 }
 
@@ -31,6 +32,7 @@ internal enum class WebChatRealtimeVoiceVisibleState(val label: String) {
     SPEAKING("回答中"),
     PAUSED("已暂停"),
     ENDING("结束中"),
+    HANGUP_UNCONFIRMED("仍在通话"),
     FAILED("连接异常"),
 }
 
@@ -39,6 +41,8 @@ internal object WebChatRealtimeVoiceStatePolicy {
         when (state.lifecycle) {
             WebChatRealtimeVoiceLifecycle.CONNECTING -> WebChatRealtimeVoiceVisibleState.CONNECTING
             WebChatRealtimeVoiceLifecycle.ENDING -> WebChatRealtimeVoiceVisibleState.ENDING
+            WebChatRealtimeVoiceLifecycle.HANGUP_UNCONFIRMED ->
+                WebChatRealtimeVoiceVisibleState.HANGUP_UNCONFIRMED
             WebChatRealtimeVoiceLifecycle.FAILED -> WebChatRealtimeVoiceVisibleState.FAILED
             WebChatRealtimeVoiceLifecycle.ACTIVE -> if (state.paused) {
                 WebChatRealtimeVoiceVisibleState.PAUSED

@@ -183,6 +183,7 @@ internal class WebChatRealtimeVoiceOverlay(
             WebChatRealtimeVoiceVisibleState.SPEAKING -> color(R.color.elon_status_success)
             WebChatRealtimeVoiceVisibleState.PAUSED -> color(R.color.elon_text_secondary)
             WebChatRealtimeVoiceVisibleState.ENDING -> color(R.color.elon_status_info)
+            WebChatRealtimeVoiceVisibleState.HANGUP_UNCONFIRMED -> color(R.color.elon_status_info)
             WebChatRealtimeVoiceVisibleState.FAILED -> color(R.color.elon_status_danger)
         }
         applyVoiceIconStyle(collapsedOrb, collapsedIcon, stageColor, strokeWidth = 2)
@@ -190,12 +191,19 @@ internal class WebChatRealtimeVoiceOverlay(
         collapsedStatus.background = oval(stageColor, color(R.color.elon_surface_float), 2)
         close.isEnabled = visibleState != WebChatRealtimeVoiceVisibleState.ENDING
         close.alpha = if (close.isEnabled) 1f else 0.4f
-        failureActions.visibility = if (visibleState == WebChatRealtimeVoiceVisibleState.FAILED) {
+        val actionRequired = visibleState == WebChatRealtimeVoiceVisibleState.FAILED ||
+            visibleState == WebChatRealtimeVoiceVisibleState.HANGUP_UNCONFIRMED
+        retry.text = if (visibleState == WebChatRealtimeVoiceVisibleState.HANGUP_UNCONFIRMED) {
+            "再次挂断"
+        } else {
+            "重试"
+        }
+        failureActions.visibility = if (actionRequired) {
             View.VISIBLE
         } else {
             View.GONE
         }
-        if (visibleState == WebChatRealtimeVoiceVisibleState.FAILED) setExpanded(true)
+        if (actionRequired) setExpanded(true)
         panel.contentDescription = buildString {
             append(WebChatProductionSelectors.REALTIME_VOICE_SURFACE)
             append('：')

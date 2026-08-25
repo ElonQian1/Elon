@@ -34,6 +34,7 @@ internal class WebChatRealtimeVoiceCoordinator(
     private var commandRequestId: String? = null
     private var closePending = false
     private var closeFailed = false
+    private var automaticCloseRetries = 0
     private var interactiveActivation = false
     private var pendingLoginProvider: WebChatProviderIdentity? = null
     private var waitingForLoginReturn = false
@@ -48,7 +49,7 @@ internal class WebChatRealtimeVoiceCoordinator(
         schedule = schedule,
         onCompleted = { paused, detail ->
             backgroundBridge.setPaused(paused, detail)
-            lastState?.takeIf { it.lifecycle == WebChatRealtimeVoiceLifecycle.ACTIVE }?.let {
+            lastState?.takeIf { it.lifecycle.isVoiceOngoing() }?.let {
                 render(it.lifecycle, detail, it.turn, paused)
             }
         },
@@ -81,6 +82,7 @@ internal class WebChatRealtimeVoiceCoordinator(
         preparedGeneration = null
         commandRequestId = null
         closeFailed = false
+        automaticCloseRetries = 0
         interactiveActivation = false
         pauseController.reset()
         backgroundBridge.stop()
@@ -117,6 +119,7 @@ internal class WebChatRealtimeVoiceCoordinator(
     private fun beginClose() {
         closePending = true
         closeFailed = false
+        automaticCloseRetries = 0
         pauseController.reset()
         finishInteractiveActivation()
         closeSettlement.begin()
@@ -153,19 +156,34 @@ internal class WebChatRealtimeVoiceCoordinator(
                 port?.state()?.let { state -> provider?.let { launchCache.observe(it.id, state) } }
                 finishClose(gracefulExit = true)
             }
-            WebChatRealtimeVoiceCloseDecision.CompleteInterrupted -> failClose()
+            WebChatRealtimeVoiceCloseDecision.CompleteInterrupted -> retryCloseOrReportStillActive()
         }
     }
 
+    private fun retryCloseOrReportStillActive() {
+        if (automaticCloseRetries < MAX_AUTOMATIC_CLOSE_RETRIES) {
+            automaticCloseRetries += 1
+            closeSettlement.begin()
+            consumerPort()?.requestControls()
+            render(
+                WebChatRealtimeVoiceLifecycle.ENDING,
+                "挂断暂未生效，正在再次尝试",
+            )
+            advanceCloseSettlement(generation)
+            return
+        }
+        failClose()
+    }
+
     private fun failClose() {
-        log("voice_close_unconfirmed")
+        log("voice_close_unconfirmed retries=$automaticCloseRetries")
         closePending = false
         closeFailed = true
         closeSettlement.reset()
         consumerPort()?.requestControls()
         render(
-            WebChatRealtimeVoiceLifecycle.FAILED,
-            "未能确认语音已经挂断。请重试，或打开官网语音确认关闭",
+            WebChatRealtimeVoiceLifecycle.HANGUP_UNCONFIRMED,
+            "挂断尚未生效，语音仍在进行。可再次挂断，或打开官网语音确认关闭",
         )
     }
 
@@ -174,6 +192,7 @@ internal class WebChatRealtimeVoiceCoordinator(
         generation += 1
         closePending = false
         closeFailed = false
+        automaticCloseRetries = 0
         finishInteractiveActivation()
         provider = null
         prepareRequestId = null
@@ -224,13 +243,13 @@ internal class WebChatRealtimeVoiceCoordinator(
     }
 
     override fun pauseFromBackground(source: WebChatRealtimeVoiceBackgroundControlSource) {
-        if (lastState?.lifecycle == WebChatRealtimeVoiceLifecycle.ACTIVE) {
+        if (lastState?.lifecycle.isVoiceOngoing()) {
             pauseController.request(paused = true, source = source)
         }
     }
 
     override fun resumeFromBackground(source: WebChatRealtimeVoiceBackgroundControlSource) {
-        if (lastState?.lifecycle == WebChatRealtimeVoiceLifecycle.ACTIVE) {
+        if (lastState?.lifecycle.isVoiceOngoing()) {
             pauseController.request(paused = false, source = source)
         }
     }
@@ -247,6 +266,7 @@ internal class WebChatRealtimeVoiceCoordinator(
         startedAtElapsedMs = monotonicTimeMs()
         closePending = false
         closeFailed = false
+        automaticCloseRetries = 0
         prepareRequestId = null
         preparedGeneration = null
         commandRequestId = null
@@ -632,6 +652,7 @@ internal class WebChatRealtimeVoiceCoordinator(
         const val AUDIO_ACTIVATION_POLL_DELAY_MS = 250L
         const val MAX_BACKGROUND_ACTIVATION_POLLS = 12
         const val MAX_INTERACTIVE_ACTIVATION_POLLS = 60
+        const val MAX_AUTOMATIC_CLOSE_RETRIES = 1
         const val CONTROL_SETTLE_MS = 400L
         const val CLOSE_POLL_DELAY_MS = 250L
         const val AUTHENTICATION_POLL_DELAY_MS = 400L
@@ -649,6 +670,10 @@ internal class WebChatRealtimeVoiceCoordinator(
         fun monotonicTimeMs(): Long = System.nanoTime() / 1_000_000L
     }
 }
+
+private fun WebChatRealtimeVoiceLifecycle?.isVoiceOngoing(): Boolean =
+    this == WebChatRealtimeVoiceLifecycle.ACTIVE ||
+        this == WebChatRealtimeVoiceLifecycle.HANGUP_UNCONFIRMED
 
 internal interface WebChatRealtimeVoiceBackControl {
     fun setEnabled(enabled: Boolean)

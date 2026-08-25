@@ -26,6 +26,23 @@ class WebChatRealtimeVoiceBackgroundContractTest {
     }
 
     @Test
+    fun unconfirmedHangupRemainsAnOngoingVoiceSession() {
+        val state = WebChatRealtimeVoiceState(
+            lifecycle = WebChatRealtimeVoiceLifecycle.HANGUP_UNCONFIRMED,
+            detail = "still connected",
+        )
+
+        assertEquals(
+            WebChatRealtimeVoiceVisibleState.HANGUP_UNCONFIRMED,
+            WebChatRealtimeVoiceStatePolicy.visibleState(state),
+        )
+        assertEquals(
+            WebChatRealtimeVoiceBackgroundStatus.LISTENING,
+            WebChatRealtimeVoiceBackgroundStatusPolicy.from(state),
+        )
+    }
+
+    @Test
     fun manifestAndServiceKeepBackgroundMicrophoneExplicitAndUserControlled() {
         val manifest = readRepositoryFile("android/app/src/main/AndroidManifest.xml")
         val service = readRepositoryFile(
