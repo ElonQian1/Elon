@@ -281,22 +281,30 @@ fn node_image_material_identity(
         } => component_identity_digest.as_str(),
         WindowsLoaderModuleNode::KnownDllSection {
             section_identity_digest,
-        } => resolution
-            .known_dll_authority
-            .sections
-            .iter()
-            .find(|entry| entry.section_identity_digest == *section_identity_digest)?
-            .component_identity_digest
-            .as_str(),
+        } => {
+            let Some(entry) = resolution
+                .known_dll_authority
+                .sections
+                .iter()
+                .find(|entry| entry.section_identity_digest == *section_identity_digest)
+            else {
+                return Ok(None);
+            };
+            entry.component_identity_digest.as_str()
+        }
         WindowsLoaderModuleNode::SideBySideAssembly {
             assembly_identity_digest,
-        } => resolution
-            .side_by_side_authority
-            .assembly_bindings
-            .iter()
-            .find(|entry| entry.assembly_identity_digest == *assembly_identity_digest)?
-            .component_identity_digest
-            .as_str(),
+        } => {
+            let Some(entry) = resolution
+                .side_by_side_authority
+                .assembly_bindings
+                .iter()
+                .find(|entry| entry.assembly_identity_digest == *assembly_identity_digest)
+            else {
+                return Ok(None);
+            };
+            entry.component_identity_digest.as_str()
+        }
     };
     Ok(resolution
         .system_module_images

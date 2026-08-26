@@ -24,7 +24,7 @@ type RawStateExpected = (
 
 type AbandonExpected = (
     RawAbandonOutcome,
-    &'static [(RawStateCase, RawAbandonCauseDisposition)],
+    Vec<(RawStateCase, RawAbandonCauseDisposition)>,
     MapSourceStepId,
     SourceEffect,
     RawSlotRetention,
@@ -171,14 +171,14 @@ fn validate_abandon_partition() -> Result<(), &'static str> {
     let expected = [
         abandon_expected(
             RawAbandonOutcome::Empty,
-            &[prefix_cause(RawStateCase::Uninstalled)],
+            vec![prefix_cause(RawStateCase::Uninstalled)],
             MapSourceStepId::RawAbandonEmpty,
             SourceEffect::None,
             NO_RAW_VALUES,
         ),
         abandon_expected(
             RawAbandonOutcome::InstalledDropCompleted,
-            &[
+            vec![
                 prefix_cause(RawStateCase::TypeMismatchInstalled),
                 beyond_frontier_cause(RawStateCase::CaughtUnwindFromTypedOperation),
             ],
@@ -188,7 +188,7 @@ fn validate_abandon_partition() -> Result<(), &'static str> {
         ),
         abandon_expected(
             RawAbandonOutcome::InstalledDropUnwindCaught,
-            &[
+            vec![
                 prefix_cause(RawStateCase::TypeMismatchInstalled),
                 beyond_frontier_cause(RawStateCase::CaughtUnwindFromTypedOperation),
             ],
@@ -198,14 +198,14 @@ fn validate_abandon_partition() -> Result<(), &'static str> {
         ),
         abandon_expected(
             RawAbandonOutcome::NullFileRejected,
-            &[prefix_cause(RawStateCase::NullFile)],
+            vec![prefix_cause(RawStateCase::NullFile)],
             MapSourceStepId::RawAbandonNullFileRejected,
             SourceEffect::None,
             NO_RAW_VALUES,
         ),
         abandon_expected(
             RawAbandonOutcome::ForeignMethodsNullTableRejected,
-            &[prefix_cause(
+            vec![prefix_cause(
                 RawStateCase::ForeignMethodsNullTableStatePresent,
             )],
             MapSourceStepId::RawAbandonForeignMethodsNullTableRejected,
@@ -214,7 +214,7 @@ fn validate_abandon_partition() -> Result<(), &'static str> {
         ),
         abandon_expected(
             RawAbandonOutcome::ForeignMethodsForeignTableStateNullRejected,
-            &[prefix_cause(
+            vec![prefix_cause(
                 RawStateCase::ForeignMethodsForeignTableStateNull,
             )],
             MapSourceStepId::RawAbandonForeignMethodsForeignTableRejected,
@@ -223,7 +223,7 @@ fn validate_abandon_partition() -> Result<(), &'static str> {
         ),
         abandon_expected(
             RawAbandonOutcome::ForeignMethodsForeignTableStatePresentRejected,
-            &[prefix_cause(
+            vec![prefix_cause(
                 RawStateCase::ForeignMethodsForeignTableStatePresent,
             )],
             MapSourceStepId::RawAbandonForeignMethodsForeignTableRejected,
@@ -232,7 +232,7 @@ fn validate_abandon_partition() -> Result<(), &'static str> {
         ),
         abandon_expected(
             RawAbandonOutcome::StateMissingRejected,
-            &[prefix_cause(RawStateCase::StateMissingInertTableStateNull)],
+            vec![prefix_cause(RawStateCase::StateMissingInertTableStateNull)],
             MapSourceStepId::RawAbandonStateMissingRejected,
             SourceEffect::None,
             METHODS_VALUE_ONLY,
@@ -281,9 +281,9 @@ fn validate_abandon_partition() -> Result<(), &'static str> {
     Ok(())
 }
 
-const fn abandon_expected(
+fn abandon_expected(
     outcome: RawAbandonOutcome,
-    causes: &'static [(RawStateCase, RawAbandonCauseDisposition)],
+    causes: Vec<(RawStateCase, RawAbandonCauseDisposition)>,
     step: MapSourceStepId,
     effect: SourceEffect,
     slots: RawSlotRetention,
