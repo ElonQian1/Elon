@@ -24,7 +24,9 @@ use windows_sys::Win32::{
     },
 };
 
-use super::policy::WindowsRunnerProcessPolicy;
+use super::{
+    launch_security::SealedWindowsRunnerLaunchSecurity, policy::WindowsRunnerProcessPolicy,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum ConfiguredRunnerJobFailurePhase {
@@ -46,9 +48,12 @@ pub(super) struct ConfiguredRunnerJob {
     attributes: AlignedProcessThreadAttributeList,
 }
 
-pub(super) struct ConfiguredRunnerStartupInfo<'job> {
+pub(super) struct ConfiguredRunnerStartupInfo<'owner> {
     raw: STARTUPINFOEXW,
-    _job: PhantomData<&'job ConfiguredRunnerJob>,
+    _owners: PhantomData<(
+        &'owner ConfiguredRunnerJob,
+        &'owner SealedWindowsRunnerLaunchSecurity,
+    )>,
 }
 
 impl ConfiguredRunnerJob {
@@ -75,19 +80,27 @@ impl ConfiguredRunnerJob {
         Ok(Self { job, attributes })
     }
 
-    pub(super) fn startup_info(&self) -> ConfiguredRunnerStartupInfo<'_> {
+    pub(super) fn startup_info<'owner>(
+        &'owner self,
+        launch_security: &'owner SealedWindowsRunnerLaunchSecurity,
+    ) -> ConfiguredRunnerStartupInfo<'owner> {
         // SAFETY: zero is valid for every optional STARTUPINFOEXW member.
         let mut raw = unsafe { zeroed::<STARTUPINFOEXW>() };
         raw.StartupInfo.cb = size_of::<STARTUPINFOEXW>() as u32;
+        raw.StartupInfo.lpDesktop = launch_security.private_desktop_name_ptr();
         raw.lpAttributeList = self.attributes.pointer;
         ConfiguredRunnerStartupInfo {
             raw,
-            _job: PhantomData,
+            _owners: PhantomData,
         }
     }
 
     pub(super) fn into_handle(self) -> OwnedHandle {
         self.job
+    }
+
+    pub(super) fn raw_handle(&self) -> HANDLE {
+        owned_raw(&self.job)
     }
 }
 

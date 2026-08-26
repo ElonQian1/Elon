@@ -1,34 +1,42 @@
 use std::{
     error::Error as StdError,
     fmt,
-    mem::zeroed,
-    os::windows::io::{AsRawHandle, FromRawHandle, OwnedHandle, RawHandle},
+    mem::{zeroed, ManuallyDrop},
 };
 
 use anyhow::{anyhow, Error, Result};
 use windows_sys::Win32::{
     Foundation::{FILETIME, HANDLE, WAIT_FAILED, WAIT_OBJECT_0, WAIT_TIMEOUT},
     System::{
-        JobObjects::{IsProcessInJob, TerminateJobObject},
+        JobObjects::IsProcessInJob,
         Threading::{
-            CreateProcessAsUserW, GetProcessId, GetProcessTimes, GetThreadId, TerminateProcess,
-            WaitForSingleObject, CREATE_NO_WINDOW, CREATE_SUSPENDED, CREATE_UNICODE_ENVIRONMENT,
+            CreateProcessAsUserW, GetProcessId, GetProcessTimes, GetThreadId, WaitForSingleObject,
+            CREATE_NO_WINDOW, CREATE_SUSPENDED, CREATE_UNICODE_ENVIRONMENT,
             EXTENDED_STARTUPINFO_PRESENT, PROCESS_INFORMATION,
         },
     },
 };
 
 use super::{
-    encoding::{command_line, empty_environment_block, nul_terminated_path},
+    encoding::{
+        command_line, empty_environment_block, nul_terminated_current_directory,
+        nul_terminated_path,
+    },
     model::{
         ComputePluginRunnerProcessIdentity, PreparedComputePluginRunnerProcess,
         ValidatedWindowsRunnerProcessPreparation,
     },
+    namespace_query::{
+        LoaderCurrentWindowsRunnerProcessPreparation,
+        WindowsRunnerPreCreateLoaderCurrentnessBackend,
+        WindowsRunnerPreCreateLoaderCurrentnessFailureClass,
+        WindowsRunnerPreCreateLoaderCurrentnessUnusableCustody,
+    },
     windows_job::{ConfiguredRunnerJob, ConfiguredRunnerJobFailurePhase},
+    windows_rollback::{
+        terminate_and_confirm_owned, SuspendedProcessRollback, WindowsRunnerPostCreateCustody,
+    },
 };
-
-const ROLLBACK_EXIT_CODE: u32 = 0xE10C_7101;
-const ROLLBACK_WAIT_MS: u32 = 5_000;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum WindowsRunnerProcessPrepareFailurePhase {
@@ -37,6 +45,7 @@ pub(super) enum WindowsRunnerProcessPrepareFailurePhase {
     JobCreation,
     JobConfiguration,
     JobAttributeList,
+    LoaderCurrentness,
     ProcessCreation,
     ProcessHandleContract,
     JobMembership,
@@ -44,33 +53,57 @@ pub(super) enum WindowsRunnerProcessPrepareFailurePhase {
     SuspendedLiveness,
 }
 
-/// Every failure retains the consumed preparation. If termination cannot be confirmed, it also
-/// retains all live OS handles until this error is dropped; it never returns a retry permit.
+/// Every failure retains the consumed preparation. If termination cannot be confirmed, the exact
+/// process handles, loader authority, content leases, namespace grants, and recovery key are
+/// parked together rather than being independently dropped; no retry permit is returned.
 pub(super) struct WindowsRunnerProcessPrepareFailure<'root> {
     phase: WindowsRunnerProcessPrepareFailurePhase,
     error: Error,
-    uncertain_process: Option<SuspendedProcessRollback>,
-    _preparation: ValidatedWindowsRunnerProcessPreparation<'root>,
+    custody: WindowsRunnerProcessPrepareFailureCustody<'root>,
 }
 
-pub(super) fn prepare_suspended_windows_runner_process<'root>(
+enum WindowsRunnerProcessPrepareFailureCustody<'root> {
+    Validated(ValidatedWindowsRunnerProcessPreparation<'root>),
+    LoaderCurrentnessUnusable {
+        class: WindowsRunnerPreCreateLoaderCurrentnessFailureClass,
+        custody: WindowsRunnerPreCreateLoaderCurrentnessUnusableCustody<'root>,
+    },
+    LoaderCurrent(LoaderCurrentWindowsRunnerProcessPreparation<'root>),
+    PostCreateUnconfirmed(ManuallyDrop<WindowsRunnerUnconfirmedProcessCustody<'root>>),
+}
+
+struct WindowsRunnerUnconfirmedProcessCustody<'root> {
+    _post_create: WindowsRunnerPostCreateCustody<'root>,
+    recovery_key: WindowsRunnerUnconfirmedProcessRecoveryKey,
+}
+
+struct WindowsRunnerUnconfirmedProcessRecoveryKey {
+    reported_process_id: u32,
+    reported_primary_thread_id: u32,
+    start_material_digest: String,
+}
+
+pub(super) fn prepare_suspended_windows_runner_process<
+    'root,
+    B: WindowsRunnerPreCreateLoaderCurrentnessBackend,
+>(
     preparation: ValidatedWindowsRunnerProcessPreparation<'root>,
+    loader_currentness_backend: B,
 ) -> std::result::Result<
     PreparedComputePluginRunnerProcess<'root>,
     WindowsRunnerProcessPrepareFailure<'root>,
 > {
-    let application = match nul_terminated_path(&preparation.image.absolute_path) {
+    let application_path = preparation.application_path.clone();
+    let working_directory_path = preparation.working_directory_path.clone();
+    let application = match nul_terminated_path(&application_path) {
         Ok(value) => value,
         Err(error) => return Err(before_create_failure(InputEncoding, error, preparation)),
     };
-    let mut command = match command_line(
-        &preparation.image.absolute_path,
-        &preparation.policy.arguments,
-    ) {
+    let mut command = match command_line(&application_path, &preparation.policy.arguments) {
         Ok(value) => value,
         Err(error) => return Err(before_create_failure(InputEncoding, error, preparation)),
     };
-    let current_directory = match nul_terminated_path(&preparation.image.working_directory_path) {
+    let current_directory = match nul_terminated_current_directory(&working_directory_path) {
         Ok(value) => value,
         Err(error) => return Err(before_create_failure(InputEncoding, error, preparation)),
     };
@@ -92,10 +125,168 @@ pub(super) fn prepare_suspended_windows_runner_process<'root>(
         }
     };
 
-    let startup = job.startup_info();
+    let loader_current = match loader_currentness_backend.query_current_and_seal(preparation) {
+        Ok(value) => value,
+        Err(failure) => {
+            let (class, error, custody) = failure.into_parts();
+            return Err(loader_currentness_failure(class, error, custody));
+        }
+    };
+    if let Err(error) = loader_current.validate_binding() {
+        let failure = loader_current.reject_invalid_binding(error);
+        let (class, error, custody) = failure.into_parts();
+        return Err(loader_currentness_failure(class, error, custody));
+    }
+    let mut post_create = match create_suspended_process_with_custody(
+        job,
+        loader_current,
+        &application,
+        &mut command,
+        &environment,
+        &current_directory,
+    ) {
+        Ok(custody) => custody,
+        Err(failure) => {
+            return Err(namespace_current_failure(
+                failure.phase,
+                failure.error,
+                failure.loader_current,
+            ))
+        }
+    };
+    if !post_create.rollback().has_complete_process_information() {
+        return Err(after_create_failure(
+            ProcessHandleContract,
+            anyhow!("COMPUTE_PLUGIN_WINDOWS_PROCESS_HANDLE_CONTRACT_BROKEN"),
+            post_create,
+        ));
+    }
+
+    let mut in_job = 0;
+    if unsafe {
+        IsProcessInJob(
+            post_create.rollback().process_raw(),
+            post_create.rollback().job_raw(),
+            &mut in_job,
+        )
+    } == 0
+    {
+        let error = std::io::Error::last_os_error();
+        return Err(after_create_failure(
+            JobMembership,
+            error.into(),
+            post_create,
+        ));
+    }
+    if in_job == 0 {
+        return Err(after_create_failure(
+            JobMembership,
+            anyhow!("COMPUTE_PLUGIN_WINDOWS_JOB_MEMBERSHIP_MISSING"),
+            post_create,
+        ));
+    }
+
+    let process_id = unsafe { GetProcessId(post_create.rollback().process_raw()) };
+    if process_id == 0 || process_id != post_create.rollback().reported_process_id() {
+        let error = if process_id == 0 {
+            std::io::Error::last_os_error().into()
+        } else {
+            anyhow!("COMPUTE_PLUGIN_WINDOWS_PROCESS_ID_CHANGED")
+        };
+        return Err(after_create_failure(ProcessIdentity, error, post_create));
+    }
+    let thread_id = unsafe { GetThreadId(post_create.rollback().primary_thread_raw()) };
+    if thread_id == 0 || thread_id != post_create.rollback().reported_primary_thread_id() {
+        let error = if thread_id == 0 {
+            std::io::Error::last_os_error().into()
+        } else {
+            anyhow!("COMPUTE_PLUGIN_WINDOWS_PRIMARY_THREAD_ID_CHANGED")
+        };
+        return Err(after_create_failure(ProcessIdentity, error, post_create));
+    }
+    let creation_filetime = match process_creation_filetime(post_create.rollback().process_raw()) {
+        Ok(value) if value != 0 => value,
+        Ok(_) => {
+            return Err(after_create_failure(
+                ProcessIdentity,
+                anyhow!("COMPUTE_PLUGIN_WINDOWS_PROCESS_CREATION_TIME_MISSING"),
+                post_create,
+            ))
+        }
+        Err(error) => return Err(after_create_failure(ProcessIdentity, error, post_create)),
+    };
+    match unsafe { WaitForSingleObject(post_create.rollback().process_raw(), 0) } {
+        WAIT_TIMEOUT => {}
+        WAIT_OBJECT_0 => {
+            return Err(after_create_failure(
+                SuspendedLiveness,
+                anyhow!("COMPUTE_PLUGIN_WINDOWS_SUSPENDED_PROCESS_NOT_LIVE"),
+                post_create,
+            ))
+        }
+        WAIT_FAILED => {
+            let error = std::io::Error::last_os_error();
+            return Err(after_create_failure(
+                SuspendedLiveness,
+                error.into(),
+                post_create,
+            ));
+        }
+        status => {
+            return Err(after_create_failure(
+                SuspendedLiveness,
+                anyhow!("COMPUTE_PLUGIN_WINDOWS_PROCESS_WAIT_CHANGED:{status}"),
+                post_create,
+            ))
+        }
+    }
+
+    let identity = ComputePluginRunnerProcessIdentity {
+        process_id,
+        primary_thread_id: thread_id,
+        creation_filetime,
+    };
+    match post_create.into_prepared_process(identity) {
+        Ok(prepared) => Ok(prepared),
+        Err(post_create) => Err(after_create_failure(
+            ProcessHandleContract,
+            anyhow!("COMPUTE_PLUGIN_WINDOWS_SUCCESS_CUSTODY_CONVERSION_CHANGED"),
+            post_create,
+        )),
+    }
+}
+
+struct WindowsRunnerCreateProcessFailure<'root> {
+    phase: WindowsRunnerProcessPrepareFailurePhase,
+    error: Error,
+    loader_current: LoaderCurrentWindowsRunnerProcessPreparation<'root>,
+}
+
+/// Owns Job and loader authority while issuing CreateProcessAsUserW. On success, the returned OS
+/// handles enter whole-graph post-create custody inside this frame before control returns to any
+/// fallible validator; the configured Job (including its attribute storage) is retained too.
+fn create_suspended_process_with_custody<'root>(
+    job: ConfiguredRunnerJob,
+    loader_current: LoaderCurrentWindowsRunnerProcessPreparation<'root>,
+    application: &[u16],
+    command: &mut [u16],
+    environment: &[u16],
+    current_directory: &[u16],
+) -> std::result::Result<
+    WindowsRunnerPostCreateCustody<'root>,
+    WindowsRunnerCreateProcessFailure<'root>,
+> {
+    if let Err(error) = loader_current.preparation.launch_security.validate() {
+        return Err(WindowsRunnerCreateProcessFailure {
+            phase: LaunchSecurity,
+            error,
+            loader_current,
+        });
+    }
+    let startup = job.startup_info(&loader_current.preparation.launch_security);
+    let create_security = loader_current.preparation.launch_security.for_create();
     // SAFETY: CreateProcessAsUserW initializes this record on success.
     let mut process_information = unsafe { zeroed::<PROCESS_INFORMATION>() };
-    let create_security = preparation.launch_security.for_create();
     let created = unsafe {
         CreateProcessAsUserW(
             create_security.primary_token,
@@ -114,147 +305,25 @@ pub(super) fn prepare_suspended_windows_runner_process<'root>(
             &mut process_information,
         )
     };
-    let create_error = (created == 0).then(std::io::Error::last_os_error);
+    if created == 0 {
+        let error = std::io::Error::last_os_error().into();
+        drop(create_security);
+        drop(startup);
+        return Err(WindowsRunnerCreateProcessFailure {
+            phase: ProcessCreation,
+            error,
+            loader_current,
+        });
+    }
     drop(create_security);
     drop(startup);
-    if let Some(error) = create_error {
-        return Err(before_create_failure(
-            ProcessCreation,
-            error.into(),
-            preparation,
-        ));
-    }
-    let job = job.into_handle();
-    // SAFETY: every distinct non-null handle returned by successful CreateProcessAsUserW is newly
-    // owned. The
-    // rollback guard wraps each such handle exactly once, including the defensive contract-broken
-    // branch, so an unconfirmed child never becomes a scalar-only error.
-    let mut rollback = unsafe { SuspendedProcessRollback::from_created(job, process_information) };
-    if !rollback.has_complete_process_information() {
-        return Err(after_create_failure(
-            ProcessHandleContract,
-            anyhow!("COMPUTE_PLUGIN_WINDOWS_PROCESS_HANDLE_CONTRACT_BROKEN"),
-            preparation,
-            rollback,
-        ));
-    }
-
-    let mut in_job = 0;
-    if unsafe { IsProcessInJob(rollback.process_raw(), rollback.job_raw(), &mut in_job) } == 0 {
-        let error = std::io::Error::last_os_error();
-        return Err(after_create_failure(
-            JobMembership,
-            error.into(),
-            preparation,
-            rollback,
-        ));
-    }
-    if in_job == 0 {
-        return Err(after_create_failure(
-            JobMembership,
-            anyhow!("COMPUTE_PLUGIN_WINDOWS_JOB_MEMBERSHIP_MISSING"),
-            preparation,
-            rollback,
-        ));
-    }
-
-    let process_id = unsafe { GetProcessId(rollback.process_raw()) };
-    if process_id == 0 || process_id != process_information.dwProcessId {
-        let error = if process_id == 0 {
-            std::io::Error::last_os_error().into()
-        } else {
-            anyhow!("COMPUTE_PLUGIN_WINDOWS_PROCESS_ID_CHANGED")
-        };
-        return Err(after_create_failure(
-            ProcessIdentity,
-            error,
-            preparation,
-            rollback,
-        ));
-    }
-    let thread_id = unsafe { GetThreadId(rollback.primary_thread_raw()) };
-    if thread_id == 0 || thread_id != process_information.dwThreadId {
-        let error = if thread_id == 0 {
-            std::io::Error::last_os_error().into()
-        } else {
-            anyhow!("COMPUTE_PLUGIN_WINDOWS_PRIMARY_THREAD_ID_CHANGED")
-        };
-        return Err(after_create_failure(
-            ProcessIdentity,
-            error,
-            preparation,
-            rollback,
-        ));
-    }
-    let creation_filetime = match process_creation_filetime(rollback.process_raw()) {
-        Ok(value) if value != 0 => value,
-        Ok(_) => {
-            return Err(after_create_failure(
-                ProcessIdentity,
-                anyhow!("COMPUTE_PLUGIN_WINDOWS_PROCESS_CREATION_TIME_MISSING"),
-                preparation,
-                rollback,
-            ))
-        }
-        Err(error) => {
-            return Err(after_create_failure(
-                ProcessIdentity,
-                error,
-                preparation,
-                rollback,
-            ))
-        }
-    };
-    match unsafe { WaitForSingleObject(rollback.process_raw(), 0) } {
-        WAIT_TIMEOUT => {}
-        WAIT_OBJECT_0 => {
-            return Err(after_create_failure(
-                SuspendedLiveness,
-                anyhow!("COMPUTE_PLUGIN_WINDOWS_SUSPENDED_PROCESS_NOT_LIVE"),
-                preparation,
-                rollback,
-            ))
-        }
-        WAIT_FAILED => {
-            let error = std::io::Error::last_os_error();
-            return Err(after_create_failure(
-                SuspendedLiveness,
-                error.into(),
-                preparation,
-                rollback,
-            ));
-        }
-        status => {
-            return Err(after_create_failure(
-                SuspendedLiveness,
-                anyhow!("COMPUTE_PLUGIN_WINDOWS_PROCESS_WAIT_CHANGED:{status}"),
-                preparation,
-                rollback,
-            ))
-        }
-    }
-
-    let (job, process, primary_thread) = rollback.into_handles();
-    let ValidatedWindowsRunnerProcessPreparation {
-        admitted,
-        image,
-        launch_security,
-        policy,
-    } = preparation;
-    Ok(PreparedComputePluginRunnerProcess {
-        job,
-        process,
-        primary_thread,
-        launch_security,
-        runner_image: image,
-        admitted,
-        identity: ComputePluginRunnerProcessIdentity {
-            process_id,
-            primary_thread_id: thread_id,
-            creation_filetime,
-        },
-        start_material_digest: policy.start_material_digest,
-    })
+    // SAFETY: each distinct non-null handle returned on success is newly owned. Construction is
+    // infallible and happens before this frame returns or performs any post-create validation.
+    let rollback = unsafe { SuspendedProcessRollback::from_created(job, process_information) };
+    Ok(WindowsRunnerPostCreateCustody::new(
+        rollback,
+        loader_current,
+    ))
 }
 
 fn process_creation_filetime(process: HANDLE) -> Result<u64> {
@@ -277,128 +346,118 @@ fn before_create_failure<'root>(
     WindowsRunnerProcessPrepareFailure {
         phase,
         error,
-        uncertain_process: None,
-        _preparation: preparation,
+        custody: WindowsRunnerProcessPrepareFailureCustody::Validated(preparation),
+    }
+}
+
+fn loader_currentness_failure<'root>(
+    class: WindowsRunnerPreCreateLoaderCurrentnessFailureClass,
+    error: Error,
+    custody: WindowsRunnerPreCreateLoaderCurrentnessUnusableCustody<'root>,
+) -> WindowsRunnerProcessPrepareFailure<'root> {
+    WindowsRunnerProcessPrepareFailure {
+        phase: LoaderCurrentness,
+        error,
+        custody: WindowsRunnerProcessPrepareFailureCustody::LoaderCurrentnessUnusable {
+            class,
+            custody,
+        },
+    }
+}
+
+fn namespace_current_failure<'root>(
+    phase: WindowsRunnerProcessPrepareFailurePhase,
+    error: Error,
+    preparation: LoaderCurrentWindowsRunnerProcessPreparation<'root>,
+) -> WindowsRunnerProcessPrepareFailure<'root> {
+    WindowsRunnerProcessPrepareFailure {
+        phase,
+        error,
+        custody: WindowsRunnerProcessPrepareFailureCustody::LoaderCurrent(preparation),
     }
 }
 
 fn after_create_failure<'root>(
     phase: WindowsRunnerProcessPrepareFailurePhase,
     error: Error,
-    preparation: ValidatedWindowsRunnerProcessPreparation<'root>,
-    mut rollback: SuspendedProcessRollback,
+    mut post_create: WindowsRunnerPostCreateCustody<'root>,
 ) -> WindowsRunnerProcessPrepareFailure<'root> {
-    let uncertain_process = if rollback.terminate_and_confirm() {
-        None
+    let custody = if post_create.rollback_mut().terminate_and_confirm() {
+        let (rollback, preparation) = post_create.into_parts();
+        drop(rollback);
+        WindowsRunnerProcessPrepareFailureCustody::LoaderCurrent(preparation)
     } else {
-        Some(rollback)
+        let recovery_key = WindowsRunnerUnconfirmedProcessRecoveryKey {
+            reported_process_id: post_create.rollback().reported_process_id(),
+            reported_primary_thread_id: post_create.rollback().reported_primary_thread_id(),
+            start_material_digest: post_create
+                .preparation()
+                .currentness
+                .start_material_digest()
+                .to_owned(),
+        };
+        WindowsRunnerProcessPrepareFailureCustody::PostCreateUnconfirmed(ManuallyDrop::new(
+            WindowsRunnerUnconfirmedProcessCustody {
+                _post_create: post_create,
+                recovery_key,
+            },
+        ))
     };
     WindowsRunnerProcessPrepareFailure {
         phase,
         error,
-        uncertain_process,
-        _preparation: preparation,
-    }
-}
-
-struct SuspendedProcessRollback {
-    job: Option<OwnedHandle>,
-    process: Option<OwnedHandle>,
-    primary_thread: Option<OwnedHandle>,
-    armed: bool,
-}
-
-impl SuspendedProcessRollback {
-    /// Takes ownership of each distinct non-null handle returned by CreateProcessAsUserW.
-    unsafe fn from_created(job: OwnedHandle, information: PROCESS_INFORMATION) -> Self {
-        let handles_alias =
-            !information.hProcess.is_null() && information.hProcess == information.hThread;
-        Self {
-            job: Some(job),
-            process: (!information.hProcess.is_null()).then(|| unsafe {
-                OwnedHandle::from_raw_handle(information.hProcess as RawHandle)
-            }),
-            primary_thread: (!information.hThread.is_null() && !handles_alias)
-                .then(|| unsafe { OwnedHandle::from_raw_handle(information.hThread as RawHandle) }),
-            armed: true,
-        }
-    }
-
-    fn has_complete_process_information(&self) -> bool {
-        self.process.is_some() && self.primary_thread.is_some()
-    }
-
-    fn job_raw(&self) -> HANDLE {
-        owned_raw(self.job.as_ref().expect("job custody retained"))
-    }
-
-    fn process_raw(&self) -> HANDLE {
-        owned_raw(self.process.as_ref().expect("process custody retained"))
-    }
-
-    fn primary_thread_raw(&self) -> HANDLE {
-        owned_raw(
-            self.primary_thread
-                .as_ref()
-                .expect("primary thread custody retained"),
-        )
-    }
-
-    fn terminate_and_confirm(&mut self) -> bool {
-        let process = self.process.as_ref().map(owned_raw);
-        if let Some(process) = process {
-            if unsafe { WaitForSingleObject(process, 0) } == WAIT_OBJECT_0 {
-                self.armed = false;
-                return true;
-            }
-        }
-        unsafe { TerminateJobObject(self.job_raw(), ROLLBACK_EXIT_CODE) };
-        let Some(process) = process else {
-            return false;
-        };
-        unsafe { TerminateProcess(process, ROLLBACK_EXIT_CODE) };
-        let confirmed = unsafe { WaitForSingleObject(process, ROLLBACK_WAIT_MS) } == WAIT_OBJECT_0;
-        if confirmed {
-            self.armed = false;
-        }
-        confirmed
-    }
-
-    fn into_handles(mut self) -> (OwnedHandle, OwnedHandle, OwnedHandle) {
-        self.armed = false;
-        (
-            self.job.take().expect("job custody retained"),
-            self.process.take().expect("process custody retained"),
-            self.primary_thread
-                .take()
-                .expect("primary thread custody retained"),
-        )
-    }
-}
-
-impl Drop for SuspendedProcessRollback {
-    fn drop(&mut self) {
-        if self.armed {
-            let _ = self.terminate_and_confirm();
-        }
+        custody,
     }
 }
 
 impl Drop for PreparedComputePluginRunnerProcess<'_> {
     fn drop(&mut self) {
-        unsafe { TerminateJobObject(owned_raw(&self.job), ROLLBACK_EXIT_CODE) };
-        unsafe { WaitForSingleObject(owned_raw(&self.process), ROLLBACK_WAIT_MS) };
+        let custody = &*self.custody;
+        if terminate_and_confirm_owned(&custody.job, &custody.process) {
+            // SAFETY: termination is confirmed and this is the sole explicit drop of the
+            // ManuallyDrop owner graph. On failure the graph remains deliberately parked.
+            unsafe { ManuallyDrop::drop(&mut self.custody) };
+        }
     }
 }
 
 impl fmt::Debug for WindowsRunnerProcessPrepareFailure<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let (loader_currentness, outcome_uncertain, recovery_process_id) = match &self.custody {
+            WindowsRunnerProcessPrepareFailureCustody::Validated(_) => ("not_queried", false, None),
+            WindowsRunnerProcessPrepareFailureCustody::LoaderCurrentnessUnusable {
+                class, ..
+            } => match class {
+                WindowsRunnerPreCreateLoaderCurrentnessFailureClass::DefinitiveRejected => {
+                    ("definitive_rejected", false, None)
+                }
+                WindowsRunnerPreCreateLoaderCurrentnessFailureClass::OutcomeUncertain => {
+                    ("outcome_uncertain", true, None)
+                }
+            },
+            WindowsRunnerProcessPrepareFailureCustody::LoaderCurrent(_) => {
+                ("retained_current", false, None)
+            }
+            WindowsRunnerProcessPrepareFailureCustody::PostCreateUnconfirmed(custody) => {
+                let _ = (
+                    custody.recovery_key.reported_primary_thread_id,
+                    &custody.recovery_key.start_material_digest,
+                );
+                (
+                    "retained_current",
+                    true,
+                    Some(custody.recovery_key.reported_process_id),
+                )
+            }
+        };
         formatter
             .debug_struct("WindowsRunnerProcessPrepareFailure")
             .field("phase", &self.phase)
             .field("error", &self.error)
             .field("preparation", &"<retained-linear-custody>")
-            .field("outcome_uncertain", &self.uncertain_process.is_some())
+            .field("outcome_uncertain", &outcome_uncertain)
+            .field("recovery_process_id", &recovery_process_id)
+            .field("loader_currentness", &loader_currentness)
             .finish()
     }
 }
@@ -410,9 +469,5 @@ impl fmt::Display for WindowsRunnerProcessPrepareFailure<'_> {
 }
 
 impl StdError for WindowsRunnerProcessPrepareFailure<'_> {}
-
-fn owned_raw(handle: &OwnedHandle) -> HANDLE {
-    handle.as_raw_handle() as HANDLE
-}
 
 use WindowsRunnerProcessPrepareFailurePhase::*;

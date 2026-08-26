@@ -3,13 +3,22 @@ use std::{ffi::OsStr, os::windows::ffi::OsStrExt, path::Path};
 use anyhow::{bail, Result};
 
 const WINDOWS_COMMAND_LINE_MAX_U16: usize = 32_767;
+const WINDOWS_CURRENT_DIRECTORY_MAX_U16: usize = 260;
 
 pub(super) fn nul_terminated_path(path: &Path) -> Result<Vec<u16>> {
+    nul_terminated_path_with_limit(path, WINDOWS_COMMAND_LINE_MAX_U16)
+}
+
+pub(super) fn nul_terminated_current_directory(path: &Path) -> Result<Vec<u16>> {
+    nul_terminated_path_with_limit(path, WINDOWS_CURRENT_DIRECTORY_MAX_U16)
+}
+
+fn nul_terminated_path_with_limit(path: &Path, maximum_u16: usize) -> Result<Vec<u16>> {
     if !path.is_absolute() {
         bail!("COMPUTE_PLUGIN_WINDOWS_RUNNER_PATH_NOT_ABSOLUTE");
     }
     let mut value = path.as_os_str().encode_wide().collect::<Vec<_>>();
-    if value.is_empty() || value.contains(&0) || value.len() >= WINDOWS_COMMAND_LINE_MAX_U16 {
+    if value.is_empty() || value.contains(&0) || value.len() >= maximum_u16 {
         bail!("COMPUTE_PLUGIN_WINDOWS_RUNNER_PATH_INVALID");
     }
     value.push(0);
