@@ -14,6 +14,8 @@ verification_status: source_review_only
 
 权威合同见
 [Recursive System-Image Acquisition Custody authority](user-node-windows-runner-recursive-system-image-acquisition-custody-authority.md)。
+逐波 forward plan见
+[Recursive Wave Resolution Plan authority](user-node-windows-runner-recursive-wave-resolution-plan-authority.md)。
 
 ## 1. 本批证据等级
 
@@ -36,10 +38,11 @@ test、migration、SQLite、网络、设备、Win32 fixture或真实 Runner。ru
 | 文件/模块 | 唯一的未运行源码责任 |
 |---|---|
 | `runtime_loader_load_set/launch_path_discovery/exact_context_plan/recursive_policy.rs` | 独立 signed policy、六项 exact limits、borrow-only projected-total gate、private `Infallible` producer |
-| `runtime_loader_load_set/resolution/system_closure/acquisition.rs` | wave request/resolution plan、acquisition receipt、sealed acquisition chain 与 closure cross-binding facade |
+| `runtime_loader_load_set/resolution/system_closure/acquisition.rs`及 `acquisition/{plan,plan_digest,plan_forwarder_validation,plan_owner_validation,plan_projection,plan_validation}.rs` | A0/`Ak` split、canonical request/resolution plan V1、DispatchReady、acquisition receipt V2与 chain V1 facade |
 | `system_closure/acquisition/custody.rs` | whole accumulated graph、pre-dispatch signed-limit gate 与 request/grant/candidate/lease/same-owner-parse/completed/terminal linear stages |
 | `system_closure/acquisition/failure.rs` | post-dispatch definitive 与 outcome-uncertain whole-graph failure custody |
 | `system_closure/acquisition/digest.rs` | output/receipt/set/chain及 grant/candidate/parse/terminal canonical digest material |
+| `node_agent_managed_fs/loader/system_image_custody.rs`、`node_agent_managed_fs/loader_system_validation.rs` | positive outcome保留 candidate servicing/currentness/open evidence并提供 final borrow-only重验 |
 | `system_closure/acquisition/validation.rs` | producer/target wave、range、frontier、receipt、owner set 与 final projection cross-binding validators |
 | `system_closure/validation.rs` | final cumulative signed-limit、parse/frontier/fixpoint 与 acquisition-chain projection validation |
 | `runtime_loader_recursive_wave_custody_source_contract_tests.rs` | 未运行 source-shape guard；文件存在不等于测试通过 |
@@ -49,10 +52,13 @@ test、migration、SQLite、网络、设备、Win32 fixture或真实 Runner。ru
 | authenticated policy | direct context/plan/parser/preloaded/routes/limits fields、经 digest传递的 admission/machine/search lineage与独立签名域 |
 | wave coordinates | base producer 0；nonempty时 producer `k`→target `Some(k+1)`，terminal `A_N`→`None` |
 | canonical queue | earliest producer、连续 receipt/range分配、backend completion order不影响 final graph |
+| forward plans | A0只复用 GrantReady；Ak直接绑定 prior receipt/output custody、typed frontier、ordered search steps、requests、dispositions、terminals、dedupe、owner commitments与 exact vectors |
+| DispatchReady | exact vectors派生 limits且 whole-plan验证后才允许第一项 dispatch，无 scalar permit |
 | whole-owner state | prior graph、namespace session、grants/owners/leases、active/pending refs按值移动，无 scalar重建 |
 | route-specific acquisition | package/preloaded/KnownDLL typed reuse；filesystem retained candidate→positive outcome→lease/section |
 | same-owner parse | exact immutable owner/material/policy/generation与 producer request绑定，拒绝跨代 splice |
-| wave evidence | acquisition receipt以 response/owner-set digests与 projection ranges、parse receipts、next frontier逐项 cross-bind；raw bytes留在 custody |
+| wave evidence | Ak receipt/chain按值保留 immutable typed plan vectors，并以 response/owner-set digests、projection ranges、parse receipts、next frontier逐项 cross-bind；raw bytes与 live owners留在 custody |
+| prior-state coverage | receipt提交完整 A0 base-owner set与累计 forwarder-chain set；下一 wave重算 accumulated vectors，final graph重建 prefix，拒绝自洽子集 |
 | failure custody | exact negative、positive+negative/invalid/timeout uncertain、partial owners与 response bytes完整保留 |
 | final aggregate | empty frontier后才可封印；完整 namespace原子性属于 final aggregate/query而非递归前预取 |
 
@@ -70,20 +76,30 @@ test、migration、SQLite、网络、设备、Win32 fixture或真实 Runner。ru
 5. target按 earliest final module-request ordinal去重并分配连续 parse-receipt ordinal；response race不能改变顺序。
 6. module/name/system-owner ranges连续且使用 checked arithmetic；不同 ordinal domain不能按 vector index互换。
 7. every wave advancer消费 whole prior state；没有 Clone/Serde/raw handle/path/成功拆件或 retry scalar。
-8. package/preloaded/KnownDLL复用 exact typed owner；只有 ordinary filesystem消费 retained candidate并取得 immutable lease/section。
+8. package/preloaded/KnownDLL复用 exact typed owner；只有 filesystem-backed ordinary/SxS route消费 retained candidate并取得 immutable lease/section。
 9. already parsed target不重复 acquisition/parse；cache key绑定不同 identity/route失败关闭。
-10. filesystem parse使用 exact leased handle/section；所有 route的 parse receipt绑定同一 authenticated policy与 exact owner material。
-11. acquisition receipt绑定 prior state、frontier、requests、terminal/dispositions、response/owner-set digests、owner/lease
-    transitions、parse allocation与 next frontier，并与现有 projection wave逐项相等；raw response bytes与 positive owners只留在
-    成功线性或失败 custody，不嵌入 receipt。
-12. policy V1、parse receipt V2/owner sets及 plan/prior custody共同单向进入 acquisition receipt/set/chain V1，再进入 closure V2
-    与既有 profile V3；parse receipt只保存 producer acquisition ordinal，acquisition digest不反向引用 closure/profile/required
+10. filesystem parse使用 exact leased handle/section；所有 route的 parse receipt经 producer acquisition ordinal与 chain传递绑定同一
+    authenticated policy，并直接绑定 exact owner material。
+11. A0 exact复用 GrantReady plan；`Ak (k >= 1)`使用独立 request/resolution plan V1，final edge/wave digests只反向
+    cross-bind，不能冒充 forward plan。
+12. 三个旧 `projected_*` scalar由 exact vectors和 whole prior custody派生；DispatchReady前重算六项 signed limits。
+13. `Ak` acquisition receipt按值保留完整 immutable typed frontier/request/resolution vectors并绑定 prior receipt/output custody、
+    terminal/dispositions、response/owner-set digests、owner/lease transitions、parse allocation与 next frontier；chain按值保留 ordered
+    receipts并与现有 projection wave逐项相等。raw response bytes与 live positive owners只留在成功线性或失败 custody，不嵌入
+    plan evidence。
+14. 每份 receipt提交完整 A0 prelease/package/postlease owner set与处理完当前 producer后的累计 direct-root/forwarder-chain set；
+    下一 wave和 final graph分别独立重算，空集/子集不能降低 parsed/depth limits。
+15. positive outcome保留 actual candidate的 parent-open、code-integrity、servicing与 namespace-currentness evidence；candidate
+    evidence与消费后 image必须绑定同一个 parent-relative open receipt，candidate-set V2与 final projection再逐字段绑定 plan，
+    而非只比较 detached candidate digest。
+16. policy V1、parse receipt V2/owner sets及 plan V1/prior custody共同单向进入 acquisition receipt/output V2，再由 receipt-set/chain
+    V1进入 closure V2与既有 profile V3；parse receipt只保存 producer acquisition ordinal，acquisition digest不反向引用 closure/profile/required
     context，摘要 DAG无环。
-13. dispatch前 failure才能返回 borrow-only owner；dispatch后所有 failure保留 whole graph、active/pending与 returned outcomes。
-14. definitive negative必须与 exact session/attempt/request/nonce/candidate/material匹配且无 positive；其余均 uncertain。
-15. positive+negative、positive-invalid、timeout、missing/malformed response不能丢弃 positive owner或 response bytes/digest。
-16. empty frontier前不能形成 final closure/profile；per-wave contract不构造 sealer/query/runtime producer。
-17. nested API-set DAG、Shadow positive、runtime module load与所有 Runtime/Ready/market效果继续 fail-closed或 missing。
+17. dispatch前 failure才能返回 borrow-only owner；dispatch后所有 failure保留 whole graph、active/pending与 returned outcomes。
+18. definitive negative必须与 exact session/attempt/request/nonce/candidate/material匹配且无 positive；其余均 uncertain。
+19. positive+negative、positive-invalid、timeout、missing/malformed response不能丢弃 positive owner或 response bytes/digest。
+20. empty frontier前不能形成 final closure/profile；per-wave contract不构造 sealer/query/runtime producer。
+21. nested API-set DAG、Shadow positive、runtime module load与所有 Runtime/Ready/market效果继续 fail-closed或 missing。
 
 以上断言目前只经过源码审阅，全部不能记为 passed。
 
@@ -97,6 +113,8 @@ test、migration、SQLite、网络、设备、Win32 fixture或真实 Runner。ru
 | six exact policy limits | 0 | 0 | 1 | 未运行 zero/overflow/base+suffix/depth mutation矩阵 |
 | producer-wave→target-wave cross-binding | 0 | 0 | 1 | source shape only；无 positive advancer |
 | earliest-producer receipt allocation | 0 | 0 | 1 | 未运行 multi-target/race/permutation矩阵 |
+| canonical per-wave request/resolution plan | 0 | 0 | 1 | source shape written；parser/resolver producer missing |
+| exact-vector limits / DispatchReady | 0 | 0 | 1 | 三个旧 scalar已移除；未运行 mutation/overflow矩阵 |
 | base A0→wave 1 / terminal None | 0 | 0 | 1 | nonempty才到 wave 1；selector/GrantReady/grant/lease producers missing |
 | per-wave grants / candidates / leases | 0 | 0 | 1 | custody contract source-written；backend/positive transitions missing |
 | route-specific owner reuse | 0 | 0 | 1 | 未运行 package/preloaded/KnownDLL/filesystem矩阵 |
@@ -120,7 +138,8 @@ test、migration、SQLite、网络、设备、Win32 fixture或真实 Runner。ru
 - wrong owner/session/attempt/request/nonce/candidate/FileId/section/generation negative与 positive-invalid；
 - positive+negative同返、timeout、partial acquisition、parser failure、crash parking及 response bytes/digest mutation；
 - same handle/section、servicing/lease generation drift、writable mapping、rename/swap/reparse/hardlink；
-- acquisition receipt字段/range/frontier mutation、projection wave mismatch及 closure/profile digest mutation；
+- plan vector/terminal/disposition/dedupe、acquisition receipt V2字段/range/frontier mutation、projection wave mismatch及
+  closure/profile digest mutation；
 - final aggregate session/generation drift、release/recovery、nested API-set、Shadow与 runtime load fail-closed。
 
 ## 6. 禁止误报
@@ -130,7 +149,7 @@ test、migration、SQLite、网络、设备、Win32 fixture或真实 Runner。ru
 - 把 source-only policy称为 real signer/current policy或可用配置；
 - 把 custody type/acquisition receipt称为 grant、candidate、lease、parser、advancer、sealer或 query backend；
 - 把 per-wave source contract称为真实 recursive resolver、runtime closure或 Windows proof；
-- 把 final projection `wave_digest`称为 acquisition custody evidence；
+- 把 final projection `parsed_edge_set_digest`/`wave_digest`称为 forward plan或 acquisition custody evidence；
 - 声称 nested API-set DAG、Shadow positive、live OS、pre-resume或 dynamic-load authority已实现；
 - 声称编译、Rust test、SQLite、Windows、网络、设备、真实 Runner或生产验收已完成；
 - 生成或声称 Runtime、Ready、Provider、route、Offer、Capacity、Execution、Attempt、Lease、usage、settlement、money effect。

@@ -17,7 +17,9 @@ exact selector/pre-lease/preliminary seam见
 [Launch Context Selection authority](user-node-windows-runner-launch-context-selection-authority.md)。
 post-lease递归边界见
 [Recursive System-Image Closure authority](user-node-windows-runner-recursive-system-image-closure-authority.md)，逐波来源与失败保管见
-[Recursive System-Image Acquisition Custody authority](user-node-windows-runner-recursive-system-image-acquisition-custody-authority.md)。
+[Recursive System-Image Acquisition Custody authority](user-node-windows-runner-recursive-system-image-acquisition-custody-authority.md)，
+Ak forward plan见
+[Recursive Wave Resolution Plan authority](user-node-windows-runner-recursive-wave-resolution-plan-authority.md)。
 
 ## 1. 本批结论
 
@@ -37,7 +39,8 @@ plan-directory retained handle-chain discovery 已形成 purpose-specific source
 `LoaderLockedWorkAdmittedPluginSlot` 没有成功 producer，进程 backend 仍不可达。
 system-image recursive imports 的 **final projection envelope** 已写入 stage-explicit base/suffix、producer-bound owner、
 frontier/fixpoint、deterministic merge与 final slice摘要；authenticated recursive policy及逐 producer wave acquisition custody
-source contract也已写，但真实 policy signer/currentness、recursive parser、grant/candidate/lease backend、positive advancer、
+source contract也已写；A0复用 GrantReady，Ak canonical request/resolution plan V1、exact-vector DispatchReady与 acquisition
+receipt/output V2也已写。但真实 policy signer/currentness、recursive parser/resolver、grant/candidate/lease backend、positive advancer、
 sealer/query仍缺，因此不是可达的 acquisition authority或 runtime closure。
 本批只定义指定 launch context 下的 startup/import resolution material；pre-create 观测最多保护 path-based
 process open，普通 imports 多在 suspended primary thread 后续运行时解析。因此 pre-resume loader-currentness 与
@@ -119,7 +122,7 @@ authority。当前函数名表达调用顺序约束，但没有 caller，也没�
 关闭任何 share-none package file 前，必须按 borrow-only discovery/pre-lease material → authenticated exact CWD
 selection/preliminary unresolved request plan → wave-zero exact terminal/disposition/external owner grant-ready resolution →
 base name/launch-component grants + package leases + base route-specific system owners → package same-handle rehash/re-parse →
-producer wave parse/outgoing request/grant/candidate/lease acquisition → empty frontier → final aggregate/final resolution seal →
+producer wave parse/canonical request-resolution plan/DispatchReady → grant/candidate/lease acquisition → empty frontier → final aggregate/final resolution seal →
 consuming generation query-back 的权威顺序完成。当前源码已删除 grants/leases 前持有 final resolution 的旧 prerequisite。
 `PreliminaryResolutionRequestsPlannedWork` 仅持有未解析 request skeleton；future
 `GrantReadyWindowsRunnerResolutionPrerequisite` 合同必须消费 whole request owner并绑定 exact terminal、每步 disposition、
@@ -147,8 +150,9 @@ acquisition完整、same-owner parse闭合且 frontier为空后，final sealer�
   leaf；normal/delay base imports与 separate forwarder hops形成 immutable wave-zero prefix。独立 post-lease contract已冻结
   system-image parsed receipt、earliest producer owner、连续 ranges、frontier/fixpoint、deterministic edge merge、global-root
   forwarder chain与 final edge/name/system-owner反向摘要。独立 source contract还冻结 signed policy、nonempty producer→target /
-  terminal None、
-  whole-owner partial custody及 acquisition→projection cross-binding；其真实 policy/parser/backend/positive advancer与 sealer producer仍不可构造；
+  terminal None、A0 GrantReady复用、Ak canonical request/resolution plan V1、exact-vector limit派生、DispatchReady、
+  whole-owner partial custody及 V2 acquisition receipt/output→projection cross-binding；其真实 policy/parser/resolver/backend/
+  positive advancer与 sealer producer仍不可构造；
 - package module name → exact package-file ordinal/digest/FileId；
 - pre-lease package PE material 绑定 FileId + sealed digest + parser policy，但不得包含或预测 content-lease generation；
   final sealer 必须在 leases 下从同一 handles 重哈希/重解析，并把真实 lease generation 加入 canonical composite。
@@ -321,8 +325,9 @@ crash/recovery owner；不得以 Drop 或 session disconnect 当作 release。�
 3. 实现 exact terminal/disposition、external-directory owner与 resolved-system dedupe resolver，形成 grant-ready owner；
 4. 实现 base searched-name/launch-path grant acquisition、package lease与 base route-specific system-owner backends，对三种
    authenticated-negative 精确绑定 owner/attempt/session/request/nonce；
-5. 实现 authenticated recursive-policy signer/currentness、recursive retained-handle parser，并按已冻结合同接入每 producer wave
-   grant/candidate/lease/negative/outcome-uncertain backend与 positive advancer；
+5. 实现 authenticated recursive-policy signer/currentness、recursive retained-handle parser与 per-wave resolver，把 canonical
+   plans推进为真实 DispatchReady owner，再按已冻结合同接入每 producer wave grant/candidate/lease/negative/
+   outcome-uncertain backend与 positive advancer；
 6. 在 leases 下 same-handle 重哈希/重解析，封印 exact PE graph、launch path、recursive fixpoint与 startup/import/system resolution；
 7. 实现 consuming namespace/content-generation query、anchor-consuming reopen receipt、final query 与全五类 recovery；
 8. 实现 persistent-grant explicit authorized release/crash recovery 与 live Windows KnownDLL/API-set/SxS currentness；

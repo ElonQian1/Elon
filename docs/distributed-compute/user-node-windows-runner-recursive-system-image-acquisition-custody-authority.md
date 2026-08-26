@@ -18,11 +18,12 @@ verification_status: source_review_only
 [Recursive System-Image Closure authority](user-node-windows-runner-recursive-system-image-closure-authority.md)，wave-zero
 请求与 GrantReady prefix 见
 [Launch Context Selection authority](user-node-windows-runner-launch-context-selection-authority.md)，最终 owner graph 见
-[Loader Load-Set authority](user-node-windows-runner-loader-load-set-authority.md)。
+[Loader Load-Set authority](user-node-windows-runner-loader-load-set-authority.md)。`Ak (k >= 1)`的 forward plan见
+[Recursive Wave Resolution Plan authority](user-node-windows-runner-recursive-wave-resolution-plan-authority.md)。
 
 ## 1. 本批结论
 
-本批只冻结并写入 **source-only authenticated recursive policy 与 per-producer-wave acquisition custody contract**。
+本批冻结并写入 **source-only authenticated recursive policy、canonical per-producer-wave plans与 acquisition custody contract**。
 它把 final projection envelope 前缺失的线性来源补成 typed shape：base GrantReady acquisition在 frontier非空时产生
 wave 1 source owners；每个 producer wave解析本波 source images，再为 outgoing requests取得 exact grants、route-specific
 owners与 leases，形成下一 wave frontier；empty frontier 后才允许 final aggregate/sealer消费整图。
@@ -98,6 +99,11 @@ owner/ref，不重新取得 grant、candidate、lease或 parse receipt。相同 
 existing closure仍按 source parse-receipt顺序合并 edges；本合同额外保证这些 receipt ordinals不是调用方或 final sealer任意
 选择的排序输入。
 
+`A0`不生成 recursive plan，而是 exact复用同一 GrantReady request/resolution plan digest。只有 `Ak (k >= 1)`持有独立
+request plan V1与 resolution plan V1；它们逐项保存 outgoing request、search-step disposition、exact terminal、filesystem
+dedupe与后续 grant/candidate/route-owner/lease commitments。final `parsed_edge_set_digest`和 `wave_digest`只用于反向
+cross-binding，不能冒充上述 forward-plan digests。
+
 ## 5. Per-producer-wave linear custody
 
 每个 wave advancer按值消费 whole prior state，至少持有 admission、authenticated policy、namespace session、base与 earlier-wave
@@ -112,8 +118,9 @@ base GrantReady requests
 → A0 composite same-owner evidence：package pre/post same-handle cross-binding + base-target parse set
 → [frontier 非空时] wave 1 source-owner custody
 → producer wave k same-owner parse
-→ canonical outgoing unresolved requests
-→ exact terminal + per-step dispositions + movable external owners
+→ canonical outgoing unresolved request plan V1
+→ exact terminal + per-step dispositions + movable external-owner refs resolution plan V1
+→ whole-plan validation + DispatchReady typestate
 → same-session searched-name / required search-directory grants
 → route-specific owner/candidate/content-lease acquisition
 → next-wave source-owner custody
@@ -129,12 +136,17 @@ base GrantReady requests
 4. `ResolvedFilesystemSystemImage`才消费 parent-relative retained candidate，取得 authenticated positive outcome、
    servicing-generation-bound immutable content lease与 section mapping。
 
+candidate file被 positive transition消费后，positive outcome仍按值保留不含 handle的 candidate resolution evidence：parent
+directory、normalized host/name、component/file、parent-relative open、code-integrity、servicing generation/receipt、namespace
+currentness与 candidate binding。candidate evidence与消费后 image必须绑定同一个 parent-relative open receipt；final projection必须
+重验这些字段，不能只凭 lease image或 detached candidate digest补写。
+
 API-set是到 exact host的 terminal indirection，不是可解析 image owner；SxS最终仍必须落到上述 exact host owner。
 相同 owner跨 edge/wave只用 typed ordinal/ref引用，不能 clone线性 handle、lease或 section owner。
 
 ## 6. Same-owner parse 与 acquisition receipt
 
-ordinary filesystem image只能从 exact acquired lease所持 retained handle/immutable section解析；package、preloaded与 KnownDLL
+filesystem-backed ordinary/SxS image只能从 exact acquired lease所持 retained handle/immutable section解析；package、preloaded与 KnownDLL
 也必须从其 exact immutable owner material解析。parse receipt V2直接绑定 parse ordinal、target parse wave、
 `producer_acquisition_receipt_ordinal`、earliest producer request、source-owner ref/binding、material identity、parser policy、
 import-table digest/counts与 same-owner receipt digest；lease/servicing generation经 exact owner/material commitment传递。它不直接保存
@@ -144,23 +156,35 @@ authenticated-policy digest或 acquisition-receipt digest；acquisition validato
 每个 producer wave另有独立 acquisition receipt，至少绑定：
 
 - prior/output whole-state digest、policy/parser binding、producer/target coordinates与 exact input frontier；
-- canonical outgoing request ranges及 source/resolved-plan digests；
-- authenticated positive searched-name grant set、filesystem candidate set、immutable lease set与 same-owner parse-set digests；
+- 完整 A0 prelease/package/postlease parsed-owner set digest，以及处理完该 producer range后的累计 direct-root/forwarder-chain
+  set digest；下一 wave从 accumulated typed vectors重算，final validator从最终 cross-binding/edge prefix独立重建；
+- A0的 exact GrantReady plan digest，或 `Ak (k >= 1)`按值保留的 immutable
+  `WindowsRecursiveWaveDispatchPlanEvidence`（typed source frontier、request/resolution exact vectors、V1 digests与 exact ranges）；
+- authenticated positive searched-name grant set、包含 retained servicing/currentness evidence的 filesystem candidate set V2、
+  immutable lease set与 same-owner parse-set digests；
 - next-frontier parse-receipt ordinals与 output custody digest。
 
-acquisition receipt必须与 final projection wave的 module/name/system-owner ranges及 next frontier逐项 cross-bind。
-raw authenticated response bytes、positive owners与 retained handles不嵌入 receipt；它们留在成功线性 custody或完整失败 custody，
-receipt只承诺其 digests/owner sets。
-现有 projection `wave_digest`只证明 final slice，不能冒充 acquisition custody。摘要 DAG固定为：
+acquisition receipt必须与 final projection wave的 module/name/system-owner ranges及 next frontier逐项 cross-bind。chain按值保留
+ordered receipts，因此 final validator能从完整 plan vectors重算上述 forward evidence，而非只信 detached digests。
+raw authenticated response bytes、positive owners与 retained handles不嵌入 plan evidence；它们留在成功线性 custody或完整失败
+custody，receipt只额外承诺其 digests/owner sets。
+现有 projection `wave_digest`只证明 final slice，不能冒充 forward plan或 acquisition custody。三个旧 scalar
+`projected_next_frontier_parse_receipt_count`、`projected_parsed_image_count`、
+`projected_forwarder_hop_depth`已由 exact request/terminal/frontier/forwarder vectors及 whole prior custody派生；dispatch前
+signed-limit gate不得接受 caller projection。摘要 DAG固定为：
 
 ```text
-authenticated policy V1 ───────────────┐
-parse receipt V2 digests + owner sets ──┼→ acquisition receipts/set/chain V1 → recursive closure V2 → resolution profile V3
-source/resolved plan + prior custody ───┘
+authenticated policy V1 ────────────────────┐
+parse receipt V2 digests + owner sets ───────┼→ request/resolution plans V1
+exact prior custody + canonical vectors ─────┘       ↓
+                                      acquisition output/receipt V2
+                                      → receipt-set/chain V1 → recursive closure V2 → resolution profile V3
 ```
 
-parse receipt只保存 producer acquisition ordinal，不保存 acquisition digest；acquisition receipt不得反向引用 final closure/profile
-或 required process context。外层 resolution profile仍只消费版本化 closure digest，因此 schema保持 V3。
+parse receipt只保存 producer acquisition ordinal，不保存 policy或 acquisition digest；policy经 plans与 chain传递绑定。
+acquisition receipt/output升级到 V2，因为其 plan字段现在承诺独立 forward-plan V1，不再复用 final reverse projection。
+receipt-set/chain material仍只消费 ordered versioned receipt digests，closure/profile仍只消费 versioned child digest，因此分别保持
+V1/V2/V3。plans与 receipt不得反向引用 final closure/profile或 required process context。
 
 ## 7. Failure、partial acquisition 与 quarantine
 
@@ -186,7 +210,8 @@ generation aggregate与 consuming currentness query，不表示递归开始前�
 KnownDLL/API-set/SxS currentness、post-create machine query、pre-resume enforcement、process create/resume、IPC、Store、Ready、
 v15、Provider、route、Offer、Capacity、Execution、Attempt、Lease、usage、settlement或 money。
 
-真实 authenticated policy signer/currentness、selector、prelease/recursive parser、GrantReady/recursive resolver、external-directory
+canonical request/resolution plan与 DispatchReady source shape虽已写，真实 authenticated policy signer/currentness、selector、
+prelease/recursive parser、GrantReady/recursive resolver、external-directory
 owner、grant/candidate/lease backend、positive-consuming advancer、sealer/query/reopen/release/recovery与所有 runtime producer均
 `missing`。source contract的存在不能升级 loader predecessor或 process reachability。
 

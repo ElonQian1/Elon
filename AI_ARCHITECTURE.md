@@ -209,9 +209,11 @@ F1 的 Ready 边界新增未登记、未编译/未运行的 source-lineage 草�
 
 F1 的 Windows Host authority草案已把线性 owner顺序冻结为 retained discovery → authenticated intent + package-only pre-lease
 PE → preliminary requests → private GrantReady wave-zero exact prefix → authenticated recursive policy-bound base acquisition →
-producer-wave same-owner parse/outgoing request/grant/candidate/lease custody → empty frontier/final aggregate → post-lease recursive
+producer-wave same-owner parse → A0 GrantReady复用或 Ak canonical request/resolution plan V1 → exact-vector DispatchReady →
+outgoing grant/candidate/lease custody → empty frontier/final aggregate → post-lease recursive
 final projection/fixpoint → resolution profile V3 → QueryVerified lineage → process pre-create projection。该 projection不是 live process machine/WOW64 receipt；recursive
-policy/custody与 final envelope虽已冻结，真实 signer/currentness/parser/backend/positive advancer仍缺，nested API-set DAG与
+policy/plans/custody与 final envelope虽已冻结，acquisition receipt/output为 V2而 receipt-set/chain保持 V1、parse/closure保持
+V2、profile保持 V3；真实 signer/currentness/parser/resolver/backend/positive advancer仍缺，nested API-set DAG与
 Shadow positive path继续 fail-closed。selector、prelease/recursive parser、resolver、positive-consuming、sealer/query、live-OS/launch-security/
 create/resume/recovery producers均保持
 uninhabited，Windows matrix未运行，pre-resume/dynamic-load、IPC/Store也未形成 authority；成熟度事实统一见

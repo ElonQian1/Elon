@@ -17,7 +17,9 @@ verification_status: source_review_only
 [Loader Load-Set authority](user-node-windows-runner-loader-load-set-authority.md) 负责。
 post-lease system-image fixed-point另见
 [Recursive System-Image Closure authority](user-node-windows-runner-recursive-system-image-closure-authority.md)，逐波 policy/custody见
-[Recursive System-Image Acquisition Custody authority](user-node-windows-runner-recursive-system-image-acquisition-custody-authority.md)。
+[Recursive System-Image Acquisition Custody authority](user-node-windows-runner-recursive-system-image-acquisition-custody-authority.md)，
+Ak forward plan见
+[Recursive Wave Resolution Plan authority](user-node-windows-runner-recursive-wave-resolution-plan-authority.md)。
 
 ## 1. 本批结论
 
@@ -29,7 +31,9 @@ resolver 必须消费的精确请求；GrantReady 合同虽已写，真实 resol
 grant/lease 前错误持有 final resolution 的时间顺序，并消除 loader resolution digest 与 process required-launch-context digest 的
 直接自引用。独立的 source-only recursive final-projection envelope现已冻结 wave-zero prefix、system-postlease suffix、
 producer-bound parse receipts、frontier/fixpoint与 final slice摘要；authenticated recursive policy与逐 producer wave whole-owner
-custody contract也已写，但真实 signer/currentness、grant/candidate/lease backend、positive advancer与 sealer producer仍 `missing`。
+custody contract也已写。A0复用 GrantReady，Ak canonical request/resolution plan V1、exact-vector limit派生与 DispatchReady
+source shape现已补齐，但真实 signer/currentness、parser/resolver、grant/candidate/lease backend、positive advancer与 sealer
+producer仍 `missing`。
 
 证据严格为 `source_written/source_review_only/implementation_uncompiled/implementation_unrun`、
 `passed=0/failed=0`、Windows dynamic=`0`、`migration/table/writer=none/none/none`。Manifest V1、InstallPlan V1 与
@@ -127,7 +131,8 @@ LaunchPathDiscoveredWork
 → base searched-name / launch-component grants + package leases + base route-specific system owners
 → same-handle full-package rehash/reparse under package leases
 → exact prelease-image/import-edge ↔ postlease-image/import-binding cross-binding receipt
-→ producer wave `k` same-owner parse + outgoing requests/terminal/dispositions/grants/candidates/leases
+→ producer wave `k` same-owner parse + canonical request/resolution plan V1
+→ exact-vector validation + DispatchReady + grants/candidates/leases
 → [next frontier非空] target parse wave `k+1` owners + deterministic suffix；[empty] terminal `A_N` target=None
 → empty recursive frontier + final aggregate + exact final edge/name/system-owner reverse projection
 → final exact PE graph + launch path + loader resolution seal
@@ -157,7 +162,9 @@ launch_context_selector_digest
 ├→ grant_ready_resolution_plan_digest
 └→ authenticated_recursive_resolution_policy_digest
 authenticated_recursive_resolution_policy_digest + grant_ready_resolution_plan_digest
-→ recursive_wave_acquisition_receipt_digests
+→ [A0 GrantReady reuse | Ak request/resolution plan V1]
+→ recursive_wave_acquisition_receipt_v2_digests
+→ receipt-set/acquisition-chain V1
 → recursive_resolution_closure_digest
 → windows_loader_resolution_profile.v3
 → windows_runner_required_launch_context.v3
@@ -193,7 +200,9 @@ postlease_exact_pe_import_graph_sealer = missing
 postlease_same_owner_lineage_contract = source_written_uncompiled_unrun
 recursive_system_import_closure_contract = source_written_uncompiled_unrun
 recursive_system_import_acquisition_custody_contract = source_written_uncompiled_unrun
+recursive_wave_request_resolution_plan_contract = source_written_uncompiled_unrun
 authenticated_recursive_policy_producer = missing
+recursive_wave_plan_resolver_producer = missing
 recursive_wave_acquisition_backend = missing
 recursive_wave_positive_advancer = missing
 recursive_system_import_closure_producer = missing
@@ -209,6 +218,6 @@ post_create_live_process_machine_context_queryback = missing
 ## 8. 源码铺设与生产可达
 
 源码铺设顺序允许在架构阶段继续冻结下一 typed contract；生产可达顺序不变：extraction-share 与 discovery 的真实 Windows
-动态矩阵仍必须先留下非零通过证据，且 selector/policy/parser/grant/candidate/lease/positive-advancer/post-lease
+动态矩阵仍必须先留下非零通过证据，且 selector/policy/parser/recursive-plan resolver/grant/candidate/lease/positive-advancer/post-lease
 sealer/query/reopen/currentness producers 全部闭合后
 才可提升 loader predecessor。任何 source shape、digest 或人工 review 都不能升级 Runtime、Ready、Provider 或经济效果。
