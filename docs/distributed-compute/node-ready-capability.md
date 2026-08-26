@@ -83,10 +83,12 @@ v217 源码新增 `reauthorize_existing`：Control-signed InstallPlan 只能精�
 2026-08-26 的未登记 `source_written/source_review_only/implementation_uncompiled/implementation_unrun` Windows Runner
 drafts 中，loader 定义单一 successor/by-value seam、FileId leases/reopen receipts 与五类 failure custody；process 定义
 launch/Job/pre-create currentness 及 unconfirmed whole-graph parking。extraction→loader 的 retained DELETE owner + narrow
-share-delete probe typed seam 已写，但 Windows 动态矩阵未运行；PE/launch/live-OS、launch-security/currentness/
+share-delete probe，以及 Runner/package-root/全部 plan-directory retained handle-chain 候选发现均已写，但不选择 CWD、
+不授予 grant，Windows 动态矩阵未运行；exact PE/launch authority/live-OS、launch-security/currentness/
 release-recovery producers 均缺，pre-resume/dynamic-load blocked；`passed=0/failed=0`、四 gap missing、loader 18 effects
 none，`migration/table/writer=none/none/none`，无 IPC/Store/health/Ready。边界见
 `user-node-windows-runner-extraction-directory-share-custody-authority.md`、
+`user-node-windows-runner-launch-path-discovery-authority.md`、
 `user-node-windows-runner-loader-load-set-authority.md`、
 `user-node-windows-runner-process-custody-authority.md` 与对应 acceptance。
 

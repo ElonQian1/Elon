@@ -58,16 +58,22 @@ source-contract guard 也未执行：
    definitive，positive receipt/owner 必须保留；所有 authenticated positive/negative response 均保留 exact response
    bytes + digest 并在 classification 前重算，对应 producer uninhabited；
 4. `existing_extraction_directory_access_share_compatibility=source_seam_written_windows_dynamic_unverified`；
-   retained DELETE owner + narrow share-delete probe 源码 seam 已线性接入，但不得认为 loader predecessor 已动态可达；
-5. authenticated exact PE graph 与 launch-path parent-chain authorities 以 `Infallible` 保持 uninhabited；sealed
+   retained DELETE owner + narrow share-delete probe 源码 seam 已线性接入；
+   `launch_path_handle_chain_discovery=source_written_windows_dynamic_unverified`，而 exact context selection/component
+   grant 仍 `missing`，不得认为 loader predecessor 已动态可达；
+5. 两阶段顺序固定为 discovery/pre-lease material → authenticated selection/preliminary plan → grants → leases →
+   same-handle rehash/reparse → final seal → query/reopen。authenticated exact PE graph 与 launch-path parent-chain
+   authorities 以 `Infallible` 保持 uninhabited；sealed
    startup/import resolution 必须先以 Runner basename 与 authenticated process preloaded/bootstrap set 预种
-   process-machine/cache-key/immutable-section/evidence-bound cache，再要求 Runner-rooted true reachable closure、per-importer continuous interleaved edge order、
-   resolved-module cache-key collision closure；package PE parser identity 必须是 FileId + sealed digest + lease generation +
-   immutable policy 的 canonical composite，禁止跨代 parser splice；KnownDLL named-section→immutable-image-section mapping；API-set
+   process-machine/cache-key/immutable-section/evidence-bound cache，再要求 Runner-rooted true reachable closure、symbol
+   name/ordinal、descriptor/thunk ordinal、actual reachable forwarder source-export/target-symbol/逐跳 evidence/cycle-depth、
+   已冻结 canonical merge rule 与 resolved-module cache-key collision closure；pre-lease parser material 不得预测 lease
+   generation，post-lease final sealer 必须在同一 handles 重哈希/重解析后加入真实 generation，禁止跨代 parser splice；
+   KnownDLL named-section→immutable-image-section mapping；API-set
    contract→host 递归终止于 exact authenticated preloaded module、KnownDLL、普通 filesystem search 或 SxS terminal；SxS 绑定
    activation-context receipt、exact search directory、FileId 与 immutable section；present searched-name disposition
-   直接绑定 package FileId，或 system FileId + immutable section + servicing generation，实际 lease generations 只由随后
-   consuming query/aggregate 绑定；external System/Windows/SxS search directory 保留 full handle-derived ancestor chain、
+   直接绑定 package FileId，或 system FileId + immutable section + servicing generation，实际 lease owners 先为 post-lease
+   final sealer 提供 generations，随后 consuming query/aggregate 再确认同一 set；external System/Windows/SxS search directory 保留 full handle-derived ancestor chain、
    parent share/grant contract 与 namespace-alias currentness receipt，并纳入
    `startup_import_resolution_profile_digest`；同时绑定 exact
    token/AppContainer、architecture/WOW64、empty-environment/search policy、cwd 和 creation flags；
@@ -125,7 +131,8 @@ source-contract guard 也未执行：
 | share-none→locked loader load-set | 0 | 0 | 1 | linear leases/reopen receipts/五类 failure-custody shapes 已写；success producers 不存在 |
 | successor-owned `ComputePluginRootLockLease` | 0 | 0 | 1 | exact owner shape 已写；external-borrow end 与 parked/leaked lifetime 未运行 |
 | existing extraction directory access/share compatibility | 0 | 0 | 1 | typed retained-owner seam 已写；Windows access/share、identity/path、descendant 与 failure-custody matrix 未运行 |
-| exact PE graph / launch-path / startup resolution | 0 | 0 | 1 | PE/parent-chain authorities uninhabited；parser composite 与 launch-context producer 未验证 |
+| launch-path retained-handle candidate discovery | 0 | 0 | 1 | source seam 已写但未动态运行；没有 selected CWD 或 component grant |
+| exact PE graph / launch-path / startup resolution | 0 | 0 | 1 | PE/parent-chain authorities uninhabited；post-lease sealer 与 launch-context producer 未验证 |
 | grants / unified package+system FileId leases / anchor reopen | 0 | 0 | 1 | acquisition/query/reopen backends 均不存在；servicing generation 与 exact negative ownership 未动态验证 |
 | live OS KnownDLL/API-set/SxS currentness | 0 | 0 | 1 | sealed/pre-create fields 只是 echoes；live backend 不存在 |
 | pre-create loader currentness backend | 0 | 0 | 1 | exact attempt/receipt/failure contract 已写，trait 无实现，process 不可达 |
@@ -160,9 +167,12 @@ source-contract guard 也未执行：
   servicing generation 必须穿越全部 failure/success/process custody；
 - extraction-directory retained DELETE owner + narrow share-delete probe 的共存、同 FileId/path、descendant
   retained-parent create-new、失败保管，以及普通 managed-directory open 未被放宽；
-- authenticated PE graph/launch-path parent chain、normal/delay/forwarder imports，以及 token/AppContainer、architecture/
-  WOW64、true reachable closure、per-importer continuous interleaved edge order、cache-key collision closure、package parser
-  FileId/sealed-digest/lease-generation/immutable-policy composite 与跨代 splice、KnownDLL
+- Runner/package-root/全部 plan-directory retained launch-path chains 的 granted access、volume/FileId/type/reparse、
+  single-component/Volume-GUID canonical relation 与 failure admission custody；
+- authenticated PE graph/exact launch-path selection+grants、normal/delay/forwarder symbol name/ordinal、descriptor/thunk
+  ordinal、actual reachable forwarder source-export/target-symbol/逐跳 evidence/cycle-depth、canonical merge rule，以及
+  token/AppContainer、architecture/WOW64、true reachable closure、cache-key collision closure、pre-lease parser
+  FileId/sealed-digest/policy 与 post-lease same-handle reparse/真实 lease-generation composite、跨代 splice、KnownDLL
   named-section mapping、API-set recursive exact terminal chain、SxS activation-context/search-directory/FileId/section
   binding、filesystem servicing-generation lease 与 parent-relative retained file/open/section receipts、present disposition
   package/system FileId + system section/servicing-generation binding、external search-directory handle-derived ancestor/
@@ -201,6 +211,7 @@ source-contract guard 也未执行：
   network/uptime 或完整 grant enforcement；
 - 声称 loader、exact PE graph/launch path、launch-security/private-desktop、live-OS/pre-create/pre-resume currentness、
   release/recovery 或 dynamic-load enforcement producer 已实现/可达；
+- 把 launch-path candidate discovery receipt 称为 selected CWD、component grant、exact launch authority 或动态证明；
 - 声称 pre-create currentness 已封存 suspended child 运行时才解析的 eventual imports；
 - 在 loader currentness 后跳过紧邻 `CreateProcessAsUserW` 的 launch-security live validation，或在两者间插入 fallible setup；
 - 把 sealed/pre-create KnownDLL/API-set/SxS echoes 称为 live OS currentness；

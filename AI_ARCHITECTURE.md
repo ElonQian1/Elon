@@ -211,10 +211,12 @@ F1 的 Windows Host 路径另新增 loader load-set/process custody authority �
 完整 by-value seam、线性 FileId leases/anchor reopen receipts 与五类 failure-custody contract；process 定义
 launch/Job/pre-create currentness 与终止未确认时的 whole-graph custody。exact PE/launch-path/live-OS、
 launch-security/currentness/release-recovery producers 均保持 uninhabited；extraction→loader 已写 retained DELETE
-owner + narrow share-delete probe 的父句柄相对 typed seam，但未动态验证 Windows access/share matrix，pre-resume/
+owner + narrow share-delete probe 的父句柄相对 typed seam，其上新增 Runner/package-root/全部 plan-directory retained
+handle-chain 候选发现，但没有 authenticated CWD selection 或 component grant；两层 Windows matrix 均未动态验证，pre-resume/
 dynamic-load、IPC/Store 也未形成 authority；成熟度事实统一见
 `docs/distributed-compute/current-implementation-status.md`，精确边界见
 `docs/distributed-compute/user-node-windows-runner-extraction-directory-share-custody-authority.md`、
+`docs/distributed-compute/user-node-windows-runner-launch-path-discovery-authority.md`、
 `docs/distributed-compute/user-node-windows-runner-loader-load-set-authority.md` 与
 `docs/distributed-compute/user-node-windows-runner-process-custody-authority.md`。
 

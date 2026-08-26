@@ -34,6 +34,7 @@ Windows、网络、设备或真实 Runner 验证：
 | Owner | 文件 | 责任 |
 |---|---|---|
 | private facade | `runtime_loader_load_set.rs` | 路由 model/failure/policy/resolution/transition/validation；声明无 producer 与成功 transition |
+| launch-path discovery | `node_agent_managed_fs/{loader_launch_path_discovery,windows_loader_launch_path_discovery}.rs`、`runtime_loader_load_set/launch_path_discovery.rs` | typed retained-owner handle-chain candidate observations；不选择 CWD、不授予 grant |
 | resolution owners | `runtime_loader_load_set/resolution.rs` | uninhabited PE graph/launch path/resolution、parser composite、name grants、FileId leases 与 pre/post-query authority |
 | successor model | `runtime_loader_load_set/model.rs` | 自有 exact root-lock 的单一 successor、全 authority residue、持有 lease/reopen receipt 的 indexed package files |
 | failure custody | `runtime_loader_load_set/failure.rs` | name-grant、content-lease、borrow-only、namespace-query 与 indexed post-barrier 五类 custody |
@@ -62,12 +63,15 @@ Windows、网络、设备或真实 Runner 验证：
    failure/success/process custody，外部 root borrow 结束或 graph leaked/unconfirmed 都不得解锁；
 5. purpose-specific seams 按值移动全部 authority，exact 验证 file+lease vector/cardinality/ordinal/path/FileId，不借用
    cleanup projection、截断式 zip、clone 或 scalar reconstruction；
-6. `SealedWindowsPeImportGraphAuthority`、`SealedWindowsLoaderLaunchPathAuthority` 与整个 resolution
-   authority 含 `Infallible`，exact PE graph/launch-path producer 不存在；PE validation 必须先以 Runner basename 与
+6. source-written launch-path discovery 只从 retained Runner/package-root/全部 plan-directory handles 生成候选观测，
+   success/failure 均返回原 admission owner；它不含 selected CWD 或 grant。`SealedWindowsPeImportGraphAuthority`、
+   `SealedWindowsLoaderLaunchPathAuthority` 与整个 resolution authority 继续含 `Infallible`，exact PE graph/launch-path
+   producer 不存在；PE validation 必须先以 Runner basename 与
    authenticated process preloaded/bootstrap module set 预种 cache，逐项绑定 process-machine context/cache key/
-   immutable section/evidence，再证明 Runner-rooted true reachable closure、每 importer 连续交错 edge ordinals 及
-   resolved-module cache-key collision closure；每个 package PE parser material identity 必须是 FileId + sealed digest +
-   lease generation + immutable policy 的 canonical composite，parser evidence/edges 不得跨代 splice；
+   immutable section/evidence，再证明 Runner-rooted true reachable closure；normal/delay/forwarder 必须绑定 symbol
+   name/ordinal、descriptor/thunk ordinal，forwarder 绑定 source export/target symbol/逐跳 evidence/cycle-depth receipt，并
+   执行已冻结的 canonical merge rule；resolved-module cache-key collision 必须闭包。pre-lease parser material 不得预测
+   lease generation，final sealer 必须在 lease 下 same-handle rehash/reparse 后加入真实 generation，禁止跨代 splice；
 7. resolution material 覆盖 normal/delay/forwarder、package/system modules、KnownDLL/API-set/SxS/system images、
    searched names 及 exact token/AppContainer、architecture/WOW64、environment/search policy、cwd/flags launch context；
    KnownDLL named section 必须映射到 exact immutable image section；API-set contract→host 必须递归终止于 exact
@@ -80,7 +84,8 @@ Windows、网络、设备或真实 Runner 验证：
    与 runtime `LoadLibrary` enforcement 均为 resume blocker；
 9. exact searched-name/launch-path grants 绑定 session、parent/name、disposition 和 generation，覆盖 present/absent/
    shadow；present disposition digest 直接绑定 package/system exact FileId，system 还绑定 immutable section 与 servicing
-   generation；实际 package+system lease generations 只由随后 consuming query/aggregate 绑定；统一 FileId lease-set
+   generation；实际 package+system lease owners 先为 post-lease final sealer 提供 generation，随后 consuming
+   query/aggregate 再确认同一 set；统一 FileId lease-set
    拒绝 writable open/write/delete/writable-section mapping；两类 backend 均无 producer；
 10. name-grant `AuthenticatedRejected`、content-lease `DefinitiveRejected` 和 namespace-query `DefinitiveRejected`
     都必须持有与 exact owner/session/attempt/request/nonce 匹配的 authenticated-negative receipt；错绑或缺失
@@ -100,11 +105,14 @@ Windows、网络、设备或真实 Runner 验证：
 14. managed loader owners 不暴露 raw handle/path constructor、clone 或 Serde 逃逸；
 15. package files 与 purpose-specific extraction-directory probe 都有 candidate Windows access/share recipe，均只
     `FILE_OPEN`；目录 probe 保留原 DELETE owner、要求 share-read/write/delete 且不替代 namespace/content authority；
-16. transition 权威顺序要求 name/launch grant acquisition、统一 package+system FileId lease acquisition、lease 下
-    same-handle rehash、consuming generation query、exact indexing、
+16. transition 权威顺序要求 borrow-only launch-path discovery/pre-lease PE plan、authenticated exact CWD selection、
+    name/launch grant acquisition、统一 package+system FileId lease acquisition、lease 下 same-handle rehash/reparse 与
+    final PE/launch/resolution seal、consuming generation query、exact indexing、
     retain directories、Runner-last file reopen、anchor receipt、identity/hash/path 与 final query；
 17. `existing_extraction_directory_access_share_compatibility=source_seam_written_windows_dynamic_unverified`；typed
     retained-owner seam 已接入 extraction→loader owner graph，但没有 Windows 动态证据；
+    `launch_path_handle_chain_discovery=source_written_windows_dynamic_unverified`，而
+    `launch_path_exact_context_selection=missing`、`launch_path_component_grant_backend=missing`；
 18. success digest 不代替 resolution/namespace/lease authority；persistent grants 的 explicit authorized release/recovery 无
     producer，不得以 Drop/session disconnect 释放；
 19. process custody 只接受 loader-locked successor；loader slice 内没有 `CreateProcessAsUserW`、`ResumeThread`、
@@ -119,6 +127,7 @@ Windows、网络、设备或真实 Runner 验证：
 |---|---:|---:|---:|---|
 | Rust compile / Windows link | 0 | 0 | 1 | 未编译，type/borrow/Win32 constants 未由 compiler 证明 |
 | source-contract Rust test | 0 | 0 | 1 | guard 已写但未运行 |
+| launch-path retained-handle candidate discovery | 0 | 0 | 1 | source seam 已写；Windows access/FileId/type/reparse/canonical-chain/failure custody 未运行 |
 | exact PE graph / launch-path authority | 0 | 0 | 1 | authenticated parser 与 parent-chain grant/share authorities 均以 `Infallible` uninhabited |
 | exact startup/import resolution producer | 0 | 0 | 1 | resolution 不可构造，无 imports/system identities 或 launch-context proof |
 | searched-name / launch-path grants | 0 | 0 | 1 | 无 acquisition backend；present/absent/shadow 与 component grants 未证明 |
@@ -167,10 +176,14 @@ exact 18 项：`runtime_phase`、`runtime_generation`、`runtime_start`、`runti
 
 解除架构阶段禁令后，至少验证：
 
-- authenticated PE normal/delay/forwarder graph、recursive/system edges、architecture/WOW64、launch-path parent chain、
+- launch-path Runner/package-root/全部 plan-directory retained chains 的 granted access、volume/FileId/type/reparse、
+  single-component/Volume-GUID canonical relation 与每阶段 failure admission custody；
+- authenticated PE normal/delay/forwarder symbol name/ordinal、descriptor/thunk ordinal、actual reachable forwarder
+  source-export/target-symbol/逐跳 evidence/cycle-depth、canonical merge rule、recursive/system edges、architecture/WOW64、
+  exact launch-path selection/grants、
   Runner-basename/preloaded/bootstrap authenticated cache seed、process-machine/cache-key/immutable-section/evidence
-  drift、true reachable closure、per-importer continuous interleaved edge order、resolved-module cache-key collision closure、
-  package parser FileId/sealed-digest/lease-generation/immutable-policy canonical composite 与跨代 splice、
+  drift、true reachable closure、已冻结 canonical merged edge order、resolved-module cache-key collision closure、
+  pre-lease package parser FileId/sealed-digest/policy 与 post-lease same-handle reparse/真实 lease-generation composite、跨代 splice、
   KnownDLL named-section→immutable-image-section mapping、API-set contract→host recursive terminal chain、SxS
   activation-context/search-directory/FileId/section binding、filesystem parent-relative retained file/open/section receipts、
   servicing-generation-bound system immutable lease、external search-directory handle-derived ancestor/parent-share-grant/
@@ -207,10 +220,12 @@ exact 18 项：`runtime_phase`、`runtime_generation`、`runtime_start`、`runti
 以下任一声明均为失败：
 
 - 声称本批已生成 `LoaderLockedWorkAdmittedPluginSlot` 或调用了 Windows loader/process backend；
+- 把 source-written handle-chain candidate receipt 称为 selected CWD、component grant、exact launch-path authority 或
+  Windows dynamic proof；
 - 声称 exact PE graph、launch-path、resolution、name-grant、content-lease/query/reopen/release producer 可构造；
 - 把完整 package file set、hash 或 extraction plan 称为 startup/import resolution authority；
 - 忽略 Runner-basename/preloaded/bootstrap cache seed 与其 process-machine/cache-key/immutable-section/evidence binding、
-  PE true reachable closure/per-importer continuous interleaved edge order/cache-key collision closure、KnownDLL
+  PE true reachable closure/canonical merged edge order/cache-key collision closure、KnownDLL
   named-section immutable-image mapping、API-set recursive exact terminal、SxS activation-context/search-directory/FileId/
   section binding、external search-directory ancestor/parent-share-grant/alias-currentness receipt，或 filesystem system
   servicing-generation lease 与 parent-relative retained file/open/section receipts；

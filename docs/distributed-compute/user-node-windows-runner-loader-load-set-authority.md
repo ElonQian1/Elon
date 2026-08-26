@@ -21,10 +21,11 @@ seam、五类 failure-custody contract 与不可伪造 prerequisite**。它修�
 `DurableWorkAdmittedPluginSlot + detached image` 的不可能所有权形状：Runner 本来就是 admission 内完整 package
 file set 的一个 ordinal，成功结果只能是替换原 admission 的单一 successor owner。
 
-当前 exact PE graph、launch-path parent-chain、startup/import resolution、searched-name grants/query、FileId
-content leases、package-file reopen/recovery 都无 producer；其中 PE/launch-path/resolution authority 以 `Infallible`
-保持 uninhabited。既有 extraction directory access/share compatibility 已形成 purpose-specific retained-owner
-源码 seam，但 Windows 动态矩阵仍为 `unverified`。因此
+当前 exact PE graph、launch-context selection、launch-path grants/authority、startup/import resolution、searched-name
+grants/query、FileId content leases、package-file reopen/recovery 都无 producer；其中 PE/launch-path/resolution authority
+以 `Infallible` 保持 uninhabited。既有 extraction directory access/share compatibility 与 Runner/package-root/全部
+plan-directory retained handle-chain discovery 已形成 purpose-specific source seam，但 Windows 动态矩阵仍为
+`unverified`。discovery receipt 不是 exact CWD、grant 或 launch-path authority。因此
 `LoaderLockedWorkAdmittedPluginSlot` 没有成功 producer，进程 backend 仍不可达。
 本批只定义指定 launch context 下的 startup/import resolution material；pre-create 观测最多保护 path-based
 process open，普通 imports 多在 suspended primary thread 后续运行时解析。因此 pre-resume loader-currentness 与
@@ -43,11 +44,14 @@ process open，普通 imports 多在 suspended primary thread 后续运行时解
 
 冻结的完整图为：
 
-`DurableWorkAdmittedPluginSlot<'root> + WindowsRunnerLoadSetBorrowPrerequisite`
-→ borrow-only receipt/evidence/resolution preflight
+`DurableWorkAdmittedPluginSlot<'root>`
+→ borrow-only receipt/evidence preflight
+→ 从 retained handles 发现 Runner/package-root/全部 plan-directory launch-path candidates，并预租约解析 PE material
+→ authenticated launch-context 选择 exact CWD 并形成 preliminary resolution plan
 → 为全部 searched/launch-path names 取得 exact grants
 → 取得 package files 与普通 filesystem system images 的统一 linear content-lease set；system lease 绑定 servicing generation
-→ 在 lease 下做 same-handle full-package rehash
+→ 在 lease 下做 same-handle full-package rehash/re-parse，封印 exact PE graph、launch path 与 startup/import resolution，
+  形成 `WindowsRunnerLoadSetBorrowPrerequisite`
 → consuming query 同时验证 name-grant 与 content-lease generation set
 → purpose-specific by-value destructure
 → validate 并包装原 package-root/plan-directory handles，不关闭或重开目录
@@ -97,9 +101,11 @@ authority。当前函数名表达调用顺序约束，但没有 caller，也没�
 
 ## 4. 不可构造的 resolution/name/content authority
 
-关闭任何 share-none package file 前，必须按 resolution → name grants → package+system content leases → lease 下
-same-handle rehash → consuming generation query-back 的权威顺序完成；任一不可构造的子 authority 都使成功
-prerequisite 不可达。
+关闭任何 share-none package file 前，必须按 borrow-only discovery/pre-lease material → authenticated exact CWD
+selection/preliminary resolution plan → name/launch-component grants → package+system content leases → lease 下
+same-handle rehash/re-parse → final resolution seal → consuming generation query-back 的权威顺序完成。当前
+`WindowsRunnerLoadSetBorrowPrerequisite` 仍把 final resolution 作为不可构造输入；未来
+producer 必须按上述两阶段拆分，不能预测 lease generation 或让 discovery receipt 冒充 final authority。
 
 ### 4.1 Exact startup/import resolution authority
 
@@ -108,15 +114,17 @@ prerequisite 不可达。
 - exact work-admission source、extraction plan、Runner 与 working directory；
 - exact launch token/AppContainer profile、target architecture/WOW64 mode、显式空 environment 及 loader search
   policy、cwd 与 process creation flags；
-- normal imports、delay imports 与 forwarders；
+- normal imports、delay imports 与实际被引用的 forwarders；每条边必须绑定 import symbol name/ordinal、descriptor/thunk
+  ordinal；forwarder 还必须绑定 source export、target DLL/symbol、逐跳 evidence 与 cycle/depth receipt；
 - 在校验任何 PE edge 前，以 Runner basename 和 authenticated process preloaded/bootstrap module set 预种 module-cache
   closure；每项预种绑定 process-machine context、cache key、immutable section 与 authenticated evidence；
-- 再从 Runner 根计算真实 reachable closure；每个 importer 的 normal/delay/forwarder edges 必须共用连续且保持原始
-  交错顺序的 ordinal sequence；resolved-module cache key 的全部 collision class 必须闭包到唯一 exact module
-  identity，冲突或漏项均拒绝；
+- 再从 Runner 根计算真实 reachable closure；normal/delay/forwarder 来自不同 PE tables，producer 必须先冻结并执行
+  canonical merge rule，不能声称存在未定义的“原始交错顺序”；resolved-module cache key 的全部 collision class 必须
+  闭包到唯一 exact module identity，冲突或漏项均拒绝；
 - package module name → exact package-file ordinal/digest/FileId；
-- 每个 package PE parser material identity 必须是 FileId + sealed digest + content-lease generation + immutable policy
-  的 canonical composite；parser evidence/edges 必须绑定该 composite，禁止跨代 parser splice；
+- pre-lease package PE material 绑定 FileId + sealed digest + parser policy，但不得包含或预测 content-lease generation；
+  final sealer 必须在 leases 下从同一 handles 重哈希/重解析，并把真实 lease generation 加入 canonical composite。
+  parser evidence/edges 禁止跨代 splice；
 - allowed system dependency → exact resolved component identity；普通 filesystem system image 还必须持有
   servicing-generation-bound immutable content lease、parent-relative retained file custody、authenticated open receipt 与
   immutable image-section receipt；
@@ -133,16 +141,17 @@ prerequisite 不可达。
 
 当前 exact `SealedWindowsPeImportGraphAuthority` 和 `SealedWindowsLoaderLaunchPathAuthority` 分别以
 authenticated-parser 与 parent-chain grant/share `Infallible` 字段保持 uninhabited；整个
-`SealedWindowsLoaderResolutionAuthority` 也无 producer。完整 package file set 只证明 archive coverage，
-**不证明** preloaded/bootstrap cache seed、exact PE graph、launch path 或 startup/import resolution。
+`SealedWindowsLoaderResolutionAuthority` 也无 producer。source-written handle-chain candidate discovery 只证明 typed
+owner 上的候选观测形状；完整 package file set 只证明 archive coverage，二者都 **不证明** selected CWD、component
+grants、preloaded/bootstrap cache seed、exact PE graph、launch path 或 startup/import resolution。
 
 ### 4.2 Whole searched-name namespace authority
 
 未来 namespace producer 必须在 kernel 层原子覆盖 startup/import policy 的完整 searched-name 和 launch-path
 component set，包括预期存在文件与预期缺失/shadow name。每个 grant 必须与 exact session、parent/name、
 disposition 和 generation 绑定。present searched-name disposition digest 必须直接绑定 resolved package/system exact
-FileId；system target 还必须绑定 immutable section identity 与 servicing generation。随后 consuming query/aggregate
-才绑定实际 package+system content-lease generations。普通 directory
+FileId；system target 还必须绑定 immutable section identity 与 servicing generation。实际 package+system lease owners
+先把 generation 交给 post-lease final sealer，随后 consuming query/aggregate 必须再次确认同一 generation set。普通 directory
 handle/share mode、digest 或 oplock 不能代替。
 
 当前 searched-name grant acquisition/fence/query backend 均不存在。成功 owner 只能暴露从该 authority 派生的
@@ -208,10 +217,12 @@ uninhabited，不能由 source shape 推导真实回执已产生。
 
 ## 6. Candidate package-file reopen 与 retained-directory 边界
 
-候选顺序固定为：borrow-only preflight → exact name/launch-path grants → indexed package+system FileId content leases →
-lease 下 same-handle full-package rehash → consuming name-grant/content-lease-generation query → exact file+lease owner-graph
-indexing → retain/wrap 原 package-root 与 plan-directory handles → 只对 package files parent-relative close/reopen（Runner
-最后）→ anchor-consuming reopen receipt → replacement identity/hash/handle-path → ordered final name/content query。
+候选顺序固定为：borrow-only receipt/evidence preflight → retained handle-chain launch-path discovery + pre-lease PE material →
+authenticated exact CWD/preliminary resolution selection → exact name/launch-component grants → indexed package+system FileId
+content leases → lease 下 same-handle rehash/re-parse + final PE/launch/resolution seal → consuming name-grant/content-lease-
+generation query → exact file+lease owner-graph indexing → retain/wrap 原 package-root 与 plan-directory handles → 只对 package
+files parent-relative close/reopen（Runner 最后）→ anchor-consuming reopen receipt → replacement identity/hash/handle-path →
+ordered final name/content query。
 
 package files 与 extraction-directory compatibility probe 的候选 access/share shape 为：
 
@@ -259,14 +270,16 @@ crash/recovery owner；不得以 Drop 或 session disconnect 当作 release。�
 
 1. 在 Windows 动态验证 source-written `existing_extraction_directory_access_share_compatibility` access/share、
    identity/path 与 failure-custody 矩阵；验证前不得假定 directory predecessor 可达；
-2. 实现 authenticated exact PE graph 与 launch-path parent-chain authority producer，再形成 launch-context-bound
-   startup/import/system resolution；
-3. 实现 searched-name/launch-path grant acquisition 与 FileId immutable-content lease backends，对三种
+2. 动态验证 source-written retained handle-chain discovery，并冻结 pre-lease PE symbol/forwarder material、canonical edge
+   merge rule 与 authenticated exact CWD selector；
+3. 形成 preliminary resolution plan，实现 searched-name/launch-path grant acquisition 与 FileId immutable-content lease
+   backends，对三种
    authenticated-negative 精确绑定 owner/attempt/session/request/nonce；
-4. 实现 consuming namespace/content-generation query、anchor-consuming reopen receipt、final query 与全五类 recovery；
-5. 实现 persistent-grant explicit authorized release/crash recovery 与 live Windows KnownDLL/API-set/SxS currentness；
-6. 执行 Windows share/TOCTOU/content-mapping/rename/swap/reparse/hardlink/delete-pending/startup-import matrix；
-7. 后续另行实现 pre-resume loader-currentness、dynamic `LoadLibrary` enforcement、launch security、IPC/Store、
+4. 在 leases 下 same-handle 重哈希/重解析，封印 exact PE graph、launch path 与 startup/import/system resolution；
+5. 实现 consuming namespace/content-generation query、anchor-consuming reopen receipt、final query 与全五类 recovery；
+6. 实现 persistent-grant explicit authorized release/crash recovery 与 live Windows KnownDLL/API-set/SxS currentness；
+7. 执行 Windows share/TOCTOU/content-mapping/rename/swap/reparse/hardlink/delete-pending/startup-import matrix；
+8. 后续另行实现 launch security、pre-create/pre-resume loader-currentness、dynamic `LoadLibrary` enforcement、IPC/Store、
    controlled resume、health/Ready/v15。
 
 任何后续步骤都不能从本批 source types 或 digest 字段推导“loader load-set 已锁定”。
