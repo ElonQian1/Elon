@@ -81,7 +81,7 @@ internal class ChatGptWebMcpActions(
         }
         when (action) {
             "state", "open_chatgpt_web" -> Unit
-            "set_input_text" -> {
+            "set_input_text", "chatgpt_set_page_input_text" -> {
                 val text = args.optString("text").take(MAX_INPUT_CHARS)
                 val expectedDraft = snapshot()?.draft.orEmpty().take(MAX_INPUT_CHARS)
                 setInputText(text)
@@ -89,7 +89,7 @@ internal class ChatGptWebMcpActions(
                     commands.setDraft(text, expectedDraft, requestId)
                 }
             }
-            "send_input" -> dispatch("send_prompt", commands::sendInput)
+            "send_input", "chatgpt_send_page_input" -> dispatch("send_prompt", commands::sendInput)
             "chatgpt_invoke_control" -> {
                 val controlId = args.optString("control_id")
                 if (!CONTROL_ID.matches(controlId)) return error(action, "invalid_control_id")

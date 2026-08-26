@@ -32,7 +32,7 @@ class ChatGptWebMcpActionsTest {
         )
 
         val result = actions.control(JSONObject()
-            .put("action", "set_input_text")
+            .put("action", "chatgpt_set_page_input_text")
             .put("text", "next prompt"))
 
         assertTrue(result.getBoolean("control_ok"))
@@ -302,7 +302,7 @@ class ChatGptWebMcpActionsTest {
             includeRealtimeVoiceControl = true,
             onDispatch = { action, requestId -> dispatched += action to requestId },
         )
-        val commands = listOf(JSONObject().put("action", "send_input") to "send_prompt",
+        val commands = listOf(JSONObject().put("action", "chatgpt_send_page_input") to "send_prompt",
             JSONObject().put("action", "chatgpt_invoke_control")
                 .put("control_id", "control_suggestion_demo") to "invoke_ui_control",
             JSONObject().put("action", "chatgpt_set_control_text")

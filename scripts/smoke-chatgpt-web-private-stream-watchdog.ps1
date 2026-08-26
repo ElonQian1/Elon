@@ -27,6 +27,7 @@ $watchdogFired = $false
 $streamSettled = $false
 $originalConversationRestored = $false
 $originalProviderRestored = $false
+$probePrompt = "Write 120 short numbered lines, one item per line."
 
 function Get-ConversationPath {
     param([AllowNull()][string]$Url)
@@ -69,6 +70,9 @@ try {
         -TimeoutSec $ReadyTimeoutSec
     Assert-ChatGptWebSmokeAdapterVersion -State $ready `
         -ExpectedAdapterVersion $ExpectedAdapterVersion
+    if ([int]$ready.input.text_length -ne 0) {
+        throw "ChatGPT watchdog acceptance refuses to overwrite an existing native draft."
+    }
     $originalChatPath = Get-ConversationPath ([string]$ready.conversation.url)
 
     $newDispatch = Invoke-ChatGptWebSmokeReadyAction -Runtime $runtime `
@@ -86,6 +90,7 @@ try {
                 $state.adapter_current -eq $true -and
                 $state.composer_ready -eq $true -and
                 $state.streaming -eq $false -and
+                [int]$state.input.text_length -eq 0 -and
                 [int]$state.conversation.message_count -eq 0
         }
     $privateRevisionBefore = [long]$blank.private_stream_observer.revision
@@ -99,15 +104,19 @@ try {
     $probeStartedAtMs = [long]$probeDispatch.command_receipt.started_at_ms
 
     $draftDispatch = Invoke-ChatGptWebSmokeReadyAction -Runtime $runtime `
-        -Action "set_input_text" -Arguments @{
-            text = "Write 120 short numbered lines, one item per line."
-        } -TimeoutSec $ReadyTimeoutSec
-    $draftRequestId = [string]$draftDispatch.command_receipt.request_id
-    Wait-Command -RequestId $draftRequestId -ExpectedAction "set_draft" `
-        -TimeoutSec $ReadyTimeoutSec | Out-Null
+        -Action "chatgpt_set_page_input_text" -Arguments @{ text = $probePrompt } `
+        -TimeoutSec $ReadyTimeoutSec
+    if ($draftDispatch.control_ok -ne $true) {
+        throw "Unable to stage the isolated watchdog prompt."
+    }
+    Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec 15 `
+        -Description "isolated watchdog native draft" -Predicate {
+            param($state)
+            [int]$state.input.text_length -eq $probePrompt.Length
+        }.GetNewClosure() | Out-Null
 
     $sendDispatch = Invoke-ChatGptWebSmokeReadyAction -Runtime $runtime `
-        -Action "send_input" -TimeoutSec $ReadyTimeoutSec
+        -Action "chatgpt_send_page_input" -TimeoutSec $ReadyTimeoutSec
     $sendRequestId = [string]$sendDispatch.command_receipt.request_id
     if ([string]::IsNullOrWhiteSpace($sendRequestId)) {
         throw "Streaming probe did not return a command receipt."
@@ -147,6 +156,11 @@ try {
         if ($current.streaming -eq $true) {
             Invoke-ChatGptWebSmokeReadyAction -Runtime $runtime `
                 -Action "chatgpt_stop_generation" -TimeoutSec 20 | Out-Null
+        }
+        if ([int]$current.input.text_length -eq $probePrompt.Length) {
+            Invoke-ChatGptWebSmokeReadyAction -Runtime $runtime `
+                -Action "chatgpt_set_page_input_text" -Arguments @{ text = "" } `
+                -TimeoutSec 20 | Out-Null
         }
     } catch { }
     if ($originalChatPath) {

@@ -650,6 +650,8 @@ class ChatGptWebFeatureBaselineTest {
             "state",
             "set_input_text",
             "send_input",
+            "chatgpt_set_page_input_text",
+            "chatgpt_send_page_input",
             "stage_chatgpt_web_acceptance_attachment",
             "remove_chatgpt_web_acceptance_attachment",
             "chatgpt_invoke_control",

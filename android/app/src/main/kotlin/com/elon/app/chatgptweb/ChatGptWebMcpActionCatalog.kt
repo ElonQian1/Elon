@@ -5,6 +5,8 @@ internal object ChatGptWebMcpActionCatalog {
         "state",
         "set_input_text",
         "send_input",
+        "chatgpt_set_page_input_text",
+        "chatgpt_send_page_input",
         "chatgpt_invoke_control",
         "chatgpt_set_control_text",
         "chatgpt_set_control_selected",

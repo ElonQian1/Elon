@@ -217,6 +217,8 @@ class ChatGptWebProductIntegrationContractTest {
         assertTrue(baseAdapter.contains("streamWatchdogProbe.watchdogFired(schedule)"))
         assertTrue(watchdogProbe.contains("private_stream_watchdog_timeout"))
         assertTrue(watchdogProbe.contains("minimumStallMs"))
+        assertTrue(mcp.contains("chatgpt_set_page_input_text"))
+        assertTrue(mcp.contains("chatgpt_send_page_input"))
         assertTrue(mcp.contains("adb_content_description"))
         assertTrue(mcp.contains("context_id"))
         assertTrue(mcp.contains("ChatGptWebMessageJson.encode"))
