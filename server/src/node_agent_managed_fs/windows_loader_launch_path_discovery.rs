@@ -32,7 +32,7 @@ use windows_sys::{
     },
 };
 
-pub(super) fn discover_loader_directory_launch_path(
+pub(in crate::node_agent_managed_fs) fn discover_loader_directory_launch_path(
     directory: &PinnedManagedDirectory,
 ) -> Result<ManagedLoaderLaunchPathDiscoveryReceipt> {
     let handles = directory
@@ -53,7 +53,7 @@ pub(super) fn discover_loader_directory_launch_path(
     )
 }
 
-pub(super) fn discover_loader_file_launch_path(
+pub(in crate::node_agent_managed_fs) fn discover_loader_file_launch_path(
     file: &PinnedManagedFile,
 ) -> Result<ManagedLoaderLaunchPathDiscoveryReceipt> {
     let mut handles = file
