@@ -136,10 +136,8 @@ fn prelease_pe_material_is_exact_but_predicts_no_grant_or_lease_generation() {
         "target_symbol_name",
         "target_symbol_ordinal",
         "hop_evidence_digest",
-        "cycle_check_receipt_digest",
         "reachable_set_digest",
         "module_cache_collision_closure_digest",
-        "authenticated_module_cache_collision_receipt_digest",
         "importer_edge_ordinal",
         "normalized_module_name",
         "process_machine_context_digest",
@@ -166,6 +164,8 @@ fn prelease_pe_material_is_exact_but_predicts_no_grant_or_lease_generation() {
     assert!(PRELEASE_PE
         .contains("self.package_images[hop.source_image_ordinal].normalized_module_name"));
     assert!(PRELEASE_PE_CLOSURE.contains("validate_external_leaf_coverage"));
+    assert!(PRELEASE_PE_CLOSURE.contains("cycle_check_receipt_digest"));
+    assert!(PRELEASE_PE_CLOSURE.contains("authenticated_module_cache_collision_receipt_digest"));
     assert!(PRELEASE_PE_DIGEST.contains("ELON_WINDOWS_RUNNER_PRELEASE_PE_MATERIAL_V1"));
     assert!(PRELEASE_PE_DIGEST.contains("ELON_WINDOWS_PE_EDGE_MERGE_RULE_V1"));
     assert!(PRELEASE_PE_DIGEST.contains("self.0.update([1])"));
@@ -295,7 +295,7 @@ fn grant_ready_plan_is_private_typed_and_splits_movable_owners_before_final_reso
     }
     let prerequisite = between(
         GRANT_READY,
-        "struct GrantReadyWindowsRunnerResolutionPrerequisite<'root>",
+        "pub(in crate::node_agent_compute_plugin_host::runtime_loader_load_set) struct GrantReadyWindowsRunnerResolutionPrerequisite<",
         "/// Name-grant success consumes",
     );
     for required in [
@@ -310,7 +310,8 @@ fn grant_ready_plan_is_private_typed_and_splits_movable_owners_before_final_reso
     assert!(GRANT_READY.contains("struct GrantAcquiredWindowsRunnerResolutionLeaseCustody"));
     assert!(RESOLUTION
         .contains("resolution_custody: GrantAcquiredWindowsRunnerResolutionLeaseCustody<'root>"));
-    assert!(GRANT_READY.contains("struct PostLeaseWindowsRunnerResolutionLineage<'root>"));
+    assert!(GRANT_READY.contains("struct PostLeaseWindowsRunnerResolutionLineage<"));
+    assert!(GRANT_READY.contains("'root,"));
     assert!(
         RESOLUTION.contains("resolution_lineage: PostLeaseWindowsRunnerResolutionLineage<'root>")
     );

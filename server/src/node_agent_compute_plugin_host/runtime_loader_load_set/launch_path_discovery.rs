@@ -20,6 +20,7 @@ use crate::node_agent_managed_fs::{
 
 use super::super::work_admission_contract::DurableWorkAdmittedPluginSlot;
 
+pub(in crate::node_agent_compute_plugin_host) use exact_context_plan::WindowsRunnerLaunchContextPreCreateProjection;
 pub(super) use exact_context_plan::{
     consume_query_verified_loader_prerequisite, AuthenticatedWindowsRunnerLaunchContextIntent,
     PreliminaryResolutionRequestsPlannedWork, PreliminaryWindowsRunnerResolutionRequestPlanView,
@@ -29,7 +30,6 @@ pub(super) use exact_context_plan::{
     WindowsPreliminaryLaunchPathComponentRequest, WindowsPreliminaryModuleEdgeLocator,
     WindowsPreliminaryModuleResolutionRequest, WindowsPreliminaryRetainedDirectoryLocation,
     WindowsPreliminarySearchDirectoryBinding, WindowsPreliminarySearchDirectoryTarget,
-    WindowsRunnerLaunchContextPreCreateProjection,
 };
 
 const CANDIDATE_BINDING_DOMAIN: &[u8] = b"ELON_WINDOWS_RUNNER_LAUNCH_PATH_CANDIDATES_V1";

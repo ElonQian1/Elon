@@ -3,9 +3,11 @@
 use super::{
     PreliminaryResolutionRequestsPlannedWork, WindowsPreliminaryContentLeaseRequestRef,
     WindowsPreliminaryImportEdgeKind, WindowsPreliminaryLaunchPathComponentRequest,
-    WindowsPreliminaryModuleResolutionRequest, WindowsPreliminarySearchDirectoryBinding,
-    WindowsPreliminarySearchDirectoryTarget,
+    WindowsPreliminaryModuleEdgeLocator, WindowsPreliminaryModuleResolutionRequest,
+    WindowsPreliminarySearchDirectoryBinding, WindowsPreliminarySearchDirectoryTarget,
 };
+
+use super::super::prelease_pe_material::AuthenticatedWindowsPreLeasePeMaterial;
 
 use crate::node_agent_compute_plugin_host::runtime_loader_load_set::model::WindowsLoaderWorkingDirectoryLocation;
 
@@ -28,6 +30,7 @@ pub(in super::super::super) struct PreliminaryWindowsRunnerSelectedContextView<'
 }
 
 pub(in super::super::super) struct PreliminaryWindowsRunnerResolutionRequestPlanView<'plan> {
+    pe_material: &'plan AuthenticatedWindowsPreLeasePeMaterial,
     pub(in super::super::super) admission_source_digest: &'plan str,
     pub(in super::super::super) admission_receipt_digest: &'plan str,
     pub(in super::super::super) extraction_plan_digest: &'plan str,
@@ -55,6 +58,7 @@ impl PreliminaryResolutionRequestsPlannedWork<'_> {
         &self,
     ) -> PreliminaryWindowsRunnerResolutionRequestPlanView<'_> {
         PreliminaryWindowsRunnerResolutionRequestPlanView {
+            pe_material: &self.pe_material,
             admission_source_digest: &self.plan.admission_source_digest,
             admission_receipt_digest: &self.plan.admission_receipt_digest,
             extraction_plan_digest: &self.plan.extraction_plan_digest,
@@ -122,7 +126,9 @@ impl PreliminaryResolutionRequestsPlannedWork<'_> {
             content_lease_requests: &self.plan.content_lease_requests,
         }
     }
+}
 
+impl PreliminaryWindowsRunnerResolutionRequestPlanView<'_> {
     pub(in super::super::super) fn package_image_count(&self) -> usize {
         self.pe_material.package_images().len()
     }
