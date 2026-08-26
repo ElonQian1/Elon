@@ -103,7 +103,7 @@ internal object WebAiPrivateTransportCatalog {
             id = "android_google_web_private_reply_observer_v1",
             provider = "google_web_ai",
             status = "completed",
-            verification = "targeted_tests_passed_device_regression_pending",
+            verification = "device_verified_stream_to_completion_v1_1_1303",
             productionDefault = true,
             runtimeEnabled = true,
             requestMode = "passive_completion_signal",

@@ -76,6 +76,25 @@ class WebAiPrivateTransportCatalogTest {
             googleSnapshotCache.getString("fallback"),
         )
 
+        val googleReplyObserver = values.first {
+            it.getString("capability_id") ==
+                "android_google_web_private_reply_observer_v1"
+        }
+        assertEquals("completed", googleReplyObserver.getString("implementation_status"))
+        assertEquals(
+            "device_verified_stream_to_completion_v1_1_1303",
+            googleReplyObserver.getString("verification_status"),
+        )
+        assertTrue(googleReplyObserver.getBoolean("production_default"))
+        assertEquals(
+            "fast_initial_probe_then_sparse_stream_watchdog_and_dom_reconciliation",
+            googleReplyObserver.getString("health_policy"),
+        )
+        assertEquals(
+            "official_dom_reply_snapshot",
+            googleReplyObserver.getString("fallback"),
+        )
+
         val voiceOverlay = values.first {
             it.getString("capability_id") ==
                 "android_chatgpt_realtime_voice_background_overlay_v1"

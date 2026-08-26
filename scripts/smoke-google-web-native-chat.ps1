@@ -7,7 +7,9 @@ param(
     [string]$ExpectedHardwareSerial = "",
     [ValidateRange(10, 300)][int]$TimeoutSec = 120,
     [ValidateRange(0, 9999)][int]$ExpectedAdapterVersion = 0,
+    [ValidateRange(100, 2000)][int]$StatePollIntervalMs = 250,
     [switch]$SendProbe,
+    [switch]$RequireStreamingTransition,
     [string]$ProbeMarker = "",
     [string]$Prompt = "",
     [string]$ExpectedReply = ""
@@ -34,15 +36,25 @@ function Wait-GoogleWebProbeReply {
         [Parameter(Mandatory = $true)]$Runtime,
         [Parameter(Mandatory = $true)][string]$Prompt,
         [Parameter(Mandatory = $true)][string]$ExpectedReply,
-        [ValidateRange(10, 300)][int]$WaitTimeoutSec
+        [ValidateRange(10, 300)][int]$WaitTimeoutSec,
+        [ValidateRange(100, 2000)][int]$PollIntervalMs
     )
 
     $deadline = [DateTimeOffset]::UtcNow.AddSeconds($WaitTimeoutSec)
+    $streamingObserved = $false
+    $pollCount = 0
     do {
         if (-not (Test-WebChatNativeChatSurfaceForeground -Runtime $Runtime)) {
             throw "Google Web AI acceptance was interrupted because another app took the foreground."
         }
         $state = Invoke-ChatGptWebSmokeMcp -Runtime $Runtime -Tool "ui_state"
+        $pollCount += 1
+        if (
+            [string]$state.social_chat.web_chat_provider_id -eq "google_web" -and
+            $state.social_chat.web_chat_streaming -eq $true
+        ) {
+            $streamingObserved = $true
+        }
         $messages = @($state.social_chat.messages)
         $user = @($messages | Where-Object { [string]$_.role -eq "user" }) |
             Select-Object -Last 1
@@ -51,18 +63,28 @@ function Wait-GoogleWebProbeReply {
         if (
             [string]$state.social_chat.web_chat_provider_id -eq "google_web" -and
             [string]$state.social_chat.web_chat_state -eq "ready" -and
+            $state.social_chat.web_chat_streaming -ne $true -and
             [string]$user.content -eq $Prompt -and
             [string]$assistant.content -eq $ExpectedReply
         ) {
-            return $state
+            return [pscustomobject]@{
+                state = $state
+                streaming_observed = $streamingObserved
+                completion_after_streaming = $streamingObserved -and
+                    $state.social_chat.web_chat_streaming -ne $true
+                poll_count = $pollCount
+            }
         }
-        Start-Sleep -Seconds $Runtime.poll_interval_sec
+        Start-Sleep -Milliseconds $PollIntervalMs
     } while ([DateTimeOffset]::UtcNow -lt $deadline)
     throw "Timed out waiting for the Google Web AI probe reply."
 }
 
 if (-not $SendProbe -and ($ProbeMarker -or $Prompt -or $ExpectedReply)) {
     throw "Probe arguments require -SendProbe because the default Google smoke is read-only."
+}
+if ($RequireStreamingTransition -and -not $SendProbe) {
+    throw "RequireStreamingTransition requires -SendProbe."
 }
 if ($ProbeMarker -and ($Prompt -or $ExpectedReply)) {
     throw "ProbeMarker cannot be combined with Prompt or ExpectedReply."
@@ -106,6 +128,10 @@ try {
         composer_ready = $true
         sent_messages = 0
         assistant_completed = $false
+        streaming_observed = $false
+        completion_after_streaming = $false
+        state_poll_count = 0
+        state_poll_interval_ms = $StatePollIntervalMs
         probe_kind = if ($Prompt) { "custom_exact" } else { "marker_exact" }
         original_conversation_restored = $true
         cleared_cookies = $false
@@ -128,11 +154,17 @@ try {
             Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "set_input_text" `
                 -Arguments @{ text = $probePrompt } | Out-Null
             Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "send_input" | Out-Null
-            Wait-GoogleWebProbeReply -Runtime $runtime -Prompt $probePrompt `
+            $probeResult = Wait-GoogleWebProbeReply -Runtime $runtime -Prompt $probePrompt `
                 -ExpectedReply $probeExpectedReply `
-                -WaitTimeoutSec $TimeoutSec | Out-Null
+                -WaitTimeoutSec $TimeoutSec -PollIntervalMs $StatePollIntervalMs
+            if ($RequireStreamingTransition -and -not $probeResult.streaming_observed) {
+                throw "Google Web AI completed without an observable native streaming transition."
+            }
             $report.sent_messages = 1
             $report.assistant_completed = $true
+            $report.streaming_observed = [bool]$probeResult.streaming_observed
+            $report.completion_after_streaming = [bool]$probeResult.completion_after_streaming
+            $report.state_poll_count = [int]$probeResult.poll_count
         } finally {
             if ($originPath) {
                 $report.original_conversation_restored = Restore-WebChatNativeConversation `

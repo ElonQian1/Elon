@@ -17,7 +17,7 @@ installed build; individual capability documents retain implementation evidence.
 | Realtime voice background continuity | ChatGPT | Completed and enabled; native/system overlay handoff and media auto-pause device verified, manual overlay actions pending | Official WebView voice and foreground notification |
 | Conversation directory | Google Web AI | Completed and enabled | Local cache and official page |
 | Visited conversation body cache | Google Web AI | Completed, enabled, and device verified | Official WebView navigation |
-| Reply stream and completion observer | Google Web AI | Completed and enabled; adaptive-watchdog device regression pending | Official DOM snapshot |
+| Reply stream and completion observer | Google Web AI | Completed, enabled, and stream-to-completion device verified on `v1.1.1303 (1313)` | Official DOM snapshot |
 | Background navigation continuity | ChatGPT and Google Web AI | Completed, enabled, and device verified | Bounded official WebView recovery |
 
 All production transports keep the official page authoritative. They do not export
@@ -49,6 +49,14 @@ reply appears. Once streaming is visible, MutationObserver and the passive same-
 completion signal remain primary while dense polling is replaced by four sparse watchdogs
 over 68 seconds. Repeated streaming snapshots cannot stack timers, completion cancels the
 remaining watchdog immediately, and the official DOM snapshot remains the fallback.
+
+Device acceptance on APK `v1.1.1303 (1313)` used one isolated exact-marker conversation
+without exposing message content. The native Google Web AI surface entered streaming,
+then returned to a completed ready state with one assistant reply, and restored the
+original conversation. This closes the adaptive-watchdog regression gap: the verified
+streaming snapshot exercises the dense-to-sparse transition, while completion exercises
+the watchdog cancellation path. The smoke reports only structural booleans and counts and
+does not clear cookies or application data.
 
 ChatGPT streaming remains event-driven while the verified private response observer is
 producing the current turn. Private progress schedules the native snapshot directly,

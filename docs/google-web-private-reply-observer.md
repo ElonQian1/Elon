@@ -1,7 +1,7 @@
 ---
 capability_id: android_google_web_private_reply_observer_v1
 implementation_status: completed
-verification_status: device_verified
+verification_status: device_verified_stream_to_completion_v1_1_1303
 production_default: true
 repeat_implementation: prohibited_without_regression_evidence
 ---
@@ -31,3 +31,9 @@ data or cookies. One controlled exact-marker message completed in the native Goo
 AI chat, the original conversation was restored, and structural diagnostics showed the
 official completion signal followed by one safe new answer candidate and one completed
 reply. No private conversation content was emitted by the acceptance script.
+
+Release adapter version 37 retained that observer and replaced dense reply polling after
+the first streaming snapshot with four sparse watchdogs. APK `v1.1.1303 (1313)` passed a
+second isolated exact-marker acceptance: native state observed streaming, then a completed
+ready reply, and the original conversation was restored. The acceptance output contained
+only provider/version flags, state-transition booleans, counts, and recovery status.

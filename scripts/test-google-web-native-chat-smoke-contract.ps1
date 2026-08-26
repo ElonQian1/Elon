@@ -15,7 +15,10 @@ if (@($parseErrors).Count -gt 0) {
 
 foreach ($required in @(
     '[switch]$SendProbe',
+    '[switch]$RequireStreamingTransition',
+    '[ValidateRange(100, 2000)][int]$StatePollIntervalMs = 250',
     'Probe arguments require -SendProbe',
+    'RequireStreamingTransition requires -SendProbe',
     'Prompt and ExpectedReply must be provided together',
     'probe_kind = if ($Prompt) { "custom_exact" } else { "marker_exact" }',
     'Open-WebChatNativeChatSurface',
@@ -26,6 +29,11 @@ foreach ($required in @(
     '-Action "set_input_text"',
     '-Action "send_input"',
     'Wait-GoogleWebProbeReply',
+    'web_chat_streaming',
+    '$state.social_chat.web_chat_streaming -ne $true',
+    'completion_after_streaming',
+    'state_poll_interval_ms = $StatePollIntervalMs',
+    'Google Web AI completed without an observable native streaming transition.',
     '-ExpectedReply $probeExpectedReply',
     'Restore-WebChatNativeConversation',
     'cleared_cookies = $false',
