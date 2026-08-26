@@ -6,6 +6,8 @@ const WIN_COMMON_RICH_CONTENT_ADAPTER: &str = include_str!("rich_content_dom_ada
 const WIN_CITATION_ADAPTER: &str = include_str!("chatgpt_citation_adapter.js");
 const WIN_NEW_CONVERSATION_GUARD: &str = include_str!("chatgpt_win_new_conversation_guard.js");
 const WIN_RESPONSE_RESEARCH_CAPTURE: &str = include_str!("win_web_response_research_capture.js");
+const WIN_CAPTURED_FINANCE_RECOVERY: &str =
+    include_str!("chatgpt_win_captured_finance_recovery.js");
 const WIN_PRIVATE_STREAM_BINDING: &str = include_str!("chatgpt_win_private_stream_binding.js");
 const WIN_PRIVATE_STREAM_RECOVERY: &str = include_str!("chatgpt_win_private_stream_recovery.js");
 const WIN_PRIVATE_FINANCE_PERIODS: &str = include_str!("chatgpt_win_private_finance_periods.js");
@@ -258,6 +260,8 @@ pub(super) fn initialization_script() -> String {
   __PRIVATE_SOCKET_TAP__
   window.__elonChatGptBootstrapStage = 'chatgpt_web_private_conversation_directory.js';
   __PRIVATE_CONVERSATION_DIRECTORY__
+  window.__elonChatGptBootstrapStage = 'chatgpt_win_captured_finance_recovery.js';
+  __CAPTURED_FINANCE_RECOVERY__
   __RESPONSE_RESEARCH_CAPTURE__
 
   var touchPurposes = new Set([
@@ -369,6 +373,10 @@ pub(super) fn initialization_script() -> String {
         "__PRIVATE_CONVERSATION_DIRECTORY__",
         PRIVATE_CONVERSATION_DIRECTORY,
     )
+    .replace(
+        "__CAPTURED_FINANCE_RECOVERY__",
+        WIN_CAPTURED_FINANCE_RECOVERY,
+    )
     .replace("__RESPONSE_RESEARCH_CAPTURE__", &research_capture)
     .replace("__ADAPTER_ASSETS__", &adapters)
 }
@@ -430,6 +438,8 @@ mod tests {
         assert!(script.contains("官网未离开上一会话，已转入安全恢复。"));
         assert!(script.contains("publish_local_ai_web_research_capture"));
         assert!(script.contains("conversation_stream"));
+        assert!(script.contains("chatgpt_win_captured_finance_recovery.js"));
+        assert!(script.contains("__elonWinChatGptCapturedFinanceRecovery"));
         assert!(script.contains("__elonChatGptPrivateStreamObserverEnabled = true"));
         assert!(script.contains("__elonChatGptPrivateFetchTap"));
         assert!(script.contains("__elonChatGptPrivateSocketTap"));

@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  var VERSION = 9;
+  var VERSION = 10;
   var PROVIDER_ID = '__PROVIDER_ID__';
   var MAX_BODY_BYTES = 2 * 1024 * 1024;
   var ANALYSIS_SCHEMA = 'yilong.web-ai.capture-analysis.v1';
@@ -326,6 +326,16 @@
       googleRpcAnalysis(bounded.body, format);
     if (analysis) capture.analysis = analysis;
     invokeCapture(capture);
+    if (PROVIDER_ID === 'chatgpt') {
+      var financeRecovery = window.__elonWinChatGptCapturedFinanceRecovery;
+      if (financeRecovery && typeof financeRecovery.recover === 'function') {
+        Promise.resolve(financeRecovery.recover(
+          bounded.body,
+          format,
+          meta.recoveryGeneration
+        )).catch(function () {});
+      }
+    }
   }
 
   async function observeFetchResponse(response, meta) {
