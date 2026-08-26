@@ -62,7 +62,8 @@ internal class WebChatProductionComposerToolsCoordinator(
     private val consumerPort: () -> WebChatConsumerPort?,
     private val activeProvider: () -> WebChatProviderId?,
     private val openOfficialFallback: () -> Unit,
-    private val startNativeRealtimeVoice: (WebChatProviderIdentity) -> Boolean,
+    private val startWebRealtimeVoice: (WebChatProviderIdentity) -> Boolean,
+    private val startNativeApiRealtimeVoice: (() -> Boolean)? = null,
     private val onOperationFeedback: (WebChatConsumerComposerFeedback) -> Unit,
     private val onQuickActionChanged: (WebChatProductionQuickComposerAction?) -> Unit,
     private val interactionCache: WebChatProductionInteractionCache,
@@ -92,13 +93,7 @@ internal class WebChatProductionComposerToolsCoordinator(
                     contentDescription = "web-chat-composer-tool:${provider.id.wireValue}:${action.semantic}",
                 )
             },
-            footerActions = listOf(
-                WebChatActionSheetFooterAction(
-                    label = "官网完整功能",
-                    contentDescription = "web-chat-composer-tools-official:${provider.id.wireValue}",
-                    action = openOfficialFallback,
-                ),
-            ),
+            footerActions = footerActions(provider),
             onCancelled = { requestEpoch += 1 },
             onDismissed = { activeSheet = null },
         ) { item ->
@@ -109,6 +104,26 @@ internal class WebChatProductionComposerToolsCoordinator(
 
     fun quickActions(provider: WebChatProviderIdentity): List<WebChatProductionQuickComposerAction> =
         WebChatProductionQuickComposerActionCatalog.availableFor(provider)
+
+    private fun footerActions(provider: WebChatProviderIdentity): List<WebChatActionSheetFooterAction> =
+        buildList {
+            if (provider.id == WebChatProviderId.CHATGPT_WEB && startNativeApiRealtimeVoice != null) {
+                add(WebChatActionSheetFooterAction(
+                    label = "原生实时 AI",
+                    contentDescription = "web-chat-native-realtime:new-local-conversation",
+                    action = {
+                        if (!startNativeApiRealtimeVoice.invoke()) {
+                            Toast.makeText(activity, "请先结束当前语音会话", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                ))
+            }
+            add(WebChatActionSheetFooterAction(
+                label = "官网完整功能",
+                contentDescription = "web-chat-composer-tools-official:${provider.id.wireValue}",
+                action = openOfficialFallback,
+            ))
+        }
 
     fun selectedQuickAction(provider: WebChatProviderIdentity): WebChatProductionQuickComposerAction? {
         if (activeProvider() != provider.id) return null
@@ -213,7 +228,7 @@ internal class WebChatProductionComposerToolsCoordinator(
         cancelPending()
         if (activeProvider() != provider.id) return false
         if (command.action == REALTIME_VOICE_ACTION) {
-            return startNativeRealtimeVoice(provider)
+            return startWebRealtimeVoice(provider)
         }
         val pending = PendingSessionCommand(provider.id, command, requestEpoch)
         pendingSessionCommand = pending

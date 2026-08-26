@@ -15,15 +15,24 @@ installed build; individual capability documents retain implementation evidence.
 | Private stream completion settlement | ChatGPT | Completed, enabled, and device verified on `v1.1.1302 (1312)` | Official DOM snapshot |
 | Realtime voice transcript refresh | ChatGPT | Completed and enabled; supervised voice exit pending | Retained native transcript and official DOM snapshot |
 | Realtime voice background continuity | ChatGPT | Completed and enabled; native/system overlay handoff and media auto-pause device verified, manual overlay actions pending | Official WebView voice and foreground notification |
+| Native API realtime voice | 一龙 AI / OpenAI API | Implemented and enabled for an explicit new local conversation; targeted tests passed, device verification pending | Official ChatGPT WebView voice |
 | Conversation directory | Google Web AI | Completed and enabled | Local cache and official page |
 | Visited conversation body cache | Google Web AI | Completed, enabled, and device verified | Official WebView navigation |
 | Reply stream and completion observer | Google Web AI | Completed, enabled, and stream-to-completion device verified on `v1.1.1303 (1313)` | Official DOM snapshot |
 | Background navigation continuity | ChatGPT and Google Web AI | Completed, enabled, and device verified | Bounded official WebView recovery |
 
-All production transports keep the official page authoritative. They do not export
+All web-account transports keep the official page authoritative. They do not export
 cookies, credentials, request headers, or private conversation content outside the
 device. Every observer is bounded and emits nothing on malformed or unsuccessful
 responses.
+
+The separate native API realtime transport is not a ChatGPT web-account shortcut. It
+uses the existing authenticated 一龙 realtime WebSocket and records to local 一龙 AI
+history. Its production entry is deliberately labeled `原生实时 AI`, while the blue
+ChatGPT composer voice action remains owned by the current official web conversation.
+The runtime inventory exposes both transport IDs and their conversation scopes so UI,
+ADB, MCP, and future agents cannot conflate them. Detailed boundaries are in
+`docs/native-realtime-voice-transport.md`.
 
 The Google conversation directory persists the timestamp of the last successful
 official directory response. Cached rows render immediately; a legacy or expired cache

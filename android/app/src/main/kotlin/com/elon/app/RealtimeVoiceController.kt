@@ -46,6 +46,8 @@ internal class RealtimeVoiceController(
     private val onRealtimeSpeechStarted: () -> Unit = {},
     private val onRealtimeSpeechStopped: () -> Unit = {},
     private val onRealtimeResponseDone: () -> Unit = {},
+    private val onReady: () -> Unit = {},
+    private val onClosed: () -> Unit = {},
     private val onError: (String) -> Unit = {},
 ) {
     private val recorder = RealtimePcmRecorder(
@@ -82,7 +84,9 @@ internal class RealtimeVoiceController(
                     // WS 握手成功后再启动麦克风
                     if (!recorder.start(scope)) {
                         onError("无法启动麦克风采集")
+                        return
                     }
+                    this@RealtimeVoiceController.onReady()
                 }
                 override fun onTranscriptDelta(text: String): Unit =
                     this@RealtimeVoiceController.onTranscriptDelta(text)
@@ -120,6 +124,7 @@ internal class RealtimeVoiceController(
 
                 override fun onClosed() {
                     recorder.stop()
+                    this@RealtimeVoiceController.onClosed()
                 }
             },
         )
@@ -147,6 +152,19 @@ internal class RealtimeVoiceController(
         autoResumeJob = null
         resetAutoTurn()
         autoPaused = false
+    }
+
+    /** 暂停麦克风但保留 WebSocket，恢复时无需重新握手。 */
+    fun pauseInput() {
+        recorder.stop()
+    }
+
+    /** 在现有 WebSocket 上恢复麦克风采集。 */
+    fun resumeInput(): Boolean {
+        if (ws == null) return false
+        if (recorder.isRecording) return true
+        val scope = autoScope ?: return false
+        return recorder.start(scope)
     }
 
     fun shutdown() {

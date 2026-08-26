@@ -68,6 +68,9 @@ class WebChatRealtimeVoiceBackgroundContractTest {
         val overlay = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/WebChatRealtimeVoiceSystemOverlay.kt",
         )
+        val bridge = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/WebChatRealtimeVoiceBackgroundBridge.kt",
+        )
 
         assertTrue(manifest.contains("android.permission.FOREGROUND_SERVICE_MICROPHONE"))
         assertTrue(manifest.contains(".WebChatRealtimeVoiceBackgroundService"))
@@ -79,6 +82,7 @@ class WebChatRealtimeVoiceBackgroundContractTest {
         assertTrue(service.contains("ACTION_HANG_UP"))
         assertTrue(session.contains("if (realtimeVoiceBacking.isActive()) cookieManager.flush()"))
         assertTrue(overlay.indexOf("root.addView(panel)") < overlay.indexOf("root.addView(orb"))
+        assertTrue(bridge.contains("if (!running) return"))
     }
 
     private fun readRepositoryFile(relativePath: String): String =

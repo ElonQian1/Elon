@@ -113,6 +113,7 @@ internal object WebChatProductionCapabilityContract {
             .put("ready", gaps.isEmpty())
             .put("missing", JSONArray(gaps.map { it.name.lowercase() }))
             .put("capabilities", JSONArray(rows))
+            .put("realtime_voice_transports", RealtimeVoiceTransportCatalog.describe())
     }
 
     private fun shared(

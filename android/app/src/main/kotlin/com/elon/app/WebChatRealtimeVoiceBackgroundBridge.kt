@@ -29,6 +29,7 @@ internal class WebChatRealtimeVoiceBackgroundBridge(
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             if (intent?.action != WebChatRealtimeVoiceBackgroundProtocol.ACTION_CONTROL) return
+            if (!running) return
             val source = WebChatRealtimeVoiceBackgroundProtocol.source(
                 intent.getStringExtra(WebChatRealtimeVoiceBackgroundProtocol.EXTRA_SOURCE),
             )

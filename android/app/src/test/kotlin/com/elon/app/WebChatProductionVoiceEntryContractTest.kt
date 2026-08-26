@@ -12,21 +12,20 @@ import org.junit.Test
 
 class WebChatProductionVoiceEntryContractTest {
     @Test
-    fun friendChatPhoneRoutesWebChatBeforeLegacyWorkVoice() {
+    fun friendChatPhoneStartsTheNonBlockingNativeApiConversation() {
         val activity = read("android/app/src/main/kotlin/com/elon/app/MainActivity.kt")
         val route = activity.substringAfter("private fun openSocialAiVoiceCall()")
             .substringBefore("private fun suspendSocialChatForProjectReturn()")
 
-        assertTrue(route.contains("socialAiChatFeature.startWebChatRealtimeVoice()"))
-        assertTrue(
-            route.indexOf("startWebChatRealtimeVoice") <
-                route.indexOf("SocialAiVoiceCallActivity.createIntent"),
-        )
+        assertTrue(route.contains("socialAiChatFeature.startNativeApiRealtimeVoice()"))
+        assertFalse(route.contains("SocialAiVoiceCallActivity.createIntent"))
     }
 
     @Test
     fun productionFeatureDelegatesToTheCurrentProviderToolCoordinator() {
         val feature = read("android/app/src/main/kotlin/com/elon/app/MainSocialAiChatFeature.kt")
+        val transports = read("android/app/src/main/kotlin/com/elon/app/MainRealtimeVoiceTransports.kt")
+        val factory = read("android/app/src/main/kotlin/com/elon/app/MainRealtimeVoiceCoordinatorFactory.kt")
         val tools = read("android/app/src/main/kotlin/com/elon/app/WebChatProductionComposerTools.kt")
         val commands = read("android/app/src/main/kotlin/com/elon/app/WebChatProductionComposerCommands.kt")
         val controls = read("android/app/src/main/kotlin/com/elon/app/WebChatProductionVoiceControls.kt")
@@ -42,21 +41,23 @@ class WebChatProductionVoiceEntryContractTest {
         assertTrue(feature.contains("productionVoiceControls.restoreLocalVoiceInput"))
         assertTrue(commands.contains("WebChatProviderCapability.REALTIME_VOICE"))
         assertTrue(tools.contains("chatgpt_start_realtime_voice"))
-        assertTrue(tools.contains("startNativeRealtimeVoice"))
+        assertTrue(tools.contains("startWebRealtimeVoice"))
+        assertTrue(tools.contains("startNativeApiRealtimeVoice"))
+        assertTrue(tools.contains("原生实时 AI"))
         assertFalse(tools.contains("ChatGptWebTestActivity"))
         assertTrue(directRoute.contains("executeCommand(provider, command)"))
         assertTrue(commandRoute.contains("command.action == REALTIME_VOICE_ACTION"))
-        assertTrue(commandRoute.contains("startNativeRealtimeVoice(provider)"))
+        assertTrue(commandRoute.contains("startWebRealtimeVoice(provider)"))
         assertFalse(commandRoute.contains("openOfficialRealtimeVoice()"))
-        assertTrue(feature.contains("WebChatRealtimeVoiceOverlay"))
-        assertTrue(feature.contains("createWebChatRealtimeVoiceCoordinator"))
+        assertTrue(transports.contains("WebChatRealtimeVoiceOverlay"))
+        assertTrue(factory.contains("createWebChatRealtimeVoiceCoordinator"))
         assertEquals(
             "provider changes must hand voice control between the native and system overlays",
             2,
-            "realtimeVoice.onActiveSurfaceChanged()".toRegex().findAll(feature).count(),
+            "realtimeVoices.onActiveSurfaceChanged()".toRegex().findAll(feature).count(),
         )
-        assertTrue(feature.contains("openOfficialFallback = modeController::openOfficialRealtimeVoice"))
-        assertTrue(feature.contains("beginRealtimeVoiceBacking"))
+        assertTrue(transports.contains("modeController.openOfficialRealtimeVoice()"))
+        assertTrue(factory.contains("beginRealtimeVoiceBacking"))
         assertFalse(commandRoute.contains("mcpPort()"))
         assertTrue(tools.contains("port.executeSessionCommand(pending.command.action)"))
         assertTrue(tools.contains("pendingSessionCommand"))
@@ -112,6 +113,9 @@ class WebChatProductionVoiceEntryContractTest {
         val feature = read(
             "android/app/src/main/kotlin/com/elon/app/MainSocialAiChatFeature.kt",
         )
+        val factory = read(
+            "android/app/src/main/kotlin/com/elon/app/MainRealtimeVoiceCoordinatorFactory.kt",
+        )
         val session = read(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptBackgroundSession.kt",
         )
@@ -140,23 +144,23 @@ class WebChatProductionVoiceEntryContractTest {
         val deactivate = feature.substringAfter("private fun deactivateChatProvider")
             .substringBefore("private fun activateChatProvider")
         assertFalse(deactivate.contains("realtimeVoice.close()"))
-        assertTrue(feature.contains("resolveConversationContext = { resolveRealtimeVoiceContext"))
-        assertTrue(feature.contains("openRealtimeVoiceConversation(it"))
+        assertTrue(factory.contains("resolveConversationContext = { resolveRealtimeVoiceContext"))
+        assertTrue(factory.contains("openRealtimeVoiceConversation(it"))
         assertTrue(session.contains("if (realtimeVoiceBacking.isActive())"))
         assertTrue(session.contains("pageAdapter?.requestConversationRefresh()"))
     }
 
     @Test
     fun productionVoiceGatesOnlyConfirmedGuestsAndDelegatesCredentialsToTheOfficialPage() {
-        val feature = read("android/app/src/main/kotlin/com/elon/app/MainSocialAiChatFeature.kt")
+        val factory = read("android/app/src/main/kotlin/com/elon/app/MainRealtimeVoiceCoordinatorFactory.kt")
         val coordinator = read("android/app/src/main/kotlin/com/elon/app/WebChatRealtimeVoiceCoordinator.kt")
         val gate = read("android/app/src/main/kotlin/com/elon/app/WebChatRealtimeVoiceLoginGate.kt")
         val mode = read("android/app/src/main/kotlin/com/elon/app/SocialAiChatModeController.kt")
         val strings = read("android/app/src/main/res/values/strings.xml")
 
-        assertTrue(feature.contains("authenticated = chatGptController::authenticated"))
-        assertTrue(feature.contains("sessionState ="))
-        assertTrue(feature.contains("openOfficialLogin = modeController::openOfficialLogin"))
+        assertTrue(factory.contains("authenticated = controller::authenticated"))
+        assertTrue(factory.contains("sessionState = controller::stateWireValue"))
+        assertTrue(factory.contains("openOfficialLogin = modeController::openOfficialLogin"))
         assertTrue(coordinator.contains("WebChatRealtimeVoiceAuthenticationState.GUEST"))
         assertTrue(coordinator.contains("WebChatRealtimeVoiceAuthenticationState.AUTHENTICATED"))
         assertTrue(mode.contains("ChatGptWebOfficialFallbackIntent.createLogin(activity)"))

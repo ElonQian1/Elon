@@ -168,7 +168,7 @@ internal class WebChatRealtimeVoiceOverlay(
         detail.text = state.detail
         val context = state.context
         conversationTarget.text = context?.let { "记录到：${it.label}" } ?: "记录到：当前 ChatGPT 会话"
-        conversationTarget.isEnabled = context?.conversationPath != null && context.savedToHistory
+        conversationTarget.isEnabled = context?.openable == true
         conversationTarget.alpha = if (conversationTarget.isEnabled) 1f else 0.72f
         conversationTarget.contentDescription = buildString {
             append(WebChatProductionSelectors.REALTIME_VOICE_OPEN_CONVERSATION)

@@ -11,9 +11,10 @@ internal fun createMainRealtimeVoiceCoordinator(
     modeController: SocialAiChatModeController,
     nativeRoot: View,
     launchCache: WebChatRealtimeVoiceLaunchCache,
+    surface: WebChatRealtimeVoiceSurface = WebChatRealtimeVoiceOverlay(activity),
 ): WebChatRealtimeVoiceCoordinator = createWebChatRealtimeVoiceCoordinator(
     activity = activity,
-    surface = WebChatRealtimeVoiceOverlay(activity),
+    surface = surface,
     activeProvider = activeProvider,
     consumerPort = controller::consumerPort,
     sessionReady = { controller.stateWireValue() == "ready" && controller.composerReady() },

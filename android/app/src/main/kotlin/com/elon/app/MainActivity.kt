@@ -639,7 +639,7 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, "实时语音目前只支持一龙AI 私聊", Toast.LENGTH_SHORT).show()
             return
         }
-        if (!socialAiChatFeature.startWebChatRealtimeVoice()) startActivity(SocialAiVoiceCallActivity.createIntent(this, serverUrl, userId))
+        if (!socialAiChatFeature.startNativeApiRealtimeVoice()) Toast.makeText(this, "请先结束当前语音会话", Toast.LENGTH_SHORT).show()
     }
 
     private fun suspendSocialChatForProjectReturn(): Boolean {
@@ -1039,7 +1039,7 @@ class MainActivity : AppCompatActivity() {
             collapseInputComposer = { inputActions.inputFocusActions.collapseInputComposer() },
             inputComposerViews = inputActions::inputComposerViewsOrNull, pendingInputAttachmentCount = inputActions.pendingAttachmentActions::pendingAttachmentCount, prepareInputForProviderSwitch = inputActions::prepareForWebChatProviderSwitch,
             showWorkModelSelector = modelActions::showModelPopupOrLoad,
-            updateWorkModel = modelActions::updateModelButton, refreshInputComposerVisual = inputActions.sendButtonVisualActions::updateSendButtonVisual, chatGptWebLifecycle = chatGptWebLifecycle,
+            updateWorkModel = modelActions::updateModelButton, refreshInputComposerVisual = inputActions.sendButtonVisualActions::updateSendButtonVisual, chatGptWebLifecycle = chatGptWebLifecycle, serverUrl = { serverUrl }, userId = { AuthManager.effectiveUserId(this) },
         )
     }
 

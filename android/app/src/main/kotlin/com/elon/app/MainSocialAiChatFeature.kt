@@ -27,6 +27,8 @@ internal class MainSocialAiChatFeature(
     private val updateWorkModel: () -> Unit,
     private val refreshInputComposerVisual: () -> Unit,
     private val chatGptWebLifecycle: MainChatGptWebLifecycle,
+    private val serverUrl: () -> String,
+    private val userId: () -> String,
 ) {
     private var onWebChatNavigationChanged: () -> Unit = {}
     private val webChatInteractionCache = WebChatProductionInteractionCache(
@@ -128,25 +130,27 @@ internal class MainSocialAiChatFeature(
         WebChatProductionSuggestionsCoordinator(activity)
     }
     private val productionSuggestions by productionSuggestionsDelegate
-    private val realtimeVoiceDelegate: Lazy<WebChatRealtimeVoiceCoordinator> = lazy {
-        createMainRealtimeVoiceCoordinator(
+    private val realtimeVoicesDelegate: Lazy<MainRealtimeVoiceTransports> = lazy {
+        MainRealtimeVoiceTransports(
             activity = activity,
-            activeProvider = {
-                if (isChatModeActive()) providerId() else null
-            },
-            controller = chatGptController,
+            controller = { chatGptController },
             webLifecycle = chatGptWebLifecycle,
             modeController = modeController,
             nativeRoot = binding.root,
+            activeProvider = {
+                if (isChatModeActive()) providerId() else null
+            },
+            serverUrl = serverUrl,
+            userId = userId,
             launchCache = realtimeVoiceLaunchCache,
         )
     }
-    private val realtimeVoice by realtimeVoiceDelegate
+    private val realtimeVoices by realtimeVoicesDelegate
 
     private fun handleChatGptConsumerStateObserved(state: WebChatConsumerState) {
         realtimeVoiceLaunchCache.observe(WebChatProviderId.CHATGPT_WEB, state)
-        if (realtimeVoiceDelegate.isInitialized()) {
-            realtimeVoice.onConsumerStateChanged(state)
+        if (realtimeVoicesDelegate.isInitialized()) {
+            realtimeVoices.onConsumerStateChanged(state)
         }
     }
     private val productionComposerToolsDelegate = lazy {
@@ -160,7 +164,8 @@ internal class MainSocialAiChatFeature(
                 if (isChatModeActive()) providerId() else null
             },
             openOfficialFallback = ::openOfficialFallback,
-            startNativeRealtimeVoice = realtimeVoice::start,
+            startWebRealtimeVoice = realtimeVoices::startWeb,
+            startNativeApiRealtimeVoice = ::startNativeApiRealtimeVoice,
             onOperationFeedback = ::showComposerOperationFeedback,
             onQuickActionChanged = ::onQuickComposerActionChanged,
             interactionCache = webChatInteractionCache,
@@ -333,6 +338,10 @@ internal class MainSocialAiChatFeature(
     fun startWebChatRealtimeVoice(): Boolean =
         productionComposerTools.startRealtimeVoice(WebChatProviderRegistry.get(providerId()))
 
+    fun startNativeApiRealtimeVoice(): Boolean {
+        return realtimeVoices.startNative()
+    }
+
     fun interactionMode(): SocialAiInteractionMode = modeController.interactionMode()
 
     fun providerId(): WebChatProviderId = modeController.providerId()
@@ -481,7 +490,7 @@ internal class MainSocialAiChatFeature(
         } else {
             resumeWorkChat()
         }
-        if (realtimeVoiceDelegate.isInitialized()) realtimeVoice.onHostResumed()
+        if (realtimeVoicesDelegate.isInitialized()) realtimeVoices.onHostResumed()
         sessionPrewarmer.onHostResumed()
     }
 
@@ -492,7 +501,7 @@ internal class MainSocialAiChatFeature(
             productionCapabilityPrewarmer.cancel()
         }
         if (sessionPrewarmerDelegate.isInitialized()) sessionPrewarmer.cancel()
-        if (realtimeVoiceDelegate.isInitialized()) realtimeVoice.onHostPaused()
+        if (realtimeVoicesDelegate.isInitialized()) realtimeVoices.onHostPaused()
         if (chatGptControllerDelegate.isInitialized()) chatGptController.onHostPaused()
         if (googleControllerDelegate.isInitialized()) googleController.onHostPaused()
     }
@@ -504,7 +513,7 @@ internal class MainSocialAiChatFeature(
             productionCapabilityPrewarmer.cancel()
         }
         if (sessionPrewarmerDelegate.isInitialized()) sessionPrewarmer.cancel()
-        if (realtimeVoiceDelegate.isInitialized()) realtimeVoice.destroy()
+        if (realtimeVoicesDelegate.isInitialized()) realtimeVoices.destroy()
         if (chatGptControllerDelegate.isInitialized()) chatGptController.destroy()
         if (googleControllerDelegate.isInitialized()) googleController.destroy()
         chatGptWebLifecycle.dispose()
@@ -558,7 +567,7 @@ internal class MainSocialAiChatFeature(
         }
         updateWorkModel()
         refreshInputComposerVisual()
-        if (realtimeVoiceDelegate.isInitialized()) realtimeVoice.onActiveSurfaceChanged()
+        if (realtimeVoicesDelegate.isInitialized()) realtimeVoices.onActiveSurfaceChanged()
     }
 
     private fun activateChatProvider(provider: WebChatProviderIdentity) {
@@ -624,7 +633,7 @@ internal class MainSocialAiChatFeature(
         binding.root.post { controller.refreshComposerModel() }
         refreshConsumerComposerUi()
         productionCapabilityPrewarmer.schedule(provider)
-        if (realtimeVoiceDelegate.isInitialized()) realtimeVoice.onActiveSurfaceChanged()
+        if (realtimeVoicesDelegate.isInitialized()) realtimeVoices.onActiveSurfaceChanged()
     }
 
     private fun renderToolbarVoiceAction(webChatModeActive: Boolean) {

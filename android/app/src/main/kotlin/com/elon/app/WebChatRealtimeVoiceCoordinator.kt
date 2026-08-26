@@ -129,6 +129,8 @@ internal class WebChatRealtimeVoiceCoordinator(
         return true
     }
 
+    fun isActive(): Boolean = provider != null || closePending
+
     fun close() {
         if (closePending) return
         if (closeFailed) {

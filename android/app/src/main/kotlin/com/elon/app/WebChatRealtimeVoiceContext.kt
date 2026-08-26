@@ -7,6 +7,7 @@ internal data class WebChatRealtimeVoiceContext(
     val conversationPath: String?,
     val label: String,
     val savedToHistory: Boolean,
+    val openable: Boolean = conversationPath != null && savedToHistory,
 )
 
 internal object WebChatRealtimeVoiceContextPolicy {
