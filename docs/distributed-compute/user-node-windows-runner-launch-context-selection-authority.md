@@ -15,6 +15,8 @@ verification_status: source_review_only
 对应验收见 [Launch Context Selection acceptance](user-node-windows-runner-launch-context-selection-acceptance.md)。上游候选
 只来自 [Launch Path Discovery authority](user-node-windows-runner-launch-path-discovery-authority.md)，下游最终封印仍由
 [Loader Load-Set authority](user-node-windows-runner-loader-load-set-authority.md) 负责。
+post-lease system-image fixed-point另见
+[Recursive System-Image Closure authority](user-node-windows-runner-recursive-system-image-closure-authority.md)。
 
 ## 1. 本批结论
 
@@ -23,7 +25,9 @@ preliminary unresolved resolution request plan、GrantReady exact terminal/dispo
 custody、post-lease same-owner cross-binding，以及 QueryVerified lineage 到 process pre-create projection。preliminary plan 仍只冻结
 resolver 必须消费的精确请求；GrantReady 合同虽已写，真实 resolver/owner producer 仍为 `missing`。该 owner graph 修正
 grant/lease 前错误持有 final resolution 的时间顺序，并消除 loader resolution digest 与 process required-launch-context digest 的
-直接自引用。
+直接自引用。独立的 source-only recursive final-projection envelope现已冻结 wave-zero prefix、system-postlease suffix、
+producer-bound parse receipts、frontier/fixpoint与 final slice摘要，但逐 wave grant/candidate/lease custody、advancer与 sealer producer仍
+`missing`。
 
 证据严格为 `source_written/source_review_only/implementation_uncompiled/implementation_unrun`、
 `passed=0/failed=0`、Windows dynamic=`0`、`migration/table/writer=none/none/none`。Manifest V1、InstallPlan V1 与
@@ -116,6 +120,8 @@ LaunchPathDiscoveredWork
 → all package + deduplicated resolved-filesystem-system immutable-content leases
 → same-handle full-package rehash/reparse under grants+leases
 → exact prelease-image/import-edge ↔ postlease-image/import-binding cross-binding receipt
+→ post-lease system-image recursive parse receipts + deterministic suffix waves
+→ empty recursive frontier + exact final edge/name/system-owner reverse projection
 → final exact PE graph + launch path + loader resolution seal
 → consuming grant/lease generation query
 → close/reopen/final currentness
@@ -139,12 +145,14 @@ typed lineage，不是 post-create `IsWow64Process2`/process-machine query recei
 launch_context_selector_digest
 → selected-context binding + preliminary_resolution_request_plan_digest
 → grant_ready_resolution_plan_digest
-→ windows_loader_resolution_profile.v2
-→ windows_runner_required_launch_context.v2
+→ recursive_resolution_closure_digest
+→ windows_loader_resolution_profile.v3
+→ windows_runner_required_launch_context.v3
 → process start material
 ```
 
-final loader resolution profile V2 必须同时包含 selector digest、preliminary request-plan digest与 grant-ready plan digest；不得
+final loader resolution profile V3 必须同时包含 selector digest、preliminary request-plan、grant-ready plan与 recursive closure
+digest；不得
 包含未来 required process context digest。required process launch context V3 则同时包含 selector digest与 final startup/import
 resolution profile digest。其 expected digest存入不参与 resolution-profile hash 的 launch-security bridge，并在 process policy
 重算后做 equality check。由此 final resolution先完成、process context后完成，不要求 SHA-256 fixed point，也不丢失 authenticated
@@ -170,6 +178,8 @@ fileid_immutable_content_lease_backend = missing
 system_image_positive_consuming_transition = missing
 postlease_exact_pe_import_graph_sealer = missing
 postlease_same_owner_lineage_contract = source_written_uncompiled_unrun
+recursive_system_import_closure_contract = source_written_uncompiled_unrun
+recursive_system_import_closure_producer = missing
 startup_import_resolution_producer = missing
 post_create_live_process_machine_context_queryback = missing
 ```

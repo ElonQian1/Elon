@@ -37,6 +37,7 @@ Windows、网络、设备或真实 Runner 验证：
 | launch-path discovery | `node_agent_managed_fs/{loader_launch_path_discovery,windows_loader_launch_path_discovery}.rs`、`runtime_loader_load_set/launch_path_discovery.rs` | typed retained-owner handle-chain candidate observations；不选择 CWD、不授予 grant |
 | exact-context/preliminary | `runtime_loader_load_set/launch_path_discovery/{exact_context_plan,prelease_pe_material}{,/digest,/closure}.rs` | uninhabited selector/parser、package-only pre-lease PE与 unresolved request plan；不是 GrantReady/final authority |
 | GrantReady + lineage | `runtime_loader_load_set/resolution/grant_ready{,/validation,/search_projection,/final_projection}.rs`、`exact_context_plan/lineage.rs` | private exact terminal/disposition/movable-owner、pre/post cross-binding、QueryVerified lineage与 pre-create projection source shapes；无 producer |
+| recursive final envelope | `resolution/system_closure{,/digest,/edge_order,/edge_projection,/projection_digest,/source_projection,/validation}.rs`、`pe_graph_validation/image_source.rs` | wave-zero prefix + system-postlease suffix、exact producer owner、frontier/fixpoint、forwarder chain与 final slice摘要；逐波 custody/producer缺失 |
 | resolution owners | `runtime_loader_load_set/resolution.rs` | uninhabited PE graph/launch path/resolution、name grants、package/system FileId leases 与 pre/post-query authority |
 | successor model | `runtime_loader_load_set/model.rs` | 自有 exact root-lock 的单一 successor、全 authority residue、持有 lease/reopen receipt 的 indexed package files |
 | failure custody | `runtime_loader_load_set/failure.rs` | name-grant、content-lease、borrow-only、namespace-query 与 indexed post-barrier 五类 custody |
@@ -72,8 +73,10 @@ Windows、网络、设备或真实 Runner 验证：
    authenticated process preloaded/bootstrap module set 预种 cache，逐项绑定 expected process-machine context/cache key/
    immutable section/evidence，再形成 Runner-rooted package-image closure claim与 typed external leaves；normal/delay base
    imports必须绑定 symbol name/ordinal、descriptor/thunk ordinal，forwarder作为 separate source-edge hop绑定 source export/
-   target symbol/逐跳 evidence/cycle-depth receipt并执行已冻结 canonical rule。pre-lease validator不证明 true transitive system
-   closure；post-lease sealer仍须闭合 system imports/cache collisions。pre-lease parser material不得预测
+   target symbol/逐跳 evidence/cycle-depth receipt并执行已冻结 canonical rule。pre-lease validator不证明 system-image imports；
+   独立 post-lease source envelope已冻结 stage locator、producer-bound owner、frontier/fixpoint、deterministic merge、global-root
+   forwarder chain与 final edge/name/system-owner reverse projection，但 recursive parser、逐波 grant/candidate/lease custody、
+   advancer/sealer/query仍 missing。pre-lease parser material不得预测
    lease generation，final sealer 必须在 lease 下 same-handle rehash/reparse 后加入真实 generation，禁止跨代 splice；
 7. resolution material 覆盖 normal/delay/forwarder、package/system modules、KnownDLL/API-set/SxS/system images、
    searched names 及 exact token/AppContainer、architecture/WOW64、environment/search policy、cwd/flags launch context；
@@ -110,13 +113,14 @@ Windows、网络、设备或真实 Runner 验证：
     `FILE_OPEN`；目录 probe 保留原 DELETE owner、要求 share-read/write/delete 且不替代 namespace/content authority；
 16. transition 权威顺序要求 borrow-only launch-path discovery/pre-lease PE plan、authenticated exact CWD/unresolved request、
     exact terminal/disposition/external-owner grant-ready resolution、name/launch grant acquisition、统一 package+system FileId
-    lease acquisition、lease 下 same-handle rehash/reparse 与
-    final PE/launch/resolution seal、consuming generation query、exact indexing、
+    lease acquisition、lease 下 same-handle rehash/reparse、recursive suffix waves/empty frontier 与
+    final PE/launch/resolution profile V3 seal、consuming generation query、exact indexing、
     retain directories、Runner-last file reopen、anchor receipt、identity/hash/path 与 final query；
 17. `existing_extraction_directory_access_share_compatibility=source_seam_written_windows_dynamic_unverified`；typed
     retained-owner seam 已接入 extraction→loader owner graph，但没有 Windows 动态证据；
     `launch_path_handle_chain_discovery=source_written_windows_dynamic_unverified`；exact-context/pre-lease/unresolved request/
-    GrantReady/post-lease lineage contracts为 `source_written_uncompiled_unrun`，但 selector/parser/GrantReady resolver、external-directory owner与 positive advancer producer以及
+    GrantReady/post-lease lineage/recursive final-envelope contracts为 `source_written_uncompiled_unrun`，但
+    selector/prelease-or-recursive parser/GrantReady resolver、external-directory owner、逐波 custody与 positive advancer producer以及
     `launch_path_component_grant_backend` 仍 `missing`；
 18. success digest 不代替 resolution/namespace/lease authority；persistent grants 的 explicit authorized release/recovery 无
     producer，不得以 Drop/session disconnect 释放；
@@ -135,6 +139,7 @@ Windows、网络、设备或真实 Runner 验证：
 | launch-path retained-handle candidate discovery | 0 | 0 | 1 | source seam 已写；Windows access/FileId/type/reparse/canonical-chain/failure custody 未运行 |
 | exact selector/pre-lease PE/preliminary unresolved request | 0 | 0 | 1 | typed source已写；selector/parser producer missing，未编译/未运行 |
 | GrantReady terminal/disposition/external-owner contract | 0 | 0 | 1 | plan/validator/movable-owner source written；resolver/producer missing，Shadow rejected |
+| recursive system-image final envelope | 0 | 0 | 1 | owner/frontier/fixpoint/merge/digest source written；recursive parser、逐波 custody/advancer/sealer/query missing |
 | exact PE graph / launch-path authority | 0 | 0 | 1 | authenticated parser 与 parent-chain grant/share authorities 均以 `Infallible` uninhabited |
 | exact startup/import resolution producer | 0 | 0 | 1 | resolution 不可构造，无 imports/system identities 或 launch-context proof |
 | searched-name / launch-path grants | 0 | 0 | 1 | 无 acquisition backend；terminal/absence未证明，Shadow path显式不可接受 |
@@ -190,7 +195,8 @@ exact 18 项：`runtime_phase`、`runtime_generation`、`runtime_start`、`runti
   source-export/target-symbol/逐跳 evidence/cycle-depth、canonical merge rule、package external-leaf coverage、expected architecture/WOW64、
   exact launch-path selection/grants、
   Runner-basename/preloaded/bootstrap authenticated cache seed、process-machine/cache-key/immutable-section/evidence
-  drift、未来独立的 true transitive system closure、已冻结 canonical merged edge order、resolved-module cache-key collision closure、
+  drift、已冻结但未运行的 recursive prefix/suffix、earliest producer owner、frontier/fixpoint与 canonical merged edge order、
+  resolved-module cache-key collision closure、
   pre-lease package parser FileId/sealed-digest/policy 与 post-lease same-handle reparse/真实 lease-generation composite、跨代 splice、
   KnownDLL named-section→immutable-image-section mapping、当前 API-set non-recursive host与未来独立 nested typed DAG、SxS
   activation-context/search-directory/FileId/section binding、filesystem parent-relative retained file/open/section receipts、
@@ -233,7 +239,7 @@ exact 18 项：`runtime_phase`、`runtime_generation`、`runtime_start`、`runti
 - 声称 exact PE graph、launch-path、resolution、name-grant、content-lease/query/reopen/release producer 可构造；
 - 把完整 package file set、hash 或 extraction plan 称为 startup/import resolution authority；
 - 忽略 Runner-basename/preloaded/bootstrap cache seed 与其 process-machine/cache-key/immutable-section/evidence binding、
-  未来 PE true transitive system closure/canonical merged edge order/cache-key collision closure、KnownDLL
+  source-written recursive final envelope/canonical merged edge order/cache-key collision closure、KnownDLL
   named-section immutable-image mapping、当前 API-set non-recursive terminal与未来 nested typed DAG、SxS activation-context/search-directory/FileId/
   section binding、external search-directory ancestor/parent-share-grant/alias-currentness receipt，或 filesystem system
   servicing-generation lease 与 parent-relative retained file/open/section receipts；
@@ -245,6 +251,7 @@ exact 18 项：`runtime_phase`、`runtime_generation`、`runtime_start`、`runti
 - 把 sealed/pre-create KnownDLL/API-set/SxS fields 称为 live OS currentness，或把 share-read/hash 称为 FileId
   immutable-content lease；
 - 把 source type、`Infallible` prerequisite 或 consuming seam 称为 producer 已实现；
+- 把 recursive final projection envelope称为逐 wave grant/candidate/lease acquisition authority、真实 parser/sealer或 runtime proof；
 - 用 FileId、digest、lease generation 或 policy 任一单字段替代 package PE parser canonical composite，或接受跨代
   parser splice；
 - 用 path、digest、receipt scalar、caller-opened `File` 或短 borrow 替代 owner custody；

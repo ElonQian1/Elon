@@ -33,10 +33,11 @@ verification_status: source_review_only
 |---|---|
 | `runtime_loader_load_set/launch_path_discovery/exact_context_plan.rs` | uninhabited intent、whole-owner success/failure facade |
 | `exact_context_plan/{intent,binding,digest,edge_locator,lineage}.rs` | nested policy重算、typed edge locator、pre/post cross-binding、QueryVerified lineage与 pre-create projection |
-| `launch_path_discovery/prelease_pe_material{,/digest,/closure}.rs` | package-image pre-lease base imports + separate forwarder hops/closure与 canonical digest；无 system recursive closure或 lease generation |
+| `launch_path_discovery/prelease_pe_material{,/digest,/closure}.rs` | package-image pre-lease base imports + separate forwarder hops/closure与 canonical digest；该阶段本身不解析 system image或预测 lease generation |
 | `runtime_loader_load_set/{failure,resolution}.rs`、`resolution/grant_ready{,/validation,/search_projection,/final_projection}.rs` | preliminary→GrantReady exact terminal/disposition→grants/leases→post-lease final 的线性 owner/failure custody与 final projection |
-| `runtime_loader_load_set/{digest,validation,model}.rs` | loader resolution profile V2绑定 selector+request plan+grant-ready plan |
-| `runtime_process_custody/{launch_security,model,policy}.rs` | resolution外的 expected-context bridge、V2重算与相等性检查 |
+| `resolution/system_closure{,/digest,/edge_order,/edge_projection,/projection_digest,/source_projection,/validation}.rs`、`pe_graph_validation/image_source.rs` | source-only recursive final envelope：producer-bound owner、frontier/fixpoint、deterministic suffix与 final slice重算；真实逐波 producer缺失 |
+| `runtime_loader_load_set/{digest,validation,model}.rs` | loader resolution profile V3绑定 selector+request plan+grant-ready plan+recursive closure |
+| `runtime_process_custody/{launch_security,model,policy}.rs` | resolution外的 expected-context bridge、V3重算与相等性检查 |
 | `runtime_loader_*source_contract_tests.rs` | 未运行 source-shape guards |
 
 ## 3. 静态源码审阅目标
@@ -51,7 +52,7 @@ verification_status: source_review_only
    path/digest/size/FileId；Runner按 package-file ordinal定位后再绑定 parsed root。
 5. normal/delay base imports均有 symbol name/ordinal、descriptor/thunk；forwarder作为 exact source-edge 上的独立 hop，具有
    source-export/target/hop evidence；canonical order与 retained package-image reachable/cycle/depth/cache-collision closure齐全，
-   不声称 system-image recursive closure。
+   不声称 pre-lease阶段已经解析 system image；独立 post-lease recursive final envelope只冻结 source contract。
 6. preliminary request plan只为每条 import edge生成 ordered search-step refs与 unresolved状态；external目录只要求 typed owner；
    package lease refs覆盖全部 plan files，system lease refs在 exact terminal resolution与 dedupe前不存在。
 7. success/failure整体保留 discovery+intent+PE material；无 Clone/Copy/Serde、raw handle/File/path、成功 `into_parts` 或 retry
@@ -62,11 +63,13 @@ verification_status: source_review_only
 9. name-grant、content-lease、borrow-only与 namespace-query failure分别持有其 exact whole-stage owner；typed positive receipt保留
    request/nonce/response bytes+digest，但 name/system positive-consuming transition仍由 `Infallible` 阻断；final resolution只在全部
    grants/leases之后出现。
-10. loader profile V2包含 selector、preliminary request-plan与 grant-ready plan digest，不包含 required process digest；process
+10. GrantReady只对应 final base prefix；recursive envelope以 stage-explicit suffix、earliest producer owner、frontier/fixpoint与
+    final edge/name/system-owner slice重算闭合其余 projection，但逐 wave custody/advancer/sealer producer仍 missing。
+11. loader profile V3包含 selector、preliminary request-plan、grant-ready plan与 recursive closure digest，不包含 required process digest；process
     required-context V3绑定 selector+final resolution，expected digest由 resolution外 launch-security bridge携带并比较。
-11. prelease parsed image/import edge到 postlease parsed image/import binding具有 exact typed cross-binding；QueryVerified lineage到
+12. prelease parsed image/import edge到 postlease parsed image/import binding具有 exact typed cross-binding；QueryVerified lineage到
     process的输出命名为 pre-create projection，不是实际 OS machine/WOW64 query receipt。
-12. 四项 Ready gap仍 `missing`，loader exact 18 effects仍 `none`。
+13. 四项 Ready gap仍 `missing`，loader exact 18 effects仍 `none`。
 
 ## 4. 明确未验收矩阵
 
@@ -85,6 +88,7 @@ verification_status: source_review_only
 | complete package lease refs/system terminal dedupe | 0 | 0 | 1 | source review / resolver missing |
 | positive name/system outcome consumption | 0 | 0 | 1 | typed receipt/custody written；consuming transitions `Infallible` |
 | pre/post image + import-edge cross-binding / QueryVerified lineage | 0 | 0 | 1 | source review only；sealer/query producers missing |
+| recursive system-image final projection envelope | 0 | 0 | 1 | prefix/suffix、owner/frontier/fixpoint/digest source written；parser/逐波 custody/advancer/sealer missing |
 | post-create process machine/WOW64 query-back | 0 | 0 | 1 | missing；pre-create projection不是 actual receipt |
 | failure whole-owner custody | 0 | 0 | 1 | 未故障注入 |
 | acyclic selector→request→grant-ready→final→process digest chain | 0 | 0 | 1 | source review only |
@@ -114,7 +118,7 @@ lease, usage, settlement, money
 ## 6. 负向验收与下一门
 
 本批不得声称 selector/parser producer、selected runtime CWD、GrantReady resolver、external directory authority、grant、
-lease、system recursive import/API-set DAG、final PE graph/launch path/resolution、actual process machine context、process
+lease、真实 system recursive producer/nested API-set DAG、final PE graph/launch path/resolution、actual process machine context、process
 create/resume、Runtime、Ready 或结算已实现。源码铺设可继续；生产可达必须
 先完成 extraction-share/discovery Windows 动态证据，再按 selector+parser → request plan → exact terminal/disposition resolver →
 grants → leases → same-handle post-lease seal → query/reopen/currentness 顺序留下独立动态验收。

@@ -12,6 +12,9 @@ verification_status: source_review_only
 
 # UserNode Windows Runner 进程监管前置 V1 验收草案
 
+上游递归投影边界见 [recursive system-image closure authority](user-node-windows-runner-recursive-system-image-closure-authority.md)
+与 [acceptance](user-node-windows-runner-recursive-system-image-closure-acceptance.md)。
+
 ## 1. 本批证据等级
 
 本批只有 `source_written/source_review_only` 证据。用户要求架构铺设阶段不编译、不运行、不执行 migration 或真实验证，因此新增 Rust
@@ -35,6 +38,7 @@ source-contract guard 也未执行：
 | Windows encoding | `runtime_process_custody/encoding.rs` | absolute UTF-16 path、argv quoting、显式空 environment |
 | launch security | `runtime_process_custody/launch_security.rs` | uninhabited restricted/AppContainer/object-isolation authority、exact private desktop owners 与 post-currentness live validation |
 | loader currentness | `runtime_process_custody/namespace_query.rs` | exact attempt/response bytes+digest/content-lease currentness、authenticated quarantine、unavailable release policy 与无实现 backend trait |
+| recursive profile | `runtime_loader_load_set/resolution/system_closure.rs` 与子模块 | source-only final envelope、逐波反向摘要与 resolution profile V3；真实逐波 custody/runtime producers missing |
 | Job/startup owner | `runtime_process_custody/windows_job.rs` | Job set/query-back、aligned Job-list RAII，以及 borrow-bind Job+launch-security 后设置 `lpDesktop` 的 startup info |
 | Windows backend | `runtime_process_custody/windows.rs`、`windows_rollback.rs` | atomic-Job create、membership/identity query、四项 termination confirmation 与 unconfirmed whole-graph parking |
 | source review | `runtime_process_custody_source_contract_tests.rs` | 未运行 guard，固定 owner、调用顺序、负边界和证据状态 |
@@ -60,14 +64,17 @@ source-contract guard 也未执行：
 4. `existing_extraction_directory_access_share_compatibility=source_seam_written_windows_dynamic_unverified`；
    retained DELETE owner + narrow share-delete probe 源码 seam 已线性接入；
    `launch_path_handle_chain_discovery=source_written_windows_dynamic_unverified`；exact-context/prelease/request/GrantReady/
-   post-lease lineage contracts为 `source_written_uncompiled_unrun`，但真实 selector/parser/resolver/advancer/component-grant
+   post-lease lineage/recursive final-envelope contracts为 `source_written_uncompiled_unrun`，但真实
+   selector/prelease-or-recursive parser/resolver/逐波 custody advancer/component-grant
    producers仍 `missing`，不得认为 loader predecessor已动态可达；
 5. 两阶段顺序固定为 discovery/pre-lease material → authenticated selection/preliminary plan → GrantReady exact resolution → grants → leases →
    same-handle rehash/reparse → final seal → query/reopen。authenticated exact PE graph 与 launch-path parent-chain
    authorities 以 `Infallible` 保持 uninhabited；sealed
    startup/import resolution 必须先以 Runner basename 与 authenticated process preloaded/bootstrap set 预种
    expected process-machine/cache-key/immutable-section/evidence-bound cache，再形成 Runner-rooted package-image closure claim与
-   typed external leaves；true transitive system closure/system-image own imports仍是 freeze blocker。normal/delay base imports绑定
+   typed external leaves；post-lease system-image own imports的 final projection contract已冻结 producer-bound owner、
+   frontier/fixpoint、deterministic merge与 final slice摘要，但逐波 grant/candidate/lease custody、parser/advancer/sealer/query仍
+   missing。normal/delay base imports绑定
    symbol name/ordinal、descriptor/thunk ordinal，separate forwarder hops绑定 source-export/target-symbol/逐跳 evidence/cycle-depth、
    已冻结 canonical merge rule 与 resolved-module cache-key collision closure；pre-lease parser material 不得预测 lease
    generation，post-lease final sealer 必须在同一 handles 重哈希/重解析后加入真实 generation，禁止跨代 parser splice；
@@ -77,7 +84,7 @@ source-contract guard 也未执行：
    直接绑定 package FileId，或 system FileId + immutable section + servicing generation，实际 lease owners 先为 post-lease
    final sealer 提供 generations，随后 consuming query/aggregate 再确认同一 set；external System/Windows/SxS search directory 保留 full handle-derived ancestor chain、
    parent share/grant contract 与 namespace-alias currentness receipt，并纳入
-   `startup_import_resolution_profile_digest`；同时绑定 exact
+   `startup_import_resolution_profile_digest`；resolution profile V3 必须包含 recursive closure digest，同时绑定 exact
    token/AppContainer、expected architecture/WOW64、empty-environment/search policy、cwd和 creation flags；这些 machine字段
    不是 post-create live query-back receipt；
 6. preparation 与 process custody 按值拥有 successor 与 launch security，不再同时拥有 original admission 和
@@ -136,6 +143,7 @@ source-contract guard 也未执行：
 | existing extraction directory access/share compatibility | 0 | 0 | 1 | typed retained-owner seam 已写；Windows access/share、identity/path、descendant 与 failure-custody matrix 未运行 |
 | launch-path retained-handle candidate discovery | 0 | 0 | 1 | source seam 已写但未动态运行；没有 selected CWD 或 component grant |
 | exact-context/prelease/request/GrantReady contracts | 0 | 0 | 1 | source written；真实 selector/parser/resolver/advancer producers missing，Shadow rejected |
+| recursive system-image final envelope | 0 | 0 | 1 | owner/frontier/fixpoint/merge/digest source written；逐波 custody与 runtime producer missing |
 | exact PE graph / launch-path / startup resolution | 0 | 0 | 1 | PE/parent-chain authorities uninhabited；post-lease sealer 与 launch-context producer 未验证 |
 | grants / unified package+system FileId leases / anchor reopen | 0 | 0 | 1 | acquisition/query/reopen backends 均不存在；servicing generation 与 exact negative ownership 未动态验证 |
 | live OS KnownDLL/API-set/SxS currentness | 0 | 0 | 1 | sealed/pre-create fields 只是 echoes；live backend 不存在 |
@@ -176,7 +184,7 @@ source-contract guard 也未执行：
   single-component/Volume-GUID canonical relation 与 failure admission custody；
 - authenticated PE graph/exact launch-path selection+grants、normal/delay base-import symbol name/ordinal、descriptor/thunk
   ordinal、separate forwarder source-export/target-symbol/逐跳 evidence/cycle-depth、canonical merge rule，以及
-  token/AppContainer、expected architecture/WOW64、未来独立的 true transitive system closure/cache-key collision closure、pre-lease parser
+  token/AppContainer、expected architecture/WOW64、source-written recursive final envelope/cache-key collision closure、pre-lease parser
   FileId/sealed-digest/policy 与 post-lease same-handle reparse/真实 lease-generation composite、跨代 splice、KnownDLL
   named-section mapping、当前 API-set non-recursive host与未来独立 nested typed DAG、SxS activation-context/search-directory/FileId/section
   binding、filesystem servicing-generation lease 与 parent-relative retained file/open/section receipts、present disposition
@@ -225,7 +233,7 @@ source-contract guard 也未执行：
   service-SID/account isolation、live token session/logon namespace、exact desktop access-check、effective ACL/
   private-desktop query-back 或 qualified `lpDesktop` owner binding；
 - 忽略 Runner-basename/preloaded/bootstrap cache seed 的 expected process-machine/cache-key/immutable-section/evidence binding、
-  当前 package-image closure/external leaves、未来 system recursive edge/cache-key closure、KnownDLL named-section immutable-image mapping、当前 API-set non-recursive terminal与未来 nested typed DAG、SxS
+  当前 package-image closure/external leaves、recursive final edge envelope/cache-key closure、KnownDLL named-section immutable-image mapping、当前 API-set non-recursive terminal与未来 nested typed DAG、SxS
   activation-context/search-directory/FileId/section binding、filesystem system servicing-generation lease 与 parent-relative
   retained file/open/section receipts、external search-directory ancestor/parent-share-grant/alias-currentness receipt、present
   disposition exact binding 或 HDESK↔HWINSTA/token-session exact-handle binding；

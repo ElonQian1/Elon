@@ -15,6 +15,8 @@ verification_status: source_review_only
 上游 exact selector、pre-lease PE 与 unresolved resolution request边界见
 [Launch Context Selection authority](user-node-windows-runner-launch-context-selection-authority.md)；最终 loader owner graph见
 [Loader Load-Set authority](user-node-windows-runner-loader-load-set-authority.md)。
+递归 final envelope见
+[Recursive System-Image Closure authority](user-node-windows-runner-recursive-system-image-closure-authority.md)。
 
 ## 1. 本批结论
 
@@ -109,7 +111,9 @@ outcome uncertainty。因此未来 bridge 不能是 path/raw-handle getter，也
 - startup/import resolution 绑定 normal/delay base imports、separate forwarder hops、package/system/KnownDLL/API-set/SxS/
   search-name和 exact launch context；PE authority必须先以 Runner basename与 authenticated process preloaded/bootstrap set
   预种 expected process-machine/cache-key/immutable-section/evidence-bound module cache。pre-lease当前只形成 package-image
-  closure claim与 typed external leaves；true transitive system closure/system-image own imports仍为 post-lease freeze blocker。
+  closure claim与 typed external leaves；post-lease system-image own imports 的 source-only final envelope已冻结
+  base/suffix provenance、producer owner、frontier/fixpoint、merge与摘要，但 retained-handle recursive parser、逐波
+  grant/candidate/lease custody、advancer和 sealer/query producer仍为 blocker。
   每条请求绑定 symbol name/ordinal、descriptor/thunk ordinal，forwarder绑定 source-export/target-symbol/逐跳 evidence/cycle-depth、
   已冻结 canonical merge rule 与 resolved-module cache-key collision closure；pre-lease parser material 只绑定 FileId +
   sealed digest + policy，不得预测 generation；post-lease final sealer 必须在同一 handles 重哈希/重解析后加入真实 lease
@@ -131,7 +135,7 @@ outcome uncertainty。因此未来 bridge 不能是 path/raw-handle getter，也
   classification前重算。当前明确的 positive shapes仅为 name-grant与system-image，其 consuming producer仍 uninhabited；close ambiguity使用
   `ManuallyDrop` quarantine，不运行 ordinary `File` Drop。
 
-但 selector/parser、GrantReady resolver/external-directory owners/advancer、cache-seed/exact PE graph、selected launch-path/grants 和
+但 selector/prelease-or-recursive parser、GrantReady resolver/external-directory owners/逐波 custody advancer、cache-seed/exact PE graph、selected launch-path/grants 和
 resolution authority 以 `Infallible` 或明确 blocker保持不可构造，name-grant/
 FileId-lease/query/reopen producer 也不存在。extraction directory 已新增 retained DELETE owner + parent-relative
 share-delete probe；Runner/package-root/全部 plan-directory retained handle-chain candidate discovery 也已写，但不选择
@@ -290,8 +294,8 @@ process start-material V3只绑定 work-admission source/receipt、installation/
 FileId、`startup_import_resolution_profile_digest`、`startup_import_namespace_authority_digest`、entrypoint argv、
 launch token/SD/owner-label/access-check/private-desktop binding digests、live primary-token session/logon namespace 与 exact
 desktop access-check binding、resource/permission ceiling、runtime generation before
-与 authority/process/clock fences；这些 digests 不代替 retained launch owners 或 query-back。resolution profile V2 还必须绑定
-selector、preliminary request-plan、grant-ready plan、token/AppContainer、architecture/WOW64、empty-environment/search policy、
+与 authority/process/clock fences；这些 digests 不代替 retained launch owners 或 query-back。resolution profile V3 还必须绑定
+selector、preliminary request-plan、grant-ready plan、recursive closure、token/AppContainer、architecture/WOW64、empty-environment/search policy、
 cwd 与 creation flags，但不得包含 required process context digest。required launch-context V3绑定 selector+final resolution；其
 expected digest由 resolution外 launch-security owner携带，process policy重算后必须相等。pre-create currentness 再绑定
 namespace/fence/content-lease/resolution/OS-build/KnownDLL/API-set/SxS/

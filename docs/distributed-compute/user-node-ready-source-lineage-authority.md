@@ -136,13 +136,15 @@ authenticated session、append-only ledger、重放与撤销闭环关闭。v14 �
 Ready 分支。
 
 2026-08-26 的 Windows Runner 草案只写入单一 loader successor、完整 by-value seam、FileId leases/reopen receipts、
-五类 failure custody、suspended-child/atomic-Job/pre-create currentness 与 unconfirmed whole-graph parking；exact PE/launch/
-live-OS、launch-security/currentness/release-recovery producers 均缺。extraction-share 与 Runner/package-root/全部
-plan-directory retained handle-chain candidate discovery 已形成 typed source seams，但没有 selected CWD/component grant，
-两层 Windows 动态矩阵仍缺；pre-resume/dynamic-load、
+五类 failure custody、GrantReady wave-zero prefix、post-lease recursive system-image final projection envelope、
+suspended-child/atomic-Job/pre-create currentness 与 unconfirmed whole-graph parking；真实 selector、prelease/recursive parser、
+resolver、逐波 grant/candidate/lease custody advancer、sealer/query、exact PE/launch/live-OS、launch-security/currentness/
+release-recovery producers 均缺。extraction-share 与 Runner/package-root/全部 plan-directory retained handle-chain candidate
+discovery 已形成 typed source seams，但没有真实 selected CWD/component grant，两层 Windows 动态矩阵仍缺；pre-resume/dynamic-load、
 `ResumeThread`、IPC/enforcement/Store blocked。因此
 `runtime_transition_authority` 与 `host_runtime_authority` 仍均为 `missing`；精确
-边界见 [`loader load-set`](user-node-windows-runner-loader-load-set-authority.md) 与
+边界见 [`recursive system-image closure`](user-node-windows-runner-recursive-system-image-closure-authority.md)、
+[`loader load-set`](user-node-windows-runner-loader-load-set-authority.md) 与
 [`process custody`](user-node-windows-runner-process-custody-authority.md)，目录 seam 另见
 [`extraction share custody`](user-node-windows-runner-extraction-directory-share-custody-authority.md)，候选发现见
 [`launch-path discovery`](user-node-windows-runner-launch-path-discovery-authority.md)。
@@ -170,9 +172,9 @@ Attempt 或 Lease。
 
 ## 11. 后续顺序
 
-1. 沿 Windows Runner 草案先动态验证 source-written extraction-share 与 launch-path discovery，再冻结 pre-lease PE
-   material、authenticated CWD selection/preliminary plan；依次补齐 name/launch grants、FileId leases、lease 下
-   rehash/reparse 与 exact PE/launch/resolution seal、query/reopen、launch-security/private desktop、
+1. 沿 Windows Runner 草案动态验证 source-written extraction-share 与 launch-path discovery，并实现真实 authenticated CWD
+   selector、prelease/recursive parser、GrantReady resolver、name/launch grants、FileId leases、逐波 candidate/grant/lease custody
+   advancer、lease 下 rehash/reparse 与 exact recursive PE/launch/resolution seal、query/reopen、launch-security/private desktop、
    live-OS/pre-create/pre-resume currentness、explicit release/recovery、dynamic-load、
    IPC/enforcement/Store、受控 resume 与健康/撤销，形成真实 Host runtime authority；
 2. 新建 v15 endpoint session，不修改 v14 blocked-only；

@@ -29,7 +29,8 @@ pub(super) enum WindowsPostLeaseModuleEdgeLocator {
     },
     Forwarder {
         /// The final global/module-request ordinal of the root normal/delay import. It is not an
-        /// importer-local ordinal and may refer to the BasePrelease prefix or an earlier wave.
+        /// importer-local ordinal and may refer to the BasePrelease prefix, an earlier wave, or a
+        /// direct edge ordered earlier in the same recursive wave.
         source_import_edge_ordinal: usize,
         /// Zero-based hop ordinal across the complete base-plus-postlease chain for that root.
         forwarder_hop_ordinal: usize,
