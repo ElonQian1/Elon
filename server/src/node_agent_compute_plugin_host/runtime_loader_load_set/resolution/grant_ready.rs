@@ -326,7 +326,7 @@ impl<'root> PostLeaseWindowsRunnerResolutionLineage<'root> {
             .pe_import_graph
             .recursive_resolution_closure
             .validate_against(
-                self.preliminary.package_image_count(),
+                preliminary.package_image_count(),
                 base_modules,
                 base_names,
                 base_system_images,
