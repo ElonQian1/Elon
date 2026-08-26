@@ -198,6 +198,10 @@ class ChatGptWebProductIntegrationContractTest {
         )
         assertTrue(
             pageAdapter.indexOf("chatgpt_web_stream_watchdog_probe.js") <
+                pageAdapter.indexOf("chatgpt_web_stream_watchdog_acceptance.js"),
+        )
+        assertTrue(
+            pageAdapter.indexOf("chatgpt_web_stream_watchdog_acceptance.js") <
                 pageAdapter.indexOf("chatgpt_web_adapter.js"),
         )
         assertTrue(layoutAdapter.contains("scrollIntoView"))
@@ -213,9 +217,13 @@ class ChatGptWebProductIntegrationContractTest {
         assertTrue(baseAdapter.contains("privateStreamRevision += 1"))
         assertTrue(baseAdapter.contains("privateStreamObserved: privateStreamRevision > 0"))
         assertTrue(baseAdapter.contains("privateStreamState,"))
-        assertTrue(baseAdapter.contains("privateStreamTransport.current(location.pathname)"))
-        assertTrue(baseAdapter.contains("streamWatchdogProbe.observePrivateUpdate(privateStreamState)"))
-        assertTrue(baseAdapter.contains("streamWatchdogProbe.watchdogFired(schedule)"))
+        assertTrue(baseAdapter.contains("streamWatchdogAcceptance.run"))
+        val watchdogAcceptance = read(
+            "android/app/src/main/assets/chatgpt_web_stream_watchdog_acceptance.js",
+        )
+        assertTrue(watchdogAcceptance.contains("probe.observePrivateUpdate('streaming')"))
+        assertTrue(watchdogAcceptance.contains("{ privateStreamObserved: true }"))
+        assertTrue(watchdogAcceptance.contains("probe.watchdogFired(schedule)"))
         assertTrue(watchdogProbe.contains("private_stream_watchdog_timeout"))
         assertTrue(watchdogProbe.contains("minimumStallMs"))
         assertTrue(mcp.contains("chatgpt_set_page_input_text"))

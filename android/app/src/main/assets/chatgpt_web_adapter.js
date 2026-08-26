@@ -11,7 +11,7 @@
   const layoutAdapter = window.__elonChatGptLayout;
   const snapshotSchedulerModule = window.__elonChatGptSnapshotScheduler;
   const streamingPolicyModule = window.__elonChatGptStreamingPolicy;
-  const streamWatchdogProbeModule = window.__elonChatGptStreamWatchdogProbe;
+  const streamWatchdogAcceptanceModule = window.__elonChatGptStreamWatchdogAcceptance;
   const skinAdapter = window.__elonChatGptSkin;
   const privateTransport = window.__elonChatGptPrivateTransport;
   const privateStreamTransport = window.__elonChatGptPrivateStreamTransport;
@@ -42,11 +42,15 @@
     scheduleTimer: (delayMs, action) => window.setTimeout(action, delayMs),
     cancelTimer: (timer) => clearTimeout(timer)
   });
-  const streamWatchdogProbe = streamWatchdogProbeModule && streamWatchdogProbeModule.create({
+  const streamWatchdogAcceptance = streamWatchdogAcceptanceModule &&
+    streamWatchdogAcceptanceModule.create({
+    probeModule: window.__elonChatGptStreamWatchdogProbe,
+    streamingPolicy,
     now: Date.now,
     scheduleTimer: (delayMs, action) => window.setTimeout(action, delayMs),
     cancelTimer: (timer) => clearTimeout(timer),
-    onResult: (requestId, ok, detail) => result('verify_private_stream_watchdog', ok, detail, requestId)
+    onResult: (requestId, ok, detail) => result('verify_private_stream_watchdog', ok, detail, requestId),
+    scheduleSnapshot: () => scheduleSnapshot(true)
   });
   function emitEvent(event) {
     if (disposed) return;
@@ -307,7 +311,6 @@
     if (streamingPolicy) streamingPolicy.scheduleNext(
       streaming,
       (schedule) => {
-        optional(undefined, () => streamWatchdogProbe && streamWatchdogProbe.watchdogFired(schedule));
         scheduleSnapshot(true);
       },
       { privateStreamObserved: privateStreamingSnapshotMode }
@@ -645,7 +648,7 @@
       return;
     }
     if (action === 'verify_private_stream_watchdog') {
-      const armed = streamWatchdogProbe && streamWatchdogProbe.arm(
+      const armed = streamWatchdogAcceptance && streamWatchdogAcceptance.run(
         String(command.requestId || ''), streamingSnapshotMode
       );
       if (!armed || armed.accepted !== true) respond(action, false, armed && armed.detail || 'probe_unavailable');
@@ -730,7 +733,7 @@
     }
     disposed = true;
     if (streamingPolicy) streamingPolicy.dispose();
-    if (streamWatchdogProbe) streamWatchdogProbe.dispose();
+    if (streamWatchdogAcceptance) streamWatchdogAcceptance.dispose();
     if (snapshotScheduler) snapshotScheduler.dispose();
     if (typeof privateStreamUnsubscribe === 'function') privateStreamUnsubscribe();
     privateStreamUnsubscribe = null;
@@ -764,10 +767,7 @@
     typeof privateStreamTransport.subscribe === 'function'
     ? privateStreamTransport.subscribe(() => {
       privateStreamRevision += 1;
-      const privateStream = optional(null, () => privateStreamTransport.current(location.pathname));
-      const privateStreamState = String(privateStream && privateStream.state || 'idle');
-      if (!streamWatchdogProbe ||
-          !streamWatchdogProbe.observePrivateUpdate(privateStreamState)) scheduleSnapshot(true);
+      scheduleSnapshot(true);
     })
     : null);
   if (privateConversationDirectory &&
