@@ -24,12 +24,16 @@ const visibility = read('pc-frontend/src/features/ai/aiMessageVisibility.ts')
 const api = read('pc-frontend/src/features/user-browser/internalBrowserApi.ts')
 const fullPage = read('pc-frontend/src/features/user-browser/AiBrowserExperience.tsx')
 const embedded = read('desktop-shell/src-tauri/src/local_ai_browser/embedded_view.rs')
+const streamingPresentation = read('pc-frontend/src/features/user-browser/localAiStreamingPresentation.ts')
 assert.doesNotMatch(page, /AiOfficialAnswerSurface/)
 assert.match(pageStyles, /\.feed\s*\{[^}]*position:\s*relative;/s)
 assert.match(page, /visibleMessages\.filter\(\(m\) => m\.role !== 'system'\)\.map/)
 assert.match(page, /<AiChatMessageRow/)
 assert.match(backend, /\.filter\(shouldRenderNativeStructuredPart\)/)
 assert.match(backend, /\[\.\.\.controller\.visibleMessages\]/)
+assert.match(backend, /const effectiveState = item\.id === streamingTarget\?\.messageId/)
+assert.match(backend, /streamingTarget\?\.synthetic/)
+assert.match(backend, /localAiStreamingStatus\(\{/)
 assert.match(controller, /beginPendingLocalAiResponse/)
 assert.match(controller, /pendingLocalAiResponseObserved/)
 assert.match(responseRefresh, /requestReturnToAiChat/)
@@ -51,6 +55,8 @@ assert.match(structuredContent, /visibleParts\.map/)
 assert.match(messageRow, /hasVisibleAiMessageContent\(content\)/)
 assert.match(messageRow, /Boolean\(message\.structured_parts\?\.length\)/)
 assert.match(messageRow, /!streaming && hasVisibleText/)
+assert.match(messageRow, /isLocalAiSearchProgress\(streamingStatus\)/)
+assert.match(messageRow, /<Globe2/)
 assert.match(markdownContent, /citationIndex/)
 assert.match(markdownContent, /findCitation\(citationIndex, safe\)/)
 assert.match(markdownContent, /className=\{styles\.citationLink\}/)
@@ -76,6 +82,44 @@ assert.equal(hasVisibleAiMessageContent('**正文**'), true)
 assert.equal(shouldKeepAiWebMessage({ content: '\u200b', state: 'streaming' }), true)
 assert.equal(shouldKeepAiWebMessage({ content: '\u200b', state: 'completed' }), false)
 assert.equal(shouldKeepAiWebMessage({ content: '', state: 'completed', sourceCount: 1 }), true)
+
+const streamingPresentationFilename = path.join(root, 'pc-frontend/src/features/user-browser/localAiStreamingPresentation.ts')
+const streamingPresentationOutput = ts.transpileModule(streamingPresentation, {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2023 },
+  fileName: streamingPresentationFilename,
+}).outputText
+const compiledStreamingPresentation = new Module(streamingPresentationFilename, module)
+compiledStreamingPresentation.filename = streamingPresentationFilename
+compiledStreamingPresentation.paths = module.paths
+compiledStreamingPresentation._compile(streamingPresentationOutput, streamingPresentationFilename)
+const {
+  isLocalAiSearchProgress,
+  localAiStreamingStatus,
+  localAiStreamingTarget,
+} = compiledStreamingPresentation.exports
+const user = { id: 'user-1', role: 'user', state: 'completed', content: [{ type: 'text', text: 'KOSPI' }] }
+const completedShell = { id: 'assistant-shell', role: 'assistant', state: 'completed', content: [] }
+assert.deepEqual(localAiStreamingTarget([user, completedShell], true), {
+  messageId: 'assistant-shell', synthetic: false,
+})
+assert.deepEqual(localAiStreamingTarget([user], true), {
+  messageId: 'snapshot-progress', synthetic: true,
+})
+assert.equal(localAiStreamingTarget([user, completedShell], false), null)
+assert.deepEqual(localAiStreamingTarget([
+  { ...completedShell, id: 'old-stream', state: 'streaming' },
+  user,
+], true), { messageId: 'snapshot-progress', synthetic: true }, 'an old turn must not own the new stream')
+assert.equal(localAiStreamingTarget([
+  user,
+  { ...completedShell, id: 'assistant-live', state: 'streaming' },
+], false).messageId, 'assistant-live')
+assert.equal(localAiStreamingStatus({
+  officialStatus: '正在搜索 South Korea stock market', pendingSlow: true, providerName: 'ChatGPT',
+}), '正在搜索 South Korea stock market', 'official progress must beat the generic slow warning')
+assert.match(localAiStreamingStatus({ pendingSlow: true, providerName: 'ChatGPT' }), /回答同步较慢/)
+assert.equal(isLocalAiSearchProgress('正在搜索 11 个网站'), true)
+assert.equal(isLocalAiSearchProgress('ChatGPT 正在回答…'), false)
 
 const structuredPolicyFilename = path.join(root, 'pc-frontend/src/features/user-browser/localAiStructuredPartPolicy.ts')
 const structuredPolicyOutput = ts.transpileModule(structuredPolicy, {

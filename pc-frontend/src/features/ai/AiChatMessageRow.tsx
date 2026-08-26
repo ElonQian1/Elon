@@ -1,3 +1,4 @@
+import { Globe2 } from 'lucide-react'
 import type { User } from '../../store/auth'
 import { displayMessageContentOrAttachment } from '../../lib/messageDisplay'
 import { formatTime } from '../../lib/utils'
@@ -12,6 +13,7 @@ import AiSourceLinks from './AiSourceLinks'
 import { hasVisibleAiMessageContent } from './aiMessageVisibility'
 import AiRendererUpgradeNotice from './AiRendererUpgradeNotice'
 import type { LocalAiRendererCompatibilityNotice } from '../user-browser/localAiRendererCompatibility'
+import { isLocalAiSearchProgress } from '../user-browser/localAiStreamingPresentation'
 
 export interface AiMessage {
   id?: string
@@ -95,6 +97,7 @@ export default function AiChatMessageRow({
   const copySourceId = messageCopySourceId('ai-chat', messageActionKey)
   const nodePrefix = message.node_remote ? '远程' : '本机'
   const webProviderName = aiWebProviderDisplayName(message.assistant_provider_id)
+  const searchProgress = streaming && isLocalAiSearchProgress(streamingStatus)
   const nameLabel = isUser
     ? (user?.nickname ?? user?.account ?? '我')
     : (isNode ? `${nodePrefix} · ${message.node_display_name ?? ''}` : webProviderName ?? 'AI')
@@ -125,6 +128,7 @@ export default function AiChatMessageRow({
         </div>
         {streaming && !hasVisibleContent
           ? <div className={styles.typing} aria-live="polite">
+            {searchProgress && <Globe2 className={styles.typingIcon} size={15} aria-hidden="true" />}
             <span className={styles.typingText}>{streamingStatus}</span>
             <span className={styles.typingDot} /><span className={styles.typingDot} /><span className={styles.typingDot} />
           </div>

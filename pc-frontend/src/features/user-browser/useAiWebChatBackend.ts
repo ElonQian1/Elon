@@ -16,6 +16,10 @@ import { isYilongRichContent } from './richContentProtocol'
 import { localAiRendererCompatibility } from './localAiRendererCompatibility'
 import { localAiAssistantExtractionIncomplete } from './localAiAssistantContentQuality'
 import useLocalAiProviderActivity from './useLocalAiProviderActivity'
+import {
+  localAiStreamingStatus,
+  localAiStreamingTarget,
+} from './localAiStreamingPresentation'
 
 const PROVIDER_STORAGE_KEY = 'elon.pc.aiChatProvider'
 
@@ -33,6 +37,10 @@ export default function useAiWebChatBackend(mode: AiHomeMode, ownerKey: string) 
     mode === 'chat' ? ownerKey : '',
     capability.state,
   )
+  const streamingTarget = useMemo(() => localAiStreamingTarget(
+    controller.visibleMessages,
+    controller.snapshot?.streaming === true,
+  ), [controller.snapshot?.streaming, controller.visibleMessages])
 
   useEffect(() => {
     if (!provider || provider.id === providerId) return
@@ -53,7 +61,7 @@ export default function useAiWebChatBackend(mode: AiHomeMode, ownerKey: string) 
     const latestAffectedAssistantId = [...controller.visibleMessages]
       .reverse()
       .find((item) => compatibilityByMessage.get(item.id))?.id
-    return controller.visibleMessages.flatMap((item): AiMessage[] => {
+    const mapped = controller.visibleMessages.flatMap((item): AiMessage[] => {
       const sources = item.content
         .filter((part): part is Extract<typeof part, { type: 'citation' }> => part.type === 'citation' && Boolean(part.url))
         .map<AiSource>((part) => ({
@@ -98,9 +106,10 @@ export default function useAiWebChatBackend(mode: AiHomeMode, ownerKey: string) 
           }
         })
         .filter((part) => part.type !== 'rich_card' || Boolean(part.richContent))
+      const effectiveState = item.id === streamingTarget?.messageId ? 'streaming' : item.state
       if (!shouldKeepAiWebMessage({
         content,
-        state: item.state,
+        state: effectiveState,
         sourceCount: sources.length,
         structuredCount: structuredParts.length,
       })) {
@@ -120,7 +129,20 @@ export default function useAiWebChatBackend(mode: AiHomeMode, ownerKey: string) 
           : undefined,
       }]
     })
-  }, [controller.visibleMessages, provider?.id])
+    if (streamingTarget?.synthetic) {
+      mapped.push({
+        id: `web:${provider?.id || 'ai'}:${streamingTarget.messageId}`,
+        role: 'assistant',
+        content: '',
+        content_format: 'plain',
+        assistant_provider_id: provider?.id,
+        tool_used: null,
+        sources: [],
+        structured_parts: [],
+      })
+    }
+    return mapped
+  }, [controller.visibleMessages, provider?.id, streamingTarget])
   const ready = capability.state === 'ready' && Boolean(ownerKey && provider)
   const providerActivities = useLocalAiProviderActivity({
     enabled: mode === 'chat' && ready,
@@ -131,9 +153,6 @@ export default function useAiWebChatBackend(mode: AiHomeMode, ownerKey: string) 
   })
   const canEdit = capability.state === 'ready' && Boolean(provider) && controller.canEditDraft
   const canCompose = ready && controller.canSubmitDraft
-  const streamingMessageId = [...controller.visibleMessages]
-    .reverse()
-    .find((item) => item.state === 'streaming')?.id
   const contextTurnCount = (controller.snapshot?.messages ?? [])
     .filter((item) => item.role === 'user').length
   const contextReady = controller.sessionState?.contextReady !== false
@@ -167,11 +186,14 @@ export default function useAiWebChatBackend(mode: AiHomeMode, ownerKey: string) 
     canEdit,
     canCompose,
     title: controller.snapshot?.title || '新对话',
-    streamingMessageId: streamingMessageId ? `web:${provider?.id || 'ai'}:${streamingMessageId}` : null,
-    streamingStatus: controller.pendingResponseSlow
-      ? `${provider?.displayName || '网页 AI'} 已发送 · 回答同步较慢，可继续等待或打开官方页确认`
-      : controller.snapshot?.streamingStatus?.trim()
-      || `${provider?.displayName || '网页 AI'} 正在回答…`,
+    streamingMessageId: streamingTarget
+      ? `web:${provider?.id || 'ai'}:${streamingTarget.messageId}`
+      : null,
+    streamingStatus: localAiStreamingStatus({
+      officialStatus: controller.snapshot?.streamingStatus,
+      pendingSlow: controller.pendingResponseSlow,
+      providerName: provider?.displayName,
+    }),
     contextReady,
     contextStatus,
     contextTurnCount,
