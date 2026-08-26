@@ -47,6 +47,7 @@ import {
 } from './localAiNewConversation'
 import useChatGptNewConversationRecovery from './useChatGptNewConversationRecovery'
 import useLocalAiNewConversationDeadline from './useLocalAiNewConversationDeadline'
+import useLocalAiNewConversationLifecycle from './useLocalAiNewConversationLifecycle'
 import { localAiComposerAvailability } from './localAiComposerAvailability'
 import {
   BACKGROUND_RECONNECT_MAX_ATTEMPTS,
@@ -79,20 +80,19 @@ export default function useLocalAiWebChatController(
   const { draft, draftRef, draftTouched, setDraft, setDraftTouched } = useLocalAiComposerDraft(providerId, ownerKey)
   const [pendingSends, setPendingSends] = useState<PendingLocalAiSend[]>([])
   const [pendingResponses, setPendingResponses] = useState<PendingLocalAiResponse[]>([])
-  const [queuedSend, setQueuedSend] = useState<QueuedLocalAiSend | null>(null)
   const [busyAction, setBusyAction] = useState('')
   const [message, setMessage] = useState('')
-  const [newConversationRecoveryStartedAtMs, setNewConversationRecoveryStartedAtMs] = useState(0)
+  const { baselineId: newConversationBaselineId, begin: beginNewConversationTransition,
+    cancel: cancelNewConversationTransition, confirmPage: confirmNewConversationPage,
+    finish: finishNewConversationTransition, pageConfirmed: newConversationPageConfirmed,
+    queuedSend, queuedSendDispatching, queuedSendRef, recoveryStartedAtMs: newConversationRecoveryStartedAtMs,
+    reset: resetNewConversationTransition, setQueuedSend } = useLocalAiNewConversationLifecycle<QueuedLocalAiSend>()
   const newConversationRecoveryExpired = useLocalAiNewConversationDeadline(newConversationRecoveryStartedAtMs)
-  const [newConversationPageConfirmed, setNewConversationPageConfirmed] = useState(false)
   const pendingResponseSlow = useLocalAiPendingResponseWatchdog(requestedSessionIdentity, pendingResponses)
   const autoStartKey = useRef('')
   const backgroundReconnectAttempts = useRef(0)
   const backgroundReconnectInFlight = useRef(false)
   const optimisticSendSequence = useRef(0)
-  const queuedSendDispatching = useRef(false)
-  const queuedSendRef = useRef<QueuedLocalAiSend | null>(null)
-  const newConversationBaselineId = useRef('')
   const visibleSessionState = provider && ownerKey
     ? sessionEntry.identity === requestedSessionIdentity
       && sessionEntry.state?.providerId === provider.id
@@ -159,10 +159,17 @@ export default function useLocalAiWebChatController(
     [visibleSessionState?.uiManifestEvent],
   )
   const sessionOpen = Boolean(visibleSessionState && visibleSessionState.windowStatus !== 'closed')
-  const userState = useMemo(
-    () => deriveLocalAiUserState(clientState, provider, visibleSessionState, liveSnapshot),
-    [clientState, liveSnapshot, provider, visibleSessionState],
-  )
+  const userState = useMemo(() => {
+    const next = deriveLocalAiUserState(clientState, provider, visibleSessionState, liveSnapshot)
+    if (!newConversationRecoveryStartedAtMs) return next
+    return {
+      ...next,
+      canNewConversation: false,
+      features: next.features.map((feature) => feature.id === 'new_conversation'
+        ? { ...feature, active: false }
+        : feature),
+    }
+  }, [clientState, liveSnapshot, newConversationRecoveryStartedAtMs, provider, visibleSessionState])
   const composerAvailability = localAiComposerAvailability({
     clientReady: clientState === 'ready',
     providerAvailable: Boolean(provider),
@@ -188,14 +195,9 @@ export default function useLocalAiWebChatController(
       : null)
     setPendingSends([])
     setPendingResponses([])
-    setQueuedSend(null)
-    queuedSendRef.current = null
-    queuedSendDispatching.current = false
-    newConversationBaselineId.current = ''
-    setNewConversationPageConfirmed(false)
+    resetNewConversationTransition()
     setBusyAction('')
     setMessage('')
-    setNewConversationRecoveryStartedAtMs(0)
     autoStartKey.current = ''
     backgroundReconnectAttempts.current = 0
     backgroundReconnectInFlight.current = false
@@ -215,19 +217,11 @@ export default function useLocalAiWebChatController(
       nativeReady,
       newConversationPageConfirmed,
     )
-    if (nativeReady && !queuedSend) {
-      newConversationBaselineId.current = ''
-      setNewConversationPageConfirmed(false)
-      setNewConversationRecoveryStartedAtMs(0)
-      return
-    }
+    if (nativeReady && !queuedSend) return finishNewConversationTransition()
     if (queuedSendReady && queuedSend && !busyAction && !queuedSendDispatching.current) {
       queuedSendDispatching.current = true
-      newConversationBaselineId.current = ''
-      setNewConversationPageConfirmed(false)
-      setNewConversationRecoveryStartedAtMs(0)
+      finishNewConversationTransition()
       setQueuedSend(null)
-      queuedSendRef.current = null
       void dispatchPreparedPrompt(queuedSend)
         .finally(() => { queuedSendDispatching.current = false })
       return
@@ -235,17 +229,10 @@ export default function useLocalAiWebChatController(
     // 五个条件里任何一个（尤其是官网迟迟不给可信实时快照）迟迟凑不齐时，不能让
     // 输入框永远显示空白；排队消息只在新会话绑定成功后发送，超时则安全还原草稿。
     if (!newConversationRecoveryExpired) return
-    newConversationBaselineId.current = ''
-    setNewConversationPageConfirmed(false)
-    setNewConversationRecoveryStartedAtMs(0)
-    if (queuedSend) {
-      restoreQueuedSend(queuedSend)
-      setQueuedSend(null)
-      queuedSendRef.current = null
-      setMessage('新会话后台连接超时，消息没有误发；草稿已保留，可显示官方页确认后重试。')
-    } else {
-      setMessage('新会话后台连接超时；输入仍可继续编辑，如页面显示旧内容可打开官方页确认。')
-    }
+    cancelNewConversationTransition(restoreQueuedSend)
+    setMessage(queuedSend
+      ? '新会话后台连接超时，消息没有误发；草稿已保留，可显示官方页确认后重试。'
+      : '新会话后台连接超时；输入仍可继续编辑，如页面显示旧内容可打开官方页确认。')
   }, [busyAction, liveSnapshot, newConversationPageConfirmed, newConversationRecoveryExpired,
     newConversationRecoveryStartedAtMs, providerId, queuedSend, visibleSessionState])
 
@@ -282,7 +269,7 @@ export default function useLocalAiWebChatController(
     suspended: busyAction === 'new_conversation',
     onState: setSessionState,
     onMessage: setMessage,
-    onPageBoundaryConfirmed: () => setNewConversationPageConfirmed(true),
+    onPageBoundaryConfirmed: confirmNewConversationPage,
   })
 
   useEffect(() => {
@@ -407,6 +394,7 @@ export default function useLocalAiWebChatController(
 
   async function openCachedConversation(conversationId: string) {
     if (!provider || !ownerKey || busyAction) return
+    cancelNewConversationTransition(restoreQueuedSend)
     setBusyAction('open_cached_conversation')
     setPendingSends([])
     setPendingResponses([])
@@ -437,9 +425,12 @@ export default function useLocalAiWebChatController(
         pending,
         sessionIdentity: requestedSessionIdentity,
       }
-      queuedSendRef.current = queued
       setQueuedSend(queued)
       setMessage('消息已保存在本机新会话队列；官网在后台完成绑定后会自动发送。')
+      return visibleSessionState
+    }
+    if (action === 'new_conversation' && newConversationRecoveryStartedAtMs) {
+      setMessage('当前新会话仍在后台确认；为避免串到上一会话，确认完成前不会重复新建。')
       return visibleSessionState
     }
     if (busyAction || (action === 'send_prompt' && !composerAvailability.canSubmit)) return null
@@ -458,6 +449,7 @@ export default function useLocalAiWebChatController(
     }
     setBusyAction(action)
     if (['open_conversation', 'open_project'].includes(action)) {
+      cancelNewConversationTransition(restoreQueuedSend)
       cancelResponseRefresh()
     }
     setMessage('')
@@ -572,13 +564,10 @@ export default function useLocalAiWebChatController(
 
   function beginLocalNewConversation() {
     const previousDraft = draftRef.current
-    newConversationBaselineId.current = visibleSessionState?.activeConversationId ?? ''
-    setNewConversationPageConfirmed(false)
-    setNewConversationRecoveryStartedAtMs(Date.now())
+    beginNewConversationTransition(visibleSessionState?.activeConversationId ?? '')
     setPendingSends([])
     setPendingResponses([])
     setQueuedSend(null)
-    queuedSendRef.current = null
     queuedSendDispatching.current = false
     cancelResponseRefresh()
     setDraft('')
@@ -598,7 +587,7 @@ export default function useLocalAiWebChatController(
     )
     if (retry) {
       setPendingSends([retry.pending]); setPendingResponses([retry.response])
-      setQueuedSend(retry.queued); queuedSendRef.current = retry.queued
+      setQueuedSend(retry.queued)
       accessRecovery.dismiss()
     }
     setBusyAction('new_conversation')
@@ -622,7 +611,7 @@ export default function useLocalAiWebChatController(
               const background = await keepLocalAiNewConversationInNativeForeground(provider, ownerKey, next)
               setSessionState(background)
               if (result?.action === 'new_conversation' && result.ok) {
-                setNewConversationPageConfirmed(true)
+                confirmNewConversationPage()
                 setMessage(`已确认 ${provider.displayName} 空白新会话；首条消息可以立即发送，富内容上下文继续在后台同步。`)
               } else {
                 setMessage(`已进入 ${provider.displayName} 新会话；可以立即输入，官网上下文正在后台确认。`)
@@ -673,15 +662,9 @@ export default function useLocalAiWebChatController(
   }
 
   function failLocalNewConversation(previousDraft: string, error: unknown) {
-    newConversationBaselineId.current = ''
-    setNewConversationPageConfirmed(false)
-    setNewConversationRecoveryStartedAtMs(0)
     const queued = queuedSendRef.current
-    if (queued) {
-      restoreQueuedSend(queued)
-      queuedSendRef.current = null
-      setQueuedSend(null)
-    } else if (!draftRef.current && previousDraft) {
+    cancelNewConversationTransition(restoreQueuedSend)
+    if (!queued && !draftRef.current && previousDraft) {
       setDraft(previousDraft)
       setDraftTouched(true)
     }

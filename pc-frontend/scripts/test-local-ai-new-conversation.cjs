@@ -22,6 +22,10 @@ const chatGptRecoverySource = fs.readFileSync(
   path.resolve(__dirname, '../src/features/user-browser/useChatGptNewConversationRecovery.ts'),
   'utf8',
 )
+const lifecycleSource = fs.readFileSync(
+  path.resolve(__dirname, '../src/features/user-browser/useLocalAiNewConversationLifecycle.ts'),
+  'utf8',
+)
 const controllerConfigSource = fs.readFileSync(
   path.resolve(__dirname, '../src/features/user-browser/localAiWebChatControllerConfig.ts'),
   'utf8',
@@ -259,17 +263,37 @@ assert.match(deadlineSource, /window\.setTimeout\(\(\) => setExpiredGeneration\(
 assert.match(deadlineSource, /return \(\) => window\.clearTimeout\(timer\)/)
 assert.match(controllerSource, /useLocalAiNewConversationDeadline\(newConversationRecoveryStartedAtMs\)/)
 assert.match(controllerSource, /if \(!newConversationRecoveryExpired\) return/)
+assert.match(
+  controllerSource,
+  /action === 'new_conversation' && newConversationRecoveryStartedAtMs[\s\S]{0,240}确认完成前不会重复新建/,
+)
+assert.match(
+  controllerSource,
+  /openCachedConversation[\s\S]{0,220}cancelNewConversationTransition\(restoreQueuedSend\)/,
+)
+assert.match(
+  controllerSource,
+  /\['open_conversation', 'open_project'\][\s\S]{0,180}cancelNewConversationTransition\(restoreQueuedSend\)/,
+)
+assert.match(
+  lifecycleSource,
+  /const cancel = useCallback[\s\S]{0,260}reset\(\)[\s\S]{0,100}restore\(queued\)/,
+)
+assert.match(
+  controllerSource,
+  /if \(!newConversationRecoveryStartedAtMs\) return next[\s\S]{0,260}canNewConversation: false/,
+)
 assert.match(controllerSource, /if \(action === 'new_conversation'\) \{\s*return startNewConversation\(\)/)
 assert.match(controllerSource, /function beginLocalNewConversation\(\)/)
-assert.match(controllerSource, /setNewConversationRecoveryStartedAtMs\(Date\.now\(\)\)/)
-assert.match(controllerSource, /newConversationBaselineId\.current = visibleSessionState\?\.activeConversationId \?\? ''/)
+assert.match(controllerSource, /beginNewConversationTransition\(visibleSessionState\?\.activeConversationId \?\? ''\)/)
+assert.match(lifecycleSource, /setRecoveryStartedAtMs\(Date\.now\(\)\)/)
 assert.match(controllerSource, /visibleSessionState\?\.semanticConversationAligned === false/)
 assert.match(controllerSource, /deriveLocalAiUserState\(clientState, provider, visibleSessionState, liveSnapshot\)/)
 assert.match(controllerSource, /localAiNewConversationNativeReady\(/)
 assert.match(controllerSource, /localAiNewConversationCanDispatchQueuedSend\(/)
 assert.match(controllerSource, /newConversationPageConfirmed/)
-assert.match(controllerSource, /setNewConversationPageConfirmed\(true\)/)
-assert.match(controllerSource, /onPageBoundaryConfirmed: \(\) => setNewConversationPageConfirmed\(true\)/)
+assert.match(controllerSource, /confirmNewConversationPage\(\)/)
+assert.match(controllerSource, /onPageBoundaryConfirmed: confirmNewConversationPage/)
 assert.match(controllerSource, /const path = selectLocalAiNewConversationPath\(/)
 assert.match(controllerSource, /if \(path === 'adapter'\)/)
 assert.match(controllerSource, /waitForLocalAiAdapterResult\([\s\S]*?'new_conversation'/)
@@ -296,7 +320,7 @@ assert.doesNotMatch(
 )
 assert.match(controllerSource, /消息已保存在本机新会话队列/)
 assert.match(controllerSource, /dispatchPreparedPrompt\(queuedSend\)/)
-assert.match(controllerSource, /restoreQueuedSend\(queuedSend\)/)
+assert.match(controllerSource, /cancelNewConversationTransition\(restoreQueuedSend\)/)
 assert.match(welcomeSource, /!web\.controller\.newConversationRecoveryActive/)
 
 process.stdout.write('PASS local AI new-conversation recovery policy\n')
