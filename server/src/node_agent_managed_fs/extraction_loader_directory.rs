@@ -94,6 +94,12 @@ impl PinnedManagedDirectory {
 }
 
 impl PinnedManagedExtractionLoaderDirectory {
+    /// Purpose-specific borrow for launch-path discovery. It exposes no path, file, or handle and
+    /// cannot select a CWD or mint namespace authority.
+    pub(super) fn discovery_directory(&self) -> &PinnedManagedDirectory {
+        &self.directory
+    }
+
     pub(crate) fn create_new_directory_child(
         &self,
         name: &OsStr,

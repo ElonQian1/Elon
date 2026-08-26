@@ -18,6 +18,7 @@ mod extraction_loader_directory;
 mod hash;
 mod loader;
 mod loader_debug;
+mod loader_launch_path_discovery;
 mod loader_system_validation;
 mod lock;
 mod namespace;
@@ -55,6 +56,11 @@ pub(crate) use loader::{
     PinnedManagedLoaderDirectory, PinnedManagedLoaderFile, PinnedWindowsLoaderSearchDirectory,
     PinnedWindowsLoaderSystemImageFile, QuarantinedManagedLoaderFile,
     QuarantinedManagedLoaderSourceClose,
+};
+pub(crate) use loader_launch_path_discovery::{
+    discover_loader_launch_path_candidates, ManagedLoaderLaunchPathComponentDiscovery,
+    ManagedLoaderLaunchPathDiscoveryReceipt, ManagedLoaderLaunchPathDiscoverySet,
+    ManagedLoaderLaunchPathObjectKind, ManagedLoaderPlanDirectoryLaunchPathDiscovery,
 };
 pub(crate) use namespace::{
     ManagedDeleteDisposition, ManagedExpectedIdentityMatchPresence,

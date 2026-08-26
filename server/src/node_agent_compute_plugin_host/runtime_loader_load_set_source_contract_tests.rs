@@ -49,7 +49,7 @@ fn source_slice() -> String {
 }
 
 #[test]
-fn source_routes_twelve_private_loader_authority_modules() {
+fn source_routes_thirteen_private_loader_authority_modules() {
     assert!(HOST_MODULE.contains("mod runtime_loader_load_set;"));
     assert!(HOST_MODULE.contains("mod runtime_loader_load_set_source_contract_tests;"));
     assert!(MANAGED_FACADE.contains("mod loader;"));
@@ -57,6 +57,7 @@ fn source_routes_twelve_private_loader_authority_modules() {
     for module in [
         "mod digest;",
         "mod failure;",
+        "mod launch_path_discovery;",
         "mod launch_path_validation;",
         "mod model;",
         "mod model_debug;",
@@ -70,7 +71,7 @@ fn source_routes_twelve_private_loader_authority_modules() {
     ] {
         assert!(FACADE.contains(module), "missing module {module}");
     }
-    assert_eq!(FACADE.matches("mod ").count(), 12);
+    assert_eq!(FACADE.matches("mod ").count(), 13);
     assert!(MODEL_DEBUG.contains("impl fmt::Debug for SealedComputePluginRunnerImage"));
 }
 
@@ -486,9 +487,13 @@ fn source_freezes_missing_authorities_eighteen_zero_effects_and_transition_order
         "PROPOSED_WINDOWS_READ_ONLY_ASSET_DESIRED_ACCESS",
         "PROPOSED_WINDOWS_FILE_CREATE_DISPOSITION",
         "FILE_SHARE_READ",
+        "borrow_only_receipt_and_evidence_preflight",
+        "discover_retained_launch_path_candidates_and_prelease_pe_material",
+        "authenticate_exact_launch_context_and_preliminary_resolution_plan",
         "acquire_all_searched_name_and_launch_path_component_grants",
         "acquire_indexed_fileid_content_leases_after_all_name_grants",
-        "same_handle_full_package_rehash_under_content_leases_and_name_grants",
+        "same_handle_full_package_rehash_and_reparse_under_content_leases_and_name_grants",
+        "seal_exact_pe_graph_launch_path_and_startup_import_resolution_under_leases",
         "query_all_name_grants_and_content_lease_generation_set",
         "validate_and_retain_package_root_and_plan_directory_handles",
         "close_reopen_package_files_runner_last",
@@ -506,7 +511,9 @@ fn source_freezes_missing_authorities_eighteen_zero_effects_and_transition_order
     assert!(POLICY.contains("existing_extraction_directory_access_share_compatibility"));
     assert!(POLICY.contains("fileid_immutable_content_lease_backend"));
     assert!(POLICY.contains("authenticated_pe_import_graph_projection"));
-    assert!(POLICY.contains("launch_path_parent_chain_share_or_grant_authority"));
+    assert!(POLICY.contains("launch_path_handle_chain_discovery"));
+    assert!(POLICY.contains("launch_path_exact_context_selection"));
+    assert!(POLICY.contains("launch_path_component_grant_backend"));
     assert!(!POLICY.contains("PROPOSED_WINDOWS_DIRECTORY_DESIRED_ACCESS"));
     assert!(!POLICY.contains("PROPOSED_WINDOWS_DIRECTORY_SHARE_ACCESS"));
 }

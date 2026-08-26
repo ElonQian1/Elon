@@ -8,6 +8,7 @@
 
 mod digest;
 mod failure;
+mod launch_path_discovery;
 mod launch_path_validation;
 mod model;
 mod model_debug;

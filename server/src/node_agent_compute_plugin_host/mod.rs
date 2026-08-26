@@ -44,6 +44,8 @@ mod work_admission_contract;
 #[cfg(test)]
 mod runtime_extraction_loader_directory_source_contract_tests;
 #[cfg(test)]
+mod runtime_loader_launch_path_discovery_source_contract_tests;
+#[cfg(test)]
 mod runtime_loader_load_set_source_contract_tests;
 #[cfg(test)]
 mod runtime_process_custody_source_contract_tests;

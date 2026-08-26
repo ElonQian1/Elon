@@ -73,6 +73,14 @@ impl PreparedComputePluginCandidateStaging<'_> {
         self.root.root_identity_digest()
     }
 
+    /// Purpose-specific borrow for retained-handle launch-path discovery. This does not expose a
+    /// path, raw handle, component grant, selected working directory, or loader authority.
+    pub(in crate::node_agent_compute_plugin_host) fn loader_launch_path_package_root(
+        &self,
+    ) -> &PinnedManagedExtractionLoaderDirectory {
+        &self.directory
+    }
+
     pub(in crate::node_agent_compute_plugin_host) fn create_new_directory_child(
         &self,
         name: &OsStr,

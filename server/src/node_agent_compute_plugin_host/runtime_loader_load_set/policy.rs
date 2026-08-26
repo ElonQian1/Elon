@@ -33,9 +33,9 @@ pub(super) const LOADER_LOAD_SET_AUTHORITY_GAPS: &[(&str, &str)] = &[
 /// process-resume blocker until a module-load enforcement policy and backend exist.
 pub(super) const DYNAMIC_MODULE_LOAD_AUTHORITY: &str = "missing_resume_blocker";
 
-/// The extraction producer now has a source-written, purpose-specific retained-owner seam for
-/// DELETE-capable directories and share-delete probes. Windows has not dynamically verified that
-/// access/share matrix, so the loader predecessor remains unreachable in this architecture phase.
+/// Extraction-share custody and retained launch-path candidate discovery now have source-written
+/// seams. Windows has dynamically verified neither layer, and exact context selection/grants stay
+/// missing, so the loader predecessor remains unreachable in this architecture phase.
 pub(super) const LOADER_LOAD_SET_REACHABILITY_BLOCKERS: &[(&str, &str)] = &[
     (
         "existing_extraction_directory_access_share_compatibility",
@@ -46,9 +46,11 @@ pub(super) const LOADER_LOAD_SET_REACHABILITY_BLOCKERS: &[(&str, &str)] = &[
     ("searched_name_grant_acquisition_backend", "missing"),
     ("searched_name_fence_backend", "missing"),
     (
-        "launch_path_parent_chain_share_or_grant_authority",
-        "missing",
+        "launch_path_handle_chain_discovery",
+        "source_written_windows_dynamic_unverified",
     ),
+    ("launch_path_exact_context_selection", "missing"),
+    ("launch_path_component_grant_backend", "missing"),
     ("authenticated_pe_import_graph_projection", "missing"),
     ("live_windows_resolution_currentness_backend", "missing"),
     ("parent_relative_file_reopen_backend", "missing"),
@@ -64,10 +66,13 @@ pub(super) const PROPOSED_WINDOWS_IMAGE_CREATE_OPTIONS: &str =
     "FILE_NON_DIRECTORY_FILE|FILE_OPEN_REPARSE_POINT|FILE_SYNCHRONOUS_IO_NONALERT";
 
 pub(super) const LOADER_TRANSITION_ORDER: &[&str] = &[
-    "borrow_only_receipt_evidence_resolution_preflight",
+    "borrow_only_receipt_and_evidence_preflight",
+    "discover_retained_launch_path_candidates_and_prelease_pe_material",
+    "authenticate_exact_launch_context_and_preliminary_resolution_plan",
     "acquire_all_searched_name_and_launch_path_component_grants",
     "acquire_indexed_fileid_content_leases_after_all_name_grants",
-    "same_handle_full_package_rehash_under_content_leases_and_name_grants",
+    "same_handle_full_package_rehash_and_reparse_under_content_leases_and_name_grants",
+    "seal_exact_pe_graph_launch_path_and_startup_import_resolution_under_leases",
     "query_all_name_grants_and_content_lease_generation_set",
     "validate_and_retain_package_root_and_plan_directory_handles",
     "close_reopen_package_files_runner_last",

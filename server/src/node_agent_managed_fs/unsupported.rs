@@ -9,7 +9,8 @@ use super::{
         PlatformExtractionLoaderDirectoryProbe, PlatformExtractionLoaderDirectoryProbeFailure,
     },
     namespace::PlatformParentRelativeObservation,
-    ManagedSqliteAccess, ManagedSqliteFileKind, ManagedSqliteOpenMode, PlatformFileIdentity,
+    ManagedLoaderLaunchPathDiscoveryReceipt, ManagedSqliteAccess, ManagedSqliteFileKind,
+    ManagedSqliteOpenMode, PinnedManagedDirectory, PinnedManagedFile, PlatformFileIdentity,
     PlatformManagedSqliteLockAttempt, PlatformNamespaceDurabilityReceipt,
     PlatformNamespaceFlushFailure,
 };
@@ -61,6 +62,18 @@ pub(super) fn probe_extraction_loader_directory_relative(
     Err(PlatformExtractionLoaderDirectoryProbeFailure::before_probe(
         unsupported(),
     ))
+}
+
+pub(super) fn discover_loader_directory_launch_path(
+    _directory: &PinnedManagedDirectory,
+) -> anyhow::Result<ManagedLoaderLaunchPathDiscoveryReceipt> {
+    Err(unsupported().into())
+}
+
+pub(super) fn discover_loader_file_launch_path(
+    _file: &PinnedManagedFile,
+) -> anyhow::Result<ManagedLoaderLaunchPathDiscoveryReceipt> {
+    Err(unsupported().into())
 }
 
 pub(super) fn create_new_directory_relative(

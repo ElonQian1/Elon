@@ -47,11 +47,16 @@ use super::{
 
 #[path = "windows_extraction_loader_directory.rs"]
 mod extraction_loader_directory;
+#[path = "windows_loader_launch_path_discovery.rs"]
+mod loader_launch_path_discovery;
 #[path = "windows_sqlite.rs"]
 mod sqlite;
 #[path = "windows_sqlite_locking.rs"]
 mod sqlite_locking;
 pub(super) use extraction_loader_directory::probe_extraction_loader_directory_relative;
+pub(super) use loader_launch_path_discovery::{
+    discover_loader_directory_launch_path, discover_loader_file_launch_path,
+};
 pub(super) use sqlite::{
     close_sqlite_file, flush_sqlite_file, open_sqlite_file_for_access_relative,
     open_sqlite_file_for_delete_relative, open_sqlite_file_relative, read_sqlite_file_at,

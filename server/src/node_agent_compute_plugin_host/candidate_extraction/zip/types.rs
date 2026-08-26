@@ -14,7 +14,9 @@ use crate::{
         fetch_contract::ComputePluginFetchCancellationGuard,
         fetch_file::PreparedComputePluginCandidateStaging,
     },
-    node_agent_managed_fs::{PinnedManagedDirectory, PinnedManagedFile},
+    node_agent_managed_fs::{
+        PinnedManagedDirectory, PinnedManagedExtractionLoaderDirectory, PinnedManagedFile,
+    },
 };
 
 pub(in crate::node_agent_compute_plugin_host) const EXTRACTED_ARCHIVE_EVIDENCE_SCHEMA: &str =
@@ -103,6 +105,48 @@ pub(in crate::node_agent_compute_plugin_host) struct ExtractedComputePluginCandi
     pub(super) seal: PinnedManagedFile,
     pub(super) seal_evidence: ComputePluginStagingSealEvidence,
     pub(super) completed_at: Instant,
+}
+
+/// Borrow-only retained owner view for launch-path candidate discovery. It deliberately exposes
+/// the complete typed owner set rather than reconstructible paths, digests, or raw handles.
+pub(in crate::node_agent_compute_plugin_host) struct ExtractedComputePluginLaunchPathDiscoveryView<
+    'archive,
+> {
+    plan: &'archive ValidatedComputePluginArchiveExtractionPlan,
+    evidence: &'archive HashedComputePluginExtractedArchiveEvidence,
+    package_root: &'archive PinnedManagedExtractionLoaderDirectory,
+    directories: &'archive [PinnedManagedDirectory],
+    files: &'archive [PinnedManagedFile],
+}
+
+impl<'archive> ExtractedComputePluginLaunchPathDiscoveryView<'archive> {
+    pub(in crate::node_agent_compute_plugin_host) fn plan(
+        &self,
+    ) -> &'archive ValidatedComputePluginArchiveExtractionPlan {
+        self.plan
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn evidence(
+        &self,
+    ) -> &'archive HashedComputePluginExtractedArchiveEvidence {
+        self.evidence
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn package_root(
+        &self,
+    ) -> &'archive PinnedManagedExtractionLoaderDirectory {
+        self.package_root
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn directories(
+        &self,
+    ) -> &'archive [PinnedManagedDirectory] {
+        self.directories
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn files(&self) -> &'archive [PinnedManagedFile] {
+        self.files
+    }
 }
 
 pub(in crate::node_agent_compute_plugin_host) struct ExtractedComputePluginCandidateCleanupParts<
@@ -238,6 +282,18 @@ impl ExtractedComputePluginCandidateArchive<'_> {
         &self,
     ) -> ComputePluginFetchCancellationGuard {
         self.verified.snapshot_cancellation_guard()
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn launch_path_discovery_view(
+        &self,
+    ) -> ExtractedComputePluginLaunchPathDiscoveryView<'_> {
+        ExtractedComputePluginLaunchPathDiscoveryView {
+            plan: &self.plan,
+            evidence: &self.evidence,
+            package_root: self.staging.loader_launch_path_package_root(),
+            directories: &self.directories,
+            files: &self.files,
+        }
     }
 
     pub(in crate::node_agent_compute_plugin_host) fn pin_cleanup_ancestors(
