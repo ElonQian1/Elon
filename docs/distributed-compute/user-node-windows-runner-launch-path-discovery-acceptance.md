@@ -13,6 +13,8 @@ verification_status: source_review_only
 # UserNode Windows Runner Launch Path Discovery V1 验收草案
 
 权威合同见 [Launch Path Discovery authority](user-node-windows-runner-launch-path-discovery-authority.md)。
+后续 source-only seam见
+[Launch Context Selection acceptance](user-node-windows-runner-launch-context-selection-acceptance.md)。
 
 ## 1. 本批证据等级
 
@@ -71,11 +73,17 @@ verification_status: source_review_only
 ### 3.4 blocker 与时序
 
 - `launch_path_handle_chain_discovery=source_written_windows_dynamic_unverified`；
-- `launch_path_exact_context_selection=missing`；
+- `launch_context_selection_contract=source_written_uncompiled_unrun`，但
+  `authenticated_launch_context_source_producer=missing`；
+- `prelease_authenticated_pe_material` 与 `preliminary_resolution_request_plan` 均为
+  `source_written_uncompiled_unrun`，parser producer仍 `missing`；
+- `grant_ready_resolution_contract=source_written_uncompiled_unrun`，但
+  `grant_ready_resolution_producer=missing`、`external_search_directory_authority_producer=missing`；
 - `launch_path_component_grant_backend=missing`；
 - exact `SealedWindowsLoaderLaunchPathAuthority` 仍含 `Infallible`；
-- transition order 固定为 discovery/pre-lease material → authenticated selection/preliminary plan → grants → leases →
-  same-handle rehash/reparse → final seal → query/reopen。
+- transition order 固定为 discovery/pre-lease material → authenticated selection/unresolved request → exact
+  terminal/disposition/external owner grant-ready resolution → grants → leases → same-handle rehash/reparse → final seal →
+  query/reopen。
 
 以上均只计为 source review，不增加动态 passed 数。
 
@@ -91,7 +99,9 @@ verification_status: source_review_only
 | Volume-GUID canonical chain | `missing` | 未覆盖 alias、case、rename race 与 multi-component 反例 |
 | application/package/directory candidates | `missing` | 未对真实 extraction archive 执行 |
 | failure admission custody | `missing` | 未逐阶段故障注入 |
-| exact CWD selection/grants | `out_of_scope_missing` | 当前无 authenticated selector/backend |
+| exact CWD/pre-lease/unresolved request plan | `out_of_scope_source_unrun` | typed source已写；selector/parser producer均 missing |
+| GrantReady typed contract | `out_of_scope_source_unrun` | plan/validator/movable-owner shapes已写；resolver/producer missing，`ShadowedByEarlierName`仍显式 rejected |
+| name/component grants | `out_of_scope_missing` | acquisition backend missing |
 | PE/resolution/lease/reopen/process | `out_of_scope_missing` | 最终 loader success 仍不可达 |
 
 动态总计保持 `passed=0/failed=0`。
@@ -133,6 +143,7 @@ grant、PE/resolution、process、Runtime 或 Ready blocker。
 
 ## 7. 负向验收
 
-本批明确不证明 Windows 编译/运行通过，不证明 extraction share兼容、exact CWD、component grant、PE graph、
+本批明确不证明 Windows 编译/运行通过，不证明 extraction share兼容、authenticated selector/parser、exact runtime CWD、
+component grant、PE graph、
 startup/import resolution、FileId lease、reopen/currentness、process launch/resume、Host runtime、Ready、Provider、route、
 Offer、Attempt、Lease、Usage、Settlement 或 Money 效果存在。

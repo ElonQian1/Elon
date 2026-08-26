@@ -81,14 +81,14 @@ v217 源码新增 `reauthorize_existing`：Control-signed InstallPlan 只能精�
 2026-08-25 新增的未登记 source-lineage 草案只把上述 work-admission、局部 Ready-health 与明确 `Untrusted` 的 Host observation 投影为六键 JCS 谱系，并固定缺 local currentness、runtime transition、Host runtime 与 v15 session 四项权威。它保留 CPU-only、signed grant 与结构时间等式，但不生成 `ComputeReadyCapability` 或服务端 execution capability；源码未编译、测试或运行。精确边界见 `user-node-ready-source-lineage-authority.md` 与 `user-node-ready-source-lineage-acceptance.md`。
 
 2026-08-26 的未登记 `source_written/source_review_only/implementation_uncompiled/implementation_unrun` Windows Runner
-drafts 中，loader 定义单一 successor/by-value seam、FileId leases/reopen receipts 与五类 failure custody；process 定义
-launch/Job/pre-create currentness 及 unconfirmed whole-graph parking。extraction→loader 的 retained DELETE owner + narrow
-share-delete probe，以及 Runner/package-root/全部 plan-directory retained handle-chain 候选发现均已写，但不选择 CWD、
-不授予 grant，Windows 动态矩阵未运行；exact PE/launch authority/live-OS、launch-security/currentness/
-release-recovery producers 均缺，pre-resume/dynamic-load blocked；`passed=0/failed=0`、四 gap missing、loader 18 effects
-none，`migration/table/writer=none/none/none`，无 IPC/Store/health/Ready。边界见
+drafts 中，retained discovery→exact intent/package-only pre-lease PE→preliminary requests→私有 GrantReady plan/movable owners→
+package+去重 system-image custody→same-owner pre/post cross-binding→QueryVerified lineage→process pre-create projection合同已写。
+它不证明 selected runtime CWD、system recursive imports、nested API-set、Shadow grant或 live process machine/WOW64；真实 selector/
+parser/resolver/positive-consuming/sealer/query/live-OS/create/resume/recovery producers均缺，Windows dynamic=`0`。`passed=0/failed=0`、
+四 gap=`missing`、loader 18 effects=`none`、`migration/table/writer=none/none/none`，无 IPC/Store/health/Ready。边界见
 `user-node-windows-runner-extraction-directory-share-custody-authority.md`、
 `user-node-windows-runner-launch-path-discovery-authority.md`、
+`user-node-windows-runner-launch-context-selection-authority.md`、
 `user-node-windows-runner-loader-load-set-authority.md`、
 `user-node-windows-runner-process-custody-authority.md` 与对应 acceptance。
 

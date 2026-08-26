@@ -6,7 +6,7 @@ owners: node, compute, windows
 proposed_feature_id: compute-user-node-windows-runner-process-custody-v1
 registration_status: unregistered_feature_workflow_unavailable
 design_status: draft_frozen
-implementation_status: source_draft_uncompiled
+implementation_status: source_written_uncompiled
 verification_status: source_review_only
 ---
 
@@ -55,28 +55,31 @@ source-contract guard 也未执行：
    custody 不暴露 raw handle/clone/retry authority；三种 definitive/authenticated rejection 都要求 exact
    authenticated-negative ownership；initial/final namespace query 的 positive-but-invalid returned receipt 同样进入
    outcome-uncertain custody 且不得丢弃；grant/lease/reopen/initial-or-final query 同时 positive+negative 时也不得
-   definitive，positive receipt/owner 必须保留；所有 authenticated positive/negative response 均保留 exact response
-   bytes + digest 并在 classification 前重算，对应 producer uninhabited；
+   definitive，positive receipt/owner必须保留；凡 typed custody声称 authenticated response均保留 exact bytes+digest并在
+   classification前重算。当前明确的 positive shapes仅为 name-grant与system-image，其 consuming producer uninhabited；
 4. `existing_extraction_directory_access_share_compatibility=source_seam_written_windows_dynamic_unverified`；
    retained DELETE owner + narrow share-delete probe 源码 seam 已线性接入；
-   `launch_path_handle_chain_discovery=source_written_windows_dynamic_unverified`，而 exact context selection/component
-   grant 仍 `missing`，不得认为 loader predecessor 已动态可达；
-5. 两阶段顺序固定为 discovery/pre-lease material → authenticated selection/preliminary plan → grants → leases →
+   `launch_path_handle_chain_discovery=source_written_windows_dynamic_unverified`；exact-context/prelease/request/GrantReady/
+   post-lease lineage contracts为 `source_written_uncompiled_unrun`，但真实 selector/parser/resolver/advancer/component-grant
+   producers仍 `missing`，不得认为 loader predecessor已动态可达；
+5. 两阶段顺序固定为 discovery/pre-lease material → authenticated selection/preliminary plan → GrantReady exact resolution → grants → leases →
    same-handle rehash/reparse → final seal → query/reopen。authenticated exact PE graph 与 launch-path parent-chain
    authorities 以 `Infallible` 保持 uninhabited；sealed
    startup/import resolution 必须先以 Runner basename 与 authenticated process preloaded/bootstrap set 预种
-   process-machine/cache-key/immutable-section/evidence-bound cache，再要求 Runner-rooted true reachable closure、symbol
-   name/ordinal、descriptor/thunk ordinal、actual reachable forwarder source-export/target-symbol/逐跳 evidence/cycle-depth、
+   expected process-machine/cache-key/immutable-section/evidence-bound cache，再形成 Runner-rooted package-image closure claim与
+   typed external leaves；true transitive system closure/system-image own imports仍是 freeze blocker。normal/delay base imports绑定
+   symbol name/ordinal、descriptor/thunk ordinal，separate forwarder hops绑定 source-export/target-symbol/逐跳 evidence/cycle-depth、
    已冻结 canonical merge rule 与 resolved-module cache-key collision closure；pre-lease parser material 不得预测 lease
    generation，post-lease final sealer 必须在同一 handles 重哈希/重解析后加入真实 generation，禁止跨代 parser splice；
-   KnownDLL named-section→immutable-image-section mapping；API-set
-   contract→host 递归终止于 exact authenticated preloaded module、KnownDLL、普通 filesystem search 或 SxS terminal；SxS 绑定
+   KnownDLL named-section→immutable-image-section mapping；当前 API-set只允许一步映射到 exact non-recursive authenticated
+   preloaded、KnownDLL、普通 filesystem search或 SxS terminal，nested API-set DAG fail-closed；SxS绑定
    activation-context receipt、exact search directory、FileId 与 immutable section；present searched-name disposition
    直接绑定 package FileId，或 system FileId + immutable section + servicing generation，实际 lease owners 先为 post-lease
    final sealer 提供 generations，随后 consuming query/aggregate 再确认同一 set；external System/Windows/SxS search directory 保留 full handle-derived ancestor chain、
    parent share/grant contract 与 namespace-alias currentness receipt，并纳入
    `startup_import_resolution_profile_digest`；同时绑定 exact
-   token/AppContainer、architecture/WOW64、empty-environment/search policy、cwd 和 creation flags；
+   token/AppContainer、expected architecture/WOW64、empty-environment/search policy、cwd和 creation flags；这些 machine字段
+   不是 post-create live query-back receipt；
 6. preparation 与 process custody 按值拥有 successor 与 launch security，不再同时拥有 original admission 和
    detached image；
 7. launch token 必须 query-back primary 且 restricted/AppContainer profile 不漂移，token handle 不可继承；
@@ -132,11 +135,13 @@ source-contract guard 也未执行：
 | successor-owned `ComputePluginRootLockLease` | 0 | 0 | 1 | exact owner shape 已写；external-borrow end 与 parked/leaked lifetime 未运行 |
 | existing extraction directory access/share compatibility | 0 | 0 | 1 | typed retained-owner seam 已写；Windows access/share、identity/path、descendant 与 failure-custody matrix 未运行 |
 | launch-path retained-handle candidate discovery | 0 | 0 | 1 | source seam 已写但未动态运行；没有 selected CWD 或 component grant |
+| exact-context/prelease/request/GrantReady contracts | 0 | 0 | 1 | source written；真实 selector/parser/resolver/advancer producers missing，Shadow rejected |
 | exact PE graph / launch-path / startup resolution | 0 | 0 | 1 | PE/parent-chain authorities uninhabited；post-lease sealer 与 launch-context producer 未验证 |
 | grants / unified package+system FileId leases / anchor reopen | 0 | 0 | 1 | acquisition/query/reopen backends 均不存在；servicing generation 与 exact negative ownership 未动态验证 |
 | live OS KnownDLL/API-set/SxS currentness | 0 | 0 | 1 | sealed/pre-create fields 只是 echoes；live backend 不存在 |
 | pre-create loader currentness backend | 0 | 0 | 1 | exact attempt/receipt/failure contract 已写，trait 无实现，process 不可达 |
-| authenticated query response bytes/digest | 0 | 0 | 1 | positive/negative custody shape 已写；producer uninhabited，未运行重算矩阵 |
+| authenticated query response bytes/digest | 0 | 0 | 1 | name-grant/system-image positive custody shapes已写；consuming producers uninhabited，未运行重算矩阵 |
+| post-create live machine/WOW64 query-back | 0 | 0 | 1 | pre-create expected projection only；`IsWow64Process2`/equivalent receipt/backend missing |
 | pre-resume loader currentness / dynamic module load | 0 | 0 | 1 | pre-create path-open 观测不封存 eventual imports；resume blockers 缺失 |
 | launch security + private desktop producer | 0 | 0 | 1 | exact owner/lpDesktop/live-revalidation shapes 存在但 uninhabited；owner/label/account/object/desktop query-back 缺失 |
 | `CreateProcessAsUserW` + atomic Job-list | 0 | 0 | 1 | 未在 Windows 运行 |
@@ -169,15 +174,16 @@ source-contract guard 也未执行：
   retained-parent create-new、失败保管，以及普通 managed-directory open 未被放宽；
 - Runner/package-root/全部 plan-directory retained launch-path chains 的 granted access、volume/FileId/type/reparse、
   single-component/Volume-GUID canonical relation 与 failure admission custody；
-- authenticated PE graph/exact launch-path selection+grants、normal/delay/forwarder symbol name/ordinal、descriptor/thunk
-  ordinal、actual reachable forwarder source-export/target-symbol/逐跳 evidence/cycle-depth、canonical merge rule，以及
-  token/AppContainer、architecture/WOW64、true reachable closure、cache-key collision closure、pre-lease parser
+- authenticated PE graph/exact launch-path selection+grants、normal/delay base-import symbol name/ordinal、descriptor/thunk
+  ordinal、separate forwarder source-export/target-symbol/逐跳 evidence/cycle-depth、canonical merge rule，以及
+  token/AppContainer、expected architecture/WOW64、未来独立的 true transitive system closure/cache-key collision closure、pre-lease parser
   FileId/sealed-digest/policy 与 post-lease same-handle reparse/真实 lease-generation composite、跨代 splice、KnownDLL
-  named-section mapping、API-set recursive exact terminal chain、SxS activation-context/search-directory/FileId/section
+  named-section mapping、当前 API-set non-recursive host与未来独立 nested typed DAG、SxS activation-context/search-directory/FileId/section
   binding、filesystem servicing-generation lease 与 parent-relative retained file/open/section receipts、present disposition
   package/system FileId + system section/servicing-generation binding、external search-directory handle-derived ancestor/
   parent-share-grant/alias-currentness chain，以及 environment/search policy、cwd/creation flags 不同 launch context；
-- pre-create namespace/fence/content-lease/resolution/process-machine/session/grant/query attempt+receipt 漂移；sealed
+- pre-create namespace/fence/content-lease/resolution/expected-process-machine/session/grant/query attempt+receipt漂移，以及
+  post-create live process machine/WOW64 query-back缺失或不一致；sealed
   KnownDLL/API-set/SxS echoes 与 live OS observation 差异；query definitive rejection 只接受 exact authenticated negative，
   同时 positive+negative 时 positive receipt 与 response bytes/digest 必须留在 uncertain custody；
 - process path open 后、primary-thread resume 前的 loader 状态漂移、eventual import resolution 及 runtime `LoadLibrary`；
@@ -218,8 +224,8 @@ source-contract guard 也未执行：
 - 忽略 launch-context resolution binding、extraction-directory access/share prerequisite、owner SID/mandatory label/
   service-SID/account isolation、live token session/logon namespace、exact desktop access-check、effective ACL/
   private-desktop query-back 或 qualified `lpDesktop` owner binding；
-- 忽略 Runner-basename/preloaded/bootstrap cache seed 的 process-machine/cache-key/immutable-section/evidence binding、
-  PE reachable/edge/cache-key closure、KnownDLL named-section immutable-image mapping、API-set recursive terminal、SxS
+- 忽略 Runner-basename/preloaded/bootstrap cache seed 的 expected process-machine/cache-key/immutable-section/evidence binding、
+  当前 package-image closure/external leaves、未来 system recursive edge/cache-key closure、KnownDLL named-section immutable-image mapping、当前 API-set non-recursive terminal与未来 nested typed DAG、SxS
   activation-context/search-directory/FileId/section binding、filesystem system servicing-generation lease 与 parent-relative
   retained file/open/section receipts、external search-directory ancestor/parent-share-grant/alias-currentness receipt、present
   disposition exact binding 或 HDESK↔HWINSTA/token-session exact-handle binding；

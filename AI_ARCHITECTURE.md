@@ -207,16 +207,16 @@ AI_PROJECT / AI_INDEX / AGENTS
 
 F1 的 Ready 边界新增未登记、未编译/未运行的 source-lineage 草案：它从线性 work-admission 与 Ready-health owner token 读取事实，并把 Host runtime observation 保持为 `Untrusted`，输出固定缺少 local currentness、runtime transition、Host runtime 与 v15 authenticated session 四项权威的 `Projected` 六键谱系。它不构造 Ready 或 execution capability，也不改变 Provider、route、Offer、Attempt、Lease 或资金；精确边界见 `docs/distributed-compute/user-node-ready-source-lineage-authority.md`。
 
-F1 的 Windows Host 路径另新增 loader load-set/process custody authority 草案：loader 定义单一成功 successor、
-完整 by-value seam、线性 FileId leases/anchor reopen receipts 与五类 failure-custody contract；process 定义
-launch/Job/pre-create currentness 与终止未确认时的 whole-graph custody。exact PE/launch-path/live-OS、
-launch-security/currentness/release-recovery producers 均保持 uninhabited；extraction→loader 已写 retained DELETE
-owner + narrow share-delete probe 的父句柄相对 typed seam，其上新增 Runner/package-root/全部 plan-directory retained
-handle-chain 候选发现，但没有 authenticated CWD selection 或 component grant；两层 Windows matrix 均未动态验证，pre-resume/
-dynamic-load、IPC/Store 也未形成 authority；成熟度事实统一见
+F1 的 Windows Host authority草案已把线性 owner顺序冻结为 retained discovery → authenticated intent + package-only pre-lease
+PE → preliminary requests → private GrantReady exact terminal/disposition + movable owners → name grants + package/去重 system-image
+leases → same-handle reparse与 typed pre/post image/edge cross-binding → QueryVerified lineage → process pre-create projection。该
+projection不是 live process machine/WOW64 receipt；system recursive imports、nested API-set与 Shadow path仍 fail-closed。
+selector/parser/resolver/positive-consuming/sealer/query/live-OS/launch-security/create/resume/recovery producers均保持
+uninhabited，Windows matrix未运行，pre-resume/dynamic-load、IPC/Store也未形成 authority；成熟度事实统一见
 `docs/distributed-compute/current-implementation-status.md`，精确边界见
 `docs/distributed-compute/user-node-windows-runner-extraction-directory-share-custody-authority.md`、
 `docs/distributed-compute/user-node-windows-runner-launch-path-discovery-authority.md`、
+`docs/distributed-compute/user-node-windows-runner-launch-context-selection-authority.md`、
 `docs/distributed-compute/user-node-windows-runner-loader-load-set-authority.md` 与
 `docs/distributed-compute/user-node-windows-runner-process-custody-authority.md`。
 

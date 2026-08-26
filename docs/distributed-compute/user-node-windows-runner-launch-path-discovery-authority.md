@@ -15,6 +15,8 @@ verification_status: source_review_only
 对应验收见 [Launch Path Discovery acceptance](user-node-windows-runner-launch-path-discovery-acceptance.md)。上游目录
 owner 合同见 [Extraction Directory Share Custody authority](user-node-windows-runner-extraction-directory-share-custody-authority.md)，
 最终 loader 合同仍由 [Loader Load-Set authority](user-node-windows-runner-loader-load-set-authority.md) 负责。
+候选之后的 typed source 合同见
+[Launch Context Selection authority](user-node-windows-runner-launch-context-selection-authority.md)。
 
 ## 1. 本批结论
 
@@ -106,18 +108,21 @@ material 绑定真实 content-lease generation，但 lease 又依赖 preliminary
 ```text
 retained admitted owners
 → borrow-only launch-path discovery + pre-lease authenticated PE material
-→ authenticated launch-context selection + preliminary resolution plan
+→ authenticated launch-context selection + preliminary unresolved request plan
+→ GrantReady contract → missing exact terminal/disposition/external-directory resolver/producer
 → searched-name/launch-component grants
-→ package/system FileId content leases
+→ all package + deduplicated resolved-filesystem-system FileId content leases
 → lease 下 same-handle rehash/re-parse
 → sealed exact PE graph + launch-path + startup/import resolution
 → consuming generation query
 → close/reopen/final currentness
 ```
 
-本批只写第一行中的 launch-path discovery seam；没有 PE parser、selection、grant、lease、seal、query 或 reopen producer。
-未来 PE 合同还必须冻结 symbol name/ordinal、descriptor/thunk ordinal、实际可达 forwarder source/target symbol chain、
-cycle/depth receipt，以及 normal/delay/forwarder 的 canonical merge rule，不能用当前 module-level graph 推断这些事实。
+本专题只负责第一行中的 launch-path discovery seam。下一专题已写入 uninhabited PE material、selection、unresolved request、
+GrantReady private plan/typed movable owners与 post-lease same-owner lineage source shapes；PE source shape只冻结 package-image
+base import/separate forwarder-hop、cycle/depth与 canonical merge。真实 PE parser、authenticated selector、exact terminal/
+disposition resolver、external directory owner、grant/lease positive advancer、seal、query 或 reopen producer仍不存在；它也不证明
+system-image recursive closure。request skeleton不能被解释为 GrantReady authority，GrantReady contract不能被解释为 producer。
 
 ## 7. blocker、Ready 与零效果
 
@@ -125,7 +130,14 @@ cycle/depth receipt，以及 normal/delay/forwarder 的 canonical merge rule，�
 
 ```text
 launch_path_handle_chain_discovery = source_written_windows_dynamic_unverified
-launch_path_exact_context_selection = missing
+launch_context_selection_contract = source_written_uncompiled_unrun
+authenticated_launch_context_source_producer = missing
+prelease_authenticated_pe_material = source_written_uncompiled_unrun
+authenticated_prelease_pe_parser_producer = missing
+preliminary_resolution_request_plan = source_written_uncompiled_unrun
+grant_ready_resolution_contract = source_written_uncompiled_unrun
+grant_ready_resolution_producer = missing
+external_search_directory_authority_producer = missing
 launch_path_component_grant_backend = missing
 ```
 
@@ -141,9 +153,11 @@ loader 18 项 effect 全为 `none`：`runtime_phase`、`runtime_generation`、`r
 
 ## 8. 后续门槛
 
-1. 先完成 extraction directory share custody 的 Windows 动态矩阵并留下 `passed>0` 证据；
-2. 动态验证本发现层的 access、FileId/type/reparse、Volume-GUID canonical chain 与失败 owner 回传；
-3. 冻结 pre-lease PE symbol/forwarder material 与 authenticated launch-context CWD selector；
+源码铺设允许继续冻结后续 typed contracts；生产可达仍按以下门槛：
+
+1. 完成 extraction directory share custody 与本发现层的 Windows 动态矩阵并留下 `passed>0` 证据；
+2. 实现 authenticated selector/parser producers，并动态验收 exact CWD 与 PE material；
+3. 补齐 exact terminal/disposition、external directory owners及 resolved-system canonical dedupe，形成 grant-ready owner；
 4. 实现 grants/leases，再在 leases 下重哈希/重解析并封印最终 graph/resolution；
 5. 完成 query/reopen/recovery 后，才进入 launch-security、pre-create currentness、process create 与 pre-resume。
 

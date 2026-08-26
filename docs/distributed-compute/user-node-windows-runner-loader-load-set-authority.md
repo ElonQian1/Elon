@@ -6,13 +6,15 @@ owners: node, compute, windows
 proposed_feature_id: compute-user-node-windows-runner-loader-load-set-v1
 registration_status: unregistered_feature_workflow_unavailable
 design_status: draft_frozen
-implementation_status: source_draft_uncompiled
+implementation_status: source_written_uncompiled
 verification_status: source_review_only
 ---
 
 # UserNode Windows Runner Loader Load-Set Authority V1 权威草案
 
 对应验收见 [Loader Load-Set acceptance](user-node-windows-runner-loader-load-set-acceptance.md)。
+exact selector/pre-lease/preliminary seam见
+[Launch Context Selection authority](user-node-windows-runner-launch-context-selection-authority.md)。
 
 ## 1. 本批结论
 
@@ -21,8 +23,11 @@ seam、五类 failure-custody contract 与不可伪造 prerequisite**。它修�
 `DurableWorkAdmittedPluginSlot + detached image` 的不可能所有权形状：Runner 本来就是 admission 内完整 package
 file set 的一个 ordinal，成功结果只能是替换原 admission 的单一 successor owner。
 
-当前 exact PE graph、launch-context selection、launch-path grants/authority、startup/import resolution、searched-name
-grants/query、FileId content leases、package-file reopen/recovery 都无 producer；其中 PE/launch-path/resolution authority
+当前 exact launch-context/pre-lease/preliminary unresolved request、GrantReady private plan/movable owners、post-lease
+same-owner lineage 与 process pre-create projection typed seam 已写，但 authenticated selector/parser、GrantReady
+terminal/disposition resolver与 external-directory owner producer仍缺；exact PE graph、
+launch-path grants/authority、startup/import resolution、searched-name grants/query、FileId content leases、package-file
+reopen/recovery 也都无 producer；其中 PE/launch-path/resolution authority
 以 `Infallible` 保持 uninhabited。既有 extraction directory access/share compatibility 与 Runner/package-root/全部
 plan-directory retained handle-chain discovery 已形成 purpose-specific source seam，但 Windows 动态矩阵仍为
 `unverified`。discovery receipt 不是 exact CWD、grant 或 launch-path authority。因此
@@ -47,11 +52,12 @@ process open，普通 imports 多在 suspended primary thread 后续运行时解
 `DurableWorkAdmittedPluginSlot<'root>`
 → borrow-only receipt/evidence preflight
 → 从 retained handles 发现 Runner/package-root/全部 plan-directory launch-path candidates，并预租约解析 PE material
-→ authenticated launch-context 选择 exact CWD 并形成 preliminary resolution plan
+→ authenticated launch-context 选择 exact CWD 并形成 preliminary unresolved request plan
+→ 补齐 exact terminal、每步 disposition、external directory owners与 resolved-system canonical dedupe，形成 grant-ready owner
 → 为全部 searched/launch-path names 取得 exact grants
 → 取得 package files 与普通 filesystem system images 的统一 linear content-lease set；system lease 绑定 servicing generation
 → 在 lease 下做 same-handle full-package rehash/re-parse，封印 exact PE graph、launch path 与 startup/import resolution，
-  形成 `WindowsRunnerLoadSetBorrowPrerequisite`
+  形成 `PostLeaseSealedWindowsRunnerLoadSetPreQueryPrerequisite`
 → consuming query 同时验证 name-grant 与 content-lease generation set
 → purpose-specific by-value destructure
 → validate 并包装原 package-root/plan-directory handles，不关闭或重开目录
@@ -102,10 +108,18 @@ authority。当前函数名表达调用顺序约束，但没有 caller，也没�
 ## 4. 不可构造的 resolution/name/content authority
 
 关闭任何 share-none package file 前，必须按 borrow-only discovery/pre-lease material → authenticated exact CWD
-selection/preliminary resolution plan → name/launch-component grants → package+system content leases → lease 下
-same-handle rehash/re-parse → final resolution seal → consuming generation query-back 的权威顺序完成。当前
-`WindowsRunnerLoadSetBorrowPrerequisite` 仍把 final resolution 作为不可构造输入；未来
-producer 必须按上述两阶段拆分，不能预测 lease generation 或让 discovery receipt 冒充 final authority。
+selection/preliminary unresolved request plan → exact terminal/disposition/external owner grant-ready resolution →
+name/launch-component grants → package+system content leases → lease 下 same-handle rehash/re-parse → final resolution seal →
+consuming generation query-back 的权威顺序完成。当前源码已删除 grants/leases 前持有 final resolution 的旧 prerequisite。
+`PreliminaryResolutionRequestsPlannedWork` 仅持有未解析 request skeleton；future
+`GrantReadyWindowsRunnerResolutionPrerequisite` 合同必须消费 whole request owner并绑定 exact terminal、每步 disposition、
+external owners与 resolved-system request set；其 source shape已写，真实 producer仍由 `Infallible` 阻断，且
+`ShadowedByEarlierName` variant当前在 GrantReady/final projection validator中显式拒绝。name-grant failure持有 grant-ready
+owner；content-lease failure持有
+`PreFinalWindowsLoaderNamespaceGrantSet`、统一 package/system acquired lease、active dispatch与 pending refs；borrow-only failure
+持有 whole request owner；namespace-query failure持有 post-lease whole prerequisite。只有全部 grants/leases 后的 same-handle
+sealer才允许形成 `PostLeaseSealedWindowsRunnerLoadSetPreQueryPrerequisite`，其 producer仍不可构造。不得预测 lease generation，
+或让 discovery/request receipt冒充 grant-ready/final authority。
 
 ### 4.1 Exact startup/import resolution authority
 
@@ -117,14 +131,18 @@ producer 必须按上述两阶段拆分，不能预测 lease generation 或让 d
 - normal imports、delay imports 与实际被引用的 forwarders；每条边必须绑定 import symbol name/ordinal、descriptor/thunk
   ordinal；forwarder 还必须绑定 source export、target DLL/symbol、逐跳 evidence 与 cycle/depth receipt；
 - 在校验任何 PE edge 前，以 Runner basename 和 authenticated process preloaded/bootstrap module set 预种 module-cache
-  closure；每项预种绑定 process-machine context、cache key、immutable section 与 authenticated evidence；
-- 再从 Runner 根计算真实 reachable closure；normal/delay/forwarder 来自不同 PE tables，producer 必须先冻结并执行
-  canonical merge rule，不能声称存在未定义的“原始交错顺序”；resolved-module cache key 的全部 collision class 必须
-  闭包到唯一 exact module identity，冲突或漏项均拒绝；
+  closure；每项预种绑定 expected process-machine context、cache key、immutable section 与 authenticated evidence；
+- pre-lease只计算 Runner-rooted package-image/importer/forwarder-source closure，并把非 package target变成 typed external
+  leaf；normal/delay base imports与 separate forwarder hops必须按冻结规则 canonical merge。true transitive package+system
+  closure、ordinary system image自身 imports与所有 cache-key collision的 post-lease闭包仍是不可构造 sealer的义务；
 - package module name → exact package-file ordinal/digest/FileId；
 - pre-lease package PE material 绑定 FileId + sealed digest + parser policy，但不得包含或预测 content-lease generation；
   final sealer 必须在 leases 下从同一 handles 重哈希/重解析，并把真实 lease generation 加入 canonical composite。
   parser evidence/edges 禁止跨代 splice；
+- final resolution profile V2 必须绑定 `launch_context_selector_digest`、
+  `preliminary_resolution_request_plan_digest` 与 `grant_ready_resolution_plan_digest`，不得包含未来
+  `required_launch_context_digest`；process required-launch-context V3 才同时绑定 selector 与 final resolution profile；其
+  expected digest由 resolution外 launch-security bridge持有并比较，摘要链不得要求 fixed point；
 - allowed system dependency → exact resolved component identity；普通 filesystem system image 还必须持有
   servicing-generation-bound immutable content lease、parent-relative retained file custody、authenticated open receipt 与
   immutable image-section receipt；
@@ -133,29 +151,33 @@ producer 必须按上述两阶段拆分，不能预测 lease generation 或让 d
   与 namespace-alias currentness receipt，并把整组证据纳入 `startup_import_resolution_profile_digest`；
 - OS-build-bound KnownDLL/Object Manager section generation，以及每个 KnownDLL named section → exact immutable image
   section 的映射；
-- 每个 API-set contract→host binding 必须递归落到 exact authenticated preloaded module、KnownDLL、普通 filesystem
-  search 或 SxS terminal；循环、未解析 host 或非终端 echo 均拒绝；
+- 当前 V1 API-set contract只允许一步映射到 exact non-recursive authenticated preloaded、KnownDLL、ordinary filesystem
+  search 或 SxS terminal；nested API-set必须 fail-closed，未来递归解析需独立 typed DAG contract；
 - 每个 SxS binding 必须同时保留 activation-context receipt、exact search directory、resolved FileId 与 immutable
   image-section receipt；
-- 启动/import resolution 中每个 search directory 的 present、absent 或 shadow name。
+- 启动/import resolution 中每个 search directory 的 terminal或 `MustRemainAbsent` name；Shadow variant当前仅占位且 validator
+  显式拒绝，不能声称 shadow grant path已冻结或可消费。
 
 当前 exact `SealedWindowsPeImportGraphAuthority` 和 `SealedWindowsLoaderLaunchPathAuthority` 分别以
 authenticated-parser 与 parent-chain grant/share `Infallible` 字段保持 uninhabited；整个
 `SealedWindowsLoaderResolutionAuthority` 也无 producer。source-written handle-chain candidate discovery 只证明 typed
-owner 上的候选观测形状；完整 package file set 只证明 archive coverage，二者都 **不证明** selected CWD、component
-grants、preloaded/bootstrap cache seed、exact PE graph、launch path 或 startup/import resolution。
+owner 上的候选观测形状；新 exact-context/pre-lease/unresolved-request/GrantReady/post-lease lineage types已有 source shape，
+但 selector/parser/resolver/advancer producer仍 `missing`。完整 package file set只证明
+archive coverage，上述 source shapes都 **不证明** runtime selected CWD、component grants、preloaded/bootstrap cache
+seed、exact PE graph、launch path 或 startup/import resolution。
 
 ### 4.2 Whole searched-name namespace authority
 
 未来 namespace producer 必须在 kernel 层原子覆盖 startup/import policy 的完整 searched-name 和 launch-path
-component set，包括预期存在文件与预期缺失/shadow name。每个 grant 必须与 exact session、parent/name、
+component set，包括预期存在文件与预期缺失 name；Shadow variant的 typed evidence/producer仍 `missing`。每个 grant必须与 exact session、parent/name、
 disposition 和 generation 绑定。present searched-name disposition digest 必须直接绑定 resolved package/system exact
 FileId；system target 还必须绑定 immutable section identity 与 servicing generation。实际 package+system lease owners
 先把 generation 交给 post-lease final sealer，随后 consuming query/aggregate 必须再次确认同一 generation set。普通 directory
 handle/share mode、digest 或 oplock 不能代替。
 
-当前 searched-name grant acquisition/fence/query backend 均不存在。成功 owner 只能暴露从该 authority 派生的
-`startup_import_namespace_authority_digest`，该 digest 本身不是 namespace authority。
+当前 searched-name grant acquisition/fence/query backend 均不存在。name-grant positive shape虽保留 exact
+request/nonce/response bytes+digest/self-binding，消费 exact attempt形成正向 owner的 transition仍以 `Infallible` 阻断。成功
+owner只能暴露从该 authority 派生的 `startup_import_namespace_authority_digest`，该 digest 本身不是 namespace authority。
 
 ### 4.3 Unified FileId immutable-content lease-set 与 live-OS currentness
 
@@ -163,11 +185,13 @@ name grants 后、final same-handle hash 前，每个 package file 必须取得 
 filesystem system image 必须取得 exact FileId/immutable-section、servicing-generation-bound content lease。两类 lease
 合成统一 linear lease-set，在 startup/import mapping、全部 failure custody、loader success 与后续 process custody 全期
 持有；lease 必须拒绝 writable open、write/delete disposition 与 writable section mapping。当前这些 lease 与
-acquisition/negative custody 只有 source shape，backend 不存在。
+acquisition/negative custody 只有 source shape，backend 不存在。ordinary system-image positive custody虽已定义 unique owner与
+exact response material，消费同一 attempt形成该 owner的 transition仍以 `Infallible` 阻断。
 
-resolution 中的 KnownDLL/API-set/SxS/immutable system-image 字段只是 sealed material。pre-create query 也只回显
-这些字段，不是 live OS KnownDLL/Object Manager、API-set schema/host 或 SxS activation-context 观测。
-`live_windows_resolution_currentness_backend=missing`，仍是 resume blocker。
+resolution 中的 KnownDLL/API-set/SxS/immutable system-image字段与 machine/WOW64只是 sealed expected material。pre-create
+projection/query也只回显这些字段，不是 live OS KnownDLL/Object Manager、API-set schema/host 或 SxS activation-context
+观测。`live_windows_resolution_currentness_backend=missing`，post-create `IsWow64Process2`/equivalent machine query-back
+receipt也 `missing`，两者仍是 resume blocker。
 
 ## 5. Barrier 与失败 custody
 
@@ -176,14 +200,14 @@ content-lease 与 namespace query dispatch 在此之前已可销毁 retry author
 
 1. `NameGrantAcquisitionUnusable`：只有 authenticated-negative receipt 与 exact namespace session、request digest
    及 nonce 匹配时才是 `AuthenticatedRejected`；否则必须是 `OutcomeUncertain`。custody 保留
-   admission、resolution、session、已取得 grants、active attempt、negative receipt 与 pending ordinals；若 backend
+   完整 preliminary owner、session、已取得 grants、active attempt、negative receipt 与 pending ordinals；若 backend
    同时返回 positive 与 negative，绝不能标为 definitive，positive receipt 必须留在 outcome-uncertain custody；
 2. `ContentLeaseAcquisitionUnusable`：只有 FileId/content-digest authenticated-negative receipt 与 exact
    acquisition attempt 匹配时才是 `DefinitiveRejected`；否则为 `OutcomeUncertain`。custody 保留
-   admission、resolution、namespace grants、已取得统一 package+system leases、active attempt/negative 及 pending
+   完整 preliminary owner、namespace grants、已取得统一 package+system leases、active attempt/negative 及 pending
    ordinals；同时返回 positive 与 negative 时不得 definitive，positive receipt 必须保留；
 3. `BorrowOnlyNotTransitioned`：只用于任何 grant/lease dispatch 之前的纯 borrow-only validation，保留
-   exact original admission 与 borrow prerequisite；
+   exact whole preliminary owner；
 4. `NamespaceQueryUnusable`：`DefinitiveRejected` 仅在 authenticated-negative 属于 exact retained
    session/request/nonce 时成立；缺失或错绑的 negative 必须降为 `OutcomeUncertain`。admission、
    unqueried prerequisite、query attempt 和 optional negative 全部 quarantine；initial query 返回 positive-but-invalid
@@ -211,14 +235,15 @@ close ambiguity 仍使用
 只有全部 package+system leases、package files、retained directory bindings、reopen receipts、identity/hash/path 与 final fence query 成功，
 才能形成单一 successor。源码当前只写入 owner/failure shapes；grant/lease/query/reopen/release/recovery
 backend 均不存在，五类 contract 不是已通过 fault injection 的运行事实。
-所有 authenticated positive/negative grant、lease、namespace-query 与 reopen response 都必须按值保留 exact response
-bytes 和 response digest；classification 前必须重算并核对 digest。对应 authenticated response producer 仍为
-uninhabited，不能由 source shape 推导真实回执已产生。
+凡 typed custody声称 authenticated response，都必须按值保留 exact response bytes与 response digest，并在
+classification前重算。当前明确写入的是 name-grant positive与 resolved-system-image positive shape；其 consuming
+transition/backend仍 uninhabited，不能外推为所有 lease/query/reopen positive path均已有合同或真实回执。
 
 ## 6. Candidate package-file reopen 与 retained-directory 边界
 
 候选顺序固定为：borrow-only receipt/evidence preflight → retained handle-chain launch-path discovery + pre-lease PE material →
-authenticated exact CWD/preliminary resolution selection → exact name/launch-component grants → indexed package+system FileId
+authenticated exact CWD/preliminary unresolved request → exact terminal/disposition/external-owner grant-ready resolution → exact
+name/launch-component grants → indexed package+system FileId
 content leases → lease 下 same-handle rehash/re-parse + final PE/launch/resolution seal → consuming name-grant/content-lease-
 generation query → exact file+lease owner-graph indexing → retain/wrap 原 package-root 与 plan-directory handles → 只对 package
 files parent-relative close/reopen（Runner 最后）→ anchor-consuming reopen receipt → replacement identity/hash/handle-path →
@@ -268,18 +293,18 @@ crash/recovery owner；不得以 Drop 或 session disconnect 当作 release。�
 
 ## 8. 后续顺序
 
-1. 在 Windows 动态验证 source-written `existing_extraction_directory_access_share_compatibility` access/share、
-   identity/path 与 failure-custody 矩阵；验证前不得假定 directory predecessor 可达；
-2. 动态验证 source-written retained handle-chain discovery，并冻结 pre-lease PE symbol/forwarder material、canonical edge
-   merge rule 与 authenticated exact CWD selector；
-3. 形成 preliminary resolution plan，实现 searched-name/launch-path grant acquisition 与 FileId immutable-content lease
-   backends，对三种
+源码铺设顺序允许继续冻结下一合同；生产可达顺序固定为：
+
+1. 动态验证 source-written extraction-share 与 retained handle-chain discovery；验证前不得假定 predecessor 可达；
+2. 实现并动态验收 authenticated exact-context selector、pre-lease PE parser 与 preliminary request producer；
+3. 实现 exact terminal/disposition、external-directory owner与 resolved-system dedupe resolver，形成 grant-ready owner；
+4. 实现 searched-name/launch-path grant acquisition 与 FileId immutable-content lease backends，对三种
    authenticated-negative 精确绑定 owner/attempt/session/request/nonce；
-4. 在 leases 下 same-handle 重哈希/重解析，封印 exact PE graph、launch path 与 startup/import/system resolution；
-5. 实现 consuming namespace/content-generation query、anchor-consuming reopen receipt、final query 与全五类 recovery；
-6. 实现 persistent-grant explicit authorized release/crash recovery 与 live Windows KnownDLL/API-set/SxS currentness；
-7. 执行 Windows share/TOCTOU/content-mapping/rename/swap/reparse/hardlink/delete-pending/startup-import matrix；
-8. 后续另行实现 launch security、pre-create/pre-resume loader-currentness、dynamic `LoadLibrary` enforcement、IPC/Store、
+5. 在 leases 下 same-handle 重哈希/重解析，封印 exact PE graph、launch path 与 startup/import/system resolution；
+6. 实现 consuming namespace/content-generation query、anchor-consuming reopen receipt、final query 与全五类 recovery；
+7. 实现 persistent-grant explicit authorized release/crash recovery 与 live Windows KnownDLL/API-set/SxS currentness；
+8. 执行 Windows share/TOCTOU/content-mapping/rename/swap/reparse/hardlink/delete-pending/startup-import matrix；
+9. 后续另行实现 launch security、pre-create/pre-resume loader-currentness、dynamic `LoadLibrary` enforcement、IPC/Store、
    controlled resume、health/Ready/v15。
 
 任何后续步骤都不能从本批 source types 或 digest 字段推导“loader load-set 已锁定”。

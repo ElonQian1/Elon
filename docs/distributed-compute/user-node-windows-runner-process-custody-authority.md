@@ -6,11 +6,15 @@ owners: node, compute, windows
 proposed_feature_id: compute-user-node-windows-runner-process-custody-v1
 registration_status: unregistered_feature_workflow_unavailable
 design_status: draft_frozen
-implementation_status: source_draft_uncompiled
+implementation_status: source_written_uncompiled
 verification_status: source_review_only
 ---
 
 # UserNode Windows Runner 进程监管前置 V1 权威草案
+
+上游 exact selector、pre-lease PE 与 unresolved resolution request边界见
+[Launch Context Selection authority](user-node-windows-runner-launch-context-selection-authority.md)；最终 loader owner graph见
+[Loader Load-Set authority](user-node-windows-runner-loader-load-set-authority.md)。
 
 ## 1. 本批结论
 
@@ -91,7 +95,9 @@ outcome uncertainty。因此未来 bridge 不能是 path/raw-handle getter，也
 
 - 按值消费 exact admitted/archive Runner custody，不能接收 caller path、digest、index；
 - 先从 retained handles 做 launch-path discovery 与 pre-lease PE material，再由 authenticated context 选择 exact CWD
-  并形成 preliminary resolution plan；随后取得 searched-name/launch-component grants 与 package/system linear
+  并形成 preliminary unresolved request plan；GrantReady contract/movable-owner source shape已写，但真实 resolver必须先补齐
+  exact terminal/disposition、external directory owners与 resolved-system dedupe，才能形成 owner并取得 searched-name/
+  launch-component grants与 package/system linear
   content-lease set，在 leases 下 same-handle rehash/reparse 并封印 final PE/launch/resolution，最后执行 consuming
   generation query；每种 definitive/authenticated rejection 都必须保留与 exact owner/attempt/session/
   request/nonce 匹配的 authenticated-negative receipt；
@@ -100,15 +106,16 @@ outcome uncertainty。因此未来 bridge 不能是 path/raw-handle getter，也
   本身只持有 anchor-only attempt custody，replacement 是 backend outcome；
 - 原 package-root/plan-directory handles retained/wrapped，只对 package files close/reopen；reopen 后重证
   volume/FileId/type/reparse/link/size/digest/path；
-- startup/import resolution 绑定 normal/delay/forwarder、package/system/KnownDLL/API-set/SxS/search-name 和 exact
-  launch context；PE authority 必须先以 Runner basename 与 authenticated process preloaded/bootstrap set 预种
-  process-machine/cache-key/immutable-section/evidence-bound module cache，再要求 true reachable closure、symbol
-  name/ordinal、descriptor/thunk ordinal、actual reachable forwarder source-export/target-symbol/逐跳 evidence/cycle-depth、
+- startup/import resolution 绑定 normal/delay base imports、separate forwarder hops、package/system/KnownDLL/API-set/SxS/
+  search-name和 exact launch context；PE authority必须先以 Runner basename与 authenticated process preloaded/bootstrap set
+  预种 expected process-machine/cache-key/immutable-section/evidence-bound module cache。pre-lease当前只形成 package-image
+  closure claim与 typed external leaves；true transitive system closure/system-image own imports仍为 post-lease freeze blocker。
+  每条请求绑定 symbol name/ordinal、descriptor/thunk ordinal，forwarder绑定 source-export/target-symbol/逐跳 evidence/cycle-depth、
   已冻结 canonical merge rule 与 resolved-module cache-key collision closure；pre-lease parser material 只绑定 FileId +
   sealed digest + policy，不得预测 generation；post-lease final sealer 必须在同一 handles 重哈希/重解析后加入真实 lease
-  generation，parser evidence/edges 不得跨代 splice；KnownDLL named sections
-  映射到 immutable image sections；API-set
-  contract→host 递归终止于 exact authenticated preloaded module、KnownDLL、普通 filesystem search 或 SxS terminal；SxS 绑定
+  generation，parser evidence/edges 不得跨代 splice；KnownDLL named sections映射到 immutable image sections；API-set
+  当前只允许一步落到 exact non-recursive authenticated preloaded、KnownDLL、普通 filesystem search或 SxS terminal；nested
+  API-set DAG仍为 fail-closed blocker；SxS绑定
   activation-context receipt、exact search directory、FileId 与 immutable section；普通 filesystem system images
   保留 servicing-generation-bound immutable content lease 与 parent-relative file/open/section receipts。present
   searched-name disposition 直接绑定 package FileId，或 system FileId + immutable section + servicing generation；实际
@@ -120,11 +127,12 @@ outcome uncertainty。因此未来 bridge 不能是 path/raw-handle getter，也
   `BorrowOnlyNotTransitioned`、namespace-query definitive/uncertain quarantine 与 indexed
   `PostBarrierOutcomeUncertain`；initial/final query 的 positive-but-invalid returned receipt 同样进入
   outcome-uncertain custody 并保留；grant/lease/reopen/initial-or-final query 同时返回 positive+negative 时不得
-  definitive，positive receipt/owner 必须保留；所有 authenticated positive/negative response 均保留 exact bytes +
-  response digest 并在 classification 前重算核对，对应 producer 仍 uninhabited；close ambiguity 使用
+  definitive，positive receipt/owner必须保留；凡 typed custody声称 authenticated response均保留 exact bytes+digest并在
+  classification前重算。当前明确的 positive shapes仅为 name-grant与system-image，其 consuming producer仍 uninhabited；close ambiguity使用
   `ManuallyDrop` quarantine，不运行 ordinary `File` Drop。
 
-但 cache-seed/exact PE graph、selected launch-path/grants 和 resolution authority 以 `Infallible` 保持不可构造，name-grant/
+但 selector/parser、GrantReady resolver/external-directory owners/advancer、cache-seed/exact PE graph、selected launch-path/grants 和
+resolution authority 以 `Infallible` 或明确 blocker保持不可构造，name-grant/
 FileId-lease/query/reopen producer 也不存在。extraction directory 已新增 retained DELETE owner + parent-relative
 share-delete probe；Runner/package-root/全部 plan-directory retained handle-chain candidate discovery 也已写，但不选择
 CWD、不产生 grant。两层 Windows 动态矩阵均未运行，其中上游状态为
@@ -179,14 +187,14 @@ create 序列末端按值消费 `ValidatedWindowsRunnerProcessPreparation`，调
   `startup_import_resolution_profile_digest`；
 - KnownDLL OS-build identity/Object Manager section generation、API-set schema/host authority 与 SxS activation-context
   identity；
-- process-machine/launch-context material，以及 exact query attempt/receipt 的 session、request、nonce、fence/content-lease
+- expected process-machine/launch-context pre-create projection，以及 exact query attempt/receipt 的 session、request、nonce、fence/content-lease
   generation bindings；
 - kernel driver session identity、grant generation、query generation 与
   `explicit_authorized_release_required_but_unavailable` policy；
 - original/base start material 与包含上述观测的 recomputed final start digest。
 
-这些 KnownDLL/API-set/SxS/system-image 字段只是 loader-sealed echoes，不是 live OS observation；
-`live_windows_resolution_currentness` 仍是 resume blocker。definitive rejection 只有在 authenticated-negative receipt 与
+这些 KnownDLL/API-set/SxS/system-image与 machine/WOW64字段只是 loader-sealed expected echoes，不是 live OS observation；
+`live_windows_resolution_currentness`与 post-create `IsWow64Process2`/equivalent live machine query-back仍是 resume blocker。definitive rejection只有在 authenticated-negative receipt与
 retained exact namespace session/query attempt/request/nonce/fence/content-lease generations 全部匹配时成立；缺失或错绑的
 negative 必须归入 outcome uncertainty；pre-create query 同时返回 positive+negative 时也不得 definitive，positive
 receipt 必须随 preparation/query attempt/negative 进入 non-reusable outcome-uncertain quarantine。authenticated
@@ -278,14 +286,16 @@ PID、path、receipt、candidate health、CLI sidecar record 或 `ComputePluginF
 
 ## 10. 不变式与零效果
 
-start material 只绑定 work-admission source/receipt、installation/plugin/slot/release、Plan/grant、Runner path/digest/size/
+process start-material V3只绑定 work-admission source/receipt、installation/plugin/slot/release、Plan/grant、Runner path/digest/size/
 FileId、`startup_import_resolution_profile_digest`、`startup_import_namespace_authority_digest`、entrypoint argv、
 launch token/SD/owner-label/access-check/private-desktop binding digests、live primary-token session/logon namespace 与 exact
 desktop access-check binding、resource/permission ceiling、runtime generation before
-与 authority/process/clock fences；这些 digests 不代替 retained launch owners 或 query-back。resolution
-profile 还必须绑定 token/AppContainer、architecture/WOW64、empty-environment/search policy、cwd 与 creation
-flags；pre-create currentness 再绑定 namespace/fence/content-lease/resolution/OS-build/KnownDLL/API-set/SxS/
-process-machine/session/grant/query generations、exact attempt/receipt 与 unavailable release policy，并重算 final start
+与 authority/process/clock fences；这些 digests 不代替 retained launch owners 或 query-back。resolution profile V2 还必须绑定
+selector、preliminary request-plan、grant-ready plan、token/AppContainer、architecture/WOW64、empty-environment/search policy、
+cwd 与 creation flags，但不得包含 required process context digest。required launch-context V3绑定 selector+final resolution；其
+expected digest由 resolution外 launch-security owner携带，process policy重算后必须相等。pre-create currentness 再绑定
+namespace/fence/content-lease/resolution/OS-build/KnownDLL/API-set/SxS/
+expected process-machine/session/grant/query generations、exact attempt/receipt 与 unavailable release policy，并重算 final start
 digest。KnownDLL/API-set/SxS 字段只是 echoes；这些 material 不等于 live OS currentness、eventual import resolution 或
 resume authority。它同时把以下效果
 固定为 `none`：
@@ -302,20 +312,20 @@ WebSocket。source-lineage 的 local currentness、runtime transition、Host run
 
 1. 先动态验证 source-written `existing_extraction_directory_access_share_compatibility` 的 Windows access/share、
    identity/path、descendant traversal 与 failure-custody 矩阵；
-2. 动态验证 retained launch-path handle-chain discovery，冻结 pre-lease PE symbol/forwarder material、canonical edge merge
-   rule 与 authenticated exact CWD selector；
-3. 形成 preliminary resolution plan，依次实现 loader name/launch grants、FileId leases、lease 下 same-handle rehash/reparse
-   与 exact PE/launch/startup-import seal，再完成 query、anchor-consuming package-file reopen/recovery 及 Windows matrix；
-4. 实现 launch-security producer，创建并保留 exact private window-station/desktop owners，完整 query-back token/
+2. 动态验证 retained launch-path handle-chain discovery、pre-lease PE material与 authenticated exact CWD selector；
+3. 形成 preliminary unresolved request plan，补齐 exact terminal/disposition、external directory owners与 resolved-system dedupe；
+4. 依次实现 loader name/launch grants、FileId leases、lease 下 same-handle rehash/reparse与 exact PE/launch/startup-import
+   seal，再完成 query、anchor-consuming package-file reopen/recovery 及 Windows matrix；
+5. 实现 launch-security producer，创建并保留 exact private window-station/desktop owners，完整 query-back token/
    integrity/SID/privilege/capability、owner/label/account/effective ACL 与 qualified desktop binding，并做 sibling
    reopen/resume/injection 矩阵；
-5. 实现 consuming pre-create loader-currentness backend，验证 definitive/uncertain quarantine 与全 failure/success evidence
+6. 实现 consuming pre-create loader-currentness backend，验证 definitive/uncertain quarantine 与全 failure/success evidence
    retention；
-6. 实现 live OS resolution currentness、pre-resume loader-currentness/import-period authority retention、dynamic
+7. 实现 live OS resolution currentness、pre-resume loader-currentness/import-period authority retention、dynamic
    `LoadLibrary` enforcement，以及 process-image/object/private-desktop query-back；
-7. 实现 termination-unconfirmed whole-graph recovery 与 namespace-fence explicit authorized release/crash recovery；
-8. 冻结 authenticated IPC/bootstrap 与 CPU/VRAM/disk/network/uptime enforcement，形成 durable Store transaction/recovery；
-9. 只有上述 blockers 和同一 process custody 全部成功才新增受控 resume，再实现 active health、Ready
+8. 实现 termination-unconfirmed whole-graph recovery 与 namespace-fence explicit authorized release/crash recovery；
+9. 冻结 authenticated IPC/bootstrap 与 CPU/VRAM/disk/network/uptime enforcement，形成 durable Store transaction/recovery；
+10. 只有上述 blockers 和同一 process custody 全部成功才新增受控 resume，再实现 active health、Ready
    source currentness、v15 session 与 server verifier。
 
 任何后续步骤都不能把本批 source draft 的存在描述为 Host runtime gap 已关闭。
