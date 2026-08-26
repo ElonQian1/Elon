@@ -62,6 +62,7 @@ internal class GoogleWebBackgroundSession(
     private var webView: WebView? = null
     private var pageAdapter: GoogleWebPageAdapter? = null
     private var latestSnapshot: ChatGptWebSnapshot? = snapshotStore.restore()
+        ?.let(GoogleWebSnapshotMerger::sanitizeCached)
     private var latestSnapshotPath: String? = latestSnapshot?.url?.let(conversationStore::currentPath)
     private var activePath: String? = null
     private var awaitingNewConversationBoundary = false

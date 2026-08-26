@@ -23,5 +23,15 @@
       remembered;
   }
 
-  return Object.freeze({ version: 2, select });
+  function isCarryOverAnswer(observation) {
+    if (!observation || observation.rememberedOwned !== true) return false;
+    const previousQuery = clean(observation.previousQuery);
+    const nextQuery = clean(observation.nextQuery);
+    const previousAnswer = clean(observation.previousAnswer);
+    const nextAnswer = clean(observation.nextAnswer);
+    return !!previousQuery && !!nextQuery && previousQuery !== nextQuery &&
+      !!previousAnswer && previousAnswer === nextAnswer;
+  }
+
+  return Object.freeze({ version: 3, select, isCarryOverAnswer });
 });

@@ -71,6 +71,69 @@ class GoogleWebSnapshotMergerTest {
     }
 
     @Test
+    fun previousAnswerCannotBeCarriedAcrossANewQuestion() {
+        val answered = snapshot("first", "answer one")
+
+        val stale = GoogleWebSnapshotMerger.merge(
+            answered,
+            snapshot("second", "answer one"),
+            sameConversation = true,
+        )
+
+        assertEquals(
+            listOf("first", "answer one", "second"),
+            stale.messages.map { it.content },
+        )
+
+        val refreshed = GoogleWebSnapshotMerger.merge(
+            stale,
+            snapshot("second", "answer two"),
+            sameConversation = true,
+        )
+
+        assertEquals(
+            listOf("first", "answer one", "second", "answer two"),
+            refreshed.messages.map { it.content },
+        )
+    }
+
+    @Test
+    fun completedStreamingTurnMayLegitimatelyRepeatAnEarlierAnswer() {
+        val waiting = GoogleWebSnapshotMerger.merge(
+            snapshot("first", "same answer"),
+            snapshot("second", "same answer").copy(streaming = true),
+            sameConversation = true,
+        )
+
+        val completed = GoogleWebSnapshotMerger.merge(
+            waiting,
+            snapshot("second", "same answer"),
+            sameConversation = true,
+        )
+
+        assertEquals(
+            listOf("first", "same answer", "second", "same answer"),
+            completed.messages.map { it.content },
+        )
+    }
+
+    @Test
+    fun laterQuestionProvesCachedRepeatedAnswerWasCarryOver() {
+        val corrupted = snapshot(
+            "first", "same answer",
+            "second", "same answer",
+            "third",
+        )
+
+        val sanitized = GoogleWebSnapshotMerger.sanitizeCached(corrupted)
+
+        assertEquals(
+            listOf("first", "same answer", "second", "third"),
+            sanitized.messages.map { it.content },
+        )
+    }
+
+    @Test
     fun switchingConversationDoesNotLeakPreviousMessages() {
         val merged = GoogleWebSnapshotMerger.merge(
             snapshot("private old", "old answer"),

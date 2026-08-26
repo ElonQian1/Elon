@@ -18,6 +18,27 @@ assert.equal(policy.select({
 }), 'native follow-up')
 assert.equal(policy.select({ urlQuery: 'initial query' }), 'initial query')
 assert.equal(policy.select(null), '')
-assert.equal(policy.version, 2)
+assert.equal(policy.isCarryOverAnswer({
+  rememberedOwned: true,
+  previousQuery: 'first question',
+  previousAnswer: 'first answer',
+  nextQuery: 'second question',
+  nextAnswer: ' first   answer ',
+}), true)
+assert.equal(policy.isCarryOverAnswer({
+  rememberedOwned: true,
+  previousQuery: 'first question',
+  previousAnswer: 'first answer',
+  nextQuery: 'second question',
+  nextAnswer: 'second answer',
+}), false)
+assert.equal(policy.isCarryOverAnswer({
+  rememberedOwned: false,
+  previousQuery: 'first question',
+  previousAnswer: 'same answer',
+  nextQuery: 'second question',
+  nextAnswer: 'same answer',
+}), false)
+assert.equal(policy.version, 3)
 
 console.log('google web query policy passed')

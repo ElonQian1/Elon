@@ -11,27 +11,58 @@ internal object GoogleWebSnapshotMerger {
     ): ChatGptWebSnapshot {
         if (!sameConversation || previous == null) return stabilized(incoming)
         if (incoming.messages.isEmpty()) {
+            val preserved = sanitizeCached(previous)
             return incoming.copy(
-                messages = previous.messages,
-                messageWindowStart = previous.messageWindowStart,
-                observedMessageCount = previous.observedMessageCount,
+                messages = preserved.messages,
+                messageWindowStart = preserved.messageWindowStart,
+                observedMessageCount = preserved.observedMessageCount,
             )
         }
-        val mergedTurns = messageTurns(previous.messages).toMutableList()
+        val mergedTurns = stabilizedTurns(previous.messages).toMutableList()
         messageTurns(incoming.messages).forEach { incomingTurn ->
             val userText = incomingTurn.firstOrNull()?.content?.let(::normalized).orEmpty()
             if (userText.isEmpty()) return@forEach
             val existingIndex = mergedTurns.indexOfFirst { turn ->
                 turn.firstOrNull()?.content?.let(::normalized) == userText
             }
+            val admittedTurn = admitTurn(
+                mergedTurns = mergedTurns,
+                incomingTurn = incomingTurn,
+                existingIndex = existingIndex,
+                completedAfterStreaming = previous.streaming && !incoming.streaming,
+            )
             if (existingIndex < 0) {
-                mergedTurns += incomingTurn
-            } else if (incomingTurn.any { it.role == "assistant" }) {
-                mergedTurns[existingIndex] = incomingTurn
+                mergedTurns += admittedTurn
+            } else if (admittedTurn.any { it.role == "assistant" }) {
+                mergedTurns[existingIndex] = admittedTurn
             }
         }
         val merged = mergedTurns.flatten()
         return incoming.withBoundedMessages(merged, previous.messageWindowStart)
+    }
+
+    fun sanitizeCached(snapshot: ChatGptWebSnapshot): ChatGptWebSnapshot =
+        snapshot.withBoundedMessages(
+            stabilizedTurns(snapshot.messages).flatten(),
+            snapshot.messageWindowStart,
+        )
+
+    private fun admitTurn(
+        mergedTurns: List<List<ChatGptWebMessage>>,
+        incomingTurn: List<ChatGptWebMessage>,
+        existingIndex: Int,
+        completedAfterStreaming: Boolean,
+    ): List<ChatGptWebMessage> {
+        val assistantFingerprint = assistantFingerprint(incomingTurn) ?: return incomingTurn
+        val duplicatesEarlierAnswer = mergedTurns.withIndex().any { (index, turn) ->
+            index != existingIndex && assistantFingerprint(turn) == assistantFingerprint
+        }
+        if (!duplicatesEarlierAnswer) return incomingTurn
+
+        val existingTurnAwaitingAnswer = existingIndex >= 0 &&
+            mergedTurns[existingIndex].none { it.role == "assistant" }
+        if (existingTurnAwaitingAnswer && completedAfterStreaming) return incomingTurn
+        return incomingTurn.filterNot { it.role == "assistant" }
     }
 
     private fun messageTurns(messages: List<ChatGptWebMessage>): List<List<ChatGptWebMessage>> {
@@ -44,6 +75,25 @@ internal object GoogleWebSnapshotMerger {
             }
         }
         return turns
+    }
+
+    private fun stabilizedTurns(messages: List<ChatGptWebMessage>): List<List<ChatGptWebMessage>> {
+        val turns = messageTurns(messages).map { it.toMutableList() }
+        for (index in 1 until turns.lastIndex) {
+            val previousFingerprint = assistantFingerprint(turns[index - 1]) ?: continue
+            if (assistantFingerprint(turns[index]) != previousFingerprint) continue
+            turns[index].removeAll { it.role == "assistant" }
+        }
+        return turns
+    }
+
+    private fun assistantFingerprint(turn: List<ChatGptWebMessage>): String? {
+        val content = turn.asSequence()
+            .filter { it.role == "assistant" }
+            .map { normalized(it.content) }
+            .filter(String::isNotEmpty)
+            .toList()
+        return content.takeIf(List<String>::isNotEmpty)?.joinToString("\u0000")
     }
 
     private fun stabilized(snapshot: ChatGptWebSnapshot): ChatGptWebSnapshot {

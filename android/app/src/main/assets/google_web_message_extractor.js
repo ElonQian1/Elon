@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  const extractorVersion = 31;
+  const extractorVersion = 32;
   if (window.__elonGoogleWebMessageExtractor &&
       window.__elonGoogleWebMessageExtractor.version === extractorVersion) return;
 
@@ -27,6 +27,10 @@
   ];
   let rememberedQueryValue = '';
   let rememberedQueryOwned = false;
+  let lastObservedQueryValue = '';
+  let lastObservedAnswerValue = '';
+  let pendingPreviousQueryValue = '';
+  let pendingPreviousAnswerValue = '';
 
   function cleanText(value) {
     return String(value || '')
@@ -57,6 +61,10 @@
   function rememberQuery(value) {
     const query = cleanText(value).slice(0, 40000);
     if (!query) return;
+    if (query !== rememberedQueryValue) {
+      pendingPreviousQueryValue = lastObservedQueryValue;
+      pendingPreviousAnswerValue = lastObservedAnswerValue;
+    }
     rememberedQueryValue = query;
     rememberedQueryOwned = true;
   }
@@ -64,6 +72,10 @@
   function clearRememberedQuery() {
     rememberedQueryValue = '';
     rememberedQueryOwned = false;
+    lastObservedQueryValue = '';
+    lastObservedAnswerValue = '';
+    pendingPreviousQueryValue = '';
+    pendingPreviousAnswerValue = '';
   }
 
   function rememberedQuery() {
@@ -462,6 +474,17 @@
         content: [{ type: 'text', text: entry.text }]
       });
       if (!answer) return;
+      const latestQuery = index === queries.length - 1;
+      const carryOver = latestQuery && queryPolicy &&
+        typeof queryPolicy.isCarryOverAnswer === 'function' &&
+        queryPolicy.isCarryOverAnswer({
+          rememberedOwned: rememberedQueryOwned,
+          previousQuery: pendingPreviousQueryValue,
+          previousAnswer: pendingPreviousAnswerValue,
+          nextQuery: entry.text,
+          nextAnswer: answer.text
+        });
+      if (carryOver) return;
       let content = richContent && typeof richContent.parts === 'function'
         ? richContent.parts(answer.node, answer.text, entry.text)
         : (answer.text ? [{ type: 'text', text: answer.text }] : []);
@@ -476,6 +499,15 @@
         content
       });
       answerCount += 1;
+      if (latestQuery) {
+        lastObservedQueryValue = entry.text;
+        lastObservedAnswerValue = answer.text;
+        if (rememberedQueryOwned && entry.text === rememberedQueryValue) {
+          rememberedQueryOwned = false;
+          pendingPreviousQueryValue = '';
+          pendingPreviousAnswerValue = '';
+        }
+      }
     });
     return {
       messages,

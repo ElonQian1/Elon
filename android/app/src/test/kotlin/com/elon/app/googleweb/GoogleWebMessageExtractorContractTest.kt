@@ -33,6 +33,8 @@ class GoogleWebMessageExtractorContractTest {
         assertTrue(source.contains("observedMessageCount: messages.length"))
         assertTrue(source.contains("hasQuery: !!query"))
         assertTrue(source.contains("queryPolicy.select"))
+        assertTrue(source.contains("queryPolicy.isCarryOverAnswer"))
+        assertTrue(source.contains("pendingPreviousAnswerValue"))
         assertTrue(source.contains("currentQueryMatches"))
         assertTrue(source.contains("hasCurrentQuery"))
         assertTrue(queryPolicy.contains("explicitQuery"))
