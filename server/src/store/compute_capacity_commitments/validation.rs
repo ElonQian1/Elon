@@ -235,7 +235,7 @@ pub(super) fn validate_create_dependencies_on(
     })
 }
 
-fn validate_contract_multiple(
+pub(in crate::store) fn validate_contract_multiple(
     quantities: &[crate::compute_federation::capacity_commitment::ComputeCapacityCommitmentQuantity],
     contract_units: &[crate::compute_federation::capacity_instrument::ComputeCapacityInstrumentContractUnit],
 ) -> Result<()> {

@@ -29,6 +29,7 @@ pub(crate) use types::{
     COMPUTE_CAPACITY_COMMITMENT_CREATE_CONFIRMATION,
     COMPUTE_CAPACITY_COMMITMENT_EXPIRE_DUE_CONFIRMATION,
 };
+pub(in crate::store) use validation::validate_contract_multiple;
 
 use super::Store;
 use super::{

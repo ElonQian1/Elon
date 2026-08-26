@@ -3,6 +3,7 @@
 mod canonical;
 mod exercise;
 mod grant;
+mod historical;
 mod read;
 mod reservation_expiry_recovery;
 mod reservation_expiry_scan;
@@ -30,6 +31,10 @@ pub(crate) use types::{
     COMPUTE_DELIVERY_ALLOCATION_GRANT_CONFIRMATION,
 };
 
+pub(in crate::store) use historical::{
+    audited_historical_delivery_allocation_settlement_source_on,
+    HistoricalDeliveryAllocationSettlementSource,
+};
 pub(in crate::store) use read::{
     delivery_allocation_commitment_status_on,
     persisted_delivery_allocation_reservation_authority_on,

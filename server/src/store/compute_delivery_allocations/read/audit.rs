@@ -20,7 +20,9 @@ use super::super::{
             audited_capacity_commitment_source_on, audited_historical_capacity_commitment_source_on,
         },
         compute_job_registry::{registered_historical_job_version_on, registered_job_version_on},
-        compute_reservation_registry::registered_reservation_version_on,
+        compute_reservation_registry::{
+            registered_historical_reservation_version_on, registered_reservation_version_on,
+        },
     },
     types::{DeliveryAllocationClaimTransferAuthority, DeliveryAllocationReservationAuthority},
     validation::parse_utc,
@@ -389,20 +391,56 @@ pub(super) fn audit_exercise_consumers_on(
     grant: &ComputeDeliveryAllocationGrant,
     terminal: &ComputeDeliveryAllocationTerminalReceipt,
 ) -> Result<()> {
+    audit_exercise_consumers_with_dependency_policy_on(conn, grant, terminal, false)
+}
+
+pub(in crate::store::compute_delivery_allocations) fn audit_historical_exercise_consumers_on(
+    conn: &Connection,
+    grant: &ComputeDeliveryAllocationGrant,
+    terminal: &ComputeDeliveryAllocationTerminalReceipt,
+) -> Result<()> {
+    audit_exercise_consumers_with_dependency_policy_on(conn, grant, terminal, true)
+}
+
+fn audit_exercise_consumers_with_dependency_policy_on(
+    conn: &Connection,
+    grant: &ComputeDeliveryAllocationGrant,
+    terminal: &ComputeDeliveryAllocationTerminalReceipt,
+    use_historical_dependencies: bool,
+) -> Result<()> {
     let evidence = terminal
         .exercise
         .as_ref()
         .ok_or_else(|| anyhow!("缺少 exercise evidence"))?;
-    let _authority = reservation_authority_from_terminal_on(conn, grant, terminal)?;
-    let reservation = registered_reservation_version_on(
-        conn,
-        &evidence.reservation.reservation_id,
-        evidence.reservation.reservation_revision,
-    )?
+    let _authority = if use_historical_dependencies {
+        historical_reservation_authority_from_terminal_on(conn, grant, terminal)?
+    } else {
+        reservation_authority_from_terminal_on(conn, grant, terminal)?
+    };
+    let reservation = if use_historical_dependencies {
+        registered_historical_reservation_version_on(
+            conn,
+            &evidence.reservation.reservation_id,
+            evidence.reservation.reservation_revision,
+        )?
+    } else {
+        registered_reservation_version_on(
+            conn,
+            &evidence.reservation.reservation_id,
+            evidence.reservation.reservation_revision,
+        )?
+    }
     .ok_or_else(|| anyhow!("DeliveryAllocation Reservation 历史版本缺失"))?;
-    let reserved_job =
+    let reserved_job = if use_historical_dependencies {
+        registered_historical_job_version_on(
+            conn,
+            &grant.job.job_id,
+            evidence.reserved_job_revision,
+        )?
+    } else {
         registered_job_version_on(conn, &grant.job.job_id, evidence.reserved_job_revision)?
-            .ok_or_else(|| anyhow!("DeliveryAllocation reserved Job 历史版本缺失"))?;
+    }
+    .ok_or_else(|| anyhow!("DeliveryAllocation reserved Job 历史版本缺失"))?;
     let broker = broker_reserve_binding_on(
         conn,
         &evidence.reservation.reservation_id,
@@ -416,9 +454,12 @@ pub(super) fn audit_exercise_consumers_on(
         || broker.budget_reservation_id != evidence.budget_reservation_id
         || broker.budget_reserved_fen != evidence.reserved_amount_fen
         || broker.capacity_claim.claim_id != evidence.reservation_claim.claim_id
+        || broker.capacity_claim.claim_revision != evidence.reservation_claim.claim_revision
         || broker.capacity_claim.claim_digest != evidence.reservation_claim.claim_digest
+        || broker.source_job.job_id != grant.job.job_id
         || broker.source_job.job_revision != evidence.source_job_revision
         || broker.source_job.job_digest != evidence.source_job_digest
+        || broker.reserved_job.job_id != grant.job.job_id
         || broker.reserved_job.job_revision != evidence.reserved_job_revision
         || broker.reserved_job.job_digest != evidence.reserved_job_digest
         || broker.reservation_revision != evidence.reservation.reservation_revision

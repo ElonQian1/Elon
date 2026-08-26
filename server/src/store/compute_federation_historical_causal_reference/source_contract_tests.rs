@@ -2,6 +2,7 @@ use crate::compute_federation::federation_historical_causal_reference::build_exe
 
 use super::source_refs::{validate_execution_source_links, validate_settlement_source_links};
 
+mod capacity_future;
 mod fixtures;
 mod owner_contracts;
 mod release;

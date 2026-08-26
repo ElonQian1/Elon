@@ -11,7 +11,10 @@ use crate::{
 
 use super::{
     compute_offer_contract_validation::compute_offer_digest,
-    compute_offer_registry::{current_registered_offer_on, registered_offer_version_on},
+    compute_offer_registry::{
+        current_registered_offer_on, registered_historical_offer_version_on,
+        registered_offer_version_on,
+    },
     new_id, now, Store,
 };
 
@@ -148,6 +151,18 @@ pub(in crate::store) fn audited_compute_offer_publication_on(
         .transpose()
 }
 
+pub(in crate::store) fn audited_historical_compute_offer_publication_on(
+    conn: &Connection,
+    offer_id: &str,
+) -> Result<Option<ComputeOfferPublicationReceipt>> {
+    publication_by_offer_on(conn, offer_id)?
+        .map(|stored| {
+            audit_publication_with_offer_policy_on(conn, &stored, true)?;
+            Ok(stored.into_receipt(false))
+        })
+        .transpose()
+}
+
 #[derive(Debug, Clone)]
 struct StoredPublication {
     publication_id: String,
@@ -206,10 +221,26 @@ fn validate_replay(
 }
 
 fn audit_publication_on(conn: &Connection, stored: &StoredPublication) -> Result<()> {
-    let source = registered_offer_version_on(conn, &stored.offer_id, stored.source_offer_version)?
-        .ok_or_else(|| anyhow!("Offer 发布回执引用的 draft 历史版本不存在"))?;
-    let active = registered_offer_version_on(conn, &stored.offer_id, stored.active_offer_version)?
-        .ok_or_else(|| anyhow!("Offer 发布回执引用的 active 历史版本不存在"))?;
+    audit_publication_with_offer_policy_on(conn, stored, false)
+}
+
+fn audit_publication_with_offer_policy_on(
+    conn: &Connection,
+    stored: &StoredPublication,
+    use_historical_offers: bool,
+) -> Result<()> {
+    let source = if use_historical_offers {
+        registered_historical_offer_version_on(conn, &stored.offer_id, stored.source_offer_version)?
+    } else {
+        registered_offer_version_on(conn, &stored.offer_id, stored.source_offer_version)?
+    }
+    .ok_or_else(|| anyhow!("Offer 发布回执引用的 draft 历史版本不存在"))?;
+    let active = if use_historical_offers {
+        registered_historical_offer_version_on(conn, &stored.offer_id, stored.active_offer_version)?
+    } else {
+        registered_offer_version_on(conn, &stored.offer_id, stored.active_offer_version)?
+    }
+    .ok_or_else(|| anyhow!("Offer 发布回执引用的 active 历史版本不存在"))?;
     let expected_digest = publication_digest(
         &stored.publication_id,
         &stored.offer_id,

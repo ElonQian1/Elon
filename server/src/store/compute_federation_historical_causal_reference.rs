@@ -20,6 +20,11 @@ use super::{
     Store,
 };
 
+mod capacity_future;
+pub(crate) use capacity_future::{
+    ComputeCapacityFutureSettlementLineageResolveError,
+    ValidatedComputeCapacityFutureSettlementLineageV1,
+};
 mod execution;
 mod release;
 mod release_refs;

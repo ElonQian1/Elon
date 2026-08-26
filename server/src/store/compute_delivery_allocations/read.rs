@@ -21,6 +21,7 @@ use super::{
 mod audit;
 mod ledger;
 
+pub(super) use audit::audit_historical_exercise_consumers_on;
 use audit::{
     audit_exercise_consumers_on, audit_grant_dependencies_on, audit_grant_indexes_on,
     audit_historical_grant_dependencies_on, audit_terminal_indexes_on,

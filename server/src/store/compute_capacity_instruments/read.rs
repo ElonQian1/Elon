@@ -173,6 +173,34 @@ pub(super) fn adoption_by_offer_on(
     adoption_on(conn, "WHERE offer_id=?1", params![offer_id])
 }
 
+pub(super) fn historical_adoption_by_exact_offer_on(
+    conn: &Connection,
+    offer_id: &str,
+    offer_version: i64,
+    offer_digest: &str,
+) -> Result<Option<StoredAdoption>> {
+    let adoption_count: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM compute_capacity_instrument_offer_adoptions WHERE offer_id=?1",
+        params![offer_id],
+        |row| row.get(0),
+    )?;
+    if adoption_count == 0 {
+        return Ok(None);
+    }
+    if adoption_count != 1 {
+        bail!("historical capacity instrument Offer adoption cardinality drifted");
+    }
+    let adoption = adoption_on(
+        conn,
+        "WHERE offer_id=?1 AND offer_version=?2 AND offer_digest=?3",
+        params![offer_id, offer_version, offer_digest],
+    )?;
+    if adoption.is_none() {
+        bail!("historical capacity instrument exact Offer adoption tuple drifted");
+    }
+    Ok(adoption)
+}
+
 pub(super) fn adoption_by_idempotency_on(
     conn: &Connection,
     scope: &str,
