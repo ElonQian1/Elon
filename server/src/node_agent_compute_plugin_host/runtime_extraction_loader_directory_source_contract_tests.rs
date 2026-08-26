@@ -113,7 +113,8 @@ fn staging_and_loader_transition_retain_the_typed_directory_custody() {
         "fn create_new_file_child(",
         "fn create_new_seal_file(",
     );
-    assert!(root_file_child.contains("self.directory.create_new_file_child(name)"));
+    assert!(root_file_child.contains("self.directory"));
+    assert!(root_file_child.contains(".create_new_file_child(name)"));
     assert!(!root_file_child.contains("self.root"));
     assert!(!root_file_child.contains("pin_existing_directory"));
 

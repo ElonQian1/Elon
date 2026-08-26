@@ -199,20 +199,20 @@ fn write_zip_to_staging(
     plan: &ValidatedComputePluginArchiveExtractionPlan,
     staging: &PreparedComputePluginCandidateStaging<'_>,
 ) -> Result<ExtractedArchiveParts> {
-    let mut directories = Vec::with_capacity(plan.envelope().plan.directories.len());
+    let mut directories: Vec<PinnedManagedDirectory> =
+        Vec::with_capacity(plan.envelope().plan.directories.len());
     let mut directory_indexes = HashMap::with_capacity(plan.envelope().plan.directories.len());
     for relative in &plan.envelope().plan.directories {
         let (parent_relative, name) = split_planned_descendant(relative)?;
         let directory = match parent_relative {
             None => staging.create_new_directory_child(name)?,
             Some(parent_relative) => {
-                let parent_index =
-                    directory_indexes
-                        .get(parent_relative)
-                        .copied()
-                        .ok_or_else(|| {
-                            anyhow::anyhow!("COMPUTE_PLUGIN_EXTRACTION_PARENT_NOT_RETAINED")
-                        })?;
+                let parent_index: usize = directory_indexes
+                    .get(parent_relative)
+                    .copied()
+                    .ok_or_else(|| {
+                        anyhow::anyhow!("COMPUTE_PLUGIN_EXTRACTION_PARENT_NOT_RETAINED")
+                    })?;
                 directories[parent_index]
                     .create_new_extraction_loader_directory_child(name)
                     .map_err(Error::new)?

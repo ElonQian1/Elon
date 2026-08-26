@@ -29,7 +29,7 @@ const PROBE_DESIRED_ACCESS: u32 = FILE_READ_ATTRIBUTES | FILE_TRAVERSE | SYNCHRO
 const PROBE_SHARE_ACCESS: u32 = FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE;
 const PROBE_CREATE_OPTIONS: u32 =
     FILE_DIRECTORY_FILE | FILE_OPEN_REPARSE_POINT | FILE_SYNCHRONOUS_IO_NONALERT;
-pub(super) fn probe_extraction_loader_directory_relative(
+pub(in crate::node_agent_managed_fs) fn probe_extraction_loader_directory_relative(
     retained_delete_owner: &File,
     parent: &File,
     name: &OsStr,
