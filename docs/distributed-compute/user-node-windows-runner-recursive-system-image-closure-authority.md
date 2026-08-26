@@ -103,7 +103,7 @@ target node + target symbol；hop ordinal 无重复、无 gap；证据 digest �
 - exact new filesystem system-image custody set。
 
 parse receipt、wave 与 closure 自身再使用固定 JCS/SHA-256 material重算。recursive image parse receipt保持 V2
-（含 producer acquisition ordinal）；本批新增 request/resolution plan V1，并把 acquisition output/receipt升级到 V2；receipt-set/
+（含 producer acquisition ordinal）；request/resolution plan保持V1，point-of-use currentness使 acquisition output/receipt升级到V3；receipt-set/
 chain保持 V1。recursive closure保持 V2（移除裸 limits/source
 mirror，改为纳入 authenticated policy-bound acquisition-chain digest）。既有 wave V1字段未变。outer loader resolution profile仍为 V3，
 因为它继续只消费版本化 closure digest而未增加独立字段；不得静默改写 profile V3 material。process pre-create只能消费该 final
@@ -111,7 +111,7 @@ profile，不能把 digest 当成 live OS observation。
 
 recursive parse receipt V2直接绑定 parser policy、producer acquisition ordinal、wave、owner/material与 parse evidence，但不直接
 保存 authenticated policy digest；对应 request/resolution plan V1与 acquisition chain再用同一 parser policy、parse-receipt digest
-及 authenticated policy digest把它传递接回独立 policy V1。
+及 authenticated policy digest把它传递接回 authenticated policy binding V2（其 payload保持V1）。
 该 policy直接绑定 selected launch-context intent digest、preliminary-plan digest、parser、preloaded set、exact routes、六项 limits与
 签名验证链；search/machine lineage经 authenticated intent/plan digests传递。max wave/image/module/name/system-owner/
 forwarder-depth 六项数值由 policy payload逐值认证并经 acquisition chain纳入 closure digest，不能只引用 intent digest，也不能由
@@ -124,11 +124,12 @@ hop depth执行。
 same-session grant → route-specific owner/candidate/lease → nonempty时 target parse wave `k+1`、terminal时 `None` 的 typed shape，并冻结 exact authenticated negative、
 partial acquisition与 outcome-uncertain whole-graph parking。它还规定 parse-receipt ordinal按 earliest producer连续分配，后台完成
 顺序不得改变 final graph。新增 plan V1逐项冻结 outgoing requests、per-step dispositions、exact terminals、filesystem dedupe与
-owner commitments；A0仍只复用 GrantReady，Ak才使用该 plan，DispatchReady由 exact vectors派生 limits。该合同仍由
+owner commitments；A0仍只复用 GrantReady，Ak才使用该 plan，exact vectors先派生 limits，再进入 currentness-pending并消费
+point-of-use authorization形成 DispatchReady。该合同仍由
 `Infallible`保持不可构造，也没有 release/recovery backend；因此本合同只能称为 final
 projection envelope，不能称为可达的 recursive acquisition authority。
 
-以下 producer全部保持 `missing`：authenticated selector/policy signer-currentness、prelease/recursive parser、GrantReady resolver、
+以下 producer全部保持 `missing`：authenticated selector/policy signature verifier/currentness backend、prelease/recursive parser、GrantReady resolver、
 external-directory owners、name/system positive-consuming transition、recursive acquisition backend/advancer、post-lease sealer/query、reopen/currentness、live-OS、post-create
 machine query、create/resume/recovery、pre-resume与 dynamic-load enforcement。`Infallible` producer使当前 closure不可构造。
 
@@ -148,8 +149,8 @@ usage、settlement 或 money effect。
 
 ## 9. 后续顺序
 
-1. 实现真实 authenticated recursive-policy signer/currentness与 retained-handle recursive parser；
-2. 实现 authenticated per-wave resolver，把 source-written canonical plans推进为真实 DispatchReady owner；
+1. 接入真实 authenticated recursive-policy signature verifier/currentness backend与 retained-handle recursive parser；
+2. 实现 authenticated per-wave resolver与 currentness producer，使 source-written canonical plans经 currentness-pending推进为真实 DispatchReady owner；
 3. 按已冻结合同实现每 producer wave 的 grant/candidate/lease/negative/outcome-uncertain backend与 positive advancer；
 4. 实现 final sealer/query、namespace/currentness/reopen 与 generation-drift fault matrix；
 5. 单独设计 nested API-set DAG与 Shadow positive authority；

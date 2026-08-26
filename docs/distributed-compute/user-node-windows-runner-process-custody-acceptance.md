@@ -44,7 +44,7 @@ source-contract guard 也未执行：
 | loader currentness | `runtime_process_custody/namespace_query.rs` | exact attempt/response bytes+digest/content-lease currentness、authenticated quarantine、unavailable release policy 与无实现 backend trait |
 | recursive profile | `runtime_loader_load_set/resolution/system_closure.rs` 与子模块 | source-only final envelope、逐波反向摘要与 resolution profile V3 |
 | recursive acquisition custody | `exact_context_plan/recursive_policy.rs`、`system_closure/acquisition{,/custody,/failure,/digest,/validation}.rs` | signed policy、nonempty producer→target / terminal None、partial whole-owner custody与 cross-binding；真实 producers missing |
-| recursive forward plans | `system_closure/acquisition/{plan,plan_digest,plan_forwarder_validation,plan_owner_validation,plan_projection,plan_validation}.rs` | A0复用 GrantReady、Ak plans V1、exact-vector DispatchReady与 receipt/output V2；真实 parser/resolver missing |
+| recursive forward plans/currentness | `system_closure/acquisition/{plan,plan_digest,plan_forwarder_validation,plan_owner_validation,plan_projection,plan_validation}.rs` | A0复用 GrantReady、Ak plans V1、exact-vector currentness-pending→DispatchReady与 receipt/output V3；真实 currentness/parser/resolver missing |
 | Job/startup owner | `runtime_process_custody/windows_job.rs` | Job set/query-back、aligned Job-list RAII，以及 borrow-bind Job+launch-security 后设置 `lpDesktop` 的 startup info |
 | Windows backend | `runtime_process_custody/windows.rs`、`windows_rollback.rs` | atomic-Job create、membership/identity query、四项 termination confirmation 与 unconfirmed whole-graph parking |
 | source review | `runtime_process_custody_source_contract_tests.rs` | 未运行 guard，固定 owner、调用顺序、负边界和证据状态 |
@@ -71,18 +71,20 @@ source-contract guard 也未执行：
    retained DELETE owner + narrow share-delete probe 源码 seam 已线性接入；
    `launch_path_handle_chain_discovery=source_written_windows_dynamic_unverified`；exact-context/prelease/request/GrantReady/
    post-lease lineage/recursive final-envelope contracts为 `source_written_uncompiled_unrun`，但真实
-   selector/policy signer-currentness/prelease-or-recursive parser/GrantReady或逐波 resolver/逐波 acquisition backend/positive advancer/component-grant
+   selector/policy signature verifier/currentness backend、prelease-or-recursive parser/GrantReady或逐波 resolver/逐波 acquisition backend/positive advancer/component-grant
    producers仍 `missing`，不得认为 loader predecessor已动态可达；
-5. 顺序固定为 discovery/pre-lease material → authenticated selection/preliminary plan → wave-zero GrantReady → base
-   grants/package leases/route-specific owners → package same-handle rehash/reparse → producer-wave parse/canonical plans/
-   DispatchReady/outgoing acquisition →
+5. 顺序固定为 discovery/pre-lease material → authenticated selection/preliminary plan → wave-zero GrantReady → whole-owner
+   borrowed validation + exact currentness query → PolicyCurrent GrantReady → base grants/package leases/route-specific owners →
+   package same-handle rehash/reparse → producer-wave parse/canonical plans/
+   currentness-pending/point-of-use authorization/DispatchReady/outgoing acquisition →
    empty frontier/final aggregate → final seal/query/reopen。authenticated exact PE graph与 launch-path parent-chain
    authorities 以 `Infallible` 保持 uninhabited；sealed
    startup/import resolution 必须先以 Runner basename 与 authenticated process preloaded/bootstrap set 预种
    expected process-machine/cache-key/immutable-section/evidence-bound cache，再形成 Runner-rooted package-image closure claim与
    typed external leaves；post-lease system-image own imports的 final projection contract已冻结 producer-bound owner、
    frontier/fixpoint、deterministic merge与 final slice摘要；逐波 source contract还冻结 policy、A0/`Ak` split、plans V1、
-   exact-vector limits、DispatchReady、wave coordinates、route-specific owners与 partial custody，但 policy/parser/resolver/backend/
+   exact-vector limits、currentness-pending→DispatchReady、wave coordinates、route-specific owners与 partial custody，但 policy
+   signature verifier/currentness backend、parser/resolver/acquisition backend/
    positive advancer/sealer/query仍 missing。normal/delay base imports绑定
    symbol name/ordinal、descriptor/thunk ordinal，separate forwarder hops绑定 source-export/target-symbol/逐跳 evidence/cycle-depth、
    已冻结 canonical merge rule 与 resolved-module cache-key collision closure；pre-lease parser material 不得预测 lease
@@ -153,8 +155,8 @@ source-contract guard 也未执行：
 | launch-path retained-handle candidate discovery | 0 | 0 | 1 | source seam 已写但未动态运行；没有 selected CWD 或 component grant |
 | exact-context/prelease/request/GrantReady contracts | 0 | 0 | 1 | source written；真实 selector/parser/resolver/advancer producers missing，Shadow rejected |
 | recursive system-image final envelope | 0 | 0 | 1 | owner/frontier/fixpoint/merge/digest source written；runtime producer missing |
-| recursive policy / per-wave acquisition custody | 0 | 0 | 1 | source contract written；signer/backend/positive advancer missing |
-| canonical per-wave plans / DispatchReady | 0 | 0 | 1 | source written；parser/resolver missing |
+| recursive policy / per-wave acquisition custody | 0 | 0 | 1 | source contract written；signature verifier/currentness backend/positive advancer missing |
+| canonical per-wave plans / currentness-pending→DispatchReady | 0 | 0 | 1 | source written；currentness/parser/resolver missing |
 | exact PE graph / launch-path / startup resolution | 0 | 0 | 1 | PE/parent-chain authorities uninhabited；post-lease sealer 与 launch-context producer 未验证 |
 | grants / unified package+system FileId leases / anchor reopen | 0 | 0 | 1 | acquisition/query/reopen backends 均不存在；servicing generation 与 exact negative ownership 未动态验证 |
 | live OS KnownDLL/API-set/SxS currentness | 0 | 0 | 1 | sealed/pre-create fields 只是 echoes；live backend 不存在 |

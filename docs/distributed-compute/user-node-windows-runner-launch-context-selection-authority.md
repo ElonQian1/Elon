@@ -18,6 +18,8 @@ verification_status: source_review_only
 post-lease system-image fixed-point另见
 [Recursive System-Image Closure authority](user-node-windows-runner-recursive-system-image-closure-authority.md)，逐波 policy/custody见
 [Recursive System-Image Acquisition Custody authority](user-node-windows-runner-recursive-system-image-acquisition-custody-authority.md)，
+policy signature verification与逐 A0/Ak currentness见
+[Recursive Policy Currentness authority](user-node-windows-runner-recursive-policy-currentness-authority.md)，
 Ak forward plan见
 [Recursive Wave Resolution Plan authority](user-node-windows-runner-recursive-wave-resolution-plan-authority.md)。
 
@@ -31,9 +33,11 @@ resolver 必须消费的精确请求；GrantReady 合同虽已写，真实 resol
 grant/lease 前错误持有 final resolution 的时间顺序，并消除 loader resolution digest 与 process required-launch-context digest 的
 直接自引用。独立的 source-only recursive final-projection envelope现已冻结 wave-zero prefix、system-postlease suffix、
 producer-bound parse receipts、frontier/fixpoint与 final slice摘要；authenticated recursive policy与逐 producer wave whole-owner
-custody contract也已写。A0复用 GrantReady，Ak canonical request/resolution plan V1、exact-vector limit派生与 DispatchReady
-source shape现已补齐，但真实 signer/currentness、parser/resolver、grant/candidate/lease backend、positive advancer与 sealer
-producer仍 `missing`。
+custody contract也已写。A0复用 GrantReady，Ak canonical request/resolution plan V1、exact-vector limit派生、
+currentness-pending与 DispatchReady source shape现已补齐；signed envelope、typed verification evidence与逐 A0/Ak currentness
+authorization合同也已写，但真实
+signature verifier/currentness backend、parser/resolver、grant/candidate/lease backend、positive advancer与 sealer producer仍
+`missing`。
 
 证据严格为 `source_written/source_review_only/implementation_uncompiled/implementation_unrun`、
 `passed=0/failed=0`、Windows dynamic=`0`、`migration/table/writer=none/none/none`。Manifest V1、InstallPlan V1 与
@@ -53,9 +57,10 @@ key/generation、signature receipt，以及以下完整 projection：
 - required restricted-token/AppContainer policy expectation；它不是 token handle 或 launch-security authority；
 - 有序 DLL search roles 与有序 `preloaded/api_set/known_dll/side_by_side/filesystem` routes，禁止 ambient PATH。
 
-递归 limits与 parser policy不再由 final sealer从上述 intent digest旁路推导。独立 signed recursive policy V1必须直接逐项
+递归 limits与 parser policy不再由 final sealer从上述 intent digest旁路推导。独立 recursive policy payload V1（由 signed
+envelope V1验证并进入 authenticated binding V2）必须直接逐项
 绑定本 intent digest、preliminary request-plan digest、parser policy、authenticated preloaded set、上述 route order与六项
-limits；admission/manifest/machine/search lineage经前两项 authenticated digests传递。V1必须 exact复用 route order，不得收窄
+limits；admission/manifest/machine/search lineage经前两项 authenticated digests传递。payload V1必须 exact复用 route order，不得收窄
 或按 wave扩大；未来若允许显式收窄，必须升级 policy schema/domain。
 
 不得默认 package root、Runner parent、第一个 plan directory 或当前进程 CWD。Plan-directory 选择必须同时核对 plan ordinal、
@@ -128,11 +133,13 @@ LaunchPathDiscoveredWork
 → PreliminaryResolutionRequestsPlannedWork
 → wave-zero exact terminals + per-step dispositions + external directory owners
 → GrantReadyWindowsRunnerResolutionPrerequisite
+→ whole GrantReady borrowed validation + exact Control-ring/trusted-time currentness query
+→ PolicyCurrentGrantReadyWindowsRunnerResolutionPrerequisite
 → base searched-name / launch-component grants + package leases + base route-specific system owners
 → same-handle full-package rehash/reparse under package leases
 → exact prelease-image/import-edge ↔ postlease-image/import-binding cross-binding receipt
 → producer wave `k` same-owner parse + canonical request/resolution plan V1
-→ exact-vector validation + DispatchReady + grants/candidates/leases
+→ exact-vector validation + currentness-pending + point-of-use authorization + DispatchReady + grants/candidates/leases
 → [next frontier非空] target parse wave `k+1` owners + deterministic suffix；[empty] terminal `A_N` target=None
 → empty recursive frontier + final aggregate + exact final edge/name/system-owner reverse projection
 → final exact PE graph + launch path + loader resolution seal
@@ -141,7 +148,8 @@ LaunchPathDiscoveredWork
 → retained process pre-create launch-context projection
 ```
 
-base name-grant failure持有 whole grant-ready owner；base content-lease failure持有 pre-final namespace grants、已取得
+base name-grant failure持有 whole `PolicyCurrentGrantReadyWindowsRunnerResolutionPrerequisite`；base content-lease failure持有 outer
+`PolicyCurrentPreFinalWindowsLoaderNamespaceGrantSet`，其 policy/authorization保持在 policy-free inner namespace之外，并保留已取得
 package/system owner custody、active dispatch与 pending refs；recursive failure另按 producer wave保留 whole earlier graph、active
 attempt、returned outcomes与 pending refs。纯 borrow failure持有 whole preliminary request owner。name-grant与 system-image
 positive receipt虽已有 request/nonce/exact response bytes+digest/self-binding 的 typed custody，消费 exact attempt 形成正向 owner 的
@@ -163,7 +171,7 @@ launch_context_selector_digest
 └→ authenticated_recursive_resolution_policy_digest
 authenticated_recursive_resolution_policy_digest + grant_ready_resolution_plan_digest
 → [A0 GrantReady reuse | Ak request/resolution plan V1]
-→ recursive_wave_acquisition_receipt_v2_digests
+→ recursive_wave_acquisition_receipt_v3_digests
 → receipt-set/acquisition-chain V1
 → recursive_resolution_closure_digest
 → windows_loader_resolution_profile.v3
@@ -202,6 +210,10 @@ recursive_system_import_closure_contract = source_written_uncompiled_unrun
 recursive_system_import_acquisition_custody_contract = source_written_uncompiled_unrun
 recursive_wave_request_resolution_plan_contract = source_written_uncompiled_unrun
 authenticated_recursive_policy_producer = missing
+recursive_policy_signature_verification_contract = source_written_uncompiled_unrun
+recursive_policy_dispatch_currentness_contract = source_written_uncompiled_unrun
+recursive_policy_signature_verifier_producer = missing
+recursive_policy_dispatch_currentness_backend = missing
 recursive_wave_plan_resolver_producer = missing
 recursive_wave_acquisition_backend = missing
 recursive_wave_positive_advancer = missing

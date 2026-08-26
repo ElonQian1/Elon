@@ -101,9 +101,11 @@ outcome uncertainty。因此未来 bridge 不能是 path/raw-handle getter，也
 - 按值消费 exact admitted/archive Runner custody，不能接收 caller path、digest、index；
 - 先从 retained handles 做 launch-path discovery 与 pre-lease PE material，再由 authenticated context 选择 exact CWD
   并形成 preliminary unresolved request plan；GrantReady contract/movable-owner source shape已写，但真实 resolver必须先补齐
-  wave-zero terminal/disposition、external directory owners与 resolved-system dedupe，随后取得 base grants、package leases与
+  wave-zero terminal/disposition、external directory owners与 resolved-system dedupe，再经 whole GrantReady borrowed validation +
+  exact Control-ring/trusted-time currentness query形成 PolicyCurrent GrantReady，随后取得 base grants、package leases与
   base route-specific system owners，完成 package same-handle rehash/reparse；再逐 producer wave解析 source images，以 canonical
-  request/resolution plan V1和 exact-vector validation形成 DispatchReady，取得 outgoing grants/candidates/leases并推进 next
+  request/resolution plan V1和 exact-vector validation进入 currentness-pending，消费 point-of-use authorization后形成 DispatchReady，
+  取得 outgoing grants/candidates/leases并推进 next
   frontier，empty frontier后才形成 final aggregate、封印 final PE/launch/resolution并执行
   consuming generation query；每种 definitive/authenticated rejection 都必须保留与 exact owner/attempt/session/
   request/nonce 匹配的 authenticated-negative receipt；
@@ -117,8 +119,8 @@ outcome uncertainty。因此未来 bridge 不能是 path/raw-handle getter，也
   预种 expected process-machine/cache-key/immutable-section/evidence-bound module cache。pre-lease当前只形成 package-image
   closure claim与 typed external leaves；post-lease system-image own imports 的 source-only final envelope已冻结
   base/suffix provenance、producer owner、frontier/fixpoint、merge与摘要；相邻 source contract还冻结 authenticated policy、A0
-  GrantReady复用、Ak canonical plans V1、nonempty producer→target / terminal None、exact-vector DispatchReady、route-specific
-  acquisition、whole-owner partial custody与 V2 receipt/output cross-binding，但真实 policy/retained-handle recursive parser/
+  GrantReady复用、Ak canonical plans V1、nonempty producer→target / terminal None、exact-vector currentness-pending→DispatchReady、route-specific
+  acquisition、whole-owner partial custody与 V3 receipt/output cross-binding，但真实 policy/retained-handle recursive parser/
   resolver/backend/positive advancer和 sealer/query producer仍为 blocker。
   每条请求绑定 symbol name/ordinal、descriptor/thunk ordinal，forwarder绑定 source-export/target-symbol/逐跳 evidence/cycle-depth、
   已冻结 canonical merge rule 与 resolved-module cache-key collision closure；pre-lease parser material 只绑定 FileId +
@@ -141,7 +143,7 @@ outcome uncertainty。因此未来 bridge 不能是 path/raw-handle getter，也
   classification前重算。当前明确的 positive shapes仅为 name-grant与system-image，其 consuming producer仍 uninhabited；close ambiguity使用
   `ManuallyDrop` quarantine，不运行 ordinary `File` Drop。
 
-但 selector/policy signer-currentness/prelease-or-recursive parser、GrantReady或逐波 resolver/external-directory owners/逐波 acquisition
+但 selector/policy signature verifier/currentness backend、prelease-or-recursive parser、GrantReady或逐波 resolver/external-directory owners/逐波 acquisition
 backend/positive advancer、cache-seed/exact PE graph、selected launch-path/grants和
 resolution authority 以 `Infallible` 或明确 blocker保持不可构造，name-grant/
 FileId-lease/query/reopen producer 也不存在。extraction directory 已新增 retained DELETE owner + parent-relative
@@ -302,8 +304,8 @@ FileId、`startup_import_resolution_profile_digest`、`startup_import_namespace_
 launch token/SD/owner-label/access-check/private-desktop binding digests、live primary-token session/logon namespace 与 exact
 desktop access-check binding、resource/permission ceiling、runtime generation before
 与 authority/process/clock fences；这些 digests 不代替 retained launch owners 或 query-back。resolution profile V3 还必须绑定
-selector、preliminary request-plan、grant-ready plan、recursive closure（含 authenticated recursive policy、plans V1与 V2
-acquisition receipts，经 receipt-set/chain V1传递）、
+selector、preliminary request-plan、grant-ready plan、recursive closure（含 authenticated recursive policy binding V2、plans V1与
+V3 acquisition receipts，经 receipt-set/chain V1传递）、
 token/AppContainer、architecture/WOW64、empty-environment/search policy、
 cwd 与 creation flags，但不得包含 required process context digest。required launch-context V3绑定 selector+final resolution；其
 expected digest由 resolution外 launch-security owner携带，process policy重算后必须相等。pre-create currentness 再绑定
@@ -328,7 +330,7 @@ WebSocket。source-lineage 的 local currentness、runtime transition、Host run
 2. 动态验证 retained launch-path handle-chain discovery、pre-lease PE material与 authenticated exact CWD selector；
 3. 形成 preliminary unresolved request plan，补齐 wave-zero terminal/disposition、external directory owners与 resolved-system dedupe；
 4. 实现 base grants/package leases/route-specific owners及 package same-handle reparse，再实现 authenticated recursive policy、
-   recursive parser与逐 producer wave resolver，把 canonical plans推进为真实 DispatchReady owner后接入 acquisition backend/
+   recursive parser与逐 producer wave resolver，使 canonical plans完成 currentness-pending与 point-of-use authorization后推进为真实 DispatchReady owner，再接入 acquisition backend/
    positive advancer；empty frontier后形成 final aggregate并完成 exact
    PE/launch/startup-import seal、consuming query、anchor-consuming package-file reopen/recovery及 Windows matrix；
 5. 实现 launch-security producer，创建并保留 exact private window-station/desktop owners，完整 query-back token/

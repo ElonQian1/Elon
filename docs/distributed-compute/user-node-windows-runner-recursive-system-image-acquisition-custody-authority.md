@@ -19,7 +19,9 @@ verification_status: source_review_only
 请求与 GrantReady prefix 见
 [Launch Context Selection authority](user-node-windows-runner-launch-context-selection-authority.md)，最终 owner graph 见
 [Loader Load-Set authority](user-node-windows-runner-loader-load-set-authority.md)。`Ak (k >= 1)`的 forward plan见
-[Recursive Wave Resolution Plan authority](user-node-windows-runner-recursive-wave-resolution-plan-authority.md)。
+[Recursive Wave Resolution Plan authority](user-node-windows-runner-recursive-wave-resolution-plan-authority.md)，signed envelope与逐波
+currentness见
+[Recursive Policy Currentness authority](user-node-windows-runner-recursive-policy-currentness-authority.md)。
 
 ## 1. 本批结论
 
@@ -28,8 +30,8 @@ verification_status: source_review_only
 wave 1 source owners；每个 producer wave解析本波 source images，再为 outgoing requests取得 exact grants、route-specific
 owners与 leases，形成下一 wave frontier；empty frontier 后才允许 final aggregate/sealer消费整图。
 
-该合同不是签名/验签/策略签发/currentness、namespace、candidate、lease、parser、advancer、sealer、query、release或 recovery
-backend。
+signed envelope、typed verification evidence与 A0/Ak point-of-use currentness authorization已形成 source-only shape，但该合同不是
+真实签名/验签/currentness、namespace、candidate、lease、parser、advancer、sealer、query、release或 recovery backend。
 所有成功 producer继续由 private `Infallible` 保持不可构造。状态严格为
 `source_written/source_review_only/implementation_uncompiled/implementation_unrun`、`passed=0/failed=0`、Windows
 dynamic=`0`、`migration/table/writer=none/none/none`。本批没有运行编译、Cargo/Rust/source-contract test、migration、
@@ -37,8 +39,7 @@ SQLite、网络、设备、Win32 fixture或真实 Runner；`failed=0` 不表示�
 
 ## 2. Authenticated recursive policy
 
-`AuthenticatedWindowsRecursiveResolutionPolicy` 必须是独立版本化、Control-signed或同等 sealed typed source。V1 signed
-payload直接绑定：
+`AuthenticatedWindowsRecursiveResolutionPolicy` 必须是独立版本化、Control-signed typed source。payload V1直接绑定：
 
 - `launch_context_intent_digest`；
 - `preliminary_request_plan_digest`、`parser_policy_digest`、`authenticated_preloaded_module_set_digest`与 exact ordered
@@ -46,10 +47,16 @@ payload直接绑定：
 - 六项 exact limits：`max_wave_count`、`max_parsed_image_count`、`max_module_request_count`、
   `max_searched_name_count`、`max_system_image_request_count`、`max_forwarder_hop_count`；
 - `ambient_path_allowed=false`、nested API-set/Shadow positive关闭与 startup-import-only dynamic-load scope；
-- control key ID/keyring generation、payload/signed/verified digest、signed envelope与 signature-verification receipt。
+- control key ID/keyring generation与 policy-scope payload digest。
+
+signed envelope/verification/currentness的完整 signer tuple、validity、Control-ring exact record、policy scope replacement generation、
+trusted time/anti-rollback及每波 dispatch coordinates由独立
+[Recursive Policy Currentness authority](user-node-windows-runner-recursive-policy-currentness-authority.md)冻结。authenticated policy
+binding为V2并按值保留 typed verification evidence；A0与每个Ak只有在 whole plan/limits gate后取得一次性 currentness
+authorization才可进入第一项 dispatch。
 
 admission source/receipt、manifest/signed envelope、grant、Runner、process-machine/WOW64与 search policy经已验证的 exact
-context-intent/preliminary-plan digests传递绑定，不在 policy V1重复铺字段；传递绑定不能被描述成独立重复签名证据。
+context-intent/preliminary-plan digests传递绑定，不在 policy payload V1重复铺字段；传递绑定不能被描述成独立重复签名证据。
 
 signed payload不包含自身 envelope、verification receipt或最终 binding digest，避免摘要 fixed point。schema使用独立
 domain/version与长度定界的 canonical SHA-256 material；future wire decoder对 unknown version/field、非 canonical值或摘要错绑
@@ -61,7 +68,7 @@ wave count只计 recursive waves；parsed/module/name/system-owner limits覆盖 
 forwarder limit表示最大 hop depth而非 edge总数。任何会产生外部副作用的 dispatch前必须用 checked arithmetic验证本次
 投影不会越限。
 
-recursive policy V1必须 exact复用 selected launch-context中的 route order与由 context/plan传递的 machine/search binding，且保持
+recursive policy payload V1必须 exact复用 selected launch-context中的 route order与由 context/plan传递的 machine/search binding，且保持
 `ambient_path_allowed=false`；不得按 wave更换 policy、增加 ambient目录或把 fail-closed route打开。未来若允许显式收窄，必须
 升级 policy版本并冻结 canonical semantics。所有 recursive parse、acquisition与 final closure逐项绑定同一 authenticated policy
 binding digest。
@@ -114,13 +121,17 @@ Deserialize，不暴露 raw handle、`File`、path、detached digest constructor
 
 ```text
 base GrantReady requests
+→ whole GrantReady borrowed validation + exact Control-ring/trusted-time currentness query
+→ PolicyCurrent GrantReady
 → base name grants + package leases + route-specific system owners
 → A0 composite same-owner evidence：package pre/post same-handle cross-binding + base-target parse set
 → [frontier 非空时] wave 1 source-owner custody
 → producer wave k same-owner parse
 → canonical outgoing unresolved request plan V1
 → exact terminal + per-step dispositions + movable external-owner refs resolution plan V1
-→ whole-plan validation + DispatchReady typestate
+→ whole-plan / exact-vector limit validation
+→ PolicyCurrentnessPending typestate + exact point-of-use authorization
+→ DispatchReady typestate
 → same-session searched-name / required search-directory grants
 → route-specific owner/candidate/content-lease acquisition
 → next-wave source-owner custody
@@ -153,7 +164,7 @@ import-table digest/counts与 same-owner receipt digest；lease/servicing genera
 authenticated-policy digest或 acquisition-receipt digest；acquisition validator用 producer ordinal、同一 parser policy与 owner projection
 把它接回对应 receipt，从而避免摘要回环。
 
-每个 producer wave另有独立 acquisition receipt，至少绑定：
+每个 producer wave另有独立 acquisition receipt V3，至少绑定：
 
 - prior/output whole-state digest、policy/parser binding、producer/target coordinates与 exact input frontier；
 - 完整 A0 prelease/package/postlease parsed-owner set digest，以及处理完该 producer range后的累计 direct-root/forwarder-chain
@@ -162,6 +173,7 @@ authenticated-policy digest或 acquisition-receipt digest；acquisition validato
   `WindowsRecursiveWaveDispatchPlanEvidence`（typed source frontier、request/resolution exact vectors、V1 digests与 exact ranges）；
 - authenticated positive searched-name grant set、包含 retained servicing/currentness evidence的 filesystem candidate set V2、
   immutable lease set与 same-owner parse-set digests；
+- 按值保留的完整 policy dispatch-currentness authorization evidence；
 - next-frontier parse-receipt ordinals与 output custody digest。
 
 acquisition receipt必须与 final projection wave的 module/name/system-owner ranges及 next frontier逐项 cross-bind。chain按值保留
@@ -174,15 +186,17 @@ custody，receipt只额外承诺其 digests/owner sets。
 signed-limit gate不得接受 caller projection。摘要 DAG固定为：
 
 ```text
-authenticated policy V1 ────────────────────┐
+authenticated policy binding V2 ────────────┐
 parse receipt V2 digests + owner sets ───────┼→ request/resolution plans V1
 exact prior custody + canonical vectors ─────┘       ↓
-                                      acquisition output/receipt V2
+                         point-of-use currentness V1
+                                      ↓
+                                      acquisition output/receipt V3
                                       → receipt-set/chain V1 → recursive closure V2 → resolution profile V3
 ```
 
 parse receipt只保存 producer acquisition ordinal，不保存 policy或 acquisition digest；policy经 plans与 chain传递绑定。
-acquisition receipt/output升级到 V2，因为其 plan字段现在承诺独立 forward-plan V1，不再复用 final reverse projection。
+acquisition receipt/output在 forward-plan V1批次曾升级到V2；本批因完整 currentness evidence进入 canonical material再升级到V3。
 receipt-set/chain material仍只消费 ordered versioned receipt digests，closure/profile仍只消费 versioned child digest，因此分别保持
 V1/V2/V3。plans与 receipt不得反向引用 final closure/profile或 required process context。
 
@@ -210,7 +224,8 @@ generation aggregate与 consuming currentness query，不表示递归开始前�
 KnownDLL/API-set/SxS currentness、post-create machine query、pre-resume enforcement、process create/resume、IPC、Store、Ready、
 v15、Provider、route、Offer、Capacity、Execution、Attempt、Lease、usage、settlement或 money。
 
-canonical request/resolution plan与 DispatchReady source shape虽已写，真实 authenticated policy signer/currentness、selector、
+canonical request/resolution plan、policy verification/currentness与 DispatchReady source shape虽已写，真实 authenticated policy
+signature verifier/currentness backend、selector、
 prelease/recursive parser、GrantReady/recursive resolver、external-directory
 owner、grant/candidate/lease backend、positive-consuming advancer、sealer/query/reopen/release/recovery与所有 runtime producer均
 `missing`。source contract的存在不能升级 loader predecessor或 process reachability。

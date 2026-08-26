@@ -14,6 +14,8 @@ verification_status: source_review_only
 
 逐波策略与 owner contract见
 [Recursive System-Image Acquisition Custody authority](user-node-windows-runner-recursive-system-image-acquisition-custody-authority.md)。
+policy signature verification与逐波 currentness见
+[Recursive Policy Currentness authority](user-node-windows-runner-recursive-policy-currentness-authority.md)。
 Ak forward plan见
 [Recursive Wave Resolution Plan authority](user-node-windows-runner-recursive-wave-resolution-plan-authority.md)。
 
@@ -26,7 +28,7 @@ Ak forward plan见
 - code acceptance: `passed=0/failed=0`；
 - Windows dynamic evidence: `0`；
 - persistence: `migration/table/writer=none/none/none`；
-- real selector/policy signer-currentness/parser/grant-ready resolver/external-directory/grant/candidate/lease
+- real selector/policy signature-verifier/currentness-backend/parser/grant-ready resolver/external-directory/grant/candidate/lease
   positive-consuming/final sealer/query/live-machine
   producers: `missing`。
 
@@ -42,8 +44,8 @@ Ak forward plan见
 | `launch_path_discovery/prelease_pe_material{,/digest,/closure}.rs` | package-image pre-lease base imports + separate forwarder hops/closure与 canonical digest；该阶段本身不解析 system image或预测 lease generation |
 | `runtime_loader_load_set/{failure,resolution}.rs`、`resolution/grant_ready{,/validation,/search_projection,/final_projection}.rs` | preliminary→GrantReady exact terminal/disposition→grants/leases→post-lease final 的线性 owner/failure custody与 final projection |
 | `resolution/system_closure{,/digest,/edge_order,/edge_projection,/projection_digest,/source_projection,/validation}.rs`、`pe_graph_validation/image_source.rs` | source-only recursive final envelope：producer-bound owner、frontier/fixpoint、deterministic suffix与 final slice重算 |
-| `exact_context_plan/recursive_policy.rs`、`system_closure/acquisition{,/custody,/failure,/digest,/validation}.rs` | authenticated policy、nonempty producer→target wave / terminal None、whole-owner partial custody与 acquisition→projection cross-binding；真实 producer缺失 |
-| `system_closure/acquisition/{plan,plan_digest,plan_forwarder_validation,plan_owner_validation,plan_projection,plan_validation}.rs` | A0复用 GrantReady、Ak request/resolution plan V1、exact-vector DispatchReady与 acquisition receipt/output V2；真实 parser/resolver缺失 |
+| `exact_context_plan/recursive_policy{,/signature,/currentness,/digest,/validation}.rs`、`grant_ready/policy_currentness.rs`、`system_closure/acquisition{,/custody,/failure,/digest,/validation}.rs` | signed policy evidence、A0/Ak point-of-use currentness、nonempty producer→target wave / terminal None、whole-owner partial custody与 acquisition→projection cross-binding；真实 verifier/backend缺失 |
+| `system_closure/acquisition/{plan,plan_digest,plan_forwarder_validation,plan_owner_validation,plan_projection,plan_validation}.rs` | A0复用 GrantReady、Ak request/resolution plan V1、exact-vector currentness-pending→DispatchReady与 acquisition receipt/output V3；真实 currentness/parser/resolver缺失 |
 | `runtime_loader_load_set/{digest,validation,model}.rs` | loader resolution profile V3绑定 selector+request plan+grant-ready plan+recursive closure |
 | `runtime_process_custody/{launch_security,model,policy}.rs` | resolution外的 expected-context bridge、V3重算与相等性检查 |
 | `runtime_loader_*source_contract_tests.rs` | 未运行 source-shape guards |
@@ -72,10 +74,11 @@ Ak forward plan见
 9. name-grant、content-lease、borrow-only与 namespace-query failure分别持有其 exact whole-stage owner；typed positive receipt保留
     request/nonce/response bytes+digest，但 name/system positive-consuming transition仍由 `Infallible` 阻断；final resolution只在全部
     base acquisition与 producer-wave grants/owners/leases完成且 frontier为空后出现。
-10. GrantReady只对应 final base prefix且 A0 exact复用该 plan；Ak canonical request/resolution plan V1以 exact outgoing requests、
-    dispositions、terminals、dedupe与 next-frontier vectors形成 DispatchReady，再与 recursive envelope的 stage-explicit suffix、
-    earliest producer、frontier/fixpoint及 final slices逐项 cross-bind。policy/custody/plan contract source written，但 signer/parser/
-    resolver/backend/positive advancer/sealer producer仍 missing。
+10. GrantReady只对应 final base prefix且 A0 exact复用该 plan；Ak canonical request/resolution plan V1先完成 exact outgoing requests、
+    dispositions、terminals、dedupe与 next-frontier vector validation，再进入 currentness-pending并消费 exact point-of-use
+    authorization形成 DispatchReady，最后与 recursive envelope的 stage-explicit suffix、earliest producer、frontier/fixpoint及 final
+    slices逐项 cross-bind。policy/custody/plan contract source written，但 signature verifier/currentness backend、parser/resolver、
+    acquisition backend/positive advancer/sealer producer仍 missing。
 11. loader profile V3包含 selector、preliminary request-plan、grant-ready plan与 recursive closure digest，不包含 required process digest；process
     required-context V3绑定 selector+final resolution，expected digest由 resolution外 launch-security bridge携带并比较。
 12. prelease parsed image/import edge到 postlease parsed image/import binding具有 exact typed cross-binding；QueryVerified lineage到
@@ -100,8 +103,8 @@ Ak forward plan见
 | positive name/system outcome consumption | 0 | 0 | 1 | typed receipt/custody written；consuming transitions `Infallible` |
 | pre/post image + import-edge cross-binding / QueryVerified lineage | 0 | 0 | 1 | source review only；sealer/query producers missing |
 | recursive system-image final projection envelope | 0 | 0 | 1 | prefix/suffix、owner/frontier/fixpoint/digest source written；parser/sealer missing |
-| recursive policy / per-wave acquisition custody | 0 | 0 | 1 | contract source written；signer/backend/positive advancer missing |
-| A0/`Ak` canonical plans + DispatchReady | 0 | 0 | 1 | plan V1与 receipt/output V2 source written；parser/resolver missing |
+| recursive policy / per-wave acquisition custody | 0 | 0 | 1 | contract source written；signature verifier/currentness backend/positive advancer missing |
+| `[A0 PolicyCurrent GrantReady→base acquisition \| Ak plan V1→currentness-pending→authorization→DispatchReady]` | 0 | 0 | 1 | plan V1与 receipt/output V3 source written；currentness/parser/resolver missing |
 | post-create process machine/WOW64 query-back | 0 | 0 | 1 | missing；pre-create projection不是 actual receipt |
 | failure whole-owner custody | 0 | 0 | 1 | 未故障注入 |
 | acyclic selector→request→grant-ready→final→process digest chain | 0 | 0 | 1 | source review only |
@@ -134,5 +137,5 @@ lease, usage, settlement, money
 candidate、lease、真实 system recursive backend/positive advancer/nested API-set DAG、final PE graph/launch path/resolution、actual process machine context、process
 create/resume、Runtime、Ready 或结算已实现。源码铺设可继续；生产可达必须
 先完成 extraction-share/discovery Windows动态证据，再按 selector+policy+parser → wave-zero request/terminal resolver → base
-acquisition → producer-wave parse → canonical request/resolution plan + DispatchReady → outgoing acquisition → empty frontier/final
+acquisition → producer-wave parse → canonical request/resolution plan + currentness-pending + point-of-use authorization + DispatchReady → outgoing acquisition → empty frontier/final
 aggregate → seal/query/reopen/currentness顺序留下独立动态验收。

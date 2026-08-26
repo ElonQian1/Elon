@@ -16,6 +16,8 @@ verification_status: source_review_only
 [Recursive System-Image Acquisition Custody authority](user-node-windows-runner-recursive-system-image-acquisition-custody-authority.md)。
 逐波 forward plan见
 [Recursive Wave Resolution Plan authority](user-node-windows-runner-recursive-wave-resolution-plan-authority.md)。
+policy signature verification与逐波 currentness见
+[Recursive Policy Currentness acceptance](user-node-windows-runner-recursive-policy-currentness-acceptance.md)。
 
 ## 1. 本批证据等级
 
@@ -25,7 +27,7 @@ verification_status: source_review_only
 - Windows dynamic evidence: `0`；
 - persistence: `migration/table/writer=none/none/none`；
 - registration: `unregistered_feature_workflow_unavailable`；
-- authenticated policy signer/currentness、selector、prelease/recursive parser、GrantReady/recursive resolver、external-directory
+- authenticated policy signature-verifier/currentness-backend、selector、prelease/recursive parser、GrantReady/recursive resolver、external-directory
   owner、grant/candidate/lease backend、positive-consuming advancer、sealer/query/reopen/release/recovery及所有 runtime producers:
   `missing`。
 
@@ -37,8 +39,9 @@ test、migration、SQLite、网络、设备、Win32 fixture或真实 Runner。ru
 
 | 文件/模块 | 唯一的未运行源码责任 |
 |---|---|
-| `runtime_loader_load_set/launch_path_discovery/exact_context_plan/recursive_policy.rs` | 独立 signed policy、六项 exact limits、borrow-only projected-total gate、private `Infallible` producer |
-| `runtime_loader_load_set/resolution/system_closure/acquisition.rs`及 `acquisition/{plan,plan_digest,plan_forwarder_validation,plan_owner_validation,plan_projection,plan_validation}.rs` | A0/`Ak` split、canonical request/resolution plan V1、DispatchReady、acquisition receipt V2与 chain V1 facade |
+| `runtime_loader_load_set/launch_path_discovery/exact_context_plan/recursive_policy{,/signature,/currentness,/digest,/validation}.rs` | policy payload V1、signed evidence/currentness V1、authenticated binding V2、六项 limits与 private producers |
+| `runtime_loader_load_set/resolution/grant_ready/policy_currentness.rs` | A0 GrantReady → PolicyCurrent pre-dispatch typestate |
+| `runtime_loader_load_set/resolution/system_closure/acquisition.rs`及 `acquisition/{plan,plan_digest,plan_forwarder_validation,plan_owner_validation,plan_projection,plan_validation}.rs` | A0/`Ak` split、canonical request/resolution plan V1、currentness-pending→DispatchReady、acquisition receipt V3与 chain V1 facade |
 | `system_closure/acquisition/custody.rs` | whole accumulated graph、pre-dispatch signed-limit gate 与 request/grant/candidate/lease/same-owner-parse/completed/terminal linear stages |
 | `system_closure/acquisition/failure.rs` | post-dispatch definitive 与 outcome-uncertain whole-graph failure custody |
 | `system_closure/acquisition/digest.rs` | output/receipt/set/chain及 grant/candidate/parse/terminal canonical digest material |
@@ -53,7 +56,7 @@ test、migration、SQLite、网络、设备、Win32 fixture或真实 Runner。ru
 | wave coordinates | base producer 0；nonempty时 producer `k`→target `Some(k+1)`，terminal `A_N`→`None` |
 | canonical queue | earliest producer、连续 receipt/range分配、backend completion order不影响 final graph |
 | forward plans | A0只复用 GrantReady；Ak直接绑定 prior receipt/output custody、typed frontier、ordered search steps、requests、dispositions、terminals、dedupe、owner commitments与 exact vectors |
-| DispatchReady | exact vectors派生 limits且 whole-plan验证后才允许第一项 dispatch，无 scalar permit |
+| DispatchReady | exact vectors派生 limits，whole-plan验证后必须经过 currentness-pending并消费 point-of-use authorization才允许第一项 dispatch，无 scalar permit |
 | whole-owner state | prior graph、namespace session、grants/owners/leases、active/pending refs按值移动，无 scalar重建 |
 | route-specific acquisition | package/preloaded/KnownDLL typed reuse；filesystem retained candidate→positive outcome→lease/section |
 | same-owner parse | exact immutable owner/material/policy/generation与 producer request绑定，拒绝跨代 splice |
@@ -82,7 +85,8 @@ test、migration、SQLite、网络、设备、Win32 fixture或真实 Runner。ru
     authenticated policy，并直接绑定 exact owner material。
 11. A0 exact复用 GrantReady plan；`Ak (k >= 1)`使用独立 request/resolution plan V1，final edge/wave digests只反向
     cross-bind，不能冒充 forward plan。
-12. 三个旧 `projected_*` scalar由 exact vectors和 whole prior custody派生；DispatchReady前重算六项 signed limits。
+12. 三个旧 `projected_*` scalar由 exact vectors和 whole prior custody派生；先重算六项 signed limits，再进入
+    currentness-pending并消费 exact point-of-use authorization，才能形成 DispatchReady。
 13. `Ak` acquisition receipt按值保留完整 immutable typed frontier/request/resolution vectors并绑定 prior receipt/output custody、
     terminal/dispositions、response/owner-set digests、owner/lease transitions、parse allocation与 next frontier；chain按值保留 ordered
     receipts并与现有 projection wave逐项相等。raw response bytes与 live positive owners只留在成功线性或失败 custody，不嵌入
@@ -92,7 +96,8 @@ test、migration、SQLite、网络、设备、Win32 fixture或真实 Runner。ru
 15. positive outcome保留 actual candidate的 parent-open、code-integrity、servicing与 namespace-currentness evidence；candidate
     evidence与消费后 image必须绑定同一个 parent-relative open receipt，candidate-set V2与 final projection再逐字段绑定 plan，
     而非只比较 detached candidate digest。
-16. policy V1、parse receipt V2/owner sets及 plan V1/prior custody共同单向进入 acquisition receipt/output V2，再由 receipt-set/chain
+16. policy binding V2、逐波 currentness V1、parse receipt V2/owner sets及 plan V1/prior custody共同单向进入 acquisition
+    receipt/output V3，再由 receipt-set/chain
     V1进入 closure V2与既有 profile V3；parse receipt只保存 producer acquisition ordinal，acquisition digest不反向引用 closure/profile/required
     context，摘要 DAG无环。
 17. dispatch前 failure才能返回 borrow-only owner；dispatch后所有 failure保留 whole graph、active/pending与 returned outcomes。
@@ -109,12 +114,12 @@ test、migration、SQLite、网络、设备、Win32 fixture或真实 Runner。ru
 |---|---:|---:|---:|---|
 | Rust compile / Windows link | 0 | 0 | 1 | 未编译，type/borrow/Win32 feature未由 compiler证明 |
 | source-contract Rust test | 0 | 0 | 1 | guard已写但未运行 |
-| signed recursive policy provenance | 0 | 0 | 1 | source contract存在，signer/currentness producer missing |
+| signed recursive policy provenance/currentness | 0 | 0 | 1 | typed contract存在，signature verifier/currentness backend missing |
 | six exact policy limits | 0 | 0 | 1 | 未运行 zero/overflow/base+suffix/depth mutation矩阵 |
 | producer-wave→target-wave cross-binding | 0 | 0 | 1 | source shape only；无 positive advancer |
 | earliest-producer receipt allocation | 0 | 0 | 1 | 未运行 multi-target/race/permutation矩阵 |
 | canonical per-wave request/resolution plan | 0 | 0 | 1 | source shape written；parser/resolver producer missing |
-| exact-vector limits / DispatchReady | 0 | 0 | 1 | 三个旧 scalar已移除；未运行 mutation/overflow矩阵 |
+| exact-vector limits / currentness-pending→DispatchReady | 0 | 0 | 1 | 三个旧 scalar已移除；currentness producer missing；未运行 mutation/overflow矩阵 |
 | base A0→wave 1 / terminal None | 0 | 0 | 1 | nonempty才到 wave 1；selector/GrantReady/grant/lease producers missing |
 | per-wave grants / candidates / leases | 0 | 0 | 1 | custody contract source-written；backend/positive transitions missing |
 | route-specific owner reuse | 0 | 0 | 1 | 未运行 package/preloaded/KnownDLL/filesystem矩阵 |
@@ -138,7 +143,7 @@ test、migration、SQLite、网络、设备、Win32 fixture或真实 Runner。ru
 - wrong owner/session/attempt/request/nonce/candidate/FileId/section/generation negative与 positive-invalid；
 - positive+negative同返、timeout、partial acquisition、parser failure、crash parking及 response bytes/digest mutation；
 - same handle/section、servicing/lease generation drift、writable mapping、rename/swap/reparse/hardlink；
-- plan vector/terminal/disposition/dedupe、acquisition receipt V2字段/range/frontier mutation、projection wave mismatch及
+- plan vector/terminal/disposition/dedupe、acquisition receipt V3/currentness字段/range/frontier mutation、projection wave mismatch及
   closure/profile digest mutation；
 - final aggregate session/generation drift、release/recovery、nested API-set、Shadow与 runtime load fail-closed。
 
@@ -146,7 +151,7 @@ test、migration、SQLite、网络、设备、Win32 fixture或真实 Runner。ru
 
 本批禁止：
 
-- 把 source-only policy称为 real signer/current policy或可用配置；
+- 把 source-only verification/currentness contract称为 real signature verifier/current backend或可用配置；
 - 把 custody type/acquisition receipt称为 grant、candidate、lease、parser、advancer、sealer或 query backend；
 - 把 per-wave source contract称为真实 recursive resolver、runtime closure或 Windows proof；
 - 把 final projection `parsed_edge_set_digest`/`wave_digest`称为 forward plan或 acquisition custody evidence；

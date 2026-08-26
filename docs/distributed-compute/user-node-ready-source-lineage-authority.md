@@ -138,7 +138,7 @@ Ready 分支。
 2026-08-26 的 Windows Runner 草案只写入单一 loader successor、完整 by-value seam、FileId leases/reopen receipts、
 五类 failure custody、GrantReady wave-zero prefix、authenticated recursive policy/per-producer-wave custody contract、post-lease
 recursive system-image final projection envelope、suspended-child/atomic-Job/pre-create currentness与 unconfirmed whole-graph parking；
-真实 selector/policy signer-currentness、prelease/recursive parser、resolver、grant/candidate/lease backend/positive advancer、
+真实 selector/policy signature verifier/currentness backend、prelease/recursive parser、resolver、grant/candidate/lease backend/positive advancer、
 sealer/query、exact PE/launch/live-OS、launch-security/currentness/
 release-recovery producers 均缺。extraction-share 与 Runner/package-root/全部 plan-directory retained handle-chain candidate
 discovery 已形成 typed source seams，但没有真实 selected CWD/component grant，两层 Windows 动态矩阵仍缺；pre-resume/dynamic-load、
@@ -175,7 +175,7 @@ Attempt 或 Lease。
 ## 11. 后续顺序
 
 1. 沿 Windows Runner 草案动态验证 source-written extraction-share 与 launch-path discovery，并实现真实 authenticated CWD
-   selector/recursive-policy signer-currentness、prelease/recursive parser、GrantReady resolver、base grants/leases、逐 producer
+   selector/recursive-policy signature verifier/currentness backend、prelease/recursive parser、GrantReady resolver、base grants/leases、逐 producer
    wave candidate/grant/lease backend与 positive advancer、same-owner reparse及 exact recursive PE/launch/resolution
    seal/final aggregate/query/reopen、launch-security/private desktop、
    live-OS/pre-create/pre-resume currentness、explicit release/recovery、dynamic-load、

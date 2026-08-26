@@ -18,7 +18,8 @@ acquisition receipt见
 [Recursive System-Image Acquisition Custody authority](user-node-windows-runner-recursive-system-image-acquisition-custody-authority.md)，
 最终反投影与 fixpoint见
 [Recursive System-Image Closure authority](user-node-windows-runner-recursive-system-image-closure-authority.md)，wave-zero 计划见
-[Launch Context Selection authority](user-node-windows-runner-launch-context-selection-authority.md)。
+[Launch Context Selection authority](user-node-windows-runner-launch-context-selection-authority.md)，逐 A0/Ak currentness见
+[Recursive Policy Currentness authority](user-node-windows-runner-recursive-policy-currentness-authority.md)。
 
 ## 1. 本批结论
 
@@ -129,7 +130,7 @@ signed policy gate；caller不能提交三个 scalar、detached digest或预估�
 ## 6. DispatchReady typestate
 
 只有 borrowed validation逐项证明以下关系后，whole request/resolution owner才可进入
-`DispatchReadyWindowsRecursiveWaveGrantCustody`：
+`PolicyCurrentnessPendingWindowsRecursiveWaveGrantCustody`：
 
 1. policy、parser、producer wave、previous receipt/output custody与 source frontier完全一致；
 2. requests、ranges、search steps、terminals、dispositions、dedupe与所有子摘要重算一致；
@@ -143,8 +144,10 @@ signed policy gate；caller不能提交三个 scalar、detached digest或预估�
    parent-relative open receipt，供 final projection重验。
 
 `WindowsRecursiveWaveRequestCustody`与 `WindowsRecursiveWaveResolvedPlanCustody`分别按值保留 request与 authenticated resolved
-plan；未来 consuming validator transition只能把完整 accumulated owner与完整 plan evidence一起推进为
-`DispatchReadyWindowsRecursiveWaveGrantCustody`。该 validated plan evidence随后按值留在 grant/candidate/lease/parse stages，不能
+plan；未来 consuming validator transition只能把完整 accumulated owner与完整 plan evidence一起推进为 currentness-pending。
+后者再取得绑定本 wave/input/plan的线性 currentness authorization，才形成
+`DispatchReadyWindowsRecursiveWaveGrantCustody`。该 validated plan evidence与 authorization随后按值留在
+grant/candidate/lease/parse stages，不能
 拆成 scalar permit，也不提供 Clone/Copy/Serde、成功 `into_parts`、raw handle、path或 retry extractor。它只表示可以尝试第一项
 side-effecting dispatch，不表示 dispatch、resolver、grant、candidate、lease、positive advancer或 wave完成成功。
 
@@ -153,18 +156,18 @@ side-effecting dispatch，不表示 dispatch、resolver、grant、candidate、le
 本批版本链固定为：
 
 ```text
-authenticated recursive policy V1
+authenticated recursive policy binding V2 + point-of-use currentness V1
 + parse receipt V2 + exact prior custody
 → recursive request plan V1
 → recursive resolution plan V1
-→ acquisition output-custody V2 + acquisition receipt V2
+→ acquisition output-custody V3 + acquisition receipt V3
   （含 base-owner-set / cumulative-forwarder-chain-set commitments）
 → receipt-set V1 → acquisition chain V1
 → recursive closure V2 → loader resolution profile V3
 ```
 
-acquisition receipt/output从 V1升级到 V2，因为其 `source_request_plan_digest`与 `resolved_plan_digest`现在承诺独立 forward-plan
-V1，而不再与 final reverse-projection digest混用。receipt-set/chain canonical material仍只消费 ordered versioned receipt digests，
+acquisition receipt/output在 forward-plan批次从V1升级到V2；本批因完整 point-of-use currentness evidence进入 canonical material
+再升级到V3。receipt-set/chain canonical material仍只消费 ordered versioned receipt digests，
 closure仍只消费 versioned chain digest，profile仍只消费 versioned closure digest，因此三者分别保持 V1/V2/V3，不得无字段变化
 而联动升版。
 
@@ -184,7 +187,8 @@ plan与 acquisition chain传递绑定。plan不得引用 current acquisition rec
 
 ## 8. Producer、失败与零效果边界
 
-真实 policy signer/currentness、prelease/recursive parser、GrantReady/recursive resolver、external-directory owner、
+policy signature-verification/currentness source shape已写；真实 signature verifier/currentness backend、prelease/recursive parser、
+GrantReady/recursive resolver、external-directory owner、
 grant/candidate/lease backend、positive-consuming advancer、final sealer/query/reopen/release/recovery仍全部 `missing`。request plan、
 resolution plan和 DispatchReady的成功 producer继续由 private `Infallible`保持不可构造。
 
@@ -199,7 +203,7 @@ authority定义的 whole-graph definitive或 outcome-uncertain custody，保留 
 
 ## 9. 后续顺序
 
-1. 实现真实 policy signer/currentness与 retained-handle recursive parser，使 canonical request plan拥有真实输入；
+1. 接入真实 policy signature verifier/currentness backend与 retained-handle recursive parser，使 canonical request plan拥有真实输入；
 2. 实现 authenticated per-wave resolver与 external-directory currentness，形成真实 DispatchReady owner；
 3. 按既有 acquisition合同实现 grant/candidate/lease/negative backend与 positive advancer；
 4. empty frontier后实现 final sealer/query/reopen/recovery及 Windows fault matrix；

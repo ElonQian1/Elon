@@ -84,7 +84,7 @@ v217 源码新增 `reauthorize_existing`：Control-signed InstallPlan 只能精�
 drafts 中，retained discovery→exact intent/package-only pre-lease PE→preliminary requests→私有 GrantReady wave-zero prefix→
 authenticated recursive policy-bound base acquisition→producer-wave custody→empty frontier/final aggregate→recursive final projection
 envelope→QueryVerified lineage→process pre-create projection合同已写。它不证明 selected runtime CWD、真实 recursive resolution、
-nested API-set、Shadow grant或 live process machine/WOW64；真实 selector/policy signer-currentness、prelease/recursive parser、
+nested API-set、Shadow grant或 live process machine/WOW64；真实 selector/policy signature verifier/currentness backend、prelease/recursive parser、
 resolver、grant/candidate/lease backend/positive advancer、sealer/query、live-OS/create/resume/recovery producers均缺，Windows
 dynamic=`0`。`passed=0/failed=0`、
 四 gap=`missing`、loader 18 effects=`none`、`migration/table/writer=none/none/none`，无 IPC/Store/health/Ready。边界见

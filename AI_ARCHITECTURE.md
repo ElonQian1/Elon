@@ -208,12 +208,14 @@ AI_PROJECT / AI_INDEX / AGENTS
 F1 的 Ready 边界新增未登记、未编译/未运行的 source-lineage 草案：它从线性 work-admission 与 Ready-health owner token 读取事实，并把 Host runtime observation 保持为 `Untrusted`，输出固定缺少 local currentness、runtime transition、Host runtime 与 v15 authenticated session 四项权威的 `Projected` 六键谱系。它不构造 Ready 或 execution capability，也不改变 Provider、route、Offer、Attempt、Lease 或资金；精确边界见 `docs/distributed-compute/user-node-ready-source-lineage-authority.md`。
 
 F1 的 Windows Host authority草案已把线性 owner顺序冻结为 retained discovery → authenticated intent + package-only pre-lease
-PE → preliminary requests → private GrantReady wave-zero exact prefix → authenticated recursive policy-bound base acquisition →
-producer-wave same-owner parse → A0 GrantReady复用或 Ak canonical request/resolution plan V1 → exact-vector DispatchReady →
+PE → preliminary requests → private GrantReady wave-zero exact prefix → signed recursive-policy evidence → A0 point-of-use PolicyCurrent →
+authenticated recursive policy-bound base acquisition → producer-wave same-owner parse → Ak canonical request/resolution plan V1 →
+exact-vector currentness-pending → point-of-use currentness → DispatchReady →
 outgoing grant/candidate/lease custody → empty frontier/final aggregate → post-lease recursive
 final projection/fixpoint → resolution profile V3 → QueryVerified lineage → process pre-create projection。该 projection不是 live process machine/WOW64 receipt；recursive
-policy/plans/custody与 final envelope虽已冻结，acquisition receipt/output为 V2而 receipt-set/chain保持 V1、parse/closure保持
-V2、profile保持 V3；真实 signer/currentness/parser/resolver/backend/positive advancer仍缺，nested API-set DAG与
+policy/plans/custody与 final envelope虽已冻结，authenticated policy binding为V2、acquisition receipt/output为V3，而
+receipt-set/chain保持V1、parse/closure保持V2、profile保持V3；真实 signature verifier/currentness backend/parser/resolver/backend/
+positive advancer仍缺，nested API-set DAG与
 Shadow positive path继续 fail-closed。selector、prelease/recursive parser、resolver、positive-consuming、sealer/query、live-OS/launch-security/
 create/resume/recovery producers均保持
 uninhabited，Windows matrix未运行，pre-resume/dynamic-load、IPC/Store也未形成 authority；成熟度事实统一见
@@ -221,6 +223,7 @@ uninhabited，Windows matrix未运行，pre-resume/dynamic-load、IPC/Store也�
 `docs/distributed-compute/user-node-windows-runner-extraction-directory-share-custody-authority.md`、
 `docs/distributed-compute/user-node-windows-runner-launch-path-discovery-authority.md`、
 `docs/distributed-compute/user-node-windows-runner-launch-context-selection-authority.md`、
+`docs/distributed-compute/user-node-windows-runner-recursive-policy-currentness-authority.md`、
 `docs/distributed-compute/user-node-windows-runner-recursive-system-image-acquisition-custody-authority.md`、
 `docs/distributed-compute/user-node-windows-runner-recursive-system-image-closure-authority.md`、
 `docs/distributed-compute/user-node-windows-runner-loader-load-set-authority.md` 与

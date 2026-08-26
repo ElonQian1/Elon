@@ -26,7 +26,7 @@ verification_status: source_review_only
 - Windows dynamic evidence: `0`；
 - persistence: `migration/table/writer=none/none/none`；
 - registration: `unregistered_feature_workflow_unavailable`；
-- policy signer-currentness/parser/acquisition-backend/positive-advancer/sealer/query/runtime producers: `missing`。
+- policy signature-verifier/currentness/parser/acquisition-backend/positive-advancer/sealer/query/runtime producers: `missing`。
 
 用户要求架构铺设阶段暂不编译或真实运行。本批没有运行 Cargo/Rust/source-contract test、migration、SQLite、网络、设备、Win32
 fixture或真实 Runner。rustfmt、diff、体积和文档门禁只属于静态交付卫生；`failed=0` 不表示通过。
@@ -41,7 +41,7 @@ fixture或真实 Runner。rustfmt、diff、体积和文档门禁只属于静态�
 | `system_closure/{source_projection,validation}.rs` | earliest-producer frontier、owner splice拒绝、no-delay、一次性 receipt、prefix+suffix count closure |
 | `system_closure/{edge_order,edge_projection}.rs` | deterministic wave merge、global root import、node+symbol forwarder continuity/cycle/depth与 new-owner use |
 | `exact_context_plan/recursive_policy.rs`、`system_closure/acquisition{,/custody,/failure,/digest,/validation}.rs` | authenticated policy、nonempty producer→target / terminal None、whole-owner partial custody与 acquisition→projection cross-binding；所有 producer missing |
-| `acquisition/{plan,plan_digest,plan_forwarder_validation,plan_owner_validation,plan_projection,plan_validation}.rs` | A0复用 GrantReady、Ak canonical request/resolution plan V1、exact-vector DispatchReady与 V2 receipt/output |
+| `acquisition/{plan,plan_digest,plan_forwarder_validation,plan_owner_validation,plan_projection,plan_validation}.rs` | A0复用 GrantReady、Ak canonical request/resolution plan V1、exact-vector currentness-pending→DispatchReady与 V3 receipt/output |
 | `pe_graph_validation/image_source.rs` | owner binding与 immutable byte/section material identity分离，防 parser receipt替换绕过 dedupe |
 | `grant_ready/{final_projection,search_projection}.rs` | GrantReady只重证 final base prefix，recursive suffix交由独立 closure反向覆盖 |
 | `digest{,/material,/pe_cross_binding}.rs` | PE V2与 resolution profile V3 canonical material |
@@ -65,12 +65,13 @@ fixture或真实 Runner。rustfmt、diff、体积和文档门禁只属于静态�
 8. 每 wave edge/name/system-owner摘要从 final slice重算；system edge包含 binding ordinal与完整 resolution origin。
 9. parsed-image source binding、material identity、import-table digest/counts与 final graph一致；相同 material不得换 receipt重解析。
 10. loader profile V3包含 closure digest；GrantReady digest、closure digest与 process pre-create required profile不得自引用。
-11. recursive plan使用 V1，parse receipt使用 V2 acquisition ordinal，acquisition output/receipt使用 V2，receipt-set/chain保持
+11. recursive plan使用V1，parse receipt使用V2 acquisition ordinal，acquisition output/receipt使用V3并承诺逐波currentness，receipt-set/chain保持
     V1，closure保持 V2；outer profile V3只经 closure digest吸收变化，未静默增加字段或改写其 hash material。
 12. A0只复用 GrantReady；Ak forward plan与 final reverse slices独立并逐项 cross-bind，三个旧 `projected_*` scalar由 exact
-    vectors派生；Ak receipt/chain按值保留完整 immutable typed plan evidence，DispatchReady不构造 backend authority。
+    vectors派生；whole-plan验证后必须进入 currentness-pending并消费 point-of-use authorization；Ak receipt/chain按值保留完整
+    immutable typed plan evidence，DispatchReady不构造 backend authority。
 13. nested API-set DAG与 Shadow positive path仍 fail-closed；一步 API-set terminal不等于 nested DAG。
-14. policy、canonical plans与逐波 custody source contract已写；policy signer、parser/resolver、acquisition backend、positive advancer、closure producer、sealer/query与
+14. policy、canonical plans与逐波 custody source contract已写；policy signature verifier/currentness backend、parser/resolver、acquisition backend、positive advancer、closure producer、sealer/query与
     所有 runtime producer仍不可构造。
 
 这些断言目前只经过源码审阅，全部不能记为 passed。
@@ -89,7 +90,7 @@ fixture或真实 Runner。rustfmt、diff、体积和文档门禁只属于静态�
 | final edge/name/system-owner digest recompute | 0 | 0 | 1 | source recompute已写，无 mutation test |
 | byte/section material dedupe | 0 | 0 | 1 | 未运行 alias、same bytes/different receipt与 generation drift |
 | per-wave grant/candidate/lease custody | 0 | 0 | 1 | source contract written；backend/positive advancer producer missing |
-| canonical request/resolution plans / DispatchReady | 0 | 0 | 1 | source written；parser/resolver producer missing |
+| canonical request/resolution plans / currentness-pending→DispatchReady | 0 | 0 | 1 | source written；currentness/parser/resolver producer missing |
 | recursive sealer/query/currentness | 0 | 0 | 1 | missing |
 | nested API-set / Shadow positive | 0 | 0 | 1 | fail-closed，未实现 |
 | live OS / post-create machine | 0 | 0 | 1 | sealed echoes不是 live observation |

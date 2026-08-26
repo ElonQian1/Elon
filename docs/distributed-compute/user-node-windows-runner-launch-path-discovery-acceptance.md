@@ -83,7 +83,8 @@ verification_status: source_review_only
 - `launch_path_component_grant_backend=missing`；
 - exact `SealedWindowsLoaderLaunchPathAuthority` 仍含 `Infallible`；
 - transition order固定为 discovery/pre-lease material → authenticated selection/unresolved request → wave-zero exact
-  terminal/disposition/external owner grant-ready resolution → base grants/package leases/route-specific owners → package
+  terminal/disposition/external owner grant-ready resolution → whole GrantReady borrowed validation + exact currentness query →
+  PolicyCurrent GrantReady → base grants/package leases/route-specific owners → package
   same-handle rehash/reparse → producer-wave parse/outgoing acquisition → empty frontier/final aggregate → final seal/query/reopen。
 
 以上均只计为 source review，不增加动态 passed 数。

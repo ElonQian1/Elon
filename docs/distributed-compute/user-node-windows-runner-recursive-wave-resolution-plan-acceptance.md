@@ -14,6 +14,8 @@ verification_status: source_review_only
 
 权威合同见
 [Recursive Wave Resolution Plan authority](user-node-windows-runner-recursive-wave-resolution-plan-authority.md)。
+逐波 currentness见
+[Recursive Policy Currentness acceptance](user-node-windows-runner-recursive-policy-currentness-acceptance.md)。
 
 ## 1. 本批证据等级
 
@@ -23,7 +25,7 @@ verification_status: source_review_only
 - Windows dynamic evidence: `0`；
 - persistence: `migration/table/writer=none/none/none`；
 - registration: `unregistered_feature_workflow_unavailable`；
-- real signer/parser/resolver/backend/advancer/sealer/runtime producers: `missing`。
+- real signature-verifier/currentness-backend/parser/resolver/backend/advancer/sealer/runtime producers: `missing`。
 
 本验收只审阅 source-only typed shape。用户要求架构铺设阶段暂不编译或真实运行；未运行 Cargo/Rust/source-contract test、
 migration、SQLite、网络、设备、Win32 fixture或真实 Runner。静态格式、diff、体积与文档门禁不计为 code/runtime passed。
@@ -36,9 +38,9 @@ migration、SQLite、网络、设备、Win32 fixture或真实 Runner。静态格
 | request plan V1 | prior receipt/output custody、typed source frontier、outgoing edge/request、symbol、ordered search steps、ranges及独立 digest |
 | resolution plan V1 | per-step disposition、exact terminal、earliest producer、route-specific refs、filesystem dedupe与 grant/candidate/lease commitments |
 | exact projections | 三个旧 `projected_*` scalar不存在；count/depth由 exact vectors和 prior custody派生 |
-| DispatchReady | whole plan validation通过后才允许第一项 dispatch；无 scalar permit或 owner拆件 |
-| acquisition V2 | Ak receipt/chain按值保留 immutable typed plan vectors，与 final reverse projection逐项 cross-bind |
-| version chain | plan V1、receipt/output V2、receipt-set/chain V1、parse/closure V2、profile V3 |
+| DispatchReady | whole plan validation→currentness-pending→exact authorization后才允许第一项 dispatch；无 scalar permit或 owner拆件 |
+| acquisition V3 | Ak receipt/chain按值保留 immutable typed plan vectors与 currentness evidence，并与 final reverse projection逐项 cross-bind |
+| version chain | policy binding V2/currentness V1、plan V1、receipt/output V3、receipt-set/chain V1、parse/closure V2、profile V3 |
 | producer boundary | 所有成功 producers继续 uninhabited，零 runtime/market effect |
 
 ## 3. 未运行的验收断言
@@ -63,7 +65,8 @@ migration、SQLite、网络、设备、Win32 fixture或真实 Runner。静态格
 8. API-set edge直接绑定 contract name；若 host走 filesystem/SxS，则 searched-name、filesystem use/request与 candidate必须绑定
    normalized host module key，而非 contract name。
 9. next frontier allocation逐项绑定 target node、earliest producer、target wave、owner ref与 parse receipt ordinal；response race不改变顺序。
-10. DispatchReady必须先验证 policy/parser/previous custody/frontier、plans/digests、limits与 owner commitments；其本身不证明任何
+10. currentness-pending必须先验证 policy/parser/previous custody/frontier、plans/digests、limits与 owner commitments，再取得绑定
+    exact wave/input/plan的一次性授权形成DispatchReady；其本身不证明任何
    dispatch或 positive outcome。
 11. 每份 output receipt提交完整 A0 base-owner set及截至本 producer后的累计 direct-root/forwarder-chain set；final graph独立重建，
     下一 wave从 accumulated vectors重算，禁止空集/子集低报 parsed count或 depth。
@@ -74,10 +77,10 @@ migration、SQLite、网络、设备、Win32 fixture或真实 Runner。静态格
 14. final sealed slices必须逐项反向验证 forward plans；不得继续以 `parsed_edge_set_digest`或 `wave_digest`冒充 plan digest。
 15. `Ak` acquisition receipt以 `WindowsRecursiveWaveDispatchPlanEvidence`按值保留完整 immutable typed vectors，chain按值保留
     ordered receipts；不能只留 detached digests，也不能把 live directory/grant/candidate/lease/parser owner塞入 evidence。
-16. acquisition receipt/output与 candidate-set使用 V2；receipt-set/chain仍 V1、parse/closure仍 V2、profile仍 V3，任何版本变化都必须与
+16. acquisition receipt/output使用V3、candidate-set使用V2；receipt-set/chain仍V1、parse/closure仍V2、profile仍V3，任何版本变化都必须与
     canonical material变化一致。
 17. pre-dispatch plan failure保留 whole owner；开始 dispatch后的 failure沿既有 definitive/outcome-uncertain whole-graph custody处理。
-18. signer/currentness、parser、resolver、backend、positive advancer、sealer/query与 runtime producers继续 `missing`。
+18. signature verifier/currentness backend、parser、resolver、backend、positive advancer、sealer/query与 runtime producers继续 `missing`。
 
 以上断言目前只经过源码审阅，全部不能记为 passed。
 
@@ -94,7 +97,7 @@ migration、SQLite、网络、设备、Win32 fixture或真实 Runner。静态格
 | exact-vector derived limits | 0 | 0 | 1 | 未运行 overflow/mutation矩阵 |
 | DispatchReady custody | 0 | 0 | 1 | no dispatch producer |
 | plan→acquisition→final cross-binding | 0 | 0 | 1 | 未运行 mutation matrix |
-| receipt/output V2 version chain | 0 | 0 | 1 | source review only |
+| receipt/output V3 + currentness version chain | 0 | 0 | 1 | source review only |
 | grant/candidate/lease/advancer | 0 | 0 | 1 | missing |
 | sealer/query/recovery/runtime | 0 | 0 | 1 | missing |
 | Ready / v15 / market | 0 | 0 | 1 | 四 gap missing；18 effects none |

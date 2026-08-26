@@ -111,7 +111,8 @@ retained admitted owners
 → borrow-only launch-path discovery + pre-lease authenticated PE material
 → authenticated launch-context selection + preliminary unresolved request plan
 → GrantReady contract → missing exact terminal/disposition/external-directory resolver/producer
-→ base searched-name/launch-component grants + package leases + base route-specific system owners
+→ whole GrantReady borrowed validation + exact Control-ring/trusted-time currentness query
+→ PolicyCurrent GrantReady → base searched-name/launch-component grants + package leases + base route-specific system owners
 → package lease 下 same-handle rehash/re-parse
 → producer-wave recursive parse/outgoing request/grant/candidate/lease advancement
 → empty frontier + final aggregate
@@ -123,7 +124,7 @@ retained admitted owners
 本专题只负责第一行中的 launch-path discovery seam。后续专题已写入 uninhabited PE material、selection、unresolved request、
 GrantReady private plan/typed movable owners、post-lease same-owner lineage与逐 producer wave acquisition custody source shapes；PE source shape只冻结 package-image
 base import/separate forwarder-hop、cycle/depth与 canonical merge。真实 PE parser、authenticated selector、exact terminal/
-disposition resolver、recursive-policy signer/currentness、external directory owner、grant/candidate/lease backend、positive
+disposition resolver、recursive-policy signature verifier/currentness backend、external directory owner、grant/candidate/lease backend、positive
 advancer、seal、query或 reopen producer仍不存在；它也不证明
 system-image recursive closure。request skeleton不能被解释为 GrantReady authority，GrantReady contract不能被解释为 producer。
 

@@ -39,8 +39,8 @@ plan-directory retained handle-chain discovery 已形成 purpose-specific source
 `LoaderLockedWorkAdmittedPluginSlot` 没有成功 producer，进程 backend 仍不可达。
 system-image recursive imports 的 **final projection envelope** 已写入 stage-explicit base/suffix、producer-bound owner、
 frontier/fixpoint、deterministic merge与 final slice摘要；authenticated recursive policy及逐 producer wave acquisition custody
-source contract也已写；A0复用 GrantReady，Ak canonical request/resolution plan V1、exact-vector DispatchReady与 acquisition
-receipt/output V2也已写。但真实 policy signer/currentness、recursive parser/resolver、grant/candidate/lease backend、positive advancer、
+source contract也已写；A0复用 GrantReady，Ak canonical request/resolution plan V1、exact-vector currentness-pending→DispatchReady与 acquisition
+receipt/output V3与逐 A0/Ak currentness source shape也已写。但真实 policy signature verifier/currentness backend、recursive parser/resolver、grant/candidate/lease backend、positive advancer、
 sealer/query仍缺，因此不是可达的 acquisition authority或 runtime closure。
 本批只定义指定 launch context 下的 startup/import resolution material；pre-create 观测最多保护 path-based
 process open，普通 imports 多在 suspended primary thread 后续运行时解析。因此 pre-resume loader-currentness 与
@@ -64,6 +64,7 @@ process open，普通 imports 多在 suspended primary thread 后续运行时解
 → 从 retained handles 发现 Runner/package-root/全部 plan-directory launch-path candidates，并预租约解析 PE material
 → authenticated launch-context 选择 exact CWD 并形成 preliminary unresolved request plan
 → 补齐 wave-zero exact terminal、每步 disposition、external directory owners与 resolved-system canonical dedupe，形成 grant-ready owner
+→ borrowed whole-owner validation + exact Control-ring/trusted-time currentness query，形成 policy-current GrantReady owner
 → 取得 base searched/launch-path grants、全部 package leases及 base requests命中的 route-specific system owners
 → 在 package leases 下做 same-handle full-package rehash/re-parse与 pre/post cross-binding
 → 对 producer wave `k`：same-owner parse本波 source images → canonical outgoing requests/terminal/dispositions → same-session grants
@@ -121,15 +122,18 @@ authority。当前函数名表达调用顺序约束，但没有 caller，也没�
 
 关闭任何 share-none package file 前，必须按 borrow-only discovery/pre-lease material → authenticated exact CWD
 selection/preliminary unresolved request plan → wave-zero exact terminal/disposition/external owner grant-ready resolution →
+whole GrantReady borrowed validation + exact Control-ring/trusted-time currentness query → PolicyCurrent GrantReady →
 base name/launch-component grants + package leases + base route-specific system owners → package same-handle rehash/re-parse →
-producer wave parse/canonical request-resolution plan/DispatchReady → grant/candidate/lease acquisition → empty frontier → final aggregate/final resolution seal →
+producer wave parse/canonical request-resolution plan → exact-vector validation → currentness-pending → point-of-use authorization →
+DispatchReady → grant/candidate/lease acquisition → empty frontier → final aggregate/final resolution seal →
 consuming generation query-back 的权威顺序完成。当前源码已删除 grants/leases 前持有 final resolution 的旧 prerequisite。
 `PreliminaryResolutionRequestsPlannedWork` 仅持有未解析 request skeleton；future
 `GrantReadyWindowsRunnerResolutionPrerequisite` 合同必须消费 whole request owner并绑定 exact terminal、每步 disposition、
 external owners与 resolved-system request set；其 source shape已写，真实 producer仍由 `Infallible` 阻断，且
-`ShadowedByEarlierName` variant当前在 GrantReady/final projection validator中显式拒绝。name-grant failure持有 grant-ready
-owner；content-lease failure持有
-`PreFinalWindowsLoaderNamespaceGrantSet`、统一 package/system acquired lease、active dispatch与 pending refs；borrow-only failure
+`ShadowedByEarlierName` variant当前在 GrantReady/final projection validator中显式拒绝。name-grant failure持有
+`PolicyCurrentGrantReadyWindowsRunnerResolutionPrerequisite`；content-lease failure持有 outer
+`PolicyCurrentPreFinalWindowsLoaderNamespaceGrantSet`，policy/authorization保持在 policy-free inner namespace之外，并保留统一
+package/system acquired lease、active dispatch与 pending refs；borrow-only failure
 持有 whole request owner；namespace-query failure持有 post-lease whole prerequisite。只有 base与全部 producer-wave
 acquisition完整、same-owner parse闭合且 frontier为空后，final sealer才允许形成
 `PostLeaseSealedWindowsRunnerLoadSetPreQueryPrerequisite`，其 producer仍不可构造。不得预测 lease generation，
@@ -150,8 +154,8 @@ acquisition完整、same-owner parse闭合且 frontier为空后，final sealer�
   leaf；normal/delay base imports与 separate forwarder hops形成 immutable wave-zero prefix。独立 post-lease contract已冻结
   system-image parsed receipt、earliest producer owner、连续 ranges、frontier/fixpoint、deterministic edge merge、global-root
   forwarder chain与 final edge/name/system-owner反向摘要。独立 source contract还冻结 signed policy、nonempty producer→target /
-  terminal None、A0 GrantReady复用、Ak canonical request/resolution plan V1、exact-vector limit派生、DispatchReady、
-  whole-owner partial custody及 V2 acquisition receipt/output→projection cross-binding；其真实 policy/parser/resolver/backend/
+  terminal None、A0 GrantReady复用、Ak canonical request/resolution plan V1、exact-vector limit派生、currentness-pending→DispatchReady、
+  whole-owner partial custody及 V3 acquisition receipt/output→projection cross-binding；其真实 policy/parser/resolver/backend/
   positive advancer与 sealer producer仍不可构造；
 - package module name → exact package-file ordinal/digest/FileId；
 - pre-lease package PE material 绑定 FileId + sealed digest + parser policy，但不得包含或预测 content-lease generation；
@@ -181,7 +185,7 @@ acquisition完整、same-owner parse闭合且 frontier为空后，final sealer�
 authenticated-parser 与 parent-chain grant/share `Infallible` 字段保持 uninhabited；整个
 `SealedWindowsLoaderResolutionAuthority` 也无 producer。source-written handle-chain candidate discovery 只证明 typed
 owner 上的候选观测形状；新 exact-context/pre-lease/unresolved-request/GrantReady/post-lease lineage types已有 source shape，
-  recursive final envelope与逐波 custody contract也已有 source shape，但 selector/policy signer-currentness/prelease-or-recursive
+  recursive final envelope与逐波 custody contract也已有 source shape，但 selector/policy signature verifier/currentness backend、prelease-or-recursive
   parser/resolver/acquisition backend/positive advancer/sealer producer仍 `missing`。完整 package file set只证明
 archive coverage，上述 source shapes都 **不证明** runtime selected CWD、component grants、preloaded/bootstrap cache
 seed、exact PE graph、launch path 或 startup/import resolution。
@@ -325,8 +329,8 @@ crash/recovery owner；不得以 Drop 或 session disconnect 当作 release。�
 3. 实现 exact terminal/disposition、external-directory owner与 resolved-system dedupe resolver，形成 grant-ready owner；
 4. 实现 base searched-name/launch-path grant acquisition、package lease与 base route-specific system-owner backends，对三种
    authenticated-negative 精确绑定 owner/attempt/session/request/nonce；
-5. 实现 authenticated recursive-policy signer/currentness、recursive retained-handle parser与 per-wave resolver，把 canonical
-   plans推进为真实 DispatchReady owner，再按已冻结合同接入每 producer wave grant/candidate/lease/negative/
+5. 接入 authenticated recursive-policy signature verifier/currentness backend、recursive retained-handle parser与 per-wave resolver，使 canonical
+   plans完成 currentness-pending与 point-of-use authorization后推进为真实 DispatchReady owner，再按已冻结合同接入每 producer wave grant/candidate/lease/negative/
    outcome-uncertain backend与 positive advancer；
 6. 在 leases 下 same-handle 重哈希/重解析，封印 exact PE graph、launch path、recursive fixpoint与 startup/import/system resolution；
 7. 实现 consuming namespace/content-generation query、anchor-consuming reopen receipt、final query 与全五类 recovery；
