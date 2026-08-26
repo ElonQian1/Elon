@@ -2,6 +2,7 @@ const assert = require('node:assert/strict')
 const fs = require('node:fs')
 const path = require('node:path')
 const vm = require('node:vm')
+const zlib = require('node:zlib')
 
 const source = fs.readFileSync(path.resolve(
   __dirname,
@@ -45,6 +46,28 @@ const chart = {
     payload: { title: 'Bitcoin (BTC)', chartType: 'line', series: [], points: [] },
   },
 }
+const financeWidget = {
+  asset_display_name: 'Bitcoin (BTC)',
+  current_price_text: 'US$78,805.00',
+  default_range: '1D',
+  timeframe_order: ['1D'],
+  timeframe_configs: {
+    '1D': {
+      summary: { price_text: 'US$78,805.00', price_change_text: '+1.81%' },
+      chart: {
+        data: [
+          { formatted: '08:00', close: 77_000 },
+          { formatted: '09:00', close: 78_805 },
+        ],
+      },
+    },
+  },
+  metrics_display: [{ cols: [{ label: '日内最高价', value: 'US$79,934.00' }] }],
+}
+const packedFinance = {
+  __encoding: 'gzip-json-base64url-v1',
+  __compressed: zlib.gzipSync(JSON.stringify(financeWidget)).toString('base64url'),
+}
 const policy = {
   assistantFrame: ({ message }) => message.id === 'assistant-one' ? {
     text: 'BTC [Reuters](https://reuters.com/) 正在回升。',
@@ -58,11 +81,53 @@ const policy = {
   } : null,
   clientChartPartFromMetadata: () => chart,
   financePartsFromMetadata: () => [],
-  packedFinanceWidgets: () => [],
-  financePartFromWidget: () => null,
+  packedFinanceWidgets: ({ message, conversation_id: conversationId }) => (
+    message.id === 'assistant-one'
+      ? [{
+        widgetId: 'finance-one',
+        messageId: message.id,
+        conversationId,
+        turnId: 'turn-one',
+        encoding: packedFinance.__encoding,
+        compressed: packedFinance.__compressed,
+      }]
+      : []
+  ),
+  financePartFromWidget: (widget) => ({
+    type: 'rich_card',
+    text: widget.asset_display_name,
+    kind: 'finance',
+    richContent: {
+      schema: 'yilong.rich-content.v1',
+      kind: 'finance',
+      source: 'private_response',
+      payload: {
+        title: widget.asset_display_name,
+        primaryValue: widget.current_price_text,
+        trend: 'positive',
+        periods: [{ id: '1d', label: '1D', selected: true }],
+        metrics: widget.metrics_display[0].cols,
+        chart: {
+          kind: 'line',
+          points: widget.timeframe_configs['1D'].chart.data.map((point) => ({
+            x: point.formatted,
+            y: point.close,
+          })),
+        },
+      },
+    },
+  }),
 }
+let recoveredFinance = null
 const window = {
   __elonChatGptPrivateStreamPolicy: policy,
+  __elonWinChatGptPrivateStreamRecovery: {
+    accept: (snapshot) => {
+      recoveredFinance = snapshot
+      return true
+    },
+  },
+  setTimeout,
   fetch: async () => {
     fetchCount += 1
     return response
@@ -81,6 +146,12 @@ const context = {
   Number,
   Date,
   JSON,
+  Blob,
+  TextDecoder,
+  DecompressionStream,
+  Uint8Array,
+  atob,
+  setTimeout,
 }
 
 vm.runInNewContext(source, context, {
@@ -107,8 +178,17 @@ async function main() {
   assert.equal(enriched.content[0].type, 'markdown')
   assert.match(enriched.content[0].text, /Reuters/)
   assert.equal(enriched.content.filter((part) => part.type === 'citation').length, 1)
-  assert.equal(enriched.content.filter((part) => part.type === 'rich_card').length, 1)
-  assert.equal(enriched.content.find((part) => part.type === 'rich_card').kind, 'chart')
+  assert.equal(enriched.content.filter((part) => part.type === 'rich_card').length, 2)
+  assert.equal(enriched.content.find((part) => part.kind === 'chart').kind, 'chart')
+  const finance = enriched.content.find((part) => part.kind === 'finance')
+  assert.ok(finance)
+  assert.equal(finance.richContent.payload.chart.points.length, 2)
+  assert.equal(finance.richContent.payload.periods.length, 1)
+  assert.equal(finance.richContent.payload.metrics.length, 1)
+  assert.ok(recoveredFinance)
+  assert.equal(recoveredFinance.messageId, 'assistant-one')
+  assert.equal(recoveredFinance.conversationId, 'conversation-one')
+  assert.equal(recoveredFinance.richParts[0].kind, 'finance')
 
   const stale = cache.enrichMessage({
     id: 'assistant-one',

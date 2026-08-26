@@ -216,13 +216,16 @@ pub(super) fn initialization_script() -> String {
                 )
             } else if *name == "chatgpt_web_private_stream_policy.js" {
                 format!(
-                    "{}\nwindow.__elonChatGptBootstrapStage = 'chatgpt_win_private_finance_periods.js';\n{}\nwindow.__elonChatGptBootstrapStage = 'chatgpt_win_private_source_groups.js';\n{}",
-                    shared, WIN_PRIVATE_FINANCE_PERIODS, WIN_PRIVATE_SOURCE_GROUPS
+                    "{}\nwindow.__elonChatGptBootstrapStage = 'chatgpt_win_private_finance_periods.js';\n{}\nwindow.__elonChatGptBootstrapStage = 'chatgpt_win_private_source_groups.js';\n{}\nwindow.__elonChatGptBootstrapStage = 'chatgpt_win_private_conversation_rich_cache.js';\n{}",
+                    shared,
+                    WIN_PRIVATE_FINANCE_PERIODS,
+                    WIN_PRIVATE_SOURCE_GROUPS,
+                    WIN_PRIVATE_CONVERSATION_RICH_CACHE
                 )
             } else if *name == "chatgpt_web_private_transport.js" {
                 format!(
-                    "window.__elonChatGptBootstrapStage = 'chatgpt_win_private_conversation_rich_cache.js';\n{}\n{}\nwindow.__elonChatGptBootstrapStage = 'chatgpt_win_private_conversation_refresh.js';\n{}",
-                    WIN_PRIVATE_CONVERSATION_RICH_CACHE, shared, WIN_PRIVATE_CONVERSATION_REFRESH
+                    "{}\nwindow.__elonChatGptBootstrapStage = 'chatgpt_win_private_conversation_refresh.js';\n{}",
+                    shared, WIN_PRIVATE_CONVERSATION_REFRESH
                 )
             } else if *name == "chatgpt_web_private_stream_transport.js" {
                 format!(
@@ -436,6 +439,7 @@ mod tests {
         assert!(script.contains("chatgpt_web_private_stream_transport.js"));
         assert!(script.contains("chatgpt_win_private_finance_periods.js"));
         assert!(script.contains("chatgpt_win_private_source_groups.js"));
+        assert!(script.contains("chatgpt_win_private_conversation_rich_cache.js"));
         assert!(script.contains("__elonWinChatGptPrivateFinancePeriods"));
         assert!(
             script.find("chatgpt_web_private_stream_policy.js").unwrap()
@@ -453,6 +457,20 @@ mod tests {
         );
         assert!(
             script.find("chatgpt_win_private_source_groups.js").unwrap()
+                < script
+                    .find("chatgpt_web_private_stream_transport.js")
+                    .unwrap()
+        );
+        assert!(
+            script.find("chatgpt_win_private_source_groups.js").unwrap()
+                < script
+                    .find("chatgpt_win_private_conversation_rich_cache.js")
+                    .unwrap()
+        );
+        assert!(
+            script
+                .find("chatgpt_win_private_conversation_rich_cache.js")
+                .unwrap()
                 < script
                     .find("chatgpt_web_private_stream_transport.js")
                     .unwrap()
