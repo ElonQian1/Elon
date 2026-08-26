@@ -7,6 +7,7 @@ import {
   type LocalAiResearchCaptureStatus,
 } from './localAiBrowserApi'
 import AiProviderSessionStatus from './AiProviderSessionStatus'
+import { localAiPrivateTransportStatusCopy } from './localAiPrivateTransportCatalog'
 import styles from './AiWebProviderPopover.module.css'
 
 export default function AiWebProviderPopover({
@@ -21,6 +22,7 @@ export default function AiWebProviderPopover({
   const [position, setPosition] = useState({ left: 12, bottom: 12 })
   const [researchStatus, setResearchStatus] = useState<LocalAiResearchCaptureStatus>()
   const busy = Boolean(web.controller.busyAction)
+  const privateTransport = localAiPrivateTransportStatusCopy(web.provider)
 
   useEffect(() => {
     const reposition = () => {
@@ -73,6 +75,11 @@ export default function AiWebProviderPopover({
           <p title="仅包含计数、状态和命令回执，不记录提示词、回复正文、Cookie 或 Token">
             诊断：消息 {web.controller.sessionState.diagnostics.messageCount} · 助手回复 {web.controller.sessionState.diagnostics.assistantMessageCount}
             {web.controller.sessionState.diagnostics.lastCommandAction ? ` · ${web.controller.sessionState.diagnostics.lastCommandAction} ${web.controller.sessionState.diagnostics.lastCommandOk === false ? '失败' : '完成'}` : ''}
+          </p>
+        )}
+        {privateTransport && (
+          <p data-private-transport="preset" title={privateTransport.detail}>
+            {privateTransport.copy} 失败时自动回退官网语义层。
           </p>
         )}
         {researchStatus && (

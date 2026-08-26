@@ -6,6 +6,7 @@ import {
   localAiBrowserErrorMessage,
   type LocalAiWebProvider,
 } from './localAiBrowserApi'
+import { localAiWebProviderPresets } from './localAiWebProviders'
 
 export type LocalAiBrowserCapabilityState =
   | 'desktop_required'
@@ -24,20 +25,26 @@ export interface LocalAiBrowserCapability {
 export default function useLocalAiBrowserCapability(): LocalAiBrowserCapability {
   const desktopDetected = isLocalAiBrowserAvailable()
   const [state, setState] = useState<LocalAiBrowserCapabilityState>(
-    desktopDetected ? 'checking' : 'desktop_required',
+    desktopDetected ? 'ready' : 'desktop_required',
   )
-  const [providers, setProviders] = useState<LocalAiWebProvider[]>([])
-  const [message, setMessage] = useState('')
+  const [providers, setProviders] = useState<LocalAiWebProvider[]>(
+    desktopDetected ? localAiWebProviderPresets() : [],
+  )
+  const [message, setMessage] = useState(
+    desktopDetected ? '已载入 Win 私有能力预设；正在后台核对当前运行时版本。' : '',
+  )
 
-  const refresh = useCallback(async () => {
+  const verify = useCallback(async (preservePreset: boolean) => {
     if (!desktopDetected) {
       setState('desktop_required')
       setProviders([])
       setMessage('请在一龙 Windows 客户端中使用本地 ChatGPT。')
       return
     }
-    setState('checking')
-    setMessage('')
+    if (!preservePreset) {
+      setState('checking')
+      setMessage('正在核对当前 Win 运行时的网页 AI 适配器版本…')
+    }
     try {
       const items = await listLocalAiWebProviders()
       if (!items.length) {
@@ -56,7 +63,9 @@ export default function useLocalAiBrowserCapability(): LocalAiBrowserCapability 
     }
   }, [desktopDetected])
 
-  useEffect(() => { void refresh() }, [refresh])
+  const refresh = useCallback(() => verify(false), [verify])
+
+  useEffect(() => { void verify(true) }, [verify])
 
   return { state, providers, message, refresh }
 }
