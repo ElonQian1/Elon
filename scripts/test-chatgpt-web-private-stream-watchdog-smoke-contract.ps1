@@ -7,6 +7,8 @@ function Assert-Contains([string]$Needle) {
 }
 
 Assert-Contains 'chatgpt_verify_private_stream_watchdog'
+Assert-Contains '[string]$ExpectedHardwareSerial = ""'
+Assert-Contains 'Assert-ChatGptWebSmokeTrustedDevice -Runtime $runtime'
 Assert-Contains 'PrivateRevisionGreaterThan $privateRevisionBefore'
 Assert-Contains 'ExpectedAction "verify_private_stream_watchdog"'
 Assert-Contains '$probeCompletedAtMs - $probeStartedAtMs -ge 3500'

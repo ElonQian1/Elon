@@ -1,6 +1,7 @@
 param(
     [string]$Adb = "D:\Android\sdk\platform-tools\adb.exe",
     [Parameter(Mandatory = $true)][string]$DeviceSerial,
+    [string]$ExpectedHardwareSerial = "",
     [ValidateRange(0, 9999)][int]$ExpectedAdapterVersion = 0,
     [ValidateRange(15, 180)][int]$ReadyTimeoutSec = 90,
     [ValidateRange(10, 90)][int]$ProbeTimeoutSec = 45
@@ -14,7 +15,7 @@ $repositoryRoot = Split-Path -Parent $PSScriptRoot
 $ExpectedAdapterVersion = Resolve-ChatGptWebSmokeExpectedAdapterVersion `
     -ExpectedAdapterVersion $ExpectedAdapterVersion -RepositoryRoot $repositoryRoot
 $runtime = New-ChatGptWebSmokeRuntime -Adb $Adb -DeviceSerial $DeviceSerial `
-    -PollIntervalSec 1
+    -ExpectedHardwareSerial $ExpectedHardwareSerial -PollIntervalSec 1
 $originalProvider = ""
 $originalChatPath = ""
 $probeStartedAtMs = 0L
@@ -53,7 +54,7 @@ function Wait-Command {
 }
 
 try {
-    Assert-ChatGptWebSmokeUsbDevice -Runtime $runtime
+    Assert-ChatGptWebSmokeTrustedDevice -Runtime $runtime
     $readiness = Get-ChatGptWebSmokeUserReadiness -Runtime $runtime
     if ($readiness.ready -ne $true) {
         throw "ChatGPT watchdog acceptance requires an unlocked device."
