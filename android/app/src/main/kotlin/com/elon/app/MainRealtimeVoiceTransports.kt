@@ -3,7 +3,7 @@ package com.elon.app
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
 
-/** Keeps the account-bound WebView voice and local native API voice explicitly separate. */
+/** Uses official WebRTC by default while retaining the server API path as a disabled experiment. */
 internal class MainRealtimeVoiceTransports(
     activity: AppCompatActivity,
     controller: () -> ChatGptSocialChatController,
@@ -46,11 +46,13 @@ internal class MainRealtimeVoiceTransports(
     }
     private val native by nativeDelegate
 
-    fun startWeb(provider: WebChatProviderIdentity): Boolean =
-        (!nativeDelegate.isInitialized() || !native.isActive()) && web.start(provider)
+    fun startDefaultOfficialWebRtc(provider: WebChatProviderIdentity): Boolean =
+        RealtimeVoiceTransportCatalog.officialWebRtc.runtimeEnabled &&
+            (!nativeDelegate.isInitialized() || !native.isActive()) && web.start(provider)
 
-    fun startNative(): Boolean =
-        (!webDelegate.isInitialized() || !web.isActive()) && native.start()
+    fun startServerApiExperiment(): Boolean =
+        RealtimeVoiceTransportCatalog.serverApiExperiment.runtimeEnabled &&
+            (!webDelegate.isInitialized() || !web.isActive()) && native.start()
 
     fun onConsumerStateChanged(state: WebChatConsumerState) = web.onConsumerStateChanged(state)
 

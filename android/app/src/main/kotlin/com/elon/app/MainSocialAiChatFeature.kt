@@ -164,8 +164,7 @@ internal class MainSocialAiChatFeature(
                 if (isChatModeActive()) providerId() else null
             },
             openOfficialFallback = ::openOfficialFallback,
-            startWebRealtimeVoice = realtimeVoices::startWeb,
-            startNativeApiRealtimeVoice = ::startNativeApiRealtimeVoice,
+            startWebRealtimeVoice = realtimeVoices::startDefaultOfficialWebRtc,
             onOperationFeedback = ::showComposerOperationFeedback,
             onQuickActionChanged = ::onQuickComposerActionChanged,
             interactionCache = webChatInteractionCache,
@@ -335,11 +334,13 @@ internal class MainSocialAiChatFeature(
 
     fun openOfficialFallback() = modeController.openOfficialFallback()
 
-    fun startWebChatRealtimeVoice(): Boolean =
-        productionComposerTools.startRealtimeVoice(WebChatProviderRegistry.get(providerId()))
-
-    fun startNativeApiRealtimeVoice(): Boolean {
-        return realtimeVoices.startNative()
+    fun startDefaultRealtimeVoice(): Boolean {
+        if (providerId() != WebChatProviderId.CHATGPT_WEB &&
+            !selectChatProvider(WebChatProviderId.CHATGPT_WEB)
+        ) return false
+        return productionComposerTools.startRealtimeVoice(
+            WebChatProviderRegistry.get(WebChatProviderId.CHATGPT_WEB),
+        )
     }
 
     fun interactionMode(): SocialAiInteractionMode = modeController.interactionMode()

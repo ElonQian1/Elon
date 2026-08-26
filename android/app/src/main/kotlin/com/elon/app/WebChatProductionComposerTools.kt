@@ -63,7 +63,6 @@ internal class WebChatProductionComposerToolsCoordinator(
     private val activeProvider: () -> WebChatProviderId?,
     private val openOfficialFallback: () -> Unit,
     private val startWebRealtimeVoice: (WebChatProviderIdentity) -> Boolean,
-    private val startNativeApiRealtimeVoice: (() -> Boolean)? = null,
     private val onOperationFeedback: (WebChatConsumerComposerFeedback) -> Unit,
     private val onQuickActionChanged: (WebChatProductionQuickComposerAction?) -> Unit,
     private val interactionCache: WebChatProductionInteractionCache,
@@ -107,17 +106,6 @@ internal class WebChatProductionComposerToolsCoordinator(
 
     private fun footerActions(provider: WebChatProviderIdentity): List<WebChatActionSheetFooterAction> =
         buildList {
-            if (provider.id == WebChatProviderId.CHATGPT_WEB && startNativeApiRealtimeVoice != null) {
-                add(WebChatActionSheetFooterAction(
-                    label = "原生实时 AI",
-                    contentDescription = "web-chat-native-realtime:new-local-conversation",
-                    action = {
-                        if (!startNativeApiRealtimeVoice.invoke()) {
-                            Toast.makeText(activity, "请先结束当前语音会话", Toast.LENGTH_SHORT).show()
-                        }
-                    },
-                ))
-            }
             add(WebChatActionSheetFooterAction(
                 label = "官网完整功能",
                 contentDescription = "web-chat-composer-tools-official:${provider.id.wireValue}",

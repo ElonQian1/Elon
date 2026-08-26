@@ -20,7 +20,7 @@ internal class NativeApiRealtimeVoiceCoordinator(
     private val backgroundBridge: WebChatRealtimeVoiceBackgroundBridge =
         WebChatRealtimeVoiceBackgroundBridge(activity),
 ) : WebChatRealtimeVoiceBackgroundControlSink {
-    private val transport = RealtimeVoiceTransportCatalog.nativeApi
+    private val transport = RealtimeVoiceTransportCatalog.serverApiExperiment
     private val context = RealtimeVoiceTransportPolicy.contextFor(transport)
     private var controller: RealtimeVoiceController? = null
     private var player: RealtimePcmPlayer? = null
@@ -44,7 +44,7 @@ internal class NativeApiRealtimeVoiceCoordinator(
         paused = false
         turn = WebChatRealtimeVoiceTurn.UNKNOWN
         surface.show(::close, ::retry, ::openOfficialVoice, ::openConversation)
-        render(WebChatRealtimeVoiceLifecycle.CONNECTING, "正在连接原生实时 AI")
+        render(WebChatRealtimeVoiceLifecycle.CONNECTING, "正在连接${transport.label}")
         audioPermissionController.runWithMicrophone(
             action = ::startGrantedSession,
             onPermissionDenied = { fail("需要麦克风权限才能开始实时语音") },

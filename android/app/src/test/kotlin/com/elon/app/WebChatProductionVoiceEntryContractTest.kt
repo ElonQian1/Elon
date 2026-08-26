@@ -12,12 +12,14 @@ import org.junit.Test
 
 class WebChatProductionVoiceEntryContractTest {
     @Test
-    fun friendChatPhoneStartsTheNonBlockingNativeApiConversation() {
+    fun friendChatPhoneStartsTheOfficialWebRtcDefault() {
         val activity = read("android/app/src/main/kotlin/com/elon/app/MainActivity.kt")
         val route = activity.substringAfter("private fun openSocialAiVoiceCall()")
             .substringBefore("private fun suspendSocialChatForProjectReturn()")
 
-        assertTrue(route.contains("socialAiChatFeature.startNativeApiRealtimeVoice()"))
+        assertTrue(route.contains("socialAiChatFeature.startDefaultRealtimeVoice()"))
+        assertFalse(route.contains("ServerApi"))
+        assertFalse(route.contains("NativeApi"))
         assertFalse(route.contains("SocialAiVoiceCallActivity.createIntent"))
     }
 
@@ -35,20 +37,24 @@ class WebChatProductionVoiceEntryContractTest {
         val commandRoute = tools.substringAfter("fun executeCommand")
             .substringBefore("fun cancelPending")
 
-        assertTrue(feature.contains("fun startWebChatRealtimeVoice(): Boolean"))
+        assertTrue(feature.contains("fun startDefaultRealtimeVoice(): Boolean"))
+        assertTrue(feature.contains("selectChatProvider(WebChatProviderId.CHATGPT_WEB)"))
         assertTrue(feature.contains("productionComposerTools.startRealtimeVoice"))
         assertTrue(feature.contains("productionVoiceControls.render"))
         assertTrue(feature.contains("productionVoiceControls.restoreLocalVoiceInput"))
         assertTrue(commands.contains("WebChatProviderCapability.REALTIME_VOICE"))
         assertTrue(tools.contains("chatgpt_start_realtime_voice"))
         assertTrue(tools.contains("startWebRealtimeVoice"))
-        assertTrue(tools.contains("startNativeApiRealtimeVoice"))
-        assertTrue(tools.contains("原生实时 AI"))
+        assertFalse(tools.contains("startNativeApiRealtimeVoice"))
+        assertFalse(tools.contains("原生实时 AI"))
         assertFalse(tools.contains("ChatGptWebTestActivity"))
         assertTrue(directRoute.contains("executeCommand(provider, command)"))
         assertTrue(commandRoute.contains("command.action == REALTIME_VOICE_ACTION"))
         assertTrue(commandRoute.contains("startWebRealtimeVoice(provider)"))
         assertFalse(commandRoute.contains("openOfficialRealtimeVoice()"))
+        assertTrue(transports.contains("startDefaultOfficialWebRtc"))
+        assertTrue(transports.contains("officialWebRtc.runtimeEnabled"))
+        assertTrue(transports.contains("serverApiExperiment.runtimeEnabled"))
         assertTrue(transports.contains("WebChatRealtimeVoiceOverlay"))
         assertTrue(factory.contains("createWebChatRealtimeVoiceCoordinator"))
         assertEquals(
@@ -99,7 +105,7 @@ class WebChatProductionVoiceEntryContractTest {
     }
 
     @Test
-    fun nativeRealtimeVoiceUsesAStableTitleAndPreservesConversationDuringExit() {
+    fun officialRealtimeVoiceUsesNativeUiAndPreservesTheBackgroundWebView() {
         val surface = read(
             "android/app/src/main/kotlin/com/elon/app/WebChatRealtimeVoiceSurface.kt",
         )
@@ -133,6 +139,7 @@ class WebChatProductionVoiceEntryContractTest {
         assertFalse(backing.contains("if (!gracefulExit) view.reload()"))
         assertTrue(backing.contains("requestConversationSnapshot()"))
         assertTrue(backing.contains("requestPrivateConversationSnapshot()"))
+        assertTrue(backing.contains("beginWebChatRealtimeVoiceInteraction()"))
         assertTrue(backing.contains("if (gracefulExit) return"))
         assertTrue(backing.contains("conversationRecoveredSince(recoveryToken.snapshotRevision)"))
         assertTrue(backing.contains("recoveryGate.shouldReload"))
@@ -147,6 +154,7 @@ class WebChatProductionVoiceEntryContractTest {
         assertTrue(factory.contains("resolveConversationContext = { resolveRealtimeVoiceContext"))
         assertTrue(factory.contains("openRealtimeVoiceConversation(it"))
         assertTrue(session.contains("if (realtimeVoiceBacking.isActive())"))
+        assertTrue(session.contains("fun onHostPaused() = if (realtimeVoiceBacking.isActive()) cookieManager.flush()"))
         assertTrue(session.contains("pageAdapter?.requestConversationRefresh()"))
     }
 

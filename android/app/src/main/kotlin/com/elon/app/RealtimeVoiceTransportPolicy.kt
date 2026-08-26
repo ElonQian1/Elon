@@ -4,8 +4,8 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 internal enum class RealtimeVoiceTransportId {
-    WEB_ACCOUNT,
-    NATIVE_API,
+    OFFICIAL_WEB_RTC,
+    SERVER_API_EXPERIMENT,
 }
 
 internal enum class RealtimeVoiceConversationScope {
@@ -18,34 +18,52 @@ internal data class RealtimeVoiceTransportDescriptor(
     val capabilityId: String,
     val label: String,
     val scope: RealtimeVoiceConversationScope,
+    val identityLayer: String,
+    val mediaTransport: String,
+    val presentationLayer: String,
+    val consumerDefault: Boolean,
+    val runtimeEnabled: Boolean,
+    val userVisible: Boolean,
 )
 
 internal object RealtimeVoiceTransportCatalog {
-    val webAccount = RealtimeVoiceTransportDescriptor(
-        id = RealtimeVoiceTransportId.WEB_ACCOUNT,
+    val officialWebRtc = RealtimeVoiceTransportDescriptor(
+        id = RealtimeVoiceTransportId.OFFICIAL_WEB_RTC,
         capabilityId = "android_chatgpt_web_realtime_voice_v1",
-        label = "ChatGPT 网页语音",
+        label = "官网实时语音",
         scope = RealtimeVoiceConversationScope.CURRENT_PROVIDER_CONVERSATION,
+        identityLayer = "persistent_background_webview",
+        mediaTransport = "official_webrtc",
+        presentationLayer = "native_ui_overlay",
+        consumerDefault = true,
+        runtimeEnabled = true,
+        userVisible = true,
     )
 
-    val nativeApi = RealtimeVoiceTransportDescriptor(
-        id = RealtimeVoiceTransportId.NATIVE_API,
+    val serverApiExperiment = RealtimeVoiceTransportDescriptor(
+        id = RealtimeVoiceTransportId.SERVER_API_EXPERIMENT,
         capabilityId = "android_openai_native_realtime_voice_v1",
-        label = "原生实时 AI",
+        label = "API 实时语音（实验）",
         scope = RealtimeVoiceConversationScope.NEW_LOCAL_CONVERSATION,
+        identityLayer = "yilong_server_session",
+        mediaTransport = "server_realtime_api_websocket",
+        presentationLayer = "native_ui_overlay",
+        consumerDefault = false,
+        runtimeEnabled = false,
+        userVisible = false,
     )
 
     fun describe(): JSONArray = JSONArray().apply {
         put(entry(
-            descriptor = webAccount,
+            descriptor = officialWebRtc,
             implementationStatus = "completed",
             verificationStatus = "device_verified",
             fallback = "official_webview_voice",
         ))
         put(entry(
-            descriptor = nativeApi,
+            descriptor = serverApiExperiment,
             implementationStatus = "implemented",
-            verificationStatus = "targeted_tests_passed_device_pending",
+            verificationStatus = "experimental_disabled",
             fallback = "official_webview_voice",
         ))
     }
@@ -60,9 +78,14 @@ internal object RealtimeVoiceTransportCatalog {
         .put("transport_id", descriptor.id.name.lowercase())
         .put("label", descriptor.label)
         .put("conversation_scope", descriptor.scope.name.lowercase())
+        .put("identity_layer", descriptor.identityLayer)
+        .put("media_transport", descriptor.mediaTransport)
+        .put("presentation_layer", descriptor.presentationLayer)
+        .put("consumer_default", descriptor.consumerDefault)
+        .put("user_visible", descriptor.userVisible)
         .put("implementation_status", implementationStatus)
         .put("verification_status", verificationStatus)
-        .put("runtime_enabled", true)
+        .put("runtime_enabled", descriptor.runtimeEnabled)
         .put("fallback", fallback)
 }
 
