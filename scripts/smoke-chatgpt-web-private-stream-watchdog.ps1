@@ -70,7 +70,10 @@ try {
         -TimeoutSec $ReadyTimeoutSec
     Assert-ChatGptWebSmokeAdapterVersion -State $ready `
         -ExpectedAdapterVersion $ExpectedAdapterVersion
-    if ([int]$ready.input.text_length -ne 0) {
+    if (
+        [int]$ready.input.text_length -ne 0 -or
+        [int]$ready.input.official_draft_length -ne 0
+    ) {
         throw "ChatGPT watchdog acceptance refuses to overwrite an existing native draft."
     }
     $originalChatPath = Get-ConversationPath ([string]$ready.conversation.url)
@@ -91,6 +94,7 @@ try {
                 $state.composer_ready -eq $true -and
                 $state.streaming -eq $false -and
                 [int]$state.input.text_length -eq 0 -and
+                [int]$state.input.official_draft_length -eq 0 -and
                 [int]$state.conversation.message_count -eq 0
         }
     $privateRevisionBefore = [long]$blank.private_stream_observer.revision
@@ -109,10 +113,15 @@ try {
     if ($draftDispatch.control_ok -ne $true) {
         throw "Unable to stage the isolated watchdog prompt."
     }
+    $draftRequestId = [string]$draftDispatch.command_receipt.request_id
+    if (-not $draftRequestId) { throw "Page draft did not return a command receipt." }
+    Wait-Command -RequestId $draftRequestId -ExpectedAction "set_draft" `
+        -TimeoutSec $ReadyTimeoutSec | Out-Null
     Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec 15 `
         -Description "isolated watchdog native draft" -Predicate {
             param($state)
-            [int]$state.input.text_length -eq $probePrompt.Length
+            [int]$state.input.text_length -eq $probePrompt.Length -and
+                [int]$state.input.official_draft_length -eq $probePrompt.Length
         }.GetNewClosure() | Out-Null
 
     $sendDispatch = Invoke-ChatGptWebSmokeReadyAction -Runtime $runtime `
@@ -157,10 +166,18 @@ try {
             Invoke-ChatGptWebSmokeReadyAction -Runtime $runtime `
                 -Action "chatgpt_stop_generation" -TimeoutSec 20 | Out-Null
         }
-        if ([int]$current.input.text_length -eq $probePrompt.Length) {
-            Invoke-ChatGptWebSmokeReadyAction -Runtime $runtime `
+        if (
+            [int]$current.input.text_length -eq $probePrompt.Length -or
+            [int]$current.input.official_draft_length -eq $probePrompt.Length
+        ) {
+            $cleanupDispatch = Invoke-ChatGptWebSmokeReadyAction -Runtime $runtime `
                 -Action "chatgpt_set_page_input_text" -Arguments @{ text = "" } `
-                -TimeoutSec 20 | Out-Null
+                -TimeoutSec 20
+            $cleanupRequestId = [string]$cleanupDispatch.command_receipt.request_id
+            if ($cleanupRequestId) {
+                Wait-Command -RequestId $cleanupRequestId -ExpectedAction "set_draft" `
+                    -TimeoutSec 20 | Out-Null
+            }
         }
     } catch { }
     if ($originalChatPath) {

@@ -52,6 +52,7 @@ internal class ChatGptWebMcpActions(
             .put("input", JSONObject()
                 .put("text", inputText().take(MAX_INPUT_CHARS))
                 .put("text_length", inputText().length)
+                .put("official_draft_length", current?.draft?.length ?: 0)
             )
             .put("audio", ChatGptWebAudioPermissionJson.encode(audioPermissionState()))
             .put("ui_manifest", manifestJson(currentManifest))
