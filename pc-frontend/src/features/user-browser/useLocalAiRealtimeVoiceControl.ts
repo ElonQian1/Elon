@@ -17,15 +17,15 @@ import {
   observeLocalAiRealtimeVoiceHangup,
   shouldRefreshLocalAiRealtimeVoiceHangupControls,
 } from './localAiRealtimeVoiceHangup'
+import {
+  LOCAL_AI_REALTIME_VOICE_TRANSCRIPT_REFRESH_GAPS_MS,
+  LocalAiRealtimeVoiceTranscriptRefreshFlight,
+} from './localAiRealtimeVoiceTranscriptRefresh'
 import { requestReturnToAiChat } from './internalBrowserApi'
 import type { AiWebChatBackend } from './useAiWebChatBackend'
 
-// Match the APK close settlement: let the official voice overlay close first,
-// then perform one private current-conversation refresh and two bounded DOM fallbacks.
-const REALTIME_VOICE_TRANSCRIPT_REFRESH_GAPS_MS = [250, 750, 1_500] as const
-
 export default function useLocalAiRealtimeVoiceControl(web: AiWebChatBackend) {
-  const generation = useRef(0)
+  const transcriptRefresh = useRef(new LocalAiRealtimeVoiceTranscriptRefreshFlight())
   const timer = useRef(0)
   const activationGeneration = useRef(0)
   const activationTimer = useRef(0)
@@ -43,7 +43,7 @@ export default function useLocalAiRealtimeVoiceControl(web: AiWebChatBackend) {
   manifestRef.current = web.controller.uiManifest
 
   useEffect(() => {
-    generation.current += 1
+    transcriptRefresh.current.cancel()
     window.clearTimeout(timer.current)
     activationGeneration.current += 1
     window.clearTimeout(activationTimer.current)
@@ -57,7 +57,7 @@ export default function useLocalAiRealtimeVoiceControl(web: AiWebChatBackend) {
     setTranscriptSyncing(false)
     setHangupStatus('idle')
     return () => {
-      generation.current += 1
+      transcriptRefresh.current.cancel()
       activationGeneration.current += 1
       hangupGeneration.current += 1
       window.clearTimeout(timer.current)
@@ -132,30 +132,33 @@ export default function useLocalAiRealtimeVoiceControl(web: AiWebChatBackend) {
   const startTranscriptRefresh = useCallback(() => {
     const request = web.officialRequest
     if (request?.providerId !== 'chatgpt') return
-    const activeGeneration = ++generation.current
-    let step = 0
+    const start = transcriptRefresh.current.start()
+    if (!start.started) return
+    window.clearTimeout(timer.current)
     setTranscriptSyncing(true)
+    requestReturnToAiChat(request)
+    void controlLocalAiWebSession(request.providerId, request.ownerKey, 'background')
+      .then(() => {}, () => {})
     const refresh = (): void => {
-      if (activeGeneration !== generation.current) return
-      requestReturnToAiChat(request)
-      void controlLocalAiWebSession(request.providerId, request.ownerKey, 'background')
-        .then(() => {}, () => {})
-      const operation = step === 0
+      const claim = transcriptRefresh.current.claim(start.generation)
+      if (claim.status !== 'run') return
+      const operation = claim.action === 'private_conversation'
         ? requestLocalAiCurrentConversationRefresh(request.providerId, request.ownerKey)
         : requestLocalAiWebSnapshot(request.providerId, request.ownerKey)
-      step += 1
-      const delay = REALTIME_VOICE_TRANSCRIPT_REFRESH_GAPS_MS[step]
-      if (delay !== undefined) {
-        void operation.then(() => {}, () => {})
-        timer.current = window.setTimeout(refresh, delay)
-      } else {
-        const settle = () => {
-          if (activeGeneration === generation.current) setTranscriptSyncing(false)
+      const settle = () => {
+        const next = transcriptRefresh.current.settle(start.generation)
+        if (next.status === 'wait') {
+          timer.current = window.setTimeout(refresh, next.delayMs)
+        } else if (next.status === 'done') {
+          setTranscriptSyncing(false)
         }
-        void operation.then(settle, settle)
       }
+      void operation.then(settle, settle)
     }
-    timer.current = window.setTimeout(refresh, REALTIME_VOICE_TRANSCRIPT_REFRESH_GAPS_MS[0])
+    timer.current = window.setTimeout(
+      refresh,
+      LOCAL_AI_REALTIME_VOICE_TRANSCRIPT_REFRESH_GAPS_MS[0],
+    )
   }, [web.officialRequest])
 
   useEffect(() => {
@@ -233,7 +236,7 @@ export default function useLocalAiRealtimeVoiceControl(web: AiWebChatBackend) {
   }, [evaluateHangup, hangupStatus, web.controller.uiManifest])
 
   const startHangupConfirmation = useCallback(() => {
-    generation.current += 1
+    transcriptRefresh.current.cancel()
     window.clearTimeout(timer.current)
     setTranscriptSyncing(false)
     const expectedGeneration = ++hangupGeneration.current
@@ -250,7 +253,7 @@ export default function useLocalAiRealtimeVoiceControl(web: AiWebChatBackend) {
   ) => {
     if (!controlId.trim()) return null
     if (action === 'start') {
-      generation.current += 1
+      transcriptRefresh.current.cancel()
       activationGeneration.current += 1
       hangupGeneration.current += 1
       window.clearTimeout(timer.current)

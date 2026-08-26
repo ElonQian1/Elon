@@ -64,8 +64,8 @@ const CATALOG: Record<string, CapabilityDefinition[]> = {
     },
     {
       id: 'win_chatgpt_realtime_voice_private_transcript_refresh_v1',
-      label: '语音结束后转写刷新',
-      requestMode: 'authenticated_same_origin_get_current_conversation',
+      label: '语音结束后转写单飞行刷新',
+      requestMode: 'serial_authenticated_same_origin_get_then_snapshot',
       fallback: 'official_dom_snapshot',
       requiredActions: ['invoke_ui_control'],
     },

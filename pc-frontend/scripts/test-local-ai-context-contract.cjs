@@ -37,6 +37,10 @@ const realtimeVoiceActivationPath = path.join(
   root,
   'pc-frontend/src/features/user-browser/localAiRealtimeVoiceActivation.ts',
 )
+const realtimeVoiceTranscriptRefreshPath = path.join(
+  root,
+  'pc-frontend/src/features/user-browser/localAiRealtimeVoiceTranscriptRefresh.ts',
+)
 const realtimeVoiceControl = read('pc-frontend/src/features/user-browser/useLocalAiRealtimeVoiceControl.ts')
 const responseTracking = read('pc-frontend/src/features/user-browser/localAiResponseTracking.ts')
 const backend = read('pc-frontend/src/features/user-browser/useAiWebChatBackend.ts')
@@ -107,7 +111,7 @@ assert.match(controls, /'结束语音'/)
 assert.match(backend, /官方网页尚未恢复到对应会话/)
 assert.match(userState, /context_restoring/)
 assert.match(userState, /缓存会话与当前官方页面不一致/)
-assert.match(realtimeVoiceControl, /REALTIME_VOICE_TRANSCRIPT_REFRESH_GAPS_MS = \[250, 750, 1_500\]/)
+assert.match(realtimeVoiceControl, /LocalAiRealtimeVoiceTranscriptRefreshFlight/)
 assert.match(realtimeVoiceControl, /requestLocalAiCurrentConversationRefresh/)
 assert.match(realtimeVoiceControl, /requestLocalAiWebSnapshot/)
 assert.match(realtimeVoiceControl, /controlLocalAiWebSession/)
@@ -140,6 +144,12 @@ assert.equal(responseRefreshConfig.localAiResponseRefreshPhase({
   providerId: 'google-ai-mode', current: 'streaming_watchdog', assistantObserved: true,
   streaming: false, completed: true,
 }), 'completed')
+
+const transcriptRefresh = loadTypeScriptModule(realtimeVoiceTranscriptRefreshPath)
+assert.deepEqual(
+  transcriptRefresh.LOCAL_AI_REALTIME_VOICE_TRANSCRIPT_REFRESH_GAPS_MS,
+  [250, 750, 1_500],
+)
 
 const { localAiDirectoryAutoSyncKey } = loadTypeScriptModule(directoryAutoSyncPath)
 assert.equal(localAiDirectoryAutoSyncKey({
