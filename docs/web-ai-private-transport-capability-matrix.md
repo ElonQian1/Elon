@@ -14,8 +14,8 @@ installed build; individual capability documents retain implementation evidence.
 | Streaming reply observer | ChatGPT | Completed and enabled; completion and sparse-watchdog timer/bridge device verified | Official DOM snapshot |
 | Private stream completion settlement | ChatGPT | Completed, enabled, and device verified on `v1.1.1302 (1312)` | Official DOM snapshot |
 | Realtime voice transcript refresh | ChatGPT | Completed and enabled; supervised voice exit pending | Retained native transcript and official DOM snapshot |
-| Realtime voice background continuity | ChatGPT | Completed and enabled; native/system overlay handoff and media auto-pause device verified, manual overlay actions pending | Official WebView voice and foreground notification |
-| Native API realtime voice | 一龙 AI / OpenAI API | Implemented and enabled for an explicit new local conversation; targeted tests passed, device verification pending | Official ChatGPT WebView voice |
+| Realtime voice background continuity | ChatGPT | Completed, enabled, and consumer default; native UI + persistent background WebView identity + official WebRTC | Official full-screen WebView voice and foreground notification |
+| Server API realtime voice experiment | 一龙 AI / OpenAI API | Implemented but disabled and hidden from consumer UI | Native UI + persistent background WebView identity + official WebRTC |
 | Conversation directory | Google Web AI | Completed and enabled | Local cache and official page |
 | Visited conversation body cache | Google Web AI | Completed, enabled, and device verified | Official WebView navigation |
 | Reply stream and completion observer | Google Web AI | Completed, enabled, and stream-to-completion device verified on `v1.1.1303 (1313)` | Official DOM snapshot |
@@ -27,12 +27,13 @@ cookies, credentials, request headers, or private conversation content outside t
 device. Every observer is bounded and emits nothing on malformed or unsuccessful
 responses.
 
-The separate native API realtime transport is not a ChatGPT web-account shortcut. It
-uses the existing authenticated 一龙 realtime WebSocket and records to local 一龙 AI
-history. Its production entry is deliberately labeled `原生实时 AI`, while the blue
-ChatGPT composer voice action remains owned by the current official web conversation.
-The runtime inventory exposes both transport IDs and their conversation scopes so UI,
-ADB, MCP, and future agents cannot conflate them. Detailed boundaries are in
+The consumer default is one architecture: native chat and floating voice UI, the same
+persistent background ChatGPT WebView as the identity and conversation layer, and the
+official page-created WebRTC session as the media transport. The friend-chat phone action,
+blue composer voice action, and semantic/MCP voice command all enter this route.
+The separate server API realtime transport remains an explicit disabled experiment with
+no consumer entry. The runtime inventory exposes both transport IDs, layers, visibility,
+default state, and conversation scopes so future agents cannot conflate them. Details are in
 `docs/native-realtime-voice-transport.md`.
 
 The Google conversation directory persists the timestamp of the last successful
