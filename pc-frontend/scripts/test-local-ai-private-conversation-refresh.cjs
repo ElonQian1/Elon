@@ -51,9 +51,22 @@ assert.equal(shouldRefresh({
   ...base,
   snapshot: snapshot([
     user('新的问题'),
-    assistant([{ type: 'interactive', text: 'Bitcoin (BTC)', kind: 'renderer_upgrade_required' }]),
+    assistant([
+      { type: 'markdown', text: '正文仍然完整显示。' },
+      { type: 'interactive', text: '官网富内容已升级', kind: 'renderer_upgrade_required' },
+    ]),
   ]),
-}), true)
+}), false, 'a confirmed renderer upgrade signal must not trigger a redundant private history request')
+assert.equal(shouldRefresh({
+  ...base,
+  snapshot: snapshot([
+    user('新的问题'),
+    assistant([
+      { type: 'markdown', text: '正文仍然完整显示。' },
+      { type: 'interactive', text: 'Bitcoin (BTC)', kind: 'interactive' },
+    ]),
+  ]),
+}), true, 'an unresolved generic placeholder still needs one private history refresh')
 assert.equal(shouldRefresh({
   ...base,
   elapsedMs: 2_000,

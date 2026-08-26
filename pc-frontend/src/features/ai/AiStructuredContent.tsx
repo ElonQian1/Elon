@@ -46,6 +46,7 @@ export default function AiStructuredContent({
   ))
   const visibleParts = placement === 'primary' ? [] : parts?.filter((part) => (
     part.type !== 'image' && part.type !== 'rich_card' && Boolean(part.label.trim() || metadataFor(part))
+    && !(part.type === 'interactive' && part.kind === 'renderer_upgrade_required')
   )) ?? []
   if (!visibleParts.length && !richParts.length) return null
   return (

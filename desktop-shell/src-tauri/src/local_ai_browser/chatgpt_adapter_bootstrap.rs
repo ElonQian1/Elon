@@ -9,6 +9,8 @@ const WIN_RESPONSE_RESEARCH_CAPTURE: &str = include_str!("win_web_response_resea
 const WIN_PRIVATE_STREAM_RECOVERY: &str = include_str!("chatgpt_win_private_stream_recovery.js");
 const WIN_PRIVATE_FINANCE_PERIODS: &str = include_str!("chatgpt_win_private_finance_periods.js");
 const WIN_PRIVATE_SOURCE_GROUPS: &str = include_str!("chatgpt_win_private_source_groups.js");
+const WIN_PRIVATE_RICH_COMPATIBILITY: &str =
+    include_str!("chatgpt_win_private_rich_compatibility.js");
 const WIN_PRIVATE_CONVERSATION_REFRESH: &str =
     include_str!("chatgpt_win_private_conversation_refresh.js");
 const WIN_PRIVATE_CONVERSATION_RICH_CACHE: &str =
@@ -216,10 +218,11 @@ pub(super) fn initialization_script() -> String {
                 )
             } else if *name == "chatgpt_web_private_stream_policy.js" {
                 format!(
-                    "{}\nwindow.__elonChatGptBootstrapStage = 'chatgpt_win_private_finance_periods.js';\n{}\nwindow.__elonChatGptBootstrapStage = 'chatgpt_win_private_source_groups.js';\n{}\nwindow.__elonChatGptBootstrapStage = 'chatgpt_win_private_conversation_rich_cache.js';\n{}",
+                    "{}\nwindow.__elonChatGptBootstrapStage = 'chatgpt_win_private_finance_periods.js';\n{}\nwindow.__elonChatGptBootstrapStage = 'chatgpt_win_private_source_groups.js';\n{}\nwindow.__elonChatGptBootstrapStage = 'chatgpt_win_private_rich_compatibility.js';\n{}\nwindow.__elonChatGptBootstrapStage = 'chatgpt_win_private_conversation_rich_cache.js';\n{}",
                     shared,
                     WIN_PRIVATE_FINANCE_PERIODS,
                     WIN_PRIVATE_SOURCE_GROUPS,
+                    WIN_PRIVATE_RICH_COMPATIBILITY,
                     WIN_PRIVATE_CONVERSATION_RICH_CACHE
                 )
             } else if *name == "chatgpt_web_private_transport.js" {
@@ -439,6 +442,7 @@ mod tests {
         assert!(script.contains("chatgpt_web_private_stream_transport.js"));
         assert!(script.contains("chatgpt_win_private_finance_periods.js"));
         assert!(script.contains("chatgpt_win_private_source_groups.js"));
+        assert!(script.contains("chatgpt_win_private_rich_compatibility.js"));
         assert!(script.contains("chatgpt_win_private_conversation_rich_cache.js"));
         assert!(script.contains("__elonWinChatGptPrivateFinancePeriods"));
         assert!(
@@ -463,6 +467,14 @@ mod tests {
         );
         assert!(
             script.find("chatgpt_win_private_source_groups.js").unwrap()
+                < script
+                    .find("chatgpt_win_private_rich_compatibility.js")
+                    .unwrap()
+        );
+        assert!(
+            script
+                .find("chatgpt_win_private_rich_compatibility.js")
+                .unwrap()
                 < script
                     .find("chatgpt_win_private_conversation_rich_cache.js")
                     .unwrap()

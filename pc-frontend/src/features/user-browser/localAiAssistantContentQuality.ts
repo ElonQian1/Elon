@@ -31,6 +31,6 @@ export function localAiAssistantExtractionIncomplete(message: LocalAiVisibleMess
 export function localAiAssistantHasRendererPlaceholder(message: LocalAiVisibleMessage): boolean {
   return message.role === 'assistant' && message.content.some((part) => (
     part.type === 'interactive'
-    && ['interactive', 'renderer_upgrade_required'].includes(String(part.kind || ''))
+    && String(part.kind || '') === 'interactive'
   ))
 }
