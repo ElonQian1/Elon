@@ -15,12 +15,14 @@ verification_status: source_review_only
 对应验收见 [Recursive System-Image Closure acceptance](user-node-windows-runner-recursive-system-image-closure-acceptance.md)。
 上游 package-only 请求与 GrantReady prefix 见
 [Launch Context Selection authority](user-node-windows-runner-launch-context-selection-authority.md)，最终 load-set owner 边界见
-[Loader Load-Set authority](user-node-windows-runner-loader-load-set-authority.md)。
+[Loader Load-Set authority](user-node-windows-runner-loader-load-set-authority.md)。逐 producer wave 的策略与 owner 边界见
+[Recursive System-Image Acquisition Custody authority](user-node-windows-runner-recursive-system-image-acquisition-custody-authority.md)。
 
 ## 1. 本批结论
 
-本批冻结并写入的是 **source-only final projection envelope**，不是可达的递归解析器、逐波 acquisition workflow 或运行时
-Windows 证明。它解除旧 final validator 把 package-only preliminary/GrantReady 数量强行等同全部 final edge/name/system-image
+本批冻结并写入的是 **source-only final projection envelope**，不是可达的递归解析器、acquisition workflow 或运行时
+Windows 证明。相邻 source-only 合同现已冻结 authenticated recursive policy与逐 producer wave custody，但所有真实 producer
+仍 missing。它解除旧 final validator 把 package-only preliminary/GrantReady 数量强行等同全部 final edge/name/system-image
 数量的结构矛盾：wave 0 保持不可变 base prefix；真实 system image 第一次由 post-lease resolution 到达后，其 imports/forwarders
 只能进入 stage-explicit recursive suffix，直到 empty frontier。
 
@@ -98,22 +100,30 @@ target node + target symbol；hop ordinal 无重复、无 gap；证据 digest �
 - exact searched-name disposition set；
 - exact new filesystem system-image custody set。
 
-parse receipt、wave 与 closure 自身再使用固定 JCS/SHA-256 material重算。private digest schema 本批更新为：PE import table V2、
-PE final edge set V2、pre/post receipt/import-edge cross-binding V2、parsed-image set V2、loader resolution profile V3。
-profile V3 必须纳入 recursive closure digest；process pre-create只能消费该 final profile，不能把 digest 当成 live OS observation。
+parse receipt、wave 与 closure 自身再使用固定 JCS/SHA-256 material重算。本批把 recursive image parse receipt升级为 V2
+（新增 producer acquisition ordinal），新增 acquisition receipt/chain V1，并把 recursive closure升级为 V2（移除裸 limits/source
+mirror，改为纳入 authenticated policy-bound acquisition-chain digest）。既有 wave V1字段未变。outer loader resolution profile仍为 V3，
+因为它继续只消费版本化 closure digest而未增加独立字段；不得静默改写 profile V3 material。process pre-create只能消费该 final
+profile，不能把 digest 当成 live OS observation。
 
-recursive parser policy逐 receipt绑定既有 authenticated preliminary parser policy；limit source绑定 selected launch-context intent，
-max wave/image/module/name/system-owner/forwarder-depth 数值封入 closure digest。未来仍需真实 policy producer证明这些 limit 值确实由
-签名配置选择，不能由 final sealer任意决定。
+recursive parse receipt V2直接绑定 parser policy、producer acquisition ordinal、wave、owner/material与 parse evidence；对应
+acquisition receipt/chain再用同一 parser policy、parse-receipt digest与 authenticated policy digest把它传递接回独立 policy V1。
+该 policy直接绑定 selected launch-context intent digest、preliminary-plan digest、parser、preloaded set、exact routes、六项 limits与
+签名验证链；search/machine lineage经 authenticated intent/plan digests传递。max wave/image/module/name/system-owner/
+forwarder-depth 六项数值由 policy payload逐值认证并经 acquisition chain纳入 closure digest，不能只引用 intent digest，也不能由
+final sealer任意决定。wave count只计 recursive waves，其余 count覆盖 final base+suffix cumulative totals，forwarder limit按最大
+hop depth执行。
 
-## 7. 明确未冻结的逐波 custody
+## 7. 逐波 custody source contract 与 producer gap
 
-当前结构没有逐 wave 的 request → searched-name/launch-component grant → candidate → lease → same-handle parse 的可构造 typed
-advancer，也没有 per-wave authenticated negative、partial acquisition、outcome-uncertain parking、release/recovery backend。
-因此本合同只能称为 final projection envelope，不能称为完整 recursive acquisition authority。
+相邻 acquisition-custody合同已写入 base acquisition → producer wave `k` same-owner parse → outgoing request/terminal/disposition →
+same-session grant → route-specific owner/candidate/lease → nonempty时 target parse wave `k+1`、terminal时 `None` 的 typed shape，并冻结 exact authenticated negative、
+partial acquisition与 outcome-uncertain whole-graph parking。它还规定 parse-receipt ordinal按 earliest producer连续分配，后台完成
+顺序不得改变 final graph。该合同仍由 `Infallible`保持不可构造，也没有 release/recovery backend；因此本合同只能称为 final
+projection envelope，不能称为可达的 recursive acquisition authority。
 
-以下 producer全部保持 `missing`：authenticated selector、prelease/recursive parser、GrantReady resolver、external-directory owners、
-name/system positive-consuming transition、recursive advancer、post-lease sealer/query、reopen/currentness、live-OS、post-create
+以下 producer全部保持 `missing`：authenticated selector/policy signer-currentness、prelease/recursive parser、GrantReady resolver、
+external-directory owners、name/system positive-consuming transition、recursive acquisition backend/advancer、post-lease sealer/query、reopen/currentness、live-OS、post-create
 machine query、create/resume/recovery、pre-resume与 dynamic-load enforcement。`Infallible` producer使当前 closure不可构造。
 
 当前 API-set只表达一步 contract → exact non-recursive preloaded/KnownDLL/filesystem/SxS host；recursive suffix可包含这种一步
@@ -132,8 +142,8 @@ usage、settlement 或 money effect。
 
 ## 9. 后续顺序
 
-1. 把 recursive limits加入 authenticated launch policy，并实现真实 retained-handle recursive parser；
-2. 冻结并实现每 wave 的 grant/candidate/lease/negative/outcome-uncertain typed custody与 advancer；
+1. 实现真实 authenticated recursive-policy signer/currentness与 retained-handle recursive parser；
+2. 按已冻结合同实现每 producer wave 的 grant/candidate/lease/negative/outcome-uncertain backend与 positive advancer；
 3. 实现 final sealer/query、namespace/currentness/reopen 与 generation-drift fault matrix；
 4. 单独设计 nested API-set DAG与 Shadow positive authority；
 5. 再做 live OS、post-create machine、pre-resume/dynamic-load enforcement和受控 resume；

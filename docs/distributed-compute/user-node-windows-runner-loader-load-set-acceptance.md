@@ -13,6 +13,8 @@ verification_status: source_review_only
 # UserNode Windows Runner Loader Load-Set Authority V1 验收草案
 
 权威合同见 [Loader Load-Set authority](user-node-windows-runner-loader-load-set-authority.md)。
+逐波来源合同见
+[Recursive System-Image Acquisition Custody authority](user-node-windows-runner-recursive-system-image-acquisition-custody-authority.md)。
 
 ## 1. 本批证据等级
 
@@ -37,7 +39,8 @@ Windows、网络、设备或真实 Runner 验证：
 | launch-path discovery | `node_agent_managed_fs/{loader_launch_path_discovery,windows_loader_launch_path_discovery}.rs`、`runtime_loader_load_set/launch_path_discovery.rs` | typed retained-owner handle-chain candidate observations；不选择 CWD、不授予 grant |
 | exact-context/preliminary | `runtime_loader_load_set/launch_path_discovery/{exact_context_plan,prelease_pe_material}{,/digest,/closure}.rs` | uninhabited selector/parser、package-only pre-lease PE与 unresolved request plan；不是 GrantReady/final authority |
 | GrantReady + lineage | `runtime_loader_load_set/resolution/grant_ready{,/validation,/search_projection,/final_projection}.rs`、`exact_context_plan/lineage.rs` | private exact terminal/disposition/movable-owner、pre/post cross-binding、QueryVerified lineage与 pre-create projection source shapes；无 producer |
-| recursive final envelope | `resolution/system_closure{,/digest,/edge_order,/edge_projection,/projection_digest,/source_projection,/validation}.rs`、`pe_graph_validation/image_source.rs` | wave-zero prefix + system-postlease suffix、exact producer owner、frontier/fixpoint、forwarder chain与 final slice摘要；逐波 custody/producer缺失 |
+| recursive final envelope | `resolution/system_closure{,/digest,/edge_order,/edge_projection,/projection_digest,/source_projection,/validation}.rs`、`pe_graph_validation/image_source.rs` | wave-zero prefix + system-postlease suffix、exact producer owner、frontier/fixpoint、forwarder chain与 final slice摘要 |
+| recursive acquisition custody | `exact_context_plan/recursive_policy.rs`、`system_closure/acquisition{,/custody,/failure,/digest,/validation}.rs` | signed policy、nonempty producer→target / terminal None、whole-owner partial custody与 acquisition→projection cross-binding；所有真实 producer缺失 |
 | resolution owners | `runtime_loader_load_set/resolution.rs` | uninhabited PE graph/launch path/resolution、name grants、package/system FileId leases 与 pre/post-query authority |
 | successor model | `runtime_loader_load_set/model.rs` | 自有 exact root-lock 的单一 successor、全 authority residue、持有 lease/reopen receipt 的 indexed package files |
 | failure custody | `runtime_loader_load_set/failure.rs` | name-grant、content-lease、borrow-only、namespace-query 与 indexed post-barrier 五类 custody |
@@ -49,6 +52,7 @@ Windows、网络、设备或真实 Runner 验证：
 | nested seams | `work_admission_contract/capability.rs`、`candidate_promotion_contract/capability.rs`、`candidate_extraction/zip/types.rs` | 不丢 receipt/time/barrier/evidence/handle 的 purpose-specific consuming parts |
 | process successor bridge | `runtime_process_custody/model.rs`、`namespace_query.rs`、`windows.rs` | process preparation 只消费 loader-locked successor；pre-create currentness backend 形状已定义但无实现 |
 | source review | `runtime_loader_load_set_source_contract_tests.rs` | 未运行 guard，固定 owner graph、uninhabited prerequisites、failure split、zero-effect 负边界 |
+| recursive source review | `runtime_loader_recursive_wave_custody_source_contract_tests.rs` | 未运行 guard，固定 policy/per-wave source shape而非正向 producer |
 
 ## 3. 静态源码审阅目标
 
@@ -75,7 +79,8 @@ Windows、网络、设备或真实 Runner 验证：
    imports必须绑定 symbol name/ordinal、descriptor/thunk ordinal，forwarder作为 separate source-edge hop绑定 source export/
    target symbol/逐跳 evidence/cycle-depth receipt并执行已冻结 canonical rule。pre-lease validator不证明 system-image imports；
    独立 post-lease source envelope已冻结 stage locator、producer-bound owner、frontier/fixpoint、deterministic merge、global-root
-   forwarder chain与 final edge/name/system-owner reverse projection，但 recursive parser、逐波 grant/candidate/lease custody、
+   forwarder chain与 final edge/name/system-owner reverse projection；逐波 source contract还冻结 authenticated policy、
+   nonempty producer→target / terminal None、route-specific acquisition、partial custody与 cross-binding，但 policy/parser/backend/positive
    advancer/sealer/query仍 missing。pre-lease parser material不得预测
    lease generation，final sealer 必须在 lease 下 same-handle rehash/reparse 后加入真实 generation，禁止跨代 splice；
 7. resolution material 覆盖 normal/delay/forwarder、package/system modules、KnownDLL/API-set/SxS/system images、
@@ -90,8 +95,8 @@ Windows、网络、设备或真实 Runner 验证：
    与 runtime `LoadLibrary` enforcement 均为 resume blocker；
 9. exact searched-name/launch-path grants合同绑定 session、parent/name、disposition和 generation；terminal/
    `MustRemainAbsent` shape已写，`ShadowedByEarlierName`仅占位且当前 validator显式拒绝。present disposition digest直接绑定 package/system exact FileId，system还绑定 immutable section与 servicing
-   generation；实际 package+system lease owners 先为 post-lease final sealer 提供 generation，随后 consuming
-   query/aggregate 再确认同一 set；统一 FileId lease-set
+   generation；实际 package+system lease owners逐 base/producer wave进入 graph，final aggregate/sealer消费完整 generation set，
+   随后 consuming query再确认同一 set；统一 FileId lease-set
    拒绝 writable open/write/delete/writable-section mapping；两类 backend 均无 producer；
 10. name-grant `AuthenticatedRejected`、content-lease `DefinitiveRejected` 和 namespace-query `DefinitiveRejected`
     都必须持有与 exact owner/session/attempt/request/nonce 匹配的 authenticated-negative receipt；错绑或缺失
@@ -112,15 +117,16 @@ Windows、网络、设备或真实 Runner 验证：
 15. package files 与 purpose-specific extraction-directory probe 都有 candidate Windows access/share recipe，均只
     `FILE_OPEN`；目录 probe 保留原 DELETE owner、要求 share-read/write/delete 且不替代 namespace/content authority；
 16. transition 权威顺序要求 borrow-only launch-path discovery/pre-lease PE plan、authenticated exact CWD/unresolved request、
-    exact terminal/disposition/external-owner grant-ready resolution、name/launch grant acquisition、统一 package+system FileId
-    lease acquisition、lease 下 same-handle rehash/reparse、recursive suffix waves/empty frontier 与
-    final PE/launch/resolution profile V3 seal、consuming generation query、exact indexing、
+    wave-zero terminal/disposition/external-owner grant-ready resolution、base grants + package leases + base route-specific owners、
+    package same-handle rehash/reparse、producer-wave parse/outgoing request/grant/candidate/lease advancement、empty frontier、
+    final aggregate + PE/launch/resolution profile V3 seal、consuming generation query、exact indexing、
     retain directories、Runner-last file reopen、anchor receipt、identity/hash/path 与 final query；
 17. `existing_extraction_directory_access_share_compatibility=source_seam_written_windows_dynamic_unverified`；typed
     retained-owner seam 已接入 extraction→loader owner graph，但没有 Windows 动态证据；
     `launch_path_handle_chain_discovery=source_written_windows_dynamic_unverified`；exact-context/pre-lease/unresolved request/
     GrantReady/post-lease lineage/recursive final-envelope contracts为 `source_written_uncompiled_unrun`，但
-    selector/prelease-or-recursive parser/GrantReady resolver、external-directory owner、逐波 custody与 positive advancer producer以及
+    selector/policy signer-currentness/prelease-or-recursive parser/GrantReady resolver、external-directory owner、逐波 acquisition
+    backend与 positive advancer producer以及
     `launch_path_component_grant_backend` 仍 `missing`；
 18. success digest 不代替 resolution/namespace/lease authority；persistent grants 的 explicit authorized release/recovery 无
     producer，不得以 Drop/session disconnect 释放；
@@ -139,7 +145,8 @@ Windows、网络、设备或真实 Runner 验证：
 | launch-path retained-handle candidate discovery | 0 | 0 | 1 | source seam 已写；Windows access/FileId/type/reparse/canonical-chain/failure custody 未运行 |
 | exact selector/pre-lease PE/preliminary unresolved request | 0 | 0 | 1 | typed source已写；selector/parser producer missing，未编译/未运行 |
 | GrantReady terminal/disposition/external-owner contract | 0 | 0 | 1 | plan/validator/movable-owner source written；resolver/producer missing，Shadow rejected |
-| recursive system-image final envelope | 0 | 0 | 1 | owner/frontier/fixpoint/merge/digest source written；recursive parser、逐波 custody/advancer/sealer/query missing |
+| recursive system-image final envelope | 0 | 0 | 1 | owner/frontier/fixpoint/merge/digest source written；parser/sealer/query missing |
+| recursive per-wave acquisition custody | 0 | 0 | 1 | authenticated policy/whole-owner contract source written；backend/positive advancer missing |
 | exact PE graph / launch-path authority | 0 | 0 | 1 | authenticated parser 与 parent-chain grant/share authorities 均以 `Infallible` uninhabited |
 | exact startup/import resolution producer | 0 | 0 | 1 | resolution 不可构造，无 imports/system identities 或 launch-context proof |
 | searched-name / launch-path grants | 0 | 0 | 1 | 无 acquisition backend；terminal/absence未证明，Shadow path显式不可接受 |
@@ -251,7 +258,7 @@ exact 18 项：`runtime_phase`、`runtime_generation`、`runtime_start`、`runti
 - 把 sealed/pre-create KnownDLL/API-set/SxS fields 称为 live OS currentness，或把 share-read/hash 称为 FileId
   immutable-content lease；
 - 把 source type、`Infallible` prerequisite 或 consuming seam 称为 producer 已实现；
-- 把 recursive final projection envelope称为逐 wave grant/candidate/lease acquisition authority、真实 parser/sealer或 runtime proof；
+- 把 recursive final projection或 per-wave source contract称为真实 grant/candidate/lease backend、positive advancer、parser/sealer或 runtime proof；
 - 用 FileId、digest、lease generation 或 policy 任一单字段替代 package PE parser canonical composite，或接受跨代
   parser splice；
 - 用 path、digest、receipt scalar、caller-opened `File` 或短 borrow 替代 owner custody；

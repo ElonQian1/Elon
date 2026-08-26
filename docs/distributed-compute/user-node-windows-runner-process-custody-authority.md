@@ -16,7 +16,8 @@ verification_status: source_review_only
 [Launch Context Selection authority](user-node-windows-runner-launch-context-selection-authority.md)；最终 loader owner graph见
 [Loader Load-Set authority](user-node-windows-runner-loader-load-set-authority.md)。
 递归 final envelope见
-[Recursive System-Image Closure authority](user-node-windows-runner-recursive-system-image-closure-authority.md)。
+[Recursive System-Image Closure authority](user-node-windows-runner-recursive-system-image-closure-authority.md)，逐波来源合同见
+[Recursive System-Image Acquisition Custody authority](user-node-windows-runner-recursive-system-image-acquisition-custody-authority.md)。
 
 ## 1. 本批结论
 
@@ -98,10 +99,10 @@ outcome uncertainty。因此未来 bridge 不能是 path/raw-handle getter，也
 - 按值消费 exact admitted/archive Runner custody，不能接收 caller path、digest、index；
 - 先从 retained handles 做 launch-path discovery 与 pre-lease PE material，再由 authenticated context 选择 exact CWD
   并形成 preliminary unresolved request plan；GrantReady contract/movable-owner source shape已写，但真实 resolver必须先补齐
-  exact terminal/disposition、external directory owners与 resolved-system dedupe，才能形成 owner并取得 searched-name/
-  launch-component grants与 package/system linear
-  content-lease set，在 leases 下 same-handle rehash/reparse 并封印 final PE/launch/resolution，最后执行 consuming
-  generation query；每种 definitive/authenticated rejection 都必须保留与 exact owner/attempt/session/
+  wave-zero terminal/disposition、external directory owners与 resolved-system dedupe，随后取得 base grants、package leases与
+  base route-specific system owners，完成 package same-handle rehash/reparse；再逐 producer wave解析 source images、取得 outgoing
+  grants/candidates/leases并推进 next frontier，empty frontier后才形成 final aggregate、封印 final PE/launch/resolution并执行
+  consuming generation query；每种 definitive/authenticated rejection 都必须保留与 exact owner/attempt/session/
   request/nonce 匹配的 authenticated-negative receipt；
 - 将每项 package-file content lease 移入 parent-relative metadata identity anchor，system-image lease 保留在 resolution
   owner；reopen 必须消费该 anchor 与 replacement handle 才能产生证明 lease continuity 的 receipt；post-close dispatch
@@ -112,8 +113,9 @@ outcome uncertainty。因此未来 bridge 不能是 path/raw-handle getter，也
   search-name和 exact launch context；PE authority必须先以 Runner basename与 authenticated process preloaded/bootstrap set
   预种 expected process-machine/cache-key/immutable-section/evidence-bound module cache。pre-lease当前只形成 package-image
   closure claim与 typed external leaves；post-lease system-image own imports 的 source-only final envelope已冻结
-  base/suffix provenance、producer owner、frontier/fixpoint、merge与摘要，但 retained-handle recursive parser、逐波
-  grant/candidate/lease custody、advancer和 sealer/query producer仍为 blocker。
+  base/suffix provenance、producer owner、frontier/fixpoint、merge与摘要；相邻 source contract还冻结 authenticated policy、
+  nonempty producer→target / terminal None、route-specific acquisition、whole-owner partial custody与 projection cross-binding，但真实 policy/
+  retained-handle recursive parser/backend/positive advancer和 sealer/query producer仍为 blocker。
   每条请求绑定 symbol name/ordinal、descriptor/thunk ordinal，forwarder绑定 source-export/target-symbol/逐跳 evidence/cycle-depth、
   已冻结 canonical merge rule 与 resolved-module cache-key collision closure；pre-lease parser material 只绑定 FileId +
   sealed digest + policy，不得预测 generation；post-lease final sealer 必须在同一 handles 重哈希/重解析后加入真实 lease
@@ -123,8 +125,8 @@ outcome uncertainty。因此未来 bridge 不能是 path/raw-handle getter，也
   activation-context receipt、exact search directory、FileId 与 immutable section；普通 filesystem system images
   保留 servicing-generation-bound immutable content lease 与 parent-relative file/open/section receipts。present
   searched-name disposition 直接绑定 package FileId，或 system FileId + immutable section + servicing generation；实际
-  package+system lease owners 先为 post-lease final sealer 提供 generations，随后 consuming query/aggregate 必须确认同一
-  set；whole searched-name namespace authority
+  package+system lease owners逐 base/producer wave进入同一线性 graph，final aggregate/sealer消费完整 generations，随后
+  consuming query必须确认同一 set；whole searched-name namespace authority
   单独保留；external System/Windows/SxS search directory 还保留 full handle-derived ancestor chain、parent share/grant
   contract 与 namespace-alias currentness receipt，并纳入 `startup_import_resolution_profile_digest`；
 - 五类 failure custody 分别是 name-grant acquisition、content-lease acquisition、纯 pre-dispatch
@@ -135,7 +137,8 @@ outcome uncertainty。因此未来 bridge 不能是 path/raw-handle getter，也
   classification前重算。当前明确的 positive shapes仅为 name-grant与system-image，其 consuming producer仍 uninhabited；close ambiguity使用
   `ManuallyDrop` quarantine，不运行 ordinary `File` Drop。
 
-但 selector/prelease-or-recursive parser、GrantReady resolver/external-directory owners/逐波 custody advancer、cache-seed/exact PE graph、selected launch-path/grants 和
+但 selector/policy signer-currentness/prelease-or-recursive parser、GrantReady resolver/external-directory owners/逐波 acquisition
+backend/positive advancer、cache-seed/exact PE graph、selected launch-path/grants和
 resolution authority 以 `Infallible` 或明确 blocker保持不可构造，name-grant/
 FileId-lease/query/reopen producer 也不存在。extraction directory 已新增 retained DELETE owner + parent-relative
 share-delete probe；Runner/package-root/全部 plan-directory retained handle-chain candidate discovery 也已写，但不选择
@@ -295,7 +298,8 @@ FileId、`startup_import_resolution_profile_digest`、`startup_import_namespace_
 launch token/SD/owner-label/access-check/private-desktop binding digests、live primary-token session/logon namespace 与 exact
 desktop access-check binding、resource/permission ceiling、runtime generation before
 与 authority/process/clock fences；这些 digests 不代替 retained launch owners 或 query-back。resolution profile V3 还必须绑定
-selector、preliminary request-plan、grant-ready plan、recursive closure、token/AppContainer、architecture/WOW64、empty-environment/search policy、
+selector、preliminary request-plan、grant-ready plan、recursive closure（含 authenticated recursive policy与 acquisition receipts）、
+token/AppContainer、architecture/WOW64、empty-environment/search policy、
 cwd 与 creation flags，但不得包含 required process context digest。required launch-context V3绑定 selector+final resolution；其
 expected digest由 resolution外 launch-security owner携带，process policy重算后必须相等。pre-create currentness 再绑定
 namespace/fence/content-lease/resolution/OS-build/KnownDLL/API-set/SxS/
@@ -317,9 +321,10 @@ WebSocket。source-lineage 的 local currentness、runtime transition、Host run
 1. 先动态验证 source-written `existing_extraction_directory_access_share_compatibility` 的 Windows access/share、
    identity/path、descendant traversal 与 failure-custody 矩阵；
 2. 动态验证 retained launch-path handle-chain discovery、pre-lease PE material与 authenticated exact CWD selector；
-3. 形成 preliminary unresolved request plan，补齐 exact terminal/disposition、external directory owners与 resolved-system dedupe；
-4. 依次实现 loader name/launch grants、FileId leases、lease 下 same-handle rehash/reparse与 exact PE/launch/startup-import
-   seal，再完成 query、anchor-consuming package-file reopen/recovery 及 Windows matrix；
+3. 形成 preliminary unresolved request plan，补齐 wave-zero terminal/disposition、external directory owners与 resolved-system dedupe；
+4. 实现 base grants/package leases/route-specific owners及 package same-handle reparse，再实现 authenticated recursive policy、
+   recursive parser与逐 producer wave acquisition backend/positive advancer；empty frontier后形成 final aggregate并完成 exact
+   PE/launch/startup-import seal、consuming query、anchor-consuming package-file reopen/recovery及 Windows matrix；
 5. 实现 launch-security producer，创建并保留 exact private window-station/desktop owners，完整 query-back token/
    integrity/SID/privilege/capability、owner/label/account/effective ACL 与 qualified desktop binding，并做 sibling
    reopen/resume/injection 矩阵；

@@ -16,7 +16,8 @@ verification_status: source_review_only
 owner 合同见 [Extraction Directory Share Custody authority](user-node-windows-runner-extraction-directory-share-custody-authority.md)，
 最终 loader 合同仍由 [Loader Load-Set authority](user-node-windows-runner-loader-load-set-authority.md) 负责。
 候选之后的 typed source 合同见
-[Launch Context Selection authority](user-node-windows-runner-launch-context-selection-authority.md)。
+[Launch Context Selection authority](user-node-windows-runner-launch-context-selection-authority.md)；后续逐波来源见
+[Recursive System-Image Acquisition Custody authority](user-node-windows-runner-recursive-system-image-acquisition-custody-authority.md)。
 
 ## 1. 本批结论
 
@@ -110,18 +111,20 @@ retained admitted owners
 → borrow-only launch-path discovery + pre-lease authenticated PE material
 → authenticated launch-context selection + preliminary unresolved request plan
 → GrantReady contract → missing exact terminal/disposition/external-directory resolver/producer
-→ searched-name/launch-component grants
-→ all package + deduplicated resolved-filesystem-system FileId content leases
-→ lease 下 same-handle rehash/re-parse
+→ base searched-name/launch-component grants + package leases + base route-specific system owners
+→ package lease 下 same-handle rehash/re-parse
+→ producer-wave recursive parse/outgoing request/grant/candidate/lease advancement
+→ empty frontier + final aggregate
 → sealed exact PE graph + launch-path + startup/import resolution
 → consuming generation query
 → close/reopen/final currentness
 ```
 
-本专题只负责第一行中的 launch-path discovery seam。下一专题已写入 uninhabited PE material、selection、unresolved request、
-GrantReady private plan/typed movable owners与 post-lease same-owner lineage source shapes；PE source shape只冻结 package-image
+本专题只负责第一行中的 launch-path discovery seam。后续专题已写入 uninhabited PE material、selection、unresolved request、
+GrantReady private plan/typed movable owners、post-lease same-owner lineage与逐 producer wave acquisition custody source shapes；PE source shape只冻结 package-image
 base import/separate forwarder-hop、cycle/depth与 canonical merge。真实 PE parser、authenticated selector、exact terminal/
-disposition resolver、external directory owner、grant/lease positive advancer、seal、query 或 reopen producer仍不存在；它也不证明
+disposition resolver、recursive-policy signer/currentness、external directory owner、grant/candidate/lease backend、positive
+advancer、seal、query或 reopen producer仍不存在；它也不证明
 system-image recursive closure。request skeleton不能被解释为 GrantReady authority，GrantReady contract不能被解释为 producer。
 
 ## 7. blocker、Ready 与零效果

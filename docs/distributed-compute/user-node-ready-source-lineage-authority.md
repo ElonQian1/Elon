@@ -136,14 +136,16 @@ authenticated session、append-only ledger、重放与撤销闭环关闭。v14 �
 Ready 分支。
 
 2026-08-26 的 Windows Runner 草案只写入单一 loader successor、完整 by-value seam、FileId leases/reopen receipts、
-五类 failure custody、GrantReady wave-zero prefix、post-lease recursive system-image final projection envelope、
-suspended-child/atomic-Job/pre-create currentness 与 unconfirmed whole-graph parking；真实 selector、prelease/recursive parser、
-resolver、逐波 grant/candidate/lease custody advancer、sealer/query、exact PE/launch/live-OS、launch-security/currentness/
+五类 failure custody、GrantReady wave-zero prefix、authenticated recursive policy/per-producer-wave custody contract、post-lease
+recursive system-image final projection envelope、suspended-child/atomic-Job/pre-create currentness与 unconfirmed whole-graph parking；
+真实 selector/policy signer-currentness、prelease/recursive parser、resolver、grant/candidate/lease backend/positive advancer、
+sealer/query、exact PE/launch/live-OS、launch-security/currentness/
 release-recovery producers 均缺。extraction-share 与 Runner/package-root/全部 plan-directory retained handle-chain candidate
 discovery 已形成 typed source seams，但没有真实 selected CWD/component grant，两层 Windows 动态矩阵仍缺；pre-resume/dynamic-load、
 `ResumeThread`、IPC/enforcement/Store blocked。因此
 `runtime_transition_authority` 与 `host_runtime_authority` 仍均为 `missing`；精确
-边界见 [`recursive system-image closure`](user-node-windows-runner-recursive-system-image-closure-authority.md)、
+边界见 [`recursive acquisition custody`](user-node-windows-runner-recursive-system-image-acquisition-custody-authority.md)、
+[`recursive system-image closure`](user-node-windows-runner-recursive-system-image-closure-authority.md)、
 [`loader load-set`](user-node-windows-runner-loader-load-set-authority.md) 与
 [`process custody`](user-node-windows-runner-process-custody-authority.md)，目录 seam 另见
 [`extraction share custody`](user-node-windows-runner-extraction-directory-share-custody-authority.md)，候选发现见
@@ -173,8 +175,9 @@ Attempt 或 Lease。
 ## 11. 后续顺序
 
 1. 沿 Windows Runner 草案动态验证 source-written extraction-share 与 launch-path discovery，并实现真实 authenticated CWD
-   selector、prelease/recursive parser、GrantReady resolver、name/launch grants、FileId leases、逐波 candidate/grant/lease custody
-   advancer、lease 下 rehash/reparse 与 exact recursive PE/launch/resolution seal、query/reopen、launch-security/private desktop、
+   selector/recursive-policy signer-currentness、prelease/recursive parser、GrantReady resolver、base grants/leases、逐 producer
+   wave candidate/grant/lease backend与 positive advancer、same-owner reparse及 exact recursive PE/launch/resolution
+   seal/final aggregate/query/reopen、launch-security/private desktop、
    live-OS/pre-create/pre-resume currentness、explicit release/recovery、dynamic-load、
    IPC/enforcement/Store、受控 resume 与健康/撤销，形成真实 Host runtime authority；
 2. 新建 v15 endpoint session，不修改 v14 blocked-only；

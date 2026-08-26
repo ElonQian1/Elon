@@ -14,7 +14,8 @@ verification_status: source_review_only
 
 权威合同见 [Launch Path Discovery authority](user-node-windows-runner-launch-path-discovery-authority.md)。
 后续 source-only seam见
-[Launch Context Selection acceptance](user-node-windows-runner-launch-context-selection-acceptance.md)。
+[Launch Context Selection acceptance](user-node-windows-runner-launch-context-selection-acceptance.md)与
+[Recursive System-Image Acquisition Custody acceptance](user-node-windows-runner-recursive-system-image-acquisition-custody-acceptance.md)。
 
 ## 1. 本批证据等级
 
@@ -81,9 +82,9 @@ verification_status: source_review_only
   `grant_ready_resolution_producer=missing`、`external_search_directory_authority_producer=missing`；
 - `launch_path_component_grant_backend=missing`；
 - exact `SealedWindowsLoaderLaunchPathAuthority` 仍含 `Infallible`；
-- transition order 固定为 discovery/pre-lease material → authenticated selection/unresolved request → exact
-  terminal/disposition/external owner grant-ready resolution → grants → leases → same-handle rehash/reparse → final seal →
-  query/reopen。
+- transition order固定为 discovery/pre-lease material → authenticated selection/unresolved request → wave-zero exact
+  terminal/disposition/external owner grant-ready resolution → base grants/package leases/route-specific owners → package
+  same-handle rehash/reparse → producer-wave parse/outgoing acquisition → empty frontier/final aggregate → final seal/query/reopen。
 
 以上均只计为 source review，不增加动态 passed 数。
 

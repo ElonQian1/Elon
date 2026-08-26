@@ -16,18 +16,20 @@ verification_status: source_review_only
 只来自 [Launch Path Discovery authority](user-node-windows-runner-launch-path-discovery-authority.md)，下游最终封印仍由
 [Loader Load-Set authority](user-node-windows-runner-loader-load-set-authority.md) 负责。
 post-lease system-image fixed-point另见
-[Recursive System-Image Closure authority](user-node-windows-runner-recursive-system-image-closure-authority.md)。
+[Recursive System-Image Closure authority](user-node-windows-runner-recursive-system-image-closure-authority.md)，逐波 policy/custody见
+[Recursive System-Image Acquisition Custody authority](user-node-windows-runner-recursive-system-image-acquisition-custody-authority.md)。
 
 ## 1. 本批结论
 
 本批写入一条仍不可生产的私有 typed chain：authenticated exact launch-context intent、authenticated pre-lease PE material、
-preliminary unresolved resolution request plan、GrantReady exact terminal/disposition plan、grants/统一 package+system lease
-custody、post-lease same-owner cross-binding，以及 QueryVerified lineage 到 process pre-create projection。preliminary plan 仍只冻结
+preliminary unresolved resolution request plan、GrantReady wave-zero terminal/disposition plan、base acquisition、逐 producer wave
+grants/route-specific owners/leases、最终统一 package+system lease custody、post-lease same-owner cross-binding，以及 QueryVerified
+lineage到 process pre-create projection。preliminary plan仍只冻结
 resolver 必须消费的精确请求；GrantReady 合同虽已写，真实 resolver/owner producer 仍为 `missing`。该 owner graph 修正
 grant/lease 前错误持有 final resolution 的时间顺序，并消除 loader resolution digest 与 process required-launch-context digest 的
 直接自引用。独立的 source-only recursive final-projection envelope现已冻结 wave-zero prefix、system-postlease suffix、
-producer-bound parse receipts、frontier/fixpoint与 final slice摘要，但逐 wave grant/candidate/lease custody、advancer与 sealer producer仍
-`missing`。
+producer-bound parse receipts、frontier/fixpoint与 final slice摘要；authenticated recursive policy与逐 producer wave whole-owner
+custody contract也已写，但真实 signer/currentness、grant/candidate/lease backend、positive advancer与 sealer producer仍 `missing`。
 
 证据严格为 `source_written/source_review_only/implementation_uncompiled/implementation_unrun`、
 `passed=0/failed=0`、Windows dynamic=`0`、`migration/table/writer=none/none/none`。Manifest V1、InstallPlan V1 与
@@ -47,6 +49,11 @@ key/generation、signature receipt，以及以下完整 projection：
 - required restricted-token/AppContainer policy expectation；它不是 token handle 或 launch-security authority；
 - 有序 DLL search roles 与有序 `preloaded/api_set/known_dll/side_by_side/filesystem` routes，禁止 ambient PATH。
 
+递归 limits与 parser policy不再由 final sealer从上述 intent digest旁路推导。独立 signed recursive policy V1必须直接逐项
+绑定本 intent digest、preliminary request-plan digest、parser policy、authenticated preloaded set、上述 route order与六项
+limits；admission/manifest/machine/search lineage经前两项 authenticated digests传递。V1必须 exact复用 route order，不得收窄
+或按 wave扩大；未来若允许显式收窄，必须升级 policy schema/domain。
+
 不得默认 package root、Runner parent、第一个 plan directory 或当前进程 CWD。Plan-directory 选择必须同时核对 plan ordinal、
 relative path、candidate ordinal、FileId identity、component-set 与 observation receipt。最终 selected binding 分开保留：
 
@@ -63,7 +70,8 @@ role 时也不能丢失 role/step ordinal。
 ## 3. Authenticated pre-lease PE material
 
 `AuthenticatedWindowsPreLeasePeMaterial` 只绑定 retained package-file handles 上的 admission、plan/evidence、Runner、target
-architecture、expected process-machine context、parser policy 与 parser input receipt。每个 parsed package image 都必须按自己的
+architecture、expected process-machine context、parser policy 与 parser input receipt。parser policy只有与独立 authenticated
+recursive policy逐项相等并通过其签名 lineage时才能称为 authenticated，不能由裸 digest自证。每个 parsed package image都必须按自己的
 package-file ordinal 与 plan/evidence/retained file 的 relative path、sealed digest、size、FileId 做 exact cross-binding。parsed-image
 ordinal 与 package-file ordinal 是不同坐标；Runner root通过 package-file ordinal 查找后再绑定其 parsed-image ordinal，不得按
 vector index 猜测。
@@ -114,26 +122,28 @@ admission 的 extractor、scalar retry permit、Clone/Copy/Serde、path/raw-hand
 LaunchPathDiscoveredWork
 → authenticated exact selection + pre-lease PE material
 → PreliminaryResolutionRequestsPlannedWork
-→ exact terminals + per-step dispositions + external directory owners
+→ wave-zero exact terminals + per-step dispositions + external directory owners
 → GrantReadyWindowsRunnerResolutionPrerequisite
-→ searched-name / launch-component grants
-→ all package + deduplicated resolved-filesystem-system immutable-content leases
-→ same-handle full-package rehash/reparse under grants+leases
+→ base searched-name / launch-component grants + package leases + base route-specific system owners
+→ same-handle full-package rehash/reparse under package leases
 → exact prelease-image/import-edge ↔ postlease-image/import-binding cross-binding receipt
-→ post-lease system-image recursive parse receipts + deterministic suffix waves
-→ empty recursive frontier + exact final edge/name/system-owner reverse projection
+→ producer wave `k` same-owner parse + outgoing requests/terminal/dispositions/grants/candidates/leases
+→ [next frontier非空] target parse wave `k+1` owners + deterministic suffix；[empty] terminal `A_N` target=None
+→ empty recursive frontier + final aggregate + exact final edge/name/system-owner reverse projection
 → final exact PE graph + launch path + loader resolution seal
 → consuming grant/lease generation query
 → close/reopen/final currentness
 → retained process pre-create launch-context projection
 ```
 
-name-grant failure持有 whole grant-ready owner；content-lease failure持有 pre-final namespace grants、统一 package/system acquired
-lease custody、active dispatch与 pending refs；纯 borrow failure持有 whole preliminary request owner。name-grant 与 system-image
+base name-grant failure持有 whole grant-ready owner；base content-lease failure持有 pre-final namespace grants、已取得
+package/system owner custody、active dispatch与 pending refs；recursive failure另按 producer wave保留 whole earlier graph、active
+attempt、returned outcomes与 pending refs。纯 borrow failure持有 whole preliminary request owner。name-grant与 system-image
 positive receipt虽已有 request/nonce/exact response bytes+digest/self-binding 的 typed custody，消费 exact attempt 形成正向 owner 的
 transition仍以 `Infallible` 保持不可达。namespace query failure持有 post-lease whole prerequisite。任何 grants/leases 前路径都不
-持有 `SealedWindowsLoaderResolutionAuthority`。final resolution只能在全部 grants 与 package/system leases 完成后进入
-`PostLeaseSealedWindowsRunnerLoadSetPreQueryPrerequisite`；same-owner image/edge cross-binding、QueryVerified lineage 和 pre-create
+持有 `SealedWindowsLoaderResolutionAuthority`。final resolution只能在 base acquisition与全部 producer-wave
+grants/owners/leases完成且 frontier为空后进入 `PostLeaseSealedWindowsRunnerLoadSetPreQueryPrerequisite`；same-owner
+image/edge cross-binding、QueryVerified lineage 和 pre-create
 projection已有 source shape，但 post-lease sealer/query/positive-consuming producer继续不可构造。pre-create projection只是 retained
 typed lineage，不是 post-create `IsWow64Process2`/process-machine query receipt。
 
@@ -144,7 +154,10 @@ typed lineage，不是 post-create `IsWow64Process2`/process-machine query recei
 ```text
 launch_context_selector_digest
 → selected-context binding + preliminary_resolution_request_plan_digest
-→ grant_ready_resolution_plan_digest
+├→ grant_ready_resolution_plan_digest
+└→ authenticated_recursive_resolution_policy_digest
+authenticated_recursive_resolution_policy_digest + grant_ready_resolution_plan_digest
+→ recursive_wave_acquisition_receipt_digests
 → recursive_resolution_closure_digest
 → windows_loader_resolution_profile.v3
 → windows_runner_required_launch_context.v3
@@ -152,7 +165,7 @@ launch_context_selector_digest
 ```
 
 final loader resolution profile V3 必须同时包含 selector digest、preliminary request-plan、grant-ready plan与 recursive closure
-digest；不得
+digest；closure内逐项绑定 authenticated recursive policy与 acquisition receipts。profile不得
 包含未来 required process context digest。required process launch context V3 则同时包含 selector digest与 final startup/import
 resolution profile digest。其 expected digest存入不参与 resolution-profile hash 的 launch-security bridge，并在 process policy
 重算后做 equality check。由此 final resolution先完成、process context后完成，不要求 SHA-256 fixed point，也不丢失 authenticated
@@ -179,6 +192,10 @@ system_image_positive_consuming_transition = missing
 postlease_exact_pe_import_graph_sealer = missing
 postlease_same_owner_lineage_contract = source_written_uncompiled_unrun
 recursive_system_import_closure_contract = source_written_uncompiled_unrun
+recursive_system_import_acquisition_custody_contract = source_written_uncompiled_unrun
+authenticated_recursive_policy_producer = missing
+recursive_wave_acquisition_backend = missing
+recursive_wave_positive_advancer = missing
 recursive_system_import_closure_producer = missing
 startup_import_resolution_producer = missing
 post_create_live_process_machine_context_queryback = missing
@@ -192,5 +209,6 @@ post_create_live_process_machine_context_queryback = missing
 ## 8. 源码铺设与生产可达
 
 源码铺设顺序允许在架构阶段继续冻结下一 typed contract；生产可达顺序不变：extraction-share 与 discovery 的真实 Windows
-动态矩阵仍必须先留下非零通过证据，且 selector/parser/grant/lease/post-lease sealer/query/reopen/currentness producers 全部闭合后
+动态矩阵仍必须先留下非零通过证据，且 selector/policy/parser/grant/candidate/lease/positive-advancer/post-lease
+sealer/query/reopen/currentness producers 全部闭合后
 才可提升 loader predecessor。任何 source shape、digest 或人工 review 都不能升级 Runtime、Ready、Provider 或经济效果。
