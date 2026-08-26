@@ -21,6 +21,7 @@ interface ChatGptNewConversationRecoveryOptions {
   suspended: boolean
   onState: (state: LocalAiWebSessionState) => void
   onMessage: (message: string) => void
+  onPageBoundaryConfirmed: () => void
 }
 
 export default function useChatGptNewConversationRecovery({
@@ -31,9 +32,10 @@ export default function useChatGptNewConversationRecovery({
   suspended,
   onState,
   onMessage,
+  onPageBoundaryConfirmed,
 }: ChatGptNewConversationRecoveryOptions) {
-  const callbacks = useRef({ onState, onMessage })
-  callbacks.current = { onState, onMessage }
+  const callbacks = useRef({ onState, onMessage, onPageBoundaryConfirmed })
+  callbacks.current = { onState, onMessage, onPageBoundaryConfirmed }
 
   useEffect(() => {
     if (!startedAtMs || providerId !== 'chatgpt' || !ownerKey || suspended) return
@@ -76,6 +78,7 @@ export default function useChatGptNewConversationRecovery({
             if (retried?.commandResult?.action === 'new_conversation'
               && retried.commandResult.ok) {
               callbacks.current.onState(retried)
+              callbacks.current.onPageBoundaryConfirmed()
               callbacks.current.onMessage('ChatGPT 新会话已在后台确认，可以继续输入。')
               return
             }

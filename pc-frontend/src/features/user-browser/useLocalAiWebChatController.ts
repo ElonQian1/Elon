@@ -41,6 +41,7 @@ import {
 import {
   chatGptNewConversationResetControlAction,
   googleNewConversationNeedsReload,
+  localAiNewConversationCanDispatchQueuedSend,
   localAiNewConversationNativeReady,
   selectLocalAiNewConversationPath,
 } from './localAiNewConversation'
@@ -83,6 +84,7 @@ export default function useLocalAiWebChatController(
   const [busyAction, setBusyAction] = useState('')
   const [message, setMessage] = useState('')
   const [newConversationRecoveryStartedAtMs, setNewConversationRecoveryStartedAtMs] = useState(0)
+  const [newConversationPageConfirmed, setNewConversationPageConfirmed] = useState(false)
   const pendingResponseSlow = useLocalAiPendingResponseWatchdog(requestedSessionIdentity, pendingResponses)
   const autoStartKey = useRef('')
   const backgroundReconnectAttempts = useRef(0)
@@ -189,6 +191,7 @@ export default function useLocalAiWebChatController(
     queuedSendRef.current = null
     queuedSendDispatching.current = false
     newConversationBaselineId.current = ''
+    setNewConversationPageConfirmed(false)
     setBusyAction('')
     setMessage('')
     setNewConversationRecoveryStartedAtMs(0)
@@ -206,14 +209,21 @@ export default function useLocalAiWebChatController(
       newConversationRecoveryStartedAtMs,
       newConversationBaselineId.current,
     )
+    const queuedSendReady = localAiNewConversationCanDispatchQueuedSend(
+      providerId,
+      nativeReady,
+      newConversationPageConfirmed,
+    )
     if (nativeReady && !queuedSend) {
       newConversationBaselineId.current = ''
+      setNewConversationPageConfirmed(false)
       setNewConversationRecoveryStartedAtMs(0)
       return
     }
-    if (nativeReady && queuedSend && !busyAction && !queuedSendDispatching.current) {
+    if (queuedSendReady && queuedSend && !busyAction && !queuedSendDispatching.current) {
       queuedSendDispatching.current = true
       newConversationBaselineId.current = ''
+      setNewConversationPageConfirmed(false)
       setNewConversationRecoveryStartedAtMs(0)
       setQueuedSend(null)
       queuedSendRef.current = null
@@ -225,6 +235,7 @@ export default function useLocalAiWebChatController(
     // 输入框永远显示空白；排队消息只在新会话绑定成功后发送，超时则安全还原草稿。
     if (Date.now() - newConversationRecoveryStartedAtMs < NEW_CONVERSATION_RECOVERY_TIMEOUT_MS) return
     newConversationBaselineId.current = ''
+    setNewConversationPageConfirmed(false)
     setNewConversationRecoveryStartedAtMs(0)
     if (queuedSend) {
       restoreQueuedSend(queuedSend)
@@ -234,7 +245,8 @@ export default function useLocalAiWebChatController(
     } else {
       setMessage('新会话后台连接超时；输入仍可继续编辑，如页面显示旧内容可打开官方页确认。')
     }
-  }, [busyAction, liveSnapshot, newConversationRecoveryStartedAtMs, queuedSend, visibleSessionState])
+  }, [busyAction, liveSnapshot, newConversationPageConfirmed,
+    newConversationRecoveryStartedAtMs, providerId, queuedSend, visibleSessionState])
 
   useEffect(() => {
     if (!newConversationRecoveryStartedAtMs || providerId !== 'google-ai-mode' || !ownerKey) return
@@ -269,6 +281,7 @@ export default function useLocalAiWebChatController(
     suspended: busyAction === 'new_conversation',
     onState: setSessionState,
     onMessage: setMessage,
+    onPageBoundaryConfirmed: () => setNewConversationPageConfirmed(true),
   })
 
   useEffect(() => {
@@ -559,6 +572,7 @@ export default function useLocalAiWebChatController(
   function beginLocalNewConversation() {
     const previousDraft = draftRef.current
     newConversationBaselineId.current = visibleSessionState?.activeConversationId ?? ''
+    setNewConversationPageConfirmed(false)
     setNewConversationRecoveryStartedAtMs(Date.now())
     setPendingSends([])
     setPendingResponses([])
@@ -606,7 +620,12 @@ export default function useLocalAiWebChatController(
             if (result?.action !== 'new_conversation' || result.ok) {
               const background = await keepLocalAiNewConversationInNativeForeground(provider, ownerKey, next)
               setSessionState(background)
-              setMessage(`已进入 ${provider.displayName} 新会话；可以立即输入，官网上下文正在后台确认。`)
+              if (result?.action === 'new_conversation' && result.ok) {
+                setNewConversationPageConfirmed(true)
+                setMessage(`已确认 ${provider.displayName} 空白新会话；首条消息可以立即发送，富内容上下文继续在后台同步。`)
+              } else {
+                setMessage(`已进入 ${provider.displayName} 新会话；可以立即输入，官网上下文正在后台确认。`)
+              }
               return background
             }
             setSessionState(next)
@@ -654,6 +673,7 @@ export default function useLocalAiWebChatController(
 
   function failLocalNewConversation(previousDraft: string, error: unknown) {
     newConversationBaselineId.current = ''
+    setNewConversationPageConfirmed(false)
     setNewConversationRecoveryStartedAtMs(0)
     const queued = queuedSendRef.current
     if (queued) {
