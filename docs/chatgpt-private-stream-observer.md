@@ -1,7 +1,7 @@
 ---
 capability_id: android_chatgpt_private_stream_observer_v1
 implementation_status: completed
-verification_status: device_verified_protocol_adaptive_watchdog_regression_pending
+verification_status: device_verified_completion_v1_1_1302_and_structural_sparse_watchdog_v1_1_1310
 production_default: true
 repeat_implementation: legacy_sse_and_websocket_discovery_not_required
 ---
@@ -83,11 +83,21 @@ generations. Do not repeat protocol discovery without a current regression.
 
 ## Adaptive native snapshot scheduling
 
-Adapter `181` keeps the completed private observer as the primary streaming signal.
+Adapter `188` keeps the completed private observer as the primary streaming signal.
 Each accepted private update schedules the native snapshot directly. While that signal is
 active, duplicate DOM mutations no longer trigger another snapshot and the fixed 400 ms
 heartbeat becomes a four-second read-only watchdog. If no private stream is available, the
 original DOM heartbeat is unchanged; completion, parsing failure, timeout, or protocol drift
 therefore continues through the official DOM fallback. Targeted policy and Android contract
-tests cover watchdog selection, timer replacement, and adapter wiring. Device regression is
-pending and does not invalidate the earlier private-stream protocol verification.
+tests cover watchdog selection, timer replacement, and adapter wiring.
+
+Xiaomi acceptance on APK `v1.1.1310 (1320)` verified the sparse-watchdog timer and
+JavaScript-to-native settlement bridge with the production policy algorithm in an isolated,
+no-request page fixture. The watchdog fired after 5.528 seconds, native streaming settled,
+and the original conversation and provider were restored. The fixture did not create a
+conversation, send or replay an official request, clear cookies or application data, or emit
+private content. This closes the timer/bridge regression gap without claiming that the sampled
+official response naturally produced a sparse external stream. A real private completion was
+already device verified on `v1.1.1302 (1312)`; the official DOM snapshot remains authoritative
+for parse, timeout, protocol, and natural-stream failures. Do not repeat this structural
+watchdog research without current regression evidence.

@@ -37,6 +37,20 @@ class WebAiPrivateTransportCatalogTest {
         )
         assertTrue(streamSettlement.getBoolean("production_default"))
 
+        val streamObserver = values.first {
+            it.getString("capability_id") == "android_chatgpt_private_stream_observer_v1"
+        }
+        assertEquals("completed", streamObserver.getString("implementation_status"))
+        assertEquals(
+            "device_verified_completion_v1_1_1302_and_structural_sparse_watchdog_v1_1_1310",
+            streamObserver.getString("verification_status"),
+        )
+        assertTrue(streamObserver.getBoolean("production_default"))
+        assertEquals(
+            "official_dom_stream_snapshot",
+            streamObserver.getString("fallback"),
+        )
+
         values.forEach { row ->
             assertFalse(row.getBoolean("direct_post_enabled"))
             assertTrue(row.getBoolean("official_page_authoritative"))
