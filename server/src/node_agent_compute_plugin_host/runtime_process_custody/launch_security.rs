@@ -42,6 +42,9 @@ pub(super) struct SealedWindowsRunnerLaunchSecurity {
     primary_token: OwnedHandle,
     process_descriptor: AlignedSelfRelativeSecurityDescriptor,
     thread_descriptor: AlignedSelfRelativeSecurityDescriptor,
+    launch_context_selector_digest: String,
+    startup_import_resolution_profile_digest: String,
+    expected_required_launch_context_digest: String,
     token_profile_digest: String,
     restricted_token_expected: bool,
     app_container_expected: bool,
@@ -157,7 +160,10 @@ pub(super) struct WindowsRunnerCreateSecurity<'owner> {
 
 impl SealedWindowsRunnerLaunchSecurity {
     pub(super) fn validate(&self) -> Result<()> {
-        if !is_sha256(&self.token_profile_digest)
+        if !is_sha256(&self.launch_context_selector_digest)
+            || !is_sha256(&self.startup_import_resolution_profile_digest)
+            || !is_sha256(&self.expected_required_launch_context_digest)
+            || !is_sha256(&self.token_profile_digest)
             || !is_sha256(&self.token_user_sid_digest)
             || !is_sha256(&self.process_owner_sid_digest)
             || !is_sha256(&self.thread_owner_sid_digest)
@@ -225,6 +231,18 @@ impl SealedWindowsRunnerLaunchSecurity {
 
     pub(super) fn token_profile_digest(&self) -> &str {
         &self.token_profile_digest
+    }
+
+    pub(super) fn launch_context_selector_digest(&self) -> &str {
+        &self.launch_context_selector_digest
+    }
+
+    pub(super) fn startup_import_resolution_profile_digest(&self) -> &str {
+        &self.startup_import_resolution_profile_digest
+    }
+
+    pub(super) fn expected_required_launch_context_digest(&self) -> &str {
+        &self.expected_required_launch_context_digest
     }
 
     pub(super) fn process_descriptor_digest(&self) -> &str {

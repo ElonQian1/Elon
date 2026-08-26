@@ -2,6 +2,10 @@ const HOST_MODULE: &str = include_str!("mod.rs");
 const LOADER_MODEL: &str = include_str!("runtime_loader_load_set/model.rs");
 const LOADER_RESOLUTION: &str = include_str!("runtime_loader_load_set/resolution.rs");
 const LOADER_VALIDATION: &str = include_str!("runtime_loader_load_set/validation.rs");
+const EXACT_CONTEXT_LINEAGE: &str =
+    include_str!("runtime_loader_load_set/launch_path_discovery/exact_context_plan/lineage.rs");
+const EXACT_CONTEXT_INTENT: &str =
+    include_str!("runtime_loader_load_set/launch_path_discovery/exact_context_plan/intent.rs");
 const MANAGED_LOADER: &str = include_str!("../node_agent_managed_fs/loader.rs");
 const FACADE: &str = include_str!("runtime_process_custody.rs");
 const MODEL: &str = include_str!("runtime_process_custody/model.rs");
@@ -20,6 +24,8 @@ fn source_slice() -> String {
         LOADER_MODEL,
         LOADER_RESOLUTION,
         LOADER_VALIDATION,
+        EXACT_CONTEXT_LINEAGE,
+        EXACT_CONTEXT_INTENT,
         MANAGED_LOADER,
         MODEL,
         LOADER_CURRENTNESS,
@@ -92,6 +98,7 @@ fn sealed_launch_authorities_have_no_producer_clone_or_scalar_escape() {
 fn preparation_consumes_linear_authorities_and_typed_failure_keeps_both_owners() {
     assert!(LOADER_MODEL.contains("struct LoaderLockedWorkAdmittedPluginSlot<'root>"));
     assert!(LOADER_MODEL.contains("authority: LoaderTransitionAuthorityCustody<'root>"));
+    assert!(LOADER_MODEL.contains("authenticated_launch_lineage:"));
     assert!(LOADER_MODEL.contains("image: SealedComputePluginRunnerImage"));
     assert!(MODEL.contains("loader_locked: LoaderLockedWorkAdmittedPluginSlot<'root>"));
     assert!(!MODEL.contains("DurableWorkAdmittedPluginSlot"));
@@ -324,6 +331,7 @@ fn source_material_freezes_resume_blockers_launch_binding_and_zero_effects() {
         assert!(POLICY.contains(blocker), "missing blocker {blocker}");
     }
     for prerequisite in [
+        "launch_context_selector_digest",
         "startup_import_resolution_profile_digest",
         "startup_import_namespace_authority_digest",
         "required_launch_context_digest",
@@ -339,6 +347,74 @@ fn source_material_freezes_resume_blockers_launch_binding_and_zero_effects() {
             "missing prerequisite {prerequisite}"
         );
     }
+    assert!(POLICY.contains("windows_runner_required_launch_context.v3"));
+    assert!(POLICY.contains("elon.compute_plugin.windows_runner_process_preparation.v3"));
+    assert!(POLICY.contains("entrypoint_arguments_digest: profile.entrypoint_arguments_digest()"));
+    assert!(POLICY.contains("explicit_empty_unicode_environment_block_v1"));
+    assert!(POLICY.contains("process_creation_flags: PROCESS_CREATION_FLAGS"));
+    for authenticated_bridge in [
+        "launch_context_selector_digest: String",
+        "startup_import_resolution_profile_digest: String",
+        "expected_required_launch_context_digest: String",
+        "fn launch_context_selector_digest(&self) -> &str",
+        "fn startup_import_resolution_profile_digest(&self) -> &str",
+        "fn expected_required_launch_context_digest(&self) -> &str",
+    ] {
+        assert!(
+            LAUNCH_SECURITY.contains(authenticated_bridge),
+            "missing launch-security context bridge {authenticated_bridge}"
+        );
+    }
+    assert!(MODEL.contains(
+        "launch_security.launch_context_selector_digest() != image.launch_context_selector_digest()"
+    ));
+    assert!(MODEL.contains("launch_security.startup_import_resolution_profile_digest()"));
+    assert!(MODEL.contains("!= image.startup_import_resolution_profile_digest()"));
+    assert!(MODEL.contains("WindowsRunnerLaunchContextPreCreateProjection::new("));
+    assert!(MODEL.contains("profile.entrypoint_arguments_digest()"));
+    assert!(MODEL.contains("loader_locked.validate_authenticated_launch_context_projection("));
+    assert!(LOADER_VALIDATION.contains("fn validate_authenticated_launch_context_projection("));
+    assert!(LOADER_VALIDATION.contains(".authenticated_launch_lineage"));
+    assert!(LOADER_VALIDATION.contains(".validate_loader_image_binding("));
+    assert!(LOADER_VALIDATION.contains(".validate_process_projection(profile, expected)"));
+    assert!(EXACT_CONTEXT_LINEAGE.contains("struct WindowsRunnerLaunchContextPreCreateProjection"));
+    assert!(EXACT_CONTEXT_LINEAGE.contains("fn validate_process_projection("));
+    for exact_field in [
+        "expected.restricted_token",
+        "expected.app_container",
+        "expected.inherited_handles",
+        "expected.environment_policy",
+        "expected.process_creation_flags",
+        "expected.entrypoint_arguments_digest",
+    ] {
+        assert!(
+            EXACT_CONTEXT_INTENT.contains(exact_field),
+            "missing exact process projection field {exact_field}"
+        );
+    }
+    let loader_internal = MODEL
+        .find("loader_locked.validate_internal_binding()?")
+        .expect("loader internal binding validation missing");
+    let security = MODEL
+        .find("launch_security.validate()?")
+        .expect("launch-security validation missing");
+    let projection = MODEL
+        .find("let precreate_launch_context = WindowsRunnerLaunchContextPreCreateProjection::new(")
+        .expect("pre-create launch-context projection missing");
+    let typed_projection = MODEL
+        .find("loader_locked.validate_authenticated_launch_context_projection(")
+        .expect("typed launch-context validation missing");
+    let policy_projection = MODEL
+        .find("WindowsRunnerProcessPolicy::from_sources(")
+        .expect("required process-policy projection missing");
+    assert!(loader_internal < security);
+    assert!(security < projection);
+    assert!(projection < typed_projection);
+    assert!(typed_projection < policy_projection);
+    assert!(POLICY.contains("expected_required_launch_context_digest()"));
+    assert!(POLICY.contains("post_create_live_process_machine_context_queryback"));
+    assert!(POLICY.contains("bail!(\"COMPUTE_PLUGIN_WINDOWS_REQUIRED_LAUNCH_CONTEXT_CHANGED\")"));
+    assert!(!POLICY.contains("required_launch_context_digest != image."));
     for effect in [
         "runtime_phase_effect",
         "runtime_generation_effect",

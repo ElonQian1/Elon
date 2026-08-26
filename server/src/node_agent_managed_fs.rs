@@ -53,9 +53,12 @@ pub(crate) use loader::{
     ManagedLoaderParentRelativeReopenAttemptCustody,
     ManagedLoaderParentRelativeReopenAuthenticatedNegativeReceipt, ManagedLoaderSearchedNameGrant,
     ManagedLoaderSearchedNameGrantAcquisitionAttemptCustody, ManagedLoaderSystemImageContentLease,
-    PinnedManagedLoaderDirectory, PinnedManagedLoaderFile, PinnedWindowsLoaderSearchDirectory,
-    PinnedWindowsLoaderSystemImageFile, QuarantinedManagedLoaderFile,
-    QuarantinedManagedLoaderSourceClose,
+    ManagedLoaderSystemImageContentLeaseAcquisitionAttemptCustody,
+    ManagedLoaderSystemImageContentLeaseAuthenticatedNegativeReceipt,
+    ManagedLoaderSystemImageContentLeasePositiveOutcomeCustody, PinnedManagedLoaderDirectory,
+    PinnedManagedLoaderFile, PinnedWindowsLoaderResolvedSystemImageCandidate,
+    PinnedWindowsLoaderSearchDirectory, PinnedWindowsLoaderSystemImageFile,
+    QuarantinedManagedLoaderFile, QuarantinedManagedLoaderSourceClose,
 };
 pub(crate) use loader_launch_path_discovery::{
     discover_loader_launch_path_candidates, ManagedLoaderLaunchPathComponentDiscovery,

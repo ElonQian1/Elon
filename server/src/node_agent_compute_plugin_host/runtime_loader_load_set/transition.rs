@@ -1,10 +1,7 @@
 use anyhow::Error;
 
 use crate::{
-    node_agent_compute_plugin_host::{
-        candidate_extraction::ExtractedComputePluginLoaderTransitionParts,
-        work_admission_contract::DurableWorkAdmittedPluginSlot,
-    },
+    node_agent_compute_plugin_host::candidate_extraction::ExtractedComputePluginLoaderTransitionParts,
     node_agent_managed_fs::{
         ManagedLoaderFileContentLease, PinnedManagedDirectory,
         PinnedManagedExtractionLoaderDirectory, PinnedManagedFile,
@@ -16,6 +13,10 @@ use super::{
         PendingWindowsRunnerPackageFileCustody,
         ValidatedRetainedWindowsRunnerNamespaceDirectoryCustody,
     },
+    launch_path_discovery::{
+        consume_query_verified_loader_prerequisite,
+        QueryVerifiedWindowsRunnerLaunchLineageValidationFailure,
+    },
     model::LoaderTransitionAuthorityCustody,
     resolution::{
         PostLeaseSplitWindowsRunnerLoadSetPrerequisite, SealedWindowsRunnerLoadSetPrerequisite,
@@ -26,7 +27,9 @@ use super::{
 /// remain nested in their original owners; this shape cannot enter the barrier.
 pub(super) struct RawDestructuredLoaderTransitionCustody<'root> {
     pub(super) authority: LoaderTransitionAuthorityCustody<'root>,
-    pub(super) prerequisite: SealedWindowsRunnerLoadSetPrerequisite,
+    pub(super) prerequisite: PostLeaseSplitWindowsRunnerLoadSetPrerequisite,
+    pub(super) package_content_leases:
+        Vec<super::resolution::WindowsLoaderPackageContentLeaseCustody>,
     pub(super) package_root_directory: PinnedManagedExtractionLoaderDirectory,
     pub(super) namespace_directories: Vec<PinnedManagedDirectory>,
     pub(super) package_files: Vec<PinnedManagedFile>,
@@ -85,9 +88,13 @@ pub(super) struct BarrierReadyLoaderTransitionCustody<'root> {
 /// successor without cleanup projection or scalar reconstruction. A future producer may call this
 /// only after all fallible borrow-only checks and namespace-fence acquisition have succeeded.
 pub(super) fn destructure_query_verified_owners<'root>(
-    admitted: DurableWorkAdmittedPluginSlot<'root>,
-    prerequisite: SealedWindowsRunnerLoadSetPrerequisite,
-) -> RawDestructuredLoaderTransitionCustody<'root> {
+    prerequisite: SealedWindowsRunnerLoadSetPrerequisite<'root>,
+) -> std::result::Result<
+    RawDestructuredLoaderTransitionCustody<'root>,
+    QueryVerifiedWindowsRunnerLaunchLineageValidationFailure<'root>,
+> {
+    let (admitted, authenticated_launch_lineage, prerequisite, package_content_leases) =
+        consume_query_verified_loader_prerequisite(prerequisite)?;
     let (work_revalidated, work_admission_receipts) = admitted.into_loader_transition_parts();
     let (installed, work_admission_trusted_time, work_admission_revalidated_at) =
         work_revalidated.into_loader_transition_parts();
@@ -109,8 +116,9 @@ pub(super) fn destructure_query_verified_owners<'root>(
     } = archive.into_loader_transition_parts();
     let staging = staging.into_loader_transition_parts();
     let staging_root_lock_lease = staging.root.root_lock_lease();
-    RawDestructuredLoaderTransitionCustody {
+    Ok(RawDestructuredLoaderTransitionCustody {
         authority: LoaderTransitionAuthorityCustody {
+            authenticated_launch_lineage,
             work_admission_receipts,
             work_admission_trusted_time,
             work_admission_revalidated_at,
@@ -132,8 +140,9 @@ pub(super) fn destructure_query_verified_owners<'root>(
             extraction_completed_at: completed_at,
         },
         prerequisite,
+        package_content_leases,
         package_root_directory: staging.package_root,
         namespace_directories: directories,
         package_files: files,
-    }
+    })
 }

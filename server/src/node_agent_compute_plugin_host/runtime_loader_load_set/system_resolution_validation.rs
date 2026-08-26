@@ -282,11 +282,29 @@ pub(super) fn system_resolution_origin_valid(
     resolution: &SealedWindowsLoaderResolutionAuthority,
 ) -> bool {
     match &binding.resolution_origin {
+        WindowsLoaderSystemResolutionOrigin::Preloaded {
+            preloaded_module_ordinal,
+        } => {
+            binding.resolved_search_directory_ordinal.is_none()
+                && binding.filesystem_image_ref.is_none()
+                && resolution
+                    .preloaded_module_authority
+                    .modules
+                    .get(*preloaded_module_ordinal)
+                    .is_some_and(|entry| {
+                        entry.resolved_module_cache_key == binding.normalized_import_name
+                            && entry.resolved_module_cache_key == binding.resolved_module_cache_key
+                            && entry.component_identity_digest
+                                == binding.resolved_component_identity_digest
+                            && entry.immutable_section_identity_digest
+                                == binding.resolved_image_section_identity_digest
+                    })
+        }
         WindowsLoaderSystemResolutionOrigin::KnownDll {
             section_identity_digest,
         } => resolution.known_dll_authority.sections.iter().any(|entry| {
             binding.resolved_search_directory_ordinal.is_none()
-                && binding.filesystem_image.is_none()
+                && binding.filesystem_image_ref.is_none()
                 && entry.normalized_name == binding.normalized_import_name
                 && entry.resolved_module_cache_key == binding.resolved_module_cache_key
                 && entry.section_identity_digest == *section_identity_digest
@@ -349,7 +367,7 @@ fn api_set_host_resolution_valid(
             preloaded_module_ordinal,
         } => {
             binding.resolved_search_directory_ordinal.is_none()
-                && binding.filesystem_image.is_none()
+                && binding.filesystem_image_ref.is_none()
                 && resolution
                     .preloaded_module_authority
                     .modules
@@ -366,7 +384,7 @@ fn api_set_host_resolution_valid(
             section_identity_digest,
         } => {
             binding.resolved_search_directory_ordinal.is_none()
-                && binding.filesystem_image.is_none()
+                && binding.filesystem_image_ref.is_none()
                 && resolution.known_dll_authority.sections.iter().any(|entry| {
                     entry.normalized_name == binding.resolved_module_cache_key
                         && entry.resolved_module_cache_key == binding.resolved_module_cache_key
@@ -407,23 +425,25 @@ fn side_by_side_terminal_valid(
     search_directory_ordinal: usize,
     resolution: &SealedWindowsLoaderResolutionAuthority,
 ) -> bool {
-    let exact_assembly = binding.filesystem_image.as_ref().is_some_and(|file| {
-        let (_, _, file_identity, section_identity, _, _) = file.binding();
-        resolution
-            .side_by_side_authority
-            .assembly_bindings
-            .iter()
-            .any(|entry| {
-                entry.normalized_import_name == expected_requested_name
-                    && entry.assembly_identity_digest == assembly_identity_digest
-                    && entry.resolved_module_cache_key == binding.resolved_module_cache_key
-                    && entry.component_identity_digest == binding.resolved_component_identity_digest
-                    && entry.image_file_identity_digest == file_identity
-                    && entry.immutable_section_identity_digest == section_identity
-                    && section_identity == binding.resolved_image_section_identity_digest
-                    && is_sha256(&entry.activation_context_resolution_receipt_digest)
-            })
-    });
+    let exact_assembly =
+        resolved_filesystem_system_image(binding, resolution).is_some_and(|file| {
+            let (_, _, file_identity, section_identity, _, _) = file.binding();
+            resolution
+                .side_by_side_authority
+                .assembly_bindings
+                .iter()
+                .any(|entry| {
+                    entry.normalized_import_name == expected_requested_name
+                        && entry.assembly_identity_digest == assembly_identity_digest
+                        && entry.resolved_module_cache_key == binding.resolved_module_cache_key
+                        && entry.component_identity_digest
+                            == binding.resolved_component_identity_digest
+                        && entry.image_file_identity_digest == file_identity
+                        && entry.immutable_section_identity_digest == section_identity
+                        && section_identity == binding.resolved_image_section_identity_digest
+                        && is_sha256(&entry.activation_context_resolution_receipt_digest)
+                })
+        });
     exact_assembly
         && filesystem_terminal_valid(
             binding,
@@ -449,7 +469,11 @@ fn filesystem_terminal_valid(
         .find(|image| {
             image.component_identity_digest == binding.resolved_component_identity_digest
         });
-    match (directory, image, binding.filesystem_image.as_ref()) {
+    match (
+        directory,
+        image,
+        resolved_filesystem_system_image(binding, resolution),
+    ) {
         (Some(directory), Some(image), Some(file)) => {
             let directory_kind_valid = !require_side_by_side_directory
                 || matches!(
@@ -468,6 +492,20 @@ fn filesystem_terminal_valid(
         }
         _ => false,
     }
+}
+
+/// Borrow the one deduplicated final system-image owner referenced by this import edge. The
+/// ordinal is checked on both the edge and owner so vector position cannot silently rebind it.
+pub(super) fn resolved_filesystem_system_image<'resolution>(
+    binding: &WindowsLoaderSystemModuleBinding,
+    resolution: &'resolution SealedWindowsLoaderResolutionAuthority,
+) -> Option<&'resolution crate::node_agent_managed_fs::PinnedWindowsLoaderSystemImageFile> {
+    let image_ref = binding.filesystem_image_ref.as_ref()?;
+    let custody = resolution
+        .resolved_filesystem_system_images
+        .get(image_ref.resolution_request_ordinal)?;
+    (custody.resolution_request_ordinal == image_ref.resolution_request_ordinal)
+        .then_some(custody.outcome.image())
 }
 
 pub(super) fn system_terminal_search_binding(

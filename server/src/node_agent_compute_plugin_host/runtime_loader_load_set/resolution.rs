@@ -1,3 +1,5 @@
+mod grant_ready;
+
 use std::{convert::Infallible, fmt, path::PathBuf};
 
 use crate::{
@@ -5,17 +7,27 @@ use crate::{
     node_agent_managed_fs::{
         ManagedLoaderFileContentLease, ManagedLoaderNamespaceQueryAttemptCustody,
         ManagedLoaderNamespaceQueryReceipt, ManagedLoaderNamespaceSession,
-        ManagedLoaderSearchedNameGrant, PinnedWindowsLoaderSearchDirectory,
-        PinnedWindowsLoaderSystemImageFile,
+        ManagedLoaderSearchedNameGrant, ManagedLoaderSystemImageContentLeasePositiveOutcomeCustody,
+        PinnedWindowsLoaderSearchDirectory,
     },
 };
 
+use super::launch_path_discovery::WindowsPreliminaryModuleEdgeLocator;
+
+pub(super) use grant_ready::*;
+
 pub(super) struct WindowsLoaderPackageModuleBinding {
+    pub(super) module_request_ordinal: usize,
+    pub(super) global_import_edge_ordinal: usize,
+    pub(super) edge_locator: WindowsPreliminaryModuleEdgeLocator,
+    pub(super) importer_parsed_image_ordinal: usize,
     pub(super) importer: WindowsLoaderModuleNode,
-    /// Contiguous parser order within this exact importer's normal/delay/forwarder table.
-    pub(super) importer_edge_ordinal: usize,
+    /// Contiguous resolved-graph order within this exact importer.
+    pub(super) importer_graph_edge_ordinal: usize,
     pub(super) edge_kind: WindowsLoaderImportEdgeKind,
     pub(super) normalized_import_name: String,
+    pub(super) imported_symbol_name: Option<String>,
+    pub(super) imported_symbol_ordinal: Option<u16>,
     pub(super) resolved_module_cache_key: String,
     pub(super) relative_path: String,
     pub(super) resolved_package_file_ordinal: usize,
@@ -24,6 +36,9 @@ pub(super) struct WindowsLoaderPackageModuleBinding {
 }
 
 pub(super) enum WindowsLoaderSystemResolutionOrigin {
+    Preloaded {
+        preloaded_module_ordinal: usize,
+    },
     KnownDll {
         section_identity_digest: String,
     },
@@ -57,19 +72,32 @@ pub(super) enum WindowsLoaderApiSetHostResolution {
     },
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) struct WindowsLoaderResolvedFilesystemSystemImageRef {
+    pub(super) resolution_request_ordinal: usize,
+}
+
 pub(super) struct WindowsLoaderSystemModuleBinding {
+    pub(super) module_request_ordinal: usize,
+    pub(super) global_import_edge_ordinal: usize,
+    pub(super) edge_locator: WindowsPreliminaryModuleEdgeLocator,
+    pub(super) importer_parsed_image_ordinal: usize,
     pub(super) importer: WindowsLoaderModuleNode,
-    /// Contiguous parser order shared with package edges for this exact importer.
-    pub(super) importer_edge_ordinal: usize,
+    /// Contiguous resolved-graph order shared with package edges for this exact importer.
+    pub(super) importer_graph_edge_ordinal: usize,
     pub(super) edge_kind: WindowsLoaderImportEdgeKind,
     pub(super) normalized_import_name: String,
+    pub(super) imported_symbol_name: Option<String>,
+    pub(super) imported_symbol_ordinal: Option<u16>,
     pub(super) resolved_module_cache_key: String,
     pub(super) resolved_dependency_ordinal: usize,
     pub(super) resolved_component_identity_digest: String,
     pub(super) resolved_image_section_identity_digest: String,
     pub(super) resolution_origin: WindowsLoaderSystemResolutionOrigin,
     pub(super) resolved_search_directory_ordinal: Option<usize>,
-    pub(super) filesystem_image: Option<PinnedWindowsLoaderSystemImageFile>,
+    /// Typed borrow key into the unique final system-image custody table. Multiple import edges may
+    /// reference one deduplicated FileId owner without cloning its file or content lease.
+    pub(super) filesystem_image_ref: Option<WindowsLoaderResolvedFilesystemSystemImageRef>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -233,15 +261,23 @@ pub(super) enum WindowsLoaderSearchedNameDisposition {
         immutable_section_identity_digest: String,
         servicing_generation_digest: String,
     },
-    MustRemainAbsentShadow,
+    MustRemainAbsent,
+    ShadowedByEarlierName {
+        earlier_searched_name_ordinal: usize,
+    },
 }
 
 pub(super) struct WindowsLoaderSearchedNameBinding {
     pub(super) searched_name_ordinal: usize,
     pub(super) import_binding: WindowsLoaderImportBindingRef,
+    /// Position inside this import's exact search sequence.
     pub(super) search_step_ordinal: usize,
     pub(super) normalized_name: String,
+    /// Global search-directory plan ordinal selected at this position.
     pub(super) search_directory_ordinal: usize,
+    pub(super) search_directory_authority_binding_digest: String,
+    pub(super) grant_request_digest: String,
+    pub(super) disposition_binding_digest: String,
     pub(super) disposition: WindowsLoaderSearchedNameDisposition,
 }
 
@@ -269,6 +305,41 @@ pub(super) struct WindowsPeImportSearchSequenceBinding {
     pub(super) searched_name_ordinals: Vec<usize>,
 }
 
+pub(super) struct WindowsPeParsedImageCrossBinding {
+    pub(super) prelease_parsed_image_ordinal: usize,
+    pub(super) package_file_ordinal: usize,
+    pub(super) file_identity_digest: String,
+    pub(super) postlease_parsed_image_ordinal: usize,
+    pub(super) postlease_image_material_identity_digest: String,
+    pub(super) lease_generation_digest: String,
+}
+
+pub(super) struct WindowsPeImportEdgeCrossBinding {
+    pub(super) preliminary_request_ordinal: usize,
+    pub(super) prelease_importer_parsed_image_ordinal: usize,
+    pub(super) edge_locator: WindowsPreliminaryModuleEdgeLocator,
+    pub(super) postlease_import_binding: WindowsLoaderImportBindingRef,
+    pub(super) postlease_importer_parsed_image_ordinal: usize,
+}
+
+/// Purpose-specific receipt emitted only by the postlease same-handle reparse sealer. It binds
+/// every prelease package PE input to the final parsed graph and the exact immutable package lease
+/// generation set. A digest-only caller cannot construct this receipt.
+pub(super) struct SealedWindowsPePrePostCrossBindingReceipt {
+    pub(super) prelease_material_set_digest: String,
+    pub(super) postlease_parsed_image_set_digest: String,
+    pub(super) postlease_import_edge_set_digest: String,
+    pub(super) postlease_reachable_node_set_digest: String,
+    pub(super) package_content_lease_set_digest: String,
+    pub(super) same_retained_file_handle_set_digest: String,
+    pub(super) parsed_image_cross_bindings: Vec<WindowsPeParsedImageCrossBinding>,
+    pub(super) parsed_image_cross_binding_set_digest: String,
+    pub(super) import_edge_cross_bindings: Vec<WindowsPeImportEdgeCrossBinding>,
+    pub(super) import_edge_cross_binding_set_digest: String,
+    pub(super) receipt_digest: String,
+    pub(super) _same_handle_reparse_producer_unavailable: Infallible,
+}
+
 pub(super) struct SealedWindowsPeImportGraphAuthority {
     pub(super) root_package_file_ordinal: usize,
     pub(super) parsed_images: Vec<WindowsPeParsedImageBinding>,
@@ -281,6 +352,7 @@ pub(super) struct SealedWindowsPeImportGraphAuthority {
     pub(super) expected_package_edge_count: usize,
     pub(super) expected_system_edge_count: usize,
     pub(super) expected_search_step_count: usize,
+    pub(super) pre_post_cross_binding: SealedWindowsPePrePostCrossBindingReceipt,
     pub(super) _authenticated_pe_parser_producer_unavailable: Infallible,
 }
 
@@ -332,6 +404,21 @@ pub(super) struct WindowsLoaderPackageContentLeaseCustody {
     pub(super) lease: ManagedLoaderFileContentLease,
 }
 
+pub(super) enum WindowsLoaderAcquiredImmutableContentLeaseCustody {
+    Package(WindowsLoaderPackageContentLeaseCustody),
+    ResolvedFilesystemSystemImage {
+        resolution_request_ordinal: usize,
+        outcome: ManagedLoaderSystemImageContentLeasePositiveOutcomeCustody,
+    },
+}
+
+/// One final owned system image per GrantReady resolution request/FileId. Import edges only retain
+/// typed ordinals into this table, so one physical file/lease owner can serve every exact use.
+pub(super) struct WindowsLoaderResolvedFilesystemSystemImageCustody {
+    pub(super) resolution_request_ordinal: usize,
+    pub(super) outcome: ManagedLoaderSystemImageContentLeasePositiveOutcomeCustody,
+}
+
 /// Exact Windows startup/import loader resolution authority required before any share-none handle
 /// may close. Runtime-derived module names are outside this set and remain a resume blocker.
 ///
@@ -352,6 +439,8 @@ pub(super) struct SealedWindowsLoaderResolutionAuthority {
     pub(super) side_by_side_authority: WindowsSideBySideResolutionAuthority,
     pub(super) package_module_bindings: Vec<WindowsLoaderPackageModuleBinding>,
     pub(super) system_module_bindings: Vec<WindowsLoaderSystemModuleBinding>,
+    pub(super) resolved_filesystem_system_images:
+        Vec<WindowsLoaderResolvedFilesystemSystemImageCustody>,
     pub(super) signed_system_dependencies: SealedSignedSystemDependencyAuthority,
     pub(super) resolved_system_dependencies: Vec<WindowsResolvedSystemDependencyAuthority>,
     pub(super) system_module_images: SealedWindowsSystemModuleImageAuthority,
@@ -363,7 +452,10 @@ pub(super) struct SealedWindowsLoaderResolutionAuthority {
     pub(super) system_content_lease_set_digest: String,
     pub(super) immutable_content_lease_set_digest: String,
     pub(super) resolution_profile_digest: String,
-    pub(super) required_launch_context_digest: String,
+    pub(super) launch_context_selector_digest: String,
+    pub(super) selected_context_binding_digest: String,
+    pub(super) preliminary_resolution_request_plan_digest: String,
+    pub(super) grant_ready_resolution_plan_digest: String,
     pub(super) process_machine_context_digest: String,
     pub(super) _producer_unavailable: Infallible,
 }
@@ -377,6 +469,8 @@ pub(super) struct SealedWindowsLoaderNamespacePrerequisite {
     pub(super) initial_query_receipt: ManagedLoaderNamespaceQueryReceipt,
     pub(super) session: ManagedLoaderNamespaceSession,
     pub(super) resolution_profile_digest: String,
+    pub(super) preliminary_resolution_request_plan_digest: String,
+    pub(super) grant_ready_resolution_plan_digest: String,
     pub(super) searched_name_set_digest: String,
     pub(super) fence_generation_set_digest: String,
     pub(super) _whole_resolution_fence_backend_unavailable: Infallible,
@@ -384,26 +478,40 @@ pub(super) struct SealedWindowsLoaderNamespacePrerequisite {
 
 /// Grants and exact FileId content leases acquired before the consuming pre-barrier currentness
 /// query. A query failure retains this owner rather than an impossible already-successful receipt.
-pub(super) struct UnqueriedWindowsLoaderNamespaceGrantSet {
+pub(super) struct PreFinalWindowsLoaderNamespaceGrantSet<'root> {
+    pub(super) resolution_custody: GrantAcquiredWindowsRunnerResolutionLeaseCustody<'root>,
     pub(super) searched_name_grants: Vec<WindowsLoaderSearchedNameFenceCustody>,
     pub(super) launch_path_component_grants: Vec<WindowsLoaderLaunchPathGrantCustody>,
     pub(super) session: ManagedLoaderNamespaceSession,
-    pub(super) resolution_profile_digest: String,
+    pub(super) preliminary_resolution_request_plan_digest: String,
+    pub(super) grant_ready_resolution_plan_digest: String,
     pub(super) searched_name_set_digest: String,
     pub(super) fence_generation_set_digest: String,
     pub(super) _whole_resolution_fence_backend_unavailable: Infallible,
 }
 
-pub(super) struct UnqueriedWindowsRunnerLoadSetPrerequisite {
-    pub(super) namespace: UnqueriedWindowsLoaderNamespaceGrantSet,
-    pub(super) resolution: SealedWindowsLoaderResolutionAuthority,
-    pub(super) package_content_leases: Vec<WindowsLoaderPackageContentLeaseCustody>,
+/// Namespace grant/session lineage after every movable external directory and system candidate
+/// has moved exactly once into final resolution/lease custody. It cannot duplicate those owners.
+pub(super) struct PostLeaseWindowsLoaderNamespaceGrantSet<'root> {
+    pub(super) resolution_lineage: PostLeaseWindowsRunnerResolutionLineage<'root>,
+    pub(super) searched_name_grants: Vec<WindowsLoaderSearchedNameFenceCustody>,
+    pub(super) launch_path_component_grants: Vec<WindowsLoaderLaunchPathGrantCustody>,
+    pub(super) session: ManagedLoaderNamespaceSession,
+    pub(super) preliminary_resolution_request_plan_digest: String,
+    pub(super) grant_ready_resolution_plan_digest: String,
+    pub(super) searched_name_set_digest: String,
+    pub(super) fence_generation_set_digest: String,
+    pub(super) _postlease_namespace_lineage_producer_unavailable: Infallible,
 }
 
-/// Borrow-only resolution/receipt input before any name-grant or content-lease platform dispatch.
-pub(super) struct WindowsRunnerLoadSetBorrowPrerequisite {
+/// Final resolution can exist only after every grant and package/system content lease. Resolved
+/// system-image leases have moved into `resolution`; package leases remain linear for the later
+/// close/reopen transition. This whole pre-query owner has no producer in the current source.
+pub(super) struct PostLeaseSealedWindowsRunnerLoadSetPreQueryPrerequisite<'root> {
+    pub(super) namespace: PostLeaseWindowsLoaderNamespaceGrantSet<'root>,
     pub(super) resolution: SealedWindowsLoaderResolutionAuthority,
-    pub(super) _grant_and_content_acquisition_producer_unavailable: Infallible,
+    pub(super) package_content_leases: Vec<WindowsLoaderPackageContentLeaseCustody>,
+    pub(super) _postlease_final_resolution_sealer_unavailable: Infallible,
 }
 
 /// Final namespace authority created only after every package file crossed close/reopen and a new
@@ -418,7 +526,8 @@ pub(super) struct SealedWindowsLoaderNamespaceAuthority {
 /// Both hard prerequisites must be acquired and query-verified before the owned transition enters
 /// its irreversible close/reopen barrier. Namespace is declared first so any future explicit
 /// release owner can release grants while resolution-directory handles are still retained.
-pub(super) struct SealedWindowsRunnerLoadSetPrerequisite {
+pub(super) struct SealedWindowsRunnerLoadSetPrerequisite<'root> {
+    pub(super) postlease_lineage: PostLeaseWindowsRunnerResolutionLineage<'root>,
     pub(super) namespace: SealedWindowsLoaderNamespacePrerequisite,
     pub(super) resolution: SealedWindowsLoaderResolutionAuthority,
     pub(super) package_content_leases: Vec<WindowsLoaderPackageContentLeaseCustody>,
@@ -429,23 +538,6 @@ pub(super) struct SealedWindowsRunnerLoadSetPrerequisite {
 pub(super) struct PostLeaseSplitWindowsRunnerLoadSetPrerequisite {
     pub(super) namespace: SealedWindowsLoaderNamespacePrerequisite,
     pub(super) resolution: SealedWindowsLoaderResolutionAuthority,
-}
-
-impl SealedWindowsRunnerLoadSetPrerequisite {
-    pub(super) fn into_transition_parts(
-        self,
-    ) -> (
-        PostLeaseSplitWindowsRunnerLoadSetPrerequisite,
-        Vec<WindowsLoaderPackageContentLeaseCustody>,
-    ) {
-        (
-            PostLeaseSplitWindowsRunnerLoadSetPrerequisite {
-                namespace: self.namespace,
-                resolution: self.resolution,
-            },
-            self.package_content_leases,
-        )
-    }
 }
 
 /// Post-barrier authority stored by a successful image. Namespace is first so an eventual explicit
@@ -487,7 +579,7 @@ impl fmt::Debug for SealedWindowsLoaderNamespacePrerequisite {
     }
 }
 
-impl fmt::Debug for SealedWindowsRunnerLoadSetPrerequisite {
+impl fmt::Debug for SealedWindowsRunnerLoadSetPrerequisite<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("SealedWindowsRunnerLoadSetPrerequisite")

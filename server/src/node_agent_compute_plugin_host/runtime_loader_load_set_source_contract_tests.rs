@@ -1,6 +1,8 @@
 const HOST_MODULE: &str = include_str!("mod.rs");
 const MANAGED_FACADE: &str = include_str!("../node_agent_managed_fs.rs");
 const MANAGED_LOADER: &str = include_str!("../node_agent_managed_fs/loader.rs");
+const MANAGED_NAME_GRANT_POSITIVE: &str =
+    include_str!("../node_agent_managed_fs/loader/name_grant_positive.rs");
 const MANAGED_LOADER_SYSTEM_VALIDATION: &str =
     include_str!("../node_agent_managed_fs/loader_system_validation.rs");
 const FACADE: &str = include_str!("runtime_loader_load_set.rs");
@@ -92,7 +94,9 @@ fn hard_pe_resolution_launch_path_and_namespace_prerequisites_remain_uninhabited
     assert!(RESOLUTION.contains("enum WindowsLoaderSearchedNameDisposition"));
     assert!(RESOLUTION.contains("ExpectedPackage"));
     assert!(RESOLUTION.contains("ExpectedSystem"));
-    assert!(RESOLUTION.contains("MustRemainAbsentShadow"));
+    assert!(RESOLUTION.contains("MustRemainAbsent"));
+    assert!(RESOLUTION.contains("ShadowedByEarlierName"));
+    assert!(RESOLUTION.contains("earlier_searched_name_ordinal: usize"));
     assert!(RESOLUTION.contains("struct WindowsKnownDllResolutionAuthority"));
     assert!(RESOLUTION.contains("struct WindowsApiSetResolutionAuthority"));
     assert!(RESOLUTION.contains("struct WindowsSideBySideResolutionAuthority"));
@@ -119,7 +123,9 @@ fn hard_pe_resolution_launch_path_and_namespace_prerequisites_remain_uninhabited
 
 #[test]
 fn pe_dfs_cache_system_sections_and_handle_paths_are_recomputed_and_cross_bound() {
-    assert!(RESOLUTION.contains("importer_edge_ordinal: usize"));
+    assert!(RESOLUTION.contains("importer_graph_edge_ordinal: usize"));
+    assert!(RESOLUTION.contains("struct WindowsPeImportEdgeCrossBinding"));
+    assert!(RESOLUTION.contains("import_edge_cross_binding_set_digest: String"));
     assert!(RESOLUTION.contains("resolved_module_cache_key: String"));
     assert!(RESOLUTION.contains("struct WindowsLoaderPreloadedModuleBinding"));
     assert!(RESOLUTION.contains("struct SealedWindowsLoaderPreloadedModuleAuthority"));
@@ -134,7 +140,7 @@ fn pe_dfs_cache_system_sections_and_handle_paths_are_recomputed_and_cross_bound(
     assert!(DIGEST.contains("fn importer_edge_table_digest("));
     assert!(DIGEST.contains("ordered_edges.sort_by_key(|(edge_ordinal, _)| *edge_ordinal)"));
     assert!(PE_GRAPH_VALIDATION.contains("fn validate_pe_import_graph("));
-    assert!(PE_GRAPH_VALIDATION.contains("fn importer_edge_ordinals_are_contiguous("));
+    assert!(PE_GRAPH_VALIDATION.contains("fn importer_graph_edge_ordinals_are_contiguous("));
     assert!(PE_GRAPH_VALIDATION.contains("let mut stack = vec![root.clone()]"));
     assert!(PE_GRAPH_VALIDATION.contains("while let Some(importer) = stack.pop()"));
     assert!(PE_GRAPH_VALIDATION.contains("targets.sort_by_key(|(edge_ordinal, _)| *edge_ordinal)"));
@@ -292,7 +298,7 @@ fn indexed_content_leases_move_once_into_reopen_receipts() {
         RESOLUTION.contains("package_content_leases: Vec<WindowsLoaderPackageContentLeaseCustody>")
     );
     assert!(RESOLUTION.contains("struct PostLeaseSplitWindowsRunnerLoadSetPrerequisite"));
-    assert!(RESOLUTION.contains("fn into_transition_parts("));
+    assert!(TRANSITION.contains("consume_query_verified_loader_prerequisite(prerequisite)?"));
     assert!(TRANSITION.contains("struct ValidatedPreBarrierPackageFileCustody"));
     assert!(TRANSITION.contains("content_lease: ManagedLoaderFileContentLease"));
     assert!(TRANSITION.contains("package_files: Vec<ValidatedPreBarrierPackageFileCustody>"));
@@ -392,17 +398,59 @@ fn five_failure_phases_retain_linear_indexed_custody() {
             .count(),
         2
     );
-    assert_eq!(FAILURE.matches("returned_positive.is_none()").count(), 4);
     assert!(FAILURE.contains("_returned_positive: Option<ManagedLoaderSearchedNameGrant>"));
-    assert!(FAILURE.contains("_returned_positive: Option<ManagedLoaderFileContentLease>"));
+    assert!(FAILURE.contains("returned_positive: Option<ManagedLoaderFileContentLease>"));
+    assert!(FAILURE.contains("WindowsRunnerActiveContentLeaseAcquisitionCustody::PackageFile"));
+    assert!(
+        FAILURE.contains("attempt: ManagedLoaderSystemImageContentLeaseAcquisitionAttemptCustody")
+    );
+    assert!(FAILURE.contains("ResolvedFilesystemSystemImagePositiveOutcome"));
+    assert!(FAILURE.contains("outcome: ManagedLoaderSystemImageContentLeasePositiveOutcomeCustody"));
+    assert!(!FAILURE.contains("_returned_positive: Option<ManagedLoaderFileContentLease>"));
     assert!(FAILURE.contains("query_attempt.matches_session(&prerequisite.namespace.session)"));
     assert!(FAILURE.contains("query_attempt.matches_session(session)"));
     assert!(FAILURE.contains("negative.matches_query(session, request_digest, query_nonce_digest)"));
+    assert!(FAILURE.contains("authenticated_negative.matches_attempt(&active_attempt)"));
     assert!(FAILURE
         .contains("_authenticated_negative: Option<ManagedLoaderAuthenticatedNegativeReceipt>"));
     assert!(FAILURE.contains("QuarantinedManagedLoaderSourceClose"));
     assert!(MANAGED_LOADER.contains("fn returned_positive_is_none(&self) -> bool"));
     assert!(FAILURE.contains("attempt.returned_positive_is_none()"));
+    assert_eq!(
+        FAILURE
+            .matches("_preliminary: PreliminaryResolutionRequestsPlannedWork<'root>")
+            .count(),
+        1
+    );
+    assert!(FAILURE.contains("_grant_ready: GrantReadyWindowsRunnerResolutionPrerequisite<'root>"));
+    assert!(FAILURE.contains("_namespace_grants: PreFinalWindowsLoaderNamespaceGrantSet<'root>"));
+    assert!(FAILURE
+        .contains("_acquired_leases: Vec<WindowsLoaderAcquiredImmutableContentLeaseCustody>"));
+    assert!(FAILURE.contains("_active: WindowsRunnerActiveContentLeaseAcquisitionCustody"));
+    assert!(FAILURE.contains("_pending: Vec<WindowsRunnerPendingContentLeaseRef>"));
+    assert!(FAILURE
+        .contains("_prerequisite: PostLeaseSealedWindowsRunnerLoadSetPreQueryPrerequisite<'root>"));
+    assert!(!FAILURE.contains("_resolution: SealedWindowsLoaderResolutionAuthority"));
+    assert!(RESOLUTION.contains("enum WindowsLoaderAcquiredImmutableContentLeaseCustody"));
+    assert!(RESOLUTION.contains("ResolvedFilesystemSystemImage"));
+    assert!(RESOLUTION.contains("struct PreFinalWindowsLoaderNamespaceGrantSet<'root>"));
+    assert!(RESOLUTION.contains("struct PostLeaseWindowsLoaderNamespaceGrantSet<'root>"));
+    assert!(RESOLUTION.contains("struct PostLeaseSealedWindowsRunnerLoadSetPreQueryPrerequisite"));
+    assert!(RESOLUTION.contains("namespace: PostLeaseWindowsLoaderNamespaceGrantSet<'root>"));
+    assert!(
+        RESOLUTION.contains("postlease_lineage: PostLeaseWindowsRunnerResolutionLineage<'root>")
+    );
+    assert!(
+        RESOLUTION.contains("package_content_leases: Vec<WindowsLoaderPackageContentLeaseCustody>")
+    );
+    assert!(RESOLUTION.contains("_postlease_final_resolution_sealer_unavailable: Infallible"));
+    assert!(!RESOLUTION.contains("struct WindowsRunnerLoadSetBorrowPrerequisite"));
+    assert!(DIGEST.contains("windows_loader_resolution_profile.v2"));
+    assert!(DIGEST.contains("\"launch_context_selector_digest\""));
+    assert!(DIGEST.contains("\"selected_context_binding_digest\""));
+    assert!(DIGEST.contains("\"preliminary_resolution_request_plan_digest\""));
+    assert!(DIGEST.contains("\"grant_ready_resolution_plan_digest\""));
+    assert!(!DIGEST.contains("\"required_launch_context_digest\""));
     assert!(!FAILURE.contains("fn retry"));
     assert!(!FAILURE.contains("fn into_admitted"));
     assert!(!FAILURE.contains("fn into_prerequisite"));
@@ -438,6 +486,11 @@ fn managed_loader_typestates_expose_no_raw_or_reconstructing_authority() {
     assert!(MANAGED_LOADER.contains("handle_derived_canonical_path"));
     assert!(MANAGED_LOADER.contains("authenticated_response_digest: String"));
     assert!(MANAGED_LOADER.contains("authenticated_response_is_bound"));
+    assert!(MANAGED_LOADER.contains("_authenticated_positive_backend_unavailable: Infallible"));
+    assert!(MANAGED_NAME_GRANT_POSITIVE.contains("fn matches_attempt("));
+    assert!(MANAGED_NAME_GRANT_POSITIVE.contains("Arc::ptr_eq(&self.owner, &attempt.owner)"));
+    assert!(MANAGED_NAME_GRANT_POSITIVE
+        .contains("self.authenticated_response == attempt.response_buffer"));
     assert!(MANAGED_LOADER_SYSTEM_VALIDATION.contains("path_currentness_binding"));
     assert!(MANAGED_LOADER_SYSTEM_VALIDATION.contains("namespace_alias_currentness_receipt_digest"));
 }
@@ -489,7 +542,9 @@ fn source_freezes_missing_authorities_eighteen_zero_effects_and_transition_order
         "FILE_SHARE_READ",
         "borrow_only_receipt_and_evidence_preflight",
         "discover_retained_launch_path_candidates_and_prelease_pe_material",
-        "authenticate_exact_launch_context_and_preliminary_resolution_plan",
+        "authenticate_exact_launch_context_and_preliminary_resolution_requests",
+        "resolve_exact_terminals_dispositions_and_external_directory_owners",
+        "seal_grant_ready_preliminary_resolution_plan",
         "acquire_all_searched_name_and_launch_path_component_grants",
         "acquire_indexed_fileid_content_leases_after_all_name_grants",
         "same_handle_full_package_rehash_and_reparse_under_content_leases_and_name_grants",
@@ -510,12 +565,33 @@ fn source_freezes_missing_authorities_eighteen_zero_effects_and_transition_order
     assert!(POLICY.contains("missing_resume_blocker"));
     assert!(POLICY.contains("existing_extraction_directory_access_share_compatibility"));
     assert!(POLICY.contains("fileid_immutable_content_lease_backend"));
-    assert!(POLICY.contains("authenticated_pe_import_graph_projection"));
+    assert!(POLICY.contains("prelease_authenticated_pe_material"));
+    assert!(POLICY.contains("authenticated_prelease_pe_parser_producer"));
+    assert!(POLICY.contains("postlease_exact_pe_import_graph_sealer"));
     assert!(POLICY.contains("launch_path_handle_chain_discovery"));
-    assert!(POLICY.contains("launch_path_exact_context_selection"));
+    assert!(POLICY.contains("launch_context_selection_contract"));
+    assert!(POLICY.contains("authenticated_launch_context_source_producer"));
+    assert!(POLICY.contains("preliminary_resolution_request_plan"));
+    assert!(POLICY.contains("grant_ready_preliminary_resolution_plan"));
+    assert!(POLICY.contains("external_search_directory_authority"));
     assert!(POLICY.contains("launch_path_component_grant_backend"));
     assert!(!POLICY.contains("PROPOSED_WINDOWS_DIRECTORY_DESIRED_ACCESS"));
     assert!(!POLICY.contains("PROPOSED_WINDOWS_DIRECTORY_SHARE_ACCESS"));
+
+    let transition_positions = [
+        "discover_retained_launch_path_candidates_and_prelease_pe_material",
+        "authenticate_exact_launch_context_and_preliminary_resolution_requests",
+        "resolve_exact_terminals_dispositions_and_external_directory_owners",
+        "seal_grant_ready_preliminary_resolution_plan",
+        "acquire_all_searched_name_and_launch_path_component_grants",
+        "acquire_indexed_fileid_content_leases_after_all_name_grants",
+        "same_handle_full_package_rehash_and_reparse_under_content_leases_and_name_grants",
+        "seal_exact_pe_graph_launch_path_and_startup_import_resolution_under_leases",
+    ]
+    .map(|step| POLICY.find(step).expect("transition step missing"));
+    assert!(transition_positions
+        .windows(2)
+        .all(|positions| positions[0] < positions[1]));
 }
 
 #[test]

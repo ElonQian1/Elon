@@ -32,6 +32,8 @@ use super::resolution::SealedWindowsRunnerLoadSetAuthority;
 /// time barriers, staging root/lock, and the share-none seal remain here.
 #[must_use = "loader-transition authority must remain in successor or recovery custody"]
 pub(super) struct LoaderTransitionAuthorityCustody<'root> {
+    pub(super) authenticated_launch_lineage:
+        super::launch_path_discovery::QueryVerifiedWindowsRunnerLaunchLineage,
     pub(super) work_admission_receipts: ComputePluginWorkAdmissionReceiptPair,
     pub(super) work_admission_trusted_time: ComputePluginTrustedTimeObservation,
     pub(super) work_admission_revalidated_at: Instant,
@@ -373,11 +375,11 @@ impl SealedComputePluginRunnerImage {
             .immutable_content_lease_set_digest
     }
 
-    pub(in crate::node_agent_compute_plugin_host) fn required_launch_context_digest(&self) -> &str {
+    pub(in crate::node_agent_compute_plugin_host) fn launch_context_selector_digest(&self) -> &str {
         &self
             .load_set_authority
             .resolution
-            .required_launch_context_digest
+            .launch_context_selector_digest
     }
 
     pub(in crate::node_agent_compute_plugin_host) fn process_machine_context_digest(&self) -> &str {

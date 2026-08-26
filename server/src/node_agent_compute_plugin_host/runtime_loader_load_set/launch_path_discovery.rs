@@ -5,6 +5,9 @@
 
 #![allow(dead_code)]
 
+mod exact_context_plan;
+mod prelease_pe_material;
+
 use std::fmt;
 
 use anyhow::{anyhow, bail, Error, Result};
@@ -16,6 +19,18 @@ use crate::node_agent_managed_fs::{
 };
 
 use super::super::work_admission_contract::DurableWorkAdmittedPluginSlot;
+
+pub(super) use exact_context_plan::{
+    consume_query_verified_loader_prerequisite, AuthenticatedWindowsRunnerLaunchContextIntent,
+    PreliminaryResolutionRequestsPlannedWork, PreliminaryWindowsRunnerResolutionRequestPlanView,
+    PreliminaryWindowsRunnerSelectedContextView, QueryVerifiedWindowsRunnerLaunchLineage,
+    QueryVerifiedWindowsRunnerLaunchLineageValidationFailure,
+    WindowsPreliminaryContentLeaseRequestRef, WindowsPreliminaryImportEdgeKind,
+    WindowsPreliminaryLaunchPathComponentRequest, WindowsPreliminaryModuleEdgeLocator,
+    WindowsPreliminaryModuleResolutionRequest, WindowsPreliminaryRetainedDirectoryLocation,
+    WindowsPreliminarySearchDirectoryBinding, WindowsPreliminarySearchDirectoryTarget,
+    WindowsRunnerLaunchContextPreCreateProjection,
+};
 
 const CANDIDATE_BINDING_DOMAIN: &[u8] = b"ELON_WINDOWS_RUNNER_LAUNCH_PATH_CANDIDATES_V1";
 

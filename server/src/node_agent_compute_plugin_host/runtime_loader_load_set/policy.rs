@@ -33,25 +33,48 @@ pub(super) const LOADER_LOAD_SET_AUTHORITY_GAPS: &[(&str, &str)] = &[
 /// process-resume blocker until a module-load enforcement policy and backend exist.
 pub(super) const DYNAMIC_MODULE_LOAD_AUTHORITY: &str = "missing_resume_blocker";
 
-/// Extraction-share custody and retained launch-path candidate discovery now have source-written
-/// seams. Windows has dynamically verified neither layer, and exact context selection/grants stay
-/// missing, so the loader predecessor remains unreachable in this architecture phase.
+/// Source contracts can advance while production reachability remains blocked on dynamic Windows
+/// evidence and every real authenticated producer/backend below.
 pub(super) const LOADER_LOAD_SET_REACHABILITY_BLOCKERS: &[(&str, &str)] = &[
     (
         "existing_extraction_directory_access_share_compatibility",
         "source_seam_written_windows_dynamic_unverified",
     ),
-    ("startup_import_resolution_producer", "missing"),
-    ("fileid_immutable_content_lease_backend", "missing"),
-    ("searched_name_grant_acquisition_backend", "missing"),
-    ("searched_name_fence_backend", "missing"),
     (
         "launch_path_handle_chain_discovery",
         "source_written_windows_dynamic_unverified",
     ),
-    ("launch_path_exact_context_selection", "missing"),
+    (
+        "launch_context_selection_contract",
+        "source_written_uncompiled_unrun",
+    ),
+    ("authenticated_launch_context_source_producer", "missing"),
+    (
+        "prelease_authenticated_pe_material",
+        "source_written_uncompiled_unrun",
+    ),
+    ("authenticated_prelease_pe_parser_producer", "missing"),
+    (
+        "preliminary_resolution_request_plan",
+        "source_written_uncompiled_unrun",
+    ),
+    (
+        "grant_ready_resolution_contract",
+        "source_written_uncompiled_unrun",
+    ),
+    ("grant_ready_resolution_producer", "missing"),
+    ("external_search_directory_authority", "missing"),
     ("launch_path_component_grant_backend", "missing"),
-    ("authenticated_pe_import_graph_projection", "missing"),
+    ("searched_name_grant_acquisition_backend", "missing"),
+    ("searched_name_fence_backend", "missing"),
+    ("fileid_immutable_content_lease_backend", "missing"),
+    ("postlease_exact_pe_import_graph_sealer", "missing"),
+    (
+        "postlease_same_owner_lineage_contract",
+        "source_written_uncompiled_unrun",
+    ),
+    ("final_namespace_query_backend", "missing"),
+    ("startup_import_resolution_producer", "missing"),
     ("live_windows_resolution_currentness_backend", "missing"),
     ("parent_relative_file_reopen_backend", "missing"),
 ];
@@ -68,7 +91,9 @@ pub(super) const PROPOSED_WINDOWS_IMAGE_CREATE_OPTIONS: &str =
 pub(super) const LOADER_TRANSITION_ORDER: &[&str] = &[
     "borrow_only_receipt_and_evidence_preflight",
     "discover_retained_launch_path_candidates_and_prelease_pe_material",
-    "authenticate_exact_launch_context_and_preliminary_resolution_plan",
+    "authenticate_exact_launch_context_and_preliminary_resolution_requests",
+    "resolve_exact_terminals_dispositions_and_external_directory_owners",
+    "seal_grant_ready_preliminary_resolution_plan",
     "acquire_all_searched_name_and_launch_path_component_grants",
     "acquire_indexed_fileid_content_leases_after_all_name_grants",
     "same_handle_full_package_rehash_and_reparse_under_content_leases_and_name_grants",

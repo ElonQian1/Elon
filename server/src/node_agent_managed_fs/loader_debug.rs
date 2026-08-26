@@ -100,6 +100,60 @@ impl fmt::Debug for PinnedWindowsLoaderSearchDirectory {
     }
 }
 
+impl fmt::Debug for PinnedWindowsLoaderResolvedSystemImageCandidate {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("PinnedWindowsLoaderResolvedSystemImageCandidate")
+            .field("file", &"<retained-parent-relative-system-image-candidate>")
+            .field("parent_directory_identity_digest", &"<redacted>")
+            .field("normalized_name", &"<redacted>")
+            .field("image_file_identity_digest", &"<redacted>")
+            .finish()
+    }
+}
+
+impl fmt::Debug for ManagedLoaderSystemImageContentLeaseAcquisitionAttemptCustody {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("ManagedLoaderSystemImageContentLeaseAcquisitionAttemptCustody")
+            .field(
+                "resolution_request_ordinal",
+                &self.resolution_request_ordinal,
+            )
+            .field("request_digest", &"<redacted>")
+            .field("response_bytes", &self.response_buffer.len())
+            .finish()
+    }
+}
+
+impl fmt::Debug for ManagedLoaderSystemImageContentLeaseAuthenticatedNegativeReceipt {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("ManagedLoaderSystemImageContentLeaseAuthenticatedNegativeReceipt")
+            .field(
+                "resolution_request_ordinal",
+                &self.resolution_request_ordinal,
+            )
+            .field("receipt_digest", &"<redacted>")
+            .finish()
+    }
+}
+
+impl fmt::Debug for ManagedLoaderSystemImageContentLeasePositiveOutcomeCustody {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("ManagedLoaderSystemImageContentLeasePositiveOutcomeCustody")
+            .field("session", &"<retained-authenticated-lease-session>")
+            .field(
+                "resolution_request_ordinal",
+                &self.resolution_request_ordinal,
+            )
+            .field("authenticated_response_digest", &"<redacted>")
+            .field("image", &self.image)
+            .finish()
+    }
+}
+
 impl fmt::Debug for PinnedWindowsLoaderSystemImageFile {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter

@@ -3,12 +3,15 @@ use std::{error::Error as StdError, fmt, mem::ManuallyDrop, path::PathBuf};
 use anyhow::{bail, Error, Result};
 
 use crate::node_agent_compute_plugin_host::{
-    manifest_validation::is_sha256, runtime_loader_load_set::LoaderLockedWorkAdmittedPluginSlot,
+    manifest_validation::is_sha256,
+    runtime_loader_load_set::{
+        LoaderLockedWorkAdmittedPluginSlot, WindowsRunnerLaunchContextPreCreateProjection,
+    },
 };
 
 #[cfg(windows)]
 use super::launch_security::SealedWindowsRunnerLaunchSecurity;
-use super::policy::WindowsRunnerProcessPolicy;
+use super::policy::{WindowsRunnerProcessPolicy, EMPTY_ENVIRONMENT_POLICY, PROCESS_CREATION_FLAGS};
 
 /// Exact work-admission plus sealed image material prepared before any process is created.
 /// The loader-locked successor already replaced the share-none admission; keeping both would be
@@ -92,6 +95,26 @@ fn validate_sealed_authorities(
         bail!("COMPUTE_PLUGIN_RUNNER_IMAGE_BINDING_CHANGED");
     }
     launch_security.validate()?;
+    if launch_security.launch_context_selector_digest() != image.launch_context_selector_digest()
+        || launch_security.startup_import_resolution_profile_digest()
+            != image.startup_import_resolution_profile_digest()
+    {
+        bail!("COMPUTE_PLUGIN_WINDOWS_LAUNCH_SECURITY_LOADER_CONTEXT_CHANGED");
+    }
+    let precreate_launch_context = WindowsRunnerLaunchContextPreCreateProjection::new(
+        image.launch_context_selector_digest(),
+        image.process_machine_context_digest(),
+        image.startup_import_resolution_profile_digest(),
+        image.working_directory_identity_digest(),
+        profile.runner_relative_path(),
+        profile.entrypoint_arguments_digest(),
+        launch_security.restricted_token_expected(),
+        launch_security.app_container_expected(),
+        false,
+        EMPTY_ENVIRONMENT_POLICY,
+        PROCESS_CREATION_FLAGS,
+    );
+    loader_locked.validate_authenticated_launch_context_projection(&precreate_launch_context)?;
     let policy = WindowsRunnerProcessPolicy::from_sources(&loader_locked, &launch_security)?;
     Ok((
         policy,

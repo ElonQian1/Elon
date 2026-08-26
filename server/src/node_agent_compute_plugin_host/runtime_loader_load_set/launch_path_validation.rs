@@ -139,6 +139,7 @@ fn validate_path_kind(
             || component.parent_directory_identity_digest != expected_parent
             || component.normalized_component.trim().is_empty()
             || !grant.grant.matches_session(session)
+            || !grant.grant.authenticated_positive_is_bound()
             || grant_generation != session.binding().1
             || parent != component.parent_directory_identity_digest
             || name != component.normalized_component

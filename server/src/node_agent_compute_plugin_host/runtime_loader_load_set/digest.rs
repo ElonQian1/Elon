@@ -1,13 +1,26 @@
+mod material;
+mod pe_cross_binding;
+
 use anyhow::{bail, Result};
-use serde_json::{json, Value};
+use serde_json::json;
 
 use crate::node_agent_compute_plugin_host::signed_artifact_verification::jcs_sha256_hex;
 
 use super::resolution::{
     SealedWindowsLoaderNamespaceAuthority, SealedWindowsLoaderResolutionAuthority,
-    WindowsLoaderFilesystemSearchDirectoryTarget, WindowsLoaderImportBindingRef,
-    WindowsLoaderImportEdgeKind, WindowsLoaderLaunchPathKind, WindowsLoaderModuleNode,
-    WindowsLoaderSearchedNameDisposition, WindowsLoaderSystemResolutionOrigin,
+    WindowsLoaderLaunchPathKind, WindowsLoaderModuleNode,
+};
+
+pub(super) use material::searched_name_disposition_digest;
+use material::{
+    disposition_material, edge_kind_name, filesystem_system_image_ref_material,
+    import_binding_ref_material, launch_path_kind_name, module_node_material,
+    search_target_material, system_resolution_origin_material,
+};
+use pe_cross_binding::edge_locator_material;
+pub(super) use pe_cross_binding::{
+    pe_import_edge_cross_binding_set_digest, pe_parsed_image_cross_binding_set_digest,
+    pe_pre_post_cross_binding_receipt_digest,
 };
 
 /// Canonical PE edge material for one exact importer. The authenticated parser's per-image
@@ -24,13 +37,19 @@ pub(super) fn importer_edge_table_digest(
         .filter(|(_, entry)| &entry.importer == importer)
         .map(|(binding_ordinal, entry)| {
             (
-                entry.importer_edge_ordinal,
+                entry.importer_graph_edge_ordinal,
                 json!({
                 "target_kind": "package",
                 "binding_ordinal": binding_ordinal,
-                "importer_edge_ordinal": entry.importer_edge_ordinal,
+                "module_request_ordinal": entry.module_request_ordinal,
+                "global_import_edge_ordinal": entry.global_import_edge_ordinal,
+                "edge_locator": edge_locator_material(&entry.edge_locator),
+                "importer_parsed_image_ordinal": entry.importer_parsed_image_ordinal,
+                "importer_graph_edge_ordinal": entry.importer_graph_edge_ordinal,
                 "edge_kind": edge_kind_name(&entry.edge_kind),
                 "normalized_import_name": entry.normalized_import_name,
+                "imported_symbol_name": entry.imported_symbol_name,
+                "imported_symbol_ordinal": entry.imported_symbol_ordinal,
                 "resolved_module_cache_key": entry.resolved_module_cache_key,
                 "relative_path": entry.relative_path,
                 "resolved_package_file_ordinal": entry.resolved_package_file_ordinal,
@@ -47,20 +66,26 @@ pub(super) fn importer_edge_table_digest(
         .filter(|(_, entry)| &entry.importer == importer)
         .map(|(binding_ordinal, entry)| {
             (
-                entry.importer_edge_ordinal,
+                entry.importer_graph_edge_ordinal,
                 json!({
                 "target_kind": "system",
                 "binding_ordinal": binding_ordinal,
-                "importer_edge_ordinal": entry.importer_edge_ordinal,
+                "module_request_ordinal": entry.module_request_ordinal,
+                "global_import_edge_ordinal": entry.global_import_edge_ordinal,
+                "edge_locator": edge_locator_material(&entry.edge_locator),
+                "importer_parsed_image_ordinal": entry.importer_parsed_image_ordinal,
+                "importer_graph_edge_ordinal": entry.importer_graph_edge_ordinal,
                 "edge_kind": edge_kind_name(&entry.edge_kind),
                 "normalized_import_name": entry.normalized_import_name,
+                "imported_symbol_name": entry.imported_symbol_name,
+                "imported_symbol_ordinal": entry.imported_symbol_ordinal,
                 "resolved_module_cache_key": entry.resolved_module_cache_key,
                 "resolved_dependency_ordinal": entry.resolved_dependency_ordinal,
                 "resolved_component_identity_digest": entry.resolved_component_identity_digest,
                 "resolved_image_section_identity_digest": entry.resolved_image_section_identity_digest,
                 "resolution_origin": system_resolution_origin_material(&entry.resolution_origin),
                 "resolved_search_directory_ordinal": entry.resolved_search_directory_ordinal,
-                "filesystem_image": filesystem_system_image_material(entry.filesystem_image.as_ref()),
+                "filesystem_image_ref": filesystem_system_image_ref_material(entry.filesystem_image_ref.as_ref()),
                 }),
             )
         })
@@ -93,6 +118,9 @@ pub(super) fn validate_aggregate_digests(
                 "search_step_ordinal": entry.search_step_ordinal,
                 "normalized_name": entry.normalized_name,
                 "search_directory_ordinal": entry.search_directory_ordinal,
+                "search_directory_authority_binding_digest": entry.search_directory_authority_binding_digest,
+                "grant_request_digest": entry.grant_request_digest,
+                "disposition_binding_digest": entry.disposition_binding_digest,
                 "disposition": disposition_material(&entry.disposition),
             }))
         })
@@ -107,6 +135,8 @@ pub(super) fn validate_aggregate_digests(
         .map(|entry| {
             let (grant_generation, parent, name, disposition, fence_generation) =
                 entry.grant.binding();
+            let (request, nonce, response, positive_receipt) =
+                entry.grant.authenticated_positive_binding();
             json!({
                 "grant_kind": "import_search_name",
                 "searched_name_ordinal": entry.searched_name_ordinal,
@@ -116,6 +146,10 @@ pub(super) fn validate_aggregate_digests(
                 "normalized_name": name,
                 "disposition_digest": disposition,
                 "fence_generation_digest": fence_generation,
+                "request_digest": request,
+                "query_nonce_digest": nonce,
+                "authenticated_response_digest": response,
+                "positive_receipt_digest": positive_receipt,
             })
         })
         .collect::<Vec<_>>();
@@ -135,6 +169,8 @@ pub(super) fn validate_aggregate_digests(
         .collect::<Vec<_>>();
     for entry in &prerequisite.launch_path_component_grants {
         let (grant_generation, parent, name, disposition, fence_generation) = entry.grant.binding();
+        let (request, nonce, response, positive_receipt) =
+            entry.grant.authenticated_positive_binding();
         grants.push(json!({
             "grant_kind": "launch_path_component",
             "path_kind": launch_path_kind_name(entry.path_kind),
@@ -144,6 +180,10 @@ pub(super) fn validate_aggregate_digests(
             "normalized_name": name,
             "disposition_digest": disposition,
             "fence_generation_digest": fence_generation,
+            "request_digest": request,
+            "query_nonce_digest": nonce,
+            "authenticated_response_digest": response,
+            "positive_receipt_digest": positive_receipt,
         }));
     }
     if jcs_sha256_hex(&launch_path_components)?
@@ -214,10 +254,16 @@ pub(super) fn validate_aggregate_digests(
         .iter()
         .map(|entry| {
             json!({
+                "module_request_ordinal": entry.module_request_ordinal,
+                "global_import_edge_ordinal": entry.global_import_edge_ordinal,
+                "edge_locator": edge_locator_material(&entry.edge_locator),
+                "importer_parsed_image_ordinal": entry.importer_parsed_image_ordinal,
                 "importer": module_node_material(&entry.importer),
-                "importer_edge_ordinal": entry.importer_edge_ordinal,
+                "importer_graph_edge_ordinal": entry.importer_graph_edge_ordinal,
                 "edge_kind": edge_kind_name(&entry.edge_kind),
                 "normalized_import_name": entry.normalized_import_name,
+                "imported_symbol_name": entry.imported_symbol_name,
+                "imported_symbol_ordinal": entry.imported_symbol_ordinal,
                 "resolved_module_cache_key": entry.resolved_module_cache_key,
                 "relative_path": entry.relative_path,
                 "resolved_package_file_ordinal": entry.resolved_package_file_ordinal,
@@ -231,17 +277,23 @@ pub(super) fn validate_aggregate_digests(
         .iter()
         .map(|entry| {
             json!({
+                "module_request_ordinal": entry.module_request_ordinal,
+                "global_import_edge_ordinal": entry.global_import_edge_ordinal,
+                "edge_locator": edge_locator_material(&entry.edge_locator),
+                "importer_parsed_image_ordinal": entry.importer_parsed_image_ordinal,
                 "importer": module_node_material(&entry.importer),
-                "importer_edge_ordinal": entry.importer_edge_ordinal,
+                "importer_graph_edge_ordinal": entry.importer_graph_edge_ordinal,
                 "edge_kind": edge_kind_name(&entry.edge_kind),
                 "normalized_import_name": entry.normalized_import_name,
+                "imported_symbol_name": entry.imported_symbol_name,
+                "imported_symbol_ordinal": entry.imported_symbol_ordinal,
                 "resolved_module_cache_key": entry.resolved_module_cache_key,
                 "resolved_dependency_ordinal": entry.resolved_dependency_ordinal,
                 "resolved_component_identity_digest": entry.resolved_component_identity_digest,
                 "resolved_image_section_identity_digest": entry.resolved_image_section_identity_digest,
                 "resolution_origin": system_resolution_origin_material(&entry.resolution_origin),
                 "resolved_search_directory_ordinal": entry.resolved_search_directory_ordinal,
-                "filesystem_image": filesystem_system_image_material(entry.filesystem_image.as_ref()),
+                "filesystem_image_ref": filesystem_system_image_ref_material(entry.filesystem_image_ref.as_ref()),
             })
         })
         .collect::<Vec<_>>();
@@ -285,6 +337,24 @@ pub(super) fn validate_aggregate_digests(
     {
         bail!("COMPUTE_PLUGIN_LOADER_SYSTEM_IMAGE_SET_DIGEST_CHANGED");
     }
+    let resolved_system_image_custodies = resolution
+        .resolved_filesystem_system_images
+        .iter()
+        .map(|custody| {
+            let (request, candidate, session, lease_request, nonce, response, receipt) =
+                custody.outcome.binding();
+            json!({
+                "resolution_request_ordinal": custody.resolution_request_ordinal,
+                "outcome_request_ordinal": request,
+                "candidate_binding_digest": candidate,
+                "lease_session_identity_digest": session,
+                "lease_request_digest": lease_request,
+                "query_nonce_digest": nonce,
+                "authenticated_response_digest": response,
+                "positive_receipt_digest": receipt,
+            })
+        })
+        .collect::<Vec<_>>();
     let preloaded_modules = resolution
         .preloaded_module_authority
         .modules
@@ -417,7 +487,7 @@ pub(super) fn validate_aggregate_digests(
     }
 
     let resolution_material = json!({
-        "schema": "elon.compute_plugin.windows_loader_resolution_profile.v1",
+        "schema": "elon.compute_plugin.windows_loader_resolution_profile.v2",
         "admission_source_digest": resolution.admission_source_digest,
         "admission_receipt_digest": resolution.admission_receipt_digest,
         "extraction_plan_digest": resolution.extraction_plan_digest,
@@ -451,6 +521,7 @@ pub(super) fn validate_aggregate_digests(
         },
         "resolved_system_dependencies": resolved_dependencies,
         "system_component_image_set_digest": resolution.system_module_images.component_image_set_digest,
+        "resolved_filesystem_system_image_custodies": resolved_system_image_custodies,
         "preloaded_modules": {
             "process_machine_context_digest": resolution.preloaded_module_authority.process_machine_context_digest,
             "modules": preloaded_modules,
@@ -472,12 +543,18 @@ pub(super) fn validate_aggregate_digests(
             "expected_package_edge_count": resolution.pe_import_graph.expected_package_edge_count,
             "expected_system_edge_count": resolution.pe_import_graph.expected_system_edge_count,
             "expected_search_step_count": resolution.pe_import_graph.expected_search_step_count,
+            "parsed_image_cross_binding_set_digest": resolution.pe_import_graph.pre_post_cross_binding.parsed_image_cross_binding_set_digest,
+            "import_edge_cross_binding_set_digest": resolution.pe_import_graph.pre_post_cross_binding.import_edge_cross_binding_set_digest,
+            "pre_post_cross_binding_receipt_digest": resolution.pe_import_graph.pre_post_cross_binding.receipt_digest,
         },
         "launch_path_component_set_digest": resolution.launch_path_authority.component_set_digest,
         "application_launch_path_component_set_digest": resolution.launch_path_authority.application_component_set_digest,
         "working_directory_launch_path_component_set_digest": resolution.launch_path_authority.working_directory_component_set_digest,
         "retained_parent_chain_share_contract_set_digest": resolution.launch_path_authority.retained_parent_chain_share_contract_set_digest,
-        "required_launch_context_digest": resolution.required_launch_context_digest,
+        "launch_context_selector_digest": resolution.launch_context_selector_digest,
+        "selected_context_binding_digest": resolution.selected_context_binding_digest,
+        "preliminary_resolution_request_plan_digest": resolution.preliminary_resolution_request_plan_digest,
+        "grant_ready_resolution_plan_digest": resolution.grant_ready_resolution_plan_digest,
         "process_machine_context_digest": resolution.process_machine_context_digest,
     });
     if jcs_sha256_hex(&resolution_material)? != resolution.resolution_profile_digest {
@@ -532,238 +609,4 @@ pub(super) fn validate_aggregate_digests(
         bail!("COMPUTE_PLUGIN_LOADER_NAMESPACE_AUTHORITY_DIGEST_CHANGED");
     }
     Ok(())
-}
-
-pub(super) fn searched_name_disposition_digest(
-    disposition: &WindowsLoaderSearchedNameDisposition,
-) -> Result<String> {
-    jcs_sha256_hex(&disposition_material(disposition))
-}
-
-fn disposition_material(disposition: &WindowsLoaderSearchedNameDisposition) -> Value {
-    match disposition {
-        WindowsLoaderSearchedNameDisposition::ExpectedPackage {
-            package_file_ordinal,
-            image_file_identity_digest,
-        } => json!({
-            "kind": "expected_package",
-            "package_file_ordinal": package_file_ordinal,
-            "image_file_identity_digest": image_file_identity_digest,
-        }),
-        WindowsLoaderSearchedNameDisposition::ExpectedSystem {
-            resolved_component_identity_digest,
-            image_file_identity_digest,
-            immutable_section_identity_digest,
-            servicing_generation_digest,
-        } => json!({
-            "kind": "expected_system",
-            "resolved_component_identity_digest": resolved_component_identity_digest,
-            "image_file_identity_digest": image_file_identity_digest,
-            "immutable_section_identity_digest": immutable_section_identity_digest,
-            "servicing_generation_digest": servicing_generation_digest,
-        }),
-        WindowsLoaderSearchedNameDisposition::MustRemainAbsentShadow => {
-            json!({ "kind": "must_remain_absent_shadow" })
-        }
-    }
-}
-
-fn search_target_material(target: &WindowsLoaderFilesystemSearchDirectoryTarget) -> Value {
-    match target {
-        WindowsLoaderFilesystemSearchDirectoryTarget::PackageRoot => {
-            json!({ "kind": "package_root" })
-        }
-        WindowsLoaderFilesystemSearchDirectoryTarget::PackageWorkingDirectory => {
-            json!({ "kind": "package_working_directory" })
-        }
-        WindowsLoaderFilesystemSearchDirectoryTarget::PackagePlanDirectory {
-            directory_ordinal,
-        } => json!({
-            "kind": "package_plan_directory",
-            "directory_ordinal": directory_ordinal,
-        }),
-        WindowsLoaderFilesystemSearchDirectoryTarget::SystemDirectory { directory } => {
-            external_search_directory_material("system_directory", directory)
-        }
-        WindowsLoaderFilesystemSearchDirectoryTarget::WindowsDirectory { directory } => {
-            external_search_directory_material("windows_directory", directory)
-        }
-        WindowsLoaderFilesystemSearchDirectoryTarget::SideBySideAssemblyDirectory { directory } => {
-            external_search_directory_material("side_by_side_assembly_directory", directory)
-        }
-    }
-}
-
-fn external_search_directory_material(
-    kind: &str,
-    directory: &crate::node_agent_managed_fs::PinnedWindowsLoaderSearchDirectory,
-) -> Value {
-    let (
-        root_identity_digest,
-        final_identity_digest,
-        canonical_path_digest,
-        component_set_digest,
-        retained_parent_chain_share_contract_digest,
-        observation_receipt_digest,
-        namespace_alias_currentness_receipt_digest,
-    ) = directory.path_currentness_binding();
-    json!({
-        "kind": kind,
-        "root_identity_digest": root_identity_digest,
-        "final_identity_digest": final_identity_digest,
-        "canonical_path_digest": canonical_path_digest,
-        "component_set_digest": component_set_digest,
-        "retained_parent_chain_share_contract_digest": retained_parent_chain_share_contract_digest,
-        "observation_receipt_digest": observation_receipt_digest,
-        "namespace_alias_currentness_receipt_digest": namespace_alias_currentness_receipt_digest,
-    })
-}
-
-fn edge_kind_name(kind: &WindowsLoaderImportEdgeKind) -> &'static str {
-    match kind {
-        WindowsLoaderImportEdgeKind::NormalImport => "normal_import",
-        WindowsLoaderImportEdgeKind::DelayImport => "delay_import",
-        WindowsLoaderImportEdgeKind::Forwarder => "forwarder",
-    }
-}
-
-fn launch_path_kind_name(kind: WindowsLoaderLaunchPathKind) -> &'static str {
-    match kind {
-        WindowsLoaderLaunchPathKind::Application => "application",
-        WindowsLoaderLaunchPathKind::WorkingDirectory => "working_directory",
-    }
-}
-
-fn module_node_material(node: &WindowsLoaderModuleNode) -> Value {
-    match node {
-        WindowsLoaderModuleNode::PackageFile {
-            package_file_ordinal,
-        } => json!({
-            "kind": "package_file",
-            "package_file_ordinal": package_file_ordinal,
-        }),
-        WindowsLoaderModuleNode::SystemComponent {
-            component_identity_digest,
-        } => json!({
-            "kind": "system_component",
-            "component_identity_digest": component_identity_digest,
-        }),
-        WindowsLoaderModuleNode::KnownDllSection {
-            section_identity_digest,
-        } => json!({
-            "kind": "known_dll_section",
-            "section_identity_digest": section_identity_digest,
-        }),
-        WindowsLoaderModuleNode::ApiSetHost {
-            component_identity_digest,
-        } => json!({
-            "kind": "api_set_host",
-            "component_identity_digest": component_identity_digest,
-        }),
-        WindowsLoaderModuleNode::SideBySideAssembly {
-            assembly_identity_digest,
-        } => json!({
-            "kind": "side_by_side_assembly",
-            "assembly_identity_digest": assembly_identity_digest,
-        }),
-    }
-}
-
-fn import_binding_ref_material(binding: &WindowsLoaderImportBindingRef) -> Value {
-    match binding {
-        WindowsLoaderImportBindingRef::Package { binding_ordinal } => json!({
-            "kind": "package",
-            "binding_ordinal": binding_ordinal,
-        }),
-        WindowsLoaderImportBindingRef::System { binding_ordinal } => json!({
-            "kind": "system",
-            "binding_ordinal": binding_ordinal,
-        }),
-    }
-}
-
-fn system_resolution_origin_material(origin: &WindowsLoaderSystemResolutionOrigin) -> Value {
-    match origin {
-        WindowsLoaderSystemResolutionOrigin::KnownDll {
-            section_identity_digest,
-        } => json!({
-            "kind": "known_dll",
-            "section_identity_digest": section_identity_digest,
-        }),
-        WindowsLoaderSystemResolutionOrigin::ApiSet {
-            normalized_contract_name,
-            host_component_identity_digest,
-            host_resolution,
-        } => json!({
-            "kind": "api_set",
-            "normalized_contract_name": normalized_contract_name,
-            "host_component_identity_digest": host_component_identity_digest,
-            "host_resolution": api_set_host_resolution_material(host_resolution),
-        }),
-        WindowsLoaderSystemResolutionOrigin::SideBySide {
-            assembly_identity_digest,
-            search_directory_ordinal,
-        } => json!({
-            "kind": "side_by_side",
-            "assembly_identity_digest": assembly_identity_digest,
-            "search_directory_ordinal": search_directory_ordinal,
-        }),
-        WindowsLoaderSystemResolutionOrigin::FilesystemSearch {
-            search_directory_ordinal,
-        } => json!({
-            "kind": "filesystem_search",
-            "search_directory_ordinal": search_directory_ordinal,
-        }),
-    }
-}
-
-fn api_set_host_resolution_material(
-    resolution: &super::resolution::WindowsLoaderApiSetHostResolution,
-) -> Value {
-    use super::resolution::WindowsLoaderApiSetHostResolution;
-    match resolution {
-        WindowsLoaderApiSetHostResolution::Preloaded {
-            preloaded_module_ordinal,
-        } => json!({
-            "kind": "preloaded",
-            "preloaded_module_ordinal": preloaded_module_ordinal,
-        }),
-        WindowsLoaderApiSetHostResolution::KnownDll {
-            section_identity_digest,
-        } => json!({
-            "kind": "known_dll",
-            "section_identity_digest": section_identity_digest,
-        }),
-        WindowsLoaderApiSetHostResolution::FilesystemSearch {
-            search_directory_ordinal,
-        } => json!({
-            "kind": "filesystem_search",
-            "search_directory_ordinal": search_directory_ordinal,
-        }),
-        WindowsLoaderApiSetHostResolution::SideBySide {
-            assembly_identity_digest,
-            search_directory_ordinal,
-        } => json!({
-            "kind": "side_by_side",
-            "assembly_identity_digest": assembly_identity_digest,
-            "search_directory_ordinal": search_directory_ordinal,
-        }),
-    }
-}
-
-fn filesystem_system_image_material(
-    image: Option<&crate::node_agent_managed_fs::PinnedWindowsLoaderSystemImageFile>,
-) -> Value {
-    let Some(image) = image else {
-        return Value::Null;
-    };
-    let (parent, name, file, section, open_receipt, mapping_receipt) = image.binding();
-    json!({
-        "parent_directory_identity_digest": parent,
-        "normalized_name": name,
-        "image_file_identity_digest": file,
-        "immutable_section_identity_digest": section,
-        "parent_relative_open_receipt_digest": open_receipt,
-        "section_mapping_receipt_digest": mapping_receipt,
-    })
 }

@@ -11,7 +11,7 @@ use crate::node_agent_compute_plugin_host::{
 #[cfg(windows)]
 use super::launch_security::SealedWindowsRunnerLaunchSecurity;
 
-const START_MATERIAL_SCHEMA: &str = "elon.compute_plugin.windows_runner_process_preparation.v1";
+const START_MATERIAL_SCHEMA: &str = "elon.compute_plugin.windows_runner_process_preparation.v3";
 const PREPARED_PROCESS_STATE: &str = "primary_thread_suspended";
 const RESUME_AUTHORITY_STATUS: &str =
     "blocked_missing_authenticated_ipc_complete_enforcement_runtime_store_and_recovery";
@@ -29,6 +29,7 @@ pub(super) const RESUME_BLOCKERS: &[&str] = &[
     "namespace_fence_explicit_release_and_recovery",
     "pre_resume_loader_currentness",
     "post_create_process_image_fileid_queryback",
+    "post_create_live_process_machine_context_queryback",
     "process_object_owner_label_acl_queryback",
     "private_noninteractive_window_station_desktop_isolation",
     "runtime_transition_store",
@@ -112,6 +113,7 @@ struct WindowsRunnerProcessStartMaterial<'a> {
 #[derive(Serialize)]
 struct WindowsRunnerRequiredLaunchContext<'a> {
     schema: &'static str,
+    launch_context_selector_digest: &'a str,
     target_id: &'a str,
     target_operating_system: &'a str,
     target_architecture: &'a str,
@@ -134,6 +136,7 @@ struct WindowsRunnerRequiredLaunchContext<'a> {
     child_object_dacl: &'static str,
     inherited_handles: bool,
     environment: &'static str,
+    entrypoint_arguments_digest: &'a str,
     working_directory_identity_digest: &'a str,
     working_directory_source: &'static str,
     executable_path_source: &'static str,
@@ -142,12 +145,13 @@ struct WindowsRunnerRequiredLaunchContext<'a> {
     job_assignment_mode: &'static str,
 }
 
-const PROCESS_CREATION_FLAGS: &[&str] = &[
+pub(super) const PROCESS_CREATION_FLAGS: &[&str] = &[
     "create_no_window",
     "create_suspended",
     "create_unicode_environment",
     "extended_startupinfo_present",
 ];
+pub(super) const EMPTY_ENVIRONMENT_POLICY: &str = "explicit_empty_unicode_environment_block_v1";
 
 pub(super) struct WindowsRunnerProcessPolicy {
     pub(super) arguments: Vec<String>,
@@ -185,7 +189,8 @@ impl WindowsRunnerProcessPolicy {
         let generations = receipt.generations();
         let authority = receipt.authority();
         let launch_context = WindowsRunnerRequiredLaunchContext {
-            schema: "elon.compute_plugin.windows_runner_required_launch_context.v1",
+            schema: "elon.compute_plugin.windows_runner_required_launch_context.v3",
+            launch_context_selector_digest: image.launch_context_selector_digest(),
             target_id: profile.target_id(),
             target_operating_system: &profile.target().operating_system,
             target_architecture: &profile.target().architecture,
@@ -209,7 +214,8 @@ impl WindowsRunnerProcessPolicy {
             private_desktop_isolation_digest: launch_security.private_desktop_isolation_digest(),
             child_object_dacl: "present_non_null_empty_not_sibling_safe_alone",
             inherited_handles: false,
-            environment: "explicit_empty_unicode_environment_block",
+            environment: EMPTY_ENVIRONMENT_POLICY,
+            entrypoint_arguments_digest: profile.entrypoint_arguments_digest(),
             working_directory_identity_digest: image.working_directory_identity_digest(),
             working_directory_source: "retained_handle_derived",
             executable_path_source: "retained_handle_derived",
@@ -219,7 +225,9 @@ impl WindowsRunnerProcessPolicy {
             job_assignment_mode: "proc_thread_attribute_job_list",
         };
         let required_launch_context_digest = jcs_sha256_hex(&launch_context)?;
-        if required_launch_context_digest != image.required_launch_context_digest() {
+        if required_launch_context_digest
+            != launch_security.expected_required_launch_context_digest()
+        {
             bail!("COMPUTE_PLUGIN_WINDOWS_REQUIRED_LAUNCH_CONTEXT_CHANGED");
         }
         let material = WindowsRunnerProcessStartMaterial {

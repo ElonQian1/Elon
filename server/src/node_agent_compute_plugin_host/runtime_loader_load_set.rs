@@ -20,4 +20,5 @@ mod system_resolution_validation;
 mod transition;
 mod validation;
 
+pub(in crate::node_agent_compute_plugin_host) use launch_path_discovery::WindowsRunnerLaunchContextPreCreateProjection;
 pub(in crate::node_agent_compute_plugin_host) use model::LoaderLockedWorkAdmittedPluginSlot;

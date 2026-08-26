@@ -1,29 +1,32 @@
 use std::fmt;
 
+mod system_content_lease;
+
 use anyhow::Error;
 
-use crate::{
-    node_agent_compute_plugin_host::work_admission_contract::DurableWorkAdmittedPluginSlot,
-    node_agent_managed_fs::{
-        ManagedLoaderAuthenticatedNegativeReceipt, ManagedLoaderFileContentLease,
-        ManagedLoaderFileContentLeaseAcquisitionAttemptCustody,
-        ManagedLoaderFileContentLeaseAuthenticatedNegativeReceipt, ManagedLoaderFileIdentityAnchor,
-        ManagedLoaderNamespaceQueryAttemptCustody, ManagedLoaderNamespaceQueryReceipt,
-        ManagedLoaderNamespaceSession, ManagedLoaderParentRelativeReopenAttemptCustody,
-        ManagedLoaderParentRelativeReopenAuthenticatedNegativeReceipt,
-        ManagedLoaderSearchedNameGrant, ManagedLoaderSearchedNameGrantAcquisitionAttemptCustody,
-        PinnedManagedFile, PinnedManagedLoaderDirectory, PinnedManagedLoaderFile,
-        QuarantinedManagedLoaderFile, QuarantinedManagedLoaderSourceClose,
-    },
+use crate::node_agent_managed_fs::{
+    ManagedLoaderAuthenticatedNegativeReceipt, ManagedLoaderFileContentLease,
+    ManagedLoaderFileContentLeaseAcquisitionAttemptCustody,
+    ManagedLoaderFileContentLeaseAuthenticatedNegativeReceipt, ManagedLoaderFileIdentityAnchor,
+    ManagedLoaderNamespaceQueryAttemptCustody, ManagedLoaderNamespaceQueryReceipt,
+    ManagedLoaderNamespaceSession, ManagedLoaderParentRelativeReopenAttemptCustody,
+    ManagedLoaderParentRelativeReopenAuthenticatedNegativeReceipt, ManagedLoaderSearchedNameGrant,
+    ManagedLoaderSearchedNameGrantAcquisitionAttemptCustody,
+    ManagedLoaderSystemImageContentLeaseAcquisitionAttemptCustody,
+    ManagedLoaderSystemImageContentLeaseAuthenticatedNegativeReceipt,
+    ManagedLoaderSystemImageContentLeasePositiveOutcomeCustody, PinnedManagedFile,
+    PinnedManagedLoaderDirectory, PinnedManagedLoaderFile, QuarantinedManagedLoaderFile,
+    QuarantinedManagedLoaderSourceClose,
 };
 
 use super::{
+    launch_path_discovery::PreliminaryResolutionRequestsPlannedWork,
     model::LoaderTransitionAuthorityCustody,
     resolution::{
-        PostLeaseSplitWindowsRunnerLoadSetPrerequisite, SealedWindowsLoaderResolutionAuthority,
-        UnqueriedWindowsLoaderNamespaceGrantSet, UnqueriedWindowsRunnerLoadSetPrerequisite,
-        WindowsLoaderAcquiredNameGrantCustody, WindowsLoaderPackageContentLeaseCustody,
-        WindowsRunnerLoadSetBorrowPrerequisite,
+        GrantReadyWindowsRunnerResolutionPrerequisite,
+        PostLeaseSealedWindowsRunnerLoadSetPreQueryPrerequisite,
+        PostLeaseSplitWindowsRunnerLoadSetPrerequisite, PreFinalWindowsLoaderNamespaceGrantSet,
+        WindowsLoaderAcquiredImmutableContentLeaseCustody, WindowsLoaderAcquiredNameGrantCustody,
     },
 };
 
@@ -57,8 +60,7 @@ pub(super) enum WindowsRunnerPendingNameGrantRef {
 
 pub(super) struct WindowsRunnerNameGrantAcquisitionUnusableCustody<'root> {
     class: WindowsRunnerNameGrantAcquisitionFailureClass,
-    _admitted: DurableWorkAdmittedPluginSlot<'root>,
-    _resolution: SealedWindowsLoaderResolutionAuthority,
+    _grant_ready: GrantReadyWindowsRunnerResolutionPrerequisite<'root>,
     _session: ManagedLoaderNamespaceSession,
     _acquired_grants: Vec<WindowsLoaderAcquiredNameGrantCustody>,
     _active_grant_ref: WindowsRunnerPendingNameGrantRef,
@@ -71,8 +73,7 @@ pub(super) struct WindowsRunnerNameGrantAcquisitionUnusableCustody<'root> {
 impl<'root> WindowsRunnerNameGrantAcquisitionUnusableCustody<'root> {
     #[allow(clippy::too_many_arguments)]
     pub(super) fn reject_acquisition(
-        admitted: DurableWorkAdmittedPluginSlot<'root>,
-        resolution: SealedWindowsLoaderResolutionAuthority,
+        grant_ready: GrantReadyWindowsRunnerResolutionPrerequisite<'root>,
         session: ManagedLoaderNamespaceSession,
         acquired_grants: Vec<WindowsLoaderAcquiredNameGrantCustody>,
         active_grant_ref: WindowsRunnerPendingNameGrantRef,
@@ -92,8 +93,7 @@ impl<'root> WindowsRunnerNameGrantAcquisitionUnusableCustody<'root> {
         };
         Self {
             class,
-            _admitted: admitted,
-            _resolution: resolution,
+            _grant_ready: grant_ready,
             _session: session,
             _acquired_grants: acquired_grants,
             _active_grant_ref: active_grant_ref,
@@ -106,8 +106,7 @@ impl<'root> WindowsRunnerNameGrantAcquisitionUnusableCustody<'root> {
 
     #[allow(clippy::too_many_arguments)]
     pub(super) fn outcome_uncertain(
-        admitted: DurableWorkAdmittedPluginSlot<'root>,
-        resolution: SealedWindowsLoaderResolutionAuthority,
+        grant_ready: GrantReadyWindowsRunnerResolutionPrerequisite<'root>,
         session: ManagedLoaderNamespaceSession,
         acquired_grants: Vec<WindowsLoaderAcquiredNameGrantCustody>,
         active_grant_ref: WindowsRunnerPendingNameGrantRef,
@@ -117,8 +116,7 @@ impl<'root> WindowsRunnerNameGrantAcquisitionUnusableCustody<'root> {
     ) -> Self {
         Self {
             class: WindowsRunnerNameGrantAcquisitionFailureClass::OutcomeUncertain,
-            _admitted: admitted,
-            _resolution: resolution,
+            _grant_ready: grant_ready,
             _session: session,
             _acquired_grants: acquired_grants,
             _active_grant_ref: active_grant_ref,
@@ -134,31 +132,48 @@ impl<'root> WindowsRunnerNameGrantAcquisitionUnusableCustody<'root> {
 /// complete unqueried grant set, the intact admitted owner, every acquired FileId lease, the active
 /// platform dispatch, and pending ordinals. It cannot collapse into namespace query failure because
 /// no query-verified prerequisite exists yet.
+pub(super) enum WindowsRunnerPendingContentLeaseRef {
+    PackageFile { package_file_ordinal: usize },
+    ResolvedFilesystemSystemImage { resolution_request_ordinal: usize },
+}
+
+pub(super) enum WindowsRunnerActiveContentLeaseAcquisitionCustody {
+    PackageFile {
+        package_file_ordinal: usize,
+        attempt: ManagedLoaderFileContentLeaseAcquisitionAttemptCustody,
+        returned_positive: Option<ManagedLoaderFileContentLease>,
+        authenticated_negative: Option<ManagedLoaderFileContentLeaseAuthenticatedNegativeReceipt>,
+    },
+    ResolvedFilesystemSystemImage {
+        resolution_request_ordinal: usize,
+        attempt: ManagedLoaderSystemImageContentLeaseAcquisitionAttemptCustody,
+        authenticated_negative:
+            Option<ManagedLoaderSystemImageContentLeaseAuthenticatedNegativeReceipt>,
+    },
+    ResolvedFilesystemSystemImagePositiveOutcome {
+        resolution_request_ordinal: usize,
+        outcome: ManagedLoaderSystemImageContentLeasePositiveOutcomeCustody,
+    },
+}
+
 pub(super) struct WindowsRunnerContentLeaseAcquisitionUnusableCustody<'root> {
     class: WindowsRunnerContentLeaseAcquisitionFailureClass,
-    _admitted: DurableWorkAdmittedPluginSlot<'root>,
-    _resolution: SealedWindowsLoaderResolutionAuthority,
-    _namespace_grants: UnqueriedWindowsLoaderNamespaceGrantSet,
-    _acquired_leases: Vec<WindowsLoaderPackageContentLeaseCustody>,
-    _active_package_file_ordinal: usize,
-    _active_attempt: ManagedLoaderFileContentLeaseAcquisitionAttemptCustody,
-    _returned_positive: Option<ManagedLoaderFileContentLease>,
-    _authenticated_negative: Option<ManagedLoaderFileContentLeaseAuthenticatedNegativeReceipt>,
-    _pending_package_file_ordinals: Vec<usize>,
+    _namespace_grants: PreFinalWindowsLoaderNamespaceGrantSet<'root>,
+    _acquired_leases: Vec<WindowsLoaderAcquiredImmutableContentLeaseCustody>,
+    _active: WindowsRunnerActiveContentLeaseAcquisitionCustody,
+    _pending: Vec<WindowsRunnerPendingContentLeaseRef>,
 }
 
 impl<'root> WindowsRunnerContentLeaseAcquisitionUnusableCustody<'root> {
     #[allow(clippy::too_many_arguments)]
     pub(super) fn reject_acquisition(
-        admitted: DurableWorkAdmittedPluginSlot<'root>,
-        resolution: SealedWindowsLoaderResolutionAuthority,
-        namespace_grants: UnqueriedWindowsLoaderNamespaceGrantSet,
-        acquired_leases: Vec<WindowsLoaderPackageContentLeaseCustody>,
+        namespace_grants: PreFinalWindowsLoaderNamespaceGrantSet<'root>,
+        acquired_leases: Vec<WindowsLoaderAcquiredImmutableContentLeaseCustody>,
         active_package_file_ordinal: usize,
         active_attempt: ManagedLoaderFileContentLeaseAcquisitionAttemptCustody,
         returned_positive: Option<ManagedLoaderFileContentLease>,
         authenticated_negative: ManagedLoaderFileContentLeaseAuthenticatedNegativeReceipt,
-        pending_package_file_ordinals: Vec<usize>,
+        pending: Vec<WindowsRunnerPendingContentLeaseRef>,
     ) -> Self {
         let class = if returned_positive.is_none()
             && authenticated_negative.matches_attempt(&active_attempt)
@@ -169,40 +184,38 @@ impl<'root> WindowsRunnerContentLeaseAcquisitionUnusableCustody<'root> {
         };
         Self {
             class,
-            _admitted: admitted,
-            _resolution: resolution,
             _namespace_grants: namespace_grants,
             _acquired_leases: acquired_leases,
-            _active_package_file_ordinal: active_package_file_ordinal,
-            _active_attempt: active_attempt,
-            _returned_positive: returned_positive,
-            _authenticated_negative: Some(authenticated_negative),
-            _pending_package_file_ordinals: pending_package_file_ordinals,
+            _active: WindowsRunnerActiveContentLeaseAcquisitionCustody::PackageFile {
+                package_file_ordinal: active_package_file_ordinal,
+                attempt: active_attempt,
+                returned_positive,
+                authenticated_negative: Some(authenticated_negative),
+            },
+            _pending: pending,
         }
     }
 
     #[allow(clippy::too_many_arguments)]
     pub(super) fn outcome_uncertain(
-        admitted: DurableWorkAdmittedPluginSlot<'root>,
-        resolution: SealedWindowsLoaderResolutionAuthority,
-        namespace_grants: UnqueriedWindowsLoaderNamespaceGrantSet,
-        acquired_leases: Vec<WindowsLoaderPackageContentLeaseCustody>,
+        namespace_grants: PreFinalWindowsLoaderNamespaceGrantSet<'root>,
+        acquired_leases: Vec<WindowsLoaderAcquiredImmutableContentLeaseCustody>,
         active_package_file_ordinal: usize,
         active_attempt: ManagedLoaderFileContentLeaseAcquisitionAttemptCustody,
         returned_positive: Option<ManagedLoaderFileContentLease>,
-        pending_package_file_ordinals: Vec<usize>,
+        pending: Vec<WindowsRunnerPendingContentLeaseRef>,
     ) -> Self {
         Self {
             class: WindowsRunnerContentLeaseAcquisitionFailureClass::OutcomeUncertain,
-            _admitted: admitted,
-            _resolution: resolution,
             _namespace_grants: namespace_grants,
             _acquired_leases: acquired_leases,
-            _active_package_file_ordinal: active_package_file_ordinal,
-            _active_attempt: active_attempt,
-            _returned_positive: returned_positive,
-            _authenticated_negative: None,
-            _pending_package_file_ordinals: pending_package_file_ordinals,
+            _active: WindowsRunnerActiveContentLeaseAcquisitionCustody::PackageFile {
+                package_file_ordinal: active_package_file_ordinal,
+                attempt: active_attempt,
+                returned_positive,
+                authenticated_negative: None,
+            },
+            _pending: pending,
         }
     }
 }
@@ -210,18 +223,15 @@ impl<'root> WindowsRunnerContentLeaseAcquisitionUnusableCustody<'root> {
 /// Pure borrowed validation runs before any name-grant or content-lease dispatch or irreversible
 /// barrier. Exact owners remain only for cleanup/recovery; there is no retry extractor.
 pub(super) struct WindowsRunnerBorrowOnlyNotTransitionedCustody<'root> {
-    _admitted: DurableWorkAdmittedPluginSlot<'root>,
-    _prerequisite: WindowsRunnerLoadSetBorrowPrerequisite,
+    _preliminary: PreliminaryResolutionRequestsPlannedWork<'root>,
 }
 
 impl<'root> WindowsRunnerBorrowOnlyNotTransitionedCustody<'root> {
     pub(super) fn reject_validation(
-        admitted: DurableWorkAdmittedPluginSlot<'root>,
-        prerequisite: WindowsRunnerLoadSetBorrowPrerequisite,
+        preliminary: PreliminaryResolutionRequestsPlannedWork<'root>,
     ) -> Self {
         Self {
-            _admitted: admitted,
-            _prerequisite: prerequisite,
+            _preliminary: preliminary,
         }
     }
 }
@@ -231,8 +241,7 @@ impl<'root> WindowsRunnerBorrowOnlyNotTransitionedCustody<'root> {
 /// advanced and the same request nonce must never be replayed.
 pub(super) struct WindowsRunnerNamespaceQueryUnusableCustody<'root> {
     class: WindowsRunnerNamespaceQueryFailureClass,
-    _admitted: DurableWorkAdmittedPluginSlot<'root>,
-    _prerequisite: UnqueriedWindowsRunnerLoadSetPrerequisite,
+    _prerequisite: PostLeaseSealedWindowsRunnerLoadSetPreQueryPrerequisite<'root>,
     _query_attempt: ManagedLoaderNamespaceQueryAttemptCustody,
     _returned_positive: Option<ManagedLoaderNamespaceQueryReceipt>,
     _authenticated_negative: Option<ManagedLoaderAuthenticatedNegativeReceipt>,
@@ -240,8 +249,7 @@ pub(super) struct WindowsRunnerNamespaceQueryUnusableCustody<'root> {
 
 impl<'root> WindowsRunnerNamespaceQueryUnusableCustody<'root> {
     pub(super) fn reject_query(
-        admitted: DurableWorkAdmittedPluginSlot<'root>,
-        prerequisite: UnqueriedWindowsRunnerLoadSetPrerequisite,
+        prerequisite: PostLeaseSealedWindowsRunnerLoadSetPreQueryPrerequisite<'root>,
         query_attempt: ManagedLoaderNamespaceQueryAttemptCustody,
         returned_positive: Option<ManagedLoaderNamespaceQueryReceipt>,
         authenticated_negative: Option<ManagedLoaderAuthenticatedNegativeReceipt>,
@@ -262,7 +270,6 @@ impl<'root> WindowsRunnerNamespaceQueryUnusableCustody<'root> {
         };
         Self {
             class,
-            _admitted: admitted,
             _prerequisite: prerequisite,
             _query_attempt: query_attempt,
             _returned_positive: returned_positive,

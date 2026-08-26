@@ -9,6 +9,7 @@ use crate::node_agent_compute_plugin_host::{
 
 use super::{
     digest::{searched_name_disposition_digest, validate_aggregate_digests},
+    launch_path_discovery::WindowsRunnerLaunchContextPreCreateProjection,
     launch_path_validation::validate_launch_path_authority,
     model::{LoaderLockedWorkAdmittedPluginSlot, WindowsLoaderWorkingDirectoryLocation},
     namespace_validation::validate_namespace_queries,
@@ -19,8 +20,8 @@ use super::{
     },
     system_resolution_validation::{
         canonical_loader_module_basename, module_node_valid, normalized_loader_module_key_valid,
-        system_resolution_origin_valid, system_terminal_search_binding,
-        validate_system_dependencies,
+        resolved_filesystem_system_image, system_resolution_origin_valid,
+        system_terminal_search_binding, validate_system_dependencies,
     },
 };
 
@@ -43,6 +44,39 @@ impl ValidatedLoaderLockedRunnerBinding<'_> {
 }
 
 impl LoaderLockedWorkAdmittedPluginSlot<'_> {
+    pub(in crate::node_agent_compute_plugin_host) fn validate_authenticated_launch_context_projection(
+        &self,
+        expected: &WindowsRunnerLaunchContextPreCreateProjection<'_>,
+    ) -> Result<()> {
+        let receipts = &self.authority.work_admission_receipts;
+        receipts.validate()?;
+        let profile = receipts.source().source().launch_profile();
+        profile.validate()?;
+        let image = &self.image;
+        self.authority
+            .authenticated_launch_lineage
+            .validate_loader_image_binding(
+                receipts.source().source_digest(),
+                receipts.receipt().receipt_digest(),
+                profile,
+                image,
+            )?;
+        let (selector, machine, resolution_profile, working_directory, runner, arguments) =
+            expected.loader_binding();
+        if selector != image.launch_context_selector_digest()
+            || machine != image.process_machine_context_digest()
+            || resolution_profile != image.startup_import_resolution_profile_digest()
+            || working_directory != image.working_directory_identity_digest()
+            || runner != profile.runner_relative_path()
+            || arguments != profile.entrypoint_arguments_digest()
+        {
+            bail!("COMPUTE_PLUGIN_WINDOWS_LOADER_ACTUAL_CONTEXT_PROJECTION_CHANGED");
+        }
+        self.authority
+            .authenticated_launch_lineage
+            .validate_process_projection(profile, expected)
+    }
+
     pub(in crate::node_agent_compute_plugin_host) fn validate_internal_binding(
         &self,
     ) -> Result<ValidatedLoaderLockedRunnerBinding<'_>> {
@@ -148,34 +182,85 @@ impl LoaderLockedWorkAdmittedPluginSlot<'_> {
             bail!("COMPUTE_PLUGIN_LOADER_PACKAGE_CONTENT_LEASE_SET_CHANGED");
         }
         let system_content_lease_material = resolution
-            .system_module_bindings
+            .resolved_filesystem_system_images
             .iter()
-            .enumerate()
-            .filter_map(|(binding_ordinal, binding)| {
-                binding.filesystem_image.as_ref().map(|file| {
-                    let (file_identity, section, servicing, generation, policy) =
-                        file.content_lease_binding();
-                    json!({
-                        "binding_ordinal": binding_ordinal,
-                        "resolved_module_cache_key": binding.resolved_module_cache_key,
-                        "image_file_identity_digest": file_identity,
-                        "immutable_section_identity_digest": section,
-                        "servicing_generation_digest": servicing,
-                        "lease_generation_digest": generation,
-                        "immutable_content_policy_digest": policy,
-                    })
+            .map(|custody| {
+                let (request, candidate, session, lease_request, nonce, response, receipt) =
+                    custody.outcome.binding();
+                let (parent, name, file, section, open_receipt, mapping_receipt) =
+                    custody.outcome.image().binding();
+                let (_, _, servicing, generation, policy) =
+                    custody.outcome.image().content_lease_binding();
+                json!({
+                    "resolution_request_ordinal": custody.resolution_request_ordinal,
+                    "outcome_request_ordinal": request,
+                    "candidate_binding_digest": candidate,
+                    "lease_session_identity_digest": session,
+                    "lease_request_digest": lease_request,
+                    "query_nonce_digest": nonce,
+                    "authenticated_response_digest": response,
+                    "positive_receipt_digest": receipt,
+                    "parent_directory_identity_digest": parent,
+                    "normalized_name": name,
+                    "image_file_identity_digest": file,
+                    "immutable_section_identity_digest": section,
+                    "parent_relative_open_receipt_digest": open_receipt,
+                    "section_mapping_receipt_digest": mapping_receipt,
+                    "servicing_generation_digest": servicing,
+                    "lease_generation_digest": generation,
+                    "immutable_content_policy_digest": policy,
                 })
             })
             .collect::<Vec<_>>();
-        if resolution
-            .system_module_bindings
+        let system_owner_graph_invalid = resolution
+            .resolved_filesystem_system_images
             .iter()
-            .filter_map(|binding| binding.filesystem_image.as_ref())
-            .flat_map(|file| {
-                let binding = file.content_lease_binding();
-                [binding.0, binding.1, binding.2, binding.3, binding.4]
+            .enumerate()
+            .any(|(ordinal, custody)| {
+                let owner_binding = custody.outcome.image().binding();
+                let lease_binding = custody.outcome.image().content_lease_binding();
+                custody.resolution_request_ordinal != ordinal
+                    || owner_binding.2 != lease_binding.0
+                    || owner_binding.3 != lease_binding.1
+                    || resolution.resolved_filesystem_system_images[..ordinal]
+                        .iter()
+                        .any(|prior| prior.outcome.image().binding().2 == owner_binding.2)
+                    || !resolution.system_module_bindings.iter().any(|binding| {
+                        binding
+                            .filesystem_image_ref
+                            .as_ref()
+                            .is_some_and(|image_ref| {
+                                image_ref.resolution_request_ordinal == ordinal
+                            })
+                    })
+                    || [
+                        owner_binding.0,
+                        owner_binding.2,
+                        owner_binding.3,
+                        owner_binding.4,
+                        owner_binding.5,
+                        lease_binding.2,
+                        lease_binding.3,
+                        lease_binding.4,
+                    ]
+                    .into_iter()
+                    .any(|digest| !is_sha256(digest))
             })
-            .any(|digest| !is_sha256(digest))
+            || resolution.system_module_bindings.iter().any(|binding| {
+                binding
+                    .filesystem_image_ref
+                    .as_ref()
+                    .is_some_and(|image_ref| {
+                        resolution
+                            .resolved_filesystem_system_images
+                            .get(image_ref.resolution_request_ordinal)
+                            .is_none_or(|custody| {
+                                custody.resolution_request_ordinal
+                                    != image_ref.resolution_request_ordinal
+                            })
+                    })
+            });
+        if system_owner_graph_invalid
             || jcs_sha256_hex(&system_content_lease_material)?
                 != resolution.system_content_lease_set_digest
         {
@@ -418,7 +503,8 @@ fn validate_resolution_bindings(
                                         image_file_identity_digest,
                                     )
                             }
-                            WindowsLoaderSearchedNameDisposition::MustRemainAbsentShadow => true,
+                            WindowsLoaderSearchedNameDisposition::MustRemainAbsent
+                            | WindowsLoaderSearchedNameDisposition::ShadowedByEarlierName { .. } => true,
                             WindowsLoaderSearchedNameDisposition::ExpectedSystem { .. } => false,
                         }
                 }),
@@ -443,13 +529,15 @@ fn validate_resolution_bindings(
                                     && terminal_directory_ordinal
                                         == searched.search_directory_ordinal
                                     && system_present_disposition_matches(
+                                        resolution,
                                         binding,
                                         image_file_identity_digest,
                                         immutable_section_identity_digest,
                                         servicing_generation_digest,
                                     )
                             }
-                            WindowsLoaderSearchedNameDisposition::MustRemainAbsentShadow => true,
+                            WindowsLoaderSearchedNameDisposition::MustRemainAbsent
+                            | WindowsLoaderSearchedNameDisposition::ShadowedByEarlierName { .. } => true,
                             WindowsLoaderSearchedNameDisposition::ExpectedPackage { .. } => false,
                         }
                         },
@@ -490,6 +578,7 @@ fn validate_resolution_bindings(
                                 },
                             )
                             && system_present_disposition_matches(
+                                resolution,
                                 binding,
                                 image_file_identity_digest,
                                 immutable_section_identity_digest,
@@ -497,7 +586,10 @@ fn validate_resolution_bindings(
                             )
                     })
             }
-            WindowsLoaderSearchedNameDisposition::MustRemainAbsentShadow => true,
+            WindowsLoaderSearchedNameDisposition::MustRemainAbsent => true,
+            WindowsLoaderSearchedNameDisposition::ShadowedByEarlierName {
+                earlier_searched_name_ordinal: _,
+            } => false,
         };
         let expected_parent_identity = resolution
             .search_directories
@@ -510,6 +602,7 @@ fn validate_resolution_bindings(
             .count();
         let (grant_generation, parent_identity, normalized_name, disposition_digest, fence_digest) =
             fence.grant.binding();
+        let (grant_request, _, _, _) = fence.grant.authenticated_positive_binding();
         if searched.searched_name_ordinal != ordinal
             || !normalized_loader_module_key_valid(&searched.normalized_name)
             || searched.search_directory_ordinal >= resolution.search_directories.len()
@@ -522,6 +615,8 @@ fn validate_resolution_bindings(
             || normalized_name != searched.normalized_name
             || disposition_digest != expected_disposition_digest
             || !is_sha256(fence_digest)
+            || !fence.grant.authenticated_positive_is_bound()
+            || grant_request != searched.grant_request_digest
             || !disposition_valid
             || !linked_import_valid
         {
@@ -550,7 +645,10 @@ fn validate_resolution_bindings(
         &resolution
             .side_by_side_authority
             .assembly_binding_set_digest,
-        &resolution.required_launch_context_digest,
+        &resolution.launch_context_selector_digest,
+        &resolution.selected_context_binding_digest,
+        &resolution.preliminary_resolution_request_plan_digest,
+        &resolution.grant_ready_resolution_plan_digest,
         &resolution.process_machine_context_digest,
         &resolution.system_module_images.component_image_set_digest,
         &resolution.package_content_lease_set_digest,
@@ -651,12 +749,13 @@ fn package_present_disposition_matches(
 }
 
 fn system_present_disposition_matches(
+    resolution: &SealedWindowsLoaderResolutionAuthority,
     binding: &super::resolution::WindowsLoaderSystemModuleBinding,
     image_file_identity_digest: &str,
     immutable_section_identity_digest: &str,
     servicing_generation_digest: &str,
 ) -> bool {
-    binding.filesystem_image.as_ref().is_some_and(|file| {
+    resolved_filesystem_system_image(binding, resolution).is_some_and(|file| {
         let (file_identity, section_identity, retained_servicing_generation, _, _) =
             file.content_lease_binding();
         file_identity == image_file_identity_digest

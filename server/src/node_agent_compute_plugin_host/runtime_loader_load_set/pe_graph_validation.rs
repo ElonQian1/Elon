@@ -57,7 +57,7 @@ pub(super) fn validate_pe_import_graph(
             || parsed.normal_import_count != normal
             || parsed.delay_import_count != delay
             || parsed.forwarder_count != forwarder
-            || !importer_edge_ordinals_are_contiguous(&parsed.node, resolution)
+            || !importer_graph_edge_ordinals_are_contiguous(&parsed.node, resolution)
             || !is_sha256(&parsed.image_material_identity_digest)
             || parsed.import_table_digest != expected_import_table_digest
             || !is_sha256(&parsed.import_table_digest)
@@ -168,7 +168,7 @@ fn edge_counts_for_importer(
     )
 }
 
-fn importer_edge_ordinals_are_contiguous(
+fn importer_graph_edge_ordinals_are_contiguous(
     importer: &WindowsLoaderModuleNode,
     resolution: &SealedWindowsLoaderResolutionAuthority,
 ) -> bool {
@@ -176,13 +176,13 @@ fn importer_edge_ordinals_are_contiguous(
         .package_module_bindings
         .iter()
         .filter(|binding| &binding.importer == importer)
-        .map(|binding| binding.importer_edge_ordinal)
+        .map(|binding| binding.importer_graph_edge_ordinal)
         .chain(
             resolution
                 .system_module_bindings
                 .iter()
                 .filter(|binding| &binding.importer == importer)
-                .map(|binding| binding.importer_edge_ordinal),
+                .map(|binding| binding.importer_graph_edge_ordinal),
         )
         .collect::<Vec<_>>();
     ordinals.sort_unstable();
@@ -265,13 +265,12 @@ fn node_image_material_identity(
             };
             let (file_identity, sealed_digest, lease_generation, immutable_policy) =
                 entry.file.content_lease_binding();
-            return Ok(Some(jcs_sha256_hex(&json!({
-                "schema": "elon.compute_plugin.windows_package_parsed_image_material.v1",
-                "file_identity_digest": file_identity,
-                "sealed_content_digest": sealed_digest,
-                "content_lease_generation_digest": lease_generation,
-                "immutable_content_policy_digest": immutable_policy,
-            }))?));
+            return Ok(Some(package_parsed_image_material_digest(
+                file_identity,
+                sealed_digest,
+                lease_generation,
+                immutable_policy,
+            )?));
         }
         WindowsLoaderModuleNode::SystemComponent {
             component_identity_digest,
@@ -314,6 +313,21 @@ fn node_image_material_identity(
         .map(|entry| entry.immutable_section_identity_digest.clone()))
 }
 
+pub(super) fn package_parsed_image_material_digest(
+    file_identity_digest: &str,
+    sealed_content_digest: &str,
+    content_lease_generation_digest: &str,
+    immutable_content_policy_digest: &str,
+) -> Result<String> {
+    jcs_sha256_hex(&json!({
+        "schema": "elon.compute_plugin.windows_package_parsed_image_material.v1",
+        "file_identity_digest": file_identity_digest,
+        "sealed_content_digest": sealed_content_digest,
+        "content_lease_generation_digest": content_lease_generation_digest,
+        "immutable_content_policy_digest": immutable_content_policy_digest,
+    }))
+}
+
 fn derive_reachable_node_closure(
     root: &WindowsLoaderModuleNode,
     resolution: &SealedWindowsLoaderResolutionAuthority,
@@ -331,7 +345,7 @@ fn derive_reachable_node_closure(
             .filter(|binding| binding.importer == importer)
             .map(|binding| {
                 (
-                    binding.importer_edge_ordinal,
+                    binding.importer_graph_edge_ordinal,
                     WindowsLoaderModuleNode::PackageFile {
                         package_file_ordinal: binding.resolved_package_file_ordinal,
                     },
@@ -344,7 +358,7 @@ fn derive_reachable_node_closure(
                     .filter(|binding| binding.importer == importer)
                     .map(|binding| {
                         (
-                            binding.importer_edge_ordinal,
+                            binding.importer_graph_edge_ordinal,
                             system_binding_target_node(binding),
                         )
                     }),
@@ -364,6 +378,11 @@ fn system_binding_target_node(
     binding: &WindowsLoaderSystemModuleBinding,
 ) -> WindowsLoaderModuleNode {
     match &binding.resolution_origin {
+        WindowsLoaderSystemResolutionOrigin::Preloaded { .. } => {
+            WindowsLoaderModuleNode::SystemComponent {
+                component_identity_digest: binding.resolved_component_identity_digest.clone(),
+            }
+        }
         WindowsLoaderSystemResolutionOrigin::KnownDll {
             section_identity_digest,
         } => WindowsLoaderModuleNode::KnownDllSection {
@@ -412,7 +431,8 @@ fn validate_search_sequence(
         .all(|step| {
             matches!(
                 &step.disposition,
-                WindowsLoaderSearchedNameDisposition::MustRemainAbsentShadow
+                WindowsLoaderSearchedNameDisposition::MustRemainAbsent
+                    | WindowsLoaderSearchedNameDisposition::ShadowedByEarlierName { .. }
             )
         });
     if !prior_steps_are_absent {

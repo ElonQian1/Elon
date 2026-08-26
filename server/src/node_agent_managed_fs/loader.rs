@@ -1,5 +1,15 @@
 #![allow(dead_code)]
 
+mod name_grant_positive;
+mod system_image_custody;
+
+pub(crate) use system_image_custody::{
+    ManagedLoaderSystemImageContentLeaseAcquisitionAttemptCustody,
+    ManagedLoaderSystemImageContentLeaseAuthenticatedNegativeReceipt,
+    ManagedLoaderSystemImageContentLeasePositiveOutcomeCustody,
+    PinnedWindowsLoaderResolvedSystemImageCandidate,
+};
+
 use std::{
     convert::Infallible,
     fs::File,
@@ -239,6 +249,12 @@ pub(crate) struct ManagedLoaderSearchedNameGrant {
     pub(super) normalized_name: String,
     pub(super) disposition_digest: String,
     pub(super) fence_generation_digest: String,
+    pub(super) request_digest: String,
+    pub(super) query_nonce_digest: String,
+    pub(super) authenticated_response: Vec<u8>,
+    pub(super) authenticated_response_digest: String,
+    pub(super) positive_receipt_digest: String,
+    pub(super) _authenticated_positive_backend_unavailable: Infallible,
 }
 
 #[must_use = "name-grant acquisition attempt must remain in failure custody"]
