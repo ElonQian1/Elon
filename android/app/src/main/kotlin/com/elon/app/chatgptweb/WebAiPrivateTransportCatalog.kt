@@ -56,6 +56,17 @@ internal object WebAiPrivateTransportCatalog {
             fallback = "official_dom_stream_snapshot",
         ),
         Entry(
+            id = "android_chatgpt_private_stream_completion_settlement_v1",
+            provider = "chatgpt",
+            status = "completed",
+            verification = "device_verified_v1_1_1302",
+            productionDefault = true,
+            runtimeEnabled = BuildConfig.CHATGPT_PRIVATE_STREAM_OBSERVER_ENABLED,
+            requestMode = "passive_private_completion_reconciliation",
+            healthPolicy = "official_stop_control_wins_otherwise_release_stale_native_stream",
+            fallback = "official_dom_stream_snapshot",
+        ),
+        Entry(
             id = "android_chatgpt_realtime_voice_private_transcript_refresh_v1",
             provider = "chatgpt",
             status = "completed",

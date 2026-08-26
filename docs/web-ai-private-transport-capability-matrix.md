@@ -12,6 +12,7 @@ installed build; individual capability documents retain implementation evidence.
 | Conversation body prefetch | ChatGPT | Completed and enabled | Official WebView navigation |
 | Send dispatch acknowledgement | ChatGPT | Completed and enabled | Official DOM confirmation |
 | Streaming reply observer | ChatGPT | Completed and enabled; adaptive-watchdog device regression pending | Official DOM snapshot |
+| Private stream completion settlement | ChatGPT | Completed, enabled, and device verified on `v1.1.1302 (1312)` | Official DOM snapshot |
 | Realtime voice transcript refresh | ChatGPT | Completed and enabled; supervised voice exit pending | Retained native transcript and official DOM snapshot |
 | Realtime voice background continuity | ChatGPT | Completed and enabled; native/system overlay handoff and media auto-pause device verified, manual overlay actions pending | Official WebView voice and foreground notification |
 | Conversation directory | Google Web AI | Completed and enabled | Local cache and official page |
@@ -54,6 +55,17 @@ producing the current turn. Private progress schedules the native snapshot direc
 duplicate DOM mutations are ignored during that interval, and a four-second read-only
 watchdog preserves official DOM reconciliation if private progress stalls. When no private
 stream is available, the existing 400 ms bounded DOM heartbeat remains unchanged.
+
+Device acceptance on APK `v1.1.1302 (1312)` verified completion settlement without
+reading or exporting message text: a fresh native send entered streaming, the private
+observer revision advanced to a completed response, native streaming became false, and
+the original conversation was restored. A completed private response now releases stale
+native streaming immediately when the official stop control is absent; a still-visible
+official stop control remains authoritative. Each new send clears only the previous
+private completion snapshot before the official click, without replaying or duplicating
+the request. This capability is complete and must not be reimplemented without current
+regression evidence. The separate sparse-watchdog stall path remains pending device
+fault-injection evidence.
 
 Realtime voice hangup has two separate states: the APK requesting the official action,
 and the official call actually settling. Late reconciliation runs only after the official

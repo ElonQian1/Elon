@@ -18,12 +18,24 @@ class WebAiPrivateTransportCatalogTest {
         assertTrue("android_chatgpt_private_conversation_prefetch_v1" in enabledIds)
         assertTrue("android_chatgpt_private_send_dispatch_observer_v1" in enabledIds)
         assertTrue("android_chatgpt_private_stream_observer_v1" in enabledIds)
+        assertTrue("android_chatgpt_private_stream_completion_settlement_v1" in enabledIds)
         assertTrue("android_chatgpt_realtime_voice_private_transcript_refresh_v1" in enabledIds)
         assertTrue("android_google_web_private_conversation_directory_v1" in enabledIds)
         assertTrue("android_google_web_conversation_snapshot_cache_v1" in enabledIds)
         assertTrue("android_google_web_private_reply_observer_v1" in enabledIds)
         assertTrue("android_web_ai_background_navigation_continuity_v1" in enabledIds)
         assertTrue("android_chatgpt_realtime_voice_background_overlay_v1" in enabledIds)
+
+        val streamSettlement = values.first {
+            it.getString("capability_id") ==
+                "android_chatgpt_private_stream_completion_settlement_v1"
+        }
+        assertEquals("completed", streamSettlement.getString("implementation_status"))
+        assertEquals(
+            "device_verified_v1_1_1302",
+            streamSettlement.getString("verification_status"),
+        )
+        assertTrue(streamSettlement.getBoolean("production_default"))
 
         values.forEach { row ->
             assertFalse(row.getBoolean("direct_post_enabled"))
