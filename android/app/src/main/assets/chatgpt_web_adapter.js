@@ -11,6 +11,7 @@
   const layoutAdapter = window.__elonChatGptLayout;
   const snapshotSchedulerModule = window.__elonChatGptSnapshotScheduler;
   const streamingPolicyModule = window.__elonChatGptStreamingPolicy;
+  const streamWatchdogProbeModule = window.__elonChatGptStreamWatchdogProbe;
   const skinAdapter = window.__elonChatGptSkin;
   const privateTransport = window.__elonChatGptPrivateTransport;
   const privateStreamTransport = window.__elonChatGptPrivateStreamTransport;
@@ -40,6 +41,12 @@
     now: Date.now,
     scheduleTimer: (delayMs, action) => window.setTimeout(action, delayMs),
     cancelTimer: (timer) => clearTimeout(timer)
+  });
+  const streamWatchdogProbe = streamWatchdogProbeModule && streamWatchdogProbeModule.create({
+    now: Date.now,
+    scheduleTimer: (delayMs, action) => window.setTimeout(action, delayMs),
+    cancelTimer: (timer) => clearTimeout(timer),
+    onResult: (requestId, ok, detail) => result('verify_private_stream_watchdog', ok, detail, requestId)
   });
   function emitEvent(event) {
     if (disposed) return;
@@ -299,7 +306,10 @@
     optional(undefined, () => layoutAdapter && layoutAdapter.emitSnapshot(emitEvent));
     if (streamingPolicy) streamingPolicy.scheduleNext(
       streaming,
-      () => scheduleSnapshot(true),
+      (schedule) => {
+        optional(undefined, () => streamWatchdogProbe && streamWatchdogProbe.watchdogFired(schedule));
+        scheduleSnapshot(true);
+      },
       { privateStreamObserved: privateStreamingSnapshotMode }
     );
   }
@@ -634,6 +644,13 @@
       }
       return;
     }
+    if (action === 'verify_private_stream_watchdog') {
+      const armed = streamWatchdogProbe && streamWatchdogProbe.arm(
+        String(command.requestId || ''), streamingSnapshotMode
+      );
+      if (!armed || armed.accepted !== true) respond(action, false, armed && armed.detail || 'probe_unavailable');
+      return;
+    }
     if (action === 'open_conversation' && conversationAdapter) {
       if (comparableText(composerValue(findComposer()))) {
         return respond(action, false, '网页中有未发送草稿，请先处理草稿。');
@@ -713,6 +730,7 @@
     }
     disposed = true;
     if (streamingPolicy) streamingPolicy.dispose();
+    if (streamWatchdogProbe) streamWatchdogProbe.dispose();
     if (snapshotScheduler) snapshotScheduler.dispose();
     if (typeof privateStreamUnsubscribe === 'function') privateStreamUnsubscribe();
     privateStreamUnsubscribe = null;
@@ -746,7 +764,7 @@
     typeof privateStreamTransport.subscribe === 'function'
     ? privateStreamTransport.subscribe(() => {
       privateStreamRevision += 1;
-      scheduleSnapshot(true);
+      if (!streamWatchdogProbe || !streamWatchdogProbe.observePrivateUpdate()) scheduleSnapshot(true);
     })
     : null);
   if (privateConversationDirectory &&

@@ -144,24 +144,35 @@ assert.equal(
     heartbeatMs: 400,
     privateStreamWatchdogMs: 4000
   });
-  heartbeatPolicy.scheduleNext(true, () => { heartbeats += 1; });
+  let firedSchedule = null;
+  const recordHeartbeat = (schedule) => {
+    heartbeats += 1;
+    firedSchedule = schedule;
+  };
+  const denseSchedule = heartbeatPolicy.scheduleNext(true, recordHeartbeat);
+  assert.equal(denseSchedule.mode, 'dom_heartbeat');
+  assert.equal(denseSchedule.delayMs, 400);
   assert.equal(Array.from(timers.values())[0].delay, 400);
-  heartbeatPolicy.scheduleNext(true, () => { heartbeats += 1; });
+  heartbeatPolicy.scheduleNext(true, recordHeartbeat);
   assert.equal(timers.size, 1, 'new DOM snapshots replace the pending heartbeat');
   const timer = Array.from(timers.values())[0];
   timer.action();
   assert.equal(heartbeats, 1);
-  heartbeatPolicy.scheduleNext(true, () => { heartbeats += 1; }, {
+  assert.equal(firedSchedule.mode, 'dom_heartbeat');
+  const watchdogSchedule = heartbeatPolicy.scheduleNext(true, recordHeartbeat, {
     privateStreamObserved: true
   });
+  assert.equal(watchdogSchedule.mode, 'private_stream_watchdog');
+  assert.equal(watchdogSchedule.delayMs, 4000);
   assert.equal(Array.from(timers.values())[0].delay, 4000,
     'an observed private stream replaces dense DOM heartbeats with a sparse watchdog');
-  heartbeatPolicy.scheduleNext(true, () => { heartbeats += 1; }, {
+  heartbeatPolicy.scheduleNext(true, recordHeartbeat, {
     privateStreamObserved: true
   });
   assert.equal(timers.size, 1, 'private-stream progress cannot stack watchdog timers');
   Array.from(timers.values())[0].action();
   assert.equal(heartbeats, 2);
+  assert.equal(firedSchedule.mode, 'private_stream_watchdog');
   heartbeatPolicy.dispose();
 }
 

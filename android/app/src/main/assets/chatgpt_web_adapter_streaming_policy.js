@@ -111,14 +111,20 @@
     function scheduleNext(shouldSchedule, next, scheduleOptions) {
       if (heartbeatTimer && typeof cancelTimer === 'function') cancelTimer(heartbeatTimer);
       heartbeatTimer = 0;
-      if (shouldSchedule !== true || typeof scheduleTimer !== 'function' || typeof next !== 'function') return;
-      const delayMs = scheduleOptions && scheduleOptions.privateStreamObserved === true
+      if (shouldSchedule !== true || typeof scheduleTimer !== 'function' || typeof next !== 'function') return null;
+      const privateStreamObserved = scheduleOptions && scheduleOptions.privateStreamObserved === true;
+      const delayMs = privateStreamObserved
         ? privateStreamWatchdogMs
         : heartbeatMs;
+      const schedule = Object.freeze({
+        mode: privateStreamObserved ? 'private_stream_watchdog' : 'dom_heartbeat',
+        delayMs
+      });
       heartbeatTimer = scheduleTimer(delayMs, function () {
         heartbeatTimer = 0;
-        next();
+        next(schedule);
       });
+      return schedule;
     }
 
     function dispose() {

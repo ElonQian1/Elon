@@ -58,7 +58,7 @@ internal class ChatGptWebMcpActions(
             .put("navigation", navigationSummary(observed))
             .put("last_command", ChatGptWebCommandReceipts.lastResultJson(observed))
             .put("command_requests", ChatGptWebCommandReceipts.requestsJson(observed))
-            .put("available_actions", JSONArray(AVAILABLE_ACTIONS))
+            .put("available_actions", JSONArray(ChatGptWebMcpActionCatalog.availableActions))
     }
 
     override fun control(args: JSONObject): JSONObject {
@@ -185,6 +185,10 @@ internal class ChatGptWebMcpActions(
             }
             "chatgpt_new_conversation" -> dispatch("new_conversation", commands::newConversation)
             "chatgpt_stop_generation" -> dispatch("stop_generation", commands::stopGeneration)
+            "chatgpt_verify_private_stream_watchdog" -> dispatch(
+                "verify_private_stream_watchdog",
+                commands::verifyPrivateStreamWatchdog,
+            )
             "chatgpt_copy_last_response" -> return ChatGptWebCopyAction.execute(snapshot(), copyMessage)
             "chatgpt_regenerate_response" -> {
                 val current = snapshot()
@@ -754,45 +758,6 @@ internal class ChatGptWebMcpActions(
             "open_chatgpt_web",
             "chatgpt_refresh",
             "chatgpt_get_capability_matrix",
-            "chatgpt_select_view",
-        )
-        val AVAILABLE_ACTIONS = listOf(
-            "state",
-            "set_input_text",
-            "send_input",
-            "chatgpt_invoke_control",
-            "chatgpt_set_control_text",
-            "chatgpt_set_control_selected",
-            "chatgpt_select_control_choice",
-            "chatgpt_set_control_slider",
-            "chatgpt_set_control_expanded",
-            "chatgpt_new_conversation",
-            "chatgpt_stop_generation",
-            "chatgpt_copy_last_response",
-            "chatgpt_regenerate_response",
-            "chatgpt_start_dictation",
-            "chatgpt_prepare_realtime_voice",
-            "chatgpt_start_realtime_voice",
-            "chatgpt_cancel_dictation",
-            "chatgpt_submit_dictation",
-            "chatgpt_remove_attachment",
-            "chatgpt_refresh",
-            "chatgpt_refresh_controls",
-            "chatgpt_list_conversations",
-            "chatgpt_list_composer_options",
-            "chatgpt_dismiss_composer_options",
-            "chatgpt_select_composer_option",
-            "chatgpt_list_features",
-            "chatgpt_dismiss_features",
-            "chatgpt_select_feature",
-            "chatgpt_get_context",
-            "chatgpt_reveal_message",
-            "chatgpt_find_controls",
-            "chatgpt_get_conversations",
-            "chatgpt_get_navigation",
-            "chatgpt_get_capability_matrix",
-            "chatgpt_record_verification_cases",
-            "chatgpt_open_conversation",
             "chatgpt_select_view",
         )
     }

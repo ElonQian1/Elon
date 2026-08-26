@@ -11,6 +11,7 @@ internal interface ChatGptWebMcpCommandPort {
     fun setControlExpanded(controlId: String, expanded: Boolean, requestId: String)
     fun newConversation(requestId: String)
     fun stopGeneration(requestId: String)
+    fun verifyPrivateStreamWatchdog(requestId: String)
     fun regenerateResponse(requestId: String)
     fun startDictation(requestId: String)
     fun cancelDictation(requestId: String)

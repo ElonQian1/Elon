@@ -148,6 +148,7 @@ class ChatGptWebMcpGenerationTest {
             override fun setControlExpanded(controlId: String, expanded: Boolean, requestId: String) = Unit
             override fun newConversation(requestId: String) = Unit
             override fun stopGeneration(requestId: String) = Unit
+            override fun verifyPrivateStreamWatchdog(requestId: String) = Unit
             override fun regenerateResponse(requestId: String) = Unit
             override fun startDictation(requestId: String) = Unit
             override fun cancelDictation(requestId: String) = Unit

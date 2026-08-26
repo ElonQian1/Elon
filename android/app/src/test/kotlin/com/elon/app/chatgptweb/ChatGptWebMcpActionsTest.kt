@@ -302,8 +302,7 @@ class ChatGptWebMcpActionsTest {
             includeRealtimeVoiceControl = true,
             onDispatch = { action, requestId -> dispatched += action to requestId },
         )
-        val commands = listOf(
-            JSONObject().put("action", "send_input") to "send_prompt",
+        val commands = listOf(JSONObject().put("action", "send_input") to "send_prompt",
             JSONObject().put("action", "chatgpt_invoke_control")
                 .put("control_id", "control_suggestion_demo") to "invoke_ui_control",
             JSONObject().put("action", "chatgpt_set_control_text")
@@ -323,6 +322,7 @@ class ChatGptWebMcpActionsTest {
                 .put("expanded", true) to "set_ui_control_expanded",
             JSONObject().put("action", "chatgpt_new_conversation") to "new_conversation",
             JSONObject().put("action", "chatgpt_stop_generation") to "stop_generation",
+            JSONObject().put("action", "chatgpt_verify_private_stream_watchdog") to "verify_private_stream_watchdog",
             JSONObject().put("action", "chatgpt_regenerate_response") to "regenerate_response",
             JSONObject().put("action", "chatgpt_start_realtime_voice") to "invoke_ui_control",
             JSONObject().put("action", "chatgpt_cancel_dictation") to "cancel_dictation",

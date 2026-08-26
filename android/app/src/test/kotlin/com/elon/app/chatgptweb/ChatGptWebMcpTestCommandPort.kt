@@ -58,6 +58,8 @@ internal class ChatGptWebMcpTestCommandPort(
 
     override fun newConversation(requestId: String) = dispatch("new_conversation", requestId)
     override fun stopGeneration(requestId: String) = dispatch("stop_generation", requestId)
+    override fun verifyPrivateStreamWatchdog(requestId: String) =
+        dispatch("verify_private_stream_watchdog", requestId)
     override fun regenerateResponse(requestId: String) = dispatch("regenerate_response", requestId)
 
     override fun startDictation(requestId: String) {

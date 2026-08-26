@@ -179,6 +179,11 @@ internal class ChatGptWebPageAdapter(
 
     fun stopGeneration(requestId: String) = runCommand("stop_generation", requestId = requestId)
 
+    fun verifyPrivateStreamWatchdog(requestId: String) = runCommand(
+        "verify_private_stream_watchdog",
+        requestId = requestId,
+    )
+
     fun regenerateResponse() = runCommand("regenerate_response")
 
     fun regenerateResponse(requestId: String) = runCommand(
@@ -435,7 +440,7 @@ internal class ChatGptWebPageAdapter(
         origin.scheme == "https" && origin.host == "chatgpt.com" && origin.port == -1
 
     companion object {
-        internal const val ADAPTER_VERSION = 184
+        internal const val ADAPTER_VERSION = 185
 
         private val ADAPTER_ASSETS = listOf(
             "chatgpt_web_adapter_bootstrap.js",
@@ -469,6 +474,7 @@ internal class ChatGptWebPageAdapter(
             "chatgpt_web_adapter_disclosure_controls.js",
             "chatgpt_web_adapter_snapshot_scheduler.js",
             "chatgpt_web_adapter_streaming_policy.js",
+            "chatgpt_web_stream_watchdog_probe.js",
             "chatgpt_web_adapter_skin.js",
             "chatgpt_web_adapter_realtime_voice_policy.js",
             "chatgpt_web_adapter_layout.js",

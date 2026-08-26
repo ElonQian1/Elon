@@ -660,6 +660,7 @@ class ChatGptWebFeatureBaselineTest {
             "chatgpt_set_control_expanded",
             "chatgpt_new_conversation",
             "chatgpt_stop_generation",
+            "chatgpt_verify_private_stream_watchdog",
             "chatgpt_copy_last_response",
             "chatgpt_regenerate_response",
             "chatgpt_start_dictation",

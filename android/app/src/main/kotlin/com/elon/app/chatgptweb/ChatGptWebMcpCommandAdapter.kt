@@ -33,6 +33,8 @@ internal class ChatGptWebMcpCommandAdapter(
 
     override fun newConversation(requestId: String) = pageAdapter.startNewConversation(requestId)
     override fun stopGeneration(requestId: String) = pageAdapter.stopGeneration(requestId)
+    override fun verifyPrivateStreamWatchdog(requestId: String) =
+        pageAdapter.verifyPrivateStreamWatchdog(requestId)
     override fun regenerateResponse(requestId: String) = pageAdapter.regenerateResponse(requestId)
     override fun startDictation(requestId: String) = startDictationAction(requestId)
     override fun cancelDictation(requestId: String) = pageAdapter.cancelDictation(requestId)

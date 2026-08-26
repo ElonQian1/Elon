@@ -192,8 +192,19 @@ class ChatGptWebProductIntegrationContractTest {
             pageAdapter.indexOf("chatgpt_web_adapter_message_portal_policy.js") <
                 pageAdapter.indexOf("chatgpt_web_adapter_layout.js"),
         )
+        assertTrue(
+            pageAdapter.indexOf("chatgpt_web_adapter_streaming_policy.js") <
+                pageAdapter.indexOf("chatgpt_web_stream_watchdog_probe.js"),
+        )
+        assertTrue(
+            pageAdapter.indexOf("chatgpt_web_stream_watchdog_probe.js") <
+                pageAdapter.indexOf("chatgpt_web_adapter.js"),
+        )
         assertTrue(layoutAdapter.contains("scrollIntoView"))
         val baseAdapter = read("android/app/src/main/assets/chatgpt_web_adapter.js")
+        val watchdogProbe = read(
+            "android/app/src/main/assets/chatgpt_web_stream_watchdog_probe.js",
+        )
         assertTrue(baseAdapter.contains("if (fingerprint !== lastSnapshot)"))
         assertTrue(baseAdapter.indexOf("layoutAdapter.emitSnapshot") > baseAdapter.indexOf("emitEvent(event)"))
         assertTrue(baseAdapter.contains("privateStreamingSnapshotMode"))
@@ -202,6 +213,10 @@ class ChatGptWebProductIntegrationContractTest {
         assertTrue(baseAdapter.contains("privateStreamRevision += 1"))
         assertTrue(baseAdapter.contains("privateStreamObserved: privateStreamRevision > 0"))
         assertTrue(baseAdapter.contains("privateStreamState,"))
+        assertTrue(baseAdapter.contains("streamWatchdogProbe.observePrivateUpdate()"))
+        assertTrue(baseAdapter.contains("streamWatchdogProbe.watchdogFired(schedule)"))
+        assertTrue(watchdogProbe.contains("private_stream_watchdog_timeout"))
+        assertTrue(watchdogProbe.contains("minimumStallMs"))
         assertTrue(mcp.contains("adb_content_description"))
         assertTrue(mcp.contains("context_id"))
         assertTrue(mcp.contains("ChatGptWebMessageJson.encode"))
