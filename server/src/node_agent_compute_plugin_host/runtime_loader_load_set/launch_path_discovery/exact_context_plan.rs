@@ -22,6 +22,7 @@ pub(in super::super) use lineage::{
 pub(in super::super) use recursive_policy::{
     AuthenticatedWindowsRecursiveResolutionPolicy,
     AuthenticatedWindowsRecursiveResolutionPolicyLimits,
+    WindowsRecursivePolicyDispatchAuthorization,
 };
 pub(in super::super) use view::{
     PreliminaryWindowsRunnerResolutionRequestPlanView, PreliminaryWindowsRunnerSelectedContextView,

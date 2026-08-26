@@ -13,7 +13,10 @@ use crate::{
     },
 };
 
-use super::launch_path_discovery::WindowsPreliminaryModuleEdgeLocator;
+use super::launch_path_discovery::{
+    AuthenticatedWindowsRecursiveResolutionPolicy, WindowsPreliminaryModuleEdgeLocator,
+    WindowsRecursivePolicyDispatchAuthorization,
+};
 
 pub(super) use grant_ready::*;
 pub(super) use system_closure::*;
@@ -533,6 +536,18 @@ pub(super) struct PreFinalWindowsLoaderNamespaceGrantSet<'root> {
     pub(super) searched_name_set_digest: String,
     pub(super) fence_generation_set_digest: String,
     pub(super) _whole_resolution_fence_backend_unavailable: Infallible,
+}
+
+/// Policy-current A0 owner retained across base candidate/content-lease acquisition. The inner
+/// namespace remains policy-free: a future A0 sealer must consume this whole wrapper exactly once,
+/// moving `namespace` into recursive accumulated custody, `authenticated_recursive_policy` beside
+/// it, and `policy_dispatch_authorization` into the A0 acquisition receipt.
+#[must_use = "policy-current base namespace must advance whole or enter failure custody"]
+pub(super) struct PolicyCurrentPreFinalWindowsLoaderNamespaceGrantSet<'root> {
+    pub(super) namespace: PreFinalWindowsLoaderNamespaceGrantSet<'root>,
+    pub(super) authenticated_recursive_policy: AuthenticatedWindowsRecursiveResolutionPolicy,
+    pub(super) policy_dispatch_authorization: WindowsRecursivePolicyDispatchAuthorization,
+    pub(super) _a0_policy_current_namespace_transition_unavailable: Infallible,
 }
 
 /// Final aggregate namespace grant/session lineage after the recursive empty-frontier sealer has

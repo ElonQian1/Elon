@@ -8,6 +8,7 @@
 
 mod digest;
 mod final_projection;
+mod policy_currentness;
 mod search_projection;
 mod validation;
 
@@ -23,6 +24,8 @@ use super::super::launch_path_discovery::{
     PreliminaryResolutionRequestsPlannedWork, PreliminaryWindowsRunnerResolutionRequestPlanView,
     WindowsPreliminaryModuleEdgeLocator, WindowsPreliminaryRetainedDirectoryLocation,
 };
+
+pub(in crate::node_agent_compute_plugin_host::runtime_loader_load_set) use policy_currentness::PolicyCurrentGrantReadyWindowsRunnerResolutionPrerequisite;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum WindowsGrantReadyImportEdgeKind {
@@ -231,10 +234,11 @@ struct GrantReadyWindowsRunnerMovableOwnerSet {
     external_search_directories: Vec<WindowsGrantReadyExternalSearchDirectoryCustody>,
 }
 
-/// Exact terminal/disposition plan plus all linear external owners required before name-grant
-/// dispatch. No constructor exists: the unresolved preliminary skeleton cannot fabricate this
-/// owner, and all fields stay private to this module's future validator/advancer.
-#[must_use = "grant-ready owner must advance whole or remain in failure custody"]
+/// Exact terminal/disposition plan plus all linear external owners before policy-currentness is
+/// authorized. It cannot enter name-grant dispatch directly: only the purpose-specific wrapper in
+/// `policy_currentness` binds an authenticated recursive policy and exact A0 authorization.
+/// No constructor exists, and all fields stay private to this module's future validator/advancer.
+#[must_use = "grant-ready owner must enter policy-current custody or remain whole"]
 pub(in crate::node_agent_compute_plugin_host::runtime_loader_load_set) struct GrantReadyWindowsRunnerResolutionPrerequisite<
     'root,
 > {
@@ -247,8 +251,10 @@ pub(in crate::node_agent_compute_plugin_host::runtime_loader_load_set) struct Gr
 /// Name-grant success consumes the whole grant-ready owner into this lease-acquisition custody.
 /// Exact candidate files become owned only here, after every required name grant exists. The
 /// immutable plan retains the expected candidate digests while these unique handles advance into
-/// one lease attempt or purpose-specific failure custody. External directories remain retained
-/// until final resolution consumes them.
+/// one lease attempt or purpose-specific failure custody. Policy/currentness authority lives in a
+/// purpose-specific outer wrapper so the A0 sealer can later move policy, authorization and this
+/// policy-free namespace owner into three unique destinations. External directories remain
+/// retained until final resolution consumes them.
 #[must_use = "post-grant resolution custody must advance through every content lease"]
 pub(super) struct GrantAcquiredWindowsRunnerResolutionLeaseCustody<'root> {
     preliminary: PreliminaryResolutionRequestsPlannedWork<'root>,

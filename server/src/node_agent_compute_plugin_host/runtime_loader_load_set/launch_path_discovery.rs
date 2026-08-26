@@ -32,6 +32,7 @@ pub(super) use exact_context_plan::{
     WindowsPreliminaryLaunchPathComponentRequest, WindowsPreliminaryModuleEdgeLocator,
     WindowsPreliminaryModuleResolutionRequest, WindowsPreliminaryRetainedDirectoryLocation,
     WindowsPreliminarySearchDirectoryBinding, WindowsPreliminarySearchDirectoryTarget,
+    WindowsRecursivePolicyDispatchAuthorization,
 };
 pub(super) use prelease_pe_material::symbol_is_exact;
 

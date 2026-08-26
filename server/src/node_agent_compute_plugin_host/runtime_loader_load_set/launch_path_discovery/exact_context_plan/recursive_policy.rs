@@ -1,19 +1,28 @@
 //! Independently signed policy for bounded recursive Windows startup-import resolution.
 //!
-//! Launch-context payload V1 predates recursive parser limits. This source-only authority uses a
-//! separate signature domain and binds one already-authenticated context plus its preliminary
-//! request/parser inputs. It therefore neither mutates the V1 launch-context hash domain nor lets
-//! a closure self-assert unauthenticated limit values. No signature verifier produces this owner.
+//! Launch-context payload V1 predates recursive parser limits. The immutable policy payload stays
+//! in its original hash domain, while signer-envelope and typed verification evidence are bound by
+//! authenticated-policy binding V2. A separate point-of-use currentness owner must authorize one
+//! exact A0/Ak dispatch. No signature verifier or currentness backend produces either owner.
+
+mod currentness;
+mod digest;
+mod signature;
+mod validation;
 
 use std::convert::Infallible;
 
 use anyhow::{bail, Result};
 
-use crate::node_agent_compute_plugin_host::manifest_validation::is_sha256;
+use super::PreliminaryWindowsRunnerResolutionRequestPlanView;
+use signature::{
+    SignedWindowsRecursiveResolutionPolicyEnvelope,
+    WindowsRecursivePolicySignatureVerificationReceipt,
+};
 
-use super::{digest::PlanDigest, PreliminaryWindowsRunnerResolutionRequestPlanView};
+pub(in crate::node_agent_compute_plugin_host::runtime_loader_load_set) use currentness::WindowsRecursivePolicyDispatchAuthorization;
 
-const RECURSIVE_DYNAMIC_LOAD_SCOPE: &str = "startup_import_closure_only_v1";
+pub(super) const RECURSIVE_DYNAMIC_LOAD_SCOPE: &str = "startup_import_closure_only_v1";
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(in crate::node_agent_compute_plugin_host::runtime_loader_load_set) struct AuthenticatedWindowsRecursiveResolutionPolicyLimits
@@ -32,12 +41,13 @@ pub(in crate::node_agent_compute_plugin_host::runtime_loader_load_set) struct Au
         u64,
 }
 
-/// Control-signed recursive policy bound one-way to an authenticated launch-context V1 intent.
+/// One signed recursive policy after exact typed signature verification.
 ///
-/// Structural permissions are hard V1 invariants rather than opt-in switches: ambient PATH,
-/// nested API-set host redirection, positive Shadow resolution and post-start dynamic loads all
-/// remain outside this policy. The `Infallible` field keeps even correctly shaped source data from
-/// becoming authenticated evidence without a future signature/key-currentness backend.
+/// The payload is immutable V1 material. The signed envelope adds authority scope, generation and
+/// validity bounds without mutating that payload domain. Signature verification evidence is kept
+/// by value rather than reduced to caller-supplied digest strings. Point-of-use currentness remains
+/// a separate one-dispatch linear owner so a previously verified policy cannot authorize a later
+/// wave after signer revocation, policy supersession or expiry.
 #[must_use = "authenticated recursive policy must remain with the whole recursive custody chain"]
 pub(in crate::node_agent_compute_plugin_host::runtime_loader_load_set) struct AuthenticatedWindowsRecursiveResolutionPolicy
 {
@@ -54,10 +64,8 @@ pub(in crate::node_agent_compute_plugin_host::runtime_loader_load_set) struct Au
     control_key_id: String,
     control_keyring_generation: u64,
     policy_payload_digest: String,
-    signed_policy_payload_digest: String,
-    verified_policy_payload_digest: String,
-    signed_policy_envelope_digest: String,
-    signature_verification_receipt_digest: String,
+    signed_envelope: SignedWindowsRecursiveResolutionPolicyEnvelope,
+    signature_verification: WindowsRecursivePolicySignatureVerificationReceipt,
     authenticated_recursive_policy_digest: String,
     _authenticated_recursive_policy_source_producer_unavailable: Infallible,
 }
@@ -81,9 +89,17 @@ impl AuthenticatedWindowsRecursiveResolutionPolicy {
         &self.parser_policy_digest
     }
 
-    /// Borrow-only gate required before the first side-effecting dispatch of either A0 or a
-    /// recursive producer wave. A future caller must derive these cumulative projections from its
-    /// whole typed plan; passing this gate creates no grant, candidate, lease or retry authority.
+    pub(in crate::node_agent_compute_plugin_host::runtime_loader_load_set) fn signature_verification_receipt_digest(
+        &self,
+    ) -> &str {
+        &self
+            .signature_verification
+            .signature_verification_receipt_digest
+    }
+
+    /// Borrow-only limit gate. A caller must derive every cumulative projection from its whole
+    /// typed plan. This check is necessary but not sufficient for dispatch: the same exact A0/Ak
+    /// owner also needs a current `WindowsRecursivePolicyDispatchAuthorization`.
     #[allow(clippy::too_many_arguments)]
     pub(in crate::node_agent_compute_plugin_host::runtime_loader_load_set) fn validate_projected_totals_before_dispatch(
         &self,
@@ -138,86 +154,13 @@ impl AuthenticatedWindowsRecursiveResolutionPolicy {
         expected_authenticated_preloaded_module_set_digest: &str,
         expected_resolution_route_order: &[String],
     ) -> Result<()> {
-        if self.launch_context_intent_digest != expected_launch_context_intent_digest
-            || self.preliminary_request_plan_digest != expected_preliminary_request_plan_digest
-            || self.parser_policy_digest != expected_parser_policy_digest
-            || self.authenticated_preloaded_module_set_digest
-                != expected_authenticated_preloaded_module_set_digest
-            || self.inherited_resolution_route_order != expected_resolution_route_order
-            || self.ambient_path_allowed
-            || self.nested_api_set_host_redirection_allowed
-            || self.positive_shadow_disposition_allowed
-            || self.dynamic_module_load_scope != RECURSIVE_DYNAMIC_LOAD_SCOPE
-            || self.control_key_id.trim().is_empty()
-            || self.control_keyring_generation == 0
-            || [
-                &self.launch_context_intent_digest,
-                &self.preliminary_request_plan_digest,
-                &self.parser_policy_digest,
-                &self.authenticated_preloaded_module_set_digest,
-                &self.policy_payload_digest,
-                &self.signed_policy_payload_digest,
-                &self.verified_policy_payload_digest,
-                &self.signed_policy_envelope_digest,
-                &self.signature_verification_receipt_digest,
-                &self.authenticated_recursive_policy_digest,
-            ]
-            .into_iter()
-            .any(|value| !is_sha256(value))
-            || self.recompute_payload_digest() != self.policy_payload_digest
-            || self.signed_policy_payload_digest != self.policy_payload_digest
-            || self.verified_policy_payload_digest != self.policy_payload_digest
-            || self.recompute_authenticated_binding_digest()
-                != self.authenticated_recursive_policy_digest
-        {
-            bail!("COMPUTE_PLUGIN_WINDOWS_RECURSIVE_POLICY_SOURCE_CHANGED");
-        }
-        Ok(())
-    }
-
-    fn recompute_payload_digest(&self) -> String {
-        let mut digest = PlanDigest::new(b"ELON_WINDOWS_RECURSIVE_RESOLUTION_POLICY_PAYLOAD_V1");
-        for value in [
-            &self.launch_context_intent_digest,
-            &self.preliminary_request_plan_digest,
-            &self.parser_policy_digest,
-            &self.authenticated_preloaded_module_set_digest,
-        ] {
-            digest.text(value);
-        }
-        for route in &self.inherited_resolution_route_order {
-            digest.text(route);
-        }
-        for limit in [
-            self.limits.max_wave_count,
-            self.limits.max_parsed_image_count,
-            self.limits.max_module_request_count,
-            self.limits.max_searched_name_count,
-            self.limits.max_system_image_request_count,
-            self.limits.max_forwarder_hop_count,
-        ] {
-            digest.u64(limit);
-        }
-        digest.boolean(self.ambient_path_allowed);
-        digest.boolean(self.nested_api_set_host_redirection_allowed);
-        digest.boolean(self.positive_shadow_disposition_allowed);
-        digest.text(&self.dynamic_module_load_scope);
-        digest.text(&self.control_key_id);
-        digest.u64(self.control_keyring_generation);
-        digest.finish()
-    }
-
-    fn recompute_authenticated_binding_digest(&self) -> String {
-        let mut digest = PlanDigest::new(b"ELON_WINDOWS_AUTHENTICATED_RECURSIVE_POLICY_BINDING_V1");
-        for value in [
-            &self.policy_payload_digest,
-            &self.signed_policy_payload_digest,
-            &self.verified_policy_payload_digest,
-            &self.signed_policy_envelope_digest,
-            &self.signature_verification_receipt_digest,
-        ] {
-            digest.text(value);
-        }
-        digest.finish()
+        validation::validate_policy_against(
+            self,
+            expected_launch_context_intent_digest,
+            expected_preliminary_request_plan_digest,
+            expected_parser_policy_digest,
+            expected_authenticated_preloaded_module_set_digest,
+            expected_resolution_route_order,
+        )
     }
 }

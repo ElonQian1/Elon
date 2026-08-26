@@ -478,8 +478,10 @@ fn five_failure_phases_retain_linear_indexed_custody() {
             .count(),
         1
     );
-    assert!(FAILURE.contains("_grant_ready: GrantReadyWindowsRunnerResolutionPrerequisite<'root>"));
-    assert!(FAILURE.contains("_namespace_grants: PreFinalWindowsLoaderNamespaceGrantSet<'root>"));
+    assert!(FAILURE.contains("_policy_current_grant_ready:"));
+    assert!(FAILURE.contains("PolicyCurrentGrantReadyWindowsRunnerResolutionPrerequisite<'root>"));
+    assert!(FAILURE.contains("_policy_current_namespace:"));
+    assert!(FAILURE.contains("PolicyCurrentPreFinalWindowsLoaderNamespaceGrantSet<'root>"));
     assert!(FAILURE
         .contains("_acquired_leases: Vec<WindowsLoaderAcquiredImmutableContentLeaseCustody>"));
     assert!(FAILURE.contains("_active: WindowsRunnerActiveContentLeaseAcquisitionCustody"));
@@ -490,6 +492,14 @@ fn five_failure_phases_retain_linear_indexed_custody() {
     assert!(RESOLUTION.contains("enum WindowsLoaderAcquiredImmutableContentLeaseCustody"));
     assert!(RESOLUTION.contains("ResolvedFilesystemSystemImage"));
     assert!(RESOLUTION.contains("struct PreFinalWindowsLoaderNamespaceGrantSet<'root>"));
+    assert!(
+        RESOLUTION.contains("struct PolicyCurrentPreFinalWindowsLoaderNamespaceGrantSet<'root>")
+    );
+    assert!(RESOLUTION.contains("namespace: PreFinalWindowsLoaderNamespaceGrantSet<'root>"));
+    assert!(RESOLUTION
+        .contains("authenticated_recursive_policy: AuthenticatedWindowsRecursiveResolutionPolicy"));
+    assert!(RESOLUTION
+        .contains("policy_dispatch_authorization: WindowsRecursivePolicyDispatchAuthorization"));
     assert!(RESOLUTION.contains("struct PostLeaseWindowsLoaderNamespaceGrantSet<'root>"));
     assert!(RESOLUTION.contains("struct PostLeaseSealedWindowsRunnerLoadSetPreQueryPrerequisite"));
     assert!(RESOLUTION.contains("namespace: PostLeaseWindowsLoaderNamespaceGrantSet<'root>"));

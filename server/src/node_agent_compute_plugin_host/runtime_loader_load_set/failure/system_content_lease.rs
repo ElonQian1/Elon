@@ -4,7 +4,7 @@ use super::*;
 
 impl<'root> WindowsRunnerContentLeaseAcquisitionUnusableCustody<'root> {
     pub(in crate::node_agent_compute_plugin_host::runtime_loader_load_set) fn reject_system_image_acquisition(
-        namespace_grants: PreFinalWindowsLoaderNamespaceGrantSet<'root>,
+        policy_current_namespace: PolicyCurrentPreFinalWindowsLoaderNamespaceGrantSet<'root>,
         acquired_leases: Vec<WindowsLoaderAcquiredImmutableContentLeaseCustody>,
         active_attempt: ManagedLoaderSystemImageContentLeaseAcquisitionAttemptCustody,
         authenticated_negative: ManagedLoaderSystemImageContentLeaseAuthenticatedNegativeReceipt,
@@ -18,7 +18,7 @@ impl<'root> WindowsRunnerContentLeaseAcquisitionUnusableCustody<'root> {
         };
         Self {
             class,
-            _namespace_grants: namespace_grants,
+            _policy_current_namespace: policy_current_namespace,
             _acquired_leases: acquired_leases,
             _active:
                 WindowsRunnerActiveContentLeaseAcquisitionCustody::ResolvedFilesystemSystemImage {
@@ -31,7 +31,7 @@ impl<'root> WindowsRunnerContentLeaseAcquisitionUnusableCustody<'root> {
     }
 
     pub(in crate::node_agent_compute_plugin_host::runtime_loader_load_set) fn system_image_outcome_uncertain(
-        namespace_grants: PreFinalWindowsLoaderNamespaceGrantSet<'root>,
+        policy_current_namespace: PolicyCurrentPreFinalWindowsLoaderNamespaceGrantSet<'root>,
         acquired_leases: Vec<WindowsLoaderAcquiredImmutableContentLeaseCustody>,
         active_attempt: ManagedLoaderSystemImageContentLeaseAcquisitionAttemptCustody,
         pending: Vec<WindowsRunnerPendingContentLeaseRef>,
@@ -39,7 +39,7 @@ impl<'root> WindowsRunnerContentLeaseAcquisitionUnusableCustody<'root> {
         let resolution_request_ordinal = active_attempt.binding().0;
         Self {
             class: WindowsRunnerContentLeaseAcquisitionFailureClass::OutcomeUncertain,
-            _namespace_grants: namespace_grants,
+            _policy_current_namespace: policy_current_namespace,
             _acquired_leases: acquired_leases,
             _active:
                 WindowsRunnerActiveContentLeaseAcquisitionCustody::ResolvedFilesystemSystemImage {
@@ -52,7 +52,7 @@ impl<'root> WindowsRunnerContentLeaseAcquisitionUnusableCustody<'root> {
     }
 
     pub(in crate::node_agent_compute_plugin_host::runtime_loader_load_set) fn system_image_positive_outcome_uncertain(
-        namespace_grants: PreFinalWindowsLoaderNamespaceGrantSet<'root>,
+        policy_current_namespace: PolicyCurrentPreFinalWindowsLoaderNamespaceGrantSet<'root>,
         acquired_leases: Vec<WindowsLoaderAcquiredImmutableContentLeaseCustody>,
         outcome: ManagedLoaderSystemImageContentLeasePositiveOutcomeCustody,
         pending: Vec<WindowsRunnerPendingContentLeaseRef>,
@@ -60,7 +60,7 @@ impl<'root> WindowsRunnerContentLeaseAcquisitionUnusableCustody<'root> {
         let resolution_request_ordinal = outcome.binding().0;
         Self {
             class: WindowsRunnerContentLeaseAcquisitionFailureClass::OutcomeUncertain,
-            _namespace_grants: namespace_grants,
+            _policy_current_namespace: policy_current_namespace,
             _acquired_leases: acquired_leases,
             _active:
                 WindowsRunnerActiveContentLeaseAcquisitionCustody::ResolvedFilesystemSystemImagePositiveOutcome {

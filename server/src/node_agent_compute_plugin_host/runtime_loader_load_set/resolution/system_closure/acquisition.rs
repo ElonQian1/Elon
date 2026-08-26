@@ -20,18 +20,21 @@ use std::convert::Infallible;
 
 use anyhow::Result;
 
-use super::super::super::launch_path_discovery::AuthenticatedWindowsRecursiveResolutionPolicy;
+use super::super::super::launch_path_discovery::{
+    AuthenticatedWindowsRecursiveResolutionPolicy, WindowsRecursivePolicyDispatchAuthorization,
+};
 use super::super::{
     SealedWindowsLoaderNamespacePrerequisite, SealedWindowsLoaderResolutionAuthority,
 };
 use super::SealedWindowsRecursiveResolutionClosure;
 
 pub(in crate::node_agent_compute_plugin_host::runtime_loader_load_set) use custody::{
-    DispatchReadyWindowsRecursiveWaveGrantCustody, TerminalWindowsRecursiveResolutionCustody,
-    WindowsRecursiveResolutionAccumulatedCustody, WindowsRecursiveWaveCandidateAcquisitionCustody,
-    WindowsRecursiveWaveCompletedCustody, WindowsRecursiveWaveLeaseAcquisitionCustody,
-    WindowsRecursiveWaveRequestCustody, WindowsRecursiveWaveResolvedPlanCustody,
-    WindowsRecursiveWaveSameOwnerParseCustody,
+    DispatchReadyWindowsRecursiveWaveGrantCustody,
+    PolicyCurrentnessPendingWindowsRecursiveWaveGrantCustody,
+    TerminalWindowsRecursiveResolutionCustody, WindowsRecursiveResolutionAccumulatedCustody,
+    WindowsRecursiveWaveCandidateAcquisitionCustody, WindowsRecursiveWaveCompletedCustody,
+    WindowsRecursiveWaveLeaseAcquisitionCustody, WindowsRecursiveWaveRequestCustody,
+    WindowsRecursiveWaveResolvedPlanCustody, WindowsRecursiveWaveSameOwnerParseCustody,
 };
 pub(in crate::node_agent_compute_plugin_host::runtime_loader_load_set) use failure::{
     WindowsRecursiveWaveAdvanceFailureClass, WindowsRecursiveWaveAdvanceFailureCustody,
@@ -39,13 +42,14 @@ pub(in crate::node_agent_compute_plugin_host::runtime_loader_load_set) use failu
 pub(in crate::node_agent_compute_plugin_host::runtime_loader_load_set) use plan::{
     AuthenticatedWindowsRecursiveWaveResolutionPlan, WindowsRecursiveWaveRequestPlan,
 };
+pub(in crate::node_agent_compute_plugin_host::runtime_loader_load_set) use plan_digest::base_pre_dispatch_plan_evidence_digest;
 
 /// One source-only acquisition receipt in the unified `A0..AN` chain.
 ///
 /// `target_parse_wave_ordinal` is `Some(producer + 1)` exactly when the next frontier is nonempty.
-/// The terminal receipt uses `None`. The receipt owns no live handle; live grants, candidates,
-/// leases and parse owners remain in the by-value typestate graph until a future whole-chain
-/// sealer consumes them.
+/// The terminal receipt uses `None`. Each receipt retains the exact one-use policy dispatch
+/// authorization by value, while owning no live filesystem handle; grants, candidates, leases and
+/// parse owners remain in the typestate graph until a future whole-chain sealer consumes them.
 #[must_use = "wave acquisition receipt must remain ordered in its sealed acquisition chain"]
 pub(in crate::node_agent_compute_plugin_host::runtime_loader_load_set) struct WindowsRecursiveWaveAcquisitionReceipt
 {
@@ -69,6 +73,7 @@ pub(in crate::node_agent_compute_plugin_host::runtime_loader_load_set) struct Wi
     resolved_plan_digest: String,
     pre_dispatch_plan_evidence: WindowsRecursiveAcquisitionPlanEvidence,
     pre_dispatch_plan_evidence_digest: String,
+    policy_dispatch_authorization: WindowsRecursivePolicyDispatchAuthorization,
     searched_name_grant_set_digest: String,
     filesystem_candidate_set_digest: String,
     immutable_content_lease_set_digest: String,

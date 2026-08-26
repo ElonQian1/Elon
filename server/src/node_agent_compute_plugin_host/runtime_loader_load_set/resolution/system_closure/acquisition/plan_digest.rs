@@ -383,10 +383,31 @@ pub(super) fn route_owner_binding_digest(
 pub(super) fn pre_dispatch_plan_evidence_digest(
     evidence: &WindowsRecursiveAcquisitionPlanEvidence,
 ) -> Result<String> {
+    pre_dispatch_plan_evidence_material_digest(acquisition_plan_evidence_material(evidence))
+}
+
+fn pre_dispatch_plan_evidence_material_digest(evidence: Value) -> Result<String> {
     jcs_sha256_hex(&json!({
         "schema": "elon.compute_plugin.windows_recursive_pre_dispatch_plan_evidence.v1",
-        "evidence": acquisition_plan_evidence_material(evidence),
+        "evidence": evidence,
     }))
+}
+
+/// Recomputes the exact A0 `BaseGrantReady` evidence commitment without manufacturing a recursive
+/// wave plan. This delegates to the same V1 domain and material encoder used by unified `A0..AN`
+/// receipts, so a base dispatcher cannot substitute a lookalike digest domain.
+pub(in crate::node_agent_compute_plugin_host::runtime_loader_load_set) fn base_pre_dispatch_plan_evidence_digest(
+    grant_ready_resolution_plan_digest: &str,
+) -> Result<String> {
+    pre_dispatch_plan_evidence_digest(&WindowsRecursiveAcquisitionPlanEvidence::BaseGrantReady {
+        grant_ready_resolution_plan_digest: grant_ready_resolution_plan_digest.to_owned(),
+    })
+}
+
+pub(super) fn recursive_pre_dispatch_plan_evidence_digest(
+    plan: &WindowsRecursiveWaveDispatchPlanEvidence,
+) -> Result<String> {
+    pre_dispatch_plan_evidence_material_digest(recursive_acquisition_plan_evidence_material(plan))
 }
 
 pub(super) fn validated_dispatch_plan_evidence_digest(
@@ -427,17 +448,25 @@ pub(super) fn acquisition_plan_evidence_material(
             "kind": "base_grant_ready",
             "grant_ready_resolution_plan_digest": grant_ready_resolution_plan_digest,
         }),
-        WindowsRecursiveAcquisitionPlanEvidence::RecursiveWave { plan } => json!({
-            "kind": "recursive_wave",
-            "validated_plan_evidence_digest": plan.validated_plan_evidence_digest,
-            "request_plan_digest": plan.request_plan_digest,
-            "terminal_resolution_set_digest": plan.terminal_resolution_set_digest,
-            "searched_name_disposition_set_digest": plan.searched_name_disposition_set_digest,
-            "filesystem_request_set_digest": plan.filesystem_request_set_digest,
-            "route_owner_set_digest": plan.route_owner_set_digest,
-            "resolved_plan_digest": plan.resolved_plan_digest,
-        }),
+        WindowsRecursiveAcquisitionPlanEvidence::RecursiveWave { plan } => {
+            recursive_acquisition_plan_evidence_material(plan)
+        }
     }
+}
+
+fn recursive_acquisition_plan_evidence_material(
+    plan: &WindowsRecursiveWaveDispatchPlanEvidence,
+) -> Value {
+    json!({
+        "kind": "recursive_wave",
+        "validated_plan_evidence_digest": plan.validated_plan_evidence_digest,
+        "request_plan_digest": plan.request_plan_digest,
+        "terminal_resolution_set_digest": plan.terminal_resolution_set_digest,
+        "searched_name_disposition_set_digest": plan.searched_name_disposition_set_digest,
+        "filesystem_request_set_digest": plan.filesystem_request_set_digest,
+        "route_owner_set_digest": plan.route_owner_set_digest,
+        "resolved_plan_digest": plan.resolved_plan_digest,
+    })
 }
 
 pub(super) fn request_material(request: &WindowsRecursiveParsedEdgeRequest) -> Value {

@@ -19,7 +19,7 @@ pub(super) fn output_custody_digest(
     receipt: &WindowsRecursiveWaveAcquisitionReceipt,
 ) -> Result<String> {
     jcs_sha256_hex(&json!({
-        "schema": "elon.compute_plugin.windows_recursive_wave_output_custody.v2",
+        "schema": "elon.compute_plugin.windows_recursive_wave_output_custody.v3",
         "acquisition_receipt_ordinal": receipt.acquisition_receipt_ordinal,
         "previous_acquisition_receipt_digest": receipt.previous_acquisition_receipt_digest,
         "authenticated_recursive_policy_digest": receipt.authenticated_recursive_policy_digest,
@@ -39,6 +39,7 @@ pub(super) fn output_custody_digest(
         "source_request_plan_digest": receipt.source_request_plan_digest,
         "resolved_plan_digest": receipt.resolved_plan_digest,
         "pre_dispatch_plan_evidence_digest": receipt.pre_dispatch_plan_evidence_digest,
+        "policy_dispatch_authorization": receipt.policy_dispatch_authorization.canonical_material(),
         "searched_name_grant_set_digest": receipt.searched_name_grant_set_digest,
         "filesystem_candidate_set_digest": receipt.filesystem_candidate_set_digest,
         "immutable_content_lease_set_digest": receipt.immutable_content_lease_set_digest,
@@ -49,7 +50,7 @@ pub(super) fn output_custody_digest(
 
 pub(super) fn receipt_digest(receipt: &WindowsRecursiveWaveAcquisitionReceipt) -> Result<String> {
     jcs_sha256_hex(&json!({
-        "schema": "elon.compute_plugin.windows_recursive_wave_acquisition_receipt.v2",
+        "schema": "elon.compute_plugin.windows_recursive_wave_acquisition_receipt.v3",
         "acquisition_receipt_ordinal": receipt.acquisition_receipt_ordinal,
         "previous_acquisition_receipt_digest": receipt.previous_acquisition_receipt_digest,
         "authenticated_recursive_policy_digest": receipt.authenticated_recursive_policy_digest,
@@ -69,6 +70,7 @@ pub(super) fn receipt_digest(receipt: &WindowsRecursiveWaveAcquisitionReceipt) -
         "source_request_plan_digest": receipt.source_request_plan_digest,
         "resolved_plan_digest": receipt.resolved_plan_digest,
         "pre_dispatch_plan_evidence_digest": receipt.pre_dispatch_plan_evidence_digest,
+        "policy_dispatch_authorization": receipt.policy_dispatch_authorization.canonical_material(),
         "searched_name_grant_set_digest": receipt.searched_name_grant_set_digest,
         "filesystem_candidate_set_digest": receipt.filesystem_candidate_set_digest,
         "immutable_content_lease_set_digest": receipt.immutable_content_lease_set_digest,

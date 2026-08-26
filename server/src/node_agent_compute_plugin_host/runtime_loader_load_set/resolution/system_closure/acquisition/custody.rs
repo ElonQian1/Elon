@@ -9,7 +9,9 @@ use crate::node_agent_managed_fs::{
     PinnedWindowsLoaderResolvedSystemImageCandidate,
 };
 
-use super::super::super::super::launch_path_discovery::AuthenticatedWindowsRecursiveResolutionPolicy;
+use super::super::super::super::launch_path_discovery::{
+    AuthenticatedWindowsRecursiveResolutionPolicy, WindowsRecursivePolicyDispatchAuthorization,
+};
 use super::super::super::{
     PreFinalWindowsLoaderNamespaceGrantSet, WindowsLoaderPackageContentLeaseCustody,
     WindowsLoaderSearchedNameFenceCustody,
@@ -24,7 +26,7 @@ use super::{
         WindowsRecursiveRetainedSearchDirectoryAuthorityRef,
         WindowsRecursiveWaveDispatchPlanEvidence,
     },
-    plan_validation, AuthenticatedWindowsRecursiveWaveResolutionPlan,
+    plan_digest, plan_validation, AuthenticatedWindowsRecursiveWaveResolutionPlan,
     WindowsRecursiveWaveRequestPlan,
 };
 
@@ -139,8 +141,8 @@ pub(in crate::node_agent_compute_plugin_host::runtime_loader_load_set) struct Wi
     _wave_request_dispatch_producer_unavailable: Infallible,
 }
 
-/// Authenticated resolver output before the complete borrow-only pre-dispatch gate. It has no
-/// grant attempt or backend capability and cannot be passed to the future dispatcher.
+/// Authenticated resolver output before the complete borrow-only plan gate. It has no grant
+/// attempt or backend capability and cannot skip the policy-currentness pending state.
 #[must_use = "unvalidated recursive resolution must validate whole or remain intact"]
 pub(in crate::node_agent_compute_plugin_host::runtime_loader_load_set) struct WindowsRecursiveWaveResolvedPlanCustody<
     'root,
@@ -151,14 +153,50 @@ pub(in crate::node_agent_compute_plugin_host::runtime_loader_load_set) struct Wi
     _resolved_plan_validator_transition_unavailable: Infallible,
 }
 
-/// The only state a future searched-name dispatcher may consume. Its full typed plan evidence was
-/// validated before this state was formed and remains by value through every later stage.
+/// The complete typed Ak plan has passed its borrow-only structural and cumulative-limit gate,
+/// but no searched-name request may be dispatched until a fresh policy-currentness authorization
+/// is consumed into the next state. The plan evidence remains by value so the authorization is
+/// bound to the exact evidence that will accompany every later acquisition stage.
+#[must_use = "validated wave must obtain fresh policy currentness before first dispatch"]
+pub(in crate::node_agent_compute_plugin_host::runtime_loader_load_set) struct PolicyCurrentnessPendingWindowsRecursiveWaveGrantCustody<
+    'root,
+> {
+    accumulated: WindowsRecursiveResolutionAccumulatedCustody<'root>,
+    validated_plan_evidence: WindowsRecursiveWaveDispatchPlanEvidence,
+    _policy_currentness_authorization_producer_unavailable: Infallible,
+}
+
+impl PolicyCurrentnessPendingWindowsRecursiveWaveGrantCustody<'_> {
+    /// Borrow-only Ak gate for the authorization that a future consuming transition would move
+    /// into `DispatchReadyWindowsRecursiveWaveGrantCustody` beside this exact plan evidence.
+    pub(super) fn validate_authorization_before_first_dispatch(
+        &self,
+        authorization: &WindowsRecursivePolicyDispatchAuthorization,
+    ) -> Result<()> {
+        let producer_wave_ordinal = self.validated_plan_evidence.producer_wave_ordinal;
+        let pre_dispatch_plan_evidence_digest =
+            plan_digest::recursive_pre_dispatch_plan_evidence_digest(
+                &self.validated_plan_evidence,
+            )?;
+        authorization.validate_against(
+            &self.accumulated.authenticated_policy,
+            producer_wave_ordinal,
+            producer_wave_ordinal,
+            &self.validated_plan_evidence.input_custody_digest,
+            &pre_dispatch_plan_evidence_digest,
+        )
+    }
+}
+
+/// The only Ak state a future searched-name dispatcher may consume. Its typed plan evidence and
+/// fresh policy-currentness authorization remain by value through every later acquisition stage.
 #[must_use = "dispatch-ready wave grants must advance whole or enter grant failure custody"]
 pub(in crate::node_agent_compute_plugin_host::runtime_loader_load_set) struct DispatchReadyWindowsRecursiveWaveGrantCustody<
     'root,
 > {
     accumulated: WindowsRecursiveResolutionAccumulatedCustody<'root>,
     validated_plan_evidence: WindowsRecursiveWaveDispatchPlanEvidence,
+    policy_dispatch_authorization: WindowsRecursivePolicyDispatchAuthorization,
     acquired_searched_name_grants: Vec<WindowsLoaderSearchedNameFenceCustody>,
     pending_searched_name_grants: Vec<WindowsRecursivePendingSearchedNameGrantRef>,
     searched_name_grant_set_digest: String,
@@ -169,9 +207,9 @@ pub(super) type WindowsRecursiveWaveGrantAcquisitionCustody<'root> =
     DispatchReadyWindowsRecursiveWaveGrantCustody<'root>;
 
 impl WindowsRecursiveWaveResolvedPlanCustody<'_> {
-    /// Complete pre-dispatch gate. A future validator transition may consume this intact state into
-    /// `DispatchReadyWindowsRecursiveWaveGrantCustody` only after this returns success; no such
-    /// producer exists in the source-only architecture slice.
+    /// Complete typed-plan gate. A future validator transition may consume this intact state into
+    /// `PolicyCurrentnessPendingWindowsRecursiveWaveGrantCustody` only after this returns success;
+    /// no such producer exists in the source-only architecture slice.
     pub(super) fn validate_whole_before_first_dispatch(&self) -> Result<()> {
         let projection = plan_validation::validate_whole_before_first_dispatch(
             &self.accumulated,
@@ -199,6 +237,7 @@ pub(in crate::node_agent_compute_plugin_host::runtime_loader_load_set) struct Wi
 > {
     accumulated: WindowsRecursiveResolutionAccumulatedCustody<'root>,
     validated_plan_evidence: WindowsRecursiveWaveDispatchPlanEvidence,
+    policy_dispatch_authorization: WindowsRecursivePolicyDispatchAuthorization,
     acquired_searched_name_grants: Vec<WindowsLoaderSearchedNameFenceCustody>,
     acquired_route_candidates: Vec<WindowsRecursiveRouteCandidateCustody>,
     pending_filesystem_candidates: Vec<WindowsRecursivePendingFilesystemCandidateRef>,
@@ -215,6 +254,7 @@ pub(in crate::node_agent_compute_plugin_host::runtime_loader_load_set) struct Wi
 > {
     accumulated: WindowsRecursiveResolutionAccumulatedCustody<'root>,
     validated_plan_evidence: WindowsRecursiveWaveDispatchPlanEvidence,
+    policy_dispatch_authorization: WindowsRecursivePolicyDispatchAuthorization,
     acquired_searched_name_grants: Vec<WindowsLoaderSearchedNameFenceCustody>,
     acquired_parse_sources: Vec<WindowsRecursiveSameOwnerParseSourceCustody>,
     pending_filesystem_candidates: Vec<WindowsRecursiveFilesystemCandidateCustody>,
@@ -231,6 +271,7 @@ pub(in crate::node_agent_compute_plugin_host::runtime_loader_load_set) struct Wi
 > {
     accumulated: WindowsRecursiveResolutionAccumulatedCustody<'root>,
     validated_plan_evidence: WindowsRecursiveWaveDispatchPlanEvidence,
+    policy_dispatch_authorization: WindowsRecursivePolicyDispatchAuthorization,
     acquired_searched_name_grants: Vec<WindowsLoaderSearchedNameFenceCustody>,
     completed_parse_sources: Vec<WindowsRecursiveSameOwnerParseSourceCustody>,
     completed_parse_receipts: Vec<WindowsPostLeaseSystemImageParseReceipt>,

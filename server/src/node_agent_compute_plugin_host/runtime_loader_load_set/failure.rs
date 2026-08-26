@@ -23,9 +23,10 @@ use super::{
     launch_path_discovery::PreliminaryResolutionRequestsPlannedWork,
     model::LoaderTransitionAuthorityCustody,
     resolution::{
-        GrantReadyWindowsRunnerResolutionPrerequisite,
+        PolicyCurrentGrantReadyWindowsRunnerResolutionPrerequisite,
+        PolicyCurrentPreFinalWindowsLoaderNamespaceGrantSet,
         PostLeaseSealedWindowsRunnerLoadSetPreQueryPrerequisite,
-        PostLeaseSplitWindowsRunnerLoadSetPrerequisite, PreFinalWindowsLoaderNamespaceGrantSet,
+        PostLeaseSplitWindowsRunnerLoadSetPrerequisite,
         WindowsLoaderAcquiredImmutableContentLeaseCustody, WindowsLoaderAcquiredNameGrantCustody,
     },
 };
@@ -60,7 +61,7 @@ pub(super) enum WindowsRunnerPendingNameGrantRef {
 
 pub(super) struct WindowsRunnerNameGrantAcquisitionUnusableCustody<'root> {
     class: WindowsRunnerNameGrantAcquisitionFailureClass,
-    _grant_ready: GrantReadyWindowsRunnerResolutionPrerequisite<'root>,
+    _policy_current_grant_ready: PolicyCurrentGrantReadyWindowsRunnerResolutionPrerequisite<'root>,
     _session: ManagedLoaderNamespaceSession,
     _acquired_grants: Vec<WindowsLoaderAcquiredNameGrantCustody>,
     _active_grant_ref: WindowsRunnerPendingNameGrantRef,
@@ -73,7 +74,9 @@ pub(super) struct WindowsRunnerNameGrantAcquisitionUnusableCustody<'root> {
 impl<'root> WindowsRunnerNameGrantAcquisitionUnusableCustody<'root> {
     #[allow(clippy::too_many_arguments)]
     pub(super) fn reject_acquisition(
-        grant_ready: GrantReadyWindowsRunnerResolutionPrerequisite<'root>,
+        policy_current_grant_ready: PolicyCurrentGrantReadyWindowsRunnerResolutionPrerequisite<
+            'root,
+        >,
         session: ManagedLoaderNamespaceSession,
         acquired_grants: Vec<WindowsLoaderAcquiredNameGrantCustody>,
         active_grant_ref: WindowsRunnerPendingNameGrantRef,
@@ -93,7 +96,7 @@ impl<'root> WindowsRunnerNameGrantAcquisitionUnusableCustody<'root> {
         };
         Self {
             class,
-            _grant_ready: grant_ready,
+            _policy_current_grant_ready: policy_current_grant_ready,
             _session: session,
             _acquired_grants: acquired_grants,
             _active_grant_ref: active_grant_ref,
@@ -106,7 +109,9 @@ impl<'root> WindowsRunnerNameGrantAcquisitionUnusableCustody<'root> {
 
     #[allow(clippy::too_many_arguments)]
     pub(super) fn outcome_uncertain(
-        grant_ready: GrantReadyWindowsRunnerResolutionPrerequisite<'root>,
+        policy_current_grant_ready: PolicyCurrentGrantReadyWindowsRunnerResolutionPrerequisite<
+            'root,
+        >,
         session: ManagedLoaderNamespaceSession,
         acquired_grants: Vec<WindowsLoaderAcquiredNameGrantCustody>,
         active_grant_ref: WindowsRunnerPendingNameGrantRef,
@@ -116,7 +121,7 @@ impl<'root> WindowsRunnerNameGrantAcquisitionUnusableCustody<'root> {
     ) -> Self {
         Self {
             class: WindowsRunnerNameGrantAcquisitionFailureClass::OutcomeUncertain,
-            _grant_ready: grant_ready,
+            _policy_current_grant_ready: policy_current_grant_ready,
             _session: session,
             _acquired_grants: acquired_grants,
             _active_grant_ref: active_grant_ref,
@@ -159,7 +164,7 @@ pub(super) enum WindowsRunnerActiveContentLeaseAcquisitionCustody {
 
 pub(super) struct WindowsRunnerContentLeaseAcquisitionUnusableCustody<'root> {
     class: WindowsRunnerContentLeaseAcquisitionFailureClass,
-    _namespace_grants: PreFinalWindowsLoaderNamespaceGrantSet<'root>,
+    _policy_current_namespace: PolicyCurrentPreFinalWindowsLoaderNamespaceGrantSet<'root>,
     _acquired_leases: Vec<WindowsLoaderAcquiredImmutableContentLeaseCustody>,
     _active: WindowsRunnerActiveContentLeaseAcquisitionCustody,
     _pending: Vec<WindowsRunnerPendingContentLeaseRef>,
@@ -168,7 +173,7 @@ pub(super) struct WindowsRunnerContentLeaseAcquisitionUnusableCustody<'root> {
 impl<'root> WindowsRunnerContentLeaseAcquisitionUnusableCustody<'root> {
     #[allow(clippy::too_many_arguments)]
     pub(super) fn reject_acquisition(
-        namespace_grants: PreFinalWindowsLoaderNamespaceGrantSet<'root>,
+        policy_current_namespace: PolicyCurrentPreFinalWindowsLoaderNamespaceGrantSet<'root>,
         acquired_leases: Vec<WindowsLoaderAcquiredImmutableContentLeaseCustody>,
         active_package_file_ordinal: usize,
         active_attempt: ManagedLoaderFileContentLeaseAcquisitionAttemptCustody,
@@ -185,7 +190,7 @@ impl<'root> WindowsRunnerContentLeaseAcquisitionUnusableCustody<'root> {
         };
         Self {
             class,
-            _namespace_grants: namespace_grants,
+            _policy_current_namespace: policy_current_namespace,
             _acquired_leases: acquired_leases,
             _active: WindowsRunnerActiveContentLeaseAcquisitionCustody::PackageFile {
                 package_file_ordinal: active_package_file_ordinal,
@@ -199,7 +204,7 @@ impl<'root> WindowsRunnerContentLeaseAcquisitionUnusableCustody<'root> {
 
     #[allow(clippy::too_many_arguments)]
     pub(super) fn outcome_uncertain(
-        namespace_grants: PreFinalWindowsLoaderNamespaceGrantSet<'root>,
+        policy_current_namespace: PolicyCurrentPreFinalWindowsLoaderNamespaceGrantSet<'root>,
         acquired_leases: Vec<WindowsLoaderAcquiredImmutableContentLeaseCustody>,
         active_package_file_ordinal: usize,
         active_attempt: ManagedLoaderFileContentLeaseAcquisitionAttemptCustody,
@@ -208,7 +213,7 @@ impl<'root> WindowsRunnerContentLeaseAcquisitionUnusableCustody<'root> {
     ) -> Self {
         Self {
             class: WindowsRunnerContentLeaseAcquisitionFailureClass::OutcomeUncertain,
-            _namespace_grants: namespace_grants,
+            _policy_current_namespace: policy_current_namespace,
             _acquired_leases: acquired_leases,
             _active: WindowsRunnerActiveContentLeaseAcquisitionCustody::PackageFile {
                 package_file_ordinal: active_package_file_ordinal,

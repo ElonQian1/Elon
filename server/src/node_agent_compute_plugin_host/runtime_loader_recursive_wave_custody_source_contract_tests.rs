@@ -220,10 +220,10 @@ fn recursive_wave_chain_binds_a0_to_an_custody_and_parse_provenance() {
     }
     assert!(ACQUISITION_DIGEST.contains("WindowsRecursiveWaveAcquisitionReceipt"));
     assert!(
-        ACQUISITION_DIGEST.contains("elon.compute_plugin.windows_recursive_wave_output_custody.v2")
+        ACQUISITION_DIGEST.contains("elon.compute_plugin.windows_recursive_wave_output_custody.v3")
     );
     assert!(ACQUISITION_DIGEST
-        .contains("elon.compute_plugin.windows_recursive_wave_acquisition_receipt.v2"));
+        .contains("elon.compute_plugin.windows_recursive_wave_acquisition_receipt.v3"));
     assert!(ACQUISITION_DIGEST
         .contains("elon.compute_plugin.windows_recursive_resolution_acquisition_chain.v1"));
     assert!(SYSTEM_CLOSURE_DIGEST

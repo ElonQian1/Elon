@@ -48,6 +48,8 @@ mod runtime_loader_launch_path_discovery_source_contract_tests;
 #[cfg(test)]
 mod runtime_loader_load_set_source_contract_tests;
 #[cfg(test)]
+mod runtime_loader_recursive_policy_currentness_source_contract_tests;
+#[cfg(test)]
 mod runtime_loader_recursive_wave_custody_source_contract_tests;
 #[cfg(test)]
 mod runtime_process_custody_source_contract_tests;

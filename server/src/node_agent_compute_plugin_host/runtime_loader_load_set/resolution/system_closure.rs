@@ -18,7 +18,9 @@ use std::convert::Infallible;
 use super::WindowsLoaderModuleNode;
 
 pub(in crate::node_agent_compute_plugin_host::runtime_loader_load_set) use acquisition::{
-    AuthenticatedWindowsRecursiveWaveResolutionPlan, DispatchReadyWindowsRecursiveWaveGrantCustody,
+    base_pre_dispatch_plan_evidence_digest, AuthenticatedWindowsRecursiveWaveResolutionPlan,
+    DispatchReadyWindowsRecursiveWaveGrantCustody,
+    PolicyCurrentnessPendingWindowsRecursiveWaveGrantCustody,
     SealedWindowsRecursiveResolutionAcquisitionChain, TerminalWindowsRecursiveResolutionCustody,
     WindowsRecursiveResolutionAccumulatedCustody, WindowsRecursiveWaveAcquisitionReceipt,
     WindowsRecursiveWaveAdvanceFailureClass, WindowsRecursiveWaveAdvanceFailureCustody,

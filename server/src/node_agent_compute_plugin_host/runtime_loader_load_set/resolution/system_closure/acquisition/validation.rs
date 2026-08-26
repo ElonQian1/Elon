@@ -1,5 +1,7 @@
 //! Fail-closed projection and live-owner validation for the `A0..AN` receipt chain.
 
+use std::collections::HashSet;
+
 use anyhow::{anyhow, bail, Result};
 
 use crate::node_agent_compute_plugin_host::manifest_validation::is_sha256;
@@ -34,8 +36,47 @@ pub(super) fn validate_projection_against(
         bail!("COMPUTE_PLUGIN_WINDOWS_RECURSIVE_ACQUISITION_CHAIN_SHAPE_CHANGED");
     }
 
+    let mut authorization_nonces = HashSet::with_capacity(chain.receipts().len());
+    let mut previous_control_keyring_generation = None;
+    let mut previous_trusted_now_ms = None;
+    let mut previous_trusted_time_attestation_sequence = None;
     for (ordinal, receipt) in chain.receipts().iter().enumerate() {
         validate_receipt_projection(ordinal, receipt, chain, closure, resolution)?;
+        receipt.policy_dispatch_authorization.validate_against(
+            chain.policy(),
+            receipt.acquisition_receipt_ordinal,
+            receipt.producer_wave_ordinal,
+            &receipt.input_custody_digest,
+            &receipt.pre_dispatch_plan_evidence_digest,
+        )?;
+        if !authorization_nonces.insert(receipt.policy_dispatch_authorization.nonce_digest()) {
+            bail!("COMPUTE_PLUGIN_WINDOWS_RECURSIVE_POLICY_AUTHORIZATION_NONCE_REUSED");
+        }
+        let observed_generation = receipt
+            .policy_dispatch_authorization
+            .observed_control_keyring_generation();
+        if previous_control_keyring_generation
+            .is_some_and(|previous| observed_generation < previous)
+        {
+            bail!("COMPUTE_PLUGIN_WINDOWS_RECURSIVE_POLICY_CONTROL_KEYRING_GENERATION_REGRESSED");
+        }
+        previous_control_keyring_generation = Some(observed_generation);
+
+        let trusted_now_ms = receipt.policy_dispatch_authorization.trusted_now_ms();
+        if previous_trusted_now_ms.is_some_and(|previous| trusted_now_ms < previous) {
+            bail!("COMPUTE_PLUGIN_WINDOWS_RECURSIVE_POLICY_TRUSTED_TIME_REGRESSED");
+        }
+        previous_trusted_now_ms = Some(trusted_now_ms);
+
+        let trusted_time_attestation_sequence = receipt
+            .policy_dispatch_authorization
+            .trusted_time_attestation_sequence();
+        if previous_trusted_time_attestation_sequence
+            .is_some_and(|previous| trusted_time_attestation_sequence < previous)
+        {
+            bail!("COMPUTE_PLUGIN_WINDOWS_RECURSIVE_POLICY_TRUSTED_TIME_SEQUENCE_REGRESSED");
+        }
+        previous_trusted_time_attestation_sequence = Some(trusted_time_attestation_sequence);
     }
 
     let Some(terminal_receipt) = chain.receipts().last() else {
@@ -231,6 +272,7 @@ fn validate_receipt_projection(
     ]
     .into_iter()
     .any(|value| !is_sha256(value))
+        || !is_sha256(receipt.policy_dispatch_authorization.digest())
         || receipt
             .previous_acquisition_receipt_digest
             .as_deref()
