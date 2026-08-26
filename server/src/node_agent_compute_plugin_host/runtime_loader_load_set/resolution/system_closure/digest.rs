@@ -41,9 +41,10 @@ pub(super) fn parse_receipt_digest(
     receipt: &WindowsPostLeaseSystemImageParseReceipt,
 ) -> Result<String> {
     jcs_sha256_hex(&json!({
-        "schema": "elon.compute_plugin.windows_recursive_image_parse_receipt.v1",
+        "schema": "elon.compute_plugin.windows_recursive_image_parse_receipt.v2",
         "parse_receipt_ordinal": receipt.parse_receipt_ordinal,
         "wave_ordinal": receipt.wave_ordinal,
+        "producer_acquisition_receipt_ordinal": receipt.producer_acquisition_receipt_ordinal,
         "producer_module_request_ordinal": receipt.producer_module_request_ordinal,
         "parsed_image_ordinal": receipt.parsed_image_ordinal,
         "node": super::super::super::digest::module_node_material(&receipt.node),
@@ -89,20 +90,14 @@ pub(super) fn closure_digest(closure: &SealedWindowsRecursiveResolutionClosure) 
         .map(|wave| wave.wave_digest.as_str())
         .collect::<Vec<_>>();
     jcs_sha256_hex(&json!({
-        "schema": "elon.compute_plugin.windows_recursive_resolution_closure.v1",
+        "schema": "elon.compute_plugin.windows_recursive_resolution_closure.v2",
         "base_prelease_parsed_image_count": closure.base_prelease_parsed_image_count,
         "base_module_request_count": closure.base_module_request_count,
         "base_searched_name_count": closure.base_searched_name_count,
         "base_system_image_request_count": closure.base_system_image_request_count,
         "parse_receipts": parse_receipts,
         "waves": waves,
-        "max_wave_count": closure.max_wave_count,
-        "max_parsed_image_count": closure.max_parsed_image_count,
-        "max_module_request_count": closure.max_module_request_count,
-        "max_searched_name_count": closure.max_searched_name_count,
-        "max_system_image_request_count": closure.max_system_image_request_count,
-        "max_forwarder_hop_count": closure.max_forwarder_hop_count,
-        "limit_policy_source_digest": closure.limit_policy_source_digest,
+        "recursive_acquisition_chain_digest": closure.acquisition_chain.digest(),
         "file_identity_dedupe_receipt_digest": closure.file_identity_dedupe_receipt_digest,
         "module_cache_collision_closure_receipt_digest": closure.module_cache_collision_closure_receipt_digest,
         "forwarder_cycle_closure_receipt_digest": closure.forwarder_cycle_closure_receipt_digest,

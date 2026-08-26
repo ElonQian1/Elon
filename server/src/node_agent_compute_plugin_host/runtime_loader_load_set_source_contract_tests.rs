@@ -601,10 +601,13 @@ fn source_freezes_missing_authorities_eighteen_zero_effects_and_transition_order
         "authenticate_exact_launch_context_and_preliminary_resolution_requests",
         "resolve_exact_terminals_dispositions_and_external_directory_owners",
         "seal_grant_ready_preliminary_resolution_plan",
-        "acquire_all_searched_name_and_launch_path_component_grants",
-        "acquire_indexed_fileid_content_leases_after_all_name_grants",
-        "same_handle_full_package_rehash_and_reparse_under_content_leases_and_name_grants",
-        "seal_exact_pe_graph_launch_path_and_startup_import_resolution_under_leases",
+        "acquire_base_searched_name_and_launch_path_component_grants",
+        "acquire_base_route_specific_owners_and_fileid_leases_after_base_grants",
+        "same_owner_parse_base_targets_into_first_recursive_frontier",
+        "repeat_recursive_request_resolution_grant_route_owner_lease_and_same_owner_parse_by_producer_wave",
+        "prove_terminal_empty_frontier_without_detaching_custody",
+        "aggregate_all_base_and_recursive_grants_leases_and_owner_bindings",
+        "seal_exact_recursive_pe_graph_under_final_aggregate",
         "query_all_name_grants_and_content_lease_generation_set",
         "validate_and_retain_package_root_and_plan_directory_handles",
         "close_reopen_package_files_runner_last",
@@ -629,6 +632,11 @@ fn source_freezes_missing_authorities_eighteen_zero_effects_and_transition_order
     assert!(POLICY.contains("authenticated_launch_context_source_producer"));
     assert!(POLICY.contains("preliminary_resolution_request_plan"));
     assert!(POLICY.contains("grant_ready_preliminary_resolution_plan"));
+    assert!(POLICY.contains("authenticated_recursive_resolution_policy_contract"));
+    assert!(POLICY.contains("authenticated_recursive_policy_source_producer"));
+    assert!(POLICY.contains("recursive_wave_acquisition_custody_contract"));
+    assert!(POLICY.contains("recursive_wave_positive_advancer_backend"));
+    assert!(POLICY.contains("recursive_same_owner_parser_backend"));
     assert!(POLICY.contains("external_search_directory_authority"));
     assert!(POLICY.contains("launch_path_component_grant_backend"));
     assert!(!POLICY.contains("PROPOSED_WINDOWS_DIRECTORY_DESIRED_ACCESS"));
@@ -639,10 +647,13 @@ fn source_freezes_missing_authorities_eighteen_zero_effects_and_transition_order
         "authenticate_exact_launch_context_and_preliminary_resolution_requests",
         "resolve_exact_terminals_dispositions_and_external_directory_owners",
         "seal_grant_ready_preliminary_resolution_plan",
-        "acquire_all_searched_name_and_launch_path_component_grants",
-        "acquire_indexed_fileid_content_leases_after_all_name_grants",
-        "same_handle_full_package_rehash_and_reparse_under_content_leases_and_name_grants",
-        "seal_exact_pe_graph_launch_path_and_startup_import_resolution_under_leases",
+        "acquire_base_searched_name_and_launch_path_component_grants",
+        "acquire_base_route_specific_owners_and_fileid_leases_after_base_grants",
+        "same_owner_parse_base_targets_into_first_recursive_frontier",
+        "repeat_recursive_request_resolution_grant_route_owner_lease_and_same_owner_parse_by_producer_wave",
+        "prove_terminal_empty_frontier_without_detaching_custody",
+        "aggregate_all_base_and_recursive_grants_leases_and_owner_bindings",
+        "seal_exact_recursive_pe_graph_under_final_aggregate",
     ]
     .map(|step| POLICY.find(step).expect("transition step missing"));
     assert!(transition_positions

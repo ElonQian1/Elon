@@ -623,6 +623,15 @@ fn validate_resolution_bindings(
             bail!("COMPUTE_PLUGIN_LOADER_SEARCHED_NAME_BINDING_CHANGED");
         }
     }
+    resolution
+        .pe_import_graph
+        .recursive_resolution_closure
+        .acquisition_chain
+        .validate_namespace_grants_against(
+            &resolution.pe_import_graph.recursive_resolution_closure,
+            namespace_prerequisite,
+            resolution,
+        )?;
     validate_launch_path_authority(image, resolution, namespace_prerequisite)?;
     for digest in [
         &resolution.known_dll_authority.os_build_identity_digest,

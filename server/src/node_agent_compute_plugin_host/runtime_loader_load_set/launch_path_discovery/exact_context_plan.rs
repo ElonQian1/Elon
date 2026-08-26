@@ -10,6 +10,7 @@ mod digest;
 mod edge_locator;
 mod intent;
 mod lineage;
+mod recursive_policy;
 mod view;
 
 pub(in super::super) use edge_locator::WindowsPreliminaryModuleEdgeLocator;
@@ -17,6 +18,10 @@ pub(in crate::node_agent_compute_plugin_host) use lineage::WindowsRunnerLaunchCo
 pub(in super::super) use lineage::{
     consume_query_verified_loader_prerequisite, QueryVerifiedWindowsRunnerLaunchLineage,
     QueryVerifiedWindowsRunnerLaunchLineageValidationFailure,
+};
+pub(in super::super) use recursive_policy::{
+    AuthenticatedWindowsRecursiveResolutionPolicy,
+    AuthenticatedWindowsRecursiveResolutionPolicyLimits,
 };
 pub(in super::super) use view::{
     PreliminaryWindowsRunnerResolutionRequestPlanView, PreliminaryWindowsRunnerSelectedContextView,

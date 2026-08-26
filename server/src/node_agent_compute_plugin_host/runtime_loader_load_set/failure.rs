@@ -128,10 +128,11 @@ impl<'root> WindowsRunnerNameGrantAcquisitionUnusableCustody<'root> {
     }
 }
 
-/// Partial content-lease acquisition occurs only after all name grants exist and retains that
-/// complete unqueried grant set, the intact admitted owner, every acquired FileId lease, the active
-/// platform dispatch, and pending ordinals. It cannot collapse into namespace query failure because
-/// no query-verified prerequisite exists yet.
+/// Wave-zero partial content-lease acquisition occurs only after all base name grants exist and
+/// retains that complete unqueried base set, the intact admitted owner, every acquired FileId
+/// lease, the active platform dispatch, and pending ordinals. Recursive suffix acquisition has its
+/// own producer-wave failure custody because later searched names do not exist yet here. Neither
+/// form can collapse into namespace query failure before final aggregation/currentness.
 pub(super) enum WindowsRunnerPendingContentLeaseRef {
     PackageFile { package_file_ordinal: usize },
     ResolvedFilesystemSystemImage { resolution_request_ordinal: usize },

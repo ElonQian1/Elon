@@ -25,6 +25,7 @@ impl GrantReadyWindowsRunnerResolutionPlan {
         self.validate_digests(preliminary)?;
         if self.search_directories.len() != preliminary.search_directories.len()
             || self.module_resolutions.len() != preliminary.module_resolution_requests.len()
+            || preliminary.package_image_count() == 0
             || [
                 &self.grant_ready_resolution_plan_digest,
                 &self.exact_terminal_resolution_set_digest,
@@ -628,7 +629,6 @@ impl GrantReadyWindowsRunnerMovableOwnerSet {
     pub(super) fn validate_against(
         &self,
         plan: &GrantReadyWindowsRunnerResolutionPlan,
-        preliminary: &PreliminaryWindowsRunnerResolutionRequestPlanView<'_>,
     ) -> Result<()> {
         let expected_external_count = plan
             .search_directories
@@ -640,10 +640,7 @@ impl GrantReadyWindowsRunnerMovableOwnerSet {
                 )
             })
             .count();
-        if self.external_search_directories.len() != expected_external_count
-            || self.pending_system_image_candidates.len()
-                != plan.resolved_filesystem_system_image_requests.len()
-        {
+        if self.external_search_directories.len() != expected_external_count {
             bail!("COMPUTE_PLUGIN_WINDOWS_GRANT_READY_MOVABLE_OWNER_COUNT_CHANGED");
         }
         for (ordinal, owner) in self.external_search_directories.iter().enumerate() {
@@ -668,15 +665,33 @@ impl GrantReadyWindowsRunnerMovableOwnerSet {
                 bail!("COMPUTE_PLUGIN_WINDOWS_GRANT_READY_EXTERNAL_OWNER_CHANGED");
             }
         }
+        Ok(())
+    }
+}
+
+impl GrantAcquiredWindowsRunnerResolutionLeaseCustody<'_> {
+    /// Validate the unique candidate handles only after name-grant success moved them into this
+    /// post-grant owner. This is a borrowed proof seam for a future positive advancer; it neither
+    /// constructs candidates nor exposes an extractor that could move them back to GrantReady.
+    pub(super) fn validate_pending_system_image_candidates_after_grants(&self) -> Result<()> {
+        self.movable_owners.validate_against(&self.plan)?;
+        if self.pending_system_image_candidates.len()
+            != self.plan.resolved_filesystem_system_image_requests.len()
+        {
+            bail!("COMPUTE_PLUGIN_WINDOWS_POST_GRANT_SYSTEM_CANDIDATE_COUNT_CHANGED");
+        }
         for (ordinal, owner) in self.pending_system_image_candidates.iter().enumerate() {
-            let request = &plan.resolved_filesystem_system_image_requests[ordinal];
+            let request = &self.plan.resolved_filesystem_system_image_requests[ordinal];
             let parent_identity = request
                 .uses
                 .get(request.primary_use_ordinal)
                 .and_then(|usage| {
-                    self.external_search_directories.iter().find(|directory| {
-                        directory.search_step_ordinal == usage.search_step_ordinal
-                    })
+                    self.movable_owners
+                        .external_search_directories
+                        .iter()
+                        .find(|directory| {
+                            directory.search_step_ordinal == usage.search_step_ordinal
+                        })
                 })
                 .map(|directory| directory.directory.path_currentness_binding().1);
             if owner.candidate_owner_ordinal != ordinal
@@ -694,11 +709,8 @@ impl GrantReadyWindowsRunnerMovableOwnerSet {
                 )
                 || owner.candidate.binding().9 != request.candidate_binding_digest
             {
-                bail!("COMPUTE_PLUGIN_WINDOWS_GRANT_READY_SYSTEM_CANDIDATE_CHANGED");
+                bail!("COMPUTE_PLUGIN_WINDOWS_POST_GRANT_SYSTEM_CANDIDATE_CHANGED");
             }
-        }
-        if preliminary.package_image_count() == 0 {
-            bail!("COMPUTE_PLUGIN_WINDOWS_GRANT_READY_PACKAGE_IMAGE_SET_EMPTY");
         }
         Ok(())
     }

@@ -17,18 +17,35 @@ impl SealedWindowsRecursiveResolutionClosure {
         base_module_request_count: usize,
         base_searched_name_count: usize,
         base_system_image_request_count: usize,
+        expected_launch_context_intent_digest: &str,
+        expected_preliminary_request_plan_digest: &str,
         expected_parser_policy_digest: &str,
-        expected_limit_policy_source_digest: &str,
+        expected_authenticated_preloaded_module_set_digest: &str,
+        expected_resolution_route_order: &[String],
         resolution: &SealedWindowsLoaderResolutionAuthority,
     ) -> Result<()> {
+        let policy = self.acquisition_chain.policy();
+        policy.validate_expected_binding(
+            expected_launch_context_intent_digest,
+            expected_preliminary_request_plan_digest,
+            expected_parser_policy_digest,
+            expected_authenticated_preloaded_module_set_digest,
+            expected_resolution_route_order,
+        )?;
+        let limits = policy.limits();
+        let max_wave_count = policy_limit(limits.max_wave_count)?;
+        let max_parsed_image_count = policy_limit(limits.max_parsed_image_count)?;
+        let max_module_request_count = policy_limit(limits.max_module_request_count)?;
+        let max_searched_name_count = policy_limit(limits.max_searched_name_count)?;
+        let max_system_image_request_count = policy_limit(limits.max_system_image_request_count)?;
+        let max_forwarder_hop_count = policy_limit(limits.max_forwarder_hop_count)?;
         self.validate_digests(expected_parser_policy_digest, resolution)?;
         if self.base_prelease_parsed_image_count != base_prelease_parsed_image_count
             || self.base_module_request_count != base_module_request_count
             || self.base_searched_name_count != base_searched_name_count
             || self.base_system_image_request_count != base_system_image_request_count
-            || self.limit_policy_source_digest != expected_limit_policy_source_digest
-            || self.waves.len() > self.max_wave_count
-            || resolution.pe_import_graph.parsed_images.len() > self.max_parsed_image_count
+            || self.waves.len() > max_wave_count
+            || resolution.pe_import_graph.parsed_images.len() > max_parsed_image_count
         {
             bail!("COMPUTE_PLUGIN_WINDOWS_RECURSIVE_CLOSURE_BASE_CHANGED");
         }
@@ -42,11 +59,10 @@ impl SealedWindowsRecursiveResolutionClosure {
         if module_count != final_module_count
             || searched_name_count != resolution.searched_names.len()
             || system_image_count != resolution.resolved_filesystem_system_images.len()
-            || module_count > self.max_module_request_count
-            || searched_name_count > self.max_searched_name_count
-            || system_image_count > self.max_system_image_request_count
-            || edge_projection::maximum_forwarder_hop_depth(resolution)?
-                > self.max_forwarder_hop_count
+            || module_count > max_module_request_count
+            || searched_name_count > max_searched_name_count
+            || system_image_count > max_system_image_request_count
+            || edge_projection::maximum_forwarder_hop_depth(resolution)? > max_forwarder_hop_count
             || self
                 .base_prelease_parsed_image_count
                 .checked_add(self.parse_receipts.len())
@@ -57,7 +73,9 @@ impl SealedWindowsRecursiveResolutionClosure {
 
         self.validate_parse_receipts(resolution)?;
         edge_projection::validate_final_edge_provenance(self, resolution)?;
-        self.validate_recursive_search_projection(resolution)
+        self.validate_recursive_search_projection(resolution)?;
+        self.acquisition_chain
+            .validate_projection_against(self, resolution)
     }
 
     fn validate_digests(
@@ -104,7 +122,7 @@ impl SealedWindowsRecursiveResolutionClosure {
         }
         if self.closure_digest != digest::closure_digest(self)?
             || [
-                &self.limit_policy_source_digest,
+                self.acquisition_chain.digest(),
                 &self.file_identity_dedupe_receipt_digest,
                 &self.module_cache_collision_closure_receipt_digest,
                 &self.forwarder_cycle_closure_receipt_digest,
@@ -125,6 +143,7 @@ impl SealedWindowsRecursiveResolutionClosure {
         let mut next_system_image = self.base_system_image_request_count;
         let mut used_receipts = HashSet::new();
         let mut expected_frontier: Option<&[usize]> = None;
+        let mut next_parse_receipt_ordinal = 0usize;
 
         for (index, wave) in self.waves.iter().enumerate() {
             let wave_ordinal = index.checked_add(1).ok_or_else(count_overflow)?;
@@ -140,15 +159,26 @@ impl SealedWindowsRecursiveResolutionClosure {
             {
                 bail!("COMPUTE_PLUGIN_WINDOWS_RECURSIVE_WAVE_ORDER_CHANGED");
             }
+            let mut previous_producer_module_request_ordinal = None;
             for receipt_ordinal in &wave.source_parse_receipt_ordinals {
-                if !used_receipts.insert(*receipt_ordinal)
-                    || !self
-                        .parse_receipts
-                        .get(*receipt_ordinal)
-                        .is_some_and(|receipt| receipt.wave_ordinal == wave_ordinal)
+                let receipt = self.parse_receipts.get(*receipt_ordinal);
+                if *receipt_ordinal != next_parse_receipt_ordinal
+                    || !used_receipts.insert(*receipt_ordinal)
+                    || !receipt.is_some_and(|receipt| {
+                        receipt.wave_ordinal == wave_ordinal
+                            && receipt.producer_acquisition_receipt_ordinal == index
+                            && previous_producer_module_request_ordinal.is_none_or(|previous| {
+                                previous < receipt.producer_module_request_ordinal
+                            })
+                    })
                 {
                     bail!("COMPUTE_PLUGIN_WINDOWS_RECURSIVE_WAVE_FRONTIER_CHANGED");
                 }
+                previous_producer_module_request_ordinal =
+                    receipt.map(|receipt| receipt.producer_module_request_ordinal);
+                next_parse_receipt_ordinal = next_parse_receipt_ordinal
+                    .checked_add(1)
+                    .ok_or_else(count_overflow)?;
             }
             next_module = next_module
                 .checked_add(wave.module_request_count)
@@ -343,6 +373,11 @@ fn strictly_increasing(values: &[usize]) -> bool {
 
 fn count_overflow() -> anyhow::Error {
     anyhow::anyhow!("COMPUTE_PLUGIN_WINDOWS_RECURSIVE_COUNT_OVERFLOW")
+}
+
+fn policy_limit(value: u64) -> Result<usize> {
+    usize::try_from(value)
+        .map_err(|_| anyhow::anyhow!("COMPUTE_PLUGIN_WINDOWS_RECURSIVE_POLICY_LIMIT_OVERFLOW"))
 }
 
 fn import_binding_module_request_ordinal(

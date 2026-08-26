@@ -22,9 +22,11 @@ use super::super::work_admission_contract::DurableWorkAdmittedPluginSlot;
 
 pub(in crate::node_agent_compute_plugin_host) use exact_context_plan::WindowsRunnerLaunchContextPreCreateProjection;
 pub(super) use exact_context_plan::{
-    consume_query_verified_loader_prerequisite, AuthenticatedWindowsRunnerLaunchContextIntent,
-    PreliminaryResolutionRequestsPlannedWork, PreliminaryWindowsRunnerResolutionRequestPlanView,
-    PreliminaryWindowsRunnerSelectedContextView, QueryVerifiedWindowsRunnerLaunchLineage,
+    consume_query_verified_loader_prerequisite, AuthenticatedWindowsRecursiveResolutionPolicy,
+    AuthenticatedWindowsRecursiveResolutionPolicyLimits,
+    AuthenticatedWindowsRunnerLaunchContextIntent, PreliminaryResolutionRequestsPlannedWork,
+    PreliminaryWindowsRunnerResolutionRequestPlanView, PreliminaryWindowsRunnerSelectedContextView,
+    QueryVerifiedWindowsRunnerLaunchLineage,
     QueryVerifiedWindowsRunnerLaunchLineageValidationFailure,
     WindowsPreliminaryContentLeaseRequestRef, WindowsPreliminaryImportEdgeKind,
     WindowsPreliminaryLaunchPathComponentRequest, WindowsPreliminaryModuleEdgeLocator,

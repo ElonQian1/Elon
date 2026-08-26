@@ -570,11 +570,13 @@ fn exact_authority_gaps_and_zero_effects_remain_closed() {
     );
     assert!(POLICY.contains("resolve_exact_terminals_dispositions_and_external_directory_owners"));
     assert!(POLICY.contains("seal_grant_ready_preliminary_resolution_plan"));
+    assert!(POLICY.contains("same_owner_parse_base_targets_into_first_recursive_frontier"));
     assert!(POLICY.contains(
-        "same_handle_full_package_rehash_and_reparse_under_content_leases_and_name_grants"
+        "repeat_recursive_request_resolution_grant_route_owner_lease_and_same_owner_parse_by_producer_wave"
     ));
-    assert!(POLICY
-        .contains("seal_exact_pe_graph_launch_path_and_startup_import_resolution_under_leases"));
+    assert!(POLICY.contains("prove_terminal_empty_frontier_without_detaching_custody"));
+    assert!(POLICY.contains("aggregate_all_base_and_recursive_grants_leases_and_owner_bindings"));
+    assert!(POLICY.contains("seal_exact_recursive_pe_graph_under_final_aggregate"));
     let zero_effects = between(
         POLICY,
         "pub(super) const LOADER_LOAD_SET_ZERO_EFFECTS",

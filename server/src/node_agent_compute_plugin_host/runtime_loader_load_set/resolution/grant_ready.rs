@@ -1,8 +1,10 @@
-//! Typed exact resolution custody required before any name grant or system-image lease dispatch.
+//! Typed wave-zero exact resolution custody required before any base name grant or lease dispatch.
 //!
-//! The immutable plan is deliberately separate from movable directory/candidate owners. A future
-//! backend must consume this module's purpose-specific typestate seams; sibling modules cannot
-//! construct, splice or extract its private fields.
+//! The immutable plan is deliberately separate from movable directory owners and later post-grant
+//! candidate owners. A future backend must consume this module's purpose-specific typestate seams;
+//! sibling modules cannot construct, splice or extract its private fields. Recursive suffix waves
+//! use the separate `system_closure::acquisition` owner graph after same-owner parsing reveals
+//! their requests.
 
 mod digest;
 mod final_projection;
@@ -227,7 +229,6 @@ impl GrantReadyWindowsRunnerResolutionPlan {
 
 struct GrantReadyWindowsRunnerMovableOwnerSet {
     external_search_directories: Vec<WindowsGrantReadyExternalSearchDirectoryCustody>,
-    pending_system_image_candidates: Vec<WindowsGrantReadyResolvedSystemImageCandidateCustody>,
 }
 
 /// Exact terminal/disposition plan plus all linear external owners required before name-grant
@@ -244,13 +245,16 @@ pub(in crate::node_agent_compute_plugin_host::runtime_loader_load_set) struct Gr
 }
 
 /// Name-grant success consumes the whole grant-ready owner into this lease-acquisition custody.
-/// Movable owners remain here until each candidate is consumed by exactly one attempt and each
-/// external directory moves into the final resolution.
+/// Exact candidate files become owned only here, after every required name grant exists. The
+/// immutable plan retains the expected candidate digests while these unique handles advance into
+/// one lease attempt or purpose-specific failure custody. External directories remain retained
+/// until final resolution consumes them.
 #[must_use = "post-grant resolution custody must advance through every content lease"]
 pub(super) struct GrantAcquiredWindowsRunnerResolutionLeaseCustody<'root> {
     preliminary: PreliminaryResolutionRequestsPlannedWork<'root>,
     plan: GrantReadyWindowsRunnerResolutionPlan,
     movable_owners: GrantReadyWindowsRunnerMovableOwnerSet,
+    pending_system_image_candidates: Vec<WindowsGrantReadyResolvedSystemImageCandidateCustody>,
     _grant_acquisition_transition_producer_unavailable: Infallible,
 }
 
@@ -276,8 +280,7 @@ impl GrantReadyWindowsRunnerResolutionPrerequisite<'_> {
     pub(super) fn validate_whole(&self) -> Result<()> {
         let preliminary = self.borrow_preliminary_requests();
         self.plan.validate_against(&preliminary)?;
-        self.movable_owners
-            .validate_against(&self.plan, &preliminary)
+        self.movable_owners.validate_against(&self.plan)
     }
 }
 
@@ -330,8 +333,11 @@ impl<'root> PostLeaseWindowsRunnerResolutionLineage<'root> {
                 base_modules,
                 base_names,
                 base_system_images,
-                preliminary.parser_policy_digest,
                 preliminary.selected_context.context_intent_digest,
+                preliminary.preliminary_request_plan_digest,
+                preliminary.parser_policy_digest,
+                preliminary.authenticated_preloaded_module_set_digest,
+                preliminary.resolution_route_order,
                 resolution,
             )
     }

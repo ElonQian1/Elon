@@ -520,8 +520,9 @@ pub(super) struct SealedWindowsLoaderNamespacePrerequisite {
     pub(super) _whole_resolution_fence_backend_unavailable: Infallible,
 }
 
-/// Grants and exact FileId content leases acquired before the consuming pre-barrier currentness
-/// query. A query failure retains this owner rather than an impossible already-successful receipt.
+/// Wave-zero grants acquired before route-specific owner/candidate and content-lease acquisition.
+/// A recursive successor must consume this whole base owner, retain the same namespace session,
+/// and append later-wave grants; this type cannot stand for the unknown recursive suffix.
 pub(super) struct PreFinalWindowsLoaderNamespaceGrantSet<'root> {
     pub(super) resolution_custody: GrantAcquiredWindowsRunnerResolutionLeaseCustody<'root>,
     pub(super) searched_name_grants: Vec<WindowsLoaderSearchedNameFenceCustody>,
@@ -534,8 +535,9 @@ pub(super) struct PreFinalWindowsLoaderNamespaceGrantSet<'root> {
     pub(super) _whole_resolution_fence_backend_unavailable: Infallible,
 }
 
-/// Namespace grant/session lineage after every movable external directory and system candidate
-/// has moved exactly once into final resolution/lease custody. It cannot duplicate those owners.
+/// Final aggregate namespace grant/session lineage after the recursive empty-frontier sealer has
+/// moved every base and suffix candidate exactly once into resolution/lease custody. It cannot be
+/// created from the wave-zero owner alone or duplicate those owners.
 pub(super) struct PostLeaseWindowsLoaderNamespaceGrantSet<'root> {
     pub(super) resolution_lineage: PostLeaseWindowsRunnerResolutionLineage<'root>,
     pub(super) searched_name_grants: Vec<WindowsLoaderSearchedNameFenceCustody>,
@@ -548,9 +550,10 @@ pub(super) struct PostLeaseWindowsLoaderNamespaceGrantSet<'root> {
     pub(super) _postlease_namespace_lineage_producer_unavailable: Infallible,
 }
 
-/// Final resolution can exist only after every grant and package/system content lease. Resolved
-/// system-image leases have moved into `resolution`; package leases remain linear for the later
-/// close/reopen transition. This whole pre-query owner has no producer in the current source.
+/// Final resolution can exist only after A0..AN acquisition, the terminal empty frontier, every
+/// grant and every package/system content lease. Resolved system-image leases have moved into
+/// `resolution`; package leases remain linear for the later close/reopen transition. This whole
+/// pre-query owner has no producer in the current source.
 pub(super) struct PostLeaseSealedWindowsRunnerLoadSetPreQueryPrerequisite<'root> {
     pub(super) namespace: PostLeaseWindowsLoaderNamespaceGrantSet<'root>,
     pub(super) resolution: SealedWindowsLoaderResolutionAuthority,

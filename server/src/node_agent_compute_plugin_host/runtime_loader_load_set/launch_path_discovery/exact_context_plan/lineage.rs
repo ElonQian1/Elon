@@ -520,8 +520,11 @@ impl QueryVerifiedWindowsRunnerLaunchLineage {
                 base_modules,
                 base_names,
                 base_system_images,
-                &self.plan.parser_policy_digest,
                 &self.plan.selected_context.context_intent_digest,
+                &self.plan.preliminary_request_plan_digest,
+                &self.plan.parser_policy_digest,
+                &self.plan.authenticated_preloaded_module_set_digest,
+                &self.plan.resolution_route_order,
                 resolution,
             )?;
         if self.plan.recompute_digest() != self.plan.preliminary_request_plan_digest

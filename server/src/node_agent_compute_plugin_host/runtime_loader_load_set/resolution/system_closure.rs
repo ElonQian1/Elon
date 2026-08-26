@@ -1,9 +1,11 @@
 //! Post-lease recursive PE closure for images first reached through system resolution.
 //!
 //! Wave zero remains the package-only preliminary/GrantReady plan. This module freezes the
-//! disjoint provenance, exact source-owner parse receipts and terminal fixpoint required for every
-//! later wave. It deliberately provides no parser, resolver, grant, lease or sealing producer.
+//! disjoint provenance, signed recursive limits, exact per-producer-wave acquisition custody,
+//! source-owner parse receipts and terminal fixpoint required for every later wave. It deliberately
+//! provides no signature, parser, resolver, grant, candidate, lease, advancer or sealing producer.
 
+mod acquisition;
 mod digest;
 mod edge_order;
 mod edge_projection;
@@ -14,6 +16,17 @@ mod validation;
 use std::convert::Infallible;
 
 use super::WindowsLoaderModuleNode;
+
+pub(in crate::node_agent_compute_plugin_host::runtime_loader_load_set) use acquisition::{
+    AuthenticatedWindowsRecursiveWaveResolutionPlan,
+    SealedWindowsRecursiveResolutionAcquisitionChain, TerminalWindowsRecursiveResolutionCustody,
+    WindowsRecursiveResolutionAccumulatedCustody, WindowsRecursiveWaveAcquisitionReceipt,
+    WindowsRecursiveWaveAdvanceFailureClass, WindowsRecursiveWaveAdvanceFailureCustody,
+    WindowsRecursiveWaveCandidateAcquisitionCustody, WindowsRecursiveWaveCompletedCustody,
+    WindowsRecursiveWaveGrantAcquisitionCustody, WindowsRecursiveWaveLeaseAcquisitionCustody,
+    WindowsRecursiveWaveRequestCustody, WindowsRecursiveWaveRequestPlan,
+    WindowsRecursiveWaveSameOwnerParseCustody,
+};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(in crate::node_agent_compute_plugin_host::runtime_loader_load_set) enum WindowsRecursiveImageOwnerRef
@@ -48,6 +61,11 @@ pub(in crate::node_agent_compute_plugin_host::runtime_loader_load_set) struct Wi
     pub(in crate::node_agent_compute_plugin_host::runtime_loader_load_set) parse_receipt_ordinal:
         usize,
     pub(in crate::node_agent_compute_plugin_host::runtime_loader_load_set) wave_ordinal: usize,
+    /// Index of the producer-wave acquisition receipt that retained the exact owner parsed here.
+    /// It is always `wave_ordinal - 1`; the receipt digest cannot be embedded without a digest
+    /// cycle because that receipt commits the completed parse-receipt set.
+    pub(in crate::node_agent_compute_plugin_host::runtime_loader_load_set) producer_acquisition_receipt_ordinal:
+        usize,
     pub(in crate::node_agent_compute_plugin_host::runtime_loader_load_set) producer_module_request_ordinal:
         usize,
     pub(in crate::node_agent_compute_plugin_host::runtime_loader_load_set) parsed_image_ordinal:
@@ -118,19 +136,8 @@ pub(in crate::node_agent_compute_plugin_host::runtime_loader_load_set) struct Se
         Vec<WindowsPostLeaseSystemImageParseReceipt>,
     pub(in crate::node_agent_compute_plugin_host::runtime_loader_load_set) waves:
         Vec<WindowsRecursiveResolutionWavePlan>,
-    pub(in crate::node_agent_compute_plugin_host::runtime_loader_load_set) max_wave_count: usize,
-    pub(in crate::node_agent_compute_plugin_host::runtime_loader_load_set) max_parsed_image_count:
-        usize,
-    pub(in crate::node_agent_compute_plugin_host::runtime_loader_load_set) max_module_request_count:
-        usize,
-    pub(in crate::node_agent_compute_plugin_host::runtime_loader_load_set) max_searched_name_count:
-        usize,
-    pub(in crate::node_agent_compute_plugin_host::runtime_loader_load_set) max_system_image_request_count:
-        usize,
-    pub(in crate::node_agent_compute_plugin_host::runtime_loader_load_set) max_forwarder_hop_count:
-        usize,
-    pub(in crate::node_agent_compute_plugin_host::runtime_loader_load_set) limit_policy_source_digest:
-        String,
+    pub(in crate::node_agent_compute_plugin_host::runtime_loader_load_set) acquisition_chain:
+        SealedWindowsRecursiveResolutionAcquisitionChain,
     pub(in crate::node_agent_compute_plugin_host::runtime_loader_load_set) file_identity_dedupe_receipt_digest:
         String,
     pub(in crate::node_agent_compute_plugin_host::runtime_loader_load_set) module_cache_collision_closure_receipt_digest:
