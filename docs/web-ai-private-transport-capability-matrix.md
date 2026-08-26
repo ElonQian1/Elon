@@ -20,7 +20,7 @@ installed build; individual capability documents retain implementation evidence.
 | Visited conversation body cache | Google Web AI | Completed, enabled, and device verified | Official WebView navigation |
 | Reply stream and completion observer | Google Web AI | Completed, enabled, and stream-to-completion device verified on `v1.1.1303 (1313)` | Official DOM snapshot |
 | Background navigation continuity | ChatGPT and Google Web AI | Completed, enabled, and device verified | Bounded official WebView recovery |
-| Unified send coordinator | ChatGPT and Google Web AI | Completed and enabled; targeted tests passed, device acceptance pending | Official-page confirmation and draft recovery |
+| Unified send coordinator | ChatGPT and Google Web AI | Completed, enabled, and device verified on `v1.1.1313 (1323)` | Official-page confirmation and draft recovery |
 
 All web-account transports keep the official page authoritative. They do not export
 cookies, credentials, request headers, or private conversation content outside the
@@ -118,6 +118,12 @@ the draft for an explicit user retry. Confirmation must also contain message evi
 than the pre-send snapshot, so an older identical prompt cannot settle a repeated send.
 This boundary permits a future transport only after it preserves the same confirmation and
 reconciliation contract; it does not enable Google direct POST today.
+
+Device acceptance on `v1.1.1313 (1323)` verified the production friend-chat surface with
+ChatGPT adapter `188` and Google adapter `37`. Both providers completed an isolated exact
+reply probe through the native composer; Google additionally exposed a streaming-to-complete
+transition. The acceptance did not clear cookies or application data and emitted no private
+conversation content.
 
 Normal and interrupted realtime-voice exits now reuse the verified conversation-body
 transport for a non-navigating refresh of the current `/c/{id}` only. Requests are
