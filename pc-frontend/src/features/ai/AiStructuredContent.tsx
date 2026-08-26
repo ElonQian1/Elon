@@ -6,6 +6,7 @@ import {
   Map,
   Sigma,
   Table2,
+  TriangleAlert,
   Video,
   type LucideIcon,
 } from 'lucide-react'
@@ -44,16 +45,30 @@ export default function AiStructuredContent({
   const richParts = allRichParts.filter((part) => (
     placement === 'all' || (placement === 'primary') === isPrimaryRichCard(part.richContent!)
   ))
+  const upgradeParts = placement === 'primary' ? [] : parts?.filter((part) => (
+    part.type === 'interactive' && part.kind === 'renderer_upgrade_required'
+  )) ?? []
   const visibleParts = placement === 'primary' ? [] : parts?.filter((part) => (
     part.type !== 'image' && part.type !== 'rich_card' && Boolean(part.label.trim() || metadataFor(part))
     && !(part.type === 'interactive' && part.kind === 'renderer_upgrade_required')
   )) ?? []
-  if (!visibleParts.length && !richParts.length) return null
+  if (!visibleParts.length && !richParts.length && !upgradeParts.length) return null
   return (
     <>
       {richParts.map((part, index) => (
         <AiRichContentCard content={part.richContent!} key={`${part.label}:${index}`} />
       ))}
+      {upgradeParts.length > 0 && (
+        <div className={styles.upgradeNotice} role="status" aria-label="官网富内容升级提示">
+          <span className={styles.upgradeIcon}>
+            <TriangleAlert size={16} aria-hidden="true" />
+          </span>
+          <span className={styles.upgradeCopy}>
+            <strong>官网富内容已升级</strong>
+            <small>正文已保留；当前组件可用顶部“官网完整内容”查看，Win 渲染器更新后会自动恢复。</small>
+          </span>
+        </div>
+      )}
       {visibleParts.length > 0 && (
         <div className={styles.grid} aria-label="官方回复中的结构化内容">
           {visibleParts.map((part, index) => {

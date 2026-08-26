@@ -5,6 +5,49 @@
   margin-top: 10px;
 }
 
+.upgradeNotice {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 9px 10px;
+  border: 1px solid rgba(245, 183, 74, .24);
+  border-radius: 10px;
+  color: var(--text, #f5f6f8);
+  background: rgba(245, 183, 74, .07);
+}
+
+.upgradeIcon {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  color: #f5b74a;
+  background: rgba(245, 183, 74, .12);
+}
+
+.upgradeCopy {
+  min-width: 0;
+}
+
+.upgradeCopy strong,
+.upgradeCopy small {
+  display: block;
+}
+
+.upgradeCopy strong {
+  font-size: 12px;
+}
+
+.upgradeCopy small {
+  margin-top: 2px;
+  color: var(--text-muted, #a9adb6);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
 .card {
   min-width: 0;
   display: grid;

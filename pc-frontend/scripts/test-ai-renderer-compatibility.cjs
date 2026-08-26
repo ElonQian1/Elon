@@ -51,4 +51,12 @@ assert.deepEqual(compatibility.localAiRendererCompatibility([], true), {
   reason: 'incomplete_extraction',
 })
 
+const structuredContent = read('src/features/ai/AiStructuredContent.tsx')
+const structuredStyles = read('src/features/ai/AiStructuredContent.module.css')
+assert.match(structuredContent, /const upgradeParts =/)
+assert.match(structuredContent, /role="status" aria-label="官网富内容升级提示"/)
+assert.match(structuredContent, /正文已保留；当前组件可用顶部“官网完整内容”查看/)
+assert.match(structuredStyles, /\.upgradeNotice\s*\{/)
+assert.match(structuredStyles, /rgba\(245, 183, 74, \.07\)/)
+
 console.log('AI renderer compatibility tests passed')
