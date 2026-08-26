@@ -205,6 +205,11 @@ AI_PROJECT / AI_INDEX / AGENTS
 
 当前云端已形成 Provider/Pool/Bucket/Supply、Offer/Price Snapshot、Job/Reservation/Claim、Broker、Attempt 证据与验证、结算/挑战/纠正/释放/提款及激活恢复等版本化合同与控制面代码。各子链验证强度不同，不能把整条链统一描述为“未编译”或“已完成”；实现成熟度只由 `docs/distributed-compute/current-implementation-status.md` 与其链接的专题验收文档维护。节点侧已形成 Manifest/InstallPlan、双 keyring、authority v3/PlanApply、可恢复取数、Windows 受管文件、候选原子验证、可信时间/回滚锚合同，以及 ZIP 安全物化、不可变 staging receipt、`verifying -> staged` 原子事务、`NotCreated`/exact `Staged` 结果读取、retained-handle 线性 adoption 和进程内候选健康评估合同；`PinnedComputePluginRoot` 还强制持有父句柄相对、share-none 的跨进程工件根锁，派生的取数/验证 custody 继续保活同一锁句柄。默认关闭的 Bootstrap 已挂入 NodeRuntime，但尚无 sharing-on 获取该锁的启动过渡；生产时间源/回滚见证、真实下载、目录耐久/跨重启恢复、真实 Sidecar 探针、health Store/恢复、installed/promotion 和正式 Attempt 通道仍未接线。现有模型白名单、Token 预留和流租约继续作为 `user_node + llm_chat` 兼容路径；协议阅读顺序与协作去重边界见 `docs/distributed-compute/README.md`。
 
+`capacity_future` 的历史解释边界另有独立、未登记的 reference-only V1：Domain projection 不改变 F0 carrier；
+Store retained resolver source 只以 settlement Lease 为根，在同一 Deferred snapshot 内历史重建
+CapacityInstrument→Commitment→exercised DeliveryAllocation→F0 execution/verification/settlement/release，封入
+crate-visible、private-field、non-Clone/non-Serde seal。该增量未编译、未运行且无 Service/API/表/写入/effect，不能解释为清算或真实计量。
+
 F1 的 Ready 边界新增未登记、未编译/未运行的 source-lineage 草案：它从线性 work-admission 与 Ready-health owner token 读取事实，并把 Host runtime observation 保持为 `Untrusted`，输出固定缺少 local currentness、runtime transition、Host runtime 与 v15 authenticated session 四项权威的 `Projected` 六键谱系。它不构造 Ready 或 execution capability，也不改变 Provider、route、Offer、Attempt、Lease 或资金；精确边界见 `docs/distributed-compute/user-node-ready-source-lineage-authority.md`。
 
 F1 的 Windows Host authority草案已把线性 owner顺序冻结为 retained discovery → authenticated intent + package-only pre-lease

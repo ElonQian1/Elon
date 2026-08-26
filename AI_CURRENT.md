@@ -66,7 +66,7 @@ reviewed_at: 2026-08-26
 - 外部矿池：V277/V278 uncompiled/unrun、#13-18 deny、eligible=0；V280 仅 ABI。
 - V279 UserNode Binding：Domain/Store/API/activation 源码已写但未编译/运行，零下游与经济效果；见 `docs/distributed-compute/user-node-provider-binding-authority.md`。
 - UserNode Ready谱系与 Windows Runner仍为未登记、未编译/未运行、零效果草案；Windows新增 policy signature verification、A0/Ak currentness与 acquisition V3 source shape；真实 verifier/resolver/backend/runtime缺失、四 gap不变；见 `AI_INDEX.md`。
-- `capacity_future` bridge 是未登记 source draft：仅 Domain/source equations，v192/v195 摘要分域且不判等；未编译/运行，无 Store/API/effect；见 `docs/distributed-compute/capacity-future-settlement-lineage-authority.md`。
+- `capacity_future`：Lease-rooted Store resolver/private-field seal 已写；未登记、未编译/运行、无 API/effect；见 `AI_INDEX.md`。
 
 ## 已接受的产品方向
 
