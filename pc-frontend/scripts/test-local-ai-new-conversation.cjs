@@ -26,6 +26,25 @@ const controllerConfigSource = fs.readFileSync(
   path.resolve(__dirname, '../src/features/user-browser/localAiWebChatControllerConfig.ts'),
   'utf8',
 )
+const deadlineFilename = path.resolve(
+  __dirname,
+  '../src/features/user-browser/useLocalAiNewConversationDeadline.ts',
+)
+const deadlineSource = fs.readFileSync(deadlineFilename, 'utf8')
+const deadlineOutput = ts.transpileModule(deadlineSource, {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+  fileName: deadlineFilename,
+}).outputText
+const deadlineModule = new Module(deadlineFilename, module)
+deadlineModule.filename = deadlineFilename
+deadlineModule.paths = module.paths
+deadlineModule.require = (id) => id === 'react'
+  ? { useEffect: () => {}, useState: () => [0, () => {}] }
+  : id === './localAiWebChatControllerConfig'
+    ? { NEW_CONVERSATION_RECOVERY_TIMEOUT_MS: 24_000 }
+    : require(id)
+deadlineModule._compile(deadlineOutput, deadlineFilename)
+const { localAiNewConversationDeadlineDelay } = deadlineModule.exports
 const output = ts.transpileModule(source, {
   compilerOptions: {
     module: ts.ModuleKind.CommonJS,
@@ -232,6 +251,14 @@ assert.match(chatGptRecoverySource, /current\.loading \|\| current\.rendererStat
 assert.match(chatGptRecoverySource, /if \(!startedAtMs \|\| providerId !== 'chatgpt' \|\| !ownerKey \|\| suspended\) return/)
 assert.match(chatGptRecoverySource, /CHATGPT_NEW_CONVERSATION_RECOVERY_DELAYS_MS[\s\S]*?\.filter[\s\S]*?\.map/)
 assert.match(controllerConfigSource, /\[6_000, 12_000, 18_000\]/)
+assert.equal(localAiNewConversationDeadlineDelay(0, 30_000), null)
+assert.equal(localAiNewConversationDeadlineDelay(10_000, 10_000), 24_000)
+assert.equal(localAiNewConversationDeadlineDelay(10_000, 22_000), 12_000)
+assert.equal(localAiNewConversationDeadlineDelay(10_000, 40_000), 0)
+assert.match(deadlineSource, /window\.setTimeout\(\(\) => setExpiredGeneration\(startedAtMs\), delay\)/)
+assert.match(deadlineSource, /return \(\) => window\.clearTimeout\(timer\)/)
+assert.match(controllerSource, /useLocalAiNewConversationDeadline\(newConversationRecoveryStartedAtMs\)/)
+assert.match(controllerSource, /if \(!newConversationRecoveryExpired\) return/)
 assert.match(controllerSource, /if \(action === 'new_conversation'\) \{\s*return startNewConversation\(\)/)
 assert.match(controllerSource, /function beginLocalNewConversation\(\)/)
 assert.match(controllerSource, /setNewConversationRecoveryStartedAtMs\(Date\.now\(\)\)/)

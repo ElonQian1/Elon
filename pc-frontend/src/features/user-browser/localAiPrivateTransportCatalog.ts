@@ -32,6 +32,14 @@ const SHARED_REFRESH_SINGLE_FLIGHT: CapabilityDefinition = {
   requiredActions: ['snapshot'],
 }
 
+const SHARED_SEND_COORDINATOR: CapabilityDefinition = {
+  id: 'win_web_ai_unified_send_coordinator_v1',
+  label: '官网发送确认单飞行',
+  requestMode: 'single_flight_official_page_transport',
+  fallback: 'official_page_confirmation_and_draft_recovery',
+  requiredActions: ['send_prompt'],
+}
+
 const CATALOG: Record<string, CapabilityDefinition[]> = {
   chatgpt: [
     {
@@ -71,6 +79,7 @@ const CATALOG: Record<string, CapabilityDefinition[]> = {
     },
     SHARED_CONTINUITY,
     SHARED_REFRESH_SINGLE_FLIGHT,
+    SHARED_SEND_COORDINATOR,
   ],
   'google-ai-mode': [
     {
@@ -96,6 +105,7 @@ const CATALOG: Record<string, CapabilityDefinition[]> = {
     },
     SHARED_CONTINUITY,
     SHARED_REFRESH_SINGLE_FLIGHT,
+    SHARED_SEND_COORDINATOR,
   ],
 }
 

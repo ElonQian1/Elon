@@ -46,11 +46,11 @@ import {
   selectLocalAiNewConversationPath,
 } from './localAiNewConversation'
 import useChatGptNewConversationRecovery from './useChatGptNewConversationRecovery'
+import useLocalAiNewConversationDeadline from './useLocalAiNewConversationDeadline'
 import { localAiComposerAvailability } from './localAiComposerAvailability'
 import {
   BACKGROUND_RECONNECT_MAX_ATTEMPTS,
   GOOGLE_NEW_CONVERSATION_RELOAD_DELAY_MS,
-  NEW_CONVERSATION_RECOVERY_TIMEOUT_MS,
   type QueuedLocalAiSend,
 } from './localAiWebChatControllerConfig'
 import useLocalAiAccessRecovery, { createLocalAiAccessRetry } from './useLocalAiAccessRecovery'
@@ -61,7 +61,6 @@ import { localAiWarmSessionReusable } from './localAiWarmSessionPolicy'
 import { resumeLocalAiWebSession } from './resumeLocalAiWebSession'
 import useLocalAiCapabilityPrewarm from './useLocalAiCapabilityPrewarm'
 import { syncLocalAiDeferredMenu } from './localAiDeferredMenuSync'
-
 export default function useLocalAiWebChatController(
   provider: LocalAiWebProvider | undefined,
   ownerKey: string,
@@ -84,6 +83,7 @@ export default function useLocalAiWebChatController(
   const [busyAction, setBusyAction] = useState('')
   const [message, setMessage] = useState('')
   const [newConversationRecoveryStartedAtMs, setNewConversationRecoveryStartedAtMs] = useState(0)
+  const newConversationRecoveryExpired = useLocalAiNewConversationDeadline(newConversationRecoveryStartedAtMs)
   const [newConversationPageConfirmed, setNewConversationPageConfirmed] = useState(false)
   const pendingResponseSlow = useLocalAiPendingResponseWatchdog(requestedSessionIdentity, pendingResponses)
   const autoStartKey = useRef('')
@@ -234,7 +234,7 @@ export default function useLocalAiWebChatController(
     }
     // 五个条件里任何一个（尤其是官网迟迟不给可信实时快照）迟迟凑不齐时，不能让
     // 输入框永远显示空白；排队消息只在新会话绑定成功后发送，超时则安全还原草稿。
-    if (Date.now() - newConversationRecoveryStartedAtMs < NEW_CONVERSATION_RECOVERY_TIMEOUT_MS) return
+    if (!newConversationRecoveryExpired) return
     newConversationBaselineId.current = ''
     setNewConversationPageConfirmed(false)
     setNewConversationRecoveryStartedAtMs(0)
@@ -246,7 +246,7 @@ export default function useLocalAiWebChatController(
     } else {
       setMessage('新会话后台连接超时；输入仍可继续编辑，如页面显示旧内容可打开官方页确认。')
     }
-  }, [busyAction, liveSnapshot, newConversationPageConfirmed,
+  }, [busyAction, liveSnapshot, newConversationPageConfirmed, newConversationRecoveryExpired,
     newConversationRecoveryStartedAtMs, providerId, queuedSend, visibleSessionState])
 
   useEffect(() => {
