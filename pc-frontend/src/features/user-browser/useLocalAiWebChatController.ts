@@ -39,6 +39,7 @@ import {
   requestLocalAiNewConversationNativeForeground,
 } from './localAiNewConversationForeground'
 import {
+  chatGptNewConversationResetControlAction,
   googleNewConversationNeedsReload,
   localAiNewConversationNativeReady,
   selectLocalAiNewConversationPath,
@@ -265,6 +266,7 @@ export default function useLocalAiWebChatController(
     ownerKey,
     startedAtMs: newConversationRecoveryStartedAtMs,
     baselineConversationId: newConversationBaselineId.current,
+    suspended: busyAction === 'new_conversation',
     onState: setSessionState,
     onMessage: setMessage,
   })
@@ -633,7 +635,9 @@ export default function useLocalAiWebChatController(
       const next = await controlLocalAiWebSession(
         provider.id,
         ownerKey,
-        provider.id === 'chatgpt' ? 'new_conversation_home' : 'home',
+        provider.id === 'chatgpt'
+          ? chatGptNewConversationResetControlAction(visibleSessionState?.currentUrl)
+          : 'home',
       )
       const background = await keepLocalAiNewConversationInNativeForeground(provider, ownerKey, next)
       setSessionState(background)

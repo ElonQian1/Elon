@@ -225,6 +225,7 @@ export type LocalAiBrowserControlAction =
   | 'back'
   | 'home'
   | 'new_conversation_home'
+  | 'new_conversation_reload'
   | 'external'
 
 export type LocalAiAdapterAction =

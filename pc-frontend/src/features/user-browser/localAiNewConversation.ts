@@ -2,8 +2,27 @@ import type { LocalAiMessageSnapshot, LocalAiWebSessionState } from './localAiBr
 
 export type LocalAiNewConversationPath = 'adapter' | 'home'
 export type ChatGptNewConversationRecoveryAction = 'home' | 'reload' | null
+export type ChatGptNewConversationResetControlAction =
+  | 'new_conversation_home'
+  | 'new_conversation_reload'
 
 const NEW_CONVERSATION_NATIVE_SETTLE_MS = 750
+
+export function chatGptNewConversationResetControlAction(
+  currentUrl: string | null | undefined,
+): ChatGptNewConversationResetControlAction {
+  if (!currentUrl) return 'new_conversation_home'
+  try {
+    const current = new URL(currentUrl)
+    return current.protocol === 'https:'
+      && current.hostname === 'chatgpt.com'
+      && current.pathname === '/'
+      ? 'new_conversation_reload'
+      : 'new_conversation_home'
+  } catch {
+    return 'new_conversation_home'
+  }
+}
 
 export function selectLocalAiNewConversationPath(
   _providerId: string,

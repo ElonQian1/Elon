@@ -41,11 +41,30 @@ compiled._compile(output, filename)
 
 const {
   chatGptNewConversationRecoveryAction,
+  chatGptNewConversationResetControlAction,
   googleNewConversationNeedsReload,
   localAiNewConversationContextReady,
   localAiNewConversationNativeReady,
   selectLocalAiNewConversationPath,
 } = compiled.exports
+
+assert.equal(
+  chatGptNewConversationResetControlAction('https://chatgpt.com/'),
+  'new_conversation_reload',
+)
+assert.equal(
+  chatGptNewConversationResetControlAction('https://chatgpt.com/?temporary-chat=true'),
+  'new_conversation_reload',
+)
+assert.equal(
+  chatGptNewConversationResetControlAction('https://chatgpt.com/c/old-conversation'),
+  'new_conversation_home',
+)
+assert.equal(
+  chatGptNewConversationResetControlAction('not a url'),
+  'new_conversation_home',
+)
+assert.equal(chatGptNewConversationResetControlAction(null), 'new_conversation_home')
 
 const liveSession = {
   windowStatus: 'ready',
@@ -198,8 +217,13 @@ assert.match(controllerSource, /useChatGptNewConversationRecovery\(/)
 assert.match(chatGptRecoverySource, /CHATGPT_NEW_CONVERSATION_RECOVERY_DELAYS_MS/)
 assert.match(chatGptRecoverySource, /providerId !== 'chatgpt'/)
 assert.match(chatGptRecoverySource, /chatGptNewConversationRecoveryAction\(/)
-assert.match(chatGptRecoverySource, /'new_conversation_home'/)
-assert.match(chatGptRecoverySource, /CHATGPT_NEW_CONVERSATION_RECOVERY_DELAYS_MS\.map/)
+assert.match(chatGptRecoverySource, /chatGptNewConversationResetControlAction/)
+assert.match(chatGptRecoverySource, /runLocalAiWebAdapterCommand\([\s\S]*?'new_conversation'/)
+assert.match(chatGptRecoverySource, /waitForLocalAiAdapterResult\([\s\S]*?'new_conversation'/)
+assert.match(chatGptRecoverySource, /chatGptNewConversationResetControlAction\(current\.currentUrl\)/)
+assert.match(chatGptRecoverySource, /current\.loading \|\| current\.rendererStatus !== 'active'/)
+assert.match(chatGptRecoverySource, /if \(!startedAtMs \|\| providerId !== 'chatgpt' \|\| !ownerKey \|\| suspended\) return/)
+assert.match(chatGptRecoverySource, /CHATGPT_NEW_CONVERSATION_RECOVERY_DELAYS_MS[\s\S]*?\.filter[\s\S]*?\.map/)
 assert.match(controllerConfigSource, /\[6_000, 12_000, 18_000\]/)
 assert.match(controllerSource, /if \(action === 'new_conversation'\) \{\s*return startNewConversation\(\)/)
 assert.match(controllerSource, /function beginLocalNewConversation\(\)/)
@@ -226,7 +250,7 @@ assert.match(
 )
 assert.match(
   controllerSource,
-  /provider\.id === 'chatgpt' \? 'new_conversation_home' : 'home'[\s\S]*?keepLocalAiNewConversationInNativeForeground\(provider, ownerKey, next\)/,
+  /provider\.id === 'chatgpt'[\s\S]*?chatGptNewConversationResetControlAction\(visibleSessionState\?\.currentUrl\)[\s\S]*?: 'home'[\s\S]*?keepLocalAiNewConversationInNativeForeground\(provider, ownerKey, next\)/,
 )
 assert.doesNotMatch(
   controllerSource,

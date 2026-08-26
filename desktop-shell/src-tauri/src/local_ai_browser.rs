@@ -33,6 +33,8 @@ mod provider_adapter;
 pub(crate) mod research_capture;
 #[path = "local_ai_browser/semantic_context.rs"]
 mod semantic_context;
+#[path = "local_ai_browser/session_control.rs"]
+mod session_control;
 #[path = "local_ai_browser/session_identity.rs"]
 mod session_identity;
 #[path = "local_ai_browser/snapshot_cache.rs"]
@@ -423,22 +425,7 @@ pub async fn control_local_ai_web_session(
             .ok_or_else(|| format!("{} 本地会话状态不可用。", provider.display_name));
     }
 
-    match action.as_str() {
-        "restore" => {
-            embedded_view::restore_popout(&app, &label)?;
-            runtime.mark_window_status(&label, "ready");
-            runtime.mark_window_visible(&label, true);
-        }
-        "reload" => embedded_view::reload_after_stop(&page)?,
-        "back" => page.eval("history.back();").map_err(display_error)?,
-        "home" | "new_conversation_home" if action == "home" || provider.id == "chatgpt" => {
-            if action == "new_conversation_home" && provider.id == "chatgpt" {
-                runtime.mark_command_pending(&label, "new_conversation", None);
-            }
-            embedded_view::navigate_after_stop(&page, parse_start_url(provider)?)?;
-        }
-        _ => return Err("不支持的本地 AI 浏览器控制动作。".to_string()),
-    }
+    session_control::apply(&app, runtime.inner(), provider, &label, &page, &action)?;
     embedded_view::park_if_background(&app, runtime.inner(), &label)?;
     runtime
         .snapshot(&label)

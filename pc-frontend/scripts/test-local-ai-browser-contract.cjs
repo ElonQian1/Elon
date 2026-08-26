@@ -3,7 +3,10 @@ const fs = require('node:fs')
 const path = require('node:path')
 
 const root = path.resolve(__dirname, '..', '..')
-const rust = read('desktop-shell/src-tauri/src/local_ai_browser.rs')
+const rust = [
+  read('desktop-shell/src-tauri/src/local_ai_browser.rs'),
+  read('desktop-shell/src-tauri/src/local_ai_browser/session_control.rs'),
+].join('\n')
 const embeddedViewRust = read('desktop-shell/src-tauri/src/local_ai_browser/embedded_view.rs')
 const stateRust = read('desktop-shell/src-tauri/src/local_ai_browser/state.rs')
 const snapshotCacheRust = read('desktop-shell/src-tauri/src/local_ai_browser/snapshot_cache.rs')
@@ -126,13 +129,13 @@ assert.match(rust, /pub async fn get_local_ai_web_session_state/)
 assert.match(rust, /pub async fn control_local_ai_web_session/)
 assert.match(
   `${rust}\n${embeddedViewRust}`,
-  /"reload"\s*=>\s*embedded_view::reload_after_stop\(&page\)[\s\S]*?fn reload_after_stop[\s\S]*?webview\.eval\("window\.stop\(\);"\)[\s\S]*?webview\.reload\(\)/,
+  /"reload"\s*=>\s*embedded_view::reload_after_stop\(page\)[\s\S]*?fn reload_after_stop[\s\S]*?webview\.eval\("window\.stop\(\);"\)[\s\S]*?webview\.reload\(\)/,
 )
 assert.match(
   `${rust}\n${embeddedViewRust}`,
-  /"home"\s*\|\s*"new_conversation_home"[\s\S]*?embedded_view::navigate_after_stop\(&page, parse_start_url\(provider\)\?\)[\s\S]*?fn navigate_after_stop[\s\S]*?webview\.eval\("window\.stop\(\);"\)[\s\S]*?webview\.navigate\(url\)/,
+  /"home"\s*\|\s*"new_conversation_home"\s*\|\s*"new_conversation_reload"[\s\S]*?action == "new_conversation_reload"[\s\S]*?embedded_view::reload_after_stop\(page\)[\s\S]*?embedded_view::navigate_after_stop\(page, parse_start_url\(provider\)\?\)[\s\S]*?fn navigate_after_stop[\s\S]*?webview\.eval\("window\.stop\(\);"\)[\s\S]*?webview\.navigate\(url\)/,
 )
-assert.match(rust, /action == "new_conversation_home"[\s\S]*?mark_command_pending\(&label, "new_conversation", None\)/)
+assert.match(rust, /"new_conversation_home"\s*\|\s*"new_conversation_reload"[\s\S]*?mark_command_pending\(label, "new_conversation", None\)/)
 assert.match(rust, /pub async fn run_local_ai_web_adapter_command/)
 assert.match(rust, /pub async fn open_local_ai_cached_conversation/)
 assert.doesNotMatch(rust, /\.is_minimized\(\)|window\.url\(\)/)
@@ -140,7 +143,7 @@ assert.match(rust, /WebviewUrl::External\(bootstrap_url\)/)
 assert.match(rust, /page\.navigate\(start_url\)/)
 assert.match(rust, /\.unminimize\(\)/)
 assert.match(rust, /if action == "background"/)
-assert.match(controlOfficialWebview, /}\s*embedded_view::park_if_background\(&app, runtime\.inner\(\), &label\)\?;/)
+assert.match(controlOfficialWebview, /session_control::apply\([\s\S]*?\)\?;\s*embedded_view::park_if_background\(&app, runtime\.inner\(\), &label\)\?;/)
 assert.match(embeddedViewRust, /webview\.hide\(\)/)
 assert.match(embeddedViewRust, /webview\.reparent\(/)
 assert.match(parkOfficialWebview, /webview\.hide\(\)/)
@@ -463,7 +466,7 @@ assert.match(chatController, /openCachedConversation/)
 assert.match(chatController, /showWindow: false/)
 assert.doesNotMatch(chatController, /setBusyAction\('prepare_guest_session'\)/)
 assert.match(chatController, /selectLocalAiNewConversationPath/)
-assert.match(chatController, /provider\.id === 'chatgpt' \? 'new_conversation_home' : 'home'/)
+assert.match(chatController, /provider\.id === 'chatgpt'[\s\S]*?chatGptNewConversationResetControlAction\(visibleSessionState\?\.currentUrl\)[\s\S]*?: 'home'/)
 assert.match(chatController, /已在本机进入 .* 新会话；官网正在后台同步/)
 assert.match(chatController, /newConversationRecoveryActive/)
 assert.match(chatController, /setNewConversationRecoveryStartedAtMs\(Date\.now\(\)\)/)
