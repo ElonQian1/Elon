@@ -26,5 +26,8 @@ if ($source -match 'pm\s+clear|clear\s+com\.elon\.app') {
 if ($source -match 'chatgpt_set_page_input_text|chatgpt_send_page_input|send_prompt') {
     throw "Watchdog smoke must not dispatch an official conversation request."
 }
+if ($source -match 'chatgpt_new_conversation|ExpectedAction "new_conversation"') {
+    throw "Watchdog smoke must not navigate away from the current conversation."
+}
 
 Write-Output "ChatGPT private stream watchdog smoke contract passed."

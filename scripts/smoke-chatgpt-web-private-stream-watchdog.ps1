@@ -74,25 +74,6 @@ try {
     }
     $originalChatPath = Get-ConversationPath ([string]$ready.conversation.url)
 
-    $newDispatch = Invoke-ChatGptWebSmokeReadyAction -Runtime $runtime `
-        -Action "chatgpt_new_conversation" -TimeoutSec $ReadyTimeoutSec
-    $newRequestId = [string]$newDispatch.command_receipt.request_id
-    if ([string]::IsNullOrWhiteSpace($newRequestId)) {
-        throw "New conversation did not return a command receipt."
-    }
-    Wait-Command -RequestId $newRequestId -ExpectedAction "new_conversation" `
-        -TimeoutSec $ReadyTimeoutSec | Out-Null
-    $blank = Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutSec `
-        -Description "isolated blank ChatGPT watchdog conversation" -Predicate {
-            param($state)
-            $state.bridge_state -eq "ready" -and
-                $state.adapter_current -eq $true -and
-                $state.composer_ready -eq $true -and
-                $state.streaming -eq $false -and
-                [int]$state.input.text_length -eq 0 -and
-                [int]$state.input.official_draft_length -eq 0 -and
-                [int]$state.conversation.message_count -eq 0
-        }
     $probeDispatch = Invoke-ChatGptWebSmokeReadyAction -Runtime $runtime `
         -Action "chatgpt_verify_private_stream_watchdog" -TimeoutSec $ReadyTimeoutSec
     $probeRequestId = [string]$probeDispatch.command_receipt.request_id

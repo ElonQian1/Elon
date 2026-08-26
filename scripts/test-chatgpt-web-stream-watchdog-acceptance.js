@@ -27,7 +27,7 @@ const policy = {
 };
 const acceptance = context.window.__elonChatGptStreamWatchdogAcceptance.create({
   probeModule: context.window.__elonChatGptStreamWatchdogProbe,
-  streamingPolicy: policy,
+  streamingPolicyModule: { create: () => policy },
   now: () => now,
   scheduleTimer: () => 1,
   cancelTimer() {},

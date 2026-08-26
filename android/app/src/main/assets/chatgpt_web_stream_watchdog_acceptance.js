@@ -9,9 +9,14 @@
 
   function create(options) {
     const probeModule = options.probeModule;
-    const streamingPolicy = options.streamingPolicy;
+    const streamingPolicyModule = options.streamingPolicyModule;
     const onResult = options.onResult;
     const scheduleSnapshot = options.scheduleSnapshot;
+    const streamingPolicy = streamingPolicyModule && streamingPolicyModule.create({
+      now: options.now,
+      scheduleTimer: options.scheduleTimer,
+      cancelTimer: options.cancelTimer
+    });
     const probe = probeModule && probeModule.create({
       now: options.now,
       scheduleTimer: options.scheduleTimer,
@@ -53,6 +58,9 @@
 
     function dispose() {
       if (probe) probe.dispose();
+      if (streamingPolicy && typeof streamingPolicy.dispose === 'function') {
+        streamingPolicy.dispose();
+      }
     }
 
     return Object.freeze({ run, dispose });

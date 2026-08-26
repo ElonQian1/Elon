@@ -45,7 +45,7 @@
   const streamWatchdogAcceptance = streamWatchdogAcceptanceModule &&
     streamWatchdogAcceptanceModule.create({
     probeModule: window.__elonChatGptStreamWatchdogProbe,
-    streamingPolicy,
+    streamingPolicyModule,
     now: Date.now,
     scheduleTimer: (delayMs, action) => window.setTimeout(action, delayMs),
     cancelTimer: (timer) => clearTimeout(timer),
