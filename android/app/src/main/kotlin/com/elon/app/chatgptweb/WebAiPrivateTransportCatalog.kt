@@ -123,6 +123,17 @@ internal object WebAiPrivateTransportCatalog {
             fallback = "official_webview_bounded_recovery",
         ),
         Entry(
+            id = "android_web_ai_unified_send_coordinator_v1",
+            provider = "chatgpt_and_google_web_ai",
+            status = "completed",
+            verification = "targeted_tests_passed_device_pending",
+            productionDefault = true,
+            runtimeEnabled = true,
+            requestMode = "single_flight_official_page_transport",
+            healthPolicy = "baseline_bound_confirmation_reconciliation_timeout_and_draft_restore",
+            fallback = "official_page_confirmation_and_user_visible_draft_recovery",
+        ),
+        Entry(
             id = "android_chatgpt_realtime_voice_background_overlay_v1",
             provider = "chatgpt",
             status = "completed",

@@ -37,6 +37,9 @@ class GoogleWebAdapterContractTest {
         val pendingSendState = read(
             "android/app/src/main/kotlin/com/elon/app/WebChatPendingSendState.kt",
         )
+        val sendCoordinator = read(
+            "android/app/src/main/kotlin/com/elon/app/WebChatSendCoordinator.kt",
+        )
 
         assertTrue(adapter.contains("providerId: 'google_web'"))
         assertTrue(adapter.contains("documentToken"))
@@ -142,26 +145,22 @@ class GoogleWebAdapterContractTest {
         assertTrue(modeController.contains("officialFallbackUrl()"))
         val controller = read("android/app/src/main/kotlin/com/elon/app/GoogleWebSocialChatController.kt")
         assertTrue(controller.contains("session.currentOfficialUrl()"))
-        assertTrue(controller.contains("pendingSend.confirmSubmission()"))
-        assertTrue(controller.contains("pendingSend.observeSubmission(latestUserPrompt)"))
+        assertTrue(controller.contains("OfficialPageWebChatSendTransport("))
+        assertTrue(controller.contains("WebChatSendCoordinator("))
+        assertTrue(controller.contains("sendCoordinator.acceptCommandResult(event.ok)"))
+        assertTrue(controller.contains("sendCoordinator.observeSnapshot(snapshot)"))
         assertTrue(controller.contains("session.onSubmissionObserved()"))
         assertTrue(session.contains("fun onSubmissionObserved() = responseRefresh.onSendConfirmed()"))
-        assertTrue(controller.contains("WebChatPendingSendPresentation.status(pendingSend.phase())"))
+        assertTrue(controller.contains("sendCoordinator.status()"))
         assertTrue(controller.contains("?.sendStatus = pendingStatus"))
-        assertTrue(Regex(
-            """pendingSend\.confirmSubmission\(\).*?renderSnapshot""",
-            RegexOption.DOT_MATCHES_ALL,
-        ).containsMatchIn(controller))
-        assertTrue(controller.contains("pendingSend.observeCompletedTurn"))
+        assertTrue(controller.contains("session.currentSnapshot()?.let(::renderSnapshot)"))
         assertTrue(controller.contains("restorePrompt(failedPrompt)"))
-        assertTrue(controller.contains("pendingSend.onConfirmationTimeout(generation)"))
-        assertTrue(Regex(
-            """TimeoutAction\.KEEP_WAITING\s*->\s*\{.*?scheduleSubmissionConfirmationWatchdog\(generation\)""",
-            RegexOption.DOT_MATCHES_ALL,
-        ).containsMatchIn(controller))
+        assertTrue(sendCoordinator.contains("state.onConfirmationTimeout(generation)"))
+        assertTrue(sendCoordinator.contains("transport::reconcile"))
+        assertTrue(sendCoordinator.contains("armWatchdog(generation)"))
         assertTrue(controller.contains("TimeoutAction.REQUIRE_OFFICIAL_CONFIRMATION"))
-        assertTrue(controller.contains("pendingSend.requiresOfficialConfirmation()"))
-        assertTrue(controller.contains("binding.root::removeCallbacks"))
+        assertTrue(controller.contains("sendCoordinator.requiresOfficialConfirmation()"))
+        assertTrue(sendCoordinator.contains("removeCallbacks"))
         assertTrue(controller.contains("session.requestConversationIndex()"))
         assertTrue(pendingSendState.contains("TimeoutAction.KEEP_WAITING"))
         assertTrue(pendingSendState.contains("TimeoutAction.REQUIRE_OFFICIAL_CONFIRMATION"))

@@ -20,6 +20,7 @@ installed build; individual capability documents retain implementation evidence.
 | Visited conversation body cache | Google Web AI | Completed, enabled, and device verified | Official WebView navigation |
 | Reply stream and completion observer | Google Web AI | Completed, enabled, and stream-to-completion device verified on `v1.1.1303 (1313)` | Official DOM snapshot |
 | Background navigation continuity | ChatGPT and Google Web AI | Completed, enabled, and device verified | Bounded official WebView recovery |
+| Unified send coordinator | ChatGPT and Google Web AI | Completed and enabled; targeted tests passed, device acceptance pending | Official-page confirmation and draft recovery |
 
 All web-account transports keep the official page authoritative. They do not export
 cookies, credentials, request headers, or private conversation content outside the
@@ -106,6 +107,17 @@ Background provider switching keeps one already-started official navigation aliv
 On resume, the APK first reattaches the versioned page adapter and cached snapshot;
 only a failed or stalled document consumes the bounded full-page reload budget. It
 does not add a new request path or keep an idle polling loop alive.
+
+Text sending now enters both providers through one single-flight coordinator and an
+explicit official-page transport port. It owns optimistic pending state, command receipt
+confirmation, bounded reconciliation, timeout settlement, and draft restoration. Provider
+controllers retain only provider-specific readiness messages and rendering callbacks.
+The coordinator never retries a write by issuing a second request: an accepted official
+dispatch waits for observable page or reply evidence, and an unconfirmed dispatch restores
+the draft for an explicit user retry. Confirmation must also contain message evidence newer
+than the pre-send snapshot, so an older identical prompt cannot settle a repeated send.
+This boundary permits a future transport only after it preserves the same confirmation and
+reconciliation contract; it does not enable Google direct POST today.
 
 Normal and interrupted realtime-voice exits now reuse the verified conversation-body
 transport for a non-navigating refresh of the current `/c/{id}` only. Requests are

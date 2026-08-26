@@ -24,6 +24,7 @@ class WebAiPrivateTransportCatalogTest {
         assertTrue("android_google_web_conversation_snapshot_cache_v1" in enabledIds)
         assertTrue("android_google_web_private_reply_observer_v1" in enabledIds)
         assertTrue("android_web_ai_background_navigation_continuity_v1" in enabledIds)
+        assertTrue("android_web_ai_unified_send_coordinator_v1" in enabledIds)
         assertTrue("android_chatgpt_realtime_voice_background_overlay_v1" in enabledIds)
 
         val streamSettlement = values.first {
@@ -117,6 +118,24 @@ class WebAiPrivateTransportCatalogTest {
         assertEquals(
             "device_handoff_verified_manual_overlay_actions_pending",
             voiceOverlay.getString("verification_status"),
+        )
+
+        val sendCoordinator = values.first {
+            it.getString("capability_id") == "android_web_ai_unified_send_coordinator_v1"
+        }
+        assertEquals("completed", sendCoordinator.getString("implementation_status"))
+        assertEquals(
+            "targeted_tests_passed_device_pending",
+            sendCoordinator.getString("verification_status"),
+        )
+        assertTrue(sendCoordinator.getBoolean("production_default"))
+        assertEquals(
+            "single_flight_official_page_transport",
+            sendCoordinator.getString("request_mode"),
+        )
+        assertEquals(
+            "official_page_confirmation_and_user_visible_draft_recovery",
+            sendCoordinator.getString("fallback"),
         )
     }
 

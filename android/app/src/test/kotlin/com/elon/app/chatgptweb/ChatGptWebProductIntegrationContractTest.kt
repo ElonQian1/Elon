@@ -45,9 +45,10 @@ class ChatGptWebProductIntegrationContractTest {
         assertTrue(navigationSession.contains("session.capabilities.all(provider.capabilities::contains)"))
         assertTrue(navigationSession.contains("REQUIRED_NATIVE_NAVIGATION.all(session.capabilities::contains)"))
         assertTrue(chatController.contains("ChatGptFriendMessageMapper.map"))
-        assertTrue(chatController.contains("WebChatPendingSendState()"))
-        assertTrue(chatController.contains("pendingSend.observeCompletedTurn"))
-        assertTrue(chatController.contains("pendingSend.confirmSubmission()"))
+        assertTrue(chatController.contains("WebChatSendCoordinator("))
+        assertTrue(chatController.contains("OfficialPageWebChatSendTransport("))
+        assertTrue(chatController.contains("sendCoordinator.observeSnapshot"))
+        assertTrue(chatController.contains("sendCoordinator.acceptCommandResult"))
         assertTrue(chatController.contains("WebChatPendingSendSnapshotPresentation.resolve"))
         assertTrue(googleController.contains("GoogleWebBackgroundSession"))
         assertTrue(googleController.contains("ChatGptFriendMessageMapper.map"))
@@ -98,7 +99,7 @@ class ChatGptWebProductIntegrationContractTest {
         assertTrue(chatController.contains("session.deactivate()"))
         assertTrue(googleController.contains("WebChatSendFallbackPolicy.decide(loginRequired = false)"))
         assertTrue(googleController.contains("session.onHostResumed()"))
-        assertTrue(googleController.contains("cancelPendingSendWatchdog()"))
+        assertTrue(googleController.contains("sendCoordinator.pauseWatchdog()"))
         assertTrue(googleController.contains("session.deactivate()"))
         val chatPageAdapter = read(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebPageAdapter.kt",

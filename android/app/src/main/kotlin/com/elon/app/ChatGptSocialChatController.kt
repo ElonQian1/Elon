@@ -53,11 +53,20 @@ internal class ChatGptSocialChatController(
         onConversationIndexChanged = { onConversationIndexChanged() },
         audioPermissionController = audioPermissionController,
     )
+    private val sendTransport = OfficialPageWebChatSendTransport(
+        ready = session::canSend,
+        sendPrompt = session::sendPrompt,
+        requestReconciliation = { session.currentSnapshot()?.let(::renderSnapshot) },
+    )
+    private val sendCoordinator = WebChatSendCoordinator(
+        transport = sendTransport,
+        postDelayed = { task, delayMs -> binding.root.postDelayed(task, delayMs) },
+        removeCallbacks = { task -> binding.root.removeCallbacks(task) },
+        onTerminalTimeout = ::handlePendingSendTimeout,
+    )
     private val skinPresentation = ChatGptWebSkinPresentationController(binding, session)
     private var provider = WebChatProviderRegistry.get(WebChatProviderId.CHATGPT_WEB)
     private var active = false
-    private val pendingSend = WebChatPendingSendState()
-    private var pendingSendWatchdog: Runnable? = null
     private var pendingAttachmentPrompt: String? = null
     private var pendingAttachments = emptyList<PendingAttachment>()
     private var lastMessageSnapshot: ChatGptWebSnapshot? = null
@@ -110,7 +119,7 @@ internal class ChatGptSocialChatController(
 
     override fun deactivate() {
         active = false
-        cancelPendingSendWatchdog()
+        sendCoordinator.pauseWatchdog()
         if (!session.realtimeVoiceActive()) realtimeVoiceTranscript.reset()
         skinPresentation.exit()
         modelPopup?.dismiss()
@@ -161,8 +170,8 @@ internal class ChatGptSocialChatController(
 
     override fun trySendMessage(rawText: String, pendingAttachments: List<PendingAttachment>): Boolean {
         if (!active) return false
-        if (pendingSend.prompt() != null) {
-            val detail = if (pendingSend.requiresOfficialConfirmation()) {
+        if (sendCoordinator.prompt() != null) {
+            val detail = if (sendCoordinator.requiresOfficialConfirmation()) {
                 "上一条已发送，但回答尚未同步，请打开官网功能确认"
             } else {
                 "上一条消息仍在处理，请稍候"
@@ -198,7 +207,7 @@ internal class ChatGptSocialChatController(
         }
         val prompt = rawText.trim()
         if (prompt.isBlank()) return true
-        if (!session.canSend()) {
+        if (!sendCoordinator.isReady()) {
             when (WebChatSendFallbackPolicy.decide(
                 loginRequired = session.state() == ChatGptBackgroundSession.State.LOGIN_REQUIRED,
             )) {
@@ -213,20 +222,25 @@ internal class ChatGptSocialChatController(
             }
             return true
         }
-        val sendGeneration = pendingSend.begin(prompt)
-        transcript.requestFollowLatest()
-        renderSnapshot(session.currentSnapshot() ?: return true)
-        if (!session.sendPrompt(prompt)) {
-            val failedPrompt = pendingSend.failSubmission()
-            renderAfterPendingSendFailure()
-            restorePrompt(failedPrompt)
-            Toast.makeText(activity, R.string.web_chat_not_ready, Toast.LENGTH_LONG).show()
-            return true
+        val currentSnapshot = session.currentSnapshot() ?: return true
+        val result = sendCoordinator.dispatch(prompt, currentSnapshot) {
+            transcript.requestFollowLatest()
+            renderSnapshot(currentSnapshot)
         }
-        scheduleSubmissionConfirmationWatchdog(sendGeneration)
-        binding.inputEdit.text?.clear()
-        clearPendingSendState()
-        collapseInputComposer()
+        when (result.outcome) {
+            WebChatSendCoordinator.DispatchOutcome.DISPATCHED -> {
+                binding.inputEdit.text?.clear()
+                clearPendingSendState()
+                collapseInputComposer()
+            }
+            WebChatSendCoordinator.DispatchOutcome.REJECTED -> {
+                renderAfterPendingSendFailure()
+                restorePrompt(result.prompt)
+                Toast.makeText(activity, R.string.web_chat_not_ready, Toast.LENGTH_LONG).show()
+            }
+            WebChatSendCoordinator.DispatchOutcome.BUSY,
+            WebChatSendCoordinator.DispatchOutcome.NOT_READY -> Unit
+        }
         return true
     }
 
@@ -430,17 +444,8 @@ internal class ChatGptSocialChatController(
             }
             return
         }
-        val lastUserIndex = voicePresentation.messages.indexOfLast { it.role == "user" }
-        val latestUserPrompt = voicePresentation.messages.getOrNull(lastUserIndex)?.content
-        val assistantObserved = lastUserIndex >= 0 && voicePresentation.messages
-            .drop(lastUserIndex + 1)
-            .any { it.role == "assistant" }
-        if (pendingSend.observeCompletedTurn(latestUserPrompt, assistantObserved)) {
-            cancelPendingSendWatchdog()
-        } else {
-            pendingSend.observeSubmission(latestUserPrompt)
-        }
-        val pendingTextPrompt = pendingSend.prompt()
+        sendCoordinator.observeSnapshot(voicePresentation)
+        val pendingTextPrompt = sendCoordinator.prompt()
         val presentationSnapshot = WebChatPendingSendSnapshotPresentation.resolve(
             previous = lastMessageSnapshot,
             incoming = voicePresentation,
@@ -454,7 +459,7 @@ internal class ChatGptSocialChatController(
                 else -> "发送中…"
             }
         } else {
-            WebChatPendingSendPresentation.status(pendingSend.phase()) ?: "发送中…"
+            sendCoordinator.status() ?: "发送中…"
         }
         val displayedPendingPrompt = pendingAttachmentPrompt ?: pendingTextPrompt
         val mapped = ChatGptFriendMessageMapper.map(
@@ -469,7 +474,7 @@ internal class ChatGptSocialChatController(
             ),
             timestampFor = transcript::timestampFor,
         )
-        if (pendingTextPrompt != null && !assistantObserved) {
+        if (pendingTextPrompt != null) {
             mapped.lastOrNull { message ->
                 message.role == "user" && message.content.trim() == pendingTextPrompt.trim()
             }?.sendStatus = pendingStatus
@@ -524,13 +529,11 @@ internal class ChatGptSocialChatController(
         )
         if (pendingAttachments.isNotEmpty()) return
         if (event.action != "send_prompt") return
+        val failedPrompt = sendCoordinator.acceptCommandResult(event.ok)
         if (event.ok) {
-            pendingSend.confirmSubmission()
             session.currentSnapshot()?.let(::renderSnapshot)
             return
         }
-        val failedPrompt = pendingSend.failSubmission()
-        cancelPendingSendWatchdog()
         renderAfterPendingSendFailure()
         restorePrompt(failedPrompt)
         Toast.makeText(
@@ -565,49 +568,31 @@ internal class ChatGptSocialChatController(
         }
     }
 
-    private fun scheduleSubmissionConfirmationWatchdog(generation: Long) {
-        cancelPendingSendWatchdog()
-        val watchdog = Runnable {
-            pendingSendWatchdog = null
-            val result = pendingSend.onConfirmationTimeout(generation)
-            when (result.action) {
-                WebChatPendingSendState.TimeoutAction.IGNORE -> Unit
-                WebChatPendingSendState.TimeoutAction.KEEP_WAITING -> {
-                    session.currentSnapshot()?.let(::renderSnapshot)
-                    scheduleSubmissionConfirmationWatchdog(generation)
-                }
-                WebChatPendingSendState.TimeoutAction.REQUIRE_OFFICIAL_CONFIRMATION -> {
-                    session.currentSnapshot()?.let(::renderSnapshot)
-                    if (active) Toast.makeText(
-                        activity,
-                        "官网已确认发送，但回答同步较慢，可继续等待或打开官网功能确认",
-                        Toast.LENGTH_LONG,
-                    ).show()
-                }
-                WebChatPendingSendState.TimeoutAction.RESTORE -> {
-                    renderAfterPendingSendFailure()
-                    restorePrompt(result.prompt)
-                    if (active) Toast.makeText(
-                        activity,
-                        "官网未确认发送，消息已保留，请重试",
-                        Toast.LENGTH_LONG,
-                    ).show()
-                }
+    private fun handlePendingSendTimeout(result: WebChatPendingSendState.TimeoutResult) {
+        when (result.action) {
+            WebChatPendingSendState.TimeoutAction.REQUIRE_OFFICIAL_CONFIRMATION -> {
+                session.currentSnapshot()?.let(::renderSnapshot)
+                if (active) Toast.makeText(
+                    activity,
+                    "官网已确认发送，但回答同步较慢，可继续等待或打开官网功能确认",
+                    Toast.LENGTH_LONG,
+                ).show()
             }
+            WebChatPendingSendState.TimeoutAction.RESTORE -> {
+                renderAfterPendingSendFailure()
+                restorePrompt(result.prompt)
+                if (active) Toast.makeText(
+                    activity,
+                    "官网未确认发送，消息已保留，请重试",
+                    Toast.LENGTH_LONG,
+                ).show()
+            }
+            WebChatPendingSendState.TimeoutAction.IGNORE,
+            WebChatPendingSendState.TimeoutAction.KEEP_WAITING -> Unit
         }
-        pendingSendWatchdog = watchdog
-        binding.root.postDelayed(watchdog, SEND_CONFIRMATION_TIMEOUT_MS)
     }
 
-    private fun clearPendingSend() {
-        pendingSend.clear()
-        cancelPendingSendWatchdog()
-    }
-
-    private fun cancelPendingSendWatchdog() {
-        pendingSendWatchdog?.let(binding.root::removeCallbacks)
-        pendingSendWatchdog = null
-    }
+    private fun clearPendingSend() = sendCoordinator.clear()
 
     private fun renderAfterPendingSendFailure() {
         (lastMessageSnapshot ?: session.currentSnapshot())?.let(::renderSnapshot)
@@ -766,6 +751,5 @@ internal class ChatGptSocialChatController(
         const val MODEL_SECTION = "model"
         const val MAX_REVEAL_ATTEMPTS = 8
         const val REVEAL_RETRY_DELAY_MS = 80L
-        const val SEND_CONFIRMATION_TIMEOUT_MS = 12_000L
     }
 }

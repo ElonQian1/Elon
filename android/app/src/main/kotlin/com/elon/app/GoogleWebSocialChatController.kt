@@ -38,6 +38,17 @@ internal class GoogleWebSocialChatController(
         onCommandResult = ::handleCommandResult,
         onConversationIndexChanged = { onConversationIndexChanged() },
     )
+    private val sendTransport = OfficialPageWebChatSendTransport(
+        ready = session::canSend,
+        sendPrompt = session::sendPrompt,
+        requestReconciliation = { session.requestConversationIndex() },
+    )
+    private val sendCoordinator = WebChatSendCoordinator(
+        transport = sendTransport,
+        postDelayed = { task, delayMs -> binding.root.postDelayed(task, delayMs) },
+        removeCallbacks = { task -> binding.root.removeCallbacks(task) },
+        onTerminalTimeout = ::handlePendingSendTimeout,
+    )
     private var provider = WebChatProviderRegistry.get(WebChatProviderId.GOOGLE_WEB)
     private val productionMessageActions by lazy {
         WebChatProductionMessageActionCoordinator(
@@ -47,8 +58,6 @@ internal class GoogleWebSocialChatController(
         )
     }
     private var active = false
-    private val pendingSend = WebChatPendingSendState()
-    private var pendingSendWatchdog: Runnable? = null
     private var latestCommandStatus: WebChatCommandStatus? = null
     private var latestStateDetail: String? = null
 
@@ -63,7 +72,7 @@ internal class GoogleWebSocialChatController(
 
     override fun deactivate() {
         active = false
-        cancelPendingSendWatchdog()
+        sendCoordinator.pauseWatchdog()
         session.deactivate()
     }
 
@@ -111,8 +120,8 @@ internal class GoogleWebSocialChatController(
         }
         val prompt = rawText.trim()
         if (prompt.isBlank()) return true
-        if (pendingSend.prompt() != null) {
-            val detail = if (pendingSend.requiresOfficialConfirmation()) {
+        if (sendCoordinator.prompt() != null) {
+            val detail = if (sendCoordinator.requiresOfficialConfirmation()) {
                 "上一条已发送，但回答尚未同步，请打开官方页确认"
             } else {
                 "上一条消息仍在提交，请稍候"
@@ -120,7 +129,7 @@ internal class GoogleWebSocialChatController(
             Toast.makeText(activity, detail, Toast.LENGTH_LONG).show()
             return true
         }
-        if (!session.canSend()) {
+        if (!sendCoordinator.isReady()) {
             when (WebChatSendFallbackPolicy.decide(loginRequired = false)) {
                 WebChatSendFallbackPolicy.Action.RETRY_IN_PLACE,
                 WebChatSendFallbackPolicy.Action.RETRY_GUEST_ACCESS -> {
@@ -130,19 +139,28 @@ internal class GoogleWebSocialChatController(
             }
             return true
         }
-        val sendGeneration = pendingSend.begin(prompt)
-        transcript.requestFollowLatest()
-        session.currentSnapshot()?.let(::renderSnapshot)
-        if (!session.sendPrompt(prompt)) {
-            pendingSend.failSubmission()
+        val result = sendCoordinator.dispatch(prompt, session.currentSnapshot()) {
+            transcript.requestFollowLatest()
             session.currentSnapshot()?.let(::renderSnapshot)
-            Toast.makeText(activity, "Google 网页 AI 发送入口尚未就绪", Toast.LENGTH_LONG).show()
-            return true
         }
-        scheduleSubmissionConfirmationWatchdog(sendGeneration)
-        binding.inputEdit.text?.clear()
-        clearPendingSendState()
-        collapseInputComposer()
+        when (result.outcome) {
+            WebChatSendCoordinator.DispatchOutcome.DISPATCHED -> {
+                binding.inputEdit.text?.clear()
+                clearPendingSendState()
+                collapseInputComposer()
+            }
+            WebChatSendCoordinator.DispatchOutcome.REJECTED -> {
+                session.currentSnapshot()?.let(::renderSnapshot)
+                restorePrompt(result.prompt)
+                Toast.makeText(
+                    activity,
+                    "Google 网页 AI 发送入口尚未就绪",
+                    Toast.LENGTH_LONG,
+                ).show()
+            }
+            WebChatSendCoordinator.DispatchOutcome.BUSY,
+            WebChatSendCoordinator.DispatchOutcome.NOT_READY -> Unit
+        }
         return true
     }
 
@@ -201,22 +219,14 @@ internal class GoogleWebSocialChatController(
     }
 
     private fun renderSnapshot(snapshot: ChatGptWebSnapshot) {
-        val lastUserIndex = snapshot.messages.indexOfLast { it.role == "user" }
-        val latestUserPrompt = snapshot.messages.getOrNull(lastUserIndex)?.content
-        val assistantObserved = lastUserIndex >= 0 && snapshot.messages
-            .drop(lastUserIndex + 1)
-            .any { it.role == "assistant" }
-        if (pendingSend.observeCompletedTurn(
-                latestUserPrompt,
-                assistantObserved,
-            )
-        ) {
-            cancelPendingSendWatchdog()
-        } else if (pendingSend.observeSubmission(latestUserPrompt)) {
-            session.onSubmissionObserved()
+        when (sendCoordinator.observeSnapshot(snapshot)) {
+            WebChatSendCoordinator.Observation.SUBMISSION_CONFIRMED ->
+                session.onSubmissionObserved()
+            WebChatSendCoordinator.Observation.NONE,
+            WebChatSendCoordinator.Observation.TURN_COMPLETED -> Unit
         }
-        val pendingStatus = WebChatPendingSendPresentation.status(pendingSend.phase())
-        val pendingPrompt = pendingSend.prompt()
+        val pendingStatus = sendCoordinator.status()
+        val pendingPrompt = sendCoordinator.prompt()
         val mapped = ChatGptFriendMessageMapper.map(
             snapshot = snapshot,
             provider = provider,
@@ -226,7 +236,7 @@ internal class GoogleWebSocialChatController(
             attachmentsForMessage = { emptyList() },
             timestampFor = transcript::timestampFor,
         )
-        if (pendingStatus != null && !assistantObserved) {
+        if (pendingStatus != null) {
             mapped.lastOrNull { message ->
                 message.role == "user" && message.content.trim() == pendingPrompt?.trim()
             }?.sendStatus = pendingStatus
@@ -267,62 +277,41 @@ internal class GoogleWebSocialChatController(
         )
         if (event.action != "send_prompt") return
         Log.i(SEND_LOG_TAG, "action=send_prompt ok=${event.ok}")
+        val failedPrompt = sendCoordinator.acceptCommandResult(event.ok)
         if (event.ok) {
-            pendingSend.confirmSubmission()
             session.currentSnapshot()?.let(::renderSnapshot)
             return
         }
-        val failedPrompt = pendingSend.failSubmission()
-        cancelPendingSendWatchdog()
         session.currentSnapshot()?.let(::renderSnapshot)
         restorePrompt(failedPrompt)
         Toast.makeText(activity, event.detail.ifBlank { "Google 网页 AI 操作失败" }, Toast.LENGTH_LONG).show()
     }
 
-    private fun scheduleSubmissionConfirmationWatchdog(generation: Long) {
-        cancelPendingSendWatchdog()
-        val watchdog = Runnable {
-            pendingSendWatchdog = null
-            val result = pendingSend.onConfirmationTimeout(generation)
-            when (result.action) {
-                WebChatPendingSendState.TimeoutAction.IGNORE -> Unit
-                WebChatPendingSendState.TimeoutAction.KEEP_WAITING -> {
-                    session.requestConversationIndex()
-                    scheduleSubmissionConfirmationWatchdog(generation)
-                }
-                WebChatPendingSendState.TimeoutAction.REQUIRE_OFFICIAL_CONFIRMATION -> {
-                    session.requestConversationIndex()
-                    session.currentSnapshot()?.let(::renderSnapshot)
-                    if (active) Toast.makeText(
-                        activity,
-                        "官网已确认发送，但回答同步超时，请打开官方页确认",
-                        Toast.LENGTH_LONG,
-                    ).show()
-                }
-                WebChatPendingSendState.TimeoutAction.RESTORE -> {
-                    session.currentSnapshot()?.let(::renderSnapshot)
-                    restorePrompt(result.prompt)
-                    if (active) Toast.makeText(
-                        activity,
-                        "官网未确认发送，消息已保留，请重试",
-                        Toast.LENGTH_LONG,
-                    ).show()
-                }
+    private fun handlePendingSendTimeout(result: WebChatPendingSendState.TimeoutResult) {
+        when (result.action) {
+            WebChatPendingSendState.TimeoutAction.REQUIRE_OFFICIAL_CONFIRMATION -> {
+                session.currentSnapshot()?.let(::renderSnapshot)
+                if (active) Toast.makeText(
+                    activity,
+                    "官网已确认发送，但回答同步超时，请打开官方页确认",
+                    Toast.LENGTH_LONG,
+                ).show()
             }
+            WebChatPendingSendState.TimeoutAction.RESTORE -> {
+                session.currentSnapshot()?.let(::renderSnapshot)
+                restorePrompt(result.prompt)
+                if (active) Toast.makeText(
+                    activity,
+                    "官网未确认发送，消息已保留，请重试",
+                    Toast.LENGTH_LONG,
+                ).show()
+            }
+            WebChatPendingSendState.TimeoutAction.IGNORE,
+            WebChatPendingSendState.TimeoutAction.KEEP_WAITING -> Unit
         }
-        pendingSendWatchdog = watchdog
-        binding.root.postDelayed(watchdog, SEND_CONFIRMATION_TIMEOUT_MS)
     }
 
-    private fun clearPendingSend() {
-        pendingSend.clear()
-        cancelPendingSendWatchdog()
-    }
-
-    private fun cancelPendingSendWatchdog() {
-        pendingSendWatchdog?.let(binding.root::removeCallbacks)
-        pendingSendWatchdog = null
-    }
+    private fun clearPendingSend() = sendCoordinator.clear()
 
     private fun restorePrompt(prompt: String?) {
         if (!active || prompt.isNullOrBlank() || !binding.inputEdit.text.isNullOrBlank()) return
@@ -345,7 +334,6 @@ internal class GoogleWebSocialChatController(
     }
 
     private companion object {
-        const val SEND_CONFIRMATION_TIMEOUT_MS = 12_000L
         const val SEND_LOG_TAG = "ElonGoogleWebSend"
     }
 }
