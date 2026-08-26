@@ -9,7 +9,7 @@
   const enhanced = api.enhancePolicy(policy);
   root.__elonChatGptPrivateStreamPolicy = Object.freeze(enhanced);
   root.__elonWinChatGptPrivateRichCompatibility = Object.freeze({
-    version: 1,
+    version: 2,
     current: enhanced.richCompatibility,
     policy: enhanced,
   });
@@ -96,6 +96,23 @@
   }
 
   function enhanceSession(policy, session, tracker) {
+    function accept(payload) {
+      if (session.accept(payload)) return true;
+
+      // The official SSE can deliver a packed interactive widget in its own
+      // frame, after the assistant text frame. The shared session parser
+      // intentionally rejects that frame because it has no message body, but
+      // the transport only attempts widget decoding after accept() succeeds.
+      // Keep this Win-only compatibility bridge narrow: only release frames
+      // that the upstream policy positively identifies as finance widgets.
+      try {
+        return typeof policy.packedFinanceWidgets === 'function'
+          && policy.packedFinanceWidgets(payload).length > 0;
+      } catch (_) {
+        return false;
+      }
+    }
+
     function begin() {
       tracker.reset();
       return session.begin();
@@ -121,6 +138,7 @@
     }
 
     return Object.freeze(Object.assign({}, session, {
+      accept,
       begin,
       current,
       merge,

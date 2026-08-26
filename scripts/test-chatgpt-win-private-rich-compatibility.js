@@ -46,6 +46,11 @@ const fakePayloadPolicy = compatibility.enhancePolicy(Object.assign({}, basePoli
 const fakeSession = fakePayloadPolicy.createSession({ now: () => ++clock })
 fakeSession.begin()
 fakeSession.accept(assistantFrame('assistant-rich-compatibility', '正文仍然应该完整显示。'))
+assert.equal(
+  fakeSession.accept({ packed: true }),
+  true,
+  'a standalone packed-widget SSE frame must reach the Win decoder even without a message body',
+)
 fakePayloadPolicy.packedFinanceWidgets({ packed: true })
 fakeSession.finish()
 
@@ -101,4 +106,4 @@ assert.equal(valid.richParts.length, 1)
 assert.equal(valid.richParts[0].kind, 'finance')
 assert.equal(validPolicy.richCompatibility().rendererUpgradeRequired, false)
 
-console.log('PASS: Win private rich compatibility preserves text, flags failed packed widgets, and clears on reset or successful finance decoding')
+console.log('PASS: Win private rich compatibility accepts standalone widget frames, preserves text, flags failed widgets, and clears on reset or successful finance decoding')
