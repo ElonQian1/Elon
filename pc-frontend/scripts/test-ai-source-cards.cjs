@@ -38,6 +38,10 @@ assert.match(sourceMark, /loadedUrl === iconUrl/, 'an unconfirmed remote image m
 assert.match(sourceMarkStyles, /\.logoReady\s*\{[\s\S]*opacity:\s*1/, 'a source logo becomes visible only after load succeeds')
 assert.match(presentation, /safeIconUrl/, 'source logos must be validated again at the presentation boundary')
 assert.match(component, /aiSourceDisplayTitle/, 'raw citation URLs must be reduced to a readable source title')
+assert.match(component, /source\.snippet/, 'structured private search summaries must reach the native source card')
+assert.match(component, /source\.thumbnail_url/, 'official public source thumbnails must remain available to the native source card')
+assert.match(component, /referrerPolicy="no-referrer"/, 'source thumbnails must not disclose the conversation page as a referrer')
+assert.match(presentation, /safeAiSourceThumbnail/, 'source thumbnails need the same public HTTPS presentation guard as logos')
 assert.match(component, /aria-expanded=\{expanded\}/, 'the default source presentation must be a compact expandable entry')
 assert.match(component, /logoStack/, 'the compact source entry must preview available logos')
 assert.match(component, /全部显示/, 'long source collections need an explicit expand action')
@@ -59,9 +63,13 @@ assert.match(protocol, /iconUrl\?: string/, 'the local AI protocol must carry a 
 assert.match(protocol, /markerText\?: string/, 'the local AI protocol must preserve an exact structurally linked citation marker')
 assert.match(protocol, /citationId\?: string/, 'the local AI protocol must preserve a bounded local citation identity')
 assert.match(protocol, /groupSize\?: number/, 'the local AI protocol must preserve the official citation group size')
+assert.match(protocol, /snippet\?: string/, 'the local AI protocol must preserve a bounded public result summary')
+assert.match(protocol, /thumbnailUrl\?: string/, 'the local AI protocol must preserve a sanitized public result thumbnail')
 assert.match(backend, /icon_url: part\.iconUrl/, 'citation logo metadata must reach the source-card model')
 assert.match(backend, /marker_text: part\.markerText/, 'structured citation markers must reach the source-card model')
 assert.match(backend, /group_size: part\.groupSize/, 'structured citation group counts must reach the inline label')
+assert.match(backend, /snippet: part\.snippet/, 'public result summaries must reach the source-card model')
+assert.match(backend, /thumbnail_url: part\.thumbnailUrl/, 'public result thumbnails must reach the source-card model')
 assert.match(markdown, /findCitation\(citationIndex, safe\)/, 'inline citation matching must use the structured citation index instead of visible label text')
 assert.match(markdown, /byHost/, 'inline citation matching needs an unambiguous host fallback for vendor redirect links')
 assert.match(markdown, /aiInlineCitationLabel\(citation, inlineText\(children\)\)/, 'inline links must render a stable provider label and source count')
@@ -76,6 +84,8 @@ assert.match(sanitizer, /part_type == "citation"[\s\S]*"iconUrl"/, 'the Rust bou
 assert.match(sanitizer, /"markerText"/, 'the Rust boundary must preserve only bounded citation marker text')
 assert.match(sanitizer, /"citationId"/, 'the Rust boundary must preserve only bounded citation identities')
 assert.match(sanitizer, /"groupSize"/, 'the Rust boundary must preserve only bounded citation group counts')
+assert.match(sanitizer, /part\.get\("snippet"\)/, 'the Rust boundary must preserve only bounded public result summaries')
+assert.match(sanitizer, /part\.get\("thumbnailUrl"\)/, 'the Rust boundary must sanitize public result thumbnails')
 
 const compiledPresentation = ts.transpileModule(presentation, {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },

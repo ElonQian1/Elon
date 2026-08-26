@@ -42,6 +42,8 @@ export interface AiSource {
   marker_text?: string
   citation_id?: string
   group_size?: number
+  snippet?: string
+  thumbnail_url?: string
 }
 
 export interface AiProjectCandidate {

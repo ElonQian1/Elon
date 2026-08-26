@@ -22,6 +22,8 @@ interface LocalAiStructuredContentMetadata {
   markerText?: string
   citationId?: string
   groupSize?: number
+  snippet?: string
+  thumbnailUrl?: string
   kind?: string
   language?: string
   mediaType?: string

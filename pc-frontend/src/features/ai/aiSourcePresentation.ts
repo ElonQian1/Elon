@@ -4,6 +4,12 @@ export interface AiSourcePresentationInput {
   icon_url?: string
   marker_text?: string
   group_size?: number
+  snippet?: string
+  thumbnail_url?: string
+}
+
+export function safeAiSourceThumbnail(value?: string) {
+  return safeIconUrl(value)
 }
 
 export interface AiSiteIdentity {

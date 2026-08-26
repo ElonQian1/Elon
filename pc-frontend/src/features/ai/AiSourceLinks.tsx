@@ -4,7 +4,12 @@ import { isLocalAiBrowserAvailable } from '../user-browser/localAiBrowserApi'
 import { openInternalBrowserLink } from '../user-browser/internalBrowserApi'
 import type { AiSource } from './AiChatMessageRow'
 import AiSourceMark from './AiSourceMark'
-import { aiSiteIdentity, aiSourceDisplayTitle, normalizedAiSourceUrl } from './aiSourcePresentation'
+import {
+  aiSiteIdentity,
+  aiSourceDisplayTitle,
+  normalizedAiSourceUrl,
+  safeAiSourceThumbnail,
+} from './aiSourcePresentation'
 import styles from './AiSourceLinks.module.css'
 
 const MAX_VISIBLE_SOURCES = 3
@@ -48,13 +53,26 @@ export default function AiSourceLinks({ sources }: { sources?: AiSource[] }) {
             {visibleSources.map((source) => {
               const identity = aiSiteIdentity(source.url)
               const title = aiSourceDisplayTitle(source, identity)
+              const thumbnailUrl = safeAiSourceThumbnail(source.thumbnail_url)
               const content = (
                 <>
                   <AiSourceMark source={source} />
                   <span className={styles.copy}>
                     <strong>{title}</strong>
                     <small>{identity.host || '公开网页'}</small>
+                    {source.snippet && <span className={styles.snippet}>{source.snippet}</span>}
                   </span>
+                  {thumbnailUrl && (
+                    <img
+                      className={styles.thumbnail}
+                      src={thumbnailUrl}
+                      alt=""
+                      loading="lazy"
+                      decoding="async"
+                      referrerPolicy="no-referrer"
+                      onError={(event) => { event.currentTarget.hidden = true }}
+                    />
+                  )}
                 </>
               )
 
@@ -122,6 +140,8 @@ function uniqueSourcesFor(sources?: AiSource[]) {
       marker_text: existing.marker_text || source.marker_text,
       citation_id: existing.citation_id || source.citation_id,
       group_size: Math.max(existing.group_size || 1, source.group_size || 1),
+      snippet: existing.snippet || source.snippet,
+      thumbnail_url: existing.thumbnail_url || source.thumbnail_url,
     }
   }
   return unique

@@ -71,6 +71,8 @@ export default function useAiWebChatBackend(mode: AiHomeMode, ownerKey: string) 
           marker_text: part.markerText,
           citation_id: part.citationId,
           group_size: part.groupSize,
+          snippet: part.snippet,
+          thumbnail_url: part.thumbnailUrl,
         }))
       const content = item.content
         .filter((part): part is Extract<typeof part, { type: 'text' | 'markdown' }> => (

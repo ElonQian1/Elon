@@ -88,6 +88,14 @@ fn sanitize_part(provider_id: &str, value: &Value) -> Option<Value> {
         }
         insert_token(&mut sanitized, part, "citationId", 64, valid_lower_token);
         insert_count(&mut sanitized, part, "groupSize", 32);
+        let snippet = clean_string(part.get("snippet"), 320);
+        if !snippet.is_empty() {
+            sanitized.insert("snippet".into(), Value::String(snippet));
+        }
+        let thumbnail_url = sanitize_public_url(part.get("thumbnailUrl"));
+        if !thumbnail_url.is_empty() {
+            sanitized.insert("thumbnailUrl".into(), Value::String(thumbnail_url));
+        }
     }
     Some(Value::Object(sanitized))
 }
@@ -185,7 +193,7 @@ mod tests {
         let parts = json!([
             {"type":"markdown","text":"**answer**"},
             {"type":"code","text":"Rust code","kind":"code_block","language":"rust","lineCount":12},
-            {"type":"citation","text":"Docs","url":"https://example.com/docs?token=secret","iconUrl":"https://cdn.example.com/icons/docs.png?signature=secret","targetHost":"example.com","markerText":"Docs +2","citationId":"citation_control_1","groupSize":3,"privateField":"secret"},
+            {"type":"citation","text":"Docs","url":"https://example.com/docs?token=secret","iconUrl":"https://cdn.example.com/icons/docs.png?signature=secret","targetHost":"example.com","markerText":"Docs +2","citationId":"citation_control_1","groupSize":3,"snippet":"Visible public summary","thumbnailUrl":"https://cdn.example.com/thumbs/docs.jpg?signature=secret","privateField":"secret"},
             {"type":"credential","text":"secret"}
         ]);
         let sanitized = sanitize_parts("chatgpt", Some(&parts));
@@ -200,6 +208,11 @@ mod tests {
         assert_eq!(sanitized[2]["markerText"], "Docs +2");
         assert_eq!(sanitized[2]["citationId"], "citation_control_1");
         assert_eq!(sanitized[2]["groupSize"], 3);
+        assert_eq!(sanitized[2]["snippet"], "Visible public summary");
+        assert_eq!(
+            sanitized[2]["thumbnailUrl"],
+            "https://cdn.example.com/thumbs/docs.jpg"
+        );
         assert!(sanitized[2].get("privateField").is_none());
         assert!(!Value::Array(sanitized).to_string().contains("token"));
     }
