@@ -207,7 +207,14 @@ AI_PROJECT / AI_INDEX / AGENTS
 
 F1 的 Ready 边界新增未登记、未编译/未运行的 source-lineage 草案：它从线性 work-admission 与 Ready-health owner token 读取事实，并把 Host runtime observation 保持为 `Untrusted`，输出固定缺少 local currentness、runtime transition、Host runtime 与 v15 authenticated session 四项权威的 `Projected` 六键谱系。它不构造 Ready 或 execution capability，也不改变 Provider、route、Offer、Attempt、Lease 或资金；精确边界见 `docs/distributed-compute/user-node-ready-source-lineage-authority.md`。
 
-F1 的 Windows Host 路径另新增未登记、未编译/未运行的 Runner process-custody prerequisite：sealed loader load-set、sealed restricted/AppContainer launch security 与 by-value work-admission 才能进入私有 suspended-process backend；Job 先 set/query，再以 `PROC_THREAD_ATTRIBUTE_JOB_LIST` 原子附加到 `CreateProcessAsUserW` child，最终 custody 永不 resume 且 Drop kill。owned loader transition、launch-security producer、IPC、完整 enforcement、runtime Store/recovery 仍缺，所以它只冻结 owner/rollback 边界，不关闭 runtime-transition/Host-runtime gap；精确边界见 `docs/distributed-compute/user-node-windows-runner-process-custody-authority.md`。
+F1 的 Windows Host 路径另新增 loader load-set/process custody authority 草案：loader 定义单一成功 successor、
+完整 by-value seam、线性 FileId leases/anchor reopen receipts 与五类 failure-custody contract；process 定义
+launch/Job/pre-create currentness 与终止未确认时的 whole-graph custody。exact PE/launch-path/live-OS、
+launch-security/currentness/release-recovery producers 均保持 uninhabited，extraction-share、pre-resume/
+dynamic-load、IPC/Store 也未形成 authority；成熟度事实统一见
+`docs/distributed-compute/current-implementation-status.md`，精确边界见
+`docs/distributed-compute/user-node-windows-runner-loader-load-set-authority.md` 与
+`docs/distributed-compute/user-node-windows-runner-process-custody-authority.md`。
 
 v187 只补齐 staging 无用量中止：Provider 所有者必须精确绑定 v185 激活回执对应的首版、无心跳 Lease 及当前 Job/Reservation/Claim，在截止时间前显式声明外部执行器从未开始。单一事务把预授权全额退款、active Claim 归还 available、Job 转 canceled、Reservation 转 released、Lease 转 terminal，并保存不可变回执。它不验证外部中止引用、不发送 Abort/Cancel 命令，也不覆盖已开始执行、自动超时、部分收费、重试或最终结算。边界见 `docs/distributed-compute/attempt-abort-api.md`。
 
