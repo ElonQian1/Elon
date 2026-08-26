@@ -1,12 +1,11 @@
 (function () {
   'use strict';
 
-  var VERSION = 8;
+  var VERSION = 9;
   var PROVIDER_ID = '__PROVIDER_ID__';
   var MAX_BODY_BYTES = 2 * 1024 * 1024;
   var ANALYSIS_SCHEMA = 'yilong.web-ai.capture-analysis.v1';
-  if (window.__elonWinWebResponseResearchCaptureVersion >= VERSION) return;
-  window.__elonWinWebResponseResearchCaptureVersion = VERSION;
+  var RUNTIME_SLOT = '__elonWinWebResponseResearchCaptureRuntime';
 
   function invokeCapture(capture) {
     var internalInvoke = window.__TAURI_INTERNALS__ && window.__TAURI_INTERNALS__.invoke;
@@ -313,6 +312,7 @@
     var format = responseFormat(contentType, bounded.body.slice(0, 80));
     var capture = {
       providerId: PROVIDER_ID,
+      captureRuntimeVersion: VERSION,
       method: meta.method,
       endpointFamily: meta.endpointFamily,
       transport: transport,
@@ -366,20 +366,56 @@
     }
   }
 
+  function requestMetadata(input, init) {
+    var meta = classify(requestUrl(input), requestMethod(input, init));
+    if (!meta) return null;
+    var recovery = window.__elonWinChatGptPrivateStreamRecovery;
+    if (recovery && typeof recovery.generation === 'function') {
+      try { meta.recoveryGeneration = recovery.generation(); } catch (_) {}
+    }
+    return meta;
+  }
+
+  function observeXhrResponse(xhr, meta) {
+    if (!xhr || !meta || xhr.status < 100 || xhr.status > 599) return;
+    var contentType = '';
+    var body = '';
+    try { contentType = xhr.getResponseHeader('content-type') || ''; } catch (_) {}
+    try {
+      body = !xhr.responseType || xhr.responseType === 'text'
+        ? xhr.responseText
+        : xhr.responseType === 'json' ? JSON.stringify(xhr.response) : '';
+    } catch (_) {}
+    publish(meta, 'xhr', xhr.status, contentType, body, false);
+  }
+
+  var runtime = Object.freeze({
+    version: VERSION,
+    providerId: PROVIDER_ID,
+    requestMetadata: requestMetadata,
+    observeFetchResponse: observeFetchResponse,
+    observeXhrResponse: observeXhrResponse,
+  });
+  window[RUNTIME_SLOT] = runtime;
+  window.__elonWinWebResponseResearchCaptureVersion = VERSION;
+
   if (typeof window.fetch === 'function' && !window.fetch.__elonResearchCaptureWrapped) {
     var originalFetch = window.fetch;
     var wrappedFetch = function (input, init) {
-      var meta = classify(requestUrl(input), requestMethod(input, init));
-      var recovery = window.__elonWinChatGptPrivateStreamRecovery;
-      if (meta && recovery && typeof recovery.generation === 'function') {
-        try { meta.recoveryGeneration = recovery.generation(); } catch (_) {}
-      }
+      var activeRuntime = window[RUNTIME_SLOT];
+      var meta = activeRuntime && typeof activeRuntime.requestMetadata === 'function'
+        ? activeRuntime.requestMetadata(input, init)
+        : null;
       return originalFetch.apply(this, arguments).then(function (response) {
-        if (meta) void observeFetchResponse(response, meta);
+        var latestRuntime = window[RUNTIME_SLOT] || activeRuntime;
+        if (meta && latestRuntime && typeof latestRuntime.observeFetchResponse === 'function') {
+          void latestRuntime.observeFetchResponse(response, meta);
+        }
         return response;
       });
     };
     Object.defineProperty(wrappedFetch, '__elonResearchCaptureWrapped', { value: true });
+    Object.defineProperty(wrappedFetch, '__elonResearchCaptureRuntimeProxyVersion', { value: 1 });
     window.fetch = wrappedFetch;
   }
 
@@ -388,32 +424,32 @@
     var originalOpen = XMLHttpRequest.prototype.open;
     var originalSend = XMLHttpRequest.prototype.send;
     XMLHttpRequest.prototype.open = function (method, url) {
-      xhrMeta.set(this, classify(String(url || ''), String(method || 'GET').toUpperCase()));
+      var activeRuntime = window[RUNTIME_SLOT];
+      xhrMeta.set(this, activeRuntime && typeof activeRuntime.requestMetadata === 'function'
+        ? activeRuntime.requestMetadata(String(url || ''), {
+          method: String(method || 'GET').toUpperCase()
+        })
+        : null);
       return originalOpen.apply(this, arguments);
     };
     XMLHttpRequest.prototype.send = function () {
       var xhr = this;
       var meta = xhrMeta.get(xhr);
       if (meta) {
-        var recovery = window.__elonWinChatGptPrivateStreamRecovery;
-        if (recovery && typeof recovery.generation === 'function') {
-          try { meta.recoveryGeneration = recovery.generation(); } catch (_) {}
-        }
         xhr.addEventListener('loadend', function () {
-          if (xhr.status < 100 || xhr.status > 599) return;
-          var contentType = '';
-          var body = '';
-          try { contentType = xhr.getResponseHeader('content-type') || ''; } catch (_) {}
-          try {
-            body = !xhr.responseType || xhr.responseType === 'text'
-              ? xhr.responseText
-              : xhr.responseType === 'json' ? JSON.stringify(xhr.response) : '';
-          } catch (_) {}
-          publish(meta, 'xhr', xhr.status, contentType, body, false);
+          var activeRuntime = window[RUNTIME_SLOT];
+          if (activeRuntime && typeof activeRuntime.observeXhrResponse === 'function') {
+            activeRuntime.observeXhrResponse(xhr, meta);
+          }
         }, { once: true });
       }
       return originalSend.apply(this, arguments);
     };
     Object.defineProperty(XMLHttpRequest.prototype, '__elonResearchCaptureWrapped', { value: true });
+    Object.defineProperty(
+      XMLHttpRequest.prototype,
+      '__elonResearchCaptureRuntimeProxyVersion',
+      { value: 1 }
+    );
   }
 })();

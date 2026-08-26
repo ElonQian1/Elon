@@ -27,8 +27,34 @@ const response = {
   },
 }
 const originalFetch = async () => response
+class FakeXmlHttpRequest {
+  constructor() {
+    this.status = 200
+    this.responseType = ''
+    this.responseText = responseBody
+    this.listeners = new Map()
+  }
+
+  open() {}
+
+  send() {}
+
+  addEventListener(name, listener) {
+    this.listeners.set(name, listener)
+  }
+
+  getResponseHeader() {
+    return 'application/json; charset=utf-8'
+  }
+
+  complete() {
+    const listener = this.listeners.get('loadend')
+    if (listener) listener()
+  }
+}
 const windowObject = {
   fetch: originalFetch,
+  XMLHttpRequest: FakeXmlHttpRequest,
   __TAURI_INTERNALS__: {
     invoke: async (command, args) => {
       assert.equal(command, 'publish_local_ai_web_research_capture')
@@ -44,6 +70,7 @@ const sandbox = {
   TextDecoder,
   Set,
   Promise,
+  XMLHttpRequest: FakeXmlHttpRequest,
   console,
 }
 
@@ -55,6 +82,7 @@ async function main() {
   assert.equal(captures.length, 1)
   const capture = captures[0]
   assert.equal(capture.providerId, 'google-ai-mode')
+  assert.equal(capture.captureRuntimeVersion, 9)
   assert.equal(capture.endpointFamily, 'ai_rpc')
   assert.equal(capture.analysis.policyAvailable, true)
   assert.equal(capture.analysis.decodedFrameCount, 1)
@@ -65,7 +93,37 @@ async function main() {
   )
   assert.equal(capture.analysis.assistantFrameCount, 0)
   assert.equal(capture.analysis.textLength, 0)
-  console.log('PASS: Win Web response research capture tests (12 assertions)')
+  const installedFetch = windowObject.fetch
+  const installedOpen = FakeXmlHttpRequest.prototype.open
+  const installedSend = FakeXmlHttpRequest.prototype.send
+  const firstXhr = new FakeXmlHttpRequest()
+  firstXhr.open('POST', 'https://www.google.com/async/folif')
+  firstXhr.send()
+  firstXhr.complete()
+  assert.equal(captures.length, 2)
+  assert.equal(captures[1].transport, 'xhr')
+  assert.equal(captures[1].captureRuntimeVersion, 9)
+  const upgradedSource = source.replace('var VERSION = 9;', 'var VERSION = 10;')
+  vm.runInNewContext(upgradedSource, sandbox, {
+    filename: 'win_web_response_research_capture.js',
+  })
+  assert.equal(windowObject.fetch, installedFetch, 'runtime upgrade must not stack fetch wrappers')
+  assert.equal(FakeXmlHttpRequest.prototype.open, installedOpen)
+  assert.equal(FakeXmlHttpRequest.prototype.send, installedSend)
+  assert.equal(windowObject.__elonWinWebResponseResearchCaptureVersion, 10)
+  assert.equal(windowObject.__elonWinWebResponseResearchCaptureRuntime.version, 10)
+  await windowObject.fetch('https://www.google.com/async/folif', { method: 'POST' })
+  await new Promise((resolve) => setImmediate(resolve))
+  assert.equal(captures.length, 3, 'each response must be captured exactly once after upgrade')
+  assert.equal(captures[2].captureRuntimeVersion, 10)
+  const secondXhr = new FakeXmlHttpRequest()
+  secondXhr.open('POST', 'https://www.google.com/async/folif')
+  secondXhr.send()
+  secondXhr.complete()
+  assert.equal(captures.length, 4)
+  assert.equal(captures[3].transport, 'xhr')
+  assert.equal(captures[3].captureRuntimeVersion, 10)
+  console.log('PASS: Win Web response research capture tests (26 assertions)')
 }
 
 main().catch((error) => {
