@@ -66,7 +66,7 @@ const base = Object.freeze({
   financePartsFromMetadata: () => [original],
 })
 const window = { __elonChatGptPrivateStreamPolicy: base }
-vm.runInNewContext(source, {
+const sandbox = {
   window,
   location: { origin: 'https://chatgpt.com' },
   Array,
@@ -75,7 +75,8 @@ vm.runInNewContext(source, {
   Number,
   JSON,
   Set,
-}, { filename: 'chatgpt_win_private_finance_periods.js' })
+}
+vm.runInNewContext(source, sandbox, { filename: 'chatgpt_win_private_finance_periods.js' })
 
 const bridge = window.__elonWinChatGptPrivateFinancePeriods
 assert.ok(bridge)
@@ -96,5 +97,12 @@ const metadata = window.__elonChatGptPrivateStreamPolicy.financePartsFromMetadat
   content_references: [{ type: 'dil', dil: { initialState: widget } }],
 })
 assert.equal(metadata[0].richContent.payload.periodViews[0].id, '1d')
+
+const replacementBase = Object.freeze(Object.assign({}, base, { generation: 2 }))
+window.__elonChatGptPrivateStreamPolicy = replacementBase
+vm.runInNewContext(source, sandbox, { filename: 'chatgpt_win_private_finance_periods.js' })
+assert.notEqual(window.__elonChatGptPrivateStreamPolicy, replacementBase)
+assert.equal(window.__elonWinChatGptPrivateFinancePeriods.basePolicy, replacementBase)
+assert.equal(window.__elonChatGptPrivateStreamPolicy.__elonWinPrivateFinancePeriodsWrapped, true)
 
 console.log('ChatGPT Win private finance-period tests passed')

@@ -6,6 +6,7 @@ const WIN_COMMON_RICH_CONTENT_ADAPTER: &str = include_str!("rich_content_dom_ada
 const WIN_CITATION_ADAPTER: &str = include_str!("chatgpt_citation_adapter.js");
 const WIN_NEW_CONVERSATION_GUARD: &str = include_str!("chatgpt_win_new_conversation_guard.js");
 const WIN_RESPONSE_RESEARCH_CAPTURE: &str = include_str!("win_web_response_research_capture.js");
+const WIN_PRIVATE_STREAM_BINDING: &str = include_str!("chatgpt_win_private_stream_binding.js");
 const WIN_PRIVATE_STREAM_RECOVERY: &str = include_str!("chatgpt_win_private_stream_recovery.js");
 const WIN_PRIVATE_FINANCE_PERIODS: &str = include_str!("chatgpt_win_private_finance_periods.js");
 const WIN_PRIVATE_SOURCE_GROUPS: &str = include_str!("chatgpt_win_private_source_groups.js");
@@ -232,8 +233,8 @@ pub(super) fn initialization_script() -> String {
                 )
             } else if *name == "chatgpt_web_private_stream_transport.js" {
                 format!(
-                    "{}\nwindow.__elonChatGptBootstrapStage = 'chatgpt_win_private_stream_recovery.js';\n{}",
-                    shared, WIN_PRIVATE_STREAM_RECOVERY
+                    "window.__elonChatGptBootstrapStage = 'chatgpt_win_private_stream_binding.js';\n{}\n{}\nwindow.__elonChatGptBootstrapStage = 'chatgpt_win_private_stream_recovery.js';\n{}\nif (window.__elonWinChatGptPrivateStreamBindingLifecycle) window.__elonWinChatGptPrivateStreamBindingLifecycle.commit(window);",
+                    WIN_PRIVATE_STREAM_BINDING, shared, WIN_PRIVATE_STREAM_RECOVERY
                 )
             } else {
                 shared
@@ -505,7 +506,17 @@ mod tests {
                 < script.find("chatgpt_web_adapter.js").unwrap()
         );
         assert!(script.contains("chatgpt_win_private_stream_recovery.js"));
+        assert!(script.contains("chatgpt_win_private_stream_binding.js"));
+        assert!(script.contains("__elonWinChatGptPrivateStreamBindingLifecycle.commit(window)"));
         assert!(script.contains("__elonWinChatGptPrivateStreamRecovery"));
+        assert!(
+            script
+                .find("chatgpt_win_private_stream_binding.js")
+                .unwrap()
+                < script
+                    .find("chatgpt_web_private_stream_transport.js")
+                    .unwrap()
+        );
         assert!(
             script
                 .find("chatgpt_web_private_stream_transport.js")

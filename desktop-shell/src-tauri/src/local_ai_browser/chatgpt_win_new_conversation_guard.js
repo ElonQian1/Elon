@@ -1,9 +1,10 @@
 (function () {
   'use strict';
 
-  if (location.origin !== 'https://chatgpt.com' || window.__elonWinChatGptNewConversationGuard) return;
+  if (location.origin !== 'https://chatgpt.com') return;
   const conversations = window.__elonChatGptConversations;
   if (!conversations || typeof conversations.newConversation !== 'function') return;
+  if (conversations.__elonWinNewConversationGuardWrapped === true) return;
 
   const CONVERSATION_PATH = /^(?:\/c\/[A-Za-z0-9_-]{1,160}|\/g\/g-p-[A-Za-z0-9_-]{1,160}\/c\/[A-Za-z0-9_-]{1,160})$/;
   const CONFIRM_STABLE_MS = 1_600;
@@ -94,10 +95,12 @@
   }
 
   window.__elonChatGptConversations = Object.freeze(Object.assign({}, conversations, {
+    __elonWinNewConversationGuardWrapped: true,
     newConversation
   }));
   window.__elonWinChatGptNewConversationGuard = Object.freeze({
-    version: 2,
+    version: 3,
+    conversations: window.__elonChatGptConversations,
     confirmStableMs: CONFIRM_STABLE_MS,
     confirmTimeoutMs: CONFIRM_TIMEOUT_MS
   });

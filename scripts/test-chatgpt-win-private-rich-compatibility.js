@@ -43,6 +43,8 @@ assert.equal(compatibility.packedWidgetKey({}), '')
 const fakePayloadPolicy = compatibility.enhancePolicy(Object.assign({}, basePolicy, {
   packedFinanceWidgets: () => [widget],
 }))
+assert.equal(fakePayloadPolicy.__elonWinPrivateRichCompatibilityWrapped, true)
+assert.equal(compatibility.enhancePolicy(fakePayloadPolicy), fakePayloadPolicy)
 const fakeSession = fakePayloadPolicy.createSession({ now: () => ++clock })
 fakeSession.begin()
 fakeSession.accept(assistantFrame('assistant-rich-compatibility', '正文仍然应该完整显示。'))
@@ -105,5 +107,37 @@ const valid = validSession.current('/c/conversation-rich-compatibility')
 assert.equal(valid.richParts.length, 1)
 assert.equal(valid.richParts[0].kind, 'finance')
 assert.equal(validPolicy.richCompatibility().rendererUpgradeRequired, false)
+
+const renderedPolicy = compatibility.enhancePolicy(basePolicy)
+const renderedStream = {
+  id: 'assistant-rendered-equivalent',
+  conversationId: 'conversation-rendered-equivalent',
+  turnId: 'turn-rendered-equivalent',
+  text: '**当前走势**\n\n- BTC 价格约为 **US$77,000**，短线保持震荡。',
+  state: 'completed',
+  citations: [],
+  richParts: [financePart],
+}
+const renderedMessages = [{
+  id: 'official-dom-assistant',
+  role: 'assistant',
+  state: 'completed',
+  content: [{
+    type: 'markdown',
+    text: '当前走势 BTC 价格约为 US$77,000，短线保持震荡。',
+  }],
+}]
+const renderedMerged = compatibility.mergeRenderedReply(
+  basePolicy,
+  renderedMessages,
+  renderedStream,
+)
+assert.equal(renderedMerged.length, 1, 'rendered DOM text and Markdown stream text are one answer')
+assert.equal(renderedMerged[0].id, 'official-dom-assistant')
+assert.equal(renderedMerged[0].content.filter((part) => part.kind === 'finance').length, 1)
+assert.equal(
+  compatibility.sameRenderedReply(renderedMessages[0].content[0].text, renderedStream.text),
+  true,
+)
 
 console.log('PASS: Win private rich compatibility accepts standalone widget frames, preserves text, flags failed widgets, and clears on reset or successful finance decoding')

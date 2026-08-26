@@ -52,7 +52,7 @@ function createContext(initialPath, options = {}) {
     setTimeout: setTimeoutFake
   };
   window.window = window;
-  vm.runInNewContext(source, {
+  const sandbox = {
     window,
     document,
     location,
@@ -63,7 +63,8 @@ function createContext(initialPath, options = {}) {
     Set,
     String,
     Array
-  }, { filename: 'chatgpt_win_new_conversation_guard.js' });
+  };
+  vm.runInNewContext(source, sandbox, { filename: 'chatgpt_win_new_conversation_guard.js' });
 
   function advance(milliseconds) {
     const target = now + milliseconds;
@@ -84,7 +85,13 @@ function createContext(initialPath, options = {}) {
     inspect: () => current,
     location,
     results,
-    advance
+    advance,
+    reinstall(conversations) {
+      window.__elonChatGptConversations = conversations;
+      vm.runInNewContext(source, sandbox, { filename: 'chatgpt_win_new_conversation_guard.js' });
+      this.adapter = window.__elonChatGptConversations;
+      this.guard = window.__elonWinChatGptNewConversationGuard;
+    }
   };
 }
 
@@ -120,5 +127,16 @@ assert.deepEqual(staleGuest.results, [[
 const freshGuest = createContext('/', { detachTurnOnClick: true });
 runNewConversation(freshGuest);
 assert.deepEqual(freshGuest.results, [['new_conversation', true, '']]);
+
+const reconnect = createContext('/c/old-conversation');
+const firstGuardedConversations = reconnect.adapter;
+reconnect.reinstall(Object.freeze({
+  marker: 'replacement',
+  newConversation: (_inspect, result) => result('new_conversation', true, '')
+}));
+assert.notEqual(reconnect.adapter, firstGuardedConversations);
+assert.equal(reconnect.adapter.marker, 'replacement');
+assert.equal(reconnect.adapter.__elonWinNewConversationGuardWrapped, true);
+assert.equal(reconnect.guard.conversations, reconnect.adapter);
 
 process.stdout.write('PASS Win ChatGPT new-conversation route and DOM guard\n');

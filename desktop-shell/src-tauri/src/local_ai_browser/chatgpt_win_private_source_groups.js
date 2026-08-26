@@ -3,11 +3,17 @@
 
   const api = factory();
   if (typeof module === 'object' && module.exports) module.exports = api;
-  if (!root || root.__elonChatGptWinPrivateSourceGroupsInstalled) return;
+  if (!root) return;
   const policy = root.__elonChatGptPrivateStreamPolicy;
   if (!policy || typeof policy.createSession !== 'function') return;
-  root.__elonChatGptWinPrivateSourceGroupsInstalled = true;
-  root.__elonChatGptPrivateStreamPolicy = Object.freeze(api.enhancePolicy(policy));
+  if (policy.__elonWinPrivateSourceGroupsWrapped === true) return;
+  const enhanced = Object.freeze(api.enhancePolicy(policy));
+  root.__elonChatGptPrivateStreamPolicy = enhanced;
+  root.__elonChatGptWinPrivateSourceGroupsInstalled = Object.freeze({
+    version: 2,
+    basePolicy: policy,
+    policy: enhanced,
+  });
 })(typeof window === 'object' ? window : null, function () {
   'use strict';
 
@@ -191,7 +197,9 @@
   function enhancePolicy(policy) {
     if (!policy || typeof policy.createSession !== 'function' ||
         typeof policy.mergeMessages !== 'function') return policy;
+    if (policy.__elonWinPrivateSourceGroupsWrapped === true) return policy;
     return Object.assign({}, policy, {
+      __elonWinPrivateSourceGroupsWrapped: true,
       createSession(options) {
         return enhanceSession(policy, policy.createSession(options || {}));
       }

@@ -3,19 +3,22 @@
 
   const api = factory();
   if (typeof module === 'object' && module.exports) module.exports = api;
-  if (!root || root.__elonWinChatGptPrivateRichCompatibility) return;
+  if (!root) return;
   const policy = root.__elonChatGptPrivateStreamPolicy;
   if (!policy || typeof policy.createSession !== 'function') return;
+  if (policy.__elonWinPrivateRichCompatibilityWrapped === true) return;
   const enhanced = api.enhancePolicy(policy);
   root.__elonChatGptPrivateStreamPolicy = Object.freeze(enhanced);
   root.__elonWinChatGptPrivateRichCompatibility = Object.freeze({
-    version: 2,
+    version: api.version,
+    basePolicy: policy,
     current: enhanced.richCompatibility,
     policy: enhanced,
   });
 })(typeof window === 'object' ? window : null, function () {
   'use strict';
 
+  const VERSION = 3;
   const MAX_WIDGET_KEYS = 32;
 
   function packedWidgetKey(widget) {
@@ -36,6 +39,79 @@
       part.kind === 'finance' ||
       part.richContent && part.richContent.kind === 'finance'
     ));
+  }
+
+  function comparisonText(value) {
+    return String(value || '')
+      .normalize('NFKC')
+      .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')
+      .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+      .replace(/<[^>]{1,200}>/g, ' ')
+      .replace(/[`*_~>#|\[\]{}-]/g, '')
+      .replace(/\s+/g, '')
+      .toLowerCase()
+      .slice(0, 16000);
+  }
+
+  function sameRenderedReply(left, right) {
+    const first = comparisonText(left);
+    const second = comparisonText(right);
+    if (!first || !second) return false;
+    if (first === second) return true;
+    const shorter = first.length <= second.length ? first : second;
+    const longer = first.length > second.length ? first : second;
+    return shorter.length >= 24 && longer.includes(shorter) &&
+      shorter.length / longer.length >= 0.78;
+  }
+
+  function primaryReplyText(message) {
+    return (Array.isArray(message && message.content) ? message.content : [])
+      .filter((part) => part && (part.type === 'markdown' || part.type === 'text'))
+      .map((part) => String(part.text || ''))
+      .join('\n');
+  }
+
+  function mergeRenderedReply(policy, values, stream) {
+    const messages = Array.isArray(values) ? values : [];
+    const merged = policy.mergeMessages(messages, stream);
+    if (!stream || !stream.text || !Array.isArray(merged) || merged.length <= messages.length) {
+      return merged;
+    }
+    let latestUser = -1;
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      if (messages[index] && messages[index].role === 'user') {
+        latestUser = index;
+        break;
+      }
+    }
+    let assistantIndex = -1;
+    for (let index = messages.length - 1; index > latestUser; index -= 1) {
+      const message = messages[index];
+      if (message && message.role === 'assistant' &&
+          sameRenderedReply(primaryReplyText(message), stream.text)) {
+        assistantIndex = index;
+        break;
+      }
+    }
+    if (assistantIndex < 0) return merged;
+
+    // Reuse the shared merge implementation after supplying a temporary
+    // identity match. This keeps citations and rich cards in the official DOM
+    // message instead of appending a second private-stream answer.
+    const forcedId = String(stream.id || 'win-rendered-reply');
+    const originalId = messages[assistantIndex].id;
+    const forcedMessages = messages.slice();
+    forcedMessages[assistantIndex] = Object.assign({}, messages[assistantIndex], { id: forcedId });
+    const forced = policy.mergeMessages(
+      forcedMessages,
+      Object.assign({}, stream, { id: forcedId }),
+    );
+    if (!Array.isArray(forced) || forced.length !== messages.length) return merged;
+    const restored = Object.assign({}, forced[assistantIndex]);
+    if (originalId === undefined) delete restored.id;
+    else restored.id = originalId;
+    forced[assistantIndex] = restored;
+    return forced;
   }
 
   function rendererUpgradePart() {
@@ -134,7 +210,7 @@
 
     function merge(values, pathname) {
       const active = current(pathname);
-      return active ? policy.mergeMessages(values, active) : values;
+      return active ? mergeRenderedReply(policy, values, active) : values;
     }
 
     return Object.freeze(Object.assign({}, session, {
@@ -150,6 +226,7 @@
   function enhancePolicy(policy) {
     if (!policy || typeof policy.createSession !== 'function' ||
         typeof policy.mergeMessages !== 'function') return policy;
+    if (policy.__elonWinPrivateRichCompatibilityWrapped === true) return policy;
     const tracker = createTracker();
 
     function financePartFromWidget(widget) {
@@ -177,6 +254,7 @@
     }
 
     return Object.assign({}, policy, {
+      __elonWinPrivateRichCompatibilityWrapped: true,
       createSession(options) {
         tracker.reset();
         return enhanceSession(policy, policy.createSession(options || {}), tracker);
@@ -188,8 +266,11 @@
   }
 
   return Object.freeze({
+    version: VERSION,
     enhancePolicy,
+    mergeRenderedReply,
     packedWidgetKey,
     rendererUpgradePart,
+    sameRenderedReply,
   });
 });

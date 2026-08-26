@@ -1,14 +1,13 @@
 (function () {
   'use strict';
 
-  var VERSION = 1;
+  var VERSION = 2;
   var MAX_PERIODS = 12;
   var MAX_POINTS_PER_PERIOD = 192;
   if (location.origin !== 'https://chatgpt.com') return;
   var base = window.__elonChatGptPrivateStreamPolicy;
   if (!base || typeof base.financePartFromWidget !== 'function') return;
-  var previous = window.__elonWinChatGptPrivateFinancePeriods;
-  if (previous && Number(previous.version) >= VERSION) return;
+  if (base.__elonWinPrivateFinancePeriodsWrapped === true) return;
 
   function cleanText(value, limit) {
     return String(value || '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim()
@@ -107,12 +106,14 @@
   }
 
   var wrapped = Object.freeze(Object.assign({}, base, {
+    __elonWinPrivateFinancePeriodsWrapped: true,
     financePartFromWidget: financePartFromWidget,
     financePartsFromMetadata: financePartsFromMetadata,
   }));
   window.__elonChatGptPrivateStreamPolicy = wrapped;
   window.__elonWinChatGptPrivateFinancePeriods = Object.freeze({
     version: VERSION,
+    basePolicy: base,
     periodViews: periodViews,
     policy: wrapped,
   });

@@ -12,6 +12,8 @@ const sourceGroups = require(path.join(
 ))
 
 const policy = sourceGroups.enhancePolicy(basePolicy)
+assert.equal(policy.__elonWinPrivateSourceGroupsWrapped, true)
+assert.equal(sourceGroups.enhancePolicy(policy), policy)
 let clock = 1_000
 const session = policy.createSession({ now: () => ++clock })
 
