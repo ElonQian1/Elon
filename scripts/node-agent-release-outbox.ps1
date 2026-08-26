@@ -5,6 +5,12 @@ function Get-NodeAgentReleaseOutboxRoot {
     if (-not [string]::IsNullOrWhiteSpace($ExplicitRoot)) {
         return [System.IO.Path]::GetFullPath($ExplicitRoot)
     }
+    if (Get-Command Get-ElonManagedNodeReleaseStateRoot -ErrorAction SilentlyContinue) {
+        $managed = Get-ElonManagedNodeReleaseStateRoot
+        if (-not [string]::IsNullOrWhiteSpace($managed)) {
+            return (Join-Path $managed 'release-outbox-v1')
+        }
+    }
     $local = [System.Environment]::GetFolderPath([System.Environment+SpecialFolder]::LocalApplicationData)
     if ([string]::IsNullOrWhiteSpace($local)) {
         throw 'LOCALAPPDATA is unavailable; cannot create the durable node release outbox.'

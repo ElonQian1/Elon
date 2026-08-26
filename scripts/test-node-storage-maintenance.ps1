@@ -3,6 +3,8 @@ Set-StrictMode -Version 2.0
 
 $RepoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 . (Join-Path $PSScriptRoot 'node-storage-paths.ps1')
+. (Join-Path $PSScriptRoot 'node-agent-release-outbox.ps1')
+. (Join-Path $PSScriptRoot 'node-agent-local-activation.ps1')
 
 $script:Assertions = 0
 function Assert-True {
@@ -69,6 +71,15 @@ try {
     Assert-Equal (Join-Path $nodeRoot 'cache\release-targets') `
         (Get-ElonManagedReleaseTargetRoot) `
         'managed release targets should live below the node data cache root'
+    Assert-Equal (Join-Path $nodeRoot 'release-state') `
+        (Get-ElonManagedNodeReleaseStateRoot) `
+        'managed release state should live below the verified node data root'
+    Assert-Equal (Join-Path $nodeRoot 'release-state\release-outbox-v1') `
+        (Get-NodeAgentReleaseOutboxRoot) `
+        'release outbox should prefer the verified node data root'
+    Assert-Equal (Join-Path $nodeRoot 'release-state\local-node-releases-v1') `
+        (Get-NodeAgentLocalActivationRoot) `
+        'local activation staging should prefer the verified node data root'
 
     Write-Utf8Json -Path (Join-Path $nodeRoot '.elon-node-data-root.json') -Value @{
         schema_version = 1

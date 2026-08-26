@@ -9,6 +9,12 @@ function Get-NodeAgentLocalActivationRoot {
     if (-not [string]::IsNullOrWhiteSpace($ExplicitRoot)) {
         return [System.IO.Path]::GetFullPath($ExplicitRoot)
     }
+    if (Get-Command Get-ElonManagedNodeReleaseStateRoot -ErrorAction SilentlyContinue) {
+        $managed = Get-ElonManagedNodeReleaseStateRoot
+        if (-not [string]::IsNullOrWhiteSpace($managed)) {
+            return (Join-Path $managed 'local-node-releases-v1')
+        }
+    }
     $local = [System.Environment]::GetFolderPath([System.Environment+SpecialFolder]::LocalApplicationData)
     if ([string]::IsNullOrWhiteSpace($local)) { throw 'LOCALAPPDATA is unavailable; cannot stage a local node release.' }
     return (Join-Path $local 'Elon\local-node-releases-v1')

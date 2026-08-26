@@ -93,6 +93,12 @@ function Get-ElonManagedReleaseTargetRoot {
     return (Join-Path $nodeDataRoot 'cache\release-targets')
 }
 
+function Get-ElonManagedNodeReleaseStateRoot {
+    $nodeDataRoot = Get-ElonNodeDataRoot
+    if ([string]::IsNullOrWhiteSpace($nodeDataRoot)) { return $null }
+    return (Join-Path $nodeDataRoot 'release-state')
+}
+
 function Resolve-ElonNodeAgentTargetDir {
     $candidates = @()
     if (-not [string]::IsNullOrWhiteSpace($env:ELON_NODE_AGENT_TARGET_DIR)) {
