@@ -24,8 +24,9 @@
 })(typeof window === 'object' ? window : null, function () {
   'use strict';
 
-  const VERSION = 4;
+  const VERSION = 5;
   const MAX_WIDGET_KEYS = 32;
+  const MAX_PENDING_RICH_PARTS = 8;
 
   function packedWidgetKey(widget) {
     if (!widget || typeof widget !== 'object' || Array.isArray(widget)) return '';
@@ -48,6 +49,40 @@
         part.richContent.kind === 'finance' || part.richContent.kind === 'chart'
       )
     ));
+  }
+
+  function richIdentity(value) {
+    const source = value && typeof value === 'object' ? value : {};
+    return {
+      messageId: String(source.messageId || source.id || '').slice(0, 180),
+      turnId: String(source.turnId || '').slice(0, 180),
+      conversationId: String(source.conversationId || '').slice(0, 180),
+    };
+  }
+
+  function hasRichIdentity(value) {
+    const identity = richIdentity(value);
+    return Boolean(identity.messageId || identity.turnId || identity.conversationId);
+  }
+
+  function richIdentityMatches(active, candidate) {
+    const stream = richIdentity({
+      messageId: active && active.id,
+      turnId: active && active.turnId,
+      conversationId: active && active.conversationId,
+    });
+    const context = richIdentity(candidate);
+    if (!hasRichIdentity(stream) || !hasRichIdentity(context)) return false;
+    if (stream.conversationId && context.conversationId &&
+        stream.conversationId !== context.conversationId) return false;
+    if (stream.turnId && context.turnId && stream.turnId !== context.turnId) return false;
+    if (stream.messageId && context.messageId && stream.messageId === context.messageId) return true;
+    if (stream.turnId && context.turnId && stream.turnId === context.turnId) return true;
+    return Boolean(
+      !stream.turnId && !context.turnId &&
+      stream.conversationId && context.conversationId &&
+      stream.conversationId === context.conversationId
+    );
   }
 
   function comparisonText(value) {
@@ -181,8 +216,49 @@
   }
 
   function enhanceSession(policy, session, tracker, publishCompatibility) {
+    let pendingRichParts = [];
+
     function publish() {
       publishCompatibility(tracker.snapshot());
+    }
+
+    function activeStream() {
+      try { return typeof session.current === 'function' ? session.current('') : null; }
+      catch (_) { return null; }
+    }
+
+    function stageRichParts(parts, identity) {
+      const values = Array.isArray(parts)
+        ? parts.filter(Boolean).slice(0, MAX_PENDING_RICH_PARTS)
+        : [];
+      if (!values.length || !hasRichIdentity(identity)) return false;
+      if (pendingRichParts.length >= MAX_PENDING_RICH_PARTS) pendingRichParts.shift();
+      pendingRichParts.push({
+        parts: values,
+        identity: richIdentity(identity),
+      });
+      return true;
+    }
+
+    function flushPendingRichParts() {
+      if (!pendingRichParts.length || typeof session.acceptRichParts !== 'function') return false;
+      const active = activeStream();
+      if (!hasRichIdentity({
+        messageId: active && active.id,
+        turnId: active && active.turnId,
+        conversationId: active && active.conversationId,
+      })) return false;
+      const queued = pendingRichParts;
+      pendingRichParts = [];
+      let accepted = false;
+      queued.forEach((entry) => {
+        if (!richIdentityMatches(active, entry.identity)) return;
+        if (!session.acceptRichParts(entry.parts, entry.identity)) return;
+        entry.parts.forEach(tracker.converted);
+        tracker.observeWidgets([entry.identity]);
+        accepted = true;
+      });
+      return accepted;
     }
 
     function accept(payload) {
@@ -203,11 +279,13 @@
         widgets = [];
       }
       tracker.observeWidgets(widgets);
+      flushPendingRichParts();
       publish();
       return accepted || widgets.length > 0;
     }
 
     function begin() {
+      pendingRichParts = [];
       tracker.reset();
       const result = session.begin();
       publish();
@@ -215,6 +293,7 @@
     }
 
     function reset() {
+      pendingRichParts = [];
       tracker.reset();
       const result = session.reset();
       publish();
@@ -222,11 +301,27 @@
     }
 
     function acceptRichParts(parts, identity) {
-      tracker.observeWidgets(identity ? [identity] : []);
+      const active = activeStream();
+      if (hasRichIdentity(identity) && !hasRichIdentity({
+        messageId: active && active.id,
+        turnId: active && active.turnId,
+        conversationId: active && active.conversationId,
+      })) {
+        stageRichParts(parts, identity);
+        publish();
+        return false;
+      }
+      if (hasRichIdentity(identity) && !richIdentityMatches(active, identity)) {
+        publish();
+        return false;
+      }
       const accepted = typeof session.acceptRichParts === 'function'
         ? session.acceptRichParts(parts, identity)
         : false;
-      if (accepted) (Array.isArray(parts) ? parts : []).forEach(tracker.converted);
+      if (accepted) {
+        (Array.isArray(parts) ? parts : []).forEach(tracker.converted);
+        tracker.observeWidgets(identity ? [identity] : []);
+      }
       publish();
       return accepted;
     }
@@ -289,5 +384,6 @@
     packedWidgetKey,
     rendererUpgradePart,
     sameRenderedReply,
+    richIdentityMatches,
   });
 });

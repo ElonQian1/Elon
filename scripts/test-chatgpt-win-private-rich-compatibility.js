@@ -32,6 +32,13 @@ function assistantFrame(id, text) {
   }
 }
 
+function assistantFrameFor(id, text, conversationId, turnId) {
+  const frame = assistantFrame(id, text)
+  frame.conversation_id = conversationId
+  frame.message.metadata.turn_exchange_id = turnId
+  return frame
+}
+
 function packedWidget() {
   return {
     encoding: 'gzip-json-base64url-v1',
@@ -158,7 +165,7 @@ const stalePolicy = Object.assign({}, basePolicy, {
 const upgradeWindow = {
   __elonChatGptPrivateStreamPolicy: stalePolicy,
   __elonWinChatGptPrivateRichCompatibility: Object.freeze({
-    version: 3,
+    version: 4,
     basePolicy,
     policy: stalePolicy,
   }),
@@ -166,9 +173,52 @@ const upgradeWindow = {
 vm.runInNewContext(compatibilitySource, { window: upgradeWindow }, {
   filename: 'chatgpt_win_private_rich_compatibility.js',
 })
-assert.equal(upgradeWindow.__elonWinChatGptPrivateRichCompatibility.version, 4)
+assert.equal(upgradeWindow.__elonWinChatGptPrivateRichCompatibility.version, 5)
 assert.notEqual(upgradeWindow.__elonChatGptPrivateStreamPolicy, stalePolicy)
 assert.equal(upgradeWindow.__elonWinChatGptPrivateRichCompatibility.basePolicy, basePolicy)
+
+const delayedPolicy = compatibility.enhancePolicy(basePolicy)
+const delayedSession = delayedPolicy.createSession({ now: () => ++clock })
+const staleWidget = Object.assign({}, widget, {
+  messageId: 'assistant-stale-widget',
+  turnId: 'turn-stale-widget',
+  conversationId: 'conversation-stale-widget',
+})
+delayedSession.begin()
+assert.equal(
+  delayedSession.acceptRichParts([financePart], staleWidget),
+  false,
+  'a decoded widget must wait until the response identity is known',
+)
+delayedSession.accept(assistantFrameFor(
+  'assistant-next-response',
+  '下一会话正文。',
+  'conversation-next-response',
+  'turn-next-response',
+))
+const delayed = delayedSession.current('/c/conversation-next-response')
+assert.equal(delayed.text, '下一会话正文。')
+assert.equal(delayed.richParts.length, 0, 'a late widget from the previous conversation must be discarded')
+
+const earlyPolicy = compatibility.enhancePolicy(basePolicy)
+const earlySession = earlyPolicy.createSession({ now: () => ++clock })
+const earlyWidget = Object.assign({}, widget, {
+  messageId: 'assistant-early-widget',
+  turnId: 'turn-early-widget',
+  conversationId: 'conversation-early-widget',
+})
+earlySession.begin()
+assert.equal(earlySession.acceptRichParts([financePart], earlyWidget), false)
+earlySession.accept(assistantFrameFor(
+  'assistant-early-widget',
+  '同一会话正文。',
+  'conversation-early-widget',
+  'turn-early-widget',
+))
+const early = earlySession.current('/c/conversation-early-widget')
+assert.equal(early.text, '同一会话正文。')
+assert.equal(early.richParts.length, 1, 'an early widget must bind after its matching response arrives')
+assert.equal(early.richParts[0].kind, 'finance')
 
 const renderedPolicy = compatibility.enhancePolicy(basePolicy)
 const renderedStream = {
@@ -202,4 +252,4 @@ assert.equal(
   true,
 )
 
-console.log('PASS: Win private rich compatibility isolates sessions, accepts standalone widget frames, preserves text, and treats finance or chart decoding as supported')
+console.log('PASS: Win private rich compatibility isolates sessions, binds delayed widgets by response identity, preserves text, and treats finance or chart decoding as supported')
