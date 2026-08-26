@@ -90,6 +90,31 @@ assert.deepEqual(plain(policy.observe(regenerated, false)), {
   assistantKey: ''
 }, 'an official completion affordance ends streaming after one quiet confirmation');
 
+policy.begin(regenerated, { allowSameTurn: true });
+now += 100;
+assert.deepEqual(plain(context.window.__elonChatGptStreamingPolicy.readState(
+  policy,
+  { lastAssistantObservation: () => observation('assistant-2', 'private completion', false) },
+  { querySelector: () => null },
+  null,
+  () => false,
+  { privateStreamState: 'completed' }
+)), {
+  active: false,
+  assistantKey: ''
+}, 'a completed private stream immediately releases stale native streaming when the official stop control is absent');
+
+policy.begin(regenerated, { allowSameTurn: true });
+assert.equal(context.window.__elonChatGptStreamingPolicy.readState(
+  policy,
+  { lastAssistantObservation: () => observation('assistant-2', 'private completion', false) },
+  { querySelector: () => ({}) },
+  null,
+  () => true,
+  { privateStreamState: 'completed' }
+).active, true, 'an official stop control remains authoritative over a premature private completion');
+policy.reset();
+
 policy.begin(observation('assistant-2', '完成', true));
 now += 30001;
 assert.equal(

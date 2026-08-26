@@ -199,9 +199,16 @@
     }) || null;
   }
 
-  function readStreamingState() {
+  function readStreamingState(privateStreamState) {
     return streamingPolicyModule
-      ? streamingPolicyModule.readState(streamingPolicy, messageAdapter, document, findComposer(), isVisible)
+      ? streamingPolicyModule.readState(
+        streamingPolicy,
+        messageAdapter,
+        document,
+        findComposer(),
+        isVisible,
+        { privateStreamState: String(privateStreamState || 'idle') }
+      )
       : { active: false, assistantKey: '' };
   }
   function detectCapabilities(composer) {
@@ -233,7 +240,6 @@
       accessDecision(pageKind, composer, privateAccess));
     const loginRequired = access.loginRequired === true;
     const dictationActive = optional(false, () => composerAdapter ? composerAdapter.dictationActive(composer) : false);
-    const streamingState = optional({ active: false, assistantKey: '' }, readStreamingState);
     const privateStream = optional(null, () => privateStreamTransport &&
       typeof privateStreamTransport.current === 'function'
       ? privateStreamTransport.current(location.pathname)
@@ -241,6 +247,10 @@
     const privateStreamState = ['streaming', 'completed'].includes(
       String(privateStream && privateStream.state || '')
     ) ? String(privateStream.state) : 'idle';
+    const streamingState = optional(
+      { active: false, assistantKey: '' },
+      () => readStreamingState(privateStreamState)
+    );
     const streaming = access.blocked !== true &&
       (streamingState.active || !!(privateStream && privateStream.state === 'streaming'));
     if (access.blocked === true && streamingPolicy) streamingPolicy.reset();
@@ -419,6 +429,9 @@
         const sendMarker = privateSendObserver && typeof privateSendObserver.marker === 'function'
           ? privateSendObserver.marker()
           : null;
+        if (privateStreamTransport && typeof privateStreamTransport.prepareSend === 'function') {
+          privateStreamTransport.prepareSend();
+        }
         button.click();
         scheduleSnapshot(true);
         waitForSendAccepted(
@@ -641,6 +654,9 @@
       return conversationAdapter.openProject(String(command.value || ''), respond);
     }
     if (action === 'regenerate_response' && messageAdapter) {
+      if (privateStreamTransport && typeof privateStreamTransport.prepareSend === 'function') {
+        privateStreamTransport.prepareSend();
+      }
       if (streamingPolicyModule) streamingPolicyModule.begin(
         streamingPolicy, messageAdapter, { allowSameTurn: true }
       );

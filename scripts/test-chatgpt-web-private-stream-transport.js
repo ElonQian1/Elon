@@ -147,7 +147,7 @@ function context(enabled, response) {
     'data: [DONE]\n\n'
   ]);
   const enabled = context(true, response);
-  assert.equal(enabled.window.__elonChatGptPrivateStreamTransport.version, 10);
+  assert.equal(enabled.window.__elonChatGptPrivateStreamTransport.version, 11);
   assert.equal(enabled.socketListenerCount(), 1);
   let notifications = 0;
   enabled.window.__elonChatGptPrivateStreamTransport.subscribe(() => { notifications += 1; });
@@ -292,6 +292,47 @@ function context(enabled, response) {
   assert.equal(merged.length, 1);
   assert.equal(merged[0].state, 'completed');
   assert.equal(merged[0].content[0].text, 'hello world');
+
+  const prepared = context(true, createResponse([
+    'data: {"conversation_id":"conversation-one","message":{"id":"assistant-one",',
+    '"author":{"role":"assistant"},"status":"finished_successfully","content":{"parts":["old answer"]}}}\n\n',
+    'data: [DONE]\n\n'
+  ]));
+  let preparedNotifications = 0;
+  prepared.window.__elonChatGptPrivateStreamTransport.subscribe(() => {
+    preparedNotifications += 1;
+  });
+  await prepared.window.fetch(request, init);
+  await tick();
+  await tick();
+  const notificationsBeforePrepare = preparedNotifications;
+  prepared.window.__elonChatGptPrivateStreamTransport.prepareSend();
+  assert.equal(prepared.window.__elonChatGptPrivateStreamTransport.current('/'), null);
+  assert.ok(preparedNotifications > notificationsBeforePrepare,
+    'preparing a send immediately clears stale private completion state');
+  prepared.emitSocket(JSON.stringify({
+    type: 'reply',
+    id: 'official-next-request-id',
+    reply: JSON.stringify({
+      c: 'patch',
+      o: 'replace',
+      p: '/messages/3',
+      v: {
+        conversation_id: 'conversation-one',
+        message: {
+          id: 'assistant-next',
+          author: { role: 'assistant' },
+          status: 'finished_successfully',
+          content: { parts: ['next answer'] }
+        }
+      }
+    })
+  }));
+  assert.equal(
+    prepared.window.__elonChatGptPrivateStreamTransport.current('/c/conversation-one').text,
+    'next answer',
+    'preparing a send must keep the current conversation eligible for its next response'
+  );
 
   enabled.window.__elonChatGptPrivateStreamTransport.reset();
   assert.equal(enabled.window.__elonChatGptPrivateStreamTransport.current('/'), null);

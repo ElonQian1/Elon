@@ -72,7 +72,7 @@ function responseFor(chunks) {
   vm.runInNewContext(policySource, sandbox, { filename: 'chatgpt_web_private_stream_policy.js' });
   vm.runInNewContext(transportSource, sandbox, { filename: 'chatgpt_web_private_stream_transport.js' });
   assert.equal(window.__elonChatGptPrivateFetchTap.version, 1);
-  assert.equal(window.__elonChatGptPrivateStreamTransport.version, 10);
+  assert.equal(window.__elonChatGptPrivateStreamTransport.version, 11);
 
   const request = { method: 'POST', url: 'https://chatgpt.com/backend-api/f/conversation' };
   const init = { method: 'POST' };

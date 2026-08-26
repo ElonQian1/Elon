@@ -178,6 +178,11 @@ assert.match(adapterSource, /privateSendObserver\.marker\(\)/);
 assert.match(adapterSource, /privateSendObserver\.dispatchedAfter\(sendMarker\)/);
 assert.match(adapterSource, /official_request_dispatched/);
 assert.match(adapterSource, /official_page_accepted/);
+assert.match(
+  adapterSource,
+  /privateStreamTransport\.prepareSend\(\);[\s\S]*?button\.click\(\);/,
+  'the adapter must clear stale private completion state before the official send click'
+);
 
 (async () => {
   const enabled = createContext();

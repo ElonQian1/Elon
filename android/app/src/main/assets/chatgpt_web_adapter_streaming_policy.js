@@ -161,9 +161,13 @@
     };
   }
 
-  function readState(policy, messageAdapter, document, composer, visible) {
+  function readState(policy, messageAdapter, document, composer, visible, options) {
     const observation = messageObservation(messageAdapter);
     const active = officialActive(document, composer, visible);
+    if (policy && options && options.privateStreamState === 'completed' &&
+        active !== true && observation.pending !== true) {
+      return policy.reset();
+    }
     return policy
       ? policy.observe(observation, active)
       : { active: active || observation.pending, assistantKey: observation.key };

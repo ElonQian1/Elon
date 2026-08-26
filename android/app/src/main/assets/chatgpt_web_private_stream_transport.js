@@ -72,6 +72,17 @@
     notify();
   }
 
+  function prepareSend() {
+    blockedConversationId = '';
+    conversationGeneration += 1;
+    observedWidgets.clear();
+    socketFrames = 0;
+    socketFirstReported = false;
+    socketSuccessReported = false;
+    session.reset();
+    notify();
+  }
+
   function packedWidgetKey(widget) {
     const value = String(widget && widget.compressed || '');
     return [
@@ -556,11 +567,12 @@
   }
 
   window.__elonChatGptPrivateStreamTransport = Object.freeze({
-    version: 10,
+    version: 11,
     enabled: true,
     current: (pathname) => session.current(pathname),
     access: currentAccess,
     mergeMessages: (messages, pathname) => session.merge(messages, pathname),
+    prepareSend,
     reset: resetConversationBoundary,
     subscribe: (listener) => {
       if (typeof listener !== 'function') return function () {};
