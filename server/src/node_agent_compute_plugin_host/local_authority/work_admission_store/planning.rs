@@ -4,7 +4,7 @@ use anyhow::{bail, Context, Result};
 use rusqlite::Transaction;
 
 use super::{
-    current::validate_current_admission,
+    current::{validate_current_admission, validate_current_installed_receipts},
     head::{read_head, WorkAdmissionHead},
     readback::read_pair_required,
 };
@@ -73,6 +73,44 @@ pub(in crate::node_agent_compute_plugin_host::local_authority) fn read_planning_
 
     validate_legal_successor(authority, receipt)?;
     Ok(None)
+}
+
+/// Rebuilds the exact current work-admission head without requiring the authority to remain at the
+/// original stopped/no-health state. A Ready-currentness reader must separately prove that the
+/// later authority state is the legal exact successor it expects. Receipt counting and predecessor
+/// replay are intentionally complete and therefore O(history); this source seam is not a hot-path
+/// publisher until a separately bounded/cached owner contract exists.
+pub(in crate::node_agent_compute_plugin_host::local_authority) fn read_current_work_admission_head_pair_on(
+    transaction: &Transaction<'_>,
+    expected: &ComputePluginWorkAdmissionReceiptPair,
+) -> Result<ComputePluginWorkAdmissionReceiptPair> {
+    let expected_receipt = expected.receipt().receipt();
+    let receipt_count = count_receipts_on(
+        transaction,
+        expected_receipt.installation_id_digest(),
+        expected_receipt.plugin_id(),
+    )?;
+    let head = read_head(transaction, expected_receipt.plugin_id())?.ok_or_else(|| {
+        anyhow::anyhow!("COMPUTE_PLUGIN_READY_CURRENT_WORK_ADMISSION_HEAD_MISSING")
+    })?;
+    if head.installation_id_digest != expected_receipt.installation_id_digest()
+        || head.plugin_id != expected_receipt.plugin_id()
+        || head.generation <= 0
+        || receipt_count != head.generation
+        || head.work_admission_id != expected_receipt.work_admission_id()
+        || head.receipt_digest != expected.receipt().receipt_digest()
+    {
+        bail!("COMPUTE_PLUGIN_READY_CURRENT_WORK_ADMISSION_HEAD_CHANGED");
+    }
+
+    let stored = read_pair_required(transaction, &head.work_admission_id, &head.receipt_digest)?;
+    validate_head_pair(&head, &stored)?;
+    validate_predecessor_chain(transaction, &head, &stored)?;
+    if &stored != expected {
+        bail!("COMPUTE_PLUGIN_READY_CURRENT_WORK_ADMISSION_OWNER_CHANGED");
+    }
+    validate_current_installed_receipts(transaction, &stored)?;
+    Ok(stored)
 }
 
 fn count_receipts_on(

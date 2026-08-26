@@ -32,7 +32,9 @@ mod source;
 mod validation;
 mod write;
 
-pub(super) use planning::read_planning_work_admission_on;
+pub(super) use planning::{
+    read_current_work_admission_head_pair_on, read_planning_work_admission_on,
+};
 pub(in crate::node_agent_compute_plugin_host) use recovery::ComputePluginWorkAdmissionRecoveryAuthoritySession;
 
 pub(in crate::node_agent_compute_plugin_host) struct ComputePluginPostRevalidationWorkAdmissionAuthoritySession<

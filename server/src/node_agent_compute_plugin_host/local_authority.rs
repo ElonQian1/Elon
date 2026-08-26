@@ -35,6 +35,7 @@ mod plan_application_writes;
 mod planning_snapshot;
 mod process_ownership;
 mod promotion_store;
+mod ready_source_currentness;
 mod rollback_checkpoint;
 mod sharing_policy_binding;
 #[allow(dead_code)]

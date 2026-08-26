@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{fmt, time::Instant};
 
 use anyhow::{bail, Result};
 use chrono::{DateTime, Duration, SecondsFormat, Utc};
@@ -165,6 +165,41 @@ pub(in crate::node_agent_compute_plugin_host) fn validate_ready_capability_publi
         record: record.clone(),
         trusted_time,
     })
+}
+
+/// Revalidates one previously sealed publication against the exact inventory currently read from
+/// the local authority. The fresh observation extends only the time/currentness check; it does not
+/// create a runtime transition, Host authority or Ready capability.
+pub(in crate::node_agent_compute_plugin_host) fn revalidate_ready_publication_at_current_authority(
+    publication: &ValidatedComputeReadyPublication,
+    current_inventory: &ComputePluginInventorySnapshot,
+    fresh_time: &ComputePluginTrustedTimeObservation,
+) -> Result<()> {
+    fresh_time.ensure_live(Instant::now())?;
+    let prior_time = publication.trusted_time();
+    if fresh_time.installation_id_digest() != prior_time.installation_id_digest()
+        || fresh_time.clock_epoch_digest() != prior_time.clock_epoch_digest()
+        || fresh_time.observed_at() <= prior_time.observed_at()
+        || fresh_time.trusted_now() <= prior_time.trusted_now()
+        || current_inventory.inventory_revision != publication.inventory_revision()
+        || current_inventory.desired_policy_revision != publication.desired_policy_revision()
+        || !current_inventory.sharing_enabled
+    {
+        bail!("COMPUTE_READY_CURRENT_AUTHORITY_BINDING_CHANGED");
+    }
+
+    validate_inventory(current_inventory, fresh_time.trusted_now().to_owned())?;
+    let mut records = current_inventory
+        .plugins
+        .iter()
+        .filter(|record| record.plugin_id == publication.record().plugin_id);
+    let current_record = records
+        .next()
+        .ok_or_else(|| anyhow::anyhow!("COMPUTE_READY_CURRENT_RECORD_MISSING"))?;
+    if records.next().is_some() || current_record != publication.record() {
+        bail!("COMPUTE_READY_CURRENT_RECORD_CHANGED");
+    }
+    validate_ready_record(current_record, fresh_time.trusted_now())
 }
 
 fn validate_ready_record(

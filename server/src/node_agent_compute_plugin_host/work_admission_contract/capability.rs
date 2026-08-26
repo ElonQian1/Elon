@@ -137,6 +137,16 @@ impl<'root> DurableWorkAdmittedPluginSlot<'root> {
         &self.receipts
     }
 
+    pub(in crate::node_agent_compute_plugin_host) fn trusted_time(
+        &self,
+    ) -> &ComputePluginTrustedTimeObservation {
+        self.revalidated.trusted_time()
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn revalidated_at(&self) -> Instant {
+        self.revalidated.revalidated_at()
+    }
+
     /// Consumes the exact admitted owner without cloning or projecting receipt scalars. This is
     /// only for the future share-none→loader load-set transition after all borrow-only preflight
     /// checks have succeeded.

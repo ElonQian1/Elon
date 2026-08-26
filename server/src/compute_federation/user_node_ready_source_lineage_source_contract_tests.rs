@@ -1,3 +1,6 @@
+#[path = "user_node_ready_source_lineage_source_contract_tests/currentness.rs"]
+mod currentness;
+
 const DOMAIN_ROOT: &str = include_str!("user_node_ready_source_lineage.rs");
 const DOMAIN_TYPES: &str = include_str!("user_node_ready_source_lineage/types.rs");
 const DOMAIN_CANONICAL: &str = include_str!("user_node_ready_source_lineage/canonical.rs");

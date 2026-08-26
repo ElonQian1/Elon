@@ -183,7 +183,7 @@ pub(super) fn validate_current_admission(
     Ok(())
 }
 
-fn validate_current_installed_receipts(
+pub(super) fn validate_current_installed_receipts(
     transaction: &Transaction<'_>,
     pair: &ComputePluginWorkAdmissionReceiptPair,
 ) -> Result<()> {
