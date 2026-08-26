@@ -2,6 +2,7 @@ const WIN_COMMON_RICH_CONTENT_ADAPTER: &str = include_str!("rich_content_dom_ada
 const WIN_RICH_CONTENT_ADAPTER: &str = include_str!("google_rich_content_adapter.js");
 const WIN_PRIVATE_CONVERSATION_BRIDGE: &str =
     include_str!("google_win_private_conversation_bridge.js");
+const WIN_PRIVATE_REPLY_STATE: &str = include_str!("google_win_private_reply_state.js");
 const PRIVATE_RESPONSE_TAP: &str =
     include_str!("../../../../android/app/src/main/assets/google_web_private_response_tap.js");
 const PRIVATE_THREAD_DIRECTORY: &str =
@@ -64,7 +65,11 @@ pub(super) fn initialization_script(adapter_version: u32) -> String {
         .iter()
         .map(|(name, source)| {
             let shared = format!("window.__elonGoogleWebBootstrapStage = '{name}';\n{source}");
-            if *name == "google_web_rich_content.js" {
+            if *name == "google_web_private_reply_observer.js" {
+                format!(
+                    "{shared}\nwindow.__elonGoogleWebBootstrapStage = 'google_win_private_reply_state.js';\n{WIN_PRIVATE_REPLY_STATE}"
+                )
+            } else if *name == "google_web_rich_content.js" {
                 format!(
                     "{shared}\nwindow.__elonGoogleWebBootstrapStage = 'rich_content_dom_adapter.js';\n{WIN_COMMON_RICH_CONTENT_ADAPTER}\nwindow.__elonGoogleWebBootstrapStage = 'google_rich_content_adapter.js';\n{WIN_RICH_CONTENT_ADAPTER}"
                 )

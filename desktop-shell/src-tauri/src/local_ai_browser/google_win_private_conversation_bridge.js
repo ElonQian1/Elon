@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  var VERSION = 1;
+  var VERSION = 2;
   var allowedOrigins = new Set(['https://google.com', 'https://www.google.com']);
   if (!allowedOrigins.has(location.origin)) return;
   if (Number(window.__elonWinGooglePrivateConversationBridgeVersion || 0) >= VERSION) return;
@@ -43,6 +43,11 @@
     return Array.isArray(values) ? values.slice(0, 200) : [];
   }
 
+  function resetPrivateReplyState() {
+    var state = window.__elonWinGooglePrivateReplyState;
+    if (state && typeof state.reset === 'function') state.reset();
+  }
+
   function safeProviderUrl(value) {
     var url;
     try { url = new URL(String(value || ''), location.href); }
@@ -81,10 +86,12 @@
         emitResult(action, false, 'Google AI 官网会话已变化，请先重新同步。', id);
         return;
       }
+      resetPrivateReplyState();
       emitResult(action, true, '', id);
       location.assign(target.href);
       return;
     }
+    if (action === 'new_conversation') resetPrivateReplyState();
     baseBridge.command(raw);
   }
 

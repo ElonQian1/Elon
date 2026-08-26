@@ -97,6 +97,9 @@ fn sanitize_protocol_event(event: &Map<String, Value>) -> Result<SanitizedAdapte
             "loginRequired": event.get("loginRequired").and_then(Value::as_bool).unwrap_or(false),
             "composerReady": event.get("composerReady").and_then(Value::as_bool).unwrap_or(false),
             "streaming": event.get("streaming").and_then(Value::as_bool).unwrap_or(false),
+            "privateStreamObserved": event.get("privateStreamObserved").and_then(Value::as_bool).unwrap_or(false),
+            "privateStreamRevision": bounded_u64(event.get("privateStreamRevision"), 0, 1_000_000_000),
+            "privateStreamState": sanitize_private_stream_state(event.get("privateStreamState")),
             "currentModel": clean_string(event.get("currentModel"), 80),
             "capabilities": clean_identifiers(event.get("capabilities"), 20),
         }),
@@ -207,6 +210,14 @@ fn sanitize_page_kind(value: Option<&Value>) -> &'static str {
     }
 }
 
+fn sanitize_private_stream_state(value: Option<&Value>) -> &'static str {
+    match value.and_then(Value::as_str) {
+        Some("streaming") => "streaming",
+        Some("completed") => "completed",
+        _ => "idle",
+    }
+}
+
 fn clean_string(value: Option<&Value>, max: usize) -> String {
     value
         .and_then(Value::as_str)
@@ -261,6 +272,9 @@ mod tests {
                 "url": "https://www.google.com/search?udm=50&q=private",
                 "pageKind": "ai_mode",
                 "loginRequired": false,
+                "privateStreamObserved": true,
+                "privateStreamRevision": 7,
+                "privateStreamState": "completed",
                 "messages": [{
                     "id": "answer",
                     "role": "assistant",
@@ -277,6 +291,9 @@ mod tests {
         assert_eq!(event.kind, "message_snapshot");
         assert_eq!(event.payload["url"], "https://www.google.com/search");
         assert_eq!(event.payload["pageKind"], "ai_mode");
+        assert_eq!(event.payload["privateStreamObserved"], true);
+        assert_eq!(event.payload["privateStreamRevision"], 7);
+        assert_eq!(event.payload["privateStreamState"], "completed");
         assert_eq!(
             event.restorable_url.as_deref(),
             Some("https://www.google.com/search?udm=50&q=private")
@@ -352,6 +369,8 @@ mod tests {
         assert!(script.contains("google_win_private_conversation_bridge.js"));
         assert!(script.contains("__elonWinGooglePrivateConversationBridgeVersion"));
         assert!(script.contains("__elonGoogleWebPrivateReplyObserver"));
+        assert!(script.contains("google_win_private_reply_state.js"));
+        assert!(script.contains("__elonWinGooglePrivateReplyState"));
         assert!(script.contains("__elonGoogleWebPrivateThreadDirectory"));
         assert!(script.contains("__elonGoogleWebQueryPolicy"));
         let dom_ready = script

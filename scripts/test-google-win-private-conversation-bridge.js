@@ -12,6 +12,7 @@ const source = fs.readFileSync(path.join(
 const baseCommands = [];
 const events = [];
 const navigations = [];
+let privateReplyResets = 0;
 const location = {
   origin: 'https://www.google.com',
   href: 'https://www.google.com/search?udm=50&q=current&csuir=active_thread_1234',
@@ -38,6 +39,9 @@ const window = {
   elonGoogleWebNative: {
     postMessage(raw) { events.push(JSON.parse(String(raw))); },
   },
+  __elonWinGooglePrivateReplyState: {
+    reset() { privateReplyResets += 1; },
+  },
 };
 
 vm.runInNewContext(source, {
@@ -52,7 +56,7 @@ vm.runInNewContext(source, {
   Number,
 });
 
-assert.equal(window.__elonWinGooglePrivateConversationBridgeVersion, 1);
+assert.equal(window.__elonWinGooglePrivateConversationBridgeVersion, 2);
 assert.notEqual(window.__elonGoogleWebBridge, baseBridge);
 
 window.__elonGoogleWebBridge.command(JSON.stringify({
@@ -77,6 +81,7 @@ assert.equal(
   navigations.pop(),
   'https://www.google.com/search?udm=50&q=BTC&csuir=thread_1234567890',
 );
+assert.equal(privateReplyResets, 1);
 
 window.__elonGoogleWebBridge.command(JSON.stringify({
   action: 'open_conversation',
@@ -85,6 +90,15 @@ window.__elonGoogleWebBridge.command(JSON.stringify({
 }));
 assert.equal(events.pop().ok, false);
 assert.equal(navigations.length, 0);
+assert.equal(privateReplyResets, 1);
+
+const newConversation = JSON.stringify({
+  action: 'new_conversation',
+  requestId: 'mcp_new1',
+});
+window.__elonGoogleWebBridge.command(newConversation);
+assert.equal(privateReplyResets, 2);
+assert.equal(baseCommands.pop(), newConversation);
 
 const passthrough = JSON.stringify({ action: 'snapshot' });
 window.__elonGoogleWebBridge.command(passthrough);
