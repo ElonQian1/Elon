@@ -99,6 +99,19 @@ impl<'root> RevalidatedInstalledWorkAdmission<'root> {
     ) -> DurableInstalledPluginSlot<'root> {
         self.installed
     }
+
+    /// Purpose-specific consuming seam for the owned loader transition. Unlike
+    /// `into_installed`, this preserves the authenticated time observation and monotonic barrier
+    /// that must remain in successor or outcome-uncertain custody.
+    pub(in crate::node_agent_compute_plugin_host) fn into_loader_transition_parts(
+        self,
+    ) -> (
+        DurableInstalledPluginSlot<'root>,
+        ComputePluginTrustedTimeObservation,
+        Instant,
+    ) {
+        (self.installed, self.trusted_time, self.revalidated_at)
+    }
 }
 
 impl<'root> DurableWorkAdmittedPluginSlot<'root> {
@@ -122,6 +135,18 @@ impl<'root> DurableWorkAdmittedPluginSlot<'root> {
         &self,
     ) -> &ComputePluginWorkAdmissionReceiptPair {
         &self.receipts
+    }
+
+    /// Consumes the exact admitted owner without cloning or projecting receipt scalars. This is
+    /// only for the future share-none→loader load-set transition after all borrow-only preflight
+    /// checks have succeeded.
+    pub(in crate::node_agent_compute_plugin_host) fn into_loader_transition_parts(
+        self,
+    ) -> (
+        RevalidatedInstalledWorkAdmission<'root>,
+        ComputePluginWorkAdmissionReceiptPair,
+    ) {
+        (self.revalidated, self.receipts)
     }
 }
 

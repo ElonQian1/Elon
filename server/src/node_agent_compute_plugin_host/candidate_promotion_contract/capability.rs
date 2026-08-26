@@ -135,6 +135,19 @@ impl<'root> RevalidatedCandidatePromotion<'root> {
     ) -> DurableCandidateHealthPublication<'root> {
         self.publication
     }
+
+    /// Full consuming seam reserved for loader-transition successor custody. The shorter
+    /// `into_publication` intentionally cannot be used because it drops authenticated time and
+    /// the post-rehash monotonic barrier.
+    pub(in crate::node_agent_compute_plugin_host) fn into_loader_transition_parts(
+        self,
+    ) -> (
+        DurableCandidateHealthPublication<'root>,
+        ComputePluginTrustedTimeObservation,
+        Instant,
+    ) {
+        (self.publication, self.trusted_time, self.revalidated_at)
+    }
 }
 
 impl<'root> DurableInstalledPluginSlot<'root> {

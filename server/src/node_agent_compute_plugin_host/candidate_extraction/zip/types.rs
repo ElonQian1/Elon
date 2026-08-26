@@ -121,6 +121,26 @@ pub(in crate::node_agent_compute_plugin_host) struct ExtractedComputePluginCandi
     pub(in crate::node_agent_compute_plugin_host) seal_evidence: ComputePluginStagingSealEvidence,
 }
 
+/// Complete archive ownership prepared for the linear loader transition. Unlike cleanup parts,
+/// this retains the validated plan, completion barrier, verified-artifact authority, staging root
+/// borrow, every package handle, directory handle, and seal.
+pub(in crate::node_agent_compute_plugin_host) struct ExtractedComputePluginLoaderTransitionParts<
+    'root,
+> {
+    pub(in crate::node_agent_compute_plugin_host) plan: ValidatedComputePluginArchiveExtractionPlan,
+    pub(in crate::node_agent_compute_plugin_host) evidence:
+        HashedComputePluginExtractedArchiveEvidence,
+    pub(in crate::node_agent_compute_plugin_host) verified:
+        VerifiedComputePluginCandidateArtifactSet,
+    pub(in crate::node_agent_compute_plugin_host) staging:
+        PreparedComputePluginCandidateStaging<'root>,
+    pub(in crate::node_agent_compute_plugin_host) directories: Vec<PinnedManagedDirectory>,
+    pub(in crate::node_agent_compute_plugin_host) files: Vec<PinnedManagedFile>,
+    pub(in crate::node_agent_compute_plugin_host) seal: PinnedManagedFile,
+    pub(in crate::node_agent_compute_plugin_host) seal_evidence: ComputePluginStagingSealEvidence,
+    pub(in crate::node_agent_compute_plugin_host) completed_at: Instant,
+}
+
 pub(in crate::node_agent_compute_plugin_host) struct ComputePluginArchiveExtractionFailure {
     pub(super) error: Error,
     pub(super) verified: VerifiedComputePluginCandidateArtifactSet,
@@ -279,6 +299,22 @@ impl<'root> ExtractedComputePluginCandidateArchive<'root> {
             files,
             seal: self.seal,
             seal_evidence: self.seal_evidence,
+        }
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn into_loader_transition_parts(
+        self,
+    ) -> ExtractedComputePluginLoaderTransitionParts<'root> {
+        ExtractedComputePluginLoaderTransitionParts {
+            plan: self.plan,
+            evidence: self.evidence,
+            verified: self.verified,
+            staging: self.staging,
+            directories: self.directories,
+            files: self.files,
+            seal: self.seal,
+            seal_evidence: self.seal_evidence,
+            completed_at: self.completed_at,
         }
     }
 }

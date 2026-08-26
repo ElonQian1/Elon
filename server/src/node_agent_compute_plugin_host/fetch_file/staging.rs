@@ -51,6 +51,17 @@ pub(in crate::node_agent_compute_plugin_host) struct PreparedComputePluginCandid
     staging_run_digest: String,
 }
 
+/// Complete staging ownership split for the loader transition. The package-root directory moves
+/// into loader namespace custody while the root borrow and binding scalars remain in the authority
+/// residue; neither side can be reconstructed from paths alone.
+pub(in crate::node_agent_compute_plugin_host) struct PreparedComputePluginStagingLoaderParts<'root>
+{
+    pub(in crate::node_agent_compute_plugin_host) root: &'root PinnedComputePluginRoot,
+    pub(in crate::node_agent_compute_plugin_host) package_root: PinnedManagedDirectory,
+    pub(in crate::node_agent_compute_plugin_host) relative_root: String,
+    pub(in crate::node_agent_compute_plugin_host) staging_run_digest: String,
+}
+
 impl PreparedComputePluginCandidateStaging<'_> {
     pub(in crate::node_agent_compute_plugin_host) fn staging_run_digest(&self) -> &str {
         &self.staging_run_digest
@@ -156,6 +167,19 @@ impl PreparedComputePluginCandidateStaging<'_> {
             return Err(anyhow!("COMPUTE_PLUGIN_STAGING_RELATIVE_PATH_INVALID"));
         }
         Ok(Path::new(&self.relative_root).join(path))
+    }
+}
+
+impl<'root> PreparedComputePluginCandidateStaging<'root> {
+    pub(in crate::node_agent_compute_plugin_host) fn into_loader_transition_parts(
+        self,
+    ) -> PreparedComputePluginStagingLoaderParts<'root> {
+        PreparedComputePluginStagingLoaderParts {
+            root: self.root,
+            package_root: self.directory,
+            relative_root: self.relative_root,
+            staging_run_digest: self.staging_run_digest,
+        }
     }
 }
 

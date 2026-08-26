@@ -15,6 +15,9 @@ use sha2::{Digest, Sha256};
 mod copy;
 mod delete;
 mod hash;
+mod loader;
+mod loader_debug;
+mod loader_system_validation;
 mod lock;
 mod namespace;
 mod open;
@@ -35,6 +38,19 @@ pub(crate) use delete::{
     ManagedDirectoryDeleteFailure, ManagedFileDeleteFailure, ManagedObjectDeleteEvidence,
 };
 pub(crate) use hash::{ManagedFileHashFailure, ManagedFileHashPhase, ManagedFileHashResult};
+pub(crate) use loader::{
+    ManagedLoaderAuthenticatedNegativeReceipt, ManagedLoaderFileContentLease,
+    ManagedLoaderFileContentLeaseAcquisitionAttemptCustody,
+    ManagedLoaderFileContentLeaseAuthenticatedNegativeReceipt, ManagedLoaderFileIdentityAnchor,
+    ManagedLoaderFileReopenReceipt, ManagedLoaderNamespaceQueryAttemptCustody,
+    ManagedLoaderNamespaceQueryReceipt, ManagedLoaderNamespaceSession,
+    ManagedLoaderParentRelativeReopenAttemptCustody,
+    ManagedLoaderParentRelativeReopenAuthenticatedNegativeReceipt, ManagedLoaderSearchedNameGrant,
+    ManagedLoaderSearchedNameGrantAcquisitionAttemptCustody, ManagedLoaderSystemImageContentLease,
+    PinnedManagedLoaderDirectory, PinnedManagedLoaderFile, PinnedWindowsLoaderSearchDirectory,
+    PinnedWindowsLoaderSystemImageFile, QuarantinedManagedLoaderFile,
+    QuarantinedManagedLoaderSourceClose,
+};
 pub(crate) use namespace::{
     ManagedDeleteDisposition, ManagedExpectedIdentityMatchPresence,
     ManagedNamespaceDurabilityFailure, ManagedNamespaceDurabilityFailureCustody,

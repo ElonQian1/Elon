@@ -19,10 +19,10 @@ mod zip;
 pub(in crate::node_agent_compute_plugin_host) use zip::{
     extract_verified_compute_plugin_zip_archive, scan_verified_compute_plugin_zip_archive,
     ComputePluginArchiveExtractionFailure, ComputePluginStagingSealEvidence,
-    ExtractedComputePluginCandidateArchive, HashedComputePluginExtractedArchiveEvidence,
-    EXTRACTED_ARCHIVE_EVIDENCE_SCHEMA, HASHED_EXTRACTED_ARCHIVE_EVIDENCE_SCHEMA,
-    STAGING_EVIDENCE_CANONICALIZATION, STAGING_EVIDENCE_DIGEST_ALGORITHM,
-    STAGING_SEAL_EVIDENCE_SCHEMA, STAGING_SEAL_PAYLOAD_SCHEMA,
+    ExtractedComputePluginCandidateArchive, ExtractedComputePluginLoaderTransitionParts,
+    HashedComputePluginExtractedArchiveEvidence, EXTRACTED_ARCHIVE_EVIDENCE_SCHEMA,
+    HASHED_EXTRACTED_ARCHIVE_EVIDENCE_SCHEMA, STAGING_EVIDENCE_CANONICALIZATION,
+    STAGING_EVIDENCE_DIGEST_ALGORITHM, STAGING_SEAL_EVIDENCE_SCHEMA, STAGING_SEAL_PAYLOAD_SCHEMA,
 };
 
 pub(in crate::node_agent_compute_plugin_host) const COMPUTE_PLUGIN_EXTRACTION_PLAN_SCHEMA: &str =

@@ -33,7 +33,8 @@ pub(in crate::node_agent_compute_plugin_host) use recovery::{
 };
 pub(in crate::node_agent_compute_plugin_host) use staging::{
     prepare_compute_plugin_candidate_staging, ComputePluginStagingPrepareFailure,
-    PreparedComputePluginCandidateStaging, COMPUTE_PLUGIN_STAGING_SEAL_FILE,
+    PreparedComputePluginCandidateStaging, PreparedComputePluginStagingLoaderParts,
+    COMPUTE_PLUGIN_STAGING_SEAL_FILE,
 };
 pub(in crate::node_agent_compute_plugin_host) use types::{
     ComputePluginPartCursorDamage, ComputePluginPartCursorDamageKind,
