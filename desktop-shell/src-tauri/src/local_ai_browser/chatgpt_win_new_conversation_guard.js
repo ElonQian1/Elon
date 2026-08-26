@@ -1,15 +1,27 @@
 (function () {
   'use strict';
 
+  const VERSION = 4;
   if (location.origin !== 'https://chatgpt.com') return;
-  const conversations = window.__elonChatGptConversations;
-  if (!conversations || typeof conversations.newConversation !== 'function') return;
-  if (conversations.__elonWinNewConversationGuardWrapped === true) return;
+  const candidate = window.__elonChatGptConversations;
+  if (!candidate || typeof candidate.newConversation !== 'function') return;
+
+  const existing = window.__elonWinChatGptNewConversationGuard;
+  if (existing && Number(existing.version || 0) >= VERSION &&
+      typeof existing.rebind === 'function') {
+    existing.rebind(candidate);
+    return;
+  }
 
   const CONVERSATION_PATH = /^(?:\/c\/[A-Za-z0-9_-]{1,160}|\/g\/g-p-[A-Za-z0-9_-]{1,160}\/c\/[A-Za-z0-9_-]{1,160})$/;
   const CONFIRM_STABLE_MS = 1_600;
   const CONFIRM_TIMEOUT_MS = 4_800;
-  const originalNewConversation = conversations.newConversation.bind(conversations);
+  let delegate = candidate.__elonWinNewConversationGuardWrapped === true &&
+    candidate.baseConversations && typeof candidate.baseConversations.newConversation === 'function'
+    ? candidate.baseConversations
+    : candidate;
+  let bindingRevision = 1;
+  let conversationsProxy = null;
 
   function cleanText(value) {
     return String(value || '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
@@ -81,7 +93,7 @@
     const initialPath = location.pathname;
     const initialSurface = surface(inspect);
     const initialTurns = visibleTurnEvidence();
-    return originalNewConversation(inspect, (action, ok, detail) => {
+    return delegate.newConversation(inspect, (action, ok, detail) => {
       if (action !== 'new_conversation' || !ok) return result(action, ok, detail);
       confirmFreshConversation(
         initialPath,
@@ -94,14 +106,52 @@
     });
   }
 
-  window.__elonChatGptConversations = Object.freeze(Object.assign({}, conversations, {
+  function callDelegate(method, args) {
+    return typeof delegate[method] === 'function'
+      ? delegate[method].apply(delegate, args)
+      : undefined;
+  }
+
+  conversationsProxy = Object.freeze({
     __elonWinNewConversationGuardWrapped: true,
+    get baseConversations() { return delegate; },
+    capabilities: function () { return callDelegate('capabilities', arguments) || []; },
+    requestList: function () { return callDelegate('requestList', arguments); },
+    openConversation: function () { return callDelegate('openConversation', arguments); },
+    openProject: function () { return callDelegate('openProject', arguments); },
     newConversation
-  }));
+  });
+
+  function rebind(nextConversations) {
+    if (nextConversations === conversationsProxy) {
+      window.__elonChatGptConversations = conversationsProxy;
+      return false;
+    }
+    const next = nextConversations && nextConversations.__elonWinNewConversationGuardWrapped === true &&
+      nextConversations.baseConversations &&
+      typeof nextConversations.baseConversations.newConversation === 'function'
+      ? nextConversations.baseConversations
+      : nextConversations;
+    if (!next || typeof next.newConversation !== 'function') return false;
+    if (next === delegate) {
+      window.__elonChatGptConversations = conversationsProxy;
+      return false;
+    }
+    delegate = next;
+    bindingRevision += 1;
+    window.__elonChatGptConversations = conversationsProxy;
+    return true;
+  }
+
+  window.__elonChatGptConversations = conversationsProxy;
   window.__elonWinChatGptNewConversationGuard = Object.freeze({
-    version: 3,
-    conversations: window.__elonChatGptConversations,
+    version: VERSION,
+    conversations: conversationsProxy,
+    rebind,
     confirmStableMs: CONFIRM_STABLE_MS,
-    confirmTimeoutMs: CONFIRM_TIMEOUT_MS
+    confirmTimeoutMs: CONFIRM_TIMEOUT_MS,
+    diagnostics: function () {
+      return 'v' + VERSION + '|bindings=' + bindingRevision;
+    }
   });
 })();

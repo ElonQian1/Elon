@@ -102,7 +102,8 @@ function runNewConversation(context) {
 
 const staleRoute = createContext('/c/old-conversation');
 runNewConversation(staleRoute);
-assert.equal(staleRoute.adapter.marker, 'preserved');
+assert.equal(staleRoute.adapter.baseConversations.marker, 'preserved');
+assert.equal(staleRoute.guard.version, 4);
 assert.deepEqual(staleRoute.results, [[
   'new_conversation', false, '官网未离开上一会话，已转入安全恢复。'
 ]]);
@@ -130,13 +131,31 @@ assert.deepEqual(freshGuest.results, [['new_conversation', true, '']]);
 
 const reconnect = createContext('/c/old-conversation');
 const firstGuardedConversations = reconnect.adapter;
-reconnect.reinstall(Object.freeze({
+let replacementCalls = 0;
+const replacement = Object.freeze({
   marker: 'replacement',
-  newConversation: (_inspect, result) => result('new_conversation', true, '')
-}));
-assert.notEqual(reconnect.adapter, firstGuardedConversations);
-assert.equal(reconnect.adapter.marker, 'replacement');
+  capabilities: () => ['replacement'],
+  newConversation: (_inspect, result) => {
+    replacementCalls += 1;
+    result('new_conversation', false, 'replacement-delegate');
+  }
+});
+reconnect.reinstall(replacement);
+assert.equal(reconnect.adapter, firstGuardedConversations);
+assert.equal(reconnect.adapter.baseConversations, replacement);
 assert.equal(reconnect.adapter.__elonWinNewConversationGuardWrapped, true);
 assert.equal(reconnect.guard.conversations, reconnect.adapter);
+assert.deepEqual(reconnect.adapter.capabilities(), ['replacement']);
+reconnect.results.length = 0;
+runNewConversation(reconnect);
+assert.equal(replacementCalls, 1);
+assert.deepEqual(reconnect.results, [[
+  'new_conversation', false, 'replacement-delegate'
+]]);
+assert.equal(reconnect.guard.diagnostics(), 'v4|bindings=2');
 
-process.stdout.write('PASS Win ChatGPT new-conversation route and DOM guard\n');
+reconnect.reinstall(reconnect.adapter);
+assert.equal(reconnect.adapter, firstGuardedConversations);
+assert.equal(reconnect.guard.diagnostics(), 'v4|bindings=2');
+
+process.stdout.write('PASS Win ChatGPT new-conversation route, DOM guard, and hot rebind\n');
