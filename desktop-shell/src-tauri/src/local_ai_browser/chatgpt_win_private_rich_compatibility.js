@@ -4,8 +4,14 @@
   const api = factory();
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (!root) return;
-  const policy = root.__elonChatGptPrivateStreamPolicy;
-  if (!policy || typeof policy.createSession !== 'function') return;
+  const current = root.__elonChatGptPrivateStreamPolicy;
+  if (!current || typeof current.createSession !== 'function') return;
+  const installed = root.__elonWinChatGptPrivateRichCompatibility;
+  if (installed && Number(installed.version || 0) >= api.version && installed.policy === current) return;
+  const policy = current.__elonWinPrivateRichCompatibilityWrapped === true && installed &&
+    installed.basePolicy && typeof installed.basePolicy.createSession === 'function'
+    ? installed.basePolicy
+    : current;
   if (policy.__elonWinPrivateRichCompatibilityWrapped === true) return;
   const enhanced = api.enhancePolicy(policy);
   root.__elonChatGptPrivateStreamPolicy = Object.freeze(enhanced);
@@ -18,7 +24,7 @@
 })(typeof window === 'object' ? window : null, function () {
   'use strict';
 
-  const VERSION = 3;
+  const VERSION = 4;
   const MAX_WIDGET_KEYS = 32;
 
   function packedWidgetKey(widget) {
@@ -34,10 +40,13 @@
     ].join(':').slice(0, 460);
   }
 
-  function isFinancePart(part) {
+  function isSupportedRichPart(part) {
     return Boolean(part && part.type === 'rich_card' && (
       part.kind === 'finance' ||
-      part.richContent && part.richContent.kind === 'finance'
+      part.kind === 'chart' ||
+      part.richContent && (
+        part.richContent.kind === 'finance' || part.richContent.kind === 'chart'
+      )
     ));
   }
 
@@ -137,7 +146,7 @@
     }
 
     function converted(part) {
-      if (isFinancePart(part)) convertedCount += 1;
+      if (isSupportedRichPart(part)) convertedCount += 1;
       return part;
     }
 
@@ -160,7 +169,7 @@
   function withCompatibility(active, tracker) {
     if (!active || active.state !== 'completed') return active;
     const richParts = Array.isArray(active.richParts) ? active.richParts : [];
-    if (richParts.some(isFinancePart)) return active;
+    if (richParts.some(isSupportedRichPart)) return active;
     const status = tracker.snapshot();
     if (!status.rendererUpgradeRequired) return active;
     if (richParts.some((part) => (
@@ -171,9 +180,14 @@
     });
   }
 
-  function enhanceSession(policy, session, tracker) {
+  function enhanceSession(policy, session, tracker, publishCompatibility) {
+    function publish() {
+      publishCompatibility(tracker.snapshot());
+    }
+
     function accept(payload) {
-      if (session.accept(payload)) return true;
+      const accepted = session.accept(payload);
+      let widgets = [];
 
       // The official SSE can deliver a packed interactive widget in its own
       // frame, after the assistant text frame. The shared session parser
@@ -182,30 +196,52 @@
       // Keep this Win-only compatibility bridge narrow: only release frames
       // that the upstream policy positively identifies as finance widgets.
       try {
-        return typeof policy.packedFinanceWidgets === 'function'
-          && policy.packedFinanceWidgets(payload).length > 0;
+        widgets = typeof policy.packedFinanceWidgets === 'function'
+          ? policy.packedFinanceWidgets(payload)
+          : [];
       } catch (_) {
-        return false;
+        widgets = [];
       }
+      tracker.observeWidgets(widgets);
+      publish();
+      return accepted || widgets.length > 0;
     }
 
     function begin() {
       tracker.reset();
-      return session.begin();
+      const result = session.begin();
+      publish();
+      return result;
     }
 
     function reset() {
       tracker.reset();
-      return session.reset();
+      const result = session.reset();
+      publish();
+      return result;
+    }
+
+    function acceptRichParts(parts, identity) {
+      tracker.observeWidgets(identity ? [identity] : []);
+      const accepted = typeof session.acceptRichParts === 'function'
+        ? session.acceptRichParts(parts, identity)
+        : false;
+      if (accepted) (Array.isArray(parts) ? parts : []).forEach(tracker.converted);
+      publish();
+      return accepted;
     }
 
     function packedWidgets() {
       const values = typeof session.packedWidgets === 'function' ? session.packedWidgets() : [];
-      return tracker.observeWidgets(values);
+      const observed = tracker.observeWidgets(values);
+      publish();
+      return observed;
     }
 
     function current(pathname) {
-      return withCompatibility(session.current(pathname), tracker);
+      const active = withCompatibility(session.current(pathname), tracker);
+      publish();
+      return active;
     }
 
     function merge(values, pathname) {
@@ -215,6 +251,7 @@
 
     return Object.freeze(Object.assign({}, session, {
       accept,
+      acceptRichParts,
       begin,
       current,
       merge,
@@ -227,41 +264,21 @@
     if (!policy || typeof policy.createSession !== 'function' ||
         typeof policy.mergeMessages !== 'function') return policy;
     if (policy.__elonWinPrivateRichCompatibilityWrapped === true) return policy;
-    const tracker = createTracker();
-
-    function financePartFromWidget(widget) {
-      let part = null;
-      try {
-        part = typeof policy.financePartFromWidget === 'function'
-          ? policy.financePartFromWidget(widget)
-          : null;
-      } catch (_) {
-        part = null;
-      }
-      return tracker.converted(part);
-    }
-
-    function packedFinanceWidgets(payload) {
-      let values = [];
-      try {
-        values = typeof policy.packedFinanceWidgets === 'function'
-          ? policy.packedFinanceWidgets(payload)
-          : [];
-      } catch (_) {
-        values = [];
-      }
-      return tracker.observeWidgets(values);
-    }
+    let latestCompatibility = createTracker().snapshot();
 
     return Object.assign({}, policy, {
       __elonWinPrivateRichCompatibilityWrapped: true,
       createSession(options) {
-        tracker.reset();
-        return enhanceSession(policy, policy.createSession(options || {}), tracker);
+        const tracker = createTracker();
+        latestCompatibility = tracker.snapshot();
+        return enhanceSession(
+          policy,
+          policy.createSession(options || {}),
+          tracker,
+          (snapshot) => { latestCompatibility = snapshot; },
+        );
       },
-      financePartFromWidget,
-      packedFinanceWidgets,
-      richCompatibility: tracker.snapshot,
+      richCompatibility: () => latestCompatibility,
     });
   }
 

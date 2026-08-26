@@ -1,5 +1,7 @@
 const assert = require('node:assert/strict')
+const fs = require('node:fs')
 const path = require('node:path')
+const vm = require('node:vm')
 
 const root = path.resolve(__dirname, '..')
 const basePolicy = require(path.join(
@@ -10,6 +12,10 @@ const compatibility = require(path.join(
   root,
   'desktop-shell/src-tauri/src/local_ai_browser/chatgpt_win_private_rich_compatibility.js',
 ))
+const compatibilitySource = fs.readFileSync(path.join(
+  root,
+  'desktop-shell/src-tauri/src/local_ai_browser/chatgpt_win_private_rich_compatibility.js',
+), 'utf8')
 
 let clock = 10_000
 
@@ -41,7 +47,7 @@ const widget = packedWidget()
 assert.equal(compatibility.packedWidgetKey(null), '')
 assert.equal(compatibility.packedWidgetKey({}), '')
 const fakePayloadPolicy = compatibility.enhancePolicy(Object.assign({}, basePolicy, {
-  packedFinanceWidgets: () => [widget],
+  packedFinanceWidgets: (payload) => payload && payload.packed ? [widget] : [],
 }))
 assert.equal(fakePayloadPolicy.__elonWinPrivateRichCompatibilityWrapped, true)
 assert.equal(compatibility.enhancePolicy(fakePayloadPolicy), fakePayloadPolicy)
@@ -53,7 +59,6 @@ assert.equal(
   true,
   'a standalone packed-widget SSE frame must reach the Win decoder even without a message body',
 )
-fakePayloadPolicy.packedFinanceWidgets({ packed: true })
 fakeSession.finish()
 
 const failed = fakeSession.current('/c/conversation-rich-compatibility')
@@ -79,12 +84,12 @@ assert.equal(fakePayloadPolicy.richCompatibility().packedWidgetCount, 0)
 assert.equal(fakeSession.current('/c/conversation-rich-compatibility'), null)
 
 const validPolicy = compatibility.enhancePolicy(Object.assign({}, basePolicy, {
-  packedFinanceWidgets: () => [widget],
+  packedFinanceWidgets: (payload) => payload && payload.packed ? [widget] : [],
 }))
 const validSession = validPolicy.createSession({ now: () => ++clock })
 validSession.begin()
 validSession.accept(assistantFrame('assistant-rich-valid', '行情正文。'))
-validPolicy.packedFinanceWidgets({ packed: true })
+validSession.accept({ packed: true })
 const financePart = validPolicy.financePartFromWidget({
   asset_display_name: 'Bitcoin (BTC)',
   current_price_text: 'US$77,000.00',
@@ -101,12 +106,69 @@ const financePart = validPolicy.financePartFromWidget({
   },
 })
 assert.equal(financePart.kind, 'finance')
-validSession.acceptRichParts([financePart], widget)
+assert.equal(validSession.acceptRichParts([financePart], widget), true)
 validSession.finish()
 const valid = validSession.current('/c/conversation-rich-compatibility')
 assert.equal(valid.richParts.length, 1)
 assert.equal(valid.richParts[0].kind, 'finance')
 assert.equal(validPolicy.richCompatibility().rendererUpgradeRequired, false)
+
+const isolatedPolicy = compatibility.enhancePolicy(Object.assign({}, basePolicy, {
+  packedFinanceWidgets: (payload) => payload && payload.packed ? [widget] : [],
+}))
+const failedSession = isolatedPolicy.createSession({ now: () => ++clock })
+failedSession.begin()
+failedSession.accept(assistantFrame('assistant-isolated-failed', '第一会话正文。'))
+failedSession.accept({ packed: true })
+failedSession.finish()
+const successfulSession = isolatedPolicy.createSession({ now: () => ++clock })
+successfulSession.begin()
+successfulSession.accept(assistantFrame('assistant-isolated-chart', '第二会话正文。'))
+assert.equal(successfulSession.acceptRichParts([{
+  type: 'rich_card',
+  text: 'BTC 趋势',
+  kind: 'chart',
+  richContent: {
+    schema: 'yilong.rich-content.v1',
+    kind: 'chart',
+    source: 'private_response',
+    payload: {
+      title: 'BTC 趋势',
+      chartType: 'line',
+      series: [{ key: 'price', label: '价格' }],
+      points: [{ x: '10:00', values: [1] }, { x: '11:00', values: [2] }],
+    },
+  },
+}], widget), true)
+successfulSession.finish()
+assert.equal(
+  failedSession.current('/c/conversation-rich-compatibility').richParts[0].kind,
+  'renderer_upgrade_required',
+  'another parser session must not clear the first conversation compatibility state',
+)
+assert.equal(
+  successfulSession.current('/c/conversation-rich-compatibility').richParts[0].kind,
+  'chart',
+  'a supported chart must not be accompanied by an upgrade placeholder',
+)
+
+const stalePolicy = Object.assign({}, basePolicy, {
+  __elonWinPrivateRichCompatibilityWrapped: true,
+})
+const upgradeWindow = {
+  __elonChatGptPrivateStreamPolicy: stalePolicy,
+  __elonWinChatGptPrivateRichCompatibility: Object.freeze({
+    version: 3,
+    basePolicy,
+    policy: stalePolicy,
+  }),
+}
+vm.runInNewContext(compatibilitySource, { window: upgradeWindow }, {
+  filename: 'chatgpt_win_private_rich_compatibility.js',
+})
+assert.equal(upgradeWindow.__elonWinChatGptPrivateRichCompatibility.version, 4)
+assert.notEqual(upgradeWindow.__elonChatGptPrivateStreamPolicy, stalePolicy)
+assert.equal(upgradeWindow.__elonWinChatGptPrivateRichCompatibility.basePolicy, basePolicy)
 
 const renderedPolicy = compatibility.enhancePolicy(basePolicy)
 const renderedStream = {
@@ -140,4 +202,4 @@ assert.equal(
   true,
 )
 
-console.log('PASS: Win private rich compatibility accepts standalone widget frames, preserves text, flags failed widgets, and clears on reset or successful finance decoding')
+console.log('PASS: Win private rich compatibility isolates sessions, accepts standalone widget frames, preserves text, and treats finance or chart decoding as supported')
