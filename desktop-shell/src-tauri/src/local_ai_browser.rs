@@ -13,6 +13,8 @@ mod adapter_command;
 mod adapter_content;
 #[path = "local_ai_browser/chatgpt_adapter_bootstrap.rs"]
 mod chatgpt_adapter_bootstrap;
+#[path = "local_ai_browser/chatgpt_cached_conversation_navigation.rs"]
+mod chatgpt_cached_conversation_navigation;
 #[path = "local_ai_browser/conversation_directory.rs"]
 mod conversation_directory;
 #[path = "local_ai_browser/embedded_view.rs"]
@@ -523,7 +525,9 @@ pub async fn open_local_ai_cached_conversation(
     if !allows_navigation(provider, &url) {
         return Err("本机会话缓存不再属于当前 AI 厂商。".to_string());
     }
-    page.navigate(url).map_err(display_error)?;
+    if !chatgpt_cached_conversation_navigation::start(&page, provider.id, &url) {
+        page.navigate(url).map_err(display_error)?;
+    }
     runtime
         .snapshot(&label)
         .ok_or_else(|| format!("{} 本地会话状态不可用。", provider.display_name))

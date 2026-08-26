@@ -135,7 +135,7 @@ bridge.command(JSON.stringify(command));
     })
 }
 
-fn is_safe_conversation_path(path: &str) -> bool {
+pub(super) fn is_safe_conversation_path(path: &str) -> bool {
     let segments = path
         .strip_prefix('/')
         .map(|value| value.split('/').collect::<Vec<_>>());
