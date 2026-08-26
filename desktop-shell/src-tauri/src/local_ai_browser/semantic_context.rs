@@ -6,6 +6,7 @@ mod chatgpt_stream_shadow;
 mod chatgpt_window;
 
 use serde_json::Value;
+use self::chatgpt_rich_preservation::preserve_message_rich_content;
 use std::{
     sync::atomic::{AtomicU64, Ordering},
     time::{SystemTime, UNIX_EPOCH},
@@ -203,13 +204,31 @@ fn merge_google_turns(previous: Vec<Value>, incoming: Vec<Value>) -> Vec<Value> 
             turn.first().map(normalized_text).as_deref() == Some(user_text.as_str())
         }) {
             if incoming_turn.iter().any(|message| role(message) == Some("assistant")) {
-                merged[index] = incoming_turn;
+                merged[index] = preserve_google_turn_rich_content(&merged[index], incoming_turn);
             }
         } else {
             merged.push(incoming_turn);
         }
     }
     merged.into_iter().flatten().collect()
+}
+
+fn preserve_google_turn_rich_content(previous: &[Value], mut incoming: Vec<Value>) -> Vec<Value> {
+    let previous_assistants = previous
+        .iter()
+        .filter(|message| role(message) == Some("assistant"))
+        .collect::<Vec<_>>();
+    let mut assistant_index = 0usize;
+    for message in &mut incoming {
+        if role(message) != Some("assistant") {
+            continue;
+        }
+        if let Some(known) = previous_assistants.get(assistant_index) {
+            *message = preserve_message_rich_content(known, message.clone());
+        }
+        assistant_index += 1;
+    }
+    incoming
 }
 
 fn message_turns(source: Vec<Value>) -> Vec<Vec<Value>> {
@@ -400,6 +419,55 @@ mod tests {
             merged["messages"][3]["content"][0]["text"],
             "fresh second answer"
         );
+    }
+
+    #[test]
+    fn google_temporary_dom_downgrade_keeps_the_known_rich_card() {
+        let previous = json!({"messages":[
+            {"role":"user","content":[{"type":"text","text":"today weather"}]},
+            {"role":"assistant","state":"completed","content":[
+                {"type":"markdown","text":"Weather answer"},
+                {"type":"rich_card","text":"天气预报","kind":"weather","richContent":{
+                    "schema":"yilong.rich-content.v1","kind":"weather","source":"official_dom",
+                    "payload":{"title":"天气预报","summary":"晴","rows":[]}
+                }}
+            ]}
+        ]});
+        let incoming = json!({"messages":[
+            {"role":"user","content":[{"type":"text","text":"today weather"}]},
+            {"role":"assistant","state":"streaming","content":[
+                {"type":"markdown","text":"Weather answer updated"},
+                {"type":"interactive","text":"天气预报","kind":"renderer_upgrade_required"},
+                {"type":"interactive","text":"另一个独立工具","kind":"interactive"}
+            ]}
+        ]});
+
+        let merged = merge_message_snapshot("google-ai-mode", Some(&previous), incoming, true);
+        let content = merged["messages"][1]["content"].as_array().unwrap();
+
+        assert!(content.iter().any(|part| part["type"] == "rich_card"));
+        assert!(!content.iter().any(|part| {
+            part["type"] == "interactive" && part["text"] == "天气预报"
+        }));
+        assert!(content.iter().any(|part| part["text"] == "另一个独立工具"));
+        assert!(content.iter().any(|part| part["text"] == "Weather answer updated"));
+    }
+
+    #[test]
+    fn google_new_conversation_never_inherits_a_previous_rich_card() {
+        let previous = json!({"messages":[
+            {"role":"user","content":[{"type":"text","text":"old"}]},
+            {"role":"assistant","content":[{"type":"rich_card","text":"旧天气","kind":"weather","richContent":{
+                "schema":"yilong.rich-content.v1","kind":"weather","source":"official_dom","payload":{"title":"旧天气"}
+            }}]}
+        ]});
+        let incoming = json!({"messages":[
+            {"role":"user","content":[{"type":"text","text":"new"}]},
+            {"role":"assistant","content":[{"type":"markdown","text":"new answer"}]}
+        ]});
+
+        let merged = merge_message_snapshot("google-ai-mode", Some(&previous), incoming, false);
+        assert!(!merged.to_string().contains("旧天气"));
     }
 
     #[test]
