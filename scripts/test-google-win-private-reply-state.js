@@ -30,9 +30,11 @@ const window = {
 
 vm.runInNewContext(source, { window, JSON, String, Number, Object });
 
-assert.equal(window.__elonWinGooglePrivateReplyStateVersion, 1);
+assert.equal(window.__elonWinGooglePrivateReplyStateVersion, 2);
 assert.notEqual(window.__elonGoogleWebPrivateReplyObserver, baseObserver);
 assert.notEqual(window.elonGoogleWebNative, baseNative);
+const installedObserver = window.__elonGoogleWebPrivateReplyObserver;
+const installedNative = window.elonGoogleWebNative;
 
 window.__elonGoogleWebPrivateReplyObserver.observePrompt('BTC 走势');
 assert.equal(observedPrompt, 'BTC 走势');
@@ -67,6 +69,42 @@ assert.equal(event.privateStreamRevision, 2);
 window.__elonGoogleWebPrivateReplyObserver.setListener(() => {});
 assert.equal(typeof listener, 'function');
 assert.equal(window.__elonGoogleWebPrivateReplyObserver.diagnostics(), 'base-diagnostics');
+
+let reboundPrompt = '';
+let reboundReply = null;
+let reboundListener = null;
+const reboundEmitted = [];
+const reboundObserver = {
+  version: 6,
+  observePrompt(value) { reboundPrompt = String(value); reboundReply = null; },
+  snapshot() { return reboundReply; },
+  diagnostics() { return 'rebound-diagnostics'; },
+  setListener(value) { reboundListener = value; },
+};
+const reboundNative = {
+  postMessage(raw) { reboundEmitted.push(JSON.parse(String(raw))); },
+};
+window.__elonGoogleWebPrivateReplyObserver = reboundObserver;
+window.elonGoogleWebNative = reboundNative;
+vm.runInNewContext(source, { window, JSON, String, Number, Object });
+
+assert.equal(window.__elonGoogleWebPrivateReplyObserver, installedObserver);
+assert.equal(window.elonGoogleWebNative, installedNative);
+assert.equal(window.__elonGoogleWebPrivateReplyObserver.version, 6);
+assert.equal(reboundListener, listener, 'adapter listener must follow a replacement observer');
+assert.equal(
+  window.__elonWinGooglePrivateReplyState.diagnostics(),
+  'v2|bindings=2|state=idle',
+);
+window.__elonGoogleWebPrivateReplyObserver.observePrompt('ETH 走势');
+assert.equal(reboundPrompt, 'ETH 走势');
+reboundReply = { prompt: 'ETH 走势', text: '新观察器回答', streaming: false };
+window.elonGoogleWebNative.postMessage(envelope(true));
+event = reboundEmitted.pop().event;
+assert.equal(event.privateStreamObserved, true);
+assert.equal(event.privateStreamState, 'completed');
+assert.equal(event.streaming, false);
+assert.equal(emitted.length, 0, 'rebound events must not leak to the stale native bridge');
 assert.doesNotMatch(source, /document\.cookie|authorization|access[_-]?token|fetch\s*\(/i);
 
 function envelope(streaming) {

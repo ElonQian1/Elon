@@ -1,12 +1,19 @@
 (function () {
   'use strict';
 
-  if (Number(window.__elonWinGooglePrivateReplyStateVersion || 0) >= 1) return;
+  var STATE_VERSION = 2;
   const baseObserver = window.__elonGoogleWebPrivateReplyObserver;
   const baseNative = window.elonGoogleWebNative;
   if (!baseObserver || typeof baseObserver.observePrompt !== 'function' ||
       typeof baseObserver.snapshot !== 'function' || !baseNative ||
       typeof baseNative.postMessage !== 'function') return;
+
+  const existingState = window.__elonWinGooglePrivateReplyState;
+  if (existingState && Number(existingState.version || 0) >= STATE_VERSION &&
+      typeof existingState.rebind === 'function') {
+    existingState.rebind(baseObserver, baseNative);
+    return;
+  }
 
   let generation = 0;
   let revision = 0;
@@ -14,6 +21,12 @@
   let observed = false;
   let state = 'idle';
   let acceptingReplies = false;
+  let observerDelegate = baseObserver;
+  let nativeDelegate = baseNative;
+  let observerListener = null;
+  let bindingRevision = 1;
+  let observer;
+  let nativeProxy;
 
   function reset() {
     generation += 1;
@@ -26,12 +39,12 @@
   function observePrompt(value) {
     reset();
     acceptingReplies = true;
-    return baseObserver.observePrompt(value);
+    return observerDelegate.observePrompt(value);
   }
 
   function snapshot() {
     if (!acceptingReplies) return null;
-    const value = baseObserver.snapshot();
+    const value = observerDelegate.snapshot();
     if (!value || !value.prompt || !value.text) return value;
     const nextState = value.streaming ? 'streaming' : 'completed';
     const fingerprint = [generation, nextState, String(value.text)].join('|');
@@ -44,24 +57,35 @@
     return value;
   }
 
-  const observer = Object.freeze({
-    version: Number(baseObserver.version || 0),
+  function setListener(value) {
+    observerListener = typeof value === 'function' ? value : null;
+    if (typeof observerDelegate.setListener === 'function') {
+      return observerDelegate.setListener(observerListener);
+    }
+  }
+
+  observer = {
     observePrompt,
     snapshot,
-    diagnostics: typeof baseObserver.diagnostics === 'function'
-      ? function () { return baseObserver.diagnostics(); }
-      : function () { return ''; },
-    setListener: typeof baseObserver.setListener === 'function'
-      ? function (value) { return baseObserver.setListener(value); }
-      : function () {},
+    diagnostics: function () {
+      return typeof observerDelegate.diagnostics === 'function'
+        ? observerDelegate.diagnostics()
+        : '';
+    },
+    setListener,
+  };
+  Object.defineProperty(observer, 'version', {
+    enumerable: true,
+    get: function () { return Number(observerDelegate.version || 0); },
   });
-  window.__elonGoogleWebPrivateReplyObserver = observer;
+  observer = Object.freeze(observer);
 
-  window.elonGoogleWebNative = Object.freeze({
+  nativeProxy = Object.freeze({
+    __elonWinGooglePrivateReplyStateWrapped: true,
     postMessage: function (raw) {
       let payload;
       try { payload = JSON.parse(String(raw || '')); }
-      catch (_) { return baseNative.postMessage(raw); }
+      catch (_) { return nativeDelegate.postMessage(raw); }
       if (payload && payload.schema === 'yilong.ai.ui.v1' && payload.event &&
           payload.event.type === 'message_snapshot') {
         snapshot();
@@ -70,17 +94,47 @@
         payload.event.privateStreamState = state;
         if (observed && state === 'streaming') payload.event.streaming = true;
         if (observed && state === 'completed') payload.event.streaming = false;
-        return baseNative.postMessage(JSON.stringify(payload));
+        return nativeDelegate.postMessage(JSON.stringify(payload));
       }
-      return baseNative.postMessage(raw);
+      return nativeDelegate.postMessage(raw);
     },
   });
 
-  window.__elonWinGooglePrivateReplyStateVersion = 1;
+  function rebind(nextObserver, nextNative) {
+    let changed = false;
+    if (nextObserver && nextObserver !== observer && nextObserver !== observerDelegate &&
+        typeof nextObserver.observePrompt === 'function' &&
+        typeof nextObserver.snapshot === 'function') {
+      observerDelegate = nextObserver;
+      if (typeof observerDelegate.setListener === 'function') {
+        observerDelegate.setListener(observerListener);
+      }
+      reset();
+      changed = true;
+    }
+    if (nextNative && nextNative !== nativeProxy && nextNative !== nativeDelegate &&
+        typeof nextNative.postMessage === 'function') {
+      nativeDelegate = nextNative;
+      changed = true;
+    }
+    if (changed) bindingRevision += 1;
+    window.__elonGoogleWebPrivateReplyObserver = observer;
+    window.elonGoogleWebNative = nativeProxy;
+    return changed;
+  }
+
+  window.__elonGoogleWebPrivateReplyObserver = observer;
+  window.elonGoogleWebNative = nativeProxy;
+  window.__elonWinGooglePrivateReplyStateVersion = STATE_VERSION;
   window.__elonWinGooglePrivateReplyState = Object.freeze({
+    version: STATE_VERSION,
     reset,
+    rebind,
     snapshot: function () {
-      return Object.freeze({ generation, revision, observed, state });
+      return Object.freeze({ generation, revision, observed, state, bindingRevision });
+    },
+    diagnostics: function () {
+      return 'v' + STATE_VERSION + '|bindings=' + bindingRevision + '|state=' + state;
     },
   });
 })();

@@ -1,10 +1,9 @@
 (function () {
   'use strict';
 
-  var VERSION = 2;
+  var VERSION = 3;
   var allowedOrigins = new Set(['https://google.com', 'https://www.google.com']);
   if (!allowedOrigins.has(location.origin)) return;
-  if (Number(window.__elonWinGooglePrivateConversationBridgeVersion || 0) >= VERSION) return;
 
   var baseBridge = window.__elonGoogleWebBridge;
   var directory = window.__elonGoogleWebPrivateThreadDirectory;
@@ -12,6 +11,15 @@
   if (!baseBridge || typeof baseBridge.command !== 'function' ||
       !directory || typeof directory.snapshot !== 'function' ||
       !nativeBridge || typeof nativeBridge.postMessage !== 'function') return;
+
+  var existingState = window.__elonWinGooglePrivateConversationBridge;
+  if (existingState && Number(existingState.version || 0) >= VERSION &&
+      typeof existingState.rebind === 'function') {
+    existingState.rebind(baseBridge, directory, nativeBridge);
+    return;
+  }
+  var bindingRevision = 1;
+  var bridgeProxy;
 
   function parse(raw) {
     try { return JSON.parse(String(raw || '{}')); }
@@ -95,14 +103,51 @@
     baseBridge.command(raw);
   }
 
-  window.__elonGoogleWebBridge = Object.freeze({
-    version: baseBridge.version,
-    documentToken: baseBridge.documentToken,
+  bridgeProxy = {
     command: command,
     dispose: function () {
       if (typeof baseBridge.dispose === 'function') baseBridge.dispose();
     },
-    baseBridge: baseBridge
+  };
+  Object.defineProperty(bridgeProxy, 'version', {
+    enumerable: true,
+    get: function () { return baseBridge.version; },
   });
+  Object.defineProperty(bridgeProxy, 'documentToken', {
+    enumerable: true,
+    get: function () { return baseBridge.documentToken; },
+  });
+  bridgeProxy = Object.freeze(bridgeProxy);
+
+  function rebind(nextBridge, nextDirectory, nextNative) {
+    var changed = false;
+    if (nextBridge && nextBridge !== bridgeProxy && nextBridge !== baseBridge &&
+        typeof nextBridge.command === 'function') {
+      baseBridge = nextBridge;
+      changed = true;
+    }
+    if (nextDirectory && nextDirectory !== directory &&
+        typeof nextDirectory.snapshot === 'function') {
+      directory = nextDirectory;
+      changed = true;
+    }
+    if (nextNative && nextNative !== nativeBridge &&
+        typeof nextNative.postMessage === 'function') {
+      nativeBridge = nextNative;
+      changed = true;
+    }
+    if (changed) bindingRevision += 1;
+    window.__elonGoogleWebBridge = bridgeProxy;
+    return changed;
+  }
+
+  window.__elonGoogleWebBridge = bridgeProxy;
   window.__elonWinGooglePrivateConversationBridgeVersion = VERSION;
+  window.__elonWinGooglePrivateConversationBridge = Object.freeze({
+    version: VERSION,
+    rebind: rebind,
+    diagnostics: function () {
+      return 'v' + VERSION + '|bindings=' + bindingRevision;
+    },
+  });
 })();

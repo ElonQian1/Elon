@@ -56,8 +56,9 @@ vm.runInNewContext(source, {
   Number,
 });
 
-assert.equal(window.__elonWinGooglePrivateConversationBridgeVersion, 2);
+assert.equal(window.__elonWinGooglePrivateConversationBridgeVersion, 3);
 assert.notEqual(window.__elonGoogleWebBridge, baseBridge);
+const installedBridge = window.__elonGoogleWebBridge;
 
 window.__elonGoogleWebBridge.command(JSON.stringify({
   action: 'list_conversations',
@@ -103,6 +104,64 @@ assert.equal(baseCommands.pop(), newConversation);
 const passthrough = JSON.stringify({ action: 'snapshot' });
 window.__elonGoogleWebBridge.command(passthrough);
 assert.deepEqual(baseCommands, [passthrough]);
+
+const reboundCommands = [];
+const reboundEvents = [];
+const reboundBaseBridge = {
+  version: 38,
+  documentToken: 'doc_rebound',
+  command(raw) { reboundCommands.push(String(raw)); },
+  dispose() {},
+};
+window.__elonGoogleWebBridge = reboundBaseBridge;
+window.__elonGoogleWebPrivateThreadDirectory = {
+  snapshot() {
+    return [
+      {
+        id: 'thread_2222222222',
+        title: 'ETH 走势',
+        path: '/c/thread_2222222222',
+        providerUrl: 'https://www.google.com/search?udm=50&q=ETH&csuir=thread_2222222222',
+      },
+      {
+        id: 'thread_3333333333',
+        title: '黄金走势',
+        path: '/c/thread_3333333333',
+        providerUrl: 'https://www.google.com/search?udm=50&q=gold&csuir=thread_3333333333',
+      },
+    ];
+  },
+};
+window.elonGoogleWebNative = {
+  postMessage(raw) { reboundEvents.push(JSON.parse(String(raw))); },
+};
+vm.runInNewContext(source, {
+  window,
+  location,
+  URL,
+  Set,
+  JSON,
+  Object,
+  String,
+  Array,
+  Number,
+});
+
+assert.equal(window.__elonGoogleWebBridge, installedBridge);
+assert.equal(window.__elonGoogleWebBridge.version, 38);
+assert.equal(window.__elonGoogleWebBridge.documentToken, 'doc_rebound');
+assert.equal(
+  window.__elonWinGooglePrivateConversationBridge.diagnostics(),
+  'v3|bindings=2',
+);
+window.__elonGoogleWebBridge.command(JSON.stringify({
+  action: 'list_conversations',
+  requestId: 'mcp_list2',
+}));
+assert.equal(reboundEvents.pop().detail, '已同步 2 个 Google AI 官网会话。');
+window.__elonGoogleWebBridge.command(passthrough);
+assert.deepEqual(reboundCommands, [passthrough]);
+assert.equal(events.length, 0, 'rebound results must not leak to the stale native bridge');
 assert.doesNotMatch(source, /document\.cookie|authorization|access[_-]?token|fetch\s*\(/i);
 
 process.stdout.write('PASS Google Win private conversation bridge\n');
