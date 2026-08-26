@@ -80,6 +80,12 @@ v217 源码新增 `reauthorize_existing`：Control-signed InstallPlan 只能精�
 
 2026-08-25 新增的未登记 source-lineage 草案只把上述 work-admission、局部 Ready-health 与明确 `Untrusted` 的 Host observation 投影为六键 JCS 谱系，并固定缺 local currentness、runtime transition、Host runtime 与 v15 session 四项权威。它保留 CPU-only、signed grant 与结构时间等式，但不生成 `ComputeReadyCapability` 或服务端 execution capability；源码未编译、测试或运行。精确边界见 `user-node-ready-source-lineage-authority.md` 与 `user-node-ready-source-lineage-acceptance.md`。
 
+2026-08-27 又把 local currentness 铺成独立的 transaction-scoped source seal：未来 handle-bound opened authority 可在
+同一 query-only Deferred 快照内重读 exact work-admission head/chain、install/promotion owner、共享授权、Ready inventory
+revision/policy 与逐字段相同的 exact plugin record，并用 fresh authenticated time 重验 health TTL。seal 由 HRTB lifetime 禁止外逃，原六键 envelope 仍保留
+四项 `missing`；runtime transition、Host runtime 与 v15 session 未关闭。当前仍无 handle-bound open producer，源码未编译、
+测试或运行，详见 `user-node-ready-local-currentness-authority.md` 与对应 acceptance。
+
 2026-08-26 的未登记 `source_written/source_review_only/implementation_uncompiled/implementation_unrun` Windows Runner
 drafts 中，retained discovery→exact intent/package-only pre-lease PE→preliminary requests→私有 GrantReady wave-zero prefix→
 authenticated recursive policy-bound base acquisition→producer-wave custody→empty frontier/final aggregate→recursive final projection
@@ -102,7 +108,7 @@ dynamic=`0`。`passed=0/failed=0`、
 - Sidecar 到 Host 的认证 IPC、响应验证和真实探针调度；
 - 失败候选的清理完成 Store、目录耐久闭包、重试授权与跨重启 custody 治理；
 - Host enforcement profile、Runtime 启动/激活和活动健康回执；
-- 发布 Ready 前的 fresh Store read、CAS/fencing 和主动失效链；
+- handle-bound VFS/open 的生产接线，以及 local-currentness seal 的动态故障矩阵、CAS/fencing 和主动失效链；
 - 在 source-lineage 之后完成 `ComputeReadyCapability` 的规范短 TTL 构建、节点签名、v15 认证上报和服务端验证；
 - 共享关闭、排水、崩溃和撤销后的主动失效通知；
 - 从技术就绪事实到 Provider、CapacityPool、Offer 和 Attempt 的生产接线。

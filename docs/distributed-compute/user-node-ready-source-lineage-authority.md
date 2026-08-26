@@ -135,6 +135,13 @@ CAS/fencing 与主动失效链关闭。Runtime transition 缺口只能由未来�
 authenticated session、append-only ledger、重放与撤销闭环关闭。v14 永久是 blocked-only compatibility profile，不得添加
 Ready 分支。
 
+独立的 [`UserNode Ready 本机当前性封印 V1`](user-node-ready-local-currentness-authority.md) 已把第一个缺口铺成
+source-written、未编译/未运行的 transaction-scoped seam：只有 handle-bound opened authority、同一 process fence、fresh
+authenticated time、exact current work-admission head/chain、相同 inventory revision/policy 与逐字段相同的 exact
+plugin record 同时成立，才在
+`for<'snapshot>` callback 内形成 private-field、non-Clone/non-Serde seal。原六键 envelope 仍把四项 gap 全部写为
+`missing`；脱离该 seal 不得声称 local currentness 已成立。该增量没有生产 open 构造器、表、写入或下游效果。
+
 2026-08-26 的 Windows Runner 草案只写入单一 loader successor、完整 by-value seam、FileId leases/reopen receipts、
 五类 failure custody、GrantReady wave-zero prefix、authenticated recursive policy/per-producer-wave custody contract、post-lease
 recursive system-image final projection envelope、suspended-child/atomic-Job/pre-create currentness与 unconfirmed whole-graph parking；
@@ -169,21 +176,23 @@ Attempt 或 Lease。
 - settlement；
 - money。
 
-本批没有表、migration、writer、Store resolver、Service、HTTP/MCP、节点上报或控制 WebSocket。canonical parser 也只能
-恢复 untrusted envelope，不能恢复 owner custody 或构造 `Projected...`。
+原六键 projection 模块自身没有表、Store/SQL resolver、migration、writer、Service、HTTP/MCP、节点上报或控制
+WebSocket；独立 local-currentness seam 只读既有 authority/work-admission 表，没有 migration 或 writer。canonical parser
+也只能恢复 untrusted envelope，不能恢复 owner custody 或构造 `Projected...`。
 
 ## 11. 后续顺序
 
-1. 沿 Windows Runner 草案动态验证 source-written extraction-share 与 launch-path discovery，并实现真实 authenticated CWD
+1. 实现 handle-bound SQLite VFS/open，并动态验收独立 local-currentness seal 的 exact head、drift、TTL 与 custody 矩阵；
+2. 沿 Windows Runner 草案动态验证 source-written extraction-share 与 launch-path discovery，并实现真实 authenticated CWD
    selector/recursive-policy signature verifier/currentness backend、prelease/recursive parser、GrantReady resolver、base grants/leases、逐 producer
    wave candidate/grant/lease backend与 positive advancer、same-owner reparse及 exact recursive PE/launch/resolution
    seal/final aggregate/query/reopen、launch-security/private desktop、
    live-OS/pre-create/pre-resume currentness、explicit release/recovery、dynamic-load、
    IPC/enforcement/Store、受控 resume 与健康/撤销，形成真实 Host runtime authority；
-2. 新建 v15 endpoint session，不修改 v14 blocked-only；
-3. 由 Node owner 对本谱系做 fresh authority read、fencing 与签名发布；
-4. 服务端在 current V279 binding/session/credential 下验证并封存短 TTL Ready authority；
-5. 再把 server-owned Ready 与独立 route/hardware authority 投影为 execution capability；
-6. 市场 Offer、容量预留和任务 Lease 继续走各自门卫。
+3. 新建 v15 endpoint session，不修改 v14 blocked-only；
+4. 由 Node owner 消费 local-currentness、Runtime/Host authority 与 v15 session，完成签名发布；
+5. 服务端在 current V279 binding/session/credential 下验证并封存短 TTL Ready authority；
+6. 再把 server-owned Ready 与独立 route/hardware authority 投影为 execution capability；
+7. 市场 Offer、容量预留和任务 Lease 继续走各自门卫。
 
 任何一步都不能把本批 source draft 的存在描述为用户节点已经可被联邦 Broker 调度。

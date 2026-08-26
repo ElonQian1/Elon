@@ -38,6 +38,10 @@ Rust test 执行；格式化、文本检索、diff、体积和模块化检查即
 复用；没有复制第二份 schema 或摘要实现。两个 binary/逻辑 module 会各自编译该文本，Rust 类型身份不可跨 target 直接
 互换，未来 wire 仍必须使用 canonical envelope。
 
+独立的 [`local-currentness acceptance`](user-node-ready-local-currentness-acceptance.md) 另行记录 source-written 的
+handle-bound/query-only/HRTB seal。它不修改本 V1 envelope 或本页四项 `missing` gap；只有 seal lifetime 内可解释为
+第一项缺口已在该 SQLite 快照中重证。该 guard 同样未运行，不能给本页增加 passed 数。
+
 ## 3. 静态源码审阅目标
 
 源码应满足：
@@ -51,7 +55,8 @@ Rust test 执行；格式化、文本检索、diff、体积和模块化检查即
 7. CPU-only 不虚构 accelerator，Host 自报资源不能超过 signed grant；
 8. local currentness、runtime transition、Host runtime、v15 session 四项 authority gap 与九项下游 zero-effect 不可省略；
 9. 无 Ready/Verified execution capability 构造器；
-10. 无 Store、SQL、migration、API、MCP、Wire 或状态写入。
+10. 原六键 projection 模块无 Store/SQL；独立 local-currentness seam 只有既有表的只读查询；两者均无 migration、writer、
+    API、MCP、Wire 或状态写入。
 
 这些目标当前只有 source-written 状态；在用户解除架构阶段禁令并运行相应测试前，不记通过数。
 
@@ -87,7 +92,8 @@ Rust test 执行；格式化、文本检索、diff、体积和模块化检查即
 
 ## 6. 下一验收门
 
-下一阶段不是给本 DTO 加一个公开 constructor，而是形成可动态验收的 Host runtime authority。其最小故障矩阵至少包括：
+下一阶段不是给本 DTO 加一个公开 constructor。先实现 handle-bound SQLite VFS/open 并动态验收 local-currentness seal，
+再形成可动态验收的 Host runtime authority。其最小故障矩阵至少包括：
 
 - Runner 启动前/后崩溃与 custody 恢复；
 - IPC 双向认证、重放、乱序、超时和响应大小限制；

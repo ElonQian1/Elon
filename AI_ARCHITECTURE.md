@@ -210,7 +210,7 @@ Store retained resolver source 只以 settlement Lease 为根，在同一 Deferr
 CapacityInstrument→Commitment→exercised DeliveryAllocation→F0 execution/verification/settlement/release，封入
 crate-visible、private-field、non-Clone/non-Serde seal。该增量未编译、未运行且无 Service/API/表/写入/effect，不能解释为清算或真实计量。
 
-F1 的 Ready 边界新增未登记、未编译/未运行的 source-lineage 草案：它从线性 work-admission 与 Ready-health owner token 读取事实，并把 Host runtime observation 保持为 `Untrusted`，输出固定缺少 local currentness、runtime transition、Host runtime 与 v15 authenticated session 四项权威的 `Projected` 六键谱系。它不构造 Ready 或 execution capability，也不改变 Provider、route、Offer、Attempt、Lease 或资金；精确边界见 `docs/distributed-compute/user-node-ready-source-lineage-authority.md`。
+F1 的 Ready 边界新增未登记、未编译/未运行的 source-lineage 草案：它从线性 work-admission 与 Ready-health owner token 读取事实，并把 Host runtime observation 保持为 `Untrusted`，输出固定缺少 local currentness、runtime transition、Host runtime 与 v15 authenticated session 四项权威的 `Projected` 六键谱系。独立 local-currentness seam 又把第一个缺口限制在未来 handle-bound opened authority 的 query-only Deferred 快照和 HRTB private seal 内：重审 exact admission head/chain、共享授权、process fence、Ready inventory revision/policy、逐字段相同的 exact plugin record 与 fresh health TTL；原 envelope 仍保留四 gap，脱离 seal 不得外推 currentness。两者都不构造 Ready 或 execution capability，也不改变 Provider、route、Offer、Attempt、Lease 或资金；精确边界见 `docs/distributed-compute/user-node-ready-source-lineage-authority.md` 与 `docs/distributed-compute/user-node-ready-local-currentness-authority.md`。
 
 F1 的 Windows Host authority草案已把线性 owner顺序冻结为 retained discovery → authenticated intent + package-only pre-lease
 PE → preliminary requests → private GrantReady wave-zero exact prefix → signed recursive-policy evidence → A0 point-of-use PolicyCurrent →
