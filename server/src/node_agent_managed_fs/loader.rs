@@ -4,6 +4,7 @@ mod name_grant_positive;
 mod system_image_custody;
 
 pub(crate) use system_image_custody::{
+    ManagedLoaderSystemImageCandidateResolutionEvidence,
     ManagedLoaderSystemImageContentLeaseAcquisitionAttemptCustody,
     ManagedLoaderSystemImageContentLeaseAuthenticatedNegativeReceipt,
     ManagedLoaderSystemImageContentLeasePositiveOutcomeCustody,

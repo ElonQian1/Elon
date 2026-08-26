@@ -2,7 +2,7 @@
 
 use std::convert::Infallible;
 
-use anyhow::{bail, Result};
+use anyhow::Result;
 
 use crate::node_agent_managed_fs::{
     ManagedLoaderSystemImageContentLeasePositiveOutcomeCustody,
@@ -17,7 +17,16 @@ use super::super::super::{
 use super::super::{
     WindowsPostLeaseSystemImageParseReceipt, WindowsRecursiveWaveAcquisitionReceipt,
 };
-use super::{AuthenticatedWindowsRecursiveWaveResolutionPlan, WindowsRecursiveWaveRequestPlan};
+use super::{
+    plan::{
+        WindowsRecursiveBaseParsedImageOwnerPlanEntry,
+        WindowsRecursiveRetainedForwarderChainPlanEntry,
+        WindowsRecursiveRetainedSearchDirectoryAuthorityRef,
+        WindowsRecursiveWaveDispatchPlanEvidence,
+    },
+    plan_validation, AuthenticatedWindowsRecursiveWaveResolutionPlan,
+    WindowsRecursiveWaveRequestPlan,
+};
 
 /// Exact earlier graph, authenticated policy and live owners retained across every wave.
 ///
@@ -28,14 +37,18 @@ use super::{AuthenticatedWindowsRecursiveWaveResolutionPlan, WindowsRecursiveWav
 pub(in crate::node_agent_compute_plugin_host::runtime_loader_load_set) struct WindowsRecursiveResolutionAccumulatedCustody<
     'root,
 > {
-    root_namespace: PreFinalWindowsLoaderNamespaceGrantSet<'root>,
-    authenticated_policy: AuthenticatedWindowsRecursiveResolutionPolicy,
-    base_package_content_leases: Vec<WindowsLoaderPackageContentLeaseCustody>,
-    retained_filesystem_content_leases:
+    pub(super) root_namespace: PreFinalWindowsLoaderNamespaceGrantSet<'root>,
+    pub(super) authenticated_policy: AuthenticatedWindowsRecursiveResolutionPolicy,
+    pub(super) base_parsed_image_owners: Vec<WindowsRecursiveBaseParsedImageOwnerPlanEntry>,
+    pub(super) retained_forwarder_chains: Vec<WindowsRecursiveRetainedForwarderChainPlanEntry>,
+    pub(super) retained_search_directories:
+        Vec<WindowsRecursiveRetainedSearchDirectoryAuthorityRef>,
+    pub(super) base_package_content_leases: Vec<WindowsLoaderPackageContentLeaseCustody>,
+    pub(super) retained_filesystem_content_leases:
         Vec<ManagedLoaderSystemImageContentLeasePositiveOutcomeCustody>,
-    completed_parse_receipts: Vec<WindowsPostLeaseSystemImageParseReceipt>,
-    completed_acquisition_receipts: Vec<WindowsRecursiveWaveAcquisitionReceipt>,
-    whole_state_digest: String,
+    pub(super) completed_parse_receipts: Vec<WindowsPostLeaseSystemImageParseReceipt>,
+    pub(super) completed_acquisition_receipts: Vec<WindowsRecursiveWaveAcquisitionReceipt>,
+    pub(super) whole_state_digest: String,
 }
 
 struct WindowsRecursivePendingSearchedNameGrantRef {
@@ -84,7 +97,7 @@ struct WindowsRecursiveKnownDllSectionSourceRef {
     section_image_mapping_receipt_digest: String,
 }
 
-/// Only the ordinary filesystem route owns a retained parent-relative candidate.
+/// Only a filesystem-backed ordinary or side-by-side route owns a retained candidate.
 #[must_use = "filesystem candidate must enter one lease attempt or failure custody"]
 struct WindowsRecursiveFilesystemCandidateCustody {
     resolution_request_ordinal: usize,
@@ -126,78 +139,56 @@ pub(in crate::node_agent_compute_plugin_host::runtime_loader_load_set) struct Wi
     _wave_request_dispatch_producer_unavailable: Infallible,
 }
 
-/// Partial searched-name grant acquisition. Completed grants, active root and pending refs remain
-/// together; a future dispatcher must consume this whole value for each next attempt.
-#[must_use = "partial wave grants must advance whole or enter grant failure custody"]
-pub(in crate::node_agent_compute_plugin_host::runtime_loader_load_set) struct WindowsRecursiveWaveGrantAcquisitionCustody<
+/// Authenticated resolver output before the complete borrow-only pre-dispatch gate. It has no
+/// grant attempt or backend capability and cannot be passed to the future dispatcher.
+#[must_use = "unvalidated recursive resolution must validate whole or remain intact"]
+pub(in crate::node_agent_compute_plugin_host::runtime_loader_load_set) struct WindowsRecursiveWaveResolvedPlanCustody<
     'root,
 > {
     accumulated: WindowsRecursiveResolutionAccumulatedCustody<'root>,
     request_plan: WindowsRecursiveWaveRequestPlan,
     resolved_plan: AuthenticatedWindowsRecursiveWaveResolutionPlan,
+    _resolved_plan_validator_transition_unavailable: Infallible,
+}
+
+/// The only state a future searched-name dispatcher may consume. Its full typed plan evidence was
+/// validated before this state was formed and remains by value through every later stage.
+#[must_use = "dispatch-ready wave grants must advance whole or enter grant failure custody"]
+pub(in crate::node_agent_compute_plugin_host::runtime_loader_load_set) struct DispatchReadyWindowsRecursiveWaveGrantCustody<
+    'root,
+> {
+    accumulated: WindowsRecursiveResolutionAccumulatedCustody<'root>,
+    validated_plan_evidence: WindowsRecursiveWaveDispatchPlanEvidence,
     acquired_searched_name_grants: Vec<WindowsLoaderSearchedNameFenceCustody>,
     pending_searched_name_grants: Vec<WindowsRecursivePendingSearchedNameGrantRef>,
     searched_name_grant_set_digest: String,
-    _wave_grant_advancer_unavailable: Infallible,
+    _dispatch_ready_grant_advancer_unavailable: Infallible,
 }
 
-impl WindowsRecursiveWaveGrantAcquisitionCustody<'_> {
-    /// Purpose-specific borrow gate that must succeed before the first searched-name dispatch.
-    /// The cumulative module/name/system totals are derived from exact contiguous request ranges;
-    /// the authenticated resolver supplies parsed-image/frontier/depth projections that the final
-    /// acquisition/closure validators must later cross-bind to actual receipts and edges.
-    pub(super) fn validate_policy_limits_before_first_dispatch(&self) -> Result<()> {
-        if self.resolved_plan.producer_wave_ordinal != self.request_plan.producer_wave_ordinal
-            || self.resolved_plan.source_request_plan_digest
-                != self.request_plan.source_request_plan_digest
-        {
-            bail!("COMPUTE_PLUGIN_WINDOWS_RECURSIVE_PRE_DISPATCH_PLAN_CHANGED");
-        }
-        let projected_recursive_wave_count = self
-            .request_plan
-            .producer_wave_ordinal
-            .checked_add(
-                if self
-                    .resolved_plan
-                    .projected_next_frontier_parse_receipt_count
-                    > 0
-                {
-                    1
-                } else {
-                    0
-                },
-            )
-            .ok_or_else(projected_count_overflow)?;
-        let projected_module_request_count = self
-            .request_plan
-            .first_module_request_ordinal
-            .checked_add(self.request_plan.module_request_count)
-            .ok_or_else(projected_count_overflow)?;
-        let projected_searched_name_count = self
-            .request_plan
-            .first_searched_name_ordinal
-            .checked_add(self.request_plan.searched_name_count)
-            .ok_or_else(projected_count_overflow)?;
-        let projected_system_image_request_count = self
-            .request_plan
-            .first_system_image_request_ordinal
-            .checked_add(self.request_plan.system_image_request_count)
-            .ok_or_else(projected_count_overflow)?;
+pub(super) type WindowsRecursiveWaveGrantAcquisitionCustody<'root> =
+    DispatchReadyWindowsRecursiveWaveGrantCustody<'root>;
+
+impl WindowsRecursiveWaveResolvedPlanCustody<'_> {
+    /// Complete pre-dispatch gate. A future validator transition may consume this intact state into
+    /// `DispatchReadyWindowsRecursiveWaveGrantCustody` only after this returns success; no such
+    /// producer exists in the source-only architecture slice.
+    pub(super) fn validate_whole_before_first_dispatch(&self) -> Result<()> {
+        let projection = plan_validation::validate_whole_before_first_dispatch(
+            &self.accumulated,
+            &self.request_plan,
+            &self.resolved_plan,
+        )?;
         self.accumulated
             .authenticated_policy
             .validate_projected_totals_before_dispatch(
-                projected_recursive_wave_count,
-                self.resolved_plan.projected_parsed_image_count,
-                projected_module_request_count,
-                projected_searched_name_count,
-                projected_system_image_request_count,
-                self.resolved_plan.projected_forwarder_hop_depth,
+                projection.recursive_wave_count,
+                projection.parsed_image_count,
+                projection.module_request_count,
+                projection.searched_name_count,
+                projection.system_image_request_count,
+                projection.forwarder_hop_depth,
             )
     }
-}
-
-fn projected_count_overflow() -> anyhow::Error {
-    anyhow::anyhow!("COMPUTE_PLUGIN_WINDOWS_RECURSIVE_PRE_DISPATCH_COUNT_OVERFLOW")
 }
 
 /// Route selection after all required searched-name grants. Filesystem candidates first become
@@ -207,8 +198,7 @@ pub(in crate::node_agent_compute_plugin_host::runtime_loader_load_set) struct Wi
     'root,
 > {
     accumulated: WindowsRecursiveResolutionAccumulatedCustody<'root>,
-    request_plan: WindowsRecursiveWaveRequestPlan,
-    resolved_plan: AuthenticatedWindowsRecursiveWaveResolutionPlan,
+    validated_plan_evidence: WindowsRecursiveWaveDispatchPlanEvidence,
     acquired_searched_name_grants: Vec<WindowsLoaderSearchedNameFenceCustody>,
     acquired_route_candidates: Vec<WindowsRecursiveRouteCandidateCustody>,
     pending_filesystem_candidates: Vec<WindowsRecursivePendingFilesystemCandidateRef>,
@@ -224,8 +214,7 @@ pub(in crate::node_agent_compute_plugin_host::runtime_loader_load_set) struct Wi
     'root,
 > {
     accumulated: WindowsRecursiveResolutionAccumulatedCustody<'root>,
-    request_plan: WindowsRecursiveWaveRequestPlan,
-    resolved_plan: AuthenticatedWindowsRecursiveWaveResolutionPlan,
+    validated_plan_evidence: WindowsRecursiveWaveDispatchPlanEvidence,
     acquired_searched_name_grants: Vec<WindowsLoaderSearchedNameFenceCustody>,
     acquired_parse_sources: Vec<WindowsRecursiveSameOwnerParseSourceCustody>,
     pending_filesystem_candidates: Vec<WindowsRecursiveFilesystemCandidateCustody>,
@@ -241,8 +230,7 @@ pub(in crate::node_agent_compute_plugin_host::runtime_loader_load_set) struct Wi
     'root,
 > {
     accumulated: WindowsRecursiveResolutionAccumulatedCustody<'root>,
-    request_plan: WindowsRecursiveWaveRequestPlan,
-    resolved_plan: AuthenticatedWindowsRecursiveWaveResolutionPlan,
+    validated_plan_evidence: WindowsRecursiveWaveDispatchPlanEvidence,
     acquired_searched_name_grants: Vec<WindowsLoaderSearchedNameFenceCustody>,
     completed_parse_sources: Vec<WindowsRecursiveSameOwnerParseSourceCustody>,
     completed_parse_receipts: Vec<WindowsPostLeaseSystemImageParseReceipt>,
@@ -258,7 +246,10 @@ pub(in crate::node_agent_compute_plugin_host::runtime_loader_load_set) struct Wi
 pub(in crate::node_agent_compute_plugin_host::runtime_loader_load_set) struct WindowsRecursiveWaveCompletedCustody<
     'root,
 > {
-    parsed_wave: WindowsRecursiveWaveSameOwnerParseCustody<'root>,
+    accumulated: WindowsRecursiveResolutionAccumulatedCustody<'root>,
+    acquired_searched_name_grants: Vec<WindowsLoaderSearchedNameFenceCustody>,
+    completed_parse_sources: Vec<WindowsRecursiveSameOwnerParseSourceCustody>,
+    completed_parse_receipts: Vec<WindowsPostLeaseSystemImageParseReceipt>,
     acquisition_receipt: WindowsRecursiveWaveAcquisitionReceipt,
     _completed_wave_sealer_unavailable: Infallible,
 }

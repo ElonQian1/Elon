@@ -5,13 +5,84 @@ use std::path::Path;
 use sha2::{Digest, Sha256};
 
 use super::loader::{
-    ManagedLoaderSystemImageContentLease,
+    ManagedLoaderSystemImageCandidateResolutionEvidence, ManagedLoaderSystemImageContentLease,
     ManagedLoaderSystemImageContentLeaseAcquisitionAttemptCustody,
     ManagedLoaderSystemImageContentLeaseAuthenticatedNegativeReceipt,
     ManagedLoaderSystemImageContentLeasePositiveOutcomeCustody,
     PinnedWindowsLoaderResolvedSystemImageCandidate, PinnedWindowsLoaderSearchDirectory,
     PinnedWindowsLoaderSystemImageFile,
 };
+
+impl ManagedLoaderSystemImageCandidateResolutionEvidence {
+    #[allow(clippy::too_many_arguments)]
+    fn matches_resolution_request(
+        &self,
+        parent_directory_identity_digest: &str,
+        normalized_name: &str,
+        resolved_component_identity_digest: &str,
+        image_file_identity_digest: &str,
+        concrete_servicing_generation_digest: &str,
+        code_integrity_evidence_digest: &str,
+        servicing_resolution_receipt_digest: &str,
+        namespace_alias_currentness_receipt_digest: &str,
+        candidate_binding_digest: &str,
+    ) -> bool {
+        self.parent_directory_identity_digest == parent_directory_identity_digest
+            && self.normalized_name == normalized_name
+            && self.resolved_component_identity_digest == resolved_component_identity_digest
+            && self.image_file_identity_digest == image_file_identity_digest
+            && self.concrete_servicing_generation_digest == concrete_servicing_generation_digest
+            && self.code_integrity_evidence_digest == code_integrity_evidence_digest
+            && self.servicing_resolution_receipt_digest == servicing_resolution_receipt_digest
+            && self.namespace_alias_currentness_receipt_digest
+                == namespace_alias_currentness_receipt_digest
+            && self.candidate_binding_digest == candidate_binding_digest
+            && self.binding_is_self_consistent()
+    }
+
+    fn binding_is_self_consistent(&self) -> bool {
+        [
+            &self.parent_directory_identity_digest,
+            &self.resolved_component_identity_digest,
+            &self.image_file_identity_digest,
+            &self.parent_relative_open_receipt_digest,
+            &self.code_integrity_evidence_digest,
+            &self.concrete_servicing_generation_digest,
+            &self.servicing_resolution_receipt_digest,
+            &self.namespace_alias_currentness_receipt_digest,
+            &self.candidate_binding_digest,
+        ]
+        .iter()
+        .all(|digest| is_lower_sha256(digest))
+            && self.candidate_binding_digest
+                == system_image_candidate_binding_digest(
+                    &self.parent_directory_identity_digest,
+                    &self.normalized_name,
+                    &self.resolved_component_identity_digest,
+                    &self.image_file_identity_digest,
+                    &self.parent_relative_open_receipt_digest,
+                    &self.code_integrity_evidence_digest,
+                    &self.concrete_servicing_generation_digest,
+                    &self.servicing_resolution_receipt_digest,
+                    &self.namespace_alias_currentness_receipt_digest,
+                )
+    }
+
+    pub(crate) fn binding(&self) -> (&str, &str, &str, &str, &str, &str, &str, &str, &str, &str) {
+        (
+            &self.parent_directory_identity_digest,
+            &self.normalized_name,
+            &self.resolved_component_identity_digest,
+            &self.image_file_identity_digest,
+            &self.parent_relative_open_receipt_digest,
+            &self.code_integrity_evidence_digest,
+            &self.concrete_servicing_generation_digest,
+            &self.servicing_resolution_receipt_digest,
+            &self.namespace_alias_currentness_receipt_digest,
+            &self.candidate_binding_digest,
+        )
+    }
+}
 
 impl PinnedWindowsLoaderSearchDirectory {
     pub(crate) fn matches_handle_binding(
@@ -203,9 +274,19 @@ impl ManagedLoaderSystemImageContentLeasePositiveOutcomeCustody {
         servicing_generation_digest: &str,
     ) -> bool {
         let image_binding = self.image.binding();
+        let (_, _, _, _, image_parent_relative_open_receipt_digest, _) = image_binding;
         let lease_binding = self.image.content_lease_binding();
         self.resolution_request_ordinal == resolution_request_ordinal
             && self.candidate_binding_digest == candidate_binding_digest
+            && self
+                .candidate_resolution_evidence
+                .binding_is_self_consistent()
+            && self.candidate_resolution_evidence.candidate_binding_digest
+                == self.candidate_binding_digest
+            && self
+                .candidate_resolution_evidence
+                .parent_relative_open_receipt_digest
+                == image_parent_relative_open_receipt_digest
             && self.request_digest == lease_request_digest
             && [
                 &self.candidate_binding_digest,
@@ -238,6 +319,38 @@ impl ManagedLoaderSystemImageContentLeasePositiveOutcomeCustody {
                     image_binding,
                     lease_binding,
                 )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn matches_candidate_resolution_request(
+        &self,
+        parent_directory_identity_digest: &str,
+        normalized_name: &str,
+        resolved_component_identity_digest: &str,
+        image_file_identity_digest: &str,
+        concrete_servicing_generation_digest: &str,
+        code_integrity_evidence_digest: &str,
+        servicing_resolution_receipt_digest: &str,
+        namespace_alias_currentness_receipt_digest: &str,
+    ) -> bool {
+        self.candidate_resolution_evidence
+            .matches_resolution_request(
+                parent_directory_identity_digest,
+                normalized_name,
+                resolved_component_identity_digest,
+                image_file_identity_digest,
+                concrete_servicing_generation_digest,
+                code_integrity_evidence_digest,
+                servicing_resolution_receipt_digest,
+                namespace_alias_currentness_receipt_digest,
+                &self.candidate_binding_digest,
+            )
+    }
+
+    pub(crate) fn candidate_resolution_binding(
+        &self,
+    ) -> (&str, &str, &str, &str, &str, &str, &str, &str, &str, &str) {
+        self.candidate_resolution_evidence.binding()
     }
 
     pub(crate) fn image(&self) -> &PinnedWindowsLoaderSystemImageFile {

@@ -11,7 +11,8 @@ use super::super::{
     projection_digest, SealedWindowsRecursiveResolutionClosure, WindowsRecursiveResolutionWavePlan,
 };
 use super::{
-    digest, SealedWindowsRecursiveResolutionAcquisitionChain,
+    digest, plan_digest, plan_forwarder_validation, plan_projection,
+    SealedWindowsRecursiveResolutionAcquisitionChain, WindowsRecursiveAcquisitionPlanEvidence,
     WindowsRecursiveWaveAcquisitionReceipt,
 };
 
@@ -84,6 +85,15 @@ fn validate_receipt_projection(
         expected_resolved_plan_digest,
         expected_lease_set_digest,
     ) = if ordinal == 0 {
+        let WindowsRecursiveAcquisitionPlanEvidence::BaseGrantReady {
+            grant_ready_resolution_plan_digest,
+        } = &receipt.pre_dispatch_plan_evidence
+        else {
+            bail!("COMPUTE_PLUGIN_WINDOWS_RECURSIVE_BASE_PLAN_EVIDENCE_CHANGED");
+        };
+        if grant_ready_resolution_plan_digest != &resolution.grant_ready_resolution_plan_digest {
+            bail!("COMPUTE_PLUGIN_WINDOWS_RECURSIVE_BASE_PLAN_EVIDENCE_CHANGED");
+        }
         (
             &[][..],
             0,
@@ -101,6 +111,11 @@ fn validate_receipt_projection(
             .waves
             .get(ordinal - 1)
             .ok_or_else(|| anyhow!("COMPUTE_PLUGIN_WINDOWS_RECURSIVE_ACQUISITION_WAVE_MISSING"))?;
+        let WindowsRecursiveAcquisitionPlanEvidence::RecursiveWave { plan } =
+            &receipt.pre_dispatch_plan_evidence
+        else {
+            bail!("COMPUTE_PLUGIN_WINDOWS_RECURSIVE_PLAN_EVIDENCE_KIND_CHANGED");
+        };
         (
             wave.source_parse_receipt_ordinals.as_slice(),
             wave.first_module_request_ordinal,
@@ -109,11 +124,21 @@ fn validate_receipt_projection(
             wave.searched_name_count,
             wave.first_system_image_request_ordinal,
             wave.system_image_request_count,
-            wave.parsed_edge_set_digest.as_str(),
-            wave.wave_digest.as_str(),
+            plan.request_plan_digest.as_str(),
+            plan.resolved_plan_digest.as_str(),
             wave.acquired_system_image_set_digest.clone(),
         )
     };
+    let module_request_end = first_module_request_ordinal
+        .checked_add(module_request_count)
+        .ok_or_else(count_overflow)?;
+    let expected_base_owner_set_digest =
+        plan_digest::base_parsed_image_owner_set_digest_from_resolution(resolution)?;
+    let expected_forwarder_chain_set_digest =
+        plan_forwarder_validation::final_forwarder_chain_set_digest_through(
+            module_request_end,
+            resolution,
+        )?;
 
     let expected_next_frontier = if ordinal == 0 {
         closure
@@ -161,6 +186,8 @@ fn validate_receipt_projection(
         || receipt.first_system_image_request_ordinal != first_system_image_request_ordinal
         || receipt.system_image_request_count != system_image_request_count
         || receipt.input_custody_digest != expected_input_custody_digest
+        || receipt.base_parsed_image_owner_set_digest != expected_base_owner_set_digest
+        || receipt.retained_forwarder_chain_set_digest != expected_forwarder_chain_set_digest
         || receipt.source_request_plan_digest != expected_source_request_plan_digest
         || receipt.resolved_plan_digest != expected_resolved_plan_digest
         || receipt.filesystem_candidate_set_digest != expected_candidate_set_digest
@@ -190,8 +217,11 @@ fn validate_receipt_projection(
         &receipt.authenticated_recursive_policy_digest,
         &receipt.parser_policy_digest,
         &receipt.input_custody_digest,
+        &receipt.base_parsed_image_owner_set_digest,
+        &receipt.retained_forwarder_chain_set_digest,
         &receipt.source_request_plan_digest,
         &receipt.resolved_plan_digest,
+        &receipt.pre_dispatch_plan_evidence_digest,
         &receipt.searched_name_grant_set_digest,
         &receipt.filesystem_candidate_set_digest,
         &receipt.immutable_content_lease_set_digest,
@@ -205,10 +235,21 @@ fn validate_receipt_projection(
             .previous_acquisition_receipt_digest
             .as_deref()
             .is_some_and(|digest| !is_sha256(digest))
+        || receipt.pre_dispatch_plan_evidence_digest
+            != plan_digest::pre_dispatch_plan_evidence_digest(&receipt.pre_dispatch_plan_evidence)?
         || receipt.output_custody_digest != digest::output_custody_digest(receipt)?
         || receipt.receipt_digest != digest::receipt_digest(receipt)?
     {
         bail!("COMPUTE_PLUGIN_WINDOWS_RECURSIVE_ACQUISITION_RECEIPT_DIGEST_CHANGED");
+    }
+    if ordinal > 0 {
+        let wave = closure
+            .waves
+            .get(ordinal - 1)
+            .ok_or_else(|| anyhow!("COMPUTE_PLUGIN_WINDOWS_RECURSIVE_ACQUISITION_WAVE_MISSING"))?;
+        plan_projection::validate_recursive_plan_evidence_against(
+            receipt, wave, closure, resolution,
+        )?;
     }
     Ok(())
 }

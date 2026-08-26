@@ -23,6 +23,22 @@ pub(crate) struct PinnedWindowsLoaderResolvedSystemImageCandidate {
         Infallible,
 }
 
+/// Immutable scalar evidence retained when the candidate file moves into a positive lease image.
+/// It preserves every field that formed the candidate binding, including servicing and namespace
+/// currentness, without duplicating the consumed file handle.
+pub(crate) struct ManagedLoaderSystemImageCandidateResolutionEvidence {
+    pub(in crate::node_agent_managed_fs) parent_directory_identity_digest: String,
+    pub(in crate::node_agent_managed_fs) normalized_name: String,
+    pub(in crate::node_agent_managed_fs) resolved_component_identity_digest: String,
+    pub(in crate::node_agent_managed_fs) image_file_identity_digest: String,
+    pub(in crate::node_agent_managed_fs) parent_relative_open_receipt_digest: String,
+    pub(in crate::node_agent_managed_fs) code_integrity_evidence_digest: String,
+    pub(in crate::node_agent_managed_fs) concrete_servicing_generation_digest: String,
+    pub(in crate::node_agent_managed_fs) servicing_resolution_receipt_digest: String,
+    pub(in crate::node_agent_managed_fs) namespace_alias_currentness_receipt_digest: String,
+    pub(in crate::node_agent_managed_fs) candidate_binding_digest: String,
+}
+
 /// Dispatched attempt owns both the exact candidate file and authenticated backend session. A
 /// negative leaves both here; a positive transition must consume them into the dedicated positive
 /// outcome and final system-image owner.
@@ -69,6 +85,8 @@ pub(crate) struct ManagedLoaderSystemImageContentLeasePositiveOutcomeCustody {
     pub(in crate::node_agent_managed_fs) authenticated_response_digest: String,
     pub(in crate::node_agent_managed_fs) authenticated_response: Vec<u8>,
     pub(in crate::node_agent_managed_fs) positive_receipt_digest: String,
+    pub(in crate::node_agent_managed_fs) candidate_resolution_evidence:
+        ManagedLoaderSystemImageCandidateResolutionEvidence,
     pub(in crate::node_agent_managed_fs) image: PinnedWindowsLoaderSystemImageFile,
     pub(in crate::node_agent_managed_fs) _authenticated_system_content_positive_backend_unavailable:
         Infallible,

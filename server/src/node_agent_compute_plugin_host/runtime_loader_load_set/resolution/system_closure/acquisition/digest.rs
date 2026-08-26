@@ -19,7 +19,7 @@ pub(super) fn output_custody_digest(
     receipt: &WindowsRecursiveWaveAcquisitionReceipt,
 ) -> Result<String> {
     jcs_sha256_hex(&json!({
-        "schema": "elon.compute_plugin.windows_recursive_wave_output_custody.v1",
+        "schema": "elon.compute_plugin.windows_recursive_wave_output_custody.v2",
         "acquisition_receipt_ordinal": receipt.acquisition_receipt_ordinal,
         "previous_acquisition_receipt_digest": receipt.previous_acquisition_receipt_digest,
         "authenticated_recursive_policy_digest": receipt.authenticated_recursive_policy_digest,
@@ -34,8 +34,11 @@ pub(super) fn output_custody_digest(
         "first_system_image_request_ordinal": receipt.first_system_image_request_ordinal,
         "system_image_request_count": receipt.system_image_request_count,
         "input_custody_digest": receipt.input_custody_digest,
+        "base_parsed_image_owner_set_digest": receipt.base_parsed_image_owner_set_digest,
+        "retained_forwarder_chain_set_digest": receipt.retained_forwarder_chain_set_digest,
         "source_request_plan_digest": receipt.source_request_plan_digest,
         "resolved_plan_digest": receipt.resolved_plan_digest,
+        "pre_dispatch_plan_evidence_digest": receipt.pre_dispatch_plan_evidence_digest,
         "searched_name_grant_set_digest": receipt.searched_name_grant_set_digest,
         "filesystem_candidate_set_digest": receipt.filesystem_candidate_set_digest,
         "immutable_content_lease_set_digest": receipt.immutable_content_lease_set_digest,
@@ -46,7 +49,7 @@ pub(super) fn output_custody_digest(
 
 pub(super) fn receipt_digest(receipt: &WindowsRecursiveWaveAcquisitionReceipt) -> Result<String> {
     jcs_sha256_hex(&json!({
-        "schema": "elon.compute_plugin.windows_recursive_wave_acquisition_receipt.v1",
+        "schema": "elon.compute_plugin.windows_recursive_wave_acquisition_receipt.v2",
         "acquisition_receipt_ordinal": receipt.acquisition_receipt_ordinal,
         "previous_acquisition_receipt_digest": receipt.previous_acquisition_receipt_digest,
         "authenticated_recursive_policy_digest": receipt.authenticated_recursive_policy_digest,
@@ -61,8 +64,11 @@ pub(super) fn receipt_digest(receipt: &WindowsRecursiveWaveAcquisitionReceipt) -
         "first_system_image_request_ordinal": receipt.first_system_image_request_ordinal,
         "system_image_request_count": receipt.system_image_request_count,
         "input_custody_digest": receipt.input_custody_digest,
+        "base_parsed_image_owner_set_digest": receipt.base_parsed_image_owner_set_digest,
+        "retained_forwarder_chain_set_digest": receipt.retained_forwarder_chain_set_digest,
         "source_request_plan_digest": receipt.source_request_plan_digest,
         "resolved_plan_digest": receipt.resolved_plan_digest,
+        "pre_dispatch_plan_evidence_digest": receipt.pre_dispatch_plan_evidence_digest,
         "searched_name_grant_set_digest": receipt.searched_name_grant_set_digest,
         "filesystem_candidate_set_digest": receipt.filesystem_candidate_set_digest,
         "immutable_content_lease_set_digest": receipt.immutable_content_lease_set_digest,
@@ -154,6 +160,18 @@ pub(super) fn filesystem_candidate_set_digest(
         .map(|custody| {
             let (request, candidate, _, _, _, _, _) = custody.outcome.binding();
             let (parent, name, file, _, open_receipt, _) = custody.outcome.image().binding();
+            let (
+                evidence_parent,
+                evidence_name,
+                component,
+                evidence_file,
+                evidence_open_receipt,
+                code_integrity,
+                servicing_generation,
+                servicing_resolution,
+                namespace_currentness,
+                evidence_candidate,
+            ) = custody.outcome.candidate_resolution_binding();
             json!({
                 "resolution_request_ordinal": custody.resolution_request_ordinal,
                 "outcome_request_ordinal": request,
@@ -162,11 +180,23 @@ pub(super) fn filesystem_candidate_set_digest(
                 "normalized_name": name,
                 "image_file_identity_digest": file,
                 "parent_relative_open_receipt_digest": open_receipt,
+                "candidate_resolution_evidence": {
+                    "parent_directory_identity_digest": evidence_parent,
+                    "normalized_name": evidence_name,
+                    "resolved_component_identity_digest": component,
+                    "image_file_identity_digest": evidence_file,
+                    "parent_relative_open_receipt_digest": evidence_open_receipt,
+                    "code_integrity_evidence_digest": code_integrity,
+                    "concrete_servicing_generation_digest": servicing_generation,
+                    "servicing_resolution_receipt_digest": servicing_resolution,
+                    "namespace_alias_currentness_receipt_digest": namespace_currentness,
+                    "candidate_binding_digest": evidence_candidate,
+                },
             })
         })
         .collect::<Vec<_>>();
     jcs_sha256_hex(&json!({
-        "schema": "elon.compute_plugin.windows_recursive_filesystem_candidate_set.v1",
+        "schema": "elon.compute_plugin.windows_recursive_filesystem_candidate_set.v2",
         "producer_wave_ordinal": producer_wave_ordinal,
         "candidates": candidates,
     }))
