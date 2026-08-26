@@ -170,6 +170,7 @@ export default function useLocalAiWebChatController(
     directSendReady: userState.canSend,
     newConversationRecoveryActive: Boolean(newConversationRecoveryStartedAtMs),
     queuedSendActive: Boolean(queuedSend),
+    sendFlightActive: pendingSends.length > 0 || pendingResponses.length > 0,
     busyAction,
   })
   const capabilityPrewarmBlocked = Boolean(
@@ -441,7 +442,7 @@ export default function useLocalAiWebChatController(
       setMessage('消息已保存在本机新会话队列；官网在后台完成绑定后会自动发送。')
       return visibleSessionState
     }
-    if (busyAction) return null
+    if (busyAction || (action === 'send_prompt' && !composerAvailability.canSubmit)) return null
     if (action === 'new_conversation') {
       return startNewConversation()
     }

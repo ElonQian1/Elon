@@ -45,6 +45,7 @@ const base = {
   directSendReady: false,
   newConversationRecoveryActive: false,
   queuedSendActive: false,
+  sendFlightActive: false,
   busyAction: '',
 }
 
@@ -70,6 +71,15 @@ assert.equal(localAiComposerAvailability({
 assert.deepEqual(localAiComposerAvailability({ ...base, directSendReady: true }), {
   canEdit: true,
   canSubmit: true,
+  shouldQueue: false,
+})
+assert.deepEqual(localAiComposerAvailability({
+  ...base,
+  directSendReady: true,
+  sendFlightActive: true,
+}), {
+  canEdit: true,
+  canSubmit: false,
   shouldQueue: false,
 })
 assert.deepEqual(localAiComposerAvailability({
@@ -138,5 +148,7 @@ assert.match(backend, /const canCompose = ready && controller\.canSubmitDraft/)
 assert.match(backend, /官网页面正在后台异步同步/)
 assert.match(controller, /resumeLocalAiWebSession\(providerId, ownerKey, cachedState\)/)
 assert.match(controller, /if \(!warmSession\) setMessage/)
+assert.match(controller, /sendFlightActive: pendingSends\.length > 0 \|\| pendingResponses\.length > 0/)
+assert.match(controller, /action === 'send_prompt' && !composerAvailability\.canSubmit/)
 
 process.stdout.write('PASS local AI non-blocking composer availability\n')

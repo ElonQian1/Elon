@@ -5,6 +5,7 @@ export interface LocalAiComposerAvailabilityInput {
   directSendReady: boolean
   newConversationRecoveryActive: boolean
   queuedSendActive: boolean
+  sendFlightActive: boolean
   busyAction: string
 }
 
@@ -32,6 +33,7 @@ export function localAiComposerAvailability(
   const direct = enabled
     && input.directSendReady
     && !input.newConversationRecoveryActive
+    && !input.sendFlightActive
     && !input.busyAction
   return {
     canEdit: enabled,
