@@ -123,15 +123,32 @@ pub(super) fn merge_message_snapshot(
         replace_messages(&mut incoming, incoming_messages, base_window_start);
         return incoming;
     };
-    let previous_messages = messages(previous)
-        .into_iter()
-        .filter(|message| !google_page_chrome_message(message))
-        .collect::<Vec<_>>();
+    let previous_messages = stabilize_google_turns(
+        messages(previous)
+            .into_iter()
+            .filter(|message| !google_page_chrome_message(message))
+            .collect::<Vec<_>>(),
+    )
+    .into_iter()
+    .flatten()
+    .collect::<Vec<_>>();
     if incoming_messages.is_empty() {
         replace_messages(&mut incoming, previous_messages, base_window_start);
         return incoming;
     }
-    let merged = merge_google_turns(previous_messages, incoming_messages);
+    let completed_after_streaming = previous
+        .get("streaming")
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
+        && !incoming
+            .get("streaming")
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
+    let merged = merge_google_turns(
+        previous_messages,
+        incoming_messages,
+        completed_after_streaming,
+    );
     replace_messages(&mut incoming, merged, base_window_start);
     incoming
 }
@@ -193,24 +210,98 @@ fn google_page_chrome_message(message: &Value) -> bool {
     (signed_out && chrome_signals >= 1) || chrome_signals >= 4
 }
 
-fn merge_google_turns(previous: Vec<Value>, incoming: Vec<Value>) -> Vec<Value> {
+fn merge_google_turns(
+    previous: Vec<Value>,
+    incoming: Vec<Value>,
+    completed_after_streaming: bool,
+) -> Vec<Value> {
     let mut merged = message_turns(previous);
     for incoming_turn in message_turns(incoming) {
-        let user_text = incoming_turn.first().map(normalized_text).unwrap_or_default();
+        let user_text = incoming_turn
+            .first()
+            .map(normalized_text)
+            .unwrap_or_default();
         if user_text.is_empty() {
             continue;
         }
-        if let Some(index) = merged.iter().position(|turn| {
+        let existing_index = merged.iter().position(|turn| {
             turn.first().map(normalized_text).as_deref() == Some(user_text.as_str())
-        }) {
-            if incoming_turn.iter().any(|message| role(message) == Some("assistant")) {
-                merged[index] = preserve_google_turn_rich_content(&merged[index], incoming_turn);
+        });
+        let admitted = admit_google_turn(
+            &merged,
+            incoming_turn,
+            existing_index,
+            completed_after_streaming,
+        );
+        if let Some(index) = existing_index {
+            if admitted
+                .iter()
+                .any(|message| role(message) == Some("assistant"))
+            {
+                merged[index] = preserve_google_turn_rich_content(&merged[index], admitted);
             }
         } else {
-            merged.push(incoming_turn);
+            merged.push(admitted);
         }
     }
     merged.into_iter().flatten().collect()
+}
+
+fn admit_google_turn(
+    merged: &[Vec<Value>],
+    mut incoming: Vec<Value>,
+    existing_index: Option<usize>,
+    completed_after_streaming: bool,
+) -> Vec<Value> {
+    let Some(fingerprint) = google_assistant_fingerprint(&incoming) else {
+        return incoming;
+    };
+    // Google can leave the preceding answer mounted while the next query starts.
+    // Admit the same text only when it settles a turn that was already streaming.
+    let duplicates_earlier_answer = merged.iter().enumerate().any(|(index, turn)| {
+        Some(index) != existing_index
+            && google_assistant_fingerprint(turn).as_deref() == Some(fingerprint.as_str())
+    });
+    if !duplicates_earlier_answer {
+        return incoming;
+    }
+    let existing_turn_awaiting_answer = existing_index.is_some_and(|index| {
+        !merged[index]
+            .iter()
+            .any(|message| role(message) == Some("assistant"))
+    });
+    if existing_turn_awaiting_answer && completed_after_streaming {
+        return incoming;
+    }
+    incoming.retain(|message| role(message) != Some("assistant"));
+    incoming
+}
+
+fn stabilize_google_turns(messages: Vec<Value>) -> Vec<Vec<Value>> {
+    let mut turns = message_turns(messages);
+    if turns.len() < 3 {
+        return turns;
+    }
+    for index in 1..turns.len() - 1 {
+        let Some(previous) = google_assistant_fingerprint(&turns[index - 1]) else {
+            continue;
+        };
+        if google_assistant_fingerprint(&turns[index]).as_deref() != Some(previous.as_str()) {
+            continue;
+        }
+        turns[index].retain(|message| role(message) != Some("assistant"));
+    }
+    turns
+}
+
+fn google_assistant_fingerprint(turn: &[Value]) -> Option<String> {
+    let content = turn
+        .iter()
+        .filter(|message| role(message) == Some("assistant"))
+        .map(normalized_text)
+        .filter(|text| !text.is_empty())
+        .collect::<Vec<_>>();
+    (!content.is_empty()).then(|| content.join("\0"))
 }
 
 fn preserve_google_turn_rich_content(previous: &[Value], mut incoming: Vec<Value>) -> Vec<Value> {
@@ -419,6 +510,68 @@ mod tests {
             merged["messages"][3]["content"][0]["text"],
             "fresh second answer"
         );
+    }
+
+    #[test]
+    fn google_new_prompt_rejects_the_previous_answer_carry_over() {
+        let previous = json!({"streaming":false,"messages":[
+            {"role":"user","content":[{"type":"text","text":"first question"}]},
+            {"role":"assistant","content":[{"type":"text","text":"first answer"}]}
+        ]});
+        let incoming = json!({"streaming":true,"messages":[
+            {"role":"user","content":[{"type":"text","text":"first question"}]},
+            {"role":"assistant","content":[{"type":"text","text":"first answer"}]},
+            {"role":"user","content":[{"type":"text","text":"second question"}]},
+            {"role":"assistant","content":[{"type":"text","text":"first answer"}]}
+        ]});
+
+        let merged = merge_message_snapshot("google-ai-mode", Some(&previous), incoming, true);
+        let messages = merged["messages"].as_array().unwrap();
+
+        assert_eq!(messages.len(), 3);
+        assert_eq!(messages[2]["content"][0]["text"], "second question");
+        assert_eq!(messages[2]["role"], "user");
+    }
+
+    #[test]
+    fn google_completed_stream_can_repeat_an_answer_for_the_pending_turn() {
+        let previous = json!({"streaming":true,"messages":[
+            {"role":"user","content":[{"type":"text","text":"first question"}]},
+            {"role":"assistant","content":[{"type":"text","text":"same answer"}]},
+            {"role":"user","content":[{"type":"text","text":"second question"}]}
+        ]});
+        let incoming = json!({"streaming":false,"messages":[
+            {"role":"user","content":[{"type":"text","text":"second question"}]},
+            {"role":"assistant","state":"completed","content":[{"type":"text","text":"same answer"}]}
+        ]});
+
+        let merged = merge_message_snapshot("google-ai-mode", Some(&previous), incoming, true);
+        let messages = merged["messages"].as_array().unwrap();
+
+        assert_eq!(messages.len(), 4);
+        assert_eq!(messages[3]["role"], "assistant");
+        assert_eq!(messages[3]["content"][0]["text"], "same answer");
+    }
+
+    #[test]
+    fn google_cached_intermediate_carry_over_is_sanitized() {
+        let previous = json!({"messages":[
+            {"role":"user","content":[{"type":"text","text":"first question"}]},
+            {"role":"assistant","content":[{"type":"text","text":"first answer"}]},
+            {"role":"user","content":[{"type":"text","text":"second question"}]},
+            {"role":"assistant","content":[{"type":"text","text":"first answer"}]},
+            {"role":"user","content":[{"type":"text","text":"third question"}]},
+            {"role":"assistant","content":[{"type":"text","text":"third answer"}]}
+        ]});
+        let incoming = json!({"messages":[]});
+
+        let merged = merge_message_snapshot("google-ai-mode", Some(&previous), incoming, true);
+        let messages = merged["messages"].as_array().unwrap();
+
+        assert_eq!(messages.len(), 5);
+        assert_eq!(messages[2]["content"][0]["text"], "second question");
+        assert_eq!(messages[3]["content"][0]["text"], "third question");
+        assert_eq!(messages[4]["content"][0]["text"], "third answer");
     }
 
     #[test]
