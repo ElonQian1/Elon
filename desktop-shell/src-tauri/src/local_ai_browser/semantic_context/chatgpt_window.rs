@@ -38,7 +38,12 @@ pub(super) fn merge(
         let mut enriched = incoming_messages;
         preserve_private_rich_content(&previous_messages, &mut enriched);
         preserve_private_stream_turn_content(&previous_messages, &mut enriched);
-        replace_messages(&mut incoming, enriched, incoming_start, incoming_observed);
+        replace_messages(
+            &mut incoming,
+            reconcile_private_stream_shadows(enriched),
+            incoming_start,
+            incoming_observed,
+        );
         return incoming;
     }
 
@@ -360,6 +365,45 @@ mod tests {
         let messages = merged["messages"].as_array().unwrap();
 
         assert_eq!(messages.len(), 2);
+        assert_eq!(messages[1]["id"], "conversation-turn-1");
+        assert!(messages[1]["content"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|part| part["type"] == "rich_card"));
+    }
+
+    #[test]
+    fn complete_dom_snapshot_collapses_private_and_official_assistant_copies() {
+        let previous = snapshot(
+            0,
+            2,
+            vec![
+                user_message("u1", "比特币走势图"),
+                finance_message("private-stream:reply-1", "US$78,805.00"),
+            ],
+        );
+        let incoming = snapshot(
+            0,
+            3,
+            vec![
+                user_message("conversation-turn-0", "比特币走势图"),
+                private_answer(
+                    "private-stream:reply-1",
+                    "这是比特币走势图的正式行情正文",
+                ),
+                assistant_message(
+                    "conversation-turn-1",
+                    "这是比特币走势图的正式行情正文，并附来源",
+                ),
+            ],
+        );
+
+        let merged = merge(Some(&previous), incoming, true);
+        let messages = merged["messages"].as_array().unwrap();
+
+        assert_eq!(messages.len(), 2);
+        assert_eq!(messages[0]["id"], "conversation-turn-0");
         assert_eq!(messages[1]["id"], "conversation-turn-1");
         assert!(messages[1]["content"]
             .as_array()
