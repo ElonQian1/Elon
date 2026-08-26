@@ -105,6 +105,9 @@
     if (nextObserver && nextObserver !== observer && nextObserver !== observerDelegate &&
         typeof nextObserver.observePrompt === 'function' &&
         typeof nextObserver.snapshot === 'function') {
+      if (typeof observerDelegate.setListener === 'function') {
+        try { observerDelegate.setListener(null); } catch (_) {}
+      }
       observerDelegate = nextObserver;
       if (typeof observerDelegate.setListener === 'function') {
         observerDelegate.setListener(observerListener);

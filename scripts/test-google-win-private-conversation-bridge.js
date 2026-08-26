@@ -13,6 +13,7 @@ const baseCommands = [];
 const events = [];
 const navigations = [];
 let privateReplyResets = 0;
+let baseDisposes = 0;
 const location = {
   origin: 'https://www.google.com',
   href: 'https://www.google.com/search?udm=50&q=current&csuir=active_thread_1234',
@@ -22,7 +23,7 @@ const baseBridge = {
   version: 37,
   documentToken: 'doc_test',
   command(raw) { baseCommands.push(String(raw)); },
-  dispose() {},
+  dispose() { baseDisposes += 1; },
 };
 const window = {
   __elonGoogleWebBridge: baseBridge,
@@ -148,6 +149,7 @@ vm.runInNewContext(source, {
 });
 
 assert.equal(window.__elonGoogleWebBridge, installedBridge);
+assert.equal(baseDisposes, 1, 'stale Google adapter bridge must be disposed during rebind');
 assert.equal(window.__elonGoogleWebBridge.version, 38);
 assert.equal(window.__elonGoogleWebBridge.documentToken, 'doc_rebound');
 assert.equal(

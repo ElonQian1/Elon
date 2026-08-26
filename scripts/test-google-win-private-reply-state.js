@@ -68,6 +68,7 @@ assert.equal(event.privateStreamRevision, 2);
 
 window.__elonGoogleWebPrivateReplyObserver.setListener(() => {});
 assert.equal(typeof listener, 'function');
+const installedListener = listener;
 assert.equal(window.__elonGoogleWebPrivateReplyObserver.diagnostics(), 'base-diagnostics');
 
 let reboundPrompt = '';
@@ -91,7 +92,8 @@ vm.runInNewContext(source, { window, JSON, String, Number, Object });
 assert.equal(window.__elonGoogleWebPrivateReplyObserver, installedObserver);
 assert.equal(window.elonGoogleWebNative, installedNative);
 assert.equal(window.__elonGoogleWebPrivateReplyObserver.version, 6);
-assert.equal(reboundListener, listener, 'adapter listener must follow a replacement observer');
+assert.equal(listener, null, 'stale observer listener must be detached during rebind');
+assert.equal(reboundListener, installedListener, 'adapter listener must follow a replacement observer');
 assert.equal(
   window.__elonWinGooglePrivateReplyState.diagnostics(),
   'v2|bindings=2|state=idle',

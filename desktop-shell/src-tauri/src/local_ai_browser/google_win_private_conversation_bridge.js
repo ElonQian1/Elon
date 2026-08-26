@@ -123,6 +123,9 @@
     var changed = false;
     if (nextBridge && nextBridge !== bridgeProxy && nextBridge !== baseBridge &&
         typeof nextBridge.command === 'function') {
+      if (typeof baseBridge.dispose === 'function') {
+        try { baseBridge.dispose(); } catch (_) {}
+      }
       baseBridge = nextBridge;
       changed = true;
     }
