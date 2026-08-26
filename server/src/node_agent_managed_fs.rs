@@ -14,6 +14,7 @@ use sha2::{Digest, Sha256};
 
 mod copy;
 mod delete;
+mod extraction_loader_directory;
 mod hash;
 mod loader;
 mod loader_debug;
@@ -36,6 +37,10 @@ mod write;
 pub(crate) use copy::ManagedFileCopyResult;
 pub(crate) use delete::{
     ManagedDirectoryDeleteFailure, ManagedFileDeleteFailure, ManagedObjectDeleteEvidence,
+};
+pub(crate) use extraction_loader_directory::{
+    ManagedExtractionLoaderDirectoryChildFailure, ManagedExtractionLoaderDirectoryFailure,
+    ManagedExtractionLoaderFileFailure, PinnedManagedExtractionLoaderDirectory,
 };
 pub(crate) use hash::{ManagedFileHashFailure, ManagedFileHashPhase, ManagedFileHashResult};
 pub(crate) use loader::{

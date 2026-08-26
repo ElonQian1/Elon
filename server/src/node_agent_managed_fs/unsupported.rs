@@ -5,9 +5,13 @@ use std::{
 };
 
 use super::{
-    namespace::PlatformParentRelativeObservation, ManagedSqliteAccess, ManagedSqliteFileKind,
-    ManagedSqliteOpenMode, PlatformFileIdentity, PlatformManagedSqliteLockAttempt,
-    PlatformNamespaceDurabilityReceipt, PlatformNamespaceFlushFailure,
+    extraction_loader_directory::{
+        PlatformExtractionLoaderDirectoryProbe, PlatformExtractionLoaderDirectoryProbeFailure,
+    },
+    namespace::PlatformParentRelativeObservation,
+    ManagedSqliteAccess, ManagedSqliteFileKind, ManagedSqliteOpenMode, PlatformFileIdentity,
+    PlatformManagedSqliteLockAttempt, PlatformNamespaceDurabilityReceipt,
+    PlatformNamespaceFlushFailure,
 };
 
 pub(super) struct PlatformManagedSqliteOpen {
@@ -47,6 +51,16 @@ pub(super) fn open_managed_directory_relative(
     _name: &OsStr,
 ) -> std::io::Result<File> {
     Err(unsupported())
+}
+
+pub(super) fn probe_extraction_loader_directory_relative(
+    _retained_delete_owner: &File,
+    _parent: &File,
+    _name: &OsStr,
+) -> Result<PlatformExtractionLoaderDirectoryProbe, PlatformExtractionLoaderDirectoryProbeFailure> {
+    Err(PlatformExtractionLoaderDirectoryProbeFailure::before_probe(
+        unsupported(),
+    ))
 }
 
 pub(super) fn create_new_directory_relative(

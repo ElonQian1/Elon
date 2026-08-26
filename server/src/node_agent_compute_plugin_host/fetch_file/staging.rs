@@ -1,7 +1,4 @@
-use std::{
-    ffi::OsStr,
-    path::{Component, Path},
-};
+use std::{ffi::OsStr, path::Path};
 
 use anyhow::{anyhow, Error, Result};
 
@@ -9,8 +6,7 @@ use super::{PinnedComputePluginRoot, CANDIDATES_DIRECTORY, COMPUTE_PLUGIN_DIRECT
 use crate::{
     node_agent_compute_plugin_host::manifest_validation::is_sha256,
     node_agent_managed_fs::{
-        ManagedDirectoryPrepareFailure, ManagedFileOpenFailure, PinnedManagedDirectory,
-        PinnedManagedFile,
+        PinnedManagedDirectory, PinnedManagedExtractionLoaderDirectory, PinnedManagedFile,
     },
 };
 
@@ -42,11 +38,12 @@ impl std::fmt::Debug for ComputePluginStagingPrepareFailure {
     }
 }
 
-/// A create-new staging namespace below one pinned candidate root. All descendant lookups continue
-/// to use the original pinned root and normalized relative components.
+/// A create-new staging namespace below one pinned candidate root. Descendants are created only
+/// from the retained package root or an exact plan-parent handle; full-path root traversal is not
+/// an extraction authority.
 pub(in crate::node_agent_compute_plugin_host) struct PreparedComputePluginCandidateStaging<'root> {
     root: &'root PinnedComputePluginRoot,
-    directory: PinnedManagedDirectory,
+    directory: PinnedManagedExtractionLoaderDirectory,
     relative_root: String,
     staging_run_digest: String,
 }
@@ -57,7 +54,8 @@ pub(in crate::node_agent_compute_plugin_host) struct PreparedComputePluginCandid
 pub(in crate::node_agent_compute_plugin_host) struct PreparedComputePluginStagingLoaderParts<'root>
 {
     pub(in crate::node_agent_compute_plugin_host) root: &'root PinnedComputePluginRoot,
-    pub(in crate::node_agent_compute_plugin_host) package_root: PinnedManagedDirectory,
+    pub(in crate::node_agent_compute_plugin_host) package_root:
+        PinnedManagedExtractionLoaderDirectory,
     pub(in crate::node_agent_compute_plugin_host) relative_root: String,
     pub(in crate::node_agent_compute_plugin_host) staging_run_digest: String,
 }
@@ -75,41 +73,28 @@ impl PreparedComputePluginCandidateStaging<'_> {
         self.root.root_identity_digest()
     }
 
-    pub(in crate::node_agent_compute_plugin_host) fn prepare_directory(
+    pub(in crate::node_agent_compute_plugin_host) fn create_new_directory_child(
         &self,
-        relative: &str,
+        name: &OsStr,
     ) -> Result<PinnedManagedDirectory> {
-        self.root
-            .root
-            .prepare_directory(&self.descendant_path(relative)?)
-            .map_err(ManagedDirectoryPrepareFailure::into_error)
+        self.directory
+            .create_new_directory_child(name)
+            .map_err(Error::new)
     }
 
-    pub(in crate::node_agent_compute_plugin_host) fn create_new_file(
+    pub(in crate::node_agent_compute_plugin_host) fn create_new_file_child(
         &self,
-        relative: &str,
+        name: &OsStr,
     ) -> Result<PinnedManagedFile> {
-        let full = self.descendant_path(relative)?;
-        let parent = full
-            .parent()
-            .ok_or_else(|| anyhow!("COMPUTE_PLUGIN_STAGING_FILE_PARENT_MISSING"))?;
-        let name = full
-            .file_name()
-            .ok_or_else(|| anyhow!("COMPUTE_PLUGIN_STAGING_FILE_NAME_MISSING"))?;
-        let directory = self.root.root.pin_existing_directory(parent)?;
-        directory.create_new_read_write(name).map_err(open_error)
+        self.directory
+            .create_new_file_child(name)
+            .map_err(Error::new)
     }
 
     pub(in crate::node_agent_compute_plugin_host) fn create_new_seal_file(
         &self,
     ) -> Result<PinnedManagedFile> {
-        let directory = self
-            .root
-            .root
-            .pin_existing_directory(Path::new(&self.relative_root))?;
-        directory
-            .create_new_read_write(OsStr::new(COMPUTE_PLUGIN_STAGING_SEAL_FILE))
-            .map_err(open_error)
+        self.create_new_file_child(OsStr::new(COMPUTE_PLUGIN_STAGING_SEAL_FILE))
     }
 
     pub(in crate::node_agent_compute_plugin_host) fn pin_cleanup_ancestors(
@@ -150,23 +135,7 @@ impl PreparedComputePluginCandidateStaging<'_> {
     pub(in crate::node_agent_compute_plugin_host) fn into_cleanup_directory(
         self,
     ) -> PinnedManagedDirectory {
-        self.directory
-    }
-
-    fn descendant_path(&self, relative: &str) -> Result<std::path::PathBuf> {
-        let path = Path::new(relative);
-        if relative.is_empty()
-            || relative.contains('\\')
-            || relative.starts_with('/')
-            || relative.ends_with('/')
-            || relative.contains("//")
-            || path
-                .components()
-                .any(|component| !matches!(component, Component::Normal(_)))
-        {
-            return Err(anyhow!("COMPUTE_PLUGIN_STAGING_RELATIVE_PATH_INVALID"));
-        }
-        Ok(Path::new(&self.relative_root).join(path))
+        self.directory.into_cleanup_directory()
     }
 }
 
@@ -176,7 +145,7 @@ impl<'root> PreparedComputePluginCandidateStaging<'root> {
     ) -> PreparedComputePluginStagingLoaderParts<'root> {
         PreparedComputePluginStagingLoaderParts {
             root: self.root,
-            package_root: self.directory,
+            package_root: self.directory.into_loader_parts(),
             relative_root: self.relative_root,
             staging_run_digest: self.staging_run_digest,
         }
@@ -228,6 +197,11 @@ pub(in crate::node_agent_compute_plugin_host) fn prepare_compute_plugin_candidat
         .map_err(|failure| ComputePluginStagingPrepareFailure {
             filesystem_mutated: parent_mutated || failure.filesystem_mutated(),
             error: failure.into_error(),
+        })?
+        .into_extraction_loader_directory_custody()
+        .map_err(|failure| ComputePluginStagingPrepareFailure {
+            error: failure.into(),
+            filesystem_mutated: true,
         })?;
     Ok(PreparedComputePluginCandidateStaging {
         root,
@@ -235,12 +209,4 @@ pub(in crate::node_agent_compute_plugin_host) fn prepare_compute_plugin_candidat
         relative_root: format!("{parent_relative}/{staging_run_digest}"),
         staging_run_digest: staging_run_digest.to_string(),
     })
-}
-
-fn open_error(failure: ManagedFileOpenFailure) -> Error {
-    match failure {
-        ManagedFileOpenFailure::NotOpened(error)
-        | ManagedFileOpenFailure::FileNotOpened { error, .. } => error.into(),
-        ManagedFileOpenFailure::Opened { error, .. } => error,
-    }
 }

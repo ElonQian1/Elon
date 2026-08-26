@@ -6,7 +6,8 @@ use crate::{
         work_admission_contract::DurableWorkAdmittedPluginSlot,
     },
     node_agent_managed_fs::{
-        ManagedLoaderFileContentLease, PinnedManagedDirectory, PinnedManagedFile,
+        ManagedLoaderFileContentLease, PinnedManagedDirectory,
+        PinnedManagedExtractionLoaderDirectory, PinnedManagedFile,
     },
 };
 
@@ -26,7 +27,7 @@ use super::{
 pub(super) struct RawDestructuredLoaderTransitionCustody<'root> {
     pub(super) authority: LoaderTransitionAuthorityCustody<'root>,
     pub(super) prerequisite: SealedWindowsRunnerLoadSetPrerequisite,
-    pub(super) package_root_directory: PinnedManagedDirectory,
+    pub(super) package_root_directory: PinnedManagedExtractionLoaderDirectory,
     pub(super) namespace_directories: Vec<PinnedManagedDirectory>,
     pub(super) package_files: Vec<PinnedManagedFile>,
 }
@@ -44,7 +45,7 @@ pub(super) struct ValidatedPreBarrierPackageFileCustody {
 pub(super) struct DestructuredLoaderTransitionCustody<'root> {
     pub(super) authority: LoaderTransitionAuthorityCustody<'root>,
     pub(super) prerequisite: PostLeaseSplitWindowsRunnerLoadSetPrerequisite,
-    pub(super) package_root_directory: PinnedManagedDirectory,
+    pub(super) package_root_directory: PinnedManagedExtractionLoaderDirectory,
     pub(super) namespace_directories: Vec<PinnedManagedDirectory>,
     pub(super) package_files: Vec<ValidatedPreBarrierPackageFileCustody>,
 }

@@ -1,6 +1,7 @@
 use std::{
     collections::{HashMap, HashSet},
     io::Cursor,
+    path::Path,
     time::Instant,
 };
 
@@ -199,8 +200,31 @@ fn write_zip_to_staging(
     staging: &PreparedComputePluginCandidateStaging<'_>,
 ) -> Result<ExtractedArchiveParts> {
     let mut directories = Vec::with_capacity(plan.envelope().plan.directories.len());
+    let mut directory_indexes = HashMap::with_capacity(plan.envelope().plan.directories.len());
     for relative in &plan.envelope().plan.directories {
-        directories.push(staging.prepare_directory(relative)?);
+        let (parent_relative, name) = split_planned_descendant(relative)?;
+        let directory = match parent_relative {
+            None => staging.create_new_directory_child(name)?,
+            Some(parent_relative) => {
+                let parent_index =
+                    directory_indexes
+                        .get(parent_relative)
+                        .copied()
+                        .ok_or_else(|| {
+                            anyhow::anyhow!("COMPUTE_PLUGIN_EXTRACTION_PARENT_NOT_RETAINED")
+                        })?;
+                directories[parent_index]
+                    .create_new_extraction_loader_directory_child(name)
+                    .map_err(Error::new)?
+            }
+        };
+        if directory_indexes
+            .insert(relative.as_str(), directories.len())
+            .is_some()
+        {
+            bail!("COMPUTE_PLUGIN_EXTRACTION_DIRECTORY_DUPLICATE");
+        }
+        directories.push(directory);
     }
 
     let package = &manifest.manifest().package;
@@ -215,7 +239,7 @@ fn write_zip_to_staging(
             file.with_read_cursor(
                 expected_len,
                 || reader_cancellation.ensure_current(),
-                |reader| extract_zip_entries(reader, plan, staging, &cancellation),
+                |reader| extract_zip_entries(reader, plan, staging, &directories, &cancellation),
             )
         },
     )?;
@@ -242,6 +266,7 @@ fn extract_zip_entries(
     reader: &mut ManagedFileReadCursor<'_>,
     plan: &ValidatedComputePluginArchiveExtractionPlan,
     staging: &PreparedComputePluginCandidateStaging<'_>,
+    directories: &[PinnedManagedDirectory],
     cancellation: &ComputePluginFetchCancellationGuard,
 ) -> Result<(
     Vec<PinnedManagedFile>,
@@ -263,6 +288,17 @@ fn extract_zip_entries(
         .directories
         .iter()
         .map(String::as_str)
+        .collect();
+    if directories.len() != plan.envelope().plan.directories.len() {
+        bail!("COMPUTE_PLUGIN_EXTRACTION_DIRECTORY_CUSTODY_CHANGED");
+    }
+    let retained_directories: HashMap<_, _> = plan
+        .envelope()
+        .plan
+        .directories
+        .iter()
+        .map(String::as_str)
+        .zip(directories)
         .collect();
     let mut outputs: Vec<Option<(PinnedManagedFile, ComputePluginExtractedFileEvidence)>> =
         (0..expected_files.len()).map(|_| None).collect();
@@ -290,7 +326,18 @@ fn extract_zip_entries(
                 {
                     bail!("COMPUTE_PLUGIN_ZIP_FILE_PLAN_DUPLICATE");
                 }
-                let mut output = staging.create_new_file(&expected.relative_path)?;
+                let (parent_relative, name) = split_planned_descendant(&expected.relative_path)?;
+                let mut output = match parent_relative {
+                    None => staging.create_new_file_child(name)?,
+                    Some(parent_relative) => retained_directories
+                        .get(parent_relative)
+                        .copied()
+                        .ok_or_else(|| {
+                            anyhow::anyhow!("COMPUTE_PLUGIN_EXTRACTION_FILE_PARENT_NOT_RETAINED")
+                        })?
+                        .create_new_extraction_loader_file_child(name)
+                        .map_err(Error::new)?,
+                };
                 let expected_size = u64::try_from(expected.expected_size_bytes)
                     .context("COMPUTE_PLUGIN_EXTRACTED_FILE_SIZE")?;
                 let copied = output.copy_reader_sync_hash_and_revalidate(
@@ -329,6 +376,23 @@ fn extract_zip_entries(
         evidence.push(output.1);
     }
     Ok((files, evidence, completed_at))
+}
+
+fn split_planned_descendant(relative: &str) -> Result<(Option<&str>, &std::ffi::OsStr)> {
+    let path = Path::new(relative);
+    let name = path
+        .file_name()
+        .ok_or_else(|| anyhow::anyhow!("COMPUTE_PLUGIN_EXTRACTION_DESCENDANT_NAME_MISSING"))?;
+    let parent = path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .map(|parent| {
+            parent.to_str().ok_or_else(|| {
+                anyhow::anyhow!("COMPUTE_PLUGIN_EXTRACTION_DESCENDANT_PARENT_INVALID")
+            })
+        })
+        .transpose()?;
+    Ok((parent, name))
 }
 
 fn new_staging_run_digest(candidate_token_digest: &str, plan_digest: &str) -> String {

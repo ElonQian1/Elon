@@ -33,13 +33,13 @@ pub(super) const LOADER_LOAD_SET_AUTHORITY_GAPS: &[(&str, &str)] = &[
 /// process-resume blocker until a module-load enforcement policy and backend exist.
 pub(super) const DYNAMIC_MODULE_LOAD_AUTHORITY: &str = "missing_resume_blocker";
 
-/// The existing extraction producer retains directory handles opened with DELETE access while
-/// later traversals omit FILE_SHARE_DELETE. Windows compatibility is unverified and may keep even
-/// the share-none predecessor unreachable; this slice does not change that runtime contract.
+/// The extraction producer now has a source-written, purpose-specific retained-owner seam for
+/// DELETE-capable directories and share-delete probes. Windows has not dynamically verified that
+/// access/share matrix, so the loader predecessor remains unreachable in this architecture phase.
 pub(super) const LOADER_LOAD_SET_REACHABILITY_BLOCKERS: &[(&str, &str)] = &[
     (
         "existing_extraction_directory_access_share_compatibility",
-        "missing_windows_verification_and_fix",
+        "source_seam_written_windows_dynamic_unverified",
     ),
     ("startup_import_resolution_producer", "missing"),
     ("fileid_immutable_content_lease_backend", "missing"),
