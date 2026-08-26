@@ -12,6 +12,8 @@ const MAX_OBJECT_FIELDS = 128
 const MAX_ARRAY_ITEMS = 64
 const MAX_TOTAL_NODES = 20_000
 const MAX_UNIQUE_ARRAY_SHAPES = 8
+const MAX_NESTED_JSON_VALUES = 256
+const MAX_STABLE_FIELD_PATHS = 96
 const PROVIDERS = new Set(['chatgpt', 'google-ai-mode'])
 
 const SENSITIVE_KEY = /(?:^|[_-])(?:authorization|auth|cookie|cookies|credential|credentials|password|passwd|secret|session|tokens?|access[_-]?token|refresh[_-]?token|id[_-]?token|api[_-]?key|csrf|xsrf|signature|signed|headers?|set[_-]?cookie|account|email|phone|user[_-]?id|owner|request[_-]?token|device[_-]?id|profile[_-]?id)(?:$|[_-])/i
@@ -59,9 +61,46 @@ function isSensitiveKey(value) {
   return SENSITIVE_KEY.test(normalized)
 }
 
-function parseResearchFrames(source) {
+function parseGoogleBatchedFrames(text) {
+  const xssiPrefix = /^\s*\)\]\}'/.test(text)
+  const normalized = text.replace(/^\s*\)\]\}'[^\r\n]*(?:\r?\n)?/, '').trim()
+  if (!normalized) return null
+  const lines = normalized.split(/\r?\n/).map((line) => line.trim()).filter(Boolean)
+  const lengthPrefixCount = lines.filter((line) => /^\d{1,12}$/.test(line)).length
+  const candidates = []
+  const seen = new Set()
+  const add = (value) => {
+    const candidate = String(value || '').trim()
+    if (!/^[\[{]/.test(candidate) || seen.has(candidate)) return
+    seen.add(candidate)
+    candidates.push(candidate)
+  }
+  add(normalized)
+  lines.filter((line) => !/^\d{1,12}$/.test(line)).forEach(add)
+  const frames = []
+  for (const candidate of candidates.slice(0, MAX_FRAMES)) {
+    try { frames.push(JSON.parse(candidate)) } catch (_) { /* Keep trying framed lines. */ }
+  }
+  if (!frames.length || (!xssiPrefix && !lengthPrefixCount && !normalized.includes('wrb.fr'))) return null
+  return {
+    format: 'google-batched-json',
+    frames,
+    protocol: {
+      family: 'google_batched_rpc',
+      xssiPrefix,
+      lengthPrefixCount
+    }
+  }
+}
+
+function parseResearchFrames(source, providerId = '') {
   const text = String(source || '').replace(/^\uFEFF/, '')
   if (!text.trim()) throw new Error('研究响应为空。')
+
+  if (providerId === 'google-ai-mode' || /^\s*\)\]\}'/.test(text)) {
+    const google = parseGoogleBatchedFrames(text)
+    if (google) return google
+  }
 
   const lines = text.split(/\r?\n/)
   const looksLikeSse = lines.some((line) => /^\s*(?:data|event|id|retry):/.test(line))
@@ -88,20 +127,103 @@ function parseResearchFrames(source) {
     }
     flush()
     if (!frames.length) throw new Error('SSE 中没有可研究的 JSON data 帧。')
-    return { format: 'sse', frames }
+    return { format: 'sse', frames, protocol: { family: 'sse' } }
   }
 
   try {
-    return { format: 'json', frames: [JSON.parse(text)] }
+    return { format: 'json', frames: [JSON.parse(text)], protocol: { family: 'json' } }
   } catch (_) {
     const nonEmpty = lines.map((line) => line.trim()).filter(Boolean)
     if (nonEmpty.length < 2) throw new Error('研究响应不是有效 JSON、NDJSON 或 SSE。')
     try {
-      return { format: 'ndjson', frames: nonEmpty.map((line) => JSON.parse(line)) }
+      return {
+        format: 'ndjson',
+        frames: nonEmpty.map((line) => JSON.parse(line)),
+        protocol: { family: 'ndjson' }
+      }
     } catch (_) {
       throw new Error('研究响应不是有效 JSON、NDJSON 或 SSE。')
     }
   }
+}
+
+function expandNestedJson(value, state, depth = 0) {
+  if (depth > 6 || state.visited >= MAX_TOTAL_NODES) return value
+  state.visited += 1
+  if (typeof value === 'string') {
+    const candidate = value.trim()
+    if (state.parsed >= MAX_NESTED_JSON_VALUES || candidate.length > 1024 * 1024 || !/^[\[{]/.test(candidate)) {
+      return value
+    }
+    try {
+      state.parsed += 1
+      return expandNestedJson(JSON.parse(candidate), state, depth + 1)
+    } catch (_) {
+      return value
+    }
+  }
+  if (Array.isArray(value)) {
+    return value.slice(0, MAX_ARRAY_ITEMS).map((item) => expandNestedJson(item, state, depth + 1))
+  }
+  if (value && typeof value === 'object') {
+    const output = {}
+    for (const key of Object.keys(value).slice(0, MAX_OBJECT_FIELDS)) {
+      output[key] = expandNestedJson(value[key], state, depth + 1)
+    }
+    return output
+  }
+  return value
+}
+
+function inspectProtocol(frames, parsed) {
+  const state = { visited: 0, parsed: 0 }
+  const expandedFrames = frames.map((frame) => expandNestedJson(frame, state))
+  let rpcEnvelopeCount = 0
+  let inspected = 0
+  const queue = expandedFrames.slice()
+  while (queue.length && inspected < MAX_TOTAL_NODES) {
+    const value = queue.shift()
+    inspected += 1
+    if (Array.isArray(value)) {
+      if (value[0] === 'wrb.fr') rpcEnvelopeCount += 1
+      value.slice(0, MAX_ARRAY_ITEMS).forEach((item) => queue.push(item))
+    } else if (value && typeof value === 'object') {
+      Object.keys(value).slice(0, MAX_OBJECT_FIELDS).forEach((key) => queue.push(value[key]))
+    }
+  }
+  return {
+    expandedFrames,
+    shape: {
+      family: parsed.protocol && parsed.protocol.family || 'unknown',
+      xssiPrefix: Boolean(parsed.protocol && parsed.protocol.xssiPrefix),
+      lengthPrefixCountBucket: sizeBucket(parsed.protocol && parsed.protocol.lengthPrefixCount || 0),
+      nestedJsonValueCountBucket: sizeBucket(state.parsed),
+      rpcEnvelopeCountBucket: sizeBucket(rpcEnvelopeCount)
+    }
+  }
+}
+
+function stableFieldPaths(frames) {
+  const paths = new Set()
+  let inspected = 0
+  function visit(value, path, depth) {
+    if (paths.size >= MAX_STABLE_FIELD_PATHS || inspected >= MAX_TOTAL_NODES || depth > MAX_DEPTH) return
+    inspected += 1
+    if (Array.isArray(value)) {
+      value.slice(0, MAX_ARRAY_ITEMS).forEach((item) => visit(item, `${path}[]`, depth + 1))
+      return
+    }
+    if (!value || typeof value !== 'object') return
+    for (const key of Object.keys(value).sort().slice(0, MAX_OBJECT_FIELDS)) {
+      if (paths.size >= MAX_STABLE_FIELD_PATHS) break
+      if (isSensitiveKey(key) || !/^[A-Za-z_][A-Za-z0-9_.:-]{0,63}$/.test(key) || DYNAMIC_KEY.test(key)) continue
+      const next = `${path}.${key}`.replace(/^\./, '').slice(0, 180)
+      paths.add(next)
+      visit(value[key], next, depth + 1)
+    }
+  }
+  frames.forEach((frame) => visit(frame, '', 0))
+  return [...paths].sort()
 }
 
 function createState() {
@@ -167,9 +289,10 @@ function sanitizeResearchResponse(source, providerId) {
   if (!PROVIDERS.has(providerId)) throw new Error('provider 必须是 chatgpt 或 google-ai-mode。')
   const input = Buffer.isBuffer(source) ? source : Buffer.from(String(source || ''), 'utf8')
   if (!input.length || input.length > MAX_INPUT_BYTES) throw new Error('研究响应大小必须在 1 B 到 8 MiB 之间。')
-  const parsed = parseResearchFrames(input.toString('utf8'))
+  const parsed = parseResearchFrames(input.toString('utf8'), providerId)
+  const protocol = inspectProtocol(parsed.frames.slice(0, MAX_FRAMES), parsed)
   const state = createState()
-  const frameShapes = parsed.frames.slice(0, MAX_FRAMES).map((frame) => shapeOf(frame, state, 0))
+  const frameShapes = protocol.expandedFrames.map((frame) => shapeOf(frame, state, 0))
   if (parsed.frames.length > MAX_FRAMES) state.arrayItemsTruncated += parsed.frames.length - MAX_FRAMES
   const uniqueFrames = new Map()
   for (const frame of frameShapes) {
@@ -190,10 +313,12 @@ function sanitizeResearchResponse(source, providerId) {
     },
     structure: {
       sha256: shapeFingerprint,
+      protocol: protocol.shape,
+      stableFieldPaths: stableFieldPaths(protocol.expandedFrames),
       uniqueFrameShapes: shapes
     },
     sanitization: {
-      policy: 'shape-only-no-values-v1',
+      policy: 'shape-only-no-values-v2',
       sensitiveFieldsDropped: state.sensitiveFieldsDropped,
       dynamicFieldsDropped: state.dynamicFieldsDropped,
       truncated: truncationCount > 0,

@@ -163,6 +163,10 @@ ChatGPT SSE 样本会报告正文帧与已识别富内容；Google AI Mode 后�
 结构 Fixture。该脚本不连接网络、不读取 WebView Profile，只输出
 `yilong.web-ai-response-shape.v1` 的字段形状、类型、长度分桶、输入指纹和结构指纹。使用示例：
 
+Google AI Mode 的 XSSI 前缀、长度行、`wrb.fr` 批处理与内嵌 JSON 会先经过有界展开；输出仅增加
+协议族、数量分桶和不含数组下标值的稳定字段路径，具体字符串、数值、URL、RPC ID 与敏感字段仍全部
+丢弃。研究人员据多个样本共同出现的字段路径提出 AST 映射，不能凭单个样本或正文关键词直接上线。
+
 ```powershell
 node scripts/sanitize-web-ai-response-fixture.cjs --input D:\private\response.sse --output D:\private\response.shape.json --provider chatgpt
 ```

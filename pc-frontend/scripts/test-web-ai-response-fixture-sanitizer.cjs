@@ -22,6 +22,7 @@ assert.equal(chatgpt.schema, SCHEMA)
 assert.equal(chatgpt.providerId, 'chatgpt')
 assert.equal(chatgpt.sourceFormat, 'json')
 assert.ok(chatgpt.sanitization.sensitiveFieldsDropped >= 3)
+assert.ok(chatgpt.structure.stableFieldPaths.length <= 96)
 
 const chatgptOutput = JSON.stringify(chatgpt)
 for (const forbidden of [
@@ -67,6 +68,37 @@ for (const forbidden of [
   'requestToken'
 ]) assert.equal(googleOutput.includes(forbidden), false, `sanitized output leaked ${forbidden}`)
 assert.doesNotMatch(googleOutput, /"(?:temperature|value)"\s*:\s*23(?:\D|$)/)
+
+const nestedGooglePayload = JSON.stringify({
+  answerCard: {
+    title: 'Synthetic nested answer must disappear',
+    temperature: 31,
+    requestToken: 'synthetic-nested-token-must-disappear'
+  }
+})
+const googleBatched = [
+  `)]}'`,
+  '',
+  String(nestedGooglePayload.length + 40),
+  JSON.stringify([['wrb.fr', 'rpc-id', nestedGooglePayload, null, null, null, 'generic']])
+].join('\n')
+const parsedGoogleBatch = parseResearchFrames(googleBatched, 'google-ai-mode')
+assert.equal(parsedGoogleBatch.format, 'google-batched-json')
+const googleBatch = sanitizeResearchResponse(googleBatched, 'google-ai-mode')
+assert.equal(googleBatch.sourceFormat, 'google-batched-json')
+assert.equal(googleBatch.structure.protocol.family, 'google_batched_rpc')
+assert.equal(googleBatch.structure.protocol.xssiPrefix, true)
+assert.notEqual(googleBatch.structure.protocol.nestedJsonValueCountBucket, '0')
+assert.notEqual(googleBatch.structure.protocol.rpcEnvelopeCountBucket, '0')
+assert.ok(googleBatch.structure.stableFieldPaths.some((value) => value.endsWith('.answerCard')))
+assert.ok(googleBatch.structure.stableFieldPaths.some((value) => value.endsWith('.answerCard.title')))
+const googleBatchOutput = JSON.stringify(googleBatch)
+for (const forbidden of [
+  'Synthetic nested answer must disappear',
+  'synthetic-nested-token-must-disappear',
+  'rpc-id'
+]) assert.equal(googleBatchOutput.includes(forbidden), false, `sanitized batch output leaked ${forbidden}`)
+assert.doesNotMatch(googleBatchOutput, /"temperature"\s*:\s*31(?:\D|$)/)
 
 const ndjson = `${JSON.stringify({ type: 'alpha', value: 1 })}\n${JSON.stringify({ type: 'beta', value: 2 })}\n`
 assert.equal(parseResearchFrames(ndjson).format, 'ndjson')
