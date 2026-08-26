@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  var VERSION = 4;
+  var VERSION = 5;
   var MAX_AGE_MS = 5 * 60 * 1000;
   var OFFICIAL_COMPLETION_SETTLE_MS = 3000;
   var MAX_RICH_PARTS = 4;
@@ -25,6 +25,18 @@
   var disposed = false;
   var baseUnsubscribe = null;
   var conversationGeneration = 0;
+  // `base.reset()` records the conversation that must stay blocked after a
+  // new-chat boundary. The first prompt in that new conversation must not call
+  // `base.prepareSend()`, because the shared transport intentionally clears the
+  // blocked conversation there. Later prompts are ordinary turns and must call
+  // it so completed text, citations and charts cannot leak into the next answer.
+  var newConversationBoundaryPending = false;
+
+  function clearTurnRecovery() {
+    conversationGeneration += 1;
+    recovered = null;
+    completionOverride = null;
+  }
 
   function cleanText(value, limit) {
     return String(value || '').replace(/\s+/g, ' ').trim().slice(0, limit || 240);
@@ -393,6 +405,15 @@
       try { return typeof base.access === 'function' ? base.access() : null; }
       catch (_) { return null; }
     },
+    prepareSend: function () {
+      clearTurnRecovery();
+      if (newConversationBoundaryPending) {
+        newConversationBoundaryPending = false;
+      } else {
+        try { if (typeof base.prepareSend === 'function') base.prepareSend(); } catch (_) {}
+      }
+      notify();
+    },
     mergeMessages: function (messages, pathname) {
       observeOfficialCompletion(messages, pathname);
       var merged = messages;
@@ -400,9 +421,8 @@
       return applyMergedCompletion(enrichMessages(merged, pathname), pathname);
     },
     reset: function () {
-      conversationGeneration += 1;
-      recovered = null;
-      completionOverride = null;
+      clearTurnRecovery();
+      newConversationBoundaryPending = true;
       try { if (typeof base.reset === 'function') base.reset(); } catch (_) {}
       notify();
     },
@@ -414,9 +434,8 @@
     dispose: function () {
       if (disposed) return;
       disposed = true;
-      conversationGeneration += 1;
-      recovered = null;
-      completionOverride = null;
+      clearTurnRecovery();
+      newConversationBoundaryPending = false;
       listeners.clear();
       if (typeof baseUnsubscribe === 'function') baseUnsubscribe();
       baseUnsubscribe = null;

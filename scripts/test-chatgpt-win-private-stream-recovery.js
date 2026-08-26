@@ -39,6 +39,7 @@ let active = {
   richParts: [],
 }
 let baseResetCount = 0
+let basePrepareSendCount = 0
 let domStreaming = false
 let progressNodes = []
 const visibleNode = (text = '') => ({
@@ -67,6 +68,7 @@ const base = {
   current: () => active,
   access: () => ({ blocked: false }),
   mergeMessages: (messages) => messages,
+  prepareSend: () => { basePrepareSendCount += 1; active = null },
   reset: () => { baseResetCount += 1; active = null },
   subscribe: (listener) => {
     baseListeners.add(listener)
@@ -95,6 +97,7 @@ assert.ok(recovery)
 assert.notEqual(transport, base)
 assert.equal(recovery.baseTransport, base)
 assert.equal(transport.__elonWinRichRecoveryWrapped, true)
+assert.equal(typeof transport.prepareSend, 'function')
 
 let notifications = 0
 transport.subscribe(() => { notifications += 1 })
@@ -235,4 +238,18 @@ assert.equal(recovery.accept({
   richParts: [financePart()],
 }), false, 'an old response must not cross a new-conversation generation boundary')
 assert.equal(transport.mergeMessages(messages, '/'), messages)
+
+transport.prepareSend()
+assert.equal(
+  basePrepareSendCount,
+  0,
+  'the first prompt after new conversation must preserve the shared transport old-conversation block',
+)
+assert.equal(recovery.generation(), detachedGeneration + 2)
+transport.prepareSend()
+assert.equal(
+  basePrepareSendCount,
+  1,
+  'later prompts in the new conversation must reset the previous completed private turn',
+)
 console.log('ChatGPT Win private stream recovery tests passed')
