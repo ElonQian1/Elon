@@ -29,12 +29,9 @@ const responsePayload = {
     },
   },
 }
+let activeResponsePayload = responsePayload
 
 let fetchCount = 0
-const response = {
-  ok: true,
-  json: async () => responsePayload,
-}
 const chart = {
   type: 'rich_card',
   text: 'Bitcoin (BTC)',
@@ -130,7 +127,10 @@ const window = {
   setTimeout,
   fetch: async () => {
     fetchCount += 1
-    return response
+    return {
+      ok: true,
+      json: async () => activeResponsePayload,
+    }
   },
 }
 const context = {
@@ -196,6 +196,61 @@ async function main() {
     content: [{ type: 'markdown', text: '另一个会话' }],
   }, '/c/conversation-two')
   assert.equal(stale.content[0].text, '另一个会话')
+
+  const reboundPayload = {
+    mapping: {
+      assistant: {
+        message: {
+          id: 'assistant-two',
+          author: { role: 'assistant' },
+          status: 'finished_successfully',
+          content: { content_type: 'text', parts: ['ETH 正在回升。'] },
+          metadata: {},
+        },
+      },
+    },
+  }
+  const reboundPolicy = {
+    assistantFrame: ({ message }) => message.id === 'assistant-two' ? {
+      text: 'ETH 使用重连后的新策略解析。',
+      citations: [{
+        type: 'citation',
+        text: 'Example',
+        url: 'https://example.com/',
+        markerText: 'Example',
+        groupSize: 1,
+      }],
+    } : null,
+    clientChartPartFromMetadata: () => null,
+    financePartsFromMetadata: () => [],
+    packedFinanceWidgets: () => [],
+  }
+  activeResponsePayload = reboundPayload
+  window.__elonChatGptPrivateStreamPolicy = reboundPolicy
+  const installedFetch = window.fetch
+  vm.runInNewContext(source, context, {
+    filename: 'chatgpt_win_private_conversation_rich_cache.js',
+  })
+  assert.equal(window.fetch, installedFetch, 'reconnect must not stack another fetch wrapper')
+  assert.equal(window.__elonWinChatGptConversationRichCache, cache)
+  assert.equal(cache.diagnostics(), 'v2|bindings=2|entries=1')
+
+  const reboundResponse = await window.fetch('/backend-api/conversations/conversation-two', {
+    method: 'GET',
+    __elonPrivateTransport: 'conversation_prefetch',
+  })
+  assert.equal(fetchCount, 2)
+  assert.equal(await reboundResponse.json(), reboundPayload)
+  const rebound = cache.enrichMessage({
+    id: 'assistant-two',
+    role: 'assistant',
+    state: 'completed',
+    content: [{ type: 'markdown', text: '旧策略正文' }],
+  }, '/c/conversation-two')
+  assert.match(rebound.content[0].text, /重连后的新策略/)
+  assert.equal(rebound.content.filter((part) => part.type === 'citation').length, 1)
+  assert.equal(cache.diagnostics(), 'v2|bindings=2|entries=2')
+  assert.equal(window.fetch.__elonWinPrivateConversationRichCacheWrapped, true)
   console.log('ChatGPT Win private conversation rich-cache tests passed')
 }
 

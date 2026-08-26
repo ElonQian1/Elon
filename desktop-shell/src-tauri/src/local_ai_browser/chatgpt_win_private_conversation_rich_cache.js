@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  var VERSION = 1;
+  var VERSION = 2;
   var MAX_ENTRIES = 24;
   var MAX_RICH_PARTS = 6;
   var MAX_PACKED_WIDGET_BYTES = 768 * 1024;
@@ -12,8 +12,19 @@
   if (location.origin !== 'https://chatgpt.com' || !policy || !delegateFetch) return;
 
   var previous = window.__elonWinChatGptConversationRichCache;
-  if (previous && Number(previous.version) >= VERSION) return;
+  if (previous && Number(previous.version) >= VERSION) {
+    if (typeof previous.rebind === 'function') previous.rebind(policy);
+    return;
+  }
   var entries = new Map();
+  var bindingRevision = 1;
+
+  function rebind(nextPolicy) {
+    if (!nextPolicy || nextPolicy === policy) return false;
+    policy = nextPolicy;
+    bindingRevision += 1;
+    return true;
+  }
 
   function cleanText(value, limit) {
     return String(value || '').replace(/\s+/g, ' ').trim().slice(0, limit || 240);
@@ -195,7 +206,7 @@
     return Object.assign({}, message, { content: content });
   }
 
-  window.fetch = function () {
+  function cachedFetch() {
     var args = Array.from(arguments);
     var target = requestTarget(args[0], args[1] || {});
     var result = delegateFetch.apply(window, args);
@@ -219,11 +230,21 @@
       }
       return response;
     });
-  };
+  }
+  Object.defineProperty(cachedFetch, '__elonWinPrivateConversationRichCacheWrapped', {
+    configurable: false,
+    enumerable: false,
+    value: true,
+  });
+  window.fetch = cachedFetch;
 
   window.__elonWinChatGptConversationRichCache = Object.freeze({
     version: VERSION,
+    rebind: rebind,
     enrichMessage: enrichMessage,
     size: function () { return entries.size; },
+    diagnostics: function () {
+      return 'v' + VERSION + '|bindings=' + bindingRevision + '|entries=' + entries.size;
+    },
   });
 })();
