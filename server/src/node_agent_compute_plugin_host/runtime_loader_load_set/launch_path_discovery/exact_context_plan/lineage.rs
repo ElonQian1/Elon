@@ -344,8 +344,6 @@ fn validate_pre_post_import_edge_cross_bindings(
 
     let receipt = &resolution.pe_import_graph.pre_post_cross_binding;
     if receipt.import_edge_cross_bindings.len() != preliminary.module_resolution_requests.len()
-        || receipt.import_edge_cross_bindings.len()
-            != resolution.package_module_bindings.len() + resolution.system_module_bindings.len()
         || super::super::super::digest::pe_import_edge_cross_binding_set_digest(
             &receipt.import_edge_cross_bindings,
         )? != receipt.import_edge_cross_binding_set_digest
@@ -386,7 +384,11 @@ fn validate_pre_post_import_edge_cross_bindings(
                     .get(binding_ordinal)
                     .is_some_and(|binding| {
                         binding.module_request_ordinal == request_ordinal
-                            && &binding.edge_locator == edge_locator
+                            && final_base_edge_locator_matches(
+                                &binding.edge_locator,
+                                request_ordinal,
+                                edge_locator,
+                            )
                             && binding.importer_graph_edge_ordinal == importer_graph_edge_ordinal
                             && binding.importer_parsed_image_ordinal
                                 == cross.postlease_importer_parsed_image_ordinal
@@ -400,7 +402,11 @@ fn validate_pre_post_import_edge_cross_bindings(
                     .get(binding_ordinal)
                     .is_some_and(|binding| {
                         binding.module_request_ordinal == request_ordinal
-                            && &binding.edge_locator == edge_locator
+                            && final_base_edge_locator_matches(
+                                &binding.edge_locator,
+                                request_ordinal,
+                                edge_locator,
+                            )
                             && binding.importer_graph_edge_ordinal == importer_graph_edge_ordinal
                             && binding.importer_parsed_image_ordinal
                                 == cross.postlease_importer_parsed_image_ordinal
@@ -421,6 +427,23 @@ fn validate_pre_post_import_edge_cross_bindings(
         }
     }
     Ok(())
+}
+
+fn final_base_edge_locator_matches(
+    final_locator: &super::super::super::resolution::WindowsLoaderModuleEdgeLocator,
+    preliminary_request_ordinal: usize,
+    preliminary_locator: &super::WindowsPreliminaryModuleEdgeLocator,
+) -> bool {
+    matches!(
+        final_locator,
+        super::super::super::resolution::WindowsLoaderModuleEdgeLocator::BasePrelease {
+            preliminary_request_ordinal: final_request_ordinal,
+            import_edge_cross_binding_ordinal,
+            locator,
+        } if *final_request_ordinal == preliminary_request_ordinal
+            && *import_edge_cross_binding_ordinal == preliminary_request_ordinal
+            && locator == preliminary_locator
+    )
 }
 
 impl QueryVerifiedWindowsRunnerLaunchLineage {
@@ -486,7 +509,21 @@ impl QueryVerifiedWindowsRunnerLaunchLineage {
         };
         let resolution = &image.load_set_authority.resolution;
         self.grant_ready_plan
-            .validate_final_system_image_projection(resolution)?;
+            .validate_final_base_projection(resolution)?;
+        let (base_modules, base_names, base_system_images) =
+            self.grant_ready_plan.base_projection_shape();
+        resolution
+            .pe_import_graph
+            .recursive_resolution_closure
+            .validate_against(
+                self.pe_material.package_images().len(),
+                base_modules,
+                base_names,
+                base_system_images,
+                &self.plan.parser_policy_digest,
+                &self.plan.selected_context.context_intent_digest,
+                resolution,
+            )?;
         if self.plan.recompute_digest() != self.plan.preliminary_request_plan_digest
             || self.plan.launch_path_candidate_set_digest != candidate_set_digest
             || self.plan.prelease_pe_material_digest != self.pe_material.material_set_digest()

@@ -1,9 +1,8 @@
-use anyhow::{bail, Result};
-use serde_json::json;
+mod image_source;
 
-use crate::node_agent_compute_plugin_host::{
-    manifest_validation::is_sha256, signed_artifact_verification::jcs_sha256_hex,
-};
+use anyhow::{bail, Result};
+
+use crate::node_agent_compute_plugin_host::manifest_validation::is_sha256;
 
 use super::{
     digest::importer_edge_table_digest,
@@ -18,6 +17,9 @@ use super::{
         system_terminal_search_binding,
     },
 };
+
+pub(super) use image_source::package_parsed_image_material_digest;
+use image_source::parsed_image_source_binding;
 
 pub(super) fn validate_pe_import_graph(
     image: &SealedComputePluginRunnerImage,
@@ -46,19 +48,23 @@ pub(super) fn validate_pe_import_graph(
             prior.image_material_identity_digest == parsed.image_material_identity_digest
         });
         let (normal, delay, forwarder) = edge_counts_for_importer(&parsed.node, resolution);
-        let expected_material = node_image_material_identity(&parsed.node, image, resolution)?;
+        let expected_source = parsed_image_source_binding(parsed, image, resolution)?;
         let expected_import_table_digest = importer_edge_table_digest(&parsed.node, resolution)?;
         if parsed.parsed_image_ordinal != ordinal
             || duplicate
             || duplicate_image_material
             || derived_closure.get(ordinal) != Some(&parsed.node)
             || !module_node_valid(&parsed.node, resolution, image.package_files.len())
-            || expected_material.as_deref() != Some(parsed.image_material_identity_digest.as_str())
+            || !expected_source.is_some_and(|(source_binding, image_material)| {
+                source_binding == parsed.source_binding_digest
+                    && image_material == parsed.image_material_identity_digest
+            })
             || parsed.normal_import_count != normal
             || parsed.delay_import_count != delay
             || parsed.forwarder_count != forwarder
             || !importer_graph_edge_ordinals_are_contiguous(&parsed.node, resolution)
             || !is_sha256(&parsed.image_material_identity_digest)
+            || !is_sha256(&parsed.source_binding_digest)
             || parsed.import_table_digest != expected_import_table_digest
             || !is_sha256(&parsed.import_table_digest)
         {
@@ -251,83 +257,6 @@ fn record_cache_alias(observed: &mut Vec<(String, String)>, key: &str, target: &
     true
 }
 
-fn node_image_material_identity(
-    node: &WindowsLoaderModuleNode,
-    image: &SealedComputePluginRunnerImage,
-    resolution: &SealedWindowsLoaderResolutionAuthority,
-) -> Result<Option<String>> {
-    let component = match node {
-        WindowsLoaderModuleNode::PackageFile {
-            package_file_ordinal,
-        } => {
-            let Some(entry) = image.package_files.get(*package_file_ordinal) else {
-                return Ok(None);
-            };
-            let (file_identity, sealed_digest, lease_generation, immutable_policy) =
-                entry.file.content_lease_binding();
-            return Ok(Some(package_parsed_image_material_digest(
-                file_identity,
-                sealed_digest,
-                lease_generation,
-                immutable_policy,
-            )?));
-        }
-        WindowsLoaderModuleNode::SystemComponent {
-            component_identity_digest,
-        }
-        | WindowsLoaderModuleNode::ApiSetHost {
-            component_identity_digest,
-        } => component_identity_digest.as_str(),
-        WindowsLoaderModuleNode::KnownDllSection {
-            section_identity_digest,
-        } => {
-            let Some(entry) = resolution
-                .known_dll_authority
-                .sections
-                .iter()
-                .find(|entry| entry.section_identity_digest == *section_identity_digest)
-            else {
-                return Ok(None);
-            };
-            entry.component_identity_digest.as_str()
-        }
-        WindowsLoaderModuleNode::SideBySideAssembly {
-            assembly_identity_digest,
-        } => {
-            let Some(entry) = resolution
-                .side_by_side_authority
-                .assembly_bindings
-                .iter()
-                .find(|entry| entry.assembly_identity_digest == *assembly_identity_digest)
-            else {
-                return Ok(None);
-            };
-            entry.component_identity_digest.as_str()
-        }
-    };
-    Ok(resolution
-        .system_module_images
-        .component_images
-        .iter()
-        .find(|entry| entry.component_identity_digest == component)
-        .map(|entry| entry.immutable_section_identity_digest.clone()))
-}
-
-pub(super) fn package_parsed_image_material_digest(
-    file_identity_digest: &str,
-    sealed_content_digest: &str,
-    content_lease_generation_digest: &str,
-    immutable_content_policy_digest: &str,
-) -> Result<String> {
-    jcs_sha256_hex(&json!({
-        "schema": "elon.compute_plugin.windows_package_parsed_image_material.v1",
-        "file_identity_digest": file_identity_digest,
-        "sealed_content_digest": sealed_content_digest,
-        "content_lease_generation_digest": content_lease_generation_digest,
-        "immutable_content_policy_digest": immutable_content_policy_digest,
-    }))
-}
-
 fn derive_reachable_node_closure(
     root: &WindowsLoaderModuleNode,
     resolution: &SealedWindowsLoaderResolutionAuthority,
@@ -374,7 +303,7 @@ fn derive_reachable_node_closure(
     closure
 }
 
-fn system_binding_target_node(
+pub(super) fn system_binding_target_node(
     binding: &WindowsLoaderSystemModuleBinding,
 ) -> WindowsLoaderModuleNode {
     match &binding.resolution_origin {

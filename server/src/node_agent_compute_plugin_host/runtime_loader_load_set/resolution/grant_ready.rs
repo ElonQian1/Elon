@@ -213,6 +213,16 @@ impl GrantReadyWindowsRunnerResolutionPlan {
     ) -> &str {
         &self.grant_ready_resolution_plan_digest
     }
+
+    pub(in crate::node_agent_compute_plugin_host::runtime_loader_load_set) fn base_projection_shape(
+        &self,
+    ) -> (usize, usize, usize) {
+        (
+            self.module_resolutions.len(),
+            self.searched_name_dispositions.len(),
+            self.resolved_filesystem_system_image_requests.len(),
+        )
+    }
 }
 
 struct GrantReadyWindowsRunnerMovableOwnerSet {
@@ -309,6 +319,20 @@ impl<'root> PostLeaseWindowsRunnerResolutionLineage<'root> {
         &self,
         resolution: &super::SealedWindowsLoaderResolutionAuthority,
     ) -> Result<()> {
-        self.plan.validate_final_system_image_projection(resolution)
+        self.plan.validate_final_base_projection(resolution)?;
+        let (base_modules, base_names, base_system_images) = self.plan.base_projection_shape();
+        let preliminary = self.preliminary.borrow_resolution_request_plan();
+        resolution
+            .pe_import_graph
+            .recursive_resolution_closure
+            .validate_against(
+                self.preliminary.package_image_count(),
+                base_modules,
+                base_names,
+                base_system_images,
+                preliminary.parser_policy_digest,
+                preliminary.selected_context.context_intent_digest,
+                resolution,
+            )
     }
 }

@@ -15,17 +15,16 @@ use super::super::{
 use super::*;
 
 impl GrantReadyWindowsRunnerResolutionPlan {
-    /// Crosswalk the immutable GrantReady request/uses graph to the final unique system-image
-    /// custody table and every edge reference. This is deliberately structural: matching aggregate
-    /// digests cannot substitute for the same request ordinal, response, FileId owner, and uses.
-    pub(in crate::node_agent_compute_plugin_host::runtime_loader_load_set) fn validate_final_system_image_projection(
+    /// Crosswalk wave-zero GrantReady requests/uses to their final prefix. Later recursive waves
+    /// have disjoint provenance and are reverse-covered by `SealedWindowsRecursiveResolutionClosure`.
+    pub(in crate::node_agent_compute_plugin_host::runtime_loader_load_set) fn validate_final_base_projection(
         &self,
         resolution: &SealedWindowsLoaderResolutionAuthority,
     ) -> Result<()> {
         self.validate_final_search_projection(resolution)?;
         self.validate_final_module_projection(resolution)?;
         if self.resolved_filesystem_system_image_requests.len()
-            != resolution.resolved_filesystem_system_images.len()
+            > resolution.resolved_filesystem_system_images.len()
         {
             bail!("COMPUTE_PLUGIN_WINDOWS_FINAL_SYSTEM_IMAGE_OWNER_COUNT_CHANGED");
         }
@@ -108,7 +107,7 @@ impl GrantReadyWindowsRunnerResolutionPlan {
                         })
                 })
                 .count();
-            if final_reference_count != request.uses.len() {
+            if final_reference_count < request.uses.len() {
                 bail!("COMPUTE_PLUGIN_WINDOWS_FINAL_SYSTEM_IMAGE_USE_COVERAGE_CHANGED");
             }
         }
@@ -119,9 +118,14 @@ impl GrantReadyWindowsRunnerResolutionPlan {
         &self,
         resolution: &SealedWindowsLoaderResolutionAuthority,
     ) -> Result<()> {
-        if self.module_resolutions.len()
-            != resolution.package_module_bindings.len() + resolution.system_module_bindings.len()
-        {
+        let Some(final_module_count) = resolution
+            .package_module_bindings
+            .len()
+            .checked_add(resolution.system_module_bindings.len())
+        else {
+            bail!("COMPUTE_PLUGIN_WINDOWS_FINAL_MODULE_COUNT_OVERFLOW");
+        };
+        if self.module_resolutions.len() > final_module_count {
             bail!("COMPUTE_PLUGIN_WINDOWS_FINAL_MODULE_COUNT_CHANGED");
         }
         for module in &self.module_resolutions {
@@ -135,7 +139,7 @@ impl GrantReadyWindowsRunnerResolutionPlan {
                 .iter()
                 .filter(|binding| self.final_system_module_matches(module, binding, resolution))
                 .count();
-            if package_matches + system_matches != 1 {
+            if package_matches.checked_add(system_matches) != Some(1) {
                 bail!("COMPUTE_PLUGIN_WINDOWS_FINAL_MODULE_CROSSWALK_CHANGED");
             }
         }
@@ -410,7 +414,11 @@ impl GrantReadyWindowsRunnerResolutionPlan {
             .is_some_and(|image_ref| image_ref.resolution_request_ordinal == request_ordinal)
             && binding.module_request_ordinal == module.request_ordinal
             && binding.global_import_edge_ordinal == module.global_import_edge_ordinal
-            && binding.edge_locator == module.edge_locator
+            && final_edge_locator_matches_preliminary(
+                &binding.edge_locator,
+                module.request_ordinal,
+                &module.edge_locator,
+            )
             && binding.importer_parsed_image_ordinal == postlease_importer_ordinal
             && binding.importer_graph_edge_ordinal == module.importer_graph_edge_ordinal
             && binding.importer == parsed_importer.node
@@ -449,7 +457,7 @@ fn final_module_common_matches(
     module: &WindowsGrantReadyModuleResolution,
     module_request_ordinal: usize,
     global_import_edge_ordinal: usize,
-    edge_locator: &WindowsPreliminaryModuleEdgeLocator,
+    edge_locator: &super::super::WindowsLoaderModuleEdgeLocator,
     importer_parsed_image_ordinal: usize,
     importer_graph_edge_ordinal: usize,
     importer: &super::super::WindowsLoaderModuleNode,
@@ -465,12 +473,33 @@ fn final_module_common_matches(
         })
         && module_request_ordinal == module.request_ordinal
         && global_import_edge_ordinal == module.global_import_edge_ordinal
-        && edge_locator == &module.edge_locator
+        && final_edge_locator_matches_preliminary(
+            edge_locator,
+            module.request_ordinal,
+            &module.edge_locator,
+        )
         && importer_graph_edge_ordinal == module.importer_graph_edge_ordinal
         && final_import_kind_matches(edge_kind, module.import_kind)
         && normalized_import_name == module.normalized_requested_name
         && imported_symbol_name == module.imported_symbol_name.as_deref()
         && imported_symbol_ordinal == module.imported_symbol_ordinal
+}
+
+fn final_edge_locator_matches_preliminary(
+    final_locator: &super::super::WindowsLoaderModuleEdgeLocator,
+    preliminary_request_ordinal: usize,
+    preliminary_locator: &WindowsPreliminaryModuleEdgeLocator,
+) -> bool {
+    matches!(
+        final_locator,
+        super::super::WindowsLoaderModuleEdgeLocator::BasePrelease {
+            preliminary_request_ordinal: final_request_ordinal,
+            import_edge_cross_binding_ordinal,
+            locator,
+        } if *final_request_ordinal == preliminary_request_ordinal
+            && *import_edge_cross_binding_ordinal == preliminary_request_ordinal
+            && locator == preliminary_locator
+    )
 }
 
 fn postlease_parsed_image_for_prelease(

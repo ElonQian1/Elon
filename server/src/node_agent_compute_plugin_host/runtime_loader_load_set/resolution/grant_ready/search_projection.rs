@@ -14,8 +14,8 @@ impl GrantReadyWindowsRunnerResolutionPlan {
         resolution: &SealedWindowsLoaderResolutionAuthority,
     ) -> Result<()> {
         if self.search_directories.len() != resolution.search_directories.len()
-            || self.searched_name_dispositions.len() != resolution.searched_names.len()
-            || self.module_resolutions.len() != resolution.pe_import_graph.search_sequences.len()
+            || self.searched_name_dispositions.len() > resolution.searched_names.len()
+            || self.module_resolutions.len() > resolution.pe_import_graph.search_sequences.len()
         {
             bail!("COMPUTE_PLUGIN_WINDOWS_FINAL_SEARCH_PROJECTION_COUNT_CHANGED");
         }

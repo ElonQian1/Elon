@@ -462,7 +462,10 @@ impl WindowsPreLeaseImportKind {
     }
 }
 
-fn symbol_is_exact(name: Option<&str>, ordinal: Option<u16>) -> bool {
+pub(in crate::node_agent_compute_plugin_host::runtime_loader_load_set) fn symbol_is_exact(
+    name: Option<&str>,
+    ordinal: Option<u16>,
+) -> bool {
     matches!((name, ordinal), (Some(value), None) if !value.is_empty() && !value.contains('\0'))
         || matches!((name, ordinal), (None, Some(_)))
 }

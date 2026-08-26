@@ -8,16 +8,20 @@ use crate::node_agent_compute_plugin_host::signed_artifact_verification::jcs_sha
 
 use super::resolution::{
     SealedWindowsLoaderNamespaceAuthority, SealedWindowsLoaderResolutionAuthority,
-    WindowsLoaderLaunchPathKind, WindowsLoaderModuleNode,
+    WindowsLoaderLaunchPathKind, WindowsLoaderModuleNode, WindowsPeParsedImageSource,
 };
 
+pub(super) use material::edge_kind_name;
+pub(super) use material::module_node_material;
 pub(super) use material::searched_name_disposition_digest;
 use material::{
-    disposition_material, edge_kind_name, filesystem_system_image_ref_material,
-    import_binding_ref_material, launch_path_kind_name, module_node_material,
-    search_target_material, system_resolution_origin_material,
+    disposition_material, import_binding_ref_material, launch_path_kind_name,
+    search_target_material,
 };
-use pe_cross_binding::edge_locator_material;
+pub(super) use material::{
+    filesystem_system_image_ref_material, system_resolution_origin_material,
+};
+pub(super) use pe_cross_binding::final_edge_locator_material;
 pub(super) use pe_cross_binding::{
     pe_import_edge_cross_binding_set_digest, pe_parsed_image_cross_binding_set_digest,
     pe_pre_post_cross_binding_receipt_digest,
@@ -43,7 +47,7 @@ pub(super) fn importer_edge_table_digest(
                 "binding_ordinal": binding_ordinal,
                 "module_request_ordinal": entry.module_request_ordinal,
                 "global_import_edge_ordinal": entry.global_import_edge_ordinal,
-                "edge_locator": edge_locator_material(&entry.edge_locator),
+                "edge_locator": final_edge_locator_material(&entry.edge_locator),
                 "importer_parsed_image_ordinal": entry.importer_parsed_image_ordinal,
                 "importer_graph_edge_ordinal": entry.importer_graph_edge_ordinal,
                 "edge_kind": edge_kind_name(&entry.edge_kind),
@@ -72,7 +76,7 @@ pub(super) fn importer_edge_table_digest(
                 "binding_ordinal": binding_ordinal,
                 "module_request_ordinal": entry.module_request_ordinal,
                 "global_import_edge_ordinal": entry.global_import_edge_ordinal,
-                "edge_locator": edge_locator_material(&entry.edge_locator),
+                "edge_locator": final_edge_locator_material(&entry.edge_locator),
                 "importer_parsed_image_ordinal": entry.importer_parsed_image_ordinal,
                 "importer_graph_edge_ordinal": entry.importer_graph_edge_ordinal,
                 "edge_kind": edge_kind_name(&entry.edge_kind),
@@ -97,7 +101,7 @@ pub(super) fn importer_edge_table_digest(
         .map(|(_, material)| material)
         .collect::<Vec<_>>();
     jcs_sha256_hex(&json!({
-        "schema": "elon.compute_plugin.windows_pe_import_table.v1",
+        "schema": "elon.compute_plugin.windows_pe_import_table.v2",
         "importer": module_node_material(importer),
         "ordered_edges": ordered_edges,
     }))
@@ -256,7 +260,7 @@ pub(super) fn validate_aggregate_digests(
             json!({
                 "module_request_ordinal": entry.module_request_ordinal,
                 "global_import_edge_ordinal": entry.global_import_edge_ordinal,
-                "edge_locator": edge_locator_material(&entry.edge_locator),
+                "edge_locator": final_edge_locator_material(&entry.edge_locator),
                 "importer_parsed_image_ordinal": entry.importer_parsed_image_ordinal,
                 "importer": module_node_material(&entry.importer),
                 "importer_graph_edge_ordinal": entry.importer_graph_edge_ordinal,
@@ -279,7 +283,7 @@ pub(super) fn validate_aggregate_digests(
             json!({
                 "module_request_ordinal": entry.module_request_ordinal,
                 "global_import_edge_ordinal": entry.global_import_edge_ordinal,
-                "edge_locator": edge_locator_material(&entry.edge_locator),
+                "edge_locator": final_edge_locator_material(&entry.edge_locator),
                 "importer_parsed_image_ordinal": entry.importer_parsed_image_ordinal,
                 "importer": module_node_material(&entry.importer),
                 "importer_graph_edge_ordinal": entry.importer_graph_edge_ordinal,
@@ -298,7 +302,7 @@ pub(super) fn validate_aggregate_digests(
         })
         .collect::<Vec<_>>();
     if jcs_sha256_hex(&json!({
-        "schema": "elon.compute_plugin.windows_pe_import_edges.v1",
+        "schema": "elon.compute_plugin.windows_pe_import_edges.v2",
         "package": &package_modules,
         "system": &system_modules,
     }))? != resolution.pe_import_graph.import_edge_set_digest
@@ -442,9 +446,25 @@ pub(super) fn validate_aggregate_digests(
         .parsed_images
         .iter()
         .map(|entry| {
+            let source = match entry.source {
+                WindowsPeParsedImageSource::BasePreleasePackage {
+                    prelease_parsed_image_ordinal,
+                } => json!({
+                    "kind": "base_prelease_package",
+                    "prelease_parsed_image_ordinal": prelease_parsed_image_ordinal,
+                }),
+                WindowsPeParsedImageSource::RecursiveExpansion {
+                    parse_receipt_ordinal,
+                } => json!({
+                    "kind": "recursive_expansion",
+                    "parse_receipt_ordinal": parse_receipt_ordinal,
+                }),
+            };
             json!({
                 "parsed_image_ordinal": entry.parsed_image_ordinal,
                 "node": module_node_material(&entry.node),
+                "source": source,
+                "source_binding_digest": entry.source_binding_digest,
                 "image_material_identity_digest": entry.image_material_identity_digest,
                 "import_table_digest": entry.import_table_digest,
                 "normal_import_count": entry.normal_import_count,
@@ -453,7 +473,11 @@ pub(super) fn validate_aggregate_digests(
             })
         })
         .collect::<Vec<_>>();
-    if jcs_sha256_hex(&parsed_images)? != resolution.pe_import_graph.parsed_image_set_digest {
+    if jcs_sha256_hex(&json!({
+        "schema": "elon.compute_plugin.windows_pe_parsed_image_set.v2",
+        "images": &parsed_images,
+    }))? != resolution.pe_import_graph.parsed_image_set_digest
+    {
         bail!("COMPUTE_PLUGIN_LOADER_PARSED_IMAGE_SET_DIGEST_CHANGED");
     }
     let reachable_nodes = resolution
@@ -487,7 +511,7 @@ pub(super) fn validate_aggregate_digests(
     }
 
     let resolution_material = json!({
-        "schema": "elon.compute_plugin.windows_loader_resolution_profile.v2",
+        "schema": "elon.compute_plugin.windows_loader_resolution_profile.v3",
         "admission_source_digest": resolution.admission_source_digest,
         "admission_receipt_digest": resolution.admission_receipt_digest,
         "extraction_plan_digest": resolution.extraction_plan_digest,
@@ -546,6 +570,7 @@ pub(super) fn validate_aggregate_digests(
             "parsed_image_cross_binding_set_digest": resolution.pe_import_graph.pre_post_cross_binding.parsed_image_cross_binding_set_digest,
             "import_edge_cross_binding_set_digest": resolution.pe_import_graph.pre_post_cross_binding.import_edge_cross_binding_set_digest,
             "pre_post_cross_binding_receipt_digest": resolution.pe_import_graph.pre_post_cross_binding.receipt_digest,
+            "recursive_resolution_closure_digest": resolution.pe_import_graph.recursive_resolution_closure.digest(),
         },
         "launch_path_component_set_digest": resolution.launch_path_authority.component_set_digest,
         "application_launch_path_component_set_digest": resolution.launch_path_authority.application_component_set_digest,

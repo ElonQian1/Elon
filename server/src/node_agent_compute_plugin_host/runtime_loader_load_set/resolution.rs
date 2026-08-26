@@ -1,4 +1,5 @@
 mod grant_ready;
+mod system_closure;
 
 use std::{convert::Infallible, fmt, path::PathBuf};
 
@@ -15,11 +16,50 @@ use crate::{
 use super::launch_path_discovery::WindowsPreliminaryModuleEdgeLocator;
 
 pub(super) use grant_ready::*;
+pub(super) use system_closure::*;
+
+#[derive(Clone, PartialEq, Eq)]
+pub(super) enum WindowsPostLeaseModuleEdgeLocator {
+    Import {
+        /// The final global/module-request ordinal of this direct import edge.
+        source_import_edge_ordinal: usize,
+        descriptor_ordinal: usize,
+        thunk_ordinal: usize,
+        edge_evidence_digest: String,
+    },
+    Forwarder {
+        /// The final global/module-request ordinal of the root normal/delay import. It is not an
+        /// importer-local ordinal and may refer to the BasePrelease prefix or an earlier wave.
+        source_import_edge_ordinal: usize,
+        /// Zero-based hop ordinal across the complete base-plus-postlease chain for that root.
+        forwarder_hop_ordinal: usize,
+        source_export_name: Option<String>,
+        source_export_ordinal: Option<u16>,
+        hop_evidence_digest: String,
+    },
+}
+
+/// Final edge provenance is stage-explicit. A post-lease system-image edge can never masquerade
+/// as an edge observed by the package-only preliminary parser.
+#[derive(Clone, PartialEq, Eq)]
+pub(super) enum WindowsLoaderModuleEdgeLocator {
+    BasePrelease {
+        preliminary_request_ordinal: usize,
+        import_edge_cross_binding_ordinal: usize,
+        locator: WindowsPreliminaryModuleEdgeLocator,
+    },
+    SystemPostLease {
+        wave_ordinal: usize,
+        source_parsed_image_ordinal: usize,
+        parse_receipt_ordinal: usize,
+        locator: WindowsPostLeaseModuleEdgeLocator,
+    },
+}
 
 pub(super) struct WindowsLoaderPackageModuleBinding {
     pub(super) module_request_ordinal: usize,
     pub(super) global_import_edge_ordinal: usize,
-    pub(super) edge_locator: WindowsPreliminaryModuleEdgeLocator,
+    pub(super) edge_locator: WindowsLoaderModuleEdgeLocator,
     pub(super) importer_parsed_image_ordinal: usize,
     pub(super) importer: WindowsLoaderModuleNode,
     /// Contiguous resolved-graph order within this exact importer.
@@ -80,7 +120,7 @@ pub(super) struct WindowsLoaderResolvedFilesystemSystemImageRef {
 pub(super) struct WindowsLoaderSystemModuleBinding {
     pub(super) module_request_ordinal: usize,
     pub(super) global_import_edge_ordinal: usize,
-    pub(super) edge_locator: WindowsPreliminaryModuleEdgeLocator,
+    pub(super) edge_locator: WindowsLoaderModuleEdgeLocator,
     pub(super) importer_parsed_image_ordinal: usize,
     pub(super) importer: WindowsLoaderModuleNode,
     /// Contiguous resolved-graph order shared with package edges for this exact importer.
@@ -287,6 +327,8 @@ pub(super) struct WindowsLoaderSearchedNameBinding {
 pub(super) struct WindowsPeParsedImageBinding {
     pub(super) parsed_image_ordinal: usize,
     pub(super) node: WindowsLoaderModuleNode,
+    pub(super) source: WindowsPeParsedImageSource,
+    pub(super) source_binding_digest: String,
     pub(super) image_material_identity_digest: String,
     pub(super) import_table_digest: String,
     pub(super) normal_import_count: usize,
@@ -353,6 +395,7 @@ pub(super) struct SealedWindowsPeImportGraphAuthority {
     pub(super) expected_system_edge_count: usize,
     pub(super) expected_search_step_count: usize,
     pub(super) pre_post_cross_binding: SealedWindowsPePrePostCrossBindingReceipt,
+    pub(super) recursive_resolution_closure: SealedWindowsRecursiveResolutionClosure,
     pub(super) _authenticated_pe_parser_producer_unavailable: Infallible,
 }
 

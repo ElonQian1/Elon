@@ -31,6 +31,7 @@ pub(super) use exact_context_plan::{
     WindowsPreliminaryModuleResolutionRequest, WindowsPreliminaryRetainedDirectoryLocation,
     WindowsPreliminarySearchDirectoryBinding, WindowsPreliminarySearchDirectoryTarget,
 };
+pub(super) use prelease_pe_material::symbol_is_exact;
 
 const CANDIDATE_BINDING_DOMAIN: &[u8] = b"ELON_WINDOWS_RUNNER_LAUNCH_PATH_CANDIDATES_V1";
 

@@ -102,7 +102,9 @@ fn external_search_directory_material(
     })
 }
 
-pub(super) fn edge_kind_name(kind: &WindowsLoaderImportEdgeKind) -> &'static str {
+pub(in crate::node_agent_compute_plugin_host::runtime_loader_load_set) fn edge_kind_name(
+    kind: &WindowsLoaderImportEdgeKind,
+) -> &'static str {
     match kind {
         WindowsLoaderImportEdgeKind::NormalImport => "normal_import",
         WindowsLoaderImportEdgeKind::DelayImport => "delay_import",
@@ -117,7 +119,9 @@ pub(super) fn launch_path_kind_name(kind: WindowsLoaderLaunchPathKind) -> &'stat
     }
 }
 
-pub(super) fn module_node_material(node: &WindowsLoaderModuleNode) -> Value {
+pub(in crate::node_agent_compute_plugin_host::runtime_loader_load_set) fn module_node_material(
+    node: &WindowsLoaderModuleNode,
+) -> Value {
     match node {
         WindowsLoaderModuleNode::PackageFile {
             package_file_ordinal,
@@ -165,7 +169,7 @@ pub(super) fn import_binding_ref_material(binding: &WindowsLoaderImportBindingRe
     }
 }
 
-pub(super) fn system_resolution_origin_material(
+pub(in crate::node_agent_compute_plugin_host::runtime_loader_load_set) fn system_resolution_origin_material(
     origin: &WindowsLoaderSystemResolutionOrigin,
 ) -> Value {
     match origin {
@@ -242,7 +246,7 @@ fn api_set_host_resolution_material(
     }
 }
 
-pub(super) fn filesystem_system_image_ref_material(
+pub(in crate::node_agent_compute_plugin_host::runtime_loader_load_set) fn filesystem_system_image_ref_material(
     image_ref: Option<&super::super::resolution::WindowsLoaderResolvedFilesystemSystemImageRef>,
 ) -> Value {
     let Some(image_ref) = image_ref else {

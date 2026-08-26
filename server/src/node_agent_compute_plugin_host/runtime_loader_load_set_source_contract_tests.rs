@@ -16,6 +16,21 @@ const NAMESPACE_VALIDATION: &str = include_str!("runtime_loader_load_set/namespa
 const PE_GRAPH_VALIDATION: &str = include_str!("runtime_loader_load_set/pe_graph_validation.rs");
 const POLICY: &str = include_str!("runtime_loader_load_set/policy.rs");
 const RESOLUTION: &str = include_str!("runtime_loader_load_set/resolution.rs");
+const SYSTEM_CLOSURE: &str = include_str!("runtime_loader_load_set/resolution/system_closure.rs");
+const SYSTEM_CLOSURE_DIGEST: &str =
+    include_str!("runtime_loader_load_set/resolution/system_closure/digest.rs");
+const SYSTEM_CLOSURE_EDGE_ORDER: &str =
+    include_str!("runtime_loader_load_set/resolution/system_closure/edge_order.rs");
+const SYSTEM_CLOSURE_EDGE_PROJECTION: &str =
+    include_str!("runtime_loader_load_set/resolution/system_closure/edge_projection.rs");
+const SYSTEM_CLOSURE_PROJECTION_DIGEST: &str =
+    include_str!("runtime_loader_load_set/resolution/system_closure/projection_digest.rs");
+const SYSTEM_CLOSURE_SOURCE_PROJECTION: &str =
+    include_str!("runtime_loader_load_set/resolution/system_closure/source_projection.rs");
+const SYSTEM_CLOSURE_VALIDATION: &str =
+    include_str!("runtime_loader_load_set/resolution/system_closure/validation.rs");
+const PE_IMAGE_SOURCE: &str =
+    include_str!("runtime_loader_load_set/pe_graph_validation/image_source.rs");
 const SYSTEM_RESOLUTION_VALIDATION: &str =
     include_str!("runtime_loader_load_set/system_resolution_validation.rs");
 const TRANSITION: &str = include_str!("runtime_loader_load_set/transition.rs");
@@ -39,6 +54,13 @@ fn source_slice() -> String {
         PE_GRAPH_VALIDATION,
         POLICY,
         RESOLUTION,
+        SYSTEM_CLOSURE,
+        SYSTEM_CLOSURE_DIGEST,
+        SYSTEM_CLOSURE_EDGE_ORDER,
+        SYSTEM_CLOSURE_EDGE_PROJECTION,
+        SYSTEM_CLOSURE_PROJECTION_DIGEST,
+        SYSTEM_CLOSURE_SOURCE_PROJECTION,
+        SYSTEM_CLOSURE_VALIDATION,
         SYSTEM_RESOLUTION_VALIDATION,
         TRANSITION,
         VALIDATION,
@@ -122,6 +144,39 @@ fn hard_pe_resolution_launch_path_and_namespace_prerequisites_remain_uninhabited
 }
 
 #[test]
+fn recursive_system_image_edges_have_disjoint_postlease_provenance_and_fixpoint_seal() {
+    assert!(RESOLUTION.contains("enum WindowsLoaderModuleEdgeLocator"));
+    assert!(RESOLUTION.contains("BasePrelease"));
+    assert!(RESOLUTION.contains("SystemPostLease"));
+    assert!(RESOLUTION.contains("source: WindowsPeParsedImageSource"));
+    assert!(RESOLUTION
+        .contains("recursive_resolution_closure: SealedWindowsRecursiveResolutionClosure"));
+    assert!(SYSTEM_CLOSURE.contains("struct WindowsPostLeaseSystemImageParseReceipt"));
+    assert!(SYSTEM_CLOSURE.contains("struct WindowsRecursiveResolutionWavePlan"));
+    assert!(SYSTEM_CLOSURE.contains("struct SealedWindowsRecursiveResolutionClosure"));
+    assert!(SYSTEM_CLOSURE
+        .contains("_recursive_system_import_closure_producer_unavailable: Infallible"));
+    assert!(SYSTEM_CLOSURE.contains("producer_module_request_ordinal"));
+    assert!(SYSTEM_CLOSURE_EDGE_PROJECTION.contains("validate_final_edge_provenance"));
+    assert!(SYSTEM_CLOSURE_EDGE_PROJECTION.contains("validate_forwarder_chains"));
+    assert!(SYSTEM_CLOSURE_EDGE_PROJECTION.contains("maximum_forwarder_hop_depth"));
+    assert!(SYSTEM_CLOSURE_SOURCE_PROJECTION.contains("source_owner_matches_producer_binding"));
+    assert!(SYSTEM_CLOSURE_SOURCE_PROJECTION
+        .contains("COMPUTE_PLUGIN_WINDOWS_RECURSIVE_FRONTIER_DELAYED"));
+    assert!(SYSTEM_CLOSURE_EDGE_ORDER.contains("validate_recursive_edge_order"));
+    assert!(SYSTEM_CLOSURE_EDGE_ORDER
+        .contains("COMPUTE_PLUGIN_WINDOWS_RECURSIVE_WAVE_EDGE_MERGE_CHANGED"));
+    assert!(SYSTEM_CLOSURE_PROJECTION_DIGEST.contains("system_resolution_origin_material"));
+    assert!(SYSTEM_CLOSURE_DIGEST.contains("producer_module_request_ordinal"));
+    assert!(SYSTEM_CLOSURE_VALIDATION.contains("validate_recursive_search_projection"));
+    assert!(SYSTEM_CLOSURE_VALIDATION.contains("COMPUTE_PLUGIN_WINDOWS_RECURSIVE_FIXPOINT_CHANGED"));
+    assert!(PE_IMAGE_SOURCE.contains("windows_recursive_image_owner_binding.v1"));
+    assert!(SYSTEM_CLOSURE.contains("same_owner_parse_receipt_digest"));
+    assert!(DIGEST.contains("windows_loader_resolution_profile.v3"));
+    assert!(DIGEST.contains("windows_pe_import_edges.v2"));
+}
+
+#[test]
 fn pe_dfs_cache_system_sections_and_handle_paths_are_recomputed_and_cross_bound() {
     assert!(RESOLUTION.contains("importer_graph_edge_ordinal: usize"));
     assert!(RESOLUTION.contains("struct WindowsPeImportEdgeCrossBinding"));
@@ -156,15 +211,16 @@ fn pe_dfs_cache_system_sections_and_handle_paths_are_recomputed_and_cross_bound(
         PE_GRAPH_VALIDATION.contains("parsed.import_table_digest != expected_import_table_digest")
     );
     assert!(PE_GRAPH_VALIDATION.contains("loaded_module_cache_targets_are_consistent"));
-    assert!(PE_GRAPH_VALIDATION
-        .contains("elon.compute_plugin.windows_package_parsed_image_material.v1"));
+    assert!(
+        PE_IMAGE_SOURCE.contains("elon.compute_plugin.windows_package_parsed_image_material.v1")
+    );
     for material in [
         "file_identity_digest",
         "sealed_content_digest",
         "content_lease_generation_digest",
         "immutable_content_policy_digest",
     ] {
-        assert!(PE_GRAPH_VALIDATION.contains(material));
+        assert!(PE_IMAGE_SOURCE.contains(material));
     }
     assert!(PE_GRAPH_VALIDATION.contains("derived_closure.get(ordinal) != Some(&reachable.node)"));
     assert!(SYSTEM_RESOLUTION_VALIDATION
@@ -445,7 +501,7 @@ fn five_failure_phases_retain_linear_indexed_custody() {
     );
     assert!(RESOLUTION.contains("_postlease_final_resolution_sealer_unavailable: Infallible"));
     assert!(!RESOLUTION.contains("struct WindowsRunnerLoadSetBorrowPrerequisite"));
-    assert!(DIGEST.contains("windows_loader_resolution_profile.v2"));
+    assert!(DIGEST.contains("windows_loader_resolution_profile.v3"));
     assert!(DIGEST.contains("\"launch_context_selector_digest\""));
     assert!(DIGEST.contains("\"selected_context_binding_digest\""));
     assert!(DIGEST.contains("\"preliminary_resolution_request_plan_digest\""));

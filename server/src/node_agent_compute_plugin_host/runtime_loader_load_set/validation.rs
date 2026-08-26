@@ -673,6 +673,10 @@ fn validate_resolution_bindings(
         &namespace.namespace_authority_digest,
         &resolution.pe_import_graph.parsed_image_set_digest,
         &resolution.pe_import_graph.import_edge_set_digest,
+        resolution
+            .pe_import_graph
+            .recursive_resolution_closure
+            .digest(),
         &resolution.pe_import_graph.reachable_node_set_digest,
         &resolution.pe_import_graph.search_sequence_set_digest,
     ] {
