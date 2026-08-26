@@ -120,6 +120,7 @@ assert.match(renderer, /payload\.rows\.map/)
 const context = {
   window: { getComputedStyle: () => ({ display: 'block', visibility: 'visible' }) },
   location: { origin: 'https://chatgpt.com', href: 'https://chatgpt.com/' },
+  document: { getElementById: () => null },
   Element: Object,
   HTMLElement: Object,
   URL,
@@ -252,9 +253,40 @@ assert.equal(
 const common = context.window.__elonRichContentDomAdapter
 const media = common.normalizeMediaGalleryPayload(mediaMapFixture.mediaGallery)
 assert.equal(media.title, '回答图片')
-assert.equal(media.items.length, 1, 'duplicate and signed media URLs must be excluded from persistent AST')
+assert.equal(media.items.length, 3, 'signed and proxied media must lose query secrets instead of losing the visible image')
 assert.equal(media.items[0].alt, '市场走势图')
 assert.equal(media.items[0].mediaType, 'image/png')
+assert.equal(media.items[1].url, 'https://images.example.com/private/chart.png')
+assert.equal(media.items[1].alt, '含签名查询的图片')
+assert.equal(media.items[1].width, undefined, 'unknown dimensions must stay absent instead of becoming invalid zeroes')
+assert.equal(media.items[1].sourceUrl, undefined, 'missing source links must not resolve to the provider home page')
+assert.equal(media.items[2].url, 'https://cdn.example.com/charts/btc.png')
+assert.equal(media.items.some((item) => item.alt === '缺失图片地址'), false)
+let mediaOwnership = ''
+context.document.getElementById = (id) => id === 'official-chart-title'
+  ? { textContent: '官方比特币走势图' }
+  : null
+const mediaImage = {
+  isConnected: true,
+  naturalWidth: 1280,
+  naturalHeight: 720,
+  currentSrc: 'https://proxy.example.com/image?url=https%3A%2F%2Fcdn.example.com%2Fcharts%2Fbtc.png%3Ftoken%3Dsecret',
+  alt: '',
+  getBoundingClientRect: () => ({ width: 640, height: 360 }),
+  getAttribute: (name) => name === 'aria-labelledby' ? 'official-chart-title' : '',
+  closest: (selector) => selector === 'figure, article, section'
+    ? { querySelector: () => null }
+    : null,
+  setAttribute: (_name, value) => { mediaOwnership = value },
+}
+const mediaContainer = {
+  querySelectorAll: (selector) => selector === 'img' ? [mediaImage] : [],
+}
+const extractedMediaParts = common.parts(mediaContainer)
+assert.equal(extractedMediaParts.length, 1)
+assert.equal(extractedMediaParts[0].richContent.payload.items[0].url, 'https://cdn.example.com/charts/btc.png')
+assert.equal(extractedMediaParts[0].richContent.payload.items[0].alt, '官方比特币走势图')
+assert.equal(mediaOwnership, 'media_gallery', 'owned media must not fall through to legacy empty image tiles')
 const map = common.normalizeMapPayload(mediaMapFixture.map)
 assert.equal(map.places.length, 3)
 assert.equal(map.summary, '官网回答中可见的地点摘要')

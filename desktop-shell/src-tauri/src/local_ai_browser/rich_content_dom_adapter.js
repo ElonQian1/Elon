@@ -17,13 +17,36 @@
       .slice(0, max || 240);
   }
 
-  function safePublicUrl(value, requireStableResource) {
+  function safePublicUrl(value) {
     try {
-      const url = new URL(String(value || ''), location.href);
+      const raw = String(value || '').trim();
+      if (!raw) return '';
+      const url = new URL(raw, location.href);
       if (url.protocol !== 'https:' || url.username || url.password ||
           (url.port && url.port !== '443')) return '';
-      if (requireStableResource && (url.search || url.hash)) return '';
+      // Official media commonly carries resize, cache-busting, or short-lived
+      // signature parameters. Rejecting the whole URL made visible answer media
+      // disappear from the native snapshot. Keep only the public origin/path;
+      // Rust repeats the same sanitation before anything reaches React/cache.
       return (url.origin + url.pathname).slice(0, 1200);
+    } catch (_) {
+      return '';
+    }
+  }
+
+  function safePublicMediaUrl(value) {
+    try {
+      const raw = String(value || '').trim();
+      if (!raw) return '';
+      const url = new URL(raw, location.href);
+      // Provider image proxies often put the actual public asset in one of these
+      // well-known parameters. Prefer that stable nested URL before dropping the
+      // proxy query string; this keeps the picture without persisting its token.
+      for (const key of ['url', 'image_url', 'imgurl', 'src']) {
+        const nested = safePublicUrl(url.searchParams.get(key));
+        if (nested) return nested;
+      }
+      return safePublicUrl(url.href);
     } catch (_) {
       return '';
     }
@@ -58,17 +81,17 @@
     const seen = new Set();
     const items = (Array.isArray(source.items) ? source.items : []).slice(0, MAX_MEDIA_ITEMS)
       .map((item) => {
-        const url = safePublicUrl(item && item.url, true);
+        const url = safePublicMediaUrl(item && item.url);
         const alt = cleanText(item && (item.alt || item.title), 180);
         const width = Math.max(0, Math.min(8192, Number(item && item.width) || 0));
         const height = Math.max(0, Math.min(8192, Number(item && item.height) || 0));
-        const sourceUrl = safePublicUrl(item && item.sourceUrl, false);
+        const sourceUrl = safePublicUrl(item && item.sourceUrl);
         return {
           url,
           alt,
           mediaType: mediaType(url),
-          width,
-          height,
+          ...(width > 0 ? { width } : {}),
+          ...(height > 0 ? { height } : {}),
           ...(sourceUrl ? { sourceUrl } : {})
         };
       })
@@ -124,9 +147,23 @@
       if (node.closest('[' + ROOT_ATTRIBUTE + '], [data-elon-rich-content-root]')) return;
       const dimensions = imageDimensions(node);
       if (!visible(node, 96, 72) || dimensions.width < 128 || dimensions.height < 96) return;
-      const url = safePublicUrl(node.currentSrc || node.src || node.getAttribute('src'), true);
+      const url = safePublicMediaUrl(node.currentSrc || node.src || node.getAttribute('src'));
       const caption = node.closest('figure')?.querySelector('figcaption');
-      const alt = cleanText(node.alt || node.getAttribute('aria-label') || caption?.textContent, 180);
+      const labelledBy = cleanText(node.getAttribute('aria-labelledby'), 120);
+      const labelledText = labelledBy
+        ? cleanText(document.getElementById(labelledBy)?.textContent, 180)
+        : '';
+      const nearbyTitle = node.closest('figure, article, section')?.querySelector('h1, h2, h3, h4');
+      const alt = cleanText(
+        node.alt
+          || node.getAttribute('aria-label')
+          || labelledText
+          || caption?.textContent
+          || node.getAttribute('title')
+          || nearbyTitle?.textContent
+          || `回答图片 ${items.length + 1}`,
+        180
+      );
       if (!url || !alt) return;
       const anchor = node.closest('a[href]');
       items.push({
@@ -134,7 +171,7 @@
         alt,
         width: dimensions.width,
         height: dimensions.height,
-        sourceUrl: safePublicUrl(anchor && anchor.href, false)
+        sourceUrl: safePublicUrl(anchor && anchor.href)
       });
       nodes.push(node);
     });

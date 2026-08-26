@@ -1,6 +1,6 @@
 {
   "schema": "yilong.sanitized-rich-content-fixture.v1",
-  "description": "Synthetic, sanitized fixture. It contains no raw vendor response, request headers, cookies, tokens, coordinates, or signed URLs.",
+  "description": "Synthetic fixture. It contains no raw vendor response, request headers, cookies, tokens, or coordinates; the fake signature verifies URL sanitation.",
   "mediaGallery": {
     "title": "回答图片",
     "items": [
@@ -18,6 +18,14 @@
       {
         "url": "https://images.example.com/private/chart.png?signature=removed",
         "alt": "含签名查询的图片"
+      },
+      {
+        "url": "https://proxy.example.com/image?url=https%3A%2F%2Fcdn.example.com%2Fcharts%2Fbtc.png%3Fsignature%3Dremoved",
+        "alt": "代理中的公开图片"
+      },
+      {
+        "url": "",
+        "alt": "缺失图片地址"
       }
     ]
   },
