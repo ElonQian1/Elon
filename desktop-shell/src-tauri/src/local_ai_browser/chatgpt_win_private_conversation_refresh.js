@@ -1,10 +1,24 @@
 (function () {
   'use strict';
 
+  const VERSION = 2;
   if (location.origin !== 'https://chatgpt.com') return;
-  const delegate = window.__elonChatGptPrivateTransport;
-  if (!delegate || delegate.__elonWinConversationRefreshWrapped === true ||
-      typeof delegate.prefetchConversation !== 'function') return;
+  const candidate = window.__elonChatGptPrivateTransport;
+  if (!candidate || typeof candidate.prefetchConversation !== 'function') return;
+
+  const existing = window.__elonWinChatGptConversationRefresh;
+  if (existing && Number(existing.version || 0) >= VERSION &&
+      typeof existing.rebind === 'function') {
+    existing.rebind(candidate);
+    return;
+  }
+
+  let delegate = candidate.__elonWinConversationRefreshWrapped === true &&
+    candidate.baseTransport && typeof candidate.baseTransport.prefetchConversation === 'function'
+    ? candidate.baseTransport
+    : candidate;
+  let bindingRevision = 1;
+  let wrapper = null;
 
   function conversationIdentity(path) {
     const match = String(path || '').match(/(?:^|\/)c\/([A-Za-z0-9_-]{1,160})$/);
@@ -87,11 +101,46 @@
     return delegate.prefetchConversation(requestedPath, emit, null);
   }
 
-  window.__elonChatGptPrivateTransport = Object.freeze({
-    ...delegate,
-    __elonWinConversationRefreshWrapped: true,
-    winConversationRefreshVersion: 1,
-    prefetchConversation,
-    refreshCurrentConversation,
+  function createWrapper() {
+    return Object.freeze({
+      ...delegate,
+      __elonWinConversationRefreshWrapped: true,
+      winConversationRefreshVersion: VERSION,
+      baseTransport: delegate,
+      prefetchConversation,
+      refreshCurrentConversation,
+    });
+  }
+
+  function rebind(nextTransport) {
+    if (nextTransport === wrapper) {
+      window.__elonChatGptPrivateTransport = wrapper;
+      return false;
+    }
+    const next = nextTransport && nextTransport.__elonWinConversationRefreshWrapped === true &&
+      nextTransport.baseTransport &&
+      typeof nextTransport.baseTransport.prefetchConversation === 'function'
+      ? nextTransport.baseTransport
+      : nextTransport;
+    if (!next || typeof next.prefetchConversation !== 'function') return false;
+    if (next === delegate) {
+      window.__elonChatGptPrivateTransport = wrapper;
+      return false;
+    }
+    delegate = next;
+    bindingRevision += 1;
+    wrapper = createWrapper();
+    window.__elonChatGptPrivateTransport = wrapper;
+    return true;
+  }
+
+  wrapper = createWrapper();
+  window.__elonChatGptPrivateTransport = wrapper;
+  window.__elonWinChatGptConversationRefresh = Object.freeze({
+    version: VERSION,
+    rebind,
+    diagnostics: function () {
+      return 'v' + VERSION + '|bindings=' + bindingRevision;
+    },
   });
 })();
