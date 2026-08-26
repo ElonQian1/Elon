@@ -19,6 +19,8 @@ pub(crate) struct CaptureAnalysis {
     pub text_length: u32,
     pub rich_kinds: Vec<String>,
     pub content_types: Vec<String>,
+    #[serde(default)]
+    pub unsupported_rich_count: u32,
     pub completed: bool,
     pub parse_error: bool,
 }
@@ -36,6 +38,7 @@ pub(crate) struct ResearchCaptureStatus {
     text_length: u32,
     rich_kinds: Vec<String>,
     content_types: Vec<String>,
+    unsupported_rich_count: u32,
     completed: bool,
     truncated: bool,
 }
@@ -53,6 +56,7 @@ impl Default for ResearchCaptureStatus {
             text_length: 0,
             rich_kinds: Vec::new(),
             content_types: Vec::new(),
+            unsupported_rich_count: 0,
             completed: false,
             truncated: false,
         }
@@ -64,12 +68,13 @@ pub(super) fn validate(analysis: Option<&CaptureAnalysis>) -> Result<(), String>
         return Ok(());
     };
     if analysis.schema != ANALYSIS_SCHEMA
-        || analysis.analyzer_version != 1
+        || !matches!(analysis.analyzer_version, 1 | 2)
         || analysis.decoded_frame_count > 100_000
         || analysis.accepted_frame_count > analysis.decoded_frame_count
         || analysis.assistant_frame_count > analysis.decoded_frame_count
         || analysis.progress_frame_count > analysis.decoded_frame_count
         || analysis.text_length > 10_000_000
+        || analysis.unsupported_rich_count > 32
         || !valid_tokens(&analysis.rich_kinds, 32)
         || !valid_tokens(&analysis.content_types, 40)
     {
@@ -142,6 +147,7 @@ pub(super) fn read_status(root: &Path) -> Result<ResearchCaptureStatus, String> 
         status.text_length = analysis.text_length;
         status.rich_kinds = analysis.rich_kinds;
         status.content_types = analysis.content_types;
+        status.unsupported_rich_count = analysis.unsupported_rich_count;
         status.completed = analysis.completed;
         status.truncated = truncated;
     }
@@ -157,6 +163,8 @@ fn compatibility(analysis: &CaptureAnalysis, truncated: bool) -> &'static str {
         "parse_error"
     } else if analysis.decoded_frame_count == 0 {
         "empty_stream"
+    } else if analysis.unsupported_rich_count > 0 {
+        "renderer_upgrade_required"
     } else if analysis.accepted_frame_count == 0 {
         "upstream_changed"
     } else if analysis
@@ -218,6 +226,18 @@ mod tests {
     }
 
     #[test]
+    fn unsupported_private_widget_requires_renderer_upgrade_even_with_text() {
+        let mut analysis = sample();
+        analysis.analyzer_version = 2;
+        analysis.accepted_frame_count = 3;
+        analysis.assistant_frame_count = 1;
+        analysis.text_length = 320;
+        analysis.unsupported_rich_count = 1;
+        assert_eq!(compatibility(&analysis, false), "renderer_upgrade_required");
+        assert!(validate(Some(&analysis)).is_ok());
+    }
+
+    #[test]
     fn parsed_google_rpc_without_a_stable_content_mapping_is_observed() {
         let mut analysis = sample();
         analysis.decoded_frame_count = 1;
@@ -239,6 +259,7 @@ mod tests {
             text_length: 0,
             rich_kinds: Vec::new(),
             content_types: vec!["text".to_string()],
+            unsupported_rich_count: 0,
             completed: true,
             parse_error: false,
         }

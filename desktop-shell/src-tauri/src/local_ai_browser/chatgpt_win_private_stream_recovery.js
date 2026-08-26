@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  var VERSION = 5;
+  var VERSION = 6;
   var MAX_AGE_MS = 5 * 60 * 1000;
   var OFFICIAL_COMPLETION_SETTLE_MS = 3000;
   var MAX_RICH_PARTS = 4;
@@ -66,9 +66,18 @@
   }
 
   function validRichPart(part) {
-    if (!part || part.type !== 'rich_card') return null;
+    if (!part || typeof part !== 'object') return null;
+    var rawKind = cleanText(part.kind, 32).toLowerCase();
+    if (part.type === 'interactive' && rawKind === 'renderer_upgrade_required') {
+      return {
+        type: 'interactive',
+        text: cleanText(part.text, 180) || '官网富内容已升级',
+        kind: 'renderer_upgrade_required'
+      };
+    }
+    if (part.type !== 'rich_card') return null;
     var rich = part.richContent;
-    var kind = cleanText(part.kind || rich && rich.kind, 32).toLowerCase();
+    var kind = cleanText(rawKind || rich && rich.kind, 32).toLowerCase();
     if (kind !== 'finance' && kind !== 'chart') return null;
     if (!rich || rich.schema !== 'yilong.rich-content.v1' || rich.kind !== kind ||
         rich.source !== 'private_response' || !rich.payload || typeof rich.payload !== 'object') return null;

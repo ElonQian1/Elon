@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  var VERSION = 7;
+  var VERSION = 8;
   var PROVIDER_ID = '__PROVIDER_ID__';
   var MAX_BODY_BYTES = 2 * 1024 * 1024;
   var ANALYSIS_SCHEMA = 'yilong.web-ai.capture-analysis.v1';
@@ -94,12 +94,59 @@
     return '';
   }
 
+  function visibleMessage(payload) {
+    if (!payload || typeof payload !== 'object') return null;
+    var envelope = Number.isFinite(payload.c) && payload.v && typeof payload.v === 'object'
+      ? payload.v
+      : payload;
+    var message = envelope.message || envelope.data && envelope.data.message;
+    return message && typeof message === 'object' ? message : null;
+  }
+
+  function safeStructureToken(value, limit) {
+    var text = String(value || '').toLowerCase();
+    return /^[a-z0-9_.:-]+$/.test(text) ? text.slice(0, limit || 48) : '';
+  }
+
+  function unsupportedRichSignature(reference, policy) {
+    if (!reference || typeof reference !== 'object') return '';
+    var initialState = reference.dil && reference.dil.initialState;
+    if (reference.type === 'dil' && initialState && typeof initialState === 'object' &&
+        !Array.isArray(initialState)) {
+      if (policy && typeof policy.financePartFromWidget === 'function' &&
+          policy.financePartFromWidget(initialState)) return '';
+      return 'dil:' + Object.keys(initialState).filter(function (key) {
+        return /^[A-Za-z_][A-Za-z0-9_]{0,63}$/.test(key);
+      }).sort().slice(0, 12).join(',');
+    }
+    var data = reference.data;
+    if (reference.type !== 'client_defined_widget' || !data || typeof data !== 'object') return '';
+    if (policy && typeof policy.clientChartPartFromMetadata === 'function' &&
+        policy.clientChartPartFromMetadata({ content_references: [reference] })) return '';
+    var content = data.content && typeof data.content === 'object' ? data.content : {};
+    return [
+      'client',
+      safeStructureToken(reference.category, 32),
+      safeStructureToken(data.widget_type, 48),
+      safeStructureToken(data.language, 32),
+      safeStructureToken(content.chartType, 32)
+    ].join(':');
+  }
+
+  function rendererUpgradePart() {
+    return {
+      type: 'interactive',
+      text: '官网富内容已升级',
+      kind: 'renderer_upgrade_required'
+    };
+  }
+
   function chatGptStreamAnalysis(body, format, recoveryGeneration) {
     if (PROVIDER_ID !== 'chatgpt' || format !== 'sse') return null;
     var policy = window.__elonChatGptPrivateStreamPolicy;
     var base = {
       schema: ANALYSIS_SCHEMA,
-      analyzerVersion: 1,
+      analyzerVersion: 2,
       policyAvailable: Boolean(policy),
       decodedFrameCount: 0,
       acceptedFrameCount: 0,
@@ -108,6 +155,7 @@
       textLength: 0,
       richKinds: [],
       contentTypes: [],
+      unsupportedRichCount: 0,
       completed: false,
       parseError: false
     };
@@ -116,12 +164,21 @@
     var session = policy.createSession({ now: function () { return Date.now(); } });
     var conversationId = '';
     var contentTypes = new Set();
+    var unsupportedRich = new Set();
     try {
       session.begin();
       var decoder = policy.createSseDecoder(function (payload) {
         base.decodedFrameCount += 1;
         var contentType = contentTypeFrom(payload);
         if (contentType && contentTypes.size < 16) contentTypes.add(contentType);
+        var visible = visibleMessage(payload);
+        var references = visible && visible.metadata && Array.isArray(visible.metadata.content_references)
+          ? visible.metadata.content_references
+          : [];
+        references.slice(0, 32).forEach(function (reference) {
+          var signature = unsupportedRichSignature(reference, policy);
+          if (signature && unsupportedRich.size < 32) unsupportedRich.add(signature);
+        });
         if (typeof policy.assistantFrame === 'function') {
           var assistant = policy.assistantFrame(payload);
           if (assistant) {
@@ -144,25 +201,28 @@
       if (snapshot) {
         base.textLength = Math.max(base.textLength, String(snapshot.text || '').length);
         base.completed = base.completed || snapshot.state === 'completed';
-        base.richKinds = Array.from(new Set((Array.isArray(snapshot.richParts)
-          ? snapshot.richParts : []).map(function (part) {
+        var recoveredParts = Array.isArray(snapshot.richParts) ? snapshot.richParts.slice() : [];
+        if (unsupportedRich.size) recoveredParts.push(rendererUpgradePart());
+        base.unsupportedRichCount = unsupportedRich.size;
+        base.richKinds = Array.from(new Set(recoveredParts.map(function (part) {
             return String(part && part.kind || '').toLowerCase();
           }).filter(function (kind) {
             return /^[a-z][a-z0-9_-]{0,31}$/.test(kind);
           }))).slice(0, 16);
         var recovery = window.__elonWinChatGptPrivateStreamRecovery;
         if (recovery && typeof recovery.accept === 'function' &&
-            Array.isArray(snapshot.richParts) && snapshot.richParts.length) {
+            recoveredParts.length) {
           recovery.accept({
             messageId: snapshot.id || '',
             turnId: snapshot.turnId || '',
             conversationId: snapshot.conversationId || conversationId || '',
             text: snapshot.text || '',
             generation: recoveryGeneration,
-            richParts: snapshot.richParts
+            richParts: recoveredParts
           });
         }
       }
+      base.unsupportedRichCount = unsupportedRich.size;
       base.contentTypes = Array.from(contentTypes).slice(0, 16);
       return base;
     } catch (_) {
@@ -176,7 +236,7 @@
     if (PROVIDER_ID !== 'google-ai-mode') return null;
     var base = {
       schema: ANALYSIS_SCHEMA,
-      analyzerVersion: 1,
+      analyzerVersion: 2,
       policyAvailable: true,
       decodedFrameCount: 0,
       acceptedFrameCount: 0,
@@ -185,6 +245,7 @@
       textLength: 0,
       richKinds: [],
       contentTypes: [],
+      unsupportedRichCount: 0,
       completed: true,
       parseError: false
     };

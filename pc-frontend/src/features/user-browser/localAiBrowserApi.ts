@@ -69,6 +69,7 @@ export interface LocalAiResearchCaptureStatus {
     | 'parse_error'
     | 'empty_stream'
     | 'upstream_changed'
+    | 'renderer_upgrade_required'
     | 'incomplete'
     | 'structure_observed'
     | 'text_compatible'
@@ -79,6 +80,7 @@ export interface LocalAiResearchCaptureStatus {
   textLength: number
   richKinds: string[]
   contentTypes: string[]
+  unsupportedRichCount: number
   completed: boolean
   truncated: boolean
 }

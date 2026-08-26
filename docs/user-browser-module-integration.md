@@ -167,6 +167,11 @@ Google AI Mode 的 XSSI 前缀、长度行、`wrb.fr` 批处理与内嵌 JSON �
 协议族、数量分桶和不含数组下标值的稳定字段路径，具体字符串、数值、URL、RPC ID 与敏感字段仍全部
 丢弃。研究人员据多个样本共同出现的字段路径提出 AST 映射，不能凭单个样本或正文关键词直接上线。
 
+Win 端的 ChatGPT 私有流分析器同时区分“正文可读”和“富组件可渲染”。已知金融/图表结构继续生成
+`yilong.rich-content.v1`；若响应中出现 `dil` 或 `client_defined_widget`，但当前解析器不能把它转换为
+已授权的富内容 AST，该条消息会保留正文并增加 `renderer_upgrade_required` 占位，诊断状态显示未支持
+组件数量。此占位不携带组件原始数据，只提供查看官网完整内容和检查 Win 更新的闭环。
+
 ```powershell
 node scripts/sanitize-web-ai-response-fixture.cjs --input D:\private\response.sse --output D:\private\response.shape.json --provider chatgpt
 ```

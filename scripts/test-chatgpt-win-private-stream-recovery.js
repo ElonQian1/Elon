@@ -105,9 +105,25 @@ assert.equal(recovery.accept({
   messageId: 'assistant-one',
   turnId: 'turn-one',
   conversationId: 'conversation-one',
+  richParts: [{
+    type: 'interactive',
+    text: '官网富内容已升级',
+    kind: 'renderer_upgrade_required',
+  }],
+}), true)
+const upgradeMerged = transport.mergeMessages([{
+  role: 'assistant',
+  state: 'completed',
+  content: [{ type: 'markdown', text: 'BTC answer' }],
+}], '/c/conversation-one')
+assert.equal(upgradeMerged[0].content.at(-1).kind, 'renderer_upgrade_required')
+assert.equal(recovery.accept({
+  messageId: 'assistant-one',
+  turnId: 'turn-one',
+  conversationId: 'conversation-one',
   richParts: [financePart()],
 }), true)
-assert.equal(notifications, 1)
+assert.equal(notifications, 2)
 
 const messages = [{
   id: 'dom-assistant',

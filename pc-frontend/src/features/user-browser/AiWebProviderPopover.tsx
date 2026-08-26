@@ -100,10 +100,13 @@ export default function AiWebProviderPopover({
 }
 
 function researchStatusWarning(status: LocalAiResearchCaptureStatus) {
-  return ['upstream_changed', 'parse_error', 'incomplete'].includes(status.compatibility)
+  return ['upstream_changed', 'renderer_upgrade_required', 'parse_error', 'incomplete'].includes(status.compatibility)
 }
 
 function researchStatusCopy(status: LocalAiResearchCaptureStatus) {
+  if (status.compatibility === 'renderer_upgrade_required') {
+    return `官网富内容结构已升级：发现 ${status.unsupportedRichCount} 类当前 Win 渲染器尚未支持的私有组件；正文继续显示，消息内已提供官网回退与更新提示。`
+  }
   if (researchStatusWarning(status)) {
     return `官网响应结构可能已升级：解码 ${status.decodedFrameCount} 帧，仅识别 ${status.acceptedFrameCount} 帧；原始响应已保存在本机，请更新解析与渲染代码。`
   }

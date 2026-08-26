@@ -366,7 +366,7 @@ mod tests {
         let mut capture = sample("data: rich response");
         capture.analysis = Some(analysis::CaptureAnalysis {
             schema: "yilong.web-ai.capture-analysis.v1".to_string(),
-            analyzer_version: 1,
+            analyzer_version: 2,
             policy_available: true,
             decoded_frame_count: 3,
             accepted_frame_count: 2,
@@ -375,6 +375,7 @@ mod tests {
             text_length: 128,
             rich_kinds: vec!["finance".to_string()],
             content_types: vec!["text".to_string()],
+            unsupported_rich_count: 0,
             completed: true,
             parse_error: false,
         });

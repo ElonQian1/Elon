@@ -51,6 +51,30 @@ async function main() {
     'data: [DONE]',
     '',
   ].join('\n\n')
+  const unsupportedRichStream = [
+    'data: ' + JSON.stringify({
+      conversation_id: 'conversation-one',
+      message: {
+        id: 'assistant-future-widget',
+        author: { role: 'assistant' },
+        status: 'finished_successfully',
+        content: { content_type: 'text', parts: ['visible future answer'] },
+        metadata: {
+          content_references: [{
+            type: 'client_defined_widget',
+            category: 'visualization',
+            data: {
+              language: 'future-renderer',
+              widget_type: 'future_widget_v9',
+              content: { chartType: 'radar' },
+            },
+          }],
+        },
+      },
+    }),
+    'data: [DONE]',
+    '',
+  ].join('\n\n')
   const window = {
     __elonChatGptPrivateStreamPolicy: privateStreamPolicy,
     __elonWinChatGptPrivateStreamRecovery: {
@@ -64,7 +88,7 @@ async function main() {
       fetchCalls += 1
       const body = String(input).includes('backend-anon')
         ? 'data: {"type":"unknown_future_frame","payload":{"next":true}}\n\n'
-        : richStream
+        : String(input).includes('unsupported=1') ? unsupportedRichStream : richStream
       return new Response(body, {
         status: 200,
         headers: {
@@ -108,11 +132,13 @@ async function main() {
   assert.equal(captures[0].args.capture.format, 'sse')
   assert.match(captures[0].args.capture.body, /visible answer/)
   assert.equal(captures[0].args.capture.analysis.schema, 'yilong.web-ai.capture-analysis.v1')
+  assert.equal(captures[0].args.capture.analysis.analyzerVersion, 2)
   assert.equal(captures[0].args.capture.analysis.policyAvailable, true)
   assert.equal(captures[0].args.capture.analysis.acceptedFrameCount, 1)
   assert.equal(captures[0].args.capture.analysis.assistantFrameCount, 1)
   assert.equal(captures[0].args.capture.analysis.textLength, 'visible answer'.length)
   assert.deepEqual(Array.from(captures[0].args.capture.analysis.richKinds), ['chart'])
+  assert.equal(captures[0].args.capture.analysis.unsupportedRichCount, 0)
   assert.equal(recovered.length, 1)
   assert.equal(recovered[0].messageId, 'assistant-one')
   assert.equal(recovered[0].conversationId, 'conversation-one')
@@ -145,10 +171,23 @@ async function main() {
   assert.equal(captures[3].args.capture.analysis.decodedFrameCount, 1)
   assert.equal(captures[3].args.capture.analysis.acceptedFrameCount, 0)
 
+  await window.fetch('https://chatgpt.com/backend-api/f/conversation?unsupported=1', {
+    method: 'POST',
+  })
+  await new Promise((resolve) => setTimeout(resolve, 20))
+  assert.equal(captures.length, 5)
+  assert.equal(captures[4].args.capture.analysis.unsupportedRichCount, 1)
+  assert.deepEqual(
+    Array.from(captures[4].args.capture.analysis.richKinds),
+    ['renderer_upgrade_required'],
+  )
+  assert.equal(recovered.at(-1).richParts[0].type, 'interactive')
+  assert.equal(recovered.at(-1).richParts[0].kind, 'renderer_upgrade_required')
+
   await window.fetch('https://chatgpt.com/backend-api/accounts/check', { method: 'GET' })
   await new Promise((resolve) => setTimeout(resolve, 5))
-  assert.equal(fetchCalls, 5)
-  assert.equal(captures.length, 4, 'unregistered endpoint families must not enter local capture')
+  assert.equal(fetchCalls, 6)
+  assert.equal(captures.length, 5, 'unregistered endpoint families must not enter local capture')
   console.log('Win Web response research capture tests passed')
 }
 
