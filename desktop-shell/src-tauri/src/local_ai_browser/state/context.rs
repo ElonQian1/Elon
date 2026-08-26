@@ -57,6 +57,7 @@ impl SessionRecord {
             // spinner, but the old snapshot must stay unaligned and therefore hidden
             // until a fresh empty page (or a deliberate first user turn) is observed.
             self.pending_context_action.clear();
+            self.pending_context_request_id = None;
             self.pending_context_since_ms = 0;
             self.pending_send_prompt = None;
             self.preserve_conversation_on_navigation = false;
@@ -66,6 +67,7 @@ impl SessionRecord {
         self.active_conversation_id = self.semantic_conversation_id.clone();
         self.active_page_context_key = self.semantic_page_context_key.clone();
         self.pending_context_action.clear();
+        self.pending_context_request_id = None;
         self.pending_context_since_ms = 0;
         self.pending_send_prompt = None;
         self.new_conversation_baseline_user = None;
@@ -73,9 +75,15 @@ impl SessionRecord {
         self.last_event_kind = "context_transition_timed_out".to_string();
     }
 
-    pub(super) fn begin_context_command(&mut self, action: &str, target: Option<&str>) {
+    pub(super) fn begin_context_command(
+        &mut self,
+        action: &str,
+        target: Option<&str>,
+        request_id: Option<&str>,
+    ) {
         if action == "send_prompt" {
             self.pending_context_action = action.to_string();
+            self.pending_context_request_id = request_id.map(ToOwned::to_owned);
             self.pending_context_since_ms = super::now_ms();
             self.pending_send_prompt = target.map(|value| value.to_string());
             self.preserve_conversation_on_navigation = true;
@@ -89,6 +97,7 @@ impl SessionRecord {
         }
         self.pending_send_prompt = None;
         self.pending_context_action = action.to_string();
+        self.pending_context_request_id = request_id.map(ToOwned::to_owned);
         self.pending_context_since_ms = super::now_ms();
         self.preserve_conversation_on_navigation = false;
         if action == "new_conversation" {
@@ -111,6 +120,7 @@ impl SessionRecord {
     pub(super) fn begin_cached_conversation(&mut self, id: String, restorable_url: &str) {
         self.new_conversation_baseline_user = None;
         self.pending_context_action = "open_cached_conversation".to_string();
+        self.pending_context_request_id = None;
         self.pending_context_since_ms = super::now_ms();
         self.preserve_conversation_on_navigation = false;
         self.active_conversation_id = Some(id);
@@ -161,6 +171,7 @@ impl SessionRecord {
             },
         );
         self.pending_context_action = "navigation".to_string();
+        self.pending_context_request_id = None;
         self.pending_context_since_ms = super::now_ms();
     }
 
@@ -267,6 +278,7 @@ impl SessionRecord {
             .map(ToOwned::to_owned)
             .or_else(|| self.active_page_context_key.clone());
         self.pending_context_action.clear();
+        self.pending_context_request_id = None;
         self.pending_context_since_ms = 0;
         self.pending_send_prompt = None;
         if self
@@ -285,10 +297,18 @@ impl SessionRecord {
             .and_then(Value::as_str)
             .unwrap_or_default();
         let ok = payload.get("ok").and_then(Value::as_bool).unwrap_or(false);
+        let request_matches = self.pending_context_request_id.is_none()
+            || payload.get("requestId").and_then(Value::as_str)
+                == self.pending_context_request_id.as_deref();
+        if self.pending_context_action == action && !request_matches {
+            self.last_event_kind = "stale_context_command_result_ignored".to_string();
+            return;
+        }
         if !ok && self.pending_context_action == action {
             self.active_conversation_id = self.semantic_conversation_id.clone();
             self.active_page_context_key = self.semantic_page_context_key.clone();
             self.pending_context_action.clear();
+            self.pending_context_request_id = None;
             self.pending_context_since_ms = 0;
             self.pending_send_prompt = None;
             if action == "new_conversation" {
@@ -306,6 +326,7 @@ impl SessionRecord {
         self.active_page_context_key = None;
         self.semantic_page_context_key = None;
         self.pending_context_action.clear();
+        self.pending_context_request_id = None;
         self.pending_context_since_ms = 0;
         self.pending_send_prompt = None;
         self.new_conversation_baseline_user = None;

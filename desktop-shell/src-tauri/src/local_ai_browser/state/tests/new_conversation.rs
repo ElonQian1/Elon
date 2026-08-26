@@ -251,3 +251,97 @@ fn failed_page_action_can_reestablish_a_safe_home_boundary() {
     );
     assert!(runtime.snapshot("session").unwrap().context_ready);
 }
+
+#[test]
+fn stale_new_conversation_receipt_cannot_rollback_the_current_request_generation() {
+    let runtime = LocalAiBrowserRuntime::default();
+    runtime.ensure_session("session", "chatgpt", "active");
+    let previous = Url::parse("https://chatgpt.com/c/previous").unwrap();
+    let previous_key = semantic_context::page_context_key("chatgpt", previous.as_str());
+    runtime.mark_navigation("session", &previous, true, None);
+    runtime.mark_page_finished("session", &previous);
+    runtime.record_adapter_event_with_context(
+        "session",
+        "message_snapshot",
+        json!({"type":"message_snapshot","messages":[
+            {"id":"previous-user","role":"user","state":"completed","content":[{"type":"text","text":"previous"}]},
+            {"id":"previous-answer","role":"assistant","state":"completed","content":[{"type":"text","text":"answer"}]}
+        ]}),
+        previous_key.as_deref(),
+    );
+    let previous_id = runtime.snapshot("session").unwrap().active_conversation_id.unwrap();
+
+    runtime.mark_command_pending_with_value(
+        "session",
+        "new_conversation",
+        Some("mcp_current"),
+        None,
+    );
+    let current_id = runtime.snapshot("session").unwrap().active_conversation_id.unwrap();
+    assert_ne!(current_id, previous_id);
+    runtime.record_adapter_event(
+        "session",
+        "command_result",
+        json!({
+            "type":"command_result",
+            "action":"new_conversation",
+            "requestId":"mcp_stale",
+            "ok":false
+        }),
+    );
+
+    let guarded = runtime.snapshot("session").unwrap();
+    assert_eq!(guarded.active_conversation_id.as_deref(), Some(current_id.as_str()));
+    assert!(!guarded.context_ready);
+    assert_eq!(
+        guarded.diagnostics["lastEventKind"],
+        "stale_context_command_result_ignored"
+    );
+}
+
+#[test]
+fn stale_send_failure_cannot_cancel_the_current_prompt_generation() {
+    let runtime = LocalAiBrowserRuntime::default();
+    runtime.ensure_session("session", "chatgpt", "active");
+    let url = Url::parse("https://chatgpt.com/c/current").unwrap();
+    let key = semantic_context::page_context_key("chatgpt", url.as_str());
+    runtime.mark_navigation("session", &url, true, None);
+    runtime.mark_page_finished("session", &url);
+    runtime.record_adapter_event_with_context(
+        "session",
+        "message_snapshot",
+        json!({"type":"message_snapshot","messages":[
+            {"id":"user","role":"user","state":"completed","content":[{"type":"text","text":"first"}]},
+            {"id":"answer","role":"assistant","state":"completed","content":[{"type":"text","text":"answer"}]}
+        ]}),
+        key.as_deref(),
+    );
+    runtime.mark_command_pending_with_value(
+        "session",
+        "send_prompt",
+        Some("mcp_current"),
+        Some("second"),
+    );
+    for request_id in ["mcp_stale", "mcp_current"] {
+        runtime.record_adapter_event(
+            "session",
+            "command_result",
+            json!({
+                "type":"command_result",
+                "action":"send_prompt",
+                "requestId":request_id,
+                "ok":false
+            }),
+        );
+        let state = runtime.snapshot("session").unwrap();
+        if request_id == "mcp_stale" {
+            assert!(!state.context_ready);
+            assert_eq!(
+                state.diagnostics["lastEventKind"],
+                "stale_context_command_result_ignored"
+            );
+        } else {
+            assert!(state.context_ready);
+        }
+    }
+}

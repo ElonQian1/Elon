@@ -62,6 +62,7 @@ struct SessionRecord {
     active_page_context_key: Option<String>,
     semantic_page_context_key: Option<String>,
     pending_context_action: String,
+    pending_context_request_id: Option<String>,
     pending_context_since_ms: u64,
     pending_send_prompt: Option<String>,
     new_conversation_baseline_user: Option<String>,
@@ -239,6 +240,7 @@ impl LocalAiBrowserRuntime {
                 active_page_context_key: active_page_context_key.clone(),
                 semantic_page_context_key: active_page_context_key,
                 pending_context_action: String::new(),
+                pending_context_request_id: None,
                 pending_context_since_ms: 0,
                 pending_send_prompt: None,
                 new_conversation_baseline_user: None,
@@ -369,7 +371,7 @@ impl LocalAiBrowserRuntime {
             record.last_command_request_id =
                 request_id.map(|value| truncate(value.to_string(), 36));
             record.last_command_ok = None;
-            record.begin_context_command(action, value);
+            record.begin_context_command(action, value, request_id);
         });
     }
 
