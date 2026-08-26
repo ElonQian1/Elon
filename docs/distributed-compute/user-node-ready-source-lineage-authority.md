@@ -137,11 +137,13 @@ Ready 分支。
 
 2026-08-26 的 Windows Runner 草案只写入单一 loader successor、完整 by-value seam、FileId leases/reopen receipts、
 五类 failure custody、suspended-child/atomic-Job/pre-create currentness 与 unconfirmed whole-graph parking；exact PE/launch/
-live-OS、launch-security/currentness/release-recovery producers 均缺，extraction-share、pre-resume/dynamic-load、
+live-OS、launch-security/currentness/release-recovery producers 均缺。extraction-share 已形成 retained-owner typed
+source seam 但 Windows 动态矩阵仍缺；pre-resume/dynamic-load、
 `ResumeThread`、IPC/enforcement/Store blocked。因此
 `runtime_transition_authority` 与 `host_runtime_authority` 仍均为 `missing`；精确
 边界见 [`loader load-set`](user-node-windows-runner-loader-load-set-authority.md) 与
-[`process custody`](user-node-windows-runner-process-custody-authority.md)。
+[`process custody`](user-node-windows-runner-process-custody-authority.md)，目录 seam 另见
+[`extraction share custody`](user-node-windows-runner-extraction-directory-share-custody-authority.md)。
 
 只有四项 source authority 均形成后，服务端 verifier 才可在 current V279 binding、current consent/credential、节点签名
 和 session witness 上重新验证，并生成新的 server-owned Ready authority。它也仍不会自动创建 route、Offer、容量、
@@ -166,7 +168,8 @@ Attempt 或 Lease。
 
 ## 11. 后续顺序
 
-1. 沿 Windows Runner 草案依次补齐 extraction-share、exact PE/launch resolution、name-grant/FileId-lease/reopen、
+1. 沿 Windows Runner 草案先动态验证 source-written extraction-share，再依次补齐 exact PE/launch resolution、
+   name-grant/FileId-lease/reopen、
    launch-security/private desktop、live-OS/pre-create/pre-resume currentness、explicit release/recovery、dynamic-load、
    IPC/enforcement/Store、受控 resume 与健康/撤销，形成真实 Host runtime authority；
 2. 新建 v15 endpoint session，不修改 v14 blocked-only；

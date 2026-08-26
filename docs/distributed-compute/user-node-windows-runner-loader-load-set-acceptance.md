@@ -98,12 +98,13 @@ Windows、网络、设备或真实 Runner 验证：
     replacement 只能作为 backend outcome 返回，failure 保留 anchor-only attempt custody；同时 positive+negative 时不得
     definitive，positive reopen receipt/owner 及其 response bytes/digest 留在 outcome-uncertain custody；
 14. managed loader owners 不暴露 raw handle/path constructor、clone 或 Serde 逃逸；
-15. 只有 package files 有 candidate Windows access/share recipe，均只 `FILE_OPEN`；无 directory recipe，且
-    share-read 不替代 content lease；
+15. package files 与 purpose-specific extraction-directory probe 都有 candidate Windows access/share recipe，均只
+    `FILE_OPEN`；目录 probe 保留原 DELETE owner、要求 share-read/write/delete 且不替代 namespace/content authority；
 16. transition 权威顺序要求 name/launch grant acquisition、统一 package+system FileId lease acquisition、lease 下
     same-handle rehash、consuming generation query、exact indexing、
     retain directories、Runner-last file reopen、anchor receipt、identity/hash/path 与 final query；
-17. `existing_extraction_directory_access_share_compatibility=missing/unverified`；未修改/验证 predecessor；
+17. `existing_extraction_directory_access_share_compatibility=source_seam_written_windows_dynamic_unverified`；typed
+    retained-owner seam 已接入 extraction→loader owner graph，但没有 Windows 动态证据；
 18. success digest 不代替 resolution/namespace/lease authority；persistent grants 的 explicit authorized release/recovery 无
     producer，不得以 Drop/session disconnect 释放；
 19. process custody 只接受 loader-locked successor；loader slice 内没有 `CreateProcessAsUserW`、`ResumeThread`、
@@ -126,8 +127,8 @@ Windows、网络、设备或真实 Runner 验证：
 | successful loader transition | 0 | 0 | 1 | 无 transition function、caller 或 success producer |
 | successor-owned root-lock lease | 0 | 0 | 1 | ownership shape 已写；无 success/recovery producer，未验证 parked/leaked lifetime |
 | anchor-consuming parent-relative reopen | 0 | 0 | 1 | anchor/reopen receipt/close quarantine 只有 source shape，无 backend |
-| package-file candidate access/share recipe | 0 | 0 | 1 | 未在 Windows 验证兼容性或拒绝效果；无 directory recipe |
-| existing extraction directory access/share compatibility | 0 | 0 | 1 | DELETE access 与缺 `FILE_SHARE_DELETE` 的 predecessor 可能不兼容；未修改/未验证 |
+| package-file candidate access/share recipe | 0 | 0 | 1 | 未在 Windows 验证兼容性或拒绝效果；不由目录 probe 推导 content lease |
+| existing extraction directory access/share compatibility | 0 | 0 | 1 | retained DELETE owner + narrow share-delete probe 源码 seam 已写；Windows access/share、identity/path 与 failure custody 未运行 |
 | full-package rehash / replacement rehash | 0 | 0 | 1 | 顺序已冻结，未实现/未执行 |
 | FileId/reparse/hardlink/delete-pending/handle path | 0 | 0 | 1 | 未实现 query-back/fault injection |
 | five failure-custody families | 0 | 0 | 1 | name-grant/content-lease/borrow/namespace/post-barrier shapes 存在；无运行 recovery |
@@ -191,8 +192,8 @@ exact 18 项：`runtime_phase`、`runtime_generation`、`runtime_start`、`runti
   和 content-lease continuity；reopen 同时 positive+negative 时 positive receipt/owner 也必须留在 uncertain custody；
 - package/root/plan vectors 长度不等、ordinal/path 错配、截断式 zip；package files 多 ordinal、Runner
   first/middle/last 输入但实际 close 始终 Runner last，以及所有 indexed partial custody；
-- 既有 extraction directory 创建的 DELETE access + share-read/write 与后续缺 `FILE_SHARE_DELETE` traversal/reopen
-  组合，及修复后原 package-root/plan-directory handle retained/wrapped 路径；
+- extraction directory 原 DELETE access + share-read/write owner 与 parent-relative narrow share-delete probe 的
+  共存、同 FileId/volume/non-reparse/canonical-path、retained-parent create-new、失败保管，以及普通目录 open 未被放宽；
 - rejected replacement handle 不泄漏、不丢失，retry/admission extractor 不存在；
 - Node crash/restart、fence owner disconnect、explicit-authorized release/recovery、orphan lease/grant/handle scan；
 - 外部 root borrow 结束、unconfirmed/leaked graph 与 recovery scan 期间 exact `ComputePluginRootLockLease` 仍由 successor 保管；
@@ -214,7 +215,8 @@ exact 18 项：`runtime_phase`、`runtime_generation`、`runtime_start`、`runti
   section binding、external search-directory ancestor/parent-share-grant/alias-currentness receipt，或 filesystem system
   servicing-generation lease 与 parent-relative retained file/open/section receipts；
 - 把 directory handle/share mode、oplock 或 digest 称为 searched-name namespace authority；
-- 声称原 package-root/plan-directory handles 被 narrow reopen，或存在 directory access/share recipe；
+- 声称 share-delete probe 替换了原 package-root/plan-directory owner、授权 loader namespace/content authority，或普通
+  managed-directory open 已被全局放宽；
 - 声称既有 extraction directory producer 的 access/share compatibility 已验证、admission→loader predecessor 已可达；
 - 把 `startup_import_resolution_profile_digest` 或 `startup_import_namespace_authority_digest` 称为对应 authority；
 - 把 sealed/pre-create KnownDLL/API-set/SxS fields 称为 live OS currentness，或把 share-read/hash 称为 FileId

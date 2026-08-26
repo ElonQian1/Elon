@@ -57,8 +57,8 @@ source-contract guard 也未执行：
    outcome-uncertain custody 且不得丢弃；grant/lease/reopen/initial-or-final query 同时 positive+negative 时也不得
    definitive，positive receipt/owner 必须保留；所有 authenticated positive/negative response 均保留 exact response
    bytes + digest 并在 classification 前重算，对应 producer uninhabited；
-4. `existing_extraction_directory_access_share_compatibility=missing/unverified`；本 slice 未修改/验证既有
-   producer，不得认为 loader predecessor 可达；
+4. `existing_extraction_directory_access_share_compatibility=source_seam_written_windows_dynamic_unverified`；
+   retained DELETE owner + narrow share-delete probe 源码 seam 已线性接入，但不得认为 loader predecessor 已动态可达；
 5. authenticated exact PE graph 与 launch-path parent-chain authorities 以 `Infallible` 保持 uninhabited；sealed
    startup/import resolution 必须先以 Runner basename 与 authenticated process preloaded/bootstrap set 预种
    process-machine/cache-key/immutable-section/evidence-bound cache，再要求 Runner-rooted true reachable closure、per-importer continuous interleaved edge order、
@@ -124,7 +124,7 @@ source-contract guard 也未执行：
 | source-contract Rust test | 0 | 0 | 1 | guard 已写但未运行 |
 | share-none→locked loader load-set | 0 | 0 | 1 | linear leases/reopen receipts/五类 failure-custody shapes 已写；success producers 不存在 |
 | successor-owned `ComputePluginRootLockLease` | 0 | 0 | 1 | exact owner shape 已写；external-borrow end 与 parked/leaked lifetime 未运行 |
-| existing extraction directory access/share compatibility | 0 | 0 | 1 | DELETE access/缺 `FILE_SHARE_DELETE` predecessor 可能不兼容；未修改/未验证 |
+| existing extraction directory access/share compatibility | 0 | 0 | 1 | typed retained-owner seam 已写；Windows access/share、identity/path、descendant 与 failure-custody matrix 未运行 |
 | exact PE graph / launch-path / startup resolution | 0 | 0 | 1 | PE/parent-chain authorities uninhabited；parser composite 与 launch-context producer 未验证 |
 | grants / unified package+system FileId leases / anchor reopen | 0 | 0 | 1 | acquisition/query/reopen backends 均不存在；servicing generation 与 exact negative ownership 未动态验证 |
 | live OS KnownDLL/API-set/SxS currentness | 0 | 0 | 1 | sealed/pre-create fields 只是 echoes；live backend 不存在 |
@@ -158,7 +158,8 @@ source-contract guard 也未执行：
 - linear FileId lease、anchor-consuming reopen receipt、close-uncertain no-Drop、same path/different FileId、rename/swap/
   reparse/hardlink/share-mode、writable mapping、重哈希与 searched-name mutation；package+system 统一 lease-set 及 system
   servicing generation 必须穿越全部 failure/success/process custody；
-- 既有 extraction-directory DELETE access + share-read/write 与后续缺 `FILE_SHARE_DELETE` traversal/reopen；
+- extraction-directory retained DELETE owner + narrow share-delete probe 的共存、同 FileId/path、descendant
+  retained-parent create-new、失败保管，以及普通 managed-directory open 未被放宽；
 - authenticated PE graph/launch-path parent chain、normal/delay/forwarder imports，以及 token/AppContainer、architecture/
   WOW64、true reachable closure、per-importer continuous interleaved edge order、cache-key collision closure、package parser
   FileId/sealed-digest/lease-generation/immutable-policy composite 与跨代 splice、KnownDLL

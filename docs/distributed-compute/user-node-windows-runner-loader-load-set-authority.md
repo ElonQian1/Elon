@@ -23,7 +23,8 @@ file set 的一个 ordinal，成功结果只能是替换原 admission 的单一 
 
 当前 exact PE graph、launch-path parent-chain、startup/import resolution、searched-name grants/query、FileId
 content leases、package-file reopen/recovery 都无 producer；其中 PE/launch-path/resolution authority 以 `Infallible`
-保持 uninhabited。既有 extraction directory access/share compatibility 也仍为 `missing/unverified`。因此
+保持 uninhabited。既有 extraction directory access/share compatibility 已形成 purpose-specific retained-owner
+源码 seam，但 Windows 动态矩阵仍为 `unverified`。因此
 `LoaderLockedWorkAdmittedPluginSlot` 没有成功 producer，进程 backend 仍不可达。
 本批只定义指定 launch context 下的 startup/import resolution material；pre-create 观测最多保护 path-based
 process open，普通 imports 多在 suspended primary thread 后续运行时解析。因此 pre-resume loader-currentness 与
@@ -212,19 +213,21 @@ lease 下 same-handle full-package rehash → consuming name-grant/content-lease
 indexing → retain/wrap 原 package-root 与 plan-directory handles → 只对 package files parent-relative close/reopen（Runner
 最后）→ anchor-consuming reopen receipt → replacement identity/hash/handle-path → ordered final name/content query。
 
-只有 package files 有候选 access/share shape：
+package files 与 extraction-directory compatibility probe 的候选 access/share shape 为：
 
 | Object | Desired access | Share access | Create options |
 |---|---|---|---|
 | package executable / DLL | `FILE_GENERIC_READ | FILE_GENERIC_EXECUTE` | `FILE_SHARE_READ` | `FILE_NON_DIRECTORY_FILE | FILE_OPEN_REPARSE_POINT | FILE_SYNCHRONOUS_IO_NONALERT` |
 | package read-only asset | `FILE_GENERIC_READ` | `FILE_SHARE_READ` | `FILE_NON_DIRECTORY_FILE | FILE_OPEN_REPARSE_POINT | FILE_SYNCHRONOUS_IO_NONALERT` |
+| extraction package-root / descendant directory probe | `FILE_READ_ATTRIBUTES | FILE_TRAVERSE | SYNCHRONIZE` | `FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE` | `FILE_DIRECTORY_FILE | FILE_OPEN_REPARSE_POINT | FILE_SYNCHRONOUS_IO_NONALERT` |
 
-file create disposition 固定候选为 `FILE_OPEN`。目录没有 narrow reopen/access/share recipe：成功 image 包装并继续持有
-extraction 已返回的原 package-root/plan-directory handles；外部 System/Windows/SxS search directory 则属于 future resolution
-producer 的独立 retained custody。尤其既有 Windows extraction directory creation 可能以 DELETE access 配合
-`FILE_SHARE_READ|FILE_SHARE_WRITE`，而后续 traversal/reopen 又缺 `FILE_SHARE_DELETE`；本批没有修改或验证该 predecessor，
-所以 `existing_extraction_directory_access_share_compatibility` 保持 `missing/unverified`，不得声称 admission→loader
-predecessor 可达。
+两类 create disposition 都固定候选为 `FILE_OPEN`。新增目录 recipe 只证明原 `DELETE` owner 与 parent-relative
+share-delete probe 可同时保留，并以同 volume/FileId、非 reparse directory 和 handle-derived canonical path 绑定；它不
+把 probe 替换成 loader authority，也不放宽普通 managed-directory open。staging descendant 必须从这份 retained
+package-root 或 plan 中已保留的 exact parent owner 单 component create-new，不重开 existing descendant；清理与 loader
+分支再线性消费同一 typed receipt。外部 System/Windows/SxS search
+directory 仍属于 future resolution producer 的独立 custody。当前 blocker 精确为
+`source_seam_written_windows_dynamic_unverified`，不得声称 admission→loader predecessor 已动态可达。
 
 package-file recipe 也只是未编译/未运行的 source candidate。`FILE_SHARE_READ` 不会阻止 writable section
 mapping，不能替代 exact FileId content lease；reopen 后的 hash/name 观测也不能替代 lease continuity、
@@ -254,7 +257,8 @@ crash/recovery owner；不得以 Drop 或 session disconnect 当作 release。�
 
 ## 8. 后续顺序
 
-1. 先修正并动态验证 `existing_extraction_directory_access_share_compatibility`，不得假定现有 directory predecessor 可达；
+1. 在 Windows 动态验证 source-written `existing_extraction_directory_access_share_compatibility` access/share、
+   identity/path 与 failure-custody 矩阵；验证前不得假定 directory predecessor 可达；
 2. 实现 authenticated exact PE graph 与 launch-path parent-chain authority producer，再形成 launch-context-bound
    startup/import/system resolution；
 3. 实现 searched-name/launch-path grant acquisition 与 FileId immutable-content lease backends，对三种

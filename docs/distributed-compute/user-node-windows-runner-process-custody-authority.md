@@ -121,9 +121,11 @@ outcome uncertainty。因此未来 bridge 不能是 path/raw-handle getter，也
   `ManuallyDrop` quarantine，不运行 ordinary `File` Drop。
 
 但 cache-seed/exact PE graph、launch-path parent-chain 和 resolution authority 以 `Infallible` 保持不可构造，name-grant/
-FileId-lease/query/reopen producer 也不存在。既有 extraction directory creation 可能以 DELETE access 配合
-share-read/write，后续 traversal/reopen 又缺 `FILE_SHARE_DELETE`；本 slice 未修改或验证该 predecessor，
-`existing_extraction_directory_access_share_compatibility=missing/unverified`，不得声称 loader 输入可达。精确边界见
+FileId-lease/query/reopen producer 也不存在。extraction directory 已新增 retained DELETE owner + parent-relative
+share-delete probe 的 typed source seam，并把 descendant 操作和 loader transition 绑定到同一线性 custody；Windows
+动态矩阵尚未运行，状态为
+`existing_extraction_directory_access_share_compatibility=source_seam_written_windows_dynamic_unverified`，不得声称
+loader 输入已动态可达。精确边界见
 [`user-node-windows-runner-loader-load-set-authority.md`](user-node-windows-runner-loader-load-set-authority.md)。
 
 ## 5. Launch security 前置
@@ -293,8 +295,9 @@ WebSocket。source-lineage 的 local currentness、runtime transition、Host run
 
 ## 11. 后续顺序
 
-1. 先修正并动态验证 `existing_extraction_directory_access_share_compatibility`，再实现 loader name-grant/FileId-lease/
-   query 与 anchor-consuming package-file reopen/recovery；
+1. 先动态验证 source-written `existing_extraction_directory_access_share_compatibility` 的 Windows access/share、
+   identity/path、descendant traversal 与 failure-custody 矩阵，再实现 loader name-grant/FileId-lease/query 与
+   anchor-consuming package-file reopen/recovery；
 2. 实现 authenticated exact PE graph、launch-path parent-chain、launch-context-bound startup/import resolution 与 whole
    searched-name namespace producers，完成 Windows TOCTOU/share/import/path matrix；
 3. 实现 consuming pre-create loader-currentness backend，验证 definitive/uncertain quarantine 与全 failure/success evidence

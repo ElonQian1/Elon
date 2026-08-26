@@ -210,9 +210,11 @@ F1 的 Ready 边界新增未登记、未编译/未运行的 source-lineage 草�
 F1 的 Windows Host 路径另新增 loader load-set/process custody authority 草案：loader 定义单一成功 successor、
 完整 by-value seam、线性 FileId leases/anchor reopen receipts 与五类 failure-custody contract；process 定义
 launch/Job/pre-create currentness 与终止未确认时的 whole-graph custody。exact PE/launch-path/live-OS、
-launch-security/currentness/release-recovery producers 均保持 uninhabited，extraction-share、pre-resume/
+launch-security/currentness/release-recovery producers 均保持 uninhabited；extraction→loader 已写 retained DELETE
+owner + narrow share-delete probe 的父句柄相对 typed seam，但未动态验证 Windows access/share matrix，pre-resume/
 dynamic-load、IPC/Store 也未形成 authority；成熟度事实统一见
 `docs/distributed-compute/current-implementation-status.md`，精确边界见
+`docs/distributed-compute/user-node-windows-runner-extraction-directory-share-custody-authority.md`、
 `docs/distributed-compute/user-node-windows-runner-loader-load-set-authority.md` 与
 `docs/distributed-compute/user-node-windows-runner-process-custody-authority.md`。
 
