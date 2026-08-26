@@ -6,7 +6,6 @@ import {
   isLocalAiConversationSnapshot,
   isLocalAiMessageSnapshot,
   localAiBrowserErrorMessage,
-  openLocalAiCachedConversation,
   openLocalAiWebResearchDirectory,
   openLocalAiWebSession,
   runLocalAiWebAdapterCommand,
@@ -62,6 +61,7 @@ import { localAiWarmSessionReusable } from './localAiWarmSessionPolicy'
 import { resumeLocalAiWebSession } from './resumeLocalAiWebSession'
 import useLocalAiCapabilityPrewarm from './useLocalAiCapabilityPrewarm'
 import { syncLocalAiDeferredMenu } from './localAiDeferredMenuSync'
+import useLocalAiCachedConversationNavigation from './useLocalAiCachedConversationNavigation'
 export default function useLocalAiWebChatController(
   provider: LocalAiWebProvider | undefined,
   ownerKey: string,
@@ -70,6 +70,8 @@ export default function useLocalAiWebChatController(
   const providerId = provider?.id ?? ''
   const providerDisplayName = provider?.displayName ?? ''
   const requestedSessionIdentity = providerId && ownerKey ? `${providerId}:${ownerKey}` : ''
+  const activeSessionIdentity = useRef(requestedSessionIdentity)
+  activeSessionIdentity.current = requestedSessionIdentity
   const [sessionEntry, setSessionEntry] = useState<{
     identity: string
     state: LocalAiWebSessionState | null
@@ -392,23 +394,22 @@ export default function useLocalAiWebChatController(
     }
   }
 
-  async function openCachedConversation(conversationId: string) {
-    if (!provider || !ownerKey || busyAction) return
+  const openCachedConversation = useLocalAiCachedConversationNavigation({
+    provider,
+    ownerKey,
+    sessionIdentity: requestedSessionIdentity,
+    busyAction,
+    isSessionCurrent: (identity) => activeSessionIdentity.current === identity,
+    beforeOpen: () => {
     cancelNewConversationTransition(restoreQueuedSend)
-    setBusyAction('open_cached_conversation')
     setPendingSends([])
     setPendingResponses([])
     cancelResponseRefresh()
-    setMessage('正在从本机缓存恢复会话，并在后台连接官方上下文…')
-    try {
-      setSessionState(await openLocalAiCachedConversation(provider.id, ownerKey, conversationId))
-      setMessage('已立即恢复本机会话缓存；官方页面正在后台同步最新内容。')
-    } catch (error) {
-      setMessage(localAiBrowserErrorMessage(error))
-    } finally {
-      setBusyAction('')
-    }
-  }
+    },
+    onBusyAction: setBusyAction,
+    onMessage: setMessage,
+    onState: setSessionState,
+  })
 
   async function run(action: LocalAiAdapterAction, value?: string, expectedDraft?: string) {
     if (!provider || !ownerKey) return null

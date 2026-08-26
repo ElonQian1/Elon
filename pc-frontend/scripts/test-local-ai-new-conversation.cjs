@@ -26,6 +26,10 @@ const lifecycleSource = fs.readFileSync(
   path.resolve(__dirname, '../src/features/user-browser/useLocalAiNewConversationLifecycle.ts'),
   'utf8',
 )
+const cachedNavigationSource = fs.readFileSync(
+  path.resolve(__dirname, '../src/features/user-browser/useLocalAiCachedConversationNavigation.ts'),
+  'utf8',
+)
 const controllerConfigSource = fs.readFileSync(
   path.resolve(__dirname, '../src/features/user-browser/localAiWebChatControllerConfig.ts'),
   'utf8',
@@ -269,8 +273,9 @@ assert.match(
 )
 assert.match(
   controllerSource,
-  /openCachedConversation[\s\S]{0,220}cancelNewConversationTransition\(restoreQueuedSend\)/,
+  /useLocalAiCachedConversationNavigation\([\s\S]{0,260}cancelNewConversationTransition\(restoreQueuedSend\)/,
 )
+assert.match(cachedNavigationSource, /beforeOpen\(\)[\s\S]{0,100}onBusyAction\('open_cached_conversation'\)/)
 assert.match(
   controllerSource,
   /\['open_conversation', 'open_project'\][\s\S]{0,180}cancelNewConversationTransition\(restoreQueuedSend\)/,
