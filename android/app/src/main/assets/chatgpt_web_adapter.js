@@ -764,7 +764,10 @@
     typeof privateStreamTransport.subscribe === 'function'
     ? privateStreamTransport.subscribe(() => {
       privateStreamRevision += 1;
-      if (!streamWatchdogProbe || !streamWatchdogProbe.observePrivateUpdate()) scheduleSnapshot(true);
+      const privateStream = optional(null, () => privateStreamTransport.current(location.pathname));
+      const privateStreamState = String(privateStream && privateStream.state || 'idle');
+      if (!streamWatchdogProbe ||
+          !streamWatchdogProbe.observePrivateUpdate(privateStreamState)) scheduleSnapshot(true);
     })
     : null);
   if (privateConversationDirectory &&

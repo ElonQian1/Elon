@@ -41,8 +41,10 @@ const create = () => context.window.__elonChatGptStreamWatchdogProbe.create({
   assert.equal(probe.arm('mcp_probe1', true).detail, 'stream_already_active');
   assert.equal(probe.arm('mcp_probe1', false).accepted, true);
   assert.equal(probe.arm('mcp_probe2', false).detail, 'watchdog_probe_already_active');
-  assert.equal(probe.observePrivateUpdate(), false, 'the first update must enter native streaming');
-  assert.equal(probe.observePrivateUpdate(), true, 'later private updates are withheld for the probe');
+  assert.equal(probe.observePrivateUpdate('idle'), false, 'the pre-send reset must not arm a stall');
+  assert.equal(probe.state().phase, 'armed');
+  assert.equal(probe.observePrivateUpdate('streaming'), false, 'the first stream update enters native streaming');
+  assert.equal(probe.observePrivateUpdate('streaming'), true, 'later stream updates are withheld for the probe');
   now += 3499;
   assert.equal(probe.watchdogFired({ mode: 'private_stream_watchdog' }), false);
   now += 1;
@@ -52,6 +54,19 @@ const create = () => context.window.__elonChatGptStreamWatchdogProbe.create({
     requestId: 'mcp_probe1',
     ok: true,
     detail: 'private_stream_watchdog_fired'
+  });
+  assert.equal(probe.state().active, false);
+}
+
+{
+  const probe = create();
+  assert.equal(probe.arm('mcp_probe4', false).accepted, true);
+  assert.equal(probe.observePrivateUpdate('idle'), false);
+  assert.equal(probe.observePrivateUpdate('completed'), false);
+  assert.deepEqual(results.pop(), {
+    requestId: 'mcp_probe4',
+    ok: false,
+    detail: 'private_stream_completed_before_watchdog'
   });
   assert.equal(probe.state().active, false);
 }

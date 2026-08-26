@@ -56,7 +56,14 @@
       return { accepted: true, detail: '' };
     }
 
-    function observePrivateUpdate() {
+    function observePrivateUpdate(streamState) {
+      const state = String(streamState || 'idle');
+      if (state === 'idle') return false;
+      if (state === 'completed') {
+        if (phase !== 'idle') finish(false, 'private_stream_completed_before_watchdog');
+        return false;
+      }
+      if (state !== 'streaming') return false;
       if (phase === 'armed') {
         phase = 'stalling';
         firstPrivateAt = now();
