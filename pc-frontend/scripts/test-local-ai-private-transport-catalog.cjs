@@ -32,25 +32,26 @@ const google = provider('google-ai-mode', [
 ])
 
 const chatCapabilities = localAiPrivateTransportCapabilities(chatgpt)
-assert.equal(chatCapabilities.length, 6)
+assert.equal(chatCapabilities.length, 7)
 assert.equal(chatCapabilities.every((capability) => capability.runtimeEnabled), true)
 assert.equal(chatCapabilities.every((capability) => (
   capability.activation === 'preset_then_background_verify'
 )), true)
 
 const googleCapabilities = localAiPrivateTransportCapabilities(google)
-assert.equal(googleCapabilities.length, 4)
+assert.equal(googleCapabilities.length, 5)
 assert.equal(googleCapabilities.every((capability) => capability.runtimeEnabled), true)
 
 const incompleteGoogle = localAiPrivateTransportCapabilities(provider('google-ai-mode', [
   'snapshot', 'send_prompt',
 ]))
-assert.equal(incompleteGoogle.filter((capability) => capability.runtimeEnabled).length, 2)
+assert.equal(incompleteGoogle.filter((capability) => capability.runtimeEnabled).length, 3)
 
 const copy = localAiPrivateTransportStatusCopy(chatgpt)
-assert.match(copy.copy, /6\/6/)
+assert.match(copy.copy, /7\/7/)
 assert.match(copy.copy, /无需等待官网扫描/)
 assert.match(copy.detail, /私有流与完成态结算/)
+assert.match(copy.detail, /官网快照单飞行刷新/)
 
 const capabilityHook = fs.readFileSync(path.resolve(
   __dirname,

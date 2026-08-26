@@ -11,6 +11,7 @@ import { requestReturnToAiChat } from './internalBrowserApi'
 import { lastMatchingLocalAiUserIndex, normalizeLocalAiResponsePrompt } from './localAiResponseTracking'
 import { shouldRequestLocalAiPrivateConversationRefresh } from './localAiPrivateConversationRefreshPolicy'
 import { localAiSnapshotIsStreaming } from './localAiPrivateStreamSignal'
+import { LocalAiResponseRefreshFlight } from './localAiResponseRefreshFlight'
 import {
   RESPONSE_COMPLETION_SETTLE_MS,
   localAiResponseRefreshDelay,
@@ -31,7 +32,7 @@ export default function useLocalAiResponseRefresh({
   snapshot,
   refreshSessionState,
 }: LocalAiResponseRefreshOptions) {
-  const generation = useRef(0)
+  const refreshFlight = useRef(new LocalAiResponseRefreshFlight())
   const timer = useRef(0)
   const requestRef = useRef<() => void>(() => {})
   const scheduleRef = useRef<() => void>(() => {})
@@ -45,7 +46,7 @@ export default function useLocalAiResponseRefresh({
   snapshotRef.current = snapshot
 
   const cancel = useCallback(() => {
-    generation.current += 1
+    refreshFlight.current.reset()
     window.clearTimeout(timer.current)
     timer.current = 0
     requestRef.current = () => {}
@@ -65,13 +66,16 @@ export default function useLocalAiResponseRefresh({
     if (!activeProvider || !ownerKey || !normalizedPrompt) return
     expectedPrompt.current = prompt
     startedAt.current = Date.now()
-    const activeGeneration = generation.current
+    const activeGeneration = refreshFlight.current.currentGeneration()
     const scheduleNext = (): void => {
       const delay = localAiResponseRefreshDelay(refreshPhase.current, delayIndex.current++)
-      if (delay !== undefined) timer.current = window.setTimeout(request, delay)
+      window.clearTimeout(timer.current)
+      timer.current = delay === undefined ? 0 : window.setTimeout(request, delay)
     }
     const request = (): void => {
-      if (activeGeneration !== generation.current) return
+      timer.current = 0
+      const claim = refreshFlight.current.claim(activeGeneration)
+      if (claim !== 'run') return
       requestReturnToAiChat({
         providerId: activeProvider.id,
         providerName: activeProvider.displayName,
@@ -82,8 +86,9 @@ export default function useLocalAiResponseRefresh({
       // cover the native answer while generation is in progress.
       void controlLocalAiWebSession(activeProvider.id, ownerKey, 'background')
         .then(() => {}, () => {})
-      void requestLocalAiWebSnapshot(activeProvider.id, ownerKey)
-        .then(refreshSessionState, () => {})
+      const requests: Promise<unknown>[] = [
+        requestLocalAiWebSnapshot(activeProvider.id, ownerKey),
+      ]
       if (shouldRequestLocalAiPrivateConversationRefresh({
         providerId: activeProvider.id,
         snapshot: snapshotRef.current,
@@ -92,10 +97,15 @@ export default function useLocalAiResponseRefresh({
         attempted: privateRefreshAttempted.current,
       })) {
         privateRefreshAttempted.current = true
-        void requestLocalAiCurrentConversationRefresh(activeProvider.id, ownerKey)
-          .then(refreshSessionState, () => {})
+        requests.push(requestLocalAiCurrentConversationRefresh(activeProvider.id, ownerKey))
       }
-      scheduleNext()
+      void Promise.allSettled(requests).then(() => {
+        const settlement = refreshFlight.current.settle(activeGeneration)
+        if (settlement === 'stale') return
+        refreshSessionState()
+        if (settlement === 'rerun') request()
+        else scheduleNext()
+      })
     }
     requestRef.current = request
     scheduleRef.current = scheduleNext

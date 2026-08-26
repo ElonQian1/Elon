@@ -24,6 +24,14 @@ const SHARED_CONTINUITY: CapabilityDefinition = {
   fallback: 'official_webview_bounded_recovery',
 }
 
+const SHARED_REFRESH_SINGLE_FLIGHT: CapabilityDefinition = {
+  id: 'win_web_ai_snapshot_refresh_single_flight_v1',
+  label: '官网快照单飞行刷新',
+  requestMode: 'coalesced_official_snapshot_poll',
+  fallback: 'official_webview_bounded_recovery',
+  requiredActions: ['snapshot'],
+}
+
 const CATALOG: Record<string, CapabilityDefinition[]> = {
   chatgpt: [
     {
@@ -62,6 +70,7 @@ const CATALOG: Record<string, CapabilityDefinition[]> = {
       requiredActions: ['invoke_ui_control'],
     },
     SHARED_CONTINUITY,
+    SHARED_REFRESH_SINGLE_FLIGHT,
   ],
   'google-ai-mode': [
     {
@@ -86,6 +95,7 @@ const CATALOG: Record<string, CapabilityDefinition[]> = {
       requiredActions: ['snapshot', 'send_prompt'],
     },
     SHARED_CONTINUITY,
+    SHARED_REFRESH_SINGLE_FLIGHT,
   ],
 }
 
