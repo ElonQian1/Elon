@@ -4,6 +4,7 @@ import {
   localAiAssistantHasRendererPlaceholder,
 } from './localAiAssistantContentQuality'
 import { lastMatchingLocalAiUserIndex, normalizeLocalAiResponsePrompt } from './localAiResponseTracking'
+import { localAiPrivateStreamState, localAiSnapshotIsStreaming } from './localAiPrivateStreamSignal'
 
 export const PRIVATE_CONVERSATION_REFRESH_GRACE_MS = 1_800
 export const PRIVATE_CONVERSATION_STREAM_STALL_MS = 6_000
@@ -32,8 +33,13 @@ export function shouldRequestLocalAiPrivateConversationRefresh({
   if (userIndex < 0) return false
   const assistant = snapshot.messages.slice(userIndex + 1)
     .find((message) => message.role === 'assistant')
-  if (!assistant) return !snapshot.streaming || elapsedMs >= PRIVATE_CONVERSATION_STREAM_STALL_MS
-  if (assistant.state === 'streaming' || snapshot.streaming) {
+  const privateState = localAiPrivateStreamState(snapshot)
+  if (!assistant) {
+    return privateState === 'completed'
+      || !localAiSnapshotIsStreaming(snapshot)
+      || elapsedMs >= PRIVATE_CONVERSATION_STREAM_STALL_MS
+  }
+  if (localAiSnapshotIsStreaming(snapshot, assistant)) {
     return elapsedMs >= PRIVATE_CONVERSATION_STREAM_STALL_MS
   }
   return assistantNeedsPrivateRefresh(assistant)

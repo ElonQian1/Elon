@@ -20,6 +20,7 @@ import {
   localAiStreamingStatus,
   localAiStreamingTarget,
 } from './localAiStreamingPresentation'
+import { localAiPrivateStreamState } from './localAiPrivateStreamSignal'
 
 const PROVIDER_STORAGE_KEY = 'elon.pc.aiChatProvider'
 
@@ -40,7 +41,13 @@ export default function useAiWebChatBackend(mode: AiHomeMode, ownerKey: string) 
   const streamingTarget = useMemo(() => localAiStreamingTarget(
     controller.visibleMessages,
     controller.snapshot?.streaming === true,
-  ), [controller.snapshot?.streaming, controller.visibleMessages])
+    localAiPrivateStreamState(controller.snapshot),
+  ), [
+    controller.snapshot?.privateStreamObserved,
+    controller.snapshot?.privateStreamState,
+    controller.snapshot?.streaming,
+    controller.visibleMessages,
+  ])
 
   useEffect(() => {
     if (!provider || provider.id === providerId) return

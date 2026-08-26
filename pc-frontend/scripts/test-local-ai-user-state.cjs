@@ -17,6 +17,19 @@ const output = ts.transpileModule(source, {
 const compiled = new Module(filename, module)
 compiled.filename = filename
 compiled.paths = module.paths
+const privateSignalFilename = path.resolve(__dirname, '../src/features/user-browser/localAiPrivateStreamSignal.ts')
+const privateSignalOutput = ts.transpileModule(fs.readFileSync(privateSignalFilename, 'utf8'), {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+  fileName: privateSignalFilename,
+}).outputText
+const privateSignalModule = new Module(privateSignalFilename, module)
+privateSignalModule.filename = privateSignalFilename
+privateSignalModule.paths = module.paths
+privateSignalModule._compile(privateSignalOutput, privateSignalFilename)
+const defaultRequire = compiled.require.bind(compiled)
+compiled.require = (id) => id === './localAiPrivateStreamSignal'
+  ? privateSignalModule.exports
+  : defaultRequire(id)
 compiled._compile(output, filename)
 const { deriveLocalAiUserState } = compiled.exports
 
@@ -214,6 +227,32 @@ const streaming = deriveLocalAiUserState('ready', chatgpt, readySession, snapsho
 }))
 assert.equal(streaming.phase, 'streaming')
 assert.equal(streaming.canStop, true)
+
+const privateStreaming = deriveLocalAiUserState('ready', chatgpt, readySession, snapshot({
+  authenticated: true,
+  composerReady: true,
+  streaming: false,
+  privateStreamObserved: true,
+  privateStreamRevision: 8,
+  privateStreamState: 'streaming',
+  pageKind: 'conversation',
+  capabilities: ['new_conversation'],
+}))
+assert.equal(privateStreaming.phase, 'streaming')
+assert.equal(privateStreaming.canStop, true)
+
+const privateCompleted = deriveLocalAiUserState('ready', chatgpt, readySession, snapshot({
+  authenticated: true,
+  composerReady: true,
+  streaming: true,
+  privateStreamObserved: true,
+  privateStreamRevision: 9,
+  privateStreamState: 'completed',
+  pageKind: 'conversation',
+  capabilities: ['new_conversation'],
+}))
+assert.equal(privateCompleted.phase, 'ready_authenticated')
+assert.equal(privateCompleted.canStop, false, 'private completion must override a stale DOM streaming flag')
 
 process.stdout.write('PASS local AI user-state and capability degradation matrix\n')
 

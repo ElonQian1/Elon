@@ -1,5 +1,5 @@
 const ALLOWED_ORIGIN: &str = "https://chatgpt.com";
-pub(super) const ADAPTER_VERSION: u32 = 184;
+pub(super) const ADAPTER_VERSION: u32 = 185;
 
 const WIN_RICH_CONTENT_ADAPTER: &str = include_str!("chatgpt_rich_content_adapter.js");
 const WIN_COMMON_RICH_CONTENT_ADAPTER: &str = include_str!("rich_content_dom_adapter.js");
@@ -145,6 +145,10 @@ const ADAPTER_ASSETS: &[(&str, &str)] = &[
     (
         "chatgpt_web_adapter_streaming_policy.js",
         include_str!("../../../../android/app/src/main/assets/chatgpt_web_adapter_streaming_policy.js"),
+    ),
+    (
+        "chatgpt_web_stream_watchdog_probe.js",
+        include_str!("../../../../android/app/src/main/assets/chatgpt_web_stream_watchdog_probe.js"),
     ),
     (
         "chatgpt_web_adapter_skin.js",
@@ -444,9 +448,7 @@ mod tests {
                     .unwrap()
         );
         assert!(
-            script
-                .find("chatgpt_win_private_source_groups.js")
-                .unwrap()
+            script.find("chatgpt_win_private_source_groups.js").unwrap()
                 < script
                     .find("chatgpt_web_private_stream_transport.js")
                     .unwrap()

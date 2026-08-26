@@ -5,6 +5,25 @@ use serde_json::json;
 mod new_conversation;
 
 #[test]
+fn private_stream_state_is_authoritative_over_stale_dom_streaming() {
+    assert!(private_stream::is_streaming(Some(&json!({
+        "streaming": false,
+        "privateStreamObserved": true,
+        "privateStreamState": "streaming"
+    }))));
+    assert!(!private_stream::is_streaming(Some(&json!({
+        "streaming": true,
+        "privateStreamObserved": true,
+        "privateStreamState": "completed"
+    }))));
+    assert!(private_stream::is_streaming(Some(&json!({
+        "streaming": true,
+        "privateStreamObserved": false,
+        "privateStreamState": "completed"
+    }))));
+}
+
+#[test]
 fn parked_session_labels_excludes_visible_and_closed_sessions() {
     let runtime = LocalAiBrowserRuntime::default();
     runtime.ensure_session("parked", "chatgpt", "active");

@@ -106,6 +106,13 @@ assert.deepEqual(localAiStreamingTarget([user], true), {
   messageId: 'snapshot-progress', synthetic: true,
 })
 assert.equal(localAiStreamingTarget([user, completedShell], false), null)
+assert.equal(localAiStreamingTarget([
+  user,
+  { ...completedShell, id: 'stale-private-shell', state: 'streaming' },
+], true, 'completed'), null, 'private completion must close a stale DOM streaming shell')
+assert.deepEqual(localAiStreamingTarget([user], false, 'streaming'), {
+  messageId: 'snapshot-progress', synthetic: true,
+}, 'private stream activity must render progress before the DOM assistant appears')
 assert.deepEqual(localAiStreamingTarget([
   { ...completedShell, id: 'old-stream', state: 'streaming' },
   user,

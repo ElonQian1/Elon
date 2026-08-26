@@ -3,6 +3,7 @@ import type {
   LocalAiMessageSnapshot,
   LocalAiWebSessionState,
 } from './localAiBrowserApi'
+import { localAiSnapshotIsStreaming } from './localAiPrivateStreamSignal'
 
 export const LOCAL_AI_CAPABILITY_PREWARM_DELAY_MS = 900
 export const LOCAL_AI_CAPABILITY_PREWARM_COOLDOWN_MS = 60_000
@@ -37,7 +38,7 @@ export function localAiCapabilityPrewarmEligible({
       && !sessionState.loading
       && !sessionState.lastError
       && snapshot?.composerReady
-      && !snapshot.streaming
+      && !localAiSnapshotIsStreaming(snapshot)
       && !foregroundBlocked
       && (supportsManifest || supportsModel),
   )

@@ -108,6 +108,9 @@ export interface LocalAiSessionDiagnostics {
   linkedCitationCount?: number
   citationLogoCount?: number
   streaming: boolean
+  privateStreamObserved?: boolean
+  privateStreamRevision?: number
+  privateStreamState?: 'idle' | 'streaming' | 'completed'
   updatedAtMs: number
 }
 

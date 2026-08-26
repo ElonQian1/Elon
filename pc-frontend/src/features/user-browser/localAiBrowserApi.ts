@@ -125,6 +125,9 @@ export interface LocalAiMessageSnapshot {
   composerReady: boolean
   streaming: boolean
   streamingStatus?: string
+  privateStreamObserved?: boolean
+  privateStreamRevision?: number
+  privateStreamState?: 'idle' | 'streaming' | 'completed'
   currentModel: string
   attachments?: LocalAiAttachment[]
   dictationActive?: boolean

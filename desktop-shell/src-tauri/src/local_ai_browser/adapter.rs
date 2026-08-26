@@ -106,6 +106,9 @@ fn sanitize_protocol_event(event: &Map<String, Value>) -> Result<SanitizedAdapte
             "composerReady": event.get("composerReady").and_then(Value::as_bool).unwrap_or(false),
             "streaming": event.get("streaming").and_then(Value::as_bool).unwrap_or(false),
             "streamingStatus": clean_string(event.get("streamingStatus"), 220),
+            "privateStreamObserved": event.get("privateStreamObserved").and_then(Value::as_bool).unwrap_or(false),
+            "privateStreamRevision": bounded_u64(event.get("privateStreamRevision"), 0, 1_000_000_000),
+            "privateStreamState": sanitize_private_stream_state(event.get("privateStreamState")),
             "currentModel": clean_string(event.get("currentModel"), 80),
             "attachments": sanitize_attachments(event.get("attachments")),
             "dictationActive": event.get("dictationActive").and_then(Value::as_bool).unwrap_or(false),
@@ -521,6 +524,14 @@ fn sanitize_access_source(value: Option<&Value>) -> &'static str {
     }
 }
 
+fn sanitize_private_stream_state(value: Option<&Value>) -> &'static str {
+    match value.and_then(Value::as_str) {
+        Some("streaming") => "streaming",
+        Some("completed") => "completed",
+        _ => "idle",
+    }
+}
+
 fn clean_string(value: Option<&Value>, max: usize) -> String {
     value
         .and_then(Value::as_str)
@@ -566,6 +577,9 @@ mod tests {
                 "accessSource": "visible_page",
                 "streaming": true,
                 "streamingStatus": "正在搜索 South Korea stock market",
+                "privateStreamObserved": true,
+                "privateStreamRevision": 42,
+                "privateStreamState": "completed",
                 "draft": "hello",
                 "messages": [{
                     "id": "m1",
@@ -591,6 +605,9 @@ mod tests {
             event.payload["streamingStatus"],
             "正在搜索 South Korea stock market"
         );
+        assert_eq!(event.payload["privateStreamObserved"], true);
+        assert_eq!(event.payload["privateStreamRevision"], 42);
+        assert_eq!(event.payload["privateStreamState"], "completed");
         assert!(!event.payload.to_string().contains("secret"));
         assert!(event.payload.to_string().contains("visible"));
     }

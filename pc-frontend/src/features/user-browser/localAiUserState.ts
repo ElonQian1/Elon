@@ -4,6 +4,7 @@ import type {
   LocalAiWebProvider,
   LocalAiWebSessionState,
 } from './localAiBrowserApi'
+import { localAiSnapshotIsStreaming } from './localAiPrivateStreamSignal'
 
 export type LocalAiClientState = 'desktop_required' | 'checking' | 'ready' | 'upgrade_required' | 'error'
 
@@ -107,7 +108,7 @@ export function deriveLocalAiUserState(
     authenticated,
     guestMode,
     canSend,
-    canStop: Boolean(!accessBlocked && snapshot?.streaming && supportedActions.has('stop_generation')),
+    canStop: Boolean(!accessBlocked && localAiSnapshotIsStreaming(snapshot) && supportedActions.has('stop_generation')),
     canNewConversation,
     canConversationHistory,
     canStartGoogleLogin,
@@ -173,7 +174,7 @@ export function deriveLocalAiUserState(
       shared,
     )
   }
-  if (snapshot?.streaming) {
+  if (localAiSnapshotIsStreaming(snapshot)) {
     return result('streaming', 'ready', '回答中', `${provider.displayName} 正在回答`, '回答和公开来源正在同步到一龙聊天界面。', false, false, shared)
   }
   if (!snapshot?.composerReady) {

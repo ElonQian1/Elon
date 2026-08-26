@@ -44,6 +44,19 @@ const prewarmOutput = ts.transpileModule(fs.readFileSync(prewarmFilename, 'utf8'
 const prewarmModule = new Module(prewarmFilename, module)
 prewarmModule.filename = prewarmFilename
 prewarmModule.paths = module.paths
+const privateSignalFilename = path.resolve(__dirname, '../src/features/user-browser/localAiPrivateStreamSignal.ts')
+const privateSignalOutput = ts.transpileModule(fs.readFileSync(privateSignalFilename, 'utf8'), {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+  fileName: privateSignalFilename,
+}).outputText
+const privateSignalModule = new Module(privateSignalFilename, module)
+privateSignalModule.filename = privateSignalFilename
+privateSignalModule.paths = module.paths
+privateSignalModule._compile(privateSignalOutput, privateSignalFilename)
+const prewarmDefaultRequire = prewarmModule.require.bind(prewarmModule)
+prewarmModule.require = (id) => id === './localAiPrivateStreamSignal'
+  ? privateSignalModule.exports
+  : prewarmDefaultRequire(id)
 prewarmModule._compile(prewarmOutput, prewarmFilename)
 const {
   LOCAL_AI_CAPABILITY_PREWARM_COOLDOWN_MS,
@@ -90,6 +103,7 @@ for (const override of [
   { sessionState: { ...readySession, loading: true } },
   { sessionState: { ...readySession, windowStatus: 'closed' } },
   { snapshot: { ...readySnapshot, streaming: true } },
+  { snapshot: { ...readySnapshot, privateStreamObserved: true, privateStreamState: 'streaming' } },
   { adapterActions: ['list_model_options'] },
 ]) {
   assert.equal(localAiCapabilityPrewarmEligible({

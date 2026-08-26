@@ -4,6 +4,21 @@ const Module = require('node:module')
 const path = require('node:path')
 const ts = require('typescript')
 
+function compile(relativePath) {
+  const target = path.resolve(__dirname, '..', relativePath)
+  const result = ts.transpileModule(fs.readFileSync(target, 'utf8'), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+    fileName: target,
+  }).outputText
+  const instance = new Module(target, module)
+  instance.filename = target
+  instance.paths = module.paths
+  instance._compile(result, target)
+  return instance
+}
+
+const privateStreamSignal = compile('src/features/user-browser/localAiPrivateStreamSignal.ts')
+
 const filename = path.resolve(__dirname, '../src/features/user-browser/localAiProviderActivity.ts')
 const source = fs.readFileSync(filename, 'utf8')
 const output = ts.transpileModule(source, {
@@ -17,6 +32,10 @@ const output = ts.transpileModule(source, {
 const compiled = new Module(filename, module)
 compiled.filename = filename
 compiled.paths = module.paths
+const defaultRequire = compiled.require.bind(compiled)
+compiled.require = (id) => id === './localAiPrivateStreamSignal'
+  ? privateStreamSignal.exports
+  : defaultRequire(id)
 compiled._compile(output, filename)
 const { initializeLocalAiProviderActivity, updateLocalAiProviderActivity } = compiled.exports
 
@@ -57,6 +76,13 @@ const selectedStreaming = updateLocalAiProviderActivity(
 assert.equal(selectedStreaming.label, '正在回答')
 assert.equal(selectedStreaming.unread, false)
 
+const privateCompleted = updateLocalAiProviderActivity(
+  selectedStreaming,
+  state({ id: 'answer-3', streaming: true, updatedAt: 45, privateStreamState: 'completed' }),
+  false,
+)
+assert.equal(privateCompleted.phase, 'completed', 'private completion must override a stale DOM streaming flag')
+
 const attention = updateLocalAiProviderActivity(
   selectedStreaming,
   { ...state({ id: 'answer-3', streaming: false, updatedAt: 50 }), windowStatus: 'blocked' },
@@ -87,7 +113,7 @@ assert.match(sidebarSource, /providerActivities\[provider\.id\]/)
 
 process.stdout.write('PASS local AI background provider activity contract\n')
 
-function state({ id, streaming, updatedAt }) {
+function state({ id, streaming, updatedAt, privateStreamState }) {
   return {
     providerId: 'chatgpt',
     windowLabel: 'local-ai-chatgpt-test',
@@ -112,6 +138,9 @@ function state({ id, streaming, updatedAt }) {
       authenticated: false,
       composerReady: true,
       streaming,
+      privateStreamObserved: Boolean(privateStreamState),
+      privateStreamRevision: privateStreamState ? 1 : 0,
+      privateStreamState: privateStreamState || 'idle',
       currentModel: '',
       capabilities: [],
     },

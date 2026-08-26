@@ -19,6 +19,8 @@ mod cache;
 mod context;
 #[path = "state/diagnostics.rs"]
 mod diagnostics;
+#[path = "state/private_stream.rs"]
+mod private_stream;
 
 #[derive(Clone, Default)]
 pub struct LocalAiBrowserRuntime {
@@ -433,10 +435,7 @@ impl LocalAiBrowserRuntime {
                                 })
                                 .count()
                         });
-                    record.streaming = snapshot
-                        .and_then(|event| event.get("streaming"))
-                        .and_then(Value::as_bool)
-                        .unwrap_or(false);
+                    record.streaming = private_stream::is_streaming(snapshot);
                     record.semantic_live = true;
                     let updated_at_ms = now_ms();
                     record.cache_updated_at_ms = updated_at_ms;
@@ -620,6 +619,9 @@ impl LocalAiBrowserRuntime {
             "linked_citation_count": coverage.linked_citation_count,
             "citation_logo_count": coverage.citation_logo_count,
             "streaming": record.streaming,
+            "private_stream_observed": private_stream::observed(snapshot),
+            "private_stream_revision": private_stream::revision(snapshot),
+            "private_stream_state": private_stream::state(snapshot),
             "updated_at_ms": record.updated_at_ms,
         }))
     }
@@ -751,6 +753,9 @@ fn diagnostic_summary(record: &SessionRecord) -> Value {
         "linkedCitationCount": coverage.linked_citation_count,
         "citationLogoCount": coverage.citation_logo_count,
         "streaming": record.streaming,
+        "privateStreamObserved": private_stream::observed(record.semantic_event.as_ref()),
+        "privateStreamRevision": private_stream::revision(record.semantic_event.as_ref()),
+        "privateStreamState": private_stream::state(record.semantic_event.as_ref()),
         "semanticUpdatedAtMs": record.semantic_updated_at_ms,
         "updatedAtMs": record.updated_at_ms,
     })

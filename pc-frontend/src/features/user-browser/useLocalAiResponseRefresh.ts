@@ -10,6 +10,7 @@ import { localAiAssistantExtractionIncomplete } from './localAiAssistantContentQ
 import { requestReturnToAiChat } from './internalBrowserApi'
 import { lastMatchingLocalAiUserIndex, normalizeLocalAiResponsePrompt } from './localAiResponseTracking'
 import { shouldRequestLocalAiPrivateConversationRefresh } from './localAiPrivateConversationRefreshPolicy'
+import { localAiSnapshotIsStreaming } from './localAiPrivateStreamSignal'
 import {
   RESPONSE_COMPLETION_SETTLE_MS,
   localAiResponseRefreshDelay,
@@ -108,7 +109,7 @@ export default function useLocalAiResponseRefresh({
     if (userIndex < 0) return
     const assistant = snapshot.messages.slice(userIndex + 1)
       .find((item) => item.role === 'assistant')
-    const streaming = Boolean(assistant && (assistant.state === 'streaming' || snapshot.streaming))
+    const streaming = Boolean(assistant && localAiSnapshotIsStreaming(snapshot, assistant))
     const completed = Boolean(assistant && !streaming && !localAiAssistantExtractionIncomplete(assistant))
     const nextPhase = localAiResponseRefreshPhase({
       providerId: provider.id,

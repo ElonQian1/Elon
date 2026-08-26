@@ -1,4 +1,5 @@
 import type { LocalAiMessageSnapshot, LocalAiWebSessionState } from './localAiBrowserApi'
+import { localAiSnapshotIsStreaming } from './localAiPrivateStreamSignal'
 
 export type LocalAiProviderActivityPhase = 'idle' | 'streaming' | 'completed' | 'attention'
 
@@ -82,7 +83,7 @@ function providerSignal(state: LocalAiWebSessionState | null): ProviderSignal {
     .reverse()
     .find((message) => message.role === 'assistant')
   return {
-    streaming: snapshot?.streaming === true || lastAssistant?.state === 'streaming',
+    streaming: localAiSnapshotIsStreaming(snapshot, lastAssistant),
     attention: Boolean(
       state?.lastError?.trim()
       || state?.windowStatus === 'error'

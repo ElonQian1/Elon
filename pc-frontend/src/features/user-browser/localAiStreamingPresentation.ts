@@ -1,4 +1,5 @@
 import type { LocalAiVisibleMessage } from './localAiBrowserApi'
+import type { LocalAiPrivateStreamState } from './localAiPrivateStreamSignal'
 
 export interface LocalAiStreamingTarget {
   messageId: string
@@ -8,6 +9,7 @@ export interface LocalAiStreamingTarget {
 export function localAiStreamingTarget(
   messages: LocalAiVisibleMessage[],
   snapshotStreaming: boolean,
+  privateStreamState: LocalAiPrivateStreamState = null,
 ): LocalAiStreamingTarget | null {
   let latestUserIndex = -1
   for (let index = messages.length - 1; index >= 0; index -= 1) {
@@ -16,13 +18,17 @@ export function localAiStreamingTarget(
       break
     }
   }
-  for (let index = messages.length - 1; index > latestUserIndex; index -= 1) {
-    const message = messages[index]
-    if (message.role === 'assistant' && message.state === 'streaming') {
-      return { messageId: message.id, synthetic: false }
+  if (privateStreamState !== 'completed') {
+    for (let index = messages.length - 1; index > latestUserIndex; index -= 1) {
+      const message = messages[index]
+      if (message.role === 'assistant' && message.state === 'streaming') {
+        return { messageId: message.id, synthetic: false }
+      }
     }
   }
-  if (!snapshotStreaming) return null
+  const effectiveStreaming = privateStreamState === 'streaming'
+    || (privateStreamState !== 'completed' && snapshotStreaming)
+  if (!effectiveStreaming) return null
 
   let candidate: LocalAiVisibleMessage | undefined
   for (let index = messages.length - 1; index > latestUserIndex; index -= 1) {

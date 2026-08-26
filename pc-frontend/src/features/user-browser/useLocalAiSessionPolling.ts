@@ -5,6 +5,7 @@ import {
   isLocalAiMessageSnapshot,
   type LocalAiWebSessionState,
 } from './localAiBrowserApi'
+import { localAiSnapshotIsStreaming } from './localAiPrivateStreamSignal'
 
 const ACTIVE_POLL_DELAY_MS = 1_500
 const OFFICIAL_WINDOW_POLL_DELAY_MS = 3_000
@@ -33,7 +34,7 @@ export function localAiSessionPollDelay(
     || state.contextReady === false) return ACTIVE_POLL_DELAY_MS
 
   const snapshot = isLocalAiMessageSnapshot(state.semanticEvent) ? state.semanticEvent : null
-  if (snapshot?.streaming) return ACTIVE_POLL_DELAY_MS
+  if (localAiSnapshotIsStreaming(snapshot)) return ACTIVE_POLL_DELAY_MS
 
   const directory = isLocalAiConversationSnapshot(state.navigationEvent) ? state.navigationEvent : null
   if (directory?.collection && !directory.collection.complete) return ACTIVE_POLL_DELAY_MS

@@ -23,9 +23,11 @@ const load = (relative, replacements = {}) => {
 
 const quality = load('src/features/user-browser/localAiAssistantContentQuality.ts')
 const tracking = load('src/features/user-browser/localAiResponseTracking.ts')
+const privateStreamSignal = load('src/features/user-browser/localAiPrivateStreamSignal.ts')
 const policy = load('src/features/user-browser/localAiPrivateConversationRefreshPolicy.ts', {
   './localAiAssistantContentQuality': quality,
   './localAiResponseTracking': tracking,
+  './localAiPrivateStreamSignal': privateStreamSignal,
 })
 const { shouldRequestLocalAiPrivateConversationRefresh: shouldRefresh } = policy.exports
 
@@ -62,6 +64,15 @@ assert.equal(shouldRefresh({
   elapsedMs: 6_500,
   snapshot: snapshot([user('新的问题'), { ...assistant([]), state: 'streaming' }], true),
 }), true)
+assert.equal(shouldRefresh({
+  ...base,
+  snapshot: {
+    ...snapshot([user('新的问题')], true),
+    privateStreamObserved: true,
+    privateStreamRevision: 9,
+    privateStreamState: 'completed',
+  },
+}), true, 'completed private transport must refresh missing official content without a six-second stall')
 
 function snapshot(messages, streaming = false) {
   return {
