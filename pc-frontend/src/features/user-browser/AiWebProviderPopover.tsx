@@ -111,6 +111,10 @@ function researchStatusCopy(status: LocalAiResearchCaptureStatus) {
     const kinds = status.richKinds.length ? ` · 富内容 ${status.richKinds.join(' / ')}` : ''
     return `最近私有响应解析正常：识别 ${status.acceptedFrameCount}/${status.decodedFrameCount} 帧${kinds}。`
   }
+  if (status.compatibility === 'structure_observed') {
+    const formats = status.contentTypes.length ? `（${status.contentTypes.join(' / ')}）` : ''
+    return `已采集并解码 Google 私有响应结构${formats}；正文与富卡尚未建立稳定字段映射，当前继续使用官网 DOM 与一龙原生卡片回退。`
+  }
   if (status.compatibility === 'text_compatible') {
     return `最近私有响应正文解析正常：识别 ${status.acceptedFrameCount}/${status.decodedFrameCount} 帧。`
   }

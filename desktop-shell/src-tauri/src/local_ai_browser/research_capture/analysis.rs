@@ -159,6 +159,14 @@ fn compatibility(analysis: &CaptureAnalysis, truncated: bool) -> &'static str {
         "empty_stream"
     } else if analysis.accepted_frame_count == 0 {
         "upstream_changed"
+    } else if analysis
+        .content_types
+        .iter()
+        .any(|value| value == "google_rpc")
+        && analysis.assistant_frame_count == 0
+        && analysis.rich_kinds.is_empty()
+    {
+        "structure_observed"
     } else if analysis.rich_kinds.is_empty()
         && analysis.assistant_frame_count == 0
         && analysis.text_length == 0
@@ -206,6 +214,16 @@ mod tests {
         analysis.text_length = 320;
         analysis.rich_kinds = vec!["finance".to_string()];
         assert_eq!(compatibility(&analysis, false), "rich_compatible");
+        assert!(validate(Some(&analysis)).is_ok());
+    }
+
+    #[test]
+    fn parsed_google_rpc_without_a_stable_content_mapping_is_observed() {
+        let mut analysis = sample();
+        analysis.decoded_frame_count = 1;
+        analysis.accepted_frame_count = 1;
+        analysis.content_types = vec!["google_rpc".to_string(), "batched_json".to_string()];
+        assert_eq!(compatibility(&analysis, false), "structure_observed");
         assert!(validate(Some(&analysis)).is_ok());
     }
 

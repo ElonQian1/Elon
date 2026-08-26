@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  var VERSION = 6;
+  var VERSION = 7;
   var PROVIDER_ID = '__PROVIDER_ID__';
   var MAX_BODY_BYTES = 2 * 1024 * 1024;
   var ANALYSIS_SCHEMA = 'yilong.web-ai.capture-analysis.v1';
@@ -172,6 +172,80 @@
     }
   }
 
+  function googleRpcAnalysis(body, format) {
+    if (PROVIDER_ID !== 'google-ai-mode') return null;
+    var base = {
+      schema: ANALYSIS_SCHEMA,
+      analyzerVersion: 1,
+      policyAvailable: true,
+      decodedFrameCount: 0,
+      acceptedFrameCount: 0,
+      assistantFrameCount: 0,
+      progressFrameCount: 0,
+      textLength: 0,
+      richKinds: [],
+      contentTypes: [],
+      completed: true,
+      parseError: false
+    };
+    var source = String(body || '').replace(/^\)\]\}'\s*/, '').trim();
+    if (!source) return base;
+
+    var candidates = [];
+    var seenCandidates = new Set();
+    function addCandidate(value) {
+      var candidate = String(value || '').trim();
+      if (!candidate || !/^[\[{]/.test(candidate) || seenCandidates.has(candidate)) return;
+      seenCandidates.add(candidate);
+      candidates.push(candidate);
+    }
+    addCandidate(source);
+    source.split(/\r?\n/).forEach(addCandidate);
+
+    var queue = [];
+    candidates.slice(0, 64).forEach(function (candidate) {
+      try {
+        queue.push({ value: JSON.parse(candidate), depth: 0 });
+        base.decodedFrameCount += 1;
+        base.acceptedFrameCount += 1;
+      } catch (_) {}
+    });
+    if (!queue.length) {
+      base.parseError = format === 'json';
+      return base;
+    }
+
+    var types = new Set(['google_rpc']);
+    if (source.indexOf('wrb.fr') >= 0) types.add('batched_json');
+    var inspected = 0;
+    var nestedJson = 0;
+    while (queue.length && inspected < 4096) {
+      var entry = queue.shift();
+      inspected += 1;
+      if (typeof entry.value === 'string') {
+        var nested = entry.value.trim();
+        if (entry.depth < 5 && /^[\[{]/.test(nested) && nested.length <= MAX_BODY_BYTES) {
+          try {
+            queue.push({ value: JSON.parse(nested), depth: entry.depth + 1 });
+            nestedJson += 1;
+          } catch (_) {}
+        }
+      } else if (Array.isArray(entry.value)) {
+        entry.value.slice(0, 128).forEach(function (value) {
+          queue.push({ value: value, depth: entry.depth + 1 });
+        });
+      } else if (entry.value && typeof entry.value === 'object') {
+        Object.keys(entry.value).slice(0, 128).forEach(function (key) {
+          queue.push({ value: entry.value[key], depth: entry.depth + 1 });
+        });
+      }
+    }
+    if (nestedJson) types.add('nested_json');
+    if (inspected >= 4096) types.add('bounded_walk');
+    base.contentTypes = Array.from(types).slice(0, 16);
+    return base;
+  }
+
   function publish(meta, transport, status, contentType, body, truncated) {
     var bounded = boundedUtf8(body, truncated);
     if (!bounded.body) return;
@@ -187,7 +261,8 @@
       body: bounded.body,
       truncated: bounded.truncated
     };
-    var analysis = chatGptStreamAnalysis(bounded.body, format, meta.recoveryGeneration);
+    var analysis = chatGptStreamAnalysis(bounded.body, format, meta.recoveryGeneration) ||
+      googleRpcAnalysis(bounded.body, format);
     if (analysis) capture.analysis = analysis;
     invokeCapture(capture);
   }

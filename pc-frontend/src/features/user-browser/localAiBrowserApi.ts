@@ -70,6 +70,7 @@ export interface LocalAiResearchCaptureStatus {
     | 'empty_stream'
     | 'upstream_changed'
     | 'incomplete'
+    | 'structure_observed'
     | 'text_compatible'
     | 'rich_compatible'
   decodedFrameCount: number
