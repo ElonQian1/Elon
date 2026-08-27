@@ -164,6 +164,20 @@ class WebAiPrivateTransportCatalogTest {
         assertEquals("audited_no_safe_gain", voiceReuse.getString("implementation_status"))
         assertFalse(voiceReuse.getBoolean("runtime_enabled"))
 
+        val privateVoiceResearch = requireNotNull(
+            byId["android_chatgpt_web_private_voice_bootstrap_research_v1"],
+        )
+        assertEquals(
+            "research_in_progress",
+            privateVoiceResearch.getString("implementation_status"),
+        )
+        assertFalse(privateVoiceResearch.getBoolean("production_default"))
+        assertFalse(privateVoiceResearch.getBoolean("runtime_enabled"))
+        assertEquals(
+            "official_page_created_webrtc",
+            privateVoiceResearch.getString("fallback"),
+        )
+
         values.filter { it.getString("implementation_status") == "research_only" }
             .forEach { row ->
                 assertFalse(row.getBoolean("production_default"))

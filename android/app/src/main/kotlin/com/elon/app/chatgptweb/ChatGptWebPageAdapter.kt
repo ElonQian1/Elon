@@ -55,6 +55,16 @@ internal class ChatGptWebPageAdapter(
             input.reader(StandardCharsets.UTF_8).readText()
         }
     }
+    private val privateRealtimeVoiceResearchScript = """
+        window.__elonChatGptAdapterTargetVersion = $ADAPTER_VERSION;
+        window.__elonChatGptPrivateResearchEnabled =
+            ${BuildConfig.CHATGPT_PRIVATE_RESEARCH_ENABLED};
+        if (!/^doc_[a-z0-9_]{3,80}$/.test(String(window.__elonChatGptDocumentToken || ""))) {
+            window.__elonChatGptDocumentToken =
+                "doc_android_" + Math.random().toString(36).slice(2) + Date.now().toString(36);
+        }
+    """.trimIndent() + "\n" + context.assets.open(PRIVATE_REALTIME_VOICE_RESEARCH_ASSET)
+        .use { input -> input.reader(StandardCharsets.UTF_8).readText() }
     private val privateConversationDirectoryScript =
         context.assets.open(PRIVATE_CONVERSATION_DIRECTORY_ASSET).use { input ->
             input.reader(StandardCharsets.UTF_8).readText()
@@ -88,6 +98,16 @@ internal class ChatGptWebPageAdapter(
             if (!wasCurrent) onDocumentChanged(document)
             if (parsed.event.completesHandshake()) handshake.acknowledge()
             onEvent(parsed.event)
+        }
+        if (
+            BuildConfig.CHATGPT_PRIVATE_RESEARCH_ENABLED &&
+            WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)
+        ) {
+            WebViewCompat.addDocumentStartJavaScript(
+                webView,
+                privateRealtimeVoiceResearchScript,
+                setOf(ALLOWED_ORIGIN),
+            )
         }
         if (
             BuildConfig.CHATGPT_PRIVATE_STREAM_OBSERVER_ENABLED &&
@@ -440,7 +460,7 @@ internal class ChatGptWebPageAdapter(
         origin.scheme == "https" && origin.host == "chatgpt.com" && origin.port == -1
 
     companion object {
-        internal const val ADAPTER_VERSION = 188
+        internal const val ADAPTER_VERSION = 189
 
         private val ADAPTER_ASSETS = listOf(
             "chatgpt_web_adapter_bootstrap.js",
@@ -480,6 +500,7 @@ internal class ChatGptWebPageAdapter(
             "chatgpt_web_adapter_realtime_voice_policy.js",
             "chatgpt_web_adapter_layout.js",
             "chatgpt_web_private_research_probe.js",
+            "chatgpt_web_realtime_voice_research.js",
             "chatgpt_web_private_transport_policy.js",
             "chatgpt_web_private_transport.js",
             "chatgpt_web_private_stream_policy.js",
@@ -491,6 +512,8 @@ internal class ChatGptWebPageAdapter(
         private const val ALLOWED_ORIGIN = "https://chatgpt.com"
         private const val PRIVATE_FETCH_TAP_ASSET = "chatgpt_web_private_fetch_tap.js"
         private const val PRIVATE_SOCKET_TAP_ASSET = "chatgpt_web_private_socket_tap.js"
+        private const val PRIVATE_REALTIME_VOICE_RESEARCH_ASSET =
+            "chatgpt_web_realtime_voice_research.js"
         private const val PRIVATE_CONVERSATION_DIRECTORY_ASSET =
             "chatgpt_web_private_conversation_directory.js"
         private const val MAX_PROMPT_LENGTH = 20_000

@@ -7,8 +7,6 @@ import android.webkit.CookieManager
 import android.webkit.WebView
 import android.widget.FrameLayout
 import androidx.appcompat.app.AppCompatActivity
-import com.elon.app.BuildConfig
-import com.elon.app.DebugTraceStore
 import com.elon.app.PendingAttachment
 import com.elon.app.WebChatConsumerPort
 import com.elon.app.WebChatSessionRecoveryCoordinator
@@ -477,22 +475,7 @@ internal class ChatGptBackgroundSession(
     }
 
     private fun handleEvent(event: ChatGptWebEvent) {
-        if (
-            event is ChatGptWebEvent.CommandResult &&
-            event.action == PRIVATE_RESEARCH_ACTION
-        ) {
-            if (
-                BuildConfig.CHATGPT_PRIVATE_RESEARCH_ENABLED &&
-                event.ok &&
-                PRIVATE_RESEARCH_DETAIL.matches(event.detail)
-            ) {
-                DebugTraceStore.record(
-                    phase = "chatgpt_private_research_observation",
-                    details = mapOf("summary" to event.detail),
-                )
-            }
-            return
-        }
+        if (ChatGptWebPrivateResearchEventRecorder.record(event)) return
         observedMcpState.accept(event)
         when (event) {
             is ChatGptWebEvent.Snapshot -> {
@@ -794,7 +777,5 @@ internal class ChatGptBackgroundSession(
         const val ATTACHMENT_PHASE_IDLE = "idle"
         const val ATTACHMENT_PHASE_COMPLETED = "completed"
         const val ATTACHMENT_TIMEOUT_MS = 120_000L
-        const val PRIVATE_RESEARCH_ACTION = "research_network_observation"
-        val PRIVATE_RESEARCH_DETAIL = Regex("^[A-Za-z0-9._:/|{}-]{1,160}$")
     }
 }

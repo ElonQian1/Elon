@@ -157,6 +157,17 @@ internal object WebAiPrivateTransportCatalog {
             fallback = "none",
         ),
         Entry(
+            id = "android_chatgpt_web_private_voice_bootstrap_research_v1",
+            provider = "chatgpt",
+            status = "research_in_progress",
+            verification = "redacted_observer_targeted_tests_pending",
+            productionDefault = false,
+            runtimeEnabled = BuildConfig.CHATGPT_PRIVATE_RESEARCH_ENABLED,
+            requestMode = "redacted_page_local_webrtc_and_bootstrap_observer",
+            healthPolicy = "in_memory_shapes_only_no_credentials_sdp_or_ice",
+            fallback = "official_page_created_webrtc",
+        ),
+        Entry(
             id = "android_google_web_private_response_research_v1",
             provider = "google_web_ai",
             status = "research_only",
