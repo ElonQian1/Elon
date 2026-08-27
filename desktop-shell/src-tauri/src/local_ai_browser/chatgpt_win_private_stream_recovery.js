@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  var VERSION = 6;
+  var VERSION = 7;
   var MAX_AGE_MS = 5 * 60 * 1000;
   var OFFICIAL_COMPLETION_SETTLE_MS = 3000;
   var MAX_RICH_PARTS = 4;
@@ -431,8 +431,10 @@
     },
     reset: function () {
       clearTurnRecovery();
-      newConversationBoundaryPending = true;
-      try { if (typeof base.reset === 'function') base.reset(); } catch (_) {}
+      if (!newConversationBoundaryPending) {
+        newConversationBoundaryPending = true;
+        try { if (typeof base.reset === 'function') base.reset(); } catch (_) {}
+      }
       notify();
     },
     subscribe: function (listener) {

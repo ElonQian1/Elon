@@ -246,6 +246,13 @@ assert.equal(
 transport.reset()
 assert.equal(baseResetCount, 1)
 assert.equal(recovery.generation(), detachedGeneration + 1)
+transport.reset()
+assert.equal(
+  baseResetCount,
+  1,
+  'a recovery retry inside the same new-conversation boundary must preserve the blocked old conversation',
+)
+assert.equal(recovery.generation(), detachedGeneration + 2)
 assert.equal(recovery.accept({
   messageId: 'late-assistant',
   conversationId: 'conversation-one',
@@ -261,7 +268,7 @@ assert.equal(
   0,
   'the first prompt after new conversation must preserve the shared transport old-conversation block',
 )
-assert.equal(recovery.generation(), detachedGeneration + 2)
+assert.equal(recovery.generation(), detachedGeneration + 3)
 transport.prepareSend()
 assert.equal(
   basePrepareSendCount,
