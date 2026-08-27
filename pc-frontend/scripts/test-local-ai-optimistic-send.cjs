@@ -25,6 +25,15 @@ const visibilityModule = new Module(visibilityFilename, module)
 visibilityModule.filename = visibilityFilename
 visibilityModule.paths = module.paths
 visibilityModule._compile(visibilityOutput, visibilityFilename)
+const trackingFilename = path.resolve(__dirname, '../src/features/user-browser/localAiResponseTracking.ts')
+const trackingOutput = ts.transpileModule(fs.readFileSync(trackingFilename, 'utf8'), {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+  fileName: trackingFilename,
+}).outputText
+const trackingModule = new Module(trackingFilename, module)
+trackingModule.filename = trackingFilename
+trackingModule.paths = module.paths
+trackingModule._compile(trackingOutput, trackingFilename)
 const source = fs.readFileSync(filename, 'utf8')
 const watchdogSource = fs.readFileSync(path.resolve(
   __dirname,
@@ -46,6 +55,8 @@ compiled.require = (id) => id === './localAiAssistantContentQuality'
   ? qualityModule.exports
   : id === '../ai/aiMessageVisibility'
     ? visibilityModule.exports
+    : id === './localAiResponseTracking'
+      ? trackingModule.exports
   : defaultRequire(id)
 compiled._compile(output, filename)
 const {

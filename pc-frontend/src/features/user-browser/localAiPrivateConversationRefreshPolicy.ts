@@ -3,7 +3,7 @@ import {
   localAiAssistantExtractionIncomplete,
   localAiAssistantHasRendererPlaceholder,
 } from './localAiAssistantContentQuality'
-import { lastMatchingLocalAiUserIndex, normalizeLocalAiResponsePrompt } from './localAiResponseTracking'
+import { matchingLocalAiUserIndex, normalizeLocalAiResponsePrompt } from './localAiResponseTracking'
 import { localAiPrivateStreamState, localAiSnapshotIsStreaming } from './localAiPrivateStreamSignal'
 
 export const PRIVATE_CONVERSATION_REFRESH_GRACE_MS = 1_800
@@ -13,6 +13,7 @@ interface LocalAiPrivateConversationRefreshInput {
   providerId: string
   snapshot: LocalAiMessageSnapshot | null
   expectedPrompt: string
+  baselineMatchingUserCount: number
   elapsedMs: number
   attempted: boolean
 }
@@ -21,6 +22,7 @@ export function shouldRequestLocalAiPrivateConversationRefresh({
   providerId,
   snapshot,
   expectedPrompt,
+  baselineMatchingUserCount,
   elapsedMs,
   attempted,
 }: LocalAiPrivateConversationRefreshInput): boolean {
@@ -29,7 +31,11 @@ export function shouldRequestLocalAiPrivateConversationRefresh({
     || !isChatGptConversationUrl(snapshot.url)) return false
   const expected = normalizeLocalAiResponsePrompt(expectedPrompt)
   if (!expected) return false
-  const userIndex = lastMatchingLocalAiUserIndex(snapshot.messages, expected)
+  const userIndex = matchingLocalAiUserIndex(
+    snapshot.messages,
+    expected,
+    baselineMatchingUserCount,
+  )
   if (userIndex < 0) return false
   const assistant = snapshot.messages.slice(userIndex + 1)
     .find((message) => message.role === 'assistant')

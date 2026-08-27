@@ -14,7 +14,12 @@ compiled.filename = filename
 compiled.paths = module.paths
 compiled._compile(output, filename)
 
-const { lastMatchingLocalAiUserIndex, normalizeLocalAiResponsePrompt } = compiled.exports
+const {
+  lastMatchingLocalAiUserIndex,
+  matchingLocalAiUserCount,
+  matchingLocalAiUserIndex,
+  normalizeLocalAiResponsePrompt,
+} = compiled.exports
 const messages = [
   { role: 'user', content: [{ type: 'text', text: '重复  问题' }] },
   { role: 'assistant', content: [{ type: 'text', text: '旧回答' }] },
@@ -24,5 +29,10 @@ const messages = [
 assert.equal(normalizeLocalAiResponsePrompt('  重复\n问题 '), '重复 问题')
 assert.equal(lastMatchingLocalAiUserIndex(messages, '重复 问题'), 2)
 assert.equal(lastMatchingLocalAiUserIndex(messages, '不存在'), -1)
+assert.equal(matchingLocalAiUserCount(messages, '重复 问题'), 2)
+assert.equal(matchingLocalAiUserIndex(messages, '重复 问题', 0), 0)
+assert.equal(matchingLocalAiUserIndex(messages, '重复 问题', 1), 2)
+assert.equal(matchingLocalAiUserIndex(messages, '重复 问题', 2), -1)
+assert.equal(matchingLocalAiUserIndex(messages, '重复 问题', Number.NaN), 0)
 
 process.stdout.write('PASS local AI response prompt tracking\n')

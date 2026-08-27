@@ -1,6 +1,11 @@
 import type { LocalAiVisibleMessage } from './localAiBrowserApi'
 import { localAiAssistantExtractionIncomplete } from './localAiAssistantContentQuality'
 import { hasVisibleAiMessageContent } from '../ai/aiMessageVisibility'
+import {
+  matchingLocalAiUserCount,
+  matchingLocalAiUserIndex,
+  normalizeLocalAiResponsePrompt,
+} from './localAiResponseTracking'
 
 export interface PendingLocalAiSend {
   id: string
@@ -26,7 +31,7 @@ export function beginOptimisticLocalAiSend(
   prompt: string,
   id: string,
 ): PendingLocalAiSend | null {
-  const normalizedPrompt = normalizeLocalAiPrompt(prompt)
+  const normalizedPrompt = normalizeLocalAiResponsePrompt(prompt)
   if (!normalizedPrompt || !id.trim()) return null
   const unresolvedMatching = pendingSends.filter((pending) => (
     pending.normalizedPrompt === normalizedPrompt
@@ -36,7 +41,7 @@ export function beginOptimisticLocalAiSend(
     id,
     prompt: prompt.trim(),
     normalizedPrompt,
-    baselineMatchingUserCount: matchingUserCount(officialMessages, normalizedPrompt)
+    baselineMatchingUserCount: matchingLocalAiUserCount(officialMessages, normalizedPrompt)
       + unresolvedMatching,
   }
 }
@@ -45,7 +50,7 @@ export function pendingLocalAiSendObserved(
   officialMessages: LocalAiVisibleMessage[],
   pending: PendingLocalAiSend,
 ): boolean {
-  return matchingUserCount(officialMessages, pending.normalizedPrompt)
+  return matchingLocalAiUserCount(officialMessages, pending.normalizedPrompt)
     > pending.baselineMatchingUserCount
 }
 
@@ -125,19 +130,6 @@ export function mergeOptimisticLocalAiMessages(
   return normalizedOfficial.concat(optimisticUsers, optimisticResponses)
 }
 
-function matchingUserCount(messages: LocalAiVisibleMessage[], normalizedPrompt: string): number {
-  return messages.filter((message) => (
-    message.role === 'user' && normalizeLocalAiPrompt(visibleMessageText(message)) === normalizedPrompt
-  )).length
-}
-
-function visibleMessageText(message: LocalAiVisibleMessage): string {
-  return message.content
-    .filter((part) => part.type === 'text' || part.type === 'markdown')
-    .map((part) => part.text ?? '')
-    .join('\n')
-}
-
 function officialAssistantForPendingResponse(
   messages: LocalAiVisibleMessage[],
   pending: PendingLocalAiResponse,
@@ -151,15 +143,11 @@ function targetUserIndex(
   messages: LocalAiVisibleMessage[],
   pending: PendingLocalAiResponse,
 ): number {
-  let matchingUsers = 0
-  for (let index = 0; index < messages.length; index += 1) {
-    const message = messages[index]
-    if (message.role !== 'user'
-      || normalizeLocalAiPrompt(visibleMessageText(message)) !== pending.normalizedPrompt) continue
-    if (matchingUsers >= pending.baselineMatchingUserCount) return index
-    matchingUsers += 1
-  }
-  return -1
+  return matchingLocalAiUserIndex(
+    messages,
+    pending.normalizedPrompt,
+    pending.baselineMatchingUserCount,
+  )
 }
 
 function hasSubstantiveAssistantContent(message: LocalAiVisibleMessage): boolean {
@@ -177,8 +165,4 @@ function isSubstantiveStructuredPart(part: LocalAiVisibleMessage['content'][numb
 
 function substantiveText(value: string): boolean {
   return hasVisibleAiMessageContent(value)
-}
-
-function normalizeLocalAiPrompt(value: string): string {
-  return value.trim().replace(/\s+/g, ' ')
 }

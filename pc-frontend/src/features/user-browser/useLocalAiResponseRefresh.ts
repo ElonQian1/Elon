@@ -8,7 +8,7 @@ import {
 } from './localAiBrowserApi'
 import { localAiAssistantExtractionIncomplete } from './localAiAssistantContentQuality'
 import { requestReturnToAiChat } from './internalBrowserApi'
-import { lastMatchingLocalAiUserIndex, normalizeLocalAiResponsePrompt } from './localAiResponseTracking'
+import { matchingLocalAiUserIndex, normalizeLocalAiResponsePrompt } from './localAiResponseTracking'
 import { shouldRequestLocalAiPrivateConversationRefresh } from './localAiPrivateConversationRefreshPolicy'
 import { localAiSnapshotIsStreaming } from './localAiPrivateStreamSignal'
 import { LocalAiResponseRefreshFlight } from './localAiResponseRefreshFlight'
@@ -40,6 +40,7 @@ export default function useLocalAiResponseRefresh({
   const delayIndex = useRef(0)
   const completionObservedAt = useRef(0)
   const expectedPrompt = useRef('')
+  const baselineMatchingUserCount = useRef(0)
   const startedAt = useRef(0)
   const privateRefreshAttempted = useRef(false)
   const snapshotRef = useRef(snapshot)
@@ -55,16 +56,20 @@ export default function useLocalAiResponseRefresh({
     delayIndex.current = 0
     completionObservedAt.current = 0
     expectedPrompt.current = ''
+    baselineMatchingUserCount.current = 0
     startedAt.current = 0
     privateRefreshAttempted.current = false
   }, [])
 
-  const start = useCallback((prompt: string) => {
+  const start = useCallback((prompt: string, promptBaselineMatchingUserCount = 0) => {
     cancel()
     const activeProvider = provider
     const normalizedPrompt = normalizeLocalAiResponsePrompt(prompt)
     if (!activeProvider || !ownerKey || !normalizedPrompt) return
     expectedPrompt.current = prompt
+    baselineMatchingUserCount.current = Number.isFinite(promptBaselineMatchingUserCount)
+      ? Math.max(0, Math.floor(promptBaselineMatchingUserCount))
+      : 0
     startedAt.current = Date.now()
     const activeGeneration = refreshFlight.current.currentGeneration()
     const scheduleNext = (): void => {
@@ -93,6 +98,7 @@ export default function useLocalAiResponseRefresh({
         providerId: activeProvider.id,
         snapshot: snapshotRef.current,
         expectedPrompt: prompt,
+        baselineMatchingUserCount: baselineMatchingUserCount.current,
         elapsedMs: Date.now() - startedAt.current,
         attempted: privateRefreshAttempted.current,
       })) {
@@ -115,7 +121,11 @@ export default function useLocalAiResponseRefresh({
   useEffect(() => {
     const expected = normalizeLocalAiResponsePrompt(expectedPrompt.current)
     if (!expected || !provider || !ownerKey || !snapshot) return
-    const userIndex = lastMatchingLocalAiUserIndex(snapshot.messages, expected)
+    const userIndex = matchingLocalAiUserIndex(
+      snapshot.messages,
+      expected,
+      baselineMatchingUserCount.current,
+    )
     if (userIndex < 0) return
     const assistant = snapshot.messages.slice(userIndex + 1)
       .find((item) => item.role === 'assistant')

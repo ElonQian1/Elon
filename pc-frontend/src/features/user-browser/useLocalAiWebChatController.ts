@@ -548,7 +548,7 @@ export default function useLocalAiWebChatController(
         setMessage(result.detail || '官方网页没有完成发送，草稿已保留；可显示官方窗口后重试。')
       } else {
         setMessage(result?.detail || '消息已交给官方网页发送；正在一龙聊天界面同步回复。')
-        startResponseRefresh(prepared.prompt)
+        startResponseRefresh(prepared.prompt, prepared.pending.baselineMatchingUserCount)
       }
       return next
     } catch (error) {

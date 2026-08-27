@@ -34,6 +34,7 @@ const { shouldRequestLocalAiPrivateConversationRefresh: shouldRefresh } = policy
 const base = {
   providerId: 'chatgpt',
   expectedPrompt: '新的问题',
+  baselineMatchingUserCount: 0,
   elapsedMs: 2_000,
   attempted: false,
 }
@@ -41,6 +42,20 @@ assert.equal(shouldRefresh({ ...base, snapshot: snapshot([]) }), false)
 assert.equal(shouldRefresh({ ...base, snapshot: snapshot([user('旧的问题')]) }), false)
 assert.equal(shouldRefresh({ ...base, elapsedMs: 500, snapshot: snapshot([user('新的问题')]) }), false)
 assert.equal(shouldRefresh({ ...base, snapshot: snapshot([user('新的问题')]) }), true)
+assert.equal(shouldRefresh({
+  ...base,
+  baselineMatchingUserCount: 1,
+  snapshot: snapshot([user('新的问题'), assistant([{ type: 'markdown', text: '旧回答' }])]),
+}), false, 'an earlier identical prompt must not satisfy the current response generation')
+assert.equal(shouldRefresh({
+  ...base,
+  baselineMatchingUserCount: 1,
+  snapshot: snapshot([
+    user('新的问题'),
+    assistant([{ type: 'markdown', text: '旧回答' }]),
+    user('新的问题'),
+  ]),
+}), true, 'the matching user turn after the send baseline should trigger refresh')
 assert.equal(shouldRefresh({ ...base, attempted: true, snapshot: snapshot([user('新的问题')]) }), false)
 assert.equal(shouldRefresh({ ...base, providerId: 'google-ai-mode', snapshot: snapshot([user('新的问题')]) }), false)
 assert.equal(shouldRefresh({
