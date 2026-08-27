@@ -372,6 +372,7 @@ impl LocalAiBrowserRuntime {
         page_context_key: Option<&str>,
         restorable_url: Option<&str>,
     ) {
+        let mut persist_semantic = false;
         self.update(label, |record| {
             record.last_event_kind = truncate(kind.to_string(), 48);
             match kind {
@@ -434,7 +435,7 @@ impl LocalAiBrowserRuntime {
                 "navigation_snapshot" => record.feature_event = Some(payload),
                 "ui_manifest_snapshot" => record.ui_manifest_event = Some(payload),
                 "command_result" => {
-                    record.finish_context_command(&payload);
+                    persist_semantic = record.finish_context_command(&payload);
                     record.last_command_action = payload
                         .get("action")
                         .and_then(Value::as_str)
@@ -470,7 +471,7 @@ impl LocalAiBrowserRuntime {
                 _ => {}
             }
         });
-        if matches!(kind, "message_snapshot" | "conversation_snapshot") {
+        if persist_semantic || matches!(kind, "message_snapshot" | "conversation_snapshot") {
             self.persist_snapshot(label);
         }
     }

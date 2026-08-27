@@ -72,6 +72,7 @@ export function chatGptNewConversationRecoveryAction(
     | 'cacheUpdatedAtMs'
     | 'semanticUpdatedAtMs'
     | 'updatedAtMs'
+    | 'diagnostics'
   > | null,
   snapshot: Pick<
     LocalAiMessageSnapshot,
@@ -134,6 +135,7 @@ export function localAiNewConversationNativeReady(
   session: Pick<
     LocalAiWebSessionState,
     | 'windowStatus'
+    | 'diagnostics'
     | 'loading'
     | 'rendererStatus'
     | 'semanticCacheStatus'
@@ -160,7 +162,8 @@ export function localAiNewConversationNativeReady(
     )
     && !session?.loading
     && !['closed', 'opening', 'loading', 'blocked', 'error'].includes(session?.windowStatus || '')
-    && observedAtMs >= (session?.semanticUpdatedAtMs || 0) + NEW_CONVERSATION_NATIVE_SETTLE_MS
+    && (session?.diagnostics?.lastEventKind === 'verified_empty_new_conversation'
+      || observedAtMs >= (session?.semanticUpdatedAtMs || 0) + NEW_CONVERSATION_NATIVE_SETTLE_MS)
     && snapshot?.composerReady
     && (snapshot.authenticated || !snapshot.loginRequired),
   )

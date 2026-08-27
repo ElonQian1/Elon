@@ -218,6 +218,16 @@ assert.equal(localAiNewConversationNativeReady(
   2_500,
 ), false)
 assert.equal(localAiNewConversationNativeReady(
+  {
+    ...bindingSession,
+    diagnostics: { lastEventKind: 'verified_empty_new_conversation' },
+  },
+  { messages: [], composerReady: true, authenticated: false, loginRequired: false },
+  1_000,
+  'old-conversation',
+  2_001,
+), true)
+assert.equal(localAiNewConversationNativeReady(
   bindingSession,
   { messages: [], composerReady: true, authenticated: false, loginRequired: false },
   1_000,

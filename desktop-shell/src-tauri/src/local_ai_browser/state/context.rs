@@ -1,4 +1,4 @@
-use serde_json::Value;
+use serde_json::{json, Value};
 
 use super::super::semantic_context;
 use super::SessionRecord;
@@ -292,7 +292,7 @@ impl SessionRecord {
         true
     }
 
-    pub(super) fn finish_context_command(&mut self, payload: &Value) {
+    pub(super) fn finish_context_command(&mut self, payload: &Value) -> bool {
         let action = payload
             .get("action")
             .and_then(Value::as_str)
@@ -303,7 +303,15 @@ impl SessionRecord {
                 == self.pending_context_request_id.as_deref();
         if self.pending_context_action == action && !request_matches {
             self.last_event_kind = "stale_context_command_result_ignored".to_string();
-            return;
+            return false;
+        }
+        if ok
+            && action == "new_conversation"
+            && self.provider_id == "chatgpt"
+            && self.pending_context_action == action
+        {
+            self.confirm_verified_empty_chatgpt_conversation();
+            return true;
         }
         if !ok && self.pending_context_action == action {
             self.active_conversation_id = self.semantic_conversation_id.clone();
@@ -319,6 +327,70 @@ impl SessionRecord {
         if action == "send_prompt" && !ok {
             self.preserve_conversation_on_navigation = false;
         }
+        false
+    }
+
+    fn confirm_verified_empty_chatgpt_conversation(&mut self) {
+        let previous = self.semantic_event.as_ref();
+        let authenticated = previous
+            .and_then(|event| event.get("authenticated"))
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
+        let login_required = previous
+            .and_then(|event| event.get("loginRequired"))
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
+        let current_model = previous
+            .and_then(|event| event.get("currentModel"))
+            .and_then(Value::as_str)
+            .unwrap_or_default();
+        let capabilities = previous
+            .and_then(|event| event.get("capabilities"))
+            .and_then(Value::as_array)
+            .cloned()
+            .unwrap_or_default();
+        let home_key = semantic_context::page_context_key("chatgpt", "https://chatgpt.com/");
+        if self.active_page_context_key.is_none() {
+            self.active_page_context_key = home_key;
+        }
+        self.semantic_event = Some(json!({
+            "type": "message_snapshot",
+            "title": "New chat",
+            "url": "https://chatgpt.com/",
+            "draft": "",
+            "messages": [],
+            "observedMessageCount": 0,
+            "messageWindowStart": 0,
+            "authenticated": authenticated,
+            "pageKind": "conversation",
+            "loginRequired": login_required,
+            "composerReady": true,
+            "streaming": false,
+            "streamingStatus": "",
+            "privateStreamState": "idle",
+            "currentModel": current_model,
+            "attachments": [],
+            "dictationActive": false,
+            "capabilities": capabilities,
+        }));
+        self.semantic_conversation_id = self.active_conversation_id.clone();
+        self.semantic_page_context_key = self.active_page_context_key.clone();
+        self.pending_context_action.clear();
+        self.pending_context_request_id = None;
+        self.pending_context_since_ms = 0;
+        self.pending_send_prompt = None;
+        self.preserve_conversation_on_navigation = false;
+        self.window_status = "ready".to_string();
+        self.loading = false;
+        self.renderer_status = "active".to_string();
+        self.message_count = 0;
+        self.assistant_message_count = 0;
+        self.streaming = false;
+        self.semantic_live = true;
+        let updated_at_ms = super::now_ms();
+        self.cache_updated_at_ms = updated_at_ms;
+        self.semantic_updated_at_ms = updated_at_ms;
+        self.last_event_kind = "verified_empty_new_conversation".to_string();
     }
 
     pub(super) fn reset_context(&mut self) {
