@@ -1,4 +1,4 @@
-export type CapabilityParityStatus = 'app_shared' | 'web_specialized' | 'needs_contract'
+export type CapabilityParityStatus = 'app_shared' | 'app_baseline' | 'web_specialized' | 'needs_contract'
 
 export interface CapabilityParityEntry {
   id: string
@@ -37,12 +37,12 @@ export const CAPABILITY_PARITY: CapabilityParityEntry[] = [
     status: 'needs_contract',
     webRoute: '/ai',
     appSurface: 'APP ElonServerAIClient：WS → 项目 HTTP → /api/llm/chat',
-    detail: '当前网页直接调用 /api/llm/chat/stream，尚未复用 APP 的主链路；这是本轮确认的 AI 质量差异根因。',
+    detail: '网页 /ai 当前直接进入 /api/llm/chat/stream 的首页工具编排；APP 先走气球项目 WebSocket，再走项目 HTTP chat_only，最后才以 /api/llm/chat 兜底。两端入口、上下文和降级顺序仍不同，这是当前 AI 体验差异的核心风险。',
   },
   {
     id: 'realtime-voice',
     label: '官方实时语音',
-    status: 'app_shared',
+    status: 'app_baseline',
     webRoute: '/user-browser/native',
     appSurface: 'APP 官方网页适配器 voice_mode 控件',
     detail: '网页只负责桌面呈现和控制转发，能力判断与页面动作来自 APP 同源适配器。',
@@ -66,15 +66,16 @@ export const CAPABILITY_PARITY: CapabilityParityEntry[] = [
   {
     id: 'ai-work-summary',
     label: 'AI 工作摘要',
-    status: 'needs_contract',
-    webRoute: '/workspace',
-    appSurface: 'APP 任务状态与恢复摘要',
-    detail: '网页已有恢复快照读取，但 APP 工作摘要尚未形成可直接复用的正式数据契约。',
+    status: 'app_shared',
+    webRoute: '/ai-work-summary',
+    appSurface: 'APP AiWorkSummaryActivity',
+    detail: '网页已同步 APP 当前 Activity 的页面结构、摘要卡片和操作语义；APP 当前数据仍是本地静态基线，动态数据契约尚未共享。',
   },
 ]
 
 export const capabilityParityStatusLabel: Record<CapabilityParityStatus, string> = {
   app_shared: 'APP 同源',
+  app_baseline: 'APP 基线同步',
   web_specialized: '网页专属',
   needs_contract: '待补契约',
 }

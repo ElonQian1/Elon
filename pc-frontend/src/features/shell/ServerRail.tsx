@@ -26,7 +26,8 @@ const OFFICIAL_AI_ITEM: RailItem = {
 }
 
 const RAIL_ITEMS: RailItem[] = [
-  { path: '/ai',      Icon: Bot,          label: '平台 AI（待接 APP 主链）',   color: '#2a2b2f', hoverColor: '#34363b' },
+  { path: '/ai',      Icon: Bot,          label: '平台 AI（APP多级链路待接）',   color: '#2a2b2f', hoverColor: '#34363b' },
+  { path: '/ai-work-summary', Icon: ClipboardCheck, label: 'AI 工作摘要（APP基线）', color: '#26342f', hoverColor: '#315046' },
   { path: '/projects', Icon: Boxes,       label: '项目中心',  color: '#2a2b2f', hoverColor: '#34363b' },
   { path: '/friends', Icon: UsersRound,   label: '好友',      color: '#2a2b2f', hoverColor: '#34363b' },
   { path: '/git-worktrees', Icon: GitBranch, label: 'Git 现场', color: '#2a2b2f', hoverColor: '#34363b' },

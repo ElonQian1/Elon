@@ -26,7 +26,9 @@ export default function AiChatTopbar({
   return (
     <header className={styles.topbar}>
       <span className={styles.topbarTitle}>{title}</span>
-      <AiHomeModeSwitch mode={mode} onChange={onModeChange} />
+      <div className={styles.topbarMode}>
+        <AiHomeModeSwitch mode={mode} onChange={onModeChange} />
+      </div>
       <div className={styles.topbarRight}>
         <button
           className={[styles.topbarBtn, styles.panelToggleBtn].join(' ')}

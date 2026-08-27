@@ -143,6 +143,7 @@
 }
 
 .parityStatus[data-status="app_shared"] { border-color: rgba(84, 199, 161, .45); color: #84e2c2; }
+.parityStatus[data-status="app_baseline"] { border-color: rgba(131, 182, 237, .45); color: #9fc8f3; }
 .parityStatus[data-status="web_specialized"] { border-color: rgba(224, 178, 112, .45); color: #e6bd86; }
 .parityStatus[data-status="needs_contract"] { border-color: rgba(224, 112, 112, .45); color: #e7a0a0; }
 

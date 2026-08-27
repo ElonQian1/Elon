@@ -9,6 +9,7 @@ const ConversationPage = lazy(() => import('./features/conversation/Conversation
 const ProjectsPage = lazy(() => import('./features/projects/ProjectsPage'))
 const ProjectDetailPage = lazy(() => import('./features/projects/ProjectDetailPage'))
 const AiHomePage = lazy(() => import('./features/ai/AiHomePage'))
+const AiWorkSummaryPage = lazy(() => import('./features/ai/AiWorkSummaryPage'))
 const FriendsPage = lazy(() => import('./features/friends/FriendsPage'))
 const PlazaPage = lazy(() => import('./features/plaza/PlazaPage'))
 const AccountPage = lazy(() => import('./features/account/AccountPage'))
@@ -60,6 +61,7 @@ export default function App() {
         {/* 首页：一龙 AI 工作台 */}
         <Route index element={<Navigate to={defaultPath} replace />} />
         <Route path="ai" element={lazyRoute(<AiHomePage />)} />
+        <Route path="ai-work-summary" element={lazyRoute(<AiWorkSummaryPage />)} />
         <Route path="workspace" element={lazyRoute(<ConversationPage />)} />
         <Route path="friends" element={lazyRoute(<FriendsPage />)} />
         <Route path="plaza" element={lazyRoute(<PlazaPage />)} />

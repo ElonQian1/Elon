@@ -263,16 +263,20 @@
   border-bottom: 1px solid #1b1c20;
 }
 .topbarTitle { overflow: hidden; font-size: 15px; font-weight: 700; color: var(--text); text-overflow: ellipsis; white-space: nowrap; }
-.topbarRight { min-width: 0; display: flex; justify-self: end; gap: 8px; align-items: center; }
+.topbarMode { min-width: 0; justify-self: center; }
+.topbarRight { min-width: 0; max-width: 100%; display: flex; justify-self: end; gap: 8px; align-items: center; overflow-x: auto; scrollbar-width: thin; }
 .modelBadge {
+  flex: 0 0 auto;
   padding: 3px 10px;
   border-radius: 10px;
   background: rgba(46, 168, 97, .12);
   color: #4caf78;
   font-size: 12px;
   font-weight: 700;
+  white-space: nowrap;
 }
 .topbarBtn {
+  flex: 0 0 auto;
   height: 24px;
   padding: 0 9px;
   border: 1px solid rgba(255,255,255,.1);
@@ -859,6 +863,30 @@
   to { background-position: -100% 0; }
 }
 .sendError { padding: 0 16px 10px; font-size: 12px; color: var(--red); }
+
+/* 窄窗口时顶栏拆成两行，避免中间模式切换和右侧操作互相挤压。 */
+@media (max-width: 1100px) {
+  .chat { grid-template-rows: auto minmax(0, 1fr) auto; }
+  .topbar {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "title mode"
+      "actions actions";
+    grid-template-rows: minmax(42px, auto) minmax(34px, auto);
+    gap: 5px 10px;
+    min-height: 82px;
+    padding: 7px 12px 6px;
+    align-items: center;
+  }
+  .topbarTitle { grid-area: title; }
+  .topbarMode { grid-area: mode; justify-self: end; }
+  .topbarRight {
+    grid-area: actions;
+    justify-self: stretch;
+    width: 100%;
+    padding-bottom: 2px;
+  }
+}
 
 @media (max-width: 780px) {
   .layout { grid-template-columns: 1fr; }
