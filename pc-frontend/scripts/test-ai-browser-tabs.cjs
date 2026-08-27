@@ -19,10 +19,8 @@ const sourceLinks = read('pc-frontend/src/features/ai/AiSourceLinks.tsx')
 const topbar = read('pc-frontend/src/features/ai/AiChatTopbar.tsx')
 const chat = read('pc-frontend/src/features/ai/AiChatPage.tsx')
 const controller = read('pc-frontend/src/features/user-browser/useLocalAiWebChatController.ts')
-const sendSuccessBranch = controller.slice(
-  controller.indexOf('async function dispatchPreparedPrompt'),
-  controller.indexOf('function restoreQueuedSend'),
-)
+const sendDispatcher = read('pc-frontend/src/features/user-browser/dispatchPreparedLocalAiPrompt.ts')
+const sendSuccessBranch = sendDispatcher.slice(sendDispatcher.indexOf('export async function'))
 const nativeCommandBranch = localBrowser.slice(
   localBrowser.indexOf('pub async fn run_local_ai_web_adapter_command'),
   localBrowser.indexOf('pub async fn open_local_ai_cached_conversation'),
@@ -120,16 +118,17 @@ assert.match(chat, /AiBrowserExperience/)
 assert.match(chat, /data-ai-chat-main/)
 assert.match(chat, /chatMode && web\.ready/)
 assert.doesNotMatch(chat, /AiOfficialAnswerSurface/)
-assert.match(sendSuccessBranch, /startResponseRefresh/)
+assert.match(sendSuccessBranch, /onResponseRefresh/)
 assert.doesNotMatch(sendSuccessBranch, /requestOfficialAiTab|showOfficialAfterSend|openOfficial/)
 assert.doesNotMatch(controller, /showOfficialAfterSend/)
-assert.match(controller, /requestReturnToAiChat/)
-assert.match(controller, /controlLocalAiWebSession\(provider\.id, ownerKey, 'background'\)/)
+assert.match(controller, /dispatchPreparedLocalAiPrompt/)
+assert.match(sendDispatcher, /requestReturnToAiChat/)
+assert.match(sendDispatcher, /controlLocalAiWebSession\(provider\.id, ownerKey, 'background'\)/)
 assert.ok(
-  (controller.match(/controlLocalAiWebSession\(provider\.id, ownerKey, 'background'\)/g) || []).length >= 2,
+  (sendDispatcher.match(/controlLocalAiWebSession\(provider\.id, ownerKey, 'background'\)/g) || []).length >= 2,
   'native send must park the official page before dispatch and after its matching receipt',
 )
-assert.match(controller, /消息已交给官方网页发送；正在一龙聊天界面同步回复/)
+assert.match(sendDispatcher, /消息已交给官方网页发送；正在一龙聊天界面同步回复/)
 
 process.stdout.write('PASS Win AI internal browser tab contract\n')
 

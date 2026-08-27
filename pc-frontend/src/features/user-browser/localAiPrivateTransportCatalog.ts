@@ -34,8 +34,8 @@ const SHARED_REFRESH_SINGLE_FLIGHT: CapabilityDefinition = {
 
 const SHARED_SEND_COORDINATOR: CapabilityDefinition = {
   id: 'win_web_ai_unified_send_coordinator_v1',
-  label: '官网发送确认单飞行',
-  requestMode: 'single_flight_official_page_transport',
+  label: '缓存先接与官网发送确认单飞行',
+  requestMode: 'cache_first_single_flight_official_page_transport',
   fallback: 'official_page_confirmation_and_draft_recovery',
   requiredActions: ['send_prompt'],
 }

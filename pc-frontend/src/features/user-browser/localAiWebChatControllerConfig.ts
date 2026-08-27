@@ -5,6 +5,9 @@ export interface QueuedLocalAiSend {
   expectedDraft: string
   pending: PendingLocalAiSend
   sessionIdentity: string
+  draftIdentity: string
+  queueReason: 'direct' | 'new_conversation' | 'session_resume'
+  queuedAtMs: number
 }
 
 export const RESPONSE_REFRESH_DELAYS_MS = [400, 800, 1_500, 2_500, 4_000, 6_000, 8_000, 10_000] as const

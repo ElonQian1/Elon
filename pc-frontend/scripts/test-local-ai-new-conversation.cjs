@@ -317,7 +317,7 @@ assert.doesNotMatch(
   /action === 'new_conversation'[\s\S]{0,160}selectLocalAiNewConversationPath[\s\S]{0,80}recoverNewConversation/,
 )
 assert.match(controllerSource, /消息已保存在本机新会话队列/)
-assert.match(controllerSource, /dispatchPreparedPrompt\(queuedSend\)/)
+assert.match(controllerSource, /dispatchPreparedPrompt\(newConversationQueuedSend\)/)
 assert.match(controllerSource, /cancelNewConversationTransition\(restoreQueuedSend\)/)
 assert.match(welcomeSource, /!web\.controller\.newConversationRecoveryActive/)
 

@@ -33,9 +33,13 @@ const {
   LocalAiProviderDraftCache,
   LOCAL_AI_PROVIDER_DRAFT_MAX_LENGTH,
   localAiProviderDraftIdentity,
+  mergeLocalAiRecoveredDraft,
 } = loadTypeScriptModule('../src/features/user-browser/localAiProviderDraftCache.ts')
 const { localAiWarmSessionReusable } = loadTypeScriptModule(
   '../src/features/user-browser/localAiWarmSessionPolicy.ts',
+)
+const { localAiQueuedSendRecoveryAction } = loadTypeScriptModule(
+  '../src/features/user-browser/localAiQueuedSendRecoveryPolicy.ts',
 )
 
 const base = {
@@ -44,6 +48,7 @@ const base = {
   sendSupported: true,
   directSendReady: false,
   newConversationRecoveryActive: false,
+  sessionResumeRecoveryActive: false,
   queuedSendActive: false,
   sendFlightActive: false,
   busyAction: '',
@@ -53,6 +58,7 @@ assert.deepEqual(localAiComposerAvailability(base), {
   canEdit: true,
   canSubmit: false,
   shouldQueue: false,
+  queueReason: null,
 })
 assert.deepEqual(localAiComposerAvailability({
   ...base,
@@ -62,7 +68,22 @@ assert.deepEqual(localAiComposerAvailability({
   canEdit: true,
   canSubmit: true,
   shouldQueue: true,
+  queueReason: 'new_conversation',
 })
+assert.deepEqual(localAiComposerAvailability({
+  ...base,
+  sessionResumeRecoveryActive: true,
+}), {
+  canEdit: true,
+  canSubmit: true,
+  shouldQueue: true,
+  queueReason: 'session_resume',
+})
+assert.equal(localAiComposerAvailability({
+  ...base,
+  sessionResumeRecoveryActive: true,
+  busyAction: 'open',
+}).canSubmit, false)
 assert.equal(localAiComposerAvailability({
   ...base,
   newConversationRecoveryActive: true,
@@ -72,6 +93,7 @@ assert.deepEqual(localAiComposerAvailability({ ...base, directSendReady: true })
   canEdit: true,
   canSubmit: true,
   shouldQueue: false,
+  queueReason: null,
 })
 assert.deepEqual(localAiComposerAvailability({
   ...base,
@@ -81,6 +103,7 @@ assert.deepEqual(localAiComposerAvailability({
   canEdit: true,
   canSubmit: false,
   shouldQueue: false,
+  queueReason: null,
 })
 assert.deepEqual(localAiComposerAvailability({
   ...base,
@@ -90,6 +113,7 @@ assert.deepEqual(localAiComposerAvailability({
   canEdit: true,
   canSubmit: true,
   shouldQueue: true,
+  queueReason: 'new_conversation',
 })
 assert.deepEqual(localAiComposerAvailability({
   ...base,
@@ -99,6 +123,7 @@ assert.deepEqual(localAiComposerAvailability({
   canEdit: true,
   canSubmit: false,
   shouldQueue: false,
+  queueReason: null,
 })
 assert.equal(localAiComposerAvailability({ ...base, clientReady: false }).canEdit, false)
 
@@ -114,6 +139,37 @@ assert.equal(drafts.read(ownedChatGpt), 'typed before identity recovery')
 assert.equal(drafts.read(ownedGoogle), 'Google draft')
 drafts.remember(ownedGoogle, 'x'.repeat(LOCAL_AI_PROVIDER_DRAFT_MAX_LENGTH + 20))
 assert.equal(drafts.read(ownedGoogle).length, LOCAL_AI_PROVIDER_DRAFT_MAX_LENGTH)
+assert.equal(mergeLocalAiRecoveredDraft('queued first', ''), 'queued first')
+assert.equal(mergeLocalAiRecoveredDraft('queued first', 'typed second'), 'queued first\n\ntyped second')
+assert.equal(mergeLocalAiRecoveredDraft('queued first', 'queued first'), 'queued first')
+
+const queuedSend = {
+  prompt: 'queued first',
+  expectedDraft: '',
+  pending: {},
+  sessionIdentity: 'chatgpt:owner-a',
+  draftIdentity: ownedChatGpt,
+  queueReason: 'session_resume',
+  queuedAtMs: 1,
+}
+const queuedRecovery = {
+  queuedSend,
+  requestedSessionIdentity: 'chatgpt:owner-a',
+  canSend: false,
+  busy: false,
+  expired: false,
+}
+assert.equal(localAiQueuedSendRecoveryAction(queuedRecovery), 'wait')
+assert.equal(localAiQueuedSendRecoveryAction({ ...queuedRecovery, canSend: true }), 'dispatch')
+assert.equal(localAiQueuedSendRecoveryAction({ ...queuedRecovery, expired: true }), 'restore')
+assert.equal(localAiQueuedSendRecoveryAction({
+  ...queuedRecovery,
+  requestedSessionIdentity: 'google-ai-mode:owner-a',
+}), 'discard')
+assert.equal(localAiQueuedSendRecoveryAction({
+  ...queuedRecovery,
+  queuedSend: { ...queuedSend, queueReason: 'new_conversation' },
+}), 'ignore')
 
 const warmState = {
   providerId: 'chatgpt',
@@ -150,5 +206,8 @@ assert.match(controller, /resumeLocalAiWebSession\(providerId, ownerKey, cachedS
 assert.match(controller, /if \(!warmSession\) setMessage/)
 assert.match(controller, /sendFlightActive: pendingSends\.length > 0 \|\| pendingResponses\.length > 0/)
 assert.match(controller, /action === 'send_prompt' && !composerAvailability\.canSubmit/)
+assert.match(controller, /queueReason: composerAvailability\.queueReason/)
+assert.match(controller, /localAiQueuedSendRecoveryAction\(/)
+assert.match(controller, /mergeLocalAiRecoveredDraft\(pending\.prompt, draftRef\.current\)/)
 
 process.stdout.write('PASS local AI non-blocking composer availability\n')

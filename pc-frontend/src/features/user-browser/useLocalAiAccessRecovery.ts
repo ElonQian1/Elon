@@ -48,6 +48,7 @@ export default function useLocalAiAccessRecovery(
 
 export function createLocalAiAccessRetry(
   sessionIdentity: string,
+  draftIdentity: string,
   prompt: string,
   id: string,
 ) {
@@ -58,6 +59,9 @@ export function createLocalAiAccessRetry(
     expectedDraft: '',
     pending,
     sessionIdentity,
+    draftIdentity,
+    queueReason: 'direct',
+    queuedAtMs: Date.now(),
   }
   return { pending, response: beginPendingLocalAiResponse(pending), queued }
 }

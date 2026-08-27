@@ -57,3 +57,12 @@ export function localAiProviderDraftIdentity(providerId: string, ownerKey: strin
     ? `${provider.length}:${provider}:${owner.length}:${owner}`
     : `${provider.length}:${provider}:pending-owner`
 }
+
+export function mergeLocalAiRecoveredDraft(prompt: string, currentDraft: string): string {
+  const recovered = prompt.trim()
+  const current = currentDraft.trim()
+  if (!recovered) return currentDraft.slice(0, LOCAL_AI_PROVIDER_DRAFT_MAX_LENGTH)
+  if (!current) return prompt.slice(0, LOCAL_AI_PROVIDER_DRAFT_MAX_LENGTH)
+  if (current === recovered) return currentDraft.slice(0, LOCAL_AI_PROVIDER_DRAFT_MAX_LENGTH)
+  return `${prompt}\n\n${currentDraft}`.slice(0, LOCAL_AI_PROVIDER_DRAFT_MAX_LENGTH)
+}
