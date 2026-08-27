@@ -8,7 +8,11 @@ import {
 } from './localAiBrowserApi'
 import { localAiAssistantExtractionIncomplete } from './localAiAssistantContentQuality'
 import { requestReturnToAiChat } from './internalBrowserApi'
-import { matchingLocalAiUserIndex, normalizeLocalAiResponsePrompt } from './localAiResponseTracking'
+import {
+  latestLocalAiAssistantForUserTurn,
+  matchingLocalAiUserIndex,
+  normalizeLocalAiResponsePrompt,
+} from './localAiResponseTracking'
 import { shouldRequestLocalAiPrivateConversationRefresh } from './localAiPrivateConversationRefreshPolicy'
 import { localAiSnapshotIsStreaming } from './localAiPrivateStreamSignal'
 import { LocalAiResponseRefreshFlight } from './localAiResponseRefreshFlight'
@@ -127,8 +131,7 @@ export default function useLocalAiResponseRefresh({
       baselineMatchingUserCount.current,
     )
     if (userIndex < 0) return
-    const assistant = snapshot.messages.slice(userIndex + 1)
-      .find((item) => item.role === 'assistant')
+    const assistant = latestLocalAiAssistantForUserTurn(snapshot.messages, userIndex)
     const streaming = Boolean(assistant && localAiSnapshotIsStreaming(snapshot, assistant))
     const completed = Boolean(assistant && !streaming && !localAiAssistantExtractionIncomplete(assistant))
     const nextPhase = localAiResponseRefreshPhase({

@@ -42,7 +42,7 @@ assert.match(responseRefresh, /controlLocalAiWebSession\(activeProvider\.id, own
 assert.match(responseRefresh, /RESPONSE_COMPLETION_SETTLE_MS/)
 assert.match(responseRefresh, /completionObservedAt/)
 assert.match(responseRefresh, /requestRef\.current/)
-assert.match(responseRefresh, /\.find\(\(item\) => item\.role === 'assistant'\)/)
+assert.match(responseRefresh, /latestLocalAiAssistantForUserTurn/)
 assert.match(responseRefresh, /!localAiAssistantExtractionIncomplete\(assistant\)/)
 assert.match(responseRefresh, /requestLocalAiCurrentConversationRefresh/)
 assert.match(responseRefresh, /shouldRequestLocalAiPrivateConversationRefresh/)

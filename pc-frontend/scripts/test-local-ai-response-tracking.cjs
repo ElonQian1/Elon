@@ -16,6 +16,7 @@ compiled._compile(output, filename)
 
 const {
   lastMatchingLocalAiUserIndex,
+  latestLocalAiAssistantForUserTurn,
   matchingLocalAiUserCount,
   matchingLocalAiUserIndex,
   normalizeLocalAiResponsePrompt,
@@ -34,5 +35,16 @@ assert.equal(matchingLocalAiUserIndex(messages, '重复 问题', 0), 0)
 assert.equal(matchingLocalAiUserIndex(messages, '重复 问题', 1), 2)
 assert.equal(matchingLocalAiUserIndex(messages, '重复 问题', 2), -1)
 assert.equal(matchingLocalAiUserIndex(messages, '重复 问题', Number.NaN), 0)
+
+const staged = [
+  { id: 'u1', role: 'user', content: [] },
+  { id: 'a-progress', role: 'assistant', content: [] },
+  { id: 'a-final', role: 'assistant', content: [] },
+  { id: 'u2', role: 'user', content: [] },
+  { id: 'a-next', role: 'assistant', content: [] },
+]
+assert.equal(latestLocalAiAssistantForUserTurn(staged, 0)?.id, 'a-final')
+assert.equal(latestLocalAiAssistantForUserTurn(staged, 3)?.id, 'a-next')
+assert.equal(latestLocalAiAssistantForUserTurn(staged, 1), undefined)
 
 process.stdout.write('PASS local AI response prompt tracking\n')

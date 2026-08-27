@@ -56,6 +56,22 @@ assert.equal(shouldRefresh({
     user('新的问题'),
   ]),
 }), true, 'the matching user turn after the send baseline should trigger refresh')
+assert.equal(shouldRefresh({
+  ...base,
+  snapshot: snapshot([
+    user('新的问题'),
+    { ...assistant([]), id: 'a-progress', state: 'streaming' },
+    { ...assistant([{ type: 'markdown', text: '最终正文' }]), id: 'a-final' },
+  ], true),
+}), false, 'the final assistant stage should win over an earlier streaming stage in the same turn')
+assert.equal(shouldRefresh({
+  ...base,
+  snapshot: snapshot([
+    user('新的问题'),
+    user('后一个问题'),
+    assistant([{ type: 'interactive', text: 'Bitcoin', kind: 'interactive' }]),
+  ], true),
+}), false, 'a later user turn assistant must not satisfy or refresh the earlier response')
 assert.equal(shouldRefresh({ ...base, attempted: true, snapshot: snapshot([user('新的问题')]) }), false)
 assert.equal(shouldRefresh({ ...base, providerId: 'google-ai-mode', snapshot: snapshot([user('新的问题')]) }), false)
 assert.equal(shouldRefresh({

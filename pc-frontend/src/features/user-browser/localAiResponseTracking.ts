@@ -48,6 +48,23 @@ export function matchingLocalAiUserIndex(
   return -1
 }
 
+/** Returns the final assistant stage within one user turn without crossing into the next turn. */
+export function latestLocalAiAssistantForUserTurn<T extends { role: string }>(
+  messages: T[],
+  userIndex: number,
+): T | undefined {
+  if (userIndex < 0 || userIndex >= messages.length || messages[userIndex].role !== 'user') {
+    return undefined
+  }
+  let assistant: T | undefined
+  for (let index = userIndex + 1; index < messages.length; index += 1) {
+    const message = messages[index]
+    if (message.role === 'user') break
+    if (message.role === 'assistant') assistant = message
+  }
+  return assistant
+}
+
 function visibleMessageText(message: { content: Array<{ type: string; text?: string }> }): string {
   return message.content
     .filter((part) => part.type === 'text' || part.type === 'markdown')

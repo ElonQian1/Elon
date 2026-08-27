@@ -2,6 +2,7 @@ import type { LocalAiVisibleMessage } from './localAiBrowserApi'
 import { localAiAssistantExtractionIncomplete } from './localAiAssistantContentQuality'
 import { hasVisibleAiMessageContent } from '../ai/aiMessageVisibility'
 import {
+  latestLocalAiAssistantForUserTurn,
   matchingLocalAiUserCount,
   matchingLocalAiUserIndex,
   normalizeLocalAiResponsePrompt,
@@ -136,7 +137,7 @@ function officialAssistantForPendingResponse(
 ): LocalAiVisibleMessage | undefined {
   const userIndex = targetUserIndex(messages, pending)
   if (userIndex < 0) return undefined
-  return messages.slice(userIndex + 1).find((message) => message.role === 'assistant')
+  return latestLocalAiAssistantForUserTurn(messages, userIndex)
 }
 
 function targetUserIndex(
