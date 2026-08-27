@@ -8,19 +8,6 @@ export type ChatGptNewConversationResetControlAction =
 
 const NEW_CONVERSATION_NATIVE_SETTLE_MS = 750
 
-export function localAiNewConversationCanDispatchQueuedSend(
-  providerId: string,
-  nativeReady: boolean,
-  pageBoundaryConfirmed: boolean,
-): boolean {
-  // The Win ChatGPT page guard only reports success after the previous turns have
-  // detached and an empty composer has stayed stable. That confirmation is strong
-  // enough to submit the deliberately queued first prompt while the semantic/private
-  // snapshot is still catching up. Other providers keep requiring the full native
-  // context binding because they do not currently expose the same guarded receipt.
-  return nativeReady || (providerId === 'chatgpt' && pageBoundaryConfirmed)
-}
-
 export function chatGptNewConversationResetControlAction(
   currentUrl: string | null | undefined,
 ): ChatGptNewConversationResetControlAction {

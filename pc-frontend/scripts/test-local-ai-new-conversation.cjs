@@ -70,16 +70,10 @@ const {
   chatGptNewConversationRecoveryAction,
   chatGptNewConversationResetControlAction,
   googleNewConversationNeedsReload,
-  localAiNewConversationCanDispatchQueuedSend,
   localAiNewConversationContextReady,
   localAiNewConversationNativeReady,
   selectLocalAiNewConversationPath,
 } = compiled.exports
-
-assert.equal(localAiNewConversationCanDispatchQueuedSend('chatgpt', false, true), true)
-assert.equal(localAiNewConversationCanDispatchQueuedSend('chatgpt', false, false), false)
-assert.equal(localAiNewConversationCanDispatchQueuedSend('google-ai-mode', false, true), false)
-assert.equal(localAiNewConversationCanDispatchQueuedSend('google-ai-mode', true, false), true)
 
 assert.equal(
   chatGptNewConversationResetControlAction('https://chatgpt.com/'),
@@ -253,7 +247,7 @@ assert.match(chatGptRecoverySource, /chatGptNewConversationRecoveryAction\(/)
 assert.match(chatGptRecoverySource, /chatGptNewConversationResetControlAction/)
 assert.match(chatGptRecoverySource, /runLocalAiWebAdapterCommand\([\s\S]*?'new_conversation'/)
 assert.match(chatGptRecoverySource, /waitForLocalAiAdapterResult\([\s\S]*?'new_conversation'/)
-assert.match(chatGptRecoverySource, /callbacks\.current\.onPageBoundaryConfirmed\(\)/)
+assert.doesNotMatch(chatGptRecoverySource, /onPageBoundaryConfirmed/)
 assert.match(chatGptRecoverySource, /chatGptNewConversationResetControlAction\(current\.currentUrl\)/)
 assert.match(chatGptRecoverySource, /current\.loading \|\| current\.rendererStatus !== 'active'/)
 assert.match(chatGptRecoverySource, /if \(!startedAtMs \|\| providerId !== 'chatgpt' \|\| !ownerKey \|\| suspended\) return/)
@@ -295,10 +289,9 @@ assert.match(lifecycleSource, /setRecoveryStartedAtMs\(Date\.now\(\)\)/)
 assert.match(controllerSource, /visibleSessionState\?\.semanticConversationAligned === false/)
 assert.match(controllerSource, /deriveLocalAiUserState\(clientState, provider, visibleSessionState, liveSnapshot\)/)
 assert.match(controllerSource, /localAiNewConversationNativeReady\(/)
-assert.match(controllerSource, /localAiNewConversationCanDispatchQueuedSend\(/)
-assert.match(controllerSource, /newConversationPageConfirmed/)
-assert.match(controllerSource, /confirmNewConversationPage\(\)/)
-assert.match(controllerSource, /onPageBoundaryConfirmed: confirmNewConversationPage/)
+assert.match(controllerSource, /const queuedSendReady = nativeReady/)
+assert.doesNotMatch(controllerSource, /newConversationPageConfirmed|confirmNewConversationPage/)
+assert.doesNotMatch(lifecycleSource, /pageConfirmed|confirmPage/)
 assert.match(controllerSource, /const path = selectLocalAiNewConversationPath\(/)
 assert.match(controllerSource, /if \(path === 'adapter'\)/)
 assert.match(controllerSource, /waitForLocalAiAdapterResult\([\s\S]*?'new_conversation'/)

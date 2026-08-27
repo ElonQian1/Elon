@@ -40,7 +40,6 @@ import {
 import {
   chatGptNewConversationResetControlAction,
   googleNewConversationNeedsReload,
-  localAiNewConversationCanDispatchQueuedSend,
   localAiNewConversationNativeReady,
   selectLocalAiNewConversationPath,
 } from './localAiNewConversation'
@@ -85,8 +84,7 @@ export default function useLocalAiWebChatController(
   const [busyAction, setBusyAction] = useState('')
   const [message, setMessage] = useState('')
   const { baselineId: newConversationBaselineId, begin: beginNewConversationTransition,
-    cancel: cancelNewConversationTransition, confirmPage: confirmNewConversationPage,
-    finish: finishNewConversationTransition, pageConfirmed: newConversationPageConfirmed,
+    cancel: cancelNewConversationTransition, finish: finishNewConversationTransition,
     queuedSend, queuedSendDispatching, queuedSendRef, recoveryStartedAtMs: newConversationRecoveryStartedAtMs,
     reset: resetNewConversationTransition, setQueuedSend } = useLocalAiNewConversationLifecycle<QueuedLocalAiSend>()
   const newConversationRecoveryExpired = useLocalAiNewConversationDeadline(newConversationRecoveryStartedAtMs)
@@ -214,11 +212,11 @@ export default function useLocalAiWebChatController(
       newConversationRecoveryStartedAtMs,
       newConversationBaselineId.current,
     )
-    const queuedSendReady = localAiNewConversationCanDispatchQueuedSend(
-      providerId,
-      nativeReady,
-      newConversationPageConfirmed,
-    )
+    // A page-level new-chat receipt is provisional: guest ChatGPT can briefly show an
+    // empty root surface and then restore the previous conversation from its profile.
+    // Only the native snapshot proves that the replacement conversation identity,
+    // empty message surface, composer and semantic cache all agree.
+    const queuedSendReady = nativeReady
     if (nativeReady && !queuedSend) return finishNewConversationTransition()
     if (queuedSendReady && queuedSend && !busyAction && !queuedSendDispatching.current) {
       queuedSendDispatching.current = true
@@ -235,7 +233,7 @@ export default function useLocalAiWebChatController(
     setMessage(queuedSend
       ? '新会话后台连接超时，消息没有误发；草稿已保留，可显示官方页确认后重试。'
       : '新会话后台连接超时；输入仍可继续编辑，如页面显示旧内容可打开官方页确认。')
-  }, [busyAction, liveSnapshot, newConversationPageConfirmed, newConversationRecoveryExpired,
+  }, [busyAction, liveSnapshot, newConversationRecoveryExpired,
     newConversationRecoveryStartedAtMs, providerId, queuedSend, visibleSessionState])
 
   useEffect(() => {
@@ -271,7 +269,6 @@ export default function useLocalAiWebChatController(
     suspended: busyAction === 'new_conversation',
     onState: setSessionState,
     onMessage: setMessage,
-    onPageBoundaryConfirmed: confirmNewConversationPage,
   })
 
   useEffect(() => {
@@ -612,8 +609,7 @@ export default function useLocalAiWebChatController(
               const background = await keepLocalAiNewConversationInNativeForeground(provider, ownerKey, next)
               setSessionState(background)
               if (result?.action === 'new_conversation' && result.ok) {
-                confirmNewConversationPage()
-                setMessage(`已确认 ${provider.displayName} 空白新会话；首条消息可以立即发送，富内容上下文继续在后台同步。`)
+                setMessage(`已确认 ${provider.displayName} 空白新会话；首条消息可立即输入，原生会话绑定完成后自动发送。`)
               } else {
                 setMessage(`已进入 ${provider.displayName} 新会话；可以立即输入，官网上下文正在后台确认。`)
               }

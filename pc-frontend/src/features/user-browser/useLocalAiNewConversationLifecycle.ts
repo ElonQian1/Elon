@@ -3,7 +3,6 @@ import { useCallback, useRef, useState } from 'react'
 export default function useLocalAiNewConversationLifecycle<T>() {
   const [queuedSend, setQueuedSendValue] = useState<T | null>(null)
   const [recoveryStartedAtMs, setRecoveryStartedAtMs] = useState(0)
-  const [pageConfirmed, setPageConfirmed] = useState(false)
   const baselineId = useRef('')
   const queuedSendRef = useRef<T | null>(null)
   const queuedSendDispatching = useRef(false)
@@ -12,10 +11,8 @@ export default function useLocalAiNewConversationLifecycle<T>() {
     queuedSendRef.current = value
     setQueuedSendValue(value)
   }, [])
-  const confirmPage = useCallback(() => setPageConfirmed(true), [])
   const finish = useCallback(() => {
     baselineId.current = ''
-    setPageConfirmed(false)
     setRecoveryStartedAtMs(0)
   }, [])
   const clearQueuedSend = useCallback(() => {
@@ -28,7 +25,6 @@ export default function useLocalAiNewConversationLifecycle<T>() {
   }, [clearQueuedSend, finish])
   const begin = useCallback((baselineConversationId: string) => {
     baselineId.current = baselineConversationId
-    setPageConfirmed(false)
     setRecoveryStartedAtMs(Date.now())
   }, [])
   const cancel = useCallback((restore?: (queued: T) => void) => {
@@ -42,9 +38,7 @@ export default function useLocalAiNewConversationLifecycle<T>() {
     begin,
     cancel,
     clearQueuedSend,
-    confirmPage,
     finish,
-    pageConfirmed,
     queuedSend,
     queuedSendDispatching,
     queuedSendRef,
