@@ -1,7 +1,10 @@
 export interface LocalAiDeferredConversationOpen {
   conversationId: string
   sessionIdentity: string
+  action?: LocalAiDeferredConversationAction
 }
+
+export type LocalAiDeferredConversationAction = 'open_conversation' | 'open_project'
 
 /** Latest-selection-wins queue for a single provider/profile session. */
 export class LocalAiConversationOpenQueue {
@@ -10,8 +13,11 @@ export class LocalAiConversationOpenQueue {
 
   constructor(private readonly sessionIdentity: string) {}
 
-  enqueue(conversationId: string): boolean {
-    this.pending = { conversationId, sessionIdentity: this.sessionIdentity }
+  enqueue(conversationId: string, action?: LocalAiDeferredConversationAction): boolean {
+    if (this.pending?.conversationId === conversationId && this.pending.action === action) {
+      return false
+    }
+    this.pending = { conversationId, sessionIdentity: this.sessionIdentity, ...(action ? { action } : {}) }
     if (this.draining) return false
     this.draining = true
     return true

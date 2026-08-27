@@ -352,7 +352,6 @@ function DirectorySection({
           data-active={item.active}
           title={item.title}
           onClick={() => action && void web.controller.run(action, item.path)}
-          disabled={Boolean(web.controller.busyAction)}
         >
           <span>{item.title}</span>
         </button>

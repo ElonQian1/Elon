@@ -6,12 +6,10 @@ import {
   isLocalAiConversationSnapshot,
   isLocalAiMessageSnapshot,
   localAiBrowserErrorMessage,
-  openLocalAiWebResearchDirectory,
   openLocalAiWebSession,
   runLocalAiWebAdapterCommand,
   waitForLocalAiAdapterResult,
   type LocalAiAdapterAction,
-  type LocalAiBrowserControlAction,
   type LocalAiWebProvider,
   type LocalAiWebSessionState,
 } from './localAiBrowserApi'
@@ -32,7 +30,6 @@ import {
   type PendingLocalAiResponse,
   type PendingLocalAiSend,
 } from './localAiOptimisticSend'
-import { requestOfficialAiTab } from './internalBrowserApi'
 import {
   keepLocalAiNewConversationInNativeForeground,
   requestLocalAiNewConversationNativeForeground,
@@ -69,6 +66,10 @@ import useLocalAiCachedConversationNavigation from './useLocalAiCachedConversati
 import { dispatchPreparedLocalAiPrompt } from './dispatchPreparedLocalAiPrompt'
 import { localAiQueuedSendRecoveryAction } from './localAiQueuedSendRecoveryPolicy'
 import useLocalAiBackgroundNavigationRecovery from './useLocalAiBackgroundNavigationRecovery'
+import useLocalAiDeferredConversationNavigation, {
+  isLocalAiDeferredConversationAction,
+} from './useLocalAiDeferredConversationNavigation'
+import useLocalAiWindowActions from './useLocalAiWindowActions'
 export default function useLocalAiWebChatController(
   provider: LocalAiWebProvider | undefined,
   ownerKey: string,
@@ -393,57 +394,10 @@ export default function useLocalAiWebChatController(
     if (remaining.length !== pendingResponses.length) setPendingResponses(remaining)
   }, [pendingResponses, snapshot])
 
-  async function openOfficial() {
-    if (!provider || !ownerKey || busyAction) return
-    setBusyAction('open')
-    setMessage('')
-    try {
-      await openLocalAiWebSession(provider.id, ownerKey, { showWindow: false })
-      try {
-        setSessionState(await getLocalAiWebSessionState(provider.id, ownerKey))
-      } catch {
-        // The bounded poll recovers a state refresh without reopening the window.
-      }
-      requestOfficialAiTab({ providerId: provider.id, providerName: provider.displayName, ownerKey })
-      setMessage(`已切换到 ${provider.displayName} 官方原生标签；天气、地图、图标和交互内容由官网直接显示。`)
-    } catch (error) {
-      setMessage(localAiBrowserErrorMessage(error))
-    } finally {
-      setBusyAction('')
-    }
-  }
-
-  async function openResearchDirectory() {
-    if (!provider || !ownerKey || busyAction) return
-    setBusyAction('research-directory')
-    setMessage('')
-    try {
-      await openLocalAiWebResearchDirectory(provider.id, ownerKey)
-      setMessage('已打开当前厂商的本机原始响应研究目录。')
-    } catch (error) {
-      setMessage(localAiBrowserErrorMessage(error))
-    } finally {
-      setBusyAction('')
-    }
-  }
-
-  async function control(action: LocalAiBrowserControlAction) {
-    if (!provider || !ownerKey || busyAction) return
-    setBusyAction(action)
-    setMessage('')
-    try {
-      setSessionState(await controlLocalAiWebSession(provider.id, ownerKey, action))
-      if (action === 'external') {
-        setMessage('已打开系统浏览器；系统浏览器不会与一龙本地窗口共享 Cookie。')
-      } else if (action === 'background') {
-        setMessage(`${provider.displayName} 官方页已收起到本机后台，一龙聊天界面可以继续使用。`)
-      }
-    } catch (error) {
-      setMessage(localAiBrowserErrorMessage(error))
-    } finally {
-      setBusyAction('')
-    }
-  }
+  const { control, openOfficial, openResearchDirectory } = useLocalAiWindowActions({
+    provider, ownerKey, busyAction, onBusyAction: setBusyAction,
+    onMessage: setMessage, onState: setSessionState,
+  })
 
   const openCachedConversation = useLocalAiCachedConversationNavigation({
     provider,
@@ -494,6 +448,10 @@ export default function useLocalAiWebChatController(
       setMessage('当前新会话仍在后台确认；为避免串到上一会话，确认完成前不会重复新建。')
       return visibleSessionState
     }
+    if (busyAction && isLocalAiDeferredConversationAction(action)) {
+      deferConversationNavigation(action, value)
+      return visibleSessionState
+    }
     if (busyAction || (action === 'send_prompt' && !composerAvailability.canSubmit)) return null
     if (action === 'new_conversation') {
       return startNewConversation()
@@ -539,6 +497,13 @@ export default function useLocalAiWebChatController(
       setBusyAction('')
     }
   }
+
+  const deferConversationNavigation = useLocalAiDeferredConversationNavigation({
+    sessionIdentity: requestedSessionIdentity,
+    busyAction,
+    dispatch: run,
+    onMessage: setMessage,
+  })
 
   function preparePendingSend(prompt: string): PendingLocalAiSend | null {
     if (!provider) return null
