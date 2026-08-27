@@ -529,7 +529,7 @@ internal class ChatGptSocialChatController(
         )
         if (pendingAttachments.isNotEmpty()) return
         if (event.action != "send_prompt") return
-        val failedPrompt = sendCoordinator.acceptCommandResult(event.ok)
+        val failedPrompt = sendCoordinator.acceptCommandResult(event.requestId, event.ok)
         if (event.ok) {
             session.currentSnapshot()?.let(::renderSnapshot)
             return

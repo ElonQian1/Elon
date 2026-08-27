@@ -2,8 +2,9 @@ package com.elon.app
 
 import com.elon.app.chatgptweb.ChatGptWebSnapshot
 
-internal enum class WebChatSendAuthority {
-    OFFICIAL_PAGE,
+internal enum class WebChatTransportDispatchResult {
+    QUEUED,
+    REJECTED,
 }
 
 internal interface WebChatSendTransport {
@@ -11,21 +12,26 @@ internal interface WebChatSendTransport {
 
     fun isReady(): Boolean
 
-    fun dispatch(prompt: String): Boolean
+    fun dispatch(command: WebChatSendCommand): WebChatTransportDispatchResult
 
     fun reconcile()
 }
 
 internal class OfficialPageWebChatSendTransport(
     private val ready: () -> Boolean,
-    private val sendPrompt: (String) -> Boolean,
+    private val sendPrompt: (prompt: String, requestId: String) -> Boolean,
     private val requestReconciliation: () -> Unit,
 ) : WebChatSendTransport {
     override val authority: WebChatSendAuthority = WebChatSendAuthority.OFFICIAL_PAGE
 
     override fun isReady(): Boolean = ready()
 
-    override fun dispatch(prompt: String): Boolean = sendPrompt(prompt)
+    override fun dispatch(command: WebChatSendCommand): WebChatTransportDispatchResult =
+        if (sendPrompt(command.prompt, command.id)) {
+            WebChatTransportDispatchResult.QUEUED
+        } else {
+            WebChatTransportDispatchResult.REJECTED
+        }
 
     override fun reconcile() = requestReconciliation()
 }
@@ -53,9 +59,10 @@ internal class WebChatSendCoordinator(
     data class DispatchResult(
         val outcome: DispatchOutcome,
         val prompt: String? = null,
+        val commandId: String? = null,
     )
 
-    private val state = WebChatPendingSendState()
+    private val ledger = WebChatSendCommandLedger()
     private var watchdog: Runnable? = null
     private var baseline: SnapshotEvidence? = null
 
@@ -63,63 +70,75 @@ internal class WebChatSendCoordinator(
 
     fun isReady(): Boolean = transport.isReady()
 
-    fun prompt(): String? = state.prompt()
+    fun prompt(): String? = ledger.prompt()
 
-    fun phase(): WebChatPendingSendState.Phase = state.phase()
+    fun phase(): WebChatPendingSendState.Phase = ledger.phase()
 
-    fun status(): String? = WebChatPendingSendPresentation.status(state.phase())
+    fun status(): String? = WebChatPendingSendPresentation.status(ledger.phase())
 
-    fun requiresOfficialConfirmation(): Boolean = state.requiresOfficialConfirmation()
+    fun requiresOfficialConfirmation(): Boolean =
+        ledger.current()?.requiresOfficialConfirmation == true
+
+    fun commandId(): String? = ledger.commandId()
+
+    fun pageSyncState(): WebChatPageSyncState? = ledger.current()?.pageSyncState
+
+    fun fallbackDecision(): WebChatSendCommandLedger.FallbackDecision = ledger.fallbackDecision()
 
     fun dispatch(
         prompt: String,
         baselineSnapshot: ChatGptWebSnapshot?,
         onPending: () -> Unit,
     ): DispatchResult {
-        if (state.prompt() != null) return DispatchResult(DispatchOutcome.BUSY)
+        if (ledger.prompt() != null) return DispatchResult(DispatchOutcome.BUSY)
         if (!transport.isReady()) return DispatchResult(DispatchOutcome.NOT_READY)
 
         baseline = baselineSnapshot?.let(::snapshotEvidence)
-        val generation = state.begin(prompt)
+        val command = ledger.begin(prompt, transport.authority)
+            ?: return DispatchResult(DispatchOutcome.BUSY)
         onPending()
-        val dispatched = runCatching { transport.dispatch(prompt) }.getOrDefault(false)
-        if (!dispatched) {
-            val failedPrompt = state.failSubmission()
+        val dispatchResult = runCatching { transport.dispatch(command) }
+            .getOrDefault(WebChatTransportDispatchResult.REJECTED)
+        if (dispatchResult == WebChatTransportDispatchResult.REJECTED) {
+            val failedPrompt = ledger.failBeforeDispatch(command.id)
             baseline = null
             cancelWatchdog()
-            return DispatchResult(DispatchOutcome.REJECTED, failedPrompt)
+            return DispatchResult(DispatchOutcome.REJECTED, failedPrompt, command.id)
         }
-        armWatchdog(generation)
-        return DispatchResult(DispatchOutcome.DISPATCHED)
+        ledger.markDispatched(command.id)
+        armWatchdog(command.generation)
+        return DispatchResult(DispatchOutcome.DISPATCHED, commandId = command.id)
     }
 
-    fun acceptCommandResult(ok: Boolean): String? {
-        if (ok) {
-            state.confirmSubmission()
-            return null
+    fun acceptCommandResult(requestId: String?, ok: Boolean): String? {
+        val failedPrompt = ledger.current()?.prompt
+        return when (ledger.acceptReceipt(requestId, ok)) {
+            WebChatSendCommandLedger.ReceiptResult.IGNORED -> null
+            WebChatSendCommandLedger.ReceiptResult.ACCEPTED -> null
+            WebChatSendCommandLedger.ReceiptResult.FAILED -> {
+                baseline = null
+                cancelWatchdog()
+                failedPrompt
+            }
         }
-        val failedPrompt = state.failSubmission()
-        baseline = null
-        cancelWatchdog()
-        return failedPrompt
     }
 
     fun observeSnapshot(snapshot: ChatGptWebSnapshot): Observation {
         val evidence = snapshotEvidence(snapshot)
         if (!evidence.isNewerThan(baseline)) return Observation.NONE
-        if (state.observeCompletedTurn(evidence.latestUserPrompt, evidence.assistantObserved)) {
+        if (ledger.observeCompletedTurn(evidence.latestUserPrompt, evidence.assistantObserved)) {
             baseline = null
             cancelWatchdog()
             return Observation.TURN_COMPLETED
         }
-        if (state.observeSubmission(evidence.latestUserPrompt)) {
+        if (ledger.observeSubmission(evidence.latestUserPrompt)) {
             return Observation.SUBMISSION_CONFIRMED
         }
         return Observation.NONE
     }
 
     fun clear() {
-        state.clear()
+        ledger.clear()
         baseline = null
         cancelWatchdog()
     }
@@ -132,7 +151,7 @@ internal class WebChatSendCoordinator(
         cancelWatchdog()
         val task = Runnable {
             watchdog = null
-            val result = state.onConfirmationTimeout(generation)
+            val result = ledger.onConfirmationTimeout(generation)
             when (result.action) {
                 WebChatPendingSendState.TimeoutAction.IGNORE -> Unit
                 WebChatPendingSendState.TimeoutAction.KEEP_WAITING -> {

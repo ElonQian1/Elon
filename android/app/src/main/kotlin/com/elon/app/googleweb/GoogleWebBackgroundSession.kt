@@ -109,12 +109,12 @@ internal class GoogleWebBackgroundSession(
         latestSnapshot?.url?.let(conversationStore::currentPath),
     )
 
-    fun sendPrompt(prompt: String): Boolean {
+    fun sendPrompt(prompt: String, requestId: String): Boolean {
         val snapshot = latestSnapshot ?: return false
         if (!canSend()) return false
         webExecution.interactionRequested()
         responseRefresh.onSendStarted(prompt)
-        pageAdapter?.sendPrompt(prompt, snapshot.draft) ?: return false
+        pageAdapter?.sendPrompt(prompt, snapshot.draft, requestId) ?: return false
         return true
     }
 

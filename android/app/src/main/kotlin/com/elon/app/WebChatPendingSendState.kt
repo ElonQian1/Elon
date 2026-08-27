@@ -22,99 +22,42 @@ internal class WebChatPendingSendState {
         val prompt: String? = null,
     )
 
-    private data class Pending(
-        val prompt: String,
-        val generation: Long,
-        var submissionConfirmed: Boolean = false,
-        var confirmationRechecks: Int = 0,
-        var requiresOfficialConfirmation: Boolean = false,
-    )
-
-    private var generation = 0L
-    private var pending: Pending? = null
+    private val ledger = WebChatSendCommandLedger()
 
     fun begin(prompt: String): Long {
-        generation += 1
-        pending = Pending(prompt = prompt, generation = generation)
-        return generation
+        if (ledger.current() != null) ledger.clear()
+        val command = requireNotNull(ledger.begin(prompt, WebChatSendAuthority.OFFICIAL_PAGE))
+        ledger.markDispatched(command.id)
+        return command.generation
     }
 
-    fun prompt(): String? = pending?.prompt
+    fun prompt(): String? = ledger.prompt()
 
     fun requiresOfficialConfirmation(): Boolean =
-        pending?.requiresOfficialConfirmation == true
+        ledger.current()?.requiresOfficialConfirmation == true
 
-    fun phase(): Phase = pending?.let { current ->
-        when {
-            current.requiresOfficialConfirmation -> Phase.OFFICIAL_CONFIRMATION
-            current.submissionConfirmed -> Phase.AWAITING_RESPONSE
-            else -> Phase.SUBMITTING
-        }
-    } ?: Phase.IDLE
+    fun phase(): Phase = ledger.phase()
 
     fun confirmSubmission(): Boolean {
-        val current = pending ?: return false
-        if (current.submissionConfirmed) return false
-        current.submissionConfirmed = true
-        return true
+        val command = ledger.current() ?: return false
+        return ledger.acceptReceipt(command.id, ok = true) ==
+            WebChatSendCommandLedger.ReceiptResult.ACCEPTED
     }
 
-    fun observeSubmission(content: String?): Boolean {
-        val current = pending ?: return false
-        if (normalize(content) != normalize(current.prompt)) return false
-        return confirmSubmission()
-    }
+    fun observeSubmission(content: String?): Boolean = ledger.observeSubmission(content)
 
     fun failSubmission(): String? {
-        val prompt = pending?.prompt ?: return null
-        invalidate()
-        return prompt
+        val command = ledger.current() ?: return null
+        return ledger.failBeforeDispatch(command.id)
     }
 
-    fun observeCompletedTurn(content: String?, assistantObserved: Boolean): Boolean {
-        val current = pending ?: return false
-        if (normalize(content) != normalize(current.prompt)) return false
-        if (!assistantObserved) return false
-        invalidate()
-        return true
-    }
+    fun observeCompletedTurn(content: String?, assistantObserved: Boolean): Boolean =
+        ledger.observeCompletedTurn(content, assistantObserved)
 
-    fun onConfirmationTimeout(expectedGeneration: Long): TimeoutResult {
-        val current = pending ?: return TimeoutResult(TimeoutAction.IGNORE)
-        if (current.generation != expectedGeneration) {
-            return TimeoutResult(TimeoutAction.IGNORE)
-        }
-        if (current.submissionConfirmed) {
-            if (current.requiresOfficialConfirmation) {
-                return TimeoutResult(TimeoutAction.IGNORE)
-            }
-            current.confirmationRechecks += 1
-            if (current.confirmationRechecks > MAX_CONFIRMATION_RECHECKS) {
-                current.requiresOfficialConfirmation = true
-                return TimeoutResult(TimeoutAction.REQUIRE_OFFICIAL_CONFIRMATION)
-            }
-            return TimeoutResult(TimeoutAction.KEEP_WAITING)
-        }
-        val prompt = current.prompt
-        invalidate()
-        return TimeoutResult(TimeoutAction.RESTORE, prompt)
-    }
+    fun onConfirmationTimeout(expectedGeneration: Long): TimeoutResult =
+        ledger.onConfirmationTimeout(expectedGeneration)
 
-    fun clear() {
-        invalidate()
-    }
-
-    private fun invalidate() {
-        generation += 1
-        pending = null
-    }
-
-    private fun normalize(value: String?): String = value.orEmpty().trim().replace(WHITESPACE, " ")
-
-    private companion object {
-        const val MAX_CONFIRMATION_RECHECKS = 2
-        val WHITESPACE = Regex("\\s+")
-    }
+    fun clear() = ledger.clear()
 }
 
 internal object WebChatPendingSendPresentation {

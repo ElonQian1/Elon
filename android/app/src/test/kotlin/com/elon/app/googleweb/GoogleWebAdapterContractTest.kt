@@ -43,6 +43,9 @@ class GoogleWebAdapterContractTest {
         val sendCoordinator = read(
             "android/app/src/main/kotlin/com/elon/app/WebChatSendCoordinator.kt",
         )
+        val sendLedger = read(
+            "android/app/src/main/kotlin/com/elon/app/WebChatSendCommandLedger.kt",
+        )
 
         assertTrue(adapter.contains("providerId: 'google_web'"))
         assertTrue(adapter.contains("documentToken"))
@@ -157,7 +160,7 @@ class GoogleWebAdapterContractTest {
         assertTrue(controller.contains("session.currentOfficialUrl()"))
         assertTrue(controller.contains("OfficialPageWebChatSendTransport("))
         assertTrue(controller.contains("WebChatSendCoordinator("))
-        assertTrue(controller.contains("sendCoordinator.acceptCommandResult(event.ok)"))
+        assertTrue(controller.contains("sendCoordinator.acceptCommandResult(event.requestId, event.ok)"))
         assertTrue(controller.contains("sendCoordinator.observeSnapshot(snapshot)"))
         assertTrue(controller.contains("session.onSubmissionObserved()"))
         assertTrue(session.contains("fun onSubmissionObserved() = responseRefresh.onSendConfirmed()"))
@@ -165,9 +168,11 @@ class GoogleWebAdapterContractTest {
         assertTrue(controller.contains("?.sendStatus = pendingStatus"))
         assertTrue(controller.contains("session.currentSnapshot()?.let(::renderSnapshot)"))
         assertTrue(controller.contains("restorePrompt(failedPrompt)"))
-        assertTrue(sendCoordinator.contains("state.onConfirmationTimeout(generation)"))
+        assertTrue(sendCoordinator.contains("ledger.onConfirmationTimeout(generation)"))
         assertTrue(sendCoordinator.contains("transport::reconcile"))
-        assertTrue(sendCoordinator.contains("armWatchdog(generation)"))
+        assertTrue(sendCoordinator.contains("armWatchdog(command.generation)"))
+        assertTrue(sendLedger.contains("WebChatSendAcceptance.DISPATCHED_UNCONFIRMED"))
+        assertTrue(sendLedger.contains("FallbackDecision.RECONCILE_ONLY"))
         assertTrue(controller.contains("TimeoutAction.REQUIRE_OFFICIAL_CONFIRMATION"))
         assertTrue(controller.contains("sendCoordinator.requiresOfficialConfirmation()"))
         assertTrue(sendCoordinator.contains("removeCallbacks"))

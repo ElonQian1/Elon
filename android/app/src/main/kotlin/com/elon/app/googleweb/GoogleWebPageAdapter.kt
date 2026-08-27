@@ -129,11 +129,12 @@ internal class GoogleWebPageAdapter(
 
     fun requestSnapshot() = runCommand("snapshot")
 
-    fun sendPrompt(value: String, expectedDraft: String) = runCommand(
+    fun sendPrompt(value: String, expectedDraft: String, requestId: String) = runCommand(
         action = "send_prompt",
         value = value.take(MAX_PROMPT_LENGTH),
         expectedDraft = expectedDraft.take(MAX_PROMPT_LENGTH),
         ownedComposer = true,
+        requestId = requestId,
     )
 
     fun stopGeneration() = runCommand("stop_generation")
@@ -155,12 +156,14 @@ internal class GoogleWebPageAdapter(
         value: String = "",
         expectedDraft: String = "",
         ownedComposer: Boolean = false,
+        requestId: String? = null,
     ) {
         val command = JSONObject()
             .put("action", action)
             .put("value", value)
             .put("expectedDraft", expectedDraft)
             .put("ownedComposer", ownedComposer)
+            .put("requestId", requestId ?: "")
             .toString()
         val encoded = JSONObject.quote(command)
         webView.evaluateJavascript(

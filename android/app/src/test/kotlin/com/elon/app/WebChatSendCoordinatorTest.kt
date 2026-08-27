@@ -44,6 +44,8 @@ class WebChatSendCoordinatorTest {
 
         assertEquals(WebChatSendAuthority.OFFICIAL_PAGE, fixture.coordinator.authority())
         assertEquals(WebChatSendCoordinator.DispatchOutcome.DISPATCHED, first.outcome)
+        assertEquals(first.commandId, fixture.coordinator.commandId())
+        assertTrue(first.commandId?.startsWith("mcp_s") == true)
         assertEquals(WebChatSendCoordinator.DispatchOutcome.BUSY, second.outcome)
         assertEquals(listOf("hello"), fixture.transport.prompts)
         assertEquals(1, fixture.optimisticRenders)
@@ -136,7 +138,7 @@ class WebChatSendCoordinatorTest {
     fun confirmedSendReconcilesTwiceThenRequiresOfficialConfirmation() {
         val fixture = Fixture()
         fixture.coordinator.dispatch("hello", null) {}
-        fixture.coordinator.acceptCommandResult(ok = true)
+        fixture.coordinator.acceptCommandResult(fixture.coordinator.commandId(), ok = true)
 
         fixture.scheduler.runNext()
         fixture.scheduler.runNext()
@@ -170,7 +172,10 @@ class WebChatSendCoordinatorTest {
         val fixture = Fixture()
         fixture.coordinator.dispatch("retry me", null) {}
 
-        val prompt = fixture.coordinator.acceptCommandResult(ok = false)
+        val prompt = fixture.coordinator.acceptCommandResult(
+            fixture.coordinator.commandId(),
+            ok = false,
+        )
 
         assertEquals("retry me", prompt)
         assertNull(fixture.coordinator.prompt())
@@ -241,9 +246,13 @@ class WebChatSendCoordinatorTest {
 
         override fun isReady(): Boolean = ready
 
-        override fun dispatch(prompt: String): Boolean {
-            prompts += prompt
-            return dispatchAccepted
+        override fun dispatch(command: WebChatSendCommand): WebChatTransportDispatchResult {
+            prompts += command.prompt
+            return if (dispatchAccepted) {
+                WebChatTransportDispatchResult.QUEUED
+            } else {
+                WebChatTransportDispatchResult.REJECTED
+            }
         }
 
         override fun reconcile() {

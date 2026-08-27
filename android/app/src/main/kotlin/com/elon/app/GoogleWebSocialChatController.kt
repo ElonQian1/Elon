@@ -277,7 +277,7 @@ internal class GoogleWebSocialChatController(
         )
         if (event.action != "send_prompt") return
         Log.i(SEND_LOG_TAG, "action=send_prompt ok=${event.ok}")
-        val failedPrompt = sendCoordinator.acceptCommandResult(event.ok)
+        val failedPrompt = sendCoordinator.acceptCommandResult(event.requestId, event.ok)
         if (event.ok) {
             session.currentSnapshot()?.let(::renderSnapshot)
             return

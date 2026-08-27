@@ -222,12 +222,12 @@ internal class ChatGptBackgroundSession(
 
     fun canSend(): Boolean = WebChatSendContextPolicy.allows(state == State.READY, latestSnapshot, conversationNavigation.hasPending(), currentConversationPath(), currentConversationPath())
 
-    fun sendPrompt(prompt: String): Boolean {
+    fun sendPrompt(prompt: String, requestId: String): Boolean {
         val adapter = pageAdapter ?: return false
         val snapshot = latestSnapshot ?: return false
         if (!canSend()) return false
         lastAttachmentSendPhase = ATTACHMENT_PHASE_IDLE
-        adapter.sendPrompt(prompt, snapshot.draft)
+        adapter.sendPrompt(prompt, snapshot.draft, requestId)
         return true
     }
 
