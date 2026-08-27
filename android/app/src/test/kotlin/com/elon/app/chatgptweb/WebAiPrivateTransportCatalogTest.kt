@@ -168,7 +168,7 @@ class WebAiPrivateTransportCatalogTest {
             byId["android_chatgpt_web_private_voice_bootstrap_research_v1"],
         )
         assertEquals(
-            "research_in_progress",
+            "research_completed",
             privateVoiceResearch.getString("implementation_status"),
         )
         assertFalse(privateVoiceResearch.getBoolean("production_default"))
@@ -176,6 +176,17 @@ class WebAiPrivateTransportCatalogTest {
         assertEquals(
             "official_page_created_webrtc",
             privateVoiceResearch.getString("fallback"),
+        )
+
+        val nativeVoiceRelay = requireNotNull(
+            byId["android_chatgpt_web_private_voice_native_relay_v1"],
+        )
+        assertEquals("planned", nativeVoiceRelay.getString("implementation_status"))
+        assertFalse(nativeVoiceRelay.getBoolean("production_default"))
+        assertFalse(nativeVoiceRelay.getBoolean("runtime_enabled"))
+        assertEquals(
+            "official_page_created_webrtc",
+            nativeVoiceRelay.getString("fallback"),
         )
 
         values.filter { it.getString("implementation_status") == "research_only" }

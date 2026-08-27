@@ -35,8 +35,55 @@ temporary credentials, or private conversation content.
 
 ## Current Decision
 
-The repository has no Android native WebRTC dependency. Adding one before observing
-the real web bootstrap would guess the private protocol and increase APK size and
-maintenance cost without proving that the temporary session can be transferred.
-The first implementation is therefore a redacted document-start observer with a
-typed native parser. It records protocol shape, not credentials.
+Stage 2 is complete on Android research build `1.1.1318 (1328)`. One official
+voice start produced this redacted sequence:
+
+1. The page created a peer connection, data channel, local audio offer, and local
+   description.
+2. The page prepared the current conversation and short-lived sentinel state.
+3. The page sent multipart `FormData` to `POST /realtime/wm`.
+4. A successful response returned HTTP `201` with text shaped as a remote answer.
+5. The page applied that answer, received a remote audio track, and reached ICE and
+   peer-connection `connected` states.
+
+This proves that native media ownership is structurally possible: Android can
+create the offer and own the audio peer connection while a same-origin hidden
+WebView remains the identity and bootstrap authority. Cookie export to an Android
+HTTP client is neither required nor desirable.
+
+Android research build `1.1.1320 (1330)` completed the bounded multipart check.
+The request has an offer-like session-description field and a separate `session`
+text field. The `session` field is JSON, not an opaque credential. Its redacted
+top-level shape contains model selection, reasoning effort, chat mode, client
+tools, and current-conversation binding. No field value crossed the bridge.
+
+Stage 3 has therefore proved that the bootstrap body is portable inside the page
+process. It has not yet proved that the page-owned session template can drive a
+React-independent peer connection or that its lifetime permits fast re-entry.
+Those are separate relay experiments and must not repeat protocol observation.
+
+If that contract is stable, the next implementation is an in-memory single-use
+relay:
+
+- Android native WebRTC creates the audio offer.
+- The hidden same-origin WebView performs the official conversation/sentinel
+  preparation and builds the exact multipart request from page-owned state.
+- The WebView returns only the remote answer to the native peer-connection owner;
+  the handoff is never logged or persisted and expires immediately after use.
+- Android owns microphone/audio routing, connection state, pause/resume, and stop.
+- Transcript and current-conversation reconciliation remain bound to the official
+  page session; any unknown shape, timeout, or mismatch falls back to the existing
+  official page-created WebRTC route.
+
+The repository intentionally has no Android native WebRTC dependency yet. The
+official WebRTC Android source exposes `PeerConnectionFactory`, audio sources,
+audio tracks, offers, answers, and peer observers, but the upstream project expects
+Android consumers to build its JNI-backed SDK. A precompiled dependency must be
+reviewed for provenance, ABI size, update cadence, and audio-only packaging before
+it enters even a research APK.
+
+The next capability is tracked separately as
+`android_chatgpt_web_private_voice_native_relay_v1`. Its first proof must reuse the
+captured page-local `session` template in memory, create an independent peer without
+depending on the official React voice state, expire after one use, and fall back to
+the existing official page-created WebRTC flow on any mismatch.

@@ -1,6 +1,7 @@
 package com.elon.app.chatgptweb
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -8,14 +9,20 @@ import org.junit.Test
 class ChatGptWebRealtimeVoiceResearchObservationTest {
     @Test
     fun acceptsBoundedShapeOnlyObservations() {
-        val value = "v1|network-end|post|chatgpt-origin|/backend-api/realtime/{id}|200|json|b2"
+        val value = "v1|network-start|post|chatgpt-origin|/realtime/wm|session-description|text|b3|offer-like"
         val observation = requireNotNull(
             ChatGptWebRealtimeVoiceResearchObservation.parse(value),
         )
 
-        assertEquals("network-end", observation.channel)
+        assertEquals("network-start", observation.channel)
         assertEquals(value, observation.detail)
         assertEquals(value, observation.traceDetails()["summary"])
+
+        assertNotNull(
+            ChatGptWebRealtimeVoiceResearchObservation.parse(
+                "v1|network-form-shape|chatgpt-origin|/realtime/wm|json-voice.model",
+            ),
+        )
     }
 
     @Test

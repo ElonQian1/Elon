@@ -101,22 +101,33 @@ async function run(enabled) {
     Number,
     String,
     JSON,
-    WeakMap
+    WeakMap,
+    Headers,
+    URLSearchParams,
+    FormData,
+    Blob,
+    ArrayBuffer
   };
   vm.runInNewContext(source, context, { filename: 'chatgpt_web_realtime_voice_research.js' });
   if (!enabled) return { events, window };
 
-  await window.fetch('https://chatgpt.com/backend-api/realtime/bootstrap?token=must-not-cross-bridge', {
+  window.__elonChatGptRealtimeVoiceResearch.activate();
+  const realtimeBody = new FormData();
+  realtimeBody.append('sdp', 'v=0\r\nm=audio 9 UDP/TLS/RTP/SAVPF 111\r\nx-private: must-not-cross-bridge');
+  realtimeBody.append('session', JSON.stringify({
+    voice: 'must-not-cross-bridge',
+    token: 'must-not-cross-bridge'
+  }));
+  await window.fetch('https://chatgpt.com/realtime/wm?token=must-not-cross-bridge', {
     method: 'POST',
     headers: { Authorization: 'must-not-cross-bridge' },
-    body: 'must-not-cross-bridge'
+    body: realtimeBody
   });
   await new Promise((resolve) => setImmediate(resolve));
-  window.__elonChatGptRealtimeVoiceResearch.activate();
   const xhr = new window.XMLHttpRequest();
-  xhr.open('POST', 'https://chatgpt.com/backend-api/session/bootstrap?secret=ignored');
+  xhr.open('POST', 'https://chatgpt.com/backend-api/f/conversation/prepare?secret=ignored');
   xhr.send('must-not-cross-bridge');
-  const socket = new window.WebSocket('wss://ws.chatgpt.com/backend-api/session?token=ignored');
+  const socket = new window.WebSocket('wss://ws.chatgpt.com/realtime/socket?token=ignored');
   socket.dispatch('open');
   socket.dispatch('close');
   await window.navigator.mediaDevices.getUserMedia({ audio: true });
@@ -130,6 +141,7 @@ async function run(enabled) {
   peer.iceConnectionState = 'connected';
   peer.dispatch('iceconnectionstatechange');
   peer.dispatch('track', { track: { kind: 'audio', id: 'must-not-cross-bridge' } });
+  window.__elonChatGptRealtimeVoiceResearch.activate();
   return { events, window };
 }
 
@@ -141,16 +153,21 @@ async function run(enabled) {
   const enabled = await run(true);
   const details = enabled.events.map((event) => event.detail);
   assert.ok(details.includes('v1|observer-ready'));
+  assert.ok(details.includes('v1|window-start|1'));
+  assert.ok(details.includes('v1|window-start|2'));
   assert.ok(details.some((value) => value.startsWith(
-    'v1|network-start|post|chatgpt_origin|/backend-api/realtime/bootstrap'
+    'v1|network-start|post|chatgpt_origin|/realtime/wm|none|form|unknown|ephemeral-field-offer-like.session-text'
   )));
+  assert.ok(details.includes(
+    'v1|network-form-shape|chatgpt_origin|/realtime/wm|json-ephemeral-field.voice'
+  ));
   assert.ok(details.some((value) => value.includes('|network-shape|')));
   assert.ok(details.some((value) => value.startsWith(
-    'v1|network-start|post|chatgpt_origin|/backend-api/session/bootstrap'
+    'v1|network-start|post|chatgpt_origin|/backend-api/f/conversation/prepare'
   )));
-  assert.ok(details.includes('v1|socket-start|chatgpt_subdomain|/backend-api/session'));
-  assert.ok(details.includes('v1|socket-open|chatgpt_subdomain|/backend-api/session'));
-  assert.ok(details.includes('v1|socket-close|chatgpt_subdomain|/backend-api/session'));
+  assert.ok(details.includes('v1|socket-start|chatgpt_subdomain|/realtime/socket'));
+  assert.ok(details.includes('v1|socket-open|chatgpt_subdomain|/realtime/socket'));
+  assert.ok(details.includes('v1|socket-close|chatgpt_subdomain|/realtime/socket'));
   assert.ok(details.includes('v1|media-request|audio'));
   assert.ok(details.includes('v1|media-granted|a1v0'));
   assert.ok(details.includes('v1|peer-created'));
@@ -161,6 +178,7 @@ async function run(enabled) {
   assert.ok(details.includes('v1|peer-ice|connected'));
   assert.ok(details.includes('v1|peer-track|audio'));
   assert.ok(enabled.events.every((event) => event.action === 'research_voice_observation'));
+  assert.equal(enabled.window.__elonChatGptRealtimeVoiceResearch.snapshot().windows, 2);
 
   const emitted = JSON.stringify(enabled.events).toLowerCase();
   assert.doesNotMatch(emitted, /must-not-cross-bridge|client_secret|authorization|cookie/);

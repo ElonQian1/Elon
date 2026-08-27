@@ -4,14 +4,17 @@
   if (window.__elonChatGptPrivateResearchEnabled !== true) return;
   if (location.origin !== 'https://chatgpt.com') return;
   const existing = window.__elonChatGptRealtimeVoiceResearch;
-  if (existing && Number(existing.version) >= 1) return;
+  if (existing && Number(existing.version) >= 2) return;
 
   const startedAt = Date.now();
   const expiresAt = startedAt + (10 * 60 * 1000);
-  const maxObservations = 160;
-  const voicePathHint = /(voice|realtime|webrtc|rtc|audio|speech)/i;
+  const maxObservationsPerWindow = 96;
+  const maxVoiceWindows = 3;
+  const voicePathHint = /(voice|realtime|webrtc|rtc|audio|speech|\/backend-api\/f\/conversation\/prepare|\/backend-api\/sentinel\/[^/]+\/(prepare|finalize))/i;
   const sensitiveKeyHint = /(token|secret|credential|authorization|cookie|proof|sdp|candidate)/i;
   let observationCount = 0;
+  let windowObservationCount = 0;
+  let voiceWindowCount = 0;
   let voiceWindowUntil = 0;
 
   function bridgeReady() {
@@ -25,10 +28,13 @@
     return normalized.slice(0, 96) || fallback;
   }
 
-  function emit(parts) {
-    if (!bridgeReady() || Date.now() > expiresAt || observationCount >= maxObservations) return;
+  function emit(parts, force) {
+    const active = Date.now() <= voiceWindowUntil;
+    if (!bridgeReady() || Date.now() > expiresAt) return;
+    if (!force && (!active || windowObservationCount >= maxObservationsPerWindow)) return;
     const detail = ['v1'].concat(parts.map((part) => safePart(part, 'none'))).join('|').slice(0, 160);
     observationCount += 1;
+    if (!force) windowObservationCount += 1;
     window.elonChatGptNative.postMessage(JSON.stringify({
       type: 'command_result',
       action: 'research_voice_observation',
@@ -39,8 +45,17 @@
     }));
   }
 
-  function activateVoiceWindow() {
+  function extendVoiceWindow() {
     voiceWindowUntil = Math.max(voiceWindowUntil, Date.now() + (2 * 60 * 1000));
+  }
+
+  function activateVoiceWindow() {
+    if (voiceWindowCount >= maxVoiceWindows) return false;
+    voiceWindowCount += 1;
+    windowObservationCount = 0;
+    voiceWindowUntil = Date.now() + (2 * 60 * 1000);
+    emit(['window-start', String(voiceWindowCount)]);
+    return true;
   }
 
   function lengthBucket(value) {
@@ -110,11 +125,99 @@
       const method = String(init && init.method || input && input.method || 'GET').toUpperCase();
       const family = hostFamily(url);
       const active = Date.now() <= voiceWindowUntil;
-      const candidate = family !== 'other' && (active || voicePathHint.test(url.pathname));
-      return candidate ? { url, method, family, path: safePath(url) } : null;
+      const candidate = family !== 'other' && active && voicePathHint.test(url.pathname);
+      return candidate ? {
+        url,
+        method,
+        family,
+        path: safePath(url),
+        contentKind: requestContentKind(input, init),
+        body: requestBodySummary(init && init.body)
+      } : null;
     } catch (_) {
       return null;
     }
+  }
+
+  function requestContentKind(input, init) {
+    try {
+      const headers = new Headers(init && init.headers || input && input.headers || undefined);
+      const value = String(headers.get('content-type') || '').toLowerCase();
+      if (value.includes('sdp')) return 'session-description';
+      if (value.includes('json')) return 'json';
+      if (value.includes('form')) return 'form';
+      if (value.startsWith('text/')) return 'text';
+      return value ? 'other' : 'none';
+    } catch (_) {
+      return 'unknown';
+    }
+  }
+
+  function requestBodySummary(body) {
+    if (body === undefined || body === null) return ['none', 'b0', 'opaque'];
+    if (typeof body === 'string') {
+      const offerLike = /^v=0(?:\r?\n)/.test(body) && /(?:\r?\n)m=audio\s/i.test(body);
+      return ['text', lengthBucket(body.length), offerLike ? 'offer-like' : 'opaque'];
+    }
+    if (typeof URLSearchParams !== 'undefined' && body instanceof URLSearchParams) {
+      return ['url-params', lengthBucket(String(body).length), 'opaque'];
+    }
+    if (typeof FormData !== 'undefined' && body instanceof FormData) {
+      return ['form', 'unknown', formShape(body)];
+    }
+    if (typeof Blob !== 'undefined' && body instanceof Blob) return ['blob', lengthBucket(body.size), 'opaque'];
+    if (typeof ArrayBuffer !== 'undefined' && body instanceof ArrayBuffer) {
+      return ['bytes', lengthBucket(body.byteLength), 'opaque'];
+    }
+    return ['other', 'unknown', 'opaque'];
+  }
+
+  function formShape(body) {
+    const fields = [];
+    try {
+      body.forEach((value, key) => {
+        if (fields.length >= 8) return;
+        const rawKey = String(key || 'field');
+        const safeKey = sensitiveKeyHint.test(rawKey)
+          ? 'ephemeral-field'
+          : safePart(rawKey, 'field').replace(/[.:/]/g, '-');
+        let kind = 'other';
+        if (typeof value === 'string') {
+          kind = /^v=0(?:\r?\n)/.test(value) && /(?:\r?\n)m=audio\s/i.test(value)
+            ? 'offer-like'
+            : 'text';
+        } else if (typeof Blob !== 'undefined' && value instanceof Blob) {
+          kind = 'blob';
+        }
+        fields.push(`${safeKey}-${kind}`);
+      });
+    } catch (_) {
+      return 'unavailable';
+    }
+    return fields.length ? fields.join('.') : 'empty';
+  }
+
+  function formSessionShape(body) {
+    if (typeof FormData === 'undefined' || !(body instanceof FormData)) return 'none';
+    let shape = 'missing';
+    try {
+      body.forEach((value, key) => {
+        if (shape !== 'missing' || String(key || '').toLowerCase() !== 'session') return;
+        if (typeof value !== 'string') {
+          shape = 'non-text';
+          return;
+        }
+        try {
+          const parsed = JSON.parse(value);
+          shape = `json-${safeResponseKeys(parsed).join('.')}`;
+        } catch (_) {
+          shape = `opaque-${lengthBucket(value.length)}`;
+        }
+      });
+    } catch (_) {
+      return 'unavailable';
+    }
+    return shape;
   }
 
   function observeResponseShape(info, response) {
@@ -133,7 +236,13 @@
     window.fetch = function (input, init) {
       const info = requestInfo(input, init || {});
       const requestStartedAt = Date.now();
-      if (info) emit(['network-start', info.method, info.family, info.path]);
+      if (info) emit([
+        'network-start', info.method, info.family, info.path,
+        info.contentKind, info.body[0], info.body[1], info.body[2]
+      ]);
+      if (info && info.path === '/realtime/wm') {
+        emit(['network-form-shape', info.family, info.path, formSessionShape(init && init.body)]);
+      }
       return originalFetch.apply(this, arguments).then((response) => {
         if (info) {
           emit([
@@ -177,7 +286,11 @@
       const info = requests.get(this);
       const requestStartedAt = Date.now();
       if (info) {
-        emit(['network-start', info.method, info.family, info.path]);
+        const body = requestBodySummary(arguments[0]);
+        emit([
+          'network-start', info.method, info.family, info.path,
+          info.contentKind, body[0], body[1], body[2]
+        ]);
         this.addEventListener('loadend', () => emit([
           'network-end', info.method, info.family, info.path,
           String(this.status || 0), xhrResponseKind(this),
@@ -235,7 +348,7 @@
     if (!mediaDevices || typeof mediaDevices.getUserMedia !== 'function') return;
     const original = mediaDevices.getUserMedia.bind(mediaDevices);
     mediaDevices.getUserMedia = function (constraints) {
-      activateVoiceWindow();
+      extendVoiceWindow();
       const requested = constraints && constraints.audio ? 'audio' : 'other';
       emit(['media-request', requested]);
       return original(constraints).then((stream) => {
@@ -255,7 +368,7 @@
   }
 
   function observePeerConnection(peer) {
-    activateVoiceWindow();
+    extendVoiceWindow();
     emit(['peer-created']);
     const eventNames = ['connectionstatechange', 'iceconnectionstatechange', 'signalingstatechange', 'track', 'datachannel'];
     eventNames.forEach((eventName) => {
@@ -312,15 +425,17 @@
   installPeerObserver();
 
   window.__elonChatGptRealtimeVoiceResearch = Object.freeze({
-    version: 1,
+    version: 2,
     activate: activateVoiceWindow,
     snapshot: function () {
       return Object.freeze({
         active: Date.now() <= voiceWindowUntil,
         observations: observationCount,
+        windowObservations: windowObservationCount,
+        windows: voiceWindowCount,
         expiresAt
       });
     }
   });
-  emit(['observer-ready']);
+  emit(['observer-ready'], true);
 })();

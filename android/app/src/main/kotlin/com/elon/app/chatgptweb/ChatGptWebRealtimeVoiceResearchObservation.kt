@@ -16,6 +16,7 @@ internal data class ChatGptWebRealtimeVoiceResearchObservation(
         )
         private val CHANNELS = setOf(
             "observer-ready",
+            "window-start",
             "media-request",
             "media-granted",
             "media-error",
@@ -30,6 +31,7 @@ internal data class ChatGptWebRealtimeVoiceResearchObservation(
             "peer-track",
             "peer-data-channel",
             "network-start",
+            "network-form-shape",
             "network-end",
             "network-error",
             "network-shape",
@@ -42,7 +44,7 @@ internal data class ChatGptWebRealtimeVoiceResearchObservation(
         fun parse(value: String): ChatGptWebRealtimeVoiceResearchObservation? {
             if (!SAFE_DETAIL.matches(value) || SENSITIVE_MARKER.containsMatchIn(value)) return null
             val parts = value.split('|')
-            if (parts.size !in 2..8 || parts[0] != "v1") return null
+            if (parts.size !in 2..10 || parts[0] != "v1") return null
             val channel = parts[1]
             if (channel !in CHANNELS) return null
             return ChatGptWebRealtimeVoiceResearchObservation(channel, value)
