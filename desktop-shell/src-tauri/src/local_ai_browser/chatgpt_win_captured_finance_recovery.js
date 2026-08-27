@@ -17,7 +17,7 @@
 })(typeof window === 'object' ? window : null, function () {
   'use strict';
 
-  const VERSION = 1;
+  const VERSION = 2;
   const MAX_WIDGETS = 4;
   const MAX_PACKED_BYTES = 1024 * 1024;
   const MAX_UNPACKED_BYTES = 2 * 1024 * 1024;
@@ -62,6 +62,53 @@
       part.richContent && (part.richContent.kind === 'finance' ||
         part.richContent.kind === 'chart')
     ));
+  }
+
+  function richPartKey(part) {
+    const content = part && part.richContent && typeof part.richContent === 'object'
+      ? part.richContent
+      : {};
+    return [text(part && (part.kind || content.kind), 48), text(part && part.text, 240)].join(':');
+  }
+
+  function chartPointCount(chart) {
+    if (!chart || typeof chart !== 'object') return 0;
+    const points = Array.isArray(chart.points) ? chart.points.length : 0;
+    const candles = Array.isArray(chart.candles) ? chart.candles.length : 0;
+    const series = Array.isArray(chart.series)
+      ? chart.series.reduce(function (total, item) {
+          return total + (Array.isArray(item && item.points) ? item.points.length : 0);
+        }, 0)
+      : 0;
+    return points + candles + series;
+  }
+
+  function richPartQuality(part) {
+    const payload = part && part.richContent && part.richContent.payload;
+    if (!payload || typeof payload !== 'object') return 0;
+    const periodViews = Array.isArray(payload.periodViews) ? payload.periodViews : [];
+    const periodPoints = periodViews.reduce(function (total, view) {
+      return total + chartPointCount(view && view.chart);
+    }, 0);
+    const metrics = Array.isArray(payload.metrics) ? payload.metrics.length : 0;
+    return periodViews.length * 10000 + periodPoints * 10 +
+      chartPointCount(payload.chart) * 10 + metrics;
+  }
+
+  function addOrUpgradePart(parts, part) {
+    if (!supportedPart(part)) return false;
+    const key = richPartKey(part);
+    const existingIndex = parts.findIndex(function (candidate) {
+      return richPartKey(candidate) === key;
+    });
+    if (existingIndex < 0) {
+      if (parts.length >= MAX_WIDGETS) return false;
+      parts.push(part);
+      return true;
+    }
+    if (richPartQuality(part) <= richPartQuality(parts[existingIndex])) return false;
+    parts[existingIndex] = part;
+    return true;
   }
 
   function base64Bytes(rootValue, encoded) {
@@ -181,15 +228,15 @@
     if (!recovery || typeof recovery.accept !== 'function') return false;
     const result = collect(rootValue, body);
     if (!result || liveAlreadyHasRich(rootValue, result.snapshot)) return false;
-    const parts = (Array.isArray(result.snapshot.richParts) ? result.snapshot.richParts : [])
-      .filter(supportedPart).slice(0, MAX_WIDGETS);
-    for (let index = 0; index < result.widgets.length && parts.length < MAX_WIDGETS; index += 1) {
+    const parts = [];
+    (Array.isArray(result.snapshot.richParts) ? result.snapshot.richParts : [])
+      .filter(supportedPart).slice(0, MAX_WIDGETS).forEach(function (part) {
+        addOrUpgradePart(parts, part);
+      });
+    for (let index = 0; index < result.widgets.length; index += 1) {
       const value = await decodeWidget(rootValue, result.widgets[index]);
       const part = value && result.policy.financePartFromWidget(value);
-      if (!part || parts.some(function (candidate) {
-        return candidate.kind === part.kind && text(candidate.text, 240) === text(part.text, 240);
-      })) continue;
-      parts.push(part);
+      if (part) addOrUpgradePart(parts, part);
     }
     if (!parts.length || liveAlreadyHasRich(rootValue, result.snapshot)) return false;
     return Boolean(recovery.accept({
