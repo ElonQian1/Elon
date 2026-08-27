@@ -30,7 +30,7 @@ const window = {
 
 vm.runInNewContext(source, { window, JSON, String, Number, Object });
 
-assert.equal(window.__elonWinGooglePrivateReplyStateVersion, 2);
+assert.equal(window.__elonWinGooglePrivateReplyStateVersion, 3);
 assert.notEqual(window.__elonGoogleWebPrivateReplyObserver, baseObserver);
 assert.notEqual(window.elonGoogleWebNative, baseNative);
 const installedObserver = window.__elonGoogleWebPrivateReplyObserver;
@@ -53,11 +53,33 @@ event = emitted.pop().event;
 assert.equal(event.privateStreamRevision, 1, 'unchanged private text must not advance revision');
 
 reply = { prompt: 'BTC 走势', text: '回答完成', streaming: false };
-window.elonGoogleWebNative.postMessage(envelope(true));
+window.elonGoogleWebNative.postMessage(envelope(true, [
+  { role: 'user', content: [{ type: 'text', text: 'BTC 走势' }] },
+  {
+    role: 'assistant',
+    state: 'streaming',
+    content: [
+      { type: 'text', text: '回答' },
+      { type: 'source_group', text: '保留来源', sources: [{ title: '来源', url: 'https://example.com' }] },
+    ],
+  },
+]));
 event = emitted.pop().event;
 assert.equal(event.privateStreamRevision, 2);
 assert.equal(event.privateStreamState, 'completed');
 assert.equal(event.streaming, false, 'private completion must override stale DOM streaming');
+assert.equal(event.privateStreamContentApplied, true);
+assert.equal(event.messages[1].state, 'completed');
+assert.equal(event.messages[1].content[0].text, '回答完成');
+assert.equal(event.messages[1].content[1].type, 'source_group', 'existing rich source content must survive text upgrade');
+
+window.elonGoogleWebNative.postMessage(envelope(false, [
+  { role: 'user', content: [{ type: 'text', text: '另一个问题' }] },
+  { role: 'assistant', content: [{ type: 'text', text: '另一个回答' }] },
+]));
+event = emitted.pop().event;
+assert.equal(event.privateStreamContentApplied, false, 'a private reply must not cross the matching user turn');
+assert.equal(event.messages[1].content[0].text, '另一个回答');
 
 window.__elonWinGooglePrivateReplyState.reset();
 window.elonGoogleWebNative.postMessage(envelope(false));
@@ -96,7 +118,7 @@ assert.equal(listener, null, 'stale observer listener must be detached during re
 assert.equal(reboundListener, installedListener, 'adapter listener must follow a replacement observer');
 assert.equal(
   window.__elonWinGooglePrivateReplyState.diagnostics(),
-  'v2|bindings=2|state=idle',
+  'v3|bindings=2|state=idle',
 );
 window.__elonGoogleWebPrivateReplyObserver.observePrompt('ETH 走势');
 assert.equal(reboundPrompt, 'ETH 走势');
@@ -109,11 +131,11 @@ assert.equal(event.streaming, false);
 assert.equal(emitted.length, 0, 'rebound events must not leak to the stale native bridge');
 assert.doesNotMatch(source, /document\.cookie|authorization|access[_-]?token|fetch\s*\(/i);
 
-function envelope(streaming) {
+function envelope(streaming, messages) {
   return JSON.stringify({
     schema: 'yilong.ai.ui.v1',
     providerId: 'google_web',
-    event: { type: 'message_snapshot', streaming },
+    event: { type: 'message_snapshot', streaming, messages },
   });
 }
 

@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  var STATE_VERSION = 2;
+  var STATE_VERSION = 3;
   const baseObserver = window.__elonGoogleWebPrivateReplyObserver;
   const baseNative = window.elonGoogleWebNative;
   if (!baseObserver || typeof baseObserver.observePrompt !== 'function' ||
@@ -27,6 +27,86 @@
   let bindingRevision = 1;
   let observer;
   let nativeProxy;
+
+  function cleanText(value) {
+    return String(value || '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+
+  function contentText(message) {
+    const content = Array.isArray(message && message.content) ? message.content : [];
+    return cleanText(content.map(function (part) {
+      if (typeof part === 'string') return part;
+      return part && (part.type === 'text' || part.type === 'markdown') ? part.text : '';
+    }).filter(Boolean).join(' '));
+  }
+
+  function richerPrivateText(current, next) {
+    const existing = cleanText(current);
+    const candidate = cleanText(next);
+    if (!candidate || candidate === existing || candidate.length <= existing.length) return false;
+    return !existing || candidate.includes(existing) ||
+      (existing.length <= 120 && candidate.length >= existing.length + 24);
+  }
+
+  function upgradedContent(content, value) {
+    const source = Array.isArray(content) ? content : [];
+    const next = [];
+    let inserted = false;
+    source.forEach(function (part) {
+      const textual = typeof part === 'string' ||
+        part && (part.type === 'text' || part.type === 'markdown');
+      if (!textual) {
+        next.push(part);
+      } else if (!inserted) {
+        const type = part && typeof part === 'object' && part.type === 'markdown'
+          ? 'markdown'
+          : 'text';
+        next.push({ type: type, text: value });
+        inserted = true;
+      }
+    });
+    if (!inserted) next.unshift({ type: 'text', text: value });
+    return next;
+  }
+
+  function applyPrivateReply(event, value) {
+    const messages = Array.isArray(event && event.messages) ? event.messages : null;
+    const prompt = cleanText(value && value.prompt);
+    const answer = cleanText(value && value.text);
+    if (!messages || !prompt || !answer) return false;
+    let userIndex = -1;
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      if (messages[index] && messages[index].role === 'user' &&
+          contentText(messages[index]) === prompt) {
+        userIndex = index;
+        break;
+      }
+    }
+    if (userIndex < 0) return false;
+    let assistantIndex = -1;
+    for (let index = messages.length - 1; index > userIndex; index -= 1) {
+      if (messages[index] && messages[index].role === 'assistant') {
+        assistantIndex = index;
+        break;
+      }
+    }
+    if (assistantIndex < 0) {
+      messages.splice(userIndex + 1, 0, {
+        id: 'google-private-answer-win-' + generation + '-' + revision,
+        role: 'assistant',
+        state: value.streaming ? 'streaming' : 'completed',
+        content: [{ type: 'text', text: answer }],
+      });
+      return true;
+    }
+    const assistant = messages[assistantIndex];
+    if (!richerPrivateText(contentText(assistant), answer)) return false;
+    messages[assistantIndex] = Object.assign({}, assistant, {
+      state: value.streaming ? 'streaming' : 'completed',
+      content: upgradedContent(assistant.content, answer),
+    });
+    return true;
+  }
 
   function reset() {
     generation += 1;
@@ -88,10 +168,11 @@
       catch (_) { return nativeDelegate.postMessage(raw); }
       if (payload && payload.schema === 'yilong.ai.ui.v1' && payload.event &&
           payload.event.type === 'message_snapshot') {
-        snapshot();
+        const privateReply = snapshot();
         payload.event.privateStreamObserved = observed;
         payload.event.privateStreamRevision = revision;
         payload.event.privateStreamState = state;
+        payload.event.privateStreamContentApplied = applyPrivateReply(payload.event, privateReply);
         if (observed && state === 'streaming') payload.event.streaming = true;
         if (observed && state === 'completed') payload.event.streaming = false;
         return nativeDelegate.postMessage(JSON.stringify(payload));
