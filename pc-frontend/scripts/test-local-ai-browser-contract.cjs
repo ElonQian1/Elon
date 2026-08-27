@@ -33,6 +33,7 @@ const chatGptWinPrivateStreamRecovery = read('desktop-shell/src-tauri/src/local_
 const chatGptWinPrivateConversationRefresh = read('desktop-shell/src-tauri/src/local_ai_browser/chatgpt_win_private_conversation_refresh.js')
 const chatGptWinPrivateConversationRichCache = read('desktop-shell/src-tauri/src/local_ai_browser/chatgpt_win_private_conversation_rich_cache.js')
 const chatGptWinPrivateRichCompatibility = read('desktop-shell/src-tauri/src/local_ai_browser/chatgpt_win_private_rich_compatibility.js')
+const chatGptWinPrivateTransportHealth = require(path.join(root, 'desktop-shell/src-tauri/src/local_ai_browser/chatgpt_win_private_transport_health.js'))
 const chatGptPageAdapter = read('android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebPageAdapter.kt')
 const chatGptAdapter = read('android/app/src/main/assets/chatgpt_web_adapter.js')
 const chatGptStreamingPolicy = read('android/app/src/main/assets/chatgpt_web_adapter_streaming_policy.js')
@@ -437,6 +438,9 @@ assert.match(rust, /desktop_runtime_version: u32/)
 assert.match(rust, /adapter_version: u32/)
 assert.match(providerAdapter, /const fn version/)
 assert.match(providerPopover, /桌面运行时 v\{provider\.desktopRuntimeVersion\} · 适配器 v\{provider\.adapterVersion\}/)
+assert.match(chatGptBootstrap, /chatgpt_win_private_transport_health\.js/)
+assert.match(chatGptBootstrap, /healthBridge\.enrich\(forwardedPayload\)/)
+assert.match(api, /privateTransportHealth\?: LocalAiPrivateTransportHealth/)
 assert.match(api, /defaultAdapterActions/)
 assert.match(api, /pageKind\?:/)
 assert.match(api, /loginRequired\?: boolean/)
@@ -625,6 +629,60 @@ assert.match(userState, /supportedActions\.has\('list_conversations'\)/)
 assert.match(userState, /semanticCacheStatus !== 'cached'/)
 assert.match(providerStatus, /当前原生能力/)
 assert.match(providerStatus, /state\.fallbackRecommended/)
+
+const privateHealthRoot = {
+  __elonChatGptPrivateTransport: {
+    conversationPrefetchEnabled: true,
+    conversationPrefetchReady: () => true,
+    health: () => ({
+      officialFresh: true,
+      cooldownRemainingMs: 0,
+      officialLatencyMs: 620,
+      privateLatencyMs: 410,
+      successes: 5,
+      failures: 1,
+      consecutiveFailures: 0,
+      lastOutcome: 'success',
+      attemptBudgetMs: 700,
+    }),
+  },
+}
+const privateEnvelope = {
+  schema: 'yilong.ai.ui.v1',
+  event: { type: 'message_snapshot', messages: [] },
+}
+const enrichedPrivateEnvelope = JSON.parse(chatGptWinPrivateTransportHealth.enrich(
+  privateHealthRoot,
+  JSON.stringify(privateEnvelope),
+))
+assert.equal(enrichedPrivateEnvelope.event.privateTransportHealth.prefetchReady, true)
+assert.equal(enrichedPrivateEnvelope.event.privateTransportHealth.privateLatencyMs, 410)
+assert.equal(enrichedPrivateEnvelope.event.privateTransportHealth.lastOutcome, 'success')
+assert.ok(enrichedPrivateEnvelope.event.privateTransportHealth.sampledAtMs > 0)
+const nonSnapshotPrivateEnvelope = JSON.stringify({ event: { type: 'command_result' } })
+assert.equal(
+  chatGptWinPrivateTransportHealth.enrich(privateHealthRoot, nonSnapshotPrivateEnvelope),
+  nonSnapshotPrivateEnvelope,
+)
+privateHealthRoot.__elonChatGptPrivateTransport.health = () => ({
+  cooldownRemainingMs: Number.MAX_SAFE_INTEGER,
+  successes: -4,
+  failures: 9999,
+  consecutiveFailures: 999,
+  lastOutcome: 'cookie',
+  attemptBudgetMs: 9999,
+})
+const boundedPrivateHealth = chatGptWinPrivateTransportHealth.snapshot(privateHealthRoot)
+assert.equal(boundedPrivateHealth.cooldownRemainingMs, 600_000)
+assert.equal(boundedPrivateHealth.successes, 0)
+assert.equal(boundedPrivateHealth.failures, 1000)
+assert.equal(boundedPrivateHealth.consecutiveFailures, 20)
+assert.equal(boundedPrivateHealth.lastOutcome, 'none')
+assert.equal(boundedPrivateHealth.attemptBudgetMs, 1200)
+assert.doesNotMatch(
+  JSON.stringify(boundedPrivateHealth),
+  /cookie|token|authorization|bearer|url/i,
+)
 
 process.stdout.write('PASS local AI browser security and renderer protocol contract\n')
 

@@ -10,7 +10,7 @@ export const LOCAL_AI_REQUIRED_ADAPTER_VERSIONS = {
 // The native Tauri host and the PC UI are released independently. Adapter
 // versions only describe page injection; this guards native commands and
 // bundled shared assets as one desktop runtime generation.
-export const LOCAL_AI_REQUIRED_DESKTOP_RUNTIME_VERSION = 1
+export const LOCAL_AI_REQUIRED_DESKTOP_RUNTIME_VERSION = 2
 
 export function requiredLocalAiAdapterVersion(providerId: string): number {
   return LOCAL_AI_REQUIRED_ADAPTER_VERSIONS[

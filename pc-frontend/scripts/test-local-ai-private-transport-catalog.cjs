@@ -56,6 +56,30 @@ assert.match(copy.detail, /稳定回执与不确定发送对账/)
 assert.match(copy.detail, /独立会话正文与富内容缓存/)
 assert.match(copy.detail, /私有流原生事件即时刷新/)
 
+const live = localAiPrivateTransportStatusCopy(chatgpt, health({
+  prefetchReady: true,
+  privateLatencyMs: 428,
+  successes: 7,
+}), 10_000)
+assert.match(live.copy, /实时可用/)
+assert.match(live.copy, /428ms/)
+assert.match(live.copy, /成功 7 次/)
+
+const cooling = localAiPrivateTransportStatusCopy(chatgpt, health({
+  cooldownRemainingMs: 31_100,
+  lastOutcome: 'timeout',
+}), 10_000)
+assert.match(cooling.copy, /约 32 秒/)
+assert.match(cooling.copy, /上次请求超时/)
+assert.match(cooling.copy, /立即回退官网/)
+
+const awaitingContext = localAiPrivateTransportStatusCopy(chatgpt, health(), 10_000)
+assert.match(awaitingContext.copy, /等待官网会话上下文/)
+assert.match(awaitingContext.copy, /不阻塞输入/)
+
+const stale = localAiPrivateTransportStatusCopy(chatgpt, health({ sampledAtMs: 1 }), 200_000)
+assert.match(stale.copy, /10\/10/)
+
 const capabilityHook = fs.readFileSync(path.resolve(
   __dirname,
   '../src/features/user-browser/useLocalAiBrowserCapability.ts',
@@ -73,5 +97,24 @@ assert.match(providerPresets, /'google-ai-mode'[\s\S]*?'list_conversations'[\s\S
 process.stdout.write('PASS Win private transport preset-first catalog\n')
 
 function provider(id, adapterActions) {
-  return { id, adapterActions, adapterVersion: 1 }
+  return { id, adapterActions, adapterVersion: 1, desktopRuntimeVersion: 2 }
+}
+
+function health(overrides = {}) {
+  return {
+    version: 1,
+    prefetchEnabled: true,
+    prefetchReady: false,
+    officialFresh: false,
+    cooldownRemainingMs: 0,
+    officialLatencyMs: 0,
+    privateLatencyMs: 0,
+    successes: 0,
+    failures: 0,
+    consecutiveFailures: 0,
+    lastOutcome: 'none',
+    attemptBudgetMs: 700,
+    sampledAtMs: 10_000,
+    ...overrides,
+  }
 }

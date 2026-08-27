@@ -139,10 +139,27 @@ export interface LocalAiMessageSnapshot {
   privateStreamObserved?: boolean
   privateStreamRevision?: number
   privateStreamState?: 'idle' | 'streaming' | 'completed'
+  privateTransportHealth?: LocalAiPrivateTransportHealth
   currentModel: string
   attachments?: LocalAiAttachment[]
   dictationActive?: boolean
   capabilities: string[]
+}
+
+export interface LocalAiPrivateTransportHealth {
+  version: number
+  prefetchEnabled: boolean
+  prefetchReady: boolean
+  officialFresh: boolean
+  cooldownRemainingMs: number
+  officialLatencyMs: number
+  privateLatencyMs: number
+  successes: number
+  failures: number
+  consecutiveFailures: number
+  lastOutcome: 'none' | 'success' | 'timeout' | 'auth' | 'context' | 'http' | 'network' | 'parse' | 'empty' | 'official_error'
+  attemptBudgetMs: number
+  sampledAtMs: number
 }
 
 export interface LocalAiConversationDirectoryItem {

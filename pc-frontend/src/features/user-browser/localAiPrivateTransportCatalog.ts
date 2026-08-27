@@ -1,4 +1,8 @@
-import type { LocalAiAdapterAction, LocalAiWebProvider } from './localAiBrowserApi'
+import type {
+  LocalAiAdapterAction,
+  LocalAiPrivateTransportHealth,
+  LocalAiWebProvider,
+} from './localAiBrowserApi'
 
 export interface LocalAiPrivateTransportCapability {
   id: string
@@ -145,12 +149,48 @@ export function localAiPrivateTransportCapabilities(
 
 export function localAiPrivateTransportStatusCopy(
   provider: LocalAiWebProvider | undefined,
+  health?: LocalAiPrivateTransportHealth,
+  nowMs = Date.now(),
 ): { copy: string; detail: string } | null {
   const capabilities = localAiPrivateTransportCapabilities(provider)
   if (!capabilities.length) return null
   const enabled = capabilities.filter((capability) => capability.runtimeEnabled)
+  const detail = enabled.map((capability) => capability.label).join('、')
+  if (provider?.id === 'chatgpt' && health?.version === 1
+      && health.sampledAtMs > 0
+      && health.sampledAtMs <= nowMs + 5_000
+      && nowMs - health.sampledAtMs <= 2 * 60 * 1000) {
+    if (health.cooldownRemainingMs > 0) {
+      return {
+        copy: `私有会话预取正在冷却（约 ${Math.ceil(health.cooldownRemainingMs / 1000)} 秒，${privateOutcomeCopy(health.lastOutcome)}）；当前立即回退官网，不阻塞聊天。`,
+        detail,
+      }
+    }
+    if (health.prefetchReady) {
+      const latency = health.privateLatencyMs > 0 ? `，最近约 ${health.privateLatencyMs}ms` : ''
+      return {
+        copy: `私有会话预取实时可用${latency}；已成功 ${health.successes} 次，失败自动回退官网。`,
+        detail,
+      }
+    }
+    if (health.prefetchEnabled) {
+      return {
+        copy: '私有会话预取已启用，正在后台等待官网会话上下文；当前使用缓存或官网语义，不阻塞输入。',
+        detail,
+      }
+    }
+  }
   return {
     copy: `私有加速预设 ${enabled.length}/${capabilities.length} 项已载入；无需等待官网扫描，运行健康在后台异步核验。`,
-    detail: enabled.map((capability) => capability.label).join('、'),
+    detail,
   }
+}
+
+function privateOutcomeCopy(outcome: LocalAiPrivateTransportHealth['lastOutcome']): string {
+  if (outcome === 'timeout') return '上次请求超时'
+  if (outcome === 'auth') return '官网登录状态待恢复'
+  if (outcome === 'context') return '官网请求上下文待恢复'
+  if (outcome === 'parse' || outcome === 'empty') return '官网响应结构待适配'
+  if (outcome === 'http' || outcome === 'network' || outcome === 'official_error') return '官网网络暂不可用'
+  return '自动保护'
 }

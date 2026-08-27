@@ -22,7 +22,10 @@ export default function AiWebProviderPopover({
   const [position, setPosition] = useState({ left: 12, bottom: 12 })
   const [researchStatus, setResearchStatus] = useState<LocalAiResearchCaptureStatus>()
   const busy = Boolean(web.controller.busyAction)
-  const privateTransport = localAiPrivateTransportStatusCopy(web.provider)
+  const privateTransport = localAiPrivateTransportStatusCopy(
+    web.provider,
+    web.controller.snapshot?.privateTransportHealth,
+  )
 
   useEffect(() => {
     const reposition = () => {

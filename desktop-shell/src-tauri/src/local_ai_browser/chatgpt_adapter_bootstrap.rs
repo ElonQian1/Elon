@@ -16,6 +16,8 @@ const WIN_PRIVATE_RICH_COMPATIBILITY: &str =
     include_str!("chatgpt_win_private_rich_compatibility.js");
 const WIN_PRIVATE_CONVERSATION_REFRESH: &str =
     include_str!("chatgpt_win_private_conversation_refresh.js");
+const WIN_PRIVATE_TRANSPORT_HEALTH: &str =
+    include_str!("chatgpt_win_private_transport_health.js");
 const WIN_PRIVATE_CONVERSATION_RICH_CACHE: &str =
     include_str!("chatgpt_win_private_conversation_rich_cache.js");
 const PRIVATE_FETCH_TAP: &str =
@@ -234,8 +236,8 @@ pub(super) fn initialization_script() -> String {
                 )
             } else if *name == "chatgpt_web_private_transport.js" {
                 format!(
-                    "{}\nwindow.__elonChatGptBootstrapStage = 'chatgpt_win_private_conversation_refresh.js';\n{}",
-                    shared, WIN_PRIVATE_CONVERSATION_REFRESH
+                    "{}\nwindow.__elonChatGptBootstrapStage = 'chatgpt_win_private_transport_health.js';\n{}\nwindow.__elonChatGptBootstrapStage = 'chatgpt_win_private_conversation_refresh.js';\n{}",
+                    shared, WIN_PRIVATE_TRANSPORT_HEALTH, WIN_PRIVATE_CONVERSATION_REFRESH
                 )
             } else if *name == "chatgpt_web_private_stream_transport.js" {
                 format!(
@@ -297,7 +299,12 @@ pub(super) fn initialization_script() -> String {
     var publicInvoke = window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke;
     var call = internalInvoke || publicInvoke;
     if (typeof call === 'function') {
-      Promise.resolve(call('publish_local_ai_web_event', { payload: String(payload || '') })).catch(function () {});
+      var forwardedPayload = String(payload || '');
+      var healthBridge = window.__elonWinChatGptPrivateTransportHealth;
+      if (healthBridge && typeof healthBridge.enrich === 'function') {
+        try { forwardedPayload = healthBridge.enrich(forwardedPayload); } catch (_) {}
+      }
+      Promise.resolve(call('publish_local_ai_web_event', { payload: forwardedPayload })).catch(function () {});
     }
   }
 

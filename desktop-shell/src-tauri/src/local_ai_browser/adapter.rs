@@ -109,6 +109,7 @@ fn sanitize_protocol_event(event: &Map<String, Value>) -> Result<SanitizedAdapte
             "privateStreamObserved": event.get("privateStreamObserved").and_then(Value::as_bool).unwrap_or(false),
             "privateStreamRevision": bounded_u64(event.get("privateStreamRevision"), 0, 1_000_000_000),
             "privateStreamState": sanitize_private_stream_state(event.get("privateStreamState")),
+            "privateTransportHealth": sanitize_private_transport_health(event.get("privateTransportHealth")),
             "currentModel": clean_string(event.get("currentModel"), 80),
             "attachments": sanitize_attachments(event.get("attachments")),
             "dictationActive": event.get("dictationActive").and_then(Value::as_bool).unwrap_or(false),
@@ -289,6 +290,26 @@ fn sanitize_compatibility(value: Option<&Value>) -> &'static str {
         Some("fallback_required") => "fallback_required",
         _ => "partial",
     }
+}
+
+fn sanitize_private_transport_health(value: Option<&Value>) -> Value {
+    let health = value.and_then(Value::as_object);
+    let outcome = clean_identifier(health.and_then(|item| item.get("lastOutcome")), 24);
+    json!({
+        "version": bounded_u64(health.and_then(|item| item.get("version")), 0, 8),
+        "prefetchEnabled": health.and_then(|item| item.get("prefetchEnabled")).and_then(Value::as_bool).unwrap_or(false),
+        "prefetchReady": health.and_then(|item| item.get("prefetchReady")).and_then(Value::as_bool).unwrap_or(false),
+        "officialFresh": health.and_then(|item| item.get("officialFresh")).and_then(Value::as_bool).unwrap_or(false),
+        "cooldownRemainingMs": bounded_u64(health.and_then(|item| item.get("cooldownRemainingMs")), 0, 600_000),
+        "officialLatencyMs": bounded_u64(health.and_then(|item| item.get("officialLatencyMs")), 0, 60_000),
+        "privateLatencyMs": bounded_u64(health.and_then(|item| item.get("privateLatencyMs")), 0, 60_000),
+        "successes": bounded_u64(health.and_then(|item| item.get("successes")), 0, 1_000),
+        "failures": bounded_u64(health.and_then(|item| item.get("failures")), 0, 1_000),
+        "consecutiveFailures": bounded_u64(health.and_then(|item| item.get("consecutiveFailures")), 0, 20),
+        "lastOutcome": matches!(outcome.as_str(), "none" | "success" | "timeout" | "auth" | "context" | "http" | "network" | "parse" | "empty" | "official_error").then_some(outcome).unwrap_or_else(|| "none".to_string()),
+        "attemptBudgetMs": bounded_u64(health.and_then(|item| item.get("attemptBudgetMs")), 700, 1_200),
+        "sampledAtMs": bounded_u64(health.and_then(|item| item.get("sampledAtMs")), 0, 9_007_199_254_740_991),
+    })
 }
 
 pub(super) fn sanitize_conversations(value: Option<&Value>) -> Vec<Value> {
@@ -580,6 +601,21 @@ mod tests {
                 "privateStreamObserved": true,
                 "privateStreamRevision": 42,
                 "privateStreamState": "completed",
+                "privateTransportHealth": {
+                    "version": 1,
+                    "prefetchEnabled": true,
+                    "prefetchReady": false,
+                    "officialFresh": true,
+                    "cooldownRemainingMs": 9_999_999,
+                    "privateLatencyMs": 418,
+                    "successes": 7,
+                    "failures": 2,
+                    "consecutiveFailures": 1,
+                    "lastOutcome": "timeout",
+                    "attemptBudgetMs": 860,
+                    "sampledAtMs": 1_787_830_000_000_u64,
+                    "token": "secret"
+                },
                 "draft": "hello",
                 "messages": [{
                     "id": "m1",
@@ -608,6 +644,18 @@ mod tests {
         assert_eq!(event.payload["privateStreamObserved"], true);
         assert_eq!(event.payload["privateStreamRevision"], 42);
         assert_eq!(event.payload["privateStreamState"], "completed");
+        assert_eq!(
+            event.payload["privateTransportHealth"]["cooldownRemainingMs"],
+            600_000
+        );
+        assert_eq!(
+            event.payload["privateTransportHealth"]["privateLatencyMs"],
+            418
+        );
+        assert_eq!(
+            event.payload["privateTransportHealth"]["lastOutcome"],
+            "timeout"
+        );
         assert!(!event.payload.to_string().contains("secret"));
         assert!(event.payload.to_string().contains("visible"));
     }
