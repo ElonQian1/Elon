@@ -10,7 +10,11 @@ use serde_json::Value;
 
 use super::semantic_context;
 
-const CACHE_SCHEMA: &str = "elon.local_ai_web_snapshot.v2";
+#[path = "snapshot_cache/conversation_store.rs"]
+mod conversation_store;
+
+const CACHE_SCHEMA: &str = "elon.local_ai_web_snapshot.v3";
+const PREVIOUS_CACHE_SCHEMA: &str = "elon.local_ai_web_snapshot.v2";
 const LEGACY_CACHE_SCHEMA: &str = "elon.local_ai_web_snapshot.v1";
 const DPAPI_ENTROPY: &[u8] = b"elon.local-ai-web-snapshot.v1";
 const MAX_CACHE_BYTES: usize = 2 * 1024 * 1024;
@@ -45,34 +49,26 @@ struct SnapshotEnvelope {
 }
 
 pub(super) fn load(path: &Path, provider_id: &str) -> Result<Option<LoadedSnapshot>> {
-    if !cfg!(windows) || !path.is_file() {
+    if !cfg!(windows) {
         return Ok(None);
     }
-    let protected = fs::read(path).context("read local AI snapshot cache")?;
-    if protected.is_empty() || protected.len() > MAX_CACHE_BYTES * 2 {
-        bail!("local AI snapshot cache size is invalid");
-    }
-    let plaintext = unprotect_for_current_user(&protected)?;
-    if plaintext.is_empty() || plaintext.len() > MAX_CACHE_BYTES {
-        bail!("local AI snapshot plaintext size is invalid");
-    }
-    let envelope: SnapshotEnvelope =
-        serde_json::from_slice(&plaintext).context("decode local AI snapshot cache")?;
-    if !matches!(envelope.schema.as_str(), CACHE_SCHEMA | LEGACY_CACHE_SCHEMA)
-        || envelope.provider_id != provider_id
-    {
-        bail!("local AI snapshot cache identity is invalid");
-    }
-    if envelope.updated_at_ms == 0 || now_ms().saturating_sub(envelope.updated_at_ms) > CACHE_TTL_MS
-    {
-        clear(path);
-        return Ok(None);
-    }
+    let stored_conversations = conversation_store::load(path, provider_id);
+    let main = match load_main_envelope(path, provider_id) {
+        Ok(value) => value,
+        Err(_error) if !stored_conversations.is_empty() => {
+            clear_main(path);
+            None
+        }
+        Err(error) => return Err(error),
+    };
+    let Some(envelope) = main else {
+        return Ok(loaded_from_conversations(stored_conversations));
+    };
     let mut semantic_event = envelope.semantic_event;
-    let mut conversation_snapshots = sanitize_stored_conversations(
-        provider_id,
-        envelope.conversation_snapshots,
-    );
+    let legacy_conversations =
+        sanitize_stored_conversations(provider_id, envelope.conversation_snapshots);
+    let mut conversation_snapshots =
+        merge_conversation_snapshots(stored_conversations, legacy_conversations);
     if provider_id == "google-ai-mode" {
         if let Some(snapshot) = semantic_event.as_mut() {
             semantic_context::sanitize_google_snapshot(snapshot);
@@ -89,6 +85,35 @@ pub(super) fn load(path: &Path, provider_id: &str) -> Result<Option<LoadedSnapsh
     }))
 }
 
+fn load_main_envelope(path: &Path, provider_id: &str) -> Result<Option<SnapshotEnvelope>> {
+    if !path.is_file() {
+        return Ok(None);
+    }
+    let protected = fs::read(path).context("read local AI snapshot cache")?;
+    if protected.is_empty() || protected.len() > MAX_CACHE_BYTES * 2 {
+        bail!("local AI snapshot cache size is invalid");
+    }
+    let plaintext = unprotect_for_current_user(&protected)?;
+    if plaintext.is_empty() || plaintext.len() > MAX_CACHE_BYTES {
+        bail!("local AI snapshot plaintext size is invalid");
+    }
+    let envelope: SnapshotEnvelope =
+        serde_json::from_slice(&plaintext).context("decode local AI snapshot cache")?;
+    if !matches!(
+        envelope.schema.as_str(),
+        CACHE_SCHEMA | PREVIOUS_CACHE_SCHEMA | LEGACY_CACHE_SCHEMA
+    ) || envelope.provider_id != provider_id
+    {
+        bail!("local AI snapshot cache identity is invalid");
+    }
+    if envelope.updated_at_ms == 0 || now_ms().saturating_sub(envelope.updated_at_ms) > CACHE_TTL_MS
+    {
+        clear_main(path);
+        return Ok(None);
+    }
+    Ok(Some(envelope))
+}
+
 pub(super) fn store(
     path: &Path,
     provider_id: &str,
@@ -100,6 +125,7 @@ pub(super) fn store(
     if !cfg!(windows) {
         return Ok(false);
     }
+    conversation_store::store(path, provider_id, conversation_snapshots)?;
     let Some(envelope) = cacheable_envelope(
         provider_id,
         semantic_event,
@@ -126,6 +152,11 @@ pub(super) fn store(
 }
 
 pub(super) fn clear(path: &Path) {
+    conversation_store::clear(path);
+    clear_main(path);
+}
+
+fn clear_main(path: &Path) {
     let _ = fs::remove_file(path);
     let _ = fs::remove_file(temporary_path(path));
 }
@@ -134,7 +165,7 @@ fn cacheable_envelope(
     provider_id: &str,
     semantic_event: Option<&Value>,
     navigation_event: Option<&Value>,
-    conversation_snapshots: &[StoredConversationSnapshot],
+    _conversation_snapshots: &[StoredConversationSnapshot],
     updated_at_ms: u64,
 ) -> Option<SnapshotEnvelope> {
     if semantic_event.is_some_and(is_streaming_snapshot) {
@@ -154,12 +185,41 @@ fn cacheable_envelope(
         provider_id: provider_id.to_string(),
         semantic_event,
         navigation_event,
-        conversation_snapshots: sanitize_stored_conversations(
-            provider_id,
-            conversation_snapshots.to_vec(),
-        ),
+        // V3 stores every conversation body in its own bounded DPAPI file.
+        // Keeping them out of this 2 MiB provider envelope prevents one long
+        // active answer from evicting every cached conversation at once.
+        conversation_snapshots: Vec::new(),
         updated_at_ms,
     })
+}
+
+fn loaded_from_conversations(
+    mut conversation_snapshots: Vec<StoredConversationSnapshot>,
+) -> Option<LoadedSnapshot> {
+    let latest = conversation_snapshots.first()?.clone();
+    let updated_at_ms = latest.updated_at_ms;
+    Some(LoadedSnapshot {
+        semantic_event: Some(latest.semantic_event),
+        navigation_event: None,
+        conversation_snapshots: std::mem::take(&mut conversation_snapshots),
+        updated_at_ms,
+    })
+}
+
+fn merge_conversation_snapshots(
+    primary: Vec<StoredConversationSnapshot>,
+    fallback: Vec<StoredConversationSnapshot>,
+) -> Vec<StoredConversationSnapshot> {
+    let mut values = primary;
+    for entry in fallback {
+        if values.iter().any(|candidate| candidate.id == entry.id) {
+            continue;
+        }
+        values.push(entry);
+    }
+    values.sort_by_key(|entry| std::cmp::Reverse(entry.updated_at_ms));
+    values.truncate(48);
+    values
 }
 
 fn encode_with_bounded_history(mut envelope: SnapshotEnvelope) -> Result<Vec<u8>> {
@@ -218,6 +278,14 @@ fn sanitize_stored_conversations(
     provider_id: &str,
     values: Vec<StoredConversationSnapshot>,
 ) -> Vec<StoredConversationSnapshot> {
+    sanitize_stored_conversations_with_ttl(provider_id, values, CACHE_TTL_MS)
+}
+
+fn sanitize_stored_conversations_with_ttl(
+    provider_id: &str,
+    values: Vec<StoredConversationSnapshot>,
+    max_age_ms: u64,
+) -> Vec<StoredConversationSnapshot> {
     let now = now_ms();
     let mut values = values
         .into_iter()
@@ -226,7 +294,7 @@ fn sanitize_stored_conversations(
                 && !entry.title.trim().is_empty()
                 && entry.title.chars().count() <= 160
                 && entry.updated_at_ms > 0
-                && now.saturating_sub(entry.updated_at_ms) <= CACHE_TTL_MS
+                && now.saturating_sub(entry.updated_at_ms) <= max_age_ms
                 && valid_restorable_url(provider_id, &entry.restorable_url)
                 && entry.semantic_event.get("type").and_then(Value::as_str)
                     == Some("message_snapshot")
@@ -573,6 +641,62 @@ mod tests {
 
         fs::write(&path, b"corrupt cache").unwrap();
         assert!(load(&path, "chatgpt").is_err());
+        clear(&path);
+        let _ = fs::remove_dir(&directory);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn v3_restores_independent_conversation_bodies_without_the_main_file() {
+        let unique = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let directory = std::env::temp_dir().join(format!(
+            "elon-local-ai-independent-conversation-test-{}-{unique}",
+            std::process::id()
+        ));
+        let path = directory.join("snapshot.dpapi");
+        let stored_at = now_ms();
+        let semantic = json!({
+            "type":"message_snapshot", "streaming":false,
+            "messages":[{"id":"a1","role":"assistant","state":"completed","content":[{"type":"markdown","text":"current"}]}]
+        });
+        let conversation = StoredConversationSnapshot {
+            id: "0000000000000004".to_string(),
+            title: "Cached rich conversation".to_string(),
+            restorable_url: "https://chatgpt.com/c/0000000000000004".to_string(),
+            semantic_event: json!({
+                "type":"message_snapshot", "streaming":false,
+                "messages":[{"id":"a2","role":"assistant","state":"completed","content":[
+                    {"type":"markdown","text":"cached"},
+                    {"type":"rich_card","text":"Bitcoin (BTC)","kind":"finance","richContent":{
+                        "schema":"yilong.rich-content.v1","kind":"finance","source":"private_response",
+                        "payload":{"title":"Bitcoin (BTC)","primaryValue":"US$77,000","trend":"positive"}
+                    }}
+                ]}]
+            }),
+            updated_at_ms: stored_at,
+        };
+
+        assert!(store(
+            &path,
+            "chatgpt",
+            Some(&semantic),
+            None,
+            std::slice::from_ref(&conversation),
+            stored_at,
+        )
+        .unwrap());
+        fs::remove_file(&path).unwrap();
+
+        let loaded = load(&path, "chatgpt").unwrap().unwrap();
+        assert_eq!(loaded.conversation_snapshots.len(), 1);
+        assert_eq!(
+            loaded.semantic_event.unwrap()["messages"][0]["content"][1]["type"],
+            "rich_card"
+        );
+
         clear(&path);
         let _ = fs::remove_dir(&directory);
     }

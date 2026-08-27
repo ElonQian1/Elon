@@ -40,6 +40,14 @@ const SHARED_SEND_COORDINATOR: CapabilityDefinition = {
   requiredActions: ['send_prompt'],
 }
 
+const SHARED_CONVERSATION_BODY_CACHE: CapabilityDefinition = {
+  id: 'win_web_ai_per_conversation_rich_snapshot_cache_v1',
+  label: '独立会话正文与富内容缓存',
+  requestMode: 'dpapi_per_conversation_cache_first',
+  fallback: 'official_webview_navigation',
+  requiredActions: ['open_conversation'],
+}
+
 const CATALOG: Record<string, CapabilityDefinition[]> = {
   chatgpt: [
     {
@@ -80,6 +88,7 @@ const CATALOG: Record<string, CapabilityDefinition[]> = {
     SHARED_CONTINUITY,
     SHARED_REFRESH_SINGLE_FLIGHT,
     SHARED_SEND_COORDINATOR,
+    SHARED_CONVERSATION_BODY_CACHE,
   ],
   'google-ai-mode': [
     {
@@ -106,6 +115,7 @@ const CATALOG: Record<string, CapabilityDefinition[]> = {
     SHARED_CONTINUITY,
     SHARED_REFRESH_SINGLE_FLIGHT,
     SHARED_SEND_COORDINATOR,
+    SHARED_CONVERSATION_BODY_CACHE,
   ],
 }
 
