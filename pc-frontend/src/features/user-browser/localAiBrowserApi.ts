@@ -6,7 +6,10 @@ import {
   findMatchingLocalAiCommandReceipt,
   isLocalAiRequestId,
 } from './localAiCommandReceipt'
-import { requiredLocalAiAdapterVersion } from './localAiAdapterCompatibility'
+import {
+  LOCAL_AI_REQUIRED_DESKTOP_RUNTIME_VERSION,
+  requiredLocalAiAdapterVersion,
+} from './localAiAdapterCompatibility'
 import {
   LOCAL_AI_RESULT_POLL_INTERVAL_MS,
   localAiAdapterResultAttempts,
@@ -39,6 +42,7 @@ export interface LocalAiWebProvider {
   rendererStatus: 'reserved' | 'active'
   researchCaptureStatus: 'local_raw_prelaunch'
   researchCaptureRetentionDays: number
+  desktopRuntimeVersion: number
   adapterVersion: number
   adapterActions: LocalAiAdapterAction[]
 }
@@ -642,6 +646,16 @@ function normalizeProvider(provider: LocalAiWebProvider): void {
     || !Number.isInteger(provider.researchCaptureRetentionDays)
     || provider.researchCaptureRetentionDays < 1) {
     throw new Error('桌面壳返回了不受支持的 AI 网页厂商协议。')
+  }
+  if (!Number.isInteger(provider.desktopRuntimeVersion)
+      || provider.desktopRuntimeVersion < LOCAL_AI_REQUIRED_DESKTOP_RUNTIME_VERSION) {
+    const current = Number.isInteger(provider.desktopRuntimeVersion)
+      ? provider.desktopRuntimeVersion
+      : 0
+    throw new LocalAiBrowserError(
+      'upgrade_required',
+      `当前 Win 客户端的桌面运行时版本 ${current || '未知'}，新版界面至少需要 ${LOCAL_AI_REQUIRED_DESKTOP_RUNTIME_VERSION}。请更新并完全退出旧客户端后重新打开。`,
+    )
   }
   const requiredAdapterVersion = requiredLocalAiAdapterVersion(provider.id)
   if (!Number.isInteger(provider.adapterVersion)

@@ -29,6 +29,8 @@ mod guest_identity;
 mod owner_profile;
 #[path = "local_ai_browser/private_response_authorization.rs"]
 mod private_response_authorization;
+#[path = "local_ai_browser/provider_contract.rs"]
+mod provider_contract;
 #[path = "local_ai_browser/provider_adapter.rs"]
 mod provider_adapter;
 #[path = "local_ai_browser/research_capture.rs"]
@@ -51,7 +53,6 @@ mod tests;
 
 use std::{fs, process::Command};
 
-use serde::Serialize;
 use tauri::{
     webview::{NewWindowResponse, PageLoadEvent, WebviewBuilder},
     AppHandle, LogicalPosition, LogicalSize, Manager, State, Url, Webview, WebviewUrl, Window,
@@ -60,6 +61,8 @@ use tauri::{
 
 pub use guest_identity::LocalAiGuestOwnerIdentity;
 use owner_profile::resolve as resolve_owner_fingerprint;
+pub use provider_contract::{ClearLocalAiWebSession, LocalAiWebProvider, LocalAiWebSession};
+use provider_contract::DESKTOP_RUNTIME_VERSION;
 use provider_adapter::ProviderAdapter;
 use session_identity::{
     ensure_runtime_session, lock_webview_creation, profile_directory, window_label,
@@ -136,41 +139,6 @@ const GOOGLE_AI_MODE: ProviderDefinition = ProviderDefinition {
 };
 
 const PROVIDERS: &[ProviderDefinition] = &[GOOGLE_AI_MODE, CHATGPT];
-
-#[derive(Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct LocalAiWebProvider {
-    id: &'static str,
-    display_name: &'static str,
-    start_host: &'static str,
-    login_mode: &'static str,
-    profile_scope: &'static str,
-    renderer_protocol: &'static str,
-    renderer_status: &'static str,
-    research_capture_status: &'static str,
-    research_capture_retention_days: u16,
-    adapter_version: u32,
-    adapter_actions: &'static [&'static str],
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct LocalAiWebSession {
-    provider_id: &'static str,
-    window_label: String,
-    status: &'static str,
-    profile_scope: &'static str,
-    cookie_access: &'static str,
-    renderer_protocol: &'static str,
-    renderer_status: &'static str,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ClearLocalAiWebSession {
-    provider_id: &'static str,
-    status: &'static str,
-}
 
 #[tauri::command]
 pub fn list_local_ai_web_providers(webview: Webview) -> Result<Vec<LocalAiWebProvider>, String> {
@@ -604,6 +572,7 @@ fn provider_summary(provider: &ProviderDefinition) -> LocalAiWebProvider {
         renderer_status: provider.renderer_status,
         research_capture_status: "local_raw_prelaunch",
         research_capture_retention_days: 30,
+        desktop_runtime_version: DESKTOP_RUNTIME_VERSION,
         adapter_version: provider.adapter.map_or(0, ProviderAdapter::version),
         adapter_actions: provider.adapter.map_or(
             &[] as &'static [&'static str],

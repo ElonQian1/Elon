@@ -1,5 +1,8 @@
 import type { LocalAiWebProvider } from './localAiBrowserApi'
-import { requiredLocalAiAdapterVersion } from './localAiAdapterCompatibility'
+import {
+  LOCAL_AI_REQUIRED_DESKTOP_RUNTIME_VERSION,
+  requiredLocalAiAdapterVersion,
+} from './localAiAdapterCompatibility'
 
 export const LOCAL_AI_PROVIDER_FALLBACKS: Record<string, LocalAiWebProvider> = {
   'google-ai-mode': {
@@ -12,6 +15,7 @@ export const LOCAL_AI_PROVIDER_FALLBACKS: Record<string, LocalAiWebProvider> = {
     rendererStatus: 'active',
     researchCaptureStatus: 'local_raw_prelaunch',
     researchCaptureRetentionDays: 30,
+    desktopRuntimeVersion: LOCAL_AI_REQUIRED_DESKTOP_RUNTIME_VERSION,
     adapterVersion: requiredLocalAiAdapterVersion('google-ai-mode'),
     adapterActions: [
       'snapshot',
@@ -32,6 +36,7 @@ export const LOCAL_AI_PROVIDER_FALLBACKS: Record<string, LocalAiWebProvider> = {
     rendererStatus: 'active',
     researchCaptureStatus: 'local_raw_prelaunch',
     researchCaptureRetentionDays: 30,
+    desktopRuntimeVersion: LOCAL_AI_REQUIRED_DESKTOP_RUNTIME_VERSION,
     adapterVersion: requiredLocalAiAdapterVersion('chatgpt'),
     adapterActions: [
       'snapshot',

@@ -5,6 +5,7 @@ const path = require('node:path')
 const root = path.resolve(__dirname, '..', '..')
 const rust = [
   read('desktop-shell/src-tauri/src/local_ai_browser.rs'),
+  read('desktop-shell/src-tauri/src/local_ai_browser/provider_contract.rs'),
   read('desktop-shell/src-tauri/src/local_ai_browser/session_control.rs'),
 ].join('\n')
 const embeddedViewRust = read('desktop-shell/src-tauri/src/local_ai_browser/embedded_view.rs')
@@ -413,6 +414,7 @@ assert.match(api, /LocalAiConversationSnapshot/)
 assert.match(api, /navigationEvent/)
 assert.match(api, /LocalAiProjectDirectoryItem/)
 assert.match(api, /adapterActions: LocalAiAdapterAction\[\]/)
+assert.match(api, /desktopRuntimeVersion: number/)
 assert.match(api, /adapterVersion: number/)
 assert.match(api, /requiredLocalAiAdapterVersion/)
 assert.match(
@@ -421,11 +423,20 @@ assert.match(
   'the hot-loaded PC UI must reject any ChatGPT shell older than the current native adapter',
 )
 assert.match(adapterCompatibility, /'google-ai-mode': 40/)
+const desktopRuntimeVersion = rust.match(/const DESKTOP_RUNTIME_VERSION: u32 = (\d+);/)?.[1]
+assert.ok(desktopRuntimeVersion, 'the native desktop runtime generation must be declared')
+assert.match(
+  adapterCompatibility,
+  new RegExp(`LOCAL_AI_REQUIRED_DESKTOP_RUNTIME_VERSION = ${desktopRuntimeVersion}`),
+  'the hot-loaded PC UI must reject an older native desktop runtime generation',
+)
+assert.match(api, /provider\.desktopRuntimeVersion < LOCAL_AI_REQUIRED_DESKTOP_RUNTIME_VERSION/)
 assert.match(api, /provider\.adapterVersion < requiredAdapterVersion/)
 assert.match(api, /完全退出旧客户端后重新打开/)
+assert.match(rust, /desktop_runtime_version: u32/)
 assert.match(rust, /adapter_version: u32/)
 assert.match(providerAdapter, /const fn version/)
-assert.match(providerPopover, /适配器 v\{provider\.adapterVersion\}/)
+assert.match(providerPopover, /桌面运行时 v\{provider\.desktopRuntimeVersion\} · 适配器 v\{provider\.adapterVersion\}/)
 assert.match(api, /defaultAdapterActions/)
 assert.match(api, /pageKind\?:/)
 assert.match(api, /loginRequired\?: boolean/)

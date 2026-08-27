@@ -22,6 +22,7 @@ static STORE_LOCK: Mutex<()> = Mutex::new(());
 
 const VOICE_CHANNELS: &[&str] = &[
     "observer-ready",
+    "window-start",
     "media-request",
     "media-granted",
     "media-error",
@@ -39,6 +40,7 @@ const VOICE_CHANNELS: &[&str] = &[
     "network-end",
     "network-error",
     "network-shape",
+    "network-form-shape",
     "socket-start",
     "socket-open",
     "socket-close",
@@ -268,6 +270,19 @@ mod tests {
         )
         .unwrap();
         assert_eq!(voice.channel, "peer-created");
+        for detail in [
+            "v1|window-start|1",
+            "v1|network-form-shape|chatgpt-origin|/realtime/wm|json-voice.model",
+            "v1|network-start|POST|chatgpt-origin|/realtime/wm|form|form|b1k|session-text",
+        ] {
+            let observation = parse(
+                "chatgpt",
+                "command_result",
+                &json!({"action": ACTION_VOICE, "ok": true, "detail": detail}),
+            )
+            .unwrap();
+            assert_eq!(observation.detail, detail);
+        }
         let network = parse(
             "google-ai-mode",
             "command_result",

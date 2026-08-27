@@ -68,6 +68,8 @@ fn provider_summaries_expose_exact_native_adapter_versions() {
     assert_eq!(google.adapter_version, google_ai_mode::ADAPTER_VERSION);
     assert!(chatgpt.adapter_version > 0);
     assert!(google.adapter_version > 0);
+    assert_eq!(chatgpt.desktop_runtime_version, DESKTOP_RUNTIME_VERSION);
+    assert_eq!(google.desktop_runtime_version, DESKTOP_RUNTIME_VERSION);
 }
 
 #[test]

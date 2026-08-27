@@ -64,7 +64,7 @@ export default function AiWebProviderPopover({
         {web.providers.map((provider) => (
           <button key={provider.id} type="button" data-active={provider.id === web.provider?.id} onClick={() => web.selectProvider(provider.id)}>
             <b>{provider.id === 'chatgpt' ? '◎' : 'G'}</b>
-            <span><strong>{provider.displayName}</strong><small>{provider.id === 'chatgpt' ? 'ChatGPT 官方网页会话' : 'Google 搜索 AI 模式'} · 适配器 v{provider.adapterVersion}</small></span>
+            <span><strong>{provider.displayName}</strong><small>{provider.id === 'chatgpt' ? 'ChatGPT 官方网页会话' : 'Google 搜索 AI 模式'} · 桌面运行时 v{provider.desktopRuntimeVersion} · 适配器 v{provider.adapterVersion}</small></span>
           </button>
         ))}
       </div>
