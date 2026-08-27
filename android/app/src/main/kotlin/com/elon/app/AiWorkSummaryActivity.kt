@@ -17,45 +17,33 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.google.gson.Gson
-
-internal data class WorkSummaryItem(
-    val project: String,
-    val title: String,
-    val reason: String,
-    val suggestion: String,
-    val primaryAction: String,
-    val secondaryAction: String,
-    val highPriority: Boolean = false,
-    val highlightPrimary: Boolean = true,
-)
-
-internal data class WorkSummaryUpdate(val project: String, val update: String, val date: String)
+import okhttp3.OkHttpClient
+import java.util.Calendar
+import kotlin.concurrent.thread
 
 class AiWorkSummaryActivity : AppCompatActivity() {
     private val regular = Typeface.create("sans-serif", Typeface.NORMAL)
-    private val storedProjects by lazy {
-        loadStoredProjects(AuthManager.userDataPrefs(this), Gson(), {}, null).projects
+    private val http = OkHttpClient()
+    private var selectedDayMillis = System.currentTimeMillis()
+    private var projects: List<AppProject> = emptyList()
+    private lateinit var root: ScrollView
+    private fun storedProjects(): List<AppProject> {
+        return loadStoredProjects(AuthManager.userDataPrefs(this), Gson(), {}, null).projects
     }
-    private val attentionItems = listOf(
-        WorkSummaryItem("一龙网游加速器", "Windows 端末检测出新问题", "大卫提出了2个兼容性问题\n目前还没有负责人确认", "建议先确认系统兼容性问题", "交给 AI 处理", "进入项目", true, true),
-        WorkSummaryItem("新项目4", "APK 构建已完成", "等待你是否进入测试阶段。", "建议先进入测试相关内容", "查看项目", "进入测试", highlightPrimary = false),
-        WorkSummaryItem("牛宝", "主页 UI 修改已完成但未发布", "等待你的发布确认", "建议发布新版本", "交给 AI 处理", "查看详情"),
-    )
-    private val progressItems = listOf(
-        WorkSummaryUpdate("杀蟑螂", "完成了个人页面中心优化", "8月17号"),
-        WorkSummaryUpdate("牛宝", "修复了交易界面上下自动弹回问题", "8月18号"),
-    )
-    private val confirmItems = listOf(WorkSummaryUpdate("大卫", "大卫提交发布了新版本。", "8月17号"))
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.statusBarColor = elonColor(R.color.elon_bg_app)
         window.navigationBarColor = elonColor(R.color.elon_bg_app)
         window.decorView.systemUiVisibility = 0
-        setContentView(createContent())
+        projects = storedProjects()
+        root = createContent()
+        setContentView(root)
+        refreshFromServer()
     }
 
-    private fun createContent(): View = ScrollView(this).apply {
+    private fun createContent(): ScrollView = ScrollView(this).apply {
+        val summary = generateWorkSummary(projects, selectedDayMillis)
         isFillViewport = true
         clipToPadding = false
         setBackgroundColor(elonColor(R.color.elon_bg_app))
@@ -64,12 +52,13 @@ class AiWorkSummaryActivity : AppCompatActivity() {
             setPadding(dp(15), 0, dp(19), dp(40))
             addView(createToolbar())
             addView(createDateRow())
-            addView(createGreeting())
-            addView(createMetrics())
-            addView(sectionTitle("需要你关注", attentionItems.size))
-            attentionItems.forEachIndexed { index, item -> addView(attentionCard(item, index == attentionItems.lastIndex)) }
-            addView(collapsibleSection("有新进展", progressItems))
-            addView(collapsibleSection("待确认", confirmItems))
+            addView(createGreeting(summary.projectCount))
+            addView(createMetrics(summary))
+            addView(sectionTitle("需要你关注", summary.attention.size))
+            if (summary.attention.isEmpty()) addView(emptyState("这一天没有需要处理的项目"))
+            summary.attention.forEachIndexed { index, item -> addView(attentionCard(item, index == summary.attention.lastIndex)) }
+            addView(collapsibleSection("有新进展", summary.progress))
+            addView(collapsibleSection("待确认", summary.confirm))
         })
     }
 
@@ -91,7 +80,7 @@ class AiWorkSummaryActivity : AppCompatActivity() {
 
     private fun createDateRow(): View = FrameLayout(this).apply {
         layoutParams = LinearLayout.LayoutParams(MATCH, dp(38))
-        val dateLabel = label("今天", 15f, "#E7ECEB", regular).apply {
+        val dateLabel = label(formatSelectedDay(), 15f, "#E7ECEB", regular).apply {
             gravity = Gravity.CENTER_VERTICAL
         }
         addView(LinearLayout(this@AiWorkSummaryActivity).apply {
@@ -118,7 +107,7 @@ class AiWorkSummaryActivity : AppCompatActivity() {
         }, FrameLayout.LayoutParams(dp(48), dp(48), Gravity.CENTER_VERTICAL or Gravity.END))
     }
 
-    private fun createGreeting(): View = FrameLayout(this).apply {
+    private fun createGreeting(projectCount: Int): View = FrameLayout(this).apply {
         layoutParams = LinearLayout.LayoutParams(MATCH, dp(94)).apply { topMargin = dp(11) }
         addView(ImageView(this@AiWorkSummaryActivity).apply {
             setImageResource(R.drawable.ic_home_ai_avatar)
@@ -127,21 +116,21 @@ class AiWorkSummaryActivity : AppCompatActivity() {
         addView(LinearLayout(this@AiWorkSummaryActivity).apply {
             orientation = LinearLayout.VERTICAL
             addView(label("早上好", 17f, "#F0F8F7F4", regular))
-            addView(label("AI 已分析你的 21 个项目", 14f, "#CDD2D1", regular).apply {
+            addView(label("AI 已分析你的 $projectCount 个项目", 14f, "#CDD2D1", regular).apply {
                 setPadding(0, dp(6), 0, 0)
             })
         }, FrameLayout.LayoutParams(WRAP, WRAP, Gravity.CENTER_VERTICAL).apply { marginStart = dp(106) })
     }
 
-    private fun createMetrics(): View = LinearLayout(this).apply {
+    private fun createMetrics(summary: GeneratedWorkSummary): View = LinearLayout(this).apply {
         layoutParams = LinearLayout.LayoutParams(MATCH, dp(82)).apply {
             topMargin = dp(13)
             bottomMargin = dp(22)
         }
         orientation = LinearLayout.HORIZONTAL
-        addView(metric("3", "需要你关注", "#8EAED0"), weighted())
-        addView(metric("2", "有新进展", "#70BB7E"), weighted(dp(16)))
-        addView(metric("1", "待确认", "#F08A3C"), weighted(dp(16)))
+        addView(metric(summary.attention.size.toString(), "需要你关注", "#8EAED0"), weighted())
+        addView(metric(summary.progress.size.toString(), "有新进展", "#70BB7E"), weighted(dp(16)))
+        addView(metric(summary.confirm.size.toString(), "待确认", "#F08A3C"), weighted(dp(16)))
     }
 
     private fun metric(number: String, caption: String, color: String): View = LinearLayout(this).apply {
@@ -166,7 +155,7 @@ class AiWorkSummaryActivity : AppCompatActivity() {
         }, LinearLayout.LayoutParams(dp(20), dp(21)).apply { marginStart = dp(9) })
     }
 
-    private fun attentionCard(item: WorkSummaryItem, isLast: Boolean): View = LinearLayout(this).apply {
+    private fun attentionCard(item: GeneratedWorkSummaryItem, isLast: Boolean): View = LinearLayout(this).apply {
         layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { bottomMargin = if (isLast) 0 else dp(16) }
         minimumHeight = dp(if (item.highPriority) 268 else 258)
         background = rounded("#181D25", 18)
@@ -237,10 +226,11 @@ class AiWorkSummaryActivity : AppCompatActivity() {
         }, FrameLayout.LayoutParams(MATCH, dp(36), Gravity.CENTER))
     }
 
-    private fun collapsibleSection(title: String, items: List<WorkSummaryUpdate>): View = LinearLayout(this).apply {
+    private fun collapsibleSection(title: String, items: List<GeneratedWorkSummaryItem>): View = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
         val content = LinearLayout(this@AiWorkSummaryActivity).apply {
             orientation = LinearLayout.VERTICAL
+            if (items.isEmpty()) addView(emptyState("这一天没有${title}"))
             items.forEach { item -> addView(updateRow(item)) }
             addView(LinearLayout(this@AiWorkSummaryActivity).apply {
                 gravity = Gravity.CENTER_VERTICAL or Gravity.END
@@ -249,7 +239,7 @@ class AiWorkSummaryActivity : AppCompatActivity() {
                 isClickable = true
                 isFocusable = true
                 contentDescription = "查看${title}全部内容"
-                setOnClickListener { toast("已展开${title}全部内容") }
+                setOnClickListener { toast("当前已显示${title}全部内容") }
                 addView(label("查看全部", 15f, "#8FAEC5", regular))
                 addView(ImageView(this@AiWorkSummaryActivity).apply {
                     setImageResource(R.drawable.ic_project_space_chevron_right)
@@ -284,7 +274,7 @@ class AiWorkSummaryActivity : AppCompatActivity() {
         addView(content)
     }
 
-    private fun updateRow(item: WorkSummaryUpdate): View = LinearLayout(this).apply {
+    private fun updateRow(item: GeneratedWorkSummaryItem): View = LinearLayout(this).apply {
         layoutParams = LinearLayout.LayoutParams(MATCH, WRAP)
         minimumHeight = dp(76)
         gravity = Gravity.CENTER_VERTICAL
@@ -294,11 +284,11 @@ class AiWorkSummaryActivity : AppCompatActivity() {
         addView(LinearLayout(this@AiWorkSummaryActivity).apply {
             orientation = LinearLayout.VERTICAL
             addView(label(item.project, 16f, "#E8ECEB", regular))
-            addView(label("•  ${item.update}", 14f, "#818786", regular).apply {
+            addView(label("•  ${item.reason}", 14f, "#818786", regular).apply {
                 setPadding(0, dp(8), 0, 0)
             })
         }, LinearLayout.LayoutParams(0, WRAP, 1f).apply { marginStart = dp(16) })
-        addView(label(item.date, 13f, "#707574", regular).apply { gravity = Gravity.TOP or Gravity.END },
+        addView(label(formatDate(item.updatedAt), 13f, "#707574", regular).apply { gravity = Gravity.TOP or Gravity.END },
             LinearLayout.LayoutParams(dp(68), dp(48)))
     }
 
@@ -313,14 +303,12 @@ class AiWorkSummaryActivity : AppCompatActivity() {
     private fun weighted(start: Int = 0) = LinearLayout.LayoutParams(0, MATCH, 1f).apply { marginStart = start }
 
     private fun showDatePicker(dateLabel: TextView) {
-        val today = java.util.Calendar.getInstance()
+        val selected = Calendar.getInstance().apply { timeInMillis = selectedDayMillis }
         DatePickerDialog(this, { _, year, month, day ->
-            dateLabel.text = if (year == today.get(java.util.Calendar.YEAR) && month == today.get(java.util.Calendar.MONTH) && day == today.get(java.util.Calendar.DAY_OF_MONTH)) {
-                "今天"
-            } else {
-                "${month + 1}月${day}日"
-            }
-        }, today.get(java.util.Calendar.YEAR), today.get(java.util.Calendar.MONTH), today.get(java.util.Calendar.DAY_OF_MONTH)).show()
+            selectedDayMillis = Calendar.getInstance().apply { set(year, month, day, 12, 0, 0); set(Calendar.MILLISECOND, 0) }.timeInMillis
+            dateLabel.text = formatSelectedDay()
+            rerender()
+        }, selected.get(Calendar.YEAR), selected.get(Calendar.MONTH), selected.get(Calendar.DAY_OF_MONTH)).show()
     }
 
     private fun openProject(project: String) {
@@ -330,7 +318,7 @@ class AiWorkSummaryActivity : AppCompatActivity() {
         })
     }
 
-    private fun runAction(item: WorkSummaryItem, action: String) {
+    private fun runAction(item: GeneratedWorkSummaryItem, action: String) {
         if (action == "进入项目" || action == "查看项目" || action == "查看详情") {
             openProject(item.project)
             return
@@ -345,6 +333,33 @@ class AiWorkSummaryActivity : AppCompatActivity() {
             putExtra(EXTRA_WORK_SUMMARY_AUTO_SEND, true)
             addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
         })
+    }
+    private fun emptyState(message: String) = label(message, 13f, "#707574", regular).apply {
+        gravity = Gravity.CENTER
+        layoutParams = LinearLayout.LayoutParams(MATCH, dp(64))
+    }
+    private fun formatDate(value: Long): String = Calendar.getInstance().apply { timeInMillis = value }.let { "${it.get(Calendar.MONTH) + 1}月${it.get(Calendar.DAY_OF_MONTH)}日" }
+    private fun formatSelectedDay(): String {
+        val selected = Calendar.getInstance().apply { timeInMillis = selectedDayMillis }
+        val today = Calendar.getInstance()
+        return if (selected.get(Calendar.YEAR) == today.get(Calendar.YEAR) && selected.get(Calendar.DAY_OF_YEAR) == today.get(Calendar.DAY_OF_YEAR)) "今天"
+        else "${selected.get(Calendar.MONTH) + 1}月${selected.get(Calendar.DAY_OF_MONTH)}日"
+    }
+    private fun rerender() {
+        val replacement = createContent()
+        root = replacement
+        setContentView(replacement)
+    }
+    private fun refreshFromServer() {
+        if (!AuthManager.isLoggedIn(this)) return
+        thread(name = "work-summary-refresh") {
+            val remote = runCatching { fetchMyProjectArchive(http, ElonApplication.activeServerUrl(this), this).allProjects.map { it.toAppProject() } }.getOrNull()
+            if (!remote.isNullOrEmpty()) runOnUiThread {
+                val remoteIds = remote.mapTo(mutableSetOf()) { it.id }
+                projects = remote + projects.filterNot { it.id in remoteIds }
+                rerender()
+            }
+        }
     }
     private fun rounded(color: String, radius: Int) = GradientDrawable().apply {
         setColor(Color.parseColor(color)); cornerRadius = dp(radius).toFloat()
