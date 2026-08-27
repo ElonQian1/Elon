@@ -16,12 +16,27 @@ export type DesktopInvoke = <T>(
   args?: Record<string, unknown>,
 ) => Promise<T>
 
+export interface DesktopEvent<T> {
+  event: string
+  id: number
+  payload: T
+}
+
+export type DesktopUnlisten = () => void
+export type DesktopEventListen = <T>(
+  event: string,
+  handler: (event: DesktopEvent<T>) => void,
+) => Promise<DesktopUnlisten>
+
 declare global {
   interface Window {
     __ELON_DESKTOP_FRAMELESS__?: boolean
     __TAURI__?: {
       core?: {
         invoke?: DesktopInvoke
+      }
+      event?: {
+        listen?: DesktopEventListen
       }
       window?: {
         getCurrentWindow?: () => TauriWindowHandle
@@ -49,6 +64,16 @@ export function getDesktopInvoke(): DesktopInvoke | null {
   try {
     const invoke = window.__TAURI__?.core?.invoke
     return invoke ? (command, args) => invoke(command, args) : null
+  } catch {
+    return null
+  }
+}
+
+/** 订阅桌面壳的轻量原生事件；普通浏览器/PWA 中返回 null。 */
+export function getDesktopEventListen(): DesktopEventListen | null {
+  try {
+    const listen = window.__TAURI__?.event?.listen
+    return listen ? (event, handler) => listen(event, handler) : null
   } catch {
     return null
   }

@@ -6,8 +6,14 @@ import {
   type LocalAiWebSessionState,
 } from './localAiBrowserApi'
 import { localAiSnapshotIsStreaming } from './localAiPrivateStreamSignal'
+import {
+  LOCAL_AI_NATIVE_UPDATE_COALESCE_MS,
+  listenLocalAiNativeSessionUpdates,
+  localAiNativeSessionUpdateMatches,
+} from './localAiNativeSessionUpdates'
 
 const ACTIVE_POLL_DELAY_MS = 1_500
+const PRIVATE_STREAM_WATCHDOG_POLL_DELAY_MS = 4_000
 const OFFICIAL_WINDOW_POLL_DELAY_MS = 3_000
 const IDLE_POLL_DELAY_MS = 6_000
 const DEGRADED_POLL_DELAY_MS = 8_000
@@ -34,7 +40,11 @@ export function localAiSessionPollDelay(
     || state.contextReady === false) return ACTIVE_POLL_DELAY_MS
 
   const snapshot = isLocalAiMessageSnapshot(state.semanticEvent) ? state.semanticEvent : null
-  if (localAiSnapshotIsStreaming(snapshot)) return ACTIVE_POLL_DELAY_MS
+  if (localAiSnapshotIsStreaming(snapshot)) {
+    return snapshot?.privateStreamObserved === true
+      ? PRIVATE_STREAM_WATCHDOG_POLL_DELAY_MS
+      : ACTIVE_POLL_DELAY_MS
+  }
 
   const directory = isLocalAiConversationSnapshot(state.navigationEvent) ? state.navigationEvent : null
   if (directory?.collection && !directory.collection.complete) return ACTIVE_POLL_DELAY_MS
@@ -64,6 +74,8 @@ export default function useLocalAiSessionPolling({
     let polling = false
     let refreshQueued = false
     let timer = 0
+    let nativeUpdateTimer = 0
+    let unlistenNativeUpdate = () => {}
 
     const schedule = (delay: number) => {
       window.clearTimeout(timer)
@@ -107,12 +119,31 @@ export default function useLocalAiSessionPolling({
     }
 
     refreshRef.current = refreshNow
+    void listenLocalAiNativeSessionUpdates((update) => {
+      if (!active || !localAiNativeSessionUpdateMatches(
+        update,
+        providerId,
+        stateRef.current?.windowLabel,
+      )) return
+      if (nativeUpdateTimer) return
+      nativeUpdateTimer = window.setTimeout(() => {
+        nativeUpdateTimer = 0
+        refreshNow()
+      }, LOCAL_AI_NATIVE_UPDATE_COALESCE_MS)
+    }).then((unlisten) => {
+      if (active) unlistenNativeUpdate = unlisten
+      else unlisten()
+    }).catch(() => {
+      // Native events are an optimization. Fixed polling remains the fail-open path.
+    })
     window.addEventListener('focus', refreshWhenVisible)
     document.addEventListener('visibilitychange', refreshWhenVisible)
     void poll()
     return () => {
       active = false
       window.clearTimeout(timer)
+      window.clearTimeout(nativeUpdateTimer)
+      unlistenNativeUpdate()
       window.removeEventListener('focus', refreshWhenVisible)
       document.removeEventListener('visibilitychange', refreshWhenVisible)
       refreshRef.current = () => {}

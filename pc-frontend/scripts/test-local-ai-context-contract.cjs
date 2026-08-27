@@ -7,6 +7,7 @@ const ts = require('typescript')
 const root = path.resolve(__dirname, '..', '..')
 const state = read('desktop-shell/src-tauri/src/local_ai_browser/state.rs')
 const shell = read('desktop-shell/src-tauri/src/local_ai_browser.rs')
+const nativeSessionUpdateHost = read('desktop-shell/src-tauri/src/local_ai_browser/session_update_event.rs')
 const snapshotCache = read('desktop-shell/src-tauri/src/local_ai_browser/snapshot_cache.rs')
 const context = read('desktop-shell/src-tauri/src/local_ai_browser/state/context.rs')
 const merger = read('desktop-shell/src-tauri/src/local_ai_browser/semantic_context.rs')
@@ -17,6 +18,8 @@ const googleAdapter = read('desktop-shell/src-tauri/src/local_ai_browser/google_
 const api = read('pc-frontend/src/features/user-browser/localAiBrowserApi.ts')
 const controller = read('pc-frontend/src/features/user-browser/useLocalAiWebChatController.ts')
 const responseRefresh = read('pc-frontend/src/features/user-browser/useLocalAiResponseRefresh.ts')
+const sessionPolling = read('pc-frontend/src/features/user-browser/useLocalAiSessionPolling.ts')
+const nativeSessionUpdates = read('pc-frontend/src/features/user-browser/localAiNativeSessionUpdates.ts')
 const responseRefreshConfigPath = path.join(
   root,
   'pc-frontend/src/features/user-browser/localAiWebChatControllerConfig.ts',
@@ -89,6 +92,17 @@ assert.match(responseRefresh, /RESPONSE_COMPLETION_SETTLE_MS/)
 assert.match(responseRefresh, /requestLocalAiWebSnapshot/)
 assert.match(responseRefresh, /matchingLocalAiUserIndex/)
 assert.match(responseRefresh, /baselineMatchingUserCount/)
+assert.match(responseRefresh, /localAiPrivateStreamState\(snapshot\) === 'streaming'/)
+assert.match(sessionPolling, /listenLocalAiNativeSessionUpdates/)
+assert.match(sessionPolling, /LOCAL_AI_NATIVE_UPDATE_COALESCE_MS/)
+assert.match(sessionPolling, /PRIVATE_STREAM_WATCHDOG_POLL_DELAY_MS = 4_000/)
+assert.match(sessionPolling, /if \(nativeUpdateTimer\) return/)
+assert.match(nativeSessionUpdates, /elon:local-ai-session-updated/)
+assert.match(shell, /session_update_event::emit/)
+assert.match(nativeSessionUpdateHost, /elon:local-ai-session-updated/)
+assert.match(nativeSessionUpdateHost, /emit_to/)
+assert.match(nativeSessionUpdateHost, /provider_id:[\s\S]*window_label:[\s\S]*kind:/)
+assert.doesNotMatch(nativeSessionUpdateHost, /response_text|content:/)
 assert.match(responseTracking, /lastMatchingLocalAiUserIndex/)
 assert.match(responseTracking, /matchingLocalAiUserIndex/)
 assert.match(responseTracking, /latestLocalAiAssistantForUserTurn/)
@@ -142,6 +156,14 @@ assert.equal(responseRefreshConfig.localAiResponseRefreshPhase({
 assert.equal(responseRefreshConfig.localAiResponseRefreshPhase({
   providerId: 'chatgpt', current: 'initial', assistantObserved: true,
   streaming: true, completed: false,
+}), 'initial')
+assert.equal(responseRefreshConfig.localAiResponseRefreshPhase({
+  providerId: 'chatgpt', current: 'initial', assistantObserved: true,
+  streaming: true, completed: false, privateStreamDriven: true,
+}), 'streaming_watchdog')
+assert.equal(responseRefreshConfig.localAiResponseRefreshPhase({
+  providerId: 'chatgpt', current: 'initial', assistantObserved: true,
+  streaming: true, completed: false, privateStreamDriven: false,
 }), 'initial')
 assert.equal(responseRefreshConfig.localAiResponseRefreshPhase({
   providerId: 'google-ai-mode', current: 'streaming_watchdog', assistantObserved: true,

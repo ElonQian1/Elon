@@ -28,15 +28,18 @@ export function localAiResponseRefreshPhase({
   assistantObserved,
   streaming,
   completed,
+  privateStreamDriven = false,
 }: {
   providerId: string
   current: LocalAiResponseRefreshPhase
   assistantObserved: boolean
   streaming: boolean
   completed: boolean
+  privateStreamDriven?: boolean
 }): LocalAiResponseRefreshPhase {
   if (completed) return 'completed'
-  if (providerId === 'google-ai-mode' && current === 'initial' && assistantObserved && streaming) {
+  if (current === 'initial' && assistantObserved && streaming
+    && (providerId === 'google-ai-mode' || privateStreamDriven)) {
     return 'streaming_watchdog'
   }
   return current

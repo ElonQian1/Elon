@@ -48,6 +48,13 @@ const SHARED_CONVERSATION_BODY_CACHE: CapabilityDefinition = {
   requiredActions: ['open_conversation'],
 }
 
+const SHARED_NATIVE_STREAM_REFRESH: CapabilityDefinition = {
+  id: 'win_web_ai_native_stream_refresh_v1',
+  label: '私有流原生事件即时刷新',
+  requestMode: 'coalesced_native_session_update_event',
+  fallback: 'bounded_session_and_dom_watchdog',
+}
+
 const CATALOG: Record<string, CapabilityDefinition[]> = {
   chatgpt: [
     {
@@ -89,6 +96,7 @@ const CATALOG: Record<string, CapabilityDefinition[]> = {
     SHARED_REFRESH_SINGLE_FLIGHT,
     SHARED_SEND_COORDINATOR,
     SHARED_CONVERSATION_BODY_CACHE,
+    SHARED_NATIVE_STREAM_REFRESH,
   ],
   'google-ai-mode': [
     {
@@ -116,6 +124,7 @@ const CATALOG: Record<string, CapabilityDefinition[]> = {
     SHARED_REFRESH_SINGLE_FLIGHT,
     SHARED_SEND_COORDINATOR,
     SHARED_CONVERSATION_BODY_CACHE,
+    SHARED_NATIVE_STREAM_REFRESH,
   ],
 }
 

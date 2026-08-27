@@ -39,6 +39,8 @@ mod semantic_context;
 mod session_control;
 #[path = "local_ai_browser/session_identity.rs"]
 mod session_identity;
+#[path = "local_ai_browser/session_update_event.rs"]
+mod session_update_event;
 #[path = "local_ai_browser/snapshot_cache.rs"]
 mod snapshot_cache;
 #[path = "local_ai_browser/state.rs"]
@@ -535,6 +537,7 @@ pub async fn open_local_ai_cached_conversation(
 
 #[tauri::command]
 pub fn publish_local_ai_web_event(
+    app: AppHandle,
     webview: Webview,
     runtime: State<'_, LocalAiBrowserRuntime>,
     payload: String,
@@ -551,6 +554,7 @@ pub fn publish_local_ai_web_event(
         event.page_context_key.as_deref(),
         event.restorable_url.as_deref(),
     );
+    session_update_event::emit(&app, MAIN_WEBVIEW_LABEL, provider.id, label, &event.kind);
     Ok(())
 }
 

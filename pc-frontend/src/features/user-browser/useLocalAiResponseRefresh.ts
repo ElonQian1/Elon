@@ -14,7 +14,10 @@ import {
   normalizeLocalAiResponsePrompt,
 } from './localAiResponseTracking'
 import { shouldRequestLocalAiPrivateConversationRefresh } from './localAiPrivateConversationRefreshPolicy'
-import { localAiSnapshotIsStreaming } from './localAiPrivateStreamSignal'
+import {
+  localAiPrivateStreamState,
+  localAiSnapshotIsStreaming,
+} from './localAiPrivateStreamSignal'
 import { LocalAiResponseRefreshFlight } from './localAiResponseRefreshFlight'
 import {
   RESPONSE_COMPLETION_SETTLE_MS,
@@ -140,6 +143,7 @@ export default function useLocalAiResponseRefresh({
       assistantObserved: Boolean(assistant),
       streaming,
       completed,
+      privateStreamDriven: localAiPrivateStreamState(snapshot) === 'streaming',
     })
     if (nextPhase !== refreshPhase.current) {
       refreshPhase.current = nextPhase
