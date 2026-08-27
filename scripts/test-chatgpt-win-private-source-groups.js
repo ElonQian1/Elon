@@ -14,6 +14,59 @@ const sourceGroups = require(path.join(
 const policy = sourceGroups.enhancePolicy(basePolicy)
 assert.equal(policy.__elonWinPrivateSourceGroupsWrapped, true)
 assert.equal(sourceGroups.enhancePolicy(policy), policy)
+
+const authoritativeSources = [{
+  type: 'citation',
+  text: 'Reuters',
+  url: 'https://www.reuters.com/markets/recovery/',
+  markerText: 'Reuters +2',
+  groupSize: 3,
+}]
+const supportingSources = Array.from({ length: 12 }, (_, index) => index === 11 ? {
+  type: 'citation',
+  text: 'Markets recover after a volatile open',
+  url: 'https://www.reuters.com/markets/recovery/',
+  markerText: 'Reuters',
+  groupSize: 1,
+  iconUrl: 'https://cdn.reuters.com/icon.png',
+  snippet: 'A concise public result summary for the native source card.',
+  thumbnailUrl: 'https://cdn.reuters.com/market.jpg',
+} : {
+  type: 'citation',
+  text: `Supporting source ${index}`,
+  url: `https://source-${index}.example.com/article`,
+  markerText: `Source ${index}`,
+  groupSize: 1,
+})
+const boundedSources = sourceGroups.mergeCitations(authoritativeSources, supportingSources)
+assert.equal(boundedSources.length, 12)
+assert.equal(boundedSources[0].groupSize, 3, 'the official +N source group must remain authoritative')
+assert.equal(boundedSources[0].markerText, 'Reuters +2')
+assert.equal(boundedSources[0].iconUrl, 'https://cdn.reuters.com/icon.png')
+assert.match(boundedSources[0].snippet, /native source card/)
+assert.equal(boundedSources[0].thumbnailUrl, 'https://cdn.reuters.com/market.jpg')
+
+const sameSiteLogo = sourceGroups.mergeCitations([{
+  type: 'citation',
+  text: 'A second Reuters article',
+  url: 'https://www.reuters.com/markets/second-article',
+  markerText: 'Reuters +1',
+  groupSize: 2,
+}], [{
+  type: 'citation',
+  text: 'Reuters market landing page',
+  url: 'https://www.reuters.com/markets/',
+  markerText: 'Reuters',
+  groupSize: 1,
+  iconUrl: 'https://cdn.reuters.com/icon.png',
+}])
+assert.equal(
+  sameSiteLogo[0].iconUrl,
+  'https://cdn.reuters.com/icon.png',
+  'the same public publisher may safely share its observed site logo across article URLs',
+)
+assert.equal(sameSiteLogo[0].snippet, undefined, 'article summaries must never cross URL boundaries')
+
 let clock = 1_000
 const session = policy.createSession({ now: () => ++clock })
 

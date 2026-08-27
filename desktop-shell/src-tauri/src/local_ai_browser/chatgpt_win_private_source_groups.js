@@ -10,7 +10,7 @@
   const enhanced = Object.freeze(api.enhancePolicy(policy));
   root.__elonChatGptPrivateStreamPolicy = enhanced;
   root.__elonChatGptWinPrivateSourceGroupsInstalled = Object.freeze({
-    version: 2,
+    version: 3,
     basePolicy: policy,
     policy: enhanced,
   });
@@ -117,15 +117,32 @@
   function mergeCitations(primary, supporting) {
     const merged = [];
     const indexes = new Map();
-    [supporting, primary].forEach((parts) => {
+    const iconsByHost = new Map();
+    [primary, supporting].forEach((parts) => {
       (Array.isArray(parts) ? parts : []).forEach((part) => {
-        if (!part || part.type !== 'citation' || !part.url || merged.length >= MAX_SOURCES) return;
+        const url = publicHttpsUrl(part && part.url);
+        const iconUrl = publicHttpsUrl(part && part.iconUrl);
+        const host = sourceHost(url);
+        if (host && iconUrl && !iconsByHost.has(host)) iconsByHost.set(host, iconUrl);
+      });
+    });
+    // The private stream policy already linked the authoritative grouped
+    // citation to the answer text. Preserve that record before filling the
+    // remaining bounded slots with richer search-result cards; otherwise a
+    // full supporting list can prevent the matching +N group from merging.
+    [primary, supporting].forEach((parts) => {
+      (Array.isArray(parts) ? parts : []).forEach((part) => {
+        if (!part || part.type !== 'citation' || !part.url) return;
         const url = publicHttpsUrl(part.url);
         if (!url) return;
         const known = indexes.get(url);
         if (known === undefined) {
+          if (merged.length >= MAX_SOURCES) return;
           indexes.set(url, merged.length);
-          merged.push(Object.assign({}, part, { url }));
+          const next = Object.assign({}, part, { url });
+          const iconUrl = publicHttpsUrl(part.iconUrl) || iconsByHost.get(sourceHost(url));
+          if (iconUrl) next.iconUrl = iconUrl;
+          merged.push(next);
           return;
         }
         const current = merged[known];
@@ -133,7 +150,8 @@
           text: cleanText(current.text, MAX_TITLE_LENGTH).length >= cleanText(part.text, MAX_TITLE_LENGTH).length
             ? current.text
             : part.text,
-          iconUrl: current.iconUrl || part.iconUrl,
+          iconUrl: publicHttpsUrl(current.iconUrl) || publicHttpsUrl(part.iconUrl) ||
+            iconsByHost.get(sourceHost(url)),
           snippet: current.snippet || part.snippet,
           thumbnailUrl: current.thumbnailUrl || part.thumbnailUrl,
           groupSize: Math.max(Number(current.groupSize) || 1, Number(part.groupSize) || 1)
