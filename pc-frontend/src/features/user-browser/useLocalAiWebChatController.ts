@@ -280,7 +280,9 @@ export default function useLocalAiWebChatController(
     const cachedState = getCachedLocalAiWebSessionState(providerId, ownerKey)
     const warmSession = localAiWarmSessionReusable(cachedState, providerId)
     if (!warmSession) setMessage(`正在后台连接 ${providerDisplayName}；官网允许时可直接使用访客模式。`)
-    void resumeLocalAiWebSession(providerId, ownerKey, cachedState)
+    void resumeLocalAiWebSession(providerId, ownerKey, cachedState, (cached) => {
+      if (active) setSessionState(cached)
+    })
       .then(({ state, reused }) => {
         if (active && state) setSessionState(state)
         if (active && !reused) setMessage(`${providerDisplayName} 已在本机后台连接；登录是历史与增强能力的可选项。`)

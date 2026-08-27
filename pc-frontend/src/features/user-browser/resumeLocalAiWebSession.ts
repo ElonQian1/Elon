@@ -14,16 +14,20 @@ export async function resumeLocalAiWebSession(
   providerId: string,
   ownerKey: string,
   cachedState: LocalAiWebSessionState | null,
+  onCachedState?: (state: LocalAiWebSessionState) => void,
 ): Promise<LocalAiSessionResumeResult> {
-  if (localAiWarmSessionReusable(cachedState, providerId)) {
-    try {
-      const current = await getLocalAiWebSessionState(providerId, ownerKey)
-      if (localAiWarmSessionReusable(current, providerId)) {
-        return { state: current, reused: true }
-      }
-    } catch {
-      // A stale frontend cache falls through to the normal background opener.
+  let latestState = cachedState
+  try {
+    // The native state getter creates the runtime record and loads its durable
+    // semantic snapshot without creating or navigating WebView2. Publish that
+    // snapshot first so startup is cache-first instead of website-first.
+    latestState = await getLocalAiWebSessionState(providerId, ownerKey)
+    onCachedState?.(latestState)
+    if (localAiWarmSessionReusable(latestState, providerId)) {
+      return { state: latestState, reused: true }
     }
+  } catch {
+    // A missing/old native state falls through to the normal background opener.
   }
 
   await openLocalAiWebSession(providerId, ownerKey, { showWindow: false })
@@ -34,6 +38,6 @@ export async function resumeLocalAiWebSession(
     }
   } catch {
     // Session polling will obtain the state without issuing another open command.
-    return { state: null, reused: false }
+    return { state: latestState, reused: false }
   }
 }

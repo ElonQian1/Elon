@@ -7,6 +7,7 @@ import {
   type LocalAiWebProvider,
 } from './localAiBrowserApi'
 import { localAiWebProviderPresets } from './localAiWebProviders'
+import { localAiCapabilityVerificationFallback } from './localAiCapabilityVerificationPolicy'
 
 export type LocalAiBrowserCapabilityState =
   | 'desktop_required'
@@ -57,9 +58,14 @@ export default function useLocalAiBrowserCapability(): LocalAiBrowserCapability 
       setState('ready')
       setMessage('')
     } catch (error) {
-      setProviders([])
-      setState(isLocalAiBrowserUpgradeRequired(error) ? 'upgrade_required' : 'error')
-      setMessage(localAiBrowserErrorMessage(error))
+      const fallback = localAiCapabilityVerificationFallback(
+        localAiWebProviderPresets(),
+        isLocalAiBrowserUpgradeRequired(error),
+        localAiBrowserErrorMessage(error),
+      )
+      setProviders(fallback.providers)
+      setState(fallback.state)
+      setMessage(fallback.message)
     }
   }, [desktopDetected])
 
