@@ -202,7 +202,7 @@ class AiWorkSummaryActivity : AppCompatActivity() {
     private fun projectIcon(project: String): View = FrameLayout(this).apply {
         background = rounded("#E8E8E7", 12)
         clipToOutline = true
-        val bitmap = storedProjects.firstOrNull { it.title == project }?.iconDataUrl
+        val bitmap = storedProjects().firstOrNull { it.title == project }?.iconDataUrl
             ?.let(UserProfileStore::decodeAvatar)
         if (bitmap != null) {
             addView(ImageView(this@AiWorkSummaryActivity).apply {
