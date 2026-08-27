@@ -59,9 +59,17 @@ const original = {
     },
   },
 }
+let acceptedRichParts = null
+const session = {
+  accept: () => true,
+  acceptRichParts(parts, identity) {
+    acceptedRichParts = { parts, identity }
+    return true
+  },
+}
 const base = Object.freeze({
   assistantFrame: () => null,
-  createSession: () => ({}),
+  createSession: () => session,
   financePartFromWidget: () => original,
   financePartsFromMetadata: () => [original],
 })
@@ -97,6 +105,23 @@ const metadata = window.__elonChatGptPrivateStreamPolicy.financePartsFromMetadat
   content_references: [{ type: 'dil', dil: { initialState: widget } }],
 })
 assert.equal(metadata[0].richContent.payload.periodViews[0].id, '1d')
+
+const wrappedSession = window.__elonChatGptPrivateStreamPolicy.createSession()
+assert.equal(wrappedSession.accept({
+  conversation_id: 'conversation-finance',
+  message: {
+    id: 'assistant-finance',
+    metadata: {
+      turn_exchange_id: 'turn-finance',
+      content_references: [{ type: 'dil', dil: { initialState: widget } }],
+    },
+  },
+}), true)
+assert.ok(acceptedRichParts, 'a live official DIL frame must immediately upgrade the stream card')
+assert.equal(acceptedRichParts.parts[0].richContent.payload.periodViews.length, 2)
+assert.equal(acceptedRichParts.identity.messageId, 'assistant-finance')
+assert.equal(acceptedRichParts.identity.turnId, 'turn-finance')
+assert.equal(acceptedRichParts.identity.conversationId, 'conversation-finance')
 
 const replacementBase = Object.freeze(Object.assign({}, base, { generation: 2 }))
 window.__elonChatGptPrivateStreamPolicy = replacementBase

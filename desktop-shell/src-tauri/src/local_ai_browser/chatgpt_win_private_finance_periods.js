@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  var VERSION = 2;
+  var VERSION = 3;
   var MAX_PERIODS = 12;
   var MAX_POINTS_PER_PERIOD = 192;
   if (location.origin !== 'https://chatgpt.com') return;
@@ -105,8 +105,53 @@
     }).filter(Boolean).slice(0, 4);
   }
 
+  function visibleMessage(payload) {
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
+    var envelope = Number.isFinite(payload.c) && payload.v && typeof payload.v === 'object'
+      ? payload.v
+      : payload;
+    var message = envelope.message || envelope.data && envelope.data.message;
+    if (!message || typeof message !== 'object') return null;
+    return { envelope: envelope, message: message };
+  }
+
+  function richIdentity(visible) {
+    var message = visible && visible.message || {};
+    var metadata = message.metadata && typeof message.metadata === 'object'
+      ? message.metadata
+      : {};
+    var envelope = visible && visible.envelope || {};
+    return {
+      messageId: cleanText(message.id, 180),
+      turnId: cleanText(metadata.turn_exchange_id || metadata.working_turn_id, 180),
+      conversationId: cleanText(
+        envelope.conversation_id || envelope.conversationId,
+        180
+      ),
+    };
+  }
+
+  function enhanceSession(session) {
+    if (!session || typeof session.accept !== 'function') return session;
+    function accept(payload) {
+      var accepted = session.accept(payload);
+      var visible = visibleMessage(payload);
+      var metadata = visible && visible.message && visible.message.metadata;
+      var parts = financePartsFromMetadata(metadata);
+      if (!parts.length || typeof session.acceptRichParts !== 'function') return accepted;
+      var upgraded = false;
+      try { upgraded = session.acceptRichParts(parts, richIdentity(visible)); }
+      catch (_) { upgraded = false; }
+      return accepted || upgraded;
+    }
+    return Object.freeze(Object.assign({}, session, { accept: accept }));
+  }
+
   var wrapped = Object.freeze(Object.assign({}, base, {
     __elonWinPrivateFinancePeriodsWrapped: true,
+    createSession: function (options) {
+      return enhanceSession(base.createSession(options || {}));
+    },
     financePartFromWidget: financePartFromWidget,
     financePartsFromMetadata: financePartsFromMetadata,
   }));

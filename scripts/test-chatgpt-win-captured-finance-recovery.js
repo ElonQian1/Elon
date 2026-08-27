@@ -85,6 +85,30 @@ async function main() {
     'packed private response periods must survive rich-card deduplication',
   )
   assert.equal(accepted.generation, 7)
+
+  accepted = null
+  root.__elonChatGptPrivateStreamTransport = { current: () => ({
+    ...snapshot,
+    richParts: [basicPart],
+  }) }
+  assert.equal(
+    await recovery.recover(root, 'data: {}\n\n', 'sse', 8),
+    true,
+    'a basic live card must not block a richer completed-response upgrade',
+  )
+  assert.equal(accepted.richParts[0].richContent.payload.periodViews.length, 3)
+
+  accepted = null
+  root.__elonChatGptPrivateStreamTransport = { current: () => ({
+    ...snapshot,
+    richParts: [enhancedPart],
+  }) }
+  assert.equal(
+    await recovery.recover(root, 'data: {}\n\n', 'sse', 9),
+    false,
+    'an equal-quality live card must not be replayed again',
+  )
+  assert.equal(accepted, null)
   console.log('ChatGPT Win captured finance recovery tests passed')
 }
 

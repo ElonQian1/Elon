@@ -17,7 +17,7 @@
 })(typeof window === 'object' ? window : null, function () {
   'use strict';
 
-  const VERSION = 2;
+  const VERSION = 3;
   const MAX_WIDGETS = 4;
   const MAX_PACKED_BYTES = 1024 * 1024;
   const MAX_UNPACKED_BYTES = 2 * 1024 * 1024;
@@ -211,15 +211,25 @@
     }
   }
 
-  function liveAlreadyHasRich(rootValue, snapshot) {
+  function liveRichParts(rootValue, snapshot) {
     const transport = rootValue.__elonChatGptPrivateStreamTransport;
-    if (!transport || typeof transport.current !== 'function') return false;
+    if (!transport || typeof transport.current !== 'function') return [];
     let active = null;
     try {
       active = transport.current(rootValue.location && rootValue.location.pathname || '');
     } catch (_) {}
-    return Boolean(active && sameResponse(active, snapshot) &&
-      Array.isArray(active.richParts) && active.richParts.some(supportedPart));
+    if (!active || !sameResponse(active, snapshot) || !Array.isArray(active.richParts)) return [];
+    return active.richParts.filter(supportedPart);
+  }
+
+  function improvesLiveRichParts(rootValue, snapshot, candidates) {
+    const live = liveRichParts(rootValue, snapshot);
+    return (Array.isArray(candidates) ? candidates : []).some(function (candidate) {
+      if (!supportedPart(candidate)) return false;
+      const key = richPartKey(candidate);
+      const current = live.find(function (part) { return richPartKey(part) === key; });
+      return !current || richPartQuality(candidate) > richPartQuality(current);
+    });
   }
 
   async function recover(rootValue, body, format, generation) {
@@ -227,7 +237,7 @@
     const recovery = rootValue.__elonWinChatGptPrivateStreamRecovery;
     if (!recovery || typeof recovery.accept !== 'function') return false;
     const result = collect(rootValue, body);
-    if (!result || liveAlreadyHasRich(rootValue, result.snapshot)) return false;
+    if (!result) return false;
     const parts = [];
     (Array.isArray(result.snapshot.richParts) ? result.snapshot.richParts : [])
       .filter(supportedPart).slice(0, MAX_WIDGETS).forEach(function (part) {
@@ -238,7 +248,7 @@
       const part = value && result.policy.financePartFromWidget(value);
       if (part) addOrUpgradePart(parts, part);
     }
-    if (!parts.length || liveAlreadyHasRich(rootValue, result.snapshot)) return false;
+    if (!parts.length || !improvesLiveRichParts(rootValue, result.snapshot, parts)) return false;
     return Boolean(recovery.accept({
       messageId: result.snapshot.id || '',
       turnId: result.snapshot.turnId || '',
