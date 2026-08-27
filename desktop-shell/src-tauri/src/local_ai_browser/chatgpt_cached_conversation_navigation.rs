@@ -20,9 +20,21 @@ try{{
   var transport=window.__elonChatGptPrivateTransport;
   var nativeBridge=window.elonChatGptNative;
   var emit=function(event){{
-    if(nativeBridge&&typeof nativeBridge.postMessage==='function'){{
-      nativeBridge.postMessage(JSON.stringify(event));
-    }}
+    if(!nativeBridge||typeof nativeBridge.postMessage!=='function')return;
+    var adapterVersion=Number(window.__elonChatGptAdapterVersion||0);
+    var documentToken=String(window.__elonChatGptDocumentToken||'');
+    if(!Number.isFinite(adapterVersion)||adapterVersion<=0||
+        !/^doc_[a-z0-9_]{{3,80}}$/.test(documentToken))return;
+    nativeBridge.postMessage(JSON.stringify({{
+      schema:'yilong.ai.ui.v1',
+      adapterVersion:adapterVersion,
+      documentToken:documentToken,
+      providerId:'chatgpt',
+      source:'private_prefetch',
+      conversationId:path,
+      emittedAt:new Date().toISOString(),
+      event:event
+    }}));
   }};
   if(transport&&transport.conversationPrefetchEnabled===true&&
       typeof transport.prefetchConversation==='function'&&
@@ -42,7 +54,12 @@ mod tests {
         let script = script("chatgpt", "/c/conversation-123").unwrap();
 
         assert!(script.contains("transport.prefetchConversation(path,emit,navigate)"));
-        assert!(script.contains("nativeBridge.postMessage(JSON.stringify(event))"));
+        assert!(script.contains("schema:'yilong.ai.ui.v1'"));
+        assert!(script.contains("adapterVersion:adapterVersion"));
+        assert!(script.contains("documentToken:documentToken"));
+        assert!(script.contains("providerId:'chatgpt'"));
+        assert!(script.contains("event:event"));
+        assert!(!script.contains("postMessage(JSON.stringify(event))"));
         assert!(script.contains("if(transport&&transport.conversationPrefetchEnabled===true"));
         assert!(script.contains("navigate();"));
     }
