@@ -415,7 +415,11 @@ assert.match(api, /LocalAiProjectDirectoryItem/)
 assert.match(api, /adapterActions: LocalAiAdapterAction\[\]/)
 assert.match(api, /adapterVersion: number/)
 assert.match(api, /requiredLocalAiAdapterVersion/)
-assert.match(adapterCompatibility, /chatgpt: 180/)
+assert.match(
+  adapterCompatibility,
+  new RegExp(`chatgpt:\\s*${chatGptAndroidVersion}`),
+  'the hot-loaded PC UI must reject any ChatGPT shell older than the current native adapter',
+)
 assert.match(adapterCompatibility, /'google-ai-mode': 40/)
 assert.match(api, /provider\.adapterVersion < requiredAdapterVersion/)
 assert.match(api, /完全退出旧客户端后重新打开/)
