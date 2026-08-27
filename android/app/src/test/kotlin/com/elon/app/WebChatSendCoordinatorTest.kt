@@ -154,16 +154,21 @@ class WebChatSendCoordinatorTest {
     }
 
     @Test
-    fun unconfirmedSendTimesOutToRestorablePrompt() {
+    fun unconfirmedSendReconcilesWithoutRestoringPotentiallySentPrompt() {
         val fixture = Fixture()
         fixture.coordinator.dispatch("keep this", null) {}
 
         fixture.scheduler.runNext()
+        fixture.scheduler.runNext()
+        fixture.scheduler.runNext()
 
-        assertEquals(0, fixture.transport.reconciliations)
-        assertEquals(WebChatPendingSendState.TimeoutAction.RESTORE, fixture.terminalActions.single().action)
-        assertEquals("keep this", fixture.terminalActions.single().prompt)
-        assertNull(fixture.coordinator.prompt())
+        assertEquals(3, fixture.transport.reconciliations)
+        assertEquals(
+            WebChatPendingSendState.TimeoutAction.REQUIRE_RECONCILIATION,
+            fixture.terminalActions.single().action,
+        )
+        assertEquals("keep this", fixture.coordinator.prompt())
+        assertEquals(WebChatPendingSendState.Phase.RESULT_UNKNOWN, fixture.coordinator.phase())
         assertFalse(fixture.scheduler.hasTask())
     }
 
@@ -180,6 +185,19 @@ class WebChatSendCoordinatorTest {
         assertEquals("retry me", prompt)
         assertNull(fixture.coordinator.prompt())
         assertFalse(fixture.scheduler.hasTask())
+    }
+
+    @Test
+    fun delayedReceiptForOlderCommandCannotSettleCurrentSend() {
+        val fixture = Fixture()
+        fixture.coordinator.dispatch("current", null) {}
+
+        val prompt = fixture.coordinator.acceptCommandResult("mcp_stale", ok = false)
+
+        assertNull(prompt)
+        assertEquals("current", fixture.coordinator.prompt())
+        assertEquals(WebChatPendingSendState.Phase.SUBMITTING, fixture.coordinator.phase())
+        assertTrue(fixture.scheduler.hasTask())
     }
 
     @Test

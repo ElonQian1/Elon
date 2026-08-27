@@ -20,7 +20,7 @@ installed build; individual capability documents retain implementation evidence.
 | Visited conversation body cache | Google Web AI | Completed, enabled, and device verified | Official WebView navigation |
 | Reply stream and completion observer | Google Web AI | Completed, enabled, and stream-to-completion device verified on `v1.1.1303 (1313)` | Official DOM snapshot |
 | Background navigation continuity | ChatGPT and Google Web AI | Completed, enabled, and device verified | Bounded official WebView recovery |
-| Unified send coordinator | ChatGPT and Google Web AI | Completed, enabled, and device verified on `v1.1.1313 (1323)` | Official-page confirmation and draft recovery |
+| Unified native send ledger | ChatGPT and Google Web AI | Completed and enabled; stable request-ID reconciliation targeted tests passed, device regression pending | Official-page reconciliation without automatic write replay |
 
 All web-account transports keep the official page authoritative. They do not export
 cookies, credentials, request headers, or private conversation content outside the
@@ -117,16 +117,21 @@ On resume, the APK first reattaches the versioned page adapter and cached snapsh
 only a failed or stalled document consumes the bounded full-page reload budget. It
 does not add a new request path or keep an idle polling loop alive.
 
-Text sending now enters both providers through one single-flight coordinator and an
-explicit official-page transport port. It owns optimistic pending state, command receipt
-confirmation, bounded reconciliation, timeout settlement, and draft restoration. Provider
+Text sending enters both providers through one single-owner command ledger and an explicit
+official-page transport port. Each command has a stable bounded request ID, authority,
+acceptance state, page-sync state, generation and bounded completion history. Provider
 controllers retain only provider-specific readiness messages and rendering callbacks.
-The coordinator never retries a write by issuing a second request: an accepted official
-dispatch waits for observable page or reply evidence, and an unconfirmed dispatch restores
-the draft for an explicit user retry. Confirmation must also contain message evidence newer
-than the pre-send snapshot, so an older identical prompt cannot settle a repeated send.
-This boundary permits a future transport only after it preserves the same confirmation and
-reconciliation contract; it does not enable Google direct POST today.
+Page command results settle only the matching request ID, so a delayed receipt cannot settle
+a newer message. Observable page/reply evidence must still be newer than the pre-send
+snapshot, so an older identical prompt cannot settle a repeated send.
+
+The coordinator never retries a write by issuing a second request. A queued command without
+a receipt moves to `unknown/reconciling`, performs bounded read-only reconciliation, and then
+asks the user to inspect the official page without restoring a potentially already-sent
+draft. A command accepted by either transport forbids fallback write replay. A future
+same-origin private sender may plug into this ledger only after it supplies a versioned
+request contract and an explicit page-state handoff; current observers intentionally do not
+capture enough request material, so ChatGPT and Google direct POST remain disabled.
 
 Device acceptance on `v1.1.1313 (1323)` verified the production friend-chat surface with
 ChatGPT adapter `188` and Google adapter `37`. Both providers completed an isolated exact

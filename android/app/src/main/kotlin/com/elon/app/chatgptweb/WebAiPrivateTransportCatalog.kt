@@ -126,12 +126,13 @@ internal object WebAiPrivateTransportCatalog {
             id = "android_web_ai_unified_send_coordinator_v1",
             provider = "chatgpt_and_google_web_ai",
             status = "completed",
-            verification = "targeted_tests_passed_device_pending",
+            verification = "command_ledger_targeted_tests_passed_device_pending",
             productionDefault = true,
             runtimeEnabled = true,
-            requestMode = "single_flight_official_page_transport",
-            healthPolicy = "baseline_bound_confirmation_reconciliation_timeout_and_draft_restore",
-            fallback = "official_page_confirmation_and_user_visible_draft_recovery",
+            requestMode = "single_owner_command_ledger_with_official_page_transport",
+            healthPolicy =
+                "stable_request_id_acceptance_unknown_completion_and_page_reconciliation",
+            fallback = "official_page_reconciliation_without_automatic_write_replay",
         ),
         Entry(
             id = "android_chatgpt_realtime_voice_background_overlay_v1",

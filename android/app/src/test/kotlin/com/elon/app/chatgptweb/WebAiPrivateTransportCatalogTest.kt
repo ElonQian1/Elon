@@ -125,16 +125,16 @@ class WebAiPrivateTransportCatalogTest {
         }
         assertEquals("completed", sendCoordinator.getString("implementation_status"))
         assertEquals(
-            "targeted_tests_passed_device_pending",
+            "command_ledger_targeted_tests_passed_device_pending",
             sendCoordinator.getString("verification_status"),
         )
         assertTrue(sendCoordinator.getBoolean("production_default"))
         assertEquals(
-            "single_flight_official_page_transport",
+            "single_owner_command_ledger_with_official_page_transport",
             sendCoordinator.getString("request_mode"),
         )
         assertEquals(
-            "official_page_confirmation_and_user_visible_draft_recovery",
+            "official_page_reconciliation_without_automatic_write_replay",
             sendCoordinator.getString("fallback"),
         )
     }

@@ -174,11 +174,13 @@ class GoogleWebAdapterContractTest {
         assertTrue(sendLedger.contains("WebChatSendAcceptance.DISPATCHED_UNCONFIRMED"))
         assertTrue(sendLedger.contains("FallbackDecision.RECONCILE_ONLY"))
         assertTrue(controller.contains("TimeoutAction.REQUIRE_OFFICIAL_CONFIRMATION"))
+        assertTrue(controller.contains("TimeoutAction.REQUIRE_RECONCILIATION"))
         assertTrue(controller.contains("sendCoordinator.requiresOfficialConfirmation()"))
         assertTrue(sendCoordinator.contains("removeCallbacks"))
         assertTrue(controller.contains("session.requestConversationIndex()"))
         assertTrue(pendingSendState.contains("TimeoutAction.KEEP_WAITING"))
         assertTrue(pendingSendState.contains("TimeoutAction.REQUIRE_OFFICIAL_CONFIRMATION"))
+        assertTrue(pendingSendState.contains("TimeoutAction.REQUIRE_RECONCILIATION"))
         assertTrue(pendingSendState.contains("TimeoutAction.RESTORE"))
         assertTrue(pendingSendState.contains("OFFICIAL_CONFIRMATION"))
     }

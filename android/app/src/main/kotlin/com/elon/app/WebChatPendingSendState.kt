@@ -7,12 +7,14 @@ internal class WebChatPendingSendState {
         IDLE,
         SUBMITTING,
         AWAITING_RESPONSE,
+        RESULT_UNKNOWN,
         OFFICIAL_CONFIRMATION,
     }
 
     enum class TimeoutAction {
         IGNORE,
         KEEP_WAITING,
+        REQUIRE_RECONCILIATION,
         REQUIRE_OFFICIAL_CONFIRMATION,
         RESTORE,
     }
@@ -65,6 +67,7 @@ internal object WebChatPendingSendPresentation {
         WebChatPendingSendState.Phase.IDLE -> null
         WebChatPendingSendState.Phase.SUBMITTING -> "发送中…"
         WebChatPendingSendState.Phase.AWAITING_RESPONSE -> "已发送 · 等待回复"
+        WebChatPendingSendState.Phase.RESULT_UNKNOWN -> "发送结果待确认"
         WebChatPendingSendState.Phase.OFFICIAL_CONFIRMATION -> "已发送 · 回答同步较慢"
     }
 }

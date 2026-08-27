@@ -98,4 +98,29 @@ class WebChatSendCommandLedgerTest {
         )
         assertFalse(ledger.markPageReconciled(command.id))
     }
+
+    @Test
+    fun missingReceiptBecomesUnknownAndNeverLooksSafeToReplay() {
+        val ledger = WebChatSendCommandLedger()
+        val command = requireNotNull(ledger.begin("maybe sent", WebChatSendAuthority.OFFICIAL_PAGE))
+        ledger.markDispatched(command.id)
+
+        assertEquals(
+            WebChatPendingSendState.TimeoutAction.KEEP_WAITING,
+            ledger.onConfirmationTimeout(command.generation).action,
+        )
+        assertEquals(WebChatSendAcceptance.UNKNOWN, ledger.current()?.acceptance)
+        assertEquals(WebChatPageSyncState.RECONCILING, ledger.current()?.pageSyncState)
+        assertEquals(
+            WebChatSendCommandLedger.FallbackDecision.RECONCILE_ONLY,
+            ledger.fallbackDecision(),
+        )
+
+        ledger.onConfirmationTimeout(command.generation)
+        assertEquals(
+            WebChatPendingSendState.TimeoutAction.REQUIRE_RECONCILIATION,
+            ledger.onConfirmationTimeout(command.generation).action,
+        )
+        assertEquals("maybe sent", ledger.prompt())
+    }
 }

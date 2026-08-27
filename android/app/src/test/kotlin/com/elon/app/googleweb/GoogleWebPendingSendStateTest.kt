@@ -33,18 +33,28 @@ class GoogleWebPendingSendStateTest {
     }
 
     @Test
-    fun unconfirmedSubmissionRestoresPromptAfterTimeout() {
+    fun unconfirmedSubmissionReconcilesBeforeRequiringManualConfirmation() {
         val state = WebChatPendingSendState()
         assertEquals(WebChatPendingSendState.Phase.IDLE, state.phase())
         val generation = state.begin("hello")
         assertEquals(WebChatPendingSendState.Phase.SUBMITTING, state.phase())
 
-        val result = state.onConfirmationTimeout(generation)
-
-        assertEquals(WebChatPendingSendState.TimeoutAction.RESTORE, result.action)
-        assertEquals("hello", result.prompt)
-        assertNull(state.prompt())
-        assertEquals(WebChatPendingSendState.Phase.IDLE, state.phase())
+        assertEquals(
+            WebChatPendingSendState.TimeoutAction.KEEP_WAITING,
+            state.onConfirmationTimeout(generation).action,
+        )
+        assertEquals("hello", state.prompt())
+        assertEquals(WebChatPendingSendState.Phase.RESULT_UNKNOWN, state.phase())
+        assertEquals(
+            WebChatPendingSendState.TimeoutAction.KEEP_WAITING,
+            state.onConfirmationTimeout(generation).action,
+        )
+        assertEquals(
+            WebChatPendingSendState.TimeoutAction.REQUIRE_RECONCILIATION,
+            state.onConfirmationTimeout(generation).action,
+        )
+        assertTrue(state.requiresOfficialConfirmation())
+        assertEquals(WebChatPendingSendState.Phase.RESULT_UNKNOWN, state.phase())
     }
 
     @Test
@@ -107,7 +117,7 @@ class GoogleWebPendingSendStateTest {
         )
         assertEquals("new", state.prompt())
         assertEquals(
-            WebChatPendingSendState.TimeoutAction.RESTORE,
+            WebChatPendingSendState.TimeoutAction.KEEP_WAITING,
             state.onConfirmationTimeout(newGeneration).action,
         )
     }
@@ -138,6 +148,10 @@ class GoogleWebPendingSendStateTest {
             WebChatPendingSendPresentation.status(
                 WebChatPendingSendState.Phase.OFFICIAL_CONFIRMATION,
             ),
+        )
+        assertEquals(
+            "发送结果待确认",
+            WebChatPendingSendPresentation.status(WebChatPendingSendState.Phase.RESULT_UNKNOWN),
         )
     }
 }

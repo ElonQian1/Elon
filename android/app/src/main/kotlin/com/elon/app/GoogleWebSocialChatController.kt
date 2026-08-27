@@ -297,6 +297,14 @@ internal class GoogleWebSocialChatController(
                     Toast.LENGTH_LONG,
                 ).show()
             }
+            WebChatPendingSendState.TimeoutAction.REQUIRE_RECONCILIATION -> {
+                session.currentSnapshot()?.let(::renderSnapshot)
+                if (active) Toast.makeText(
+                    activity,
+                    "发送结果暂未确认，为避免重复发送，请打开官方页核对",
+                    Toast.LENGTH_LONG,
+                ).show()
+            }
             WebChatPendingSendState.TimeoutAction.RESTORE -> {
                 session.currentSnapshot()?.let(::renderSnapshot)
                 restorePrompt(result.prompt)

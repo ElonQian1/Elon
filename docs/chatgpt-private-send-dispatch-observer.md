@@ -10,8 +10,8 @@ repeat_research: not_required_without_regression
 
 This capability shortens native send confirmation without creating a second
 prompt request. The official ChatGPT page remains the only sender and continues
-to own React state, conversation ancestry, cookies, headers, retries, stop
-controls, and recovery.
+to own its in-memory page state, conversation ancestry, cookies, headers,
+retries, stop controls, and recovery.
 
 ## Behavior
 
@@ -32,11 +32,18 @@ controls, and recovery.
 verified private stream observer. It improves acknowledgement latency while
 preserving the official page's single-send semantics and fallback behavior.
 
-A direct native conversation POST is deliberately not enabled. It would update
-the server without synchronously updating the official page's React state and
-conversation parent pointers, which can make the official fallback stale or
-duplicate a later message. That path requires an upstream-supported state
-handoff contract before it can replace the official sender.
+A direct native conversation POST is deliberately not enabled. The current
+observer proves that a request happened, but intentionally does not capture the
+request body, headers, runtime tokens, or conversation parent contract. Sending
+without those verified inputs could update the server without synchronously
+updating the official page runtime and could duplicate a later message. That
+path requires a versioned request and state-handoff contract before it can
+replace the official sender.
+
+Native coordination no longer relies on prompt text alone. Each send receives a
+bounded request ID shared by the native command ledger and page command result.
+A missing result becomes `unknown/reconciling`; it is never treated as proven
+unsent and is never replayed automatically.
 
 ## Evidence
 

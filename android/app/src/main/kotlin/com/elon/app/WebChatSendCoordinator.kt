@@ -162,6 +162,10 @@ internal class WebChatSendCoordinator(
                     reconcile()
                     onTerminalTimeout(result)
                 }
+                WebChatPendingSendState.TimeoutAction.REQUIRE_RECONCILIATION -> {
+                    reconcile()
+                    onTerminalTimeout(result)
+                }
                 WebChatPendingSendState.TimeoutAction.RESTORE -> {
                     baseline = null
                     onTerminalTimeout(result)

@@ -72,6 +72,8 @@ internal class WebChatSendCommandLedger(
 
     fun phase(): WebChatPendingSendState.Phase = active?.let { command ->
         when {
+            command.acceptance == WebChatSendAcceptance.UNKNOWN ->
+                WebChatPendingSendState.Phase.RESULT_UNKNOWN
             command.requiresOfficialConfirmation -> WebChatPendingSendState.Phase.OFFICIAL_CONFIRMATION
             command.acceptance == WebChatSendAcceptance.ACCEPTED ->
                 WebChatPendingSendState.Phase.AWAITING_RESPONSE
@@ -145,12 +147,23 @@ internal class WebChatSendCommandLedger(
                 WebChatPendingSendState.TimeoutAction.KEEP_WAITING,
             )
         }
-        val prompt = command.prompt
-        archive(command.copy(acceptance = WebChatSendAcceptance.FAILED))
-        return WebChatPendingSendState.TimeoutResult(
-            WebChatPendingSendState.TimeoutAction.RESTORE,
-            prompt,
+        val rechecks = command.confirmationRechecks + 1
+        val unknown = command.copy(
+            acceptance = WebChatSendAcceptance.UNKNOWN,
+            pageSyncState = WebChatPageSyncState.RECONCILING,
+            confirmationRechecks = rechecks,
+            requiresOfficialConfirmation = rechecks > MAX_CONFIRMATION_RECHECKS,
         )
+        active = unknown
+        return if (unknown.requiresOfficialConfirmation) {
+            WebChatPendingSendState.TimeoutResult(
+                WebChatPendingSendState.TimeoutAction.REQUIRE_RECONCILIATION,
+            )
+        } else {
+            WebChatPendingSendState.TimeoutResult(
+                WebChatPendingSendState.TimeoutAction.KEEP_WAITING,
+            )
+        }
     }
 
     fun fallbackDecision(): FallbackDecision = when (active?.acceptance) {
