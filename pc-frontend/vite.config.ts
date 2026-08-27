@@ -48,6 +48,10 @@ export default defineConfig({
     },
     // 开发时将 API 请求代理到 Rust 后端
     proxy: {
+      '/health': {
+        target: apiProxyTarget,
+        changeOrigin: true,
+      },
       '/api': {
         target: apiProxyTarget,
         changeOrigin: true,

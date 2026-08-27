@@ -79,6 +79,15 @@ export function cloudBaseUrl(): string {
   return trimTrailingSlash(base)
 }
 
+/**
+ * 云端工作台和健康接口由同一服务托管时，优先使用当前页面的同源地址。
+ * 本地 Win 工作台没有云端 API 同源入口，才使用 bootstrap 提供的云端地址。
+ */
+export function cloudHealthUrl(): string {
+  const base = isLocalWorkbench() ? cloudBaseUrl() : location.origin
+  return new URL('/health', `${base}/`).toString()
+}
+
 export function localNodeBaseUrl(): string {
   if (validatedLocalNodeBaseUrl) return validatedLocalNodeBaseUrl
   const boot = safeLoopbackUrl(bootstrap().localNodeBaseUrl)

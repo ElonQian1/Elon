@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { MonitorCheck, RefreshCw, WifiOff } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { cloudBaseUrl, cloudWorkbenchUrl, isLocalWorkbench, localNodeUrl } from '../../api/runtime'
+import { cloudBaseUrl, cloudHealthUrl, cloudWorkbenchUrl, isLocalWorkbench, localNodeUrl } from '../../api/runtime'
 import { listLocalTasks } from '../local-tasks/localTaskApi'
 import { pendingSyncCountFromList } from '../local-tasks/localTaskModel'
 import styles from './Shell.module.css'
@@ -90,7 +90,7 @@ async function probeCloudHealth(): Promise<boolean> {
   const ctrl = new AbortController()
   const timer = setTimeout(() => ctrl.abort(), 2600)
   try {
-    const res = await fetch(new URL('/health', cloudBaseUrl()).toString(), {
+    const res = await fetch(cloudHealthUrl(), {
       cache: 'no-store',
       signal: ctrl.signal,
     })
