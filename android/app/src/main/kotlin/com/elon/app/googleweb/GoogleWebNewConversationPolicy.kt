@@ -19,7 +19,7 @@ internal object GoogleWebNewConversationPolicy {
         awaitingBoundary = awaitingBoundary,
         previous = previous,
         incoming = incoming,
-        canonicalLocation = GoogleWebNavigationPolicy::sanitizeRestorableUrl,
+        canonicalLocation = GoogleWebNavigationPolicy::sanitizeNavigableUrl,
     )) {
         WebChatNewConversationTransition.CONTINUE_CURRENT ->
             GoogleWebNewConversationTransition.CONTINUE_CURRENT

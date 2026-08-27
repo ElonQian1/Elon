@@ -73,7 +73,7 @@ internal class GoogleWebConversationStore(
     fun acceptOfficial(conversations: List<ChatGptWebConversation>): Boolean {
         var next = records
         conversations.take(MAX_ITEMS).asReversed().forEach { conversation ->
-            val url = GoogleWebNavigationPolicy.sanitizeRestorableUrl(conversation.providerUrl)
+            val url = GoogleWebNavigationPolicy.sanitizeConversationUrl(conversation.providerUrl)
                 ?: return@forEach
             val title = conversation.title.trim().takeIf(String::isNotBlank) ?: return@forEach
             next = GoogleWebConversationIndexPolicy.upsert(
@@ -97,8 +97,7 @@ internal class GoogleWebConversationStore(
         date: LocalDate = LocalDate.now(),
         preferredPath: String? = null,
     ): String? {
-        val safeUrl = GoogleWebNavigationPolicy.sanitizeRestorableUrl(url) ?: return null
-        if (!safeUrl.contains('?')) return null
+        val safeUrl = GoogleWebNavigationPolicy.sanitizeConversationUrl(url) ?: return null
         val upsert = GoogleWebConversationIndexPolicy.upsert(
             records = records,
             restorableUrl = safeUrl,
@@ -118,8 +117,7 @@ internal class GoogleWebConversationStore(
         ?.restorableUrl
 
     fun currentPath(url: String?): String? {
-        val safeUrl = GoogleWebNavigationPolicy.sanitizeRestorableUrl(url) ?: return null
-        if (!safeUrl.contains('?')) return null
+        val safeUrl = GoogleWebNavigationPolicy.sanitizeConversationUrl(url) ?: return null
         return GoogleWebConversationIndexPolicy.currentPath(records, safeUrl)
     }
 
@@ -219,7 +217,7 @@ internal object GoogleWebConversationCodec {
                 val id = value.optString("id").takeIf(ID::matches) ?: continue
                 if (!seen.add(id)) continue
                 val path = value.optString("path").takeIf { it == "$PATH_PREFIX$id" } ?: continue
-                val url = GoogleWebNavigationPolicy.sanitizeRestorableUrl(value.optString("url")) ?: continue
+                val url = GoogleWebNavigationPolicy.sanitizeConversationUrl(value.optString("url")) ?: continue
                 if (!seenUrls.add(url)) continue
                 val title = value.optString("title").trim().take(MAX_TITLE_LENGTH)
                 if (title.isBlank()) continue

@@ -33,4 +33,16 @@ class GoogleWebConversationNavigationCoordinatorTest {
 
         assertTrue(coordinator.shouldAccept("https://google.test/other"))
     }
+
+    @Test
+    fun defaultPolicyDoesNotAcceptATransientPromptUrlForAHistoryOpen() {
+        val stableUrl = "https://www.google.com/search?q=first&udm=50&csuir=thread-123"
+        val defaultCoordinator = GoogleWebConversationNavigationCoordinator()
+        defaultCoordinator.beginOpen("/google-ai-mode/conversation/target", stableUrl)
+
+        assertFalse(defaultCoordinator.shouldAccept(
+            "https://www.google.com/search?q=first&udm=50",
+        ))
+        assertTrue(defaultCoordinator.shouldAccept(stableUrl))
+    }
 }

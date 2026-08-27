@@ -127,15 +127,17 @@ internal class GoogleWebBackgroundSession(
         responseRefresh.stop()
         conversationNavigation.cancel()
         activePath = null
+        preferences.edit().remove(KEY_LAST_URL).apply()
         awaitingNewConversationBoundary = true
         pageAdapter?.startNewConversation()
     }
 
     fun currentConversationPath(): String? = conversationNavigation.selectedPath(activePath)
 
-    fun currentOfficialUrl(): String? = activePath
-        ?.let(conversationStore::restorableUrl)
-        ?: GoogleWebNavigationPolicy.sanitizeRestorableUrl(latestSnapshot?.url)
+    fun currentOfficialUrl(): String? = GoogleWebConversationResumePolicy.officialUrl(
+        activeUrl = activePath?.let(conversationStore::restorableUrl),
+        snapshotUrl = latestSnapshot?.url,
+    )
 
     fun conversationIndex(): ChatGptWebConversationIndexState = conversationStore.index(activePath)
 
@@ -147,7 +149,7 @@ internal class GoogleWebBackgroundSession(
 
     fun openConversation(path: String): Boolean {
         val url = conversationStore.restorableUrl(path) ?: return false
-        if (!GoogleWebNavigationPolicy.supportsAiMode(url)) return false
+        if (GoogleWebNavigationPolicy.sanitizeConversationUrl(url) != url) return false
         val view = webView ?: return false
         webExecution.interactionRequested()
         responseRefresh.stop()
@@ -285,9 +287,7 @@ internal class GoogleWebBackgroundSession(
                 recovery.onFailure()
                 return@prepare
             }
-            val restored = GoogleWebNavigationPolicy.sanitizeRestorableUrl(
-                preferences.getString(KEY_LAST_URL, null),
-            ) ?: GoogleWebNavigationPolicy.START_URL
+            val restored = GoogleWebConversationResumePolicy.startupUrl(storedConversationUrl())
             updateState(State.LOADING)
             webExecution.interactionRequested()
             view.loadUrl(restored)
@@ -343,7 +343,7 @@ internal class GoogleWebBackgroundSession(
                     snapshotStore.save(nextSnapshot)
                     observedPath?.let { conversationSnapshotStore.save(it, nextSnapshot) }
                 }
-                GoogleWebNavigationPolicy.sanitizeRestorableUrl(rawSnapshot.url)?.let { url ->
+                GoogleWebConversationResumePolicy.persistableUrl(rawSnapshot.url)?.let { url ->
                     preferences.edit().putString(KEY_LAST_URL, url).apply()
                 }
                 if (nextSnapshot.composerReady) {
@@ -441,16 +441,25 @@ internal class GoogleWebBackgroundSession(
 
     private fun reloadRestorablePage(): Boolean {
         val view = webView ?: return false
-        val restored = GoogleWebNavigationPolicy.sanitizeRestorableUrl(view.url)
-            ?: GoogleWebNavigationPolicy.sanitizeRestorableUrl(
-                preferences.getString(KEY_LAST_URL, null),
-            )
-            ?: GoogleWebNavigationPolicy.START_URL
+        val restored = GoogleWebConversationResumePolicy.reloadUrl(
+            currentUrl = view.url,
+            persistedUrl = storedConversationUrl(),
+        )
         view.stopLoading()
         updateState(State.LOADING)
         webExecution.interactionRequested()
         view.loadUrl(restored)
         return true
+    }
+
+    private fun storedConversationUrl(): String? {
+        val rawUrl = preferences.getString(KEY_LAST_URL, null) ?: return null
+        val safeUrl = GoogleWebConversationResumePolicy.persistableUrl(rawUrl)
+        if (safeUrl == rawUrl) return safeUrl
+        val editor = preferences.edit()
+        if (safeUrl == null) editor.remove(KEY_LAST_URL) else editor.putString(KEY_LAST_URL, safeUrl)
+        editor.apply()
+        return safeUrl
     }
 
     private companion object {

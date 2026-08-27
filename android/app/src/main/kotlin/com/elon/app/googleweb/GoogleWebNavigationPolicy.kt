@@ -23,7 +23,7 @@ internal object GoogleWebNavigationPolicy {
         }
     }
 
-    fun sanitizeRestorableUrl(rawUrl: String?): String? {
+    fun sanitizeNavigableUrl(rawUrl: String?): String? {
         val bounded = rawUrl?.take(MAX_URL_LENGTH) ?: return null
         val uri = parse(bounded)?.takeIf { supportsAiMode(bounded) } ?: return null
         val query = canonicalQuery(uri.path, uri.rawQuery)
@@ -32,6 +32,14 @@ internal object GoogleWebNavigationPolicy {
             append(uri.path)
             if (query.isNotEmpty()) append('?').append(query)
         }.take(MAX_URL_LENGTH)
+    }
+
+    fun sanitizeConversationUrl(rawUrl: String?): String? {
+        val canonical = sanitizeNavigableUrl(rawUrl) ?: return null
+        val uri = parse(canonical) ?: return null
+        if (uri.path != "/search") return null
+        if (queryValue(uri.rawQuery, "csuir").isNullOrBlank()) return null
+        return canonical
     }
 
     fun displayHost(rawUrl: String?): String = parse(rawUrl)?.host ?: "google.com"

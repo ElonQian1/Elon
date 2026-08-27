@@ -18,6 +18,7 @@ installed build; individual capability documents retain implementation evidence.
 | Server API realtime voice experiment | 一龙 AI / OpenAI API | Implemented but disabled and hidden from consumer UI | Native UI + persistent background WebView identity + official WebRTC |
 | Conversation directory | Google Web AI | Completed and enabled | Local cache and official page |
 | Visited conversation body cache | Google Web AI | Completed, enabled, and device verified | Official WebView navigation |
+| Stable conversation URL lifecycle | Google Web AI | Completed, enabled, and device verified on `v1.1.1317 (1327)` | Blank AI Mode plus native draft recovery |
 | Reply stream and completion observer | Google Web AI | Completed, enabled, and stream-to-completion device verified on `v1.1.1303 (1313)` | Official DOM snapshot |
 | Background navigation continuity | ChatGPT and Google Web AI | Completed, enabled, and device verified | Bounded official WebView recovery |
 | Unified native send ledger | ChatGPT and Google Web AI | Completed and enabled; stable request-ID reconciliation targeted tests passed, device regression pending | Official-page reconciliation without automatic write replay |
@@ -41,6 +42,13 @@ official directory response. Cached rows render immediately; a legacy or expired
 is then refreshed in the background, while a recently verified cache does not trigger
 another DOM read every time the side menu opens. The version 1 cache remains readable
 and migrates as stale instead of being discarded or misreported as freshly verified.
+
+Google prompt execution URLs and durable conversation URLs have separate contracts.
+An official `/search` URL without `csuir` may execute the current `q`, but it cannot enter
+the conversation directory, visited-body cache, restart pointer, history-open coordinator,
+or official fallback. Only a bounded allowlisted URL with a non-empty `csuir` is durable.
+Legacy prompt URLs are filtered during cache restore without clearing cookies or app data;
+recovery opens blank AI Mode instead of executing an old prompt again.
 
 Previously visited Google conversation bodies use a provider-scoped, URL-validated
 snapshot before official navigation starts. The cache is bounded to 30 days, 128 files,

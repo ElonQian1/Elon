@@ -9,7 +9,7 @@ internal object GoogleWebSnapshotPresentation {
         previous: ChatGptWebSnapshot?,
         url: String,
     ): ChatGptWebSnapshot = cached?.takeIf {
-        GoogleWebNavigationPolicy.sanitizeRestorableUrl(it.url) == url
+        GoogleWebNavigationPolicy.sanitizeConversationUrl(it.url) == url
     } ?: loading(previous, url)
 
     fun loading(previous: ChatGptWebSnapshot?, url: String): ChatGptWebSnapshot =

@@ -67,7 +67,7 @@ class GoogleWebOfficialActivity : AppCompatActivity() {
         webView = view
         val requestedUrl = intent.getStringExtra(EXTRA_START_URL)
         view.loadUrl(
-            GoogleWebNavigationPolicy.sanitizeRestorableUrl(requestedUrl)
+            GoogleWebNavigationPolicy.sanitizeNavigableUrl(requestedUrl)
                 ?: GoogleWebNavigationPolicy.START_URL,
         )
         onBackPressedDispatcher.addCallback(this, object : androidx.activity.OnBackPressedCallback(true) {
@@ -121,7 +121,7 @@ class GoogleWebOfficialActivity : AppCompatActivity() {
 
         fun createIntent(context: Context, startUrl: String? = null) =
             Intent(context, GoogleWebOfficialActivity::class.java).apply {
-                GoogleWebNavigationPolicy.sanitizeRestorableUrl(startUrl)?.let { safeUrl ->
+                GoogleWebNavigationPolicy.sanitizeNavigableUrl(startUrl)?.let { safeUrl ->
                     putExtra(EXTRA_START_URL, safeUrl)
                 }
             }

@@ -28,7 +28,7 @@ class GoogleWebSnapshotPresentationTest {
         val opening = GoogleWebSnapshotPresentation.opening(
             cached = previous(),
             previous = previous(),
-            url = "https://www.google.com/search?q=another&udm=50",
+            url = "https://www.google.com/search?q=another&udm=50&csuir=thread-another",
         )
 
         assertTrue(opening.messages.isEmpty())
@@ -50,7 +50,7 @@ class GoogleWebSnapshotPresentationTest {
 
     private fun previous() = ChatGptWebSnapshot(
         title = "private",
-        url = "https://www.google.com/search?q=private&udm=50",
+        url = "https://www.google.com/search?q=private&udm=50&csuir=thread-private",
         draft = "private draft",
         messages = listOf(ChatGptWebMessage(
             "message",

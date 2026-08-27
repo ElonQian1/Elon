@@ -1,7 +1,7 @@
 package com.elon.app.googleweb
 
 internal class GoogleWebConversationNavigationCoordinator(
-    private val sanitizeUrl: (String?) -> String? = GoogleWebNavigationPolicy::sanitizeRestorableUrl,
+    private val sanitizeUrl: (String?) -> String? = GoogleWebNavigationPolicy::sanitizeConversationUrl,
 ) {
     private var pending: PendingOpen? = null
 
