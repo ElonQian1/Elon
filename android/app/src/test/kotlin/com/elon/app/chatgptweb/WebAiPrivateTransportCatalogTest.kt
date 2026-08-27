@@ -186,12 +186,16 @@ class WebAiPrivateTransportCatalogTest {
             byId["android_chatgpt_web_private_voice_native_relay_v1"],
         )
         assertEquals(
-            "relay_contract_implemented",
+            "native_peer_implemented",
             nativeVoiceRelay.getString("implementation_status"),
+        )
+        assertEquals(
+            "research_apk_compiled_and_packaged_device_media_pending",
+            nativeVoiceRelay.getString("verification_status"),
         )
         assertFalse(nativeVoiceRelay.getBoolean("production_default"))
         assertEquals(
-            BuildConfig.CHATGPT_PRIVATE_RESEARCH_ENABLED,
+            BuildConfig.CHATGPT_PRIVATE_VOICE_NATIVE_RTC_ENABLED,
             nativeVoiceRelay.getBoolean("runtime_enabled"),
         )
         assertEquals(

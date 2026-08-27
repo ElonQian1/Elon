@@ -11,6 +11,25 @@ internal class ChatGptWebPrivateVoiceAnswer internal constructor(
     override fun toString(): String = "ChatGptWebPrivateVoiceAnswer(<redacted>)"
 }
 
+internal data class ChatGptWebPrivateVoiceDataChannelHint(
+    val label: String,
+    val ordered: Boolean,
+    val maxRetransmits: Int?,
+    val protocol: String,
+    val negotiated: Boolean,
+    val id: Int?,
+)
+
+internal sealed interface ChatGptWebPrivateVoiceBootstrap {
+    data class Ready(
+        val dataChannel: ChatGptWebPrivateVoiceDataChannelHint,
+    ) : ChatGptWebPrivateVoiceBootstrap
+
+    data class Unavailable(
+        val code: String,
+    ) : ChatGptWebPrivateVoiceBootstrap
+}
+
 internal sealed interface ChatGptWebPrivateVoiceRelayPoll {
     data object Pending : ChatGptWebPrivateVoiceRelayPoll
 
@@ -43,12 +62,65 @@ internal object ChatGptWebPrivateVoiceRelayContract {
     fun validOffer(value: String): Boolean =
         value.length in 16..MAX_OFFER_LENGTH && isAudioSdp(value)
 
+    fun bootstrapScript(): String =
+        """
+            (function () {
+              var relay = $RELAY_OBJECT;
+              return relay && relay.version >= 2
+                ? relay.bootstrap()
+                : JSON.stringify({version: 2, available: false, templateState: "missing", dataChannelState: "missing"});
+            })();
+        """.trimIndent()
+
+    fun parseBootstrap(rawEvaluateValue: String?): ChatGptWebPrivateVoiceBootstrap {
+        val value = parseEvaluateObject(rawEvaluateValue)
+            ?: return ChatGptWebPrivateVoiceBootstrap.Unavailable("malformed_bootstrap")
+        if (value.optInt("version") < 2) {
+            return ChatGptWebPrivateVoiceBootstrap.Unavailable("unsupported_relay")
+        }
+        if (!value.optBoolean("available")) {
+            val code = when {
+                value.optString("templateState") == "consumed" -> "template_consumed"
+                value.optString("templateState") == "expired" -> "template_expired"
+                value.optString("dataChannelState") == "expired" -> "data_channel_expired"
+                value.optString("dataChannelState") != "ready" -> "data_channel_unavailable"
+                else -> "template_unavailable"
+            }
+            return ChatGptWebPrivateVoiceBootstrap.Unavailable(code)
+        }
+        val dataChannel = value.optJSONObject("dataChannel")
+            ?: return ChatGptWebPrivateVoiceBootstrap.Unavailable("data_channel_unavailable")
+        val label = dataChannel.optString("label")
+        val protocol = dataChannel.optString("protocol")
+        val maxRetransmits = dataChannel.optNullableInt("maxRetransmits", 0..65_535)
+        val id = dataChannel.optNullableInt("id", 0..65_534)
+        if (!validToken(label, 64) || (protocol.isNotEmpty() && !validToken(protocol, 64))) {
+            return ChatGptWebPrivateVoiceBootstrap.Unavailable("invalid_data_channel")
+        }
+        if (
+            dataChannel.has("maxRetransmits") && !dataChannel.isNull("maxRetransmits") && maxRetransmits == null ||
+            dataChannel.has("id") && !dataChannel.isNull("id") && id == null
+        ) {
+            return ChatGptWebPrivateVoiceBootstrap.Unavailable("invalid_data_channel")
+        }
+        return ChatGptWebPrivateVoiceBootstrap.Ready(
+            ChatGptWebPrivateVoiceDataChannelHint(
+                label = label,
+                ordered = dataChannel.optBoolean("ordered", true),
+                maxRetransmits = maxRetransmits,
+                protocol = protocol,
+                negotiated = dataChannel.optBoolean("negotiated", false),
+                id = id,
+            ),
+        )
+    }
+
     fun startScript(requestId: String, offer: String): String? {
         if (!REQUEST_ID.matches(requestId) || !validOffer(offer)) return null
         return """
             (function () {
               var relay = $RELAY_OBJECT;
-              if (!relay || relay.version !== 1) return false;
+              if (!relay || relay.version < 2) return false;
               return relay.startExchange(${JSONObject.quote(requestId)}, ${JSONObject.quote(offer)});
             })();
         """.trimIndent()
@@ -59,7 +131,7 @@ internal object ChatGptWebPrivateVoiceRelayContract {
         return """
             (function () {
               var relay = $RELAY_OBJECT;
-              return relay && relay.version === 1
+              return relay && relay.version >= 2
                 ? relay.takeResult(${JSONObject.quote(requestId)})
                 : JSON.stringify({status: "failed", code: "template_unavailable"});
             })();
@@ -70,13 +142,7 @@ internal object ChatGptWebPrivateVoiceRelayContract {
         if (rawEvaluateValue.isNullOrBlank() || rawEvaluateValue == "null") {
             return ChatGptWebPrivateVoiceRelayPoll.Pending
         }
-        val unwrapped = runCatching { JSONTokener(rawEvaluateValue).nextValue() }.getOrNull()
-        val payload = when (unwrapped) {
-            is String -> unwrapped
-            else -> return ChatGptWebPrivateVoiceRelayPoll.Failed("malformed_result")
-        }
-        if (payload.isBlank()) return ChatGptWebPrivateVoiceRelayPoll.Pending
-        val value = runCatching { JSONObject(payload) }.getOrNull()
+        val value = parseEvaluateObject(rawEvaluateValue)
             ?: return ChatGptWebPrivateVoiceRelayPoll.Failed("malformed_result")
         return when (value.optString("status")) {
             "ok" -> {
@@ -99,4 +165,25 @@ internal object ChatGptWebPrivateVoiceRelayContract {
     private fun isAudioSdp(value: String): Boolean =
         (value.startsWith("v=0\r\n") || value.startsWith("v=0\n")) &&
             Regex("(?:\\r?\\n)m=audio\\s", RegexOption.IGNORE_CASE).containsMatchIn(value)
+
+    private fun parseEvaluateObject(rawEvaluateValue: String?): JSONObject? {
+        if (rawEvaluateValue.isNullOrBlank() || rawEvaluateValue == "null") return null
+        val unwrapped = runCatching { JSONTokener(rawEvaluateValue).nextValue() }.getOrNull()
+        val payload = unwrapped as? String ?: return null
+        if (payload.isBlank()) return null
+        return runCatching { JSONObject(payload) }.getOrNull()
+    }
+
+    private fun validToken(value: String, maxLength: Int): Boolean =
+        value.length in 1..maxLength && value.all { it.code in 0x20..0x7e }
+
+    private fun JSONObject.optNullableInt(key: String, range: IntRange): Int? {
+        if (!has(key) || isNull(key)) return null
+        val value = opt(key) as? Number ?: return null
+        val longValue = value.toLong()
+        if (value.toDouble() != longValue.toDouble() || longValue !in range.first.toLong()..range.last.toLong()) {
+            return null
+        }
+        return longValue.toInt()
+    }
 }

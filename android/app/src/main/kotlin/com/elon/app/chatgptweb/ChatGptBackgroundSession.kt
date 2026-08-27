@@ -109,6 +109,7 @@ internal class ChatGptBackgroundSession(
     private val realtimeVoiceBacking: ChatGptRealtimeVoiceBackingController by
         lazy(LazyThreadSafetyMode.NONE) {
             ChatGptRealtimeVoiceBackingController(
+                activity.applicationContext,
                 ::ensureInitialized, { webView }, surfaceMode, { webExecution.interactionRequested() },
                 { pageAdapter?.requestConversationRefresh() },
                 { pageAdapter?.requestSnapshot() },
@@ -316,7 +317,7 @@ internal class ChatGptBackgroundSession(
             },
             dismissComposerOptionsAction = composerOptionRequests::dismiss,
         )
-        return ChatGptWebMcpActions(
+        val officialPort = ChatGptWebMcpActions(
             snapshot = { latestSnapshot },
             uiManifest = { latestUiManifest },
             observedState = observedMcpState::snapshot,
@@ -333,6 +334,12 @@ internal class ChatGptBackgroundSession(
             refresh = { webView?.reload() },
             selectMode = selectMode,
             revealMessage = revealMessage,
+        )
+        return ChatGptWebNativeVoiceResearchMcpPort(
+            delegate = officialPort,
+            startNative = realtimeVoiceBacking::beginNativePrivateVoiceResearch,
+            muteNative = realtimeVoiceBacking::muteNativePrivateVoiceResearch,
+            stopNative = { realtimeVoiceBacking.end(gracefulExit = true) },
         )
     }
 

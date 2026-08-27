@@ -75,12 +75,12 @@ relay:
   page session; any unknown shape, timeout, or mismatch falls back to the existing
   official page-created WebRTC route.
 
-The repository intentionally has no Android native WebRTC dependency yet. The
-official WebRTC Android source exposes `PeerConnectionFactory`, audio sources,
-audio tracks, offers, answers, and peer observers, but the upstream project expects
-Android consumers to build its JNI-backed SDK. A precompiled dependency must be
-reviewed for provenance, ABI size, update cadence, and audio-only packaging before
-it enters even a research APK.
+The repository now compiles against the pinned research dependency
+`io.github.webrtc-sdk:android-prefixed-stripped:144.7559.14`. Normal builds use it
+as `compileOnly`; the JNI libraries are added with `runtimeOnly` only when both
+`ELON_CHATGPT_PRIVATE_RESEARCH=true` and
+`ELON_CHATGPT_PRIVATE_VOICE_NATIVE_RTC=true`. This keeps the experiment out of the
+production APK while retaining a compile-time contract with the Android WebRTC API.
 
 The next capability is tracked separately as
 `android_chatgpt_web_private_voice_native_relay_v1`. Its first proof must reuse the
@@ -113,3 +113,25 @@ rendering. This is not yet a device proof of React-independent media. The next s
 must add the research-only native audio peer, pass its offer through this relay, apply
 the answer, and verify remote audio plus clean close on one supervised device before
 the capability can be considered for production.
+
+## Stage 5 Native Peer Implementation
+
+The research-only native peer is implemented and a signed research Release APK has
+compiled with all four packaged WebRTC JNI ABIs. The native path now:
+
+- initializes one process-wide Android `PeerConnectionFactory`;
+- creates an audio-only Unified Plan peer connection, native microphone track, and
+  the bounded data-channel shape observed from the official page;
+- creates and applies the local offer, sends it through the page-local relay, and
+  applies the returned answer without logging SDP, ICE, credentials, or content;
+- exposes only structural connection, remote-audio, data-channel, mute, timeout,
+  and close state to the research control surface; and
+- closes on a 20-second connect timeout and leaves the official page-created WebRTC
+  path available as the production fallback.
+
+This completes code and package feasibility, not device media validation. The
+capability remains disabled in production until one supervised device proves duplex
+audio, mute, close, transcript/current-conversation reconciliation, fast reopen,
+background recovery, and deterministic fallback. A failure in any of those steps is
+evidence to keep the native transport experimental, not to remove the existing
+official voice path.

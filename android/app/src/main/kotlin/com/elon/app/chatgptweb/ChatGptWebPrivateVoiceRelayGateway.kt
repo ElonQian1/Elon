@@ -27,6 +27,24 @@ internal class ChatGptWebPrivateVoiceRelayGateway(
     private var completion: ((ChatGptWebPrivateVoiceRelayResult) -> Unit)? = null
     private var deadlineMs = 0L
 
+    fun readBootstrap(
+        onComplete: (ChatGptWebPrivateVoiceBootstrap) -> Unit,
+    ): Boolean {
+        if (!BuildConfig.CHATGPT_PRIVATE_RESEARCH_ENABLED) {
+            onComplete(ChatGptWebPrivateVoiceBootstrap.Unavailable("disabled"))
+            return false
+        }
+        val view = webView()
+        if (view == null) {
+            onComplete(ChatGptWebPrivateVoiceBootstrap.Unavailable("unavailable"))
+            return false
+        }
+        view.evaluateJavascript(ChatGptWebPrivateVoiceRelayContract.bootstrapScript()) { raw ->
+            onComplete(ChatGptWebPrivateVoiceRelayContract.parseBootstrap(raw))
+        }
+        return true
+    }
+
     fun exchange(
         offer: String,
         onComplete: (ChatGptWebPrivateVoiceRelayResult) -> Unit,

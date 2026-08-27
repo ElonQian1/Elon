@@ -120,6 +120,10 @@ def debugAppLabel = signingValue("ELON_DEBUG_APP_LABEL", localNodeName)
 def chatGptPrivateResearchEnabled = project.findProperty("ELON_CHATGPT_PRIVATE_RESEARCH")
     ?.toString()
     ?.toBoolean() ?: false
+def chatGptPrivateVoiceNativeRtcEnabled =
+    project.findProperty("ELON_CHATGPT_PRIVATE_VOICE_NATIVE_RTC")
+        ?.toString()
+        ?.toBoolean() ?: false
 def chatGptPrivateConversationPrefetchEnabled =
     project.findProperty("ELON_CHATGPT_PRIVATE_CONVERSATION_PREFETCH")
         ?.toString()
@@ -140,6 +144,9 @@ def chatGptPrivateResearchVersionName = project.findProperty("ELON_CHATGPT_PRIVA
     ?.trim()
 if ((chatGptPrivateResearchVersionCode || chatGptPrivateResearchVersionName) && !chatGptPrivateResearchEnabled) {
     throw new GradleException("ChatGPT private research version overrides require ELON_CHATGPT_PRIVATE_RESEARCH=true")
+}
+if (chatGptPrivateVoiceNativeRtcEnabled && !chatGptPrivateResearchEnabled) {
+    throw new GradleException("ELON_CHATGPT_PRIVATE_VOICE_NATIVE_RTC requires ELON_CHATGPT_PRIVATE_RESEARCH=true")
 }
 if (chatGptPrivateResearchVersionCode && !(chatGptPrivateResearchVersionCode ==~ /^[1-9][0-9]{0,8}$/)) {
     throw new GradleException("ELON_CHATGPT_PRIVATE_RESEARCH_VERSION_CODE must be a positive integer")
@@ -204,6 +211,7 @@ android {
         buildConfigField "int", "CHATGPT_WEB_VERIFIED_APK_VERSION_CODE", "${project.ext.chatGptWebVerifiedApkVersionCode}"
         buildConfigField "String", "CHATGPT_WEB_VERIFIED_SOURCE_COMMIT", "\"${project.ext.chatGptWebVerifiedSourceCommit}\""
         buildConfigField "boolean", "CHATGPT_PRIVATE_RESEARCH_ENABLED", "${chatGptPrivateResearchEnabled}"
+        buildConfigField "boolean", "CHATGPT_PRIVATE_VOICE_NATIVE_RTC_ENABLED", "${chatGptPrivateVoiceNativeRtcEnabled}"
         buildConfigField "boolean", "CHATGPT_PRIVATE_CONVERSATION_PREFETCH_ENABLED", "${chatGptPrivateConversationPrefetchEnabled}"
         buildConfigField "boolean", "CHATGPT_PRIVATE_STREAM_OBSERVER_ENABLED", "${chatGptPrivateStreamObserverEnabled}"
         buildConfigField "boolean", "GOOGLE_WEB_PRIVATE_RESEARCH_ENABLED", "${googleWebPrivateResearchEnabled}"
@@ -340,6 +348,13 @@ dependencies {
     implementation 'androidx.webkit:webkit:1.12.1'
     implementation 'androidx.lifecycle:lifecycle-viewmodel-ktx:2.7.0'
     implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.7.0'
+
+    // Research-only native audio peer. The production APK sees the API at compile time
+    // but packages the pinned AAR only when both private research flags are explicit.
+    compileOnly 'io.github.webrtc-sdk:android-prefixed-stripped:144.7559.14'
+    if (chatGptPrivateVoiceNativeRtcEnabled) {
+        runtimeOnly 'io.github.webrtc-sdk:android-prefixed-stripped:144.7559.14'
+    }
 
     // Google 官方 Sign in with Google（Credential Manager + OIDC ID token）
     implementation 'androidx.credentials:credentials:1.3.0'

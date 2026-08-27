@@ -4,7 +4,7 @@
   if (window.__elonChatGptPrivateResearchEnabled !== true) return;
   if (location.origin !== 'https://chatgpt.com') return;
   const existing = window.__elonChatGptPrivateVoiceRelay;
-  if (existing && Number(existing.version) >= 1) return;
+  if (existing && Number(existing.version) >= 2) return;
 
   const nativeFetch = window.fetch;
   const maxTemplateAgeMs = 2 * 60 * 1000;
@@ -15,6 +15,8 @@
   const requestIdPattern = /^relay_[a-z0-9]{8,32}$/;
   let template = null;
   let templateGeneration = 0;
+  let dataChannelHint = null;
+  let dataChannelGeneration = 0;
   let inFlightRequestId = null;
   let relayFetchDepth = 0;
   const results = new Map();
@@ -101,6 +103,59 @@
     pruneResults();
   }
 
+  function validToken(value, maxLength) {
+    return typeof value === 'string' &&
+      value.length >= 1 &&
+      value.length <= maxLength &&
+      /^[\x20-\x7e]+$/.test(value);
+  }
+
+  function captureDataChannel(label, options) {
+    if (!validToken(label, 64)) return;
+    const source = options && typeof options === 'object' ? options : {};
+    if (
+      source.protocol !== undefined &&
+      source.protocol !== '' &&
+      !validToken(source.protocol, 64)
+    ) return;
+    const maxRetransmits = Number.isInteger(source.maxRetransmits)
+      ? source.maxRetransmits
+      : null;
+    const id = Number.isInteger(source.id) ? source.id : null;
+    if (maxRetransmits !== null && (maxRetransmits < 0 || maxRetransmits > 65535)) return;
+    if (id !== null && (id < 0 || id > 65534)) return;
+    dataChannelGeneration += 1;
+    dataChannelHint = {
+      generation: dataChannelGeneration,
+      capturedAt: now(),
+      label,
+      ordered: source.ordered === undefined ? true : source.ordered === true,
+      maxRetransmits,
+      protocol: source.protocol === undefined ? '' : source.protocol,
+      negotiated: source.negotiated === true,
+      id
+    };
+  }
+
+  function installPeerCapture() {
+    const NativePeerConnection = window.RTCPeerConnection;
+    if (typeof NativePeerConnection !== 'function') return;
+    function RelayPeerConnection(configuration, constraints) {
+      const peer = new NativePeerConnection(configuration, constraints);
+      if (peer && typeof peer.createDataChannel === 'function') {
+        const originalCreateDataChannel = peer.createDataChannel.bind(peer);
+        peer.createDataChannel = function (label, options) {
+          captureDataChannel(label, options);
+          return originalCreateDataChannel(label, options);
+        };
+      }
+      return peer;
+    }
+    RelayPeerConnection.prototype = NativePeerConnection.prototype;
+    try { Object.setPrototypeOf(RelayPeerConnection, NativePeerConnection); } catch (_) {}
+    window.RTCPeerConnection = RelayPeerConnection;
+  }
+
   function pruneResults() {
     const cutoff = now() - resultLifetimeMs;
     results.forEach((entry, key) => {
@@ -145,13 +200,19 @@
   async function exchange(requestId, offer) {
     if (inFlightRequestId !== requestId) return;
     const activeTemplate = template;
+    const controller = typeof AbortController === 'function' ? new AbortController() : null;
     let timeoutId = null;
     try {
       relayFetchDepth += 1;
+      const init = buildInit(buildForm(offer));
+      if (controller) init.signal = controller.signal;
       const response = await Promise.race([
-        nativeFetch.call(window, activeTemplate.url, buildInit(buildForm(offer))),
+        nativeFetch.call(window, activeTemplate.url, init),
         new Promise((_, reject) => {
-          timeoutId = setTimeout(() => reject(new Error('timeout')), maxExchangeMs);
+          timeoutId = setTimeout(() => {
+            if (controller) controller.abort();
+            reject(new Error('timeout'));
+          }, maxExchangeMs);
         })
       ]);
       if (!response || !response.ok) {
@@ -219,15 +280,38 @@
     return JSON.stringify(entry.value);
   }
 
-  function state() {
+  function bootstrap() {
     const age = template ? Math.max(0, now() - template.capturedAt) : 0;
+    const dataChannelAge = dataChannelHint
+      ? Math.max(0, now() - dataChannelHint.capturedAt)
+      : 0;
+    const dataChannelReady = Boolean(
+      dataChannelHint && dataChannelAge <= maxTemplateAgeMs
+    );
+    const templateReady = Boolean(template && !template.used && age <= maxTemplateAgeMs);
     return JSON.stringify({
-      version: 1,
-      available: Boolean(template && !template.used && age <= maxTemplateAgeMs),
+      version: 2,
+      available: templateReady && dataChannelReady,
       templateGeneration,
       templateState: !template ? 'missing' : template.used ? 'consumed' : age > maxTemplateAgeMs ? 'expired' : 'ready',
+      dataChannelGeneration,
+      dataChannelState: !dataChannelHint ? 'missing' : dataChannelAge > maxTemplateAgeMs ? 'expired' : 'ready',
+      dataChannel: dataChannelReady ? {
+        label: dataChannelHint.label,
+        ordered: dataChannelHint.ordered,
+        maxRetransmits: dataChannelHint.maxRetransmits,
+        protocol: dataChannelHint.protocol,
+        negotiated: dataChannelHint.negotiated,
+        id: dataChannelHint.id
+      } : null,
       inFlight: Boolean(inFlightRequestId)
     });
+  }
+
+  function state() {
+    const value = JSON.parse(bootstrap());
+    delete value.dataChannel;
+    return JSON.stringify(value);
   }
 
   function relayFetch(input, init) {
@@ -235,9 +319,11 @@
     return nativeFetch.apply(this, arguments);
   }
 
+  installPeerCapture();
   window.fetch = relayFetch;
   window.__elonChatGptPrivateVoiceRelay = Object.freeze({
-    version: 1,
+    version: 2,
+    bootstrap,
     state,
     startExchange,
     takeResult

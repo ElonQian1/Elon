@@ -16,9 +16,15 @@ const upstream = async (input, init) => {
   calls.push({ input, init });
   return new Response(answer, { status: 201, headers: { 'content-type': 'application/sdp' } });
 };
+class FakePeerConnection {
+  createDataChannel(label, options) {
+    return { label, options };
+  }
+}
 const window = {
   __elonChatGptPrivateResearchEnabled: true,
-  fetch: upstream
+  fetch: upstream,
+  RTCPeerConnection: FakePeerConnection
 };
 window.window = window;
 const context = {
@@ -33,6 +39,7 @@ const context = {
   Map,
   JSON,
   Promise,
+  AbortController,
   setTimeout,
   clearTimeout
 };
@@ -58,6 +65,13 @@ async function main() {
   officialBody.append('sdp', originalOffer);
   officialBody.append('session', privateSession);
 
+  const peer = new window.RTCPeerConnection();
+  peer.createDataChannel('oai-events', {
+    ordered: true,
+    protocol: '',
+    negotiated: false
+  });
+
   await window.fetch('https://chatgpt.com/realtime/wm', {
     method: 'POST',
     credentials: 'include',
@@ -66,13 +80,23 @@ async function main() {
   });
 
   const relay = window.__elonChatGptPrivateVoiceRelay;
-  assert.equal(relay.version, 1);
+  assert.equal(relay.version, 2);
   assert.deepEqual(JSON.parse(relay.state()), {
-    version: 1,
+    version: 2,
     available: true,
     templateGeneration: 1,
     templateState: 'ready',
+    dataChannelGeneration: 1,
+    dataChannelState: 'ready',
     inFlight: false
+  });
+  assert.deepEqual(JSON.parse(relay.bootstrap()).dataChannel, {
+    label: 'oai-events',
+    ordered: true,
+    maxRetransmits: null,
+    protocol: '',
+    negotiated: false,
+    id: null
   });
   assert.equal(relay.startExchange('relay_12345678', nativeOffer), true);
   const result = await take('relay_12345678');
@@ -82,6 +106,7 @@ async function main() {
   assert.equal(calls[1].init.body.get('sdp'), nativeOffer);
   assert.equal(calls[1].init.body.get('session'), privateSession);
   assert.equal(calls[1].init.credentials, 'include');
+  assert.ok(calls[1].init.signal instanceof AbortSignal);
   assert.equal(calls[1].init.headers.get('x-private-runtime'), 'private-must-stay-in-page-memory');
 
   assert.equal(relay.startExchange('relay_abcdefgh', nativeOffer), false);
@@ -95,7 +120,7 @@ async function main() {
     code: 'invalid_offer'
   });
 
-  const publicState = relay.state().toLowerCase();
+  const publicState = `${relay.state()} ${relay.bootstrap()}`.toLowerCase();
   assert.doesNotMatch(publicState, /private-must-stay|conversation_id|backend_model|x-private-runtime/);
   console.log('CHATGPT_WEB_PRIVATE_VOICE_RELAY_TESTS=passed');
 }
