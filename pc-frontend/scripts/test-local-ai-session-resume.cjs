@@ -74,6 +74,7 @@ async function main() {
   assert.deepEqual(await reuse('chatgpt', 'owner', warm), { state: warm, reused: true })
   assert.equal(opened, false)
 
+  require('./test-local-ai-background-navigation-recovery.cjs')
   process.stdout.write('PASS local AI native cache-first session resume\n')
 }
 

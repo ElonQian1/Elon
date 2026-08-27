@@ -68,6 +68,7 @@ import { syncLocalAiDeferredMenu } from './localAiDeferredMenuSync'
 import useLocalAiCachedConversationNavigation from './useLocalAiCachedConversationNavigation'
 import { dispatchPreparedLocalAiPrompt } from './dispatchPreparedLocalAiPrompt'
 import { localAiQueuedSendRecoveryAction } from './localAiQueuedSendRecoveryPolicy'
+import useLocalAiBackgroundNavigationRecovery from './useLocalAiBackgroundNavigationRecovery'
 export default function useLocalAiWebChatController(
   provider: LocalAiWebProvider | undefined,
   ownerKey: string,
@@ -752,6 +753,13 @@ export default function useLocalAiWebChatController(
     snapshot: liveSnapshot,
     foregroundBlocked: capabilityPrewarmBlocked,
     onState: setSessionState,
+  })
+  useLocalAiBackgroundNavigationRecovery({
+    providerId, ownerKey, state: visibleSessionState,
+    blocked: Boolean(busyAction || pendingSends.length || pendingResponses.length
+      || newConversationRecoveryStartedAtMs || userState.phase === 'streaming'),
+    onState: setSessionState,
+    onMessage: setMessage,
   })
 
   return {
