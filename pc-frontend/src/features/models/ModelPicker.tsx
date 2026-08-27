@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
-import { Settings } from 'lucide-react'
+import { ChevronDown, Search, Settings } from 'lucide-react'
 import { useModelStore } from './useModelStore'
 import { useAuthStore } from '../../store/auth'
 import { providerGroupTitle, shortButtonLabel } from './modelUtils'
@@ -53,6 +53,8 @@ export function ModelPickerPopover({
   const [pos, setPos] = useState({ left: 12, bottom: 12, width: 360 })
   const [previewKey, setPreviewKey] = useState<string | null>(null)
   const [previewAnchorRect, setPreviewAnchorRect] = useState<DOMRect | null>(null)
+  const [modelQuery, setModelQuery] = useState('')
+  const [showDetectedModels, setShowDetectedModels] = useState(false)
   const previewCloseTimer = useRef<number | null>(null)
   const hasRuntimeRoutePicker = !!runtimeRoute && !!onRuntimeRouteChange
   const route = runtimeRoute ?? DEFAULT_RUNTIME_ROUTE
@@ -67,7 +69,11 @@ export function ModelPickerPopover({
       const targetWidth = hasRuntimeRoutePicker ? 680 : 430
       const width = Math.min(targetWidth, window.innerWidth - 24)
       const left = Math.max(12, Math.min(rect.left, window.innerWidth - width - 12))
-      const bottom = Math.max(12, window.innerHeight - rect.top + 8)
+      const estimatedHeight = hasRuntimeRoutePicker
+        ? Math.min(window.innerWidth <= 720 ? 680 : 620, window.innerHeight - 24)
+        : Math.min(520, window.innerHeight - 24)
+      const maxBottom = Math.max(12, window.innerHeight - estimatedHeight - 12)
+      const bottom = Math.max(12, Math.min(window.innerHeight - rect.top + 8, maxBottom))
       setPos({ left: Math.round(left), bottom: Math.round(bottom), width })
     }
     reposition()
@@ -80,6 +86,11 @@ export function ModelPickerPopover({
       if (previewCloseTimer.current) window.clearTimeout(previewCloseTimer.current)
     }
   }, [])
+
+  useEffect(() => {
+    setModelQuery('')
+    setShowDetectedModels(false)
+  }, [route])
 
   // 初次打开时加载
   useEffect(() => {
@@ -140,9 +151,28 @@ export function ModelPickerPopover({
   const previewGroup =
     previewKey ? modelGroups.find((group) => group.key === previewKey) ?? null : null
 
+  const query = modelQuery.trim().toLowerCase()
+  const matchesQuery = (group: ModelOptionGroup) => {
+    if (!query) return true
+    return `${group.label} ${group.subtitle} ${providerGroupTitle(group.provider)}`
+      .toLowerCase()
+      .includes(query)
+  }
+  const availableModelGroups = modelGroups.filter((group) =>
+    group.options.some((option) => option.selectable !== false),
+  )
+  const detectedModelGroups = modelGroups.filter((group) =>
+    group.options.every((option) => option.selectable === false),
+  )
+  const displayedModelGroups = (showDetectedModels
+    ? modelGroups
+    : availableModelGroups
+  ).filter(matchesQuery)
+  const selectedModelGroup = modelGroups.find((group) => group.selectedOption)
+
   // 按 provider 分组
   const providerGroups = new Map<string, ModelOptionGroup[]>()
-  for (const group of modelGroups) {
+  for (const group of displayedModelGroups) {
     const title = providerGroupTitle(group.provider)
     if (!providerGroups.has(title)) providerGroups.set(title, [])
     providerGroups.get(title)!.push(group)
@@ -178,6 +208,10 @@ export function ModelPickerPopover({
         <div className={hasRuntimeRoutePicker ? styles.pickerBody : styles.singleBody}>
           {hasRuntimeRoutePicker && (
             <aside className={styles.routePane} aria-label="用哪个 AI">
+              <div className={styles.paneIntro}>
+                <strong>AI 来源</strong>
+                <span>先决定由哪台电脑或平台提供 AI</span>
+              </div>
               {ACTIVE_RUNTIME_ROUTE_GROUPS.map((group) => (
                 <section className={styles.routeGroup} key={group.title}>
                   <div className={styles.routeGroupTitle}>
@@ -227,6 +261,33 @@ export function ModelPickerPopover({
           )}
 
           <div className={styles.modelPane}>
+            <div className={styles.modelPaneHeader}>
+              <div>
+                <span className={styles.paneEyebrow}>当前来源 · {selectedRoute.shortLabel}</span>
+                <strong>{selectedModelGroup?.label ?? (route === 'auto' ? '自动选择模型' : '选择模型')}</strong>
+              </div>
+              <span className={styles.modelCount}>{availableModelGroups.length} 个可用</span>
+            </div>
+            <p className={styles.routeDescription}>{selectedRoute.description}</p>
+            <label className={styles.searchBox}>
+              <Search size={14} aria-hidden="true" />
+              <input
+                value={modelQuery}
+                onChange={(event) => setModelQuery(event.target.value)}
+                placeholder="搜索模型或服务商"
+                aria-label="搜索模型或服务商"
+              />
+              {modelQuery && (
+                <button
+                  type="button"
+                  className={styles.clearSearch}
+                  onClick={() => setModelQuery('')}
+                  aria-label="清除模型搜索"
+                >
+                  ×
+                </button>
+              )}
+            </label>
             <div className={styles.list} onScroll={schedulePreviewClose}>
               {loading && <p className={styles.empty}>正在读取模型列表…</p>}
               {!loading && (error || saveError) && (
@@ -246,10 +307,19 @@ export function ModelPickerPopover({
                   )}
                 </div>
               )}
+              {!loading && !error && query && visibleOptions.length > 0 && displayedModelGroups.length === 0 && (
+                <div className={styles.emptyCard}>
+                  <strong>没有匹配的模型</strong>
+                  <span>换一个关键词，或清除搜索条件。</span>
+                </div>
+              )}
               {!loading &&
                 Array.from(providerGroups.entries()).map(([title, groupedOptions]) => (
                   <div key={title}>
-                    {title !== '默认' && <div className={styles.section}>{title}</div>}
+                    <div className={styles.section}>
+                      <span>{title}</span>
+                      <span>{groupedOptions.length} 个</span>
+                    </div>
                     {groupedOptions.map((group) => (
                       <button
                         key={group.key}
@@ -283,6 +353,23 @@ export function ModelPickerPopover({
                     ))}
                   </div>
                 ))}
+              {!loading && !query && detectedModelGroups.length > 0 && (
+                <button
+                  type="button"
+                  className={styles.detectedToggle}
+                  onClick={() => setShowDetectedModels((current) => !current)}
+                  aria-expanded={showDetectedModels}
+                >
+                  <span>
+                    已检测到 {detectedModelGroups.length} 个本机模型，但暂不可直接使用
+                  </span>
+                  <ChevronDown
+                    size={15}
+                    className={showDetectedModels ? styles.chevronOpen : ''}
+                    aria-hidden="true"
+                  />
+                </button>
+              )}
             </div>
           </div>
         </div>

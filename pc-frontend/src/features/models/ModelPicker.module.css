@@ -95,7 +95,7 @@
   min-height: 0;
   overflow-y: auto;
   scrollbar-gutter: stable;
-  padding: 8px;
+  padding: 12px 10px;
   border-right: 1px solid rgba(255, 255, 255, 0.06);
 }
 
@@ -104,6 +104,120 @@
   height: 100%;
   min-height: 0;
   overflow: hidden;
+  display: grid;
+  grid-template-rows: auto auto auto minmax(0, 1fr);
+}
+
+.paneIntro {
+  display: grid;
+  gap: 3px;
+  margin: 0 4px 10px;
+}
+
+.paneIntro strong,
+.paneEyebrow {
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: .02em;
+}
+
+.paneIntro span {
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.modelPaneHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px 6px;
+}
+
+.modelPaneHeader > div {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.modelPaneHeader strong {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 15px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.modelCount {
+  flex: 0 0 auto;
+  color: var(--text-muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.routeDescription {
+  margin: 0;
+  padding: 0 14px 9px;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.4;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.searchBox {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 12px 4px;
+  min-height: 32px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 7px;
+  background: #24262d;
+  color: var(--text-muted);
+  padding: 0 9px;
+}
+
+.searchBox:focus-within {
+  border-color: rgba(110, 168, 254, 0.48);
+  background: #292c34;
+}
+
+.searchBox input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+}
+
+.searchBox input::placeholder {
+  color: var(--text-muted);
+}
+
+.clearSearch {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 16px;
+  line-height: 1;
+}
+
+.clearSearch:hover {
+  background: #343741;
+  color: var(--text-primary);
 }
 
 .previewPane {
@@ -332,7 +446,7 @@
   display: flex;
   flex-direction: column;
   gap: 3px;
-  padding: 2px 4px;
+  padding: 2px 4px 1px;
 }
 
 .routeGroupTitle strong {
@@ -345,6 +459,10 @@
   color: var(--text-muted);
   font-size: 11px;
   line-height: 1.35;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+  overflow: hidden;
 }
 
 .routeOption {
@@ -376,7 +494,7 @@
   border: 0;
   background: transparent;
   color: inherit;
-  padding: 9px;
+  padding: 8px 9px;
   text-align: left;
   font: inherit;
   cursor: pointer;
@@ -414,6 +532,10 @@
   color: var(--text-muted);
   font-size: 11px;
   line-height: 1.35;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
 }
 
 .routeConfigLink {
@@ -438,11 +560,21 @@
 }
 
 .section {
-  padding: 10px 8px 5px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 9px 8px 5px;
   color: var(--text-muted);
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0;
+}
+
+.section span:last-child {
+  color: #737782;
+  font-size: 10px;
+  font-weight: 700;
 }
 
 .option {
@@ -530,6 +662,33 @@
 .emptyCard strong {
   color: var(--text-primary);
   font-size: 13px;
+}
+
+.detectedToggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.025);
+  color: var(--text-muted);
+  padding: 8px 9px;
+  text-align: left;
+  font: inherit;
+  font-size: 11px;
+}
+
+.detectedToggle:hover {
+  border-color: rgba(110, 168, 254, 0.34);
+  background: rgba(110, 168, 254, 0.08);
+  color: var(--text-secondary);
+}
+
+.chevronOpen {
+  transform: rotate(180deg);
 }
 
 .emptyAction {
@@ -633,9 +792,13 @@
   }
 
   .routePane {
-    max-height: 260px;
+    max-height: 320px;
     border-right: 0;
     border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  .modelPane {
+    min-height: 0;
   }
 
   .effortPopover {
