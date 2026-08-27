@@ -11,6 +11,8 @@ use tauri::{AppHandle, Webview};
 
 #[path = "research_capture/analysis.rs"]
 mod analysis;
+#[path = "research_capture/private_observation.rs"]
+mod private_observation;
 
 use super::{
     ensure_main_webview, profile_directory, provider, provider_for_window_label,
@@ -66,7 +68,23 @@ pub(crate) fn get_local_ai_web_research_capture_status(
     let provider = provider(&provider_id)?;
     let fingerprint = resolve_owner_fingerprint(&app, provider, &owner_key)?;
     let root = profile_directory(&app, provider, &fingerprint)?.join(DIRECTORY_NAME);
-    analysis::read_status(&root)
+    analysis::read_status(&root, provider.id)
+}
+
+pub(super) fn record_sanitized_adapter_observation(
+    app: &AppHandle,
+    provider: &ProviderDefinition,
+    label: &str,
+    kind: &str,
+    payload: &serde_json::Value,
+) -> bool {
+    let Some(observation) = private_observation::parse(provider.id, kind, payload) else {
+        return false;
+    };
+    if let Ok(root) = root_for_label(app, provider, label) {
+        let _ = private_observation::store(&root, provider.id, observation, now_ms());
+    }
+    true
 }
 
 #[derive(Clone, Deserialize)]
@@ -381,7 +399,7 @@ mod tests {
         });
         store(&root, "chatgpt", capture).unwrap();
 
-        let status = serde_json::to_value(analysis::read_status(&root).unwrap()).unwrap();
+        let status = serde_json::to_value(analysis::read_status(&root, "chatgpt").unwrap()).unwrap();
         assert_eq!(status["compatibility"], "rich_compatible");
         assert_eq!(status["acceptedFrameCount"], 2);
         assert_eq!(status["richKinds"][0], "finance");

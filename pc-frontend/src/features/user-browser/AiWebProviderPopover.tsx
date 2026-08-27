@@ -85,6 +85,7 @@ export default function AiWebProviderPopover({
         {researchStatus && (
           <p data-warning={researchStatusWarning(researchStatus)}>
             {researchStatusCopy(researchStatus)}
+            {privateObservationCopy(researchStatus)}
           </p>
         )}
         {web.capability.state !== 'ready' && (
@@ -104,6 +105,16 @@ export default function AiWebProviderPopover({
       <footer>上线前开发采样默认开启：受控接口原始响应保存到本机 Profile，最多保留 {web.provider?.researchCaptureRetentionDays || 30} 天；Cookie、Token、请求头和采样内容均不上传一龙云端。</footer>
     </section>
   </>, document.body)
+}
+
+function privateObservationCopy(status: LocalAiResearchCaptureStatus) {
+  const network = status.privateNetworkObservationCount || 0
+  const voice = status.privateVoiceObservationCount || 0
+  if (!network && !voice) return ''
+  const channels = status.privateVoiceChannels?.length
+    ? `（${status.privateVoiceChannels.join(' / ')}）`
+    : ''
+  return ` 私有结构观察已在本机聚合：网络 ${network} 条，实时语音 ${voice} 条${channels}；不保存 Cookie、Token、SDP 或 ICE 的值。`
 }
 
 function researchStatusWarning(status: LocalAiResearchCaptureStatus) {

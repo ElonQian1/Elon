@@ -41,6 +41,10 @@ pub(crate) struct ResearchCaptureStatus {
     unsupported_rich_count: u32,
     completed: bool,
     truncated: bool,
+    private_network_observation_count: u64,
+    private_voice_observation_count: u64,
+    private_observation_latest_at_ms: u64,
+    private_voice_channels: Vec<String>,
 }
 
 impl Default for ResearchCaptureStatus {
@@ -59,6 +63,10 @@ impl Default for ResearchCaptureStatus {
             unsupported_rich_count: 0,
             completed: false,
             truncated: false,
+            private_network_observation_count: 0,
+            private_voice_observation_count: 0,
+            private_observation_latest_at_ms: 0,
+            private_voice_channels: Vec::new(),
         }
     }
 }
@@ -83,11 +91,16 @@ pub(super) fn validate(analysis: Option<&CaptureAnalysis>) -> Result<(), String>
     Ok(())
 }
 
-pub(super) fn read_status(root: &Path) -> Result<ResearchCaptureStatus, String> {
-    if !root.is_dir() {
-        return Ok(ResearchCaptureStatus::default());
-    }
+pub(super) fn read_status(root: &Path, provider_id: &str) -> Result<ResearchCaptureStatus, String> {
     let mut status = ResearchCaptureStatus::default();
+    let observation = super::private_observation::read_status(root, provider_id);
+    status.private_network_observation_count = observation.network_observation_count;
+    status.private_voice_observation_count = observation.voice_observation_count;
+    status.private_observation_latest_at_ms = observation.latest_observed_at_ms;
+    status.private_voice_channels = observation.voice_channels;
+    if !root.is_dir() {
+        return Ok(status);
+    }
     let mut latest: Option<(u64, CaptureAnalysis, bool)> = None;
     for entry in fs::read_dir(root)
         .map_err(display_error)?

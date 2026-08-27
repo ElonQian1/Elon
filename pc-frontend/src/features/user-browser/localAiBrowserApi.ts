@@ -83,6 +83,10 @@ export interface LocalAiResearchCaptureStatus {
   unsupportedRichCount: number
   completed: boolean
   truncated: boolean
+  privateNetworkObservationCount: number
+  privateVoiceObservationCount: number
+  privateObservationLatestAtMs: number
+  privateVoiceChannels: string[]
 }
 
 export interface LocalAiGuestOwnerIdentity {

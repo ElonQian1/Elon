@@ -547,6 +547,9 @@ pub fn publish_local_ai_web_event(
         .filter(|provider| provider.adapter.is_some())
         .ok_or_else(|| "可见语义事件只允许已登记的本地 AI 会话窗口发送。".to_string())?;
     let event = provider.adapter.unwrap().sanitize_event(&payload)?;
+    if research_capture::record_sanitized_adapter_observation(&app, provider, label, &event.kind, &event.payload) {
+        return Ok(());
+    }
     runtime.record_adapter_event_with_context_and_url(
         label,
         &event.kind,
