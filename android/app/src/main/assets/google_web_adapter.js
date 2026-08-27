@@ -9,6 +9,7 @@
   const composerBridge = window.__elonGoogleWebComposerBridge;
   const sendPolicy = window.__elonGoogleWebSendPolicy;
   const privateReplyObserver = window.__elonGoogleWebPrivateReplyObserver;
+  const privateReplyReconciler = window.__elonGoogleWebPrivateReplyReconciler;
   const privateThreadDirectory = window.__elonGoogleWebPrivateThreadDirectory;
   const privateResearchTap = window.__elonGoogleWebPrivateResponseTap;
   if (!allowedOrigins.has(location.origin) || !adapterVersion ||
@@ -17,6 +18,7 @@
       typeof messageExtractor.extract !== 'function' ||
       typeof messageExtractor.currentQueryMatches !== 'function' ||
       typeof messageExtractor.hasCurrentQuery !== 'function' ||
+      !privateReplyReconciler || typeof privateReplyReconciler.apply !== 'function' ||
       typeof composerBridge.findSubmitAction !== 'function') return;
   if (window.__elonGoogleWebBridge &&
       window.__elonGoogleWebBridge.version === adapterVersion &&
@@ -188,24 +190,9 @@
     const privateReply = privateReplyObserver && typeof privateReplyObserver.snapshot === 'function'
       ? privateReplyObserver.snapshot()
       : null;
-    if (privateReply && privateReply.prompt && privateReply.text) {
-      const userIndex = extraction.messages.findIndex((message) =>
-        message.role === 'user' && message.content && message.content.some((part) =>
-          part.type === 'text' && cleanText(part.text) === privateReply.prompt
-        )
-      );
-      const hasAssistant = userIndex >= 0 && extraction.messages.slice(userIndex + 1)
-        .some((message) => message.role === 'assistant');
-      if (userIndex >= 0 && !hasAssistant) {
-        extraction.messages.splice(userIndex + 1, 0, {
-          id: 'google-private-answer-' + userIndex,
-          role: 'assistant',
-          state: privateReply.streaming ? 'streaming' : 'completed',
-          content: [{ type: 'text', text: privateReply.text }]
-        });
-        extraction.answerFound = true;
-        extraction.observedMessageCount = extraction.messages.length;
-      }
+    if (privateReplyReconciler.apply(extraction.messages, privateReply, location.href)) {
+      extraction.answerFound = true;
+      extraction.observedMessageCount = extraction.messages.length;
     }
     const effectiveStreaming = streaming || !!(privateReply && privateReply.streaming);
     const event = {
@@ -272,6 +259,10 @@
     const prompt = cleanText(value);
     if (privateResearchTap && typeof privateResearchTap.observePrompt === 'function') {
       privateResearchTap.observePrompt(prompt);
+    }
+    if (typeof privateReplyReconciler.observePrompt === 'function') {
+      const baseline = messageExtractor.extract(composer, isStreaming());
+      privateReplyReconciler.observePrompt(baseline.messages, prompt, location.href);
     }
     if (privateReplyObserver && typeof privateReplyObserver.observePrompt === 'function') {
       privateReplyObserver.observePrompt(prompt);

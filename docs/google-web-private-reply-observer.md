@@ -37,3 +37,13 @@ the first streaming snapshot with four sparse watchdogs. APK `v1.1.1303 (1313)` 
 second isolated exact-marker acceptance: native state observed streaming, then a completed
 ready reply, and the original conversation was restored. The acceptance output contained
 only provider/version flags, state-transition booleans, counts, and recovery status.
+
+Adapter version 40 records the visible assistant-answer baseline immediately before each send,
+then reconciles a second-turn reply against a transient DOM carry-over. If every assistant row
+after the current prompt matches that baseline and the bounded private observer has captured the
+current reply, the stale rows are replaced before the native snapshot is emitted. A distinct
+current DOM answer always remains authoritative. If Google's clipped DOM omits the current prompt
+entirely, the adapter emits a generation-scoped prompt/reply pair for native text-based merging,
+but only while the stable Google conversation URL identity still matches the send-time identity.
+This does not create or replay a request and does not inspect request bodies, headers, cookies, or
+account data.

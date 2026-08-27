@@ -61,6 +61,14 @@ completion signal remain primary while dense polling is replaced by four sparse 
 over 68 seconds. Repeated streaming snapshots cannot stack timers, completion cancels the
 remaining watchdog immediately, and the official DOM snapshot remains the fallback.
 
+Adapter version 40 records the visible answer baseline immediately before each send. It rejects
+a transient second-turn DOM answer when that answer matches the baseline and the bounded observer
+has captured the reply for the current prompt. The observer result replaces only that proven
+carry-over; any distinct current DOM answer remains authoritative. No direct Google POST is
+introduced. If the clipped DOM omits the current prompt entirely, the adapter emits a
+generation-scoped prompt/reply pair for native text-based merging only while the stable Google
+conversation URL identity still matches the send-time identity.
+
 Device acceptance on APK `v1.1.1303 (1313)` used one isolated exact-marker conversation
 without exposing message content. The native Google Web AI surface entered streaming,
 then returned to a completed ready state with one assistant reply, and restored the

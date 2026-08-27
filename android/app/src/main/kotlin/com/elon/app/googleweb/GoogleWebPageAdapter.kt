@@ -175,10 +175,11 @@ internal class GoogleWebPageAdapter(
         origin.scheme == "https" && origin.port == -1 && origin.host?.lowercase() in ALLOWED_HOSTS
 
     companion object {
-        const val ADAPTER_VERSION = 38
+        const val ADAPTER_VERSION = 40
         private val ADAPTER_ASSETS = listOf(
             "google_web_answer_candidate_policy.js",
             "google_web_private_reply_observer.js",
+            "google_web_private_reply_reconciler.js",
             "google_web_private_thread_directory.js",
             "google_web_query_policy.js",
             "google_web_rich_content.js",

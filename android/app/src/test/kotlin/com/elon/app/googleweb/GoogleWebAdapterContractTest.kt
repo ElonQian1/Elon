@@ -16,6 +16,9 @@ class GoogleWebAdapterContractTest {
         val richContent = read("android/app/src/main/assets/google_web_rich_content.js")
         val composerBridge = read("android/app/src/main/assets/google_web_composer_bridge.js")
         val sendPolicy = read("android/app/src/main/assets/google_web_send_policy.js")
+        val privateReplyReconciler = read(
+            "android/app/src/main/assets/google_web_private_reply_reconciler.js",
+        )
         val privateDirectory = read(
             "android/app/src/main/assets/google_web_private_thread_directory.js",
         )
@@ -54,6 +57,9 @@ class GoogleWebAdapterContractTest {
         assertTrue(adapter.contains("navigationFallbackAllowed"))
         assertTrue(adapter.contains("messageExtractor.currentQueryMatches"))
         assertTrue(adapter.contains("messageExtractor.hasCurrentQuery"))
+        assertTrue(adapter.contains(
+            "privateReplyReconciler.apply(extraction.messages, privateReply, location.href)",
+        ))
         assertTrue(adapter.contains("composerBridge.find()"))
         assertTrue(adapter.contains("composerBridge.findAction"))
         assertTrue(adapter.contains("function confirmSubmission(startedAt)"))
@@ -71,6 +77,10 @@ class GoogleWebAdapterContractTest {
         assertTrue(!adapter.contains("document.cookie"))
         assertTrue(!adapter.contains("Authorization"))
         assertTrue(!adapter.contains("fetch("))
+        assertTrue(privateReplyReconciler.contains("matchingUserIndex"))
+        assertTrue(privateReplyReconciler.contains("staleAssistants.length !== assistants.length"))
+        assertTrue(!privateReplyReconciler.contains("document.cookie"))
+        assertTrue(!privateReplyReconciler.contains("fetch("))
         assertTrue(privateDirectory.contains("AimThreadsService/ListThreads"))
         assertTrue(privateDirectory.contains("csuir.replace(active.id, row.id)"))
         assertTrue(!privateDirectory.contains("document.cookie"))

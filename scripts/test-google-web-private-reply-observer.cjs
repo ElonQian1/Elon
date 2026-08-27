@@ -16,13 +16,19 @@ const pageAdapter = fs.readFileSync(
   path.join(root, 'android/app/src/main/kotlin/com/elon/app/googleweb/GoogleWebPageAdapter.kt'),
   'utf8',
 )
+const reconciler = fs.readFileSync(
+  path.join(root, 'android/app/src/main/assets/google_web_private_reply_reconciler.js'),
+  'utf8',
+)
 
 assert.doesNotMatch(source, /document\.cookie|authorization|request\.headers|init\.headers|init\.body/)
 assert.match(source, /url\.pathname === '\/async\/folif'/)
 assert.match(source, /diagnostics: \(\) =>/)
 assert.match(source, /baseline = new WeakSet\(candidateNodes\(\)\)/)
 assert.match(adapter, /privateReplyObserver\.observePrompt\(prompt\)/)
-assert.match(adapter, /id: 'google-private-answer-' \+ userIndex/)
+assert.match(reconciler, /id: 'google-private-answer-' \+ userIndex/)
+assert.match(adapter, /privateReplyReconciler\.observePrompt\(baseline\.messages, prompt, location\.href\)/)
+assert.match(adapter, /privateReplyReconciler\.apply\(extraction\.messages, privateReply, location\.href\)/)
 assert.match(adapter, /privateReplyObserver\.setListener\(scheduleSnapshot\)/)
 assert.match(pageAdapter, /"google_web_private_reply_observer\.js"/)
 
