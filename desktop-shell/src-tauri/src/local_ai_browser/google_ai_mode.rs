@@ -8,7 +8,7 @@ use super::{
 const MAX_EVENT_BYTES: usize = 512 * 1024;
 const MAX_MESSAGES: usize = 80;
 const MAX_DRAFT_CHARS: usize = 20_000;
-pub(super) const ADAPTER_VERSION: u32 = 38;
+pub(super) const ADAPTER_VERSION: u32 = 40;
 
 pub fn initialization_script() -> String {
     super::google_ai_mode_adapter_bootstrap::initialization_script(ADAPTER_VERSION)
@@ -369,6 +369,7 @@ mod tests {
         assert!(script.contains("google_win_private_conversation_bridge.js"));
         assert!(script.contains("__elonWinGooglePrivateConversationBridgeVersion"));
         assert!(script.contains("__elonGoogleWebPrivateReplyObserver"));
+        assert!(script.contains("__elonGoogleWebPrivateReplyReconciler"));
         assert!(script.contains("google_win_private_reply_state.js"));
         assert!(script.contains("__elonWinGooglePrivateReplyState"));
         assert!(script.contains("__elonGoogleWebPrivateThreadDirectory"));

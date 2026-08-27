@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  var STATE_VERSION = 3;
+  var STATE_VERSION = 4;
   const baseObserver = window.__elonGoogleWebPrivateReplyObserver;
   const baseNative = window.elonGoogleWebNative;
   if (!baseObserver || typeof baseObserver.observePrompt !== 'function' ||
@@ -108,6 +108,11 @@
     return true;
   }
 
+  function sharedReconcilerAvailable() {
+    const reconciler = window.__elonGoogleWebPrivateReplyReconciler;
+    return Boolean(reconciler && typeof reconciler.apply === 'function');
+  }
+
   function reset() {
     generation += 1;
     lastFingerprint = '';
@@ -172,7 +177,13 @@
         payload.event.privateStreamObserved = observed;
         payload.event.privateStreamRevision = revision;
         payload.event.privateStreamState = state;
-        payload.event.privateStreamContentApplied = applyPrivateReply(payload.event, privateReply);
+        // Adapter v40 reconciles the current prompt against its exact pre-send
+        // DOM baseline before emitting this event. Its distinct current answer
+        // must remain authoritative; retain the Win-only text upgrader solely
+        // as a compatibility fallback for an older shared adapter.
+        payload.event.privateStreamContentApplied = sharedReconcilerAvailable()
+          ? false
+          : applyPrivateReply(payload.event, privateReply);
         if (observed && state === 'streaming') payload.event.streaming = true;
         if (observed && state === 'completed') payload.event.streaming = false;
         return nativeDelegate.postMessage(JSON.stringify(payload));

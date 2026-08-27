@@ -1,5 +1,5 @@
 const ALLOWED_ORIGIN: &str = "https://chatgpt.com";
-pub(super) const ADAPTER_VERSION: u32 = 188;
+pub(super) const ADAPTER_VERSION: u32 = 189;
 
 const WIN_RICH_CONTENT_ADAPTER: &str = include_str!("chatgpt_rich_content_adapter.js");
 const WIN_COMMON_RICH_CONTENT_ADAPTER: &str = include_str!("rich_content_dom_adapter.js");
@@ -174,6 +174,10 @@ const ADAPTER_ASSETS: &[(&str, &str)] = &[
     (
         "chatgpt_web_private_research_probe.js",
         include_str!("../../../../android/app/src/main/assets/chatgpt_web_private_research_probe.js"),
+    ),
+    (
+        "chatgpt_web_realtime_voice_research.js",
+        include_str!("../../../../android/app/src/main/assets/chatgpt_web_realtime_voice_research.js"),
     ),
     (
         "chatgpt_web_private_transport_policy.js",
@@ -437,6 +441,7 @@ mod tests {
         assert!(script.contains("__elonWinChatGptNewConversationGuard"));
         assert!(script.contains("官网未离开上一会话，已转入安全恢复。"));
         assert!(script.contains("publish_local_ai_web_research_capture"));
+        assert!(script.contains("__elonChatGptRealtimeVoiceResearch"));
         assert!(script.contains("conversation_stream"));
         assert!(script.contains("chatgpt_win_captured_finance_recovery.js"));
         assert!(script.contains("__elonWinChatGptCapturedFinanceRecovery"));

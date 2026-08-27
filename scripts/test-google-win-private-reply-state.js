@@ -30,7 +30,7 @@ const window = {
 
 vm.runInNewContext(source, { window, JSON, String, Number, Object });
 
-assert.equal(window.__elonWinGooglePrivateReplyStateVersion, 3);
+assert.equal(window.__elonWinGooglePrivateReplyStateVersion, 4);
 assert.notEqual(window.__elonGoogleWebPrivateReplyObserver, baseObserver);
 assert.notEqual(window.elonGoogleWebNative, baseNative);
 const installedObserver = window.__elonGoogleWebPrivateReplyObserver;
@@ -118,7 +118,7 @@ assert.equal(listener, null, 'stale observer listener must be detached during re
 assert.equal(reboundListener, installedListener, 'adapter listener must follow a replacement observer');
 assert.equal(
   window.__elonWinGooglePrivateReplyState.diagnostics(),
-  'v3|bindings=2|state=idle',
+  'v4|bindings=2|state=idle',
 );
 window.__elonGoogleWebPrivateReplyObserver.observePrompt('ETH 走势');
 assert.equal(reboundPrompt, 'ETH 走势');
@@ -129,6 +129,25 @@ assert.equal(event.privateStreamObserved, true);
 assert.equal(event.privateStreamState, 'completed');
 assert.equal(event.streaming, false);
 assert.equal(emitted.length, 0, 'rebound events must not leak to the stale native bridge');
+
+window.__elonGoogleWebPrivateReplyReconciler = { version: 2, apply() { return false; } };
+window.__elonGoogleWebPrivateReplyObserver.observePrompt('保留官网回答');
+reboundReply = {
+  prompt: '保留官网回答',
+  text: '更长但不应覆盖官网当前回答的私有候选文本',
+  streaming: false,
+};
+window.elonGoogleWebNative.postMessage(envelope(false, [
+  { role: 'user', content: [{ type: 'text', text: '保留官网回答' }] },
+  { role: 'assistant', content: [{ type: 'text', text: '官网当前回答' }] },
+]));
+event = reboundEmitted.pop().event;
+assert.equal(event.privateStreamContentApplied, false);
+assert.equal(
+  event.messages[1].content[0].text,
+  '官网当前回答',
+  'adapter v40 reconciler owns reply replacement and distinct DOM content stays authoritative',
+);
 assert.doesNotMatch(source, /document\.cookie|authorization|access[_-]?token|fetch\s*\(/i);
 
 function envelope(streaming, messages) {

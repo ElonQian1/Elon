@@ -22,6 +22,12 @@ const ADAPTER_ASSETS: &[(&str, &str)] = &[
         ),
     ),
     (
+        "google_web_private_reply_reconciler.js",
+        include_str!(
+            "../../../../android/app/src/main/assets/google_web_private_reply_reconciler.js"
+        ),
+    ),
+    (
         "google_web_private_thread_directory.js",
         include_str!(
             "../../../../android/app/src/main/assets/google_web_private_thread_directory.js"

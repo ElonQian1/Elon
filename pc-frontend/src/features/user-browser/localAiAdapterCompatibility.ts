@@ -1,6 +1,6 @@
 export const LOCAL_AI_REQUIRED_ADAPTER_VERSIONS = {
   chatgpt: 180,
-  'google-ai-mode': 37,
+  'google-ai-mode': 40,
 } as const
 
 export function requiredLocalAiAdapterVersion(providerId: string): number {
