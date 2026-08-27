@@ -1,5 +1,6 @@
 package com.elon.app.chatgptweb
 
+import com.elon.app.BuildConfig
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -172,7 +173,10 @@ class WebAiPrivateTransportCatalogTest {
             privateVoiceResearch.getString("implementation_status"),
         )
         assertFalse(privateVoiceResearch.getBoolean("production_default"))
-        assertFalse(privateVoiceResearch.getBoolean("runtime_enabled"))
+        assertEquals(
+            BuildConfig.CHATGPT_PRIVATE_RESEARCH_ENABLED,
+            privateVoiceResearch.getBoolean("runtime_enabled"),
+        )
         assertEquals(
             "official_page_created_webrtc",
             privateVoiceResearch.getString("fallback"),
@@ -181,9 +185,15 @@ class WebAiPrivateTransportCatalogTest {
         val nativeVoiceRelay = requireNotNull(
             byId["android_chatgpt_web_private_voice_native_relay_v1"],
         )
-        assertEquals("planned", nativeVoiceRelay.getString("implementation_status"))
+        assertEquals(
+            "relay_contract_implemented",
+            nativeVoiceRelay.getString("implementation_status"),
+        )
         assertFalse(nativeVoiceRelay.getBoolean("production_default"))
-        assertFalse(nativeVoiceRelay.getBoolean("runtime_enabled"))
+        assertEquals(
+            BuildConfig.CHATGPT_PRIVATE_RESEARCH_ENABLED,
+            nativeVoiceRelay.getBoolean("runtime_enabled"),
+        )
         assertEquals(
             "official_page_created_webrtc",
             nativeVoiceRelay.getString("fallback"),
@@ -192,7 +202,10 @@ class WebAiPrivateTransportCatalogTest {
         values.filter { it.getString("implementation_status") == "research_only" }
             .forEach { row ->
                 assertFalse(row.getBoolean("production_default"))
-                assertFalse(row.getBoolean("runtime_enabled"))
+                if (row.getBoolean("runtime_enabled")) {
+                    assertEquals("chatgpt", row.getString("provider"))
+                    assertTrue(BuildConfig.CHATGPT_PRIVATE_RESEARCH_ENABLED)
+                }
             }
     }
 }

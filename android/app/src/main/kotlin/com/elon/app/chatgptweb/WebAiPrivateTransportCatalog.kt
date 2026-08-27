@@ -171,10 +171,10 @@ internal object WebAiPrivateTransportCatalog {
         Entry(
             id = "android_chatgpt_web_private_voice_native_relay_v1",
             provider = "chatgpt",
-            status = "planned",
-            verification = "react_independent_relay_and_native_peer_not_yet_verified",
+            status = "relay_contract_implemented",
+            verification = "offline_single_use_relay_verified_native_peer_pending",
             productionDefault = false,
-            runtimeEnabled = false,
+            runtimeEnabled = BuildConfig.CHATGPT_PRIVATE_RESEARCH_ENABLED,
             requestMode = "same_origin_in_memory_session_relay_and_native_webrtc",
             healthPolicy = "single_use_expiry_no_persistence_timeout_circuit_breaker",
             fallback = "official_page_created_webrtc",

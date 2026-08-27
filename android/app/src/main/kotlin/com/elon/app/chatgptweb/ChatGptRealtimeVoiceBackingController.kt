@@ -18,8 +18,14 @@ internal class ChatGptRealtimeVoiceBackingController(
 ) {
     private var active = false
     private val recoveryGate = ChatGptRealtimeVoiceRecoveryGate()
+    private val privateVoiceRelay = ChatGptWebPrivateVoiceRelayGateway(webView, schedule)
 
     fun isActive(): Boolean = active
+
+    fun exchangePrivateVoiceOffer(
+        offer: String,
+        onComplete: (ChatGptWebPrivateVoiceRelayResult) -> Unit,
+    ): Boolean = privateVoiceRelay.exchange(offer, onComplete)
 
     fun begin(): Boolean {
         ensureInitialized()
@@ -81,6 +87,7 @@ internal class ChatGptRealtimeVoiceBackingController(
     fun release() {
         active = false
         recoveryGate.invalidate()
+        privateVoiceRelay.cancel()
     }
 
     private companion object {

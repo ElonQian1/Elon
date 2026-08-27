@@ -63,8 +63,12 @@ internal class ChatGptWebPageAdapter(
             window.__elonChatGptDocumentToken =
                 "doc_android_" + Math.random().toString(36).slice(2) + Date.now().toString(36);
         }
-    """.trimIndent() + "\n" + context.assets.open(PRIVATE_REALTIME_VOICE_RESEARCH_ASSET)
-        .use { input -> input.reader(StandardCharsets.UTF_8).readText() }
+    """.trimIndent() + "\n" + listOf(
+        PRIVATE_REALTIME_VOICE_RELAY_ASSET,
+        PRIVATE_REALTIME_VOICE_RESEARCH_ASSET,
+    ).joinToString("\n") { asset ->
+        context.assets.open(asset).use { input -> input.reader(StandardCharsets.UTF_8).readText() }
+    }
     private val privateConversationDirectoryScript =
         context.assets.open(PRIVATE_CONVERSATION_DIRECTORY_ASSET).use { input ->
             input.reader(StandardCharsets.UTF_8).readText()
@@ -460,7 +464,7 @@ internal class ChatGptWebPageAdapter(
         origin.scheme == "https" && origin.host == "chatgpt.com" && origin.port == -1
 
     companion object {
-        internal const val ADAPTER_VERSION = 189
+        internal const val ADAPTER_VERSION = 190
 
         private val ADAPTER_ASSETS = listOf(
             "chatgpt_web_adapter_bootstrap.js",
@@ -500,6 +504,7 @@ internal class ChatGptWebPageAdapter(
             "chatgpt_web_adapter_realtime_voice_policy.js",
             "chatgpt_web_adapter_layout.js",
             "chatgpt_web_private_research_probe.js",
+            "chatgpt_web_private_voice_relay.js",
             "chatgpt_web_realtime_voice_research.js",
             "chatgpt_web_private_transport_policy.js",
             "chatgpt_web_private_transport.js",
@@ -514,6 +519,8 @@ internal class ChatGptWebPageAdapter(
         private const val PRIVATE_SOCKET_TAP_ASSET = "chatgpt_web_private_socket_tap.js"
         private const val PRIVATE_REALTIME_VOICE_RESEARCH_ASSET =
             "chatgpt_web_realtime_voice_research.js"
+        private const val PRIVATE_REALTIME_VOICE_RELAY_ASSET =
+            "chatgpt_web_private_voice_relay.js"
         private const val PRIVATE_CONVERSATION_DIRECTORY_ASSET =
             "chatgpt_web_private_conversation_directory.js"
         private const val MAX_PROMPT_LENGTH = 20_000

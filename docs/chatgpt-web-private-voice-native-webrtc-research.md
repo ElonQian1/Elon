@@ -87,3 +87,29 @@ The next capability is tracked separately as
 captured page-local `session` template in memory, create an independent peer without
 depending on the official React voice state, expire after one use, and fall back to
 the existing official page-created WebRTC flow on any mismatch.
+
+## Stage 4 Relay Contract
+
+The same-origin single-use relay contract is now implemented behind
+`ELON_CHATGPT_PRIVATE_RESEARCH`. It installs at document start before the bounded
+observer and captures only a valid `/realtime/wm` multipart template in page memory.
+Android may submit a replacement audio offer through a versioned page function and
+poll once for the answer. The relay:
+
+- accepts one bounded audio SDP offer and one in-flight exchange;
+- reuses the exact page-owned request URL, request shape, `session` value, and
+  runtime headers without exporting them from the page;
+- removes the multipart `Content-Type` so the browser creates a new boundary;
+- uses a 15-second upstream timeout, a two-minute template lifetime, a 30-second
+  result lifetime, and a four-result bound;
+- deletes the request template values after the exchange and consumes results when
+  Android reads them;
+- exposes only structural availability and fixed safe failure codes; and
+- preserves the official page-created WebRTC route as the only production default.
+
+Node and Kotlin contract tests prove template replacement, single-use behavior,
+bounded polling, SDP validation, safe error collapse, and redacted answer string
+rendering. This is not yet a device proof of React-independent media. The next stage
+must add the research-only native audio peer, pass its offer through this relay, apply
+the answer, and verify remote audio plus clean close on one supervised device before
+the capability can be considered for production.
