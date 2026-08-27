@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use serde_json::{json, Map, Value};
 
 pub(super) fn merge(previous: Option<&Value>, mut incoming: Value) -> Value {
-    let complete = collection_complete(&incoming);
+    let complete = is_complete(&incoming);
     let previous_conversations = records(previous, "conversations");
     let incoming_conversations = records(Some(&incoming), "conversations");
     let incoming_conversation_count = incoming_conversations.len();
@@ -49,7 +49,7 @@ pub(super) fn merge(previous: Option<&Value>, mut incoming: Value) -> Value {
     incoming
 }
 
-fn collection_complete(snapshot: &Value) -> bool {
+pub(super) fn is_complete(snapshot: &Value) -> bool {
     let Some(collection) = snapshot.get("collection").and_then(Value::as_object) else {
         return false;
     };

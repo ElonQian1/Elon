@@ -101,6 +101,7 @@ impl SessionRecord {
         self.pending_context_since_ms = super::now_ms();
         self.preserve_conversation_on_navigation = false;
         if action == "new_conversation" {
+            self.navigation_updated_at_ms = 0;
             self.new_conversation_baseline_user = self
                 .semantic_event
                 .as_ref()

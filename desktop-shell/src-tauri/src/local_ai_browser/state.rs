@@ -5,7 +5,6 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use serde::Serialize;
 use serde_json::Value;
 use tauri::Url;
 
@@ -21,6 +20,10 @@ mod context;
 mod diagnostics;
 #[path = "state/private_stream.rs"]
 mod private_stream;
+#[path = "state/public.rs"]
+mod public;
+
+pub use public::{LocalAiCachedConversation, LocalAiWebSessionState};
 
 #[derive(Clone, Default)]
 pub struct LocalAiBrowserRuntime {
@@ -69,51 +72,9 @@ struct SessionRecord {
     preserve_conversation_on_navigation: bool,
     cache_path: Option<PathBuf>,
     cache_updated_at_ms: u64,
+    navigation_updated_at_ms: u64,
     semantic_updated_at_ms: u64,
     updated_at_ms: u64,
-}
-
-#[derive(Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct LocalAiWebSessionState {
-    pub provider_id: String,
-    pub window_label: String,
-    pub window_status: String,
-    pub window_visible: bool,
-    pub current_url: String,
-    pub current_host: String,
-    pub loading: bool,
-    pub renderer_status: String,
-    pub last_error: Option<String>,
-    pub last_error_code: Option<String>,
-    pub semantic_event: Option<Value>,
-    pub navigation_event: Option<Value>,
-    pub composer_event: Option<Value>,
-    pub feature_event: Option<Value>,
-    pub ui_manifest_event: Option<Value>,
-    pub command_result: Option<Value>,
-    pub command_results: Vec<Value>,
-    pub diagnostics: Value,
-    pub cache_status: String,
-    pub semantic_cache_status: String,
-    pub navigation_cache_status: String,
-    pub local_conversations: Vec<LocalAiCachedConversation>,
-    pub active_conversation_id: Option<String>,
-    pub semantic_conversation_aligned: bool,
-    pub context_ready: bool,
-    pub context_status: String,
-    pub cache_updated_at_ms: u64,
-    pub semantic_updated_at_ms: u64,
-    pub updated_at_ms: u64,
-}
-
-#[derive(Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct LocalAiCachedConversation {
-    pub id: String,
-    pub title: String,
-    pub active: bool,
-    pub updated_at_ms: u64,
 }
 
 impl LocalAiBrowserRuntime {
@@ -182,7 +143,13 @@ impl LocalAiBrowserRuntime {
             .and_then(|path| snapshot_cache::load(path, provider_id).ok().flatten());
         let mut sessions = self.sessions();
         sessions.entry(label.to_string()).or_insert_with(|| {
-            let (semantic_event, navigation_event, conversation_snapshots, cache_updated_at_ms) =
+            let (
+                semantic_event,
+                navigation_event,
+                conversation_snapshots,
+                cache_updated_at_ms,
+                navigation_updated_at_ms,
+            ) =
                 cached
                     .map(|snapshot| {
                         (
@@ -190,6 +157,7 @@ impl LocalAiBrowserRuntime {
                             snapshot.navigation_event,
                             snapshot.conversation_snapshots,
                             snapshot.updated_at_ms,
+                            snapshot.navigation_updated_at_ms,
                         )
                     })
                     .unwrap_or_default();
@@ -247,6 +215,7 @@ impl LocalAiBrowserRuntime {
                 preserve_conversation_on_navigation: false,
                 cache_path,
                 cache_updated_at_ms,
+                navigation_updated_at_ms,
                 semantic_updated_at_ms,
                 updated_at_ms: now_ms(),
             }
@@ -448,10 +417,14 @@ impl LocalAiBrowserRuntime {
                 }
                 "conversation_snapshot" => {
                     record.renderer_status = "active".to_string();
-                    record.navigation_event = Some(conversation_directory::merge(
+                    let navigation_event = conversation_directory::merge(
                         record.navigation_event.as_ref(),
                         payload,
-                    ));
+                    );
+                    if conversation_directory::is_complete(&navigation_event) {
+                        record.navigation_updated_at_ms = now_ms();
+                    }
+                    record.navigation_event = Some(navigation_event);
                     record.navigation_live = true;
                     record.cache_updated_at_ms = now_ms();
                     record.last_error = None;
@@ -528,6 +501,7 @@ impl LocalAiBrowserRuntime {
             record.active_restorable_url = None;
             record.reset_context();
             record.cache_updated_at_ms = 0;
+            record.navigation_updated_at_ms = 0;
             record.semantic_updated_at_ms = 0;
             record.updated_at_ms = now_ms();
             record.cache_path.clone()
@@ -648,6 +622,7 @@ impl LocalAiBrowserRuntime {
                         record.semantic_event.clone(),
                         record.navigation_event.clone(),
                         record.conversation_snapshots.clone(),
+                        record.navigation_updated_at_ms,
                         record.cache_updated_at_ms,
                     )
                 })
@@ -659,6 +634,7 @@ impl LocalAiBrowserRuntime {
             semantic_event,
             navigation_event,
             conversation_snapshots,
+            navigation_updated_at_ms,
             updated_at_ms,
         )) = snapshot
         else {
@@ -670,6 +646,7 @@ impl LocalAiBrowserRuntime {
             semantic_event.as_ref(),
             navigation_event.as_ref(),
             &conversation_snapshots,
+            navigation_updated_at_ms,
             updated_at_ms,
         );
     }
@@ -734,6 +711,7 @@ impl From<SessionRecord> for LocalAiWebSessionState {
             context_ready,
             context_status,
             cache_updated_at_ms: record.cache_updated_at_ms,
+            navigation_updated_at_ms: record.navigation_updated_at_ms,
             semantic_updated_at_ms: record.semantic_updated_at_ms,
             updated_at_ms: record.updated_at_ms,
         }

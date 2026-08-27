@@ -25,6 +25,7 @@ pub(super) struct LoadedSnapshot {
     pub semantic_event: Option<Value>,
     pub navigation_event: Option<Value>,
     pub conversation_snapshots: Vec<StoredConversationSnapshot>,
+    pub navigation_updated_at_ms: u64,
     pub updated_at_ms: u64,
 }
 
@@ -45,6 +46,8 @@ struct SnapshotEnvelope {
     navigation_event: Option<Value>,
     #[serde(default)]
     conversation_snapshots: Vec<StoredConversationSnapshot>,
+    #[serde(default)]
+    navigation_updated_at_ms: u64,
     updated_at_ms: u64,
 }
 
@@ -81,6 +84,7 @@ pub(super) fn load(path: &Path, provider_id: &str) -> Result<Option<LoadedSnapsh
         semantic_event,
         navigation_event: envelope.navigation_event,
         conversation_snapshots,
+        navigation_updated_at_ms: envelope.navigation_updated_at_ms,
         updated_at_ms: envelope.updated_at_ms,
     }))
 }
@@ -120,6 +124,7 @@ pub(super) fn store(
     semantic_event: Option<&Value>,
     navigation_event: Option<&Value>,
     conversation_snapshots: &[StoredConversationSnapshot],
+    navigation_updated_at_ms: u64,
     updated_at_ms: u64,
 ) -> Result<bool> {
     if !cfg!(windows) {
@@ -131,6 +136,7 @@ pub(super) fn store(
         semantic_event,
         navigation_event,
         conversation_snapshots,
+        navigation_updated_at_ms,
         updated_at_ms,
     ) else {
         return Ok(false);
@@ -166,6 +172,7 @@ fn cacheable_envelope(
     semantic_event: Option<&Value>,
     navigation_event: Option<&Value>,
     _conversation_snapshots: &[StoredConversationSnapshot],
+    navigation_updated_at_ms: u64,
     updated_at_ms: u64,
 ) -> Option<SnapshotEnvelope> {
     if semantic_event.is_some_and(is_streaming_snapshot) {
@@ -189,6 +196,7 @@ fn cacheable_envelope(
         // Keeping them out of this 2 MiB provider envelope prevents one long
         // active answer from evicting every cached conversation at once.
         conversation_snapshots: Vec::new(),
+        navigation_updated_at_ms,
         updated_at_ms,
     })
 }
@@ -202,6 +210,7 @@ fn loaded_from_conversations(
         semantic_event: Some(latest.semantic_event),
         navigation_event: None,
         conversation_snapshots: std::mem::take(&mut conversation_snapshots),
+        navigation_updated_at_ms: 0,
         updated_at_ms,
     })
 }
@@ -555,6 +564,7 @@ mod tests {
             })),
             None,
             &[],
+            0,
             42,
         )
         .unwrap();
@@ -566,7 +576,7 @@ mod tests {
             "streaming": true,
             "messages": [{"state": "streaming"}]
         });
-        assert!(cacheable_envelope("chatgpt", Some(&streaming), None, &[], 43).is_none());
+        assert!(cacheable_envelope("chatgpt", Some(&streaming), None, &[], 0, 43).is_none());
     }
 
     #[test]
@@ -587,7 +597,7 @@ mod tests {
             "streaming": false,
             "messages": messages,
         });
-        let envelope = cacheable_envelope("chatgpt", Some(&snapshot), None, &[], 42).unwrap();
+        let envelope = cacheable_envelope("chatgpt", Some(&snapshot), None, &[], 0, 42).unwrap();
 
         let encoded = encode_with_bounded_history(envelope).unwrap();
         let decoded: SnapshotEnvelope = serde_json::from_slice(&encoded).unwrap();
@@ -633,10 +643,27 @@ mod tests {
             "streaming": false,
             "messages": [{"state": "completed"}]
         });
+        let navigation = json!({
+            "type":"conversation_snapshot",
+            "conversations":[],
+            "projects":[],
+            "collection":{"complete":true}
+        });
         let stored_at = now_ms();
-        assert!(store(&path, "chatgpt", Some(&semantic), None, &[], stored_at,).unwrap());
+        assert!(store(
+            &path,
+            "chatgpt",
+            Some(&semantic),
+            Some(&navigation),
+            &[],
+            stored_at,
+            stored_at,
+        )
+        .unwrap());
         let loaded = load(&path, "chatgpt").unwrap().unwrap();
         assert_eq!(loaded.updated_at_ms, stored_at);
+        assert_eq!(loaded.navigation_updated_at_ms, stored_at);
+        assert_eq!(loaded.navigation_event.unwrap()["collection"]["complete"], true);
         assert_eq!(loaded.semantic_event.unwrap()["draft"], "");
 
         fs::write(&path, b"corrupt cache").unwrap();
@@ -685,6 +712,7 @@ mod tests {
             Some(&semantic),
             None,
             std::slice::from_ref(&conversation),
+            0,
             stored_at,
         )
         .unwrap());

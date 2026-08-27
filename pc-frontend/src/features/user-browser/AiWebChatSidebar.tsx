@@ -12,7 +12,10 @@ import {
 } from 'lucide-react'
 import type { AiWebChatBackend } from './useAiWebChatBackend'
 import { requestReturnToAiChat } from './internalBrowserApi'
-import { localAiDirectoryAutoSyncKey } from './localAiDirectoryAutoSync'
+import {
+  localAiDirectoryAutoSyncKey,
+  localAiDirectoryNeedsAutoSync,
+} from './localAiDirectoryAutoSync'
 import styles from './AiWebChatSidebar.module.css'
 
 export default function AiWebChatSidebar({ web }: { web: AiWebChatBackend }) {
@@ -28,6 +31,10 @@ export default function AiWebChatSidebar({ web }: { web: AiWebChatBackend }) {
   const recent = filtered.filter((item) => !item.pinned && !/pinned|置顶/i.test(item.groupLabel))
   const projects = directory?.projects ?? []
   const cachedConversations = web.controller.sessionState?.localConversations ?? []
+  const directoryNeedsAutoSync = localAiDirectoryNeedsAutoSync({
+    navigationEvent: directory,
+    navigationUpdatedAtMs: web.controller.sessionState?.navigationUpdatedAtMs,
+  })
   const autoSyncKey = useRef('')
   const syncRetryAttempt = useRef(0)
   const syncRetryTimer = useRef(0)
@@ -78,6 +85,8 @@ export default function AiWebChatSidebar({ web }: { web: AiWebChatBackend }) {
       sessionIdentity: web.controller.sessionIdentity,
       windowLabel: web.controller.sessionState?.windowLabel,
       sessionOpen: web.controller.sessionOpen,
+      navigationUpdatedAtMs: web.controller.sessionState?.navigationUpdatedAtMs,
+      directoryComplete: directory?.collection?.complete,
     })
     if (!key) {
       autoSyncKey.current = ''
@@ -87,6 +96,12 @@ export default function AiWebChatSidebar({ web }: { web: AiWebChatBackend }) {
     }
     if (!web.userState.canConversationHistory || busy) return
     if (autoSyncKey.current === key) return
+    if (!directoryNeedsAutoSync) {
+      // Keep the fresh cache visible without marking the identity as synced
+      // forever. Idle session updates will re-evaluate the two-minute TTL.
+      autoSyncKey.current = ''
+      return
+    }
     autoSyncKey.current = key
     syncDirectory()
   }, [
@@ -95,7 +110,10 @@ export default function AiWebChatSidebar({ web }: { web: AiWebChatBackend }) {
     syncDirectory,
     web.controller.sessionIdentity,
     web.controller.sessionOpen,
+    web.controller.sessionState?.navigationUpdatedAtMs,
     web.controller.sessionState?.windowLabel,
+    directory,
+    directoryNeedsAutoSync,
     web.userState.canConversationHistory,
   ])
 
@@ -258,7 +276,9 @@ export default function AiWebChatSidebar({ web }: { web: AiWebChatBackend }) {
               : web.controller.sessionState?.contextReady === false
               ? web.contextSummary
               : web.controller.sessionState?.navigationCacheStatus === 'cached'
-              ? '已立即显示本机缓存；正在后台同步官网会话与项目。'
+              ? directoryNeedsAutoSync
+                ? '已立即显示本机缓存；正在后台同步官网会话与项目。'
+                : '已立即显示本机缓存；官网目录最近已验证，无需重复同步。'
               : directory?.collection && !directory.collection.complete
               ? `已显示 ${conversations.length} 个缓存/可见会话；完整官网目录正在后台同步。`
               : web.contextSummary || web.userState.detail}

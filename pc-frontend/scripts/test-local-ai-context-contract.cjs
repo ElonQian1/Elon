@@ -84,6 +84,7 @@ assert.doesNotMatch(`${adapter}\n${googleAdapter}`, /page_context_key:\s*Some\(r
 assert.match(api, /activeConversationId\?:/)
 assert.match(api, /contextReady\?:/)
 assert.match(api, /contextStatus\?:/)
+assert.match(api, /navigationUpdatedAtMs:/)
 assert.match(api, /requestLocalAiWebSnapshot/)
 assert.match(responseRefresh, /localAiResponseRefreshDelay/)
 assert.match(responseRefresh, /localAiResponseRefreshPhase/)
@@ -114,6 +115,7 @@ assert.match(backend, /contextSummary/)
 assert.match(backend, /localAiHistoryWindow/)
 assert.match(sidebar, /historyWindow\.label/)
 assert.match(sidebar, /localAiDirectoryAutoSyncKey/)
+assert.match(sidebar, /localAiDirectoryNeedsAutoSync/)
 assert.match(sidebar, /web\.controller\.sessionIdentity/)
 assert.match(controls, /MENU_CACHE_TTL_MS/)
 assert.match(controls, /menuNeedsRefresh/)
@@ -176,16 +178,42 @@ assert.deepEqual(
   [250, 750, 1_500],
 )
 
-const { localAiDirectoryAutoSyncKey } = loadTypeScriptModule(directoryAutoSyncPath)
+const {
+  LOCAL_AI_DIRECTORY_FRESHNESS_MS,
+  localAiDirectoryAutoSyncKey,
+  localAiDirectoryNeedsAutoSync,
+} = loadTypeScriptModule(directoryAutoSyncPath)
 assert.equal(localAiDirectoryAutoSyncKey({
   sessionIdentity: 'chatgpt:owner-a', windowLabel: 'chatgpt-window', sessionOpen: true,
-}), 'chatgpt:owner-a:chatgpt-window')
+}), 'chatgpt:owner-a:chatgpt-window:stale:0')
 assert.equal(localAiDirectoryAutoSyncKey({
   sessionIdentity: 'chatgpt:owner-b', windowLabel: 'chatgpt-window', sessionOpen: true,
-}), 'chatgpt:owner-b:chatgpt-window')
+  navigationUpdatedAtMs: 900_000, directoryComplete: true,
+}), 'chatgpt:owner-b:chatgpt-window:complete:900000')
 assert.equal(localAiDirectoryAutoSyncKey({
   sessionIdentity: 'chatgpt:owner-a', windowLabel: 'chatgpt-window', sessionOpen: false,
 }), '')
+const directoryNow = 1_000_000
+assert.equal(localAiDirectoryNeedsAutoSync({
+  navigationEvent: { collection: { complete: true } },
+  navigationUpdatedAtMs: directoryNow - 30_000,
+  nowMs: directoryNow,
+}), false)
+assert.equal(localAiDirectoryNeedsAutoSync({
+  navigationEvent: { collection: { complete: true } },
+  navigationUpdatedAtMs: directoryNow - LOCAL_AI_DIRECTORY_FRESHNESS_MS,
+  nowMs: directoryNow,
+}), true)
+assert.equal(localAiDirectoryNeedsAutoSync({
+  navigationEvent: { collection: { complete: false } },
+  navigationUpdatedAtMs: directoryNow - 30_000,
+  nowMs: directoryNow,
+}), true)
+assert.equal(localAiDirectoryNeedsAutoSync({
+  navigationEvent: { collection: { complete: true } },
+  navigationUpdatedAtMs: 0,
+  nowMs: directoryNow,
+}), true)
 
 const { findLocalAiRealtimeVoiceControls } = loadTypeScriptModule(realtimeVoicePath)
 const baseControl = {

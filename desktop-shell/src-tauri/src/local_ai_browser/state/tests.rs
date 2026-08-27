@@ -104,6 +104,55 @@ fn partial_official_directory_updates_do_not_erase_cached_sidebar_items() {
     assert_eq!(directory["conversations"][0]["pinned"], true);
     assert_eq!(directory["projects"].as_array().unwrap().len(), 1);
     assert_eq!(directory["collection"]["source"], "official_partial");
+    assert_eq!(snapshot.navigation_updated_at_ms, 0);
+}
+
+#[test]
+fn only_complete_official_directory_advances_verified_freshness() {
+    let runtime = LocalAiBrowserRuntime::default();
+    runtime.ensure_session("session", "chatgpt", "active");
+    runtime.record_adapter_event(
+        "session",
+        "conversation_snapshot",
+        json!({
+            "type":"conversation_snapshot",
+            "conversations":[{"path":"/c/one","title":"One"}],
+            "projects":[],
+            "collection":{"complete":false,"observedCount":1}
+        }),
+    );
+    assert_eq!(runtime.snapshot("session").unwrap().navigation_updated_at_ms, 0);
+
+    runtime.record_adapter_event(
+        "session",
+        "conversation_snapshot",
+        json!({
+            "type":"conversation_snapshot",
+            "conversations":[{"path":"/c/one","title":"One"}],
+            "projects":[],
+            "collection":{"complete":true,"observedCount":1}
+        }),
+    );
+    let verified_at = runtime.snapshot("session").unwrap().navigation_updated_at_ms;
+    assert!(verified_at > 0);
+
+    runtime.record_adapter_event(
+        "session",
+        "conversation_snapshot",
+        json!({
+            "type":"conversation_snapshot",
+            "conversations":[{"path":"/c/one","title":"One partial"}],
+            "projects":[],
+            "collection":{"complete":false,"observedCount":1}
+        }),
+    );
+    assert_eq!(
+        runtime.snapshot("session").unwrap().navigation_updated_at_ms,
+        verified_at
+    );
+
+    runtime.mark_command_pending("session", "new_conversation", Some("new-chat"));
+    assert_eq!(runtime.snapshot("session").unwrap().navigation_updated_at_ms, 0);
 }
 
 #[test]
