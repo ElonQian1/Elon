@@ -8,6 +8,7 @@ import {
 } from './localAiBrowserApi'
 import { requestReturnToAiChat } from './internalBrowserApi'
 import type { QueuedLocalAiSend } from './localAiWebChatControllerConfig'
+import { localAiSendReceiptDecision } from './localAiSendReceiptPolicy'
 
 interface DispatchPreparedLocalAiPromptOptions {
   provider: LocalAiWebProvider | undefined
@@ -38,6 +39,12 @@ export async function dispatchPreparedLocalAiPrompt({
   }
   onBusyAction('send_prompt')
   onMessage('')
+  let commandQueued = false
+  let requestId = ''
+  const reconcileUncertainSend = () => {
+    onMessage('发送结果暂未确认。为避免重复发送，一龙不会自动重放；正在从官方会话对账，可打开官方页核对。')
+    onResponseRefresh(prepared.prompt, prepared.pending.baselineMatchingUserCount)
+  }
   try {
     const foregroundRequest = {
       providerId: provider.id,
@@ -48,22 +55,27 @@ export async function dispatchPreparedLocalAiPrompt({
     // after the matching receipt because the page may navigate late after send.
     requestReturnToAiChat(foregroundRequest)
     onState(await controlLocalAiWebSession(provider.id, ownerKey, 'background'))
-    const requestId = await runLocalAiWebAdapterCommand(
+    requestId = await runLocalAiWebAdapterCommand(
       provider.id,
       ownerKey,
       'send_prompt',
       prepared.prompt,
       prepared.expectedDraft,
     )
+    commandQueued = true
     const next = await waitForLocalAiAdapterResult(
       provider.id,
       ownerKey,
       'send_prompt',
       requestId,
     )
-    if (!next) {
-      restore(prepared)
-      onMessage('没有收到当前发送的匹配回执；消息没有标记为成功，草稿已保留。')
+    const decision = localAiSendReceiptDecision({
+      commandQueued,
+      requestId,
+      receipt: next?.commandResult,
+    })
+    if (decision === 'reconcile' || !next) {
+      reconcileUncertainSend()
       return null
     }
     requestReturnToAiChat(foregroundRequest)
@@ -74,18 +86,23 @@ export async function dispatchPreparedLocalAiPrompt({
       // Response polling continues to reassert the same bounded foreground intent.
     }
     onState(foregroundState)
-    const result = next.commandResult
-    if (result?.action === 'send_prompt' && !result.ok) {
+    const result = next?.commandResult
+    if (decision === 'rejected') {
       restore(prepared)
-      onMessage(result.detail || '官方网页没有完成发送，草稿已保留；可显示官方窗口后重试。')
+      onMessage(result?.detail || '官方网页明确拒绝了发送，草稿已恢复；可显示官方窗口后重试。')
     } else {
       onMessage(result?.detail || '消息已交给官方网页发送；正在一龙聊天界面同步回复。')
       onResponseRefresh(prepared.prompt, prepared.pending.baselineMatchingUserCount)
     }
     return next
   } catch (error) {
-    restore(prepared)
-    onMessage(localAiBrowserErrorMessage(error))
+    const decision = localAiSendReceiptDecision({ commandQueued, requestId })
+    if (decision === 'reconcile') {
+      reconcileUncertainSend()
+    } else {
+      restore(prepared)
+      onMessage(localAiBrowserErrorMessage(error))
+    }
     return null
   } finally {
     onBusyAction('')

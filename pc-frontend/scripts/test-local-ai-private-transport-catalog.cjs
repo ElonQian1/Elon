@@ -52,7 +52,7 @@ assert.match(copy.copy, /10\/10/)
 assert.match(copy.copy, /无需等待官网扫描/)
 assert.match(copy.detail, /私有流与完成态结算/)
 assert.match(copy.detail, /官网快照单飞行刷新/)
-assert.match(copy.detail, /缓存先接与官网发送确认单飞行/)
+assert.match(copy.detail, /稳定回执与不确定发送对账/)
 assert.match(copy.detail, /独立会话正文与富内容缓存/)
 assert.match(copy.detail, /私有流原生事件即时刷新/)
 
