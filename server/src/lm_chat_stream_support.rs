@@ -5,9 +5,14 @@ use axum::{
 };
 use futures::stream;
 use serde_json::{json, Value};
-use std::convert::Infallible;
 use std::time::Duration;
+use std::{convert::Infallible, sync::Arc};
 use tokio::sync::mpsc;
+
+use crate::{
+    agent_fallback::call_chat_llm_with_default_fallback_options,
+    types::{AgentConfig, AppState},
+};
 
 pub(crate) fn stream_response(rx: mpsc::Receiver<String>) -> Response {
     // Keep long-running AI/tool orchestration streams alive through proxies and
@@ -64,4 +69,45 @@ pub(crate) async fn send_stream_error(tx: &mpsc::Sender<String>, message: impl I
         }),
     )
     .await;
+}
+
+pub(crate) async fn regular_home_chat(
+    state: &Arc<AppState>,
+    agent: &AgentConfig,
+    allow_fallback: bool,
+    messages: &[Value],
+    user_id: &str,
+) -> anyhow::Result<(String, String, String, bool, String, Option<String>)> {
+    let (response, used_agent, used_fallback) = call_chat_llm_with_default_fallback_options(
+        state,
+        agent,
+        allow_fallback,
+        messages,
+        user_id,
+        "lm_chat",
+        0.8,
+        900,
+    )
+    .await?;
+    if used_fallback {
+        tracing::warn!(
+            user_id = %user_id,
+            preferred_agent = %agent.name,
+            used_agent = %used_agent.name,
+            model = %used_agent.model,
+            "默认聊天模型失败后已自动切换备用代理"
+        );
+    }
+    Ok((
+        response["choices"][0]["message"]["content"]
+            .as_str()
+            .unwrap_or("")
+            .trim()
+            .to_string(),
+        used_agent.name,
+        used_agent.model,
+        used_fallback,
+        "model".to_string(),
+        None,
+    ))
 }

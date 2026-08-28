@@ -21,21 +21,25 @@ use serde_json::{json, Value};
 use std::{path::PathBuf, sync::Arc};
 use tokio::sync::mpsc;
 
+#[path = "lm_chat_routing.rs"]
+mod lm_chat_routing;
+
 use crate::{
     agent_api_loop::resolve_agent,
-    agent_fallback::{
-        call_chat_llm_with_default_fallback_options, start_chat_llm_stream_with_default_fallback,
-    },
+    agent_fallback::start_chat_llm_stream_with_default_fallback,
     conversation_router::{resolve_system_conversation_route, ConversationEntryKind},
     home_ai_orchestrator, home_ai_tools,
     lm_chat_prompt::{append_system_prompt_note, CHAT_MEMORY_LOCAL_CLI_NOTE},
     lm_chat_request::LmChatRequest,
-    lm_chat_stream_support::{send_stream_error, send_stream_event, stream_response},
+    lm_chat_stream_support::{
+        regular_home_chat, send_stream_error, send_stream_event, stream_response,
+    },
     pc_agent_runtime_choice::PcRuntimeRoutePreference,
     project_auth::{auth_from_headers, json_error},
     types::{AppState, UserAgentConfig},
     user_memory_extract::extract_and_save_memories_scoped,
 };
+use lm_chat_routing::allow_server_agent_fallback;
 
 pub(crate) use crate::lm_chat_history::{
     list_ai_chat_conversation_messages, list_ai_chat_conversations,
@@ -76,8 +80,10 @@ pub async fn lm_chat_handler(
         );
     }
     let user_agent_workspace = state.get_user_workspace(&user.id);
+    let user_agent_config = UserAgentConfig::load(&user_agent_workspace);
     if pc_runtime_route == Some(PcRuntimeRoutePreference::RouteB)
-        && !UserAgentConfig::load(&user_agent_workspace)
+        && !user_agent_config
+            .as_ref()
             .map(|cfg| cfg.has_direct_custom_api())
             .unwrap_or(false)
     {
@@ -239,7 +245,8 @@ pub async fn lm_chat_handler(
                     );
                 }
             };
-            let allow_agent_fallback = req.agent.as_deref().map(str::trim).unwrap_or("").is_empty();
+            let allow_agent_fallback =
+                allow_server_agent_fallback(pc_runtime_route, user_agent_config.as_ref());
             if entry_kind == ConversationEntryKind::ChatMemory {
                 match home_ai_orchestrator::run(
                     &state,
@@ -360,47 +367,6 @@ pub async fn lm_chat_handler(
     .into_response()
 }
 
-async fn regular_home_chat(
-    state: &Arc<AppState>,
-    agent: &crate::types::AgentConfig,
-    allow_fallback: bool,
-    messages: &[Value],
-    user_id: &str,
-) -> anyhow::Result<(String, String, String, bool, String, Option<String>)> {
-    let (response, used_agent, used_fallback) = call_chat_llm_with_default_fallback_options(
-        state,
-        agent,
-        allow_fallback,
-        messages,
-        user_id,
-        "lm_chat",
-        0.8,
-        900,
-    )
-    .await?;
-    if used_fallback {
-        tracing::warn!(
-            user_id = %user_id,
-            preferred_agent = %agent.name,
-            used_agent = %used_agent.name,
-            model = %used_agent.model,
-            "默认聊天模型失败后已自动切换备用代理"
-        );
-    }
-    Ok((
-        response["choices"][0]["message"]["content"]
-            .as_str()
-            .unwrap_or("")
-            .trim()
-            .to_string(),
-        used_agent.name,
-        used_agent.model,
-        used_fallback,
-        "model".to_string(),
-        None,
-    ))
-}
-
 /// POST /api/llm/chat/stream — 首页 AI 的流式兼容入口。
 pub async fn lm_chat_stream_handler(
     State(state): State<Arc<AppState>>,
@@ -435,8 +401,10 @@ pub async fn lm_chat_stream_handler(
         );
     }
     let user_agent_workspace = state.get_user_workspace(&user.id);
+    let user_agent_config = UserAgentConfig::load(&user_agent_workspace);
     if pc_runtime_route == Some(PcRuntimeRoutePreference::RouteB)
-        && !UserAgentConfig::load(&user_agent_workspace)
+        && !user_agent_config
+            .as_ref()
             .map(|cfg| cfg.has_direct_custom_api())
             .unwrap_or(false)
     {
@@ -448,6 +416,8 @@ pub async fn lm_chat_stream_handler(
 
     let (tx, rx) = mpsc::channel(32);
     let user_id = user.id.clone();
+    let allow_agent_fallback =
+        allow_server_agent_fallback(pc_runtime_route, user_agent_config.as_ref());
     tokio::spawn(async move {
         run_lm_chat_stream(
             state,
@@ -455,6 +425,7 @@ pub async fn lm_chat_stream_handler(
             req,
             pc_runtime_route,
             user_agent_workspace,
+            allow_agent_fallback,
             tx,
         )
         .await;
@@ -518,6 +489,7 @@ async fn run_lm_chat_stream(
     req: LmChatRequest,
     pc_runtime_route: Option<PcRuntimeRoutePreference>,
     user_agent_workspace: PathBuf,
+    allow_agent_fallback: bool,
     tx: mpsc::Sender<String>,
 ) {
     let started_at = std::time::Instant::now();
@@ -757,7 +729,6 @@ async fn run_lm_chat_stream(
             return;
         }
     };
-    let allow_agent_fallback = req.agent.as_deref().map(str::trim).unwrap_or("").is_empty();
     if entry_kind == ConversationEntryKind::ChatMemory {
         let _ = send_stream_event(
             &tx,
