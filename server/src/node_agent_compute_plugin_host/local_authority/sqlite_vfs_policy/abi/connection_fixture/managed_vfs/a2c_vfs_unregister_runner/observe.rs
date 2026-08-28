@@ -131,8 +131,20 @@ impl RegistrationShutdownActions {
     pub(in super::super) fn observe_lifecycle(
         &self,
         lifecycle: &Arc<ManagedTestLifecycleFaultController>,
+        baseline: &[ManagedTestLifecycleFaultObservation],
     ) -> anyhow::Result<()> {
-        let observations = lifecycle.observations().map_err(anyhow::Error::msg)?;
+        if baseline
+            .iter()
+            .any(|observation| observation.route.is_none())
+        {
+            return Err(anyhow!(
+                "registration shutdown baseline contains a registration-scoped observation"
+            ));
+        }
+        let all_observations = lifecycle.observations().map_err(anyhow::Error::msg)?;
+        let observations = all_observations
+            .strip_prefix(baseline)
+            .ok_or_else(|| anyhow!("registration shutdown lifecycle baseline changed"))?;
         if observations.iter().any(|observation| {
             observation.route.is_some()
                 || observation.phase != ManagedTestLifecycleFaultPhase::VfsUnregister
@@ -142,7 +154,7 @@ impl RegistrationShutdownActions {
                 "registration shutdown observed an unrelated lifecycle transition"
             ));
         }
-        for observation in &observations {
+        for observation in observations {
             if observation.triggered {
                 self.counters.increment(Counter::FaultObserve)?;
                 self.counters.increment(Counter::FaultTrigger)?;
@@ -154,7 +166,7 @@ impl RegistrationShutdownActions {
                 .context("pending lifecycle fault count exceeds u8")?,
         );
         let receipt = *self.unregister_receipt.borrow();
-        match (observations.as_slice(), receipt) {
+        match (observations, receipt) {
             ([before], None)
                 if lifecycle_observation(
                     before,

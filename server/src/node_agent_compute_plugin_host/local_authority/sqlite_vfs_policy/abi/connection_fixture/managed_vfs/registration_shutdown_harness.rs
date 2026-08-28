@@ -76,6 +76,7 @@ pub(super) fn exercise_registration_shutdown(
         None
     };
     install_unregister_fault(selector, &lifecycle)?;
+    let lifecycle_baseline = lifecycle.observations().map_err(anyhow::Error::msg)?;
 
     let lookup_present_before = vfs_is_registered(&vfs_name);
     let shutdown = registration.unregister_in_place_with(
@@ -91,7 +92,7 @@ pub(super) fn exercise_registration_shutdown(
         .map_err(|failure| anyhow!("observe registration shutdown runtime: {failure:?}"))?;
     let retained_snapshot = retained_parts.snapshot();
 
-    actions.observe_lifecycle(&lifecycle)?;
+    actions.observe_lifecycle(&lifecycle, &lifecycle_baseline)?;
     if let Some(witness) = quarantine.as_ref() {
         actions.observe_quarantined_custody(witness)?;
     }
