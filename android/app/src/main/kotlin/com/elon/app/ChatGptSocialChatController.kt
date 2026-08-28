@@ -14,6 +14,8 @@ import com.elon.app.chatgptweb.ChatGptWebAttachmentSendUpdate
 import com.elon.app.chatgptweb.ChatGptWebComposerOption
 import com.elon.app.chatgptweb.ChatGptWebEvent
 import com.elon.app.chatgptweb.ChatGptWebPresentationMode
+import com.elon.app.chatgptweb.ChatGptWebSendOrigin
+import com.elon.app.chatgptweb.ChatGptWebSendReceipt
 import com.elon.app.chatgptweb.ChatGptWebSnapshot
 import com.elon.app.chatgptweb.ChatGptWebSkinPresentationController
 import com.elon.app.databinding.ActivityMainBinding
@@ -49,20 +51,10 @@ internal class ChatGptSocialChatController(
         onStateChanged = ::renderState,
         onComposerOptions = ::showModelOptions,
         onCommandResult = ::handleCommandResult,
+        onSendTerminalTimeout = ::handlePendingSendTimeout,
         onAttachmentSendChanged = ::handleAttachmentSendUpdate,
         onConversationIndexChanged = { onConversationIndexChanged() },
         audioPermissionController = audioPermissionController,
-    )
-    private val sendTransport = OfficialPageWebChatSendTransport(
-        ready = session::canSend,
-        sendPrompt = session::sendPrompt,
-        requestReconciliation = { session.currentSnapshot()?.let(::renderSnapshot) },
-    )
-    private val sendCoordinator = WebChatSendCoordinator(
-        transport = sendTransport,
-        postDelayed = { task, delayMs -> binding.root.postDelayed(task, delayMs) },
-        removeCallbacks = { task -> binding.root.removeCallbacks(task) },
-        onTerminalTimeout = ::handlePendingSendTimeout,
     )
     private val skinPresentation = ChatGptWebSkinPresentationController(binding, session)
     private var provider = WebChatProviderRegistry.get(WebChatProviderId.CHATGPT_WEB)
@@ -119,7 +111,7 @@ internal class ChatGptSocialChatController(
 
     override fun deactivate() {
         active = false
-        sendCoordinator.pauseWatchdog()
+        session.pauseSendWatchdog()
         if (!session.realtimeVoiceActive()) realtimeVoiceTranscript.reset()
         skinPresentation.exit()
         modelPopup?.dismiss()
@@ -170,8 +162,8 @@ internal class ChatGptSocialChatController(
 
     override fun trySendMessage(rawText: String, pendingAttachments: List<PendingAttachment>): Boolean {
         if (!active) return false
-        if (sendCoordinator.prompt() != null) {
-            val detail = if (sendCoordinator.requiresOfficialConfirmation()) {
+        if (session.pendingSendPrompt() != null) {
+            val detail = if (session.pendingSendRequiresOfficialConfirmation()) {
                 "上一条已发送，但回答尚未同步，请打开官网功能确认"
             } else {
                 "上一条消息仍在处理，请稍候"
@@ -207,7 +199,7 @@ internal class ChatGptSocialChatController(
         }
         val prompt = rawText.trim()
         if (prompt.isBlank()) return true
-        if (!sendCoordinator.isReady()) {
+        if (!session.sendReady()) {
             when (WebChatSendFallbackPolicy.decide(
                 loginRequired = session.state() == ChatGptBackgroundSession.State.LOGIN_REQUIRED,
             )) {
@@ -222,11 +214,8 @@ internal class ChatGptSocialChatController(
             }
             return true
         }
-        val currentSnapshot = session.currentSnapshot() ?: return true
-        val result = sendCoordinator.dispatch(prompt, currentSnapshot) {
-            transcript.requestFollowLatest()
-            renderSnapshot(currentSnapshot)
-        }
+        transcript.requestFollowLatest()
+        val result = session.dispatchSocialPrompt(prompt)
         when (result.outcome) {
             WebChatSendCoordinator.DispatchOutcome.DISPATCHED -> {
                 binding.inputEdit.text?.clear()
@@ -444,8 +433,7 @@ internal class ChatGptSocialChatController(
             }
             return
         }
-        sendCoordinator.observeSnapshot(voicePresentation)
-        val pendingTextPrompt = sendCoordinator.prompt()
+        val pendingTextPrompt = session.pendingSendPrompt()
         val presentationSnapshot = WebChatPendingSendSnapshotPresentation.resolve(
             previous = lastMessageSnapshot,
             incoming = voicePresentation,
@@ -459,7 +447,7 @@ internal class ChatGptSocialChatController(
                 else -> "发送中…"
             }
         } else {
-            sendCoordinator.status() ?: "发送中…"
+            session.pendingSendStatus() ?: "发送中…"
         }
         val displayedPendingPrompt = pendingAttachmentPrompt ?: pendingTextPrompt
         val mapped = ChatGptFriendMessageMapper.map(
@@ -520,22 +508,23 @@ internal class ChatGptSocialChatController(
         onComposerStateChanged()
     }
 
-    private fun handleCommandResult(event: ChatGptWebEvent.CommandResult) {
+    private fun handleCommandResult(
+        event: ChatGptWebEvent.CommandResult,
+        sendReceipt: ChatGptWebSendReceipt?,
+    ) {
         latestCommandStatus = WebChatCommandStatus(
             action = event.action,
             ok = event.ok,
             detail = event.detail,
             observedAtMs = System.currentTimeMillis(),
         )
-        if (pendingAttachments.isNotEmpty()) return
-        if (event.action != "send_prompt") return
-        val failedPrompt = sendCoordinator.acceptCommandResult(event.requestId, event.ok)
+        if (sendReceipt?.origin != ChatGptWebSendOrigin.SOCIAL) return
         if (event.ok) {
             session.currentSnapshot()?.let(::renderSnapshot)
             return
         }
         renderAfterPendingSendFailure()
-        restorePrompt(failedPrompt)
+        restorePrompt(sendReceipt.failedPrompt)
         Toast.makeText(
             activity,
             event.detail.ifBlank { activity.getString(R.string.chatgpt_native_command_failed) },
@@ -600,7 +589,7 @@ internal class ChatGptSocialChatController(
         }
     }
 
-    private fun clearPendingSend() = sendCoordinator.clear()
+    private fun clearPendingSend() = session.clearPendingSend()
 
     private fun renderAfterPendingSendFailure() {
         (lastMessageSnapshot ?: session.currentSnapshot())?.let(::renderSnapshot)

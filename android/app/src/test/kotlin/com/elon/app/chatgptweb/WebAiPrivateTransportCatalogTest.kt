@@ -126,7 +126,7 @@ class WebAiPrivateTransportCatalogTest {
         }
         assertEquals("completed", sendCoordinator.getString("implementation_status"))
         assertEquals(
-            "command_ledger_targeted_tests_passed_device_pending",
+            "all_send_entry_points_targeted_tests_passed_device_pending",
             sendCoordinator.getString("verification_status"),
         )
         assertTrue(sendCoordinator.getBoolean("production_default"))

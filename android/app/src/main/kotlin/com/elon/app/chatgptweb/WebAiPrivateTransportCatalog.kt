@@ -126,7 +126,7 @@ internal object WebAiPrivateTransportCatalog {
             id = "android_web_ai_unified_send_coordinator_v1",
             provider = "chatgpt_and_google_web_ai",
             status = "completed",
-            verification = "command_ledger_targeted_tests_passed_device_pending",
+            verification = "all_send_entry_points_targeted_tests_passed_device_pending",
             productionDefault = true,
             runtimeEnabled = true,
             requestMode = "single_owner_command_ledger_with_official_page_transport",

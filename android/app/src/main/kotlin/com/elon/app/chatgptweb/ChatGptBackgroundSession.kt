@@ -1,6 +1,5 @@
 package com.elon.app.chatgptweb
 
-import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.webkit.CookieManager
@@ -9,6 +8,8 @@ import android.widget.FrameLayout
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.PendingAttachment
 import com.elon.app.WebChatConsumerPort
+import com.elon.app.WebChatPendingSendState
+import com.elon.app.WebChatSendCoordinator
 import com.elon.app.WebChatSessionRecoveryCoordinator
 import com.elon.app.WebChatSocialMcpPort
 import java.time.LocalDate
@@ -19,7 +20,8 @@ internal class ChatGptBackgroundSession(
     private val onSnapshot: (ChatGptWebSnapshot) -> Unit,
     private val onStateChanged: (State, String?) -> Unit,
     private val onComposerOptions: (List<ChatGptWebComposerOption>) -> Unit,
-    private val onCommandResult: (ChatGptWebEvent.CommandResult) -> Unit,
+    private val onCommandResult: (ChatGptWebEvent.CommandResult, ChatGptWebSendReceipt?) -> Unit,
+    private val onSendTerminalTimeout: (WebChatPendingSendState.TimeoutResult) -> Unit,
     private val onAttachmentSendChanged: (ChatGptWebAttachmentSendUpdate) -> Unit,
     private val onConversationIndexChanged: (ChatGptWebConversationIndexState) -> Unit,
     private val audioPermissionController: ChatGptWebAudioPermissionController,
@@ -48,7 +50,7 @@ internal class ChatGptBackgroundSession(
     )
     private val observedMcpState = ChatGptWebObservedState(restoredConversationHistory)
     private val verificationEvidenceStore = ChatGptWebVerificationEvidenceStore(activity.applicationContext)
-    private val attachmentHandler = Handler(Looper.getMainLooper())
+    private val sendHandler = Handler(Looper.getMainLooper())
     private val conversationRefreshHandler = Handler(Looper.getMainLooper())
     private val composerOptionHandler = Handler(Looper.getMainLooper())
     private val surfaceMode: ChatGptWebSurfaceModeController by lazy(LazyThreadSafetyMode.NONE) {
@@ -100,9 +102,6 @@ internal class ChatGptBackgroundSession(
     private var latestUiManifest: ChatGptWebUiManifest? = null
     private var latestBridgeState = ChatGptWebPageAdapter.State.WEB_ONLY
     private var state = State.IDLE
-    private var queuedUploadUris = emptyList<Uri>()
-    private var attachmentSendTracker: ChatGptWebAttachmentSendTracker? = null
-    private var lastAttachmentSendPhase = ATTACHMENT_PHASE_IDLE
     private var forceConversationRefreshAfterVoice = false
     private var requestedConversationProjectId: String? = null
     private var loadPendingAfterPause = false
@@ -118,11 +117,32 @@ internal class ChatGptBackgroundSession(
                 realtimeVoiceRecovery::recoveredSince,
             )
         }
+    private val sendOwner = ChatGptWebSendOwner(
+        transport = chatGptOfficialPageSendTransport(
+            pageAdapter = { pageAdapter },
+            snapshot = { latestSnapshot },
+            ready = ::canSend,
+        ),
+        snapshot = { latestSnapshot },
+        stageUploads = { attachments -> uploadStager.stage(attachments) },
+        requestAttachmentUpload = {
+            pageAdapter?.let {
+                it.requestAttachmentUpload()
+                true
+            } ?: false
+        },
+        removeAttachment = { id -> pageAdapter?.removeAttachment(id) },
+        postDelayed = { task, delayMs -> sendHandler.postDelayed(task, delayMs) },
+        removeCallbacks = sendHandler::removeCallbacks,
+        onTerminalTimeout = onSendTerminalTimeout,
+        onAttachmentChanged = onAttachmentSendChanged,
+        onSendStateChanged = { latestSnapshot?.let(onSnapshot) },
+    )
     private val webExecution: ChatGptBackgroundExecutionController =
         chatGptBackgroundExecutionController({ webView }) {
             surfaceMode.isSkin() || realtimeVoiceBacking.isActive() ||
                 latestSnapshot?.streaming == true ||
-                conversationNavigation.hasPending() || attachmentSendTracker != null
+                conversationNavigation.hasPending() || sendOwner.hasAttachmentSend()
         }
     private val touchRequestHandler by lazy(LazyThreadSafetyMode.NONE) {
         ChatGptWebTouchRequestHandler(
@@ -223,37 +243,22 @@ internal class ChatGptBackgroundSession(
 
     fun canSend(): Boolean = WebChatSendContextPolicy.allows(state == State.READY, latestSnapshot, conversationNavigation.hasPending(), currentConversationPath(), currentConversationPath())
 
-    fun sendPrompt(prompt: String, requestId: String): Boolean {
-        val adapter = pageAdapter ?: return false
-        val snapshot = latestSnapshot ?: return false
-        if (!canSend()) return false
-        lastAttachmentSendPhase = ATTACHMENT_PHASE_IDLE
-        adapter.sendPrompt(prompt, snapshot.draft, requestId)
-        return true
-    }
+    fun sendReady(): Boolean = sendOwner.isReady()
+    fun pendingSendPrompt(): String? = sendOwner.prompt()
+    fun pendingSendStatus(): String? = sendOwner.status()
+    fun pendingSendRequiresOfficialConfirmation(): Boolean =
+        sendOwner.requiresOfficialConfirmation()
+    fun dispatchSocialPrompt(prompt: String) = sendOwner.dispatchSocial(prompt)
+    fun pauseSendWatchdog() = sendOwner.pauseWatchdog()
+    fun clearPendingSend() = sendOwner.clear()
 
     fun sendAttachments(prompt: String, attachments: List<PendingAttachment>): Boolean {
-        val adapter = pageAdapter ?: return false
-        val snapshot = latestSnapshot ?: return false
-        if (!canSend() || attachments.isEmpty() || attachmentSendTracker != null) return false
-        val uris = runCatching { uploadStager.stage(attachments) }.getOrNull() ?: return false
-        attachmentSendTracker = ChatGptWebAttachmentSendTracker.begin(prompt, attachments.size, snapshot)
-        lastAttachmentSendPhase = ChatGptWebAttachmentSendTracker.Phase.UPLOADING.wireValue
-        queuedUploadUris = uris
-        onAttachmentSendChanged(
-            ChatGptWebAttachmentSendUpdate(
-                phase = ChatGptWebAttachmentSendTracker.Phase.UPLOADING.wireValue,
-                attachmentCount = attachments.size,
-            ),
-        )
-        scheduleAttachmentTimeout(attachmentSendTracker ?: return false)
-        adapter.requestAttachmentUpload()
-        return true
+        return sendOwner.beginAttachments(prompt, attachments)
     }
 
-    fun attachmentSendPhase(): String = attachmentSendTracker?.phase?.wireValue ?: lastAttachmentSendPhase
+    fun attachmentSendPhase(): String = sendOwner.attachmentSendPhase()
 
-    fun pendingAttachmentCount(): Int = attachmentSendTracker?.localAttachmentCount ?: 0
+    fun pendingAttachmentCount(): Int = sendOwner.pendingAttachmentCount()
 
     fun requestModelOptions(): Boolean {
         if (state != State.READY) return false
@@ -293,11 +298,22 @@ internal class ChatGptBackgroundSession(
         val commands = ChatGptWebMcpCommandAdapter(
             pageAdapter = adapter,
             sendInputAction = { requestId ->
-                adapter.sendPrompt(
-                    inputText().trim(),
-                    latestSnapshot?.draft.orEmpty(),
-                    requestId,
-                )
+                val result = sendOwner.dispatchMcp(inputText().trim(), requestId)
+                if (result.outcome != WebChatSendCoordinator.DispatchOutcome.DISPATCHED) {
+                    observedMcpState.failCommand(
+                        requestId,
+                        "send_prompt",
+                        when (result.outcome) {
+                            WebChatSendCoordinator.DispatchOutcome.BUSY -> "send_busy"
+                            WebChatSendCoordinator.DispatchOutcome.NOT_READY ->
+                                "send_not_ready"
+                            WebChatSendCoordinator.DispatchOutcome.REJECTED ->
+                                "send_rejected"
+                            WebChatSendCoordinator.DispatchOutcome.DISPATCHED ->
+                                "send_dispatched"
+                        },
+                    )
+                }
             },
             invokeControlAction = adapter::invokeUiControl,
             startDictationAction = { requestId ->
@@ -373,7 +389,8 @@ internal class ChatGptBackgroundSession(
         navigationActions.clearDeferred()
         composerOptionRequests.reset()
         pageAdapter?.dispose()
-        attachmentHandler.removeCallbacksAndMessages(null)
+        sendOwner.dispose()
+        sendHandler.removeCallbacksAndMessages(null)
         conversationRefresh.reset()
         forceConversationRefreshAfterVoice = false
         conversationRefreshHandler.removeCallbacksAndMessages(null)
@@ -391,7 +408,6 @@ internal class ChatGptBackgroundSession(
         latestSnapshot = null
         latestUiManifest = null
         latestBridgeState = ChatGptWebPageAdapter.State.WEB_ONLY
-        cancelAttachmentSend()
         updateState(State.IDLE)
     }
 
@@ -401,10 +417,9 @@ internal class ChatGptBackgroundSession(
         val view = createChatGptBackgroundWebView(
             activity, audioPermissionController, recovery::onNavigationProgress,
         ) { callback ->
-            val values = queuedUploadUris
-            queuedUploadUris = emptyList()
+            val values = sendOwner.consumeQueuedUploadUris()
             callback.onReceiveValue(values.takeIf { it.isNotEmpty() }?.toTypedArray())
-            if (values.isEmpty()) failAttachmentSend("附件请求已失效，请重新选择。")
+            if (values.isEmpty()) sendOwner.failFileChooser("附件请求已失效，请重新选择。")
         }
         surfaceMode.attach(view)
         cookieManager.setAcceptCookie(true)
@@ -558,7 +573,7 @@ internal class ChatGptBackgroundSession(
                     }
                     else -> updateState(State.LOADING)
                 }
-                processAttachmentSnapshot(snapshot)
+                sendOwner.observeSnapshot(snapshot)
                 onSnapshot(snapshot)
                 if (state == State.READY) navigationActions.onSessionReady()
             }
@@ -573,8 +588,7 @@ internal class ChatGptBackgroundSession(
                     composerOptionInteraction.release()
                     composerOptionRequests.complete(section)
                 }
-                onCommandResult(event)
-                processAttachmentCommandResult(event)
+                onCommandResult(event, sendOwner.acceptCommandResult(event))
                 if (event.ok) {
                     pageAdapter?.requestSnapshot()
                 } else {
@@ -703,86 +717,4 @@ internal class ChatGptBackgroundSession(
         onStateChanged(next, detail)
     }
 
-    private fun processAttachmentSnapshot(snapshot: ChatGptWebSnapshot) {
-        val tracker = attachmentSendTracker ?: return
-        when (val observation = tracker.observe(snapshot)) {
-            ChatGptWebAttachmentSendTracker.Observation.Wait -> Unit
-            ChatGptWebAttachmentSendTracker.Observation.SendPrompt -> {
-                lastAttachmentSendPhase = tracker.phase.wireValue
-                onAttachmentSendChanged(
-                    ChatGptWebAttachmentSendUpdate(
-                        phase = tracker.phase.wireValue,
-                        attachmentCount = tracker.localAttachmentCount,
-                    ),
-                )
-                pageAdapter?.sendPrompt(tracker.prompt, snapshot.draft)
-                    ?: failAttachmentSend("官网发送入口尚未就绪。")
-            }
-            is ChatGptWebAttachmentSendTracker.Observation.Complete -> {
-                attachmentHandler.removeCallbacksAndMessages(null)
-                attachmentSendTracker = null
-                queuedUploadUris = emptyList()
-                lastAttachmentSendPhase = ATTACHMENT_PHASE_COMPLETED
-                onAttachmentSendChanged(
-                    ChatGptWebAttachmentSendUpdate(
-                        phase = ATTACHMENT_PHASE_COMPLETED,
-                        attachmentCount = tracker.localAttachmentCount,
-                        userMessageId = observation.userMessageId,
-                    ),
-                )
-            }
-            is ChatGptWebAttachmentSendTracker.Observation.Failed -> failAttachmentSend(observation.detail)
-        }
-    }
-
-    private fun processAttachmentCommandResult(event: ChatGptWebEvent.CommandResult) {
-        if (attachmentSendTracker == null || event.ok) return
-        if (event.action == "request_attachment_upload" || event.action == "send_prompt") {
-            failAttachmentSend(event.detail.ifBlank { "官网附件操作失败，请重试。" })
-        }
-    }
-
-    private fun failAttachmentSend(detail: String) {
-        val tracker = attachmentSendTracker ?: return
-        attachmentHandler.removeCallbacksAndMessages(null)
-        latestSnapshot?.let(tracker::uploadedAttachmentIds)?.forEach { id ->
-            pageAdapter?.removeAttachment(id)
-        }
-        tracker.markSendFailed()
-        queuedUploadUris = emptyList()
-        lastAttachmentSendPhase = tracker.phase.wireValue
-        onAttachmentSendChanged(
-            ChatGptWebAttachmentSendUpdate(
-                phase = tracker.phase.wireValue,
-                attachmentCount = tracker.localAttachmentCount,
-                detail = detail,
-            ),
-        )
-        attachmentSendTracker = null
-    }
-
-    private fun cancelAttachmentSend() {
-        attachmentHandler.removeCallbacksAndMessages(null)
-        queuedUploadUris = emptyList()
-        attachmentSendTracker = null
-        lastAttachmentSendPhase = ATTACHMENT_PHASE_IDLE
-    }
-
-    private fun scheduleAttachmentTimeout(tracker: ChatGptWebAttachmentSendTracker) {
-        attachmentHandler.removeCallbacksAndMessages(null)
-        attachmentHandler.postDelayed(
-            {
-                if (attachmentSendTracker === tracker) {
-                    failAttachmentSend("附件上传超时，请检查网络后重试。")
-                }
-            },
-            ATTACHMENT_TIMEOUT_MS,
-        )
-    }
-
-    private companion object {
-        const val ATTACHMENT_PHASE_IDLE = "idle"
-        const val ATTACHMENT_PHASE_COMPLETED = "completed"
-        const val ATTACHMENT_TIMEOUT_MS = 120_000L
-    }
 }

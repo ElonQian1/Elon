@@ -29,6 +29,9 @@ class ChatGptWebProductIntegrationContractTest {
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebOfficialActivity.kt",
         )
         val strings = read("android/app/src/main/res/values/strings.xml")
+        val chatSendOwner = read(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebSendOwner.kt",
+        )
 
         assertTrue(strings.contains("ChatGPT 网页 AI"))
         assertTrue(strings.contains("工作模式"))
@@ -45,10 +48,13 @@ class ChatGptWebProductIntegrationContractTest {
         assertTrue(navigationSession.contains("session.capabilities.all(provider.capabilities::contains)"))
         assertTrue(navigationSession.contains("REQUIRED_NATIVE_NAVIGATION.all(session.capabilities::contains)"))
         assertTrue(chatController.contains("ChatGptFriendMessageMapper.map"))
-        assertTrue(chatController.contains("WebChatSendCoordinator("))
-        assertTrue(chatController.contains("OfficialPageWebChatSendTransport("))
-        assertTrue(chatController.contains("sendCoordinator.observeSnapshot"))
-        assertTrue(chatController.contains("sendCoordinator.acceptCommandResult"))
+        assertTrue(chatController.contains("session.dispatchSocialPrompt(prompt)"))
+        assertTrue(chatController.contains("session.pendingSendPrompt()"))
+        assertFalse(chatController.contains("WebChatSendCoordinator("))
+        assertTrue(chatSendOwner.contains("WebChatSendCoordinator("))
+        assertTrue(chatSendOwner.contains("dispatchMcp("))
+        assertTrue(chatSendOwner.contains("beginAttachments("))
+        assertTrue(chatSendOwner.contains("acceptCommandResult("))
         assertTrue(chatController.contains("WebChatPendingSendSnapshotPresentation.resolve"))
         assertTrue(googleController.contains("GoogleWebBackgroundSession"))
         assertTrue(googleController.contains("ChatGptFriendMessageMapper.map"))
@@ -62,7 +68,8 @@ class ChatGptWebProductIntegrationContractTest {
         assertTrue(feature.contains("deactivateChatProvider"))
         assertTrue(feature.contains("webChatNavigationSessions.session(providerId())"))
         assertTrue(feature.contains("providerId = WebChatProviderId.GOOGLE_WEB"))
-        assertTrue(!feature.contains("providerId() != WebChatProviderId.CHATGPT_WEB"))
+        assertTrue(feature.contains("fun startDefaultRealtimeVoice(): Boolean"))
+        assertTrue(feature.contains("!selectChatProvider(WebChatProviderId.CHATGPT_WEB)"))
         assertTrue(feature.contains("WEB_CHAT_MODEL_BUTTON_OWNER"))
         assertTrue(mainMcp.contains("set_social_ai_interaction_mode"))
         assertTrue(mainMcp.contains("select_web_chat_provider"))
