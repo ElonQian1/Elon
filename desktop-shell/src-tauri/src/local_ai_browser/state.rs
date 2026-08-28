@@ -18,6 +18,8 @@ mod cache;
 mod context;
 #[path = "state/diagnostics.rs"]
 mod diagnostics;
+#[path = "state/document.rs"]
+mod document;
 #[path = "state/private_stream.rs"]
 mod private_stream;
 #[path = "state/public.rs"]
@@ -70,6 +72,7 @@ struct SessionRecord {
     pending_send_prompt: Option<String>,
     new_conversation_baseline_user: Option<String>,
     preserve_conversation_on_navigation: bool,
+    document_token: Option<String>,
     cache_path: Option<PathBuf>,
     cache_updated_at_ms: u64,
     navigation_updated_at_ms: u64,
@@ -213,6 +216,7 @@ impl LocalAiBrowserRuntime {
                 pending_send_prompt: None,
                 new_conversation_baseline_user: None,
                 preserve_conversation_on_navigation: false,
+                document_token: None,
                 cache_path,
                 cache_updated_at_ms,
                 navigation_updated_at_ms,
@@ -224,6 +228,7 @@ impl LocalAiBrowserRuntime {
 
     pub fn mark_opening(&self, label: &str, window_visible: bool) {
         self.update(label, |record| {
+            record.begin_document_navigation();
             record.window_status = "opening".to_string();
             record.window_visible = window_visible;
             record.loading = true;
@@ -260,6 +265,7 @@ impl LocalAiBrowserRuntime {
             record.current_url = safe_url;
             record.current_host = host;
             if allowed {
+                record.begin_document_navigation();
                 record.active_restorable_url =
                     snapshot_cache::normalize_restorable_url(&record.provider_id, &raw_url);
                 record.mark_context_navigation(&raw_url);
@@ -299,6 +305,7 @@ impl LocalAiBrowserRuntime {
         self.update(label, |record| {
             record.window_status = status.to_string();
             if matches!(status, "closed" | "error") {
+                record.begin_document_navigation();
                 record.loading = false;
                 record.window_visible = false;
                 record.mark_snapshot_cached();
@@ -346,6 +353,21 @@ impl LocalAiBrowserRuntime {
 
     pub fn record_adapter_event(&self, label: &str, kind: &str, payload: Value) {
         self.record_adapter_event_with_context(label, kind, payload, None);
+    }
+
+    pub fn accept_adapter_document_event(
+        &self,
+        label: &str,
+        kind: &str,
+        document_token: Option<&str>,
+    ) -> bool {
+        let mut sessions = self.sessions();
+        let Some(record) = sessions.get_mut(label) else {
+            return false;
+        };
+        let accepted = record.accept_document_event(kind, document_token);
+        record.updated_at_ms = now_ms();
+        accepted
     }
 
     pub fn record_adapter_event_with_context(

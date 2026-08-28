@@ -45,6 +45,7 @@ pub fn sanitize_event(raw: &str) -> Result<SanitizedAdapterEvent, String> {
                 }),
                 page_context_key: None,
                 restorable_url: None,
+                document_token: None,
             })
         }
         Some("command_result") => Ok(SanitizedAdapterEvent {
@@ -58,6 +59,7 @@ pub fn sanitize_event(raw: &str) -> Result<SanitizedAdapterEvent, String> {
             }),
             page_context_key: None,
             restorable_url: None,
+            document_token: None,
         }),
         Some("browser_diagnostic") => Ok(SanitizedAdapterEvent {
             kind: "browser_diagnostic".to_string(),
@@ -69,6 +71,7 @@ pub fn sanitize_event(raw: &str) -> Result<SanitizedAdapterEvent, String> {
             }),
             page_context_key: None,
             restorable_url: None,
+            document_token: None,
         }),
         _ => Err("不支持的 Google AI 模式本地浏览器事件。".to_string()),
     }
@@ -132,6 +135,7 @@ fn sanitize_protocol_event(event: &Map<String, Value>) -> Result<SanitizedAdapte
         payload,
         page_context_key,
         restorable_url,
+        document_token: None,
     })
 }
 

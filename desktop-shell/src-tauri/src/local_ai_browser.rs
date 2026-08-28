@@ -515,6 +515,13 @@ pub fn publish_local_ai_web_event(
         .filter(|provider| provider.adapter.is_some())
         .ok_or_else(|| "可见语义事件只允许已登记的本地 AI 会话窗口发送。".to_string())?;
     let event = provider.adapter.unwrap().sanitize_event(&payload)?;
+    if !runtime.accept_adapter_document_event(
+        label,
+        &event.kind,
+        event.document_token.as_deref(),
+    ) {
+        return Ok(());
+    }
     if research_capture::record_sanitized_adapter_observation(&app, provider, label, &event.kind, &event.payload) {
         return Ok(());
     }

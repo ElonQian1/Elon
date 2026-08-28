@@ -178,6 +178,10 @@ const ADAPTER_ASSETS: &[(&str, &str)] = &[
         include_str!("../../../../android/app/src/main/assets/chatgpt_web_private_research_probe.js"),
     ),
     (
+        "chatgpt_web_private_voice_relay.js",
+        include_str!("../../../../android/app/src/main/assets/chatgpt_web_private_voice_relay.js"),
+    ),
+    (
         "chatgpt_web_realtime_voice_research.js",
         include_str!("../../../../android/app/src/main/assets/chatgpt_web_realtime_voice_research.js"),
     ),

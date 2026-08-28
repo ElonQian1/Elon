@@ -3,6 +3,8 @@ use serde_json::json;
 
 #[path = "tests/new_conversation.rs"]
 mod new_conversation;
+#[path = "tests/document.rs"]
+mod document;
 
 #[test]
 fn private_stream_state_is_authoritative_over_stale_dom_streaming() {

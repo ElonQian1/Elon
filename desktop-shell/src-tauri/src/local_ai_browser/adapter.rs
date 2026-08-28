@@ -15,6 +15,7 @@ pub struct SanitizedAdapterEvent {
     pub payload: Value,
     pub page_context_key: Option<String>,
     pub restorable_url: Option<String>,
+    pub document_token: Option<String>,
 }
 
 pub fn sanitize_event(raw: &str) -> Result<SanitizedAdapterEvent, String> {
@@ -36,11 +37,18 @@ pub fn sanitize_event(raw: &str) -> Result<SanitizedAdapterEvent, String> {
         {
             return Err("ChatGPT 页面文档令牌无效。".to_string());
         }
+        let document_token = value
+            .get("documentToken")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string();
         let event = value
             .get("event")
             .and_then(Value::as_object)
             .ok_or_else(|| "ChatGPT 语义事件缺少 event。".to_string())?;
-        return sanitize_protocol_event(event);
+        let mut sanitized = sanitize_protocol_event(event)?;
+        sanitized.document_token = Some(document_token);
+        return Ok(sanitized);
     }
 
     match value.get("type").and_then(Value::as_str) {
@@ -55,6 +63,7 @@ pub fn sanitize_event(raw: &str) -> Result<SanitizedAdapterEvent, String> {
             }),
             page_context_key: None,
             restorable_url: None,
+            document_token: None,
         }),
         Some("browser_diagnostic") => Ok(SanitizedAdapterEvent {
             kind: "browser_diagnostic".to_string(),
@@ -66,6 +75,7 @@ pub fn sanitize_event(raw: &str) -> Result<SanitizedAdapterEvent, String> {
             }),
             page_context_key: None,
             restorable_url: None,
+            document_token: None,
         }),
         _ => Err("不支持的 ChatGPT 本地浏览器事件。".to_string()),
     }
@@ -169,6 +179,7 @@ fn sanitize_protocol_event(event: &Map<String, Value>) -> Result<SanitizedAdapte
         payload,
         page_context_key,
         restorable_url,
+        document_token: None,
     })
 }
 
@@ -631,6 +642,7 @@ mod tests {
         .unwrap();
         let event = sanitize_event(&raw).unwrap();
         assert_eq!(event.kind, "message_snapshot");
+        assert_eq!(event.document_token.as_deref(), Some("doc_win_contract"));
         assert_eq!(event.payload["url"], "https://chatgpt.com/c/test");
         assert!(event.restorable_url.is_none());
         assert_eq!(event.payload["pageKind"], "auth");
