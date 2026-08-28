@@ -26,6 +26,10 @@ const lifecycleSource = fs.readFileSync(
   path.resolve(__dirname, '../src/features/user-browser/useLocalAiNewConversationLifecycle.ts'),
   'utf8',
 )
+const settleSource = fs.readFileSync(
+  path.resolve(__dirname, '../src/features/user-browser/useLocalAiNewConversationSettle.ts'),
+  'utf8',
+)
 const cachedNavigationSource = fs.readFileSync(
   path.resolve(__dirname, '../src/features/user-browser/useLocalAiCachedConversationNavigation.ts'),
   'utf8',
@@ -72,6 +76,7 @@ const {
   googleNewConversationNeedsReload,
   localAiNewConversationContextReady,
   localAiNewConversationNativeReady,
+  localAiNewConversationSettleDelayMs,
   selectLocalAiNewConversationPath,
 } = compiled.exports
 
@@ -226,7 +231,7 @@ assert.equal(localAiNewConversationNativeReady(
   1_000,
   'old-conversation',
   2_001,
-), true)
+), false)
 assert.equal(localAiNewConversationNativeReady(
   bindingSession,
   { messages: [], composerReady: true, authenticated: false, loginRequired: false },
@@ -234,6 +239,39 @@ assert.equal(localAiNewConversationNativeReady(
   'old-conversation',
   2_800,
 ), true)
+assert.equal(localAiNewConversationNativeReady(
+  bindingSession,
+  {
+    messages: [{ id: 'old-answer' }],
+    composerReady: true,
+    authenticated: false,
+    loginRequired: false,
+  },
+  1_000,
+  'old-conversation',
+  2_800,
+), false)
+assert.equal(localAiNewConversationSettleDelayMs(
+  bindingSession,
+  { messages: [] },
+  1_000,
+  'old-conversation',
+  2_100,
+), 650)
+assert.equal(localAiNewConversationSettleDelayMs(
+  bindingSession,
+  { messages: [] },
+  1_000,
+  'old-conversation',
+  2_800,
+), null)
+assert.equal(localAiNewConversationSettleDelayMs(
+  bindingSession,
+  { messages: [{ id: 'restored-old-turn' }] },
+  1_000,
+  'old-conversation',
+  2_100,
+), null)
 assert.equal(localAiNewConversationNativeReady(
   { ...bindingSession, loading: true },
   { messages: [], composerReady: true, authenticated: false, loginRequired: false },
@@ -270,6 +308,11 @@ assert.equal(localAiNewConversationDeadlineDelay(10_000, 40_000), 0)
 assert.match(deadlineSource, /window\.setTimeout\(\(\) => setExpiredGeneration\(startedAtMs\), delay\)/)
 assert.match(deadlineSource, /return \(\) => window\.clearTimeout\(timer\)/)
 assert.match(controllerSource, /useLocalAiNewConversationDeadline\(newConversationRecoveryStartedAtMs\)/)
+assert.match(controllerSource, /useLocalAiNewConversationSettle\(/)
+assert.match(controllerSource, /newConversationSettleGeneration/)
+assert.match(settleSource, /localAiNewConversationSettleDelayMs\(/)
+assert.match(settleSource, /setSettledGeneration\(\(generation\) => generation \+ 1\)/)
+assert.match(settleSource, /return \(\) => window\.clearTimeout\(timer\)/)
 assert.match(controllerSource, /if \(!newConversationRecoveryExpired\) return/)
 assert.match(
   controllerSource,

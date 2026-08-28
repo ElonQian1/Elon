@@ -43,6 +43,7 @@ import {
 import useChatGptNewConversationRecovery from './useChatGptNewConversationRecovery'
 import useLocalAiNewConversationDeadline from './useLocalAiNewConversationDeadline'
 import useLocalAiNewConversationLifecycle from './useLocalAiNewConversationLifecycle'
+import useLocalAiNewConversationSettle from './useLocalAiNewConversationSettle'
 import { localAiComposerAvailability } from './localAiComposerAvailability'
 import {
   BACKGROUND_RECONNECT_MAX_ATTEMPTS,
@@ -118,6 +119,12 @@ export default function useLocalAiWebChatController(
       : null,
     [visibleSessionState?.semanticEvent],
   )
+  const newConversationSettleGeneration = useLocalAiNewConversationSettle({
+    session: visibleSessionState,
+    snapshot: liveSnapshot,
+    startedAtMs: newConversationRecoveryStartedAtMs,
+    baselineConversationId: newConversationBaselineId.current,
+  })
   const snapshot = newConversationRecoveryStartedAtMs
     || visibleSessionState?.semanticConversationAligned === false
     ? null
@@ -287,7 +294,8 @@ export default function useLocalAiWebChatController(
       ? '新会话后台连接超时，消息没有误发；草稿已保留，可显示官方页确认后重试。'
       : '新会话后台连接超时；输入仍可继续编辑，如页面显示旧内容可打开官方页确认。')
   }, [busyAction, liveSnapshot, newConversationRecoveryExpired,
-    newConversationRecoveryStartedAtMs, providerId, queuedSend, visibleSessionState])
+    newConversationRecoveryStartedAtMs, newConversationSettleGeneration,
+    providerId, queuedSend, visibleSessionState])
 
   useEffect(() => {
     if (!newConversationRecoveryStartedAtMs || providerId !== 'google-ai-mode' || !ownerKey) return

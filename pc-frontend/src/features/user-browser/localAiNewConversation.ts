@@ -8,6 +8,34 @@ export type ChatGptNewConversationResetControlAction =
 
 const NEW_CONVERSATION_NATIVE_SETTLE_MS = 750
 
+export function localAiNewConversationSettleDelayMs(
+  session: Pick<
+    LocalAiWebSessionState,
+    | 'rendererStatus'
+    | 'semanticCacheStatus'
+    | 'contextReady'
+    | 'activeConversationId'
+    | 'cacheUpdatedAtMs'
+    | 'semanticUpdatedAtMs'
+    | 'updatedAtMs'
+  > | null,
+  snapshot: Pick<LocalAiMessageSnapshot, 'messages'> | null,
+  startedAtMs: number,
+  baselineConversationId: string,
+  observedAtMs: number = Date.now(),
+): number | null {
+  if (!localAiNewConversationContextReady(
+    session,
+    snapshot,
+    startedAtMs,
+    baselineConversationId,
+  ) || snapshot?.messages.length !== 0) return null
+  const remaining = (session?.semanticUpdatedAtMs || 0)
+    + NEW_CONVERSATION_NATIVE_SETTLE_MS
+    - observedAtMs
+  return remaining > 0 ? remaining : null
+}
+
 export function chatGptNewConversationResetControlAction(
   currentUrl: string | null | undefined,
 ): ChatGptNewConversationResetControlAction {
@@ -135,7 +163,6 @@ export function localAiNewConversationNativeReady(
   session: Pick<
     LocalAiWebSessionState,
     | 'windowStatus'
-    | 'diagnostics'
     | 'loading'
     | 'rendererStatus'
     | 'semanticCacheStatus'
@@ -162,8 +189,8 @@ export function localAiNewConversationNativeReady(
     )
     && !session?.loading
     && !['closed', 'opening', 'loading', 'blocked', 'error'].includes(session?.windowStatus || '')
-    && (session?.diagnostics?.lastEventKind === 'verified_empty_new_conversation'
-      || observedAtMs >= (session?.semanticUpdatedAtMs || 0) + NEW_CONVERSATION_NATIVE_SETTLE_MS)
+    && snapshot?.messages.length === 0
+    && observedAtMs >= (session?.semanticUpdatedAtMs || 0) + NEW_CONVERSATION_NATIVE_SETTLE_MS
     && snapshot?.composerReady
     && (snapshot.authenticated || !snapshot.loginRequired),
   )
