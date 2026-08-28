@@ -104,6 +104,13 @@ const CATALOG: Record<string, CapabilityDefinition[]> = {
       requiredActions: ['snapshot', 'send_prompt'],
     },
     {
+      id: 'win_chatgpt_private_rich_turn_settlement_v1',
+      label: '富内容异步解压与当前回答结算',
+      requestMode: 'observed_widget_generation_and_conversation_bound_settlement',
+      fallback: 'captured_response_recovery_and_official_dom',
+      requiredActions: ['snapshot', 'send_prompt'],
+    },
+    {
       id: 'win_chatgpt_realtime_voice_private_transcript_refresh_v1',
       label: '语音结束后转写单飞行刷新',
       requestMode: 'serial_authenticated_same_origin_get_then_snapshot',

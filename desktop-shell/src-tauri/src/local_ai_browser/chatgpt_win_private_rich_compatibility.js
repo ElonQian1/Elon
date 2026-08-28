@@ -24,7 +24,7 @@
 })(typeof window === 'object' ? window : null, function () {
   'use strict';
 
-  const VERSION = 5;
+  const VERSION = 6;
   const MAX_WIDGET_KEYS = 32;
   const MAX_PENDING_RICH_PARTS = 8;
 
@@ -83,6 +83,21 @@
       stream.conversationId && context.conversationId &&
       stream.conversationId === context.conversationId
     );
+  }
+
+  function relaxedRichIdentity(active, candidate) {
+    const stream = richIdentity({
+      messageId: active && active.id,
+      turnId: active && active.turnId,
+      conversationId: active && active.conversationId,
+    });
+    const context = richIdentity(candidate);
+    if (!stream.conversationId || !context.conversationId ||
+        stream.conversationId !== context.conversationId) return null;
+    if (stream.turnId && context.turnId && stream.turnId !== context.turnId) return null;
+    if (stream.turnId && context.turnId) return null;
+    if (!active || (active.state !== 'streaming' && active.state !== 'completed')) return null;
+    return { conversationId: stream.conversationId };
   }
 
   function comparisonText(value) {
@@ -168,10 +183,15 @@
 
   function createTracker() {
     const widgetKeys = new Set();
+    const widgetGenerations = typeof WeakMap === 'function' ? new WeakMap() : null;
     let convertedCount = 0;
+    let generation = 0;
 
     function observeWidgets(values) {
       (Array.isArray(values) ? values : []).forEach((widget) => {
+        if (widgetGenerations && widget && typeof widget === 'object') {
+          widgetGenerations.set(widget, generation);
+        }
         const key = packedWidgetKey(widget);
         if (!key || widgetKeys.has(key)) return;
         if (widgetKeys.size >= MAX_WIDGET_KEYS) widgetKeys.clear();
@@ -186,6 +206,7 @@
     }
 
     function reset() {
+      generation += 1;
       widgetKeys.clear();
       convertedCount = 0;
     }
@@ -198,7 +219,26 @@
       });
     }
 
-    return Object.freeze({ converted, observeWidgets, reset, snapshot });
+    function observedWidget(widget) {
+      const key = packedWidgetKey(widget);
+      return Boolean(key && widgetKeys.has(key));
+    }
+
+    function staleWidget(widget) {
+      return Boolean(
+        widgetGenerations && widget && typeof widget === 'object' &&
+        widgetGenerations.has(widget) && widgetGenerations.get(widget) !== generation
+      );
+    }
+
+    return Object.freeze({
+      converted,
+      observeWidgets,
+      observedWidget,
+      reset,
+      snapshot,
+      staleWidget,
+    });
   }
 
   function withCompatibility(active, tracker) {
@@ -252,8 +292,12 @@
       pendingRichParts = [];
       let accepted = false;
       queued.forEach((entry) => {
-        if (!richIdentityMatches(active, entry.identity)) return;
-        if (!session.acceptRichParts(entry.parts, entry.identity)) return;
+        const strict = richIdentityMatches(active, entry.identity);
+        const relaxed = !strict && tracker.observedWidget(entry.identity)
+          ? relaxedRichIdentity(active, entry.identity)
+          : null;
+        if (!strict && !relaxed) return;
+        if (!session.acceptRichParts(entry.parts, relaxed || entry.identity)) return;
         entry.parts.forEach(tracker.converted);
         tracker.observeWidgets([entry.identity]);
         accepted = true;
@@ -302,6 +346,10 @@
 
     function acceptRichParts(parts, identity) {
       const active = activeStream();
+      if (tracker.staleWidget(identity)) {
+        publish();
+        return false;
+      }
       if (hasRichIdentity(identity) && !hasRichIdentity({
         messageId: active && active.id,
         turnId: active && active.turnId,
@@ -312,6 +360,20 @@
         return false;
       }
       if (hasRichIdentity(identity) && !richIdentityMatches(active, identity)) {
+        const relaxed = tracker.observedWidget(identity)
+          ? relaxedRichIdentity(active, identity)
+          : null;
+        if (relaxed) {
+          const accepted = typeof session.acceptRichParts === 'function'
+            ? session.acceptRichParts(parts, relaxed)
+            : false;
+          if (accepted) {
+            (Array.isArray(parts) ? parts : []).forEach(tracker.converted);
+          }
+          publish();
+          return accepted;
+        }
+        stageRichParts(parts, identity);
         publish();
         return false;
       }
@@ -334,6 +396,7 @@
     }
 
     function current(pathname) {
+      flushPendingRichParts();
       const active = withCompatibility(session.current(pathname), tracker);
       publish();
       return active;
@@ -385,5 +448,6 @@
     rendererUpgradePart,
     sameRenderedReply,
     richIdentityMatches,
+    relaxedRichIdentity,
   });
 });

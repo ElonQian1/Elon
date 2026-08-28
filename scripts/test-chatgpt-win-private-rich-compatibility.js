@@ -173,7 +173,7 @@ const upgradeWindow = {
 vm.runInNewContext(compatibilitySource, { window: upgradeWindow }, {
   filename: 'chatgpt_win_private_rich_compatibility.js',
 })
-assert.equal(upgradeWindow.__elonWinChatGptPrivateRichCompatibility.version, 5)
+assert.equal(upgradeWindow.__elonWinChatGptPrivateRichCompatibility.version, 6)
 assert.notEqual(upgradeWindow.__elonChatGptPrivateStreamPolicy, stalePolicy)
 assert.equal(upgradeWindow.__elonWinChatGptPrivateRichCompatibility.basePolicy, basePolicy)
 
@@ -251,5 +251,63 @@ assert.equal(
   compatibility.sameRenderedReply(renderedMessages[0].content[0].text, renderedStream.text),
   true,
 )
+
+let raceStream = {
+  id: 'assistant-progress-frame',
+  turnId: '',
+  conversationId: 'conversation-race',
+  text: '正在生成行情回答',
+  state: 'streaming',
+  richParts: [],
+}
+const raceWidget = {
+  messageId: 'assistant-final-frame',
+  turnId: 'turn-race',
+  conversationId: 'conversation-race',
+  encoding: 'gzip-json-base64url-v1',
+  compressed: 'racewidgetpayload',
+}
+const racePolicy = compatibility.enhancePolicy({
+  createSession: () => ({
+    accept: () => true,
+    begin: () => true,
+    reset: () => { raceStream = null; return true },
+    current: () => raceStream,
+    packedWidgets: () => [],
+    acceptRichParts: (parts, identity) => {
+      if (!raceStream || identity.conversationId !== raceStream.conversationId) return false
+      if (identity.messageId || identity.turnId) return false
+      raceStream = { ...raceStream, richParts: parts }
+      return true
+    },
+  }),
+  mergeMessages: (values) => values,
+  packedFinanceWidgets: (payload) => payload?.widget ? [raceWidget] : [],
+})
+const raceSession = racePolicy.createSession()
+raceSession.accept({ widget: true })
+assert.equal(
+  raceSession.acceptRichParts([financePart], raceWidget),
+  true,
+  'a decoded widget may bind by the current conversation while the final turn id is still pending',
+)
+assert.equal(raceSession.current('').richParts[0].kind, 'finance')
+assert.equal(racePolicy.richCompatibility().rendererUpgradeRequired, false)
+
+raceSession.reset()
+raceStream = {
+  id: 'assistant-next-turn',
+  turnId: '',
+  conversationId: 'conversation-race',
+  text: '下一轮回答',
+  state: 'streaming',
+  richParts: [],
+}
+assert.equal(
+  raceSession.acceptRichParts([financePart], raceWidget),
+  false,
+  'an async decode from the previous generation must be rejected after reset',
+)
+assert.equal(raceStream.richParts.length, 0)
 
 console.log('PASS: Win private rich compatibility isolates sessions, binds delayed widgets by response identity, preserves text, and treats finance or chart decoding as supported')
