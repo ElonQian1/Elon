@@ -32,7 +32,7 @@ const google = provider('google-ai-mode', [
 ])
 
 const chatCapabilities = localAiPrivateTransportCapabilities(chatgpt)
-assert.equal(chatCapabilities.length, 13)
+assert.equal(chatCapabilities.length, 14)
 assert.equal(chatCapabilities.every((capability) => capability.runtimeEnabled), true)
 assert.equal(chatCapabilities.every((capability) => (
   capability.activation === 'preset_then_background_verify'
@@ -48,7 +48,7 @@ const incompleteGoogle = localAiPrivateTransportCapabilities(provider('google-ai
 assert.equal(incompleteGoogle.filter((capability) => capability.runtimeEnabled).length, 5)
 
 const copy = localAiPrivateTransportStatusCopy(chatgpt)
-assert.match(copy.copy, /13\/13/)
+assert.match(copy.copy, /14\/14/)
 assert.match(copy.copy, /无需等待官网扫描/)
 assert.match(copy.detail, /私有流与完成态结算/)
 assert.match(copy.detail, /官网快照单飞行刷新/)
@@ -58,6 +58,7 @@ assert.match(copy.detail, /私有流原生事件即时刷新/)
 assert.match(copy.detail, /游客会话富内容补齐/)
 assert.match(copy.detail, /新会话首轮私有流绑定/)
 assert.match(copy.detail, /富内容异步解压与当前回答结算/)
+assert.match(copy.detail, /富内容占位与真实卡片对账/)
 const firstTurnBinding = chatCapabilities.find((capability) => (
   capability.id === 'win_chatgpt_private_stream_send_binding_v1'
 ))
@@ -71,6 +72,17 @@ assert.equal(
   'observed_widget_generation_and_conversation_bound_settlement',
 )
 assert.equal(richTurnSettlement.fallback, 'captured_response_recovery_and_official_dom')
+const richPlaceholderReconciliation = chatCapabilities.find((capability) => (
+  capability.id === 'win_chatgpt_private_rich_placeholder_reconciliation_v1'
+))
+assert.equal(
+  richPlaceholderReconciliation.requestMode,
+  'title_bound_private_rich_placeholder_reconciliation',
+)
+assert.equal(
+  richPlaceholderReconciliation.fallback,
+  'preserve_unrelated_official_interactive_content',
+)
 
 const live = localAiPrivateTransportStatusCopy(chatgpt, health({
   prefetchReady: true,
@@ -94,7 +106,7 @@ assert.match(awaitingContext.copy, /等待官网会话上下文/)
 assert.match(awaitingContext.copy, /不阻塞输入/)
 
 const stale = localAiPrivateTransportStatusCopy(chatgpt, health({ sampledAtMs: 1 }), 200_000)
-assert.match(stale.copy, /13\/13/)
+assert.match(stale.copy, /14\/14/)
 
 const capabilityHook = fs.readFileSync(path.resolve(
   __dirname,

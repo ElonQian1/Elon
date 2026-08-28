@@ -131,13 +131,23 @@ const messages = [{
   state: 'completed',
   content: [
     { type: 'markdown', text: 'BTC answer' },
-    { type: 'interactive', text: 'Bitcoin (BTC)', kind: 'renderer_upgrade_required' },
+    { type: 'interactive', text: 'Bitcoin (BTC)', kind: 'interactive' },
+    { type: 'interactive', text: '另一个独立工具', kind: 'interactive' },
   ],
 }]
 const merged = transport.mergeMessages(messages, '/c/conversation-one')
 assert.equal(merged.length, 1, 'recovery must enrich the existing assistant instead of duplicating it')
 assert.equal(merged[0].content.filter((part) => part.type === 'rich_card').length, 1)
-assert.equal(merged[0].content.some((part) => part.type === 'interactive'), false)
+assert.equal(
+  merged[0].content.some((part) => part.type === 'interactive' && part.text === 'Bitcoin (BTC)'),
+  false,
+  'a generic official placeholder with the recovered finance title must be removed',
+)
+assert.equal(
+  merged[0].content.some((part) => part.type === 'interactive' && part.text === '另一个独立工具'),
+  true,
+  'an unrelated official interactive component must be preserved',
+)
 assert.equal(merged[0].content.at(-1).richContent.payload.chart.points.length, 2)
 assert.equal(transport.current('/c/conversation-one').richParts.length, 1)
 

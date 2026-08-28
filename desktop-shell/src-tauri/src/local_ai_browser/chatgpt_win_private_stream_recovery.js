@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  var VERSION = 7;
+  var VERSION = 8;
   var MAX_AGE_MS = 5 * 60 * 1000;
   var OFFICIAL_COMPLETION_SETTLE_MS = 3000;
   var MAX_RICH_PARTS = 4;
@@ -63,6 +63,28 @@
     var rich = part && part.richContent;
     return cleanText(part && (part.kind || rich && rich.kind), 32).toLowerCase() + ':' +
       cleanText(part && (part.text || rich && rich.payload && rich.payload.title), 240).toLowerCase();
+  }
+
+  function richTitle(part) {
+    var rich = part && part.richContent;
+    return cleanText(part && (part.text || rich && rich.payload && rich.payload.title), 240)
+      .toLowerCase();
+  }
+
+  function genericPlaceholderReplacedBy(part, replacements) {
+    if (!part || part.type !== 'interactive') return false;
+    var kind = cleanText(part.kind, 40).toLowerCase();
+    if (kind && kind !== 'interactive') return false;
+    var title = richTitle(part);
+    if (!title) return false;
+    return replacements.some(function (replacement) {
+      var replacementKind = cleanText(
+        replacement && (replacement.kind || replacement.richContent && replacement.richContent.kind),
+        40
+      ).toLowerCase();
+      return (replacementKind === 'finance' || replacementKind === 'chart') &&
+        richTitle(replacement) === title;
+    });
   }
 
   function validRichPart(part) {
@@ -365,6 +387,7 @@
         return part.richContent && part.richContent.source === 'private_response';
       }
       if (type !== 'interactive' && type !== 'artifact' && type !== 'chart') return true;
+      if (genericPlaceholderReplacedBy(part, additions)) return false;
       var kind = cleanText(part.kind || part.richContent && part.richContent.kind, 40).toLowerCase();
       var renderer = cleanText(part.renderer || part.rendererKind || part.reason, 80).toLowerCase();
       return !(['finance', 'chart', 'renderer_upgrade_required'].includes(kind) ||

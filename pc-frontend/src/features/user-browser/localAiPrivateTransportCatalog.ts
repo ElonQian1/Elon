@@ -111,6 +111,13 @@ const CATALOG: Record<string, CapabilityDefinition[]> = {
       requiredActions: ['snapshot', 'send_prompt'],
     },
     {
+      id: 'win_chatgpt_private_rich_placeholder_reconciliation_v1',
+      label: '富内容占位与真实卡片对账',
+      requestMode: 'title_bound_private_rich_placeholder_reconciliation',
+      fallback: 'preserve_unrelated_official_interactive_content',
+      requiredActions: ['snapshot'],
+    },
+    {
       id: 'win_chatgpt_realtime_voice_private_transcript_refresh_v1',
       label: '语音结束后转写单飞行刷新',
       requestMode: 'serial_authenticated_same_origin_get_then_snapshot',
