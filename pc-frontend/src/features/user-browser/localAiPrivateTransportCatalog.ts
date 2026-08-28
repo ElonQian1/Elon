@@ -97,6 +97,13 @@ const CATALOG: Record<string, CapabilityDefinition[]> = {
       requiredActions: ['snapshot', 'stop_generation'],
     },
     {
+      id: 'win_chatgpt_private_stream_send_binding_v1',
+      label: '新会话首轮私有流绑定',
+      requestMode: 'send_ledger_revision_gated_private_stream_binding',
+      fallback: 'official_dom_prompt_confirmation',
+      requiredActions: ['snapshot', 'send_prompt'],
+    },
+    {
       id: 'win_chatgpt_realtime_voice_private_transcript_refresh_v1',
       label: '语音结束后转写单飞行刷新',
       requestMode: 'serial_authenticated_same_origin_get_then_snapshot',

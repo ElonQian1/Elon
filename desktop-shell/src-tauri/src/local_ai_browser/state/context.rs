@@ -60,6 +60,7 @@ impl SessionRecord {
             self.pending_context_request_id = None;
             self.pending_context_since_ms = 0;
             self.pending_send_prompt = None;
+            self.pending_send_private_stream_revision = 0;
             self.preserve_conversation_on_navigation = false;
             self.last_event_kind = "new_conversation_transition_timed_out".to_string();
             return;
@@ -70,6 +71,7 @@ impl SessionRecord {
         self.pending_context_request_id = None;
         self.pending_context_since_ms = 0;
         self.pending_send_prompt = None;
+        self.pending_send_private_stream_revision = 0;
         self.new_conversation_baseline_user = None;
         self.preserve_conversation_on_navigation = false;
         self.last_event_kind = "context_transition_timed_out".to_string();
@@ -86,6 +88,12 @@ impl SessionRecord {
             self.pending_context_request_id = request_id.map(ToOwned::to_owned);
             self.pending_context_since_ms = super::now_ms();
             self.pending_send_prompt = target.map(|value| value.to_string());
+            self.pending_send_private_stream_revision = self
+                .semantic_event
+                .as_ref()
+                .and_then(|event| event.get("privateStreamRevision"))
+                .and_then(Value::as_u64)
+                .unwrap_or_default();
             self.preserve_conversation_on_navigation = true;
             return;
         }
@@ -96,6 +104,7 @@ impl SessionRecord {
             self.new_conversation_baseline_user = None;
         }
         self.pending_send_prompt = None;
+        self.pending_send_private_stream_revision = 0;
         self.pending_context_action = action.to_string();
         self.pending_context_request_id = request_id.map(ToOwned::to_owned);
         self.pending_context_since_ms = super::now_ms();
@@ -124,6 +133,7 @@ impl SessionRecord {
         self.pending_context_request_id = None;
         self.pending_context_since_ms = super::now_ms();
         self.preserve_conversation_on_navigation = false;
+        self.pending_send_private_stream_revision = 0;
         self.active_conversation_id = Some(id);
         self.active_page_context_key =
             semantic_context::page_context_key(&self.provider_id, restorable_url);
@@ -178,19 +188,24 @@ impl SessionRecord {
 
     pub(super) fn apply_message_snapshot(
         &mut self,
-        payload: Value,
+        mut payload: Value,
         page_context_key: Option<&str>,
     ) -> bool {
         let mut boundary = self.pending_context_action.clone();
         let page_changed = page_context_key.is_some()
             && page_context_key != self.semantic_page_context_key.as_deref();
-        if boundary == "send_prompt"
-            && self.pending_send_prompt.as_deref().is_some_and(|expected| {
-                !semantic_context::has_last_user_text(&payload, expected)
-            })
-        {
-            self.last_event_kind = "pending_send_snapshot_ignored".to_string();
-            return false;
+        if boundary == "send_prompt" {
+            let prompt_missing = self
+                .pending_send_prompt
+                .as_deref()
+                .is_some_and(|expected| !semantic_context::has_last_user_text(&payload, expected));
+            if prompt_missing {
+                if !self.bind_chatgpt_private_stream_pending_send(&mut payload) {
+                    self.last_event_kind = "pending_send_snapshot_ignored".to_string();
+                    return false;
+                }
+                self.last_event_kind = "private_stream_pending_send_bound".to_string();
+            }
         }
         if boundary == "new_conversation" && semantic_context::has_visible_messages(&payload) {
             // A fresh conversation is empty until its first prompt is deliberately sent.
@@ -282,6 +297,7 @@ impl SessionRecord {
         self.pending_context_request_id = None;
         self.pending_context_since_ms = 0;
         self.pending_send_prompt = None;
+        self.pending_send_private_stream_revision = 0;
         if self
             .semantic_event
             .as_ref()
@@ -320,6 +336,7 @@ impl SessionRecord {
             self.pending_context_request_id = None;
             self.pending_context_since_ms = 0;
             self.pending_send_prompt = None;
+            self.pending_send_private_stream_revision = 0;
             if action == "new_conversation" {
                 self.new_conversation_baseline_user = None;
             }
@@ -349,6 +366,14 @@ impl SessionRecord {
             .and_then(Value::as_array)
             .cloned()
             .unwrap_or_default();
+        let private_stream_revision = previous
+            .and_then(|event| event.get("privateStreamRevision"))
+            .and_then(Value::as_u64)
+            .unwrap_or_default();
+        let private_stream_observed = previous
+            .and_then(|event| event.get("privateStreamObserved"))
+            .and_then(Value::as_bool)
+            .unwrap_or(private_stream_revision > 0);
         let home_key = semantic_context::page_context_key("chatgpt", "https://chatgpt.com/");
         if self.active_page_context_key.is_none() {
             self.active_page_context_key = home_key;
@@ -367,6 +392,8 @@ impl SessionRecord {
             "composerReady": true,
             "streaming": false,
             "streamingStatus": "",
+            "privateStreamObserved": private_stream_observed,
+            "privateStreamRevision": private_stream_revision,
             "privateStreamState": "idle",
             "currentModel": current_model,
             "attachments": [],
@@ -379,6 +406,7 @@ impl SessionRecord {
         self.pending_context_request_id = None;
         self.pending_context_since_ms = 0;
         self.pending_send_prompt = None;
+        self.pending_send_private_stream_revision = 0;
         self.preserve_conversation_on_navigation = false;
         self.window_status = "ready".to_string();
         self.loading = false;
@@ -393,6 +421,91 @@ impl SessionRecord {
         self.last_event_kind = "verified_empty_new_conversation".to_string();
     }
 
+    fn bind_chatgpt_private_stream_pending_send(&self, payload: &mut Value) -> bool {
+        if self.provider_id != "chatgpt"
+            || payload
+                .get("privateStreamObserved")
+                .and_then(Value::as_bool)
+                != Some(true)
+        {
+            return false;
+        }
+        let revision = payload
+            .get("privateStreamRevision")
+            .and_then(Value::as_u64)
+            .unwrap_or_default();
+        if revision <= self.pending_send_private_stream_revision {
+            return false;
+        }
+        let Some(stream_state) = payload
+            .get("privateStreamState")
+            .and_then(Value::as_str)
+            .filter(|state| matches!(*state, "streaming" | "completed"))
+        else {
+            return false;
+        };
+        let Some(prompt) = self
+            .pending_send_prompt
+            .as_deref()
+            .map(str::trim)
+            .filter(|prompt| !prompt.is_empty())
+        else {
+            return false;
+        };
+        let Some(assistant) = payload
+            .get("messages")
+            .and_then(Value::as_array)
+            .and_then(|messages| {
+                messages.iter().rev().find(|message| {
+                    message.get("role").and_then(Value::as_str) == Some("assistant")
+                        && message.get("state").and_then(Value::as_str) == Some(stream_state)
+                        && message
+                            .get("id")
+                            .and_then(Value::as_str)
+                            .is_some_and(|id| id.starts_with("private-stream:"))
+                })
+            })
+            .cloned()
+        else {
+            return false;
+        };
+        let request_identity = self
+            .pending_context_request_id
+            .as_deref()
+            .filter(|value| !value.is_empty())
+            .map(ToOwned::to_owned)
+            .unwrap_or_else(|| revision.to_string());
+        let identity =
+            semantic_context::opaque_id(&format!("{}:{request_identity}", self.provider_id));
+        let previous_observed = self
+            .semantic_event
+            .as_ref()
+            .map(snapshot_observed_message_count)
+            .unwrap_or_default();
+        let synthesized = json!({
+            "id": format!("private-stream-bound:{identity}:user"),
+            "role": "user",
+            "state": "completed",
+            "content": [{"type":"text", "text":prompt}],
+        });
+        let Some(snapshot) = payload.as_object_mut() else {
+            return false;
+        };
+        snapshot.insert(
+            "messages".to_string(),
+            Value::Array(vec![synthesized, assistant]),
+        );
+        snapshot.insert(
+            "messageWindowStart".to_string(),
+            Value::from(previous_observed),
+        );
+        snapshot.insert(
+            "observedMessageCount".to_string(),
+            Value::from(previous_observed.saturating_add(2)),
+        );
+        true
+    }
+
     pub(super) fn reset_context(&mut self) {
         self.active_conversation_id = None;
         self.semantic_conversation_id = None;
@@ -402,7 +515,24 @@ impl SessionRecord {
         self.pending_context_request_id = None;
         self.pending_context_since_ms = 0;
         self.pending_send_prompt = None;
+        self.pending_send_private_stream_revision = 0;
         self.new_conversation_baseline_user = None;
         self.preserve_conversation_on_navigation = false;
     }
+}
+
+fn snapshot_observed_message_count(snapshot: &Value) -> u64 {
+    let window_start = snapshot
+        .get("messageWindowStart")
+        .and_then(Value::as_u64)
+        .unwrap_or_default();
+    let message_count = snapshot
+        .get("messages")
+        .and_then(Value::as_array)
+        .map_or(0, |messages| messages.len() as u64);
+    snapshot
+        .get("observedMessageCount")
+        .and_then(Value::as_u64)
+        .unwrap_or_default()
+        .max(window_start.saturating_add(message_count))
 }

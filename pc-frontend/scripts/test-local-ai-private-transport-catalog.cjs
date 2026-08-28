@@ -32,7 +32,7 @@ const google = provider('google-ai-mode', [
 ])
 
 const chatCapabilities = localAiPrivateTransportCapabilities(chatgpt)
-assert.equal(chatCapabilities.length, 11)
+assert.equal(chatCapabilities.length, 12)
 assert.equal(chatCapabilities.every((capability) => capability.runtimeEnabled), true)
 assert.equal(chatCapabilities.every((capability) => (
   capability.activation === 'preset_then_background_verify'
@@ -48,7 +48,7 @@ const incompleteGoogle = localAiPrivateTransportCapabilities(provider('google-ai
 assert.equal(incompleteGoogle.filter((capability) => capability.runtimeEnabled).length, 5)
 
 const copy = localAiPrivateTransportStatusCopy(chatgpt)
-assert.match(copy.copy, /11\/11/)
+assert.match(copy.copy, /12\/12/)
 assert.match(copy.copy, /无需等待官网扫描/)
 assert.match(copy.detail, /私有流与完成态结算/)
 assert.match(copy.detail, /官网快照单飞行刷新/)
@@ -56,6 +56,12 @@ assert.match(copy.detail, /稳定回执与不确定发送对账/)
 assert.match(copy.detail, /独立会话正文与富内容缓存/)
 assert.match(copy.detail, /私有流原生事件即时刷新/)
 assert.match(copy.detail, /游客会话富内容补齐/)
+assert.match(copy.detail, /新会话首轮私有流绑定/)
+const firstTurnBinding = chatCapabilities.find((capability) => (
+  capability.id === 'win_chatgpt_private_stream_send_binding_v1'
+))
+assert.equal(firstTurnBinding.requestMode, 'send_ledger_revision_gated_private_stream_binding')
+assert.equal(firstTurnBinding.fallback, 'official_dom_prompt_confirmation')
 
 const live = localAiPrivateTransportStatusCopy(chatgpt, health({
   prefetchReady: true,
@@ -79,7 +85,7 @@ assert.match(awaitingContext.copy, /等待官网会话上下文/)
 assert.match(awaitingContext.copy, /不阻塞输入/)
 
 const stale = localAiPrivateTransportStatusCopy(chatgpt, health({ sampledAtMs: 1 }), 200_000)
-assert.match(stale.copy, /11\/11/)
+assert.match(stale.copy, /12\/12/)
 
 const capabilityHook = fs.readFileSync(path.resolve(
   __dirname,

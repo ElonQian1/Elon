@@ -226,7 +226,10 @@ fn failed_page_action_can_reestablish_a_safe_home_boundary() {
     // `new_conversation_home` performs this host transition before navigating.
     runtime.mark_command_pending("session", "new_conversation", None);
     let recovering = runtime.snapshot("session").unwrap();
-    assert_ne!(recovering.active_conversation_id.as_deref(), Some(previous_id.as_str()));
+    assert_ne!(
+        recovering.active_conversation_id.as_deref(),
+        Some(previous_id.as_str())
+    );
     assert!(!recovering.context_ready);
 
     runtime.record_adapter_event_with_context(
@@ -269,7 +272,11 @@ fn stale_new_conversation_receipt_cannot_rollback_the_current_request_generation
         ]}),
         previous_key.as_deref(),
     );
-    let previous_id = runtime.snapshot("session").unwrap().active_conversation_id.unwrap();
+    let previous_id = runtime
+        .snapshot("session")
+        .unwrap()
+        .active_conversation_id
+        .unwrap();
 
     runtime.mark_command_pending_with_value(
         "session",
@@ -277,7 +284,11 @@ fn stale_new_conversation_receipt_cannot_rollback_the_current_request_generation
         Some("mcp_current"),
         None,
     );
-    let current_id = runtime.snapshot("session").unwrap().active_conversation_id.unwrap();
+    let current_id = runtime
+        .snapshot("session")
+        .unwrap()
+        .active_conversation_id
+        .unwrap();
     assert_ne!(current_id, previous_id);
     runtime.record_adapter_event(
         "session",
@@ -291,7 +302,10 @@ fn stale_new_conversation_receipt_cannot_rollback_the_current_request_generation
     );
 
     let guarded = runtime.snapshot("session").unwrap();
-    assert_eq!(guarded.active_conversation_id.as_deref(), Some(current_id.as_str()));
+    assert_eq!(
+        guarded.active_conversation_id.as_deref(),
+        Some(current_id.as_str())
+    );
     assert!(!guarded.context_ready);
     assert_eq!(
         guarded.diagnostics["lastEventKind"],
@@ -315,6 +329,9 @@ fn verified_chatgpt_new_conversation_receipt_establishes_an_empty_sendable_bound
             "authenticated":false,
             "composerReady":true,
             "currentModel":"auto",
+            "privateStreamObserved":true,
+            "privateStreamRevision":17,
+            "privateStreamState":"completed",
             "capabilities":["send_prompt"],
             "messages":[
                 {"id":"previous-user","role":"user","state":"completed","content":[{"type":"text","text":"previous"}]},
@@ -352,10 +369,26 @@ fn verified_chatgpt_new_conversation_receipt_establishes_an_empty_sendable_bound
     let blank = runtime.snapshot("session").unwrap();
     assert!(blank.context_ready);
     assert!(blank.semantic_conversation_aligned);
-    assert_ne!(blank.active_conversation_id.as_deref(), Some(previous_id.as_str()));
-    assert_eq!(blank.semantic_event.as_ref().unwrap()["messages"], json!([]));
-    assert_eq!(blank.semantic_event.as_ref().unwrap()["composerReady"], true);
-    assert_eq!(blank.semantic_event.as_ref().unwrap()["currentModel"], "auto");
+    assert_ne!(
+        blank.active_conversation_id.as_deref(),
+        Some(previous_id.as_str())
+    );
+    assert_eq!(
+        blank.semantic_event.as_ref().unwrap()["messages"],
+        json!([])
+    );
+    assert_eq!(
+        blank.semantic_event.as_ref().unwrap()["composerReady"],
+        true
+    );
+    assert_eq!(
+        blank.semantic_event.as_ref().unwrap()["currentModel"],
+        "auto"
+    );
+    assert_eq!(
+        blank.semantic_event.as_ref().unwrap()["privateStreamRevision"],
+        17
+    );
     assert_eq!(
         blank.diagnostics["lastEventKind"],
         "verified_empty_new_conversation"
@@ -426,4 +459,316 @@ fn stale_send_failure_cannot_cancel_the_current_prompt_generation() {
             assert!(state.context_ready);
         }
     }
+}
+
+#[test]
+fn new_conversation_keeps_the_private_revision_watermark_for_the_next_send() {
+    let runtime = LocalAiBrowserRuntime::default();
+    runtime.ensure_session("session", "chatgpt", "active");
+    let home = Url::parse("https://chatgpt.com/").unwrap();
+    let key = semantic_context::page_context_key("chatgpt", home.as_str());
+    runtime.mark_navigation("session", &home, true, None);
+    runtime.mark_page_finished("session", &home);
+    runtime.record_adapter_event_with_context(
+        "session",
+        "message_snapshot",
+        json!({
+            "type":"message_snapshot",
+            "composerReady":true,
+            "privateStreamObserved":true,
+            "privateStreamRevision":31,
+            "privateStreamState":"completed",
+            "messages":[]
+        }),
+        key.as_deref(),
+    );
+    runtime.mark_command_pending_with_value(
+        "session",
+        "new_conversation",
+        Some("mcp-new-watermark"),
+        None,
+    );
+    runtime.record_adapter_event(
+        "session",
+        "command_result",
+        json!({
+            "type":"command_result",
+            "action":"new_conversation",
+            "requestId":"mcp-new-watermark",
+            "ok":true
+        }),
+    );
+    runtime.mark_command_pending_with_value(
+        "session",
+        "send_prompt",
+        Some("mcp-after-new"),
+        Some("新会话问题"),
+    );
+    runtime.record_adapter_event_with_context(
+        "session",
+        "message_snapshot",
+        json!({
+            "type":"message_snapshot",
+            "privateStreamObserved":true,
+            "privateStreamRevision":31,
+            "privateStreamState":"streaming",
+            "messages":[{
+                "id":"private-stream:late-old-turn",
+                "role":"assistant",
+                "state":"streaming",
+                "content":[{"type":"markdown","text":"上一会话迟到内容"}]
+            }]
+        }),
+        key.as_deref(),
+    );
+
+    let state = runtime.snapshot("session").unwrap();
+    assert!(!state.context_ready);
+    assert_eq!(
+        state.diagnostics["lastEventKind"],
+        "pending_send_snapshot_ignored"
+    );
+    assert!(state.semantic_event.unwrap()["messages"]
+        .as_array()
+        .unwrap()
+        .is_empty());
+}
+
+#[test]
+fn private_stream_binds_a_new_prompt_before_the_official_dom_mounts_its_user_turn() {
+    let runtime = LocalAiBrowserRuntime::default();
+    runtime.ensure_session("session", "chatgpt", "active");
+    let home = Url::parse("https://chatgpt.com/").unwrap();
+    let home_key = semantic_context::page_context_key("chatgpt", home.as_str());
+    runtime.mark_navigation("session", &home, true, None);
+    runtime.mark_page_finished("session", &home);
+    runtime.record_adapter_event_with_context(
+        "session",
+        "message_snapshot",
+        json!({
+            "type":"message_snapshot",
+            "privateStreamObserved":true,
+            "privateStreamRevision":7,
+            "privateStreamState":"idle",
+            "messages":[]
+        }),
+        home_key.as_deref(),
+    );
+    runtime.mark_command_pending_with_value(
+        "session",
+        "send_prompt",
+        Some("mcp-first-private"),
+        Some("比特币走势图现在怎么样"),
+    );
+    runtime.record_adapter_event_with_context(
+        "session",
+        "message_snapshot",
+        json!({
+            "type":"message_snapshot",
+            "privateStreamObserved":true,
+            "privateStreamRevision":9,
+            "privateStreamState":"streaming",
+            "streaming":true,
+            "messages":[{
+                "id":"private-stream:reply-current",
+                "role":"assistant",
+                "state":"streaming",
+                "content":[{"type":"markdown","text":"这是本次私有流回答"}]
+            }]
+        }),
+        home_key.as_deref(),
+    );
+
+    let state = runtime.snapshot("session").unwrap();
+    assert!(state.context_ready);
+    assert_eq!(
+        state.diagnostics["lastEventKind"],
+        "private_stream_pending_send_bound"
+    );
+    let semantic_event = state.semantic_event.unwrap();
+    assert_eq!(semantic_event["streaming"], true);
+    let messages = semantic_event["messages"].as_array().unwrap();
+    assert_eq!(messages.len(), 2);
+    assert_eq!(messages[0]["content"][0]["text"], "比特币走势图现在怎么样");
+    assert_eq!(messages[1]["content"][0]["text"], "这是本次私有流回答");
+    assert!(messages[0]["id"]
+        .as_str()
+        .unwrap()
+        .starts_with("private-stream-bound:"));
+    assert_eq!(messages[1]["id"], "private-stream:reply-current");
+}
+
+#[test]
+fn private_stream_revision_must_advance_before_it_can_bind_a_missing_prompt() {
+    let runtime = LocalAiBrowserRuntime::default();
+    runtime.ensure_session("session", "chatgpt", "active");
+    let url = Url::parse("https://chatgpt.com/c/current").unwrap();
+    let key = semantic_context::page_context_key("chatgpt", url.as_str());
+    runtime.mark_navigation("session", &url, true, None);
+    runtime.mark_page_finished("session", &url);
+    runtime.record_adapter_event_with_context(
+        "session",
+        "message_snapshot",
+        json!({
+            "type":"message_snapshot",
+            "privateStreamObserved":true,
+            "privateStreamRevision":11,
+            "privateStreamState":"completed",
+            "messages":[
+                {"id":"old-user","role":"user","state":"completed","content":[{"type":"text","text":"旧问题"}]},
+                {"id":"old-answer","role":"assistant","state":"completed","content":[{"type":"text","text":"旧回答"}]}
+            ]
+        }),
+        key.as_deref(),
+    );
+    runtime.mark_command_pending_with_value(
+        "session",
+        "send_prompt",
+        Some("mcp-current-private"),
+        Some("新问题"),
+    );
+    runtime.record_adapter_event_with_context(
+        "session",
+        "message_snapshot",
+        json!({
+            "type":"message_snapshot",
+            "privateStreamObserved":true,
+            "privateStreamRevision":11,
+            "privateStreamState":"streaming",
+            "messages":[
+                {"id":"old-user","role":"user","state":"completed","content":[{"type":"text","text":"旧问题"}]},
+                {"id":"private-stream:old-revision","role":"assistant","state":"streaming","content":[{"type":"text","text":"不能绑定的旧修订"}]}
+            ]
+        }),
+        key.as_deref(),
+    );
+
+    let state = runtime.snapshot("session").unwrap();
+    assert!(!state.context_ready);
+    assert_eq!(
+        state.diagnostics["lastEventKind"],
+        "pending_send_snapshot_ignored"
+    );
+    assert_eq!(
+        state.semantic_event.unwrap()["messages"][1]["content"][0]["text"],
+        "旧回答"
+    );
+}
+
+#[test]
+fn private_stream_binding_appends_after_old_dom_turn_instead_of_overwriting_it() {
+    let runtime = LocalAiBrowserRuntime::default();
+    runtime.ensure_session("session", "chatgpt", "active");
+    let url = Url::parse("https://chatgpt.com/c/current").unwrap();
+    let key = semantic_context::page_context_key("chatgpt", url.as_str());
+    runtime.mark_navigation("session", &url, true, None);
+    runtime.mark_page_finished("session", &url);
+    runtime.record_adapter_event_with_context(
+        "session",
+        "message_snapshot",
+        json!({
+            "type":"message_snapshot",
+            "privateStreamObserved":true,
+            "privateStreamRevision":4,
+            "privateStreamState":"completed",
+            "observedMessageCount":2,
+            "messageWindowStart":0,
+            "messages":[
+                {"id":"old-user","role":"user","state":"completed","content":[{"type":"text","text":"旧问题"}]},
+                {"id":"old-answer","role":"assistant","state":"completed","content":[{"type":"text","text":"旧回答"}]}
+            ]
+        }),
+        key.as_deref(),
+    );
+    runtime.mark_command_pending_with_value(
+        "session",
+        "send_prompt",
+        Some("mcp-followup-private"),
+        Some("新问题"),
+    );
+    runtime.record_adapter_event_with_context(
+        "session",
+        "message_snapshot",
+        json!({
+            "type":"message_snapshot",
+            "privateStreamObserved":true,
+            "privateStreamRevision":6,
+            "privateStreamState":"streaming",
+            "messages":[
+                {"id":"old-user","role":"user","state":"completed","content":[{"type":"text","text":"旧问题"}]},
+                {"id":"private-stream:followup","role":"assistant","state":"streaming","content":[{"type":"markdown","text":"新私有流回答"}]}
+            ]
+        }),
+        key.as_deref(),
+    );
+
+    let state = runtime.snapshot("session").unwrap();
+    assert!(state.context_ready);
+    let semantic_event = state.semantic_event.unwrap();
+    let messages = semantic_event["messages"].as_array().unwrap();
+    assert_eq!(messages.len(), 4);
+    assert_eq!(messages[1]["content"][0]["text"], "旧回答");
+    assert_eq!(messages[2]["content"][0]["text"], "新问题");
+    assert_eq!(messages[3]["content"][0]["text"], "新私有流回答");
+}
+
+#[test]
+fn later_private_stream_frames_update_the_bound_answer_without_duplicating_the_turn() {
+    let runtime = LocalAiBrowserRuntime::default();
+    runtime.ensure_session("session", "chatgpt", "active");
+    let url = Url::parse("https://chatgpt.com/").unwrap();
+    let key = semantic_context::page_context_key("chatgpt", url.as_str());
+    runtime.mark_navigation("session", &url, true, None);
+    runtime.mark_page_finished("session", &url);
+    runtime.record_adapter_event_with_context(
+        "session",
+        "message_snapshot",
+        json!({
+            "type":"message_snapshot",
+            "privateStreamObserved":true,
+            "privateStreamRevision":20,
+            "privateStreamState":"idle",
+            "messages":[]
+        }),
+        key.as_deref(),
+    );
+    runtime.mark_command_pending_with_value(
+        "session",
+        "send_prompt",
+        Some("mcp-multiframe-private"),
+        Some("连续流问题"),
+    );
+    for (revision, stream_state, text) in [
+        (21, "streaming", "第一帧"),
+        (22, "streaming", "第一帧和第二帧"),
+        (23, "completed", "完整私有流回答"),
+    ] {
+        runtime.record_adapter_event_with_context(
+            "session",
+            "message_snapshot",
+            json!({
+                "type":"message_snapshot",
+                "privateStreamObserved":true,
+                "privateStreamRevision":revision,
+                "privateStreamState":stream_state,
+                "streaming":stream_state == "streaming",
+                "messages":[{
+                    "id":"private-stream:reply-multiframe",
+                    "role":"assistant",
+                    "state":stream_state,
+                    "content":[{"type":"markdown","text":text}]
+                }]
+            }),
+            key.as_deref(),
+        );
+    }
+
+    let state = runtime.snapshot("session").unwrap();
+    let semantic_event = state.semantic_event.unwrap();
+    let messages = semantic_event["messages"].as_array().unwrap();
+    assert_eq!(messages.len(), 2);
+    assert_eq!(messages[0]["content"][0]["text"], "连续流问题");
+    assert_eq!(messages[1]["id"], "private-stream:reply-multiframe");
+    assert_eq!(messages[1]["state"], "completed");
+    assert_eq!(messages[1]["content"][0]["text"], "完整私有流回答");
 }
