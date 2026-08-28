@@ -336,6 +336,17 @@ fn production_open_and_downstream_effects_remain_absent() {
 
 #[test]
 fn authority_records_verified_source_unwired_production_and_zero_effect_boundary() {
+    let authority_a2_gate = between(AUTHORITY, "## 5. A2 与生产启用门", "## 6. 零效果");
+    for marker in [
+        "Registration `WindowsDynamic=8/8`",
+        "A2b2 `WindowsDynamic=8/117`",
+        "未完成宽回归",
+    ] {
+        assert!(
+            authority_a2_gate.contains(marker),
+            "authority A2 gate missing {marker}"
+        );
+    }
     for marker in [
         "registration_status: unregistered_feature_workflow_unavailable",
         "source_compiled_production_unwired",
@@ -349,21 +360,53 @@ fn authority_records_verified_source_unwired_production_and_zero_effect_boundary
         "service/api/http/mcp/pc/wire = none/none/none/none/none/none",
         "plan_apply/runtime/ready/provider/route/offer/capacity = none",
         "job/attempt/lease/receipt/usage/settlement/money = none",
-        "WindowsDynamic=0/8",
-        "WindowsDynamic=0/117",
     ] {
         assert!(AUTHORITY.contains(marker), "authority missing {marker}");
+    }
+
+    let current_evidence = between(ACCEPTANCE, "## 1. 当前证据强度", "## 2. Source review 清单");
+    for marker in [
+        "a2_registration_windows_dynamic=8/8",
+        "a2b2_windows_dynamic=8/117",
+        "production_acceptance=deferred",
+    ] {
+        assert!(
+            current_evidence.contains(marker),
+            "current acceptance evidence missing {marker}"
+        );
+    }
+    assert!(!current_evidence.contains("a2b2_windows_dynamic=117/117"));
+
+    let registration_row = ACCEPTANCE
+        .lines()
+        .find(|line| line.starts_with("| A2 Registration WindowsDynamic |"))
+        .expect("missing A2 Registration WindowsDynamic matrix row");
+    assert!(registration_row.contains("| 8 | 0 | 0 |"));
+    assert!(registration_row.contains("`8/8`"));
+
+    let a2b2_row = ACCEPTANCE
+        .lines()
+        .find(|line| line.starts_with("| A2b2 WindowsDynamic |"))
+        .expect("missing A2b2 WindowsDynamic matrix row");
+    assert!(a2b2_row.contains("| 8 | 0 | 109 |"));
+    assert!(a2b2_row.contains("`8/117`"));
+    assert!(!a2b2_row.contains("117/117"));
+
+    let promotion_gate = &ACCEPTANCE[ACCEPTANCE
+        .find("## 5. 晋级门")
+        .expect("missing promotion gate")..];
+    for marker in ["Registration `8/8`", "`117/117` WindowsDynamic", "宽回归"] {
+        assert!(
+            promotion_gate.contains(marker),
+            "promotion gate missing {marker}"
+        );
     }
     for marker in [
         "source_contract_guard=4/4",
         "registry_lifecycle_regression=42/42",
         "compiled_targets=1 test_cases_run=46 passed=46 failed=0",
         "open_attempt_runtime_unrun",
-        "a2_registration_windows_dynamic=0/8",
         "production_acceptance=deferred",
-        "A2b2",
-        "Registration `8/8`",
-        "117/117",
     ] {
         assert!(ACCEPTANCE.contains(marker), "acceptance missing {marker}");
     }
