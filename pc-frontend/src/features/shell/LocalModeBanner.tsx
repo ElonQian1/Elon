@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import { MonitorCheck, RefreshCw, WifiOff } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { cloudBaseUrl, cloudHealthUrl, cloudWorkbenchUrl, isLocalWorkbench, localNodeUrl } from '../../api/runtime'
+import { cloudBaseUrl, cloudConnectionProbeUrls, cloudWorkbenchUrl, isLocalWorkbench, localNodeUrl } from '../../api/runtime'
 import { listLocalTasks } from '../local-tasks/localTaskApi'
 import { pendingSyncCountFromList } from '../local-tasks/localTaskModel'
 import styles from './Shell.module.css'
 
 type CloudState = 'checking' | 'online' | 'offline'
-const CLOUD_FAILURE_THRESHOLD = 2
+const CLOUD_FAILURE_THRESHOLD = 4
+const CLOUD_PROBE_INTERVAL_MS = 15_000
+const CLOUD_PROBE_TIMEOUT_MS = 8_000
 
 interface LocalStatus {
   connected?: boolean
@@ -18,6 +20,7 @@ interface LocalStatus {
 export default function LocalModeBanner() {
   const [cloudState, setCloudState] = useState<CloudState>('checking')
   const cloudFailureCountRef = useRef(0)
+  const cloudProbeInFlightRef = useRef(false)
   const [localStatus, setLocalStatus] = useState<LocalStatus | null>(null)
   const [pendingSyncCount, setPendingSyncCount] = useState(0)
   const localMode = isLocalWorkbench()
@@ -25,8 +28,11 @@ export default function LocalModeBanner() {
   useEffect(() => {
     let cancelled = false
     async function refresh() {
+      if (cloudProbeInFlightRef.current) return
+      cloudProbeInFlightRef.current = true
       if (!localMode) {
-        const cloudOk = await probeCloudHealth()
+        const cloudOk = await probeCloudConnection()
+        cloudProbeInFlightRef.current = false
         if (cancelled) return
         if (cloudOk) {
           cloudFailureCountRef.current = 0
@@ -39,10 +45,11 @@ export default function LocalModeBanner() {
         return
       }
       const [cloudOk, status, localTasks] = await Promise.all([
-        probeCloudHealth(),
+        probeCloudConnection(),
         probeLocalStatus(),
         listLocalTasks(50).catch(() => null),
       ])
+      cloudProbeInFlightRef.current = false
       if (cancelled) return
       if (cloudOk) {
         cloudFailureCountRef.current = 0
@@ -55,7 +62,7 @@ export default function LocalModeBanner() {
       setPendingSyncCount(localTasks ? pendingSyncCountFromList(localTasks) : 0)
     }
     refresh()
-    const timer = setInterval(refresh, 12_000)
+    const timer = setInterval(refresh, CLOUD_PROBE_INTERVAL_MS)
     return () => {
       cancelled = true
       clearInterval(timer)
@@ -67,7 +74,7 @@ export default function LocalModeBanner() {
     return (
       <div className={[styles.nodeBanner, styles.localModeOffline].join(' ')}>
         <WifiOff className={styles.nodeBannerIcon} aria-hidden="true" size={14} />
-        <span>云端连接异常 · 当前显示的是一龙 PC 工作台缓存壳，本机 Win 端可用于诊断网络或防火墙问题。</span>
+        <span>云端连接暂时不可达 · 正在自动重试，当前页面保留已加载内容。</span>
         <a href={localNodeUrl('/pc/local-tasks')}>打开本机任务</a>
       </div>
     )
@@ -100,15 +107,29 @@ export default function LocalModeBanner() {
   )
 }
 
-async function probeCloudHealth(): Promise<boolean> {
+async function probeCloudConnection(): Promise<boolean> {
   const ctrl = new AbortController()
-  const timer = setTimeout(() => ctrl.abort(), 2600)
+  const timer = setTimeout(() => ctrl.abort(), CLOUD_PROBE_TIMEOUT_MS)
   try {
-    const res = await fetch(cloudHealthUrl(), {
-      cache: 'no-store',
-      signal: ctrl.signal,
+    const probeUrls = cloudConnectionProbeUrls().map((url) => {
+      const probeUrl = new URL(url)
+      probeUrl.searchParams.set('probe', String(Date.now()))
+      return probeUrl.toString()
     })
-    return res.ok
+    const results = await Promise.all(probeUrls.map(async (url) => {
+      try {
+        const res = await fetch(url, {
+          cache: 'no-store',
+          credentials: 'same-origin',
+          headers: { Accept: 'application/json, text/plain' },
+          signal: ctrl.signal,
+        })
+        return res.ok
+      } catch {
+        return false
+      }
+    }))
+    return results.some(Boolean)
   } catch {
     return false
   } finally {

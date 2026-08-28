@@ -302,9 +302,9 @@ fn classify_codex_doctor_output(status_success: bool, output: &str) -> Result<()
         && lower.contains("https fallback may still work")
         && http_reachability_ok;
     let looks_healthy = status_success
-        && no_failed_checks
         && http_reachability_ok
-        && (!looks_like_codex_network_error(&lower) || websocket_is_degraded_only);
+        && ((no_failed_checks && !looks_like_codex_network_error(&lower))
+            || websocket_is_degraded_only);
 
     if status_success && looks_healthy {
         Ok(())
@@ -405,6 +405,12 @@ mod tests {
     #[test]
     fn doctor_output_is_degraded_but_usable_when_https_fallback_is_reachable() {
         let output = "Connectivity\n  websocket    Responses WebSocket timed out; HTTPS fallback may still work\n  reachability active provider endpoints are reachable over HTTP\n12 ok · 0 fail degraded";
+        assert!(classify_codex_doctor_output(true, output).is_ok());
+    }
+
+    #[test]
+    fn doctor_output_keeps_http_fallback_usable_when_websocket_counts_as_a_failed_check() {
+        let output = "Connectivity\n  websocket    Responses WebSocket failed; HTTPS fallback may still work\n  reachability active provider endpoints are reachable over HTTP\n12 ok · 1 fail degraded";
         assert!(classify_codex_doctor_output(true, output).is_ok());
     }
 

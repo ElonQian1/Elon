@@ -88,6 +88,15 @@ export function cloudHealthUrl(): string {
   return new URL('/health', `${base}/`).toString()
 }
 
+/**
+ * 用应用接口确认云端工作台是否真的可用。
+ * /health 只代表进程存活，/api/runtime 才能确认当前服务路由仍可响应。
+ */
+export function cloudConnectionProbeUrls(): string[] {
+  const base = isLocalWorkbench() ? cloudBaseUrl() : location.origin
+  return ['/api/runtime', '/health'].map((path) => new URL(path, `${base}/`).toString())
+}
+
 export function localNodeBaseUrl(): string {
   if (validatedLocalNodeBaseUrl) return validatedLocalNodeBaseUrl
   const boot = safeLoopbackUrl(bootstrap().localNodeBaseUrl)

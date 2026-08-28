@@ -195,6 +195,7 @@ try {
   assert.strictEqual(publish.batches[0].stages[0].phaseStatus, 'running')
 
   const bannerSource = readSource('src/features/shell/LocalModeBanner.tsx')
+  const runtimeSource = readSource('src/api/runtime.ts')
   const shellSource = readSource('src/features/shell/Shell.tsx')
   const appSource = readSource('src/App.tsx')
   const railSource = readSource('src/features/shell/ServerRail.tsx')
@@ -207,6 +208,10 @@ try {
   const continuationSource = readSource('src/features/local-tasks/LocalTaskContinuationPanel.tsx')
   assert.ok(!bannerSource.includes('window.location.replace'), 'cloud recovery must not force navigation')
   assert.ok(bannerSource.includes('返回云端工作台'), 'cloud recovery must expose an explicit return action')
+  assert.ok(bannerSource.includes('CLOUD_PROBE_TIMEOUT_MS = 8_000'), 'cloud probe must tolerate normal network jitter')
+  assert.ok(bannerSource.includes('CLOUD_FAILURE_THRESHOLD = 4'), 'cloud banner must not trip on two transient probe failures')
+  assert.ok(bannerSource.includes('cloudConnectionProbeUrls'), 'cloud banner must probe the application route as well as liveness')
+  assert.ok(runtimeSource.includes("'/api/runtime', '/health'"), 'cloud probe must include an application readiness route')
   assert.ok(shellSource.includes('useNotifications(!localMode)'), 'local mode must disable cloud websocket notifications')
   assert.ok(shellSource.includes('!duplicateTab && !localMode'), 'local mode must disable project prewarm')
   assert.ok(appSource.includes("isLocalWorkbench() ? '/local-tasks' : '/ai'"), 'local workbench root must open local tasks without mounting cloud AI')
