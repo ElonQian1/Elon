@@ -30,7 +30,7 @@ owner 图只验证 baseline commit literal 形状、从 reviewed owner bytes 重
 
 - 首次真实运行：`VALIDATION_FINGERPRINT=6482de3afdddb8e8e9e97900d27489a3b5f16bbd1889360f18e8b47c026b05ca`，`2 passed / 2 failed / 1676 filtered`；owner graph 与 Map terminal ledger 均因 `source owner bytes changed after graph review` 失败。
 - 漂移审阅：39 个 owner 仅 `ManagedFsRoot`、`ManagedWindowsPlatform` 两项受此前 4 个 loader 提交影响，共 38 行模块声明/重导出新增；SQLite symbols、graph node、edge 与 ledger 语义未变化。
-- 快照刷新：baseline 更新为 `2a16dbbe5cb9235a9926ae8b09130a1f7fbaf67a`，只刷新上述两项 OID/SHA-256；预提交复测 `VALIDATION_FINGERPRINT=e3444d0ac7cd47927febc43bae94c5501733888907764c61672a078503b5596b`，`4 passed / 0 failed / 1676 filtered`。
+- 快照刷新：baseline 更新为 `2a16dbbe5cb9235a9926ae8b09130a1f7fbaf67a`，只刷新上述两项 OID/SHA-256；同一内容指纹 `VALIDATION_FINGERPRINT=e3444d0ac7cd47927febc43bae94c5501733888907764c61672a078503b5596b` 已在推送后的 clean HEAD `901cd11e6eeb7ebfc8e46fbd9311a1e2792b26e5` 重证，结果为 `4 passed / 0 failed / 1676 filtered`。
 - 计数边界：这 4 项分别是 legacy non-denominator subset、incomplete branch-atom scaffold、source-owner graph 与 Map template ledger 自洽守卫；不形成完整 terminal universe、`CaseKey`、`Expected`、denominator、`StaticContract` 或 map/lock `WindowsDynamic`。
 
 ### 历史证据元组
