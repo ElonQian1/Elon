@@ -12,6 +12,7 @@ const DEFAULT_PROBE_TIMEOUT_SECS: u64 = 30;
 const DEFAULT_STALE_AFTER_SECS: u64 = 60;
 const DEFAULT_UNHEALTHY_COOLDOWN_SECS: u64 = 60;
 const DEFAULT_PERIODIC_INTERVAL_SECS: u64 = 180;
+const MIN_FAILURES_TO_OPEN_CIRCUIT: u32 = 2;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -191,6 +192,7 @@ impl CodexNetworkHealth {
         }
 
         if inner.status == CodexNetworkStatus::Unhealthy
+            && inner.consecutive_failures >= MIN_FAILURES_TO_OPEN_CIRCUIT
             && inner
                 .checked_at
                 .map(|checked_at| checked_at.elapsed() < self.unhealthy_cooldown)
@@ -223,6 +225,7 @@ impl CodexNetworkHealth {
                 });
         let circuit_open = self.enabled
             && inner.status == CodexNetworkStatus::Unhealthy
+            && inner.consecutive_failures >= MIN_FAILURES_TO_OPEN_CIRCUIT
             && inner
                 .checked_at
                 .map(|checked_at| checked_at.elapsed() < self.unhealthy_cooldown)
@@ -298,15 +301,18 @@ fn classify_codex_doctor_output(status_success: bool, output: &str) -> Result<()
     let http_reachability_ok = lower.contains("reachability")
         && lower.contains("reachable over http")
         && !lower.contains("unreachable over http");
+    let http_reachability_failed = lower.contains("unreachable over http")
+        || (lower.contains("reachability") && lower.contains("unreachable"));
     let websocket_is_degraded_only = lower.contains("websocket")
         && lower.contains("https fallback may still work")
-        && http_reachability_ok;
-    let looks_healthy = status_success
+        && !http_reachability_failed;
+    let looks_healthy = (status_success
+        && no_failed_checks
         && http_reachability_ok
-        && ((no_failed_checks && !looks_like_codex_network_error(&lower))
-            || websocket_is_degraded_only);
+        && !looks_like_codex_network_error(&lower))
+        || websocket_is_degraded_only;
 
-    if status_success && looks_healthy {
+    if looks_healthy {
         Ok(())
     } else {
         Err(truncate_chars(compact_probe_output(output), 700))
@@ -412,6 +418,18 @@ mod tests {
     fn doctor_output_keeps_http_fallback_usable_when_websocket_counts_as_a_failed_check() {
         let output = "Connectivity\n  websocket    Responses WebSocket failed; HTTPS fallback may still work\n  reachability active provider endpoints are reachable over HTTP\n12 ok · 1 fail degraded";
         assert!(classify_codex_doctor_output(true, output).is_ok());
+    }
+
+    #[test]
+    fn doctor_output_keeps_http_fallback_usable_when_doctor_returns_nonzero_for_websocket_only() {
+        let output = "Connectivity\n  websocket    Responses WebSocket failed; HTTPS fallback may still work\n1 failed check";
+        assert!(classify_codex_doctor_output(false, output).is_ok());
+    }
+
+    #[test]
+    fn doctor_output_rejects_fallback_when_http_reachability_is_unavailable() {
+        let output = "Connectivity\n  websocket    Responses WebSocket failed; HTTPS fallback may still work\n  reachability provider endpoints are unreachable over HTTP\n10 ok · 1 fail failed";
+        assert!(classify_codex_doctor_output(false, output).is_err());
     }
 
     #[test]
