@@ -1,6 +1,6 @@
 use super::model::{OwnerSnapshot, SourceOwnerId};
 
-pub(super) const SOURCE_BASELINE_COMMIT: &str = "623bec6ed0fde7360d1f8ed7e0eb40d1b543e1ac";
+pub(super) const SOURCE_BASELINE_COMMIT: &str = "2a16dbbe5cb9235a9926ae8b09130a1f7fbaf67a";
 
 const fn owner(
     id: SourceOwnerId,
@@ -41,8 +41,8 @@ pub(super) const OWNERS: &[OwnerSnapshot] = &[
     owner(SourceOwnerId::RegistryOwnerLifecycle, "src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/registry/owner/lifecycle.rs", "f3285629bc4048c5be1e68e2f8e7a711d8d72426", "3a3c7782e9d791a7cdf528bd5941a16216c8d499b791c6cc7ff7beb18c7b5423", &["fn claim_shm"]),
     owner(SourceOwnerId::RegistryState, "src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/registry/state.rs", "e7f727c69d14cfb579393edb014e0bbf2c47723f", "aa2857e0e3092d5facb168f1149d0e8048b169b8907a44ae0415dae695468cf7", &["fn begin_callback", "fn finish_callback", "fn callback_allowed", "fn ensure_shape", "pub(super) fn claim_shm", "pub(super) fn quarantine"]),
     owner(SourceOwnerId::ManagedNamespace, "src/node_agent_managed_fs/sqlite_namespace.rs", "386afa5e1899bec65c81687e528ca14d3ead0a97", "c46624b25e788f7b94692f3f96ad104ef23ccfce4f97c1a96dd4161765f4adff", &["fn open_exact"]),
-    owner(SourceOwnerId::ManagedFsRoot, "src/node_agent_managed_fs.rs", "643ff09eb210003c6ca834f2f0abfedc200b2641", "48ec3832c96cd4ce4e8f37c62f9e30e6322ee5deacd37e4756d6d3d9b85eaf20", &["#[path = \"node_agent_managed_fs/windows.rs\"]", "mod platform"]),
-    owner(SourceOwnerId::ManagedWindowsPlatform, "src/node_agent_managed_fs/windows.rs", "8f1d434cfb1262f820e62a0341b7c8d83f84ad57", "103a007158da00ec1ad0e7ff59b203d2a654a965bd2fb100cb2347e865f677e2", &["mod sqlite_locking", "try_lock_sqlite_byte_range", "unlock_sqlite_byte_range"]),
+    owner(SourceOwnerId::ManagedFsRoot, "src/node_agent_managed_fs.rs", "4cbf55b9c1983301c799578abf40037a2aa770f6", "01a32fb5b5ac98b12919836ab96b4824eb4a48f030644933a3739997880eaa06", &["#[path = \"node_agent_managed_fs/windows.rs\"]", "mod platform"]),
+    owner(SourceOwnerId::ManagedWindowsPlatform, "src/node_agent_managed_fs/windows.rs", "889aac1d41b5f6e03af3771ead1f840fa2128d09", "e9d617d655ce8e7d85b3659042e0702befe9e0a230739fe5121bea085d42df81", &["mod sqlite_locking", "try_lock_sqlite_byte_range", "unlock_sqlite_byte_range"]),
     owner(SourceOwnerId::ManagedShmRoot, "src/node_agent_managed_fs/sqlite_namespace_shm.rs", "0f5b1ab17b0d16e1fa77b0cc3687173fca120f42", "281b7c9502fe1c6f54b32546aa4f6c676568131ea99caa7aad5f3be277b32877", &["fn open_shm_for_wal", "#[path = \"windows_sqlite_shm.rs\"]"]),
     owner(SourceOwnerId::ManagedCoordinator, "src/node_agent_managed_fs/sqlite_namespace_shm/coordinator.rs", "767543acc8be88a3853847eaa4d86463633f3bd3", "d159963a082b989d51ddb5cdab2d429ba6207db8767b54abb250a25353c8c662", &["fn bind_main_file", "fn attach", "fn poisoned_failure", "fn mark_poisoned"]),
     owner(SourceOwnerId::ManagedTypes, "src/node_agent_managed_fs/sqlite_namespace_shm/types.rs", "dee4097de08650a146f2f6fbbcdb22169b05873a", "6bc1e7b4fd3f0a95376a070c7373c970c8357cfd28576a7c08399c7716b708b0", &["struct ManagedSqliteShmBudget", "fn validate_region_size", "fn validate_logical_end", "fn validate_existing_size", "fn validate_mapped_total", "struct ManagedSqliteShmLockRequest", "fn new", "fn mask"]),
