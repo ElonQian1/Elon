@@ -23,6 +23,8 @@ pub(crate) mod embedded_view;
 mod google_ai_mode;
 #[path = "local_ai_browser/google_ai_mode_adapter_bootstrap.rs"]
 mod google_ai_mode_adapter_bootstrap;
+#[path = "local_ai_browser/google_url_policy.rs"]
+mod google_url_policy;
 #[path = "local_ai_browser/guest_identity.rs"]
 mod guest_identity;
 #[path = "local_ai_browser/owner_profile.rs"]

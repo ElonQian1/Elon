@@ -449,7 +449,10 @@ fn google_conversation_cache_exposes_only_opaque_metadata_and_restores_messages(
     runtime.ensure_session("session", "google-ai-mode", "active");
     runtime.mark_navigation(
         "session",
-        &Url::parse("https://www.google.com/search?q=private+prompt&udm=50").unwrap(),
+        &Url::parse(
+            "https://www.google.com/search?q=private+prompt&udm=50&csuir=thread_cache_1234",
+        )
+        .unwrap(),
         true,
         None,
     );
@@ -483,7 +486,10 @@ fn google_conversation_cache_exposes_only_opaque_metadata_and_restores_messages(
 fn google_cached_conversation_rejects_a_partial_live_history_overwrite() {
     let runtime = LocalAiBrowserRuntime::default();
     runtime.ensure_session("session", "google-ai-mode", "active");
-    let url = Url::parse("https://www.google.com/search?q=first&udm=50").unwrap();
+    let url = Url::parse(
+        "https://www.google.com/search?q=first&udm=50&csuir=thread_history_1234",
+    )
+    .unwrap();
     runtime.mark_navigation("session", &url, true, None);
     let context_key = semantic_context::page_context_key("google-ai-mode", url.as_str());
     runtime.record_adapter_event_with_context(
@@ -527,8 +533,10 @@ fn google_cached_conversation_rejects_a_partial_live_history_overwrite() {
 fn google_followups_merge_into_one_stable_native_conversation() {
     let runtime = LocalAiBrowserRuntime::default();
     runtime.ensure_session("session", "google-ai-mode", "active");
-    let first_url =
-        Url::parse("https://www.google.com/search?udm=50&q=first-private-prompt").unwrap();
+    let first_url = Url::parse(
+        "https://www.google.com/search?udm=50&q=first-private-prompt&csuir=thread_followup_1234",
+    )
+    .unwrap();
     runtime.mark_navigation("session", &first_url, true, None);
     runtime.record_adapter_event_with_context(
         "session",
@@ -553,8 +561,10 @@ fn google_followups_merge_into_one_stable_native_conversation() {
         Some("mcp_followup"),
         Some("second"),
     );
-    let followup_url =
-        Url::parse("https://www.google.com/search?udm=50&q=second-private-prompt").unwrap();
+    let followup_url = Url::parse(
+        "https://www.google.com/search?udm=50&q=second-private-prompt&csuir=thread_followup_1234",
+    )
+    .unwrap();
     runtime.mark_navigation("session", &followup_url, true, None);
     runtime.record_adapter_event_with_context(
         "session",

@@ -8,7 +8,7 @@ use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use super::semantic_context;
+use super::{google_url_policy, semantic_context};
 
 #[path = "snapshot_cache/conversation_store.rs"]
 mod conversation_store;
@@ -298,15 +298,19 @@ fn sanitize_stored_conversations_with_ttl(
     let now = now_ms();
     let mut values = values
         .into_iter()
-        .filter(|entry| {
-            valid_cache_id(&entry.id)
+        .filter_map(|mut entry| {
+            let restorable_url = normalize_restorable_url(provider_id, &entry.restorable_url)?;
+            (valid_cache_id(&entry.id)
                 && !entry.title.trim().is_empty()
                 && entry.title.chars().count() <= 160
                 && entry.updated_at_ms > 0
                 && now.saturating_sub(entry.updated_at_ms) <= max_age_ms
-                && valid_restorable_url(provider_id, &entry.restorable_url)
                 && entry.semantic_event.get("type").and_then(Value::as_str)
-                    == Some("message_snapshot")
+                    == Some("message_snapshot"))
+            .then(|| {
+                entry.restorable_url = restorable_url;
+                entry
+            })
         })
         .collect::<Vec<_>>();
     values.sort_by_key(|entry| std::cmp::Reverse(entry.updated_at_ms));
@@ -347,20 +351,17 @@ fn valid_restorable_url(provider_id: &str, value: &str) -> bool {
                 && (url.path().starts_with("/c/") || url.path().starts_with("/g/"))
         }
         "google-ai-mode" => {
-            matches!(url.host_str(), Some("google.com" | "www.google.com"))
-                && (url.path() == "/aimode"
-                    || (url.path() == "/search"
-                        && url.query_pairs().any(|(key, value)| {
-                            matches!(key.as_ref(), "udm" | "aep")
-                                && matches!(value.as_ref(), "50" | "11")
-                        })))
+            google_url_policy::sanitize_conversation_url(value).is_some()
         }
         _ => false,
     }
 }
 
 pub(super) fn normalize_restorable_url(provider_id: &str, value: &str) -> Option<String> {
-    valid_restorable_url(provider_id, value).then(|| value.to_string())
+    match provider_id {
+        "google-ai-mode" => google_url_policy::sanitize_conversation_url(value),
+        _ => valid_restorable_url(provider_id, value).then(|| value.to_string()),
+    }
 }
 
 fn is_streaming_snapshot(value: &Value) -> bool {
@@ -577,6 +578,39 @@ mod tests {
             "messages": [{"state": "streaming"}]
         });
         assert!(cacheable_envelope("chatgpt", Some(&streaming), None, &[], 0, 43).is_none());
+    }
+
+    #[test]
+    fn google_cache_migration_drops_prompt_urls_and_canonicalizes_durable_threads() {
+        let updated_at_ms = now_ms();
+        let snapshot = |id: &str, restorable_url: &str| StoredConversationSnapshot {
+            id: id.to_string(),
+            title: "Google conversation".to_string(),
+            restorable_url: restorable_url.to_string(),
+            semantic_event: json!({"type":"message_snapshot","messages":[]}),
+            updated_at_ms,
+        };
+        let values = sanitize_stored_conversations_with_ttl(
+            "google-ai-mode",
+            vec![
+                snapshot(
+                    "0000000000000001",
+                    "https://www.google.com/search?q=old-prompt&udm=50",
+                ),
+                snapshot(
+                    "0000000000000002",
+                    "https://google.com/search?ved=drop&q=durable&udm=50&csuir=thread_1234567890",
+                ),
+            ],
+            CACHE_TTL_MS,
+        );
+
+        assert_eq!(values.len(), 1);
+        assert_eq!(values[0].id, "0000000000000002");
+        assert_eq!(
+            values[0].restorable_url,
+            "https://www.google.com/search?q=durable&udm=50&csuir=thread_1234567890",
+        );
     }
 
     #[test]

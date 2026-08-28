@@ -34,6 +34,11 @@ const window = {
         title: 'BTC 走势',
         path: '/c/thread_1234567890',
         providerUrl: 'https://www.google.com/search?udm=50&q=BTC&csuir=thread_1234567890',
+      }, {
+        id: 'prompt_1234567890',
+        title: '瞬时提问',
+        path: '/c/prompt_1234567890',
+        providerUrl: 'https://www.google.com/search?udm=50&q=prompt-only',
       }];
     },
   },
@@ -57,7 +62,7 @@ vm.runInNewContext(source, {
   Number,
 });
 
-assert.equal(window.__elonWinGooglePrivateConversationBridgeVersion, 3);
+assert.equal(window.__elonWinGooglePrivateConversationBridgeVersion, 4);
 assert.notEqual(window.__elonGoogleWebBridge, baseBridge);
 const installedBridge = window.__elonGoogleWebBridge;
 
@@ -69,7 +74,7 @@ assert.deepEqual(events.pop(), {
   type: 'command_result',
   action: 'list_conversations',
   ok: true,
-  detail: '已同步 1 个 Google AI 官网会话。',
+  detail: '已同步 2 个 Google AI 官网会话。',
   requestId: 'mcp_list1',
 });
 
@@ -83,6 +88,15 @@ assert.equal(
   navigations.pop(),
   'https://www.google.com/search?udm=50&q=BTC&csuir=thread_1234567890',
 );
+assert.equal(privateReplyResets, 1);
+
+window.__elonGoogleWebBridge.command(JSON.stringify({
+  action: 'open_conversation',
+  value: '/c/prompt_1234567890',
+  requestId: 'mcp_open_prompt',
+}));
+assert.equal(events.pop().ok, false);
+assert.equal(navigations.length, 0);
 assert.equal(privateReplyResets, 1);
 
 window.__elonGoogleWebBridge.command(JSON.stringify({
@@ -154,7 +168,7 @@ assert.equal(window.__elonGoogleWebBridge.version, 38);
 assert.equal(window.__elonGoogleWebBridge.documentToken, 'doc_rebound');
 assert.equal(
   window.__elonWinGooglePrivateConversationBridge.diagnostics(),
-  'v3|bindings=2',
+  'v4|bindings=2',
 );
 window.__elonGoogleWebBridge.command(JSON.stringify({
   action: 'list_conversations',

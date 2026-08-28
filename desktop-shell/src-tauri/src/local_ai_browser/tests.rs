@@ -131,7 +131,18 @@ fn cached_provider_conversation_is_restored_without_restoring_auth_or_unrelated_
         )
         .unwrap()
         .as_str(),
-        "https://www.google.com/search?q=private&udm=50"
+        GOOGLE_AI_MODE.start_url
+    );
+    assert_eq!(
+        restorable_start_url(
+            &GOOGLE_AI_MODE,
+            Some(
+                "https://www.google.com/search?q=private&udm=50&csuir=thread_1234567890",
+            ),
+        )
+        .unwrap()
+        .as_str(),
+        "https://www.google.com/search?q=private&udm=50&csuir=thread_1234567890"
     );
     assert_eq!(
         restorable_start_url(

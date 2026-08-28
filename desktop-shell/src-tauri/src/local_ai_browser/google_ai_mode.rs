@@ -317,16 +317,41 @@ mod tests {
         assert_eq!(event.payload["privateStreamObserved"], true);
         assert_eq!(event.payload["privateStreamRevision"], 7);
         assert_eq!(event.payload["privateStreamState"], "completed");
-        assert_eq!(
-            event.restorable_url.as_deref(),
-            Some("https://www.google.com/search?udm=50&q=private")
-        );
+        assert!(event.restorable_url.is_none());
         assert!(event.payload.to_string().contains("visible answer"));
         assert!(event
             .payload
             .to_string()
             .contains("https://www.rust-lang.org/learn"));
         assert!(!event.payload.to_string().contains("secret"));
+    }
+
+    #[test]
+    fn snapshot_exposes_only_a_durable_google_conversation_as_restorable() {
+        let raw = serde_json::to_string(&json!({
+            "schema": "yilong.ai.ui.v1",
+            "adapterVersion": ADAPTER_VERSION,
+            "documentToken": "doc_win_google_durable",
+            "providerId": "google_web",
+            "event": {
+                "type": "message_snapshot",
+                "url": "https://google.com/search?ved=drop&q=private&udm=50&csuir=thread_1234567890",
+                "messages": [{
+                    "id": "answer",
+                    "role": "assistant",
+                    "content": [{"type": "text", "text": "visible answer"}]
+                }]
+            }
+        }))
+        .unwrap();
+
+        let event = sanitize_event(&raw).unwrap();
+        assert_eq!(
+            event.restorable_url.as_deref(),
+            Some(
+                "https://www.google.com/search?q=private&udm=50&csuir=thread_1234567890",
+            )
+        );
     }
 
     #[test]

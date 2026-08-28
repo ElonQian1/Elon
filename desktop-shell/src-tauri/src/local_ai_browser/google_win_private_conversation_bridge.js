@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  var VERSION = 3;
+  var VERSION = 4;
   var allowedOrigins = new Set(['https://google.com', 'https://www.google.com']);
   if (!allowedOrigins.has(location.origin)) return;
 
@@ -61,10 +61,10 @@
     try { url = new URL(String(value || ''), location.href); }
     catch (_) { return null; }
     if (url.origin !== location.origin) return null;
-    if (url.pathname === '/aimode') return url;
     if (url.pathname !== '/search') return null;
     var aiMode = url.searchParams.get('udm') === '50' || url.searchParams.get('aep') === '11';
-    return aiMode ? url : null;
+    var conversationId = String(url.searchParams.get('csuir') || '').trim();
+    return aiMode && conversationId ? url : null;
   }
 
   function command(raw) {
