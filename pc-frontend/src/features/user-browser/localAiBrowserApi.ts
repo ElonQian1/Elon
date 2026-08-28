@@ -3,17 +3,13 @@ import { localAiSnapshotCache } from './localAiSnapshotCache'
 import { UNIFIED_AI_PROTOCOL } from './unifiedAiProtocol'
 import {
   createLocalAiRequestId,
-  findMatchingLocalAiCommandReceipt,
   isLocalAiRequestId,
 } from './localAiCommandReceipt'
 import {
   LOCAL_AI_REQUIRED_DESKTOP_RUNTIME_VERSION,
   requiredLocalAiAdapterVersion,
 } from './localAiAdapterCompatibility'
-import {
-  LOCAL_AI_RESULT_POLL_INTERVAL_MS,
-  localAiAdapterResultAttempts,
-} from './localAiAdapterTiming'
+import { waitForLocalAiAdapterReceipts } from './localAiAdapterResultWaiter'
 import type {
   LocalAiAttachment,
   LocalAiComposerControlsSnapshot,
@@ -532,21 +528,11 @@ export async function waitForLocalAiAdapterResults(
   if (!requests.length || requests.some(({ requestId }) => !isLocalAiRequestId(requestId))) {
     throw new Error('本地 AI 命令回执标识无效。')
   }
-  const attempts = Math.max(...requests.map(({ action }) => localAiAdapterResultAttempts(action)))
-  for (let attempt = 0; attempt < attempts; attempt += 1) {
-    await new Promise((resolve) => window.setTimeout(resolve, LOCAL_AI_RESULT_POLL_INTERVAL_MS))
-    const state = await getLocalAiWebSessionState(providerId, ownerKey)
-    for (const { action, requestId } of requests) {
-      const receipt = findMatchingLocalAiCommandReceipt(
-        state.commandResult,
-        state.commandResults,
-        action,
-        requestId,
-      )
-      if (receipt) return state.commandResult === receipt ? state : { ...state, commandResult: receipt }
-    }
-  }
-  return null
+  return waitForLocalAiAdapterReceipts({
+    providerId,
+    requests,
+    readState: () => getLocalAiWebSessionState(providerId, ownerKey),
+  })
 }
 
 async function invokeDesktop<T>(

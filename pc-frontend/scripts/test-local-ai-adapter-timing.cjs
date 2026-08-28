@@ -120,3 +120,4 @@ assert.equal(cooldown.claim('owner-c', 62_000), true)
 assert.equal(cooldown.claim('owner-a', 62_001), true)
 
 process.stdout.write('PASS local AI action-specific adapter receipt timing\n')
+require('./test-local-ai-adapter-result-waiter.cjs')

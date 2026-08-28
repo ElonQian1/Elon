@@ -21,6 +21,7 @@ const controller = read('pc-frontend/src/features/user-browser/useLocalAiWebChat
 const responseRefresh = read('pc-frontend/src/features/user-browser/useLocalAiResponseRefresh.ts')
 const sessionPolling = read('pc-frontend/src/features/user-browser/useLocalAiSessionPolling.ts')
 const nativeSessionUpdates = read('pc-frontend/src/features/user-browser/localAiNativeSessionUpdates.ts')
+const adapterResultWaiter = read('pc-frontend/src/features/user-browser/localAiAdapterResultWaiter.ts')
 const responseRefreshConfigPath = path.join(
   root,
   'pc-frontend/src/features/user-browser/localAiWebChatControllerConfig.ts',
@@ -146,7 +147,10 @@ assert.match(realtimeVoiceControl, /hangupStatus !== 'confirming'/)
 assert.match(controls, /官网语音可能仍在通话，请再次挂断或打开官方页确认/)
 assert.match(directory, /official_partial/)
 assert.match(directory, /is_project_conversation/)
-assert.match(api, /localAiAdapterResultAttempts/)
+assert.match(api, /waitForLocalAiAdapterReceipts/)
+assert.match(adapterResultWaiter, /update\.kind !== 'command_result'/)
+assert.match(adapterResultWaiter, /localAiNativeSessionUpdateMatches/)
+assert.match(adapterResultWaiter, /State reads remain best effort until the action-specific deadline/)
 assert.doesNotMatch(api, /attempt < 12/)
 
 const responseRefreshConfig = loadTypeScriptModule(responseRefreshConfigPath)
