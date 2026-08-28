@@ -23,6 +23,29 @@ class WebChatSendCommandLedgerTest {
     }
 
     @Test
+    fun beginPreservesAValidExternalRequestIdAndRejectsInvalidIds() {
+        val ledger = WebChatSendCommandLedger()
+
+        assertNull(
+            ledger.begin(
+                "invalid",
+                WebChatSendAuthority.OFFICIAL_PAGE,
+                requestId = "external-request",
+            ),
+        )
+        val command = requireNotNull(
+            ledger.begin(
+                "from mcp",
+                WebChatSendAuthority.OFFICIAL_PAGE,
+                requestId = "mcp_external1",
+            ),
+        )
+
+        assertEquals("mcp_external1", command.id)
+        assertEquals(1L, command.generation)
+    }
+
+    @Test
     fun queuedCommandRequiresReconciliationUntilMatchingReceiptArrives() {
         val ledger = WebChatSendCommandLedger()
         val command = requireNotNull(ledger.begin("hello", WebChatSendAuthority.OFFICIAL_PAGE))
@@ -97,6 +120,17 @@ class WebChatSendCommandLedgerTest {
             ledger.fallbackDecision(),
         )
         assertFalse(ledger.markPageReconciled(command.id))
+    }
+
+    @Test
+    fun acceptedCommandCannotBeCanceledAsIfItWereStillReserved() {
+        val ledger = WebChatSendCommandLedger()
+        val command = requireNotNull(ledger.begin("sent", WebChatSendAuthority.OFFICIAL_PAGE))
+        ledger.markDispatched(command.id)
+        ledger.acceptReceipt(command.id, ok = true)
+
+        assertNull(ledger.failBeforeDispatch(command.id))
+        assertEquals(WebChatSendAcceptance.ACCEPTED, ledger.current()?.acceptance)
     }
 
     @Test

@@ -54,6 +54,43 @@ class WebChatSendCoordinatorTest {
     }
 
     @Test
+    fun reservedSendBlocksOtherCommandsUntilTheSameCommandIsDispatched() {
+        val fixture = Fixture()
+
+        val reserved = fixture.coordinator.reserve(
+            prompt = "attachment prompt",
+            baselineSnapshot = null,
+            requestId = "mcp_attachment1",
+        )
+        val competing = fixture.coordinator.dispatch("competing", null) {}
+
+        assertEquals(WebChatSendCoordinator.ReserveOutcome.RESERVED, reserved.outcome)
+        assertEquals("mcp_attachment1", reserved.commandId)
+        assertEquals(WebChatSendCoordinator.DispatchOutcome.BUSY, competing.outcome)
+        assertTrue(fixture.transport.prompts.isEmpty())
+        assertFalse(fixture.scheduler.hasTask())
+
+        val dispatched = fixture.coordinator.dispatchReserved("mcp_attachment1")
+
+        assertEquals(WebChatSendCoordinator.DispatchOutcome.DISPATCHED, dispatched.outcome)
+        assertEquals(listOf("attachment prompt"), fixture.transport.prompts)
+        assertTrue(fixture.scheduler.hasTask())
+    }
+
+    @Test
+    fun reservedSendCanBeCanceledOnlyBeforeTransportDispatch() {
+        val fixture = Fixture()
+        val reserved = fixture.coordinator.reserve("upload", null)
+
+        val restored = fixture.coordinator.cancelReserved(requireNotNull(reserved.commandId))
+
+        assertEquals("upload", restored)
+        assertNull(fixture.coordinator.prompt())
+        assertTrue(fixture.transport.prompts.isEmpty())
+        assertFalse(fixture.scheduler.hasTask())
+    }
+
+    @Test
     fun observedSubmissionAndCompletedTurnSettleTheSamePendingSend() {
         val fixture = Fixture()
         val baseline = snapshot(

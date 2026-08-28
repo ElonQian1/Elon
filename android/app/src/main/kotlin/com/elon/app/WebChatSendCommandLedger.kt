@@ -51,11 +51,21 @@ internal class WebChatSendCommandLedger(
     private var active: WebChatSendCommand? = null
     private val completed = ArrayDeque<WebChatSendCommand>()
 
-    fun begin(prompt: String, authority: WebChatSendAuthority): WebChatSendCommand? {
+    fun begin(
+        prompt: String,
+        authority: WebChatSendAuthority,
+        requestId: String? = null,
+    ): WebChatSendCommand? {
         if (active != null) return null
-        generation += 1
+        val nextGeneration = generation + 1
+        val commandId = when {
+            requestId == null -> requestIdFactory(nextGeneration)
+            REQUEST_ID.matches(requestId) -> requestId
+            else -> return null
+        }
+        generation = nextGeneration
         val command = WebChatSendCommand(
-            id = requestIdFactory(generation),
+            id = commandId,
             prompt = prompt,
             authority = authority,
             generation = generation,
@@ -122,7 +132,9 @@ internal class WebChatSendCommandLedger(
     }
 
     fun failBeforeDispatch(commandId: String): String? {
-        val command = active?.takeIf { it.id == commandId } ?: return null
+        val command = active?.takeIf {
+            it.id == commandId && it.acceptance == WebChatSendAcceptance.DISPATCHING
+        } ?: return null
         archive(command.copy(acceptance = WebChatSendAcceptance.FAILED))
         return command.prompt
     }
@@ -224,6 +236,7 @@ internal class WebChatSendCommandLedger(
         const val MAX_CONFIRMATION_RECHECKS = 2
         const val MAX_HISTORY = 24
         val WHITESPACE = Regex("\\s+")
+        val REQUEST_ID = Regex("mcp_[a-z0-9]{1,32}")
 
         fun defaultRequestId(generation: Long): String = "mcp_s${generation.toString(36)}"
     }
