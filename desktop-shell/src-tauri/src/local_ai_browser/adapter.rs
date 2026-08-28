@@ -81,7 +81,7 @@ pub fn sanitize_event(raw: &str) -> Result<SanitizedAdapterEvent, String> {
     }
 }
 
-fn valid_document_token(value: &str) -> bool {
+pub(super) fn valid_document_token(value: &str) -> bool {
     value.len() >= 7
         && value.len() <= 84
         && value.starts_with("doc_")

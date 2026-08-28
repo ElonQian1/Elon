@@ -26,11 +26,25 @@ pub fn sanitize_event(raw: &str) -> Result<SanitizedAdapterEvent, String> {
         if value.get("adapterVersion").and_then(Value::as_u64) != Some(u64::from(ADAPTER_VERSION)) {
             return Err("Google AI 模式语义适配器版本无效。".to_string());
         }
+        if !value
+            .get("documentToken")
+            .and_then(Value::as_str)
+            .is_some_and(adapter::valid_document_token)
+        {
+            return Err("Google AI 模式页面文档令牌无效。".to_string());
+        }
+        let document_token = value
+            .get("documentToken")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string();
         let event = value
             .get("event")
             .and_then(Value::as_object)
             .ok_or_else(|| "Google AI 模式语义事件缺少 event。".to_string())?;
-        return sanitize_protocol_event(event);
+        let mut sanitized = sanitize_protocol_event(event)?;
+        sanitized.document_token = Some(document_token);
+        return Ok(sanitized);
     }
 
     match value.get("type").and_then(Value::as_str) {
@@ -270,6 +284,7 @@ mod tests {
         let raw = serde_json::to_string(&json!({
             "schema": "yilong.ai.ui.v1",
             "adapterVersion": ADAPTER_VERSION,
+            "documentToken": "doc_win_google_contract",
             "providerId": "google_web",
             "event": {
                 "type": "message_snapshot",
@@ -293,6 +308,10 @@ mod tests {
         .unwrap();
         let event = sanitize_event(&raw).unwrap();
         assert_eq!(event.kind, "message_snapshot");
+        assert_eq!(
+            event.document_token.as_deref(),
+            Some("doc_win_google_contract")
+        );
         assert_eq!(event.payload["url"], "https://www.google.com/search");
         assert_eq!(event.payload["pageKind"], "ai_mode");
         assert_eq!(event.payload["privateStreamObserved"], true);
@@ -317,6 +336,19 @@ mod tests {
             r#"{"schema":"yilong.ai.ui.v1","providerId":"chatgpt","event":{}}"#
         )
         .is_err());
+        assert!(sanitize_event(&serde_json::to_string(&json!({
+            "schema": "yilong.ai.ui.v1",
+            "adapterVersion": ADAPTER_VERSION,
+            "providerId": "google_web",
+            "event": {"type": "adapter_ready"}
+        })).unwrap()).is_err());
+        assert!(sanitize_event(&serde_json::to_string(&json!({
+            "schema": "yilong.ai.ui.v1",
+            "adapterVersion": ADAPTER_VERSION,
+            "documentToken": "invalid-token",
+            "providerId": "google_web",
+            "event": {"type": "adapter_ready"}
+        })).unwrap()).is_err());
     }
 
     #[test]
@@ -402,6 +434,7 @@ mod tests {
         let raw = serde_json::to_string(&json!({
             "schema": "yilong.ai.ui.v1",
             "adapterVersion": ADAPTER_VERSION,
+            "documentToken": "doc_win_google_directory",
             "providerId": "google_web",
             "event": {
                 "type": "conversation_snapshot",

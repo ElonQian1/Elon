@@ -2,7 +2,7 @@ use super::SessionRecord;
 
 impl SessionRecord {
     pub(super) fn begin_document_navigation(&mut self) {
-        if self.provider_id == "chatgpt" {
+        if self.tracks_document_generation() {
             self.document_token = None;
         }
     }
@@ -12,7 +12,7 @@ impl SessionRecord {
         kind: &str,
         document_token: Option<&str>,
     ) -> bool {
-        if self.provider_id != "chatgpt" || document_token.is_none() {
+        if !self.tracks_document_generation() || document_token.is_none() {
             return true;
         }
         let token = document_token.unwrap_or_default();
@@ -25,5 +25,9 @@ impl SessionRecord {
         }
         self.last_event_kind = "stale_document_event_ignored".to_string();
         false
+    }
+
+    fn tracks_document_generation(&self) -> bool {
+        matches!(self.provider_id.as_str(), "chatgpt" | "google-ai-mode")
     }
 }
