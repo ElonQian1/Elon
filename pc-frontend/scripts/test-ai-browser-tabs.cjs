@@ -63,6 +63,16 @@ assert.doesNotMatch(hideBranch, /\.reparent\(/, 'hiding an active provider page 
 assert.match(embedded, /const PARK_OFFSET: i32 = 20_000/)
 assert.match(embedded, /present_local_ai_web_session_embedded/)
 assert.match(embedded, /hide_local_ai_web_session_embedded/)
+assert.match(
+  embedded,
+  /present\(&app, &label, bounds\)\?[\s\S]*?reconnect_adapter\(provider, &page\)/,
+  'showing an embedded official page must resume the adapter and request a fresh snapshot',
+)
+assert.match(
+  localBrowser,
+  /session_control::apply[\s\S]*?if action == "restore"[\s\S]*?reconnect_adapter\(provider, &page\)/,
+  'restoring an official popout must resume the adapter and request a fresh snapshot',
+)
 assert.match(main, /internal_browser::open_internal_browser_tab/)
 assert.match(main, /local_ai_browser::embedded_view::present_local_ai_web_session_embedded/)
 assert.match(permission, /open_internal_browser_tab/)

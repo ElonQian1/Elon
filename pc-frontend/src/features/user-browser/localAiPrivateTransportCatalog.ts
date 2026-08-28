@@ -1,5 +1,6 @@
 import type {
   LocalAiAdapterAction,
+  LocalAiMessageSnapshot,
   LocalAiPrivateRichRecovery,
   LocalAiPrivateTransportHealth,
   LocalAiWebProvider,
@@ -37,6 +38,20 @@ export function localAiPrivateRichRecoveryStatusCopy(
   return null
 }
 
+export function localAiPrivateStreamStatusCopy(
+  provider: LocalAiWebProvider | undefined,
+  snapshot: LocalAiMessageSnapshot | null | undefined,
+): string | null {
+  if (!provider || snapshot?.privateStreamObserved !== true) return null
+  if (snapshot.privateStreamState === 'streaming') {
+    return `${provider.displayName} 私有回复通道正在接收本轮内容；原生界面保持可用，官网页继续在后台生成。`
+  }
+  if (snapshot.privateStreamState === 'completed') {
+    return `${provider.displayName} 私有回复完成信号已到达；正文与富内容已进入原生结算流程。`
+  }
+  return `${provider.displayName} 私有回复通道已验证；当前没有进行中的回答。`
+}
+
 function richRecoveryOutcomeCopy(outcome: LocalAiPrivateRichRecovery['lastOutcome']): string {
   if (outcome === 'stale_generation') return '旧发送代次'
   if (outcome === 'route_mismatch') return '页面会话不一致'
@@ -55,8 +70,8 @@ interface CapabilityDefinition {
 
 const SHARED_CONTINUITY: CapabilityDefinition = {
   id: 'win_web_ai_background_navigation_continuity_v1',
-  label: '后台导航连续性',
-  requestMode: 'preserve_inflight_official_navigation',
+  label: '后台导航与宿主恢复连续性',
+  requestMode: 'preserve_inflight_navigation_and_resume_adapter_snapshot',
   fallback: 'official_webview_bounded_recovery',
 }
 

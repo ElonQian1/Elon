@@ -400,6 +400,11 @@ pub async fn control_local_ai_web_session(
     }
 
     session_control::apply(&app, runtime.inner(), provider, &label, &page, &action)?;
+    if action == "restore" {
+        // Match the APK host-resume contract: reinstall the idempotent bridge
+        // and request a fresh semantic snapshot after a hidden popout returns.
+        reconnect_adapter(provider, &page);
+    }
     embedded_view::park_if_background(&app, runtime.inner(), &label)?;
     runtime
         .snapshot(&label)

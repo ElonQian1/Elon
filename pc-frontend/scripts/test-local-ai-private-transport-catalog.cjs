@@ -20,6 +20,7 @@ compiled._compile(output, catalogFilename)
 
 const {
   localAiPrivateRichRecoveryStatusCopy,
+  localAiPrivateStreamStatusCopy,
   localAiPrivateTransportCapabilities,
   localAiPrivateTransportStatusCopy,
 } = compiled.exports
@@ -56,6 +57,7 @@ assert.match(copy.detail, /官网快照单飞行刷新/)
 assert.match(copy.detail, /稳定回执与不确定发送对账/)
 assert.match(copy.detail, /独立会话正文与富内容缓存/)
 assert.match(copy.detail, /私有流原生事件即时刷新/)
+assert.match(copy.detail, /后台导航与宿主恢复连续性/)
 assert.match(copy.detail, /游客会话富内容补齐/)
 assert.match(copy.detail, /新会话首轮私有流绑定/)
 assert.match(copy.detail, /富内容异步解压与当前回答结算/)
@@ -65,6 +67,13 @@ const firstTurnBinding = chatCapabilities.find((capability) => (
 ))
 assert.equal(firstTurnBinding.requestMode, 'send_ledger_revision_gated_private_stream_binding')
 assert.equal(firstTurnBinding.fallback, 'official_dom_prompt_confirmation')
+const hostContinuity = chatCapabilities.find((capability) => (
+  capability.id === 'win_web_ai_background_navigation_continuity_v1'
+))
+assert.equal(
+  hostContinuity.requestMode,
+  'preserve_inflight_navigation_and_resume_adapter_snapshot',
+)
 const richTurnSettlement = chatCapabilities.find((capability) => (
   capability.id === 'win_chatgpt_private_rich_turn_settlement_v1'
 ))
@@ -129,6 +138,24 @@ assert.match(awaitingContext.copy, /不阻塞输入/)
 const stale = localAiPrivateTransportStatusCopy(chatgpt, health({ sampledAtMs: 1 }), 200_000)
 assert.match(stale.copy, /14\/14/)
 
+assert.equal(localAiPrivateStreamStatusCopy(chatgpt, null), null)
+assert.equal(localAiPrivateStreamStatusCopy(chatgpt, {
+  privateStreamObserved: false,
+  privateStreamState: 'streaming',
+}), null)
+assert.match(localAiPrivateStreamStatusCopy(chatgpt, {
+  privateStreamObserved: true,
+  privateStreamState: 'streaming',
+}), /正在接收本轮内容/)
+assert.match(localAiPrivateStreamStatusCopy(google, {
+  privateStreamObserved: true,
+  privateStreamState: 'completed',
+}), /Google AI 模式 私有回复完成信号已到达/)
+assert.match(localAiPrivateStreamStatusCopy(google, {
+  privateStreamObserved: true,
+  privateStreamState: 'idle',
+}), /私有回复通道已验证/)
+
 const capabilityHook = fs.readFileSync(path.resolve(
   __dirname,
   '../src/features/user-browser/useLocalAiBrowserCapability.ts',
@@ -146,7 +173,13 @@ assert.match(providerPresets, /'google-ai-mode'[\s\S]*?'list_conversations'[\s\S
 process.stdout.write('PASS Win private transport preset-first catalog\n')
 
 function provider(id, adapterActions) {
-  return { id, adapterActions, adapterVersion: 1, desktopRuntimeVersion: 2 }
+  return {
+    id,
+    displayName: id === 'chatgpt' ? 'ChatGPT' : 'Google AI 模式',
+    adapterActions,
+    adapterVersion: 1,
+    desktopRuntimeVersion: 2,
+  }
 }
 
 function health(overrides = {}) {

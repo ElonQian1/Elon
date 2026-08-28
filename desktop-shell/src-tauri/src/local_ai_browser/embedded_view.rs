@@ -7,7 +7,7 @@ use crate::{internal_browser::raise_webview, MAIN_WINDOW_LABEL};
 
 use super::{
     ensure_runtime_session, ensure_session_webview, provider, resolve_owner_fingerprint,
-    window_label, LocalAiBrowserRuntime, LocalAiWebSessionState,
+    reconnect_adapter, window_label, LocalAiBrowserRuntime, LocalAiWebSessionState,
 };
 
 #[derive(Clone, Copy, Debug, Deserialize)]
@@ -60,9 +60,17 @@ pub(crate) async fn present_local_ai_web_session_embedded(
     ensure_session_webview(&webview, provider, &fingerprint)?;
     let label = window_label(provider, &fingerprint);
     ensure_runtime_session(&app, runtime.inner(), provider, &fingerprint, &label)?;
+    let page = app
+        .get_webview(&label)
+        .ok_or_else(|| "官方网页尚未创建。".to_string())?;
     present(&app, &label, bounds)?;
     runtime.mark_window_status(&label, "ready");
     runtime.mark_window_visible(&label, true);
+    // Android resumes the page adapter and immediately snapshots the current
+    // document whenever the official WebView returns to the foreground. Do the
+    // same for WebView2 so a parked page cannot expose an old bridge or old
+    // conversation after the native tab becomes visible again.
+    reconnect_adapter(provider, &page);
     runtime
         .snapshot(&label)
         .ok_or_else(|| format!("{} 本地会话状态不可用。", provider.display_name))

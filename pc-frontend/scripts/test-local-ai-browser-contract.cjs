@@ -148,7 +148,10 @@ assert.match(rust, /WebviewUrl::External\(bootstrap_url\)/)
 assert.match(rust, /page\.navigate\(start_url\)/)
 assert.match(rust, /\.unminimize\(\)/)
 assert.match(rust, /if action == "background"/)
-assert.match(controlOfficialWebview, /session_control::apply\([\s\S]*?\)\?;\s*embedded_view::park_if_background\(&app, runtime\.inner\(\), &label\)\?;/)
+assert.match(
+  controlOfficialWebview,
+  /session_control::apply\([\s\S]*?\)\?;[\s\S]*?if action == "restore"[\s\S]*?reconnect_adapter\(provider, &page\);[\s\S]*?embedded_view::park_if_background\(&app, runtime\.inner\(\), &label\)\?;/,
+)
 assert.match(embeddedViewRust, /webview\.hide\(\)/)
 assert.match(embeddedViewRust, /webview\.reparent\(/)
 assert.match(parkOfficialWebview, /webview\.hide\(\)/)

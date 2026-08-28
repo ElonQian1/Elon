@@ -9,6 +9,7 @@ import {
 import AiProviderSessionStatus from './AiProviderSessionStatus'
 import {
   localAiPrivateRichRecoveryStatusCopy,
+  localAiPrivateStreamStatusCopy,
   localAiPrivateTransportStatusCopy,
 } from './localAiPrivateTransportCatalog'
 import styles from './AiWebProviderPopover.module.css'
@@ -31,6 +32,10 @@ export default function AiWebProviderPopover({
   )
   const privateRichRecovery = localAiPrivateRichRecoveryStatusCopy(
     web.controller.snapshot?.privateRichRecovery,
+  )
+  const privateStream = localAiPrivateStreamStatusCopy(
+    web.provider,
+    web.controller.snapshot,
   )
 
   useEffect(() => {
@@ -89,6 +94,11 @@ export default function AiWebProviderPopover({
         {privateTransport && (
           <p data-private-transport="preset" title={privateTransport.detail}>
             {privateTransport.copy} 失败时自动回退官网语义层。
+          </p>
+        )}
+        {privateStream && (
+          <p data-private-stream="runtime" title="来自本机 WebView2 的私有流状态，不包含问题、回答、Cookie 或 Token">
+            {privateStream}
           </p>
         )}
         {privateRichRecovery && (
