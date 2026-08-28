@@ -761,6 +761,7 @@ fn diagnostic_summary(record: &SessionRecord) -> Value {
         "privateStreamObserved": private_stream::observed(record.semantic_event.as_ref()),
         "privateStreamRevision": private_stream::revision(record.semantic_event.as_ref()),
         "privateStreamState": private_stream::state(record.semantic_event.as_ref()),
+        "privateRichRecovery": diagnostics::private_rich_recovery(record.semantic_event.as_ref()),
         "semanticUpdatedAtMs": record.semantic_updated_at_ms,
         "updatedAtMs": record.updated_at_ms,
     })

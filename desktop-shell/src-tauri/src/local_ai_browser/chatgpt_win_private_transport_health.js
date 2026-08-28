@@ -57,9 +57,23 @@
     let envelope;
     try { envelope = JSON.parse(original); } catch (_) { return original; }
     if (!envelope || !envelope.event || envelope.event.type !== 'message_snapshot') return original;
+    let changed = false;
     const health = snapshot(root);
-    if (!health) return original;
-    envelope.event.privateTransportHealth = health;
+    if (health) {
+      envelope.event.privateTransportHealth = health;
+      changed = true;
+    }
+    const recovery = root && root.__elonWinChatGptPrivateStreamRecovery;
+    if (recovery && typeof recovery.snapshot === 'function') {
+      try {
+        const rich = recovery.snapshot();
+        if (rich && typeof rich === 'object') {
+          envelope.event.privateRichRecovery = rich;
+          changed = true;
+        }
+      } catch (_) {}
+    }
+    if (!changed) return original;
     return JSON.stringify(envelope);
   }
 

@@ -19,6 +19,7 @@ import type {
   LocalAiComposerControlsSnapshot,
   LocalAiFeatureNavigationSnapshot,
   LocalAiSessionDiagnostics,
+  LocalAiPrivateRichRecovery,
   LocalAiStructuredContentPart,
   LocalAiUiManifestSnapshot,
 } from './localAiBrowserProtocol'
@@ -28,6 +29,7 @@ export type {
   LocalAiComposerControlsSnapshot,
   LocalAiFeatureNavigationSnapshot,
   LocalAiSessionDiagnostics,
+  LocalAiPrivateRichRecovery,
   LocalAiStructuredContentPart,
   LocalAiUiManifestSnapshot,
 } from './localAiBrowserProtocol'
@@ -140,6 +142,7 @@ export interface LocalAiMessageSnapshot {
   privateStreamRevision?: number
   privateStreamState?: 'idle' | 'streaming' | 'completed'
   privateTransportHealth?: LocalAiPrivateTransportHealth
+  privateRichRecovery?: LocalAiPrivateRichRecovery
   currentModel: string
   attachments?: LocalAiAttachment[]
   dictationActive?: boolean

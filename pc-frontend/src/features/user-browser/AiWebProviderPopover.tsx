@@ -7,7 +7,10 @@ import {
   type LocalAiResearchCaptureStatus,
 } from './localAiBrowserApi'
 import AiProviderSessionStatus from './AiProviderSessionStatus'
-import { localAiPrivateTransportStatusCopy } from './localAiPrivateTransportCatalog'
+import {
+  localAiPrivateRichRecoveryStatusCopy,
+  localAiPrivateTransportStatusCopy,
+} from './localAiPrivateTransportCatalog'
 import styles from './AiWebProviderPopover.module.css'
 
 export default function AiWebProviderPopover({
@@ -25,6 +28,9 @@ export default function AiWebProviderPopover({
   const privateTransport = localAiPrivateTransportStatusCopy(
     web.provider,
     web.controller.snapshot?.privateTransportHealth,
+  )
+  const privateRichRecovery = localAiPrivateRichRecoveryStatusCopy(
+    web.controller.snapshot?.privateRichRecovery,
   )
 
   useEffect(() => {
@@ -83,6 +89,11 @@ export default function AiWebProviderPopover({
         {privateTransport && (
           <p data-private-transport="preset" title={privateTransport.detail}>
             {privateTransport.copy} 失败时自动回退官网语义层。
+          </p>
+        )}
+        {privateRichRecovery && (
+          <p data-private-rich-recovery="safe-diagnostics" title="仅含状态、计数和富内容种类，不含问题、回答、会话 ID、Cookie 或 Token">
+            {privateRichRecovery}
           </p>
         )}
         {researchStatus && (

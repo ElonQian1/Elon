@@ -77,6 +77,13 @@ pub(super) fn content_coverage(snapshot: Option<&Value>) -> ContentCoverage {
     coverage
 }
 
+pub(super) fn private_rich_recovery(snapshot: Option<&Value>) -> Value {
+    snapshot
+        .and_then(|event| event.get("privateRichRecovery"))
+        .cloned()
+        .unwrap_or(Value::Null)
+}
+
 fn has_text(value: &Value, key: &str) -> bool {
     value
         .get(key)

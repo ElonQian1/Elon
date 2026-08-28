@@ -111,7 +111,24 @@ export interface LocalAiSessionDiagnostics {
   privateStreamObserved?: boolean
   privateStreamRevision?: number
   privateStreamState?: 'idle' | 'streaming' | 'completed'
+  privateRichRecovery?: LocalAiPrivateRichRecovery
   updatedAtMs: number
+}
+
+export interface LocalAiPrivateRichRecovery {
+  version: number
+  generation: number
+  active: boolean
+  detached: boolean
+  conversationBound: boolean
+  turnBound: boolean
+  messageBound: boolean
+  richKinds: string[]
+  acceptedCount: number
+  rejectedCount: number
+  lastOutcome: 'none' | 'reset' | 'accepted' | 'accepted_detached' | 'invalid' | 'empty' | 'stale_generation' | 'route_mismatch' | 'detached_incomplete' | 'identity_mismatch' | 'expired'
+  placeholderReconciled: boolean
+  sampledAtMs: number
 }
 
 export function isLocalAiComposerControlsSnapshot(

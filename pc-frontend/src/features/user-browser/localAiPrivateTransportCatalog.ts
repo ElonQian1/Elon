@@ -1,5 +1,6 @@
 import type {
   LocalAiAdapterAction,
+  LocalAiPrivateRichRecovery,
   LocalAiPrivateTransportHealth,
   LocalAiWebProvider,
 } from './localAiBrowserApi'
@@ -11,6 +12,37 @@ export interface LocalAiPrivateTransportCapability {
   fallback: string
   runtimeEnabled: boolean
   activation: 'preset_then_background_verify'
+}
+
+export function localAiPrivateRichRecoveryStatusCopy(
+  recovery: LocalAiPrivateRichRecovery | undefined,
+): string | null {
+  if (!recovery || recovery.version !== 1) return null
+  const kinds = recovery.richKinds.length ? `（${recovery.richKinds.join(' / ')}）` : ''
+  if (recovery.active) {
+    const binding = recovery.turnBound
+      ? '回答轮次已绑定'
+      : recovery.conversationBound ? '会话已绑定，等待回答身份补齐' : '等待会话身份补齐'
+    const reconciled = recovery.placeholderReconciled ? '；已用真实卡片替换官网占位' : ''
+    return `富内容恢复已接纳 ${recovery.acceptedCount} 次${kinds}，${binding}${reconciled}。`
+  }
+  if (['stale_generation', 'route_mismatch', 'identity_mismatch', 'detached_incomplete'].includes(
+    recovery.lastOutcome,
+  )) {
+    return `最近富内容结果已安全拒绝（${richRecoveryOutcomeCopy(recovery.lastOutcome)}）；未串入其他会话。`
+  }
+  if (recovery.lastOutcome === 'empty') {
+    return '本轮私有响应尚未解析出可渲染富内容；继续使用正文和官网回退。'
+  }
+  return null
+}
+
+function richRecoveryOutcomeCopy(outcome: LocalAiPrivateRichRecovery['lastOutcome']): string {
+  if (outcome === 'stale_generation') return '旧发送代次'
+  if (outcome === 'route_mismatch') return '页面会话不一致'
+  if (outcome === 'identity_mismatch') return '回答身份不一致'
+  if (outcome === 'detached_incomplete') return '离线恢复身份不完整'
+  return '结构无效'
 }
 
 interface CapabilityDefinition {

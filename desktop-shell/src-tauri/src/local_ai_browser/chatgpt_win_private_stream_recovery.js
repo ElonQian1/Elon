@@ -25,6 +25,10 @@
   var disposed = false;
   var baseUnsubscribe = null;
   var conversationGeneration = 0;
+  var diagnosticAcceptedCount = 0;
+  var diagnosticRejectedCount = 0;
+  var diagnosticLastOutcome = 'none';
+  var diagnosticPlaceholderReconciled = false;
   // `base.reset()` records the conversation that must stay blocked after a
   // new-chat boundary. The first prompt in that new conversation must not call
   // `base.prepareSend()`, because the shared transport intentionally clears the
@@ -36,6 +40,14 @@
     conversationGeneration += 1;
     recovered = null;
     completionOverride = null;
+    diagnosticLastOutcome = 'reset';
+    diagnosticPlaceholderReconciled = false;
+  }
+
+  function rejectRecovery(outcome) {
+    diagnosticRejectedCount = Math.min(1_000_000, diagnosticRejectedCount + 1);
+    diagnosticLastOutcome = outcome;
+    return false;
   }
 
   function cleanText(value, limit) {
@@ -315,6 +327,7 @@
 
   function usable(pathname) {
     if (!recovered || Date.now() - recovered.updatedAt > MAX_AGE_MS) {
+      if (recovered) diagnosticLastOutcome = 'expired';
       recovered = null;
       return null;
     }
@@ -335,13 +348,15 @@
   }
 
   function accept(snapshot) {
-    if (disposed || !snapshot || typeof snapshot !== 'object') return false;
+    if (disposed || !snapshot || typeof snapshot !== 'object') return rejectRecovery('invalid');
     var values = sanitizeRichParts(snapshot.richParts);
-    if (!values.length) return false;
+    if (!values.length) return rejectRecovery('empty');
     var suppliedGeneration = Number(snapshot.generation);
     var generationBound = Number.isSafeInteger(suppliedGeneration) &&
       suppliedGeneration === conversationGeneration;
-    if (Number.isSafeInteger(suppliedGeneration) && !generationBound) return false;
+    if (Number.isSafeInteger(suppliedGeneration) && !generationBound) {
+      return rejectRecovery('stale_generation');
+    }
     var candidate = {
       messageId: cleanText(snapshot.messageId || snapshot.id, 180),
       turnId: cleanText(snapshot.turnId, 180),
@@ -354,16 +369,20 @@
     var routeConversationId = activeConversationId(location.pathname);
     var active = currentBase(location.pathname);
     if (routeConversationId && candidate.conversationId &&
-        routeConversationId !== candidate.conversationId) return false;
+        routeConversationId !== candidate.conversationId) return rejectRecovery('route_mismatch');
     if (!routeConversationId && !active) {
       if (!generationBound || !candidate.messageId || !candidate.conversationId || !candidate.text) {
-        return false;
+        return rejectRecovery('detached_incomplete');
       }
       candidate.detached = true;
     }
-    if (!routeConversationId && active && !identityMatches(candidate, active)) return false;
-    if (active && !identityMatches(candidate, active)) return false;
+    if (!routeConversationId && active && !identityMatches(candidate, active)) {
+      return rejectRecovery('identity_mismatch');
+    }
+    if (active && !identityMatches(candidate, active)) return rejectRecovery('identity_mismatch');
     recovered = candidate;
+    diagnosticAcceptedCount = Math.min(1_000_000, diagnosticAcceptedCount + 1);
+    diagnosticLastOutcome = candidate.detached ? 'accepted_detached' : 'accepted';
     notify();
     return true;
   }
@@ -373,6 +392,8 @@
     var additions = recovery.richParts.slice();
     var recoveredKeys = new Set(additions.map(richKey));
     var privateKeys = new Set();
+    var hasResolvedRich = additions.some(function (part) { return part && part.type === 'rich_card'; });
+    var reconciledPlaceholder = false;
 
     values.forEach(function (part) {
       if (part && part.type === 'rich_card' && part.richContent &&
@@ -387,12 +408,19 @@
         return part.richContent && part.richContent.source === 'private_response';
       }
       if (type !== 'interactive' && type !== 'artifact' && type !== 'chart') return true;
-      if (genericPlaceholderReplacedBy(part, additions)) return false;
+      if (genericPlaceholderReplacedBy(part, additions)) {
+        reconciledPlaceholder = true;
+        return false;
+      }
       var kind = cleanText(part.kind || part.richContent && part.richContent.kind, 40).toLowerCase();
       var renderer = cleanText(part.renderer || part.rendererKind || part.reason, 80).toLowerCase();
-      return !(['finance', 'chart', 'renderer_upgrade_required'].includes(kind) ||
-        renderer.indexOf('renderer_upgrade_required') >= 0 || recoveredKeys.has(key));
+      var replaced = ['finance', 'chart', 'renderer_upgrade_required'].includes(kind) ||
+        renderer.indexOf('renderer_upgrade_required') >= 0 || recoveredKeys.has(key);
+      if (replaced && hasResolvedRich) reconciledPlaceholder = true;
+      return !replaced;
     });
+
+    if (reconciledPlaceholder) diagnosticPlaceholderReconciled = true;
 
     additions.forEach(function (part) {
       var key = richKey(part);
@@ -485,6 +513,28 @@
     transport: transport,
     baseTransport: base,
     generation: function () { return conversationGeneration; },
+    snapshot: function () {
+      var richKinds = recovered ? recovered.richParts.map(function (part) {
+        return cleanText(part && (part.kind || part.richContent && part.richContent.kind), 32).toLowerCase();
+      }).filter(function (kind, index, values) {
+        return kind && values.indexOf(kind) === index;
+      }).slice(0, 8) : [];
+      return {
+        version: 1,
+        generation: Math.min(1_000_000_000, Math.max(0, conversationGeneration)),
+        active: Boolean(recovered),
+        detached: Boolean(recovered && recovered.detached),
+        conversationBound: Boolean(recovered && recovered.conversationId),
+        turnBound: Boolean(recovered && recovered.turnId),
+        messageBound: Boolean(recovered && recovered.messageId),
+        richKinds: richKinds,
+        acceptedCount: diagnosticAcceptedCount,
+        rejectedCount: diagnosticRejectedCount,
+        lastOutcome: diagnosticLastOutcome,
+        placeholderReconciled: diagnosticPlaceholderReconciled,
+        sampledAtMs: Date.now()
+      };
+    },
     accept: accept,
     detach: function () {
       if (typeof baseUnsubscribe === 'function') baseUnsubscribe();

@@ -19,6 +19,7 @@ compiled.paths = module.paths
 compiled._compile(output, catalogFilename)
 
 const {
+  localAiPrivateRichRecoveryStatusCopy,
   localAiPrivateTransportCapabilities,
   localAiPrivateTransportStatusCopy,
 } = compiled.exports
@@ -84,6 +85,26 @@ assert.equal(
   'preserve_unrelated_official_interactive_content',
 )
 
+const richAccepted = localAiPrivateRichRecoveryStatusCopy(richRecovery({
+  active: true,
+  conversationBound: true,
+  richKinds: ['finance'],
+  acceptedCount: 2,
+  placeholderReconciled: true,
+  lastOutcome: 'accepted',
+}))
+assert.match(richAccepted, /已接纳 2 次/)
+assert.match(richAccepted, /finance/)
+assert.match(richAccepted, /等待回答身份补齐/)
+assert.match(richAccepted, /替换官网占位/)
+
+const richRejected = localAiPrivateRichRecoveryStatusCopy(richRecovery({
+  rejectedCount: 1,
+  lastOutcome: 'stale_generation',
+}))
+assert.match(richRejected, /旧发送代次/)
+assert.match(richRejected, /未串入其他会话/)
+
 const live = localAiPrivateTransportStatusCopy(chatgpt, health({
   prefetchReady: true,
   privateLatencyMs: 428,
@@ -142,6 +163,25 @@ function health(overrides = {}) {
     consecutiveFailures: 0,
     lastOutcome: 'none',
     attemptBudgetMs: 700,
+    sampledAtMs: 10_000,
+    ...overrides,
+  }
+}
+
+function richRecovery(overrides = {}) {
+  return {
+    version: 1,
+    generation: 3,
+    active: false,
+    detached: false,
+    conversationBound: false,
+    turnBound: false,
+    messageBound: false,
+    richKinds: [],
+    acceptedCount: 0,
+    rejectedCount: 0,
+    lastOutcome: 'none',
+    placeholderReconciled: false,
     sampledAtMs: 10_000,
     ...overrides,
   }

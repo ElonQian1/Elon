@@ -150,6 +150,13 @@ assert.equal(
 )
 assert.equal(merged[0].content.at(-1).richContent.payload.chart.points.length, 2)
 assert.equal(transport.current('/c/conversation-one').richParts.length, 1)
+const acceptedDiagnostics = recovery.snapshot()
+assert.equal(acceptedDiagnostics.active, true)
+assert.equal(acceptedDiagnostics.conversationBound, true)
+assert.equal(acceptedDiagnostics.turnBound, true)
+assert.equal(acceptedDiagnostics.richKinds.includes('finance'), true)
+assert.equal(acceptedDiagnostics.placeholderReconciled, true)
+assert.equal(acceptedDiagnostics.acceptedCount, 2)
 
 active = {
   id: 'assistant-stale-stream',
@@ -270,6 +277,8 @@ assert.equal(recovery.accept({
   generation: detachedGeneration,
   richParts: [financePart()],
 }), false, 'an old response must not cross a new-conversation generation boundary')
+assert.equal(recovery.snapshot().lastOutcome, 'stale_generation')
+assert.equal(recovery.snapshot().rejectedCount, 2)
 assert.equal(transport.mergeMessages(messages, '/'), messages)
 
 transport.prepareSend()

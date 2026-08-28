@@ -4,6 +4,9 @@ use super::{
     adapter_content, chatgpt_adapter_bootstrap::ADAPTER_VERSION, semantic_context, snapshot_cache,
 };
 
+#[path = "adapter/private_rich_recovery.rs"]
+mod private_rich_recovery;
+
 const MAX_EVENT_BYTES: usize = 512 * 1024;
 const MAX_MESSAGES: usize = 80;
 const MAX_DRAFT_CHARS: usize = 20_000;
@@ -120,6 +123,7 @@ fn sanitize_protocol_event(event: &Map<String, Value>) -> Result<SanitizedAdapte
             "privateStreamRevision": bounded_u64(event.get("privateStreamRevision"), 0, 1_000_000_000),
             "privateStreamState": sanitize_private_stream_state(event.get("privateStreamState")),
             "privateTransportHealth": sanitize_private_transport_health(event.get("privateTransportHealth")),
+            "privateRichRecovery": private_rich_recovery::sanitize(event.get("privateRichRecovery")),
             "currentModel": clean_string(event.get("currentModel"), 80),
             "attachments": sanitize_attachments(event.get("attachments")),
             "dictationActive": event.get("dictationActive").and_then(Value::as_bool).unwrap_or(false),
@@ -627,6 +631,22 @@ mod tests {
                     "sampledAtMs": 1_787_830_000_000_u64,
                     "token": "secret"
                 },
+                "privateRichRecovery": {
+                    "version": 1,
+                    "generation": 44,
+                    "active": true,
+                    "detached": false,
+                    "conversationBound": true,
+                    "turnBound": false,
+                    "messageBound": true,
+                    "richKinds": ["finance", "future_unsafe/value"],
+                    "acceptedCount": 3,
+                    "rejectedCount": 1,
+                    "lastOutcome": "accepted",
+                    "placeholderReconciled": true,
+                    "sampledAtMs": 1_787_830_000_100_u64,
+                    "conversationId": "secret-conversation"
+                },
                 "draft": "hello",
                 "messages": [{
                     "id": "m1",
@@ -667,6 +687,16 @@ mod tests {
         assert_eq!(
             event.payload["privateTransportHealth"]["lastOutcome"],
             "timeout"
+        );
+        assert_eq!(event.payload["privateRichRecovery"]["generation"], 44);
+        assert_eq!(event.payload["privateRichRecovery"]["active"], true);
+        assert_eq!(
+            event.payload["privateRichRecovery"]["richKinds"],
+            json!(["finance"])
+        );
+        assert_eq!(
+            event.payload["privateRichRecovery"]["placeholderReconciled"],
+            true
         );
         assert!(!event.payload.to_string().contains("secret"));
         assert!(event.payload.to_string().contains("visible"));
