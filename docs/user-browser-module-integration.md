@@ -172,6 +172,12 @@ Win 端的 ChatGPT 私有流分析器同时区分“正文可读”和“富组�
 已授权的富内容 AST，该条消息会保留正文并增加 `renderer_upgrade_required` 占位，诊断状态显示未支持
 组件数量。此占位不携带组件原始数据，只提供查看官网完整内容和检查 Win 更新的闭环。
 
+ChatGPT 游客会话的正文补齐不能固定请求登录态的 `/backend-api/conversations/{id}`。Win 端会在内存中
+观察当前官方页实际使用的 `/backend-anon/` 会话族及请求上下文，并把既有的有界、只读会话补齐 GET
+改写到当前游客端点；若官方未先暴露精确单复数路径，只在 `conversation` 与 `conversations` 两个已授权
+候选间对 404/405 做一次有界回退。登录态上下文不会带入游客端点，原始请求头仍不写采样文件、日志或
+云端。返回值继续经过共用会话解析器、富内容 AST 清洗和按会话缓存，不建立第二套 Win 消息协议。
+
 ```powershell
 node scripts/sanitize-web-ai-response-fixture.cjs --input D:\private\response.sse --output D:\private\response.shape.json --provider chatgpt
 ```

@@ -16,6 +16,8 @@ const WIN_PRIVATE_RICH_COMPATIBILITY: &str =
     include_str!("chatgpt_win_private_rich_compatibility.js");
 const WIN_PRIVATE_CONVERSATION_REFRESH: &str =
     include_str!("chatgpt_win_private_conversation_refresh.js");
+const WIN_PRIVATE_GUEST_CONVERSATION_TRANSPORT: &str =
+    include_str!("chatgpt_win_private_guest_conversation_transport.js");
 const WIN_PRIVATE_TRANSPORT_HEALTH: &str =
     include_str!("chatgpt_win_private_transport_health.js");
 const WIN_PRIVATE_CONVERSATION_RICH_CACHE: &str =
@@ -240,8 +242,11 @@ pub(super) fn initialization_script() -> String {
                 )
             } else if *name == "chatgpt_web_private_transport.js" {
                 format!(
-                    "{}\nwindow.__elonChatGptBootstrapStage = 'chatgpt_win_private_transport_health.js';\n{}\nwindow.__elonChatGptBootstrapStage = 'chatgpt_win_private_conversation_refresh.js';\n{}",
-                    shared, WIN_PRIVATE_TRANSPORT_HEALTH, WIN_PRIVATE_CONVERSATION_REFRESH
+                    "{}\nwindow.__elonChatGptBootstrapStage = 'chatgpt_win_private_guest_conversation_transport.js';\n{}\nwindow.__elonChatGptBootstrapStage = 'chatgpt_win_private_transport_health.js';\n{}\nwindow.__elonChatGptBootstrapStage = 'chatgpt_win_private_conversation_refresh.js';\n{}",
+                    shared,
+                    WIN_PRIVATE_GUEST_CONVERSATION_TRANSPORT,
+                    WIN_PRIVATE_TRANSPORT_HEALTH,
+                    WIN_PRIVATE_CONVERSATION_REFRESH
                 )
             } else if *name == "chatgpt_web_private_stream_transport.js" {
                 format!(
@@ -517,10 +522,20 @@ mod tests {
         assert!(script.contains("privateStreamingSnapshotMode"));
         assert!(script.contains("privateStreamWatchdogMs"));
         assert!(script.contains("privateStreamObserved"));
+        assert!(script.contains("chatgpt_win_private_guest_conversation_transport.js"));
+        assert!(script.contains("__elonWinChatGptPrivateGuestConversationTransport"));
         assert!(script.contains("chatgpt_win_private_conversation_refresh.js"));
         assert!(script.contains("__elonWinConversationRefreshWrapped"));
         assert!(
             script.find("chatgpt_web_private_transport.js").unwrap()
+                < script
+                    .find("chatgpt_win_private_guest_conversation_transport.js")
+                    .unwrap()
+        );
+        assert!(
+            script
+                .find("chatgpt_win_private_guest_conversation_transport.js")
+                .unwrap()
                 < script
                     .find("chatgpt_win_private_conversation_refresh.js")
                     .unwrap()

@@ -76,6 +76,13 @@ const CATALOG: Record<string, CapabilityDefinition[]> = {
       requiredActions: ['open_conversation'],
     },
     {
+      id: 'win_chatgpt_guest_private_conversation_refresh_v1',
+      label: '游客会话富内容补齐',
+      requestMode: 'observed_same_origin_guest_get_with_bounded_endpoint_fallback',
+      fallback: 'official_stream_and_dom_snapshot',
+      requiredActions: ['open_conversation', 'snapshot'],
+    },
+    {
       id: 'win_chatgpt_private_send_dispatch_observer_v1',
       label: '发送请求被动确认',
       requestMode: 'passive_official_request_observer',

@@ -34,6 +34,9 @@ Invoke-Checked 'win_response_research_capture' {
 Invoke-Checked 'win_private_stream_binding' {
     & node (Join-Path $TaskRepoRoot 'scripts\test-chatgpt-win-private-stream-binding.js')
 }
+Invoke-Checked 'win_private_guest_conversation_transport' {
+    & node (Join-Path $TaskRepoRoot 'scripts\test-chatgpt-win-private-guest-conversation-transport.js')
+}
 Invoke-Checked 'pc_user_browser_contracts' { & npm.cmd --prefix $FrontendDirectory run test:user-browser }
 Invoke-Checked 'pc_typecheck_and_vite_build' { & npm.cmd --prefix $FrontendDirectory run build }
 Invoke-Checked 'pc_eslint' { & npm.cmd --prefix $FrontendDirectory run lint }
