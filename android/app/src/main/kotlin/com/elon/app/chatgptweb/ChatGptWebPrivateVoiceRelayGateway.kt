@@ -79,6 +79,21 @@ internal class ChatGptWebPrivateVoiceRelayGateway(
         finish(ChatGptWebPrivateVoiceRelayResult.Failure("cancelled"))
     }
 
+    fun setOfficialMediaEnabled(
+        enabled: Boolean,
+        onComplete: (ChatGptWebPrivateVoiceMediaControl) -> Unit,
+    ): Boolean = evaluateMediaControl(
+        ChatGptWebPrivateVoiceRelayContract.setOfficialMediaEnabledScript(enabled),
+        onComplete,
+    )
+
+    fun closeOfficialPeer(
+        onComplete: (ChatGptWebPrivateVoiceMediaControl) -> Unit = {},
+    ): Boolean = evaluateMediaControl(
+        ChatGptWebPrivateVoiceRelayContract.closeOfficialPeerScript(),
+        onComplete,
+    )
+
     private fun poll(token: Long, id: String) {
         if (token != generation || activeRequestId != id) return
         if (nowMs() >= deadlineMs) {
@@ -111,6 +126,26 @@ internal class ChatGptWebPrivateVoiceRelayGateway(
         completion = null
         deadlineMs = 0L
         callback?.invoke(result)
+    }
+
+    private fun evaluateMediaControl(
+        script: String,
+        onComplete: (ChatGptWebPrivateVoiceMediaControl) -> Unit,
+    ): Boolean {
+        val view = webView()
+        if (view == null) {
+            onComplete(ChatGptWebPrivateVoiceMediaControl.Unavailable("unavailable"))
+            return false
+        }
+        return view.post {
+            view.evaluateJavascript(script) { raw ->
+                onComplete(ChatGptWebPrivateVoiceRelayContract.parseMediaControl(raw))
+            }
+        }.also { accepted ->
+            if (!accepted) {
+                onComplete(ChatGptWebPrivateVoiceMediaControl.Unavailable("unavailable"))
+            }
+        }
     }
 
     private companion object {

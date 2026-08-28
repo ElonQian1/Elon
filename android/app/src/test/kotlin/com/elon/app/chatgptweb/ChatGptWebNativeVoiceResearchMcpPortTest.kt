@@ -49,12 +49,16 @@ class ChatGptWebNativeVoiceResearchMcpPortTest {
                 phase = ChatGptWebNativeVoicePhase.CONNECTED,
                 remoteAudio = true,
                 dataChannelOpen = true,
+                officialMediaSuspended = true,
+                officialPeerReleased = true,
             ),
         )
         val connected = port.uiState().getJSONObject("private_voice_native_research")
         assertEquals("connected", connected.getString("phase"))
         assertTrue(connected.getBoolean("remote_audio"))
         assertTrue(connected.getBoolean("data_channel_open"))
+        assertTrue(connected.getBoolean("official_media_suspended"))
+        assertTrue(connected.getBoolean("official_peer_released"))
 
         assertTrue(
             port.control(

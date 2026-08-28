@@ -17,8 +17,26 @@ const upstream = async (input, init) => {
   return new Response(answer, { status: 201, headers: { 'content-type': 'application/sdp' } });
 };
 class FakePeerConnection {
+  constructor() {
+    this.senderTrack = { kind: 'audio', readyState: 'live', enabled: true };
+    this.receiverTrack = { kind: 'audio', readyState: 'live', enabled: true };
+    this.closed = false;
+  }
   createDataChannel(label, options) {
     return { label, options };
+  }
+  addTrack(track) {
+    this.senderTrack = track;
+    return { track, replaceTrack: (next) => { this.senderTrack = next; } };
+  }
+  getSenders() {
+    return [{ track: this.senderTrack }];
+  }
+  getReceivers() {
+    return [{ track: this.receiverTrack }];
+  }
+  close() {
+    this.closed = true;
   }
 }
 const window = {
@@ -66,7 +84,7 @@ async function main() {
   officialBody.append('session', privateSession);
 
   const peer = new window.RTCPeerConnection();
-  peer.createDataChannel('oai-events', {
+  peer.createDataChannel('', {
     ordered: true,
     protocol: '',
     negotiated: false
@@ -80,9 +98,9 @@ async function main() {
   });
 
   const relay = window.__elonChatGptPrivateVoiceRelay;
-  assert.equal(relay.version, 2);
+  assert.equal(relay.version, 3);
   assert.deepEqual(JSON.parse(relay.state()), {
-    version: 2,
+    version: 3,
     available: true,
     templateGeneration: 1,
     templateState: 'ready',
@@ -91,13 +109,26 @@ async function main() {
     inFlight: false
   });
   assert.deepEqual(JSON.parse(relay.bootstrap()).dataChannel, {
-    label: 'oai-events',
+    label: '',
     ordered: true,
     maxRetransmits: null,
     protocol: '',
     negotiated: false,
     id: null
   });
+  assert.deepEqual(JSON.parse(relay.setOfficialMediaEnabled(false)), {
+    version: 3,
+    applied: true,
+    enabled: false,
+    senderTracks: 1,
+    receiverTracks: 1,
+    code: null
+  });
+  assert.equal(peer.senderTrack.enabled, false);
+  assert.equal(peer.receiverTrack.enabled, false);
+  const lateTrack = { kind: 'audio', readyState: 'live', enabled: true };
+  peer.addTrack(lateTrack);
+  assert.equal(lateTrack.enabled, false);
   assert.equal(relay.startExchange('relay_12345678', nativeOffer), true);
   const result = await take('relay_12345678');
   assert.equal(result.status, 'ok');
@@ -108,6 +139,16 @@ async function main() {
   assert.equal(calls[1].init.credentials, 'include');
   assert.ok(calls[1].init.signal instanceof AbortSignal);
   assert.equal(calls[1].init.headers.get('x-private-runtime'), 'private-must-stay-in-page-memory');
+  assert.deepEqual(JSON.parse(relay.setOfficialMediaEnabled(true)), {
+    version: 3,
+    applied: true,
+    enabled: true,
+    senderTracks: 1,
+    receiverTracks: 1,
+    code: null
+  });
+  assert.equal(peer.senderTrack.enabled, true);
+  assert.equal(peer.receiverTrack.enabled, true);
 
   assert.equal(relay.startExchange('relay_abcdefgh', nativeOffer), false);
   assert.deepEqual(await take('relay_abcdefgh'), {
@@ -122,6 +163,31 @@ async function main() {
 
   const publicState = `${relay.state()} ${relay.bootstrap()}`.toLowerCase();
   assert.doesNotMatch(publicState, /private-must-stay|conversation_id|backend_model|x-private-runtime/);
+  assert.deepEqual(JSON.parse(relay.closeOfficialPeer()), {
+    version: 3,
+    applied: true,
+    enabled: false,
+    senderTracks: 1,
+    receiverTracks: 1,
+    closed: true
+  });
+  assert.equal(peer.closed, true);
+  const reconnectingPeer = new window.RTCPeerConnection();
+  const reconnectingTrack = { kind: 'audio', readyState: 'live', enabled: true };
+  reconnectingPeer.addTrack(reconnectingTrack);
+  reconnectingPeer.createDataChannel('', { ordered: true, protocol: '' });
+  assert.equal(reconnectingTrack.enabled, false);
+  assert.equal(reconnectingPeer.receiverTrack.enabled, false);
+  assert.deepEqual(JSON.parse(relay.setOfficialMediaEnabled(true)), {
+    version: 3,
+    applied: true,
+    enabled: true,
+    senderTracks: 1,
+    receiverTracks: 1,
+    code: null
+  });
+  assert.equal(reconnectingTrack.enabled, true);
+  assert.equal(reconnectingPeer.receiverTrack.enabled, true);
   console.log('CHATGPT_WEB_PRIVATE_VOICE_RELAY_TESTS=passed');
 }
 

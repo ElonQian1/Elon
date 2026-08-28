@@ -58,9 +58,10 @@ top-level shape contains model selection, reasoning effort, chat mode, client
 tools, and current-conversation binding. No field value crossed the bridge.
 
 Stage 3 has therefore proved that the bootstrap body is portable inside the page
-process. It has not yet proved that the page-owned session template can drive a
-React-independent peer connection or that its lifetime permits fast re-entry.
-Those are separate relay experiments and must not repeat protocol observation.
+process. Later device work proved that the page-owned session template can drive a
+React-independent peer connection, but also exposed a one-shot bootstrap race. The
+media proof is complete and must not be repeated; atomic bootstrap ownership is the
+remaining relay experiment.
 
 If that contract is stable, the next implementation is an in-memory single-use
 relay:
@@ -129,9 +130,31 @@ compiled with all four packaged WebRTC JNI ABIs. The native path now:
 - closes on a 20-second connect timeout and leaves the official page-created WebRTC
   path available as the production fallback.
 
-This completes code and package feasibility, not device media validation. The
-capability remains disabled in production until one supervised device proves duplex
-audio, mute, close, transcript/current-conversation reconciliation, fast reopen,
-background recovery, and deterministic fallback. A failure in any of those steps is
-evidence to keep the native transport experimental, not to remove the existing
-official voice path.
+## Stage 5 Device Evidence
+
+Supervised Xiaomi research builds through `1.1.1328 (1338)` proved the native
+media path. The native peer reached connected state, received remote audio, opened
+the observed empty-label data channel, and kept Android microphone capture active.
+Android audio routing was moved to communication mode and explicitly selected the
+built-in speaker when no headset was connected.
+
+The user then heard two copies of the same answer. This is positive duplex evidence:
+both the page-created official peer and the Android-owned peer were carrying audio.
+It is also evidence that closing only the currently observed official peer is not a
+complete handoff because the page may create a replacement peer. A page-level
+takeover lock now disables late sender, receiver, transceiver, and replacement-track
+audio while native ownership is active, and restores official media after a native
+startup failure.
+
+The remaining blocker is bootstrap ownership, not media feasibility. The current
+relay first lets the page submit `POST /realtime/wm`, captures the page-owned
+multipart template, and then submits a second request with the native offer. That
+duplicate use is timing-sensitive and has produced `relay_invalid_answer`; the
+session template must be treated as one-shot.
+
+The next implementation must atomically intercept the first official request,
+replace its SDP with the pre-created native offer, and send exactly one upstream
+request. If native interception cannot complete, it must send the untouched official
+request instead. Production remains on the official page-created WebRTC path until
+that fallback plus mute, close, transcript/current-conversation reconciliation,
+fast reopen, and background recovery pass once on a supervised device.

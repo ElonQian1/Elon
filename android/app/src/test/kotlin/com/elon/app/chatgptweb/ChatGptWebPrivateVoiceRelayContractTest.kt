@@ -22,8 +22,47 @@ class ChatGptWebPrivateVoiceRelayContractTest {
         assertTrue(bootstrap.contains("bootstrap"))
         assertTrue(start!!.contains("startExchange"))
         assertTrue(poll!!.contains("takeResult"))
+        assertTrue(
+            ChatGptWebPrivateVoiceRelayContract.setOfficialMediaEnabledScript(false)
+                .contains("setOfficialMediaEnabled(false)"),
+        )
+        assertTrue(
+            ChatGptWebPrivateVoiceRelayContract.closeOfficialPeerScript()
+                .contains("closeOfficialPeer()"),
+        )
         assertNull(ChatGptWebPrivateVoiceRelayContract.startScript("bad", offer))
         assertNull(ChatGptWebPrivateVoiceRelayContract.startScript("relay_12345678", "bad"))
+    }
+
+    @Test
+    fun parsesOnlyStructuralOfficialMediaOwnershipResults() {
+        val applied = JSONObject.quote(
+            JSONObject()
+                .put("version", 3)
+                .put("applied", true)
+                .put("enabled", false)
+                .put("senderTracks", 1)
+                .put("receiverTracks", 1)
+                .put("closed", false)
+                .toString(),
+        )
+        assertEquals(
+            ChatGptWebPrivateVoiceMediaControl.Applied(
+                enabled = false,
+                senderTracks = 1,
+                receiverTracks = 1,
+                closed = false,
+            ),
+            ChatGptWebPrivateVoiceRelayContract.parseMediaControl(applied),
+        )
+        assertEquals(
+            ChatGptWebPrivateVoiceMediaControl.Unavailable("peer_unavailable"),
+            ChatGptWebPrivateVoiceRelayContract.parseMediaControl(
+                JSONObject.quote(
+                    """{"version":3,"applied":false,"code":"peer_unavailable"}""",
+                ),
+            ),
+        )
     }
 
     @Test
@@ -59,6 +98,26 @@ class ChatGptWebPrivateVoiceRelayContractTest {
                 ),
             ),
             result,
+        )
+        val emptyLabel = JSONObject(payload.toString())
+            .put(
+                "dataChannel",
+                JSONObject(payload.getJSONObject("dataChannel").toString()).put("label", ""),
+            )
+        assertEquals(
+            ChatGptWebPrivateVoiceBootstrap.Ready(
+                ChatGptWebPrivateVoiceDataChannelHint(
+                    label = "",
+                    ordered = true,
+                    maxRetransmits = null,
+                    protocol = "",
+                    negotiated = false,
+                    id = null,
+                ),
+            ),
+            ChatGptWebPrivateVoiceRelayContract.parseBootstrap(
+                JSONObject.quote(emptyLabel.toString()),
+            ),
         )
         val invalid = JSONObject(payload.toString())
             .put("dataChannel", JSONObject().put("label", "\nprivate"))

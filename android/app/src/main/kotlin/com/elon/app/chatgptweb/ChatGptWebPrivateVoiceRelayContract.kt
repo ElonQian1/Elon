@@ -42,6 +42,19 @@ internal sealed interface ChatGptWebPrivateVoiceRelayPoll {
     ) : ChatGptWebPrivateVoiceRelayPoll
 }
 
+internal sealed interface ChatGptWebPrivateVoiceMediaControl {
+    data class Applied(
+        val enabled: Boolean,
+        val senderTracks: Int,
+        val receiverTracks: Int,
+        val closed: Boolean,
+    ) : ChatGptWebPrivateVoiceMediaControl
+
+    data class Unavailable(
+        val code: String,
+    ) : ChatGptWebPrivateVoiceMediaControl
+}
+
 internal object ChatGptWebPrivateVoiceRelayContract {
     private const val RELAY_OBJECT = "window.__elonChatGptPrivateVoiceRelay"
     private const val MAX_OFFER_LENGTH = 240_000
@@ -94,7 +107,7 @@ internal object ChatGptWebPrivateVoiceRelayContract {
         val protocol = dataChannel.optString("protocol")
         val maxRetransmits = dataChannel.optNullableInt("maxRetransmits", 0..65_535)
         val id = dataChannel.optNullableInt("id", 0..65_534)
-        if (!validToken(label, 64) || (protocol.isNotEmpty() && !validToken(protocol, 64))) {
+        if (!validDataChannelLabel(label) || (protocol.isNotEmpty() && !validToken(protocol, 64))) {
             return ChatGptWebPrivateVoiceBootstrap.Unavailable("invalid_data_channel")
         }
         if (
@@ -138,6 +151,35 @@ internal object ChatGptWebPrivateVoiceRelayContract {
         """.trimIndent()
     }
 
+    fun setOfficialMediaEnabledScript(enabled: Boolean): String =
+        mediaControlScript("setOfficialMediaEnabled(${enabled.toString()})")
+
+    fun closeOfficialPeerScript(): String = mediaControlScript("closeOfficialPeer()")
+
+    fun parseMediaControl(rawEvaluateValue: String?): ChatGptWebPrivateVoiceMediaControl {
+        val value = parseEvaluateObject(rawEvaluateValue)
+            ?: return ChatGptWebPrivateVoiceMediaControl.Unavailable("malformed_result")
+        if (value.optInt("version") < 3) {
+            return ChatGptWebPrivateVoiceMediaControl.Unavailable("unsupported_relay")
+        }
+        if (!value.optBoolean("applied")) {
+            val code = value.optString("code").takeIf {
+                it == "peer_unavailable"
+            } ?: "operation_failed"
+            return ChatGptWebPrivateVoiceMediaControl.Unavailable(code)
+        }
+        val senderTracks = value.optNullableInt("senderTracks", 0..16)
+            ?: return ChatGptWebPrivateVoiceMediaControl.Unavailable("malformed_result")
+        val receiverTracks = value.optNullableInt("receiverTracks", 0..16)
+            ?: return ChatGptWebPrivateVoiceMediaControl.Unavailable("malformed_result")
+        return ChatGptWebPrivateVoiceMediaControl.Applied(
+            enabled = value.optBoolean("enabled"),
+            senderTracks = senderTracks,
+            receiverTracks = receiverTracks,
+            closed = value.optBoolean("closed"),
+        )
+    }
+
     fun parsePoll(rawEvaluateValue: String?): ChatGptWebPrivateVoiceRelayPoll {
         if (rawEvaluateValue.isNullOrBlank() || rawEvaluateValue == "null") {
             return ChatGptWebPrivateVoiceRelayPoll.Pending
@@ -174,8 +216,21 @@ internal object ChatGptWebPrivateVoiceRelayContract {
         return runCatching { JSONObject(payload) }.getOrNull()
     }
 
+    private fun mediaControlScript(operation: String): String =
+        """
+            (function () {
+              var relay = $RELAY_OBJECT;
+              return relay && relay.version >= 3 && typeof relay.${operation.substringBefore('(')} === "function"
+                ? relay.$operation
+                : JSON.stringify({version: 3, applied: false, code: "unsupported_relay"});
+            })();
+        """.trimIndent()
+
     private fun validToken(value: String, maxLength: Int): Boolean =
         value.length in 1..maxLength && value.all { it.code in 0x20..0x7e }
+
+    private fun validDataChannelLabel(value: String): Boolean =
+        value.length <= 64 && value.all { it.code in 0x20..0x7e }
 
     private fun JSONObject.optNullableInt(key: String, range: IntRange): Int? {
         if (!has(key) || isNull(key)) return null

@@ -34,6 +34,8 @@ internal data class ChatGptWebNativeVoiceState(
     val phase: ChatGptWebNativeVoicePhase,
     val remoteAudio: Boolean = false,
     val dataChannelOpen: Boolean = false,
+    val officialMediaSuspended: Boolean = false,
+    val officialPeerReleased: Boolean = false,
     val code: String? = null,
 )
 
@@ -48,6 +50,7 @@ internal class ChatGptWebNativeVoicePeer(
     private val onState: (ChatGptWebNativeVoiceState) -> Unit,
     private val mainHandler: Handler = Handler(Looper.getMainLooper()),
 ) {
+    private val audioRoute = ChatGptWebNativeVoiceAudioRoute(context)
     private var generation = 0L
     private var phase = ChatGptWebNativeVoicePhase.IDLE
     private var peer: PeerConnection? = null
@@ -64,6 +67,10 @@ internal class ChatGptWebNativeVoicePeer(
             PackageManager.PERMISSION_GRANTED
         ) {
             fail("microphone_permission_required")
+            return false
+        }
+        if (!audioRoute.acquire()) {
+            fail("audio_route_unavailable")
             return false
         }
         generation += 1
@@ -94,6 +101,8 @@ internal class ChatGptWebNativeVoicePeer(
     }
 
     fun setMuted(muted: Boolean): Boolean = audioTrack?.setEnabled(!muted) == true
+
+    fun ensureAudioRoute(): Boolean = audioRoute.acquire()
 
     fun close() {
         generation += 1
@@ -253,6 +262,7 @@ internal class ChatGptWebNativeVoicePeer(
         audioTrack = null
         audioSource?.dispose()
         audioSource = null
+        audioRoute.release()
         remoteAudio = false
         dataChannelOpen = false
     }

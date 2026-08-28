@@ -4,7 +4,7 @@
   if (window.__elonChatGptPrivateResearchEnabled !== true) return;
   if (location.origin !== 'https://chatgpt.com') return;
   const existing = window.__elonChatGptPrivateVoiceRelay;
-  if (existing && Number(existing.version) >= 2) return;
+  if (existing && Number(existing.version) >= 3) return;
 
   const nativeFetch = window.fetch;
   const maxTemplateAgeMs = 2 * 60 * 1000;
@@ -17,6 +17,9 @@
   let templateGeneration = 0;
   let dataChannelHint = null;
   let dataChannelGeneration = 0;
+  let officialPeer = null;
+  let officialMediaEnabled = true;
+  let officialTakeoverActive = false;
   let inFlightRequestId = null;
   let relayFetchDepth = 0;
   const results = new Map();
@@ -110,20 +113,29 @@
       /^[\x20-\x7e]+$/.test(value);
   }
 
+  function validDataChannelLabel(value) {
+    return typeof value === 'string' &&
+      value.length <= 64 &&
+      /^[\x20-\x7e]*$/.test(value);
+  }
+
   function captureDataChannel(label, options) {
-    if (!validToken(label, 64)) return;
+    // WebRTC permits an empty data-channel label. ChatGPT Web currently uses
+    // that shape on some page generations, so it must not be confused with a
+    // missing or malformed bootstrap hint.
+    if (!validDataChannelLabel(label)) return false;
     const source = options && typeof options === 'object' ? options : {};
     if (
       source.protocol !== undefined &&
       source.protocol !== '' &&
       !validToken(source.protocol, 64)
-    ) return;
+    ) return false;
     const maxRetransmits = Number.isInteger(source.maxRetransmits)
       ? source.maxRetransmits
       : null;
     const id = Number.isInteger(source.id) ? source.id : null;
-    if (maxRetransmits !== null && (maxRetransmits < 0 || maxRetransmits > 65535)) return;
-    if (id !== null && (id < 0 || id > 65534)) return;
+    if (maxRetransmits !== null && (maxRetransmits < 0 || maxRetransmits > 65535)) return false;
+    if (id !== null && (id < 0 || id > 65534)) return false;
     dataChannelGeneration += 1;
     dataChannelHint = {
       generation: dataChannelGeneration,
@@ -135,6 +147,93 @@
       negotiated: source.negotiated === true,
       id
     };
+    return true;
+  }
+
+  function audioTracks(peer, method) {
+    try {
+      if (!peer || typeof peer[method] !== 'function') return [];
+      return peer[method]()
+        .map((entry) => entry && entry.track)
+        .filter((track) => track && track.kind === 'audio' && track.readyState !== 'ended');
+    } catch (_) {
+      return [];
+    }
+  }
+
+  function setTracksEnabled(tracks, enabled) {
+    let changed = 0;
+    tracks.forEach((track) => {
+      try {
+        track.enabled = enabled;
+        if (track.enabled === enabled) changed += 1;
+      } catch (_) {}
+    });
+    return changed;
+  }
+
+  function guardSender(peer, sender) {
+    if (!sender || sender.__elonPrivateVoiceGuarded === true) return sender;
+    try {
+      const originalReplaceTrack = typeof sender.replaceTrack === 'function'
+        ? sender.replaceTrack.bind(sender)
+        : null;
+      if (originalReplaceTrack) {
+        sender.replaceTrack = function (track) {
+          if (
+            peer === officialPeer &&
+            !officialMediaEnabled &&
+            track &&
+            track.kind === 'audio'
+          ) {
+            try { track.enabled = false; } catch (_) {}
+          }
+          return originalReplaceTrack(track);
+        };
+      }
+      Object.defineProperty(sender, '__elonPrivateVoiceGuarded', { value: true });
+    } catch (_) {}
+    return sender;
+  }
+
+  function setOfficialMediaEnabled(enabled) {
+    const nextEnabled = enabled === true;
+    if (!officialPeer) {
+      return JSON.stringify({ version: 3, applied: false, code: 'peer_unavailable' });
+    }
+    officialTakeoverActive = !nextEnabled;
+    officialMediaEnabled = nextEnabled;
+    const senderTracks = setTracksEnabled(audioTracks(officialPeer, 'getSenders'), nextEnabled);
+    const receiverTracks = setTracksEnabled(audioTracks(officialPeer, 'getReceivers'), nextEnabled);
+    return JSON.stringify({
+      version: 3,
+      applied: true,
+      enabled: nextEnabled,
+      senderTracks,
+      receiverTracks,
+      code: null
+    });
+  }
+
+  function closeOfficialPeer() {
+    if (!officialPeer) {
+      return JSON.stringify({ version: 3, applied: false, code: 'peer_unavailable' });
+    }
+    const peer = officialPeer;
+    const senderTracks = setTracksEnabled(audioTracks(peer, 'getSenders'), false);
+    const receiverTracks = setTracksEnabled(audioTracks(peer, 'getReceivers'), false);
+    officialMediaEnabled = false;
+    officialTakeoverActive = true;
+    officialPeer = null;
+    try { peer.close(); } catch (_) {}
+    return JSON.stringify({
+      version: 3,
+      applied: true,
+      enabled: false,
+      senderTracks,
+      receiverTracks,
+      closed: true
+    });
   }
 
   function installPeerCapture() {
@@ -142,10 +241,48 @@
     if (typeof NativePeerConnection !== 'function') return;
     function RelayPeerConnection(configuration, constraints) {
       const peer = new NativePeerConnection(configuration, constraints);
+      if (peer && typeof peer.addTrack === 'function') {
+        const originalAddTrack = peer.addTrack.bind(peer);
+        peer.addTrack = function (track) {
+          if (
+            peer === officialPeer &&
+            !officialMediaEnabled &&
+            track &&
+            track.kind === 'audio'
+          ) {
+            try { track.enabled = false; } catch (_) {}
+          }
+          return guardSender(peer, originalAddTrack.apply(peer, arguments));
+        };
+      }
+      if (peer && typeof peer.addTransceiver === 'function') {
+        const originalAddTransceiver = peer.addTransceiver.bind(peer);
+        peer.addTransceiver = function () {
+          const transceiver = originalAddTransceiver.apply(peer, arguments);
+          if (transceiver) guardSender(peer, transceiver.sender);
+          return transceiver;
+        };
+      }
+      if (peer && typeof peer.addEventListener === 'function') {
+        peer.addEventListener('track', (event) => {
+          if (peer !== officialPeer || officialMediaEnabled || !event || !event.track) return;
+          try { event.track.enabled = false; } catch (_) {}
+        });
+      }
       if (peer && typeof peer.createDataChannel === 'function') {
         const originalCreateDataChannel = peer.createDataChannel.bind(peer);
         peer.createDataChannel = function (label, options) {
-          captureDataChannel(label, options);
+          if (captureDataChannel(label, options)) {
+            officialPeer = peer;
+            officialMediaEnabled = !officialTakeoverActive;
+            try {
+              if (typeof peer.getSenders === 'function') {
+                peer.getSenders().forEach((sender) => guardSender(peer, sender));
+              }
+            } catch (_) {}
+            setTracksEnabled(audioTracks(peer, 'getSenders'), officialMediaEnabled);
+            setTracksEnabled(audioTracks(peer, 'getReceivers'), officialMediaEnabled);
+          }
           return originalCreateDataChannel(label, options);
         };
       }
@@ -290,7 +427,7 @@
     );
     const templateReady = Boolean(template && !template.used && age <= maxTemplateAgeMs);
     return JSON.stringify({
-      version: 2,
+      version: 3,
       available: templateReady && dataChannelReady,
       templateGeneration,
       templateState: !template ? 'missing' : template.used ? 'consumed' : age > maxTemplateAgeMs ? 'expired' : 'ready',
@@ -322,10 +459,12 @@
   installPeerCapture();
   window.fetch = relayFetch;
   window.__elonChatGptPrivateVoiceRelay = Object.freeze({
-    version: 2,
+    version: 3,
     bootstrap,
     state,
     startExchange,
-    takeResult
+    takeResult,
+    setOfficialMediaEnabled,
+    closeOfficialPeer
   });
 })();

@@ -68,6 +68,8 @@ internal class ChatGptWebNativeVoiceResearchMcpPort(
         .put("phase", state.phase.name.lowercase())
         .put("remote_audio", state.remoteAudio)
         .put("data_channel_open", state.dataChannelOpen)
+        .put("official_media_suspended", state.officialMediaSuspended)
+        .put("official_peer_released", state.officialPeerReleased)
         .put("code", state.code ?: JSONObject.NULL)
 
     private fun JSONArray.containsString(value: String): Boolean =
