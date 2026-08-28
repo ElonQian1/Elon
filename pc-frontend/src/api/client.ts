@@ -38,6 +38,23 @@ export interface ApiStreamEvent {
   [key: string]: unknown
 }
 
+function isApiError(error: unknown): error is ApiError {
+  return Boolean(error && typeof error === 'object'
+    && typeof (error as ApiError).status === 'number'
+    && typeof (error as ApiError).message === 'string')
+}
+
+function normalizeTransportError(error: unknown): ApiError {
+  if (isApiError(error)) return error
+  if (error instanceof Error && !(error instanceof TypeError) && error.message) {
+    return { status: 0, message: error.message }
+  }
+  return {
+    status: 0,
+    message: '云端连接中断，消息已保留；请检查网络后重试。',
+  }
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const token = getAuthToken()
   const headers: Record<string, string> = {
@@ -45,7 +62,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...(init?.headers as Record<string, string> | undefined),
   }
-  const res = await fetch(resolveApiUrl(path), { ...init, headers })
+  let res: Response
+  try {
+    res = await fetch(resolveApiUrl(path), { ...init, headers })
+  } catch (error) {
+    throw normalizeTransportError(error)
+  }
   if (!res.ok) {
     let message = res.statusText
     try {
@@ -67,67 +89,79 @@ export async function streamPost(
   body: unknown,
   onEvent: (event: ApiStreamEvent) => void,
 ): Promise<void> {
-  const token = getAuthToken()
-  const res = await fetch(resolveApiUrl(path), {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'text/event-stream',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: JSON.stringify(body),
-  })
-  if (!res.ok) {
-    let message = res.statusText
-    try {
-      const data = await res.json()
-      if (typeof data?.error === 'string') message = data.error
-      else if (typeof data?.message === 'string') message = data.message
-    } catch {
-      // ignore parse error
-    }
-    throw { status: res.status, message } satisfies ApiError
-  }
-  if (!res.body) throw { status: 0, message: '服务器没有返回流式响应' } satisfies ApiError
-
-  const reader = res.body.getReader()
-  const decoder = new TextDecoder()
-  let buffer = ''
   try {
-    while (true) {
-      const chunk = await reader.read()
-      buffer += decoder.decode(chunk.value ?? new Uint8Array(), { stream: !chunk.done })
-      let separator = buffer.indexOf('\r\n\r\n')
-      let separatorLength = 4
-      if (separator < 0) {
-        separator = buffer.indexOf('\n\n')
-        separatorLength = 2
+    const token = getAuthToken()
+    const res = await fetch(resolveApiUrl(path), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'text/event-stream',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(body),
+    })
+    if (!res.ok) {
+      let message = res.statusText
+      try {
+        const data = await res.json()
+        if (typeof data?.error === 'string') message = data.error
+        else if (typeof data?.message === 'string') message = data.message
+      } catch {
+        // ignore parse error
       }
-      while (separator >= 0) {
-        const block = buffer.slice(0, separator)
-        buffer = buffer.slice(separator + separatorLength)
-        for (const line of block.split(/\r?\n/)) {
-          if (!line.startsWith('data:')) continue
-          const raw = line.slice(5).trim()
-          if (!raw || raw === '[DONE]') continue
-          try {
-            const event = JSON.parse(raw) as ApiStreamEvent
-            onEvent(event)
-          } catch {
-            // Ignore incomplete/non-JSON SSE lines and continue the stream.
-          }
-        }
-        separator = buffer.indexOf('\r\n\r\n')
-        separatorLength = 4
+      throw { status: res.status, message } satisfies ApiError
+    }
+    if (!res.body) throw { status: 0, message: '服务器没有返回流式响应' } satisfies ApiError
+
+    const reader = res.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    let terminalEventSeen = false
+    try {
+      while (true) {
+        const chunk = await reader.read()
+        buffer += decoder.decode(chunk.value ?? new Uint8Array(), { stream: !chunk.done })
+        let separator = buffer.indexOf('\r\n\r\n')
+        let separatorLength = 4
         if (separator < 0) {
           separator = buffer.indexOf('\n\n')
           separatorLength = 2
         }
+        while (separator >= 0) {
+          const block = buffer.slice(0, separator)
+          buffer = buffer.slice(separator + separatorLength)
+          for (const line of block.split(/\r?\n/)) {
+            if (!line.startsWith('data:')) continue
+            const raw = line.slice(5).trim()
+            if (!raw || raw === '[DONE]') continue
+            try {
+              const event = JSON.parse(raw) as ApiStreamEvent
+              if (event.type === 'done' || event.type === 'error') terminalEventSeen = true
+              onEvent(event)
+            } catch {
+              // Ignore incomplete/non-JSON SSE lines and continue the stream.
+            }
+          }
+          separator = buffer.indexOf('\r\n\r\n')
+          separatorLength = 4
+          if (separator < 0) {
+            separator = buffer.indexOf('\n\n')
+            separatorLength = 2
+          }
+        }
+        if (chunk.done) break
       }
-      if (chunk.done) break
+      if (!terminalEventSeen) {
+        throw {
+          status: 0,
+          message: '云端连接在回答完成前中断，消息已保留；请检查网络后重试。',
+        } satisfies ApiError
+      }
+    } finally {
+      reader.releaseLock()
     }
-  } finally {
-    reader.releaseLock()
+  } catch (error) {
+    throw normalizeTransportError(error)
   }
 }
 

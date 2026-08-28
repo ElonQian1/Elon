@@ -3,14 +3,35 @@ use axum::{
     http::{header, HeaderValue},
     response::Response,
 };
-use futures::StreamExt;
+use futures::stream;
 use serde_json::{json, Value};
 use std::convert::Infallible;
+use std::time::Duration;
 use tokio::sync::mpsc;
-use tokio_stream::wrappers::ReceiverStream;
 
 pub(crate) fn stream_response(rx: mpsc::Receiver<String>) -> Response {
-    let stream = ReceiverStream::new(rx).map(|chunk| Ok::<Bytes, Infallible>(Bytes::from(chunk)));
+    // Keep long-running AI/tool orchestration streams alive through proxies and
+    // browser network stacks that close an otherwise quiet HTTP connection.
+    // SSE comments are ignored by the client but reset idle timeouts.
+    let heartbeat = tokio::time::interval_at(
+        tokio::time::Instant::now() + Duration::from_secs(10),
+        Duration::from_secs(10),
+    );
+    let stream = stream::unfold((rx, heartbeat), |(mut rx, mut heartbeat)| async move {
+        tokio::select! {
+            chunk = rx.recv() => match chunk {
+                Some(chunk) => Some((
+                    Ok::<Bytes, Infallible>(Bytes::from(chunk)),
+                    (rx, heartbeat),
+                )),
+                None => None,
+            },
+            _ = heartbeat.tick() => Some((
+                Ok::<Bytes, Infallible>(Bytes::from_static(b": keep-alive\n\n")),
+                (rx, heartbeat),
+            )),
+        }
+    });
     let mut response = Response::new(Body::from_stream(stream));
     response.headers_mut().insert(
         header::CONTENT_TYPE,

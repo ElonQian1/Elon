@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { MonitorCheck, RefreshCw, WifiOff } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { cloudBaseUrl, cloudHealthUrl, cloudWorkbenchUrl, isLocalWorkbench, localNodeUrl } from '../../api/runtime'
@@ -7,6 +7,7 @@ import { pendingSyncCountFromList } from '../local-tasks/localTaskModel'
 import styles from './Shell.module.css'
 
 type CloudState = 'checking' | 'online' | 'offline'
+const CLOUD_FAILURE_THRESHOLD = 2
 
 interface LocalStatus {
   connected?: boolean
@@ -16,6 +17,7 @@ interface LocalStatus {
 
 export default function LocalModeBanner() {
   const [cloudState, setCloudState] = useState<CloudState>('checking')
+  const cloudFailureCountRef = useRef(0)
   const [localStatus, setLocalStatus] = useState<LocalStatus | null>(null)
   const [pendingSyncCount, setPendingSyncCount] = useState(0)
   const localMode = isLocalWorkbench()
@@ -26,7 +28,13 @@ export default function LocalModeBanner() {
       if (!localMode) {
         const cloudOk = await probeCloudHealth()
         if (cancelled) return
-        setCloudState(cloudOk ? 'online' : 'offline')
+        if (cloudOk) {
+          cloudFailureCountRef.current = 0
+          setCloudState('online')
+        } else {
+          cloudFailureCountRef.current += 1
+          if (cloudFailureCountRef.current >= CLOUD_FAILURE_THRESHOLD) setCloudState('offline')
+        }
         setLocalStatus(null)
         return
       }
@@ -36,7 +44,13 @@ export default function LocalModeBanner() {
         listLocalTasks(50).catch(() => null),
       ])
       if (cancelled) return
-      setCloudState(cloudOk ? 'online' : 'offline')
+      if (cloudOk) {
+        cloudFailureCountRef.current = 0
+        setCloudState('online')
+      } else {
+        cloudFailureCountRef.current += 1
+        if (cloudFailureCountRef.current >= CLOUD_FAILURE_THRESHOLD) setCloudState('offline')
+      }
       setLocalStatus(status)
       setPendingSyncCount(localTasks ? pendingSyncCountFromList(localTasks) : 0)
     }
