@@ -1,10 +1,11 @@
+import { lazy, Suspense } from 'react'
 import { Globe2 } from 'lucide-react'
 import type { User } from '../../store/auth'
 import { displayMessageContentOrAttachment } from '../../lib/messageDisplay'
 import { formatTime } from '../../lib/utils'
 import { forkAiConversation, forkTitleFromContent } from '../conversation/conversationForkApi'
 import MarkdownContent from '../markdown/MarkdownContent'
-import MessageActions, { messageActionsHostClassName, messageCopySourceId } from '../message-actions/MessageActions'
+import { messageActionsHostClassName, messageCopySourceId } from '../message-actions/messageActionPresentation'
 import UserAvatar from '../shell/UserAvatar'
 import AiWebProviderAvatar, { aiWebProviderDisplayName } from '../user-browser/AiWebProviderAvatar'
 import styles from './AiChatPage.module.css'
@@ -14,6 +15,8 @@ import { hasVisibleAiMessageContent } from './aiMessageVisibility'
 import AiRendererUpgradeNotice from './AiRendererUpgradeNotice'
 import type { LocalAiRendererCompatibilityNotice } from '../user-browser/localAiRendererCompatibility'
 import { isLocalAiSearchProgress } from '../user-browser/localAiStreamingPresentation'
+
+const MessageActions = lazy(() => import('../message-actions/MessageActions'))
 
 export interface AiMessage {
   id?: string
@@ -172,18 +175,22 @@ export default function AiChatMessageRow({
             )}
           </div>
         )}
-        {!streaming && hasVisibleText && <MessageActions
-          content={content}
-          messageKey={messageActionKey}
-          storageScope="ai-chat"
-          richCopySourceId={copySourceId}
-          align={isUser ? 'right' : 'left'}
-          onFork={canFork ? async () => {
-            const fork = await forkAiConversation(activeConvId, message.id!, forkTitleFromContent(content))
-            await onConversationForked?.(fork.conversation_id)
-          } : undefined}
-          onRegenerate={!isUser ? onRegenerate : undefined}
-        />}
+        {!streaming && hasVisibleText && (
+          <Suspense fallback={null}>
+            <MessageActions
+              content={content}
+              messageKey={messageActionKey}
+              storageScope="ai-chat"
+              richCopySourceId={copySourceId}
+              align={isUser ? 'right' : 'left'}
+              onFork={canFork ? async () => {
+                const fork = await forkAiConversation(activeConvId, message.id!, forkTitleFromContent(content))
+                await onConversationForked?.(fork.conversation_id)
+              } : undefined}
+              onRegenerate={!isUser ? onRegenerate : undefined}
+            />
+          </Suspense>
+        )}
       </div>
     </div>
   )

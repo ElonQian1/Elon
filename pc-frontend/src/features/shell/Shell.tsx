@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { Outlet } from 'react-router-dom'
 import { CircleCheck, Link2, TriangleAlert, WifiOff } from 'lucide-react'
 import ServerRail from './ServerRail'
@@ -8,13 +8,14 @@ import { useNotifications } from '../notifications/useNotifications'
 import { useNodeAutoConnect } from './useNodeAutoConnect'
 import { useWorkbenchTabCoordinator } from './useWorkbenchTabCoordinator'
 import { useAuthStore } from '../../store/auth'
-import AuthDialog from '../auth/AuthDialog'
 import AppUpdateWatcher from '../updates/AppUpdateWatcher'
 import LocalModeBanner from './LocalModeBanner'
 import { useProjectOpenPrewarm } from '../conversation/useProjectOpenPrewarm'
 import { isLocalWorkbench } from '../../api/runtime'
 import styles from './Shell.module.css'
 import { useCodexControlBridge } from '../codex-control/useCodexControlBridge'
+
+const AuthDialog = lazy(() => import('../auth/AuthDialog'))
 
 function NodeConnectBanner() {
   const { status, errorMessage, detailMessage } = useNodeAutoConnect()
@@ -67,11 +68,15 @@ function AccountClaimBanner() {
           注册账号
         </button>
       </div>
-      <AuthDialog
-        open={registerDialogOpen}
-        initialMode="register"
-        onClose={() => setRegisterDialogOpen(false)}
-      />
+      {registerDialogOpen && (
+        <Suspense fallback={null}>
+          <AuthDialog
+            open
+            initialMode="register"
+            onClose={() => setRegisterDialogOpen(false)}
+          />
+        </Suspense>
+      )}
     </>
   )
 }

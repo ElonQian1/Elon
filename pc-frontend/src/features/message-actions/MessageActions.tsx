@@ -2,6 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Check, ChevronDown, Copy, GitFork, RotateCcw, ThumbsDown, ThumbsUp } from 'lucide-react'
 import { copyRichTextToClipboard, copyTextToClipboard, sanitizedRichHtmlFromElement } from '../../lib/clipboard'
 import styles from './MessageActions.module.css'
+import { normalizeMessageActionStorageSegment } from './messageActionPresentation'
+
+export { messageActionsHostClassName, messageCopySourceId } from './messageActionPresentation'
 
 export type MessageFeedbackValue = 'up' | 'down' | null
 type CopyStatus = 'idle' | 'markdown' | 'rich' | 'failed'
@@ -18,8 +21,6 @@ interface MessageActionsProps {
 }
 
 const FEEDBACK_PREFIX = 'elon.pc.messageFeedback'
-
-export const messageActionsHostClassName = styles.actionHost
 
 export default function MessageActions({
   content,
@@ -40,8 +41,8 @@ export default function MessageActions({
   const copyMenuRef = useRef<HTMLDivElement>(null)
 
   const storageKey = useMemo(() => {
-    const scope = normalizeStorageSegment(storageScope)
-    const key = normalizeStorageSegment(messageKey)
+    const scope = normalizeMessageActionStorageSegment(storageScope)
+    const key = normalizeMessageActionStorageSegment(messageKey)
     return `${FEEDBACK_PREFIX}.${scope}.${key}`
   }, [messageKey, storageScope])
 
@@ -209,15 +210,4 @@ export default function MessageActions({
       )}
     </div>
   )
-}
-
-function normalizeStorageSegment(value: string): string {
-  return value
-    .trim()
-    .replace(/[^a-zA-Z0-9._:-]+/g, '_')
-    .slice(0, 120) || 'message'
-}
-
-export function messageCopySourceId(storageScope: string, messageKey: string): string {
-  return `message-copy-${normalizeStorageSegment(storageScope)}-${normalizeStorageSegment(messageKey)}`
 }

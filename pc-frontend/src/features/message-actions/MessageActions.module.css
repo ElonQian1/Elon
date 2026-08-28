@@ -146,14 +146,14 @@
     pointer-events: none;
   }
 
-  .actionHost:hover .actions,
-  .actionHost:focus-within .actions {
+  :global(.message-actions-host:hover) .actions,
+  :global(.message-actions-host:focus-within) .actions {
     opacity: .64;
     pointer-events: auto;
   }
 
-  .actionHost:hover .actions:hover,
-  .actionHost:focus-within .actions:focus-within {
+  :global(.message-actions-host:hover) .actions:hover,
+  :global(.message-actions-host:focus-within) .actions:focus-within {
     opacity: 1;
   }
 }

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { ArrowLeft, BadgeCheck, LockKeyhole, RefreshCw } from 'lucide-react'
 import { api } from '../../api/client'
 import styles from './OpenAiChatKitPage.module.css'
+import { loadChatKitScript } from './loadChatKitScript'
 
 interface ChatKitCapability {
   configured: boolean
@@ -59,6 +60,7 @@ export default function OpenAiChatKitPage() {
 
     async function mountChatKit() {
       try {
+        await loadChatKitScript()
         await Promise.race([
           window.customElements.whenDefined('openai-chatkit'),
           new Promise((_, reject) => window.setTimeout(() => reject(new Error('ChatKit 组件加载超时')), 12_000)),

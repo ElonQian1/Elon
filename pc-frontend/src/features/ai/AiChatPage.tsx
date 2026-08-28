@@ -10,7 +10,6 @@ import {
   routeModelButtonCopy,
   selectedAgentForRuntimeRoute,
 } from '../models/routeModelPolicy'
-import { ModelPickerPopover } from '../models/ModelPicker'
 import {
   initialRuntimeRouteFromStorage,
   persistRuntimeRouteSelection,
@@ -23,26 +22,32 @@ import {
   saveAiComposerDraft,
   type AiComposerDraft,
 } from '../updates/composerDrafts'
-import AuthDialog from '../auth/AuthDialog'
 import SidebarUserStrip from '../shell/SidebarUserStrip'
 import { safeNodeAdminUrl } from '../../lib/utils'
 import { DEFAULT_POPOVER_ANCHOR, popoverAnchorFromRect, type PopoverAnchor } from '../../lib/popoverPosition'
-import AiWebChatSidebar from '../user-browser/AiWebChatSidebar'
-import AiWebProviderPopover from '../user-browser/AiWebProviderPopover'
-import AiWebComposerControls, { AiBrowserExperience } from '../user-browser/AiWebComposerControls'
 import useAiWebChatBackend from '../user-browser/useAiWebChatBackend'
 import useLocalAiOwnerIdentity from '../user-browser/useLocalAiOwnerIdentity'
-import NodeStatusBanner from './NodeStatusBanner'
 import AiChatTopbar from './AiChatTopbar'
 import AiChatWelcome from './AiChatWelcome'
-import AiWebClientUpgradeNotice from './AiWebClientUpgradeNotice'
+import AiBrowserExperience from '../user-browser/AiBrowserExperience'
 import type { AiHomeMode } from './AiHomeModeSwitch'
 import AiPinnedTools from './AiPinnedTools'
-import AiUserProfilePopover, { type AiChatFriend } from './AiUserProfilePopover'
-import AiChatMessageRow, {
-  type AiHandoff,
-  type AiMessage,
-  type AiProjectCandidate,
+import {
+  AiWebChatSidebar,
+  AiWebProviderPopover,
+  AiWebComposerControls,
+  AiWebClientUpgradeNotice,
+  AiUserProfilePopover,
+  NodeStatusBanner,
+  AuthDialog,
+  ModelPickerPopover,
+} from './aiFeatureLazyComponents'
+import AiChatMessageRows from './AiChatMessageRows'
+import type { AiChatFriend } from './AiUserProfilePopover'
+import type {
+  AiHandoff,
+  AiMessage,
+  AiProjectCandidate,
 } from './AiChatMessageRow'
 import { isCodexVaultBackupIntent, runCodexVaultBackupFromAiChat } from './codexVaultQuickAction'
 import {
@@ -801,11 +806,7 @@ export default function AiChatPage({ mode, onModeChange }: { mode: AiHomeMode; o
   }
 
   return (
-    <div
-      className={styles.layout}
-      data-ai-surface="production-home"
-      data-user-panel-collapsed={userPanelCollapsed ? 'true' : undefined}
-    >
+    <div className={styles.layout} data-ai-surface="production-home" data-user-panel-collapsed={userPanelCollapsed ? 'true' : undefined}>
       {/* 会话列表（左栏）*/}
       <aside className={styles.sidebar}>
         <div className={styles.sideHeader}>
@@ -813,11 +814,11 @@ export default function AiChatPage({ mode, onModeChange }: { mode: AiHomeMode; o
           <button className={styles.newBtn} onClick={newConversation} title="新对话" type="button" disabled={visibleSending || (chatMode && !web.userState.canNewConversation)}>+</button>
         </div>
         {chatMode ? <AiWebChatSidebar web={web} /> : <><AiPinnedTools
-          sending={sending}
-          onNewConversation={newConversation}
-          onOpenDoctor={() => navigate('/doctor')}
-          onCodexVaultBackup={handleCodexVaultShortcut}
-        /><div className={styles.convList} data-testid="ai-conversation-list">
+            sending={sending}
+            onNewConversation={newConversation}
+            onOpenDoctor={() => navigate('/doctor')}
+            onCodexVaultBackup={handleCodexVaultShortcut}
+          /><div className={styles.convList} data-testid="ai-conversation-list">
           {historyGroups.length === 0 && (
             <p className={styles.hint}>{conversationsLoaded ? '还没有对话记录' : '正在加载对话记录...'}</p>
           )}
@@ -892,9 +893,7 @@ export default function AiChatPage({ mode, onModeChange }: { mode: AiHomeMode; o
           }}
         >
           {chatMode && <AiWebClientUpgradeNotice web={web} />}
-          {!chatMode && onlineNodeId && (
-            <NodeStatusBanner onlineNodeId={onlineNodeId} onlineNodeName={onlineNodeName} />
-          )}
+          {!chatMode && onlineNodeId && <NodeStatusBanner onlineNodeId={onlineNodeId} onlineNodeName={onlineNodeName} />}
           {visibleMessages.length === 0 && !visibleMessageLoading && (
             <AiChatWelcome
               chatMode={chatMode}
@@ -907,23 +906,20 @@ export default function AiChatPage({ mode, onModeChange }: { mode: AiHomeMode; o
             />
           )}
           {visibleMessageLoading && <p className={styles.hint}>{chatMode ? '正在连接本地网页 AI…' : '读取消息…'}</p>}
-          {visibleMessages.filter((m) => m.role !== 'system').map((m, i) => (
-            <AiChatMessageRow
-              key={m.id ?? `${m.role}:${m.created_at ?? i}`}
-              activeConvId={chatMode ? '' : activeConvId}
-              index={i}
-              message={m}
-              user={user}
-              streaming={m.id === (chatMode ? web.streamingMessageId : streamingMessageId)}
-              streamingStatus={chatMode ? web.streamingStatus : streamStatus || '正在处理…'}
-              onConversationForked={chatMode ? undefined : openForkedConversation}
-              onProjectHandoff={chatMode ? undefined : handleProjectHandoff}
-              onRegenerate={chatMode && m.id === lastVisibleAssistantId && web.provider?.adapterActions.includes('regenerate_response')
-                ? async () => { await web.controller.run('regenerate_response') }
-                : undefined}
-              onOpenOfficial={chatMode && m.renderer_compatibility ? () => { void web.controller.openOfficial() } : undefined} onCheckUpdates={chatMode && m.renderer_compatibility ? () => navigate('/pc/node') : undefined}
-            />
-          ))}
+          <AiChatMessageRows
+            messages={visibleMessages}
+            chatMode={chatMode}
+            activeConvId={activeConvId}
+            user={user}
+            web={web}
+            streamingMessageId={streamingMessageId}
+            streamingStatus={streamStatus}
+            lastVisibleAssistantId={lastVisibleAssistantId}
+            onConversationForked={openForkedConversation}
+            onProjectHandoff={handleProjectHandoff}
+            onOpenOfficial={() => { void web.controller.openOfficial() }}
+            onCheckUpdates={() => navigate('/pc/node')}
+          />
         </div>
 
         {chatMode && <AiWebComposerControls web={web} />}
@@ -984,7 +980,7 @@ export default function AiChatPage({ mode, onModeChange }: { mode: AiHomeMode; o
               anchor={friendPopoverAnchor}
               onClose={() => setSelectedFriend(null)}
             />,
-            document.body
+            document.body,
           )}
           {/* 搜索框 */}
           {(friends.length > 0 || userQuery) && (
@@ -1091,26 +1087,26 @@ export default function AiChatPage({ mode, onModeChange }: { mode: AiHomeMode; o
         </button>
       )}
 
-      <AuthDialog
-        open={loginDialogOpen && !user?.id}
-        initialMode="login"
-        onClose={() => setLoginDialogOpen(false)}
-      />
+      {loginDialogOpen && !user?.id && (
+        <AuthDialog open initialMode="login" onClose={() => setLoginDialogOpen(false)} />
+      )}
 
-      {showModelPicker && (chatMode ? (
-        <AiWebProviderPopover
-          anchorRef={modelBtnRef}
-          web={web}
-          onClose={() => setShowModelPicker(false)}
-        />
-      ) : (
-        <ModelPickerPopover
-          anchorRef={modelBtnRef}
-          runtimeRoute={runtimeRoute}
-          onRuntimeRouteChange={setRuntimeRoute}
-          onClose={() => setShowModelPicker(false)}
-        />
-      ))}
-    </div>
+      {showModelPicker && (
+        chatMode ? (
+            <AiWebProviderPopover
+              anchorRef={modelBtnRef}
+              web={web}
+              onClose={() => setShowModelPicker(false)}
+            />
+          ) : (
+            <ModelPickerPopover
+              anchorRef={modelBtnRef}
+              runtimeRoute={runtimeRoute}
+              onRuntimeRouteChange={setRuntimeRoute}
+              onClose={() => setShowModelPicker(false)}
+            />
+          )
+      )}
+      </div>
   )
 }
