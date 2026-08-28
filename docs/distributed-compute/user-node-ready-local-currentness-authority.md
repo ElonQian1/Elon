@@ -38,7 +38,7 @@ authenticated session。它不关闭另外三项缺口，也不生成 Provider�
 6. 明确不受信的 `UntrustedComputeUserNodeHostRuntimeObservationV1`。
 
 入口不接受路径、普通 `rusqlite::Connection`、墙钟、裸 inventory、裸摘要、caller-supplied current 布尔值或 v14
-Planning custody。`OpenedComputePluginLocalAuthority` 当前没有生产构造器，所以本合同在 handle-bound VFS 落位前仍不可达。
+Planning custody。`OpenedComputePluginLocalAuthority` 当前没有生产构造器，所以本合同在 handle-bound VFS 落位前仍不可达。新增 open-attempt 草案也只有无生产 owner 的 `RegisteredPending -> OpeningPreConnection` ownership shape，不打开 SQLite、不接受 Connection，不能充当本 seal producer。
 
 ## 3. 单一 Deferred 快照顺序
 
@@ -123,7 +123,7 @@ implementation_unrun`、`passed=0/failed=0`。格式化和静态审阅不提高�
 
 ## 8. 后续顺序
 
-1. 实现并动态验收 handle-bound SQLite VFS/open 与本 seal 的真实 producer；
+1. 先完成 A2 动态门，再为既有 open-attempt 两态接入唯一 production owner、VFS/open/close 与本 seal 的真实 producer；
 2. 形成 runtime transition 和 Host runtime authority；
 3. 新建 v15 authenticated session 与 Node 签名发布；
 4. 服务端在 current V279 binding、consent、credential/session 下验证并封存短 TTL Ready authority；

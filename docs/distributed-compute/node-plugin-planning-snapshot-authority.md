@@ -11,7 +11,7 @@ owners: node, server
 
 本文是节点插件 Planning Snapshot 的本机一致性投影、生产启用顺序和协议换代边界的主权威。SQLite 文件与 VFS 生命周期仍由 [`node-plugin-manifest-catalog-authority.md`](node-plugin-manifest-catalog-authority.md) 维护；本机 schema、Store 和恢复语义仍由 [`node-plugin-local-authority.md`](node-plugin-local-authority.md) 维护；endpoint 会话 currentness 仍由 [`node-endpoint-session-authority.md`](node-endpoint-session-authority.md) 维护。
 
-当前 A1 sealed projector 源码已随完整测试目标编译，但没有专项运行，producer 也仍不可达。A2 总合同已经冻结；A2b2/A2c 所在完整测试目标已可编译，相关 targeted fault matrix 已通过 5 项，但 A2b2 的 117 项逐 case `WindowsDynamic` 仍为 0，状态只能是 `implementation_not_dynamically_accepted`；精确边界见 [`A2 authority`](node-plugin-vfs-fault-authority.md) 与 [`acceptance`](node-plugin-vfs-fault-acceptance.md)。生产 `OpenedComputePluginLocalAuthority` 仍不能成功打开，生产 VFS、process owner/fence、root/currentness、trusted-time、rollback 与 node-profile provider 均未接线，因此不存在可生产的 snapshot custody。所有现有节点继续诚实报告 `context_ready=false`、`snapshot_ready=false`，并保持 Runtime stopped。
+当前 A1 sealed projector 源码已随完整测试目标编译，但没有专项运行，producer 也仍不可达。A2 总合同已经冻结；A2b2/A2c 所在完整测试目标已可编译，相关 targeted fault matrix 已通过 5 项，但 A2b2 的 117 项逐 case `WindowsDynamic` 仍为 0，状态只能是 `implementation_not_dynamically_accepted`；精确边界见 [`A2 authority`](node-plugin-vfs-fault-authority.md) 与 [`acceptance`](node-plugin-vfs-fault-acceptance.md)。新增 [`handle-bound open attempt`](node-plugin-handle-bound-open-attempt-authority.md) 未登记源码只冻结无生产 owner 的 `RegisteredPending -> OpeningPreConnection` custody/失败拓扑；`elon-pc-node` 已实际编译且新 guard `4/4`、registry 回归 `42/42` 通过，但 typestate runtime、VFS、SQLite、Connection/Opened authority 均未接线或运行。生产 `OpenedComputePluginLocalAuthority` 仍不能成功打开，生产 VFS、process owner/fence、root/currentness、trusted-time、rollback 与 node-profile provider 均未接线，因此不存在可生产的 snapshot custody。所有现有节点继续诚实报告 `context_ready=false`、`snapshot_ready=false`，并保持 Runtime stopped。
 
 ## 2. A1 的唯一入口
 
@@ -62,6 +62,7 @@ A1 只允许两类内部结果：
 6. 在 v15 ready 已成立后，才依次接 signed reauthorization/work-admission enforcement、Sidecar health、Runtime、Ready V2、route/outbox/Lease 与真实派发。
 
 任何阶段缺少前一阶段的动态证据或生产 custody，都必须保留后续入口不可构造。
+新 open-attempt 草案不满足第 3 步：registration-owner seal 没有生产 constructor，Opening 也没有 Connection success consumer，放弃时只能 quarantine。
 
 ## 6. v14 永久阻断，v15 独立换代
 

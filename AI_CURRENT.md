@@ -65,7 +65,7 @@ reviewed_at: 2026-08-26
 - 分布式算力各层成熟度不同，不能统称“开放算力市场已完成”；统一状态见 `docs/distributed-compute/current-implementation-status.md`。
 - 外部矿池：V277/V278 uncompiled/unrun、#13-18 deny、eligible=0；V280 仅 ABI。
 - V279 UserNode Binding：Domain/Store/API/activation 源码已写但未编译/运行，零下游与经济效果；见 `docs/distributed-compute/user-node-provider-binding-authority.md`。
-- UserNode Ready：transaction-scoped local-currentness seal 源码已写，只在未来 handle-bound/query-only 快照内重证 exact head、授权、process、Ready record 与 TTL；原 envelope 四 gap 不变。该 seam 与 Windows Runner 均未登记、编译或运行，零效果；见 `AI_INDEX.md`。
+- UserNode Ready：open-attempt 已编译，guard 4/4、registry 42/42；生产 owner/VFS/Connection 与 typestate runtime 均缺，open unavailable，local-currentness 未编译，四 gap/效果不变；见 `AI_INDEX.md`。
 - `capacity_future`：Lease-rooted Store resolver/private-field seal 已写；未登记、未编译/运行、无 API/effect；见 `AI_INDEX.md`。
 
 ## 已接受的产品方向
