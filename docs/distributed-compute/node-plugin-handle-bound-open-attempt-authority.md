@@ -78,9 +78,10 @@ proof、live `sqlite3_file` graph、SQLite return/extended-code proof、authoriz
 ## 5. A2 与生产启用门
 
 [`node-plugin-planning-snapshot-authority.md`](node-plugin-planning-snapshot-authority.md) 与
-[`node-plugin-vfs-fault-authority.md`](node-plugin-vfs-fault-authority.md) 的顺序保持不变。A2 当前仍有
-Registration `WindowsDynamic=0/8`、A2b2 `WindowsDynamic=0/117`、Map/Lock pending/open frontiers 与
-未完成宽回归。测试 VFS 不得作为本草案 owner seal 的 producer。
+[`node-plugin-vfs-fault-authority.md`](node-plugin-vfs-fault-authority.md) 的顺序保持不变。A2 当前为
+Registration `WindowsDynamic=8/8`、A2b2 `WindowsDynamic=8/117`；剩余 109 项无动态 record，
+Map/Lock pending/open frontiers 与未完成宽回归仍未闭合。A2 仍未完成，测试 VFS 不得作为本草案
+owner seal 的 producer。
 
 未来只有在 A2 完整动态验收后，才能同批补齐：唯一 production process owner、VFS 注册/注销所有权、
 ABI→registry live route、main/journal/WAL/SHM handle graph、connection success/failure custody、显式 close
@@ -104,10 +105,15 @@ job/attempt/lease/receipt/usage/settlement/money = none
 状态严格为 `unregistered/draft_frozen/source_written/source_compiled/production_unwired`。实际
 `elon-pc-node` 测试目标已编译，新 source-contract `4/4`、复用的 registry lifecycle 回归 `42/42`
 通过，均为 `failed=0`。这些证据只证明源码边界和既有 registry 行为；由于 process seal 仍没有安全
-producer，open-attempt 两态没有行为运行证据，生产 VFS/SQLite/Connection 也仍未运行。首次 A2
-Registration 动态调用因缺少编译期 `ELON_NODE_AGENT_GIT_SHA` 被证据门拒绝，不记 WindowsDynamic
-通过或代码失败，计数仍为 `0/8`。当前工具目录没有 `project_feature_workflow`，所以 proposed feature
-未登记、未 claim；禁止手改 `.elon/project-features.json`。
+producer，open-attempt 两态没有行为运行证据，生产 VFS/SQLite/Connection 也仍未运行。A2
+RegistrationShutdown 已在 commit `2a16dbbe5cb9235a9926ae8b09130a1f7fbaf67a`、validation fingerprint
+`cbdef10240696931b43aaac2a874de0666ca10a5af098e8ca855e282174591ce` 上正式验证：Windows
+10.0.26200 x86_64、fixed NTFS、SQLite 3.45.0，`8 passed/0 failed/1672 filtered`，8 个 unique
+exact-commit receipts 均为 `child_exit=0`、`parent_cleanup=deleted`。Registration 计为 `8/8`，但
+A2b2 仅为 `8/117`；剩余 109 项无动态 record，Map/Lock 与宽范围回归仍未闭合，不能据此宣称 A2
+完成。首次调用因缺少编译期 `ELON_NODE_AGENT_GIT_SHA` 被证据门拒绝；修复前一轮实际代码执行为
+`4 passed/4 failed`。两者均保留为不计数历史。当前工具目录没有 `project_feature_workflow`，所以
+proposed feature 未登记、未 claim；禁止手改 `.elon/project-features.json`。
 
 禁止：
 
@@ -116,7 +122,8 @@ Registration 动态调用因缺少编译期 `ELON_NODE_AGENT_GIT_SHA` 被证据�
 - 在本批调用 `sqlite3_vfs_register`、`sqlite3_open_v2` 或 `from_verified_backend`；
 - 把 copied descriptor、opaque logical name 或 route handle 序列化成 authority/receipt；
 - 把 Opening Drop 写成正常成功、Connection close 或 opened authority；
-- 用 source-contract/registry 回归宣称 open-attempt runtime、A2 WindowsDynamic 或生产验收通过。
+- 用 source-contract/registry 回归或 Registration 的 8 个 record 宣称 open-attempt runtime、A2 全量
+  WindowsDynamic 或生产验收通过。
 
 ## 8. 后续顺序
 

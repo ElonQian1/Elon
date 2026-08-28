@@ -123,7 +123,7 @@ implementation_unrun`、`passed=0/failed=0`。格式化和静态审阅不提高�
 
 ## 8. 后续顺序
 
-1. 先完成 A2 动态门，再为既有 open-attempt 两态接入唯一 production owner、VFS/open/close 与本 seal 的真实 producer；
+1. 先完成 A2 动态门：当前 RegistrationShutdown 已为 `8/8`，但 A2b2 仅 `8/117`，剩余 109 无动态 record，Map/Lock 与宽回归仍未闭合；之后再为既有 open-attempt 两态接入唯一 production owner、VFS/open/close 与本 seal 的真实 producer；
 2. 形成 runtime transition 和 Host runtime authority；
 3. 新建 v15 authenticated session 与 Node 签名发布；
 4. 服务端在 current V279 binding、consent、credential/session 下验证并封存短 TTL Ready authority；

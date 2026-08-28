@@ -29,17 +29,30 @@ registry_lifecycle_regression=42/42
 verification=targeted_local_source_and_registry_verified
 compile/runtime=implementation_compiled/open_attempt_runtime_unrun
 compiled_targets=1 test_cases_run=46 passed=46 failed=0
-a2_registration_attempt=environment_rejected_before_evidence
-a2_registration_windows_dynamic=0/8
+a2_registration_attempt=formal_windows_dynamic_verified
+a2_registration_windows_dynamic=8/8
+a2b2_windows_dynamic=8/117
+a2b2_remaining_without_dynamic_record=109
+a2_evidence_commit=2a16dbbe5cb9235a9926ae8b09130a1f7fbaf67a
+a2_validation_fingerprint=cbdef10240696931b43aaac2a874de0666ca10a5af098e8ca855e282174591ce
+a2_environment=Windows_10.0.26200_x86_64/fixed_NTFS/SQLite_3.45.0
+a2_test_result=8_passed/0_failed/1672_filtered
+a2_receipts=8_unique_exact_commit/child_exit_0/parent_cleanup_deleted
 migration/table/writer=none/none/none
 vfs_registration/sqlite_open/connection/opened_authority=none/none/none/none
 production_acceptance=deferred
 ```
 
 `46/46` 由新 guard `4/4` 与本次 registry lifecycle `42/42` 构成；后者证明复用 owner 的既有行为，
-不是 open-attempt typestate 的 production runtime。首次 8-case A2 Registration 调用因编译期 Git SHA
-缺失而在 evidence capture 阶段失败，不能记为动态 case 失败或通过。既有 managed-fs、A1 或 test-only
-VFS 的其他历史证据不能记为本草案通过数；功能工作流不可用，注册表保持未修改。
+不是 open-attempt typestate 的 production runtime。正式 A2 RegistrationShutdown 证据绑定 commit
+`2a16dbbe5cb9235a9926ae8b09130a1f7fbaf67a` 与 validation fingerprint
+`cbdef10240696931b43aaac2a874de0666ca10a5af098e8ca855e282174591ce`：Windows 10.0.26200 x86_64、
+fixed NTFS、SQLite 3.45.0，`8 passed/0 failed/1672 filtered`；8 个 unique receipts 全部精确绑定该 commit，
+且均为 `child_exit=0`、`parent_cleanup=deleted`。首次 8-case 调用因编译期 Git SHA 缺失而在 evidence
+capture 阶段被环境拒绝；修复前一轮代码执行为 `4 passed/4 failed`。这两次均是不计数历史。当前只把
+正式记录计为 Registration `8/8`、A2b2 `8/117`；其余 109 无动态 record，Map/Lock 与宽范围回归未闭合，
+A2 仍未完成。既有 managed-fs、A1 或 test-only VFS 的其他历史证据不能记为本草案通过数；功能工作流
+不可用，注册表保持未修改。
 
 ## 2. Source review 清单
 
@@ -70,8 +83,8 @@ VFS 的其他历史证据不能记为本草案通过数；功能工作流不可�
 | 既有 registry lifecycle 回归 | 42 | 0 | 0 | `42/42` 实际通过 |
 | open-attempt typestate 行为 | 0 | 0 | 1 | 无安全 producer，未运行 |
 | production VFS/SQLite/Connection | 0 | 0 | 1 | 明确未接线 |
-| A2 Registration WindowsDynamic | 0 | 0 | 1 | 首次调用环境无效，仍为 `0/8` |
-| A2b2 WindowsDynamic | 0 | 0 | 1 | 仍为 `0/117` |
+| A2 Registration WindowsDynamic | 8 | 0 | 0 | 正式 `8/8`，8 个 exact-commit records |
+| A2b2 WindowsDynamic | 8 | 0 | 109 | 当前 `8/117`，剩余 109 无动态 record |
 | migration/Store/runtime/network/device | 0 | 0 | 1 | 未运行 |
 | Ready/Provider/market/economy | 0 | 0 | 1 | effects=none |
 
@@ -87,7 +100,8 @@ VFS 的其他历史证据不能记为本草案通过数；功能工作流不可�
 - 引入 `sqlite3_vfs_register`、`sqlite3_open_v2`、`rusqlite::Connection`、live `sqlite3_file` 或
   `OpenedComputePluginLocalAuthority::from_verified_backend`；
 - 提升 test-only VFS，修改 migration/table/writer/API/Host/Ready/市场，或产生任何经济效果；
-- 把已编译/guard/registry 回归外推为 open-attempt runtime、A2 WindowsDynamic 或生产 producer 已存在。
+- 把已编译/guard/registry 回归或 Registration `8/8` 外推为 open-attempt runtime、A2 `117/117` 或生产
+  producer 已存在。
 
 ## 5. 晋级门
 
