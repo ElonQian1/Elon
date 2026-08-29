@@ -61,6 +61,7 @@ import {
 } from './aiConversationPresentation'
 import styles from './AiChatPage.module.css'
 import { v4 as uuidv4 } from 'uuid'
+import { consumeStreamWithRecovery } from './aiStreamRecovery'
 interface RemoteNodeInfo {
   node_id?: string
   agent_id?: string
@@ -120,21 +121,6 @@ function shouldRetryRemoteNodeExec(result: { output?: string; error?: string; ex
   )
 }
 
-const STREAM_RETRY_DELAYS_MS = [1000, 2000, 4000, 8000, 15000, 30000, 45000, 60000]
-
-function isRecoverableStreamError(error: unknown) {
-  const candidate = error as { status?: number; message?: string }
-  const message = candidate?.message ?? ''
-  const status = candidate?.status
-  if (status === 0) return true
-  if (status !== undefined && ![502, 503, 504].includes(status)) return false
-  return /(连接|网络|中断|回答完成前|fetch|load failed|timeout|超时)/i.test(message)
-}
-
-function waitForStreamRetry(delayMs: number) {
-  return new Promise<void>((resolve) => window.setTimeout(resolve, delayMs))
-}
-
 export default function AiChatPage({ mode, onModeChange }: { mode: AiHomeMode; onModeChange: (mode: AiHomeMode) => void }) {
   const navigate = useNavigate()
   const user = useAuthStore((s) => s.user)
@@ -159,6 +145,7 @@ export default function AiChatPage({ mode, onModeChange }: { mode: AiHomeMode; o
   const [sending, setSending] = useState(false)
   const [streamStatus, setStreamStatus] = useState('')
   const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null)
+  const [backgroundStreamingMessageId, setBackgroundStreamingMessageId] = useState<string | null>(null)
   const [handoffSending, setHandoffSending] = useState(false)
   const [error, setError] = useState('')
   const [showModelPicker, setShowModelPicker] = useState(false)
@@ -802,31 +789,28 @@ export default function AiChatPage({ mode, onModeChange }: { mode: AiHomeMode; o
               : message))
           }
         })
-        let retryAttempt = 0
-        while (true) {
-          try {
-            await consumeStream()
-            break
-          } catch (streamError) {
-            if (!isRecoverableStreamError(streamError) || retryAttempt >= STREAM_RETRY_DELAYS_MS.length) {
-              throw streamError
-            }
-            const delayMs = STREAM_RETRY_DELAYS_MS[retryAttempt]
-            retryAttempt += 1
-            // Keep transient transport recovery invisible to the user. The
-            // server-side task continues generating while the next request
-            // replays its journal into the same assistant bubble.
-            setStreamStatus('正在生成回答…')
-            await waitForStreamRetry(delayMs)
-            // The task replays its journal on reconnect. Rebuild the visible
-            // assistant from that replay instead of appending duplicate deltas.
+        await consumeStreamWithRecovery({
+          consumeStream,
+          resetAssistantForReplay: () => {
             if (pendingStreamMessageId) {
               setMessages((prev) => prev.map((message) => message.id === pendingStreamMessageId
                 ? { ...message, content: '' }
                 : message))
             }
-          }
-        }
+          },
+          onBackgroundStarted: () => {
+            setError('')
+            setBackgroundStreamingMessageId(pendingStreamMessageId)
+          },
+          onBackgroundFinished: () => {
+            setBackgroundStreamingMessageId(null)
+            loadConversations()
+          },
+          onBackgroundExpired: async () => {
+            setBackgroundStreamingMessageId(null)
+            try { await selectConversation(convId) } catch { /* ignore */ }
+          },
+        })
         loadConversations()
       }
     } catch (err) {
@@ -954,7 +938,7 @@ export default function AiChatPage({ mode, onModeChange }: { mode: AiHomeMode; o
             activeConvId={activeConvId}
             user={user}
             web={web}
-            streamingMessageId={streamingMessageId}
+            streamingMessageId={streamingMessageId ?? backgroundStreamingMessageId}
             streamingStatus={streamStatus}
             lastVisibleAssistantId={lastVisibleAssistantId}
             onConversationForked={openForkedConversation}
