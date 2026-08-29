@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  var VERSION = 11;
+  var VERSION = 12;
   var PROVIDER_ID = '__PROVIDER_ID__';
   var MAX_BODY_BYTES = 2 * 1024 * 1024;
   var ANALYSIS_SCHEMA = 'yilong.web-ai.capture-analysis.v1';
@@ -411,7 +411,9 @@
   window.__elonWinWebResponseResearchCaptureVersion = VERSION;
 
   function installFetchTapObserver() {
-    var tap = window.__elonChatGptPrivateFetchTap;
+    var tap = PROVIDER_ID === 'google-ai-mode'
+      ? window.__elonWinGooglePrivateFetchTap
+      : window.__elonChatGptPrivateFetchTap;
     if (!tap || typeof tap.subscribe !== 'function') return false;
     var installed = window[FETCH_TAP_SUBSCRIPTION_SLOT];
     if (installed && installed.tap === tap) return true;

@@ -3,6 +3,7 @@ const WIN_RICH_CONTENT_ADAPTER: &str = include_str!("google_rich_content_adapter
 const WIN_PRIVATE_CONVERSATION_BRIDGE: &str =
     include_str!("google_win_private_conversation_bridge.js");
 const WIN_PRIVATE_REPLY_STATE: &str = include_str!("google_win_private_reply_state.js");
+const WIN_PRIVATE_FETCH_TAP: &str = include_str!("google_win_private_fetch_tap.js");
 const PRIVATE_RESPONSE_TAP: &str =
     include_str!("../../../../android/app/src/main/assets/google_web_private_response_tap.js");
 const PRIVATE_THREAD_DIRECTORY: &str =
@@ -96,6 +97,8 @@ pub(super) fn initialization_script(adapter_version: u32) -> String {
     return location.origin === 'https://google.com' || location.origin === 'https://www.google.com';
   }
   if (!allowedOrigin()) return;
+  window.__elonGoogleWebBootstrapStage = 'google_win_private_fetch_tap.js';
+  __WIN_PRIVATE_FETCH_TAP__
   window.__elonGoogleWebBootstrapStage = 'google_web_private_thread_directory.js';
   __PRIVATE_THREAD_DIRECTORY_SOURCE__
   window.__elonGoogleWebBootstrapStage = 'google_web_private_response_tap.js';
@@ -181,6 +184,7 @@ pub(super) fn initialization_script(adapter_version: u32) -> String {
 })();
 "#
     .replace("__ADAPTER_VERSION__", &adapter_version.to_string())
+    .replace("__WIN_PRIVATE_FETCH_TAP__", WIN_PRIVATE_FETCH_TAP)
     .replace("__PRIVATE_THREAD_DIRECTORY_SOURCE__", PRIVATE_THREAD_DIRECTORY)
     .replace("__PRIVATE_RESPONSE_TAP_SOURCE__", PRIVATE_RESPONSE_TAP)
     .replace("__RESPONSE_RESEARCH_CAPTURE__", &response_research_capture)

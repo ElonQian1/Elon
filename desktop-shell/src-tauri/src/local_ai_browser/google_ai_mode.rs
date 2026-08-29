@@ -425,6 +425,7 @@ mod tests {
         assert!(script.contains("publish_local_ai_web_research_capture"));
         assert!(script.contains("endpointFamily: 'ai_rpc'"));
         assert!(script.contains("window.__elonGoogleWebPrivateResearchEnabled = true"));
+        assert!(script.contains("window.__elonWinGooglePrivateFetchTap"));
         assert!(script.contains("window.__elonGoogleWebPrivateResponseTap"));
         assert!(script.contains("research_network_observation"));
         assert!(script.contains("google_win_private_conversation_bridge.js"));
@@ -444,12 +445,16 @@ mod tests {
                 .unwrap()
                 < dom_ready
         );
+        let win_private_tap = script
+            .find("window.__elonWinGooglePrivateFetchTap")
+            .expect("Win bootstrap should install the stable Google fetch tap");
         let private_tap = script
             .find("window.__elonGoogleWebPrivateResponseTap")
             .expect("Win bootstrap should install the APK private response tap");
         let full_capture = script
             .find("window.__elonWinWebResponseResearchCaptureVersion")
             .expect("Win bootstrap should retain the bounded full response capture");
+        assert!(win_private_tap < private_tap);
         assert!(private_tap < full_capture);
         assert!(full_capture < dom_ready);
     }

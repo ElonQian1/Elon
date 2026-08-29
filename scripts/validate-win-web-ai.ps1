@@ -31,6 +31,11 @@ Invoke-Checked 'adapter_js_syntax' {
 Invoke-Checked 'win_response_research_capture' {
     & node (Join-Path $TaskRepoRoot 'scripts\test-win-web-response-research-capture.js')
 }
+Invoke-Checked 'google_win_private_fetch_tap' {
+    & node --check (Join-Path $TaskRepoRoot 'desktop-shell\src-tauri\src\local_ai_browser\google_win_private_fetch_tap.js')
+    if ($LASTEXITCODE -ne 0) { return }
+    & node (Join-Path $TaskRepoRoot 'scripts\test-google-win-private-fetch-tap.js')
+}
 Invoke-Checked 'win_private_stream_binding' {
     & node (Join-Path $TaskRepoRoot 'scripts\test-chatgpt-win-private-stream-binding.js')
 }

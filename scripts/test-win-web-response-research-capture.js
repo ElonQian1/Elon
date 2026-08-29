@@ -95,7 +95,7 @@ async function main() {
   assert.equal(captures.length, 1)
   const capture = captures[0]
   assert.equal(capture.providerId, 'google-ai-mode')
-  assert.equal(capture.captureRuntimeVersion, 11)
+  assert.equal(capture.captureRuntimeVersion, 12)
   assert.equal(capture.endpointFamily, 'ai_rpc')
   assert.equal(capture.analysis.policyAvailable, true)
   assert.equal(capture.analysis.decodedFrameCount, 1)
@@ -115,27 +115,27 @@ async function main() {
   firstXhr.complete()
   assert.equal(captures.length, 2)
   assert.equal(captures[1].transport, 'xhr')
-  assert.equal(captures[1].captureRuntimeVersion, 11)
-  const upgradedSource = source.replace('var VERSION = 11;', 'var VERSION = 12;')
+  assert.equal(captures[1].captureRuntimeVersion, 12)
+  const upgradedSource = source.replace('var VERSION = 12;', 'var VERSION = 13;')
   vm.runInNewContext(upgradedSource, sandbox, {
     filename: 'win_web_response_research_capture.js',
   })
   assert.equal(windowObject.fetch, installedFetch, 'runtime upgrade must not stack fetch wrappers')
   assert.equal(FakeXmlHttpRequest.prototype.open, installedOpen)
   assert.equal(FakeXmlHttpRequest.prototype.send, installedSend)
-  assert.equal(windowObject.__elonWinWebResponseResearchCaptureVersion, 12)
-  assert.equal(windowObject.__elonWinWebResponseResearchCaptureRuntime.version, 12)
+  assert.equal(windowObject.__elonWinWebResponseResearchCaptureVersion, 13)
+  assert.equal(windowObject.__elonWinWebResponseResearchCaptureRuntime.version, 13)
   await windowObject.fetch('https://www.google.com/async/folif', { method: 'POST' })
   await new Promise((resolve) => setImmediate(resolve))
   assert.equal(captures.length, 3, 'each response must be captured exactly once after upgrade')
-  assert.equal(captures[2].captureRuntimeVersion, 12)
+  assert.equal(captures[2].captureRuntimeVersion, 13)
   const secondXhr = new FakeXmlHttpRequest()
   secondXhr.open('POST', 'https://www.google.com/async/folif')
   secondXhr.send()
   secondXhr.complete()
   assert.equal(captures.length, 4)
   assert.equal(captures[3].transport, 'xhr')
-  assert.equal(captures[3].captureRuntimeVersion, 12)
+  assert.equal(captures[3].captureRuntimeVersion, 13)
 
   const tapCaptures = []
   const tapListeners = new Set()
@@ -144,7 +144,7 @@ async function main() {
   const tapWindow = {
     fetch: tapFetch,
     XMLHttpRequest: class {},
-    __elonChatGptPrivateFetchTap: {
+    __elonWinGooglePrivateFetchTap: {
       subscribe(listener) {
         tapSubscriptions += 1
         tapListeners.add(listener)
@@ -181,7 +181,7 @@ async function main() {
   }))
   await new Promise((resolve) => setImmediate(resolve))
   assert.equal(tapCaptures.length, 1)
-  assert.equal(tapCaptures[0].captureRuntimeVersion, 11)
+  assert.equal(tapCaptures[0].captureRuntimeVersion, 12)
   const replacementFetch = async () => response
   tapWindow.fetch = replacementFetch
   vm.runInNewContext(upgradedSource, tapSandbox, {
@@ -196,7 +196,7 @@ async function main() {
   }))
   await new Promise((resolve) => setImmediate(resolve))
   assert.equal(tapCaptures.length, 2)
-  assert.equal(tapCaptures[1].captureRuntimeVersion, 12)
+  assert.equal(tapCaptures[1].captureRuntimeVersion, 13)
 
   const financeWidget = {
     asset_display_name: 'Bitcoin (BTC)',
