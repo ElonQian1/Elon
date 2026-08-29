@@ -14,6 +14,14 @@ use rusqlite::ffi;
 
 use super::{types::InertHandleBoundSqliteFile, INERT_IO_METHODS};
 
+#[cfg(all(test, windows))]
+mod close_witness;
+
+#[cfg(all(test, windows))]
+pub(in crate::node_agent_compute_plugin_host::local_authority) use close_witness::{
+    HandleBoundSqliteAbiRawCloseWitness, HandleBoundSqliteAbiRawCloseWitnessSnapshot,
+};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum RawSqliteFileStateRejection {
     NullFile,
@@ -28,6 +36,8 @@ struct RawSqliteFileStateEnvelope {
     type_id: TypeId,
     payload: Option<NonNull<c_void>>,
     drop_payload: unsafe fn(NonNull<c_void>),
+    #[cfg(all(test, windows))]
+    close_witness: HandleBoundSqliteAbiRawCloseWitness,
 }
 
 impl RawSqliteFileStateEnvelope {
@@ -37,6 +47,8 @@ impl RawSqliteFileStateEnvelope {
             type_id: TypeId::of::<State>(),
             payload: Some(payload),
             drop_payload: drop_typed_payload::<State>,
+            #[cfg(all(test, windows))]
+            close_witness: HandleBoundSqliteAbiRawCloseWitness::new(),
         })
     }
 
@@ -173,6 +185,8 @@ pub(super) unsafe fn take_installed_state<State: 'static>(
     file: *mut ffi::sqlite3_file,
 ) -> Result<Box<State>, RawSqliteFileStateRejection> {
     let envelope = unsafe { installed_envelope(file)? };
+    #[cfg(all(test, windows))]
+    envelope.close_witness.record_state_take_attempt();
     if !envelope.is::<State>() {
         return Err(RawSqliteFileStateRejection::TypeMismatch);
     }
@@ -182,12 +196,41 @@ pub(super) unsafe fn take_installed_state<State: 'static>(
     // SAFETY: exact installation and exclusive take contracts passed above.
     let raw = unsafe {
         ptr::addr_of_mut!((*file.as_ptr()).base.pMethods).write(ptr::null());
+        #[cfg(all(test, windows))]
+        envelope.close_witness.record_methods_clear();
         ptr::addr_of_mut!((*file.as_ptr()).state).replace(ptr::null_mut())
     };
     // SAFETY: the raw pointer came from Box::into_raw in `install_state` and was cleared first.
     let envelope = unsafe { Box::from_raw(raw.cast::<RawSqliteFileStateEnvelope>()) };
+    #[cfg(all(test, windows))]
+    envelope.close_witness.record_state_take_success();
     // SAFETY: the TypeId gate above proves the payload type.
     Ok(unsafe { RawSqliteFileStateEnvelope::take_typed(envelope) })
+}
+
+/// Captures a cloneable, redacted witness while the exact test VFS allocation is still live.
+/// The clone owns only atomic counters and remains readable after SQLite releases the allocation.
+///
+/// # Safety
+///
+/// `file` must identify a live allocation initialized by this ABI module, and no callback may
+/// overlap this observation.
+#[cfg(all(test, windows))]
+pub(in crate::node_agent_compute_plugin_host::local_authority) unsafe fn observe_test_vfs_file_raw_close_witness(
+    file: *mut ffi::sqlite3_file,
+) -> Option<HandleBoundSqliteAbiRawCloseWitness> {
+    // SAFETY: the caller supplies the live serialized allocation described above.
+    let envelope = unsafe { installed_envelope(file) }.ok()?;
+    Some(envelope.close_witness.clone())
+}
+
+/// Records entry into the real raw xClose callback without changing its result or custody path.
+#[cfg(all(test, windows))]
+pub(super) unsafe fn record_test_raw_close_entry(file: *mut ffi::sqlite3_file) {
+    // SAFETY: the xClose callback supplies exclusive access to its exact live allocation.
+    if let Ok(envelope) = unsafe { installed_envelope(file) } {
+        envelope.close_witness.record_raw_close_entry();
+    }
 }
 
 /// Fail-closes an unexpectedly installed state without pretending physical xClose succeeded.
@@ -212,6 +255,16 @@ pub(super) unsafe fn abandon_installed_state(
         return Ok(false);
     }
     validate_installed(methods, state)?;
+    #[cfg(all(test, windows))]
+    // SAFETY: validation proves this exact pointer is the live envelope installed by this module.
+    unsafe {
+        state
+            .cast::<RawSqliteFileStateEnvelope>()
+            .as_ref()
+            .expect("validated state pointer is non-null")
+            .close_witness
+            .record_state_abandon();
+    }
     // SAFETY: validation proves this module's exact table and a non-null envelope.
     unsafe {
         ptr::addr_of_mut!((*file.as_ptr()).base.pMethods).write(ptr::null());

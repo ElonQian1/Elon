@@ -18,6 +18,7 @@ const MAX_ACTUAL_PAYLOAD_BYTES: usize = 1_024;
 pub(super) enum SanitizedPayloadFamily {
     RegistrationShutdown,
     Barrier,
+    RegistryLifecycle,
 }
 
 /// Parent-created nonce which must be installed in the child command before spawn.
@@ -443,6 +444,7 @@ fn registration_commitment(
     hasher.update([match family {
         SanitizedPayloadFamily::RegistrationShutdown => 1,
         SanitizedPayloadFamily::Barrier => 2,
+        SanitizedPayloadFamily::RegistryLifecycle => 3,
     }]);
     hasher.update(registration_id.to_le_bytes());
     RegistrationCommitment(hasher.finalize().into())

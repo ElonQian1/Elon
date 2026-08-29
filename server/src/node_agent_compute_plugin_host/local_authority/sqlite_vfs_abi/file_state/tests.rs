@@ -305,6 +305,37 @@ fn close_failure_consumes_state_and_drops_exactly_once() {
     assert_cleared(storage.as_ref());
 }
 
+#[cfg(windows)]
+#[test]
+fn raw_close_witness_survives_allocation_release_and_records_the_exact_transition() {
+    let facts = Arc::new(Mutex::new(FakeFacts::default()));
+    let (storage, file) = install(FakeFile::new(Arc::clone(&facts)));
+    // SAFETY: the installed allocation is live and this test serializes observation and close.
+    let witness = unsafe { raw_state::observe_test_vfs_file_raw_close_witness(file) }
+        .expect("installed raw close witness");
+
+    // SAFETY: xClose exclusively consumes this exact installed state.
+    assert_eq!(unsafe { io_core::close(file) }, ffi::SQLITE_OK);
+    assert_cleared(storage.as_ref());
+    drop(storage);
+
+    assert_eq!(
+        witness.snapshot(),
+        raw_state::HandleBoundSqliteAbiRawCloseWitnessSnapshot {
+            raw_close_entries: 1,
+            raw_close_entry_order: 1,
+            state_take_attempts: 1,
+            state_take_attempt_order: 2,
+            methods_clears: 1,
+            methods_clear_order: 3,
+            state_take_successes: 1,
+            state_take_success_order: 4,
+            state_abandons: 0,
+            state_abandon_order: 0,
+        }
+    );
+}
+
 #[test]
 fn callback_panic_abandons_state_and_prevents_a_second_drop() {
     let facts = Arc::new(Mutex::new(FakeFacts::default()));

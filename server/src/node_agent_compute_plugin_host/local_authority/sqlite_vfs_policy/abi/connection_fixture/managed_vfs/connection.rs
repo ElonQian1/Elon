@@ -1,5 +1,4 @@
 use std::{
-    mem,
     os::raw::{c_char, c_int, c_void},
     panic::{catch_unwind, AssertUnwindSafe},
     path::Path,
@@ -12,7 +11,14 @@ use rusqlite::{ffi, Connection, OpenFlags};
 
 use super::*;
 #[cfg(all(test, windows))]
-use crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_abi::HandleBoundSqliteAbiRawSlotSnapshot;
+use crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_abi::{
+    HandleBoundSqliteAbiRawCloseWitness, HandleBoundSqliteAbiRawSlotSnapshot,
+};
+
+mod registry_lifecycle;
+pub(super) use registry_lifecycle::{
+    ManagedTestRegistryLifecycleCloseOutcome, ManagedTestRegistryLifecycleRouteObserver,
+};
 
 struct ManagedVfsAuthorizerContext {
     route: Arc<TestRoute>,
@@ -279,6 +285,17 @@ impl ManagedSqliteRoutedConnectionFixture {
     }
 
     #[cfg(all(test, windows))]
+    pub(super) fn observe_main_raw_close_witness(
+        &self,
+    ) -> Result<HandleBoundSqliteAbiRawCloseWitness, &'static str> {
+        let file = self.main_file_pointer()?;
+        // SAFETY: `main_file_pointer` returned this test VFS's live serialized allocation. The
+        // returned witness clones only its durable atomic observation state.
+        unsafe { observe_test_vfs_file_raw_close_witness(file) }
+            .ok_or("managed main-file raw close witness unavailable")
+    }
+
+    #[cfg(all(test, windows))]
     pub(super) fn call_main_shm_barrier(
         &self,
     ) -> Result<ManagedTestVoidCallbackObservation, &'static str> {
@@ -362,40 +379,41 @@ impl ManagedSqliteRoutedConnectionFixture {
         unsafe { unmap(file, 0) }
     }
 
-    pub(super) fn close(mut self) -> anyhow::Result<ManagedTestVfsCounts> {
-        let counts = self.close_connection()?;
-        if let Some(registration) = self.registration.take() {
-            registration.unregister()?;
-        }
-        Ok(counts)
+    pub(super) fn close(self) -> anyhow::Result<ManagedTestVfsCounts> {
+        registry_lifecycle::close(self)
+    }
+
+    #[cfg(all(test, windows))]
+    pub(super) fn close_registry_lifecycle_once(
+        mut self,
+    ) -> anyhow::Result<ManagedTestRegistryLifecycleCloseOutcome> {
+        registry_lifecycle::close_connection_detailed(&mut self)
+    }
+
+    #[cfg(all(test, windows))]
+    pub(super) fn registry_lifecycle_binding(
+        &self,
+    ) -> anyhow::Result<ManagedTestLifecycleFaultBinding> {
+        registry_lifecycle::lifecycle_binding(self)
+    }
+
+    #[cfg(all(test, windows))]
+    pub(super) fn registry_lifecycle_route_observer(
+        &self,
+    ) -> anyhow::Result<ManagedTestRegistryLifecycleRouteObserver> {
+        registry_lifecycle::route_observer(self)
+    }
+
+    #[cfg(all(test, windows))]
+    pub(super) fn retain_outstanding_journal_sidecar(
+        &self,
+        runtime: &Arc<PinnedManagedSqliteWalRuntime>,
+    ) -> anyhow::Result<()> {
+        registry_lifecycle::retain_outstanding_journal_sidecar(self, runtime)
     }
 
     fn close_connection(&mut self) -> anyhow::Result<ManagedTestVfsCounts> {
-        if let Err(error) = self.uninstall_authorizer() {
-            if let Some(connection) = self.connection.take() {
-                mem::forget(connection);
-            }
-            return Err(error);
-        }
-        drop(self.authorizer.take());
-        let connection = self
-            .connection
-            .take()
-            .ok_or_else(|| anyhow!("managed routed SQLite connection already consumed"))?;
-        if let Err((connection, error)) = connection.close() {
-            mem::forget(connection);
-            return Err(anyhow!(
-                "close managed routed SQLite connection: {error}; connection retained"
-            ));
-        }
-        let route_entry = self
-            .route_entry
-            .as_ref()
-            .expect("managed fixture route entry");
-        let logical_removal = self.routes.retire_closed_route(route_entry)?;
-        drop(logical_removal);
-        self.route_entry.take();
-        Ok(self.counters.snapshot())
+        registry_lifecycle::close_connection(self)
     }
 
     fn cancel_open(mut self, open_error: anyhow::Error) -> anyhow::Error {

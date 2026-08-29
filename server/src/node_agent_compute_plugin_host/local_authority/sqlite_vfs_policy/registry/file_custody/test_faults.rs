@@ -3,16 +3,71 @@
 //! The adapter receives only a validated script. Runtime generation, SHM connection identity and
 //! the pinned WAL-main file remain private to this custody layer.
 
-use super::{ManagedSqliteRegistryPinnedFile, ManagedSqliteRegistryPinnedFileCustody};
+use std::sync::Arc;
+
+use super::{
+    ManagedSqliteRegistryCloseLifecycleFaults, ManagedSqliteRegistryCloseLifecyclePhase,
+    ManagedSqliteRegistryPinnedFile, ManagedSqliteRegistryPinnedFileCloseRejection,
+    ManagedSqliteRegistryPinnedFileCustody,
+};
 use crate::node_agent_managed_fs::{
     ManagedSqliteShmFailureClass, ManagedSqliteShmFailurePhase, ManagedSqliteShmTestFaultProbe,
-    ManagedSqliteShmTestTargetObserver,
+    ManagedSqliteShmTestTargetObserver, ManagedSqliteWalMainCloseReceipt,
 };
 
 use super::super::{
-    owner::ManagedSqliteRegistryCustody, process_owner::ManagedSqliteRegistryNonceSource,
-    types::ManagedSqliteRegistryTerminalReason,
+    owner::{ManagedSqliteRegistryCustody, ManagedSqliteRegistryRouteHandle},
+    process_owner::{ManagedSqliteRegistryNonceSource, ManagedSqliteRegistryProcessOwner},
+    types::{
+        ManagedSqliteRegistryFileLease, ManagedSqliteRegistryShmLease,
+        ManagedSqliteRegistryTerminalReason,
+    },
 };
+
+#[allow(clippy::too_many_arguments)]
+pub(super) fn close_wal_main_after_physical<Custody, NonceSource>(
+    owner: &'static ManagedSqliteRegistryProcessOwner<Custody, NonceSource>,
+    route: ManagedSqliteRegistryRouteHandle,
+    faults: Option<&Arc<dyn ManagedSqliteRegistryCloseLifecycleFaults>>,
+    receipt: ManagedSqliteWalMainCloseReceipt,
+    main: ManagedSqliteRegistryFileLease,
+    shm: ManagedSqliteRegistryShmLease,
+) -> Result<(), ManagedSqliteRegistryPinnedFileCloseRejection>
+where
+    Custody: ManagedSqliteRegistryCustody + 'static,
+    NonceSource: ManagedSqliteRegistryNonceSource + 'static,
+{
+    if faults.is_some_and(|faults| {
+        faults
+            .before(ManagedSqliteRegistryCloseLifecyclePhase::RegistryWalMainClose)
+            .unwrap_or(true)
+    }) {
+        let _retained_registry_close_evidence = Box::leak(Box::new((receipt, main, shm)));
+        return Err(ManagedSqliteRegistryPinnedFileCloseRejection::InjectedLifecycle);
+    }
+    match owner.close_wal_main(route, main, shm, receipt) {
+        Err(rejection) => {
+            if let Some(faults) = faults {
+                faults
+                    .native_failure(ManagedSqliteRegistryCloseLifecyclePhase::RegistryWalMainClose);
+            }
+            Err(ManagedSqliteRegistryPinnedFileCloseRejection::Registry(
+                rejection,
+            ))
+        }
+        Ok(()) => {
+            if faults.is_some_and(|faults| {
+                faults
+                    .after_success(ManagedSqliteRegistryCloseLifecyclePhase::RegistryWalMainClose)
+                    .unwrap_or(true)
+            }) {
+                Err(ManagedSqliteRegistryPinnedFileCloseRejection::InjectedLifecycle)
+            } else {
+                Ok(())
+            }
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum ManagedSqliteRegistryWalMainTestFaultRejection {

@@ -31,8 +31,13 @@ use std::sync::Arc;
 mod abi;
 mod operations;
 mod promotion;
+#[cfg(all(test, windows))]
+mod registry_lifecycle;
 #[cfg(test)]
 mod test_faults;
+
+#[cfg(all(test, windows))]
+pub(in super::super) use registry_lifecycle::ManagedSqliteRegistryLifecycleStage;
 
 pub(in crate::node_agent_compute_plugin_host::local_authority) use abi::{
     ComputePluginHandleBoundSqliteAbiFile, HandleBoundSqliteAbiAttempt, HandleBoundSqliteAbiFile,
@@ -89,6 +94,15 @@ pub(in super::super) trait ManagedSqliteRegistryCloseLifecycleFaults:
         &self,
         receipt: super::types::ManagedSqliteRegistryRetirementReceipt,
     );
+
+    #[cfg(windows)]
+    fn take_connection_observation_sidecar(&self) -> Result<Option<PinnedManagedSqliteFile>, ()>;
+
+    #[cfg(windows)]
+    fn observe_registry_lifecycle_stage(
+        &self,
+        stage: ManagedSqliteRegistryLifecycleStage,
+    ) -> Result<(), ()>;
 }
 
 struct ManagedSqliteRegistryPinnedFileCloseSuccess {
@@ -255,6 +269,11 @@ where
                 super::types::ManagedSqliteRegistryCallbackKind::Close,
             )
             .map_err(ManagedSqliteRegistryPinnedFileCloseRejection::Registry)?;
+        #[cfg(all(test, windows))]
+        registry_lifecycle::observe(
+            self.close_faults.as_ref(),
+            ManagedSqliteRegistryLifecycleStage::CallbackBegin,
+        )?;
         let custody = self
             .custody
             .take()
@@ -283,47 +302,27 @@ where
             ManagedSqliteRegistryPinnedFileCustody::WalMain { file, main, shm } => {
                 match file.close() {
                     Ok(receipt) => {
-                        #[cfg(test)]
+                        #[cfg(all(test, windows))]
                         {
-                            if self.close_faults.as_ref().is_some_and(|faults| {
-                                faults
-                                    .before(
-                                        ManagedSqliteRegistryCloseLifecyclePhase::RegistryWalMainClose,
-                                    )
-                                    .unwrap_or(true)
-                            }) {
-                                let _retained_registry_close_evidence =
-                                    Box::leak(Box::new((receipt, main, shm)));
-                                Err(ManagedSqliteRegistryPinnedFileCloseRejection::InjectedLifecycle)
-                            } else {
-                                match self.owner.close_wal_main(self.route, main, shm, receipt) {
-                                    Err(rejection) => {
-                                        if let Some(faults) = self.close_faults.as_ref() {
-                                            faults.native_failure(
-                                                ManagedSqliteRegistryCloseLifecyclePhase::RegistryWalMainClose,
-                                            );
-                                        }
-                                        Err(ManagedSqliteRegistryPinnedFileCloseRejection::Registry(
-                                            rejection,
-                                        ))
-                                    }
-                                    Ok(()) => {
-                                        if self.close_faults.as_ref().is_some_and(|faults| {
-                                            faults
-                                                .after_success(
-                                                    ManagedSqliteRegistryCloseLifecyclePhase::RegistryWalMainClose,
-                                                )
-                                                .unwrap_or(true)
-                                        }) {
-                                            Err(
-                                                ManagedSqliteRegistryPinnedFileCloseRejection::InjectedLifecycle,
-                                            )
-                                        } else {
-                                            Ok(())
-                                        }
-                                    }
-                                }
-                            }
+                            registry_lifecycle::close_wal_main_after_physical(
+                                self.owner,
+                                self.route,
+                                self.close_faults.as_ref(),
+                                receipt,
+                                main,
+                                shm,
+                            )
+                        }
+                        #[cfg(all(test, not(windows)))]
+                        {
+                            test_faults::close_wal_main_after_physical(
+                                self.owner,
+                                self.route,
+                                self.close_faults.as_ref(),
+                                receipt,
+                                main,
+                                shm,
+                            )
                         }
                         #[cfg(not(test))]
                         {
@@ -358,7 +357,34 @@ where
                 Ok(()) => Err(ManagedSqliteRegistryPinnedFileCloseRejection::InjectedLifecycle),
             };
         }
-        #[cfg(test)]
+        #[cfg(all(test, windows))]
+        let callback_complete = {
+            let mut callback = callback;
+            if let Err(rejection) = registry_lifecycle::arm_close_completion_native(
+                self.close_faults.as_ref(),
+                &mut callback,
+            ) {
+                let _ = self.owner.retain_terminal_custody(
+                    self.route,
+                    ManagedSqliteRegistryTerminalReason::FailureCustodyRetained,
+                    callback,
+                );
+                return Err(rejection);
+            }
+            if let Err(rejection) = registry_lifecycle::observe(
+                self.close_faults.as_ref(),
+                ManagedSqliteRegistryLifecycleStage::CallbackCompletionAttempt,
+            ) {
+                let _ = self.owner.retain_terminal_custody(
+                    self.route,
+                    ManagedSqliteRegistryTerminalReason::FailureCustodyRetained,
+                    callback,
+                );
+                return Err(rejection);
+            }
+            callback.complete_with_receipt()
+        };
+        #[cfg(all(test, not(windows)))]
         let callback_complete = callback.complete_with_receipt();
         #[cfg(not(test))]
         let callback_complete = callback.complete();
@@ -378,22 +404,33 @@ where
         }
         #[cfg(test)]
         match (close, callback_complete) {
-            (
-                Err(ManagedSqliteRegistryPinnedFileCloseRejection::InjectedLifecycle),
-                Ok(receipt),
-            ) => {
+            (Err(rejection), Ok(receipt)) => {
                 let _ = self.owner.retain_terminal_custody(
                     self.route,
                     ManagedSqliteRegistryTerminalReason::FailureCustodyRetained,
                     receipt,
                 );
-                Err(ManagedSqliteRegistryPinnedFileCloseRejection::InjectedLifecycle)
+                Err(rejection)
             }
-            (Err(rejection), _) => Err(rejection),
+            (Err(rejection), Err(_)) => Err(rejection),
             (Ok(()), Err(rejection)) => Err(
                 ManagedSqliteRegistryPinnedFileCloseRejection::Registry(rejection),
             ),
             (Ok(()), Ok(receipt)) => {
+                #[cfg(windows)]
+                {
+                    if let Err(rejection) = registry_lifecycle::observe(
+                        self.close_faults.as_ref(),
+                        ManagedSqliteRegistryLifecycleStage::CallbackCompletionSucceeded,
+                    ) {
+                        let _ = self.owner.retain_terminal_custody(
+                            self.route,
+                            ManagedSqliteRegistryTerminalReason::FailureCustodyRetained,
+                            receipt,
+                        );
+                        return Err(rejection);
+                    }
+                }
                 if self.close_faults.as_ref().is_some_and(|faults| {
                     faults
                         .after_success(ManagedSqliteRegistryCloseLifecyclePhase::CallbackCompletion)

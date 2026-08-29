@@ -51,7 +51,8 @@ The normalized `CaseKey` common fields are:
 | `scope` | `TargetScope::RouteMain` |
 | normalized registration/route/runtime/SHM identity | `1 / 1 / 1 / 1` |
 | role / callback / occurrence | `Main / Close / 1` |
-| mutation / lock uncertainty / domain terminal | `false / false / false` |
+| mutation | selectors 1--14 `true`; selectors 15--16 `false` |
+| lock uncertainty / domain terminal | `false / false` |
 | registration phase | `Registered` |
 | physical retry | `0` |
 
@@ -72,7 +73,7 @@ The wire spellings and their frozen identity/result boundaries are:
 | 3 | `callback-completion-after-success-known` | CallbackCompletion / AfterSuccessKnown / 0 | completion `1/1`, then exact receipt retained |
 | 4 | `connection-observation-before` | ConnectionObservation / BeforeCall / 0 | observation `0/0` |
 | 5 | `connection-observation-outstanding-sidecar` | ConnectionObservation / Validation / 1 | real outstanding sidecar makes observation `1/0` |
-| 6 | `connection-observation-after-success-known` | ConnectionObservation / AfterSuccessKnown / 0 | observation `1/1`; route reached AwaitingRetirement |
+| 6 | `connection-observation-after-success-known` | ConnectionObservation / AfterSuccessKnown / 0 | observation `1/1`; route passed AwaitingRetirement, then ended TerminalQuarantine with CompletionEvidence retained |
 | 7 | `registry-route-removal-before` | RegistryRouteRemoval / BeforeCall / 0 | owner retirement `0/0` |
 | 8 | `registry-route-removal-owner-native` | RegistryRouteRemoval / NativeUncertain / 1 | owner retirement `1/0`; route not removed |
 | 9 | `registry-route-removal-publish-native` | RegistryRouteRemoval / NativeUncertain / 2 | owner retirement `1/1`; receipt publication fails; route removed |
@@ -87,9 +88,13 @@ The wire spellings and their frozen identity/result boundaries are:
 Selectors 1--14 use `TopologyKind::FinalConnection`. Selector 15 uses
 `TopologyKind::SharedNonFinal`; selector 16 uses `TopologyKind::FinalConnection`.
 
-The logical-removal failure payloads use `SqliteOutcome::NotApplicable`, because the real SQLite
-close already succeeded before fixture-level logical index retirement. Other failures use
-`SqliteOutcome::IoerrClose`; successes use `SqliteOutcome::Ok`.
+Selectors 1--10 use `SqliteOutcome::IoerrClose`, which is the real VFS `xClose` callback result,
+not the return value of the enclosing `sqlite3_close` API. Selectors 11--14 use
+`SqliteOutcome::NotApplicable`: their real `xClose` completed successfully before the
+fixture-level logical receipt/index boundary failed. Selectors 15--16 use `SqliteOutcome::Ok`.
+For every accepted selector the `sqlite3_close` API itself succeeds. SQLite consumes the selected
+final `Connection` even when `xClose` returns `SQLITE_IOERR_CLOSE`, so all final-topology selectors
+observe post-close SQLite connection count `0`; shared success observes only its sibling (`1`).
 
 ## 4. Frozen count and custody rules
 
@@ -111,10 +116,25 @@ report `1/0`. Publication-native and receipt-claim-native are typed receipt boun
 not ordinary injected operations, so their fault counts remain `0/0/0`.
 
 All failures set `custody_retain=1`, forbid later callbacks and retain the exact linear receipt or
-route custody. Callback lease custody is one only when completion did not succeed. Registry entry
-custody becomes false only after owner retirement succeeded. Logical names remain three until the
-exact logical removal succeeded, after which they are zero. VFS table/name/context custody remains
-present and `root_deletable=false` for all sixteen observations.
+route custody. The accepted custody kind is frozen as follows; every unlisted custody kind is
+zero:
+
+| Selectors | Exact retained custody |
+|---|---|
+| 1--2 | terminal `CallbackLease=1` |
+| 3--4, 6--8 | terminal `CompletionEvidence=1` |
+| 5 | terminal `OtherTerminalCustody=1`, reason `ConnectionCloseUnproven`, real sidecar lease `1` |
+| 9--11, 13 | controller retained typed registry-retirement receipt `(1,0,0)` |
+| 12 | typed registry-retirement receipt remains in publication map `(0,1,0)` |
+| 14 | controller retained typed logical-removal receipt `(0,0,1)` |
+| 15--16 | terminal and controller custody all `0` |
+
+Here each controller tuple is `(retained_registry, published_registry, retained_logical)`.
+Selectors 1--14 prove `terminal.retention_count + controller.receipt_custody_count == 1`;
+selectors 15--16 prove `0`. `WalMainPhysicalCustody` is always zero. Registry entry custody becomes
+false only after owner retirement succeeded. Logical names remain three until the exact logical
+removal succeeded, after which they are zero. VFS table/name/context custody remains present and
+`root_deletable=false` for all sixteen observations.
 
 Success removes one exact registry route and exactly its main/journal/WAL names. Shared success
 leaves the sibling route, its three names and its live SQL/SHM custody untouched. Final success
@@ -136,10 +156,17 @@ Each child must exercise this chain once, without retry:
 6. The test VFS publishes and claims that receipt, validates exact route custody, removes exactly
    the three logical names, and returns the final result.
 
-The selected SQLite close is consumed once even on failure. Any returned rusqlite connection,
-typed receipt, physical custody, sidecar sentinel or route entry that cannot safely continue is
-retained until child exit. Drop, panic cleanup and parent validation must never invoke a second
-`xClose`.
+The selected SQLite close is consumed once even on failure. A rusqlite `Connection::close` that
+returns its connection is an out-of-family harness/API anomaly: it is retained to prevent a
+second `xClose`, and the child fails before classification or payload emission. Typed receipt,
+physical custody, sidecar sentinel or route entry that cannot safely continue is retained until
+child exit. Drop, panic cleanup and parent validation must never invoke a second `xClose`.
+
+The harness classifies a sealed physical-prefix failure as `XCloseRejected` only after the
+rusqlite `Connection::close` API itself completed and the route-bound ledger proves retirement was
+not published. Authorizer removal, a missing fixture connection, an API-level `Connection::close`
+error, or an unavailable lifecycle observer is a harness failure and invalidates the child; none
+may be projected into one of the sixteen selectors.
 
 ## 6. Lawful deterministic seams
 
@@ -147,8 +174,9 @@ Only the following test/Windows-isolated seams may make the frozen native branch
 
 1. **Close callback native rejection** validates the exact Close lease, moves that real route to
    terminal state and then lets the real completion operation reject it.
-2. **Outstanding sidecar** opens and binds a real Journal sidecar file and lease on the selected
-   live route before close and retains both through connection observation.
+2. **Outstanding sidecar** opens and stages a real Journal file before close. Only after callback
+   completion and immediately before connection observation does it claim the selected route's
+   real sidecar lease, bind that pinned file, and retain the pair through child exit.
 3. **Owner-retirement native rejection** validates the typed connection-closed receipt and exact
    route before making the real owner retirement reject; no removal receipt may be fabricated.
 4. **Retirement publication failure** runs only after owner retirement succeeded and consumes the

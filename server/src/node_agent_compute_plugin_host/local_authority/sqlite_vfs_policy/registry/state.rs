@@ -437,6 +437,11 @@ impl ManagedSqliteRegistrySessionState {
         if self.phase == ManagedSqliteRegistrySessionPhase::TerminalQuarantine {
             return self.terminal_reason.is_some();
         }
+        #[cfg(all(test, windows))]
+        let test_connection_observation_sidecar =
+            self.allows_connection_observation_sidecar_shape();
+        #[cfg(not(all(test, windows)))]
+        let test_connection_observation_sidecar = false;
         if self.terminal_reason.is_some()
             || self.main_lease.is_some_and(|record| {
                 !self.main_was_claimed
@@ -445,7 +450,7 @@ impl ManagedSqliteRegistrySessionState {
             })
             || self.sidecar_leases.iter().flatten().any(|record| {
                 !self.main_was_claimed
-                    || self.main_lease.is_none()
+                    || (self.main_lease.is_none() && !test_connection_observation_sidecar)
                     || record.role == ManagedSqliteLogicalFileRole::Main
                     || record.ordinal.get() > self.next_lease_ordinal
             })

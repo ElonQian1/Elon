@@ -42,6 +42,8 @@ use crate::{
 };
 
 mod lifecycle;
+#[cfg(all(test, windows))]
+mod test_registry_lifecycle;
 mod vfs;
 
 #[cfg(test)]

@@ -53,6 +53,12 @@ fn lifecycle_base(path: Path, phase: Phase) -> Case {
     case.retained.shm_file = false;
     case.retained.main_file = false;
     case.retained.main_lock_owner = false;
+    if path == Path::RegistryLifecycle {
+        // SQLite consumes its Connection even when the real xClose callback returns IOERR_CLOSE.
+        // The registry/logical route remains the fail-closed recovery boundary, not a retryable
+        // sqlite3 handle.
+        case.post.sqlite_connections = 0;
+    }
     case
 }
 

@@ -27,6 +27,11 @@ pub(in crate::node_agent_compute_plugin_host::local_authority) use file_state::{
     test_vfs_file_size, HandleBoundSqliteAbiRawSlotSnapshot, HandleBoundSqliteAbiTestFile,
     HandleBoundSqliteFileOperations,
 };
+#[cfg(all(test, windows))]
+pub(in crate::node_agent_compute_plugin_host::local_authority) use raw_state::{
+    observe_test_vfs_file_raw_close_witness, HandleBoundSqliteAbiRawCloseWitness,
+    HandleBoundSqliteAbiRawCloseWitnessSnapshot,
+};
 #[cfg(test)]
 pub(in crate::node_agent_compute_plugin_host::local_authority) use test_transport_vfs::{
     ensure_test_transport_vfs, test_transport_open_count, TEST_TRANSPORT_VFS_NAME,

@@ -22,7 +22,10 @@ use rusqlite::ffi;
 use super::*;
 use crate::{
     node_agent_compute_plugin_host::local_authority::{
-        sqlite_vfs_abi::{observe_test_vfs_file_raw_slots, test_vfs_file_size},
+        sqlite_vfs_abi::{
+            observe_test_vfs_file_raw_close_witness, observe_test_vfs_file_raw_slots,
+            test_vfs_file_size,
+        },
         sqlite_vfs_policy::registry::{
             ManagedSqliteRegistryProcessOwner, ManagedSqliteTestVfsCallback,
             ManagedSqliteTestVfsFile, ManagedSqliteTestVfsRoute,
@@ -44,6 +47,8 @@ mod a2c_barrier_runner;
 mod a2c_dms_shared_release_runner;
 #[cfg(all(test, windows))]
 mod a2c_mapping_close_runner;
+#[cfg(all(test, windows))]
+mod a2c_registry_lifecycle_runner;
 #[cfg(all(test, windows))]
 mod a2c_shm_file_close_runner;
 #[cfg(all(test, windows))]
@@ -67,6 +72,8 @@ mod multi_connection;
 mod registration_shutdown_custody;
 #[cfg(all(test, windows))]
 mod registration_shutdown_harness;
+#[cfg(all(test, windows))]
+mod registry_lifecycle_harness;
 mod route_file;
 mod shared_namespace;
 mod shm_fault_script;
@@ -83,6 +90,7 @@ use lifecycle_faults::{
     ManagedTestLifecycleFaultBinding, ManagedTestLifecycleFaultController,
     ManagedTestLifecycleFaultObservation, ManagedTestLifecycleFaultPhase,
     ManagedTestLifecycleFaultStep, ManagedTestLifecycleFaultTiming,
+    ManagedTestRegistryLifecycleControl, ManagedTestRegistryLifecycleTraceSnapshot,
 };
 #[cfg(all(test, windows))]
 use live_registration::ManagedTestVfsLiveRegistrationSnapshot;

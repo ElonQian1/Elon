@@ -9,6 +9,9 @@ use super::*;
 
 const CONNECTION_COUNT: usize = 2;
 
+#[cfg(all(test, windows))]
+mod registry_lifecycle;
+
 pub(super) struct ManagedSqliteMultiConnectionFixture {
     registration: Option<ManagedTestVfsRegistration>,
     connections: [Option<ManagedSqliteRoutedConnectionFixture>; CONNECTION_COUNT],
@@ -16,12 +19,31 @@ pub(super) struct ManagedSqliteMultiConnectionFixture {
 
 impl ManagedSqliteMultiConnectionFixture {
     pub(super) fn open(root: &Path, nonce_seed: [u8; 16]) -> anyhow::Result<Self> {
+        Self::open_with_count(root, nonce_seed, 2)
+    }
+
+    #[cfg(all(test, windows))]
+    pub(super) fn open_single(root: &Path, nonce_seed: [u8; 16]) -> anyhow::Result<Self> {
+        Self::open_with_count(root, nonce_seed, 1)
+    }
+
+    fn open_with_count(
+        root: &Path,
+        nonce_seed: [u8; 16],
+        connection_count: usize,
+    ) -> anyhow::Result<Self> {
         let registration = ManagedTestVfsRegistration::register(root, nonce_seed)?;
         let first = ManagedSqliteRoutedConnectionFixture::open_registered(&registration)?;
-        let second = ManagedSqliteRoutedConnectionFixture::open_registered(&registration)?;
+        let second = if connection_count == 2 {
+            Some(ManagedSqliteRoutedConnectionFixture::open_registered(
+                &registration,
+            )?)
+        } else {
+            None
+        };
         Ok(Self {
             registration: Some(registration),
-            connections: [Some(first), Some(second)],
+            connections: [Some(first), second],
         })
     }
 
