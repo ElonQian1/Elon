@@ -75,6 +75,7 @@ pub(super) const fn supports_native_failure(phase: ManagedTestLifecycleFaultPhas
     matches!(
         phase,
         ManagedTestLifecycleFaultPhase::BarrierCallbackCompletion
+            | ManagedTestLifecycleFaultPhase::UnmapCallbackCompletion
             | ManagedTestLifecycleFaultPhase::CallbackCompletion
             | ManagedTestLifecycleFaultPhase::RouteRetirement
             | ManagedTestLifecycleFaultPhase::LogicalRouteRemoval

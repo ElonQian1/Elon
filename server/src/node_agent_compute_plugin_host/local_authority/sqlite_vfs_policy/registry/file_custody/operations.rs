@@ -5,6 +5,8 @@
 
 use std::num::NonZeroU32;
 
+#[cfg(test)]
+use super::ManagedSqliteRegistryUnmapRuntimeEvent;
 use super::{ManagedSqliteRegistryPinnedFile, ManagedSqliteRegistryPinnedFileCustody};
 use crate::node_agent_managed_fs::{
     ManagedSqliteLockAttempt, ManagedSqliteLockFailure, ManagedSqliteObservedLock,
@@ -18,6 +20,8 @@ use super::super::{
     process_owner::{ManagedSqliteRegistryNonceSource, ManagedSqliteRegistryProcessRouteRejection},
     types::{ManagedSqliteRegistryCallbackKind, ManagedSqliteRegistryTerminalReason},
 };
+
+mod unmap;
 
 #[derive(Debug, Clone, Copy)]
 struct ManagedSqliteRegistryUnsafeShmFailureMarker {
@@ -256,7 +260,7 @@ where
                     };
                     if native_rejection {
                         callback
-                            .arm_barrier_callback_completion_native_rejection()
+                            .arm_shm_callback_completion_native_rejection()
                             .map_err(ManagedSqliteRegistryPinnedFileOperationRejection::Registry)?;
                     }
                     callback
@@ -296,27 +300,6 @@ where
                 }
                 Ok(())
             }
-        }
-    }
-
-    pub(super) fn shm_unmap(
-        &mut self,
-        mode: ManagedSqliteShmUnmapMode,
-    ) -> Result<(), ManagedSqliteRegistryPinnedFileOperationRejection> {
-        let callback = self
-            .owner
-            .begin_callback(self.route, ManagedSqliteRegistryCallbackKind::Shm)
-            .map_err(ManagedSqliteRegistryPinnedFileOperationRejection::Registry)?;
-        let result = self.unmap_shm_custody(mode);
-        if let Err(ManagedSqliteRegistryPinnedFileOperationRejection::Shm(failure)) = &result {
-            self.quarantine_unsafe_shm_failure(failure);
-        }
-        match (result, callback.complete()) {
-            (Err(rejection), _) => Err(rejection),
-            (Ok(()), Err(rejection)) => Err(
-                ManagedSqliteRegistryPinnedFileOperationRejection::Registry(rejection),
-            ),
-            (Ok(()), Ok(())) => Ok(()),
         }
     }
 
@@ -418,45 +401,6 @@ where
                 ManagedSqliteRegistryPinnedFileOperationRejection::Registry(rejection),
             ),
             (Ok(value), Ok(())) => Ok(value),
-        }
-    }
-
-    fn unmap_shm_custody(
-        &mut self,
-        mode: ManagedSqliteShmUnmapMode,
-    ) -> Result<(), ManagedSqliteRegistryPinnedFileOperationRejection> {
-        let custody = self
-            .custody
-            .take()
-            .expect("live SHM unmap must retain exact custody");
-        let ManagedSqliteRegistryPinnedFileCustody::WalMain {
-            mut file,
-            main,
-            shm,
-        } = custody
-        else {
-            self.custody = Some(custody);
-            return Err(ManagedSqliteRegistryPinnedFileOperationRejection::UnsupportedFileRole);
-        };
-        if file.shm_mut().is_none() {
-            self.custody =
-                Some(ManagedSqliteRegistryPinnedFileCustody::WalMain { file, main, shm });
-            return Err(ManagedSqliteRegistryPinnedFileOperationRejection::ShmDetached);
-        }
-        match file.unmap_shm(mode) {
-            Ok(file) => {
-                self.custody =
-                    Some(ManagedSqliteRegistryPinnedFileCustody::WalMain { file, main, shm });
-                Ok(())
-            }
-            Err(failure) => {
-                let (failure, file) = failure.into_parts();
-                self.custody =
-                    Some(ManagedSqliteRegistryPinnedFileCustody::WalMain { file, main, shm });
-                Err(ManagedSqliteRegistryPinnedFileOperationRejection::Shm(
-                    failure,
-                ))
-            }
         }
     }
 }

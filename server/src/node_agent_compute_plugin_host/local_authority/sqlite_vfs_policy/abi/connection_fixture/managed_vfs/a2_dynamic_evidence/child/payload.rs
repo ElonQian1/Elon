@@ -1,5 +1,5 @@
 use super::super::super::a2b2_cases::{
-    BarrierSelector, RegistrationShutdownSelector, RegistryLifecycleSelector,
+    BarrierSelector, RegistrationShutdownSelector, RegistryLifecycleSelector, UnmapSelector,
 };
 
 use super::SanitizedPayloadFamily;
@@ -9,6 +9,7 @@ const REPORT_VALUE_COUNT: usize = 81;
 const REGISTRATION_REPORT_VERSION: &str = "a2b2rs1";
 const BARRIER_REPORT_VERSION: &str = "a2b2br1";
 const REGISTRY_LIFECYCLE_REPORT_VERSION: &str = "a2b2rl1";
+const UNMAP_REPORT_VERSION: &str = "a2b2un1";
 
 pub(super) fn validate_actual_payload(
     payload: &str,
@@ -38,6 +39,11 @@ pub(super) fn validate_actual_payload(
             RegistryLifecycleSelector::from_report_name(selector)
                 .ok_or("A2_DYNAMIC_CHILD_ACTUAL_SELECTOR_INVALID")?;
             SanitizedPayloadFamily::RegistryLifecycle
+        }
+        UNMAP_REPORT_VERSION => {
+            UnmapSelector::from_report_name(selector)
+                .ok_or("A2_DYNAMIC_CHILD_ACTUAL_SELECTOR_INVALID")?;
+            SanitizedPayloadFamily::Unmap
         }
         _ => return Err("A2_DYNAMIC_CHILD_ACTUAL_VERSION_INVALID"),
     };

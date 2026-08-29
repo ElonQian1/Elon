@@ -29,6 +29,8 @@ use crate::{
 use std::sync::Arc;
 
 mod abi;
+#[cfg(test)]
+mod lifecycle_events;
 mod operations;
 mod promotion;
 #[cfg(all(test, windows))]
@@ -36,6 +38,8 @@ mod registry_lifecycle;
 #[cfg(test)]
 mod test_faults;
 
+#[cfg(test)]
+pub(in super::super) use lifecycle_events::ManagedSqliteRegistryUnmapRuntimeEvent;
 #[cfg(all(test, windows))]
 pub(in super::super) use registry_lifecycle::ManagedSqliteRegistryLifecycleStage;
 
@@ -66,6 +70,7 @@ pub(super) enum ManagedSqliteRegistryPinnedFileCloseRejection {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(in super::super) enum ManagedSqliteRegistryCloseLifecyclePhase {
     BarrierCallbackCompletion,
+    UnmapCallbackCompletion,
     RegistryWalMainClose,
     CallbackCompletion,
     ConnectionObservation,
@@ -79,12 +84,15 @@ pub(in super::super) trait ManagedSqliteRegistryCloseLifecycleFaults:
     fn before(&self, phase: ManagedSqliteRegistryCloseLifecyclePhase) -> Result<bool, ()>;
     fn after_success(&self, phase: ManagedSqliteRegistryCloseLifecyclePhase) -> Result<bool, ()>;
     fn native_failure(&self, phase: ManagedSqliteRegistryCloseLifecyclePhase);
-
+    fn observe_unmap_runtime_event(
+        &self,
+        event: ManagedSqliteRegistryUnmapRuntimeEvent,
+    ) -> Result<(), ()>;
+    fn unmap_runtime_observation_enabled(&self) -> Result<bool, ()>;
     fn claim_native_failure_gate(
         &self,
         phase: ManagedSqliteRegistryCloseLifecyclePhase,
     ) -> Result<bool, ()>;
-
     fn publish_retirement(
         &self,
         receipt: super::types::ManagedSqliteRegistryRetirementReceipt,

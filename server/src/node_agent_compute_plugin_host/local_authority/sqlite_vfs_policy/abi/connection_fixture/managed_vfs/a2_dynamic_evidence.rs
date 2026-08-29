@@ -19,4 +19,7 @@ pub(super) use child::{
 };
 pub(super) use cleanup::ValidatedParentCleanupReceipt;
 pub(super) use environment::WindowsDynamicEnvironment;
-pub(super) use record::{ValidatedWindowsDynamicRecord, WindowsDynamicReportView};
+pub(super) use record::{
+    UnmapCandidateReportView, ValidatedUnmapCandidateRecord, ValidatedWindowsDynamicRecord,
+    WindowsDynamicReportView,
+};

@@ -63,6 +63,19 @@ impl ManagedSqliteRegistryCloseLifecycleFaults for ManagedTestLifecycleFaultBind
             .native_failure(Some(self.route), registry_phase(phase));
     }
 
+    fn observe_unmap_runtime_event(
+        &self,
+        event: crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::registry::ManagedSqliteRegistryUnmapRuntimeEvent,
+    ) -> Result<(), ()> {
+        self.controller
+            .observe_unmap_runtime_event(self.route, event)
+    }
+
+    fn unmap_runtime_observation_enabled(&self) -> Result<bool, ()> {
+        self.controller
+            .unmap_runtime_observation_enabled(self.route)
+    }
+
     fn claim_native_failure_gate(
         &self,
         phase: ManagedSqliteRegistryCloseLifecyclePhase,
@@ -101,6 +114,9 @@ fn registry_phase(
     match phase {
         ManagedSqliteRegistryCloseLifecyclePhase::BarrierCallbackCompletion => {
             ManagedTestLifecycleFaultPhase::BarrierCallbackCompletion
+        }
+        ManagedSqliteRegistryCloseLifecyclePhase::UnmapCallbackCompletion => {
+            ManagedTestLifecycleFaultPhase::UnmapCallbackCompletion
         }
         ManagedSqliteRegistryCloseLifecyclePhase::RegistryWalMainClose => {
             ManagedTestLifecycleFaultPhase::RegistryWalMainClose

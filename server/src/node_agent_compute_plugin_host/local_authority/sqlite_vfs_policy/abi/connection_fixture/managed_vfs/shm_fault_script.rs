@@ -468,10 +468,12 @@ fn supported_shm_phase(phase: ManagedSqliteShmFailurePhase) -> bool {
             | ManagedSqliteShmFailurePhase::LockAcquire
             | ManagedSqliteShmFailurePhase::LockRelease
             | ManagedSqliteShmFailurePhase::Barrier
+            | ManagedSqliteShmFailurePhase::ConnectionDetach
             | ManagedSqliteShmFailurePhase::ViewUnmap
             | ManagedSqliteShmFailurePhase::MappingClose
             | ManagedSqliteShmFailurePhase::DmsSharedRelease
             | ManagedSqliteShmFailurePhase::FileClose
+            | ManagedSqliteShmFailurePhase::ExactSiblingDelete
     )
 }
 
@@ -483,16 +485,14 @@ fn supports_after_success_class(
     phase: ManagedSqliteShmFailurePhase,
     class: ManagedSqliteShmFailureClass,
 ) -> bool {
-    match phase {
-        ManagedSqliteShmFailurePhase::Barrier => {
-            class == ManagedSqliteShmFailureClass::OutcomeUncertainPoisoned
-        }
-        _ => matches!(
-            class,
-            ManagedSqliteShmFailureClass::MutatedButKnown
-                | ManagedSqliteShmFailureClass::OutcomeUncertainPoisoned
-        ),
+    if phase == ManagedSqliteShmFailurePhase::Barrier {
+        return class == ManagedSqliteShmFailureClass::OutcomeUncertainPoisoned;
     }
+    matches!(
+        class,
+        ManagedSqliteShmFailureClass::MutatedButKnown
+            | ManagedSqliteShmFailureClass::OutcomeUncertainPoisoned
+    )
 }
 
 fn permanently_retain_probe(probe: ManagedSqliteShmTestFaultProbe) {

@@ -52,6 +52,8 @@ mod a2c_registry_lifecycle_runner;
 #[cfg(all(test, windows))]
 mod a2c_shm_file_close_runner;
 #[cfg(all(test, windows))]
+mod a2c_unmap_runner;
+#[cfg(all(test, windows))]
 mod a2c_vfs_unregister_runner;
 #[cfg(all(test, windows))]
 mod a2c_view_unmap_runner;
@@ -79,6 +81,8 @@ mod shared_namespace;
 mod shm_fault_script;
 #[cfg(test)]
 mod tests;
+#[cfg(all(test, windows))]
+mod unmap_harness;
 
 use connection::ManagedSqliteRoutedConnectionFixture;
 use fault_script::{

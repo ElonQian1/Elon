@@ -292,13 +292,13 @@ where
     }
 
     #[cfg(test)]
-    fn arm_barrier_callback_completion_native_rejection(
+    fn arm_shm_callback_completion_native_rejection(
         &self,
         route: ManagedSqliteRegistryRouteHandle,
         lease: &ManagedSqliteRegistryCallbackLease,
     ) -> Result<(), ManagedSqliteRegistryProcessRouteRejection> {
         self.apply_route(route, |routes| {
-            routes.arm_barrier_callback_completion_native_rejection(route, lease)
+            routes.arm_shm_callback_completion_native_rejection(route, lease)
         })
     }
 
@@ -450,7 +450,7 @@ where
     NonceSource: ManagedSqliteRegistryNonceSource + 'static,
 {
     #[cfg(test)]
-    pub(super) fn arm_barrier_callback_completion_native_rejection(
+    pub(super) fn arm_shm_callback_completion_native_rejection(
         &mut self,
     ) -> Result<(), ManagedSqliteRegistryProcessRouteRejection> {
         let lease = self
@@ -458,7 +458,7 @@ where
             .as_ref()
             .expect("live routed callback lease must contain state custody");
         self.owner
-            .arm_barrier_callback_completion_native_rejection(self.route, lease)
+            .arm_shm_callback_completion_native_rejection(self.route, lease)
     }
 
     pub(super) fn complete(mut self) -> Result<(), ManagedSqliteRegistryProcessRouteRejection> {

@@ -282,7 +282,7 @@ fn barrier_native_completion_rejection_retains_exact_callback_and_keeps_sibling_
         .expect("begin exact SHM callback");
 
     callback
-        .arm_barrier_callback_completion_native_rejection()
+        .arm_shm_callback_completion_native_rejection()
         .expect("arm exact registry rejection");
     assert!(matches!(
         callback.complete_with_receipt(),

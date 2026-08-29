@@ -38,7 +38,7 @@ impl ManagedSqliteRegistrySessionState {
         Ok(self.file_lease(ordinal, role))
     }
 
-    pub(in super::super) fn arm_barrier_callback_completion_native_rejection(
+    pub(in super::super) fn arm_shm_callback_completion_native_rejection(
         &mut self,
         lease: &ManagedSqliteRegistryCallbackLease,
     ) -> Result<(), ManagedSqliteRegistryTransitionRejection> {

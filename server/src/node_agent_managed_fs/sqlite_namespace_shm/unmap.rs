@@ -67,6 +67,13 @@ impl PinnedManagedSqliteShmConnection {
 }
 
 impl PinnedManagedSqliteWalMainFile {
+    #[cfg(test)]
+    pub(crate) fn unmap_shm_connection_active_for_test(&self) -> bool {
+        self.shm
+            .as_ref()
+            .is_some_and(|connection| connection.active)
+    }
+
     pub(crate) fn unmap_shm(
         self,
         mode: ManagedSqliteShmUnmapMode,

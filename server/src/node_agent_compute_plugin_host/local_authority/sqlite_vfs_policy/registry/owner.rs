@@ -342,14 +342,14 @@ impl<Custody: ManagedSqliteRegistryCustody> ManagedSqliteRegistryOwner<Custody> 
     }
 
     #[cfg(test)]
-    pub(super) fn arm_barrier_callback_completion_native_rejection(
+    pub(super) fn arm_shm_callback_completion_native_rejection(
         &mut self,
         handle: ManagedSqliteRegistryRouteHandle,
         lease: &ManagedSqliteRegistryCallbackLease,
     ) -> Result<(), ManagedSqliteRegistryRouteRejection> {
         self.exact_entry_mut(handle)?
             .state
-            .arm_barrier_callback_completion_native_rejection(lease)
+            .arm_shm_callback_completion_native_rejection(lease)
             .map_err(ManagedSqliteRegistryRouteRejection::State)
     }
 

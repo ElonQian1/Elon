@@ -19,6 +19,10 @@ mod registry_lifecycle;
 pub(super) use registry_lifecycle::{
     ManagedTestRegistryLifecycleCloseOutcome, ManagedTestRegistryLifecycleRouteObserver,
 };
+#[cfg(all(test, windows))]
+mod unmap;
+#[cfg(all(test, windows))]
+pub(super) use unmap::ManagedTestUnmapCallbackObservation;
 
 struct ManagedVfsAuthorizerContext {
     route: Arc<TestRoute>,
@@ -343,40 +347,6 @@ impl ManagedSqliteRoutedConnectionFixture {
             return Err("managed barrier main-file pointer unavailable");
         }
         Ok(file)
-    }
-
-    #[cfg(all(test, windows))]
-    pub(super) fn call_main_shm_unmap_keep(&self) -> c_int {
-        let mut file = ptr::null_mut::<ffi::sqlite3_file>();
-        // SAFETY: the fixture owns this live connection. SQLite writes only its current main-file
-        // pointer to `file`; the pointer never leaves this sealed test-only method.
-        let code = unsafe {
-            ffi::sqlite3_file_control(
-                self.raw_handle(),
-                b"main\0".as_ptr().cast(),
-                ffi::SQLITE_FCNTL_FILE_POINTER,
-                (&mut file as *mut *mut ffi::sqlite3_file).cast(),
-            )
-        };
-        if code != ffi::SQLITE_OK || file.is_null() {
-            return if code == ffi::SQLITE_OK {
-                ffi::SQLITE_IOERR
-            } else {
-                code
-            };
-        }
-        // SAFETY: `file_control` returned SQLite's live main-file allocation. We validate both
-        // method table and callback before invoking direct Keep-mode xShmUnmap.
-        let methods = unsafe { (*file).pMethods };
-        if methods.is_null() {
-            return ffi::SQLITE_IOERR;
-        }
-        // SAFETY: `methods` belongs to the same live main file and was checked non-null.
-        let Some(unmap) = (unsafe { (*methods).xShmUnmap }) else {
-            return ffi::SQLITE_IOERR;
-        };
-        // SAFETY: direct callback receives its owning live sqlite3_file and delete=0 (Keep).
-        unsafe { unmap(file, 0) }
     }
 
     pub(super) fn close(self) -> anyhow::Result<ManagedTestVfsCounts> {

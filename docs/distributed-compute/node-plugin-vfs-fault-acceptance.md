@@ -183,11 +183,13 @@ map/lock foundation 的 targeted 通过只能证明对应局部路径，不得�
 
 ## 6. Unmap 与多 Connection
 
+49 个 exact selector、`a2b2un1` payload、真实观察链和整族原子晋级门统一由[`Unmap 动态权威`](node-plugin-vfs-unmap-dynamic-authority.md)维护；本页只维护 A2 汇总验收，不创建第二套 selector 或局部分母。
+
 至少以同一 namespace、同一 main FileId、同一 runtime generation 和两个不同 route/SHM connection 建立竞争拓扑，并证明：
 
 - non-final `xShmUnmap(delete=true|false)` 只 detach 当前 Connection；sibling 的 mapping、lock、route 与 callback 仍可用；
 - held-lock unmap 在平台 teardown 前拒绝，持锁与 custody 不发生虚假释放；
-- final Keep/Delete 按 ViewUnmap → MappingClose → DMS shared release → SHM file close → optional delete 的固定次序推进；
+- final Keep/Delete 按 ViewUnmap → MappingClose → DMS shared release → SHM file close → optional exact sibling delete → connection detach → callback completion 的固定次序推进；
 - 每个 before/native/after failure 都逐项对账已执行动作和剩余 custody，`physical_retry=0`；
 - delete 仅在 exact runtime/main identity 与 Main-EXCLUSIVE authority 成立时成功；
 - unsafe 或 outcome-uncertain SHM failure 终结整个 FileId/domain；纯 registry failure 不虚报 physical tombstone。

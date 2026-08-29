@@ -4,6 +4,7 @@ use super::super::a2b2_cases::{
     CaseKey, ValidatedBarrierObservation, ValidatedBarrierReportPayload,
     ValidatedRegistrationShutdownObservation, ValidatedRegistrationShutdownReportPayload,
     ValidatedRegistryLifecycleObservation, ValidatedRegistryLifecycleReportPayload,
+    ValidatedUnmapObservation, ValidatedUnmapReportPayload,
 };
 use super::{
     child::{
@@ -48,6 +49,15 @@ enum ValidatedDynamicPayload {
     RegistryLifecycle(ValidatedRegistryLifecycleReportPayload),
 }
 
+/// Linear implementation-candidate record. It cannot be promoted into a formal Windows dynamic
+/// report and intentionally implements neither `Clone`, serde traits nor `Display`.
+#[must_use = "a validated Unmap candidate record must be reported by the parent runner"]
+pub(in super::super) struct ValidatedUnmapCandidateRecord {
+    _case_key: CaseKey,
+    _validated_payload: ValidatedUnmapReportPayload,
+    report: RedactedUnmapCandidateReport,
+}
+
 struct RedactedWindowsDynamicReport {
     case_selector: &'static str,
     git_sha: String,
@@ -70,6 +80,20 @@ struct RedactedWindowsDynamicReport {
 /// or reusable custody.
 pub(in super::super) struct WindowsDynamicReportView<'a> {
     report: &'a RedactedWindowsDynamicReport,
+}
+
+struct RedactedUnmapCandidateReport {
+    case_selector: &'static str,
+    git_sha: String,
+    target: &'static str,
+    actual_payload_commitment: String,
+    child_exit_code: i32,
+}
+
+/// Borrowed, non-renderable projection containing only fields accepted by the implementation
+/// candidate marker. It deliberately has no conversion to `WindowsDynamicReportView`.
+pub(in super::super) struct UnmapCandidateReportView<'a> {
+    report: &'a RedactedUnmapCandidateReport,
 }
 
 impl ValidatedWindowsDynamicRecord {
@@ -122,28 +146,14 @@ impl ValidatedWindowsDynamicRecord {
         child: ValidatedChildProcessReceipt,
         cleanup: ValidatedParentCleanupReceipt,
     ) -> Result<Self, &'static str> {
+        let (environment, child) = validate_receipt_bindings(
+            observation.registration_id(),
+            observation.family(),
+            environment,
+            child,
+            cleanup,
+        )?;
         let child_fingerprint = child.fingerprint();
-        if environment.child_fingerprint != child_fingerprint
-            || cleanup.child_fingerprint != child_fingerprint
-        {
-            return Err("A2_DYNAMIC_CHILD_RECEIPT_BINDING_MISMATCH");
-        }
-        if environment.root_commitment != child.root_commitment
-            || cleanup.root_commitment != child.root_commitment
-        {
-            return Err("A2_DYNAMIC_ROOT_RECEIPT_BINDING_MISMATCH");
-        }
-        if environment.registration_commitment != child.registration_commitment
-            || cleanup.registration_commitment != child.registration_commitment
-        {
-            return Err("A2_DYNAMIC_REGISTRATION_RECEIPT_BINDING_MISMATCH");
-        }
-        if !child.matches_registration_id(observation.registration_id()) {
-            return Err("A2_DYNAMIC_REGISTRATION_ID_BINDING_MISMATCH");
-        }
-        if !child.matches_family(observation.family()) {
-            return Err("A2_DYNAMIC_PAYLOAD_FAMILY_BINDING_MISMATCH");
-        }
 
         let (case_selector, case_key, validated_payload) = observation.into_evidence_parts();
         if !validated_payload.matches_exact(&child.actual_payload)
@@ -180,6 +190,82 @@ impl ValidatedWindowsDynamicRecord {
             report: &self.report,
         }
     }
+}
+
+impl ValidatedUnmapCandidateRecord {
+    /// Consumes every witness exactly once but yields only a non-promotable candidate record.
+    pub(in super::super) fn validate(
+        observation: ValidatedUnmapObservation,
+        environment: WindowsDynamicEnvironment,
+        child: ValidatedChildProcessReceipt,
+        cleanup: ValidatedParentCleanupReceipt,
+    ) -> Result<Self, &'static str> {
+        let selector = observation.selector().report_name();
+        let registration_id = observation.registration_id();
+        let (case_key, payload) = observation.into_evidence_parts();
+        let (environment, child) = validate_receipt_bindings(
+            registration_id,
+            SanitizedPayloadFamily::Unmap,
+            environment,
+            child,
+            cleanup,
+        )?;
+        if !payload.matches_exact(&child.actual_payload)
+            || !payload.matches_commitment(&child.payload_commitment)
+        {
+            return Err("A2_DYNAMIC_ACTUAL_PAYLOAD_BINDING_MISMATCH");
+        }
+        let report = RedactedUnmapCandidateReport {
+            case_selector: selector,
+            git_sha: environment.git_sha,
+            target: environment.target,
+            actual_payload_commitment: opaque_commitment(&child.redacted_payload_fingerprint()),
+            child_exit_code: child.exit_code,
+        };
+        Ok(Self {
+            _case_key: case_key,
+            _validated_payload: payload,
+            report,
+        })
+    }
+
+    pub(in super::super) fn report(&self) -> UnmapCandidateReportView<'_> {
+        UnmapCandidateReportView {
+            report: &self.report,
+        }
+    }
+}
+
+fn validate_receipt_bindings(
+    registration_id: u64,
+    family: SanitizedPayloadFamily,
+    environment: WindowsDynamicEnvironment,
+    child: ValidatedChildProcessReceipt,
+    cleanup: ValidatedParentCleanupReceipt,
+) -> Result<(WindowsDynamicEnvironment, ValidatedChildProcessReceipt), &'static str> {
+    let child_fingerprint = child.fingerprint();
+    if environment.child_fingerprint != child_fingerprint
+        || cleanup.child_fingerprint != child_fingerprint
+    {
+        return Err("A2_DYNAMIC_CHILD_RECEIPT_BINDING_MISMATCH");
+    }
+    if environment.root_commitment != child.root_commitment
+        || cleanup.root_commitment != child.root_commitment
+    {
+        return Err("A2_DYNAMIC_ROOT_RECEIPT_BINDING_MISMATCH");
+    }
+    if environment.registration_commitment != child.registration_commitment
+        || cleanup.registration_commitment != child.registration_commitment
+    {
+        return Err("A2_DYNAMIC_REGISTRATION_RECEIPT_BINDING_MISMATCH");
+    }
+    if !child.matches_registration_id(registration_id) {
+        return Err("A2_DYNAMIC_REGISTRATION_ID_BINDING_MISMATCH");
+    }
+    if !child.matches_family(family) {
+        return Err("A2_DYNAMIC_PAYLOAD_FAMILY_BINDING_MISMATCH");
+    }
+    Ok((environment, child))
 }
 
 impl ValidatedDynamicObservation {
@@ -288,6 +374,32 @@ impl ValidatedDynamicPayload {
             Self::Barrier(payload) => payload.exact_payload(),
             Self::RegistryLifecycle(payload) => payload.exact_payload(),
         }
+    }
+}
+
+impl UnmapCandidateReportView<'_> {
+    pub(in super::super) fn case_selector(&self) -> &'static str {
+        self.report.case_selector
+    }
+
+    pub(in super::super) fn git_sha(&self) -> &str {
+        &self.report.git_sha
+    }
+
+    pub(in super::super) fn target(&self) -> &'static str {
+        self.report.target
+    }
+
+    pub(in super::super) fn child_exit_code(&self) -> i32 {
+        self.report.child_exit_code
+    }
+
+    pub(in super::super) fn parent_cleanup_deleted(&self) -> bool {
+        true
+    }
+
+    pub(in super::super) fn actual_payload_commitment(&self) -> &str {
+        &self.report.actual_payload_commitment
     }
 }
 

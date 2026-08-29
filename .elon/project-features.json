@@ -382,6 +382,60 @@
       "updated_at_ms": 1787457080433
     },
     {
+      "id": "backend-a2b2-unmap-windows-dynamic-v1",
+      "title": "A2b2 Unmap 49 项 WindowsDynamic 真实验收",
+      "summary": "在真实受管 SQLite/Windows 路径上实现 Unmap 49 个冻结 selector 的 test-only seam、观察器、canonical payload、进程隔离 runner 与父级线性证据；只有同一 exact clean commit 的 49/49 才晋级，且不开放生产入口。",
+      "status": "in_progress",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/distributed-compute/node-plugin-vfs-unmap-dynamic-authority.md",
+        "content_hash": "1f4440aa62b462ce5fc403e8b45662f67dd0a5c097c239a8e79fc3d38bb03fd3",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "88c37b3ed8135ffd6b5e794a40fdd3cf238ef73d",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "75f34c2b5704e199bc157d5379e70314f9f61c7a",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "node, security",
+      "tags": [
+        "distributed-compute",
+        "node-plugin",
+        "sqlite-vfs",
+        "windows",
+        "a2b2",
+        "unmap"
+      ],
+      "task_paths": [
+        "docs/distributed-compute/node-plugin-vfs-fault-acceptance.md",
+        "docs/distributed-compute/node-plugin-vfs-fault-authority.md",
+        "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs",
+        "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/registry",
+        "server/src/node_agent_managed_fs/sqlite_namespace_shm"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "现有 49 个 Unmap CaseKey 与 a2b2un1 selector 精确双射，payload canonical round-trip 且拒绝未知、别名、缺失、额外或非规范字段。",
+        "每个 selector 经真实 installed xShmUnmap、真实 SQLite/route/SHM/custody observers 产生 actual；仅需要故障 seam 的 selector 才安装 exact one-shot seam，成功与真实 prestate rejection 不伪造 fault；不得复制 Expected 或把旧 physical subset 当正式证据。",
+        "49 个 selector 各在独立 child/root 运行，parent 绑定 PID、nonce、commit、环境、registration、payload commitment、exit 与 cleanup receipt。",
+        "同一 exact clean Windows commit 上 Unmap 49/49、零重复/缺失/失败，49 条 build/arch/volume/filesystem/bundled-SQLite 环境完全一致，并重跑 Barrier、RegistrationShutdown、RegistryLifecycle 与相关 managed-VFS/registry wide regression。",
+        "生产 VFS/open/process owner/Runtime/Ready 保持不可达，Map/Lock 与 JointClose 计数不变；未达 49/49 时 A2b2 仍保持 32/117。"
+      ],
+      "implementation_evidence": [],
+      "claim": {
+        "claim_id": "claim_dbde9d5f8a8a4416890d6202717e469e",
+        "agent_id": "/root",
+        "claimed_at_ms": 1788000591082,
+        "expires_at_ms": 1788086991082
+      },
+      "created_at_ms": 1787995643672,
+      "updated_at_ms": 1788000591098
+    },
+    {
       "id": "backend-linux-task-receipt-boundary-v1",
       "title": "后端 Linux 任务回执边界 v1",
       "summary": "将依赖 Linux-only session core 的 HostReceipt 包装器和持久化入口限定到 Linux x86_64，恢复 Windows 正式编译。",
@@ -12213,126 +12267,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_329fda6d013446bdb282cd67d3aa8cbf",
-      "feature_id": "win-web-ai-rich-diagnostic-transport-v1",
-      "action": "transitioned",
-      "actor": "codex-desktop-root",
-      "reason": "范围明确且依赖已满足。",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1787434032933
-    },
-    {
-      "id": "feature_event_e4e7accc3f18475ebc5d4be541b25ea8",
-      "feature_id": "win-web-ai-rich-diagnostic-transport-v1",
-      "action": "claimed",
-      "actor": "codex-desktop-root",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1787434032945
-    },
-    {
-      "id": "feature_event_a92ba6fd34ff4259876d2ffcae66a2db",
-      "feature_id": "win-web-ai-rich-diagnostic-transport-v1",
-      "action": "claim_released",
-      "actor": "codex-desktop-root",
-      "reason": "轻量 Rust harness 需要独立锁文件供项目 --locked 验证使用。",
-      "from_status": "claimed",
-      "to_status": "ready",
-      "at_ms": 1787434056656
-    },
-    {
-      "id": "feature_event_90cca947dab044bca0a4a07e8313c512",
-      "feature_id": "win-web-ai-rich-diagnostic-transport-v1",
-      "action": "metadata_updated",
-      "actor": "codex-desktop-root",
-      "reason": "将轻量 harness 的可复现 Cargo.lock 纳入任务范围。",
-      "from_status": "ready",
-      "to_status": "proposed",
-      "at_ms": 1787434056675
-    },
-    {
-      "id": "feature_event_2b7ce424bb054aba9f410d0b5cf41bda",
-      "feature_id": "win-web-ai-rich-diagnostic-transport-v1",
-      "action": "transitioned",
-      "actor": "codex-desktop-root",
-      "reason": "独立锁文件保证测试依赖可复现。",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1787434056700
-    },
-    {
-      "id": "feature_event_e252ce7f6ecd4352b15f87eaaf7b53f8",
-      "feature_id": "win-web-ai-rich-diagnostic-transport-v1",
-      "action": "transitioned",
-      "actor": "codex-desktop-root",
-      "reason": "范围明确且依赖已满足。",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1787434056711
-    },
-    {
-      "id": "feature_event_7b8618602fb14c29bebf6e235832e408",
-      "feature_id": "win-web-ai-rich-diagnostic-transport-v1",
-      "action": "claimed",
-      "actor": "codex-desktop-root",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1787434056723
-    },
-    {
-      "id": "feature_event_1167c3b765b442a3855b590d7c74cff9",
-      "feature_id": "win-web-ai-rich-diagnostic-transport-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-desktop-root",
-      "reason": "",
-      "from_status": "claimed",
-      "to_status": "claimed",
-      "at_ms": 1787434303517
-    },
-    {
-      "id": "feature_event_83757c8b76584206b891cff567455670",
-      "feature_id": "win-web-ai-rich-diagnostic-transport-v1",
-      "action": "transitioned",
-      "actor": "codex-desktop-root",
-      "reason": "实现与验证已完成，补齐正式生命周期状态。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1787434344706
-    },
-    {
-      "id": "feature_event_4f3bf64448ed473e8be3173ce8a6e4e4",
-      "feature_id": "win-web-ai-rich-diagnostic-transport-v1",
-      "action": "transitioned",
-      "actor": "codex-desktop-root",
-      "reason": "固定白名单透传、计数约束和独立 Rust 回归已经实现。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1787434359360
-    },
-    {
-      "id": "feature_event_35776a5ea72d4058b971b1f6d045ff8b",
-      "feature_id": "win-web-ai-rich-diagnostic-transport-v1",
-      "action": "transitioned",
-      "actor": "codex-desktop-root",
-      "reason": "轻量 Rust 回归、生产节点 check 与完整 Win Web AI 验证均通过；全量 server 测试目标的既有构建阻塞已作为独立证据说明。",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1787434359378
-    },
-    {
-      "id": "feature_event_ca65c04466634e319989ca852ce6a40c",
-      "feature_id": "win-web-ai-rich-diagnostic-transport-v1",
-      "action": "transitioned",
-      "actor": "codex-desktop-root",
-      "reason": "正式发布 0.3.69+c3e961875517a6ad557afc3dc0ceb2aad5b7422f 已激活重连，生产 list_ai_windows 已现场回读五项富结构计数且隐私字段保持 false。",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1787434895573
-    },
-    {
       "id": "feature_event_4e3a7608149c4af990d30bea46ea04c8",
       "feature_id": "win-web-ai-rich-session-continuity-v2",
       "action": "registered",
@@ -14211,6 +14145,126 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1787564300584
+    },
+    {
+      "id": "feature_event_72a83e872aa04e85b7eff4da15a0aa6f",
+      "feature_id": "backend-a2b2-unmap-windows-dynamic-v1",
+      "action": "registered",
+      "actor": "Codex ai助手",
+      "reason": "用户已明确解除仅架构、不真实验证限制；Unmap 是 JointClose 的前置且是当前最短 A2b2 关键路径。",
+      "from_status": "",
+      "to_status": "proposed",
+      "at_ms": 1787995643672
+    },
+    {
+      "id": "feature_event_d6c4b2c076394987b08defce514ad166",
+      "feature_id": "backend-a2b2-unmap-windows-dynamic-v1",
+      "action": "transitioned",
+      "actor": "Codex ai助手",
+      "reason": "正式 current 权威已冻结 49 项 exact selector、真实观察链与整族晋级门。",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1787995680486
+    },
+    {
+      "id": "feature_event_85c23adacdec431da38cf570e748a4d3",
+      "feature_id": "backend-a2b2-unmap-windows-dynamic-v1",
+      "action": "transitioned",
+      "actor": "Codex ai助手",
+      "reason": "边界、验收标准、依赖和任务路径已明确，允许按认领实施。",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1787995680503
+    },
+    {
+      "id": "feature_event_049e3275ac3f4b71968288e6187137ad",
+      "feature_id": "backend-a2b2-unmap-windows-dynamic-v1",
+      "action": "claimed",
+      "actor": "/root",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1787995680517
+    },
+    {
+      "id": "feature_event_d28946d95a7848b5b967af4df41545aa",
+      "feature_id": "backend-a2b2-unmap-windows-dynamic-v1",
+      "action": "transitioned",
+      "actor": "Codex ai助手",
+      "reason": "开始实现 Unmap 49 的真实 Windows 动态链路。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1787995680532
+    },
+    {
+      "id": "feature_event_28489b8bba4c4e149bf8dd97329039ff",
+      "feature_id": "backend-a2b2-unmap-windows-dynamic-v1",
+      "action": "claim_released",
+      "actor": "/root",
+      "reason": "权威需求已按真实 SharedNonFinal 候选实现边界修订，先释放旧哈希认领并重新评审",
+      "from_status": "in_progress",
+      "to_status": "blocked",
+      "at_ms": 1788000590658
+    },
+    {
+      "id": "feature_event_44cac3c3f0144a74a51b1973d1f85fce",
+      "feature_id": "backend-a2b2-unmap-windows-dynamic-v1",
+      "action": "requirement_rebound",
+      "actor": "/root",
+      "reason": "有意同步 source_partial、候选收据、真实 registration/终态 route 与父侧 clean-SHA 合同",
+      "from_status": "blocked",
+      "to_status": "proposed",
+      "at_ms": 1788000591011
+    },
+    {
+      "id": "feature_event_4eea5226e4d64ce9b4ece523e4b7c8a4",
+      "feature_id": "backend-a2b2-unmap-windows-dynamic-v1",
+      "action": "metadata_updated",
+      "actor": "/root",
+      "reason": "校准 seam 适用范围并补全 49 条同环境 cohort 验收门",
+      "from_status": "proposed",
+      "to_status": "proposed",
+      "at_ms": 1788000591035
+    },
+    {
+      "id": "feature_event_26aadabdb79a425ca72bcf4ee9babb9c",
+      "feature_id": "backend-a2b2-unmap-windows-dynamic-v1",
+      "action": "transitioned",
+      "actor": "/root",
+      "reason": "修订后的权威、边界与验收条件已精确且不夸大 11 项候选",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1788000591054
+    },
+    {
+      "id": "feature_event_551439e4359c42239f33304242e7c706",
+      "feature_id": "backend-a2b2-unmap-windows-dynamic-v1",
+      "action": "transitioned",
+      "actor": "/root",
+      "reason": "无外部依赖阻塞，继续实现 49 项真实 Windows 路径",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1788000591068
+    },
+    {
+      "id": "feature_event_d3e7c908ace146618f17c0a677f6df3f",
+      "feature_id": "backend-a2b2-unmap-windows-dynamic-v1",
+      "action": "claimed",
+      "actor": "/root",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788000591082
+    },
+    {
+      "id": "feature_event_a63f80c0a4914902ae7ed16fc36e4064",
+      "feature_id": "backend-a2b2-unmap-windows-dynamic-v1",
+      "action": "transitioned",
+      "actor": "/root",
+      "reason": "继续 SharedNonFinal 真实运行与后续 FinalKeep/FinalDelete 实现",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788000591098
     }
   ]
 }

@@ -21,6 +21,8 @@ mod dynamic_registry_lifecycle;
 #[cfg(windows)]
 mod dynamic_shm_file_close;
 #[cfg(windows)]
+mod dynamic_unmap;
+#[cfg(windows)]
 mod dynamic_view_unmap;
 mod expected;
 mod invariants;
@@ -73,6 +75,15 @@ pub(super) use dynamic_registry_lifecycle::{
 #[cfg(windows)]
 pub(super) use dynamic_shm_file_close::{
     validate_shm_file_close_after_success_physical_subset, ShmFileClosePhysicalSubsetActual,
+};
+#[cfg(windows)]
+pub(super) use dynamic_unmap::{
+    validate_unmap_report_payload, UnmapActual, UnmapActualCounts, UnmapActualCustody,
+    UnmapActualIdentity, UnmapActualTarget, UnmapActualTopology, UnmapCallback, UnmapCause,
+    UnmapDmsCustody, UnmapFailureClass, UnmapLogicalRoutePhase, UnmapMode, UnmapNode, UnmapPath,
+    UnmapPhase, UnmapRegistrationPhase, UnmapRegistryRoutePhase, UnmapRole, UnmapSelector,
+    UnmapSqliteOutcome, UnmapTargetScope, UnmapTiming, UnmapTopology, ValidatedUnmapObservation,
+    ValidatedUnmapReportPayload,
 };
 #[cfg(windows)]
 pub(super) use dynamic_view_unmap::{

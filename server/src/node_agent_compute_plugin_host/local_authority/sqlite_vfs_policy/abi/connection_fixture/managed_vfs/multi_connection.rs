@@ -11,6 +11,10 @@ const CONNECTION_COUNT: usize = 2;
 
 #[cfg(all(test, windows))]
 mod registry_lifecycle;
+#[cfg(all(test, windows))]
+mod unmap;
+#[cfg(all(test, windows))]
+pub(super) use unmap::ManagedTestUnmapRouteObservation;
 
 pub(super) struct ManagedSqliteMultiConnectionFixture {
     registration: Option<ManagedTestVfsRegistration>,
