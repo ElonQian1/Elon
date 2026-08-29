@@ -16,13 +16,13 @@ use axum::{
     response::{IntoResponse, Response},
     Json,
 };
-use futures::StreamExt;
 use serde_json::{json, Value};
 use std::{path::PathBuf, sync::Arc};
 use tokio::sync::mpsc;
 
 #[path = "lm_chat_routing.rs"]
 mod lm_chat_routing;
+mod lm_chat_upstream;
 
 use crate::{
     agent_api_loop::resolve_agent,
@@ -40,6 +40,7 @@ use crate::{
     user_memory_extract::extract_and_save_memories_scoped,
 };
 use lm_chat_routing::allow_server_agent_fallback;
+use lm_chat_upstream::{forward, ForwardFailure};
 
 pub(crate) use crate::lm_chat_history::{
     list_ai_chat_conversation_messages, list_ai_chat_conversations,
@@ -885,55 +886,33 @@ async fn run_lm_chat_stream(
         return;
     }
 
-    let mut upstream = response.bytes_stream();
-    let mut buffer = String::new();
-    let mut reply = String::new();
-    let mut client_connected = true;
-    while let Some(chunk) = upstream.next().await {
-        let chunk = match chunk {
-            Ok(chunk) => chunk,
-            Err(e) => {
-                send_stream_error(&tx, format!("AI 流式响应中断：{e}")).await;
-                return;
-            }
-        };
-        buffer.push_str(&String::from_utf8_lossy(&chunk));
-        while let Some(position) = buffer.find('\n') {
-            let line = buffer[..position].trim_end_matches('\r').to_string();
-            buffer.drain(..=position);
-            let Some(data) = line.strip_prefix("data:").map(str::trim) else {
-                continue;
-            };
-            if data == "[DONE]" {
-                continue;
-            }
-            let Ok(payload) = serde_json::from_str::<Value>(data) else {
-                continue;
-            };
-            let delta = payload["choices"][0]["delta"]["content"]
-                .as_str()
-                .or_else(|| payload["choices"][0]["message"]["content"].as_str())
-                .unwrap_or("");
-            if delta.is_empty() {
-                continue;
-            }
-            reply.push_str(delta);
-            if !send_stream_event(
-                &tx,
-                json!({
-                    "type": "delta",
-                    "content": delta,
-                }),
+    let forwarded = forward(response, &tx).await;
+    let reply = forwarded.reply;
+    let client_connected = forwarded.client_connected;
+    if let Some(failure) = forwarded.failure {
+        if !reply.trim().is_empty() {
+            persist_stream_chat_turn(
+                &state,
+                &route.project_id,
+                &conversation_id,
+                &user_id,
+                &user_msg,
+                &reply,
+                &route.memory_scope_type,
+                route.memory_scope_id.as_deref(),
             )
-            .await
-            {
-                client_connected = false;
-                break;
+            .await;
+        }
+        match failure {
+            ForwardFailure::Idle => {
+                send_stream_error(&tx, "AI 流式响应长时间没有新内容，已保留已生成内容，请重试")
+                    .await;
+            }
+            ForwardFailure::Read(error) => {
+                send_stream_error(&tx, format!("AI 流式响应中断：{error}")).await;
             }
         }
-        if !client_connected {
-            break;
-        }
+        return;
     }
     if reply.trim().is_empty() {
         send_stream_error(&tx, "AI 没有返回可显示的内容").await;

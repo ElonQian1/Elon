@@ -9,7 +9,7 @@
 
 use anyhow::Result;
 use serde_json::{json, Value};
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use crate::{
     agent_prompts::tool_definitions,
@@ -275,6 +275,16 @@ async fn send_chat_completion_request(
             .header("editor-version", "vscode/1.99.0")
             .header("editor-plugin-version", "copilot-chat/0.26.0")
             .header("Copilot-Integration-Id", integration_id);
+    }
+
+    // The shared client has a finite total timeout for ordinary JSON requests.
+    // A streamed completion needs a much longer deadline: a model can spend
+    // longer than two minutes thinking or producing a long answer while the
+    // downstream SSE response is still kept alive by lm_chat_stream_support.
+    // The stream reader owns the separate idle protection for genuinely stalled
+    // upstream connections.
+    if body["stream"].as_bool() == Some(true) {
+        req = req.timeout(Duration::from_secs(60 * 60));
     }
 
     req.send().await.map_err(|e| {
