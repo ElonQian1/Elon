@@ -389,15 +389,15 @@
       "priority": "p0",
       "requirement": {
         "path": "docs/distributed-compute/node-plugin-vfs-joint-close-dynamic-authority.md",
-        "content_hash": "c442452ae39ac0b152e2d6729093d8de13883673533079f5fe73f441ebdf9cc5",
+        "content_hash": "e34971ec7908ad150af2d350d91e519e6cc2b83d89147dd0fabb1f16b57ebc09",
         "locator": "",
         "evidence_kind": "document",
         "git_identity": {
           "schema": "elon.project_context_git_identity.v1",
-          "head_commit": "1b7b87b57e974315e7565d7bebedfa9b4472dc34",
-          "head_blob_oid": "",
-          "worktree_blob_oid": "a917be2ff8cf399f1a2d6a055b41ebfa979c46a1",
-          "state": "untracked"
+          "head_commit": "0451d94e2a99f393968fc32e66ecc2fde5722171",
+          "head_blob_oid": "a917be2ff8cf399f1a2d6a055b41ebfa979c46a1",
+          "worktree_blob_oid": "ca6c8f4f7b41ac13725c2465fd254e69ea807f87",
+          "state": "tracked_modified"
         }
       },
       "knowledge_node_id": "",
@@ -430,13 +430,13 @@
       ],
       "implementation_evidence": [],
       "claim": {
-        "claim_id": "claim_12ebfe32c8a14870a8f8fd830bad5a4a",
+        "claim_id": "claim_490cb5e5cc414f3dadf87294f2717c4c",
         "agent_id": "/root",
-        "claimed_at_ms": 1788046295732,
-        "expires_at_ms": 1788053495732
+        "claimed_at_ms": 1788047569848,
+        "expires_at_ms": 1788061969848
       },
       "created_at_ms": 1788045555843,
-      "updated_at_ms": 1788046311047
+      "updated_at_ms": 1788047583504
     },
     {
       "id": "backend-a2b2-unmap-windows-dynamic-v1",
@@ -12488,126 +12488,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_55d2b203bf3745249963adbaec04cdd6",
-      "feature_id": "win-web-ai-citation-logo-resilience-v1",
-      "action": "transitioned",
-      "actor": "codex-root",
-      "reason": "Win 端已发布并激活 0.3.69+d5f2799857057e8cfe0c2b6cb08a39bc4ab3770e；真实 Google AI 历史会话显示彩色站点字母标识与来源 7 聚合入口，不再出现白色空圈；google-ai-mode phase=ready、page_ready=true、composer_ready=true、context_ready=true、citation_count=7。",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1787439860633
-    },
-    {
-      "id": "feature_event_2a04404c39354c7ba9662894d2723c2c",
-      "feature_id": "win-google-ai-source-rail-narrative-pruning-v3",
-      "action": "registered",
-      "actor": "codex-root",
-      "reason": "真实 Win 生产会话显示完整正文根内仍混入三条来源结果和 Table_content；已有来源面板已重复展示同一批 citation，需要在共享富内容解析层分层。",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1787440868272
-    },
-    {
-      "id": "feature_event_0f2670a4b4974350ac27c288b1a6aac3",
-      "feature_id": "win-google-ai-source-rail-narrative-pruning-v3",
-      "action": "claimed",
-      "actor": "codex-root",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1787440878882
-    },
-    {
-      "id": "feature_event_da01d2af6b1d43338330b75b4c09dbdf",
-      "feature_id": "win-google-ai-source-rail-narrative-pruning-v3",
-      "action": "transitioned",
-      "actor": "codex-root",
-      "reason": "已完成真实 Win 会话取证与代码查重，确认完整回答根内的来源列表在共享富内容解析层被当作正文列表序列化。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1787440890318
-    },
-    {
-      "id": "feature_event_600046fdffa04d16a3dd0c3a51f90cb1",
-      "feature_id": "win-google-ai-source-rail-narrative-pruning-v3",
-      "action": "evidence_recorded",
-      "actor": "codex-root",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1787441307268
-    },
-    {
-      "id": "feature_event_c41b27c3f06a4a0abd1cf56cc07593fc",
-      "feature_id": "win-google-ai-source-rail-narrative-pruning-v3",
-      "action": "transitioned",
-      "actor": "codex-root",
-      "reason": "共享富内容解析器已完成来源栏正文分层，定向与完整 Win 网页 AI 回归通过。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1787441318761
-    },
-    {
-      "id": "feature_event_b94760a419254c15b057d459ba520408",
-      "feature_id": "win-google-ai-source-rail-narrative-pruning-v3",
-      "action": "transitioned",
-      "actor": "codex-root",
-      "reason": "定向契约、完整 user-browser、类型检查、Lint、生产构建、Win 专项验证及源码规模门禁均通过。",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1787441330225
-    },
-    {
-      "id": "feature_event_c6ca1a5303eb49dcafee1aad5c535eae",
-      "feature_id": "win-google-ai-source-rail-narrative-pruning-v3",
-      "action": "transitioned",
-      "actor": "codex-root",
-      "reason": "真实 Win 历史回答验收发现官网来源链接包装未命中比例判定，回退继续修复，不保留错误的 verified 结论。",
-      "from_status": "verified",
-      "to_status": "ready",
-      "at_ms": 1787442194533
-    },
-    {
-      "id": "feature_event_99cf0297564f433da0cb36843640653a",
-      "feature_id": "win-google-ai-source-rail-narrative-pruning-v3",
-      "action": "claimed",
-      "actor": "codex-root",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1787442207371
-    },
-    {
-      "id": "feature_event_6e3b7a252ca04593bc000028ad0926d6",
-      "feature_id": "win-google-ai-source-rail-narrative-pruning-v3",
-      "action": "transitioned",
-      "actor": "codex-root",
-      "reason": "按真实 Google 来源栏边界信号继续修复。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1787442218508
-    },
-    {
-      "id": "feature_event_1d25662b9e0e4ddaa292e7940813ece1",
-      "feature_id": "win-google-ai-source-rail-narrative-pruning-v3",
-      "action": "evidence_recorded",
-      "actor": "codex-root",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1787442236372
-    },
-    {
-      "id": "feature_event_0a9bc5f4908c48cb9ee86afde82ee3d6",
-      "feature_id": "win-google-ai-source-rail-narrative-pruning-v3",
-      "action": "transitioned",
-      "actor": "codex-root",
-      "reason": "加入 Google 显示所有相关结果边界判定并完成第二轮代码回归，等待正式包真实界面验收。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1787442251936
-    },
-    {
       "id": "feature_event_5426be6b667a41edb6317808ba0fbc98",
       "feature_id": "win-google-ai-source-rail-narrative-pruning-v3",
       "action": "evidence_recorded",
@@ -14486,6 +14366,126 @@
       "from_status": "claimed",
       "to_status": "in_progress",
       "at_ms": 1788046311047
+    },
+    {
+      "id": "feature_event_7c2a0bf0918044a782bc1a2f96a73ea1",
+      "feature_id": "backend-a2b2-joint-close-windows-dynamic-v1",
+      "action": "claim_released",
+      "actor": "/root",
+      "reason": "Platform audit proved the frozen MainLockRelease NativeRetryable selector cannot be deterministically exercised with legal exact UnlockFileEx parameters; release before requirement and denominator correction.",
+      "from_status": "in_progress",
+      "to_status": "ready",
+      "at_ms": 1788046713306
+    },
+    {
+      "id": "feature_event_987babc1aea444eeaccb659d68f17802",
+      "feature_id": "backend-a2b2-joint-close-windows-dynamic-v1",
+      "action": "requirement_rebound",
+      "actor": "/root",
+      "reason": "Replace the unexercisable legal-parameter MainLock NativeRetryable cell with two real receipt-unavailable UnlockFileEx topologies (Shared and Reserved), preserving the 36-member denominator without invalid-parameter evidence.",
+      "from_status": "ready",
+      "to_status": "proposed",
+      "at_ms": 1788046773110
+    },
+    {
+      "id": "feature_event_a2961a25eefd46aeaf88881623d31555",
+      "feature_id": "backend-a2b2-joint-close-windows-dynamic-v1",
+      "action": "transitioned",
+      "actor": "/root",
+      "reason": "真实允许必须建立在可实现、合法、可重复验证的 JointClose 分母上；本次修正保持 36 项冻结分母，以两种合法 exact UnlockFileEx NativeUncertain 拓扑替换不可能稳定制造的 MainLock NativeRetryable，并明确禁止伪造 native 证据。",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1788046874106
+    },
+    {
+      "id": "feature_event_07e8eb85ba8e4d75a6c391d287f02a7f",
+      "feature_id": "backend-a2b2-joint-close-windows-dynamic-v1",
+      "action": "transitioned",
+      "actor": "/root",
+      "reason": "需求、冻结 36 项分母、依赖与可执行验收路径均已重新核对，真实 Windows evidence 合同可进入实现。",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1788046901915
+    },
+    {
+      "id": "feature_event_5c0c59b7691942cd8fb882158fbb410b",
+      "feature_id": "backend-a2b2-joint-close-windows-dynamic-v1",
+      "action": "claimed",
+      "actor": "/root",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788046932233
+    },
+    {
+      "id": "feature_event_0668ca35d13e406cb3614f3e34668ddb",
+      "feature_id": "backend-a2b2-joint-close-windows-dynamic-v1",
+      "action": "transitioned",
+      "actor": "/root",
+      "reason": "正式开始实现 JointClose 36 项 canonical schema、真实 Windows native seams、隔离 runner、reducer 与回归验证。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788046946573
+    },
+    {
+      "id": "feature_event_70fa10a9fa4e4228b079c1908ec14702",
+      "feature_id": "backend-a2b2-joint-close-windows-dynamic-v1",
+      "action": "claim_released",
+      "actor": "/root",
+      "reason": "Schema audit added an independent typed main-lock prestate and native offset-class requirement; release before rebinding the clarified canonical evidence contract.",
+      "from_status": "in_progress",
+      "to_status": "blocked",
+      "at_ms": 1788047496824
+    },
+    {
+      "id": "feature_event_3edb3e1aa3814f8ebaa3d415db998fd4",
+      "feature_id": "backend-a2b2-joint-close-windows-dynamic-v1",
+      "action": "requirement_rebound",
+      "actor": "/root",
+      "reason": "Clarify that SHM slot masks are not main database lock state, and require independent typed main-lock prestate/offset-class fields in a2b2jc1 before validator and real native evidence implementation.",
+      "from_status": "blocked",
+      "to_status": "proposed",
+      "at_ms": 1788047519793
+    },
+    {
+      "id": "feature_event_0b306a40a46b411a81eaf3c1f634c218",
+      "feature_id": "backend-a2b2-joint-close-windows-dynamic-v1",
+      "action": "transitioned",
+      "actor": "/root",
+      "reason": "Re-reviewed the clarified contract: static SHM masks stay unmodified, while canonical actual independently proves legal Shared/ReservedShared lock prestate and SharedRange/ReservedByte native boundary.",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1788047540029
+    },
+    {
+      "id": "feature_event_46204924ef594446a87d2fddbe54ac36",
+      "feature_id": "backend-a2b2-joint-close-windows-dynamic-v1",
+      "action": "transitioned",
+      "actor": "/root",
+      "reason": "Clarified evidence schema, legal native operations, frozen 36-member denominator, dependencies, and test-only scope are ready for implementation.",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1788047556974
+    },
+    {
+      "id": "feature_event_81c9e080b56e408fac6221dd4d92cce1",
+      "feature_id": "backend-a2b2-joint-close-windows-dynamic-v1",
+      "action": "claimed",
+      "actor": "/root",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788047569848
+    },
+    {
+      "id": "feature_event_7639e305c24540aa9d75fee80a6aaa36",
+      "feature_id": "backend-a2b2-joint-close-windows-dynamic-v1",
+      "action": "transitioned",
+      "actor": "/root",
+      "reason": "Resume implementation after formally rebinding and reviewing the independent main-lock native evidence fields.",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788047583504
     }
   ]
 }

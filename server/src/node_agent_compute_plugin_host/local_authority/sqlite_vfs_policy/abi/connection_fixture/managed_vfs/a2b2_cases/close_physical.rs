@@ -41,8 +41,17 @@ pub(super) fn cases() -> Vec<Case> {
         Phase::ConnectionDetach,
         Timing::AfterSuccessUncertain,
     ));
+    for (timing, variant) in [
+        (Timing::BeforeCall, 0),
+        (Timing::NativeUncertain, 0),
+        (Timing::NativeUncertain, 1),
+        (Timing::AfterSuccessKnown, 0),
+    ] {
+        let mut case = main_failure(Phase::MainLockRelease, timing);
+        case.variant = variant;
+        cases.push(case);
+    }
     for timing in platform_timings() {
-        cases.push(main_failure(Phase::MainLockRelease, timing));
         cases.push(main_failure(Phase::MainFileClose, timing));
     }
     cases.push(physical_success());
@@ -220,6 +229,7 @@ fn main_failure(phase: Phase, timing: Timing) -> Case {
     case.counts.callback_complete_success = 0;
     case.counts.shm_detach = 1;
     case.post.shm_connections = 0;
+    case.lock_outcome_uncertain = phase == Phase::MainLockRelease && uncertain;
     case.retained.node = false;
     case.retained.views = 0;
     case.retained.mappings = 0;
