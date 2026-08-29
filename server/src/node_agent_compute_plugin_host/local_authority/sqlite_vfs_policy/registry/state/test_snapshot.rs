@@ -19,6 +19,7 @@ pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy
     terminal_reason: ManagedSqliteRegistryTerminalReason,
     connection_owner: bool,
     main_file_lock_owner_lease: bool,
+    sidecar_leases: usize,
     shm_lease: bool,
     callbacks_in_flight: u32,
 }
@@ -28,6 +29,12 @@ impl ManagedSqliteRegistryTerminalRouteTestSnapshot {
         self,
     ) -> bool {
         self.terminal_reason == ManagedSqliteRegistryTerminalReason::FailureCustodyRetained
+    }
+
+    pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy) fn terminal_reason_is_connection_close_unproven(
+        self,
+    ) -> bool {
+        self.terminal_reason == ManagedSqliteRegistryTerminalReason::ConnectionCloseUnproven
     }
 
     pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy) fn connection_owner(
@@ -46,6 +53,12 @@ impl ManagedSqliteRegistryTerminalRouteTestSnapshot {
         self,
     ) -> bool {
         self.shm_lease
+    }
+
+    pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy) fn sidecar_lease_count(
+        self,
+    ) -> usize {
+        self.sidecar_leases
     }
 
     pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy) fn callbacks_in_flight(
@@ -104,6 +117,7 @@ impl ManagedSqliteRegistrySessionState {
             main_file_lock_owner_lease: self.main_lease.is_some_and(|lease| {
                 self.main_was_claimed && lease.role == ManagedSqliteLogicalFileRole::Main
             }),
+            sidecar_leases: self.sidecar_leases.iter().flatten().count(),
             shm_lease: self.shm_lease.is_some(),
             callbacks_in_flight: self.callbacks_in_flight,
         })

@@ -3,6 +3,7 @@ use std::fmt;
 use super::super::a2b2_cases::{
     CaseKey, ValidatedBarrierObservation, ValidatedBarrierReportPayload,
     ValidatedRegistrationShutdownObservation, ValidatedRegistrationShutdownReportPayload,
+    ValidatedRegistryLifecycleObservation, ValidatedRegistryLifecycleReportPayload,
 };
 use super::{
     child::{
@@ -33,11 +34,18 @@ enum ValidatedDynamicObservation {
         case_key: CaseKey,
         payload: ValidatedDynamicPayload,
     },
+    RegistryLifecycle {
+        selector: &'static str,
+        registration_id: u64,
+        case_key: CaseKey,
+        payload: ValidatedDynamicPayload,
+    },
 }
 
 enum ValidatedDynamicPayload {
     RegistrationShutdown(ValidatedRegistrationShutdownReportPayload),
     Barrier(ValidatedBarrierReportPayload),
+    RegistryLifecycle(ValidatedRegistryLifecycleReportPayload),
 }
 
 struct RedactedWindowsDynamicReport {
@@ -88,6 +96,20 @@ impl ValidatedWindowsDynamicRecord {
     ) -> Result<Self, &'static str> {
         Self::validate_observation(
             ValidatedDynamicObservation::barrier(observation),
+            environment,
+            child,
+            cleanup,
+        )
+    }
+
+    pub(in super::super) fn validate_registry_lifecycle(
+        observation: ValidatedRegistryLifecycleObservation,
+        environment: WindowsDynamicEnvironment,
+        child: ValidatedChildProcessReceipt,
+        cleanup: ValidatedParentCleanupReceipt,
+    ) -> Result<Self, &'static str> {
+        Self::validate_observation(
+            ValidatedDynamicObservation::registry_lifecycle(observation),
             environment,
             child,
             cleanup,
@@ -185,12 +207,27 @@ impl ValidatedDynamicObservation {
         }
     }
 
+    fn registry_lifecycle(observation: ValidatedRegistryLifecycleObservation) -> Self {
+        let selector = observation.selector().report_name();
+        let registration_id = observation.registration_id();
+        let (case_key, payload) = observation.into_evidence_parts();
+        Self::RegistryLifecycle {
+            selector,
+            registration_id,
+            case_key,
+            payload: ValidatedDynamicPayload::RegistryLifecycle(payload),
+        }
+    }
+
     fn registration_id(&self) -> u64 {
         match self {
             Self::RegistrationShutdown {
                 registration_id, ..
             }
             | Self::Barrier {
+                registration_id, ..
+            }
+            | Self::RegistryLifecycle {
                 registration_id, ..
             } => *registration_id,
         }
@@ -200,6 +237,7 @@ impl ValidatedDynamicObservation {
         match self {
             Self::RegistrationShutdown { .. } => SanitizedPayloadFamily::RegistrationShutdown,
             Self::Barrier { .. } => SanitizedPayloadFamily::Barrier,
+            Self::RegistryLifecycle { .. } => SanitizedPayloadFamily::RegistryLifecycle,
         }
     }
 
@@ -216,6 +254,12 @@ impl ValidatedDynamicObservation {
                 case_key,
                 payload,
                 ..
+            }
+            | Self::RegistryLifecycle {
+                selector,
+                case_key,
+                payload,
+                ..
             } => (selector, case_key, payload),
         }
     }
@@ -226,6 +270,7 @@ impl ValidatedDynamicPayload {
         match self {
             Self::RegistrationShutdown(payload) => payload.matches_exact(candidate),
             Self::Barrier(payload) => payload.matches_exact(candidate),
+            Self::RegistryLifecycle(payload) => payload.matches_exact(candidate),
         }
     }
 
@@ -233,6 +278,7 @@ impl ValidatedDynamicPayload {
         match self {
             Self::RegistrationShutdown(payload) => payload.matches_commitment(commitment),
             Self::Barrier(payload) => payload.matches_commitment(commitment),
+            Self::RegistryLifecycle(payload) => payload.matches_commitment(commitment),
         }
     }
 
@@ -240,6 +286,7 @@ impl ValidatedDynamicPayload {
         match self {
             Self::RegistrationShutdown(payload) => payload.exact_payload(),
             Self::Barrier(payload) => payload.exact_payload(),
+            Self::RegistryLifecycle(payload) => payload.exact_payload(),
         }
     }
 }

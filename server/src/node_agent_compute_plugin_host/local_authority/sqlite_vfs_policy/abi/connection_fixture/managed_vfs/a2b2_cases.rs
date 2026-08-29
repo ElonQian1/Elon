@@ -17,6 +17,8 @@ mod dynamic_mapping_close;
 #[cfg(windows)]
 mod dynamic_registration;
 #[cfg(windows)]
+mod dynamic_registry_lifecycle;
+#[cfg(windows)]
 mod dynamic_shm_file_close;
 #[cfg(windows)]
 mod dynamic_view_unmap;
@@ -57,6 +59,16 @@ pub(super) use dynamic_registration::{
     RegistrationShutdownRegistryRoutePhase, RegistrationShutdownSelector,
     RegistrationShutdownTiming, ValidatedRegistrationShutdownObservation,
     ValidatedRegistrationShutdownReportPayload,
+};
+#[cfg(windows)]
+pub(super) use dynamic_registry_lifecycle::{
+    validate_registry_lifecycle_report_payload, RegistryLifecycleActual,
+    RegistryLifecycleActualCounts, RegistryLifecycleActualCustody, RegistryLifecycleActualIdentity,
+    RegistryLifecycleActualTarget, RegistryLifecycleActualTopology, RegistryLifecycleDmsCustody,
+    RegistryLifecycleFailureClass, RegistryLifecycleLogicalRoutePhase, RegistryLifecyclePhase,
+    RegistryLifecycleRegistrationPhase, RegistryLifecycleRegistryRoutePhase,
+    RegistryLifecycleSelector, RegistryLifecycleSqliteOutcome, RegistryLifecycleTiming,
+    ValidatedRegistryLifecycleObservation, ValidatedRegistryLifecycleReportPayload,
 };
 #[cfg(windows)]
 pub(super) use dynamic_shm_file_close::{

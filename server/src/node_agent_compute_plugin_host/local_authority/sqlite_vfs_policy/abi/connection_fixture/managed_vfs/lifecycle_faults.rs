@@ -10,15 +10,19 @@ use std::{
 };
 
 use super::ManagedTestRouteOrdinal;
-use crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::registry::{
-    ManagedSqliteRegistryCloseLifecycleFaults, ManagedSqliteRegistryCloseLifecyclePhase,
-    ManagedSqliteRegistryRetirementReceipt,
-};
+use crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::registry::ManagedSqliteRegistryRetirementReceipt;
 use crate::node_agent_managed_fs::{
     ManagedSqliteMainCloseTestFaultPhase, ManagedSqliteMainCloseTestFaults,
 };
 
 const MAX_LIFECYCLE_FAULT_STEPS: usize = 32;
+
+mod native_gate;
+mod registry_lifecycle;
+use registry_lifecycle::ManagedTestRegistryLifecycleState;
+pub(super) use registry_lifecycle::{
+    ManagedTestRegistryLifecycleControl, ManagedTestRegistryLifecycleTraceSnapshot,
+};
 
 #[cfg(all(test, windows))]
 mod registration_shutdown;
@@ -115,6 +119,7 @@ struct ManagedTestLifecycleFaultState {
     >,
     observations: Vec<ManagedTestLifecycleFaultObservation>,
     retirements: HashMap<ManagedTestRouteOrdinal, ManagedSqliteRegistryRetirementReceipt>,
+    registry_lifecycle: ManagedTestRegistryLifecycleState,
     installed: bool,
     #[cfg(all(test, windows))]
     registration_shutdown_quarantine: ManagedTestRegistrationShutdownQuarantineState,
@@ -133,6 +138,7 @@ impl ManagedTestLifecycleFaultController {
                 occurrences: HashMap::new(),
                 observations: Vec::new(),
                 retirements: HashMap::new(),
+                registry_lifecycle: ManagedTestRegistryLifecycleState::default(),
                 installed: false,
                 #[cfg(all(test, windows))]
                 registration_shutdown_quarantine:
@@ -156,7 +162,7 @@ impl ManagedTestLifecycleFaultController {
         for (index, step) in steps.iter().copied().enumerate() {
             if (step.timing == ManagedTestLifecycleFaultTiming::NativeFailure
                 && (step.route.is_none()
-                    || step.phase != ManagedTestLifecycleFaultPhase::BarrierCallbackCompletion
+                    || !registry_lifecycle::supports_native_failure(step.phase)
                     || step.occurrence.get() != 1))
                 || steps[..index].iter().any(|prior| prior == &step)
             {
@@ -269,42 +275,6 @@ impl ManagedTestLifecycleFaultController {
         }
     }
 
-    fn claim_native_failure_gate(
-        &self,
-        route: ManagedTestRouteOrdinal,
-        phase: ManagedTestLifecycleFaultPhase,
-    ) -> Result<bool, ()> {
-        let mut state = self.state.lock().map_err(|_| {
-            self.terminal.store(true, Ordering::SeqCst);
-        })?;
-        let key = (Some(route), phase);
-        let native_step_exists = state.steps.iter().any(|(step, _)| {
-            step.timing == ManagedTestLifecycleFaultTiming::NativeFailure && step.phase == phase
-        });
-        if !native_step_exists {
-            return Ok(false);
-        }
-        let Some(occurrence) = state.occurrences.get(&key).copied() else {
-            self.terminal.store(true, Ordering::SeqCst);
-            return Err(());
-        };
-        let Some((_, consumed)) = state.steps.iter_mut().find(|(step, _)| {
-            step.route == key.0
-                && step.phase == key.1
-                && step.occurrence.get() == occurrence
-                && step.timing == ManagedTestLifecycleFaultTiming::NativeFailure
-        }) else {
-            self.terminal.store(true, Ordering::SeqCst);
-            return Err(());
-        };
-        if *consumed {
-            self.terminal.store(true, Ordering::SeqCst);
-            return Err(());
-        }
-        *consumed = true;
-        Ok(true)
-    }
-
     pub(super) fn before_registration(
         &self,
         phase: ManagedTestLifecycleFaultPhase,
@@ -317,39 +287,6 @@ impl ManagedTestLifecycleFaultController {
         phase: ManagedTestLifecycleFaultPhase,
     ) -> Result<bool, ()> {
         self.after_success(None, phase)
-    }
-
-    fn publish_retirement(
-        &self,
-        route: ManagedTestRouteOrdinal,
-        receipt: ManagedSqliteRegistryRetirementReceipt,
-    ) -> Result<(), ()> {
-        let mut state = match self.state.lock() {
-            Ok(state) => state,
-            Err(_) => {
-                self.retain_terminal(receipt);
-                return Err(());
-            }
-        };
-        if state.retirements.contains_key(&route) {
-            drop(state);
-            self.retain_terminal(receipt);
-            return Err(());
-        }
-        state.retirements.insert(route, receipt);
-        Ok(())
-    }
-
-    pub(super) fn claim_retirement(
-        &self,
-        route: ManagedTestRouteOrdinal,
-    ) -> Result<ManagedSqliteRegistryRetirementReceipt, ()> {
-        let mut state = self.state.lock().map_err(|_| {
-            self.terminal.store(true, Ordering::SeqCst);
-        })?;
-        state.retirements.remove(&route).ok_or_else(|| {
-            self.terminal.store(true, Ordering::SeqCst);
-        })
     }
 
     pub(super) fn retain_terminal<Retained: 'static>(&self, retained: Retained) {
@@ -406,44 +343,11 @@ impl ManagedTestLifecycleFaultBinding {
     }
 
     pub(super) fn claim_retirement(&self) -> Result<ManagedSqliteRegistryRetirementReceipt, ()> {
-        self.controller.claim_retirement(self.route)
+        self.controller.claim_registry_retirement(self.route)
     }
 
     pub(super) fn retain_terminal<Retained: 'static>(&self, retained: Retained) {
         self.controller.retain_terminal(retained);
-    }
-}
-
-impl ManagedSqliteRegistryCloseLifecycleFaults for ManagedTestLifecycleFaultBinding {
-    fn before(&self, phase: ManagedSqliteRegistryCloseLifecyclePhase) -> Result<bool, ()> {
-        self.before(registry_phase(phase))
-    }
-
-    fn after_success(&self, phase: ManagedSqliteRegistryCloseLifecyclePhase) -> Result<bool, ()> {
-        self.after_success(registry_phase(phase))
-    }
-
-    fn native_failure(&self, phase: ManagedSqliteRegistryCloseLifecyclePhase) {
-        self.controller
-            .native_failure(Some(self.route), registry_phase(phase));
-    }
-
-    fn claim_native_failure_gate(
-        &self,
-        phase: ManagedSqliteRegistryCloseLifecyclePhase,
-    ) -> Result<bool, ()> {
-        self.claim_native_failure_gate(registry_phase(phase))
-    }
-
-    fn publish_retirement(
-        &self,
-        receipt: ManagedSqliteRegistryRetirementReceipt,
-    ) -> Result<(), ()> {
-        self.controller.publish_retirement(self.route, receipt)
-    }
-
-    fn retain_retirement_failure(&self, receipt: ManagedSqliteRegistryRetirementReceipt) {
-        self.retain_terminal(receipt);
     }
 }
 
@@ -467,28 +371,6 @@ fn main_close_phase(phase: ManagedSqliteMainCloseTestFaultPhase) -> ManagedTestL
         ManagedSqliteMainCloseTestFaultPhase::Unlock => ManagedTestLifecycleFaultPhase::MainUnlock,
         ManagedSqliteMainCloseTestFaultPhase::FileClose => {
             ManagedTestLifecycleFaultPhase::MainFileClose
-        }
-    }
-}
-
-fn registry_phase(
-    phase: ManagedSqliteRegistryCloseLifecyclePhase,
-) -> ManagedTestLifecycleFaultPhase {
-    match phase {
-        ManagedSqliteRegistryCloseLifecyclePhase::BarrierCallbackCompletion => {
-            ManagedTestLifecycleFaultPhase::BarrierCallbackCompletion
-        }
-        ManagedSqliteRegistryCloseLifecyclePhase::RegistryWalMainClose => {
-            ManagedTestLifecycleFaultPhase::RegistryWalMainClose
-        }
-        ManagedSqliteRegistryCloseLifecyclePhase::CallbackCompletion => {
-            ManagedTestLifecycleFaultPhase::CallbackCompletion
-        }
-        ManagedSqliteRegistryCloseLifecyclePhase::ConnectionObservation => {
-            ManagedTestLifecycleFaultPhase::ConnectionObservation
-        }
-        ManagedSqliteRegistryCloseLifecyclePhase::RouteRetirement => {
-            ManagedTestLifecycleFaultPhase::RouteRetirement
         }
     }
 }
@@ -671,7 +553,7 @@ mod tests {
     }
 
     #[test]
-    fn barrier_native_failure_gate_rejects_wrong_route() {
+    fn barrier_native_failure_gate_ignores_other_route() {
         let route = ManagedTestRouteOrdinal::test_value(1);
         let sibling = ManagedTestRouteOrdinal::test_value(2);
         let controller = ManagedTestLifecycleFaultController::new();
@@ -681,11 +563,21 @@ mod tests {
             .before(ManagedTestLifecycleFaultPhase::BarrierCallbackCompletion)
             .expect("record sibling before"));
 
-        assert!(sibling_binding
+        assert!(!sibling_binding
             .claim_native_failure_gate(ManagedTestLifecycleFaultPhase::BarrierCallbackCompletion)
-            .is_err());
-        assert!(controller.is_terminal());
+            .expect("ignore another route's native gate"));
+        assert!(!controller.is_terminal());
         assert_eq!(controller.pending_count().expect("pending count"), 1);
+
+        let exact_binding = controller.binding(route);
+        assert!(!exact_binding
+            .before(ManagedTestLifecycleFaultPhase::BarrierCallbackCompletion)
+            .expect("record exact route before"));
+        assert!(exact_binding
+            .claim_native_failure_gate(ManagedTestLifecycleFaultPhase::BarrierCallbackCompletion)
+            .expect("claim exact route native gate"));
+        assert!(!controller.is_terminal());
+        assert_eq!(controller.pending_count().expect("pending count"), 0);
     }
 
     #[test]

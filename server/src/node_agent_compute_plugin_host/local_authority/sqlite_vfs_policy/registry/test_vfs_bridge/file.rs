@@ -5,6 +5,7 @@ use std::{
 
 use super::super::file_custody::{
     ManagedSqliteRegistryCloseLifecycleFaults, ManagedSqliteRegistryCloseLifecyclePhase,
+    ManagedSqliteRegistryLifecycleStage,
 };
 use super::super::process_owner::ManagedSqliteRegistryTerminalCustodyTestSnapshot;
 use super::*;
@@ -191,28 +192,153 @@ where
             return file.close();
         }
         let close_faults = close_faults.ok_or(())?;
+        close_faults.observe_registry_lifecycle_stage(
+            ManagedSqliteRegistryLifecycleStage::RawCloseEntered,
+        )?;
         owner.begin_connection_close(route).map_err(drop)?;
         let callback = file.close_with_callback_receipt()?;
-        if close_faults
-            .before(ManagedSqliteRegistryCloseLifecyclePhase::ConnectionObservation)
-            .unwrap_or(true)
-        {
-            let _ = owner.retain_terminal_custody(
-                route,
-                ManagedSqliteRegistryTerminalReason::FailureCustodyRetained,
-                callback,
-            );
-            return Err(());
-        }
-        let observed = match owner.observe_connection_closed_after_callback(route, callback) {
-            Ok(observed) => observed,
-            Err(_rejection) => {
-                close_faults.native_failure(
-                    ManagedSqliteRegistryCloseLifecyclePhase::ConnectionObservation,
+        let outstanding_sidecar = match close_faults.take_connection_observation_sidecar() {
+            Ok(Some(file)) => {
+                let lease = match owner.claim_connection_observation_sidecar(
+                    route,
+                    ManagedSqliteLogicalFileRole::Journal,
+                ) {
+                    Ok(lease) => lease,
+                    Err(_) => {
+                        let _ = owner.retain_terminal_custody(
+                            route,
+                            ManagedSqliteRegistryTerminalReason::FailureCustodyRetained,
+                            (callback, file),
+                        );
+                        return Err(());
+                    }
+                };
+                let sidecar = match ManagedSqliteRegistryPinnedFile::bind_sidecar(
+                    owner, route, file, lease,
+                ) {
+                    Ok(sidecar) => sidecar,
+                    Err(_) => {
+                        let _ = owner.retain_terminal_custody(
+                            route,
+                            ManagedSqliteRegistryTerminalReason::FailureCustodyRetained,
+                            callback,
+                        );
+                        return Err(());
+                    }
+                };
+                if close_faults
+                    .observe_registry_lifecycle_stage(
+                        ManagedSqliteRegistryLifecycleStage::OutstandingSidecarRetained,
+                    )
+                    .is_err()
+                {
+                    let _ = owner.retain_terminal_custody(
+                        route,
+                        ManagedSqliteRegistryTerminalReason::FailureCustodyRetained,
+                        (callback, sidecar),
+                    );
+                    return Err(());
+                }
+                Some(sidecar)
+            }
+            Ok(None) => None,
+            Err(()) => {
+                let _ = owner.retain_terminal_custody(
+                    route,
+                    ManagedSqliteRegistryTerminalReason::FailureCustodyRetained,
+                    callback,
                 );
                 return Err(());
             }
         };
+        if close_faults
+            .before(ManagedSqliteRegistryCloseLifecyclePhase::ConnectionObservation)
+            .unwrap_or(true)
+        {
+            match outstanding_sidecar {
+                Some(sidecar) => {
+                    let _ = owner.retain_terminal_custody(
+                        route,
+                        ManagedSqliteRegistryTerminalReason::FailureCustodyRetained,
+                        (callback, sidecar),
+                    );
+                }
+                None => {
+                    let _ = owner.retain_terminal_custody(
+                        route,
+                        ManagedSqliteRegistryTerminalReason::FailureCustodyRetained,
+                        callback,
+                    );
+                }
+            }
+            return Err(());
+        }
+        if close_faults
+            .observe_registry_lifecycle_stage(
+                ManagedSqliteRegistryLifecycleStage::ConnectionObservationAttempt,
+            )
+            .is_err()
+        {
+            match outstanding_sidecar {
+                Some(sidecar) => {
+                    let _ = owner.retain_terminal_custody(
+                        route,
+                        ManagedSqliteRegistryTerminalReason::FailureCustodyRetained,
+                        (callback, sidecar),
+                    );
+                }
+                None => {
+                    let _ = owner.retain_terminal_custody(
+                        route,
+                        ManagedSqliteRegistryTerminalReason::FailureCustodyRetained,
+                        callback,
+                    );
+                }
+            }
+            return Err(());
+        }
+        let observed = match outstanding_sidecar {
+            Some(sidecar) => match owner
+                .observe_connection_closed_after_callback_with_sidecar(route, callback, sidecar)
+            {
+                Ok((observed, sidecar)) => {
+                    let _ = owner.retain_terminal_custody(
+                        route,
+                        ManagedSqliteRegistryTerminalReason::StateInvariantViolated,
+                        (observed, sidecar),
+                    );
+                    return Err(());
+                }
+                Err(_rejection) => {
+                    close_faults.native_failure(
+                        ManagedSqliteRegistryCloseLifecyclePhase::ConnectionObservation,
+                    );
+                    return Err(());
+                }
+            },
+            None => match owner.observe_connection_closed_after_callback(route, callback) {
+                Ok(observed) => observed,
+                Err(_rejection) => {
+                    close_faults.native_failure(
+                        ManagedSqliteRegistryCloseLifecyclePhase::ConnectionObservation,
+                    );
+                    return Err(());
+                }
+            },
+        };
+        if close_faults
+            .observe_registry_lifecycle_stage(
+                ManagedSqliteRegistryLifecycleStage::ConnectionObservationSucceeded,
+            )
+            .is_err()
+        {
+            let _ = owner.retain_terminal_custody(
+                route,
+                ManagedSqliteRegistryTerminalReason::FailureCustodyRetained,
+                observed,
+            );
+            return Err(());
+        }
         if close_faults
             .after_success(ManagedSqliteRegistryCloseLifecyclePhase::ConnectionObservation)
             .unwrap_or(true)
@@ -235,6 +361,44 @@ where
             );
             return Err(());
         }
+        if close_faults
+            .observe_registry_lifecycle_stage(
+                ManagedSqliteRegistryLifecycleStage::RouteRetirementAttempt,
+            )
+            .is_err()
+        {
+            let _ = owner.retain_terminal_custody(
+                route,
+                ManagedSqliteRegistryTerminalReason::FailureCustodyRetained,
+                observed,
+            );
+            return Err(());
+        }
+        let reject_retirement = match close_faults
+            .claim_native_failure_gate(ManagedSqliteRegistryCloseLifecyclePhase::RouteRetirement)
+        {
+            Ok(reject) => reject,
+            Err(()) => {
+                let _ = owner.retain_terminal_custody(
+                    route,
+                    ManagedSqliteRegistryTerminalReason::FailureCustodyRetained,
+                    observed,
+                );
+                return Err(());
+            }
+        };
+        if reject_retirement
+            && owner
+                .arm_route_retirement_native_rejection(route, &observed)
+                .is_err()
+        {
+            let _ = owner.retain_terminal_custody(
+                route,
+                ManagedSqliteRegistryTerminalReason::FailureCustodyRetained,
+                observed,
+            );
+            return Err(());
+        }
         let retirement = match owner.retire_closed_after_observation(route, observed) {
             Ok(retirement) => retirement,
             Err(_rejection) => {
@@ -243,6 +407,15 @@ where
                 return Err(());
             }
         };
+        if close_faults
+            .observe_registry_lifecycle_stage(
+                ManagedSqliteRegistryLifecycleStage::RouteRetirementSucceeded,
+            )
+            .is_err()
+        {
+            close_faults.retain_retirement_failure(retirement);
+            return Err(());
+        }
         if close_faults
             .after_success(ManagedSqliteRegistryCloseLifecyclePhase::RouteRetirement)
             .unwrap_or(true)

@@ -48,6 +48,16 @@ fn child_report_rejects_duplicate_or_unsafe_actual_fields() {
         Err("A2_DYNAMIC_CHILD_ACTUAL_SELECTOR_INVALID")
     );
     assert!(validate_payload_for_test(&payload("a2b2br1", "fence-before", 7)).is_ok());
+    assert!(validate_payload_for_test(&payload(
+        "a2b2rl1",
+        "registry-route-removal-publish-native",
+        7,
+    ))
+    .is_ok());
+    assert_eq!(
+        validate_payload_for_test(&payload("a2b2rl1", "success", 7)),
+        Err("A2_DYNAMIC_CHILD_ACTUAL_SELECTOR_INVALID")
+    );
     let mut noncanonical = vec!["0".to_owned(); 81];
     noncanonical[0] = "00".to_owned();
     assert_eq!(

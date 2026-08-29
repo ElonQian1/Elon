@@ -29,6 +29,7 @@ pub(in crate::node_agent_compute_plugin_host::local_authority) use process_owner
 #[cfg(all(test, windows))]
 pub(super) use file_custody::{
     ManagedSqliteRegistryCloseLifecycleFaults, ManagedSqliteRegistryCloseLifecyclePhase,
+    ManagedSqliteRegistryLifecycleStage,
 };
 #[cfg(test)]
 pub(super) use owner::ManagedSqliteRegistryRouteHandle;

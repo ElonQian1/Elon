@@ -103,6 +103,42 @@ impl<Custody: ManagedSqliteRegistryCustody> ManagedSqliteRegistryOwner<Custody> 
             .map_err(ManagedSqliteRegistryRouteRejection::State)
     }
 
+    #[cfg(all(test, windows))]
+    pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::registry) fn claim_connection_observation_sidecar(
+        &mut self,
+        handle: ManagedSqliteRegistryRouteHandle,
+        role: ManagedSqliteLogicalFileRole,
+    ) -> Result<ManagedSqliteRegistryFileLease, ManagedSqliteRegistryRouteRejection> {
+        self.exact_entry_mut(handle)?
+            .state
+            .claim_connection_observation_sidecar(role)
+            .map_err(ManagedSqliteRegistryRouteRejection::State)
+    }
+
+    #[cfg(all(test, windows))]
+    pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::registry) fn arm_close_callback_completion_native_rejection(
+        &mut self,
+        handle: ManagedSqliteRegistryRouteHandle,
+        lease: &ManagedSqliteRegistryCallbackLease,
+    ) -> Result<(), ManagedSqliteRegistryRouteRejection> {
+        self.exact_entry_mut(handle)?
+            .state
+            .arm_close_callback_completion_native_rejection(lease)
+            .map_err(ManagedSqliteRegistryRouteRejection::State)
+    }
+
+    #[cfg(all(test, windows))]
+    pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::registry) fn arm_route_retirement_native_rejection(
+        &mut self,
+        handle: ManagedSqliteRegistryRouteHandle,
+        receipt: &ManagedSqliteRegistryConnectionClosedReceipt,
+    ) -> Result<(), ManagedSqliteRegistryRouteRejection> {
+        self.exact_entry_mut(handle)?
+            .state
+            .arm_route_retirement_native_rejection(receipt)
+            .map_err(ManagedSqliteRegistryRouteRejection::State)
+    }
+
     pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::registry) fn retire_closed(
         &mut self,
         handle: ManagedSqliteRegistryRouteHandle,

@@ -11,6 +11,12 @@ use crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::{
 };
 
 pub(super) unsafe extern "C" fn close(file: *mut ffi::sqlite3_file) -> c_int {
+    #[cfg(all(test, windows))]
+    // SAFETY: this is the real xClose entry and SQLite grants it exclusive access to the exact
+    // live allocation. Witness failure is observational and cannot change close behavior.
+    unsafe {
+        super::raw_state::record_test_raw_close_entry(file);
+    }
     // SAFETY: xClose has exclusive consuming access to this SQLite file allocation.
     unsafe { file_state::close(file, result_codes::CLOSE_UNAVAILABLE) }
 }

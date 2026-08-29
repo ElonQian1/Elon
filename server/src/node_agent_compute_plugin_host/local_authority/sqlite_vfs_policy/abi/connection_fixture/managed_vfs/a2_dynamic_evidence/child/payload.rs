@@ -1,4 +1,6 @@
-use super::super::super::a2b2_cases::{BarrierSelector, RegistrationShutdownSelector};
+use super::super::super::a2b2_cases::{
+    BarrierSelector, RegistrationShutdownSelector, RegistryLifecycleSelector,
+};
 
 use super::SanitizedPayloadFamily;
 
@@ -6,6 +8,7 @@ const MAX_ACTUAL_PAYLOAD_BYTES: usize = 1_024;
 const REPORT_VALUE_COUNT: usize = 81;
 const REGISTRATION_REPORT_VERSION: &str = "a2b2rs1";
 const BARRIER_REPORT_VERSION: &str = "a2b2br1";
+const REGISTRY_LIFECYCLE_REPORT_VERSION: &str = "a2b2rl1";
 
 pub(super) fn validate_actual_payload(
     payload: &str,
@@ -30,6 +33,11 @@ pub(super) fn validate_actual_payload(
             BarrierSelector::from_report_name(selector)
                 .ok_or("A2_DYNAMIC_CHILD_ACTUAL_SELECTOR_INVALID")?;
             SanitizedPayloadFamily::Barrier
+        }
+        REGISTRY_LIFECYCLE_REPORT_VERSION => {
+            RegistryLifecycleSelector::from_report_name(selector)
+                .ok_or("A2_DYNAMIC_CHILD_ACTUAL_SELECTOR_INVALID")?;
+            SanitizedPayloadFamily::RegistryLifecycle
         }
         _ => return Err("A2_DYNAMIC_CHILD_ACTUAL_VERSION_INVALID"),
     };

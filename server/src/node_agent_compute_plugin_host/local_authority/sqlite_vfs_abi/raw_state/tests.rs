@@ -116,3 +116,20 @@ fn type_erased_abandonment_runs_payload_drop_without_typed_access() {
     assert!(!unsafe { abandon_installed_state(file) }.expect("observe uninstalled state"));
     assert_eq!(drops.load(Ordering::SeqCst), 1);
 }
+
+#[cfg(windows)]
+#[test]
+fn raw_state_abandon_witness_survives_allocation_release() {
+    let (storage, file) = fresh_file();
+    let drops = Arc::new(AtomicUsize::new(0));
+    // SAFETY: fresh_file initialized the allocation and this test serializes all access.
+    unsafe { install_state(file, DropProbe(Arc::clone(&drops))) }.expect("install drop probe");
+    // SAFETY: the installed allocation is live and this test serializes observation/abandonment.
+    let witness = unsafe { observe_test_vfs_file_raw_close_witness(file) }
+        .expect("installed raw close witness");
+    // SAFETY: no borrow overlaps this exact type-erased abandonment.
+    assert!(unsafe { abandon_installed_state(file) }.expect("abandon installed state"));
+    drop(storage);
+    assert_eq!(witness.snapshot().state_abandons, 1);
+    assert_eq!(witness.snapshot().state_abandon_order, 1);
+}
