@@ -21,6 +21,7 @@ import {
   localAiStreamingTarget,
 } from './localAiStreamingPresentation'
 import { localAiPrivateStreamState } from './localAiPrivateStreamSignal'
+import useLocalAiProviderSessionPrewarm from './useLocalAiProviderSessionPrewarm'
 
 const PROVIDER_STORAGE_KEY = 'elon.pc.aiChatProvider'
 
@@ -154,6 +155,13 @@ export default function useAiWebChatBackend(mode: AiHomeMode, ownerKey: string) 
   }, [controller.visibleMessages, provider?.id, streamingTarget])
   const ready = capability.state === 'ready' && Boolean(ownerKey && provider)
   const providerActivities = useLocalAiProviderActivity({
+    enabled: mode === 'chat' && ready,
+    providers,
+    selectedProviderId: provider?.id,
+    ownerKey,
+    selectedState: controller.sessionState,
+  })
+  useLocalAiProviderSessionPrewarm({
     enabled: mode === 'chat' && ready,
     providers,
     selectedProviderId: provider?.id,

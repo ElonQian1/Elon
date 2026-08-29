@@ -66,6 +66,7 @@ interface CapabilityDefinition {
   requestMode: string
   fallback: string
   requiredActions?: LocalAiAdapterAction[]
+  androidParityIds?: readonly string[]
 }
 
 const SHARED_CONTINUITY: CapabilityDefinition = {
@@ -73,6 +74,7 @@ const SHARED_CONTINUITY: CapabilityDefinition = {
   label: '后台导航与宿主恢复连续性',
   requestMode: 'preserve_inflight_navigation_and_resume_adapter_snapshot',
   fallback: 'official_webview_bounded_recovery',
+  androidParityIds: ['android_web_ai_background_navigation_continuity_v1'],
 }
 
 const SHARED_REFRESH_SINGLE_FLIGHT: CapabilityDefinition = {
@@ -89,6 +91,15 @@ const SHARED_SEND_COORDINATOR: CapabilityDefinition = {
   requestMode: 'stable_request_id_single_owner_generation_gated_official_page_transport',
   fallback: 'official_page_reconciliation_without_automatic_write_replay',
   requiredActions: ['send_prompt'],
+  androidParityIds: ['android_web_ai_unified_send_coordinator_v1'],
+}
+
+const SHARED_PROVIDER_SESSION_PREWARM: CapabilityDefinition = {
+  id: 'win_web_ai_provider_session_prewarm_v1',
+  label: '厂商会话后台预热与切换复用',
+  requestMode: 'delayed_single_flight_hidden_webview_warmup',
+  fallback: 'selected_provider_foreground_resume',
+  requiredActions: ['snapshot'],
 }
 
 const SHARED_CONVERSATION_BODY_CACHE: CapabilityDefinition = {
@@ -114,6 +125,7 @@ const CATALOG: Record<string, CapabilityDefinition[]> = {
       requestMode: 'passive_official_response_observer',
       fallback: 'official_dom_directory',
       requiredActions: ['list_conversations', 'open_conversation'],
+      androidParityIds: ['android_chatgpt_private_conversation_project_directory_v1'],
     },
     {
       id: 'win_chatgpt_private_conversation_prefetch_v1',
@@ -121,6 +133,7 @@ const CATALOG: Record<string, CapabilityDefinition[]> = {
       requestMode: 'authenticated_same_origin_get',
       fallback: 'official_webview_navigation',
       requiredActions: ['open_conversation'],
+      androidParityIds: ['android_chatgpt_private_conversation_prefetch_v1'],
     },
     {
       id: 'win_chatgpt_guest_private_conversation_refresh_v1',
@@ -135,6 +148,7 @@ const CATALOG: Record<string, CapabilityDefinition[]> = {
       requestMode: 'passive_official_request_observer',
       fallback: 'official_dom_send_confirmation',
       requiredActions: ['send_prompt'],
+      androidParityIds: ['android_chatgpt_private_send_dispatch_observer_v1'],
     },
     {
       id: 'win_chatgpt_private_stream_observer_v1',
@@ -142,6 +156,10 @@ const CATALOG: Record<string, CapabilityDefinition[]> = {
       requestMode: 'passive_official_response_clone',
       fallback: 'official_dom_stream_snapshot',
       requiredActions: ['snapshot', 'stop_generation'],
+      androidParityIds: [
+        'android_chatgpt_private_stream_observer_v1',
+        'android_chatgpt_private_stream_completion_settlement_v1',
+      ],
     },
     {
       id: 'win_chatgpt_private_stream_send_binding_v1',
@@ -170,12 +188,22 @@ const CATALOG: Record<string, CapabilityDefinition[]> = {
       requestMode: 'serial_authenticated_same_origin_get_then_snapshot',
       fallback: 'official_dom_snapshot',
       requiredActions: ['invoke_ui_control'],
+      androidParityIds: ['android_chatgpt_realtime_voice_private_transcript_refresh_v1'],
+    },
+    {
+      id: 'win_chatgpt_realtime_voice_background_surface_v1',
+      label: '后台官网语音与原生控制面连续性',
+      requestMode: 'official_webrtc_background_webview_and_native_control_surface',
+      fallback: 'official_webview_realtime_voice',
+      requiredActions: ['invoke_ui_control'],
+      androidParityIds: ['android_chatgpt_realtime_voice_background_overlay_v1'],
     },
     SHARED_CONTINUITY,
     SHARED_REFRESH_SINGLE_FLIGHT,
     SHARED_SEND_COORDINATOR,
     SHARED_CONVERSATION_BODY_CACHE,
     SHARED_NATIVE_STREAM_REFRESH,
+    SHARED_PROVIDER_SESSION_PREWARM,
   ],
   'google-ai-mode': [
     {
@@ -184,6 +212,7 @@ const CATALOG: Record<string, CapabilityDefinition[]> = {
       requestMode: 'passive_official_response_observer',
       fallback: 'local_directory_cache_and_official_page',
       requiredActions: ['list_conversations', 'open_conversation'],
+      androidParityIds: ['android_google_web_private_conversation_directory_v1'],
     },
     {
       id: 'win_google_conversation_snapshot_cache_v1',
@@ -191,6 +220,7 @@ const CATALOG: Record<string, CapabilityDefinition[]> = {
       requestMode: 'passive_official_snapshot_cache',
       fallback: 'official_webview_navigation',
       requiredActions: ['open_conversation'],
+      androidParityIds: ['android_google_web_conversation_snapshot_cache_v1'],
     },
     {
       id: 'win_google_private_reply_observer_v1',
@@ -198,13 +228,35 @@ const CATALOG: Record<string, CapabilityDefinition[]> = {
       requestMode: 'passive_completion_signal',
       fallback: 'official_dom_reply_snapshot',
       requiredActions: ['snapshot', 'send_prompt'],
+      androidParityIds: ['android_google_web_private_reply_observer_v1'],
     },
     SHARED_CONTINUITY,
     SHARED_REFRESH_SINGLE_FLIGHT,
     SHARED_SEND_COORDINATOR,
     SHARED_CONVERSATION_BODY_CACHE,
     SHARED_NATIVE_STREAM_REFRESH,
+    SHARED_PROVIDER_SESSION_PREWARM,
   ],
+}
+
+export interface LocalAiAndroidProductionParity {
+  androidId: string
+  winId: string
+}
+
+/**
+ * Executable APK -> Win production parity contract. Android-only presentation
+ * concepts (for example an overlay) map to the equivalent desktop surface,
+ * never to copied mobile UI code.
+ */
+export function localAiAndroidProductionParity(): LocalAiAndroidProductionParity[] {
+  const pairs = Object.values(CATALOG).flatMap((definitions) => definitions.flatMap(
+    (definition) => (definition.androidParityIds ?? []).map((androidId) => ({
+      androidId,
+      winId: definition.id,
+    })),
+  ))
+  return [...new Map(pairs.map((pair) => [pair.androidId, pair])).values()]
 }
 
 export function localAiPrivateTransportCapabilities(
