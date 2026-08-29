@@ -70,14 +70,10 @@ export default function LocalModeBanner() {
   }, [localMode])
 
   if (!localMode) {
-    if (cloudState !== 'offline') return null
-    return (
-      <div className={[styles.nodeBanner, styles.localModeOffline].join(' ')}>
-        <WifiOff className={styles.nodeBannerIcon} aria-hidden="true" size={14} />
-        <span>云端连接暂时不可达 · 正在自动重试，当前页面保留已加载内容。</span>
-        <a href={localNodeUrl('/pc/local-tasks')}>打开本机任务</a>
-      </div>
-    )
+    // Cloud-mode requests own their recovery UI. Do not put a global offline
+    // banner above the workbench for a transient probe failure; it shifts the
+    // layout and makes a recoverable stream look like a hard disconnect.
+    return null
   }
 
   const nodeConnected = localStatus?.connected !== false

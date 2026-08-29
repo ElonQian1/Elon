@@ -120,12 +120,14 @@ function shouldRetryRemoteNodeExec(result: { output?: string; error?: string; ex
   )
 }
 
-const STREAM_RETRY_DELAYS_MS = [1000, 2500, 5000, 10000]
+const STREAM_RETRY_DELAYS_MS = [1000, 2000, 4000, 8000, 15000, 30000, 45000, 60000]
 
 function isRecoverableStreamError(error: unknown) {
   const candidate = error as { status?: number; message?: string }
   const message = candidate?.message ?? ''
-  if (candidate?.status !== 0 && (candidate?.status ?? 0) < 500) return false
+  const status = candidate?.status
+  if (status === 0) return true
+  if (status !== undefined && ![502, 503, 504].includes(status)) return false
   return /(连接|网络|中断|回答完成前|fetch|load failed|timeout|超时)/i.test(message)
 }
 
@@ -156,7 +158,6 @@ export default function AiChatPage({ mode, onModeChange }: { mode: AiHomeMode; o
   const [input, setInput] = useState(() => pendingAiDraftRef.current?.input ?? '')
   const [sending, setSending] = useState(false)
   const [streamStatus, setStreamStatus] = useState('')
-  const [streamRecovering, setStreamRecovering] = useState(false)
   const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null)
   const [handoffSending, setHandoffSending] = useState(false)
   const [error, setError] = useState('')
@@ -812,8 +813,10 @@ export default function AiChatPage({ mode, onModeChange }: { mode: AiHomeMode; o
             }
             const delayMs = STREAM_RETRY_DELAYS_MS[retryAttempt]
             retryAttempt += 1
-            setStreamRecovering(true)
-            setStreamStatus('连接中断，' + (delayMs / 1000) + ' 秒后自动恢复（第 ' + retryAttempt + ' 次）…')
+            // Keep transient transport recovery invisible to the user. The
+            // server-side task continues generating while the next request
+            // replays its journal into the same assistant bubble.
+            setStreamStatus('正在生成回答…')
             await waitForStreamRetry(delayMs)
             // The task replays its journal on reconnect. Rebuild the visible
             // assistant from that replay instead of appending duplicate deltas.
@@ -824,7 +827,6 @@ export default function AiChatPage({ mode, onModeChange }: { mode: AiHomeMode; o
             }
           }
         }
-        setStreamRecovering(false)
         loadConversations()
       }
     } catch (err) {
@@ -833,7 +835,6 @@ export default function AiChatPage({ mode, onModeChange }: { mode: AiHomeMode; o
       restoreComposerAfterError(previousInput, err)
     } finally {
       setSending(false)
-      setStreamRecovering(false)
       setStreamingMessageId(null)
       setStreamStatus('')
     }
@@ -997,10 +998,9 @@ export default function AiChatPage({ mode, onModeChange }: { mode: AiHomeMode; o
                   || Boolean(web.controller.busyAction && web.controller.busyAction !== 'new_conversation'))
                 : visibleSending || !visibleInput.trim()}
             >
-              {visibleSending ? (streamRecovering ? '恢复中…' : '…') : chatMode && web.controller.snapshot?.streaming ? '停止' : '发送'}
+              {visibleSending ? '…' : chatMode && web.controller.snapshot?.streaming ? '停止' : '发送'}
             </button>
         </form>
-        {streamRecovering && <p className={styles.streamRecovery} role="status">{streamStatus || '连接中断，正在自动恢复…'}</p>}
         {error && <p className={styles.sendError}>{error}</p>}<AiBrowserExperience />
       </div>
 

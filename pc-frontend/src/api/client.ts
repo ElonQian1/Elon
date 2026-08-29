@@ -51,7 +51,7 @@ function normalizeTransportError(error: unknown): ApiError {
   }
   return {
     status: 0,
-    message: '云端连接中断，消息已保留；请检查网络后重试。',
+    message: '回答暂时未完成，已保留已生成内容；请稍后继续。',
   }
 }
 
@@ -159,7 +159,7 @@ export async function streamPost(
       if (!terminalEventSeen) {
         throw {
           status: 0,
-          message: '云端连接在回答完成前中断，消息已保留；请检查网络后重试。',
+          message: '回答暂时未完成，已保留已生成内容；请稍后继续。',
         } satisfies ApiError
       }
     } finally {
