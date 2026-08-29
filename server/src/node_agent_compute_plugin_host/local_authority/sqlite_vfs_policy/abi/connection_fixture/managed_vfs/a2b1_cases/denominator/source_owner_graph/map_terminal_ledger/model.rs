@@ -192,6 +192,7 @@ pub(super) enum MapSourceStepId {
     RawStateTypeMismatch,
     RawStateCaughtPanic,
     RawAbandonUnwindFence,
+    RawAbandonStateWitnessRecorded,
     FileStateInnerMissing,
     RawAbandonEmpty,
     RawAbandonInstalled,

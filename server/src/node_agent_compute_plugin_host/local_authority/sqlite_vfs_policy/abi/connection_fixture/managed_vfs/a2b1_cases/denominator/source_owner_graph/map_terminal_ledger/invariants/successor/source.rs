@@ -20,6 +20,11 @@ pub(super) fn validate(steps: &[MapSourceStep]) -> Result<(), &'static str> {
     require_kind(steps, MapSourceStepId::RawAbandonUnwindFence, |kind| {
         matches!(kind, MapStepKind::StructuralJoin)
     })?;
+    require_kind(
+        steps,
+        MapSourceStepId::RawAbandonStateWitnessRecorded,
+        |kind| matches!(kind, MapStepKind::StructuralJoin),
+    )?;
     require_kind(steps, MapSourceStepId::RawFallbackProjection, |kind| {
         matches!(kind, MapStepKind::StructuralJoin)
     })?;
@@ -165,6 +170,15 @@ fn validate_source_shapes(steps: &[MapSourceStep]) -> Result<(), &'static str> {
             SourceEffect::None,
         ),
         (
+            MapSourceStepId::RawAbandonStateWitnessRecorded,
+            MapSiteId::RawAbandon,
+            SourceOwnerId::AbiRawCloseWitness,
+            "fn record_state_abandon",
+            "self.record(",
+            1,
+            SourceEffect::None,
+        ),
+        (
             MapSourceStepId::RawAbandonEmpty,
             MapSiteId::RawAbandon,
             SourceOwnerId::AbiRawState,
@@ -254,6 +268,17 @@ fn validate_call_contexts(steps: &[MapSourceStep]) -> Result<(), &'static str> {
             return Err("Map raw primary source step gained an unreviewed caller context");
         }
     }
+
+    require_contexts(
+        steps,
+        &[MapSourceStepId::RawAbandonStateWitnessRecorded],
+        source_anchor(
+            SourceOwnerId::AbiRawState,
+            "unsafe fn abandon_installed_state",
+            ".record_state_abandon();",
+            1,
+        ),
+    )?;
 
     let raw_borrow = source_anchor(
         SourceOwnerId::AbiRawState,

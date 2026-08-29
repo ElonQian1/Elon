@@ -16,28 +16,46 @@ pub(super) fn validate(nodes: &[SourceNode], edges: &[SourceEdge]) -> Result<(),
 }
 
 fn validate_operation_scoped_raw_nodes(nodes: &[SourceNode]) -> Result<(), &'static str> {
-    for (id, symbol, ops, boundary) in [
+    for (id, owner, symbol, ops, boundary) in [
         (
             SourceNodeId::AbiMapRawGate,
+            SourceOwnerId::AbiRawState,
             "unsafe fn with_installed_state",
             MAP_OPS,
             Boundary::Expanded,
         ),
         (
             SourceNodeId::AbiLockRawGate,
+            SourceOwnerId::AbiRawState,
             "unsafe fn with_installed_state",
             LOCK_OPS,
             Boundary::PendingExpansion,
         ),
         (
             SourceNodeId::AbiMapRawStateAbandon,
+            SourceOwnerId::AbiRawState,
             "unsafe fn abandon_installed_state",
             MAP_OPS,
             Boundary::Expanded,
         ),
         (
             SourceNodeId::AbiLockRawStateAbandon,
+            SourceOwnerId::AbiRawState,
             "unsafe fn abandon_installed_state",
+            LOCK_OPS,
+            Boundary::PendingExpansion,
+        ),
+        (
+            SourceNodeId::AbiMapRawStateAbandonWitness,
+            SourceOwnerId::AbiRawCloseWitness,
+            "fn record_state_abandon",
+            MAP_OPS,
+            Boundary::Expanded,
+        ),
+        (
+            SourceNodeId::AbiLockRawStateAbandonWitness,
+            SourceOwnerId::AbiRawCloseWitness,
+            "fn record_state_abandon",
             LOCK_OPS,
             Boundary::PendingExpansion,
         ),
@@ -45,7 +63,7 @@ fn validate_operation_scoped_raw_nodes(nodes: &[SourceNode]) -> Result<(), &'sta
         let Some(node) = nodes.iter().find(|node| node.id == id) else {
             return Err("operation-scoped raw-state graph node is missing");
         };
-        if node.owner != SourceOwnerId::AbiRawState
+        if node.owner != owner
             || node.symbol != symbol
             || node.role != NodeRole::RawStateGate
             || node.ops != ops
@@ -170,8 +188,26 @@ fn validate_abandon_owner_order(edges: &[SourceEdge]) -> Result<(), &'static str
             SourceEffect::None,
         ),
         (
-            "map.raw-state-abandon.pinned-drop",
+            "map.raw-state-abandon.witness",
             SourceNodeId::AbiMapRawStateAbandon,
+            SourceNodeId::AbiMapRawStateAbandonWitness,
+            EdgeKind::ConditionalCall,
+            MAP_OPS,
+            Reachability::Conditional,
+            SourceEffect::None,
+        ),
+        (
+            "lock.raw-state-abandon.witness",
+            SourceNodeId::AbiLockRawStateAbandon,
+            SourceNodeId::AbiLockRawStateAbandonWitness,
+            EdgeKind::ConditionalCall,
+            LOCK_OPS,
+            Reachability::Conditional,
+            SourceEffect::None,
+        ),
+        (
+            "map.raw-state-abandon.pinned-drop",
+            SourceNodeId::AbiMapRawStateAbandonWitness,
             SourceNodeId::RegistryPinnedDrop,
             EdgeKind::UnwindRetention,
             MAP_OPS,
@@ -180,7 +216,7 @@ fn validate_abandon_owner_order(edges: &[SourceEdge]) -> Result<(), &'static str
         ),
         (
             "lock.raw-state-abandon.pinned-drop",
-            SourceNodeId::AbiLockRawStateAbandon,
+            SourceNodeId::AbiLockRawStateAbandonWitness,
             SourceNodeId::RegistryPinnedDrop,
             EdgeKind::UnwindRetention,
             LOCK_OPS,
