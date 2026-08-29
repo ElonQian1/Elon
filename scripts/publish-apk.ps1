@@ -657,16 +657,16 @@ function Assert-ApkStillCurrentBeforeCommit {
 
 function Assert-ApkStillCurrentBeforeUpload {
     param([string]$ReleaseSha)
+    $remoteHead = Get-OriginMainSha; $deployedSha = Get-DeployedApkSha
+    $deviceFloorRepack = $Force -and $CurrentInstalledVersionCode -gt 0
 
-    $remoteHead = Get-OriginMainSha
-    $deployedSha = Get-DeployedApkSha
-
-    if ($deployedSha -and (Test-GitAncestor $ReleaseSha $deployedSha)) {
+    if ($deployedSha -and (Test-GitAncestor $ReleaseSha $deployedSha) -and -not $deviceFloorRepack) {
         Write-Host "⏭️  服务器已部署包含本源代码提交的更新 APK：$((Format-ShortSha $deployedSha))" -ForegroundColor Cyan
         Complete-Release -Success:$false -ErrorMessage "superseded by deployed apk $deployedSha"
         Write-ApkPublishStatus -ApkReleaseStatus "published" -Message "APK 已由更新主线发布，当前代码已包含在线上 APK。"
         exit 0
     }
+    if ($deployedSha -and $deviceFloorRepack) { Write-Host "   ℹ️  设备已安装 build $CurrentInstalledVersionCode，高于线上版本；允许同源代码重新封装更高 versionCode。" -ForegroundColor Cyan }
 
     if ($remoteHead -ne $ReleaseSha) {
         # 远端在编译期间前进；如果新增提交都不影响 Android，仍可安全发布
