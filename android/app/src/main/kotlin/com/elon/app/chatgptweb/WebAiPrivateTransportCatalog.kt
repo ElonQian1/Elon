@@ -171,9 +171,9 @@ internal object WebAiPrivateTransportCatalog {
         Entry(
             id = "android_chatgpt_web_private_voice_native_relay_v1",
             provider = "chatgpt",
-            status = "device_duplex_verified_atomic_bootstrap_pending",
-            verification = "research_device_native_audio_and_data_channel_verified",
-            productionDefault = false,
+            status = "completed",
+            verification = "device_native_single_audio_and_data_channel_verified",
+            productionDefault = true,
             runtimeEnabled = BuildConfig.CHATGPT_PRIVATE_VOICE_NATIVE_RTC_ENABLED,
             requestMode = "same_origin_in_memory_session_relay_and_native_webrtc",
             healthPolicy =

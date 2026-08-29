@@ -1,7 +1,10 @@
 (function () {
   'use strict';
 
-  if (window.__elonChatGptPrivateResearchEnabled !== true) return;
+  if (
+    window.__elonChatGptPrivateResearchEnabled !== true &&
+    window.__elonChatGptPrivateVoiceNativeRtcEnabled !== true
+  ) return;
   if (location.origin !== 'https://chatgpt.com') return;
   const existing = window.__elonChatGptPrivateVoiceRelay;
   if (existing && Number(existing.version) >= 4) return;

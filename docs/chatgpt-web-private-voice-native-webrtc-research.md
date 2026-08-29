@@ -9,10 +9,11 @@ route and does not use an API key.
 
 ## Production Boundary
 
-Production remains native UI plus a persistent background WebView identity layer
-plus the official page-created WebRTC session. The research build is opt-in through
-`ELON_CHATGPT_PRIVATE_RESEARCH=true`. Failure or an unknown protocol shape must keep
-the official page-created WebRTC fallback.
+Production now uses native UI plus a persistent background WebView identity/bootstrap
+layer plus an Android-owned WebRTC media session. The dedicated
+`ELON_CHATGPT_PRIVATE_VOICE_NATIVE_RTC` capability defaults to enabled and does not enable
+the broader private-research probes. Failure or an unknown protocol shape keeps the
+official page-created WebRTC fallback.
 
 The observer must never export or persist Cookie values, request header values,
 request or response bodies, SDP, ICE candidates, device labels, track identifiers,
@@ -146,15 +147,10 @@ takeover lock now disables late sender, receiver, transceiver, and replacement-t
 audio while native ownership is active, and restores official media after a native
 startup failure.
 
-The remaining blocker is bootstrap ownership, not media feasibility. The current
-relay first lets the page submit `POST /realtime/wm`, captures the page-owned
-multipart template, and then submits a second request with the native offer. That
-duplicate use is timing-sensitive and has produced `relay_invalid_answer`; the
-session template must be treated as one-shot.
-
-The next implementation must atomically intercept the first official request,
-replace its SDP with the pre-created native offer, and send exactly one upstream
-request. If native interception cannot complete, it must send the untouched official
-request instead. Production remains on the official page-created WebRTC path until
-that fallback plus mute, close, transcript/current-conversation reconciliation,
-fast reopen, and background recovery pass once on a supervised device.
+The bootstrap-ownership blocker has since been closed. The relay arms the native offer
+before the official request, atomically replaces the first page-owned SDP field, and sends
+one same-origin upstream request. The official peer is suspended only after takeover;
+native failure releases the lock and uses the untouched page-created path. A supervised
+device run verified one native audio answer, an open data channel, and no duplicate audio.
+The managed path is therefore the production default. Live transcript event-envelope
+acceptance remains tracked separately and must not be inferred from the audio proof.

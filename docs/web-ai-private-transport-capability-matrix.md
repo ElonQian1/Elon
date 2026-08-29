@@ -14,8 +14,9 @@ installed build; individual capability documents retain implementation evidence.
 | Streaming reply observer | ChatGPT | Completed and enabled; completion and sparse-watchdog timer/bridge device verified | Official DOM snapshot |
 | Private stream completion settlement | ChatGPT | Completed, enabled, and device verified on `v1.1.1302 (1312)` | Official DOM snapshot |
 | Realtime voice transcript refresh | ChatGPT | Completed and enabled; supervised voice exit pending | Retained native transcript and official DOM snapshot |
+| Realtime voice managed native relay | ChatGPT | Completed and enabled; single native audio plus data-channel device verified | Official page-created WebRTC |
 | Realtime voice live transcript stream | ChatGPT | Completed and production-default with native RTC; device event-shape acceptance pending | Same-origin conversation refresh and official DOM snapshot |
-| Realtime voice background continuity | ChatGPT | Completed, enabled, and consumer default; native UI + persistent background WebView identity + official WebRTC | Official full-screen WebView voice and foreground notification |
+| Realtime voice background continuity | ChatGPT | Completed, enabled, and consumer default; native UI + persistent background WebView identity + native WebRTC media | Official page-created WebRTC, full-screen WebView voice, and foreground notification |
 | Server API realtime voice experiment | 一龙 AI / OpenAI API | Implemented but disabled and hidden from consumer UI | Native UI + persistent background WebView identity + official WebRTC |
 | Conversation directory | Google Web AI | Completed and enabled | Local cache and official page |
 | Visited conversation body cache | Google Web AI | Completed, enabled, and device verified | Official WebView navigation |
@@ -30,9 +31,12 @@ device. Every observer is bounded and emits nothing on malformed or unsuccessful
 responses.
 
 The consumer default is one architecture: native chat and floating voice UI, the same
-persistent background ChatGPT WebView as the identity and conversation layer, and the
-official page-created WebRTC session as the media transport. The friend-chat phone action,
-blue composer voice action, and semantic/MCP voice command all enter this route.
+persistent background ChatGPT WebView as the identity and conversation/bootstrap layer,
+and an Android-owned WebRTC peer as the media and live-transcript transport. The hidden
+same-origin page performs a single-use in-memory offer relay without exporting cookies,
+headers, credentials, SDP, ICE, or conversation content. The official page-created WebRTC
+session remains the automatic fallback. The friend-chat phone action, blue composer voice
+action, and semantic/MCP voice command all enter this route.
 The separate server API realtime transport remains an explicit disabled experiment with
 no consumer entry. The runtime inventory exposes both transport IDs, layers, visibility,
 default state, and conversation scopes so future agents cannot conflate them. Details are in
@@ -163,8 +167,10 @@ the existing same-origin conversation refresh and official DOM snapshot remain t
 authoritative reconciliation path. Device acceptance must confirm the current private
 event envelope before its verification marker advances beyond targeted tests.
 
-Realtime voice remains owned by the official WebView and WebRTC session. A microphone
-foreground service keeps the session eligible while the user opens another app. The
+Realtime voice identity and bootstrap remain owned by the persistent official WebView.
+The default media session is owned by Android WebRTC, while the page-created WebRTC route
+remains the failure fallback. A microphone foreground service keeps the session eligible
+while the user opens another app. The
 native chat orb is shown only while the owning ChatGPT conversation surface is active;
 otherwise a system overlay and foreground notification provide continuity. Audio focus
 automatically pauses for other media and resumes afterward. No WebRTC credential is
@@ -189,8 +195,9 @@ refresh path.
   inventory has not identified a safe same-origin detail endpoint. The completed visited-body
   cache remains stale-while-revalidate and is always followed by official navigation.
 - ChatGPT realtime voice does not persist or replay live WebRTC credentials. The APK
-  caches the loaded WebView session and per-conversation launch hints, then lets the
-  official page create a fresh connection for each start.
+  caches the loaded WebView session and per-conversation launch hints, then creates a
+  fresh native peer from a single-use same-origin bootstrap for each start. Unknown or
+  failed bootstrap shapes use a fresh official page-created connection instead.
 - Redacted research probes remain disabled in production. They are not user features
   and require a new compatibility question before they may be re-enabled.
 

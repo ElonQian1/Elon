@@ -10,12 +10,47 @@ const source = fs.readFileSync(
   path.join(root, 'android', 'app', 'src', 'main', 'assets', 'chatgpt_web_private_voice_relay.js'),
   'utf8'
 );
+const buildGradle = fs.readFileSync(
+  path.join(root, 'android', 'app', 'build.gradle'),
+  'utf8'
+);
+const pageAdapter = fs.readFileSync(
+  path.join(root, 'android', 'app', 'src', 'main', 'kotlin', 'com', 'elon', 'app',
+    'chatgptweb', 'ChatGptWebPageAdapter.kt'),
+  'utf8'
+);
+const relayGateway = fs.readFileSync(
+  path.join(root, 'android', 'app', 'src', 'main', 'kotlin', 'com', 'elon', 'app',
+    'chatgptweb', 'ChatGptWebPrivateVoiceRelayGateway.kt'),
+  'utf8'
+);
+
+assert.match(
+  buildGradle,
+  /findProperty\("ELON_CHATGPT_PRIVATE_VOICE_NATIVE_RTC"\)[\s\S]*?\?\.toBoolean\(\) \?: true/
+);
+assert.doesNotMatch(
+  buildGradle,
+  /ELON_CHATGPT_PRIVATE_VOICE_NATIVE_RTC requires ELON_CHATGPT_PRIVATE_RESEARCH=true/
+);
+assert.match(
+  pageAdapter,
+  /window\.__elonChatGptPrivateVoiceNativeRtcEnabled =[\s\S]*?BuildConfig\.CHATGPT_PRIVATE_VOICE_NATIVE_RTC_ENABLED/
+);
+assert.match(
+  pageAdapter,
+  /BuildConfig\.CHATGPT_PRIVATE_RESEARCH_ENABLED \|\|[\s\S]*?BuildConfig\.CHATGPT_PRIVATE_VOICE_NATIVE_RTC_ENABLED/
+);
+assert.match(
+  relayGateway,
+  /if \(!BuildConfig\.CHATGPT_PRIVATE_VOICE_NATIVE_RTC_ENABLED\)/
+);
 const nativeAnswer = 'v=0\r\nm=audio 9 UDP/TLS/RTP/SAVPF 111\r\n';
 const officialAnswer = 'v=0\r\nm=audio 8 UDP/TLS/RTP/SAVPF 111\r\n';
 const originalOffer = 'v=0\r\nm=audio 1 UDP/TLS/RTP/SAVPF 111\r\n';
 const nativeOffer = 'v=0\r\nm=audio 2 UDP/TLS/RTP/SAVPF 111\r\n';
 
-function createHarness(responseForCall) {
+function createHarness(responseForCall, featureFlags = {}) {
   const calls = [];
   const upstream = async (input, init) => {
     calls.push({ input, init });
@@ -50,7 +85,8 @@ function createHarness(responseForCall) {
     }
   }
   const window = {
-    __elonChatGptPrivateResearchEnabled: true,
+    __elonChatGptPrivateResearchEnabled: featureFlags.research === true,
+    __elonChatGptPrivateVoiceNativeRtcEnabled: featureFlags.nativeRtc !== false,
     fetch: upstream,
     RTCPeerConnection: FakePeerConnection
   };
@@ -207,9 +243,18 @@ async function verifiesOfficialFallback() {
   assert.equal(peer.remoteDescriptions.length, 1);
 }
 
+async function verifiesDedicatedCapabilityGate() {
+  const upstream = async () => new Response(officialAnswer, { status: 201 });
+  const { window } = createHarness(upstream, { research: false, nativeRtc: false });
+  assert.equal(window.__elonChatGptPrivateVoiceRelay, undefined);
+  const response = await window.fetch('https://chatgpt.com/realtime/wm', {});
+  assert.equal(await response.text(), officialAnswer);
+}
+
 async function main() {
   await verifiesAtomicTakeover();
   await verifiesOfficialFallback();
+  await verifiesDedicatedCapabilityGate();
   console.log('CHATGPT_WEB_PRIVATE_VOICE_RELAY_TESTS=passed');
 }
 

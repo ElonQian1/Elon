@@ -30,7 +30,7 @@ internal class ChatGptWebPrivateVoiceRelayGateway(
     fun readBootstrap(
         onComplete: (ChatGptWebPrivateVoiceBootstrap) -> Unit,
     ): Boolean {
-        if (!BuildConfig.CHATGPT_PRIVATE_RESEARCH_ENABLED) {
+        if (!BuildConfig.CHATGPT_PRIVATE_VOICE_NATIVE_RTC_ENABLED) {
             onComplete(ChatGptWebPrivateVoiceBootstrap.Unavailable("disabled"))
             return false
         }
@@ -50,7 +50,7 @@ internal class ChatGptWebPrivateVoiceRelayGateway(
         onComplete: (ChatGptWebPrivateVoiceRelayResult) -> Unit,
         onArmed: () -> Boolean = { true },
     ): Boolean {
-        if (!BuildConfig.CHATGPT_PRIVATE_RESEARCH_ENABLED) {
+        if (!BuildConfig.CHATGPT_PRIVATE_VOICE_NATIVE_RTC_ENABLED) {
             onComplete(ChatGptWebPrivateVoiceRelayResult.Failure("disabled"))
             return false
         }

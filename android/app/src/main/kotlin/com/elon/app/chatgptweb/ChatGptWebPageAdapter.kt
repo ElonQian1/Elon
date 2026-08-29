@@ -33,6 +33,8 @@ internal class ChatGptWebPageAdapter(
             window.__elonChatGptAdapterTargetVersion = $ADAPTER_VERSION;
             window.__elonChatGptPrivateResearchEnabled =
                 ${BuildConfig.CHATGPT_PRIVATE_RESEARCH_ENABLED};
+            window.__elonChatGptPrivateVoiceNativeRtcEnabled =
+                ${BuildConfig.CHATGPT_PRIVATE_VOICE_NATIVE_RTC_ENABLED};
             window.__elonChatGptPrivateConversationPrefetchEnabled =
                 ${BuildConfig.CHATGPT_PRIVATE_CONVERSATION_PREFETCH_ENABLED};
             window.__elonChatGptPrivateStreamObserverEnabled =
@@ -59,6 +61,8 @@ internal class ChatGptWebPageAdapter(
         window.__elonChatGptAdapterTargetVersion = $ADAPTER_VERSION;
         window.__elonChatGptPrivateResearchEnabled =
             ${BuildConfig.CHATGPT_PRIVATE_RESEARCH_ENABLED};
+        window.__elonChatGptPrivateVoiceNativeRtcEnabled =
+            ${BuildConfig.CHATGPT_PRIVATE_VOICE_NATIVE_RTC_ENABLED};
         if (!/^doc_[a-z0-9_]{3,80}$/.test(String(window.__elonChatGptDocumentToken || ""))) {
             window.__elonChatGptDocumentToken =
                 "doc_android_" + Math.random().toString(36).slice(2) + Date.now().toString(36);
@@ -104,7 +108,10 @@ internal class ChatGptWebPageAdapter(
             onEvent(parsed.event)
         }
         if (
-            BuildConfig.CHATGPT_PRIVATE_RESEARCH_ENABLED &&
+            (
+                BuildConfig.CHATGPT_PRIVATE_RESEARCH_ENABLED ||
+                    BuildConfig.CHATGPT_PRIVATE_VOICE_NATIVE_RTC_ENABLED
+            ) &&
             WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)
         ) {
             WebViewCompat.addDocumentStartJavaScript(

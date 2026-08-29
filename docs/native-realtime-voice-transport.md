@@ -13,8 +13,10 @@ reviewed_at: 2026-08-27
 The production friend-chat surface has one consumer-default realtime voice architecture.
 
 - `android_chatgpt_web_realtime_voice_v1` combines native UI, the persistent background
-  ChatGPT WebView identity/session, and official page-created WebRTC. It writes to the
-  current ChatGPT conversation and is the only consumer-visible default.
+  ChatGPT WebView identity/session, and an Android-owned WebRTC peer created through a
+  same-origin single-use page relay. It writes to the current ChatGPT conversation and is
+  the only consumer-visible default. Official page-created WebRTC remains its automatic
+  fallback.
 - `android_openai_native_realtime_voice_v1` is a native media path. Android captures
   PCM, sends it through the authenticated 一龙 realtime WebSocket, and plays returned
   PCM through `AudioTrack`. It always creates or continues the local 一龙 AI history;
@@ -22,7 +24,7 @@ The production friend-chat surface has one consumer-default realtime voice archi
   remains for diagnostics, but it is disabled and has no ordinary-user entry.
 
 The friend-chat phone action, blue composer voice action, and semantic/MCP voice command
-all start the official account-bound transport. The ChatGPT tool sheet does not expose
+all start the account-bound managed native transport. The ChatGPT tool sheet does not expose
 the server API experiment.
 
 Both transports reuse the same foreground-service notification and media-focus policy.
