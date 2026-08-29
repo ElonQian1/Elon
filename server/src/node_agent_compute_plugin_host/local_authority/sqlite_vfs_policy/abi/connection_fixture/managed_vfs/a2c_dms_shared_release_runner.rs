@@ -48,7 +48,10 @@ fn exercise_child(root: &Path) -> anyhow::Result<()> {
     let fixture = ManagedSqliteRoutedConnectionFixture::open(root, [0xd4; 16])?;
     let phase = ManagedSqliteShmFailurePhase::DmsSharedRelease;
     fixture
-        .install_shm_fault_script(&[(phase, 1, ManagedSqliteShmFailureClass::MutatedButKnown)])
+        .install_shm_fault_script(
+            &[],
+            &[(phase, 1, ManagedSqliteShmFailureClass::MutatedButKnown)],
+        )
         .map_err(anyhow::Error::msg)?;
 
     let mode: String = fixture

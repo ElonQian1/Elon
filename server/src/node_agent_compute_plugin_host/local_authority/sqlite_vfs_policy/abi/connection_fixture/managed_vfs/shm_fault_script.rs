@@ -17,7 +17,9 @@ use crate::{
 };
 
 #[cfg(all(test, windows))]
-use crate::node_agent_managed_fs::ManagedSqliteShmTestTargetObserver;
+use crate::node_agent_managed_fs::{
+    ManagedSqliteShmTestTargetIdentity, ManagedSqliteShmTestTargetObserver,
+};
 
 use super::ManagedTestRouteOrdinal;
 
@@ -106,11 +108,7 @@ impl ManagedTestShmFaultPlan {
                 *occurrence == 0
                     || !supported_shm_phase(*phase)
                     || !supports_after_success(*phase)
-                    || !matches!(
-                        class,
-                        ManagedSqliteShmFailureClass::MutatedButKnown
-                            | ManagedSqliteShmFailureClass::OutcomeUncertainPoisoned
-                    )
+                    || !supports_after_success_class(*phase, *class)
             })
         {
             return Err("managed SHM fault plan contains an unsupported step");
@@ -154,7 +152,44 @@ enum ManagedTestShmFaultPlanState {
     Empty,
     Pending(ManagedTestShmFaultPlan),
     Claimed,
+    #[cfg(all(test, windows))]
+    Promoted(ManagedSqliteShmTestTargetObserver),
     Installed(ManagedSqliteShmTestFaultProbe),
+}
+
+/// Copy-only exact physical target evidence. The opaque route objects, coordinator and file
+/// custody remain behind the binding; only child-local checked counters cross into the runner.
+#[cfg(all(test, windows))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) struct ManagedTestShmTargetWitness {
+    registration_id: u64,
+    route_ordinal: u64,
+    runtime_generation: u64,
+    shm_connection_id: u64,
+    role: ManagedSqliteLogicalFileRole,
+}
+
+#[cfg(all(test, windows))]
+impl ManagedTestShmTargetWitness {
+    pub(super) fn registration_id(self) -> u64 {
+        self.registration_id
+    }
+
+    pub(super) fn route_ordinal(self) -> u64 {
+        self.route_ordinal
+    }
+
+    pub(super) fn runtime_generation(self) -> u64 {
+        self.runtime_generation
+    }
+
+    pub(super) fn shm_connection_id(self) -> u64 {
+        self.shm_connection_id
+    }
+
+    pub(super) fn role(self) -> ManagedSqliteLogicalFileRole {
+        self.role
+    }
 }
 
 pub(super) struct ManagedTestShmFaultPlanSlot {
@@ -216,11 +251,29 @@ impl ManagedTestShmFaultPlanBinding {
             .state
             .lock()
             .map_err(|_| "managed SHM fault plan slot poisoned")?;
-        if !matches!(&*state, ManagedTestShmFaultPlanState::Empty) {
-            return Err("managed SHM fault plan already installed");
+        if matches!(&*state, ManagedTestShmFaultPlanState::Empty) {
+            *state = ManagedTestShmFaultPlanState::Pending(plan);
+            return Ok(());
         }
-        *state = ManagedTestShmFaultPlanState::Pending(plan);
-        Ok(())
+        #[cfg(all(test, windows))]
+        if let ManagedTestShmFaultPlanState::Promoted(observer) = &*state {
+            let observer = observer.clone();
+            drop(state);
+            let probe =
+                observer.install_test_fault_script(plan.before_call(), plan.after_success())?;
+            let mut state = self
+                .slot
+                .state
+                .lock()
+                .map_err(|_| "managed SHM fault plan slot poisoned")?;
+            if !matches!(&*state, ManagedTestShmFaultPlanState::Promoted(_)) {
+                permanently_retain_probe(probe);
+                return Err("managed SHM target changed during late fault installation");
+            }
+            *state = ManagedTestShmFaultPlanState::Installed(probe);
+            return Ok(());
+        }
+        Err("managed SHM fault plan already installed")
     }
 
     pub(super) fn claim(&self) -> Result<Option<ManagedTestShmFaultPlan>, &'static str> {
@@ -273,6 +326,32 @@ impl ManagedTestShmFaultPlanBinding {
         Ok(())
     }
 
+    #[cfg(all(test, windows))]
+    pub(super) fn record_promoted(
+        &self,
+        observer: ManagedSqliteShmTestTargetObserver,
+    ) -> Result<(), &'static str> {
+        if self.target.role != ManagedSqliteLogicalFileRole::Main {
+            return Err("managed SHM target observer requires the exact main-file role");
+        }
+        let mut state = self
+            .slot
+            .state
+            .lock()
+            .map_err(|_| "managed SHM fault plan slot poisoned")?;
+        match &*state {
+            ManagedTestShmFaultPlanState::Empty => {
+                *state = ManagedTestShmFaultPlanState::Promoted(observer);
+                Ok(())
+            }
+            ManagedTestShmFaultPlanState::Promoted(_)
+            | ManagedTestShmFaultPlanState::Installed(_) => Ok(()),
+            ManagedTestShmFaultPlanState::Pending(_) | ManagedTestShmFaultPlanState::Claimed => {
+                Err("managed SHM target observer cannot replace a fault plan")
+            }
+        }
+    }
+
     pub(super) fn pending_count(&self) -> Result<usize, &'static str> {
         if self.target.role != ManagedSqliteLogicalFileRole::Main {
             return Err("managed SHM fault probe query requires the exact main-file role");
@@ -282,10 +361,11 @@ impl ManagedTestShmFaultPlanBinding {
             .state
             .lock()
             .map_err(|_| "managed SHM fault plan slot poisoned")?;
-        let ManagedTestShmFaultPlanState::Installed(probe) = &*state else {
-            return Err("managed SHM fault probe is not installed");
-        };
-        probe.pending_count()
+        match &*state {
+            ManagedTestShmFaultPlanState::Promoted(_) => Ok(0),
+            ManagedTestShmFaultPlanState::Installed(probe) => probe.pending_count(),
+            _ => Err("managed SHM target observer is not installed"),
+        }
     }
 
     pub(super) fn was_triggered(
@@ -301,10 +381,39 @@ impl ManagedTestShmFaultPlanBinding {
             .state
             .lock()
             .map_err(|_| "managed SHM fault plan slot poisoned")?;
-        let ManagedTestShmFaultPlanState::Installed(probe) = &*state else {
-            return Err("managed SHM fault probe is not installed");
-        };
-        probe.was_triggered(phase, occurrence)
+        match &*state {
+            ManagedTestShmFaultPlanState::Promoted(_) => Ok(false),
+            ManagedTestShmFaultPlanState::Installed(probe) => {
+                probe.was_triggered(phase, occurrence)
+            }
+            _ => Err("managed SHM target observer is not installed"),
+        }
+    }
+
+    #[cfg(all(test, windows))]
+    pub(super) fn triggered_observation(
+        &self,
+        phase: ManagedSqliteShmFailurePhase,
+        occurrence: u32,
+    ) -> Result<
+        Option<crate::node_agent_managed_fs::ManagedSqliteShmTriggeredTestFaultObservation>,
+        &'static str,
+    > {
+        if self.target.role != ManagedSqliteLogicalFileRole::Main {
+            return Err("managed SHM fault observation requires the exact main-file role");
+        }
+        let state = self
+            .slot
+            .state
+            .lock()
+            .map_err(|_| "managed SHM fault plan slot poisoned")?;
+        match &*state {
+            ManagedTestShmFaultPlanState::Promoted(_) => Ok(None),
+            ManagedTestShmFaultPlanState::Installed(probe) => {
+                probe.triggered_observation(phase, occurrence)
+            }
+            _ => Err("managed SHM target observer is not installed"),
+        }
     }
 
     #[cfg(all(test, windows))]
@@ -317,10 +426,26 @@ impl ManagedTestShmFaultPlanBinding {
             .state
             .lock()
             .map_err(|_| "managed SHM fault plan slot poisoned")?;
-        let ManagedTestShmFaultPlanState::Installed(probe) = &*state else {
-            return Err("managed SHM fault probe is not installed");
-        };
-        Ok(probe.observer())
+        match &*state {
+            ManagedTestShmFaultPlanState::Promoted(observer) => Ok(observer.clone()),
+            ManagedTestShmFaultPlanState::Installed(probe) => Ok(probe.observer()),
+            _ => Err("managed SHM target observer is not installed"),
+        }
+    }
+
+    #[cfg(all(test, windows))]
+    pub(super) fn target_witness(&self) -> Result<ManagedTestShmTargetWitness, &'static str> {
+        let ManagedSqliteShmTestTargetIdentity {
+            runtime_generation,
+            shm_connection_id,
+        } = self.observer()?.identity();
+        Ok(ManagedTestShmTargetWitness {
+            registration_id: self.target.registration.counter_value(),
+            route_ordinal: self.target.route.counter_value(),
+            runtime_generation,
+            shm_connection_id,
+            role: self.target.role,
+        })
     }
 
     pub(super) fn role(&self) -> ManagedSqliteLogicalFileRole {
@@ -342,6 +467,7 @@ fn supported_shm_phase(phase: ManagedSqliteShmFailurePhase) -> bool {
             | ManagedSqliteShmFailurePhase::ViewMap
             | ManagedSqliteShmFailurePhase::LockAcquire
             | ManagedSqliteShmFailurePhase::LockRelease
+            | ManagedSqliteShmFailurePhase::Barrier
             | ManagedSqliteShmFailurePhase::ViewUnmap
             | ManagedSqliteShmFailurePhase::MappingClose
             | ManagedSqliteShmFailurePhase::DmsSharedRelease
@@ -351,6 +477,22 @@ fn supported_shm_phase(phase: ManagedSqliteShmFailurePhase) -> bool {
 
 fn supports_after_success(phase: ManagedSqliteShmFailurePhase) -> bool {
     supported_shm_phase(phase) && phase != ManagedSqliteShmFailurePhase::FileSize
+}
+
+fn supports_after_success_class(
+    phase: ManagedSqliteShmFailurePhase,
+    class: ManagedSqliteShmFailureClass,
+) -> bool {
+    match phase {
+        ManagedSqliteShmFailurePhase::Barrier => {
+            class == ManagedSqliteShmFailureClass::OutcomeUncertainPoisoned
+        }
+        _ => matches!(
+            class,
+            ManagedSqliteShmFailureClass::MutatedButKnown
+                | ManagedSqliteShmFailureClass::OutcomeUncertainPoisoned
+        ),
+    }
 }
 
 fn permanently_retain_probe(probe: ManagedSqliteShmTestFaultProbe) {

@@ -11,6 +11,8 @@ use anyhow::{anyhow, Context};
 use rusqlite::{ffi, Connection, OpenFlags};
 
 use super::*;
+#[cfg(all(test, windows))]
+use crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_abi::HandleBoundSqliteAbiRawSlotSnapshot;
 
 struct ManagedVfsAuthorizerContext {
     route: Arc<TestRoute>,
@@ -198,8 +200,51 @@ impl ManagedSqliteRoutedConnectionFixture {
     }
 
     #[cfg(all(test, windows))]
+    pub(super) fn route_custody_snapshot(
+        &self,
+    ) -> Result<ManagedSqliteTestVfsRouteCustodySnapshot, &'static str> {
+        self.route
+            .registration_shutdown_custody_snapshot()
+            .map_err(|()| "managed route custody snapshot unavailable")
+    }
+
+    #[cfg(all(test, windows))]
+    pub(super) fn barrier_logical_route_snapshot(
+        &self,
+    ) -> anyhow::Result<ManagedTestBarrierLogicalRouteSnapshot> {
+        self.routes.barrier_logical_route_snapshot(
+            self.route_entry
+                .as_ref()
+                .expect("managed fixture route entry"),
+        )
+    }
+
+    #[cfg(all(test, windows))]
+    pub(super) fn terminal_custody_test_snapshot(
+        &self,
+    ) -> Result<
+        crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::registry::ManagedSqliteRegistryTerminalCustodyTestSnapshot,
+        &'static str,
+    >{
+        self.route
+            .terminal_custody_test_snapshot()
+            .map_err(|()| "managed terminal custody snapshot unavailable")
+    }
+
+    #[cfg(all(test, windows))]
+    pub(super) fn quarantine_for_barrier_admission_test(&self) -> Result<(), &'static str> {
+        self.route
+            .retain_failure("managed barrier admission rejection sentinel")
+            .map_err(|()| "managed barrier admission route quarantine failed")
+    }
+
+    #[cfg(all(test, windows))]
     pub(super) fn install_shm_fault_script(
         &self,
+        before_call: &[(
+            crate::node_agent_managed_fs::ManagedSqliteShmFailurePhase,
+            u32,
+        )],
         after_success: &[(
             crate::node_agent_managed_fs::ManagedSqliteShmFailurePhase,
             u32,
@@ -209,7 +254,7 @@ impl ManagedSqliteRoutedConnectionFixture {
         self.route_entry
             .as_ref()
             .ok_or("managed fixture route entry is not live")?
-            .install_shm_fault_script(&[], after_success)
+            .install_shm_fault_script(before_call, after_success)
     }
 
     #[cfg(all(test, windows))]
@@ -220,6 +265,67 @@ impl ManagedSqliteRoutedConnectionFixture {
             .as_ref()
             .ok_or("managed fixture route entry is not live")?
             .installed_shm_fault_witness()
+    }
+
+    #[cfg(all(test, windows))]
+    pub(super) fn observe_main_raw_slots(
+        &self,
+    ) -> Result<HandleBoundSqliteAbiRawSlotSnapshot, &'static str> {
+        let file = self.main_file_pointer()?;
+        // SAFETY: `main_file_pointer` returned this test VFS's live allocation and performs no
+        // callback or ownership mutation.
+        unsafe { observe_test_vfs_file_raw_slots(file) }
+            .ok_or("managed main-file raw slots unavailable")
+    }
+
+    #[cfg(all(test, windows))]
+    pub(super) fn call_main_shm_barrier(
+        &self,
+    ) -> Result<ManagedTestVoidCallbackObservation, &'static str> {
+        let file = self.main_file_pointer()?;
+        // SAFETY: file_control returned this test VFS's live allocation and callbacks are invoked
+        // serially by the owning FULL_MUTEX connection.
+        let before = unsafe { observe_test_vfs_file_raw_slots(file) }
+            .ok_or("managed barrier raw slots unavailable before callback")?;
+        if !before.methods_installed || !before.state_installed {
+            return Err("managed barrier raw state was not installed before callback");
+        }
+        // SAFETY: the live allocation exposed its installed method table above.
+        let methods = unsafe { (*file).pMethods };
+        let barrier = if methods.is_null() {
+            None
+        } else {
+            // SAFETY: methods belongs to the same live main-file allocation.
+            unsafe { (*methods).xShmBarrier }
+        }
+        .ok_or("managed barrier callback unavailable")?;
+        // SAFETY: the callback receives its owning live sqlite3_file. xShmBarrier is void, so this
+        // helper deliberately creates no SQLite result-code channel.
+        unsafe { barrier(file) };
+        // SAFETY: the allocation remains owned by the live Connection even when the callback has
+        // fail-closed and cleared both installed ownership slots.
+        let after = unsafe { observe_test_vfs_file_raw_slots(file) }
+            .ok_or("managed barrier raw slots unavailable after callback")?;
+        Ok(ManagedTestVoidCallbackObservation { before, after })
+    }
+
+    #[cfg(all(test, windows))]
+    fn main_file_pointer(&self) -> Result<*mut ffi::sqlite3_file, &'static str> {
+        let mut file = ptr::null_mut::<ffi::sqlite3_file>();
+        // SAFETY: the fixture owns this live connection. SQLite writes only its current main-file
+        // pointer to `file`; the pointer remains inside this sealed Windows-test helper.
+        let code = unsafe {
+            ffi::sqlite3_file_control(
+                self.raw_handle(),
+                b"main\0".as_ptr().cast(),
+                ffi::SQLITE_FCNTL_FILE_POINTER,
+                (&mut file as *mut *mut ffi::sqlite3_file).cast(),
+            )
+        };
+        if code != ffi::SQLITE_OK || file.is_null() {
+            return Err("managed barrier main-file pointer unavailable");
+        }
+        Ok(file)
     }
 
     #[cfg(all(test, windows))]
@@ -351,6 +457,13 @@ impl ManagedSqliteRoutedConnectionFixture {
         // SAFETY: used only while this fixture owns the live Connection.
         unsafe { self.connection().handle() }
     }
+}
+
+#[cfg(all(test, windows))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) struct ManagedTestVoidCallbackObservation {
+    pub(super) before: HandleBoundSqliteAbiRawSlotSnapshot,
+    pub(super) after: HandleBoundSqliteAbiRawSlotSnapshot,
 }
 
 impl Drop for ManagedSqliteRoutedConnectionFixture {

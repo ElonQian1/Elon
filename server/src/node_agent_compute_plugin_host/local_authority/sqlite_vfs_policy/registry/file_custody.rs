@@ -75,6 +75,11 @@ pub(in super::super) trait ManagedSqliteRegistryCloseLifecycleFaults:
     fn after_success(&self, phase: ManagedSqliteRegistryCloseLifecyclePhase) -> Result<bool, ()>;
     fn native_failure(&self, phase: ManagedSqliteRegistryCloseLifecyclePhase);
 
+    fn claim_native_failure_gate(
+        &self,
+        phase: ManagedSqliteRegistryCloseLifecyclePhase,
+    ) -> Result<bool, ()>;
+
     fn publish_retirement(
         &self,
         receipt: super::types::ManagedSqliteRegistryRetirementReceipt,
@@ -427,6 +432,24 @@ where
 {
     fn drop(&mut self) {
         if let Some(custody) = self.custody.take() {
+            #[cfg(test)]
+            {
+                let _ = match custody {
+                    custody @ ManagedSqliteRegistryPinnedFileCustody::WalMain { .. } => {
+                        self.owner.retain_terminal_wal_main_physical_custody(
+                            self.route,
+                            ManagedSqliteRegistryTerminalReason::FailureCustodyRetained,
+                            custody,
+                        )
+                    }
+                    custody => self.owner.retain_terminal_custody(
+                        self.route,
+                        ManagedSqliteRegistryTerminalReason::FailureCustodyRetained,
+                        custody,
+                    ),
+                };
+            }
+            #[cfg(not(test))]
             let _ = self.owner.retain_terminal_custody(
                 self.route,
                 ManagedSqliteRegistryTerminalReason::FailureCustodyRetained,

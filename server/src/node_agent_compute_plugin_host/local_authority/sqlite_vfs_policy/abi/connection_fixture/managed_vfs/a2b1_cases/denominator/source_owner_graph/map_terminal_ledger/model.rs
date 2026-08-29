@@ -222,6 +222,8 @@ pub(super) enum MapSourceStepId {
     FaultInstallRejected,
     FaultProbeRecordRejected,
     FaultProbeRecorded,
+    FaultObserverRecordRejected,
+    FaultObserverRecorded,
     RoutePreparationResultGate,
     RouteOperationDispatch,
     BridgeOperationDispatch,

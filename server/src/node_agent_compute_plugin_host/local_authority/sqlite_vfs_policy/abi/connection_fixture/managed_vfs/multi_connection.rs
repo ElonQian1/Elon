@@ -47,6 +47,35 @@ impl ManagedSqliteMultiConnectionFixture {
         Ok(self.route(index)?.route_ordinal())
     }
 
+    #[cfg(all(test, windows))]
+    pub(super) fn live_connection_count(&self) -> usize {
+        self.connections
+            .iter()
+            .filter(|slot| slot.is_some())
+            .count()
+    }
+
+    #[cfg(all(test, windows))]
+    pub(super) fn logical_route_counts(&self) -> anyhow::Result<(usize, usize)> {
+        let snapshot = self
+            .registration
+            .as_ref()
+            .expect("managed VFS registration")
+            .routes()
+            .registration_shutdown_snapshot()?;
+        Ok((snapshot.live_routes(), snapshot.logical_names()))
+    }
+
+    #[cfg(all(test, windows))]
+    pub(super) fn live_registration_snapshot(
+        &self,
+    ) -> anyhow::Result<ManagedTestVfsLiveRegistrationSnapshot> {
+        self.registration
+            .as_ref()
+            .expect("managed VFS registration")
+            .live_registration_snapshot()
+    }
+
     pub(super) fn install_callback_fault_script(
         &self,
         steps: &[ManagedTestCallbackFaultStep],
@@ -74,6 +103,18 @@ impl ManagedSqliteMultiConnectionFixture {
             .expect("managed VFS registration")
             .lifecycle()
             .install(steps)
+    }
+
+    #[cfg(all(test, windows))]
+    pub(super) fn begin_unfaulted_barrier_observation_window(
+        &self,
+        route: ManagedTestRouteOrdinal,
+    ) -> Result<(), &'static str> {
+        self.registration
+            .as_ref()
+            .expect("managed VFS registration")
+            .lifecycle()
+            .begin_unfaulted_barrier_observation_window(route)
     }
 
     pub(super) fn pending_lifecycle_fault_count(&self) -> Result<usize, &'static str> {

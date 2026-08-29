@@ -29,6 +29,10 @@ impl ManagedTestRouteOrdinal {
     pub(super) fn test_value(value: u64) -> Self {
         Self(NonZeroU64::new(value).expect("fault-matrix route ordinal must be non-zero"))
     }
+
+    pub(super) fn counter_value(self) -> u64 {
+        self.0.get()
+    }
 }
 
 impl fmt::Debug for ManagedTestRouteOrdinal {
@@ -88,6 +92,26 @@ impl ManagedTestCallbackFaultStep {
 
     fn same_occurrence(self, other: Self) -> bool {
         self.key() == other.key() && self.occurrence == other.occurrence
+    }
+
+    pub(super) fn route_ordinal(self) -> ManagedTestRouteOrdinal {
+        self.route
+    }
+
+    pub(super) fn role(self) -> ManagedSqliteLogicalFileRole {
+        self.role
+    }
+
+    pub(super) fn operation(self) -> ManagedTestCallbackFaultOperation {
+        self.operation
+    }
+
+    pub(super) fn occurrence(self) -> u32 {
+        self.occurrence.get()
+    }
+
+    pub(super) fn timing(self) -> ManagedTestCallbackFaultTiming {
+        self.timing
     }
 }
 

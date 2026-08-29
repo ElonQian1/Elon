@@ -8,6 +8,7 @@ mod raw_fragment;
 mod route_callback_fragment;
 mod route_callback_source_shapes;
 mod route_callback_witnesses;
+mod route_observer_source_shapes;
 mod shared;
 mod source;
 mod typed_fragment;

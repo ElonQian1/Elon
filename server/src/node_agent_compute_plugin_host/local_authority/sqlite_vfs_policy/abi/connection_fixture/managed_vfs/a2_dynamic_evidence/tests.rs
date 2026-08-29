@@ -40,6 +40,26 @@ fn child_report_rejects_duplicate_or_unsafe_actual_fields() {
         Err("A2_DYNAMIC_CHILD_ACTUAL_FIELDS_INVALID")
     );
     assert_eq!(
+        validate_payload_for_test(&payload("a2b2rs1", "fence-before", 7)),
+        Err("A2_DYNAMIC_CHILD_ACTUAL_SELECTOR_INVALID")
+    );
+    assert_eq!(
+        validate_payload_for_test(&payload("a2b2br1", "outstanding-callback-gate", 7)),
+        Err("A2_DYNAMIC_CHILD_ACTUAL_SELECTOR_INVALID")
+    );
+    assert!(validate_payload_for_test(&payload("a2b2br1", "fence-before", 7)).is_ok());
+    let mut noncanonical = vec!["0".to_owned(); 81];
+    noncanonical[0] = "00".to_owned();
+    assert_eq!(
+        validate_payload_for_test(&format!("a2b2br1,fence-before,{}", noncanonical.join(","))),
+        Err("A2_DYNAMIC_CHILD_ACTUAL_FIELDS_INVALID")
+    );
+    noncanonical[0] = "18446744073709551616".to_owned();
+    assert_eq!(
+        validate_payload_for_test(&format!("a2b2br1,fence-before,{}", noncanonical.join(","))),
+        Err("A2_DYNAMIC_CHILD_ACTUAL_FIELDS_INVALID")
+    );
+    assert_eq!(
         SanitizedChildReport::encode_for_current_child(NONCE, &root, 0, &actual).err(),
         Some("A2_DYNAMIC_REGISTRATION_ID_INVALID")
     );
@@ -108,9 +128,13 @@ fn test_root(label: &str) -> PathBuf {
 }
 
 fn actual_payload(registration_id: u64) -> String {
+    payload("a2b2rs1", "success", registration_id)
+}
+
+fn payload(version: &str, selector: &str, registration_id: u64) -> String {
     let mut fields = vec!["0".to_owned(); 81];
     fields[12] = registration_id.to_string();
-    format!("a2b2rs1,success,{}", fields.join(","))
+    format!("{version},{selector},{}", fields.join(","))
 }
 
 fn changed_actual_payload() -> String {

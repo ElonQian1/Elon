@@ -14,8 +14,8 @@ mod record;
 mod tests;
 
 pub(super) use child::{
-    BoundDynamicChild, ChildLaunchIdentity, SanitizedActualPayloadCommitment, SanitizedChildReport,
-    ValidatedChildProcessReceipt, A2_DYNAMIC_CHILD_NONCE_ENV,
+    BoundDynamicChild, ChildLaunchIdentity, DynamicChildFailure, SanitizedActualPayloadCommitment,
+    SanitizedChildReport, ValidatedChildProcessReceipt, A2_DYNAMIC_CHILD_NONCE_ENV,
 };
 pub(super) use cleanup::ValidatedParentCleanupReceipt;
 pub(super) use environment::WindowsDynamicEnvironment;

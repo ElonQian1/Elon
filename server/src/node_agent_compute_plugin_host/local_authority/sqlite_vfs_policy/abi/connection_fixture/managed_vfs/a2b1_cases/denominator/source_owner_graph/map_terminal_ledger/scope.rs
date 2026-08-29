@@ -55,6 +55,7 @@ pub(super) const REVIEW_GATES: &[MapReviewGateRecord] = &[
             MapSourceStepId::PromotionClaimShmRejected,
             MapSourceStepId::FaultInstallRejected,
             MapSourceStepId::FaultProbeRecordRejected,
+            MapSourceStepId::FaultObserverRecordRejected,
         ],
     },
     MapReviewGateRecord {

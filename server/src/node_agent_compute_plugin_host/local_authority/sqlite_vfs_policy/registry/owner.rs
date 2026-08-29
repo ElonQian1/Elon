@@ -6,7 +6,9 @@ use std::{
 };
 
 #[cfg(test)]
-use super::state::ManagedSqliteRegistrySessionTestSnapshot;
+use super::state::{
+    ManagedSqliteRegistrySessionTestSnapshot, ManagedSqliteRegistryTerminalRouteTestSnapshot,
+};
 #[cfg(test)]
 use super::types::{
     ManagedSqliteRegistryCallbackCompletionReceipt, ManagedSqliteRegistryConnectionClosedReceipt,
@@ -224,6 +226,47 @@ impl<Custody: ManagedSqliteRegistryCustody> ManagedSqliteRegistryOwner<Custody> 
     }
 
     #[cfg(test)]
+    pub(super) fn terminal_reason(
+        &self,
+        handle: ManagedSqliteRegistryRouteHandle,
+    ) -> Result<Option<ManagedSqliteRegistryTerminalReason>, ManagedSqliteRegistryRouteRejection>
+    {
+        Ok(self.exact_entry(handle)?.state.terminal_reason())
+    }
+
+    #[cfg(test)]
+    pub(super) fn prepare_terminal_route_test_snapshot(
+        &mut self,
+        handle: ManagedSqliteRegistryRouteHandle,
+        reason: ManagedSqliteRegistryTerminalReason,
+    ) -> Result<ManagedSqliteRegistryTerminalRouteTestSnapshot, ManagedSqliteRegistryRouteRejection>
+    {
+        let state = &mut self.exact_entry_mut(handle)?.state;
+        state.quarantine(reason);
+        state.terminal_route_test_snapshot().map_err(|_| {
+            ManagedSqliteRegistryRouteRejection::State(
+                ManagedSqliteRegistryTransitionRejection::StateInvariantViolated,
+            )
+        })
+    }
+
+    #[cfg(test)]
+    pub(super) fn terminal_route_test_snapshot(
+        &self,
+        handle: ManagedSqliteRegistryRouteHandle,
+    ) -> Result<ManagedSqliteRegistryTerminalRouteTestSnapshot, ManagedSqliteRegistryRouteRejection>
+    {
+        self.exact_entry(handle)?
+            .state
+            .terminal_route_test_snapshot()
+            .map_err(|_| {
+                ManagedSqliteRegistryRouteRejection::State(
+                    ManagedSqliteRegistryTransitionRejection::StateInvariantViolated,
+                )
+            })
+    }
+
+    #[cfg(test)]
     pub(super) fn registration_shutdown_test_snapshot(
         &self,
         handle: ManagedSqliteRegistryRouteHandle,
@@ -295,6 +338,18 @@ impl<Custody: ManagedSqliteRegistryCustody> ManagedSqliteRegistryOwner<Custody> 
         self.exact_entry_mut(handle)?
             .state
             .finish_callback(lease)
+            .map_err(ManagedSqliteRegistryRouteRejection::State)
+    }
+
+    #[cfg(test)]
+    pub(super) fn arm_barrier_callback_completion_native_rejection(
+        &mut self,
+        handle: ManagedSqliteRegistryRouteHandle,
+        lease: &ManagedSqliteRegistryCallbackLease,
+    ) -> Result<(), ManagedSqliteRegistryRouteRejection> {
+        self.exact_entry_mut(handle)?
+            .state
+            .arm_barrier_callback_completion_native_rejection(lease)
             .map_err(ManagedSqliteRegistryRouteRejection::State)
     }
 

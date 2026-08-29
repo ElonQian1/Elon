@@ -23,8 +23,9 @@ mod test_transport_vfs;
 
 #[cfg(test)]
 pub(in crate::node_agent_compute_plugin_host::local_authority) use file_state::{
-    initialize_test_vfs_file, install_test_vfs_file, test_vfs_file_size,
-    HandleBoundSqliteAbiTestFile, HandleBoundSqliteFileOperations,
+    initialize_test_vfs_file, install_test_vfs_file, observe_test_vfs_file_raw_slots,
+    test_vfs_file_size, HandleBoundSqliteAbiRawSlotSnapshot, HandleBoundSqliteAbiTestFile,
+    HandleBoundSqliteFileOperations,
 };
 #[cfg(test)]
 pub(in crate::node_agent_compute_plugin_host::local_authority) use test_transport_vfs::{

@@ -23,5 +23,8 @@ mod tests;
 
 pub(crate) use api::ManagedSqliteShmTestFaultProbe;
 #[cfg(all(test, windows))]
-pub(crate) use api::ManagedSqliteShmTestTargetObserver;
+pub(crate) use api::{
+    ManagedSqliteShmTestTargetIdentity, ManagedSqliteShmTestTargetObserver,
+    ManagedSqliteShmTriggeredTestFaultObservation,
+};
 pub(super) use controller::ManagedSqliteShmTestFaultController;

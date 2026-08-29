@@ -1,10 +1,14 @@
 use std::fmt;
 
 use super::super::a2b2_cases::{
-    CaseKey, ValidatedRegistrationShutdownObservation, ValidatedRegistrationShutdownReportPayload,
+    CaseKey, ValidatedBarrierObservation, ValidatedBarrierReportPayload,
+    ValidatedRegistrationShutdownObservation, ValidatedRegistrationShutdownReportPayload,
 };
 use super::{
-    child::ValidatedChildProcessReceipt, cleanup::ValidatedParentCleanupReceipt,
+    child::{
+        SanitizedActualPayloadCommitment, SanitizedPayloadFamily, ValidatedChildProcessReceipt,
+    },
+    cleanup::ValidatedParentCleanupReceipt,
     environment::WindowsDynamicEnvironment,
 };
 
@@ -12,8 +16,28 @@ use super::{
 #[must_use = "a validated Windows dynamic record must be reported by the parent runner"]
 pub(in super::super) struct ValidatedWindowsDynamicRecord {
     _case_key: CaseKey,
-    _validated_payload: ValidatedRegistrationShutdownReportPayload,
+    _validated_payload: ValidatedDynamicPayload,
     report: RedactedWindowsDynamicReport,
+}
+
+enum ValidatedDynamicObservation {
+    RegistrationShutdown {
+        selector: &'static str,
+        registration_id: u64,
+        case_key: CaseKey,
+        payload: ValidatedDynamicPayload,
+    },
+    Barrier {
+        selector: &'static str,
+        registration_id: u64,
+        case_key: CaseKey,
+        payload: ValidatedDynamicPayload,
+    },
+}
+
+enum ValidatedDynamicPayload {
+    RegistrationShutdown(ValidatedRegistrationShutdownReportPayload),
+    Barrier(ValidatedBarrierReportPayload),
 }
 
 struct RedactedWindowsDynamicReport {
@@ -48,6 +72,34 @@ impl ValidatedWindowsDynamicRecord {
         child: ValidatedChildProcessReceipt,
         cleanup: ValidatedParentCleanupReceipt,
     ) -> Result<Self, &'static str> {
+        Self::validate_observation(
+            ValidatedDynamicObservation::registration_shutdown(observation),
+            environment,
+            child,
+            cleanup,
+        )
+    }
+
+    pub(in super::super) fn validate_barrier(
+        observation: ValidatedBarrierObservation,
+        environment: WindowsDynamicEnvironment,
+        child: ValidatedChildProcessReceipt,
+        cleanup: ValidatedParentCleanupReceipt,
+    ) -> Result<Self, &'static str> {
+        Self::validate_observation(
+            ValidatedDynamicObservation::barrier(observation),
+            environment,
+            child,
+            cleanup,
+        )
+    }
+
+    fn validate_observation(
+        observation: ValidatedDynamicObservation,
+        environment: WindowsDynamicEnvironment,
+        child: ValidatedChildProcessReceipt,
+        cleanup: ValidatedParentCleanupReceipt,
+    ) -> Result<Self, &'static str> {
         let child_fingerprint = child.fingerprint();
         if environment.child_fingerprint != child_fingerprint
             || cleanup.child_fingerprint != child_fingerprint
@@ -67,9 +119,11 @@ impl ValidatedWindowsDynamicRecord {
         if !child.matches_registration_id(observation.registration_id()) {
             return Err("A2_DYNAMIC_REGISTRATION_ID_BINDING_MISMATCH");
         }
+        if !child.matches_family(observation.family()) {
+            return Err("A2_DYNAMIC_PAYLOAD_FAMILY_BINDING_MISMATCH");
+        }
 
-        let case_selector = observation.selector().report_name();
-        let (case_key, validated_payload) = observation.into_evidence_parts();
+        let (case_selector, case_key, validated_payload) = observation.into_evidence_parts();
         if !validated_payload.matches_exact(&child.actual_payload)
             || !validated_payload.matches_commitment(&child.payload_commitment)
         {
@@ -102,6 +156,90 @@ impl ValidatedWindowsDynamicRecord {
     pub(in super::super) fn report(&self) -> WindowsDynamicReportView<'_> {
         WindowsDynamicReportView {
             report: &self.report,
+        }
+    }
+}
+
+impl ValidatedDynamicObservation {
+    fn registration_shutdown(observation: ValidatedRegistrationShutdownObservation) -> Self {
+        let selector = observation.selector().report_name();
+        let registration_id = observation.registration_id();
+        let (case_key, payload) = observation.into_evidence_parts();
+        Self::RegistrationShutdown {
+            selector,
+            registration_id,
+            case_key,
+            payload: ValidatedDynamicPayload::RegistrationShutdown(payload),
+        }
+    }
+
+    fn barrier(observation: ValidatedBarrierObservation) -> Self {
+        let selector = observation.selector().report_name();
+        let registration_id = observation.registration_id();
+        let (case_key, payload) = observation.into_evidence_parts();
+        Self::Barrier {
+            selector,
+            registration_id,
+            case_key,
+            payload: ValidatedDynamicPayload::Barrier(payload),
+        }
+    }
+
+    fn registration_id(&self) -> u64 {
+        match self {
+            Self::RegistrationShutdown {
+                registration_id, ..
+            }
+            | Self::Barrier {
+                registration_id, ..
+            } => *registration_id,
+        }
+    }
+
+    fn family(&self) -> SanitizedPayloadFamily {
+        match self {
+            Self::RegistrationShutdown { .. } => SanitizedPayloadFamily::RegistrationShutdown,
+            Self::Barrier { .. } => SanitizedPayloadFamily::Barrier,
+        }
+    }
+
+    fn into_evidence_parts(self) -> (&'static str, CaseKey, ValidatedDynamicPayload) {
+        match self {
+            Self::RegistrationShutdown {
+                selector,
+                case_key,
+                payload,
+                ..
+            }
+            | Self::Barrier {
+                selector,
+                case_key,
+                payload,
+                ..
+            } => (selector, case_key, payload),
+        }
+    }
+}
+
+impl ValidatedDynamicPayload {
+    fn matches_exact(&self, candidate: &str) -> bool {
+        match self {
+            Self::RegistrationShutdown(payload) => payload.matches_exact(candidate),
+            Self::Barrier(payload) => payload.matches_exact(candidate),
+        }
+    }
+
+    fn matches_commitment(&self, commitment: &SanitizedActualPayloadCommitment) -> bool {
+        match self {
+            Self::RegistrationShutdown(payload) => payload.matches_commitment(commitment),
+            Self::Barrier(payload) => payload.matches_commitment(commitment),
+        }
+    }
+
+    fn exact_payload(&self) -> &str {
+        match self {
+            Self::RegistrationShutdown(payload) => payload.exact_payload(),
+            Self::Barrier(payload) => payload.exact_payload(),
         }
     }
 }

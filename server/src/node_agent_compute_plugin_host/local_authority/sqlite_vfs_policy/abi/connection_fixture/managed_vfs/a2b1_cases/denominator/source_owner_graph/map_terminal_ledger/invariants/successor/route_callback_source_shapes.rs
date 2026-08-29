@@ -11,6 +11,7 @@ use super::super::anchors::source_symbol_span;
 
 pub(super) fn validate(steps: &[MapSourceStep]) -> Result<(), &'static str> {
     validate_outer_failure_shapes(steps)?;
+    super::route_observer_source_shapes::validate(steps)?;
     validate_dispatch_shapes(steps)?;
     validate_callback_shapes(steps)?;
     validate_exact_source_order()
@@ -340,7 +341,7 @@ fn validate_exact_source_order() -> Result<(), &'static str> {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn validate_shape(
+pub(super) fn validate_shape(
     steps: &[MapSourceStep],
     id: MapSourceStepId,
     site: MapSiteId,
@@ -367,7 +368,7 @@ fn validate_shape(
     Ok(())
 }
 
-fn require_source_order(
+pub(super) fn require_source_order(
     owner: SourceOwnerId,
     symbol: &'static str,
     needles: &[&'static str],
@@ -386,7 +387,7 @@ fn require_source_order(
     Ok(())
 }
 
-fn pending_unavailable(
+pub(super) fn pending_unavailable(
     phase: MapPhase,
     retention: MapRetention,
     reason: MapPendingReason,

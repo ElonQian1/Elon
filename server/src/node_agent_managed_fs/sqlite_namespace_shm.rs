@@ -119,7 +119,10 @@ pub(crate) use coordinator::{
 #[cfg(test)]
 pub(crate) use test_faults::ManagedSqliteShmTestFaultProbe;
 #[cfg(all(test, windows))]
-pub(crate) use test_faults::ManagedSqliteShmTestTargetObserver;
+pub(crate) use test_faults::{
+    ManagedSqliteShmTestTargetIdentity, ManagedSqliteShmTestTargetObserver,
+    ManagedSqliteShmTriggeredTestFaultObservation,
+};
 #[cfg(all(test, windows))]
 pub(crate) use test_snapshot::{
     ManagedSqliteShmTestDmsCustody, ManagedSqliteShmTestTargetSnapshot,

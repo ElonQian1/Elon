@@ -2,10 +2,16 @@ use std::{
     io::Read,
     process::{Child, ChildStderr, ChildStdout, ExitStatus},
     thread::{self, JoinHandle},
+    time::{Duration, Instant},
 };
+
+use super::child::DynamicChildFailure;
 
 const MAX_CAPTURED_STDOUT_BYTES: usize = 64 * 1024;
 const MAX_CAPTURED_STDERR_BYTES: usize = 64 * 1024;
+const CHILD_WAIT_TIMEOUT: Duration = Duration::from_secs(120);
+const ABORT_CONFIRM_TIMEOUT: Duration = Duration::from_secs(5);
+const CHILD_POLL_INTERVAL: Duration = Duration::from_millis(10);
 
 pub(super) struct CapturedChildOutput {
     pub(super) status: ExitStatus,
@@ -14,47 +20,77 @@ pub(super) struct CapturedChildOutput {
 
 pub(super) fn wait_for_bounded_output(
     child: &mut Child,
-) -> Result<CapturedChildOutput, &'static str> {
+) -> Result<CapturedChildOutput, DynamicChildFailure> {
     let stdout = match child.stdout.take() {
         Some(stdout) => stdout,
         None => {
-            abort_child(child);
-            return Err("A2_DYNAMIC_CHILD_STDOUT_NOT_PIPED");
+            return Err(abort_child(child, "A2_DYNAMIC_CHILD_STDOUT_NOT_PIPED"));
         }
     };
     let stderr = match child.stderr.take() {
         Some(stderr) => stderr,
         None => {
-            abort_child(child);
-            return Err("A2_DYNAMIC_CHILD_STDERR_NOT_PIPED");
+            return Err(abort_child(child, "A2_DYNAMIC_CHILD_STDERR_NOT_PIPED"));
         }
     };
     let stdout_reader = match spawn_stdout_reader(stdout) {
         Ok(reader) => reader,
         Err(error) => {
-            abort_child(child);
-            return Err(error);
+            return Err(abort_child(child, error));
         }
     };
     let stderr_reader = match spawn_stderr_reader(stderr) {
         Ok(reader) => reader,
         Err(error) => {
-            abort_child(child);
-            let _ = stdout_reader.join();
-            return Err(error);
+            let failure = abort_child(child, error);
+            if failure.exit_confirmed() {
+                let _ = stdout_reader.join();
+            }
+            return Err(failure);
         }
     };
 
-    let status = child.wait();
-    if status.is_err() {
-        abort_child(child);
-    }
-    let stdout = join_reader(stdout_reader, "A2_DYNAMIC_CHILD_STDOUT_READER_PANICKED");
-    let stderr = join_reader(stderr_reader, "A2_DYNAMIC_CHILD_STDERR_READER_PANICKED");
-    let status = status.map_err(|_| "A2_DYNAMIC_CHILD_WAIT_FAILED")?;
-    let stdout = stdout?;
-    let _stderr = stderr?;
+    let status = match wait_for_child_exit(child) {
+        Ok(status) => status,
+        Err(failure) => {
+            if failure.exit_confirmed() {
+                let _ = stdout_reader.join();
+                let _ = stderr_reader.join();
+            }
+            return Err(failure);
+        }
+    };
+    let stdout = join_reader(stdout_reader, "A2_DYNAMIC_CHILD_STDOUT_READER_PANICKED")
+        .map_err(DynamicChildFailure::exited)?;
+    let _stderr = join_reader(stderr_reader, "A2_DYNAMIC_CHILD_STDERR_READER_PANICKED")
+        .map_err(DynamicChildFailure::exited)?;
     Ok(CapturedChildOutput { status, stdout })
+}
+
+fn wait_for_child_exit(child: &mut Child) -> Result<ExitStatus, DynamicChildFailure> {
+    let started = Instant::now();
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => return Ok(status),
+            Ok(None) if started.elapsed() < CHILD_WAIT_TIMEOUT => {
+                thread::sleep(CHILD_POLL_INTERVAL);
+            }
+            Ok(None) => {
+                return Err(abort_child_with_detail(
+                    child,
+                    "A2_DYNAMIC_CHILD_WAIT_TIMEOUT",
+                    "child did not exit within the bounded wait".to_owned(),
+                ));
+            }
+            Err(error) => {
+                return Err(abort_child_with_detail(
+                    child,
+                    "A2_DYNAMIC_CHILD_WAIT_FAILED",
+                    format!("initial try_wait failed: {error}"),
+                ));
+            }
+        }
+    }
 }
 
 fn spawn_stdout_reader(
@@ -122,9 +158,47 @@ fn join_reader(
     reader.join().map_err(|_| panic_error)?
 }
 
-pub(super) fn abort_child(child: &mut Child) {
-    let _ = child.kill();
-    let _ = child.wait();
+pub(super) fn abort_child(child: &mut Child, code: &'static str) -> DynamicChildFailure {
+    abort_child_with_detail(child, code, "child capture aborted".to_owned())
+}
+
+fn abort_child_with_detail(
+    child: &mut Child,
+    code: &'static str,
+    cause: String,
+) -> DynamicChildFailure {
+    let mut details = vec![cause];
+    match child.try_wait() {
+        Ok(Some(status)) => {
+            details.push(format!("already exited with {status}"));
+            return DynamicChildFailure::exited_with_detail(code, details.join("; "));
+        }
+        Ok(None) => {}
+        Err(error) => details.push(format!("pre-kill try_wait failed: {error}")),
+    }
+    if let Err(error) = child.kill() {
+        details.push(format!("kill failed: {error}"));
+    }
+    let started = Instant::now();
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                details.push(format!("exit confirmed with {status}"));
+                return DynamicChildFailure::exited_with_detail(code, details.join("; "));
+            }
+            Ok(None) if started.elapsed() < ABORT_CONFIRM_TIMEOUT => {
+                thread::sleep(CHILD_POLL_INTERVAL);
+            }
+            Ok(None) => {
+                details.push("exit was not observed before abort timeout".to_owned());
+                return DynamicChildFailure::exit_unconfirmed(code, details.join("; "));
+            }
+            Err(error) => {
+                details.push(format!("post-kill try_wait failed: {error}"));
+                return DynamicChildFailure::exit_unconfirmed(code, details.join("; "));
+            }
+        }
+    }
 }
 
 #[cfg(test)]

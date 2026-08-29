@@ -52,8 +52,9 @@ pub(crate) use shm::{
 };
 #[cfg(all(test, windows))]
 pub(crate) use shm::{
-    ManagedSqliteShmTestDmsCustody, ManagedSqliteShmTestTargetObserver,
-    ManagedSqliteShmTestTargetSnapshot, ManagedSqliteShmTestTopologySnapshot,
+    ManagedSqliteShmTestDmsCustody, ManagedSqliteShmTestTargetIdentity,
+    ManagedSqliteShmTestTargetObserver, ManagedSqliteShmTestTargetSnapshot,
+    ManagedSqliteShmTestTopologySnapshot, ManagedSqliteShmTriggeredTestFaultObservation,
 };
 use types::ManagedSqliteNamespaceInner;
 pub(crate) use types::{

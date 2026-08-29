@@ -23,6 +23,10 @@ impl ManagedSqliteShmTestFaultTarget {
             connection_id,
         }
     }
+
+    pub(super) fn identity(self) -> (u64, u64) {
+        (self.generation.get(), self.connection_id)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -204,6 +208,24 @@ impl ManagedSqliteShmTestFaultController {
         self.triggered
             .iter()
             .any(|step| step.target == target && step.phase == phase && step.ordinal == ordinal)
+    }
+
+    pub(super) fn triggered_timing_and_class(
+        &self,
+        target: ManagedSqliteShmTestFaultTarget,
+        phase: ManagedSqliteShmFailurePhase,
+        ordinal: u32,
+    ) -> Option<(bool, ManagedSqliteShmFailureClass)> {
+        let ordinal = NonZeroU32::new(ordinal)?;
+        self.triggered
+            .iter()
+            .find(|step| step.target == target && step.phase == phase && step.ordinal == ordinal)
+            .map(|step| {
+                (
+                    step.timing == ManagedSqliteShmTestFaultTiming::BeforeCall,
+                    step.class,
+                )
+            })
     }
 }
 

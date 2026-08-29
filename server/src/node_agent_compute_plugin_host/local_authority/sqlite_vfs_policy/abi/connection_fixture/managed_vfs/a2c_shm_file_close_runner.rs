@@ -49,7 +49,10 @@ fn exercise_child(root: &Path) -> anyhow::Result<()> {
     // Runtime `FileClose` is the physical seam represented by frozen `Phase::ShmFileClose`.
     let phase = ManagedSqliteShmFailurePhase::FileClose;
     fixture
-        .install_shm_fault_script(&[(phase, 1, ManagedSqliteShmFailureClass::MutatedButKnown)])
+        .install_shm_fault_script(
+            &[],
+            &[(phase, 1, ManagedSqliteShmFailureClass::MutatedButKnown)],
+        )
         .map_err(anyhow::Error::msg)?;
 
     let mode: String = fixture

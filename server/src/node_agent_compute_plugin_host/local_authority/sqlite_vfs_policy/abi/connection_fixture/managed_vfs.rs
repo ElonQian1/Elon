@@ -22,7 +22,7 @@ use rusqlite::ffi;
 use super::*;
 use crate::{
     node_agent_compute_plugin_host::local_authority::{
-        sqlite_vfs_abi::test_vfs_file_size,
+        sqlite_vfs_abi::{observe_test_vfs_file_raw_slots, test_vfs_file_size},
         sqlite_vfs_policy::registry::{
             ManagedSqliteRegistryProcessOwner, ManagedSqliteTestVfsCallback,
             ManagedSqliteTestVfsFile, ManagedSqliteTestVfsRoute,
@@ -39,6 +39,8 @@ mod a2b1_cases;
 #[cfg(test)]
 mod a2b2_cases;
 #[cfg(all(test, windows))]
+mod a2c_barrier_runner;
+#[cfg(all(test, windows))]
 mod a2c_dms_shared_release_runner;
 #[cfg(all(test, windows))]
 mod a2c_mapping_close_runner;
@@ -50,12 +52,16 @@ mod a2c_vfs_unregister_runner;
 mod a2c_view_unmap_runner;
 #[cfg(all(test, windows))]
 mod a2c_windows_runner;
+#[cfg(all(test, windows))]
+mod barrier_harness;
 mod callbacks;
 mod connection;
 #[cfg(test)]
 mod fault_matrix;
 mod fault_script;
 mod lifecycle_faults;
+#[cfg(all(test, windows))]
+mod live_registration;
 mod multi_connection;
 #[cfg(all(test, windows))]
 mod registration_shutdown_custody;
@@ -78,6 +84,8 @@ use lifecycle_faults::{
     ManagedTestLifecycleFaultObservation, ManagedTestLifecycleFaultPhase,
     ManagedTestLifecycleFaultStep, ManagedTestLifecycleFaultTiming,
 };
+#[cfg(all(test, windows))]
+use live_registration::ManagedTestVfsLiveRegistrationSnapshot;
 use multi_connection::ManagedSqliteMultiConnectionFixture;
 #[cfg(all(test, windows))]
 use registration_shutdown_custody::{
@@ -86,11 +94,14 @@ use registration_shutdown_custody::{
     ManagedTestVfsRetainedPartsWitness,
 };
 use route_file::ManagedTestRouteFile;
+#[cfg(all(test, windows))]
+use shared_namespace::ManagedTestBarrierLogicalRouteSnapshot;
 use shared_namespace::{
     ManagedTestNonceSource, ManagedTestVfsRouteCollection, ManagedTestVfsRouteEntry,
 };
 use shm_fault_script::{
     ManagedTestRegistrationId, ManagedTestShmFaultPlanBinding, ManagedTestShmFaultPlanSlot,
+    ManagedTestShmTargetWitness,
 };
 
 type TestProcessOwner = ManagedSqliteRegistryProcessOwner<TestCustody, ManagedTestNonceSource>;

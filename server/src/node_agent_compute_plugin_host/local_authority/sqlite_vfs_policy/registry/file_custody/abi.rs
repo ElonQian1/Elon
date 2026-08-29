@@ -164,6 +164,15 @@ where
     }
 
     #[cfg(test)]
+    pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy) fn exact_wal_main_shm_test_target_observer(
+        &self,
+    ) -> Result<crate::node_agent_managed_fs::ManagedSqliteShmTestTargetObserver, ()> {
+        self.file
+            .exact_wal_main_shm_test_target_observer()
+            .map_err(drop)
+    }
+
+    #[cfg(test)]
     pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy) fn install_exact_wal_main_shm_test_fault_script(
         &mut self,
         before_call: &[(ManagedSqliteShmFailurePhase, u32)],

@@ -6,6 +6,7 @@
 use super::{ManagedSqliteRegistryPinnedFile, ManagedSqliteRegistryPinnedFileCustody};
 use crate::node_agent_managed_fs::{
     ManagedSqliteShmFailureClass, ManagedSqliteShmFailurePhase, ManagedSqliteShmTestFaultProbe,
+    ManagedSqliteShmTestTargetObserver,
 };
 
 use super::super::{
@@ -25,6 +26,19 @@ where
     Custody: ManagedSqliteRegistryCustody + 'static,
     NonceSource: ManagedSqliteRegistryNonceSource + 'static,
 {
+    pub(super) fn exact_wal_main_shm_test_target_observer(
+        &self,
+    ) -> Result<ManagedSqliteShmTestTargetObserver, ManagedSqliteRegistryWalMainTestFaultRejection>
+    {
+        match self.custody.as_ref() {
+            Some(ManagedSqliteRegistryPinnedFileCustody::WalMain { file, .. }) => file
+                .test_shm_target_observer()
+                .map_err(ManagedSqliteRegistryWalMainTestFaultRejection::ScriptRejected),
+            Some(_) => Err(ManagedSqliteRegistryWalMainTestFaultRejection::NotWalMain),
+            None => Err(ManagedSqliteRegistryWalMainTestFaultRejection::CustodyMissing),
+        }
+    }
+
     pub(super) fn install_exact_wal_main_shm_test_fault_script(
         &mut self,
         before_call: &[(ManagedSqliteShmFailurePhase, u32)],

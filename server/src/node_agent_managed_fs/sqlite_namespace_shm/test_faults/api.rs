@@ -39,6 +39,22 @@ pub(crate) struct ManagedSqliteShmTestTargetObserver {
     target: ManagedSqliteShmTestFaultTarget,
 }
 
+/// Numeric identity observed from the exact live physical target. This copy-only value is
+/// available solely to the process-isolated Windows evidence runner and carries no custody.
+#[cfg(all(test, windows))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct ManagedSqliteShmTestTargetIdentity {
+    pub(crate) runtime_generation: u64,
+    pub(crate) shm_connection_id: u64,
+}
+
+#[cfg(all(test, windows))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct ManagedSqliteShmTriggeredTestFaultObservation {
+    pub(crate) before_call: bool,
+    pub(crate) class: ManagedSqliteShmFailureClass,
+}
+
 impl ManagedSqliteShmTestFaultProbe {
     pub(crate) fn pending_count(&self) -> Result<usize, &'static str> {
         match self.coordinator.test_faults.lock() {
@@ -59,6 +75,30 @@ impl ManagedSqliteShmTestFaultProbe {
     ) -> Result<bool, &'static str> {
         match self.coordinator.test_faults.lock() {
             Ok(faults) => Ok(faults.was_triggered(self.target, phase, ordinal)),
+            Err(poison) => {
+                drop(poison.into_inner());
+                self.coordinator
+                    .poison_test_fault_controller_from_external_access();
+                Err(CONTROLLER_POISONED)
+            }
+        }
+    }
+
+    #[cfg(all(test, windows))]
+    pub(crate) fn triggered_observation(
+        &self,
+        phase: ManagedSqliteShmFailurePhase,
+        ordinal: u32,
+    ) -> Result<Option<ManagedSqliteShmTriggeredTestFaultObservation>, &'static str> {
+        match self.coordinator.test_faults.lock() {
+            Ok(faults) => Ok(faults
+                .triggered_timing_and_class(self.target, phase, ordinal)
+                .map(
+                    |(before_call, class)| ManagedSqliteShmTriggeredTestFaultObservation {
+                        before_call,
+                        class,
+                    },
+                )),
             Err(poison) => {
                 drop(poison.into_inner());
                 self.coordinator
@@ -95,6 +135,33 @@ impl ManagedSqliteShmTestTargetObserver {
         snapshot_test_target(&self.coordinator, |connection_id| {
             self.coordinator.test_fault_target(connection_id) == self.target
         })
+    }
+
+    pub(crate) fn identity(&self) -> ManagedSqliteShmTestTargetIdentity {
+        let (runtime_generation, shm_connection_id) = self.target.identity();
+        ManagedSqliteShmTestTargetIdentity {
+            runtime_generation,
+            shm_connection_id,
+        }
+    }
+
+    /// Installs one script only after a fixture has observed this exact live physical target.
+    /// This authority is sealed to Windows tests and cannot redirect to a sibling connection.
+    pub(crate) fn install_test_fault_script(
+        &self,
+        before_call: &[(ManagedSqliteShmFailurePhase, u32)],
+        after_success: &[(
+            ManagedSqliteShmFailurePhase,
+            u32,
+            ManagedSqliteShmFailureClass,
+        )],
+    ) -> Result<ManagedSqliteShmTestFaultProbe, &'static str> {
+        install_exact_test_fault_script(
+            Arc::clone(&self.coordinator),
+            self.target,
+            before_call,
+            after_success,
+        )
     }
 }
 
@@ -181,6 +248,19 @@ impl ManagedSqliteShmCoordinator {
 }
 
 impl PinnedManagedSqliteWalMainFile {
+    /// Creates a read-only exact-target witness without installing a fault. The observer is
+    /// sealed to Windows tests and retains neither file nor route custody.
+    #[cfg(all(test, windows))]
+    pub(crate) fn test_shm_target_observer(
+        &self,
+    ) -> Result<ManagedSqliteShmTestTargetObserver, &'static str> {
+        let (coordinator, target) = self.exact_test_fault_target()?;
+        Ok(ManagedSqliteShmTestTargetObserver {
+            coordinator,
+            target,
+        })
+    }
+
     /// Installs one script for this exact live SHM attachment. Before-call entries always request
     /// `IoBeforeMutation`; after-success entries may request only known or uncertain mutation.
     pub(crate) fn install_shm_test_fault_script(
@@ -193,21 +273,7 @@ impl PinnedManagedSqliteWalMainFile {
         )],
     ) -> Result<ManagedSqliteShmTestFaultProbe, &'static str> {
         let (coordinator, target) = self.exact_test_fault_target()?;
-        let mut faults = match coordinator.test_faults.lock() {
-            Ok(faults) => faults,
-            Err(poison) => {
-                drop(poison.into_inner());
-                coordinator.poison_test_fault_controller_from_external_access();
-                return Err(CONTROLLER_POISONED);
-            }
-        };
-        let installed = faults.install(target, before_call, after_success);
-        drop(faults);
-        installed?;
-        Ok(ManagedSqliteShmTestFaultProbe {
-            coordinator,
-            target,
-        })
+        install_exact_test_fault_script(coordinator, target, before_call, after_success)
     }
 
     fn exact_test_fault_target(
@@ -230,4 +296,31 @@ impl PinnedManagedSqliteWalMainFile {
         let target = coordinator.test_fault_target(connection.connection_id);
         Ok((coordinator, target))
     }
+}
+
+fn install_exact_test_fault_script(
+    coordinator: Arc<ManagedSqliteShmCoordinator>,
+    target: ManagedSqliteShmTestFaultTarget,
+    before_call: &[(ManagedSqliteShmFailurePhase, u32)],
+    after_success: &[(
+        ManagedSqliteShmFailurePhase,
+        u32,
+        ManagedSqliteShmFailureClass,
+    )],
+) -> Result<ManagedSqliteShmTestFaultProbe, &'static str> {
+    let mut faults = match coordinator.test_faults.lock() {
+        Ok(faults) => faults,
+        Err(poison) => {
+            drop(poison.into_inner());
+            coordinator.poison_test_fault_controller_from_external_access();
+            return Err(CONTROLLER_POISONED);
+        }
+    };
+    let installed = faults.install(target, before_call, after_success);
+    drop(faults);
+    installed?;
+    Ok(ManagedSqliteShmTestFaultProbe {
+        coordinator,
+        target,
+    })
 }

@@ -242,6 +242,26 @@ where
                     return Err(ManagedSqliteRegistryPinnedFileOperationRejection::InjectedLifecycle);
                 }
                 #[cfg(test)]
+                let callback = {
+                    let mut callback = callback;
+                    let native_rejection = match self.close_faults.as_ref() {
+                        Some(faults) => faults
+                            .claim_native_failure_gate(
+                                super::ManagedSqliteRegistryCloseLifecyclePhase::BarrierCallbackCompletion,
+                            )
+                            .map_err(|()| {
+                                ManagedSqliteRegistryPinnedFileOperationRejection::InjectedLifecycle
+                            })?,
+                        None => false,
+                    };
+                    if native_rejection {
+                        callback
+                            .arm_barrier_callback_completion_native_rejection()
+                            .map_err(ManagedSqliteRegistryPinnedFileOperationRejection::Registry)?;
+                    }
+                    callback
+                };
+                #[cfg(test)]
                 let completed = match callback.complete_with_receipt() {
                     Ok(completed) => completed,
                     Err(rejection) => {

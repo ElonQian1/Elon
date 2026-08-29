@@ -24,6 +24,10 @@ use crate::{
 };
 
 #[cfg(all(test, windows))]
+mod barrier;
+#[cfg(all(test, windows))]
+pub(super) use barrier::ManagedTestBarrierLogicalRouteSnapshot;
+#[cfg(all(test, windows))]
 mod registration_shutdown;
 #[cfg(all(test, windows))]
 pub(super) use registration_shutdown::ManagedTestRegistrationShutdownRouteSnapshot;
@@ -154,7 +158,7 @@ impl ManagedTestVfsRouteEntry {
         &self,
     ) -> Result<ManagedTestShmFaultPlanBinding, &'static str> {
         let binding = self.readonly_main_shm_fault_binding()?;
-        binding.observer()?;
+        let _observer = binding.observer()?;
         Ok(binding)
     }
 

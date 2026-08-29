@@ -14,7 +14,7 @@ use super::{
     owner::{ManagedSqliteRegistryCustody, ManagedSqliteRegistryRouteHandle},
     process_owner::{
         ManagedSqliteRegistryNonceSource, ManagedSqliteRegistryProcessOwner,
-        ManagedSqliteRegistryRoutedCallbackLease,
+        ManagedSqliteRegistryRoutedCallbackLease, ManagedSqliteRegistryTerminalCustodyTestSnapshot,
     },
     types::{
         ManagedSqliteRegistryCallbackKind, ManagedSqliteRegistrySessionPhase,
@@ -330,6 +330,16 @@ where
                 ManagedSqliteRegistryTerminalReason::FailureCustodyRetained,
                 custody,
             )
+            .map_err(drop)
+    }
+
+    /// Returns an exact-route, redacted terminal-retention witness even after the live registry
+    /// entry has been removed. No route token or retained custody leaves the process owner.
+    pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy) fn terminal_custody_test_snapshot(
+        &self,
+    ) -> Result<ManagedSqliteRegistryTerminalCustodyTestSnapshot, ()> {
+        self.owner
+            .terminal_custody_test_snapshot(self.route)
             .map_err(drop)
     }
 

@@ -6,7 +6,9 @@ use std::{
 use ring::rand::{SecureRandom, SystemRandom};
 
 #[cfg(test)]
-use super::state::ManagedSqliteRegistrySessionTestSnapshot;
+use super::state::{
+    ManagedSqliteRegistrySessionTestSnapshot, ManagedSqliteRegistryTerminalRouteTestSnapshot,
+};
 #[cfg(test)]
 use super::types::{
     ManagedSqliteRegistryCallbackCompletionReceipt, ManagedSqliteRegistryConnectionClosedReceipt,
@@ -41,6 +43,9 @@ use crate::{
 
 mod lifecycle;
 mod vfs;
+
+#[cfg(test)]
+pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy) use lifecycle::ManagedSqliteRegistryTerminalCustodyTestSnapshot;
 
 const ROUTE_NONCE_ATTEMPTS: usize = 8;
 
@@ -110,6 +115,8 @@ pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy
 > {
     routes: Mutex<ManagedSqliteRegistryOwner<Custody>>,
     nonce_source: NonceSource,
+    #[cfg(test)]
+    terminal_custody_test_ledger: lifecycle::ManagedSqliteRegistryTerminalCustodyTestLedger,
 }
 
 impl<Custody, NonceSource> ManagedSqliteRegistryProcessOwner<Custody, NonceSource>
@@ -123,6 +130,9 @@ where
         Box::leak(Box::new(Self {
             routes: Mutex::new(ManagedSqliteRegistryOwner::new()),
             nonce_source,
+            #[cfg(test)]
+            terminal_custody_test_ledger:
+                lifecycle::ManagedSqliteRegistryTerminalCustodyTestLedger::new(),
         }))
     }
 
@@ -270,8 +280,23 @@ where
         route: ManagedSqliteRegistryRouteHandle,
         lease: ManagedSqliteRegistryCallbackLease,
     ) -> Result<(), ManagedSqliteRegistryProcessRouteRejection> {
-        self.apply_route_retaining_failure(route, lease, |routes, lease| {
-            routes.finish_callback(route, lease)
+        self.apply_route_retaining_failure(
+            route,
+            lease,
+            #[cfg(test)]
+            lifecycle::ManagedSqliteRegistryTerminalCustodyTestRetentionKind::CallbackLease,
+            |routes, lease| routes.finish_callback(route, lease),
+        )
+    }
+
+    #[cfg(test)]
+    fn arm_barrier_callback_completion_native_rejection(
+        &self,
+        route: ManagedSqliteRegistryRouteHandle,
+        lease: &ManagedSqliteRegistryCallbackLease,
+    ) -> Result<(), ManagedSqliteRegistryProcessRouteRejection> {
+        self.apply_route(route, |routes| {
+            routes.arm_barrier_callback_completion_native_rejection(route, lease)
         })
     }
 
@@ -284,9 +309,12 @@ where
         ManagedSqliteRegistryCallbackCompletionReceipt,
         ManagedSqliteRegistryProcessRouteRejection,
     > {
-        self.apply_route_retaining_failure(route, lease, |routes, lease| {
-            routes.finish_callback_with_receipt(route, lease)
-        })
+        self.apply_route_retaining_failure(
+            route,
+            lease,
+            lifecycle::ManagedSqliteRegistryTerminalCustodyTestRetentionKind::CallbackLease,
+            |routes, lease| routes.finish_callback_with_receipt(route, lease),
+        )
     }
 
     fn apply_route<T>(
@@ -313,6 +341,8 @@ where
         &self,
         route: ManagedSqliteRegistryRouteHandle,
         evidence: Evidence,
+        #[cfg(test)]
+        retained_kind: lifecycle::ManagedSqliteRegistryTerminalCustodyTestRetentionKind,
         operation: impl FnOnce(
             &mut ManagedSqliteRegistryOwner<Custody>,
             &Evidence,
@@ -321,14 +351,55 @@ where
         let mut routes = match self.lock_routes() {
             Ok(routes) => routes,
             Err(rejection) => {
+                #[cfg(test)]
+                let _ = self.record_terminal_custody_test_event(
+                    route,
+                    lifecycle::ManagedSqliteRegistryTerminalCustodyTestEventKind::Retention {
+                        kind: retained_kind,
+                        explicit_failure_custody_retained: false,
+                        terminal_route: None,
+                    },
+                );
                 let _permanent_evidence = Box::leak(Box::new(evidence));
                 return Err(rejection);
             }
         };
+        #[cfg(test)]
+        let exact_route_was_active = routes.phase(route).is_ok();
         match operation(&mut routes, &evidence) {
             Ok(value) => Ok(value),
             Err(rejection) => {
+                #[cfg(test)]
+                let explicit_failure_custody_retained = matches!(
+                    routes.terminal_reason(route),
+                    Ok(Some(
+                        ManagedSqliteRegistryTerminalReason::FailureCustodyRetained
+                    ))
+                );
+                #[cfg(test)]
+                let terminal_route = routes.terminal_route_test_snapshot(route).ok();
+                #[cfg(test)]
+                let _ = self.record_terminal_custody_test_event(
+                    route,
+                    lifecycle::ManagedSqliteRegistryTerminalCustodyTestEventKind::Retention {
+                        kind: retained_kind,
+                        explicit_failure_custody_retained,
+                        terminal_route,
+                    },
+                );
                 routes.retain_terminal_if_present(route);
+                #[cfg(test)]
+                if exact_route_was_active
+                    && matches!(
+                        routes.phase(route),
+                        Err(ManagedSqliteRegistryRouteRejection::UnknownOrRetired)
+                    )
+                {
+                    let _ = self.record_terminal_custody_test_event(
+                        route,
+                        lifecycle::ManagedSqliteRegistryTerminalCustodyTestEventKind::RouteRemoved,
+                    );
+                }
                 let _permanent_evidence = Box::leak(Box::new(evidence));
                 Err(ManagedSqliteRegistryProcessRouteRejection::Route(rejection))
             }
@@ -376,6 +447,18 @@ where
     Custody: ManagedSqliteRegistryCustody + 'static,
     NonceSource: ManagedSqliteRegistryNonceSource + 'static,
 {
+    #[cfg(test)]
+    pub(super) fn arm_barrier_callback_completion_native_rejection(
+        &mut self,
+    ) -> Result<(), ManagedSqliteRegistryProcessRouteRejection> {
+        let lease = self
+            .lease
+            .as_ref()
+            .expect("live routed callback lease must contain state custody");
+        self.owner
+            .arm_barrier_callback_completion_native_rejection(self.route, lease)
+    }
+
     pub(super) fn complete(mut self) -> Result<(), ManagedSqliteRegistryProcessRouteRejection> {
         let lease = self
             .lease
@@ -408,10 +491,12 @@ where
         if let Some(lease) = self.lease.take() {
             // Stack unwinding or an abandoned callback is not normal completion evidence. Keep
             // the exact lease forever and quarantine its route before any custody can be reused.
-            let _ = self.owner.retain_terminal_custody(
+            let _ = self.owner.retain_terminal_custody_with_test_kind(
                 self.route,
                 ManagedSqliteRegistryTerminalReason::FailureCustodyRetained,
                 lease,
+                #[cfg(test)]
+                lifecycle::ManagedSqliteRegistryTerminalCustodyTestRetentionKind::CallbackLease,
             );
         }
     }

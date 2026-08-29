@@ -66,7 +66,13 @@ impl ManagedTestRouteFile {
                     return Err(());
                 }
             }
-            None => self.inner.promote_main_to_wal_for_shm()?,
+            None => {
+                let observer = self.inner.promote_main_to_wal_for_shm()?;
+                if let Err(code) = self.shm_faults.record_promoted(observer) {
+                    let _ = self.inner.retain_test_fault_bridge_failure(code);
+                    return Err(());
+                }
+            }
         }
         Ok(())
     }

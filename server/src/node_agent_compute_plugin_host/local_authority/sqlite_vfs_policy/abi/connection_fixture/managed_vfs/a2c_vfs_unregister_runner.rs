@@ -10,8 +10,8 @@ use anyhow::{anyhow, Context};
 
 use super::{
     a2_dynamic_evidence::{
-        ChildLaunchIdentity, ValidatedParentCleanupReceipt, ValidatedWindowsDynamicRecord,
-        WindowsDynamicEnvironment, A2_DYNAMIC_CHILD_NONCE_ENV,
+        ChildLaunchIdentity, DynamicChildFailure, ValidatedParentCleanupReceipt,
+        ValidatedWindowsDynamicRecord, WindowsDynamicEnvironment, A2_DYNAMIC_CHILD_NONCE_ENV,
     },
     a2b2_cases::{validate_registration_shutdown_report_payload, RegistrationShutdownSelector},
 };
@@ -115,14 +115,14 @@ fn run_parent(
     let bound = match launch.bind(spawned) {
         Ok(bound) => bound,
         Err(error) => {
-            cleanup_failed_case(&root);
-            return Err(anyhow!(error));
+            return Err(handle_child_failure(&root, error));
         }
     };
+    let child = match bound.wait_for_successful_report() {
+        Ok(child) => child,
+        Err(error) => return Err(handle_child_failure(&root, error)),
+    };
     let result = (|| {
-        let child = bound
-            .wait_for_successful_report()
-            .map_err(anyhow::Error::msg)?;
         let observation =
             validate_registration_shutdown_report_payload(selector, child.actual_payload())
                 .map_err(anyhow::Error::msg)?;
@@ -142,10 +142,10 @@ fn run_parent(
         println!("{report}");
         Ok(())
     })();
-    if result.is_err() {
-        cleanup_failed_case(&root);
+    match result {
+        Ok(()) => Ok(()),
+        Err(error) => Err(cleanup_failed_case(&root, error)),
     }
-    result
 }
 
 fn private_child_root(selector: RegistrationShutdownSelector) -> std::path::PathBuf {
@@ -157,8 +157,26 @@ fn private_child_root(selector: RegistrationShutdownSelector) -> std::path::Path
     ))
 }
 
-fn cleanup_failed_case(root: &Path) {
-    if root.exists() {
-        let _ = fs::remove_dir_all(root);
+fn handle_child_failure(root: &Path, failure: DynamicChildFailure) -> anyhow::Error {
+    let exit_confirmed = failure.exit_confirmed();
+    let error = anyhow!(failure);
+    if exit_confirmed {
+        cleanup_failed_case(root, error)
+    } else {
+        error.context(format!(
+            "retained registration shutdown case root {} because child exit is unconfirmed",
+            root.display()
+        ))
+    }
+}
+
+fn cleanup_failed_case(root: &Path, error: anyhow::Error) -> anyhow::Error {
+    match fs::remove_dir_all(root) {
+        Ok(()) => error,
+        Err(cleanup_error) if cleanup_error.kind() == std::io::ErrorKind::NotFound => error,
+        Err(cleanup_error) => error.context(format!(
+            "also failed to remove registration shutdown case root {}: {cleanup_error}",
+            root.display()
+        )),
     }
 }

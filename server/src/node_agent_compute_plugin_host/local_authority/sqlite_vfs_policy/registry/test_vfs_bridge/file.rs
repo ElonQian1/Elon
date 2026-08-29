@@ -6,6 +6,7 @@ use std::{
 use super::super::file_custody::{
     ManagedSqliteRegistryCloseLifecycleFaults, ManagedSqliteRegistryCloseLifecyclePhase,
 };
+use super::super::process_owner::ManagedSqliteRegistryTerminalCustodyTestSnapshot;
 use super::*;
 use crate::node_agent_compute_plugin_host::local_authority::{
     sqlite_vfs_abi::HandleBoundSqliteFileOperations,
@@ -17,6 +18,7 @@ use crate::node_agent_compute_plugin_host::local_authority::{
 };
 use crate::node_agent_managed_fs::{
     ManagedSqliteShmFailureClass, ManagedSqliteShmFailurePhase, ManagedSqliteShmTestFaultProbe,
+    ManagedSqliteShmTestTargetObserver,
 };
 
 pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy) struct ManagedSqliteTestVfsFile<
@@ -77,12 +79,13 @@ where
 
     pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy) fn promote_main_to_wal_for_shm(
         &mut self,
-    ) -> Result<(), ()> {
+    ) -> Result<ManagedSqliteShmTestTargetObserver, ()> {
         if self.role != ManagedSqliteLogicalFileRole::Main {
             return Err(());
         }
         let runtime = self.wal_runtime.as_deref().ok_or(())?;
-        self.file.promote_main_to_wal(runtime)
+        self.file.promote_main_to_wal(runtime)?;
+        self.file.exact_wal_main_shm_test_target_observer()
     }
 
     pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy) fn retain_test_fault_bridge_failure(
@@ -95,6 +98,15 @@ where
                 ManagedSqliteRegistryTerminalReason::FailureCustodyRetained,
                 code,
             )
+            .map_err(drop)
+    }
+
+    /// Returns only redacted counts and route-presence state for this file's exact private route.
+    pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy) fn terminal_custody_test_snapshot(
+        &self,
+    ) -> Result<ManagedSqliteRegistryTerminalCustodyTestSnapshot, ()> {
+        self.owner
+            .terminal_custody_test_snapshot(self.route)
             .map_err(drop)
     }
 }
@@ -194,11 +206,10 @@ where
         }
         let observed = match owner.observe_connection_closed_after_callback(route, callback) {
             Ok(observed) => observed,
-            Err(rejection) => {
+            Err(_rejection) => {
                 close_faults.native_failure(
                     ManagedSqliteRegistryCloseLifecyclePhase::ConnectionObservation,
                 );
-                drop(rejection);
                 return Err(());
             }
         };
@@ -226,10 +237,9 @@ where
         }
         let retirement = match owner.retire_closed_after_observation(route, observed) {
             Ok(retirement) => retirement,
-            Err(rejection) => {
+            Err(_rejection) => {
                 close_faults
                     .native_failure(ManagedSqliteRegistryCloseLifecyclePhase::RouteRetirement);
-                drop(rejection);
                 return Err(());
             }
         };

@@ -162,6 +162,41 @@ pub(in crate::node_agent_compute_plugin_host::local_authority) struct HandleBoun
     file: *mut ffi::sqlite3_file,
 }
 
+/// Redacted test-only observation of the two raw ownership slots. It exposes neither pointer and
+/// can only distinguish the installed/cleared states needed by the void-callback evidence path.
+#[cfg(test)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(in crate::node_agent_compute_plugin_host::local_authority) struct HandleBoundSqliteAbiRawSlotSnapshot
+{
+    pub(in crate::node_agent_compute_plugin_host::local_authority) methods_installed: bool,
+    pub(in crate::node_agent_compute_plugin_host::local_authority) state_installed: bool,
+}
+
+/// Observes the raw slots of one live allocation owned by this test VFS without borrowing or
+/// consuming its installed Rust payload.
+///
+/// # Safety
+///
+/// `file` must identify a live, aligned `szOsFile` allocation initialized by this ABI module, and
+/// no SQLite callback may overlap this read-only observation.
+#[cfg(test)]
+pub(in crate::node_agent_compute_plugin_host::local_authority) unsafe fn observe_test_vfs_file_raw_slots(
+    file: *mut ffi::sqlite3_file,
+) -> Option<HandleBoundSqliteAbiRawSlotSnapshot> {
+    let file = NonNull::new(file.cast::<super::types::InertHandleBoundSqliteFile>())?;
+    // SAFETY: the caller supplies this module's live allocation and serializes callback access.
+    let (methods, state) = unsafe {
+        (
+            std::ptr::addr_of!((*file.as_ptr()).base.pMethods).read(),
+            std::ptr::addr_of!((*file.as_ptr()).state).read(),
+        )
+    };
+    Some(HandleBoundSqliteAbiRawSlotSnapshot {
+        methods_installed: !methods.is_null(),
+        state_installed: !state.is_null(),
+    })
+}
+
 #[cfg(test)]
 impl HandleBoundSqliteAbiTestFile {
     pub(in crate::node_agent_compute_plugin_host::local_authority) fn install(

@@ -1,6 +1,10 @@
-use std::{path::Path, process::Child};
+use std::{fmt, path::Path, process::Child};
 
 use sha2::{Digest, Sha256};
+
+mod payload;
+
+use payload::validate_actual_payload;
 
 pub(in super::super) const A2_DYNAMIC_CHILD_NONCE_ENV: &str = "ELON_SQLITE_A2_DYNAMIC_CHILD_NONCE";
 
@@ -9,8 +13,12 @@ const NONCE_HEX_LEN: usize = 32;
 const COMMITMENT_HEX_LEN: usize = 64;
 const MAX_CAPTURED_STDOUT_BYTES: usize = 64 * 1024;
 const MAX_ACTUAL_PAYLOAD_BYTES: usize = 1_024;
-const REGISTRATION_REPORT_VERSION: &str = "a2b2rs1";
-const REGISTRATION_REPORT_VALUE_COUNT: usize = 81;
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum SanitizedPayloadFamily {
+    RegistrationShutdown,
+    Barrier,
+}
 
 /// Parent-created nonce which must be installed in the child command before spawn.
 ///
@@ -23,6 +31,14 @@ pub(in super::super) struct ChildLaunchIdentity {
 pub(in super::super) struct BoundDynamicChild {
     child: Child,
     identity: UniqueChildIdentity,
+}
+
+/// Failure from the exact spawned child, carrying the only authority for fallback root cleanup.
+#[derive(Debug)]
+pub(in super::super) struct DynamicChildFailure {
+    code: &'static str,
+    exit_confirmed: bool,
+    detail: Option<String>,
 }
 
 pub(super) struct UniqueChildIdentity {
@@ -63,6 +79,7 @@ pub(in super::super) struct SanitizedChildReport {
     pub(super) root_commitment: RootCommitment,
     pub(super) registration_commitment: RegistrationCommitment,
     pub(super) actual_payload: String,
+    family: SanitizedPayloadFamily,
 }
 
 /// Linear proof produced only by waiting the `Child` consumed by `BoundDynamicChild`.
@@ -72,6 +89,7 @@ pub(in super::super) struct ValidatedChildProcessReceipt {
     pub(super) registration_commitment: RegistrationCommitment,
     pub(super) actual_payload: String,
     pub(super) payload_commitment: SanitizedActualPayloadCommitment,
+    family: SanitizedPayloadFamily,
     pub(super) exit_code: i32,
 }
 
@@ -91,11 +109,13 @@ impl ChildLaunchIdentity {
     pub(in super::super) fn bind(
         self,
         mut child: Child,
-    ) -> Result<BoundDynamicChild, &'static str> {
+    ) -> Result<BoundDynamicChild, DynamicChildFailure> {
         let process_id = child.id();
         if process_id == 0 || !valid_nonce(&self.nonce) {
-            super::capture::abort_child(&mut child);
-            return Err("A2_DYNAMIC_CHILD_IDENTITY_INVALID");
+            return Err(super::capture::abort_child(
+                &mut child,
+                "A2_DYNAMIC_CHILD_IDENTITY_INVALID",
+            ));
         }
         Ok(BoundDynamicChild {
             child,
@@ -112,18 +132,21 @@ impl BoundDynamicChild {
     /// exactly one report and verifies that the report carries this child's PID and launch nonce.
     pub(in super::super) fn wait_for_successful_report(
         mut self,
-    ) -> Result<ValidatedChildProcessReceipt, &'static str> {
+    ) -> Result<ValidatedChildProcessReceipt, DynamicChildFailure> {
         let output = super::capture::wait_for_bounded_output(&mut self.child)?;
         if !output.status.success() {
-            return Err("A2_DYNAMIC_CHILD_EXIT_FAILED");
+            return Err(DynamicChildFailure::exited("A2_DYNAMIC_CHILD_EXIT_FAILED"));
         }
         let exit_code = output
             .status
             .code()
-            .ok_or("A2_DYNAMIC_CHILD_EXIT_CODE_UNAVAILABLE")?;
-        let report = SanitizedChildReport::parse_captured_stdout(&output.stdout)?;
+            .ok_or_else(|| DynamicChildFailure::exited("A2_DYNAMIC_CHILD_EXIT_CODE_UNAVAILABLE"))?;
+        let report = SanitizedChildReport::parse_captured_stdout(&output.stdout)
+            .map_err(DynamicChildFailure::exited)?;
         if !self.identity.matches(&report.identity) {
-            return Err("A2_DYNAMIC_CHILD_IDENTITY_MISMATCH");
+            return Err(DynamicChildFailure::exited(
+                "A2_DYNAMIC_CHILD_IDENTITY_MISMATCH",
+            ));
         }
         let payload_commitment = payload_commitment(&report.actual_payload);
         Ok(ValidatedChildProcessReceipt {
@@ -132,12 +155,80 @@ impl BoundDynamicChild {
             registration_commitment: report.registration_commitment,
             actual_payload: report.actual_payload,
             payload_commitment,
+            family: report.family,
             exit_code,
         })
     }
 }
 
+impl DynamicChildFailure {
+    pub(super) fn exited(code: &'static str) -> Self {
+        Self {
+            code,
+            exit_confirmed: true,
+            detail: None,
+        }
+    }
+
+    pub(super) fn exited_with_detail(code: &'static str, detail: String) -> Self {
+        Self {
+            code,
+            exit_confirmed: true,
+            detail: Some(detail),
+        }
+    }
+
+    pub(super) fn exit_unconfirmed(code: &'static str, detail: String) -> Self {
+        Self {
+            code,
+            exit_confirmed: false,
+            detail: Some(detail),
+        }
+    }
+
+    pub(in super::super) fn exit_confirmed(&self) -> bool {
+        self.exit_confirmed
+    }
+}
+
+impl fmt::Display for DynamicChildFailure {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            formatter,
+            "{} (child_exit={})",
+            self.code,
+            if self.exit_confirmed {
+                "confirmed"
+            } else {
+                "unconfirmed"
+            }
+        )?;
+        if let Some(detail) = &self.detail {
+            write!(formatter, ": {detail}")?;
+        }
+        Ok(())
+    }
+}
+
+impl std::error::Error for DynamicChildFailure {}
+
 impl SanitizedChildReport {
+    /// Rejects a substituted or reparse-point root before the child performs any real VFS work.
+    pub(in super::super) fn validate_root_before_exercise(
+        launch_nonce: &str,
+        root: &Path,
+    ) -> Result<(), &'static str> {
+        if !valid_nonce(launch_nonce) {
+            return Err("A2_DYNAMIC_CHILD_NONCE_INVALID");
+        }
+        let captured_root =
+            super::environment::capture_root_binding(root, std::process::id(), launch_nonce)?;
+        if captured_root.canonical_root != root {
+            return Err("A2_DYNAMIC_ROOT_NOT_CANONICAL");
+        }
+        Ok(())
+    }
+
     /// Produces the one child report line. Root and registration commitments are computed from the
     /// real inputs here; the caller cannot inject either digest or expose their raw values.
     pub(in super::super) fn encode_for_current_child(
@@ -152,7 +243,7 @@ impl SanitizedChildReport {
         if registration_id == 0 {
             return Err("A2_DYNAMIC_REGISTRATION_ID_INVALID");
         }
-        validate_actual_payload(actual_payload)?;
+        let family = validate_actual_payload(actual_payload)?;
         let process_id = std::process::id();
         let captured_root =
             super::environment::capture_root_binding(root, process_id, launch_nonce)?;
@@ -162,6 +253,7 @@ impl SanitizedChildReport {
             launch_nonce,
             &captured_root.commitment,
             &payload_commitment,
+            family,
             registration_id,
         );
         Ok(format!(
@@ -209,8 +301,13 @@ impl ValidatedChildProcessReceipt {
                     &self.identity.nonce,
                     &self.root_commitment,
                     &self.payload_commitment,
+                    self.family,
                     registration_id,
                 )
+    }
+
+    pub(super) fn matches_family(&self, family: SanitizedPayloadFamily) -> bool {
+        self.family == family
     }
 
     pub(super) fn redacted_payload_fingerprint(&self) -> [u8; 32] {
@@ -279,7 +376,7 @@ fn parse_report_line(line: &str) -> Result<SanitizedChildReport, &'static str> {
     if parts.next().is_some() {
         return Err("A2_DYNAMIC_CHILD_REPORT_FIELDS_INVALID");
     }
-    validate_actual_payload(actual_payload)?;
+    let family = validate_actual_payload(actual_payload)?;
     Ok(SanitizedChildReport {
         identity: ReportedChildIdentity {
             process_id,
@@ -288,6 +385,7 @@ fn parse_report_line(line: &str) -> Result<SanitizedChildReport, &'static str> {
         root_commitment,
         registration_commitment,
         actual_payload: actual_payload.to_owned(),
+        family,
     })
 }
 
@@ -312,36 +410,6 @@ fn valid_nonce(value: &str) -> bool {
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
-fn validate_actual_payload(payload: &str) -> Result<(), &'static str> {
-    if payload.is_empty() || payload.len() > MAX_ACTUAL_PAYLOAD_BYTES || !payload.is_ascii() {
-        return Err("A2_DYNAMIC_CHILD_ACTUAL_SIZE_INVALID");
-    }
-    let mut fields = payload.split(',');
-    if fields.next() != Some(REGISTRATION_REPORT_VERSION) {
-        return Err("A2_DYNAMIC_CHILD_ACTUAL_VERSION_INVALID");
-    }
-    let selector = fields
-        .next()
-        .ok_or("A2_DYNAMIC_CHILD_ACTUAL_SELECTOR_MISSING")?;
-    if selector.is_empty()
-        || selector.len() > 64
-        || !selector
-            .bytes()
-            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
-    {
-        return Err("A2_DYNAMIC_CHILD_ACTUAL_SELECTOR_INVALID");
-    }
-    let values = fields.collect::<Vec<_>>();
-    if values.len() != REGISTRATION_REPORT_VALUE_COUNT
-        || values.iter().any(|value| {
-            value.is_empty() || value.len() > 20 || !value.bytes().all(|byte| byte.is_ascii_digit())
-        })
-    {
-        return Err("A2_DYNAMIC_CHILD_ACTUAL_FIELDS_INVALID");
-    }
-    Ok(())
-}
-
 fn identity_fingerprint(process_id: u32, nonce: &str) -> ChildIdentityFingerprint {
     let mut hasher = Sha256::new();
     hasher.update(b"elon-a2-windows-dynamic-child-v2\0");
@@ -363,6 +431,7 @@ fn registration_commitment(
     nonce: &str,
     root: &RootCommitment,
     payload: &SanitizedActualPayloadCommitment,
+    family: SanitizedPayloadFamily,
     registration_id: u64,
 ) -> RegistrationCommitment {
     let mut hasher = Sha256::new();
@@ -371,11 +440,15 @@ fn registration_commitment(
     hasher.update(nonce.as_bytes());
     hasher.update(root.0);
     hasher.update(payload.0);
+    hasher.update([match family {
+        SanitizedPayloadFamily::RegistrationShutdown => 1,
+        SanitizedPayloadFamily::Barrier => 2,
+    }]);
     hasher.update(registration_id.to_le_bytes());
     RegistrationCommitment(hasher.finalize().into())
 }
 
 #[cfg(test)]
 pub(super) fn validate_payload_for_test(payload: &str) -> Result<(), &'static str> {
-    validate_actual_payload(payload)
+    validate_actual_payload(payload).map(|_| ())
 }

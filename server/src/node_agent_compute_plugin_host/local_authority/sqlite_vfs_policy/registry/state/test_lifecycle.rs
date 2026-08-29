@@ -4,6 +4,23 @@ use crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::r
 };
 
 impl ManagedSqliteRegistrySessionState {
+    pub(in super::super) fn arm_barrier_callback_completion_native_rejection(
+        &mut self,
+        lease: &ManagedSqliteRegistryCallbackLease,
+    ) -> Result<(), ManagedSqliteRegistryTransitionRejection> {
+        self.ensure_shape()?;
+        if self.phase != ManagedSqliteRegistrySessionPhase::Active
+            || lease.session_id != self.session_id
+            || lease.kind != ManagedSqliteRegistryCallbackKind::Shm
+            || self.callbacks_in_flight != 1
+        {
+            self.enter_terminal(ManagedSqliteRegistryTerminalReason::StateInvariantViolated);
+            return Err(ManagedSqliteRegistryTransitionRejection::StateInvariantViolated);
+        }
+        self.enter_terminal(ManagedSqliteRegistryTerminalReason::FailureCustodyRetained);
+        Ok(())
+    }
+
     pub(in super::super) fn finish_callback_with_receipt(
         &mut self,
         lease: &ManagedSqliteRegistryCallbackLease,
@@ -11,6 +28,9 @@ impl ManagedSqliteRegistrySessionState {
         ManagedSqliteRegistryCallbackCompletionReceipt,
         ManagedSqliteRegistryTransitionRejection,
     > {
+        if self.phase == ManagedSqliteRegistrySessionPhase::TerminalQuarantine {
+            return Err(ManagedSqliteRegistryTransitionRejection::Terminal);
+        }
         self.finish_callback(lease)?;
         Ok(ManagedSqliteRegistryCallbackCompletionReceipt::from_completed(lease))
     }

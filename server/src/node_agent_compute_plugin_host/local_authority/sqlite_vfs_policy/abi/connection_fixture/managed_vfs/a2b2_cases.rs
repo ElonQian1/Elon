@@ -1,12 +1,15 @@
 //! Static A2b2 source inventory for the full managed-VFS close authority boundary.
 //!
 //! The inventory is wired through `managed_vfs.rs` as a `cfg(test)` static contract. Compilation
-//! is not case execution, and no inventory entry currently has Windows dynamic evidence.
+//! is not case execution; dynamic evidence is attached only by each case family's dedicated
+//! Windows runner and validator.
 
 mod barrier;
 mod case_key;
 mod close_physical;
 mod close_registry;
+#[cfg(windows)]
+mod dynamic_barrier;
 #[cfg(windows)]
 mod dynamic_dms_shared_release;
 #[cfg(windows)]
@@ -27,6 +30,14 @@ mod unmap_teardown;
 
 #[cfg(windows)]
 pub(super) use case_key::CaseKey;
+#[cfg(windows)]
+pub(super) use dynamic_barrier::{
+    validate_barrier_report_payload, BarrierActual, BarrierActualCounts, BarrierActualCustody,
+    BarrierActualIdentity, BarrierActualTarget, BarrierActualTopology, BarrierDmsCustody,
+    BarrierFailureClass, BarrierLogicalRoutePhase, BarrierPhase, BarrierRegistrationPhase,
+    BarrierRegistryRoutePhase, BarrierSelector, BarrierTiming, ValidatedBarrierObservation,
+    ValidatedBarrierReportPayload,
+};
 #[cfg(windows)]
 pub(super) use dynamic_dms_shared_release::{
     validate_dms_shared_release_after_success_physical_subset, DmsSharedReleasePhysicalSubsetActual,

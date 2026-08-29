@@ -187,13 +187,130 @@ fn dropped_callback_lease_quarantines_the_exact_route() {
             .begin_callback(route, ManagedSqliteRegistryCallbackKind::FullPathname)
             .expect("callback lease");
     }
+    let witness = process
+        .terminal_custody_test_snapshot(route)
+        .expect("redacted terminal custody witness");
+    assert_eq!(witness.retention_count(), 1);
+    assert_eq!(witness.callback_lease_retention_count(), 1);
+    assert_eq!(witness.completion_evidence_retention_count(), 0);
+    assert_eq!(witness.other_terminal_custody_retention_count(), 0);
+    assert_eq!(witness.explicit_failure_custody_retained_count(), 1);
+    assert_eq!(witness.route_removal_count(), 1);
+    assert!(!witness.active_route_present());
     assert_eq!(drops.load(Ordering::SeqCst), 0);
     assert!(matches!(
-        process.begin_connection_close(route),
+        process.begin_callback(route, ManagedSqliteRegistryCallbackKind::FullPathname),
         Err(ManagedSqliteRegistryProcessRouteRejection::Route(
             ManagedSqliteRegistryRouteRejection::UnknownOrRetired,
         ))
     ));
+}
+
+#[test]
+fn callback_completion_evidence_witness_is_exact_and_route_cannot_be_reused() {
+    let process = ManagedSqliteRegistryProcessOwner::leak(SequenceNonceSource::new([
+        Ok(FIRST_NONCE),
+        Ok(SECOND_NONCE),
+    ]));
+    let (terminal_custody, terminal_drops) = probe();
+    let (untouched_custody, untouched_drops) = probe();
+    let route = process.register(terminal_custody).expect("terminal route");
+    let untouched_route = process
+        .register(untouched_custody)
+        .expect("untouched route");
+    process.begin_open_attempt(route).expect("opening");
+    let completed = process
+        .begin_callback(route, ManagedSqliteRegistryCallbackKind::FullPathname)
+        .expect("callback lease")
+        .complete_with_receipt()
+        .expect("completion evidence");
+
+    process
+        .retain_terminal_custody(
+            route,
+            ManagedSqliteRegistryTerminalReason::FailureCustodyRetained,
+            completed,
+        )
+        .expect("retain completion evidence and remove route");
+
+    let witness = process
+        .terminal_custody_test_snapshot(route)
+        .expect("redacted terminal custody witness");
+    assert_eq!(witness.retention_count(), 1);
+    assert_eq!(witness.callback_lease_retention_count(), 0);
+    assert_eq!(witness.completion_evidence_retention_count(), 1);
+    assert_eq!(witness.other_terminal_custody_retention_count(), 0);
+    assert_eq!(witness.explicit_failure_custody_retained_count(), 1);
+    assert_eq!(witness.route_removal_count(), 1);
+    assert!(!witness.active_route_present());
+    assert!(matches!(
+        process.begin_callback(route, ManagedSqliteRegistryCallbackKind::FullPathname),
+        Err(ManagedSqliteRegistryProcessRouteRejection::Route(
+            ManagedSqliteRegistryRouteRejection::UnknownOrRetired,
+        ))
+    ));
+
+    let untouched = process
+        .terminal_custody_test_snapshot(untouched_route)
+        .expect("unrelated exact route witness");
+    assert_eq!(untouched.retention_count(), 0);
+    assert_eq!(untouched.route_removal_count(), 0);
+    assert!(untouched.active_route_present());
+    assert_eq!(terminal_drops.load(Ordering::SeqCst), 0);
+    assert_eq!(untouched_drops.load(Ordering::SeqCst), 0);
+}
+
+#[test]
+fn barrier_native_completion_rejection_retains_exact_callback_and_keeps_sibling_live() {
+    let process = ManagedSqliteRegistryProcessOwner::leak(SequenceNonceSource::new([
+        Ok(FIRST_NONCE),
+        Ok(SECOND_NONCE),
+    ]));
+    let (terminal_custody, terminal_drops) = probe();
+    let (sibling_custody, sibling_drops) = probe();
+    let route = process.register(terminal_custody).expect("terminal route");
+    let sibling = process.register(sibling_custody).expect("sibling route");
+    process
+        .begin_open_attempt(route)
+        .expect("open terminal route");
+    let _main = process.claim_main(route).expect("claim terminal main");
+    process
+        .activate_connection(route)
+        .expect("activate terminal route");
+    let mut callback = process
+        .begin_callback(route, ManagedSqliteRegistryCallbackKind::Shm)
+        .expect("begin exact SHM callback");
+
+    callback
+        .arm_barrier_callback_completion_native_rejection()
+        .expect("arm exact registry rejection");
+    assert!(matches!(
+        callback.complete_with_receipt(),
+        Err(ManagedSqliteRegistryProcessRouteRejection::Route(
+            ManagedSqliteRegistryRouteRejection::State(
+                ManagedSqliteRegistryTransitionRejection::Terminal,
+            ),
+        ))
+    ));
+
+    let witness = process
+        .terminal_custody_test_snapshot(route)
+        .expect("terminal callback witness");
+    assert_eq!(witness.callback_lease_retention_count(), 1);
+    assert_eq!(witness.explicit_failure_custody_retained_count(), 1);
+    assert_eq!(witness.route_removal_count(), 1);
+    assert!(!witness.active_route_present());
+    assert_eq!(terminal_drops.load(Ordering::SeqCst), 0);
+
+    process
+        .begin_open_attempt(sibling)
+        .expect("sibling owner remains live");
+    process
+        .begin_callback(sibling, ManagedSqliteRegistryCallbackKind::Open)
+        .expect("sibling callback")
+        .complete()
+        .expect("sibling callback completion");
+    assert_eq!(sibling_drops.load(Ordering::SeqCst), 0);
 }
 
 #[test]
@@ -251,8 +368,12 @@ fn close_evidence_is_permanently_retained_when_route_lock_is_poisoned() {
         panic!("poison process owner before close transition");
     }));
 
-    let result: Result<(), _> =
-        process.apply_route_retaining_failure(route, close_evidence, |_routes, _evidence| Ok(()));
+    let result: Result<(), _> = process.apply_route_retaining_failure(
+        route,
+        close_evidence,
+        lifecycle::ManagedSqliteRegistryTerminalCustodyTestRetentionKind::CompletionEvidence,
+        |_routes, _evidence| Ok(()),
+    );
 
     assert_eq!(
         result,
@@ -270,10 +391,12 @@ fn close_evidence_is_permanently_retained_when_route_transition_rejects() {
     let (close_evidence, evidence_drops) = probe();
     let route = process.register(route_custody).expect("route");
 
-    let result: Result<(), _> =
-        process.apply_route_retaining_failure(route, close_evidence, |_routes, _evidence| {
-            Err(ManagedSqliteRegistryRouteRejection::UnknownOrRetired)
-        });
+    let result: Result<(), _> = process.apply_route_retaining_failure(
+        route,
+        close_evidence,
+        lifecycle::ManagedSqliteRegistryTerminalCustodyTestRetentionKind::CompletionEvidence,
+        |_routes, _evidence| Err(ManagedSqliteRegistryRouteRejection::UnknownOrRetired),
+    );
 
     assert_eq!(
         result,
@@ -310,6 +433,45 @@ fn terminal_retention_precedes_exact_route_quarantine() {
             ManagedSqliteRegistryRouteRejection::UnknownOrRetired,
         ))
     ));
+}
+
+#[test]
+fn second_terminal_retention_keeps_custody_without_duplicate_route_projection() {
+    let process =
+        ManagedSqliteRegistryProcessOwner::leak(SequenceNonceSource::new([Ok(FIRST_NONCE)]));
+    let (route_custody, route_drops) = probe();
+    let (first_retained, first_drops) = probe();
+    let (second_retained, second_drops) = probe();
+    let route = process.register(route_custody).expect("route");
+    process.begin_open_attempt(route).expect("opening");
+
+    process
+        .retain_terminal_custody(
+            route,
+            ManagedSqliteRegistryTerminalReason::FailureCustodyRetained,
+            first_retained,
+        )
+        .expect("first terminal retention");
+    assert!(matches!(
+        process.retain_terminal_custody(
+            route,
+            ManagedSqliteRegistryTerminalReason::FailureCustodyRetained,
+            second_retained,
+        ),
+        Err(ManagedSqliteRegistryProcessRouteRejection::Route(
+            ManagedSqliteRegistryRouteRejection::UnknownOrRetired,
+        ))
+    ));
+
+    let witness = process
+        .terminal_custody_test_snapshot(route)
+        .expect("double-retention witness");
+    assert_eq!(witness.retention_count(), 2);
+    assert_eq!(witness.terminal_route_observation_count(), 1);
+    assert_eq!(witness.route_removal_count(), 1);
+    assert_eq!(route_drops.load(Ordering::SeqCst), 0);
+    assert_eq!(first_drops.load(Ordering::SeqCst), 0);
+    assert_eq!(second_drops.load(Ordering::SeqCst), 0);
 }
 
 #[test]
