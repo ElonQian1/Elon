@@ -2,7 +2,11 @@ package com.elon.app
 
 import com.elon.app.chatgptweb.ChatGptWebConversationPath
 import com.elon.app.chatgptweb.ChatGptWebMessage
+import com.elon.app.chatgptweb.ChatGptWebNativeVoiceTranscriptEvent
+import com.elon.app.chatgptweb.ChatGptWebNativeVoiceTranscriptUpdate
 import com.elon.app.chatgptweb.ChatGptWebSnapshot
+import java.util.LinkedHashMap
+import java.util.LinkedHashSet
 
 internal class WebChatRealtimeVoiceTranscriptContinuity {
     private enum class Phase {
@@ -14,17 +18,43 @@ internal class WebChatRealtimeVoiceTranscriptContinuity {
     private var phase = Phase.IDLE
     private var conversationPath: String? = null
     private var retainedSnapshot: ChatGptWebSnapshot? = null
+    private var baselineMessageIds = emptySet<String>()
+    private val liveMessages = LinkedHashMap<String, LiveMessage>()
+    private val seenEventIds = LinkedHashSet<String>()
 
     fun begin(current: ChatGptWebSnapshot?) {
         phase = Phase.ACTIVE
         conversationPath = ChatGptWebConversationPath.fromUrl(current?.url)
         retainedSnapshot = current?.takeIf(::isConversationTranscript)
+        baselineMessageIds = retainedSnapshot?.messages?.mapTo(mutableSetOf()) { it.id }.orEmpty()
+        liveMessages.clear()
+        seenEventIds.clear()
     }
 
     fun end(current: ChatGptWebSnapshot?): ChatGptWebSnapshot? {
         retain(current)
         phase = Phase.RECOVERING
-        return retainedSnapshot
+        return presentationSnapshot()
+    }
+
+    fun applyLive(event: ChatGptWebNativeVoiceTranscriptEvent): ChatGptWebSnapshot? {
+        if (phase != Phase.ACTIVE || retainedSnapshot == null) return null
+        if (event.eventId != null && !rememberEvent(event.eventId)) return presentationSnapshot()
+        val previous = liveMessages[event.streamKey]
+        val nextText = when (event.update) {
+            ChatGptWebNativeVoiceTranscriptUpdate.DELTA ->
+                (previous?.text.orEmpty() + event.text).take(MAX_LIVE_TRANSCRIPT_CHARS)
+            ChatGptWebNativeVoiceTranscriptUpdate.FINAL ->
+                event.text.takeIf(String::isNotBlank) ?: previous?.text.orEmpty()
+        }
+        if (nextText.isBlank()) return presentationSnapshot()
+        liveMessages[event.streamKey] = LiveMessage(
+            id = previous?.id ?: liveMessageId(event),
+            role = event.speaker.role,
+            text = nextText,
+            final = event.update == ChatGptWebNativeVoiceTranscriptUpdate.FINAL,
+        )
+        return presentationSnapshot()
     }
 
     fun resolve(incoming: ChatGptWebSnapshot): ChatGptWebSnapshot? = when (phase) {
@@ -40,6 +70,9 @@ internal class WebChatRealtimeVoiceTranscriptContinuity {
         phase = Phase.IDLE
         conversationPath = null
         retainedSnapshot = null
+        baselineMessageIds = emptySet()
+        liveMessages.clear()
+        seenEventIds.clear()
     }
 
     private fun resolveRecovery(incoming: ChatGptWebSnapshot): ChatGptWebSnapshot? {
@@ -51,8 +84,9 @@ internal class WebChatRealtimeVoiceTranscriptContinuity {
             reset()
             return incoming
         }
+        reconcileLiveMessages(incoming)
         retain(incoming)
-        return retainedSnapshot
+        return presentationSnapshot()
     }
 
     private fun retain(candidate: ChatGptWebSnapshot?) {
@@ -127,4 +161,65 @@ internal class WebChatRealtimeVoiceTranscriptContinuity {
         snapshot.messages.isNotEmpty() &&
             snapshot.pageKind == "conversation" &&
             ChatGptWebConversationPath.fromUrl(snapshot.url) != null
+
+    private fun presentationSnapshot(): ChatGptWebSnapshot? {
+        val retained = retainedSnapshot ?: return null
+        if (liveMessages.isEmpty()) return retained
+        val messages = retained.messages + liveMessages.values.map { live ->
+            ChatGptWebMessage(
+                id = live.id,
+                role = live.role,
+                content = live.text,
+                state = if (live.final) "completed" else "streaming",
+                parts = emptyList(),
+            )
+        }
+        return retained.copy(
+            messages = messages,
+            streaming = liveMessages.values.any { !it.final },
+            observedMessageCount = maxOf(retained.observedMessageCount, messages.size),
+        )
+    }
+
+    private fun reconcileLiveMessages(incoming: ChatGptWebSnapshot) {
+        if (liveMessages.isEmpty()) return
+        val authoritative = incoming.messages.filterNot { it.id in baselineMessageIds }
+        liveMessages.entries.removeAll { (_, live) ->
+            authoritative.any { message ->
+                message.role == live.role && authoritativeCoversLive(message.content, live.text)
+            }
+        }
+    }
+
+    private fun authoritativeCoversLive(authoritative: String, live: String): Boolean {
+        val settled = authoritative.trim()
+        val preview = live.trim()
+        if (settled.isEmpty() || preview.isEmpty()) return false
+        return settled == preview || settled.contains(preview)
+    }
+
+    private fun rememberEvent(eventId: String): Boolean {
+        if (!seenEventIds.add(eventId)) return false
+        while (seenEventIds.size > MAX_SEEN_EVENTS) {
+            val oldest = seenEventIds.iterator()
+            oldest.next()
+            oldest.remove()
+        }
+        return true
+    }
+
+    private fun liveMessageId(event: ChatGptWebNativeVoiceTranscriptEvent): String =
+        "elon-native-voice-${event.speaker.role}-${Integer.toHexString(event.streamKey.hashCode())}"
+
+    private data class LiveMessage(
+        val id: String,
+        val role: String,
+        val text: String,
+        val final: Boolean,
+    )
+
+    private companion object {
+        const val MAX_LIVE_TRANSCRIPT_CHARS = 64 * 1024
+        const val MAX_SEEN_EVENTS = 256
+    }
 }

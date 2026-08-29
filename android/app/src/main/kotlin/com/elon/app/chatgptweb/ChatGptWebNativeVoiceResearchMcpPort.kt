@@ -11,6 +11,7 @@ internal class ChatGptWebNativeVoiceResearchMcpPort(
     private val startNative: ((ChatGptWebNativeVoiceState) -> Unit) -> Boolean,
     private val muteNative: (Boolean) -> Boolean,
     private val stopNative: () -> Unit,
+    private val currentState: (() -> ChatGptWebNativeVoiceState)? = null,
     private val enabled: Boolean = BuildConfig.CHATGPT_PRIVATE_VOICE_NATIVE_RTC_ENABLED,
 ) : WebChatSocialMcpPort {
     @Volatile
@@ -63,14 +64,19 @@ internal class ChatGptWebNativeVoiceResearchMcpPort(
             .put("action", action)
             .put("error", error ?: JSONObject.NULL)
 
-    private fun stateJson(): JSONObject = JSONObject()
-        .put("enabled", enabled)
-        .put("phase", state.phase.name.lowercase())
-        .put("remote_audio", state.remoteAudio)
-        .put("data_channel_open", state.dataChannelOpen)
-        .put("official_media_suspended", state.officialMediaSuspended)
-        .put("official_peer_released", state.officialPeerReleased)
-        .put("code", state.code ?: JSONObject.NULL)
+    private fun stateJson(): JSONObject {
+        val observed = currentState?.invoke() ?: state
+        return JSONObject()
+            .put("enabled", enabled)
+            .put("phase", observed.phase.name.lowercase())
+            .put("remote_audio", observed.remoteAudio)
+            .put("data_channel_open", observed.dataChannelOpen)
+            .put("data_channel_message_count", observed.dataChannelMessageCount)
+            .put("transcript_event_count", observed.transcriptEventCount)
+            .put("official_media_suspended", observed.officialMediaSuspended)
+            .put("official_peer_released", observed.officialPeerReleased)
+            .put("code", observed.code ?: JSONObject.NULL)
+    }
 
     private fun JSONArray.containsString(value: String): Boolean =
         (0 until length()).any { optString(it) == value }

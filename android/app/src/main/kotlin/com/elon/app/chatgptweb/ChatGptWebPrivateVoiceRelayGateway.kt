@@ -48,6 +48,7 @@ internal class ChatGptWebPrivateVoiceRelayGateway(
     fun exchange(
         offer: String,
         onComplete: (ChatGptWebPrivateVoiceRelayResult) -> Unit,
+        onArmed: () -> Boolean = { true },
     ): Boolean {
         if (!BuildConfig.CHATGPT_PRIVATE_RESEARCH_ENABLED) {
             onComplete(ChatGptWebPrivateVoiceRelayResult.Failure("disabled"))
@@ -59,7 +60,7 @@ internal class ChatGptWebPrivateVoiceRelayGateway(
         }
         val view = webView()
         val id = requestId()
-        val script = ChatGptWebPrivateVoiceRelayContract.startScript(id, offer)
+        val script = ChatGptWebPrivateVoiceRelayContract.armScript(id, offer)
         if (view == null || script == null) {
             onComplete(ChatGptWebPrivateVoiceRelayResult.Failure("unavailable"))
             return false
@@ -69,13 +70,27 @@ internal class ChatGptWebPrivateVoiceRelayGateway(
         activeRequestId = id
         completion = onComplete
         deadlineMs = nowMs() + EXCHANGE_TIMEOUT_MS
-        view.evaluateJavascript(script, null)
-        schedule(Runnable { poll(token, id) }, FIRST_POLL_DELAY_MS)
+        view.evaluateJavascript(script) { raw ->
+            if (token != generation || activeRequestId != id) return@evaluateJavascript
+            when (val result = ChatGptWebPrivateVoiceRelayContract.parseArm(raw)) {
+                ChatGptWebPrivateVoiceRelayArm.Accepted -> {
+                    if (onArmed()) {
+                        schedule(Runnable { poll(token, id) }, FIRST_POLL_DELAY_MS)
+                    } else {
+                        cancelOnPage(view, id)
+                        finish(ChatGptWebPrivateVoiceRelayResult.Failure("official_start_unavailable"))
+                    }
+                }
+                is ChatGptWebPrivateVoiceRelayArm.Rejected ->
+                    finish(ChatGptWebPrivateVoiceRelayResult.Failure(result.code))
+            }
+        }
         return true
     }
 
     fun cancel() {
-        if (activeRequestId == null) return
+        val id = activeRequestId ?: return
+        webView()?.let { cancelOnPage(it, id) }
         finish(ChatGptWebPrivateVoiceRelayResult.Failure("cancelled"))
     }
 
@@ -91,6 +106,13 @@ internal class ChatGptWebPrivateVoiceRelayGateway(
         onComplete: (ChatGptWebPrivateVoiceMediaControl) -> Unit = {},
     ): Boolean = evaluateMediaControl(
         ChatGptWebPrivateVoiceRelayContract.closeOfficialPeerScript(),
+        onComplete,
+    )
+
+    fun resetTakeover(
+        onComplete: (ChatGptWebPrivateVoiceMediaControl) -> Unit = {},
+    ): Boolean = evaluateMediaControl(
+        ChatGptWebPrivateVoiceRelayContract.resetTakeoverScript(),
         onComplete,
     )
 
@@ -126,6 +148,11 @@ internal class ChatGptWebPrivateVoiceRelayGateway(
         completion = null
         deadlineMs = 0L
         callback?.invoke(result)
+    }
+
+    private fun cancelOnPage(view: WebView, id: String) {
+        val script = ChatGptWebPrivateVoiceRelayContract.cancelScript(id) ?: return
+        view.evaluateJavascript(script, null)
     }
 
     private fun evaluateMediaControl(

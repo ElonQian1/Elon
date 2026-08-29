@@ -13,6 +13,7 @@ import com.elon.app.chatgptweb.ChatGptWebAudioPermissionController
 import com.elon.app.chatgptweb.ChatGptWebAttachmentSendUpdate
 import com.elon.app.chatgptweb.ChatGptWebComposerOption
 import com.elon.app.chatgptweb.ChatGptWebEvent
+import com.elon.app.chatgptweb.ChatGptWebNativeVoiceTranscriptEvent
 import com.elon.app.chatgptweb.ChatGptWebPresentationMode
 import com.elon.app.chatgptweb.ChatGptWebSendOrigin
 import com.elon.app.chatgptweb.ChatGptWebSendReceipt
@@ -55,6 +56,7 @@ internal class ChatGptSocialChatController(
         onAttachmentSendChanged = ::handleAttachmentSendUpdate,
         onConversationIndexChanged = { onConversationIndexChanged() },
         audioPermissionController = audioPermissionController,
+        onRealtimeVoiceTranscript = ::handleRealtimeVoiceTranscript,
     )
     private val skinPresentation = ChatGptWebSkinPresentationController(binding, session)
     private var provider = WebChatProviderRegistry.get(WebChatProviderId.CHATGPT_WEB)
@@ -304,6 +306,18 @@ internal class ChatGptSocialChatController(
         return true
     }
 
+    override fun startManagedRealtimeVoice(): Boolean = session.startManagedRealtimeVoice()
+
+    override fun managedRealtimeVoiceState(): WebChatManagedRealtimeVoiceState =
+        session.managedRealtimeVoiceState()
+
+    override fun setManagedRealtimeVoiceMuted(muted: Boolean): Boolean =
+        session.setManagedRealtimeVoiceMuted(muted)
+
+    private fun handleRealtimeVoiceTranscript(event: ChatGptWebNativeVoiceTranscriptEvent) {
+        realtimeVoiceTranscript.applyLive(event)?.let(::presentSnapshot)
+    }
+
     override fun endRealtimeVoiceBacking(gracefulExit: Boolean) {
         val immediate = realtimeVoiceTranscript.end(session.currentSnapshot())
         immediate?.let(::renderSnapshot)
@@ -433,6 +447,10 @@ internal class ChatGptSocialChatController(
             }
             return
         }
+        presentSnapshot(voicePresentation)
+    }
+
+    private fun presentSnapshot(voicePresentation: ChatGptWebSnapshot) {
         val pendingTextPrompt = session.pendingSendPrompt()
         val presentationSnapshot = WebChatPendingSendSnapshotPresentation.resolve(
             previous = lastMessageSnapshot,

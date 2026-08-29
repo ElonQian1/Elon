@@ -37,6 +37,68 @@ class WebChatRealtimeVoiceCoordinatorTest {
     }
 
     @Test
+    fun managedNativeWebRtcKeepsTheNativeSurfaceAndSkipsASecondOfficialStart() {
+        val fixture = Fixture(managedVoiceAvailable = true)
+
+        assertTrue(fixture.coordinator.start(fixture.provider))
+        fixture.scheduler.runNext()
+        fixture.port.prepareStatus = WebChatConsumerCommandStatus.SUCCEEDED
+        fixture.scheduler.runNext()
+        fixture.scheduler.runNext()
+
+        assertEquals(1, fixture.startManagedVoiceCount)
+        assertEquals(1, fixture.port.executeCount)
+        assertTrue(fixture.surface.visible)
+        assertEquals(WebChatRealtimeVoiceLifecycle.CONNECTING, fixture.surface.state?.lifecycle)
+
+        fixture.managedVoiceState = WebChatManagedRealtimeVoiceState(
+            WebChatManagedRealtimeVoicePhase.ACTIVE,
+        )
+        fixture.scheduler.runNext()
+
+        assertEquals(WebChatRealtimeVoiceLifecycle.ACTIVE, fixture.surface.state?.lifecycle)
+        assertEquals(0, fixture.interactiveActivationCount)
+        assertEquals(1, fixture.background.startCount)
+    }
+
+    @Test
+    fun managedNativeFailureFallsBackToTheExistingOfficialStart() {
+        val fixture = Fixture(managedVoiceAvailable = true)
+        fixture.coordinator.start(fixture.provider)
+        fixture.scheduler.runNext()
+        fixture.port.prepareStatus = WebChatConsumerCommandStatus.SUCCEEDED
+        fixture.scheduler.runNext()
+        fixture.scheduler.runNext()
+        fixture.managedVoiceState = WebChatManagedRealtimeVoiceState(
+            WebChatManagedRealtimeVoicePhase.FAILED,
+            code = "relay_unavailable",
+        )
+
+        fixture.scheduler.runNext()
+
+        assertEquals(2, fixture.port.executeCount)
+        assertEquals(WebChatRealtimeVoiceLifecycle.CONNECTING, fixture.surface.state?.lifecycle)
+    }
+
+    @Test
+    fun managedHangupCompletesLocallyAndCanStartAgain() {
+        val fixture = Fixture(managedVoiceAvailable = true)
+        fixture.completeManagedVoiceStart()
+
+        fixture.surface.closeVoice()
+
+        assertEquals(listOf(true), fixture.endBackingGraceful)
+        assertFalse(fixture.surface.visible)
+        assertFalse(fixture.coordinator.isActive())
+        assertEquals(null, fixture.port.invokedControlId)
+
+        fixture.completeManagedVoiceStart()
+
+        assertEquals(2, fixture.startManagedVoiceCount)
+        assertEquals(WebChatRealtimeVoiceLifecycle.ACTIVE, fixture.surface.state?.lifecycle)
+    }
+
+    @Test
     fun keepsAnAcceptedVoiceLaunchAliveWhenPageEvidenceArrivesLate() {
         val fixture = Fixture()
         fixture.coordinator.start(fixture.provider)
@@ -537,6 +599,7 @@ class WebChatRealtimeVoiceCoordinatorTest {
         sessionReady: Boolean = true,
         authenticated: Boolean = true,
         sessionState: String = "ready",
+        managedVoiceAvailable: Boolean = false,
     ) {
         val provider = WebChatProviderRegistry.get(WebChatProviderId.CHATGPT_WEB)
         val surface = FakeSurface()
@@ -557,6 +620,14 @@ class WebChatRealtimeVoiceCoordinatorTest {
         var nativeRestoreCount = 0
         var sessionRecoveryCount = 0
         var webPermissionGrantRevision = 0L
+        var startManagedVoiceCount = 0
+        var managedVoiceState = WebChatManagedRealtimeVoiceState(
+            if (managedVoiceAvailable) {
+                WebChatManagedRealtimeVoicePhase.IDLE
+            } else {
+                WebChatManagedRealtimeVoicePhase.UNAVAILABLE
+            },
+        )
         var openedContext: WebChatRealtimeVoiceContext? = null
         var activeProviderId: WebChatProviderId? = WebChatProviderId.CHATGPT_WEB
         var context = WebChatRealtimeVoiceContext(
@@ -585,7 +656,27 @@ class WebChatRealtimeVoiceCoordinatorTest {
                 )
             },
             beginWebBacking = { beginBackingCount += 1; true },
-            endWebBacking = { graceful -> endBackingGraceful += graceful },
+            endWebBacking = { graceful ->
+                endBackingGraceful += graceful
+                if (managedVoiceState.managed) {
+                    managedVoiceState = WebChatManagedRealtimeVoiceState(
+                        WebChatManagedRealtimeVoicePhase.CLOSED,
+                    )
+                }
+            },
+            startManagedWebRtc = {
+                startManagedVoiceCount += 1
+                if (managedVoiceState.phase == WebChatManagedRealtimeVoicePhase.UNAVAILABLE) {
+                    false
+                } else {
+                    managedVoiceState = WebChatManagedRealtimeVoiceState(
+                        WebChatManagedRealtimeVoicePhase.STARTING,
+                    )
+                    true
+                }
+            },
+            managedWebRtcState = { managedVoiceState },
+            setManagedWebRtcMuted = { managedVoiceState.phase == WebChatManagedRealtimeVoicePhase.ACTIVE },
             showInteractiveActivation = {
                 interactiveActivationCount += 1
                 true
@@ -614,6 +705,18 @@ class WebChatRealtimeVoiceCoordinatorTest {
             port.voiceStatus = WebChatConsumerCommandStatus.SUCCEEDED
             scheduler.runNext()
             webPermissionGrantRevision += 1
+            scheduler.runNext()
+        }
+
+        fun completeManagedVoiceStart() {
+            coordinator.start(provider)
+            scheduler.runNext()
+            port.prepareStatus = WebChatConsumerCommandStatus.SUCCEEDED
+            scheduler.runNext()
+            scheduler.runNext()
+            managedVoiceState = WebChatManagedRealtimeVoiceState(
+                WebChatManagedRealtimeVoicePhase.ACTIVE,
+            )
             scheduler.runNext()
         }
     }

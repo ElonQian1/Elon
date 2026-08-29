@@ -8,6 +8,7 @@ import android.widget.FrameLayout
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.PendingAttachment
 import com.elon.app.WebChatConsumerPort
+import com.elon.app.WebChatManagedRealtimeVoiceState
 import com.elon.app.WebChatPendingSendState
 import com.elon.app.WebChatSendCoordinator
 import com.elon.app.WebChatSessionRecoveryCoordinator
@@ -25,6 +26,7 @@ internal class ChatGptBackgroundSession(
     private val onAttachmentSendChanged: (ChatGptWebAttachmentSendUpdate) -> Unit,
     private val onConversationIndexChanged: (ChatGptWebConversationIndexState) -> Unit,
     private val audioPermissionController: ChatGptWebAudioPermissionController,
+    private val onRealtimeVoiceTranscript: (ChatGptWebNativeVoiceTranscriptEvent) -> Unit = {},
 ) {
     enum class State(val wireValue: String) {
         IDLE("idle"),
@@ -109,12 +111,14 @@ internal class ChatGptBackgroundSession(
         lazy(LazyThreadSafetyMode.NONE) {
             ChatGptRealtimeVoiceBackingController(
                 activity.applicationContext,
-                ::ensureInitialized, { webView }, surfaceMode, { webExecution.interactionRequested() },
+                ::ensureInitialized, { webView }, surfaceMode, ::invokeRealtimeVoiceControl,
+                { webExecution.interactionRequested() },
                 { pageAdapter?.requestConversationRefresh() },
                 { pageAdapter?.requestSnapshot() },
                 { task, delay -> recoveryHandler.postDelayed(task, delay) },
                 realtimeVoiceRecovery::revision,
                 realtimeVoiceRecovery::recoveredSince,
+                onRealtimeVoiceTranscript,
             )
         }
     private val sendOwner = ChatGptWebSendOwner(
@@ -356,6 +360,7 @@ internal class ChatGptBackgroundSession(
             startNative = realtimeVoiceBacking::beginNativePrivateVoiceResearch,
             muteNative = realtimeVoiceBacking::muteNativePrivateVoiceResearch,
             stopNative = { realtimeVoiceBacking.end(gracefulExit = true) },
+            currentState = realtimeVoiceBacking::nativePrivateVoiceState,
         )
     }
 
@@ -367,7 +372,20 @@ internal class ChatGptBackgroundSession(
             executeControl = mcpPort::control,
         )
 
+    private fun invokeRealtimeVoiceControl(): Boolean {
+        val adapter = pageAdapter ?: return false
+        val control = ChatGptRealtimeVoicePolicy.resolve(latestUiManifest) ?: return false
+        adapter.invokeUiControl(control.id)
+        webExecution.interactionRequested()
+        return true
+    }
+
     fun beginRealtimeVoiceBacking(): Boolean = realtimeVoiceBacking.begin()
+    fun startManagedRealtimeVoice(): Boolean = realtimeVoiceBacking.startManagedRealtimeVoice()
+    fun managedRealtimeVoiceState(): WebChatManagedRealtimeVoiceState =
+        realtimeVoiceBacking.managedRealtimeVoiceState()
+    fun setManagedRealtimeVoiceMuted(muted: Boolean): Boolean =
+        realtimeVoiceBacking.setManagedRealtimeVoiceMuted(muted)
     fun realtimeVoiceActive(): Boolean = realtimeVoiceBacking.isActive()
     fun endRealtimeVoiceBacking(gracefulExit: Boolean) {
         if (!realtimeVoiceBacking.isActive()) return
@@ -620,6 +638,7 @@ internal class ChatGptBackgroundSession(
             }
             is ChatGptWebEvent.UiManifest -> {
                 latestUiManifest = event.value
+                realtimeVoiceBacking.onUiManifestAvailable()
                 if (ChatGptWebBridgeReadinessPolicy.canRestoreFromManifest(latestSnapshot, event.value)) {
                     pageAdapter?.markReady()
                 }

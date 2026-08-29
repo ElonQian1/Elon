@@ -4,7 +4,7 @@
   if (window.__elonChatGptPrivateResearchEnabled !== true) return;
   if (location.origin !== 'https://chatgpt.com') return;
   const existing = window.__elonChatGptPrivateVoiceRelay;
-  if (existing && Number(existing.version) >= 3) return;
+  if (existing && Number(existing.version) >= 4) return;
 
   const nativeFetch = window.fetch;
   const maxTemplateAgeMs = 2 * 60 * 1000;
@@ -13,6 +13,14 @@
   const maxOfferLength = 240000;
   const maxAnswerLength = 320000;
   const requestIdPattern = /^relay_[a-z0-9]{8,32}$/;
+  const presetDataChannel = Object.freeze({
+    label: '',
+    ordered: true,
+    maxRetransmits: null,
+    protocol: '',
+    negotiated: false,
+    id: null
+  });
   let template = null;
   let templateGeneration = 0;
   let dataChannelHint = null;
@@ -20,8 +28,10 @@
   let officialPeer = null;
   let officialMediaEnabled = true;
   let officialTakeoverActive = false;
+  let takeoverAnswer = null;
+  let pendingExchange = null;
+  let pendingTimeoutId = null;
   let inFlightRequestId = null;
-  let relayFetchDepth = 0;
   const results = new Map();
 
   function now() {
@@ -199,14 +209,15 @@
   function setOfficialMediaEnabled(enabled) {
     const nextEnabled = enabled === true;
     if (!officialPeer) {
-      return JSON.stringify({ version: 3, applied: false, code: 'peer_unavailable' });
+      return JSON.stringify({ version: 4, applied: false, code: 'peer_unavailable' });
     }
     officialTakeoverActive = !nextEnabled;
+    if (nextEnabled) takeoverAnswer = null;
     officialMediaEnabled = nextEnabled;
     const senderTracks = setTracksEnabled(audioTracks(officialPeer, 'getSenders'), nextEnabled);
     const receiverTracks = setTracksEnabled(audioTracks(officialPeer, 'getReceivers'), nextEnabled);
     return JSON.stringify({
-      version: 3,
+      version: 4,
       applied: true,
       enabled: nextEnabled,
       senderTracks,
@@ -217,7 +228,7 @@
 
   function closeOfficialPeer() {
     if (!officialPeer) {
-      return JSON.stringify({ version: 3, applied: false, code: 'peer_unavailable' });
+      return JSON.stringify({ version: 4, applied: false, code: 'peer_unavailable' });
     }
     const peer = officialPeer;
     const senderTracks = setTracksEnabled(audioTracks(peer, 'getSenders'), false);
@@ -227,7 +238,7 @@
     officialPeer = null;
     try { peer.close(); } catch (_) {}
     return JSON.stringify({
-      version: 3,
+      version: 4,
       applied: true,
       enabled: false,
       senderTracks,
@@ -236,11 +247,42 @@
     });
   }
 
+  function resetTakeover() {
+    clearPendingExchange();
+    const peer = officialPeer;
+    const senderTracks = setTracksEnabled(audioTracks(peer, 'getSenders'), false);
+    const receiverTracks = setTracksEnabled(audioTracks(peer, 'getReceivers'), false);
+    officialPeer = null;
+    officialMediaEnabled = true;
+    officialTakeoverActive = false;
+    takeoverAnswer = null;
+    if (peer) {
+      try { peer.close(); } catch (_) {}
+    }
+    return JSON.stringify({
+      version: 4,
+      applied: true,
+      enabled: true,
+      senderTracks,
+      receiverTracks,
+      closed: Boolean(peer)
+    });
+  }
+
   function installPeerCapture() {
     const NativePeerConnection = window.RTCPeerConnection;
     if (typeof NativePeerConnection !== 'function') return;
     function RelayPeerConnection(configuration, constraints) {
       const peer = new NativePeerConnection(configuration, constraints);
+      if (peer && typeof peer.setRemoteDescription === 'function') {
+        const originalSetRemoteDescription = peer.setRemoteDescription.bind(peer);
+        peer.setRemoteDescription = function () {
+          if (peer === officialPeer && officialTakeoverActive && takeoverAnswer) {
+            return Promise.resolve();
+          }
+          return originalSetRemoteDescription.apply(peer, arguments);
+        };
+      }
       if (peer && typeof peer.addTrack === 'function') {
         const originalAddTrack = peer.addTrack.bind(peer);
         peer.addTrack = function (track) {
@@ -273,8 +315,18 @@
         const originalCreateDataChannel = peer.createDataChannel.bind(peer);
         peer.createDataChannel = function (label, options) {
           if (captureDataChannel(label, options)) {
+            const previousPeer = officialPeer;
             officialPeer = peer;
             officialMediaEnabled = !officialTakeoverActive;
+            if (
+              officialTakeoverActive &&
+              previousPeer &&
+              previousPeer !== peer
+            ) {
+              setTracksEnabled(audioTracks(previousPeer, 'getSenders'), false);
+              setTracksEnabled(audioTracks(previousPeer, 'getReceivers'), false);
+              try { previousPeer.close(); } catch (_) {}
+            }
             try {
               if (typeof peer.getSenders === 'function') {
                 peer.getSenders().forEach((sender) => guardSender(peer, sender));
@@ -334,17 +386,86 @@
     return init;
   }
 
-  async function exchange(requestId, offer) {
-    if (inFlightRequestId !== requestId) return;
-    const activeTemplate = template;
+  function clearPendingExchange(requestId) {
+    if (requestId && (!pendingExchange || pendingExchange.requestId !== requestId)) return false;
+    if (pendingTimeoutId !== null) clearTimeout(pendingTimeoutId);
+    pendingTimeoutId = null;
+    pendingExchange = null;
+    return true;
+  }
+
+  function releaseTakeoverForFallback() {
+    officialTakeoverActive = false;
+    officialMediaEnabled = true;
+    takeoverAnswer = null;
+    setTracksEnabled(audioTracks(officialPeer, 'getSenders'), true);
+    setTracksEnabled(audioTracks(officialPeer, 'getReceivers'), true);
+  }
+
+  function armExchange(requestId, offer) {
+    pruneResults();
+    const id = String(requestId || '');
+    if (!requestIdPattern.test(id)) {
+      return JSON.stringify({ version: 4, armed: false, code: 'invalid_request' });
+    }
+    results.delete(id);
+    if (!isAudioSdp(offer) || offer.length > maxOfferLength) {
+      failure(id, 'invalid_offer');
+      return JSON.stringify({ version: 4, armed: false, code: 'invalid_offer' });
+    }
+    if (pendingExchange || inFlightRequestId) {
+      failure(id, 'busy');
+      return JSON.stringify({ version: 4, armed: false, code: 'busy' });
+    }
+    template = null;
+    pendingExchange = { requestId: id, offer, armedAt: now() };
+    officialTakeoverActive = true;
+    officialMediaEnabled = false;
+    takeoverAnswer = null;
+    setTracksEnabled(audioTracks(officialPeer, 'getSenders'), false);
+    setTracksEnabled(audioTracks(officialPeer, 'getReceivers'), false);
+    pendingTimeoutId = setTimeout(() => {
+      if (!pendingExchange || pendingExchange.requestId !== id) return;
+      clearPendingExchange(id);
+      releaseTakeoverForFallback();
+      failure(id, 'timeout');
+    }, maxExchangeMs);
+    return JSON.stringify({ version: 4, armed: true, code: null });
+  }
+
+  function cancelExchange(requestId) {
+    const id = String(requestId || '');
+    if (!clearPendingExchange(id)) return false;
+    releaseTakeoverForFallback();
+    return true;
+  }
+
+  function upstreamCall(receiver, input, init) {
+    return init === undefined
+      ? nativeFetch.call(receiver, input)
+      : nativeFetch.call(receiver, input, init);
+  }
+
+  function takeoverResponse() {
+    return new Response(takeoverAnswer, {
+      status: 201,
+      statusText: 'Created',
+      headers: { 'content-type': 'application/sdp' }
+    });
+  }
+
+  async function exchangeOnOfficialRequest(receiver, input, originalInit, active, activeTemplate) {
+    const requestId = active.requestId;
     const controller = typeof AbortController === 'function' ? new AbortController() : null;
     let timeoutId = null;
+    clearPendingExchange(requestId);
+    inFlightRequestId = requestId;
+    activeTemplate.used = true;
     try {
-      relayFetchDepth += 1;
-      const init = buildInit(buildForm(offer));
-      if (controller) init.signal = controller.signal;
+      const replacementInit = buildInit(buildForm(active.offer));
+      if (controller) replacementInit.signal = controller.signal;
       const response = await Promise.race([
-        nativeFetch.call(window, activeTemplate.url, init),
+        nativeFetch.call(window, activeTemplate.url, replacementInit),
         new Promise((_, reject) => {
           timeoutId = setTimeout(() => {
             if (controller) controller.abort();
@@ -354,19 +475,28 @@
       ]);
       if (!response || !response.ok) {
         failure(requestId, 'upstream_rejected');
-        return;
+        releaseTakeoverForFallback();
+        return upstreamCall(receiver, input, originalInit);
       }
-      const answer = await response.text();
+      const answer = await response.clone().text();
       if (!isAudioSdp(answer) || answer.length > maxAnswerLength) {
         failure(requestId, 'invalid_answer');
-        return;
+        releaseTakeoverForFallback();
+        return upstreamCall(receiver, input, originalInit);
       }
+      takeoverAnswer = answer;
+      officialTakeoverActive = true;
+      officialMediaEnabled = false;
+      setTracksEnabled(audioTracks(officialPeer, 'getSenders'), false);
+      setTracksEnabled(audioTracks(officialPeer, 'getReceivers'), false);
       saveResult(requestId, { status: 'ok', answer });
+      return response;
     } catch (error) {
       failure(requestId, error && error.message === 'timeout' ? 'timeout' : 'network_error');
+      releaseTakeoverForFallback();
+      return upstreamCall(receiver, input, originalInit);
     } finally {
       if (timeoutId !== null) clearTimeout(timeoutId);
-      relayFetchDepth = Math.max(0, relayFetchDepth - 1);
       if (inFlightRequestId === requestId) inFlightRequestId = null;
       if (template === activeTemplate) {
         template = {
@@ -376,37 +506,6 @@
         };
       }
     }
-  }
-
-  function startExchange(requestId, offer) {
-    pruneResults();
-    if (!requestIdPattern.test(String(requestId || ''))) return false;
-    results.delete(requestId);
-    if (!isAudioSdp(offer) || offer.length > maxOfferLength) {
-      failure(requestId, 'invalid_offer');
-      return false;
-    }
-    if (inFlightRequestId) {
-      failure(requestId, 'busy');
-      return false;
-    }
-    if (!template) {
-      failure(requestId, 'template_unavailable');
-      return false;
-    }
-    if (now() - template.capturedAt > maxTemplateAgeMs) {
-      template = null;
-      failure(requestId, 'template_expired');
-      return false;
-    }
-    if (template.used) {
-      failure(requestId, 'template_consumed');
-      return false;
-    }
-    template.used = true;
-    inFlightRequestId = requestId;
-    exchange(requestId, offer);
-    return true;
   }
 
   function takeResult(requestId) {
@@ -422,26 +521,28 @@
     const dataChannelAge = dataChannelHint
       ? Math.max(0, now() - dataChannelHint.capturedAt)
       : 0;
-    const dataChannelReady = Boolean(
+    const observedDataChannelReady = Boolean(
       dataChannelHint && dataChannelAge <= maxTemplateAgeMs
     );
-    const templateReady = Boolean(template && !template.used && age <= maxTemplateAgeMs);
+    const channel = observedDataChannelReady ? dataChannelHint : presetDataChannel;
     return JSON.stringify({
-      version: 3,
-      available: templateReady && dataChannelReady,
+      version: 4,
+      available: !pendingExchange && !inFlightRequestId,
       templateGeneration,
       templateState: !template ? 'missing' : template.used ? 'consumed' : age > maxTemplateAgeMs ? 'expired' : 'ready',
       dataChannelGeneration,
-      dataChannelState: !dataChannelHint ? 'missing' : dataChannelAge > maxTemplateAgeMs ? 'expired' : 'ready',
-      dataChannel: dataChannelReady ? {
-        label: dataChannelHint.label,
-        ordered: dataChannelHint.ordered,
-        maxRetransmits: dataChannelHint.maxRetransmits,
-        protocol: dataChannelHint.protocol,
-        negotiated: dataChannelHint.negotiated,
-        id: dataChannelHint.id
-      } : null,
-      inFlight: Boolean(inFlightRequestId)
+      dataChannelState: observedDataChannelReady ? 'ready' : 'preset',
+      dataChannel: {
+        label: channel.label,
+        ordered: channel.ordered,
+        maxRetransmits: channel.maxRetransmits,
+        protocol: channel.protocol,
+        negotiated: channel.negotiated,
+        id: channel.id
+      },
+      armed: Boolean(pendingExchange),
+      inFlight: Boolean(inFlightRequestId),
+      takeoverActive: officialTakeoverActive && Boolean(takeoverAnswer)
     });
   }
 
@@ -452,19 +553,38 @@
   }
 
   function relayFetch(input, init) {
-    if (relayFetchDepth === 0) captureTemplate(input, init || {});
-    return nativeFetch.apply(this, arguments);
+    const url = requestUrl(input);
+    const isVoiceRequest = Boolean(
+      url && url.origin === location.origin && url.pathname === '/realtime/wm'
+    );
+    if (!isVoiceRequest) return nativeFetch.apply(this, arguments);
+    if (officialTakeoverActive && takeoverAnswer) {
+      return Promise.resolve(takeoverResponse());
+    }
+    captureTemplate(input, init || {});
+    if (!pendingExchange) return nativeFetch.apply(this, arguments);
+    const active = pendingExchange;
+    const activeTemplate = template;
+    if (!activeTemplate || activeTemplate.used) {
+      clearPendingExchange(active.requestId);
+      releaseTakeoverForFallback();
+      failure(active.requestId, 'template_unavailable');
+      return nativeFetch.apply(this, arguments);
+    }
+    return exchangeOnOfficialRequest(this, input, init, active, activeTemplate);
   }
 
   installPeerCapture();
   window.fetch = relayFetch;
   window.__elonChatGptPrivateVoiceRelay = Object.freeze({
-    version: 3,
+    version: 4,
     bootstrap,
     state,
-    startExchange,
+    armExchange,
+    cancelExchange,
     takeResult,
     setOfficialMediaEnabled,
-    closeOfficialPeer
+    closeOfficialPeer,
+    resetTakeover
   });
 })();

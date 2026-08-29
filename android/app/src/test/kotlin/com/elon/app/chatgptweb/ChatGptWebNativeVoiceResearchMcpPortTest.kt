@@ -77,16 +77,41 @@ class ChatGptWebNativeVoiceResearchMcpPortTest {
         )
     }
 
+    @Test
+    fun currentPeerStatePublishesOnlyStructuralTranscriptCounters() {
+        val port = port(
+            enabled = true,
+            currentState = {
+                ChatGptWebNativeVoiceState(
+                    phase = ChatGptWebNativeVoicePhase.CONNECTED,
+                    dataChannelOpen = true,
+                    dataChannelMessageCount = 12,
+                    transcriptEventCount = 7,
+                )
+            },
+        )
+
+        val state = port.uiState().getJSONObject("private_voice_native_research")
+
+        assertEquals(12, state.getInt("data_channel_message_count"))
+        assertEquals(7, state.getInt("transcript_event_count"))
+        assertFalse(state.has("transcript"))
+        assertFalse(state.has("text"))
+        assertFalse(state.has("payload"))
+    }
+
     private fun port(
         enabled: Boolean,
         start: ((ChatGptWebNativeVoiceState) -> Unit) -> Boolean = { true },
         mute: (Boolean) -> Boolean = { true },
         stop: () -> Unit = {},
+        currentState: (() -> ChatGptWebNativeVoiceState)? = null,
     ): ChatGptWebNativeVoiceResearchMcpPort = ChatGptWebNativeVoiceResearchMcpPort(
         delegate = FakePort(),
         startNative = start,
         muteNative = mute,
         stopNative = stop,
+        currentState = currentState,
         enabled = enabled,
     )
 

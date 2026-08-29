@@ -10,60 +10,83 @@ const source = fs.readFileSync(
   path.join(root, 'android', 'app', 'src', 'main', 'assets', 'chatgpt_web_private_voice_relay.js'),
   'utf8'
 );
-const calls = [];
-const answer = 'v=0\r\nm=audio 9 UDP/TLS/RTP/SAVPF 111\r\n';
-const upstream = async (input, init) => {
-  calls.push({ input, init });
-  return new Response(answer, { status: 201, headers: { 'content-type': 'application/sdp' } });
-};
-class FakePeerConnection {
-  constructor() {
-    this.senderTrack = { kind: 'audio', readyState: 'live', enabled: true };
-    this.receiverTrack = { kind: 'audio', readyState: 'live', enabled: true };
-    this.closed = false;
-  }
-  createDataChannel(label, options) {
-    return { label, options };
-  }
-  addTrack(track) {
-    this.senderTrack = track;
-    return { track, replaceTrack: (next) => { this.senderTrack = next; } };
-  }
-  getSenders() {
-    return [{ track: this.senderTrack }];
-  }
-  getReceivers() {
-    return [{ track: this.receiverTrack }];
-  }
-  close() {
-    this.closed = true;
-  }
-}
-const window = {
-  __elonChatGptPrivateResearchEnabled: true,
-  fetch: upstream,
-  RTCPeerConnection: FakePeerConnection
-};
-window.window = window;
-const context = {
-  window,
-  location: { origin: 'https://chatgpt.com', href: 'https://chatgpt.com/' },
-  URL,
-  Headers,
-  FormData,
-  Blob,
-  Response,
-  Date,
-  Map,
-  JSON,
-  Promise,
-  AbortController,
-  setTimeout,
-  clearTimeout
-};
-vm.runInNewContext(source, context, { filename: 'chatgpt_web_private_voice_relay.js' });
+const nativeAnswer = 'v=0\r\nm=audio 9 UDP/TLS/RTP/SAVPF 111\r\n';
+const officialAnswer = 'v=0\r\nm=audio 8 UDP/TLS/RTP/SAVPF 111\r\n';
+const originalOffer = 'v=0\r\nm=audio 1 UDP/TLS/RTP/SAVPF 111\r\n';
+const nativeOffer = 'v=0\r\nm=audio 2 UDP/TLS/RTP/SAVPF 111\r\n';
 
-async function take(requestId) {
+function createHarness(responseForCall) {
+  const calls = [];
+  const upstream = async (input, init) => {
+    calls.push({ input, init });
+    return responseForCall(calls.length, input, init);
+  };
+  class FakePeerConnection {
+    constructor() {
+      this.senderTrack = { kind: 'audio', readyState: 'live', enabled: true };
+      this.receiverTrack = { kind: 'audio', readyState: 'live', enabled: true };
+      this.closed = false;
+      this.remoteDescriptions = [];
+    }
+    createDataChannel(label, options) {
+      return { label, options };
+    }
+    addTrack(track) {
+      this.senderTrack = track;
+      return { track, replaceTrack: (next) => { this.senderTrack = next; } };
+    }
+    getSenders() {
+      return [{ track: this.senderTrack }];
+    }
+    getReceivers() {
+      return [{ track: this.receiverTrack }];
+    }
+    setRemoteDescription(description) {
+      this.remoteDescriptions.push(description);
+      return Promise.resolve();
+    }
+    close() {
+      this.closed = true;
+    }
+  }
+  const window = {
+    __elonChatGptPrivateResearchEnabled: true,
+    fetch: upstream,
+    RTCPeerConnection: FakePeerConnection
+  };
+  window.window = window;
+  vm.runInNewContext(source, {
+    window,
+    location: { origin: 'https://chatgpt.com', href: 'https://chatgpt.com/' },
+    URL,
+    Headers,
+    FormData,
+    Blob,
+    Response,
+    Date,
+    Map,
+    JSON,
+    Promise,
+    AbortController,
+    setTimeout,
+    clearTimeout
+  }, { filename: 'chatgpt_web_private_voice_relay.js' });
+  return { window, calls };
+}
+
+function officialRequest(privateSession) {
+  const body = new FormData();
+  body.append('sdp', originalOffer);
+  body.append('session', privateSession);
+  return {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'x-private-runtime': 'private-must-stay-in-page-memory' },
+    body
+  };
+}
+
+async function take(window, requestId) {
   for (let index = 0; index < 20; index += 1) {
     const value = window.__elonChatGptPrivateVoiceRelay.takeResult(requestId);
     if (value) return JSON.parse(value);
@@ -72,42 +95,12 @@ async function take(requestId) {
   throw new Error(`No relay result for ${requestId}`);
 }
 
-async function main() {
-  const originalOffer = 'v=0\r\nm=audio 1 UDP/TLS/RTP/SAVPF 111\r\n';
-  const nativeOffer = 'v=0\r\nm=audio 2 UDP/TLS/RTP/SAVPF 111\r\n';
-  const privateSession = JSON.stringify({
-    conversation_id: 'private-must-stay-in-page-memory',
-    backend_model: 'private-must-stay-in-page-memory'
-  });
-  const officialBody = new FormData();
-  officialBody.append('sdp', originalOffer);
-  officialBody.append('session', privateSession);
-
-  const peer = new window.RTCPeerConnection();
-  peer.createDataChannel('', {
-    ordered: true,
-    protocol: '',
-    negotiated: false
-  });
-
-  await window.fetch('https://chatgpt.com/realtime/wm', {
-    method: 'POST',
-    credentials: 'include',
-    headers: { 'x-private-runtime': 'private-must-stay-in-page-memory' },
-    body: officialBody
-  });
-
+async function verifiesAtomicTakeover() {
+  const { window, calls } = createHarness(async () =>
+    new Response(nativeAnswer, { status: 201, headers: { 'content-type': 'application/sdp' } })
+  );
   const relay = window.__elonChatGptPrivateVoiceRelay;
-  assert.equal(relay.version, 3);
-  assert.deepEqual(JSON.parse(relay.state()), {
-    version: 3,
-    available: true,
-    templateGeneration: 1,
-    templateState: 'ready',
-    dataChannelGeneration: 1,
-    dataChannelState: 'ready',
-    inFlight: false
-  });
+  assert.equal(relay.version, 4);
   assert.deepEqual(JSON.parse(relay.bootstrap()).dataChannel, {
     label: '',
     ordered: true,
@@ -116,78 +109,107 @@ async function main() {
     negotiated: false,
     id: null
   });
-  assert.deepEqual(JSON.parse(relay.setOfficialMediaEnabled(false)), {
-    version: 3,
-    applied: true,
-    enabled: false,
-    senderTracks: 1,
-    receiverTracks: 1,
+  assert.equal(JSON.parse(relay.bootstrap()).dataChannelState, 'preset');
+  assert.deepEqual(JSON.parse(relay.armExchange('relay_12345678', nativeOffer)), {
+    version: 4,
+    armed: true,
     code: null
   });
-  assert.equal(peer.senderTrack.enabled, false);
-  assert.equal(peer.receiverTrack.enabled, false);
+
+  const peer = new window.RTCPeerConnection();
   const lateTrack = { kind: 'audio', readyState: 'live', enabled: true };
   peer.addTrack(lateTrack);
+  peer.createDataChannel('', { ordered: true, protocol: '', negotiated: false });
   assert.equal(lateTrack.enabled, false);
-  assert.equal(relay.startExchange('relay_12345678', nativeOffer), true);
-  const result = await take('relay_12345678');
-  assert.equal(result.status, 'ok');
-  assert.equal(result.answer, answer);
-  assert.equal(calls.length, 2);
-  assert.equal(calls[1].init.body.get('sdp'), nativeOffer);
-  assert.equal(calls[1].init.body.get('session'), privateSession);
-  assert.equal(calls[1].init.credentials, 'include');
-  assert.ok(calls[1].init.signal instanceof AbortSignal);
-  assert.equal(calls[1].init.headers.get('x-private-runtime'), 'private-must-stay-in-page-memory');
-  assert.deepEqual(JSON.parse(relay.setOfficialMediaEnabled(true)), {
-    version: 3,
+  assert.equal(peer.receiverTrack.enabled, false);
+
+  const privateSession = JSON.stringify({
+    conversation_id: 'private-must-stay-in-page-memory',
+    backend_model: 'private-must-stay-in-page-memory'
+  });
+  const response = await window.fetch(
+    'https://chatgpt.com/realtime/wm',
+    officialRequest(privateSession)
+  );
+  assert.equal(await response.text(), nativeAnswer);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].init.body.get('sdp'), nativeOffer);
+  assert.equal(calls[0].init.body.get('session'), privateSession);
+  assert.equal(calls[0].init.credentials, 'include');
+  assert.ok(calls[0].init.signal instanceof AbortSignal);
+  assert.equal(calls[0].init.headers.get('x-private-runtime'), 'private-must-stay-in-page-memory');
+  assert.deepEqual(await take(window, 'relay_12345678'), {
+    status: 'ok',
+    answer: nativeAnswer
+  });
+
+  await peer.setRemoteDescription({ type: 'answer', sdp: nativeAnswer });
+  assert.equal(peer.remoteDescriptions.length, 0);
+  const replay = await window.fetch(
+    'https://chatgpt.com/realtime/wm',
+    officialRequest(privateSession)
+  );
+  assert.equal(await replay.text(), nativeAnswer);
+  assert.equal(calls.length, 1);
+
+  const replacementPeer = new window.RTCPeerConnection();
+  replacementPeer.createDataChannel('', { ordered: true, protocol: '' });
+  assert.equal(peer.closed, true);
+  assert.equal(replacementPeer.senderTrack.enabled, false);
+  assert.equal(replacementPeer.receiverTrack.enabled, false);
+
+  assert.deepEqual(JSON.parse(relay.resetTakeover()), {
+    version: 4,
     applied: true,
     enabled: true,
-    senderTracks: 1,
-    receiverTracks: 1,
-    code: null
-  });
-  assert.equal(peer.senderTrack.enabled, true);
-  assert.equal(peer.receiverTrack.enabled, true);
-
-  assert.equal(relay.startExchange('relay_abcdefgh', nativeOffer), false);
-  assert.deepEqual(await take('relay_abcdefgh'), {
-    status: 'failed',
-    code: 'template_consumed'
-  });
-  assert.equal(relay.startExchange('relay_invalid1', 'not-an-offer'), false);
-  assert.deepEqual(await take('relay_invalid1'), {
-    status: 'failed',
-    code: 'invalid_offer'
-  });
-
-  const publicState = `${relay.state()} ${relay.bootstrap()}`.toLowerCase();
-  assert.doesNotMatch(publicState, /private-must-stay|conversation_id|backend_model|x-private-runtime/);
-  assert.deepEqual(JSON.parse(relay.closeOfficialPeer()), {
-    version: 3,
-    applied: true,
-    enabled: false,
     senderTracks: 1,
     receiverTracks: 1,
     closed: true
   });
-  assert.equal(peer.closed, true);
-  const reconnectingPeer = new window.RTCPeerConnection();
-  const reconnectingTrack = { kind: 'audio', readyState: 'live', enabled: true };
-  reconnectingPeer.addTrack(reconnectingTrack);
-  reconnectingPeer.createDataChannel('', { ordered: true, protocol: '' });
-  assert.equal(reconnectingTrack.enabled, false);
-  assert.equal(reconnectingPeer.receiverTrack.enabled, false);
-  assert.deepEqual(JSON.parse(relay.setOfficialMediaEnabled(true)), {
-    version: 3,
-    applied: true,
-    enabled: true,
-    senderTracks: 1,
-    receiverTracks: 1,
-    code: null
+  assert.equal(replacementPeer.closed, true);
+  const nextPeer = new window.RTCPeerConnection();
+  nextPeer.createDataChannel('', { ordered: true, protocol: '' });
+  assert.equal(nextPeer.senderTrack.enabled, true);
+  assert.equal(nextPeer.receiverTrack.enabled, true);
+
+  const publicState = `${relay.state()} ${relay.bootstrap()}`.toLowerCase();
+  assert.doesNotMatch(publicState, /private-must-stay|conversation_id|backend_model|x-private-runtime/);
+}
+
+async function verifiesOfficialFallback() {
+  const { window, calls } = createHarness(async (callNumber) => {
+    if (callNumber === 1) return new Response('not-an-answer', { status: 201 });
+    return new Response(officialAnswer, {
+      status: 201,
+      headers: { 'content-type': 'application/sdp' }
+    });
   });
-  assert.equal(reconnectingTrack.enabled, true);
-  assert.equal(reconnectingPeer.receiverTrack.enabled, true);
+  const relay = window.__elonChatGptPrivateVoiceRelay;
+  assert.equal(JSON.parse(relay.armExchange('relay_abcdefgh', nativeOffer)).armed, true);
+  const peer = new window.RTCPeerConnection();
+  peer.createDataChannel('', { ordered: true, protocol: '' });
+  const privateSession = JSON.stringify({ conversation_id: 'private-fallback' });
+  const response = await window.fetch(
+    'https://chatgpt.com/realtime/wm',
+    officialRequest(privateSession)
+  );
+  assert.equal(await response.text(), officialAnswer);
+  assert.equal(calls.length, 2);
+  assert.equal(calls[0].init.body.get('sdp'), nativeOffer);
+  assert.equal(calls[1].init.body.get('sdp'), originalOffer);
+  assert.deepEqual(await take(window, 'relay_abcdefgh'), {
+    status: 'failed',
+    code: 'invalid_answer'
+  });
+  assert.equal(peer.senderTrack.enabled, true);
+  assert.equal(peer.receiverTrack.enabled, true);
+  await peer.setRemoteDescription({ type: 'answer', sdp: officialAnswer });
+  assert.equal(peer.remoteDescriptions.length, 1);
+}
+
+async function main() {
+  await verifiesAtomicTakeover();
+  await verifiesOfficialFallback();
   console.log('CHATGPT_WEB_PRIVATE_VOICE_RELAY_TESTS=passed');
 }
 

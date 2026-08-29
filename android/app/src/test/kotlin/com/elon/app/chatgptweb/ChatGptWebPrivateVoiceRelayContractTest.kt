@@ -14,13 +14,16 @@ class ChatGptWebPrivateVoiceRelayContractTest {
     @Test
     fun buildsOnlyBoundedResearchRelayScripts() {
         val bootstrap = ChatGptWebPrivateVoiceRelayContract.bootstrapScript()
-        val start = ChatGptWebPrivateVoiceRelayContract.startScript("relay_12345678", offer)
+        val arm = ChatGptWebPrivateVoiceRelayContract.armScript("relay_12345678", offer)
+        val cancel = ChatGptWebPrivateVoiceRelayContract.cancelScript("relay_12345678")
         val poll = ChatGptWebPrivateVoiceRelayContract.pollScript("relay_12345678")
 
-        assertNotNull(start)
+        assertNotNull(arm)
+        assertNotNull(cancel)
         assertNotNull(poll)
         assertTrue(bootstrap.contains("bootstrap"))
-        assertTrue(start!!.contains("startExchange"))
+        assertTrue(arm!!.contains("armExchange"))
+        assertTrue(cancel!!.contains("cancelExchange"))
         assertTrue(poll!!.contains("takeResult"))
         assertTrue(
             ChatGptWebPrivateVoiceRelayContract.setOfficialMediaEnabledScript(false)
@@ -30,15 +33,41 @@ class ChatGptWebPrivateVoiceRelayContractTest {
             ChatGptWebPrivateVoiceRelayContract.closeOfficialPeerScript()
                 .contains("closeOfficialPeer()"),
         )
-        assertNull(ChatGptWebPrivateVoiceRelayContract.startScript("bad", offer))
-        assertNull(ChatGptWebPrivateVoiceRelayContract.startScript("relay_12345678", "bad"))
+        assertTrue(
+            ChatGptWebPrivateVoiceRelayContract.resetTakeoverScript()
+                .contains("resetTakeover()"),
+        )
+        assertNull(ChatGptWebPrivateVoiceRelayContract.armScript("bad", offer))
+        assertNull(ChatGptWebPrivateVoiceRelayContract.armScript("relay_12345678", "bad"))
+    }
+
+    @Test
+    fun parsesOnlyVersionedAtomicArmReceipts() {
+        assertEquals(
+            ChatGptWebPrivateVoiceRelayArm.Accepted,
+            ChatGptWebPrivateVoiceRelayContract.parseArm(
+                JSONObject.quote("""{"version":4,"armed":true,"code":null}"""),
+            ),
+        )
+        assertEquals(
+            ChatGptWebPrivateVoiceRelayArm.Rejected("busy"),
+            ChatGptWebPrivateVoiceRelayContract.parseArm(
+                JSONObject.quote("""{"version":4,"armed":false,"code":"busy"}"""),
+            ),
+        )
+        assertEquals(
+            ChatGptWebPrivateVoiceRelayArm.Rejected("relay_failed"),
+            ChatGptWebPrivateVoiceRelayContract.parseArm(
+                JSONObject.quote("""{"version":4,"armed":false,"code":"private"}"""),
+            ),
+        )
     }
 
     @Test
     fun parsesOnlyStructuralOfficialMediaOwnershipResults() {
         val applied = JSONObject.quote(
             JSONObject()
-                .put("version", 3)
+                .put("version", 4)
                 .put("applied", true)
                 .put("enabled", false)
                 .put("senderTracks", 1)
@@ -59,7 +88,7 @@ class ChatGptWebPrivateVoiceRelayContractTest {
             ChatGptWebPrivateVoiceMediaControl.Unavailable("peer_unavailable"),
             ChatGptWebPrivateVoiceRelayContract.parseMediaControl(
                 JSONObject.quote(
-                    """{"version":3,"applied":false,"code":"peer_unavailable"}""",
+                    """{"version":4,"applied":false,"code":"peer_unavailable"}""",
                 ),
             ),
         )
@@ -68,7 +97,7 @@ class ChatGptWebPrivateVoiceRelayContractTest {
     @Test
     fun parsesOnlyBoundedNonSecretDataChannelHints() {
         val payload = JSONObject()
-            .put("version", 2)
+            .put("version", 4)
             .put("available", true)
             .put("templateState", "ready")
             .put("dataChannelState", "ready")
@@ -126,6 +155,31 @@ class ChatGptWebPrivateVoiceRelayContractTest {
             ChatGptWebPrivateVoiceRelayContract.parseBootstrap(
                 JSONObject.quote(invalid.toString()),
             ),
+        )
+    }
+
+    @Test
+    fun acceptsColdStartPresetWithoutAConsumedRequestTemplate() {
+        val payload = JSONObject()
+            .put("version", 4)
+            .put("available", true)
+            .put("templateState", "missing")
+            .put("dataChannelState", "preset")
+            .put(
+                "dataChannel",
+                JSONObject()
+                    .put("label", "")
+                    .put("ordered", true)
+                    .put("maxRetransmits", JSONObject.NULL)
+                    .put("protocol", "")
+                    .put("negotiated", false)
+                    .put("id", JSONObject.NULL),
+            )
+
+        assertTrue(
+            ChatGptWebPrivateVoiceRelayContract.parseBootstrap(
+                JSONObject.quote(payload.toString()),
+            ) is ChatGptWebPrivateVoiceBootstrap.Ready,
         )
     }
 

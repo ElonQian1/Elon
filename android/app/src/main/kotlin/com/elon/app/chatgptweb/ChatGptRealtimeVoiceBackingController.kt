@@ -3,6 +3,8 @@ package com.elon.app.chatgptweb
 import android.content.Context
 import android.webkit.WebView
 import com.elon.app.BuildConfig
+import com.elon.app.WebChatManagedRealtimeVoicePhase
+import com.elon.app.WebChatManagedRealtimeVoiceState
 import com.elon.app.beginWebChatRealtimeVoiceInteraction
 import com.elon.app.showWebChatBackgroundSurface
 
@@ -11,17 +13,23 @@ internal class ChatGptRealtimeVoiceBackingController(
     private val ensureInitialized: () -> Unit,
     private val webView: () -> WebView?,
     private val surfaceMode: ChatGptWebSurfaceModeController,
+    private val startOfficialVoice: () -> Boolean,
     private val requestExecution: () -> Unit,
     private val requestPrivateConversationSnapshot: () -> Unit,
     private val requestConversationSnapshot: () -> Unit,
     private val schedule: (Runnable, Long) -> Unit,
     private val conversationSnapshotRevision: () -> Long,
     private val conversationRecoveredSince: (Long) -> Boolean,
+    private val onTranscript: (ChatGptWebNativeVoiceTranscriptEvent) -> Unit,
 ) {
     private var active = false
     private val recoveryGate = ChatGptRealtimeVoiceRecoveryGate()
     private val privateVoiceRelay = ChatGptWebPrivateVoiceRelayGateway(webView, schedule)
     private var nativeResearch: ChatGptWebNativeVoiceResearchController? = null
+    private var officialFallbackPending = false
+    @Volatile
+    private var nativeVoiceState = ChatGptWebNativeVoiceState(ChatGptWebNativeVoicePhase.IDLE)
+    private var nativeStateObserver: ((ChatGptWebNativeVoiceState) -> Unit)? = null
 
     fun isActive(): Boolean = active
 
@@ -32,6 +40,22 @@ internal class ChatGptRealtimeVoiceBackingController(
 
     fun beginNativePrivateVoiceResearch(
         onState: (ChatGptWebNativeVoiceState) -> Unit,
+    ): Boolean = startNativePrivateVoice(onState)
+
+    fun startManagedRealtimeVoice(): Boolean = startNativePrivateVoice(onState = null)
+
+    fun managedRealtimeVoiceState(): WebChatManagedRealtimeVoiceState =
+        nativeVoiceState.toManagedRealtimeVoiceState(
+            BuildConfig.CHATGPT_PRIVATE_VOICE_NATIVE_RTC_ENABLED,
+        )
+
+    fun nativePrivateVoiceState(): ChatGptWebNativeVoiceState = nativeVoiceState
+
+    fun setManagedRealtimeVoiceMuted(muted: Boolean): Boolean =
+        nativeResearch?.setMuted(muted) == true
+
+    private fun startNativePrivateVoice(
+        onState: ((ChatGptWebNativeVoiceState) -> Unit)?,
     ): Boolean {
         if (!BuildConfig.CHATGPT_PRIVATE_VOICE_NATIVE_RTC_ENABLED) return false
         ensureInitialized()
@@ -39,27 +63,29 @@ internal class ChatGptRealtimeVoiceBackingController(
         active = true
         surfaceMode.select(ChatGptWebPresentationMode.NATIVE)
         requestExecution()
+        nativeStateObserver = onState
+        nativeVoiceState = ChatGptWebNativeVoiceState(ChatGptWebNativeVoicePhase.BOOTSTRAPPING)
         val controller = nativeResearch ?: ChatGptWebNativeVoiceResearchController(
             context = context,
             relay = privateVoiceRelay,
             schedule = schedule,
-            onState = { state ->
-                if (
-                    state.phase == ChatGptWebNativeVoicePhase.FAILED ||
-                    state.phase == ChatGptWebNativeVoicePhase.CLOSED
-                ) {
-                    active = false
-                }
-                onState(state)
-            },
+            startOfficialVoice = startOfficialVoice,
+            requestOfficialFallback = ::requestOfficialFallback,
+            onTranscript = onTranscript,
+            onState = ::acceptNativeVoiceState,
         ).also { nativeResearch = it }
         return controller.start().also { accepted ->
-            if (!accepted) active = false
+            if (!accepted) {
+                nativeVoiceState = ChatGptWebNativeVoiceState(
+                    ChatGptWebNativeVoicePhase.FAILED,
+                    code = "start_rejected",
+                )
+            }
         }
     }
 
     fun muteNativePrivateVoiceResearch(muted: Boolean): Boolean =
-        nativeResearch?.setMuted(muted) == true
+        setManagedRealtimeVoiceMuted(muted)
 
     fun begin(): Boolean {
         ensureInitialized()
@@ -87,10 +113,17 @@ internal class ChatGptRealtimeVoiceBackingController(
         }
     }
 
+    fun onUiManifestAvailable() {
+        if (!officialFallbackPending) return
+        if (startOfficialVoice()) officialFallbackPending = false
+    }
+
     fun end(gracefulExit: Boolean) {
         if (!active) return
         active = false
+        officialFallbackPending = false
         nativeResearch?.close()
+        nativeStateObserver = null
         val view = webView() ?: return
         val recoveryToken = recoveryGate.arm(
             snapshotRevision = conversationSnapshotRevision(),
@@ -121,14 +154,57 @@ internal class ChatGptRealtimeVoiceBackingController(
 
     fun release() {
         active = false
+        officialFallbackPending = false
         recoveryGate.invalidate()
         nativeResearch?.close()
         nativeResearch = null
+        nativeStateObserver = null
+        nativeVoiceState = ChatGptWebNativeVoiceState(ChatGptWebNativeVoicePhase.CLOSED)
         privateVoiceRelay.cancel()
+    }
+
+    private fun acceptNativeVoiceState(state: ChatGptWebNativeVoiceState) {
+        nativeVoiceState = state
+        nativeStateObserver?.invoke(state)
+    }
+
+    private fun requestOfficialFallback(): Boolean {
+        val view = webView() ?: return false
+        officialFallbackPending = true
+        view.reload()
+        requestExecution()
+        return true
     }
 
     private companion object {
         const val SNAPSHOT_SETTLE_DELAY_MS = 600L
         const val INTERRUPTED_RECOVERY_TIMEOUT_MS = 3_000L
     }
+}
+
+internal fun ChatGptWebNativeVoiceState.toManagedRealtimeVoiceState(
+    enabled: Boolean,
+): WebChatManagedRealtimeVoiceState {
+    if (!enabled) return WebChatManagedRealtimeVoiceState.Unavailable
+    val managedPhase = when (phase) {
+        ChatGptWebNativeVoicePhase.IDLE -> WebChatManagedRealtimeVoicePhase.IDLE
+        ChatGptWebNativeVoicePhase.BOOTSTRAPPING,
+        ChatGptWebNativeVoicePhase.CREATING_OFFER,
+        ChatGptWebNativeVoicePhase.RELAYING,
+        ChatGptWebNativeVoicePhase.APPLYING_ANSWER,
+        ChatGptWebNativeVoicePhase.CONNECTING -> WebChatManagedRealtimeVoicePhase.STARTING
+        ChatGptWebNativeVoicePhase.CONNECTED -> WebChatManagedRealtimeVoicePhase.ACTIVE
+        ChatGptWebNativeVoicePhase.OFFICIAL_FALLBACK ->
+            WebChatManagedRealtimeVoicePhase.OFFICIAL_FALLBACK
+        ChatGptWebNativeVoicePhase.FAILED -> WebChatManagedRealtimeVoicePhase.FAILED
+        ChatGptWebNativeVoicePhase.CLOSED -> WebChatManagedRealtimeVoicePhase.CLOSED
+    }
+    val detailCode = code ?: if (
+        phase == ChatGptWebNativeVoicePhase.CONNECTED && (!remoteAudio || !dataChannelOpen)
+    ) {
+        "media_observation_pending"
+    } else {
+        null
+    }
+    return WebChatManagedRealtimeVoiceState(managedPhase, detailCode)
 }

@@ -48,6 +48,10 @@ internal interface WebChatSocialController {
     fun assignConversationToLocalProject(path: String, projectId: String?): Boolean = false
     fun consumerPort(): WebChatConsumerPort? = null
     fun beginRealtimeVoiceBacking(): Boolean = false
+    fun startManagedRealtimeVoice(): Boolean = false
+    fun managedRealtimeVoiceState(): WebChatManagedRealtimeVoiceState =
+        WebChatManagedRealtimeVoiceState.Unavailable
+    fun setManagedRealtimeVoiceMuted(muted: Boolean): Boolean = false
     fun endRealtimeVoiceBacking(gracefulExit: Boolean) = Unit
     fun mcpPort(): WebChatSocialMcpPort? = null
     fun lastCommandStatus(): WebChatCommandStatus? = null

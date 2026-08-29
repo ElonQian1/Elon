@@ -10,6 +10,51 @@ internal data class WebChatRealtimeVoiceContext(
     val openable: Boolean = conversationPath != null && savedToHistory,
 )
 
+internal class WebChatRealtimeVoiceContextTracker(
+    private val resolve: () -> WebChatRealtimeVoiceContext,
+    private val schedule: (Runnable, Long) -> Unit,
+    private val isCurrent: (Int) -> Boolean,
+    private val onChanged: (WebChatRealtimeVoiceContext) -> Unit,
+) {
+    var value: WebChatRealtimeVoiceContext? = null
+        private set
+
+    fun begin(): WebChatRealtimeVoiceContext = resolve().also { value = it }
+
+    fun reset() {
+        value = null
+    }
+
+    fun refresh(): Boolean {
+        val next = resolve()
+        if (next == value) return false
+        value = next
+        onChanged(next)
+        return true
+    }
+
+    fun scheduleRefresh(generation: Int, attempt: Int = 0) {
+        if (!isCurrent(generation) || !needsRefresh()) return
+        schedule(Runnable {
+            if (!isCurrent(generation)) return@Runnable
+            refresh()
+            if (attempt < MAX_POLLS && needsRefresh()) scheduleRefresh(generation, attempt + 1)
+        }, REFRESH_DELAY_MS)
+    }
+
+    private fun needsRefresh(): Boolean = value?.let { context ->
+        context.savedToHistory && (
+            context.conversationPath == null || context.label == CURRENT_CONVERSATION_LABEL
+        )
+    } == true
+
+    private companion object {
+        const val REFRESH_DELAY_MS = 1_000L
+        const val MAX_POLLS = 90
+        const val CURRENT_CONVERSATION_LABEL = "当前 ChatGPT 会话"
+    }
+}
+
 internal object WebChatRealtimeVoiceContextPolicy {
     fun resolve(
         conversationPath: String?,

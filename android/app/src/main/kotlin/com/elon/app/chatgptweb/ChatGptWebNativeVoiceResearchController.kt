@@ -3,23 +3,26 @@ package com.elon.app.chatgptweb
 import android.content.Context
 import com.elon.app.BuildConfig
 
-/** Coordinates the research-only native peer and the page-local bootstrap relay. */
+/** Coordinates the research-only native peer and atomic page-local bootstrap relay. */
 internal class ChatGptWebNativeVoiceResearchController(
     context: Context,
     private val relay: ChatGptWebPrivateVoiceRelayGateway,
     schedule: (Runnable, Long) -> Unit,
+    private val startOfficialVoice: () -> Boolean,
+    private val requestOfficialFallback: () -> Boolean,
+    private val onTranscript: (ChatGptWebNativeVoiceTranscriptEvent) -> Unit,
     private val onState: (ChatGptWebNativeVoiceState) -> Unit,
 ) {
     private var starting = false
     private var generation = 0L
     private var officialMediaSuspended = false
-    private var officialPeerReleased = false
-    private var releaseInFlight = false
     private var closing = false
     private val peer = ChatGptWebNativeVoicePeer(
         context = context,
         relay = relay::exchange,
         schedule = schedule,
+        onRelayArmed = startOfficialVoice,
+        onTranscript = onTranscript,
         onState = ::acceptPeerState,
     )
 
@@ -28,23 +31,20 @@ internal class ChatGptWebNativeVoiceResearchController(
         generation += 1
         val token = generation
         closing = false
-        officialPeerReleased = false
-        releaseInFlight = false
+        officialMediaSuspended = false
         starting = true
         return relay.readBootstrap { bootstrap ->
             if (token != generation) return@readBootstrap
             when (bootstrap) {
                 is ChatGptWebPrivateVoiceBootstrap.Ready -> {
-                    suspendOfficialMediaThenStart(token, bootstrap.dataChannel)
+                    if (!peer.start(bootstrap.dataChannel)) {
+                        starting = false
+                        emitFailure("native_start_rejected")
+                    }
                 }
                 is ChatGptWebPrivateVoiceBootstrap.Unavailable -> {
                     starting = false
-                    onState(
-                        ChatGptWebNativeVoiceState(
-                            phase = ChatGptWebNativeVoicePhase.FAILED,
-                            code = "bootstrap_${bootstrap.code}",
-                        ),
-                    )
+                    emitFailure("bootstrap_${bootstrap.code}")
                 }
             }
         }.also { accepted ->
@@ -59,150 +59,82 @@ internal class ChatGptWebNativeVoiceResearchController(
         closing = true
         starting = false
         relay.cancel()
-        val shouldCloseOfficial = officialMediaSuspended
-        officialMediaSuspended = false
-        officialPeerReleased = false
-        releaseInFlight = false
         peer.close()
-        if (shouldCloseOfficial) relay.closeOfficialPeer()
+        officialMediaSuspended = false
+        relay.resetTakeover()
         closing = false
     }
 
-    private fun suspendOfficialMediaThenStart(
-        token: Long,
-        dataChannel: ChatGptWebPrivateVoiceDataChannelHint,
-    ) {
-        val accepted = relay.setOfficialMediaEnabled(false) { result ->
-            if (token != generation) return@setOfficialMediaEnabled
-            when (result) {
-                is ChatGptWebPrivateVoiceMediaControl.Applied -> {
-                    if (result.enabled) {
-                        failStart("media_handoff_not_suspended")
-                        return@setOfficialMediaEnabled
-                    }
-                    officialMediaSuspended = true
-                    if (!peer.start(dataChannel)) {
-                        restoreOfficialMedia(
-                            ChatGptWebNativeVoiceState(
-                                phase = ChatGptWebNativeVoicePhase.FAILED,
-                                code = "native_start_rejected",
-                            ),
-                        )
-                    }
-                }
-                is ChatGptWebPrivateVoiceMediaControl.Unavailable ->
-                    failStart("media_handoff_${result.code}")
-            }
-        }
-        // The gateway reports a rejected WebView post through the callback.
-        // Avoid emitting a second failure for the same handoff attempt.
-        if (!accepted) starting = false
-    }
-
     private fun acceptPeerState(state: ChatGptWebNativeVoiceState) {
-        starting = false
-        val decorated = decorate(state)
         if (
-            !closing &&
-            !officialPeerReleased &&
-            !releaseInFlight &&
-            officialMediaSuspended &&
-            state.phase == ChatGptWebNativeVoicePhase.CONNECTED &&
-            state.remoteAudio &&
-            state.dataChannelOpen
+            state.phase !in setOf(
+                ChatGptWebNativeVoicePhase.BOOTSTRAPPING,
+                ChatGptWebNativeVoicePhase.CREATING_OFFER,
+                ChatGptWebNativeVoicePhase.RELAYING,
+            )
         ) {
-            releaseOfficialPeer(state)
+            starting = false
+        }
+        if (state.phase == ChatGptWebNativeVoicePhase.APPLYING_ANSWER) {
+            officialMediaSuspended = true
+        }
+        if (closing) {
+            onState(decorate(state))
             return
         }
-        if (
-            !closing &&
-            officialMediaSuspended &&
-            !officialPeerReleased &&
-            (state.phase == ChatGptWebNativeVoicePhase.FAILED ||
-                state.phase == ChatGptWebNativeVoicePhase.CLOSED)
-        ) {
-            restoreOfficialMedia(decorated)
-        } else {
-            onState(decorated)
-        }
-    }
-
-    private fun restoreOfficialMedia(state: ChatGptWebNativeVoiceState) {
-        val token = generation
-        onState(state.copy(officialMediaSuspended = true))
-        relay.setOfficialMediaEnabled(true) { result ->
-            if (token != generation) return@setOfficialMediaEnabled
-            if (result is ChatGptWebPrivateVoiceMediaControl.Applied && result.enabled) {
-                officialMediaSuspended = false
+        if (state.phase == ChatGptWebNativeVoicePhase.FAILED) {
+            if (officialMediaSuspended) {
+                recoverOfficialAfterTakeover(state)
+            } else if (state.code?.startsWith("relay_") == true) {
+                // The page relay has already restored and sent the untouched
+                // official request after rejecting the native response.
+                onState(
+                    decorate(state).copy(
+                        phase = ChatGptWebNativeVoicePhase.OFFICIAL_FALLBACK,
+                        code = "official_fallback_active",
+                    ),
+                )
+            } else {
                 onState(decorate(state))
             }
+            return
         }
+        onState(decorate(state))
     }
 
-    private fun releaseOfficialPeer(state: ChatGptWebNativeVoiceState) {
+    private fun recoverOfficialAfterTakeover(state: ChatGptWebNativeVoiceState) {
         val token = generation
-        releaseInFlight = true
         onState(decorate(state))
-        val accepted = relay.closeOfficialPeer { result ->
-            if (token != generation) return@closeOfficialPeer
-            releaseInFlight = false
-            when (result) {
-                is ChatGptWebPrivateVoiceMediaControl.Applied -> {
-                    officialPeerReleased = result.closed
-                    if (!peer.ensureAudioRoute()) {
-                        peer.close()
-                        onState(
-                            decorate(
-                                ChatGptWebNativeVoiceState(
-                                    phase = ChatGptWebNativeVoicePhase.FAILED,
-                                    code = "audio_route_unavailable",
-                                ),
-                            ),
-                        )
-                    } else {
-                        onState(decorate(state))
-                    }
-                }
-                is ChatGptWebPrivateVoiceMediaControl.Unavailable -> {
-                    closing = true
-                    peer.close()
-                    closing = false
-                    restoreOfficialMedia(
-                        ChatGptWebNativeVoiceState(
-                            phase = ChatGptWebNativeVoicePhase.FAILED,
-                            code = "media_release_${result.code}",
-                        ),
-                    )
-                }
+        relay.resetTakeover { result ->
+            if (token != generation) return@resetTakeover
+            officialMediaSuspended = false
+            val accepted = result is ChatGptWebPrivateVoiceMediaControl.Applied &&
+                requestOfficialFallback()
+            if (accepted) {
+                onState(
+                    state.copy(
+                        phase = ChatGptWebNativeVoicePhase.OFFICIAL_FALLBACK,
+                        officialMediaSuspended = false,
+                        code = "official_fallback_reloading",
+                    ),
+                )
+            } else {
+                emitFailure("official_fallback_unavailable")
             }
-        }
-        if (!accepted) {
-            releaseInFlight = false
-            closing = true
-            peer.close()
-            closing = false
-            restoreOfficialMedia(
-                ChatGptWebNativeVoiceState(
-                    phase = ChatGptWebNativeVoicePhase.FAILED,
-                    code = "media_release_unavailable",
-                ),
-            )
         }
     }
 
     private fun decorate(state: ChatGptWebNativeVoiceState): ChatGptWebNativeVoiceState =
         state.copy(
             officialMediaSuspended = officialMediaSuspended,
-            officialPeerReleased = officialPeerReleased,
+            officialPeerReleased = false,
         )
 
-    private fun failStart(code: String) {
-        starting = false
+    private fun emitFailure(code: String) {
         onState(
             ChatGptWebNativeVoiceState(
                 phase = ChatGptWebNativeVoicePhase.FAILED,
                 officialMediaSuspended = officialMediaSuspended,
-                officialPeerReleased = officialPeerReleased,
                 code = code,
             ),
         )

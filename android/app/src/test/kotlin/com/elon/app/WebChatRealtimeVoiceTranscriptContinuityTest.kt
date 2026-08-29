@@ -2,6 +2,9 @@ package com.elon.app
 
 import com.elon.app.chatgptweb.ChatGptWebCapabilities
 import com.elon.app.chatgptweb.ChatGptWebMessage
+import com.elon.app.chatgptweb.ChatGptWebNativeVoiceTranscriptEvent
+import com.elon.app.chatgptweb.ChatGptWebNativeVoiceTranscriptSpeaker
+import com.elon.app.chatgptweb.ChatGptWebNativeVoiceTranscriptUpdate
 import com.elon.app.chatgptweb.ChatGptWebSnapshot
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -129,6 +132,82 @@ class WebChatRealtimeVoiceTranscriptContinuityTest {
         assertEquals(complete.messages, restored?.messages)
     }
 
+    @Test
+    fun nativeDataChannelTranscriptStreamsIntoTheRetainedConversation() {
+        val continuity = WebChatRealtimeVoiceTranscriptContinuity()
+        continuity.begin(snapshot("/c/origin", "old question", "old answer"))
+
+        val first = continuity.applyLive(transcript(
+            id = "assistant-event-1",
+            stream = "assistant-item",
+            speaker = ChatGptWebNativeVoiceTranscriptSpeaker.ASSISTANT,
+            update = ChatGptWebNativeVoiceTranscriptUpdate.DELTA,
+            text = "实时",
+        ))
+        val second = continuity.applyLive(transcript(
+            id = "assistant-event-2",
+            stream = "assistant-item",
+            speaker = ChatGptWebNativeVoiceTranscriptSpeaker.ASSISTANT,
+            update = ChatGptWebNativeVoiceTranscriptUpdate.DELTA,
+            text = "字幕",
+        ))
+
+        assertEquals("实时", first?.messages?.last()?.content)
+        assertEquals("实时字幕", second?.messages?.last()?.content)
+        assertEquals("streaming", second?.messages?.last()?.state)
+    }
+
+    @Test
+    fun finalNativeTranscriptIsReplacedByTheAuthoritativeConversationSnapshot() {
+        val continuity = WebChatRealtimeVoiceTranscriptContinuity()
+        val beforeVoice = snapshot("/c/origin", "old question", "old answer")
+        continuity.begin(beforeVoice)
+        continuity.applyLive(transcript(
+            id = "user-event",
+            stream = "user-item",
+            speaker = ChatGptWebNativeVoiceTranscriptSpeaker.USER,
+            update = ChatGptWebNativeVoiceTranscriptUpdate.FINAL,
+            text = "语音问题",
+        ))
+        continuity.applyLive(transcript(
+            id = "assistant-event",
+            stream = "assistant-item",
+            speaker = ChatGptWebNativeVoiceTranscriptSpeaker.ASSISTANT,
+            update = ChatGptWebNativeVoiceTranscriptUpdate.FINAL,
+            text = "语音回答",
+        ))
+        continuity.end(null)
+
+        val authoritative = snapshot(
+            "/c/origin",
+            "old question",
+            "old answer",
+            "语音问题",
+            "语音回答",
+        )
+        val resolved = continuity.resolve(authoritative)
+
+        assertEquals(authoritative.messages, resolved?.messages)
+    }
+
+    @Test
+    fun repeatedRealtimeEventIdDoesNotDuplicateText() {
+        val continuity = WebChatRealtimeVoiceTranscriptContinuity()
+        continuity.begin(snapshot("/c/origin", "old question", "old answer"))
+        val event = transcript(
+            id = "same-event",
+            stream = "assistant-item",
+            speaker = ChatGptWebNativeVoiceTranscriptSpeaker.ASSISTANT,
+            update = ChatGptWebNativeVoiceTranscriptUpdate.DELTA,
+            text = "一次",
+        )
+
+        continuity.applyLive(event)
+        val repeated = continuity.applyLive(event)
+
+        assertEquals("一次", repeated?.messages?.last()?.content)
+    }
+
     private fun snapshot(path: String, vararg content: String): ChatGptWebSnapshot {
         val messages = content.mapIndexed { index, value ->
             ChatGptWebMessage(
@@ -143,6 +222,14 @@ class WebChatRealtimeVoiceTranscriptContinuityTest {
     }
 
     private fun emptySnapshot(path: String): ChatGptWebSnapshot = base(path, emptyList())
+
+    private fun transcript(
+        id: String,
+        stream: String,
+        speaker: ChatGptWebNativeVoiceTranscriptSpeaker,
+        update: ChatGptWebNativeVoiceTranscriptUpdate,
+        text: String,
+    ) = ChatGptWebNativeVoiceTranscriptEvent(id, stream, speaker, update, text)
 
     private fun base(path: String, messages: List<ChatGptWebMessage>) = ChatGptWebSnapshot(
         title = "voice conversation",

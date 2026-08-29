@@ -14,6 +14,7 @@ installed build; individual capability documents retain implementation evidence.
 | Streaming reply observer | ChatGPT | Completed and enabled; completion and sparse-watchdog timer/bridge device verified | Official DOM snapshot |
 | Private stream completion settlement | ChatGPT | Completed, enabled, and device verified on `v1.1.1302 (1312)` | Official DOM snapshot |
 | Realtime voice transcript refresh | ChatGPT | Completed and enabled; supervised voice exit pending | Retained native transcript and official DOM snapshot |
+| Realtime voice live transcript stream | ChatGPT | Completed and production-default with native RTC; device event-shape acceptance pending | Same-origin conversation refresh and official DOM snapshot |
 | Realtime voice background continuity | ChatGPT | Completed, enabled, and consumer default; native UI + persistent background WebView identity + official WebRTC | Official full-screen WebView voice and foreground notification |
 | Server API realtime voice experiment | 一龙 AI / OpenAI API | Implemented but disabled and hidden from consumer UI | Native UI + persistent background WebView identity + official WebRTC |
 | Conversation directory | Google Web AI | Completed and enabled | Local cache and official page |
@@ -152,6 +153,15 @@ transport for a non-navigating refresh of the current `/c/{id}` only. Requests a
 single-flight and inherit the existing timeout, cooldown, and circuit breaker. The
 native transcript stays visible while the private snapshot and official DOM snapshot
 race; failure emits no unsupported-capability error and the DOM path continues.
+
+The native realtime peer also consumes the official WebRTC data channel directly for
+allowlisted user and assistant transcript delta/final events. Bounded in-memory events
+update native chat bubbles without reading the voice-page DOM. Event identifiers are
+deduplicated, message and text sizes are capped, and MCP diagnostics expose only message
+counts, never transcript text or payloads. A missing or changed event shape is silent:
+the existing same-origin conversation refresh and official DOM snapshot remain the
+authoritative reconciliation path. Device acceptance must confirm the current private
+event envelope before its verification marker advances beyond targeted tests.
 
 Realtime voice remains owned by the official WebView and WebRTC session. A microphone
 foreground service keeps the session eligible while the user opens another app. The

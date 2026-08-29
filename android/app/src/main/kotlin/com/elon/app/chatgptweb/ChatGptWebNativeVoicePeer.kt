@@ -24,8 +24,10 @@ internal enum class ChatGptWebNativeVoicePhase {
     BOOTSTRAPPING,
     CREATING_OFFER,
     RELAYING,
+    APPLYING_ANSWER,
     CONNECTING,
     CONNECTED,
+    OFFICIAL_FALLBACK,
     FAILED,
     CLOSED,
 }
@@ -34,6 +36,8 @@ internal data class ChatGptWebNativeVoiceState(
     val phase: ChatGptWebNativeVoicePhase,
     val remoteAudio: Boolean = false,
     val dataChannelOpen: Boolean = false,
+    val dataChannelMessageCount: Int = 0,
+    val transcriptEventCount: Int = 0,
     val officialMediaSuspended: Boolean = false,
     val officialPeerReleased: Boolean = false,
     val code: String? = null,
@@ -45,8 +49,11 @@ internal class ChatGptWebNativeVoicePeer(
     private val relay: (
         String,
         (ChatGptWebPrivateVoiceRelayResult) -> Unit,
+        () -> Boolean,
     ) -> Boolean,
     private val schedule: (Runnable, Long) -> Unit,
+    private val onRelayArmed: () -> Boolean,
+    private val onTranscript: (ChatGptWebNativeVoiceTranscriptEvent) -> Unit,
     private val onState: (ChatGptWebNativeVoiceState) -> Unit,
     private val mainHandler: Handler = Handler(Looper.getMainLooper()),
 ) {
@@ -59,6 +66,8 @@ internal class ChatGptWebNativeVoicePeer(
     private var dataChannel: DataChannel? = null
     private var remoteAudio = false
     private var dataChannelOpen = false
+    private var dataChannelMessageCount = 0
+    private var transcriptEventCount = 0
 
     fun start(hint: ChatGptWebPrivateVoiceDataChannelHint): Boolean {
         if (!BuildConfig.CHATGPT_PRIVATE_VOICE_NATIVE_RTC_ENABLED || !canStart()) return false
@@ -77,6 +86,8 @@ internal class ChatGptWebNativeVoicePeer(
         val token = generation
         remoteAudio = false
         dataChannelOpen = false
+        dataChannelMessageCount = 0
+        transcriptEventCount = 0
         update(ChatGptWebNativeVoicePhase.CREATING_OFFER)
         val factory = runCatching { ChatGptWebNativeVoiceRuntime.factory(context) }.getOrNull()
             ?: return fail("native_runtime_unavailable")
@@ -139,7 +150,12 @@ internal class ChatGptWebNativeVoicePeer(
             update(ChatGptWebNativeVoicePhase.RELAYING)
             mainHandler.post {
                 if (!current(token)) return@post
-                if (!relay(offer) { result -> acceptRelay(token, result) }) {
+                if (!relay(
+                        offer,
+                        { result -> acceptRelay(token, result) },
+                        { current(token) && onRelayArmed() },
+                    )
+                ) {
                     fail("relay_unavailable")
                 }
             }
@@ -154,6 +170,7 @@ internal class ChatGptWebNativeVoicePeer(
         if (!current(token)) return
         when (result) {
             is ChatGptWebPrivateVoiceRelayResult.Success -> {
+                update(ChatGptWebNativeVoicePhase.APPLYING_ANSWER)
                 val answer = SessionDescription(
                     SessionDescription.Type.ANSWER,
                     result.answer.value(),
@@ -213,7 +230,20 @@ internal class ChatGptWebNativeVoicePeer(
 
     private fun dataChannelObserver(token: Long): DataChannel.Observer = object : DataChannel.Observer {
         override fun onBufferedAmountChange(previousAmount: Long) = Unit
-        override fun onMessage(buffer: DataChannel.Buffer) = Unit
+        override fun onMessage(buffer: DataChannel.Buffer) {
+            if (!current(token) || buffer.binary) return
+            val payload = buffer.data.duplicate().let { data ->
+                if (data.remaining() !in 1..MAX_DATA_CHANNEL_MESSAGE_BYTES) return
+                ByteArray(data.remaining()).also(data::get).toString(Charsets.UTF_8)
+            }
+            if (dataChannelMessageCount < Int.MAX_VALUE) dataChannelMessageCount += 1
+            val event = ChatGptWebNativeVoiceTranscriptParser.parse(payload) ?: return
+            if (transcriptEventCount < Int.MAX_VALUE) transcriptEventCount += 1
+            emit()
+            mainHandler.post {
+                if (current(token)) onTranscript(event)
+            }
+        }
         override fun onStateChange() {
             if (!current(token)) return
             dataChannelOpen = dataChannel?.state() == DataChannel.State.OPEN
@@ -265,6 +295,8 @@ internal class ChatGptWebNativeVoicePeer(
         audioRoute.release()
         remoteAudio = false
         dataChannelOpen = false
+        dataChannelMessageCount = 0
+        transcriptEventCount = 0
     }
 
     private fun update(next: ChatGptWebNativeVoicePhase) {
@@ -278,6 +310,8 @@ internal class ChatGptWebNativeVoicePeer(
                 phase = phase,
                 remoteAudio = remoteAudio,
                 dataChannelOpen = dataChannelOpen,
+                dataChannelMessageCount = dataChannelMessageCount,
+                transcriptEventCount = transcriptEventCount,
             ),
         )
     }
@@ -304,5 +338,6 @@ internal class ChatGptWebNativeVoicePeer(
         const val AUDIO_TRACK_ID = "elon_private_voice_audio"
         const val AUDIO_STREAM_ID = "elon_private_voice_stream"
         const val CONNECT_TIMEOUT_MS = 20_000L
+        const val MAX_DATA_CHANNEL_MESSAGE_BYTES = 256 * 1024
     }
 }

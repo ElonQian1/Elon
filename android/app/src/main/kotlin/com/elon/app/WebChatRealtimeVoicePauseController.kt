@@ -29,6 +29,20 @@ internal object WebChatRealtimeVoicePauseControlPolicy {
     private const val SEMANTIC_UNMUTE = "voice_unmute"
 }
 
+internal class WebChatRealtimeVoicePauseRouter(
+    private val managedVoice: WebChatManagedRealtimeVoiceLaunchCoordinator,
+    private val officialVoice: WebChatRealtimeVoicePauseController,
+    private val onManagedApplied: (paused: Boolean, detail: String) -> Unit,
+) {
+    fun request(paused: Boolean, source: WebChatRealtimeVoiceBackgroundControlSource) {
+        if (managedVoice.setMutedIfActive(paused)) {
+            onManagedApplied(paused, if (paused) "原生麦克风已暂停" else "原生麦克风已恢复")
+        } else {
+            officialVoice.request(paused, source)
+        }
+    }
+}
+
 internal class WebChatRealtimeVoicePauseController(
     private val consumerPort: () -> WebChatConsumerPort?,
     private val schedule: (Runnable, Long) -> Unit,

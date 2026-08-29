@@ -186,11 +186,11 @@ class WebAiPrivateTransportCatalogTest {
             byId["android_chatgpt_web_private_voice_native_relay_v1"],
         )
         assertEquals(
-            "native_peer_implemented",
+            "device_duplex_verified_atomic_bootstrap_pending",
             nativeVoiceRelay.getString("implementation_status"),
         )
         assertEquals(
-            "research_apk_compiled_and_packaged_device_media_pending",
+            "research_device_native_audio_and_data_channel_verified",
             nativeVoiceRelay.getString("verification_status"),
         )
         assertFalse(nativeVoiceRelay.getBoolean("production_default"))
@@ -201,6 +201,27 @@ class WebAiPrivateTransportCatalogTest {
         assertEquals(
             "official_page_created_webrtc",
             nativeVoiceRelay.getString("fallback"),
+        )
+
+        val nativeVoiceTranscript = requireNotNull(
+            byId["android_chatgpt_realtime_voice_data_channel_transcript_v1"],
+        )
+        assertEquals(
+            "completed",
+            nativeVoiceTranscript.getString("implementation_status"),
+        )
+        assertEquals(
+            "targeted_tests_passed_device_event_shape_pending",
+            nativeVoiceTranscript.getString("verification_status"),
+        )
+        assertTrue(nativeVoiceTranscript.getBoolean("production_default"))
+        assertEquals(
+            BuildConfig.CHATGPT_PRIVATE_VOICE_NATIVE_RTC_ENABLED,
+            nativeVoiceTranscript.getBoolean("runtime_enabled"),
+        )
+        assertEquals(
+            "private_conversation_refresh_and_official_dom_snapshot",
+            nativeVoiceTranscript.getString("fallback"),
         )
 
         values.filter { it.getString("implementation_status") == "research_only" }

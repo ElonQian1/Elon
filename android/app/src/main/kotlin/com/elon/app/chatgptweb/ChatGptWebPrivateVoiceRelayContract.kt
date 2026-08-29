@@ -42,6 +42,14 @@ internal sealed interface ChatGptWebPrivateVoiceRelayPoll {
     ) : ChatGptWebPrivateVoiceRelayPoll
 }
 
+internal sealed interface ChatGptWebPrivateVoiceRelayArm {
+    data object Accepted : ChatGptWebPrivateVoiceRelayArm
+
+    data class Rejected(
+        val code: String,
+    ) : ChatGptWebPrivateVoiceRelayArm
+}
+
 internal sealed interface ChatGptWebPrivateVoiceMediaControl {
     data class Applied(
         val enabled: Boolean,
@@ -64,7 +72,9 @@ internal object ChatGptWebPrivateVoiceRelayContract {
         "busy",
         "invalid_answer",
         "invalid_offer",
+        "invalid_request",
         "network_error",
+        "official_start_unavailable",
         "template_consumed",
         "template_expired",
         "template_unavailable",
@@ -79,24 +89,26 @@ internal object ChatGptWebPrivateVoiceRelayContract {
         """
             (function () {
               var relay = $RELAY_OBJECT;
-              return relay && relay.version >= 2
+              return relay && relay.version >= 4
                 ? relay.bootstrap()
-                : JSON.stringify({version: 2, available: false, templateState: "missing", dataChannelState: "missing"});
+                : JSON.stringify({version: 4, available: false, templateState: "missing", dataChannelState: "missing"});
             })();
         """.trimIndent()
 
     fun parseBootstrap(rawEvaluateValue: String?): ChatGptWebPrivateVoiceBootstrap {
         val value = parseEvaluateObject(rawEvaluateValue)
             ?: return ChatGptWebPrivateVoiceBootstrap.Unavailable("malformed_bootstrap")
-        if (value.optInt("version") < 2) {
+        if (value.optInt("version") < 4) {
             return ChatGptWebPrivateVoiceBootstrap.Unavailable("unsupported_relay")
         }
         if (!value.optBoolean("available")) {
             val code = when {
+                value.optBoolean("armed") || value.optBoolean("inFlight") -> "busy"
                 value.optString("templateState") == "consumed" -> "template_consumed"
                 value.optString("templateState") == "expired" -> "template_expired"
                 value.optString("dataChannelState") == "expired" -> "data_channel_expired"
-                value.optString("dataChannelState") != "ready" -> "data_channel_unavailable"
+                value.optString("dataChannelState") !in setOf("ready", "preset") ->
+                    "data_channel_unavailable"
                 else -> "template_unavailable"
             }
             return ChatGptWebPrivateVoiceBootstrap.Unavailable(code)
@@ -128,13 +140,24 @@ internal object ChatGptWebPrivateVoiceRelayContract {
         )
     }
 
-    fun startScript(requestId: String, offer: String): String? {
+    fun armScript(requestId: String, offer: String): String? {
         if (!REQUEST_ID.matches(requestId) || !validOffer(offer)) return null
         return """
             (function () {
               var relay = $RELAY_OBJECT;
-              if (!relay || relay.version < 2) return false;
-              return relay.startExchange(${JSONObject.quote(requestId)}, ${JSONObject.quote(offer)});
+              return relay && relay.version >= 4 && typeof relay.armExchange === "function"
+                ? relay.armExchange(${JSONObject.quote(requestId)}, ${JSONObject.quote(offer)})
+                : JSON.stringify({version: 4, armed: false, code: "unsupported_relay"});
+            })();
+        """.trimIndent()
+    }
+
+    fun cancelScript(requestId: String): String? {
+        if (!REQUEST_ID.matches(requestId)) return null
+        return """
+            (function () {
+              var relay = $RELAY_OBJECT;
+              return Boolean(relay && relay.version >= 4 && relay.cancelExchange(${JSONObject.quote(requestId)}));
             })();
         """.trimIndent()
     }
@@ -144,7 +167,7 @@ internal object ChatGptWebPrivateVoiceRelayContract {
         return """
             (function () {
               var relay = $RELAY_OBJECT;
-              return relay && relay.version >= 2
+              return relay && relay.version >= 4
                 ? relay.takeResult(${JSONObject.quote(requestId)})
                 : JSON.stringify({status: "failed", code: "template_unavailable"});
             })();
@@ -155,6 +178,20 @@ internal object ChatGptWebPrivateVoiceRelayContract {
         mediaControlScript("setOfficialMediaEnabled(${enabled.toString()})")
 
     fun closeOfficialPeerScript(): String = mediaControlScript("closeOfficialPeer()")
+
+    fun resetTakeoverScript(): String = mediaControlScript("resetTakeover()")
+
+    fun parseArm(rawEvaluateValue: String?): ChatGptWebPrivateVoiceRelayArm {
+        val value = parseEvaluateObject(rawEvaluateValue)
+            ?: return ChatGptWebPrivateVoiceRelayArm.Rejected("malformed_result")
+        if (value.optInt("version") < 4) {
+            return ChatGptWebPrivateVoiceRelayArm.Rejected("unsupported_relay")
+        }
+        if (value.optBoolean("armed")) return ChatGptWebPrivateVoiceRelayArm.Accepted
+        return ChatGptWebPrivateVoiceRelayArm.Rejected(
+            value.optString("code").takeIf(SAFE_FAILURES::contains) ?: "relay_failed",
+        )
+    }
 
     fun parseMediaControl(rawEvaluateValue: String?): ChatGptWebPrivateVoiceMediaControl {
         val value = parseEvaluateObject(rawEvaluateValue)
@@ -220,9 +257,9 @@ internal object ChatGptWebPrivateVoiceRelayContract {
         """
             (function () {
               var relay = $RELAY_OBJECT;
-              return relay && relay.version >= 3 && typeof relay.${operation.substringBefore('(')} === "function"
+              return relay && relay.version >= 4 && typeof relay.${operation.substringBefore('(')} === "function"
                 ? relay.$operation
-                : JSON.stringify({version: 3, applied: false, code: "unsupported_relay"});
+                : JSON.stringify({version: 4, applied: false, code: "unsupported_relay"});
             })();
         """.trimIndent()
 
