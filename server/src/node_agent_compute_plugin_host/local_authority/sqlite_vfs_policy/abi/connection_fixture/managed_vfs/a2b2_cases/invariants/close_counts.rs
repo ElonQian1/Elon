@@ -5,11 +5,11 @@ use super::super::model::{Case, Path, Phase, RegistryRoutePhase, Timing, Topolog
 pub(super) fn validate(case: &Case) -> Result<(), &'static str> {
     let direct_unmap_terminal = case.path == Path::Unmap && case.domain_terminal;
     let joint_physical_failure = case.path == Path::JointClose
-        && case.variant == 0
         && matches!(
             case.phase,
             Phase::ShmUnmapLift | Phase::MainLockRelease | Phase::MainFileClose
-        );
+        )
+        && !(case.phase == Phase::MainFileClose && case.variant == 1);
     if (direct_unmap_terminal || joint_physical_failure)
         && (case.counts.callback_begin != 1
             || case.counts.callback_complete_attempt != 1
@@ -26,6 +26,18 @@ pub(super) fn validate(case: &Case) -> Result<(), &'static str> {
         {
             return Err("physical close success lacks its pending registry receipt boundary");
         }
+    }
+    if case.path == Path::JointClose
+        && case.phase == Phase::MainLockRelease
+        && case.lock_outcome_uncertain != (case.timing == Timing::NativeUncertain)
+    {
+        return Err("main unlock uncertainty differs from its exact native receipt boundary");
+    }
+    if case.path == Path::JointClose
+        && case.phase == Phase::MainFileClose
+        && case.lock_outcome_uncertain
+    {
+        return Err("main file close cannot invent a main unlock uncertainty");
     }
     if case.path == Path::JointClose
         && case.phase == Phase::MainLockRelease

@@ -70,15 +70,25 @@ or replayed Unmap evidence is not JointClose evidence.
 
 | Phase | Selectors |
 |---|---|
-| `MainLockRelease` | `main-lock-release-before`, `main-lock-release-native-retryable`, `main-lock-release-native-uncertain`, `main-lock-release-after-known` |
+| `MainLockRelease` | `main-lock-release-before`, `main-lock-release-native-uncertain-shared`, `main-lock-release-native-uncertain-reserved`, `main-lock-release-after-known` |
 | `MainFileClose` | `main-file-close-before`, `main-file-close-native-retryable`, `main-file-close-native-uncertain`, `main-file-close-after-known` |
 
 The native selectors require an exact Windows operation receipt. A synthetic observer, returned
-enum, default counter, or pre-native rejection cannot be relabelled as a native failure. Retryable
-means the exact native call was observed to fail before consuming custody and the live owner is
-retained. Uncertain means the exact call ran once but its success receipt was deliberately not
-observed, so the exact route plus main-file/lock custody becomes terminal and cannot be retried.
-Because SHM teardown already succeeded, this does not falsely poison the empty SHM/FileId domain.
+enum, default counter, invalid reserved argument, or pre-native rejection cannot be relabelled as a
+native failure. The two main-lock uncertainty selectors execute legal `UnlockFileEx` calls against
+the exact live handle with, respectively, a held Shared range and a held Reserved-plus-Shared
+topology; the return receipt is deliberately not read. The main-file retryable selector observes a
+real `CloseHandle` rejection before custody is consumed and returns the still-live owner. In every
+uncertain selector the exact call ran once, so the route plus main-file/lock custody becomes
+terminal and cannot be retried. Because SHM teardown already succeeded, this does not falsely
+poison the empty SHM/FileId domain.
+
+The static keys distinguish the two main-lock uncertainty cases with variant `0` and `1`.
+`pre_shared_mask` and `pre_exclusive_mask` remain SHM-slot masks and must not be overloaded with
+main-database lock state. The canonical actual instead carries independent typed
+`main_lock_prestate` and `main_lock_offset_class` fields: variant `0` requires
+`Shared/SharedRange`, while variant `1` requires `ReservedShared/ReservedByte`. All other selectors
+require both fields to be `NotApplicable`.
 
 ### 2.4 Physical-to-registry handoff — 4
 
@@ -159,8 +169,9 @@ action. They must be bound to registration ID, route ordinal, runtime generation
 ID, Main role, Close callback, phase, and occurrence.
 
 - Existing SHM before/after/native adapters may be reused only through the real close chain.
-- Main unlock and main handle native seams must execute the exact Windows boundary once and return
-  a typed receipt distinguishing observed retryable failure from return-receipt-unavailable.
+- Main unlock and main handle native seams must execute the exact legal Windows boundary once. Main
+  unlock has two held-lock topologies with a typed return-receipt-unavailable witness; main handle
+  close additionally distinguishes observed retryable failure from return-receipt-unavailable.
 - Raw-state and callback-admission seams must be allocation/route-bound and externally witnessed;
   no process-global flag, environment-selected identity, sleep ordering, or pointer selector is
   allowed.
@@ -182,7 +193,8 @@ in a fixed positional order, including:
 - node, view, mapping, DMS, SHM file, main file/lock owner, main/SHM/callback lease, registry entry,
   three logical names, VFS table/name/context, and root-deletable custody;
 - every raw/callback/action/SHM/main/registry/connection/route/logical-name/unregister/fault/custody
-  counter defined by the frozen A2b2 schema, including `physical_retry`.
+  counter defined by the frozen A2b2 schema, including `physical_retry`;
+- the independent typed main-lock prestate and selected native offset class described above.
 
 The codec must reject aliases, whitespace drift, alternate numbers, unknown enum values, extra or
 missing fields, non-canonical booleans, and non-canonical round trips. The validator must compare
