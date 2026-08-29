@@ -53,5 +53,7 @@ assert.match(dispatchSource, /commandQueued = true[\s\S]*?waitForLocalAiAdapterR
 assert.match(dispatchSource, /decision === 'reconcile'[\s\S]*?reconcileUncertainSend\(\)/)
 assert.match(dispatchSource, /一龙不会自动重放/)
 assert.match(dispatchSource, /reconcileUncertainSend[\s\S]*?onResponseRefresh/)
+assert.match(dispatchSource, /if \(!isCurrent\(\)\) return null[\s\S]*?waitForLocalAiAdapterResult/)
+assert.match(dispatchSource, /if \(isGenerationCurrent\(\)\) onBusyAction\(''\)/)
 
 process.stdout.write('PASS local AI stable receipt and uncertain send reconciliation\n')

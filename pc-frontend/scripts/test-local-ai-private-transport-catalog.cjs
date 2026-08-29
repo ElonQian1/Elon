@@ -54,7 +54,7 @@ assert.match(copy.copy, /14\/14/)
 assert.match(copy.copy, /无需等待官网扫描/)
 assert.match(copy.detail, /私有流与完成态结算/)
 assert.match(copy.detail, /官网快照单飞行刷新/)
-assert.match(copy.detail, /稳定回执与不确定发送对账/)
+assert.match(copy.detail, /单所有者发送、稳定回执与跨会话隔离/)
 assert.match(copy.detail, /独立会话正文与富内容缓存/)
 assert.match(copy.detail, /私有流原生事件即时刷新/)
 assert.match(copy.detail, /后台导航与宿主恢复连续性/)
@@ -70,6 +70,13 @@ assert.equal(firstTurnBinding.fallback, 'official_dom_prompt_confirmation')
 const hostContinuity = chatCapabilities.find((capability) => (
   capability.id === 'win_web_ai_background_navigation_continuity_v1'
 ))
+const sendCoordinator = chatCapabilities.find((capability) => (
+  capability.id === 'win_web_ai_unified_send_coordinator_v1'
+))
+assert.equal(
+  sendCoordinator.requestMode,
+  'stable_request_id_single_owner_generation_gated_official_page_transport',
+)
 assert.equal(
   hostContinuity.requestMode,
   'preserve_inflight_navigation_and_resume_adapter_snapshot',

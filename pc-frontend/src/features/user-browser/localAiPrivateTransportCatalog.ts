@@ -85,8 +85,8 @@ const SHARED_REFRESH_SINGLE_FLIGHT: CapabilityDefinition = {
 
 const SHARED_SEND_COORDINATOR: CapabilityDefinition = {
   id: 'win_web_ai_unified_send_coordinator_v1',
-  label: '稳定回执与不确定发送对账',
-  requestMode: 'stable_request_id_single_flight_official_page_transport',
+  label: '单所有者发送、稳定回执与跨会话隔离',
+  requestMode: 'stable_request_id_single_owner_generation_gated_official_page_transport',
   fallback: 'official_page_reconciliation_without_automatic_write_replay',
   requiredActions: ['send_prompt'],
 }

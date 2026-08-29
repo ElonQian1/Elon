@@ -20,6 +20,8 @@ interface DispatchPreparedLocalAiPromptOptions {
   onMessage: (message: string) => void
   onState: (state: LocalAiWebSessionState) => void
   onResponseRefresh: (prompt: string, baselineMatchingUserCount: number) => void
+  isCurrent: () => boolean
+  isGenerationCurrent: () => boolean
 }
 
 export async function dispatchPreparedLocalAiPrompt({
@@ -32,7 +34,10 @@ export async function dispatchPreparedLocalAiPrompt({
   onMessage,
   onState,
   onResponseRefresh,
+  isCurrent,
+  isGenerationCurrent,
 }: DispatchPreparedLocalAiPromptOptions): Promise<LocalAiWebSessionState | null> {
+  if (!isCurrent()) return null
   if (!provider || !ownerKey || prepared.sessionIdentity !== requestedSessionIdentity) {
     restore(prepared)
     return null
@@ -42,6 +47,7 @@ export async function dispatchPreparedLocalAiPrompt({
   let commandQueued = false
   let requestId = ''
   const reconcileUncertainSend = () => {
+    if (!isCurrent()) return
     onMessage('发送结果暂未确认。为避免重复发送，一龙不会自动重放；正在从官方会话对账，可打开官方页核对。')
     onResponseRefresh(prepared.prompt, prepared.pending.baselineMatchingUserCount)
   }
@@ -54,7 +60,9 @@ export async function dispatchPreparedLocalAiPrompt({
     // The native chat surface owns focus. Park the official WebView before and
     // after the matching receipt because the page may navigate late after send.
     requestReturnToAiChat(foregroundRequest)
-    onState(await controlLocalAiWebSession(provider.id, ownerKey, 'background'))
+    const parked = await controlLocalAiWebSession(provider.id, ownerKey, 'background')
+    if (!isCurrent()) return null
+    onState(parked)
     requestId = await runLocalAiWebAdapterCommand(
       provider.id,
       ownerKey,
@@ -62,6 +70,7 @@ export async function dispatchPreparedLocalAiPrompt({
       prepared.prompt,
       prepared.expectedDraft,
     )
+    if (!isCurrent()) return null
     commandQueued = true
     const next = await waitForLocalAiAdapterResult(
       provider.id,
@@ -69,6 +78,7 @@ export async function dispatchPreparedLocalAiPrompt({
       'send_prompt',
       requestId,
     )
+    if (!isCurrent()) return null
     const decision = localAiSendReceiptDecision({
       commandQueued,
       requestId,
@@ -85,6 +95,7 @@ export async function dispatchPreparedLocalAiPrompt({
     } catch {
       // Response polling continues to reassert the same bounded foreground intent.
     }
+    if (!isCurrent()) return null
     onState(foregroundState)
     const result = next?.commandResult
     if (decision === 'rejected') {
@@ -96,6 +107,7 @@ export async function dispatchPreparedLocalAiPrompt({
     }
     return next
   } catch (error) {
+    if (!isCurrent()) return null
     const decision = localAiSendReceiptDecision({ commandQueued, requestId })
     if (decision === 'reconcile') {
       reconcileUncertainSend()
@@ -105,6 +117,8 @@ export async function dispatchPreparedLocalAiPrompt({
     }
     return null
   } finally {
-    onBusyAction('')
+    // A provider/conversation boundary invalidates the old generation. Its late
+    // finally block must not clear the busy state owned by a newer operation.
+    if (isGenerationCurrent()) onBusyAction('')
   }
 }

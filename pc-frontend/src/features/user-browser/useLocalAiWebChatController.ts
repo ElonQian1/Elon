@@ -64,13 +64,14 @@ import { resumeLocalAiWebSession } from './resumeLocalAiWebSession'
 import useLocalAiCapabilityPrewarm from './useLocalAiCapabilityPrewarm'
 import { syncLocalAiDeferredMenu } from './localAiDeferredMenuSync'
 import useLocalAiCachedConversationNavigation from './useLocalAiCachedConversationNavigation'
-import { dispatchPreparedLocalAiPrompt } from './dispatchPreparedLocalAiPrompt'
 import { localAiQueuedSendRecoveryAction } from './localAiQueuedSendRecoveryPolicy'
 import useLocalAiBackgroundNavigationRecovery from './useLocalAiBackgroundNavigationRecovery'
 import useLocalAiDeferredConversationNavigation, {
   isLocalAiDeferredConversationAction,
 } from './useLocalAiDeferredConversationNavigation'
 import useLocalAiWindowActions from './useLocalAiWindowActions'
+import useLocalAiSendFlightLedger from './useLocalAiSendFlightLedger'
+import { createLocalAiPreparedPromptDispatcher } from './createLocalAiPreparedPromptDispatcher'
 export default function useLocalAiWebChatController(
   provider: LocalAiWebProvider | undefined,
   ownerKey: string,
@@ -107,6 +108,11 @@ export default function useLocalAiWebChatController(
   const backgroundReconnectAttempts = useRef(0)
   const backgroundReconnectInFlight = useRef(false)
   const optimisticSendSequence = useRef(0)
+  const sendFlightLedger = useLocalAiSendFlightLedger(
+    requestedSessionIdentity,
+    pendingSends,
+    pendingResponses,
+  )
   const visibleSessionState = provider && ownerKey
     ? sessionEntry.identity === requestedSessionIdentity
       && sessionEntry.state?.providerId === provider.id
@@ -227,6 +233,7 @@ export default function useLocalAiWebChatController(
       : null)
     setPendingSends([])
     setPendingResponses([])
+    sendFlightLedger.invalidate()
     resetNewConversationTransition()
     setBusyAction('')
     setMessage('')
@@ -415,6 +422,7 @@ export default function useLocalAiWebChatController(
     isSessionCurrent: (identity) => activeSessionIdentity.current === identity,
     beforeOpen: () => {
     cancelNewConversationTransition(restoreQueuedSend)
+    sendFlightLedger.invalidate()
     setPendingSends([])
     setPendingResponses([])
     cancelResponseRefresh()
@@ -522,6 +530,10 @@ export default function useLocalAiWebChatController(
       `optimistic-${provider.id}-${Date.now()}-${optimisticSendSequence.current++}`,
     )
     if (!pending) return null
+    if (!sendFlightLedger.begin(requestedSessionIdentity, pending.id)) {
+      setMessage('上一条消息仍在等待官网确认；为避免重复发送，请等待回复或新建会话。')
+      return null
+    }
     setPendingSends((current) => current.concat(pending))
     setPendingResponses((current) => current.concat(beginPendingLocalAiResponse(pending)))
     setDraft('')
@@ -529,25 +541,17 @@ export default function useLocalAiWebChatController(
     return pending
   }
 
-  async function dispatchPreparedPrompt(
-    prepared: QueuedLocalAiSend,
-  ): Promise<LocalAiWebSessionState | null> {
-    return dispatchPreparedLocalAiPrompt({
-      provider,
-      ownerKey,
-      requestedSessionIdentity,
-      prepared,
-      restore: restoreQueuedSend,
-      onBusyAction: setBusyAction,
-      onMessage: setMessage,
-      onState: setSessionState,
-      onResponseRefresh: startResponseRefresh,
-    })
-  }
+  const dispatchPreparedPrompt = createLocalAiPreparedPromptDispatcher({
+    provider, ownerKey, requestedSessionIdentity, activeSessionIdentity,
+    ledger: sendFlightLedger, restore: restoreQueuedSend,
+    onBusyAction: setBusyAction, onMessage: setMessage, onState: setSessionState,
+    onResponseRefresh: startResponseRefresh,
+  })
 
   function beginLocalNewConversation() {
     const previousDraft = draftRef.current
     beginNewConversationTransition(visibleSessionState?.activeConversationId ?? '')
+    sendFlightLedger.invalidate()
     setPendingSends([])
     setPendingResponses([])
     setQueuedSend(null)
@@ -571,6 +575,7 @@ export default function useLocalAiWebChatController(
       `optimistic-${provider.id}-${Date.now()}-${optimisticSendSequence.current++}`,
     )
     if (retry) {
+      sendFlightLedger.begin(requestedSessionIdentity, retry.pending.id)
       setPendingSends([retry.pending]); setPendingResponses([retry.response])
       setQueuedSend(retry.queued)
       accessRecovery.dismiss()
@@ -659,6 +664,7 @@ export default function useLocalAiWebChatController(
 
   function rollbackPendingSend(pending: PendingLocalAiSend | null) {
     if (!pending) return
+    sendFlightLedger.settle(requestedSessionIdentity, pending.id)
     setPendingSends((current) => current.filter((item) => item.id !== pending.id))
     setPendingResponses((current) => current.filter((item) => item.sendId !== pending.id))
     setDraft(mergeLocalAiRecoveredDraft(pending.prompt, draftRef.current))

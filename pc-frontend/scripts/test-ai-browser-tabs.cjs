@@ -20,6 +20,7 @@ const topbar = read('pc-frontend/src/features/ai/AiChatTopbar.tsx')
 const chat = read('pc-frontend/src/features/ai/AiChatPage.tsx')
 const controller = read('pc-frontend/src/features/user-browser/useLocalAiWebChatController.ts')
 const sendDispatcher = read('pc-frontend/src/features/user-browser/dispatchPreparedLocalAiPrompt.ts')
+const preparedDispatcher = read('pc-frontend/src/features/user-browser/createLocalAiPreparedPromptDispatcher.ts')
 const sendSuccessBranch = sendDispatcher.slice(sendDispatcher.indexOf('export async function'))
 const nativeCommandBranch = localBrowser.slice(
   localBrowser.indexOf('pub async fn run_local_ai_web_adapter_command'),
@@ -131,7 +132,8 @@ assert.doesNotMatch(chat, /AiOfficialAnswerSurface/)
 assert.match(sendSuccessBranch, /onResponseRefresh/)
 assert.doesNotMatch(sendSuccessBranch, /requestOfficialAiTab|showOfficialAfterSend|openOfficial/)
 assert.doesNotMatch(controller, /showOfficialAfterSend/)
-assert.match(controller, /dispatchPreparedLocalAiPrompt/)
+assert.match(controller, /createLocalAiPreparedPromptDispatcher/)
+assert.match(preparedDispatcher, /dispatchPreparedLocalAiPrompt/)
 assert.match(sendDispatcher, /requestReturnToAiChat/)
 assert.match(sendDispatcher, /controlLocalAiWebSession\(provider\.id, ownerKey, 'background'\)/)
 assert.ok(
