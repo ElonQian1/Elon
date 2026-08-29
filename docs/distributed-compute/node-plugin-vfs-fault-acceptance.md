@@ -64,10 +64,12 @@ A2a/A2b1 map/lock 或 A2b2 的任何 `WindowsDynamic` case。后续执行必须�
 
 ### 当前宽范围回归基线
 
-- 被测 clean HEAD：`1d57b8d98a1fed70fe40ad6f1575f4b856226857`；
-- Rust 验证指纹：`VALIDATION_FINGERPRINT=e6903ba19d0ff512bba4d1489857b179874a93666bd97f9fae815ef045347e99`；
-- 命令范围：`scripts/validate-rust.ps1 -Domain agent-validation -Force -- test --manifest-path server/Cargo.toml --locked sqlite_vfs_policy -- --nocapture --test-threads=1`，编译时 `ELON_NODE_AGENT_GIT_SHA` 逐字绑定上述 commit；
+- 被测 clean HEAD：`2c6393745e84cccc3ec8d1e25a3f0092eb412988`；
+- Rust 验证指纹：`VALIDATION_FINGERPRINT=2d498cb483459785c8593d89839097675f1d224d560e211ef4ff5c2529b5b57b`；
+- 命令范围：同一 PowerShell 进程先执行 `$env:ELON_NODE_AGENT_GIT_SHA = (git rev-parse HEAD).Trim()`，再执行 `scripts/validate-rust.ps1 -Domain agent-validation -Force -- test --manifest-path server/Cargo.toml --locked sqlite_vfs_policy -- --nocapture --test-threads=1`；
 - 结果：主 `sqlite_vfs_policy` 集合 `121 passed / 0 failed / 1582 filtered`，同次进程隔离子运行均通过；
+- 动态记录复核：同次输出含 Barrier 8 条与 RegistrationShutdown 8 条记录，16 条均逐字绑定上述 commit，且全部为 `child_exit=0`、`parent_cleanup=deleted`；
+- 失败边界：同一指纹下首次未注入 `ELON_NODE_AGENT_GIT_SHA` 的强制尝试被 `A2_DYNAMIC_GIT_SHA_MISSING` 拒绝，不计正式证据；随后显式绑定提交并再次 `-Force` 的成功运行才构成本基线。指纹本身不编码该环境变量，因此必须同时核对 receipt 与记录内嵌 commit；
 - 证据边界：该结果证明上述 exact clean HEAD 的宽范围回归健康。任何后续源码变更都必须在新 commit 上重新运行；不得仅凭宽回归增加 `WindowsDynamic` 计数。
 
 ## 2. Case 集合与完成条件

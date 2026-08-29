@@ -23,7 +23,8 @@ the minimum test-only seams required before any Windows dynamic result may be re
 - exact evidence commit: `1d57b8d98a1fed70fe40ad6f1575f4b856226857`
 - Barrier validation fingerprint: `c300720aa17bae7850f0d0088827b918c5b5d66c2842ff6d5b548e80c7d185f4`
 - current A2b2 Windows dynamic total: `16/117`; remaining: `101`
-- clean wide-regression fingerprint: `e6903ba19d0ff512bba4d1489857b179874a93666bd97f9fae815ef045347e99`
+- clean wide-regression commit: `2c6393745e84cccc3ec8d1e25a3f0092eb412988`
+- clean wide-regression fingerprint: `2d498cb483459785c8593d89839097675f1d224d560e211ef4ff5c2529b5b57b`
   (`sqlite_vfs_policy` `121/121`)
 
 The design text alone is not implementation evidence. The status above is backed by eight unique
