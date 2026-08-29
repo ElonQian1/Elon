@@ -173,7 +173,7 @@ const upgradeWindow = {
 vm.runInNewContext(compatibilitySource, { window: upgradeWindow }, {
   filename: 'chatgpt_win_private_rich_compatibility.js',
 })
-assert.equal(upgradeWindow.__elonWinChatGptPrivateRichCompatibility.version, 6)
+assert.equal(upgradeWindow.__elonWinChatGptPrivateRichCompatibility.version, 7)
 assert.notEqual(upgradeWindow.__elonChatGptPrivateStreamPolicy, stalePolicy)
 assert.equal(upgradeWindow.__elonWinChatGptPrivateRichCompatibility.basePolicy, basePolicy)
 
@@ -219,6 +219,82 @@ const early = earlySession.current('/c/conversation-early-widget')
 assert.equal(early.text, '同一会话正文。')
 assert.equal(early.richParts.length, 1, 'an early widget must bind after its matching response arrives')
 assert.equal(early.richParts[0].kind, 'finance')
+
+const splitMetadataPolicy = compatibility.enhancePolicy(basePolicy)
+const splitMetadataSession = splitMetadataPolicy.createSession({ now: () => ++clock })
+splitMetadataSession.begin()
+splitMetadataSession.accept(assistantFrameFor(
+  'assistant-split-text',
+  '正文和富内容由不同的官方帧提供。',
+  'conversation-split-metadata',
+  'turn-split-metadata',
+))
+const splitFinanceWidget = {
+  asset_display_name: 'Bitcoin (BTC)',
+  current_price_text: 'US$77,000.00',
+  default_range: '1D',
+  timeframe_order: ['1D'],
+  timeframe_configs: {
+    '1D': {
+      summary: { price_text: 'US$77,000.00', price_change_text: '+1.2%' },
+      chart: { data: [
+        { formatted: '10:00', close: 76_900 },
+        { formatted: '11:00', close: 77_000 },
+      ] },
+    },
+  },
+}
+assert.equal(splitMetadataSession.accept({
+  conversation_id: 'conversation-split-metadata',
+  message: {
+    id: 'assistant-split-rich',
+    author: { role: 'assistant' },
+    status: 'finished_successfully',
+    content: { content_type: 'interactive', parts: [] },
+    metadata: {
+      turn_exchange_id: 'turn-split-metadata',
+      content_references: [{
+        type: 'dil',
+        dil: { initialState: splitFinanceWidget },
+      }],
+    },
+  },
+}), true, 'a non-text assistant frame with supported metadata is a useful private update')
+splitMetadataSession.finish()
+const splitMetadata = splitMetadataSession.current('/c/conversation-split-metadata')
+assert.equal(splitMetadata.text, '正文和富内容由不同的官方帧提供。')
+assert.equal(splitMetadata.richParts.length, 1)
+assert.equal(splitMetadata.richParts[0].kind, 'finance')
+assert.equal(splitMetadata.richParts[0].richContent.payload.chart.points.length, 2)
+
+const stagedMetadataPolicy = compatibility.enhancePolicy(basePolicy)
+const stagedMetadataSession = stagedMetadataPolicy.createSession({ now: () => ++clock })
+stagedMetadataSession.begin()
+assert.equal(stagedMetadataSession.accept({
+  conversation_id: 'conversation-staged-metadata',
+  message: {
+    id: 'assistant-staged-rich',
+    author: { role: 'assistant' },
+    content: { content_type: 'interactive', parts: [] },
+    metadata: {
+      turn_exchange_id: 'turn-staged-metadata',
+      content_references: [{
+        type: 'dil',
+        dil: { initialState: splitFinanceWidget },
+      }],
+    },
+  },
+}), true)
+stagedMetadataSession.accept(assistantFrameFor(
+  'assistant-staged-text',
+  '稍后到达的正文仍应接回同一张行情卡。',
+  'conversation-staged-metadata',
+  'turn-staged-metadata',
+))
+const stagedMetadata = stagedMetadataSession.current('/c/conversation-staged-metadata')
+assert.equal(stagedMetadata.text, '稍后到达的正文仍应接回同一张行情卡。')
+assert.equal(stagedMetadata.richParts.length, 1)
+assert.equal(stagedMetadata.richParts[0].kind, 'finance')
 
 const renderedPolicy = compatibility.enhancePolicy(basePolicy)
 const renderedStream = {

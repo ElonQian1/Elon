@@ -24,7 +24,7 @@
 })(typeof window === 'object' ? window : null, function () {
   'use strict';
 
-  const VERSION = 6;
+  const VERSION = 7;
   const MAX_WIDGET_KEYS = 32;
   const MAX_PENDING_RICH_PARTS = 8;
 
@@ -128,6 +128,66 @@
       .filter((part) => part && (part.type === 'markdown' || part.type === 'text'))
       .map((part) => String(part.text || ''))
       .join('\n');
+  }
+
+  function visibleRichContext(payload) {
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
+    const envelope = Number.isFinite(payload.c) && payload.v && typeof payload.v === 'object'
+      ? payload.v
+      : payload;
+    const message = envelope.message || envelope.data && envelope.data.message;
+    if (!message || typeof message !== 'object' ||
+        String(message.author && message.author.role || '').toLowerCase() !== 'assistant') {
+      return null;
+    }
+    const metadata = message.metadata && typeof message.metadata === 'object'
+      ? message.metadata
+      : null;
+    if (!metadata) return null;
+    return {
+      metadata,
+      identity: {
+        messageId: String(message.id || '').slice(0, 180),
+        turnId: String(
+          metadata.turn_exchange_id || metadata.working_turn_id || '',
+        ).slice(0, 180),
+        conversationId: String(
+          envelope.conversation_id || envelope.conversationId || '',
+        ).slice(0, 180),
+      },
+    };
+  }
+
+  function richPartsFromPayload(policy, payload) {
+    const context = visibleRichContext(payload);
+    if (!context) return { identity: null, parts: [] };
+    const parts = [];
+    try {
+      const chart = typeof policy.clientChartPartFromMetadata === 'function'
+        ? policy.clientChartPartFromMetadata(context.metadata)
+        : null;
+      if (isSupportedRichPart(chart)) parts.push(chart);
+    } catch (_) {
+      // The official frame remains authoritative when an unknown chart arrives.
+    }
+    try {
+      const finance = typeof policy.financePartsFromMetadata === 'function'
+        ? policy.financePartsFromMetadata(context.metadata)
+        : [];
+      (Array.isArray(finance) ? finance : []).forEach((part) => {
+        if (!isSupportedRichPart(part)) return;
+        const duplicate = parts.some((candidate) => (
+          String(candidate && candidate.kind || candidate && candidate.richContent &&
+            candidate.richContent.kind || '') ===
+          String(part && part.kind || part && part.richContent && part.richContent.kind || '') &&
+          String(candidate && candidate.text || '') === String(part && part.text || '')
+        ));
+        if (!duplicate && parts.length < MAX_PENDING_RICH_PARTS) parts.push(part);
+      });
+    } catch (_) {
+      // Unknown metadata is reported by the compatibility tracker, not rendered.
+    }
+    return { identity: context.identity, parts };
   }
 
   function mergeRenderedReply(policy, values, stream) {
@@ -308,6 +368,16 @@
     function accept(payload) {
       const accepted = session.accept(payload);
       let widgets = [];
+      const structured = richPartsFromPayload(policy, payload);
+
+      // Upstream now also emits finance/chart metadata in dedicated non-text
+      // assistant frames. The shared parser intentionally ignores their body so
+      // tool instructions never leak into chat, but Win still has to attach the
+      // positively identified rich metadata to the active assistant turn.
+      let structuredAccepted = false;
+      if (structured.parts.length) {
+        structuredAccepted = acceptRichParts(structured.parts, structured.identity);
+      }
 
       // The official SSE can deliver a packed interactive widget in its own
       // frame, after the assistant text frame. The shared session parser
@@ -325,7 +395,7 @@
       tracker.observeWidgets(widgets);
       flushPendingRichParts();
       publish();
-      return accepted || widgets.length > 0;
+      return accepted || structuredAccepted || structured.parts.length > 0 || widgets.length > 0;
     }
 
     function begin() {
@@ -446,6 +516,7 @@
     mergeRenderedReply,
     packedWidgetKey,
     rendererUpgradePart,
+    richPartsFromPayload,
     sameRenderedReply,
     richIdentityMatches,
     relaxedRichIdentity,
