@@ -18,6 +18,7 @@ import livekit.org.webrtc.RtpReceiver
 import livekit.org.webrtc.RtpTransceiver
 import livekit.org.webrtc.SdpObserver
 import livekit.org.webrtc.SessionDescription
+import java.util.IdentityHashMap
 
 internal enum class ChatGptWebNativeVoicePhase {
     IDLE,
@@ -58,12 +59,14 @@ internal class ChatGptWebNativeVoicePeer(
     private val mainHandler: Handler = Handler(Looper.getMainLooper()),
 ) {
     private val audioRoute = ChatGptWebNativeVoiceAudioRoute(context)
+    @Volatile
     private var generation = 0L
     private var phase = ChatGptWebNativeVoicePhase.IDLE
     private var peer: PeerConnection? = null
     private var audioSource: AudioSource? = null
     private var audioTrack: AudioTrack? = null
-    private var dataChannel: DataChannel? = null
+    private val dataChannelLock = Any()
+    private val dataChannels = IdentityHashMap<DataChannel, DataChannel.Observer>()
     private var remoteAudio = false
     private var dataChannelOpen = false
     private var dataChannelMessageCount = 0
@@ -234,7 +237,7 @@ internal class ChatGptWebNativeVoicePeer(
     ): DataChannel.Observer = object : DataChannel.Observer {
         override fun onBufferedAmountChange(previousAmount: Long) = Unit
         override fun onMessage(buffer: DataChannel.Buffer) {
-            if (!current(token) || dataChannel !== observedChannel) return
+            if (!current(token) || !hasDataChannel(observedChannel)) return
             val payload = buffer.data.duplicate().let { data ->
                 if (data.remaining() !in 1..MAX_DATA_CHANNEL_MESSAGE_BYTES) return
                 ByteArray(data.remaining()).also(data::get).toString(Charsets.UTF_8)
@@ -248,32 +251,44 @@ internal class ChatGptWebNativeVoicePeer(
             }
         }
         override fun onStateChange() {
-            if (!current(token) || dataChannel !== observedChannel) return
-            dataChannelOpen = observedChannel.state() == DataChannel.State.OPEN
+            if (!current(token) || !hasDataChannel(observedChannel)) return
+            refreshDataChannelOpen()
             emit()
         }
     }
 
     private fun bindDataChannel(token: Long, channel: DataChannel) {
-        if (!current(token)) {
+        val observer = dataChannelObserver(token, channel)
+        val accepted = synchronized(dataChannelLock) {
+            when {
+                !current(token) -> false
+                dataChannels.containsKey(channel) -> return
+                dataChannels.size >= MAX_DATA_CHANNELS -> false
+                else -> {
+                    dataChannels[channel] = observer
+                    runCatching { channel.registerObserver(observer) }
+                        .onFailure { dataChannels.remove(channel) }
+                        .isSuccess
+                }
+            }
+        }
+        if (!accepted) {
             channel.close()
             channel.dispose()
             return
         }
-        val currentChannel = dataChannel
-        if (currentChannel === channel) return
-        if (currentChannel?.state() == DataChannel.State.OPEN) {
-            channel.close()
-            channel.dispose()
-            return
-        }
-        currentChannel?.unregisterObserver()
-        currentChannel?.close()
-        currentChannel?.dispose()
-        dataChannel = channel
-        channel.registerObserver(dataChannelObserver(token, channel))
-        dataChannelOpen = channel.state() == DataChannel.State.OPEN
+        refreshDataChannelOpen()
         emit()
+    }
+
+    private fun hasDataChannel(channel: DataChannel): Boolean =
+        synchronized(dataChannelLock) { dataChannels.containsKey(channel) }
+
+    private fun refreshDataChannelOpen() {
+        val channels = synchronized(dataChannelLock) { dataChannels.keys.toList() }
+        dataChannelOpen = channels.any { channel ->
+            runCatching { channel.state() == DataChannel.State.OPEN }.getOrDefault(false)
+        }
     }
 
     private fun acceptRemoteTrack(token: Long, kind: String?) {
@@ -304,10 +319,14 @@ internal class ChatGptWebNativeVoicePeer(
     }
 
     private fun releasePeer() {
-        dataChannel?.unregisterObserver()
-        dataChannel?.close()
-        dataChannel?.dispose()
-        dataChannel = null
+        val channels = synchronized(dataChannelLock) {
+            dataChannels.entries.map { it.key to it.value }.also { dataChannels.clear() }
+        }
+        channels.forEach { (channel, _) ->
+            runCatching { channel.unregisterObserver() }
+            runCatching { channel.close() }
+            runCatching { channel.dispose() }
+        }
         peer?.setAudioRecording(false)
         peer?.setAudioPlayout(false)
         peer?.close()
@@ -363,6 +382,7 @@ internal class ChatGptWebNativeVoicePeer(
         const val AUDIO_TRACK_ID = "elon_private_voice_audio"
         const val AUDIO_STREAM_ID = "elon_private_voice_stream"
         const val CONNECT_TIMEOUT_MS = 20_000L
+        const val MAX_DATA_CHANNELS = 4
         const val MAX_DATA_CHANNEL_MESSAGE_BYTES = 256 * 1024
     }
 }

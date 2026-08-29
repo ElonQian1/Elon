@@ -34,8 +34,11 @@ class WebChatProductionVoiceEntryContractTest {
         assertTrue(relay.contains("label: 'oai-events'"))
         assertTrue(peer.contains("override fun onDataChannel(channel: DataChannel)"))
         assertTrue(peer.contains("bindDataChannel(token, channel)"))
-        assertTrue(peer.contains("dataChannel !== observedChannel"))
-        assertTrue(peer.contains("currentChannel?.state() == DataChannel.State.OPEN"))
+        assertTrue(peer.contains("IdentityHashMap<DataChannel, DataChannel.Observer>()"))
+        assertTrue(peer.contains("dataChannels.size >= MAX_DATA_CHANNELS"))
+        assertTrue(peer.contains("hasDataChannel(observedChannel)"))
+        assertTrue(peer.contains("dataChannels.keys.toList()"))
+        assertFalse(peer.contains("currentChannel?.close()"))
     }
 
     @Test
