@@ -1,7 +1,7 @@
 ---
 title: 节点插件本机权威库与下载栅栏
 status: current
-reviewed_at: 2026-08-21
+reviewed_at: 2026-08-30
 owners: node, security
 ---
 
@@ -196,6 +196,6 @@ enabled 必须使 authorization revision/digest 精确等于 policy，disabled �
 
 `user_version=6` 另铺设Control-signed Manifest catalog binding与catalog-aware rollback V2：仅空库存、无活动候选owner或prepared work时可追加目录头；V1/V2证据不互转。精确签名、回执、时间和迁移合同见[`node-plugin-manifest-catalog-authority.md`](node-plugin-manifest-catalog-authority.md)。
 
-这仍不是生产planning context：A1随完整目标编译但未专项运行；A2同样编译且5项targeted通过，但A2b2动态仍为`0/117`，见[`A2验收`](node-plugin-vfs-fault-acceptance.md)。生产open/VFS/process/root/time/rollback/producer不可达；v14 blocked-only，无Host、PlanApply、下载、准入或ready副作用。
+这仍不是生产planning context：A1随完整目标编译但未专项运行；A2同样编译且5项targeted通过，Barrier、RegistrationShutdown、RegistryLifecycle 与 Unmap 已分别形成 `8/8`、`8/8`、`16/16`、`49/49` 正式动态记录，A2b2 当前为 `81/117`，剩余 36 项全部是 JointClose；Map/Lock 独立 denominator 仍未开放，见[`A2验收`](node-plugin-vfs-fault-acceptance.md)。生产open/VFS/process/root/time/rollback/producer不可达；v14 blocked-only，无Host、PlanApply、下载、准入或ready副作用。
 
 当前供应链、候选健康与失败候选清理 sequence 1–4 已通过 `elon-pc-node` 编译；候选清理链通过 3 项 Windows 同句柄删除、1 项目录顺序、4 项 completion、5 项 topology builder/Store、4 项首 intent builder/Store、3 项强 disposition、4 项 disposition event builder/Store，以及 sequence 3/4 各 4 项 builder/SQLite exact-row 测试，合计 32 项，另有 1 项 topology/journal schema 建库与重开测试。新增 8 项只证明 hash-chain、时间/绑定拒绝、NULL/durability 列精确回读和列篡改失败关闭，不证明真实 parent-relative OS 观察、authority/owner fresh/recovery 全事务或 native namespace barrier。仍没有 retained custody → cleanup authorization → topology → intent → physical disposition → disposition Store → parent observation → absence Store → namespace barrier → namespace Store 的完整事务夹具。cleanup authorization Store 可推进 `cleanup_pending`，topology Store 可封存 exact execution plan，intent Store 可独立提交第一个物理动作前置授权，私有单对象 executor 可消费该 capability并保留物理结果 custody，disposition、absence 与 namespace durability Store 可分别独立持久化 sequence 2/3/4 并分类不确定提交；这些入口均没有 Host 调用方。由于安全 mutation fence 构造器、后续 ordinal 和 terminal journal producer 仍缺，终态 capability 不可构造，完整私有流水线尚不可达。未接生产 Host/本地库，不能授权生产重试、安装、promotion、Ready或商业Verification。v216 install/promotion已编译并通过v7版本链；生产迁移/完整夹具仍缺。work-admission Domain/DDL、legacy Store、currentness与同进程recovery已写，但opened-authority移植、生产caller/验证、Runtime/Ready/Attempt接线仍缺。精确边界见 `node-ready-capability.md` 与 `node-plugin-candidate-cleanup.md`。

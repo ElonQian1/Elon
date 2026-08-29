@@ -1,7 +1,7 @@
 ---
 title: UserNode Ready 本机当前性封印 V1 权威草案
 status: draft
-reviewed_at: 2026-08-27
+reviewed_at: 2026-08-30
 owners: node, compute
 proposed_feature_id: compute-user-node-ready-local-currentness-v1
 registration_status: unregistered_feature_workflow_unavailable
@@ -123,7 +123,7 @@ implementation_unrun`、`passed=0/failed=0`。格式化和静态审阅不提高�
 
 ## 8. 后续顺序
 
-1. 先完成 A2 动态门：当前 Barrier 与 RegistrationShutdown 均为 `8/8`、RegistryLifecycle 为 `16/16`，但 A2b2 仅 `32/117`，剩余 85 无动态 record；clean wide regression `142/142` 已通过，但 Map/Lock、Unmap 与 JointClose 未闭合；之后再为既有 open-attempt 两态接入唯一 production owner、VFS/open/close 与本 seal 的真实 producer；
+1. 先完成 A2 动态门：当前 Barrier 与 RegistrationShutdown 均为 `8/8`、RegistryLifecycle 为 `16/16`、Unmap 为 `49/49`，A2b2 为 `81/117`，剩余 36 项全部是 JointClose；clean wide regression `205/205` 已通过，但 Map/Lock 独立 denominator 与 JointClose 未闭合；之后再为既有 open-attempt 两态接入唯一 production owner、VFS/open/close 与本 seal 的真实 producer；
 2. 形成 runtime transition 和 Host runtime authority；
 3. 新建 v15 authenticated session 与 Node 签名发布；
 4. 服务端在 current V279 binding、consent、credential/session 下验证并封存短 TTL Ready authority；

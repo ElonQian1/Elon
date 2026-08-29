@@ -340,8 +340,9 @@ fn authority_records_verified_source_unwired_production_and_zero_effect_boundary
     for marker in [
         "Barrier 与 Registration 各 `WindowsDynamic=8/8`",
         "RegistryLifecycle `WindowsDynamic=16/16`",
-        "A2b2 `WindowsDynamic=32/117`",
-        "clean wide regression `142/142`",
+        "Unmap\n`WindowsDynamic=49/49`",
+        "A2b2 `WindowsDynamic=81/117`",
+        "clean wide\nregression `205/205`",
     ] {
         assert!(
             authority_a2_gate.contains(marker),
@@ -370,7 +371,8 @@ fn authority_records_verified_source_unwired_production_and_zero_effect_boundary
         "a2_barrier_windows_dynamic=8/8",
         "a2_registration_windows_dynamic=8/8",
         "a2_registry_lifecycle_windows_dynamic=16/16",
-        "a2b2_windows_dynamic=32/117",
+        "a2_unmap_windows_dynamic=49/49",
+        "a2b2_windows_dynamic=81/117",
         "production_acceptance=deferred",
     ] {
         assert!(
@@ -401,12 +403,19 @@ fn authority_records_verified_source_unwired_production_and_zero_effect_boundary
     assert!(registry_lifecycle_row.contains("| 16 | 0 | 0 |"));
     assert!(registry_lifecycle_row.contains("`16/16`"));
 
+    let unmap_row = ACCEPTANCE
+        .lines()
+        .find(|line| line.starts_with("| A2 Unmap WindowsDynamic |"))
+        .expect("missing A2 Unmap WindowsDynamic matrix row");
+    assert!(unmap_row.contains("| 49 | 0 | 0 |"));
+    assert!(unmap_row.contains("`49/49`"));
+
     let a2b2_row = ACCEPTANCE
         .lines()
         .find(|line| line.starts_with("| A2b2 WindowsDynamic |"))
         .expect("missing A2b2 WindowsDynamic matrix row");
-    assert!(a2b2_row.contains("| 32 | 0 | 85 |"));
-    assert!(a2b2_row.contains("`32/117`"));
+    assert!(a2b2_row.contains("| 81 | 0 | 36 |"));
+    assert!(a2b2_row.contains("`81/117`"));
     assert!(!a2b2_row.contains("117/117"));
 
     let promotion_gate = &ACCEPTANCE[ACCEPTANCE
@@ -415,6 +424,7 @@ fn authority_records_verified_source_unwired_production_and_zero_effect_boundary
     for marker in [
         "Barrier/Registration 各 `8/8`",
         "RegistryLifecycle `16/16`",
+        "Unmap `49/49`",
         "`117/117` WindowsDynamic",
         "宽回归",
     ] {

@@ -1,11 +1,11 @@
 ---
 title: 节点插件 VFS Unmap 49 项动态证据权威
 status: current
-reviewed_at: 2026-08-29
+reviewed_at: 2026-08-30
 owners: node, security
 design_status: design_frozen
-implementation_status: source_partial_shared_nonfinal_11_of_49
-verification_status: WindowsDynamic_0_of_49
+implementation_status: implementation_compiled
+verification_status: WindowsDynamic_49_of_49
 ---
 
 # Node plugin VFS Unmap 49-case dynamic authority
@@ -17,15 +17,16 @@ verification_status: WindowsDynamic_0_of_49
 
 - lifecycle: `current`
 - authority: `design_frozen`
-- source: `schema_written / SharedNonFinal_candidate_source=11/49`
-- evidence: `WindowsDynamic=0/49`
-- 当前 A2b2：`32/117`；剩余 `85`
+- source: `implementation_compiled / formal_family_source=49/49`
+- evidence: `WindowsDynamic=49/49`
+- 当前 A2b2：`81/117`；剩余 `36`，全部为 JointClose
 - 已接受前序：Barrier `8/8`、RegistrationShutdown `8/8`、RegistryLifecycle `16/16`
 
-静态 `Case`、历史局部测试、编译成功或单条动态运行都不能提升本族。只有同一 exact clean
-commit、同一受支持 Windows 环境上的 49 个唯一 selector 全部形成可验证记录，Unmap 才能从
-`0/49` 原子晋级为 `49/49`，届时 A2b2 才从 `32/117` 变为 `81/117`、剩余 `36`。不得删除、
-合并或重命名静态 case 来改变分母，也不得把分批实现进度计入 numerator。
+静态 `Case`、历史局部测试、编译成功或单条动态运行都不能提升本族。本族已在 exact clean
+commit `da62f95b09287b79bc1f4c23780b95993cdd85a0`、同一受支持 Windows 环境上让 49 个唯一
+selector 全部形成可验证记录，因此从 `0/49` 原子晋级为 `49/49`，A2b2 同步从 `32/117`
+变为 `81/117`、剩余 `36`。不得删除、合并或重命名静态 case 来改变分母，也不得把分批实现
+进度计入 numerator。
 
 ## 2. Frozen family partition
 
@@ -241,33 +242,65 @@ parent-side responsibility, not a child claim.
 The parent owns root creation and accepts only matching selector, nonce, child PID, environment,
 registration and payload commitment. It requires successful child exit, validates all 81 fields
 against the selector's static `Expected`, then deletes that exact root and proves it absent before
-forming a non-Clone/non-Serde linear candidate. The SharedNonFinal runner additionally verifies that
-the compiled `ELON_NODE_AGENT_GIT_SHA` equals current checkout HEAD and that the worktree is clean
-before emitting `A2_UNMAP_IMPLEMENTATION_CANDIDATE_V1`. Cleanup before exit, a child-declared cleanup
-receipt, wrong root, retained live process, SHA mismatch or dirty checkout invalidates the candidate.
-This 11-case candidate marker is deliberately not `A2_WINDOWS_DYNAMIC_V2` and cannot advance the
-formal numerator.
+forming a non-Clone/non-Serde linear receipt. The historical SharedNonFinal runner additionally
+verified that compiled `ELON_NODE_AGENT_GIT_SHA` equalled checkout HEAD and that the worktree was
+clean before emitting `A2_UNMAP_IMPLEMENTATION_CANDIDATE_V1`; that 11-case cohort remains the first
+historical candidate evidence and cannot be relabelled as a formal record. The current 49 individual
+selector regression tests may each emit the same candidate marker, so a wide run can contain 49
+candidate records; those records remain non-formal. The complete reducer revalidates all bindings
+for all 49 selectors before emitting `A2_WINDOWS_DYNAMIC_V2` records and one family seal, while its
+dedicated exact run rejects candidate-marker leakage. Cleanup before exit, a child-declared cleanup
+receipt, wrong root, retained live process, SHA mismatch or dirty checkout invalidates the whole
+cohort.
 
-All 49 records must have one exact clean `ELON_NODE_AGENT_GIT_SHA`, identical Windows build,
+All 49 records have one exact clean `ELON_NODE_AGENT_GIT_SHA`, identical Windows build,
 architecture, fixed-volume classification, accepted filesystem (`NTFS|ReFS`) and bundled SQLite
-version. The eventual formal family reducer must consume the clean-checkout receipt before emitting
-the complete record set. Duplicate, missing, aliased, mixed-commit or mixed-environment selectors
-invalidate the whole family. Partial cohorts remain implementation evidence only.
+version. The formal family reducer consumes the clean-checkout receipt before emitting the complete
+record set. Duplicate, missing, aliased, mixed-commit or mixed-environment selectors invalidate the
+whole family. Partial cohorts remain implementation evidence only.
 
 ## 8. Implementation sequence and acceptance gate
 
-Source should be split into bounded leaves for selector catalog, actual ledger, codec, validator,
+Source is split into bounded leaves for selector catalog, actual ledger, codec, validator,
 fixture/seams, child runner and parent record. Existing static `unmap_*` files remain the sole
-`Case` owner. The schema/codec/validator and SharedNonFinal 11-case candidate source now exist;
-FinalKeep 23, FinalDelete 15 and the 49-case formal reducer remain unwritten. No cohort advances the
-formal numerator.
+`Case` owner. SharedNonFinal 11、FinalKeep 23、FinalDelete 15 and the 49-case formal reducer now all
+exist and compile. Final paths use exact Windows adapters for retryable/uncertain native outcomes,
+preserve terminal custody before fallible witnesses, and bind the post-raw SQL receipt only to the
+same `Connection` and precompiled constant VM; that receipt must not be expanded into a claim that
+the pager, database, VFS or retired SHM remains usable.
 
-Before formal execution, implementation must prove exact selector-set equality, canonical codec
-negative cases, actual-versus-Expected comparison, wrong-route/phase/occurrence rejection,
-child-report isolation, single-call/no-retry behavior and parent cleanup enforcement. After the
-architecture-stage execution pause is explicitly lifted, all 49 must run process-isolated on one
-exact clean commit, followed by predecessor-family and relevant managed-VFS/registry wide
-regression. Compile or wide-test success alone is not dynamic evidence.
+The implementation proves exact selector-set equality, canonical codec negative cases,
+actual-versus-Expected comparison, wrong-route/phase/occurrence rejection, child-report isolation,
+single-call/no-retry behavior and parent cleanup enforcement. After the architecture-stage execution
+pause was explicitly lifted, all 49 ran process-isolated on one exact clean commit, followed by the
+relevant managed-SHM、A2b1、production-check and wide regressions. Compile or wide-test success alone
+remains insufficient dynamic evidence.
+
+Formal evidence:
+
+- tested clean commit: `da62f95b09287b79bc1f4c23780b95993cdd85a0`;
+- command scope and target:
+
+  ```powershell
+  $env:ELON_NODE_AGENT_GIT_SHA = (git rev-parse HEAD).Trim()
+  powershell -NoProfile -ExecutionPolicy Bypass -File scripts\validate-rust.ps1 -Force -- test --locked --manifest-path server/Cargo.toml --bin elon-pc-node node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::abi::connection_fixture::managed_vfs::a2c_unmap_runner::unmap_windows_dynamic_family_49 -- --exact --nocapture --test-threads=1
+  ```
+
+- exact-family validation fingerprint: `2f9552efe2fd6be6c9fca67791e50cda77a0c9bc8c6ac98c1871d4d257c9e2e7`;
+  external validation receipt profile: `54fba941caa967ef9aa1d39e1d8dd17942d344ee11efa17b50c586facffca0b7`;
+- environment: Windows build `10.0.26200`, `x86_64`, fixed NTFS, bundled SQLite `3.45.0`;
+- result: exactly 49 authority selectors, each unique, ordered and encoded as `a2b2un1` plus 81
+  canonical unsigned fields (83 tokens total); all report `child_exit=0` and
+  `parent_cleanup=deleted`; child/root/registration commitments are each 49-way unique;
+- family seal: `cases=49`, commit equal to the tested HEAD, `checkout=clean`; independently
+  recomputed cohort `sha256:55afa9bde0bee2945ff6cb0071ba3c661cfe44c07c90f4f9bdad7c7505329ed1`
+  and family seal `sha256:faec6426d1b5363b1228f33aa05f4e452490bbb69d573fd2f8040dc634257481`
+  match; outer libtest is `1 passed / 0 failed` with no candidate or child marker leakage;
+- same-commit regressions: `sqlite_vfs_policy` `205/205`
+  (`1ceaf594efa00061dca18ee61b511e4a8bbb863b6ff431101ceac3512b344698`), managed SHM `11/11`
+  (`bf67e1168466c019712a42545553ec72265af824c09373b834f31f455458fb1a`), A2b1 `4/4`
+  (`b8f61313a01561e159e2ce6752a6d3ee77407454c12c4eabc543d11383ec18f8`) and production
+  `elon-pc-node` check (`1be807164c5a9c1e1c85e115f6457d948884b1537606ba706dce476750825d72`).
 
 The only accepted promotion is:
 
@@ -283,9 +316,8 @@ Map/Lock denominator, and does not activate production VFS registration/open/Con
 Planning A1, Runtime, Ready, dispatch, market or settlement. It changes no production ABI,
 storage schema, runtime default, network behavior or registry ownership.
 
-`49/49` would prove only the Unmap family. It cannot be reported before the exact family gate,
-cannot be inferred from the SharedNonFinal 11-case candidate or four historical physical bridges,
-and cannot be converted into `117/117` by denominator edits. Until formal evidence is later
-recorded, the truthful state stays `source_partial_shared_nonfinal_11_of_49 /
-WindowsDynamic=0/49`, A2b2 stays `32/117`, and A2 remains
-`implementation_not_dynamically_accepted`.
+`49/49` proves only the Unmap family. It was not inferred from the SharedNonFinal 11-case candidate
+or four historical physical bridges, and it cannot be converted into `117/117` by denominator
+edits. The truthful current state is `implementation_compiled / WindowsDynamic=49/49`, A2b2 is
+`81/117`, the remaining 36 cases are all JointClose, and A2 remains
+`implementation_not_dynamically_accepted` until its independent completion gates are met.

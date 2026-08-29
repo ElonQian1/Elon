@@ -1,7 +1,7 @@
 ---
 title: 节点插件 VFS Barrier 8/8 动态权威
 status: current
-reviewed_at: 2026-08-29
+reviewed_at: 2026-08-30
 owners: node, security
 design_status: design_frozen
 implementation_status: implementation_compiled
@@ -22,10 +22,10 @@ the minimum test-only seams required before any Windows dynamic result may be re
 - evidence: `WindowsDynamic=8/8`
 - exact evidence commit: `95d910f0dbc167138f913861efafa20ff11295cc`
 - Barrier validation fingerprint: `193d258f7573209236b8231c5288c4ff165bc793c635cabbbc9a69d1b73ca610`
-- current A2b2 Windows dynamic total: `32/117`; remaining: `85`
-- clean wide-regression commit: `95d910f0dbc167138f913861efafa20ff11295cc`
-- clean wide-regression fingerprint: `78c3acc23ff5db33b78f105a8b6da4124708e6cdc5e18373f5540a6d7f66eab8`
-  (`sqlite_vfs_policy` `142/142`)
+- current A2b2 Windows dynamic total: `81/117`; remaining: `36` (all JointClose)
+- current clean wide-regression commit: `da62f95b09287b79bc1f4c23780b95993cdd85a0`
+- current clean wide-regression fingerprint: `1ceaf594efa00061dca18ee61b511e4a8bbb863b6ff431101ceac3512b344698`
+  (`sqlite_vfs_policy` `205/205`)
 
 The design text alone is not implementation evidence. The status above is backed by eight unique
 process-isolated records from the exact clean evidence commit: Windows 10.0.26200 x86_64, fixed
@@ -330,7 +330,9 @@ At its original acceptance point, Barrier moved from `WindowsDynamic=0/8` to
 canonical, exact-set records and the related guards passed. That historical batch advanced A2b2
 from `8/117` to `16/117`. The later exact commit
 `95d910f0dbc167138f913861efafa20ff11295cc` revalidated Barrier `8/8` and RegistrationShutdown
-`8/8`, accepted RegistryLifecycle `16/16`, and advanced the current aggregate to `32/117`.
+`8/8`, accepted RegistryLifecycle `16/16`, and advanced that historical aggregate to `32/117`.
+The later clean commit `da62f95b09287b79bc1f4c23780b95993cdd85a0` accepted Unmap `49/49`
+and advanced the current aggregate to `81/117` without rewriting Barrier evidence.
 
 The authoritative family state is now:
 
@@ -338,6 +340,6 @@ The authoritative family state is now:
 design_frozen / implementation_compiled / WindowsDynamic=8/8
 ```
 
-Barrier remains closed at `8/8`; RegistryLifecycle is now separately closed at `16/16`. Unmap
-remains `0/49`, JointClose `0/36`, and Map/Lock dynamic admission remains unopened; A2 therefore
-stays `implementation_not_dynamically_accepted` with 85 A2b2 cases remaining.
+Barrier remains closed at `8/8`; RegistryLifecycle is separately closed at `16/16`, and Unmap is
+now separately closed at `49/49`. JointClose remains `0/36`, and Map/Lock dynamic admission remains
+unopened; A2 therefore stays `implementation_not_dynamically_accepted` with 36 A2b2 cases remaining.

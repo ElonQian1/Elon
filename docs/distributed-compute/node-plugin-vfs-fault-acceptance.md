@@ -1,11 +1,11 @@
 ---
 title: 节点插件测试 VFS 故障动态验收
 status: current
-reviewed_at: 2026-08-29
+reviewed_at: 2026-08-30
 owners: node, security
 design_status: design_frozen
 implementation_status: implementation_not_dynamically_accepted
-verification_status: WindowsDynamic_32_of_117_Unmap_candidate_11_of_49_wide_161_of_161
+verification_status: WindowsDynamic_81_of_117_Unmap_49_of_49_wide_205_of_205
 ---
 
 # 节点插件测试 VFS 故障动态验收
@@ -15,14 +15,14 @@ verification_status: WindowsDynamic_32_of_117_Unmap_candidate_11_of_49_wide_161_
 本验收只消费 [`node-plugin-vfs-fault-authority.md`](node-plugin-vfs-fault-authority.md) 冻结的 A2 case inventory，
 不创建第二套 VFS authority，也不授权生产入口。当前可记录的事实严格为：
 
-- `design_frozen / source_written / implementation_not_dynamically_accepted`；Barrier 与 RegistrationShutdown runner 均已 `implementation_compiled / WindowsDynamic=8/8`，RegistryLifecycle runner 已 `implementation_compiled / WindowsDynamic=16/16`；Unmap SharedNonFinal 11 项已在 exact clean commit 上形成 `implementation_candidate=11/11`，但因整族 49 项原子门未满足，仍为正式 `WindowsDynamic=0/49`；Map ABI/raw reviewed-successor prefix、denominator-facing ABI fragment、source-neutral raw fragment、typed Map outer-result、route/callback与adapter composed fragment已随目标编译并进入共享 A2b1 targeted guard `4/4`，但仍为 `source_review_only / dynamic_unrun`；
+- `design_frozen / source_written / implementation_not_dynamically_accepted`；Barrier 与 RegistrationShutdown runner 均已 `implementation_compiled / WindowsDynamic=8/8`，RegistryLifecycle runner 已 `implementation_compiled / WindowsDynamic=16/16`，Unmap runner 已在 exact clean commit 上原子形成 `implementation_compiled / WindowsDynamic=49/49`；历史 SharedNonFinal `implementation_candidate=11/11` 只保留 provenance，不计第二次 numerator；Map ABI/raw reviewed-successor prefix、denominator-facing ABI fragment、source-neutral raw fragment、typed Map outer-result、route/callback与adapter composed fragment已随目标编译并进入共享 A2b1 targeted guard `4/4`，但仍为 `source_review_only / dynamic_unrun`；
 - `elon-pc-node` 完整测试目标在 2026-08-12 基线修复后可编译；
 - 与可见性修复直接相关的 targeted fault matrix 已运行并通过 5 项；
 - A2a/A2b1 map/lock 的 commit-bound `SourceScope/SourceOwnerGraph v1` 与 Map source-terminal template review ledger v1 已 `design_frozen/source_written/source_review_only/validator_compiled/targeted_guard_4_of_4`。既有source-neutral raw fragment精确区分8个admission/prestate（7 rejection + 1 expected-type continuation）、typed operation后的2个outcome与8个abandon outcome；共享raw owner node已拆为Map/Lock sibling，只有两个Map raw gate/abandon node由专属Map site闭合，resolved cross-link保持9、Map-reachable graph pending保持5，两个Lock sibling仍Pending。Map raw projection fragment只包含8条fallback continuation与1条typed-frontier continuation；新增typed Map outer-result fragment另行exact-set冻结NotPresent、Mapped、Failure和CaughtUnwind四类外壳结果，其中caught unwind按Drop完成/Drop unwind展开，合计5个local cell。它只冻结initial null write、唯一Mapped pointer write、`SQLITE_OK`/`SQLITE_IOERR_SHMMAP`投影及canonical raw slots/cleanup；route、callback、managed outcome provenance、prestate、prefix mutation与payload Drop custody仍Pending，因此两个open frontier继续开放，reviewed-successor prefix不新增跨frontier edge。denominator-facing ABI fragment仍严格是15个pre-raw terminal cell与1个`AbiRawDispatch` continuation，后续cell不加入这15个ABI terminal。ledger仍保留Pending/open boundaries与六个prestate-pending success candidates，没有source-exhaustive terminal set或完整successor trace；candidate typed schema与显式不完整的branch-atom scaffold虽通过自身 self-consistency guard，仍仅为source-written review输入，完整terminal universe、quotient、exact key set、`SourceBranch`、`Expected`、`CaseKey`、exclusion ledger与denominator保持`source_review_pending/not_counted`，不得记`StaticContract`或开放`WindowsDynamic`；production ABI/managed-fs/route/open保持未修改；
 - 本批 route/callback normal-return fragment 另在 outer callback-fault pass + live inner 的入口下，以 exact `1 + 1 + 2 × 2 = 6` cell 冻结 route preparation rejection、callback admission rejection 与 admitted operation/completion product；outer controller reject/selected/inner-missing均在集合外。operation `Err` 必须在 completion `Ok|Err` 两支都胜出；operation `Ok` + completion `Err` 也投影 typed Failure；只有双 `Ok` 可继续到 adapter projection Pending。6 个 cell 都保持 output null、installed raw slots、cleanup none、pointer write=0；caught unwind 不属于该集合。其 source witness 必须覆盖 route preparation gate、四段 operation dispatch、admission、completion attempt、error-precedence/completion-rejection/completed 三个 arm，并保持 conditional quarantine 位于 completion 之前。它已随目标编译并进入共享 A2b1 targeted guard `4/4`，但没有独立 denominator 或 dynamic record，不改变两个 open frontier、owner-graph Pending=5/resolved cross-links=9、`StaticContract` 或 `WindowsDynamic`；
 - adapter composed child必须保持exact 7-cell reviewed control/result inventory：5个parent Failure逐格保持`SQLITE_IOERR_SHMMAP/null/installed/no-cleanup/0-write`，另有Observe-only NotPresent与防御守卫通过后的Observe/Extend Mapped两格。NotPresent固定`SQLITE_OK/null/0-write`；guard-pass Mapped固定`SQLITE_OK/non-null/1-write`，typed-wrapper value-flow必须逐层是`ManagedMapped=TypedPointerCreated`、`AdapterMapped=TypedPointerCarried`、`AbiMappedProjection=AbiPointerWritten`。admission、operation与completion rejection必须分型；operation `Ok` + completion `Err`还必须记录`SuccessPayloadDroppedBeforeAdapter`并保持payload custody Pending，不得把7格冒充payload-type完整分区。`AdapterRegionMismatch/LengthMismatch/NullPointer`必须恰为3条child-local guard review，disposition固定`Pending/Pending/ExcludedByNonNullTypeEnvelope`且不进入7格；因此7格不得被称为双Ok continuation或guard rejection路径的穷尽分割。source guard须锁定私有`NonNull<u8>`字段及原样accessor、ManagedMapping owner内唯一lexical constructor call、adapter两arm/一reject及ABI三arm，同时守卫shared parent ledger的Region Pending与Length/Null既有defensive disposition不变。该NullPointer排除只属于commit-bound reviewed type envelope，不是动态不可达或完整exclusion-ledger证明；dropped/mapped payload custody、managed prestate与route/callback custody继续Pending；
-- A2b2 的 117 项 source-exhaustive inventory 全部仍是 `StaticContract`；Barrier 与 RegistrationShutdown 各提供 8 条、RegistryLifecycle 提供 16 条正式动态 record，因此 `WindowsDynamic=32/117`，其余 85 项待完成；Unmap 的 11 条 candidate marker 既不拆分 49 项原子分母，也不增加该正式计数；RegistryLifecycle 的 exact selector、实现与证据见 [`RegistryLifecycle 动态权威`](node-plugin-vfs-registry-lifecycle-dynamic-authority.md)；
-- exact clean evidence commit `99fcea71214dedd4e11f21dd20ffee4f1109402c` 的宽范围 `sqlite_vfs_policy` 回归已真实通过 `161/161`。这不能把 Unmap candidate、其余 85 项或 Map/Lock 写成 A2 完成。
+- A2b2 的 117 项 source-exhaustive inventory 全部仍是 `StaticContract`；Barrier 与 RegistrationShutdown 各提供 8 条、RegistryLifecycle 提供 16 条、Unmap 提供 49 条正式动态 record，因此 `WindowsDynamic=81/117`，其余 36 项全部是 JointClose；历史 Unmap 11 条 candidate marker 既不拆分 49 项原子分母，也不重复增加正式计数；Unmap 与 RegistryLifecycle 的 exact selector、实现与证据分别见 [`Unmap 动态权威`](node-plugin-vfs-unmap-dynamic-authority.md) 与 [`RegistryLifecycle 动态权威`](node-plugin-vfs-registry-lifecycle-dynamic-authority.md)；
+- exact clean evidence commit `da62f95b09287b79bc1f4c23780b95993cdd85a0` 的宽范围 `sqlite_vfs_policy` 回归已真实通过 `205/205`。这不能把 JointClose、Map/Lock 或生产入口写成 A2 完成。
 
 owner 图只验证 baseline commit literal 形状、从 reviewed owner bytes 重算的 Git blob OID/规范化 SHA-256、symbol presence、ABI roots、逐 operation scope 可达性，以及 wrapper/promotion/callback/cold-prefix/loop/cleanup/quarantine/result projection 的有序结构；它不读取 `.git`，不能自动证明当前 checkout HEAD 等于 baseline，也不是 exact terminal inventory。Map review ledger 验证自己声明的 step ID materialization、owner/symbol/occurrence anchor、共享分支 call context、candidate disposition、pointer-flow 分层、cause/returned/stored/route 四轴、六个 success projection witness、非空 Pending/open boundaries，以及 Map-reachable pending exact set与九个 resolved owner/stage 关联的 exact owner/symbol-or-site witness link；ABI/raw prefix另验证 exact case/edge/endpoint set、terminal无后继、open frontier与 raw slot保留轴。typed outer-result fragment的静态守卫还必须验证5-cell exact set、3 normal/2 unwind、唯一pointer write、canonical post-operation/abandon projection，以及四条有序source witness chain：三条ABI result arm→raw accepted→normal-code forward normal chain，和一条caught unwind→abandon catch fence→state-abandon witness→installed Drop→fallback unwind chain；复用的wrapper/helper projection witness必须携带exact caller context；primary raw gate/abandon witness继续保持context-free，并由site/operation scope限定。守卫还必须确认`TypedMapOperation` frontier和全部Pending provenance未被关闭。它们都不验证完整 source coverage、端到端 trace、exclusion proof 或 denominator。candidate typed schema 与不完整 branch-atom scaffold 保持既有 source-only 边界；这些 Map/Lock 源码已随目标编译，4 个 A2b1 静态自洽守卫通过，但仍无 dynamic record。严格 test-only 的 Barrier、RegistrationShutdown 与 RegistryLifecycle actual/validator、进程隔离 runner与线性 evidence envelope则已按下方正式证据元组完成编译和逐 case Windows 运行，但不改变 Map/Lock 边界。
 
@@ -30,8 +30,8 @@ owner 图只验证 baseline commit literal 形状、从 reviewed owner bytes 重
 
 - 首次真实运行：`VALIDATION_FINGERPRINT=6482de3afdddb8e8e9e97900d27489a3b5f16bbd1889360f18e8b47c026b05ca`，`2 passed / 2 failed / 1676 filtered`；owner graph 与 Map terminal ledger 均因 `source owner bytes changed after graph review` 失败。
 - 漂移审阅：39 个 owner 仅 `ManagedFsRoot`、`ManagedWindowsPlatform` 两项受此前 4 个 loader 提交影响，共 38 行模块声明/重导出新增；SQLite symbols、graph node、edge 与 ledger 语义未变化。
-- 当前快照刷新：source baseline 固定为已推送实现提交 `a75769029ba4abf5e30002f64846c0f7099d9ae7`；8 个既有变化 owner与新增 `AbiRawCloseWitness` owner 均重算 Git blob OID 与 LF 规范化 SHA-256，零偏差。Map/Lock graph 新增 operation-scoped state-abandon witness，fallback 保持原节点，Map-reachable Pending=5、resolved cross-links=9 不变。clean 验证在 `95d910f0dbc167138f913861efafa20ff11295cc`、`VALIDATION_FINGERPRINT=e7ea6855df7e6f0677a985d214dfcf467585e79c938c2a1e54b7ce7b6cdd4ad5` 上得到 `4 passed / 0 failed / 1722 filtered`。
-- 本批 source-owner 续绑：Unmap 源码在 rebase 后独立固定为非自指 baseline `9dcb8292aba7285464a97af56e790ccbb3dfacb6`；最终 ledger commit `99fcea71214dedd4e11f21dd20ffee4f1109402c` 仅刷新 `FixtureFaultPlan`、`RegistryOperations`、`RegistryFileCustody`、`RegistryProcessOwner` 与 `RegistryOwner` 的 Git blob OID/LF 规范化 SHA-256。`VALIDATION_FINGERPRINT=496465291e1fd48d5e431853422a3bd15a4f0022989d763cdf784d20083aee69`、receipt `4ed595d5938ed2d49dbafe449651b967902989b92db4f7022d28c86e9235bdf0` 得到 `4 passed / 0 failed / 1741 filtered`；owner/node/reachability、Pending=5、resolved cross-links=9 与两个 open frontier 均未扩张。
+- 历史前序快照刷新：source baseline 固定为当时已推送实现提交 `a75769029ba4abf5e30002f64846c0f7099d9ae7`；8 个既有变化 owner与新增 `AbiRawCloseWitness` owner 均重算 Git blob OID 与 LF 规范化 SHA-256，零偏差。Map/Lock graph 新增 operation-scoped state-abandon witness，fallback 保持原节点，Map-reachable Pending=5、resolved cross-links=9 不变。clean 验证在 `95d910f0dbc167138f913861efafa20ff11295cc`、`VALIDATION_FINGERPRINT=e7ea6855df7e6f0677a985d214dfcf467585e79c938c2a1e54b7ce7b6cdd4ad5` 上得到 `4 passed / 0 failed / 1722 filtered`。
+- 当前 source-owner 续绑：Unmap 完整源码固定为非自指 baseline `baa5ad9ab1db404ea9393fcf24e37b4b5a7ed86a`；ledger evidence commit `da62f95b09287b79bc1f4c23780b95993cdd85a0` 更新受影响 owner 的 Git blob OID/LF 规范化 SHA-256。`VALIDATION_FINGERPRINT=b8f61313a01561e159e2ce6752a6d3ee77407454c12c4eabc543d11383ec18f8`、receipt `6629d828f5cdcb79a8e75d91381b1be9b8fb4e99469170ff93401834bbdb953a` 得到 `4 passed / 0 failed / 1785 filtered`；owner/node/reachability、Pending=5、resolved cross-links=9 与两个 Map/Lock open frontier 均未扩张。
 - 计数边界：这 4 项分别是 legacy non-denominator subset、incomplete branch-atom scaffold、source-owner graph 与 Map template ledger 自洽守卫；不形成完整 terminal universe、`CaseKey`、`Expected`、denominator、`StaticContract` 或 map/lock `WindowsDynamic`。
 
 ### 历史证据元组
@@ -52,19 +52,19 @@ owner 图只验证 baseline commit literal 形状、从 reviewed owner bytes 重
 因此这组历史证据只支撑“完整目标曾编译、5 个 targeted 测试曾通过”，不满足第 3 节 evidence record，不能计入
 A2a/A2b1 map/lock 或 A2b2 的任何 `WindowsDynamic` case。后续执行必须从完整命令与平台元组重新建账。
 
-### 当前 Barrier、RegistrationShutdown 与 RegistryLifecycle 正式证据元组
+### 历史前序 families 正式证据元组
 
 - 被测 clean HEAD：`99fcea71214dedd4e11f21dd20ffee4f1109402c`；
 - Barrier、RegistrationShutdown 与 RegistryLifecycle 均在同一强制执行宽回归中复验：`VALIDATION_FINGERPRINT=437aeb7b85dc2a7e60def3709530c18831b72dcc06c59ee0dec9e736deb70ab8`，receipt `44a243aa8b9f315a508afcc9b089e1567ac03ea6dbec888e8928e88545f98247`；
 - 环境：Windows build `10.0.26200`、`x86_64`、fixed NTFS、bundled SQLite `3.45.0`；
 - 结果：同次宽回归顶层为 `161 passed / 0 failed / 1584 filtered`；输出中 Barrier、RegistrationShutdown 各有 8 条、RegistryLifecycle 有 16 条 family+selector 唯一的 `A2_WINDOWS_DYNAMIC_V2` record，共 32 条，全部逐字绑定上述 commit，且每条均为 `child_exit=0`、`parent_cleanup=deleted`；
-- 计数：Barrier `WindowsDynamic=8/8`、RegistrationShutdown `WindowsDynamic=8/8`、RegistryLifecycle `WindowsDynamic=16/16`，A2b2 `WindowsDynamic=32/117`；其余 85 项与 A2a/A2b1 map/lock dynamic 继续 pending，A2 不升级完成状态。
+- 当时计数：Barrier `WindowsDynamic=8/8`、RegistrationShutdown `WindowsDynamic=8/8`、RegistryLifecycle `WindowsDynamic=16/16`，A2b2 `WindowsDynamic=32/117`；该历史批次不包含后来 Unmap 49/49 的实现或证据。
 
-此前缺少编译时 `ELON_NODE_AGENT_GIT_SHA` 的尝试、旧 fingerprint cache reuse 与 partial failure 均不计正式通过。只有上述 exact commit、三个强制执行指纹、环境和 32 条唯一 record 共同绑定的 clean-HEAD 运行计入当前 `8/8`、`8/8` 与 `16/16`。
+此前缺少编译时 `ELON_NODE_AGENT_GIT_SHA` 的尝试、旧 fingerprint cache reuse 与 partial failure 均不计正式通过。只有上述 exact commit、三个强制执行指纹、环境和 32 条唯一 record 共同绑定的 clean-HEAD 运行计入前序 families 的 `8/8`、`8/8` 与 `16/16`；当前 aggregate 由后文独立 Unmap formal 证据推进到 `81/117`。
 
-### 当前 Unmap SharedNonFinal 实现候选证据
+### 历史 Unmap SharedNonFinal 实现候选证据
 
-本批只实现冻结 Unmap 49 项中的 SharedNonFinal 11 项。它们使用真实 installed `xShmUnmap`、两个真实 SQLite Connection、exact route/SHM/custody 观察器与独立 child/root；candidate/formal 类型已隔离，候选 record 没有 `Display` 或到正式 `WindowsDynamicReportView` 的转换。
+此前批次只实现冻结 Unmap 49 项中的 SharedNonFinal 11 项。它们使用真实 installed `xShmUnmap`、两个真实 SQLite Connection、exact route/SHM/custody 观察器与独立 child/root；candidate/formal 类型已隔离，候选 record 没有 `Display` 或到正式 `WindowsDynamicReportView` 的转换。以下元组保留为历史 provenance，不覆盖当前 formal 49。
 
 | 范围 | Validation fingerprint | Receipt | 结果 |
 |---|---|---|---|
@@ -76,18 +76,29 @@ A2a/A2b1 map/lock 或 A2b2 的任何 `WindowsDynamic` case。后续执行必须�
 
 - 被测 exact clean HEAD：`99fcea71214dedd4e11f21dd20ffee4f1109402c`；11 条输出均为唯一 `A2_UNMAP_IMPLEMENTATION_CANDIDATE_V1`，commit 全相同，`child_exit=0`、`parent_cleanup=deleted`，正式 `A2_WINDOWS_DYNAMIC_V2` 输出为 0。
 - 提交前故意在 dirty checkout 强制运行的 `VALIDATION_FINGERPRINT=322e29f71b25ba19dc705404ac295b612e9c5f9ef64e661952296b6418ab1e4a` 中，11/11 child 与 81 字段 validator 已完成，但父层恰好只出现 11 次 `A2_UNMAP_CHECKOUT_NOT_CLEAN`；该失败元组不计通过，只证明 clean gate 失败关闭。
-- 这 11 条记录只证明当前实现切片可真实运行；正式 Unmap 分子仍是原子的 `0/49`，不得写成 `11/49`。因此 A2b2 仍为 `32/117`、剩余 85；只有同一 exact clean commit 的 49 个 selector 与完整环境集合经 future family reducer 零缺失/重复/失败后，才允许一次性晋级为 `49/49`。
-- 当前受控验证器合同沿用既有 A2 runner：parent 对 bounded stdout 中的 PID/nonce/root/registration/payload commitment 重验，并在运行时检查 compiled `ELON_NODE_AGENT_GIT_SHA` 等于 clean HEAD；它不是恶意 child 或敌对 build artifact 的密码学认证。验收只认 exact candidate/formal marker，不以 ambient child-mode libtest exit 代替 parent record；正式 49 项晋级前仍需保留 clean build/receipt，并可进一步升级为 peer-PID 单写者 IPC 与 artifact/input digest。
+- 这 11 条记录只证明当时实现切片可真实运行；它们从未把正式 Unmap 写成 `11/49`，也不与后续 formal 49 重复计数。
+- 当前 49 个逐-selector 回归测试仍可各自输出一条 `A2_UNMAP_IMPLEMENTATION_CANDIDATE_V1`，因此 current wide 日志含 49 条 candidate marker；它们只扩展了候选覆盖，不是第二套 formal records，也不重复增加 numerator。
+- 受控验证器合同沿用既有 A2 runner：parent 对 bounded stdout 中的 PID/nonce/root/registration/payload commitment 重验，并在运行时检查 compiled `ELON_NODE_AGENT_GIT_SHA` 等于 clean HEAD；它不是恶意 child 或敌对 build artifact 的密码学认证。验收只认 exact candidate/formal marker，不以 ambient child-mode libtest exit 代替 parent record。
+
+### 当前 Unmap 49/49 正式证据
+
+- 被测 exact clean HEAD：`da62f95b09287b79bc1f4c23780b95993cdd85a0`；运行前后完整 porcelain（含 untracked）均为空，HEAD 未变化。
+- 命令范围：绑定上述 HEAD 后，通过 `scripts/validate-rust.ps1 -Force` 对 `--bin elon-pc-node` 运行 exact filter `node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::abi::connection_fixture::managed_vfs::a2c_unmap_runner::unmap_windows_dynamic_family_49 -- --exact --nocapture --test-threads=1`。
+- exact family fingerprint：`2f9552efe2fd6be6c9fca67791e50cda77a0c9bc8c6ac98c1871d4d257c9e2e7`；external validation receipt profile `54fba941caa967ef9aa1d39e1d8dd17942d344ee11efa17b50c586facffca0b7`；强制 fresh build/run，未复用旧 receipt。
+- 环境：Windows build `10.0.26200`、`x86_64`、fixed NTFS、bundled SQLite `3.45.0`。
+- 机械结果：authority 49-selector 集合、顺序与唯一性全部一致；每条 wire 恰好 83 tokens，版本 `a2b2un1`，selector 与 case 绑定，81 个数值均为 canonical `u64`；49 个 actual commitment 全部重算匹配，child/root/registration commitment 各 49 unique。
+- 运行结果：49 条均为 `child_exit=0`、`parent_cleanup=deleted`；family marker 恰好 1 条，`cases=49`、commit 匹配、`checkout=clean`，cohort `sha256:55afa9bde0bee2945ff6cb0071ba3c661cfe44c07c90f4f9bdad7c7505329ed1` 与 family seal `sha256:faec6426d1b5363b1228f33aa05f4e452490bbb69d573fd2f8040dc634257481` 独立重算一致；outer libtest `1 passed / 0 failed`，candidate marker 与 child marker 泄漏均为 0。
+- 证明边界：Delete 请求变体证明 shared evaluator 的错误参数拒绝与 untouched 正确请求重检，不声称上游 ABI 自然携带畸形值；post-raw SQL receipt 只证明 exact `Connection`/预编译常量 VM 仍可 step，不证明 pager、数据库、VFS 或退休 SHM 可用。
 
 ### 当前宽范围回归基线
 
-- 被测 clean HEAD：`99fcea71214dedd4e11f21dd20ffee4f1109402c`；
-- Rust 验证指纹：`VALIDATION_FINGERPRINT=437aeb7b85dc2a7e60def3709530c18831b72dcc06c59ee0dec9e736deb70ab8`，receipt `44a243aa8b9f315a508afcc9b089e1567ac03ea6dbec888e8928e88545f98247`；
+- 被测 clean HEAD：`da62f95b09287b79bc1f4c23780b95993cdd85a0`；
+- Rust 验证指纹：`VALIDATION_FINGERPRINT=1ceaf594efa00061dca18ee61b511e4a8bbb863b6ff431101ceac3512b344698`，receipt `03e2b9ee1afde1765b9cb1e3d77b43e06474019f3884f151d2e46dbbb723cce0`；
 - 命令范围：同一 PowerShell 进程先执行 `$env:ELON_NODE_AGENT_GIT_SHA = (git rev-parse HEAD).Trim()`，再执行 `scripts/validate-rust.ps1 -Domain agent-validation -Force -- test --manifest-path server/Cargo.toml --locked sqlite_vfs_policy -- --nocapture --test-threads=1`；
-- 结果：主 `sqlite_vfs_policy` 集合 `161 passed / 0 failed / 1584 filtered`，同次进程隔离子运行均通过；
-- 动态记录复核：同次输出含 Barrier 8 条、RegistrationShutdown 8 条与 RegistryLifecycle 16 条正式记录，以及 11 条 Unmap candidate；32 条正式 family+selector 与 11 条候选 selector 均唯一并逐字绑定上述 commit，全部为 `child_exit=0`、`parent_cleanup=deleted`，Unmap 正式 marker 为 0；
-- 失败边界：同一指纹下首次未注入 `ELON_NODE_AGENT_GIT_SHA` 的强制尝试被 `A2_DYNAMIC_GIT_SHA_MISSING` 拒绝，不计正式证据；随后显式绑定提交并再次 `-Force` 的成功运行才构成本基线。指纹本身不编码该环境变量，因此必须同时核对 receipt 与记录内嵌 commit；
-- 证据边界：该结果证明上述 exact clean HEAD 的宽范围回归健康。任何后续源码变更都必须在新 commit 上重新运行；不得仅凭宽回归增加 `WindowsDynamic` 计数。
+- 结果：主 `sqlite_vfs_policy` 集合 `205 passed / 0 failed / 1584 filtered`，同次进程隔离子运行均通过；
+- 动态记录复核：同次输出复验 Barrier、RegistrationShutdown、RegistryLifecycle 与 Unmap formal family，共含 81 条唯一正式 `A2_WINDOWS_DYNAMIC_V2` record；其中 Unmap 为 49 条及一条 `checkout=clean` family seal，全部逐字绑定上述 commit，均为 `child_exit=0`、`parent_cleanup=deleted`。同次 49 条逐-selector candidate marker 只属于非正式回归通道，不计 numerator；
+- 失败边界：必须显式绑定提交并 `-Force`，且同时核对 receipt、记录内嵌 commit 与 clean family seal；fingerprint 本身不编码 `ELON_NODE_AGENT_GIT_SHA`，不能脱离这些字段单独充当动态证据；
+- 证据边界：该结果证明上述 exact clean HEAD 的宽范围回归健康。任何后续相关运行时源码变更都必须在新 commit 上重新运行；纯文档或只约束文档字段的 source-contract guard 更新不改变该运行时基线。不得仅凭宽回归增加 `WindowsDynamic` 计数。
 
 ## 2. Case 集合与完成条件
 
@@ -127,13 +138,13 @@ static expected 来迁就观察结果。
 | Case family | 冻结数量 | 当前 WindowsDynamic | 完成条件 |
 |---|---:|---:|---|
 | Barrier | 8 | 8 | callback admission、before/native/after fence、completion 与 success 已全部形成唯一正式 record。 |
-| Unmap | 49 | 0 | non-final/final、Keep/Delete、held-lock、detach、view/mapping/DMS/SHM file 与 delete authority 全部逐项运行。 |
+| Unmap | 49 | 49 | non-final/final、Keep/Delete、held-lock、detach、view/mapping/DMS/SHM file 与 delete authority 已全部逐项形成唯一正式 record。 |
 | JointClose | 36 | 0 | SHM lift、main unlock/file close、callback、connection、route/logical-name retirement 全部逐项运行。 |
 | Registry lifecycle | 16 | 16 | route observation/removal、logical-name claim/index/custody、quarantine 与成功清空已全部形成唯一正式 record。 |
 | Registration shutdown | 8 | 8 | callback、live route、quarantine、unregister before/injected-pre-native/after 与完整成功已逐项形成唯一正式 record。 |
-| **A2b2 总计** | **117** | **32** | Barrier、RegistrationShutdown 各 8 项且 RegistryLifecycle 16 项已通过；其余 85 个唯一 static case key 仍各需且只需一个通过的 Windows dynamic record。 |
+| **A2b2 总计** | **117** | **81** | Barrier、RegistrationShutdown、RegistryLifecycle 与 Unmap 已分别通过 8、8、16、49 项；其余 36 个唯一 static case key 全部属于 JointClose，仍各需且只需一个通过的 Windows dynamic record。 |
 
-Barrier、RegistrationShutdown 的 8-case runner 与 RegistryLifecycle 的 16-case runner 已在上方 exact clean HEAD 与环境中完成编译和逐项执行，32 个 family+selector 各形成一条唯一正式 record，因此三个 family 分别为 `8/8`、`8/8`、`16/16`，并把 A2b2 当前计数推进到 `32/117`。这不补足其他 85 项，也不改变 map/lock 的独立 denominator。
+Barrier、RegistrationShutdown 的 8-case runner、RegistryLifecycle 的 16-case runner 与 Unmap 的 49-case runner 已完成编译和逐项执行，因此四个 family 分别为 `8/8`、`8/8`、`16/16`、`49/49`，并把 A2b2 当前计数推进到 `81/117`。这不补足 JointClose 36 项，也不改变 map/lock 的独立 denominator。
 
 这里的 117 只统计 A2b2 barrier/unmap/close/registry inventory，不包含 A2a/A2b1 的 SHM map/lock。map/lock 的最终 N 与
 A2b2 的 117 必须分栏记账；两套计数不得合并为一个 denominator，也不得互相补足缺失 dynamic record。
@@ -251,7 +262,7 @@ A2 完成必须同时满足：
   `implementation_not_dynamically_accepted` 升级；
 - 任何证据缺失、环境不明、case key漂移、观察不完整或生产入口变化都维持失败关闭。
 
-当前正式结论仍是：历史完整目标可编译且5项targeted fault matrix曾通过；本批map/lock owner图与含ABI/raw successor prefix、source-neutral raw、Map raw projection、typed outer-result 5-cell、route/callback 6-cell及adapter composed 7-cell fragment的template ledger已`source_written/source_review_only/validator_compiled/targeted_guard_4_of_4`，owner-graph Pending=5/resolved cross-links=9且Lock raw sibling仍Pending，两个open frontier仍开放；完整terminal inventory仍为`source_review_pending/not_counted`，尚不能记`StaticContract`或开放 map/lock `WindowsDynamic`。Barrier 与 Registration runner 已在 exact clean HEAD 上分别正式通过 8 个 frozen selector，RegistryLifecycle runner 正式通过 16 个 frozen selector，三个 family 分别为 `WindowsDynamic=8/8`、`8/8`、`16/16`；Unmap SharedNonFinal 11 项已形成 implementation candidate，但正式 Unmap 仍为原子 `0/49`，所以 A2b2 仍是 `32/117`、其余 85 项与 map/lock dynamic 仍未完成。宽范围回归 clean baseline 为 `161/161`，但任何运行时源码改动后必须重跑；A2继续为`implementation_not_dynamically_accepted`。生产open、A1、v15、Runtime与Ready均未改变。
+当前正式结论仍是：历史完整目标可编译且5项targeted fault matrix曾通过；本批map/lock owner图与含ABI/raw successor prefix、source-neutral raw、Map raw projection、typed outer-result 5-cell、route/callback 6-cell及adapter composed 7-cell fragment的template ledger已`source_written/source_review_only/validator_compiled/targeted_guard_4_of_4`，owner-graph Pending=5/resolved cross-links=9且Lock raw sibling仍Pending，两个open frontier仍开放；完整terminal inventory仍为`source_review_pending/not_counted`，尚不能记`StaticContract`或开放 map/lock `WindowsDynamic`。Barrier、RegistrationShutdown、RegistryLifecycle 与 Unmap 已在 exact clean evidence commits 上分别正式通过 8、8、16、49 个 frozen selector，四个 family 分别为 `WindowsDynamic=8/8`、`8/8`、`16/16`、`49/49`；A2b2 因而是 `81/117`，剩余 36 项全部为 JointClose。clean wide baseline 为 `205/205`，但任何运行时源码改动后必须重跑；A2继续为`implementation_not_dynamically_accepted`。生产open、A1、v15、Runtime与Ready均未改变。
 
 其中本批新增 route/callback normal-return 6-cell fragment 只属于上述 `source_written/source_review_only/validator_compiled/shared_a2b1_guard_passed` ledger：它没有新增 terminal、prefix edge、denominator key、静态计数或动态证据；唯一双成功分支仍是 adapter projection Pending。其余结论与计数不变。
 

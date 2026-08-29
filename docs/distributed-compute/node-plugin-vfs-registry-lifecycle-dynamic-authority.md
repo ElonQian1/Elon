@@ -1,7 +1,7 @@
 ---
 title: 节点插件 VFS RegistryLifecycle 16/16 动态权威
 status: current
-reviewed_at: 2026-08-29
+reviewed_at: 2026-08-30
 owners: node, security
 design_status: design_frozen
 implementation_status: implementation_compiled
@@ -20,7 +20,7 @@ event ledger and child/parent evidence chain before implementation is allowed to
 - authority: `design_frozen`
 - source: `implementation_compiled`
 - evidence: `WindowsDynamic=16/16`
-- current A2b2 Windows dynamic total: `32/117`; remaining: `85`
+- current A2b2 Windows dynamic total: `81/117`; remaining: `36` (all JointClose)
 - accepted predecessor families: RegistrationShutdown `8/8`, Barrier `8/8`
 
 No selector in this family is accepted merely because its static `Case` exists, a unit test
@@ -279,9 +279,10 @@ The family may advance only as one exact set:
 design_frozen / implementation_compiled / WindowsDynamic=16/16
 ```
 
-Only then may the A2b2 summary advance from `16/117` to `32/117`, leaving `85`. Unmap remains
-`0/49`, JointClose remains `0/36`, and Map/Lock dynamic admission remains unopened; A2 therefore
-still remains `implementation_not_dynamically_accepted`.
+At this family's acceptance point the A2b2 summary advanced from `16/117` to `32/117`, leaving
+`85`. The later Unmap formal family advanced separately to `49/49`, so the current A2b2 summary is
+`81/117` with JointClose `0/36`. Map/Lock dynamic admission remains unopened; A2 therefore still
+remains `implementation_not_dynamically_accepted`.
 
 ## 11. Formal evidence
 
@@ -315,6 +316,7 @@ still remains `implementation_not_dynamically_accepted`.
   `(payload family, selector)` records for Barrier, RegistrationShutdown and RegistryLifecycle,
   all bound to the same tested commit with confirmed child exit and deleted parent roots.
 
-These records advance only RegistryLifecycle and the A2b2 aggregate. They do not open Map/Lock
-dynamic admission, implement Unmap or JointClose, or make production VFS/open/Runtime/Ready
-reachable.
+These records advanced only RegistryLifecycle and the A2b2 aggregate at their historical evidence
+commit. The later Unmap `49/49` evidence is independent and does not rewrite this family. Neither
+family opens Map/Lock dynamic admission, implements JointClose, or makes production
+VFS/open/Runtime/Ready reachable.

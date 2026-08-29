@@ -1,7 +1,7 @@
 ---
 title: 节点插件 handle-bound authority open attempt V1 权威草案
 status: draft
-reviewed_at: 2026-08-29
+reviewed_at: 2026-08-30
 owners: node, platform
 proposed_feature_id: compute-plugin-handle-bound-open-attempt-v1
 registration_status: unregistered_feature_workflow_unavailable
@@ -79,9 +79,10 @@ proof、live `sqlite3_file` graph、SQLite return/extended-code proof、authoriz
 
 [`node-plugin-planning-snapshot-authority.md`](node-plugin-planning-snapshot-authority.md) 与
 [`node-plugin-vfs-fault-authority.md`](node-plugin-vfs-fault-authority.md) 的顺序保持不变。A2 当前为
-Barrier 与 Registration 各 `WindowsDynamic=8/8`、RegistryLifecycle `WindowsDynamic=16/16`、A2b2 `WindowsDynamic=32/117`；剩余 85 项无动态
-record，clean wide regression `142/142` 已通过，但 Map/Lock pending/open frontiers 与其余 family 仍未
-闭合。A2 仍未完成，测试 VFS 不得作为本草案 owner seal 的 producer。
+Barrier 与 Registration 各 `WindowsDynamic=8/8`、RegistryLifecycle `WindowsDynamic=16/16`、Unmap
+`WindowsDynamic=49/49`、A2b2 `WindowsDynamic=81/117`；剩余 36 项全部是 JointClose，clean wide
+regression `205/205` 已通过，但 Map/Lock pending/open frontiers 与 JointClose 仍未闭合。A2 仍未完成，
+测试 VFS 不得作为本草案 owner seal 的 producer。
 
 未来只有在 A2 完整动态验收后，才能同批补齐：唯一 production process owner、VFS 注册/注销所有权、
 ABI→registry live route、main/journal/WAL/SHM handle graph、connection success/failure custody、显式 close
@@ -106,11 +107,11 @@ job/attempt/lease/receipt/usage/settlement/money = none
 `elon-pc-node` 测试目标已编译，新 source-contract `4/4`、复用的 registry lifecycle 回归 `45/45`
 通过，均为 `failed=0`。这些证据只证明源码边界和既有 registry 行为；由于 process seal 仍没有安全
 producer，open-attempt 两态没有行为运行证据，生产 VFS/SQLite/Connection 也仍未运行。A2 Barrier、
-RegistrationShutdown 与 RegistryLifecycle 已在 exact clean commit `95d910f0dbc167138f913861efafa20ff11295cc` 上正式
-验证：Windows 10.0.26200 x86_64、fixed NTFS、SQLite 3.45.0，三个 family 分别
-`8/8`、`8/8`、`16/16`，共 32 个 unique family+selector exact-commit receipts，均为 `child_exit=0`、
-`parent_cleanup=deleted`。A2b2 为 `32/117`；剩余 85 项无动态 record，
-clean wide regression `142/142` 已通过，但 Map/Lock 与其余 family 未闭合，不能据此宣称 A2 完成。
+RegistrationShutdown 与 RegistryLifecycle 已在各自 exact clean evidence commit 上正式验证；Unmap 又在
+exact clean commit `da62f95b09287b79bc1f4c23780b95993cdd85a0`、Windows 10.0.26200 x86_64、fixed NTFS、
+SQLite 3.45.0 上正式 `49/49`。四个 family 分别 `8/8`、`8/8`、`16/16`、`49/49`，正式 records 均为
+`child_exit=0`、`parent_cleanup=deleted`。A2b2 为 `81/117`；剩余 36 项全部是 JointClose，
+clean wide regression `205/205` 已通过，但 Map/Lock 与 JointClose 未闭合，不能据此宣称 A2 完成。
 缺编译期 Git SHA、旧 cache reuse 与 partial failure 均保留为不计数历史。当前工具目录没有
 `project_feature_workflow`，所以
 proposed feature 未登记、未 claim；禁止手改 `.elon/project-features.json`。
