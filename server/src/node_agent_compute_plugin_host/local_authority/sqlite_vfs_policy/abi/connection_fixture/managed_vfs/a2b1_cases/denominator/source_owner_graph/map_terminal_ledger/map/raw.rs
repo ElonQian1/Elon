@@ -207,6 +207,26 @@ pub(in super::super) const STEPS: &[MapSourceStep] = &[
         ),
         run_code_abandon_context(),
     ),
+    with_call_context(
+        step(
+            MapSourceStepId::RawAbandonStateWitnessRecorded,
+            MapSiteId::RawAbandon,
+            SourceOwnerId::AbiRawCloseWitness,
+            "fn record_state_abandon",
+            "self.record(",
+            1,
+            MAP_BOTH,
+            Epoch::AbiInput,
+            SourceEffect::None,
+            MapStepKind::StructuralJoin,
+        ),
+        source_anchor(
+            SourceOwnerId::AbiRawState,
+            "unsafe fn abandon_installed_state",
+            ".record_state_abandon();",
+            1,
+        ),
+    ),
     step(
         MapSourceStepId::FileStateInnerMissing,
         MapSiteId::RawState,

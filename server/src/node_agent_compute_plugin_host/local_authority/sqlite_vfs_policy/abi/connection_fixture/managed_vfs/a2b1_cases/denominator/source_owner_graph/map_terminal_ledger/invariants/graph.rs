@@ -127,6 +127,7 @@ const RESOLVED_EXPECTATIONS: &[ResolvedExpectation] = &[
         selector: LedgerSelector::Site(MapSiteId::RawAbandon),
         witnesses: &[
             MapSourceStepId::RawAbandonEmpty,
+            MapSourceStepId::RawAbandonStateWitnessRecorded,
             MapSourceStepId::RawAbandonInstalled,
             MapSourceStepId::RawAbandonNullFileRejected,
             MapSourceStepId::RawAbandonForeignMethodsNullTableRejected,

@@ -40,6 +40,7 @@ pub(super) const REVIEW_GATES: &[MapReviewGateRecord] = &[
         gate: MapReviewGate::RawAbandonOutcomeSplit,
         witnesses: &[
             MapSourceStepId::RawAbandonEmpty,
+            MapSourceStepId::RawAbandonStateWitnessRecorded,
             MapSourceStepId::RawAbandonInstalled,
             MapSourceStepId::RawAbandonNullFileRejected,
             MapSourceStepId::RawAbandonForeignMethodsNullTableRejected,
@@ -328,6 +329,7 @@ pub(super) const RESOLVED_GRAPH_BOUNDARIES: &[MapResolvedBoundaryRecord] = &[
         node: SourceNodeId::AbiMapRawStateAbandon,
         witnesses: &[
             MapSourceStepId::RawAbandonEmpty,
+            MapSourceStepId::RawAbandonStateWitnessRecorded,
             MapSourceStepId::RawAbandonInstalled,
             MapSourceStepId::RawAbandonNullFileRejected,
             MapSourceStepId::RawAbandonForeignMethodsNullTableRejected,

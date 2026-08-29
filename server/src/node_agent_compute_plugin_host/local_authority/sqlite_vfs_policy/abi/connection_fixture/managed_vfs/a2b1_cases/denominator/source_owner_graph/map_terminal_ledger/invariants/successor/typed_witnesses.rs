@@ -6,6 +6,7 @@ use super::super::super::model::{
     MapExit, MapPendingReason, MapSiteId, MapSourceStep, MapSourceStepId, MapStepKind,
     MapValueFlow, SourceAnchor, MAP_BOTH, MAP_OBSERVE,
 };
+use super::route_callback_source_shapes::require_source_order;
 
 const NORMAL_WITNESS_CHAINS: &[(ReviewedTypedMapOutcomeFragment, [MapSourceStepId; 3])] = &[
     (
@@ -37,6 +38,7 @@ const NORMAL_WITNESS_CHAINS: &[(ReviewedTypedMapOutcomeFragment, [MapSourceStepI
 const UNWIND_WITNESS_CHAIN: &[MapSourceStepId] = &[
     MapSourceStepId::RawStateCaughtPanic,
     MapSourceStepId::RawAbandonUnwindFence,
+    MapSourceStepId::RawAbandonStateWitnessRecorded,
     MapSourceStepId::RawAbandonInstalled,
     MapSourceStepId::RawFallbackProjection,
 ];
@@ -109,6 +111,17 @@ fn validate_normal_return_witnesses(steps: &[MapSourceStep]) -> Result<(), &'sta
 }
 
 fn validate_unwind_witnesses(steps: &[MapSourceStep]) -> Result<(), &'static str> {
+    require_source_order(
+        SourceOwnerId::AbiRawState,
+        "unsafe fn abandon_installed_state",
+        &[
+            "validate_installed(methods, state)?;",
+            ".record_state_abandon();",
+            "base.pMethods).write(ptr::null());",
+            "drop(Box::from_raw",
+        ],
+    )?;
+
     let caught = require_step(steps, MapSourceStepId::RawStateCaughtPanic)?;
     if caught.site != MapSiteId::RawGate
         || caught.anchor.owner != SourceOwnerId::AbiFileState
@@ -139,6 +152,21 @@ fn validate_unwind_witnesses(steps: &[MapSourceStep]) -> Result<(), &'static str
         1,
         run_code_abandon_context(),
     )?;
+
+    let state_witness = require_step(steps, MapSourceStepId::RawAbandonStateWitnessRecorded)?;
+    if state_witness.site != MapSiteId::RawAbandon
+        || state_witness.anchor.owner != SourceOwnerId::AbiRawCloseWitness
+        || state_witness.anchor.symbol != "fn record_state_abandon"
+        || state_witness.anchor.needle != "self.record("
+        || state_witness.anchor.occurrence != 1
+        || state_witness.ops != MAP_BOTH
+        || state_witness.effect != SourceEffect::None
+        || state_witness.value_flow != MapValueFlow::None
+        || state_witness.kind != MapStepKind::StructuralJoin
+        || state_witness.call_context != Some(raw_abandon_witness_context())
+    {
+        return Err("typed Map unwind state-abandon witness changed shape");
+    }
 
     let abandon = require_step(steps, MapSourceStepId::RawAbandonInstalled)?;
     if abandon.site != MapSiteId::RawAbandon
@@ -230,6 +258,7 @@ fn validate_ordered_witness_chains(steps: &[MapSourceStep]) -> Result<(), &'stat
     let expected_unwind = [
         MapSourceStepId::RawStateCaughtPanic,
         MapSourceStepId::RawAbandonUnwindFence,
+        MapSourceStepId::RawAbandonStateWitnessRecorded,
         MapSourceStepId::RawAbandonInstalled,
         MapSourceStepId::RawFallbackProjection,
     ];
@@ -325,6 +354,15 @@ fn run_code_abandon_context() -> SourceAnchor {
         owner: SourceOwnerId::AbiFileState,
         symbol: "unsafe fn run_code",
         needle: "abandon_without_unwind(file)",
+        occurrence: 1,
+    }
+}
+
+fn raw_abandon_witness_context() -> SourceAnchor {
+    SourceAnchor {
+        owner: SourceOwnerId::AbiRawState,
+        symbol: "unsafe fn abandon_installed_state",
+        needle: ".record_state_abandon();",
         occurrence: 1,
     }
 }
