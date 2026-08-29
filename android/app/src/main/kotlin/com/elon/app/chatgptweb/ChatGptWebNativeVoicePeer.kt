@@ -234,7 +234,7 @@ internal class ChatGptWebNativeVoicePeer(
     ): DataChannel.Observer = object : DataChannel.Observer {
         override fun onBufferedAmountChange(previousAmount: Long) = Unit
         override fun onMessage(buffer: DataChannel.Buffer) {
-            if (!current(token) || dataChannel !== observedChannel || buffer.binary) return
+            if (!current(token) || dataChannel !== observedChannel) return
             val payload = buffer.data.duplicate().let { data ->
                 if (data.remaining() !in 1..MAX_DATA_CHANNEL_MESSAGE_BYTES) return
                 ByteArray(data.remaining()).also(data::get).toString(Charsets.UTF_8)

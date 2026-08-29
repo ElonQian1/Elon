@@ -27,6 +27,7 @@ internal class ChatGptRealtimeVoiceBackingController(
     private val privateVoiceRelay = ChatGptWebPrivateVoiceRelayGateway(webView, schedule)
     private var nativeResearch: ChatGptWebNativeVoiceResearchController? = null
     private var officialFallbackPending = false
+    private var transcriptRefreshGeneration = 0L
     @Volatile
     private var nativeVoiceState = ChatGptWebNativeVoiceState(ChatGptWebNativeVoicePhase.IDLE)
     private var nativeStateObserver: ((ChatGptWebNativeVoiceState) -> Unit)? = null
@@ -65,6 +66,8 @@ internal class ChatGptRealtimeVoiceBackingController(
         requestExecution()
         nativeStateObserver = onState
         nativeVoiceState = ChatGptWebNativeVoiceState(ChatGptWebNativeVoicePhase.BOOTSTRAPPING)
+        transcriptRefreshGeneration += 1
+        val refreshToken = transcriptRefreshGeneration
         val controller = nativeResearch ?: ChatGptWebNativeVoiceResearchController(
             context = context,
             relay = privateVoiceRelay,
@@ -80,6 +83,8 @@ internal class ChatGptRealtimeVoiceBackingController(
                     ChatGptWebNativeVoicePhase.FAILED,
                     code = "start_rejected",
                 )
+            } else {
+                scheduleActiveTranscriptRefresh(refreshToken, attempt = 0)
             }
         }
     }
@@ -121,6 +126,7 @@ internal class ChatGptRealtimeVoiceBackingController(
     fun end(gracefulExit: Boolean) {
         if (!active) return
         active = false
+        transcriptRefreshGeneration += 1
         officialFallbackPending = false
         nativeResearch?.close()
         nativeStateObserver = null
@@ -154,6 +160,7 @@ internal class ChatGptRealtimeVoiceBackingController(
 
     fun release() {
         active = false
+        transcriptRefreshGeneration += 1
         officialFallbackPending = false
         recoveryGate.invalidate()
         nativeResearch?.close()
@@ -168,6 +175,29 @@ internal class ChatGptRealtimeVoiceBackingController(
         nativeStateObserver?.invoke(state)
     }
 
+    private fun scheduleActiveTranscriptRefresh(token: Long, attempt: Int) {
+        schedule(Runnable {
+            if (
+                token != transcriptRefreshGeneration ||
+                !active ||
+                nativeVoiceState.phase in setOf(
+                    ChatGptWebNativeVoicePhase.FAILED,
+                    ChatGptWebNativeVoicePhase.CLOSED,
+                    ChatGptWebNativeVoicePhase.OFFICIAL_FALLBACK,
+                )
+            ) return@Runnable
+
+            val liveTranscriptObserved = nativeVoiceState.transcriptEventCount > 0
+            if (!liveTranscriptObserved || attempt % PRIVATE_REFRESH_RECONCILE_INTERVAL == 0) {
+                requestPrivateConversationSnapshot()
+            }
+            if (attempt % DOM_REFRESH_WATCHDOG_INTERVAL == 0) {
+                requestConversationSnapshot()
+            }
+            scheduleActiveTranscriptRefresh(token, attempt + 1)
+        }, if (attempt == 0) ACTIVE_TRANSCRIPT_INITIAL_DELAY_MS else ACTIVE_TRANSCRIPT_REFRESH_DELAY_MS)
+    }
+
     private fun requestOfficialFallback(): Boolean {
         val view = webView() ?: return false
         officialFallbackPending = true
@@ -179,6 +209,10 @@ internal class ChatGptRealtimeVoiceBackingController(
     private companion object {
         const val SNAPSHOT_SETTLE_DELAY_MS = 600L
         const val INTERRUPTED_RECOVERY_TIMEOUT_MS = 3_000L
+        const val ACTIVE_TRANSCRIPT_INITIAL_DELAY_MS = 700L
+        const val ACTIVE_TRANSCRIPT_REFRESH_DELAY_MS = 1_500L
+        const val PRIVATE_REFRESH_RECONCILE_INTERVAL = 4
+        const val DOM_REFRESH_WATCHDOG_INTERVAL = 8
     }
 }
 

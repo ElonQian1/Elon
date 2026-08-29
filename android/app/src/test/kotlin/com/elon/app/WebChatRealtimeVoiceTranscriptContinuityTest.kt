@@ -12,7 +12,7 @@ import org.junit.Test
 
 class WebChatRealtimeVoiceTranscriptContinuityTest {
     @Test
-    fun voiceSnapshotsAreCapturedWithoutReplacingTheVisibleConversation() {
+    fun authoritativeVoiceSnapshotsUpdateTheVisibleConversationWithoutClearingIt() {
         val continuity = WebChatRealtimeVoiceTranscriptContinuity()
         val beforeVoice = snapshot("/c/origin", "old question", "old answer")
         val duringVoice = snapshot(
@@ -25,7 +25,7 @@ class WebChatRealtimeVoiceTranscriptContinuityTest {
 
         continuity.begin(beforeVoice)
 
-        assertNull(continuity.resolve(duringVoice))
+        assertEquals(duringVoice, continuity.resolve(duringVoice))
         assertEquals(duringVoice, continuity.end(duringVoice))
     }
 

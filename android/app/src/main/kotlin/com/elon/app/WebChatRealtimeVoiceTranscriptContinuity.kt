@@ -61,7 +61,7 @@ internal class WebChatRealtimeVoiceTranscriptContinuity {
         Phase.IDLE -> incoming
         Phase.ACTIVE -> {
             retain(incoming)
-            null
+            presentationSnapshot()
         }
         Phase.RECOVERING -> resolveRecovery(incoming)
     }

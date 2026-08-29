@@ -306,7 +306,12 @@ internal class ChatGptSocialChatController(
         return true
     }
 
-    override fun startManagedRealtimeVoice(): Boolean = session.startManagedRealtimeVoice()
+    override fun startManagedRealtimeVoice(): Boolean {
+        val started = session.startManagedRealtimeVoice()
+        if (!started) return false
+        realtimeVoiceTranscript.begin(session.currentSnapshot())
+        return true
+    }
 
     override fun managedRealtimeVoiceState(): WebChatManagedRealtimeVoiceState =
         session.managedRealtimeVoiceState()
