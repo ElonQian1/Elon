@@ -117,6 +117,7 @@ export async function streamPost(
     const decoder = new TextDecoder()
     let buffer = ''
     let terminalEventSeen = false
+    let stopReading = false
     try {
       while (true) {
         const chunk = await reader.read()
@@ -133,7 +134,15 @@ export async function streamPost(
           for (const line of block.split(/\r?\n/)) {
             if (!line.startsWith('data:')) continue
             const raw = line.slice(5).trim()
-            if (!raw || raw === '[DONE]') continue
+            if (!raw) continue
+            if (raw === '[DONE]') {
+              // Some SSE implementations use the conventional sentinel but
+              // keep the HTTP connection alive afterwards. It is terminal for
+              // this request, so do not wait for the socket to close.
+              terminalEventSeen = true
+              stopReading = true
+              break
+            }
             let event: ApiStreamEvent
             try {
               event = JSON.parse(raw) as ApiStreamEvent
@@ -146,7 +155,15 @@ export async function streamPost(
             // application-level SSE error must not be mistaken for a healthy
             // completed stream and silently swallow the retry path.
             onEvent(event)
+            if (terminalEventSeen) {
+              // The server intentionally sends keep-alive comments after the
+              // final event. The final event, rather than HTTP EOF, defines
+              // completion; waiting for EOF leaves the composer stuck on "…".
+              stopReading = true
+              break
+            }
           }
+          if (stopReading) break
           separator = buffer.indexOf('\r\n\r\n')
           separatorLength = 4
           if (separator < 0) {
@@ -154,6 +171,7 @@ export async function streamPost(
             separatorLength = 2
           }
         }
+        if (stopReading) break
         if (chunk.done) break
       }
       if (!terminalEventSeen) {
@@ -163,6 +181,10 @@ export async function streamPost(
         } satisfies ApiError
       }
     } finally {
+      // Release the fetch body as soon as the application-level terminal event
+      // arrives. This also prevents a keep-alive SSE response from lingering
+      // after the composer has returned to its normal send state.
+      await reader.cancel().catch(() => {})
       reader.releaseLock()
     }
   } catch (error) {
