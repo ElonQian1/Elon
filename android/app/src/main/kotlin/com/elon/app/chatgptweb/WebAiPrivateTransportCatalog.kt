@@ -74,8 +74,9 @@ internal object WebAiPrivateTransportCatalog {
             verification = "targeted_tests_passed_device_pending",
             productionDefault = true,
             runtimeEnabled = BuildConfig.CHATGPT_PRIVATE_CONVERSATION_PREFETCH_ENABLED,
-            requestMode = "authenticated_same_origin_get_current_conversation",
-            healthPolicy = "single_flight_timeout_cooldown_and_circuit_breaker",
+            requestMode = "event_first_active_same_origin_get_current_conversation_reconciliation",
+            healthPolicy =
+                "single_flight_timeout_cooldown_circuit_breaker_and_sparse_dom_watchdog",
             fallback = "retained_native_transcript_and_official_dom_snapshot",
         ),
         Entry(
@@ -189,7 +190,7 @@ internal object WebAiPrivateTransportCatalog {
             runtimeEnabled = BuildConfig.CHATGPT_PRIVATE_VOICE_NATIVE_RTC_ENABLED,
             requestMode = "passive_native_webrtc_data_channel_transcript_events",
             healthPolicy =
-                "bounded_allowlisted_event_parser_deduplicated_in_memory_stream",
+                "bounded_utf8_event_parser_deduplicated_in_memory_stream",
             fallback = "private_conversation_refresh_and_official_dom_snapshot",
         ),
         Entry(

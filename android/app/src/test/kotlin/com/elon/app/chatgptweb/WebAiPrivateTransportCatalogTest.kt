@@ -72,6 +72,14 @@ class WebAiPrivateTransportCatalogTest {
             "retained_native_transcript_and_official_dom_snapshot",
             voiceRefresh.getString("fallback"),
         )
+        assertEquals(
+            "event_first_active_same_origin_get_current_conversation_reconciliation",
+            voiceRefresh.getString("request_mode"),
+        )
+        assertEquals(
+            "single_flight_timeout_cooldown_circuit_breaker_and_sparse_dom_watchdog",
+            voiceRefresh.getString("health_policy"),
+        )
 
         val googleSnapshotCache = values.first {
             it.getString("capability_id") ==
@@ -213,6 +221,10 @@ class WebAiPrivateTransportCatalogTest {
         assertEquals(
             "targeted_tests_passed_device_event_shape_pending",
             nativeVoiceTranscript.getString("verification_status"),
+        )
+        assertEquals(
+            "bounded_utf8_event_parser_deduplicated_in_memory_stream",
+            nativeVoiceTranscript.getString("health_policy"),
         )
         assertTrue(nativeVoiceTranscript.getBoolean("production_default"))
         assertEquals(

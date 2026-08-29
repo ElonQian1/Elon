@@ -152,23 +152,28 @@ reply probe through the native composer; Google additionally exposed a streaming
 transition. The acceptance did not clear cookies or application data and emitted no private
 conversation content.
 
-Normal and interrupted realtime-voice exits now reuse the verified conversation-body
+Active, normal-exit, and interrupted realtime voice reuse the verified conversation-body
 transport for a non-navigating refresh of the current `/c/{id}` only. Requests are
-single-flight and inherit the existing timeout, cooldown, and circuit breaker. The
-native transcript stays visible while the private snapshot and official DOM snapshot
-race; failure emits no unsupported-capability error and the DOM path continues.
+single-flight and inherit the existing timeout, cooldown, and circuit breaker. Native
+data-channel events have priority; before one is parsed, private reconciliation runs about
+every 1.5 seconds, then backs off to about every 6 seconds. The native transcript stays
+visible while authoritative snapshots update it. A DOM snapshot is only a sparse watchdog
+about every 12 seconds and an exit fallback; failure emits no unsupported-capability error.
 
 The native realtime peer also consumes the official WebRTC data channel directly for
-allowlisted user and assistant transcript delta/final events. Bounded in-memory events
+allowlisted user and assistant transcript delta/final events. Bounded UTF-8 JSON frames are
+accepted whether WebRTC marks them as text or binary. Bounded in-memory events
 update native chat bubbles without reading the voice-page DOM. Event identifiers are
 deduplicated, message and text sizes are capped, and MCP diagnostics expose only message
 counts, never transcript text or payloads. A cold session starts with the documented
 `oai-events` label, a current page-observed safe label overrides that preset, and a
 server-created channel can replace a still-connecting local channel. A missing or changed
-event shape is silent:
-the existing same-origin conversation refresh and official DOM snapshot remain the
-authoritative reconciliation path. Device acceptance must confirm the current private
-event envelope before its verification marker advances beyond targeted tests.
+event shape is silent: the existing same-origin conversation refresh and sparse official
+DOM watchdog remain the authoritative reconciliation path. The managed production entry
+initializes the existing transcript-continuity owner, so authoritative snapshots can update
+native bubbles without an empty DOM clearing retained content. Device acceptance must
+confirm either live data-channel events or visible private-snapshot reconciliation before
+the relevant verification marker advances beyond targeted tests.
 
 Realtime voice identity and bootstrap remain owned by the persistent official WebView.
 The default media session is owned by Android WebRTC, while the page-created WebRTC route

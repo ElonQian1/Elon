@@ -17,6 +17,7 @@ Realtime API.
 ## Runtime contract
 
 - Accepts allowlisted user and assistant transcript delta/final event types only.
+- Bounded UTF-8 JSON is parsed whether WebRTC marks the frame as text or binary.
 - Requires a bounded event type and stable item or response identifier.
 - Limits each data-channel message to 256 KiB and each transcript stream to 64 KiB.
 - Deduplicates bounded event identifiers and keeps live text in memory only.
@@ -29,10 +30,18 @@ Realtime API.
   already-open local channel remains authoritative so duplicate streams are not attached.
 - Leaves the WebView as the identity and official session owner.
 - Reconciles native preview bubbles with the existing same-origin conversation refresh
-  and official DOM snapshot after the voice turn settles.
+  while the voice turn is active and after it settles. When no parsed data-channel event
+  has arrived, the current conversation refresh runs about every 1.5 seconds. Once live
+  events arrive, private reconciliation becomes sparse (about every 6 seconds), with an
+  official DOM watchdog about every 12 seconds.
+- Starts the existing transcript-continuity owner from the production managed voice entry,
+  so authoritative snapshots can update native bubbles without an empty DOM clearing the
+  retained conversation.
 
 Malformed, unknown, missing, or changed events produce no capability error and do not
-interrupt audio. The final conversation refresh and official DOM remain authoritative.
+interrupt audio. The same-origin current-conversation refresh and sparse official DOM
+watchdog remain authoritative. They reuse the existing single-flight, timeout, cooldown,
+and circuit-breaker policy rather than introducing a second transport.
 
 ## Verification
 
@@ -42,6 +51,9 @@ Passed offline:
 - user transcription delta/completed event parsing;
 - malformed, unbound, unrelated, and oversized payload rejection;
 - incremental native bubble accumulation and duplicate-event suppression;
+- text and binary UTF-8 data-channel frame handling;
+- managed production-entry transcript initialization;
+- event-first active refresh cadence with private and DOM fallback throttling;
 - replacement by the authoritative conversation snapshot;
 - structural-only MCP state reporting.
 
