@@ -4,8 +4,8 @@ status: current
 reviewed_at: 2026-08-29
 owners: node, security
 design_status: design_frozen
-implementation_status: source_not_written
-verification_status: WindowsDynamic_0_of_8
+implementation_status: implementation_compiled
+verification_status: WindowsDynamic_8_of_8
 ---
 
 # Node plugin VFS Barrier 8/8 dynamic authority
@@ -18,15 +18,20 @@ the minimum test-only seams required before any Windows dynamic result may be re
 
 - lifecycle: `current`
 - authority: `design_frozen`
-- source: `source_not_written`
-- evidence: `WindowsDynamic=0/8`
-- current A2b2 Windows dynamic total: `8/117`
-- permitted total after all eight Barrier records pass at one exact clean source commit:
-  `16/117`
+- source: `implementation_compiled`
+- evidence: `WindowsDynamic=8/8`
+- exact evidence commit: `1d57b8d98a1fed70fe40ad6f1575f4b856226857`
+- Barrier validation fingerprint: `c300720aa17bae7850f0d0088827b918c5b5d66c2842ff6d5b548e80c7d185f4`
+- current A2b2 Windows dynamic total: `16/117`; remaining: `101`
+- clean wide-regression fingerprint: `e6903ba19d0ff512bba4d1489857b179874a93666bd97f9fae815ef045347e99`
+  (`sqlite_vfs_policy` `121/121`)
 
-This document is not implementation evidence. No selector below is passed merely because its
-static `Case` exists, a low-level fault controller unit test passes, or a fixture reports the
-expected value. Partial results must remain `0/8`; this family advances only as an exact 8/8 set.
+The design text alone is not implementation evidence. The status above is backed by eight unique
+process-isolated records from the exact clean evidence commit: Windows 10.0.26200 x86_64, fixed
+NTFS, bundled SQLite 3.45.0, `8 passed / 0 failed / 1695 filtered`; every record reports
+`child_exit=0` and `parent_cleanup=deleted`. No selector passes merely because its static `Case`
+exists, a low-level unit test passes, or a fixture reports an expected value. Partial future reruns
+must remain `0/8`; the accepted family is always one exact 8/8 set.
 
 ## 2. Common exact identity
 
@@ -266,32 +271,33 @@ following chain is linear and complete:
 No child report alone is a Windows dynamic record. The record must bind case key, exact payload,
 child receipt, root identity, environment, source commit and parent cleanup receipt.
 
-## 8. Five missing test-only seams
+## 8. Implemented test-only seams and evidence closure
 
-The following seams are required and are not implemented at the status frozen by this document:
+The five required seams are implemented behind the existing test/Windows isolation and are part
+of the exact clean-commit evidence described in section 10:
 
-1. **Barrier physical selector admission** — add `ManagedSqliteShmFailurePhase::Barrier` to
-   `managed_vfs/shm_fault_script.rs::supported_shm_phase` and permit only
-   `OutcomeUncertainPoisoned` for its after-success form.
-2. **Before/after fixture installation** — extend
-   `connection.rs::ManagedSqliteRoutedConnectionFixture::install_shm_fault_script` so the exact
-   route can install both before-call and after-success arrays without weakening existing users.
-3. **Real void ABI invocation and raw observation** — add a sealed Windows-test helper beside
-   `connection.rs::call_main_shm_unmap_keep` that validates and calls the live `xShmBarrier`,
-   observes `pMethods` before and after, and never creates a result-code channel.
-4. **Deterministic native completion rejection** — extend
-   `lifecycle_faults.rs::ManagedTestLifecycleFaultController` so an exact
-   `BarrierCallbackCompletion/NativeFailure` step is installed and consumed through a
-   synchronization gate. The registry must genuinely reject `complete_with_receipt`; sleeps,
-   races and synthesized native failures are forbidden.
-5. **Terminal custody witness** — add a test-only redacted witness at the real
-   `registry/process_owner/lifecycle.rs::retain_terminal_custody` boundary, exposed through the
-   registry test bridge/lifecycle observer. The active-route snapshot cannot be used after the
-   exact route has been removed into permanent terminal custody.
+1. **Barrier physical selector admission** — `ManagedSqliteShmFailurePhase::Barrier` is admitted by
+   `managed_vfs/shm_fault_script.rs::supported_shm_phase`, with only
+   `OutcomeUncertainPoisoned` accepted for its after-success form.
+2. **Before/after fixture installation** —
+   `connection.rs::ManagedSqliteRoutedConnectionFixture::install_shm_fault_script` installs the
+   exact route's before-call and after-success arrays without weakening existing users.
+3. **Real void ABI invocation and raw observation** — the sealed Windows-test helper beside
+   `connection.rs::call_main_shm_unmap_keep` validates and calls the live `xShmBarrier`, observes
+   `pMethods` before and after, and creates no result-code channel.
+4. **Deterministic native completion rejection** —
+   `lifecycle_faults.rs::ManagedTestLifecycleFaultController` installs and consumes the exact
+   `BarrierCallbackCompletion/NativeFailure` step through a synchronization gate. The registry
+   genuinely rejects `complete_with_receipt`; no sleep, race or synthesized native failure is
+   used as evidence.
+5. **Terminal custody witness** — a test-only redacted witness is captured at the real
+   `registry/process_owner/lifecycle.rs::retain_terminal_custody` boundary and exposed through the
+   registry test bridge/lifecycle observer, so the evidence does not depend on an active-route
+   snapshot after the exact route enters permanent terminal custody.
 
-The existing low-level Barrier probe, wrapper-before path, registry barrier callback lifecycle,
-two-Connection fixture and A2 child/root/environment/cleanup envelope are reusable but do not
-remove these five gaps.
+Together with the reused low-level Barrier probe, wrapper-before path, registry barrier callback
+lifecycle, two-Connection fixture and A2 child/root/environment/cleanup envelope, these seams
+close the Barrier family's previously listed implementation gaps without opening production VFS.
 
 ## 9. Exact-set, fail-closed and isolation rules
 
@@ -318,14 +324,17 @@ remove these five gaps.
 
 ## 10. Completion gate
 
-Barrier may move from `WindowsDynamic=0/8` to `WindowsDynamic=8/8` only when one exact clean
-Windows source commit produces all eight isolated, canonical, exact-set records and the relevant
-static inventory, payload negative tests, low-level Barrier tests, managed VFS regression and
-A2b1 source-owner guards all pass. Only then may the A2b2 summary advance from `8/117` to
-`16/117`.
+Barrier moved from `WindowsDynamic=0/8` to `WindowsDynamic=8/8` only after the exact clean evidence
+commit produced all eight isolated, canonical, exact-set records and the relevant static inventory,
+payload negative tests, low-level Barrier tests, managed VFS regression and A2b1 source-owner
+guards all passed. The A2b2 summary therefore advances from `8/117` to `16/117`.
 
-Until that gate is met, the authoritative state remains:
+The authoritative family state is now:
 
 ```text
-design_frozen / source_not_written / WindowsDynamic=0/8
+design_frozen / implementation_compiled / WindowsDynamic=8/8
 ```
+
+This closes only the Barrier family. Unmap remains `0/49`, JointClose `0/36`, Registry lifecycle
+`0/16`, and Map/Lock dynamic admission remains unopened; A2 therefore stays
+`implementation_not_dynamically_accepted`.

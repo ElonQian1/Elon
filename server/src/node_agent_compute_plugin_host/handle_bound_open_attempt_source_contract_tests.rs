@@ -338,9 +338,9 @@ fn production_open_and_downstream_effects_remain_absent() {
 fn authority_records_verified_source_unwired_production_and_zero_effect_boundary() {
     let authority_a2_gate = between(AUTHORITY, "## 5. A2 与生产启用门", "## 6. 零效果");
     for marker in [
-        "Registration `WindowsDynamic=8/8`",
-        "A2b2 `WindowsDynamic=8/117`",
-        "未完成宽回归",
+        "Barrier 与 Registration 各 `WindowsDynamic=8/8`",
+        "A2b2 `WindowsDynamic=16/117`",
+        "clean wide regression `121/121`",
     ] {
         assert!(
             authority_a2_gate.contains(marker),
@@ -366,8 +366,9 @@ fn authority_records_verified_source_unwired_production_and_zero_effect_boundary
 
     let current_evidence = between(ACCEPTANCE, "## 1. 当前证据强度", "## 2. Source review 清单");
     for marker in [
+        "a2_barrier_windows_dynamic=8/8",
         "a2_registration_windows_dynamic=8/8",
-        "a2b2_windows_dynamic=8/117",
+        "a2b2_windows_dynamic=16/117",
         "production_acceptance=deferred",
     ] {
         assert!(
@@ -376,6 +377,13 @@ fn authority_records_verified_source_unwired_production_and_zero_effect_boundary
         );
     }
     assert!(!current_evidence.contains("a2b2_windows_dynamic=117/117"));
+
+    let barrier_row = ACCEPTANCE
+        .lines()
+        .find(|line| line.starts_with("| A2 Barrier WindowsDynamic |"))
+        .expect("missing A2 Barrier WindowsDynamic matrix row");
+    assert!(barrier_row.contains("| 8 | 0 | 0 |"));
+    assert!(barrier_row.contains("`8/8`"));
 
     let registration_row = ACCEPTANCE
         .lines()
@@ -388,14 +396,18 @@ fn authority_records_verified_source_unwired_production_and_zero_effect_boundary
         .lines()
         .find(|line| line.starts_with("| A2b2 WindowsDynamic |"))
         .expect("missing A2b2 WindowsDynamic matrix row");
-    assert!(a2b2_row.contains("| 8 | 0 | 109 |"));
-    assert!(a2b2_row.contains("`8/117`"));
+    assert!(a2b2_row.contains("| 16 | 0 | 101 |"));
+    assert!(a2b2_row.contains("`16/117`"));
     assert!(!a2b2_row.contains("117/117"));
 
     let promotion_gate = &ACCEPTANCE[ACCEPTANCE
         .find("## 5. 晋级门")
         .expect("missing promotion gate")..];
-    for marker in ["Registration `8/8`", "`117/117` WindowsDynamic", "宽回归"] {
+    for marker in [
+        "Barrier/Registration 各 `8/8`",
+        "`117/117` WindowsDynamic",
+        "宽回归",
+    ] {
         assert!(
             promotion_gate.contains(marker),
             "promotion gate missing {marker}"

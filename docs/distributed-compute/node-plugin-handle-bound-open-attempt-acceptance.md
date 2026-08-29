@@ -29,29 +29,33 @@ registry_lifecycle_regression=42/42
 verification=targeted_local_source_and_registry_verified
 compile/runtime=implementation_compiled/open_attempt_runtime_unrun
 compiled_targets=1 test_cases_run=46 passed=46 failed=0
-a2_registration_attempt=formal_windows_dynamic_verified
+a2_barrier_attempt=formal_windows_dynamic_verified
+a2_barrier_windows_dynamic=8/8
+a2_registration_attempt=formal_windows_dynamic_reverified
 a2_registration_windows_dynamic=8/8
-a2b2_windows_dynamic=8/117
-a2b2_remaining_without_dynamic_record=109
-a2_evidence_commit=2a16dbbe5cb9235a9926ae8b09130a1f7fbaf67a
-a2_validation_fingerprint=cbdef10240696931b43aaac2a874de0666ca10a5af098e8ca855e282174591ce
+a2b2_windows_dynamic=16/117
+a2b2_remaining_without_dynamic_record=101
+a2_evidence_commit=1d57b8d98a1fed70fe40ad6f1575f4b856226857
+a2_barrier_validation_fingerprint=c300720aa17bae7850f0d0088827b918c5b5d66c2842ff6d5b548e80c7d185f4
+a2_registration_validation_fingerprint=b970858c74a2226c69182b64afd4c86ffe66d2a3c6b5d1cd3cf26aa57f5698bb
+a2_wide_validation_fingerprint=e6903ba19d0ff512bba4d1489857b179874a93666bd97f9fae815ef045347e99
 a2_environment=Windows_10.0.26200_x86_64/fixed_NTFS/SQLite_3.45.0
-a2_test_result=8_passed/0_failed/1672_filtered
-a2_receipts=8_unique_exact_commit/child_exit_0/parent_cleanup_deleted
+a2_test_result=barrier_8_passed/registration_8_passed/0_failed/1695_filtered_each
+a2_receipts=16_unique_exact_commit/child_exit_0/parent_cleanup_deleted
+a2_wide_regression=121_passed/0_failed
 migration/table/writer=none/none/none
 vfs_registration/sqlite_open/connection/opened_authority=none/none/none/none
 production_acceptance=deferred
 ```
 
 `46/46` 由新 guard `4/4` 与本次 registry lifecycle `42/42` 构成；后者证明复用 owner 的既有行为，
-不是 open-attempt typestate 的 production runtime。正式 A2 RegistrationShutdown 证据绑定 commit
-`2a16dbbe5cb9235a9926ae8b09130a1f7fbaf67a` 与 validation fingerprint
-`cbdef10240696931b43aaac2a874de0666ca10a5af098e8ca855e282174591ce`：Windows 10.0.26200 x86_64、
-fixed NTFS、SQLite 3.45.0，`8 passed/0 failed/1672 filtered`；8 个 unique receipts 全部精确绑定该 commit，
-且均为 `child_exit=0`、`parent_cleanup=deleted`。首次 8-case 调用因编译期 Git SHA 缺失而在 evidence
-capture 阶段被环境拒绝；修复前一轮代码执行为 `4 passed/4 failed`。这两次均是不计数历史。当前只把
-正式记录计为 Registration `8/8`、A2b2 `8/117`；其余 109 无动态 record，Map/Lock 与宽范围回归未闭合，
-A2 仍未完成。既有 managed-fs、A1 或 test-only VFS 的其他历史证据不能记为本草案通过数；功能工作流
+不是 open-attempt typestate 的 production runtime。正式 A2 Barrier 与 RegistrationShutdown 证据绑定 exact
+clean commit `1d57b8d98a1fed70fe40ad6f1575f4b856226857`：Windows 10.0.26200 x86_64、fixed NTFS、
+SQLite 3.45.0，两个 family 各 `8 passed/0 failed/1695 filtered`；16 个 unique receipts 全部精确绑定该
+commit，且均为 `child_exit=0`、`parent_cleanup=deleted`。缺编译期 Git SHA、旧 cache reuse 与 partial
+failure 均是不计数历史。当前正式记录计为 Barrier `8/8`、Registration `8/8`、A2b2 `16/117`；其余
+101 无动态 record，clean wide regression `121/121` 已通过，但 Map/Lock 与其余 family 未闭合，A2 仍
+未完成。既有 managed-fs、A1 或 test-only VFS 的其他历史证据不能记为本草案通过数；功能工作流
 不可用，注册表保持未修改。
 
 ## 2. Source review 清单
@@ -83,8 +87,9 @@ A2 仍未完成。既有 managed-fs、A1 或 test-only VFS 的其他历史证据
 | 既有 registry lifecycle 回归 | 42 | 0 | 0 | `42/42` 实际通过 |
 | open-attempt typestate 行为 | 0 | 0 | 1 | 无安全 producer，未运行 |
 | production VFS/SQLite/Connection | 0 | 0 | 1 | 明确未接线 |
+| A2 Barrier WindowsDynamic | 8 | 0 | 0 | 正式 `8/8`，8 个 exact-commit records |
 | A2 Registration WindowsDynamic | 8 | 0 | 0 | 正式 `8/8`，8 个 exact-commit records |
-| A2b2 WindowsDynamic | 8 | 0 | 109 | 当前 `8/117`，剩余 109 无动态 record |
+| A2b2 WindowsDynamic | 16 | 0 | 101 | 当前 `16/117`，剩余 101 无动态 record |
 | migration/Store/runtime/network/device | 0 | 0 | 1 | 未运行 |
 | Ready/Provider/market/economy | 0 | 0 | 1 | effects=none |
 
@@ -100,12 +105,12 @@ A2 仍未完成。既有 managed-fs、A1 或 test-only VFS 的其他历史证据
 - 引入 `sqlite3_vfs_register`、`sqlite3_open_v2`、`rusqlite::Connection`、live `sqlite3_file` 或
   `OpenedComputePluginLocalAuthority::from_verified_backend`；
 - 提升 test-only VFS，修改 migration/table/writer/API/Host/Ready/市场，或产生任何经济效果；
-- 把已编译/guard/registry 回归或 Registration `8/8` 外推为 open-attempt runtime、A2 `117/117` 或生产
+- 把已编译/guard/registry 回归或 Barrier/Registration `8/8` 外推为 open-attempt runtime、A2 `117/117` 或生产
   producer 已存在。
 
 ## 5. 晋级门
 
-解除架构阶段禁令后，必须先完成 A2 全部 source inventory/terminal closure、Registration `8/8`、A2b2
+解除架构阶段禁令后，必须先完成 A2 全部 source inventory/terminal closure、Barrier/Registration 各 `8/8`、A2b2
 `117/117` WindowsDynamic 与宽回归，再用唯一 production owner 验证正常注册/open/close、entropy/collision、
 owner poison、logical-name/begin failure、SQLite error/extended code、callback/handle teardown、Connection close
 不确定和 route retirement。只有这些证据与真实 opened-authority producer 同批闭合后，才可修改本页的
