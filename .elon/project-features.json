@@ -382,6 +382,63 @@
       "updated_at_ms": 1787457080433
     },
     {
+      "id": "backend-a2b2-joint-close-windows-dynamic-v1",
+      "title": "A2b2 JointClose 36 项 WindowsDynamic 真实验收",
+      "summary": "在真实受管 SQLite/Windows test-only 路径上实现 JointClose 36 个冻结 selector 的 raw xClose、SHM lift、main close、registry handoff、canonical payload、进程隔离 runner 与原子 family；只有同一 exact clean commit 的 36/36 才晋级，且不开放生产入口。",
+      "status": "in_progress",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/distributed-compute/node-plugin-vfs-joint-close-dynamic-authority.md",
+        "content_hash": "c442452ae39ac0b152e2d6729093d8de13883673533079f5fe73f441ebdf9cc5",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "1b7b87b57e974315e7565d7bebedfa9b4472dc34",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "a917be2ff8cf399f1a2d6a055b41ebfa979c46a1",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "node, security",
+      "tags": [
+        "distributed-compute",
+        "node-plugin",
+        "sqlite-vfs",
+        "windows",
+        "a2b2",
+        "joint-close"
+      ],
+      "task_paths": [
+        "docs/distributed-compute/node-plugin-vfs-fault-acceptance.md",
+        "docs/distributed-compute/node-plugin-vfs-fault-authority.md",
+        "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs",
+        "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/registry",
+        "server/src/node_agent_managed_fs"
+      ],
+      "dependencies": [
+        "backend-a2b2-unmap-windows-dynamic-v1"
+      ],
+      "acceptance_criteria": [
+        "现有 36 个 JointClose CaseKey 与 a2b2jc1 selector 精确双射，canonical payload round-trip 且拒绝别名、缺失、额外、未知或非规范字段。",
+        "每个 selector 经 live FULL_MUTEX Connection 所属 allocation 上真实 installed raw xClose 产生 actual；SQLite allocation 被保留但不再使用/Drop，第二次 xClose 失败且 OS physical_retry=0。",
+        "SHM lift 20 项证明任一 SHM 失败时 main unlock/file close 为零；main 8 项与 registry handoff 3 项由 exact Windows native receipt、typed terminal custody 和真实 counters 证明。",
+        "36 个 selector 各在独立 child/root 运行，parent 绑定 PID、nonce、commit、环境、registration、payload、exit 与 cleanup；只有 exact clean same-environment 36-member reducer 可渲染正式 family。",
+        "同一 runtime-source commit 重跑 Barrier 8/8、RegistrationShutdown 8/8、RegistryLifecycle 16/16、Unmap 49/49、managed SHM 定向与 wide sqlite_vfs_policy 回归。",
+        "生产 VFS/open/process owner/Connection/Runtime/Ready 与经济效果保持不可达；JointClose 36/36 只把 A2b2 推到 117/117，Map/Lock denominator 仍须独立闭合。"
+      ],
+      "implementation_evidence": [],
+      "claim": {
+        "claim_id": "claim_12ebfe32c8a14870a8f8fd830bad5a4a",
+        "agent_id": "/root",
+        "claimed_at_ms": 1788046295732,
+        "expires_at_ms": 1788053495732
+      },
+      "created_at_ms": 1788045555843,
+      "updated_at_ms": 1788046311047
+    },
+    {
       "id": "backend-a2b2-unmap-windows-dynamic-v1",
       "title": "A2b2 Unmap 49 项 WindowsDynamic 真实验收",
       "summary": "在真实受管 SQLite/Windows 路径上实现 Unmap 49 个冻结 selector 的 test-only seam、观察器、canonical payload、进程隔离 runner 与父级线性证据；只有同一 exact clean commit 的 49/49 才晋级，且不开放生产入口。",
@@ -12431,66 +12488,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_6fe137f40dd84507bce4719e490f23a3",
-      "feature_id": "win-web-ai-citation-logo-resilience-v1",
-      "action": "registered",
-      "actor": "codex-root",
-      "reason": "实机诊断显示 Google 回答已有 7 条结构化引用但 citation_logo_count=0；当前首选远程 favicon 服务在本机网络挂起并造成白圆。",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1787438602172
-    },
-    {
-      "id": "feature_event_370bcbd9b5bd456b9cd88f33bf91f00b",
-      "feature_id": "win-web-ai-citation-logo-resilience-v1",
-      "action": "claimed",
-      "actor": "codex-root",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1787438613052
-    },
-    {
-      "id": "feature_event_cfa117c7ffc443858fa22bf42545780f",
-      "feature_id": "win-web-ai-citation-logo-resilience-v1",
-      "action": "transitioned",
-      "actor": "codex-root",
-      "reason": "已完成现有来源链审查并实现站点优先、有界超时、字母底图及双厂商可见图标提取；进入验证与证据绑定。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1787438934381
-    },
-    {
-      "id": "feature_event_6bbd8230e009412095a28bb5b341bd08",
-      "feature_id": "win-web-ai-citation-logo-resilience-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-root",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1787438953861
-    },
-    {
-      "id": "feature_event_4177294a64fd4866b5415e18cd3cb0fe",
-      "feature_id": "win-web-ai-citation-logo-resilience-v1",
-      "action": "transitioned",
-      "actor": "codex-root",
-      "reason": "来源候选顺序、有界超时、加载前字母底图、ChatGPT/Google 可见图标提取和持久 AST query/hash 清洗均已实现，相关证据已绑定。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1787438967552
-    },
-    {
-      "id": "feature_event_82b3b7e8683a48369f1cb5e61f9b604c",
-      "feature_id": "win-web-ai-citation-logo-resilience-v1",
-      "action": "transitioned",
-      "actor": "codex-root",
-      "reason": "npm run typecheck、lint、build、test:user-browser 及 scripts/validate-win-web-ai.ps1 全部通过；专项来源卡、富内容和 Google 提取器测试通过。",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1787438978832
-    },
-    {
       "id": "feature_event_55d2b203bf3745249963adbaec04cdd6",
       "feature_id": "win-web-ai-citation-logo-resilience-v1",
       "action": "transitioned",
@@ -14429,6 +14426,66 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1788044066061
+    },
+    {
+      "id": "feature_event_77fa1f2414a6473b92fdb72c3d3b9235",
+      "feature_id": "backend-a2b2-joint-close-windows-dynamic-v1",
+      "action": "registered",
+      "actor": "codex-root",
+      "reason": "JointClose 是 A2b2 唯一剩余 family；其已验证 Unmap 前置已完成，当前冻结分母为 36。",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1788045555843
+    },
+    {
+      "id": "feature_event_5f54e2c4914345609cadc8bdc21f014b",
+      "feature_id": "backend-a2b2-joint-close-windows-dynamic-v1",
+      "action": "requirement_rebound",
+      "actor": "/root",
+      "reason": "Align main unlock uncertainty with the aggregate SHM-domain authority and make later separately accepted production activation rerun affected families instead of inheriting test seams.",
+      "from_status": "ready",
+      "to_status": "proposed",
+      "at_ms": 1788046230168
+    },
+    {
+      "id": "feature_event_8ed2d8fe739545b5ac3de1f6a565253c",
+      "feature_id": "backend-a2b2-joint-close-windows-dynamic-v1",
+      "action": "transitioned",
+      "actor": "/root",
+      "reason": "Reviewed against the aggregate A2b2 authority: main-close uncertainty quarantines only exact route/main custody, SHM domain semantics remain unchanged, and future production activation is a separate rerun-bound feature.",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1788046238598
+    },
+    {
+      "id": "feature_event_acdc174f26114025ab3a031237716669",
+      "feature_id": "backend-a2b2-joint-close-windows-dynamic-v1",
+      "action": "transitioned",
+      "actor": "/root",
+      "reason": "The reviewed JointClose authority is accepted, its Unmap dependency is verified, and the exact implementation scope is ready to claim.",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1788046270260
+    },
+    {
+      "id": "feature_event_be59498a406a49b18f2a7a1dbfa17a9f",
+      "feature_id": "backend-a2b2-joint-close-windows-dynamic-v1",
+      "action": "claimed",
+      "actor": "/root",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788046295732
+    },
+    {
+      "id": "feature_event_d1ab795928c6487285dd88e3f160335c",
+      "feature_id": "backend-a2b2-joint-close-windows-dynamic-v1",
+      "action": "transitioned",
+      "actor": "/root",
+      "reason": "Implementation begins with the canonical 36-selector schema and exact test-only native/raw close seams before the isolated runner and family reducer.",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788046311047
     }
   ]
 }
