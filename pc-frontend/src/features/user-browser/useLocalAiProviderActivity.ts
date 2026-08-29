@@ -32,15 +32,14 @@ export default function useLocalAiProviderActivity({
 }: LocalAiProviderActivityOptions): Record<string, LocalAiProviderActivity> {
   const providerIds = useMemo(() => providers.map((item) => item.id), [providers])
   const providerKey = providerIds.join('|')
-  const [activities, setActivities] = useState<Record<string, LocalAiProviderActivity>>({})
+  const [activities, setActivities] = useState<Record<string, LocalAiProviderActivity>>(() => (
+    initializeProviderActivities(providerIds, ownerKey)
+  ))
   const activitiesRef = useRef(activities)
   activitiesRef.current = activities
 
   useEffect(() => {
-    const initial = Object.fromEntries(providerIds.map((providerId) => [
-      providerId,
-      initializeLocalAiProviderActivity(getCachedLocalAiWebSessionState(providerId, ownerKey)),
-    ]))
+    const initial = initializeProviderActivities(providerIds, ownerKey)
     activitiesRef.current = initial
     setActivities(initial)
   }, [ownerKey, providerKey])
@@ -116,6 +115,16 @@ export default function useLocalAiProviderActivity({
   }, [enabled, ownerKey, providerKey, selectedProviderId])
 
   return activities
+}
+
+function initializeProviderActivities(
+  providerIds: string[],
+  ownerKey: string,
+): Record<string, LocalAiProviderActivity> {
+  return Object.fromEntries(providerIds.map((providerId) => [
+    providerId,
+    initializeLocalAiProviderActivity(getCachedLocalAiWebSessionState(providerId, ownerKey)),
+  ]))
 }
 
 function updateActivity(

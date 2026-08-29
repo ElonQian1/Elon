@@ -1,0 +1,55 @@
+.surface {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 32px;
+  color: #f1f5f9;
+  background: #101214;
+}
+
+.card {
+  width: min(520px, 100%);
+  padding: 28px;
+  border: 1px solid #334139;
+  border-radius: 18px;
+  background: #171b1d;
+  box-shadow: 0 20px 60px rgb(0 0 0 / 35%);
+}
+
+.status {
+  color: #69d58a;
+  font-size: 13px;
+}
+
+.card h1 {
+  margin: 12px 0 8px;
+  font-size: 24px;
+}
+
+.card p {
+  margin: 0;
+  color: #aeb8c4;
+  line-height: 1.7;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.actions button {
+  min-height: 40px;
+  padding: 0 16px;
+  border: 1px solid #3b4d43;
+  border-radius: 10px;
+  color: #f6fff8;
+  background: #214c32;
+  cursor: pointer;
+}
+
+.actions button:last-child {
+  color: #d8dee8;
+  background: #252a2e;
+}

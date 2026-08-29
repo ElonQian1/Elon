@@ -145,35 +145,36 @@ export default function AiWebChatSidebar({ web }: { web: AiWebChatBackend }) {
       <div className={styles.providerPane}>
         <div className={styles.heading}>聊天来源</div>
         <div className={styles.providerTabs} role="tablist" aria-label="网页 AI 来源">
-          {web.providers.map((provider) => (
-            <button
-              className={styles.provider}
-              data-active={provider.id === web.provider?.id}
-              key={provider.id}
-              type="button"
-              role="tab"
-              aria-selected={provider.id === web.provider?.id}
-              onClick={() => web.selectProvider(provider.id)}
-            >
-              <span className={styles.logo}>{provider.id === 'chatgpt' ? '◎' : 'G'}</span>
-              <span className={styles.providerLabel}>
-                <strong>{provider.id === 'chatgpt' ? 'ChatGPT' : 'Google AI'}</strong>
-                {web.providerActivities[provider.id]?.label && (
-                  <small data-phase={web.providerActivities[provider.id].phase}>
-                    {web.providerActivities[provider.id].label}
-                  </small>
+          {web.providers.map((provider) => {
+            const activity = web.providerActivities[provider.id]
+            return (
+              <button
+                className={styles.provider}
+                data-active={provider.id === web.provider?.id}
+                key={provider.id}
+                type="button"
+                role="tab"
+                aria-selected={provider.id === web.provider?.id}
+                onClick={() => web.selectProvider(provider.id)}
+              >
+                <span className={styles.logo}>{provider.id === 'chatgpt' ? '◎' : 'G'}</span>
+                <span className={styles.providerLabel}>
+                  <strong>{provider.id === 'chatgpt' ? 'ChatGPT' : 'Google AI'}</strong>
+                  {activity?.label && (
+                    <small data-phase={activity.phase}>{activity.label}</small>
+                  )}
+                </span>
+                {activity && activity.phase !== 'idle' && (
+                  <i
+                    className={styles.providerActivity}
+                    data-phase={activity.phase}
+                    aria-label={activity.label}
+                    title={activity.label}
+                  />
                 )}
-              </span>
-              {web.providerActivities[provider.id]?.phase !== 'idle' && (
-                <i
-                  className={styles.providerActivity}
-                  data-phase={web.providerActivities[provider.id].phase}
-                  aria-label={web.providerActivities[provider.id].label}
-                  title={web.providerActivities[provider.id].label}
-                />
-              )}
-            </button>
-          ))}
+              </button>
+            )
+          })}
         </div>
         {web.provider?.id === 'chatgpt' ? (
           <nav className={styles.directory} aria-label="ChatGPT 网页聊天项目与会话">
