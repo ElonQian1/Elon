@@ -328,7 +328,8 @@ fn observe_dms(
         ManagedSqliteShmTestDmsCustody::Absent => Ok(RegistrationShutdownDmsCustody::Absent),
         ManagedSqliteShmTestDmsCustody::Shared => Ok(RegistrationShutdownDmsCustody::Shared),
         ManagedSqliteShmTestDmsCustody::Released => Ok(RegistrationShutdownDmsCustody::Released),
-        ManagedSqliteShmTestDmsCustody::ExclusiveOutcomeUncertain => {
+        ManagedSqliteShmTestDmsCustody::SharedOutcomeUncertain
+        | ManagedSqliteShmTestDmsCustody::ExclusiveOutcomeUncertain => {
             Ok(RegistrationShutdownDmsCustody::OutcomeUncertain)
         }
         ManagedSqliteShmTestDmsCustody::ExclusiveKnown => Err(anyhow!(

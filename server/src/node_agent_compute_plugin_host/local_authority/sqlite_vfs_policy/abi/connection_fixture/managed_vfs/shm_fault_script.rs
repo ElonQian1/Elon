@@ -23,6 +23,9 @@ use crate::node_agent_managed_fs::{
 
 use super::ManagedTestRouteOrdinal;
 
+#[cfg(all(test, windows))]
+mod unmap_authority;
+
 const MAX_SHM_FAULT_STEPS: usize = 32;
 
 #[derive(Clone, Copy, PartialEq, Eq)]

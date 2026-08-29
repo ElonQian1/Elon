@@ -44,6 +44,8 @@ use super::{
     namespace::PlatformParentRelativeObservation, PlatformFileIdentity,
     PlatformNamespaceDurabilityReceipt, PlatformNamespaceFlushFailure,
 };
+#[cfg(all(test, windows))]
+use crate::node_agent_managed_fs::ManagedSqliteShmTestUnmapNativeObservation;
 
 #[path = "windows_extraction_loader_directory.rs"]
 mod extraction_loader_directory;
@@ -63,9 +65,48 @@ pub(super) use sqlite::{
     write_sqlite_file_at, PlatformManagedSqliteCloseCustody, PlatformManagedSqliteCloseFailure,
     PlatformManagedSqliteOpen,
 };
+#[cfg(all(test, windows))]
+pub(super) use sqlite::{
+    close_sqlite_file_for_test_native, PlatformManagedSqliteCloseTestNative,
+    PlatformManagedSqliteCloseTestNativeResult,
+};
+#[cfg(all(test, windows))]
+pub(super) use sqlite_locking::unlock_sqlite_byte_range_outcome_uncertain_for_test;
 pub(super) use sqlite_locking::{try_lock_sqlite_byte_range, unlock_sqlite_byte_range};
 
 const MAX_FINAL_PATH_UTF16: usize = 32_768;
+
+#[cfg(all(test, windows))]
+#[derive(Debug)]
+struct PlatformManagedSqliteNativeReturnReceiptUnavailable {
+    operation: &'static str,
+}
+
+#[cfg(all(test, windows))]
+impl std::fmt::Display for PlatformManagedSqliteNativeReturnReceiptUnavailable {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            formatter,
+            "NODE_MANAGED_SQLITE_NATIVE_RETURN_RECEIPT_UNAVAILABLE:{}",
+            self.operation
+        )
+    }
+}
+
+#[cfg(all(test, windows))]
+impl std::error::Error for PlatformManagedSqliteNativeReturnReceiptUnavailable {}
+
+/// Typed transport error used only after an exact native call whose return value was deliberately
+/// not observed. Classification comes from the test-native receipt, never from this error.
+#[cfg(all(test, windows))]
+pub(super) fn test_native_return_receipt_unavailable_error(
+    operation: &'static str,
+) -> std::io::Error {
+    std::io::Error::new(
+        std::io::ErrorKind::Other,
+        PlatformManagedSqliteNativeReturnReceiptUnavailable { operation },
+    )
+}
 
 /// The configured namespace is used only to acquire the first volume-root handle. Every child
 /// below it is opened relative to its already pinned parent handle.
@@ -217,6 +258,79 @@ pub(super) fn delete_by_handle(file: &File) -> std::io::Result<()> {
         return Err(std::io::Error::last_os_error());
     }
     Ok(())
+}
+
+#[cfg(all(test, windows))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum PlatformManagedSqliteDeleteTestNative {
+    Retryable,
+    OutcomeUncertain,
+}
+
+#[cfg(all(test, windows))]
+pub(super) struct PlatformManagedSqliteDeleteTestNativeResult {
+    pub(super) result: std::io::Result<()>,
+    pub(super) observation: Option<ManagedSqliteShmTestUnmapNativeObservation>,
+}
+
+/// Narrow exact-SHM test adapter colocated with the real SetFileInformationByHandle boundary.
+#[cfg(all(test, windows))]
+pub(super) fn delete_by_handle_for_test_native(
+    file: &File,
+    native: PlatformManagedSqliteDeleteTestNative,
+) -> PlatformManagedSqliteDeleteTestNativeResult {
+    if native == PlatformManagedSqliteDeleteTestNative::Retryable {
+        let disposition = FILE_DISPOSITION_INFO_EX {
+            Flags: FILE_DISPOSITION_FLAG_DELETE
+                | FILE_DISPOSITION_FLAG_POSIX_SEMANTICS
+                | FILE_DISPOSITION_FLAG_IGNORE_READONLY_ATTRIBUTE,
+        };
+        // SAFETY: this is the exact live DELETE-capable SHM handle and production information
+        // class. A zero buffer length is the one-shot test adapter: Windows must reject it before
+        // consuming the disposition, yielding a real retryable native failure without mutation.
+        let deleted = unsafe {
+            SetFileInformationByHandle(
+                file.as_raw_handle() as HANDLE,
+                FileDispositionInfoEx,
+                (&disposition as *const FILE_DISPOSITION_INFO_EX).cast(),
+                0,
+            )
+        };
+        let (result, observation) = if deleted == 0 {
+            (
+                Err(std::io::Error::last_os_error()),
+                Some(ManagedSqliteShmTestUnmapNativeObservation::NativeFailureObserved),
+            )
+        } else {
+            (Ok(()), None)
+        };
+        return PlatformManagedSqliteDeleteTestNativeResult {
+            result,
+            observation,
+        };
+    }
+    let disposition = FILE_DISPOSITION_INFO_EX {
+        Flags: FILE_DISPOSITION_FLAG_DELETE
+            | FILE_DISPOSITION_FLAG_POSIX_SEMANTICS
+            | FILE_DISPOSITION_FLAG_IGNORE_READONLY_ATTRIBUTE,
+    };
+    // SAFETY: this is the exact live DELETE-capable SHM handle and the same information class,
+    // buffer, and flags as production. The adapter intentionally discards the native return value,
+    // so it cannot relabel known success or known failure as an uncertain outcome.
+    unsafe {
+        SetFileInformationByHandle(
+            file.as_raw_handle() as HANDLE,
+            FileDispositionInfoEx,
+            (&disposition as *const FILE_DISPOSITION_INFO_EX).cast(),
+            size_of::<FILE_DISPOSITION_INFO_EX>() as u32,
+        );
+    }
+    PlatformManagedSqliteDeleteTestNativeResult {
+        result: Err(test_native_return_receipt_unavailable_error(
+            "SetFileInformationByHandle(FileDispositionInfoEx)",
+        )),
+        observation: Some(ManagedSqliteShmTestUnmapNativeObservation::ReturnReceiptUnavailable),
+    }
 }
 
 /// Flushes directory data, metadata, and the underlying storage cache synchronously.

@@ -34,6 +34,9 @@ mod test_snapshot;
 #[cfg(test)]
 #[path = "sqlite_namespace_shm/test_support.rs"]
 mod test_support;
+#[cfg(all(test, windows))]
+#[path = "sqlite_namespace_shm/test_unmap_runtime.rs"]
+mod test_unmap_runtime;
 #[path = "sqlite_namespace_shm/types.rs"]
 mod types;
 #[path = "sqlite_namespace_shm/unmap.rs"]
@@ -107,6 +110,34 @@ impl PinnedManagedSqliteNamespace {
     fn delete_shm_for_wal(&self) -> Result<ManagedSqliteDeleteOutcome, ManagedSqliteDeleteFailure> {
         self.delete_exact(ManagedSqliteFileKind::Shm, false)
     }
+
+    #[cfg(all(test, windows))]
+    fn delete_shm_for_wal_with_test_native(
+        &self,
+        operation: test_unmap_runtime::ManagedSqliteShmTestUnmapNativeOperation,
+        before_native: impl FnOnce() -> std::io::Result<()>,
+        after_native: impl FnOnce(
+            test_unmap_runtime::ManagedSqliteShmTestUnmapNativeObservation,
+        ) -> std::io::Result<()>,
+    ) -> Result<ManagedSqliteDeleteOutcome, ManagedSqliteDeleteFailure> {
+        let native = match operation {
+            test_unmap_runtime::ManagedSqliteShmTestUnmapNativeOperation::ExactSiblingDeleteRetryable => {
+                super::platform::PlatformManagedSqliteDeleteTestNative::Retryable
+            }
+            test_unmap_runtime::ManagedSqliteShmTestUnmapNativeOperation::ExactSiblingDeleteOutcomeUncertain => {
+                super::platform::PlatformManagedSqliteDeleteTestNative::OutcomeUncertain
+            }
+            _ => unreachable!("validated exact-delete native operation"),
+        };
+        self.delete_exact_with(ManagedSqliteFileKind::Shm, false, |file| {
+            before_native()?;
+            let native_result = super::platform::delete_by_handle_for_test_native(file, native);
+            if let Some(observation) = native_result.observation {
+                after_native(observation)?;
+            }
+            native_result.result
+        })
+    }
 }
 
 pub(crate) use close::{
@@ -127,6 +158,14 @@ pub(crate) use test_faults::{
 pub(crate) use test_snapshot::{
     ManagedSqliteShmTestDmsCustody, ManagedSqliteShmTestTargetSnapshot,
     ManagedSqliteShmTestTopologySnapshot,
+};
+#[cfg(all(test, windows))]
+pub(crate) use test_unmap_runtime::{
+    ManagedSqliteShmTestUnmapActionEvent, ManagedSqliteShmTestUnmapActionOutcome,
+    ManagedSqliteShmTestUnmapDeleteAuthorityReceipt, ManagedSqliteShmTestUnmapDeletePrestate,
+    ManagedSqliteShmTestUnmapDeletePrestateReceipt, ManagedSqliteShmTestUnmapNativeObservation,
+    ManagedSqliteShmTestUnmapNativeOperation, ManagedSqliteShmTestUnmapNativeReceipt,
+    ManagedSqliteShmTestUnmapNativeTiming, ManagedSqliteShmTestUnmapReceipt,
 };
 pub(crate) use types::{
     ManagedSqliteShmBudget, ManagedSqliteShmFailure, ManagedSqliteShmFailureClass,

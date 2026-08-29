@@ -8,7 +8,12 @@ use windows_sys::Win32::{
     System::IO::{OVERLAPPED, OVERLAPPED_0, OVERLAPPED_0_0},
 };
 
+#[cfg(all(test, windows))]
+use crate::node_agent_managed_fs::ManagedSqliteShmTestUnmapNativeObservation;
 use crate::node_agent_managed_fs::PlatformManagedSqliteLockAttempt;
+
+#[cfg(all(test, windows))]
+use super::test_native_return_receipt_unavailable_error;
 
 pub(in crate::node_agent_managed_fs) fn try_lock_sqlite_byte_range(
     file: &File,
@@ -64,6 +69,36 @@ pub(in crate::node_agent_managed_fs) fn unlock_sqlite_byte_range(
         return Err(std::io::Error::last_os_error());
     }
     Ok(())
+}
+
+/// Executes the real UnlockFileEx call once without inspecting its return receipt.
+#[cfg(all(test, windows))]
+pub(in crate::node_agent_managed_fs) fn unlock_sqlite_byte_range_outcome_uncertain_for_test(
+    file: &File,
+    offset: u64,
+    length: u64,
+) -> (
+    std::io::Result<()>,
+    Option<ManagedSqliteShmTestUnmapNativeObservation>,
+) {
+    let mut overlapped = overlapped_at(offset);
+    // SAFETY: this exact range is held by the live SHM node. The return value is intentionally
+    // discarded, so the adapter never relabels known success or known failure as uncertain.
+    unsafe {
+        UnlockFileEx(
+            file.as_raw_handle() as HANDLE,
+            0,
+            length as u32,
+            (length >> 32) as u32,
+            &mut overlapped,
+        );
+    }
+    (
+        Err(test_native_return_receipt_unavailable_error(
+            "UnlockFileEx(SQLite SHM DMS)",
+        )),
+        Some(ManagedSqliteShmTestUnmapNativeObservation::ReturnReceiptUnavailable),
+    )
 }
 
 fn overlapped_at(offset: u64) -> OVERLAPPED {

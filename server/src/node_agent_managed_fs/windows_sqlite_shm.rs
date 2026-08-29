@@ -7,6 +7,8 @@ use std::{
     sync::OnceLock,
 };
 
+#[cfg(all(test, windows))]
+use crate::node_agent_managed_fs::ManagedSqliteShmTestUnmapNativeObservation;
 use windows_sys::Win32::{
     Foundation::{CloseHandle, HANDLE},
     System::{
@@ -17,6 +19,9 @@ use windows_sys::Win32::{
         SystemInformation::{GetSystemInfo, SYSTEM_INFO},
     },
 };
+
+#[cfg(all(test, windows))]
+use super::super::platform::test_native_return_receipt_unavailable_error;
 
 static ALLOCATION_GRANULARITY: OnceLock<u64> = OnceLock::new();
 
@@ -159,6 +164,37 @@ impl OwnedSqliteShmView {
         self.address.Value = ptr::null_mut();
         Ok(())
     }
+
+    /// Executes the real Windows boundary once without inspecting its return receipt. This is
+    /// scoped to the exact-target Unmap harness and deliberately leaves terminal uncertain custody.
+    #[cfg(all(test, windows))]
+    pub(super) fn unmap_explicit_outcome_uncertain_for_test(
+        &mut self,
+    ) -> (
+        io::Result<()>,
+        Option<ManagedSqliteShmTestUnmapNativeObservation>,
+    ) {
+        if self.outcome_uncertain || self.address.Value.is_null() {
+            return (
+                Err(io::Error::other(
+                    "NODE_MANAGED_SQLITE_SHM_VIEW_UNMAP_TEST_NATIVE_TARGET_INVALID",
+                )),
+                None,
+            );
+        }
+        // SAFETY: this is the exact aligned base returned by MapViewOfFile. The native return is
+        // intentionally discarded, so no known success/failure is relabeled as uncertain.
+        unsafe {
+            UnmapViewOfFile(self.address);
+        }
+        self.outcome_uncertain = true;
+        (
+            Err(test_native_return_receipt_unavailable_error(
+                "UnmapViewOfFile(SQLite SHM view)",
+            )),
+            Some(ManagedSqliteShmTestUnmapNativeObservation::ReturnReceiptUnavailable),
+        )
+    }
 }
 
 impl OwnedSqliteShmMapping {
@@ -185,6 +221,36 @@ impl OwnedSqliteShmMapping {
         }
         self.handle = ptr::null_mut();
         Ok(())
+    }
+
+    /// Executes CloseHandle once without inspecting its return receipt for exact-target tests.
+    #[cfg(all(test, windows))]
+    pub(super) fn close_explicit_outcome_uncertain_for_test(
+        &mut self,
+    ) -> (
+        io::Result<()>,
+        Option<ManagedSqliteShmTestUnmapNativeObservation>,
+    ) {
+        if self.outcome_uncertain || self.handle.is_null() {
+            return (
+                Err(io::Error::other(
+                    "NODE_MANAGED_SQLITE_SHM_MAPPING_CLOSE_TEST_NATIVE_TARGET_INVALID",
+                )),
+                None,
+            );
+        }
+        // SAFETY: this is the sole CreateFileMappingW handle. The native return is deliberately
+        // discarded, preserving epistemic uncertainty instead of relabeling a known result.
+        unsafe {
+            CloseHandle(self.handle);
+        }
+        self.outcome_uncertain = true;
+        (
+            Err(test_native_return_receipt_unavailable_error(
+                "CloseHandle(SQLite SHM mapping)",
+            )),
+            Some(ManagedSqliteShmTestUnmapNativeObservation::ReturnReceiptUnavailable),
+        )
     }
 }
 

@@ -1,4 +1,4 @@
-//! Process-isolated Windows runners for the implemented SharedNonFinal Unmap selectors.
+//! Process-isolated Windows runners for the frozen Unmap selectors.
 
 use std::{
     fs,
@@ -10,15 +10,17 @@ use anyhow::{anyhow, Context};
 
 use super::{
     a2_dynamic_evidence::{
-        ChildLaunchIdentity, DynamicChildFailure, ValidatedParentCleanupReceipt,
-        ValidatedUnmapCandidateRecord, WindowsDynamicEnvironment, A2_DYNAMIC_CHILD_NONCE_ENV,
+        ChildLaunchIdentity, DynamicChildFailure, UnmapFamilyCohort, ValidatedChildProcessReceipt,
+        ValidatedParentCleanupReceipt, ValidatedUnmapCandidateRecord,
+        ValidatedUnmapFamilyMemberReceipt, WindowsDynamicEnvironment, A2_DYNAMIC_CHILD_NONCE_ENV,
     },
-    a2b2_cases::{validate_unmap_report_payload, UnmapSelector},
+    a2b2_cases::{validate_unmap_report_payload, UnmapSelector, ValidatedUnmapObservation},
 };
 
 mod cases;
 mod checkout;
 mod child;
+mod family;
 
 macro_rules! unmap_case {
     ($test:ident, $exact:ident, $selector:ident) => {
@@ -84,6 +86,13 @@ unmap_case!(
     SHARED_DELETE_SUCCESS,
     SharedDeleteSuccess
 );
+include!("a2c_unmap_runner/final_tests.rs");
+
+#[test]
+fn unmap_windows_dynamic_family_49() -> anyhow::Result<()> {
+    family::run()
+}
+
 fn run_isolated_case(exact_test: &'static str, selector: UnmapSelector) -> anyhow::Result<()> {
     if let Some(root) = child::selected_child_root()? {
         return child::exercise_child(&root, selector);
@@ -93,6 +102,64 @@ fn run_isolated_case(exact_test: &'static str, selector: UnmapSelector) -> anyho
 
 fn run_parent(exact_test: &'static str, selector: UnmapSelector) -> anyhow::Result<()> {
     let executable = std::env::current_exe().context("resolve current Unmap test executable")?;
+    let record = capture_parent_case(
+        &executable,
+        exact_test,
+        selector,
+        |observation, environment, child, cleanup| {
+            ValidatedUnmapCandidateRecord::validate(observation, environment, child, cleanup)
+                .map_err(anyhow::Error::msg)
+        },
+    )?;
+    let report = record.report();
+    if report.case_selector() != selector.report_name() || !report.parent_cleanup_deleted() {
+        return Err(anyhow!("Unmap evidence report binding changed"));
+    }
+    checkout::verify_exact_clean_checkout(report.git_sha())?;
+    println!(
+        "A2_UNMAP_IMPLEMENTATION_CANDIDATE_V1 case={} commit={} target={} child_exit={} parent_cleanup=deleted actual_commitment={}",
+        report.case_selector(),
+        report.git_sha(),
+        report.target(),
+        report.child_exit_code(),
+        report.actual_payload_commitment(),
+    );
+    Ok(())
+}
+
+pub(super) fn capture_family_member(
+    executable: &Path,
+    case: cases::ExactUnmapCase,
+    cohort: &UnmapFamilyCohort,
+) -> anyhow::Result<ValidatedUnmapFamilyMemberReceipt> {
+    capture_parent_case(
+        executable,
+        case.exact_test,
+        case.selector,
+        |observation, environment, child, cleanup| {
+            ValidatedUnmapFamilyMemberReceipt::validate(
+                observation,
+                environment,
+                child,
+                cleanup,
+                cohort,
+            )
+            .map_err(anyhow::Error::msg)
+        },
+    )
+}
+
+fn capture_parent_case<T>(
+    executable: &Path,
+    exact_test: &'static str,
+    selector: UnmapSelector,
+    validate: impl FnOnce(
+        ValidatedUnmapObservation,
+        WindowsDynamicEnvironment,
+        ValidatedChildProcessReceipt,
+        ValidatedParentCleanupReceipt,
+    ) -> anyhow::Result<T>,
+) -> anyhow::Result<T> {
     let root = create_private_child_root(selector)?;
     let launch = ChildLaunchIdentity::new();
     let spawned = match Command::new(executable)
@@ -125,26 +192,10 @@ fn run_parent(exact_test: &'static str, selector: UnmapSelector) -> anyhow::Resu
             WindowsDynamicEnvironment::capture(&root, &child).map_err(anyhow::Error::msg)?;
         let cleanup = ValidatedParentCleanupReceipt::remove_after_child_exit(&child, &environment)
             .map_err(anyhow::Error::msg)?;
-        let record =
-            ValidatedUnmapCandidateRecord::validate(observation, environment, child, cleanup)
-                .map_err(anyhow::Error::msg)?;
-        let report = record.report();
-        if report.case_selector() != selector.report_name() || !report.parent_cleanup_deleted() {
-            return Err(anyhow!("Unmap evidence report binding changed"));
-        }
-        checkout::verify_exact_clean_checkout(report.git_sha())?;
-        println!(
-            "A2_UNMAP_IMPLEMENTATION_CANDIDATE_V1 case={} commit={} target={} child_exit={} parent_cleanup=deleted actual_commitment={}",
-            report.case_selector(),
-            report.git_sha(),
-            report.target(),
-            report.child_exit_code(),
-            report.actual_payload_commitment(),
-        );
-        Ok(())
+        validate(observation, environment, child, cleanup)
     })();
     match result {
-        Ok(()) => Ok(()),
+        Ok(value) => Ok(value),
         Err(error) => Err(cleanup_failed_case(&root, error)),
     }
 }

@@ -1,46 +1,290 @@
-//! Fixed libtest selectors for the implemented SharedNonFinal Unmap slice.
+//! Fixed libtest selectors for the frozen Unmap family.
 
-macro_rules! exact_case {
-    ($name:ident, $test:literal) => {
-        pub(super) const $name: &str = concat!(
-            "node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::abi::connection_fixture::managed_vfs::a2c_unmap_runner::",
-            $test
-        );
+use super::super::a2b2_cases::UnmapSelector;
+
+#[derive(Clone, Copy)]
+pub(super) struct ExactUnmapCase {
+    pub(super) selector: UnmapSelector,
+    pub(super) exact_test: &'static str,
+}
+
+macro_rules! exact_cases {
+    ($(($name:ident, $selector:ident, $test:literal)),+ $(,)?) => {
+        $(
+            pub(super) const $name: &str = concat!(
+                "node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::abi::connection_fixture::managed_vfs::a2c_unmap_runner::",
+                $test
+            );
+        )+
+
+        pub(super) const ALL: [ExactUnmapCase; UnmapSelector::ALL.len()] = [
+            $(ExactUnmapCase {
+                selector: UnmapSelector::$selector,
+                exact_test: $name,
+            }),+
+        ];
     };
 }
 
-exact_case!(
-    SHARED_DELETE_REQUEST_VALIDATION,
-    "unmap_shared_delete_request_validation"
+exact_cases!(
+    (
+        SHARED_DELETE_REQUEST_VALIDATION,
+        SharedDeleteRequestValidation,
+        "unmap_shared_delete_request_validation"
+    ),
+    (
+        SHARED_KEEP_CALLBACK_ADMISSION,
+        SharedKeepCallbackAdmission,
+        "unmap_shared_keep_callback_admission"
+    ),
+    (
+        SHARED_KEEP_CALLBACK_WRAPPER_BEFORE,
+        SharedKeepCallbackWrapperBefore,
+        "unmap_shared_keep_callback_wrapper_before"
+    ),
+    (
+        SHARED_KEEP_HELD_SHARED_LOCK,
+        SharedKeepHeldSharedLock,
+        "unmap_shared_keep_held_shared_lock"
+    ),
+    (
+        SHARED_KEEP_HELD_EXCLUSIVE_LOCK,
+        SharedKeepHeldExclusiveLock,
+        "unmap_shared_keep_held_exclusive_lock"
+    ),
+    (
+        SHARED_KEEP_DETACH_BEFORE,
+        SharedKeepDetachBefore,
+        "unmap_shared_keep_detach_before"
+    ),
+    (
+        SHARED_KEEP_DETACH_AFTER_KNOWN,
+        SharedKeepDetachAfterKnown,
+        "unmap_shared_keep_detach_after_known"
+    ),
+    (
+        SHARED_KEEP_DETACH_AFTER_UNCERTAIN,
+        SharedKeepDetachAfterUncertain,
+        "unmap_shared_keep_detach_after_uncertain"
+    ),
+    (
+        SHARED_KEEP_COMPLETION_NATIVE_UNCERTAIN,
+        SharedKeepCompletionNativeUncertain,
+        "unmap_shared_keep_completion_native_uncertain"
+    ),
+    (
+        SHARED_KEEP_SUCCESS,
+        SharedKeepSuccess,
+        "unmap_shared_keep_success"
+    ),
+    (
+        SHARED_DELETE_SUCCESS,
+        SharedDeleteSuccess,
+        "unmap_shared_delete_success"
+    ),
+    (
+        FINAL_KEEP_VIEW_UNMAP_BEFORE,
+        FinalKeepViewUnmapBefore,
+        "unmap_final_keep_view_unmap_before"
+    ),
+    (
+        FINAL_KEEP_VIEW_UNMAP_NATIVE_UNCERTAIN,
+        FinalKeepViewUnmapNativeUncertain,
+        "unmap_final_keep_view_unmap_native_uncertain"
+    ),
+    (
+        FINAL_KEEP_VIEW_UNMAP_AFTER_KNOWN,
+        FinalKeepViewUnmapAfterKnown,
+        "unmap_final_keep_view_unmap_after_known"
+    ),
+    (
+        FINAL_KEEP_VIEW_UNMAP_AFTER_UNCERTAIN,
+        FinalKeepViewUnmapAfterUncertain,
+        "unmap_final_keep_view_unmap_after_uncertain"
+    ),
+    (
+        FINAL_KEEP_MAPPING_CLOSE_BEFORE,
+        FinalKeepMappingCloseBefore,
+        "unmap_final_keep_mapping_close_before"
+    ),
+    (
+        FINAL_KEEP_MAPPING_CLOSE_NATIVE_UNCERTAIN,
+        FinalKeepMappingCloseNativeUncertain,
+        "unmap_final_keep_mapping_close_native_uncertain"
+    ),
+    (
+        FINAL_KEEP_MAPPING_CLOSE_AFTER_KNOWN,
+        FinalKeepMappingCloseAfterKnown,
+        "unmap_final_keep_mapping_close_after_known"
+    ),
+    (
+        FINAL_KEEP_MAPPING_CLOSE_AFTER_UNCERTAIN,
+        FinalKeepMappingCloseAfterUncertain,
+        "unmap_final_keep_mapping_close_after_uncertain"
+    ),
+    (
+        FINAL_KEEP_DMS_RELEASE_BEFORE,
+        FinalKeepDmsReleaseBefore,
+        "unmap_final_keep_dms_release_before"
+    ),
+    (
+        FINAL_KEEP_DMS_RELEASE_NATIVE_UNCERTAIN,
+        FinalKeepDmsReleaseNativeUncertain,
+        "unmap_final_keep_dms_release_native_uncertain"
+    ),
+    (
+        FINAL_KEEP_DMS_RELEASE_AFTER_KNOWN,
+        FinalKeepDmsReleaseAfterKnown,
+        "unmap_final_keep_dms_release_after_known"
+    ),
+    (
+        FINAL_KEEP_DMS_RELEASE_AFTER_UNCERTAIN,
+        FinalKeepDmsReleaseAfterUncertain,
+        "unmap_final_keep_dms_release_after_uncertain"
+    ),
+    (
+        FINAL_KEEP_FILE_CLOSE_BEFORE,
+        FinalKeepFileCloseBefore,
+        "unmap_final_keep_file_close_before"
+    ),
+    (
+        FINAL_KEEP_FILE_CLOSE_NATIVE_RETRYABLE,
+        FinalKeepFileCloseNativeRetryable,
+        "unmap_final_keep_file_close_native_retryable"
+    ),
+    (
+        FINAL_KEEP_FILE_CLOSE_NATIVE_UNCERTAIN,
+        FinalKeepFileCloseNativeUncertain,
+        "unmap_final_keep_file_close_native_uncertain"
+    ),
+    (
+        FINAL_KEEP_FILE_CLOSE_AFTER_KNOWN,
+        FinalKeepFileCloseAfterKnown,
+        "unmap_final_keep_file_close_after_known"
+    ),
+    (
+        FINAL_KEEP_FILE_CLOSE_AFTER_UNCERTAIN,
+        FinalKeepFileCloseAfterUncertain,
+        "unmap_final_keep_file_close_after_uncertain"
+    ),
+    (
+        FINAL_KEEP_DETACH_BEFORE,
+        FinalKeepDetachBefore,
+        "unmap_final_keep_detach_before"
+    ),
+    (
+        FINAL_KEEP_DETACH_AFTER_KNOWN,
+        FinalKeepDetachAfterKnown,
+        "unmap_final_keep_detach_after_known"
+    ),
+    (
+        FINAL_KEEP_DETACH_AFTER_UNCERTAIN,
+        FinalKeepDetachAfterUncertain,
+        "unmap_final_keep_detach_after_uncertain"
+    ),
+    (
+        FINAL_KEEP_COMPLETION_NATIVE_UNCERTAIN,
+        FinalKeepCompletionNativeUncertain,
+        "unmap_final_keep_completion_native_uncertain"
+    ),
+    (
+        FINAL_KEEP_SUCCESS_LIVE_NODE,
+        FinalKeepSuccessLiveNode,
+        "unmap_final_keep_success_live_node"
+    ),
+    (
+        FINAL_KEEP_SUCCESS_NODE_ABSENT,
+        FinalKeepSuccessNodeAbsent,
+        "unmap_final_keep_success_node_absent"
+    ),
+    (
+        FINAL_DELETE_AUTH_MAIN_IDENTITY_MISSING,
+        FinalDeleteAuthMainIdentityMissing,
+        "unmap_final_delete_auth_main_identity_missing"
+    ),
+    (
+        FINAL_DELETE_AUTH_MAIN_OR_GENERATION_MISMATCH,
+        FinalDeleteAuthMainOrGenerationMismatch,
+        "unmap_final_delete_auth_main_or_generation_mismatch"
+    ),
+    (
+        FINAL_DELETE_AUTH_MAIN_NOT_EXCLUSIVE,
+        FinalDeleteAuthMainNotExclusive,
+        "unmap_final_delete_auth_main_not_exclusive"
+    ),
+    (
+        FINAL_DELETE_AUTH_LOCK_STATE_UNCERTAIN,
+        FinalDeleteAuthLockStateUncertain,
+        "unmap_final_delete_auth_lock_state_uncertain"
+    ),
+    (
+        FINAL_DELETE_SIBLING_BEFORE,
+        FinalDeleteSiblingBefore,
+        "unmap_final_delete_sibling_before"
+    ),
+    (
+        FINAL_DELETE_SIBLING_NATIVE_RETRYABLE,
+        FinalDeleteSiblingNativeRetryable,
+        "unmap_final_delete_sibling_native_retryable"
+    ),
+    (
+        FINAL_DELETE_SIBLING_NATIVE_UNCERTAIN,
+        FinalDeleteSiblingNativeUncertain,
+        "unmap_final_delete_sibling_native_uncertain"
+    ),
+    (
+        FINAL_DELETE_SIBLING_AFTER_KNOWN,
+        FinalDeleteSiblingAfterKnown,
+        "unmap_final_delete_sibling_after_known"
+    ),
+    (
+        FINAL_DELETE_SIBLING_AFTER_UNCERTAIN,
+        FinalDeleteSiblingAfterUncertain,
+        "unmap_final_delete_sibling_after_uncertain"
+    ),
+    (
+        FINAL_DELETE_DETACH_BEFORE,
+        FinalDeleteDetachBefore,
+        "unmap_final_delete_detach_before"
+    ),
+    (
+        FINAL_DELETE_DETACH_AFTER_KNOWN,
+        FinalDeleteDetachAfterKnown,
+        "unmap_final_delete_detach_after_known"
+    ),
+    (
+        FINAL_DELETE_DETACH_AFTER_UNCERTAIN,
+        FinalDeleteDetachAfterUncertain,
+        "unmap_final_delete_detach_after_uncertain"
+    ),
+    (
+        FINAL_DELETE_COMPLETION_NATIVE_UNCERTAIN,
+        FinalDeleteCompletionNativeUncertain,
+        "unmap_final_delete_completion_native_uncertain"
+    ),
+    (
+        FINAL_DELETE_SUCCESS_DELETED,
+        FinalDeleteSuccessDeleted,
+        "unmap_final_delete_success_deleted"
+    ),
+    (
+        FINAL_DELETE_SUCCESS_NOT_FOUND,
+        FinalDeleteSuccessNotFound,
+        "unmap_final_delete_success_not_found"
+    ),
 );
-exact_case!(
-    SHARED_KEEP_CALLBACK_ADMISSION,
-    "unmap_shared_keep_callback_admission"
-);
-exact_case!(
-    SHARED_KEEP_CALLBACK_WRAPPER_BEFORE,
-    "unmap_shared_keep_callback_wrapper_before"
-);
-exact_case!(
-    SHARED_KEEP_HELD_SHARED_LOCK,
-    "unmap_shared_keep_held_shared_lock"
-);
-exact_case!(
-    SHARED_KEEP_HELD_EXCLUSIVE_LOCK,
-    "unmap_shared_keep_held_exclusive_lock"
-);
-exact_case!(SHARED_KEEP_DETACH_BEFORE, "unmap_shared_keep_detach_before");
-exact_case!(
-    SHARED_KEEP_DETACH_AFTER_KNOWN,
-    "unmap_shared_keep_detach_after_known"
-);
-exact_case!(
-    SHARED_KEEP_DETACH_AFTER_UNCERTAIN,
-    "unmap_shared_keep_detach_after_uncertain"
-);
-exact_case!(
-    SHARED_KEEP_COMPLETION_NATIVE_UNCERTAIN,
-    "unmap_shared_keep_completion_native_uncertain"
-);
-exact_case!(SHARED_KEEP_SUCCESS, "unmap_shared_keep_success");
-exact_case!(SHARED_DELETE_SUCCESS, "unmap_shared_delete_success");
+
+pub(super) fn validate_all() -> Result<(), &'static str> {
+    for (index, case) in ALL.iter().enumerate() {
+        if case.selector != UnmapSelector::ALL[index] {
+            return Err("A2_UNMAP_FAMILY_CASE_ORDER_MISMATCH");
+        }
+        if ALL[..index]
+            .iter()
+            .any(|prior| prior.exact_test == case.exact_test)
+        {
+            return Err("A2_UNMAP_FAMILY_EXACT_TEST_ALIAS");
+        }
+    }
+    Ok(())
+}

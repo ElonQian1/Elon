@@ -210,6 +210,20 @@ impl ManagedSqliteShmTestFaultController {
             .any(|step| step.target == target && step.phase == phase && step.ordinal == ordinal)
     }
 
+    pub(super) fn was_observed(
+        &self,
+        target: ManagedSqliteShmTestFaultTarget,
+        phase: ManagedSqliteShmFailurePhase,
+        ordinal: u32,
+    ) -> bool {
+        let Some(index) = phase_index(phase) else {
+            return false;
+        };
+        self.observed_ordinals
+            .get(&(target.generation, target.connection_id, index))
+            .is_some_and(|observed| *observed >= ordinal && ordinal != 0)
+    }
+
     pub(super) fn triggered_timing_and_class(
         &self,
         target: ManagedSqliteShmTestFaultTarget,

@@ -54,6 +54,12 @@ pub(crate) struct ManagedSqliteFileCloseFailure {
     custody: ManagedSqliteFileCloseCustody,
 }
 
+#[cfg(all(test, windows))]
+pub(crate) struct ManagedSqliteFileCloseTestNativeResult {
+    pub(crate) result: Result<ManagedSqliteFileCloseReceipt, ManagedSqliteFileCloseFailure>,
+    pub(crate) observation: Option<super::ManagedSqliteShmTestUnmapNativeObservation>,
+}
+
 #[must_use = "failed rejected-handle close retains live or terminal handle custody"]
 pub(crate) struct ManagedSqliteQuarantinedFileCloseFailure {
     error: std::io::Error,
@@ -128,6 +134,33 @@ impl PinnedManagedSqliteFile {
     pub(crate) fn close(
         self,
     ) -> Result<ManagedSqliteFileCloseReceipt, ManagedSqliteFileCloseFailure> {
+        self.close_with(platform::close_sqlite_file)
+    }
+
+    #[cfg(all(test, windows))]
+    pub(in crate::node_agent_managed_fs::sqlite_namespace) fn close_for_unmap_test_native(
+        self,
+        native: platform::PlatformManagedSqliteCloseTestNative,
+    ) -> ManagedSqliteFileCloseTestNativeResult {
+        let observation = std::cell::Cell::new(None);
+        let result = self.close_with(|file| {
+            let platform_result = platform::close_sqlite_file_for_test_native(file, native);
+            observation.set(platform_result.observation);
+            platform_result.result
+        });
+        ManagedSqliteFileCloseTestNativeResult {
+            result,
+            observation: observation.get(),
+        }
+    }
+
+    fn close_with<F>(
+        self,
+        close: F,
+    ) -> Result<ManagedSqliteFileCloseReceipt, ManagedSqliteFileCloseFailure>
+    where
+        F: FnOnce(std::fs::File) -> Result<(), platform::PlatformManagedSqliteCloseFailure>,
+    {
         let Self {
             file,
             namespace,
@@ -137,7 +170,7 @@ impl PinnedManagedSqliteFile {
             identity_digest,
             created,
         } = self;
-        match platform::close_sqlite_file(file) {
+        match close(file) {
             Ok(()) => Ok(ManagedSqliteFileCloseReceipt { kind }),
             Err(platform_failure) => {
                 let error = platform_failure.error;

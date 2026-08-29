@@ -8,6 +8,8 @@ use std::{
     },
 };
 
+#[cfg(all(test, windows))]
+use windows_sys::Win32::Foundation::{SetHandleInformation, HANDLE_FLAG_PROTECT_FROM_CLOSE};
 use windows_sys::{
     Wdk::{
         Foundation::OBJECT_ATTRIBUTES,
@@ -31,6 +33,10 @@ use windows_sys::{
 };
 
 use super::ntstatus_error;
+#[cfg(all(test, windows))]
+use super::test_native_return_receipt_unavailable_error;
+#[cfg(all(test, windows))]
+use crate::node_agent_managed_fs::ManagedSqliteShmTestUnmapNativeObservation;
 use crate::node_agent_managed_fs::{
     ManagedSqliteAccess, ManagedSqliteFileKind, ManagedSqliteOpenMode,
 };
@@ -56,6 +62,20 @@ pub(in crate::node_agent_managed_fs) enum PlatformManagedSqliteCloseCustody {
     OutcomeUncertainRawHandle(usize),
 }
 
+#[cfg(all(test, windows))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(in crate::node_agent_managed_fs) enum PlatformManagedSqliteCloseTestNative {
+    Retryable,
+    OutcomeUncertain,
+}
+
+#[cfg(all(test, windows))]
+pub(in crate::node_agent_managed_fs) struct PlatformManagedSqliteCloseTestNativeResult {
+    pub(in crate::node_agent_managed_fs) result: Result<(), PlatformManagedSqliteCloseFailure>,
+    pub(in crate::node_agent_managed_fs) observation:
+        Option<ManagedSqliteShmTestUnmapNativeObservation>,
+}
+
 pub(in crate::node_agent_managed_fs) fn close_sqlite_file(
     file: File,
 ) -> Result<(), PlatformManagedSqliteCloseFailure> {
@@ -70,6 +90,83 @@ pub(in crate::node_agent_managed_fs) fn close_sqlite_file(
         });
     }
     Ok(())
+}
+
+/// Narrow one-shot adapter at the same CloseHandle ownership boundary as production close.
+#[cfg(all(test, windows))]
+pub(in crate::node_agent_managed_fs) fn close_sqlite_file_for_test_native(
+    file: File,
+    native: PlatformManagedSqliteCloseTestNative,
+) -> PlatformManagedSqliteCloseTestNativeResult {
+    if native == PlatformManagedSqliteCloseTestNative::Retryable {
+        let raw_handle = file.as_raw_handle() as HANDLE;
+        // Protecting the exact live handle makes the immediately following real CloseHandle call
+        // fail before consuming it. The protection is removed before live custody returns.
+        if unsafe {
+            SetHandleInformation(
+                raw_handle,
+                HANDLE_FLAG_PROTECT_FROM_CLOSE,
+                HANDLE_FLAG_PROTECT_FROM_CLOSE,
+            )
+        } == 0
+        {
+            return PlatformManagedSqliteCloseTestNativeResult {
+                result: Err(PlatformManagedSqliteCloseFailure {
+                    error: std::io::Error::last_os_error(),
+                    custody: PlatformManagedSqliteCloseCustody::Unattempted(file),
+                }),
+                observation: None,
+            };
+        }
+        // SAFETY: this is the exact handle owned by `file`; PROTECT_FROM_CLOSE is expected to
+        // reject this close while preserving the handle for retryable custody.
+        let closed = unsafe { CloseHandle(raw_handle) };
+        let close_error = (closed == 0).then(std::io::Error::last_os_error);
+        if closed != 0 {
+            std::mem::forget(file);
+            return PlatformManagedSqliteCloseTestNativeResult {
+                result: Ok(()),
+                observation: None,
+            };
+        }
+        // SAFETY: the failed CloseHandle left this same protected handle live. Clearing only the
+        // protection bit restores ordinary sole-File custody.
+        if unsafe { SetHandleInformation(raw_handle, HANDLE_FLAG_PROTECT_FROM_CLOSE, 0) } == 0 {
+            let raw_handle = file.into_raw_handle();
+            return PlatformManagedSqliteCloseTestNativeResult {
+                result: Err(PlatformManagedSqliteCloseFailure {
+                    error: std::io::Error::last_os_error(),
+                    custody: PlatformManagedSqliteCloseCustody::OutcomeUncertainRawHandle(
+                        raw_handle as usize,
+                    ),
+                }),
+                observation: None,
+            };
+        }
+        return PlatformManagedSqliteCloseTestNativeResult {
+            result: Err(PlatformManagedSqliteCloseFailure {
+                error: close_error.expect("failed CloseHandle has an OS error"),
+                custody: PlatformManagedSqliteCloseCustody::Unattempted(file),
+            }),
+            observation: Some(ManagedSqliteShmTestUnmapNativeObservation::NativeFailureObserved),
+        };
+    }
+    let raw_handle = file.into_raw_handle();
+    // SAFETY: into_raw_handle transfers the only owner into this exact CloseHandle call. Its return
+    // value is intentionally discarded, so the adapter cannot first learn success/failure and then
+    // relabel that known result as uncertain.
+    unsafe {
+        CloseHandle(raw_handle as HANDLE);
+    }
+    PlatformManagedSqliteCloseTestNativeResult {
+        result: Err(PlatformManagedSqliteCloseFailure {
+            error: test_native_return_receipt_unavailable_error("CloseHandle(SQLite SHM file)"),
+            custody: PlatformManagedSqliteCloseCustody::OutcomeUncertainRawHandle(
+                raw_handle as usize,
+            ),
+        }),
+        observation: Some(ManagedSqliteShmTestUnmapNativeObservation::ReturnReceiptUnavailable),
+    }
 }
 
 pub(in crate::node_agent_managed_fs) fn open_sqlite_file_relative(

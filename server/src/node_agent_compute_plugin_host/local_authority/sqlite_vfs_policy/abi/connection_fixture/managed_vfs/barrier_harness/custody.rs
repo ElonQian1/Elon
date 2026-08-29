@@ -315,7 +315,8 @@ fn observe_dms(value: ManagedSqliteShmTestDmsCustody) -> anyhow::Result<BarrierD
         ManagedSqliteShmTestDmsCustody::Absent => Ok(BarrierDmsCustody::Absent),
         ManagedSqliteShmTestDmsCustody::Shared => Ok(BarrierDmsCustody::Shared),
         ManagedSqliteShmTestDmsCustody::Released => Ok(BarrierDmsCustody::Released),
-        ManagedSqliteShmTestDmsCustody::ExclusiveOutcomeUncertain => {
+        ManagedSqliteShmTestDmsCustody::SharedOutcomeUncertain
+        | ManagedSqliteShmTestDmsCustody::ExclusiveOutcomeUncertain => {
             Ok(BarrierDmsCustody::OutcomeUncertain)
         }
         ManagedSqliteShmTestDmsCustody::ExclusiveKnown => {

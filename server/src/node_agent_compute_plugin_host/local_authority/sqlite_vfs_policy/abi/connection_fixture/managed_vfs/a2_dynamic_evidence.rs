@@ -12,6 +12,7 @@ mod environment;
 mod record;
 #[cfg(test)]
 mod tests;
+mod unmap_family;
 
 pub(super) use child::{
     BoundDynamicChild, ChildLaunchIdentity, DynamicChildFailure, SanitizedActualPayloadCommitment,
@@ -22,4 +23,8 @@ pub(super) use environment::WindowsDynamicEnvironment;
 pub(super) use record::{
     UnmapCandidateReportView, ValidatedUnmapCandidateRecord, ValidatedWindowsDynamicRecord,
     WindowsDynamicReportView,
+};
+pub(super) use unmap_family::{
+    RenderedUnmapFamilyReport, UnmapFamilyCohort, ValidatedUnmapCleanCheckoutReceipt,
+    ValidatedUnmapFamily, ValidatedUnmapFamilyMemberReceipt,
 };

@@ -1,4 +1,4 @@
-//! Real installed-ABI executor for the eleven SharedNonFinal Unmap cases.
+//! Real installed-ABI executor for the frozen 49-case Windows Unmap family.
 
 use std::path::Path;
 
@@ -8,6 +8,7 @@ use super::a2b2_cases::{UnmapActual, UnmapActualTopology, UnmapSelector};
 use crate::node_agent_managed_fs::ManagedSqliteShmFailurePhase;
 
 mod custody;
+mod final_connection;
 mod observe;
 mod outcome;
 mod prepare;
@@ -18,6 +19,13 @@ use observe::{classify_and_count, UnmapEventSet};
 use prepare::{RetainedUnmapFixture, SELECTED, SIBLING};
 
 pub(super) fn exercise_unmap(root: &Path, selected: UnmapSelector) -> anyhow::Result<UnmapActual> {
+    if final_connection::supports(selected) {
+        return final_connection::exercise(root, selected);
+    }
+    exercise_shared_unmap(root, selected)
+}
+
+fn exercise_shared_unmap(root: &Path, selected: UnmapSelector) -> anyhow::Result<UnmapActual> {
     if !stimulus::supports_shared(selected) {
         return Err(anyhow!(
             "Unmap selector is outside this SharedNonFinal runtime batch"

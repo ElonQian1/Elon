@@ -1,6 +1,9 @@
 //! Direct, installed-ABI Unmap and SHM-lock calls for Windows dynamic evidence.
 
-use std::os::raw::c_int;
+use std::{
+    os::raw::{c_int, c_void},
+    ptr,
+};
 
 use rusqlite::ffi;
 
@@ -13,6 +16,47 @@ pub(in super::super) struct ManagedTestUnmapCallbackObservation {
     result_code: c_int,
     before: HandleBoundSqliteAbiRawSlotSnapshot,
     after: HandleBoundSqliteAbiRawSlotSnapshot,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(in super::super) struct ManagedTestShmMapCallbackObservation {
+    region: c_int,
+    region_size: c_int,
+    raw_extend: c_int,
+    result_code: c_int,
+    output_was_cleared: bool,
+    before: HandleBoundSqliteAbiRawSlotSnapshot,
+    after: HandleBoundSqliteAbiRawSlotSnapshot,
+}
+
+impl ManagedTestShmMapCallbackObservation {
+    pub(in super::super) fn region(self) -> c_int {
+        self.region
+    }
+
+    pub(in super::super) fn region_size(self) -> c_int {
+        self.region_size
+    }
+
+    pub(in super::super) fn raw_extend(self) -> c_int {
+        self.raw_extend
+    }
+
+    pub(in super::super) fn result_code(self) -> c_int {
+        self.result_code
+    }
+
+    pub(in super::super) fn output_was_cleared(self) -> bool {
+        self.output_was_cleared
+    }
+
+    pub(in super::super) fn before(self) -> HandleBoundSqliteAbiRawSlotSnapshot {
+        self.before
+    }
+
+    pub(in super::super) fn after(self) -> HandleBoundSqliteAbiRawSlotSnapshot {
+        self.after
+    }
 }
 
 impl ManagedTestUnmapCallbackObservation {
@@ -34,6 +78,47 @@ impl ManagedTestUnmapCallbackObservation {
 }
 
 impl ManagedSqliteRoutedConnectionFixture {
+    pub(in super::super) fn call_main_shm_map_raw(
+        &self,
+        region: c_int,
+        region_size: c_int,
+        raw_extend: c_int,
+    ) -> Result<ManagedTestShmMapCallbackObservation, &'static str> {
+        let file = self.main_file_pointer()?;
+        // SAFETY: `main_file_pointer` returned this test VFS's live serialized allocation.
+        let before = unsafe { super::super::observe_test_vfs_file_raw_slots(file) }
+            .ok_or("managed SHM-map raw slots unavailable before callback")?;
+        if !before.methods_installed || !before.state_installed {
+            return Err("managed SHM-map raw state was not installed before callback");
+        }
+        // SAFETY: the live allocation owns the installed method table observed above.
+        let methods = unsafe { (*file).pMethods };
+        if methods.is_null() {
+            return Err("managed SHM-map method table is unavailable");
+        }
+        // SAFETY: `methods` belongs to the same live main-file allocation.
+        let map = unsafe { (*methods).xShmMap }.ok_or("managed SHM-map callback is unavailable")?;
+        // A known non-null, never-dereferenced sentinel proves that the installed ABI entry clear
+        // ran; starting with null would make a skipped callback indistinguishable from success.
+        let mut output = ptr::without_provenance_mut::<c_void>(1);
+        // SAFETY: the callback receives its owning live sqlite3_file and a writable local output
+        // slot. The raw request deliberately reaches the installed ABI and production budget
+        // validator instead of projecting a harness-only node-absent state.
+        let result_code = unsafe { map(file, region, region_size, raw_extend, &mut output) };
+        // SAFETY: the allocation remains owned by the live Connection after a fail-closed map.
+        let after = unsafe { super::super::observe_test_vfs_file_raw_slots(file) }
+            .ok_or("managed SHM-map raw slots unavailable after callback")?;
+        Ok(ManagedTestShmMapCallbackObservation {
+            region,
+            region_size,
+            raw_extend,
+            result_code,
+            output_was_cleared: output.is_null(),
+            before,
+            after,
+        })
+    }
+
     pub(in super::super) fn call_main_shm_unmap_raw(
         &self,
         raw_delete: c_int,
@@ -92,6 +177,19 @@ impl ManagedSqliteRoutedConnectionFixture {
         // SAFETY: this calls SQLite's installed xShmLock with its owning live file. Callers use
         // canonical SQLite flags and inspect the coordinator snapshot after the call.
         Ok(unsafe { lock(file, offset, count, flags) })
+    }
+
+    pub(in super::super) fn call_main_file_lock_exclusive(&self) -> Result<c_int, &'static str> {
+        let file = self.main_file_pointer()?;
+        // SAFETY: `main_file_pointer` returned this fixture's live serialized main-file
+        // allocation, and the installed method table belongs to that same allocation.
+        let methods = unsafe { (*file).pMethods };
+        if methods.is_null() {
+            return Err("managed main-file lock method table is unavailable");
+        }
+        // SAFETY: the callback receives its owning live file and SQLite's canonical lock level.
+        let lock = unsafe { (*methods).xLock }.ok_or("managed main-file xLock is unavailable")?;
+        Ok(unsafe { lock(file, ffi::SQLITE_LOCK_EXCLUSIVE) })
     }
 
     pub(in super::super) fn quarantine_for_unmap_admission_test(&self) -> Result<(), &'static str> {

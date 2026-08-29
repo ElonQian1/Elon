@@ -54,7 +54,12 @@ pub(crate) use shm::{
 pub(crate) use shm::{
     ManagedSqliteShmTestDmsCustody, ManagedSqliteShmTestTargetIdentity,
     ManagedSqliteShmTestTargetObserver, ManagedSqliteShmTestTargetSnapshot,
-    ManagedSqliteShmTestTopologySnapshot, ManagedSqliteShmTriggeredTestFaultObservation,
+    ManagedSqliteShmTestTopologySnapshot, ManagedSqliteShmTestUnmapActionEvent,
+    ManagedSqliteShmTestUnmapActionOutcome, ManagedSqliteShmTestUnmapDeleteAuthorityReceipt,
+    ManagedSqliteShmTestUnmapDeletePrestate, ManagedSqliteShmTestUnmapDeletePrestateReceipt,
+    ManagedSqliteShmTestUnmapNativeObservation, ManagedSqliteShmTestUnmapNativeOperation,
+    ManagedSqliteShmTestUnmapNativeReceipt, ManagedSqliteShmTestUnmapNativeTiming,
+    ManagedSqliteShmTestUnmapReceipt, ManagedSqliteShmTriggeredTestFaultObservation,
 };
 use types::ManagedSqliteNamespaceInner;
 pub(crate) use types::{
@@ -285,6 +290,18 @@ impl PinnedManagedSqliteNamespace {
         kind: ManagedSqliteFileKind,
         sync_parent: bool,
     ) -> std::result::Result<ManagedSqliteDeleteOutcome, ManagedSqliteDeleteFailure> {
+        self.delete_exact_with(kind, sync_parent, platform::delete_by_handle)
+    }
+
+    fn delete_exact_with<F>(
+        &self,
+        kind: ManagedSqliteFileKind,
+        sync_parent: bool,
+        delete: F,
+    ) -> std::result::Result<ManagedSqliteDeleteOutcome, ManagedSqliteDeleteFailure>
+    where
+        F: FnOnce(&File) -> std::io::Result<()>,
+    {
         self.validate_parent().map_err(|error| {
             ManagedSqliteDeleteFailure::new(
                 ManagedSqliteDeleteFailurePhase::ParentValidation,
@@ -349,7 +366,7 @@ impl PinnedManagedSqliteNamespace {
                 error,
             ));
         }
-        if let Err(error) = platform::delete_by_handle(&file) {
+        if let Err(error) = delete(&file) {
             return Err(self.delete_with_custody(
                 kind,
                 file,

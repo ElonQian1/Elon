@@ -12,6 +12,7 @@ use super::{
 pub(crate) enum ManagedSqliteShmTestDmsCustody {
     Absent,
     Shared,
+    SharedOutcomeUncertain,
     ExclusiveKnown,
     ExclusiveOutcomeUncertain,
     Released,
@@ -181,6 +182,9 @@ fn copy_state_snapshot(
 fn test_dms_custody(custody: ManagedSqliteShmDmsCustody) -> ManagedSqliteShmTestDmsCustody {
     match custody {
         ManagedSqliteShmDmsCustody::Shared => ManagedSqliteShmTestDmsCustody::Shared,
+        ManagedSqliteShmDmsCustody::SharedOutcomeUncertain => {
+            ManagedSqliteShmTestDmsCustody::SharedOutcomeUncertain
+        }
         ManagedSqliteShmDmsCustody::ExclusiveKnown => {
             ManagedSqliteShmTestDmsCustody::ExclusiveKnown
         }

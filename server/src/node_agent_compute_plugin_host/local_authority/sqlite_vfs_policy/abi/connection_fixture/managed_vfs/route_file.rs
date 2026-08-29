@@ -2,6 +2,7 @@
 //!
 //! The first main-file SHM map consumes a plan bound to this registration, route ordinal and role,
 //! promotes the private file into WAL-main custody, installs into that custody and only then maps.
+//! A validated map request then continues through the managed coordinator.
 
 use std::num::{NonZeroU32, NonZeroU8};
 

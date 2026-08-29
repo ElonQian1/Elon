@@ -22,7 +22,7 @@ pub(super) use registry_lifecycle::{
 #[cfg(all(test, windows))]
 mod unmap;
 #[cfg(all(test, windows))]
-pub(super) use unmap::ManagedTestUnmapCallbackObservation;
+pub(super) use unmap::{ManagedTestShmMapCallbackObservation, ManagedTestUnmapCallbackObservation};
 
 struct ManagedVfsAuthorizerContext {
     route: Arc<TestRoute>,

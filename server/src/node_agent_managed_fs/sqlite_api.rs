@@ -27,5 +27,10 @@ pub(crate) use super::sqlite_namespace::{
 pub(crate) use super::sqlite_namespace::{
     ManagedSqliteShmTestDmsCustody, ManagedSqliteShmTestTargetIdentity,
     ManagedSqliteShmTestTargetObserver, ManagedSqliteShmTestTargetSnapshot,
-    ManagedSqliteShmTestTopologySnapshot, ManagedSqliteShmTriggeredTestFaultObservation,
+    ManagedSqliteShmTestTopologySnapshot, ManagedSqliteShmTestUnmapActionEvent,
+    ManagedSqliteShmTestUnmapActionOutcome, ManagedSqliteShmTestUnmapDeleteAuthorityReceipt,
+    ManagedSqliteShmTestUnmapDeletePrestate, ManagedSqliteShmTestUnmapDeletePrestateReceipt,
+    ManagedSqliteShmTestUnmapNativeObservation, ManagedSqliteShmTestUnmapNativeOperation,
+    ManagedSqliteShmTestUnmapNativeReceipt, ManagedSqliteShmTestUnmapNativeTiming,
+    ManagedSqliteShmTestUnmapReceipt, ManagedSqliteShmTriggeredTestFaultObservation,
 };

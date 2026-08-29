@@ -16,6 +16,11 @@ use super::{
 use super::super::test_snapshot::{
     test_target_snapshot as snapshot_test_target, ManagedSqliteShmTestTargetSnapshot,
 };
+#[cfg(all(test, windows))]
+use super::super::test_unmap_runtime::{
+    ManagedSqliteShmTestUnmapDeletePrestate, ManagedSqliteShmTestUnmapNativeOperation,
+    ManagedSqliteShmTestUnmapReceipt,
+};
 
 const CONTROLLER_POISONED: &str = "NODE_MANAGED_SQLITE_SHM_TEST_FAULT_CONTROLLER_POISONED";
 
@@ -84,6 +89,24 @@ impl ManagedSqliteShmTestFaultProbe {
         }
     }
 
+    /// Reports whether the exact phase occurrence was reached, even when an after-success token
+    /// intentionally remains pending because the native outcome was NotFound rather than Deleted.
+    pub(crate) fn was_observed(
+        &self,
+        phase: ManagedSqliteShmFailurePhase,
+        ordinal: u32,
+    ) -> Result<bool, &'static str> {
+        match self.coordinator.test_faults.lock() {
+            Ok(faults) => Ok(faults.was_observed(self.target, phase, ordinal)),
+            Err(poison) => {
+                drop(poison.into_inner());
+                self.coordinator
+                    .poison_test_fault_controller_from_external_access();
+                Err(CONTROLLER_POISONED)
+            }
+        }
+    }
+
     #[cfg(all(test, windows))]
     pub(crate) fn triggered_observation(
         &self,
@@ -143,6 +166,71 @@ impl ManagedSqliteShmTestTargetObserver {
             runtime_generation,
             shm_connection_id,
         }
+    }
+
+    /// Starts one append-only Unmap action observation for this exact generation/connection.
+    pub(crate) fn begin_unmap_action_observation(&self) -> Result<(), &'static str> {
+        let snapshot = self
+            .snapshot()
+            .map_err(|_| "NODE_MANAGED_SQLITE_SHM_TEST_UNMAP_TARGET_SNAPSHOT_FAILED")?;
+        if !snapshot.target_attached || snapshot.topology.shm_connections != 1 {
+            return Err("NODE_MANAGED_SQLITE_SHM_TEST_UNMAP_TARGET_NOT_FINAL");
+        }
+        let mut runtime = self
+            .coordinator
+            .test_unmap_runtime
+            .lock()
+            .map_err(|_| CONTROLLER_POISONED)?;
+        runtime.begin(self.target.identity())
+    }
+
+    /// Installs one one-shot native adapter. The adapter can trigger only at its declared phase
+    /// and only while this exact target executes final-connection Unmap.
+    pub(crate) fn install_unmap_native_operation(
+        &self,
+        operation: ManagedSqliteShmTestUnmapNativeOperation,
+    ) -> Result<(), &'static str> {
+        let mut runtime = self
+            .coordinator
+            .test_unmap_runtime
+            .lock()
+            .map_err(|_| CONTROLLER_POISONED)?;
+        runtime.install_native(self.target.identity(), operation)
+    }
+
+    /// Installs one exact delete-authority/filesystem prestate control.
+    pub(crate) fn set_unmap_delete_prestate(
+        &self,
+        prestate: ManagedSqliteShmTestUnmapDeletePrestate,
+    ) -> Result<(), &'static str> {
+        let mut runtime = self
+            .coordinator
+            .test_unmap_runtime
+            .lock()
+            .map_err(|_| CONTROLLER_POISONED)?;
+        runtime.install_prestate(self.target.identity(), prestate)
+    }
+
+    pub(crate) fn observe_unmap_test_receipt(
+        &self,
+    ) -> Result<ManagedSqliteShmTestUnmapReceipt, &'static str> {
+        self.coordinator
+            .test_unmap_runtime
+            .lock()
+            .map_err(|_| CONTROLLER_POISONED)?
+            .receipt(self.target.identity())
+    }
+
+    /// Seals the action ledger after the one raw Unmap call. The returned receipt still reports
+    /// any unconsumed native or prestate adapter so the harness cannot mistake it for evidence.
+    pub(crate) fn finish_unmap_test_receipt(
+        &self,
+    ) -> Result<ManagedSqliteShmTestUnmapReceipt, &'static str> {
+        self.coordinator
+            .test_unmap_runtime
+            .lock()
+            .map_err(|_| CONTROLLER_POISONED)?
+            .finish(self.target.identity())
     }
 
     /// Installs one script only after a fixture has observed this exact live physical target.

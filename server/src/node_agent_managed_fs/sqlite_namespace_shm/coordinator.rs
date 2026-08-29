@@ -45,6 +45,9 @@ pub(super) struct ManagedSqliteShmCoordinator {
     pub(super) state: Mutex<ManagedSqliteShmCoordinatorState>,
     #[cfg(test)]
     pub(super) test_faults: Mutex<super::test_faults::ManagedSqliteShmTestFaultController>,
+    #[cfg(all(test, windows))]
+    pub(super) test_unmap_runtime:
+        Mutex<super::test_unmap_runtime::ManagedSqliteShmTestUnmapController>,
     pub(super) namespace: PinnedManagedSqliteNamespace,
     pub(super) domain_key: ManagedSqliteShmDomainKey,
     pub(super) generation: NonZeroU64,
@@ -84,6 +87,7 @@ pub(super) struct ManagedSqliteShmNode {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum ManagedSqliteShmDmsCustody {
     Shared,
+    SharedOutcomeUncertain,
     ExclusiveKnown,
     ExclusiveOutcomeUncertain,
     Released,
@@ -136,6 +140,10 @@ impl PinnedManagedSqliteNamespace {
             #[cfg(test)]
             test_faults: Mutex::new(
                 super::test_faults::ManagedSqliteShmTestFaultController::default(),
+            ),
+            #[cfg(all(test, windows))]
+            test_unmap_runtime: Mutex::new(
+                super::test_unmap_runtime::ManagedSqliteShmTestUnmapController::default(),
             ),
             namespace: self,
             domain_key,

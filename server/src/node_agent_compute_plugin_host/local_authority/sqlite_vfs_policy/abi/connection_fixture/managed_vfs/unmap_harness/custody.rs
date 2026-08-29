@@ -234,7 +234,8 @@ fn observe_dms(value: ManagedSqliteShmTestDmsCustody) -> anyhow::Result<UnmapDms
         ManagedSqliteShmTestDmsCustody::Absent => Ok(UnmapDmsCustody::Absent),
         ManagedSqliteShmTestDmsCustody::Shared => Ok(UnmapDmsCustody::Shared),
         ManagedSqliteShmTestDmsCustody::Released => Ok(UnmapDmsCustody::Released),
-        ManagedSqliteShmTestDmsCustody::ExclusiveOutcomeUncertain => {
+        ManagedSqliteShmTestDmsCustody::SharedOutcomeUncertain
+        | ManagedSqliteShmTestDmsCustody::ExclusiveOutcomeUncertain => {
             Ok(UnmapDmsCustody::OutcomeUncertain)
         }
         ManagedSqliteShmTestDmsCustody::ExclusiveKnown => Err(anyhow!(
