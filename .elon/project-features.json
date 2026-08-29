@@ -425,7 +425,190 @@
         "同一 exact clean Windows commit 上 Unmap 49/49、零重复/缺失/失败，49 条 build/arch/volume/filesystem/bundled-SQLite 环境完全一致，并重跑 Barrier、RegistrationShutdown、RegistryLifecycle 与相关 managed-VFS/registry wide regression。",
         "生产 VFS/open/process owner/Runtime/Ready 保持不可达，Map/Lock 与 JointClose 计数不变；未达 49/49 时 A2b2 仍保持 32/117。"
       ],
-      "implementation_evidence": [],
+      "implementation_evidence": [
+        {
+          "path": "docs/distributed-compute/node-plugin-vfs-fault-acceptance.md",
+          "content_hash": "53f6585f685042699822a3f3d934189a034a0e36706309aabf74ba92d402c773",
+          "locator": "当前 Unmap SharedNonFinal 实现候选证据",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "0c6fad06645f06a1d0053693b6d740dc841f03b1",
+            "head_blob_oid": "97d5f4e48aa8ab30073f242f632e5b08b9d1f08d",
+            "worktree_blob_oid": "1864842c503943c73fa19f6967f03776b1df48d8",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "docs/distributed-compute/node-plugin-vfs-unmap-dynamic-authority.md",
+          "content_hash": "1f4440aa62b462ce5fc403e8b45662f67dd0a5c097c239a8e79fc3d38bb03fd3",
+          "locator": "SharedNonFinal candidate source boundary",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "0c6fad06645f06a1d0053693b6d740dc841f03b1",
+            "head_blob_oid": "75f34c2b5704e199bc157d5379e70314f9f61c7a",
+            "worktree_blob_oid": "75f34c2b5704e199bc157d5379e70314f9f61c7a",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2_dynamic_evidence/record.rs",
+          "content_hash": "c9367b79bb95bbab4be9c5a9e3ebbc8556fcc50ae288c3eae92b733bee37c252",
+          "locator": "ValidatedUnmapCandidateRecord",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "0c6fad06645f06a1d0053693b6d740dc841f03b1",
+            "head_blob_oid": "4b8b68a34dc7a6563ff7fb397ad3b9e1fdee204f",
+            "worktree_blob_oid": "4b8b68a34dc7a6563ff7fb397ad3b9e1fdee204f",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2_dynamic_evidence/tests.rs",
+          "content_hash": "9456154a21c29f02446fa5024f4e132c3f76078202d359a2d293b8ab5be32ecc",
+          "locator": "Unmap candidate receipt binding tests",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "0c6fad06645f06a1d0053693b6d740dc841f03b1",
+            "head_blob_oid": "31110ffab3db0eb81a9b275d27bdaa34c3e4b4de",
+            "worktree_blob_oid": "31110ffab3db0eb81a9b275d27bdaa34c3e4b4de",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/source_owner_graph/owners.rs",
+          "content_hash": "2a23711a112d60b2e9de648e2522b21cb6035644604968e819aa9f4297a93ebb",
+          "locator": "SOURCE_BASELINE_COMMIT",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "0c6fad06645f06a1d0053693b6d740dc841f03b1",
+            "head_blob_oid": "1739469680891db74c85fa13dfab17aeb50993b7",
+            "worktree_blob_oid": "1739469680891db74c85fa13dfab17aeb50993b7",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b2_cases/dynamic_unmap.rs",
+          "content_hash": "589d1fd1e21254fc05d5eddae130cead2e9eb8b59097dcb0827f3e4767a83c23",
+          "locator": "UnmapSelector",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "0c6fad06645f06a1d0053693b6d740dc841f03b1",
+            "head_blob_oid": "b9064f2a074ed603651e6a8054471f39221b3903",
+            "worktree_blob_oid": "b9064f2a074ed603651e6a8054471f39221b3903",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b2_cases/dynamic_unmap/codec.rs",
+          "content_hash": "c1890c37f04efb593018075fe2585406f80428b4a51d2f97f5da85351c3e0875",
+          "locator": "a2b2un1 canonical codec",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "0c6fad06645f06a1d0053693b6d740dc841f03b1",
+            "head_blob_oid": "00385646348b7bb86c9560c0968919db5a597c78",
+            "worktree_blob_oid": "00385646348b7bb86c9560c0968919db5a597c78",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b2_cases/dynamic_unmap/tests.rs",
+          "content_hash": "04c155ab60527b7d7c761b71e02943be41853d6b92cd541979b5fdb3811ad647",
+          "locator": "selector bijection and 81-field mutation tests",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "0c6fad06645f06a1d0053693b6d740dc841f03b1",
+            "head_blob_oid": "4dd6ee61cb8de5d6da582b1d17ff615ef23aa78b",
+            "worktree_blob_oid": "4dd6ee61cb8de5d6da582b1d17ff615ef23aa78b",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b2_cases/dynamic_unmap/validate.rs",
+          "content_hash": "9cf2ef177583c3a4f9a656845200736d4f40180cd1fe013450f154136372f7c0",
+          "locator": "validate_unmap_report_payload",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "0c6fad06645f06a1d0053693b6d740dc841f03b1",
+            "head_blob_oid": "f0db45a362b73241a812b49c4bd3d7e932d0c2b7",
+            "worktree_blob_oid": "f0db45a362b73241a812b49c4bd3d7e932d0c2b7",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2c_unmap_runner.rs",
+          "content_hash": "b762df487fff40ef7ef35506cae0f442aa7864a5471319d233af3a2d185026fe",
+          "locator": "A2_UNMAP_IMPLEMENTATION_CANDIDATE_V1",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "0c6fad06645f06a1d0053693b6d740dc841f03b1",
+            "head_blob_oid": "80a559c8a3560e2ef167335975db851ba89d4c88",
+            "worktree_blob_oid": "80a559c8a3560e2ef167335975db851ba89d4c88",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/lifecycle_faults/unmap.rs",
+          "content_hash": "6a909a173d1bdee27c762733c3e84ad8b66b13ca59aee0206247fca63a805111",
+          "locator": "enable_unmap_runtime_observation",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "0c6fad06645f06a1d0053693b6d740dc841f03b1",
+            "head_blob_oid": "d5878c00cc6f275527dec61dd5e9cf35cbdd3214",
+            "worktree_blob_oid": "d5878c00cc6f275527dec61dd5e9cf35cbdd3214",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/unmap_harness.rs",
+          "content_hash": "cd8fa890d47a545cc73da5c7b14ed91c7cf8a1f93bc6f3bb9d429fe3654d1829",
+          "locator": "exercise_unmap",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "0c6fad06645f06a1d0053693b6d740dc841f03b1",
+            "head_blob_oid": "edc969fb1a85b23a80e61a19beaa52c8279bcdcc",
+            "worktree_blob_oid": "edc969fb1a85b23a80e61a19beaa52c8279bcdcc",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/registry/file_custody/operations/unmap.rs",
+          "content_hash": "edfdb647a5c05714ec9bc533fb225071a234bf25aa9f67d5bdf53b724b04d5c0",
+          "locator": "shm_unmap",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "0c6fad06645f06a1d0053693b6d740dc841f03b1",
+            "head_blob_oid": "c091c96d6f01944c6cd3e96496b0e68096d1f578",
+            "worktree_blob_oid": "c091c96d6f01944c6cd3e96496b0e68096d1f578",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/node_agent_managed_fs/sqlite_namespace_shm/unmap.rs",
+          "content_hash": "a50d0c39e48d9a3523783703ac0eb91736050ef9ddd1c56320897bd6203f7a74",
+          "locator": "unmap_shm_connection_active_for_test",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "0c6fad06645f06a1d0053693b6d740dc841f03b1",
+            "head_blob_oid": "a106795f15368eb63bbfeaa8160258968189f762",
+            "worktree_blob_oid": "a106795f15368eb63bbfeaa8160258968189f762",
+            "state": "tracked_clean"
+          }
+        }
+      ],
       "claim": {
         "claim_id": "claim_dbde9d5f8a8a4416890d6202717e469e",
         "agent_id": "/root",
@@ -433,7 +616,7 @@
         "expires_at_ms": 1788086991082
       },
       "created_at_ms": 1787995643672,
-      "updated_at_ms": 1788000591098
+      "updated_at_ms": 1788005616062
     },
     {
       "id": "backend-linux-task-receipt-boundary-v1",
@@ -12267,16 +12450,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_4e3a7608149c4af990d30bea46ea04c8",
-      "feature_id": "win-web-ai-rich-session-continuity-v2",
-      "action": "registered",
-      "actor": "codex-root",
-      "reason": "",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1787436124298
-    },
-    {
       "id": "feature_event_067fe25dfcc644a1a9e2ce2c707f005e",
       "feature_id": "win-web-ai-rich-session-continuity-v2",
       "action": "claimed",
@@ -14265,6 +14438,16 @@
       "from_status": "claimed",
       "to_status": "in_progress",
       "at_ms": 1788000591098
+    },
+    {
+      "id": "feature_event_38e035de62e547de8978afb4ac9249e8",
+      "feature_id": "backend-a2b2-unmap-windows-dynamic-v1",
+      "action": "evidence_recorded",
+      "actor": "/root",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788005616062
     }
   ]
 }
