@@ -25,36 +25,39 @@ claim=none
 design=draft_frozen
 ownership_source=source_compiled_no_safe_producer
 source_contract_guard=4/4
-registry_lifecycle_regression=42/42
+registry_lifecycle_regression=45/45
 verification=targeted_local_source_and_registry_verified
 compile/runtime=implementation_compiled/open_attempt_runtime_unrun
-compiled_targets=1 test_cases_run=46 passed=46 failed=0
+compiled_targets=1 test_cases_run=49 passed=49 failed=0
 a2_barrier_attempt=formal_windows_dynamic_verified
 a2_barrier_windows_dynamic=8/8
 a2_registration_attempt=formal_windows_dynamic_reverified
 a2_registration_windows_dynamic=8/8
-a2b2_windows_dynamic=16/117
-a2b2_remaining_without_dynamic_record=101
-a2_evidence_commit=1d57b8d98a1fed70fe40ad6f1575f4b856226857
-a2_barrier_validation_fingerprint=c300720aa17bae7850f0d0088827b918c5b5d66c2842ff6d5b548e80c7d185f4
-a2_registration_validation_fingerprint=b970858c74a2226c69182b64afd4c86ffe66d2a3c6b5d1cd3cf26aa57f5698bb
-a2_wide_validation_fingerprint=e6903ba19d0ff512bba4d1489857b179874a93666bd97f9fae815ef045347e99
+a2_registry_lifecycle_attempt=formal_windows_dynamic_verified
+a2_registry_lifecycle_windows_dynamic=16/16
+a2b2_windows_dynamic=32/117
+a2b2_remaining_without_dynamic_record=85
+a2_evidence_commit=95d910f0dbc167138f913861efafa20ff11295cc
+a2_barrier_validation_fingerprint=193d258f7573209236b8231c5288c4ff165bc793c635cabbbc9a69d1b73ca610
+a2_registration_validation_fingerprint=467d069431e173387467062e5f50625cdb45c142af9e83de37312a9b8ad16a5e
+a2_registry_lifecycle_validation_fingerprint=2fdc953b8485c373585905c66954c97b40d3d5324cae70747df86fc3f54d4168
+a2_wide_validation_fingerprint=78c3acc23ff5db33b78f105a8b6da4124708e6cdc5e18373f5540a6d7f66eab8
 a2_environment=Windows_10.0.26200_x86_64/fixed_NTFS/SQLite_3.45.0
-a2_test_result=barrier_8_passed/registration_8_passed/0_failed/1695_filtered_each
-a2_receipts=16_unique_exact_commit/child_exit_0/parent_cleanup_deleted
-a2_wide_regression=121_passed/0_failed
+a2_test_result=barrier_8_passed/registration_8_passed/registry_lifecycle_16_passed/0_failed
+a2_receipts=32_unique_family_selector_exact_commit/child_exit_0/parent_cleanup_deleted
+a2_wide_regression=142_passed/0_failed
 migration/table/writer=none/none/none
 vfs_registration/sqlite_open/connection/opened_authority=none/none/none/none
 production_acceptance=deferred
 ```
 
-`46/46` 由新 guard `4/4` 与本次 registry lifecycle `42/42` 构成；后者证明复用 owner 的既有行为，
+`49/49` 由新 guard `4/4` 与本次 registry lifecycle `45/45` 构成；后者证明复用 owner 的既有行为，
 不是 open-attempt typestate 的 production runtime。正式 A2 Barrier 与 RegistrationShutdown 证据绑定 exact
-clean commit `1d57b8d98a1fed70fe40ad6f1575f4b856226857`：Windows 10.0.26200 x86_64、fixed NTFS、
-SQLite 3.45.0，两个 family 各 `8 passed/0 failed/1695 filtered`；16 个 unique receipts 全部精确绑定该
+clean commit `95d910f0dbc167138f913861efafa20ff11295cc`；RegistryLifecycle 也绑定同一提交：Windows 10.0.26200 x86_64、fixed NTFS、
+SQLite 3.45.0，三个 family 分别 `8/8`、`8/8`、`16/16`；32 个 family+selector unique receipts 全部精确绑定该
 commit，且均为 `child_exit=0`、`parent_cleanup=deleted`。缺编译期 Git SHA、旧 cache reuse 与 partial
-failure 均是不计数历史。当前正式记录计为 Barrier `8/8`、Registration `8/8`、A2b2 `16/117`；其余
-101 无动态 record，clean wide regression `121/121` 已通过，但 Map/Lock 与其余 family 未闭合，A2 仍
+failure 均是不计数历史。当前正式记录计为 Barrier `8/8`、Registration `8/8`、RegistryLifecycle `16/16`、A2b2 `32/117`；其余
+85 无动态 record，clean wide regression `142/142` 已通过，但 Map/Lock 与其余 family 未闭合，A2 仍
 未完成。既有 managed-fs、A1 或 test-only VFS 的其他历史证据不能记为本草案通过数；功能工作流
 不可用，注册表保持未修改。
 
@@ -84,12 +87,13 @@ failure 均是不计数历史。当前正式记录计为 Barrier `8/8`、Registr
 |---|---:|---:|---:|---|
 | Rust `elon-pc-node` test target 编译 | 1 | 0 | 0 | 实际通过 |
 | source-contract guard | 4 | 0 | 0 | `4/4` 实际通过 |
-| 既有 registry lifecycle 回归 | 42 | 0 | 0 | `42/42` 实际通过 |
+| 既有 registry lifecycle 回归 | 45 | 0 | 0 | `45/45` 实际通过 |
 | open-attempt typestate 行为 | 0 | 0 | 1 | 无安全 producer，未运行 |
 | production VFS/SQLite/Connection | 0 | 0 | 1 | 明确未接线 |
 | A2 Barrier WindowsDynamic | 8 | 0 | 0 | 正式 `8/8`，8 个 exact-commit records |
 | A2 Registration WindowsDynamic | 8 | 0 | 0 | 正式 `8/8`，8 个 exact-commit records |
-| A2b2 WindowsDynamic | 16 | 0 | 101 | 当前 `16/117`，剩余 101 无动态 record |
+| A2 RegistryLifecycle WindowsDynamic | 16 | 0 | 0 | 正式 `16/16`，16 个 exact-commit records |
+| A2b2 WindowsDynamic | 32 | 0 | 85 | 当前 `32/117`，剩余 85 无动态 record |
 | migration/Store/runtime/network/device | 0 | 0 | 1 | 未运行 |
 | Ready/Provider/market/economy | 0 | 0 | 1 | effects=none |
 
@@ -105,12 +109,12 @@ failure 均是不计数历史。当前正式记录计为 Barrier `8/8`、Registr
 - 引入 `sqlite3_vfs_register`、`sqlite3_open_v2`、`rusqlite::Connection`、live `sqlite3_file` 或
   `OpenedComputePluginLocalAuthority::from_verified_backend`；
 - 提升 test-only VFS，修改 migration/table/writer/API/Host/Ready/市场，或产生任何经济效果；
-- 把已编译/guard/registry 回归或 Barrier/Registration `8/8` 外推为 open-attempt runtime、A2 `117/117` 或生产
+- 把已编译/guard/registry 回归或 Barrier/Registration/RegistryLifecycle 已通过记录外推为 open-attempt runtime、A2 `117/117` 或生产
   producer 已存在。
 
 ## 5. 晋级门
 
-解除架构阶段禁令后，必须先完成 A2 全部 source inventory/terminal closure、Barrier/Registration 各 `8/8`、A2b2
+解除架构阶段禁令后，必须先完成 A2 全部 source inventory/terminal closure、Barrier/Registration 各 `8/8`、RegistryLifecycle `16/16`、A2b2
 `117/117` WindowsDynamic 与宽回归，再用唯一 production owner 验证正常注册/open/close、entropy/collision、
 owner poison、logical-name/begin failure、SQLite error/extended code、callback/handle teardown、Connection close
 不确定和 route retirement。只有这些证据与真实 opened-authority producer 同批闭合后，才可修改本页的

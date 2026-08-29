@@ -20,16 +20,16 @@ the minimum test-only seams required before any Windows dynamic result may be re
 - authority: `design_frozen`
 - source: `implementation_compiled`
 - evidence: `WindowsDynamic=8/8`
-- exact evidence commit: `1d57b8d98a1fed70fe40ad6f1575f4b856226857`
-- Barrier validation fingerprint: `c300720aa17bae7850f0d0088827b918c5b5d66c2842ff6d5b548e80c7d185f4`
-- current A2b2 Windows dynamic total: `16/117`; remaining: `101`
-- clean wide-regression commit: `fd516d6de91356557e109715292f3c38f08eb1c4`
-- clean wide-regression fingerprint: `2d498cb483459785c8593d89839097675f1d224d560e211ef4ff5c2529b5b57b`
-  (`sqlite_vfs_policy` `121/121`)
+- exact evidence commit: `95d910f0dbc167138f913861efafa20ff11295cc`
+- Barrier validation fingerprint: `193d258f7573209236b8231c5288c4ff165bc793c635cabbbc9a69d1b73ca610`
+- current A2b2 Windows dynamic total: `32/117`; remaining: `85`
+- clean wide-regression commit: `95d910f0dbc167138f913861efafa20ff11295cc`
+- clean wide-regression fingerprint: `78c3acc23ff5db33b78f105a8b6da4124708e6cdc5e18373f5540a6d7f66eab8`
+  (`sqlite_vfs_policy` `142/142`)
 
 The design text alone is not implementation evidence. The status above is backed by eight unique
 process-isolated records from the exact clean evidence commit: Windows 10.0.26200 x86_64, fixed
-NTFS, bundled SQLite 3.45.0, `8 passed / 0 failed / 1695 filtered`; every record reports
+NTFS, bundled SQLite 3.45.0, `8 passed / 0 failed / 1718 filtered`; every record reports
 `child_exit=0` and `parent_cleanup=deleted`. No selector passes merely because its static `Case`
 exists, a low-level unit test passes, or a fixture reports an expected value. Partial future reruns
 must remain `0/8`; the accepted family is always one exact 8/8 set.
@@ -325,10 +325,12 @@ close the Barrier family's previously listed implementation gaps without opening
 
 ## 10. Completion gate
 
-Barrier moved from `WindowsDynamic=0/8` to `WindowsDynamic=8/8` only after the exact clean evidence
-commit produced all eight isolated, canonical, exact-set records and the relevant static inventory,
-payload negative tests, low-level Barrier tests, managed VFS regression and A2b1 source-owner
-guards all passed. The A2b2 summary therefore advances from `8/117` to `16/117`.
+At its original acceptance point, Barrier moved from `WindowsDynamic=0/8` to
+`WindowsDynamic=8/8` only after one exact clean evidence commit produced all eight isolated,
+canonical, exact-set records and the related guards passed. That historical batch advanced A2b2
+from `8/117` to `16/117`. The later exact commit
+`95d910f0dbc167138f913861efafa20ff11295cc` revalidated Barrier `8/8` and RegistrationShutdown
+`8/8`, accepted RegistryLifecycle `16/16`, and advanced the current aggregate to `32/117`.
 
 The authoritative family state is now:
 
@@ -336,6 +338,6 @@ The authoritative family state is now:
 design_frozen / implementation_compiled / WindowsDynamic=8/8
 ```
 
-This closes only the Barrier family. Unmap remains `0/49`, JointClose `0/36`, Registry lifecycle
-`0/16`, and Map/Lock dynamic admission remains unopened; A2 therefore stays
-`implementation_not_dynamically_accepted`.
+Barrier remains closed at `8/8`; RegistryLifecycle is now separately closed at `16/16`. Unmap
+remains `0/49`, JointClose `0/36`, and Map/Lock dynamic admission remains unopened; A2 therefore
+stays `implementation_not_dynamically_accepted` with 85 A2b2 cases remaining.
