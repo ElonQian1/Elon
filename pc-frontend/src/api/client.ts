@@ -134,13 +134,18 @@ export async function streamPost(
             if (!line.startsWith('data:')) continue
             const raw = line.slice(5).trim()
             if (!raw || raw === '[DONE]') continue
+            let event: ApiStreamEvent
             try {
-              const event = JSON.parse(raw) as ApiStreamEvent
-              if (event.type === 'done' || event.type === 'error') terminalEventSeen = true
-              onEvent(event)
+              event = JSON.parse(raw) as ApiStreamEvent
             } catch {
-              // Ignore incomplete/non-JSON SSE lines and continue the stream.
+              // Ignore malformed/non-JSON SSE lines and continue the stream.
+              continue
             }
+            if (event.type === 'done' || event.type === 'error') terminalEventSeen = true
+            // Keep callback failures visible to the caller. In particular, an
+            // application-level SSE error must not be mistaken for a healthy
+            // completed stream and silently swallow the retry path.
+            onEvent(event)
           }
           separator = buffer.indexOf('\r\n\r\n')
           separatorLength = 4

@@ -195,7 +195,7 @@ const controller = fs.readFileSync(
   path.resolve(__dirname, '../src/features/user-browser/useLocalAiWebChatController.ts'),
   'utf8',
 )
-assert.match(page, /disabled=\{chatMode \? !web\.canEdit : visibleSending\}/)
+assert.match(page, /disabled=\{chatMode \? !web\.canEdit : false\}/)
 assert.match(page, /busyAction !== 'new_conversation'/)
 assert.match(page, /requestAnimationFrame\(\(\) => textareaRef\.current\?\.focus\(\)\)/)
 assert.match(page, /className=\{styles\.newBtn\} onClick=\{newConversation\}/)

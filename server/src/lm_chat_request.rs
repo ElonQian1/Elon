@@ -9,6 +9,8 @@ pub(crate) struct LmChatRequest {
     pub(crate) conversation_id: Option<String>,
     pub(crate) conversation_title: Option<String>,
     pub(crate) scope: Option<String>,
+    #[serde(default, alias = "requestId")]
+    pub(crate) request_id: Option<String>,
     #[serde(
         default,
         alias = "runtimeRoute",

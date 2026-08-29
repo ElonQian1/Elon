@@ -863,6 +863,7 @@
   to { background-position: -100% 0; }
 }
 .sendError { padding: 0 16px 10px; font-size: 12px; color: var(--red); }
+.streamRecovery { padding: 0 16px 10px; margin: 0; font-size: 12px; color: #e7bd70; }
 
 /* 窄窗口时顶栏拆成两行，避免中间模式切换和右侧操作互相挤压。 */
 @media (max-width: 1100px) {

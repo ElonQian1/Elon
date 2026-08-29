@@ -120,6 +120,19 @@ function shouldRetryRemoteNodeExec(result: { output?: string; error?: string; ex
   )
 }
 
+const STREAM_RETRY_DELAYS_MS = [1000, 2500, 5000, 10000]
+
+function isRecoverableStreamError(error: unknown) {
+  const candidate = error as { status?: number; message?: string }
+  const message = candidate?.message ?? ''
+  if (candidate?.status !== 0 && (candidate?.status ?? 0) < 500) return false
+  return /(连接|网络|中断|回答完成前|fetch|load failed|timeout|超时)/i.test(message)
+}
+
+function waitForStreamRetry(delayMs: number) {
+  return new Promise<void>((resolve) => window.setTimeout(resolve, delayMs))
+}
+
 export default function AiChatPage({ mode, onModeChange }: { mode: AiHomeMode; onModeChange: (mode: AiHomeMode) => void }) {
   const navigate = useNavigate()
   const user = useAuthStore((s) => s.user)
@@ -143,6 +156,7 @@ export default function AiChatPage({ mode, onModeChange }: { mode: AiHomeMode; o
   const [input, setInput] = useState(() => pendingAiDraftRef.current?.input ?? '')
   const [sending, setSending] = useState(false)
   const [streamStatus, setStreamStatus] = useState('')
+  const [streamRecovering, setStreamRecovering] = useState(false)
   const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null)
   const [handoffSending, setHandoffSending] = useState(false)
   const [error, setError] = useState('')
@@ -735,14 +749,17 @@ export default function AiChatPage({ mode, onModeChange }: { mode: AiHomeMode; o
           content: '',
           created_at: new Date().toISOString(),
         }])
-        await api.streamPost('/api/llm/chat/stream', {
+        const requestId = uuidv4()
+        const streamBody = {
           messages: [{ role: 'user', content: text }],
           agent: requestAgent || null,
           runtimeRoute: requestRuntimeRoute,
           conversation_id: convId,
           conversation_title: newConversationTitle,
           scope: 'chat_memory',
-        }, (event) => {
+          request_id: requestId,
+        }
+        const consumeStream = () => api.streamPost('/api/llm/chat/stream', streamBody, (event) => {
           if (event.type === 'status') {
             setStreamStatus(typeof event.message === 'string' ? event.message : '正在生成回答…')
             return
@@ -784,15 +801,39 @@ export default function AiChatPage({ mode, onModeChange }: { mode: AiHomeMode; o
               : message))
           }
         })
+        let retryAttempt = 0
+        while (true) {
+          try {
+            await consumeStream()
+            break
+          } catch (streamError) {
+            if (!isRecoverableStreamError(streamError) || retryAttempt >= STREAM_RETRY_DELAYS_MS.length) {
+              throw streamError
+            }
+            const delayMs = STREAM_RETRY_DELAYS_MS[retryAttempt]
+            retryAttempt += 1
+            setStreamRecovering(true)
+            setStreamStatus('连接中断，' + (delayMs / 1000) + ' 秒后自动恢复（第 ' + retryAttempt + ' 次）…')
+            await waitForStreamRetry(delayMs)
+            // The task replays its journal on reconnect. Rebuild the visible
+            // assistant from that replay instead of appending duplicate deltas.
+            if (pendingStreamMessageId) {
+              setMessages((prev) => prev.map((message) => message.id === pendingStreamMessageId
+                ? { ...message, content: '' }
+                : message))
+            }
+          }
+        }
+        setStreamRecovering(false)
         loadConversations()
       }
     } catch (err) {
-      if (pendingStreamMessageId) {
-        setMessages((prev) => prev.filter((message) => message.id !== pendingStreamMessageId))
-      }
+      // Keep the partial assistant bubble visible. The server persists the
+      // completed or partially generated turn, so a refresh remains useful.
       restoreComposerAfterError(previousInput, err)
     } finally {
       setSending(false)
+      setStreamRecovering(false)
       setStreamingMessageId(null)
       setStreamStatus('')
     }
@@ -945,7 +986,7 @@ export default function AiChatPage({ mode, onModeChange }: { mode: AiHomeMode; o
               }}
               onKeyDown={handleKeyDown}
               placeholder="输入消息，Enter 发送，Shift+Enter 换行"
-              disabled={chatMode ? !web.canEdit : visibleSending}
+              disabled={chatMode ? !web.canEdit : false}
               rows={1}
             />
             <button
@@ -956,9 +997,10 @@ export default function AiChatPage({ mode, onModeChange }: { mode: AiHomeMode; o
                   || Boolean(web.controller.busyAction && web.controller.busyAction !== 'new_conversation'))
                 : visibleSending || !visibleInput.trim()}
             >
-              {visibleSending ? '…' : chatMode && web.controller.snapshot?.streaming ? '停止' : '发送'}
+              {visibleSending ? (streamRecovering ? '恢复中…' : '…') : chatMode && web.controller.snapshot?.streaming ? '停止' : '发送'}
             </button>
-          </form>
+        </form>
+        {streamRecovering && <p className={styles.streamRecovery} role="status">{streamStatus || '连接中断，正在自动恢复…'}</p>}
         {error && <p className={styles.sendError}>{error}</p>}<AiBrowserExperience />
       </div>
 

@@ -22,6 +22,7 @@ use tokio::sync::mpsc;
 
 #[path = "lm_chat_routing.rs"]
 mod lm_chat_routing;
+mod lm_chat_task;
 mod lm_chat_upstream;
 
 use crate::{
@@ -40,6 +41,7 @@ use crate::{
     user_memory_extract::extract_and_save_memories_scoped,
 };
 use lm_chat_routing::allow_server_agent_fallback;
+use lm_chat_task::get_or_create;
 use lm_chat_upstream::{forward, ForwardFailure};
 
 pub(crate) use crate::lm_chat_history::{
@@ -415,23 +417,35 @@ pub async fn lm_chat_stream_handler(
         );
     }
 
-    let (tx, rx) = mpsc::channel(32);
     let user_id = user.id.clone();
-    let allow_agent_fallback =
-        allow_server_agent_fallback(pc_runtime_route, user_agent_config.as_ref());
-    tokio::spawn(async move {
-        run_lm_chat_stream(
-            state,
-            user_id,
-            req,
-            pc_runtime_route,
-            user_agent_workspace,
-            allow_agent_fallback,
-            tx,
-        )
-        .await;
-    });
-    stream_response(rx)
+    let request_id = req
+        .request_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(|value| value.chars().take(128).collect::<String>())
+        .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
+    let (task, is_new) = get_or_create(&user_id, &request_id).await;
+    if is_new {
+        let task_for_runner = task.clone();
+        let tx = task.sender().await;
+        let allow_agent_fallback =
+            allow_server_agent_fallback(pc_runtime_route, user_agent_config.as_ref());
+        tokio::spawn(async move {
+            run_lm_chat_stream(
+                state,
+                user_id,
+                req,
+                pc_runtime_route,
+                user_agent_workspace,
+                allow_agent_fallback,
+                tx,
+            )
+            .await;
+            task_for_runner.finish().await;
+        });
+    }
+    task.response()
 }
 
 async fn persist_stream_chat_turn(
@@ -494,7 +508,7 @@ async fn run_lm_chat_stream(
     tx: mpsc::Sender<String>,
 ) {
     let started_at = std::time::Instant::now();
-    if !send_stream_event(
+    let _ = send_stream_event(
         &tx,
         json!({
             "type": "status",
@@ -503,10 +517,7 @@ async fn run_lm_chat_stream(
             "elapsed_ms": 0,
         }),
     )
-    .await
-    {
-        return;
-    }
+    .await;
 
     let entry_kind = ConversationEntryKind::from_scope(req.scope.as_deref());
     let route = match resolve_system_conversation_route(&state.store, &user_id, entry_kind) {
@@ -705,7 +716,7 @@ async fn run_lm_chat_stream(
             );
         }
     }
-    if !send_stream_event(
+    let _ = send_stream_event(
         &tx,
         json!({
             "type": "status",
@@ -714,10 +725,7 @@ async fn run_lm_chat_stream(
             "elapsed_ms": started_at.elapsed().as_millis(),
         }),
     )
-    .await
-    {
-        return;
-    }
+    .await;
     let platform_workspace = PathBuf::new();
     let agent_workspace = match pc_runtime_route {
         Some(PcRuntimeRoutePreference::RouteC) => platform_workspace.as_path(),
