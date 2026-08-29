@@ -165,10 +165,11 @@ allowlisted user and assistant transcript delta/final events. Bounded UTF-8 JSON
 accepted whether WebRTC marks them as text or binary. Bounded in-memory events
 update native chat bubbles without reading the voice-page DOM. Event identifiers are
 deduplicated, message and text sizes are capped, and MCP diagnostics expose only message
-counts, never transcript text or payloads. A cold session starts with the documented
-`oai-events` label, a current page-observed safe label overrides that preset, and a
-server-created channel can replace a still-connecting local channel. A missing or changed
-event shape is silent: the existing same-origin conversation refresh and sparse official
+counts, never transcript text or payloads. A cold session starts with the empty-label
+shape observed from ChatGPT Web rather than the public Realtime API's `oai-events`
+example. A current page-observed safe label overrides that preset, and bounded local plus
+server-created channels stay observed until close. A missing or changed event shape is
+silent: the existing same-origin conversation refresh and sparse official
 DOM watchdog remain the authoritative reconciliation path. The managed production entry
 initializes the existing transcript-continuity owner, so authoritative snapshots can update
 native bubbles without an empty DOM clearing retained content. Device acceptance must

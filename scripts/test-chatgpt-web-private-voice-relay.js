@@ -138,7 +138,7 @@ async function verifiesAtomicTakeover() {
   const relay = window.__elonChatGptPrivateVoiceRelay;
   assert.equal(relay.version, 4);
   assert.deepEqual(JSON.parse(relay.bootstrap()).dataChannel, {
-    label: 'oai-events',
+    label: '',
     ordered: true,
     maxRetransmits: null,
     protocol: '',

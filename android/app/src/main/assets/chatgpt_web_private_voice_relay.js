@@ -17,7 +17,9 @@
   const maxAnswerLength = 320000;
   const requestIdPattern = /^relay_[a-z0-9]{8,32}$/;
   const presetDataChannel = Object.freeze({
-    label: 'oai-events',
+    // ChatGPT Web currently creates an empty-label channel. This is distinct
+    // from public Realtime API examples that commonly use `oai-events`.
+    label: '',
     ordered: true,
     maxRetransmits: null,
     protocol: '',

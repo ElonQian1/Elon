@@ -31,7 +31,8 @@ class WebChatProductionVoiceEntryContractTest {
         )
         val relay = read("android/app/src/main/assets/chatgpt_web_private_voice_relay.js")
 
-        assertTrue(relay.contains("label: 'oai-events'"))
+        assertTrue(relay.contains("label: ''"))
+        assertFalse(relay.contains("label: 'oai-events'"))
         assertTrue(peer.contains("override fun onDataChannel(channel: DataChannel)"))
         assertTrue(peer.contains("bindDataChannel(token, channel)"))
         assertTrue(peer.contains("IdentityHashMap<DataChannel, DataChannel.Observer>()"))

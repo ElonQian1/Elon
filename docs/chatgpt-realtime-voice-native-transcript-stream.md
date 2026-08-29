@@ -24,10 +24,13 @@ Realtime API.
 - Never logs or publishes transcript text, payloads, cookies, SDP, ICE, credentials, or
   request headers.
 - Exposes only structural data-channel and parsed-transcript event counts through MCP.
-- Uses the documented `oai-events` label on cold start, while a bounded label observed
-  from the current official page overrides that preset.
-- Accepts a server-created channel only while the local channel is still connecting; an
-  already-open local channel remains authoritative so duplicate streams are not attached.
+- Uses the empty-label channel shape observed from ChatGPT Web on cold start. It must not
+  borrow the public Realtime API's `oai-events` example because this transport targets the
+  signed-in ChatGPT website protocol. A bounded label observed from the current official
+  page still overrides the preset.
+- Retains bounded local and server-created channels until close, consumes transcript events
+  from any open channel, and relies on the existing event-id continuity layer to suppress
+  duplicate transcript updates.
 - Leaves the WebView as the identity and official session owner.
 - Reconciles native preview bubbles with the existing same-origin conversation refresh
   while the voice turn is active and after it settles. When no parsed data-channel event
