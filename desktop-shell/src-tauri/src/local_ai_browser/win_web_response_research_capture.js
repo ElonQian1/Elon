@@ -1,11 +1,12 @@
 (function () {
   'use strict';
 
-  var VERSION = 10;
+  var VERSION = 11;
   var PROVIDER_ID = '__PROVIDER_ID__';
   var MAX_BODY_BYTES = 2 * 1024 * 1024;
   var ANALYSIS_SCHEMA = 'yilong.web-ai.capture-analysis.v1';
   var RUNTIME_SLOT = '__elonWinWebResponseResearchCaptureRuntime';
+  var FETCH_TAP_SUBSCRIPTION_SLOT = '__elonWinWebResponseResearchCaptureFetchTapSubscription';
 
   function invokeCapture(capture) {
     var internalInvoke = window.__TAURI_INTERNALS__ && window.__TAURI_INTERNALS__.invoke;
@@ -409,7 +410,39 @@
   window[RUNTIME_SLOT] = runtime;
   window.__elonWinWebResponseResearchCaptureVersion = VERSION;
 
-  if (typeof window.fetch === 'function' && !window.fetch.__elonResearchCaptureWrapped) {
+  function installFetchTapObserver() {
+    var tap = window.__elonChatGptPrivateFetchTap;
+    if (!tap || typeof tap.subscribe !== 'function') return false;
+    var installed = window[FETCH_TAP_SUBSCRIPTION_SLOT];
+    if (installed && installed.tap === tap) return true;
+    if (installed && typeof installed.unsubscribe === 'function') {
+      try { installed.unsubscribe(); } catch (_) {}
+    }
+    var unsubscribe = tap.subscribe(function (event) {
+      var activeRuntime = window[RUNTIME_SLOT];
+      if (!activeRuntime || !event || !event.response ||
+          typeof activeRuntime.requestMetadata !== 'function' ||
+          typeof activeRuntime.observeFetchResponse !== 'function') return;
+      var meta = activeRuntime.requestMetadata(String(event.url || ''), {
+        method: String(event.method || 'GET').toUpperCase()
+      });
+      if (meta) void activeRuntime.observeFetchResponse(event.response, meta);
+    });
+    window[FETCH_TAP_SUBSCRIPTION_SLOT] = Object.freeze({
+      tap: tap,
+      unsubscribe: typeof unsubscribe === 'function' ? unsubscribe : null
+    });
+    return true;
+  }
+
+  // The shared APK/Win fetch tap is installed before the page application and
+  // remains the canonical interception point even when later adapters replace
+  // window.fetch. Prefer that stable bus; retain the legacy wrapper only for
+  // providers or test environments where the tap is unavailable.
+  var observingFetchTap = installFetchTapObserver();
+
+  if (!observingFetchTap && typeof window.fetch === 'function' &&
+      !window.fetch.__elonResearchCaptureWrapped) {
     var originalFetch = window.fetch;
     var wrappedFetch = function (input, init) {
       var activeRuntime = window[RUNTIME_SLOT];
