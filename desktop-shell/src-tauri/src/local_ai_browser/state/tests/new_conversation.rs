@@ -314,7 +314,7 @@ fn stale_new_conversation_receipt_cannot_rollback_the_current_request_generation
 }
 
 #[test]
-fn verified_chatgpt_new_conversation_receipt_establishes_an_empty_sendable_boundary() {
+fn chatgpt_new_conversation_receipt_waits_for_a_live_empty_snapshot() {
     let runtime = LocalAiBrowserRuntime::default();
     runtime.ensure_session("session", "chatgpt", "active");
     let previous = Url::parse("https://chatgpt.com/c/previous").unwrap();
@@ -366,6 +366,38 @@ fn verified_chatgpt_new_conversation_receipt_establishes_an_empty_sendable_bound
         }),
     );
 
+    let provisional = runtime.snapshot("session").unwrap();
+    assert!(!provisional.context_ready);
+    assert!(!provisional.semantic_conversation_aligned);
+    assert_eq!(
+        provisional.diagnostics["lastEventKind"],
+        "new_conversation_receipt_awaiting_snapshot"
+    );
+    assert_eq!(
+        provisional.semantic_event.as_ref().unwrap()["messages"]
+            .as_array()
+            .unwrap()
+            .len(),
+        2
+    );
+
+    runtime.record_adapter_event_with_context(
+        "session",
+        "message_snapshot",
+        json!({
+            "type":"message_snapshot",
+            "authenticated":false,
+            "composerReady":true,
+            "currentModel":"auto",
+            "privateStreamObserved":true,
+            "privateStreamRevision":18,
+            "privateStreamState":"idle",
+            "capabilities":["send_prompt"],
+            "messages":[]
+        }),
+        semantic_context::page_context_key("chatgpt", "https://chatgpt.com/").as_deref(),
+    );
+
     let blank = runtime.snapshot("session").unwrap();
     assert!(blank.context_ready);
     assert!(blank.semantic_conversation_aligned);
@@ -387,11 +419,7 @@ fn verified_chatgpt_new_conversation_receipt_establishes_an_empty_sendable_bound
     );
     assert_eq!(
         blank.semantic_event.as_ref().unwrap()["privateStreamRevision"],
-        17
-    );
-    assert_eq!(
-        blank.diagnostics["lastEventKind"],
-        "verified_empty_new_conversation"
+        18
     );
 
     runtime.record_adapter_event_with_context(
@@ -498,6 +526,19 @@ fn new_conversation_keeps_the_private_revision_watermark_for_the_next_send() {
             "ok":true
         }),
     );
+    runtime.record_adapter_event_with_context(
+        "session",
+        "message_snapshot",
+        json!({
+            "type":"message_snapshot",
+            "composerReady":true,
+            "privateStreamObserved":true,
+            "privateStreamRevision":32,
+            "privateStreamState":"idle",
+            "messages":[]
+        }),
+        key.as_deref(),
+    );
     runtime.mark_command_pending_with_value(
         "session",
         "send_prompt",
@@ -510,7 +551,7 @@ fn new_conversation_keeps_the_private_revision_watermark_for_the_next_send() {
         json!({
             "type":"message_snapshot",
             "privateStreamObserved":true,
-            "privateStreamRevision":31,
+            "privateStreamRevision":32,
             "privateStreamState":"streaming",
             "messages":[{
                 "id":"private-stream:late-old-turn",

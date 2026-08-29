@@ -326,8 +326,14 @@ impl SessionRecord {
             && self.provider_id == "chatgpt"
             && self.pending_context_action == action
         {
-            self.confirm_verified_empty_chatgpt_conversation();
-            return true;
+            // The page command guard proves that ChatGPT showed a stable empty
+            // surface, but it is still only a command receipt. Guest ChatGPT can
+            // restore the previous root conversation after that receipt. Keep the
+            // native generation unbound until the adapter emits the corresponding
+            // live empty message snapshot; queued first turns must not enter the
+            // previous official conversation in this provisional window.
+            self.last_event_kind = "new_conversation_receipt_awaiting_snapshot".to_string();
+            return false;
         }
         if !ok && self.pending_context_action == action {
             self.active_conversation_id = self.semantic_conversation_id.clone();
@@ -345,80 +351,6 @@ impl SessionRecord {
             self.preserve_conversation_on_navigation = false;
         }
         false
-    }
-
-    fn confirm_verified_empty_chatgpt_conversation(&mut self) {
-        let previous = self.semantic_event.as_ref();
-        let authenticated = previous
-            .and_then(|event| event.get("authenticated"))
-            .and_then(Value::as_bool)
-            .unwrap_or(false);
-        let login_required = previous
-            .and_then(|event| event.get("loginRequired"))
-            .and_then(Value::as_bool)
-            .unwrap_or(false);
-        let current_model = previous
-            .and_then(|event| event.get("currentModel"))
-            .and_then(Value::as_str)
-            .unwrap_or_default();
-        let capabilities = previous
-            .and_then(|event| event.get("capabilities"))
-            .and_then(Value::as_array)
-            .cloned()
-            .unwrap_or_default();
-        let private_stream_revision = previous
-            .and_then(|event| event.get("privateStreamRevision"))
-            .and_then(Value::as_u64)
-            .unwrap_or_default();
-        let private_stream_observed = previous
-            .and_then(|event| event.get("privateStreamObserved"))
-            .and_then(Value::as_bool)
-            .unwrap_or(private_stream_revision > 0);
-        let home_key = semantic_context::page_context_key("chatgpt", "https://chatgpt.com/");
-        if self.active_page_context_key.is_none() {
-            self.active_page_context_key = home_key;
-        }
-        self.semantic_event = Some(json!({
-            "type": "message_snapshot",
-            "title": "New chat",
-            "url": "https://chatgpt.com/",
-            "draft": "",
-            "messages": [],
-            "observedMessageCount": 0,
-            "messageWindowStart": 0,
-            "authenticated": authenticated,
-            "pageKind": "conversation",
-            "loginRequired": login_required,
-            "composerReady": true,
-            "streaming": false,
-            "streamingStatus": "",
-            "privateStreamObserved": private_stream_observed,
-            "privateStreamRevision": private_stream_revision,
-            "privateStreamState": "idle",
-            "currentModel": current_model,
-            "attachments": [],
-            "dictationActive": false,
-            "capabilities": capabilities,
-        }));
-        self.semantic_conversation_id = self.active_conversation_id.clone();
-        self.semantic_page_context_key = self.active_page_context_key.clone();
-        self.pending_context_action.clear();
-        self.pending_context_request_id = None;
-        self.pending_context_since_ms = 0;
-        self.pending_send_prompt = None;
-        self.pending_send_private_stream_revision = 0;
-        self.preserve_conversation_on_navigation = false;
-        self.window_status = "ready".to_string();
-        self.loading = false;
-        self.renderer_status = "active".to_string();
-        self.message_count = 0;
-        self.assistant_message_count = 0;
-        self.streaming = false;
-        self.semantic_live = true;
-        let updated_at_ms = super::now_ms();
-        self.cache_updated_at_ms = updated_at_ms;
-        self.semantic_updated_at_ms = updated_at_ms;
-        self.last_event_kind = "verified_empty_new_conversation".to_string();
     }
 
     fn bind_chatgpt_private_stream_pending_send(&self, payload: &mut Value) -> bool {

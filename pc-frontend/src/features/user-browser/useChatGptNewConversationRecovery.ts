@@ -76,7 +76,9 @@ export default function useChatGptNewConversationRecovery({
             if (retried?.commandResult?.action === 'new_conversation'
               && retried.commandResult.ok) {
               callbacks.current.onState(retried)
-              callbacks.current.onMessage('ChatGPT 新会话已在后台确认，可以继续输入。')
+              callbacks.current.onMessage(
+                'ChatGPT 官网空白页已确认，正在等待本机实时快照绑定；提前输入的消息仍会安全排队。',
+              )
               return
             }
             if (retried) {
