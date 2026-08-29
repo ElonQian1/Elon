@@ -339,8 +339,9 @@ fn authority_records_verified_source_unwired_production_and_zero_effect_boundary
     let authority_a2_gate = between(AUTHORITY, "## 5. A2 与生产启用门", "## 6. 零效果");
     for marker in [
         "Barrier 与 Registration 各 `WindowsDynamic=8/8`",
-        "A2b2 `WindowsDynamic=16/117`",
-        "clean wide regression `121/121`",
+        "RegistryLifecycle `WindowsDynamic=16/16`",
+        "A2b2 `WindowsDynamic=32/117`",
+        "clean wide regression `142/142`",
     ] {
         assert!(
             authority_a2_gate.contains(marker),
@@ -352,7 +353,7 @@ fn authority_records_verified_source_unwired_production_and_zero_effect_boundary
         "source_compiled_production_unwired",
         "targeted_local_source_and_registry_verified",
         "source-contract `4/4`",
-        "registry lifecycle 回归 `42/42`",
+        "registry lifecycle 回归 `45/45`",
         "open-attempt 两态没有行为运行证据",
         "migration/table/view/trigger/writer = none/none/none/none/none",
         "vfs_registration/sqlite_open/connection/opened_authority = none/none/none/none",
@@ -368,7 +369,8 @@ fn authority_records_verified_source_unwired_production_and_zero_effect_boundary
     for marker in [
         "a2_barrier_windows_dynamic=8/8",
         "a2_registration_windows_dynamic=8/8",
-        "a2b2_windows_dynamic=16/117",
+        "a2_registry_lifecycle_windows_dynamic=16/16",
+        "a2b2_windows_dynamic=32/117",
         "production_acceptance=deferred",
     ] {
         assert!(
@@ -392,12 +394,19 @@ fn authority_records_verified_source_unwired_production_and_zero_effect_boundary
     assert!(registration_row.contains("| 8 | 0 | 0 |"));
     assert!(registration_row.contains("`8/8`"));
 
+    let registry_lifecycle_row = ACCEPTANCE
+        .lines()
+        .find(|line| line.starts_with("| A2 RegistryLifecycle WindowsDynamic |"))
+        .expect("missing A2 RegistryLifecycle WindowsDynamic matrix row");
+    assert!(registry_lifecycle_row.contains("| 16 | 0 | 0 |"));
+    assert!(registry_lifecycle_row.contains("`16/16`"));
+
     let a2b2_row = ACCEPTANCE
         .lines()
         .find(|line| line.starts_with("| A2b2 WindowsDynamic |"))
         .expect("missing A2b2 WindowsDynamic matrix row");
-    assert!(a2b2_row.contains("| 16 | 0 | 101 |"));
-    assert!(a2b2_row.contains("`16/117`"));
+    assert!(a2b2_row.contains("| 32 | 0 | 85 |"));
+    assert!(a2b2_row.contains("`32/117`"));
     assert!(!a2b2_row.contains("117/117"));
 
     let promotion_gate = &ACCEPTANCE[ACCEPTANCE
@@ -405,6 +414,7 @@ fn authority_records_verified_source_unwired_production_and_zero_effect_boundary
         .expect("missing promotion gate")..];
     for marker in [
         "Barrier/Registration 各 `8/8`",
+        "RegistryLifecycle `16/16`",
         "`117/117` WindowsDynamic",
         "宽回归",
     ] {
@@ -415,8 +425,8 @@ fn authority_records_verified_source_unwired_production_and_zero_effect_boundary
     }
     for marker in [
         "source_contract_guard=4/4",
-        "registry_lifecycle_regression=42/42",
-        "compiled_targets=1 test_cases_run=46 passed=46 failed=0",
+        "registry_lifecycle_regression=45/45",
+        "compiled_targets=1 test_cases_run=49 passed=49 failed=0",
         "open_attempt_runtime_unrun",
         "production_acceptance=deferred",
     ] {

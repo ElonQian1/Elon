@@ -4,8 +4,8 @@ status: current
 reviewed_at: 2026-08-29
 owners: node, security
 design_status: design_frozen
-implementation_status: implementation_not_compiled
-verification_status: WindowsDynamic_0_of_16
+implementation_status: implementation_compiled
+verification_status: WindowsDynamic_16_of_16
 ---
 
 # Node plugin VFS RegistryLifecycle 16/16 dynamic authority
@@ -18,15 +18,15 @@ event ledger and child/parent evidence chain before implementation is allowed to
 
 - lifecycle: `current`
 - authority: `design_frozen`
-- source: `implementation_not_compiled`
-- evidence: `WindowsDynamic=0/16`
-- current A2b2 Windows dynamic total: `16/117`; remaining: `101`
+- source: `implementation_compiled`
+- evidence: `WindowsDynamic=16/16`
+- current A2b2 Windows dynamic total: `32/117`; remaining: `85`
 - accepted predecessor families: RegistrationShutdown `8/8`, Barrier `8/8`
 
 No selector in this family is accepted merely because its static `Case` exists, a unit test
-passes, or an injected error equals the expected SQLite result. The family remains `0/16` until
-one exact clean source commit produces all sixteen unique process-isolated records. Partial runs
-must not advance the numerator.
+passes, or an injected error equals the expected SQLite result. The current `16/16` is accepted
+only because one exact clean source commit produced all sixteen unique process-isolated records;
+partial and earlier runs did not advance the numerator.
 
 This family consumes the successful physical-close prefix already present in source, but it does
 not require JointClose `36/36` or Unmap `49/49` to have been dynamically accepted first. It closes
@@ -282,3 +282,39 @@ design_frozen / implementation_compiled / WindowsDynamic=16/16
 Only then may the A2b2 summary advance from `16/117` to `32/117`, leaving `85`. Unmap remains
 `0/49`, JointClose remains `0/36`, and Map/Lock dynamic admission remains unopened; A2 therefore
 still remains `implementation_not_dynamically_accepted`.
+
+## 11. Formal evidence
+
+- Tested clean commit: `95d910f0dbc167138f913861efafa20ff11295cc`; the remote task branch matched
+  this SHA before execution. The implementation source was frozen in
+  `a75769029ba4abf5e30002f64846c0f7099d9ae7`, and the commit-bound A2b1 owner graph/ledger was
+  added in the tested commit.
+- RegistryLifecycle exact-set validation fingerprint:
+  `2fdc953b8485c373585905c66954c97b40d3d5324cae70747df86fc3f54d4168`.
+- Command scope: `cargo test --manifest-path server/Cargo.toml --bin elon-pc-node
+  a2c_registry_lifecycle_runner::registry_lifecycle_ --locked -- --nocapture --test-threads=1`,
+  executed through `scripts/validate-rust.ps1 -Force` after binding
+  `ELON_NODE_AGENT_GIT_SHA` to the tested SHA.
+- Result: `16 passed / 0 failed / 1710 filtered`; validation was freshly executed, not reused.
+  All 16 records have unique `a2b2rl1` selectors, embed the tested commit, report
+  `child_exit=0`, and carry `parent_cleanup=deleted`.
+- Environment: Windows build `10.0.26200`, `x86_64`, fixed NTFS, bundled SQLite `3.45.0`.
+- Static and ownership guards on the same tested commit: RegistryLifecycle contract `5/5`
+  (`41387759a6b4b10030fe1e9c1178b69a2a8d85ab15f8c50c78883ab514b5cc79`), raw-close witness
+  `2/2` (`abde2cf133ef7ff1c669922cb481e8f101f92c164275a5daae1555747e24cd26`), and A2b1 review
+  guards `4/4` (`e7ea6855df7e6f0677a985d214dfcf467585e79c938c2a1e54b7ce7b6cdd4ad5`).
+- Predecessor revalidation: Barrier `8/8`
+  (`193d258f7573209236b8231c5288c4ff165bc793c635cabbbc9a69d1b73ca610`) and
+  RegistrationShutdown `8/8`
+  (`467d069431e173387467062e5f50625cdb45c142af9e83de37312a9b8ad16a5e`).
+- Regression evidence: registry owner/state/file-custody main set `45/45`
+  (`fd0ac69aa07fec5898c5c106c55020810da29c2048418c2c7d33b34dca26c130`) and full
+  `sqlite_vfs_policy` main set `142/142`
+  (`78c3acc23ff5db33b78f105a8b6da4124708e6cdc5e18373f5540a6d7f66eab8`); all process-isolated
+  child runs in those validations also passed. The wide run contains exactly 32 unique
+  `(payload family, selector)` records for Barrier, RegistrationShutdown and RegistryLifecycle,
+  all bound to the same tested commit with confirmed child exit and deleted parent roots.
+
+These records advance only RegistryLifecycle and the A2b2 aggregate. They do not open Map/Lock
+dynamic admission, implement Unmap or JointClose, or make production VFS/open/Runtime/Ready
+reachable.
