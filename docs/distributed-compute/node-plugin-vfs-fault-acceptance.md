@@ -64,7 +64,7 @@ A2a/A2b1 map/lock 或 A2b2 的任何 `WindowsDynamic` case。后续执行必须�
 
 ### 当前宽范围回归基线
 
-- 被测 clean HEAD：`2c6393745e84cccc3ec8d1e25a3f0092eb412988`；
+- 被测 clean HEAD：`fd516d6de91356557e109715292f3c38f08eb1c4`；
 - Rust 验证指纹：`VALIDATION_FINGERPRINT=2d498cb483459785c8593d89839097675f1d224d560e211ef4ff5c2529b5b57b`；
 - 命令范围：同一 PowerShell 进程先执行 `$env:ELON_NODE_AGENT_GIT_SHA = (git rev-parse HEAD).Trim()`，再执行 `scripts/validate-rust.ps1 -Domain agent-validation -Force -- test --manifest-path server/Cargo.toml --locked sqlite_vfs_policy -- --nocapture --test-threads=1`；
 - 结果：主 `sqlite_vfs_policy` 集合 `121 passed / 0 failed / 1582 filtered`，同次进程隔离子运行均通过；
