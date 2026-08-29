@@ -12,7 +12,7 @@ import org.junit.Test
 
 class WebChatProductionVoiceEntryContractTest {
     @Test
-    fun friendChatPhoneStartsTheOfficialWebRtcDefault() {
+    fun friendChatPhoneStartsTheManagedAccountBoundDefault() {
         val activity = read("android/app/src/main/kotlin/com/elon/app/MainActivity.kt")
         val route = activity.substringAfter("private fun openSocialAiVoiceCall()")
             .substringBefore("private fun suspendSocialChatForProjectReturn()")
@@ -21,6 +21,21 @@ class WebChatProductionVoiceEntryContractTest {
         assertFalse(route.contains("ServerApi"))
         assertFalse(route.contains("NativeApi"))
         assertFalse(route.contains("SocialAiVoiceCallActivity.createIntent"))
+    }
+
+    @Test
+    fun managedNativePeerKeepsCurrentAndRemoteCreatedDataChannels() {
+        val peer = read(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/" +
+                "ChatGptWebNativeVoicePeer.kt",
+        )
+        val relay = read("android/app/src/main/assets/chatgpt_web_private_voice_relay.js")
+
+        assertTrue(relay.contains("label: 'oai-events'"))
+        assertTrue(peer.contains("override fun onDataChannel(channel: DataChannel)"))
+        assertTrue(peer.contains("bindDataChannel(token, channel)"))
+        assertTrue(peer.contains("dataChannel !== observedChannel"))
+        assertTrue(peer.contains("currentChannel?.state() == DataChannel.State.OPEN"))
     }
 
     @Test

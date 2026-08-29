@@ -162,7 +162,10 @@ The native realtime peer also consumes the official WebRTC data channel directly
 allowlisted user and assistant transcript delta/final events. Bounded in-memory events
 update native chat bubbles without reading the voice-page DOM. Event identifiers are
 deduplicated, message and text sizes are capped, and MCP diagnostics expose only message
-counts, never transcript text or payloads. A missing or changed event shape is silent:
+counts, never transcript text or payloads. A cold session starts with the documented
+`oai-events` label, a current page-observed safe label overrides that preset, and a
+server-created channel can replace a still-connecting local channel. A missing or changed
+event shape is silent:
 the existing same-origin conversation refresh and official DOM snapshot remain the
 authoritative reconciliation path. Device acceptance must confirm the current private
 event envelope before its verification marker advances beyond targeted tests.

@@ -103,9 +103,7 @@ internal class ChatGptWebNativeVoicePeer(
             it.setEnabled(true)
             createdPeer.addTrack(it, listOf(AUDIO_STREAM_ID))
         }
-        dataChannel = createdPeer.createDataChannel(hint.label, hint.toInit()).also {
-            it.registerObserver(dataChannelObserver(token))
-        }
+        bindDataChannel(token, createdPeer.createDataChannel(hint.label, hint.toInit()))
         schedule(Runnable { timeout(token) }, CONNECT_TIMEOUT_MS)
         createdPeer.createOffer(createOfferObserver(token), MediaConstraints())
         return true
@@ -205,7 +203,9 @@ internal class ChatGptWebNativeVoicePeer(
         override fun onIceCandidatesRemoved(candidates: Array<out IceCandidate>) = Unit
         override fun onAddStream(stream: MediaStream) = Unit
         override fun onRemoveStream(stream: MediaStream) = Unit
-        override fun onDataChannel(channel: DataChannel) = Unit
+        override fun onDataChannel(channel: DataChannel) {
+            bindDataChannel(token, channel)
+        }
         override fun onRenegotiationNeeded() = Unit
 
         override fun onConnectionChange(state: PeerConnection.PeerConnectionState) {
@@ -228,10 +228,13 @@ internal class ChatGptWebNativeVoicePeer(
         }
     }
 
-    private fun dataChannelObserver(token: Long): DataChannel.Observer = object : DataChannel.Observer {
+    private fun dataChannelObserver(
+        token: Long,
+        observedChannel: DataChannel,
+    ): DataChannel.Observer = object : DataChannel.Observer {
         override fun onBufferedAmountChange(previousAmount: Long) = Unit
         override fun onMessage(buffer: DataChannel.Buffer) {
-            if (!current(token) || buffer.binary) return
+            if (!current(token) || dataChannel !== observedChannel || buffer.binary) return
             val payload = buffer.data.duplicate().let { data ->
                 if (data.remaining() !in 1..MAX_DATA_CHANNEL_MESSAGE_BYTES) return
                 ByteArray(data.remaining()).also(data::get).toString(Charsets.UTF_8)
@@ -245,10 +248,32 @@ internal class ChatGptWebNativeVoicePeer(
             }
         }
         override fun onStateChange() {
-            if (!current(token)) return
-            dataChannelOpen = dataChannel?.state() == DataChannel.State.OPEN
+            if (!current(token) || dataChannel !== observedChannel) return
+            dataChannelOpen = observedChannel.state() == DataChannel.State.OPEN
             emit()
         }
+    }
+
+    private fun bindDataChannel(token: Long, channel: DataChannel) {
+        if (!current(token)) {
+            channel.close()
+            channel.dispose()
+            return
+        }
+        val currentChannel = dataChannel
+        if (currentChannel === channel) return
+        if (currentChannel?.state() == DataChannel.State.OPEN) {
+            channel.close()
+            channel.dispose()
+            return
+        }
+        currentChannel?.unregisterObserver()
+        currentChannel?.close()
+        currentChannel?.dispose()
+        dataChannel = channel
+        channel.registerObserver(dataChannelObserver(token, channel))
+        dataChannelOpen = channel.state() == DataChannel.State.OPEN
+        emit()
     }
 
     private fun acceptRemoteTrack(token: Long, kind: String?) {

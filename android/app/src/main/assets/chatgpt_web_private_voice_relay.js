@@ -17,7 +17,7 @@
   const maxAnswerLength = 320000;
   const requestIdPattern = /^relay_[a-z0-9]{8,32}$/;
   const presetDataChannel = Object.freeze({
-    label: '',
+    label: 'oai-events',
     ordered: true,
     maxRetransmits: null,
     protocol: '',

@@ -23,6 +23,10 @@ Realtime API.
 - Never logs or publishes transcript text, payloads, cookies, SDP, ICE, credentials, or
   request headers.
 - Exposes only structural data-channel and parsed-transcript event counts through MCP.
+- Uses the documented `oai-events` label on cold start, while a bounded label observed
+  from the current official page overrides that preset.
+- Accepts a server-created channel only while the local channel is still connecting; an
+  already-open local channel remains authoritative so duplicate streams are not attached.
 - Leaves the WebView as the identity and official session owner.
 - Reconciles native preview bubbles with the existing same-origin conversation refresh
   and official DOM snapshot after the voice turn settles.
