@@ -534,6 +534,75 @@ fn managed_fs_receipts_drive_exact_process_route_retirement() {
     );
 }
 
+#[cfg(windows)]
+#[test]
+fn physical_success_handoff_retains_closing_route_and_all_live_leases() {
+    let process =
+        ManagedSqliteRegistryProcessOwner::leak(SequenceNonceSource::new([Ok(FIRST_NONCE)]));
+    let (custody, drops) = probe();
+    let route = process.register(custody).expect("route");
+
+    process.begin_open_attempt(route).expect("opening");
+    let main = process.claim_main(route).expect("main lease");
+    process.activate_connection(route).expect("active");
+    let shm = process.claim_shm(route).expect("SHM lease");
+    process.begin_connection_close(route).expect("begin close");
+    let callback = process
+        .begin_callback(route, ManagedSqliteRegistryCallbackKind::Close)
+        .expect("close callback");
+
+    process
+        .retain_physical_success_handoff(
+            route,
+            (
+                ManagedSqliteWalMainCloseReceipt::test_value(),
+                main,
+                shm,
+                callback,
+            ),
+        )
+        .expect("typed physical-success handoff");
+
+    let snapshot = process
+        .terminal_custody_test_snapshot(route)
+        .expect("redacted handoff ledger");
+    assert_eq!(snapshot.physical_success_handoff_retention_count(), 1);
+    assert_eq!(
+        snapshot.physical_success_handoff_shape(),
+        (true, true, true, 1)
+    );
+    assert_eq!(snapshot.route_removal_count(), 0);
+    assert!(snapshot.active_route_present());
+    assert_eq!(drops.load(Ordering::SeqCst), 0);
+}
+
+#[cfg(windows)]
+#[test]
+fn physical_success_handoff_retains_custody_even_when_route_observation_rejects() {
+    let process =
+        ManagedSqliteRegistryProcessOwner::leak(SequenceNonceSource::new([Ok(FIRST_NONCE)]));
+    let (route_custody, route_drops) = probe();
+    let route = process.register(route_custody).expect("route");
+    process.begin_open_attempt(route).expect("opening");
+    let main = process.claim_main(route).expect("main lease");
+    process.activate_connection(route).expect("active");
+    process.begin_connection_close(route).expect("begin close");
+    process
+        .close_main(route, main, ManagedSqliteMainFileCloseReceipt::test_value())
+        .expect("close main");
+    process
+        .observe_connection_closed(route)
+        .expect("observe connection close");
+    process.retire_closed(route).expect("retire route");
+    assert_eq!(route_drops.load(Ordering::SeqCst), 1);
+
+    let (handoff_custody, handoff_drops) = probe();
+    assert!(process
+        .retain_physical_success_handoff(route, handoff_custody)
+        .is_err());
+    assert_eq!(handoff_drops.load(Ordering::SeqCst), 0);
+}
+
 #[test]
 fn mismatched_managed_fs_receipt_permanently_quarantines_route_custody() {
     let process =

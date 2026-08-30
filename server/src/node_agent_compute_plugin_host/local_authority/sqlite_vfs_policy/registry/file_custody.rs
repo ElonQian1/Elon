@@ -111,6 +111,11 @@ pub(in super::super) trait ManagedSqliteRegistryCloseLifecycleFaults:
         &self,
         stage: ManagedSqliteRegistryLifecycleStage,
     ) -> Result<(), ()>;
+
+    #[cfg(windows)]
+    fn claim_physical_success_handoff(&self) -> Result<bool, ()> {
+        Ok(false)
+    }
 }
 
 struct ManagedSqliteRegistryPinnedFileCloseSuccess {
@@ -312,6 +317,37 @@ where
                     Ok(receipt) => {
                         #[cfg(all(test, windows))]
                         {
+                            let handoff = self
+                                .close_faults
+                                .as_ref()
+                                .map(|faults| faults.claim_physical_success_handoff())
+                                .transpose();
+                            let handoff = match handoff {
+                                Ok(handoff) => handoff.unwrap_or(false),
+                                Err(()) => {
+                                    let _ = self.owner.retain_terminal_wal_main_physical_custody(
+                                        self.route,
+                                        crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::registry::types::ManagedSqliteRegistryTerminalReason::FailureCustodyRetained,
+                                        (receipt, main, shm, callback),
+                                    );
+                                    return Err(
+                                        ManagedSqliteRegistryPinnedFileCloseRejection::InjectedLifecycle,
+                                    );
+                                }
+                            };
+                            if handoff {
+                                self.owner
+                                    .retain_physical_success_handoff(
+                                        self.route,
+                                        (receipt, main, shm, callback),
+                                    )
+                                    .map_err(
+                                        ManagedSqliteRegistryPinnedFileCloseRejection::Registry,
+                                    )?;
+                                return Err(
+                                    ManagedSqliteRegistryPinnedFileCloseRejection::InjectedLifecycle,
+                                );
+                            }
                             registry_lifecycle::close_wal_main_after_physical(
                                 self.owner,
                                 self.route,

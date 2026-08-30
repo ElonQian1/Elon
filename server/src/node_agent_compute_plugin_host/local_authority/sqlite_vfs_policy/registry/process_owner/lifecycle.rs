@@ -18,6 +18,12 @@ pub(super) enum ManagedSqliteRegistryTerminalCustodyTestEventKind {
         terminal_route: Option<ManagedSqliteRegistryTerminalRouteTestSnapshot>,
     },
     RouteRemoved,
+    PhysicalSuccessHandoff {
+        route_closing: bool,
+        main_lease: bool,
+        shm_lease: bool,
+        callbacks_in_flight: u32,
+    },
 }
 
 #[cfg(test)]
@@ -54,6 +60,11 @@ pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy
     terminal_route: Option<ManagedSqliteRegistryTerminalRouteTestSnapshot>,
     route_removals: usize,
     active_route_present: bool,
+    physical_success_handoff_retentions: usize,
+    physical_success_route_closing: bool,
+    physical_success_main_lease: bool,
+    physical_success_shm_lease: bool,
+    physical_success_callbacks_in_flight: u32,
 }
 
 #[cfg(test)]
@@ -119,6 +130,23 @@ impl ManagedSqliteRegistryTerminalCustodyTestSnapshot {
         self,
     ) -> bool {
         self.active_route_present
+    }
+
+    pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy) fn physical_success_handoff_retention_count(
+        self,
+    ) -> usize {
+        self.physical_success_handoff_retentions
+    }
+
+    pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy) fn physical_success_handoff_shape(
+        self,
+    ) -> (bool, bool, bool, u32) {
+        (
+            self.physical_success_route_closing,
+            self.physical_success_main_lease,
+            self.physical_success_shm_lease,
+            self.physical_success_callbacks_in_flight,
+        )
     }
 }
 
@@ -234,6 +262,42 @@ where
         )
     }
 
+    /// Retains the exact post-physical-close custody without quarantining or retiring the route.
+    /// This boundary is test-only: it models loss of control immediately after the real WAL-main
+    /// close receipt while the close callback and registry leases remain live.
+    #[cfg(all(test, windows))]
+    pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::registry) fn retain_physical_success_handoff<
+        Retained: 'static,
+    >(
+        &self,
+        route: ManagedSqliteRegistryRouteHandle,
+        custody: Retained,
+    ) -> Result<(), ManagedSqliteRegistryProcessRouteRejection> {
+        let mut custody = Some(custody);
+        let snapshot = match self.registration_shutdown_test_snapshot(route) {
+            Ok(snapshot) => snapshot,
+            Err(rejection) => {
+                let _permanent_physical_success_handoff =
+                    Box::leak(Box::new(custody.take().expect("physical-success custody")));
+                return Err(rejection);
+            }
+        };
+        let event = ManagedSqliteRegistryTerminalCustodyTestEventKind::PhysicalSuccessHandoff {
+            route_closing: snapshot.phase() == ManagedSqliteRegistrySessionPhase::Closing,
+            main_lease: snapshot.main_file_lock_owner_lease(),
+            shm_lease: snapshot.shm_lease(),
+            callbacks_in_flight: snapshot.callbacks_in_flight(),
+        };
+        if let Err(rejection) = self.record_terminal_custody_test_event(route, event) {
+            let _permanent_physical_success_handoff =
+                Box::leak(Box::new(custody.take().expect("physical-success custody")));
+            return Err(rejection);
+        }
+        let _permanent_physical_success_handoff =
+            Box::leak(Box::new(custody.take().expect("physical-success custody")));
+        Ok(())
+    }
+
     #[cfg(test)]
     pub(super) fn record_terminal_custody_test_event(
         &self,
@@ -281,6 +345,11 @@ where
             terminal_route: None,
             route_removals: 0,
             active_route_present,
+            physical_success_handoff_retentions: 0,
+            physical_success_route_closing: false,
+            physical_success_main_lease: false,
+            physical_success_shm_lease: false,
+            physical_success_callbacks_in_flight: 0,
         };
         for event in events.iter().filter(|event| event.route == route) {
             match event.kind {
@@ -313,6 +382,18 @@ where
                 }
                 ManagedSqliteRegistryTerminalCustodyTestEventKind::RouteRemoved => {
                     snapshot.route_removals += 1;
+                }
+                ManagedSqliteRegistryTerminalCustodyTestEventKind::PhysicalSuccessHandoff {
+                    route_closing,
+                    main_lease,
+                    shm_lease,
+                    callbacks_in_flight,
+                } => {
+                    snapshot.physical_success_handoff_retentions += 1;
+                    snapshot.physical_success_route_closing = route_closing;
+                    snapshot.physical_success_main_lease = main_lease;
+                    snapshot.physical_success_shm_lease = shm_lease;
+                    snapshot.physical_success_callbacks_in_flight = callbacks_in_flight;
                 }
             }
         }
