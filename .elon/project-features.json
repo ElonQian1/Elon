@@ -385,18 +385,18 @@
       "id": "backend-a2b2-joint-close-windows-dynamic-v1",
       "title": "A2b2 JointClose 36 项 WindowsDynamic 真实验收",
       "summary": "在真实受管 SQLite/Windows test-only 路径上实现 JointClose 36 个冻结 selector 的 raw xClose、SHM lift、main close、registry handoff、canonical payload、进程隔离 runner 与原子 family；只有同一 exact clean commit 的 36/36 才晋级，且不开放生产入口。",
-      "status": "blocked",
+      "status": "verified",
       "priority": "p0",
       "requirement": {
         "path": "docs/distributed-compute/node-plugin-vfs-joint-close-dynamic-authority.md",
-        "content_hash": "2acb7aa4e139960442c213a0389506659bf2cc4e039f74fd0b8762328961faba",
+        "content_hash": "831e74cd4067ca86d4fe65bc15ac416d63177ed1dac38231d08df2f7ac062a3b",
         "locator": "",
         "evidence_kind": "document",
         "git_identity": {
           "schema": "elon.project_context_git_identity.v1",
-          "head_commit": "ac54807dee78a8567d5fef82ca207db26ef229a5",
-          "head_blob_oid": "e71d7e12cecbf4ddf71606c7b505a8c07d7d9848",
-          "worktree_blob_oid": "e71d7e12cecbf4ddf71606c7b505a8c07d7d9848",
+          "head_commit": "04b105e03fd63dc8b0707966884f8030a414bb9f",
+          "head_blob_oid": "ad88316a55182a970bac13007a754c42507de739",
+          "worktree_blob_oid": "ad88316a55182a970bac13007a754c42507de739",
           "state": "tracked_clean"
         }
       },
@@ -428,9 +428,218 @@
         "同一 runtime-source commit 重跑 Barrier 8/8、RegistrationShutdown 8/8、RegistryLifecycle 16/16、Unmap 49/49、managed SHM 定向与 wide sqlite_vfs_policy 回归。",
         "生产 VFS/open/process owner/Connection/Runtime/Ready 与经济效果保持不可达；JointClose 36/36 只把 A2b2 推到 117/117，Map/Lock denominator 仍须独立闭合。"
       ],
-      "implementation_evidence": [],
+      "implementation_evidence": [
+        {
+          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_abi/raw_state.rs",
+          "content_hash": "e720b32c811b806d7edf1b57a0a4cc39c19c6b224b8e1c2ebf223f916968a346",
+          "locator": "allocation-bound raw close control",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "04b105e03fd63dc8b0707966884f8030a414bb9f",
+            "head_blob_oid": "f35e6bcd750d8b6a150375b980e8f9e33858bb41",
+            "worktree_blob_oid": "f35e6bcd750d8b6a150375b980e8f9e33858bb41",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b2_joint_close_cases.rs",
+          "content_hash": "f399b8a1c6f9d01e8946d54c678d38efb5a88a951a37ab32635488aeff7786ee",
+          "locator": "JointClose exact 36-case static inventory",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "04b105e03fd63dc8b0707966884f8030a414bb9f",
+            "head_blob_oid": "caeed9a9b11d00a600392e69e4deb36f7300ee76",
+            "worktree_blob_oid": "caeed9a9b11d00a600392e69e4deb36f7300ee76",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b2_joint_close_runner.rs",
+          "content_hash": "a3a9b200f1e7312b9c0e7b901032a82c38c6a04ece416dc085034e52cf10ffa0",
+          "locator": "joint_close_windows_dynamic_family_36",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "04b105e03fd63dc8b0707966884f8030a414bb9f",
+            "head_blob_oid": "efe7651144959ef65f5023a8894903e146bfa25a",
+            "worktree_blob_oid": "efe7651144959ef65f5023a8894903e146bfa25a",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/connection/joint_close.rs",
+          "content_hash": "e70fb28514c1f98e2ad57097b2abc6ab91da867a47e1007dacb99e691ebfc80c",
+          "locator": "installed raw xClose stimulus",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "04b105e03fd63dc8b0707966884f8030a414bb9f",
+            "head_blob_oid": "8c24e8fe6b6ecc5cae552ed86086194ba6dd1d4f",
+            "worktree_blob_oid": "8c24e8fe6b6ecc5cae552ed86086194ba6dd1d4f",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/joint_close_harness.rs",
+          "content_hash": "456141f80c6e913abce474f6b967ec307fe7292ed9ebce9386bfe73f1ffaa130",
+          "locator": "JointClose live SQLite harness",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "04b105e03fd63dc8b0707966884f8030a414bb9f",
+            "head_blob_oid": "1c50d469b45a8461bd2a6fe168c3df467f6acc0a",
+            "worktree_blob_oid": "1c50d469b45a8461bd2a6fe168c3df467f6acc0a",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/joint_close_harness/boundary/validate.rs",
+          "content_hash": "9a6450aa49253e2bd2242b7f9bc1ed6f04cc8eb1576a564785cb03b68cd66049",
+          "locator": "selector-exact canonical actual validator",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "04b105e03fd63dc8b0707966884f8030a414bb9f",
+            "head_blob_oid": "68706ce9e9f941f79d8ab847c428b0feffa3e573",
+            "worktree_blob_oid": "68706ce9e9f941f79d8ab847c428b0feffa3e573",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/joint_close_harness/boundary/validate/custody.rs",
+          "content_hash": "64ccc6921c8716dbd0c862b9fd8001409fa39c90a5627b906a186cb56b20d5d6",
+          "locator": "JointClose exact custody validation",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "04b105e03fd63dc8b0707966884f8030a414bb9f",
+            "head_blob_oid": "d0290be99799039b41c406f48bea195911a44328",
+            "worktree_blob_oid": "d0290be99799039b41c406f48bea195911a44328",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/lifecycle_faults/joint_close.rs",
+          "content_hash": "0ba0d3c556ecb73adcbf46d56f5ab21e15562f99702c5c16f1db54b0ba20f0e0",
+          "locator": "JointClose lifecycle fault selectors",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "04b105e03fd63dc8b0707966884f8030a414bb9f",
+            "head_blob_oid": "addee2ab8cdc140a41ba6eb017d81355f4b9c7dd",
+            "worktree_blob_oid": "addee2ab8cdc140a41ba6eb017d81355f4b9c7dd",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/unmap_harness/observe.rs",
+          "content_hash": "51523c0f259f1744270f7a87ac7983eb8815e6dc3f8c071eb94a3256c31a86db",
+          "locator": "SharedNonFinal detach regression guard",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "04b105e03fd63dc8b0707966884f8030a414bb9f",
+            "head_blob_oid": "e7491c8c48ddc608b498751d726dd183b8fc7a25",
+            "worktree_blob_oid": "e7491c8c48ddc608b498751d726dd183b8fc7a25",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/registry/file_custody.rs",
+          "content_hash": "00b761728eb368258686325f35adaebe0d1c354b7b5b075ca0a9f9bd30613220",
+          "locator": "typed terminal file custody",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "04b105e03fd63dc8b0707966884f8030a414bb9f",
+            "head_blob_oid": "e8dac8ea5612800d864339f38f3d8e3d97971b1d",
+            "worktree_blob_oid": "e8dac8ea5612800d864339f38f3d8e3d97971b1d",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/registry/file_custody/joint_close_runtime.rs",
+          "content_hash": "519b71f2eb761c464500a26562e5a5f9270c3414dd1946bd34784e8888808f7b",
+          "locator": "JointClose runtime receipt projection",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "04b105e03fd63dc8b0707966884f8030a414bb9f",
+            "head_blob_oid": "8149f16f5a51f2b4d31c0752d57d9522375dd619",
+            "worktree_blob_oid": "8149f16f5a51f2b4d31c0752d57d9522375dd619",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/registry/process_owner/joint_close_direct_xclose.rs",
+          "content_hash": "b7da83a6233c286f3d8194640df07992e5c48e4f3a30937adeef5e415c673d1c",
+          "locator": "direct live xClose bridge",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "04b105e03fd63dc8b0707966884f8030a414bb9f",
+            "head_blob_oid": "d1f12e8869bf2d948e72dbe3f2be6bebcc78c5a1",
+            "worktree_blob_oid": "d1f12e8869bf2d948e72dbe3f2be6bebcc78c5a1",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/registry/process_owner/lifecycle.rs",
+          "content_hash": "8153f10db8746ca99ff357d7999441e2e4b039fa9a15cbffe03e9da589bccc19",
+          "locator": "terminal retention and close lifecycle",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "04b105e03fd63dc8b0707966884f8030a414bb9f",
+            "head_blob_oid": "2ccdaa2d49563579db3a1c9c71c755a0c872823e",
+            "worktree_blob_oid": "2ccdaa2d49563579db3a1c9c71c755a0c872823e",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/node_agent_managed_fs/sqlite_namespace_close/main_close.rs",
+          "content_hash": "ee2be681f6225aa24cd69123e5319b2387c534cb7d0f9f6bf23ce50df0a0e467",
+          "locator": "main unlock and file-close receipts",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "04b105e03fd63dc8b0707966884f8030a414bb9f",
+            "head_blob_oid": "e45b93eeef776882e161b7a5cbf2b3db7ed94bc9",
+            "worktree_blob_oid": "e45b93eeef776882e161b7a5cbf2b3db7ed94bc9",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/node_agent_managed_fs/sqlite_namespace_shm/close.rs",
+          "content_hash": "6d18594eb5bafa355fb9cd5902b28ef8cb18712679cc0faee4af42d73a4c21fc",
+          "locator": "real SHM close receipt path",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "04b105e03fd63dc8b0707966884f8030a414bb9f",
+            "head_blob_oid": "6648e3e2ee0a6a94c57b9fea46043e71c3c93adf",
+            "worktree_blob_oid": "6648e3e2ee0a6a94c57b9fea46043e71c3c93adf",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/node_agent_managed_fs/sqlite_namespace_shm/test_unmap_runtime/detach.rs",
+          "content_hash": "cde586fa889269ad5869743644df5a9486c1715ab2804047345bb61c471356db",
+          "locator": "source-bound detach occurrence receipt",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "04b105e03fd63dc8b0707966884f8030a414bb9f",
+            "head_blob_oid": "9ab2346b9a5793325bf71264a73be68f546db995",
+            "worktree_blob_oid": "9ab2346b9a5793325bf71264a73be68f546db995",
+            "state": "tracked_clean"
+          }
+        }
+      ],
       "created_at_ms": 1788045555843,
-      "updated_at_ms": 1788074424036
+      "updated_at_ms": 1788074946193
     },
     {
       "id": "backend-a2b2-unmap-windows-dynamic-v1",
@@ -12482,86 +12691,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_ef2dc925a3d2443dac1df8194cc6af0e",
-      "feature_id": "win-web-ai-private-response-research-fixture-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-root",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1787448781558
-    },
-    {
-      "id": "feature_event_e6672877dcc24d558f023cb6147529eb",
-      "feature_id": "win-web-ai-private-response-research-fixture-v1",
-      "action": "transitioned",
-      "actor": "codex-root",
-      "reason": "离线 JSON/NDJSON/SSE 结构脱敏器、结构指纹、合成 fixture 和回归测试已实现。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1787448796043
-    },
-    {
-      "id": "feature_event_586a8f45efc84afd966d3869a3ec42ee",
-      "feature_id": "win-web-ai-private-response-research-fixture-v1",
-      "action": "transitioned",
-      "actor": "codex-root",
-      "reason": "定向 sanitizer 契约、完整 test:user-browser、typecheck、lint、build、validate-win-web-ai 与源码体积门禁全部通过。",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1787448807362
-    },
-    {
-      "id": "feature_event_d50f0820028748cca0411e1441aeeff5",
-      "feature_id": "win-web-ai-private-response-research-fixture-v1",
-      "action": "transitioned",
-      "actor": "codex-root",
-      "reason": "实现与验证提交已 fast-forward 推送到 origin/main；该离线研究工具无需 Win 客户端运行时重启。",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1787448898341
-    },
-    {
-      "id": "feature_event_94c52a5e90ea455289d9ca58f2700c07",
-      "feature_id": "win-web-ai-rich-content-runtime-guard-v1",
-      "action": "registered",
-      "actor": "codex-root",
-      "reason": "现有 TypeScript 层直接信任缓存恢复数据，异常旧缓存或上游结构漂移存在空卡/渲染异常风险。",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1787449323325
-    },
-    {
-      "id": "feature_event_510985882fb44b1d97001c7e162f57c2",
-      "feature_id": "win-web-ai-rich-content-runtime-guard-v1",
-      "action": "claimed",
-      "actor": "codex-root",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1787449349095
-    },
-    {
-      "id": "feature_event_00ff55ad7945475cb3a411347ea08258",
-      "feature_id": "win-web-ai-rich-content-runtime-guard-v1",
-      "action": "transitioned",
-      "actor": "codex-root",
-      "reason": "开始实现前端运行时协议门禁与异常缓存回归。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1787449361035
-    },
-    {
-      "id": "feature_event_5503542290ed49968a05242f0f6057d8",
-      "feature_id": "win-web-ai-rich-content-runtime-guard-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-root",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1787449816663
-    },
-    {
       "id": "feature_event_cf9baadfb53746b6be207054130389fe",
       "feature_id": "win-web-ai-rich-content-runtime-guard-v1",
       "action": "transitioned",
@@ -14480,6 +14609,86 @@
       "from_status": "in_progress",
       "to_status": "blocked",
       "at_ms": 1788074424036
+    },
+    {
+      "id": "feature_event_d781902bfabb4b418c632223931e0c5e",
+      "feature_id": "backend-a2b2-joint-close-windows-dynamic-v1",
+      "action": "requirement_rebound",
+      "actor": "codex/root",
+      "reason": "绑定变基后正式证据文档与 current exact clean commit bfa1a1180。",
+      "from_status": "blocked",
+      "to_status": "proposed",
+      "at_ms": 1788074829557
+    },
+    {
+      "id": "feature_event_0413730a4e9946cba56407012ad2ba71",
+      "feature_id": "backend-a2b2-joint-close-windows-dynamic-v1",
+      "action": "transitioned",
+      "actor": "codex/root",
+      "reason": "已复核 requirement：只重绑定变基后 exact evidence，不扩大 A2b2、Map/Lock 或生产开放范围。",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1788074840984
+    },
+    {
+      "id": "feature_event_f326df5ba6b84b39afab5af2d15aa96c",
+      "feature_id": "backend-a2b2-joint-close-windows-dynamic-v1",
+      "action": "transitioned",
+      "actor": "codex/root",
+      "reason": "依赖已 verified，requirement 当前且范围复核通过。",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1788074855826
+    },
+    {
+      "id": "feature_event_cbfa69b2a4744d47a15cb0ccc64fa840",
+      "feature_id": "backend-a2b2-joint-close-windows-dynamic-v1",
+      "action": "claimed",
+      "actor": "codex/root",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788074865737
+    },
+    {
+      "id": "feature_event_fcc7d1c69ac14df18280f5e197b4b662",
+      "feature_id": "backend-a2b2-joint-close-windows-dynamic-v1",
+      "action": "transitioned",
+      "actor": "codex/root",
+      "reason": "记录 rebased current implementation evidence 并恢复 verified 状态。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788074876969
+    },
+    {
+      "id": "feature_event_e3b6a1add7814f658762d1005d3386d7",
+      "feature_id": "backend-a2b2-joint-close-windows-dynamic-v1",
+      "action": "evidence_recorded",
+      "actor": "codex/root",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788074922773
+    },
+    {
+      "id": "feature_event_425378e719124ee3b48ac3e6af38211e",
+      "feature_id": "backend-a2b2-joint-close-windows-dynamic-v1",
+      "action": "transitioned",
+      "actor": "codex/root",
+      "reason": "16 条实现证据均绑定当前干净源码；exact Windows families、wide、SHM、A2b1 与 cargo check 已通过。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1788074934958
+    },
+    {
+      "id": "feature_event_06ccd8b0b6c54170ad361d24d48ad9bd",
+      "feature_id": "backend-a2b2-joint-close-windows-dynamic-v1",
+      "action": "transitioned",
+      "actor": "codex/root",
+      "reason": "P0/P1 code/doc 审计通过；exact clean JointClose 36/36、Unmap 49/49、wide 266/266、SHM 11/11、A2b1 4/4 与 production check 全部通过。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1788074946193
     }
   ]
 }
