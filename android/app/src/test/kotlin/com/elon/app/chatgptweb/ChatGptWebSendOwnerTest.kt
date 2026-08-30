@@ -16,6 +16,31 @@ import org.junit.Test
 
 class ChatGptWebSendOwnerTest {
     @Test
+    fun officialTransportChecksTheObservedPageDraftBeforeReplacingIt() {
+        val port = FakeOfficialPageSendCommandPort()
+        val transport = chatGptOfficialPageSendTransport(
+            pageAdapter = { port },
+            snapshot = { snapshot(draft = "stale draft") },
+            ready = { true },
+        )
+
+        val outcome = transport.dispatch(
+            WebChatSendCommand(
+                id = "web_send_draft_authority",
+                prompt = "current prompt",
+                authority = WebChatSendAuthority.OFFICIAL_PAGE,
+                generation = 1L,
+            ),
+        )
+
+        assertEquals(WebChatTransportDispatchResult.QUEUED, outcome)
+        assertEquals("current prompt", port.prompt)
+        assertEquals("stale draft", port.expectedDraft)
+        assertEquals("web_send_draft_authority", port.requestId)
+        assertTrue(port.privateTextTransactionAllowed)
+    }
+
+    @Test
     fun mcpRequestIdIsOwnedByTheSameLedgerAsSocialSends() {
         val fixture = Fixture()
 
@@ -153,6 +178,27 @@ class ChatGptWebSendOwnerTest {
         override fun reconcile() = Unit
     }
 
+    private class FakeOfficialPageSendCommandPort : ChatGptOfficialPageSendCommandPort {
+        var prompt = ""
+        var expectedDraft = ""
+        var requestId: String? = null
+        var privateTextTransactionAllowed = false
+
+        override fun sendPrompt(
+            prompt: String,
+            expectedDraft: String,
+            requestId: String?,
+            allowPrivateTextTransaction: Boolean,
+        ) {
+            this.prompt = prompt
+            this.expectedDraft = expectedDraft
+            this.requestId = requestId
+            privateTextTransactionAllowed = allowPrivateTextTransaction
+        }
+
+        override fun requestSnapshot() = Unit
+    }
+
     private class FakeScheduler {
         private val tasks = linkedSetOf<Runnable>()
 
@@ -169,10 +215,11 @@ class ChatGptWebSendOwnerTest {
         fun snapshot(
             messages: List<ChatGptWebMessage> = emptyList(),
             attachments: List<ChatGptWebAttachment> = emptyList(),
+            draft: String = "",
         ) = ChatGptWebSnapshot(
             title = "",
             url = "https://chatgpt.com/c/test",
-            draft = "",
+            draft = draft,
             messages = messages,
             authenticated = true,
             composerReady = true,

@@ -26,6 +26,7 @@ class WebAiPrivateTransportCatalogTest {
         assertTrue("android_google_web_private_reply_observer_v1" in enabledIds)
         assertTrue("android_web_ai_background_navigation_continuity_v1" in enabledIds)
         assertTrue("android_web_ai_unified_send_coordinator_v1" in enabledIds)
+        assertTrue("android_chatgpt_same_origin_text_transaction_v1" in enabledIds)
         assertTrue("android_chatgpt_realtime_voice_background_overlay_v1" in enabledIds)
 
         val streamSettlement = values.first {
@@ -54,7 +55,11 @@ class WebAiPrivateTransportCatalogTest {
         )
 
         values.forEach { row ->
-            assertFalse(row.getBoolean("direct_post_enabled"))
+            if (row.getString("capability_id") !=
+                "android_chatgpt_same_origin_text_transaction_v1"
+            ) {
+                assertFalse(row.getBoolean("direct_post_enabled"))
+            }
             assertTrue(row.getBoolean("official_page_authoritative"))
             assertTrue(row.getString("fallback").isNotBlank())
         }
@@ -145,6 +150,29 @@ class WebAiPrivateTransportCatalogTest {
         assertEquals(
             "official_page_reconciliation_without_automatic_write_replay",
             sendCoordinator.getString("fallback"),
+        )
+
+        val textTransaction = values.first {
+            it.getString("capability_id") ==
+                "android_chatgpt_same_origin_text_transaction_v1"
+        }
+        assertEquals("completed", textTransaction.getString("implementation_status"))
+        assertEquals(
+            "device_verified_v1_1_1365_adapter_206",
+            textTransaction.getString("verification_status"),
+        )
+        assertTrue(textTransaction.getBoolean("production_default"))
+        assertEquals(
+            BuildConfig.CHATGPT_PRIVATE_TEXT_TRANSACTIONS_ENABLED,
+            textTransaction.getBoolean("runtime_enabled"),
+        )
+        assertEquals(
+            BuildConfig.CHATGPT_PRIVATE_TEXT_TRANSACTIONS_ENABLED,
+            textTransaction.getBoolean("direct_post_enabled"),
+        )
+        assertEquals(
+            "immediate_official_page_transaction_without_write_replay",
+            textTransaction.getString("fallback"),
         )
     }
 

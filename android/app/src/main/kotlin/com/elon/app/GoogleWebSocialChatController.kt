@@ -40,7 +40,7 @@ internal class GoogleWebSocialChatController(
     )
     private val sendTransport = OfficialPageWebChatSendTransport(
         ready = session::canSend,
-        sendPrompt = session::sendPrompt,
+        sendPrompt = { prompt, requestId, _ -> session.sendPrompt(prompt, requestId) },
         requestReconciliation = { session.requestConversationIndex() },
     )
     private val sendCoordinator = WebChatSendCoordinator(

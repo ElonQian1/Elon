@@ -25,6 +25,7 @@ internal data class WebChatSendCommand(
     val prompt: String,
     val authority: WebChatSendAuthority,
     val generation: Long,
+    val privateTextTransactionAllowed: Boolean = true,
     val acceptance: WebChatSendAcceptance = WebChatSendAcceptance.DISPATCHING,
     val pageSyncState: WebChatPageSyncState = WebChatPageSyncState.CLEAN,
     val confirmationRechecks: Int = 0,
@@ -38,6 +39,7 @@ internal class WebChatSendCommandLedger(
         IGNORED,
         ACCEPTED,
         FAILED,
+        UNKNOWN,
     }
 
     enum class FallbackDecision {
@@ -55,6 +57,7 @@ internal class WebChatSendCommandLedger(
         prompt: String,
         authority: WebChatSendAuthority,
         requestId: String? = null,
+        privateTextTransactionAllowed: Boolean = true,
     ): WebChatSendCommand? {
         if (active != null) return null
         val nextGeneration = generation + 1
@@ -69,6 +72,7 @@ internal class WebChatSendCommandLedger(
             prompt = prompt,
             authority = authority,
             generation = generation,
+            privateTextTransactionAllowed = privateTextTransactionAllowed,
         )
         active = command
         return command
@@ -96,16 +100,35 @@ internal class WebChatSendCommandLedger(
         command.copy(acceptance = WebChatSendAcceptance.DISPATCHED_UNCONFIRMED)
     }
 
-    fun acceptReceipt(commandId: String?, ok: Boolean): ReceiptResult {
+    fun acceptReceipt(
+        commandId: String?,
+        ok: Boolean,
+        authority: WebChatSendAuthority? = null,
+        indeterminate: Boolean = false,
+    ): ReceiptResult {
         val command = active ?: return ReceiptResult.IGNORED
         if (commandId.isNullOrBlank() || command.id != commandId) return ReceiptResult.IGNORED
+        val resolvedAuthority = authority ?: command.authority
+        if (indeterminate) {
+            if (command.acceptance == WebChatSendAcceptance.ACCEPTED) return ReceiptResult.IGNORED
+            active = command.copy(
+                authority = resolvedAuthority,
+                acceptance = WebChatSendAcceptance.UNKNOWN,
+                pageSyncState = WebChatPageSyncState.RECONCILING,
+            )
+            return ReceiptResult.UNKNOWN
+        }
         if (!ok) {
-            archive(command.copy(acceptance = WebChatSendAcceptance.FAILED))
+            archive(command.copy(
+                authority = resolvedAuthority,
+                acceptance = WebChatSendAcceptance.FAILED,
+            ))
             return ReceiptResult.FAILED
         }
         active = command.copy(
+            authority = resolvedAuthority,
             acceptance = WebChatSendAcceptance.ACCEPTED,
-            pageSyncState = pageSyncStateAfterAcceptance(command.authority),
+            pageSyncState = pageSyncStateAfterAcceptance(resolvedAuthority),
         )
         return ReceiptResult.ACCEPTED
     }

@@ -136,6 +136,20 @@ internal object WebAiPrivateTransportCatalog {
             fallback = "official_page_reconciliation_without_automatic_write_replay",
         ),
         Entry(
+            id = "android_chatgpt_same_origin_text_transaction_v1",
+            provider = "chatgpt",
+            status = "completed",
+            verification = "device_verified_v1_1_1365_adapter_206",
+            productionDefault = true,
+            runtimeEnabled = BuildConfig.CHATGPT_PRIVATE_TEXT_TRANSACTIONS_ENABLED,
+            requestMode =
+                "versioned_single_flight_same_origin_text_post_when_reusable_else_official_page",
+            healthPolicy =
+                "dynamic_proof_gate_15s_timeout_two_failure_45s_cooldown_and_read_only_reconciliation",
+            fallback = "immediate_official_page_transaction_without_write_replay",
+            directPostEnabled = BuildConfig.CHATGPT_PRIVATE_TEXT_TRANSACTIONS_ENABLED,
+        ),
+        Entry(
             id = "android_chatgpt_realtime_voice_background_overlay_v1",
             provider = "chatgpt",
             status = "completed",
@@ -250,6 +264,7 @@ internal object WebAiPrivateTransportCatalog {
         val requestMode: String,
         val healthPolicy: String,
         val fallback: String,
+        val directPostEnabled: Boolean = false,
     ) {
         fun toJson(): JSONObject = JSONObject()
             .put("capability_id", id)
@@ -261,7 +276,7 @@ internal object WebAiPrivateTransportCatalog {
             .put("request_mode", requestMode)
             .put("health_policy", healthPolicy)
             .put("fallback", fallback)
-            .put("direct_post_enabled", false)
+            .put("direct_post_enabled", directPostEnabled)
             .put("official_page_authoritative", true)
     }
 }

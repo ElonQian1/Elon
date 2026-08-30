@@ -4,7 +4,7 @@
   if (window.__elonChatGptPrivateStreamObserverEnabled !== true) return;
   if (location.origin !== 'https://chatgpt.com') return;
   const existing = window.__elonChatGptPrivateStreamTransport;
-  if (existing && Number(existing.version) >= 10) return;
+  if (existing && Number(existing.version) >= 15) return;
   if (existing && typeof existing.dispose === 'function') {
     try { existing.dispose(); }
     catch (_) { /* A stale transport must not block the upgraded observer. */ }
@@ -31,11 +31,20 @@
   let socketFirstReported = false;
   let socketSuccessReported = false;
   let accessSignal = null;
+  let privateUser = null;
   let conversationGeneration = 0;
   let blockedConversationId = '';
   const ACCESS_SIGNAL_TTL_MS = 2 * 60 * 1000;
 
   function notify() {
+    const textTransactionRelay = window.__elonChatGptPrivateTextTransactionRelay;
+    if (textTransactionRelay && typeof textTransactionRelay.observeStream === 'function') {
+      const current = session.current(location.pathname);
+      if (current) {
+        try { textTransactionRelay.observeStream(current); }
+        catch (_) { /* Native and official reconciliation remain available. */ }
+      }
+    }
     listeners.forEach((listener) => {
       try { listener(); }
       catch (_) { /* Native snapshot fallback remains active. */ }
@@ -69,6 +78,7 @@
     socketFirstReported = false;
     socketSuccessReported = false;
     session.reset();
+    privateUser = null;
     notify();
   }
 
@@ -80,7 +90,49 @@
     socketFirstReported = false;
     socketSuccessReported = false;
     session.reset();
+    privateUser = null;
     notify();
+  }
+
+  function preparePrivateSend(prompt, userMessageId) {
+    const text = String(prompt || '');
+    const id = String(userMessageId || '');
+    if (!text.trim() || text.length > 20000 || !/^[A-Za-z0-9_-]{8,180}$/.test(id)) return false;
+    prepareSend();
+    privateUser = Object.freeze({
+      id,
+      role: 'user',
+      state: 'complete',
+      content: [Object.freeze({ type: 'text', text })]
+    });
+    notify();
+    return true;
+  }
+
+  function preparePrivateRegeneration() {
+    prepareSend();
+    return true;
+  }
+
+  function finishPrivateSend() {
+    if (!session.finish()) session.reset();
+    notify();
+    return true;
+  }
+
+  function mergePrivateUser(messages) {
+    const values = Array.isArray(messages) ? messages : [];
+    if (!privateUser) return values;
+    const existing = values.some((message) => message && (
+      message.id === privateUser.id ||
+      (message.role === 'user' && Array.isArray(message.content) &&
+        message.content.some((part) => part && part.text === privateUser.content[0].text))
+    ));
+    if (existing) {
+      privateUser = null;
+      return values;
+    }
+    return values.concat([privateUser]);
   }
 
   function packedWidgetKey(widget) {
@@ -410,7 +462,7 @@
   function isOfficialConversationStream(method, url, response) {
     if (String(method || 'GET').toUpperCase() !== 'POST') return false;
     if (url.origin !== location.origin ||
-        !/^\/(?:backend-api|backend-anon)\/(?:f\/)?conversation(?:\/|$)/.test(url.pathname)) return false;
+        !/^\/(?:backend-api|backend-anon)\/(?:f\/)?conversation\/?$/.test(url.pathname)) return false;
     if (!response || !response.ok || !response.headers || typeof response.headers.get !== 'function') return false;
     return String(response.headers.get('content-type') || '').toLowerCase()
       .includes('text/event-stream');
@@ -419,7 +471,7 @@
   function isOfficialConversationRequest(method, url) {
     return String(method || 'GET').toUpperCase() === 'POST' &&
       url.origin === location.origin &&
-      /^\/(?:backend-api|backend-anon)\/(?:f\/)?conversation(?:\/|$)/.test(url.pathname);
+      /^\/(?:backend-api|backend-anon)\/(?:f\/)?conversation\/?$/.test(url.pathname);
   }
 
   function observeAccessResponse(method, url, response) {
@@ -567,11 +619,14 @@
   }
 
   window.__elonChatGptPrivateStreamTransport = Object.freeze({
-    version: 11,
+    version: 15,
     enabled: true,
     current: (pathname) => session.current(pathname),
     access: currentAccess,
-    mergeMessages: (messages, pathname) => session.merge(messages, pathname),
+    mergeMessages: (messages, pathname) => session.merge(mergePrivateUser(messages), pathname),
+    preparePrivateSend,
+    preparePrivateRegeneration,
+    finishPrivateSend,
     prepareSend,
     reset: resetConversationBoundary,
     subscribe: (listener) => {
@@ -589,6 +644,7 @@
       if (typeof socketUnsubscribe === 'function') socketUnsubscribe();
       socketUnsubscribe = null;
       accessSignal = null;
+      privateUser = null;
       session.reset();
       if (window.fetch === wrappedFetch) window.fetch = originalFetch;
     }

@@ -20,7 +20,7 @@ internal class ChatGptWebPageAdapter(
     private val onStateChanged: (State) -> Unit,
     private val onDocumentChanged: (WebBridgeDocumentSession.Snapshot) -> Unit = {},
     private val onWebExecutionRequested: () -> Unit = {},
-) {
+) : ChatGptOfficialPageSendCommandPort {
     enum class State {
         WEB_ONLY,
         CONNECTING,
@@ -39,6 +39,8 @@ internal class ChatGptWebPageAdapter(
                 ${BuildConfig.CHATGPT_PRIVATE_CONVERSATION_PREFETCH_ENABLED};
             window.__elonChatGptPrivateStreamObserverEnabled =
                 ${BuildConfig.CHATGPT_PRIVATE_STREAM_OBSERVER_ENABLED};
+            window.__elonChatGptPrivateTextTransactionsEnabled =
+                ${BuildConfig.CHATGPT_PRIVATE_TEXT_TRANSACTIONS_ENABLED};
             if (!/^doc_[a-z0-9_]{3,80}$/.test(String(window.__elonChatGptDocumentToken || ""))) {
                 window.__elonChatGptDocumentToken =
                     "doc_android_" + Math.random().toString(36).slice(2) + Date.now().toString(36);
@@ -52,7 +54,14 @@ internal class ChatGptWebPageAdapter(
     private val privateEarlyTapScript = """
         window.__elonChatGptPrivateStreamObserverEnabled =
             ${BuildConfig.CHATGPT_PRIVATE_STREAM_OBSERVER_ENABLED};
-    """.trimIndent() + "\n" + listOf(PRIVATE_FETCH_TAP_ASSET, PRIVATE_SOCKET_TAP_ASSET)
+        window.__elonChatGptPrivateTextTransactionsEnabled =
+            ${BuildConfig.CHATGPT_PRIVATE_TEXT_TRANSACTIONS_ENABLED};
+    """.trimIndent() + "\n" + listOf(
+        PRIVATE_FETCH_TAP_ASSET,
+        PRIVATE_TEXT_TRANSACTION_POLICY_ASSET,
+        PRIVATE_TEXT_TRANSACTION_RELAY_ASSET,
+        PRIVATE_SOCKET_TAP_ASSET,
+    )
         .joinToString("\n") { asset -> context.assets.open(asset).use { input ->
             input.reader(StandardCharsets.UTF_8).readText()
         }
@@ -121,7 +130,10 @@ internal class ChatGptWebPageAdapter(
             )
         }
         if (
-            BuildConfig.CHATGPT_PRIVATE_STREAM_OBSERVER_ENABLED &&
+            (
+                BuildConfig.CHATGPT_PRIVATE_STREAM_OBSERVER_ENABLED ||
+                    BuildConfig.CHATGPT_PRIVATE_TEXT_TRANSACTIONS_ENABLED
+            ) &&
             WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)
         ) {
             WebViewCompat.addDocumentStartJavaScript(
@@ -192,11 +204,17 @@ internal class ChatGptWebPageAdapter(
         )
     }
 
-    fun sendPrompt(prompt: String, expectedDraft: String, requestId: String? = null) = runCommand(
+    override fun sendPrompt(
+        prompt: String,
+        expectedDraft: String,
+        requestId: String?,
+        allowPrivateTextTransaction: Boolean,
+    ) = runCommand(
         action = "send_prompt",
         value = prompt.take(MAX_PROMPT_LENGTH),
         expectedDraft = expectedDraft.take(MAX_PROMPT_LENGTH),
         requestId = requestId,
+        allowPrivateTextTransaction = allowPrivateTextTransaction,
     )
 
     fun setDraft(value: String, expectedDraft: String, requestId: String) = runCommand(
@@ -374,7 +392,7 @@ internal class ChatGptWebPageAdapter(
         )
     }
 
-    fun requestSnapshot() = runCommand("snapshot")
+    override fun requestSnapshot() = runCommand("snapshot")
 
     fun requestConversationRefresh() = runCommand("refresh_current_conversation")
 
@@ -426,6 +444,7 @@ internal class ChatGptWebPageAdapter(
         choiceIndex: Int? = null,
         numericValue: Double? = null,
         expanded: Boolean? = null,
+        allowPrivateTextTransaction: Boolean? = null,
         projectHints: List<ChatGptWebProject> = emptyList(),
         projectScopeId: String? = null,
     ) {
@@ -443,6 +462,9 @@ internal class ChatGptWebPageAdapter(
                 if (choiceIndex != null) put("choiceIndex", choiceIndex)
                 if (numericValue != null && numericValue.isFinite()) put("numericValue", numericValue)
                 if (expanded != null) put("expanded", expanded)
+                if (allowPrivateTextTransaction != null) {
+                    put("allowPrivateTextTransaction", allowPrivateTextTransaction)
+                }
                 ChatGptWebConversationPath.canonicalProjectId(projectScopeId)?.let {
                     put("projectScopeId", it)
                 }
@@ -471,7 +493,7 @@ internal class ChatGptWebPageAdapter(
         origin.scheme == "https" && origin.host == "chatgpt.com" && origin.port == -1
 
     companion object {
-        internal const val ADAPTER_VERSION = 190
+        internal const val ADAPTER_VERSION = 206
 
         private val ADAPTER_ASSETS = listOf(
             "chatgpt_web_adapter_bootstrap.js",
@@ -515,15 +537,22 @@ internal class ChatGptWebPageAdapter(
             "chatgpt_web_realtime_voice_research.js",
             "chatgpt_web_private_transport_policy.js",
             "chatgpt_web_private_transport.js",
+            "chatgpt_web_private_text_transaction_policy.js",
+            "chatgpt_web_private_text_transaction_relay.js",
             "chatgpt_web_private_stream_policy.js",
             "chatgpt_web_private_stream_transport.js",
             "chatgpt_web_private_send_observer.js",
+            "chatgpt_web_text_transaction_orchestrator.js",
             "chatgpt_web_adapter.js",
         )
         private const val BRIDGE_OBJECT = "elonChatGptNative"
         private const val ALLOWED_ORIGIN = "https://chatgpt.com"
         private const val PRIVATE_FETCH_TAP_ASSET = "chatgpt_web_private_fetch_tap.js"
         private const val PRIVATE_SOCKET_TAP_ASSET = "chatgpt_web_private_socket_tap.js"
+        private const val PRIVATE_TEXT_TRANSACTION_POLICY_ASSET =
+            "chatgpt_web_private_text_transaction_policy.js"
+        private const val PRIVATE_TEXT_TRANSACTION_RELAY_ASSET =
+            "chatgpt_web_private_text_transaction_relay.js"
         private const val PRIVATE_REALTIME_VOICE_RESEARCH_ASSET =
             "chatgpt_web_realtime_voice_research.js"
         private const val PRIVATE_REALTIME_VOICE_RELAY_ASSET =

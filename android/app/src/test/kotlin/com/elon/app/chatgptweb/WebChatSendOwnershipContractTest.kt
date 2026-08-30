@@ -15,6 +15,7 @@ class WebChatSendOwnershipContractTest {
         val sourceRoot = root().resolve("android/app/src/main/kotlin")
         val allowed = setOf(
             "com/elon/app/chatgptweb/ChatGptWebSendOwner.kt",
+            "com/elon/app/GoogleWebSocialChatController.kt",
             "com/elon/app/googleweb/GoogleWebBackgroundSession.kt",
         )
         val violations = mutableListOf<String>()

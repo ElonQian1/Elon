@@ -96,10 +96,21 @@ const adapterSource = fs.readFileSync(path.join(
   'assets',
   'chatgpt_web_adapter.js'
 ), 'utf8');
+const orchestratorSource = fs.readFileSync(path.join(
+  __dirname,
+  '..',
+  'android',
+  'app',
+  'src',
+  'main',
+  'assets',
+  'chatgpt_web_text_transaction_orchestrator.js'
+), 'utf8');
 assert.match(adapterSource, /function scheduleSnapshot\(recordsOrActive\)/);
 assert.match(adapterSource, /streamingSnapshotMode = streaming/);
-assert.match(adapterSource, /recordsOrActive === true \|\| streamingSnapshotMode/);
-assert.match(adapterSource, /button\.click\(\);\s*scheduleSnapshot\(true\)/);
+assert.match(adapterSource, /const forced = recordsOrActive === true/);
+assert.match(adapterSource, /const active = forced \|\| streamingSnapshotMode/);
+assert.match(orchestratorSource, /button\.click\(\);\s*options\.scheduleSnapshot\(true\)/);
 assert.match(adapterSource, /snapshotScheduler\.schedule\(active\)/);
 assert.match(adapterSource, /quietDelayMs:\s*240/);
 assert.match(adapterSource, /maxDelayMs:\s*5000/);

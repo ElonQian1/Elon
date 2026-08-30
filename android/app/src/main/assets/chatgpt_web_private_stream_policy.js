@@ -608,7 +608,15 @@
       const progress = progressFrame(payload);
       if (progress) {
         if (!stream) begin();
-        stream = Object.assign({}, stream, progress, { updatedAt: now() });
+        const sameConversation = !progress.conversationId || !stream.conversationId ||
+          progress.conversationId === stream.conversationId;
+        const progressState = stream.state === 'completed' && sameConversation
+          ? 'completed'
+          : 'streaming';
+        stream = Object.assign({}, stream, progress, {
+          state: progressState,
+          updatedAt: now()
+        });
         accepted = true;
       }
       const visible = assistantEnvelope(payload);
@@ -618,8 +626,12 @@
       if (!stream) begin();
       const frame = assistantFrame(payload);
       const rawStatus = String(visible.message.status || visible.envelope.status || '').toLowerCase();
-      stream = Object.assign({}, stream, {
-        id: String(visible.message.id || stream.id || '').slice(0, 180),
+      const nextId = String(visible.message.id || stream.id || '').slice(0, 180);
+      const explicitlyCompleted = /^(completed|finished_successfully|finished)$/.test(rawStatus);
+      const sameCompletedMessage = stream.state === 'completed' && !!nextId &&
+        nextId === stream.id;
+      stream = Object.assign({}, stream, frame || {}, {
+        id: nextId,
         turnId: String(
           visible.message.metadata && (
             visible.message.metadata.turn_exchange_id ||
@@ -629,11 +641,9 @@
         conversationId: String(
           visible.envelope.conversation_id || visible.envelope.conversationId || stream.conversationId || ''
         ).slice(0, 180),
-        state: /^(completed|finished_successfully|finished)$/.test(rawStatus)
-          ? 'completed'
-          : 'streaming',
+        state: explicitlyCompleted || sameCompletedMessage ? 'completed' : 'streaming',
         updatedAt: now()
-      }, frame || {});
+      });
       const chartPart = clientChartPartFromMetadata(visible.message.metadata);
       if (chartPart) {
         const richParts = Array.isArray(stream.richParts) ? stream.richParts.slice() : [];

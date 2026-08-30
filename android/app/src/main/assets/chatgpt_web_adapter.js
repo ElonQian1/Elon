@@ -14,8 +14,8 @@
   const streamWatchdogAcceptanceModule = window.__elonChatGptStreamWatchdogAcceptance;
   const skinAdapter = window.__elonChatGptSkin;
   const privateTransport = window.__elonChatGptPrivateTransport;
+  const textTransactionOrchestratorModule = window.__elonChatGptTextTransactionOrchestrator;
   const privateStreamTransport = window.__elonChatGptPrivateStreamTransport;
-  const privateSendObserver = window.__elonChatGptPrivateSendObserver;
   const privateConversationDirectory = window.__elonChatGptPrivateConversationDirectory;
   const authenticationPolicy = window.__elonChatGptAuthenticationPolicy;
   const adapterVersion = Number(window.__elonChatGptAdapterVersion || 0);
@@ -33,15 +33,27 @@
   let streamingSnapshotMode = false;
   let privateStreamingSnapshotMode = false;
   let skinMode = false;
-  const SEND_BUTTON_POLL_MS = 60;
-  const SEND_BUTTON_SETTLE_MS = 180;
-  const SEND_BUTTON_TIMEOUT_MS = 4000;
-  const SEND_ACCEPT_TIMEOUT_MS = 3000;
   const streamingPolicy = streamingPolicyModule && streamingPolicyModule.create({
     now: Date.now,
     scheduleTimer: (delayMs, action) => window.setTimeout(action, delayMs),
     cancelTimer: (timer) => clearTimeout(timer)
   });
+  const textTransactionOrchestrator = textTransactionOrchestratorModule &&
+    typeof textTransactionOrchestratorModule.create === 'function'
+    ? textTransactionOrchestratorModule.create({
+      findComposer,
+      composerValue,
+      setComposerValue,
+      comparableText,
+      findButton,
+      isVisible,
+      readStreamingState,
+      streamingPolicy,
+      streamingPolicyModule,
+      messageAdapter,
+      scheduleSnapshot
+    })
+    : null;
   const streamWatchdogAcceptance = streamWatchdogAcceptanceModule &&
     streamWatchdogAcceptanceModule.create({
     probeModule: window.__elonChatGptStreamWatchdogProbe,
@@ -222,6 +234,12 @@
       )
       : { active: false, assistantKey: '' };
   }
+
+  function invalidatePrivateTextContext() {
+    const relay = window.__elonChatGptPrivateTextTransactionRelay;
+    if (relay && typeof relay.invalidateContext === 'function') relay.invalidateContext();
+  }
+
   function detectCapabilities(composer) {
     const capabilities = [
       'streaming',
@@ -361,19 +379,6 @@
     nativeBridge.postMessage(JSON.stringify(event));
   }
 
-  function findSendButton(composer) {
-    const scope = composer && composer.closest('form');
-    const candidates = [
-      scope && scope.querySelector('[data-testid="send-button"]'),
-      scope && scope.querySelector('button[aria-label*="send" i]'),
-      scope && scope.querySelector('button[type="submit"]'),
-      findButton('send-button', ['send', '发送'])
-    ];
-    return candidates.find((button) =>
-      isVisible(button) && !button.disabled && button.getAttribute('aria-disabled') !== 'true'
-    ) || null;
-  }
-
   function waitForReady(check, timeoutMs, onReady, onTimeout) {
     const started = Date.now();
     function poll() {
@@ -383,90 +388,6 @@
       window.setTimeout(poll, 60);
     }
     poll();
-  }
-
-  function waitForStableSendButton(composer, expectedValue, onReady, onTimeout) {
-    const started = Date.now();
-    let readySince = 0;
-    let readyButton = null;
-    function poll() {
-      const button = findSendButton(composer);
-      const draftMatches = comparableText(composerValue(composer)) === comparableText(expectedValue);
-      if (button && draftMatches) {
-        if (button !== readyButton) {
-          readyButton = button;
-          readySince = Date.now();
-        }
-        if (Date.now() - readySince >= SEND_BUTTON_SETTLE_MS) return onReady(button);
-      } else {
-        readyButton = null;
-        readySince = 0;
-      }
-      if (Date.now() - started >= SEND_BUTTON_TIMEOUT_MS) return onTimeout();
-      window.setTimeout(poll, SEND_BUTTON_POLL_MS);
-    }
-    poll();
-  }
-
-  function waitForSendAccepted(composer, expectedValue, sendMarker, onAccepted, onTimeout) {
-    const started = Date.now();
-    function poll() {
-      if (privateSendObserver && typeof privateSendObserver.dispatchedAfter === 'function' &&
-          privateSendObserver.dispatchedAfter(sendMarker)) {
-        return onAccepted('official_request_dispatched');
-      }
-      const currentValue = comparableText(composerValue(composer));
-      if (!currentValue || currentValue !== comparableText(expectedValue) || readStreamingState().active) {
-        return onAccepted('official_page_accepted');
-      }
-      if (Date.now() - started >= SEND_ACCEPT_TIMEOUT_MS) return onTimeout();
-      window.setTimeout(poll, SEND_BUTTON_POLL_MS);
-    }
-    poll();
-  }
-
-  function sendPrompt(value, expectedDraft, respond) {
-    const composer = findComposer();
-    const assistantBeforeSend = streamingPolicyModule && streamingPolicyModule.messageObservation(messageAdapter);
-    if (!composer) return respond('send_prompt', false, '未找到输入框，请切换网页模式。');
-    if (comparableText(composerValue(composer)) !== comparableText(expectedDraft)) {
-      return respond('send_prompt', false, '网页草稿已变化，请返回官网确认后重试。');
-    }
-    if (!setComposerValue(composer, value)) {
-      return respond('send_prompt', false, '官方输入框未接受文本，请返回官网重试。');
-    }
-    waitForStableSendButton(
-      composer,
-      value,
-      (button) => {
-        const sendMarker = privateSendObserver && typeof privateSendObserver.marker === 'function'
-          ? privateSendObserver.marker()
-          : null;
-        if (privateStreamTransport && typeof privateStreamTransport.prepareSend === 'function') {
-          privateStreamTransport.prepareSend();
-        }
-        button.click();
-        scheduleSnapshot(true);
-        waitForSendAccepted(
-          composer,
-          value,
-          sendMarker,
-          (acceptance) => {
-            if (streamingPolicy) streamingPolicy.begin(assistantBeforeSend);
-            respond(
-              'send_prompt',
-              true,
-              acceptance === 'official_request_dispatched'
-                ? '官网发送请求已提交。'
-                : '官方网页已确认发送。'
-            );
-            scheduleSnapshot();
-          },
-          () => respond('send_prompt', false, '官方网页未确认发送，请重试。')
-        );
-      },
-      () => respond('send_prompt', false, '发送按钮尚未就绪，请返回官网重试。')
-    );
   }
 
   function setDraft(value, expectedDraft, respond) {
@@ -509,6 +430,7 @@
       return result(action || 'unknown', false, '页面已更新，请重新执行。', requestId);
     }
     const respond = (resultAction, ok, detail) => result(resultAction, ok, detail, requestId);
+    respond.requestId = requestId;
     if (action === 'snapshot') return snapshot();
     if (action === 'set_skin_mode') {
       if (!skinAdapter || typeof skinAdapter.setEnabled !== 'function') {
@@ -540,10 +462,14 @@
       return layoutAdapter.invoke(String(command.value || ''), emitEvent, respond);
     }
     if (action === 'send_prompt') {
-      return sendPrompt(
+      if (!textTransactionOrchestrator) {
+        return respond(action, false, '发送事务模块尚未就绪，请重试。');
+      }
+      return textTransactionOrchestrator.sendPrompt(
         String(command.value || '').slice(0, 20000),
         String(command.expectedDraft || '').slice(0, 20000),
-        respond
+        respond,
+        command.allowPrivateTextTransaction === true
       );
     }
     if (action === 'set_draft') {
@@ -567,16 +493,19 @@
       return composerAdapter.collectRequestedOptions('tools', findComposer(), emitEvent, respond);
     }
     if (action === 'select_model_option' && composerAdapter) {
+      invalidatePrivateTextContext();
       return composerAdapter.selectOption(
         'model', String(command.value || ''), findComposer(), emitEvent, respond, scheduleSnapshot
       );
     }
     if (action === 'select_composer_tool' && composerAdapter) {
+      invalidatePrivateTextContext();
       return composerAdapter.selectOption(
         'tools', String(command.value || ''), findComposer(), emitEvent, respond, scheduleSnapshot
       );
     }
     if (action === 'request_attachment_upload' && composerAdapter) {
+      invalidatePrivateTextContext();
       return composerAdapter.requestAttachmentUpload(respond);
     }
     if (action === 'open_model_selector' && composerAdapter) {
@@ -618,16 +547,19 @@
       );
     }
     if (action === 'set_ui_control_selected' && layoutAdapter) {
+      invalidatePrivateTextContext();
       return layoutAdapter.setSelected(
         String(command.controlId || ''), command.selected === true, emitEvent, respond
       );
     }
     if (action === 'select_ui_control_choice' && layoutAdapter) {
+      invalidatePrivateTextContext();
       return layoutAdapter.selectChoice(
         String(command.controlId || ''), Number(command.choiceIndex), emitEvent, respond
       );
     }
     if (action === 'set_ui_control_slider' && layoutAdapter) {
+      invalidatePrivateTextContext();
       return layoutAdapter.setSliderValue(
         String(command.controlId || ''), Number(command.numericValue), emitEvent, respond
       );
@@ -658,6 +590,7 @@
       if (comparableText(composerValue(findComposer()))) {
         return respond(action, false, '网页中有未发送草稿，请先处理草稿。');
       }
+      invalidatePrivateTextContext();
       const path = String(command.value || '');
       const navigate = () => conversationAdapter.openConversation(path, respond);
       if (privateTransport && privateTransport.conversationPrefetchEnabled === true &&
@@ -671,6 +604,7 @@
       if (comparableText(composerValue(findComposer()))) {
         return respond(action, false, '网页中有未发送草稿，请先处理草稿。');
       }
+      invalidatePrivateTextContext();
       return conversationAdapter.openProject(String(command.value || ''), respond);
     }
     if (action === 'regenerate_response' && messageAdapter) {
@@ -680,9 +614,12 @@
       if (streamingPolicyModule) streamingPolicyModule.begin(
         streamingPolicy, messageAdapter, { allowSameTurn: true }
       );
+      if (textTransactionOrchestrator &&
+          textTransactionOrchestrator.tryPrivateRegeneration(respond)) return;
       return messageAdapter.regenerate(emitEvent, respond);
     }
     if (action === 'stop_generation') {
+      if (textTransactionOrchestrator && textTransactionOrchestrator.stopPrivate(respond)) return;
       const composer = findComposer();
       const scope = composer && composer.closest('form');
       const stop = document.querySelector('[data-testid="stop-button"]') ||
@@ -704,6 +641,7 @@
         return respond(action, false, '网页中有未发送草稿，请先处理草稿。');
       }
       if (!conversationAdapter) return respond(action, false, '会话适配器尚未就绪。');
+      invalidatePrivateTextContext();
       if (streamingPolicy) streamingPolicy.reset();
       if (privateStreamTransport && typeof privateStreamTransport.reset === 'function') {
         privateStreamTransport.reset();

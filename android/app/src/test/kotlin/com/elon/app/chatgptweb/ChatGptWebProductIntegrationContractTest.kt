@@ -82,6 +82,7 @@ class ChatGptWebProductIntegrationContractTest {
         )
         assertTrue(mainMcp.contains("web_chat_attachment_phase"))
         assertTrue(mainMcp.contains("web_chat_last_command"))
+        assertTrue(mainMcp.contains("web_chat_last_send_command"))
         assertTrue(mainMcp.contains("web_chat_streaming"))
         assertTrue(feature.contains("webChatLastCommandStatus"))
         assertTrue(mainMcp.contains("start_new_web_chat_conversation"))

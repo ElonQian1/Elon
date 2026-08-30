@@ -380,8 +380,8 @@ internal class MainSocialAiChatFeature(
 
     fun webChatStreaming(): Boolean = isChatModeActive() && activeController().streaming()
 
-    fun webChatLastCommandStatus(): WebChatCommandStatus? =
-        if (isChatModeActive()) activeController().lastCommandStatus() else null
+    fun webChatLastCommandStatus() = if (isChatModeActive()) activeController().lastCommandStatus() else null
+    fun webChatLastSendCommandStatus() = if (isChatModeActive()) activeController().lastSendCommandStatus() else null
 
     fun stopWebChatGeneration(): Boolean {
         if (!webChatStreaming()) return false

@@ -71,17 +71,27 @@ function responseFor(chunks) {
   const reactCapturedFetch = window.fetch;
   vm.runInNewContext(policySource, sandbox, { filename: 'chatgpt_web_private_stream_policy.js' });
   vm.runInNewContext(transportSource, sandbox, { filename: 'chatgpt_web_private_stream_transport.js' });
-  assert.equal(window.__elonChatGptPrivateFetchTap.version, 1);
-  assert.equal(window.__elonChatGptPrivateStreamTransport.version, 11);
+  assert.equal(window.__elonChatGptPrivateFetchTap.version, 2);
+  assert.equal(window.__elonChatGptPrivateStreamTransport.version, 15);
 
   const request = { method: 'POST', url: 'https://chatgpt.com/backend-api/f/conversation' };
   const init = { method: 'POST' };
   Object.defineProperty(init, 'headers', { get: () => { throw new Error('headers must not be read'); } });
   Object.defineProperty(init, 'body', { get: () => { throw new Error('body must not be read'); } });
+  await reactCapturedFetch({
+    method: 'POST',
+    url: 'https://chatgpt.com/backend-api/f/conversation/prepare'
+  }, init);
+  for (let index = 0; index < 4; index += 1) await tick();
+  assert.equal(
+    window.__elonChatGptPrivateStreamTransport.current('/c/early-fetch'),
+    null,
+    'prepare responses never enter the message stream observer'
+  );
   const returned = await reactCapturedFetch(request, init);
   for (let index = 0; index < 8; index += 1) await tick();
   assert.equal(returned, response, 'the tap never replaces the official response');
-  assert.equal(calls, 1, 'the tap never replays the official request');
+  assert.equal(calls, 2, 'the tap never replays official or prepare requests');
   assert.equal(
     window.__elonChatGptPrivateStreamTransport.current('/c/early-fetch').text,
     'hello from early fetch',
@@ -89,7 +99,7 @@ function responseFor(chunks) {
   );
 
   await reactCapturedFetch('https://chatgpt.com/backend-api/accounts/check', { method: 'GET' });
-  assert.equal(calls, 2, 'unrelated requests still pass through exactly once');
+  assert.equal(calls, 3, 'unrelated requests still pass through exactly once');
   window.__elonChatGptPrivateStreamTransport.dispose();
   window.__elonChatGptPrivateFetchTap.dispose();
   assert.equal(window.fetch, originalFetch);

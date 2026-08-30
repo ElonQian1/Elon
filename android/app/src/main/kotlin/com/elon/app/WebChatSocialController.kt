@@ -55,6 +55,7 @@ internal interface WebChatSocialController {
     fun endRealtimeVoiceBacking(gracefulExit: Boolean) = Unit
     fun mcpPort(): WebChatSocialMcpPort? = null
     fun lastCommandStatus(): WebChatCommandStatus? = null
+    fun lastSendCommandStatus(): WebChatCommandStatus? = null
     fun discardAcceptanceAttachmentSend(): Boolean = false
     fun retryGuestAccess(): Boolean = false
     fun retryConnection(): Boolean = false

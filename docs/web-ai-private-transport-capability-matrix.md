@@ -24,6 +24,7 @@ installed build; individual capability documents retain implementation evidence.
 | Reply stream and completion observer | Google Web AI | Completed, enabled, and stream-to-completion device verified on `v1.1.1303 (1313)` | Official DOM snapshot |
 | Background navigation continuity | ChatGPT and Google Web AI | Completed, enabled, and device verified | Bounded official WebView recovery |
 | Unified native send ledger | ChatGPT and Google Web AI | Completed and enabled; stable request-ID reconciliation targeted tests passed, device regression pending | Official-page reconciliation without automatic write replay |
+| Same-origin text transaction | ChatGPT | Completed, enabled, and device verified on `v1.1.1365 (1386)`, adapter `206`; current dynamic proof selects immediate official fallback | Official-page transaction without automatic write replay |
 
 All web-account transports keep the official page authoritative. They do not export
 cookies, credentials, request headers, or private conversation content outside the
@@ -142,9 +143,13 @@ The coordinator never retries a write by issuing a second request. A queued comm
 a receipt moves to `unknown/reconciling`, performs bounded read-only reconciliation, and then
 asks the user to inspect the official page without restoring a potentially already-sent
 draft. A command accepted by either transport forbids fallback write replay. A future
-same-origin private sender may plug into this ledger only after it supplies a versioned
-request contract and an explicit page-state handoff; current observers intentionally do not
-capture enough request material, so ChatGPT and Google direct POST remain disabled.
+same-origin direct ChatGPT sender is now connected through a versioned pure-text transaction.
+It is eligible only for a current, route-bound, stream-confirmed request template without
+one-time dynamic proof. Current ChatGPT Web sends contain such proof, so adapter `206`
+rejects the direct path before dispatch and immediately invokes the official page transaction.
+The 15-second transport timeout, two-failure 45-second cooldown, explicit stop semantics, and
+read-only reconciliation remain active if a future page contract exposes a reusable template.
+Google direct POST remains disabled.
 
 Device acceptance on `v1.1.1313 (1323)` verified the production friend-chat surface with
 ChatGPT adapter `188` and Google adapter `37`. Both providers completed an isolated exact

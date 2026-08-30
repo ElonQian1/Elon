@@ -18,18 +18,35 @@ internal data class ChatGptWebSendReceipt(
     val origin: ChatGptWebSendOrigin,
     val ok: Boolean,
     val failedPrompt: String? = null,
+    val indeterminate: Boolean = false,
 )
 
+internal interface ChatGptOfficialPageSendCommandPort {
+    fun sendPrompt(
+        prompt: String,
+        expectedDraft: String,
+        requestId: String?,
+        allowPrivateTextTransaction: Boolean,
+    )
+
+    fun requestSnapshot()
+}
+
 internal fun chatGptOfficialPageSendTransport(
-    pageAdapter: () -> ChatGptWebPageAdapter?,
+    pageAdapter: () -> ChatGptOfficialPageSendCommandPort?,
     snapshot: () -> ChatGptWebSnapshot?,
     ready: () -> Boolean,
 ): WebChatSendTransport = OfficialPageWebChatSendTransport(
     ready = ready,
-    sendPrompt = send@ { prompt, requestId ->
+    sendPrompt = send@ { prompt, requestId, privateTextTransactionAllowed ->
         val adapter = pageAdapter() ?: return@send false
         val current = snapshot() ?: return@send false
-        adapter.sendPrompt(prompt, current.draft, requestId)
+        adapter.sendPrompt(
+            prompt,
+            current.draft,
+            requestId,
+            privateTextTransactionAllowed,
+        )
         true
     },
     requestReconciliation = { pageAdapter()?.requestSnapshot() },
@@ -94,6 +111,7 @@ internal class ChatGptWebSendOwner(
         val reserved = coordinator.reserve(
             prompt = prompt,
             baselineSnapshot = current,
+            privateTextTransactionAllowed = false,
             onPending = onSendStateChanged,
         )
         if (reserved.outcome != WebChatSendCoordinator.ReserveOutcome.RESERVED) return false
@@ -145,15 +163,26 @@ internal class ChatGptWebSendOwner(
         if (event.action != "send_prompt") return null
         if (event.requestId.isNullOrBlank() || event.requestId != coordinator.commandId()) return null
         val matchedOrigin = origin ?: return null
-        val failedPrompt = coordinator.acceptCommandResult(event.requestId, event.ok)
-        if (!event.ok) {
+        val semantics = ChatGptWebPrivateTextReceiptPolicy.resolve(event)
+        val failedPrompt = coordinator.acceptCommandResult(
+            requestId = event.requestId,
+            ok = event.ok,
+            authority = semantics.authority,
+            indeterminate = semantics.indeterminate,
+        )
+        if (!event.ok && !semantics.indeterminate) {
             origin = null
             if (matchedOrigin == ChatGptWebSendOrigin.ATTACHMENT) {
                 failAttachmentSend(event.detail.ifBlank { "官网附件操作失败，请重试。" })
             }
         }
         onSendStateChanged()
-        return ChatGptWebSendReceipt(matchedOrigin, event.ok, failedPrompt)
+        return ChatGptWebSendReceipt(
+            origin = matchedOrigin,
+            ok = event.ok && !semantics.indeterminate,
+            failedPrompt = failedPrompt,
+            indeterminate = semantics.indeterminate,
+        )
     }
 
     fun failFileChooser(detail: String) = failAttachmentSend(detail)

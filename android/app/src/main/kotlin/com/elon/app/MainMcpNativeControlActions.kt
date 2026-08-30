@@ -588,6 +588,20 @@ internal class MainMcpNativeControlActions(
                 },
             )
             .put(
+                "web_chat_last_send_command",
+                if (friend.isSocialAi()) {
+                    feature?.webChatLastSendCommandStatus()?.let { status ->
+                        JSONObject()
+                            .put("action", status.action)
+                            .put("ok", status.ok)
+                            .put("detail", status.detail)
+                            .put("observed_at_ms", status.observedAtMs)
+                    } ?: JSONObject.NULL
+                } else {
+                    JSONObject.NULL
+                },
+            )
+            .put(
                 "web_chat_attachment_supported",
                 friend.isSocialAi() && feature?.webChatAttachmentSupported() == true,
             )

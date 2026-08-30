@@ -8,7 +8,12 @@ const vm = require('node:vm');
 const source = fs.readFileSync(path.join(
   __dirname, '..', 'android', 'app', 'src', 'main', 'assets', 'chatgpt_web_adapter.js'
 ), 'utf8');
+const orchestratorSource = fs.readFileSync(path.join(
+  __dirname, '..', 'android', 'app', 'src', 'main', 'assets',
+  'chatgpt_web_text_transaction_orchestrator.js'
+), 'utf8');
 const events = [];
+const privateDispatches = [];
 
 class NodeElement {}
 
@@ -42,6 +47,19 @@ const window = {
   __elonChatGptSnapshotScheduler: {
     create() { return { schedule() {}, dispose() {} }; }
   },
+  __elonChatGptPrivateTextTransactionRelay: {
+    dispatch(command) {
+      privateDispatches.push(command.prompt);
+      return {
+        dispatched: true,
+        userMessageId: 'private_user_message',
+        completion: Promise.resolve({ status: 'accepted', code: 'accepted' })
+      };
+    }
+  },
+  __elonChatGptPrivateStreamTransport: {
+    preparePrivateSend() { return true; }
+  },
   getComputedStyle: () => ({ display: 'block', visibility: 'visible' }),
   setTimeout,
   clearTimeout,
@@ -61,7 +79,7 @@ Object.defineProperty(InputElement.prototype, 'value', {
 });
 window.window = window;
 
-vm.runInNewContext(source, {
+const sandbox = {
   window,
   document,
   location: window.location,
@@ -73,30 +91,56 @@ vm.runInNewContext(source, {
   Node: window.Node,
   setTimeout,
   clearTimeout
-}, { filename: 'chatgpt_web_adapter.js' });
+};
 
-window.__elonChatGptBridge.command(JSON.stringify({
-  action: 'set_draft',
-  documentToken: 'doc_test_1',
-  requestId: 'mcp_a',
-  value: 'next draft',
-  expectedDraft: 'old draft'
-}));
-assert.equal(composer.value, 'next draft');
-assert.equal(events.at(-1).action, 'set_draft');
-assert.equal(events.at(-1).ok, true);
-assert.equal(events.at(-1).requestId, 'mcp_a');
+vm.runInNewContext(orchestratorSource, sandbox, {
+  filename: 'chatgpt_web_text_transaction_orchestrator.js'
+});
 
-window.__elonChatGptBridge.command(JSON.stringify({
-  action: 'set_draft',
-  documentToken: 'doc_test_1',
-  requestId: 'mcp_b',
-  value: 'must not overwrite',
-  expectedDraft: 'stale draft'
-}));
-assert.equal(composer.value, 'next draft');
-assert.equal(events.at(-1).action, 'set_draft');
-assert.equal(events.at(-1).ok, false);
-assert.equal(events.at(-1).requestId, 'mcp_b');
+vm.runInNewContext(source, sandbox, { filename: 'chatgpt_web_adapter.js' });
 
-console.log('CHATGPT_DRAFT_SYNC_POLICY=passed');
+(async () => {
+  window.__elonChatGptBridge.command(JSON.stringify({
+    action: 'set_draft',
+    documentToken: 'doc_test_1',
+    requestId: 'mcp_a',
+    value: 'next draft',
+    expectedDraft: 'old draft'
+  }));
+  assert.equal(composer.value, 'next draft');
+  assert.equal(events.at(-1).action, 'set_draft');
+  assert.equal(events.at(-1).ok, true);
+  assert.equal(events.at(-1).requestId, 'mcp_a');
+
+  window.__elonChatGptBridge.command(JSON.stringify({
+    action: 'set_draft',
+    documentToken: 'doc_test_1',
+    requestId: 'mcp_b',
+    value: 'must not overwrite',
+    expectedDraft: 'stale draft'
+  }));
+  assert.equal(composer.value, 'next draft');
+  assert.equal(events.at(-1).action, 'set_draft');
+  assert.equal(events.at(-1).ok, false);
+  assert.equal(events.at(-1).requestId, 'mcp_b');
+
+  window.__elonChatGptBridge.command(JSON.stringify({
+    action: 'send_prompt',
+    documentToken: 'doc_test_1',
+    requestId: 'mcp_private',
+    value: 'next draft',
+    expectedDraft: 'next draft',
+    allowPrivateTextTransaction: true
+  }));
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(privateDispatches, ['next draft']);
+  assert.equal(composer.value, '', 'the private request owns and clears the matching page draft');
+  const receipt = events.find((event) => event.requestId === 'mcp_private');
+  assert.equal(receipt && receipt.ok, true);
+  assert.equal(receipt && receipt.detail, 'private_text_v1:accepted');
+
+  console.log('CHATGPT_DRAFT_SYNC_POLICY=passed');
+})().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});

@@ -4,7 +4,7 @@
   if (window.__elonChatGptPrivateStreamObserverEnabled !== true) return;
   if (location.origin !== 'https://chatgpt.com') return;
   const existing = window.__elonChatGptPrivateSendObserver;
-  if (existing && Number(existing.version) >= 1) return;
+  if (existing && Number(existing.version) >= 2) return;
 
   const delegateFetch = typeof window.fetch === 'function' ? window.fetch : null;
   if (!delegateFetch) return;
@@ -25,7 +25,7 @@
     const url = requestUrl(input);
     const method = String(init && init.method || input && input.method || 'GET').toUpperCase();
     return method === 'POST' && !!url && url.origin === location.origin &&
-      /^\/(?:backend-api|backend-anon)\/(?:f\/)?conversation(?:\/|$)/.test(url.pathname);
+      /^\/(?:backend-api|backend-anon)\/(?:f\/)?conversation\/?$/.test(url.pathname);
   }
 
   const wrappedFetch = function () {
@@ -66,7 +66,7 @@
   }
 
   window.__elonChatGptPrivateSendObserver = Object.freeze({
-    version: 1,
+    version: 2,
     marker,
     dispatchedAfter
   });

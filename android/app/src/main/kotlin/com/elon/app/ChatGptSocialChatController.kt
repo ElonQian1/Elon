@@ -15,6 +15,7 @@ import com.elon.app.chatgptweb.ChatGptWebComposerOption
 import com.elon.app.chatgptweb.ChatGptWebEvent
 import com.elon.app.chatgptweb.ChatGptWebNativeVoiceTranscriptEvent
 import com.elon.app.chatgptweb.ChatGptWebPresentationMode
+import com.elon.app.chatgptweb.ChatGptWebPrivateTextReceiptPolicy
 import com.elon.app.chatgptweb.ChatGptWebSendOrigin
 import com.elon.app.chatgptweb.ChatGptWebSendReceipt
 import com.elon.app.chatgptweb.ChatGptWebSnapshot
@@ -67,6 +68,7 @@ internal class ChatGptSocialChatController(
     private val sentAttachments = linkedMapOf<String, List<ChatAttachment>>()
     private var waitingForAttachmentCompletion = false
     private var latestCommandStatus: WebChatCommandStatus? = null
+    private var latestSendCommandStatus: WebChatCommandStatus? = null
     private var latestStateDetail: String? = null
     private var modelPopup: WebChatModelControlPopupHandle? = null
     private var modelOptionById = emptyMap<String, WebChatConsumerOption>()
@@ -253,6 +255,7 @@ internal class ChatGptSocialChatController(
     override fun startNewConversation() {
         realtimeVoiceTranscript.reset()
         clearPendingSend()
+        latestSendCommandStatus = null
         pendingAttachmentPrompt = null
         lastMessageSnapshot = null
         transcript.requestFollowLatest()
@@ -279,6 +282,7 @@ internal class ChatGptSocialChatController(
     override fun openConversation(path: String): Boolean {
         realtimeVoiceTranscript.reset()
         clearPendingSend()
+        latestSendCommandStatus = null
         pendingAttachmentPrompt = null
         lastMessageSnapshot = null
         transcript.requestFollowLatest()
@@ -290,6 +294,7 @@ internal class ChatGptSocialChatController(
     override fun openProject(path: String): Boolean {
         realtimeVoiceTranscript.reset()
         clearPendingSend()
+        latestSendCommandStatus = null
         pendingAttachmentPrompt = null
         lastMessageSnapshot = null
         return session.openProject(path)
@@ -333,6 +338,8 @@ internal class ChatGptSocialChatController(
     }
 
     override fun lastCommandStatus(): WebChatCommandStatus? = latestCommandStatus
+
+    override fun lastSendCommandStatus(): WebChatCommandStatus? = latestSendCommandStatus
 
     override fun discardAcceptanceAttachmentSend(): Boolean {
         if (waitingForAttachmentCompletion) return false
@@ -535,13 +542,24 @@ internal class ChatGptSocialChatController(
         event: ChatGptWebEvent.CommandResult,
         sendReceipt: ChatGptWebSendReceipt?,
     ) {
-        latestCommandStatus = WebChatCommandStatus(
+        val status = WebChatCommandStatus(
             action = event.action,
             ok = event.ok,
             detail = event.detail,
             observedAtMs = System.currentTimeMillis(),
         )
+        latestCommandStatus = status
+        if (event.action == "send_prompt") latestSendCommandStatus = status
         if (sendReceipt?.origin != ChatGptWebSendOrigin.SOCIAL) return
+        if (sendReceipt.indeterminate) {
+            session.currentSnapshot()?.let(::renderSnapshot)
+            Toast.makeText(
+                activity,
+                ChatGptWebPrivateTextReceiptPolicy.userDetail(event),
+                Toast.LENGTH_LONG,
+            ).show()
+            return
+        }
         if (event.ok) {
             session.currentSnapshot()?.let(::renderSnapshot)
             return

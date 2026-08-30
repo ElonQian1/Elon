@@ -8,6 +8,10 @@ const vm = require('node:vm');
 const source = fs.readFileSync(path.join(
   __dirname, '..', 'android', 'app', 'src', 'main', 'assets', 'chatgpt_web_adapter.js'
 ), 'utf8');
+const orchestratorSource = fs.readFileSync(path.join(
+  __dirname, '..', 'android', 'app', 'src', 'main', 'assets',
+  'chatgpt_web_text_transaction_orchestrator.js'
+), 'utf8');
 const streamingPolicySource = fs.readFileSync(path.join(
   __dirname, '..', 'android', 'app', 'src', 'main', 'assets', 'chatgpt_web_adapter_streaming_policy.js'
 ), 'utf8');
@@ -125,6 +129,9 @@ const sandbox = {
 };
 vm.runInNewContext(streamingPolicySource, sandbox, {
   filename: 'chatgpt_web_adapter_streaming_policy.js'
+});
+vm.runInNewContext(orchestratorSource, sandbox, {
+  filename: 'chatgpt_web_text_transaction_orchestrator.js'
 });
 vm.runInNewContext(source, sandbox, { filename: 'chatgpt_web_adapter.js' });
 

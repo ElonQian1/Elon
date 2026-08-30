@@ -627,7 +627,11 @@ internal class ChatGptBackgroundSession(
                         onConversationIndexChanged(conversationIndex())
                         conversationRefresh.onFailed()
                     }
-                    onStateChanged(state, event.detail.ifBlank { "官网操作失败" })
+                    onStateChanged(
+                        state,
+                        ChatGptWebPrivateTextReceiptPolicy.userDetail(event)
+                            .ifBlank { "官网操作失败" },
+                    )
                 }
             }
             is ChatGptWebEvent.ConversationList -> {

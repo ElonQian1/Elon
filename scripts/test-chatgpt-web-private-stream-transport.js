@@ -147,7 +147,7 @@ function context(enabled, response) {
     'data: [DONE]\n\n'
   ]);
   const enabled = context(true, response);
-  assert.equal(enabled.window.__elonChatGptPrivateStreamTransport.version, 11);
+  assert.equal(enabled.window.__elonChatGptPrivateStreamTransport.version, 15);
   assert.equal(enabled.socketListenerCount(), 1);
   let notifications = 0;
   enabled.window.__elonChatGptPrivateStreamTransport.subscribe(() => { notifications += 1; });
@@ -292,6 +292,32 @@ function context(enabled, response) {
   assert.equal(merged.length, 1);
   assert.equal(merged[0].state, 'completed');
   assert.equal(merged[0].content[0].text, 'hello world');
+
+  const monotonic = context(true, createResponse([]));
+  monotonic.emitSocket(JSON.stringify({
+    conversation_id: 'conversation-one',
+    message: {
+      id: 'assistant-monotonic',
+      author: { role: 'assistant' },
+      status: 'finished_successfully',
+      content: { parts: ['final answer'] }
+    }
+  }));
+  monotonic.emitSocket(JSON.stringify({
+    conversation_id: 'conversation-one',
+    message: {
+      id: 'assistant-monotonic',
+      author: { role: 'assistant' },
+      status: 'in_progress',
+      content: { parts: ['final answer'] },
+      metadata: { phase: 'final_metadata' }
+    }
+  }));
+  assert.equal(
+    monotonic.window.__elonChatGptPrivateStreamTransport.current('/c/conversation-one').state,
+    'completed',
+    'late metadata for the same assistant message cannot regress a completed stream'
+  );
 
   const prepared = context(true, createResponse([
     'data: {"conversation_id":"conversation-one","message":{"id":"assistant-one",',
@@ -586,18 +612,46 @@ function context(enabled, response) {
   assert.equal(enabled.calls(), 3, 'guest conversation streams are observed without request replay');
 
   const denied = context(true, createAccessResponse(403));
+  await denied.window.fetch({
+    method: 'POST',
+    url: 'https://chatgpt.com/backend-api/f/conversation/prepare'
+  }, { method: 'POST' });
+  assert.equal(
+    denied.window.__elonChatGptPrivateStreamTransport.access(),
+    null,
+    'prepare failures cannot masquerade as message-send access failures'
+  );
   await denied.window.fetch(request, init);
   const deniedAccess = denied.window.__elonChatGptPrivateStreamTransport.access();
   assert.equal(deniedAccess.reason, 'login_required');
   assert.equal(deniedAccess.status, 403);
   assert.ok(deniedAccess.observedAt > 0, 'a passive 401/403 response adds a bounded login hint');
-  assert.equal(denied.calls(), 1, 'access classification must not replay the official request');
+  assert.equal(denied.calls(), 2, 'access classification must not replay official requests');
 
   const limited = context(true, createAccessResponse(429));
   await limited.window.fetch(request, init);
   assert.equal(limited.window.__elonChatGptPrivateStreamTransport.access().reason, 'rate_limited');
 
-  enabled.window.__elonChatGptPrivateStreamTransport.dispose();
+  const transport = enabled.window.__elonChatGptPrivateStreamTransport;
+  assert.equal(transport.preparePrivateSend('private native prompt', 'private-user-one'), true);
+  const privateUserMerge = transport.mergeMessages([{
+    id: 'assistant-before-private',
+    role: 'assistant',
+    state: 'complete',
+    content: [{ type: 'text', text: 'older reply' }]
+  }], '/c/conversation-one');
+  assert.equal(privateUserMerge.length, 2);
+  assert.equal(privateUserMerge[1].id, 'private-user-one');
+  assert.equal(privateUserMerge[1].role, 'user');
+  assert.equal(transport.finishPrivateSend(), true);
+  assert.equal(transport.preparePrivateRegeneration(), true);
+  assert.equal(
+    transport.mergeMessages(privateUserMerge.slice(0, 1), '/c/conversation-one').length,
+    1,
+    'regeneration clears only the synthetic pending user turn'
+  );
+
+  transport.dispose();
   assert.equal(enabled.window.fetch, enabled.originalFetch);
   assert.equal(enabled.socketListenerCount(), 0);
 

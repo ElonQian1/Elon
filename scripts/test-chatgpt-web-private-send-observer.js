@@ -13,6 +13,10 @@ const observerSource = fs.readFileSync(assetPath, 'utf8');
 const adapterSource = fs.readFileSync(path.join(
   root, 'android', 'app', 'src', 'main', 'assets', 'chatgpt_web_adapter.js'
 ), 'utf8');
+const orchestratorSource = fs.readFileSync(path.join(
+  root, 'android', 'app', 'src', 'main', 'assets',
+  'chatgpt_web_text_transaction_orchestrator.js'
+), 'utf8');
 const pageAdapterSource = fs.readFileSync(path.join(
   root, 'android', 'app', 'src', 'main', 'kotlin', 'com', 'elon', 'app',
   'chatgptweb', 'ChatGptWebPageAdapter.kt'
@@ -162,6 +166,9 @@ function createAdapterContext() {
   vm.runInNewContext(streamingPolicySource, sandbox, {
     filename: 'chatgpt_web_adapter_streaming_policy.js'
   });
+  vm.runInNewContext(orchestratorSource, sandbox, {
+    filename: 'chatgpt_web_text_transaction_orchestrator.js'
+  });
   vm.runInNewContext(adapterSource, sandbox, { filename: 'chatgpt_web_adapter.js' });
   return { window, composer, events, fetchCalls: () => fetchCalls };
 }
@@ -172,14 +179,14 @@ assert.ok(
 );
 assert.ok(
   pageAdapterSource.indexOf('chatgpt_web_private_send_observer.js') <
-  pageAdapterSource.indexOf('chatgpt_web_adapter.js')
+  pageAdapterSource.indexOf('chatgpt_web_text_transaction_orchestrator.js')
 );
-assert.match(adapterSource, /privateSendObserver\.marker\(\)/);
-assert.match(adapterSource, /privateSendObserver\.dispatchedAfter\(sendMarker\)/);
-assert.match(adapterSource, /official_request_dispatched/);
-assert.match(adapterSource, /official_page_accepted/);
+assert.match(orchestratorSource, /privateSendObserver\.marker\(\)/);
+assert.match(orchestratorSource, /privateSendObserver\.dispatchedAfter\(sendMarker\)/);
+assert.match(orchestratorSource, /official_request_dispatched/);
+assert.match(orchestratorSource, /official_page_accepted/);
 assert.match(
-  adapterSource,
+  orchestratorSource,
   /privateStreamTransport\.prepareSend\(\);[\s\S]*?button\.click\(\);/,
   'the adapter must clear stale private completion state before the official send click'
 );
@@ -187,11 +194,15 @@ assert.match(
 (async () => {
   const enabled = createContext();
   const observer = enabled.window.__elonChatGptPrivateSendObserver;
-  assert.equal(observer.version, 1);
+  assert.equal(observer.version, 2);
 
   const first = observer.marker();
   await enabled.window.fetch('/backend-api/conversations/conversation-one', { method: 'GET' });
   assert.equal(observer.dispatchedAfter(first), false, 'conversation reads are not sends');
+
+  const prepareMarker = observer.marker();
+  await enabled.window.fetch('/backend-api/f/conversation/prepare', { method: 'POST' });
+  assert.equal(observer.dispatchedAfter(prepareMarker), false, 'prepare requests are not sends');
 
   const privateMarker = observer.marker();
   await enabled.window.fetch('/backend-api/conversation', {

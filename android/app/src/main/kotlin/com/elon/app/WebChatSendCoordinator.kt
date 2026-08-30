@@ -19,7 +19,11 @@ internal interface WebChatSendTransport {
 
 internal class OfficialPageWebChatSendTransport(
     private val ready: () -> Boolean,
-    private val sendPrompt: (prompt: String, requestId: String) -> Boolean,
+    private val sendPrompt: (
+        prompt: String,
+        requestId: String,
+        privateTextTransactionAllowed: Boolean,
+    ) -> Boolean,
     private val requestReconciliation: () -> Unit,
 ) : WebChatSendTransport {
     override val authority: WebChatSendAuthority = WebChatSendAuthority.OFFICIAL_PAGE
@@ -27,7 +31,7 @@ internal class OfficialPageWebChatSendTransport(
     override fun isReady(): Boolean = ready()
 
     override fun dispatch(command: WebChatSendCommand): WebChatTransportDispatchResult =
-        if (sendPrompt(command.prompt, command.id)) {
+        if (sendPrompt(command.prompt, command.id, command.privateTextTransactionAllowed)) {
             WebChatTransportDispatchResult.QUEUED
         } else {
             WebChatTransportDispatchResult.REJECTED
@@ -77,7 +81,7 @@ internal class WebChatSendCoordinator(
     private var watchdog: Runnable? = null
     private var baseline: SnapshotEvidence? = null
 
-    fun authority(): WebChatSendAuthority = transport.authority
+    fun authority(): WebChatSendAuthority = ledger.current()?.authority ?: transport.authority
 
     fun isReady(): Boolean = transport.isReady()
 
@@ -100,9 +104,16 @@ internal class WebChatSendCoordinator(
         prompt: String,
         baselineSnapshot: ChatGptWebSnapshot?,
         requestId: String? = null,
+        privateTextTransactionAllowed: Boolean = true,
         onPending: () -> Unit,
     ): DispatchResult {
-        val reserved = reserve(prompt, baselineSnapshot, requestId, onPending)
+        val reserved = reserve(
+            prompt,
+            baselineSnapshot,
+            requestId,
+            privateTextTransactionAllowed,
+            onPending,
+        )
         return when (reserved.outcome) {
             ReserveOutcome.BUSY -> DispatchResult(DispatchOutcome.BUSY)
             ReserveOutcome.NOT_READY -> DispatchResult(DispatchOutcome.NOT_READY)
@@ -114,13 +125,19 @@ internal class WebChatSendCoordinator(
         prompt: String,
         baselineSnapshot: ChatGptWebSnapshot?,
         requestId: String? = null,
+        privateTextTransactionAllowed: Boolean = true,
         onPending: () -> Unit = {},
     ): ReserveResult {
         if (ledger.prompt() != null) return ReserveResult(ReserveOutcome.BUSY)
         if (!transport.isReady()) return ReserveResult(ReserveOutcome.NOT_READY)
 
         baseline = baselineSnapshot?.let(::snapshotEvidence)
-        val command = ledger.begin(prompt, transport.authority, requestId)
+        val command = ledger.begin(
+            prompt,
+            transport.authority,
+            requestId,
+            privateTextTransactionAllowed,
+        )
             ?: return ReserveResult(ReserveOutcome.BUSY)
         onPending()
         return ReserveResult(ReserveOutcome.RESERVED, command.id)
@@ -151,11 +168,17 @@ internal class WebChatSendCoordinator(
         return prompt
     }
 
-    fun acceptCommandResult(requestId: String?, ok: Boolean): String? {
+    fun acceptCommandResult(
+        requestId: String?,
+        ok: Boolean,
+        authority: WebChatSendAuthority? = null,
+        indeterminate: Boolean = false,
+    ): String? {
         val failedPrompt = ledger.current()?.prompt
-        return when (ledger.acceptReceipt(requestId, ok)) {
+        return when (ledger.acceptReceipt(requestId, ok, authority, indeterminate)) {
             WebChatSendCommandLedger.ReceiptResult.IGNORED -> null
             WebChatSendCommandLedger.ReceiptResult.ACCEPTED -> null
+            WebChatSendCommandLedger.ReceiptResult.UNKNOWN -> null
             WebChatSendCommandLedger.ReceiptResult.FAILED -> {
                 baseline = null
                 cancelWatchdog()

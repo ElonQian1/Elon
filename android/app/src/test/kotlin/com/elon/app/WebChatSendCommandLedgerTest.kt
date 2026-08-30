@@ -91,6 +91,54 @@ class WebChatSendCommandLedgerTest {
     }
 
     @Test
+    fun privateReceiptCanChangeAuthorityAfterThePageCommandWasQueued() {
+        val ledger = WebChatSendCommandLedger()
+        val command = requireNotNull(
+            ledger.begin("hello", WebChatSendAuthority.OFFICIAL_PAGE),
+        )
+        ledger.markDispatched(command.id)
+
+        assertEquals(
+            WebChatSendCommandLedger.ReceiptResult.ACCEPTED,
+            ledger.acceptReceipt(
+                command.id,
+                ok = true,
+                authority = WebChatSendAuthority.SAME_ORIGIN_PRIVATE,
+            ),
+        )
+
+        assertEquals(WebChatSendAuthority.SAME_ORIGIN_PRIVATE, ledger.current()?.authority)
+        assertEquals(WebChatPageSyncState.DIRTY, ledger.current()?.pageSyncState)
+    }
+
+    @Test
+    fun indeterminatePrivateReceiptNeverRestoresOrReplaysThePrompt() {
+        val ledger = WebChatSendCommandLedger()
+        val command = requireNotNull(
+            ledger.begin("maybe sent", WebChatSendAuthority.OFFICIAL_PAGE),
+        )
+        ledger.markDispatched(command.id)
+
+        assertEquals(
+            WebChatSendCommandLedger.ReceiptResult.UNKNOWN,
+            ledger.acceptReceipt(
+                command.id,
+                ok = false,
+                authority = WebChatSendAuthority.SAME_ORIGIN_PRIVATE,
+                indeterminate = true,
+            ),
+        )
+
+        assertEquals(WebChatSendAcceptance.UNKNOWN, ledger.current()?.acceptance)
+        assertEquals(WebChatPageSyncState.RECONCILING, ledger.current()?.pageSyncState)
+        assertEquals("maybe sent", ledger.prompt())
+        assertEquals(
+            WebChatSendCommandLedger.FallbackDecision.RECONCILE_ONLY,
+            ledger.fallbackDecision(),
+        )
+    }
+
+    @Test
     fun completedTurnArchivesSettledCommandAndAllowsNextCommand() {
         val ledger = WebChatSendCommandLedger()
         val command = requireNotNull(ledger.begin("hello world", WebChatSendAuthority.OFFICIAL_PAGE))
