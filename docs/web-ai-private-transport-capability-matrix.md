@@ -25,6 +25,7 @@ installed build; individual capability documents retain implementation evidence.
 | Background navigation continuity | ChatGPT and Google Web AI | Completed, enabled, and device verified | Bounded official WebView recovery |
 | Unified native send ledger | ChatGPT and Google Web AI | Completed and enabled; stable request-ID reconciliation targeted tests passed, device regression pending | Official-page reconciliation without automatic write replay |
 | Same-origin text transaction | ChatGPT | Completed, enabled, and device verified on `v1.1.1365 (1386)`, adapter `206`; current dynamic proof selects immediate official fallback | Official-page transaction without automatic write replay |
+| Interaction presets and deferred chat actions | ChatGPT | Completed, enabled, and device verified on research build `v1.1.1367 (1388)` | Current official control and WebView navigation |
 
 All web-account transports keep the official page authoritative. They do not export
 cookies, credentials, request headers, or private conversation content outside the
@@ -150,6 +151,24 @@ rejects the direct path before dispatch and immediately invokes the official pag
 The 15-second transport timeout, two-failure 45-second cooldown, explicit stop semantics, and
 read-only reconciliation remain active if a future page contract exposes a reusable template.
 Google direct POST remains disabled.
+
+ChatGPT model and tool choices use built-in presentation presets plus a user-scoped,
+bounded stale-while-refresh cache. The native UI renders immediately and resolves the
+current official semantic ID only when the user selects an option. Temporary chat uses
+the same rule: an unobserved control remains actionable, one desired state is queued,
+and success is shown only after the live official control confirms it. Starting a new
+conversation is also accepted while the background session is idle or loading; the APK
+shows the blank native conversation immediately and dispatches the official navigation
+once the current bridge is ready. Duplicate taps cannot issue a second navigation.
+
+Device acceptance on research APK `v1.1.1367 (1388)` started from an existing conversation,
+force-stopped only the process, and requested a new conversation while the production
+surface reported `loading`. The intent was accepted, the official path crossed to a blank
+composer-ready conversation, and the original conversation was restored. A separate blank
+conversation verified that the temporary-chat preset remained clickable before relying on
+the live DOM, the official selected state changed, the original state was restored, and the
+original conversation reopened. The evidence contains only structural booleans and does not
+clear or export cookies, application data, credentials, headers, or conversation text.
 
 Device acceptance on `v1.1.1313 (1323)` verified the production friend-chat surface with
 ChatGPT adapter `188` and Google adapter `37`. Both providers completed an isolated exact

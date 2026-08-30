@@ -10,13 +10,16 @@ import org.junit.Test
 
 class WebChatProductionHeaderActionsTest {
     @Test
-    fun exposesTheHeaderEntryOnlyOnReadyChatGptChatPages() {
+    fun exposesTheHeaderEntryWhileAChatGptChatPageIsRestoring() {
         val chatGpt = WebChatProviderRegistry.get(WebChatProviderId.CHATGPT_WEB)
         val google = WebChatProviderRegistry.get(WebChatProviderId.GOOGLE_WEB)
 
         assertTrue(WebChatProductionHeaderActionPolicy.visible(chatGpt, "ready", "home"))
+        assertTrue(WebChatProductionHeaderActionPolicy.visible(chatGpt, "loading", "home"))
+        assertTrue(WebChatProductionHeaderActionPolicy.visible(chatGpt, "idle", "conversation"))
         assertTrue(WebChatProductionHeaderActionPolicy.visible(chatGpt, "ready", "conversation"))
         assertFalse(WebChatProductionHeaderActionPolicy.visible(chatGpt, "connecting", "home"))
+        assertFalse(WebChatProductionHeaderActionPolicy.visible(chatGpt, "error", "home"))
         assertFalse(WebChatProductionHeaderActionPolicy.visible(chatGpt, "ready", "feature"))
         assertFalse(WebChatProductionHeaderActionPolicy.visible(google, "ready", "conversation"))
     }
@@ -67,6 +70,7 @@ class WebChatProductionHeaderActionsTest {
     fun usesADedicatedTemporaryChatIconAndStateLabel() {
         val inactive = WebChatProductionHeaderActionPolicy.buttonPresentation(selected = false)
         val active = WebChatProductionHeaderActionPolicy.buttonPresentation(selected = true)
+        val syncing = WebChatProductionHeaderActionPolicy.buttonPresentation(selected = null)
 
         assertEquals(R.drawable.ic_temporary_chat, inactive.iconRes)
         assertFalse(inactive.selected)
@@ -74,6 +78,23 @@ class WebChatProductionHeaderActionsTest {
         assertEquals(R.drawable.ic_temporary_chat, active.iconRes)
         assertTrue(active.selected)
         assertEquals("临时聊天已开启", active.statusLabel)
+        assertEquals(R.drawable.ic_temporary_chat, syncing.iconRes)
+        assertFalse(syncing.selected)
+        assertEquals("临时聊天状态同步中", syncing.statusLabel)
+    }
+
+    @Test
+    fun keepsTheTemporaryChatPresetActionableBeforeTheOfficialControlIsObserved() {
+        val item = WebChatProductionHeaderActionPolicy.temporaryChatItem(
+            control = null,
+            observation = WebChatProductionObservationState.SYNCING,
+        )
+
+        assertEquals(WebChatProductionHeaderActionPolicy.TEMPORARY_ITEM_ID, item.id)
+        assertEquals("临时聊天", item.title)
+        assertTrue(item.enabled)
+        assertTrue(item.subtitle!!.contains("后台确认"))
+        assertEquals("chatgpt-native:temporary-chat:临时聊天", item.contentDescription)
     }
 
     private fun state(

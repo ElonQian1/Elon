@@ -29,7 +29,7 @@ internal object WebChatProductionHeaderActionPolicy {
         pageKind: String,
     ): Boolean = provider.id == WebChatProviderId.CHATGPT_WEB &&
         provider.supports(WebChatProviderCapability.PAGE_ACTIONS) &&
-        sessionState == "ready" &&
+        sessionState in USABLE_SESSION_STATES &&
         pageKind.trim().lowercase() in CHAT_PAGE_KINDS
 
     fun resolve(
@@ -47,13 +47,36 @@ internal object WebChatProductionHeaderActionPolicy {
             ChatGptWebConversationPath.normalize(currentConversationPath) != null,
     )
 
-    fun buttonPresentation(selected: Boolean) = WebChatProductionHeaderButtonPresentation(
+    fun buttonPresentation(selected: Boolean?) = WebChatProductionHeaderButtonPresentation(
         iconRes = R.drawable.ic_temporary_chat,
-        selected = selected,
-        statusLabel = if (selected) "临时聊天已开启" else "临时聊天未开启",
+        selected = selected == true,
+        statusLabel = when (selected) {
+            true -> "临时聊天已开启"
+            false -> "临时聊天未开启"
+            null -> "临时聊天状态同步中"
+        },
+    )
+
+    fun temporaryChatItem(
+        control: WebChatConsumerControl?,
+        observation: WebChatProductionObservationState,
+    ) = WebChatActionSheetItem(
+        id = TEMPORARY_ITEM_ID,
+        title = if (control?.selected == true) "关闭临时聊天" else "临时聊天",
+        subtitle = when {
+            control?.selected == true -> "已开启，本次对话不会出现在历史记录中"
+            control != null -> "开启后，本次对话不会出现在历史记录中"
+            observation == WebChatProductionObservationState.TEMPORARILY_UNOBSERVED ->
+                "点按后重新同步官网状态并开启"
+            else -> "点按后连接官网并开启，状态将在后台确认"
+        },
+        selected = control?.selected == true,
+        contentDescription = ChatGptNativeNavigationSelector.TEMPORARY_CHAT,
     )
 
     private val CHAT_PAGE_KINDS = setOf("home", "conversation")
+    private val USABLE_SESSION_STATES = setOf("idle", "loading", "ready")
+    const val TEMPORARY_ITEM_ID = "header:temporary-chat"
     const val TEMPORARY_CHAT = "temporary_chat"
 }
 
@@ -75,6 +98,7 @@ internal class WebChatProductionHeaderActionsCoordinator(
 ) {
     private var requestEpoch = 0
     private var activeSheet: WebChatActionSheetHandle? = null
+    private val temporaryChatIntent = WebChatTemporaryChatIntentQueue()
 
     fun render(button: ImageButton, provider: WebChatProviderIdentity, sessionState: String) {
         val port = consumerPort()
@@ -85,9 +109,14 @@ internal class WebChatProductionHeaderActionsCoordinator(
             state.pageKind,
         )
         button.visibility = if (visible) View.VISIBLE else View.GONE
-        val selected = visible && WebChatProductionHeaderActionPolicy
-            .resolve(state!!, currentConversationPath())
-            .temporaryChatSelected
+        val selected = if (visible) {
+            WebChatProductionHeaderActionPolicy.resolve(
+                state!!,
+                currentConversationPath(),
+            ).temporaryChat?.selected
+        } else {
+            null
+        }
         val presentation = WebChatProductionHeaderActionPolicy.buttonPresentation(selected)
         button.setImageResource(presentation.iconRes)
         button.isSelected = presentation.selected
@@ -125,6 +154,7 @@ internal class WebChatProductionHeaderActionsCoordinator(
 
     fun cancelPending() {
         requestEpoch += 1
+        temporaryChatIntent.clear()
         activeSheet?.dismiss()
         activeSheet = null
     }
@@ -140,23 +170,9 @@ internal class WebChatProductionHeaderActionsCoordinator(
             currentConversationPath(),
         )
         val items = buildList {
-            resolved.temporaryChat?.let { control ->
-                add(WebChatActionSheetItem(
-                    id = TEMPORARY_ITEM_ID,
-                    title = if (control.selected) "关闭临时聊天" else "临时聊天",
-                    subtitle = if (control.selected) {
-                        "已开启，本次对话不会出现在历史记录中"
-                    } else {
-                        "开启后，本次对话不会出现在历史记录中"
-                    },
-                    selected = control.selected,
-                    contentDescription = ChatGptNativeNavigationSelector.TEMPORARY_CHAT,
-                ))
-            } ?: add(WebChatProductionInteractionPlaceholder.item(
-                provider.id,
-                surface = "temporary-chat",
-                title = "临时聊天",
-                state = observation,
+            add(WebChatProductionHeaderActionPolicy.temporaryChatItem(
+                resolved.temporaryChat,
+                observation,
             ))
             if (resolved.conversationSettingsAvailable) {
                 add(WebChatActionSheetItem(
@@ -180,11 +196,15 @@ internal class WebChatProductionHeaderActionsCoordinator(
                 contentDescription = "web-chat-header-actions-official:${provider.id.wireValue}",
                 action = openOfficialFallback,
             )),
-            onCancelled = { requestEpoch += 1 },
+            onCancelled = {
+                requestEpoch += 1
+                temporaryChatIntent.clear()
+            },
             onDismissed = { activeSheet = null },
         ) { item ->
             when (item.id) {
-                TEMPORARY_ITEM_ID -> toggleTemporaryChat(provider, port, resolved)
+                WebChatProductionHeaderActionPolicy.TEMPORARY_ITEM_ID ->
+                    toggleTemporaryChat(provider, port)
                 CONVERSATION_SETTINGS_ITEM_ID -> openConversationSettings()
             }
         }
@@ -193,21 +213,19 @@ internal class WebChatProductionHeaderActionsCoordinator(
     private fun toggleTemporaryChat(
         provider: WebChatProviderIdentity,
         port: WebChatConsumerPort,
-        state: WebChatProductionHeaderActionState,
     ) {
-        val control = state.temporaryChat ?: return
-        val desiredSelected = !control.selected
-        val result = port.updateControl(
-            control.id,
-            WebChatConsumerControlMutation.Selected(desiredSelected),
-        )
-        if (!result.accepted) {
-            Toast.makeText(activity, errorMessage(result.error), Toast.LENGTH_SHORT).show()
+        val control = WebChatProductionHeaderActionPolicy.resolve(
+            cachedState(provider.id, port.state()),
+            currentConversationPath(),
+        ).temporaryChat
+        val desiredSelected = control?.selected?.not() ?: true
+        if (!temporaryChatIntent.begin(desiredSelected)) {
+            Toast.makeText(activity, "临时聊天正在切换", Toast.LENGTH_SHORT).show()
             return
         }
         val epoch = ++requestEpoch
         port.requestControls()
-        pollSelectedState(provider, port, desiredSelected, epoch, attempt = 0)
+        pollTemporaryChatIntent(provider, port, epoch, attempt = 0)
     }
 
     private fun pollControls(
@@ -234,37 +252,68 @@ internal class WebChatProductionHeaderActionsCoordinator(
         host.postDelayed({ pollControls(provider, port, epoch, attempt + 1) }, POLL_INTERVAL_MS)
     }
 
-    private fun pollSelectedState(
+    private fun pollTemporaryChatIntent(
         provider: WebChatProviderIdentity,
         port: WebChatConsumerPort,
-        desiredSelected: Boolean,
         epoch: Int,
         attempt: Int,
     ) {
         if (!isCurrent(provider.id, epoch)) return
         val state = cachedState(provider.id, port.state())
-        val observed = WebChatProductionHeaderActionPolicy.resolve(
+        val control = WebChatProductionHeaderActionPolicy.resolve(
             state,
             currentConversationPath(),
         ).temporaryChat
-        if (observed?.selected == desiredSelected) {
-            onStateChanged()
-            Toast.makeText(
-                activity,
-                if (desiredSelected) "临时聊天已开启" else "临时聊天已关闭",
-                Toast.LENGTH_SHORT,
-            ).show()
-            return
+        when (val decision = temporaryChatIntent.evaluate(control)) {
+            WebChatTemporaryChatIntentDecision.Idle -> return
+            WebChatTemporaryChatIntentDecision.AwaitingControl,
+            WebChatTemporaryChatIntentDecision.AwaitingConfirmation -> {
+                if (attempt >= MAX_INTENT_POLL_ATTEMPTS) {
+                    temporaryChatIntent.clear()
+                    onStateChanged()
+                    Toast.makeText(
+                        activity,
+                        "临时聊天状态尚未确认，请稍后重试",
+                        Toast.LENGTH_SHORT,
+                    ).show()
+                    return
+                }
+                if (attempt % CONTROL_REFRESH_INTERVAL == 0) port.requestControls()
+                host.postDelayed(
+                    { pollTemporaryChatIntent(provider, port, epoch, attempt + 1) },
+                    POLL_INTERVAL_MS,
+                )
+            }
+            is WebChatTemporaryChatIntentDecision.Apply -> {
+                val result = port.updateControl(
+                    decision.controlId,
+                    WebChatConsumerControlMutation.Selected(decision.selected),
+                )
+                if (!result.accepted) {
+                    temporaryChatIntent.mutationRejected(decision.controlId)
+                    if (result.error !in RECOVERABLE_CONTROL_ERRORS) {
+                        temporaryChatIntent.clear()
+                        Toast.makeText(activity, errorMessage(result.error), Toast.LENGTH_SHORT).show()
+                        return
+                    }
+                }
+                port.requestControls()
+                host.postDelayed(
+                    { pollTemporaryChatIntent(provider, port, epoch, attempt + 1) },
+                    POLL_INTERVAL_MS,
+                )
+            }
+            is WebChatTemporaryChatIntentDecision.Confirmed -> {
+                temporaryChatIntent.clear()
+                present(provider, port, state, WebChatProductionObservationState.AVAILABLE)
+                onStateChanged()
+                Toast.makeText(
+                    activity,
+                    if (decision.selected) "临时聊天已开启" else "临时聊天已关闭",
+                    Toast.LENGTH_SHORT,
+                ).show()
+            }
         }
-        if (attempt >= MAX_POLL_ATTEMPTS) {
-            onStateChanged()
-            Toast.makeText(activity, "临时聊天状态尚未确认，请稍后查看", Toast.LENGTH_SHORT).show()
-            return
-        }
-        host.postDelayed(
-            { pollSelectedState(provider, port, desiredSelected, epoch, attempt + 1) },
-            POLL_INTERVAL_MS,
-        )
     }
 
     private fun cachedState(
@@ -288,10 +337,16 @@ internal class WebChatProductionHeaderActionsCoordinator(
     }
 
     private companion object {
-        const val TEMPORARY_ITEM_ID = "header:temporary-chat"
         const val CONVERSATION_SETTINGS_ITEM_ID = "header:conversation-settings"
         const val MAX_CONTROL_COUNT = 80
         const val MAX_POLL_ATTEMPTS = 8
+        const val MAX_INTENT_POLL_ATTEMPTS = 16
+        const val CONTROL_REFRESH_INTERVAL = 4
         const val POLL_INTERVAL_MS = 250L
+        val RECOVERABLE_CONTROL_ERRORS = setOf(
+            "stale_control_id",
+            "bridge_not_ready",
+            "adapter_not_current",
+        )
     }
 }

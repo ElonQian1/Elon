@@ -150,6 +150,19 @@ internal object WebAiPrivateTransportCatalog {
             directPostEnabled = BuildConfig.CHATGPT_PRIVATE_TEXT_TRANSACTIONS_ENABLED,
         ),
         Entry(
+            id = "android_chatgpt_interaction_preset_cache_v1",
+            provider = "chatgpt",
+            status = "completed",
+            verification = "device_verified_v1_1_1367",
+            productionDefault = true,
+            runtimeEnabled = true,
+            requestMode =
+                "built_in_preset_persistent_cache_and_single_intent_official_reconciliation",
+            healthPolicy =
+                "stale_while_refresh_live_semantic_id_bounded_poll_and_exactly_once_dispatch",
+            fallback = "current_official_control_and_webview_navigation",
+        ),
+        Entry(
             id = "android_chatgpt_realtime_voice_background_overlay_v1",
             provider = "chatgpt",
             status = "completed",
