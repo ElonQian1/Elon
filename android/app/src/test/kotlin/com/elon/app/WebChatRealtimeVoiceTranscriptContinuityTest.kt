@@ -158,6 +158,93 @@ class WebChatRealtimeVoiceTranscriptContinuityTest {
     }
 
     @Test
+    fun nativeDataChannelTranscriptStartsOnAnEmptyNewConversation() {
+        val continuity = WebChatRealtimeVoiceTranscriptContinuity()
+        continuity.begin(emptySnapshot("/").copy(composerReady = true))
+
+        val user = continuity.applyLive(transcript(
+            id = "user-event",
+            stream = "user-item",
+            speaker = ChatGptWebNativeVoiceTranscriptSpeaker.USER,
+            update = ChatGptWebNativeVoiceTranscriptUpdate.FINAL,
+            text = "语音问题",
+        ))
+        val assistant = continuity.applyLive(transcript(
+            id = "assistant-event",
+            stream = "assistant-item",
+            speaker = ChatGptWebNativeVoiceTranscriptSpeaker.ASSISTANT,
+            update = ChatGptWebNativeVoiceTranscriptUpdate.FINAL,
+            text = "语音回答",
+        ))
+
+        assertEquals(listOf("语音问题"), user?.messages?.map { it.content })
+        assertEquals(listOf("user", "assistant"), assistant?.messages?.map { it.role })
+        assertEquals(listOf("语音问题", "语音回答"), assistant?.messages?.map { it.content })
+        assertEquals("home", assistant?.pageKind)
+    }
+
+    @Test
+    fun nativeDataChannelTranscriptUsesTheReadyOfficialFeatureSnapshot() {
+        val continuity = WebChatRealtimeVoiceTranscriptContinuity()
+        continuity.begin(
+            emptySnapshot("/features/voice").copy(
+                composerReady = true,
+                pageKind = "feature",
+            ),
+        )
+
+        val live = continuity.applyLive(transcript(
+            id = "assistant-event",
+            stream = "assistant-item",
+            speaker = ChatGptWebNativeVoiceTranscriptSpeaker.ASSISTANT,
+            update = ChatGptWebNativeVoiceTranscriptUpdate.DELTA,
+            text = "实时字幕",
+        ))
+
+        assertEquals("实时字幕", live?.messages?.single()?.content)
+        assertEquals("feature", live?.pageKind)
+    }
+
+    @Test
+    fun nativeDataChannelTranscriptRejectsAnUnreadyOfficialPage() {
+        val continuity = WebChatRealtimeVoiceTranscriptContinuity()
+        continuity.begin(emptySnapshot("/features/voice").copy(pageKind = "feature"))
+
+        assertNull(continuity.applyLive(transcript(
+            id = "assistant-event",
+            stream = "assistant-item",
+            speaker = ChatGptWebNativeVoiceTranscriptSpeaker.ASSISTANT,
+            update = ChatGptWebNativeVoiceTranscriptUpdate.DELTA,
+            text = "不应显示",
+        )))
+    }
+
+    @Test
+    fun authoritativeConversationReplacesNewConversationLiveCaptionsWithoutDuplicates() {
+        val continuity = WebChatRealtimeVoiceTranscriptContinuity()
+        continuity.begin(emptySnapshot("/").copy(composerReady = true))
+        continuity.applyLive(transcript(
+            id = "user-event",
+            stream = "user-item",
+            speaker = ChatGptWebNativeVoiceTranscriptSpeaker.USER,
+            update = ChatGptWebNativeVoiceTranscriptUpdate.FINAL,
+            text = "语音问题",
+        ))
+        continuity.applyLive(transcript(
+            id = "assistant-event",
+            stream = "assistant-item",
+            speaker = ChatGptWebNativeVoiceTranscriptSpeaker.ASSISTANT,
+            update = ChatGptWebNativeVoiceTranscriptUpdate.FINAL,
+            text = "语音回答",
+        ))
+        continuity.end(null)
+
+        val authoritative = snapshot("/c/new", "语音问题", "语音回答")
+
+        assertEquals(authoritative.messages, continuity.resolve(authoritative)?.messages)
+    }
+
+    @Test
     fun finalNativeTranscriptIsReplacedByTheAuthoritativeConversationSnapshot() {
         val continuity = WebChatRealtimeVoiceTranscriptContinuity()
         val beforeVoice = snapshot("/c/origin", "old question", "old answer")

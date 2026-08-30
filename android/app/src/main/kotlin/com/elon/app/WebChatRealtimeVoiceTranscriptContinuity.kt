@@ -2,6 +2,7 @@ package com.elon.app
 
 import com.elon.app.chatgptweb.ChatGptWebConversationPath
 import com.elon.app.chatgptweb.ChatGptWebMessage
+import com.elon.app.chatgptweb.ChatGptWebNavigationPolicy
 import com.elon.app.chatgptweb.ChatGptWebNativeVoiceTranscriptEvent
 import com.elon.app.chatgptweb.ChatGptWebNativeVoiceTranscriptUpdate
 import com.elon.app.chatgptweb.ChatGptWebSnapshot
@@ -25,7 +26,7 @@ internal class WebChatRealtimeVoiceTranscriptContinuity {
     fun begin(current: ChatGptWebSnapshot?) {
         phase = Phase.ACTIVE
         conversationPath = ChatGptWebConversationPath.fromUrl(current?.url)
-        retainedSnapshot = current?.takeIf(::isConversationTranscript)
+        retainedSnapshot = current?.takeIf(::isLivePresentationBase)
         baselineMessageIds = retainedSnapshot?.messages?.mapTo(mutableSetOf()) { it.id }.orEmpty()
         liveMessages.clear()
         seenEventIds.clear()
@@ -161,6 +162,16 @@ internal class WebChatRealtimeVoiceTranscriptContinuity {
         snapshot.messages.isNotEmpty() &&
             snapshot.pageKind == "conversation" &&
             ChatGptWebConversationPath.fromUrl(snapshot.url) != null
+
+    private fun isLivePresentationBase(snapshot: ChatGptWebSnapshot): Boolean =
+        isConversationTranscript(snapshot) ||
+            (
+                snapshot.messages.isEmpty() &&
+                    snapshot.composerReady &&
+                    !snapshot.loginRequired &&
+                    ChatGptWebNavigationPolicy.supportsEnhancedMode(snapshot.url) &&
+                    !ChatGptWebNavigationPolicy.isAuthenticationPage(snapshot.url)
+                )
 
     private fun presentationSnapshot(): ChatGptWebSnapshot? {
         val retained = retainedSnapshot ?: return null
