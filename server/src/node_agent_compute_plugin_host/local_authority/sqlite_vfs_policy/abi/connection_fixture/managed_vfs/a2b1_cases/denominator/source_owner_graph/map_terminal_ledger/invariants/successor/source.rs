@@ -275,7 +275,7 @@ fn validate_call_contexts(steps: &[MapSourceStep]) -> Result<(), &'static str> {
         source_anchor(
             SourceOwnerId::AbiRawState,
             "unsafe fn abandon_installed_state",
-            ".record_state_abandon();",
+            "control.record_state_abandon(file.as_ptr().cast());",
             1,
         ),
     )?;
