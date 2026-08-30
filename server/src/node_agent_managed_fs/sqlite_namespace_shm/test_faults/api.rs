@@ -173,8 +173,8 @@ impl ManagedSqliteShmTestTargetObserver {
         let snapshot = self
             .snapshot()
             .map_err(|_| "NODE_MANAGED_SQLITE_SHM_TEST_UNMAP_TARGET_SNAPSHOT_FAILED")?;
-        if !snapshot.target_attached || snapshot.topology.shm_connections != 1 {
-            return Err("NODE_MANAGED_SQLITE_SHM_TEST_UNMAP_TARGET_NOT_FINAL");
+        if !snapshot.target_attached || snapshot.topology.shm_connections == 0 {
+            return Err("NODE_MANAGED_SQLITE_SHM_TEST_UNMAP_TARGET_NOT_ATTACHED");
         }
         let mut runtime = self
             .coordinator

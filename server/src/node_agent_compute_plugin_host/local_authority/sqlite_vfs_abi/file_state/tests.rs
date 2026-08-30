@@ -173,6 +173,14 @@ fn assert_cleared(storage: &MaybeUninit<InertHandleBoundSqliteFile>) {
 }
 
 #[cfg(windows)]
+fn assert_installed(storage: &MaybeUninit<InertHandleBoundSqliteFile>) {
+    // SAFETY: install initialized the exact storage and it remains alive.
+    let file = unsafe { storage.assume_init_ref() };
+    assert!(!file.base.pMethods.is_null());
+    assert!(!file.state.is_null());
+}
+
+#[cfg(windows)]
 fn raw_close_control_installed(storage: &MaybeUninit<InertHandleBoundSqliteFile>) -> bool {
     // SAFETY: install initialized the exact test-only sidecar slot and storage remains alive.
     !unsafe { storage.assume_init_ref() }
@@ -354,8 +362,8 @@ fn raw_close_witness_survives_allocation_release_and_records_the_exact_transitio
 fn raw_state_take_rejection_is_exact_allocation_bound_and_second_close_is_rejected() {
     let facts = Arc::new(Mutex::new(FakeFacts::default()));
     let (storage, file) = install(FakeFile::new(Arc::clone(&facts)));
-    // Save the real callback while pMethods is installed; the first invocation deliberately clears
-    // that slot, while the simulated Connection continues to own the allocation and callback fn.
+    // Save the real callback while pMethods is installed; the exact rejection must preserve that
+    // slot and the typed state while the simulated Connection continues to own the allocation.
     let close_callback = unsafe {
         (*(*file).pMethods)
             .xClose
@@ -395,13 +403,12 @@ fn raw_state_take_rejection_is_exact_allocation_bound_and_second_close_is_reject
         }
     );
 
-    // First xClose clears both raw slots after a successful take, then transfers the typed state to
-    // explicit process-lifetime custody before any physical close attempt.
+    // First xClose rejects before typed take or either raw-slot mutation and before physical close.
     assert_eq!(
         unsafe { close_callback(file) },
         result_codes::CLOSE_UNAVAILABLE
     );
-    assert_cleared(storage.as_ref());
+    assert_installed(storage.as_ref());
     assert!(raw_close_control_installed(storage.as_ref()));
     let first = witness.snapshot();
     assert_eq!(
@@ -411,12 +418,12 @@ fn raw_state_take_rejection_is_exact_allocation_bound_and_second_close_is_reject
             raw_close_entry_order: 1,
             state_take_attempts: 1,
             state_take_attempt_order: 2,
-            methods_clears: 1,
-            methods_clear_order: 3,
-            state_take_successes: 1,
-            state_take_success_order: 4,
-            state_close_custody_retentions: 1,
-            state_close_custody_retention_order: 5,
+            methods_clears: 0,
+            methods_clear_order: 0,
+            state_take_successes: 0,
+            state_take_success_order: 0,
+            state_close_custody_retentions: 0,
+            state_close_custody_retention_order: 0,
             state_close_attempts: 0,
             state_close_attempt_order: 0,
             state_abandons: 0,
@@ -428,14 +435,14 @@ fn raw_state_take_rejection_is_exact_allocation_bound_and_second_close_is_reject
     assert_eq!(primary_facts.drops, 0);
     drop(primary_facts);
 
-    // The saved real callback can enter again even though pMethods is null. Its selected delta is
-    // entry=1/take-attempt=1 with no second success, methods clear, or physical work.
+    // The saved real callback enters again against the same retained allocation. Its exact delta is
+    // entry=1/take-attempt=1 with no success, methods clear, abandonment, or physical work.
     assert_eq!(
         unsafe { close_callback(file) },
         result_codes::CLOSE_UNAVAILABLE
     );
     let second = witness.snapshot();
-    assert_cleared(storage.as_ref());
+    assert_installed(storage.as_ref());
     assert!(raw_close_control_installed(storage.as_ref()));
     assert_eq!(second.raw_close_entries - first.raw_close_entries, 1);
     assert_eq!(second.state_take_attempts - first.state_take_attempts, 1);
@@ -449,13 +456,13 @@ fn raw_state_take_rejection_is_exact_allocation_bound_and_second_close_is_reject
     assert_eq!(second.state_abandons - first.state_abandons, 0);
     assert_eq!(second.raw_close_entries, 2);
     assert_eq!(second.state_take_attempts, 2);
-    assert_eq!(second.methods_clears, 1);
-    assert_eq!(second.state_take_successes, 1);
+    assert_eq!(second.methods_clears, 0);
+    assert_eq!(second.state_take_successes, 0);
     assert_eq!(facts.lock().expect("primary fake facts").closes, 0);
     assert_eq!(facts.lock().expect("primary fake facts").drops, 0);
 
     // `storage` intentionally models the Connection's process-lifetime allocation custody. Its
-    // sidecar owns the ManuallyDrop-wrapped typed state; no ad-hoc Box::leak is involved.
+    // installed typed state is never dropped after direct xClose; no ad-hoc Box::leak is involved.
 }
 
 #[test]

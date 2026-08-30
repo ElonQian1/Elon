@@ -5,7 +5,7 @@ use std::{
 
 use super::super::file_custody::{
     ManagedSqliteRegistryCloseLifecycleFaults, ManagedSqliteRegistryCloseLifecyclePhase,
-    ManagedSqliteRegistryLifecycleStage,
+    ManagedSqliteRegistryLifecycleStage, ManagedSqliteRegistryPinnedFileTestCloseOutcome,
 };
 use super::super::process_owner::ManagedSqliteRegistryTerminalCustodyTestSnapshot;
 use super::*;
@@ -195,8 +195,20 @@ where
         close_faults.observe_registry_lifecycle_stage(
             ManagedSqliteRegistryLifecycleStage::RawCloseEntered,
         )?;
+        if close_faults.claim_begin_connection_close_rejection()? {
+            owner
+                .arm_begin_connection_close_rejection(route)
+                .map_err(drop)?;
+        }
         owner.begin_connection_close(route).map_err(drop)?;
-        let callback = file.close_with_callback_receipt()?;
+        let callback = match file.close_with_callback_receipt()? {
+            ManagedSqliteRegistryPinnedFileTestCloseOutcome::CallbackCompleted(callback) => {
+                callback
+            }
+            ManagedSqliteRegistryPinnedFileTestCloseOutcome::PhysicalSuccessHandoff => {
+                return Ok(())
+            }
+        };
         let outstanding_sidecar = match close_faults.take_connection_observation_sidecar() {
             Ok(Some(file)) => {
                 let lease = match owner.claim_connection_observation_sidecar(

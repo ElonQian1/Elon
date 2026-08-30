@@ -18,6 +18,10 @@ pub(super) struct ManagedSqliteRegistryCloseCallbackAdmissionTestGate {
     slots: Mutex<Vec<Slot>>,
 }
 
+pub(super) struct ManagedSqliteRegistryBeginConnectionCloseTestGate {
+    slots: Mutex<Vec<Slot>>,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy) struct ManagedSqliteRegistryWalMainNativeUncertainTestSnapshot
 {
@@ -26,6 +30,12 @@ pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy) struct ManagedSqliteRegistryCloseCallbackAdmissionTestSnapshot
+{
+    claims: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy) struct ManagedSqliteRegistryBeginConnectionCloseTestSnapshot
 {
     claims: usize,
 }
@@ -39,6 +49,14 @@ impl ManagedSqliteRegistryWalMainNativeUncertainTestSnapshot {
 }
 
 impl ManagedSqliteRegistryCloseCallbackAdmissionTestSnapshot {
+    pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy) fn claim_count(
+        self,
+    ) -> usize {
+        self.claims
+    }
+}
+
+impl ManagedSqliteRegistryBeginConnectionCloseTestSnapshot {
     pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy) fn claim_count(
         self,
     ) -> usize {
@@ -168,6 +186,67 @@ impl ManagedSqliteRegistryCloseCallbackAdmissionTestGate {
     }
 }
 
+impl ManagedSqliteRegistryBeginConnectionCloseTestGate {
+    pub(super) fn new() -> Self {
+        Self {
+            slots: Mutex::new(Vec::new()),
+        }
+    }
+
+    fn arm(
+        &self,
+        route: ManagedSqliteRegistryRouteHandle,
+    ) -> Result<(), ManagedSqliteRegistryProcessRouteRejection> {
+        let mut slots = self
+            .slots
+            .lock()
+            .map_err(|_| ManagedSqliteRegistryProcessRouteRejection::OwnerPoisoned)?;
+        if slots.iter().any(|slot| slot.route == route) {
+            return Err(ManagedSqliteRegistryProcessRouteRejection::BeginConnectionCloseRejected);
+        }
+        slots.push(Slot { route, claims: 0 });
+        Ok(())
+    }
+
+    fn claim(
+        &self,
+        route: ManagedSqliteRegistryRouteHandle,
+    ) -> Result<bool, ManagedSqliteRegistryProcessRouteRejection> {
+        let mut slots = self
+            .slots
+            .lock()
+            .map_err(|_| ManagedSqliteRegistryProcessRouteRejection::OwnerPoisoned)?;
+        let Some(slot) = slots.iter_mut().find(|slot| slot.route == route) else {
+            return Ok(false);
+        };
+        if slot.claims != 0 {
+            return Err(ManagedSqliteRegistryProcessRouteRejection::BeginConnectionCloseRejected);
+        }
+        slot.claims = 1;
+        Ok(true)
+    }
+
+    fn snapshot(
+        &self,
+        route: ManagedSqliteRegistryRouteHandle,
+    ) -> Result<
+        ManagedSqliteRegistryBeginConnectionCloseTestSnapshot,
+        ManagedSqliteRegistryProcessRouteRejection,
+    > {
+        let slots = self
+            .slots
+            .lock()
+            .map_err(|_| ManagedSqliteRegistryProcessRouteRejection::OwnerPoisoned)?;
+        let slot = slots
+            .iter()
+            .find(|slot| slot.route == route)
+            .ok_or(ManagedSqliteRegistryProcessRouteRejection::BeginConnectionCloseRejected)?;
+        Ok(ManagedSqliteRegistryBeginConnectionCloseTestSnapshot {
+            claims: slot.claims,
+        })
+    }
+}
+
 impl<Custody, NonceSource> ManagedSqliteRegistryProcessOwner<Custody, NonceSource>
 where
     Custody: ManagedSqliteRegistryCustody + 'static,
@@ -219,5 +298,30 @@ where
         ManagedSqliteRegistryProcessRouteRejection,
     > {
         self.joint_close_callback_admission_fault.snapshot(route)
+    }
+
+    pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::registry) fn arm_begin_connection_close_rejection(
+        &self,
+        route: ManagedSqliteRegistryRouteHandle,
+    ) -> Result<(), ManagedSqliteRegistryProcessRouteRejection> {
+        self.joint_close_begin_connection_close_fault.arm(route)
+    }
+
+    pub(super) fn claim_begin_connection_close_rejection(
+        &self,
+        route: ManagedSqliteRegistryRouteHandle,
+    ) -> Result<bool, ManagedSqliteRegistryProcessRouteRejection> {
+        self.joint_close_begin_connection_close_fault.claim(route)
+    }
+
+    pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy) fn begin_connection_close_test_snapshot(
+        &self,
+        route: ManagedSqliteRegistryRouteHandle,
+    ) -> Result<
+        ManagedSqliteRegistryBeginConnectionCloseTestSnapshot,
+        ManagedSqliteRegistryProcessRouteRejection,
+    > {
+        self.joint_close_begin_connection_close_fault
+            .snapshot(route)
     }
 }

@@ -22,6 +22,7 @@ pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy
     sidecar_leases: usize,
     shm_lease: bool,
     callbacks_in_flight: u32,
+    access_callback_allowed: bool,
 }
 
 impl ManagedSqliteRegistryTerminalRouteTestSnapshot {
@@ -35,6 +36,18 @@ impl ManagedSqliteRegistryTerminalRouteTestSnapshot {
         self,
     ) -> bool {
         self.terminal_reason == ManagedSqliteRegistryTerminalReason::ConnectionCloseUnproven
+    }
+
+    pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy) fn terminal_reason_is_shm_teardown_unproven(
+        self,
+    ) -> bool {
+        self.terminal_reason == ManagedSqliteRegistryTerminalReason::ShmTeardownUnproven
+    }
+
+    pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy) fn terminal_reason_is_handle_close_unproven(
+        self,
+    ) -> bool {
+        self.terminal_reason == ManagedSqliteRegistryTerminalReason::HandleCloseUnproven
     }
 
     pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy) fn connection_owner(
@@ -65,6 +78,12 @@ impl ManagedSqliteRegistryTerminalRouteTestSnapshot {
         self,
     ) -> u32 {
         self.callbacks_in_flight
+    }
+
+    pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy) fn access_callback_allowed(
+        self,
+    ) -> bool {
+        self.access_callback_allowed
     }
 }
 
@@ -120,6 +139,8 @@ impl ManagedSqliteRegistrySessionState {
             sidecar_leases: self.sidecar_leases.iter().flatten().count(),
             shm_lease: self.shm_lease.is_some(),
             callbacks_in_flight: self.callbacks_in_flight,
+            access_callback_allowed: self
+                .callback_allowed(ManagedSqliteRegistryCallbackKind::Access),
         })
     }
 

@@ -106,6 +106,30 @@ impl ManagedSqliteRegistryCloseLifecycleFaults for ManagedTestLifecycleFaultBind
     ) -> Result<(), ()> {
         self.controller.observe_registry_stage(self.route, stage)
     }
+
+    #[cfg(windows)]
+    fn claim_physical_success_handoff(&self) -> Result<bool, ()> {
+        self.controller
+            .claim_joint_close_physical_success(self.route)
+    }
+
+    #[cfg(windows)]
+    fn claim_registry_wal_main_native_uncertain(&self) -> Result<bool, ()> {
+        self.controller
+            .claim_joint_close_registry_native(self.route)
+    }
+
+    #[cfg(windows)]
+    fn claim_close_callback_admission_rejection(&self) -> Result<bool, ()> {
+        self.controller
+            .claim_joint_close_callback_admission(self.route)
+    }
+
+    #[cfg(windows)]
+    fn claim_begin_connection_close_rejection(&self) -> Result<bool, ()> {
+        self.controller
+            .claim_joint_close_begin_connection_close(self.route)
+    }
 }
 
 fn registry_phase(

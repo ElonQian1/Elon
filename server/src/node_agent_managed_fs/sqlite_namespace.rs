@@ -58,14 +58,16 @@ pub(crate) use shm::{
 };
 #[cfg(all(test, windows))]
 pub(crate) use shm::{
-    ManagedSqliteShmTestDmsCustody, ManagedSqliteShmTestTargetIdentity,
-    ManagedSqliteShmTestTargetObserver, ManagedSqliteShmTestTargetSnapshot,
-    ManagedSqliteShmTestTopologySnapshot, ManagedSqliteShmTestUnmapActionEvent,
-    ManagedSqliteShmTestUnmapActionOutcome, ManagedSqliteShmTestUnmapDeleteAuthorityReceipt,
-    ManagedSqliteShmTestUnmapDeletePrestate, ManagedSqliteShmTestUnmapDeletePrestateReceipt,
-    ManagedSqliteShmTestUnmapNativeObservation, ManagedSqliteShmTestUnmapNativeOperation,
-    ManagedSqliteShmTestUnmapNativeReceipt, ManagedSqliteShmTestUnmapNativeTiming,
-    ManagedSqliteShmTestUnmapReceipt, ManagedSqliteShmTriggeredTestFaultObservation,
+    ManagedSqliteShmTestConnectionDetachReceipt, ManagedSqliteShmTestDmsCustody,
+    ManagedSqliteShmTestTargetIdentity, ManagedSqliteShmTestTargetObserver,
+    ManagedSqliteShmTestTargetSnapshot, ManagedSqliteShmTestTopologySnapshot,
+    ManagedSqliteShmTestUnmapActionEvent, ManagedSqliteShmTestUnmapActionOutcome,
+    ManagedSqliteShmTestUnmapDeleteAuthorityReceipt, ManagedSqliteShmTestUnmapDeletePrestate,
+    ManagedSqliteShmTestUnmapDeletePrestateReceipt, ManagedSqliteShmTestUnmapNativeObservation,
+    ManagedSqliteShmTestUnmapNativeOperation, ManagedSqliteShmTestUnmapNativeReceipt,
+    ManagedSqliteShmTestUnmapNativeTiming, ManagedSqliteShmTestUnmapReceipt,
+    ManagedSqliteShmTriggeredTestFaultObservation, ManagedSqliteWalMainCloseFailureTestBoundary,
+    ManagedSqliteWalMainCloseFailureTestSnapshot,
 };
 use types::ManagedSqliteNamespaceInner;
 pub(crate) use types::{

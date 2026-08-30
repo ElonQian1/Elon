@@ -343,6 +343,36 @@ where
             .map_err(drop)
     }
 
+    #[cfg(all(test, windows))]
+    pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy) fn registry_wal_main_native_uncertain_claim_count(
+        &self,
+    ) -> Result<usize, ()> {
+        self.owner
+            .registry_wal_main_native_uncertain_test_snapshot(self.route)
+            .map(|snapshot| snapshot.claim_count())
+            .map_err(drop)
+    }
+
+    #[cfg(all(test, windows))]
+    pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy) fn close_callback_admission_claim_count(
+        &self,
+    ) -> Result<usize, ()> {
+        self.owner
+            .close_callback_admission_test_snapshot(self.route)
+            .map(|snapshot| snapshot.claim_count())
+            .map_err(drop)
+    }
+
+    #[cfg(all(test, windows))]
+    pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy) fn begin_connection_close_claim_count(
+        &self,
+    ) -> Result<usize, ()> {
+        self.owner
+            .begin_connection_close_test_snapshot(self.route)
+            .map(|snapshot| snapshot.claim_count())
+            .map_err(drop)
+    }
+
     pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy) fn abort_unopened_for_test(
         &self,
     ) {

@@ -85,13 +85,6 @@ impl HandleBoundSqliteAbiRawCloseWitness {
         );
     }
 
-    pub(super) fn record_state_close_custody_retention(&self) {
-        self.record(
-            &self.state.state_close_custody_retentions,
-            &self.state.state_close_custody_retention_order,
-        );
-    }
-
     pub(super) fn record_state_close_attempt(&self) {
         self.record(
             &self.state.state_close_attempts,

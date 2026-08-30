@@ -32,6 +32,8 @@ pub(super) enum RawSqliteFileStateRejection {
     ForeignMethods,
     StateMissing,
     TypeMismatch,
+    #[cfg(all(test, windows))]
+    TestStateTakeRejected,
 }
 
 struct RawSqliteFileStateEnvelope {
@@ -198,6 +200,12 @@ pub(super) unsafe fn take_installed_state<State: 'static>(
     unsafe {
         record_test_state_take_attempt(file);
     }
+    #[cfg(all(test, windows))]
+    // SAFETY: this is the same serialized allocation. The exact test control rejects before
+    // either raw slot changes, so the retained Connection remains the typed state owner.
+    if unsafe { test_raw_state_take_is_rejected(file) } {
+        return Err(RawSqliteFileStateRejection::TestStateTakeRejected);
+    }
     let envelope = unsafe { installed_envelope(file)? };
     if !envelope.is::<State>() {
         return Err(RawSqliteFileStateRejection::TypeMismatch);
@@ -242,8 +250,8 @@ pub(in crate::node_agent_compute_plugin_host::local_authority) unsafe fn observe
     Some(unsafe { ensure_test_raw_close_control(file) }?.witness())
 }
 
-/// Arms a one-shot rejection for this exact allocation after typed take succeeds and before
-/// physical close begins. The returned witness remains readable after both raw slots are cleared.
+/// Arms an exact-allocation rejection before typed take or either raw-slot mutation.
+/// The returned witness remains readable while the owning test Connection is retained.
 ///
 /// # Safety
 ///
@@ -289,14 +297,8 @@ unsafe fn record_test_state_take_success(file: *mut ffi::sqlite3_file) {
 }
 
 #[cfg(all(test, windows))]
-pub(super) unsafe fn retain_test_raw_close_state_if_armed(
-    file: *mut ffi::sqlite3_file,
-    state: Box<super::file_state::HandleBoundSqliteFileState>,
-) -> Option<Box<super::file_state::HandleBoundSqliteFileState>> {
-    let Some(control) = (unsafe { test_raw_close_control(file) }) else {
-        return Some(state);
-    };
-    control.retain_taken_state_if_armed(file, state)
+unsafe fn test_raw_state_take_is_rejected(file: *mut ffi::sqlite3_file) -> bool {
+    unsafe { test_raw_close_control(file) }.is_some_and(|control| control.rejects_state_take(file))
 }
 
 #[cfg(all(test, windows))]
@@ -306,8 +308,8 @@ pub(super) unsafe fn record_test_state_close_attempt(file: *mut ffi::sqlite3_fil
     }
 }
 
-/// Releases the allocation-owned sidecar on an ordinary terminal path. A sidecar holding explicit
-/// process-lifetime custody remains installed so later xClose attempts retain durable evidence.
+/// Releases the allocation-owned sidecar on an ordinary terminal path. An armed rejection never
+/// reaches this path because it preserves both installed raw slots for process-lifetime custody.
 #[cfg(all(test, windows))]
 pub(super) unsafe fn release_test_raw_close_control_if_unretained(file: *mut ffi::sqlite3_file) {
     let Some(file) = NonNull::new(file.cast::<InertHandleBoundSqliteFile>()) else {
@@ -321,9 +323,7 @@ pub(super) unsafe fn release_test_raw_close_control_if_unretained(file: *mut ffi
         return;
     };
     // A mismatched pointer cannot be safely reclaimed through this allocation.
-    if !unsafe { control.as_ref() }.matches_allocation(file.as_ptr().cast())
-        || unsafe { control.as_ref() }.retains_process_lifetime_custody()
-    {
+    if !unsafe { control.as_ref() }.matches_allocation(file.as_ptr().cast()) {
         return;
     }
     // Clear the allocation slot before releasing its uniquely owned Box.
