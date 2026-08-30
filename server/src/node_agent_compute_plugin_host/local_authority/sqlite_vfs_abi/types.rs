@@ -9,6 +9,10 @@ use rusqlite::ffi;
 pub(super) struct InertHandleBoundSqliteFile {
     pub(super) base: ffi::sqlite3_file,
     pub(super) state: *mut c_void,
+    /// Test-only sidecar for allocation-bound raw-close observation and terminal custody. It is
+    /// absent from production layout and never carries a selector or filesystem authority.
+    #[cfg(all(test, windows))]
+    pub(super) raw_close_control: *mut c_void,
 }
 
 /// `sqlite3_vfs` contains raw pointers and therefore is not `Sync` by default. This wrapper is
