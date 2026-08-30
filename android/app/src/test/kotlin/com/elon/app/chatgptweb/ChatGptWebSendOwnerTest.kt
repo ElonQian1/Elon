@@ -127,6 +127,23 @@ class ChatGptWebSendOwnerTest {
     }
 
     @Test
+    fun transportCompletionUsesTheReservedSendWhenTheObservedSnapshotIsStable() {
+        val fixture = Fixture()
+        assertTrue(fixture.owner.beginAttachments("with transport", listOf(pendingAttachment())))
+
+        fixture.owner.acceptAttachmentTransport(
+            ChatGptWebAttachmentTransportEvidence(
+                version = 1,
+                sequence = 1,
+                state = ChatGptWebAttachmentTransportState.COMPLETED,
+                completedCount = 1,
+            ),
+        )
+        assertEquals(listOf("with transport"), fixture.transport.commands.map(WebChatSendCommand::prompt))
+        assertEquals("sending", fixture.owner.attachmentSendPhase())
+    }
+
+    @Test
     fun localStagingFailureReleasesTheReservationWithoutDispatching() {
         val fixture = Fixture(stageSucceeds = false)
 

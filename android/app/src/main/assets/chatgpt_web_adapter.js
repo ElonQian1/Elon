@@ -16,6 +16,7 @@
   const privateTransport = window.__elonChatGptPrivateTransport;
   const textTransactionOrchestratorModule = window.__elonChatGptTextTransactionOrchestrator;
   const privateStreamTransport = window.__elonChatGptPrivateStreamTransport;
+  const attachmentTransportObserver = window.__elonChatGptAttachmentTransportObserver;
   const privateConversationDirectory = window.__elonChatGptPrivateConversationDirectory;
   const authenticationPolicy = window.__elonChatGptAuthenticationPolicy;
   const adapterVersion = Number(window.__elonChatGptAdapterVersion || 0);
@@ -506,6 +507,9 @@
     }
     if (action === 'request_attachment_upload' && composerAdapter) {
       invalidatePrivateTextContext();
+      if (attachmentTransportObserver && typeof attachmentTransportObserver.arm === 'function') {
+        attachmentTransportObserver.arm();
+      }
       return composerAdapter.requestAttachmentUpload(respond);
     }
     if (action === 'open_model_selector' && composerAdapter) {

@@ -27,6 +27,7 @@ class WebAiPrivateTransportCatalogTest {
         assertTrue("android_web_ai_background_navigation_continuity_v1" in enabledIds)
         assertTrue("android_web_ai_unified_send_coordinator_v1" in enabledIds)
         assertTrue("android_chatgpt_same_origin_text_transaction_v1" in enabledIds)
+        assertTrue("android_chatgpt_attachment_transport_reconciliation_v1" in enabledIds)
         assertTrue("android_chatgpt_realtime_voice_background_overlay_v1" in enabledIds)
 
         val streamSettlement = values.first {
@@ -173,6 +174,23 @@ class WebAiPrivateTransportCatalogTest {
         assertEquals(
             "immediate_official_page_transaction_without_write_replay",
             textTransaction.getString("fallback"),
+        )
+
+        val attachmentTransport = values.first {
+            it.getString("capability_id") ==
+                "android_chatgpt_attachment_transport_reconciliation_v1"
+        }
+        assertEquals("completed", attachmentTransport.getString("implementation_status"))
+        assertEquals(
+            "device_verified_v1_1_1373_adapter_207",
+            attachmentTransport.getString("verification_status"),
+        )
+        assertTrue(attachmentTransport.getBoolean("production_default"))
+        assertTrue(attachmentTransport.getBoolean("runtime_enabled"))
+        assertFalse(attachmentTransport.getBoolean("direct_post_enabled"))
+        assertEquals(
+            "official_dom_attachment_snapshot_and_bounded_timeout",
+            attachmentTransport.getString("fallback"),
         )
     }
 

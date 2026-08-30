@@ -547,6 +547,26 @@ class ChatGptWebProtocolTest {
     }
 
     @Test
+    fun parsesOnlyBoundedVersionedAttachmentTransportEvidence() {
+        val event = ChatGptWebProtocol.parse(
+            """{"schema":"yilong.ai.ui.v1","event":{"type":"attachment_transport","transportVersion":1,"sequence":3,"state":"completed","completedCount":2}}""",
+        ) as ChatGptWebEvent.AttachmentTransport
+
+        assertEquals(3L, event.evidence.sequence)
+        assertEquals(2, event.evidence.completedCount)
+        assertEquals(ChatGptWebAttachmentTransportState.COMPLETED, event.evidence.state)
+        assertNull(ChatGptWebProtocol.parse(
+            """{"schema":"yilong.ai.ui.v1","event":{"type":"attachment_transport","transportVersion":2,"sequence":3,"state":"completed","completedCount":2}}""",
+        ))
+        assertNull(ChatGptWebProtocol.parse(
+            """{"schema":"yilong.ai.ui.v1","event":{"type":"attachment_transport","transportVersion":1,"sequence":0,"state":"completed","completedCount":2}}""",
+        ))
+        assertNull(ChatGptWebProtocol.parse(
+            """{"schema":"yilong.ai.ui.v1","event":{"type":"attachment_transport","transportVersion":1,"sequence":3,"state":"completed","completedCount":11}}""",
+        ))
+    }
+
+    @Test
     fun treatsMissingAuthenticationSignalAsLoggedOut() {
         val event = ChatGptWebProtocol.parse(
             """

@@ -26,6 +26,7 @@ installed build; individual capability documents retain implementation evidence.
 | Unified native send ledger | ChatGPT and Google Web AI | Completed and enabled; stable request-ID reconciliation targeted tests passed, device regression pending | Official-page reconciliation without automatic write replay |
 | Same-origin text transaction | ChatGPT | Completed, enabled, and device verified on `v1.1.1365 (1386)`, adapter `206`; current dynamic proof selects immediate official fallback | Official-page transaction without automatic write replay |
 | Interaction presets and deferred chat actions | ChatGPT | Completed, enabled, and device verified on research build `v1.1.1367 (1388)` | Current official control and WebView navigation |
+| Attachment upload reconciliation | ChatGPT | Completed, enabled, and device verified on research build `v1.1.1373 (1394)`, adapter `207` | Official DOM attachment snapshot and bounded timeout |
 
 All web-account transports keep the official page authoritative. They do not export
 cookies, credentials, request headers, or private conversation content outside the
@@ -43,6 +44,19 @@ The separate server API realtime transport remains an explicit disabled experime
 no consumer entry. The runtime inventory exposes both transport IDs, layers, visibility,
 default state, and conversation scopes so future agents cannot conflate them. Details are in
 `docs/native-realtime-voice-transport.md`.
+
+Native attachments keep the official page as the upload owner. Adapter `207` arms a
+document-start, same-origin observer only after the native picker is requested. It emits
+only a version, monotonic sequence, state, and completed count. A successful completion
+may release the already-reserved single send slot when the current official snapshot is
+composer-ready and not streaming; DOM attachment chips remain valid evidence and the
+existing timeout remains the fallback. This closes the official-upload/hidden-chip false
+timeout without copying cookies into Android HTTP, replaying uploads, or exporting file
+metadata. Device acceptance on `v1.1.1373 (1394)` completed one fixed-fixture upload and
+reply, restored the original conversation, and registered
+`supervised/attachment_lifecycle`. The completed capability is
+`android_chatgpt_attachment_transport_reconciliation_v1` and must not be reimplemented
+without current regression evidence.
 
 The Google conversation directory persists the timestamp of the last successful
 official directory response. Cached rows render immediately; a legacy or expired cache

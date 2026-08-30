@@ -155,6 +155,11 @@ internal class ChatGptWebSendOwner(
         processAttachmentSnapshot(current)
     }
 
+    fun acceptAttachmentTransport(evidence: ChatGptWebAttachmentTransportEvidence) {
+        attachmentTracker?.observeTransport(evidence) ?: return
+        snapshot()?.let(::processAttachmentSnapshot)
+    }
+
     fun acceptCommandResult(event: ChatGptWebEvent.CommandResult): ChatGptWebSendReceipt? {
         if (event.action == "request_attachment_upload" && !event.ok) {
             failAttachmentSend(event.detail.ifBlank { "官网附件操作失败，请重试。" })

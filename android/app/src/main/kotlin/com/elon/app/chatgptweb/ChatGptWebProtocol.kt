@@ -144,6 +144,10 @@ internal sealed interface ChatGptWebEvent {
         val controlId: String? = null,
     ) : ChatGptWebEvent
 
+    data class AttachmentTransport(
+        val evidence: ChatGptWebAttachmentTransportEvidence,
+    ) : ChatGptWebEvent
+
     data class CommandResult(
         val action: String,
         val ok: Boolean,
@@ -189,6 +193,7 @@ internal object ChatGptWebProtocol {
                 "navigation_snapshot" -> ChatGptWebEvent.FeatureNavigation(parseFeatures(event))
                 "ui_manifest_snapshot" -> ChatGptWebEvent.UiManifest(parseUiManifest(event))
                 "web_touch_request" -> parseWebTouchRequest(event)
+                "attachment_transport" -> parseAttachmentTransport(event)
                 else -> null
             }
         } else when (payload.optString("type")) {
@@ -207,6 +212,18 @@ internal object ChatGptWebProtocol {
                 .takeIf(WebBridgeDocumentSession.DOCUMENT_TOKEN::matches),
             event = parsedEvent,
         )
+    }
+
+    private fun parseAttachmentTransport(event: JSONObject): ChatGptWebEvent.AttachmentTransport? {
+        val evidence = ChatGptWebAttachmentTransportEvidence(
+            version = event.optInt("transportVersion", 0),
+            sequence = event.optLong("sequence", 0L),
+            state = ChatGptWebAttachmentTransportState.fromWireValue(event.optString("state"))
+                ?: return null,
+            completedCount = event.optInt("completedCount", -1),
+        )
+        return evidence.takeIf(ChatGptWebAttachmentTransportEvidence::supported)
+            ?.let { ChatGptWebEvent.AttachmentTransport(it) }
     }
 
     private fun parseSnapshot(event: JSONObject): ChatGptWebSnapshot {

@@ -647,6 +647,10 @@ internal class ChatGptBackgroundSession(
                     pageAdapter?.markReady()
                 }
             }
+            is ChatGptWebEvent.AttachmentTransport -> {
+                sendOwner.acceptAttachmentTransport(event.evidence)
+                pageAdapter?.requestSnapshot()
+            }
             is ChatGptWebEvent.AdapterReady,
             is ChatGptWebEvent.FeatureNavigation -> Unit
             is ChatGptWebEvent.WebTouchRequest -> touchRequestHandler.handle(event)

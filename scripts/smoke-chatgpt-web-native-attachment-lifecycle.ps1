@@ -319,7 +319,8 @@ try {
             Invoke-NativeAction -Action "remove_chatgpt_web_acceptance_attachment" `
                 -Arguments @{ fixture_id = $fixtureId } | Out-Null
             $restored = Restore-Origin -Checkpoint $checkpoint
-            $official = Invoke-NativeAction -Action "open_chatgpt_official_fallback"
+            $official = Invoke-NativeAction -Action "open_chatgpt_official_fallback" `
+                -Arguments @{ wait_for_target_bind_ms = 12000 }
             if ($official.target_activity_bound -ne $true) {
                 throw "Official fallback did not bind for evidence registration."
             }

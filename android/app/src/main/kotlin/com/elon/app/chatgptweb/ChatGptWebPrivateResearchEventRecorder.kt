@@ -9,6 +9,20 @@ internal object ChatGptWebPrivateResearchEventRecorder {
     private val NETWORK_DETAIL = Regex("^[A-Za-z0-9._:/|{}-]{1,160}$")
 
     fun record(event: ChatGptWebEvent): Boolean {
+        if (event is ChatGptWebEvent.AttachmentTransport) {
+            if (BuildConfig.CHATGPT_PRIVATE_RESEARCH_ENABLED) {
+                DebugTraceStore.record(
+                    phase = "chatgpt_attachment_transport_observation",
+                    details = mapOf(
+                        "version" to event.evidence.version,
+                        "sequence" to event.evidence.sequence,
+                        "state" to event.evidence.state.wireValue,
+                        "completed_count" to event.evidence.completedCount,
+                    ),
+                )
+            }
+            return false
+        }
         if (event !is ChatGptWebEvent.CommandResult) return false
         return when (event.action) {
             NETWORK_ACTION -> {

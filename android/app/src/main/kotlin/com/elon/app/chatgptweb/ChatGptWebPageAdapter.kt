@@ -86,6 +86,12 @@ internal class ChatGptWebPageAdapter(
         context.assets.open(PRIVATE_CONVERSATION_DIRECTORY_ASSET).use { input ->
             input.reader(StandardCharsets.UTF_8).readText()
         }
+    private val attachmentTransportObserverScript = """
+        window.__elonChatGptAdapterTargetVersion = $ADAPTER_VERSION;
+    """.trimIndent() + "\n" +
+        context.assets.open(ATTACHMENT_TRANSPORT_OBSERVER_ASSET).use { input ->
+            input.reader(StandardCharsets.UTF_8).readText()
+        }
     private val mainHandler = Handler(Looper.getMainLooper())
     private val documentSession = WebBridgeDocumentSession()
     private val handshake = ChatGptWebBridgeHandshake(
@@ -126,6 +132,13 @@ internal class ChatGptWebPageAdapter(
             WebViewCompat.addDocumentStartJavaScript(
                 webView,
                 privateRealtimeVoiceResearchScript,
+                setOf(ALLOWED_ORIGIN),
+            )
+        }
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
+            WebViewCompat.addDocumentStartJavaScript(
+                webView,
+                attachmentTransportObserverScript,
                 setOf(ALLOWED_ORIGIN),
             )
         }
@@ -431,6 +444,7 @@ internal class ChatGptWebPageAdapter(
         is ChatGptWebEvent.FeatureNavigation,
         is ChatGptWebEvent.UiManifest,
         is ChatGptWebEvent.WebTouchRequest,
+        is ChatGptWebEvent.AttachmentTransport,
         is ChatGptWebEvent.CommandResult -> true
     }
 
@@ -493,7 +507,7 @@ internal class ChatGptWebPageAdapter(
         origin.scheme == "https" && origin.host == "chatgpt.com" && origin.port == -1
 
     companion object {
-        internal const val ADAPTER_VERSION = 206
+        internal const val ADAPTER_VERSION = 207
 
         private val ADAPTER_ASSETS = listOf(
             "chatgpt_web_adapter_bootstrap.js",
@@ -543,6 +557,7 @@ internal class ChatGptWebPageAdapter(
             "chatgpt_web_private_stream_transport.js",
             "chatgpt_web_private_send_observer.js",
             "chatgpt_web_text_transaction_orchestrator.js",
+            "chatgpt_web_attachment_transport_observer.js",
             "chatgpt_web_adapter.js",
         )
         private const val BRIDGE_OBJECT = "elonChatGptNative"
@@ -559,6 +574,8 @@ internal class ChatGptWebPageAdapter(
             "chatgpt_web_private_voice_relay.js"
         private const val PRIVATE_CONVERSATION_DIRECTORY_ASSET =
             "chatgpt_web_private_conversation_directory.js"
+        private const val ATTACHMENT_TRANSPORT_OBSERVER_ASSET =
+            "chatgpt_web_attachment_transport_observer.js"
         private const val MAX_PROMPT_LENGTH = 20_000
         private const val MAX_CONVERSATION_PATH_LENGTH = 256
         private const val MAX_PROJECT_HINTS = 40
