@@ -33,12 +33,13 @@ reconciliation remain the fallback.
   cancellation, and payload privacy.
 - Kotlin tests cover protocol bounds, stale sequence rejection, multi-file gating,
   stable-snapshot gating, failure fallback, and single-owner reserved dispatch.
-- Xiaomi device acceptance on Research APK `v1.1.1373 (1394)`, adapter `207`, used only
-  the repository fixed text fixture. The official upload completed, native attachment
-  phase became `completed`, pending count returned to zero, exactly one user turn and
-  one assistant turn were observed structurally, the fixture was removed, and the
-  original conversation was restored. No private conversation content was emitted and
-  no cookies or application data were cleared.
+- Xiaomi device acceptance first passed on Research APK `v1.1.1373 (1394)` and then on
+  the published Release APK `v1.1.1374 (1395)`, both with adapter `207`, using only the
+  repository fixed text fixture. The official upload completed, native pending count
+  returned to zero, exactly one user turn and one assistant turn were observed
+  structurally, the fixture was removed, and the original conversation was restored.
+  No private conversation content was emitted and no cookies or application data were
+  cleared.
 
 This capability is complete and production-default. Future work should reuse it rather
 than adding another attachment uploader unless current regression evidence proves the

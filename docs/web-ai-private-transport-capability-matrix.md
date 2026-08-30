@@ -26,7 +26,7 @@ installed build; individual capability documents retain implementation evidence.
 | Unified native send ledger | ChatGPT and Google Web AI | Completed and enabled; stable request-ID reconciliation targeted tests passed, device regression pending | Official-page reconciliation without automatic write replay |
 | Same-origin text transaction | ChatGPT | Completed, enabled, and device verified on `v1.1.1365 (1386)`, adapter `206`; current dynamic proof selects immediate official fallback | Official-page transaction without automatic write replay |
 | Interaction presets and deferred chat actions | ChatGPT | Completed, enabled, and device verified on research build `v1.1.1367 (1388)` | Current official control and WebView navigation |
-| Attachment upload reconciliation | ChatGPT | Completed, enabled, and device verified on research build `v1.1.1373 (1394)`, adapter `207` | Official DOM attachment snapshot and bounded timeout |
+| Attachment upload reconciliation | ChatGPT | Completed, enabled, and device verified on published Release `v1.1.1374 (1395)`, adapter `207` | Official DOM attachment snapshot and bounded timeout |
 
 All web-account transports keep the official page authoritative. They do not export
 cookies, credentials, request headers, or private conversation content outside the

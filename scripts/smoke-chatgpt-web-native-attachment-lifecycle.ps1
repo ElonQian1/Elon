@@ -319,18 +319,10 @@ try {
             Invoke-NativeAction -Action "remove_chatgpt_web_acceptance_attachment" `
                 -Arguments @{ fixture_id = $fixtureId } | Out-Null
             $restored = Restore-Origin -Checkpoint $checkpoint
-            $official = Invoke-NativeAction -Action "open_chatgpt_official_fallback" `
-                -Arguments @{ wait_for_target_bind_ms = 12000 }
-            if ($official.target_activity_bound -ne $true) {
-                throw "Official fallback did not bind for evidence registration."
-            }
             Register-ChatGptWebVerificationCases -Runtime $runtime `
                 -CaseIds @("supervised/attachment_lifecycle") `
-                -ExpectedAdapterVersion $ExpectedAdapterVersion | Out-Null
-            Invoke-ChatGptWebSmokeAdb -Runtime $runtime `
-                -Arguments @("shell", "input", "keyevent", "4") `
-                -TimeoutSec 8 -Label "return to native ChatGPT Web AI chat" | Out-Null
-            Open-ChatGptWebNativeChatSurface -Runtime $runtime -TimeoutSec $TimeoutSec | Out-Null
+                -ExpectedAdapterVersion $ExpectedAdapterVersion `
+                -ProductionSurface | Out-Null
             $checkpoint.phase = "passed"
             $checkpoint.updated_utc = [DateTimeOffset]::UtcNow.ToString("o")
             $checkpoint.sent_messages = 1
