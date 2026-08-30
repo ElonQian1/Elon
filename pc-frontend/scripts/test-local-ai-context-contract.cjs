@@ -224,7 +224,8 @@ assert.equal(localAiDirectoryNeedsAutoSync({
   nowMs: directoryNow,
 }), true)
 
-const { findLocalAiRealtimeVoiceControls } = loadTypeScriptModule(realtimeVoicePath)
+const realtimeVoice = loadTypeScriptModule(realtimeVoicePath)
+const { findLocalAiRealtimeVoiceControls } = realtimeVoice
 const baseControl = {
   region: 'composer', role: 'button', enabled: true, selected: false,
 }
@@ -245,6 +246,15 @@ const genericDialog = findLocalAiRealtimeVoiceControls([
 ])
 assert.equal(genericDialog.end, undefined)
 assert.equal(genericDialog.active, false)
+assert.deepEqual(realtimeVoice.readLocalAiRealtimeVoicePrivateState({
+  type: 'realtime_voice_state', version: 1, active: true, openChannelCount: 1,
+}), { observed: true, active: true })
+assert.deepEqual(realtimeVoice.readLocalAiRealtimeVoicePrivateState({
+  type: 'realtime_voice_state', version: 1, active: false, openChannelCount: 0,
+}), { observed: true, active: false })
+assert.deepEqual(realtimeVoice.readLocalAiRealtimeVoicePrivateState({ type: 'other' }), {
+  observed: false, active: false,
+})
 
 const hangup = loadTypeScriptModule(realtimeVoiceHangupPath)
 assert.deepEqual(hangup.LOCAL_AI_REALTIME_VOICE_HANGUP_WATCHDOG_DELAYS_MS, [
@@ -253,17 +263,17 @@ assert.deepEqual(hangup.LOCAL_AI_REALTIME_VOICE_HANGUP_WATCHDOG_DELAYS_MS, [
 let hangupObservation = hangup.beginLocalAiRealtimeVoiceHangupObservation()
 let hangupResult = hangup.observeLocalAiRealtimeVoiceHangup(hangupObservation, {
   conversationPage: true, manifestHealthy: true, controlsTruncated: false,
-  startAvailable: true, voiceActive: false,
+  startAvailable: true, voiceActive: false, privateDataChannelActive: false,
 }, 1_000)
 assert.equal(hangupResult.confirmed, false)
 hangupResult = hangup.observeLocalAiRealtimeVoiceHangup(hangupResult.observation, {
   conversationPage: true, manifestHealthy: true, controlsTruncated: false,
-  startAvailable: true, voiceActive: false,
+  startAvailable: true, voiceActive: false, privateDataChannelActive: false,
 }, 3_000)
 assert.equal(hangupResult.confirmed, true)
 hangupResult = hangup.observeLocalAiRealtimeVoiceHangup(hangupResult.observation, {
   conversationPage: true, manifestHealthy: false, controlsTruncated: false,
-  startAvailable: true, voiceActive: false,
+  startAvailable: true, voiceActive: false, privateDataChannelActive: false,
 }, 4_000)
 assert.equal(hangupResult.confirmed, false)
 assert.deepEqual(hangupResult.observation, { stableSinceMs: 0, stableObservations: 0 })
@@ -276,13 +286,29 @@ assert.deepEqual(activation.LOCAL_AI_REALTIME_VOICE_ACTIVATION_WATCHDOG_DELAYS_M
 ])
 assert.equal(activation.localAiRealtimeVoiceActivationConfirmed({
   manifestHealthy: true, controlsTruncated: false, voiceActive: true,
+  privateDataChannelActive: false,
 }), true)
 assert.equal(activation.localAiRealtimeVoiceActivationConfirmed({
   manifestHealthy: false, controlsTruncated: false, voiceActive: true,
+  privateDataChannelActive: false,
 }), false)
 assert.equal(activation.localAiRealtimeVoiceActivationConfirmed({
   manifestHealthy: true, controlsTruncated: true, voiceActive: true,
+  privateDataChannelActive: false,
 }), false)
+assert.equal(activation.localAiRealtimeVoiceActivationConfirmed({
+  manifestHealthy: false, controlsTruncated: true, voiceActive: false,
+  privateDataChannelActive: true,
+}), true)
+hangupResult = hangup.observeLocalAiRealtimeVoiceHangup(
+  hangup.beginLocalAiRealtimeVoiceHangupObservation(),
+  {
+    conversationPage: true, manifestHealthy: true, controlsTruncated: false,
+    startAvailable: true, voiceActive: false, privateDataChannelActive: true,
+  },
+  10_000,
+)
+assert.equal(hangupResult.confirmed, false)
 assert.equal(activation.shouldRefreshLocalAiRealtimeVoiceActivationControls(0), true)
 assert.equal(activation.shouldRefreshLocalAiRealtimeVoiceActivationControls(2), false)
 

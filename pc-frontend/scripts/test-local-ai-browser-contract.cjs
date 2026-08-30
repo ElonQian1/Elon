@@ -248,6 +248,7 @@ assert.match(chatGptWinPrivateConversationRichCache, /__elonWinChatGptPrivateStr
 assert.doesNotMatch(chatGptWinPrivateConversationRichCache, /document\.cookie|authorization|access[_-]?token|method:\s*['"]POST/i)
 assert.match(chatGptWinPrivateConversationRefresh, /accessSource: 'private_response'/)
 assert.match(adapterCommand, /refresh_current_conversation/)
+assert.match(adapterCommand, /set_draft/)
 assert.match(api, /requestLocalAiCurrentConversationRefresh/)
 assert.match(chatGptWinPrivateStreamRecovery, /__elonWinChatGptPrivateStreamRecovery/)
 assert.match(chatGptWinPrivateStreamRecovery, /rich\.source !== 'private_response'/)

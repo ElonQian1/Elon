@@ -8,6 +8,7 @@ export interface LocalAiRealtimeVoiceHangupEvidence {
   controlsTruncated: boolean
   startAvailable: boolean
   voiceActive: boolean
+  privateDataChannelActive: boolean
 }
 
 export interface LocalAiRealtimeVoiceHangupObservation {
@@ -29,6 +30,7 @@ export function observeLocalAiRealtimeVoiceHangup(
     && !evidence.controlsTruncated
     && evidence.startAvailable
     && !evidence.voiceActive
+    && !evidence.privateDataChannelActive
   if (!ended) {
     return {
       observation: beginLocalAiRealtimeVoiceHangupObservation(),

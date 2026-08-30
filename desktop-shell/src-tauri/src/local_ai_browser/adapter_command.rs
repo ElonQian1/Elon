@@ -3,6 +3,7 @@ use serde_json::{Map, Value};
 pub(super) const CHATGPT_ACTIONS: &[&str] = &[
     "snapshot",
     "refresh_current_conversation",
+    "set_draft",
     "send_prompt",
     "stop_generation",
     "regenerate_response",
@@ -216,6 +217,8 @@ mod tests {
     fn provider_action_matrix_is_explicit_and_provider_scoped() {
         assert!(CHATGPT_ACTIONS.contains(&"list_conversations"));
         assert!(CHATGPT_ACTIONS.contains(&"refresh_current_conversation"));
+        assert!(CHATGPT_ACTIONS.contains(&"set_draft"));
+        assert!(!GOOGLE_AI_MODE_ACTIONS.contains(&"set_draft"));
         assert!(!GOOGLE_AI_MODE_ACTIONS.contains(&"refresh_current_conversation"));
         assert!(CHATGPT_ACTIONS.contains(&"start_google_login"));
         assert!(GOOGLE_AI_MODE_ACTIONS.contains(&"list_conversations"));

@@ -49,6 +49,7 @@ struct SessionRecord {
     composer_event: Option<Value>,
     feature_event: Option<Value>,
     ui_manifest_event: Option<Value>,
+    realtime_voice_event: Option<Value>,
     command_result: Option<Value>,
     command_results: Vec<Value>,
     last_event_kind: String,
@@ -194,6 +195,7 @@ impl LocalAiBrowserRuntime {
                 composer_event: None,
                 feature_event: None,
                 ui_manifest_event: None,
+                realtime_voice_event: None,
                 command_result: None,
                 command_results: Vec::new(),
                 last_event_kind: "session_created".to_string(),
@@ -402,6 +404,7 @@ impl LocalAiBrowserRuntime {
             match kind {
                 "adapter_ready" => {
                     record.renderer_status = "active".to_string();
+                    record.realtime_voice_event = None;
                     record.last_error = None;
                     record.last_error_code = None;
                 }
@@ -458,6 +461,7 @@ impl LocalAiBrowserRuntime {
                 "composer_controls_snapshot" => record.composer_event = Some(payload),
                 "navigation_snapshot" => record.feature_event = Some(payload),
                 "ui_manifest_snapshot" => record.ui_manifest_event = Some(payload),
+                "realtime_voice_state" => record.realtime_voice_event = Some(payload),
                 "command_result" => {
                     persist_semantic = record.finish_context_command(&payload);
                     record.last_command_action = payload
@@ -511,6 +515,7 @@ impl LocalAiBrowserRuntime {
             record.composer_event = None;
             record.feature_event = None;
             record.ui_manifest_event = None;
+            record.realtime_voice_event = None;
             record.command_result = None;
             record.command_results.clear();
             record.last_event_kind = "session_cleared".to_string();
@@ -681,90 +686,6 @@ impl LocalAiBrowserRuntime {
             .lock()
             .unwrap_or_else(|error| error.into_inner())
     }
-}
-
-impl From<SessionRecord> for LocalAiWebSessionState {
-    fn from(record: SessionRecord) -> Self {
-        let cache_status = record.cache_status().to_string();
-        let semantic_cache_status = record
-            .event_cache_status(record.semantic_event.is_some(), record.semantic_live)
-            .to_string();
-        let navigation_cache_status = record
-            .event_cache_status(record.navigation_event.is_some(), record.navigation_live)
-            .to_string();
-        let diagnostics = diagnostic_summary(&record);
-        let context_ready = record.context_ready();
-        let context_status = record.context_binding_status().to_string();
-        let semantic_conversation_aligned = record.active_conversation_id.is_none()
-            || record.semantic_conversation_id.is_none()
-            || record.active_conversation_id == record.semantic_conversation_id;
-        let local_conversations = record
-            .conversation_snapshots
-            .iter()
-            .map(|entry| LocalAiCachedConversation {
-                id: entry.id.clone(),
-                title: entry.title.clone(),
-                active: record.active_conversation_id.as_deref() == Some(entry.id.as_str()),
-                updated_at_ms: entry.updated_at_ms,
-            })
-            .collect();
-        Self {
-            provider_id: record.provider_id,
-            window_label: record.window_label,
-            window_status: record.window_status,
-            window_visible: record.window_visible,
-            current_url: record.current_url,
-            current_host: record.current_host,
-            loading: record.loading,
-            renderer_status: record.renderer_status,
-            last_error: record.last_error,
-            last_error_code: record.last_error_code,
-            semantic_event: record.semantic_event,
-            navigation_event: record.navigation_event,
-            composer_event: record.composer_event,
-            feature_event: record.feature_event,
-            ui_manifest_event: record.ui_manifest_event,
-            command_result: record.command_result,
-            command_results: record.command_results,
-            diagnostics,
-            cache_status,
-            semantic_cache_status,
-            navigation_cache_status,
-            local_conversations,
-            active_conversation_id: record.active_conversation_id,
-            semantic_conversation_aligned,
-            context_ready,
-            context_status,
-            cache_updated_at_ms: record.cache_updated_at_ms,
-            navigation_updated_at_ms: record.navigation_updated_at_ms,
-            semantic_updated_at_ms: record.semantic_updated_at_ms,
-            updated_at_ms: record.updated_at_ms,
-        }
-    }
-}
-
-fn diagnostic_summary(record: &SessionRecord) -> Value {
-    let coverage = diagnostics::content_coverage(record.semantic_event.as_ref());
-    serde_json::json!({
-        "lastEventKind": record.last_event_kind,
-        "lastCommandAction": record.last_command_action,
-        "lastCommandRequestId": record.last_command_request_id,
-        "lastCommandOk": record.last_command_ok,
-        "messageCount": record.message_count,
-        "assistantMessageCount": record.assistant_message_count,
-        "contentPartCounts": coverage.part_counts,
-        "richCardKindCounts": coverage.rich_kind_counts,
-        "citationCount": coverage.citation_count,
-        "linkedCitationCount": coverage.linked_citation_count,
-        "citationLogoCount": coverage.citation_logo_count,
-        "streaming": record.streaming,
-        "privateStreamObserved": private_stream::observed(record.semantic_event.as_ref()),
-        "privateStreamRevision": private_stream::revision(record.semantic_event.as_ref()),
-        "privateStreamState": private_stream::state(record.semantic_event.as_ref()),
-        "privateRichRecovery": diagnostics::private_rich_recovery(record.semantic_event.as_ref()),
-        "semanticUpdatedAtMs": record.semantic_updated_at_ms,
-        "updatedAtMs": record.updated_at_ms,
-    })
 }
 
 fn safe_visible_url(url: &Url) -> String {

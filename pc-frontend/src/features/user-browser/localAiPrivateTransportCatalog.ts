@@ -208,8 +208,8 @@ const CATALOG: Record<string, CapabilityDefinition[]> = {
     },
     {
       id: 'win_chatgpt_realtime_voice_data_channel_transcript_v1',
-      label: '私有语音数据通道实时转写',
-      requestMode: 'passive_webview2_official_webrtc_data_channel_delta_transcript',
+      label: '私有语音数据通道状态与实时转写',
+      requestMode: 'passive_webview2_official_webrtc_data_channel_state_and_delta_transcript',
       fallback: 'private_conversation_refresh_and_official_dom_snapshot',
       requiredActions: ['invoke_ui_control', 'snapshot'],
       androidParityIds: ['android_chatgpt_realtime_voice_data_channel_transcript_v1'],
@@ -266,6 +266,10 @@ export interface LocalAiAndroidProductionParityGap {
 }
 
 const ANDROID_PRODUCTION_PARITY_GAPS: readonly LocalAiAndroidProductionParityGap[] = [
+  {
+    androidId: 'android_chatgpt_interaction_preset_cache_v1',
+    reason: 'Win 当前只有会话级内存预设与后台预热；持久预设缓存和单次官网动作对账尚待独立验收。',
+  },
   {
     androidId: 'android_chatgpt_web_private_voice_native_relay_v1',
     reason: 'Win 当前由后台 WebView2 持有单一官网 WebRTC；原生媒体所有权仍需独立验收。',

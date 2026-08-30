@@ -121,8 +121,10 @@ export default function AiWebComposerControls({ web }: { web: AiWebChatBackend }
           <button
             type="button"
             onClick={() => void realtimeVoiceControl.run('start', realtimeVoice.start?.id ?? '')}
-            disabled={busy || realtimeVoiceControl.activationStatus === 'confirming' || realtimeVoiceControl.hangupStatus === 'confirming' || !realtimeVoice.start.enabled}
-            title="使用 ChatGPT 官网实时语音；首次使用时 WebView2 可能请求麦克风权限"
+            disabled={busy || Boolean(web.controller.draft.trim()) || realtimeVoiceControl.activationStatus === 'confirming' || realtimeVoiceControl.hangupStatus === 'confirming' || !realtimeVoice.start.enabled}
+            title={web.controller.draft.trim()
+              ? '请先发送或清空当前输入，再启动实时语音'
+              : '使用 ChatGPT 官网实时语音；首次使用时 WebView2 可能请求麦克风权限'}
           >
             <AudioLines size={13} /><span>{realtimeVoiceControl.activationStatus === 'confirming' ? '正在连接' : '实时语音'}</span>
           </button>
@@ -169,7 +171,9 @@ export default function AiWebComposerControls({ web }: { web: AiWebChatBackend }
             : realtimeVoiceControl.activationStatus === 'unconfirmed'
               ? '官网语音连接尚未确认，可再次尝试或显示官方页'
             : realtimeVoiceControl.activationStatus === 'active'
-              ? '官网实时语音已连接'
+              ? realtimeVoiceControl.privateDataChannelActive
+                ? '官网实时语音已连接 · 私有转写通道正常'
+                : '官网实时语音已连接'
             : realtimeVoiceControl.transcriptSyncing
               ? '正在同步语音转写与回复…'
               : `${web.provider.displayName} 官方网页会话`}</span>

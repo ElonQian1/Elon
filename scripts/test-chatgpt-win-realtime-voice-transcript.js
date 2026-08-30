@@ -25,7 +25,12 @@ class EventTargetMock {
   }
 }
 
-class DataChannelMock extends EventTargetMock {}
+class DataChannelMock extends EventTargetMock {
+  constructor() {
+    super();
+    this.readyState = 'connecting';
+  }
+}
 class PeerConnectionMock extends EventTargetMock {
   createDataChannel() {
     this.localChannel = new DataChannelMock();
@@ -35,6 +40,7 @@ class PeerConnectionMock extends EventTargetMock {
 
 let baseMessages = [];
 let snapshotRequests = 0;
+const nativeEvents = [];
 const windowValue = {
   RTCPeerConnection: PeerConnectionMock,
   setTimeout,
@@ -43,6 +49,10 @@ const windowValue = {
   ArrayBuffer,
   Blob,
   __elonChatGptDocumentToken: 'doc_win_voice_test',
+  __elonChatGptAdapterVersion: 206,
+  elonChatGptNative: {
+    postMessage(payload) { nativeEvents.push(JSON.parse(payload)); },
+  },
   __elonChatGptBridge: { command() { snapshotRequests += 1; } },
   __elonChatGptMessages: Object.freeze({
     capabilities: () => ['message_copy', 'rich_text'],
@@ -141,6 +151,8 @@ runtime.reset('/c/voice-channel');
 baseMessages = [];
 const peer = new windowValue.RTCPeerConnection();
 const channel = peer.createDataChannel('');
+channel.readyState = 'open';
+channel.emit('open');
 channel.emit('message', { data: JSON.stringify({
   event_id: 'channel_assistant_1',
   type: 'response.output_audio_transcript.done',
@@ -155,9 +167,23 @@ setTimeout(() => {
   assert.equal(channelMessages[0].content[0].text, '后台语音实时到达');
   assert.equal(runtime.status().openChannelCount, 1);
   assert.ok(snapshotRequests > 0, 'accepted private transcript must request a native snapshot');
+  const activeState = nativeEvents.map((entry) => entry.event).findLast((event) => (
+    event && event.type === 'realtime_voice_state' && event.active === true
+  ));
+  assert.equal(activeState.openChannelCount, 1);
+  assert.doesNotMatch(JSON.stringify(activeState), /后台语音实时到达/);
 
   channelMessages = runtime.mergeMessageWindow(emptyWindow, '/').messages;
   assert.equal(channelMessages.length, 0, 'new-chat navigation must clear old live voice text');
   assert.equal(runtime.status().openChannelCount, 1, 'route isolation must not duplicate audio channels');
-  process.stdout.write('PASS Win ChatGPT realtime voice private transcript bridge\n');
+  channel.readyState = 'closed';
+  channel.emit('close');
+  setTimeout(() => {
+    const finalState = nativeEvents.map((entry) => entry.event).findLast((event) => (
+      event && event.type === 'realtime_voice_state'
+    ));
+    assert.equal(finalState.active, false);
+    assert.equal(finalState.openChannelCount, 0);
+    process.stdout.write('PASS Win ChatGPT realtime voice private transcript bridge\n');
+  }, 60);
 }, 90);

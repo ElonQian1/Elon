@@ -28,6 +28,7 @@
   const boundPeers = new WeakSet();
   const boundChannels = new WeakSet();
   const openChannels = new Set();
+  const connectedChannels = new Set();
   const streams = new Map();
   const seenHashes = new Map();
   let deltaDecoder = deltaFactory.create();
@@ -38,6 +39,46 @@
   let observedFrameCount = 0;
   let acceptedEventCount = 0;
   let snapshotTimer = 0;
+  let stateTimer = 0;
+
+  function structuralState() {
+    return Object.freeze({
+      version: 1,
+      active: connectedChannels.size > 0,
+      observedChannelCount: openChannels.size,
+      openChannelCount: connectedChannels.size,
+      observedFrameCount,
+      acceptedEventCount,
+      streamCount: streams.size,
+      revision,
+    });
+  }
+
+  function emitStructuralState() {
+    stateTimer = 0;
+    const nativeBridge = root.elonChatGptNative;
+    const documentToken = String(root.__elonChatGptDocumentToken || '');
+    const adapterVersion = Number(root.__elonChatGptAdapterVersion || 0);
+    if (!nativeBridge || typeof nativeBridge.postMessage !== 'function' ||
+      !validIdentifier(documentToken) || !Number.isInteger(adapterVersion) || adapterVersion < 1) return;
+    try {
+      nativeBridge.postMessage(JSON.stringify({
+        schema: 'yilong.ai.ui.v1',
+        adapterVersion,
+        documentToken,
+        providerId: 'chatgpt',
+        source: 'official_web',
+        conversationId: cleanRoute(location.pathname),
+        emittedAt: new Date().toISOString(),
+        event: { type: 'realtime_voice_state', ...structuralState() },
+      }));
+    } catch (_) {}
+  }
+
+  function scheduleStructuralState() {
+    if (stateTimer) return;
+    stateTimer = window.setTimeout(emitStructuralState, 40);
+  }
 
   function cleanRoute(value) {
     try {
@@ -262,6 +303,7 @@
     acceptedEventCount += 1;
     revision += 1;
     requestSnapshot();
+    scheduleStructuralState();
     return true;
   }
 
@@ -329,6 +371,7 @@
     route = cleanRoute(nextRoute || location.pathname);
     nextOrder = 0;
     revision += 1;
+    scheduleStructuralState();
   }
 
   function decodeChannelData(value) {
@@ -349,12 +392,22 @@
     boundChannels.add(channel);
     if (openChannels.size === 0) reset(location.pathname);
     openChannels.add(channel);
+    if (channel.readyState === 'open') connectedChannels.add(channel);
+    channel.addEventListener('open', () => {
+      connectedChannels.add(channel);
+      scheduleStructuralState();
+    });
     channel.addEventListener('message', (event) => {
       void decodeChannelData(event && event.data).then((payload) => { if (payload) acceptPayload(payload); });
     });
-    const close = () => { openChannels.delete(channel); };
+    const close = () => {
+      connectedChannels.delete(channel);
+      openChannels.delete(channel);
+      scheduleStructuralState();
+    };
     channel.addEventListener('close', close);
     channel.addEventListener('error', close);
+    scheduleStructuralState();
     return channel;
   }
 
@@ -411,14 +464,7 @@
     mergeMessageWindow,
     reset,
     status() {
-      return Object.freeze({
-        version: 1,
-        revision,
-        observedFrameCount,
-        acceptedEventCount,
-        streamCount: streams.size,
-        openChannelCount: openChannels.size,
-      });
+      return structuralState();
     },
   });
 })();

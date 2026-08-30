@@ -1,3 +1,4 @@
+import type { LocalAiRealtimeVoiceStateEvent } from './localAiBrowserApi'
 import type { LocalAiUiControl } from './localAiBrowserProtocol'
 
 export type LocalAiRealtimeVoiceAction = 'start' | 'mute' | 'unmute' | 'end'
@@ -24,4 +25,17 @@ export function findLocalAiRealtimeVoiceControls(
       && (VOICE_LABEL.test(control.label) || (active && control.region === 'overlay'))
   ))
   return { start, mute, unmute, end, active: active || Boolean(end) }
+}
+
+export function readLocalAiRealtimeVoicePrivateState(
+  value: LocalAiRealtimeVoiceStateEvent | Record<string, unknown> | null | undefined,
+) {
+  if (!value || value.type !== 'realtime_voice_state' || value.version !== 1) {
+    return { observed: false, active: false }
+  }
+  const openChannelCount = Number(value.openChannelCount)
+  return {
+    observed: Number.isInteger(openChannelCount) && openChannelCount >= 0,
+    active: value.active === true && openChannelCount > 0,
+  }
 }

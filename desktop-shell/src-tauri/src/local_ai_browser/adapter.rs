@@ -6,6 +6,9 @@ use super::{
 
 #[path = "adapter/private_rich_recovery.rs"]
 mod private_rich_recovery;
+#[cfg(test)]
+#[path = "adapter/realtime_voice_tests.rs"]
+mod realtime_voice_tests;
 
 const MAX_EVENT_BYTES: usize = 512 * 1024;
 const MAX_MESSAGES: usize = 80;
@@ -154,6 +157,17 @@ fn sanitize_protocol_event(event: &Map<String, Value>) -> Result<SanitizedAdapte
             "controls": sanitize_ui_controls(event.get("controls")),
             "discoveredControlCount": bounded_u64(event.get("discoveredControlCount"), 0, 10_000),
             "controlsTruncated": event.get("controlsTruncated").and_then(Value::as_bool).unwrap_or(false),
+        }),
+        "realtime_voice_state" => json!({
+            "type": kind,
+            "version": bounded_u64(event.get("version"), 1, 4),
+            "active": event.get("active").and_then(Value::as_bool).unwrap_or(false),
+            "observedChannelCount": bounded_u64(event.get("observedChannelCount"), 0, 32),
+            "openChannelCount": bounded_u64(event.get("openChannelCount"), 0, 32),
+            "observedFrameCount": bounded_u64(event.get("observedFrameCount"), 0, 1_000_000_000),
+            "acceptedEventCount": bounded_u64(event.get("acceptedEventCount"), 0, 1_000_000_000),
+            "streamCount": bounded_u64(event.get("streamCount"), 0, 32),
+            "revision": bounded_u64(event.get("revision"), 0, 1_000_000_000),
         }),
         "web_touch_request" => json!({
             "type": kind,

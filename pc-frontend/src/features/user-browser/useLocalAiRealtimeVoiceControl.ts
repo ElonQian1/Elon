@@ -5,7 +5,11 @@ import {
   requestLocalAiWebSnapshot,
   runLocalAiWebAdapterCommand,
 } from './localAiBrowserApi'
-import { findLocalAiRealtimeVoiceControls, type LocalAiRealtimeVoiceAction } from './localAiRealtimeVoice'
+import {
+  findLocalAiRealtimeVoiceControls,
+  readLocalAiRealtimeVoicePrivateState,
+  type LocalAiRealtimeVoiceAction,
+} from './localAiRealtimeVoice'
 import {
   LOCAL_AI_REALTIME_VOICE_ACTIVATION_WATCHDOG_DELAYS_MS,
   localAiRealtimeVoiceActivationConfirmed,
@@ -36,11 +40,17 @@ export default function useLocalAiRealtimeVoiceControl(web: AiWebChatBackend) {
   const hangupWatchdogIndex = useRef(0)
   const hangupObservation = useRef(beginLocalAiRealtimeVoiceHangupObservation())
   const manifestRef = useRef(web.controller.uiManifest)
+  const privateStateRef = useRef(readLocalAiRealtimeVoicePrivateState(
+    web.controller.sessionState?.realtimeVoiceEvent,
+  ))
   const [activationStatus, setActivationStatus] = useState<'idle' | 'confirming' | 'active' | 'unconfirmed'>('idle')
   const [transcriptSyncing, setTranscriptSyncing] = useState(false)
   const [hangupStatus, setHangupStatus] = useState<'idle' | 'confirming' | 'unconfirmed'>('idle')
   const sessionIdentity = web.controller.sessionIdentity
   manifestRef.current = web.controller.uiManifest
+  privateStateRef.current = readLocalAiRealtimeVoicePrivateState(
+    web.controller.sessionState?.realtimeVoiceEvent,
+  )
 
   useEffect(() => {
     transcriptRefresh.current.cancel()
@@ -74,6 +84,7 @@ export default function useLocalAiRealtimeVoiceControl(web: AiWebChatBackend) {
       manifestHealthy: manifest?.compatibility === 'healthy',
       controlsTruncated: manifest?.controlsTruncated === true,
       voiceActive: voice.active,
+      privateDataChannelActive: privateStateRef.current.active,
     })) return false
     activationGeneration.current += 1
     window.clearTimeout(activationTimer.current)
@@ -119,6 +130,7 @@ export default function useLocalAiRealtimeVoiceControl(web: AiWebChatBackend) {
       manifestHealthy: manifest?.compatibility === 'healthy',
       controlsTruncated: manifest?.controlsTruncated === true,
       voiceActive: voice.active,
+      privateDataChannelActive: privateStateRef.current.active,
     })) {
       setActivationStatus('active')
     } else if (activationStatus === 'active'
@@ -127,7 +139,12 @@ export default function useLocalAiRealtimeVoiceControl(web: AiWebChatBackend) {
       && Boolean(voice.start)) {
       setActivationStatus('idle')
     }
-  }, [activationStatus, evaluateActivation, web.controller.uiManifest])
+  }, [
+    activationStatus,
+    evaluateActivation,
+    web.controller.sessionState?.realtimeVoiceEvent,
+    web.controller.uiManifest,
+  ])
 
   const startTranscriptRefresh = useCallback(() => {
     const request = web.officialRequest
@@ -168,6 +185,7 @@ export default function useLocalAiRealtimeVoiceControl(web: AiWebChatBackend) {
       manifestHealthy: manifest?.compatibility === 'healthy',
       controlsTruncated: manifest?.controlsTruncated === true,
       voiceActive: voice.active,
+      privateDataChannelActive: privateStateRef.current.active,
     })
     const endedOnOfficialSurface = officialVoiceActive.current
       && !current
@@ -176,7 +194,12 @@ export default function useLocalAiRealtimeVoiceControl(web: AiWebChatBackend) {
       && Boolean(voice.start)
     officialVoiceActive.current = current
     if (endedOnOfficialSurface && hangupStatus !== 'confirming') startTranscriptRefresh()
-  }, [hangupStatus, startTranscriptRefresh, web.controller.uiManifest])
+  }, [
+    hangupStatus,
+    startTranscriptRefresh,
+    web.controller.sessionState?.realtimeVoiceEvent,
+    web.controller.uiManifest,
+  ])
 
   const evaluateHangup = useCallback((expectedGeneration: number) => {
     if (expectedGeneration !== hangupGeneration.current) return false
@@ -190,6 +213,7 @@ export default function useLocalAiRealtimeVoiceControl(web: AiWebChatBackend) {
         controlsTruncated: manifest?.controlsTruncated === true,
         startAvailable: Boolean(voice.start),
         voiceActive: voice.active,
+        privateDataChannelActive: privateStateRef.current.active,
       },
       Date.now(),
     )
@@ -233,7 +257,12 @@ export default function useLocalAiRealtimeVoiceControl(web: AiWebChatBackend) {
 
   useEffect(() => {
     if (hangupStatus === 'confirming') evaluateHangup(hangupGeneration.current)
-  }, [evaluateHangup, hangupStatus, web.controller.uiManifest])
+  }, [
+    evaluateHangup,
+    hangupStatus,
+    web.controller.sessionState?.realtimeVoiceEvent,
+    web.controller.uiManifest,
+  ])
 
   const startHangupConfirmation = useCallback(() => {
     transcriptRefresh.current.cancel()
@@ -253,6 +282,7 @@ export default function useLocalAiRealtimeVoiceControl(web: AiWebChatBackend) {
   ) => {
     if (!controlId.trim()) return null
     if (action === 'start') {
+      if (web.controller.draft.trim()) return null
       transcriptRefresh.current.cancel()
       activationGeneration.current += 1
       hangupGeneration.current += 1
@@ -262,6 +292,14 @@ export default function useLocalAiRealtimeVoiceControl(web: AiWebChatBackend) {
       setActivationStatus('confirming')
       setTranscriptSyncing(false)
       setHangupStatus('idle')
+      const officialDraft = web.controller.snapshot?.draft ?? ''
+      if (officialDraft) {
+        const prepared = await web.controller.run('set_draft', '', officialDraft)
+        if (prepared?.commandResult?.action !== 'set_draft' || !prepared.commandResult.ok) {
+          setActivationStatus('unconfirmed')
+          return prepared
+        }
+      }
     }
     const next = await web.controller.run('invoke_ui_control', controlId)
     const result = next?.commandResult
@@ -275,5 +313,11 @@ export default function useLocalAiRealtimeVoiceControl(web: AiWebChatBackend) {
     return next
   }, [startActivationConfirmation, startHangupConfirmation, web.controller])
 
-  return { run, activationStatus, transcriptSyncing, hangupStatus }
+  return {
+    run,
+    activationStatus,
+    transcriptSyncing,
+    hangupStatus,
+    privateDataChannelActive: privateStateRef.current.active,
+  }
 }

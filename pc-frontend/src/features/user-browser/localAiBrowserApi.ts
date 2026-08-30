@@ -210,6 +210,18 @@ export interface LocalAiCommandResult {
   requestId?: string | null
 }
 
+export interface LocalAiRealtimeVoiceStateEvent {
+  type: 'realtime_voice_state'
+  version: number
+  active: boolean
+  observedChannelCount: number
+  openChannelCount: number
+  observedFrameCount: number
+  acceptedEventCount: number
+  streamCount: number
+  revision: number
+}
+
 export interface LocalAiWebSessionState {
   providerId: string
   windowLabel: string
@@ -225,6 +237,7 @@ export interface LocalAiWebSessionState {
   composerEvent?: LocalAiComposerControlsSnapshot | Record<string, unknown> | null
   featureEvent?: LocalAiFeatureNavigationSnapshot | Record<string, unknown> | null
   uiManifestEvent?: LocalAiUiManifestSnapshot | Record<string, unknown> | null
+  realtimeVoiceEvent?: LocalAiRealtimeVoiceStateEvent | Record<string, unknown> | null
   commandResult?: LocalAiCommandResult | null
   commandResults?: LocalAiCommandResult[]
   diagnostics?: LocalAiSessionDiagnostics
@@ -262,6 +275,7 @@ export type LocalAiBrowserControlAction =
 export type LocalAiAdapterAction =
   | 'snapshot'
   | 'refresh_current_conversation'
+  | 'set_draft'
   | 'send_prompt'
   | 'stop_generation'
   | 'regenerate_response'
@@ -681,6 +695,8 @@ function normalizeProvider(provider: LocalAiWebProvider): void {
 
 const LOCAL_AI_ADAPTER_ACTIONS = new Set<LocalAiAdapterAction>([
   'snapshot',
+  'refresh_current_conversation',
+  'set_draft',
   'send_prompt',
   'stop_generation',
   'regenerate_response',

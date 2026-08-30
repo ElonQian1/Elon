@@ -1,10 +1,12 @@
 use super::*;
 use serde_json::json;
 
-#[path = "tests/new_conversation.rs"]
-mod new_conversation;
 #[path = "tests/document.rs"]
 mod document;
+#[path = "tests/new_conversation.rs"]
+mod new_conversation;
+#[path = "tests/realtime_voice.rs"]
+mod realtime_voice;
 
 #[test]
 fn private_stream_state_is_authoritative_over_stale_dom_streaming() {

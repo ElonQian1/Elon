@@ -66,7 +66,7 @@ assert.match(copy.detail, /新会话首轮私有流绑定/)
 assert.match(copy.detail, /富内容异步解压与当前回答结算/)
 assert.match(copy.detail, /富内容占位与真实卡片对账/)
 assert.match(copy.detail, /后台官网语音与原生控制面连续性/)
-assert.match(copy.detail, /私有语音数据通道实时转写/)
+assert.match(copy.detail, /私有语音数据通道状态与实时转写/)
 assert.match(copy.detail, /厂商会话后台预热与切换复用/)
 const firstTurnBinding = chatCapabilities.find((capability) => (
   capability.id === 'win_chatgpt_private_stream_send_binding_v1'
@@ -111,7 +111,7 @@ const voiceDataChannel = chatCapabilities.find((capability) => (
 ))
 assert.equal(
   voiceDataChannel.requestMode,
-  'passive_webview2_official_webrtc_data_channel_delta_transcript',
+  'passive_webview2_official_webrtc_data_channel_state_and_delta_transcript',
 )
 assert.equal(
   voiceDataChannel.fallback,
@@ -173,7 +173,7 @@ const androidProductionIds = [...androidCatalog.matchAll(
   .map((match) => match[1])
 const parity = localAiAndroidProductionParity()
 const parityGaps = localAiAndroidProductionParityGaps()
-assert.equal(androidProductionIds.length, 15)
+assert.equal(androidProductionIds.length, 16)
 assert.deepEqual(
   [...new Set([
     ...parity.map((item) => item.androidId),
@@ -185,6 +185,7 @@ assert.deepEqual(
 assert.deepEqual(
   parityGaps.map((item) => item.androidId).sort(),
   [
+    'android_chatgpt_interaction_preset_cache_v1',
     'android_chatgpt_web_private_voice_native_relay_v1',
   ],
 )
