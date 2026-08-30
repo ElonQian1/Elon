@@ -25,6 +25,7 @@ const WIN_REALTIME_VOICE_JSON_DELTA: &str =
     include_str!("chatgpt_win_realtime_voice_json_delta.js");
 const WIN_REALTIME_VOICE_TRANSCRIPT: &str =
     include_str!("chatgpt_win_realtime_voice_transcript.js");
+const WIN_MANAGED_VOICE_PEER: &str = include_str!("chatgpt_win_managed_voice_peer.js");
 const PRIVATE_FETCH_TAP: &str =
     include_str!("../../../../android/app/src/main/assets/chatgpt_web_private_fetch_tap.js");
 const PRIVATE_SOCKET_TAP: &str =
@@ -270,6 +271,11 @@ pub(super) fn initialization_script() -> String {
                     "window.__elonChatGptBootstrapStage = 'chatgpt_win_private_stream_binding.js';\n{}\n{}\nwindow.__elonChatGptBootstrapStage = 'chatgpt_win_private_stream_recovery.js';\n{}\nif (window.__elonWinChatGptPrivateStreamBindingLifecycle) window.__elonWinChatGptPrivateStreamBindingLifecycle.commit(window);",
                     WIN_PRIVATE_STREAM_BINDING, shared, WIN_PRIVATE_STREAM_RECOVERY
                 )
+            } else if *name == "chatgpt_web_private_voice_relay.js" {
+                format!(
+                    "if (!window.__elonWinChatGptManagedVoicePeerConstructor && typeof window.RTCPeerConnection === 'function') Object.defineProperty(window, '__elonWinChatGptManagedVoicePeerConstructor', {{ value: window.RTCPeerConnection, configurable: false }});\n{}\nwindow.__elonChatGptBootstrapStage = 'chatgpt_win_managed_voice_peer.js';\n{}",
+                    shared, WIN_MANAGED_VOICE_PEER
+                )
             } else {
                 shared
             }
@@ -377,6 +383,9 @@ pub(super) fn initialization_script() -> String {
     try {
       window.__elonChatGptAdapterTargetVersion = __ADAPTER_VERSION__;
       __ADAPTER_ASSETS__
+      if (window.__elonWinChatGptManagedVoicePeerLifecycle) {
+        window.__elonWinChatGptManagedVoicePeerLifecycle.commit(window);
+      }
       window.__elonChatGptBootstrapStage = 'bridge_check';
       if (!window.__elonChatGptBridge || typeof window.__elonChatGptBridge.command !== 'function') {
         throw new Error('bridge_missing');
@@ -475,6 +484,9 @@ mod tests {
         assert!(script.contains("__elonWinChatGptRealtimeVoiceJsonDelta"));
         assert!(script.contains("__elonWinChatGptRealtimeVoiceTranscript"));
         assert!(script.contains("realtime_voice_private_transcript"));
+        assert!(script.contains("__elonWinChatGptManagedVoicePeerConstructor"));
+        assert!(script.contains("__elonWinChatGptManagedVoicePeerLifecycle.commit"));
+        assert!(script.contains("prepare_realtime_voice"));
         assert!(script.contains("__elonWinChatGptNewConversationGuard"));
         assert!(script.contains("官网未离开上一会话，已转入安全恢复。"));
         assert!(script.contains("publish_local_ai_web_research_capture"));

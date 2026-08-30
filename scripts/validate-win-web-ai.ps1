@@ -52,6 +52,11 @@ Invoke-Checked 'win_realtime_voice_private_transcript' {
     if ($LASTEXITCODE -ne 0) { return }
     & node (Join-Path $TaskRepoRoot 'scripts\test-chatgpt-win-realtime-voice-transcript.js')
 }
+Invoke-Checked 'win_managed_realtime_voice_peer' {
+    & node --check (Join-Path $TaskRepoRoot 'desktop-shell\src-tauri\src\local_ai_browser\chatgpt_win_managed_voice_peer.js')
+    if ($LASTEXITCODE -ne 0) { return }
+    & node (Join-Path $TaskRepoRoot 'scripts\test-chatgpt-win-managed-voice-peer.js')
+}
 Invoke-Checked 'win_interaction_preset_cache' {
     & node (Join-Path $FrontendDirectory 'scripts\test-local-ai-interaction-presets.cjs')
 }

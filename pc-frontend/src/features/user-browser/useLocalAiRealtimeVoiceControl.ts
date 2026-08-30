@@ -300,12 +300,24 @@ export default function useLocalAiRealtimeVoiceControl(web: AiWebChatBackend) {
           return prepared
         }
       }
+      // Win first prepares an independent WebView2 media peer. The command only
+      // arms the same-origin in-memory relay; the following official click still
+      // owns upstream session creation and remains the automatic fallback.
+      await web.controller.run('prepare_realtime_voice')
     }
     const next = await web.controller.run('invoke_ui_control', controlId)
     const result = next?.commandResult
     if (action === 'start') {
-      if (result?.action === 'invoke_ui_control' && result.ok) startActivationConfirmation()
-      else setActivationStatus('unconfirmed')
+      if (result?.action === 'invoke_ui_control' && result.ok) {
+        startActivationConfirmation()
+      } else {
+        await web.controller.run('control_managed_realtime_voice', 'end')
+        setActivationStatus('unconfirmed')
+      }
+    } else {
+      // Mirroring is a safe no-op when the managed peer was unavailable, so the
+      // existing official mute/end controls continue to work on every fallback.
+      await web.controller.run('control_managed_realtime_voice', action)
     }
     if (action === 'end' && result?.action === 'invoke_ui_control' && result.ok) {
       startHangupConfirmation()

@@ -307,6 +307,8 @@ export type LocalAiAdapterAction =
   | 'dismiss_navigation'
   | 'snapshot_ui_manifest'
   | 'invoke_ui_control'
+  | 'prepare_realtime_voice'
+  | 'control_managed_realtime_voice'
 
 type LocalAiBrowserErrorCode = 'upgrade_required' | 'desktop_required' | 'invoke_failed' | 'invoke_timeout'
 
@@ -728,6 +730,8 @@ const LOCAL_AI_ADAPTER_ACTIONS = new Set<LocalAiAdapterAction>([
   'dismiss_navigation',
   'snapshot_ui_manifest',
   'invoke_ui_control',
+  'prepare_realtime_voice',
+  'control_managed_realtime_voice',
 ])
 
 function defaultAdapterActions(providerId: string): LocalAiAdapterAction[] {
@@ -760,6 +764,8 @@ function defaultAdapterActions(providerId: string): LocalAiAdapterAction[] {
         'dismiss_navigation',
         'snapshot_ui_manifest',
         'invoke_ui_control',
+        'prepare_realtime_voice',
+        'control_managed_realtime_voice',
       ]
     : shared
 }

@@ -68,6 +68,8 @@ export const LOCAL_AI_PROVIDER_FALLBACKS: Record<string, LocalAiWebProvider> = {
       'dismiss_navigation',
       'snapshot_ui_manifest',
       'invoke_ui_control',
+      'prepare_realtime_voice',
+      'control_managed_realtime_voice',
     ],
   },
 }

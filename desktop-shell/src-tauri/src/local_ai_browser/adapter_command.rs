@@ -32,6 +32,8 @@ pub(super) const CHATGPT_ACTIONS: &[&str] = &[
     "dismiss_navigation",
     "snapshot_ui_manifest",
     "invoke_ui_control",
+    "prepare_realtime_voice",
+    "control_managed_realtime_voice",
 ];
 
 pub(super) const GOOGLE_AI_MODE_ACTIONS: &[&str] = &[
@@ -225,6 +227,8 @@ mod tests {
         assert!(GOOGLE_AI_MODE_ACTIONS.contains(&"open_conversation"));
         assert!(CHATGPT_ACTIONS.contains(&"request_attachment_upload"));
         assert!(CHATGPT_ACTIONS.contains(&"start_dictation"));
+        assert!(CHATGPT_ACTIONS.contains(&"prepare_realtime_voice"));
+        assert!(CHATGPT_ACTIONS.contains(&"control_managed_realtime_voice"));
     }
 
     #[test]

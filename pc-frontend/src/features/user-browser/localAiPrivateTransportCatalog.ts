@@ -226,6 +226,14 @@ const CATALOG: Record<string, CapabilityDefinition[]> = {
       requiredActions: ['invoke_ui_control', 'snapshot'],
       androidParityIds: ['android_chatgpt_realtime_voice_data_channel_transcript_v1'],
     },
+    {
+      id: 'win_chatgpt_private_voice_managed_webview2_relay_v1',
+      label: 'Win 管理的实时语音私有中继',
+      requestMode: 'same_origin_in_memory_relay_and_win_managed_webview2_webrtc',
+      fallback: 'official_webview_realtime_voice_without_private_takeover',
+      requiredActions: ['prepare_realtime_voice', 'control_managed_realtime_voice'],
+      androidParityIds: ['android_chatgpt_web_private_voice_native_relay_v1'],
+    },
     SHARED_CONTINUITY,
     SHARED_REFRESH_SINGLE_FLIGHT,
     SHARED_SEND_COORDINATOR,
@@ -277,12 +285,7 @@ export interface LocalAiAndroidProductionParityGap {
   reason: string
 }
 
-const ANDROID_PRODUCTION_PARITY_GAPS: readonly LocalAiAndroidProductionParityGap[] = [
-  {
-    androidId: 'android_chatgpt_web_private_voice_native_relay_v1',
-    reason: 'Win 当前由后台 WebView2 持有单一官网 WebRTC；原生媒体所有权仍需独立验收。',
-  },
-]
+const ANDROID_PRODUCTION_PARITY_GAPS: readonly LocalAiAndroidProductionParityGap[] = []
 
 /**
  * Executable APK -> Win production parity contract. Android-only presentation
