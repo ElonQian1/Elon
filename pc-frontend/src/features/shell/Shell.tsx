@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
-import { Outlet, useLocation } from 'react-router-dom'
+import { Outlet } from 'react-router-dom'
 import { CircleCheck, Link2, TriangleAlert, WifiOff } from 'lucide-react'
 import ServerRail from './ServerRail'
 import WorkspaceNav from './WorkspaceNav'
@@ -15,7 +15,6 @@ import { useProjectOpenPrewarm } from '../conversation/useProjectOpenPrewarm'
 import { isLocalWorkbench } from '../../api/runtime'
 import styles from './Shell.module.css'
 import { useCodexControlBridge } from '../codex-control/useCodexControlBridge'
-import { shouldShowWorkspaceNav } from './navigationModel'
 
 const AuthDialog = lazy(() => import('../auth/AuthDialog'))
 
@@ -102,8 +101,7 @@ export default function Shell() {
   useCodexControlBridge()
   const duplicateTab = useWorkbenchTabCoordinator()
   const localMode = isLocalWorkbench()
-  const { pathname } = useLocation()
-  const showWorkspaceNav = !localMode && shouldShowWorkspaceNav(pathname)
+  const [workspaceNavOpen, setWorkspaceNavOpen] = useState(false)
   useNotifications(!localMode)
   const token = useAuthStore((s) => s.token)
   const fetchMe = useAuthStore((s) => s.fetchMe)
@@ -126,9 +124,14 @@ export default function Shell() {
     <div className={styles.shellRoot}>
       {isDesktopShellFrameless() && <DesktopTitleBar />}
       <div className={styles.shell}>
-        <ServerRail />
-        {showWorkspaceNav && <WorkspaceNav />}
-        <div className={[styles.content, showWorkspaceNav ? styles.contentWithWorkspaceNav : ''].join(' ')}>
+        <ServerRail
+          workspaceNavOpen={workspaceNavOpen}
+          onToggleWorkspaceNav={(_workspace, isCurrentWorkspace) => {
+            setWorkspaceNavOpen((open) => isCurrentWorkspace ? !open : true)
+          }}
+        />
+        {!localMode && workspaceNavOpen && <WorkspaceNav onClose={() => setWorkspaceNavOpen(false)} />}
+        <div className={styles.content}>
           {!localMode && <AccountClaimBanner />}
           <LocalModeBanner />
           {!localMode && <NodeConnectBanner />}

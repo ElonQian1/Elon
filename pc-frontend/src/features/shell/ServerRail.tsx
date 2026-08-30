@@ -11,10 +11,16 @@ import {
   LOCAL_RAIL_ITEMS,
   WORKSPACE_RAIL_ITEMS,
   workspaceForPath,
+  type WorkspaceKey,
 } from './navigationModel'
 import styles from './ServerRail.module.css'
 
-export default function ServerRail() {
+interface ServerRailProps {
+  workspaceNavOpen: boolean
+  onToggleWorkspaceNav: (workspace: WorkspaceKey, isCurrentWorkspace: boolean) => void
+}
+
+export default function ServerRail({ workspaceNavOpen, onToggleWorkspaceNav }: ServerRailProps) {
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const user = useAuthStore((state) => state.user)
@@ -50,7 +56,8 @@ export default function ServerRail() {
           type="button"
           title="AI 工作区"
           aria-label="AI 工作区"
-          onClick={() => navigate('/ai')}
+          aria-expanded={workspace === 'ai' ? workspaceNavOpen : undefined}
+          onClick={() => { navigate('/ai'); onToggleWorkspaceNav('ai', workspace === 'ai') }}
         >
           <span>一</span>
         </button>
@@ -64,7 +71,8 @@ export default function ServerRail() {
             key={item.path}
             className={[styles.avatar, active ? styles.active : ''].join(' ')}
             style={{ '--item-color': item.color, '--item-hover': item.hoverColor } as React.CSSProperties}
-            onClick={() => navigate(item.path)}
+            aria-expanded={workspace === item.workspace ? workspaceNavOpen : undefined}
+            onClick={() => { navigate(item.path); onToggleWorkspaceNav(item.workspace, workspace === item.workspace) }}
             onMouseEnter={(event) => showTip(event, item.label)}
             onMouseLeave={() => setTooltip(null)}
             title={item.label}

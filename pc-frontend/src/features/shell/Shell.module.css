@@ -8,8 +8,9 @@
 }
 
 .shell {
+  position: relative;
   display: grid;
-  grid-template-columns: var(--rail-width) var(--sidebar-width) minmax(0, 1fr);
+  grid-template-columns: var(--rail-width) minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
   flex: 1 1 auto;
   min-height: 0;
@@ -25,10 +26,6 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
-}
-
-.contentWithWorkspaceNav {
-  grid-column: 3;
 }
 
 .routeFrame {

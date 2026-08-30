@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, Plus, Search } from 'lucide-react'
+import { ChevronDown, ChevronRight, PanelLeftClose, Plus, Search } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../store/auth'
@@ -20,7 +20,7 @@ const WORKSPACE_TITLES: Record<WorkspaceKey, string> = {
   admin: '管理中心',
 }
 
-function Section({ section, pathname }: { section: NavSection; pathname: string }) {
+function Section({ section, pathname, onNavigate }: { section: NavSection; pathname: string; onNavigate: () => void }) {
   const [collapsed, setCollapsed] = useState(false)
   const navigate = useNavigate()
   const active = section.items.some((item) => pathMatches(pathname, item.path))
@@ -46,7 +46,7 @@ function Section({ section, pathname }: { section: NavSection; pathname: string 
                 key={item.path}
                 className={[styles.item, isActive ? styles.itemActive : ''].join(' ')}
                 type="button"
-                onClick={() => navigate(item.path)}
+                onClick={() => { navigate(item.path); onNavigate() }}
                 title={item.label}
                 aria-current={isActive ? 'page' : undefined}
               >
@@ -61,7 +61,7 @@ function Section({ section, pathname }: { section: NavSection; pathname: string 
   )
 }
 
-export default function WorkspaceNav() {
+export default function WorkspaceNav({ onClose }: { onClose: () => void }) {
   const { pathname } = useLocation()
   const navigate = useNavigate()
   const user = useAuthStore((state) => state.user)
@@ -79,11 +79,16 @@ export default function WorkspaceNav() {
           <span className={styles.kicker}>工作区</span>
           <strong>{WORKSPACE_TITLES[workspace]}</strong>
         </div>
-        {workspace === 'projects' && (
-          <button className={styles.iconButton} type="button" title="新建项目" aria-label="新建项目" onClick={() => navigate('/projects')}>
-            <Plus size={16} aria-hidden="true" />
+        <div className={styles.headerActions}>
+          {workspace === 'projects' && (
+            <button className={styles.iconButton} type="button" title="新建项目" aria-label="新建项目" onClick={() => { navigate('/projects'); onClose() }}>
+              <Plus size={16} aria-hidden="true" />
+            </button>
+          )}
+          <button className={styles.iconButton} type="button" title="收起工作区导航" aria-label="收起工作区导航" onClick={onClose}>
+            <PanelLeftClose size={16} aria-hidden="true" />
           </button>
-        )}
+        </div>
       </header>
 
       {workspace === 'projects' && projects.length > 0 && (
@@ -93,14 +98,14 @@ export default function WorkspaceNav() {
         </div>
       )}
 
-      <button className={styles.searchHint} type="button" onClick={() => navigate('/projects')}>
+      <button className={styles.searchHint} type="button" onClick={() => { navigate('/projects'); onClose() }}>
         <Search size={14} aria-hidden="true" />
         <span>搜索工作区</span>
         <kbd>⌘K</kbd>
       </button>
 
       <div className={styles.sections}>
-        {sections.map((section) => <Section key={section.id} section={section} pathname={pathname} />)}
+        {sections.map((section) => <Section key={section.id} section={section} pathname={pathname} onNavigate={onClose} />)}
         {workspace === 'admin' && !isAdmin && <p className={styles.notice}>当前账号没有管理权限。</p>}
       </div>
 
