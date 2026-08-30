@@ -151,6 +151,14 @@ const CATALOG: Record<string, CapabilityDefinition[]> = {
       androidParityIds: ['android_chatgpt_private_send_dispatch_observer_v1'],
     },
     {
+      id: 'win_chatgpt_same_origin_text_transaction_v1',
+      label: '同源私有文本写事务与官网回退',
+      requestMode: 'versioned_single_flight_same_origin_text_post_when_reusable',
+      fallback: 'immediate_official_page_transaction_without_write_replay',
+      requiredActions: ['send_prompt'],
+      androidParityIds: ['android_chatgpt_same_origin_text_transaction_v1'],
+    },
+    {
       id: 'win_chatgpt_private_stream_observer_v1',
       label: '私有流与完成态结算',
       requestMode: 'passive_official_response_clone',
@@ -198,6 +206,14 @@ const CATALOG: Record<string, CapabilityDefinition[]> = {
       requiredActions: ['invoke_ui_control'],
       androidParityIds: ['android_chatgpt_realtime_voice_background_overlay_v1'],
     },
+    {
+      id: 'win_chatgpt_realtime_voice_data_channel_transcript_v1',
+      label: '私有语音数据通道实时转写',
+      requestMode: 'passive_webview2_official_webrtc_data_channel_delta_transcript',
+      fallback: 'private_conversation_refresh_and_official_dom_snapshot',
+      requiredActions: ['invoke_ui_control', 'snapshot'],
+      androidParityIds: ['android_chatgpt_realtime_voice_data_channel_transcript_v1'],
+    },
     SHARED_CONTINUITY,
     SHARED_REFRESH_SINGLE_FLIGHT,
     SHARED_SEND_COORDINATOR,
@@ -244,6 +260,18 @@ export interface LocalAiAndroidProductionParity {
   winId: string
 }
 
+export interface LocalAiAndroidProductionParityGap {
+  androidId: string
+  reason: string
+}
+
+const ANDROID_PRODUCTION_PARITY_GAPS: readonly LocalAiAndroidProductionParityGap[] = [
+  {
+    androidId: 'android_chatgpt_web_private_voice_native_relay_v1',
+    reason: 'Win 当前由后台 WebView2 持有单一官网 WebRTC；原生媒体所有权仍需独立验收。',
+  },
+]
+
 /**
  * Executable APK -> Win production parity contract. Android-only presentation
  * concepts (for example an overlay) map to the equivalent desktop surface,
@@ -257,6 +285,11 @@ export function localAiAndroidProductionParity(): LocalAiAndroidProductionParity
     })),
   ))
   return [...new Map(pairs.map((pair) => [pair.androidId, pair])).values()]
+}
+
+/** New APK defaults must be mapped or remain in this explicit, tested gap list. */
+export function localAiAndroidProductionParityGaps(): LocalAiAndroidProductionParityGap[] {
+  return ANDROID_PRODUCTION_PARITY_GAPS.map((gap) => ({ ...gap }))
 }
 
 export function localAiPrivateTransportCapabilities(

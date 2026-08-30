@@ -45,6 +45,13 @@ Invoke-Checked 'win_private_guest_conversation_transport' {
 Invoke-Checked 'win_private_transport_health' {
     & node (Join-Path $TaskRepoRoot 'scripts\test-chatgpt-win-private-transport-health.js')
 }
+Invoke-Checked 'win_realtime_voice_private_transcript' {
+    & node --check (Join-Path $TaskRepoRoot 'desktop-shell\src-tauri\src\local_ai_browser\chatgpt_win_realtime_voice_json_delta.js')
+    if ($LASTEXITCODE -ne 0) { return }
+    & node --check (Join-Path $TaskRepoRoot 'desktop-shell\src-tauri\src\local_ai_browser\chatgpt_win_realtime_voice_transcript.js')
+    if ($LASTEXITCODE -ne 0) { return }
+    & node (Join-Path $TaskRepoRoot 'scripts\test-chatgpt-win-realtime-voice-transcript.js')
+}
 Invoke-Checked 'pc_user_browser_contracts' { & npm.cmd --prefix $FrontendDirectory run test:user-browser }
 Invoke-Checked 'pc_typecheck_and_vite_build' { & npm.cmd --prefix $FrontendDirectory run build }
 Invoke-Checked 'pc_eslint' { & npm.cmd --prefix $FrontendDirectory run lint }

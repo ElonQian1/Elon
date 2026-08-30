@@ -3,7 +3,7 @@ use serde::Serialize;
 // The PC UI can update independently from the installed Tauri executable.
 // Increment this whenever the native host contract or bundled shared assets
 // change in a way that a newer UI must not drive through an older executable.
-pub(super) const DESKTOP_RUNTIME_VERSION: u32 = 7;
+pub(super) const DESKTOP_RUNTIME_VERSION: u32 = 8;
 
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]

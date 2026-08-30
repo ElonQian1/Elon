@@ -1,5 +1,5 @@
 const ALLOWED_ORIGIN: &str = "https://chatgpt.com";
-pub(super) const ADAPTER_VERSION: u32 = 190;
+pub(super) const ADAPTER_VERSION: u32 = 206;
 
 const WIN_RICH_CONTENT_ADAPTER: &str = include_str!("chatgpt_rich_content_adapter.js");
 const WIN_COMMON_RICH_CONTENT_ADAPTER: &str = include_str!("rich_content_dom_adapter.js");
@@ -18,10 +18,13 @@ const WIN_PRIVATE_CONVERSATION_REFRESH: &str =
     include_str!("chatgpt_win_private_conversation_refresh.js");
 const WIN_PRIVATE_GUEST_CONVERSATION_TRANSPORT: &str =
     include_str!("chatgpt_win_private_guest_conversation_transport.js");
-const WIN_PRIVATE_TRANSPORT_HEALTH: &str =
-    include_str!("chatgpt_win_private_transport_health.js");
+const WIN_PRIVATE_TRANSPORT_HEALTH: &str = include_str!("chatgpt_win_private_transport_health.js");
 const WIN_PRIVATE_CONVERSATION_RICH_CACHE: &str =
     include_str!("chatgpt_win_private_conversation_rich_cache.js");
+const WIN_REALTIME_VOICE_JSON_DELTA: &str =
+    include_str!("chatgpt_win_realtime_voice_json_delta.js");
+const WIN_REALTIME_VOICE_TRANSCRIPT: &str =
+    include_str!("chatgpt_win_realtime_voice_transcript.js");
 const PRIVATE_FETCH_TAP: &str =
     include_str!("../../../../android/app/src/main/assets/chatgpt_web_private_fetch_tap.js");
 const PRIVATE_SOCKET_TAP: &str =
@@ -196,6 +199,14 @@ const ADAPTER_ASSETS: &[(&str, &str)] = &[
         include_str!("../../../../android/app/src/main/assets/chatgpt_web_private_transport.js"),
     ),
     (
+        "chatgpt_web_private_text_transaction_policy.js",
+        include_str!("../../../../android/app/src/main/assets/chatgpt_web_private_text_transaction_policy.js"),
+    ),
+    (
+        "chatgpt_web_private_text_transaction_relay.js",
+        include_str!("../../../../android/app/src/main/assets/chatgpt_web_private_text_transaction_relay.js"),
+    ),
+    (
         "chatgpt_web_private_stream_policy.js",
         include_str!("../../../../android/app/src/main/assets/chatgpt_web_private_stream_policy.js"),
     ),
@@ -206,6 +217,10 @@ const ADAPTER_ASSETS: &[(&str, &str)] = &[
     (
         "chatgpt_web_private_send_observer.js",
         include_str!("../../../../android/app/src/main/assets/chatgpt_web_private_send_observer.js"),
+    ),
+    (
+        "chatgpt_web_text_transaction_orchestrator.js",
+        include_str!("../../../../android/app/src/main/assets/chatgpt_web_text_transaction_orchestrator.js"),
     ),
     (
         "chatgpt_web_adapter.js",
@@ -224,10 +239,12 @@ pub(super) fn initialization_script() -> String {
             );
             if *name == "chatgpt_web_adapter_messages.js" {
                 format!(
-                    "window.__elonChatGptBootstrapStage = 'rich_content_dom_adapter.js';\n{}\nwindow.__elonChatGptBootstrapStage = 'chatgpt_rich_content_adapter.js';\n{}\n{}\nwindow.__elonChatGptBootstrapStage = 'chatgpt_citation_adapter.js';\n{}\nwindow.__elonChatGptBootstrapStage = 'chatgpt_win_new_conversation_guard.js';\n{}",
+                    "window.__elonChatGptBootstrapStage = 'rich_content_dom_adapter.js';\n{}\nwindow.__elonChatGptBootstrapStage = 'chatgpt_rich_content_adapter.js';\n{}\n{}\nwindow.__elonChatGptBootstrapStage = 'chatgpt_win_realtime_voice_json_delta.js';\n{}\nwindow.__elonChatGptBootstrapStage = 'chatgpt_win_realtime_voice_transcript.js';\n{}\nwindow.__elonChatGptBootstrapStage = 'chatgpt_citation_adapter.js';\n{}\nwindow.__elonChatGptBootstrapStage = 'chatgpt_win_new_conversation_guard.js';\n{}",
                     WIN_COMMON_RICH_CONTENT_ADAPTER,
                     WIN_RICH_CONTENT_ADAPTER,
                     shared,
+                    WIN_REALTIME_VOICE_JSON_DELTA,
+                    WIN_REALTIME_VOICE_TRANSCRIPT,
                     WIN_CITATION_ADAPTER,
                     WIN_NEW_CONVERSATION_GUARD
                 )
@@ -269,6 +286,7 @@ pub(super) fn initialization_script() -> String {
   window.__elonChatGptPrivateResearchEnabled = true;
   window.__elonChatGptPrivateStreamObserverEnabled = true;
   window.__elonChatGptPrivateConversationPrefetchEnabled = true;
+  window.__elonChatGptPrivateTextTransactionsEnabled = true;
   window.__elonChatGptBootstrapStage = 'chatgpt_web_private_fetch_tap.js';
   __PRIVATE_FETCH_TAP__
   window.__elonChatGptBootstrapStage = 'chatgpt_web_private_socket_tap.js';
@@ -454,6 +472,9 @@ mod tests {
         assert!(script.contains("chatgpt_web_adapter_project_hints.js"));
         assert!(script.contains("chatgpt_citation_adapter.js"));
         assert!(script.contains("__elonChatGptCitationAdapter"));
+        assert!(script.contains("__elonWinChatGptRealtimeVoiceJsonDelta"));
+        assert!(script.contains("__elonWinChatGptRealtimeVoiceTranscript"));
+        assert!(script.contains("realtime_voice_private_transcript"));
         assert!(script.contains("__elonWinChatGptNewConversationGuard"));
         assert!(script.contains("官网未离开上一会话，已转入安全恢复。"));
         assert!(script.contains("publish_local_ai_web_research_capture"));
@@ -471,6 +492,9 @@ mod tests {
                     .unwrap()
         );
         assert!(script.contains("__elonChatGptPrivateConversationDirectory"));
+        assert!(script.contains("__elonChatGptPrivateTextTransactionsEnabled = true"));
+        assert!(script.contains("__elonChatGptPrivateTextTransactionRelay"));
+        assert!(script.contains("__elonChatGptTextTransactionOrchestrator"));
         assert!(script.contains("chatgpt_web_private_stream_transport.js"));
         assert!(script.contains("chatgpt_win_private_finance_periods.js"));
         assert!(script.contains("chatgpt_win_private_source_groups.js"));

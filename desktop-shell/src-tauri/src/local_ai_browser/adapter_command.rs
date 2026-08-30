@@ -72,6 +72,9 @@ pub fn build(
     }
     let mut command = Map::new();
     command.insert("action".to_string(), Value::String(action.to_string()));
+    if provider_name == "ChatGPT" && action == "send_prompt" {
+        command.insert("allowPrivateTextTransaction".to_string(), Value::Bool(true));
+    }
     if action == "list_conversations" {
         command.insert("fastDirectoryAck".to_string(), Value::Bool(true));
     }
@@ -219,6 +222,31 @@ mod tests {
         assert!(GOOGLE_AI_MODE_ACTIONS.contains(&"open_conversation"));
         assert!(CHATGPT_ACTIONS.contains(&"request_attachment_upload"));
         assert!(CHATGPT_ACTIONS.contains(&"start_dictation"));
+    }
+
+    #[test]
+    fn chatgpt_send_enables_the_reviewed_same_origin_text_transaction() {
+        let chatgpt = build(
+            "ChatGPT",
+            CHATGPT_ACTIONS,
+            "send_prompt",
+            Some("hello".into()),
+            Some(String::new()),
+            Some("mcp_private1".into()),
+        )
+        .unwrap();
+        assert_eq!(chatgpt["allowPrivateTextTransaction"], true);
+
+        let google = build(
+            "Google AI 模式",
+            GOOGLE_AI_MODE_ACTIONS,
+            "send_prompt",
+            Some("hello".into()),
+            Some(String::new()),
+            Some("mcp_official1".into()),
+        )
+        .unwrap();
+        assert!(google.get("allowPrivateTextTransaction").is_none());
     }
 
     #[test]

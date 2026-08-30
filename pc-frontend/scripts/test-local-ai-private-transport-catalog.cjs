@@ -20,6 +20,7 @@ compiled._compile(output, catalogFilename)
 
 const {
   localAiAndroidProductionParity,
+  localAiAndroidProductionParityGaps,
   localAiPrivateRichRecoveryStatusCopy,
   localAiPrivateStreamStatusCopy,
   localAiPrivateTransportCapabilities,
@@ -35,7 +36,7 @@ const google = provider('google-ai-mode', [
 ])
 
 const chatCapabilities = localAiPrivateTransportCapabilities(chatgpt)
-assert.equal(chatCapabilities.length, 16)
+assert.equal(chatCapabilities.length, 18)
 assert.equal(chatCapabilities.every((capability) => capability.runtimeEnabled), true)
 assert.equal(chatCapabilities.every((capability) => (
   capability.activation === 'preset_then_background_verify'
@@ -51,9 +52,10 @@ const incompleteGoogle = localAiPrivateTransportCapabilities(provider('google-ai
 assert.equal(incompleteGoogle.filter((capability) => capability.runtimeEnabled).length, 6)
 
 const copy = localAiPrivateTransportStatusCopy(chatgpt)
-assert.match(copy.copy, /16\/16/)
+assert.match(copy.copy, /18\/18/)
 assert.match(copy.copy, /无需等待官网扫描/)
 assert.match(copy.detail, /私有流与完成态结算/)
+assert.match(copy.detail, /同源私有文本写事务与官网回退/)
 assert.match(copy.detail, /官网快照单飞行刷新/)
 assert.match(copy.detail, /单所有者发送、稳定回执与跨会话隔离/)
 assert.match(copy.detail, /独立会话正文与富内容缓存/)
@@ -64,6 +66,7 @@ assert.match(copy.detail, /新会话首轮私有流绑定/)
 assert.match(copy.detail, /富内容异步解压与当前回答结算/)
 assert.match(copy.detail, /富内容占位与真实卡片对账/)
 assert.match(copy.detail, /后台官网语音与原生控制面连续性/)
+assert.match(copy.detail, /私有语音数据通道实时转写/)
 assert.match(copy.detail, /厂商会话后台预热与切换复用/)
 const firstTurnBinding = chatCapabilities.find((capability) => (
   capability.id === 'win_chatgpt_private_stream_send_binding_v1'
@@ -102,6 +105,17 @@ assert.equal(
 assert.equal(
   richPlaceholderReconciliation.fallback,
   'preserve_unrelated_official_interactive_content',
+)
+const voiceDataChannel = chatCapabilities.find((capability) => (
+  capability.id === 'win_chatgpt_realtime_voice_data_channel_transcript_v1'
+))
+assert.equal(
+  voiceDataChannel.requestMode,
+  'passive_webview2_official_webrtc_data_channel_delta_transcript',
+)
+assert.equal(
+  voiceDataChannel.fallback,
+  'private_conversation_refresh_and_official_dom_snapshot',
 )
 
 const richAccepted = localAiPrivateRichRecoveryStatusCopy(richRecovery({
@@ -146,7 +160,7 @@ assert.match(awaitingContext.copy, /等待官网会话上下文/)
 assert.match(awaitingContext.copy, /不阻塞输入/)
 
 const stale = localAiPrivateTransportStatusCopy(chatgpt, health({ sampledAtMs: 1 }), 200_000)
-assert.match(stale.copy, /16\/16/)
+assert.match(stale.copy, /18\/18/)
 
 const androidCatalog = fs.readFileSync(path.resolve(
   __dirname,
@@ -158,12 +172,27 @@ const androidProductionIds = [...androidCatalog.matchAll(
   .filter((match) => match[2] === 'true')
   .map((match) => match[1])
 const parity = localAiAndroidProductionParity()
-assert.equal(androidProductionIds.length, 12)
+const parityGaps = localAiAndroidProductionParityGaps()
+assert.equal(androidProductionIds.length, 15)
 assert.deepEqual(
-  [...new Set(parity.map((item) => item.androidId))].sort(),
+  [...new Set([
+    ...parity.map((item) => item.androidId),
+    ...parityGaps.map((item) => item.androidId),
+  ])].sort(),
   [...androidProductionIds].sort(),
-  'every APK production private capability must map to an equivalent Win capability',
+  'every APK production private capability must map to Win or remain an explicit tested gap',
 )
+assert.deepEqual(
+  parityGaps.map((item) => item.androidId).sort(),
+  [
+    'android_chatgpt_web_private_voice_native_relay_v1',
+  ],
+)
+assert.equal(parityGaps.every((item) => item.reason.trim().length > 12), true)
+assert.equal(parity.some((item) => (
+  item.androidId === 'android_chatgpt_realtime_voice_data_channel_transcript_v1'
+  && item.winId === 'win_chatgpt_realtime_voice_data_channel_transcript_v1'
+)), true)
 const winCapabilityIds = new Set([...chatCapabilities, ...googleCapabilities].map((item) => item.id))
 for (const mapping of parity) {
   assert.equal(winCapabilityIds.has(mapping.winId), true, `${mapping.androidId} maps to missing ${mapping.winId}`)

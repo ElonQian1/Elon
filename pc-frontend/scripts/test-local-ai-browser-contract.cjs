@@ -86,6 +86,7 @@ const aiWebClientUpgradeNotice = read('pc-frontend/src/features/ai/AiWebClientUp
 const aiModeSwitch = read('pc-frontend/src/features/ai/AiHomeModeSwitch.tsx')
 const app = read('pc-frontend/src/App.tsx')
 const serverRail = read('pc-frontend/src/features/shell/ServerRail.tsx')
+const navigationModel = read('pc-frontend/src/features/shell/navigationModel.ts')
 const parkOfficialWebview = embeddedViewRust.slice(
   embeddedViewRust.indexOf('pub(crate) fn park'),
   embeddedViewRust.indexOf('pub(crate) fn present'),
@@ -581,13 +582,11 @@ assert.match(aiModeSwitch, />\s*聊天\s*</)
 assert.match(aiModeSwitch, />\s*工作\s*</)
 assert.match(app, /features\/ai\/AiHomePage/)
 assert.doesNotMatch(app, /NativeAiWebChatWindow|user-browser\/native/)
-assert.match(serverRail, /const OFFICIAL_AI_ITEM/)
-assert.match(
-  serverRail,
-  /\? \[LOCAL_TASK_ITEM, LOCAL_CODEX_CONTROL_ITEM, LOCAL_AI_CHAT_ITEM, OFFICIAL_AI_ITEM\]/,
-)
-assert.match(serverRail, /const LOCAL_AI_CHAT_ITEM[\s\S]*path: '\/ai'/)
-assert.match(serverRail, /一龙 AI（ChatGPT \/ Google）/)
+assert.match(serverRail, /LOCAL_RAIL_ITEMS/)
+assert.match(serverRail, /localMode\s*\? LOCAL_RAIL_ITEMS/)
+assert.match(navigationModel, /export const LOCAL_RAIL_ITEMS/)
+assert.match(navigationModel, /path: '\/ai'[\s\S]*label: '一龙 AI'/)
+assert.match(navigationModel, /path: '\/user-browser'[\s\S]*label: '官方 AI'/)
 for (const removedPath of [
   'pc-frontend/src/features/user-browser/NativeAiWebChat.tsx',
   'pc-frontend/src/features/user-browser/NativeAiWebChatWindow.tsx',
