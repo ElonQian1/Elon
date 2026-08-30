@@ -22,6 +22,7 @@ import {
 } from './localAiStreamingPresentation'
 import { localAiPrivateStreamState } from './localAiPrivateStreamSignal'
 import useLocalAiProviderSessionPrewarm from './useLocalAiProviderSessionPrewarm'
+import useLocalAiResearchCompatibility from './useLocalAiResearchCompatibility'
 
 const PROVIDER_STORAGE_KEY = 'elon.pc.aiChatProvider'
 
@@ -168,6 +169,13 @@ export default function useAiWebChatBackend(mode: AiHomeMode, ownerKey: string) 
     ownerKey,
     selectedState: controller.sessionState,
   })
+  const researchStatus = useLocalAiResearchCompatibility({
+    enabled: mode === 'chat' && ready,
+    providerId: provider?.id,
+    ownerKey,
+    semanticUpdatedAtMs: controller.sessionState?.semanticUpdatedAtMs ?? 0,
+    streaming: controller.snapshot?.streaming === true,
+  })
   const canEdit = capability.state === 'ready' && Boolean(provider) && controller.canEditDraft
   const canCompose = ready && controller.canSubmitDraft
   const contextTurnCount = (controller.snapshot?.messages ?? [])
@@ -193,6 +201,7 @@ export default function useAiWebChatBackend(mode: AiHomeMode, ownerKey: string) 
     capability,
     providers,
     providerActivities,
+    researchStatus,
     provider,
     selectProvider,
     controller,

@@ -55,6 +55,9 @@ Invoke-Checked 'win_realtime_voice_private_transcript' {
 Invoke-Checked 'win_interaction_preset_cache' {
     & node (Join-Path $FrontendDirectory 'scripts\test-local-ai-interaction-presets.cjs')
 }
+Invoke-Checked 'win_research_compatibility_notice' {
+    & node (Join-Path $FrontendDirectory 'scripts\test-local-ai-research-compatibility-notice.cjs')
+}
 Invoke-Checked 'pc_user_browser_contracts' { & npm.cmd --prefix $FrontendDirectory run test:user-browser }
 Invoke-Checked 'pc_typecheck_and_vite_build' { & npm.cmd --prefix $FrontendDirectory run build }
 Invoke-Checked 'pc_eslint' { & npm.cmd --prefix $FrontendDirectory run lint }
