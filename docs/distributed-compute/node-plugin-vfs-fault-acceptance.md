@@ -1,11 +1,11 @@
 ---
 title: 节点插件测试 VFS 故障动态验收
 status: current
-reviewed_at: 2026-08-30
+reviewed_at: 2026-08-31
 owners: node, security
 design_status: design_frozen
 implementation_status: implementation_not_dynamically_accepted
-verification_status: WindowsDynamic_117_of_117_JointClose_36_of_36_wide_266_of_266
+verification_status: MapStatic_43476_of_43476_LockStatic_8668_of_8668_MapLockDynamic_not_opened_A2b2_117_of_117
 ---
 
 # 节点插件测试 VFS 故障动态验收
@@ -15,14 +15,14 @@ verification_status: WindowsDynamic_117_of_117_JointClose_36_of_36_wide_266_of_2
 本验收只消费 [`node-plugin-vfs-fault-authority.md`](node-plugin-vfs-fault-authority.md) 冻结的 A2 case inventory，
 不创建第二套 VFS authority，也不授权生产入口。当前可记录的事实严格为：
 
-- `design_frozen / source_written / implementation_not_dynamically_accepted`；Barrier 与 RegistrationShutdown runner 均已 `implementation_compiled / WindowsDynamic=8/8`，RegistryLifecycle runner 已 `implementation_compiled / WindowsDynamic=16/16`，Unmap 与 JointClose runner 已分别在 exact clean commit 上原子形成 `implementation_compiled / WindowsDynamic=49/49` 与 `36/36`；历史 SharedNonFinal `implementation_candidate=11/11` 只保留 provenance，不计第二次 numerator；Map ABI/raw reviewed-successor prefix、denominator-facing ABI fragment、source-neutral raw fragment、typed Map outer-result、route/callback与adapter composed fragment已随目标编译并进入共享 A2b1 targeted guard `4/4`，但仍为 `source_review_only / dynamic_unrun`；
+- `design_frozen / implementation_not_dynamically_accepted`；Map `StaticContract=43476/43476`、Lock `StaticContract=8668/8668` 已由独立静态权威验证；Map/Lock dynamic projector 与 quotient manifests 尚未实现或冻结，`Qmap/Qlock=unknown`、`WindowsDynamic=not_opened`；Barrier 与 RegistrationShutdown runner 均为 `WindowsDynamic=8/8`，RegistryLifecycle=`16/16`，Unmap=`49/49`，JointClose=`36/36`，A2b2=`117/117`；
 - `elon-pc-node` 完整测试目标在 2026-08-12 基线修复后可编译；
 - 与可见性修复直接相关的 targeted fault matrix 已运行并通过 5 项；
-- A2a/A2b1 map/lock 的 commit-bound `SourceScope/SourceOwnerGraph v1` 与 Map source-terminal template review ledger v1 已 `design_frozen/source_written/source_review_only/validator_compiled/targeted_guard_4_of_4`。既有source-neutral raw fragment精确区分8个admission/prestate（7 rejection + 1 expected-type continuation）、typed operation后的2个outcome与8个abandon outcome；共享raw owner node已拆为Map/Lock sibling，只有两个Map raw gate/abandon node由专属Map site闭合，resolved cross-link保持9、Map-reachable graph pending保持5，两个Lock sibling仍Pending。Map raw projection fragment只包含8条fallback continuation与1条typed-frontier continuation；新增typed Map outer-result fragment另行exact-set冻结NotPresent、Mapped、Failure和CaughtUnwind四类外壳结果，其中caught unwind按Drop完成/Drop unwind展开，合计5个local cell。它只冻结initial null write、唯一Mapped pointer write、`SQLITE_OK`/`SQLITE_IOERR_SHMMAP`投影及canonical raw slots/cleanup；route、callback、managed outcome provenance、prestate、prefix mutation与payload Drop custody仍Pending，因此两个open frontier继续开放，reviewed-successor prefix不新增跨frontier edge。denominator-facing ABI fragment仍严格是15个pre-raw terminal cell与1个`AbiRawDispatch` continuation，后续cell不加入这15个ABI terminal。ledger仍保留Pending/open boundaries与六个prestate-pending success candidates，没有source-exhaustive terminal set或完整successor trace；candidate typed schema与显式不完整的branch-atom scaffold虽通过自身 self-consistency guard，仍仅为source-written review输入，完整terminal universe、quotient、exact key set、`SourceBranch`、`Expected`、`CaseKey`、exclusion ledger与denominator保持`source_review_pending/not_counted`，不得记`StaticContract`或开放`WindowsDynamic`；production ABI/managed-fs/route/open保持未修改；
+- 静态闭合前的 `SourceScope/SourceOwnerGraph v1`、Map terminal review ledger 与局部 ABI/raw/route/callback/adapter fragments 只保留为 provenance；它们已被完整 static denominator graph、leaf ledger、Expected、exclusion 与 exact-set guards 取代，不能再把当前 Map/Lock 静态状态降回 `source_review_pending/not_counted`，也不能作为 dynamic class 的文本分类输入；
 - 本批 route/callback normal-return fragment 另在 outer callback-fault pass + live inner 的入口下，以 exact `1 + 1 + 2 × 2 = 6` cell 冻结 route preparation rejection、callback admission rejection 与 admitted operation/completion product；outer controller reject/selected/inner-missing均在集合外。operation `Err` 必须在 completion `Ok|Err` 两支都胜出；operation `Ok` + completion `Err` 也投影 typed Failure；只有双 `Ok` 可继续到 adapter projection Pending。6 个 cell 都保持 output null、installed raw slots、cleanup none、pointer write=0；caught unwind 不属于该集合。其 source witness 必须覆盖 route preparation gate、四段 operation dispatch、admission、completion attempt、error-precedence/completion-rejection/completed 三个 arm，并保持 conditional quarantine 位于 completion 之前。它已随目标编译并进入共享 A2b1 targeted guard `4/4`，但没有独立 denominator 或 dynamic record，不改变两个 open frontier、owner-graph Pending=5/resolved cross-links=9、`StaticContract` 或 `WindowsDynamic`；
 - adapter composed child必须保持exact 7-cell reviewed control/result inventory：5个parent Failure逐格保持`SQLITE_IOERR_SHMMAP/null/installed/no-cleanup/0-write`，另有Observe-only NotPresent与防御守卫通过后的Observe/Extend Mapped两格。NotPresent固定`SQLITE_OK/null/0-write`；guard-pass Mapped固定`SQLITE_OK/non-null/1-write`，typed-wrapper value-flow必须逐层是`ManagedMapped=TypedPointerCreated`、`AdapterMapped=TypedPointerCarried`、`AbiMappedProjection=AbiPointerWritten`。admission、operation与completion rejection必须分型；operation `Ok` + completion `Err`还必须记录`SuccessPayloadDroppedBeforeAdapter`并保持payload custody Pending，不得把7格冒充payload-type完整分区。`AdapterRegionMismatch/LengthMismatch/NullPointer`必须恰为3条child-local guard review，disposition固定`Pending/Pending/ExcludedByNonNullTypeEnvelope`且不进入7格；因此7格不得被称为双Ok continuation或guard rejection路径的穷尽分割。source guard须锁定私有`NonNull<u8>`字段及原样accessor、ManagedMapping owner内唯一lexical constructor call、adapter两arm/一reject及ABI三arm，同时守卫shared parent ledger的Region Pending与Length/Null既有defensive disposition不变。该NullPointer排除只属于commit-bound reviewed type envelope，不是动态不可达或完整exclusion-ledger证明；dropped/mapped payload custody、managed prestate与route/callback custody继续Pending；
 - A2b2 的 117 项 source-exhaustive inventory 全部已有正式 `WindowsDynamic` record：Barrier 与 RegistrationShutdown 各 8 条、RegistryLifecycle 16 条、Unmap 49 条、JointClose 36 条，因此 `WindowsDynamic=117/117`；历史 Unmap 11 条 candidate marker 既不拆分 49 项原子分母，也不重复增加正式计数；各族 exact selector、实现与证据分别见 [`Barrier 动态权威`](node-plugin-vfs-barrier-dynamic-authority.md)、[`RegistryLifecycle 动态权威`](node-plugin-vfs-registry-lifecycle-dynamic-authority.md)、[`Unmap 动态权威`](node-plugin-vfs-unmap-dynamic-authority.md)与[`JointClose 动态权威`](node-plugin-vfs-joint-close-dynamic-authority.md)；
-- exact clean runtime-source commit `bfa1a1180d220e9a4c8e39251414fc9a1b0a9ace` 的宽范围 `sqlite_vfs_policy` 回归已真实通过 `266/266`。这关闭 A2b2，但不能把独立 Map/Lock denominator、A2 或生产入口写成完成。
+- exact clean runtime-source commit `bfa1a1180d220e9a4c8e39251414fc9a1b0a9ace` 的宽范围 `sqlite_vfs_policy` 回归已真实通过 `266/266`，关闭 A2b2；后续 static denominator delivery 又在 exact clean commit `31943fee5f7343e1194255a72805762603b320ca` 上验证 Map `43,476/43,476`、Lock `8,668/8,668`，wide 结果为 `301 passed / 0 failed / 1 expected ignored / 1592 filtered`。两者都不构成 dynamic quotient manifest、Windows class record、完整 A2 或生产入口。
 
 owner 图只验证 baseline commit literal 形状、从 reviewed owner bytes 重算的 Git blob OID/规范化 SHA-256、symbol presence、ABI roots、逐 operation scope 可达性，以及 wrapper/promotion/callback/cold-prefix/loop/cleanup/quarantine/result projection 的有序结构；它不读取 `.git`，不能自动证明当前 checkout HEAD 等于 baseline，也不是 exact terminal inventory。Map review ledger 验证自己声明的 step ID materialization、owner/symbol/occurrence anchor、共享分支 call context、candidate disposition、pointer-flow 分层、cause/returned/stored/route 四轴、六个 success projection witness、非空 Pending/open boundaries，以及 Map-reachable pending exact set与九个 resolved owner/stage 关联的 exact owner/symbol-or-site witness link；ABI/raw prefix另验证 exact case/edge/endpoint set、terminal无后继、open frontier与 raw slot保留轴。typed outer-result fragment的静态守卫还必须验证5-cell exact set、3 normal/2 unwind、唯一pointer write、canonical post-operation/abandon projection，以及四条有序source witness chain：三条ABI result arm→raw accepted→normal-code forward normal chain，和一条caught unwind→abandon catch fence→state-abandon witness→installed Drop→fallback unwind chain；复用的wrapper/helper projection witness必须携带exact caller context；primary raw gate/abandon witness继续保持context-free，并由site/operation scope限定。守卫还必须确认`TypedMapOperation` frontier和全部Pending provenance未被关闭。它们都不验证完整 source coverage、端到端 trace、exclusion proof 或 denominator。candidate typed schema 与不完整 branch-atom scaffold 保持既有 source-only 边界；这些 Map/Lock 源码已随目标编译，4 个 A2b1 静态自洽守卫通过，但仍无 dynamic record。严格 test-only 的 Barrier、RegistrationShutdown 与 RegistryLifecycle actual/validator、进程隔离 runner与线性 evidence envelope则已按下方正式证据元组完成编译和逐 case Windows 运行，但不改变 Map/Lock 边界。
 
@@ -114,9 +114,21 @@ A2a/A2b1 map/lock 或 A2b2 的任何 `WindowsDynamic` case。后续执行必须�
 
 ### 2.1 A2a/A2b1 map/lock
 
-map/lock denominator 的唯一 quotient、scope、`CaseKey`、`SourceBranch`、`Expected` 与 legacy 28 非 denominator 边界由
-[`authority §5.1`](node-plugin-vfs-fault-authority.md) 维护。本验收以后只消费 source/red-team review clean 的 frozen typed set，
-不从 runner、历史 targeted 名称、intermediate candidate count 或实际可运行子集反推 denominator。
+Map/Lock 静态 scope、`CaseKey`、`SourceBranch`、`Expected`、exclusion 与 legacy 28 非 denominator 边界只由
+[`static denominator authority`](node-plugin-vfs-map-lock-static-denominator-authority.md) 维护。本验收消费已验证的 Map 43,476 与 Lock 8,668 included exact set，不从 runner、历史 targeted 名称或可运行子集反推或缩小它。
+
+动态执行集合由独立[`dynamic quotient authority`](node-plugin-vfs-map-lock-dynamic-quotient-authority.md)和
+[`acceptance`](node-plugin-vfs-map-lock-dynamic-quotient-acceptance.md)维护。它必须把全部 included members 精确、不交地分入 typed classes，冻结 `Qmap/Qlock` 后每个 class 恰好产生一条真实 Windows record。当前 projector/manifest 不存在，两个 Q 均为 `unknown`。
+
+| Family | StaticContract | DynamicQuotientMemberCoverage | WindowsDynamic | 当前门槛 |
+|---|---:|---:|---:|---|
+| Map | `43476/43476` | `0/43476` | `not_opened` | 实现 typed projector，冻结 exact class/member manifest，机械得到 `Qmap` |
+| Lock | `8668/8668` | `0/8668` | `not_opened` | 实现 typed projector，冻结 exact class/member manifest，机械得到 `Qlock` |
+| **Map/Lock aggregate** | **verified** | **not_started** | **not_opened** | **逐 class Windows exact-set 后才可形成 `Q/Q`** |
+
+#### 2.1.1 静态闭合前 review provenance（历史）
+
+以下 owner graph、局部 fragment、Pending/frontier 与 candidate 表仅解释静态合同的演进；它们不再控制当前静态计数，也不得被 dynamic projector 通过解析文本复用。
 
 `SourceOwnerGraph v1` 是进入 terminal ledger 之前的结构门：它必须逐字匹配 reviewed owner blob/SHA/symbol，并保持两条 ABI root、逐 operation scope endpoint 可达、valid non-null Map output slot 的 fail-null、null slot no-write、独立 fallback/result-code、outer wrapper-before-route、promotion callback-before-operation callback、`ScopePending` cold Lock prior-Map witness、Unlock no-init、四段 budget 调用顺序、FileSize 只读/双操作、FileGrow mutation+poison/Extend-only、region loop、cause-separated cleanup rewrite、unsafe retention-before-completion 与 operation/completion error precedence。Map ledger 的 denominator-facing ABI fragment必须保持15个pre-raw terminal cell + 1个`AbiRawDispatch` continuation，并以两个rejection witness exact-link已扩展的`AbiMapValidation`；source-neutral raw fragment必须另行exact-set校验8个admission/prestate、2个post-operation outcome与8个abandon outcome，raw cell不得并入ABI的15个terminal。Map raw projection必须恰为8条fallback continuation + 1条typed Map operation frontier continuation；typed outer-result fragment必须恰为5个local cell：NotPresent、Mapped、Failure各1个normal-return，CaughtUnwind按installed Drop完成/Drop unwind拆2个。只有Mapped允许非null ABI write；NotPresent/Mapped返回`SQLITE_OK`，Failure和两种unwind返回`SQLITE_IOERR_SHMMAP`，normal-return保持installed raw slots，unwind先清slots再Drop。全部cell的route/managed/prestate/custody provenance与expected status必须保持Pending；两个Map raw node已resolved，两个Lock sibling仍Pending，typed-operation与raw-fallback custody/route两个open frontier都未关闭。正常返回后的`RawStateAccepted`与caught unwind后的`RawStateCaughtPanic`仍须标为`BeyondOpenFrontier(TypedMapOperation)`且不得出现在prefix DAG；caught-panic→abandon→fallback只能保存为带frontier标签的source cause，不能冒充reviewed successor。只有prefix-materialized raw rejection可进入“unavailable-null exit已知但custody/route尚未闭合”的frontier。cold witness只能引用ensure-node之前的Map返回，完整early-return universe与node-absent prestate partition仍Pending；FileSize site的`ObserveNotPresent`和ABI/raw之后的fault-finish/outer-result关联仍只有ledger/fragment事实，不构成完整branch/projection successor trace。present output slot必须callback-owned/non-alias/aligned/writable/live；非null file必须live/aligned/initialized/serialized，exact methods+state必须是本模块live envelope。违背这些premise的指针是UB，不进入有限case或terminal count。通过owner图或Map review ledger仍只允许写`source_written/source_review_only`；不能据此产生完整`SourceBranch`、`Expected`、`CaseKey`、denominator、`StaticContract`或`WindowsDynamic`。
 
@@ -124,22 +136,21 @@ route/callback fragment 的 exact-set 守卫还必须验证 6 个 branch 与 6 �
 
 守卫必须把parent provenance作为五个累计 `NotReached|Pending` 轴比较，并让child只把adapter control-flow及无operation/no-pointer payload分支细化为Reviewed；completion拒绝前已产生但丢弃的success payload与Mapped payload custody都必须保持Pending，禁止互斥枚举掩盖已到达但仍未裁决的早期轴。每条 Failure chain还必须 exact-link `OuterFaultPass`→ABI Failure arm→normal-return raw accepted→normal-code forward；admitted chain必须锚定 routed callback `complete` 的 exact `Result<(), ManagedSqliteRegistryProcessRouteRejection>` 值域和 `finish_callback` delegate。route→bridge→adapter→registry→`with_shm`/`complete` 的 caller context必须逐段相等；同 owner 中 route gate先于dispatch、conditional quarantine先于completion、三个result arm位于completion attempt之后，且unsafe-retain helper必须保持三项early-return predicate→marker→retain顺序；这些顺序只能在对应 owner symbol span 内按真实 needle offset守卫，不能越过函数边界或只比较手写 ledger 顺序。六条branch chains、`UnsupportedFileRole|ShmDetached` exact-fixture exclusions与unsafe-retain conditional custody必须作为三组互斥的 source-step ID inventory，其并集与该 route/callback ledger selector精确相等；这不表示三类运行时分支互斥。每条chain的completion-attempt数量必须等于对应cell的0或1声明。
 
-当前 denominator 计数尚未冻结：
+以下是静态闭合前的历史状态表，已被上述 current table 与 static denominator authority 取代：
 
 | Case family | Source review | StaticContract | WindowsDynamic | 完成条件 |
 |---|---|---|---|---|
-| Map | owner graph + template ledger + ABI/raw reviewed-successor prefix + ABI denominator-facing fragment + source-neutral raw/Map projection + typed-outer 5-cell + route/callback 6-cell + adapter composed 7-cell fragments written；5 graph Pending 与2个open frontier仍非空；full exact-set review pending | not counted | not opened | 每个 frozen Map `CaseKey` 各有且只有一个通过的 Windows dynamic record，且 actual 与 expected 逐字段相等。 |
-| Lock | owner graph written; exact-set review pending | not counted | not opened | 每个 frozen Lock `CaseKey` 各有且只有一个通过的 Windows dynamic record，且 actual 与 expected 逐字段相等。 |
-| **A2a/A2b1 map/lock 总计** | **exact-set review pending** | **not counted** | **not opened** | static/dynamic 两次集合比较均与最终 frozen key set 精确相等。 |
+| Map | owner graph + fragments written；当时仍有 Pending/frontier | historical not counted（已取代） | historical not opened | 已取代：当前使用 exact quotient member partition + 每 class 一条 record。 |
+| Lock | owner graph written；当时 exact-set review pending | historical not counted（已取代） | historical not opened | 已取代：当前使用 exact quotient member partition + 每 class 一条 record。 |
+| **A2a/A2b1 map/lock 总计** | **historical review pending（已取代）** | **historical only** | **not opened** | **当前合同见本节 current table。** |
 
 只有 authority frozen typed key、source-branch projection、expected record 与 exclusion ledger 在源码中存在并通过 exact-set review，
 才可写 `StaticContract=N/N`；当前 `4/4` 只证明上述静态 review artifacts 自洽，不得写成完整 denominator `passed=N`、dynamic verified 或动态接受。现有 18 map + 10 lock
 仅为 `static_subset/non_denominator`，不计入未来 N 的完成数，也不允许与新 inventory 相加成 `N+28`。
 
-static 集合验收必须同时满足：authority frozen `BTreeSet<CaseKey>` 与源码集合 exact equality；每个 in-scope source terminal
+历史 static 集合验收要求后来已由 frozen static guards 完成：authority frozen `BTreeSet<CaseKey>` 与源码集合 exact equality；每个 in-scope source terminal
 leaf 恰好投影一个 key；每个 key 有非空 `SourceBranch` 集合和唯一 `Expected`；missing、extra、duplicate、unknown、无理由排除、
-同 key 不同 expected、只比较长度或手写 actual 全部失败关闭。dynamic 集合以后必须再与同一 key set exact equality，不能修改
-static expected 来迁就观察结果。
+同 key 不同 expected、只比较长度或手写 actual 全部失败关闭。当前 dynamic exact-set 法则不是“一条静态 key 一条 record”，而是 class member sets 的不交并集精确等于该 frozen key set；不能修改 static expected 来迁就观察结果。
 
 ### 2.2 A2b2
 
@@ -166,7 +177,7 @@ A2b2 的 117 必须分栏记账；两套计数不得合并为一个 denominator�
 每个 Windows dynamic record 至少必须保存或在测试报告中逐字投影：
 
 - commit、测试目标、Windows build、架构、文件系统/卷类型、bundled SQLite 版本和隔离 child identity；
-- frozen case key、family、registration、route ordinal、runtime generation、SHM connection、role、callback、cause/terminal phase、
+- frozen evidence identity：A2b2 保存 case key；Map/Lock 保存 quotient class ID、representative 与完整 member-set commitment；另存 family、registration、route ordinal、runtime generation、SHM connection、role、callback、cause/terminal phase、
   occurrence、timing 与 unmap mode；
 - 预期和实际 failure class、mutation/lock uncertainty、SQLite result code 或 `VoidNoResultCode`；
 - fault selector 的 observed/triggered/pending 精确计数，以及 callback/action 的 attempted/succeeded 计数；
@@ -205,7 +216,7 @@ phase 与 terminal phase，不能把 cleanup failure 归并回最初注入点或
 | Case | 必须结果 |
 |---|---|
 | ABI validation/output | 非法 region/size/extend、null output、非法 offset/count/flags 在 managed action 前失败；map output 保持 null，callback/platform/fault count 与 expected 一致。 |
-| map success | 分别证明 Extend cold-create、Extend warm-create、Extend reuse、Observe warm-create、Observe reuse、Observe not-present 六种语义；canonical region 值可 quotient，cold/warm、create/reuse 与 mapping prefix 不得互换。 |
+| map success | 分别证明 Extend cold-create、Extend warm-create、Extend reuse、Observe warm-create、Observe reuse、Observe not-present 六种语义；Map ordinal/regions-to-create 在 V1 默认保留，只有版本化可执行全域证明才可消去；cold/warm、create/reuse 与 mapping prefix 不得互换。 |
 | map failure before mutation | 输出指针清零；返回冻结 SQLite code；node/mapping/file custody 与 route phase逐项匹配 expected。 |
 | map mutation known | 已完成 OS mutation 不得被描述为无副作用；本地 custody必须同步后终态化。 |
 | map outcome uncertain | FileId/domain 永久 tombstone；同 domain sibling 不得重建 runtime 或继续 SHM。 |
@@ -252,7 +263,7 @@ SQLite `xClose` 的第二次调用、Drop、panic recovery 或测试清理不得
 
 A2 完成必须同时满足：
 
-1. A2a/A2b1 的 SHM map/lock `StaticContract=N/N` 已独立冻结且全部 `WindowsDynamic=N/N` 通过，static/dynamic 两次集合比较均零缺失、额外或失败；
+1. A2a/A2b1 的 SHM map/lock `StaticContract=43476/43476` 与 `8668/8668` 保持冻结；quotient manifests 对全部静态 members 完成精确、不交分区并得到 `Qmap/Qlock`，随后每个 frozen class 恰好一条正式 Windows record，分别原子形成 `WindowsDynamic=Qmap/Qmap` 与 `Qlock/Qlock`；
 2. A2b2 的 117 项 Windows dynamic records 全部通过，集合与 static inventory 精确相等；
 3. 宽范围 `sqlite_vfs_policy` 回归通过，既有 69 项成功路径不得退化；
 4. source-contract 继续证明 fault script、fixture、pointer、observer 与 dynamic record只在测试边界可达；
@@ -265,14 +276,16 @@ A2 完成必须同时满足：
 
 ## 9. 计数、报告与状态升级
 
-- 每次执行报告必须分开列 `compiled`、targeted tests、map/lock `StaticContract` 与 `WindowsDynamic`、A2b2 StaticContract、A2b2 WindowsDynamic及wide regression；
+- 每次执行报告必须分开列 `compiled`、targeted tests、Map/Lock `StaticContract`、`DynamicQuotientMemberCoverage`、`Qmap/Qlock`、`WindowsDynamic`、A2b2 StaticContract、A2b2 WindowsDynamic及wide regression；
 - targeted tests 只能按真实测试数记账，不能映射为 `WindowsDynamic` case 数；
-- 一个 dynamic case 失败时保留其 case key、最小脱敏差异和失败阶段，其余已通过 case 不改写为失败或未运行；
+- 一个 dynamic unit 失败时，A2b2 保留 case key；Map/Lock 保留 class ID、representative/member-set commitment、最小脱敏差异和失败阶段；其余记录不伪造成整族已接受；
 - 只有 map/lock 独立矩阵全部通过、A2b2 117/117、宽范围回归通过且 production isolation保持时，A2 才可从
   `implementation_not_dynamically_accepted` 升级；
 - 任何证据缺失、环境不明、case key漂移、观察不完整或生产入口变化都维持失败关闭。
 
-当前正式结论是：历史完整目标可编译且5项targeted fault matrix曾通过；本批map/lock owner图与含ABI/raw successor prefix、source-neutral raw、Map raw projection、typed outer-result 5-cell、route/callback 6-cell及adapter composed 7-cell fragment的template ledger已`source_written/source_review_only/validator_compiled/targeted_guard_4_of_4`，owner-graph Pending=5/resolved cross-links=9且Lock raw sibling仍Pending，两个open frontier仍开放；完整terminal inventory仍为`source_review_pending/not_counted`，尚不能记`StaticContract`或开放 map/lock `WindowsDynamic`。Barrier、RegistrationShutdown、RegistryLifecycle、Unmap 与 JointClose 已在 exact clean evidence commits 上分别正式通过 8、8、16、49、36 个 frozen selector，A2b2 因而是 `117/117`；clean runtime-source commit `bfa1a1180d220e9a4c8e39251414fc9a1b0a9ace` 的 wide baseline 为 `266/266`。A2仍因独立 Map/Lock 门禁未闭合而保持`implementation_not_dynamically_accepted`；生产open、A1、v15、Runtime与Ready均未改变。
+当前正式结论是：Map `StaticContract=43476/43476`、Lock `StaticContract=8668/8668`；dynamic quotient projector 与 manifests 尚未实现，`DynamicQuotientMemberCoverage` 分别为 `0/43476`、`0/8668`，`Qmap/Qlock=unknown`，Map/Lock `WindowsDynamic=not_opened`。Barrier、RegistrationShutdown、RegistryLifecycle、Unmap 与 JointClose 分别为 `8/8`、`8/8`、`16/16`、`49/49`、`36/36`，A2b2=`117/117`。A2 仍为 `implementation_not_dynamically_accepted`；生产 open、A1、v15、Runtime、Ready、派发、市场与资金效果均未改变。
+
+### 9.1 静态闭合前 fragment provenance（历史）
 
 其中本批新增 route/callback normal-return 6-cell fragment 只属于上述 `source_written/source_review_only/validator_compiled/shared_a2b1_guard_passed` ledger：它没有新增 terminal、prefix edge、denominator key、静态计数或动态证据；唯一双成功分支仍是 adapter projection Pending。其余结论与计数不变。
 
