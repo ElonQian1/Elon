@@ -33,6 +33,109 @@ pub(crate) struct HomeAiAnswer {
     pub(crate) sources: Vec<Value>,
 }
 
+/// Weather is already a deterministic, bounded service. Do not spend a slow
+/// model round trip deciding whether an obvious weather question needs it.
+/// This also handles short follow-ups such as “明天呢” using prior history.
+async fn run_weather_fast_path(
+    state: &Arc<AppState>,
+    preferred: &AgentConfig,
+    message: &str,
+    history: &[ConversationMessage],
+) -> Option<HomeAiAnswer> {
+    if !is_weather_like_message(message)
+        && !home_ai_weather::is_weather_context_follow_up(message, history)
+    {
+        return None;
+    }
+    let location = home_ai_weather::resolve_location(message, history);
+    let Some(location) = location else {
+        return Some(HomeAiAnswer {
+            reply: home_ai_weather::missing_location_reply().to_string(),
+            agent_name: preferred.name.clone(),
+            model: preferred.model.clone(),
+            used_fallback: false,
+            tool_used: Some("weather_location_required".to_string()),
+            sources: Vec::new(),
+        });
+    };
+    let detail = if home_ai_weather::is_rain_forecast_request(message) {
+        home_ai_weather::WeatherDetail::RainForecast
+    } else if home_ai_weather::is_hourly_weather_request(message) {
+        home_ai_weather::WeatherDetail::HourlyRain
+    } else {
+        home_ai_weather::WeatherDetail::Summary
+    };
+    let day_offset = home_ai_weather::day_offset(message);
+    let forecast_days = if detail == home_ai_weather::WeatherDetail::RainForecast {
+        7
+    } else {
+        day_offset + 1
+    };
+    let lookup =
+        home_ai_weather::lookup_with_detail(state, &location, day_offset, detail, forecast_days)
+            .await;
+    let (reply, tool_used, sources) = match lookup {
+        home_ai_weather::WeatherLookup::Answer(answer) => (
+            answer.reply,
+            "weather".to_string(),
+            vec![json!({ "title": answer.source_title, "url": answer.source_url })],
+        ),
+        home_ai_weather::WeatherLookup::NotFound { location } => (
+            home_ai_weather::not_found_reply(&location),
+            "weather_location_required".to_string(),
+            Vec::new(),
+        ),
+        home_ai_weather::WeatherLookup::Unavailable { location } => (
+            home_ai_weather::unavailable_reply(&location),
+            "weather_unavailable".to_string(),
+            Vec::new(),
+        ),
+    };
+    Some(HomeAiAnswer {
+        reply,
+        agent_name: preferred.name.clone(),
+        model: preferred.model.clone(),
+        used_fallback: false,
+        tool_used: Some(tool_used),
+        sources,
+    })
+}
+
+/// Keep ordinary chat on the real streaming path. Only clearly live/external
+/// questions need the slower tool-planning round trip.
+pub(crate) fn should_run_tool_orchestrator(message: &str, history: &[ConversationMessage]) -> bool {
+    if is_weather_like_message(message)
+        || home_ai_weather::is_weather_context_follow_up(message, history)
+    {
+        return true;
+    }
+    let normalized = message.to_lowercase();
+    [
+        "最新",
+        "实时",
+        "新闻",
+        "刚刚",
+        "价格",
+        "股价",
+        "汇率",
+        "搜索",
+        "查一下",
+        "官网",
+        "来源",
+        "资料",
+        "热搜",
+    ]
+    .iter()
+    .any(|keyword| normalized.contains(keyword))
+}
+
+fn is_weather_like_message(message: &str) -> bool {
+    let normalized = message.to_lowercase();
+    home_ai_weather::is_weather_request(message)
+        || normalized.contains("台风")
+        || normalized.contains("预警")
+}
+
 struct ToolExecution {
     content: String,
     tool_used: String,
@@ -102,19 +205,27 @@ pub(crate) async fn run(
     user_id: &str,
     history: &[ConversationMessage],
 ) -> Result<HomeAiAnswer> {
+    let latest_user_content = messages
+        .iter()
+        .rev()
+        .find(|message| message["role"].as_str() == Some("user"))
+        .and_then(|message| message["content"].as_str())
+        .unwrap_or("");
+    if !should_run_tool_orchestrator(latest_user_content, history) {
+        return Err(anyhow!("普通聊天跳过工具编排，直接使用流式回答"));
+    }
+    if let Some(answer) =
+        run_weather_fast_path(state, preferred, latest_user_content, history).await
+    {
+        return Ok(answer);
+    }
     let mut messages = with_tool_note(messages);
     let tools = tool_definitions();
     let mut used_tool = None;
     let mut sources = Vec::new();
     let mut active_agent = preferred.clone();
     let mut used_fallback = false;
-    let latest_user_content = messages
-        .iter()
-        .rev()
-        .find(|message| message["role"].as_str() == Some("user"))
-        .and_then(|message| message["content"].as_str())
-        .unwrap_or("")
-        .to_string();
+    let latest_user_content = latest_user_content.to_string();
 
     for _ in 0..4 {
         let (response, used_agent, fell_back) = call_tool_llm_with_definitions(

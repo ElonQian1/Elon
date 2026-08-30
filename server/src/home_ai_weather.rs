@@ -364,7 +364,7 @@ fn has_weather_context(history: &[ConversationMessage]) -> bool {
     })
 }
 
-fn is_weather_context_follow_up(message: &str, history: &[ConversationMessage]) -> bool {
+pub(crate) fn is_weather_context_follow_up(message: &str, history: &[ConversationMessage]) -> bool {
     let compact = message
         .trim()
         .trim_matches(|ch: char| "，。？！?：:、".contains(ch));
