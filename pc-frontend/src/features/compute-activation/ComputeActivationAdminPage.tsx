@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { CircleCheck, FileCheck2, RefreshCw, ShieldAlert, ShieldCheck, ShieldX, TriangleAlert } from 'lucide-react'
 import { useAuthStore } from '../../store/auth'
-import WorkspaceFeatureNav from '../shell/WorkspaceFeatureNav'
 import { type ComputeActivationEvidenceRequest, type ComputeActivationPreflightReport } from '../compute-supply/computeActivationApi'
 import ActivationReviewDialog from './ActivationReviewDialog'
 import ActivationPlanPanel from './ActivationPlanPanel'
@@ -80,7 +79,7 @@ export default function ComputeActivationAdminPage() {
     {notice && <div className={styles.alert} data-tone="success"><CircleCheck size={15} />{notice}</div>}
     <div className={styles.filters} role="tablist" aria-label="申请状态">{FILTERS.map((filter) => <button type="button" role="tab" aria-selected={filter.value === status} data-active={filter.value === status} key={filter.value} onClick={() => setStatus(filter.value)}>{filter.label}</button>)}</div>
     <section className={styles.workbench}>
-      <aside className={styles.queue}><WorkspaceFeatureNav /><header><strong>申请队列</strong><span>{requests.length}</span></header>{requests.map((request) => <button type="button" key={request.request_id} data-active={request.request_id === selectedId} onClick={() => setSelectedId(request.request_id)}><FileCheck2 size={16} /><span><strong>{shortId(request.provider_id)}</strong><small>{shortId(request.pool_id)} · {formatTime(request.requested_at)}</small></span></button>)}{requests.length === 0 && !loading && <div className={styles.empty}>当前状态没有申请</div>}</aside>
+      <aside className={styles.queue}><header><strong>申请队列</strong><span>{requests.length}</span></header>{requests.map((request) => <button type="button" key={request.request_id} data-active={request.request_id === selectedId} onClick={() => setSelectedId(request.request_id)}><FileCheck2 size={16} /><span><strong>{shortId(request.provider_id)}</strong><small>{shortId(request.pool_id)} · {formatTime(request.requested_at)}</small></span></button>)}{requests.length === 0 && !loading && <div className={styles.empty}>当前状态没有申请</div>}</aside>
       <div className={styles.detail}>{selected ? <>
         <header className={styles.requestHeader}><div><span>申请 ID</span><h2>{selected.request_id}</h2></div><span className={styles.status}>{statusLabel(selected.status)}</span></header>
         <div className={styles.facts}><div><span>Provider</span><strong>{shortId(selected.provider_id)}</strong></div><div><span>Pool</span><strong>{shortId(selected.pool_id)}</strong></div><div><span>Provider Revision</span><strong>{selected.expected_provider_policy_revision}</strong></div><div><span>Pool Epoch / Revision</span><strong>{selected.expected_capacity_epoch} / {selected.expected_pool_revision}</strong></div></div>

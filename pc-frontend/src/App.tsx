@@ -1,6 +1,7 @@
 import { lazy, Suspense, type ReactNode } from 'react'
 import { Navigate, Routes, Route } from 'react-router-dom'
 import Shell from './features/shell/Shell'
+import ComputeWorkspaceLayout from './features/compute/ComputeWorkspaceLayout'
 import { isLocalWorkbench } from './api/runtime'
 import styles from './App.module.css'
 
@@ -77,24 +78,26 @@ export default function App() {
         <Route path="ui-tuner" element={lazyRoute(<UiTunerPage />)} />
         <Route path="local-tasks" element={lazyRoute(<LocalTasksPage />)} />
         <Route path="codex-control" element={lazyRoute(<CodexControlPage />)} />
-        <Route path="compute-settlement" element={lazyRoute(<ComputeSettlementPage />)} />
-        <Route path="my-compute-settlement" element={lazyRoute(<MyComputeSettlementPage />)} />
-        <Route path="compute-supply" element={lazyRoute(<ComputeSupplyPage />)} />
-        <Route path="compute-activation" element={lazyRoute(<ComputeActivationAdminPage />)} />
-        <Route path="compute-offers" element={lazyRoute(<ComputeOfferAdminPage />)} />
-        <Route path="compute-reference-curves" element={lazyRoute(<ComputeReferenceCurvePage />)} />
-        <Route path="compute-external-pools" element={lazyRoute(<ComputeExternalPoolsPage />)} />
-        <Route path="compute-market" element={lazyRoute(<ComputeMarketPage />)} />
-        <Route path="compute-reviews" element={lazyRoute(<ComputeConsumerReviewPage />)} />
-        <Route path="compute-execution" element={lazyRoute(<ComputeExecutionPage />)} />
-        <Route path="compute-observations" element={lazyRoute(<ComputePlatformObservationPage />)} />
-        <Route path="compute-verification" element={lazyRoute(<ComputeVerificationPage />)} />
-        <Route path="compute-receipts" element={lazyRoute(<ComputeExecutionReceiptPage />)} />
-        <Route path="compute-finalization" element={lazyRoute(<ComputeAttemptFinalizationPage />)} />
-        <Route path="compute-settlement-issuance" element={lazyRoute(<ComputeSettlementIssuancePage />)} />
-        <Route path="compute-challenges" element={lazyRoute(<ComputeSettlementChallengePage />)} />
-        <Route path="compute-challenge-resolution" element={lazyRoute(<ComputeSettlementChallengeResolutionPage />)} />
-        <Route path="compute-corrections" element={lazyRoute(<ComputeSettlementCorrectionPage />)} />
+        <Route element={<ComputeWorkspaceLayout />}>
+          <Route path="compute-settlement" element={lazyRoute(<ComputeSettlementPage />)} />
+          <Route path="my-compute-settlement" element={lazyRoute(<MyComputeSettlementPage />)} />
+          <Route path="compute-supply" element={lazyRoute(<ComputeSupplyPage />)} />
+          <Route path="compute-activation" element={lazyRoute(<ComputeActivationAdminPage />)} />
+          <Route path="compute-offers" element={lazyRoute(<ComputeOfferAdminPage />)} />
+          <Route path="compute-reference-curves" element={lazyRoute(<ComputeReferenceCurvePage />)} />
+          <Route path="compute-external-pools" element={lazyRoute(<ComputeExternalPoolsPage />)} />
+          <Route path="compute-market" element={lazyRoute(<ComputeMarketPage />)} />
+          <Route path="compute-reviews" element={lazyRoute(<ComputeConsumerReviewPage />)} />
+          <Route path="compute-execution" element={lazyRoute(<ComputeExecutionPage />)} />
+          <Route path="compute-observations" element={lazyRoute(<ComputePlatformObservationPage />)} />
+          <Route path="compute-verification" element={lazyRoute(<ComputeVerificationPage />)} />
+          <Route path="compute-receipts" element={lazyRoute(<ComputeExecutionReceiptPage />)} />
+          <Route path="compute-finalization" element={lazyRoute(<ComputeAttemptFinalizationPage />)} />
+          <Route path="compute-settlement-issuance" element={lazyRoute(<ComputeSettlementIssuancePage />)} />
+          <Route path="compute-challenges" element={lazyRoute(<ComputeSettlementChallengePage />)} />
+          <Route path="compute-challenge-resolution" element={lazyRoute(<ComputeSettlementChallengeResolutionPage />)} />
+          <Route path="compute-corrections" element={lazyRoute(<ComputeSettlementCorrectionPage />)} />
+        </Route>
         <Route path="voice" element={lazyRoute(<VoicePage />)} />
         <Route path="doctor" element={lazyRoute(<DoctorPage />)} />
         <Route path="node/public-dev-smoke" element={lazyRoute(<PublicDevSmokePage />)} />
