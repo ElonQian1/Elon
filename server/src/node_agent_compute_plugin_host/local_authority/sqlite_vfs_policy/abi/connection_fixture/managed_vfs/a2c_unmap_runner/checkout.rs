@@ -1,6 +1,6 @@
 //! Parent-side binding from the compiled SHA to the exact clean checkout under test.
 
-use std::{path::Path, process::Command};
+use std::path::Path;
 
 use anyhow::{anyhow, Context};
 
@@ -22,7 +22,7 @@ pub(super) fn verify_exact_clean_checkout(expected_git_sha: &str) -> anyhow::Res
 }
 
 fn git_output(root: &Path, arguments: &[&str]) -> anyhow::Result<String> {
-    let output = Command::new("git")
+    let output = crate::git_command_error::git_command()
         .arg("-C")
         .arg(root)
         .args(arguments)

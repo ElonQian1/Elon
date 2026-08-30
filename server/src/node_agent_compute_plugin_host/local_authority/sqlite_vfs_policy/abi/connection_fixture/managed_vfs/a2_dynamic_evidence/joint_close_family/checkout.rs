@@ -1,6 +1,6 @@
 //! Linear proof that the exact compiled JointClose commit is the clean checkout under test.
 
-use std::{path::Path, process::Command};
+use std::path::Path;
 
 use super::{super::environment::validate_git_sha, JointCloseFamilyCohort};
 
@@ -42,7 +42,7 @@ impl ValidatedJointCloseCleanCheckoutReceipt {
 }
 
 fn git_output(root: &Path, arguments: &[&str]) -> Result<String, &'static str> {
-    let output = Command::new("git")
+    let output = crate::git_command_error::git_command()
         .arg("-C")
         .arg(root)
         .args(arguments)

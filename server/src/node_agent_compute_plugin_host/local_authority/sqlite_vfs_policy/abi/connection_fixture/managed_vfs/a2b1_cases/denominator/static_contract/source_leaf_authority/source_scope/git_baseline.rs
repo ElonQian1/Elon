@@ -1,7 +1,4 @@
-use std::{
-    path::Path,
-    process::{Command, Output},
-};
+use std::{path::Path, process::Output};
 
 use super::super::source_scope_support::is_lower_hex;
 use super::SOURCE_BASELINE_COMMIT_SHA1;
@@ -110,7 +107,7 @@ impl GitRepository {
     }
 
     fn git_allow_status(&self, arguments: &[&str]) -> Result<Output, String> {
-        Command::new("git")
+        crate::git_command_error::git_command()
             .current_dir(self.manifest_dir)
             .env_remove("GIT_DIR")
             .env_remove("GIT_WORK_TREE")

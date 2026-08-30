@@ -8,7 +8,6 @@ use std::{
     fmt,
     fmt::Write as _,
     path::Path,
-    process::Command,
 };
 
 use sha2::{Digest, Sha256};
@@ -481,7 +480,7 @@ fn opaque_commitment(value: &[u8; 32]) -> String {
 }
 
 fn git_output(root: &Path, arguments: &[&str]) -> Result<String, &'static str> {
-    let output = Command::new("git")
+    let output = crate::git_command_error::git_command()
         .arg("-C")
         .arg(root)
         .args(arguments)
