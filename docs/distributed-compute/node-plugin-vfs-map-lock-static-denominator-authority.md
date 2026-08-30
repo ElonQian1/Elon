@@ -31,6 +31,20 @@ acquire/release success-busy-error outcomes, before/native/after-success fault p
 cold-acquire initialization, callback/route completion, raw abandon, custody retention, and the
 rule that unlock never initializes a node.
 
+The source cut is the production Windows `xShmMap` or `xShmLock` callback with every memory-safe
+ABI/raw-slot state admitted by those callbacks. Test VFS registration, route preparation, fault
+selectors, fault-controller failure, and test-only lifecycle controls are harness overlays: they
+may stimulate or observe a production semantic leaf, but they are not production source leaves and
+do not widen `N` or `M`.
+
+The finite quotient is defined by the ordered source decisions actually read before the outermost
+callback return. Inputs not read before an early terminal use one `not_reached`/`any_valid` cell and
+must not be multiplied by Map mode, Lock action, slot, or prestate. Distinct source sites never
+merge merely because they return the same result. Native error classes split when production code
+projects them differently. Map loop ordinals and regions-to-create are bounded by the authority
+budget (`1..=256`) and are mechanically expanded unless an executable equivalence proof removes
+the exact ordinal from every Expected observation.
+
 ## 3. Countable record contract
 
 Every frozen Map or Lock record must contain:
@@ -53,9 +67,16 @@ missing == extra == duplicate == unknown == 0
 pending == open_frontier == unresolved_exclusion == 0
 ```
 
-The final denominators are the mechanically counted widths `N = |Map keys|` and
-`M = |Lock keys|`. This document intentionally does not predict either number before source
-closure.
+The equations are evaluated over one rooted acyclic decision graph per callback. A parent
+continuation is replaced by its child leaves; parent/local fragment widths are never added to child
+widths. The source universe is the disjoint union of included terminal leaf cells and proved
+excluded leaf cells. Only complete root-to-terminal cases contribute to the denominator.
+
+The closed denominators are the mechanically counted widths `N = |Map keys| = 43,476` and
+`M = |Lock keys| = 8,668`. The complete reviewed universes also retain every proved exclusion:
+Map has 324,561 source leaves (`43,476` included and `281,085` excluded), while Lock has 62,442
+source leaves (`8,668` included and `53,774` excluded). Exclusions are part of the frozen authority
+but never contribute to `N` or `M`.
 
 ## 4. Required static guards
 
@@ -83,10 +104,22 @@ effects. Those remain separate dependent features.
 ## 6. Current delivery state
 
 ```text
-authority=design_frozen
-implementation=planned
-map_static_contract=not_counted
-lock_static_contract=not_counted
+authority=source_and_ledger_frozen
+source_baseline=47cb2652321b42cc9689319075d253fe2275ace1
+implementation=exact_guards_implemented
+map_static_contract=43476/43476
+map_source_universe=324561
+map_leaf_ledger_sha256=0a756fe7f48ba5fb4634f8f2716d482e1382152f29ad7e300dd411c96e205333
+map_manifest_sha256=0c51c3abe52f1a4f5ad1217c79ebd7393188452ff09659739ca6e1d93d205c19
+lock_static_contract=8668/8668
+lock_source_universe=62442
+lock_leaf_ledger_sha256=23610b46e8217d396aea7a5367c2eed93f54c2488178d2ee8aa80c121425f082
+lock_manifest_sha256=c690c2f5b78b68201bd5c0eacd4e6489e87bb4c6abf8ab584aa24e443795491e
 windows_dynamic=not_opened
 production_vfs_open=unavailable
 ```
+
+The Map leaf ledger is checked in as 16 fixed, line-boundary parts because its canonical byte
+stream exceeds the hosting provider's single-blob limit. Concatenating the parts in numeric order
+reconstructs the exact canonical TSV bound by `map_leaf_ledger_sha256`; splitting does not change
+the ledger, leaf identities, or manifest.

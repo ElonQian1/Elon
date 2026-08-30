@@ -316,19 +316,19 @@
       "id": "backend-a2-map-lock-static-denominator-v1",
       "title": "A2 Map/Lock 静态分母闭合 V1",
       "summary": "冻结 source-exhaustive Map/Lock terminal inventories、CaseKey、SourceBranch、Expected 与 exclusion，并以 exact-set guards 关闭所有 Pending/frontier；只产生 StaticContract N/N、M/M，不开放动态或生产入口。",
-      "status": "proposed",
+      "status": "verified",
       "priority": "p0",
       "requirement": {
         "path": "docs/distributed-compute/node-plugin-vfs-map-lock-static-denominator-authority.md",
-        "content_hash": "17b5f560a5283a7b10a6a1b64fa739eeeeec88011316386c765a7afbc7685ff0",
+        "content_hash": "8bd7c7aaaa58bb31c9b1043bdc615c71471f9b09e3fc8161d661ff8d3904dfe2",
         "locator": "",
         "evidence_kind": "document",
         "git_identity": {
           "schema": "elon.project_context_git_identity.v1",
-          "head_commit": "47cb2652321b42cc9689319075d253fe2275ace1",
-          "head_blob_oid": "",
-          "worktree_blob_oid": "239ee88ebb11859dc85f87127955e7eb56a710a4",
-          "state": "untracked"
+          "head_commit": "d7b0be7addbc3677cf96174434b96acd681b9783",
+          "head_blob_oid": "239ee88ebb11859dc85f87127955e7eb56a710a4",
+          "worktree_blob_oid": "86f00ce9fa955a866e9114e0e7bdeb03d2117a47",
+          "state": "tracked_modified"
         }
       },
       "knowledge_node_id": "",
@@ -360,9 +360,140 @@
         "Map/Lock exact guards 对 source terminal 等式、missing/extra/duplicate/unknown、pending/frontier/exclusion 和 legacy widening 全部 fail closed，并通过独立红队审计。",
         "只晋级 StaticContract=N/N 与 M/M；WindowsDynamic、A2、生产 VFS/open/Connection/Opened/Runtime/Ready 继续不可达。"
       ],
-      "implementation_evidence": [],
+      "implementation_evidence": [
+        {
+          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases.rs",
+          "content_hash": "ed615ef09a331d9f5bb1d267bd7da3026c525d6740befc518c79312ce9fb6216",
+          "locator": "a2b1_map_static_denominator_is_exact / lock / aggregate",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "d7b0be7addbc3677cf96174434b96acd681b9783",
+            "head_blob_oid": "ade972cb8f07dc6614e0089655a7bc6c7ce3d175",
+            "worktree_blob_oid": "140d30c66a40ad732a9da12e140fc28b7148ba16",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract.rs",
+          "content_hash": "82e56e479ab592eecbfe8acf0de8bf20c17d40c60c9463058839a3793999e7b4",
+          "locator": "validate_map / validate_lock / validate_all",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "d7b0be7addbc3677cf96174434b96acd681b9783",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "d777789423795e54a9318b47297797ba4ac70c6b",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/lock.rs",
+          "content_hash": "9f232ba62a2616cd8d6a7bbbe9464ed214c9e540808ec6b12555f57d14cbd95c",
+          "locator": "Lock source-exhaustive contract graph",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "d7b0be7addbc3677cf96174434b96acd681b9783",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "74ac2467656e1abaf6f44d952a6c9202bd768b46",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/map.rs",
+          "content_hash": "46370832ba71bd5f3ef7610427d39f435db8348b67a3baff8cdf786cdd7da165",
+          "locator": "Map source-exhaustive contract graph",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "d7b0be7addbc3677cf96174434b96acd681b9783",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "bb66651cd43c9c40941d184cef41977776f577ac",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/source_leaf_authority/adapter.rs",
+          "content_hash": "ebfb8f0485496a673fed0031e47b0d77fe784f09d93ff6d6f15c62f86cd4b09d",
+          "locator": "source graph to canonical leaf adapter",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "d7b0be7addbc3677cf96174434b96acd681b9783",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "6e4512addbc3e2a81be1467b349e613ff247643c",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/source_leaf_authority/frozen.rs",
+          "content_hash": "0fe20fec9c6dcae380e17c86311963db95d6e08985d045cf104ec58e409c498b",
+          "locator": "checked-in pair parsing, trusted context, graph and manifest validation",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "d7b0be7addbc3677cf96174434b96acd681b9783",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "86bd336aa4d517268db034719a69e9b9a7119af7",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/source_leaf_authority/frozen/lock.source-leaf-manifest.v1.tsv",
+          "content_hash": "af2f10c55a8f1f84b170a960e2b436651be5b5b57a7fe6e7c40b76ec1e902469",
+          "locator": "Lock root/global/256-shard commitments",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "d7b0be7addbc3677cf96174434b96acd681b9783",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "5a5a6c3083491b545ff27b18afdef2af2b03b83c",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/source_leaf_authority/frozen/map.source-leaf-manifest.v1.tsv",
+          "content_hash": "c3bd785a3594479608b3ddeadf9ae40f11b9220e08fc8a6c67c50964f6fcc683",
+          "locator": "Map root/global/256-shard commitments",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "d7b0be7addbc3677cf96174434b96acd681b9783",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "385b6a1aa49c4e16ddc2cc5cc8fccbf4400ad6dc",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/source_leaf_authority/generation_tests.rs",
+          "content_hash": "18242b5d13edcda6fc0069372de4da857efe1b6940a09b03725c2be481ea3aea",
+          "locator": "map_leaf_partition_is_fixed_balanced_and_byte_exact",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "d7b0be7addbc3677cf96174434b96acd681b9783",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "a1290a7a35e716fb7af201ee00c6bbb987e3d43b",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/source_leaf_authority/tests/frozen_negative.rs",
+          "content_hash": "27686da6f6bdb00a16ae6597c5f03a39b1faad51347180226acbdc62f14e0f54",
+          "locator": "five frozen drift negative tests",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "d7b0be7addbc3677cf96174434b96acd681b9783",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "cb87eacf0d8aaf956c86e1a83bc056180a9d4c9f",
+            "state": "untracked"
+          }
+        }
+      ],
       "created_at_ms": 1788075290023,
-      "updated_at_ms": 1788075290023
+      "updated_at_ms": 1788098999957
     },
     {
       "id": "backend-a2b2-fixture-compile-import-v1",
@@ -12743,136 +12874,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_407e5a8c94e24d248dac05f700a41264",
-      "feature_id": "win-web-ai-rich-content-runtime-guard-v1",
-      "action": "transitioned",
-      "actor": "codex-root",
-      "reason": "真实 TypeScript 门禁契约、完整 user-browser、typecheck、lint、build、validate-win-web-ai 与源码体积门禁全部通过。",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1787449846973
-    },
-    {
-      "id": "feature_event_33ac7976741b4fac838b9bb8e100ed19",
-      "feature_id": "win-web-ai-rich-content-runtime-guard-v1",
-      "action": "transitioned",
-      "actor": "codex-root",
-      "reason": "实现与验证提交已推送，Win 正式版 0.3.69+b83f7fb9d861bf0d2f34956e6fca4be107d6d5ad 已发布、激活并确认 ChatGPT 会话重连就绪。",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1787450383520
-    },
-    {
-      "id": "feature_event_756df664f11146fdaa12c0cac9d9bfb8",
-      "feature_id": "win-chatgpt-visible-finance-chart-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-root",
-      "reason": "",
-      "from_status": "implemented",
-      "to_status": "implemented",
-      "at_ms": 1787450588560
-    },
-    {
-      "id": "feature_event_205dcc0a0fe54bd49f1621116bf1493d",
-      "feature_id": "win-local-mode-production-ai-entry-v1",
-      "action": "registered",
-      "actor": "codex-goal-rich-content",
-      "reason": "现场 Win 验收发现本地模式隐藏 /ai，用户只能进入官方 AI 会话检查页，生产聊天功能缺少可发现入口。",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1787451699771
-    },
-    {
-      "id": "feature_event_4c528b4510db435b9754dc850bb448ff",
-      "feature_id": "win-local-mode-production-ai-entry-v1",
-      "action": "claimed",
-      "actor": "codex-goal-rich-content",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1787451734711
-    },
-    {
-      "id": "feature_event_87653b9de6c246428bd727c5d56f2291",
-      "feature_id": "win-local-mode-production-ai-entry-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-rich-content",
-      "reason": "开始补回 Win 本地模式生产 AI 聊天入口并增加回归合同。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1787451745721
-    },
-    {
-      "id": "feature_event_14819722a1de4f1cb841baa9e10ca71a",
-      "feature_id": "win-local-mode-production-ai-entry-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-goal-rich-content",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1787451990189
-    },
-    {
-      "id": "feature_event_a9ea73431f9e496a8d63dfd5ffdcb8f6",
-      "feature_id": "win-local-mode-production-ai-entry-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-rich-content",
-      "reason": "已在本地模式侧栏增加复用 /ai 的生产聊天入口，并补充本地任务与网页 AI 静态合同。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1787452000743
-    },
-    {
-      "id": "feature_event_2a8ab3868e124ce184e509868dff6009",
-      "feature_id": "win-local-mode-production-ai-entry-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-rich-content",
-      "reason": "定向合同、test:local-tasks、test:user-browser、typecheck、lint、build 与 validate-win-web-ai 全部通过。",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1787452011666
-    },
-    {
-      "id": "feature_event_9f14fa9059464c488eecb4aee9da93ad",
-      "feature_id": "win-local-mode-production-ai-entry-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-agent",
-      "reason": "Reopen the not-yet-released feature before its first commit so the requirement binding can be corrected for the repository EOF hygiene rule.",
-      "from_status": "verified",
-      "to_status": "ready",
-      "at_ms": 1787452486688
-    },
-    {
-      "id": "feature_event_bc43910ae89c45b9bb1c90f250e38bd8",
-      "feature_id": "win-local-mode-production-ai-entry-v1",
-      "action": "requirement_rebound",
-      "actor": "codex-goal-agent",
-      "reason": "Bind the repository-compliant requirement content after removing the trailing blank line rejected by pre-commit.",
-      "from_status": "ready",
-      "to_status": "proposed",
-      "at_ms": 1787452537593
-    },
-    {
-      "id": "feature_event_7b191b8a46b34c03b4c7a0306b1ecab1",
-      "feature_id": "win-local-mode-production-ai-entry-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-agent",
-      "reason": "Re-reviewed the unchanged feature scope after the EOF-only requirement hygiene correction.",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1787452555042
-    },
-    {
-      "id": "feature_event_f962d334431d4e3a85bb2b28feb0f8e3",
-      "feature_id": "win-local-mode-production-ai-entry-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-agent",
-      "reason": "The reviewed scope is ready and its dependency is already verified.",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1787452610057
-    },
-    {
       "id": "feature_event_3bc6888a723248f5af818cff87a407e9",
       "feature_id": "win-local-mode-production-ai-entry-v1",
       "action": "claimed",
@@ -14741,6 +14742,136 @@
       "from_status": "",
       "to_status": "proposed",
       "at_ms": 1788075290023
+    },
+    {
+      "id": "feature_event_543527e40b744132bcacc61c0d21332b",
+      "feature_id": "backend-a2-map-lock-static-denominator-v1",
+      "action": "transitioned",
+      "actor": "codex/root",
+      "reason": "已审阅静态分母合同：不预填 N/M，不把 legacy 28 计数，动态与生产范围继续隔离。",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1788075354637
+    },
+    {
+      "id": "feature_event_fd00d284624c412d8047f7b036e2175f",
+      "feature_id": "backend-a2-map-lock-static-denominator-v1",
+      "action": "transitioned",
+      "actor": "codex/root",
+      "reason": "JointClose 依赖 verified，requirement 当前且无阻塞依赖。",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1788075364109
+    },
+    {
+      "id": "feature_event_cdf0ea8b6af945e4a9e93bbccede2c00",
+      "feature_id": "backend-a2-map-lock-static-denominator-v1",
+      "action": "claimed",
+      "actor": "codex/root",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788075375481
+    },
+    {
+      "id": "feature_event_375c8a3a5c8647459a12f8ea91eef81c",
+      "feature_id": "backend-a2-map-lock-static-denominator-v1",
+      "action": "transitioned",
+      "actor": "codex/root",
+      "reason": "开始闭合 Map/Lock source terminal inventories 与 exact static guards。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788075386634
+    },
+    {
+      "id": "feature_event_3a91f57e0aaf4bb99ace7c75b9a7bc9f",
+      "feature_id": "backend-a2-map-lock-static-denominator-v1",
+      "action": "claim_released",
+      "actor": "codex/root",
+      "reason": "Requirement authority intentionally gained exact frozen counts and reviewed ledger identities; release before explicit rebind.",
+      "from_status": "in_progress",
+      "to_status": "blocked",
+      "at_ms": 1788097864916
+    },
+    {
+      "id": "feature_event_ec7064688c6740f3b17251752322efe6",
+      "feature_id": "backend-a2-map-lock-static-denominator-v1",
+      "action": "requirement_rebound",
+      "actor": "codex/root",
+      "reason": "Bind the reviewed exact Map/Lock frozen denominator authority and hashes produced by this implementation.",
+      "from_status": "blocked",
+      "to_status": "proposed",
+      "at_ms": 1788097865870
+    },
+    {
+      "id": "feature_event_9111b9b40bec43e88f186fe7f0280065",
+      "feature_id": "backend-a2-map-lock-static-denominator-v1",
+      "action": "transitioned",
+      "actor": "codex/root",
+      "reason": "Reviewed scope remains static-denominator-only and preserves all downstream fail-closed gates.",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1788097865890
+    },
+    {
+      "id": "feature_event_65e86b1fc1294f98be3bf14a5954f848",
+      "feature_id": "backend-a2-map-lock-static-denominator-v1",
+      "action": "transitioned",
+      "actor": "codex/root",
+      "reason": "Requirement hash is current and the static denominator task is ready for evidence binding.",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1788097865910
+    },
+    {
+      "id": "feature_event_21a575adac2e40caa080cc9fc4e3bcb7",
+      "feature_id": "backend-a2-map-lock-static-denominator-v1",
+      "action": "claimed",
+      "actor": "codex/root",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788097865929
+    },
+    {
+      "id": "feature_event_4a882f8f7d1e4843a4d393451e72a088",
+      "feature_id": "backend-a2-map-lock-static-denominator-v1",
+      "action": "transitioned",
+      "actor": "codex/root",
+      "reason": "Continue formal validation and bind implementation/test evidence for the exact static contract.",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788097865949
+    },
+    {
+      "id": "feature_event_509b3a82ef1f4f32a58cffb350d0a276",
+      "feature_id": "backend-a2-map-lock-static-denominator-v1",
+      "action": "evidence_recorded",
+      "actor": "codex/root",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788098999920
+    },
+    {
+      "id": "feature_event_16d7be84e1f34d0e9760a4614db2a3e6",
+      "feature_id": "backend-a2-map-lock-static-denominator-v1",
+      "action": "transitioned",
+      "actor": "codex/root",
+      "reason": "Exact Map/Lock static graphs, frozen ledgers, independent guards, negative drift tests, and formal exact tests are implemented.",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1788098999937
+    },
+    {
+      "id": "feature_event_91f5db0326d041c5b7e99fbac4cbf907",
+      "feature_id": "backend-a2-map-lock-static-denominator-v1",
+      "action": "transitioned",
+      "actor": "codex/root",
+      "reason": "Map 43476/43476, Lock 8668/8668, aggregate, frozen negatives, split byte identity, source-size, diff, and production check passed; downstream dynamic and production-open gates remain closed.",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1788098999957
     }
   ]
 }
