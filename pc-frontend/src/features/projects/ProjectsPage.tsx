@@ -13,6 +13,7 @@ import { CreateProjectModal } from './CreateProjectModal'
 import { useProjectStore } from '../conversation/useProjectStore'
 import type { Project } from '../conversation/types'
 import ProjectPlazaView from '../plaza/ProjectPlazaView'
+import WorkspaceFeatureNav from '../shell/WorkspaceFeatureNav'
 import styles from './ProjectsPage.module.css'
 
 type ProjectCenterTab = 'mine' | 'plaza'
@@ -106,6 +107,8 @@ export default function ProjectsPage() {
             <span>项目广场</span>
           </button>
         </div>
+
+        <WorkspaceFeatureNav excludedPaths={['/projects']} />
 
         <div className={styles.sideSectionTitle}>快速进入</div>
         <div className={styles.sideProjectList}>

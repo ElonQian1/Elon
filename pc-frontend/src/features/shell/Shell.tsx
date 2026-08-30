@@ -2,7 +2,6 @@ import { lazy, Suspense, useEffect, useState } from 'react'
 import { Outlet } from 'react-router-dom'
 import { CircleCheck, Link2, TriangleAlert, WifiOff } from 'lucide-react'
 import ServerRail from './ServerRail'
-import WorkspaceNav from './WorkspaceNav'
 import DesktopTitleBar from './DesktopTitleBar'
 import { isDesktopShellFrameless } from './desktopShell'
 import { useNotifications } from '../notifications/useNotifications'
@@ -101,7 +100,6 @@ export default function Shell() {
   useCodexControlBridge()
   const duplicateTab = useWorkbenchTabCoordinator()
   const localMode = isLocalWorkbench()
-  const [workspaceNavOpen, setWorkspaceNavOpen] = useState(false)
   useNotifications(!localMode)
   const token = useAuthStore((s) => s.token)
   const fetchMe = useAuthStore((s) => s.fetchMe)
@@ -124,13 +122,7 @@ export default function Shell() {
     <div className={styles.shellRoot}>
       {isDesktopShellFrameless() && <DesktopTitleBar />}
       <div className={styles.shell}>
-        <ServerRail
-          workspaceNavOpen={workspaceNavOpen}
-          onToggleWorkspaceNav={(_workspace, isCurrentWorkspace) => {
-            setWorkspaceNavOpen((open) => isCurrentWorkspace ? !open : true)
-          }}
-        />
-        {!localMode && workspaceNavOpen && <WorkspaceNav onClose={() => setWorkspaceNavOpen(false)} />}
+        <ServerRail />
         <div className={styles.content}>
           {!localMode && <AccountClaimBanner />}
           <LocalModeBanner />

@@ -22,7 +22,7 @@ import {
   saveAiComposerDraft,
   type AiComposerDraft,
 } from '../updates/composerDrafts'
-import SidebarUserStrip from '../shell/SidebarUserStrip'
+import SidebarUserStrip from '../shell/SidebarUserStrip'; import WorkspaceFeatureNav from '../shell/WorkspaceFeatureNav'
 import { safeNodeAdminUrl } from '../../lib/utils'
 import { DEFAULT_POPOVER_ANCHOR, popoverAnchorFromRect, type PopoverAnchor } from '../../lib/popoverPosition'
 import useAiWebChatBackend from '../user-browser/useAiWebChatBackend'
@@ -839,7 +839,7 @@ export default function AiChatPage({ mode, onModeChange }: { mode: AiHomeMode; o
           <span>一龙 AI</span>
           <button className={styles.newBtn} onClick={newConversation} title="新对话" type="button" disabled={visibleSending || (chatMode && !web.userState.canNewConversation)}>+</button>
         </div>
-        {chatMode ? <AiWebChatSidebar web={web} /> : <><AiPinnedTools
+        <WorkspaceFeatureNav excludedPaths={['/doctor']} />{chatMode ? <AiWebChatSidebar web={web} /> : <><AiPinnedTools
             sending={sending}
             onNewConversation={newConversation}
             onOpenDoctor={() => navigate('/doctor')}

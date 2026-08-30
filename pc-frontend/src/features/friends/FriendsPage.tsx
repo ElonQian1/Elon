@@ -4,6 +4,7 @@ import { api } from '../../api/client'
 import { useAuthStore } from '../../store/auth'
 import { clean, formatTime } from '../../lib/utils'
 import { displayMessageContentOrAttachment } from '../../lib/messageDisplay'
+import WorkspaceFeatureNav from '../shell/WorkspaceFeatureNav'
 import MarkdownContent from '../markdown/MarkdownContent'
 import MessageActions, { messageActionsHostClassName, messageCopySourceId } from '../message-actions/MessageActions'
 import styles from './FriendsPage.module.css'
@@ -413,6 +414,7 @@ export default function FriendsPage() {
           <span>会话</span>
           <small>{friends.length} 好友 · {groups.length} 群聊</small>
         </div>
+        <WorkspaceFeatureNav />
 
         <form onSubmit={handleSearch} className={styles.searchForm}>
           <input

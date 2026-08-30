@@ -27,7 +27,7 @@ import ConversationTopbarActions from './ConversationTopbarActions'
 import { useConversationRealtimeRefresh } from './useConversationRealtimeRefresh'
 import { useConversationAutoScroll } from './useConversationAutoScroll'
 import { useConversationTaskActions } from './useConversationTaskActions'
-import ProjectContextSidebar from './ProjectContextSidebar'
+import ProjectContextSidebar from './ProjectContextSidebar'; import WorkspaceFeatureNav from '../shell/WorkspaceFeatureNav'
 import type { ProjectMemberScope } from './ProjectContextSidebar'
 import WorkspacePanelResizeHandle from './WorkspacePanelResizeHandle'
 import { api } from '../../api/client'
@@ -1103,7 +1103,7 @@ export default function ConversationPage() {
         </div>
 
         {/* 内容区：根据是否有选中项目切换两种视图 */}
-        <div className={styles.channelList}>
+        <div className={styles.channelList}><WorkspaceFeatureNav excludedPaths={['/workspace']} />
           {activeProjectId ? (
             /* —— Discord 式：只显当前项目的频道 + 会话列表 —— */
             <>
