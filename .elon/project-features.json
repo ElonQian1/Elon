@@ -313,6 +313,58 @@
       "updated_at_ms": 1786762799336
     },
     {
+      "id": "backend-a2-map-lock-static-denominator-v1",
+      "title": "A2 Map/Lock 静态分母闭合 V1",
+      "summary": "冻结 source-exhaustive Map/Lock terminal inventories、CaseKey、SourceBranch、Expected 与 exclusion，并以 exact-set guards 关闭所有 Pending/frontier；只产生 StaticContract N/N、M/M，不开放动态或生产入口。",
+      "status": "proposed",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/distributed-compute/node-plugin-vfs-map-lock-static-denominator-authority.md",
+        "content_hash": "17b5f560a5283a7b10a6a1b64fa739eeeeec88011316386c765a7afbc7685ff0",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "47cb2652321b42cc9689319075d253fe2275ace1",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "239ee88ebb11859dc85f87127955e7eb56a710a4",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "node, security",
+      "tags": [
+        "distributed-compute",
+        "node-plugin",
+        "sqlite-vfs",
+        "a2",
+        "map",
+        "lock",
+        "denominator"
+      ],
+      "task_paths": [
+        "docs/distributed-compute/node-plugin-vfs-fault-acceptance.md",
+        "docs/distributed-compute/node-plugin-vfs-fault-authority.md",
+        "docs/distributed-compute/node-plugin-vfs-map-lock-static-denominator-authority.md",
+        "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases",
+        "server/src/node_agent_managed_fs/sqlite_namespace_shm"
+      ],
+      "dependencies": [
+        "backend-a2b2-joint-close-windows-dynamic-v1"
+      ],
+      "acceptance_criteria": [
+        "旧 18 Map + 10 Lock 仅为 legacy_non_denominator，不得合计或外推；最终 N/M 只由 source-exhaustive frozen keys 机械计数。",
+        "Map 关闭 5 个 Pending graph node 与 TypedMapOperation/RawFallbackCustodyAndRouteProjection 两个 frontier，覆盖六类成功语义和所有失败、cleanup、custody terminal。",
+        "Lock 覆盖四动作、cold initialization、mask/同连接/sibling contention、native success-busy-error、fault phase、route/callback/raw abandon 与 unlock 不初始化规则。",
+        "每个 frozen key 具有唯一非空 SourceBranch、唯一 Expected、terminal disposition 与必要 custody；exclusion 必须有 source-bound reachability/type proof。",
+        "Map/Lock exact guards 对 source terminal 等式、missing/extra/duplicate/unknown、pending/frontier/exclusion 和 legacy widening 全部 fail closed，并通过独立红队审计。",
+        "只晋级 StaticContract=N/N 与 M/M；WindowsDynamic、A2、生产 VFS/open/Connection/Opened/Runtime/Ready 继续不可达。"
+      ],
+      "implementation_evidence": [],
+      "created_at_ms": 1788075290023,
+      "updated_at_ms": 1788075290023
+    },
+    {
       "id": "backend-a2b2-fixture-compile-import-v1",
       "title": "后端 A2b2 fixture 编译导入修复 V1",
       "summary": "修复 elon-pc-node 测试目标中 A2b2 frozen inventory 缺失八种 model 枚举导入造成的 E0432 编译阻塞；只恢复测试 fixture 类型可见性，不改变 117 个静态 case、动态证据计数或生产 VFS 边界。",
@@ -12691,16 +12743,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_cf9baadfb53746b6be207054130389fe",
-      "feature_id": "win-web-ai-rich-content-runtime-guard-v1",
-      "action": "transitioned",
-      "actor": "codex-root",
-      "reason": "运行时 schema/kind/source/payload 门禁和映射/组件双边界降级已实现。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1787449829418
-    },
-    {
       "id": "feature_event_407e5a8c94e24d248dac05f700a41264",
       "feature_id": "win-web-ai-rich-content-runtime-guard-v1",
       "action": "transitioned",
@@ -14689,6 +14731,16 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1788074946193
+    },
+    {
+      "id": "feature_event_bbfdf2d678e444e5b99a2e648e4906de",
+      "feature_id": "backend-a2-map-lock-static-denominator-v1",
+      "action": "registered",
+      "actor": "codex/root",
+      "reason": "",
+      "from_status": "",
+      "to_status": "proposed",
+      "at_ms": 1788075290023
     }
   ]
 }
