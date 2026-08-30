@@ -319,7 +319,7 @@ storage schema, runtime default, network behavior or registry ownership.
 `49/49` proves only the Unmap family. It was not inferred from the SharedNonFinal 11-case candidate
 or four historical physical bridges, and it cannot be converted into `117/117` by denominator
 edits. JointClose was separately accepted at `36/36` on clean evidence commit
-`83ed2a33c3e5e7dcfdecd253d94670eb0a78d71d`; the truthful current aggregate is A2b2 `117/117`, with
+`bfa1a1180d220e9a4c8e39251414fc9a1b0a9ace`; the truthful current aggregate is A2b2 `117/117`, with
 wide `sqlite_vfs_policy` regression `266/266`. A2 remains `implementation_not_dynamically_accepted`
 because the independent Map/Lock denominator and dynamic gate remain unopened; production VFS/open
 is still unavailable.

@@ -385,7 +385,7 @@
       "id": "backend-a2b2-joint-close-windows-dynamic-v1",
       "title": "A2b2 JointClose 36 项 WindowsDynamic 真实验收",
       "summary": "在真实受管 SQLite/Windows test-only 路径上实现 JointClose 36 个冻结 selector 的 raw xClose、SHM lift、main close、registry handoff、canonical payload、进程隔离 runner 与原子 family；只有同一 exact clean commit 的 36/36 才晋级，且不开放生产入口。",
-      "status": "in_progress",
+      "status": "blocked",
       "priority": "p0",
       "requirement": {
         "path": "docs/distributed-compute/node-plugin-vfs-joint-close-dynamic-authority.md",
@@ -429,14 +429,8 @@
         "生产 VFS/open/process owner/Connection/Runtime/Ready 与经济效果保持不可达；JointClose 36/36 只把 A2b2 推到 117/117，Map/Lock denominator 仍须独立闭合。"
       ],
       "implementation_evidence": [],
-      "claim": {
-        "claim_id": "claim_db57b9171ee14ef5b2d4f8c80188b6c5",
-        "agent_id": "codex/root",
-        "claimed_at_ms": 1788073188015,
-        "expires_at_ms": 1788087588015
-      },
       "created_at_ms": 1788045555843,
-      "updated_at_ms": 1788073199018
+      "updated_at_ms": 1788074424036
     },
     {
       "id": "backend-a2b2-unmap-windows-dynamic-v1",
@@ -12488,16 +12482,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_3fdec4e75fd048f29024cadb19f63928",
-      "feature_id": "win-web-ai-private-response-research-fixture-v1",
-      "action": "transitioned",
-      "actor": "codex-root",
-      "reason": "开始实现离线脱敏、结构指纹和合成 fixture 回归。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1787448294243
-    },
-    {
       "id": "feature_event_ef2dc925a3d2443dac1df8194cc6af0e",
       "feature_id": "win-web-ai-private-response-research-fixture-v1",
       "action": "evidence_recorded",
@@ -14486,6 +14470,16 @@
       "from_status": "claimed",
       "to_status": "in_progress",
       "at_ms": 1788073199018
+    },
+    {
+      "id": "feature_event_3779fcf4a01b4ef9b239d247b97570b3",
+      "feature_id": "backend-a2b2-joint-close-windows-dynamic-v1",
+      "action": "transitioned",
+      "actor": "codex/root",
+      "reason": "正式运行通过，先以 blocked 收口变基后 requirement/evidence 身份刷新；提交文档后重新绑定、评审和验收。",
+      "from_status": "in_progress",
+      "to_status": "blocked",
+      "at_ms": 1788074424036
     }
   ]
 }

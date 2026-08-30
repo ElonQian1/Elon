@@ -257,18 +257,18 @@ This feature does not:
 ## 10. Current formal evidence
 
 The full gate passed on exact clean runtime-source commit
-`83ed2a33c3e5e7dcfdecd253d94670eb0a78d71d`:
+`bfa1a1180d220e9a4c8e39251414fc9a1b0a9ace`:
 
 - the isolated family runner produced `36/36`, zero failed/missing/extra/duplicate selectors, and
   one `checkout=clean` family marker;
 - validation fingerprint:
-  `74d27ad6e4f39dc58441d3bfba93b3177ba1a375d4fdd3dfb9b250aa67a8e33d`;
+  `eea57714b0e970062726b044fb24e8e8a02a27c0a6a22204dfc13fa264c3ba3f`;
 - external validation receipt:
-  `18461fa1ae3d03bd255c837adcb710436d754052387c0d1a67496a568ed3b97f`;
-- cohort: `sha256:4ac04eb8bf92a0b6497e8c6e1787325ea035ca08cc6c50b4c624d677633ec956`;
-  family seal: `sha256:5f06ef3d62e52aacee7f29d629ad3f1c1200df2476f9e7f344c41c86affc6b1a`;
+  `1c33cfadd8f0c80383fd8c0165be869a22e17b1f09f3bfae4e5d533ce5f683b6`;
+- cohort: `sha256:c6954ed6eff83342e27125b4c3bab2ca37778358eb25e30fd1cd206611f9ca3f`;
+  family seal: `sha256:b0e6407b25cb2dd4d679fed4c9712bf818d88adec0023fd419723baead158f17`;
 - clean-commit fingerprint:
-  `sha256:a1be5ca9c57c8ea4cac51e58152ef9e41f0dd8197ed8e11c3a94cafdb8d25e3c`;
+  `sha256:e48ad03b8362d4ddde97facd557d88fa125f758d37dae462afbc1be40dc83911`;
 - environment: Windows `10.0.26200`, `x86_64`, fixed NTFS, bundled SQLite `3.45.0`;
 - the same runtime-source commit also passed Unmap `49/49`, managed SHM `11/11`, A2b1 owner
   guards `4/4`, production-target `cargo check`, and the wide `sqlite_vfs_policy` regression

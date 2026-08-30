@@ -23,7 +23,7 @@ the minimum test-only seams required before any Windows dynamic result may be re
 - exact evidence commit: `95d910f0dbc167138f913861efafa20ff11295cc`
 - Barrier validation fingerprint: `193d258f7573209236b8231c5288c4ff165bc793c635cabbbc9a69d1b73ca610`
 - current A2b2 Windows dynamic total: `117/117`; JointClose is separately closed at `36/36`
-- current clean wide-regression commit: `83ed2a33c3e5e7dcfdecd253d94670eb0a78d71d`
+- current clean wide-regression commit: `bfa1a1180d220e9a4c8e39251414fc9a1b0a9ace`
 - current clean wide-regression result: `sqlite_vfs_policy` `266/266`; its exact fingerprint and receipt are maintained by aggregate acceptance
 
 The design text alone is not implementation evidence. The status above is backed by eight unique
@@ -333,7 +333,7 @@ from `8/117` to `16/117`. The later exact commit
 The later clean commit `da62f95b09287b79bc1f4c23780b95993cdd85a0` accepted Unmap `49/49`
 and advanced the then-current aggregate to `81/117` without rewriting Barrier evidence. JointClose
 was subsequently accepted at `36/36` on clean evidence commit
-`83ed2a33c3e5e7dcfdecd253d94670eb0a78d71d`, advancing the current A2b2 aggregate to `117/117`;
+`bfa1a1180d220e9a4c8e39251414fc9a1b0a9ace`, advancing the current A2b2 aggregate to `117/117`;
 the same current commit passed the wide `sqlite_vfs_policy` regression at `266/266`.
 
 The authoritative family state is now:

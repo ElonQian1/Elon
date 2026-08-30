@@ -110,7 +110,7 @@ producer，open-attempt 两态没有行为运行证据，生产 VFS/SQLite/Conne
 RegistrationShutdown 与 RegistryLifecycle 已在各自 exact clean evidence commit 上正式验证；Unmap 又在
 exact clean commit `da62f95b09287b79bc1f4c23780b95993cdd85a0`、Windows 10.0.26200 x86_64、fixed NTFS、
 SQLite 3.45.0 上首次正式 `49/49`。JointClose 随后在 clean evidence commit
-`83ed2a33c3e5e7dcfdecd253d94670eb0a78d71d` 上正式 `36/36`。五个 family 分别为 `8/8`、`8/8`、
+`bfa1a1180d220e9a4c8e39251414fc9a1b0a9ace` 上正式 `36/36`。五个 family 分别为 `8/8`、`8/8`、
 `16/16`、`49/49`、`36/36`，正式 records 均为 `child_exit=0`、`parent_cleanup=deleted`。A2b2 为
 `117/117`，clean wide regression `266/266` 已通过，但 Map/Lock 独立 denominator 与动态验收未闭合，
 不能据此宣称 A2 完成或生产入口可用。
