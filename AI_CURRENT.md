@@ -65,7 +65,7 @@ reviewed_at: 2026-08-30
 - 分布式算力各层成熟度不同，不能统称“开放算力市场已完成”；统一状态见 `docs/distributed-compute/current-implementation-status.md`。
 - 外部矿池：V277/V278 uncompiled/unrun、#13-18 deny、eligible=0；V280 仅 ABI。
 - V279 UserNode Binding：Domain/Store/API/activation 源码已写但未编译/运行，零下游与经济效果；见 `docs/distributed-compute/user-node-provider-binding-authority.md`。
-- UserNode Ready：open-attempt 已编译，guard `4/4`、registry `45/45`；A2 Barrier/RegistrationShutdown=`8/8`、RegistryLifecycle=`16/16`、Unmap=`49/49`，故 A2b2=`81/117`、仅余 JointClose 36，clean wide=`205/205`。Map/Lock denominator 未开放，A2 仍未动态验收；生产 owner/VFS/open/Connection/Runtime/Ready 与四 gap/效果不变。精确证据见 `AI_INDEX.md`。
+- UserNode Ready：open-attempt 已编译、registry `45/45`；A2b1 baseline `5b844566`、evidence `83ed2a33`、guard `4/4`。A2b2 的 Barrier/RegistrationShutdown=`8/8`、RegistryLifecycle=`16/16`、Unmap=`49/49`、JointClose=`36/36`，总计 `117/117`，clean wide=`266/266`。Map/Lock denominator 未开放，A2 未动态验收；生产 owner/VFS/open/Connection/Runtime/Ready 与四 gap/效果不变。见 `AI_INDEX.md`。
 - `capacity_future`：Lease-rooted Store resolver/private-field seal 已写；未登记、未编译/运行、无 API/effect；见 `AI_INDEX.md`。
 
 ## 已接受的产品方向

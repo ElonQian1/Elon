@@ -1,7 +1,8 @@
 ---
 version_status: current
 reviewed_at: 2026-08-30
-implementation_status: accepted_requirement
+implementation_status: implementation_compiled
+verification_status: WindowsDynamic_36_of_36
 authority_scope: node-plugin-vfs-joint-close-windows-dynamic-v1
 ---
 
@@ -9,12 +10,11 @@ authority_scope: node-plugin-vfs-joint-close-windows-dynamic-v1
 
 ## 1. Authority status
 
-This document is the single requirement authority for the A2b2 `JointClose` Windows dynamic
-family. The aggregate A2 contract remains in
+This document is the single requirement and current evidence authority for the A2b2 `JointClose`
+Windows dynamic family. The aggregate A2 contract remains in
 [`node-plugin-vfs-fault-authority.md`](node-plugin-vfs-fault-authority.md), and aggregate acceptance
 remains in [`node-plugin-vfs-fault-acceptance.md`](node-plugin-vfs-fault-acceptance.md). Those pages
-must link here after this family produces current implementation evidence; they do not define a
-second JointClose selector set.
+consume this family's evidence; they do not define a second JointClose selector set.
 
 Current accepted baseline at the start of this feature is:
 
@@ -254,6 +254,28 @@ This feature does not:
 - authorize a production process owner, download, Sidecar, v15 session, or workload execution;
 - treat existing Unmap or RegistryLifecycle records as JointClose records.
 
-Until the full acceptance gate passes, the only lawful status is
-`source_written/uncompiled_unrun/JointClose=0/36/A2b2=81/117`, with production behavior and
-economic effects unchanged.
+## 10. Current formal evidence
+
+The full gate passed on exact clean runtime-source commit
+`83ed2a33c3e5e7dcfdecd253d94670eb0a78d71d`:
+
+- the isolated family runner produced `36/36`, zero failed/missing/extra/duplicate selectors, and
+  one `checkout=clean` family marker;
+- validation fingerprint:
+  `74d27ad6e4f39dc58441d3bfba93b3177ba1a375d4fdd3dfb9b250aa67a8e33d`;
+- external validation receipt:
+  `18461fa1ae3d03bd255c837adcb710436d754052387c0d1a67496a568ed3b97f`;
+- cohort: `sha256:4ac04eb8bf92a0b6497e8c6e1787325ea035ca08cc6c50b4c624d677633ec956`;
+  family seal: `sha256:5f06ef3d62e52aacee7f29d629ad3f1c1200df2476f9e7f344c41c86affc6b1a`;
+- clean-commit fingerprint:
+  `sha256:a1be5ca9c57c8ea4cac51e58152ef9e41f0dd8197ed8e11c3a94cafdb8d25e3c`;
+- environment: Windows `10.0.26200`, `x86_64`, fixed NTFS, bundled SQLite `3.45.0`;
+- the same runtime-source commit also passed Unmap `49/49`, managed SHM `11/11`, A2b1 owner
+  guards `4/4`, production-target `cargo check`, and the wide `sqlite_vfs_policy` regression
+  `266/266`.
+
+JointClose therefore advances atomically to `WindowsDynamic=36/36`, and A2b2 advances from
+`81/117` to `117/117`. This closes A2b2 only. Map/Lock still has no accepted denominator,
+`StaticContract` or `WindowsDynamic` evidence, so A2 remains
+`implementation_not_dynamically_accepted`; production VFS/open and every downstream runtime or
+economic effect remain unavailable pending separately accepted activation work.

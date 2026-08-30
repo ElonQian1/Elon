@@ -19,7 +19,7 @@ verification_status: WindowsDynamic_49_of_49
 - authority: `design_frozen`
 - source: `implementation_compiled / formal_family_source=49/49`
 - evidence: `WindowsDynamic=49/49`
-- 当前 A2b2：`81/117`；剩余 `36`，全部为 JointClose
+- 当前 A2b2：`117/117`；JointClose 已由独立动态族正式闭合为 `36/36`
 - 已接受前序：Barrier `8/8`、RegistrationShutdown `8/8`、RegistryLifecycle `16/16`
 
 静态 `Case`、历史局部测试、编译成功或单条动态运行都不能提升本族。本族已在 exact clean
@@ -318,6 +318,8 @@ storage schema, runtime default, network behavior or registry ownership.
 
 `49/49` proves only the Unmap family. It was not inferred from the SharedNonFinal 11-case candidate
 or four historical physical bridges, and it cannot be converted into `117/117` by denominator
-edits. The truthful current state is `implementation_compiled / WindowsDynamic=49/49`, A2b2 is
-`81/117`, the remaining 36 cases are all JointClose, and A2 remains
-`implementation_not_dynamically_accepted` until its independent completion gates are met.
+edits. JointClose was separately accepted at `36/36` on clean evidence commit
+`83ed2a33c3e5e7dcfdecd253d94670eb0a78d71d`; the truthful current aggregate is A2b2 `117/117`, with
+wide `sqlite_vfs_policy` regression `266/266`. A2 remains `implementation_not_dynamically_accepted`
+because the independent Map/Lock denominator and dynamic gate remain unopened; production VFS/open
+is still unavailable.
