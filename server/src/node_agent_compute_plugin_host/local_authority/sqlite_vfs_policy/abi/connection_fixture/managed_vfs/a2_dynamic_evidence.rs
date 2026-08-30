@@ -9,6 +9,7 @@ mod capture;
 mod child;
 mod cleanup;
 mod environment;
+mod joint_close_family;
 mod record;
 #[cfg(test)]
 mod tests;
@@ -20,6 +21,11 @@ pub(super) use child::{
 };
 pub(super) use cleanup::ValidatedParentCleanupReceipt;
 pub(super) use environment::WindowsDynamicEnvironment;
+pub(super) use joint_close_family::{
+    JointCloseCandidateReportView, JointCloseFamilyCohort, RenderedJointCloseFamilyReport,
+    ValidatedJointCloseCandidateRecord, ValidatedJointCloseCleanCheckoutReceipt,
+    ValidatedJointCloseFamily, ValidatedJointCloseFamilyMemberReceipt,
+};
 pub(super) use record::{
     UnmapCandidateReportView, ValidatedUnmapCandidateRecord, ValidatedWindowsDynamicRecord,
     WindowsDynamicReportView,

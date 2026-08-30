@@ -1,15 +1,18 @@
 use super::super::super::a2b2_cases::{
-    BarrierSelector, RegistrationShutdownSelector, RegistryLifecycleSelector, UnmapSelector,
+    BarrierSelector, JointCloseSelector, RegistrationShutdownSelector, RegistryLifecycleSelector,
+    UnmapSelector,
 };
 
 use super::SanitizedPayloadFamily;
 
 const MAX_ACTUAL_PAYLOAD_BYTES: usize = 1_024;
-const REPORT_VALUE_COUNT: usize = 81;
+const COMMON_REPORT_VALUE_COUNT: usize = 81;
+const JOINT_CLOSE_REPORT_VALUE_COUNT: usize = 83;
 const REGISTRATION_REPORT_VERSION: &str = "a2b2rs1";
 const BARRIER_REPORT_VERSION: &str = "a2b2br1";
 const REGISTRY_LIFECYCLE_REPORT_VERSION: &str = "a2b2rl1";
 const UNMAP_REPORT_VERSION: &str = "a2b2un1";
+const JOINT_CLOSE_REPORT_VERSION: &str = "a2b2jc1";
 
 pub(super) fn validate_actual_payload(
     payload: &str,
@@ -24,31 +27,45 @@ pub(super) fn validate_actual_payload(
     let selector = fields
         .next()
         .ok_or("A2_DYNAMIC_CHILD_ACTUAL_SELECTOR_MISSING")?;
-    let family = match version {
+    let (family, expected_value_count) = match version {
         REGISTRATION_REPORT_VERSION => {
             RegistrationShutdownSelector::from_report_name(selector)
                 .ok_or("A2_DYNAMIC_CHILD_ACTUAL_SELECTOR_INVALID")?;
-            SanitizedPayloadFamily::RegistrationShutdown
+            (
+                SanitizedPayloadFamily::RegistrationShutdown,
+                COMMON_REPORT_VALUE_COUNT,
+            )
         }
         BARRIER_REPORT_VERSION => {
             BarrierSelector::from_report_name(selector)
                 .ok_or("A2_DYNAMIC_CHILD_ACTUAL_SELECTOR_INVALID")?;
-            SanitizedPayloadFamily::Barrier
+            (SanitizedPayloadFamily::Barrier, COMMON_REPORT_VALUE_COUNT)
         }
         REGISTRY_LIFECYCLE_REPORT_VERSION => {
             RegistryLifecycleSelector::from_report_name(selector)
                 .ok_or("A2_DYNAMIC_CHILD_ACTUAL_SELECTOR_INVALID")?;
-            SanitizedPayloadFamily::RegistryLifecycle
+            (
+                SanitizedPayloadFamily::RegistryLifecycle,
+                COMMON_REPORT_VALUE_COUNT,
+            )
         }
         UNMAP_REPORT_VERSION => {
             UnmapSelector::from_report_name(selector)
                 .ok_or("A2_DYNAMIC_CHILD_ACTUAL_SELECTOR_INVALID")?;
-            SanitizedPayloadFamily::Unmap
+            (SanitizedPayloadFamily::Unmap, COMMON_REPORT_VALUE_COUNT)
+        }
+        JOINT_CLOSE_REPORT_VERSION => {
+            JointCloseSelector::from_report_name(selector)
+                .ok_or("A2_DYNAMIC_CHILD_ACTUAL_SELECTOR_INVALID")?;
+            (
+                SanitizedPayloadFamily::JointClose,
+                JOINT_CLOSE_REPORT_VALUE_COUNT,
+            )
         }
         _ => return Err("A2_DYNAMIC_CHILD_ACTUAL_VERSION_INVALID"),
     };
     let values = fields.collect::<Vec<_>>();
-    if values.len() != REPORT_VALUE_COUNT || values.iter().any(|value| !canonical_u64(value)) {
+    if values.len() != expected_value_count || values.iter().any(|value| !canonical_u64(value)) {
         return Err("A2_DYNAMIC_CHILD_ACTUAL_FIELDS_INVALID");
     }
     Ok(family)
