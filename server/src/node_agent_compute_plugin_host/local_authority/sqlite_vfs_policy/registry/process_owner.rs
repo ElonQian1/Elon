@@ -41,6 +41,8 @@ use crate::{
     },
 };
 
+#[cfg(all(test, windows))]
+mod joint_close_fault;
 mod lifecycle;
 #[cfg(all(test, windows))]
 mod test_registry_lifecycle;
@@ -107,6 +109,10 @@ pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy
 {
     OwnerPoisoned,
     Route(ManagedSqliteRegistryRouteRejection),
+    #[cfg(all(test, windows))]
+    RegistryWalMainNativeUncertain,
+    #[cfg(all(test, windows))]
+    CloseCallbackAdmissionRejected,
 }
 
 /// A process-lifetime route table. Construction deliberately leaks the wrapper so a poisoned
@@ -119,6 +125,12 @@ pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy
     nonce_source: NonceSource,
     #[cfg(test)]
     terminal_custody_test_ledger: lifecycle::ManagedSqliteRegistryTerminalCustodyTestLedger,
+    #[cfg(all(test, windows))]
+    joint_close_registry_native_fault:
+        joint_close_fault::ManagedSqliteRegistryWalMainNativeUncertainTestGate,
+    #[cfg(all(test, windows))]
+    joint_close_callback_admission_fault:
+        joint_close_fault::ManagedSqliteRegistryCloseCallbackAdmissionTestGate,
 }
 
 impl<Custody, NonceSource> ManagedSqliteRegistryProcessOwner<Custody, NonceSource>
@@ -135,6 +147,12 @@ where
             #[cfg(test)]
             terminal_custody_test_ledger:
                 lifecycle::ManagedSqliteRegistryTerminalCustodyTestLedger::new(),
+            #[cfg(all(test, windows))]
+            joint_close_registry_native_fault:
+                joint_close_fault::ManagedSqliteRegistryWalMainNativeUncertainTestGate::new(),
+            #[cfg(all(test, windows))]
+            joint_close_callback_admission_fault:
+                joint_close_fault::ManagedSqliteRegistryCloseCallbackAdmissionTestGate::new(),
         }))
     }
 
@@ -252,6 +270,12 @@ where
         ManagedSqliteRegistryRoutedCallbackLease<Custody, NonceSource>,
         ManagedSqliteRegistryProcessRouteRejection,
     > {
+        #[cfg(all(test, windows))]
+        if kind == ManagedSqliteRegistryCallbackKind::Close
+            && self.claim_close_callback_admission_rejection(route)?
+        {
+            return Err(ManagedSqliteRegistryProcessRouteRejection::CloseCallbackAdmissionRejected);
+        }
         let lease = self.apply_route(route, |routes| routes.begin_callback(route, kind))?;
         Ok(ManagedSqliteRegistryRoutedCallbackLease {
             owner: self,
