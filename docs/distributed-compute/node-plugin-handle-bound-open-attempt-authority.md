@@ -1,7 +1,7 @@
 ---
 title: 节点插件 handle-bound authority open attempt V1 权威草案
 status: draft
-reviewed_at: 2026-08-30
+reviewed_at: 2026-08-31
 owners: node, platform
 proposed_feature_id: compute-plugin-handle-bound-open-attempt-v1
 registration_status: unregistered_feature_workflow_unavailable
@@ -78,10 +78,10 @@ proof、live `sqlite3_file` graph、SQLite return/extended-code proof、authoriz
 ## 5. A2 与生产启用门
 
 [`node-plugin-planning-snapshot-authority.md`](node-plugin-planning-snapshot-authority.md) 与
-[`node-plugin-vfs-fault-authority.md`](node-plugin-vfs-fault-authority.md) 的顺序保持不变。A2 当前为
-Barrier 与 Registration 各 `WindowsDynamic=8/8`、RegistryLifecycle `WindowsDynamic=16/16`、Unmap
-`WindowsDynamic=49/49`、JointClose `WindowsDynamic=36/36`、A2b2 `WindowsDynamic=117/117`；clean wide
-regression `266/266` 已通过，但 Map/Lock pending/open frontiers 与独立 denominator 仍未闭合。A2 仍未完成，
+[`node-plugin-vfs-fault-authority.md`](node-plugin-vfs-fault-authority.md) 的顺序保持不变。A2b2 当前为
+Barrier 与 Registration 各 `8/8`、RegistryLifecycle `16/16`、Unmap `49/49`、JointClose `36/36`，合计
+`117/117`。Map/Lock StaticContract 已闭合为 `43476/43476` 与 `8668/8668`；dynamic quotient
+projector/manifests、`Qmap/Qlock` 与逐 class Windows `Q/Q` 仍未完成。A2 仍未完成，
 测试 VFS 不得作为本草案 owner seal 的 producer。
 
 未来只有在 A2 完整动态验收后，才能同批补齐：唯一 production process owner、VFS 注册/注销所有权、
@@ -112,7 +112,8 @@ exact clean commit `da62f95b09287b79bc1f4c23780b95993cdd85a0`、Windows 10.0.262
 SQLite 3.45.0 上首次正式 `49/49`。JointClose 随后在 clean evidence commit
 `bfa1a1180d220e9a4c8e39251414fc9a1b0a9ace` 上正式 `36/36`。五个 family 分别为 `8/8`、`8/8`、
 `16/16`、`49/49`、`36/36`，正式 records 均为 `child_exit=0`、`parent_cleanup=deleted`。A2b2 为
-`117/117`，clean wide regression `266/266` 已通过，但 Map/Lock 独立 denominator 与动态验收未闭合，
+`117/117`。Map/Lock StaticContract 已为 `43476/43476` 与 `8668/8668`，但 dynamic quotient manifests、
+`Qmap/Qlock` 与逐 class Windows `Q/Q` 未闭合，
 不能据此宣称 A2 完成或生产入口可用。
 缺编译期 Git SHA、旧 cache reuse 与 partial failure 均保留为不计数历史。当前工具目录没有
 `project_feature_workflow`，所以

@@ -1,7 +1,7 @@
 ---
 title: 节点插件 Planning Snapshot 本机投影权威
 status: current
-reviewed_at: 2026-08-30
+reviewed_at: 2026-08-31
 owners: node, server
 ---
 
@@ -11,7 +11,7 @@ owners: node, server
 
 本文是节点插件 Planning Snapshot 的本机一致性投影、生产启用顺序和协议换代边界的主权威。SQLite 文件与 VFS 生命周期仍由 [`node-plugin-manifest-catalog-authority.md`](node-plugin-manifest-catalog-authority.md) 维护；本机 schema、Store 和恢复语义仍由 [`node-plugin-local-authority.md`](node-plugin-local-authority.md) 维护；endpoint 会话 currentness 仍由 [`node-endpoint-session-authority.md`](node-endpoint-session-authority.md) 维护。
 
-当前 A1 sealed projector 源码已随完整测试目标编译，但没有专项运行，producer 也仍不可达。A2 总合同已经冻结；A2b2/A2c 所在完整测试目标已可编译，相关 targeted fault matrix 已通过 5 项。A2b1 owner graph 已续绑 source baseline `e3663e109039f38477de4d6ab5cd57483dbd0541`，并在 clean evidence commit `bfa1a1180d220e9a4c8e39251414fc9a1b0a9ace` 保持 guard `4/4`。Barrier、RegistrationShutdown 与 RegistryLifecycle 已分别形成 Windows `8/8`、`8/8`、`16/16` 正式动态记录；Unmap 已在 exact clean commit `da62f95b09287b79bc1f4c23780b95993cdd85a0` 上首次正式形成 `49/49`，JointClose 随后在当前 clean evidence commit 上正式形成 `36/36`，因此 A2b2 的 117 项逐 case `WindowsDynamic` 为 `117/117`，current clean wide regression `266/266` 已通过。Map/Lock 独立 denominator 仍未开放，状态仍只能是 `implementation_not_dynamically_accepted`。精确边界见 [`Unmap authority`](node-plugin-vfs-unmap-dynamic-authority.md)、[`JointClose authority`](node-plugin-vfs-joint-close-dynamic-authority.md)、[`RegistryLifecycle authority`](node-plugin-vfs-registry-lifecycle-dynamic-authority.md)、[`A2 authority`](node-plugin-vfs-fault-authority.md) 与 [`acceptance`](node-plugin-vfs-fault-acceptance.md)。新增 [`handle-bound open attempt`](node-plugin-handle-bound-open-attempt-authority.md) 未登记源码只冻结无生产 owner 的 `RegisteredPending -> OpeningPreConnection` custody/失败拓扑；`elon-pc-node` 已实际编译且 registry 回归 `45/45` 通过，但 typestate runtime、VFS、SQLite、Connection/Opened authority 均未接线或运行。生产 `OpenedComputePluginLocalAuthority` 仍不能成功打开，生产 VFS、process owner/fence、root/currentness、trusted-time、rollback 与 node-profile provider 均未接线，因此不存在可生产的 snapshot custody。所有现有节点继续诚实报告 `context_ready=false`、`snapshot_ready=false`，并保持 Runtime stopped。
+当前 A1 sealed projector 源码已随完整测试目标编译，但没有专项运行，producer 也仍不可达。A2 总合同已经冻结；A2b2/A2c 所在完整测试目标已可编译，相关 targeted fault matrix 已通过 5 项。A2b1 owner graph 已续绑 source baseline `e3663e109039f38477de4d6ab5cd57483dbd0541`，并在 clean evidence commit `bfa1a1180d220e9a4c8e39251414fc9a1b0a9ace` 保持 guard `4/4`。Barrier、RegistrationShutdown 与 RegistryLifecycle 已分别形成 Windows `8/8`、`8/8`、`16/16` 正式动态记录；Unmap 已在 exact clean commit `da62f95b09287b79bc1f4c23780b95993cdd85a0` 上首次正式形成 `49/49`，JointClose 随后在当前 clean evidence commit 上正式形成 `36/36`，因此 A2b2 的 117 项逐 case `WindowsDynamic` 为 `117/117`，current clean wide regression `266/266` 已通过。Map/Lock StaticContract 已为 `43476/43476` 与 `8668/8668`；dynamic quotient/Q/WindowsDynamic 仍未开放，状态仍只能是 `implementation_not_dynamically_accepted`。精确边界见 [`Unmap authority`](node-plugin-vfs-unmap-dynamic-authority.md)、[`JointClose authority`](node-plugin-vfs-joint-close-dynamic-authority.md)、[`RegistryLifecycle authority`](node-plugin-vfs-registry-lifecycle-dynamic-authority.md)、[`A2 authority`](node-plugin-vfs-fault-authority.md) 与 [`acceptance`](node-plugin-vfs-fault-acceptance.md)。新增 [`handle-bound open attempt`](node-plugin-handle-bound-open-attempt-authority.md) 未登记源码只冻结无生产 owner 的 `RegisteredPending -> OpeningPreConnection` custody/失败拓扑；`elon-pc-node` 已实际编译且 registry 回归 `45/45` 通过，但 typestate runtime、VFS、SQLite、Connection/Opened authority 均未接线或运行。生产 `OpenedComputePluginLocalAuthority` 仍不能成功打开，生产 VFS、process owner/fence、root/currentness、trusted-time、rollback 与 node-profile provider 均未接线，因此不存在可生产的 snapshot custody。所有现有节点继续诚实报告 `context_ready=false`、`snapshot_ready=false`，并保持 Runtime stopped。
 
 ## 2. A1 的唯一入口
 
@@ -55,7 +55,7 @@ A1 只允许两类内部结果：
 后续实现必须依次推进，不得跨级接线：
 
 1. A1：先落 sealed、handle-bound、单只读事务 projector 形状；保持生产 open 和所有协议 producer 不可达。
-2. A2 先按 [`authority`](node-plugin-vfs-fault-authority.md) 与 [`acceptance`](node-plugin-vfs-fault-acceptance.md) 完成测试 VFS 的 SHM map/lock/unmap、联合 close 确定性平台故障矩阵和同 namespace 多 Connection custody；A2b2 的 `117/117` 逐 case Windows 动态证据与 wide `266/266` 已完成，但 Map/Lock 独立 denominator、StaticContract 与 WindowsDynamic 仍未完成，因此仍不能进入第 3 步，这些测试证据也不能自动提升为生产入口。
+2. A2 先按 [`authority`](node-plugin-vfs-fault-authority.md) 与 [`acceptance`](node-plugin-vfs-fault-acceptance.md) 完成测试 VFS 的 SHM map/lock/unmap、联合 close 确定性平台故障矩阵和同 namespace 多 Connection custody；A2b2 的 `117/117` 逐 case Windows 动态证据与 wide `266/266` 已完成，Map/Lock StaticContract 已完成为 `43476/43476` 与 `8668/8668`，但 dynamic quotient/Q/WindowsDynamic 仍未完成，因此仍不能进入第 3 步，这些测试证据也不能自动提升为生产入口。
 3. 建立生产 process owner、VFS 注册/注销所有权、live `sqlite3_file`/route、持续 authorizer/PRAGMA 门卫、handle-bound open/close 和 exact root/process fence 生命周期。
 4. 接入生产 root/keyring、trusted-time、rollback 与 node-profile provider；用真实 opened authority 证明 A1 全字段同快照投影及全部 typed blocker。
 5. 另建协议 v15 producer、会话账本和节点接收链；完成版本隔离、兼容失败关闭及动态验收后，才讨论 `snapshot_ready=true`。

@@ -1,7 +1,7 @@
 ---
 title: 节点插件 handle-bound authority open attempt V1 验收草案
 status: draft
-reviewed_at: 2026-08-30
+reviewed_at: 2026-08-31
 owners: node, platform
 proposed_feature_id: compute-plugin-handle-bound-open-attempt-v1
 registration_status: unregistered_feature_workflow_unavailable
@@ -66,8 +66,7 @@ production_acceptance=deferred
 clean commit `95d910f0dbc167138f913861efafa20ff11295cc`；RegistryLifecycle 也绑定同一提交：Windows 10.0.26200 x86_64、fixed NTFS、
 SQLite 3.45.0，三个 family 分别 `8/8`、`8/8`、`16/16`；32 个 family+selector unique receipts 全部精确绑定该
 commit，且均为 `child_exit=0`、`parent_cleanup=deleted`。缺编译期 Git SHA、旧 cache reuse 与 partial
-failure 均是不计数历史。当前正式记录计为 Barrier `8/8`、Registration `8/8`、RegistryLifecycle `16/16`、Unmap `49/49`、JointClose `36/36`、A2b2 `117/117`；clean wide regression `266/266` 已通过，但 Map/Lock 独立 denominator 与动态验收未闭合，A2 仍
-未完成。既有 managed-fs、A1 或 test-only VFS 的其他历史证据不能记为本草案通过数；功能工作流
+failure 均是不计数历史。当前正式记录计为 Barrier `8/8`、Registration `8/8`、RegistryLifecycle `16/16`、Unmap `49/49`、JointClose `36/36`、A2b2 `117/117`。Map/Lock StaticContract 已闭合为 `43476/43476` 与 `8668/8668`；dynamic quotient projector/manifest、`Qmap/Qlock` 与逐 class Windows `Q/Q` 尚未完成，所以 A2 仍未完成。既有 managed-fs、A1 或 test-only VFS 的其他历史证据不能记为本草案通过数；功能工作流
 不可用，注册表保持未修改。
 
 ## 2. Source review 清单
@@ -125,7 +124,7 @@ failure 均是不计数历史。当前正式记录计为 Barrier `8/8`、Registr
 
 ## 5. 晋级门
 
-解除架构阶段禁令后，仍必须完成 A2 的 Map/Lock source inventory/terminal closure、独立 denominator 与全部 WindowsDynamic；A2b2 的 Barrier/Registration 各 `8/8`、RegistryLifecycle `16/16`、Unmap `49/49`、JointClose `36/36`、总计 `117/117` 及 wide `266/266` 已完成，但不替代该独立门。之后再用唯一 production owner 验证正常注册/open/close、entropy/collision、
+解除架构阶段禁令后，仍必须实现 A2 Map/Lock typed dynamic quotient、冻结 exact class/member manifests 并完成逐 class Windows `Qmap/Qmap` 与 `Qlock/Qlock`；静态 source inventory/terminal closure 已为 `43476/43476` 与 `8668/8668`，A2b2=`117/117`，但都不替代该动态门。之后再用唯一 production owner 验证正常注册/open/close、entropy/collision、
 owner poison、logical-name/begin failure、SQLite error/extended code、callback/handle teardown、Connection close
 不确定和 route retirement。只有这些证据与真实 opened-authority producer 同批闭合后，才可修改本页的
 `production_acceptance=deferred`。
