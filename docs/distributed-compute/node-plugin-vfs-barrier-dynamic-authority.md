@@ -22,10 +22,9 @@ the minimum test-only seams required before any Windows dynamic result may be re
 - evidence: `WindowsDynamic=8/8`
 - exact evidence commit: `95d910f0dbc167138f913861efafa20ff11295cc`
 - Barrier validation fingerprint: `193d258f7573209236b8231c5288c4ff165bc793c635cabbbc9a69d1b73ca610`
-- current A2b2 Windows dynamic total: `81/117`; remaining: `36` (all JointClose)
-- current clean wide-regression commit: `da62f95b09287b79bc1f4c23780b95993cdd85a0`
-- current clean wide-regression fingerprint: `1ceaf594efa00061dca18ee61b511e4a8bbb863b6ff431101ceac3512b344698`
-  (`sqlite_vfs_policy` `205/205`)
+- current A2b2 Windows dynamic total: `117/117`; JointClose is separately closed at `36/36`
+- current clean wide-regression commit: `83ed2a33c3e5e7dcfdecd253d94670eb0a78d71d`
+- current clean wide-regression result: `sqlite_vfs_policy` `266/266`; its exact fingerprint and receipt are maintained by aggregate acceptance
 
 The design text alone is not implementation evidence. The status above is backed by eight unique
 process-isolated records from the exact clean evidence commit: Windows 10.0.26200 x86_64, fixed
@@ -332,7 +331,10 @@ from `8/117` to `16/117`. The later exact commit
 `95d910f0dbc167138f913861efafa20ff11295cc` revalidated Barrier `8/8` and RegistrationShutdown
 `8/8`, accepted RegistryLifecycle `16/16`, and advanced that historical aggregate to `32/117`.
 The later clean commit `da62f95b09287b79bc1f4c23780b95993cdd85a0` accepted Unmap `49/49`
-and advanced the current aggregate to `81/117` without rewriting Barrier evidence.
+and advanced the then-current aggregate to `81/117` without rewriting Barrier evidence. JointClose
+was subsequently accepted at `36/36` on clean evidence commit
+`83ed2a33c3e5e7dcfdecd253d94670eb0a78d71d`, advancing the current A2b2 aggregate to `117/117`;
+the same current commit passed the wide `sqlite_vfs_policy` regression at `266/266`.
 
 The authoritative family state is now:
 
@@ -340,6 +342,6 @@ The authoritative family state is now:
 design_frozen / implementation_compiled / WindowsDynamic=8/8
 ```
 
-Barrier remains closed at `8/8`; RegistryLifecycle is separately closed at `16/16`, and Unmap is
-now separately closed at `49/49`. JointClose remains `0/36`, and Map/Lock dynamic admission remains
-unopened; A2 therefore stays `implementation_not_dynamically_accepted` with 36 A2b2 cases remaining.
+Barrier remains closed at `8/8`; RegistryLifecycle, Unmap, and JointClose are separately closed at
+`16/16`, `49/49`, and `36/36`. A2b2 is therefore `117/117`, but Map/Lock dynamic admission remains
+unopened; A2 stays `implementation_not_dynamically_accepted`, and production VFS/open remains unavailable.

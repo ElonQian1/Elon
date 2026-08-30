@@ -20,7 +20,7 @@ event ledger and child/parent evidence chain before implementation is allowed to
 - authority: `design_frozen`
 - source: `implementation_compiled`
 - evidence: `WindowsDynamic=16/16`
-- current A2b2 Windows dynamic total: `81/117`; remaining: `36` (all JointClose)
+- current A2b2 Windows dynamic total: `117/117`; JointClose is separately closed at `36/36`
 - accepted predecessor families: RegistrationShutdown `8/8`, Barrier `8/8`
 
 No selector in this family is accepted merely because its static `Case` exists, a unit test
@@ -280,9 +280,11 @@ design_frozen / implementation_compiled / WindowsDynamic=16/16
 ```
 
 At this family's acceptance point the A2b2 summary advanced from `16/117` to `32/117`, leaving
-`85`. The later Unmap formal family advanced separately to `49/49`, so the current A2b2 summary is
-`81/117` with JointClose `0/36`. Map/Lock dynamic admission remains unopened; A2 therefore still
-remains `implementation_not_dynamically_accepted`.
+`85`. The later Unmap formal family advanced separately to `49/49`, taking the then-current A2b2
+summary to `81/117`. JointClose was subsequently accepted at `36/36` on clean evidence commit
+`83ed2a33c3e5e7dcfdecd253d94670eb0a78d71d`, so the current A2b2 summary is `117/117` and the
+current wide regression is `266/266`. Map/Lock dynamic admission remains unopened; A2 therefore
+still remains `implementation_not_dynamically_accepted`, and production VFS/open remains unavailable.
 
 ## 11. Formal evidence
 
