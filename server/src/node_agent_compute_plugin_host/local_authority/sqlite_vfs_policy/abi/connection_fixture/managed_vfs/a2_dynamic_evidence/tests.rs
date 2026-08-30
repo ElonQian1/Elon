@@ -1,11 +1,11 @@
 use std::{fs, path::PathBuf};
 
 use super::super::a2b2_cases::{
-    validate_unmap_report_payload, UnmapActual, UnmapActualCounts, UnmapActualCustody,
-    UnmapActualIdentity, UnmapActualTarget, UnmapActualTopology, UnmapCallback, UnmapCause,
-    UnmapDmsCustody, UnmapFailureClass, UnmapLogicalRoutePhase, UnmapMode, UnmapNode, UnmapPath,
-    UnmapPhase, UnmapRegistrationPhase, UnmapRegistryRoutePhase, UnmapRole, UnmapSelector,
-    UnmapSqliteOutcome, UnmapTargetScope, UnmapTiming, UnmapTopology,
+    validate_unmap_report_payload, JointCloseSelector, UnmapActual, UnmapActualCounts,
+    UnmapActualCustody, UnmapActualIdentity, UnmapActualTarget, UnmapActualTopology, UnmapCallback,
+    UnmapCause, UnmapDmsCustody, UnmapFailureClass, UnmapLogicalRoutePhase, UnmapMode, UnmapNode,
+    UnmapPath, UnmapPhase, UnmapRegistrationPhase, UnmapRegistryRoutePhase, UnmapRole,
+    UnmapSelector, UnmapSqliteOutcome, UnmapTargetScope, UnmapTiming, UnmapTopology,
 };
 use super::{
     capture::drain_capped_for_test,
@@ -106,6 +106,39 @@ fn child_payload_accepts_every_frozen_unmap_selector() {
         validate_payload_for_test(&payload("a2b2un1", selector.report_name(), 7))
             .expect("accept one allow-listed canonical Unmap payload");
     }
+}
+
+#[test]
+fn child_payload_accepts_exact_joint_close_width_without_widening_other_families() {
+    for selector in JointCloseSelector::ALL {
+        let payload = payload_with_count("a2b2jc1", selector.report_name(), 83);
+        assert_eq!(payload.split(',').count(), 85);
+        validate_payload_for_test(&payload)
+            .expect("accept one allow-listed canonical JointClose payload");
+    }
+
+    for field_count in [81, 82, 84] {
+        assert_eq!(
+            validate_payload_for_test(&payload_with_count(
+                "a2b2jc1",
+                JointCloseSelector::RawStateTakeRejected.report_name(),
+                field_count,
+            )),
+            Err("A2_DYNAMIC_CHILD_ACTUAL_FIELDS_INVALID")
+        );
+    }
+    assert_eq!(
+        validate_payload_for_test(&payload_with_count(
+            "a2b2un1",
+            UnmapSelector::SharedDeleteRequestValidation.report_name(),
+            83,
+        )),
+        Err("A2_DYNAMIC_CHILD_ACTUAL_FIELDS_INVALID")
+    );
+    assert_eq!(
+        validate_payload_for_test(&payload_with_count("a2b2jc1", "unknown-member", 83)),
+        Err("A2_DYNAMIC_CHILD_ACTUAL_SELECTOR_INVALID")
+    );
 }
 
 #[test]
@@ -235,6 +268,10 @@ fn payload(version: &str, selector: &str, registration_id: u64) -> String {
     let mut fields = vec!["0".to_owned(); 81];
     fields[12] = registration_id.to_string();
     format!("{version},{selector},{}", fields.join(","))
+}
+
+fn payload_with_count(version: &str, selector: &str, field_count: usize) -> String {
+    format!("{version},{selector},{}", vec!["0"; field_count].join(","))
 }
 
 fn changed_actual_payload() -> String {

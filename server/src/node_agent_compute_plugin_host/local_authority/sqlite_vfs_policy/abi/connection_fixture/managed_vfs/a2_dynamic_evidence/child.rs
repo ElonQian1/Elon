@@ -20,6 +20,7 @@ pub(super) enum SanitizedPayloadFamily {
     Barrier,
     RegistryLifecycle,
     Unmap,
+    JointClose,
 }
 
 /// Parent-created nonce which must be installed in the child command before spawn.
@@ -447,6 +448,7 @@ fn registration_commitment(
         SanitizedPayloadFamily::Barrier => 2,
         SanitizedPayloadFamily::RegistryLifecycle => 3,
         SanitizedPayloadFamily::Unmap => 4,
+        SanitizedPayloadFamily::JointClose => 5,
     }]);
     hasher.update(registration_id.to_le_bytes());
     RegistrationCommitment(hasher.finalize().into())
