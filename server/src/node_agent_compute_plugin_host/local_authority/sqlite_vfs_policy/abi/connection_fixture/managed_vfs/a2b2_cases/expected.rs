@@ -255,7 +255,16 @@ fn frozen_inventory() -> BTreeSet<CaseKey> {
         (NativeUncertain, Uncertain, 1),
         (After, Mutated, 0),
     ] {
-        add(k(JointClose, Final, Keep, MainLockRelease, timing, class, close).variant(variant));
+        add(k(
+            JointClose,
+            Final,
+            Keep,
+            MainLockRelease,
+            timing,
+            class,
+            close,
+        )
+        .variant(variant));
     }
     for (timing, class) in [
         (Before, Mutated),
@@ -263,7 +272,15 @@ fn frozen_inventory() -> BTreeSet<CaseKey> {
         (NativeUncertain, Uncertain),
         (After, Mutated),
     ] {
-        add(k(JointClose, Final, Keep, MainFileClose, timing, class, close));
+        add(k(
+            JointClose,
+            Final,
+            Keep,
+            MainFileClose,
+            timing,
+            class,
+            close,
+        ));
     }
     add(k(
         JointClose, Final, Keep, Success, Succeeded, NoFailure, close,
