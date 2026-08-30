@@ -1,7 +1,7 @@
 ---
 capability_id: android_chatgpt_realtime_voice_data_channel_transcript_v1
 implementation_status: completed
-verification_status: targeted_tests_passed_device_event_shape_pending
+verification_status: device_private_delta_shape_observed_native_peer_connected_targeted_tests_passed
 production_default: true
 repeat_research: not_required_without_regression
 ---
@@ -17,6 +17,8 @@ Realtime API.
 ## Runtime contract
 
 - Accepts allowlisted user and assistant transcript delta/final event types only.
+- Reconstructs ChatGPT Web's compact `chat_message_delta` state with bounded channel,
+  path, patch, collection, and result limits before extracting message text.
 - Bounded UTF-8 JSON is parsed whether WebRTC marks the frame as text or binary.
 - Requires a bounded event type and stable item or response identifier.
 - Limits each data-channel message to 256 KiB and each transcript stream to 64 KiB.
@@ -50,6 +52,7 @@ and circuit-breaker policy rather than introducing a second transport.
 
 Passed offline:
 
+- compact private message delta add, append, replace, patch, remove, and truncate;
 - current and legacy assistant transcript event parsing;
 - user transcription delta/completed event parsing;
 - malformed, unbound, unrelated, and oversized payload rejection;
@@ -60,7 +63,15 @@ Passed offline:
 - replacement by the authoritative conversation snapshot;
 - structural-only MCP state reporting.
 
-Still pending device evidence: complete one native WebRTC voice turn and confirm that the
-data-channel message count and parsed transcript count advance and that native bubbles
-appear before final conversation reconciliation. Evidence must not contain transcript
+Passed on device without retaining private content or raw payloads:
+
+- the official voice page emitted the private `chat_message_delta` event shape during a
+  fixed synthetic diagnostic turn;
+- the native WebRTC peer connected with remote audio and the official data channel open;
+- the production-default Release build completed after the private delta decoder was wired
+  into the native peer.
+
+Still pending supervised UI evidence: complete one native microphone voice turn and confirm
+that native bubbles appear before final conversation reconciliation. This is a presentation
+acceptance check, not a protocol-shape research prerequisite, and must not record transcript
 text or raw event payloads.

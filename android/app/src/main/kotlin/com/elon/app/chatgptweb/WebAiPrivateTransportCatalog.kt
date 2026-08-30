@@ -185,12 +185,13 @@ internal object WebAiPrivateTransportCatalog {
             id = "android_chatgpt_realtime_voice_data_channel_transcript_v1",
             provider = "chatgpt",
             status = "completed",
-            verification = "targeted_tests_passed_device_event_shape_pending",
+            verification =
+                "device_private_delta_shape_observed_native_peer_connected_targeted_tests_passed",
             productionDefault = true,
             runtimeEnabled = BuildConfig.CHATGPT_PRIVATE_VOICE_NATIVE_RTC_ENABLED,
-            requestMode = "passive_native_webrtc_data_channel_transcript_events",
+            requestMode = "passive_native_webrtc_private_delta_transcript_events",
             healthPolicy =
-                "bounded_utf8_event_parser_deduplicated_in_memory_stream",
+                "bounded_utf8_delta_decoder_deduplicated_in_memory_stream",
             fallback = "private_conversation_refresh_and_official_dom_snapshot",
         ),
         Entry(

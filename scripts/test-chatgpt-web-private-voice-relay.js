@@ -27,7 +27,7 @@ const relayGateway = fs.readFileSync(
 
 assert.match(
   buildGradle,
-  /findProperty\("ELON_CHATGPT_PRIVATE_VOICE_NATIVE_RTC"\)[\s\S]*?\?\.toBoolean\(\) \?: true/
+  /chatGptPrivateVoiceNativeRtcProperty == null[\s\S]*?\? true[\s\S]*?: chatGptPrivateVoiceNativeRtcProperty\.toString\(\)\.toBoolean\(\)/
 );
 assert.doesNotMatch(
   buildGradle,

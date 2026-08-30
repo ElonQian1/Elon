@@ -219,11 +219,11 @@ class WebAiPrivateTransportCatalogTest {
             nativeVoiceTranscript.getString("implementation_status"),
         )
         assertEquals(
-            "targeted_tests_passed_device_event_shape_pending",
+            "device_private_delta_shape_observed_native_peer_connected_targeted_tests_passed",
             nativeVoiceTranscript.getString("verification_status"),
         )
         assertEquals(
-            "bounded_utf8_event_parser_deduplicated_in_memory_stream",
+            "bounded_utf8_delta_decoder_deduplicated_in_memory_stream",
             nativeVoiceTranscript.getString("health_policy"),
         )
         assertTrue(nativeVoiceTranscript.getBoolean("production_default"))

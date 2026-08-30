@@ -120,10 +120,11 @@ def debugAppLabel = signingValue("ELON_DEBUG_APP_LABEL", localNodeName)
 def chatGptPrivateResearchEnabled = project.findProperty("ELON_CHATGPT_PRIVATE_RESEARCH")
     ?.toString()
     ?.toBoolean() ?: false
-def chatGptPrivateVoiceNativeRtcEnabled =
+def chatGptPrivateVoiceNativeRtcProperty =
     project.findProperty("ELON_CHATGPT_PRIVATE_VOICE_NATIVE_RTC")
-        ?.toString()
-        ?.toBoolean() ?: true
+def chatGptPrivateVoiceNativeRtcEnabled = chatGptPrivateVoiceNativeRtcProperty == null
+    ? true
+    : chatGptPrivateVoiceNativeRtcProperty.toString().toBoolean()
 def chatGptPrivateConversationPrefetchEnabled =
     project.findProperty("ELON_CHATGPT_PRIVATE_CONVERSATION_PREFETCH")
         ?.toString()

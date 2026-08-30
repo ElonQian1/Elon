@@ -71,6 +71,7 @@ internal class ChatGptWebNativeVoicePeer(
     private var dataChannelOpen = false
     private var dataChannelMessageCount = 0
     private var transcriptEventCount = 0
+    private val transcriptDecoder = ChatGptWebNativeVoiceTranscriptDecoder()
 
     fun start(hint: ChatGptWebPrivateVoiceDataChannelHint): Boolean {
         if (!BuildConfig.CHATGPT_PRIVATE_VOICE_NATIVE_RTC_ENABLED || !canStart()) return false
@@ -91,6 +92,7 @@ internal class ChatGptWebNativeVoicePeer(
         dataChannelOpen = false
         dataChannelMessageCount = 0
         transcriptEventCount = 0
+        transcriptDecoder.reset()
         update(ChatGptWebNativeVoicePhase.CREATING_OFFER)
         val factory = runCatching { ChatGptWebNativeVoiceRuntime.factory(context) }.getOrNull()
             ?: return fail("native_runtime_unavailable")
@@ -243,7 +245,7 @@ internal class ChatGptWebNativeVoicePeer(
                 ByteArray(data.remaining()).also(data::get).toString(Charsets.UTF_8)
             }
             if (dataChannelMessageCount < Int.MAX_VALUE) dataChannelMessageCount += 1
-            val event = ChatGptWebNativeVoiceTranscriptParser.parse(payload) ?: return
+            val event = transcriptDecoder.decode(payload) ?: return
             if (transcriptEventCount < Int.MAX_VALUE) transcriptEventCount += 1
             emit()
             mainHandler.post {
@@ -341,6 +343,7 @@ internal class ChatGptWebNativeVoicePeer(
         dataChannelOpen = false
         dataChannelMessageCount = 0
         transcriptEventCount = 0
+        transcriptDecoder.reset()
     }
 
     private fun update(next: ChatGptWebNativeVoicePhase) {
