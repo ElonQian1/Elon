@@ -116,7 +116,7 @@ fn validate_unwind_witnesses(steps: &[MapSourceStep]) -> Result<(), &'static str
         "unsafe fn abandon_installed_state",
         &[
             "validate_installed(methods, state)?;",
-            ".record_state_abandon();",
+            "control.record_state_abandon(file.as_ptr().cast());",
             "base.pMethods).write(ptr::null());",
             "drop(Box::from_raw",
         ],
@@ -362,7 +362,7 @@ fn raw_abandon_witness_context() -> SourceAnchor {
     SourceAnchor {
         owner: SourceOwnerId::AbiRawState,
         symbol: "unsafe fn abandon_installed_state",
-        needle: ".record_state_abandon();",
+        needle: "control.record_state_abandon(file.as_ptr().cast());",
         occurrence: 1,
     }
 }

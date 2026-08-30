@@ -223,7 +223,7 @@ pub(in super::super) const STEPS: &[MapSourceStep] = &[
         source_anchor(
             SourceOwnerId::AbiRawState,
             "unsafe fn abandon_installed_state",
-            ".record_state_abandon();",
+            "control.record_state_abandon(file.as_ptr().cast());",
             1,
         ),
     ),
