@@ -313,6 +313,59 @@
       "updated_at_ms": 1786762799336
     },
     {
+      "id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
+      "title": "A2 Map/Lock dynamic quotient authority V1",
+      "summary": "Freeze the typed exact-partition contract that maps every verified Map/Lock static included leaf into one auditable dynamic execution class, derives Qmap/Qlock mechanically, and requires one process-isolated Windows record per frozen class without opening production effects.",
+      "status": "ready",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/distributed-compute/node-plugin-vfs-map-lock-dynamic-quotient-authority.md",
+        "content_hash": "a64cf52ee76efd258ce20f95cb123137b482b33b4c27b1d9b295edbc4ee7b7a6",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "31943fee5f7343e1194255a72805762603b320ca",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "fb4edb435b4652bbfd2bf060c494b7e44d66c5d6",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "node, security",
+      "tags": [
+        "backend",
+        "a2",
+        "vfs",
+        "map",
+        "lock",
+        "dynamic-quotient",
+        "architecture"
+      ],
+      "task_paths": [
+        "docs/distributed-compute/node-plugin-vfs-fault-acceptance.md",
+        "docs/distributed-compute/node-plugin-vfs-fault-authority.md",
+        "docs/distributed-compute/node-plugin-vfs-map-lock-dynamic-quotient-acceptance.md",
+        "docs/distributed-compute/node-plugin-vfs-map-lock-dynamic-quotient-authority.md",
+        "docs/distributed-compute/node-plugin-vfs-map-lock-static-denominator-authority.md",
+        "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2_dynamic_evidence",
+        "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract"
+      ],
+      "dependencies": [
+        "backend-a2-map-lock-static-denominator-v1"
+      ],
+      "acceptance_criteria": [
+        "Projector consumes full typed static records plus co-produced typed terminal descriptors and never classifies by leaf_id or display text.",
+        "Frozen manifests prove one exact disjoint non-empty partition of all 43,476 Map and 8,668 Lock included members; excluded leaves never enter.",
+        "Qmap and Qlock remain unknown until deterministic canonical manifests are generated, reviewed, and bound to static and projector digests.",
+        "Each frozen class later requires exactly one process-isolated Windows record under one exact clean cohort; partial records do not advance acceptance.",
+        "Until quotient and Windows gates pass, no production VFS, Runtime, Ready, dispatch, market, settlement, or funds effects may open."
+      ],
+      "implementation_evidence": [],
+      "created_at_ms": 1788116827147,
+      "updated_at_ms": 1788118559136
+    },
+    {
       "id": "backend-a2-map-lock-static-denominator-v1",
       "title": "A2 Map/Lock 静态分母闭合 V1",
       "summary": "冻结 source-exhaustive Map/Lock terminal inventories、CaseKey、SourceBranch、Expected 与 exclusion，并以 exact-set guards 关闭所有 Pending/frontier；只产生 StaticContract N/N、M/M，不开放动态或生产入口。",
@@ -12874,86 +12927,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_3bc6888a723248f5af818cff87a407e9",
-      "feature_id": "win-local-mode-production-ai-entry-v1",
-      "action": "claimed",
-      "actor": "codex-goal-agent",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1787452658601
-    },
-    {
-      "id": "feature_event_0a0d8b48da554104b81677d7f3686c4e",
-      "feature_id": "win-local-mode-production-ai-entry-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-agent",
-      "reason": "Continue the already validated implementation after requirement hash rebinding.",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1787452682817
-    },
-    {
-      "id": "feature_event_e3c4a3e5110e4251b7d62086482a0503",
-      "feature_id": "win-local-mode-production-ai-entry-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-goal-agent",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1787452722481
-    },
-    {
-      "id": "feature_event_1f33e760b5274736ba59c60bdfa5f729",
-      "feature_id": "win-local-mode-production-ai-entry-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-agent",
-      "reason": "The production AI entry and its regression contracts are implemented.",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1787452750610
-    },
-    {
-      "id": "feature_event_51e77aef952f41bb8de54525570b2eca",
-      "feature_id": "win-local-mode-production-ai-entry-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-agent",
-      "reason": "Targeted navigation tests, full frontend checks, and the complete Win Web AI validation passed.",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1787452770114
-    },
-    {
-      "id": "feature_event_ecc90743324f4f8c9d03c0ac16435bc4",
-      "feature_id": "win-local-mode-production-ai-entry-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-agent",
-      "reason": "Published and activated 0.3.69+34f05dd2ee26fb99857296a233350e7a7b4a4a1e; live Win UI shows four local-mode entries, /ai opens the production ChatGPT/Google page, and the ChatGPT composer becomes ready without a black screen.",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1787454046703
-    },
-    {
-      "id": "feature_event_71d22e76fef447bc861ba8d88fc8892c",
-      "feature_id": "win-update-exact-target-recovery-v1",
-      "action": "registered",
-      "actor": "codex-goal-agent",
-      "reason": "Live acceptance proved the target runtime was active while a repeated cloud update recreated a stale draining checkpoint.",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1787454344519
-    },
-    {
-      "id": "feature_event_1d6e08cf176a4b9db4d875fc555ad2a6",
-      "feature_id": "win-update-exact-target-recovery-v1",
-      "action": "claimed",
-      "actor": "codex-goal-agent",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1787454382094
-    },
-    {
       "id": "feature_event_e8a93c57ab054f4aa6a65d63c7c1fb81",
       "feature_id": "win-update-exact-target-recovery-v1",
       "action": "transitioned",
@@ -14872,6 +14845,86 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1788098999957
+    },
+    {
+      "id": "feature_event_b301ee1374ce4751a3281a87f7b8c1a9",
+      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
+      "action": "registered",
+      "actor": "codex/task-20260831-024900-30912-ef6a7337",
+      "reason": "Replace the stale one-static-case/one-Windows-run contract with a lossless typed quotient that preserves complete static coverage.",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1788116827147
+    },
+    {
+      "id": "feature_event_2e4efdb72eb44f3d9237485ad71a21e9",
+      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
+      "action": "claimed",
+      "actor": "codex/task-20260831-024900-30912-ef6a7337",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788116842800
+    },
+    {
+      "id": "feature_event_c49d9903681f4193ad43f1fe53467b3f",
+      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
+      "action": "transitioned",
+      "actor": "codex/task-20260831-024900-30912-ef6a7337",
+      "reason": "Writing the frozen architecture and acceptance contract, correcting stale aggregate status, and preserving compilation/runtime as not_run.",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788116858738
+    },
+    {
+      "id": "feature_event_fd9f5cc933bb479ea7a86ab3bb9341ab",
+      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
+      "action": "claim_released",
+      "actor": "codex/task-20260831-024900-30912-ef6a7337",
+      "reason": "Architecture-only authority batch is complete; release the implementation claim before rebinding the reviewed requirement and returning the future implementation feature to ready.",
+      "from_status": "in_progress",
+      "to_status": "blocked",
+      "at_ms": 1788118517641
+    },
+    {
+      "id": "feature_event_c0462e68829e4640b171502bc3ca6a17",
+      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
+      "action": "requirement_rebound",
+      "actor": "codex/task-20260831-024900-30912-ef6a7337",
+      "reason": "Bind the final reviewed architecture authority after red-team clarifications on historical verified evidence, class-key uniqueness, and exact projected class count.",
+      "from_status": "blocked",
+      "to_status": "proposed",
+      "at_ms": 1788118526875
+    },
+    {
+      "id": "feature_event_1f565e82dfb34daea80764f7babdd879",
+      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
+      "action": "metadata_updated",
+      "actor": "codex/task-20260831-024900-30912-ef6a7337",
+      "reason": "Apply final registry review: keep the criterion valid for future implementation and include the planned projector and dynamic-evidence implementation roots.",
+      "from_status": "proposed",
+      "to_status": "proposed",
+      "at_ms": 1788118541615
+    },
+    {
+      "id": "feature_event_74d2ae86ab7041338b6b664f33575059",
+      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
+      "action": "transitioned",
+      "actor": "codex/task-20260831-024900-30912-ef6a7337",
+      "reason": "Architecture authority and acceptance contract passed independent consistency, registry, and red-team review; accept the frozen future implementation scope.",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1788118550078
+    },
+    {
+      "id": "feature_event_a11c546bbeaf407cb4b21b3061576168",
+      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
+      "action": "transitioned",
+      "actor": "codex/task-20260831-024900-30912-ef6a7337",
+      "reason": "Return the accepted feature to the shared ready queue without implementation evidence or claim; the next batch may claim the generator/projector work explicitly.",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1788118559136
     }
   ]
 }
