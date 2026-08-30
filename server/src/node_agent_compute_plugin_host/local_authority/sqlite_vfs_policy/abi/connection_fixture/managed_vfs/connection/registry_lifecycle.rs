@@ -45,6 +45,26 @@ impl ManagedTestRegistryLifecycleRouteObserver {
             .registry_lifecycle_trace()
             .map_err(anyhow::Error::msg)
     }
+
+    pub(in super::super) fn registry_wal_main_native_uncertain_claim_count(
+        &self,
+    ) -> anyhow::Result<usize> {
+        self.route
+            .registry_wal_main_native_uncertain_claim_count()
+            .map_err(|()| anyhow!("observe selected JointClose registry-native claim"))
+    }
+
+    pub(in super::super) fn close_callback_admission_claim_count(&self) -> anyhow::Result<usize> {
+        self.route
+            .close_callback_admission_claim_count()
+            .map_err(|()| anyhow!("observe selected JointClose callback-admission claim"))
+    }
+
+    pub(in super::super) fn begin_connection_close_claim_count(&self) -> anyhow::Result<usize> {
+        self.route
+            .begin_connection_close_claim_count()
+            .map_err(|()| anyhow!("observe selected JointClose begin-close claim"))
+    }
 }
 
 impl ManagedTestRegistryLifecycleCloseOutcome {

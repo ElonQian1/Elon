@@ -35,7 +35,10 @@ impl ManagedSqliteWalMainBindFailure {
         (self.failure, self.main)
     }
 }
-use super::super::{ManagedSqliteFileKind, ManagedSqliteMainFileCloseFailure};
+use super::super::{
+    ManagedSqliteFileKind, ManagedSqliteMainFileCloseFailure,
+    ManagedSqliteMainFileCloseFailurePhase,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ManagedSqliteWalMainCloseFailurePhase {
@@ -68,6 +71,42 @@ pub(crate) struct ManagedSqliteWalMainCloseFailure {
     unmap_failure: Option<ManagedSqliteWalMainUnmapFailure>,
     main_failure: Option<ManagedSqliteMainFileCloseFailure>,
     runtime_generation: Option<NonZeroU64>,
+}
+
+#[cfg(all(test, windows))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ManagedSqliteWalMainCloseFailureTestBoundary {
+    Shm {
+        phase: super::types::ManagedSqliteShmFailurePhase,
+        class: ManagedSqliteShmFailureClass,
+    },
+    Main {
+        phase: ManagedSqliteMainFileCloseFailurePhase,
+        outcome_uncertain: bool,
+    },
+}
+
+#[cfg(all(test, windows))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct ManagedSqliteWalMainCloseFailureTestSnapshot {
+    boundary: ManagedSqliteWalMainCloseFailureTestBoundary,
+    main_file_custody: bool,
+    main_lock_owner_custody: bool,
+}
+
+#[cfg(all(test, windows))]
+impl ManagedSqliteWalMainCloseFailureTestSnapshot {
+    pub(crate) fn boundary(self) -> ManagedSqliteWalMainCloseFailureTestBoundary {
+        self.boundary
+    }
+
+    pub(crate) fn main_file_custody(self) -> bool {
+        self.main_file_custody
+    }
+
+    pub(crate) fn main_lock_owner_custody(self) -> bool {
+        self.main_lock_owner_custody
+    }
 }
 
 impl PinnedManagedSqliteWalMainFile {
@@ -121,6 +160,38 @@ impl ManagedSqliteWalMainCloseFailure {
             .main_failure
             .as_ref()
             .is_some_and(ManagedSqliteMainFileCloseFailure::close_outcome_uncertain)
+    }
+
+    #[cfg(all(test, windows))]
+    pub(crate) fn joint_close_test_snapshot(
+        &self,
+    ) -> Option<ManagedSqliteWalMainCloseFailureTestSnapshot> {
+        match self.phase {
+            ManagedSqliteWalMainCloseFailurePhase::ShmUnmap => {
+                let failure = self.unmap_failure.as_ref()?.failure();
+                Some(ManagedSqliteWalMainCloseFailureTestSnapshot {
+                    boundary: ManagedSqliteWalMainCloseFailureTestBoundary::Shm {
+                        phase: failure.phase(),
+                        class: failure.class(),
+                    },
+                    main_file_custody: true,
+                    main_lock_owner_custody: true,
+                })
+            }
+            ManagedSqliteWalMainCloseFailurePhase::MainClose => {
+                let failure = self.main_failure.as_ref()?;
+                let (main_file_custody, main_lock_owner_custody) =
+                    failure.joint_close_test_custody_shape();
+                Some(ManagedSqliteWalMainCloseFailureTestSnapshot {
+                    boundary: ManagedSqliteWalMainCloseFailureTestBoundary::Main {
+                        phase: failure.phase(),
+                        outcome_uncertain: failure.close_outcome_uncertain(),
+                    },
+                    main_file_custody,
+                    main_lock_owner_custody,
+                })
+            }
+        }
     }
 
     pub(crate) fn into_parts(

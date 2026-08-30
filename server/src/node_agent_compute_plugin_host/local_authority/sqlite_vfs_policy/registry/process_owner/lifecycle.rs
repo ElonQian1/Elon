@@ -6,6 +6,8 @@ pub(super) enum ManagedSqliteRegistryTerminalCustodyTestRetentionKind {
     CallbackLease,
     CompletionEvidence,
     WalMainPhysicalCustody,
+    #[cfg(windows)]
+    JointClosePhysicalFailure(ManagedSqliteWalMainCloseFailureTestSnapshot),
     OtherTerminalCustody,
 }
 
@@ -23,6 +25,7 @@ pub(super) enum ManagedSqliteRegistryTerminalCustodyTestEventKind {
         main_lease: bool,
         shm_lease: bool,
         callbacks_in_flight: u32,
+        access_callback_allowed: bool,
     },
 }
 
@@ -55,6 +58,10 @@ pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy
     completion_evidence_retentions: usize,
     wal_main_physical_custody_retentions: usize,
     other_terminal_custody_retentions: usize,
+    #[cfg(windows)]
+    joint_close_physical_failure_retentions: usize,
+    #[cfg(windows)]
+    joint_close_physical_failure: Option<ManagedSqliteWalMainCloseFailureTestSnapshot>,
     explicit_failure_custody_retained_retentions: usize,
     terminal_route_observations: usize,
     terminal_route: Option<ManagedSqliteRegistryTerminalRouteTestSnapshot>,
@@ -65,6 +72,8 @@ pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy
     physical_success_main_lease: bool,
     physical_success_shm_lease: bool,
     physical_success_callbacks_in_flight: u32,
+    physical_success_access_callback_allowed: bool,
+    active_access_callback_allowed: bool,
 }
 
 #[cfg(test)]
@@ -94,6 +103,20 @@ impl ManagedSqliteRegistryTerminalCustodyTestSnapshot {
         self,
     ) -> usize {
         self.other_terminal_custody_retentions
+    }
+
+    #[cfg(windows)]
+    pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy) fn joint_close_physical_failure_retention_count(
+        self,
+    ) -> usize {
+        self.joint_close_physical_failure_retentions
+    }
+
+    #[cfg(windows)]
+    pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy) fn joint_close_physical_failure(
+        self,
+    ) -> Option<ManagedSqliteWalMainCloseFailureTestSnapshot> {
+        self.joint_close_physical_failure
     }
 
     pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy) fn wal_main_physical_custody_retention_count(
@@ -147,6 +170,18 @@ impl ManagedSqliteRegistryTerminalCustodyTestSnapshot {
             self.physical_success_shm_lease,
             self.physical_success_callbacks_in_flight,
         )
+    }
+
+    pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy) fn physical_success_access_callback_allowed(
+        self,
+    ) -> bool {
+        self.physical_success_access_callback_allowed
+    }
+
+    pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy) fn active_access_callback_allowed(
+        self,
+    ) -> bool {
+        self.active_access_callback_allowed
     }
 }
 
@@ -262,6 +297,110 @@ where
         )
     }
 
+    /// Atomically retains the pre-registry WAL-main receipt custody together with the completion
+    /// receipt from the already admitted Close callback, seals its terminal snapshot, and records
+    /// exactly one route removal.
+    #[cfg(all(test, windows))]
+    pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::registry) fn retain_terminal_wal_main_with_callback_completion(
+        &self,
+        route: ManagedSqliteRegistryRouteHandle,
+        physical: (
+            ManagedSqliteWalMainCloseReceipt,
+            ManagedSqliteRegistryFileLease,
+            ManagedSqliteRegistryShmLease,
+        ),
+        callback: ManagedSqliteRegistryCallbackCompletionReceipt,
+    ) -> Result<(), ManagedSqliteRegistryProcessRouteRejection> {
+        let physical_event =
+            |terminal_route| ManagedSqliteRegistryTerminalCustodyTestEventKind::Retention {
+                kind: ManagedSqliteRegistryTerminalCustodyTestRetentionKind::WalMainPhysicalCustody,
+                explicit_failure_custody_retained: true,
+                terminal_route,
+            };
+        let completion_event = ManagedSqliteRegistryTerminalCustodyTestEventKind::Retention {
+            kind: ManagedSqliteRegistryTerminalCustodyTestRetentionKind::CompletionEvidence,
+            explicit_failure_custody_retained: false,
+            terminal_route: None,
+        };
+        let mut custody = Some((physical, callback));
+        let mut routes = match self.lock_routes() {
+            Ok(routes) => routes,
+            Err(rejection) => {
+                let _ = self.record_terminal_custody_test_event(route, physical_event(None));
+                let _ = self.record_terminal_custody_test_event(route, completion_event);
+                let _permanent_joint_close_custody =
+                    Box::leak(Box::new(custody.take().expect("JointClose custody")));
+                return Err(rejection);
+            }
+        };
+        let terminal_route = match routes.prepare_terminal_route_test_snapshot(
+            route,
+            ManagedSqliteRegistryTerminalReason::FailureCustodyRetained,
+        ) {
+            Ok(terminal_route) => terminal_route,
+            Err(rejection) => {
+                let _ = self.record_terminal_custody_test_event(route, physical_event(None));
+                let _ = self.record_terminal_custody_test_event(route, completion_event);
+                let _permanent_joint_close_custody =
+                    Box::leak(Box::new(custody.take().expect("JointClose custody")));
+                return Err(ManagedSqliteRegistryProcessRouteRejection::Route(rejection));
+            }
+        };
+        if let Err(rejection) =
+            self.record_terminal_custody_test_event(route, physical_event(Some(terminal_route)))
+        {
+            let _permanent_joint_close_custody =
+                Box::leak(Box::new(custody.take().expect("JointClose custody")));
+            return Err(rejection);
+        }
+        if let Err(rejection) = self.record_terminal_custody_test_event(route, completion_event) {
+            let _permanent_joint_close_custody =
+                Box::leak(Box::new(custody.take().expect("JointClose custody")));
+            return Err(rejection);
+        }
+        let _permanent_joint_close_custody =
+            Box::leak(Box::new(custody.take().expect("JointClose custody")));
+        routes
+            .quarantine(
+                route,
+                ManagedSqliteRegistryTerminalReason::FailureCustodyRetained,
+            )
+            .map_err(ManagedSqliteRegistryProcessRouteRejection::Route)?;
+        drop(routes);
+        self.record_terminal_custody_test_event(
+            route,
+            ManagedSqliteRegistryTerminalCustodyTestEventKind::RouteRemoved,
+        )
+    }
+
+    #[cfg(all(test, windows))]
+    pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::registry) fn retain_terminal_joint_close_physical_failure(
+        &self,
+        route: ManagedSqliteRegistryRouteHandle,
+        reason: ManagedSqliteRegistryTerminalReason,
+        failure: ManagedSqliteWalMainCloseFailure,
+        main: ManagedSqliteRegistryFileLease,
+        shm: ManagedSqliteRegistryShmLease,
+    ) -> Result<(), ManagedSqliteRegistryProcessRouteRejection> {
+        let Some(shape) = failure.joint_close_test_snapshot() else {
+            return match self.retain_terminal_custody_with_test_kind(
+                route,
+                reason,
+                (failure, main, shm),
+                ManagedSqliteRegistryTerminalCustodyTestRetentionKind::OtherTerminalCustody,
+            ) {
+                Ok(()) => Err(ManagedSqliteRegistryProcessRouteRejection::JointClosePhysicalFailureEvidenceUnavailable),
+                Err(rejection) => Err(rejection),
+            };
+        };
+        self.retain_terminal_custody_with_test_kind(
+            route,
+            reason,
+            (failure, main, shm),
+            ManagedSqliteRegistryTerminalCustodyTestRetentionKind::JointClosePhysicalFailure(shape),
+        )
+    }
+
     /// Retains the exact post-physical-close custody without quarantining or retiring the route.
     /// This boundary is test-only: it models loss of control immediately after the real WAL-main
     /// close receipt while the close callback and registry leases remain live.
@@ -287,6 +426,7 @@ where
             main_lease: snapshot.main_file_lock_owner_lease(),
             shm_lease: snapshot.shm_lease(),
             callbacks_in_flight: snapshot.callbacks_in_flight(),
+            access_callback_allowed: snapshot.access_callback_allowed(),
         };
         if let Err(rejection) = self.record_terminal_custody_test_event(route, event) {
             let _permanent_physical_success_handoff =
@@ -320,11 +460,11 @@ where
         ManagedSqliteRegistryTerminalCustodyTestSnapshot,
         ManagedSqliteRegistryProcessRouteRejection,
     > {
-        let active_route_present = {
+        let (active_route_present, active_access_callback_allowed) = {
             let routes = self.lock_routes()?;
-            match routes.phase(route) {
-                Ok(_) => true,
-                Err(ManagedSqliteRegistryRouteRejection::UnknownOrRetired) => false,
+            match routes.registration_shutdown_test_snapshot(route) {
+                Ok(snapshot) => (true, snapshot.access_callback_allowed()),
+                Err(ManagedSqliteRegistryRouteRejection::UnknownOrRetired) => (false, false),
                 Err(rejection) => {
                     return Err(ManagedSqliteRegistryProcessRouteRejection::Route(rejection));
                 }
@@ -340,6 +480,10 @@ where
             completion_evidence_retentions: 0,
             wal_main_physical_custody_retentions: 0,
             other_terminal_custody_retentions: 0,
+            #[cfg(windows)]
+            joint_close_physical_failure_retentions: 0,
+            #[cfg(windows)]
+            joint_close_physical_failure: None,
             explicit_failure_custody_retained_retentions: 0,
             terminal_route_observations: 0,
             terminal_route: None,
@@ -350,6 +494,8 @@ where
             physical_success_main_lease: false,
             physical_success_shm_lease: false,
             physical_success_callbacks_in_flight: 0,
+            physical_success_access_callback_allowed: false,
+            active_access_callback_allowed,
         };
         for event in events.iter().filter(|event| event.route == route) {
             match event.kind {
@@ -367,6 +513,12 @@ where
                         }
                         ManagedSqliteRegistryTerminalCustodyTestRetentionKind::WalMainPhysicalCustody => {
                             snapshot.wal_main_physical_custody_retentions += 1;
+                        }
+                        #[cfg(windows)]
+                        ManagedSqliteRegistryTerminalCustodyTestRetentionKind::JointClosePhysicalFailure(shape) => {
+                            snapshot.other_terminal_custody_retentions += 1;
+                            snapshot.joint_close_physical_failure_retentions += 1;
+                            snapshot.joint_close_physical_failure = Some(shape);
                         }
                         ManagedSqliteRegistryTerminalCustodyTestRetentionKind::OtherTerminalCustody => {
                             snapshot.other_terminal_custody_retentions += 1;
@@ -388,12 +540,14 @@ where
                     main_lease,
                     shm_lease,
                     callbacks_in_flight,
+                    access_callback_allowed,
                 } => {
                     snapshot.physical_success_handoff_retentions += 1;
                     snapshot.physical_success_route_closing = route_closing;
                     snapshot.physical_success_main_lease = main_lease;
                     snapshot.physical_success_shm_lease = shm_lease;
                     snapshot.physical_success_callbacks_in_flight = callbacks_in_flight;
+                    snapshot.physical_success_access_callback_allowed = access_callback_allowed;
                 }
             }
         }

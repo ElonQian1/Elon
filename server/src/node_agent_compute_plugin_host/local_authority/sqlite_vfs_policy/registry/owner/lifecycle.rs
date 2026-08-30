@@ -69,6 +69,21 @@ impl<Custody: ManagedSqliteRegistryCustody> ManagedSqliteRegistryOwner<Custody> 
             .map_err(ManagedSqliteRegistryRouteRejection::State)
     }
 
+    #[cfg(all(test, windows))]
+    pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::registry) fn close_wal_main_after_direct_xclose(
+        &mut self,
+        handle: ManagedSqliteRegistryRouteHandle,
+        main: &ManagedSqliteRegistryFileLease,
+        shm: &ManagedSqliteRegistryShmLease,
+        main_outcome: &ManagedSqliteRegistryCloseOutcome,
+        shm_outcome: &ManagedSqliteRegistryCloseOutcome,
+    ) -> Result<(), ManagedSqliteRegistryRouteRejection> {
+        self.exact_entry_mut(handle)?
+            .state
+            .close_wal_main_after_direct_xclose(main, shm, main_outcome, shm_outcome)
+            .map_err(ManagedSqliteRegistryRouteRejection::State)
+    }
+
     pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::registry) fn connection_close_failed(
         &mut self,
         handle: ManagedSqliteRegistryRouteHandle,

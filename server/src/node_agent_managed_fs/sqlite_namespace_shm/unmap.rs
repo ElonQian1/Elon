@@ -162,7 +162,13 @@ impl ManagedSqliteShmCoordinator {
                 ManagedSqliteShmFailurePhase::ConnectionDetach,
                 false,
             )?;
+            #[cfg(all(test, windows))]
+            self.begin_test_connection_detach_action(connection_id, false)?;
             self.detach_connection(&mut state, connection_id)?;
+            #[cfg(all(test, windows))]
+            if let Err(failure) = self.finish_test_connection_detach_action(connection_id, true) {
+                return Err(ManagedSqliteShmInnerUnmapFailure::detached(failure));
+            }
             #[cfg(test)]
             if let Some(failure) = self.finish_test_fault(&mut state, detach_fault, true) {
                 return Err(ManagedSqliteShmInnerUnmapFailure::detached(failure));
@@ -310,7 +316,13 @@ impl ManagedSqliteShmCoordinator {
             ManagedSqliteShmFailurePhase::ConnectionDetach,
             prior_unmap_mutation,
         )?;
+        #[cfg(all(test, windows))]
+        self.begin_test_connection_detach_action(connection_id, prior_unmap_mutation)?;
         self.detach_connection(&mut state, connection_id)?;
+        #[cfg(all(test, windows))]
+        if let Err(failure) = self.finish_test_connection_detach_action(connection_id, true) {
+            return Err(ManagedSqliteShmInnerUnmapFailure::detached(failure));
+        }
         #[cfg(test)]
         if let Some(failure) = self.finish_test_fault(&mut state, detach_fault, true) {
             return Err(ManagedSqliteShmInnerUnmapFailure::detached(failure));

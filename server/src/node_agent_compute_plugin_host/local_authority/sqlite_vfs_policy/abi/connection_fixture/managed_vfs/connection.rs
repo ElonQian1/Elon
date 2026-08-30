@@ -20,6 +20,10 @@ pub(super) use registry_lifecycle::{
     ManagedTestRegistryLifecycleCloseOutcome, ManagedTestRegistryLifecycleRouteObserver,
 };
 #[cfg(all(test, windows))]
+mod joint_close;
+#[cfg(all(test, windows))]
+pub(super) use joint_close::ManagedTestCapturedMainCloseCall;
+#[cfg(all(test, windows))]
 mod unmap;
 #[cfg(all(test, windows))]
 pub(super) use unmap::{ManagedTestShmMapCallbackObservation, ManagedTestUnmapCallbackObservation};

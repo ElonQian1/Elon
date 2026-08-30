@@ -42,6 +42,10 @@ mod a2b1_cases;
 #[cfg(test)]
 mod a2b2_cases;
 #[cfg(all(test, windows))]
+mod a2b2_joint_close_cases;
+#[cfg(all(test, windows))]
+mod a2b2_joint_close_runner;
+#[cfg(all(test, windows))]
 mod a2c_barrier_runner;
 #[cfg(all(test, windows))]
 mod a2c_dms_shared_release_runner;
@@ -66,6 +70,8 @@ mod connection;
 #[cfg(test)]
 mod fault_matrix;
 mod fault_script;
+#[cfg(all(test, windows))]
+mod joint_close_harness;
 mod lifecycle_faults;
 #[cfg(all(test, windows))]
 mod live_registration;
@@ -91,6 +97,7 @@ use fault_script::{
     ManagedTestCallbackFaultTiming, ManagedTestFaultingFile, ManagedTestRouteOrdinal,
 };
 use lifecycle_faults::{
+    ManagedTestJointCloseControl, ManagedTestJointCloseControlSnapshot,
     ManagedTestLifecycleFaultBinding, ManagedTestLifecycleFaultController,
     ManagedTestLifecycleFaultObservation, ManagedTestLifecycleFaultPhase,
     ManagedTestLifecycleFaultStep, ManagedTestLifecycleFaultTiming,

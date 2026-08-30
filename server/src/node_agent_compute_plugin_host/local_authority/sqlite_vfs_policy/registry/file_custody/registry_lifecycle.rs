@@ -10,9 +10,12 @@ use crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::r
     owner::{ManagedSqliteRegistryCustody, ManagedSqliteRegistryRouteHandle},
     process_owner::{
         ManagedSqliteRegistryNonceSource, ManagedSqliteRegistryProcessOwner,
-        ManagedSqliteRegistryRoutedCallbackLease,
+        ManagedSqliteRegistryProcessRouteRejection, ManagedSqliteRegistryRoutedCallbackLease,
     },
-    types::{ManagedSqliteRegistryFileLease, ManagedSqliteRegistryShmLease},
+    types::{
+        ManagedSqliteRegistryCallbackCompletionReceipt, ManagedSqliteRegistryFileLease,
+        ManagedSqliteRegistryShmLease, ManagedSqliteRegistryTerminalReason,
+    },
 };
 use crate::node_agent_managed_fs::ManagedSqliteWalMainCloseReceipt;
 
@@ -96,6 +99,90 @@ where
     Ok(())
 }
 
+/// Exact physical receipt custody which must remain on the live Closing route until its already
+/// admitted Close callback has produced a completion receipt. Drop fail-closes if control exits
+/// before the callback result can be paired with this linear custody.
+#[must_use = "deferred WAL-main terminal custody must be explicitly retained"]
+pub(super) struct ManagedSqliteRegistryDeferredWalMainTerminal<Custody, NonceSource>
+where
+    Custody: ManagedSqliteRegistryCustody + 'static,
+    NonceSource: ManagedSqliteRegistryNonceSource + 'static,
+{
+    owner: &'static ManagedSqliteRegistryProcessOwner<Custody, NonceSource>,
+    route: ManagedSqliteRegistryRouteHandle,
+    physical: Option<(
+        ManagedSqliteWalMainCloseReceipt,
+        ManagedSqliteRegistryFileLease,
+        ManagedSqliteRegistryShmLease,
+    )>,
+}
+
+impl<Custody, NonceSource> ManagedSqliteRegistryDeferredWalMainTerminal<Custody, NonceSource>
+where
+    Custody: ManagedSqliteRegistryCustody + 'static,
+    NonceSource: ManagedSqliteRegistryNonceSource + 'static,
+{
+    fn new(
+        owner: &'static ManagedSqliteRegistryProcessOwner<Custody, NonceSource>,
+        route: ManagedSqliteRegistryRouteHandle,
+        receipt: ManagedSqliteWalMainCloseReceipt,
+        main: ManagedSqliteRegistryFileLease,
+        shm: ManagedSqliteRegistryShmLease,
+    ) -> Self {
+        Self {
+            owner,
+            route,
+            physical: Some((receipt, main, shm)),
+        }
+    }
+
+    pub(super) fn retain(mut self) -> Result<(), ManagedSqliteRegistryProcessRouteRejection> {
+        let physical = self.physical.take().expect("deferred WAL-main custody");
+        self.owner.retain_terminal_wal_main_physical_custody(
+            self.route,
+            ManagedSqliteRegistryTerminalReason::FailureCustodyRetained,
+            physical,
+        )
+    }
+
+    pub(super) fn retain_with_callback_completion(
+        mut self,
+        callback: ManagedSqliteRegistryCallbackCompletionReceipt,
+    ) -> Result<(), ManagedSqliteRegistryProcessRouteRejection> {
+        let physical = self.physical.take().expect("deferred WAL-main custody");
+        self.owner
+            .retain_terminal_wal_main_with_callback_completion(self.route, physical, callback)
+    }
+}
+
+impl<Custody, NonceSource> Drop
+    for ManagedSqliteRegistryDeferredWalMainTerminal<Custody, NonceSource>
+where
+    Custody: ManagedSqliteRegistryCustody + 'static,
+    NonceSource: ManagedSqliteRegistryNonceSource + 'static,
+{
+    fn drop(&mut self) {
+        if let Some(physical) = self.physical.take() {
+            let _ = self.owner.retain_terminal_wal_main_physical_custody(
+                self.route,
+                ManagedSqliteRegistryTerminalReason::FailureCustodyRetained,
+                physical,
+            );
+        }
+    }
+}
+
+pub(super) enum ManagedSqliteRegistryWalMainAfterPhysicalFailure<Custody, NonceSource>
+where
+    Custody: ManagedSqliteRegistryCustody + 'static,
+    NonceSource: ManagedSqliteRegistryNonceSource + 'static,
+{
+    Rejected(ManagedSqliteRegistryPinnedFileCloseRejection),
+    CompleteCallbackBeforeTerminal(
+        ManagedSqliteRegistryDeferredWalMainTerminal<Custody, NonceSource>,
+    ),
+}
+
 #[allow(clippy::too_many_arguments)]
 pub(super) fn close_wal_main_after_physical<Custody, NonceSource>(
     owner: &'static ManagedSqliteRegistryProcessOwner<Custody, NonceSource>,
@@ -104,7 +191,7 @@ pub(super) fn close_wal_main_after_physical<Custody, NonceSource>(
     receipt: ManagedSqliteWalMainCloseReceipt,
     main: ManagedSqliteRegistryFileLease,
     shm: ManagedSqliteRegistryShmLease,
-) -> Result<(), ManagedSqliteRegistryPinnedFileCloseRejection>
+) -> Result<(), ManagedSqliteRegistryWalMainAfterPhysicalFailure<Custody, NonceSource>>
 where
     Custody: ManagedSqliteRegistryCustody + 'static,
     NonceSource: ManagedSqliteRegistryNonceSource + 'static,
@@ -118,19 +205,20 @@ where
             crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::registry::types::ManagedSqliteRegistryTerminalReason::FailureCustodyRetained,
             (receipt, main, shm),
         );
-        return Err(error);
+        return Err(ManagedSqliteRegistryWalMainAfterPhysicalFailure::Rejected(
+            error,
+        ));
     }
     if faults.is_some_and(|faults| {
         faults
             .before(ManagedSqliteRegistryCloseLifecyclePhase::RegistryWalMainClose)
             .unwrap_or(true)
     }) {
-        let _ = owner.retain_terminal_wal_main_physical_custody(
-            route,
-            crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::registry::types::ManagedSqliteRegistryTerminalReason::FailureCustodyRetained,
-            (receipt, main, shm),
+        return Err(
+            ManagedSqliteRegistryWalMainAfterPhysicalFailure::CompleteCallbackBeforeTerminal(
+                ManagedSqliteRegistryDeferredWalMainTerminal::new(owner, route, receipt, main, shm),
+            ),
         );
-        return Err(ManagedSqliteRegistryPinnedFileCloseRejection::InjectedLifecycle);
     }
     if let Err(error) = observe(
         faults,
@@ -141,29 +229,62 @@ where
             crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::registry::types::ManagedSqliteRegistryTerminalReason::FailureCustodyRetained,
             (receipt, main, shm),
         );
-        return Err(error);
+        return Err(ManagedSqliteRegistryWalMainAfterPhysicalFailure::Rejected(
+            error,
+        ));
     }
-    match owner.close_wal_main(route, main, shm, receipt) {
+    let arm_native = faults
+        .map(|faults| faults.claim_registry_wal_main_native_uncertain())
+        .transpose();
+    match arm_native {
+        Ok(Some(true)) => {
+            if owner.arm_registry_wal_main_native_uncertain(route).is_err() {
+                let _ = owner.retain_terminal_wal_main_physical_custody(
+                    route,
+                    crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::registry::types::ManagedSqliteRegistryTerminalReason::FailureCustodyRetained,
+                    (receipt, main, shm),
+                );
+                return Err(ManagedSqliteRegistryWalMainAfterPhysicalFailure::Rejected(
+                    ManagedSqliteRegistryPinnedFileCloseRejection::InjectedLifecycle,
+                ));
+            }
+        }
+        Ok(Some(false) | None) => {}
+        Err(()) => {
+            let _ = owner.retain_terminal_wal_main_physical_custody(
+                route,
+                crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::registry::types::ManagedSqliteRegistryTerminalReason::FailureCustodyRetained,
+                (receipt, main, shm),
+            );
+            return Err(ManagedSqliteRegistryWalMainAfterPhysicalFailure::Rejected(
+                ManagedSqliteRegistryPinnedFileCloseRejection::InjectedLifecycle,
+            ));
+        }
+    }
+    match owner.close_wal_main_after_direct_xclose(route, main, shm, receipt) {
         Err(rejection) => {
             if let Some(faults) = faults {
                 faults
                     .native_failure(ManagedSqliteRegistryCloseLifecyclePhase::RegistryWalMainClose);
             }
-            Err(ManagedSqliteRegistryPinnedFileCloseRejection::Registry(
-                rejection,
+            Err(ManagedSqliteRegistryWalMainAfterPhysicalFailure::Rejected(
+                ManagedSqliteRegistryPinnedFileCloseRejection::Registry(rejection),
             ))
         }
         Ok(()) => {
             observe(
                 faults,
                 ManagedSqliteRegistryLifecycleStage::RegistryWalMainCloseSucceeded,
-            )?;
+            )
+            .map_err(ManagedSqliteRegistryWalMainAfterPhysicalFailure::Rejected)?;
             if faults.is_some_and(|faults| {
                 faults
                     .after_success(ManagedSqliteRegistryCloseLifecyclePhase::RegistryWalMainClose)
                     .unwrap_or(true)
             }) {
-                Err(ManagedSqliteRegistryPinnedFileCloseRejection::InjectedLifecycle)
+                Err(ManagedSqliteRegistryWalMainAfterPhysicalFailure::Rejected(
+                    ManagedSqliteRegistryPinnedFileCloseRejection::InjectedLifecycle,
+                ))
             } else {
                 Ok(())
             }

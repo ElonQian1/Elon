@@ -1,29 +1,20 @@
-//! Exact-allocation, test-only control for retaining a successfully taken xClose state.
-
-use std::mem::ManuallyDrop;
+//! Exact-allocation, test-only control for rejecting xClose before typed state take.
 
 use rusqlite::ffi;
 
-use super::{
-    super::file_state::HandleBoundSqliteFileState,
-    close_witness::HandleBoundSqliteAbiRawCloseWitness,
-};
+use super::close_witness::HandleBoundSqliteAbiRawCloseWitness;
 
 enum RawStateTakeRejectionState {
     Observing,
     Armed,
-    Retained {
-        // This is deliberate process-lifetime custody. Dropping the control must never run the
-        // file state's Drop after raw slots were cleared without completing physical xClose.
-        _state: ManuallyDrop<Box<HandleBoundSqliteFileState>>,
-    },
+    Rejected,
 }
 
 /// Sidecar owned by one exact live SQLite file allocation.
 ///
 /// The raw allocation stores the sole Box pointer. Ordinary close/abandonment clears and drops it;
-/// the armed rejection path instead keeps this typed owner beside the allocation that the caller
-/// must retain for process lifetime. No process-global selector or address registry is involved.
+/// the armed rejection path leaves the original typed state and methods installed while the
+/// caller retains the owning allocation for process lifetime. No global selector is involved.
 pub(super) struct HandleBoundSqliteAbiRawCloseControl {
     allocation: usize,
     witness: HandleBoundSqliteAbiRawCloseWitness,
@@ -96,24 +87,19 @@ impl HandleBoundSqliteAbiRawCloseControl {
         }
     }
 
-    pub(super) fn retain_taken_state_if_armed(
-        &mut self,
-        file: *mut ffi::sqlite3_file,
-        state: Box<HandleBoundSqliteFileState>,
-    ) -> Option<Box<HandleBoundSqliteFileState>> {
-        if !self.matches_allocation(file)
-            || !matches!(self.state, RawStateTakeRejectionState::Armed)
-        {
-            return Some(state);
+    pub(super) fn rejects_state_take(&mut self, file: *mut ffi::sqlite3_file) -> bool {
+        if !self.matches_allocation(file) {
+            return false;
         }
-        self.witness.record_state_close_custody_retention();
-        self.state = RawStateTakeRejectionState::Retained {
-            _state: ManuallyDrop::new(state),
-        };
-        None
-    }
-
-    pub(super) fn retains_process_lifetime_custody(&self) -> bool {
-        matches!(self.state, RawStateTakeRejectionState::Retained { .. })
+        match self.state {
+            RawStateTakeRejectionState::Observing => false,
+            RawStateTakeRejectionState::Armed => {
+                // Consume the selected one-shot. The terminal state keeps subsequent saved-callback
+                // retries fail-closed without claiming the selected fault a second time.
+                self.state = RawStateTakeRejectionState::Rejected;
+                true
+            }
+            RawStateTakeRejectionState::Rejected => true,
+        }
     }
 }

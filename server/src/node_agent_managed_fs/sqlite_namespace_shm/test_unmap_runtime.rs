@@ -2,12 +2,15 @@
 
 #[path = "test_unmap_runtime/authority.rs"]
 mod authority;
+#[path = "test_unmap_runtime/detach.rs"]
+mod detach;
 #[path = "test_unmap_runtime/native.rs"]
 mod native;
 #[path = "test_unmap_runtime/prestate.rs"]
 mod prestate;
 
 pub(crate) use authority::ManagedSqliteShmTestUnmapDeleteAuthorityReceipt;
+pub(crate) use detach::ManagedSqliteShmTestConnectionDetachReceipt;
 pub(crate) use native::{
     ManagedSqliteShmTestUnmapNativeObservation, ManagedSqliteShmTestUnmapNativeOperation,
     ManagedSqliteShmTestUnmapNativeReceipt, ManagedSqliteShmTestUnmapNativeTiming,
@@ -21,6 +24,7 @@ use super::{
     types::{ManagedSqliteShmFailure, ManagedSqliteShmFailurePhase},
     ManagedSqliteDeleteOutcome,
 };
+use detach::ManagedSqliteShmTestConnectionDetachControl;
 use native::ManagedSqliteShmTestUnmapNativeControl;
 use prestate::ManagedSqliteShmTestUnmapDeletePrestateControl;
 
@@ -43,6 +47,7 @@ pub(crate) struct ManagedSqliteShmTestUnmapActionEvent {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ManagedSqliteShmTestUnmapReceipt {
     pub(crate) actions: Vec<ManagedSqliteShmTestUnmapActionEvent>,
+    pub(crate) connection_detach: ManagedSqliteShmTestConnectionDetachReceipt,
     pub(crate) native: Option<ManagedSqliteShmTestUnmapNativeReceipt>,
     pub(crate) prestate: Option<ManagedSqliteShmTestUnmapDeletePrestateReceipt>,
     pub(crate) delete_outcome: Option<ManagedSqliteDeleteOutcome>,
@@ -56,6 +61,7 @@ pub(in crate::node_agent_managed_fs::sqlite_namespace::shm) struct ManagedSqlite
 {
     target: Option<ExactTarget>,
     actions: Vec<ManagedSqliteShmTestUnmapActionEvent>,
+    connection_detach: ManagedSqliteShmTestConnectionDetachControl,
     native: ManagedSqliteShmTestUnmapNativeControl,
     prestate: ManagedSqliteShmTestUnmapDeletePrestateControl,
     delete_outcome: Option<ManagedSqliteDeleteOutcome>,
@@ -126,6 +132,18 @@ impl ManagedSqliteShmTestUnmapController {
             ordinal,
         });
         Ok(())
+    }
+
+    pub(super) fn record_connection_detach(
+        &mut self,
+        target: ExactTarget,
+        outcome: ManagedSqliteShmTestUnmapActionOutcome,
+    ) -> Result<(), &'static str> {
+        if self.target != Some(target) {
+            return Ok(());
+        }
+        self.require_live_target(target)?;
+        self.connection_detach.record(outcome)
     }
 
     pub(super) fn select_native(
@@ -254,6 +272,7 @@ impl ManagedSqliteShmTestUnmapController {
     fn copy_receipt(&self) -> ManagedSqliteShmTestUnmapReceipt {
         ManagedSqliteShmTestUnmapReceipt {
             actions: self.actions.clone(),
+            connection_detach: self.connection_detach.receipt(),
             native: self.native.receipt(),
             prestate: self.prestate.receipt(),
             delete_outcome: self.delete_outcome,
@@ -292,6 +311,54 @@ impl ManagedSqliteShmCoordinator {
                 self.test_unmap_runtime_failure(
                     ManagedSqliteShmFailurePhase::DeleteAuthorization,
                     false,
+                )
+            })
+    }
+
+    pub(super) fn begin_test_connection_detach_action(
+        &self,
+        connection_id: u64,
+        known_mutation: bool,
+    ) -> Result<(), ManagedSqliteShmFailure> {
+        self.record_test_connection_detach_action(
+            connection_id,
+            ManagedSqliteShmTestUnmapActionOutcome::Attempt,
+            known_mutation,
+        )
+    }
+
+    pub(super) fn finish_test_connection_detach_action(
+        &self,
+        connection_id: u64,
+        known_mutation: bool,
+    ) -> Result<(), ManagedSqliteShmFailure> {
+        self.record_test_connection_detach_action(
+            connection_id,
+            ManagedSqliteShmTestUnmapActionOutcome::Success,
+            known_mutation,
+        )
+    }
+
+    fn record_test_connection_detach_action(
+        &self,
+        connection_id: u64,
+        outcome: ManagedSqliteShmTestUnmapActionOutcome,
+        known_mutation: bool,
+    ) -> Result<(), ManagedSqliteShmFailure> {
+        let target = (self.generation.get(), connection_id);
+        self.test_unmap_runtime
+            .lock()
+            .map_err(|_| {
+                self.test_unmap_runtime_failure(
+                    ManagedSqliteShmFailurePhase::ConnectionDetach,
+                    known_mutation,
+                )
+            })?
+            .record_connection_detach(target, outcome)
+            .map_err(|_| {
+                self.test_unmap_runtime_failure(
+                    ManagedSqliteShmFailurePhase::ConnectionDetach,
+                    known_mutation,
                 )
             })
     }

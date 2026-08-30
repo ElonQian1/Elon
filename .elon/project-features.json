@@ -430,13 +430,13 @@
       ],
       "implementation_evidence": [],
       "claim": {
-        "claim_id": "claim_490cb5e5cc414f3dadf87294f2717c4c",
+        "claim_id": "claim_7c7bae078e8b44a48a6a5f16c128caf1",
         "agent_id": "/root",
-        "claimed_at_ms": 1788047569848,
-        "expires_at_ms": 1788061969848
+        "claimed_at_ms": 1788060622108,
+        "expires_at_ms": 1788075022108
       },
       "created_at_ms": 1788045555843,
-      "updated_at_ms": 1788047583504
+      "updated_at_ms": 1788060663597
     },
     {
       "id": "backend-a2b2-unmap-windows-dynamic-v1",
@@ -12488,36 +12488,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_5426be6b667a41edb6317808ba0fbc98",
-      "feature_id": "win-google-ai-source-rail-narrative-pruning-v3",
-      "action": "evidence_recorded",
-      "actor": "codex-root",
-      "reason": "",
-      "from_status": "implemented",
-      "to_status": "implemented",
-      "at_ms": 1787442734199
-    },
-    {
-      "id": "feature_event_6fb0be3c51f040efb3dc3c319539c8b2",
-      "feature_id": "win-google-ai-source-rail-narrative-pruning-v3",
-      "action": "evidence_recorded",
-      "actor": "codex-root",
-      "reason": "",
-      "from_status": "implemented",
-      "to_status": "implemented",
-      "at_ms": 1787443311448
-    },
-    {
-      "id": "feature_event_b2f1ca85f01e44a99ae99785c9f499b3",
-      "feature_id": "win-google-ai-source-rail-narrative-pruning-v3",
-      "action": "evidence_recorded",
-      "actor": "codex-root",
-      "reason": "",
-      "from_status": "implemented",
-      "to_status": "implemented",
-      "at_ms": 1787445888489
-    },
-    {
       "id": "feature_event_0184e20dc16c4baa9daab17b8fe63768",
       "feature_id": "win-google-ai-source-rail-narrative-pruning-v3",
       "action": "transitioned",
@@ -14486,6 +14456,36 @@
       "from_status": "claimed",
       "to_status": "in_progress",
       "at_ms": 1788047583504
+    },
+    {
+      "id": "feature_event_3cc98d15a9fe4a70ac1943c949c10c40",
+      "feature_id": "backend-a2b2-joint-close-windows-dynamic-v1",
+      "action": "claim_released",
+      "actor": "/root",
+      "reason": "Extend the same bounded implementation window for exact Windows dynamic verification; scope unchanged.",
+      "from_status": "in_progress",
+      "to_status": "ready",
+      "at_ms": 1788060490259
+    },
+    {
+      "id": "feature_event_9253f13d1db04990805a2d4389775297",
+      "feature_id": "backend-a2b2-joint-close-windows-dynamic-v1",
+      "action": "claimed",
+      "actor": "/root",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788060622108
+    },
+    {
+      "id": "feature_event_110f74f334524cc196cccc101fed4dbd",
+      "feature_id": "backend-a2b2-joint-close-windows-dynamic-v1",
+      "action": "transitioned",
+      "actor": "/root",
+      "reason": "Continue exact Windows dynamic implementation and verification under the same frozen scope.",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788060663597
     }
   ]
 }

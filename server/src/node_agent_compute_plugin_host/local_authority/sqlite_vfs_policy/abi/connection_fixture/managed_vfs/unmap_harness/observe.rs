@@ -16,7 +16,9 @@ use crate::{
         registry::ManagedSqliteRegistryUnmapRuntimeEvent, ManagedSqliteLogicalFileRole,
     },
     node_agent_managed_fs::{
-        ManagedSqliteShmFailureClass, ManagedSqliteShmTriggeredTestFaultObservation,
+        ManagedSqliteShmFailureClass, ManagedSqliteShmFailurePhase,
+        ManagedSqliteShmTestUnmapActionEvent, ManagedSqliteShmTestUnmapActionOutcome,
+        ManagedSqliteShmTestUnmapReceipt, ManagedSqliteShmTriggeredTestFaultObservation,
     },
 };
 
@@ -28,6 +30,7 @@ pub(super) struct UnmapEventSet<'a> {
     pub(super) callback_observations: &'a [ManagedTestCallbackFaultObservation],
     pub(super) lifecycle_observations: &'a [ManagedTestLifecycleFaultObservation],
     pub(super) runtime_trace: &'a [ManagedSqliteRegistryUnmapRuntimeEvent],
+    pub(super) low_level: &'a ManagedSqliteShmTestUnmapReceipt,
     pub(super) shm_trigger: Option<ManagedSqliteShmTriggeredTestFaultObservation>,
     pub(super) callback_pending: usize,
     pub(super) lifecycle_pending: usize,
@@ -91,11 +94,12 @@ pub(super) fn classify_and_count(
         classify_completion_or_success(&events)?
     };
 
-    validate_runtime_trace(&events)?;
+    let detach = validate_low_level_receipt(outcome, events.low_level)?;
+    validate_runtime_trace(&events, detach)?;
     validate_result_and_physical(outcome, &events)?;
     validate_terminal_custody(outcome, &events)?;
     validate_sibling_usability(outcome, events.sibling_sql_usable)?;
-    Ok((outcome, counts_from_events(outcome, &events)?))
+    Ok((outcome, counts_from_events(&events, detach)?))
 }
 
 fn validate_raw_slots(raw: ManagedTestUnmapCallbackObservation) -> anyhow::Result<()> {
@@ -165,7 +169,7 @@ fn validate_initial_lock_masks(pre: ManagedTestUnmapRouteObservation) -> anyhow:
     Ok(())
 }
 
-fn validate_runtime_trace(events: &UnmapEventSet<'_>) -> anyhow::Result<()> {
+fn validate_runtime_trace(events: &UnmapEventSet<'_>, detach: (u8, u8)) -> anyhow::Result<()> {
     use ManagedSqliteRegistryUnmapRuntimeEvent as E;
 
     let mut expected = Vec::with_capacity(6);
@@ -173,7 +177,7 @@ fn validate_runtime_trace(events: &UnmapEventSet<'_>) -> anyhow::Result<()> {
         expected.push(E::CallbackBeginAttempt);
         if !admission_was_preterminal(events) {
             expected.push(E::CallbackBeginSuccess);
-            if events.pre.physical.target_attached && !events.post.physical.target_attached {
+            if detach == (1, 1) {
                 expected.push(E::SelectedActionAttempt);
                 expected.push(E::SelectedActionSuccess);
             }
@@ -191,6 +195,54 @@ fn validate_runtime_trace(events: &UnmapEventSet<'_>) -> anyhow::Result<()> {
         ));
     }
     Ok(())
+}
+
+fn validate_low_level_receipt(
+    outcome: ObservedSharedUnmapOutcome,
+    receipt: &ManagedSqliteShmTestUnmapReceipt,
+) -> anyhow::Result<(u8, u8)> {
+    if !receipt.finished
+        || receipt.pending != 0
+        || !receipt.actions.is_empty()
+        || receipt.native.is_some()
+        || receipt.prestate.is_some()
+        || receipt.delete_outcome.is_some()
+        || receipt.delete_authority.is_some()
+    {
+        return Err(anyhow!(
+            "SharedNonFinal Unmap low-level receipt escaped its exact authority"
+        ));
+    }
+    let pair = [
+        detach_event(ManagedSqliteShmTestUnmapActionOutcome::Attempt),
+        detach_event(ManagedSqliteShmTestUnmapActionOutcome::Success),
+    ];
+    let expected = if outcome.action_succeeded() {
+        pair.as_slice()
+    } else {
+        &[]
+    };
+    if receipt.connection_detach.events.as_slice() != expected {
+        return Err(anyhow!(
+            "SharedNonFinal Unmap source-bound connection-detach receipt is not exact"
+        ));
+    }
+    let observed = if outcome.action_succeeded() {
+        (1, 1)
+    } else {
+        (0, 0)
+    };
+    Ok(observed)
+}
+
+fn detach_event(
+    outcome: ManagedSqliteShmTestUnmapActionOutcome,
+) -> ManagedSqliteShmTestUnmapActionEvent {
+    ManagedSqliteShmTestUnmapActionEvent {
+        phase: ManagedSqliteShmFailurePhase::ConnectionDetach,
+        outcome,
+        ordinal: 1,
+    }
 }
 
 fn classify_completion_or_success(
@@ -360,8 +412,8 @@ fn validate_sibling_usability(
 }
 
 fn counts_from_events(
-    _outcome: ObservedSharedUnmapOutcome,
     events: &UnmapEventSet<'_>,
+    detach: (u8, u8),
 ) -> anyhow::Result<UnmapActualCounts> {
     use ManagedSqliteRegistryUnmapRuntimeEvent as E;
 
@@ -370,8 +422,6 @@ fn counts_from_events(
         runtime_count(events.runtime_trace, E::CallbackCompletionAttempt)?;
     let callback_complete_success =
         runtime_count(events.runtime_trace, E::CallbackCompletionSuccess)?;
-    let selected_action_attempt = runtime_count(events.runtime_trace, E::SelectedActionAttempt)?;
-    let selected_action_success = runtime_count(events.runtime_trace, E::SelectedActionSuccess)?;
     let fault_events = events
         .callback_observations
         .len()
@@ -383,9 +433,9 @@ fn counts_from_events(
         callback_begin,
         callback_complete_attempt,
         callback_complete_success,
-        selected_action_attempt,
-        selected_action_success,
-        shm_detach: selected_action_success,
+        selected_action_attempt: detach.0,
+        selected_action_success: detach.1,
+        shm_detach: detach.1,
         fault_observe: checked_u8(fault_events, "Unmap observed fault count")?,
         fault_trigger: checked_u8(fault_events, "Unmap triggered fault count")?,
         fault_pending: checked_u8(

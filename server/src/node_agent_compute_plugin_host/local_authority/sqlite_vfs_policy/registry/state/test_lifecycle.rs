@@ -5,13 +5,69 @@ use crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::r
 
 impl ManagedSqliteRegistrySessionState {
     #[cfg(all(test, windows))]
-    pub(super) fn allows_connection_observation_sidecar_shape(&self) -> bool {
+    pub(super) fn allows_test_sidecar_after_main_close_shape(&self) -> bool {
+        let exact_retained_sidecar = {
+            let mut sidecars = self.sidecar_leases.iter().flatten();
+            let first = sidecars.next();
+            let only_one = sidecars.next().is_none();
+            only_one
+                && matches!(
+                    (first.map(|record| record.role), self.callbacks_in_flight),
+                    (Some(ManagedSqliteLogicalFileRole::Journal), 0)
+                        | (Some(ManagedSqliteLogicalFileRole::Wal), 0 | 1)
+                )
+        };
         self.phase == ManagedSqliteRegistrySessionPhase::Closing
             && self.connection_owner
             && self.main_was_claimed
             && self.main_lease.is_none()
             && self.shm_lease.is_none()
-            && self.callbacks_in_flight == 0
+            && exact_retained_sidecar
+    }
+
+    /// Consumes the exact main/SHM registry proofs produced by a real main `xClose`. This preserves
+    /// the ordinary zero-sidecar transition and additionally admits exactly one WAL sidecar when
+    /// the retained JointClose allocation cannot Drop. Production never admits that out-of-order
+    /// shape; only the already admitted Close callback may finish before terminal custody removal.
+    #[cfg(all(test, windows))]
+    pub(in super::super) fn close_wal_main_after_direct_xclose(
+        &mut self,
+        main: &ManagedSqliteRegistryFileLease,
+        shm: &ManagedSqliteRegistryShmLease,
+        main_outcome: &ManagedSqliteRegistryCloseOutcome,
+        shm_outcome: &ManagedSqliteRegistryCloseOutcome,
+    ) -> Result<(), ManagedSqliteRegistryTransitionRejection> {
+        self.ensure_shape()?;
+        self.ensure_matching_session(main.session_id)?;
+        self.ensure_matching_session(shm.session_id)?;
+        let admitted_sidecar_shape = {
+            let mut sidecars = self.sidecar_leases.iter().flatten();
+            match (sidecars.next(), sidecars.next()) {
+                (None, None) => true,
+                (Some(record), None) => record.role == ManagedSqliteLogicalFileRole::Wal,
+                _ => false,
+            }
+        };
+        let exact_main = self.main_lease.is_some_and(|record| {
+            record.ordinal == main.ordinal && record.role == ManagedSqliteLogicalFileRole::Main
+        });
+        if self.phase != ManagedSqliteRegistrySessionPhase::Closing
+            || !self.connection_owner
+            || !self.main_was_claimed
+            || self.callbacks_in_flight != 1
+            || !admitted_sidecar_shape
+            || !exact_main
+            || self.shm_lease != Some(shm.ordinal)
+        {
+            self.enter_terminal(ManagedSqliteRegistryTerminalReason::StateInvariantViolated);
+            return Err(ManagedSqliteRegistryTransitionRejection::StateInvariantViolated);
+        }
+        self.validate_close_outcome(shm_outcome, shm.ordinal)?;
+        self.validate_close_outcome(main_outcome, main.ordinal)?;
+        self.shm_lease = None;
+        self.main_lease = None;
+        debug_assert!(self.shape_is_valid());
+        Ok(())
     }
 
     #[cfg(all(test, windows))]

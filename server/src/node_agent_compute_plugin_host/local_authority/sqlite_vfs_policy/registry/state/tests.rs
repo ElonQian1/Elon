@@ -96,6 +96,75 @@ fn full_lifecycle_closes_every_exact_lease_before_retirement() {
     assert!(receipt.main_was_claimed());
 }
 
+#[cfg(windows)]
+#[test]
+fn direct_xclose_registry_consumes_main_and_shm_without_sidecar() {
+    let mut session = pending_session();
+    session.begin_open_attempt().expect("begin open");
+    let main = session.claim_main().expect("claim main");
+    session.activate_connection().expect("activate");
+    let shm = session.claim_shm().expect("claim shm");
+    session.begin_connection_close().expect("begin close");
+    let callback = session
+        .begin_callback(ManagedSqliteRegistryCallbackKind::Close)
+        .expect("admit exact close callback");
+
+    session
+        .close_wal_main_after_direct_xclose(
+            &main,
+            &shm,
+            &close_proof(&main),
+            &close_shm_proof(&shm),
+        )
+        .expect("consume zero-sidecar direct-xClose proofs");
+
+    assert!(session.main_lease.is_none());
+    assert!(session.shm_lease.is_none());
+    assert_eq!(session.sidecar_leases.iter().flatten().count(), 0);
+    assert_eq!(session.callbacks_in_flight, 1);
+    session
+        .finish_callback_with_receipt(&callback)
+        .expect("complete already admitted close callback");
+    assert!(session.shape_is_valid());
+    assert_eq!(session.callbacks_in_flight, 0);
+}
+
+#[cfg(windows)]
+#[test]
+fn direct_xclose_registry_consumes_main_and_shm_with_one_retained_wal_sidecar() {
+    let mut session = pending_session();
+    session.begin_open_attempt().expect("begin open");
+    let main = session.claim_main().expect("claim main");
+    let _wal = session
+        .claim_sidecar(ManagedSqliteLogicalFileRole::Wal)
+        .expect("claim WAL sidecar");
+    session.activate_connection().expect("activate");
+    let shm = session.claim_shm().expect("claim shm");
+    session.begin_connection_close().expect("begin close");
+    let callback = session
+        .begin_callback(ManagedSqliteRegistryCallbackKind::Close)
+        .expect("admit exact close callback");
+
+    session
+        .close_wal_main_after_direct_xclose(
+            &main,
+            &shm,
+            &close_proof(&main),
+            &close_shm_proof(&shm),
+        )
+        .expect("consume direct-xClose main and SHM proofs");
+
+    assert!(session.main_lease.is_none());
+    assert!(session.shm_lease.is_none());
+    assert_eq!(session.sidecar_leases.iter().flatten().count(), 1);
+    assert_eq!(session.callbacks_in_flight, 1);
+    session
+        .finish_callback_with_receipt(&callback)
+        .expect("complete already admitted close callback");
+    assert!(session.shape_is_valid());
+    assert_eq!(session.callbacks_in_flight, 0);
+}
+
 #[test]
 fn route_identity_mismatch_enters_permanent_terminal_quarantine() {
     let mut session = pending_session();

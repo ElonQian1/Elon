@@ -27,6 +27,11 @@ mod unmap;
 pub(super) use unmap::ManagedTestUnmapCompletionFault;
 
 #[cfg(all(test, windows))]
+mod joint_close;
+#[cfg(all(test, windows))]
+pub(super) use joint_close::{ManagedTestJointCloseControl, ManagedTestJointCloseControlSnapshot};
+
+#[cfg(all(test, windows))]
 mod registration_shutdown;
 #[cfg(all(test, windows))]
 use registration_shutdown::ManagedTestRegistrationShutdownQuarantineState;
@@ -128,6 +133,8 @@ struct ManagedTestLifecycleFaultState {
     unmap_runtime_routes: Vec<ManagedTestRouteOrdinal>,
     retirements: HashMap<ManagedTestRouteOrdinal, ManagedSqliteRegistryRetirementReceipt>,
     registry_lifecycle: ManagedTestRegistryLifecycleState,
+    #[cfg(all(test, windows))]
+    joint_close: joint_close::ManagedTestJointCloseState,
     installed: bool,
     #[cfg(all(test, windows))]
     registration_shutdown_quarantine: ManagedTestRegistrationShutdownQuarantineState,
@@ -149,6 +156,8 @@ impl ManagedTestLifecycleFaultController {
                 unmap_runtime_routes: Vec::new(),
                 retirements: HashMap::new(),
                 registry_lifecycle: ManagedTestRegistryLifecycleState::default(),
+                #[cfg(all(test, windows))]
+                joint_close: joint_close::ManagedTestJointCloseState::default(),
                 installed: false,
                 #[cfg(all(test, windows))]
                 registration_shutdown_quarantine:
@@ -373,6 +382,25 @@ impl ManagedSqliteMainCloseTestFaults for ManagedTestLifecycleFaultBinding {
     fn native_failure(&self, phase: ManagedSqliteMainCloseTestFaultPhase) {
         self.controller
             .native_failure(Some(self.route), main_close_phase(phase));
+    }
+
+    #[cfg(windows)]
+    fn claim_test_native(
+        &self,
+        phase: ManagedSqliteMainCloseTestFaultPhase,
+    ) -> Result<Option<crate::node_agent_managed_fs::ManagedSqliteMainCloseTestNativeRequest>, ()>
+    {
+        self.controller
+            .claim_joint_close_main_native(self.route, phase)
+    }
+
+    #[cfg(windows)]
+    fn observe_test_native(
+        &self,
+        evidence: crate::node_agent_managed_fs::ManagedSqliteMainCloseTestNativeEvidence,
+    ) -> Result<(), ()> {
+        self.controller
+            .observe_joint_close_main_native(self.route, evidence)
     }
 }
 

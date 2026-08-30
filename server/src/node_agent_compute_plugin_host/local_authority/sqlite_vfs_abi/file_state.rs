@@ -366,16 +366,16 @@ pub(super) unsafe fn close(file: *mut ffi::sqlite3_file, fallback: c_int) -> c_i
     }));
     let state = match state {
         Ok(Ok(state)) => state,
+        #[cfg(all(test, windows))]
+        Ok(Err(raw_state::RawSqliteFileStateRejection::TestStateTakeRejected)) => {
+            // The allocation-bound test seam rejected before state take and before pMethods was
+            // cleared. Its retained owning Connection must not be abandoned or physically closed.
+            return fallback;
+        }
         Ok(Err(_)) | Err(_) => {
             unsafe { abandon_without_unwind(file) };
             return fallback;
         }
-    };
-    #[cfg(all(test, windows))]
-    // SAFETY: the same xClose invocation retains exclusive access after typed take cleared the raw
-    // slots. An armed exact-allocation control takes explicit custody and suppresses physical close.
-    let Some(state) = (unsafe { raw_state::retain_test_raw_close_state_if_armed(file, state) }) else {
-        return fallback;
     };
     #[cfg(all(test, windows))]
     // SAFETY: physical close is about to consume the exact taken state on the ordinary path.

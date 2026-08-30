@@ -37,6 +37,9 @@ fn exercise_shared_unmap(root: &Path, selected: UnmapSelector) -> anyhow::Result
         .route(SELECTED)?
         .installed_shm_fault_witness()
         .map_err(anyhow::Error::msg)?;
+    target_binding
+        .begin_unmap_action_observation()
+        .map_err(anyhow::Error::msg)?;
     let callback_baseline = fixture
         .callback_fault_observations()
         .map_err(anyhow::Error::msg)?;
@@ -81,6 +84,9 @@ fn exercise_shared_unmap(root: &Path, selected: UnmapSelector) -> anyhow::Result
         .strip_prefix(lifecycle_baseline.as_slice())
         .context("Unmap lifecycle observation baseline changed")?;
     let runtime_trace = fixture.finish_unmap_runtime_observation(SELECTED)?;
+    let low_level = target_binding
+        .finish_unmap_test_receipt()
+        .map_err(anyhow::Error::msg)?;
     let shm_trigger = target_binding
         .triggered_observation(ManagedSqliteShmFailurePhase::ConnectionDetach, 1)
         .map_err(anyhow::Error::msg)?;
@@ -101,6 +107,7 @@ fn exercise_shared_unmap(root: &Path, selected: UnmapSelector) -> anyhow::Result
         callback_observations,
         lifecycle_observations,
         runtime_trace: runtime_trace.as_slice(),
+        low_level: &low_level,
         shm_trigger,
         callback_pending: fixture
             .pending_callback_fault_count()

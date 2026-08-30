@@ -37,6 +37,12 @@ pub(super) fn validate_and_count(
             "final Unmap action ledger disagrees with the selected real boundary"
         ));
     }
+    let detach = validate_connection_detach(selector, receipt)?;
+    if detach != (outer_attempt, outer_success) {
+        return Err(anyhow!(
+            "final Unmap outer detach trace disagrees with its source-bound receipt"
+        ));
+    }
     validate_native(selector, receipt)?;
     validate_prestate(selector, receipt)?;
     validate_delete_outcome(selector, receipt)?;
@@ -49,9 +55,42 @@ pub(super) fn validate_and_count(
         return count_actions(&receipt.actions, Some(phase));
     }
     if is_detach_or_completion(selector) {
-        return Ok((outer_attempt, outer_success));
+        return Ok(detach);
     }
     Ok((0, 0))
+}
+
+fn validate_connection_detach(
+    selector: UnmapSelector,
+    receipt: &ManagedSqliteShmTestUnmapReceipt,
+) -> anyhow::Result<(u8, u8)> {
+    use UnmapSelector as S;
+
+    let expected_success = super::outcome::is_success(selector)
+        || matches!(
+            selector,
+            S::FinalKeepDetachAfterKnown
+                | S::FinalKeepDetachAfterUncertain
+                | S::FinalKeepCompletionNativeUncertain
+                | S::FinalDeleteDetachAfterKnown
+                | S::FinalDeleteDetachAfterUncertain
+                | S::FinalDeleteCompletionNativeUncertain
+        );
+    let pair = [
+        event(Phase::ConnectionDetach, Action::Attempt),
+        event(Phase::ConnectionDetach, Action::Success),
+    ];
+    let expected = if expected_success {
+        pair.as_slice()
+    } else {
+        &[]
+    };
+    if receipt.connection_detach.events.as_slice() != expected {
+        return Err(anyhow!(
+            "final Unmap source-bound connection-detach receipt is not exact"
+        ));
+    }
+    Ok(if expected_success { (1, 1) } else { (0, 0) })
 }
 
 fn expected_actions(selector: UnmapSelector) -> Vec<Event> {

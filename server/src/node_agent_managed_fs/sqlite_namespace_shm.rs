@@ -144,6 +144,10 @@ pub(crate) use close::{
     ManagedSqliteWalMainBindFailure, ManagedSqliteWalMainCloseFailure,
     ManagedSqliteWalMainCloseFailurePhase, ManagedSqliteWalMainCloseReceipt,
 };
+#[cfg(all(test, windows))]
+pub(crate) use close::{
+    ManagedSqliteWalMainCloseFailureTestBoundary, ManagedSqliteWalMainCloseFailureTestSnapshot,
+};
 pub(crate) use coordinator::{
     PinnedManagedSqliteShmConnection, PinnedManagedSqliteWalMainFile, PinnedManagedSqliteWalRuntime,
 };
@@ -161,11 +165,12 @@ pub(crate) use test_snapshot::{
 };
 #[cfg(all(test, windows))]
 pub(crate) use test_unmap_runtime::{
-    ManagedSqliteShmTestUnmapActionEvent, ManagedSqliteShmTestUnmapActionOutcome,
-    ManagedSqliteShmTestUnmapDeleteAuthorityReceipt, ManagedSqliteShmTestUnmapDeletePrestate,
-    ManagedSqliteShmTestUnmapDeletePrestateReceipt, ManagedSqliteShmTestUnmapNativeObservation,
-    ManagedSqliteShmTestUnmapNativeOperation, ManagedSqliteShmTestUnmapNativeReceipt,
-    ManagedSqliteShmTestUnmapNativeTiming, ManagedSqliteShmTestUnmapReceipt,
+    ManagedSqliteShmTestConnectionDetachReceipt, ManagedSqliteShmTestUnmapActionEvent,
+    ManagedSqliteShmTestUnmapActionOutcome, ManagedSqliteShmTestUnmapDeleteAuthorityReceipt,
+    ManagedSqliteShmTestUnmapDeletePrestate, ManagedSqliteShmTestUnmapDeletePrestateReceipt,
+    ManagedSqliteShmTestUnmapNativeObservation, ManagedSqliteShmTestUnmapNativeOperation,
+    ManagedSqliteShmTestUnmapNativeReceipt, ManagedSqliteShmTestUnmapNativeTiming,
+    ManagedSqliteShmTestUnmapReceipt,
 };
 pub(crate) use types::{
     ManagedSqliteShmBudget, ManagedSqliteShmFailure, ManagedSqliteShmFailureClass,

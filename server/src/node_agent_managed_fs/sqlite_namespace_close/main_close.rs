@@ -363,6 +363,19 @@ impl ManagedSqliteMainFileCloseFailure {
     }
 
     #[cfg(all(test, windows))]
+    pub(crate) fn joint_close_test_custody_shape(&self) -> (bool, bool) {
+        let main_file = self.main.is_some()
+            || self.terminal_main_file.is_some()
+            || self.file_failure.is_some()
+            || self._completed_unlock_main.is_some();
+        let lock_owner = self.main.is_some()
+            || self.terminal_owner.is_some()
+            || self.live_owner.is_some()
+            || self._completed_unlock_main.is_some();
+        (main_file, lock_owner)
+    }
+
+    #[cfg(all(test, windows))]
     pub(crate) fn test_protocol_failure(
         &self,
     ) -> Option<ManagedSqliteMainCloseTestProtocolFailure> {

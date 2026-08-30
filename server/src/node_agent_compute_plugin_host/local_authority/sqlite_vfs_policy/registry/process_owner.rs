@@ -27,6 +27,10 @@ use super::{
         ManagedSqliteRegistryWalMainCloseProofs,
     },
 };
+#[cfg(all(test, windows))]
+use crate::node_agent_managed_fs::{
+    ManagedSqliteWalMainCloseFailure, ManagedSqliteWalMainCloseFailureTestSnapshot,
+};
 use crate::{
     node_agent_compute_plugin_host::local_authority::{
         sqlite_vfs_policy::{
@@ -41,6 +45,8 @@ use crate::{
     },
 };
 
+#[cfg(all(test, windows))]
+mod joint_close_direct_xclose;
 #[cfg(all(test, windows))]
 mod joint_close_fault;
 mod lifecycle;
@@ -113,6 +119,10 @@ pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy
     RegistryWalMainNativeUncertain,
     #[cfg(all(test, windows))]
     CloseCallbackAdmissionRejected,
+    #[cfg(all(test, windows))]
+    BeginConnectionCloseRejected,
+    #[cfg(all(test, windows))]
+    JointClosePhysicalFailureEvidenceUnavailable,
 }
 
 /// A process-lifetime route table. Construction deliberately leaks the wrapper so a poisoned
@@ -131,6 +141,9 @@ pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy
     #[cfg(all(test, windows))]
     joint_close_callback_admission_fault:
         joint_close_fault::ManagedSqliteRegistryCloseCallbackAdmissionTestGate,
+    #[cfg(all(test, windows))]
+    joint_close_begin_connection_close_fault:
+        joint_close_fault::ManagedSqliteRegistryBeginConnectionCloseTestGate,
 }
 
 impl<Custody, NonceSource> ManagedSqliteRegistryProcessOwner<Custody, NonceSource>
@@ -153,6 +166,9 @@ where
             #[cfg(all(test, windows))]
             joint_close_callback_admission_fault:
                 joint_close_fault::ManagedSqliteRegistryCloseCallbackAdmissionTestGate::new(),
+            #[cfg(all(test, windows))]
+            joint_close_begin_connection_close_fault:
+                joint_close_fault::ManagedSqliteRegistryBeginConnectionCloseTestGate::new(),
         }))
     }
 
@@ -259,6 +275,10 @@ where
         &self,
         route: ManagedSqliteRegistryRouteHandle,
     ) -> Result<(), ManagedSqliteRegistryProcessRouteRejection> {
+        #[cfg(all(test, windows))]
+        if self.claim_begin_connection_close_rejection(route)? {
+            return Err(ManagedSqliteRegistryProcessRouteRejection::BeginConnectionCloseRejected);
+        }
         self.apply_route(route, |routes| routes.begin_connection_close(route))
     }
 
