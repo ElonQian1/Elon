@@ -13,6 +13,8 @@ mod dynamic_barrier;
 #[cfg(windows)]
 mod dynamic_dms_shared_release;
 #[cfg(windows)]
+mod dynamic_joint_close;
+#[cfg(windows)]
 mod dynamic_mapping_close;
 #[cfg(windows)]
 mod dynamic_registration;
@@ -45,6 +47,17 @@ pub(super) use dynamic_barrier::{
 #[cfg(windows)]
 pub(super) use dynamic_dms_shared_release::{
     validate_dms_shared_release_after_success_physical_subset, DmsSharedReleasePhysicalSubsetActual,
+};
+#[cfg(windows)]
+pub(super) use dynamic_joint_close::{
+    validate_joint_close_report_payload, JointCloseActual, JointCloseActualCounts,
+    JointCloseActualCustody, JointCloseActualIdentity, JointCloseActualTarget,
+    JointCloseActualTopology, JointCloseCallback, JointCloseCause, JointCloseDmsCustody,
+    JointCloseFailureClass, JointCloseLogicalRoutePhase, JointCloseMainLockOffsetClass,
+    JointCloseMainLockPrestate, JointCloseMode, JointCloseNode, JointClosePath, JointClosePhase,
+    JointCloseRegistrationPhase, JointCloseRegistryRoutePhase, JointCloseRole, JointCloseSelector,
+    JointCloseSqliteOutcome, JointCloseTargetScope, JointCloseTiming, JointCloseTopology,
+    ValidatedJointCloseObservation, ValidatedJointCloseReportPayload,
 };
 #[cfg(windows)]
 pub(super) use dynamic_mapping_close::{
