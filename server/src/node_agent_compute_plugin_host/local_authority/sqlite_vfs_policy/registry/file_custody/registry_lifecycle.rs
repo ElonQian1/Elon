@@ -113,7 +113,11 @@ where
         faults,
         ManagedSqliteRegistryLifecycleStage::PhysicalCloseSucceeded,
     ) {
-        let _retained = Box::leak(Box::new((receipt, main, shm)));
+        let _ = owner.retain_terminal_wal_main_physical_custody(
+            route,
+            crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::registry::types::ManagedSqliteRegistryTerminalReason::FailureCustodyRetained,
+            (receipt, main, shm),
+        );
         return Err(error);
     }
     if faults.is_some_and(|faults| {
@@ -121,14 +125,22 @@ where
             .before(ManagedSqliteRegistryCloseLifecyclePhase::RegistryWalMainClose)
             .unwrap_or(true)
     }) {
-        let _retained = Box::leak(Box::new((receipt, main, shm)));
+        let _ = owner.retain_terminal_wal_main_physical_custody(
+            route,
+            crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::registry::types::ManagedSqliteRegistryTerminalReason::FailureCustodyRetained,
+            (receipt, main, shm),
+        );
         return Err(ManagedSqliteRegistryPinnedFileCloseRejection::InjectedLifecycle);
     }
     if let Err(error) = observe(
         faults,
         ManagedSqliteRegistryLifecycleStage::RegistryWalMainCloseAttempt,
     ) {
-        let _retained = Box::leak(Box::new((receipt, main, shm)));
+        let _ = owner.retain_terminal_wal_main_physical_custody(
+            route,
+            crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::registry::types::ManagedSqliteRegistryTerminalReason::FailureCustodyRetained,
+            (receipt, main, shm),
+        );
         return Err(error);
     }
     match owner.close_wal_main(route, main, shm, receipt) {
