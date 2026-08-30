@@ -30,13 +30,16 @@ const {
 const chatgpt = provider('chatgpt', [
   'snapshot', 'send_prompt', 'stop_generation', 'list_conversations',
   'open_conversation', 'invoke_ui_control',
+  'list_model_options', 'collect_model_options', 'select_model_option',
+  'list_composer_tools', 'collect_composer_tools', 'select_composer_tool',
+  'list_navigation', 'collect_navigation', 'select_navigation',
 ])
 const google = provider('google-ai-mode', [
   'snapshot', 'send_prompt', 'list_conversations', 'open_conversation',
 ])
 
 const chatCapabilities = localAiPrivateTransportCapabilities(chatgpt)
-assert.equal(chatCapabilities.length, 18)
+assert.equal(chatCapabilities.length, 19)
 assert.equal(chatCapabilities.every((capability) => capability.runtimeEnabled), true)
 assert.equal(chatCapabilities.every((capability) => (
   capability.activation === 'preset_then_background_verify'
@@ -52,7 +55,7 @@ const incompleteGoogle = localAiPrivateTransportCapabilities(provider('google-ai
 assert.equal(incompleteGoogle.filter((capability) => capability.runtimeEnabled).length, 6)
 
 const copy = localAiPrivateTransportStatusCopy(chatgpt)
-assert.match(copy.copy, /18\/18/)
+assert.match(copy.copy, /19\/19/)
 assert.match(copy.copy, /无需等待官网扫描/)
 assert.match(copy.detail, /私有流与完成态结算/)
 assert.match(copy.detail, /同源私有文本写事务与官网回退/)
@@ -65,6 +68,7 @@ assert.match(copy.detail, /游客会话富内容补齐/)
 assert.match(copy.detail, /新会话首轮私有流绑定/)
 assert.match(copy.detail, /富内容异步解压与当前回答结算/)
 assert.match(copy.detail, /富内容占位与真实卡片对账/)
+assert.match(copy.detail, /模型、工具与功能预设缓存/)
 assert.match(copy.detail, /后台官网语音与原生控制面连续性/)
 assert.match(copy.detail, /私有语音数据通道状态与实时转写/)
 assert.match(copy.detail, /厂商会话后台预热与切换复用/)
@@ -160,7 +164,7 @@ assert.match(awaitingContext.copy, /等待官网会话上下文/)
 assert.match(awaitingContext.copy, /不阻塞输入/)
 
 const stale = localAiPrivateTransportStatusCopy(chatgpt, health({ sampledAtMs: 1 }), 200_000)
-assert.match(stale.copy, /18\/18/)
+assert.match(stale.copy, /19\/19/)
 
 const androidCatalog = fs.readFileSync(path.resolve(
   __dirname,
@@ -185,11 +189,14 @@ assert.deepEqual(
 assert.deepEqual(
   parityGaps.map((item) => item.androidId).sort(),
   [
-    'android_chatgpt_interaction_preset_cache_v1',
     'android_chatgpt_web_private_voice_native_relay_v1',
   ],
 )
 assert.equal(parityGaps.every((item) => item.reason.trim().length > 12), true)
+assert.equal(parity.some((item) => (
+  item.androidId === 'android_chatgpt_interaction_preset_cache_v1'
+  && item.winId === 'win_chatgpt_interaction_preset_cache_v1'
+)), true)
 assert.equal(parity.some((item) => (
   item.androidId === 'android_chatgpt_realtime_voice_data_channel_transcript_v1'
   && item.winId === 'win_chatgpt_realtime_voice_data_channel_transcript_v1'

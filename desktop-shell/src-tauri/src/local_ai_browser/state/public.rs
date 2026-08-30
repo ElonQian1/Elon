@@ -1,5 +1,6 @@
 use serde::Serialize;
 use serde_json::Value;
+use std::collections::BTreeMap;
 
 use super::{diagnostics, private_stream, SessionRecord};
 
@@ -19,7 +20,10 @@ pub struct LocalAiWebSessionState {
     pub semantic_event: Option<Value>,
     pub navigation_event: Option<Value>,
     pub composer_event: Option<Value>,
+    pub composer_events: BTreeMap<String, Value>,
     pub feature_event: Option<Value>,
+    pub interaction_live: bool,
+    pub interaction_updated_at_ms: u64,
     pub ui_manifest_event: Option<Value>,
     pub realtime_voice_event: Option<Value>,
     pub command_result: Option<Value>,
@@ -87,7 +91,10 @@ impl From<SessionRecord> for LocalAiWebSessionState {
             semantic_event: record.semantic_event,
             navigation_event: record.navigation_event,
             composer_event: record.composer_event,
+            composer_events: record.composer_events,
             feature_event: record.feature_event,
+            interaction_live: record.interaction_live,
+            interaction_updated_at_ms: record.interaction_updated_at_ms,
             ui_manifest_event: record.ui_manifest_event,
             realtime_voice_event: record.realtime_voice_event,
             command_result: record.command_result,

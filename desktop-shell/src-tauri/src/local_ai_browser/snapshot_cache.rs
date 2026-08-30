@@ -1,4 +1,5 @@
 use std::{
+    collections::BTreeMap,
     fs::{self, OpenOptions},
     io::Write,
     path::Path,
@@ -12,9 +13,15 @@ use super::{google_url_policy, semantic_context};
 
 #[path = "snapshot_cache/conversation_store.rs"]
 mod conversation_store;
+#[path = "snapshot_cache/interaction.rs"]
+mod interaction;
+#[cfg(test)]
+#[path = "snapshot_cache/interaction_cache_tests.rs"]
+mod interaction_cache_tests;
 
-const CACHE_SCHEMA: &str = "elon.local_ai_web_snapshot.v3";
-const PREVIOUS_CACHE_SCHEMA: &str = "elon.local_ai_web_snapshot.v2";
+const CACHE_SCHEMA: &str = "elon.local_ai_web_snapshot.v4";
+const PREVIOUS_CACHE_SCHEMA: &str = "elon.local_ai_web_snapshot.v3";
+const V2_CACHE_SCHEMA: &str = "elon.local_ai_web_snapshot.v2";
 const LEGACY_CACHE_SCHEMA: &str = "elon.local_ai_web_snapshot.v1";
 const DPAPI_ENTROPY: &[u8] = b"elon.local-ai-web-snapshot.v1";
 const MAX_CACHE_BYTES: usize = 2 * 1024 * 1024;
@@ -24,6 +31,8 @@ const CACHE_TTL_MS: u64 = 7 * 24 * 60 * 60 * 1_000;
 pub(super) struct LoadedSnapshot {
     pub semantic_event: Option<Value>,
     pub navigation_event: Option<Value>,
+    pub composer_events: BTreeMap<String, Value>,
+    pub feature_event: Option<Value>,
     pub conversation_snapshots: Vec<StoredConversationSnapshot>,
     pub navigation_updated_at_ms: u64,
     pub updated_at_ms: u64,
@@ -44,6 +53,12 @@ struct SnapshotEnvelope {
     provider_id: String,
     semantic_event: Option<Value>,
     navigation_event: Option<Value>,
+    #[serde(default)]
+    composer_event: Option<Value>,
+    #[serde(default)]
+    composer_events: BTreeMap<String, Value>,
+    #[serde(default)]
+    feature_event: Option<Value>,
     #[serde(default)]
     conversation_snapshots: Vec<StoredConversationSnapshot>,
     #[serde(default)]
@@ -80,9 +95,17 @@ pub(super) fn load(path: &Path, provider_id: &str) -> Result<Option<LoadedSnapsh
             semantic_context::sanitize_google_snapshot(&mut entry.semantic_event);
         }
     }
+    let mut composer_events = interaction::sanitize_composers(&envelope.composer_events);
+    if let Some(legacy) = interaction::sanitize_composer(envelope.composer_event.as_ref()) {
+        if let Some(section) = legacy.get("section").and_then(Value::as_str) {
+            composer_events.entry(section.to_string()).or_insert(legacy);
+        }
+    }
     Ok(Some(LoadedSnapshot {
         semantic_event,
         navigation_event: envelope.navigation_event,
+        composer_events,
+        feature_event: interaction::sanitize_features(envelope.feature_event.as_ref()),
         conversation_snapshots,
         navigation_updated_at_ms: envelope.navigation_updated_at_ms,
         updated_at_ms: envelope.updated_at_ms,
@@ -105,7 +128,7 @@ fn load_main_envelope(path: &Path, provider_id: &str) -> Result<Option<SnapshotE
         serde_json::from_slice(&plaintext).context("decode local AI snapshot cache")?;
     if !matches!(
         envelope.schema.as_str(),
-        CACHE_SCHEMA | PREVIOUS_CACHE_SCHEMA | LEGACY_CACHE_SCHEMA
+        CACHE_SCHEMA | PREVIOUS_CACHE_SCHEMA | V2_CACHE_SCHEMA | LEGACY_CACHE_SCHEMA
     ) || envelope.provider_id != provider_id
     {
         bail!("local AI snapshot cache identity is invalid");
@@ -123,6 +146,8 @@ pub(super) fn store(
     provider_id: &str,
     semantic_event: Option<&Value>,
     navigation_event: Option<&Value>,
+    composer_events: &BTreeMap<String, Value>,
+    feature_event: Option<&Value>,
     conversation_snapshots: &[StoredConversationSnapshot],
     navigation_updated_at_ms: u64,
     updated_at_ms: u64,
@@ -135,6 +160,8 @@ pub(super) fn store(
         provider_id,
         semantic_event,
         navigation_event,
+        composer_events,
+        feature_event,
         conversation_snapshots,
         navigation_updated_at_ms,
         updated_at_ms,
@@ -171,6 +198,8 @@ fn cacheable_envelope(
     provider_id: &str,
     semantic_event: Option<&Value>,
     navigation_event: Option<&Value>,
+    composer_events: &BTreeMap<String, Value>,
+    feature_event: Option<&Value>,
     _conversation_snapshots: &[StoredConversationSnapshot],
     navigation_updated_at_ms: u64,
     updated_at_ms: u64,
@@ -184,7 +213,13 @@ fn cacheable_envelope(
         snapshot.insert("streaming".to_string(), Value::Bool(false));
     }
     let navigation_event = navigation_event.cloned();
-    if semantic_event.is_none() && navigation_event.is_none() {
+    let composer_events = interaction::sanitize_composers(composer_events);
+    let feature_event = interaction::sanitize_features(feature_event);
+    if semantic_event.is_none()
+        && navigation_event.is_none()
+        && composer_events.is_empty()
+        && feature_event.is_none()
+    {
         return None;
     }
     Some(SnapshotEnvelope {
@@ -192,7 +227,10 @@ fn cacheable_envelope(
         provider_id: provider_id.to_string(),
         semantic_event,
         navigation_event,
-        // V3 stores every conversation body in its own bounded DPAPI file.
+        composer_event: None,
+        composer_events,
+        feature_event,
+        // V3+ stores every conversation body in its own bounded DPAPI file.
         // Keeping them out of this 2 MiB provider envelope prevents one long
         // active answer from evicting every cached conversation at once.
         conversation_snapshots: Vec::new(),
@@ -209,6 +247,8 @@ fn loaded_from_conversations(
     Some(LoadedSnapshot {
         semantic_event: Some(latest.semantic_event),
         navigation_event: None,
+        composer_events: BTreeMap::new(),
+        feature_event: None,
         conversation_snapshots: std::mem::take(&mut conversation_snapshots),
         navigation_updated_at_ms: 0,
         updated_at_ms,
@@ -350,9 +390,7 @@ fn valid_restorable_url(provider_id: &str, value: &str) -> bool {
                 && url.query().is_none()
                 && (url.path().starts_with("/c/") || url.path().starts_with("/g/"))
         }
-        "google-ai-mode" => {
-            google_url_policy::sanitize_conversation_url(value).is_some()
-        }
+        "google-ai-mode" => google_url_policy::sanitize_conversation_url(value).is_some(),
         _ => false,
     }
 }
@@ -554,66 +592,6 @@ mod tests {
     use serde_json::json;
 
     #[test]
-    fn cacheable_snapshot_strips_draft_and_rejects_streaming_content() {
-        let complete = cacheable_envelope(
-            "chatgpt",
-            Some(&json!({
-                "type": "message_snapshot",
-                "draft": "private unfinished text",
-                "streaming": false,
-                "messages": [{"state": "completed", "content": [{"type": "text", "text": "answer"}]}]
-            })),
-            None,
-            &[],
-            0,
-            42,
-        )
-        .unwrap();
-        assert_eq!(complete.semantic_event.unwrap()["draft"], "");
-
-        let streaming = json!({
-            "type": "message_snapshot",
-            "draft": "",
-            "streaming": true,
-            "messages": [{"state": "streaming"}]
-        });
-        assert!(cacheable_envelope("chatgpt", Some(&streaming), None, &[], 0, 43).is_none());
-    }
-
-    #[test]
-    fn google_cache_migration_drops_prompt_urls_and_canonicalizes_durable_threads() {
-        let updated_at_ms = now_ms();
-        let snapshot = |id: &str, restorable_url: &str| StoredConversationSnapshot {
-            id: id.to_string(),
-            title: "Google conversation".to_string(),
-            restorable_url: restorable_url.to_string(),
-            semantic_event: json!({"type":"message_snapshot","messages":[]}),
-            updated_at_ms,
-        };
-        let values = sanitize_stored_conversations_with_ttl(
-            "google-ai-mode",
-            vec![
-                snapshot(
-                    "0000000000000001",
-                    "https://www.google.com/search?q=old-prompt&udm=50",
-                ),
-                snapshot(
-                    "0000000000000002",
-                    "https://google.com/search?ved=drop&q=durable&udm=50&csuir=thread_1234567890",
-                ),
-            ],
-            CACHE_TTL_MS,
-        );
-
-        assert_eq!(values.len(), 1);
-        assert_eq!(values[0].id, "0000000000000002");
-        assert_eq!(
-            values[0].restorable_url,
-            "https://www.google.com/search?q=durable&udm=50&csuir=thread_1234567890",
-        );
-    }
-
-    #[test]
     fn oversized_completed_snapshot_keeps_recent_context_within_the_cache_limit() {
         let messages = (0..80)
             .map(|index| {
@@ -631,7 +609,17 @@ mod tests {
             "streaming": false,
             "messages": messages,
         });
-        let envelope = cacheable_envelope("chatgpt", Some(&snapshot), None, &[], 0, 42).unwrap();
+        let envelope = cacheable_envelope(
+            "chatgpt",
+            Some(&snapshot),
+            None,
+            &BTreeMap::new(),
+            None,
+            &[],
+            0,
+            42,
+        )
+        .unwrap();
 
         let encoded = encode_with_bounded_history(envelope).unwrap();
         let decoded: SnapshotEnvelope = serde_json::from_slice(&encoded).unwrap();
@@ -683,12 +671,34 @@ mod tests {
             "projects":[],
             "collection":{"complete":true}
         });
+        let composer_events = BTreeMap::from([
+            (
+                "model".to_string(),
+                json!({
+                    "type":"composer_controls_snapshot", "section":"model", "currentModel":"Auto",
+                    "options":[{"id":"auto","label":"自动","selected":true,"kind":"model","semantic":"model","opensSubmenu":false}]
+                }),
+            ),
+            (
+                "tools".to_string(),
+                json!({
+                    "type":"composer_controls_snapshot", "section":"tools", "currentModel":"Auto",
+                    "options":[{"id":"search","label":"网页搜索","selected":true,"kind":"tool","semantic":"web_search","opensSubmenu":false}]
+                }),
+            ),
+        ]);
+        let features = json!({
+            "type":"navigation_snapshot",
+            "features":[{"id":"images","label":"图像","selected":true,"kind":"images"}]
+        });
         let stored_at = now_ms();
         assert!(store(
             &path,
             "chatgpt",
             Some(&semantic),
             Some(&navigation),
+            &composer_events,
+            Some(&features),
             &[],
             stored_at,
             stored_at,
@@ -697,8 +707,24 @@ mod tests {
         let loaded = load(&path, "chatgpt").unwrap().unwrap();
         assert_eq!(loaded.updated_at_ms, stored_at);
         assert_eq!(loaded.navigation_updated_at_ms, stored_at);
-        assert_eq!(loaded.navigation_event.unwrap()["collection"]["complete"], true);
+        assert_eq!(
+            loaded.navigation_event.unwrap()["collection"]["complete"],
+            true
+        );
         assert_eq!(loaded.semantic_event.unwrap()["draft"], "");
+        assert_eq!(loaded.composer_events.len(), 2);
+        assert_eq!(
+            loaded.composer_events["model"]["options"][0]["selected"],
+            false
+        );
+        assert_eq!(
+            loaded.composer_events["tools"]["options"][0]["selected"],
+            false
+        );
+        assert_eq!(
+            loaded.feature_event.unwrap()["features"][0]["selected"],
+            false
+        );
 
         fs::write(&path, b"corrupt cache").unwrap();
         assert!(load(&path, "chatgpt").is_err());
@@ -744,6 +770,8 @@ mod tests {
             &path,
             "chatgpt",
             Some(&semantic),
+            None,
+            &BTreeMap::new(),
             None,
             std::slice::from_ref(&conversation),
             0,

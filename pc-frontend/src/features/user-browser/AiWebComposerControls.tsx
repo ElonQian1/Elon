@@ -1,7 +1,17 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { AudioLines, ChevronDown, Clock3, Grid3X3, Mic, MicOff, Paperclip, PhoneOff, StopCircle, Wrench } from 'lucide-react'
 import type { LocalAiComposerOption, LocalAiFeatureNavigationItem } from './localAiBrowserProtocol'
 import { findLocalAiRealtimeVoiceControls } from './localAiRealtimeVoice'
+import {
+  isLocalAiInteractionPreset,
+  localAiComposerOptionsOrPreset,
+  localAiComposerSnapshotFromState,
+  localAiFeatureSnapshotFromState,
+  localAiFeaturesOrPreset,
+  localAiStableInteractionNeedsRefresh,
+  resolveLocalAiComposerPreset,
+  resolveLocalAiFeaturePreset,
+} from './localAiInteractionPresets'
 import useLocalAiRealtimeVoiceControl from './useLocalAiRealtimeVoiceControl'
 import type { AiWebChatBackend } from './useAiWebChatBackend'
 import AiWebAccessRecoveryCard from './AiWebAccessRecoveryCard'
@@ -12,52 +22,107 @@ export { default as AiBrowserExperience } from './AiBrowserExperience'
 type Panel = 'model' | 'tools' | 'features' | null
 type ComposerSection = Exclude<Panel, 'features' | null>
 type CachedMenu<T> = { options: T[]; updatedAt: number }
-const MENU_CACHE_TTL_MS = 60_000
 
 export default function AiWebComposerControls({ web }: { web: AiWebChatBackend }) {
   const [panel, setPanel] = useState<Panel>(null)
   const busy = Boolean(web.controller.busyAction)
   const actions = new Set(web.provider?.adapterActions ?? [])
   const snapshot = web.controller.snapshot
-  const menuUpdatedAt = web.controller.sessionState?.updatedAtMs || Date.now()
+  const menuUpdatedAt = web.controller.sessionState?.interactionLive
+    ? web.controller.sessionState.interactionUpdatedAtMs || Date.now()
+    : 0
+  const providerId = web.provider?.id
   const [composerCache, setComposerCache] = useState<Record<ComposerSection, CachedMenu<LocalAiComposerOption>>>({
     model: { options: [], updatedAt: 0 },
     tools: { options: [], updatedAt: 0 },
   })
   const [featureCache, setFeatureCache] = useState<CachedMenu<LocalAiFeatureNavigationItem>>({ options: [], updatedAt: 0 })
-  const composerOptions = panel === 'model' || panel === 'tools' ? composerCache[panel].options : []
-  const featureOptions = panel === 'features' ? featureCache.options : []
+  const presetFlight = useRef(false)
+  const composerOptions = panel === 'model' || panel === 'tools'
+    ? localAiComposerOptionsOrPreset(providerId, panel, composerCache[panel].options)
+    : []
+  const featureOptions = panel === 'features'
+    ? localAiFeaturesOrPreset(providerId, featureCache.options)
+    : []
   const temporaryChat = web.controller.uiManifest?.controls.find((control) => control.semantic === 'temporary_chat')
   const realtimeVoice = findLocalAiRealtimeVoiceControls(web.controller.uiManifest?.controls ?? [])
   const realtimeVoiceControl = useLocalAiRealtimeVoiceControl(web)
 
   useEffect(() => {
     setPanel(null)
-    setComposerCache({ model: { options: [], updatedAt: 0 }, tools: { options: [], updatedAt: 0 } })
-    setFeatureCache({ options: [], updatedAt: 0 })
-  }, [web.controller.sessionIdentity, web.provider?.id])
+    const state = web.controller.sessionState
+    const model = localAiComposerSnapshotFromState(state, 'model')
+    const tools = localAiComposerSnapshotFromState(state, 'tools')
+    const features = localAiFeatureSnapshotFromState(state)
+    setComposerCache({
+      model: { options: model?.options ?? [], updatedAt: model ? menuUpdatedAt : 0 },
+      tools: { options: tools?.options ?? [], updatedAt: tools ? menuUpdatedAt : 0 },
+    })
+    setFeatureCache({ options: features?.features ?? [], updatedAt: features ? menuUpdatedAt : 0 })
+  }, [web.controller.sessionIdentity, providerId])
 
   useEffect(() => {
     const current = web.controller.composerSnapshot
-    if (!current) return
+    if (!current?.options.length) return
     setComposerCache((cached) => ({ ...cached, [current.section]: { options: current.options, updatedAt: menuUpdatedAt } }))
   }, [menuUpdatedAt, web.controller.composerSnapshot])
 
   useEffect(() => {
     const current = web.controller.featureSnapshot
-    if (current) setFeatureCache({ options: current.features, updatedAt: menuUpdatedAt })
+    if (current?.features.length) setFeatureCache({ options: current.features, updatedAt: menuUpdatedAt })
   }, [menuUpdatedAt, web.controller.featureSnapshot])
 
   async function openComposerPanel(next: ComposerSection) {
     const opening = panel !== next
     setPanel(opening ? next : null)
-    if (opening && menuNeedsRefresh(composerCache[next])) await web.controller.refreshComposerControls(next)
+    const visible = localAiComposerOptionsOrPreset(providerId, next, composerCache[next].options)
+    if (opening && localAiStableInteractionNeedsRefresh(visible, composerCache[next].updatedAt)) {
+      await web.controller.refreshComposerControls(next)
+    }
   }
 
   async function openFeatures() {
     const opening = panel !== 'features'
     setPanel(opening ? 'features' : null)
-    if (opening && menuNeedsRefresh(featureCache)) await web.controller.refreshFeatureNavigation()
+    const visible = localAiFeaturesOrPreset(providerId, featureCache.options)
+    if (opening && localAiStableInteractionNeedsRefresh(visible, featureCache.updatedAt)) {
+      await web.controller.refreshFeatureNavigation()
+    }
+  }
+
+  async function selectComposerOption(section: ComposerSection, option: LocalAiComposerOption) {
+    const action = section === 'model' ? 'select_model_option' : 'select_composer_tool'
+    if (!isLocalAiInteractionPreset(option.id)) {
+      await web.controller.run(action, option.id)
+      return
+    }
+    if (presetFlight.current) return
+    presetFlight.current = true
+    try {
+      const next = await web.controller.refreshComposerControls(section)
+      const live = localAiComposerSnapshotFromState(next, section)?.options ?? []
+      const resolved = resolveLocalAiComposerPreset(option, live)
+      if (resolved) await web.controller.run(action, resolved.id)
+    } finally {
+      presetFlight.current = false
+    }
+  }
+
+  async function selectFeature(option: LocalAiFeatureNavigationItem) {
+    if (!isLocalAiInteractionPreset(option.id)) {
+      await web.controller.run('select_navigation', option.id)
+      return
+    }
+    if (presetFlight.current) return
+    presetFlight.current = true
+    try {
+      const next = await web.controller.refreshFeatureNavigation()
+      const live = localAiFeatureSnapshotFromState(next)?.features ?? []
+      const resolved = resolveLocalAiFeaturePreset(option, live)
+      if (resolved) await web.controller.run('select_navigation', resolved.id)
+    } finally {
+      presetFlight.current = false
+    }
   }
 
   async function requestAttachment() {
@@ -198,7 +263,7 @@ export default function AiWebComposerControls({ web }: { web: AiWebChatBackend }
         <div className={styles.panel} role="menu" aria-label={panelLabel(panel)}>
           {panel === 'features'
             ? featureOptions.map((option) => (
-                <button type="button" role="menuitem" key={option.id} data-selected={option.selected} onClick={() => void web.controller.run('select_navigation', option.id)} disabled={busy}>
+                <button type="button" role="menuitem" key={option.id} data-selected={option.selected} onClick={() => void selectFeature(option)} disabled={busy}>
                   <span>{option.label}</span><small>{option.kind}</small>
                 </button>
               ))
@@ -209,7 +274,7 @@ export default function AiWebComposerControls({ web }: { web: AiWebChatBackend }
                   aria-checked={option.selected}
                   key={option.id}
                   data-selected={option.selected}
-                  onClick={() => void web.controller.run(panel === 'model' ? 'select_model_option' : 'select_composer_tool', option.id)}
+                  onClick={() => void selectComposerOption(panel, option)}
                   disabled={busy}
                 >
                   <span>{option.label}</span>
@@ -229,8 +294,4 @@ function panelLabel(panel: Exclude<Panel, null>) {
   if (panel === 'model') return '选择 ChatGPT 模型'
   if (panel === 'tools') return '选择 ChatGPT 工具'
   return '打开 ChatGPT 功能'
-}
-
-function menuNeedsRefresh(value: { options: unknown[]; updatedAt: number }) {
-  return value.options.length === 0 || Date.now() - value.updatedAt >= MENU_CACHE_TTL_MS
 }

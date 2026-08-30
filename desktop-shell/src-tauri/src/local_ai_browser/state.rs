@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{BTreeMap, HashMap},
     path::PathBuf,
     sync::{Arc, Mutex, MutexGuard},
     time::{SystemTime, UNIX_EPOCH},
@@ -47,7 +47,10 @@ struct SessionRecord {
     semantic_event: Option<Value>,
     navigation_event: Option<Value>,
     composer_event: Option<Value>,
+    composer_events: BTreeMap<String, Value>,
     feature_event: Option<Value>,
+    interaction_live: bool,
+    interaction_updated_at_ms: u64,
     ui_manifest_event: Option<Value>,
     realtime_voice_event: Option<Value>,
     command_result: Option<Value>,
@@ -151,26 +154,33 @@ impl LocalAiBrowserRuntime {
             let (
                 semantic_event,
                 navigation_event,
+                composer_events,
+                feature_event,
                 conversation_snapshots,
                 cache_updated_at_ms,
                 navigation_updated_at_ms,
-            ) =
-                cached
-                    .map(|snapshot| {
-                        (
-                            snapshot.semantic_event,
-                            snapshot.navigation_event,
-                            snapshot.conversation_snapshots,
-                            snapshot.updated_at_ms,
-                            snapshot.navigation_updated_at_ms,
-                        )
-                    })
-                    .unwrap_or_default();
+            ) = cached
+                .map(|snapshot| {
+                    (
+                        snapshot.semantic_event,
+                        snapshot.navigation_event,
+                        snapshot.composer_events,
+                        snapshot.feature_event,
+                        snapshot.conversation_snapshots,
+                        snapshot.updated_at_ms,
+                        snapshot.navigation_updated_at_ms,
+                    )
+                })
+                .unwrap_or_default();
             let semantic_updated_at_ms = if semantic_event.is_some() {
                 cache_updated_at_ms
             } else {
                 0
             };
+            let composer_event = composer_events
+                .get("model")
+                .or_else(|| composer_events.get("tools"))
+                .cloned();
             let active_restorable_url = conversation_snapshots
                 .first()
                 .map(|entry| entry.restorable_url.clone());
@@ -192,8 +202,11 @@ impl LocalAiBrowserRuntime {
                 last_error_code: None,
                 semantic_event,
                 navigation_event,
-                composer_event: None,
-                feature_event: None,
+                composer_event,
+                composer_events,
+                feature_event,
+                interaction_live: false,
+                interaction_updated_at_ms: 0,
                 ui_manifest_event: None,
                 realtime_voice_event: None,
                 command_result: None,
@@ -445,10 +458,8 @@ impl LocalAiBrowserRuntime {
                 }
                 "conversation_snapshot" => {
                     record.renderer_status = "active".to_string();
-                    let navigation_event = conversation_directory::merge(
-                        record.navigation_event.as_ref(),
-                        payload,
-                    );
+                    let navigation_event =
+                        conversation_directory::merge(record.navigation_event.as_ref(), payload);
                     if conversation_directory::is_complete(&navigation_event) {
                         record.navigation_updated_at_ms = now_ms();
                     }
@@ -458,8 +469,27 @@ impl LocalAiBrowserRuntime {
                     record.last_error = None;
                     record.last_error_code = None;
                 }
-                "composer_controls_snapshot" => record.composer_event = Some(payload),
-                "navigation_snapshot" => record.feature_event = Some(payload),
+                "composer_controls_snapshot" => {
+                    record.composer_event = Some(payload.clone());
+                    if let Some(section) = payload
+                        .get("section")
+                        .and_then(Value::as_str)
+                        .filter(|section| matches!(*section, "model" | "tools"))
+                    {
+                        record.composer_events.insert(section.to_string(), payload);
+                    }
+                    let updated_at_ms = now_ms();
+                    record.cache_updated_at_ms = updated_at_ms;
+                    record.interaction_updated_at_ms = updated_at_ms;
+                    record.interaction_live = true;
+                }
+                "navigation_snapshot" => {
+                    record.feature_event = Some(payload);
+                    let updated_at_ms = now_ms();
+                    record.cache_updated_at_ms = updated_at_ms;
+                    record.interaction_updated_at_ms = updated_at_ms;
+                    record.interaction_live = true;
+                }
                 "ui_manifest_snapshot" => record.ui_manifest_event = Some(payload),
                 "realtime_voice_state" => record.realtime_voice_event = Some(payload),
                 "command_result" => {
@@ -499,7 +529,15 @@ impl LocalAiBrowserRuntime {
                 _ => {}
             }
         });
-        if persist_semantic || matches!(kind, "message_snapshot" | "conversation_snapshot") {
+        if persist_semantic
+            || matches!(
+                kind,
+                "message_snapshot"
+                    | "conversation_snapshot"
+                    | "composer_controls_snapshot"
+                    | "navigation_snapshot"
+            )
+        {
             self.persist_snapshot(label);
         }
     }
@@ -513,7 +551,10 @@ impl LocalAiBrowserRuntime {
             record.semantic_event = None;
             record.navigation_event = None;
             record.composer_event = None;
+            record.composer_events.clear();
             record.feature_event = None;
+            record.interaction_live = false;
+            record.interaction_updated_at_ms = 0;
             record.ui_manifest_event = None;
             record.realtime_voice_event = None;
             record.command_result = None;
@@ -651,6 +692,8 @@ impl LocalAiBrowserRuntime {
                         record.provider_id.clone(),
                         record.semantic_event.clone(),
                         record.navigation_event.clone(),
+                        record.composer_events.clone(),
+                        record.feature_event.clone(),
                         record.conversation_snapshots.clone(),
                         record.navigation_updated_at_ms,
                         record.cache_updated_at_ms,
@@ -663,6 +706,8 @@ impl LocalAiBrowserRuntime {
             provider_id,
             semantic_event,
             navigation_event,
+            composer_events,
+            feature_event,
             conversation_snapshots,
             navigation_updated_at_ms,
             updated_at_ms,
@@ -675,6 +720,8 @@ impl LocalAiBrowserRuntime {
             &provider_id,
             semantic_event.as_ref(),
             navigation_event.as_ref(),
+            &composer_events,
+            feature_event.as_ref(),
             &conversation_snapshots,
             navigation_updated_at_ms,
             updated_at_ms,

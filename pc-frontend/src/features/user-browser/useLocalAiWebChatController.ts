@@ -688,11 +688,11 @@ export default function useLocalAiWebChatController(
   async function refreshDeferredMenu(
     listAction: LocalAiAdapterAction,
     collectAction: LocalAiAdapterAction,
-  ) {
-    if (!provider || !ownerKey || busyAction) return
+  ): Promise<LocalAiWebSessionState | null> {
+    if (!provider || !ownerKey || busyAction) return null
     if (!provider.adapterActions.includes(listAction) || !provider.adapterActions.includes(collectAction)) {
       setMessage(`${provider.displayName} 当前没有这个官网菜单。`)
-      return
+      return null
     }
     setBusyAction(listAction)
     setMessage('正在读取官网可见选项…')
@@ -706,7 +706,7 @@ export default function useLocalAiWebChatController(
       })
       if (!next) {
         setMessage('官网菜单没有返回匹配回执；已保留现有选项，不会把旧菜单当成当前结果。')
-        return
+        return null
       }
       setSessionState(next)
       const result = next.commandResult
@@ -717,8 +717,10 @@ export default function useLocalAiWebChatController(
       } else {
         setMessage('已同步官网当前可见选项。')
       }
+      return next
     } catch (error) {
       setMessage(localAiBrowserErrorMessage(error))
+      return null
     } finally {
       setBusyAction('')
     }

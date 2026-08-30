@@ -191,6 +191,18 @@ const CATALOG: Record<string, CapabilityDefinition[]> = {
       requiredActions: ['snapshot'],
     },
     {
+      id: 'win_chatgpt_interaction_preset_cache_v1',
+      label: '模型、工具与功能预设缓存',
+      requestMode: 'dpapi_user_scoped_builtin_preset_stale_while_refresh_single_intent_reconciliation',
+      fallback: 'live_official_menu_without_cached_action_dispatch',
+      requiredActions: [
+        'list_model_options', 'collect_model_options', 'select_model_option',
+        'list_composer_tools', 'collect_composer_tools', 'select_composer_tool',
+        'list_navigation', 'collect_navigation', 'select_navigation',
+      ],
+      androidParityIds: ['android_chatgpt_interaction_preset_cache_v1'],
+    },
+    {
       id: 'win_chatgpt_realtime_voice_private_transcript_refresh_v1',
       label: '语音结束后转写单飞行刷新',
       requestMode: 'serial_authenticated_same_origin_get_then_snapshot',
@@ -266,10 +278,6 @@ export interface LocalAiAndroidProductionParityGap {
 }
 
 const ANDROID_PRODUCTION_PARITY_GAPS: readonly LocalAiAndroidProductionParityGap[] = [
-  {
-    androidId: 'android_chatgpt_interaction_preset_cache_v1',
-    reason: 'Win 当前只有会话级内存预设与后台预热；持久预设缓存和单次官网动作对账尚待独立验收。',
-  },
   {
     androidId: 'android_chatgpt_web_private_voice_native_relay_v1',
     reason: 'Win 当前由后台 WebView2 持有单一官网 WebRTC；原生媒体所有权仍需独立验收。',

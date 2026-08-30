@@ -235,7 +235,10 @@ export interface LocalAiWebSessionState {
   semanticEvent?: LocalAiMessageSnapshot | Record<string, unknown> | null
   navigationEvent?: LocalAiConversationSnapshot | Record<string, unknown> | null
   composerEvent?: LocalAiComposerControlsSnapshot | Record<string, unknown> | null
+  composerEvents?: Record<string, LocalAiComposerControlsSnapshot | Record<string, unknown>>
   featureEvent?: LocalAiFeatureNavigationSnapshot | Record<string, unknown> | null
+  interactionLive?: boolean
+  interactionUpdatedAtMs?: number
   uiManifestEvent?: LocalAiUiManifestSnapshot | Record<string, unknown> | null
   realtimeVoiceEvent?: LocalAiRealtimeVoiceStateEvent | Record<string, unknown> | null
   commandResult?: LocalAiCommandResult | null
