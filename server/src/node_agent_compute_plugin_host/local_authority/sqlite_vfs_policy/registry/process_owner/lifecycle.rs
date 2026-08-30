@@ -487,6 +487,28 @@ where
         shm: ManagedSqliteRegistryShmLease,
         receipt: ManagedSqliteWalMainCloseReceipt,
     ) -> Result<(), ManagedSqliteRegistryProcessRouteRejection> {
+        #[cfg(all(test, windows))]
+        match self.claim_registry_wal_main_native_uncertain(route) {
+            Ok(true) => {
+                let _ = self.retain_terminal_wal_main_physical_custody(
+                    route,
+                    ManagedSqliteRegistryTerminalReason::FailureCustodyRetained,
+                    (receipt, main, shm),
+                );
+                return Err(
+                    ManagedSqliteRegistryProcessRouteRejection::RegistryWalMainNativeUncertain,
+                );
+            }
+            Ok(false) => {}
+            Err(rejection) => {
+                let _ = self.retain_terminal_wal_main_physical_custody(
+                    route,
+                    ManagedSqliteRegistryTerminalReason::FailureCustodyRetained,
+                    (receipt, main, shm),
+                );
+                return Err(rejection);
+            }
+        }
         let proofs = ManagedSqliteRegistryWalMainCloseProofs::from_receipt(&main, &shm, receipt);
         let (main_outcome, shm_outcome) = match proofs {
             Ok(proofs) => {

@@ -603,6 +603,85 @@ fn physical_success_handoff_retains_custody_even_when_route_observation_rejects(
     assert_eq!(handoff_drops.load(Ordering::SeqCst), 0);
 }
 
+#[cfg(windows)]
+#[test]
+fn joint_close_owner_registry_native_uncertain_is_one_shot_and_retains_custody() {
+    let process =
+        ManagedSqliteRegistryProcessOwner::leak(SequenceNonceSource::new([Ok(FIRST_NONCE)]));
+    let (custody, drops) = probe();
+    let route = process.register(custody).expect("route");
+
+    process.begin_open_attempt(route).expect("opening");
+    let main = process.claim_main(route).expect("main lease");
+    process.activate_connection(route).expect("active");
+    let shm = process.claim_shm(route).expect("SHM lease");
+    process.begin_connection_close(route).expect("begin close");
+    process
+        .arm_registry_wal_main_native_uncertain(route)
+        .expect("arm exact route");
+    assert!(process
+        .arm_registry_wal_main_native_uncertain(route)
+        .is_err());
+
+    assert_eq!(
+        process.close_wal_main(
+            route,
+            main,
+            shm,
+            ManagedSqliteWalMainCloseReceipt::test_value(),
+        ),
+        Err(ManagedSqliteRegistryProcessRouteRejection::RegistryWalMainNativeUncertain)
+    );
+    assert_eq!(
+        process
+            .registry_wal_main_native_uncertain_test_snapshot(route)
+            .expect("gate snapshot")
+            .claim_count(),
+        1
+    );
+    let retained = process
+        .terminal_custody_test_snapshot(route)
+        .expect("terminal custody snapshot");
+    assert_eq!(retained.wal_main_physical_custody_retention_count(), 1);
+    assert_eq!(retained.route_removal_count(), 1);
+    assert!(!retained.active_route_present());
+    assert_eq!(drops.load(Ordering::SeqCst), 0);
+}
+
+#[cfg(windows)]
+#[test]
+fn joint_close_owner_callback_admission_rejects_before_callback_lease_exists() {
+    let process =
+        ManagedSqliteRegistryProcessOwner::leak(SequenceNonceSource::new([Ok(FIRST_NONCE)]));
+    let (custody, drops) = probe();
+    let route = process.register(custody).expect("route");
+
+    process.begin_open_attempt(route).expect("opening");
+    let _main = process.claim_main(route).expect("main lease");
+    process.activate_connection(route).expect("active");
+    process.begin_connection_close(route).expect("begin close");
+    process
+        .arm_close_callback_admission_rejection(route)
+        .expect("arm exact route");
+
+    assert!(matches!(
+        process.begin_callback(route, ManagedSqliteRegistryCallbackKind::Close),
+        Err(ManagedSqliteRegistryProcessRouteRejection::CloseCallbackAdmissionRejected)
+    ));
+    assert_eq!(
+        process
+            .close_callback_admission_test_snapshot(route)
+            .expect("gate snapshot")
+            .claim_count(),
+        1
+    );
+    let snapshot = process
+        .registration_shutdown_test_snapshot(route)
+        .expect("route snapshot");
+    assert_eq!(snapshot.callbacks_in_flight(), 0);
+    assert_eq!(drops.load(Ordering::SeqCst), 0);
+}
+
 #[test]
 fn mismatched_managed_fs_receipt_permanently_quarantines_route_custody() {
     let process =
