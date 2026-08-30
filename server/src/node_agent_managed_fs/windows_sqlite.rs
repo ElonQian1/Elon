@@ -74,6 +74,7 @@ pub(in crate::node_agent_managed_fs) struct PlatformManagedSqliteCloseTestNative
     pub(in crate::node_agent_managed_fs) result: Result<(), PlatformManagedSqliteCloseFailure>,
     pub(in crate::node_agent_managed_fs) observation:
         Option<ManagedSqliteShmTestUnmapNativeObservation>,
+    pub(in crate::node_agent_managed_fs) exact_call_occurrence: Option<std::num::NonZeroU32>,
 }
 
 pub(in crate::node_agent_managed_fs) fn close_sqlite_file(
@@ -116,6 +117,7 @@ pub(in crate::node_agent_managed_fs) fn close_sqlite_file_for_test_native(
                     custody: PlatformManagedSqliteCloseCustody::Unattempted(file),
                 }),
                 observation: None,
+                exact_call_occurrence: None,
             };
         }
         // SAFETY: this is the exact handle owned by `file`; PROTECT_FROM_CLOSE is expected to
@@ -127,6 +129,7 @@ pub(in crate::node_agent_managed_fs) fn close_sqlite_file_for_test_native(
             return PlatformManagedSqliteCloseTestNativeResult {
                 result: Ok(()),
                 observation: None,
+                exact_call_occurrence: std::num::NonZeroU32::new(1),
             };
         }
         // SAFETY: the failed CloseHandle left this same protected handle live. Clearing only the
@@ -141,6 +144,7 @@ pub(in crate::node_agent_managed_fs) fn close_sqlite_file_for_test_native(
                     ),
                 }),
                 observation: None,
+                exact_call_occurrence: std::num::NonZeroU32::new(1),
             };
         }
         return PlatformManagedSqliteCloseTestNativeResult {
@@ -149,6 +153,7 @@ pub(in crate::node_agent_managed_fs) fn close_sqlite_file_for_test_native(
                 custody: PlatformManagedSqliteCloseCustody::Unattempted(file),
             }),
             observation: Some(ManagedSqliteShmTestUnmapNativeObservation::NativeFailureObserved),
+            exact_call_occurrence: std::num::NonZeroU32::new(1),
         };
     }
     let raw_handle = file.into_raw_handle();
@@ -160,14 +165,19 @@ pub(in crate::node_agent_managed_fs) fn close_sqlite_file_for_test_native(
     }
     PlatformManagedSqliteCloseTestNativeResult {
         result: Err(PlatformManagedSqliteCloseFailure {
-            error: test_native_return_receipt_unavailable_error("CloseHandle(SQLite SHM file)"),
+            error: test_native_return_receipt_unavailable_error("CloseHandle(SQLite file)"),
             custody: PlatformManagedSqliteCloseCustody::OutcomeUncertainRawHandle(
                 raw_handle as usize,
             ),
         }),
         observation: Some(ManagedSqliteShmTestUnmapNativeObservation::ReturnReceiptUnavailable),
+        exact_call_occurrence: std::num::NonZeroU32::new(1),
     }
 }
+
+#[cfg(all(test, windows))]
+#[path = "windows_sqlite_close_tests.rs"]
+mod tests;
 
 pub(in crate::node_agent_managed_fs) fn open_sqlite_file_relative(
     parent: &File,

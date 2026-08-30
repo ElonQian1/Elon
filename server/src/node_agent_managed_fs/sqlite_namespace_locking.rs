@@ -8,6 +8,10 @@ use super::{
     PinnedManagedSqliteMainFile, PlatformManagedSqliteLockAttempt,
 };
 
+#[cfg(all(test, windows))]
+#[path = "sqlite_namespace_locking/test_native.rs"]
+mod test_native;
+
 const PENDING_BYTE: u64 = 0x4000_0000;
 const RESERVED_BYTE: u64 = PENDING_BYTE + 1;
 const SHARED_FIRST: u64 = PENDING_BYTE + 2;

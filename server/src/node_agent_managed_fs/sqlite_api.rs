@@ -25,6 +25,9 @@ pub(crate) use super::sqlite_namespace::{
 };
 #[cfg(all(test, windows))]
 pub(crate) use super::sqlite_namespace::{
+    ManagedSqliteMainCloseTestNativeEvidence, ManagedSqliteMainCloseTestNativeObservation,
+    ManagedSqliteMainCloseTestNativeRequest, ManagedSqliteMainCloseTestProtocolFailure,
+    ManagedSqliteMainLockHeldRangePrestate, ManagedSqliteMainLockOffsetClass,
     ManagedSqliteShmTestDmsCustody, ManagedSqliteShmTestTargetIdentity,
     ManagedSqliteShmTestTargetObserver, ManagedSqliteShmTestTargetSnapshot,
     ManagedSqliteShmTestTopologySnapshot, ManagedSqliteShmTestUnmapActionEvent,

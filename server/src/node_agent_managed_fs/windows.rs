@@ -70,9 +70,13 @@ pub(super) use sqlite::{
     close_sqlite_file_for_test_native, PlatformManagedSqliteCloseTestNative,
     PlatformManagedSqliteCloseTestNativeResult,
 };
-#[cfg(all(test, windows))]
-pub(super) use sqlite_locking::unlock_sqlite_byte_range_outcome_uncertain_for_test;
 pub(super) use sqlite_locking::{try_lock_sqlite_byte_range, unlock_sqlite_byte_range};
+#[cfg(all(test, windows))]
+pub(super) use sqlite_locking::{
+    unlock_sqlite_byte_range_outcome_uncertain_for_test,
+    unlock_sqlite_byte_range_return_receipt_unavailable_for_main_close_test,
+    PlatformManagedSqliteUnlockReturnReceiptUnavailable,
+};
 
 const MAX_FINAL_PATH_UTF16: usize = 32_768;
 

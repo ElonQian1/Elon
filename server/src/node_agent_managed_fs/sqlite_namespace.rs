@@ -32,6 +32,12 @@ pub(crate) use close::{
 };
 #[cfg(test)]
 pub(crate) use close::{ManagedSqliteMainCloseTestFaultPhase, ManagedSqliteMainCloseTestFaults};
+#[cfg(all(test, windows))]
+pub(crate) use close::{
+    ManagedSqliteMainCloseTestNativeEvidence, ManagedSqliteMainCloseTestNativeObservation,
+    ManagedSqliteMainCloseTestNativeRequest, ManagedSqliteMainCloseTestProtocolFailure,
+    ManagedSqliteMainLockHeldRangePrestate, ManagedSqliteMainLockOffsetClass,
+};
 pub(crate) use main::{
     ManagedSqliteLockAttempt, ManagedSqliteLockFailure, ManagedSqliteLockFailureKind,
     ManagedSqliteLockFailurePhase, ManagedSqliteMainFileBindFailure, ManagedSqliteObservedLock,
