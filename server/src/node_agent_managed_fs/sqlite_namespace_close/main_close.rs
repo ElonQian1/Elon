@@ -3,6 +3,18 @@ use std::{mem::ManuallyDrop, ptr};
 use super::*;
 use crate::node_agent_managed_fs::ManagedSqliteUnlockTarget;
 
+#[cfg(all(test, windows))]
+#[path = "main_close_test_native.rs"]
+mod test_native;
+#[cfg(all(test, windows))]
+#[path = "main_close_tests.rs"]
+mod tests;
+#[cfg(all(test, windows))]
+use test_native::{
+    close_main_file_for_test_native, main_file_native_protocol_failure,
+    unlock_main_for_close_test_native,
+};
+
 struct ManagedSqliteMainFileParts {
     file: PinnedManagedSqliteFile,
     owner: ManagedSqliteLockOwner,
@@ -26,8 +38,37 @@ impl PinnedManagedSqliteMainFile {
                 ManagedSqliteMainCloseTestFaultTiming::BeforeCall,
             ));
         }
-        if let Err(lock_failure) = self.unlock_to(ManagedSqliteUnlockTarget::None) {
-            #[cfg(test)]
+        #[cfg(all(test, windows))]
+        let (unlock_result, unlock_test_native_requested, unlock_test_protocol_failure) =
+            match unlock_main_for_close_test_native(&mut self) {
+                Ok(dispatch) => dispatch,
+                Err(()) => {
+                    return Err(injected_main_close_failure(
+                        self,
+                        ManagedSqliteMainCloseTestFaultPhase::Unlock,
+                        ManagedSqliteMainCloseTestFaultTiming::BeforeCall,
+                    ));
+                }
+            };
+        #[cfg(not(all(test, windows)))]
+        let unlock_result = self.unlock_to(ManagedSqliteUnlockTarget::None);
+        #[cfg(all(test, windows))]
+        if unlock_result.is_ok() {
+            if let Some(protocol_failure) = unlock_test_protocol_failure {
+                return Err(native_observation_rejected_after_unlock(
+                    self,
+                    protocol_failure,
+                ));
+            }
+        }
+        if let Err(lock_failure) = unlock_result {
+            #[cfg(all(test, windows))]
+            if !unlock_test_native_requested {
+                if let Some(faults) = &self.close_test_faults {
+                    faults.native_failure(ManagedSqliteMainCloseTestFaultPhase::Unlock);
+                }
+            }
+            #[cfg(all(test, not(windows)))]
             if let Some(faults) = &self.close_test_faults {
                 faults.native_failure(ManagedSqliteMainCloseTestFaultPhase::Unlock);
             }
@@ -71,6 +112,8 @@ impl PinnedManagedSqliteMainFile {
                 completed_file: None,
                 #[cfg(test)]
                 close_test_faults,
+                #[cfg(all(test, windows))]
+                test_protocol_failure: unlock_test_protocol_failure,
             });
         }
 
@@ -99,11 +142,53 @@ impl PinnedManagedSqliteMainFile {
             ));
         }
 
+        #[cfg(all(test, windows))]
+        let file_close_test_native = match test_faults::claim_test_native(
+            &self.close_test_faults,
+            ManagedSqliteMainCloseTestFaultPhase::FileClose,
+        ) {
+            Ok(None) => None,
+            Ok(Some(
+                request @ ManagedSqliteMainCloseTestNativeRequest::MainFileCloseNativeRetryable,
+            ))
+            | Ok(Some(
+                request @ ManagedSqliteMainCloseTestNativeRequest::MainFileCloseNativeUncertain,
+            )) => Some(request),
+            Ok(Some(
+                ManagedSqliteMainCloseTestNativeRequest::MainLockReleaseNativeUncertainShared
+                | ManagedSqliteMainCloseTestNativeRequest::MainLockReleaseNativeUncertainReserved,
+            ))
+            | Err(()) => {
+                return Err(injected_main_close_failure(
+                    self,
+                    ManagedSqliteMainCloseTestFaultPhase::FileClose,
+                    ManagedSqliteMainCloseTestFaultTiming::BeforeCall,
+                ));
+            }
+        };
+
         let parts = into_main_parts(self);
-        match parts.file.close() {
+        #[cfg(all(test, windows))]
+        let (file_close_result, file_close_test_native_requested, file_close_test_protocol_failure) =
+            close_main_file_for_test_native(
+                parts.file,
+                &parts.close_test_faults,
+                file_close_test_native,
+            );
+        #[cfg(not(all(test, windows)))]
+        let file_close_result = parts.file.close();
+        match file_close_result {
             Ok(file) => {
                 drop(parts.owner);
                 let receipt = ManagedSqliteMainFileCloseReceipt { file };
+                #[cfg(all(test, windows))]
+                if let Some(protocol_failure) = file_close_test_protocol_failure {
+                    return Err(native_observation_rejected_after_file_close(
+                        receipt,
+                        parts.close_test_faults,
+                        protocol_failure,
+                    ));
+                }
                 #[cfg(test)]
                 if test_faults::triggered(
                     &parts.close_test_faults,
@@ -118,7 +203,13 @@ impl PinnedManagedSqliteMainFile {
                 Ok(receipt)
             }
             Err(file_failure) => {
-                #[cfg(test)]
+                #[cfg(all(test, windows))]
+                if !file_close_test_native_requested {
+                    if let Some(faults) = &parts.close_test_faults {
+                        faults.native_failure(ManagedSqliteMainCloseTestFaultPhase::FileClose);
+                    }
+                }
+                #[cfg(all(test, not(windows)))]
                 if let Some(faults) = &parts.close_test_faults {
                     faults.native_failure(ManagedSqliteMainCloseTestFaultPhase::FileClose);
                 }
@@ -144,6 +235,8 @@ impl PinnedManagedSqliteMainFile {
                     completed_file: None,
                     #[cfg(test)]
                     close_test_faults: parts.close_test_faults,
+                    #[cfg(all(test, windows))]
+                    test_protocol_failure: file_close_test_protocol_failure,
                 })
             }
         }
@@ -195,6 +288,8 @@ fn injected_main_close_failure(
         _completed_unlock_main: completed_unlock_main,
         completed_file: None,
         close_test_faults: None,
+        #[cfg(all(test, windows))]
+        test_protocol_failure: None,
     }
 }
 
@@ -218,7 +313,36 @@ fn injected_completed_main_close_failure(
         _completed_unlock_main: None,
         completed_file: Some(receipt),
         close_test_faults,
+        #[cfg(all(test, windows))]
+        test_protocol_failure: None,
     }
+}
+
+#[cfg(all(test, windows))]
+fn native_observation_rejected_after_unlock(
+    main: PinnedManagedSqliteMainFile,
+    protocol_failure: ManagedSqliteMainCloseTestProtocolFailure,
+) -> ManagedSqliteMainFileCloseFailure {
+    let mut failure = injected_main_close_failure(
+        main,
+        ManagedSqliteMainCloseTestFaultPhase::Unlock,
+        ManagedSqliteMainCloseTestFaultTiming::AfterSuccess,
+    );
+    failure.test_fault = None;
+    failure.test_protocol_failure = Some(protocol_failure);
+    failure
+}
+
+#[cfg(all(test, windows))]
+fn native_observation_rejected_after_file_close(
+    receipt: ManagedSqliteMainFileCloseReceipt,
+    close_test_faults: Option<std::sync::Arc<dyn ManagedSqliteMainCloseTestFaults>>,
+    protocol_failure: ManagedSqliteMainCloseTestProtocolFailure,
+) -> ManagedSqliteMainFileCloseFailure {
+    let mut failure = injected_completed_main_close_failure(receipt, close_test_faults);
+    failure.test_fault = None;
+    failure.test_protocol_failure = Some(protocol_failure);
+    failure
 }
 
 impl ManagedSqliteMainFileCloseFailure {
@@ -236,6 +360,13 @@ impl ManagedSqliteMainFileCloseFailure {
                 .file_failure
                 .as_ref()
                 .is_some_and(ManagedSqliteFileCloseFailure::close_outcome_uncertain)
+    }
+
+    #[cfg(all(test, windows))]
+    pub(crate) fn test_protocol_failure(
+        &self,
+    ) -> Option<ManagedSqliteMainCloseTestProtocolFailure> {
+        self.test_protocol_failure
     }
 
     pub(crate) fn into_main(mut self) -> Result<PinnedManagedSqliteMainFile, Self> {

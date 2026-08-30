@@ -17,6 +17,12 @@ pub(crate) use test_faults::{
     ManagedSqliteMainCloseTestFault, ManagedSqliteMainCloseTestFaultPhase,
     ManagedSqliteMainCloseTestFaultTiming, ManagedSqliteMainCloseTestFaults,
 };
+#[cfg(all(test, windows))]
+pub(crate) use test_faults::{
+    ManagedSqliteMainCloseTestNativeEvidence, ManagedSqliteMainCloseTestNativeObservation,
+    ManagedSqliteMainCloseTestNativeRequest, ManagedSqliteMainCloseTestProtocolFailure,
+    ManagedSqliteMainLockHeldRangePrestate, ManagedSqliteMainLockOffsetClass,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ManagedSqliteFileCloseFailureClass {
@@ -58,6 +64,7 @@ pub(crate) struct ManagedSqliteFileCloseFailure {
 pub(crate) struct ManagedSqliteFileCloseTestNativeResult {
     pub(crate) result: Result<ManagedSqliteFileCloseReceipt, ManagedSqliteFileCloseFailure>,
     pub(crate) observation: Option<super::ManagedSqliteShmTestUnmapNativeObservation>,
+    pub(crate) exact_call_occurrence: Option<std::num::NonZeroU32>,
 }
 
 #[must_use = "failed rejected-handle close retains live or terminal handle custody"]
@@ -128,6 +135,8 @@ pub(crate) struct ManagedSqliteMainFileCloseFailure {
     completed_file: Option<ManagedSqliteMainFileCloseReceipt>,
     #[cfg(test)]
     close_test_faults: Option<std::sync::Arc<dyn ManagedSqliteMainCloseTestFaults>>,
+    #[cfg(all(test, windows))]
+    test_protocol_failure: Option<ManagedSqliteMainCloseTestProtocolFailure>,
 }
 
 impl PinnedManagedSqliteFile {
@@ -138,19 +147,22 @@ impl PinnedManagedSqliteFile {
     }
 
     #[cfg(all(test, windows))]
-    pub(in crate::node_agent_managed_fs::sqlite_namespace) fn close_for_unmap_test_native(
+    pub(in crate::node_agent_managed_fs) fn close_for_unmap_test_native(
         self,
         native: platform::PlatformManagedSqliteCloseTestNative,
     ) -> ManagedSqliteFileCloseTestNativeResult {
         let observation = std::cell::Cell::new(None);
+        let exact_call_occurrence = std::cell::Cell::new(None);
         let result = self.close_with(|file| {
             let platform_result = platform::close_sqlite_file_for_test_native(file, native);
             observation.set(platform_result.observation);
+            exact_call_occurrence.set(platform_result.exact_call_occurrence);
             platform_result.result
         });
         ManagedSqliteFileCloseTestNativeResult {
             result,
             observation: observation.get(),
+            exact_call_occurrence: exact_call_occurrence.get(),
         }
     }
 
