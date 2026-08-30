@@ -1,7 +1,7 @@
 ---
 capability_id: android_chatgpt_realtime_voice_data_channel_transcript_v1
 implementation_status: completed
-verification_status: device_private_delta_shape_observed_native_peer_connected_targeted_tests_passed
+verification_status: device_supervised_native_streaming_bubbles_verified
 production_default: true
 repeat_research: not_required_without_regression
 ---
@@ -70,8 +70,15 @@ Passed on device without retaining private content or raw payloads:
 - the native WebRTC peer connected with remote audio and the official data channel open;
 - the production-default Release build completed after the private delta decoder was wired
   into the native peer.
+- release `v1.1.1346 (build 1367)`, sourced from `145819bb2`, started a supervised native
+  voice turn from an empty new conversation with the native peer connected, remote audio
+  active, and the data channel open;
+- structural observation counted 263 bounded data-channel frames, 227 parsed transcript
+  events, and seven native conversation bubbles (three user and four assistant) without
+  reading or retaining their text;
+- the user confirmed that the native bubbles appeared incrementally while the voice turn
+  was still active, and the call then closed with remote audio and the data channel stopped.
 
-Still pending supervised UI evidence: complete one native microphone voice turn and confirm
-that native bubbles appear before final conversation reconciliation. This is a presentation
-acceptance check, not a protocol-shape research prerequisite, and must not record transcript
-text or raw event payloads.
+The supervised presentation gap is closed. Repeat protocol research or a larger sample is not
+required unless a current regression shows missing native bubbles, duplicate reconciliation,
+or a changed official event shape.
