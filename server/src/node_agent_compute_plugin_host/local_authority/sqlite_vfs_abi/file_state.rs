@@ -371,7 +371,24 @@ pub(super) unsafe fn close(file: *mut ffi::sqlite3_file, fallback: c_int) -> c_i
             return fallback;
         }
     };
-    match catch_unwind(AssertUnwindSafe(|| state.close())) {
+    #[cfg(all(test, windows))]
+    // SAFETY: the same xClose invocation retains exclusive access after typed take cleared the raw
+    // slots. An armed exact-allocation control takes explicit custody and suppresses physical close.
+    let Some(state) = (unsafe { raw_state::retain_test_raw_close_state_if_armed(file, state) }) else {
+        return fallback;
+    };
+    #[cfg(all(test, windows))]
+    // SAFETY: physical close is about to consume the exact taken state on the ordinary path.
+    unsafe {
+        raw_state::record_test_state_close_attempt(file);
+    }
+    let result = catch_unwind(AssertUnwindSafe(|| state.close()));
+    #[cfg(all(test, windows))]
+    // SAFETY: ordinary close has terminally consumed the state, including unwind/error outcomes.
+    unsafe {
+        raw_state::release_test_raw_close_control_if_unretained(file);
+    }
+    match result {
         Ok(Ok(())) => ffi::SQLITE_OK,
         Ok(Err(())) | Err(_) => fallback,
     }

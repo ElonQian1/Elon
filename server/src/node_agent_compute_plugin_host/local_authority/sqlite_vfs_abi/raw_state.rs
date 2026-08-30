@@ -15,6 +15,8 @@ use rusqlite::ffi;
 use super::{types::InertHandleBoundSqliteFile, INERT_IO_METHODS};
 
 #[cfg(all(test, windows))]
+mod close_control;
+#[cfg(all(test, windows))]
 mod close_witness;
 
 #[cfg(all(test, windows))]
@@ -36,8 +38,6 @@ struct RawSqliteFileStateEnvelope {
     type_id: TypeId,
     payload: Option<NonNull<c_void>>,
     drop_payload: unsafe fn(NonNull<c_void>),
-    #[cfg(all(test, windows))]
-    close_witness: HandleBoundSqliteAbiRawCloseWitness,
 }
 
 impl RawSqliteFileStateEnvelope {
@@ -47,8 +47,6 @@ impl RawSqliteFileStateEnvelope {
             type_id: TypeId::of::<State>(),
             payload: Some(payload),
             drop_payload: drop_typed_payload::<State>,
-            #[cfg(all(test, windows))]
-            close_witness: HandleBoundSqliteAbiRawCloseWitness::new(),
         })
     }
 
@@ -118,6 +116,8 @@ pub(super) unsafe fn initialize_fresh_file(file: *mut ffi::sqlite3_file) -> bool
     unsafe {
         ptr::addr_of_mut!((*file.as_ptr()).base.pMethods).write(ptr::null());
         ptr::addr_of_mut!((*file.as_ptr()).state).write(ptr::null_mut());
+        #[cfg(all(test, windows))]
+        ptr::addr_of_mut!((*file.as_ptr()).raw_close_control).write(ptr::null_mut());
     }
     true
 }
@@ -143,6 +143,14 @@ pub(super) unsafe fn install_state<State: 'static>(
             .is_null()
             || !ptr::addr_of!((*file.as_ptr()).state).read().is_null()
     };
+    #[cfg(all(test, windows))]
+    // A retained exact-allocation close control is terminal custody, not reusable fresh storage.
+    let occupied = occupied
+        || unsafe {
+            !ptr::addr_of!((*file.as_ptr()).raw_close_control)
+                .read()
+                .is_null()
+        };
     if occupied {
         return Err((RawSqliteFileStateRejection::Occupied, state));
     }
@@ -184,9 +192,13 @@ pub(super) unsafe fn with_installed_state<State: 'static, Output>(
 pub(super) unsafe fn take_installed_state<State: 'static>(
     file: *mut ffi::sqlite3_file,
 ) -> Result<Box<State>, RawSqliteFileStateRejection> {
-    let envelope = unsafe { installed_envelope(file)? };
     #[cfg(all(test, windows))]
-    envelope.close_witness.record_state_take_attempt();
+    // SAFETY: forwarded from this function's serialized live-allocation contract. Recording before
+    // validation makes a second xClose attempt durable even after the first call cleared raw slots.
+    unsafe {
+        record_test_state_take_attempt(file);
+    }
+    let envelope = unsafe { installed_envelope(file)? };
     if !envelope.is::<State>() {
         return Err(RawSqliteFileStateRejection::TypeMismatch);
     }
@@ -197,15 +209,19 @@ pub(super) unsafe fn take_installed_state<State: 'static>(
     let raw = unsafe {
         ptr::addr_of_mut!((*file.as_ptr()).base.pMethods).write(ptr::null());
         #[cfg(all(test, windows))]
-        envelope.close_witness.record_methods_clear();
+        record_test_methods_clear(file.as_ptr().cast());
         ptr::addr_of_mut!((*file.as_ptr()).state).replace(ptr::null_mut())
     };
     // SAFETY: the raw pointer came from Box::into_raw in `install_state` and was cleared first.
     let envelope = unsafe { Box::from_raw(raw.cast::<RawSqliteFileStateEnvelope>()) };
-    #[cfg(all(test, windows))]
-    envelope.close_witness.record_state_take_success();
     // SAFETY: the TypeId gate above proves the payload type.
-    Ok(unsafe { RawSqliteFileStateEnvelope::take_typed(envelope) })
+    let state = unsafe { RawSqliteFileStateEnvelope::take_typed(envelope) };
+    #[cfg(all(test, windows))]
+    // SAFETY: the same exact allocation remains live and serialized after typed take succeeds.
+    unsafe {
+        record_test_state_take_success(file.as_ptr().cast());
+    }
+    Ok(state)
 }
 
 /// Captures a cloneable, redacted witness while the exact test VFS allocation is still live.
@@ -219,17 +235,101 @@ pub(super) unsafe fn take_installed_state<State: 'static>(
 pub(in crate::node_agent_compute_plugin_host::local_authority) unsafe fn observe_test_vfs_file_raw_close_witness(
     file: *mut ffi::sqlite3_file,
 ) -> Option<HandleBoundSqliteAbiRawCloseWitness> {
+    // Validate that this is the module's live installation before creating a sidecar. The borrow
+    // ends before touching the independent control slot.
+    unsafe { installed_envelope(file) }.ok()?;
     // SAFETY: the caller supplies the live serialized allocation described above.
-    let envelope = unsafe { installed_envelope(file) }.ok()?;
-    Some(envelope.close_witness.clone())
+    Some(unsafe { ensure_test_raw_close_control(file) }?.witness())
+}
+
+/// Arms a one-shot rejection for this exact allocation after typed take succeeds and before
+/// physical close begins. The returned witness remains readable after both raw slots are cleared.
+///
+/// # Safety
+///
+/// `file` must identify a live installed allocation initialized by this ABI module, and no callback
+/// may overlap arming.
+#[cfg(all(test, windows))]
+pub(in crate::node_agent_compute_plugin_host::local_authority) unsafe fn arm_test_vfs_file_raw_state_take_rejection(
+    file: *mut ffi::sqlite3_file,
+) -> Option<HandleBoundSqliteAbiRawCloseWitness> {
+    unsafe { installed_envelope(file) }.ok()?;
+    // SAFETY: validation above and the caller's serialization contract cover the exact sidecar.
+    unsafe { ensure_test_raw_close_control(file) }?.arm_state_take_rejection(file)
 }
 
 /// Records entry into the real raw xClose callback without changing its result or custody path.
 #[cfg(all(test, windows))]
 pub(super) unsafe fn record_test_raw_close_entry(file: *mut ffi::sqlite3_file) {
     // SAFETY: the xClose callback supplies exclusive access to its exact live allocation.
-    if let Ok(envelope) = unsafe { installed_envelope(file) } {
-        envelope.close_witness.record_raw_close_entry();
+    if let Some(control) = unsafe { test_raw_close_control(file) } {
+        control.record_raw_close_entry(file);
+    }
+}
+
+#[cfg(all(test, windows))]
+unsafe fn record_test_state_take_attempt(file: *mut ffi::sqlite3_file) {
+    if let Some(control) = unsafe { test_raw_close_control(file) } {
+        control.record_state_take_attempt(file);
+    }
+}
+
+#[cfg(all(test, windows))]
+unsafe fn record_test_methods_clear(file: *mut ffi::sqlite3_file) {
+    if let Some(control) = unsafe { test_raw_close_control(file) } {
+        control.record_methods_clear(file);
+    }
+}
+
+#[cfg(all(test, windows))]
+unsafe fn record_test_state_take_success(file: *mut ffi::sqlite3_file) {
+    if let Some(control) = unsafe { test_raw_close_control(file) } {
+        control.record_state_take_success(file);
+    }
+}
+
+#[cfg(all(test, windows))]
+pub(super) unsafe fn retain_test_raw_close_state_if_armed(
+    file: *mut ffi::sqlite3_file,
+    state: Box<super::file_state::HandleBoundSqliteFileState>,
+) -> Option<Box<super::file_state::HandleBoundSqliteFileState>> {
+    let Some(control) = (unsafe { test_raw_close_control(file) }) else {
+        return Some(state);
+    };
+    control.retain_taken_state_if_armed(file, state)
+}
+
+#[cfg(all(test, windows))]
+pub(super) unsafe fn record_test_state_close_attempt(file: *mut ffi::sqlite3_file) {
+    if let Some(control) = unsafe { test_raw_close_control(file) } {
+        control.record_state_close_attempt(file);
+    }
+}
+
+/// Releases the allocation-owned sidecar on an ordinary terminal path. A sidecar holding explicit
+/// process-lifetime custody remains installed so later xClose attempts retain durable evidence.
+#[cfg(all(test, windows))]
+pub(super) unsafe fn release_test_raw_close_control_if_unretained(file: *mut ffi::sqlite3_file) {
+    let Some(file) = NonNull::new(file.cast::<InertHandleBoundSqliteFile>()) else {
+        return;
+    };
+    // SAFETY: callers serialize access to the exact initialized test allocation.
+    let raw = unsafe { ptr::addr_of!((*file.as_ptr()).raw_close_control).read() };
+    let Some(control) =
+        NonNull::new(raw.cast::<close_control::HandleBoundSqliteAbiRawCloseControl>())
+    else {
+        return;
+    };
+    // A mismatched pointer cannot be safely reclaimed through this allocation.
+    if !unsafe { control.as_ref() }.matches_allocation(file.as_ptr().cast())
+        || unsafe { control.as_ref() }.retains_process_lifetime_custody()
+    {
+        return;
+    }
+    // Clear the allocation slot before releasing its uniquely owned Box.
+    unsafe {
+        ptr::addr_of_mut!((*file.as_ptr()).raw_close_control).write(ptr::null_mut());
+        drop(Box::from_raw(control.as_ptr()));
     }
 }
 
@@ -252,18 +352,18 @@ pub(super) unsafe fn abandon_installed_state(
         )
     };
     if methods.is_null() && state.is_null() {
+        #[cfg(all(test, windows))]
+        // SAFETY: this is the same serialized initialized allocation. Retained custody is preserved.
+        unsafe {
+            release_test_raw_close_control_if_unretained(file.as_ptr().cast());
+        }
         return Ok(false);
     }
     validate_installed(methods, state)?;
     #[cfg(all(test, windows))]
-    // SAFETY: validation proves this exact pointer is the live envelope installed by this module.
-    unsafe {
-        state
-            .cast::<RawSqliteFileStateEnvelope>()
-            .as_ref()
-            .expect("validated state pointer is non-null")
-            .close_witness
-            .record_state_abandon();
+    // SAFETY: validation and the caller contract prove this exact allocation is serialized.
+    if let Some(control) = unsafe { test_raw_close_control(file.as_ptr().cast()) } {
+        control.record_state_abandon(file.as_ptr().cast());
     }
     // SAFETY: validation proves this module's exact table and a non-null envelope.
     unsafe {
@@ -271,7 +371,52 @@ pub(super) unsafe fn abandon_installed_state(
         ptr::addr_of_mut!((*file.as_ptr()).state).write(ptr::null_mut());
         drop(Box::from_raw(state.cast::<RawSqliteFileStateEnvelope>()));
     }
+    #[cfg(all(test, windows))]
+    // SAFETY: raw state has reached an ordinary terminal abandonment path.
+    unsafe {
+        release_test_raw_close_control_if_unretained(file.as_ptr().cast());
+    }
     Ok(true)
+}
+
+#[cfg(all(test, windows))]
+unsafe fn ensure_test_raw_close_control<'file>(
+    file: *mut ffi::sqlite3_file,
+) -> Option<&'file mut close_control::HandleBoundSqliteAbiRawCloseControl> {
+    let file = NonNull::new(file.cast::<InertHandleBoundSqliteFile>())?;
+    // SAFETY: observation/arming owns serialized access to the initialized test allocation.
+    let slot = unsafe { ptr::addr_of_mut!((*file.as_ptr()).raw_close_control) };
+    let mut raw = unsafe { slot.read() };
+    if raw.is_null() {
+        raw = Box::into_raw(Box::new(
+            close_control::HandleBoundSqliteAbiRawCloseControl::new(file.as_ptr().cast()),
+        ))
+        .cast();
+        unsafe { slot.write(raw) };
+    }
+    let control = unsafe {
+        raw.cast::<close_control::HandleBoundSqliteAbiRawCloseControl>()
+            .as_mut()?
+    };
+    control
+        .matches_allocation(file.as_ptr().cast())
+        .then_some(control)
+}
+
+#[cfg(all(test, windows))]
+unsafe fn test_raw_close_control<'file>(
+    file: *mut ffi::sqlite3_file,
+) -> Option<&'file mut close_control::HandleBoundSqliteAbiRawCloseControl> {
+    let file = NonNull::new(file.cast::<InertHandleBoundSqliteFile>())?;
+    // SAFETY: callers serialize access to this module's initialized test allocation.
+    let raw = unsafe { ptr::addr_of!((*file.as_ptr()).raw_close_control).read() };
+    let control = unsafe {
+        raw.cast::<close_control::HandleBoundSqliteAbiRawCloseControl>()
+            .as_mut()?
+    };
+    control
+        .matches_allocation(file.as_ptr().cast())
+        .then_some(control)
 }
 
 unsafe fn installed_envelope<'file>(
