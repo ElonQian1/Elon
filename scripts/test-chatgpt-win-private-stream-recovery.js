@@ -23,7 +23,7 @@ function financePart(title = 'Bitcoin (BTC)', sourceName = 'private_response') {
         periods: [{ id: '1d', label: '1D' }],
         chart: {
           kind: 'line',
-          points: [{ label: '12:00', value: 77000 }, { label: '13:00', value: 78805 }],
+          points: [{ x: '12:00', y: 77000 }, { x: '13:00', y: 78805 }],
         },
       },
     },
@@ -131,7 +131,7 @@ const messages = [{
   state: 'completed',
   content: [
     { type: 'markdown', text: 'BTC answer' },
-    { type: 'interactive', text: 'Bitcoin (BTC)', kind: 'interactive' },
+    { type: 'interactive', text: '交互内容', kind: 'interactive' },
     { type: 'interactive', text: '另一个独立工具', kind: 'interactive' },
   ],
 }]
@@ -139,9 +139,9 @@ const merged = transport.mergeMessages(messages, '/c/conversation-one')
 assert.equal(merged.length, 1, 'recovery must enrich the existing assistant instead of duplicating it')
 assert.equal(merged[0].content.filter((part) => part.type === 'rich_card').length, 1)
 assert.equal(
-  merged[0].content.some((part) => part.type === 'interactive' && part.text === 'Bitcoin (BTC)'),
+  merged[0].content.some((part) => part.type === 'interactive' && part.text === '交互内容'),
   false,
-  'a generic official placeholder with the recovered finance title must be removed',
+  'a generic official placeholder must be removed after finance recovery',
 )
 assert.equal(
   merged[0].content.some((part) => part.type === 'interactive' && part.text === '另一个独立工具'),
@@ -150,6 +150,31 @@ assert.equal(
 )
 assert.equal(merged[0].content.at(-1).richContent.payload.chart.points.length, 2)
 assert.equal(transport.current('/c/conversation-one').richParts.length, 1)
+
+const duplicateStages = transport.mergeMessages([{
+  id: 'user-current-turn',
+  role: 'user',
+  state: 'completed',
+  content: [{ type: 'text', text: '比特币走势图现在怎么样？' }],
+}, {
+  id: 'official-assistant-stage-one',
+  role: 'assistant',
+  state: 'completed',
+  content: [{ type: 'markdown', text: '同一个官方回答不应该在 Win 端重复显示。' }],
+}, {
+  id: 'official-assistant-stage-two',
+  role: 'assistant',
+  state: 'completed',
+  content: [
+    { type: 'markdown', text: '同一个官方回答不应该在 Win 端重复显示。' },
+    { type: 'artifact', text: '交互内容', kind: 'artifact' },
+  ],
+}], '/c/conversation-one')
+assert.equal(duplicateStages.length, 2,
+  'equivalent official assistant stages with a recovered chart must collapse')
+assert.equal(duplicateStages[1].id, 'official-assistant-stage-two')
+assert.equal(duplicateStages[1].content.filter((part) => part.type === 'rich_card').length, 1)
+assert.equal(duplicateStages[1].content.some((part) => part.text === '交互内容'), false)
 const acceptedDiagnostics = recovery.snapshot()
 assert.equal(acceptedDiagnostics.active, true)
 assert.equal(acceptedDiagnostics.conversationBound, true)

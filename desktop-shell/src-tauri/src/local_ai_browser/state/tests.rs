@@ -7,6 +7,8 @@ mod document;
 mod new_conversation;
 #[path = "tests/realtime_voice.rs"]
 mod realtime_voice;
+#[path = "tests/attachment_transport.rs"]
+mod attachment_transport;
 
 #[test]
 fn private_stream_state_is_authoritative_over_stale_dom_streaming() {

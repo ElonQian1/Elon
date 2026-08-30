@@ -6,6 +6,10 @@ use super::{
 
 #[path = "adapter/private_rich_recovery.rs"]
 mod private_rich_recovery;
+#[path = "adapter/attachment_transport.rs"]
+mod attachment_transport;
+#[path = "adapter/scalar.rs"]
+mod scalar;
 #[cfg(test)]
 #[path = "adapter/realtime_voice_tests.rs"]
 mod realtime_voice_tests;
@@ -15,6 +19,8 @@ const MAX_MESSAGES: usize = 80;
 const MAX_DRAFT_CHARS: usize = 20_000;
 const MAX_OPTIONS: usize = 100;
 const MAX_PROJECTS: usize = 40;
+
+use scalar::{bounded_u64, sanitize_access_reason, sanitize_access_source, sanitize_page_kind, sanitize_private_stream_state};
 
 pub struct SanitizedAdapterEvent {
     pub kind: String,
@@ -169,6 +175,7 @@ fn sanitize_protocol_event(event: &Map<String, Value>) -> Result<SanitizedAdapte
             "streamCount": bounded_u64(event.get("streamCount"), 0, 32),
             "revision": bounded_u64(event.get("revision"), 0, 1_000_000_000),
         }),
+        "attachment_transport" => attachment_transport::sanitize(event)?,
         "web_touch_request" => json!({
             "type": kind,
             "purpose": clean_identifier(event.get("purpose"), 48),
@@ -542,44 +549,6 @@ fn sanitize_request_id(value: Option<&Value>) -> Option<String> {
             .skip(4)
             .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit()))
     .then_some(request_id)
-}
-
-fn bounded_u64(value: Option<&Value>, default: u64, max: u64) -> u64 {
-    value.and_then(Value::as_u64).unwrap_or(default).min(max)
-}
-
-fn sanitize_page_kind(value: Option<&Value>) -> &'static str {
-    match value.and_then(Value::as_str) {
-        Some("auth") => "auth",
-        Some("conversation") => "conversation",
-        Some("home") => "home",
-        Some("feature") => "feature",
-        _ => "unknown",
-    }
-}
-
-fn sanitize_access_reason(value: Option<&Value>) -> &'static str {
-    match value.and_then(Value::as_str) {
-        Some("login_required") => "login_required",
-        Some("rate_limited") => "rate_limited",
-        _ => "",
-    }
-}
-
-fn sanitize_access_source(value: Option<&Value>) -> &'static str {
-    match value.and_then(Value::as_str) {
-        Some("visible_page") => "visible_page",
-        Some("private_response") => "private_response",
-        _ => "",
-    }
-}
-
-fn sanitize_private_stream_state(value: Option<&Value>) -> &'static str {
-    match value.and_then(Value::as_str) {
-        Some("streaming") => "streaming",
-        Some("completed") => "completed",
-        _ => "idle",
-    }
 }
 
 fn clean_string(value: Option<&Value>, max: usize) -> String {

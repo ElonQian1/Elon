@@ -14,6 +14,7 @@ import {
 } from './localAiInteractionPresets'
 import useLocalAiRealtimeVoiceControl from './useLocalAiRealtimeVoiceControl'
 import type { AiWebChatBackend } from './useAiWebChatBackend'
+import { isLocalAiAttachmentTransportEvent } from './localAiBrowserApi'
 import AiWebAccessRecoveryCard from './AiWebAccessRecoveryCard'
 import styles from './AiWebComposerControls.module.css'
 
@@ -38,6 +39,7 @@ export default function AiWebComposerControls({ web }: { web: AiWebChatBackend }
   })
   const [featureCache, setFeatureCache] = useState<CachedMenu<LocalAiFeatureNavigationItem>>({ options: [], updatedAt: 0 })
   const presetFlight = useRef(false)
+  const attachmentRefreshSequence = useRef(0)
   const composerOptions = panel === 'model' || panel === 'tools'
     ? localAiComposerOptionsOrPreset(providerId, panel, composerCache[panel].options)
     : []
@@ -47,6 +49,23 @@ export default function AiWebComposerControls({ web }: { web: AiWebChatBackend }
   const temporaryChat = web.controller.uiManifest?.controls.find((control) => control.semantic === 'temporary_chat')
   const realtimeVoice = findLocalAiRealtimeVoiceControls(web.controller.uiManifest?.controls ?? [])
   const realtimeVoiceControl = useLocalAiRealtimeVoiceControl(web)
+  const candidateAttachmentTransport = web.controller.sessionState?.attachmentTransportEvent
+  const attachmentTransport = isLocalAiAttachmentTransportEvent(candidateAttachmentTransport)
+    ? candidateAttachmentTransport
+    : null
+  const attachmentState = attachmentTransport?.state ?? null
+  const attachmentSequence = attachmentTransport?.sequence ?? 0
+
+  useEffect(() => {
+    if (attachmentState === 'armed') {
+      attachmentRefreshSequence.current = 0
+      return
+    }
+    if (attachmentState !== 'completed' || attachmentSequence <= 0) return
+    if (attachmentRefreshSequence.current >= attachmentSequence) return
+    attachmentRefreshSequence.current = attachmentSequence
+    void web.controller.run('snapshot')
+  }, [attachmentSequence, attachmentState, web.controller])
 
   useEffect(() => {
     setPanel(null)
@@ -227,7 +246,15 @@ export default function AiWebComposerControls({ web }: { web: AiWebChatBackend }
               : realtimeVoiceControl.hangupStatus === 'confirming' ? '正在确认挂断' : '结束语音'}</span>
           </button>
         )}
-        <span className={styles.source}>{realtimeVoiceControl.hangupStatus === 'confirming'
+        <span className={styles.source}>{attachmentState === 'armed'
+          ? '请选择要上传的附件…'
+          : attachmentState === 'started'
+            ? '官网正在上传附件…'
+            : attachmentState === 'completed'
+              ? `附件已上传${attachmentTransport && attachmentTransport.completedCount > 1 ? ` ${attachmentTransport.completedCount} 个` : ''}`
+              : attachmentState === 'failed'
+                ? '附件上传失败，可重试或显示官方页检查'
+                : realtimeVoiceControl.hangupStatus === 'confirming'
           ? '正在确认官网语音已结束…'
             : realtimeVoiceControl.hangupStatus === 'unconfirmed'
               ? '官网语音可能仍在通话，请再次挂断或打开官方页确认'

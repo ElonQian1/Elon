@@ -145,9 +145,25 @@ fn placeholder_replaced_by(part: &Value, replacements: &[Value]) -> bool {
             .unwrap_or_default()
             .trim();
         part_title.is_empty()
+            || generic_placeholder_title(part_title)
             || replacement_title.is_empty()
             || part_title.eq_ignore_ascii_case(replacement_title)
     })
+}
+
+fn generic_placeholder_title(value: &str) -> bool {
+    matches!(
+        value.trim().to_ascii_lowercase().as_str(),
+        "交互内容"
+            | "互动内容"
+            | "图表"
+            | "行情图表"
+            | "市场行情"
+            | "interactive content"
+            | "interactive"
+            | "chart"
+            | "finance chart"
+    )
 }
 
 #[cfg(test)]
@@ -245,6 +261,24 @@ mod tests {
         assert!(!content
             .iter()
             .any(|part| { part["type"] == "interactive" && part["text"] == "Bitcoin (BTC)" }));
+        assert!(content.iter().any(|part| part["text"] == "另一个独立工具"));
+        assert!(content.iter().any(|part| part["type"] == "rich_card"));
+    }
+
+    #[test]
+    fn generic_interactive_placeholder_is_replaced_by_private_finance_card() {
+        let previous = with_source(finance_message("US$78,805.00"), "private_response");
+        let incoming = json!({
+            "id":"a1", "role":"assistant", "content":[
+                {"type":"interactive", "text":"交互内容", "kind":"interactive"},
+                {"type":"interactive", "text":"另一个独立工具", "kind":"interactive"}
+            ]
+        });
+
+        let merged = preserve_message_rich_content(&previous, incoming);
+        let content = merged["content"].as_array().unwrap();
+
+        assert!(!content.iter().any(|part| part["text"] == "交互内容"));
         assert!(content.iter().any(|part| part["text"] == "另一个独立工具"));
         assert!(content.iter().any(|part| part["type"] == "rich_card"));
     }

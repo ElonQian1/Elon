@@ -3,7 +3,7 @@ export const LOCAL_AI_REQUIRED_ADAPTER_VERSIONS = {
   // pinned to the current native adapter so a hot-loaded UI never drives an
   // older private-stream implementation that cannot recover finance cards,
   // reconcile new-conversation boundaries, or isolate late replies.
-  chatgpt: 206,
+  chatgpt: 207,
   'google-ai-mode': 40,
 } as const
 

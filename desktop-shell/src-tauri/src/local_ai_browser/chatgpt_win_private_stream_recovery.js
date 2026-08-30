@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  var VERSION = 8;
+  var VERSION = 9;
   var MAX_AGE_MS = 5 * 60 * 1000;
   var OFFICIAL_COMPLETION_SETTLE_MS = 3000;
   var MAX_RICH_PARTS = 4;
@@ -83,11 +83,29 @@
       .toLowerCase();
   }
 
+  function genericPlaceholderTitle(value) {
+    return [
+      '交互内容', '互动内容', '图表', '行情图表', '市场行情',
+      'interactive content', 'interactive', 'chart', 'finance chart'
+    ].includes(cleanText(value, 240).toLowerCase());
+  }
+
   function genericPlaceholderReplacedBy(part, replacements) {
-    if (!part || part.type !== 'interactive') return false;
+    if (!part || !['interactive', 'artifact', 'chart'].includes(
+      cleanText(part.type, 40).toLowerCase()
+    )) return false;
     var kind = cleanText(part.kind, 40).toLowerCase();
-    if (kind && kind !== 'interactive') return false;
+    if (kind && !['interactive', 'artifact', 'chart', 'finance'].includes(kind)) return false;
     var title = richTitle(part);
+    if (kind === 'finance' || kind === 'chart' || genericPlaceholderTitle(title)) {
+      return replacements.some(function (replacement) {
+        var replacementKind = cleanText(
+          replacement && (replacement.kind || replacement.richContent && replacement.richContent.kind),
+          40
+        ).toLowerCase();
+        return replacementKind === 'finance' || replacementKind === 'chart';
+      });
+    }
     if (!title) return false;
     return replacements.some(function (replacement) {
       var replacementKind = cleanText(
@@ -429,6 +447,44 @@
     return values;
   }
 
+  function hasPrivateRichCard(message) {
+    return Boolean(message && Array.isArray(message.content) && message.content.some(function (part) {
+      return part && part.type === 'rich_card' && part.richContent &&
+        part.richContent.source === 'private_response' &&
+        (part.richContent.kind === 'finance' || part.richContent.kind === 'chart');
+    }));
+  }
+
+  function collapseEquivalentAssistantStages(messages) {
+    if (!Array.isArray(messages) || messages.length < 3) return messages;
+    var latestUserIndex = -1;
+    for (var index = messages.length - 1; index >= 0; index -= 1) {
+      if (messages[index] && messages[index].role === 'user') {
+        latestUserIndex = index;
+        break;
+      }
+    }
+    var targetIndex = -1;
+    for (var target = messages.length - 1; target > latestUserIndex; target -= 1) {
+      if (messages[target] && messages[target].role === 'assistant') {
+        targetIndex = target;
+        break;
+      }
+    }
+    if (targetIndex < 0 || !hasPrivateRichCard(messages[targetIndex])) return messages;
+    var targetText = primaryMessageText(messages[targetIndex]);
+    if (targetText.length < 12) return messages;
+    var removed = false;
+    var result = messages.filter(function (message, messageIndex) {
+      if (messageIndex === targetIndex || messageIndex <= latestUserIndex ||
+          messageIndex > targetIndex || !message || message.role !== 'assistant') return true;
+      var equivalent = primaryMessageText(message) === targetText;
+      if (equivalent) removed = true;
+      return !equivalent;
+    });
+    return removed ? result : messages;
+  }
+
   function enrichMessages(messages, pathname) {
     var recovery = usable(pathname);
     if (!recovery || !Array.isArray(messages)) return messages;
@@ -478,7 +534,9 @@
       observeOfficialCompletion(messages, pathname);
       var merged = messages;
       try { merged = base.mergeMessages(messages, pathname); } catch (_) {}
-      return applyMergedCompletion(enrichMessages(merged, pathname), pathname);
+      return applyMergedCompletion(collapseEquivalentAssistantStages(
+        enrichMessages(merged, pathname)
+      ), pathname);
     },
     reset: function () {
       clearTurnRecovery();

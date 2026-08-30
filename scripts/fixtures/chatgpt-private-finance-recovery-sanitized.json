@@ -1,0 +1,63 @@
+{
+  "schema": "yilong.chatgpt-private-finance-recovery-fixture.v1",
+  "notice": "Sanitized structural fixture. All identifiers, prose, prices and chart samples are synthetic; no credential, request header, endpoint, signed URL or account data is present.",
+  "payload": {
+    "conversation_id": "synthetic-finance-conversation",
+    "message": {
+      "id": "synthetic-finance-assistant",
+      "author": { "role": "assistant" },
+      "status": "finished_successfully",
+      "content": {
+        "content_type": "text",
+        "parts": ["这是合成的行情正文，用于验证 Win 富内容恢复。"]
+      },
+      "metadata": {
+        "turn_exchange_id": "synthetic-finance-turn",
+        "content_references": [
+          {
+            "type": "dil",
+            "dil": {
+              "initialState": {
+                "default_range": "1D",
+                "timeframe_order": ["1D", "5D", "1M", "6M", "YTD", "1Y", "5Y", "MAX"],
+                "timeframe_configs": {
+                  "1D": {
+                    "chart": {
+                      "data": [
+                        { "timestamp": 1, "formatted": "12:00", "close": 77000 },
+                        { "timestamp": 2, "formatted": "13:00", "close": 77250 },
+                        { "timestamp": 3, "formatted": "14:00", "close": 77110 }
+                      ]
+                    },
+                    "summary": {
+                      "price_text": "US$77,110.00",
+                      "price_change_text": "+US$110.00 (0.14%)",
+                      "price_change_color": "success"
+                    }
+                  },
+                  "5D": { "chart": { "data": [] }, "summary": {} },
+                  "1M": { "chart": { "data": [] }, "summary": {} },
+                  "6M": { "chart": { "data": [] }, "summary": {} },
+                  "YTD": { "chart": { "data": [] }, "summary": {} },
+                  "1Y": { "chart": { "data": [] }, "summary": {} },
+                  "5Y": { "chart": { "data": [] }, "summary": {} },
+                  "MAX": { "chart": { "data": [] }, "summary": {} }
+                },
+                "asset_display_name": "Synthetic Asset (SYN)",
+                "current_price_text": "US$77,110.00",
+                "metrics_display": [
+                  {
+                    "cols": [
+                      { "label": "当日最低价", "value": "76,500" },
+                      { "label": "当日最高价", "value": "77,600" }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

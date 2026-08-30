@@ -45,6 +45,14 @@ Invoke-Checked 'win_private_guest_conversation_transport' {
 Invoke-Checked 'win_private_transport_health' {
     & node (Join-Path $TaskRepoRoot 'scripts\test-chatgpt-win-private-transport-health.js')
 }
+Invoke-Checked 'win_private_finance_e2e' {
+    & node (Join-Path $TaskRepoRoot 'scripts\test-chatgpt-win-private-finance-e2e.js')
+}
+Invoke-Checked 'win_attachment_transport_reconciliation' {
+    & node (Join-Path $TaskRepoRoot 'scripts\test-chatgpt-web-attachment-transport-observer.js')
+    if ($LASTEXITCODE -ne 0) { return }
+    & node (Join-Path $TaskRepoRoot 'scripts\test-chatgpt-win-attachment-transport.js')
+}
 Invoke-Checked 'win_realtime_voice_private_transcript' {
     & node --check (Join-Path $TaskRepoRoot 'desktop-shell\src-tauri\src\local_ai_browser\chatgpt_win_realtime_voice_json_delta.js')
     if ($LASTEXITCODE -ne 0) { return }

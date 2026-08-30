@@ -222,6 +222,29 @@ export interface LocalAiRealtimeVoiceStateEvent {
   revision: number
 }
 
+export interface LocalAiAttachmentTransportEvent {
+  type: 'attachment_transport'
+  transportVersion: 1
+  sequence: number
+  state: 'armed' | 'started' | 'completed' | 'failed'
+  completedCount: number
+}
+
+export function isLocalAiAttachmentTransportEvent(
+  value: unknown,
+): value is LocalAiAttachmentTransportEvent {
+  if (!value || typeof value !== 'object') return false
+  const event = value as Partial<LocalAiAttachmentTransportEvent>
+  return event.type === 'attachment_transport'
+    && event.transportVersion === 1
+    && Number.isInteger(event.sequence)
+    && Number(event.sequence) > 0
+    && ['armed', 'started', 'completed', 'failed'].includes(String(event.state))
+    && Number.isInteger(event.completedCount)
+    && Number(event.completedCount) >= 0
+    && Number(event.completedCount) <= 10
+}
+
 export interface LocalAiWebSessionState {
   providerId: string
   windowLabel: string
@@ -241,6 +264,7 @@ export interface LocalAiWebSessionState {
   interactionUpdatedAtMs?: number
   uiManifestEvent?: LocalAiUiManifestSnapshot | Record<string, unknown> | null
   realtimeVoiceEvent?: LocalAiRealtimeVoiceStateEvent | Record<string, unknown> | null
+  attachmentTransportEvent?: LocalAiAttachmentTransportEvent | Record<string, unknown> | null
   commandResult?: LocalAiCommandResult | null
   commandResults?: LocalAiCommandResult[]
   diagnostics?: LocalAiSessionDiagnostics

@@ -53,6 +53,7 @@ struct SessionRecord {
     interaction_updated_at_ms: u64,
     ui_manifest_event: Option<Value>,
     realtime_voice_event: Option<Value>,
+    attachment_transport_event: Option<Value>,
     command_result: Option<Value>,
     command_results: Vec<Value>,
     last_event_kind: String,
@@ -209,6 +210,7 @@ impl LocalAiBrowserRuntime {
                 interaction_updated_at_ms: 0,
                 ui_manifest_event: None,
                 realtime_voice_event: None,
+                attachment_transport_event: None,
                 command_result: None,
                 command_results: Vec::new(),
                 last_event_kind: "session_created".to_string(),
@@ -418,6 +420,7 @@ impl LocalAiBrowserRuntime {
                 "adapter_ready" => {
                     record.renderer_status = "active".to_string();
                     record.realtime_voice_event = None;
+                    record.attachment_transport_event = None;
                     record.last_error = None;
                     record.last_error_code = None;
                 }
@@ -492,6 +495,7 @@ impl LocalAiBrowserRuntime {
                 }
                 "ui_manifest_snapshot" => record.ui_manifest_event = Some(payload),
                 "realtime_voice_state" => record.realtime_voice_event = Some(payload),
+                "attachment_transport" => record.attachment_transport_event = Some(payload),
                 "command_result" => {
                     persist_semantic = record.finish_context_command(&payload);
                     record.last_command_action = payload
@@ -557,6 +561,7 @@ impl LocalAiBrowserRuntime {
             record.interaction_updated_at_ms = 0;
             record.ui_manifest_event = None;
             record.realtime_voice_event = None;
+            record.attachment_transport_event = None;
             record.command_result = None;
             record.command_results.clear();
             record.last_event_kind = "session_cleared".to_string();
