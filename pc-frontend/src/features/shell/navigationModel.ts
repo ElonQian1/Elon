@@ -205,6 +205,26 @@ const adminSections: NavSection[] = [
   },
 ]
 
+// These routes already own their contextual navigation. Rendering the global
+// workspace nav alongside them creates the same two-level sidebar that the
+// shell is intended to eliminate.
+const CONTEXTUAL_NAV_PATHS = [
+  '/ai',
+  '/workspace',
+  '/friends',
+  '/projects',
+  '/plaza',
+  '/compute-market',
+  '/compute-supply',
+  '/compute-activation',
+  '/compute-offers',
+  '/compute-reference-curves',
+  '/local-tasks',
+  '/codex-control',
+  '/doctor',
+  '/node',
+] as const
+
 export function sectionsForWorkspace(workspace: WorkspaceKey): NavSection[] {
   switch (workspace) {
     case 'ai': return aiSections
@@ -232,4 +252,8 @@ export function workspaceForPath(pathname: string): WorkspaceKey {
 export function pathMatches(pathname: string, path: string): boolean {
   if (path === '/ai') return pathname === '/ai'
   return pathname === path || pathname.startsWith(`${path}/`)
+}
+
+export function shouldShowWorkspaceNav(pathname: string): boolean {
+  return !CONTEXTUAL_NAV_PATHS.some((path) => pathMatches(pathname, path))
 }
