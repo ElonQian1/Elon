@@ -38,6 +38,8 @@ export interface ApiStreamEvent {
   [key: string]: unknown
 }
 
+const STREAM_PROGRESS_TIMEOUT_MS = 45_000
+
 function isApiError(error: unknown): error is ApiError {
   return Boolean(error && typeof error === 'object'
     && typeof (error as ApiError).status === 'number'
@@ -118,9 +120,28 @@ export async function streamPost(
     let buffer = ''
     let terminalEventSeen = false
     let stopReading = false
+    let idleTimer: number | undefined
+    let rejectIdle: ((reason: ApiError) => void) | null = null
+    const idleFailure = new Promise<never>((_, reject) => {
+      rejectIdle = reject
+    })
+    const armIdleTimer = () => {
+      if (idleTimer !== undefined) window.clearTimeout(idleTimer)
+      idleTimer = window.setTimeout(() => {
+        rejectIdle?.({
+          status: 0,
+          message: 'AI 回答长时间没有新进展，正在自动恢复',
+        })
+        void reader.cancel().catch(() => {})
+      }, STREAM_PROGRESS_TIMEOUT_MS)
+    }
+    armIdleTimer()
     try {
       while (true) {
-        const chunk = await reader.read()
+        // The server sends SSE keep-alives, so a plain read timeout would be
+        // reset forever. Race the read against a timer that is reset only by
+        // an actual application event (status, delta, or terminal event).
+        const chunk = await Promise.race([reader.read(), idleFailure])
         buffer += decoder.decode(chunk.value ?? new Uint8Array(), { stream: !chunk.done })
         let separator = buffer.indexOf('\r\n\r\n')
         let separatorLength = 4
@@ -155,6 +176,7 @@ export async function streamPost(
             // application-level SSE error must not be mistaken for a healthy
             // completed stream and silently swallow the retry path.
             onEvent(event)
+            armIdleTimer()
             if (terminalEventSeen) {
               // The server intentionally sends keep-alive comments after the
               // final event. The final event, rather than HTTP EOF, defines
@@ -181,6 +203,7 @@ export async function streamPost(
         } satisfies ApiError
       }
     } finally {
+      if (idleTimer !== undefined) window.clearTimeout(idleTimer)
       // Release the fetch body as soon as the application-level terminal event
       // arrives. This also prevents a keep-alive SSE response from lingering
       // after the composer has returned to its normal send state.
