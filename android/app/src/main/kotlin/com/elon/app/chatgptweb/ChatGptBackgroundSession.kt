@@ -279,7 +279,7 @@ internal class ChatGptBackgroundSession(
         pageAdapter?.stopGeneration()
     }
 
-    fun startNewConversation() = navigationActions.startNewConversation()
+    fun startNewConversation(): Boolean = navigationActions.startNewConversation()
 
     fun currentConversationPath(): String? = ChatGptWebConversationPath.fromUrl(latestSnapshot?.url)
 
@@ -691,7 +691,9 @@ internal class ChatGptBackgroundSession(
 
     private fun handleAdapterState(adapterState: ChatGptWebPageAdapter.State) {
         latestBridgeState = adapterState
-        if (adapterState == ChatGptWebPageAdapter.State.UNSUPPORTED) {
+        if (adapterState == ChatGptWebPageAdapter.State.READY) {
+            navigationActions.onBridgeReady()
+        } else if (adapterState == ChatGptWebPageAdapter.State.UNSUPPORTED) {
             recovery.onTerminal()
             updateState(State.ERROR, "当前 WebView 不支持网页 AI 语义桥接")
         }

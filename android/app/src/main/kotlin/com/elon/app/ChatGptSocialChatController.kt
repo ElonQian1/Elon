@@ -252,14 +252,15 @@ internal class ChatGptSocialChatController(
 
     override fun stopGeneration() = session.stopGeneration()
 
-    override fun startNewConversation() {
+    override fun startNewConversation(): Boolean {
+        if (!session.startNewConversation()) return false
         realtimeVoiceTranscript.reset()
         clearPendingSend()
         latestSendCommandStatus = null
         pendingAttachmentPrompt = null
         lastMessageSnapshot = null
         transcript.requestFollowLatest()
-        session.startNewConversation()
+        return true
     }
 
     override fun currentConversationPath(): String? = session.currentConversationPath()

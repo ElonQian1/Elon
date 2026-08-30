@@ -290,14 +290,7 @@ internal class MainSocialAiChatFeature(
                     capabilities = WebChatProviderIdentity.REQUIRED_NATIVE_NAVIGATION,
                     indexSource = chatGptController::conversationIndex,
                     refreshSource = chatGptController::requestConversationIndex,
-                    newConversationSource = {
-                        if (webChatState() != "ready") {
-                            false
-                        } else {
-                            chatGptController.startNewConversation()
-                            true
-                        }
-                    },
+                    newConversationSource = chatGptController::startNewConversation,
                     openConversationSource = chatGptController::openConversation,
                     openProjectSource = chatGptController::openProject,
                 ),
@@ -311,7 +304,6 @@ internal class MainSocialAiChatFeature(
                             false
                         } else {
                             googleController.startNewConversation()
-                            true
                         }
                     },
                     openConversationSource = googleController::openConversation,

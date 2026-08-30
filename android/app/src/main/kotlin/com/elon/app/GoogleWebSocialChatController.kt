@@ -174,10 +174,11 @@ internal class GoogleWebSocialChatController(
         session.stopGeneration()
     }
 
-    override fun startNewConversation() {
+    override fun startNewConversation(): Boolean {
+        if (!session.startNewConversation()) return false
         clearPendingSend()
         transcript.requestFollowLatest()
-        session.startNewConversation()
+        return true
     }
 
     override fun currentConversationPath(): String? = session.currentConversationPath()

@@ -122,14 +122,16 @@ internal class GoogleWebBackgroundSession(
 
     fun stopGeneration() = pageAdapter?.stopGeneration()
 
-    fun startNewConversation() {
+    fun startNewConversation(): Boolean {
+        val adapter = pageAdapter ?: return false
         webExecution.interactionRequested()
         responseRefresh.stop()
         conversationNavigation.cancel()
         activePath = null
         preferences.edit().remove(KEY_LAST_URL).apply()
         awaitingNewConversationBoundary = true
-        pageAdapter?.startNewConversation()
+        adapter.startNewConversation()
+        return true
     }
 
     fun currentConversationPath(): String? = conversationNavigation.selectedPath(activePath)

@@ -17,16 +17,18 @@ internal class ChatGptSessionNavigationActions(
     private val conversationNavigation: ChatGptConversationNavigationCoordinator,
 ) {
     private val conversationOpenQueue = ChatGptConversationOpenQueue()
+    private var pendingNewConversation = false
 
-    fun startNewConversation() {
-        if (!canDispatch()) return
-        if (!commandAvailable()) return
+    fun startNewConversation(): Boolean {
+        if (pendingNewConversation || conversationNavigation.hasPending()) return false
+        if (!sessionReady() && !sessionCanDefer()) return false
+        ensureInitialized()
         conversationOpenQueue.clear()
         cancelNewConversationRecovery()
         presentSnapshot(conversationNavigation.beginNew(latestSnapshot()))
-        updateLoading()
-        startNewConversationCommand()
-        scheduleNewConversationRecovery()
+        pendingNewConversation = true
+        dispatchPendingNewConversation()
+        return true
     }
 
     fun openConversation(path: String): Boolean {
@@ -52,9 +54,18 @@ internal class ChatGptSessionNavigationActions(
         return openProjectCommand(normalized)
     }
 
-    fun onSessionReady() = dispatchDeferredConversationOpen()
+    fun onBridgeReady() {
+        dispatchPendingNewConversation()
+        dispatchDeferredConversationOpen()
+    }
 
-    fun clearDeferred() = conversationOpenQueue.clear()
+    fun onSessionReady() = onBridgeReady()
+
+    fun clearDeferred() {
+        conversationOpenQueue.clear()
+        pendingNewConversation = false
+        conversationNavigation.clear()
+    }
 
     private fun canDispatch(): Boolean =
         !conversationNavigation.hasPending() &&
@@ -74,6 +85,7 @@ internal class ChatGptSessionNavigationActions(
     }
 
     private fun dispatchDeferredConversationOpen() {
+        if (pendingNewConversation) return
         if (!canDispatch()) return
         val request = conversationOpenQueue.take() ?: return
         if (!dispatchConversationOpen(request.path, request.previousSnapshot)) {
@@ -84,5 +96,15 @@ internal class ChatGptSessionNavigationActions(
     private fun previewDeferredConversationOpen(path: String) {
         val request = conversationOpenQueue.enqueue(path, latestSnapshot())
         presentSnapshot(conversationNavigation.previewOpen(path, request.previousSnapshot))
+    }
+
+    private fun dispatchPendingNewConversation() {
+        if (!pendingNewConversation) return
+        if (!commandAvailable()) return
+        if (!sessionReady() && !(sessionCanDefer() && bridgeReady())) return
+        pendingNewConversation = false
+        updateLoading()
+        startNewConversationCommand()
+        scheduleNewConversationRecovery()
     }
 }

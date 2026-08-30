@@ -1,6 +1,7 @@
 package com.elon.app.chatgptweb
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -14,18 +15,20 @@ class ChatGptSessionNavigationActionsTest {
     private val presented = mutableListOf<ChatGptWebSnapshot>()
     private val opened = mutableListOf<String>()
     private var loadingTransitions = 0
+    private var initializationCount = 0
+    private var newConversationCommands = 0
     private val actions = ChatGptSessionNavigationActions(
         sessionReady = { ready },
         sessionCanDefer = { loading },
         bridgeReady = { bridgeReady },
         commandAvailable = { true },
-        startNewConversationCommand = {},
+        startNewConversationCommand = { newConversationCommands += 1 },
         openConversationCommand = opened::add,
         openProjectCommand = { true },
         latestSnapshot = { current },
         presentSnapshot = { value -> current = value; presented += value },
         updateLoading = { loadingTransitions += 1 },
-        ensureInitialized = {},
+        ensureInitialized = { initializationCount += 1 },
         cancelNewConversationRecovery = {},
         scheduleNewConversationRecovery = {},
         conversationNavigation = navigation,
@@ -58,6 +61,35 @@ class ChatGptSessionNavigationActionsTest {
 
         assertEquals(listOf("/c/target"), opened)
         assertEquals(1, loadingTransitions)
+    }
+
+    @Test
+    fun newConversationPreviewsImmediatelyAndDispatchesOnceWhenBridgeIsReady() {
+        assertTrue(actions.startNewConversation())
+
+        assertTrue(presented.last().messages.isEmpty())
+        assertEquals("home", presented.last().pageKind)
+        assertEquals(1, initializationCount)
+        assertEquals(0, newConversationCommands)
+        assertEquals(0, loadingTransitions)
+
+        bridgeReady = true
+        actions.onBridgeReady()
+        actions.onBridgeReady()
+
+        assertEquals(1, newConversationCommands)
+        assertEquals(1, loadingTransitions)
+        assertFalse(actions.startNewConversation())
+    }
+
+    @Test
+    fun newConversationIsRejectedWhenTheSessionCannotRecover() {
+        loading = false
+
+        assertFalse(actions.startNewConversation())
+        assertTrue(presented.isEmpty())
+        assertEquals(0, initializationCount)
+        assertEquals(0, newConversationCommands)
     }
 
     private fun snapshot(content: String, path: String) = ChatGptWebSnapshot(

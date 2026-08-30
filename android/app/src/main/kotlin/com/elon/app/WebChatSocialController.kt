@@ -32,7 +32,7 @@ internal interface WebChatSocialController {
     fun requestModelOptions()
     fun refreshComposerModel()
     fun stopGeneration()
-    fun startNewConversation()
+    fun startNewConversation(): Boolean
     fun currentConversationPath(): String?
     fun officialFallbackUrl(): String? = null
     fun supportsWebSkin(): Boolean = false
