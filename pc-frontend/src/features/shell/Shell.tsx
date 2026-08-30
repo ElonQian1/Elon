@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useState } from 'react'
 import { Outlet } from 'react-router-dom'
 import { CircleCheck, Link2, TriangleAlert, WifiOff } from 'lucide-react'
 import ServerRail from './ServerRail'
+import WorkspaceNav from './WorkspaceNav'
 import DesktopTitleBar from './DesktopTitleBar'
 import { isDesktopShellFrameless } from './desktopShell'
 import { useNotifications } from '../notifications/useNotifications'
@@ -123,7 +124,8 @@ export default function Shell() {
       {isDesktopShellFrameless() && <DesktopTitleBar />}
       <div className={styles.shell}>
         <ServerRail />
-        <div className={styles.content}>
+        {!localMode && <WorkspaceNav />}
+        <div className={[styles.content, !localMode ? styles.contentWithWorkspaceNav : ''].join(' ')}>
           {!localMode && <AccountClaimBanner />}
           <LocalModeBanner />
           {!localMode && <NodeConnectBanner />}

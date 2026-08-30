@@ -68,6 +68,31 @@
   outline-offset: 3px;
 }
 
+.homeButton {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, .08);
+  color: #f4f7fb;
+  font-size: 15px;
+  font-weight: 850;
+  transition: background .14s ease, color .14s ease, box-shadow .14s ease;
+}
+
+.homeButton:hover,
+.homeButton:focus-visible,
+.homeButton.active {
+  background: rgba(255, 255, 255, .15);
+  outline: none;
+}
+
+.homeButton.active {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .2);
+}
+
 .icon {
   width: 18px;
   height: 18px;
@@ -84,6 +109,26 @@
   height: 1px;
   background: rgba(255, 255, 255, .08);
   flex-shrink: 0;
+}
+
+.utilityButton,
+.projectAction {
+  width: 36px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: 7px;
+  color: var(--text-muted);
+}
+
+.utilityButton:hover,
+.utilityButton:focus-visible,
+.projectAction:hover,
+.projectAction:focus-visible {
+  color: var(--text);
+  background: rgba(255, 255, 255, .07);
+  outline: none;
 }
 
 .projectStack {
