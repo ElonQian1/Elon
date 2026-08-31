@@ -1,6 +1,6 @@
 use super::model::{OwnerSnapshot, SourceOwnerId};
 
-pub(super) const SOURCE_BASELINE_COMMIT: &str = "4edfcbcb32518fed8f93157b1983222f5f8ef74e";
+pub(super) const SOURCE_BASELINE_COMMIT: &str = "2d76dc55ca18d1c236ea02aeb2b7c97150546fa9";
 
 const fn owner(
     id: SourceOwnerId,
@@ -49,7 +49,7 @@ pub(super) const OWNERS: &[OwnerSnapshot] = &[
     owner(SourceOwnerId::ManagedTypes, "src/node_agent_managed_fs/sqlite_namespace_shm/types.rs", "dee4097de08650a146f2f6fbbcdb22169b05873a", "6bc1e7b4fd3f0a95376a070c7373c970c8357cfd28576a7c08399c7716b708b0", &["struct ManagedSqliteShmBudget", "fn validate_region_size", "fn validate_logical_end", "fn validate_existing_size", "fn validate_mapped_total", "struct ManagedSqliteShmLockRequest", "fn new", "fn mask"]),
     owner(SourceOwnerId::ManagedInitialization, "src/node_agent_managed_fs/sqlite_namespace_shm/node_initialization.rs", "d68c464d47598f910d71317c4615fdb3ced17c96", "c3ce09fbaadd9a217c1ecf72f65d32652f4c065bf3f4efc0f32d5e791d5549c0", &["fn ensure_node", "fn open_node", "fn close_failed_open_file"]),
     owner(SourceOwnerId::ManagedFailureCustody, "src/node_agent_managed_fs/sqlite_namespace_shm/failure_custody.rs", "76a01a132d7ffe31295b126bc488e094063c06fc", "03edfdcca7851208c4eba11b783bcbc15ac8f19a1c7c9c685c1b9248dfe012a5", &["fn consume_open_failure", "fn retain_handle_custody"]),
-    owner(SourceOwnerId::ManagedMapping, "src/node_agent_managed_fs/sqlite_namespace_shm/mapping.rs", "48b1a467a3076bb7dd278ede8c245ebc7260e9b3", "1dc5a7eac8e997a010ceebd8136ab4845ce09f2f5480015e749c792cf6b1e7ab", &["fn map_connection", "fn map"]),
+    owner(SourceOwnerId::ManagedMapping, "src/node_agent_managed_fs/sqlite_namespace_shm/mapping.rs", "9701b0b77c212a87d2299cd298b7be24a92df4f8", "ca525ed4d746adde03f418a15b0619b6968446b722bd50213819e5a45214dd2a", &["fn map_connection", "fn map"]),
     owner(SourceOwnerId::ManagedLocking, "src/node_agent_managed_fs/sqlite_namespace_shm/locking.rs", "dc81d3ee80a261c98f11a70a77cdcf18e6a1cf9a", "608fd31846690268947915955630476e46863f41dc66f11dc6114f38a0b1b0d4", &["fn lock_connection", "fn try_os_lock", "fn unlock_os_range", "fn sibling_masks", "fn require_unlocked"]),
     owner(SourceOwnerId::ManagedFaultApi, "src/node_agent_managed_fs/sqlite_namespace_shm/test_faults/api.rs", "27f52a7280f06a6dee122fd2f301ee1298770ff5", "1b9a0c31d8513c470e9bc230ffed110323f34426ece0929f2a4f7cd005310422", &["fn observe_test_fault", "fn trigger_before_test_fault", "fn trigger_after_test_fault", "fn install_shm_test_fault_script"]),
     owner(SourceOwnerId::ManagedFaultController, "src/node_agent_managed_fs/sqlite_namespace_shm/test_faults/controller.rs", "e33d69678d1853acb54fbff9ea5377c09a27ce71", "5a253bc83a85d3156dadbe9c650878154dde94464fadbdf8bf9c0d5813444b66", &["pub(super) fn install", "pub(super) fn observe", "fn activate_before", "fn activate_after", "fn supports_after_success"]),

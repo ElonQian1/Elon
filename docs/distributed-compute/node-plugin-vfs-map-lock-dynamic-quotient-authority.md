@@ -1,7 +1,7 @@
 ---
 title: 节点插件 VFS Map/Lock 动态商集权威 V1
 status: current
-reviewed_at: 2026-08-31
+reviewed_at: 2026-09-01
 owners: node, security
 design_status: design_frozen
 implementation_status: typed_projector_candidate_prior_compiled_map_and_lock_pre_manifest_program_inventory_and_reviewed_source_admission_bridge_source_written_uncompiled_unrun
@@ -32,10 +32,13 @@ observation/native-receipt 接线。current source 进一步把“语义 program
 `reviewed inventory -> source-program admission provider -> catalog/manifest binding` 的失败关闭源码桥。只有
 完整 inventory 不含任何 planned-missing，且其 body digest 与独立 review 后 checked-in 的 expected digest
 精确相等，provider 才可构造；原始 inventory status 不能直接授权 catalog。该路径尚未编译、未运行，当前
-Map 本批再写入 `MapSingleRegionLifecycleV1` 六成员纵切：Empty/Reuse/TargetMissing 各自的
+Map 保留前序 `MapSingleRegionLifecycleV1` 六成员纵切：Empty/Reuse/TargetMissing 各自的
 Observe/Extend 路径必须由真实 installed `xShmMap`、same-target pre/post、一次性 Map ledger、raw output 与受管
-selected-region pointer 的仅进程内等值验证以及 parent/child/cleanup 回执共同证明。Map source test 因而预期有
-`12` 个 source-present member/group、`43,464` 个 planned-missing member；Lock source test
+selected-region pointer 的仅进程内等值验证以及 parent/child/cleanup 回执共同证明。本批再新增独立 q4
+`MapRegionLoopSuccessV1`：Created-first empty Extend `n=1..256` 与 Node-live target-missing Extend `n=1..255`
+两个 exact 子族共 511 frozen members，扣除 q3 已覆盖的两个 ordinal-001 后净新增 509；q4 固定精确 N 次有序
+mapping ledger、完整 typed matcher、逐成员 seal catalog 与 source digest。Map source test 因而预期有
+`521` 个 source-present member/group、`42,955` 个 planned-missing member；Lock source test
 预期有 `114` 个 source-present member/group、`8,554` 个 planned-missing member；两根都没有 checked-in
 reviewed inventory digest。
 默认 Map/Lock producers、完整 candidate 与 manifest 路径未因此接通；
@@ -175,7 +178,8 @@ region/size 执行受管 VFS Map callback 并
 形成实际结果，parent 只在 child terminal/exit 与 cleanup receipt 都绑定后消费私有 actual receipt。它仍是
 未编译、未运行的程序合同，不是 Windows record。默认 Map producers 仍全量签发
 `Missing(QuotientRunnerNotIntegrated)`，Lock 默认 producers 仍签发
-`Missing(LockObservationIncomplete)`。只有精确命中 Map 本批六个 single-region lifecycle program 或 Lock 的
+`Missing(LockObservationIncomplete)`。只有精确命中 Map 三预算、q3 六个 single-region lifecycle 或 q4
+`MapRegionLoopSuccessV1` exact program，以及 Lock 的
 10 个 request-validation / 104 个 positive lifecycle program，且持有私有、进程隔离 actual receipt 的
 `Supported` descriptor 才可通过 program-local 准入；
 因此当前完整 candidate 仍没有
@@ -183,7 +187,7 @@ class 被放行。
 
 ### 7.0 `MapSingleRegionLifecycleV1` bounded tranche
 
-下一批 Map source-program 只允许一个版本化的六成员正向纵切。它必须通过真实安装的 `xShmMap`、
+前序 Map source-program 只允许一个版本化的六成员正向纵切。它必须通过真实安装的 `xShmMap`、
 same-target pre/post snapshot、受管 selected-region identity、一次性 append-only Map ledger、进程隔离 child
 和 parent-owned cleanup 形成私有 receipt；不得仅凭静态 descriptor、输出槽非空或拓扑差值合成 actual。
 六个 exact frozen member 固定为：
@@ -208,6 +212,15 @@ ordinal `>1` 和其他 initialization profile。完成源码接线后，未运�
 `6 source-present / 43,470 planned-missing` 变为 `12 source-present / 43,464 planned-missing`；它仍不产生
 reviewed inventory digest、quotient manifest、`Qmap`、member coverage、Windows record 或生产 permit。
 
+`MapRegionLoopSuccessV1` 在该 q3 之上使用独立 `a2mapq4` 协议，只允许 Created-first empty Extend
+`regions_to_create=1..256` 与 Node-live target-missing Extend `regions_to_create=1..255`；分别要求
+`target_region=n-1` 与 `target_region=n`，并绑定 `occurrence=ordinal=regions_to_create=n`。q4 lower ledger 必须按
+`MappingCreate -> ViewMap -> Record` 精确重复 N 次，拒绝乱序、交错、少报、额外事件和越界；typed matcher
+必须同时复核完整 profile/Expected，511 行 catalog 逐项绑定 `(case_key_sha256, full_record_sha256)`，implementation
+digest 必须包含 q4 runner、payload、ledger、catalog 与直接 production source scope。该族语义覆盖 511 frozen
+members，但 q3 已有两项重叠，故 inventory 净新增 509，变为 `521 source-present / 42,955 planned-missing`。
+它仍只是源码与静态证据；编译、测试、Windows execution 均为 `not_run`。
+
 ### 7.1 Pre-manifest execution-program inventory
 
 商 manifest 之前必须先有一层独立、非授权的 `ExecutionProgramInventoryV1`。它复用同一两遍 frozen ingress，
@@ -229,7 +242,7 @@ SourcePresentReceiptRequired { implementation_sha256 }
 本层禁止出现 `Supported` 或 `ExecutionVerified`。`SourcePresentReceiptRequired` 只表示 exact source matcher
 找到了实现，仍须后续正式 receipt；当前 matcher 只认 Map `RegionSizeBudget`、`RegionCountBudget`、
 `LogicalSizeBudget` 三类 `Completed` 请求各自的 Observe/Extend 形状、上述六个 exact single-region lifecycle
-形状，以及 Lock 四种 action 的
+形状、`MapRegionLoopSuccessV1` 两个 bounded exact 子族，以及 Lock 四种 action 的
 `RangeOverflow`、`EndPastEight` 和仅 shared action 可用的 `SharedMultiSlot` 直接拒绝形状，再加精确的 104 个
 positive lifecycle 形状：8 槽内 36 个非空连续 exclusive range 与 8 个单槽 shared range 的 native acquire/release，
 以及 8 个单槽 shared-local acquire 与 8 个 single-slot shared-local release。其他 Map program
@@ -288,7 +301,7 @@ implementation fixture，不是 acceptance authority。验收规则要求未来 
 `MapRunnerExecutionReceiptV1`/`LockRunnerExecutionReceiptV1` 只能在相应 manifest 冻结后，由 frozen class 的
 canonical representative 执行真实 Windows child 后产生。
 
-当前该 bridge 只能失败关闭：Map source test 预期 `43,476` member 中有 `12` 个 source-present、`43,464` 个
+当前该 bridge 只能失败关闭：Map source test 预期 `43,476` member 中有 `521` 个 source-present、`42,955` 个
 planned-missing；Lock source test 预期 `8,668` member 中有 `114` 个 source-present、`8,554` 个
 planned-missing；两根 reviewed inventory digest 均尚未 checked-in/frozen。因此 provider authority 不可构造，
 full Map/Lock candidate 必须在 catalog/manifest 前分别原子失败；该结论没有运行证据，current source 仍为
@@ -409,8 +422,9 @@ static 或 projector 漂移都要求全量重生成与重审。
 前序验证事实严格限于：当时实现已编译，定向单元测试已通过；Lock 全量 `8,668` 成员 candidate gate 已按预期
 完成 exact frozen ingress/typed projection，并因 `LockObservationIncomplete` 原子失败关闭；Map 全量
 `43,476` 成员 candidate gate 也已完成 exact frozen ingress/typed projection，并因
-`QuotientRunnerNotIntegrated` 原子失败关闭。Map 本批只为六个 single-region lifecycle member 写入 q3
-runner/ledger/receipt 源码；其真实阻塞已细化为剩余 `43,464` 个 planned-missing、current source 未编译/未运行和
+`QuotientRunnerNotIntegrated` 原子失败关闭。Map 前序为六个 single-region lifecycle member 写入 q3
+runner/ledger/receipt；本批又以独立 q4 `MapRegionLoopSuccessV1`、精确 N 次有序 ledger、typed matcher、逐成员
+seal 与 source digest 净新增 509 个 source-present member。其真实阻塞已细化为剩余 `42,955` 个 planned-missing、current source 未编译/未运行和
 reviewed inventory digest 缺失。Lock 的真实
 阻塞是完整 observation 尚未实现；二者都在 class catalog 或 manifest 冻结前失败，因此不产生
 `Qmap/Qlock`、member coverage 或 Windows numerator。Lock 当前的真实阻塞已细化为剩余 `8,554` 个
@@ -418,9 +432,9 @@ planned-missing member、current source 未编译/未运行和 reviewed inventor
 源级 observation/native-receipt 接线表述为 actual verification。
 
 上述回执全部是本批 Map/Lock program/receipt 改动前的 prior baseline。本批 current source-only baseline
-固定为 `4edfcbcb32518fed8f93157b1983222f5f8ef74e`，只达到
-`source_written/source_review_only/implementation_uncompiled/implementation_unrun`，新增 Map 六个 lifecycle 与
-10+104 个 Lock 窄 program、私有
+已冻结为 `2d76dc55ca18d1c236ea02aeb2b7c97150546fa9`，旧 `4edfcbcb32518fed8f93157b1983222f5f8ef74e` 仅是前序 q3 baseline；当前只达到
+`source_written/source_review_only/implementation_uncompiled/implementation_unrun`。Map 三预算、q3 六成员、q4
+511-member semantic scope/净新增509、55 项 q3/q4 共享运行时 source closure 与 171 项唯一 projector provenance，以及 10+104 个 Lock 窄 program、私有
 actual receipt、program inventory、reviewed source-program admission provider、catalog/manifest binding 与负向
 测试源码均为 `passed=0/failed=0/not_run`；不得把 prior `36/36` 或 exact blocker 回执当作 current-source 验证。
 
@@ -487,16 +501,17 @@ producer_coherence=closed_typed_relations_mixed_state_and_gap_rejected
 sealed_runner_admission_plan=source_written_source_review_only_uncompiled_unrun
 map_three_request_budget_completed_programs=source_written_private_actual_receipt_parent_child_cleanup_uncompiled_unrun
 map_single_region_lifecycle_programs=source_written_6_installed_xshmmap_exact_target_one_shot_ledger_pointer_equality_parent_child_cleanup_uncompiled_unrun
+map_region_loop_success_v1=source_written_q4_two_exact_families_511_frozen_members_509_net_new_exact_n_ordered_mapping_ledger_typed_matcher_per_member_seal_source_digest_uncompiled_unrun
 map_supported_admission=private_exact_receipt_binding_only_source_contract_not_run
 map_pre_manifest_program_inventory=source_written_full_root_two_pass_non_authorizing_uncompiled_unrun
 map_program_inventory_status=planned_missing_or_source_present_receipt_required_only
 map_program_inventory_digest=not_generated_not_frozen
 map_program_inventory_member_and_group_counts=unknown_not_run
-map_program_inventory_unrun_test_expectation=members_43476_source_present_members_12_source_present_groups_12_planned_missing_members_43464
+map_program_inventory_unrun_test_expectation=members_43476_source_present_members_521_source_present_groups_521_planned_missing_members_42955
 map_reviewed_inventory_digest=not_checked_in_not_frozen
 map_source_program_admission_provider=source_written_fail_closed_uncompiled_unrun
 map_source_program_admission_precondition=all_members_and_groups_source_present_plus_exact_checked_in_reviewed_digest
-map_source_program_admission_current=unconstructible_unrun_source_expectation_planned_missing_members_43464_and_reviewed_digest_absent
+map_source_program_admission_current=unconstructible_unrun_source_expectation_planned_missing_members_42955_and_reviewed_digest_absent
 map_catalog_manifest_inventory_binding=source_written_uncompiled_unrun
 map_actual_execution_order=post_manifest_frozen_representative_only
 map_default_producers=all_missing_quotient_runner_not_integrated
@@ -527,9 +542,11 @@ Qlock=unknown
 map_dynamic_member_coverage=0/43476
 lock_dynamic_member_coverage=0/8668
 windows_dynamic=not_opened
-compilation=current_source_not_run
-targeted_unit_tests=current_source_not_run_passed_0_failed_0
+map_region_loop_windows_execution=not_run
+compilation=not_run
+targeted_unit_tests=not_run_passed_0_failed_0
 windows_runtime=not_opened
+next_recommended_tranche=lock_stored_poison_one_outcome_1320
 ```
 
 本文不完成 A2，不注册生产 VFS，不调用生产 open，不创建 Connection/Opened authority，不获取 process
