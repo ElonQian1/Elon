@@ -25,6 +25,7 @@ internal class WebChatProductionConversationProjectMoveCoordinator(
     private var activeDialog: AlertDialog? = null
     private var destinationsById = emptyMap<String, ChatGptWebProject>()
     private var writeAttempted = false
+    private val sheetLease = WebChatConversationProjectMoveSheetLease()
 
     fun show(conversation: ChatGptWebConversation) {
         cancelPending()
@@ -37,6 +38,7 @@ internal class WebChatProductionConversationProjectMoveCoordinator(
             return
         }
         destinationsById = destinations.associateBy(ChatGptWebProject::id)
+        val lease = sheetLease.issue()
         activeSheet = WebChatActionSheet.showUpdatable(
             activity = activity,
             title = "移动到项目",
@@ -49,21 +51,25 @@ internal class WebChatProductionConversationProjectMoveCoordinator(
                 )
             },
             footerActions = listOf(officialFooter()),
-            onCancelled = { requestEpoch += 1 },
+            onCancelled = {
+                if (sheetLease.owns(lease)) requestEpoch += 1
+            },
             onDismissed = {
-                activeSheet = null
-                destinationsById = emptyMap()
+                if (sheetLease.owns(lease)) {
+                    activeSheet = null
+                    destinationsById = emptyMap()
+                }
             },
         ) { item ->
             val destination = destinationsById[item.id] ?: return@showUpdatable
+            destinationsById = emptyMap()
             host.post { beginMove(conversation, destination) }
         }
     }
 
     fun cancelPending() {
         requestEpoch += 1
-        activeSheet?.dismiss()
-        activeSheet = null
+        dismissActiveSheet()
         activeDialog?.dismiss()
         activeDialog = null
         destinationsById = emptyMap()
@@ -363,14 +369,19 @@ internal class WebChatProductionConversationProjectMoveCoordinator(
         )
 
     private fun showProgress(destination: ChatGptWebProject, subtitle: String) {
-        activeSheet?.dismiss()
+        dismissActiveSheet()
+        val lease = sheetLease.issue()
         activeSheet = WebChatActionSheet.showUpdatable(
             activity = activity,
             title = "移动到项目",
             items = listOf(progressItem(destination, subtitle)),
             footerActions = listOf(officialFooter()),
-            onCancelled = { requestEpoch += 1 },
-            onDismissed = { activeSheet = null },
+            onCancelled = {
+                if (sheetLease.owns(lease)) requestEpoch += 1
+            },
+            onDismissed = {
+                if (sheetLease.owns(lease)) activeSheet = null
+            },
         ) {}
     }
 
@@ -390,8 +401,7 @@ internal class WebChatProductionConversationProjectMoveCoordinator(
     )
 
     private fun complete(destination: ChatGptWebProject) {
-        activeSheet?.dismiss()
-        activeSheet = null
+        dismissActiveSheet()
         writeAttempted = false
         Toast.makeText(activity, "已移动到“${destination.title}”", Toast.LENGTH_SHORT).show()
     }
@@ -403,8 +413,7 @@ internal class WebChatProductionConversationProjectMoveCoordinator(
         epoch: Int,
     ) {
         if (!isCurrent(epoch) || activity.isFinishing || activity.isDestroyed) return
-        activeSheet?.dismiss()
-        activeSheet = null
+        dismissActiveSheet()
         val attempted = writeAttempted
         val message = if (attempted) {
             "$detail。已经提交过一次操作，为避免重复移动，应用不会自动重试。可以刷新目录或在官网确认。"
@@ -452,6 +461,13 @@ internal class WebChatProductionConversationProjectMoveCoordinator(
         contentDescription = "web-chat-conversation-project-move-official",
         action = openOfficialFallback,
     )
+
+    private fun dismissActiveSheet() {
+        sheetLease.invalidate()
+        val sheet = activeSheet
+        activeSheet = null
+        sheet?.dismiss()
+    }
 
     private fun isCurrent(epoch: Int): Boolean =
         epoch == requestEpoch && activeProvider() == WebChatProviderId.CHATGPT_WEB

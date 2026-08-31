@@ -32,6 +32,19 @@ class WebChatConversationProjectMovePolicyTest {
     }
 
     @Test
+    fun staleSheetCallbacksCannotReleaseTheCurrentProgressSheet() {
+        val lease = WebChatConversationProjectMoveSheetLease()
+        val picker = lease.issue()
+        val progress = lease.issue()
+
+        assertFalse(lease.owns(picker))
+        assertTrue(lease.owns(progress))
+
+        lease.invalidate()
+        assertFalse(lease.owns(progress))
+    }
+
+    @Test
     fun destinationsUseCachedProjectsAndExcludeTheCurrentProject() {
         val index = ChatGptWebConversationIndexState(
             projects = listOf(

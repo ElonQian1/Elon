@@ -126,3 +126,15 @@ internal object WebChatConversationProjectMoveTiming {
             attempt < CONTROL_POLL_LIMIT &&
             attempt % CONTROL_REFRESH_POLL == 0
 }
+
+internal class WebChatConversationProjectMoveSheetLease {
+    private var generation = 0L
+
+    fun issue(): Long = ++generation
+
+    fun invalidate() {
+        generation += 1
+    }
+
+    fun owns(candidate: Long): Boolean = candidate == generation
+}
