@@ -132,6 +132,33 @@ impl ManagedSqliteMultiConnectionFixture {
     }
 
     #[cfg(all(test, windows))]
+    pub(super) fn arm_unsafe_shm_route_preemption(&self, index: usize) -> Result<(), &'static str> {
+        let route = self
+            .route_ordinal(index)
+            .map_err(|_| "managed route missing")?;
+        self.registration
+            .as_ref()
+            .expect("managed VFS registration")
+            .lifecycle()
+            .arm_unsafe_shm_route_preemption(route)
+    }
+
+    #[cfg(all(test, windows))]
+    pub(super) fn unsafe_shm_route_preemption_snapshot(
+        &self,
+        index: usize,
+    ) -> Result<ManagedTestUnsafeShmRoutePreemptionSnapshot, &'static str> {
+        let route = self
+            .route_ordinal(index)
+            .map_err(|_| "managed route missing")?;
+        self.registration
+            .as_ref()
+            .expect("managed VFS registration")
+            .lifecycle()
+            .unsafe_shm_route_preemption_snapshot(route)
+    }
+
+    #[cfg(all(test, windows))]
     pub(super) fn begin_unfaulted_barrier_observation_window(
         &self,
         route: ManagedTestRouteOrdinal,

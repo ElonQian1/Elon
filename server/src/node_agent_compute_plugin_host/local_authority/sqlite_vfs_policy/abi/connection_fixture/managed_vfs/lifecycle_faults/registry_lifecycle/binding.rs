@@ -95,6 +95,19 @@ impl ManagedSqliteRegistryCloseLifecycleFaults for ManagedTestLifecycleFaultBind
         self.retain_registry_retirement(receipt);
     }
 
+    #[cfg(windows)]
+    fn claim_unsafe_shm_route_preemption(&self) -> Result<bool, ()> {
+        ManagedTestLifecycleFaultBinding::claim_unsafe_shm_route_preemption(self)
+    }
+
+    #[cfg(windows)]
+    fn record_unsafe_shm_route_preemption_receipt(
+        &self,
+        receipt: ManagedSqliteRegistryUnsafeShmRoutePreemptionReceipt,
+    ) -> Result<(), ()> {
+        ManagedTestLifecycleFaultBinding::record_unsafe_shm_route_preemption_receipt(self, receipt)
+    }
+
     fn take_connection_observation_sidecar(&self) -> Result<Option<PinnedManagedSqliteFile>, ()> {
         self.controller
             .take_connection_observation_sidecar(self.route)

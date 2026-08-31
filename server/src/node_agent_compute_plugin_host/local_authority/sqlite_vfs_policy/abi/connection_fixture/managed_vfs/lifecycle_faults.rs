@@ -27,6 +27,13 @@ mod unmap;
 pub(super) use unmap::ManagedTestUnmapCompletionFault;
 
 #[cfg(all(test, windows))]
+mod unsafe_shm_preemption;
+#[cfg(all(test, windows))]
+pub(super) use unsafe_shm_preemption::ManagedTestUnsafeShmRoutePreemptionSnapshot;
+#[cfg(all(test, windows))]
+use unsafe_shm_preemption::ManagedTestUnsafeShmRoutePreemptionState;
+
+#[cfg(all(test, windows))]
 mod joint_close;
 #[cfg(all(test, windows))]
 pub(super) use joint_close::{ManagedTestJointCloseControl, ManagedTestJointCloseControlSnapshot};
@@ -135,6 +142,8 @@ struct ManagedTestLifecycleFaultState {
     registry_lifecycle: ManagedTestRegistryLifecycleState,
     #[cfg(all(test, windows))]
     joint_close: joint_close::ManagedTestJointCloseState,
+    #[cfg(all(test, windows))]
+    unsafe_shm_preemption: ManagedTestUnsafeShmRoutePreemptionState,
     installed: bool,
     #[cfg(all(test, windows))]
     registration_shutdown_quarantine: ManagedTestRegistrationShutdownQuarantineState,
@@ -158,6 +167,8 @@ impl ManagedTestLifecycleFaultController {
                 registry_lifecycle: ManagedTestRegistryLifecycleState::default(),
                 #[cfg(all(test, windows))]
                 joint_close: joint_close::ManagedTestJointCloseState::default(),
+                #[cfg(all(test, windows))]
+                unsafe_shm_preemption: ManagedTestUnsafeShmRoutePreemptionState::default(),
                 installed: false,
                 #[cfg(all(test, windows))]
                 registration_shutdown_quarantine:
@@ -367,6 +378,21 @@ impl ManagedTestLifecycleFaultBinding {
 
     pub(super) fn retain_terminal<Retained: 'static>(&self, retained: Retained) {
         self.controller.retain_terminal(retained);
+    }
+
+    #[cfg(all(test, windows))]
+    pub(super) fn claim_unsafe_shm_route_preemption(&self) -> Result<bool, ()> {
+        self.controller
+            .claim_unsafe_shm_route_preemption(self.route)
+    }
+
+    #[cfg(all(test, windows))]
+    pub(super) fn record_unsafe_shm_route_preemption_receipt(
+        &self,
+        receipt: crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::registry::ManagedSqliteRegistryUnsafeShmRoutePreemptionReceipt,
+    ) -> Result<(), ()> {
+        self.controller
+            .record_unsafe_shm_route_preemption_receipt(self.route, receipt)
     }
 }
 
