@@ -3,14 +3,14 @@ export const LOCAL_AI_REQUIRED_ADAPTER_VERSIONS = {
   // pinned to the current native adapter so a hot-loaded UI never drives an
   // older private-stream implementation that cannot recover finance cards,
   // reconcile new-conversation boundaries, or isolate late replies.
-  chatgpt: 207,
+  chatgpt: 208,
   'google-ai-mode': 40,
 } as const
 
 // The native Tauri host and the PC UI are released independently. Adapter
 // versions only describe page injection; this guards native commands and
 // bundled shared assets as one desktop runtime generation.
-export const LOCAL_AI_REQUIRED_DESKTOP_RUNTIME_VERSION = 10
+export const LOCAL_AI_REQUIRED_DESKTOP_RUNTIME_VERSION = 11
 
 export function requiredLocalAiAdapterVersion(providerId: string): number {
   return LOCAL_AI_REQUIRED_ADAPTER_VERSIONS[
