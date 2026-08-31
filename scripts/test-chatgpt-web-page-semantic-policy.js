@@ -8,6 +8,15 @@ function expectEqual(actual, expected, name) {
   }
 }
 
+expectEqual(policy.conversationIdentity('/c/Conversation_1'), 'Conversation_1', 'canonical conversation identity');
+expectEqual(
+  policy.conversationIdentity('/g/g-p-demo_3/c/Project_conversation_2'),
+  'Project_conversation_2',
+  'project conversation identity'
+);
+expectEqual(policy.conversationIdentity('/g/g-p-demo_3/project'), '', 'project page is not a conversation');
+expectEqual(policy.conversationIdentity('https://chatgpt.com/c/Conversation_1'), '', 'absolute URL fails closed');
+
 expectEqual(policy.classify({
   pathname: '/scheduled',
   region: 'content',
@@ -75,6 +84,12 @@ expectEqual(policy.classify({
 }), '', 'project conversation remains unclassified');
 
 expectEqual(policy.classify({
+  pathname: '/g/g-p-a1b2c3/c/conversation-id',
+  region: 'header',
+  signal: 'More options'
+}), 'conversation_options', 'project conversation header options');
+
+expectEqual(policy.classify({
   pathname: '/',
   region: 'content',
   signal: 'Unknown action'
@@ -106,10 +121,21 @@ expectEqual(policy.conversationContextId({
 }), 'Current_conversation_123', 'header options inherit the current conversation context');
 expectEqual(policy.conversationContextId({
   semantic: 'conversation_options',
+  region: 'header',
+  pathname: '/g/g-p-Project_123/c/Project_conversation_456'
+}), 'Project_conversation_456', 'project header options inherit the current conversation context');
+expectEqual(policy.conversationContextId({
+  semantic: 'conversation_options',
   region: 'overlay',
   path: '/c/Sidebar_conversation_456',
   pathname: '/c/current_conversation_123'
 }), 'Sidebar_conversation_456', 'sidebar options retain their related conversation context');
+expectEqual(policy.conversationContextId({
+  semantic: 'conversation_options',
+  region: 'overlay',
+  path: '/g/g-p-project_123/c/Project_sidebar_789',
+  pathname: '/c/current_conversation_123'
+}), 'Project_sidebar_789', 'project sidebar options retain their related conversation context');
 expectEqual(policy.conversationContextId({
   semantic: 'more',
   region: 'header',

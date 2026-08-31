@@ -5,13 +5,16 @@ param(
     [string]$Adb = "D:\Android\sdk\platform-tools\adb.exe",
     [Parameter(Mandatory = $true)][string]$DeviceSerial,
     [string]$ExpectedHardwareSerial = "",
-    [ValidateRange(1, 9999)][int]$ExpectedAdapterVersion = 209,
+    [ValidateRange(0, 9999)][int]$ExpectedAdapterVersion = 0,
     [ValidateRange(30, 300)][int]$TimeoutSec = 150,
     [switch]$ConfirmRoundTrip
 )
 
 $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "chatgpt-web-smoke-runtime.ps1")
+
+$ExpectedAdapterVersion = Resolve-ChatGptWebSmokeExpectedAdapterVersion `
+    -ExpectedAdapterVersion $ExpectedAdapterVersion
 
 $runtime = New-ChatGptWebSmokeRuntime -Adb $Adb -DeviceSerial $DeviceSerial `
     -ExpectedHardwareSerial $ExpectedHardwareSerial -PollIntervalSec 1

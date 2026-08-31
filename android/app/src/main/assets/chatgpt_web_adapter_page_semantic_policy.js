@@ -1,14 +1,23 @@
 (function (root, factory) {
   'use strict';
 
-  const policy = factory();
+  const projectPolicy = typeof module !== 'undefined' && module.exports
+    ? require('./chatgpt_web_adapter_project_policy.js')
+    : root && root.__elonChatGptProjectPolicy;
+  const policy = factory(projectPolicy);
   if (typeof module !== 'undefined' && module.exports) module.exports = policy;
   if (root) root.__elonChatGptPageSemanticPolicy = Object.freeze(policy);
-})(typeof window !== 'undefined' ? window : null, function () {
+})(typeof window !== 'undefined' ? window : null, function (projectPolicy) {
   'use strict';
 
   function clean(value) {
     return String(value || '').replace(/\s+/g, ' ').trim().toLowerCase();
+  }
+
+  function conversationIdentity(value) {
+    return projectPolicy && typeof projectPolicy.conversationId === 'function'
+      ? projectPolicy.conversationId(value)
+      : '';
   }
 
   const contentRoutes = Object.freeze([
@@ -61,13 +70,13 @@
     if (semantic !== 'conversation' && semantic !== 'conversation_options') return '';
     const relatedPath = String(input && input.path || '').trim();
     const currentPath = String(input && input.pathname || '').trim();
-    const conversationPath = /^\/c\/[A-Za-z0-9_-]{1,160}$/;
-    if (conversationPath.test(relatedPath)) return relatedPath.slice(3);
+    const relatedIdentity = conversationIdentity(relatedPath);
+    if (relatedIdentity) return relatedIdentity;
     if (
       semantic === 'conversation_options' &&
       clean(input && input.region) === 'header' &&
-      conversationPath.test(currentPath)
-    ) return currentPath.slice(3);
+      conversationIdentity(currentPath)
+    ) return conversationIdentity(currentPath);
     return '';
   }
 
@@ -80,7 +89,7 @@
         path: String(candidate && candidate.path || '').trim(),
         label: clean(candidate && candidate.label)
       }))
-      .filter((candidate) => /^\/c\/[A-Za-z0-9_-]{1,160}$/.test(candidate.path));
+      .filter((candidate) => conversationIdentity(candidate.path));
     const uniquePaths = Array.from(new Set(conversations.map((candidate) => candidate.path)));
     if (uniquePaths.length === 1) return uniquePaths[0];
     if (uniquePaths.length === 0) return '';
@@ -112,11 +121,11 @@
       return 'navigation';
     }
     if (
-      /^\/c\/[a-z0-9_-]{1,160}$/.test(pathname) &&
+      conversationIdentity(pathname) &&
       region === 'header' &&
       /\bmore\b|options?|menu|更多|操作|菜单/.test(signal)
     ) return 'conversation_options';
-    if (/^\/c\/[a-z0-9_-]{1,160}$/.test(path) && !(input && input.isLink)) {
+    if (conversationIdentity(path) && !(input && input.isLink)) {
       return 'conversation_options';
     }
     if (
@@ -161,6 +170,7 @@
 
   return Object.freeze({
     classify,
+    conversationIdentity,
     conversationContextId,
     isTimestampLabel,
     planTemporaryChatSelection,

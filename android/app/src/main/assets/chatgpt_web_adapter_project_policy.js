@@ -11,6 +11,7 @@
   const PRODUCTION_PROJECT_ID = /^(g-p-[A-Fa-f0-9]{32})(?:-[A-Za-z0-9_-]{1,124})?$/;
   const PROJECT_PATH = /(?:^|https:\/\/chatgpt\.com)?\/g\/(g-p-[A-Za-z0-9_-]{1,160})(?:\/project)?(?:[/?#]|$)/i;
   const CONVERSATION_PATH = /(?:^|https:\/\/chatgpt\.com)?\/(?:c\/[A-Za-z0-9_-]{1,160}|g\/g-p-[A-Za-z0-9_-]{1,160}\/c\/[A-Za-z0-9_-]{1,160})(?:[/?#]|$)/i;
+  const STRICT_CONVERSATION_PATH = /^\/(?:c\/([A-Za-z0-9_-]{1,160})|g\/g-p-[A-Za-z0-9_-]{1,160}\/c\/([A-Za-z0-9_-]{1,160}))$/i;
   const PROJECT_OPTIONS = /(?:project|\u9879\u76ee).*(?:options?|menu|\u9009\u9879|\u64cd\u4f5c|\u83dc\u5355)|(?:open|\u6253\u5f00).*(?:options?|\u9009\u9879)/i;
   const RESERVED_TITLE = /^(?:chat|chatgpt|\u804a\u5929|projects?|\u9879\u76ee|new project|create project|\u65b0\u5efa\u9879\u76ee|\u65b0\u9879\u76ee|view more|\u67e5\u770b\u66f4\u591a)$/i;
 
@@ -26,6 +27,11 @@
     const id = clean(value);
     const production = id.match(PRODUCTION_PROJECT_ID);
     return production ? production[1] : id;
+  }
+
+  function conversationId(value) {
+    const match = STRICT_CONVERSATION_PATH.exec(String(value || '').trim());
+    return match ? match[1] || match[2] || '' : '';
   }
 
   function projectId(value) {
@@ -188,6 +194,6 @@
   }
 
   return Object.freeze({
-    canonicalId, canonicalPath, findNode, projectId, read, referencedTitle, runtimeProjectId, unresolved
+    canonicalId, canonicalPath, conversationId, findNode, projectId, read, referencedTitle, runtimeProjectId, unresolved
   });
 });

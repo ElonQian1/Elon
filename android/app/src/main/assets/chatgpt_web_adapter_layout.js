@@ -216,9 +216,9 @@
     if (/unarchive|archive|取消归档|归档/.test(signal)) return 'archive';
     if (/share|分享/.test(signal)) return 'share';
     if (/delete|删除/.test(signal)) return 'delete';
-    if (/^\/c\/[A-Za-z0-9_-]{1,160}$/.test(path) && node.matches('a[href]')) return 'conversation';
+    if (window.__elonChatGptProjectPolicy.conversationId(path) && node.matches('a[href]')) return 'conversation';
     if (
-      /^\/c\/[A-Za-z0-9_-]{1,160}$/.test(path)
+      window.__elonChatGptProjectPolicy.conversationId(path)
       && !node.matches('a[href]')
       && (
         /\bmore\b|options?|menu|更多|操作|菜单/.test(signal)
@@ -537,7 +537,7 @@
 
   function pageKind() {
     if (/^\/(auth|cdn-cgi)/.test(location.pathname)) return 'auth';
-    if (/^\/c\//.test(location.pathname)) return 'conversation';
+    if (window.__elonChatGptProjectPolicy.conversationId(location.pathname)) return 'conversation';
     if (location.pathname === '/' || location.pathname === '') return 'home';
     return 'feature';
   }
