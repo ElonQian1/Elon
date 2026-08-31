@@ -37,7 +37,7 @@ pub(super) use lock_runner::{
     run_lock_stored_poison_program_isolated, LockRunnerActionV1, LockRunnerEvidenceReceiptV1,
     LockRunnerIsolatedEvidenceV1, LockRunnerLifecycleBindingV1, LockRunnerLifecyclePathV1,
     LockRunnerProgramBindingV1, LockRunnerRequestValidationV1, LockRunnerStoredPoisonBindingV1,
-    LockRunnerStoredPoisonProfileV1,
+    LockRunnerStoredPoisonCompletionV1, LockRunnerStoredPoisonProfileV1,
 };
 pub(super) use map_runner::{
     run_map_lifecycle_program_isolated, run_map_program_isolated,

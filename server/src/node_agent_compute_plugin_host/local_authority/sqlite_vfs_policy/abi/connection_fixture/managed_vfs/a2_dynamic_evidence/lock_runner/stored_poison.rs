@@ -1,7 +1,7 @@
 //! Real installed-ABI Lock execution from an exact stored-poison prestate.
 
-mod fixture;
-mod payload;
+pub(super) mod fixture;
+pub(super) mod payload;
 
 use std::path::Path;
 
@@ -9,13 +9,25 @@ use anyhow::{anyhow, Context};
 use rusqlite::ffi;
 
 use super::super::{SanitizedChildReport, A2_DYNAMIC_CHILD_NONCE_ENV};
-use super::{LockRunnerActionV1, LockRunnerStoredPoisonBindingV1, LockRunnerStoredPoisonProfileV1};
+use super::{
+    LockRunnerActionV1, LockRunnerStoredPoisonBindingV1, LockRunnerStoredPoisonCompletionV1,
+    LockRunnerStoredPoisonProfileV1,
+};
 
 pub(super) use payload::{exact_selector, validate_payload, ValidatedStoredPoisonPayloadV1};
 
 pub(super) const SELECTED: usize = 0;
 
 pub(super) fn validate_binding(binding: LockRunnerStoredPoisonBindingV1) -> anyhow::Result<()> {
+    if binding.completion != LockRunnerStoredPoisonCompletionV1::RetentionSucceeded {
+        return Err(anyhow!("q3 Lock stored-poison completion mismatch"));
+    }
+    validate_common_binding(binding)
+}
+
+pub(super) fn validate_common_binding(
+    binding: LockRunnerStoredPoisonBindingV1,
+) -> anyhow::Result<()> {
     let end = binding
         .first
         .checked_add(binding.count)
@@ -44,6 +56,13 @@ pub(super) fn exercise_child(
     binding: LockRunnerStoredPoisonBindingV1,
 ) -> anyhow::Result<()> {
     validate_binding(binding)?;
+    exercise_child_inner(root, binding)
+}
+
+pub(super) fn exercise_child_inner(
+    root: &Path,
+    binding: LockRunnerStoredPoisonBindingV1,
+) -> anyhow::Result<()> {
     let nonce = std::env::var(A2_DYNAMIC_CHILD_NONCE_ENV)
         .context("read parent-created Lock stored-poison child nonce")?;
     SanitizedChildReport::validate_root_before_exercise(&nonce, root)
@@ -74,6 +93,12 @@ pub(super) fn exercise_child(
     )?;
     let poisoned = observer.snapshot()?;
     fixture::validate_poisoned_snapshot(binding.profile, poisoned)?;
+
+    if binding.completion == LockRunnerStoredPoisonCompletionV1::RetentionRouteUnknown {
+        fixture
+            .arm_unsafe_shm_route_preemption(SELECTED)
+            .map_err(anyhow::Error::msg)?;
+    }
 
     let callback = fixture
         .route(SELECTED)?
@@ -145,11 +170,35 @@ pub(super) fn exercise_child(
         u64::from(terminal_route.callbacks_in_flight()),
         u64::from(terminal_route.access_callback_allowed()),
     ];
-    if terminal_values != [2, 1, 0, 0, 1, 1, 1, 1, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0] {
+    let expected_terminal_values = match binding.completion {
+        LockRunnerStoredPoisonCompletionV1::RetentionSucceeded => {
+            [2, 1, 0, 0, 1, 1, 1, 1, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0]
+        }
+        LockRunnerStoredPoisonCompletionV1::RetentionRouteUnknown => {
+            [3, 1, 0, 0, 2, 2, 1, 1, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0]
+        }
+    };
+    if terminal_values != expected_terminal_values {
         return Err(anyhow!(
-            "Lock stored-poison retention-succeeded custody ledger mismatch"
+            "Lock stored-poison completion custody ledger mismatch"
         ));
     }
+
+    let preemption_values = match binding.completion {
+        LockRunnerStoredPoisonCompletionV1::RetentionSucceeded => None,
+        LockRunnerStoredPoisonCompletionV1::RetentionRouteUnknown => {
+            let values = fixture
+                .unsafe_shm_route_preemption_snapshot(SELECTED)
+                .map_err(anyhow::Error::msg)?
+                .ordered_values();
+            if values != [1, 1, 1, 1, 1] {
+                return Err(anyhow!(
+                    "Lock stored-poison route-unknown ordered receipt mismatch"
+                ));
+            }
+            Some(values)
+        }
+    };
 
     let registration = fixture.live_registration_snapshot()?;
     let registration_values = [
@@ -175,7 +224,7 @@ pub(super) fn exercise_child(
         ));
     }
 
-    let payload = payload::encode(
+    let q3_payload = payload::encode(
         binding,
         target.registration_id(),
         target.route_ordinal(),
@@ -194,6 +243,12 @@ pub(super) fn exercise_child(
         route_values,
         u64::from(root_shape_present),
     );
+    let payload = match preemption_values {
+        None => q3_payload,
+        Some(receipt) => {
+            super::stored_poison_route_unknown::upgrade_payload(binding, &q3_payload, receipt)?
+        }
+    };
     let report = SanitizedChildReport::encode_for_current_child(
         &nonce,
         root,

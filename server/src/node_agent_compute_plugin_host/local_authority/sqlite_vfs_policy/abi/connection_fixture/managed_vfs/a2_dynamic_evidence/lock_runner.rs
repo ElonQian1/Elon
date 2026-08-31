@@ -3,8 +3,15 @@
 mod lifecycle;
 mod request_validation;
 mod stored_poison;
+mod stored_poison_dispatch;
+mod stored_poison_model;
+mod stored_poison_route_unknown;
 
 pub(in super::super) use request_validation::{LockRunnerActionV1, LockRunnerRequestValidationV1};
+pub(in super::super) use stored_poison_model::{
+    LockRunnerStoredPoisonBindingV1, LockRunnerStoredPoisonCompletionV1,
+    LockRunnerStoredPoisonProfileV1,
+};
 
 use std::{
     fs,
@@ -51,39 +58,6 @@ pub(in super::super) struct LockRunnerLifecycleBindingV1 {
     pub(in super::super) first: u8,
     pub(in super::super) count: u8,
     pub(in super::super) mask: u8,
-    pub(in super::super) normalized_descriptor_sha256: [u8; 32],
-    pub(in super::super) case_key_sha256: [u8; 32],
-    pub(in super::super) full_record_sha256: [u8; 32],
-    pub(in super::super) plan_sha256: [u8; 32],
-    pub(in super::super) implementation_sha256: [u8; 32],
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(in super::super) enum LockRunnerStoredPoisonProfileV1 {
-    GateNoMutation,
-    FileCloseNoMutation,
-    ExactSiblingDeleteNoMutation,
-    ExactSiblingOpenUncertain,
-    DmsTruncateUncertain,
-    FileCloseUncertain,
-    ExactSiblingDeleteUncertain,
-    FileGrowUncertain,
-    MappingCloseUncertain,
-    ViewUnmapUncertain,
-    LockReleaseUncertain,
-    ConnectionDetachUncertain,
-    DeleteAuthorizationUncertain,
-    DmsExclusiveReleaseUncertain,
-    DmsSharedReleaseUncertain,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(in super::super) struct LockRunnerStoredPoisonBindingV1 {
-    pub(in super::super) action: LockRunnerActionV1,
-    pub(in super::super) first: u8,
-    pub(in super::super) count: u8,
-    pub(in super::super) mask: u8,
-    pub(in super::super) profile: LockRunnerStoredPoisonProfileV1,
     pub(in super::super) normalized_descriptor_sha256: [u8; 32],
     pub(in super::super) case_key_sha256: [u8; 32],
     pub(in super::super) full_record_sha256: [u8; 32],
@@ -162,12 +136,12 @@ pub(in super::super) fn run_lock_stored_poison_program_isolated(
     exact_test: &str,
     binding: LockRunnerStoredPoisonBindingV1,
 ) -> anyhow::Result<LockRunnerIsolatedEvidenceV1> {
-    stored_poison::validate_binding(binding)?;
+    stored_poison_dispatch::validate_binding(binding)?;
     if let Some(root) = selected_child_root()? {
         let selected = std::env::var(STORED_POISON_SELECTOR_ENV)
             .context("read parent-selected Lock stored-poison program")?;
-        if selected == stored_poison::exact_selector(binding) {
-            stored_poison::exercise_child(&root, binding)?;
+        if selected == stored_poison_dispatch::exact_selector(binding) {
+            stored_poison_dispatch::exercise_child(&root, binding)?;
         }
         return Ok(LockRunnerIsolatedEvidenceV1::ChildReported);
     }
@@ -247,7 +221,7 @@ fn run_stored_poison_parent(
         std::env::current_exe().context("resolve current Lock stored-poison test executable")?;
     let root = create_private_child_root()?;
     let launch = ChildLaunchIdentity::new();
-    let selector = stored_poison::exact_selector(binding);
+    let selector = stored_poison_dispatch::exact_selector(binding);
     let spawned = match Command::new(executable)
         .args(["--exact", exact_test, "--nocapture"])
         .env(CHILD_ROOT_ENV, &root)
@@ -354,7 +328,7 @@ fn validate_stored_poison_parent_receipt(
     if !child.matches_family(SanitizedPayloadFamily::LockQuotient) {
         return Err(anyhow!("Lock stored-poison child payload family mismatch"));
     }
-    let payload = stored_poison::validate_payload(child.actual_payload(), binding)?;
+    let payload = stored_poison_dispatch::validate_payload(child.actual_payload(), binding)?;
     if !child.matches_registration_id(payload.registration_id) {
         return Err(anyhow!(
             "Lock stored-poison child registration binding mismatch"
@@ -444,8 +418,18 @@ pub(in super::super) fn lock_stored_poison_selector_for_test(
     profile_tag: u64,
     first: u8,
     count: u8,
+    completion_tag: u64,
 ) -> Result<String, &'static str> {
-    super::child::lock_stored_poison::selector(action_tag, profile_tag, first, count)
+    match completion_tag {
+        3 => super::child::lock_stored_poison::selector(action_tag, profile_tag, first, count),
+        4 => super::child::lock_stored_poison::route_unknown::selector(
+            action_tag,
+            profile_tag,
+            first,
+            count,
+        ),
+        _ => Err("A2_DYNAMIC_CHILD_ACTUAL_SELECTOR_INVALID"),
+    }
 }
 
 fn digest_native_receipt(payload: &str) -> [u8; 32] {
