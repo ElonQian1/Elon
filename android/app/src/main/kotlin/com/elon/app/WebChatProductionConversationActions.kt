@@ -20,8 +20,14 @@ internal object WebChatProductionConversationActionPolicy {
         state: String,
     ): WebChatConversationActionReadiness = when {
         providerId != WebChatProviderId.CHATGPT_WEB -> WebChatConversationActionReadiness.CANCEL
-        currentPath == targetPath && state == "ready" -> WebChatConversationActionReadiness.SHOW
+        sameConversation(targetPath, currentPath) && state == "ready" ->
+            WebChatConversationActionReadiness.SHOW
         else -> WebChatConversationActionReadiness.WAIT
+    }
+
+    private fun sameConversation(targetPath: String, currentPath: String?): Boolean {
+        val targetIdentity = ChatGptWebConversationPath.identity(targetPath) ?: return false
+        return targetIdentity == ChatGptWebConversationPath.identity(currentPath)
     }
 }
 

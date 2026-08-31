@@ -114,7 +114,8 @@ function Invoke-NativeSelector {
     param(
         [Parameter(Mandatory = $true)][string]$Selector,
         [Parameter(Mandatory = $true)][string]$Stage,
-        [switch]$Prefix
+        [switch]$Prefix,
+        [switch]$Optional
     )
 
     $deadline = [DateTimeOffset]::UtcNow.AddSeconds(12)
@@ -139,7 +140,7 @@ function Invoke-NativeSelector {
                 -Arguments @("shell", "input", "tap", "$x", "$y") `
                 -TimeoutSec 5 -Label "invoke native project-move selector" | Out-Null
             Start-Sleep -Milliseconds 500
-            return
+            return $true
         }
         Start-Sleep -Milliseconds 500
     } while ([DateTimeOffset]::UtcNow -lt $deadline)
@@ -156,6 +157,7 @@ function Invoke-NativeSelector {
     $destinationCount = @($visibleDescriptions | Where-Object {
         $_ -like "web-chat-conversation-project-destination:*"
     }).Count
+    if ($Optional) { return $false }
     throw (
         "A required native project-move selector was not visible at stage: " +
             "$Stage (action_controls=$actionControlCount, destinations=$destinationCount)."
@@ -237,16 +239,29 @@ function Invoke-ProjectMove {
         [Parameter(Mandatory = $true)][ref]$WriteSelected
     )
 
-    Open-ProjectSidebar -ProjectId $SourceProjectId
     $conversationToken = ConvertTo-NativeToken -Value ([string]$Conversation.id)
-    Invoke-NativeSelector `
-        -Selector ("chatgpt-conversation-actions:" + $conversationToken + ":") `
-        -Stage "conversation-actions" `
-        -Prefix
-    Invoke-NativeSelector `
-        -Selector "web-chat-conversation-action-move-to-project" `
-        -Stage "move-action"
-    Invoke-NativeSelector -Selector (
+    $pickerOpened = $false
+    for ($attempt = 1; $attempt -le 2; $attempt++) {
+        Open-ProjectSidebar -ProjectId $SourceProjectId
+        $null = Invoke-NativeSelector `
+            -Selector ("chatgpt-conversation-actions:" + $conversationToken + ":") `
+            -Stage "conversation-actions" `
+            -Prefix
+        $pickerOpened = Invoke-NativeSelector `
+            -Selector "web-chat-conversation-action-move-to-project" `
+            -Stage "move-action" `
+            -Optional
+        if ($pickerOpened) { break }
+        Invoke-ChatGptWebSmokeAdb -Runtime $runtime `
+            -Arguments @("shell", "input", "keyevent", "4") `
+            -TimeoutSec 5 -Label "dismiss incomplete project-move menu" | Out-Null
+        Close-Sidebar
+        Start-Sleep -Milliseconds 1200
+    }
+    if (-not $pickerOpened) {
+        throw "The native move-to-project picker did not open after one safe retry."
+    }
+    $null = Invoke-NativeSelector -Selector (
         "web-chat-conversation-project-destination:" + $DestinationProjectId
     ) -Stage "project-destination"
     $WriteSelected.Value = $true
@@ -256,6 +271,7 @@ function Invoke-ProjectMove {
 
 Start-ChatGptWebSmokeAwakeLease -Runtime $runtime | Out-Null
 try {
+    Open-ChatGptWebNativeChatSurface -Runtime $runtime -TimeoutSec $TimeoutSec | Out-Null
     $ready = Wait-ProductionReady
     $originPath = [string]$ready.social_chat.web_chat_conversation_path
     $navigation = Get-Navigation

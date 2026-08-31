@@ -18,6 +18,19 @@ class WebChatProductionConversationActionsTest {
     }
 
     @Test
+    fun projectAndCanonicalPathsForTheSameConversationAreEquivalent() {
+        assertEquals(
+            WebChatConversationActionReadiness.SHOW,
+            WebChatProductionConversationActionPolicy.evaluate(
+                WebChatProviderId.CHATGPT_WEB,
+                targetPath = "/g/g-p-project/c/target",
+                currentPath = "/c/target",
+                state = "ready",
+            ),
+        )
+    }
+
+    @Test
     fun anotherOrLoadingConversationWaitsForNavigation() {
         listOf("loading" to "/c/target", "ready" to "/c/other").forEach { (state, current) ->
             assertEquals(

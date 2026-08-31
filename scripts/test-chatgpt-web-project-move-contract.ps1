@@ -11,6 +11,7 @@ function Assert-Contains([string]$Needle) {
 @(
     "[switch]`$ConfirmRoundTrip",
     "Wait-ProductionReady",
+    "Open-ChatGptWebNativeChatSurface",
     "get_web_chat_navigation",
     "ConvertTo-NativeToken",
     '-Stage "conversation-actions"',
@@ -18,6 +19,9 @@ function Assert-Contains([string]$Needle) {
     '-Stage "project-destination"',
     "chatgpt-conversation-actions:",
     "-Prefix",
+    "-Optional",
+    'for ($attempt = 1; $attempt -le 2; $attempt++)',
+    "one safe retry",
     "web-chat-conversation-action-move-to-project",
     "web-chat-conversation-project-destination:",
     "Wait-ConversationMembership",
