@@ -174,6 +174,19 @@ pub(super) fn resolve_with_map_execution_v1(
     resolve_supported_map_with_plan_v1(key, member, plan, execution)
 }
 
+/// Preserve the planned-missing execution decision while a separately reviewed source-program
+/// receipt authorizes only pre-manifest semantic cataloging. This function never returns
+/// `Supported`; callers must already hold and consume the opaque program-catalog receipt.
+pub(super) fn resolve_planned_for_program_catalog_v1(
+    key: &DynamicClassKeyV1,
+    member: StaticMemberSealV1,
+) -> Result<RunnerAdmissionReceiptV1, RunnerAdmissionViolationV1> {
+    let plan = compile_v1(key);
+    let mut normalized = *key;
+    normalized.recipe.capability = RunnerCapabilityV1::Missing(plan.expected_gap);
+    resolve_with_plan_v1(&normalized, member, plan)
+}
+
 pub(super) fn inventory_v1(
     key: &DynamicClassKeyV1,
 ) -> Result<ExecutionProgramInventoryReceiptV1, ExecutionProgramInventoryViolationV1> {

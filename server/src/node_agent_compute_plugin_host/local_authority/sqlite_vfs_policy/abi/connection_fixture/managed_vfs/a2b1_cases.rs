@@ -59,16 +59,18 @@ fn a2b1_map_lock_static_contract_is_exact() {
 }
 
 #[test]
-fn a2b1_map_dynamic_quotient_candidate_is_atomically_runner_blocked() {
+fn a2b1_map_dynamic_quotient_candidate_is_atomically_program_inventory_blocked() {
     let error = denominator::validate_map_dynamic_quotient_candidate_gate()
-        .expect_err("Map quotient candidate must remain closed without an executable runner");
-    assert_eq!(
-        error,
-        denominator::DynamicQuotientCandidateGateErrorV1::RunnerCapabilityMissing {
-            count: 43_476,
-            gap: denominator::CapabilityGapV1::QuotientRunnerNotIntegrated,
-        },
-        "Map candidate must validate every static member and expose the exact root blocker"
+        .expect_err("Map quotient candidate must remain closed before complete program review");
+    assert!(
+        matches!(
+            error,
+            denominator::DynamicQuotientCandidateGateErrorV1::ProgramInventoryIncomplete {
+                missing_member_count: 43_474,
+                missing_group_count,
+            } if missing_group_count > 0
+        ),
+        "Map candidate must expose the exact incomplete source-program inventory"
     );
 }
 

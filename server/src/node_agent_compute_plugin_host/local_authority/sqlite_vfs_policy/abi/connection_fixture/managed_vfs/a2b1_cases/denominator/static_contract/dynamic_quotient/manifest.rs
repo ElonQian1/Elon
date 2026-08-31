@@ -29,6 +29,10 @@ pub(crate) struct DynamicManifestContextV1 {
     pub(crate) projector_source_scope_sha256: Digest32,
     pub(crate) descriptor_binding_sha256: Digest32,
     pub(crate) runner_admission_binding_sha256: Digest32,
+    pub(crate) execution_program_inventory_sha256: Digest32,
+    pub(crate) execution_program_membership_sha256: Digest32,
+    pub(crate) execution_program_catalog_sha256: Digest32,
+    pub(crate) program_catalog_admission_binding_sha256: Digest32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -83,6 +87,7 @@ pub(crate) enum ManifestBuildErrorV1 {
     MemberOrderMismatch,
     DuplicateMember,
     ProjectedMembershipMismatch,
+    ProgramCatalogBindingMissing,
     RepresentativeMismatch,
     CountOverflow,
 }
@@ -110,6 +115,12 @@ pub(crate) fn build_dynamic_manifest_v1(
     }
     if catalog_classes.is_empty() {
         return Err(ManifestBuildErrorV1::EmptyCatalog);
+    }
+    if catalog_root == RootOperationV1::Map
+        && catalog.program_catalog_binding().is_none()
+        && !cfg!(test)
+    {
+        return Err(ManifestBuildErrorV1::ProgramCatalogBindingMissing);
     }
 
     let erasure = digest_erasure_proof_v1();
@@ -197,6 +208,7 @@ pub(crate) fn build_dynamic_manifest_v1(
         return Err(ManifestBuildErrorV1::ProjectedMembershipMismatch);
     }
 
+    let program_catalog_binding = catalog.program_catalog_binding();
     let context = DynamicManifestContextV1 {
         schema_version: super::DYNAMIC_PROJECTOR_SCHEMA_V1,
         root: catalog_root,
@@ -212,6 +224,16 @@ pub(crate) fn build_dynamic_manifest_v1(
         projector_source_scope_sha256: digest_projector_source_scope_v1(),
         descriptor_binding_sha256: catalog.descriptor_binding_sha256(),
         runner_admission_binding_sha256: catalog.runner_admission_binding_sha256(),
+        execution_program_inventory_sha256: program_catalog_binding
+            .map_or(Digest32::ZERO, |binding| binding.inventory_sha256),
+        execution_program_membership_sha256: program_catalog_binding
+            .map_or(Digest32::ZERO, |binding| {
+                binding.inventory_membership_sha256
+            }),
+        execution_program_catalog_sha256: program_catalog_binding
+            .map_or(Digest32::ZERO, |binding| binding.inventory_catalog_sha256),
+        program_catalog_admission_binding_sha256: program_catalog_binding
+            .map_or(Digest32::ZERO, |binding| binding.admission_binding_sha256),
     };
     let mut manifest = DynamicQuotientManifestV1 {
         context,

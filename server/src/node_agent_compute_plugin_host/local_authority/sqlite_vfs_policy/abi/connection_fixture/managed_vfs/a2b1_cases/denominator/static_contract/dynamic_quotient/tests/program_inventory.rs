@@ -1,7 +1,7 @@
 use super::super::runner_admission::ExecutionProgramInventoryStatusV1;
 use super::*;
 
-fn region_count_budget_record() -> LeafRecordV1 {
+pub(super) fn region_count_budget_record() -> LeafRecordV1 {
     let mut value = record(
         "map-region-count-budget-program-inventory",
         "region-index-exceeds-authority-budget",
@@ -19,7 +19,7 @@ fn region_count_budget_record() -> LeafRecordV1 {
     value
 }
 
-fn budget_descriptor(
+pub(super) fn budget_descriptor(
     stimulus: MapManagedStimulusV1,
     mode: MapModeV1,
     capability: RunnerCapabilityV1,

@@ -5,8 +5,17 @@
 //! source exists but still requires a real receipt. It never creates a quotient catalog,
 //! `Supported` admission, dynamic member coverage, or Windows execution authority.
 
+mod admission;
 mod builder;
 mod model;
+mod review;
 
+#[cfg(test)]
+pub(super) use admission::provider_for_source_program_for_test;
+pub(crate) use admission::ProgramCatalogAdmissionErrorV1;
+pub(super) use admission::{
+    review_map_execution_program_inventory_v1, ProgramCatalogBindingV1,
+    ProgramCatalogReceiptProviderV1, ReviewedExecutionProgramInventoryV1,
+};
 pub(super) use builder::build_map_execution_program_inventory_v1;
 pub(super) use model::*;

@@ -7,6 +7,10 @@ use super::super::{
     },
     validate_source_owner_authority,
 };
+use super::program_inventory::{
+    build_map_execution_program_inventory_v1, review_map_execution_program_inventory_v1,
+    ProgramCatalogAdmissionErrorV1,
+};
 use super::{
     build_dynamic_manifest_v1, CatalogErrorV1, DynamicCatalogBuilderV1, DynamicManifestBundleV1,
     ManifestBuildErrorV1,
@@ -18,6 +22,8 @@ use super::{
 pub(crate) enum DynamicCandidateErrorV1 {
     StaticIngress(String),
     StaticBindingDrift,
+    ProgramInventory(String),
+    ProgramCatalogAdmission(ProgramCatalogAdmissionErrorV1),
     Catalog(CatalogErrorV1),
     Manifest(ManifestBuildErrorV1),
     CountOverflow,
@@ -53,8 +59,27 @@ fn build_dynamic_candidate_v1(
         return Err(DynamicCandidateErrorV1::StaticBindingDrift);
     }
 
-    let mut catalog = DynamicCatalogBuilderV1::from_frozen_static_binding(&trusted_binding)
-        .map_err(DynamicCandidateErrorV1::Catalog)?;
+    let reviewed_inventory = match root {
+        RootOperationV1::Map => {
+            let inventory = build_map_execution_program_inventory_v1(graph)
+                .map_err(|error| DynamicCandidateErrorV1::ProgramInventory(format!("{error:?}")))?;
+            Some(
+                review_map_execution_program_inventory_v1(inventory, &trusted_binding)
+                    .map_err(DynamicCandidateErrorV1::ProgramCatalogAdmission)?,
+            )
+        }
+        RootOperationV1::Lock => None,
+    };
+    let mut catalog = match reviewed_inventory {
+        Some(reviewed) => {
+            DynamicCatalogBuilderV1::from_frozen_static_binding_and_reviewed_inventory(
+                &trusted_binding,
+                reviewed,
+            )
+        }
+        None => DynamicCatalogBuilderV1::from_frozen_static_binding(&trusted_binding),
+    }
+    .map_err(DynamicCandidateErrorV1::Catalog)?;
     let mut catalog_error = None;
     let observed_binding = validate_frozen_pass(graph, root, |leaf| {
         catalog.observe(leaf).map_err(|error| {

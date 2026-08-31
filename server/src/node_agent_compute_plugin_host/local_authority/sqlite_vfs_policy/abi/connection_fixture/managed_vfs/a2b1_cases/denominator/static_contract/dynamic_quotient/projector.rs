@@ -18,6 +18,7 @@ use super::{
         DynamicProjectionV1, StaticMemberSealV1, DYNAMIC_PROJECTOR_SCHEMA_V1,
     },
     producer_coherence,
+    program_inventory::{ProgramCatalogAdmissionErrorV1, ProgramCatalogReceiptProviderV1},
     runner_admission::{
         self, MapRunnerExecutionReceiptV1, RunnerAdmissionDecisionV1, RunnerAdmissionReceiptV1,
         RunnerAdmissionViolationV1,
@@ -75,6 +76,7 @@ pub(crate) enum ProjectionErrorV1 {
         typed: PhaseV1,
     },
     RunnerCapabilityMissing(CapabilityGapV1),
+    ProgramCatalogAdmission(ProgramCatalogAdmissionErrorV1),
     Invalid(ProjectionViolationV1),
 }
 
@@ -94,7 +96,22 @@ pub(super) fn project_validated_dynamic_terminal_v1(
     let prepared = prepare_dynamic_terminal_v1(record, descriptor)?;
     let runner_admission = runner_admission::resolve_v1(&prepared.key, prepared.member)
         .map_err(map_runner_admission_error)?;
-    Ok(finish_prepared_terminal(prepared, runner_admission))
+    Ok(finish_prepared_terminal(prepared, runner_admission, false))
+}
+
+pub(super) fn project_validated_dynamic_terminal_with_program_catalog_v1(
+    record: &LeafRecordV1,
+    descriptor: &TerminalDescriptorV1,
+    provider: &mut ProgramCatalogReceiptProviderV1,
+) -> Result<ValidatedDynamicTerminalV1, ProjectionErrorV1> {
+    let prepared = prepare_dynamic_terminal_v1(record, descriptor)?;
+    provider
+        .take_for(prepared.member, &prepared.key)
+        .map_err(ProjectionErrorV1::ProgramCatalogAdmission)?;
+    let runner_admission =
+        runner_admission::resolve_planned_for_program_catalog_v1(&prepared.key, prepared.member)
+            .map_err(map_runner_admission_error)?;
+    Ok(finish_prepared_terminal(prepared, runner_admission, true))
 }
 
 pub(super) fn project_validated_dynamic_terminal_with_map_execution_v1(
@@ -106,7 +123,7 @@ pub(super) fn project_validated_dynamic_terminal_with_map_execution_v1(
     let runner_admission =
         runner_admission::resolve_with_map_execution_v1(&prepared.key, prepared.member, execution)
             .map_err(map_runner_admission_error)?;
-    Ok(finish_prepared_terminal(prepared, runner_admission))
+    Ok(finish_prepared_terminal(prepared, runner_admission, false))
 }
 
 pub(super) struct PreparedDynamicTerminalV1 {
@@ -192,8 +209,16 @@ pub(super) fn prepare_dynamic_terminal_v1(
 fn finish_prepared_terminal(
     prepared: PreparedDynamicTerminalV1,
     runner_admission: RunnerAdmissionReceiptV1,
+    source_program_admitted: bool,
 ) -> ValidatedDynamicTerminalV1 {
     let projection = match runner_admission.decision() {
+        RunnerAdmissionDecisionV1::Missing(_) if source_program_admitted => {
+            Ok(DynamicProjectionV1 {
+                key: prepared.key,
+                class_key_sha256: super::digest_dynamic_class_key_v1(&prepared.key),
+                member: prepared.member,
+            })
+        }
         RunnerAdmissionDecisionV1::Missing(gap) => Err(gap),
         RunnerAdmissionDecisionV1::Supported { .. } => Ok(DynamicProjectionV1 {
             key: prepared.key,

@@ -64,6 +64,10 @@ pub(super) const PROJECTOR_SOURCE_SCOPE_V1: &[(&str, &str)] = &[
     ),
     ("dynamic_quotient/catalog.rs", include_str!("catalog.rs")),
     (
+        "dynamic_quotient/catalog/finish.rs",
+        include_str!("catalog/finish.rs"),
+    ),
+    (
         "dynamic_quotient/descriptor_binding.rs",
         include_str!("descriptor_binding.rs"),
     ),
@@ -118,6 +122,18 @@ pub(super) const PROJECTOR_SOURCE_SCOPE_V1: &[(&str, &str)] = &[
     (
         "dynamic_quotient/program_inventory/model.rs",
         include_str!("program_inventory/model.rs"),
+    ),
+    (
+        "dynamic_quotient/program_inventory/admission.rs",
+        include_str!("program_inventory/admission.rs"),
+    ),
+    (
+        "dynamic_quotient/program_inventory/admission/canonical.rs",
+        include_str!("program_inventory/admission/canonical.rs"),
+    ),
+    (
+        "dynamic_quotient/program_inventory/admission/validation.rs",
+        include_str!("program_inventory/admission/validation.rs"),
     ),
     (
         "dynamic_quotient/program_inventory_canonical.rs",
@@ -310,6 +326,22 @@ pub(super) fn digest_dynamic_manifest_body_v1(manifest: &DynamicQuotientManifest
     out.digest(
         "runner_admission_binding_sha256",
         context.runner_admission_binding_sha256,
+    );
+    out.digest(
+        "execution_program_inventory_sha256",
+        context.execution_program_inventory_sha256,
+    );
+    out.digest(
+        "execution_program_membership_sha256",
+        context.execution_program_membership_sha256,
+    );
+    out.digest(
+        "execution_program_catalog_sha256",
+        context.execution_program_catalog_sha256,
+    );
+    out.digest(
+        "program_catalog_admission_binding_sha256",
+        context.program_catalog_admission_binding_sha256,
     );
     out.u64("class_count", manifest.class_count);
     out.u64("member_count", manifest.member_count);

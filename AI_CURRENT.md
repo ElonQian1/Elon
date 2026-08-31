@@ -65,7 +65,7 @@ reviewed_at: 2026-08-31
 - 分布式算力各层成熟度不同，不能统称“开放算力市场已完成”；统一状态见 `docs/distributed-compute/current-implementation-status.md`。
 - 外部矿池：V277/V278 uncompiled/unrun、#13-18 deny、eligible=0；V280 仅 ABI。
 - V279 UserNode Binding：Domain/Store/API/activation 源码已写但未编译/运行，零下游与经济效果；见 `docs/distributed-compute/user-node-provider-binding-authority.md`。
-- UserNode Ready：registry `45/45`、A2b2 `117/117`、Map/Lock static `43476/43476+8668/8668`。Map program/inventory 仅源码且未运行（`passed=0 failed=0 not_run`）；默认 Map 全 Missing、Lock 不变，完整 candidate/manifest、`Qmap/Qlock`、coverage、WindowsDynamic 仍关闭。见 `AI_INDEX.md`。
+- UserNode Ready：registry `45/45`、A2b2 `117/117`、Map/Lock static `43476/43476+8668/8668`。Map 已写入非授权 program inventory，以及 `reviewed inventory -> source-program admission provider -> catalog/manifest binding` 的失败关闭源码桥；只有 planned-missing member/group 均为零且 inventory body digest 精确匹配独立 review 后 checked-in digest，provider authority 才可构造。current source test 仍预期 `43,474` 个 planned-missing member，reviewed digest 未 frozen，且本批不编译、不运行（`passed=0 failed=0 not_run`），所以 full candidate 仍在 catalog/manifest 前原子失败。生产 actual-execution path 尚未开放；现有 `#[cfg(all(test, windows))]` helper 只是 fixture，不是 acceptance authority，未来验收要求 actual receipt 在 manifest 后按 frozen representative 产生。默认 Map 全 Missing、Lock 不变，`Qmap/Qlock=unknown`、coverage=`0`、`WindowsDynamic=not_opened`。见 `AI_INDEX.md`。
 - `capacity_future`：Lease-rooted Store resolver/private-field seal 已写；未登记、未编译/运行、无 API/effect；见 `AI_INDEX.md`。
 
 ## 已接受的产品方向

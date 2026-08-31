@@ -1,3 +1,4 @@
+use super::super::manifest_canonical::digest_dynamic_manifest_body_v1;
 use super::*;
 
 fn catalog_and_binding() -> (DynamicCatalogV1, FrozenStaticBindingV1) {
@@ -126,6 +127,38 @@ fn manifest_rejects_class_merge_despite_an_unchanged_union() {
         build_dynamic_manifest_v1(&binding, &catalog),
         Err(ManifestBuildErrorV1::ProjectedMembershipMismatch)
     );
+}
+
+#[test]
+fn synthetic_manifest_zeros_and_binds_program_catalog_context() {
+    let (catalog, binding) = catalog_and_binding();
+    let bundle = build_dynamic_manifest_v1(&binding, &catalog).unwrap();
+    let context = &bundle.manifest.context;
+    assert_eq!(
+        [
+            context.execution_program_inventory_sha256,
+            context.execution_program_membership_sha256,
+            context.execution_program_catalog_sha256,
+            context.program_catalog_admission_binding_sha256,
+        ],
+        [Digest32::ZERO; 4],
+    );
+
+    let baseline = digest_dynamic_manifest_body_v1(&bundle.manifest);
+    assert_eq!(baseline, bundle.manifest.manifest_sha256);
+
+    let mut inventory = bundle.manifest.clone();
+    inventory.context.execution_program_inventory_sha256 = Digest32([6; 32]);
+    let mut membership = bundle.manifest.clone();
+    membership.context.execution_program_membership_sha256 = Digest32([7; 32]);
+    let mut catalog = bundle.manifest.clone();
+    catalog.context.execution_program_catalog_sha256 = Digest32([8; 32]);
+    let mut admission = bundle.manifest.clone();
+    admission.context.program_catalog_admission_binding_sha256 = Digest32([9; 32]);
+
+    for tampered in [&inventory, &membership, &catalog, &admission] {
+        assert_ne!(digest_dynamic_manifest_body_v1(tampered), baseline);
+    }
 }
 
 #[test]

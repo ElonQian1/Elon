@@ -4,8 +4,8 @@ status: current
 reviewed_at: 2026-08-31
 owners: node, security
 design_status: design_frozen
-implementation_status: typed_projector_candidate_prior_compiled_pre_manifest_program_inventory_source_written_uncompiled_unrun
-verification_status: prior_targeted_unit_36_passed_current_source_inventory_not_run_not_frozen_manifests_not_frozen
+implementation_status: typed_projector_candidate_prior_compiled_pre_manifest_program_inventory_and_reviewed_source_admission_bridge_source_written_uncompiled_unrun
+verification_status: prior_targeted_unit_36_passed_current_source_inventory_and_source_admission_not_run_review_digest_and_manifests_not_frozen
 authority_scope: backend-a2-map-lock-dynamic-quotient-authority-v1
 ---
 
@@ -22,9 +22,13 @@ authority_scope: backend-a2-map-lock-dynamic-quotient-authority-v1
 精确分区并冻结 manifest 后得出。typed descriptor、projector、内存 catalog/manifest builder 与两遍原子
 candidate 入口在前序基线已实现并通过编译和定向单元测试；本批又写入 sealed runner admission，以及仅覆盖
 Map `RegionCountBudget/Completed` 的 source-only executable program、私有 actual receipt 和 parent/child/cleanup
-合同。current source 进一步把“语义 program 分组”“源码 program 存在”“actual execution verified”拆成三层，
-新增完整 Map 根的 pre-manifest execution-program inventory 源码；但该路径尚未编译、未运行，也没有冻结
-inventory digest。默认 Map/Lock producers、完整 candidate 与 manifest 路径未因此接通；
+合同。current source 进一步把“语义 program 分组”“源码 program 存在”“reviewed source admission”与
+“actual execution verified”拆开，新增完整 Map 根的 pre-manifest execution-program inventory，以及
+`reviewed inventory -> source-program admission provider -> catalog/manifest binding` 的失败关闭源码桥。只有
+完整 inventory 不含任何 planned-missing，且其 body digest 与独立 review 后 checked-in 的 expected digest
+精确相等，provider 才可构造；原始 inventory status 不能直接授权 catalog。该路径尚未编译、未运行，当前
+source test 预期仍有 `43,474` 个 planned-missing member，也没有 checked-in reviewed inventory digest。
+默认 Map/Lock producers、完整 candidate 与 manifest 路径未因此接通；
 没有任何商 manifest 被成功生成、复核或冻结，所以两个值仍是 `unknown`。
 
 本合同是动态执行压缩合同，不是静态覆盖压缩合同：每个 included 静态 CaseKey 仍必须被完整承诺且
@@ -195,7 +199,38 @@ reverse index 并与逐叶 membership 相等；任一 missing member、extra、d
 该 inventory 不是 quotient manifest，也不选择正式 representative，不产生 `Qmap`、
 `DynamicQuotientMemberCoverage`、Windows record 或任何 runtime permit。只有以后完整 Map program inventory
 全部达到 source-present、独立 review 冻结其 digest，并由 quotient manifest context 反向绑定后，才可进入
-manifest 冻结；actual Windows execution 仍必须在 manifest 后按 frozen class representative 发生。
+manifest 冻结。生产 actual-execution path 当前仍未开放；验收规则要求未来 actual Windows execution 只能在
+manifest 后按 frozen class representative 发生。
+
+### 7.2 Reviewed source-program admission bridge
+
+current source 另写入一条 pre-manifest、非执行型的 source-program admission bridge。它不能从裸
+`ExecutionProgramInventoryV1`、单个 `SourcePresentReceiptRequired` 或调用方提交的 digest 构造许可。non-test
+production authority 的唯一入口必须同时验证：inventory root/static/projector/descriptor context 与本次两遍
+frozen ingress 完全相等；
+`planned_missing_member_count == planned_missing_group_count == 0`；source-present member/group 计数分别等于
+完整 member/group 计数；program group union、reverse index、membership/catalog/body digest 全部重算一致；
+并且 `inventory_sha256` 精确等于独立 review 后 checked-in 的 expected digest。任一条件不成立都在 catalog
+观察前原子失败，不保留部分 class 或 frozen-looking manifest。
+
+通过上述门后，私有 provider 才能按 frozen member 发放一次性 source-program admission receipt。receipt 必须
+交叉绑定 reviewed inventory digest、member seal、`program_id`、capability-normalized descriptor digest、
+`plan_sha256` 与 `implementation_sha256`；missing、extra、duplicate、member/program swap、plan 或 implementation
+替换均使整次 candidate 失败。catalog 保留 producer 的 exact planned-missing runner-admission receipt 与原始
+semantic key，只在另一个 source-program admission receipt 精确成立后把该 member 纳入 class partition；本层
+不得制造 `RunnerAdmissionDecisionV1::Supported`、execution digest 或 Windows record。
+
+成功的 quotient manifest context/body 必须反向绑定 reviewed inventory body、program membership/catalog
+commitment 与 source-program admission binding，使同一 member 的 static seal、descriptor、program 与 class
+归属不能跨 inventory 或 manifest 重放。这是 manifest source completeness 的前置证明，不是 actual execution。
+本批源码尚未把 actual receipt 绑定到 manifest/class；现有 `#[cfg(all(test, windows))]` helper 只是
+implementation fixture，不是 acceptance authority。验收规则要求未来 actual `MapRunnerExecutionReceiptV1`
+只能在 manifest 冻结后，由 frozen class 的 canonical representative 执行真实 Windows child 后产生。
+
+当前该 bridge 只能失败关闭：source test 预期 `43,476` member 中仅 `2` 个 source-present、`43,474` 个
+planned-missing，且 reviewed inventory digest 尚未 checked-in/frozen。因此 provider authority 不可构造，
+full Map candidate 必须在 catalog/manifest 前原子失败；该结论没有运行证据，current source 仍为
+`passed=0 failed=0 not_run`。
 
 ## 8. Class catalog and member commitments
 
@@ -224,6 +259,10 @@ manifest 冻结；actual Windows execution 仍必须在 manifest 后按 frozen c
 
 pre-manifest program inventory 的 program membership/catalog/body commitments 与上述 quotient bundle 分离；
 它们只能表达 program 规划状态，不能作为第四种 quotient manifest commitment 偷渡部分 catalog。
+
+reviewed source-program admission binding 同样不改变 class 等价关系。它只证明完整 inventory 已经 source-present、
+经独立 digest review，且每个 catalog member 精确消费其所属 program receipt；manifest 必须绑定它，但不能把它
+解释成 `Supported` 或 actual execution commitment。
 
 在 quotient bundle 中，capability 归一化只服务于 descriptor-binding commitment；pre-manifest inventory 的
 归一化只形成非授权 program identity。默认完整 producer inventory 仍要求 Map 为
@@ -288,8 +327,9 @@ each member reprojects to exactly its class key
 ```
 
 生成顺序固定为两遍原子入口：第一遍完成 frozen static ledger/root manifest 的全部校验，不向动态
-catalog 暴露记录；第二遍重复同一 frozen gate，并把已经逐叶验证的 full record + typed descriptor 只流入
-私有、可丢弃的内存 catalog。两遍 binding 都承诺 exact
+catalog 暴露记录；随后必须先验证完整、checked-in reviewed inventory authority，任何 planned-missing 或 digest
+不一致都在 catalog 观察前失败。第二遍重复同一 frozen gate，并把已经逐叶验证的 full record + typed descriptor
+及其一次性 source-program admission receipt 只流入私有、可丢弃的内存 catalog。两遍 binding 都承诺 exact
 `(case_key_sha256, full_record_sha256)` member-pair set 且必须完全相等。随后 catalog/manifest guard 从实际
 class union 重算 member-pair set，重算 class key，检查 class/member 唯一性、排序、representative、反向索引
 和全部 canonical digests；只有全部成功才返回内存 bundle。当前没有候选文件 writer，因此失败不会留下
@@ -305,8 +345,8 @@ static 或 projector 漂移都要求全量重生成与重审。
 
 上述回执全部是本批 Map program/receipt 改动前的 prior baseline。本批 current source 只达到
 `source_written/source_review_only/implementation_uncompiled/implementation_unrun`，新增窄 program、私有
-receipt、准入与负向测试均为 `passed=0/failed=0/not_run`；不得把 prior `36/36` 或 exact blocker 回执当作
-current-source 验证。
+actual receipt、program inventory、reviewed source-program admission provider、catalog/manifest binding 与负向
+测试源码均为 `passed=0/failed=0/not_run`；不得把 prior `36/36` 或 exact blocker 回执当作 current-source 验证。
 
 前序基线验证回执为：
 
@@ -376,6 +416,12 @@ map_program_inventory_status=planned_missing_or_source_present_receipt_required_
 map_program_inventory_digest=not_generated_not_frozen
 map_program_inventory_member_and_group_counts=unknown_not_run
 map_program_inventory_unrun_test_expectation=members_43476_source_present_members_2_source_present_groups_2_planned_missing_members_43474
+map_reviewed_inventory_digest=not_checked_in_not_frozen
+map_source_program_admission_provider=source_written_fail_closed_uncompiled_unrun
+map_source_program_admission_precondition=all_members_and_groups_source_present_plus_exact_checked_in_reviewed_digest
+map_source_program_admission_current=unconstructible_unrun_source_expectation_planned_missing_members_43474_and_reviewed_digest_absent
+map_catalog_manifest_inventory_binding=source_written_uncompiled_unrun
+map_actual_execution_order=post_manifest_frozen_representative_only
 map_default_producers=all_missing_quotient_runner_not_integrated
 lock_runner_admission=unchanged_all_missing_lock_observation_incomplete
 runner_admission_raw_supported=fail_closed_without_private_exact_receipt_not_run
@@ -385,7 +431,7 @@ lock_candidate_gate=prior_passed_expected_fail_closed_8668_current_source_not_ru
 map_bootstrap_descriptor_binding=expected_pre_freeze_drift_not_passed
 map_descriptor_binding=frozen_d3ba08a5ba0019f9ccda99ace8b580ef06eb4d6653ba80c0db5497bec51bd870_exact_gate_accepted
 lock_descriptor_binding=frozen_0cc951c8c979608fb9861167f8d880a74fd2e042c4d2cd42673100e14083e8ef_exact_gate_accepted
-map_blocker=quotient_runner_not_integrated
+map_blocker=program_inventory_incomplete_and_unreviewed_quotient_runner_not_integrated
 lock_blocker=lock_observation_incomplete
 quotient_manifests=not_frozen
 Qmap=unknown
@@ -400,5 +446,5 @@ windows_runtime=not_opened
 
 本文不完成 A2，不注册生产 VFS，不调用生产 open，不创建 Connection/Opened authority，不获取 process
 fence，不启动 A1/v15/Runtime/Ready，不产生 Provider、route、Offer、Attempt、Lease、派发、市场、结算或
-资金效果。后续 program inventory 运行与冻结、完整源码 program、商 manifest、Windows evidence 与宽回归
-必须各自按独立批次验收。
+资金效果。后续 program inventory 运行、完整源码 program、独立 review/freeze、source-program admission、商
+manifest、manifest 后 Windows evidence 与宽回归必须各自按顺序独立验收。

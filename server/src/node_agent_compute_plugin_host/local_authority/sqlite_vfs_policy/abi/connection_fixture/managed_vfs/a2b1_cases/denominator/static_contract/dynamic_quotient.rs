@@ -34,9 +34,11 @@ use model::{
     StaticMemberSealV1, DYNAMIC_PROJECTOR_SCHEMA_V1,
 };
 use program_inventory::build_map_execution_program_inventory_v1;
+pub(crate) use program_inventory::ProgramCatalogAdmissionErrorV1;
 use projector::{
     prepare_dynamic_terminal_v1, project_dynamic_class_v1, project_validated_dynamic_terminal_v1,
-    project_validated_dynamic_terminal_with_map_execution_v1, ProjectionErrorV1,
+    project_validated_dynamic_terminal_with_map_execution_v1,
+    project_validated_dynamic_terminal_with_program_catalog_v1, ProjectionErrorV1,
     ProjectionViolationV1,
 };
 

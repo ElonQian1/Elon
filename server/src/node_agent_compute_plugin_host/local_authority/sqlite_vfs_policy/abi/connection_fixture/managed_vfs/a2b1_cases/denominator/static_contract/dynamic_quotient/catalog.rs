@@ -1,22 +1,26 @@
 use std::collections::{BTreeMap, BTreeSet};
 
+mod finish;
 #[cfg(test)]
 mod test_support;
 
 use super::super::source_leaf_authority::{
-    digest_included_member_pair_set, Digest32, FrozenStaticBindingV1, LeafSealOutcomeV1,
-    RootOperationV1, StreamedLeafV1,
+    Digest32, FrozenStaticBindingV1, LeafSealOutcomeV1, RootOperationV1, StreamedLeafV1,
 };
 use super::super::terminal_descriptor::CapabilityGapV1;
 use super::descriptor_binding::{
-    checked_in_authority_v1, digest_descriptor_binding_v1, DescriptorBindingContextDriftV1,
-    DescriptorBindingEntryV1, FrozenDescriptorBindingAuthorityV1,
+    checked_in_authority_v1, DescriptorBindingContextDriftV1, DescriptorBindingEntryV1,
+    FrozenDescriptorBindingAuthorityV1,
 };
-use super::membership_commitment::digest_projected_membership_v1;
-use super::runner_admission::{self, RunnerAdmissionReceiptV1};
+use super::program_inventory::{
+    ProgramCatalogAdmissionErrorV1, ProgramCatalogBindingV1, ProgramCatalogReceiptProviderV1,
+    ReviewedExecutionProgramInventoryV1,
+};
+use super::runner_admission::RunnerAdmissionReceiptV1;
 use super::{
-    project_validated_dynamic_terminal_v1, DynamicClassKeyV1, ProjectionErrorV1,
-    StaticMemberSealV1, DYNAMIC_PROJECTOR_SCHEMA_V1,
+    project_validated_dynamic_terminal_v1,
+    project_validated_dynamic_terminal_with_program_catalog_v1, DynamicClassKeyV1,
+    ProjectionErrorV1, StaticMemberSealV1,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -59,6 +63,7 @@ pub(crate) struct DynamicCatalogV1 {
     projected_membership_sha256: Digest32,
     descriptor_binding_sha256: Digest32,
     runner_admission_binding_sha256: Digest32,
+    program_catalog_binding: Option<ProgramCatalogBindingV1>,
 }
 
 impl DynamicCatalogV1 {
@@ -88,6 +93,10 @@ impl DynamicCatalogV1 {
 
     pub(super) const fn runner_admission_binding_sha256(&self) -> Digest32 {
         self.runner_admission_binding_sha256
+    }
+
+    pub(super) const fn program_catalog_binding(&self) -> Option<ProgramCatalogBindingV1> {
+        self.program_catalog_binding
     }
 }
 
@@ -148,6 +157,7 @@ pub(crate) enum CatalogErrorV1 {
         actual: Digest32,
     },
     RunnerAdmissionBindingMismatch(StaticMemberSealV1),
+    ProgramCatalogAdmission(ProgramCatalogAdmissionErrorV1),
     ProjectionFailed {
         count: u64,
         first: ProjectionFailureV1,
@@ -185,6 +195,7 @@ pub(crate) struct DynamicCatalogBuilderV1 {
     projected_membership: BTreeMap<StaticMemberSealV1, Digest32>,
     descriptor_bindings: BTreeMap<StaticMemberSealV1, Digest32>,
     runner_admissions: BTreeMap<StaticMemberSealV1, RunnerAdmissionReceiptV1>,
+    program_catalog_provider: Option<ProgramCatalogReceiptProviderV1>,
     frozen_descriptor_binding: Option<FrozenDescriptorBindingAuthorityV1>,
     projection_failures: Vec<ProjectionFailureV1>,
 }
@@ -203,6 +214,7 @@ impl DynamicCatalogBuilderV1 {
             projected_membership: BTreeMap::new(),
             descriptor_bindings: BTreeMap::new(),
             runner_admissions: BTreeMap::new(),
+            program_catalog_provider: None,
             frozen_descriptor_binding: None,
             projection_failures: Vec::new(),
         }
@@ -224,9 +236,19 @@ impl DynamicCatalogBuilderV1 {
             projected_membership: BTreeMap::new(),
             descriptor_bindings: BTreeMap::new(),
             runner_admissions: BTreeMap::new(),
+            program_catalog_provider: None,
             frozen_descriptor_binding: Some(authority),
             projection_failures: Vec::new(),
         })
+    }
+
+    pub(super) fn from_frozen_static_binding_and_reviewed_inventory(
+        binding: &FrozenStaticBindingV1,
+        reviewed: ReviewedExecutionProgramInventoryV1,
+    ) -> Result<Self, CatalogErrorV1> {
+        let mut builder = Self::from_frozen_static_binding(binding)?;
+        builder.program_catalog_provider = Some(reviewed.into_provider());
+        Ok(builder)
     }
 
     #[cfg(test)]
@@ -271,7 +293,13 @@ impl DynamicCatalogBuilderV1 {
                 if !self.static_members.insert(member) {
                     return Err(CatalogErrorV1::DuplicateStaticMember(member));
                 }
-                match project_validated_dynamic_terminal_v1(record, descriptor) {
+                let validated = match self.program_catalog_provider.as_mut() {
+                    Some(provider) => project_validated_dynamic_terminal_with_program_catalog_v1(
+                        record, descriptor, provider,
+                    ),
+                    None => project_validated_dynamic_terminal_v1(record, descriptor),
+                };
+                match validated {
                     Ok(validated) => {
                         self.observe_descriptor_binding(member, validated.descriptor_binding)?;
                         self.observe_runner_admission(
@@ -380,151 +408,5 @@ impl DynamicCatalogBuilderV1 {
         self.class_digests
             .insert(projection.key, projection.class_key_sha256);
         Ok(())
-    }
-
-    pub(crate) fn finish(self) -> Result<DynamicCatalogV1, CatalogErrorV1> {
-        let descriptor_context = self.frozen_descriptor_binding.map_or(
-            super::descriptor_binding::DescriptorBindingContextV1 {
-                root: self.root,
-                projector_schema_version: DYNAMIC_PROJECTOR_SCHEMA_V1,
-                static_manifest_sha256: Digest32::ZERO,
-                included_count: u64::try_from(self.static_members.len())
-                    .map_err(|_| CatalogErrorV1::CountOverflow)?,
-            },
-            |authority| authority.context,
-        );
-        let descriptor_binding_sha256 = digest_descriptor_binding_v1(
-            descriptor_context,
-            self.descriptor_bindings
-                .iter()
-                .map(|(member, digest)| DescriptorBindingEntryV1 {
-                    member: *member,
-                    descriptor_semantic_sha256: *digest,
-                }),
-        );
-        if let Some(authority) = self.frozen_descriptor_binding {
-            if descriptor_binding_sha256 != authority.descriptor_binding_sha256 {
-                return Err(CatalogErrorV1::DescriptorBindingCommitmentDrift {
-                    expected: authority.descriptor_binding_sha256,
-                    actual: descriptor_binding_sha256,
-                });
-            }
-        }
-        let runner_admission_binding_sha256 = runner_admission::digest_binding_v1(
-            self.root,
-            self.runner_admissions.values().copied(),
-        );
-        let semantic_failure_count = u64::try_from(
-            self.projection_failures
-                .iter()
-                .filter(|failure| {
-                    !matches!(failure.error, ProjectionErrorV1::RunnerCapabilityMissing(_))
-                })
-                .count(),
-        )
-        .map_err(|_| CatalogErrorV1::CountOverflow)?;
-        if let Some(first) =
-            self.projection_failures.iter().copied().find(|failure| {
-                !matches!(failure.error, ProjectionErrorV1::RunnerCapabilityMissing(_))
-            })
-        {
-            return Err(CatalogErrorV1::ProjectionFailed {
-                count: semantic_failure_count,
-                first,
-            });
-        }
-        if let Some(first) = self.projection_failures.first().copied() {
-            let missing = u64::try_from(self.projection_failures.len())
-                .map_err(|_| CatalogErrorV1::CountOverflow)?;
-            let supported = u64::try_from(self.projected_members.len())
-                .map_err(|_| CatalogErrorV1::CountOverflow)?;
-            if supported != 0 {
-                return Err(CatalogErrorV1::MixedRunnerCapabilityState {
-                    supported,
-                    missing,
-                    first_missing: first,
-                });
-            }
-            let ProjectionErrorV1::RunnerCapabilityMissing(gap) = first.error else {
-                unreachable!("non-capability projection failure was selected above")
-            };
-            if let Some(conflicting) =
-                self.projection_failures
-                    .iter()
-                    .copied()
-                    .find(|failure| match failure.error {
-                        ProjectionErrorV1::RunnerCapabilityMissing(other) => other != gap,
-                        _ => false,
-                    })
-            {
-                return Err(CatalogErrorV1::MixedRunnerCapabilityGaps {
-                    count: missing,
-                    first,
-                    conflicting,
-                });
-            }
-            return Err(CatalogErrorV1::RunnerCapabilityMissing {
-                count: missing,
-                gap,
-                first_member: first.member,
-                runner_admission_binding_sha256,
-            });
-        }
-        let missing = self
-            .static_members
-            .difference(&self.projected_members)
-            .count();
-        if missing != 0 {
-            return Err(CatalogErrorV1::MissingProjection(
-                u64::try_from(missing).map_err(|_| CatalogErrorV1::CountOverflow)?,
-            ));
-        }
-        let extra = self
-            .projected_members
-            .difference(&self.static_members)
-            .count();
-        if extra != 0 {
-            return Err(CatalogErrorV1::ExtraProjection(
-                u64::try_from(extra).map_err(|_| CatalogErrorV1::CountOverflow)?,
-            ));
-        }
-        let mut classes = Vec::with_capacity(self.classes.len());
-        for (key, members) in self.classes {
-            let members = members.into_iter().collect::<Vec<_>>();
-            let Some(representative) = members.first().copied() else {
-                return Err(CatalogErrorV1::EmptyClass);
-            };
-            let class_key_sha256 = self
-                .class_digests
-                .get(&key)
-                .copied()
-                .ok_or(CatalogErrorV1::EmptyClass)?;
-            classes.push(DynamicClassV1 {
-                key,
-                class_key_sha256,
-                class_id: class_key_sha256,
-                members,
-                representative,
-            });
-        }
-        classes.sort_by_key(|class| class.class_key_sha256);
-        Ok(DynamicCatalogV1 {
-            root: self.root,
-            member_count: u64::try_from(self.static_members.len())
-                .map_err(|_| CatalogErrorV1::CountOverflow)?,
-            member_pair_set_sha256: digest_included_member_pair_set(
-                self.static_members
-                    .iter()
-                    .map(|member| (member.case_key_sha256, member.full_record_sha256))
-                    .collect(),
-            ),
-            projected_membership_sha256: digest_projected_membership_v1(
-                self.root,
-                self.projected_membership,
-            ),
-            descriptor_binding_sha256,
-            runner_admission_binding_sha256,
-            classes,
-        })
     }
 }

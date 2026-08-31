@@ -23,6 +23,10 @@ pub(crate) enum DynamicQuotientCandidateGateErrorV1 {
         count: u64,
         gap: CapabilityGapV1,
     },
+    ProgramInventoryIncomplete {
+        missing_member_count: u64,
+        missing_group_count: u64,
+    },
     DescriptorBindingCommitmentDrift {
         expected_sha256: String,
         actual_sha256: String,
@@ -104,6 +108,16 @@ fn classify_dynamic_candidate_error(
         dynamic_quotient::DynamicCandidateErrorV1::Catalog(
             dynamic_quotient::CatalogErrorV1::RunnerCapabilityMissing { count, gap, .. },
         ) => DynamicQuotientCandidateGateErrorV1::RunnerCapabilityMissing { count, gap },
+        dynamic_quotient::DynamicCandidateErrorV1::ProgramCatalogAdmission(
+            dynamic_quotient::ProgramCatalogAdmissionErrorV1::PlannedProgramsMissing {
+                member_count,
+                group_count,
+                ..
+            },
+        ) => DynamicQuotientCandidateGateErrorV1::ProgramInventoryIncomplete {
+            missing_member_count: member_count,
+            missing_group_count: group_count,
+        },
         dynamic_quotient::DynamicCandidateErrorV1::Catalog(
             dynamic_quotient::CatalogErrorV1::DescriptorBindingCommitmentDrift { expected, actual },
         ) => DynamicQuotientCandidateGateErrorV1::DescriptorBindingCommitmentDrift {
