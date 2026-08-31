@@ -5,9 +5,9 @@ use super::{
 };
 
 #[path = "adapter/private_rich_recovery.rs"]
-mod private_rich_recovery;
+pub(super) mod private_rich_recovery;
 #[path = "adapter/attachment_transport.rs"]
-mod attachment_transport;
+pub(super) mod attachment_transport;
 #[path = "adapter/scalar.rs"]
 mod scalar;
 #[cfg(test)]

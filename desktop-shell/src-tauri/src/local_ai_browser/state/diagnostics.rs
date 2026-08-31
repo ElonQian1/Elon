@@ -1,6 +1,8 @@
 use std::collections::BTreeMap;
 
-use serde_json::Value;
+use serde_json::{json, Value};
+
+use super::super::adapter::{attachment_transport, private_rich_recovery as rich_recovery};
 
 #[derive(Default)]
 pub(super) struct ContentCoverage {
@@ -78,9 +80,40 @@ pub(super) fn content_coverage(snapshot: Option<&Value>) -> ContentCoverage {
 }
 
 pub(super) fn private_rich_recovery(snapshot: Option<&Value>) -> Value {
-    snapshot
-        .and_then(|event| event.get("privateRichRecovery"))
-        .cloned()
+    let Some(recovery) = snapshot.and_then(|event| event.get("privateRichRecovery")) else {
+        return Value::Null;
+    };
+    rich_recovery::sanitize(Some(recovery))
+}
+
+pub(super) fn realtime_voice_state(event: Option<&Value>) -> Value {
+    let field = |key: &str| event.and_then(|value| value.get(key));
+    let bounded = |key: &str, max: u64| {
+        field(key)
+            .and_then(Value::as_u64)
+            .unwrap_or_default()
+            .min(max)
+    };
+    if event.and_then(Value::as_object).is_none() {
+        return Value::Null;
+    }
+    json!({
+        "type": "realtime_voice_state",
+        "version": bounded("version", 4),
+        "active": field("active").and_then(Value::as_bool).unwrap_or(false),
+        "observedChannelCount": bounded("observedChannelCount", 32),
+        "openChannelCount": bounded("openChannelCount", 32),
+        "observedFrameCount": bounded("observedFrameCount", 1_000_000_000),
+        "acceptedEventCount": bounded("acceptedEventCount", 1_000_000_000),
+        "streamCount": bounded("streamCount", 32),
+        "revision": bounded("revision", 1_000_000_000),
+    })
+}
+
+pub(super) fn attachment_transport_state(event: Option<&Value>) -> Value {
+    event
+        .and_then(Value::as_object)
+        .and_then(|event| attachment_transport::sanitize(event).ok())
         .unwrap_or(Value::Null)
 }
 

@@ -2,7 +2,7 @@ use serde_json::{json, Map, Value};
 
 use super::scalar::bounded_u64;
 
-pub(super) fn sanitize(event: &Map<String, Value>) -> Result<Value, String> {
+pub(in crate::local_ai_browser) fn sanitize(event: &Map<String, Value>) -> Result<Value, String> {
     if event.get("transportVersion").and_then(Value::as_u64) != Some(1) {
         return Err("ChatGPT 附件传输事件版本无效。".to_string());
     }

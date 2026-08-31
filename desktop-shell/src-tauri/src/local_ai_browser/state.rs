@@ -634,7 +634,7 @@ impl LocalAiBrowserRuntime {
             .and_then(|event| event.get("collection"))
             .and_then(Value::as_object);
         let coverage = diagnostics::content_coverage(snapshot);
-        Some(serde_json::json!({
+        let mut diagnostic = serde_json::json!({
             "present": true,
             "window_status": record.window_status,
             "window_visible": record.window_visible,
@@ -675,7 +675,21 @@ impl LocalAiBrowserRuntime {
             "private_stream_revision": private_stream::revision(snapshot),
             "private_stream_state": private_stream::state(snapshot),
             "updated_at_ms": record.updated_at_ms,
-        }))
+        });
+        let object = diagnostic.as_object_mut()?;
+        object.insert(
+            "private_rich_recovery".to_string(),
+            diagnostics::private_rich_recovery(snapshot),
+        );
+        object.insert(
+            "realtime_voice".to_string(),
+            diagnostics::realtime_voice_state(record.realtime_voice_event.as_ref()),
+        );
+        object.insert(
+            "attachment_transport".to_string(),
+            diagnostics::attachment_transport_state(record.attachment_transport_event.as_ref()),
+        );
+        Some(diagnostic)
     }
 
     fn update(&self, label: &str, update: impl FnOnce(&mut SessionRecord)) {

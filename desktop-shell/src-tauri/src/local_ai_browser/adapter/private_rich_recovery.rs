@@ -2,7 +2,7 @@ use serde_json::{json, Value};
 
 use super::{bounded_u64, clean_identifier, clean_identifiers};
 
-pub(super) fn sanitize(value: Option<&Value>) -> Value {
+pub(in crate::local_ai_browser) fn sanitize(value: Option<&Value>) -> Value {
     let recovery = value.and_then(Value::as_object);
     let field = |key: &str| recovery.and_then(|item| item.get(key));
     let boolean = |key: &str| field(key).and_then(Value::as_bool).unwrap_or(false);
