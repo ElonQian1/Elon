@@ -29,6 +29,9 @@ mod teardown;
 #[path = "sqlite_namespace_shm/test_faults.rs"]
 mod test_faults;
 #[cfg(all(test, windows))]
+#[path = "sqlite_namespace_shm/test_lock_runtime.rs"]
+mod test_lock_runtime;
+#[cfg(all(test, windows))]
 #[path = "sqlite_namespace_shm/test_snapshot.rs"]
 mod test_snapshot;
 #[cfg(test)]
@@ -157,6 +160,11 @@ pub(crate) use test_faults::ManagedSqliteShmTestFaultProbe;
 pub(crate) use test_faults::{
     ManagedSqliteShmTestTargetIdentity, ManagedSqliteShmTestTargetObserver,
     ManagedSqliteShmTriggeredTestFaultObservation,
+};
+#[cfg(all(test, windows))]
+pub(crate) use test_lock_runtime::{
+    ManagedSqliteShmTestLockExpectation, ManagedSqliteShmTestLockPath,
+    ManagedSqliteShmTestLockReceipt,
 };
 #[cfg(all(test, windows))]
 pub(crate) use test_snapshot::{

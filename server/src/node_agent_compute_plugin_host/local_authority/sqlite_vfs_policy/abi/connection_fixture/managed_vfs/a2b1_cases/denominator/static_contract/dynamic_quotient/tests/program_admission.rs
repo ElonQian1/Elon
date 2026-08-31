@@ -3,8 +3,8 @@ use super::super::{
     runner_admission::RunnerAdmissionDecisionV1,
 };
 use super::program_inventory::{
-    budget_descriptor, lock_request_validation_descriptor, lock_request_validation_record,
-    request_budget_record,
+    budget_descriptor, lock_lifecycle_cases, lock_lifecycle_descriptor, lock_lifecycle_record,
+    lock_request_validation_descriptor, lock_request_validation_record, request_budget_record,
 };
 use super::*;
 
@@ -68,6 +68,42 @@ fn lock_source_program_provider_projects_without_granting_runner_supported() {
     );
 
     assert!(provider.finish().is_ok());
+}
+
+#[test]
+fn lock_lifecycle_source_program_provider_still_requires_a_real_execution_receipt() {
+    let case = lock_lifecycle_cases()[0];
+    let record = lock_lifecycle_record(case);
+    let descriptor = lock_lifecycle_descriptor(
+        case,
+        RunnerCapabilityV1::Missing(CapabilityGapV1::LockObservationIncomplete),
+    );
+    let prepared = prepare_dynamic_terminal_v1(&record, &descriptor).unwrap();
+    let mut provider =
+        provider_for_source_program_for_test(prepared.member, &prepared.key).unwrap();
+
+    let validated = project_validated_dynamic_terminal_with_program_catalog_v1(
+        &record,
+        &descriptor,
+        &mut provider,
+    )
+    .unwrap();
+    assert_eq!(validated.projection.unwrap().key, prepared.key);
+    assert_eq!(
+        validated.runner_admission.decision(),
+        RunnerAdmissionDecisionV1::Missing(CapabilityGapV1::LockObservationIncomplete),
+    );
+    assert!(provider.finish().is_ok());
+
+    assert_eq!(
+        project_dynamic_class_v1(
+            &record,
+            &lock_lifecycle_descriptor(case, RunnerCapabilityV1::Supported),
+        ),
+        Err(ProjectionErrorV1::Invalid(
+            ProjectionViolationV1::RunnerAdmissionUnsealedSupported,
+        )),
+    );
 }
 
 #[test]

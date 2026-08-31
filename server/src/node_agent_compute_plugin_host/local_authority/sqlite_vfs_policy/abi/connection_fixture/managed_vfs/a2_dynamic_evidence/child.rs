@@ -2,6 +2,7 @@ use std::{fmt, path::Path, process::Child};
 
 use sha2::{Digest, Sha256};
 
+pub(super) mod lock_lifecycle;
 mod lock_request_validation;
 mod payload;
 
@@ -13,7 +14,7 @@ const REPORT_PREFIX: &str = "ELON_A2_WINDOWS_DYNAMIC_CHILD_V2";
 const NONCE_HEX_LEN: usize = 32;
 const COMMITMENT_HEX_LEN: usize = 64;
 const MAX_CAPTURED_STDOUT_BYTES: usize = 64 * 1024;
-const MAX_ACTUAL_PAYLOAD_BYTES: usize = 1_024;
+const MAX_ACTUAL_PAYLOAD_BYTES: usize = 2_048;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) enum SanitizedPayloadFamily {

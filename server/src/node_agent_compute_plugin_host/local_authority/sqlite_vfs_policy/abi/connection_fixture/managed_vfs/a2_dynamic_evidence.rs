@@ -29,8 +29,9 @@ pub(super) use joint_close_family::{
     ValidatedJointCloseFamily, ValidatedJointCloseFamilyMemberReceipt,
 };
 pub(super) use lock_runner::{
-    run_lock_program_isolated, LockRunnerActionV1, LockRunnerEvidenceReceiptV1,
-    LockRunnerIsolatedEvidenceV1, LockRunnerProgramBindingV1, LockRunnerRequestValidationV1,
+    run_lock_lifecycle_program_isolated, run_lock_program_isolated, LockRunnerActionV1,
+    LockRunnerEvidenceReceiptV1, LockRunnerIsolatedEvidenceV1, LockRunnerLifecycleBindingV1,
+    LockRunnerLifecyclePathV1, LockRunnerProgramBindingV1, LockRunnerRequestValidationV1,
 };
 pub(super) use map_runner::{
     run_map_program_isolated, MapRunnerEvidenceReceiptV1, MapRunnerIsolatedEvidenceV1,

@@ -1,8 +1,8 @@
 use super::super::super::terminal_descriptor::{
-    CallbackV1, CleanupV1, FaultSeamV1, FixtureV1, LockActionV1, LockAxesV1, LockCompletionV1,
-    LockManagedStimulusV1, LockOperationV1, LockPrestateV1, LockTerminalDescriptorV1, ObserverV1,
-    PhaseV1, PrestateV1, RawStateV1, ReachabilityV1, RunnerCapabilityV1, SourceSiteV1, StimulusV1,
-    TimingV1, ValidityV1,
+    CallbackV1, CleanupV1, FaultSeamV1, FixtureV1, InitializationProfileV1, LockActionV1,
+    LockAxesV1, LockCompletionV1, LockManagedStimulusV1, LockOperationV1, LockPrestateV1,
+    LockTerminalDescriptorV1, ObserverV1, OccurrenceV1, PhaseV1, PrestateV1, RawStateV1,
+    ReachabilityV1, RunnerCapabilityV1, SourceSiteV1, StimulusV1, TimingV1, ValidityV1,
 };
 use super::super::projector::{ProjectionErrorV1, ProjectionViolationV1};
 use super::{invalid, valid_initialization_tuple, valid_stored_poison_phase};
@@ -78,6 +78,142 @@ fn valid_lock_capability(value: LockTerminalDescriptorV1) -> bool {
                 )
             )
             && value.axes.completion == ReachabilityV1::Reached(LockCompletionV1::Direct))
+        || valid_positive_lifecycle_capability(value)
+}
+
+fn valid_positive_lifecycle_capability(value: LockTerminalDescriptorV1) -> bool {
+    if value.recipe.capability != RunnerCapabilityV1::Supported
+        || value.phase != PhaseV1::Success
+        || value.occurrence != OccurrenceV1::Natural
+        || value.recipe.callback != CallbackV1::XShmLock
+        || value.recipe.observer != ObserverV1::LockCallbackAndSnapshot
+        || value.recipe.cleanup != CleanupV1::ParentOwnedRoot
+    {
+        return false;
+    }
+    let PrestateV1::Lock(prestate) = value.prestate else {
+        return false;
+    };
+    let (
+        ReachabilityV1::Reached(action),
+        ReachabilityV1::Reached(first),
+        ReachabilityV1::Reached(count),
+        ReachabilityV1::Reached(mask),
+    ) = (
+        value.axes.action,
+        value.axes.first,
+        value.axes.count,
+        value.axes.mask,
+    )
+    else {
+        return false;
+    };
+    if lock_range_mask(first, count) != Some(mask) {
+        return false;
+    }
+    let (initialization, held_shared, held_exclusive, sibling_shared) = match (
+        value.source_site,
+        value.stimulus,
+        prestate,
+        value.operation,
+        value.timing,
+        value.recipe.fixture,
+        value.recipe.fault_seam,
+        action,
+    ) {
+        (
+            SourceSiteV1::LockNativeAcquire,
+            StimulusV1::LockManaged(LockManagedStimulusV1::NativeAcquire),
+            LockPrestateV1::NoHeldLocks,
+            LockOperationV1::NativeAcquire,
+            TimingV1::AfterSuccess,
+            FixtureV1::ManagedWalMainSingleConnection,
+            FaultSeamV1::NativeOperation,
+            LockActionV1::LockShared,
+        ) if count == 1 => (
+            ReachabilityV1::Reached(InitializationProfileV1::NodeLive),
+            0,
+            0,
+            0,
+        ),
+        (
+            SourceSiteV1::LockNativeAcquire,
+            StimulusV1::LockManaged(LockManagedStimulusV1::NativeAcquire),
+            LockPrestateV1::NoHeldLocks,
+            LockOperationV1::NativeAcquire,
+            TimingV1::AfterSuccess,
+            FixtureV1::ManagedWalMainSingleConnection,
+            FaultSeamV1::NativeOperation,
+            LockActionV1::LockExclusive,
+        ) => (
+            ReachabilityV1::Reached(InitializationProfileV1::NodeLive),
+            0,
+            0,
+            0,
+        ),
+        (
+            SourceSiteV1::LockNativeRelease,
+            StimulusV1::LockManaged(LockManagedStimulusV1::NativeRelease),
+            LockPrestateV1::OwnSharedHeld,
+            LockOperationV1::NativeRelease,
+            TimingV1::AfterSuccess,
+            FixtureV1::ManagedWalMainSingleConnection,
+            FaultSeamV1::NativeOperation,
+            LockActionV1::UnlockShared,
+        ) if count == 1 => (ReachabilityV1::NotReached, mask, 0, 0),
+        (
+            SourceSiteV1::LockNativeRelease,
+            StimulusV1::LockManaged(LockManagedStimulusV1::NativeRelease),
+            LockPrestateV1::OwnExclusiveHeld,
+            LockOperationV1::NativeRelease,
+            TimingV1::AfterSuccess,
+            FixtureV1::ManagedWalMainSingleConnection,
+            FaultSeamV1::NativeOperation,
+            LockActionV1::UnlockExclusive,
+        ) => (ReachabilityV1::NotReached, 0, mask, 0),
+        (
+            SourceSiteV1::LockLocalState,
+            StimulusV1::LockManaged(LockManagedStimulusV1::LocalState),
+            LockPrestateV1::SiblingSharedCoalesced,
+            LockOperationV1::LocalAcquire,
+            TimingV1::Natural,
+            FixtureV1::ManagedWalMainTwoConnections,
+            FaultSeamV1::Natural,
+            LockActionV1::LockShared,
+        ) if count == 1 => (ReachabilityV1::NotReached, 0, 0, mask),
+        (
+            SourceSiteV1::LockLocalState,
+            StimulusV1::LockManaged(LockManagedStimulusV1::LocalState),
+            LockPrestateV1::SiblingSharedCoalesced,
+            LockOperationV1::LocalRelease,
+            TimingV1::Natural,
+            FixtureV1::ManagedWalMainTwoConnections,
+            FaultSeamV1::Natural,
+            LockActionV1::UnlockShared,
+        ) if count == 1 => (ReachabilityV1::NotReached, mask, 0, mask),
+        _ => return false,
+    };
+    value.axes
+        == LockAxesV1 {
+            action: ReachabilityV1::Reached(action),
+            first: ReachabilityV1::Reached(first),
+            count: ReachabilityV1::Reached(count),
+            mask: ReachabilityV1::Reached(mask),
+            initialization,
+            held_shared_mask: ReachabilityV1::Reached(held_shared),
+            held_exclusive_mask: ReachabilityV1::Reached(held_exclusive),
+            sibling_shared_mask: ReachabilityV1::Reached(sibling_shared),
+            sibling_exclusive_mask: ReachabilityV1::Reached(0),
+            completion: ReachabilityV1::Reached(LockCompletionV1::Completed),
+        }
+}
+
+fn lock_range_mask(first: u8, count: u8) -> Option<u8> {
+    let end = first.checked_add(count)?;
+    if first >= 8 || count == 0 || end > 8 {
+        return None;
+    }
+    Some(((((1_u16 << count) - 1) << first) & 0xff) as u8)
 }
 
 fn valid_tuple(value: LockTerminalDescriptorV1) -> bool {

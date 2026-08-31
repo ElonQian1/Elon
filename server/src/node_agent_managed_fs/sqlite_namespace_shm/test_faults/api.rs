@@ -13,6 +13,10 @@ use super::{
 };
 
 #[cfg(all(test, windows))]
+use super::super::test_lock_runtime::{
+    ManagedSqliteShmTestLockExpectation, ManagedSqliteShmTestLockReceipt,
+};
+#[cfg(all(test, windows))]
 use super::super::test_snapshot::{
     test_target_snapshot as snapshot_test_target, ManagedSqliteShmTestTargetSnapshot,
 };
@@ -166,6 +170,45 @@ impl ManagedSqliteShmTestTargetObserver {
             runtime_generation,
             shm_connection_id,
         }
+    }
+
+    /// Arms one exact managed Lock action after any setup transitions are complete.
+    pub(crate) fn begin_lock_action_observation(
+        &self,
+        expectation: ManagedSqliteShmTestLockExpectation,
+    ) -> Result<(), &'static str> {
+        let snapshot = self
+            .snapshot()
+            .map_err(|_| "NODE_MANAGED_SQLITE_SHM_TEST_LOCK_TARGET_SNAPSHOT_FAILED")?;
+        if !snapshot.target_attached || snapshot.topology.shm_connections == 0 {
+            return Err("NODE_MANAGED_SQLITE_SHM_TEST_LOCK_TARGET_NOT_ATTACHED");
+        }
+        let mut runtime = self
+            .coordinator
+            .test_lock_runtime
+            .lock()
+            .map_err(|_| "NODE_MANAGED_SQLITE_SHM_TEST_LOCK_RUNTIME_POISONED")?;
+        runtime.arm(self.target.identity(), expectation)
+    }
+
+    /// Seals and disarms the exact-target Lock ledger so later fixture cleanup is not observed.
+    pub(crate) fn finish_lock_action_observation(
+        &self,
+    ) -> Result<ManagedSqliteShmTestLockReceipt, &'static str> {
+        self.coordinator
+            .test_lock_runtime
+            .lock()
+            .map_err(|_| "NODE_MANAGED_SQLITE_SHM_TEST_LOCK_RUNTIME_POISONED")?
+            .finish(self.target.identity())
+    }
+
+    /// Disarms an unfinished exact-target Lock ledger before fixture cleanup or unwind proceeds.
+    pub(crate) fn cancel_lock_action_observation(&self) -> Result<(), &'static str> {
+        self.coordinator
+            .test_lock_runtime
+            .lock()
+            .map_err(|_| "NODE_MANAGED_SQLITE_SHM_TEST_LOCK_RUNTIME_POISONED")?
+            .cancel(self.target.identity())
     }
 
     /// Starts one append-only Unmap action observation for this exact generation/connection.

@@ -108,6 +108,10 @@ pub(super) const PROJECTOR_SOURCE_SCOPE_V1: &[(&str, &str)] = &[
         include_str!("runner_admission/lock_program/request_validation.rs"),
     ),
     (
+        "dynamic_quotient/runner_admission/lock_program/lifecycle.rs",
+        include_str!("runner_admission/lock_program/lifecycle.rs"),
+    ),
+    (
         "managed_vfs/a2_dynamic_evidence.rs",
         include_str!("../../../../a2_dynamic_evidence.rs"),
     ),
@@ -124,6 +128,22 @@ pub(super) const PROJECTOR_SOURCE_SCOPE_V1: &[(&str, &str)] = &[
         include_str!("../../../../a2_dynamic_evidence/child/lock_request_validation.rs"),
     ),
     (
+        "managed_vfs/a2_dynamic_evidence/child/lock_lifecycle.rs",
+        include_str!("../../../../a2_dynamic_evidence/child/lock_lifecycle.rs"),
+    ),
+    (
+        "managed_vfs/a2_dynamic_evidence/capture.rs",
+        include_str!("../../../../a2_dynamic_evidence/capture.rs"),
+    ),
+    (
+        "managed_vfs/a2_dynamic_evidence/environment.rs",
+        include_str!("../../../../a2_dynamic_evidence/environment.rs"),
+    ),
+    (
+        "managed_vfs/a2_dynamic_evidence/cleanup.rs",
+        include_str!("../../../../a2_dynamic_evidence/cleanup.rs"),
+    ),
+    (
         "managed_vfs/a2_dynamic_evidence/map_runner.rs",
         include_str!("../../../../a2_dynamic_evidence/map_runner.rs"),
     ),
@@ -138,6 +158,22 @@ pub(super) const PROJECTOR_SOURCE_SCOPE_V1: &[(&str, &str)] = &[
     (
         "managed_vfs/a2_dynamic_evidence/lock_runner/request_validation.rs",
         include_str!("../../../../a2_dynamic_evidence/lock_runner/request_validation.rs"),
+    ),
+    (
+        "managed_vfs/a2_dynamic_evidence/lock_runner/lifecycle.rs",
+        include_str!("../../../../a2_dynamic_evidence/lock_runner/lifecycle.rs"),
+    ),
+    (
+        "managed_vfs/a2_dynamic_evidence/lock_runner/lifecycle/fixture.rs",
+        include_str!("../../../../a2_dynamic_evidence/lock_runner/lifecycle/fixture.rs"),
+    ),
+    (
+        "managed_vfs/a2_dynamic_evidence/lock_runner/lifecycle/payload.rs",
+        include_str!("../../../../a2_dynamic_evidence/lock_runner/lifecycle/payload.rs"),
+    ),
+    (
+        "managed_vfs.rs",
+        include_str!("../../../../../managed_vfs.rs"),
     ),
     (
         "managed_vfs/connection.rs",
@@ -158,6 +194,222 @@ pub(super) const PROJECTOR_SOURCE_SCOPE_V1: &[(&str, &str)] = &[
     (
         "managed_vfs/connection/unmap.rs",
         include_str!("../../../../connection/unmap.rs"),
+    ),
+    (
+        "managed_vfs/callbacks.rs",
+        include_str!("../../../../callbacks.rs"),
+    ),
+    (
+        "managed_vfs/route_file.rs",
+        include_str!("../../../../route_file.rs"),
+    ),
+    (
+        "managed_vfs/fault_script.rs",
+        include_str!("../../../../fault_script.rs"),
+    ),
+    (
+        "managed_vfs/fault_script/file.rs",
+        include_str!("../../../../fault_script/file.rs"),
+    ),
+    (
+        "managed_vfs/multi_connection.rs",
+        include_str!("../../../../multi_connection.rs"),
+    ),
+    (
+        "registry/test_vfs_bridge/file.rs",
+        include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/registry/test_vfs_bridge/file.rs"
+        )),
+    ),
+    (
+        "registry/file_custody/abi.rs",
+        include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/registry/file_custody/abi.rs"
+        )),
+    ),
+    (
+        "registry/file_custody/operations.rs",
+        include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/registry/file_custody/operations.rs"
+        )),
+    ),
+    (
+        "sqlite_vfs_abi.rs",
+        include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_abi.rs"
+        )),
+    ),
+    (
+        "sqlite_vfs_abi/io_shm.rs",
+        include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_abi/io_shm.rs"
+        )),
+    ),
+    (
+        "sqlite_vfs_abi/result_codes.rs",
+        include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_abi/result_codes.rs"
+        )),
+    ),
+    (
+        "sqlite_vfs_abi/file_state.rs",
+        include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_abi/file_state.rs"
+        )),
+    ),
+    (
+        "sqlite_vfs_abi/raw_state.rs",
+        include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_abi/raw_state.rs"
+        )),
+    ),
+    (
+        "sqlite_vfs_abi/types.rs",
+        include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_abi/types.rs"
+        )),
+    ),
+    (
+        "node_agent_managed_fs.rs",
+        include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/src/node_agent_managed_fs.rs"
+        )),
+    ),
+    (
+        "node_agent_managed_fs/windows.rs",
+        include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/src/node_agent_managed_fs/windows.rs"
+        )),
+    ),
+    (
+        "node_agent_managed_fs/windows_sqlite_locking.rs",
+        include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/src/node_agent_managed_fs/windows_sqlite_locking.rs"
+        )),
+    ),
+    (
+        "node_agent_managed_fs/windows_sqlite_shm.rs",
+        include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/src/node_agent_managed_fs/windows_sqlite_shm.rs"
+        )),
+    ),
+    (
+        "node_agent_managed_fs/sqlite_api.rs",
+        include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/src/node_agent_managed_fs/sqlite_api.rs"
+        )),
+    ),
+    (
+        "node_agent_managed_fs/sqlite_namespace.rs",
+        include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/src/node_agent_managed_fs/sqlite_namespace.rs"
+        )),
+    ),
+    (
+        "node_agent_managed_fs/sqlite_namespace_shm.rs",
+        include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/src/node_agent_managed_fs/sqlite_namespace_shm.rs"
+        )),
+    ),
+    (
+        "node_agent_managed_fs/sqlite_namespace_shm/coordinator.rs",
+        include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/src/node_agent_managed_fs/sqlite_namespace_shm/coordinator.rs"
+        )),
+    ),
+    (
+        "node_agent_managed_fs/sqlite_namespace_shm/types.rs",
+        include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/src/node_agent_managed_fs/sqlite_namespace_shm/types.rs"
+        )),
+    ),
+    (
+        "node_agent_managed_fs/sqlite_namespace_shm/node_initialization.rs",
+        include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/src/node_agent_managed_fs/sqlite_namespace_shm/node_initialization.rs"
+        )),
+    ),
+    (
+        "node_agent_managed_fs/sqlite_namespace_shm/mapping.rs",
+        include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/src/node_agent_managed_fs/sqlite_namespace_shm/mapping.rs"
+        )),
+    ),
+    (
+        "node_agent_managed_fs/sqlite_namespace_shm/locking.rs",
+        include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/src/node_agent_managed_fs/sqlite_namespace_shm/locking.rs"
+        )),
+    ),
+    (
+        "node_agent_managed_fs/sqlite_namespace_shm/test_faults/api.rs",
+        include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/src/node_agent_managed_fs/sqlite_namespace_shm/test_faults/api.rs"
+        )),
+    ),
+    (
+        "node_agent_managed_fs/sqlite_namespace_shm/test_snapshot.rs",
+        include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/src/node_agent_managed_fs/sqlite_namespace_shm/test_snapshot.rs"
+        )),
+    ),
+    (
+        "node_agent_managed_fs/sqlite_namespace_shm/test_faults.rs",
+        include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/src/node_agent_managed_fs/sqlite_namespace_shm/test_faults.rs"
+        )),
+    ),
+    (
+        "node_agent_managed_fs/sqlite_namespace_shm/test_faults/controller.rs",
+        include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/src/node_agent_managed_fs/sqlite_namespace_shm/test_faults/controller.rs"
+        )),
+    ),
+    (
+        "node_agent_managed_fs/sqlite_namespace_shm/test_faults/operation.rs",
+        include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/src/node_agent_managed_fs/sqlite_namespace_shm/test_faults/operation.rs"
+        )),
+    ),
+    (
+        "node_agent_managed_fs/sqlite_namespace_shm/test_faults/mapping.rs",
+        include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/src/node_agent_managed_fs/sqlite_namespace_shm/test_faults/mapping.rs"
+        )),
+    ),
+    (
+        "node_agent_managed_fs/sqlite_namespace_shm/test_lock_runtime.rs",
+        include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/src/node_agent_managed_fs/sqlite_namespace_shm/test_lock_runtime.rs"
+        )),
     ),
     (
         "dynamic_quotient/candidate.rs",

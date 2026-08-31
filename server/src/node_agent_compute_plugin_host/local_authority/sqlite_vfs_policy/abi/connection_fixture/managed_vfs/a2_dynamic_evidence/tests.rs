@@ -227,6 +227,61 @@ fn child_payload_accepts_exact_lock_request_validation_family_without_widening()
 }
 
 #[test]
+fn child_payload_accepts_exact_lock_lifecycle_family_with_frozen_width() {
+    let selectors = lock_lifecycle_selectors();
+    assert_eq!(selectors.len(), 104);
+    for selector in selectors {
+        let payload = payload_with_count("a2lockq2", &selector, 103);
+        assert_eq!(payload.split(',').count(), 105);
+        validate_payload_for_test(&payload)
+            .expect("accept one exact canonical Lock lifecycle payload");
+    }
+}
+
+#[test]
+fn child_payload_rejects_lock_lifecycle_widening_and_q1_q2_cross_family_headers() {
+    let canonical = "native-acquire-lock-shared-first0-count1-completed";
+    for field_count in [102, 104] {
+        assert_eq!(
+            validate_payload_for_test(&payload_with_count("a2lockq2", canonical, field_count,)),
+            Err("A2_DYNAMIC_CHILD_ACTUAL_FIELDS_INVALID")
+        );
+    }
+
+    for selector in [
+        "native-acquire-lock-shared-first0-count2-completed",
+        "native-acquire-lock-exclusive-first7-count2-completed",
+        "native-release-unlock-exclusive-first0-count0-completed",
+        "shared-local-acquire-lock-exclusive-first0-count1-completed",
+        "shared-local-release-unlock-shared-first8-count1-completed",
+        "native-acquire-unlock-shared-first0-count1-completed",
+        "unknown-lock-lifecycle-member",
+    ] {
+        assert_eq!(
+            validate_payload_for_test(&payload_with_count("a2lockq2", selector, 103)),
+            Err("A2_DYNAMIC_CHILD_ACTUAL_SELECTOR_INVALID")
+        );
+    }
+
+    assert_eq!(
+        validate_payload_for_test(&payload_with_count("a2lockq3", canonical, 103)),
+        Err("A2_DYNAMIC_CHILD_ACTUAL_VERSION_INVALID")
+    );
+    assert_eq!(
+        validate_payload_for_test(&payload_with_count("a2lockq1", canonical, 103)),
+        Err("A2_DYNAMIC_CHILD_ACTUAL_SELECTOR_INVALID")
+    );
+    assert_eq!(
+        validate_payload_for_test(&payload_with_count(
+            "a2lockq2",
+            "range-overflow-lock-shared-completed",
+            103,
+        )),
+        Err("A2_DYNAMIC_CHILD_ACTUAL_SELECTOR_INVALID")
+    );
+}
+
+#[test]
 fn unmap_candidate_record_accepts_one_fully_bound_observation() {
     let selector = UnmapSelector::SharedKeepSuccess;
     let payload = unmap_success_payload(7);
@@ -357,6 +412,35 @@ fn payload(version: &str, selector: &str, registration_id: u64) -> String {
 
 fn payload_with_count(version: &str, selector: &str, field_count: usize) -> String {
     format!("{version},{selector},{}", vec!["0"; field_count].join(","))
+}
+
+fn lock_lifecycle_selectors() -> std::collections::BTreeSet<String> {
+    let mut selectors = std::collections::BTreeSet::new();
+    for first in 0..8u8 {
+        assert!(selectors.insert(format!(
+            "native-acquire-lock-shared-first{first}-count1-completed"
+        )));
+        assert!(selectors.insert(format!(
+            "native-release-unlock-shared-first{first}-count1-completed"
+        )));
+        assert!(selectors.insert(format!(
+            "shared-local-acquire-lock-shared-first{first}-count1-completed"
+        )));
+        assert!(selectors.insert(format!(
+            "shared-local-release-unlock-shared-first{first}-count1-completed"
+        )));
+    }
+    for count in 1..=8u8 {
+        for first in 0..=8 - count {
+            assert!(selectors.insert(format!(
+                "native-acquire-lock-exclusive-first{first}-count{count}-completed"
+            )));
+            assert!(selectors.insert(format!(
+                "native-release-unlock-exclusive-first{first}-count{count}-completed"
+            )));
+        }
+    }
+    selectors
 }
 
 fn changed_actual_payload() -> String {

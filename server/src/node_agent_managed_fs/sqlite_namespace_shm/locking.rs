@@ -1,6 +1,10 @@
 use std::io;
 
 use super::super::{platform, PlatformManagedSqliteLockAttempt};
+#[cfg(all(test, windows))]
+use super::test_lock_runtime::{
+    ManagedSqliteShmTestNativeLockOutcome, ManagedSqliteShmTestNativeUnlockOutcome,
+};
 use super::{
     coordinator::{
         ManagedSqliteShmConnectionState, ManagedSqliteShmCoordinator,
@@ -29,6 +33,8 @@ impl ManagedSqliteShmCoordinator {
             .ok_or_else(|| protocol("NODE_MANAGED_SQLITE_SHM_CONNECTION_NOT_ATTACHED"))?;
         let sibling = sibling_masks(&state, connection_id);
         let mask = request.mask();
+        #[cfg(all(test, windows))]
+        self.begin_test_lock_action(connection_id, request)?;
         match request.action() {
             ManagedSqliteShmLockAction::LockShared => {
                 require_unlocked(current, mask)?;
@@ -44,6 +50,8 @@ impl ManagedSqliteShmCoordinator {
                     let held = state.connections.get_mut(&connection_id).ok_or_else(|| {
                         protocol("NODE_MANAGED_SQLITE_SHM_CONNECTION_DISAPPEARED")
                     })?;
+                    #[cfg(all(test, windows))]
+                    self.record_test_local_lock_transition(connection_id, request)?;
                     held.shared_mask |= mask;
                 }
             }
@@ -67,6 +75,8 @@ impl ManagedSqliteShmCoordinator {
                     let held = state.connections.get_mut(&connection_id).ok_or_else(|| {
                         protocol("NODE_MANAGED_SQLITE_SHM_CONNECTION_DISAPPEARED")
                     })?;
+                    #[cfg(all(test, windows))]
+                    self.record_test_local_lock_transition(connection_id, request)?;
                     held.shared_mask &= !mask;
                 }
             }
@@ -89,6 +99,8 @@ impl ManagedSqliteShmCoordinator {
                 self.unlock_os_range(&mut state, connection_id, request)?;
             }
         }
+        #[cfg(all(test, windows))]
+        self.finish_test_lock_action(connection_id, request)?;
         Ok(ManagedSqliteShmLockAttempt::Acquired)
     }
 
@@ -117,6 +129,8 @@ impl ManagedSqliteShmCoordinator {
             ManagedSqliteShmFailurePhase::LockAcquire,
             initialization_mutated,
         )?;
+        #[cfg(all(test, windows))]
+        self.begin_test_native_lock_action(connection_id, request)?;
         let attempt = {
             let node = state
                 .node
@@ -151,6 +165,13 @@ impl ManagedSqliteShmCoordinator {
                 } else {
                     held.shared_mask |= request.mask();
                 }
+                #[cfg(all(test, windows))]
+                self.finish_test_native_lock_action(
+                    connection_id,
+                    request,
+                    ManagedSqliteShmTestNativeLockOutcome::Acquired,
+                    true,
+                )?;
                 #[cfg(test)]
                 if let Some(failure) = self.finish_test_fault(state, fault, true) {
                     return Err(failure);
@@ -158,13 +179,29 @@ impl ManagedSqliteShmCoordinator {
                 Ok(ManagedSqliteShmLockAttempt::Acquired)
             }
             Ok(PlatformManagedSqliteLockAttempt::Contended) => {
+                #[cfg(all(test, windows))]
+                self.finish_test_native_lock_action(
+                    connection_id,
+                    request,
+                    ManagedSqliteShmTestNativeLockOutcome::Contended,
+                    initialization_mutated,
+                )?;
                 Ok(ManagedSqliteShmLockAttempt::Contended)
             }
-            Err(error) => Err(ManagedSqliteShmFailure::new(
-                ManagedSqliteShmFailurePhase::LockAcquire,
-                mutation_class(initialization_mutated, &error),
-                error,
-            )),
+            Err(error) => {
+                #[cfg(all(test, windows))]
+                self.finish_test_native_lock_action(
+                    connection_id,
+                    request,
+                    ManagedSqliteShmTestNativeLockOutcome::Error,
+                    initialization_mutated,
+                )?;
+                Err(ManagedSqliteShmFailure::new(
+                    ManagedSqliteShmFailurePhase::LockAcquire,
+                    mutation_class(initialization_mutated, &error),
+                    error,
+                ))
+            }
         }
     }
 
@@ -188,6 +225,8 @@ impl ManagedSqliteShmCoordinator {
             ManagedSqliteShmFailurePhase::LockRelease,
             false,
         )?;
+        #[cfg(all(test, windows))]
+        self.begin_test_native_unlock_action(connection_id, request)?;
         let result = match state.node.as_mut() {
             Some(node) => platform::unlock_sqlite_byte_range(
                 &node.file.file,
@@ -210,6 +249,13 @@ impl ManagedSqliteShmCoordinator {
             }
         };
         if let Err(error) = result {
+            #[cfg(all(test, windows))]
+            self.finish_test_native_unlock_action(
+                connection_id,
+                request,
+                ManagedSqliteShmTestNativeUnlockOutcome::Error,
+                false,
+            )?;
             self.mark_poisoned(
                 state,
                 ManagedSqliteShmFailurePhase::LockRelease,
@@ -238,6 +284,13 @@ impl ManagedSqliteShmCoordinator {
         } else {
             held.shared_mask &= !request.mask();
         }
+        #[cfg(all(test, windows))]
+        self.finish_test_native_unlock_action(
+            connection_id,
+            request,
+            ManagedSqliteShmTestNativeUnlockOutcome::Success,
+            true,
+        )?;
         #[cfg(test)]
         if let Some(failure) = self.finish_test_fault(state, fault, true) {
             return Err(failure);

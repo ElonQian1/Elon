@@ -226,10 +226,10 @@ impl ManagedSqliteRoutedConnectionFixture {
         // SAFETY: `methods` belongs to the same live main-file allocation.
         let lock =
             unsafe { (*methods).xShmLock }.ok_or("managed SHM-lock callback is unavailable")?;
-        // SAFETY: this calls SQLite's installed xShmLock with its owning live file. Callers use
-        // exact raw request-validation inputs and observe the same allocation after the call.
+        // SAFETY: this calls SQLite's installed xShmLock with its owning live file. The installed
+        // callback does not transfer or destroy that allocation on either success or failure.
         let result_code = unsafe { lock(file, offset, count, raw_flags) };
-        // SAFETY: request-validation rejection leaves the allocation owned by the live Connection.
+        // SAFETY: the same live Connection still owns the allocation after the callback.
         let after = unsafe { super::super::observe_test_vfs_file_raw_slots(file) }
             .ok_or("managed SHM-lock raw slots unavailable after callback")?;
         Ok(ManagedTestShmLockCallbackObservation {

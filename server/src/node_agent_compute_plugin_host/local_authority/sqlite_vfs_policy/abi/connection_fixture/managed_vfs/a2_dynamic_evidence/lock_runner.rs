@@ -1,5 +1,6 @@
 //! Process-isolated native receipts for executable Lock request-validation programs.
 
+mod lifecycle;
 mod request_validation;
 
 pub(in super::super) use request_validation::{LockRunnerActionV1, LockRunnerRequestValidationV1};
@@ -26,6 +27,28 @@ pub(super) const PAYLOAD_VERSION: &str = "a2lockq1";
 pub(in super::super) struct LockRunnerProgramBindingV1 {
     pub(in super::super) action: LockRunnerActionV1,
     pub(in super::super) request_validation: LockRunnerRequestValidationV1,
+    pub(in super::super) normalized_descriptor_sha256: [u8; 32],
+    pub(in super::super) case_key_sha256: [u8; 32],
+    pub(in super::super) full_record_sha256: [u8; 32],
+    pub(in super::super) plan_sha256: [u8; 32],
+    pub(in super::super) implementation_sha256: [u8; 32],
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(in super::super) enum LockRunnerLifecyclePathV1 {
+    NativeAcquire,
+    NativeRelease,
+    SharedLocalAcquire,
+    SharedLocalRelease,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(in super::super) struct LockRunnerLifecycleBindingV1 {
+    pub(in super::super) path: LockRunnerLifecyclePathV1,
+    pub(in super::super) action: LockRunnerActionV1,
+    pub(in super::super) first: u8,
+    pub(in super::super) count: u8,
+    pub(in super::super) mask: u8,
     pub(in super::super) normalized_descriptor_sha256: [u8; 32],
     pub(in super::super) case_key_sha256: [u8; 32],
     pub(in super::super) full_record_sha256: [u8; 32],
@@ -88,6 +111,18 @@ pub(in super::super) fn run_lock_program_isolated(
     run_parent(exact_test, binding)
 }
 
+pub(in super::super) fn run_lock_lifecycle_program_isolated(
+    exact_test: &str,
+    binding: LockRunnerLifecycleBindingV1,
+) -> anyhow::Result<LockRunnerIsolatedEvidenceV1> {
+    lifecycle::validate_binding(binding)?;
+    if let Some(root) = selected_child_root()? {
+        lifecycle::exercise_child(&root, binding)?;
+        return Ok(LockRunnerIsolatedEvidenceV1::ChildReported);
+    }
+    run_lifecycle_parent(exact_test, binding)
+}
+
 fn run_parent(
     exact_test: &str,
     binding: LockRunnerProgramBindingV1,
@@ -116,6 +151,37 @@ fn run_parent(
         .wait_for_successful_report()
         .map_err(|failure| handle_child_failure(&root, failure))?;
     validate_parent_receipt(&root, binding, child)
+        .map_err(|error| cleanup_failed_root(&root, error))
+}
+
+fn run_lifecycle_parent(
+    exact_test: &str,
+    binding: LockRunnerLifecycleBindingV1,
+) -> anyhow::Result<LockRunnerIsolatedEvidenceV1> {
+    if exact_test.is_empty() {
+        return Err(anyhow!("Lock lifecycle exact test name is empty"));
+    }
+    let executable = std::env::current_exe().context("resolve current Lock test executable")?;
+    let root = create_private_child_root()?;
+    let launch = ChildLaunchIdentity::new();
+    let spawned = match Command::new(executable)
+        .args(["--exact", exact_test, "--nocapture"])
+        .env(CHILD_ROOT_ENV, &root)
+        .env(super::A2_DYNAMIC_CHILD_NONCE_ENV, launch.env_value())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+    {
+        Ok(child) => child,
+        Err(error) => return Err(cleanup_failed_root(&root, anyhow!(error))),
+    };
+    let bound = launch
+        .bind(spawned)
+        .map_err(|failure| handle_child_failure(&root, failure))?;
+    let child = bound
+        .wait_for_successful_report()
+        .map_err(|failure| handle_child_failure(&root, failure))?;
+    validate_lifecycle_parent_receipt(&root, binding, child)
         .map_err(|error| cleanup_failed_root(&root, error))
 }
 
@@ -151,6 +217,45 @@ fn validate_parent_receipt(
             environment_sha256: digest_environment(&environment),
             cleanup_sha256: digest_cleanup(&cleanup),
             native_receipt_sha256: digest_native_receipt(child.actual_payload()),
+            child_exit_code: child.exit_code,
+        },
+    ))
+}
+
+fn validate_lifecycle_parent_receipt(
+    root: &Path,
+    binding: LockRunnerLifecycleBindingV1,
+    child: ValidatedChildProcessReceipt,
+) -> anyhow::Result<LockRunnerIsolatedEvidenceV1> {
+    if !child.matches_family(SanitizedPayloadFamily::LockQuotient) {
+        return Err(anyhow!("Lock lifecycle child payload family mismatch"));
+    }
+    let payload = lifecycle::validate_payload(child.actual_payload(), binding)?;
+    if !child.matches_registration_id(payload.registration_id) {
+        return Err(anyhow!(
+            "Lock lifecycle child registration binding mismatch"
+        ));
+    }
+    let environment =
+        WindowsDynamicEnvironment::capture(root, &child).map_err(anyhow::Error::msg)?;
+    let cleanup = ValidatedParentCleanupReceipt::remove_after_child_exit(&child, &environment)
+        .map_err(anyhow::Error::msg)?;
+    let child_fingerprint = child.fingerprint();
+    if child_fingerprint != cleanup.child_fingerprint
+        || child.root_commitment != cleanup.root_commitment
+        || child.registration_commitment != cleanup.registration_commitment
+    {
+        return Err(anyhow!("Lock lifecycle parent cleanup binding mismatch"));
+    }
+    Ok(LockRunnerIsolatedEvidenceV1::ParentReceipt(
+        LockRunnerEvidenceReceiptV1 {
+            root_commitment_sha256: child.root_commitment.0,
+            child_fingerprint_sha256: child_fingerprint.0,
+            registration_commitment_sha256: child.registration_commitment.0,
+            payload_commitment_sha256: child.payload_commitment.0,
+            environment_sha256: digest_environment(&environment),
+            cleanup_sha256: digest_cleanup(&cleanup),
+            native_receipt_sha256: payload.native_receipt_sha256,
             child_exit_code: child.exit_code,
         },
     ))

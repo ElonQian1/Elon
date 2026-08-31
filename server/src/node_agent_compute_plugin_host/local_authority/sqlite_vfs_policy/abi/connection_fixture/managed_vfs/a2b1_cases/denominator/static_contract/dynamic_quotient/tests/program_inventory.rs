@@ -68,6 +68,251 @@ const LOCK_REQUEST_VALIDATION_PROGRAMS: [(LockActionV1, LockManagedStimulusV1); 
     ),
 ];
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum LockLifecyclePathCaseV1 {
+    NativeAcquire,
+    NativeRelease,
+    SharedLocalAcquire,
+    SharedLocalRelease,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) struct LockLifecycleProgramCaseV1 {
+    pub(super) path: LockLifecyclePathCaseV1,
+    pub(super) action: LockActionV1,
+    pub(super) first: u8,
+    pub(super) count: u8,
+    pub(super) mask: u8,
+}
+
+pub(super) fn lock_lifecycle_cases() -> Vec<LockLifecycleProgramCaseV1> {
+    let mut cases = Vec::with_capacity(104);
+    for first in 0..8 {
+        cases.push(lock_lifecycle_case(
+            LockLifecyclePathCaseV1::NativeAcquire,
+            LockActionV1::LockShared,
+            first,
+            1,
+        ));
+    }
+    for first in 0..8 {
+        for count in 1..=8 - first {
+            cases.push(lock_lifecycle_case(
+                LockLifecyclePathCaseV1::NativeAcquire,
+                LockActionV1::LockExclusive,
+                first,
+                count,
+            ));
+        }
+    }
+    for first in 0..8 {
+        cases.push(lock_lifecycle_case(
+            LockLifecyclePathCaseV1::NativeRelease,
+            LockActionV1::UnlockShared,
+            first,
+            1,
+        ));
+    }
+    for first in 0..8 {
+        for count in 1..=8 - first {
+            cases.push(lock_lifecycle_case(
+                LockLifecyclePathCaseV1::NativeRelease,
+                LockActionV1::UnlockExclusive,
+                first,
+                count,
+            ));
+        }
+    }
+    for first in 0..8 {
+        cases.push(lock_lifecycle_case(
+            LockLifecyclePathCaseV1::SharedLocalAcquire,
+            LockActionV1::LockShared,
+            first,
+            1,
+        ));
+        cases.push(lock_lifecycle_case(
+            LockLifecyclePathCaseV1::SharedLocalRelease,
+            LockActionV1::UnlockShared,
+            first,
+            1,
+        ));
+    }
+    assert_eq!(cases.len(), 104);
+    cases
+}
+
+const fn lock_lifecycle_case(
+    path: LockLifecyclePathCaseV1,
+    action: LockActionV1,
+    first: u8,
+    count: u8,
+) -> LockLifecycleProgramCaseV1 {
+    let mask = ((((1_u16 << count) - 1) << first) & 0xff) as u8;
+    LockLifecycleProgramCaseV1 {
+        path,
+        action,
+        first,
+        count,
+        mask,
+    }
+}
+
+pub(super) fn lock_lifecycle_record(case: LockLifecycleProgramCaseV1) -> LeafRecordV1 {
+    let label = format!(
+        "lock-lifecycle-{:?}-{:?}-first{}-count{}",
+        case.path, case.action, case.first, case.count
+    );
+    let mut value = record(&label, "completed");
+    value.key.identity.root = RootOperationV1::Lock;
+    let LeafOutcomeV1::Terminal(expected) = &mut value.outcome else {
+        unreachable!()
+    };
+    let mode = if matches!(
+        case.action,
+        LockActionV1::LockShared | LockActionV1::UnlockShared
+    ) {
+        LockModeV1::Shared
+    } else {
+        LockModeV1::Exclusive
+    };
+    let native = matches!(
+        case.path,
+        LockLifecyclePathCaseV1::NativeAcquire | LockLifecyclePathCaseV1::NativeRelease
+    );
+    expected.sqlite = SqliteResultV1::Ok;
+    expected.disposition = TerminalDispositionV1::Returned;
+    expected.phase = "Success".to_owned();
+    expected.failure = FailureClassV1::None;
+    expected.mutation = MutationStateV1::Known;
+    expected.lock_outcome_uncertain = false;
+    expected.lock_effect = if matches!(
+        case.path,
+        LockLifecyclePathCaseV1::NativeAcquire | LockLifecyclePathCaseV1::SharedLocalAcquire
+    ) {
+        LockEffectV1::Acquired {
+            mode,
+            mask: case.mask,
+            native,
+        }
+    } else {
+        LockEffectV1::Released {
+            mode,
+            mask: case.mask,
+            native,
+        }
+    };
+    expected.dms_lock = DmsLockCustodyV1::ExistingShared;
+    expected.raw_slots = CustodyStateV1::Unchanged;
+    expected.route = CustodyStateV1::Unchanged;
+    expected.callback = CustodyStateV1::Released;
+    expected.file = CustodyStateV1::Unchanged;
+    expected.mapping = CustodyStateV1::NotReached;
+    expected.view = CustodyStateV1::NotReached;
+    expected.payload = CustodyStateV1::NotReached;
+    expected.counts = ObservableCountsV1 {
+        callback_begin: 1,
+        callback_complete: 1,
+        native_lock: u16::from(case.path == LockLifecyclePathCaseV1::NativeAcquire),
+        native_unlock: u16::from(case.path == LockLifecyclePathCaseV1::NativeRelease),
+        ..ObservableCountsV1::default()
+    };
+    value
+}
+
+pub(super) fn lock_lifecycle_descriptor(
+    case: LockLifecycleProgramCaseV1,
+    capability: RunnerCapabilityV1,
+) -> TerminalDescriptorV1 {
+    let (source, stimulus, prestate, operation, timing, fixture, seam, initialization) =
+        match case.path {
+            LockLifecyclePathCaseV1::NativeAcquire => (
+                SourceSiteV1::LockNativeAcquire,
+                LockManagedStimulusV1::NativeAcquire,
+                LockPrestateV1::NoHeldLocks,
+                LockOperationV1::NativeAcquire,
+                TimingV1::AfterSuccess,
+                FixtureV1::ManagedWalMainSingleConnection,
+                FaultSeamV1::NativeOperation,
+                ReachabilityV1::Reached(InitializationProfileV1::NodeLive),
+            ),
+            LockLifecyclePathCaseV1::NativeRelease => (
+                SourceSiteV1::LockNativeRelease,
+                LockManagedStimulusV1::NativeRelease,
+                if case.action == LockActionV1::UnlockShared {
+                    LockPrestateV1::OwnSharedHeld
+                } else {
+                    LockPrestateV1::OwnExclusiveHeld
+                },
+                LockOperationV1::NativeRelease,
+                TimingV1::AfterSuccess,
+                FixtureV1::ManagedWalMainSingleConnection,
+                FaultSeamV1::NativeOperation,
+                ReachabilityV1::NotReached,
+            ),
+            LockLifecyclePathCaseV1::SharedLocalAcquire => (
+                SourceSiteV1::LockLocalState,
+                LockManagedStimulusV1::LocalState,
+                LockPrestateV1::SiblingSharedCoalesced,
+                LockOperationV1::LocalAcquire,
+                TimingV1::Natural,
+                FixtureV1::ManagedWalMainTwoConnections,
+                FaultSeamV1::Natural,
+                ReachabilityV1::NotReached,
+            ),
+            LockLifecyclePathCaseV1::SharedLocalRelease => (
+                SourceSiteV1::LockLocalState,
+                LockManagedStimulusV1::LocalState,
+                LockPrestateV1::SiblingSharedCoalesced,
+                LockOperationV1::LocalRelease,
+                TimingV1::Natural,
+                FixtureV1::ManagedWalMainTwoConnections,
+                FaultSeamV1::Natural,
+                ReachabilityV1::NotReached,
+            ),
+        };
+    let (held_shared, held_exclusive, sibling_shared) = match case.path {
+        LockLifecyclePathCaseV1::NativeAcquire => (0, 0, 0),
+        LockLifecyclePathCaseV1::NativeRelease => {
+            if case.action == LockActionV1::UnlockShared {
+                (case.mask, 0, 0)
+            } else {
+                (0, case.mask, 0)
+            }
+        }
+        LockLifecyclePathCaseV1::SharedLocalAcquire => (0, 0, case.mask),
+        LockLifecyclePathCaseV1::SharedLocalRelease => (case.mask, 0, case.mask),
+    };
+    TerminalDescriptorV1::lock(
+        source,
+        StimulusV1::LockManaged(stimulus),
+        PrestateV1::Lock(prestate),
+        operation,
+        PhaseV1::Success,
+        timing,
+        OccurrenceV1::Natural,
+        ExecutionRecipeV1::new(
+            fixture,
+            CallbackV1::XShmLock,
+            seam,
+            ObserverV1::LockCallbackAndSnapshot,
+            CleanupV1::ParentOwnedRoot,
+            capability,
+        ),
+        LockAxesV1 {
+            action: ReachabilityV1::Reached(case.action),
+            first: ReachabilityV1::Reached(case.first),
+            count: ReachabilityV1::Reached(case.count),
+            mask: ReachabilityV1::Reached(case.mask),
+            initialization,
+            held_shared_mask: ReachabilityV1::Reached(held_shared),
+            held_exclusive_mask: ReachabilityV1::Reached(held_exclusive),
+            sibling_shared_mask: ReachabilityV1::Reached(sibling_shared),
+            sibling_exclusive_mask: ReachabilityV1::Reached(0),
+            completion: ReachabilityV1::Reached(LockCompletionV1::Completed),
+        },
+    )
+}
+
 pub(super) fn budget_descriptor(
     stimulus: MapManagedStimulusV1,
     mode: MapModeV1,
@@ -346,15 +591,43 @@ fn exact_lock_request_validation_programs_are_inventoried_without_granting_suppo
 }
 
 #[test]
+fn exact_lock_lifecycle_programs_are_inventoried_without_granting_supported() {
+    let cases = lock_lifecycle_cases();
+    assert_eq!(cases.len(), 104);
+    for case in cases {
+        let record = lock_lifecycle_record(case);
+        let descriptor = lock_lifecycle_descriptor(
+            case,
+            RunnerCapabilityV1::Missing(CapabilityGapV1::LockObservationIncomplete),
+        );
+        let prepared = prepare_dynamic_terminal_v1(&record, &descriptor).unwrap();
+        let receipt = super::super::runner_admission::inventory_v1(&prepared.key).unwrap();
+        assert!(matches!(
+            receipt.status(),
+            ExecutionProgramInventoryStatusV1::SourcePresentReceiptRequired { .. }
+        ));
+        assert_eq!(
+            project_dynamic_class_v1(
+                &record,
+                &lock_lifecycle_descriptor(case, RunnerCapabilityV1::Supported),
+            ),
+            Err(ProjectionErrorV1::Invalid(
+                ProjectionViolationV1::RunnerAdmissionUnsealedSupported,
+            )),
+        );
+    }
+}
+
+#[test]
 fn full_lock_program_inventory_accounts_for_every_frozen_member_without_opening_quotient() {
     let bundle =
         build_lock_execution_program_inventory_v1(&super::super::super::lock::graph()).unwrap();
     let inventory = &bundle.inventory;
     assert_eq!(inventory.member_count, 8_668);
     assert_eq!(bundle.reverse_index.len(), 8_668);
-    assert_eq!(inventory.source_present_member_count, 10);
-    assert_eq!(inventory.source_present_group_count, 10);
-    assert_eq!(inventory.planned_missing_member_count, 8_658);
+    assert_eq!(inventory.source_present_member_count, 114);
+    assert_eq!(inventory.source_present_group_count, 114);
+    assert_eq!(inventory.planned_missing_member_count, 8_554);
     let source_groups = bundle
         .groups
         .iter()
@@ -365,10 +638,10 @@ fn full_lock_program_inventory_accounts_for_every_frozen_member_without_opening_
             )
         })
         .collect::<Vec<_>>();
-    assert_eq!(source_groups.len(), 10);
+    assert_eq!(source_groups.len(), 114);
     assert!(source_groups.iter().all(|group| group.member_count == 1));
     let record = lock_request_validation_record();
-    let expected_source_keys = LOCK_REQUEST_VALIDATION_PROGRAMS
+    let mut expected_source_keys = LOCK_REQUEST_VALIDATION_PROGRAMS
         .into_iter()
         .map(|(action, stimulus)| {
             prepare_dynamic_terminal_v1(
@@ -383,6 +656,19 @@ fn full_lock_program_inventory_accounts_for_every_frozen_member_without_opening_
             .key
         })
         .collect::<Vec<_>>();
+    expected_source_keys.extend(lock_lifecycle_cases().into_iter().map(|case| {
+        let record = lock_lifecycle_record(case);
+        prepare_dynamic_terminal_v1(
+            &record,
+            &lock_lifecycle_descriptor(
+                case,
+                RunnerCapabilityV1::Missing(CapabilityGapV1::LockObservationIncomplete),
+            ),
+        )
+        .unwrap()
+        .key
+    }));
+    assert_eq!(expected_source_keys.len(), 114);
     assert!(source_groups
         .iter()
         .all(|group| expected_source_keys.contains(&group.normalized_key)));
