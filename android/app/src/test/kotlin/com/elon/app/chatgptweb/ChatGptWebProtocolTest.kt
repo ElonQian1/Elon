@@ -98,7 +98,7 @@ class ChatGptWebProtocolTest {
                   {"id":"u1","role":"user","state":"completed","content":[{"type":"text","text":"你好"}]},
                   {"id":"a1","role":"assistant","state":"streaming","content":[
                     {"type":"markdown","text":"## 你好\n\n需要什么帮助？"},
-                    {"type":"image","text":"生成的图片","kind":"image","mediaType":"image/png"},
+                    {"type":"image","text":"生成的图片","kind":"image","mediaType":"image/png","assetHandle":"image_0123456789abcdef","imageWidth":1024,"imageHeight":576},
                     {"type":"file","text":"分析结果.csv","kind":"download","mediaType":"text/csv","targetKind":"external","targetHost":"files.example.com"},
                     {"type":"code","text":"Kotlin 代码","kind":"code_block","language":"kotlin","lineCount":12},
                     {"type":"table","text":"表格","kind":"table","rowCount":4,"columnCount":3},
@@ -140,6 +140,9 @@ class ChatGptWebProtocolTest {
         )
         assertEquals("生成的图片", event.value.messages.last().parts.first().label)
         assertEquals("image/png", event.value.messages.last().parts.first().metadata?.mediaType)
+        assertEquals("image_0123456789abcdef", event.value.messages.last().parts.first().metadata?.assetHandle)
+        assertEquals(1024, event.value.messages.last().parts.first().metadata?.imageWidth)
+        assertEquals(576, event.value.messages.last().parts.first().metadata?.imageHeight)
         assertEquals("files.example.com", event.value.messages.last().parts[1].metadata?.targetHost)
         assertEquals("kotlin", event.value.messages.last().parts[2].metadata?.language)
         assertEquals(12, event.value.messages.last().parts[2].metadata?.lineCount)
@@ -583,6 +586,42 @@ class ChatGptWebProtocolTest {
 
         assertFalse(event.value.authenticated)
         assertTrue(event.value.composerReady)
+    }
+
+    @Test
+    fun parsesOnlyBoundedOpaqueImageAssets() {
+        val ready = ChatGptWebProtocol.parse(
+            """{"schema":"yilong.ai.ui.v1","event":{"type":"image_asset","handle":"image_0123456789abcdef","state":"ready","mediaType":"image/jpeg","width":1024,"height":576,"data":"/9j/AAAAAAAAAP/Z"}}""",
+        ) as ChatGptWebEvent.ImageAsset
+        val failed = ChatGptWebProtocol.parse(
+            """{"schema":"yilong.ai.ui.v1","event":{"type":"image_asset","handle":"image_0123456789abcdef","state":"failed","error":"http_error"}}""",
+        ) as ChatGptWebEvent.ImageAsset
+
+        assertTrue(ready.value.ready)
+        assertEquals(12, ready.value.decodedBytes()?.size)
+        assertEquals("http_error", failed.value.error)
+        assertNull(ChatGptWebProtocol.parse(
+            """{"schema":"yilong.ai.ui.v1","event":{"type":"image_asset","handle":"https://private.example/image","state":"failed","error":"http_error"}}""",
+        ))
+        assertNull(ChatGptWebProtocol.parse(
+            """{"schema":"yilong.ai.ui.v1","event":{"type":"image_asset","handle":"image_0123456789abcdef","state":"ready","mediaType":"image/svg+xml","width":100,"height":100,"data":"/9j/AAAAAAAAAP/Z"}}""",
+        ))
+        assertNull(ChatGptWebProtocol.parse(
+            """{"schema":"yilong.ai.ui.v1","event":{"type":"image_asset","handle":"image_0123456789abcdef","state":"ready","mediaType":"image/jpeg","width":5000,"height":100,"data":"/9j/AAAAAAAAAP/Z"}}""",
+        ))
+    }
+
+    @Test
+    fun boundsImageGalleryObservationWithoutExposingEntries() {
+        val event = ChatGptWebProtocol.parse(
+            """{"schema":"yilong.ai.ui.v1","event":{"type":"image_gallery_snapshot","state":"ready","observedCount":500}}""",
+        ) as ChatGptWebEvent.ImageGallerySnapshot
+
+        assertEquals(ChatGptWebImageGallerySnapshot.STATE_READY, event.value.state)
+        assertEquals(96, event.value.observedCount)
+        assertNull(ChatGptWebProtocol.parse(
+            """{"schema":"yilong.ai.ui.v1","event":{"type":"image_gallery_snapshot","state":"unsupported","observedCount":1}}""",
+        ))
     }
 
     @Test

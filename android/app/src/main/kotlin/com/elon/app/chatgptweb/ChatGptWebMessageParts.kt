@@ -14,6 +14,9 @@ internal data class ChatGptWebMessagePartMetadata(
     val mediaType: String? = null,
     val targetKind: String? = null,
     val targetHost: String? = null,
+    val assetHandle: String? = null,
+    val imageWidth: Int? = null,
+    val imageHeight: Int? = null,
     val lineCount: Int? = null,
     val rowCount: Int? = null,
     val columnCount: Int? = null,
@@ -24,6 +27,9 @@ internal data class ChatGptWebMessagePartMetadata(
             mediaType == null &&
             targetKind == null &&
             targetHost == null &&
+            assetHandle == null &&
+            imageWidth == null &&
+            imageHeight == null &&
             lineCount == null &&
             rowCount == null &&
             columnCount == null
@@ -51,6 +57,10 @@ internal object ChatGptWebMessagePartParser {
             mediaType = boundedToken(part, "mediaType", MEDIA_TYPE, MAX_MEDIA_TYPE_LENGTH),
             targetKind = part.optString("targetKind").takeIf(TARGET_KINDS::contains),
             targetHost = boundedToken(part, "targetHost", TARGET_HOST, MAX_TARGET_HOST_LENGTH),
+            assetHandle = part.optString("assetHandle")
+                .takeIf(ChatGptWebImageAssetProtocol::validHandle),
+            imageWidth = boundedCount(part, "imageWidth", MAX_IMAGE_DIMENSION),
+            imageHeight = boundedCount(part, "imageHeight", MAX_IMAGE_DIMENSION),
             lineCount = boundedCount(part, "lineCount", MAX_LINE_COUNT),
             rowCount = boundedCount(part, "rowCount", MAX_TABLE_DIMENSION),
             columnCount = boundedCount(part, "columnCount", MAX_TABLE_DIMENSION),
@@ -78,6 +88,7 @@ internal object ChatGptWebMessagePartParser {
     private const val MAX_LANGUAGE_LENGTH = 32
     private const val MAX_MEDIA_TYPE_LENGTH = 96
     private const val MAX_TARGET_HOST_LENGTH = 253
+    private const val MAX_IMAGE_DIMENSION = 4_096
     private const val MAX_LINE_COUNT = 1_000_000
     private const val MAX_TABLE_DIMENSION = 10_000
     private val SUPPORTED_TYPES = setOf(

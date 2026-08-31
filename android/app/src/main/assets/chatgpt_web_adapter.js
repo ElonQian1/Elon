@@ -6,6 +6,7 @@
   if (!nativeBridge || typeof nativeBridge.postMessage !== 'function') return;
   const conversationAdapter = window.__elonChatGptConversations;
   const messageAdapter = window.__elonChatGptMessages;
+  const imageAssets = window.__elonChatGptImageAssets;
   const composerAdapter = window.__elonChatGptComposer;
   const navigationAdapter = window.__elonChatGptNavigation;
   const layoutAdapter = window.__elonChatGptLayout;
@@ -433,6 +434,14 @@
     const respond = (resultAction, ok, detail) => result(resultAction, ok, detail, requestId);
     respond.requestId = requestId;
     if (action === 'snapshot') return snapshot();
+    if (action === 'request_image_asset') {
+      if (!imageAssets || typeof imageAssets.request !== 'function') {
+        return respond(action, false, 'image_asset_unavailable');
+      }
+      return imageAssets.request(String(command.value || ''), emitEvent).then((outcome) => {
+        respond(action, outcome && outcome.ok === true, outcome && outcome.error || '');
+      });
+    }
     if (action === 'set_skin_mode') {
       if (!skinAdapter || typeof skinAdapter.setEnabled !== 'function') {
         return respond(action, false, '网页皮肤模块尚未就绪。');

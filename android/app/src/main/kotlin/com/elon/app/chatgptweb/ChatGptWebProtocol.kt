@@ -148,6 +148,14 @@ internal sealed interface ChatGptWebEvent {
         val evidence: ChatGptWebAttachmentTransportEvidence,
     ) : ChatGptWebEvent
 
+    data class ImageAsset(
+        val value: ChatGptWebImageAsset,
+    ) : ChatGptWebEvent
+
+    data class ImageGallerySnapshot(
+        val value: ChatGptWebImageGallerySnapshot,
+    ) : ChatGptWebEvent
+
     data class CommandResult(
         val action: String,
         val ok: Boolean,
@@ -194,6 +202,10 @@ internal object ChatGptWebProtocol {
                 "ui_manifest_snapshot" -> ChatGptWebEvent.UiManifest(parseUiManifest(event))
                 "web_touch_request" -> parseWebTouchRequest(event)
                 "attachment_transport" -> parseAttachmentTransport(event)
+                "image_asset" -> ChatGptWebImageAssetProtocol.parseAsset(event)
+                    ?.let { ChatGptWebEvent.ImageAsset(it) }
+                "image_gallery_snapshot" -> ChatGptWebImageAssetProtocol.parseGallery(event)
+                    ?.let { ChatGptWebEvent.ImageGallerySnapshot(it) }
                 else -> null
             }
         } else when (payload.optString("type")) {

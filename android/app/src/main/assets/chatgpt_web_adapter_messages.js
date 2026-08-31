@@ -14,6 +14,7 @@
   const THINKING_CURSOR_PLACEHOLDERS = /[\u2022\u2026\u22ef\u25cf\u25cb\u2580-\u259f\ue000-\uf8ff]/gu;
   const messageActionPolicy = window.__elonChatGptMessageActionPolicy;
   const richContent = window.__elonChatGptRichContent;
+  const imageAssets = window.__elonChatGptImageAssets;
   let lastStructuredTypes = new Set();
   let lastComplexOutput = false;
 
@@ -347,7 +348,13 @@
     });
     Array.from(content.querySelectorAll('img')).forEach((node) => {
       if (node.closest('a[href]')) return;
-      add('image', structuredLabel(node, '图片'), node, { kind: 'image', mediaType: mediaType(node) });
+      const preview = imageAssets && typeof imageAssets.describe === 'function'
+        ? imageAssets.describe(node)
+        : {};
+      add('image', structuredLabel(node, '图片'), node, Object.assign(
+        { kind: 'image', mediaType: mediaType(node) },
+        preview
+      ));
     });
     Array.from(content.querySelectorAll('pre')).forEach((node) => {
       const metadata = codeMetadata(node);

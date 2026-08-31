@@ -11,7 +11,7 @@ internal enum class WebChatProductionFeatureCompletionDecision {
 }
 
 internal object WebChatProductionFeatureCompletionPolicy {
-    fun requiresOfficialCompletion(@Suppress("UNUSED_PARAMETER") kind: String): Boolean = true
+    fun requiresOfficialCompletion(kind: String): Boolean = kind.trim().lowercase() != "images"
 
     fun evaluate(
         feature: WebChatProductionFeature,

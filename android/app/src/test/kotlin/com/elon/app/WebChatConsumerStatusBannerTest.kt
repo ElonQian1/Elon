@@ -145,4 +145,42 @@ class WebChatConsumerStatusBannerTest {
         assertTrue(WebChatConsumerComposerOperationPolicy.resolve(chatGpt, "idle", feedback).visible)
         assertFalse(WebChatConsumerComposerOperationPolicy.resolve(google, "idle", feedback).visible)
     }
+
+    @Test
+    fun imageGenerationStatusSeparatesGenerationPreparationAndPreviewFailure() {
+        val generating = WebChatConsumerComposerOperationPolicy.resolve(
+            provider = chatGpt,
+            attachmentPhase = "idle",
+            feedback = null,
+            imageGenerationActive = true,
+            streaming = true,
+        )
+        val preparing = WebChatConsumerComposerOperationPolicy.resolve(
+            provider = chatGpt,
+            attachmentPhase = "idle",
+            feedback = null,
+            imageGenerationActive = true,
+            imagePreviewState = "preparing",
+        )
+        val failed = WebChatConsumerComposerOperationPolicy.resolve(
+            provider = chatGpt,
+            attachmentPhase = "idle",
+            feedback = null,
+            imageGenerationActive = true,
+            imagePreviewState = "failed",
+        )
+
+        assertEquals("正在创建图片…", generating.message)
+        assertEquals("图片已生成，正在准备预览…", preparing.message)
+        assertEquals("图片已生成，预览同步失败，可在“图像”中重试", failed.message)
+        assertFalse(
+            WebChatConsumerComposerOperationPolicy.resolve(
+                provider = chatGpt,
+                attachmentPhase = "idle",
+                feedback = null,
+                imageGenerationActive = false,
+                imagePreviewState = "failed",
+            ).visible,
+        )
+    }
 }

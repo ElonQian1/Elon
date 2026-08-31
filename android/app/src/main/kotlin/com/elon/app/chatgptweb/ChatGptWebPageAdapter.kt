@@ -407,6 +407,11 @@ internal class ChatGptWebPageAdapter(
 
     override fun requestSnapshot() = runCommand("snapshot")
 
+    fun requestImageAsset(handle: String) = runCommand(
+        action = "request_image_asset",
+        value = handle.take(MAX_IMAGE_ASSET_HANDLE_LENGTH),
+    )
+
     fun requestConversationRefresh() = runCommand("refresh_current_conversation")
 
     fun markReady() {
@@ -445,6 +450,8 @@ internal class ChatGptWebPageAdapter(
         is ChatGptWebEvent.UiManifest,
         is ChatGptWebEvent.WebTouchRequest,
         is ChatGptWebEvent.AttachmentTransport,
+        is ChatGptWebEvent.ImageAsset,
+        is ChatGptWebEvent.ImageGallerySnapshot,
         is ChatGptWebEvent.CommandResult -> true
     }
 
@@ -507,7 +514,7 @@ internal class ChatGptWebPageAdapter(
         origin.scheme == "https" && origin.host == "chatgpt.com" && origin.port == -1
 
     companion object {
-        internal const val ADAPTER_VERSION = 207
+        internal const val ADAPTER_VERSION = 208
 
         private val ADAPTER_ASSETS = listOf(
             "chatgpt_web_adapter_bootstrap.js",
@@ -520,6 +527,7 @@ internal class ChatGptWebPageAdapter(
             "chatgpt_web_adapter_conversations.js",
             "chatgpt_web_adapter_message_action_policy.js",
             "chatgpt_web_adapter_message_portal_policy.js",
+            "chatgpt_web_image_assets.js",
             "chatgpt_web_adapter_messages.js",
             "chatgpt_web_adapter_model_label_policy.js",
             "chatgpt_web_adapter_composer_option_policy.js",
@@ -582,6 +590,7 @@ internal class ChatGptWebPageAdapter(
         private const val MAX_PROJECT_TITLE_LENGTH = 160
         private const val MAX_OPTION_ID_LENGTH = 64
         private const val MAX_UI_CONTROL_ID_LENGTH = 72
+        private const val MAX_IMAGE_ASSET_HANDLE_LENGTH = 32
         private val REQUEST_ID = Regex("mcp_[a-z0-9]{1,32}")
     }
 }

@@ -51,6 +51,7 @@ internal class WebChatProductionFeatureNavigationCoordinator(
     private val consumerPort: () -> WebChatConsumerPort?,
     private val activeProvider: () -> WebChatProviderId?,
     private val openOfficialFallback: () -> Unit,
+    private val openNativeFeature: (WebChatProductionFeature) -> Boolean = { false },
     private val interactionCache: WebChatProductionInteractionCache,
 ) {
     private var requestEpoch = 0
@@ -211,6 +212,10 @@ internal class WebChatProductionFeatureNavigationCoordinator(
         port: WebChatConsumerPort,
         feature: WebChatProductionFeature,
     ) {
+        if (openNativeFeature(feature)) {
+            activeSheet?.dismiss()
+            return
+        }
         if (feature.selected) {
             if (feature.officialCompletion) openOfficialFallback()
             return

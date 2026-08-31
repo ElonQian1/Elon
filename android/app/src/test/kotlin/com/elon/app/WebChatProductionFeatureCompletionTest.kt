@@ -52,6 +52,7 @@ class WebChatProductionFeatureCompletionTest {
             feature("images", "images"),
             state,
         ))
+        assertFalse(WebChatProductionFeatureCompletionPolicy.requiresOfficialCompletion("images"))
     }
 
     @Test

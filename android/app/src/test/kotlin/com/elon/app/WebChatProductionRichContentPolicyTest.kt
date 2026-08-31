@@ -25,4 +25,19 @@ class WebChatProductionRichContentPolicyTest {
 
         assertEquals(parts, WebChatProductionRichContentPolicy.fallbackParts(parts))
     }
+
+    @Test
+    fun nativeImagePreviewRetainsOnlyOpaqueAssetMetadata() {
+        val image = WebChatProductionContentPart(
+            type = "image",
+            label = "图片",
+            assetHandle = "image_0123456789abcdef",
+            imageSource = "/private/cache/image_0123456789abcdef.jpg",
+            imageWidth = 1024,
+            imageHeight = 576,
+            previewPending = false,
+        )
+
+        assertEquals(listOf(image), WebChatProductionRichContentPolicy.fallbackParts(listOf(image)))
+    }
 }

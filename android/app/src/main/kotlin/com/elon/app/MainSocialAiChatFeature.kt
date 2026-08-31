@@ -61,6 +61,7 @@ internal class MainSocialAiChatFeature(
             collapseInputComposer = collapseInputComposer,
             openProviderPicker = { providerPicker.show() },
             openOfficialFallback = { modeController.openOfficialFallback() },
+            onCreateImageRequested = { productionImageActions.requestCreateImage() },
             onConversationIndexChanged = ::handleConversationIndexChanged,
             onComposerStateChanged = ::refreshConsumerComposerUi,
             onConsumerStateObserved = ::handleChatGptConsumerStateObserved,
@@ -178,6 +179,8 @@ internal class MainSocialAiChatFeature(
         )
     }
     private val productionComposerTools by productionComposerToolsDelegate
+    private val productionImageActions by lazy {
+        ChatGptProductionImageActions(productionComposerTools, ::activeController) }
     private val productionVoiceControlsDelegate = lazy {
         WebChatProductionVoiceControls(
             dp = ::dp,
@@ -195,6 +198,7 @@ internal class MainSocialAiChatFeature(
                 if (isChatModeActive()) providerId() else null
             },
             openOfficialFallback = ::openOfficialFallback,
+            openNativeFeature = productionImageActions::openNativeFeature,
             interactionCache = webChatInteractionCache,
         )
     }
@@ -667,6 +671,10 @@ internal class MainSocialAiChatFeature(
                     attachmentPhase = controller.attachmentSendPhase(),
                     feedback = composerOperationFeedback,
                     dictationActive = dictationActive,
+                    imageGenerationActive = activeQuickComposerAction ==
+                        WebChatProductionQuickComposerAction.IMAGE_GENERATION,
+                    streaming = controller.streaming(),
+                    imagePreviewState = controller.imagePreviewState(),
                 ),
             )
             inputComposerViews()?.let { views ->

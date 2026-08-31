@@ -11,15 +11,22 @@ internal object WebChatConsumerComposerOperationPolicy {
         attachmentPhase: String,
         feedback: WebChatConsumerComposerFeedback?,
         dictationActive: Boolean = false,
+        imageGenerationActive: Boolean = false,
+        streaming: Boolean = false,
+        imagePreviewState: String = "idle",
     ): WebChatConsumerRecoveryState = when (attachmentPhase) {
         "uploading", "sending" -> status("附件上传中，完成后会自动发送")
         "failed" -> status("附件发送失败，附件已保留，可重新发送")
-        else -> feedback?.takeIf { it.providerId == provider.id }?.let { status(it.message) }
-            ?: if (dictationActive) {
-                status("正在听写，点蓝色勾完成，点×取消")
-            } else {
-                hidden()
-            }
+        else -> when {
+            imageGenerationActive && streaming -> status("正在创建图片…")
+            imageGenerationActive && imagePreviewState == "preparing" ->
+                status("图片已生成，正在准备预览…")
+            imageGenerationActive && imagePreviewState == "failed" ->
+                status("图片已生成，预览同步失败，可在“图像”中重试")
+            feedback?.providerId == provider.id -> status(feedback.message)
+            dictationActive -> status("正在听写，点蓝色勾完成，点×取消")
+            else -> hidden()
+        }
     }
 
     fun commandAccepted(

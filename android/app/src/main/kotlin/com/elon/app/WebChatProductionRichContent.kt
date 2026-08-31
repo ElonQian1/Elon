@@ -5,6 +5,7 @@ import android.text.TextUtils
 import android.text.method.LinkMovementMethod
 import android.view.Gravity
 import android.view.View
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.core.content.ContextCompat
@@ -49,16 +50,13 @@ internal object WebChatProductionRichContentBinder {
         part: WebChatProductionContentPart,
         index: Int,
         onOpen: ((ChatMessage, WebChatProductionContentPart) -> Unit)?,
-    ): TextView = TextView(container.context).apply {
-        text = displayText(context, part)
-        contentDescription = buildString {
-            append("web-chat-message-part:")
-            append(metadata.providerWireValue)
-            append(':')
-            append(ChatGptNativeControlPresentation.stableContextId(metadata.sourceMessageId))
-            append(":$index:")
-            append(ChatGptNativeControlPresentation.stableContextId(part.type))
+    ): View {
+        if (part.type == "image" && (part.imageSource != null || part.previewPending)) {
+            return createImagePart(container, message, metadata, part, index, onOpen)
         }
+        return TextView(container.context).apply {
+        text = displayText(context, part)
+        contentDescription = partContentDescription(metadata, part, index)
         importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
         gravity = Gravity.CENTER_VERTICAL
         maxLines = 2
@@ -78,6 +76,70 @@ internal object WebChatProductionRichContentBinder {
             LinearLayout.LayoutParams.MATCH_PARENT,
             LinearLayout.LayoutParams.WRAP_CONTENT,
         ).apply { bottomMargin = dp(container, 4) }
+        }
+    }
+
+    private fun createImagePart(
+        container: LinearLayout,
+        message: ChatMessage,
+        metadata: WebChatProductionMessage,
+        part: WebChatProductionContentPart,
+        index: Int,
+        onOpen: ((ChatMessage, WebChatProductionContentPart) -> Unit)?,
+    ): View = LinearLayout(container.context).apply {
+        orientation = LinearLayout.VERTICAL
+        contentDescription = partContentDescription(metadata, part, index)
+        importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
+        background = ContextCompat.getDrawable(context, R.drawable.bg_chatgpt_attachment_chip)
+        isClickable = onOpen != null
+        isFocusable = onOpen != null
+        setOnClickListener(onOpen?.let { callback -> View.OnClickListener { callback(message, part) } })
+        layoutParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+        ).apply { bottomMargin = dp(container, 6) }
+
+        val preview = ImageView(context).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(container, 184),
+            )
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            setBackgroundColor(ContextCompat.getColor(context, R.color.elon_surface_card))
+            setImageResource(R.drawable.ic_attach_photos)
+            contentDescription = part.label
+        }
+        addView(preview)
+        addView(TextView(context).apply {
+            text = if (part.previewPending) "正在准备图片预览…" else part.label
+            maxLines = 2
+            ellipsize = TextUtils.TruncateAt.END
+            setPadding(dp(container, 10), dp(container, 8), dp(container, 10), dp(container, 9))
+            setTextColor(ContextCompat.getColor(context, R.color.elon_text_primary))
+            textSize = 13f
+        })
+
+        part.imageSource?.let { source ->
+            preview.tag = source
+            ChatImagePreviewLoader.load(context, source) { bitmap ->
+                preview.post {
+                    if (preview.tag == source) preview.setImageBitmap(bitmap)
+                }
+            }
+        }
+    }
+
+    private fun partContentDescription(
+        metadata: WebChatProductionMessage,
+        part: WebChatProductionContentPart,
+        index: Int,
+    ): String = buildString {
+        append("web-chat-message-part:")
+        append(metadata.providerWireValue)
+        append(':')
+        append(ChatGptNativeControlPresentation.stableContextId(metadata.sourceMessageId))
+        append(":$index:")
+        append(ChatGptNativeControlPresentation.stableContextId(part.type))
     }
 
     private fun displayText(context: Context, part: WebChatProductionContentPart): String {

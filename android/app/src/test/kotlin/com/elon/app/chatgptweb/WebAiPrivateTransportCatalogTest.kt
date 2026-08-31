@@ -28,6 +28,7 @@ class WebAiPrivateTransportCatalogTest {
         assertTrue("android_web_ai_unified_send_coordinator_v1" in enabledIds)
         assertTrue("android_chatgpt_same_origin_text_transaction_v1" in enabledIds)
         assertTrue("android_chatgpt_attachment_transport_reconciliation_v1" in enabledIds)
+        assertTrue("android_chatgpt_native_image_asset_gallery_v1" in enabledIds)
         assertTrue("android_chatgpt_realtime_voice_background_overlay_v1" in enabledIds)
 
         val streamSettlement = values.first {
@@ -192,6 +193,19 @@ class WebAiPrivateTransportCatalogTest {
             "official_dom_attachment_snapshot_and_bounded_timeout",
             attachmentTransport.getString("fallback"),
         )
+
+        val imageGallery = values.first {
+            it.getString("capability_id") == "android_chatgpt_native_image_asset_gallery_v1"
+        }
+        assertEquals("completed", imageGallery.getString("implementation_status"))
+        assertEquals(
+            "device_verified_v1_1_1375_adapter_208",
+            imageGallery.getString("verification_status"),
+        )
+        assertTrue(imageGallery.getBoolean("production_default"))
+        assertTrue(imageGallery.getBoolean("runtime_enabled"))
+        assertFalse(imageGallery.getBoolean("direct_post_enabled"))
+        assertEquals("official_images_page", imageGallery.getString("fallback"))
     }
 
     @Test

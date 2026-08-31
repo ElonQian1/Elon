@@ -27,6 +27,7 @@ installed build; individual capability documents retain implementation evidence.
 | Same-origin text transaction | ChatGPT | Completed, enabled, and device verified on `v1.1.1365 (1386)`, adapter `206`; current dynamic proof selects immediate official fallback | Official-page transaction without automatic write replay |
 | Interaction presets and deferred chat actions | ChatGPT | Completed, enabled, and device verified on research build `v1.1.1367 (1388)` | Current official control and WebView navigation |
 | Attachment upload reconciliation | ChatGPT | Completed, enabled, and device verified on published Release `v1.1.1374 (1395)`, adapter `207` | Official DOM attachment snapshot and bounded timeout |
+| Native image assets and cache-first gallery | ChatGPT | Completed, enabled, and device verified on Release candidate `v1.1.1375 (1396)`, adapter `208` | Bounded local image cache and official `/images` fallback |
 
 All web-account transports keep the official page authoritative. They do not export
 cookies, credentials, request headers, or private conversation content outside the
@@ -57,6 +58,19 @@ reply, restored the original conversation, and registered
 `supervised/attachment_lifecycle`. The completed capability is
 `android_chatgpt_attachment_transport_reconciliation_v1` and must not be reimplemented
 without current regression evidence.
+
+Native image content keeps the official page as the identity, byte-fetch, generation,
+and conversation authority. Adapter `208` maps allowlisted same-origin image content to
+opaque handles; Android receives only a bounded JPEG preview and dimensions. The native
+gallery renders the local cache immediately and starts a transient same-profile `/images`
+sync only when the six-hour freshness marker is absent or expired. Manual refresh remains
+an explicit forced sync. A sync imports at most 24 missing handles, while the cache remains
+bounded to 80 files, 64 MiB total, and 1.1 MiB per file. It never emits source URLs, labels,
+cookies, headers, credentials, or conversation text. Device acceptance imported 39 opaque
+assets, opened the native viewer, returned to the same production chat, and proved that a
+fresh second open did not create another sync WebView. The completed capability is
+`android_chatgpt_native_image_asset_gallery_v1`; details are in
+`docs/chatgpt-native-image-assets-gallery.md`.
 
 The Google conversation directory persists the timestamp of the last successful
 official directory response. Cached rows render immediately; a legacy or expired cache

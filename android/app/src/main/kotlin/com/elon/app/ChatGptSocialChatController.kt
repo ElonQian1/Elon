@@ -31,6 +31,7 @@ internal class ChatGptSocialChatController(
     private val collapseInputComposer: () -> Unit,
     private val openProviderPicker: () -> Unit,
     private val openOfficialFallback: () -> Unit,
+    private val onCreateImageRequested: () -> Unit,
     private val onConversationIndexChanged: () -> Unit,
     private val onComposerStateChanged: () -> Unit,
     private val onConsumerStateObserved: (WebChatConsumerState) -> Unit,
@@ -43,7 +44,7 @@ internal class ChatGptSocialChatController(
         setChatAdapter = setChatAdapter,
         onMessageLongPress = showMessageActions,
         onMessageAction = ::handleWebChatMessageAction,
-        onContentOpen = { _, _ -> openOfficialFallback() },
+        onContentOpen = { _, part -> imageContent.open(part) },
     )
     private val messageClipboard = ChatGptMessageClipboard(activity)
     private val session = ChatGptBackgroundSession(
@@ -59,6 +60,7 @@ internal class ChatGptSocialChatController(
         audioPermissionController = audioPermissionController,
         onRealtimeVoiceTranscript = ::handleRealtimeVoiceTranscript,
     )
+    private val imageContent by lazy(LazyThreadSafetyMode.NONE) { ChatGptSocialImageContentController(activity, session, openOfficialFallback) }
     private val skinPresentation = ChatGptWebSkinPresentationController(binding, session)
     private var provider = WebChatProviderRegistry.get(WebChatProviderId.CHATGPT_WEB)
     private var active = false
@@ -163,6 +165,9 @@ internal class ChatGptSocialChatController(
     override fun attachmentSendPhase(): String = session.attachmentSendPhase()
 
     override fun pendingAttachmentCount(): Int = maxOf(session.pendingAttachmentCount(), pendingAttachments.size)
+    override fun imagePreviewState(): String = session.imagePreviewState().name.lowercase()
+
+    override fun showNativeImageGallery(): Boolean = session.showImageGallery(onCreateImageRequested)
 
     override fun trySendMessage(rawText: String, pendingAttachments: List<PendingAttachment>): Boolean {
         if (!active) return false
@@ -491,6 +496,7 @@ internal class ChatGptSocialChatController(
             messageActionContextIds = WebChatProductionMessageActionControls.messageContextIds(
                 socialConsumerPort.state().controls,
             ),
+            imagePreviewPath = session::imagePreviewPath,
             timestampFor = transcript::timestampFor,
         )
         if (pendingTextPrompt != null) {

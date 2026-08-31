@@ -28,6 +28,8 @@ internal interface WebChatSocialController {
     fun attachmentSupported(): Boolean
     fun attachmentSendPhase(): String
     fun pendingAttachmentCount(): Int
+    fun imagePreviewState(): String = "idle"
+    fun showNativeImageGallery(): Boolean = false
     fun trySendMessage(rawText: String, pendingAttachments: List<PendingAttachment>): Boolean
     fun requestModelOptions()
     fun refreshComposerModel()

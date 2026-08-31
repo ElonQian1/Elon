@@ -17,6 +17,7 @@ internal object ChatGptFriendMessageMapper {
         pendingSendStatus: String = "发送中…",
         attachmentsForMessage: (String) -> List<ChatAttachment> = { emptyList() },
         messageActionContextIds: Set<String> = emptySet(),
+        imagePreviewPath: (String) -> String? = { null },
         timestampFor: (String) -> Long,
     ): List<ChatMessage> {
         val latestAssistantIndex = snapshot.messages.indexOfLast { it.role == "assistant" }
@@ -28,6 +29,7 @@ internal object ChatGptFriendMessageMapper {
                     contentPartFromPart(
                         part = part,
                         suppressAttachmentFallback = messageAttachments.isNotEmpty(),
+                        imagePreviewPath = imagePreviewPath,
                     )
                 }
             } else {
@@ -111,14 +113,22 @@ internal object ChatGptFriendMessageMapper {
     private fun contentPartFromPart(
         part: ChatGptWebMessagePart,
         suppressAttachmentFallback: Boolean,
+        imagePreviewPath: (String) -> String?,
     ): WebChatProductionContentPart? {
         if (suppressAttachmentFallback && part.type in ATTACHMENT_PART_TYPES) return null
+        val assetHandle = part.metadata?.assetHandle
+        val imageSource = assetHandle?.let(imagePreviewPath)
         return WebChatProductionContentPart(
             type = part.type,
             label = part.label,
             language = part.metadata?.language,
             mediaType = part.metadata?.mediaType,
             targetHost = part.metadata?.targetHost,
+            assetHandle = assetHandle,
+            imageSource = imageSource,
+            imageWidth = part.metadata?.imageWidth,
+            imageHeight = part.metadata?.imageHeight,
+            previewPending = part.type == "image" && assetHandle != null && imageSource == null,
             lineCount = part.metadata?.lineCount,
             rowCount = part.metadata?.rowCount,
             columnCount = part.metadata?.columnCount,

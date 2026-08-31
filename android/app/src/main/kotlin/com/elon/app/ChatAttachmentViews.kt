@@ -19,6 +19,7 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import java.io.File
+import java.util.concurrent.Executors
 import kotlin.math.max
 import kotlin.math.min
 
@@ -377,44 +378,68 @@ internal object ChatImagePreviewLoader {
     }
 
     fun load(context: Context, source: String, onReady: (Bitmap) -> Unit) {
-        cache.get(source)?.let {
+        load(context, source, MAX_THUMBNAIL_PIXELS, onReady)
+    }
+
+    fun loadSampled(
+        context: Context,
+        source: String,
+        maxPixels: Int,
+        onReady: (Bitmap) -> Unit,
+    ) {
+        load(context, source, maxPixels.coerceIn(MIN_THUMBNAIL_PIXELS, MAX_THUMBNAIL_PIXELS), onReady)
+    }
+
+    private fun load(
+        context: Context,
+        source: String,
+        maxPixels: Int,
+        onReady: (Bitmap) -> Unit,
+    ) {
+        val cacheKey = if (maxPixels == MAX_THUMBNAIL_PIXELS) source else "$maxPixels\u001F$source"
+        cache.get(cacheKey)?.let {
             onReady(it)
             return
         }
         val appContext = context.applicationContext
-        Thread {
-            val bitmap = runCatching { loadBitmap(appContext, source) }
+        IO.execute {
+            val bitmap = runCatching { loadBitmap(appContext, source, maxPixels) }
                 .onFailure { ChatImageDiskCache.remove(appContext, source) }
-                .getOrNull() ?: return@Thread
-            cache.put(source, bitmap)
+                .getOrNull() ?: return@execute
+            cache.put(cacheKey, bitmap)
             onReady(bitmap)
-        }.start()
+        }
     }
 
     fun cached(source: String): Bitmap? = cache.get(source)
 
-    private fun loadBitmap(context: Context, source: String): Bitmap {
+    private fun loadBitmap(context: Context, source: String, maxPixels: Int): Bitmap {
         val bytes = ChatImageDiskCache.readBytes(context, source, MAX_IMAGE_BYTES)
-        return decodeSampledBitmap(bytes)
+        return decodeSampledBitmap(bytes, maxPixels)
     }
 
-    private fun decodeSampledBitmap(bytes: ByteArray): Bitmap {
+    private fun decodeSampledBitmap(bytes: ByteArray, maxPixels: Int): Bitmap {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
         val options = BitmapFactory.Options().apply {
-            inSampleSize = thumbnailSampleSize(bounds.outWidth, bounds.outHeight)
+            inSampleSize = thumbnailSampleSize(bounds.outWidth, bounds.outHeight, maxPixels)
         }
         return BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
             ?: error("cannot decode image preview")
     }
 
-    private fun thumbnailSampleSize(width: Int, height: Int): Int {
+    private fun thumbnailSampleSize(width: Int, height: Int, maxPixels: Int): Int {
         if (width <= 0 || height <= 0) return 1
         var sample = 1
-        while ((width / sample) * (height / sample) > MAX_THUMBNAIL_PIXELS) {
+        while ((width / sample) * (height / sample) > maxPixels) {
             sample *= 2
         }
         return sample
+    }
+
+    private const val MIN_THUMBNAIL_PIXELS = 16_384
+    private val IO = Executors.newFixedThreadPool(2) { runnable ->
+        Thread(runnable, "chat-image-preview").apply { isDaemon = true }
     }
 }
 
