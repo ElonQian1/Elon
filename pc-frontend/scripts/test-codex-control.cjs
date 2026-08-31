@@ -24,6 +24,7 @@ if (!rustApi.includes('tauri_diagnostic_snapshot')) throw new Error('persistent 
 if (!rustApi.includes('/api/codex-control/tauri-diagnostics')) throw new Error('lightweight Tauri diagnostic endpoint missing')
 if (!rustApi.includes('desktop_snapshot_too_large')) throw new Error('Tauri diagnostic snapshot size guard missing')
 if (!rustMcp.includes('tauri_diagnostics')) throw new Error('MCP status must expose persistent Tauri diagnostics')
+if (!nativeBridge.includes('"ai_windows": ai_window_control::list')) throw new Error('persistent heartbeat must include redacted AI window diagnostics')
 for (const action of ['list_ai_windows', 'capture_ai_window_state', 'focus_ai_window']) {
   if (!rustMcp.includes(action) || !nativeBridge.includes(action)) throw new Error(`AI window action missing: ${action}`)
 }

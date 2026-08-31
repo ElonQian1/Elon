@@ -205,6 +205,7 @@ pub(crate) fn record_app_event(
 pub(crate) fn codex_win_capabilities(
     webview: Webview,
     bridge: State<'_, CodexSemanticBridge>,
+    ai_web_sessions: State<'_, LocalAiBrowserRuntime>,
 ) -> Result<Value, String> {
     ensure_main_webview(&webview)?;
     bridge.record(
@@ -212,7 +213,13 @@ pub(crate) fn codex_win_capabilities(
         "debug",
         "bridge.heartbeat",
         "Tauri 语义桥在线",
-        json!({"window_label": webview.label()}),
+        json!({
+            "window_label": webview.label(),
+            "ai_windows": ai_window_control::list(
+                webview.app_handle(),
+                ai_web_sessions.inner(),
+            ),
+        }),
     );
     Ok(json!({
         "schema":"elon.tauri_codex_bridge.v1",
