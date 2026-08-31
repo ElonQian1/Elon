@@ -7,6 +7,7 @@ import android.webkit.WebView
 import android.widget.FrameLayout
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.PendingAttachment
+import com.elon.app.WebChatBackgroundInteractionLease
 import com.elon.app.WebChatConsumerPort
 import com.elon.app.WebChatManagedRealtimeVoiceState
 import com.elon.app.WebChatPendingSendState
@@ -79,8 +80,19 @@ internal class ChatGptBackgroundSession(
             { webView }, { pageAdapter }, { webExecution.interactionRequested() }, ::ensureInitialized,
         )
     }
+    private val backgroundInteractionLease by lazy(LazyThreadSafetyMode.NONE) {
+        WebChatBackgroundInteractionLease(
+            webView = { webView },
+            schedule = { task, delayMs -> composerOptionHandler.postDelayed(task, delayMs) },
+            cancel = composerOptionHandler::removeCallbacks,
+        )
+    }
     private val composerOptionInteraction by lazy(LazyThreadSafetyMode.NONE) {
-        ChatGptComposerOptionInteraction({ webView }, { pageAdapter }, surfaceMode::isSkin, composerOptionHandler)
+        ChatGptComposerOptionInteraction(
+            { pageAdapter },
+            surfaceMode::isSkin,
+            backgroundInteractionLease,
+        )
     }
     private val sessionContinuityHandler = Handler(Looper.getMainLooper())
     private val recoveryHandler = Handler(Looper.getMainLooper())
@@ -169,7 +181,10 @@ internal class ChatGptBackgroundSession(
         }
     private val touchRequestHandler by lazy(LazyThreadSafetyMode.NONE) {
         ChatGptWebTouchRequestHandler(
-            { webView }, { pageAdapter }, { touchDispatcher }, webExecution::interactionRequested,
+            { webView }, { pageAdapter }, { touchDispatcher },
+            { surfaceMode.isSkin() || realtimeVoiceBacking.isActive() },
+            backgroundInteractionLease::run,
+            webExecution::interactionRequested,
             composerOptionRequests::dismiss,
             { composerOptionRequests.scheduleCollection("model") },
             { composerOptionRequests.scheduleCollection("tools") },

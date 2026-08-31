@@ -38,26 +38,30 @@
     control,
     visibleRoots,
     scheduleTask,
-    delayMs,
+    pollIntervalMs,
     signatureFor,
-    confirmationDelayMs,
-    isOpen
+    timeoutMs
   ) {
     if (!shouldArm(control) || typeof visibleRoots !== 'function') return null;
     const before = snapshotRoots(visibleRoots(), signatureFor);
     const schedule = typeof scheduleTask === 'function' ? scheduleTask : setTimeout;
-    const opened = () => (
-      (typeof isOpen === 'function' && isOpen()) ||
-      hasNewOrChangedRoot(before, visibleRoots(), signatureFor)
-    );
-    return function arm(retry) {
-      if (typeof retry !== 'function') return false;
-      schedule(() => {
-        if (opened()) return;
-        schedule(() => {
-          if (!opened()) retry();
-        }, Number.isFinite(confirmationDelayMs) ? confirmationDelayMs : 220);
-      }, Number.isFinite(delayMs) ? delayMs : 260);
+    const interval = Number.isFinite(pollIntervalMs) && pollIntervalMs > 0
+      ? pollIntervalMs
+      : 100;
+    const timeout = Number.isFinite(timeoutMs) && timeoutMs >= interval
+      ? timeoutMs
+      : 1800;
+    const opened = () => hasNewOrChangedRoot(before, visibleRoots(), signatureFor);
+    return function observe(onOpened, onTimedOut) {
+      if (typeof onOpened !== 'function' || typeof onTimedOut !== 'function') return false;
+      let elapsed = 0;
+      function poll() {
+        elapsed += interval;
+        if (opened()) return onOpened();
+        if (elapsed >= timeout) return onTimedOut();
+        schedule(poll, interval);
+      }
+      schedule(poll, interval);
       return true;
     };
   }

@@ -6,6 +6,8 @@ internal class ChatGptWebTouchRequestHandler(
     private val webView: () -> WebView?,
     private val pageAdapter: () -> ChatGptWebPageAdapter?,
     private val touchDispatcher: () -> ChatGptWebTouchDispatcher?,
+    private val isInteractiveSurface: () -> Boolean,
+    private val runBackgroundInteraction: ((() -> Unit) -> Boolean),
     private val interactionRequested: () -> Unit,
     private val dismissComposerOptions: () -> Unit,
     private val scheduleModelOptions: () -> Unit,
@@ -16,6 +18,17 @@ internal class ChatGptWebTouchRequestHandler(
         val view = webView() ?: return
         val adapter = pageAdapter() ?: return
         interactionRequested()
+        val dispatch = {
+            dispatchTouch(event, view, adapter)
+        }
+        if (isInteractiveSurface() || !runBackgroundInteraction(dispatch)) dispatch()
+    }
+
+    private fun dispatchTouch(
+        event: ChatGptWebEvent.WebTouchRequest,
+        view: WebView,
+        adapter: ChatGptWebPageAdapter,
+    ) {
         touchDispatcher()?.dispatch(event) { dispatched ->
             if (!dispatched) {
                 chatGptComposerSectionForAction(event.purpose)?.let { dismissComposerOptions() }

@@ -27,7 +27,7 @@ class ChatGptWebProjectAndMenuContractTest {
     }
 
     @Test
-    fun projectDiscoveryStaysVisibleDomOnlyAndMenuRetryIsBounded() {
+    fun projectDiscoveryStaysVisibleDomOnlyAndMenuObservationIsBounded() {
         val project = read("android/app/src/main/assets/chatgpt_web_adapter_project_policy.js")
         val conversations = read("android/app/src/main/assets/chatgpt_web_adapter_conversations.js")
         val menu = read("android/app/src/main/assets/chatgpt_web_adapter_context_menu_policy.js")
@@ -46,12 +46,13 @@ class ChatGptWebProjectAndMenuContractTest {
         assertTrue(conversations.contains("history.back()"))
         assertTrue(conversations.contains("enrichProjectConversations"))
         assertTrue(menu.contains("hasNewRoot"))
-        assertTrue(menu.contains("retry();"))
-        assertTrue(menu.contains("confirmationDelayMs"))
-        assertTrue(menu.contains("typeof isOpen === 'function' && isOpen()"))
+        assertTrue(menu.contains("function observe(onOpened, onTimedOut)"))
+        assertTrue(menu.contains("elapsed >= timeout"))
+        assertFalse(menu.contains("retry();"))
         assertTrue(layout.contains("overlayPolicy.contextMenuSignature"))
         assertTrue(layout.contains("overlays.forEach"))
         assertTrue(layout.contains("contextMenuPolicy.prepare"))
+        assertTrue(layout.contains("官网会话设置未打开，请重试。"))
     }
 
     private fun read(relativePath: String): String =

@@ -649,11 +649,10 @@
     discover();
     const node = controlsById.get(String(id || '')); const control = controlMetadataById.get(String(id || ''));
     if (!node || !isVisible(node)) return result('invoke_ui_control', false, '官网控件已变化，请刷新结构后重试。');
-    const contextMenuRetry = contextMenuPolicy && contextMenuPolicy.prepare(
-      control, visibleOverlayRoots, undefined, undefined,
-      (root) => overlayPolicy.contextMenuSignature(root, isVisible, actionableNodes),
-      undefined, () => String(node.getAttribute('aria-expanded') || '').toLowerCase() === 'true'
+    const contextMenuObservation = contextMenuPolicy && contextMenuPolicy.prepare(control, visibleOverlayRoots, undefined, undefined,
+      (root) => overlayPolicy.contextMenuSignature(root, isVisible, actionableNodes)
     );
+    const finish = (ok, detail, delayMs) => { result('invoke_ui_control', ok, detail); window.setTimeout(() => emitSnapshot(emitEvent, true), delayMs); };
     function dispatch() {
       if (!node.isConnected || !isVisible(node)) {
         return result('invoke_ui_control', false, '官网控件已变化，请刷新结构后重试。');
@@ -673,10 +672,11 @@
         if (!remembered) overlayOwnership.cancelPending(ownershipPageKey());
       }
       emitEvent({ type: 'web_touch_request', purpose: 'invoke_ui_control', controlId: id, xRatio, yRatio });
-      result('invoke_ui_control', true, ''); window.setTimeout(() => emitSnapshot(emitEvent, true), 180);
-      contextMenuRetry && contextMenuRetry(() => {
-        if (node.isConnected && isVisible(node)) emitEvent({ type: 'web_touch_request', purpose: 'invoke_ui_control', controlId: id, xRatio, yRatio });
-      });
+      if (contextMenuObservation) return contextMenuObservation(
+        () => finish(true, '', 0),
+        () => { if (overlayOwnership) overlayOwnership.cancelPending(ownershipPageKey()); finish(false, '官网会话设置未打开，请重试。', 0); }
+      );
+      finish(true, '', 180);
     }
     const rect = node.getBoundingClientRect();
     if (isInViewport(rect)) return dispatch();

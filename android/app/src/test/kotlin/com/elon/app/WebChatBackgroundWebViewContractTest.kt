@@ -36,6 +36,8 @@ class WebChatBackgroundWebViewContractTest {
         assertFalse(presentation.contains("pauseTimers"))
         assertTrue(chatGptWebView.contains("configureWebChatBackgroundSurface()"))
         assertTrue(chatGpt.contains("composerOptionInteraction::dispatch"))
+        assertTrue(chatGpt.contains("backgroundInteractionLease::run"))
+        assertTrue(chatGpt.contains("surfaceMode.isSkin() || realtimeVoiceBacking.isActive()"))
         val voiceBacking = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptRealtimeVoiceBackingController.kt",
         )

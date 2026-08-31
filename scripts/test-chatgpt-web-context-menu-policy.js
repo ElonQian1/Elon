@@ -3,6 +3,15 @@
 const assert = require('assert');
 const policy = require('../android/app/src/main/assets/chatgpt_web_adapter_context_menu_policy.js');
 
+function drain(tasks, limit = 32) {
+  let count = 0;
+  while (tasks.length) {
+    assert.ok(count < limit, 'context menu observation must remain bounded');
+    tasks.shift()();
+    count += 1;
+  }
+}
+
 const sidebar = {};
 const menu = {};
 assert.equal(policy.shouldArm({ semantic: 'conversation_options', contextId: 'conversation_1' }), true);
@@ -10,72 +19,83 @@ assert.equal(policy.shouldArm({ semantic: 'more', contextId: 'conversation_1' })
 assert.equal(policy.hasNewRoot([sidebar], [sidebar, menu]), true);
 assert.equal(policy.hasNewRoot([sidebar], [sidebar]), false);
 
-let retryCount = 0;
-let scheduled = null;
-const retryWhenMissing = policy.prepare(
+let tasks = [];
+let openedCount = 0;
+let timedOutCount = 0;
+const missingMenu = policy.prepare(
   { semantic: 'conversation_options', contextId: 'conversation_1' },
   () => [sidebar],
-  (task) => { scheduled = task; }
+  (task) => { tasks.push(task); },
+  100,
+  undefined,
+  300
 );
-retryWhenMissing(() => { retryCount += 1; });
-scheduled();
-assert.equal(retryCount, 0, 'a missing menu must survive the first confirmation stage');
-scheduled();
-assert.equal(retryCount, 1);
+assert.equal(missingMenu(
+  () => { openedCount += 1; },
+  () => { timedOutCount += 1; }
+), true);
+drain(tasks);
+assert.equal(openedCount, 0);
+assert.equal(timedOutCount, 1, 'a missing menu must fail after a bounded observation window');
 
 let roots = [sidebar];
-const skipWhenOpened = policy.prepare(
+tasks = [];
+const newlyMountedMenu = policy.prepare(
   { semantic: 'conversation_options', contextId: 'conversation_1' },
   () => roots,
-  (task) => { scheduled = task; }
+  (task) => { tasks.push(task); },
+  100,
+  undefined,
+  300
+);
+newlyMountedMenu(
+  () => { openedCount += 1; },
+  () => { timedOutCount += 1; }
 );
 roots = [sidebar, menu];
-skipWhenOpened(() => { retryCount += 1; });
-scheduled();
-assert.equal(retryCount, 1);
+drain(tasks);
+assert.equal(openedCount, 1, 'a newly mounted menu confirms the command');
+assert.equal(timedOutCount, 1);
 
 sidebar.menu = '';
+tasks = [];
 const reusedRoot = policy.prepare(
   { semantic: 'conversation_options', contextId: 'conversation_1' },
   () => [sidebar],
-  (task) => { scheduled = task; },
-  260,
-  (root) => root.menu
+  (task) => { tasks.push(task); },
+  100,
+  (root) => root.menu,
+  300
 );
-sidebar.menu = 'rename|archive|delete';
-reusedRoot(() => { retryCount += 1; });
-scheduled();
-assert.equal(retryCount, 1, 'a menu mounted into an existing root must not be clicked closed');
-
-sidebar.menu = '';
-let stagedTasks = [];
-const opensDuringConfirmation = policy.prepare(
-  { semantic: 'conversation_options', contextId: 'conversation_1' },
-  () => [sidebar],
-  (task) => { stagedTasks.push(task); },
-  260,
-  (root) => root.menu
+reusedRoot(
+  () => { openedCount += 1; },
+  () => { timedOutCount += 1; }
 );
-opensDuringConfirmation(() => { retryCount += 1; });
-stagedTasks.shift()();
 sidebar.menu = 'menuitem:rename|menuitem:archive|menuitem:delete';
-stagedTasks.shift()();
-assert.equal(retryCount, 1, 'a menu that mounts during confirmation must not be clicked closed');
+drain(tasks);
+assert.equal(openedCount, 2, 'a menu mounted into an existing root confirms the command');
+assert.equal(timedOutCount, 1);
 
-let expanded = false;
-stagedTasks = [];
-const expandedTrigger = policy.prepare(
+tasks = [];
+const unchangedRoot = policy.prepare(
   { semantic: 'conversation_options', contextId: 'conversation_1' },
   () => [sidebar],
-  (task) => { stagedTasks.push(task); },
-  260,
-  () => '',
-  220,
-  () => expanded
+  (task) => { tasks.push(task); },
+  100,
+  (root) => root.menu,
+  300
 );
-expandedTrigger(() => { retryCount += 1; });
-expanded = true;
-stagedTasks.shift()();
-assert.equal(stagedTasks.length, 0, 'aria-expanded=true suppresses the second retry stage');
-assert.equal(retryCount, 1, 'an expanded trigger must never be clicked a second time');
+unchangedRoot(
+  () => { openedCount += 1; },
+  () => { timedOutCount += 1; }
+);
+drain(tasks);
+assert.equal(openedCount, 2);
+assert.equal(timedOutCount, 2, 'an unchanged pre-existing overlay is not mistaken for this menu');
+
+assert.equal(policy.prepare(
+  { semantic: 'more', contextId: 'conversation_1' },
+  () => [],
+  (task) => { tasks.push(task); }
+), null);
 process.stdout.write('chatgpt context menu policy tests passed\n');

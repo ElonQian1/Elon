@@ -1,21 +1,12 @@
 package com.elon.app.chatgptweb
 
-import android.os.Handler
-import android.webkit.WebView
 import com.elon.app.WebChatBackgroundInteractionLease
 
 internal class ChatGptComposerOptionInteraction(
-    webView: () -> WebView?,
     private val pageAdapter: () -> ChatGptWebPageAdapter?,
     private val isInteractiveSurface: () -> Boolean,
-    handler: Handler,
+    private val backgroundLease: WebChatBackgroundInteractionLease,
 ) {
-    private val backgroundLease = WebChatBackgroundInteractionLease(
-        webView = webView,
-        schedule = { task, delayMs -> handler.postDelayed(task, delayMs) },
-        cancel = handler::removeCallbacks,
-    )
-
     fun dismiss(requestId: String?) {
         backgroundLease.release()
         pageAdapter()?.dismissComposerMenu(requestId)

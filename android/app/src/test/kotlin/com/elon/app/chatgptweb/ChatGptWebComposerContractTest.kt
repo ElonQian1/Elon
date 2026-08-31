@@ -312,6 +312,7 @@ class ChatGptWebComposerContractTest {
         assertFalse(dispatcher.contains("AccessibilityService"))
         assertTrue(handler.contains("adapter::collectModelOptions"))
         assertTrue(handler.contains("adapter::collectComposerTools"))
+        assertTrue(handler.contains("runBackgroundInteraction(dispatch)"))
         assertTrue(background.contains("is ChatGptWebEvent.WebTouchRequest -> touchRequestHandler.handle(event)"))
     }
 
