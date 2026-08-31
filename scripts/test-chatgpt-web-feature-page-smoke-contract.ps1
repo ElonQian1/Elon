@@ -38,10 +38,19 @@ Assert-Contains $runtime "function Open-ChatGptWebSmokeSurface" `
     "Runtime must centralize idempotent ChatGPT Web surface entry."
 Assert-Contains $runtime 'Open-WebChatNativeChatSurface -Runtime $Runtime -ProviderId "chatgpt_web"' `
     "Runtime must enter the production ChatGPT friend-chat surface."
-Assert-Contains $runtime '-Action "chatgpt_refresh"' `
-    "Runtime must repair a current authenticated adapter stuck connecting."
+$readyFunctionStart = $runtime.IndexOf("function Wait-ChatGptWebSmokeAuthenticatedReady")
+$readyFunctionEnd = $runtime.IndexOf("function ", $readyFunctionStart + 1)
+if ($readyFunctionStart -lt 0 -or $readyFunctionEnd -le $readyFunctionStart) {
+    throw "Runtime must expose a bounded authenticated bridge wait."
+}
+$readyFunction = $runtime.Substring($readyFunctionStart, $readyFunctionEnd - $readyFunctionStart)
+if ($readyFunction.Contains('chatgpt_refresh')) {
+    throw "Authenticated bridge recovery must preserve the warm identity page instead of reloading it."
+}
+Assert-Contains $readyFunction 'resumed authenticated ChatGPT Web bridge' `
+    "Runtime must keep waiting for the existing bounded recovery coordinator."
 Assert-Contains $runtime '$state.adapter_current -eq $true' `
-    "Runtime must not refresh an untrusted stale adapter."
+    "Runtime must accept only the current trusted adapter."
 Assert-Contains $smoke "Wait-ChatGptWebSmokeAuthenticatedReady -Runtime `$runtime" `
     "Feature-page smoke must await a ready bridge before feature controls."
 Assert-Contains $smoke "Open-ChatGptWebSmokeSurface -Runtime `$runtime" `

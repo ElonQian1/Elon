@@ -49,6 +49,16 @@ failed or pending; no write or navigation command is replayed automatically. The
 capability is `android_chatgpt_conversation_navigation_receipt_reconciliation_v1`.
 Its targeted lifecycle tests pass and consolidated device acceptance is pending.
 
+Reopening the already-active ChatGPT or Google production friend-chat surface now keeps
+the warm identity transport alive. Native composer, toolbar, and capability bindings are
+refreshed, but the selected controller is not deactivated and reactivated. Switching to a
+different provider still performs the normal bounded handoff. Smoke recovery likewise
+waits for the existing session recovery coordinator instead of forcing an official page
+reload, and the MCP harness reuses a healthy authenticated service before bootstrapping.
+The stable capability is `android_web_chat_active_provider_reentry_continuity_v1`.
+It is enabled by default; targeted contracts and Release Kotlin compilation pass, while
+consolidated device acceptance remains pending.
+
 The consumer default is one architecture: native chat and floating voice UI, the same
 persistent background ChatGPT WebView as the identity and conversation/bootstrap layer,
 and an Android-owned WebRTC peer as the media and live-transcript transport. The hidden

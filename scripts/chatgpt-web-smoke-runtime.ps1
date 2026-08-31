@@ -689,22 +689,16 @@ function Wait-ChatGptWebSmokeAuthenticatedReady {
             -TimeoutSec ([Math]::Min($InitialWaitSec, $TimeoutSec)) `
             -Description "authenticated ChatGPT Web bridge" -Predicate $ready
     } catch {
-        $state = Invoke-ChatGptWebSmokeMcp -Runtime $Runtime -Tool "ui_state"
-        $recoverable = $state.surface -eq "chatgpt_web" -and
-            $state.bridge_state -eq "connecting" -and
-            $state.adapter_current -eq $true -and
-            $state.authenticated -eq $true
-        if (-not $recoverable) { throw }
-
-        Invoke-ChatGptWebSmokeAction -Runtime $Runtime -Action "chatgpt_refresh" | Out-Null
+        # Native state is cache-first; do not turn a slow identity-layer resume into
+        # a destructive page reload. The bounded recovery coordinator remains authoritative.
         $remaining = [int][Math]::Ceiling(
             ($deadline - [DateTimeOffset]::UtcNow).TotalSeconds
         )
         if ($remaining -lt 1) {
-            throw "Timed out refreshing the authenticated ChatGPT Web bridge."
+            throw "Timed out resuming the authenticated ChatGPT Web bridge."
         }
         return Wait-ChatGptWebSmokeState -Runtime $Runtime -TimeoutSec $remaining `
-            -Description "refreshed authenticated ChatGPT Web bridge" -Predicate $ready
+            -Description "resumed authenticated ChatGPT Web bridge" -Predicate $ready
     }
 }
 

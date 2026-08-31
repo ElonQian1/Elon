@@ -580,10 +580,12 @@ internal class MainSocialAiChatFeature(
         if (productionHeaderActionsDelegate.isInitialized()) productionHeaderActions.cancelPending()
         if (productionPageActionsDelegate.isInitialized()) productionPageActions.cancelPending()
         binding.modelButton.tag = WEB_CHAT_MODEL_BUTTON_OWNER
-        if (chatGptControllerDelegate.isInitialized()) chatGptController.deactivate()
-        if (googleControllerDelegate.isInitialized()) googleController.deactivate()
         val controller = controllerFor(provider.id)
-        controller.activate(provider)
+        if (!controller.isActive()) {
+            if (chatGptControllerDelegate.isInitialized()) chatGptController.deactivate()
+            if (googleControllerDelegate.isInitialized()) googleController.deactivate()
+            controller.activate(provider)
+        }
         ensureConsumerEnhancementsAttached()
         binding.inputEdit.contentDescription = WebChatProductionSelectors.composerInput(provider.id)
         binding.moreButton.apply {
@@ -598,11 +600,9 @@ internal class MainSocialAiChatFeature(
         inputComposerViews()?.let { views ->
             views.modelButtonShell.tag = WEB_CHAT_MODEL_BUTTON_OWNER
             views.modelButtonShell.layoutParams = views.modelButtonShell.layoutParams.apply {
-                width = dp(if (provider.id == WebChatProviderId.CHATGPT_WEB) {
-                    MODEL_BUTTON_CHATGPT_WIDTH_DP
-                } else {
-                    MODEL_BUTTON_CHAT_WIDTH_DP
-                })
+                width = dp(
+                    if (provider.id == WebChatProviderId.CHATGPT_WEB) MODEL_BUTTON_CHATGPT_WIDTH_DP else MODEL_BUTTON_CHAT_WIDTH_DP,
+                )
             }
             views.planModeButton.visibility = View.GONE
             views.webToolsButton.contentDescription = WebChatProductionSelectors.composerTools(provider.id)

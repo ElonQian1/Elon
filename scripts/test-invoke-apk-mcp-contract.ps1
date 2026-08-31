@@ -14,14 +14,25 @@ if (@($errors).Count -gt 0) {
 }
 
 $activityIndex = $source.IndexOf('if ($EnsureMainActivity)')
+$reuseHealthIndex = $source.IndexOf('$health = Get-ApkMcpHealthIfAvailable')
 $forwardIndex = $source.IndexOf('Invoke-Adb forward "tcp:$Port" "tcp:$Port"')
+$bootstrapIndex = $source.IndexOf('Start-ApkMcpDebug', $forwardIndex)
 $healthIndex = $source.IndexOf('$health = Wait-ApkMcpHealth')
 $requestIndex = $source.IndexOf('$request = [ordered]@{')
-if ($activityIndex -lt 0 -or $forwardIndex -lt 0 -or $healthIndex -lt 0 -or $requestIndex -lt 0) {
+if (
+    $activityIndex -lt 0 -or $reuseHealthIndex -lt 0 -or $forwardIndex -lt 0 -or
+    $bootstrapIndex -lt 0 -or $healthIndex -lt 0 -or $requestIndex -lt 0
+) {
     throw "APK MCP lifecycle contract is missing a required stage."
 }
-if (-not ($activityIndex -lt $forwardIndex -and $forwardIndex -lt $healthIndex -and $healthIndex -lt $requestIndex)) {
-    throw "APK MCP must start the requested Activity before forwarding, health verification, and the MCP request."
+if (-not (
+    $activityIndex -lt $reuseHealthIndex -and
+    $reuseHealthIndex -lt $forwardIndex -and
+    $forwardIndex -lt $bootstrapIndex -and
+    $bootstrapIndex -lt $healthIndex -and
+    $healthIndex -lt $requestIndex
+)) {
+    throw "APK MCP must reuse health before its bounded forward/bootstrap recovery and request."
 }
 if ($source.IndexOf('if ($EnsureMainActivity)', $activityIndex + 1) -ge 0) {
     throw "APK MCP must not start the Activity again after health verification."
@@ -33,7 +44,9 @@ foreach ($token in @(
     'Assert-ElonNativeCommand',
     'Unable to create APK MCP adb forward',
     'function Get-ApkMcpHealthIfAvailable',
-    'if ($NoBootstrap -and -not $EnsureMainActivity)',
+    '$health = Get-ApkMcpHealthIfAvailable',
+    '$bootstrapFailure = $null',
+    'if ($null -ne $bootstrapFailure) { throw $bootstrapFailure }',
     'Start-ApkMainActivity -SettleMilliseconds 600',
     'Invoke-Adb shell am start -f 0x34000000',
     '-n com.elon.app/.MainActivity --ez mcp_open_main true'

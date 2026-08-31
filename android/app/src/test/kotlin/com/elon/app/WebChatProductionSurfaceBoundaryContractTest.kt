@@ -48,6 +48,12 @@ class WebChatProductionSurfaceBoundaryContractTest {
         val chatGptBackground = read(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptBackgroundSession.kt",
         )
+        val chatGptNavigationActions = read(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptSessionNavigationActions.kt",
+        )
+        val chatGptTouchRequests = read(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebTouchRequestHandler.kt",
+        )
 
         assertTrue(feature.contains("ChatGptSocialChatController"))
         assertFalse(modeController.contains("ChatGptWebTestActivity"))
@@ -75,10 +81,11 @@ class WebChatProductionSurfaceBoundaryContractTest {
         assertTrue(sideMenu.contains("WebChatSideMenuRefreshPolicy.shouldRefreshOnOpen"))
         assertTrue(sideMenu.contains("ChatGptNativeNavigationSelector.REFRESH_CONVERSATIONS"))
         assertTrue(chatGptBackground.contains("ChatGptConversationNavigationCoordinator"))
-        assertTrue(chatGptBackground.contains("conversationNavigation.beginOpen"))
-        assertTrue(chatGptBackground.contains("conversationNavigation.beginNew"))
+        assertTrue(chatGptBackground.contains("observedMcpState::beginOpenConversationCommand"))
+        assertTrue(chatGptNavigationActions.contains("conversationNavigation.beginOpen"))
+        assertTrue(chatGptNavigationActions.contains("conversationNavigation.beginNew"))
         assertTrue(chatGptBackground.contains("conversationNavigation.save"))
-        assertTrue(chatGptBackground.contains("ChatGptWebInteractionTimings"))
+        assertTrue(chatGptTouchRequests.contains("ChatGptWebInteractionTimings"))
         assertTrue(consumerComposer.contains("WebChatProviderCapability.ATTACHMENT_UPLOAD"))
         assertTrue(feature.contains("WebChatProductionSelectors.composerInput"))
         assertTrue(feature.contains("WebChatProductionSelectors.attachment"))
@@ -95,6 +102,24 @@ class WebChatProductionSurfaceBoundaryContractTest {
         assertTrue(feature.contains("WebChatProductionComposerContext.inputHint"))
         assertTrue(feature.contains("productionComposerTools.quickActions(provider).isEmpty()"))
         assertTrue(sendVisual.contains("WebChatProductionSelectors.composerAction"))
+    }
+
+    @Test
+    fun activeProviderReentryKeepsTheWarmIdentityTransport() {
+        val feature = read("android/app/src/main/kotlin/com/elon/app/MainSocialAiChatFeature.kt")
+        val activation = feature.substringAfter("private fun activateChatProvider")
+            .substringBefore("private fun renderToolbarVoiceAction")
+        val controllerIndex = activation.indexOf("val controller = controllerFor(provider.id)")
+        val activeGuardIndex = activation.indexOf("if (!controller.isActive())")
+        val deactivateIndex = activation.indexOf("chatGptController.deactivate()")
+        val activateIndex = activation.indexOf("controller.activate(provider)")
+        val presentationIndex = activation.indexOf("ensureConsumerEnhancementsAttached()")
+
+        assertTrue(controllerIndex >= 0)
+        assertTrue(activeGuardIndex > controllerIndex)
+        assertTrue(deactivateIndex > activeGuardIndex)
+        assertTrue(activateIndex > deactivateIndex)
+        assertTrue(presentationIndex > activateIndex)
     }
 
     @Test

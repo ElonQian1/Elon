@@ -101,22 +101,31 @@ function Start-ApkMainActivity {
     Start-Sleep -Milliseconds ([Math]::Max(0, $SettleMilliseconds))
 }
 
-$health = if ($NoBootstrap -and -not $EnsureMainActivity) {
-    Get-ApkMcpHealthIfAvailable
-} else { $null }
+$health = $null
+if ($EnsureMainActivity) {
+    Start-ApkMainActivity
+}
+$health = Get-ApkMcpHealthIfAvailable
 if ($null -eq $health) {
-    if (!$NoBootstrap) {
-        Start-ApkMcpDebug
-    }
-
-    if ($EnsureMainActivity) {
-        Start-ApkMainActivity
-    }
-
     Invoke-Adb forward "tcp:$Port" "tcp:$Port" | Out-Null
     Assert-ElonNativeCommand -Result $script:LastAdbResult `
         -FailureMessage "Unable to create APK MCP adb forward"
-    $health = Wait-ApkMcpHealth
+    $bootstrapFailure = $null
+    if (!$NoBootstrap) {
+        try {
+            Start-ApkMcpDebug
+        } catch {
+            # Wireless adb can outlive a service command after Android has already
+            # started the service. The authenticated health endpoint is authoritative.
+            $bootstrapFailure = $_
+        }
+    }
+    try {
+        $health = Wait-ApkMcpHealth
+    } catch {
+        if ($null -ne $bootstrapFailure) { throw $bootstrapFailure }
+        throw
+    }
 }
 $token = [string]$health.auth_token
 if (!$token) {
