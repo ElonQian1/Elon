@@ -6,7 +6,7 @@ function Invoke-ElonApkWorktreeCleanup {
     $cleanupScript = Join-Path $RepoRoot 'scripts\cleanup-task-worktrees.ps1'
     if (-not (Test-Path -LiteralPath $cleanupScript)) { return }
     try {
-        $cleanupOut = & powershell -NoProfile -ExecutionPolicy Bypass -File $cleanupScript -Apply 2>&1
+        $cleanupOut = & $cleanupScript -Apply 2>&1
         $cleanupMarker = '^' + (-join ([char]0x5b8c, [char]0x6210, [char]0xff1a, [char]0x6e05, [char]0x7406))
         $removedLine = $cleanupOut | Select-String -Pattern $cleanupMarker | Select-Object -Last 1
         if ($removedLine) {
