@@ -1,8 +1,9 @@
-//! Exact source-bound programs for stored-poison Lock quarantine with successful retention.
+//! Exact source-bound programs for both stored-poison Lock quarantine retention completions.
 //!
-//! This family deliberately covers only the fresh-live-route terminal whose unsafe custody is
-//! retained before callback completion removes the route. The sibling route-already-unknown
-//! terminal remains outside the executable quotient.
+//! The successful-retention family preserves the q3 wire shape and native-receipt domain. Its
+//! source-bound implementation seal intentionally moves with the expanded source scope. The exact
+//! route-already-unknown sibling is domain-separated behind the additive q4 receipt and a test-only
+//! one-shot route preemption after the real installed `xShmLock` has returned its unsafe failure.
 
 mod catalog;
 mod source_scope;
@@ -27,7 +28,32 @@ use super::LockRunnerExecutionViolationV1;
 use catalog::exact_member_v1;
 use source_scope::digest_implementation_v1;
 
-pub(super) const STORED_POISON_MEMBER_COUNT: usize = 1_320;
+pub(super) const STORED_POISON_COMPLETION_MEMBER_COUNT: usize = 1_320;
+pub(super) const STORED_POISON_MEMBER_COUNT: usize = 2_640;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum LockStoredPoisonCompletionV1 {
+    RetentionSucceeded,
+    RetentionRouteUnknown,
+}
+
+impl LockStoredPoisonCompletionV1 {
+    pub(super) const fn axis(self) -> LockCompletionV1 {
+        match self {
+            Self::RetentionSucceeded => LockCompletionV1::UnsafeRetentionSucceededThenRouteUnknown,
+            Self::RetentionRouteUnknown => {
+                LockCompletionV1::UnsafeRetentionRouteUnknownThenRouteUnknown
+            }
+        }
+    }
+
+    pub(super) const fn ordinal(self) -> u8 {
+        match self {
+            Self::RetentionSucceeded => 4,
+            Self::RetentionRouteUnknown => 5,
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum LockStoredPoisonProfileV1 {
@@ -171,6 +197,8 @@ pub(super) struct LockStoredPoisonProgramSpecV1 {
     pub(super) mask: u8,
     #[cfg(windows)]
     pub(super) profile: LockStoredPoisonProfileV1,
+    #[cfg(windows)]
+    pub(super) completion: LockStoredPoisonCompletionV1,
     pub(super) member: StaticMemberSealV1,
     pub(super) normalized_descriptor_sha256: Digest32,
     pub(super) plan_sha256: Digest32,
@@ -199,11 +227,14 @@ pub(super) fn program_spec_v1(
     let Some(profile) = classify_profile_v1(key) else {
         return Err(LockRunnerExecutionViolationV1::UnsupportedProgram);
     };
+    let Some(completion) = classify_completion_v1(axes.completion) else {
+        return Err(LockRunnerExecutionViolationV1::UnsupportedProgram);
+    };
     let Some(expected_mask) = range_mask_v1(action, first, count) else {
         return Err(LockRunnerExecutionViolationV1::UnsupportedProgram);
     };
     if mask != expected_mask
-        || axes != expected_axes_v1(action, first, count, mask)
+        || axes != expected_axes_v1(action, first, count, mask, completion)
         || key.expected != expected_v1(profile)
     {
         return Err(LockRunnerExecutionViolationV1::UnsupportedProgram);
@@ -219,10 +250,12 @@ pub(super) fn program_spec_v1(
         mask,
         #[cfg(windows)]
         profile,
-        member: exact_member_v1(action, first, count, mask, profile)?,
+        #[cfg(windows)]
+        completion,
+        member: exact_member_v1(action, first, count, mask, profile, completion)?,
         normalized_descriptor_sha256: plan.normalized_descriptor_sha256,
         plan_sha256: plan.plan_sha256,
-        implementation_sha256: digest_implementation_v1(action, first, count, profile),
+        implementation_sha256: digest_implementation_v1(action, first, count, profile, completion),
     })
 }
 
@@ -250,15 +283,33 @@ fn classify_profile_v1(key: &DynamicClassKeyV1) -> Option<LockStoredPoisonProfil
     })
 }
 
-fn expected_axes_v1(action: LockActionV1, first: u8, count: u8, mask: u8) -> LockAxesV1 {
+fn classify_completion_v1(
+    completion: ReachabilityV1<LockCompletionV1>,
+) -> Option<LockStoredPoisonCompletionV1> {
+    match completion {
+        ReachabilityV1::Reached(LockCompletionV1::UnsafeRetentionSucceededThenRouteUnknown) => {
+            Some(LockStoredPoisonCompletionV1::RetentionSucceeded)
+        }
+        ReachabilityV1::Reached(LockCompletionV1::UnsafeRetentionRouteUnknownThenRouteUnknown) => {
+            Some(LockStoredPoisonCompletionV1::RetentionRouteUnknown)
+        }
+        _ => None,
+    }
+}
+
+fn expected_axes_v1(
+    action: LockActionV1,
+    first: u8,
+    count: u8,
+    mask: u8,
+    completion: LockStoredPoisonCompletionV1,
+) -> LockAxesV1 {
     LockAxesV1 {
         action: ReachabilityV1::Reached(action),
         first: ReachabilityV1::Reached(first),
         count: ReachabilityV1::Reached(count),
         mask: ReachabilityV1::Reached(mask),
-        completion: ReachabilityV1::Reached(
-            LockCompletionV1::UnsafeRetentionSucceededThenRouteUnknown,
-        ),
+        completion: ReachabilityV1::Reached(completion.axis()),
         ..LockAxesV1::NOT_REACHED
     }
 }

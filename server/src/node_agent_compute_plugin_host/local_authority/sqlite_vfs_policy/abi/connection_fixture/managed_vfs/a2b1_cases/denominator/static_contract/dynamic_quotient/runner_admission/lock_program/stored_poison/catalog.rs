@@ -1,15 +1,19 @@
-//! Exact frozen-member authority for the retention-succeeded stored-poison Lock family.
+//! Exact frozen-member authority for both stored-poison Lock retention completions.
 
 use super::super::super::super::super::source_leaf_authority::Digest32;
 use super::super::super::super::super::terminal_descriptor::LockActionV1;
 use super::super::super::super::StaticMemberSealV1;
 use super::super::LockRunnerExecutionViolationV1;
 use super::{
-    range_mask_v1, LockStoredPoisonProfileV1, STORED_POISON_MEMBER_COUNT, STORED_POISON_PROFILES,
+    range_mask_v1, LockStoredPoisonCompletionV1, LockStoredPoisonProfileV1,
+    STORED_POISON_COMPLETION_MEMBER_COUNT, STORED_POISON_MEMBER_COUNT, STORED_POISON_PROFILES,
 };
 
 const HEADER: &str = "action\tfirst\tcount\tmask\tphase\tmutation\tlock_outcome_uncertain\tcase_key_sha256\tfull_record_sha256";
-const MEMBER_CATALOG: &str = include_str!("stored_poison_retention_succeeded_members.v1.tsv");
+const RETENTION_SUCCEEDED_MEMBER_CATALOG: &str =
+    include_str!("stored_poison_retention_succeeded_members.v1.tsv");
+const RETENTION_ROUTE_UNKNOWN_MEMBER_CATALOG: &str =
+    include_str!("stored_poison_retention_route_unknown_members.v1.tsv");
 const PROFILE_COUNT: usize = STORED_POISON_PROFILES.len();
 const REQUEST_COUNT: usize = 88;
 
@@ -19,8 +23,15 @@ pub(super) fn exact_member_v1(
     count: u8,
     mask: u8,
     profile: LockStoredPoisonProfileV1,
+    completion: LockStoredPoisonCompletionV1,
 ) -> Result<StaticMemberSealV1, LockRunnerExecutionViolationV1> {
-    let mut lines = MEMBER_CATALOG.lines();
+    let catalog = match completion {
+        LockStoredPoisonCompletionV1::RetentionSucceeded => RETENTION_SUCCEEDED_MEMBER_CATALOG,
+        LockStoredPoisonCompletionV1::RetentionRouteUnknown => {
+            RETENTION_ROUTE_UNKNOWN_MEMBER_CATALOG
+        }
+    };
+    let mut lines = catalog.lines();
     if lines.next() != Some(HEADER) {
         return Err(LockRunnerExecutionViolationV1::MemberCatalogInvalid);
     }
@@ -91,7 +102,7 @@ pub(super) fn exact_member_v1(
             return Err(LockRunnerExecutionViolationV1::MemberCatalogInvalid);
         }
     }
-    if observed_rows != STORED_POISON_MEMBER_COUNT {
+    if observed_rows != STORED_POISON_COMPLETION_MEMBER_COUNT {
         return Err(LockRunnerExecutionViolationV1::MemberCatalogInvalid);
     }
     selected.ok_or(LockRunnerExecutionViolationV1::MemberCatalogInvalid)
@@ -107,7 +118,7 @@ struct ExpectedRowV1 {
 }
 
 fn expected_row_v1(row: usize) -> Option<ExpectedRowV1> {
-    if row == 0 || row > STORED_POISON_MEMBER_COUNT {
+    if row == 0 || row > STORED_POISON_COMPLETION_MEMBER_COUNT {
         return None;
     }
     let zero_based = row - 1;

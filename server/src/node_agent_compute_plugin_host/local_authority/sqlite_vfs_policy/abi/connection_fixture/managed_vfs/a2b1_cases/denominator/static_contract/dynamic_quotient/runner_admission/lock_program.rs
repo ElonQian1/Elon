@@ -22,11 +22,11 @@ use lifecycle::{program_spec_v1 as lifecycle_program_spec_v1, LockLifecycleProgr
 use request_validation::{
     program_spec_v1 as request_validation_program_spec_v1, LockProgramSpecV1,
 };
-#[cfg(windows)]
-use stored_poison::LockStoredPoisonProfileV1;
 use stored_poison::{
     program_spec_v1 as stored_poison_program_spec_v1, LockStoredPoisonProgramSpecV1,
 };
+#[cfg(windows)]
+use stored_poison::{LockStoredPoisonCompletionV1, LockStoredPoisonProfileV1};
 
 #[cfg(windows)]
 use request_validation::LockRequestValidationGuardV1;
@@ -36,7 +36,8 @@ use crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::a
     run_lock_lifecycle_program_isolated, run_lock_program_isolated, LockRunnerActionV1,
     LockRunnerEvidenceReceiptV1, LockRunnerIsolatedEvidenceV1, LockRunnerLifecycleBindingV1,
     LockRunnerLifecyclePathV1, LockRunnerProgramBindingV1, LockRunnerRequestValidationV1,
-    LockRunnerStoredPoisonBindingV1, LockRunnerStoredPoisonProfileV1,
+    LockRunnerStoredPoisonBindingV1, LockRunnerStoredPoisonCompletionV1,
+    LockRunnerStoredPoisonProfileV1,
     run_lock_stored_poison_program_isolated,
 };
 
@@ -203,6 +204,14 @@ pub(in super::super) fn run_lock_isolated_for_test(
                 count: stored.count,
                 mask: stored.mask,
                 profile: runner_stored_poison_profile_v1(stored.profile),
+                completion: match stored.completion {
+                    LockStoredPoisonCompletionV1::RetentionSucceeded => {
+                        LockRunnerStoredPoisonCompletionV1::RetentionSucceeded
+                    }
+                    LockStoredPoisonCompletionV1::RetentionRouteUnknown => {
+                        LockRunnerStoredPoisonCompletionV1::RetentionRouteUnknown
+                    }
+                },
                 normalized_descriptor_sha256: program.normalized_descriptor_sha256.0,
                 case_key_sha256: member.case_key_sha256.0,
                 full_record_sha256: member.full_record_sha256.0,
