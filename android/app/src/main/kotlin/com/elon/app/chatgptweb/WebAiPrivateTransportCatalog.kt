@@ -249,6 +249,20 @@ internal object WebAiPrivateTransportCatalog {
             fallback = "official_conversation_project_menu",
         ),
         Entry(
+            id = "android_chatgpt_native_conversation_management_v1",
+            provider = "chatgpt",
+            status = "completed",
+            verification =
+                "targeted_action_policy_and_adaptive_control_tests_passed_device_mutations_pending",
+            productionDefault = true,
+            runtimeEnabled = true,
+            requestMode =
+                "context_bound_official_controls_with_native_adaptive_forms",
+            healthPolicy =
+                "conversation_identity_scope_stale_control_rejection_confirmation_and_no_write_replay",
+            fallback = "official_conversation_options",
+        ),
+        Entry(
             id = "android_chatgpt_realtime_voice_background_overlay_v1",
             provider = "chatgpt",
             status = "completed",

@@ -33,6 +33,7 @@ installed build; individual capability documents retain implementation evidence.
 | Native composer dictation | ChatGPT | Implemented and enabled; ASR/VAD draft, cancellation, and fallback tests passed; device acceptance pending | Official Web dictation after bounded local-engine cooldown |
 | Native response read aloud | ChatGPT | Implemented and enabled; full-answer chunking and message-action tests passed; device acceptance pending | Official message actions and WebView |
 | Native conversation project move | ChatGPT | Completed and enabled; exact-control and reconciliation tests passed, device round trip pending | Official conversation project menu |
+| Native conversation management | ChatGPT | Completed and enabled; rename, pin/unpin, archive/unarchive, delete confirmation, identity scoping, and adaptive-control tests passed; consolidated device mutation acceptance pending | Official conversation options |
 
 All web-account transports keep the official page authoritative. They do not export
 cookies, credentials, request headers, or private conversation content outside the
@@ -129,6 +130,16 @@ Refreshing a target project also removes the same conversation identity from its
 cached project, preventing duplicate sidebar membership. The completed capability is
 `android_chatgpt_native_conversation_project_move_v1`; it remains scheduled for one
 reversible device round trip after the first published build containing adapter `209`.
+
+Other conversation management actions use the existing context-bound official controls
+through native sheets and typed adaptive forms. Rename, pin or unpin, archive or unarchive,
+and delete stay scoped to the exact conversation identity; destructive or state-changing
+controls require explicit user confirmation. Stale controls are rejected and write
+operations are never replayed automatically. Sharing and any unsupported flow continue in
+the official conversation options. The completed capability is
+`android_chatgpt_native_conversation_management_v1`; consolidated device mutation
+acceptance remains pending and this control path must not be duplicated without current
+regression evidence.
 
 The Google conversation directory persists the timestamp of the last successful
 official directory response. Cached rows render immediately; a legacy or expired cache

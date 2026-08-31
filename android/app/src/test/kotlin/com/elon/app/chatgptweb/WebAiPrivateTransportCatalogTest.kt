@@ -32,6 +32,7 @@ class WebAiPrivateTransportCatalogTest {
         assertTrue("android_chatgpt_native_image_generation_status_v1" in enabledIds)
         assertTrue("android_chatgpt_private_rich_content_native_view_v1" in enabledIds)
         assertTrue("android_chatgpt_native_conversation_project_move_v1" in enabledIds)
+        assertTrue("android_chatgpt_native_conversation_management_v1" in enabledIds)
         assertTrue("android_chatgpt_realtime_voice_background_overlay_v1" in enabledIds)
 
         val streamSettlement = values.first {
@@ -105,6 +106,23 @@ class WebAiPrivateTransportCatalogTest {
         assertEquals(
             "official_conversation_project_menu",
             projectMove.getString("fallback"),
+        )
+
+        val conversationManagement = values.first {
+            it.getString("capability_id") ==
+                "android_chatgpt_native_conversation_management_v1"
+        }
+        assertEquals("completed", conversationManagement.getString("implementation_status"))
+        assertEquals(
+            "targeted_action_policy_and_adaptive_control_tests_passed_device_mutations_pending",
+            conversationManagement.getString("verification_status"),
+        )
+        assertTrue(conversationManagement.getBoolean("production_default"))
+        assertTrue(conversationManagement.getBoolean("runtime_enabled"))
+        assertFalse(conversationManagement.getBoolean("direct_post_enabled"))
+        assertEquals(
+            "official_conversation_options",
+            conversationManagement.getString("fallback"),
         )
 
         val googleSnapshotCache = values.first {

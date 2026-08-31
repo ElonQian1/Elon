@@ -28,12 +28,18 @@ class WebChatProductionPageActionsTest {
     fun keepsAdaptiveMutationsNativeAndRoutesExternalFlowsToTheOfficialFallback() {
         val result = WebChatProductionPageActionParser.parse(listOf(
             control("rename", "重命名会话", "rename", "overlay", WebChatConsumerControlPresentation.MENU),
+            control("pin", "取消置顶", "pin", "overlay", WebChatConsumerControlPresentation.MENU, confirmation = true),
+            control("archive", "Unarchive", "archive", "overlay", WebChatConsumerControlPresentation.MENU, confirmation = true),
             control("delete", "删除", "delete", "overlay", WebChatConsumerControlPresentation.MENU, confirmation = true),
             control("share", "分享", "share", "overlay", WebChatConsumerControlPresentation.MENU),
         ), conversationIdentity)
 
         val bySemantic = result.associateBy(WebChatProductionPageAction::semantic)
         assertFalse(bySemantic.getValue("rename").officialFallback)
+        assertEquals("取消置顶", bySemantic.getValue("pin").label)
+        assertEquals("取消归档", bySemantic.getValue("archive").label)
+        assertTrue(bySemantic.getValue("pin").requiresUserConfirmation)
+        assertTrue(bySemantic.getValue("archive").requiresUserConfirmation)
         assertFalse(bySemantic.getValue("delete").officialFallback)
         assertTrue(bySemantic.getValue("delete").requiresUserConfirmation)
         assertTrue(bySemantic.getValue("share").officialFallback)
