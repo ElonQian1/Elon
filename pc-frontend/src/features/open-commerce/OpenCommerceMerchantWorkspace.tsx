@@ -11,6 +11,7 @@ import MerchantRelationshipInbox from './MerchantRelationshipInbox'
 import MerchantPreferenceInbox from './MerchantPreferenceInbox'
 import MerchantDataRequestInbox from './MerchantDataRequestInbox'
 import MerchantBusinessEvidencePanel from './MerchantBusinessEvidencePanel'
+import MerchantMobileCapturePanel from './MerchantMobileCapturePanel'
 import type { OpenCommerceOverview } from './openCommerceTypes'
 import { commerceStyles } from './openCommerceStyles'
 import styles from './OpenCommercePanel.module.css'
@@ -161,6 +162,16 @@ export default function OpenCommerceMerchantWorkspace({
                 projectId={projectId}
                 merchantId={selectedMerchant.merchant.id}
                 canEdit={canEdit}
+              />
+              <MerchantMobileCapturePanel
+                projectId={projectId}
+                merchant={selectedMerchant}
+                grants={overview?.grants ?? []}
+                runtimeBinding={overview?.runtime_bindings.find(
+                  (item) => item.merchant_id === selectedMerchant.merchant.id,
+                )}
+                canEdit={canEdit}
+                onChanged={refresh}
               />
               <OpenCommerceMerchantEditor projectId={projectId} merchant={selectedMerchant} grants={overview?.grants ?? []} canEdit={canEdit} onChanged={refresh} />
               <OpenCommerceRateLimitManager
