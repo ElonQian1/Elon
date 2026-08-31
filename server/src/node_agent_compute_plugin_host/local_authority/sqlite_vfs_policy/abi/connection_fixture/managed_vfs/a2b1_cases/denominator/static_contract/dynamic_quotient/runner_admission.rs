@@ -29,14 +29,14 @@ pub(super) struct RunnerAdmissionReceiptV1 {
 #[cfg(all(test, windows))]
 pub(super) use lock_program::tamper_lock_implementation_digest_for_test;
 pub(super) use lock_program::LockRunnerExecutionReceiptV1;
+#[cfg(test)]
+pub(super) use lock_program::{
+    native_acquire_busy_catalog_row_count_for_test, stored_poison_catalog_row_count_for_test,
+    validate_program_for_test as validate_lock_program_for_test,
+};
 #[cfg(all(test, windows))]
 pub(super) use lock_program::{
     run_lock_isolated_for_test, LockRunnerExecutionErrorV1, LockRunnerIsolatedOutcomeV1,
-};
-#[cfg(test)]
-pub(super) use lock_program::{
-    stored_poison_catalog_row_count_for_test,
-    validate_program_for_test as validate_lock_program_for_test,
 };
 #[cfg(all(test, windows))]
 pub(super) use map_program::tamper_implementation_digest_for_test;

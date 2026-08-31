@@ -1,7 +1,9 @@
 //! Sealed admission bridge for the executable Lock dynamic-quotient programs.
 
 mod lifecycle;
+mod native_acquire_busy;
 mod request_validation;
+mod source_program;
 mod stored_poison;
 
 #[cfg(windows)]
@@ -17,28 +19,26 @@ use super::super::super::{
 use super::super::{DynamicClassKeyV1, StaticMemberSealV1};
 use super::CompiledRunnerPlanV1;
 #[cfg(windows)]
-use lifecycle::LockLifecyclePathSpecV1;
-use lifecycle::{program_spec_v1 as lifecycle_program_spec_v1, LockLifecycleProgramSpecV1};
-use request_validation::{
-    program_spec_v1 as request_validation_program_spec_v1, LockProgramSpecV1,
-};
-use stored_poison::{
-    program_spec_v1 as stored_poison_program_spec_v1, LockStoredPoisonProgramSpecV1,
-};
+use lifecycle::{LockLifecyclePathSpecV1, LockLifecycleProgramSpecV1};
 #[cfg(windows)]
-use stored_poison::{LockStoredPoisonCompletionV1, LockStoredPoisonProfileV1};
+use native_acquire_busy::LockNativeAcquireBusyProgramSpecV1;
+use source_program::program_spec_v1 as source_program_spec_v1;
+#[cfg(windows)]
+use stored_poison::{
+    LockStoredPoisonCompletionV1, LockStoredPoisonProfileV1, LockStoredPoisonProgramSpecV1,
+};
 
 #[cfg(windows)]
 use request_validation::LockRequestValidationGuardV1;
 
 #[cfg(windows)]
 use crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::abi::connection_fixture::managed_vfs::a2_dynamic_evidence::{
-    run_lock_lifecycle_program_isolated, run_lock_program_isolated, LockRunnerActionV1,
+    run_lock_lifecycle_program_isolated, run_lock_native_acquire_busy_program_isolated,
+    run_lock_program_isolated, run_lock_stored_poison_program_isolated, LockRunnerActionV1,
     LockRunnerEvidenceReceiptV1, LockRunnerIsolatedEvidenceV1, LockRunnerLifecycleBindingV1,
-    LockRunnerLifecyclePathV1, LockRunnerProgramBindingV1, LockRunnerRequestValidationV1,
-    LockRunnerStoredPoisonBindingV1, LockRunnerStoredPoisonCompletionV1,
-    LockRunnerStoredPoisonProfileV1,
-    run_lock_stored_poison_program_isolated,
+    LockRunnerLifecyclePathV1, LockRunnerNativeAcquireBusyBindingV1, LockRunnerProgramBindingV1,
+    LockRunnerRequestValidationV1, LockRunnerStoredPoisonBindingV1,
+    LockRunnerStoredPoisonCompletionV1, LockRunnerStoredPoisonProfileV1,
 };
 
 /// A real execution receipt. Private fields and the absent public constructor prevent digest-only
@@ -196,6 +196,22 @@ pub(in super::super) fn run_lock_isolated_for_test(
                 implementation_sha256: program.implementation_sha256.0,
             },
         ),
+        LockProgramCaseV1::NativeAcquireBusy(busy) => {
+            run_lock_native_acquire_busy_program_isolated(
+                exact_test,
+                LockRunnerNativeAcquireBusyBindingV1 {
+                    action: runner_action_v1(busy.action),
+                    first: busy.first,
+                    count: busy.count,
+                    mask: busy.mask,
+                    normalized_descriptor_sha256: program.normalized_descriptor_sha256.0,
+                    case_key_sha256: member.case_key_sha256.0,
+                    full_record_sha256: member.full_record_sha256.0,
+                    plan_sha256: program.plan_sha256.0,
+                    implementation_sha256: program.implementation_sha256.0,
+                },
+            )
+        }
         LockProgramCaseV1::StoredPoison(stored) => run_lock_stored_poison_program_isolated(
             exact_test,
             LockRunnerStoredPoisonBindingV1 {
@@ -319,17 +335,8 @@ enum LockProgramCaseV1 {
         guard: LockRequestValidationGuardV1,
     },
     Lifecycle(LockLifecycleProgramSpecV1),
+    NativeAcquireBusy(LockNativeAcquireBusyProgramSpecV1),
     StoredPoison(LockStoredPoisonProgramSpecV1),
-}
-
-#[derive(Clone, Copy)]
-struct SourceLockProgramSpecV1 {
-    #[cfg(windows)]
-    case: LockProgramCaseV1,
-    normalized_descriptor_sha256: Digest32,
-    expected_member: Option<StaticMemberSealV1>,
-    plan_sha256: Digest32,
-    implementation_sha256: Digest32,
 }
 
 pub(super) fn implementation_for_inventory_v1(
@@ -368,61 +375,9 @@ fn program_v1(
     })
 }
 
-fn source_program_spec_v1(
-    key: &DynamicClassKeyV1,
-    plan: CompiledRunnerPlanV1,
-) -> Result<SourceLockProgramSpecV1, LockRunnerExecutionViolationV1> {
-    match request_validation_program_spec_v1(key, plan) {
-        Ok(program) => Ok(from_request_validation_v1(program)),
-        Err(LockRunnerExecutionViolationV1::UnsupportedProgram) => {
-            match lifecycle_program_spec_v1(key, plan) {
-                Ok(program) => Ok(from_lifecycle_v1(program)),
-                Err(LockRunnerExecutionViolationV1::UnsupportedProgram) => {
-                    stored_poison_program_spec_v1(key, plan).map(from_stored_poison_v1)
-                }
-                Err(error) => Err(error),
-            }
-        }
-        Err(error) => Err(error),
-    }
-}
-
-fn from_request_validation_v1(program: LockProgramSpecV1) -> SourceLockProgramSpecV1 {
-    #[cfg(not(windows))]
-    let _ = program.action;
-    SourceLockProgramSpecV1 {
-        #[cfg(windows)]
-        case: LockProgramCaseV1::RequestValidation {
-            action: program.action,
-            guard: program.guard,
-        },
-        normalized_descriptor_sha256: program.normalized_descriptor_sha256,
-        expected_member: None,
-        plan_sha256: program.plan_sha256,
-        implementation_sha256: program.implementation_sha256,
-    }
-}
-
-fn from_lifecycle_v1(program: LockLifecycleProgramSpecV1) -> SourceLockProgramSpecV1 {
-    SourceLockProgramSpecV1 {
-        #[cfg(windows)]
-        case: LockProgramCaseV1::Lifecycle(program),
-        normalized_descriptor_sha256: program.normalized_descriptor_sha256,
-        expected_member: None,
-        plan_sha256: program.plan_sha256,
-        implementation_sha256: program.implementation_sha256,
-    }
-}
-
-fn from_stored_poison_v1(program: LockStoredPoisonProgramSpecV1) -> SourceLockProgramSpecV1 {
-    SourceLockProgramSpecV1 {
-        #[cfg(windows)]
-        case: LockProgramCaseV1::StoredPoison(program),
-        normalized_descriptor_sha256: program.normalized_descriptor_sha256,
-        expected_member: Some(program.member),
-        plan_sha256: program.plan_sha256,
-        implementation_sha256: program.implementation_sha256,
-    }
+#[cfg(test)]
+pub(super) fn native_acquire_busy_catalog_row_count_for_test() -> usize {
+    native_acquire_busy::catalog_row_count_for_test()
 }
 
 #[cfg(test)]
