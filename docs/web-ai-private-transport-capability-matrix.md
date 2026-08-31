@@ -36,6 +36,7 @@ installed build; individual capability documents retain implementation evidence.
 | Native conversation project move | ChatGPT | Completed and enabled; exact-control and reconciliation tests passed, device round trip pending | Official conversation project menu |
 | Native conversation management | ChatGPT | Completed and enabled; rename, pin/unpin, archive/unarchive, delete confirmation, identity scoping, and adaptive-control tests passed; consolidated device mutation acceptance pending | Official conversation options |
 | Acceptance evidence contract revisions | ChatGPT and Google Web AI | Completed, enabled, and installed-state migration verified on Release `v1.1.1393 (1414)`, adapter `212` | Retain implementation hashes as diagnostics without discarding accepted contracts |
+| Compact `Pro` model control classification | ChatGPT | Completed, enabled, and production-surface device verified on Release `v1.1.1394 (1415)`, adapter `213` | Official model menu remains authoritative |
 
 All web-account transports keep the official page authoritative. They do not export
 cookies, credentials, request headers, or private conversation content outside the
@@ -75,6 +76,16 @@ both page and adapter generations remained unchanged for ten seconds. It perform
 remote writes and sent no messages. The completed, default-enabled capability is
 `android_web_chat_active_provider_reentry_continuity_v1` and must not be reimplemented
 without current regression evidence.
+
+The ChatGPT composer can expose the current model as the compact label `Pro`, without a
+model-family prefix. Adapter `213` routes that exact compact label through the shared model
+policy used by both the production manifest and composer-option discovery. A read-only
+production-surface device acceptance opened the already-discovered composer model control,
+received the request-correlated control receipt, and observed one `Pro` control classified as
+`model` with zero `Pro` controls classified as the generic action. The acceptance sent no
+messages and dismissed the menu afterwards. The completed, default-enabled capability is
+`android_chatgpt_compact_pro_model_control_v1`; it must not be reimplemented without current
+regression evidence.
 
 The consumer default is one architecture: native chat and floating voice UI, the same
 persistent background ChatGPT WebView as the identity and conversation/bootstrap layer,
