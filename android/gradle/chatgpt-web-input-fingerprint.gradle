@@ -125,14 +125,6 @@ def coreCaseInputs = filesMatching([
     "android/app/src/main/assets/chatgpt_web_adapter.js",
     "android/app/src/main/assets/chatgpt_web_adapter_bootstrap.js",
     "android/app/src/main/assets/chatgpt_web_adapter_layout.js",
-    "scripts/chatgpt-web-smoke-runtime.ps1",
-    "scripts/chatgpt-web-smoke-evidence.ps1",
-])
-def supervisedSmokeCaseInputs = filesMatching([
-    "scripts/chatgpt-web-smoke-supervised-runtime.ps1",
-])
-def conversationSampleCaseInputs = filesMatching([
-    "scripts/chatgpt-web-smoke-conversation-sample.ps1",
 ])
 def composerCaseInputs = filesMatching([
     "android/app/src/main/kotlin/com/elon/app/chatgptweb/*Composer*.kt",
@@ -198,45 +190,36 @@ def sessionCaseInputs = filesMatching([
     "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebNavigationPolicy.kt",
 ])
 def allCaseInputs = new LinkedHashSet<File>(sortedInputs)
-def caseInputs = { Collection<File> specific, String smokeScript ->
+def caseInputs = { Collection<File> specific ->
     def files = new LinkedHashSet<File>(coreCaseInputs)
     files.addAll(specific)
-    files.addAll(filesMatching(["scripts/${smokeScript}"]))
     files
 }
 def verificationCaseFiles = new LinkedHashMap<String, Collection<File>>()
-verificationCaseFiles["safe/read_only_surface"] = allCaseInputs + filesMatching(["scripts/smoke-chatgpt-web-apk.ps1"])
+verificationCaseFiles["safe/read_only_surface"] = allCaseInputs
 verificationCaseFiles["safe/authenticated_session"] = caseInputs(
     sessionCaseInputs,
-    "smoke-chatgpt-web-apk.ps1",
 )
 verificationCaseFiles["reversible/anonymous_send_probe"] = caseInputs(
-    sessionCaseInputs + composerCaseInputs + messageCaseInputs + supervisedSmokeCaseInputs,
-    "smoke-chatgpt-web-anonymous-chat.ps1",
+    sessionCaseInputs + composerCaseInputs + messageCaseInputs,
 )
 verificationCaseFiles["reversible/send_probe"] = caseInputs(
     composerCaseInputs + messageCaseInputs,
-    "smoke-chatgpt-web-apk.ps1",
 )
 verificationCaseFiles["reversible/send_probe_with_stop"] = caseInputs(
     composerCaseInputs + messageCaseInputs,
-    "smoke-chatgpt-web-apk.ps1",
 )
 verificationCaseFiles["reversible/reversible_controls"] = caseInputs(
     composerCaseInputs + adaptiveCaseInputs,
-    "smoke-chatgpt-web-reversible-controls.ps1",
 )
 verificationCaseFiles["reversible/temporary_chat_toggle"] = caseInputs(
     composerCaseInputs + adaptiveCaseInputs,
-    "smoke-chatgpt-web-reversible-controls.ps1",
 )
 verificationCaseFiles["reversible/tool_execution_with_citations"] = caseInputs(
     composerCaseInputs + messageCaseInputs,
-    "smoke-chatgpt-web-tool-execution.ps1",
 )
 verificationCaseFiles["reversible/composer_controls"] = caseInputs(
     composerCaseInputs,
-    "smoke-chatgpt-web-composer-controls.ps1",
 )
 [
     deep_research: "reversible/composer_tool_execution/deep_research",
@@ -247,20 +230,16 @@ verificationCaseFiles["reversible/composer_controls"] = caseInputs(
 ].each { toolId, caseId ->
     verificationCaseFiles[caseId] = caseInputs(
         composerCaseInputs + messageCaseInputs,
-        "smoke-chatgpt-web-tool-execution.ps1",
     )
 }
 verificationCaseFiles["supervised/attachment_lifecycle"] = caseInputs(
     composerCaseInputs + attachmentCaseInputs,
-    "smoke-chatgpt-web-native-attachment-lifecycle.ps1",
 )
 verificationCaseFiles["supervised/dictation_transcription"] = caseInputs(
-    composerCaseInputs + audioCaseInputs + supervisedSmokeCaseInputs,
-    "smoke-chatgpt-web-audio-lifecycle.ps1",
+    composerCaseInputs + audioCaseInputs,
 )
 verificationCaseFiles["supervised/realtime_voice_round_trip"] = caseInputs(
-    composerCaseInputs + audioCaseInputs + supervisedSmokeCaseInputs,
-    "smoke-chatgpt-web-audio-lifecycle.ps1",
+    composerCaseInputs + audioCaseInputs,
 )
 [
     "deep_research",
@@ -271,77 +250,88 @@ verificationCaseFiles["supervised/realtime_voice_round_trip"] = caseInputs(
 ].each { toolId ->
     verificationCaseFiles["reversible/composer_tool_discovery/${toolId}"] = caseInputs(
         composerCaseInputs + composerDiscoveryCaseInputs,
-        "smoke-chatgpt-web-composer-controls.ps1",
     )
 }
 verificationCaseFiles["reversible/message_structure"] = caseInputs(
     messageCaseInputs,
-    "smoke-chatgpt-web-message-structure.ps1",
 )
 verificationCaseFiles["reversible/copy_receipt_without_content_readback"] = caseInputs(
     messageCaseInputs,
-    "smoke-chatgpt-web-copy.ps1",
 )
 verificationCaseFiles["reversible/regenerate_response"] = caseInputs(
     messageCaseInputs,
-    "smoke-chatgpt-web-regenerate.ps1",
 )
 verificationCaseFiles["safe/message_actions"] = caseInputs(
-    messageCaseInputs + adaptiveCaseInputs + supervisedSmokeCaseInputs + conversationSampleCaseInputs,
-    "smoke-chatgpt-web-message-actions.ps1",
+    messageCaseInputs + adaptiveCaseInputs,
 )
 verificationCaseFiles["supervised/message_actions"] = caseInputs(
-    messageCaseInputs + adaptiveCaseInputs + supervisedSmokeCaseInputs + conversationSampleCaseInputs,
-    "smoke-chatgpt-web-message-actions.ps1",
+    messageCaseInputs + adaptiveCaseInputs,
 )
 verificationCaseFiles["safe/feature_pages"] = caseInputs(
     navigationCaseInputs,
-    "smoke-chatgpt-web-feature-pages.ps1",
 )
-["projects", "tasks", "library", "gpts", "apps", "work"].each { featureKind ->
+["projects", "tasks", "images", "library", "gpts", "apps", "work"].each { featureKind ->
     verificationCaseFiles["safe/feature_page/${featureKind}"] = caseInputs(
         navigationCaseInputs,
-        "smoke-chatgpt-web-feature-pages.ps1",
     )
 }
 ["health", "finances"].each { featureKind ->
     verificationCaseFiles["supervised/feature_page/${featureKind}"] = caseInputs(
         navigationCaseInputs + adaptiveCaseInputs,
-        "smoke-chatgpt-web-sensitive-feature-page.ps1",
     )
 }
 verificationCaseFiles["safe/settings_overlay_form_controls"] = caseInputs(
     navigationCaseInputs + adaptiveCaseInputs,
-    "smoke-chatgpt-web-settings.ps1",
 )
 verificationCaseFiles["safe/settings_overlay_idempotent_form_controls"] = caseInputs(
     navigationCaseInputs + adaptiveCaseInputs,
-    "smoke-chatgpt-web-settings.ps1",
 )
 verificationCaseFiles["safe/session_recovery"] = caseInputs(
     sessionCaseInputs,
-    "smoke-chatgpt-web-session-recovery.ps1",
 )
 verificationCaseFiles["safe/account_menu_structure"] = caseInputs(
     navigationCaseInputs + adaptiveCaseInputs,
-    "smoke-chatgpt-web-apk.ps1",
 )
 verificationCaseFiles["supervised/account_mutations"] = caseInputs(
     navigationCaseInputs + adaptiveCaseInputs,
-    "smoke-chatgpt-web-apk.ps1",
 )
 verificationCaseFiles["safe/conversation_management_structure"] = caseInputs(
-    navigationCaseInputs + adaptiveCaseInputs + supervisedSmokeCaseInputs + conversationSampleCaseInputs,
-    "smoke-chatgpt-web-conversation-management.ps1",
+    navigationCaseInputs + adaptiveCaseInputs,
 )
 verificationCaseFiles["supervised/conversation_mutations"] = caseInputs(
-    navigationCaseInputs + adaptiveCaseInputs + supervisedSmokeCaseInputs + conversationSampleCaseInputs,
-    "smoke-chatgpt-web-conversation-management.ps1",
+    navigationCaseInputs + adaptiveCaseInputs,
 )
 verificationCaseFiles["safe/session_long_running_stability"] = caseInputs(
     sessionCaseInputs,
-    "smoke-chatgpt-web-long-running-stability.ps1",
 )
+verificationCaseFiles["safe/single_webview_skin"] = caseInputs(sessionCaseInputs)
+
+def acceptanceCatalogSource = new File(
+    repoRoot,
+    "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebAcceptanceCaseCatalog.kt",
+).getText("UTF-8")
+def acceptanceCaseIds = (acceptanceCatalogSource =~
+    /"((?:safe|reversible|supervised)\/[a-z0-9_\/-]+)"/)
+    .collect { match -> match[1] }
+    .toSet()
+def mappedCaseIds = verificationCaseFiles.keySet().toSet()
+if (acceptanceCaseIds != mappedCaseIds) {
+    def missing = (acceptanceCaseIds - mappedCaseIds).toList().sort()
+    def unknown = (mappedCaseIds - acceptanceCaseIds).toList().sort()
+    throw new GradleException(
+        "ChatGPT Web verification fingerprint catalog mismatch: missing=${missing}, unknown=${unknown}",
+    )
+}
+
+// Device evidence follows explicit user-visible contracts. Bump only affected cases
+// when acceptance meaning changes; implementation hashes remain diagnostic provenance.
+def verificationCaseContractRevisionOverrides = [:]
+if (!mappedCaseIds.containsAll(verificationCaseContractRevisionOverrides.keySet())) {
+    throw new GradleException("ChatGPT Web verification contract revision has an unknown case")
+}
+def verificationCaseContractRevisions = verificationCaseFiles.collectEntries { caseId, ignored ->
+    [(caseId): (verificationCaseContractRevisionOverrides[caseId] ?: 1)]
+}
 def verificationCaseHashes = verificationCaseFiles.collectEntries { caseId, files ->
     [(caseId): digestFiles(files)]
 }
@@ -362,6 +352,8 @@ ext.chatGptWebInputFiles = sortedInputs
 ext.chatGptWebInputSha256 = digest.digest().collect { String.format('%02x', it & 0xff) }.join()
 ext.chatGptWebVerificationCaseInputSha256 = verificationCaseHashes
 ext.chatGptWebVerificationCaseInputSha256Json = JsonOutput.toJson(verificationCaseHashes)
+ext.chatGptWebVerificationCaseContractRevisions = verificationCaseContractRevisions
+ext.chatGptWebVerificationCaseContractRevisionJson = JsonOutput.toJson(verificationCaseContractRevisions)
 ext.chatGptWebVerifiedInputSha256 = "c78bdba7b85439f8b1f135c8eb5af0f3ce1d3aea2b05e3b2d1ab035337572596"
 ext.chatGptWebVerifiedApkVersionName = "1.1.1143"
 ext.chatGptWebVerifiedApkVersionCode = 1153
@@ -413,6 +405,7 @@ tasks.register("printChatGptWebInputFingerprint") {
         }
         project.ext.chatGptWebVerificationCaseInputSha256.each { caseId, hash ->
             println "CHATGPT_WEB_VERIFICATION_CASE=${caseId}:${hash}"
+            println "CHATGPT_WEB_VERIFICATION_CONTRACT_REVISION=${caseId}:${project.ext.chatGptWebVerificationCaseContractRevisions[caseId]}"
         }
     }
 }

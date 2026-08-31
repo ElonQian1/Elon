@@ -783,6 +783,7 @@ $verifiedCases = @(
     "safe/read_only_surface"
     "safe/authenticated_session"
     "safe/account_menu_structure"
+    "safe/single_webview_skin"
 )
 if ($SendProbe) { $verifiedCases += "reversible/send_probe" }
 if ($VerifyStop) { $verifiedCases += "reversible/send_probe_with_stop" }

@@ -10,6 +10,7 @@ $expected = [ordered]@{
         "safe/read_only_surface",
         "safe/authenticated_session",
         "safe/account_menu_structure",
+        "safe/single_webview_skin",
         "reversible/send_probe"
     )
     "smoke-chatgpt-web-reversible-controls.ps1" = @(
@@ -156,6 +157,14 @@ if (-not $fingerprintSource.Contains(
     'verificationCaseFiles["reversible/temporary_chat_toggle"]'
 )) {
     throw "Temporary Chat acceptance has no APK input fingerprint mapping."
+}
+if (-not $fingerprintSource.Contains('verificationCaseFiles["safe/single_webview_skin"]')) {
+    throw "Single-WebView skin acceptance has no APK input fingerprint mapping."
+}
+if (-not $fingerprintSource.Contains(
+    '["projects", "tasks", "images", "library", "gpts", "apps", "work"]'
+)) {
+    throw "Images feature-page acceptance has no APK input fingerprint mapping."
 }
 
 $adapterSource = Get-Content (Join-Path $repoRoot `

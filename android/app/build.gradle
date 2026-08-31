@@ -159,6 +159,10 @@ if (chatGptPrivateResearchVersionName && !(chatGptPrivateResearchVersionName ==~
 def chatGptVerificationCaseJson = project.ext.chatGptWebVerificationCaseInputSha256Json
     .replace('\\', '\\\\')
     .replace('"', '\\"')
+def chatGptVerificationCaseContractRevisionJson =
+    project.ext.chatGptWebVerificationCaseContractRevisionJson
+        .replace('\\', '\\\\')
+        .replace('"', '\\"')
 
 gradle.taskGraph.whenReady { graph ->
     def needsReleaseSigning = graph.allTasks.any { it.name.toLowerCase(Locale.ROOT).contains("release") }
@@ -208,6 +212,7 @@ android {
         buildConfigField "String", "FALLBACK_SERVER_URL", "\"${fallbackUrl}\""
         buildConfigField "String", "CHATGPT_WEB_INPUT_SHA256", "\"${project.ext.chatGptWebInputSha256}\""
         buildConfigField "String", "CHATGPT_WEB_VERIFICATION_CASE_INPUT_SHA256_JSON", "\"${chatGptVerificationCaseJson}\""
+        buildConfigField "String", "CHATGPT_WEB_VERIFICATION_CASE_CONTRACT_REVISION_JSON", "\"${chatGptVerificationCaseContractRevisionJson}\""
         buildConfigField "String", "CHATGPT_WEB_VERIFIED_INPUT_SHA256", "\"${project.ext.chatGptWebVerifiedInputSha256}\""
         buildConfigField "String", "CHATGPT_WEB_VERIFIED_APK_VERSION_NAME", "\"${project.ext.chatGptWebVerifiedApkVersionName}\""
         buildConfigField "int", "CHATGPT_WEB_VERIFIED_APK_VERSION_CODE", "${project.ext.chatGptWebVerifiedApkVersionCode}"
