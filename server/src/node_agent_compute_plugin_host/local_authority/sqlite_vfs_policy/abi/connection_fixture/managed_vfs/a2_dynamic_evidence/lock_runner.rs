@@ -1,12 +1,20 @@
 //! Process-isolated native receipts for executable Lock request-validation programs.
 
 mod lifecycle;
+mod native_acquire_busy;
 mod request_validation;
 mod stored_poison;
 mod stored_poison_dispatch;
 mod stored_poison_model;
 mod stored_poison_route_unknown;
 
+#[cfg(all(test, windows))]
+pub(in super::super) use native_acquire_busy::{
+    lock_native_acquire_busy_selector_for_test, selected_lock_native_acquire_busy_selector_for_test,
+};
+pub(in super::super) use native_acquire_busy::{
+    run_lock_native_acquire_busy_program_isolated, LockRunnerNativeAcquireBusyBindingV1,
+};
 pub(in super::super) use request_validation::{LockRunnerActionV1, LockRunnerRequestValidationV1};
 pub(in super::super) use stored_poison_model::{
     LockRunnerStoredPoisonBindingV1, LockRunnerStoredPoisonCompletionV1,
