@@ -37,6 +37,7 @@ installed build; individual capability documents retain implementation evidence.
 | Native conversation management | ChatGPT | Completed and enabled; rename, pin/unpin, archive/unarchive, delete confirmation, identity scoping, and adaptive-control tests passed; consolidated device mutation acceptance pending | Official conversation options |
 | Acceptance evidence contract revisions | ChatGPT and Google Web AI | Completed, enabled, and installed-state migration verified on Release `v1.1.1393 (1414)`, adapter `212` | Retain implementation hashes as diagnostics without discarding accepted contracts |
 | Compact `Pro` model control classification | ChatGPT | Completed, enabled, and production-surface device verified on Release `v1.1.1394 (1415)`, adapter `213` | Official model menu remains authoritative |
+| Official feature sidebar trigger | ChatGPT | Completed, enabled, and production-surface device verified on Release `v1.1.1395 (1416)`, adapter `214` | Built-in native feature routes and the full official page |
 
 All web-account transports keep the official page authoritative. They do not export
 cookies, credentials, request headers, or private conversation content outside the
@@ -86,6 +87,16 @@ received the request-correlated control receipt, and observed one `Pro` control 
 messages and dismissed the menu afterwards. The completed, default-enabled capability is
 `android_chatgpt_compact_pro_model_control_v1`; it must not be reimplemented without current
 regression evidence.
+
+Feature discovery no longer treats a built-in native route as proof that the official sidebar
+is already visible. Adapter `214` publishes the bounded built-in fallback immediately, but it
+continues to the visible official sidebar trigger unless at least one live official feature node
+is present. Production-surface device acceptance opened the sidebar, observed five official
+feature nodes and one close control, dismissed it through the request-correlated command, then
+confirmed the close control disappeared while the composer remained ready. It sent no messages
+and changed no conversations. The completed, default-enabled capability is
+`android_chatgpt_official_feature_sidebar_trigger_v1`; it must not be reimplemented without
+current regression evidence.
 
 The consumer default is one architecture: native chat and floating voice UI, the same
 persistent background ChatGPT WebView as the identity and conversation/bootstrap layer,
