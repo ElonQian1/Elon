@@ -18,7 +18,7 @@ use super::{
     LockRunnerLifecyclePathV1, SELECTED, SIBLING,
 };
 
-pub(super) fn prepare(
+pub(in super::super) fn prepare(
     root: &Path,
     path: LockRunnerLifecyclePathV1,
 ) -> anyhow::Result<ManagedSqliteMultiConnectionFixture> {

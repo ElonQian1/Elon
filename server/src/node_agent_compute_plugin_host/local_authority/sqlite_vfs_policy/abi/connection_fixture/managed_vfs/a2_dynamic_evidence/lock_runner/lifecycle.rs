@@ -1,6 +1,6 @@
 //! Exact installed-ABI execution for positive Lock lifecycles.
 
-mod fixture;
+pub(super) mod fixture;
 mod payload;
 
 use std::path::Path;
