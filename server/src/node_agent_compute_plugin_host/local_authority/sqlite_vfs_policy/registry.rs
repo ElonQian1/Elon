@@ -31,7 +31,7 @@ pub(super) use file_custody::ManagedSqliteRegistryUnmapRuntimeEvent;
 #[cfg(all(test, windows))]
 pub(super) use file_custody::{
     ManagedSqliteRegistryCloseLifecycleFaults, ManagedSqliteRegistryCloseLifecyclePhase,
-    ManagedSqliteRegistryLifecycleStage,
+    ManagedSqliteRegistryLifecycleStage, ManagedSqliteRegistryUnsafeShmRoutePreemptionReceipt,
 };
 #[cfg(test)]
 pub(super) use owner::ManagedSqliteRegistryRouteHandle;

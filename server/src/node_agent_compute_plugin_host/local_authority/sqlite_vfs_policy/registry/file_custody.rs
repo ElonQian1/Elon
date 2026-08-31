@@ -44,6 +44,11 @@ mod test_faults;
 pub(in super::super) use lifecycle_events::ManagedSqliteRegistryUnmapRuntimeEvent;
 #[cfg(all(test, windows))]
 pub(in super::super) use registry_lifecycle::ManagedSqliteRegistryLifecycleStage;
+#[cfg(test)]
+pub(in super::super) use test_faults::{
+    ManagedSqliteRegistryCloseLifecycleFaults, ManagedSqliteRegistryCloseLifecyclePhase,
+    ManagedSqliteRegistryUnsafeShmRoutePreemptionReceipt,
+};
 
 pub(in crate::node_agent_compute_plugin_host::local_authority) use abi::{
     ComputePluginHandleBoundSqliteAbiFile, HandleBoundSqliteAbiAttempt, HandleBoundSqliteAbiFile,
@@ -66,73 +71,6 @@ pub(super) enum ManagedSqliteRegistryPinnedFileCloseRejection {
     Registry(ManagedSqliteRegistryProcessRouteRejection),
     #[cfg(test)]
     InjectedLifecycle,
-}
-
-#[cfg(test)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(in super::super) enum ManagedSqliteRegistryCloseLifecyclePhase {
-    BarrierCallbackCompletion,
-    UnmapCallbackCompletion,
-    RegistryWalMainClose,
-    CallbackCompletion,
-    ConnectionObservation,
-    RouteRetirement,
-}
-
-#[cfg(test)]
-pub(in super::super) trait ManagedSqliteRegistryCloseLifecycleFaults:
-    Send + Sync + 'static
-{
-    fn before(&self, phase: ManagedSqliteRegistryCloseLifecyclePhase) -> Result<bool, ()>;
-    fn after_success(&self, phase: ManagedSqliteRegistryCloseLifecyclePhase) -> Result<bool, ()>;
-    fn native_failure(&self, phase: ManagedSqliteRegistryCloseLifecyclePhase);
-    fn observe_unmap_runtime_event(
-        &self,
-        event: ManagedSqliteRegistryUnmapRuntimeEvent,
-    ) -> Result<(), ()>;
-    fn unmap_runtime_observation_enabled(&self) -> Result<bool, ()>;
-    fn claim_native_failure_gate(
-        &self,
-        phase: ManagedSqliteRegistryCloseLifecyclePhase,
-    ) -> Result<bool, ()>;
-    fn publish_retirement(
-        &self,
-        receipt: super::types::ManagedSqliteRegistryRetirementReceipt,
-    ) -> Result<(), ()>;
-
-    fn retain_retirement_failure(
-        &self,
-        receipt: super::types::ManagedSqliteRegistryRetirementReceipt,
-    );
-
-    #[cfg(windows)]
-    fn take_connection_observation_sidecar(&self) -> Result<Option<PinnedManagedSqliteFile>, ()>;
-
-    #[cfg(windows)]
-    fn observe_registry_lifecycle_stage(
-        &self,
-        stage: ManagedSqliteRegistryLifecycleStage,
-    ) -> Result<(), ()>;
-
-    #[cfg(windows)]
-    fn claim_physical_success_handoff(&self) -> Result<bool, ()> {
-        Ok(false)
-    }
-
-    #[cfg(windows)]
-    fn claim_registry_wal_main_native_uncertain(&self) -> Result<bool, ()> {
-        Ok(false)
-    }
-
-    #[cfg(windows)]
-    fn claim_close_callback_admission_rejection(&self) -> Result<bool, ()> {
-        Ok(false)
-    }
-
-    #[cfg(windows)]
-    fn claim_begin_connection_close_rejection(&self) -> Result<bool, ()> {
-        Ok(false)
-    }
 }
 
 struct ManagedSqliteRegistryPinnedFileCloseSuccess {

@@ -7,6 +7,8 @@ use std::num::NonZeroU32;
 
 #[cfg(test)]
 use super::ManagedSqliteRegistryUnmapRuntimeEvent;
+#[cfg(all(test, windows))]
+use super::ManagedSqliteRegistryUnsafeShmRoutePreemptionReceipt;
 use super::{ManagedSqliteRegistryPinnedFile, ManagedSqliteRegistryPinnedFileCustody};
 use crate::node_agent_managed_fs::{
     ManagedSqliteLockAttempt, ManagedSqliteLockFailure, ManagedSqliteObservedLock,
@@ -15,6 +17,8 @@ use crate::node_agent_managed_fs::{
     ManagedSqliteShmUnmapMode, ManagedSqliteUnlockTarget,
 };
 
+#[cfg(all(test, windows))]
+use super::super::owner::ManagedSqliteRegistryRouteRejection;
 use super::super::{
     owner::ManagedSqliteRegistryCustody,
     process_owner::{ManagedSqliteRegistryNonceSource, ManagedSqliteRegistryProcessRouteRejection},
@@ -30,6 +34,12 @@ struct ManagedSqliteRegistryUnsafeShmFailureMarker {
     mutation_may_have_occurred: bool,
     lock_outcome_uncertain: bool,
 }
+
+#[cfg(all(test, windows))]
+#[derive(Debug, Clone, Copy)]
+struct ManagedSqliteRegistryUnsafeShmRoutePreemptionMarker(
+    ManagedSqliteRegistryUnsafeShmFailureMarker,
+);
 
 #[derive(Debug)]
 pub(super) enum ManagedSqliteRegistryPinnedFileOperationRejection {
@@ -346,10 +356,49 @@ where
             };
             operation(shm).map_err(ManagedSqliteRegistryPinnedFileOperationRejection::Shm)
         })();
+        #[cfg(all(test, windows))]
+        let mut preemption_receipt = None;
         if let Err(ManagedSqliteRegistryPinnedFileOperationRejection::Shm(failure)) = &result {
-            self.quarantine_unsafe_shm_failure(failure);
+            #[cfg(all(test, windows))]
+            let preemption_retained = unsafe_shm_failure_marker(failure).and_then(|marker| {
+                self.close_faults
+                    .as_ref()
+                    .is_some_and(|faults| {
+                        faults.claim_unsafe_shm_route_preemption().unwrap_or(false)
+                    })
+                    .then(|| {
+                        self.owner
+                            .retain_terminal_custody(
+                                self.route,
+                                ManagedSqliteRegistryTerminalReason::FailureCustodyRetained,
+                                ManagedSqliteRegistryUnsafeShmRoutePreemptionMarker(marker),
+                            )
+                            .is_ok()
+                    })
+            });
+            let _unsafe_retention = self.quarantine_unsafe_shm_failure(failure);
+            #[cfg(all(test, windows))]
+            if let Some(preemption_retained) = preemption_retained {
+                preemption_receipt = Some((
+                    preemption_retained,
+                    _unsafe_retention.as_ref().is_some_and(route_was_unknown),
+                ));
+            }
         }
-        match (result, callback.complete()) {
+        let callback_completion = callback.complete();
+        #[cfg(all(test, windows))]
+        if let Some((preemption_retained, unsafe_retention_route_unknown)) = preemption_receipt {
+            if let Some(faults) = self.close_faults.as_ref() {
+                let _ = faults.record_unsafe_shm_route_preemption_receipt(
+                    ManagedSqliteRegistryUnsafeShmRoutePreemptionReceipt::new(
+                        preemption_retained,
+                        unsafe_retention_route_unknown,
+                        route_was_unknown(&callback_completion),
+                    ),
+                );
+            }
+        }
+        match (result, callback_completion) {
             (Err(rejection), _) => Err(rejection),
             (Ok(value), Err(rejection)) => Err(
                 ManagedSqliteRegistryPinnedFileOperationRejection::Registry(rejection),
@@ -358,25 +407,16 @@ where
         }
     }
 
-    fn quarantine_unsafe_shm_failure(&self, failure: &ManagedSqliteShmFailure) {
-        if failure.class()
-            != crate::node_agent_managed_fs::ManagedSqliteShmFailureClass::OutcomeUncertainPoisoned
-            && !failure.mutation_may_have_occurred()
-            && !failure.lock_outcome_uncertain()
-        {
-            return;
-        }
-        let marker = ManagedSqliteRegistryUnsafeShmFailureMarker {
-            phase: failure.phase(),
-            class: failure.class(),
-            mutation_may_have_occurred: failure.mutation_may_have_occurred(),
-            lock_outcome_uncertain: failure.lock_outcome_uncertain(),
-        };
-        let _ = self.owner.retain_terminal_custody(
+    fn quarantine_unsafe_shm_failure(
+        &self,
+        failure: &ManagedSqliteShmFailure,
+    ) -> Option<Result<(), ManagedSqliteRegistryProcessRouteRejection>> {
+        let marker = unsafe_shm_failure_marker(failure)?;
+        Some(self.owner.retain_terminal_custody(
             self.route,
             ManagedSqliteRegistryTerminalReason::FailureCustodyRetained,
             marker,
-        );
+        ))
     }
 
     fn with_callback<T>(
@@ -403,4 +443,32 @@ where
             (Ok(value), Ok(())) => Ok(value),
         }
     }
+}
+
+fn unsafe_shm_failure_marker(
+    failure: &ManagedSqliteShmFailure,
+) -> Option<ManagedSqliteRegistryUnsafeShmFailureMarker> {
+    if failure.class()
+        != crate::node_agent_managed_fs::ManagedSqliteShmFailureClass::OutcomeUncertainPoisoned
+        && !failure.mutation_may_have_occurred()
+        && !failure.lock_outcome_uncertain()
+    {
+        return None;
+    }
+    Some(ManagedSqliteRegistryUnsafeShmFailureMarker {
+        phase: failure.phase(),
+        class: failure.class(),
+        mutation_may_have_occurred: failure.mutation_may_have_occurred(),
+        lock_outcome_uncertain: failure.lock_outcome_uncertain(),
+    })
+}
+
+#[cfg(all(test, windows))]
+fn route_was_unknown(result: &Result<(), ManagedSqliteRegistryProcessRouteRejection>) -> bool {
+    matches!(
+        result,
+        Err(ManagedSqliteRegistryProcessRouteRejection::Route(
+            ManagedSqliteRegistryRouteRejection::UnknownOrRetired
+        ))
+    )
 }
