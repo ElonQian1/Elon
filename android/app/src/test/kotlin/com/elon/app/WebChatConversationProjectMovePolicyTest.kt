@@ -12,6 +12,15 @@ import org.junit.Test
 
 class WebChatConversationProjectMovePolicyTest {
     @Test
+    fun timingAllowsWebViewRecoveryWithoutHighFrequencyPolling() {
+        assertTrue(WebChatConversationProjectMoveTiming.POLL_INTERVAL_MS >= 500L)
+        assertEquals(30_000L, WebChatConversationProjectMoveTiming.NAVIGATION_TIMEOUT_MS)
+        assertEquals(15_000L, WebChatConversationProjectMoveTiming.CONTROL_TIMEOUT_MS)
+        assertEquals(15_000L, WebChatConversationProjectMoveTiming.COMMAND_TIMEOUT_MS)
+        assertEquals(30_000L, WebChatConversationProjectMoveTiming.RECONCILIATION_TIMEOUT_MS)
+    }
+
+    @Test
     fun destinationsUseCachedProjectsAndExcludeTheCurrentProject() {
         val index = ChatGptWebConversationIndexState(
             projects = listOf(

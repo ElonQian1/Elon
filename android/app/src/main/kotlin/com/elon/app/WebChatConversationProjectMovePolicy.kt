@@ -107,3 +107,17 @@ internal object WebChatConversationProjectMovePolicy {
         "radio",
     )
 }
+
+internal object WebChatConversationProjectMoveTiming {
+    const val POLL_INTERVAL_MS = 500L
+    const val NAVIGATION_POLL_LIMIT = 60
+    const val CONTROL_POLL_LIMIT = 30
+    const val COMMAND_POLL_LIMIT = 30
+    const val RECONCILIATION_POLL_LIMIT = 60
+    const val CONTROL_REFRESH_POLL = 4
+
+    const val NAVIGATION_TIMEOUT_MS = POLL_INTERVAL_MS * NAVIGATION_POLL_LIMIT
+    const val CONTROL_TIMEOUT_MS = POLL_INTERVAL_MS * CONTROL_POLL_LIMIT
+    const val COMMAND_TIMEOUT_MS = POLL_INTERVAL_MS * COMMAND_POLL_LIMIT
+    const val RECONCILIATION_TIMEOUT_MS = POLL_INTERVAL_MS * RECONCILIATION_POLL_LIMIT
+}

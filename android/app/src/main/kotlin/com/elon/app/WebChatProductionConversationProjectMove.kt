@@ -453,11 +453,12 @@ internal class WebChatProductionConversationProjectMoveCoordinator(
         epoch == requestEpoch && activeProvider() == WebChatProviderId.CHATGPT_WEB
 
     private companion object {
-        const val POLL_INTERVAL_MS = 250L
-        const val MAX_NAVIGATION_POLLS = 24
-        const val MAX_CONTROL_POLLS = 32
-        const val MAX_COMMAND_POLLS = 32
-        const val MAX_RECONCILIATION_POLLS = 48
-        const val CONTROL_REFRESH_POLL = 8
+        const val POLL_INTERVAL_MS = WebChatConversationProjectMoveTiming.POLL_INTERVAL_MS
+        const val MAX_NAVIGATION_POLLS = WebChatConversationProjectMoveTiming.NAVIGATION_POLL_LIMIT
+        const val MAX_CONTROL_POLLS = WebChatConversationProjectMoveTiming.CONTROL_POLL_LIMIT
+        const val MAX_COMMAND_POLLS = WebChatConversationProjectMoveTiming.COMMAND_POLL_LIMIT
+        const val MAX_RECONCILIATION_POLLS =
+            WebChatConversationProjectMoveTiming.RECONCILIATION_POLL_LIMIT
+        const val CONTROL_REFRESH_POLL = WebChatConversationProjectMoveTiming.CONTROL_REFRESH_POLL
     }
 }
