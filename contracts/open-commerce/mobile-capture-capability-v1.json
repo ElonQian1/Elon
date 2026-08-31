@@ -1,0 +1,28 @@
+{
+  "schema": "open_commerce.capability_contract.v1",
+  "capability_key": "merchant.mobile_capture.session.launch",
+  "access": "authorized",
+  "handler_type": "merchant_runtime",
+  "input_schema": {
+    "type": "object",
+    "required": ["target"],
+    "properties": {
+      "target": { "const": "merchant_platforms" }
+    },
+    "additionalProperties": false
+  },
+  "result": {
+    "schema": "merchant_mobile_capture.launch.v1",
+    "launch_url_scheme": "cofficethinking",
+    "android_package": "com.cofficethinking.manager",
+    "android_intent_url_present": true,
+    "ticket_single_use": true,
+    "device_token_storage": "android_keystore",
+    "browser_credentials_transport": "never"
+  },
+  "ownership": {
+    "owner_source": "signed_runtime_envelope.requester_user_id",
+    "store_source": "merchant_runtime.OPEN_COMMERCE_STORE_ID",
+    "client_store_id_accepted": false
+  }
+}
