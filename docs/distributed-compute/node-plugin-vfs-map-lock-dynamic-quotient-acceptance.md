@@ -4,8 +4,8 @@ status: current
 reviewed_at: 2026-08-31
 owners: node, security
 design_status: design_frozen
-implementation_status: typed_projector_candidate_prior_compiled_map_region_count_program_and_runner_admission_source_written_uncompiled_unrun
-verification_status: prior_targeted_unit_36_passed_current_source_not_run_manifests_not_frozen
+implementation_status: typed_projector_candidate_prior_compiled_pre_manifest_program_inventory_source_written_uncompiled_unrun
+verification_status: prior_targeted_unit_36_passed_current_source_inventory_not_run_not_frozen_manifests_not_frozen
 ---
 
 # Node Plugin VFS Map/Lock Dynamic Quotient Acceptance V1
@@ -28,7 +28,9 @@ Expected 或 source universe。
 两遍原子 candidate、exact member-pair set 与 catalog/manifest canonical guard；这些只有前序编译、定向单元
 测试和两个 root 完整失败关闭门禁的 prior baseline。本批新增 sealed admission，以及仅覆盖 Map
 `RegionCountBudget/Completed` 的 source-only executable program、私有 actual receipt 和 parent/child/cleanup
-合同；current source 未编译、未运行，也尚未成功产出或冻结任何真实商 manifest。
+合同；另新增完整 Map root 的两遍 pre-manifest execution-program inventory 源码。它只区分
+`PlannedMissing` 与 `SourcePresentReceiptRequired`，不签发 `Supported`。current source 未编译、未运行，
+没有生成可引用的 inventory counts/digest，也尚未成功产出或冻结任何真实商 manifest。
 
 ## 2. Gate A — frozen static ingress
 
@@ -68,6 +70,27 @@ Expected 或 source universe。
 Map 必须证明 mode、六类 success、prestate、fault/cleanup/custody 轴均按 authority 保留；ordinal 与
 regions-to-create 在 V1 默认保留。Lock 必须证明 action、`first/count/mask`、prestate、contention、native
 offset/effect 与 custody 均保留。任何未版本化、未执行的“看起来等价”人工消去都失败。
+
+### 3.1 Gate B1 — non-authorizing pre-manifest program inventory
+
+- [x] Source implementation：完整 Map root 复用两遍 frozen ingress，每个 included member 恰好进入一个
+      capability-normalized execution program group；excluded member 不得进入 inventory。
+- [x] Source implementation：`program_id` 使用独立 domain 绑定 root、projector schema、normalized descriptor
+      digest 与内部 `plan_sha256`；它不是 dynamic class ID，也不复用 descriptor digest。
+- [x] Source implementation：状态仅允许 `PlannedMissing(exact_gap)` 或
+      `SourcePresentReceiptRequired { implementation_sha256 }`；本层没有 `Supported`、`ExecutionVerified` 或 runtime permit。
+- [x] Source implementation：program group union 独立重建 reverse index，并与逐叶 membership 精确相等；
+      missing/extra/duplicate/collision/binding drift/empty group 或 matcher 内部错误全部原子失败。
+- [x] Test source：正式 denominator gate 与内部 bundle 测试锁定预期总成员 `43,476`，exact matcher 只允许
+      `RegionCountBudget/Completed` 的 Observe/Extend 两组、各一 member；预期 source-present 为 `2` member / `2`
+      group，其余 `43,474` member 保持 planned missing。
+- [ ] Current-source verification：编译并运行上述 gate，记录实际 counts 与 inventory digest；本批按架构阶段约束
+      保持 `passed=0 failed=0 not_run`。
+- [ ] Freeze：完整 Map program source 全部 source-present 后，由独立 review 冻结 inventory bytes/digest，并让
+      quotient manifest context 绑定该 digest。当前不得执行此项。
+
+Gate B1 只建立 manifest 前的程序规划分区；即使将来运行成功，也不能把 `43,476` 称为 `Qmap`、member
+coverage 或 Windows numerator。
 
 ## 4. Gate C — exact quotient manifests
 
@@ -113,7 +136,7 @@ candidate 已验证 exact `8,668` 输入后按预期因
 `QuotientRunnerNotIntegrated` 失败关闭。由于两个 root 都没有成功形成可冻结 catalog，Gate C 整体仍未闭合。
 
 前序基线测试事实如下；fingerprint 只标识相应验证回执，不提升验收层级。runner-admission 改动后的
-current source 为 `not_run`，本批 `passed=0/failed=0`：
+current admission 与 program-inventory source 均为 `not_run`，本批 `passed=0/failed=0`：
 
 | Verification | Result | Fingerprint / actual |
 |---|---|---|
@@ -205,6 +228,7 @@ Map、Lock、既有 A2b2 `117/117` 与宽回归均闭合，聚合 A2 才可由�
 | typed projector/candidate | `prior compiled; current source uncompiled/unrun` | `prior compiled; current source uncompiled/unrun` | 实现存在，不等于 current source 已验证或 manifest 冻结 |
 | sealed runner admission | `source written; exact receipt-only narrow support; default gap retained; not run` | `source written; exact Lock gap retained; not run` | raw `Supported` 不能成为 permit；完整 runner/observer 尚缺 |
 | narrow executable program | `RegionCountBudget/Completed; source-only; private actual receipt + parent/child/cleanup; uncompiled/unrun` | `unchanged / none` | 仅证明代码形状已写入，不是动态执行证据 |
+| pre-manifest program inventory | `full-root two-pass source written; unrun test expectation: 43476 total, 2 source-present members / 2 groups, 43474 planned-missing members; digest not generated/frozen` | `unchanged / no entry` | 非授权程序规划分区；不是 Qmap、manifest、coverage 或 Windows evidence |
 | full candidate gate | `prior 43476 checked; current source not run` | `prior 8668 checked; current source not run` | prior baseline 只证明当时完整失败关闭，不产生 quotient denominator |
 | current blocker | `default full candidate: quotient runner not integrated` | `Lock observation incomplete` | 窄 source program 不解除两个 root 的全局 blocker |
 | frozen descriptor binding | `d3ba08a5ba0019f9ccda99ace8b580ef06eb4d6653ba80c0db5497bec51bd870`；checked-in / exact gate accepted | `0cc951c8c979608fb9861167f8d880a74fd2e042c4d2cd42673100e14083e8ef`；checked-in / exact gate accepted | descriptor binding 已冻结；quotient manifest 仍未冻结 |
@@ -218,7 +242,7 @@ Map、Lock、既有 A2b2 `117/117` 与宽回归均闭合，聚合 A2 才可由�
 
 ## 9. Production isolation and current verdict
 
-当前 verdict：`design_frozen / typed_projector_candidate_prior_compiled / prior_dynamic_quotient 36/36 passed / Map RegionCountBudget-Completed program+private actual receipt+parent-child-cleanup=current_source_written_uncompiled_unrun / current_source passed=0 failed=0 not_run / Supported=private_exact_receipt_only / default Map producers=all Missing(QuotientRunnerNotIntegrated) / Lock unchanged=Missing(LockObservationIncomplete) / full 43476 candidate not rerun / quotient_manifests=not_frozen / Qmap=unknown / Qlock=unknown / member_coverage=0 / WindowsDynamic=not_opened`。
+当前 verdict：`design_frozen / typed_projector_candidate_prior_compiled / prior_dynamic_quotient 36/36 passed / Map RegionCountBudget-Completed program+private actual receipt+parent-child-cleanup=current_source_written_uncompiled_unrun / Map pre-manifest program inventory=full-root source_written_non_authorizing_uncompiled_unrun_digest_not_frozen / current_source passed=0 failed=0 not_run / Supported=private_exact_receipt_only / default Map producers=all Missing(QuotientRunnerNotIntegrated) / Lock unchanged=Missing(LockObservationIncomplete) / full 43476 candidate not rerun / quotient_manifests=not_frozen / Qmap=unknown / Qlock=unknown / member_coverage=0 / WindowsDynamic=not_opened`。
 
 本功能不注册生产 VFS，不调用 production open，不创建 Connection/Opened authority，不接 A1/v15、Runtime、
 Ready、Provider、route、Offer、Attempt、Lease、派发、市场、结算或资金。任何 Gate A-F 未闭合时，A2 都

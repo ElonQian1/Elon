@@ -10,6 +10,8 @@ mod manifest_canonical;
 mod membership_commitment;
 mod model;
 mod producer_coherence;
+mod program_inventory;
+mod program_inventory_canonical;
 mod projector;
 mod runner_admission;
 
@@ -31,11 +33,40 @@ use model::{
     DynamicAxesV1, DynamicClassKeyV1, DynamicExpectedV1, DynamicOperationV1, DynamicProjectionV1,
     StaticMemberSealV1, DYNAMIC_PROJECTOR_SCHEMA_V1,
 };
+use program_inventory::build_map_execution_program_inventory_v1;
 use projector::{
-    project_dynamic_class_v1, project_validated_dynamic_terminal_v1,
+    prepare_dynamic_terminal_v1, project_dynamic_class_v1, project_validated_dynamic_terminal_v1,
     project_validated_dynamic_terminal_with_map_execution_v1, ProjectionErrorV1,
     ProjectionViolationV1,
 };
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct ExecutionProgramInventorySummaryV1 {
+    pub(super) member_count: u64,
+    pub(super) program_group_count: u64,
+    pub(super) source_present_member_count: u64,
+    pub(super) source_present_group_count: u64,
+    pub(super) planned_missing_member_count: u64,
+    pub(super) planned_missing_group_count: u64,
+    pub(super) inventory_sha256: String,
+}
+
+pub(super) fn inspect_map_execution_program_inventory_v1(
+    graph: &super::model::ContractGraph,
+) -> Result<ExecutionProgramInventorySummaryV1, String> {
+    let bundle =
+        build_map_execution_program_inventory_v1(graph).map_err(|error| format!("{error:?}"))?;
+    let inventory = bundle.inventory;
+    Ok(ExecutionProgramInventorySummaryV1 {
+        member_count: inventory.member_count,
+        program_group_count: inventory.program_group_count,
+        source_present_member_count: inventory.source_present_member_count,
+        source_present_group_count: inventory.source_present_group_count,
+        planned_missing_member_count: inventory.planned_missing_member_count,
+        planned_missing_group_count: inventory.planned_missing_group_count,
+        inventory_sha256: inventory.inventory_sha256.to_lower_hex(),
+    })
+}
 
 #[cfg(test)]
 mod tests;

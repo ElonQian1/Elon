@@ -19,7 +19,9 @@ mod source_owner_graph;
 mod static_contract;
 mod typed_map_fragment;
 
-pub(super) use static_contract::{CapabilityGapV1, DynamicQuotientCandidateGateErrorV1};
+pub(super) use static_contract::{
+    CapabilityGapV1, DynamicQuotientCandidateGateErrorV1, ExecutionProgramInventoryGateReceiptV1,
+};
 
 pub(super) fn validate_candidate_branch_atom_scaffold() -> Result<(), &'static str> {
     invariants::validate()
@@ -53,4 +55,9 @@ pub(super) fn validate_map_dynamic_quotient_candidate_gate(
 pub(super) fn validate_lock_dynamic_quotient_candidate_gate(
 ) -> Result<(), DynamicQuotientCandidateGateErrorV1> {
     static_contract::validate_lock_dynamic_quotient_candidate_gate()
+}
+
+pub(super) fn inspect_map_execution_program_inventory_gate(
+) -> Result<ExecutionProgramInventoryGateReceiptV1, String> {
+    static_contract::inspect_map_execution_program_inventory_gate()
 }

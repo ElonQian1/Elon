@@ -174,11 +174,47 @@ struct MapProgramV1 {
     implementation_sha256: Digest32,
 }
 
+#[derive(Clone, Copy)]
+struct MapProgramSpecV1 {
+    mode: ProgramModeV1,
+    normalized_descriptor_sha256: Digest32,
+    plan_sha256: Digest32,
+    implementation_sha256: Digest32,
+}
+
+pub(super) fn implementation_for_inventory_v1(
+    key: &DynamicClassKeyV1,
+    plan: CompiledRunnerPlanV1,
+) -> Result<Option<Digest32>, MapRunnerExecutionViolationV1> {
+    match program_spec_v1(key, plan) {
+        Ok(program) => Ok(Some(program.implementation_sha256)),
+        Err(MapRunnerExecutionViolationV1::UnsupportedProgram) => Ok(None),
+        Err(error) => Err(error),
+    }
+}
+
 fn program_v1(
     key: &DynamicClassKeyV1,
     member: StaticMemberSealV1,
     plan: CompiledRunnerPlanV1,
 ) -> Result<MapProgramV1, MapRunnerExecutionViolationV1> {
+    let program = program_spec_v1(key, plan)?;
+    if key.recipe.capability != RunnerCapabilityV1::Supported {
+        return Err(MapRunnerExecutionViolationV1::UnsupportedProgram);
+    }
+    Ok(MapProgramV1 {
+        mode: program.mode,
+        normalized_descriptor_sha256: program.normalized_descriptor_sha256,
+        member,
+        plan_sha256: program.plan_sha256,
+        implementation_sha256: program.implementation_sha256,
+    })
+}
+
+fn program_spec_v1(
+    key: &DynamicClassKeyV1,
+    plan: CompiledRunnerPlanV1,
+) -> Result<MapProgramSpecV1, MapRunnerExecutionViolationV1> {
     if plan != super::compile_v1(key) {
         return Err(MapRunnerExecutionViolationV1::PlanBindingMismatch);
     }
@@ -207,7 +243,6 @@ fn program_v1(
         || key.recipe.fault_seam != FaultSeamV1::ManagedRequest
         || key.recipe.observer != ObserverV1::MapCallbackAndSnapshot
         || key.recipe.cleanup != CleanupV1::ParentOwnedRoot
-        || key.recipe.capability != RunnerCapabilityV1::Supported
         || axes.profile != ReachabilityV1::NotReached
         || axes.ordinal != ReachabilityV1::NotReached
         || axes.regions_to_create != ReachabilityV1::NotReached
@@ -216,10 +251,9 @@ fn program_v1(
     {
         return Err(MapRunnerExecutionViolationV1::UnsupportedProgram);
     }
-    Ok(MapProgramV1 {
+    Ok(MapProgramSpecV1 {
         mode,
         normalized_descriptor_sha256: plan.normalized_descriptor_sha256,
-        member,
         plan_sha256: plan.plan_sha256,
         implementation_sha256: digest_implementation_v1(),
     })

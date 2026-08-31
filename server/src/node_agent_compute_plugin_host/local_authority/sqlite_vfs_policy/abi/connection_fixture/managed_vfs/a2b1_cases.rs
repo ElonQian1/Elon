@@ -73,6 +73,37 @@ fn a2b1_map_dynamic_quotient_candidate_is_atomically_runner_blocked() {
 }
 
 #[test]
+fn a2b1_map_execution_program_inventory_is_complete_but_non_authorizing() {
+    let receipt = denominator::inspect_map_execution_program_inventory_gate()
+        .expect("complete pre-manifest Map execution-program inventory");
+    assert_eq!(receipt.member_count, 43_476);
+    assert_eq!(receipt.source_present_member_count, 2);
+    assert_eq!(receipt.source_present_group_count, 2);
+    assert_eq!(receipt.planned_missing_member_count, 43_474);
+    assert_eq!(
+        receipt
+            .source_present_member_count
+            .checked_add(receipt.planned_missing_member_count),
+        Some(receipt.member_count),
+    );
+    assert_eq!(
+        receipt
+            .source_present_group_count
+            .checked_add(receipt.planned_missing_group_count),
+        Some(receipt.program_group_count),
+    );
+    assert_eq!(receipt.inventory_sha256.len(), 64);
+    assert!(
+        receipt
+            .inventory_sha256
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)),
+        "inventory digest must be lowercase hex"
+    );
+    assert_ne!(receipt.inventory_sha256, "0".repeat(64));
+}
+
+#[test]
 fn a2b1_lock_dynamic_quotient_candidate_is_atomically_runner_blocked() {
     let error = denominator::validate_lock_dynamic_quotient_candidate_gate()
         .expect_err("Lock quotient candidate must remain closed without complete observation");

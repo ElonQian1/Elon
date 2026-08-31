@@ -21,6 +21,7 @@ mod descriptor_binding;
 mod manifest_validation;
 mod map_validation;
 mod producer_coherence;
+mod program_inventory;
 mod runner_admission;
 #[cfg(windows)]
 mod runner_admission_supported;

@@ -8,6 +8,7 @@ use super::{
 };
 
 const RUNNER_PLAN_DOMAIN_V1: &str = "ELON-A2-MAP-LOCK-DYNAMIC-RUNNER-PLAN-V1";
+const EXECUTION_PROGRAM_ID_DOMAIN_V1: &str = "ELON-A2-MAP-LOCK-EXECUTION-PROGRAM-ID-V1";
 const RUNNER_ADMISSION_BINDING_DOMAIN_V1: &str =
     "ELON-A2-MAP-LOCK-DYNAMIC-RUNNER-ADMISSION-BINDING-V1";
 
@@ -24,6 +25,19 @@ pub(super) fn digest_runner_plan_v1(
     for stage in blueprint.stages {
         out.u16("stage", stage_tag(*stage));
     }
+    out.finish()
+}
+
+pub(super) fn digest_execution_program_id_v1(
+    root: RootOperationV1,
+    normalized_descriptor_sha256: Digest32,
+    plan_sha256: Digest32,
+) -> Digest32 {
+    let mut out = StableHasher::new(EXECUTION_PROGRAM_ID_DOMAIN_V1);
+    out.u16("projector_schema_version", DYNAMIC_PROJECTOR_SCHEMA_V1);
+    out.text("root", root.canonical_name());
+    out.digest("normalized_descriptor_sha256", normalized_descriptor_sha256);
+    out.digest("plan_sha256", plan_sha256);
     out.finish()
 }
 

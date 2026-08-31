@@ -30,6 +30,19 @@ pub(crate) enum DynamicQuotientCandidateGateErrorV1 {
     Unexpected(String),
 }
 
+/// A non-authorizing pre-manifest inventory summary. Its counts are program-planning facts, not
+/// `Qmap`, dynamic member coverage, a quotient manifest, or Windows execution evidence.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ExecutionProgramInventoryGateReceiptV1 {
+    pub(crate) member_count: u64,
+    pub(crate) program_group_count: u64,
+    pub(crate) source_present_member_count: u64,
+    pub(crate) source_present_group_count: u64,
+    pub(crate) planned_missing_member_count: u64,
+    pub(crate) planned_missing_group_count: u64,
+    pub(crate) inventory_sha256: String,
+}
+
 pub(super) fn validate_map() -> Result<usize, String> {
     validate_source_owner_authority()?;
     let graph = map::graph();
@@ -68,6 +81,20 @@ pub(super) fn validate_lock_dynamic_quotient_candidate_gate(
     dynamic_quotient::build_lock_dynamic_candidate_v1(&lock::graph())
         .map(|_| ())
         .map_err(classify_dynamic_candidate_error)
+}
+
+pub(super) fn inspect_map_execution_program_inventory_gate(
+) -> Result<ExecutionProgramInventoryGateReceiptV1, String> {
+    let inventory = dynamic_quotient::inspect_map_execution_program_inventory_v1(&map::graph())?;
+    Ok(ExecutionProgramInventoryGateReceiptV1 {
+        member_count: inventory.member_count,
+        program_group_count: inventory.program_group_count,
+        source_present_member_count: inventory.source_present_member_count,
+        source_present_group_count: inventory.source_present_group_count,
+        planned_missing_member_count: inventory.planned_missing_member_count,
+        planned_missing_group_count: inventory.planned_missing_group_count,
+        inventory_sha256: inventory.inventory_sha256,
+    })
 }
 
 fn classify_dynamic_candidate_error(

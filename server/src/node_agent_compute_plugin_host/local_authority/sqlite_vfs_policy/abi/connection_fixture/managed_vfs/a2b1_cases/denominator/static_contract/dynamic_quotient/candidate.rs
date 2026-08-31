@@ -74,7 +74,7 @@ fn build_dynamic_candidate_v1(
     build_dynamic_manifest_v1(&trusted_binding, &catalog).map_err(DynamicCandidateErrorV1::Manifest)
 }
 
-fn validate_frozen_pass<F>(
+pub(super) fn validate_frozen_pass<F>(
     graph: &ContractGraph,
     root: RootOperationV1,
     observe_leaf: F,

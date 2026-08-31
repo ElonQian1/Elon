@@ -65,7 +65,7 @@ reviewed_at: 2026-08-31
 - 分布式算力各层成熟度不同，不能统称“开放算力市场已完成”；统一状态见 `docs/distributed-compute/current-implementation-status.md`。
 - 外部矿池：V277/V278 uncompiled/unrun、#13-18 deny、eligible=0；V280 仅 ABI。
 - V279 UserNode Binding：Domain/Store/API/activation 源码已写但未编译/运行，零下游与经济效果；见 `docs/distributed-compute/user-node-provider-binding-authority.md`。
-- UserNode Ready：registry `45/45`、A2b2 `117/117`、Map/Lock StaticContract `43476/43476+8668/8668`。新增 Map `RegionCountBudget/Completed` receipt-gated program（source-only、uncompiled/unrun、`passed=0 failed=0 not_run`）；默认 Map 全 Missing、Lock 不变，完整 candidate/manifest、`Qmap/Qlock`、coverage、WindowsDynamic 仍关闭。见 `AI_INDEX.md`。
+- UserNode Ready：registry `45/45`、A2b2 `117/117`、Map/Lock StaticContract `43476/43476+8668/8668`。新增 Map `RegionCountBudget/Completed` receipt-gated program 与完整 root 的非授权 pre-manifest program inventory（均 source-only、uncompiled/unrun、`passed=0 failed=0 not_run`）；测试源码预期 2 member/2 group source-present、43474 member planned missing，但无运行回执或 frozen digest。默认 Map 全 Missing、Lock 不变，完整 candidate/manifest、`Qmap/Qlock`、coverage、WindowsDynamic 仍关闭。见 `AI_INDEX.md`。
 - `capacity_future`：Lease-rooted Store resolver/private-field seal 已写；未登记、未编译/运行、无 API/effect；见 `AI_INDEX.md`。
 
 ## 已接受的产品方向

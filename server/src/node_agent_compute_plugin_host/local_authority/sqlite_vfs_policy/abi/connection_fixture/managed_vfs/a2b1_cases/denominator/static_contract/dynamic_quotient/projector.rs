@@ -109,13 +109,13 @@ pub(super) fn project_validated_dynamic_terminal_with_map_execution_v1(
     Ok(finish_prepared_terminal(prepared, runner_admission))
 }
 
-struct PreparedDynamicTerminalV1 {
-    descriptor_binding: DescriptorBindingEntryV1,
-    key: DynamicClassKeyV1,
-    member: StaticMemberSealV1,
+pub(super) struct PreparedDynamicTerminalV1 {
+    pub(super) descriptor_binding: DescriptorBindingEntryV1,
+    pub(super) key: DynamicClassKeyV1,
+    pub(super) member: StaticMemberSealV1,
 }
 
-fn prepare_dynamic_terminal_v1(
+pub(super) fn prepare_dynamic_terminal_v1(
     record: &LeafRecordV1,
     descriptor: &TerminalDescriptorV1,
 ) -> Result<PreparedDynamicTerminalV1, ProjectionErrorV1> {

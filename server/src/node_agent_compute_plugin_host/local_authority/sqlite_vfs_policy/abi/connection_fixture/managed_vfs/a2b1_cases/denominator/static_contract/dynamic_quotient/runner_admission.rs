@@ -42,6 +42,50 @@ pub(super) enum RunnerAdmissionDecisionV1 {
     Missing(CapabilityGapV1),
 }
 
+/// Pre-manifest source inventory only. This status never grants catalog admission and cannot
+/// substitute for a process-isolated execution receipt.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub(super) enum ExecutionProgramInventoryStatusV1 {
+    PlannedMissing(CapabilityGapV1),
+    SourcePresentReceiptRequired { implementation_sha256: Digest32 },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) struct ExecutionProgramInventoryReceiptV1 {
+    normalized_key: DynamicClassKeyV1,
+    normalized_descriptor_sha256: Digest32,
+    program_id: Digest32,
+    plan_sha256: Digest32,
+    status: ExecutionProgramInventoryStatusV1,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum ExecutionProgramInventoryViolationV1 {
+    MapProgramLookupFailed,
+}
+
+impl ExecutionProgramInventoryReceiptV1 {
+    pub(super) const fn normalized_key(self) -> DynamicClassKeyV1 {
+        self.normalized_key
+    }
+
+    pub(super) const fn program_id(self) -> Digest32 {
+        self.program_id
+    }
+
+    pub(super) const fn normalized_descriptor_sha256(self) -> Digest32 {
+        self.normalized_descriptor_sha256
+    }
+
+    pub(super) const fn plan_sha256(self) -> Digest32 {
+        self.plan_sha256
+    }
+
+    pub(super) const fn status(self) -> ExecutionProgramInventoryStatusV1 {
+        self.status
+    }
+}
+
 impl RunnerAdmissionReceiptV1 {
     pub(super) const fn member(self) -> StaticMemberSealV1 {
         self.member
@@ -128,6 +172,50 @@ pub(super) fn resolve_with_map_execution_v1(
 ) -> Result<RunnerAdmissionReceiptV1, RunnerAdmissionViolationV1> {
     let plan = compile_v1(key);
     resolve_supported_map_with_plan_v1(key, member, plan, execution)
+}
+
+pub(super) fn inventory_v1(
+    key: &DynamicClassKeyV1,
+) -> Result<ExecutionProgramInventoryReceiptV1, ExecutionProgramInventoryViolationV1> {
+    let plan = compile_v1(key);
+    let mut normalized_key = *key;
+    normalized_key.recipe.capability = RunnerCapabilityV1::Missing(plan.expected_gap);
+    let status = match key.root {
+        RootOperationV1::Map => {
+            match map_program::implementation_for_inventory_v1(&normalized_key, plan)
+                .map_err(|_| ExecutionProgramInventoryViolationV1::MapProgramLookupFailed)?
+            {
+                None => ExecutionProgramInventoryStatusV1::PlannedMissing(plan.expected_gap),
+                Some(implementation_sha256) => {
+                    ExecutionProgramInventoryStatusV1::SourcePresentReceiptRequired {
+                        implementation_sha256,
+                    }
+                }
+            }
+        }
+        RootOperationV1::Lock => {
+            ExecutionProgramInventoryStatusV1::PlannedMissing(plan.expected_gap)
+        }
+    };
+    Ok(ExecutionProgramInventoryReceiptV1 {
+        normalized_key,
+        normalized_descriptor_sha256: plan.normalized_descriptor_sha256,
+        program_id: execution_program_id_v1(
+            plan.root,
+            plan.normalized_descriptor_sha256,
+            plan.plan_sha256,
+        ),
+        plan_sha256: plan.plan_sha256,
+        status,
+    })
+}
+
+pub(super) fn execution_program_id_v1(
+    root: RootOperationV1,
+    normalized_descriptor_sha256: Digest32,
+    plan_sha256: Digest32,
+) -> Digest32 {
+    canonical::digest_execution_program_id_v1(root, normalized_descriptor_sha256, plan_sha256)
 }
 
 pub(super) fn digest_binding_v1(

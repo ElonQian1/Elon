@@ -107,6 +107,22 @@ pub(super) const PROJECTOR_SOURCE_SCOPE_V1: &[(&str, &str)] = &[
         "dynamic_quotient/candidate.rs",
         include_str!("candidate.rs"),
     ),
+    (
+        "dynamic_quotient/program_inventory.rs",
+        include_str!("program_inventory.rs"),
+    ),
+    (
+        "dynamic_quotient/program_inventory/builder.rs",
+        include_str!("program_inventory/builder.rs"),
+    ),
+    (
+        "dynamic_quotient/program_inventory/model.rs",
+        include_str!("program_inventory/model.rs"),
+    ),
+    (
+        "dynamic_quotient/program_inventory_canonical.rs",
+        include_str!("program_inventory_canonical.rs"),
+    ),
     ("dynamic_quotient/manifest.rs", include_str!("manifest.rs")),
     (
         "dynamic_quotient/membership_commitment.rs",

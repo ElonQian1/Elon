@@ -4,8 +4,8 @@ status: current
 reviewed_at: 2026-08-31
 owners: node, security
 design_status: design_frozen
-implementation_status: typed_projector_candidate_prior_compiled_map_region_count_program_and_runner_admission_source_written_uncompiled_unrun
-verification_status: prior_targeted_unit_36_passed_current_source_not_run_manifests_not_frozen
+implementation_status: typed_projector_candidate_prior_compiled_pre_manifest_program_inventory_source_written_uncompiled_unrun
+verification_status: prior_targeted_unit_36_passed_current_source_inventory_not_run_not_frozen_manifests_not_frozen
 authority_scope: backend-a2-map-lock-dynamic-quotient-authority-v1
 ---
 
@@ -22,7 +22,9 @@ authority_scope: backend-a2-map-lock-dynamic-quotient-authority-v1
 精确分区并冻结 manifest 后得出。typed descriptor、projector、内存 catalog/manifest builder 与两遍原子
 candidate 入口在前序基线已实现并通过编译和定向单元测试；本批又写入 sealed runner admission，以及仅覆盖
 Map `RegionCountBudget/Completed` 的 source-only executable program、私有 actual receipt 和 parent/child/cleanup
-合同，但当前源码未编译、未运行。默认 Map/Lock producers、完整 candidate 与 manifest 路径未因此接通；
+合同。current source 进一步把“语义 program 分组”“源码 program 存在”“actual execution verified”拆成三层，
+新增完整 Map 根的 pre-manifest execution-program inventory 源码；但该路径尚未编译、未运行，也没有冻结
+inventory digest。默认 Map/Lock producers、完整 candidate 与 manifest 路径未因此接通；
 没有任何商 manifest 被成功生成、复核或冻结，所以两个值仍是 `unknown`。
 
 本合同是动态执行压缩合同，不是静态覆盖压缩合同：每个 included 静态 CaseKey 仍必须被完整承诺且
@@ -159,6 +161,42 @@ semantic drift 或任一 commitment 替换都失败关闭。
 `Missing(QuotientRunnerNotIntegrated)`，Lock producers 与准入保持
 `Missing(LockObservationIncomplete)`；因此当前完整 candidate 没有 class 被放行。
 
+### 7.1 Pre-manifest execution-program inventory
+
+商 manifest 之前必须先有一层独立、非授权的 `ExecutionProgramInventoryV1`。它复用同一两遍 frozen ingress，
+但在第二遍只调用完整 typed semantic preparation 与 source-only inventory classifier，不调用 actual
+`resolve_v1`/receipt validation，也不把 Missing 变成 projection failure。每个 included member 必须恰好映射到
+一个 capability-normalized program identity；identity 完整保留
+root、typed descriptor、axes、Expected 与内部编译的 runner plan，只把 capability 归一为该 root 的 planned
+gap。`program_id` 使用独立 domain，精确绑定 root、projector schema、normalized descriptor digest 与
+`plan_sha256`；它既不是 dynamic class ID，也不直接复用 descriptor digest。CaseKey/full-record digest只进入
+member binding，不进入 program identity。
+
+inventory 状态只有两种：
+
+```text
+PlannedMissing(exact_gap)
+SourcePresentReceiptRequired { implementation_sha256 }
+```
+
+本层禁止出现 `Supported` 或 `ExecutionVerified`。`SourcePresentReceiptRequired` 只表示 exact source matcher
+找到了实现，仍须后续正式 receipt；当前 matcher 只认既有 Map `RegionCountBudget/Completed` 的 Observe/Extend
+形状。其他 Map program 继续是 `PlannedMissing(QuotientRunnerNotIntegrated)`，Lock 不在本批 inventory 入口
+范围内。matcher 只把明确的 `UnsupportedProgram` 归为 planned missing；plan/binding 等内部错误必须携带 exact
+member 使整次 inventory 失败，禁止 fail-open-as-missing。
+
+inventory context 必须绑定 static baseline/source scope/ledger/manifest、included/excluded/source-universe、
+exact included member-pair set、projector schema/source scope、frozen descriptor binding 与 inventory source scope。
+排序后的 `member -> program_id` reverse index、每个 program 的 plan/status/member-set、group/member 计数和
+总 inventory body 分别使用 domain-separated canonical digest。builder 必须从 program group union 独立重建
+reverse index 并与逐叶 membership 相等；任一 missing member、extra、duplicate、collision、binding drift 或
+空 group 都使 inventory 原子失败。
+
+该 inventory 不是 quotient manifest，也不选择正式 representative，不产生 `Qmap`、
+`DynamicQuotientMemberCoverage`、Windows record 或任何 runtime permit。只有以后完整 Map program inventory
+全部达到 source-present、独立 review 冻结其 digest，并由 quotient manifest context 反向绑定后，才可进入
+manifest 冻结；actual Windows execution 仍必须在 manifest 后按 frozen class representative 发生。
+
 ## 8. Class catalog and member commitments
 
 每个 `DynamicClassV1` 必须冻结：
@@ -171,7 +209,7 @@ semantic drift 或任一 commitment 替换都失败关闭。
 - 所属 static manifest/ledger/source baseline 与全局 class catalog digest。
 
 实现中的 catalog、classes、membership map 与 reverse index 均保持 private；调用方不能取得可变 class
-集合后自行改写成员归属。成功 bundle 必须同时带有两类相互独立的冻结承诺：
+集合后自行改写成员归属。成功 bundle 必须同时带有三类相互独立的冻结承诺：
 
 1. root/schema-bound、按 member seal 排序的 `member -> class ID digest` commitment；它由私有 class
    union 重建，并与 manifest 的 exact reverse index 相互校验；
@@ -184,7 +222,11 @@ semantic drift 或任一 commitment 替换都失败关闭。
    admission commitment；它必须与 descriptor binding 的 member 和 normalized semantic digest 精确一致，
    并同时进入当前 blocker receipt、未来 catalog 与 quotient manifest body。
 
-capability 归一化只服务于 descriptor-binding commitment；默认完整 producer inventory 仍要求 Map 为
+pre-manifest program inventory 的 program membership/catalog/body commitments 与上述 quotient bundle 分离；
+它们只能表达 program 规划状态，不能作为第四种 quotient manifest commitment 偷渡部分 catalog。
+
+在 quotient bundle 中，capability 归一化只服务于 descriptor-binding commitment；pre-manifest inventory 的
+归一化只形成非授权 program identity。默认完整 producer inventory 仍要求 Map 为
 `Missing(QuotientRunnerNotIntegrated)`、Lock 为 `Missing(LockObservationIncomplete)`。仅窄 Map program-local
 descriptor 可声明 `Supported`，且仍须私有 actual receipt 精确复验；gap 互换和未密封声明继续失败关闭。
 
@@ -201,6 +243,11 @@ ELON-A2-MAP-LOCK-DYNAMIC-MEMBER-SET-V1
 ELON-A2-MAP-LOCK-DYNAMIC-QUOTIENT-MANIFEST-V1
 ELON-A2-MAP-LOCK-DYNAMIC-RUNNER-PLAN-V1
 ELON-A2-MAP-LOCK-DYNAMIC-RUNNER-ADMISSION-BINDING-V1
+ELON-A2-MAP-LOCK-EXECUTION-PROGRAM-ID-V1
+ELON-A2-MAP-LOCK-EXECUTION-PROGRAM-INVENTORY-SOURCE-SCOPE-V1
+ELON-A2-MAP-LOCK-EXECUTION-PROGRAM-MEMBERSHIP-V1
+ELON-A2-MAP-LOCK-EXECUTION-PROGRAM-CATALOG-V1
+ELON-A2-MAP-LOCK-EXECUTION-PROGRAM-INVENTORY-V1
 ```
 
 canonical encoding 必须长度分隔、枚举显式、整数定宽、成员按摘要字节排序；禁止 JSON map 顺序、Debug
@@ -211,8 +258,13 @@ class catalog、reverse index 与 manifest canonical encoding 已实现并通过
 projector provenance commitment 精确纳入 producer coherence 的
 `producer_coherence/map.rs`、`producer_coherence/map_axes.rs`、`producer_coherence/lock.rs`、
 `producer_coherence/lock_axes.rs`，以及 `descriptor_binding.rs`、`membership_commitment.rs`、
-`runner_admission.rs`、`runner_admission/{canonical,map,lock}.rs`；其中任一
+`runner_admission.rs`、`runner_admission/{canonical,map,map_program,lock}.rs`；其中任一
 接受关系或 commitment 编码变化都必须触发 projector provenance drift 和全量重审。
+
+pre-manifest inventory 自身另以 source-scope commitment 纳入 `program_inventory.rs`、
+`program_inventory/{builder,model}.rs`、`program_inventory_canonical.rs`、`projector.rs`、
+`runner_admission.rs` 与 `runner_admission/{canonical,map,map_program,lock}.rs`。该 commitment 只是源码谱系，
+不能替代 inventory body、manifest 或执行回执。
 
 每个 root 的 quotient manifest 还必须冻结：`Qmap` 或 `Qlock`、static included/excluded/source-universe
 计数与摘要、projector schema/digest、class-key-set digest、membership map digest、representative map
@@ -319,6 +371,11 @@ producer_coherence=closed_typed_relations_mixed_state_and_gap_rejected
 sealed_runner_admission_plan=source_written_source_review_only_uncompiled_unrun
 map_region_count_budget_completed_program=source_written_private_actual_receipt_parent_child_cleanup_uncompiled_unrun
 map_supported_admission=private_exact_receipt_binding_only_source_contract_not_run
+map_pre_manifest_program_inventory=source_written_full_root_two_pass_non_authorizing_uncompiled_unrun
+map_program_inventory_status=planned_missing_or_source_present_receipt_required_only
+map_program_inventory_digest=not_generated_not_frozen
+map_program_inventory_member_and_group_counts=unknown_not_run
+map_program_inventory_unrun_test_expectation=members_43476_source_present_members_2_source_present_groups_2_planned_missing_members_43474
 map_default_producers=all_missing_quotient_runner_not_integrated
 lock_runner_admission=unchanged_all_missing_lock_observation_incomplete
 runner_admission_raw_supported=fail_closed_without_private_exact_receipt_not_run
@@ -343,4 +400,5 @@ windows_runtime=not_opened
 
 本文不完成 A2，不注册生产 VFS，不调用生产 open，不创建 Connection/Opened authority，不获取 process
 fence，不启动 A1/v15/Runtime/Ready，不产生 Provider、route、Offer、Attempt、Lease、派发、市场、结算或
-资金效果。后续源码、冻结 manifest、Windows evidence 与宽回归必须各自按独立批次验收。
+资金效果。后续 program inventory 运行与冻结、完整源码 program、商 manifest、Windows evidence 与宽回归
+必须各自按独立批次验收。
