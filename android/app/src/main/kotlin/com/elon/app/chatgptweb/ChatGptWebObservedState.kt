@@ -55,7 +55,11 @@ internal class ChatGptWebObservedState(
                     )
                 }
             }
-            is ChatGptWebEvent.Snapshot -> updateActiveConversation(event.value.url)
+            is ChatGptWebEvent.Snapshot -> {
+                expirePendingCommands(observedAtMs)
+                updateActiveConversation(event.value.url)
+                reconcileOpenConversation(event.value.url, observedAtMs)
+            }
             is ChatGptWebEvent.FeatureNavigation -> features = event.features
             is ChatGptWebEvent.ComposerControls -> {
                 composerSections = composerSections + (event.section to event.options)
@@ -105,6 +109,7 @@ internal class ChatGptWebObservedState(
             lastCommandObservedAtMs = null
             commandRequests = commandRequests.map { request ->
                 if (request.status != CommandRequest.PENDING) return@map request
+                if (request.canReconcileAfterDocumentChange()) return@map request
                 request.copy(
                     status = CommandRequest.FAILED,
                     completedAtMs = observedAtMs,
@@ -123,12 +128,33 @@ internal class ChatGptWebObservedState(
     }
 
     fun beginCommand(expectedAction: String): CommandRequest {
+        return beginCommand(expectedAction, targetConversationPath = null)
+    }
+
+    fun beginOpenConversationCommand(path: String): CommandRequest {
+        val normalized = requireNotNull(ChatGptWebConversationPath.normalize(path)) {
+            "Invalid ChatGPT conversation path"
+        }
         val startedAt = nowMs()
+        supersedePendingOpenConversationCommands(startedAt)
+        return beginCommand(
+            expectedAction = OPEN_CONVERSATION,
+            targetConversationPath = normalized,
+            startedAt = startedAt,
+        )
+    }
+
+    private fun beginCommand(
+        expectedAction: String,
+        targetConversationPath: String?,
+        startedAt: Long = nowMs(),
+    ): CommandRequest {
         val request = CommandRequest(
             id = "mcp_${(++nextCommandId).toString(36)}",
             expectedAction = expectedAction,
             status = CommandRequest.PENDING,
             startedAtMs = startedAt,
+            targetConversationPath = targetConversationPath,
         )
         commandRequests = (commandRequests + request).takeLast(MAX_COMMAND_REQUESTS)
         if (expectedAction == "list_conversations") {
@@ -145,6 +171,47 @@ internal class ChatGptWebObservedState(
     private fun updateActiveConversation(rawUrl: String) {
         val path = ChatGptWebConversationPath.fromUrl(rawUrl) ?: return
         conversations = conversations.map { it.copy(active = it.path == path) }
+    }
+
+    private fun reconcileOpenConversation(rawUrl: String, observedAtMs: Long) {
+        val observedIdentity = ChatGptWebConversationPath.fromUrl(rawUrl)
+            ?.let(ChatGptWebConversationPath::identity)
+            ?: return
+        val request = commandRequests.lastOrNull { candidate ->
+            candidate.status == CommandRequest.PENDING &&
+                candidate.expectedAction == OPEN_CONVERSATION &&
+                ChatGptWebConversationPath.identity(candidate.targetConversationPath) == observedIdentity
+        } ?: return
+        val result = ChatGptWebEvent.CommandResult(
+            action = OPEN_CONVERSATION,
+            ok = true,
+            detail = OPEN_CONVERSATION_CONFIRMED_BY_SNAPSHOT,
+            requestId = request.id,
+        )
+        lastCommand = result
+        lastCommandObservedAtMs = observedAtMs
+        completeRequest(result, observedAtMs)
+    }
+
+    private fun supersedePendingOpenConversationCommands(observedAtMs: Long) {
+        commandRequests = commandRequests.map { request ->
+            if (
+                request.status != CommandRequest.PENDING ||
+                request.expectedAction != OPEN_CONVERSATION
+            ) {
+                return@map request
+            }
+            request.copy(
+                status = CommandRequest.FAILED,
+                completedAtMs = observedAtMs,
+                result = ChatGptWebEvent.CommandResult(
+                    action = OPEN_CONVERSATION,
+                    ok = false,
+                    detail = OPEN_CONVERSATION_SUPERSEDED,
+                    requestId = request.id,
+                ),
+            )
+        }
     }
 
     fun failCommand(requestId: String, expectedAction: String, detail: String) {
@@ -193,8 +260,7 @@ internal class ChatGptWebObservedState(
         }
     }
 
-    private fun expirePendingCommands() {
-        val now = nowMs()
+    private fun expirePendingCommands(now: Long = nowMs()) {
         var changed = false
         commandRequests = commandRequests.map { request ->
             if (
@@ -248,7 +314,11 @@ internal class ChatGptWebObservedState(
         val startedAtMs: Long,
         val completedAtMs: Long? = null,
         val result: ChatGptWebEvent.CommandResult? = null,
+        val targetConversationPath: String? = null,
     ) {
+        fun canReconcileAfterDocumentChange(): Boolean =
+            expectedAction == OPEN_CONVERSATION && targetConversationPath != null
+
         companion object {
             const val PENDING = "pending"
             const val SUCCEEDED = "succeeded"
@@ -261,5 +331,8 @@ internal class ChatGptWebObservedState(
         const val MAX_COMMAND_REQUESTS = 20
         const val COMMAND_TIMEOUT_MS = 20_000L
         const val PAGE_GENERATION_CHANGED = "page_generation_changed"
+        const val OPEN_CONVERSATION = "open_conversation"
+        const val OPEN_CONVERSATION_CONFIRMED_BY_SNAPSHOT = "navigation_confirmed_by_snapshot"
+        const val OPEN_CONVERSATION_SUPERSEDED = "navigation_superseded"
     }
 }

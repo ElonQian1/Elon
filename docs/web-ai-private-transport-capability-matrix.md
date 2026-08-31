@@ -10,6 +10,7 @@ installed build; individual capability documents retain implementation evidence.
 |---|---|---|---|
 | Conversation and project directory | ChatGPT | Completed and enabled | Official DOM directory |
 | Conversation body prefetch | ChatGPT | Completed and enabled | Official WebView navigation |
+| Conversation navigation receipt reconciliation | ChatGPT | Implemented and enabled; exact-identity lifecycle tests passed, consolidated device acceptance pending | Official WebView navigation without write replay |
 | Send dispatch acknowledgement | ChatGPT | Completed and enabled | Official DOM confirmation |
 | Streaming reply observer | ChatGPT | Completed and enabled; completion and sparse-watchdog timer/bridge device verified | Official DOM snapshot |
 | Private stream completion settlement | ChatGPT | Completed, enabled, and device verified on `v1.1.1302 (1312)` | Official DOM snapshot |
@@ -39,6 +40,14 @@ All web-account transports keep the official page authoritative. They do not exp
 cookies, credentials, request headers, or private conversation content outside the
 device. Every observer is bounded and emits nothing on malformed or unsuccessful
 responses.
+
+Conversation navigation now retains the normalized target identity across an official
+document replacement. If the old page disappears before it can emit a command result, a
+fresh authenticated snapshot completes that exact request only when its conversation
+identity matches. An unrelated, expired, explicitly failed, or superseded request remains
+failed or pending; no write or navigation command is replayed automatically. The stable
+capability is `android_chatgpt_conversation_navigation_receipt_reconciliation_v1`.
+Its targeted lifecycle tests pass and consolidated device acceptance is pending.
 
 The consumer default is one architecture: native chat and floating voice UI, the same
 persistent background ChatGPT WebView as the identity and conversation/bootstrap layer,

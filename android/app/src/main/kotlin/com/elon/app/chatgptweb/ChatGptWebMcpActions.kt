@@ -23,6 +23,9 @@ internal class ChatGptWebMcpActions(
     private val refresh: () -> Unit,
     private val selectMode: (ChatGptWebPresentationMode) -> Unit,
     private val revealMessage: (String, Int?, String) -> Boolean,
+    private val beginOpenConversationCommand: (String) -> ChatGptWebObservedState.CommandRequest = {
+        beginCommand("open_conversation")
+    },
 ) : WebChatSocialMcpPort {
     override fun uiState(): JSONObject {
         val observed = observedState()
@@ -75,10 +78,15 @@ internal class ChatGptWebMcpActions(
             }
         }
         var commandRequest: ChatGptWebObservedState.CommandRequest? = null
-        fun dispatch(expectedAction: String, block: (String) -> Unit) {
-            val request = beginCommand(expectedAction)
+        fun dispatchRequest(
+            request: ChatGptWebObservedState.CommandRequest,
+            block: (String) -> Unit,
+        ) {
             commandRequest = request
             block(request.id)
+        }
+        fun dispatch(expectedAction: String, block: (String) -> Unit) {
+            dispatchRequest(beginCommand(expectedAction), block)
         }
         when (action) {
             "state", "open_chatgpt_web" -> Unit
@@ -338,7 +346,7 @@ internal class ChatGptWebMcpActions(
             "chatgpt_open_conversation" -> {
                 val path = ChatGptWebConversationPath.normalize(args.optString("conversation_path"))
                     ?: return error(action, "invalid_conversation_path")
-                dispatch("open_conversation") { requestId ->
+                dispatchRequest(beginOpenConversationCommand(path)) { requestId ->
                     commands.openConversation(path, requestId)
                 }
             }

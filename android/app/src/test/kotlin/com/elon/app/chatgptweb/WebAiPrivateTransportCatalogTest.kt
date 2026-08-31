@@ -17,6 +17,7 @@ class WebAiPrivateTransportCatalogTest {
             .toSet()
         assertTrue("android_chatgpt_private_conversation_project_directory_v1" in enabledIds)
         assertTrue("android_chatgpt_private_conversation_prefetch_v1" in enabledIds)
+        assertTrue("android_chatgpt_conversation_navigation_receipt_reconciliation_v1" in enabledIds)
         assertTrue("android_chatgpt_private_send_dispatch_observer_v1" in enabledIds)
         assertTrue("android_chatgpt_private_stream_observer_v1" in enabledIds)
         assertTrue("android_chatgpt_private_stream_completion_settlement_v1" in enabledIds)
@@ -124,6 +125,19 @@ class WebAiPrivateTransportCatalogTest {
             "official_conversation_options",
             conversationManagement.getString("fallback"),
         )
+
+        val navigationReceipt = values.first {
+            it.getString("capability_id") ==
+                "android_chatgpt_conversation_navigation_receipt_reconciliation_v1"
+        }
+        assertEquals("implemented_device_pending", navigationReceipt.getString("implementation_status"))
+        assertEquals(
+            "targeted_exact_identity_reconciliation_tests_passed",
+            navigationReceipt.getString("verification_status"),
+        )
+        assertTrue(navigationReceipt.getBoolean("production_default"))
+        assertTrue(navigationReceipt.getBoolean("runtime_enabled"))
+        assertFalse(navigationReceipt.getBoolean("direct_post_enabled"))
 
         val googleSnapshotCache = values.first {
             it.getString("capability_id") ==

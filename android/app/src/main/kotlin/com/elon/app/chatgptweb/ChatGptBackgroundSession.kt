@@ -393,6 +393,7 @@ internal class ChatGptBackgroundSession(
             refresh = { webView?.reload() },
             selectMode = selectMode,
             revealMessage = revealMessage,
+            beginOpenConversationCommand = observedMcpState::beginOpenConversationCommand,
         )
         return ChatGptWebNativeVoiceResearchMcpPort(
             delegate = officialPort,

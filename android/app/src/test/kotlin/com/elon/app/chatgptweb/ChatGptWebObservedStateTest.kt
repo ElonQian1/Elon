@@ -245,6 +245,75 @@ class ChatGptWebObservedStateTest {
     }
 
     @Test
+    fun exactConversationSnapshotCompletesNavigationAcrossDocumentGeneration() {
+        var now = 35_000L
+        val state = ChatGptWebObservedState { now }
+        state.updateDocument(document(page = 1, adapter = 1))
+        val request = state.beginOpenConversationCommand("/g/g-p-demo/c/target")
+
+        now += 10
+        state.updateDocument(document(page = 2, adapter = 0))
+        assertEquals(
+            ChatGptWebObservedState.CommandRequest.PENDING,
+            state.snapshot().commandRequests.single().status,
+        )
+
+        now += 10
+        state.accept(snapshotEvent("/c/target"))
+
+        val completed = state.snapshot().commandRequests.single()
+        assertEquals(request.id, completed.id)
+        assertEquals(ChatGptWebObservedState.CommandRequest.SUCCEEDED, completed.status)
+        assertEquals("navigation_confirmed_by_snapshot", completed.result?.detail)
+        assertEquals(now, completed.completedAtMs)
+    }
+
+    @Test
+    fun unrelatedConversationSnapshotDoesNotCompleteNavigation() {
+        val state = ChatGptWebObservedState()
+        state.beginOpenConversationCommand("/c/target")
+
+        state.accept(snapshotEvent("/c/other"))
+
+        assertEquals(
+            ChatGptWebObservedState.CommandRequest.PENDING,
+            state.snapshot().commandRequests.single().status,
+        )
+    }
+
+    @Test
+    fun explicitNavigationFailureIsNotOverriddenByLaterSnapshot() {
+        val state = ChatGptWebObservedState()
+        val request = state.beginOpenConversationCommand("/c/target")
+        state.failCommand(request.id, "open_conversation", "official_navigation_failed")
+
+        state.accept(snapshotEvent("/c/target"))
+
+        val completed = state.snapshot().commandRequests.single()
+        assertEquals(ChatGptWebObservedState.CommandRequest.FAILED, completed.status)
+        assertEquals("official_navigation_failed", completed.result?.detail)
+    }
+
+    @Test
+    fun supersededNavigationCannotConsumeTheNewerSnapshotReceipt() {
+        val state = ChatGptWebObservedState()
+        val first = state.beginOpenConversationCommand("/c/first")
+        val second = state.beginOpenConversationCommand("/c/second")
+
+        state.accept(snapshotEvent("/c/first"))
+        var requests = state.snapshot().commandRequests
+        assertEquals(ChatGptWebObservedState.CommandRequest.FAILED, requests[0].status)
+        assertEquals("navigation_superseded", requests[0].result?.detail)
+        assertEquals(ChatGptWebObservedState.CommandRequest.PENDING, requests[1].status)
+
+        state.accept(snapshotEvent("/c/second"))
+        requests = state.snapshot().commandRequests
+        assertEquals(first.id, requests[0].id)
+        assertEquals(second.id, requests[1].id)
+        assertEquals(ChatGptWebObservedState.CommandRequest.SUCCEEDED, requests[1].status)
+    }
+
+    @Test
     fun cachedHistorySurvivesReloadAndReportsOfficialRefreshFailure() {
         var now = 40_000L
         val state = ChatGptWebObservedState(
@@ -323,4 +392,18 @@ class ChatGptWebObservedStateTest {
         currentModel = "5.6 Sol 轻度",
         options = listOf(ChatGptWebComposerOption("${section}_option", label, false, "menuitem")),
     )
+
+    private fun snapshotEvent(path: String) = ChatGptWebEvent.Snapshot(ChatGptWebSnapshot(
+        title = "会话",
+        url = "https://chatgpt.com$path",
+        draft = "",
+        messages = emptyList(),
+        authenticated = true,
+        composerReady = true,
+        streaming = false,
+        dictationActive = false,
+        currentModel = "",
+        attachments = emptyList(),
+        capabilities = ChatGptWebCapabilities.EMPTY,
+    ))
 }
