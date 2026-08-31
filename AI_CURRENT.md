@@ -65,7 +65,7 @@ reviewed_at: 2026-08-31
 - 分布式算力各层成熟度不同，不能统称“开放算力市场已完成”；统一状态见 `docs/distributed-compute/current-implementation-status.md`。
 - 外部矿池：V277/V278 uncompiled/unrun、#13-18 deny、eligible=0；V280 仅 ABI。
 - V279 UserNode Binding：Domain/Store/API/activation 源码已写但未编译/运行，零下游与经济效果；见 `docs/distributed-compute/user-node-provider-binding-authority.md`。
-- UserNode Ready：registry `45/45`、A2b2 `117/117`、Map/Lock static `43476+8668`。Lock 本批新增 104 个 lifecycle 源级程序；未编译/运行（`0/0, not_run`），inventory 预期 Map `6+43470 missing`、Lock `114+8554 missing`；`Q/WindowsDynamic` 与生产效果仍关闭。见 `AI_INDEX.md`。
+- UserNode Ready：registry `45/45`、A2b2 `117/117`、Map/Lock static `43476+8668`。Map 本批新增 6 个 single-region lifecycle 源级程序，Lock 保留 104 个 lifecycle；未编译/运行（`0/0, not_run`），inventory 预期 Map `12+43464 missing`、Lock `114+8554 missing`；`Q/WindowsDynamic` 与生产效果仍关闭。见 `AI_INDEX.md`。
 - `capacity_future`：Lease-rooted Store resolver/private-field seal 已写；未登记、未编译/运行、无 API/effect；见 `AI_INDEX.md`。
 
 ## 已接受的产品方向
