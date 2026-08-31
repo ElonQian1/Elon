@@ -442,14 +442,14 @@
         },
         {
           "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/source_owner_graph/owners.rs",
-          "content_hash": "e828855461b67bfab6152765f48723d16110dd4f08f4ab9cfe2082094c524d85",
+          "content_hash": "b702500f1955b8fe7112df445f06529ee19c848d359e5cbad7942f72ac64609e",
           "locator": "implementation-baseline source owner rebind",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "28d61eb8d0a526c089e7ac886d8e137f9c9df016",
-            "head_blob_oid": "9eb6a41db60fd8f222fed4159fcc6a5caaf1fde1",
-            "worktree_blob_oid": "7aa91db44363eb43b0302eb73b5dc0bf66165346",
+            "head_commit": "1ce6387c3072e32aec0797de1e750d6b844a3c0f",
+            "head_blob_oid": "7aa91db44363eb43b0302eb73b5dc0bf66165346",
+            "worktree_blob_oid": "1ab98042e96058822de9b939c7f1b3e838d678e5",
             "state": "tracked_modified"
           }
         },
@@ -572,7 +572,7 @@
         }
       ],
       "created_at_ms": 1788116827147,
-      "updated_at_ms": 1788182560242
+      "updated_at_ms": 1788182831476
     },
     {
       "id": "backend-a2-map-lock-static-denominator-v1",
@@ -13136,16 +13136,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_ad2489214d164908898a460d393c85b0",
-      "feature_id": "win-chatgpt-ohlc-table-snapshot-stability-v1",
-      "action": "registered",
-      "actor": "codex-root",
-      "reason": "真实游客连续快照验收定位到自身标记导致富卡消失，建立独立生产修复追踪。",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1787514370554
-    },
-    {
       "id": "feature_event_945b7e64aec24c5bab3e3dc9a7dfabc8",
       "feature_id": "win-chatgpt-ohlc-table-snapshot-stability-v1",
       "action": "claimed",
@@ -15134,6 +15124,16 @@
       "from_status": "in_progress",
       "to_status": "blocked",
       "at_ms": 1788182560242
+    },
+    {
+      "id": "feature_event_620179f90a714478be4dcc32cfe3cc1c",
+      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-goal-map-lock",
+      "reason": "",
+      "from_status": "blocked",
+      "to_status": "blocked",
+      "at_ms": 1788182831476
     }
   ]
 }
