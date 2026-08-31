@@ -7,6 +7,7 @@ import {
 } from './localAiBrowserApi'
 import {
   findLocalAiRealtimeVoiceControls,
+  localAiManagedRealtimeVoiceControllable,
   readLocalAiRealtimeVoicePrivateState,
   type LocalAiRealtimeVoiceAction,
 } from './localAiRealtimeVoice'
@@ -284,7 +285,12 @@ export default function useLocalAiRealtimeVoiceControl(web: AiWebChatBackend) {
     action: LocalAiRealtimeVoiceAction,
     controlId: string,
   ) => {
-    if (!controlId.trim()) return null
+    const officialControlAvailable = Boolean(controlId.trim())
+    const managedControlAvailable = localAiManagedRealtimeVoiceControllable(
+      privateStateRef.current.managedPhase,
+    )
+    if (action === 'start' && !officialControlAvailable) return null
+    if (action !== 'start' && !officialControlAvailable && !managedControlAvailable) return null
     if (action === 'start') {
       if (web.controller.draft.trim()) return null
       transcriptRefresh.current.cancel()
@@ -309,7 +315,20 @@ export default function useLocalAiRealtimeVoiceControl(web: AiWebChatBackend) {
       // owns upstream session creation and remains the automatic fallback.
       await web.controller.run('prepare_realtime_voice')
     }
-    const next = await web.controller.run('invoke_ui_control', controlId)
+    const managedResult = action !== 'start' && managedControlAvailable
+      ? await web.controller.run('control_managed_realtime_voice', action)
+      : null
+    const managedAccepted = managedResult?.commandResult?.action === 'control_managed_realtime_voice'
+      && managedResult.commandResult.ok
+    let officialResult = null
+    if (officialControlAvailable) {
+      try {
+        officialResult = await web.controller.run('invoke_ui_control', controlId)
+      } catch (error) {
+        if (!managedAccepted) throw error
+      }
+    }
+    const next = officialResult ?? managedResult
     const result = next?.commandResult
     if (action === 'start') {
       if (result?.action === 'invoke_ui_control' && result.ok) {
@@ -318,12 +337,14 @@ export default function useLocalAiRealtimeVoiceControl(web: AiWebChatBackend) {
         await web.controller.run('control_managed_realtime_voice', 'end')
         setActivationStatus('unconfirmed')
       }
-    } else {
+    } else if (!managedControlAvailable) {
       // Mirroring is a safe no-op when the managed peer was unavailable, so the
       // existing official mute/end controls continue to work on every fallback.
       await web.controller.run('control_managed_realtime_voice', action)
     }
-    if (action === 'end' && result?.action === 'invoke_ui_control' && result.ok) {
+    const officialAccepted = officialResult?.commandResult?.action === 'invoke_ui_control'
+      && officialResult.commandResult.ok
+    if (action === 'end' && (managedAccepted || officialAccepted)) {
       startHangupConfirmation()
     }
     return next

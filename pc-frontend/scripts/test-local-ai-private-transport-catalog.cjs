@@ -41,7 +41,7 @@ const google = provider('google-ai-mode', [
 ])
 
 const chatCapabilities = localAiPrivateTransportCapabilities(chatgpt)
-assert.equal(chatCapabilities.length, 22)
+assert.equal(chatCapabilities.length, 23)
 assert.equal(chatCapabilities.every((capability) => capability.runtimeEnabled), true)
 assert.equal(chatCapabilities.every((capability) => (
   capability.activation === 'preset_then_background_verify'
@@ -57,7 +57,7 @@ const incompleteGoogle = localAiPrivateTransportCapabilities(provider('google-ai
 assert.equal(incompleteGoogle.filter((capability) => capability.runtimeEnabled).length, 6)
 
 const copy = localAiPrivateTransportStatusCopy(chatgpt)
-assert.match(copy.copy, /22\/22/)
+assert.match(copy.copy, /23\/23/)
 assert.match(copy.copy, /无需等待官网扫描/)
 assert.match(copy.detail, /私有流与完成态结算/)
 assert.match(copy.detail, /同源私有文本写事务与官网回退/)
@@ -75,6 +75,7 @@ assert.match(copy.detail, /后台官网语音与原生控制面连续性/)
 assert.match(copy.detail, /私有语音数据通道状态与实时转写/)
 assert.match(copy.detail, /Win 管理的实时语音私有中继/)
 assert.match(copy.detail, /Win 托管语音会话隔离与结构化生命周期/)
+assert.match(copy.detail, /Win 实时语音独立控制卡与直接媒体控制/)
 assert.match(copy.detail, /厂商会话后台预热与切换复用/)
 assert.match(copy.detail, /官网附件上传完成态对账/)
 const firstTurnBinding = chatCapabilities.find((capability) => (
@@ -148,6 +149,17 @@ assert.equal(
   managedVoiceLifecycle.fallback,
   'official_voice_with_bounded_connection_timeout',
 )
+const managedVoiceDock = chatCapabilities.find((capability) => (
+  capability.id === 'win_chatgpt_realtime_voice_native_control_dock_v1'
+))
+assert.equal(
+  managedVoiceDock.requestMode,
+  'managed_peer_first_mute_hangup_with_official_state_reconciliation',
+)
+assert.equal(
+  managedVoiceDock.fallback,
+  'official_voice_controls_and_unconfirmed_hangup_watchdog',
+)
 const attachmentTransport = chatCapabilities.find((capability) => (
   capability.id === 'win_chatgpt_attachment_transport_reconciliation_v1'
 ))
@@ -202,7 +214,7 @@ assert.match(awaitingContext.copy, /等待官网会话上下文/)
 assert.match(awaitingContext.copy, /不阻塞输入/)
 
 const stale = localAiPrivateTransportStatusCopy(chatgpt, health({ sampledAtMs: 1 }), 200_000)
-assert.match(stale.copy, /22\/22/)
+assert.match(stale.copy, /23\/23/)
 
 const androidCatalog = fs.readFileSync(path.resolve(
   __dirname,

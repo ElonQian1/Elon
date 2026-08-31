@@ -1,0 +1,99 @@
+.dock {
+  display: grid;
+  grid-template-columns: auto minmax(180px, 1fr) auto auto;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 9px;
+  padding: 10px 12px;
+  border: 1px solid rgba(102, 110, 126, .42);
+  border-radius: 14px;
+  color: #eef0f5;
+  background:
+    radial-gradient(circle at 8% 20%, rgba(72, 190, 119, .16), transparent 32%),
+    linear-gradient(135deg, rgba(42, 45, 53, .98), rgba(31, 33, 39, .98));
+  box-shadow: 0 14px 36px rgba(0, 0, 0, .26);
+}
+
+.dock[data-connected="true"] { border-color: rgba(83, 202, 126, .48); }
+
+.orb {
+  position: relative;
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #9be7b6;
+  background: rgba(72, 190, 119, .14);
+}
+
+.orb i {
+  position: absolute;
+  inset: -1px;
+  border: 1px solid rgba(88, 214, 135, .3);
+  border-radius: inherit;
+  animation: voice-pulse 2.1s ease-out infinite;
+}
+
+.orb i:nth-of-type(2) { animation-delay: .7s; }
+.orb i:nth-of-type(3) { animation-delay: 1.4s; }
+
+.summary { min-width: 0; display: grid; gap: 3px; }
+.summary b { font-size: 12px; }
+.summary small {
+  overflow: hidden;
+  color: #a9aeb9;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.evidence { display: flex; gap: 5px; }
+.evidence > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  border-radius: 999px;
+  color: #7e8490;
+  background: rgba(255, 255, 255, .04);
+  font-size: 9px;
+  white-space: nowrap;
+}
+.evidence > span[data-ok="true"] { color: #83dda4; background: rgba(72, 190, 119, .11); }
+
+.actions { display: flex; gap: 6px; }
+.actions button {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 10px;
+  border: 1px solid #444852;
+  border-radius: 9px;
+  color: #e4e6eb;
+  background: #30323a;
+  cursor: pointer;
+}
+.actions button[data-danger] { border-color: rgba(235, 94, 94, .42); color: #ffadad; }
+.actions button:disabled { opacity: .45; cursor: default; }
+
+@keyframes voice-pulse {
+  from { opacity: .7; transform: scale(.92); }
+  to { opacity: 0; transform: scale(1.34); }
+}
+
+@media (max-width: 980px) {
+  .dock { grid-template-columns: auto minmax(140px, 1fr) auto; }
+  .evidence { display: none; }
+}
+
+@media (max-width: 640px) {
+  .dock { gap: 8px; padding: 9px; }
+  .actions button span { display: none; }
+  .actions button { width: 34px; padding: 0; justify-content: center; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .orb i { animation: none; }
+}

@@ -242,6 +242,14 @@ const CATALOG: Record<string, CapabilityDefinition[]> = {
       requiredActions: ['prepare_realtime_voice', 'control_managed_realtime_voice'],
     },
     {
+      id: 'win_chatgpt_realtime_voice_native_control_dock_v1',
+      label: 'Win 实时语音独立控制卡与直接媒体控制',
+      requestMode: 'managed_peer_first_mute_hangup_with_official_state_reconciliation',
+      fallback: 'official_voice_controls_and_unconfirmed_hangup_watchdog',
+      requiredActions: ['control_managed_realtime_voice'],
+      androidParityIds: ['android_chatgpt_realtime_voice_background_overlay_v1'],
+    },
+    {
       id: 'win_chatgpt_attachment_transport_reconciliation_v1',
       label: '官网附件上传完成态对账',
       requestMode: 'armed_same_origin_structural_upload_lifecycle_observer',

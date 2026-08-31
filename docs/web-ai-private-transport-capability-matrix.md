@@ -206,6 +206,13 @@ control surface without retaining SDP, ICE, credentials, headers, audio, or tran
 A relay that answers but never connects is released after a bounded timeout and the official
 page-created voice path remains available.
 
+The Win native chat surface also owns an independent realtime voice control dock. Once
+the managed peer starts acquiring media, mute and hang-up no longer wait for the official
+DOM control inventory to refresh: local media is controlled first, then the official state
+is reconciled when its control is available. The dock shows only structural microphone,
+remote-audio, and private-transcript evidence. A missing official hang-up confirmation still
+uses the bounded watchdog and is never reported as a successful close prematurely.
+
 The native realtime peer also consumes the official WebRTC data channel directly for
 allowlisted user and assistant transcript delta/final events. Bounded UTF-8 JSON frames are
 accepted whether WebRTC marks them as text or binary. Bounded in-memory events

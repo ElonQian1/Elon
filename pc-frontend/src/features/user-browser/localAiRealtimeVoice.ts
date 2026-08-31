@@ -57,6 +57,15 @@ const MANAGED_PHASES = new Set([
   'connecting', 'active', 'failed', 'closed',
 ])
 
+const MANAGED_CONTROLLABLE_PHASES = new Set([
+  'requesting_microphone', 'creating_offer', 'armed', 'applying_answer',
+  'connecting', 'active',
+])
+
+export function localAiManagedRealtimeVoiceControllable(phase: string) {
+  return MANAGED_CONTROLLABLE_PHASES.has(phase)
+}
+
 function emptyPrivateState() {
   return {
     observed: false,

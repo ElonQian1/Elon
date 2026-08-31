@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { AudioLines, ChevronDown, Clock3, Grid3X3, Mic, MicOff, Paperclip, PhoneOff, StopCircle, Wrench } from 'lucide-react'
 import type { LocalAiComposerOption, LocalAiFeatureNavigationItem } from './localAiBrowserProtocol'
-import { findLocalAiRealtimeVoiceControls } from './localAiRealtimeVoice'
+import {
+  findLocalAiRealtimeVoiceControls,
+  localAiManagedRealtimeVoiceControllable,
+} from './localAiRealtimeVoice'
 import {
   isLocalAiInteractionPreset,
   localAiComposerOptionsOrPreset,
@@ -16,6 +19,7 @@ import useLocalAiRealtimeVoiceControl from './useLocalAiRealtimeVoiceControl'
 import type { AiWebChatBackend } from './useAiWebChatBackend'
 import { isLocalAiAttachmentTransportEvent } from './localAiBrowserApi'
 import AiWebAccessRecoveryCard from './AiWebAccessRecoveryCard'
+import AiWebRealtimeVoiceDock from './AiWebRealtimeVoiceDock'
 import styles from './AiWebComposerControls.module.css'
 
 export { default as AiBrowserExperience } from './AiBrowserExperience'
@@ -97,6 +101,22 @@ export default function AiWebComposerControls({ web }: { web: AiWebChatBackend }
   const attachmentState = attachmentTransport?.state ?? null
   const attachmentSequence = attachmentTransport?.sequence ?? 0
   const voiceStatusText = realtimeVoiceStatusText(realtimeVoiceControl, web.provider.displayName)
+  const managedVoiceControllable = localAiManagedRealtimeVoiceControllable(
+    realtimeVoiceControl.managedVoicePhase,
+  )
+  const voiceDockVisible = realtimeVoiceControl.activationStatus !== 'idle'
+    || realtimeVoiceControl.hangupStatus !== 'idle'
+    || realtimeVoice.active
+    || managedVoiceControllable
+  const toggleMuteAction = realtimeVoiceControl.managedVoiceActive
+    ? (realtimeVoiceControl.managedMuted ? 'unmute' : 'mute')
+    : realtimeVoice.unmute ? 'unmute' : 'mute'
+  const toggleMuteControlId = toggleMuteAction === 'unmute'
+    ? realtimeVoice.unmute?.id ?? ''
+    : realtimeVoice.mute?.id ?? ''
+  const canToggleMute = realtimeVoiceControl.managedMicrophoneActive || Boolean(
+    toggleMuteAction === 'unmute' ? realtimeVoice.unmute : realtimeVoice.mute,
+  )
 
   useEffect(() => {
     if (attachmentState === 'armed') {
@@ -196,6 +216,22 @@ export default function AiWebComposerControls({ web }: { web: AiWebChatBackend }
   return (
     <section className={styles.host} aria-label={`${web.provider.displayName} 原生聊天能力`}>
       <AiWebAccessRecoveryCard web={web} />
+      <AiWebRealtimeVoiceDock
+        visible={voiceDockVisible}
+        statusText={voiceStatusText}
+        managed={realtimeVoiceControl.managedVoiceActive || managedVoiceControllable}
+        connected={realtimeVoiceControl.activationStatus === 'active'}
+        microphoneActive={realtimeVoiceControl.managedMicrophoneActive}
+        remoteAudio={realtimeVoiceControl.managedRemoteAudio}
+        privateTranscript={realtimeVoiceControl.privateDataChannelActive}
+        muted={realtimeVoiceControl.managedMuted}
+        canToggleMute={canToggleMute}
+        canEnd={managedVoiceControllable || Boolean(realtimeVoice.end)}
+        busy={busy}
+        hangupConfirming={realtimeVoiceControl.hangupStatus === 'confirming'}
+        onToggleMute={() => void realtimeVoiceControl.run(toggleMuteAction, toggleMuteControlId)}
+        onEnd={() => void realtimeVoiceControl.run('end', realtimeVoice.end?.id ?? '')}
+      />
       <div className={styles.toolbar}>
         {actions.has('list_model_options') && (
           <button type="button" data-active={panel === 'model'} onClick={() => void openComposerPanel('model')} disabled={busy}>
@@ -255,7 +291,7 @@ export default function AiWebComposerControls({ web }: { web: AiWebChatBackend }
             <AudioLines size={13} /><span>{realtimeVoiceControl.activationStatus === 'confirming' ? '正在连接' : '实时语音'}</span>
           </button>
         )}
-        {actions.has('invoke_ui_control') && realtimeVoice.mute && (
+        {!voiceDockVisible && actions.has('invoke_ui_control') && realtimeVoice.mute && (
           <button
             type="button"
             onClick={() => void realtimeVoiceControl.run('mute', realtimeVoice.mute?.id ?? '')}
@@ -265,7 +301,7 @@ export default function AiWebComposerControls({ web }: { web: AiWebChatBackend }
             <MicOff size={13} /><span>静音</span>
           </button>
         )}
-        {actions.has('invoke_ui_control') && realtimeVoice.unmute && (
+        {!voiceDockVisible && actions.has('invoke_ui_control') && realtimeVoice.unmute && (
           <button
             type="button"
             onClick={() => void realtimeVoiceControl.run('unmute', realtimeVoice.unmute?.id ?? '')}
@@ -275,7 +311,7 @@ export default function AiWebComposerControls({ web }: { web: AiWebChatBackend }
             <Mic size={13} /><span>取消静音</span>
           </button>
         )}
-        {actions.has('invoke_ui_control') && realtimeVoice.end && (
+        {!voiceDockVisible && actions.has('invoke_ui_control') && realtimeVoice.end && (
           <button
             type="button"
             data-active
