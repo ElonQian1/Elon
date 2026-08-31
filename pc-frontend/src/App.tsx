@@ -97,11 +97,11 @@ export default function App() {
           <Route path="compute-challenges" element={lazyRoute(<ComputeSettlementChallengePage />)} />
           <Route path="compute-challenge-resolution" element={lazyRoute(<ComputeSettlementChallengeResolutionPage />)} />
           <Route path="compute-corrections" element={lazyRoute(<ComputeSettlementCorrectionPage />)} />
+          <Route path="node" element={lazyRoute(<NodePage />)} />
         </Route>
         <Route path="voice" element={lazyRoute(<VoicePage />)} />
         <Route path="doctor" element={lazyRoute(<DoctorPage />)} />
         <Route path="node/public-dev-smoke" element={lazyRoute(<PublicDevSmokePage />)} />
-        <Route path="node" element={lazyRoute(<NodePage />)} />
       </Route>
     </Routes>
   )
