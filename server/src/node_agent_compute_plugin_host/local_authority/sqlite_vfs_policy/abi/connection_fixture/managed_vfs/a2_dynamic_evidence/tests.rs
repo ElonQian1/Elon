@@ -303,6 +303,21 @@ fn child_payload_accepts_exact_lock_stored_poison_width_without_header_widening(
             Err("A2_DYNAMIC_CHILD_ACTUAL_SELECTOR_INVALID")
         );
     }
+
+    let route_unknown =
+        "lock-exclusive-first0-count1-gate-none-lock-certain-retention-route-unknown";
+    validate_payload_for_test(&payload_with_count("a2lockq4", route_unknown, 140))
+        .expect("accept one exact q4 Lock stored-poison payload header");
+    for field_count in [139, 141] {
+        assert_eq!(
+            validate_payload_for_test(&payload_with_count("a2lockq4", route_unknown, field_count,)),
+            Err("A2_DYNAMIC_CHILD_ACTUAL_FIELDS_INVALID")
+        );
+    }
+    assert_eq!(
+        validate_payload_for_test(&payload_with_count("a2lockq4", canonical, 140)),
+        Err("A2_DYNAMIC_CHILD_ACTUAL_SELECTOR_INVALID")
+    );
 }
 
 #[test]

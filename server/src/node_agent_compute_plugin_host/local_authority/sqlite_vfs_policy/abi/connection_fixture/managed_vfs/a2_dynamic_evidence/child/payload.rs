@@ -101,6 +101,11 @@ pub(super) fn validate_actual_payload(
             lock_stored_poison::classify_header(version, selector)?
                 .ok_or("A2_DYNAMIC_CHILD_ACTUAL_VERSION_INVALID")?,
         ),
+        lock_stored_poison::route_unknown::REPORT_VERSION => (
+            SanitizedPayloadFamily::LockQuotient,
+            lock_stored_poison::route_unknown::classify_header(version, selector)?
+                .ok_or("A2_DYNAMIC_CHILD_ACTUAL_VERSION_INVALID")?,
+        ),
         lock_request_validation::REPORT_VERSION => (
             SanitizedPayloadFamily::LockQuotient,
             lock_request_validation::classify_header(version, selector)?

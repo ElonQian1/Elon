@@ -1,5 +1,7 @@
 //! Fail-closed q3 header contract for stored-poison Lock quarantine evidence.
 
+pub(in super::super) mod route_unknown;
+
 pub(in super::super) const REPORT_VERSION: &str = "a2lockq3";
 pub(in super::super) const REPORT_VALUE_COUNT: usize = 135;
 
@@ -46,7 +48,7 @@ pub(in super::super) fn classify_header(
     Err("A2_DYNAMIC_CHILD_ACTUAL_SELECTOR_INVALID")
 }
 
-fn profile_name(tag: u64) -> Result<&'static str, &'static str> {
+pub(super) fn profile_name(tag: u64) -> Result<&'static str, &'static str> {
     match tag {
         1 => Ok("gate-none-lock-certain"),
         2 => Ok("file-close-none-lock-certain"),
@@ -67,7 +69,7 @@ fn profile_name(tag: u64) -> Result<&'static str, &'static str> {
     }
 }
 
-const fn valid_range(action_tag: u64, first: u8, count: u8) -> bool {
+pub(super) const fn valid_range(action_tag: u64, first: u8, count: u8) -> bool {
     if count == 0 || first >= 8 || count > 8 - first {
         return false;
     }
