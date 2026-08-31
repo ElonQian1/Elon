@@ -8,7 +8,7 @@ reviewed_at: 2026-09-01
 
 ## 当前产品主链
 
-- Android Web AI 默认启用已验证的私有观察、预设和有界缓存，失败回退官网且不导出凭证或盲目重放写请求。ChatGPT 附件对账 `android_chatgpt_attachment_transport_reconciliation_v1` 已在 `v1.1.1374 (1395)`、adapter `207` 验证；原生缓存优先图库 `android_chatgpt_native_image_asset_gallery_v1` 已在 `v1.1.1375 (1396)`、adapter `208` 验证，六小时内重开不再创建同步 WebView；私有响应富内容 `android_chatgpt_private_rich_content_native_view_v1` 已在 `v1.1.1379 (1400)` 完成有界解析、原生行情/折线图和点击详情真机结构验收。同来源重入保留后台身份页已通过定向测试和编译，真机待验收；悬浮层人工操作仍待验收。完整状态见 `docs/web-ai-private-transport-capability-matrix.md`，已完成项禁止重复实现。
+- Android Web AI 默认启用已验证的私有观察、预设和有界缓存，失败回退官网且不导出凭证或盲目重放写请求。ChatGPT 附件对账 `android_chatgpt_attachment_transport_reconciliation_v1` 已在 `v1.1.1374 (1395)`、adapter `207` 验证；原生缓存优先图库 `android_chatgpt_native_image_asset_gallery_v1` 已在 `v1.1.1375 (1396)`、adapter `208` 验证，六小时内重开不再创建同步 WebView；私有响应富内容 `android_chatgpt_private_rich_content_native_view_v1` 已在 `v1.1.1379 (1400)` 完成有界解析、原生行情/折线图和点击详情真机结构验收。同来源重入保留后台身份页已在 `v1.1.1392 (1413)` 真机验证；悬浮层人工操作仍待验收。完整状态见 `docs/web-ai-private-transport-capability-matrix.md`，已完成项禁止重复实现。
 - Android ChatGPT 已完成并默认启用 `android_chatgpt_conversation_project_directory_cache_v1` 与 `android_chatgpt_webview_proxy_prepare_fail_open_v1`：目录约 0.3 秒从有界缓存恢复；代理回调超过 750ms 会一次性放行，正式版 `v1.1.1240 (1250)` 冷启动约 2.2 秒、后台返回约 1.9 秒恢复可输入。两项均已真机验收且不再重复研究，详见 `docs/chatgpt-conversation-project-directory-cache.md`、`docs/chatgpt-webview-proxy-prepare-recovery.md`。
 - 多 PC Rust 缓存平台已具备可安装工具与 Skill、脱敏 Fleet 观测，以及不上传路径、绑定精确摘要并由目标节点复扫加锁的远程 GC 审批。远程只覆盖机器级普通/老化策略；项目级治理与高风险操作仍在本机。生产 TLS、节点发布升级和真实多 PC 验收未完成，边界见 `docs/rust-cache-fleet-operations.md`。
 - 已实现：用户通过 Android APK 或 PC 工作台描述需求，AI CLI/API 代理在真实 Git 工作区开发、验证、构建和发布应用。

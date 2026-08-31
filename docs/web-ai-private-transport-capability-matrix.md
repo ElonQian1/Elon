@@ -55,9 +55,12 @@ refreshed, but the selected controller is not deactivated and reactivated. Switc
 different provider still performs the normal bounded handoff. Smoke recovery likewise
 waits for the existing session recovery coordinator instead of forcing an official page
 reload, and the MCP harness reuses a healthy authenticated service before bootstrapping.
-The stable capability is `android_web_chat_active_provider_reentry_continuity_v1`.
-It is enabled by default; targeted contracts and Release Kotlin compilation pass, while
-consolidated device acceptance remains pending.
+Device acceptance on APK `v1.1.1392 (1413)` repeated entry into the already-active
+production ChatGPT surface, then verified that authentication, composer readiness, and
+both page and adapter generations remained unchanged for ten seconds. It performed zero
+remote writes and sent no messages. The completed, default-enabled capability is
+`android_web_chat_active_provider_reentry_continuity_v1` and must not be reimplemented
+without current regression evidence.
 
 The consumer default is one architecture: native chat and floating voice UI, the same
 persistent background ChatGPT WebView as the identity and conversation/bootstrap layer,
