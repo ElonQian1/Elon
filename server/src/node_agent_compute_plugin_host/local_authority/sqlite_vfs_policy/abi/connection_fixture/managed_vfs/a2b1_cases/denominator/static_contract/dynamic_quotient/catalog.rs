@@ -13,6 +13,7 @@ use super::descriptor_binding::{
     DescriptorBindingEntryV1, FrozenDescriptorBindingAuthorityV1,
 };
 use super::membership_commitment::digest_projected_membership_v1;
+use super::runner_admission::{self, RunnerAdmissionReceiptV1};
 use super::{
     project_validated_dynamic_terminal_v1, DynamicClassKeyV1, ProjectionErrorV1,
     StaticMemberSealV1, DYNAMIC_PROJECTOR_SCHEMA_V1,
@@ -57,6 +58,7 @@ pub(crate) struct DynamicCatalogV1 {
     classes: Vec<DynamicClassV1>,
     projected_membership_sha256: Digest32,
     descriptor_binding_sha256: Digest32,
+    runner_admission_binding_sha256: Digest32,
 }
 
 impl DynamicCatalogV1 {
@@ -82,6 +84,10 @@ impl DynamicCatalogV1 {
 
     pub(super) const fn descriptor_binding_sha256(&self) -> Digest32 {
         self.descriptor_binding_sha256
+    }
+
+    pub(super) const fn runner_admission_binding_sha256(&self) -> Digest32 {
+        self.runner_admission_binding_sha256
     }
 }
 
@@ -141,6 +147,7 @@ pub(crate) enum CatalogErrorV1 {
         expected: Digest32,
         actual: Digest32,
     },
+    RunnerAdmissionBindingMismatch(StaticMemberSealV1),
     ProjectionFailed {
         count: u64,
         first: ProjectionFailureV1,
@@ -149,6 +156,7 @@ pub(crate) enum CatalogErrorV1 {
         count: u64,
         gap: CapabilityGapV1,
         first_member: StaticMemberSealV1,
+        runner_admission_binding_sha256: Digest32,
     },
     MixedRunnerCapabilityState {
         supported: u64,
@@ -176,6 +184,7 @@ pub(crate) struct DynamicCatalogBuilderV1 {
     digest_owners: BTreeMap<Digest32, DynamicClassKeyV1>,
     projected_membership: BTreeMap<StaticMemberSealV1, Digest32>,
     descriptor_bindings: BTreeMap<StaticMemberSealV1, Digest32>,
+    runner_admissions: BTreeMap<StaticMemberSealV1, RunnerAdmissionReceiptV1>,
     frozen_descriptor_binding: Option<FrozenDescriptorBindingAuthorityV1>,
     projection_failures: Vec<ProjectionFailureV1>,
 }
@@ -193,6 +202,7 @@ impl DynamicCatalogBuilderV1 {
             digest_owners: BTreeMap::new(),
             projected_membership: BTreeMap::new(),
             descriptor_bindings: BTreeMap::new(),
+            runner_admissions: BTreeMap::new(),
             frozen_descriptor_binding: None,
             projection_failures: Vec::new(),
         }
@@ -213,6 +223,7 @@ impl DynamicCatalogBuilderV1 {
             digest_owners: BTreeMap::new(),
             projected_membership: BTreeMap::new(),
             descriptor_bindings: BTreeMap::new(),
+            runner_admissions: BTreeMap::new(),
             frozen_descriptor_binding: Some(authority),
             projection_failures: Vec::new(),
         })
@@ -263,6 +274,11 @@ impl DynamicCatalogBuilderV1 {
                 match project_validated_dynamic_terminal_v1(record, descriptor) {
                     Ok(validated) => {
                         self.observe_descriptor_binding(member, validated.descriptor_binding)?;
+                        self.observe_runner_admission(
+                            member,
+                            validated.descriptor_binding,
+                            validated.runner_admission,
+                        )?;
                         match validated.projection {
                             Ok(projection) => self.observe_projection(member, projection)?,
                             Err(gap) => self.projection_failures.push(ProjectionFailureV1 {
@@ -296,6 +312,30 @@ impl DynamicCatalogBuilderV1 {
             .is_some()
         {
             return Err(CatalogErrorV1::DuplicateStaticMember(entry.member));
+        }
+        Ok(())
+    }
+
+    fn observe_runner_admission(
+        &mut self,
+        expected_member: StaticMemberSealV1,
+        descriptor_binding: DescriptorBindingEntryV1,
+        receipt: RunnerAdmissionReceiptV1,
+    ) -> Result<(), CatalogErrorV1> {
+        if receipt.member() != expected_member
+            || receipt.normalized_descriptor_sha256()
+                != descriptor_binding.descriptor_semantic_sha256
+        {
+            return Err(CatalogErrorV1::RunnerAdmissionBindingMismatch(
+                expected_member,
+            ));
+        }
+        if self
+            .runner_admissions
+            .insert(expected_member, receipt)
+            .is_some()
+        {
+            return Err(CatalogErrorV1::DuplicateStaticMember(expected_member));
         }
         Ok(())
     }
@@ -370,6 +410,10 @@ impl DynamicCatalogBuilderV1 {
                 });
             }
         }
+        let runner_admission_binding_sha256 = runner_admission::digest_binding_v1(
+            self.root,
+            self.runner_admissions.values().copied(),
+        );
         let semantic_failure_count = u64::try_from(
             self.projection_failures
                 .iter()
@@ -423,6 +467,7 @@ impl DynamicCatalogBuilderV1 {
                 count: missing,
                 gap,
                 first_member: first.member,
+                runner_admission_binding_sha256,
             });
         }
         let missing = self
@@ -478,6 +523,7 @@ impl DynamicCatalogBuilderV1 {
                 self.projected_membership,
             ),
             descriptor_binding_sha256,
+            runner_admission_binding_sha256,
             classes,
         })
     }

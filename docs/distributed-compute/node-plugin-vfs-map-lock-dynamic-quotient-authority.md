@@ -4,8 +4,8 @@ status: current
 reviewed_at: 2026-08-31
 owners: node, security
 design_status: design_frozen
-implementation_status: typed_projector_candidate_compiled
-verification_status: targeted_unit_36_passed_exact_blockers_passed_manifests_not_frozen
+implementation_status: typed_projector_candidate_prior_compiled_runner_admission_source_written_uncompiled_unrun
+verification_status: prior_targeted_unit_36_passed_current_source_not_run_manifests_not_frozen
 authority_scope: backend-a2-map-lock-dynamic-quotient-authority-v1
 ---
 
@@ -20,7 +20,8 @@ authority_scope: backend-a2-map-lock-dynamic-quotient-authority-v1
 
 动态分母分别记作 `Qmap` 与 `Qlock`。它们只能由本文规定的类型化生成器对完整静态记录机械投影、
 精确分区并冻结 manifest 后得出。typed descriptor、projector、内存 catalog/manifest builder 与两遍原子
-candidate 入口现已实现并通过编译和定向单元测试，但没有任何商 manifest 被成功生成、复核或冻结，
+candidate 入口在前序基线已实现并通过编译和定向单元测试；本批又写入 sealed、root-bound、source-derived
+runner-admission plan/commitment，但当前源码未编译、未运行。没有任何商 manifest 被成功生成、复核或冻结，
 所以两个值仍是 `unknown`；不得根据历史 18+10 case、leaf 名称、人工抽样或 Expected 摘要预填。
 
 本合同是动态执行压缩合同，不是静态覆盖压缩合同：每个 included 静态 CaseKey 仍必须被完整承诺且
@@ -140,6 +141,14 @@ stimulus、prestate、operation、phase、timing、occurrence、fixture/callback
 内不同 Missing gap 都失败关闭。此闭合只证明 producer 元数据没有被错配；它不证明正式 runner 或
 observation 已存在。
 
+producer coherence 之后还必须由 projector 内部从同一个已验证 semantic key 机械编译 root-specific runner
+plan。plan commitment 域隔离地绑定 projector schema、root、capability-normalized descriptor digest、有序
+required stages 与 exact planned-missing gap；producer 不能提交、自签或替换该 plan。裸
+`RunnerCapabilityV1::Supported` 只是声明，不是 permit；没有私有 receipt、跨 root plan、同 root plan swap、
+semantic drift 或 gap 互换都失败关闭。本批 Map plan 仍只签发
+`Missing(QuotientRunnerNotIntegrated)` receipt，Lock plan 仍只签发
+`Missing(LockObservationIncomplete)` receipt，因此没有 class 被放行执行。
+
 ## 8. Class catalog and member commitments
 
 每个 `DynamicClassV1` 必须冻结：
@@ -161,6 +170,9 @@ observation 已存在。
    source site、stimulus、prestate、operation、phase、timing、occurrence、recipe、axes 与
    `DynamicExpectedV1`，只把 recipe capability 归一化，因此同 root、同 phase 的 descriptor swap 仍会
    造成 commitment drift。
+3. root-bound、按 member seal 排序的 `member -> normalized descriptor digest + runner plan digest + exact gap`
+   admission commitment；它必须与 descriptor binding 的 member 和 normalized semantic digest 精确一致，
+   并同时进入当前 blocker receipt、未来 catalog 与 quotient manifest body。
 
 capability 归一化只服务于 descriptor-binding commitment；生产 producer coherence 仍要求 Map 精确为
 `Missing(QuotientRunnerNotIntegrated)`、Lock 精确为 `Missing(LockObservationIncomplete)`，不接受
@@ -177,6 +189,8 @@ ELON-A2-MAP-LOCK-DYNAMIC-EXPECTED-V1
 ELON-A2-MAP-LOCK-DYNAMIC-CLASS-KEY-V1
 ELON-A2-MAP-LOCK-DYNAMIC-MEMBER-SET-V1
 ELON-A2-MAP-LOCK-DYNAMIC-QUOTIENT-MANIFEST-V1
+ELON-A2-MAP-LOCK-DYNAMIC-RUNNER-PLAN-V1
+ELON-A2-MAP-LOCK-DYNAMIC-RUNNER-ADMISSION-BINDING-V1
 ```
 
 canonical encoding 必须长度分隔、枚举显式、整数定宽、成员按摘要字节排序；禁止 JSON map 顺序、Debug
@@ -186,7 +200,8 @@ class catalog、reverse index 与 manifest canonical encoding 已实现并通过
 
 projector provenance commitment 精确纳入 producer coherence 的
 `producer_coherence/map.rs`、`producer_coherence/map_axes.rs`、`producer_coherence/lock.rs`、
-`producer_coherence/lock_axes.rs`，以及 `descriptor_binding.rs`、`membership_commitment.rs`；其中任一
+`producer_coherence/lock_axes.rs`，以及 `descriptor_binding.rs`、`membership_commitment.rs`、
+`runner_admission.rs`、`runner_admission/{canonical,map,lock}.rs`；其中任一
 接受关系或 commitment 编码变化都必须触发 projector provenance drift 和全量重审。
 
 每个 root 的 quotient manifest 还必须冻结：`Qmap` 或 `Qlock`、static included/excluded/source-universe
@@ -219,14 +234,18 @@ class union 重算 member-pair set，重算 class key，检查 class/member 唯�
 可被误认作 frozen 的部分 manifest。checked-in frozen manifest 必须经独立 review 后另批提交，且任何
 static 或 projector 漂移都要求全量重生成与重审。
 
-当前验证事实严格限于：实现已编译，定向单元测试已通过；Lock 全量 `8,668` 成员 candidate gate 已按预期
+前序验证事实严格限于：当时实现已编译，定向单元测试已通过；Lock 全量 `8,668` 成员 candidate gate 已按预期
 完成 exact frozen ingress/typed projection，并因 `LockObservationIncomplete` 原子失败关闭；Map 全量
 `43,476` 成员 candidate gate 也已完成 exact frozen ingress/typed projection，并因
 `QuotientRunnerNotIntegrated` 原子失败关闭。Map 的真实阻塞是 quotient runner 尚未集成，Lock 的真实
 阻塞是完整 observation 尚未实现；二者都在 class catalog 或 manifest 冻结前失败，因此不产生
 `Qmap/Qlock`、member coverage 或 Windows numerator。
 
-最终验证回执为：
+上述回执全部是 runner-admission 改动前的 prior baseline。本批 current source 只达到
+`source_written/source_review_only/implementation_uncompiled/implementation_unrun`，新增准入与负向测试
+均为 `passed=0/failed=0/not_run`；不得把 prior `36/36` 或 exact blocker 回执当作 current-source 验证。
+
+前序基线验证回执为：
 
 ```text
 dynamic_quotient_targeted=36/36
@@ -248,7 +267,10 @@ exact gate 接受。Lock/Map 全量回执仍只证明 exact blocker 与原子失
 
 负向守卫至少覆盖缺成员、额外成员、重复成员、excluded 混入、空类、representative 非成员、成员摘要
 漂移、class split/merge、semantic digest 漂移、未知 enum、leaf-text 分类、case-salted digest 误用、Map
-ordinal 非法消去与 Lock range 非法消去。
+ordinal 非法消去与 Lock range 非法消去；还必须覆盖 naked `Supported`、缺少私有 admission receipt、跨 root
+plan、同 root plan swap、non-capability semantic drift 与 admission binding digest 漂移。本批已写裸
+`Supported`、gap mismatch、plan swap、non-capability semantic drift 与 manifest-body digest drift 的显式测试
+源码；private receipt 构造与完整 validator tamper acceptance 仍待补齐，全部均未运行。
 
 ## 10. Windows evidence and atomic reducer
 
@@ -278,14 +300,16 @@ WindowsDynamic denominator。
 design=design_frozen
 static_map=43476/43476
 static_lock=8668/8668
-typed_terminal_descriptor=implemented_compiled
-quotient_projector=implemented_compiled
-atomic_candidate=implemented_two_pass_in_memory
-canonical_catalog_manifest_guards=implemented_targeted_unit_passed
+typed_terminal_descriptor=implemented_prior_compiled
+quotient_projector=implemented_prior_compiled_current_source_modified_uncompiled_unrun
+atomic_candidate=implemented_two_pass_in_memory_prior_compiled
+canonical_catalog_manifest_guards=implemented_prior_targeted_unit_passed
 producer_coherence=closed_typed_relations_mixed_state_and_gap_rejected
-dynamic_quotient_targeted=passed_36_of_36
-map_candidate_gate=passed_expected_fail_closed_43476
-lock_candidate_gate=passed_expected_fail_closed_8668
+sealed_runner_admission_plan=source_written_source_review_only_uncompiled_unrun
+runner_admission_raw_supported=fail_closed_by_source_contract_not_run
+dynamic_quotient_targeted=prior_passed_36_of_36_current_source_not_run
+map_candidate_gate=prior_passed_expected_fail_closed_43476_current_source_not_run
+lock_candidate_gate=prior_passed_expected_fail_closed_8668_current_source_not_run
 map_bootstrap_descriptor_binding=expected_pre_freeze_drift_not_passed
 map_descriptor_binding=frozen_d3ba08a5ba0019f9ccda99ace8b580ef06eb4d6653ba80c0db5497bec51bd870_exact_gate_accepted
 lock_descriptor_binding=frozen_0cc951c8c979608fb9861167f8d880a74fd2e042c4d2cd42673100e14083e8ef_exact_gate_accepted
@@ -297,8 +321,8 @@ Qlock=unknown
 map_dynamic_member_coverage=0/43476
 lock_dynamic_member_coverage=0/8668
 windows_dynamic=not_opened
-compilation=passed_for_targeted_implementation
-targeted_unit_tests=passed
+compilation=current_source_not_run
+targeted_unit_tests=current_source_not_run_passed_0_failed_0
 windows_runtime=not_opened
 ```
 

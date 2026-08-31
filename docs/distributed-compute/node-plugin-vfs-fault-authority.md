@@ -34,7 +34,7 @@ A2b1 current source baseline `e3663e109039f38477de4d6ab5cd57483dbd0541` 的 owne
 - registry/file-custody 已把 main、Journal/WAL sidecar、SHM lease、route 与 callback lease 不可拆持有；物理关闭失败会保留 exact custody，不能把 `Drop` 当作成功回执；
 - 测试受管 VFS 已让单个真实 SQLite Connection 经 main、Journal/WAL、SHM 和 `xClose` 进入 exact route，并在正常关闭后退休 route、注销 VFS 和删除测试根。
 
-A2a/A2b1 源码已把一个 registration 扩为 exact logical-name route 集合，每条 Connection 独立 route/authorizer/custody 并共享一个 WAL/SHM runtime；exact route 绑定 runtime generation + SHM connection ID，map 初始化与 lock 平台动作进入相邻 test-only hook。早期 owner graph、Map template ledger 与局部 ABI/raw fragments 只是在 static closure 前定位 gaps 的 provenance；完整 terminal projection、`SourceBranch`、`Expected`、`CaseKey`、exclusion 与 StaticContract 已由独立 static denominator authority 闭合为 Map `43476/43476`、Lock `8668/8668`。当前真实缺口是 typed dynamic quotient projector/manifests、`Qmap/Qlock` 和逐 class Windows evidence；A2b2=`117/117` 不能替代该动态门，也不启用生产入口。
+A2a/A2b1 源码已把一个 registration 扩为 exact logical-name route 集合，每条 Connection 独立 route/authorizer/custody 并共享一个 WAL/SHM runtime；exact route 绑定 runtime generation + SHM connection ID，map 初始化与 lock 平台动作进入相邻 test-only hook。早期 owner graph、Map template ledger 与局部 ABI/raw fragments 只是在 static closure 前定位 gaps 的 provenance；完整 terminal projection、`SourceBranch`、`Expected`、`CaseKey`、exclusion 与 StaticContract 已由独立 static denominator authority 闭合为 Map `43476/43476`、Lock `8668/8668`。typed dynamic quotient projector/candidate 已有前序编译与定向测试基线；本批 sealed runner-admission current source 已写但未编译、未运行。当前真实缺口是 Map quotient runner、Lock 完整 observation/native receipt、frozen manifests、`Qmap/Qlock` 和逐 class Windows evidence；A2b2=`117/117` 不能替代该动态门，也不启用生产入口。
 
 历史 A2c partial bridge 不产生 `WindowsDynamic` evidence。它们只覆盖 route-exact callback-before、两个 unregister shape 和四个 direct SHM physical subset；不能替代当前五个正式 family 的完整 record，也不能外推 Map/Lock、生产 open 或其他 case。
 
@@ -84,7 +84,7 @@ A2 fixture 必须保持以下所有权拓扑：
 
 当前静态唯一真源是 static denominator authority：Map included `43,476`、excluded `281,085`、source universe `324,561`；Lock included `8,668`、excluded `53,774`、source universe `62,442`。旧 18 Map + 10 Lock 继续只是 `legacy_non_denominator`，不得重复相加。
 
-动态商集不改变上述任何静态记录。它必须从完整 typed `LeafRecordV1` 与同源 typed terminal descriptor 机械生成精确、不交、非空的 class partition；不得解析 `leaf_id` 或按测试名分类。每个静态 included member 恰好属于一个 class，每个 frozen class 将来恰好形成一条真实 Windows record。`Qmap/Qlock` 在 projector 和 manifests 冻结前保持 `unknown`。
+动态商集不改变上述任何静态记录。它必须从完整 typed `LeafRecordV1` 与同源 typed terminal descriptor 机械生成精确、不交、非空的 class partition；不得解析 `leaf_id` 或按测试名分类。每个静态 included member 恰好属于一个 class，每个 frozen class 将来恰好形成一条真实 Windows record。typed projector 的前序存在与本批未验证的 sealed admission source 都不能产生 Q；`Qmap/Qlock` 在 exact manifests 冻结前保持 `unknown`。
 
 Map ordinal/regions-to-create 与 Lock `first/count/mask` 在 V1 默认保留；后者参与 native byte-range offset，前者改变可观察计数。完整 class key、member commitment、DynamicExpected、代表选择、canonical digest、Windows evidence 与 atomic reducer 规则只由 dynamic quotient authority 维护。
 
@@ -173,7 +173,7 @@ WAL-main 若仍持有 SHM connection，关闭顺序固定为：验证无 SHM 锁
 
 ## 9. 静态验收与后续门槛
 
-当前静态验收已经闭合：Map `StaticContract=43476/43476`，Lock `StaticContract=8668/8668`。后续门槛是先实现类型化 projector 并冻结 exact quotient manifests，使 `DynamicQuotientMemberCoverage` 分别达到 `43476/43476` 与 `8668/8668`；再在同一 exact clean Windows cohort 下让每个 class 恰好产生一条正式记录，原子形成 `Qmap/Qmap` 与 `Qlock/Qlock`。
+当前静态验收已经闭合：Map `StaticContract=43476/43476`，Lock `StaticContract=8668/8668`。类型化 projector/candidate 只保留前序验证基线，sealed runner-admission current source 为 `source_written/source_review_only/implementation_uncompiled/implementation_unrun`。后续门槛是验证 current source、接入真实 Map runner、补齐 Lock 完整 observer/native receipt，并冻结 exact quotient manifests，使 `DynamicQuotientMemberCoverage` 分别达到 `43476/43476` 与 `8668/8668`；再在同一 exact clean Windows cohort 下让每个 class 恰好产生一条正式记录，原子形成 `Qmap/Qmap` 与 `Qlock/Qlock`。
 
 ### 9.1 静态闭合前 fragment 结论（历史）
 

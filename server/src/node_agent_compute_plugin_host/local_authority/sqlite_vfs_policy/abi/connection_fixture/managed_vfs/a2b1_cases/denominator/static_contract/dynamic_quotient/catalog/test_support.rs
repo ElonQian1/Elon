@@ -20,6 +20,11 @@ impl DynamicCatalogBuilderV1 {
                 first: ProjectionFailureV1 { member, error },
             })?;
         self.observe_descriptor_binding(member, validated.descriptor_binding)?;
+        self.observe_runner_admission(
+            member,
+            validated.descriptor_binding,
+            validated.runner_admission,
+        )?;
         validated.semantic_key.recipe.capability = RunnerCapabilityV1::Supported;
         self.observe_projection(
             member,

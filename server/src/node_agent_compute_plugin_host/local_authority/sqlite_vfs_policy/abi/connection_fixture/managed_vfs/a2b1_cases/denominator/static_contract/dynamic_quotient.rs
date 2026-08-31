@@ -11,6 +11,7 @@ mod membership_commitment;
 mod model;
 mod producer_coherence;
 mod projector;
+mod runner_admission;
 
 pub(crate) use candidate::{
     build_lock_dynamic_candidate_v1, build_map_dynamic_candidate_v1, DynamicCandidateErrorV1,

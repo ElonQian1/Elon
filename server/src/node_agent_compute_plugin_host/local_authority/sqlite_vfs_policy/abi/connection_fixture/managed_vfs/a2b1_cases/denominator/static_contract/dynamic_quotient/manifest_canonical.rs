@@ -68,6 +68,22 @@ pub(super) const PROJECTOR_SOURCE_SCOPE_V1: &[(&str, &str)] = &[
         include_str!("descriptor_binding.rs"),
     ),
     (
+        "dynamic_quotient/runner_admission.rs",
+        include_str!("runner_admission.rs"),
+    ),
+    (
+        "dynamic_quotient/runner_admission/canonical.rs",
+        include_str!("runner_admission/canonical.rs"),
+    ),
+    (
+        "dynamic_quotient/runner_admission/map.rs",
+        include_str!("runner_admission/map.rs"),
+    ),
+    (
+        "dynamic_quotient/runner_admission/lock.rs",
+        include_str!("runner_admission/lock.rs"),
+    ),
+    (
         "dynamic_quotient/candidate.rs",
         include_str!("candidate.rs"),
     ),
@@ -254,6 +270,10 @@ pub(super) fn digest_dynamic_manifest_body_v1(manifest: &DynamicQuotientManifest
     out.digest(
         "descriptor_binding_sha256",
         context.descriptor_binding_sha256,
+    );
+    out.digest(
+        "runner_admission_binding_sha256",
+        context.runner_admission_binding_sha256,
     );
     out.u64("class_count", manifest.class_count);
     out.u64("member_count", manifest.member_count);

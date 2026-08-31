@@ -149,6 +149,10 @@ fn projector_provenance_binds_typed_descriptor_producers_and_wiring() {
         "dynamic_quotient/producer_coherence/lock_axes.rs",
         "dynamic_quotient/membership_commitment.rs",
         "dynamic_quotient/descriptor_binding.rs",
+        "dynamic_quotient/runner_admission.rs",
+        "dynamic_quotient/runner_admission/canonical.rs",
+        "dynamic_quotient/runner_admission/map.rs",
+        "dynamic_quotient/runner_admission/lock.rs",
     ];
     let source_names = PROJECTOR_SOURCE_SCOPE_V1
         .iter()

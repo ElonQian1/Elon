@@ -6,19 +6,19 @@ use super::super::{
         CallbackV1, CapabilityGapV1, ExecutionRecipeV1, FixtureV1, LockAxesV1, LockCompletionV1,
         LockManagedStimulusV1, LockOperationV1, LockPrestateV1, LockTerminalDescriptorV1,
         MapAxesV1, MapPrestateV1, MapTerminalDescriptorV1, ObserverV1, OccurrenceV1, PhaseV1,
-        PrestateV1, ReachabilityV1, RunnerCapabilityV1, SourceSiteV1, StimulusV1,
-        TerminalDescriptorV1, TimingV1,
+        PrestateV1, ReachabilityV1, SourceSiteV1, StimulusV1, TerminalDescriptorV1, TimingV1,
     },
 };
 
 use super::{
-    canonical::{digest_dynamic_class_key_v1, digest_normalized_descriptor_semantics_v1},
+    canonical::digest_normalized_descriptor_semantics_v1,
     descriptor_binding::{DescriptorBindingEntryV1, ValidatedDynamicTerminalV1},
     model::{
         DynamicAxesV1, DynamicClassKeyV1, DynamicExpectedV1, DynamicOperationV1,
         DynamicProjectionV1, StaticMemberSealV1, DYNAMIC_PROJECTOR_SCHEMA_V1,
     },
     producer_coherence,
+    runner_admission::{self, RunnerAdmissionViolationV1},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -52,6 +52,12 @@ pub(crate) enum ProjectionViolationV1 {
     LockProducerRecipeMismatch,
     TimingOccurrenceMismatch,
     ZeroOccurrence,
+    RunnerAdmissionUnsealedSupported,
+    RunnerAdmissionGapMismatch {
+        expected: CapabilityGapV1,
+        actual: CapabilityGapV1,
+    },
+    RunnerAdmissionPlanBindingMismatch,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -144,19 +150,30 @@ pub(super) fn project_validated_dynamic_terminal_v1(
         member,
         descriptor_semantic_sha256: digest_normalized_descriptor_semantics_v1(&key),
     };
-    let projection = match recipe.capability {
-        RunnerCapabilityV1::Supported => Ok(DynamicProjectionV1 {
-            class_key_sha256: digest_dynamic_class_key_v1(&key),
-            member,
-            key,
-        }),
-        RunnerCapabilityV1::Missing(gap) => Err(gap),
-    };
+    let runner_admission = runner_admission::resolve_v1(&key, member).map_err(|violation| {
+        ProjectionErrorV1::Invalid(map_runner_admission_violation(violation))
+    })?;
+    let projection = Err(runner_admission.exact_missing_gap());
     Ok(ValidatedDynamicTerminalV1 {
         descriptor_binding,
+        runner_admission,
         semantic_key: key,
         projection,
     })
+}
+
+fn map_runner_admission_violation(value: RunnerAdmissionViolationV1) -> ProjectionViolationV1 {
+    match value {
+        RunnerAdmissionViolationV1::UnsealedSupportedClaim => {
+            ProjectionViolationV1::RunnerAdmissionUnsealedSupported
+        }
+        RunnerAdmissionViolationV1::DeclaredGapMismatch { expected, actual } => {
+            ProjectionViolationV1::RunnerAdmissionGapMismatch { expected, actual }
+        }
+        RunnerAdmissionViolationV1::PlanBindingMismatch => {
+            ProjectionViolationV1::RunnerAdmissionPlanBindingMismatch
+        }
+    }
 }
 
 #[allow(clippy::type_complexity)]

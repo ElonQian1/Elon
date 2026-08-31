@@ -8,6 +8,7 @@ use sha2::{Digest as _, Sha256};
 
 use super::super::source_leaf_authority::{Digest32, FrozenStaticBindingV1, RootOperationV1};
 use super::super::terminal_descriptor::CapabilityGapV1;
+use super::runner_admission::RunnerAdmissionReceiptV1;
 use super::{DynamicProjectionV1, StaticMemberSealV1, DYNAMIC_PROJECTOR_SCHEMA_V1};
 
 const DESCRIPTOR_BINDING_DOMAIN_V1: &str = "ELON-A2-MAP-LOCK-DYNAMIC-DESCRIPTOR-BINDING-V1";
@@ -21,6 +22,7 @@ pub(super) struct DescriptorBindingEntryV1 {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) struct ValidatedDynamicTerminalV1 {
     pub(super) descriptor_binding: DescriptorBindingEntryV1,
+    pub(super) runner_admission: RunnerAdmissionReceiptV1,
     pub(super) semantic_key: super::DynamicClassKeyV1,
     pub(super) projection: Result<DynamicProjectionV1, CapabilityGapV1>,
 }

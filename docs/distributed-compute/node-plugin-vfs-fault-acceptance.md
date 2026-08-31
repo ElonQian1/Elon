@@ -5,7 +5,7 @@ reviewed_at: 2026-08-31
 owners: node, security
 design_status: design_frozen
 implementation_status: implementation_not_dynamically_accepted
-verification_status: MapStatic_43476_of_43476_LockStatic_8668_of_8668_MapLockDynamic_not_opened_A2b2_117_of_117
+verification_status: MapLockProjector_prior_verified_runner_admission_current_source_not_run_Q_unknown_Windows_not_opened_A2b2_117_of_117
 ---
 
 # 节点插件测试 VFS 故障动态验收
@@ -15,7 +15,7 @@ verification_status: MapStatic_43476_of_43476_LockStatic_8668_of_8668_MapLockDyn
 本验收只消费 [`node-plugin-vfs-fault-authority.md`](node-plugin-vfs-fault-authority.md) 冻结的 A2 case inventory，
 不创建第二套 VFS authority，也不授权生产入口。当前可记录的事实严格为：
 
-- `design_frozen / implementation_not_dynamically_accepted`；Map `StaticContract=43476/43476`、Lock `StaticContract=8668/8668` 已由独立静态权威验证；Map/Lock dynamic projector 与 quotient manifests 尚未实现或冻结，`Qmap/Qlock=unknown`、`WindowsDynamic=not_opened`；Barrier 与 RegistrationShutdown runner 均为 `WindowsDynamic=8/8`，RegistryLifecycle=`16/16`，Unmap=`49/49`，JointClose=`36/36`，A2b2=`117/117`；
+- `design_frozen / implementation_not_dynamically_accepted`；Map `StaticContract=43476/43476`、Lock `StaticContract=8668/8668` 已由独立静态权威验证；typed projector/candidate 只有前序编译与测试基线，本批 sealed runner-admission current source 已写但未编译、未运行，quotient manifests 仍未冻结，`Qmap/Qlock=unknown`、`WindowsDynamic=not_opened`；Barrier 与 RegistrationShutdown runner 均为 `WindowsDynamic=8/8`，RegistryLifecycle=`16/16`，Unmap=`49/49`，JointClose=`36/36`，A2b2=`117/117`；
 - `elon-pc-node` 完整测试目标在 2026-08-12 基线修复后可编译；
 - 与可见性修复直接相关的 targeted fault matrix 已运行并通过 5 项；
 - 静态闭合前的 `SourceScope/SourceOwnerGraph v1`、Map terminal review ledger 与局部 ABI/raw/route/callback/adapter fragments 只保留为 provenance；它们已被完整 static denominator graph、leaf ledger、Expected、exclusion 与 exact-set guards 取代，不能再把当前 Map/Lock 静态状态降回 `source_review_pending/not_counted`，也不能作为 dynamic class 的文本分类输入；
@@ -118,12 +118,12 @@ Map/Lock 静态 scope、`CaseKey`、`SourceBranch`、`Expected`、exclusion 与 
 [`static denominator authority`](node-plugin-vfs-map-lock-static-denominator-authority.md) 维护。本验收消费已验证的 Map 43,476 与 Lock 8,668 included exact set，不从 runner、历史 targeted 名称或可运行子集反推或缩小它。
 
 动态执行集合由独立[`dynamic quotient authority`](node-plugin-vfs-map-lock-dynamic-quotient-authority.md)和
-[`acceptance`](node-plugin-vfs-map-lock-dynamic-quotient-acceptance.md)维护。它必须把全部 included members 精确、不交地分入 typed classes，冻结 `Qmap/Qlock` 后每个 class 恰好产生一条真实 Windows record。当前 projector/manifest 不存在，两个 Q 均为 `unknown`。
+[`acceptance`](node-plugin-vfs-map-lock-dynamic-quotient-acceptance.md)维护。它必须把全部 included members 精确、不交地分入 typed classes，冻结 `Qmap/Qlock` 后每个 class 恰好产生一条真实 Windows record。typed projector/candidate 有前序基线；sealed runner-admission current source 为未编译、未运行，manifest 尚未冻结，两个 Q 均为 `unknown`。
 
 | Family | StaticContract | DynamicQuotientMemberCoverage | WindowsDynamic | 当前门槛 |
 |---|---:|---:|---:|---|
-| Map | `43476/43476` | `0/43476` | `not_opened` | 实现 typed projector，冻结 exact class/member manifest，机械得到 `Qmap` |
-| Lock | `8668/8668` | `0/8668` | `not_opened` | 实现 typed projector，冻结 exact class/member manifest，机械得到 `Qlock` |
+| Map | `43476/43476` | `0/43476` | `not_opened` | 验证 current admission source，接入真实 quotient runner，冻结 exact class/member manifest，机械得到 `Qmap` |
+| Lock | `8668/8668` | `0/8668` | `not_opened` | 验证 current admission source，补齐完整 observation/native receipt，冻结 exact class/member manifest，机械得到 `Qlock` |
 | **Map/Lock aggregate** | **verified** | **not_started** | **not_opened** | **逐 class Windows exact-set 后才可形成 `Q/Q`** |
 
 #### 2.1.1 静态闭合前 review provenance（历史）
@@ -283,7 +283,7 @@ A2 完成必须同时满足：
   `implementation_not_dynamically_accepted` 升级；
 - 任何证据缺失、环境不明、case key漂移、观察不完整或生产入口变化都维持失败关闭。
 
-当前正式结论是：Map `StaticContract=43476/43476`、Lock `StaticContract=8668/8668`；dynamic quotient projector 与 manifests 尚未实现，`DynamicQuotientMemberCoverage` 分别为 `0/43476`、`0/8668`，`Qmap/Qlock=unknown`，Map/Lock `WindowsDynamic=not_opened`。Barrier、RegistrationShutdown、RegistryLifecycle、Unmap 与 JointClose 分别为 `8/8`、`8/8`、`16/16`、`49/49`、`36/36`，A2b2=`117/117`。A2 仍为 `implementation_not_dynamically_accepted`；生产 open、A1、v15、Runtime、Ready、派发、市场与资金效果均未改变。
+当前正式结论是：Map `StaticContract=43476/43476`、Lock `StaticContract=8668/8668`；typed dynamic quotient projector/candidate 只有前序已编译、`36/36` 与 exact blocker 基线，本批 sealed runner-admission current source 严格为 `source_written/source_review_only/implementation_uncompiled/implementation_unrun`、`passed=0/failed=0/not_run`。Map 仍精确阻断于 `QuotientRunnerNotIntegrated`，Lock 仍精确阻断于 `LockObservationIncomplete`；manifests 未冻结，`DynamicQuotientMemberCoverage` 分别为 `0/43476`、`0/8668`，`Qmap/Qlock=unknown`，Map/Lock `WindowsDynamic=not_opened`。Barrier、RegistrationShutdown、RegistryLifecycle、Unmap 与 JointClose 分别为 `8/8`、`8/8`、`16/16`、`49/49`、`36/36`，A2b2=`117/117`。A2 仍为 `implementation_not_dynamically_accepted`；生产 open、A1、v15、Runtime、Ready、派发、市场与资金效果均未改变。
 
 ### 9.1 静态闭合前 fragment provenance（历史）
 

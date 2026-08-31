@@ -20,6 +20,7 @@ mod descriptor_binding;
 mod manifest_validation;
 mod map_validation;
 mod producer_coherence;
+mod runner_admission;
 mod runner_state;
 
 fn expected(phase: &str) -> ExpectedV1 {

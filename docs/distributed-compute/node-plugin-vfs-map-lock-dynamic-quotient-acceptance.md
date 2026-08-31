@@ -4,8 +4,8 @@ status: current
 reviewed_at: 2026-08-31
 owners: node, security
 design_status: design_frozen
-implementation_status: typed_projector_candidate_compiled
-verification_status: targeted_unit_36_passed_exact_blockers_passed_manifests_not_frozen
+implementation_status: typed_projector_candidate_prior_compiled_runner_admission_source_written_uncompiled_unrun
+verification_status: prior_targeted_unit_36_passed_current_source_not_run_manifests_not_frozen
 ---
 
 # Node Plugin VFS Map/Lock Dynamic Quotient Acceptance V1
@@ -25,9 +25,9 @@ Expected 或 source universe。
 3. Windows 动态接受：每个冻结 class 一条正式记录，整族原子形成 `Q/Q`。
 
 当前仍只完成第 1 次晋级；同时已完成第 2 次晋级所需的部分基础设施，包括 typed descriptor/projector、
-两遍原子 candidate、exact member-pair set 与 catalog/manifest canonical guard，并已通过编译、定向单元
-测试和两个 root 的完整失败关闭门禁。它们尚未成功产出或冻结任何真实商 manifest，所以不能把这批实现
-解释为第 2 次晋级完成。
+两遍原子 candidate、exact member-pair set 与 catalog/manifest canonical guard；这些只有前序编译、定向单元
+测试和两个 root 完整失败关闭门禁的 prior baseline。本批新增 sealed runner-admission plan/commitment 源码，
+current source 未编译、未运行，也尚未成功产出或冻结任何真实商 manifest，所以不能把这批实现解释为第 2 次晋级完成。
 
 ## 2. Gate A — frozen static ingress
 
@@ -54,7 +54,10 @@ Expected 或 source universe。
       phase/timing/occurrence/recipe/关键 axes 不可跨 tuple 拼接；未知 tuple、Supported、跨 root Missing gap、
       mixed Supported/Missing state 与 mixed Missing gap 均被拒绝。
 - [x] projector provenance 覆盖 `producer_coherence/{map,map_axes,lock,lock_axes}.rs`、
-      `descriptor_binding.rs` 与 `membership_commitment.rs`。
+      `descriptor_binding.rs`、`membership_commitment.rs`、`runner_admission.rs` 与
+      `runner_admission/{canonical,map,lock}.rs`。
+- [x] current source 从 validated/coherent typed key 内部编译 root-bound plan；producer 无法提交 plan，裸
+      `Supported`、跨 root/plan swap、semantic binding drift 与 gap 互换均失败关闭。
 - [ ] 仅 run nonce、临时测试文件系统根、registration/route/runtime/connection/PID 等 harness binding 可 alpha-rename，
       并仍由每条 actual environment commitment 精确绑定。
 
@@ -90,19 +93,22 @@ member_reprojection_mismatch == 0
       descriptor/class-key 语义，因此同 root、同 phase descriptor swap 也会失败。
 - [x] Implementation/fixture：归一 capability 不放宽生产 producer；Map 只接受
       `Missing(QuotientRunnerNotIntegrated)`，Lock 只接受 `Missing(LockObservationIncomplete)`。
+- [x] Source implementation：独立 runner-admission commitment 按 member 绑定 normalized descriptor、
+      root-specific plan digest 与 exact gap，并进入 blocker receipt、catalog 和 manifest body；本项尚未运行验证。
 - [x] Implementation/fixture：内存 manifest builder 绑定 static source baseline/ledger/manifest、projector version/digest、class-key set、membership、
       representative map、class catalog 与反向索引摘要。
 - [x] Implementation/fixture：canonical bytes 长度分隔、enum 显式、整数定宽、成员排序稳定，和平台路径/locale/Debug 无关。
 - [x] Implementation/fixture：两遍 frozen gate、catalog 和全部 manifest guard 成功后才返回内存 bundle；当前无 writer，失败不留下 frozen-looking partial file。
 - [ ] 独立 review 复核生成器、frozen bytes、`Qmap/Qlock` 与 checked-in digest。
 
-Gate C 的实现与隔离于生产 projector 的 test-only catalog/manifest fixture 定向单元测试通过不等于
+Gate C 的前序实现与隔离于生产 projector 的 test-only catalog/manifest fixture 定向单元测试通过不等于
 real-root 商 manifest 通过。生产 producer 仍精确要求上述 root-specific Missing capability。Lock 全量
 candidate 已验证 exact `8,668` 输入后按预期因
 `LockObservationIncomplete` 失败关闭；Map 全量 candidate 已验证 exact `43,476` 输入后按预期因
 `QuotientRunnerNotIntegrated` 失败关闭。由于两个 root 都没有成功形成可冻结 catalog，Gate C 整体仍未闭合。
 
-最终测试事实如下；fingerprint 只标识相应验证回执，不提升验收层级：
+前序基线测试事实如下；fingerprint 只标识相应验证回执，不提升验收层级。runner-admission 改动后的
+current source 为 `not_run`，本批 `passed=0/failed=0`：
 
 | Verification | Result | Fingerprint / actual |
 |---|---|---|
@@ -133,6 +139,8 @@ Lock DynamicQuotientMemberCoverage=8668/8668
 - 同 root、同 phase 下交换任一完整 descriptor semantic axis，或只改 member→class / member→descriptor binding；
 - 把一个合法 class 人为 split，或把两个不同 typed key 的 class merge；
 - 构造 Supported/Missing 混合状态、跨 root capability gap 或同 catalog 的不同 Missing gap；
+- 裸 `Supported` 无私有 admission receipt、跨 root plan、同 root plan swap、非 capability 语义漂移，或
+  member/normalized descriptor/plan/gap admission binding 被替换；
 - 使用 `leaf_id`/test name/list index 分类，或使用 case-key-salted digest 当 semantic key；
 - 未知 enum 被默认化、unexecutable class 被跳过、`NotReached` 被当作 arbitrary；
 - 消去 Map ordinal/regions-to-create，或消去 Lock `first/count/mask`；
@@ -185,21 +193,22 @@ Map、Lock、既有 A2b2 `117/117` 与宽回归均闭合，聚合 A2 才可由�
 | Dimension | Map current | Lock current | Allowed interpretation |
 |---|---:|---:|---|
 | `StaticContract` | `43476/43476` | `8668/8668` | 静态 source-exhaustive合同已闭合 |
-| typed projector/candidate | `compiled; targeted unit passed` | `compiled; targeted unit passed` | 实现存在，不等于 manifest 冻结 |
-| full candidate gate | `43476 checked; expected fail-closed` | `8668 checked; expected fail-closed` | 两个 root 都只证明完整失败关闭，不产生 quotient denominator |
+| typed projector/candidate | `prior compiled; current source uncompiled/unrun` | `prior compiled; current source uncompiled/unrun` | 实现存在，不等于 current source 已验证或 manifest 冻结 |
+| sealed runner admission | `source written; exact Map gap retained; not run` | `source written; exact Lock gap retained; not run` | raw `Supported` 不能成为 permit；真实 runner/observer 尚缺 |
+| full candidate gate | `prior 43476 checked; current source not run` | `prior 8668 checked; current source not run` | prior baseline 只证明当时完整失败关闭，不产生 quotient denominator |
 | current blocker | `quotient runner not integrated` | `Lock observation incomplete` | 两者均阻止 catalog/manifest 冻结 |
 | frozen descriptor binding | `d3ba08a5ba0019f9ccda99ace8b580ef06eb4d6653ba80c0db5497bec51bd870`；checked-in / exact gate accepted | `0cc951c8c979608fb9861167f8d880a74fd2e042c4d2cd42673100e14083e8ef`；checked-in / exact gate accepted | descriptor binding 已冻结；quotient manifest 仍未冻结 |
 | `DynamicQuotientMemberCoverage` | `0/43476` | `0/8668` | 尚无 frozen class/member commitment |
 | quotient denominator | `Qmap=unknown` | `Qlock=unknown` | 不得预估或人工填写 |
 | `WindowsDynamic` | `not_opened` | `not_opened` | 尚无正式 class record |
-| Windows runtime | `not_opened` | `not_opened` | 本批编译/静态 candidate 测试不是 Windows 动态证据 |
+| Windows runtime | `not_opened` | `not_opened` | 本批未编译、未运行，更不是 Windows 动态证据 |
 
 禁止用 `43476/43476` 或 `8668/8668` 表示 Windows dynamic；禁止把一条 representative record 解释为
 在没有 frozen member commitment 时天然覆盖其他静态成员。
 
 ## 9. Production isolation and current verdict
 
-当前 verdict：`design_frozen / typed_projector_candidate_compiled / dynamic_quotient 36/36 passed / descriptor_bindings=frozen_and_exact_gate_accepted / Lock 8668 exact blocker passed / Map bootstrap drift was expected pre-freeze diagnostic / Map 43476 exact blocker passed / producer coherence closed / mixed state and gap rejected / quotient_manifests=not_frozen / Qmap=unknown / Qlock=unknown / member_coverage=0 / WindowsDynamic=not_opened`。
+当前 verdict：`design_frozen / typed_projector_candidate_prior_compiled / prior_dynamic_quotient 36/36 passed / sealed_runner_admission=current_source_written_uncompiled_unrun / current_source passed=0 failed=0 not_run / raw Supported fail_closed_by_source_contract / descriptor_bindings=frozen_and_prior_exact_gate_accepted / Lock exact gap retained / Map exact gap retained / producer coherence closed / quotient_manifests=not_frozen / Qmap=unknown / Qlock=unknown / member_coverage=0 / WindowsDynamic=not_opened`。
 
 本功能不注册生产 VFS，不调用 production open，不创建 Connection/Opened authority，不接 A1/v15、Runtime、
 Ready、Provider、route、Offer、Attempt、Lease、派发、市场、结算或资金。任何 Gate A-F 未闭合时，A2 都

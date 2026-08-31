@@ -28,6 +28,7 @@ pub(crate) struct DynamicManifestContextV1 {
     pub(crate) projector_schema_sha256: Digest32,
     pub(crate) projector_source_scope_sha256: Digest32,
     pub(crate) descriptor_binding_sha256: Digest32,
+    pub(crate) runner_admission_binding_sha256: Digest32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -210,6 +211,7 @@ pub(crate) fn build_dynamic_manifest_v1(
         projector_schema_sha256: digest_projector_schema_v1(),
         projector_source_scope_sha256: digest_projector_source_scope_v1(),
         descriptor_binding_sha256: catalog.descriptor_binding_sha256(),
+        runner_admission_binding_sha256: catalog.runner_admission_binding_sha256(),
     };
     let mut manifest = DynamicQuotientManifestV1 {
         context,
