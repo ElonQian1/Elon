@@ -21,6 +21,17 @@ class WebChatConversationProjectMovePolicyTest {
     }
 
     @Test
+    fun controlStateRefreshesPeriodicallyOnlyWhileTheUserActionIsWaiting() {
+        assertTrue(WebChatConversationProjectMoveTiming.shouldRefreshControls(0))
+        assertFalse(WebChatConversationProjectMoveTiming.shouldRefreshControls(1))
+        assertTrue(WebChatConversationProjectMoveTiming.shouldRefreshControls(4))
+        assertTrue(WebChatConversationProjectMoveTiming.shouldRefreshControls(8))
+        assertFalse(WebChatConversationProjectMoveTiming.shouldRefreshControls(29))
+        assertFalse(WebChatConversationProjectMoveTiming.shouldRefreshControls(30))
+        assertFalse(WebChatConversationProjectMoveTiming.shouldRefreshControls(-1))
+    }
+
+    @Test
     fun destinationsUseCachedProjectsAndExcludeTheCurrentProject() {
         val index = ChatGptWebConversationIndexState(
             projects = listOf(

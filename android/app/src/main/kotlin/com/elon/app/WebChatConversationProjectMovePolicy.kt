@@ -120,4 +120,9 @@ internal object WebChatConversationProjectMoveTiming {
     const val CONTROL_TIMEOUT_MS = POLL_INTERVAL_MS * CONTROL_POLL_LIMIT
     const val COMMAND_TIMEOUT_MS = POLL_INTERVAL_MS * COMMAND_POLL_LIMIT
     const val RECONCILIATION_TIMEOUT_MS = POLL_INTERVAL_MS * RECONCILIATION_POLL_LIMIT
+
+    fun shouldRefreshControls(attempt: Int): Boolean =
+        attempt >= 0 &&
+            attempt < CONTROL_POLL_LIMIT &&
+            attempt % CONTROL_REFRESH_POLL == 0
 }

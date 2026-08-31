@@ -218,7 +218,9 @@ internal class WebChatProductionConversationProjectMoveCoordinator(
             )
             return
         }
-        if (attempt == CONTROL_REFRESH_POLL) port.requestControls()
+        if (WebChatConversationProjectMoveTiming.shouldRefreshControls(attempt)) {
+            port.requestControls()
+        }
         if (attempt >= MAX_CONTROL_POLLS) {
             fail(conversation, destination, "官网项目入口暂不可用", epoch)
             return
@@ -259,7 +261,9 @@ internal class WebChatProductionConversationProjectMoveCoordinator(
             )
             return
         }
-        if (attempt == CONTROL_REFRESH_POLL) port.requestControls()
+        if (WebChatConversationProjectMoveTiming.shouldRefreshControls(attempt)) {
+            port.requestControls()
+        }
         if (attempt >= MAX_CONTROL_POLLS) {
             fail(conversation, destination, "未找到所选项目", epoch)
             return
@@ -459,6 +463,5 @@ internal class WebChatProductionConversationProjectMoveCoordinator(
         const val MAX_COMMAND_POLLS = WebChatConversationProjectMoveTiming.COMMAND_POLL_LIMIT
         const val MAX_RECONCILIATION_POLLS =
             WebChatConversationProjectMoveTiming.RECONCILIATION_POLL_LIMIT
-        const val CONTROL_REFRESH_POLL = WebChatConversationProjectMoveTiming.CONTROL_REFRESH_POLL
     }
 }
