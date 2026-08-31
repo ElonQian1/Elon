@@ -198,7 +198,7 @@ source 新增的 reviewed source-admission path 尚未运行；按 source contra
 整体仍未闭合。
 
 前序基线测试事实如下；fingerprint 只标识相应验证回执，不提升验收层级。本批 clean source commit 已冻结为
-`3e9ddf1860d8a744ccab62222622689d12fdc80a`，旧 `4edfcbcb32518fed8f93157b1983222f5f8ef74e` 仅是前序 q3 baseline；其 admission、program-inventory
+`10aa60fb42488854657dd30a4240ad5f949c894d`，旧 `4edfcbcb32518fed8f93157b1983222f5f8ef74e` 仅是前序 q3 baseline；其 admission、program-inventory
 与 reviewed source-admission source 均为 `not_run`，本批
 `passed=0/failed=0`：
 

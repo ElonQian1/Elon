@@ -1,6 +1,6 @@
 use super::model::{OwnerSnapshot, SourceOwnerId};
 
-pub(super) const SOURCE_BASELINE_COMMIT: &str = "3e9ddf1860d8a744ccab62222622689d12fdc80a";
+pub(super) const SOURCE_BASELINE_COMMIT: &str = "10aa60fb42488854657dd30a4240ad5f949c894d";
 
 const fn owner(
     id: SourceOwnerId,
