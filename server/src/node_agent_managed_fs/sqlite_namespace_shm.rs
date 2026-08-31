@@ -32,6 +32,9 @@ mod test_faults;
 #[path = "sqlite_namespace_shm/test_lock_runtime.rs"]
 mod test_lock_runtime;
 #[cfg(all(test, windows))]
+#[path = "sqlite_namespace_shm/test_map_runtime.rs"]
+mod test_map_runtime;
+#[cfg(all(test, windows))]
 #[path = "sqlite_namespace_shm/test_snapshot.rs"]
 mod test_snapshot;
 #[cfg(test)]
@@ -165,6 +168,12 @@ pub(crate) use test_faults::{
 pub(crate) use test_lock_runtime::{
     ManagedSqliteShmTestLockExpectation, ManagedSqliteShmTestLockPath,
     ManagedSqliteShmTestLockReceipt,
+};
+#[cfg(all(test, windows))]
+pub(crate) use test_map_runtime::{
+    ManagedSqliteShmTestMapDmsPath, ManagedSqliteShmTestMapExpectation,
+    ManagedSqliteShmTestMapPath, ManagedSqliteShmTestMapPointerIdentity,
+    ManagedSqliteShmTestMapReceipt,
 };
 #[cfg(all(test, windows))]
 pub(crate) use test_snapshot::{

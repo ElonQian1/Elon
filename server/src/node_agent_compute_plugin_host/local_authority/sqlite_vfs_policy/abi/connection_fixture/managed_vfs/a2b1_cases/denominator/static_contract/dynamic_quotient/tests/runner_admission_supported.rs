@@ -2,83 +2,38 @@ use super::super::runner_admission::{
     compile_for_test, run_isolated_for_test, tamper_implementation_digest_for_test,
     MapRunnerIsolatedOutcomeV1, RunnerAdmissionDecisionV1,
 };
+use super::map_program_cases::{request_budget_descriptor_v1, request_budget_leaf_v1};
 use super::*;
 
 const EXACT_TEST_PREFIX: &str = "node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::abi::connection_fixture::managed_vfs::a2b1_cases::denominator::static_contract::dynamic_quotient::tests::runner_admission_supported::";
-
-fn request_budget_record() -> LeafRecordV1 {
-    let mut value = record(
-        "map-region-count-budget-supported",
-        "region-index-exceeds-authority-budget",
-    );
-    let LeafOutcomeV1::Terminal(expected) = &mut value.outcome else {
-        unreachable!()
-    };
-    expected.phase = "RequestValidation".to_owned();
-    expected.raw_slots = CustodyStateV1::Unchanged;
-    expected.route = CustodyStateV1::Unchanged;
-    expected.callback = CustodyStateV1::Released;
-    expected.file = CustodyStateV1::Retained;
-    expected.counts.callback_begin = 1;
-    expected.counts.callback_complete = 1;
-    value
-}
-
-fn request_budget_descriptor(
-    stimulus: MapManagedStimulusV1,
-    mode: MapModeV1,
-    capability: RunnerCapabilityV1,
-) -> TerminalDescriptorV1 {
-    TerminalDescriptorV1::map(
-        SourceSiteV1::ManagedRequestValidation,
-        StimulusV1::MapManaged(stimulus),
-        PrestateV1::Map(MapPrestateV1::NotReached),
-        MapOperationV1::ManagedRequest,
-        PhaseV1::RequestValidation,
-        TimingV1::BeforeCall,
-        OccurrenceV1::Natural,
-        ExecutionRecipeV1::new(
-            FixtureV1::ManagedWalMainSingleConnection,
-            CallbackV1::XShmMap,
-            FaultSeamV1::ManagedRequest,
-            ObserverV1::MapCallbackAndSnapshot,
-            CleanupV1::ParentOwnedRoot,
-            capability,
-        ),
-        MapAxesV1 {
-            mode: ReachabilityV1::Reached(mode),
-            completion: ReachabilityV1::Reached(MapCompletionV1::Completed),
-            ..MapAxesV1::NOT_REACHED
-        },
-    )
-}
 
 fn supported_key_and_member(
     stimulus: MapManagedStimulusV1,
     mode: MapModeV1,
 ) -> (DynamicClassKeyV1, StaticMemberSealV1) {
-    let record = request_budget_record();
-    let descriptor = request_budget_descriptor(
+    let leaf = request_budget_leaf_v1(stimulus, mode);
+    let descriptor = request_budget_descriptor_v1(
         stimulus,
         mode,
         RunnerCapabilityV1::Missing(CapabilityGapV1::QuotientRunnerNotIntegrated),
     );
-    let validated = project_validated_dynamic_terminal_v1(&record, &descriptor).unwrap();
+    let validated = project_validated_dynamic_terminal_v1(&leaf.record, &descriptor).unwrap();
+    assert_eq!(validated.descriptor_binding.member, leaf.member);
     let mut key = validated.semantic_key;
     key.recipe.capability = RunnerCapabilityV1::Supported;
-    (key, validated.descriptor_binding.member)
+    (key, leaf.member)
 }
 
 #[test]
 fn exact_supported_map_class_still_rejects_without_private_execution_receipt() {
-    let record = request_budget_record();
-    let descriptor = request_budget_descriptor(
+    let leaf = request_budget_leaf_v1(MapManagedStimulusV1::RegionCountBudget, MapModeV1::Extend);
+    let descriptor = request_budget_descriptor_v1(
         MapManagedStimulusV1::RegionCountBudget,
         MapModeV1::Extend,
         RunnerCapabilityV1::Supported,
     );
     assert_eq!(
-        project_dynamic_class_v1(&record, &descriptor),
+        project_dynamic_class_v1(&leaf.record, &descriptor),
         Err(ProjectionErrorV1::Invalid(
             ProjectionViolationV1::RunnerAdmissionUnsealedSupported,
         ))
@@ -87,8 +42,8 @@ fn exact_supported_map_class_still_rejects_without_private_execution_receipt() {
 
 #[test]
 fn supported_capability_is_limited_to_the_exact_programmed_map_class() {
-    let record = request_budget_record();
-    let mut descriptor = request_budget_descriptor(
+    let leaf = request_budget_leaf_v1(MapManagedStimulusV1::RegionCountBudget, MapModeV1::Extend);
+    let mut descriptor = request_budget_descriptor_v1(
         MapManagedStimulusV1::RegionCountBudget,
         MapModeV1::Extend,
         RunnerCapabilityV1::Supported,
@@ -98,7 +53,7 @@ fn supported_capability_is_limited_to_the_exact_programmed_map_class() {
     };
     value.stimulus = StimulusV1::MapManaged(MapManagedStimulusV1::AllocationGranularity);
     assert_eq!(
-        project_dynamic_class_v1(&record, &descriptor),
+        project_dynamic_class_v1(&leaf.record, &descriptor),
         Err(ProjectionErrorV1::Invalid(
             ProjectionViolationV1::MapProducerRecipeMismatch,
         ))
@@ -122,17 +77,20 @@ fn exercise_supported_projection(
     mode: MapModeV1,
     exact_test: &str,
 ) -> anyhow::Result<()> {
-    let record = request_budget_record();
-    let descriptor = request_budget_descriptor(stimulus, mode, RunnerCapabilityV1::Supported);
+    let leaf = request_budget_leaf_v1(stimulus, mode);
+    let descriptor = request_budget_descriptor_v1(stimulus, mode, RunnerCapabilityV1::Supported);
     let (key, member) = supported_key_and_member(stimulus, mode);
     let plan = compile_for_test(&key);
     let execution = match run_isolated_for_test(exact_test, &key, member, plan)? {
         MapRunnerIsolatedOutcomeV1::ChildReported => return Ok(()),
         MapRunnerIsolatedOutcomeV1::ParentReceipt(receipt) => receipt,
     };
-    let validated =
-        project_validated_dynamic_terminal_with_map_execution_v1(&record, &descriptor, execution)
-            .map_err(|error| anyhow::anyhow!("supported Map projection failed: {error:?}"))?;
+    let validated = project_validated_dynamic_terminal_with_map_execution_v1(
+        &leaf.record,
+        &descriptor,
+        execution,
+    )
+    .map_err(|error| anyhow::anyhow!("supported Map projection failed: {error:?}"))?;
     assert!(validated.projection.is_ok());
     assert!(matches!(
         validated.runner_admission.decision(),
@@ -214,8 +172,8 @@ fn isolated_observe_logical_size_budget_receipt_can_authorize_exact_supported_pr
 
 #[test]
 fn isolated_map_receipt_rejects_implementation_digest_tamper() -> anyhow::Result<()> {
-    let record = request_budget_record();
-    let descriptor = request_budget_descriptor(
+    let leaf = request_budget_leaf_v1(MapManagedStimulusV1::RegionCountBudget, MapModeV1::Extend);
+    let descriptor = request_budget_descriptor_v1(
         MapManagedStimulusV1::RegionCountBudget,
         MapModeV1::Extend,
         RunnerCapabilityV1::Supported,
@@ -231,7 +189,11 @@ fn isolated_map_receipt_rejects_implementation_digest_tamper() -> anyhow::Result
     };
     tamper_implementation_digest_for_test(&mut execution, Digest32([0x7c; 32]));
     assert_eq!(
-        project_validated_dynamic_terminal_with_map_execution_v1(&record, &descriptor, execution,),
+        project_validated_dynamic_terminal_with_map_execution_v1(
+            &leaf.record,
+            &descriptor,
+            execution,
+        ),
         Err(ProjectionErrorV1::Invalid(
             ProjectionViolationV1::RunnerAdmissionMapExecutionReceiptMismatch,
         ))

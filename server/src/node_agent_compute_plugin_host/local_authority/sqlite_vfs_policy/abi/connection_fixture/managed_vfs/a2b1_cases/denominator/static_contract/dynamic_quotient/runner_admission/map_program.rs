@@ -1,5 +1,6 @@
-//! Sealed admission bridge for the executable Map request-budget dynamic-quotient programs.
+//! Sealed admission bridge for the executable Map dynamic-quotient programs.
 
+mod lifecycle;
 mod request_budget;
 
 #[cfg(windows)]
@@ -12,16 +13,37 @@ use super::super::super::{
 };
 use super::super::{DynamicClassKeyV1, StaticMemberSealV1};
 use super::CompiledRunnerPlanV1;
-use request_budget::{program_spec_v1, ProgramModeV1};
-
-#[cfg(windows)]
-use request_budget::MapRequestBudgetGuardV1;
+use lifecycle::{program_spec_v1 as lifecycle_program_spec_v1, MapLifecyclePathSpecV1};
+use request_budget::{program_spec_v1 as request_budget_program_spec_v1, MapRequestBudgetGuardV1};
 
 #[cfg(windows)]
 use crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::abi::connection_fixture::managed_vfs::a2_dynamic_evidence::{
-    run_map_program_isolated, MapRunnerEvidenceReceiptV1, MapRunnerIsolatedEvidenceV1,
+    run_map_lifecycle_program_isolated, run_map_program_isolated, MapRunnerEvidenceReceiptV1,
+    MapRunnerIsolatedEvidenceV1, MapRunnerLifecycleBindingV1, MapRunnerLifecyclePathV1,
     MapRunnerModeV1, MapRunnerProgramBindingV1, MapRunnerRequestBudgetV1,
 };
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum ProgramModeV1 {
+    Observe,
+    Extend,
+}
+
+#[derive(Clone, Copy)]
+enum MapProgramCaseV1 {
+    RequestBudget(MapRequestBudgetGuardV1),
+    Lifecycle(MapLifecyclePathSpecV1),
+}
+
+#[derive(Clone, Copy)]
+struct MapProgramSpecV1 {
+    mode: ProgramModeV1,
+    case: MapProgramCaseV1,
+    member: StaticMemberSealV1,
+    normalized_descriptor_sha256: Digest32,
+    plan_sha256: Digest32,
+    implementation_sha256: Digest32,
+}
 
 /// A real execution receipt. Private fields and the absent public constructor prevent digest-only
 /// callers from converting a capability declaration or compiled plan into execution authority.
@@ -60,6 +82,7 @@ impl ValidatedMapRunnerExecutionV1 {
 pub(super) enum MapRunnerExecutionViolationV1 {
     UnsupportedProgram,
     PlanBindingMismatch,
+    MemberSealMismatch,
     ReceiptBindingMismatch,
     ExecutionSealMismatch,
 }
@@ -125,29 +148,67 @@ pub(in super::super) fn run_isolated_for_test(
 ) -> Result<MapRunnerIsolatedOutcomeV1, MapRunnerExecutionErrorV1> {
     let program = program_v1(key, member, plan)
         .map_err(|violation| MapRunnerExecutionErrorV1(format!("{violation:?}")))?;
-    let binding = MapRunnerProgramBindingV1 {
-        mode: match program.mode {
-            ProgramModeV1::Observe => MapRunnerModeV1::Observe,
-            ProgramModeV1::Extend => MapRunnerModeV1::Extend,
-        },
-        request_budget: match program.guard {
-            MapRequestBudgetGuardV1::RegionSize => MapRunnerRequestBudgetV1::RegionSize,
-            MapRequestBudgetGuardV1::RegionCount => MapRunnerRequestBudgetV1::RegionCount,
-            MapRequestBudgetGuardV1::LogicalSize => MapRunnerRequestBudgetV1::LogicalSize,
-        },
-        normalized_descriptor_sha256: program.normalized_descriptor_sha256.0,
-        case_key_sha256: member.case_key_sha256.0,
-        full_record_sha256: member.full_record_sha256.0,
-        plan_sha256: program.plan_sha256.0,
-        implementation_sha256: program.implementation_sha256.0,
+    let evidence = match program.case {
+        MapProgramCaseV1::RequestBudget(guard) => run_map_program_isolated(
+            exact_test,
+            MapRunnerProgramBindingV1 {
+                mode: runner_mode_v1(program.mode),
+                request_budget: match guard {
+                    MapRequestBudgetGuardV1::RegionSize => MapRunnerRequestBudgetV1::RegionSize,
+                    MapRequestBudgetGuardV1::RegionCount => MapRunnerRequestBudgetV1::RegionCount,
+                    MapRequestBudgetGuardV1::LogicalSize => MapRunnerRequestBudgetV1::LogicalSize,
+                },
+                normalized_descriptor_sha256: program.normalized_descriptor_sha256.0,
+                case_key_sha256: member.case_key_sha256.0,
+                full_record_sha256: member.full_record_sha256.0,
+                plan_sha256: program.plan_sha256.0,
+                implementation_sha256: program.implementation_sha256.0,
+            },
+        ),
+        MapProgramCaseV1::Lifecycle(path) => run_map_lifecycle_program_isolated(
+            exact_test,
+            MapRunnerLifecycleBindingV1 {
+                path: match path {
+                    MapLifecyclePathSpecV1::EmptyObserveNotPresent => {
+                        MapRunnerLifecyclePathV1::EmptyObserveNotPresent
+                    }
+                    MapLifecyclePathSpecV1::EmptyExtendMapped => {
+                        MapRunnerLifecyclePathV1::EmptyExtendMapped
+                    }
+                    MapLifecyclePathSpecV1::ReuseObserveMapped => {
+                        MapRunnerLifecyclePathV1::ReuseObserveMapped
+                    }
+                    MapLifecyclePathSpecV1::ReuseExtendMapped => {
+                        MapRunnerLifecyclePathV1::ReuseExtendMapped
+                    }
+                    MapLifecyclePathSpecV1::MissingObserveNotPresent => {
+                        MapRunnerLifecyclePathV1::MissingObserveNotPresent
+                    }
+                    MapLifecyclePathSpecV1::MissingExtendMapped => {
+                        MapRunnerLifecyclePathV1::MissingExtendMapped
+                    }
+                },
+                normalized_descriptor_sha256: program.normalized_descriptor_sha256.0,
+                case_key_sha256: member.case_key_sha256.0,
+                full_record_sha256: member.full_record_sha256.0,
+                plan_sha256: program.plan_sha256.0,
+                implementation_sha256: program.implementation_sha256.0,
+            },
+        ),
     };
-    match run_map_program_isolated(exact_test, binding)
-        .map_err(|error| MapRunnerExecutionErrorV1(error.to_string()))?
-    {
+    match evidence.map_err(|error| MapRunnerExecutionErrorV1(error.to_string()))? {
         MapRunnerIsolatedEvidenceV1::ChildReported => Ok(MapRunnerIsolatedOutcomeV1::ChildReported),
         MapRunnerIsolatedEvidenceV1::ParentReceipt(evidence) => Ok(
             MapRunnerIsolatedOutcomeV1::ParentReceipt(seal_execution_receipt(program, evidence)),
         ),
+    }
+}
+
+#[cfg(windows)]
+const fn runner_mode_v1(mode: ProgramModeV1) -> MapRunnerModeV1 {
+    match mode {
+        ProgramModeV1::Observe => MapRunnerModeV1::Observe,
+        ProgramModeV1::Extend => MapRunnerModeV1::Extend,
     }
 }
 
@@ -159,22 +220,11 @@ pub(in super::super) fn tamper_implementation_digest_for_test(
     receipt.implementation_sha256 = digest;
 }
 
-#[derive(Clone, Copy)]
-struct MapProgramV1 {
-    mode: ProgramModeV1,
-    #[cfg(windows)]
-    guard: MapRequestBudgetGuardV1,
-    normalized_descriptor_sha256: Digest32,
-    member: StaticMemberSealV1,
-    plan_sha256: Digest32,
-    implementation_sha256: Digest32,
-}
-
 pub(super) fn implementation_for_inventory_v1(
     key: &DynamicClassKeyV1,
     plan: CompiledRunnerPlanV1,
 ) -> Result<Option<Digest32>, MapRunnerExecutionViolationV1> {
-    match program_spec_v1(key, plan) {
+    match source_program_spec_v1(key, plan) {
         Ok(program) => Ok(Some(program.implementation_sha256)),
         Err(MapRunnerExecutionViolationV1::UnsupportedProgram) => Ok(None),
         Err(error) => Err(error),
@@ -185,25 +235,42 @@ fn program_v1(
     key: &DynamicClassKeyV1,
     member: StaticMemberSealV1,
     plan: CompiledRunnerPlanV1,
-) -> Result<MapProgramV1, MapRunnerExecutionViolationV1> {
-    let program = program_spec_v1(key, plan)?;
+) -> Result<MapProgramSpecV1, MapRunnerExecutionViolationV1> {
+    let program = source_program_spec_v1(key, plan)?;
     if key.recipe.capability != RunnerCapabilityV1::Supported {
         return Err(MapRunnerExecutionViolationV1::UnsupportedProgram);
     }
-    Ok(MapProgramV1 {
-        mode: program.mode,
-        #[cfg(windows)]
-        guard: program.guard,
-        normalized_descriptor_sha256: program.normalized_descriptor_sha256,
-        member,
-        plan_sha256: program.plan_sha256,
-        implementation_sha256: program.implementation_sha256,
-    })
+    if member != program.member {
+        return Err(MapRunnerExecutionViolationV1::MemberSealMismatch);
+    }
+    Ok(program)
+}
+
+fn source_program_spec_v1(
+    key: &DynamicClassKeyV1,
+    plan: CompiledRunnerPlanV1,
+) -> Result<MapProgramSpecV1, MapRunnerExecutionViolationV1> {
+    match request_budget_program_spec_v1(key, plan) {
+        Ok(program) => Ok(program),
+        Err(MapRunnerExecutionViolationV1::UnsupportedProgram) => {
+            lifecycle_program_spec_v1(key, plan)
+        }
+        Err(error) => Err(error),
+    }
+}
+
+#[cfg(test)]
+pub(super) fn validate_program_for_test(
+    key: &DynamicClassKeyV1,
+    member: StaticMemberSealV1,
+    plan: CompiledRunnerPlanV1,
+) -> Result<(), MapRunnerExecutionViolationV1> {
+    program_v1(key, member, plan).map(|_| ())
 }
 
 #[cfg(windows)]
 fn seal_execution_receipt(
-    program: MapProgramV1,
+    program: MapProgramSpecV1,
     evidence: MapRunnerEvidenceReceiptV1,
 ) -> MapRunnerExecutionReceiptV1 {
     let (root, child, registration, payload, environment, cleanup, native, exit_code) =

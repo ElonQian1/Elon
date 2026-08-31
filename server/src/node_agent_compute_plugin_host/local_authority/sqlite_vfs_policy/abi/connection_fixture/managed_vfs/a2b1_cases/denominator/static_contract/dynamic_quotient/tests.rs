@@ -19,6 +19,7 @@ use super::*;
 
 mod descriptor_binding;
 mod manifest_validation;
+mod map_program_cases;
 mod map_validation;
 mod producer_coherence;
 mod program_admission;
@@ -28,6 +29,8 @@ mod runner_admission;
 mod runner_admission_lock_lifecycle_supported;
 #[cfg(windows)]
 mod runner_admission_lock_supported;
+#[cfg(windows)]
+mod runner_admission_map_lifecycle_supported;
 #[cfg(windows)]
 mod runner_admission_supported;
 mod runner_state;

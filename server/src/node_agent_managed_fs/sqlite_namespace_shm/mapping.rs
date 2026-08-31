@@ -12,6 +12,11 @@ use super::{
     },
 };
 
+#[cfg(all(test, windows))]
+use super::test_map_runtime::{
+    ManagedSqliteShmTestMapDmsPath, ManagedSqliteShmTestMapPath, ManagedSqliteShmTestMapStep,
+};
+
 pub(super) struct ManagedSqliteShmRegionMapping {
     pub(super) view: Option<platform_shm::OwnedSqliteShmView>,
     pub(super) mapping: platform_shm::OwnedSqliteShmMapping,
@@ -63,6 +68,21 @@ impl ManagedSqliteShmCoordinator {
             return Err(poison.failure());
         }
 
+        #[cfg(all(test, windows))]
+        let test_request = (region, region_size.get(), mode);
+        #[cfg(all(test, windows))]
+        self.begin_test_map_action(connection_id, region, region_size.get(), mode)?;
+        #[cfg(all(test, windows))]
+        self.record_test_map_dms_path(
+            connection_id,
+            test_request,
+            if state.node.is_some() {
+                ManagedSqliteShmTestMapDmsPath::NodeLive
+            } else {
+                ManagedSqliteShmTestMapDmsPath::CreatedFirstShared
+            },
+        )?;
+
         let initialization_mutated = {
             let (node, initialization_mutated) = self.ensure_node(&mut state, connection_id)?;
             match node.region_size {
@@ -74,6 +94,8 @@ impl ManagedSqliteShmCoordinator {
             }
             initialization_mutated
         };
+        #[cfg(all(test, windows))]
+        self.record_test_map_dms_ready(connection_id, test_request, initialization_mutated)?;
         #[cfg(test)]
         let file_size_fault = self.begin_test_fault(
             &mut state,
@@ -104,9 +126,32 @@ impl ManagedSqliteShmCoordinator {
         self.budget
             .validate_existing_size(current_size)
             .map_err(request_failure)?;
+        #[cfg(all(test, windows))]
+        self.record_test_map_file_size(
+            connection_id,
+            test_request,
+            current_size,
+            logical_end,
+            initialization_mutated,
+        )?;
         let mut file_grew = false;
         if current_size < logical_end {
             if mode == ManagedSqliteShmMapMode::Observe {
+                #[cfg(all(test, windows))]
+                {
+                    self.record_test_map_step(
+                        connection_id,
+                        test_request,
+                        ManagedSqliteShmFailurePhase::FileSize,
+                        initialization_mutated,
+                        ManagedSqliteShmTestMapStep::NotPresent,
+                    )?;
+                    self.finish_test_map_action(
+                        connection_id,
+                        test_request,
+                        initialization_mutated,
+                    )?;
+                }
                 return Ok(ManagedSqliteShmMapOutcome::NotPresent);
             }
             #[cfg(test)]
@@ -141,8 +186,18 @@ impl ManagedSqliteShmCoordinator {
             if let Some(failure) = self.finish_test_fault(&mut state, file_grow_fault, true) {
                 return Err(failure);
             }
+            #[cfg(all(test, windows))]
+            self.record_test_map_step(
+                connection_id,
+                test_request,
+                ManagedSqliteShmFailurePhase::FileGrow,
+                true,
+                ManagedSqliteShmTestMapStep::FileGrow,
+            )?;
         }
 
+        #[cfg(all(test, windows))]
+        let mut mapped_new = false;
         while state
             .node
             .as_ref()
@@ -255,6 +310,14 @@ impl ManagedSqliteShmCoordinator {
                     false,
                 ));
             }
+            #[cfg(all(test, windows))]
+            self.record_test_map_step(
+                connection_id,
+                test_request,
+                ManagedSqliteShmFailurePhase::MappingCreate,
+                true,
+                ManagedSqliteShmTestMapStep::MappingCreate,
+            )?;
             #[cfg(test)]
             let view_fault = match self.begin_test_fault(
                 &mut state,
@@ -374,6 +437,14 @@ impl ManagedSqliteShmCoordinator {
             // SAFETY: `mapped_length` was checked as shift + logical length, and the view owns
             // exactly that many bytes beginning at `base`.
             let logical_pointer = unsafe { NonNull::new_unchecked(base.as_ptr().add(shift)) };
+            #[cfg(all(test, windows))]
+            self.record_test_map_step(
+                connection_id,
+                test_request,
+                ManagedSqliteShmFailurePhase::ViewMap,
+                true,
+                ManagedSqliteShmTestMapStep::ViewMap,
+            )?;
             let node = state
                 .node
                 .as_mut()
@@ -387,6 +458,17 @@ impl ManagedSqliteShmCoordinator {
                 aligned_offset,
             });
             node.mapped_bytes = mapped_total;
+            #[cfg(all(test, windows))]
+            {
+                self.record_test_map_step(
+                    connection_id,
+                    test_request,
+                    ManagedSqliteShmFailurePhase::ViewMap,
+                    true,
+                    ManagedSqliteShmTestMapStep::Record,
+                )?;
+                mapped_new = true;
+            }
             #[cfg(test)]
             if let Some(failure) = self.finish_test_fault(&mut state, view_fault, true) {
                 return Err(failure);
@@ -416,6 +498,25 @@ impl ManagedSqliteShmCoordinator {
                 false,
             ));
         };
+        #[cfg(all(test, windows))]
+        {
+            self.record_test_map_selected(
+                connection_id,
+                test_request,
+                if mapped_new {
+                    ManagedSqliteShmTestMapPath::MappedNew
+                } else {
+                    ManagedSqliteShmTestMapPath::MappedReuse
+                },
+                pointer,
+                logical_length,
+            )?;
+            self.finish_test_map_action(
+                connection_id,
+                test_request,
+                initialization_mutated || file_grew || mapped_new,
+            )?;
+        }
         Ok(ManagedSqliteShmMapOutcome::Mapped(
             ManagedSqliteShmRegionPointer::new(pointer, logical_length, region, self.generation),
         ))

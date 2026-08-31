@@ -48,6 +48,14 @@ const SOURCE_SCOPE: &[(&str, &str)] = &[
         include_str!("runner_admission/map_program/request_budget.rs"),
     ),
     (
+        "runner_admission/map_program/lifecycle.rs",
+        include_str!("runner_admission/map_program/lifecycle.rs"),
+    ),
+    (
+        "runner_admission/map_program/lifecycle/source_scope.rs",
+        include_str!("runner_admission/map_program/lifecycle/source_scope.rs"),
+    ),
+    (
         "runner_admission/lock_program.rs",
         include_str!("runner_admission/lock_program.rs"),
     ),

@@ -3,8 +3,8 @@
 //! A producer-owned `RunnerCapabilityV1::Supported` value is only a declaration. It is never an
 //! execution permit. This module compiles the exact root plan from an already validated,
 //! producer-coherent semantic key. Missing declarations receive a planned-missing receipt; the
-//! one source-supported Map kernel can receive `Supported` only after consuming its private,
-//! process-isolated execution receipt.
+//! exact source-supported Map programs can receive `Supported` only after consuming their
+//! private, process-isolated execution receipts.
 
 mod canonical;
 mod lock;
@@ -35,6 +35,8 @@ pub(super) use lock_program::{
 };
 #[cfg(all(test, windows))]
 pub(super) use map_program::tamper_implementation_digest_for_test;
+#[cfg(test)]
+pub(super) use map_program::validate_program_for_test as validate_map_program_for_test;
 pub(super) use map_program::MapRunnerExecutionReceiptV1;
 #[cfg(all(test, windows))]
 pub(super) use map_program::{

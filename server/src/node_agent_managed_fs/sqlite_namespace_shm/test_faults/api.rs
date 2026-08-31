@@ -17,6 +17,10 @@ use super::super::test_lock_runtime::{
     ManagedSqliteShmTestLockExpectation, ManagedSqliteShmTestLockReceipt,
 };
 #[cfg(all(test, windows))]
+use super::super::test_map_runtime::{
+    ManagedSqliteShmTestMapExpectation, ManagedSqliteShmTestMapReceipt,
+};
+#[cfg(all(test, windows))]
 use super::super::test_snapshot::{
     test_target_snapshot as snapshot_test_target, ManagedSqliteShmTestTargetSnapshot,
 };
@@ -211,6 +215,44 @@ impl ManagedSqliteShmTestTargetObserver {
             .cancel(self.target.identity())
     }
 
+    /// Arms one exact managed Map action after all setup Map calls are complete.
+    pub(crate) fn begin_map_action_observation(
+        &self,
+        expectation: ManagedSqliteShmTestMapExpectation,
+    ) -> Result<(), &'static str> {
+        let snapshot = self
+            .snapshot()
+            .map_err(|_| "NODE_MANAGED_SQLITE_SHM_TEST_MAP_TARGET_SNAPSHOT_FAILED")?;
+        if !snapshot.target_attached || snapshot.topology.shm_connections == 0 {
+            return Err("NODE_MANAGED_SQLITE_SHM_TEST_MAP_TARGET_NOT_ATTACHED");
+        }
+        self.coordinator
+            .test_map_runtime
+            .lock()
+            .map_err(|_| "NODE_MANAGED_SQLITE_SHM_TEST_MAP_RUNTIME_POISONED")?
+            .arm(self.target.identity(), expectation)
+    }
+
+    /// Seals and disarms the one-shot Map ledger before later fixture cleanup can be observed.
+    pub(crate) fn finish_map_action_observation(
+        &self,
+    ) -> Result<ManagedSqliteShmTestMapReceipt, &'static str> {
+        self.coordinator
+            .test_map_runtime
+            .lock()
+            .map_err(|_| "NODE_MANAGED_SQLITE_SHM_TEST_MAP_RUNTIME_POISONED")?
+            .finish(self.target.identity())
+    }
+
+    /// Disarms only this exact target's unfinished Map ledger during unwind.
+    pub(crate) fn cancel_map_action_observation(&self) -> Result<(), &'static str> {
+        self.coordinator
+            .test_map_runtime
+            .lock()
+            .map_err(|_| "NODE_MANAGED_SQLITE_SHM_TEST_MAP_RUNTIME_POISONED")?
+            .cancel(self.target.identity())
+    }
+
     /// Starts one append-only Unmap action observation for this exact generation/connection.
     pub(crate) fn begin_unmap_action_observation(&self) -> Result<(), &'static str> {
         let snapshot = self
@@ -313,6 +355,8 @@ impl ManagedSqliteShmCoordinator {
         phase: ManagedSqliteShmFailurePhase,
         known_mutation: bool,
     ) -> Result<Option<ManagedSqliteShmMatchedTestFault>, ManagedSqliteShmFailure> {
+        #[cfg(all(test, windows))]
+        self.record_test_map_dms_phase(connection_id, phase, known_mutation)?;
         let target = self.test_fault_target(connection_id);
         let mut faults = self
             .test_faults

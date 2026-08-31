@@ -96,6 +96,14 @@ pub(super) const PROJECTOR_SOURCE_SCOPE_V1: &[(&str, &str)] = &[
         include_str!("runner_admission/map_program/request_budget.rs"),
     ),
     (
+        "dynamic_quotient/runner_admission/map_program/lifecycle.rs",
+        include_str!("runner_admission/map_program/lifecycle.rs"),
+    ),
+    (
+        "dynamic_quotient/runner_admission/map_program/lifecycle/source_scope.rs",
+        include_str!("runner_admission/map_program/lifecycle/source_scope.rs"),
+    ),
+    (
         "dynamic_quotient/runner_admission/lock.rs",
         include_str!("runner_admission/lock.rs"),
     ),
@@ -132,6 +140,10 @@ pub(super) const PROJECTOR_SOURCE_SCOPE_V1: &[(&str, &str)] = &[
         include_str!("../../../../a2_dynamic_evidence/child/lock_lifecycle.rs"),
     ),
     (
+        "managed_vfs/a2_dynamic_evidence/child/map_lifecycle.rs",
+        include_str!("../../../../a2_dynamic_evidence/child/map_lifecycle.rs"),
+    ),
+    (
         "managed_vfs/a2_dynamic_evidence/capture.rs",
         include_str!("../../../../a2_dynamic_evidence/capture.rs"),
     ),
@@ -146,6 +158,18 @@ pub(super) const PROJECTOR_SOURCE_SCOPE_V1: &[(&str, &str)] = &[
     (
         "managed_vfs/a2_dynamic_evidence/map_runner.rs",
         include_str!("../../../../a2_dynamic_evidence/map_runner.rs"),
+    ),
+    (
+        "managed_vfs/a2_dynamic_evidence/map_runner/lifecycle.rs",
+        include_str!("../../../../a2_dynamic_evidence/map_runner/lifecycle.rs"),
+    ),
+    (
+        "managed_vfs/a2_dynamic_evidence/map_runner/lifecycle/fixture.rs",
+        include_str!("../../../../a2_dynamic_evidence/map_runner/lifecycle/fixture.rs"),
+    ),
+    (
+        "managed_vfs/a2_dynamic_evidence/map_runner/lifecycle/payload.rs",
+        include_str!("../../../../a2_dynamic_evidence/map_runner/lifecycle/payload.rs"),
     ),
     (
         "managed_vfs/a2_dynamic_evidence/map_runner/request_budget.rs",
@@ -314,6 +338,13 @@ pub(super) const PROJECTOR_SOURCE_SCOPE_V1: &[(&str, &str)] = &[
         )),
     ),
     (
+        "node_agent_managed_fs/sqlite_namespace_io.rs",
+        include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/src/node_agent_managed_fs/sqlite_namespace_io.rs"
+        )),
+    ),
+    (
         "node_agent_managed_fs/sqlite_namespace.rs",
         include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
@@ -409,6 +440,13 @@ pub(super) const PROJECTOR_SOURCE_SCOPE_V1: &[(&str, &str)] = &[
         include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/src/node_agent_managed_fs/sqlite_namespace_shm/test_lock_runtime.rs"
+        )),
+    ),
+    (
+        "node_agent_managed_fs/sqlite_namespace_shm/test_map_runtime.rs",
+        include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/src/node_agent_managed_fs/sqlite_namespace_shm/test_map_runtime.rs"
         )),
     ),
     (

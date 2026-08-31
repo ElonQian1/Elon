@@ -34,7 +34,8 @@ pub(super) use lock_runner::{
     LockRunnerLifecyclePathV1, LockRunnerProgramBindingV1, LockRunnerRequestValidationV1,
 };
 pub(super) use map_runner::{
-    run_map_program_isolated, MapRunnerEvidenceReceiptV1, MapRunnerIsolatedEvidenceV1,
+    run_map_lifecycle_program_isolated, run_map_program_isolated, MapRunnerEvidenceReceiptV1,
+    MapRunnerIsolatedEvidenceV1, MapRunnerLifecycleBindingV1, MapRunnerLifecyclePathV1,
     MapRunnerModeV1, MapRunnerProgramBindingV1, MapRunnerRequestBudgetV1,
 };
 pub(super) use record::{

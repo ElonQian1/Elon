@@ -60,15 +60,18 @@ pub(crate) use shm::{
 pub(crate) use shm::{
     ManagedSqliteShmTestConnectionDetachReceipt, ManagedSqliteShmTestDmsCustody,
     ManagedSqliteShmTestLockExpectation, ManagedSqliteShmTestLockPath,
-    ManagedSqliteShmTestLockReceipt, ManagedSqliteShmTestTargetIdentity,
-    ManagedSqliteShmTestTargetObserver, ManagedSqliteShmTestTargetSnapshot,
-    ManagedSqliteShmTestTopologySnapshot, ManagedSqliteShmTestUnmapActionEvent,
-    ManagedSqliteShmTestUnmapActionOutcome, ManagedSqliteShmTestUnmapDeleteAuthorityReceipt,
-    ManagedSqliteShmTestUnmapDeletePrestate, ManagedSqliteShmTestUnmapDeletePrestateReceipt,
-    ManagedSqliteShmTestUnmapNativeObservation, ManagedSqliteShmTestUnmapNativeOperation,
-    ManagedSqliteShmTestUnmapNativeReceipt, ManagedSqliteShmTestUnmapNativeTiming,
-    ManagedSqliteShmTestUnmapReceipt, ManagedSqliteShmTriggeredTestFaultObservation,
-    ManagedSqliteWalMainCloseFailureTestBoundary, ManagedSqliteWalMainCloseFailureTestSnapshot,
+    ManagedSqliteShmTestLockReceipt, ManagedSqliteShmTestMapDmsPath,
+    ManagedSqliteShmTestMapExpectation, ManagedSqliteShmTestMapPath,
+    ManagedSqliteShmTestMapPointerIdentity, ManagedSqliteShmTestMapReceipt,
+    ManagedSqliteShmTestTargetIdentity, ManagedSqliteShmTestTargetObserver,
+    ManagedSqliteShmTestTargetSnapshot, ManagedSqliteShmTestTopologySnapshot,
+    ManagedSqliteShmTestUnmapActionEvent, ManagedSqliteShmTestUnmapActionOutcome,
+    ManagedSqliteShmTestUnmapDeleteAuthorityReceipt, ManagedSqliteShmTestUnmapDeletePrestate,
+    ManagedSqliteShmTestUnmapDeletePrestateReceipt, ManagedSqliteShmTestUnmapNativeObservation,
+    ManagedSqliteShmTestUnmapNativeOperation, ManagedSqliteShmTestUnmapNativeReceipt,
+    ManagedSqliteShmTestUnmapNativeTiming, ManagedSqliteShmTestUnmapReceipt,
+    ManagedSqliteShmTriggeredTestFaultObservation, ManagedSqliteWalMainCloseFailureTestBoundary,
+    ManagedSqliteWalMainCloseFailureTestSnapshot,
 };
 use types::ManagedSqliteNamespaceInner;
 pub(crate) use types::{

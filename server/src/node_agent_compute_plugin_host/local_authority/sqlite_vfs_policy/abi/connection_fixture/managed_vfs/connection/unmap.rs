@@ -1,6 +1,7 @@
 //! Direct, installed-ABI Unmap and SHM-lock calls for Windows dynamic evidence.
 
 use std::{
+    fmt,
     os::raw::{c_int, c_void},
     ptr,
 };
@@ -18,15 +19,39 @@ pub(in super::super) struct ManagedTestUnmapCallbackObservation {
     after: HandleBoundSqliteAbiRawSlotSnapshot,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub(in super::super) struct ManagedTestShmMapCallbackObservation {
     region: c_int,
     region_size: c_int,
     raw_extend: c_int,
     result_code: c_int,
+    output: *mut c_void,
     output_was_cleared: bool,
     before: HandleBoundSqliteAbiRawSlotSnapshot,
     after: HandleBoundSqliteAbiRawSlotSnapshot,
+}
+
+impl fmt::Debug for ManagedTestShmMapCallbackObservation {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("ManagedTestShmMapCallbackObservation")
+            .field("region", &self.region)
+            .field("region_size", &self.region_size)
+            .field("raw_extend", &self.raw_extend)
+            .field("result_code", &self.result_code)
+            .field(
+                "output",
+                &if self.output.is_null() {
+                    "<null>"
+                } else {
+                    "<mapped>"
+                },
+            )
+            .field("output_was_cleared", &self.output_was_cleared)
+            .field("before", &self.before)
+            .field("after", &self.after)
+            .finish()
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -80,6 +105,12 @@ impl ManagedTestShmMapCallbackObservation {
 
     pub(in super::super) fn result_code(self) -> c_int {
         self.result_code
+    }
+
+    /// Returns the installed ABI's raw output for same-process equality checks only.
+    /// The pointer must never be dereferenced, serialized, logged, or hashed by the harness.
+    pub(in super::super) fn output_pointer(self) -> *mut c_void {
+        self.output
     }
 
     pub(in super::super) fn output_was_cleared(self) -> bool {
@@ -141,7 +172,8 @@ impl ManagedSqliteRoutedConnectionFixture {
         // slot. The raw request deliberately reaches the installed ABI and production budget
         // validator instead of projecting a harness-only node-absent state.
         let result_code = unsafe { map(file, region, region_size, raw_extend, &mut output) };
-        // SAFETY: the allocation remains owned by the live Connection after a fail-closed map.
+        // SAFETY: the allocation remains owned by the live Connection after either installed Map
+        // outcome; only the callback's output slot can carry a mapped address.
         let after = unsafe { super::super::observe_test_vfs_file_raw_slots(file) }
             .ok_or("managed SHM-map raw slots unavailable after callback")?;
         Ok(ManagedTestShmMapCallbackObservation {
@@ -149,6 +181,7 @@ impl ManagedSqliteRoutedConnectionFixture {
             region_size,
             raw_extend,
             result_code,
+            output,
             output_was_cleared: output.is_null(),
             before,
             after,

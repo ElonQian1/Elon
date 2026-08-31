@@ -1,4 +1,8 @@
 use super::super::runner_admission::ExecutionProgramInventoryStatusV1;
+use super::map_program_cases::{
+    map_lifecycle_descriptor_v1, map_lifecycle_leaf_v1, request_budget_descriptor_v1,
+    request_budget_leaf_v1, MAP_LIFECYCLE_CASES,
+};
 use super::*;
 
 pub(super) fn request_budget_record() -> LeafRecordV1 {
@@ -485,9 +489,9 @@ fn full_map_program_inventory_accounts_for_every_frozen_member_without_opening_q
     let inventory = &bundle.inventory;
     assert_eq!(inventory.member_count, 43_476);
     assert_eq!(bundle.reverse_index.len(), 43_476);
-    assert_eq!(inventory.source_present_member_count, 6);
-    assert_eq!(inventory.source_present_group_count, 6);
-    assert_eq!(inventory.planned_missing_member_count, 43_470);
+    assert_eq!(inventory.source_present_member_count, 12);
+    assert_eq!(inventory.source_present_group_count, 12);
+    assert_eq!(inventory.planned_missing_member_count, 43_464);
     assert_eq!(
         inventory
             .source_present_member_count
@@ -517,24 +521,50 @@ fn full_map_program_inventory_accounts_for_every_frozen_member_without_opening_q
             )
         })
         .collect::<Vec<_>>();
-    assert_eq!(source_groups.len(), 6);
+    assert_eq!(source_groups.len(), 12);
+    // `inventory_v1` is intentionally keyed by normalized program semantics. Keep every
+    // source-present Map program a singleton so that status cannot cover a sibling member seal.
     assert!(source_groups.iter().all(|group| group.member_count == 1));
-    let record = request_budget_record();
-    let expected_source_keys = REQUEST_BUDGET_STIMULI
+    let mut expected_source_keys = REQUEST_BUDGET_STIMULI
         .into_iter()
         .flat_map(|stimulus| {
             [MapModeV1::Observe, MapModeV1::Extend].map(|mode| {
-                let descriptor = budget_descriptor(
+                let leaf = request_budget_leaf_v1(stimulus, mode);
+                let descriptor = request_budget_descriptor_v1(
                     stimulus,
                     mode,
                     RunnerCapabilityV1::Missing(CapabilityGapV1::QuotientRunnerNotIntegrated),
                 );
-                prepare_dynamic_terminal_v1(&record, &descriptor)
+                prepare_dynamic_terminal_v1(&leaf.record, &descriptor)
                     .unwrap()
                     .key
             })
         })
         .collect::<Vec<_>>();
+    expected_source_keys.extend(MAP_LIFECYCLE_CASES.into_iter().map(|case| {
+        let leaf = map_lifecycle_leaf_v1(case);
+        let descriptor = map_lifecycle_descriptor_v1(
+            case,
+            RunnerCapabilityV1::Missing(CapabilityGapV1::QuotientRunnerNotIntegrated),
+        );
+        prepare_dynamic_terminal_v1(&leaf.record, &descriptor)
+            .unwrap()
+            .key
+    }));
+    assert_eq!(expected_source_keys.len(), 12);
+    let mut expected_source_members = REQUEST_BUDGET_STIMULI
+        .into_iter()
+        .flat_map(|stimulus| {
+            [MapModeV1::Observe, MapModeV1::Extend]
+                .map(|mode| request_budget_leaf_v1(stimulus, mode).member)
+        })
+        .collect::<Vec<_>>();
+    expected_source_members.extend(
+        MAP_LIFECYCLE_CASES
+            .into_iter()
+            .map(|case| map_lifecycle_leaf_v1(case).member),
+    );
+    assert_eq!(expected_source_members.len(), 12);
     assert!(source_groups
         .iter()
         .all(|group| expected_source_keys.contains(&group.normalized_key)));
@@ -542,6 +572,16 @@ fn full_map_program_inventory_accounts_for_every_frozen_member_without_opening_q
         source_groups
             .iter()
             .filter(|group| group.normalized_key == *expected)
+            .count()
+            == 1
+    }));
+    assert!(source_groups
+        .iter()
+        .all(|group| expected_source_members.contains(&group.members[0])));
+    assert!(expected_source_members.iter().all(|expected| {
+        source_groups
+            .iter()
+            .filter(|group| group.members.first() == Some(expected))
             .count()
             == 1
     }));
