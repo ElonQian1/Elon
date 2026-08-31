@@ -3,12 +3,12 @@ use std::{fmt, path::Path, process::Child};
 use sha2::{Digest, Sha256};
 
 pub(super) mod lock_lifecycle;
+pub(super) mod lock_native_acquire_busy;
 mod lock_request_validation;
 pub(super) mod lock_stored_poison;
 pub(super) mod map_lifecycle;
 pub(super) mod map_region_loop;
 mod payload;
-
 use payload::validate_actual_payload;
 
 pub(in super::super) const A2_DYNAMIC_CHILD_NONCE_ENV: &str = "ELON_SQLITE_A2_DYNAMIC_CHILD_NONCE";
