@@ -6,11 +6,20 @@ import org.junit.Test
 class WebChatProductionRichContentPolicyTest {
     @Test
     fun inlineRenderedPartsDoNotCreateDuplicateOfficialFallbackRows() {
-        val parts = listOf("citation", "code", "table", "math", "artifact", "chart", "interactive")
+        val parts = listOf(
+            "citation",
+            "code",
+            "table",
+            "math",
+            "artifact",
+            "chart",
+            "interactive",
+            "rich_card",
+        )
             .map { type -> WebChatProductionContentPart(type = type, label = type) }
 
         assertEquals(
-            listOf("artifact", "chart", "interactive"),
+            listOf("artifact", "chart", "interactive", "rich_card"),
             WebChatProductionRichContentPolicy.fallbackParts(parts).map { it.type },
         )
     }

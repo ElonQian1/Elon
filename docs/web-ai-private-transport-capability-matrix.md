@@ -28,6 +28,7 @@ installed build; individual capability documents retain implementation evidence.
 | Interaction presets and deferred chat actions | ChatGPT | Completed, enabled, and device verified on research build `v1.1.1367 (1388)` | Current official control and WebView navigation |
 | Attachment upload reconciliation | ChatGPT | Completed, enabled, and device verified on published Release `v1.1.1374 (1395)`, adapter `207` | Official DOM attachment snapshot and bounded timeout |
 | Native image assets and cache-first gallery | ChatGPT | Completed, enabled, and device verified on Release candidate `v1.1.1375 (1396)`, adapter `208` | Bounded local image cache and official `/images` fallback |
+| Native private-response rich content | ChatGPT | Completed, enabled, and structurally device verified on Release `v1.1.1379 (1400)` for finance and line-chart cards | Official WebView rich content |
 
 All web-account transports keep the official page authoritative. They do not export
 cookies, credentials, request headers, or private conversation content outside the
@@ -71,6 +72,18 @@ assets, opened the native viewer, returned to the same production chat, and prov
 fresh second open did not create another sync WebView. The completed capability is
 `android_chatgpt_native_image_asset_gallery_v1`; details are in
 `docs/chatgpt-native-image-assets-gallery.md`.
+
+ChatGPT private response rich content now crosses the existing passive observer only as
+the versioned `yilong.rich-content.v1` projection. Android accepts only bounded finance
+and line-chart ASTs, finite numeric points, reviewed sources, and exact kind agreement;
+malformed, oversized, credential-like, or unknown cards are dropped without rejecting
+the surrounding message. Valid cards render inline in the production conversation and
+open a native expanded detail surface, while the official WebView remains authoritative
+for unsupported rich content. A fixed-data debug scenario exercised the same production
+renderer on a Xiaomi device for finance, multi-series chart, and click-to-detail layouts
+without reading a user conversation. The completed capability is
+`android_chatgpt_private_rich_content_native_view_v1` and must not be reimplemented
+without current regression evidence.
 
 The Google conversation directory persists the timestamp of the last successful
 official directory response. Cached rows render immediately; a legacy or expired cache

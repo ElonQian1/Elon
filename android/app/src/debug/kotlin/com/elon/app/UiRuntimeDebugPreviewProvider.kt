@@ -25,6 +25,7 @@ class UiRuntimeDebugPreviewProvider : ContentProvider() {
         UiRuntimePreviewRegistry.register(viewGalleryScenario())
         UiRuntimePreviewRegistry.register(socialSidebarScenario())
         UiRuntimePreviewRegistry.register(appUpdatePreviewScenario())
+        UiRuntimePreviewRegistry.register(webChatRichCardPreviewScenario())
         UiRuntimePreviewRegistry.register(defaultComposeRuntimePreviewScenario())
         return true
     }

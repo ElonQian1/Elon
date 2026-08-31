@@ -10,6 +10,10 @@ internal class ChatGptSocialImageContentController(
     private val openOfficialFallback: () -> Unit,
 ) {
     fun open(part: WebChatProductionContentPart) {
+        part.richCard?.let { card ->
+            WebChatProductionRichCardViews.show(activity, card)
+            return
+        }
         if (part.type != "image") {
             openOfficialFallback()
             return

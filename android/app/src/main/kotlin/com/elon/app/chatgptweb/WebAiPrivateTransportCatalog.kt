@@ -187,6 +187,19 @@ internal object WebAiPrivateTransportCatalog {
             fallback = "official_images_page",
         ),
         Entry(
+            id = "android_chatgpt_private_rich_content_native_view_v1",
+            provider = "chatgpt",
+            status = "completed",
+            verification =
+                "device_structural_verified_v1_1_1379_parser_contract_and_native_finance_chart_preview",
+            productionDefault = true,
+            runtimeEnabled = true,
+            requestMode = "passive_private_response_sanitized_rich_card_projection",
+            healthPolicy =
+                "versioned_schema_bounded_finance_chart_ast_unknown_drop_and_native_detail",
+            fallback = "official_webview_rich_content",
+        ),
+        Entry(
             id = "android_chatgpt_realtime_voice_background_overlay_v1",
             provider = "chatgpt",
             status = "completed",

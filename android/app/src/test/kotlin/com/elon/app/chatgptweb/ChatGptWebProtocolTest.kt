@@ -1,5 +1,6 @@
 package com.elon.app.chatgptweb
 
+import com.elon.app.WebChatProductionRichCard
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -166,6 +167,66 @@ class ChatGptWebProtocolTest {
         assertEquals(null, metadata?.targetHost)
         assertEquals(null, metadata?.lineCount)
         assertEquals(null, metadata?.rowCount)
+    }
+
+    @Test
+    fun parsesBoundedPrivateFinanceAndChartCards() {
+        val event = ChatGptWebProtocol.parse(
+            """
+            {
+              "schema":"yilong.ai.ui.v1",
+              "event":{"type":"message_snapshot","messages":[{
+                "id":"a-rich","role":"assistant","state":"completed","content":[
+                  {"type":"markdown","text":"结构化结果"},
+                  {"type":"rich_card","text":"示例行情","kind":"finance","richContent":{
+                    "schema":"yilong.rich-content.v1","kind":"finance","source":"private_response",
+                    "payload":{"title":"示例行情","symbol":"DEMO","primaryValue":"123.45",
+                      "secondaryValue":"+1.2%","trend":"positive",
+                      "periods":[{"id":"1d","label":"1日","selected":true}],
+                      "metrics":[{"label":"成交量","value":"10M"}],
+                      "chart":{"kind":"line","points":[{"x":"09:30","y":122.0},{"x":"10:30","y":123.45}]}}
+                  }},
+                  {"type":"rich_card","text":"季度趋势","kind":"chart","richContent":{
+                    "schema":"yilong.rich-content.v1","kind":"chart","source":"private_response",
+                    "payload":{"title":"季度趋势","description":"同比变化","chartType":"line",
+                      "series":[{"key":"revenue","label":"收入","valuePrefix":"¥"}],
+                      "points":[{"x":"Q1","values":[10.0]},{"x":"Q2","values":[12.5]}]}
+                  }}
+                ]
+              }]}}
+            }
+            """.trimIndent(),
+        ) as ChatGptWebEvent.Snapshot
+
+        val cards = event.value.messages.single().parts.mapNotNull { it.richCard }
+        assertEquals(listOf("rich_card", "rich_card"), event.value.messages.single().parts.map { it.type })
+        assertEquals(WebChatProductionRichCard.Kind.FINANCE, cards[0].kind)
+        assertEquals("DEMO", cards[0].symbol)
+        assertEquals(WebChatProductionRichCard.Trend.POSITIVE, cards[0].trend)
+        assertEquals(listOf(122.0, 123.45), cards[0].points.map { it.values.single() })
+        assertEquals(WebChatProductionRichCard.Kind.CHART, cards[1].kind)
+        assertEquals("收入", cards[1].series.single().label)
+        assertEquals(listOf(10.0, 12.5), cards[1].points.map { it.values.single() })
+    }
+
+    @Test
+    fun dropsMalformedOrUnreviewedRichCardsWithoutRejectingTheMessage() {
+        val event = ChatGptWebProtocol.parse(
+            """
+            {"schema":"yilong.ai.ui.v1","event":{"type":"message_snapshot","messages":[{
+              "id":"a1","role":"assistant","state":"completed","content":[
+                {"type":"markdown","text":"answer"},
+                {"type":"rich_card","text":"unsafe","kind":"chart","richContent":{
+                  "schema":"yilong.rich-content.v1","kind":"chart","source":"credential",
+                  "payload":{"title":"unsafe","chartType":"line","series":[],"points":[]}
+                }}
+              ]
+            }]}}
+            """.trimIndent(),
+        ) as ChatGptWebEvent.Snapshot
+
+        assertEquals("answer", event.value.messages.single().content)
+        assertTrue(event.value.messages.single().parts.isEmpty())
     }
 
     @Test

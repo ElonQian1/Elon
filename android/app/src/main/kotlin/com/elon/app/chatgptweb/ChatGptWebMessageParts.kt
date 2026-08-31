@@ -1,11 +1,13 @@
 package com.elon.app.chatgptweb
 
+import com.elon.app.WebChatProductionRichCard
 import org.json.JSONObject
 
 internal data class ChatGptWebMessagePart(
     val type: String,
     val label: String,
     val metadata: ChatGptWebMessagePartMetadata? = null,
+    val richCard: WebChatProductionRichCard? = null,
 )
 
 internal data class ChatGptWebMessagePartMetadata(
@@ -45,7 +47,9 @@ internal object ChatGptWebMessagePartParser {
                 if (type !in SUPPORTED_TYPES) continue
                 val label = part.optString("text").trim().take(MAX_LABEL_LENGTH)
                 if (label.isBlank()) continue
-                add(ChatGptWebMessagePart(type, label, parseMetadata(part)))
+                val richCard = if (type == "rich_card") ChatGptWebRichCardParser.parse(part) else null
+                if (type == "rich_card" && richCard == null) continue
+                add(ChatGptWebMessagePart(type, label, parseMetadata(part), richCard))
             }
         }.take(MAX_PARTS)
     }
@@ -104,6 +108,7 @@ internal object ChatGptWebMessagePartParser {
         "chart",
         "map",
         "interactive",
+        "rich_card",
     )
     private val TARGET_KINDS = setOf("same_origin", "external")
     private val KIND = Regex("[a-z][a-z0-9_]{0,31}")

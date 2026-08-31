@@ -51,6 +51,14 @@ internal object WebChatProductionRichContentBinder {
         index: Int,
         onOpen: ((ChatMessage, WebChatProductionContentPart) -> Unit)?,
     ): View {
+        part.richCard?.let { card ->
+            return WebChatProductionRichCardViews.inline(
+                container = container,
+                card = card,
+                contentDescription = partContentDescription(metadata, part, index),
+                onClick = onOpen?.let { callback -> { callback(message, part) } },
+            )
+        }
         if (part.type == "image" && (part.imageSource != null || part.previewPending)) {
             return createImagePart(container, message, metadata, part, index, onOpen)
         }
@@ -174,6 +182,7 @@ internal object WebChatProductionRichContentBinder {
             "chart" -> R.string.chatgpt_message_part_chart
             "map" -> R.string.chatgpt_message_part_map
             "interactive" -> R.string.chatgpt_message_part_interactive
+            "rich_card" -> R.string.chatgpt_message_part_chart
             else -> R.string.chatgpt_message_part_content
         },
     )

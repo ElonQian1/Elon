@@ -29,6 +29,7 @@ class WebAiPrivateTransportCatalogTest {
         assertTrue("android_chatgpt_same_origin_text_transaction_v1" in enabledIds)
         assertTrue("android_chatgpt_attachment_transport_reconciliation_v1" in enabledIds)
         assertTrue("android_chatgpt_native_image_asset_gallery_v1" in enabledIds)
+        assertTrue("android_chatgpt_private_rich_content_native_view_v1" in enabledIds)
         assertTrue("android_chatgpt_realtime_voice_background_overlay_v1" in enabledIds)
 
         val streamSettlement = values.first {
@@ -206,6 +207,23 @@ class WebAiPrivateTransportCatalogTest {
         assertTrue(imageGallery.getBoolean("runtime_enabled"))
         assertFalse(imageGallery.getBoolean("direct_post_enabled"))
         assertEquals("official_images_page", imageGallery.getString("fallback"))
+
+        val richContent = values.first {
+            it.getString("capability_id") ==
+                "android_chatgpt_private_rich_content_native_view_v1"
+        }
+        assertEquals("completed", richContent.getString("implementation_status"))
+        assertEquals(
+            "device_structural_verified_v1_1_1379_parser_contract_and_native_finance_chart_preview",
+            richContent.getString("verification_status"),
+        )
+        assertTrue(richContent.getBoolean("production_default"))
+        assertTrue(richContent.getBoolean("runtime_enabled"))
+        assertFalse(richContent.getBoolean("direct_post_enabled"))
+        assertEquals(
+            "official_webview_rich_content",
+            richContent.getString("fallback"),
+        )
     }
 
     @Test

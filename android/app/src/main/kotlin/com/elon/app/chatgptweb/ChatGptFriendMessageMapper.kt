@@ -132,6 +132,7 @@ internal object ChatGptFriendMessageMapper {
             lineCount = part.metadata?.lineCount,
             rowCount = part.metadata?.rowCount,
             columnCount = part.metadata?.columnCount,
+            richCard = part.richCard,
         )
     }
 

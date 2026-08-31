@@ -5,6 +5,7 @@ import com.elon.app.WebChatProductionContentPart
 import com.elon.app.WebChatProviderId
 import com.elon.app.WebChatProviderRegistry
 import com.elon.app.WebChatMessageAction
+import com.elon.app.WebChatProductionRichCard
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -189,6 +190,35 @@ class ChatGptFriendMessageMapperTest {
         assertEquals("example.com", result.webChatMessage?.contentParts?.first()?.targetHost)
         assertEquals("kotlin", result.webChatMessage?.contentParts?.last()?.language)
         assertEquals(12, result.webChatMessage?.contentParts?.last()?.lineCount)
+    }
+
+    @Test
+    fun preservesValidatedRichCardsForTheProductionNativeRenderer() {
+        val card = WebChatProductionRichCard(
+            kind = WebChatProductionRichCard.Kind.CHART,
+            title = "趋势",
+            series = listOf(WebChatProductionRichCard.Series("value", "数值")),
+            points = listOf(
+                WebChatProductionRichCard.Point("A", listOf(1.0)),
+                WebChatProductionRichCard.Point("B", listOf(2.0)),
+            ),
+        )
+        val message = ChatGptWebMessage(
+            id = "a-card",
+            role = "assistant",
+            content = "趋势如下",
+            state = "completed",
+            parts = listOf(ChatGptWebMessagePart("rich_card", "趋势", richCard = card)),
+        )
+
+        val result = ChatGptFriendMessageMapper.map(
+            snapshot = snapshot(messages = listOf(message)),
+            provider = WebChatProviderRegistry.get(WebChatProviderId.CHATGPT_WEB),
+            pendingPrompt = null,
+            timestampFor = { 42L },
+        ).single()
+
+        assertEquals(card, result.webChatMessage?.contentParts?.single()?.richCard)
     }
 
     private fun snapshot(

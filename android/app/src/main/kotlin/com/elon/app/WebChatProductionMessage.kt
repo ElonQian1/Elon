@@ -20,6 +20,7 @@ data class WebChatProductionContentPart(
     val lineCount: Int? = null,
     val rowCount: Int? = null,
     val columnCount: Int? = null,
+    val richCard: WebChatProductionRichCard? = null,
 )
 
 data class WebChatProductionMessage(
