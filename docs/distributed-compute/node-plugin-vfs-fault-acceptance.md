@@ -42,6 +42,7 @@ owner 图只验证 baseline commit literal 形状、从 reviewed owner bytes 重
   `source_written/source_review_only/implementation_uncompiled/implementation_unrun`，未 Cargo、未 Windows/真实运行，
   `passed=0 failed=0 actual=not_run`；不得复用前序 `4/4`、`36/36`、fingerprint 或 receipt。
 - 计数边界：这 4 项分别是 legacy non-denominator subset、incomplete branch-atom scaffold、source-owner graph 与 Map template ledger 自洽守卫；不形成完整 terminal universe、`CaseKey`、`Expected`、denominator、`StaticContract` 或 map/lock `WindowsDynamic`。
+- current q5 source 另只匹配 `LockNativeAcquire + NodeLive + native-busy + Completed` 44 members（8 shared 单槽+36 exclusive 连续范围）；test-only child 用同一物理 SHM 的独立句柄持有真实 Win32 byte range，exact receipt 绑定同 FileId/不同 handle、installed `xShmLock` 的 `SQLITE_BUSY`/native contended、pre/post mask 与 poison 不变、holder release 和 parent cleanup。44-row catalog SHA-256=`b12bd411f7fa63f822e65a679351dfc103a6368e2887355d5b03c530fc162e2f`；它仍未编译、未运行，不能称作 Windows record。
 
 ### 历史证据元组
 
@@ -132,7 +133,7 @@ Map/Lock 静态 scope、`CaseKey`、`SourceBranch`、`Expected`、exclusion 与 
 | Family | StaticContract | DynamicQuotientMemberCoverage | WindowsDynamic | 当前门槛 |
 |---|---:|---:|---:|---|
 | Map | `43476/43476` | `0/43476` | `not_opened` | 验证 current source，补齐其余 `42,955` 个 program，冻结 exact class/member manifest，机械得到 `Qmap` |
-| Lock | `8668/8668` | `0/8668` | `not_opened` | current source 为 10 validation + 104 lifecycle + 两个 stored-poison completion 各 1320；未运行 inventory 预期 `2754 present + 5914 missing`，无 actual inventory/receipt/record 或 reviewed/frozen manifest，`Qlock` 仍 unknown |
+| Lock | `8668/8668` | `0/8668` | `not_opened` | current source 为 10 validation + q2 104 lifecycle + q3/q4 stored-poison 各 1320 + q5 native-busy 44；未运行 inventory 预期 `2798 present + 5870 missing`，无 actual inventory/receipt/record，inventory/review digest 未生成/缺失且 manifest 未冻结，`Qlock` 仍 unknown |
 | **Map/Lock aggregate** | **verified** | **not_started** | **not_opened** | **逐 class Windows exact-set 后才可形成 `Q/Q`** |
 
 #### 2.1.1 静态闭合前 review provenance（历史）
@@ -231,7 +232,7 @@ phase 与 terminal phase，不能把 cleanup failure 归并回最初注入点或
 | map outcome uncertain | FileId/domain 永久 tombstone；同 domain sibling 不得重建 runtime 或继续 SHM。 |
 | lock success | `LockShared/LockExclusive/UnlockShared/UnlockExclusive` 四动作分别覆盖 local success、shared coalescing、exact range/mask transition 与 OS acquire/release；不得用 exclusive shape代表 shared。 |
 | local lock contention | 合法 sibling 冲突只返回 `SQLITE_BUSY`，不触发脚本、不 poison、不篡改持锁 mask。 |
-| OS lock outcome | shared/exclusive sibling relation分别对账 success/contended/error；`SQLITE_BUSY` 与 I/O failure、known mutation及 uncertainty 不得合并。 |
+| OS lock outcome | shared/exclusive sibling relation分别对账 success/contended/error；q5 native-busy 必须由同一物理 SHM 的独立句柄真实持有目标 Win32 byte range，不能合成 Busy 或使用 same-handle overlap；`SQLITE_BUSY` 与 I/O failure、known mutation及 uncertainty 不得合并。 |
 | lock release uncertainty | 不清本地 mask，不释放对应 custody；domain terminal 与后续 sibling 行为逐项匹配。 |
 | cleanup rewrite | DMS unlock/file close、mapping close或exact-open cleanup改写 terminal phase/custody时，保留 cause phase并命中独立 key；不得归并原失败 phase。 |
 | barrier no-return | 通过真实无结果码通道执行；失败清 raw state一次并保留 terminal custody，不伪造 `SQLITE_IOERR` 或正常 completion。 |
@@ -292,7 +293,7 @@ A2 完成必须同时满足：
   `implementation_not_dynamically_accepted` 升级；
 - 任何证据缺失、环境不明、case key漂移、观察不完整或生产入口变化都维持失败关闭。
 
-当前正式结论是：Map `StaticContract=43476/43476`、Lock `StaticContract=8668/8668`；typed dynamic quotient projector/candidate 只有前序已编译、`36/36` 与 exact blocker 基线。Map 保留 source-only q4 `MapRegionLoopSuccessV1` 的 511 frozen members/净增 509，未运行 inventory 预期 `521` source-present、`42,955` planned-missing。Lock 在 10+104 个既有 program 上保留两个 source-only stored-poison completion：`UnsafeRetentionSucceededThenRouteUnknown` 与 `UnsafeRetentionRouteUnknownThenRouteUnknown` 各由 15 profiles×88 action/range 形成 1,320 frozen members；两份 catalog 各为 1,320 member rows/237,857 bytes，SHA-256 分别为 `4da94c20e91d97a0082116879718b1ccf0271eb235ed785e65a2e36e7a949d85` 与 `df931ad7725843098f228d07d9798d79e92f2beec4e1c23e83fc89219dfa1396`，后者另有 test-only route-preemption actual runner/selector/payload 源码桥。Lock 未运行 inventory 预期为 `2,754` source-present、`5,914` planned-missing。current source 严格为 `source_written/source_review_only/implementation_uncompiled/implementation_unrun`；本批未编译、未 Cargo、未 Windows/真实运行，`passed=0/failed=0/actual=not_run`。没有 actual inventory/receipt/record、reviewed/frozen manifest 或 Windows execution，`DynamicQuotientMemberCoverage` 分别为 `0/43476`、`0/8668`，`Qmap/Qlock=unknown`，Map/Lock `WindowsDynamic=not_opened`。global source-leaf authority scope 已静态确认 5 个 production source 有 baseline drift，其中本批继续改变 ManagedNamespace/ManagedShmRoot；本批不扩张续绑，未来编译/真实验收前须单独续绑。A2 仍为 `implementation_not_dynamically_accepted`；生产 open、A1、v15、Runtime、Ready、派发、市场与资金效果均未改变。
+当前正式结论是：Map `StaticContract=43476/43476`、Lock `StaticContract=8668/8668`；typed dynamic quotient projector/candidate 只有前序已编译、`36/36` 与 exact blocker 基线。Map 保留 source-only q4 `MapRegionLoopSuccessV1` 的 511 frozen members/净增 509，未运行 inventory 预期 `521` source-present、`42,955` planned-missing。Lock 保留 10 validation+q2 104 lifecycle，q3/q4 两个 source-only stored-poison completion 各为 15 profiles×88 action/range=1,320 frozen members，route-unknown 有 test-only route-preemption bridge；q5 再单列 44 个 `LockNativeAcquire + NodeLive + native-busy + Completed` members（8 shared 单槽+36 exclusive 连续范围），以同一物理 SHM 独立句柄的真实 Win32 byte-range contention 和 exact receipt 绑定 installed callback 的 `SQLITE_BUSY`/native contended、无状态漂移、holder release 与 parent cleanup。q3/q4 catalog SHA-256 分别为 `4da94c20e91d97a0082116879718b1ccf0271eb235ed785e65a2e36e7a949d85` 与 `df931ad7725843098f228d07d9798d79e92f2beec4e1c23e83fc89219dfa1396`，q5 44-row catalog SHA-256 为 `b12bd411f7fa63f822e65a679351dfc103a6368e2887355d5b03c530fc162e2f`。Lock 未运行 inventory 预期为 `2,798` source-present、`5,870` planned-missing。current source 严格为 `source_written/source_review_only/implementation_uncompiled/implementation_unrun`；本批未编译、未 Cargo、未 Windows/真实运行，`passed=0/failed=0/actual=not_run`。没有 actual inventory/receipt/record 或 Windows execution，inventory digest 未生成、reviewed digest 缺失、manifest 未冻结，`DynamicQuotientMemberCoverage` 分别为 `0/43476`、`0/8668`，`Qmap/Qlock=unknown`，Map/Lock `WindowsDynamic=not_opened`。global source-leaf authority scope 已静态确认 5 个 production source 有 baseline drift，其中本批继续改变 ManagedNamespace/ManagedShmRoot；本批不扩张续绑，未来编译/真实验收前须单独续绑。A2 仍为 `implementation_not_dynamically_accepted`；生产 VFS/open/SQLite、A1、v15、Runtime、Ready、Provider、route、Offer、Job、Attempt、Lease、派发、市场、结算与资金效果均关闭。
 
 ### 9.1 静态闭合前 fragment provenance（历史）
 
