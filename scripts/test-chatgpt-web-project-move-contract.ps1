@@ -25,6 +25,9 @@ function Assert-Contains([string]$Needle) {
     "web-chat-conversation-action-move-to-project",
     "web-chat-conversation-project-destination:",
     "Wait-ConversationMembership",
+    "Test-ProjectMoveWriteObserved",
+    'text -eq "正在提交一次移动操作"',
+    'text -eq "正在同步会话目录"',
     "[ref]`$WriteSelected",
     "-not `$restoreWriteSelected",
     "original_membership_restored",
@@ -32,6 +35,8 @@ function Assert-Contains([string]$Needle) {
     "cleared_cookies = `$false",
     "cleared_app_data = `$false",
     "Project-move recovery is ambiguous",
+    "if (`$null -ne `$primaryFailure) { throw `$primaryFailure }",
+    "if (`$null -ne `$cleanupFailure) { throw `$cleanupFailure }",
     "CHATGPT_WEB_PROJECT_MOVE_STATUS=passed"
 ) | ForEach-Object { Assert-Contains $_ }
 

@@ -28,6 +28,8 @@ $forwardMoveVerified = $false
 $restoreWriteSelected = $false
 $restored = $false
 $recoveryUnknown = $false
+$primaryFailure = $null
+$cleanupFailure = $null
 
 function Invoke-MainAction {
     param(
@@ -214,19 +216,37 @@ function Find-VisibleProjectConversation {
     throw "No visible project conversation is available for reversible acceptance."
 }
 
+function Test-ProjectMoveWriteObserved {
+    try {
+        return @((Get-UiNodes) | Where-Object {
+            $text = [string]$_.text
+            $text -eq "正在提交一次移动操作" -or
+                $text -eq "正在同步会话目录" -or
+                $text.Contains("已经提交过一次操作")
+        }).Count -gt 0
+    } catch {
+        return $false
+    }
+}
+
 function Wait-ConversationMembership {
     param(
         [Parameter(Mandatory = $true)][string]$ConversationId,
-        [Parameter(Mandatory = $true)][string]$ProjectId
+        [Parameter(Mandatory = $true)][string]$ProjectId,
+        [Parameter(Mandatory = $true)][ref]$WriteSelected
     )
 
     $deadline = [DateTimeOffset]::UtcNow.AddSeconds($TimeoutSec)
     do {
+        if (-not $WriteSelected.Value -and (Test-ProjectMoveWriteObserved)) {
+            $WriteSelected.Value = $true
+        }
         $navigation = Get-Navigation
         $current = @($navigation.conversations | Where-Object {
             [string]$_.id -eq $ConversationId
         }) | Select-Object -First 1
         if ($null -ne $current -and [string]$current.project_id -eq $ProjectId) {
+            $WriteSelected.Value = $true
             return $current
         }
         Start-Sleep -Seconds 2
@@ -267,9 +287,8 @@ function Invoke-ProjectMove {
     $null = Invoke-NativeSelector -Selector (
         "web-chat-conversation-project-destination:" + $DestinationProjectId
     ) -Stage "project-destination"
-    $WriteSelected.Value = $true
     return Wait-ConversationMembership -ConversationId ([string]$Conversation.id) `
-        -ProjectId $DestinationProjectId
+        -ProjectId $DestinationProjectId -WriteSelected $WriteSelected
 }
 
 Start-ChatGptWebSmokeAwakeLease -Runtime $runtime | Out-Null
@@ -325,6 +344,8 @@ try {
         cleared_app_data = $false
     } | ConvertTo-Json -Depth 4
     Write-Output "CHATGPT_WEB_PROJECT_MOVE_STATUS=passed"
+} catch {
+    $primaryFailure = $_
 } finally {
     if ($forwardWriteSelected -and -not $restored -and $null -ne $candidate) {
         try {
@@ -355,7 +376,7 @@ try {
             $recoveryUnknown = $true
         }
     }
-    Close-Sidebar
+    try { Close-Sidebar } catch { $cleanupFailure = $_ }
     try {
         if ($originPath) {
             Invoke-MainAction -Action "open_web_chat_conversation" -Arguments @{
@@ -363,8 +384,19 @@ try {
             } | Out-Null
         }
     } catch {}
-    Stop-ChatGptWebSmokeAwakeLease -Runtime $runtime | Out-Null
-    if ($recoveryUnknown) {
-        throw "Project-move recovery is ambiguous; inspect the official project menu before retrying."
+    try {
+        Stop-ChatGptWebSmokeAwakeLease -Runtime $runtime | Out-Null
+    } catch {
+        if ($null -eq $cleanupFailure) { $cleanupFailure = $_ }
     }
 }
+
+if ($recoveryUnknown) {
+    $recoveryDetail = "Project-move recovery is ambiguous; inspect the official project menu before retrying."
+    if ($null -ne $primaryFailure) {
+        throw ($primaryFailure.Exception.Message + " " + $recoveryDetail)
+    }
+    throw $recoveryDetail
+}
+if ($null -ne $primaryFailure) { throw $primaryFailure }
+if ($null -ne $cleanupFailure) { throw $cleanupFailure }
