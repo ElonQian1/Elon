@@ -1,7 +1,6 @@
 //! Source-bound specification for the exact positive Lock lifecycle programs.
 //!
-//! Admission is derived only from the typed dynamic key and its exact expected vector. Static
-//! leaf ids, test names and frozen-manifest strings are deliberately outside this matcher.
+//! Admission uses only the typed dynamic key and exact expected vector; leaf ids, test names and frozen-manifest strings stay outside this matcher.
 
 use sha2::{Digest, Sha256};
 
@@ -343,6 +342,7 @@ fn digest_implementation_v1(implementation_tag: u8) -> Digest32 {
     hasher.update(b"elon-lock-positive-lifecycle-implementation-v1\0");
     for source in [
         include_str!("../lock_program.rs"),
+        include_str!("source_program.rs"),
         include_str!("lifecycle.rs"),
         include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),

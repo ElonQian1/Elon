@@ -11,6 +11,7 @@ macro_rules! source {
 
 pub(super) const LOCK_STORED_POISON_SOURCE_SCOPE_V1: &[(&str, &str)] = &[
     source!("dynamic_quotient/runner_admission/lock_program.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/dynamic_quotient/runner_admission/lock_program.rs"),
+    source!("dynamic_quotient/runner_admission/lock_program/source_program.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/dynamic_quotient/runner_admission/lock_program/source_program.rs"),
     source!("dynamic_quotient/runner_admission/lock_program/stored_poison.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/dynamic_quotient/runner_admission/lock_program/stored_poison.rs"),
     source!("dynamic_quotient/runner_admission/lock_program/stored_poison/catalog.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/dynamic_quotient/runner_admission/lock_program/stored_poison/catalog.rs"),
     source!("dynamic_quotient/runner_admission/lock_program/stored_poison/source_scope.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/dynamic_quotient/runner_admission/lock_program/stored_poison/source_scope.rs"),
@@ -137,7 +138,7 @@ pub(super) const LOCK_STORED_POISON_SOURCE_SCOPE_V1: &[(&str, &str)] = &[
 /// Only source identities that are not already present in the projector's canonical base or its
 /// shared Map runtime scopes. The complete list above remains private to the per-program
 /// implementation digest; chaining it globally would duplicate existing source identities.
-pub(super) const LOCK_STORED_POISON_PROJECTOR_DELTA_SOURCE_SCOPE_V1: &[(&str, &str)] = &[
+pub(super) const STORED_POISON_PROJECTOR_DELTA_V1: &[(&str, &str)] = &[
     source!("dynamic_quotient/lock_stored_poison_source_scope.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/dynamic_quotient/lock_stored_poison_source_scope.rs"),
     source!("dynamic_quotient/runner_admission/lock_program/stored_poison.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/dynamic_quotient/runner_admission/lock_program/stored_poison.rs"),
     source!("dynamic_quotient/runner_admission/lock_program/stored_poison/catalog.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/dynamic_quotient/runner_admission/lock_program/stored_poison/catalog.rs"),

@@ -131,6 +131,7 @@ fn digest_implementation_v1(implementation_tag: u8) -> Digest32 {
     hasher.update(b"elon-lock-managed-request-validation-direct-implementation-v1\0");
     for source in [
         include_str!("../lock_program.rs"),
+        include_str!("source_program.rs"),
         include_str!("request_validation.rs"),
         include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
