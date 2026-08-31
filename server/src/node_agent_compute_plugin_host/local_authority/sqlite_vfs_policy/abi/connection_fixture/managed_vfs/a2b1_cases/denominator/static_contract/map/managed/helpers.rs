@@ -8,13 +8,20 @@ use super::{
             },
             poison,
             source::SourceWitness,
+            terminal_descriptor::{
+                FaultSeamV1, InitializationFaultSiteV1, InitializationProfileV1, MapFilePathV1,
+                MapManagedStimulusV1, MapModeV1, MapOperationV1, MapPrestateV1, MapProfileV1,
+                MapRegionPrestateV1, MapRegionSizeArmV1, SourceSiteV1, StimulusV1,
+            },
         },
         builder::MapGraphBuilder,
+        dynamic::{self, DescriptorSeedV1},
         projection::{self, FailureSpec},
         witnesses as w, MapMode,
     },
     build_region_size,
     mapping::build_map_or_reuse,
+    poison_profile::stored_poison_prestates,
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -36,6 +43,44 @@ impl RegionPrestate {
     pub(super) const fn has_mapping(self) -> bool {
         !matches!(self, Self::Empty)
     }
+
+    pub(super) const fn descriptor(self) -> MapPrestateV1 {
+        match self {
+            Self::Empty => MapPrestateV1::RegionsEmpty,
+            Self::Reuse => MapPrestateV1::TargetMapped,
+            Self::Missing => MapPrestateV1::TargetMissing,
+        }
+    }
+
+    const fn profile(self) -> MapRegionPrestateV1 {
+        match self {
+            Self::Empty => MapRegionPrestateV1::Empty,
+            Self::Reuse => MapRegionPrestateV1::Reuse,
+            Self::Missing => MapRegionPrestateV1::NonemptyTargetMissing,
+        }
+    }
+}
+
+pub(super) const fn profile(
+    mode: MapMode,
+    initialization: InitializationProfileV1,
+    prestate: RegionPrestate,
+    region_size_arm: MapRegionSizeArmV1,
+    file_path: MapFilePathV1,
+    prior_mutation: bool,
+) -> MapProfileV1 {
+    MapProfileV1 {
+        mode: match mode {
+            MapMode::Observe => MapModeV1::Observe,
+            MapMode::Extend => MapModeV1::Extend,
+        },
+        initialization,
+        prestate: prestate.profile(),
+        region_size_arm,
+        file_path,
+        prior_mutation,
+        preexisting_mapping: prestate.has_mapping(),
+    }
 }
 
 pub(super) fn build_post_initialization(
@@ -50,7 +95,7 @@ pub(super) fn build_post_initialization(
         native_unlock: success.native_unlock,
         ..ObservableCounts::default()
     };
-    if success.label == "node-live" {
+    if matches!(success.profile, InitializationProfileV1::NodeLive) {
         let prestate = graph.decision(&format!("{prefix}.region-prestate"), w::managed(".regions"));
         graph.edge(
             &success.node,
@@ -68,6 +113,7 @@ pub(super) fn build_post_initialization(
                 &prestate,
                 &prefix,
                 mode,
+                success.profile,
                 state,
                 false,
                 false,
@@ -81,6 +127,7 @@ pub(super) fn build_post_initialization(
             &success.node,
             &prefix,
             mode,
+            success.profile,
             RegionPrestate::Empty,
             true,
             initialization_mutated,
@@ -93,6 +140,7 @@ pub(super) fn build_post_initialization(
 pub(super) fn project_initialization_failures(
     graph: &mut MapGraphBuilder,
     failures: Vec<InitializationFailure>,
+    mode: MapMode,
 ) {
     for failure in failures {
         let quarantine = failure.class == FailureClass::OutcomeUncertainPoisoned
@@ -119,12 +167,28 @@ pub(super) fn project_initialization_failures(
                 quarantine,
                 lock_outcome_uncertain: failure.lock_uncertain,
                 dms_lock: failure.dms_lock,
+                dynamic: DescriptorSeedV1::new(
+                    initialization_source(failure.stimulus.fault_site),
+                    StimulusV1::Initialization(failure.stimulus),
+                    MapPrestateV1::NodeAbsent,
+                    super::super::super::terminal_descriptor::MapOperationV1::Initialization,
+                    failure.typed_phase,
+                    failure.timing,
+                    failure.occurrence,
+                    FaultSeamV1::Initialization,
+                    dynamic::mode_axes(mode),
+                ),
             },
         );
     }
 }
 
-pub(super) fn project_stored_poison(graph: &mut MapGraphBuilder, from: &str, prefix: &str) {
+pub(super) fn project_stored_poison(
+    graph: &mut MapGraphBuilder,
+    from: &str,
+    prefix: &str,
+    mode: MapMode,
+) {
     poison::validate_manifest();
     for cell in poison::STORED_POISON_CELLS {
         let label = cell.label();
@@ -133,6 +197,16 @@ pub(super) fn project_stored_poison(graph: &mut MapGraphBuilder, from: &str, pre
                 cell.phase,
                 FailureClass::OutcomeUncertainPoisoned,
                 cell.mutation != MutationState::None,
+                dynamic::managed_seed(
+                    mode,
+                    SourceSiteV1::CoordinatorState,
+                    StimulusV1::MapManaged(MapManagedStimulusV1::StoredPoison),
+                    MapPrestateV1::StoredPoison(prestate.typed),
+                    MapOperationV1::ManagedRequest,
+                    cell.typed_phase,
+                    super::super::super::terminal_descriptor::TimingV1::BeforeCall,
+                    FaultSeamV1::ManagedRequest,
+                ),
             );
             stored.mutation = cell.mutation;
             stored.disposition = TerminalDisposition::Quarantined;
@@ -158,136 +232,11 @@ pub(super) fn project_stored_poison(graph: &mut MapGraphBuilder, from: &str, pre
     }
 }
 
-#[derive(Debug, Clone, Copy)]
-struct StoredPoisonPrestate {
-    label: &'static str,
-    file: CustodyState,
-    mapping: CustodyState,
-    view: CustodyState,
-}
-
-const fn stored_prestate(
-    label: &'static str,
-    file: CustodyState,
-    mapping: CustodyState,
-    view: CustodyState,
-) -> StoredPoisonPrestate {
-    StoredPoisonPrestate {
-        label,
-        file,
-        mapping,
-        view,
-    }
-}
-
-const NO_NODE: StoredPoisonPrestate = stored_prestate(
-    "no-node",
-    CustodyState::NotReached,
-    CustodyState::NotReached,
-    CustodyState::NotReached,
-);
-const LIVE_EMPTY: StoredPoisonPrestate = stored_prestate(
-    "live-node-regions-empty",
-    CustodyState::Retained,
-    CustodyState::NotReached,
-    CustodyState::NotReached,
-);
-const LIVE_COMPLETE: StoredPoisonPrestate = stored_prestate(
-    "live-node-complete-regions",
-    CustodyState::Retained,
-    CustodyState::Retained,
-    CustodyState::Retained,
-);
-const QUARANTINED_EMPTY: StoredPoisonPrestate = stored_prestate(
-    "node-absent-file-quarantined-no-regions",
-    CustodyState::Quarantined,
-    CustodyState::NotReached,
-    CustodyState::NotReached,
-);
-const QUARANTINED_RELEASED: StoredPoisonPrestate = stored_prestate(
-    "node-absent-file-quarantined-regions-released",
-    CustodyState::Quarantined,
-    CustodyState::Released,
-    CustodyState::Released,
-);
-const RELEASED_EMPTY: StoredPoisonPrestate = stored_prestate(
-    "node-absent-file-released-no-regions",
-    CustodyState::Released,
-    CustodyState::NotReached,
-    CustodyState::NotReached,
-);
-const RELEASED_REGIONS: StoredPoisonPrestate = stored_prestate(
-    "node-absent-file-and-regions-released",
-    CustodyState::Released,
-    CustodyState::Released,
-    CustodyState::Released,
-);
-const MAPPING_ONLY_NO_VIEW: StoredPoisonPrestate = stored_prestate(
-    "live-node-mapping-only-view-not-created",
-    CustodyState::Retained,
-    CustodyState::Retained,
-    CustodyState::NotReached,
-);
-const MAPPING_ONLY_VIEW_RELEASED: StoredPoisonPrestate = stored_prestate(
-    "live-node-mapping-only-view-released",
-    CustodyState::Retained,
-    CustodyState::Retained,
-    CustodyState::Released,
-);
-const MAPPING_ONLY_WITH_RETAINED_VIEW: StoredPoisonPrestate = stored_prestate(
-    "live-node-mapping-only-with-prior-retained-view",
-    CustodyState::Retained,
-    CustodyState::Retained,
-    CustodyState::Retained,
-);
-const VIEW_UNMAP_RETAINED: StoredPoisonPrestate = stored_prestate(
-    "live-node-view-unmap-partial-retained",
-    CustodyState::Retained,
-    CustodyState::Retained,
-    CustodyState::Retained,
-);
-const LIVE_AFTER_REGION_RELEASE: StoredPoisonPrestate = stored_prestate(
-    "live-node-regions-released",
-    CustodyState::Retained,
-    CustodyState::Released,
-    CustodyState::Released,
-);
-
-fn stored_poison_prestates(cell: poison::StoredPoisonCell) -> &'static [StoredPoisonPrestate] {
-    match (cell.phase, cell.mutation, cell.lock_outcome_uncertain) {
-        ("Gate", MutationState::None, false) => &[NO_NODE, LIVE_EMPTY, LIVE_COMPLETE],
-        ("FileClose", MutationState::None, false) => &[QUARANTINED_EMPTY],
-        ("ExactSiblingDelete", MutationState::None, false) => &[RELEASED_EMPTY],
-        ("ExactSiblingOpen", MutationState::Uncertain, false) => &[RELEASED_EMPTY],
-        ("DmsTruncate", MutationState::Uncertain, false) => &[LIVE_EMPTY],
-        ("FileClose", MutationState::Uncertain, false) => {
-            &[QUARANTINED_EMPTY, QUARANTINED_RELEASED]
-        }
-        ("ExactSiblingDelete", MutationState::Uncertain, false) => {
-            &[RELEASED_EMPTY, RELEASED_REGIONS]
-        }
-        ("FileGrow", MutationState::Uncertain, false) => &[LIVE_EMPTY, LIVE_COMPLETE],
-        ("MappingClose", MutationState::Uncertain, false) => &[
-            MAPPING_ONLY_NO_VIEW,
-            MAPPING_ONLY_VIEW_RELEASED,
-            MAPPING_ONLY_WITH_RETAINED_VIEW,
-        ],
-        ("ViewUnmap", MutationState::Uncertain, false) => &[VIEW_UNMAP_RETAINED],
-        ("LockRelease", MutationState::None, true)
-        | ("ConnectionDetach", MutationState::None, true) => &[LIVE_EMPTY, LIVE_COMPLETE],
-        ("DeleteAuthorization", MutationState::None, true) => &[NO_NODE, LIVE_EMPTY, LIVE_COMPLETE],
-        ("DmsExclusiveRelease", MutationState::Uncertain, true)
-        | ("DmsSharedRelease", MutationState::Uncertain, true) => {
-            &[LIVE_EMPTY, LIVE_AFTER_REGION_RELEASE]
-        }
-        _ => panic!("unclassified production stored-poison cell: {cell:?}"),
-    }
-}
-
 pub(super) fn build_grow(
     graph: &mut MapGraphBuilder,
     from: &str,
     prefix: &str,
+    profile: MapProfileV1,
     prestate: RegionPrestate,
     initialization_mutated: bool,
     dms_lock: DmsLockCustody,
@@ -306,6 +255,19 @@ pub(super) fn build_grow(
         FailureClass::OutcomeUncertainPoisoned,
         true,
         prestate,
+        dynamic::profile_seed(
+            MapProfileV1 {
+                file_path: MapFilePathV1::GrowAttempted,
+                ..profile
+            },
+            SourceSiteV1::MapFileGrow,
+            StimulusV1::MapManaged(MapManagedStimulusV1::FileGrow),
+            prestate.descriptor(),
+            MapOperationV1::FileGrow,
+            super::super::super::terminal_descriptor::PhaseV1::FileGrow,
+            super::super::super::terminal_descriptor::TimingV1::AtCall,
+            FaultSeamV1::NativeOperation,
+        ),
     );
     spec.mutation = MutationState::Uncertain;
     spec.counts = baseline_counts;
@@ -325,12 +287,32 @@ pub(super) fn build_grow(
         &grow,
         &format!("{prefix}.succeeded"),
         "file_grow_succeeded",
+        MapProfileV1 {
+            file_path: MapFilePathV1::GrowSucceeded,
+            prior_mutation: true,
+            ..profile
+        },
         prestate,
         initialization_mutated,
         true,
         dms_lock,
         spec.counts,
     );
+}
+
+fn initialization_source(site: InitializationFaultSiteV1) -> SourceSiteV1 {
+    match site {
+        InitializationFaultSiteV1::ParentValidationBeforeOpen
+        | InitializationFaultSiteV1::ParentHandle
+        | InitializationFaultSiteV1::PlatformOpen
+        | InitializationFaultSiteV1::OpenCompletionValidation
+        | InitializationFaultSiteV1::OpenFileValidation
+        | InitializationFaultSiteV1::ParentValidationAfterOpen => SourceSiteV1::InitializationOpen,
+        InitializationFaultSiteV1::DmsExclusiveAcquire
+        | InitializationFaultSiteV1::DmsTruncate
+        | InitializationFaultSiteV1::DmsExclusiveRelease
+        | InitializationFaultSiteV1::DmsSharedAcquire => SourceSiteV1::InitializationDms,
+    }
 }
 
 pub(super) fn gate(
@@ -377,7 +359,12 @@ pub(super) fn exclude_region_arm(
     graph.edge(from, &id, DecisionStage::Coordination, suffix);
 }
 
-pub(super) fn failure(phase: &'static str, class: FailureClass, mutated: bool) -> FailureSpec {
+pub(super) fn failure(
+    phase: &'static str,
+    class: FailureClass,
+    mutated: bool,
+    dynamic: DescriptorSeedV1,
+) -> FailureSpec {
     FailureSpec {
         phase,
         failure: class,
@@ -395,6 +382,7 @@ pub(super) fn failure(phase: &'static str, class: FailureClass, mutated: bool) -
         quarantine: mutated,
         lock_outcome_uncertain: false,
         dms_lock: DmsLockCustody::NotReached,
+        dynamic,
     }
 }
 
@@ -403,8 +391,9 @@ pub(super) fn failure_with_prestate(
     class: FailureClass,
     mutated: bool,
     prestate: RegionPrestate,
+    dynamic: DescriptorSeedV1,
 ) -> FailureSpec {
-    let mut spec = failure(phase, class, mutated);
+    let mut spec = failure(phase, class, mutated, dynamic);
     spec.mapping = if prestate.has_mapping() {
         CustodyState::Retained
     } else {

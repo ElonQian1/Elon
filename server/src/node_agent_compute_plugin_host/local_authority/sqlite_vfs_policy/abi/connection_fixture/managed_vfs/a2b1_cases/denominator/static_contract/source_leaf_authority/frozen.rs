@@ -9,7 +9,8 @@ use super::{
     leaf_seal::{leaf_seal_tsv_sha256, LEAF_SEAL_TSV_HEADER_V1},
     manifest_tsv::parse_manifest_tsv,
     model::{ManifestContextV1, RootManifestV1, RootOperationV1},
-    trusted_current_context, validate_graph_against_frozen, MAP_LEAF_LEDGER_PARTS,
+    trusted_current_context, validate_graph_against_frozen_with_records, StreamedLeafV1,
+    MAP_LEAF_LEDGER_PARTS,
 };
 
 const MAP_LEAF_SEAL_PARTS: [&str; MAP_LEAF_LEDGER_PARTS] = [
@@ -34,30 +35,127 @@ const MAP_MANIFEST: &str = include_str!("frozen/map.source-leaf-manifest.v1.tsv"
 const LOCK_LEAF_SEALS: &str = include_str!("frozen/lock.source-leaves.v1.tsv");
 const LOCK_MANIFEST: &str = include_str!("frozen/lock.source-leaf-manifest.v1.tsv");
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct FrozenStaticBindingV1 {
+    pub(crate) context: ManifestContextV1,
+    pub(crate) included_count: u64,
+    pub(crate) excluded_count: u64,
+    pub(crate) source_universe_count: u64,
+    pub(crate) static_manifest_sha256: super::Digest32,
+    pub(crate) included_member_pair_set_sha256: super::Digest32,
+}
+
 pub(crate) fn validate_map_graph(graph: &ContractGraph) -> Result<usize, String> {
+    validate_map_graph_with_records(graph, |_| Ok(()))
+}
+
+pub(crate) fn validate_map_graph_with_records<F>(
+    graph: &ContractGraph,
+    observe_leaf: F,
+) -> Result<usize, String>
+where
+    F: FnMut(StreamedLeafV1<'_>) -> Result<(), String>,
+{
+    validate_map_graph_with_records_and_binding(graph, observe_leaf).and_then(binding_count)
+}
+
+pub(crate) fn validate_map_graph_with_records_and_binding<F>(
+    graph: &ContractGraph,
+    observe_leaf: F,
+) -> Result<FrozenStaticBindingV1, String>
+where
+    F: FnMut(StreamedLeafV1<'_>) -> Result<(), String>,
+{
     let leaf_seals = concatenate_map_leaf_seal_parts()?;
-    validate_root(graph, RootOperationV1::Map, &leaf_seals, MAP_MANIFEST)
+    validate_root_with_records(
+        graph,
+        RootOperationV1::Map,
+        &leaf_seals,
+        MAP_MANIFEST,
+        observe_leaf,
+    )
 }
 
 pub(crate) fn validate_lock_graph(graph: &ContractGraph) -> Result<usize, String> {
-    validate_root(graph, RootOperationV1::Lock, LOCK_LEAF_SEALS, LOCK_MANIFEST)
+    validate_lock_graph_with_records(graph, |_| Ok(()))
 }
 
-fn validate_root(
+pub(crate) fn validate_lock_graph_with_records<F>(
+    graph: &ContractGraph,
+    observe_leaf: F,
+) -> Result<usize, String>
+where
+    F: FnMut(StreamedLeafV1<'_>) -> Result<(), String>,
+{
+    validate_lock_graph_with_records_and_binding(graph, observe_leaf).and_then(binding_count)
+}
+
+pub(crate) fn validate_lock_graph_with_records_and_binding<F>(
+    graph: &ContractGraph,
+    observe_leaf: F,
+) -> Result<FrozenStaticBindingV1, String>
+where
+    F: FnMut(StreamedLeafV1<'_>) -> Result<(), String>,
+{
+    validate_root_with_records(
+        graph,
+        RootOperationV1::Lock,
+        LOCK_LEAF_SEALS,
+        LOCK_MANIFEST,
+        observe_leaf,
+    )
+}
+
+fn validate_root_with_records<F>(
     graph: &ContractGraph,
     root: RootOperationV1,
     frozen_leaf_seals: &str,
     frozen_manifest_tsv: &str,
-) -> Result<usize, String> {
+    observe_leaf: F,
+) -> Result<FrozenStaticBindingV1, String>
+where
+    F: FnMut(StreamedLeafV1<'_>) -> Result<(), String>,
+{
     let (trusted_context, frozen_manifest) =
         load_trusted_frozen_pair(root, frozen_leaf_seals, frozen_manifest_tsv)?;
+    let mut included_members = Vec::new();
+    let mut observe_leaf = observe_leaf;
+    let included = validate_graph_against_frozen_with_records(
+        graph,
+        trusted_context.clone(),
+        frozen_leaf_seals,
+        &frozen_manifest,
+        |leaf| {
+            if let StreamedLeafV1::Terminal { seal, .. } = &leaf {
+                included_members.push((seal.case_key_sha256, seal.full_record_sha256));
+            }
+            observe_leaf(leaf)
+        },
+    )?;
+    if included != frozen_manifest.included_count {
+        return Err(format!(
+            "{} frozen ingress count {} differs from manifest {}",
+            root.canonical_name(),
+            included,
+            frozen_manifest.included_count
+        ));
+    }
+    Ok(FrozenStaticBindingV1 {
+        context: trusted_context,
+        included_count: frozen_manifest.included_count,
+        excluded_count: frozen_manifest.excluded_count,
+        source_universe_count: graph.source_leaf_universe.len() as u64,
+        static_manifest_sha256: frozen_manifest.manifest_sha256,
+        included_member_pair_set_sha256: super::digest_included_member_pair_set(included_members),
+    })
+}
 
-    let included =
-        validate_graph_against_frozen(graph, trusted_context, frozen_leaf_seals, &frozen_manifest)?;
-    usize::try_from(included).map_err(|_| {
+fn binding_count(binding: FrozenStaticBindingV1) -> Result<usize, String> {
+    usize::try_from(binding.included_count).map_err(|_| {
         format!(
             "{} frozen included count does not fit usize: {included}",
-            root.canonical_name()
+            binding.context.root.canonical_name(),
+            included = binding.included_count,
         )
     })
 }

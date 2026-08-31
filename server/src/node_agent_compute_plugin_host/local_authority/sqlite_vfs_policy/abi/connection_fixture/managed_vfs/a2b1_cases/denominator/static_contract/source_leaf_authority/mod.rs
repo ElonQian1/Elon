@@ -17,6 +17,7 @@ mod manifest;
 mod manifest_tsv;
 mod map_profiles;
 mod model;
+mod observer;
 mod source_scope;
 mod source_scope_support;
 mod trusted_context;
@@ -24,18 +25,24 @@ mod trusted_context;
 pub(crate) use accumulator::ManifestAccumulatorV1;
 pub(crate) use adapter::{
     exact_graph_leaf_identity, stream_graph_manifest, stream_graph_manifest_with_identity,
-    validate_graph_against_frozen,
+    stream_graph_manifest_with_identity_and_records, stream_graph_manifest_with_records,
+    validate_graph_against_frozen, validate_graph_against_frozen_with_records,
 };
 pub(crate) use canonical::{
-    digest_case_key, digest_full_record, digest_leaf_identity, digest_lock_range_set,
-    digest_map_ordinal_domains, digest_map_profile_set, digest_source_scope,
+    digest_case_key, digest_full_record, digest_included_member_pair_set, digest_leaf_identity,
+    digest_lock_range_set, digest_map_ordinal_domains, digest_map_profile_set, digest_source_scope,
 };
 pub(crate) use comparison::{compare_exact_records, RecordDiff};
 pub(crate) use expected::{
     CustodyStateV1, DmsLockCustodyV1, ExpectedV1, FailureClassV1, LockEffectV1, LockModeV1,
     MutationStateV1, ObservableCountsV1, SqliteResultV1, TerminalDispositionV1,
 };
-pub(crate) use frozen::{validate_lock_graph, validate_map_graph};
+pub(crate) use frozen::{
+    validate_lock_graph, validate_lock_graph_with_records,
+    validate_lock_graph_with_records_and_binding, validate_map_graph,
+    validate_map_graph_with_records, validate_map_graph_with_records_and_binding,
+    FrozenStaticBindingV1,
+};
 pub(crate) use leaf_seal::{
     encode_leaf_seal_tsv, leaf_seal_tsv_sha256, parse_leaf_seal_tsv, FrozenLeafSealV1,
     FrozenLeafSealVerifierV1, LeafSealOutcomeV1, LeafSealV1, LEAF_SEAL_TSV_HEADER_V1,
@@ -55,6 +62,7 @@ pub(crate) use model::{
     ExclusionProofV1, LeafIdentityV1, LeafOutcomeV1, LeafRecordV1, ManifestContextV1,
     RootManifestV1, RootOperationV1, ShardManifestV1, SourceScopeFileV1, SourceWitnessV1,
 };
+pub(crate) use observer::StreamedLeafV1;
 pub(crate) use source_scope::{
     source_scope_files, source_scope_sha256, validate_baseline_path_blob,
     validate_baseline_path_blobs, validate_record_source_witnesses, validate_source_scope,

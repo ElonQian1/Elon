@@ -6,6 +6,7 @@
 //! wrapper is part of this production graph.
 
 mod builder;
+mod dynamic;
 mod input;
 mod managed;
 mod outcome;

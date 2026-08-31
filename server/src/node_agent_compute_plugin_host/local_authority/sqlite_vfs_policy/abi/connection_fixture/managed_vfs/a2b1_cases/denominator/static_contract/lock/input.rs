@@ -1,9 +1,14 @@
+use super::super::terminal_descriptor::{
+    FaultSeamV1, LockAbiScalarV1, LockManagedStimulusV1, LockOperationV1, LockPrestateV1,
+    ObserverV1, OccurrenceV1, PhaseV1, SourceSiteV1, StimulusV1, TimingV1, ValidityV1,
+};
 use super::{
     super::{
         model::{CustodyState, DecisionStage, FailureClass, LockEffect},
         source::{witness, ProductionOwner, SourceWitness},
     },
     builder::Builder,
+    dynamic::{SeedV1, TerminalPathV1},
     outcome,
     range::{self, Action, RangeCell},
 };
@@ -16,6 +21,32 @@ pub(super) struct ValidRequest {
     pub(super) range: RangeCell,
     pub(super) node: String,
     pub(super) prefix: String,
+}
+
+impl ValidRequest {
+    #[allow(clippy::too_many_arguments)]
+    pub(super) fn descriptor(
+        &self,
+        source_site: SourceSiteV1,
+        stimulus: LockManagedStimulusV1,
+        prestate: LockPrestateV1,
+        operation: LockOperationV1,
+        phase: PhaseV1,
+        timing: TimingV1,
+        fault_seam: FaultSeamV1,
+    ) -> SeedV1 {
+        SeedV1::managed(
+            self.action,
+            self.range,
+            source_site,
+            stimulus,
+            prestate,
+            operation,
+            phase,
+            timing,
+            fault_seam,
+        )
+    }
 }
 
 pub(super) fn build(builder: &mut Builder) -> (String, Vec<ValidRequest>) {
@@ -59,6 +90,21 @@ pub(super) fn build(builder: &mut Builder) -> (String, Vec<ValidRequest>) {
                     DecisionStage::AbiValidation,
                     &cell,
                     expected,
+                    SeedV1::early(
+                        SourceSiteV1::LockAbiBoundary,
+                        StimulusV1::LockAbi(LockAbiScalarV1 {
+                            offset: typed_validity(offset_valid),
+                            count: typed_validity(count_valid),
+                            flags: typed_validity(flags_valid),
+                        }),
+                        LockOperationV1::AbiValidation,
+                        PhaseV1::AbiValidation,
+                        TimingV1::BeforeCall,
+                        OccurrenceV1::Natural,
+                        FaultSeamV1::AbiBoundary,
+                        ObserverV1::LockCallbackAndSnapshot,
+                    )
+                    .terminal(TerminalPathV1::Direct),
                     abi_witness("return result_codes::SHM_LOCK_UNAVAILABLE;"),
                 );
             }
@@ -126,25 +172,37 @@ fn add_action(
         DecisionStage::ManagedRequest,
         action.label(),
     );
-    for (cell, needle) in [
+    for (cell, needle, stimulus) in [
         (
             "range-overflow",
             "NODE_MANAGED_SQLITE_SHM_LOCK_RANGE_OVERFLOW",
+            LockManagedStimulusV1::RangeOverflow,
         ),
         (
             "end-past-eight",
             "NODE_MANAGED_SQLITE_SHM_LOCK_RANGE_INVALID",
+            LockManagedStimulusV1::EndPastEight,
         ),
     ] {
-        add_request_rejection(builder, &request_gate, &prefix, cell, needle);
+        add_request_rejection(
+            builder,
+            &request_gate,
+            &prefix,
+            action,
+            cell,
+            needle,
+            stimulus,
+        );
     }
     if action.is_shared() {
         add_request_rejection(
             builder,
             &request_gate,
             &prefix,
+            action,
             "shared-multi-slot",
             "NODE_MANAGED_SQLITE_SHM_SHARED_LOCK_NOT_SINGLE_SLOT",
+            LockManagedStimulusV1::SharedMultiSlot,
         );
     }
     for range in range::representatives(action) {
@@ -179,8 +237,10 @@ fn add_request_rejection(
     builder: &mut Builder,
     request_gate: &str,
     prefix: &str,
+    action: Action,
     cell: &str,
     needle: &'static str,
+    stimulus: LockManagedStimulusV1,
 ) {
     let mut expected = outcome::unavailable("RequestValidation");
     expected.failure = FailureClass::ProtocolViolation;
@@ -194,6 +254,7 @@ fn add_request_rejection(
         DecisionStage::ManagedRequest,
         cell,
         expected,
+        SeedV1::request_rejection(action, stimulus),
         witness(
             ProductionOwner::ManagedTypes,
             "pub(crate) fn new",
@@ -208,6 +269,14 @@ fn validity(value: bool) -> &'static str {
         "valid"
     } else {
         "invalid"
+    }
+}
+
+const fn typed_validity(value: bool) -> ValidityV1 {
+    if value {
+        ValidityV1::Valid
+    } else {
+        ValidityV1::Invalid
     }
 }
 

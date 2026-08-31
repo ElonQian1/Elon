@@ -3,6 +3,9 @@ mod helpers;
 mod local;
 mod release;
 
+use super::super::terminal_descriptor::{
+    FaultSeamV1, LockManagedStimulusV1, LockOperationV1, LockPrestateV1, SourceSiteV1, TimingV1,
+};
 use super::{
     super::{
         model::{
@@ -35,7 +38,7 @@ pub(super) fn expand(builder: &mut Builder, request: ValidRequest) {
         DecisionStage::CallbackAdmission,
         "begin_shm_callback",
     );
-    add_admission_failures(builder, &admission, &request.prefix);
+    add_admission_failures(builder, &admission, &request);
 
     let custody_present = builder.decision(
         format!("{}.custody-present", request.prefix),
@@ -87,6 +90,15 @@ pub(super) fn expand(builder: &mut Builder, request: ValidRequest) {
         "not_wal_main",
         registry_operations("fn with_shm<T>", "UnsupportedFileRole"),
         Shape::failure(
+            request.descriptor(
+                SourceSiteV1::AdapterDispatch,
+                LockManagedStimulusV1::UnsupportedFileRole,
+                LockPrestateV1::NotReached,
+                LockOperationV1::CallbackAdmission,
+                super::super::terminal_descriptor::PhaseV1::CallbackAdmission,
+                TimingV1::BeforeCall,
+                FaultSeamV1::RegistryAdmission,
+            ),
             "CallbackAdmission",
             FailureClass::RegistryRejected,
             MutationState::None,
@@ -110,6 +122,15 @@ pub(super) fn expand(builder: &mut Builder, request: ValidRequest) {
         "wal_main_without_shm",
         registry_operations("fn with_shm<T>", "ShmDetached"),
         Shape::failure(
+            request.descriptor(
+                SourceSiteV1::AdapterDispatch,
+                LockManagedStimulusV1::ShmDetached,
+                LockPrestateV1::NotReached,
+                LockOperationV1::CallbackAdmission,
+                super::super::terminal_descriptor::PhaseV1::CallbackAdmission,
+                TimingV1::BeforeCall,
+                FaultSeamV1::RegistryAdmission,
+            ),
             "CallbackAdmission",
             FailureClass::RegistryRejected,
             MutationState::None,
@@ -172,6 +193,15 @@ pub(super) fn expand(builder: &mut Builder, request: ValidRequest) {
                 "return Err(poison.failure());",
             ),
             Shape::failure(
+                request.descriptor(
+                    SourceSiteV1::CoordinatorState,
+                    LockManagedStimulusV1::StoredPoison,
+                    LockPrestateV1::StoredPoison,
+                    LockOperationV1::Quarantine,
+                    cell.typed_phase,
+                    TimingV1::BeforeCall,
+                    FaultSeamV1::Natural,
+                ),
                 cell.phase,
                 FailureClass::OutcomeUncertainPoisoned,
                 cell.mutation,

@@ -1,3 +1,7 @@
+use super::super::super::terminal_descriptor::{
+    FaultSeamV1, LockManagedStimulusV1, LockOperationV1, LockPrestateV1, PhaseV1, SourceSiteV1,
+    TimingV1,
+};
 use super::super::{
     super::{
         model::{
@@ -7,6 +11,8 @@ use super::super::{
         source::{witness, ProductionOwner, SourceWitness},
     },
     builder::Builder,
+    dynamic::SeedV1,
+    input::ValidRequest,
     outcome::{self, Shape},
 };
 
@@ -46,8 +52,9 @@ pub(super) fn unsafe_branch(
     outcome::unsafe_failure(builder, &cause, prefix, shape);
 }
 
-pub(super) fn protocol(phase: &'static str, lock: u16, unlock: u16) -> Shape {
+pub(super) fn protocol(descriptor: SeedV1, phase: &'static str, lock: u16, unlock: u16) -> Shape {
     Shape::failure(
+        descriptor,
         phase,
         FailureClass::ProtocolViolation,
         MutationState::None,
@@ -58,7 +65,12 @@ pub(super) fn protocol(phase: &'static str, lock: u16, unlock: u16) -> Shape {
     .with_dms_lock(DmsLockCustody::ExistingShared)
 }
 
-pub(super) fn add_admission_failures(builder: &mut Builder, admission: &str, prefix: &str) {
+pub(super) fn add_admission_failures(
+    builder: &mut Builder,
+    admission: &str,
+    request: &ValidRequest,
+) {
+    let prefix = &request.prefix;
     let owner_poisoned = builder.excluded(
         format!("{prefix}.admission-rejected.excluded.owner-poisoned"),
         super::super::super::poison::owner_mutex_poison_proof(),
@@ -75,9 +87,10 @@ pub(super) fn add_admission_failures(builder: &mut Builder, admission: &str, pre
         DecisionStage::CallbackAdmission,
         "owner-poisoned",
     );
-    for (branch, route, disposition, source) in [
+    for (branch, stimulus, route, disposition, source) in [
         (
             "route-unknown-prior-quarantine",
+            LockManagedStimulusV1::AdmissionRouteUnknown,
             CustodyState::Quarantined,
             TerminalDisposition::Returned,
             witness(
@@ -89,6 +102,7 @@ pub(super) fn add_admission_failures(builder: &mut Builder, admission: &str, pre
         ),
         (
             "counter-overflow",
+            LockManagedStimulusV1::AdmissionCounterOverflow,
             CustodyState::Quarantined,
             TerminalDisposition::Quarantined,
             witness(
@@ -117,6 +131,15 @@ pub(super) fn add_admission_failures(builder: &mut Builder, admission: &str, pre
             DecisionStage::CallbackAdmission,
             branch,
             expected,
+            request.descriptor(
+                SourceSiteV1::RegistryCallbackAdmission,
+                stimulus,
+                LockPrestateV1::NotReached,
+                LockOperationV1::CallbackAdmission,
+                PhaseV1::CallbackAdmission,
+                TimingV1::BeforeCall,
+                FaultSeamV1::RegistryAdmission,
+            ),
             source,
         );
     }

@@ -5,7 +5,12 @@ use super::{
         CustodyState, DecisionStage, DmsLockCustody, ExclusionProof, FailureClass, MutationState,
         ObservableCounts, TerminalDisposition,
     },
+    super::terminal_descriptor::{
+        FaultSeamV1, MapManagedStimulusV1, MapOperationV1, MapPrestateV1, MapProfileV1,
+        MapRegionPrestateV1, PhaseV1, SourceSiteV1, StimulusV1, TimingV1,
+    },
     builder::MapGraphBuilder,
+    dynamic,
     projection::{self, FailureSpec},
     witnesses as w,
 };
@@ -27,6 +32,7 @@ pub(super) struct LoopSpec {
     pub(super) preexisting_mapping: bool,
     pub(super) baseline_counts: ObservableCounts,
     pub(super) dms_lock: DmsLockCustody,
+    pub(super) profile: MapProfileV1,
 }
 
 pub(super) fn assert_authority_loop_bounds() {
@@ -259,7 +265,7 @@ fn add_mapping_failure(
         graph,
         &cause,
         &format!("{prefix}.projection"),
-        failure_spec(spec, ordinal, "MappingCreate", class, mutated, false),
+        failure_spec(spec, ordinal, PhaseV1::MappingCreate, class, mutated, false),
     );
 }
 
@@ -282,7 +288,7 @@ fn add_view_failure(
         graph,
         &close,
         &format!("{prefix}.close-succeeded"),
-        failure_spec(spec, ordinal, "ViewMap", class, mutated, false),
+        failure_spec(spec, ordinal, PhaseV1::ViewMap, class, mutated, false),
     );
 
     let retained = graph.decision(
@@ -310,7 +316,7 @@ fn add_view_failure(
     let mut close_failure = failure_spec(
         spec,
         ordinal,
-        "MappingClose",
+        PhaseV1::MappingClose,
         FailureClass::OutcomeUncertainPoisoned,
         true,
         true,
@@ -328,7 +334,7 @@ fn add_view_failure(
 fn failure_spec(
     spec: &LoopSpec,
     ordinal: u16,
-    phase: &'static str,
+    phase: PhaseV1,
     failure: FailureClass,
     mutated: bool,
     retains_new_mapping: bool,
@@ -341,13 +347,13 @@ fn failure_spec(
     };
     let mut counts = spec.baseline_counts;
     counts.mapping_create += ordinal;
-    counts.view_map += if phase == "MappingCreate" {
+    counts.view_map += if matches!(phase, PhaseV1::MappingCreate) {
         ordinal - 1
     } else {
         ordinal
     };
     FailureSpec {
-        phase,
+        phase: phase.static_name(),
         failure,
         mutation: if mutated {
             MutationState::Known
@@ -371,6 +377,7 @@ fn failure_spec(
         quarantine: mutated,
         lock_outcome_uncertain: false,
         dms_lock: spec.dms_lock,
+        dynamic: loop_failure_seed(spec, ordinal, phase),
     }
 }
 
@@ -410,5 +417,63 @@ fn add_target_success(graph: &mut MapGraphBuilder, control: &str, spec: &LoopSpe
         MutationState::Known,
         spec.dms_lock,
         counts,
+        dynamic::ordinal_seed(
+            spec.profile,
+            ordinal,
+            SourceSiteV1::AbiProjection,
+            StimulusV1::MapManaged(MapManagedStimulusV1::Success),
+            loop_prestate(spec.profile),
+            MapOperationV1::SuccessProjection,
+            PhaseV1::Success,
+            TimingV1::Natural,
+            FaultSeamV1::Natural,
+        ),
     );
+}
+
+fn loop_failure_seed(spec: &LoopSpec, ordinal: u16, phase: PhaseV1) -> dynamic::DescriptorSeedV1 {
+    let (site, stimulus, operation, timing, seam) = match phase {
+        PhaseV1::MappingCreate => (
+            SourceSiteV1::MapMappingCreate,
+            MapManagedStimulusV1::MappingCreate,
+            MapOperationV1::MappingCreate,
+            TimingV1::AtCall,
+            FaultSeamV1::NativeOperation,
+        ),
+        PhaseV1::ViewMap => (
+            SourceSiteV1::MapViewMap,
+            MapManagedStimulusV1::ViewMap,
+            MapOperationV1::ViewMap,
+            TimingV1::AtCall,
+            FaultSeamV1::NativeOperation,
+        ),
+        PhaseV1::MappingClose => (
+            SourceSiteV1::MapMappingClose,
+            MapManagedStimulusV1::MappingClose,
+            MapOperationV1::MappingClose,
+            TimingV1::Cleanup,
+            FaultSeamV1::Cleanup,
+        ),
+        _ => unreachable!("Map loop failure uses one of three typed phases"),
+    };
+    dynamic::ordinal_seed(
+        spec.profile,
+        ordinal,
+        site,
+        StimulusV1::MapManaged(stimulus),
+        loop_prestate(spec.profile),
+        operation,
+        phase,
+        timing,
+        seam,
+    )
+}
+
+fn loop_prestate(profile: MapProfileV1) -> MapPrestateV1 {
+    match profile.prestate {
+        MapRegionPrestateV1::Empty => MapPrestateV1::RegionsEmpty,
+        MapRegionPrestateV1::NonemptyTargetMissing => MapPrestateV1::TargetMissing,
+        MapRegionPrestateV1::Reuse => MapPrestateV1::TargetMapped,
+        MapRegionPrestateV1::ObserveNotPresent => MapPrestateV1::RegionsEmpty,
+    }
 }

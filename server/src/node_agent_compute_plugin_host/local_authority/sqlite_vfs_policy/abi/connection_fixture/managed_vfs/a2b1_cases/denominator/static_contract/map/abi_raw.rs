@@ -1,6 +1,13 @@
 use super::{
-    super::model::{DecisionStage, ExclusionProof, Expected, RootOperation},
+    super::{
+        model::{DecisionStage, ExclusionProof, Expected, RootOperation},
+        terminal_descriptor::{
+            FaultSeamV1, MapAbiScalarV1, MapAxesV1, MapOperationV1, MapPrestateV1, OccurrenceV1,
+            PhaseV1, PresenceV1, SourceSiteV1, StimulusV1, TimingV1, ValidityV1,
+        },
+    },
     builder::MapGraphBuilder,
+    dynamic::DescriptorSeedV1,
     witnesses as w,
 };
 
@@ -88,19 +95,64 @@ fn add_scalar_cells(
     output: &str,
     can_continue: bool,
 ) -> Option<String> {
-    for mask in [
-        "invalid-region",
-        "invalid-region-size",
-        "invalid-region-and-size",
-        "invalid-extend",
-        "invalid-region-and-extend",
-        "invalid-size-and-extend",
-        "invalid-region-size-and-extend",
+    for (mask, region, region_size, extend) in [
+        (
+            "invalid-region",
+            ValidityV1::Invalid,
+            ValidityV1::Valid,
+            ValidityV1::Valid,
+        ),
+        (
+            "invalid-region-size",
+            ValidityV1::Valid,
+            ValidityV1::Invalid,
+            ValidityV1::Valid,
+        ),
+        (
+            "invalid-region-and-size",
+            ValidityV1::Invalid,
+            ValidityV1::Invalid,
+            ValidityV1::Valid,
+        ),
+        (
+            "invalid-extend",
+            ValidityV1::Valid,
+            ValidityV1::Valid,
+            ValidityV1::Invalid,
+        ),
+        (
+            "invalid-region-and-extend",
+            ValidityV1::Invalid,
+            ValidityV1::Valid,
+            ValidityV1::Invalid,
+        ),
+        (
+            "invalid-size-and-extend",
+            ValidityV1::Valid,
+            ValidityV1::Invalid,
+            ValidityV1::Invalid,
+        ),
+        (
+            "invalid-region-size-and-extend",
+            ValidityV1::Invalid,
+            ValidityV1::Invalid,
+            ValidityV1::Invalid,
+        ),
     ] {
         let id = format!("map.abi.terminal.{output}.{mask}");
         graph.terminal(
             &id,
             Expected::unavailable(RootOperation::Map, "AbiValidation"),
+            abi_scalar_descriptor(
+                if can_continue {
+                    PresenceV1::Present
+                } else {
+                    PresenceV1::Absent
+                },
+                region,
+                region_size,
+                extend,
+            ),
             w::abi(
                 "unsafe extern \"C\" fn map",
                 "return result_codes::SHM_MAP_UNAVAILABLE;",
@@ -113,6 +165,12 @@ fn add_scalar_cells(
         graph.terminal(
             id,
             Expected::unavailable(RootOperation::Map, "AbiValidation"),
+            abi_scalar_descriptor(
+                PresenceV1::Absent,
+                ValidityV1::Valid,
+                ValidityV1::Valid,
+                ValidityV1::Valid,
+            ),
             w::abi("unsafe extern \"C\" fn map", "if output.is_null()"),
         );
         graph.edge(from, id, DecisionStage::AbiValidation, "valid_scalars");
@@ -127,4 +185,29 @@ fn add_scalar_cells(
     );
     graph.edge(from, &raw, DecisionStage::AbiValidation, "valid_scalars");
     Some(raw)
+}
+
+fn abi_scalar_descriptor(
+    output: PresenceV1,
+    region: ValidityV1,
+    region_size: ValidityV1,
+    extend: ValidityV1,
+) -> super::super::terminal_descriptor::TerminalDescriptorV1 {
+    DescriptorSeedV1::new(
+        SourceSiteV1::MapAbiBoundary,
+        StimulusV1::MapAbi(MapAbiScalarV1 {
+            output,
+            region,
+            region_size,
+            extend,
+        }),
+        MapPrestateV1::NotReached,
+        MapOperationV1::AbiValidation,
+        PhaseV1::AbiValidation,
+        TimingV1::BeforeCall,
+        OccurrenceV1::Natural,
+        FaultSeamV1::AbiBoundary,
+        MapAxesV1::NOT_REACHED,
+    )
+    .direct()
 }

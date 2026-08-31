@@ -1,3 +1,7 @@
+use super::super::terminal_descriptor::{
+    InitializationFaultSiteV1, InitializationPathV1, InitializationStimulusV1, OccurrenceV1,
+    PhaseV1, TimingV1,
+};
 use super::{
     dms, failure_custody, namespace, namespace_close, namespace_types, shm_root, CustodyState,
     DmsLockCustody, ExclusionProof, FailureClass, FailureShape, InitBuilder, MutationState,
@@ -37,6 +41,7 @@ pub(super) fn build(builder: &mut InitBuilder, from: &str) {
         &parent_validation,
         "parent-validation-before-open",
         "parent_validation_failed",
+        InitializationFaultSiteV1::ParentValidationBeforeOpen,
     );
 
     let parent_handle = builder.decision(
@@ -56,6 +61,7 @@ pub(super) fn build(builder: &mut InitBuilder, from: &str) {
         &parent_handle,
         "parent-handle",
         "parent_handle_failed",
+        InitializationFaultSiteV1::ParentHandle,
     );
 
     let native_open = builder.decision(
@@ -71,6 +77,7 @@ pub(super) fn build(builder: &mut InitBuilder, from: &str) {
         &native_open,
         "platform-open",
         "platform_open_failed",
+        InitializationFaultSiteV1::PlatformOpen,
     );
 
     let completion = builder.decision(
@@ -86,6 +93,7 @@ pub(super) fn build(builder: &mut InitBuilder, from: &str) {
         &completion,
         "completion-validation",
         "open_completion_rejected",
+        InitializationFaultSiteV1::OpenCompletionValidation,
     );
 
     let identity = builder.decision(
@@ -101,6 +109,7 @@ pub(super) fn build(builder: &mut InitBuilder, from: &str) {
         &identity,
         "file-validation",
         "file_validation_rejected",
+        InitializationFaultSiteV1::OpenFileValidation,
     );
 
     let parent_revalidation = builder.decision(
@@ -116,6 +125,7 @@ pub(super) fn build(builder: &mut InitBuilder, from: &str) {
         &parent_revalidation,
         "parent-validation-after-open",
         "parent_revalidation_rejected",
+        InitializationFaultSiteV1::ParentValidationAfterOpen,
     );
 
     let created = builder.decision(
@@ -134,7 +144,13 @@ pub(super) fn build(builder: &mut InitBuilder, from: &str) {
     dms::build_exclusive(builder, &created, true, "opened_created");
 }
 
-fn not_opened_failure(builder: &mut InitBuilder, from: &str, cell: &str, branch: &str) {
+fn not_opened_failure(
+    builder: &mut InitBuilder,
+    from: &str,
+    cell: &str,
+    branch: &str,
+    site: InitializationFaultSiteV1,
+) {
     let live = builder.decision(
         &format!("open.failure.{cell}.live-custody"),
         failure_custody(
@@ -151,10 +167,16 @@ fn not_opened_failure(builder: &mut InitBuilder, from: &str, cell: &str, branch:
         namespace("fn open_exact", "ManagedSqliteFileOpenFailure::not_opened"),
     );
     builder.edge(&live, &impossible_live, "live_custody_present");
-    finish_absent_close_custody(builder, &live, cell, "live_custody_absent");
+    finish_absent_close_custody(builder, &live, cell, "live_custody_absent", site);
 }
 
-fn rejected_open_failure(builder: &mut InitBuilder, from: &str, cell: &str, branch: &str) {
+fn rejected_open_failure(
+    builder: &mut InitBuilder,
+    from: &str,
+    cell: &str,
+    branch: &str,
+    site: InitializationFaultSiteV1,
+) {
     let live = builder.decision(
         &format!("open.failure.{cell}.live-custody"),
         failure_custody(
@@ -187,16 +209,24 @@ fn rejected_open_failure(builder: &mut InitBuilder, from: &str, cell: &str, bran
         &close,
         &format!("{cell}.close-ok"),
         "live_close_succeeded",
+        site,
     );
     finish_close_failure(
         builder,
         &close,
         &format!("{cell}.close-failed"),
         "live_close_failed",
+        site,
     );
 }
 
-fn finish_absent_close_custody(builder: &mut InitBuilder, from: &str, cell: &str, branch: &str) {
+fn finish_absent_close_custody(
+    builder: &mut InitBuilder,
+    from: &str,
+    cell: &str,
+    branch: &str,
+    site: InitializationFaultSiteV1,
+) {
     let close_custody = builder.decision(
         &format!("open.failure.{cell}.prior-close-custody"),
         failure_custody(
@@ -224,11 +254,17 @@ fn finish_absent_close_custody(builder: &mut InitBuilder, from: &str, cell: &str
             "fn consume_open_failure",
             "ManagedSqliteShmFailurePhase::ExactSiblingOpen",
         ),
-        open_failure_shape("ExactSiblingOpen", CustodyState::Released),
+        open_failure_shape(PhaseV1::ExactSiblingOpen, CustodyState::Released, site),
     );
 }
 
-fn finish_close_failure(builder: &mut InitBuilder, from: &str, cell: &str, branch: &str) {
+fn finish_close_failure(
+    builder: &mut InitBuilder,
+    from: &str,
+    cell: &str,
+    branch: &str,
+    site: InitializationFaultSiteV1,
+) {
     let close_custody = builder.decision(
         &format!("open.failure.{cell}.prior-close-custody"),
         failure_custody(
@@ -253,17 +289,32 @@ fn finish_close_failure(builder: &mut InitBuilder, from: &str, cell: &str, branc
             "fn consume_open_failure",
             "ManagedSqliteShmFailurePhase::FileClose",
         ),
-        open_failure_shape("FileClose", CustodyState::Quarantined),
+        open_failure_shape(PhaseV1::FileClose, CustodyState::Quarantined, site),
     );
 }
 
-fn open_failure_shape(phase: &'static str, file: CustodyState) -> FailureShape {
+fn open_failure_shape(
+    phase: PhaseV1,
+    file: CustodyState,
+    fault_site: InitializationFaultSiteV1,
+) -> FailureShape {
     FailureShape {
         phase,
+        stimulus: InitializationStimulusV1 {
+            fault_site,
+            path: InitializationPathV1::Opening,
+            cleanup_rewrite: false,
+        },
+        timing: if matches!(phase, PhaseV1::FileClose) {
+            TimingV1::Cleanup
+        } else {
+            TimingV1::AtCall
+        },
+        occurrence: OccurrenceV1::Natural,
         class: FailureClass::OutcomeUncertainPoisoned,
         mutation: MutationState::Uncertain,
         lock_uncertain: false,
-        disposition: if phase == "FileClose" {
+        disposition: if matches!(phase, PhaseV1::FileClose) {
             TerminalDisposition::CleanupRewritten
         } else {
             TerminalDisposition::Quarantined

@@ -4,6 +4,7 @@
 //! replacing every continuation in one rooted decision graph with its downstream leaves; local
 //! fragment widths are never added together.
 
+mod dynamic_quotient;
 mod initialization;
 mod invariants;
 mod lock;
@@ -12,6 +13,22 @@ mod model;
 mod poison;
 mod source;
 mod source_leaf_authority;
+mod terminal_descriptor;
+
+pub(crate) use terminal_descriptor::CapabilityGapV1;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum DynamicQuotientCandidateGateErrorV1 {
+    RunnerCapabilityMissing {
+        count: u64,
+        gap: CapabilityGapV1,
+    },
+    DescriptorBindingCommitmentDrift {
+        expected_sha256: String,
+        actual_sha256: String,
+    },
+    Unexpected(String),
+}
 
 pub(super) fn validate_map() -> Result<usize, String> {
     validate_source_owner_authority()?;
@@ -37,6 +54,37 @@ pub(super) fn validate_all() -> Result<(usize, usize), String> {
     require_same_count("Map", map_graph_count, map)?;
     require_same_count("Lock", lock_graph_count, lock)?;
     Ok((map, lock))
+}
+
+pub(super) fn validate_map_dynamic_quotient_candidate_gate(
+) -> Result<(), DynamicQuotientCandidateGateErrorV1> {
+    dynamic_quotient::build_map_dynamic_candidate_v1(&map::graph())
+        .map(|_| ())
+        .map_err(classify_dynamic_candidate_error)
+}
+
+pub(super) fn validate_lock_dynamic_quotient_candidate_gate(
+) -> Result<(), DynamicQuotientCandidateGateErrorV1> {
+    dynamic_quotient::build_lock_dynamic_candidate_v1(&lock::graph())
+        .map(|_| ())
+        .map_err(classify_dynamic_candidate_error)
+}
+
+fn classify_dynamic_candidate_error(
+    error: dynamic_quotient::DynamicCandidateErrorV1,
+) -> DynamicQuotientCandidateGateErrorV1 {
+    match error {
+        dynamic_quotient::DynamicCandidateErrorV1::Catalog(
+            dynamic_quotient::CatalogErrorV1::RunnerCapabilityMissing { count, gap, .. },
+        ) => DynamicQuotientCandidateGateErrorV1::RunnerCapabilityMissing { count, gap },
+        dynamic_quotient::DynamicCandidateErrorV1::Catalog(
+            dynamic_quotient::CatalogErrorV1::DescriptorBindingCommitmentDrift { expected, actual },
+        ) => DynamicQuotientCandidateGateErrorV1::DescriptorBindingCommitmentDrift {
+            expected_sha256: expected.to_lower_hex(),
+            actual_sha256: actual.to_lower_hex(),
+        },
+        other => DynamicQuotientCandidateGateErrorV1::Unexpected(format!("{other:?}")),
+    }
 }
 
 pub(super) fn validate_source_owner_authority() -> Result<(), String> {

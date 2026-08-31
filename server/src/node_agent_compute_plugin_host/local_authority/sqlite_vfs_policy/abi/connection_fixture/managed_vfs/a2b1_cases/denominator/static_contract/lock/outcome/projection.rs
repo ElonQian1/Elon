@@ -7,6 +7,7 @@ use super::super::{
         source::{witness, ProductionOwner, SourceWitness},
     },
     builder::Builder,
+    dynamic::{SeedV1, TerminalPathV1},
 };
 use super::{abi_projection, Shape};
 
@@ -80,6 +81,11 @@ pub(super) fn add_completion_terminal(
         &projection,
         &format!("{prefix}.terminal.{branch}"),
         expected,
+        shape.descriptor,
+        match completion {
+            Completion::Completed => TerminalPathV1::Completed,
+            Completion::RouteUnknown => TerminalPathV1::RouteUnknown,
+        },
     );
 }
 
@@ -100,9 +106,21 @@ pub(super) fn adapter_projection(builder: &mut Builder, id: &str, sqlite: Sqlite
     )
 }
 
-pub(super) fn add_abi_terminal(builder: &mut Builder, from: &str, id: &str, expected: Expected) {
+pub(super) fn add_abi_terminal(
+    builder: &mut Builder,
+    from: &str,
+    id: &str,
+    expected: Expected,
+    descriptor: SeedV1,
+    terminal_path: TerminalPathV1,
+) {
     let sqlite = expected.sqlite;
-    let terminal = builder.terminal(id, expected, abi_projection(sqlite));
+    let terminal = builder.terminal(
+        id,
+        expected,
+        descriptor.terminal(terminal_path),
+        abi_projection(sqlite),
+    );
     builder.edge(
         from,
         &terminal,

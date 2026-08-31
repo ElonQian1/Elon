@@ -1,3 +1,7 @@
+use super::super::super::terminal_descriptor::{
+    FaultSeamV1, LockManagedStimulusV1, LockOperationV1, LockPrestateV1, PhaseV1, SourceSiteV1,
+    TimingV1,
+};
 use super::{
     super::{
         super::{
@@ -95,6 +99,7 @@ pub(super) fn expand(builder: &mut Builder, from: &str, request: &ValidRequest, 
             1,
         ),
         Shape::failure(
+            release_descriptor(request, PhaseV1::LockRelease, TimingV1::AtCall),
             "LockRelease",
             FailureClass::OutcomeUncertainPoisoned,
             MutationState::None,
@@ -156,12 +161,36 @@ pub(super) fn expand(builder: &mut Builder, from: &str, request: &ValidRequest, 
                 "held.exclusive_mask &= !request.mask()"
             },
         ),
-        Shape::success(0, 1)
-            .with_lock_effect(LockEffect::Released {
-                mode: request.action.mode(),
-                mask: request.range.mask(),
-                native: true,
-            })
-            .with_dms_lock(DmsLockCustody::ExistingShared),
+        Shape::success(
+            release_descriptor(request, PhaseV1::Success, TimingV1::AfterSuccess),
+            0,
+            1,
+        )
+        .with_lock_effect(LockEffect::Released {
+            mode: request.action.mode(),
+            mask: request.range.mask(),
+            native: true,
+        })
+        .with_dms_lock(DmsLockCustody::ExistingShared),
     );
+}
+
+fn release_descriptor(
+    request: &ValidRequest,
+    phase: PhaseV1,
+    timing: TimingV1,
+) -> super::super::dynamic::SeedV1 {
+    request.descriptor(
+        SourceSiteV1::LockNativeRelease,
+        LockManagedStimulusV1::NativeRelease,
+        if request.action.is_shared() {
+            LockPrestateV1::OwnSharedHeld
+        } else {
+            LockPrestateV1::OwnExclusiveHeld
+        },
+        LockOperationV1::NativeRelease,
+        phase,
+        timing,
+        FaultSeamV1::NativeOperation,
+    )
 }

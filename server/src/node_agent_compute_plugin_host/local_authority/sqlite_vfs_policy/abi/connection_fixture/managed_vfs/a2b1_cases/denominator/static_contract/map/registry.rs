@@ -2,7 +2,12 @@ use super::{
     super::model::{
         CustodyState, DecisionStage, DmsLockCustody, ExclusionProof, TerminalDisposition,
     },
+    super::terminal_descriptor::{
+        FaultSeamV1, MapManagedStimulusV1, MapOperationV1, MapPrestateV1, OccurrenceV1, PhaseV1,
+        SourceSiteV1, StimulusV1, TimingV1,
+    },
     builder::MapGraphBuilder,
+    dynamic::{self, DescriptorSeedV1},
     managed, projection, witnesses as w, MapMode,
 };
 
@@ -37,15 +42,18 @@ pub(super) fn build(graph: &mut MapGraphBuilder, typed_entry: &str, mode: MapMod
         graph,
         &callback,
         &format!("{prefix}.admission-rejected"),
+        mode,
     );
 
-    for (branch, needle) in [
+    for (branch, stimulus, needle) in [
         (
             "unsupported-file-role",
+            MapManagedStimulusV1::CallbackUnsupportedFileRole,
             "ManagedSqliteRegistryPinnedFileOperationRejection::UnsupportedFileRole",
         ),
         (
             "shm-detached",
+            MapManagedStimulusV1::CallbackShmDetached,
             "ManagedSqliteRegistryPinnedFileOperationRejection::ShmDetached",
         ),
     ] {
@@ -71,6 +79,17 @@ pub(super) fn build(graph: &mut MapGraphBuilder, typed_entry: &str, mode: MapMod
                 quarantine: false,
                 lock_outcome_uncertain: false,
                 dms_lock: DmsLockCustody::NotReached,
+                dynamic: DescriptorSeedV1::new(
+                    SourceSiteV1::RegistryCallbackAdmission,
+                    StimulusV1::MapManaged(stimulus),
+                    MapPrestateV1::NotReached,
+                    MapOperationV1::CallbackAdmission,
+                    PhaseV1::CallbackAdmission,
+                    TimingV1::AtCall,
+                    OccurrenceV1::Natural,
+                    FaultSeamV1::RegistryAdmission,
+                    dynamic::mode_axes(mode),
+                ),
             },
         );
     }

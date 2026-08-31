@@ -2,6 +2,7 @@ mod completion;
 mod projection;
 mod retention;
 
+use super::super::terminal_descriptor::TerminalDescriptorV1;
 use super::{
     super::{
         model::{
@@ -11,11 +12,13 @@ use super::{
         source::{witness, ProductionOwner, SourceWitness},
     },
     builder::Builder,
+    dynamic::{SeedV1, TerminalPathV1},
 };
 use projection::{adapter_projection, add_abi_terminal};
 
 #[derive(Debug, Clone, Copy)]
 pub(super) struct Shape {
+    pub(super) descriptor: SeedV1,
     pub(super) sqlite: SqliteResult,
     pub(super) phase: &'static str,
     pub(super) failure: FailureClass,
@@ -31,8 +34,9 @@ pub(super) struct Shape {
 }
 
 impl Shape {
-    pub(super) fn success(native_lock: u16, native_unlock: u16) -> Self {
+    pub(super) fn success(descriptor: SeedV1, native_lock: u16, native_unlock: u16) -> Self {
         Self::new(
+            descriptor,
             SqliteResult::Ok,
             "Success",
             FailureClass::None,
@@ -41,8 +45,14 @@ impl Shape {
         .native(native_lock, native_unlock)
     }
 
-    pub(super) fn busy(mutated: bool, native_lock: u16, native_unlock: u16) -> Self {
+    pub(super) fn busy(
+        descriptor: SeedV1,
+        mutated: bool,
+        native_lock: u16,
+        native_unlock: u16,
+    ) -> Self {
         Self::new(
+            descriptor,
             SqliteResult::Busy,
             "LockAcquire",
             if mutated {
@@ -60,6 +70,7 @@ impl Shape {
     }
 
     pub(super) fn failure(
+        descriptor: SeedV1,
         phase: &'static str,
         failure: FailureClass,
         mutation: MutationState,
@@ -67,19 +78,27 @@ impl Shape {
         native_lock: u16,
         native_unlock: u16,
     ) -> Self {
-        let mut shape = Self::new(SqliteResult::LockUnavailable, phase, failure, mutation)
-            .native(native_lock, native_unlock);
+        let mut shape = Self::new(
+            descriptor,
+            SqliteResult::LockUnavailable,
+            phase,
+            failure,
+            mutation,
+        )
+        .native(native_lock, native_unlock);
         shape.lock_uncertain = lock_uncertain;
         shape
     }
 
     fn new(
+        descriptor: SeedV1,
         sqlite: SqliteResult,
         phase: &'static str,
         failure: FailureClass,
         mutation: MutationState,
     ) -> Self {
         Self {
+            descriptor,
             sqlite,
             phase,
             failure,
@@ -131,10 +150,11 @@ pub(super) fn direct(
     stage: DecisionStage,
     branch: &str,
     mut expected: Expected,
+    descriptor: TerminalDescriptorV1,
     source: SourceWitness,
 ) {
     expected.sqlite = SqliteResult::LockUnavailable;
-    let terminal = builder.terminal(format!("{prefix}.terminal"), expected, source);
+    let terminal = builder.terminal(format!("{prefix}.terminal"), expected, descriptor, source);
     builder.edge(from, &terminal, stage, branch);
 }
 
@@ -145,6 +165,7 @@ pub(super) fn managed_direct(
     stage: DecisionStage,
     branch: &str,
     mut expected: Expected,
+    descriptor: SeedV1,
     source: SourceWitness,
 ) {
     expected.sqlite = SqliteResult::LockUnavailable;
@@ -170,6 +191,8 @@ pub(super) fn managed_direct(
         &projection,
         &format!("{prefix}.terminal"),
         expected,
+        descriptor,
+        TerminalPathV1::Direct,
     );
 }
 

@@ -1,6 +1,7 @@
 use std::collections::BTreeSet;
 
 use super::source::SourceWitness;
+use super::terminal_descriptor::TerminalDescriptorV1;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(super) enum RootOperation {
@@ -206,6 +207,7 @@ pub(super) enum NodeKind {
     Terminal {
         leaf_id: String,
         expected: Expected,
+        descriptor: TerminalDescriptorV1,
     },
     Excluded {
         leaf_id: String,

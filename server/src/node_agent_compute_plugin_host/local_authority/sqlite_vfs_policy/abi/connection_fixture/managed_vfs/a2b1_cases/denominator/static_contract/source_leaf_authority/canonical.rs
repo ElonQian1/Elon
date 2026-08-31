@@ -205,6 +205,19 @@ pub(super) fn digest_digest_set(domain: &str, mut values: Vec<Digest32>) -> Dige
     digest.finish()
 }
 
+pub(crate) fn digest_included_member_pair_set(mut members: Vec<(Digest32, Digest32)>) -> Digest32 {
+    members.sort_unstable();
+    let mut digest = StableHasher::new("ELON-A2B1-VFS-INCLUDED-MEMBER-PAIR-SET-V1");
+    digest.u64("member_count", members.len() as u64);
+    for (case_key, full_record) in members {
+        let mut bytes = [0_u8; 64];
+        bytes[..32].copy_from_slice(&case_key.0);
+        bytes[32..].copy_from_slice(&full_record.0);
+        digest.bytes("member", &bytes);
+    }
+    digest.finish()
+}
+
 fn digest_decision(decision: &super::model::DecisionV1) -> Digest32 {
     let mut digest = StableHasher::new("ELON-A2B1-VFS-DECISION-V1");
     digest.text("stage", decision.stage.canonical_name());

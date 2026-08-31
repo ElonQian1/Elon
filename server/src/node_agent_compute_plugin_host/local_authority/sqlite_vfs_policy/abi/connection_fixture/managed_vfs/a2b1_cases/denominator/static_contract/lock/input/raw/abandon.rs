@@ -1,3 +1,7 @@
+use super::super::super::super::terminal_descriptor::{
+    FaultSeamV1, LockOperationV1, ObserverV1, OccurrenceV1, PhaseV1, RawStateV1, SourceSiteV1,
+    StimulusV1, TimingV1,
+};
 use super::super::super::{
     super::{
         model::{
@@ -6,6 +10,7 @@ use super::super::super::{
         source::{witness, ProductionOwner, SourceWitness},
     },
     builder::Builder,
+    dynamic::{SeedV1, TerminalPathV1},
     outcome,
 };
 
@@ -15,6 +20,7 @@ pub(super) fn add_rejected_slots(
     builder: &mut Builder,
     raw: &str,
     shape: &str,
+    raw_state: RawStateV1,
     source: SourceWitness,
     abandon_source: SourceWitness,
     slots: CustodyState,
@@ -42,6 +48,7 @@ pub(super) fn add_rejected_slots(
     let terminal = builder.terminal(
         format!("{PREFIX}.terminal.{shape}"),
         expected,
+        raw_descriptor(raw_state, TerminalPathV1::Direct),
         outcome::abi_projection(super::super::super::super::model::SqliteResult::LockUnavailable),
     );
     builder.edge(
@@ -58,6 +65,7 @@ pub(super) fn add_envelope(
     label: &str,
     branch: &str,
     trigger: SourceWitness,
+    raw_state: RawStateV1,
     payload_present: bool,
 ) {
     let cause = builder.continuation(
@@ -99,6 +107,7 @@ pub(super) fn add_envelope(
         let terminal = builder.terminal(
             format!("{PREFIX}.terminal.{label}.drop-completed"),
             raw_expected(CustodyState::Cleared, CustodyState::Cleared),
+            raw_descriptor(raw_state, TerminalPathV1::RawDropCompleted),
             raw_witness(
                 "fn drop(&mut self)",
                 "if let Some(payload) = self.payload.take()",
@@ -164,6 +173,14 @@ pub(super) fn add_envelope(
         let terminal = builder.terminal(
             format!("{PREFIX}.terminal.{label}.{branch}"),
             expected,
+            raw_descriptor(
+                raw_state,
+                if unwind {
+                    TerminalPathV1::RawDropUnwindCaught
+                } else {
+                    TerminalPathV1::RawDropCompleted
+                },
+            ),
             outcome::abi_projection(
                 super::super::super::super::model::SqliteResult::LockUnavailable,
             ),
@@ -222,6 +239,23 @@ fn raw_expected(slots: CustodyState, payload: CustodyState) -> Expected {
     expected.raw_slots = slots;
     expected.payload = payload;
     expected
+}
+
+fn raw_descriptor(
+    raw_state: RawStateV1,
+    path: TerminalPathV1,
+) -> super::super::super::super::terminal_descriptor::TerminalDescriptorV1 {
+    SeedV1::early(
+        SourceSiteV1::RawStateAbandon,
+        StimulusV1::LockRaw(raw_state),
+        LockOperationV1::RawAbandon,
+        PhaseV1::RawAdmission,
+        TimingV1::Cleanup,
+        OccurrenceV1::Natural,
+        FaultSeamV1::RawState,
+        ObserverV1::CustodyAndCleanup,
+    )
+    .terminal(path)
 }
 
 fn raw_witness(symbol: &'static str, needle: &'static str) -> SourceWitness {

@@ -1,3 +1,7 @@
+use super::super::terminal_descriptor::{
+    InitializationFaultSiteV1, InitializationPathV1, InitializationProfileV1,
+    InitializationStimulusV1, OccurrenceV1, PhaseV1, TimingV1,
+};
 use super::{
     init, windows_locking, CustodyState, DmsLockCustody, FailureClass, FailureShape, InitBuilder,
     MutationState, TerminalDisposition,
@@ -6,6 +10,8 @@ use super::{
 #[derive(Debug, Clone, Copy)]
 struct Prefix {
     label: &'static str,
+    profile: InitializationProfileV1,
+    path: InitializationPathV1,
     mutation: MutationState,
     native_lock: u16,
     native_unlock: u16,
@@ -30,6 +36,16 @@ pub(super) fn build_exclusive(builder: &mut InitBuilder, from: &str, created: bo
                 "created-joiner"
             } else {
                 "existing-joiner"
+            },
+            profile: if created {
+                InitializationProfileV1::CreatedJoinerShared
+            } else {
+                InitializationProfileV1::ExistingJoinerShared
+            },
+            path: if created {
+                InitializationPathV1::CreatedJoiner
+            } else {
+                InitializationPathV1::ExistingJoiner
             },
             mutation: if created {
                 MutationState::Known
@@ -57,7 +73,13 @@ fn add_exclusive_error(builder: &mut InitBuilder, native: &str, created: bool, l
             &format!("{label}.exclusive-error-known-mutation"),
             "exclusive_error_after_file_create",
             FailureShape {
-                phase: "DmsExclusiveAcquire",
+                phase: PhaseV1::DmsExclusiveAcquire,
+                stimulus: initialization_stimulus(
+                    InitializationFaultSiteV1::DmsExclusiveAcquire,
+                    InitializationPathV1::Created,
+                ),
+                timing: TimingV1::AtCall,
+                occurrence: OccurrenceV1::Natural,
                 class: FailureClass::MutatedButKnown,
                 mutation: MutationState::Known,
                 lock_uncertain: false,
@@ -88,7 +110,13 @@ fn add_exclusive_error(builder: &mut InitBuilder, native: &str, created: bool, l
             &format!("{label}.exclusive-error-{kind}"),
             &format!("classified_{kind}"),
             FailureShape {
-                phase: "DmsExclusiveAcquire",
+                phase: PhaseV1::DmsExclusiveAcquire,
+                stimulus: initialization_stimulus(
+                    InitializationFaultSiteV1::DmsExclusiveAcquire,
+                    InitializationPathV1::Existing,
+                ),
+                timing: TimingV1::AtCall,
+                occurrence: OccurrenceV1::Natural,
                 class: failure,
                 mutation: MutationState::None,
                 lock_uncertain: false,
@@ -131,7 +159,13 @@ fn build_first_process(builder: &mut InitBuilder, from: &str, created: bool, bra
         "exclusive_release_succeeded",
         init("fn open_node", "ManagedSqliteShmFailurePhase::DmsTruncate"),
         FailureShape {
-            phase: "DmsTruncate",
+            phase: PhaseV1::DmsTruncate,
+            stimulus: initialization_stimulus(
+                InitializationFaultSiteV1::DmsTruncate,
+                first_path(created),
+            ),
+            timing: TimingV1::AtCall,
+            occurrence: OccurrenceV1::Natural,
             class: FailureClass::OutcomeUncertainPoisoned,
             mutation: MutationState::Uncertain,
             lock_uncertain: false,
@@ -151,7 +185,13 @@ fn build_first_process(builder: &mut InitBuilder, from: &str, created: bool, bra
             "ManagedSqliteShmDmsCustody::ExclusiveOutcomeUncertain",
         ),
         FailureShape {
-            phase: "DmsExclusiveRelease",
+            phase: PhaseV1::DmsExclusiveRelease,
+            stimulus: initialization_stimulus(
+                InitializationFaultSiteV1::DmsExclusiveRelease,
+                first_path(created),
+            ),
+            timing: TimingV1::Cleanup,
+            occurrence: OccurrenceV1::Natural,
             class: FailureClass::OutcomeUncertainPoisoned,
             mutation: MutationState::Uncertain,
             lock_uncertain: true,
@@ -180,7 +220,13 @@ fn build_first_process(builder: &mut InitBuilder, from: &str, created: bool, bra
             "ManagedSqliteShmFailurePhase::DmsExclusiveRelease",
         ),
         FailureShape {
-            phase: "DmsExclusiveRelease",
+            phase: PhaseV1::DmsExclusiveRelease,
+            stimulus: initialization_stimulus(
+                InitializationFaultSiteV1::DmsExclusiveRelease,
+                first_path(created),
+            ),
+            timing: TimingV1::AtCall,
+            occurrence: OccurrenceV1::Natural,
             class: FailureClass::OutcomeUncertainPoisoned,
             mutation: MutationState::Uncertain,
             lock_uncertain: true,
@@ -196,6 +242,12 @@ fn build_first_process(builder: &mut InitBuilder, from: &str, created: bool, bra
         &release,
         Prefix {
             label,
+            profile: if created {
+                InitializationProfileV1::CreatedFirstShared
+            } else {
+                InitializationProfileV1::ExistingFirstShared
+            },
+            path: first_path(created),
             mutation: MutationState::Known,
             native_lock: 1,
             native_unlock: 1,
@@ -216,6 +268,7 @@ fn build_shared(builder: &mut InitBuilder, from: &str, prefix: Prefix, branch: &
     builder.success(
         &native,
         success_label(prefix.label),
+        prefix.profile,
         "shared_acquired",
         true,
         prefix.mutation,
@@ -269,7 +322,10 @@ fn build_shared(builder: &mut InitBuilder, from: &str, prefix: Prefix, branch: &
 
 fn shared_failure(prefix: Prefix, class: FailureClass) -> FailureShape {
     FailureShape {
-        phase: "DmsSharedAcquire",
+        phase: PhaseV1::DmsSharedAcquire,
+        stimulus: initialization_stimulus(InitializationFaultSiteV1::DmsSharedAcquire, prefix.path),
+        timing: TimingV1::AtCall,
+        occurrence: OccurrenceV1::Natural,
         class,
         mutation: prefix.mutation,
         lock_uncertain: false,
@@ -278,6 +334,25 @@ fn shared_failure(prefix: Prefix, class: FailureClass) -> FailureShape {
         dms_lock: DmsLockCustody::Released,
         native_lock: prefix.native_lock + 1,
         native_unlock: prefix.native_unlock,
+    }
+}
+
+const fn first_path(created: bool) -> InitializationPathV1 {
+    if created {
+        InitializationPathV1::CreatedFirst
+    } else {
+        InitializationPathV1::ExistingFirst
+    }
+}
+
+const fn initialization_stimulus(
+    fault_site: InitializationFaultSiteV1,
+    path: InitializationPathV1,
+) -> InitializationStimulusV1 {
+    InitializationStimulusV1 {
+        fault_site,
+        path,
+        cleanup_rewrite: false,
     }
 }
 

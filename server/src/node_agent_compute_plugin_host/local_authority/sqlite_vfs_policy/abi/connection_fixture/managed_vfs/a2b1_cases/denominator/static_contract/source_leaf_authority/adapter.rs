@@ -5,6 +5,7 @@ mod mapping;
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 
 use super::super::model as graph;
+use super::super::terminal_descriptor::TypedTerminalDescriptorV1;
 use super::{
     accumulator::ManifestAccumulatorV1,
     coverage::validate_graph_ledger_coverage,
@@ -14,6 +15,7 @@ use super::{
         CaseKeyV1, LeafIdentityV1, LeafOutcomeV1, LeafRecordV1, ManifestContextV1, RootManifestV1,
         RootOperationV1,
     },
+    observer::StreamedLeafV1,
     source_scope::validate_source_witness,
 };
 
@@ -41,12 +43,12 @@ pub(crate) fn exact_graph_leaf_identity(
 pub(crate) fn stream_graph_manifest<F>(
     graph: &graph::ContractGraph,
     context: ManifestContextV1,
-    emit_seal: F,
+    mut emit_seal: F,
 ) -> Result<RootManifestV1, String>
 where
     F: FnMut(&LeafSealV1) -> Result<(), String>,
 {
-    stream_graph_manifest_with_identity(graph, context, exact_graph_leaf_identity, emit_seal)
+    stream_graph_manifest_with_records(graph, context, |leaf| emit_seal(leaf.seal()))
 }
 
 pub(crate) fn stream_graph_manifest_with_identity<I, F>(
@@ -58,6 +60,41 @@ pub(crate) fn stream_graph_manifest_with_identity<I, F>(
 where
     I: FnMut(RootOperationV1, &str) -> Result<LeafIdentityV1, String>,
     F: FnMut(&LeafSealV1) -> Result<(), String>,
+{
+    stream_graph_manifest_with_identity_and_records(graph, context, identity_for, |leaf| {
+        emit_seal(leaf.seal())
+    })
+}
+
+/// Streams the exact static records together with their co-produced typed terminal descriptors.
+///
+/// This observer is intentionally layered on the same accumulator as the frozen static manifest.
+/// Excluded leaves never carry a descriptor and can therefore never enter the dynamic quotient.
+pub(crate) fn stream_graph_manifest_with_records<F>(
+    graph: &graph::ContractGraph,
+    context: ManifestContextV1,
+    emit_leaf: F,
+) -> Result<RootManifestV1, String>
+where
+    F: FnMut(StreamedLeafV1<'_>) -> Result<(), String>,
+{
+    stream_graph_manifest_with_identity_and_records(
+        graph,
+        context,
+        exact_graph_leaf_identity,
+        emit_leaf,
+    )
+}
+
+pub(crate) fn stream_graph_manifest_with_identity_and_records<I, F>(
+    graph: &graph::ContractGraph,
+    context: ManifestContextV1,
+    mut identity_for: I,
+    mut emit_leaf: F,
+) -> Result<RootManifestV1, String>
+where
+    I: FnMut(RootOperationV1, &str) -> Result<LeafIdentityV1, String>,
+    F: FnMut(StreamedLeafV1<'_>) -> Result<(), String>,
 {
     let root_operation = mapping::root(graph.root_operation);
     if context.root != root_operation {
@@ -98,7 +135,11 @@ where
             stack[frame_index].entered = true;
 
             match &graph.nodes[node_index].kind {
-                graph::NodeKind::Terminal { leaf_id, expected } => {
+                graph::NodeKind::Terminal {
+                    leaf_id,
+                    expected,
+                    descriptor,
+                } => {
                     topology.require_final(node_index, graph)?;
                     let identity = identity_for(root_operation, leaf_id)?;
                     validate_identity(root_operation, leaf_id, &identity)?;
@@ -108,10 +149,11 @@ where
                     );
                     emit_record(
                         &mut accumulator,
-                        &mut emit_seal,
+                        &mut emit_leaf,
                         &mut seen_leaf_ids,
                         leaf_id,
                         &record,
+                        Some(descriptor),
                     )?;
                     pop_frame(&mut stack, &mut paths, &mut active);
                     continue;
@@ -124,10 +166,11 @@ where
                         paths.record(identity, LeafOutcomeV1::Excluded(mapping::exclusion(proof)));
                     emit_record(
                         &mut accumulator,
-                        &mut emit_seal,
+                        &mut emit_leaf,
                         &mut seen_leaf_ids,
                         leaf_id,
                         &record,
+                        None,
                     )?;
                     pop_frame(&mut stack, &mut paths, &mut active);
                     continue;
@@ -210,6 +253,29 @@ pub(crate) fn validate_graph_against_frozen(
     frozen_leaf_seal_tsv: &str,
     frozen_manifest: &RootManifestV1,
 ) -> Result<u64, String> {
+    validate_graph_against_frozen_with_records(
+        graph,
+        context,
+        frozen_leaf_seal_tsv,
+        frozen_manifest,
+        |_| Ok(()),
+    )
+}
+
+/// Frozen-static ingress for dynamic quotient construction.
+///
+/// The compact seal is checked before the observer can consume the corresponding full record.
+/// The final root-manifest equality remains a required postcondition of the whole traversal.
+pub(crate) fn validate_graph_against_frozen_with_records<F>(
+    graph: &graph::ContractGraph,
+    context: ManifestContextV1,
+    frozen_leaf_seal_tsv: &str,
+    frozen_manifest: &RootManifestV1,
+    mut observe_leaf: F,
+) -> Result<u64, String>
+where
+    F: FnMut(StreamedLeafV1<'_>) -> Result<(), String>,
+{
     let ledger_sha256 = leaf_seal_tsv_sha256(frozen_leaf_seal_tsv)?;
     if context.ledger_sha256 != ledger_sha256 {
         return Err(format!(
@@ -220,7 +286,10 @@ pub(crate) fn validate_graph_against_frozen(
     }
     let mut verifier =
         FrozenLeafSealVerifierV1::from_tsv(frozen_leaf_seal_tsv, context.ledger_sha256)?;
-    let actual = stream_graph_manifest(graph, context, |seal| verifier.observe(seal))?;
+    let actual = stream_graph_manifest_with_records(graph, context, |leaf| {
+        verifier.observe(leaf.seal())?;
+        observe_leaf(leaf)
+    })?;
     let observed = verifier.finish()?;
     if observed != actual.included_count + actual.excluded_count {
         return Err("frozen leaf verifier count differs from streamed manifest".to_owned());
@@ -245,19 +314,30 @@ fn validate_identity(
 
 fn emit_record<F>(
     accumulator: &mut ManifestAccumulatorV1,
-    emit_seal: &mut F,
+    emit_leaf: &mut F,
     seen_leaf_ids: &mut HashSet<String>,
     leaf_id: &str,
     record: &LeafRecordV1,
+    descriptor: Option<&TypedTerminalDescriptorV1>,
 ) -> Result<(), String>
 where
-    F: FnMut(&LeafSealV1) -> Result<(), String>,
+    F: FnMut(StreamedLeafV1<'_>) -> Result<(), String>,
 {
     if !seen_leaf_ids.insert(leaf_id.to_owned()) {
         return Err(format!("graph source leaf has two root paths: {leaf_id:?}"));
     }
     let seal = accumulator.push(record)?;
-    emit_seal(&seal)
+    match descriptor {
+        Some(descriptor) => emit_leaf(StreamedLeafV1::Terminal {
+            record,
+            descriptor,
+            seal: &seal,
+        }),
+        None => emit_leaf(StreamedLeafV1::Excluded {
+            record,
+            seal: &seal,
+        }),
+    }
 }
 
 #[derive(Default)]

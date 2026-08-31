@@ -1,3 +1,7 @@
+use super::super::super::terminal_descriptor::{
+    FaultSeamV1, LockManagedStimulusV1, LockOperationV1, LockPrestateV1, PhaseV1, SourceSiteV1,
+    TimingV1,
+};
 use super::super::{
     super::model::{DecisionStage, DmsLockCustody, ExclusionProof, LockEffect},
     builder::Builder,
@@ -31,7 +35,17 @@ fn lock_shared(builder: &mut Builder, local: &str, request: &ValidRequest) {
             "fn require_unlocked",
             "NODE_MANAGED_SQLITE_SHM_LOCK_TRANSITION_NOT_UNLOCKED",
         ),
-        protocol("RequestValidation", 0, 0),
+        protocol(
+            local_descriptor(
+                request,
+                LockPrestateV1::OwnOverlap,
+                LockOperationV1::LocalAcquire,
+                PhaseV1::RequestValidation,
+            ),
+            "RequestValidation",
+            0,
+            0,
+        ),
     );
     safe_branch(
         builder,
@@ -43,7 +57,18 @@ fn lock_shared(builder: &mut Builder, local: &str, request: &ValidRequest) {
             "pub(super) fn lock_connection",
             "sibling.exclusive_mask & mask != 0",
         ),
-        Shape::busy(false, 0, 0).with_dms_lock(DmsLockCustody::ExistingShared),
+        Shape::busy(
+            local_descriptor(
+                request,
+                LockPrestateV1::SiblingExclusiveContention,
+                LockOperationV1::LocalAcquire,
+                PhaseV1::LockAcquire,
+            ),
+            false,
+            0,
+            0,
+        )
+        .with_dms_lock(DmsLockCustody::ExistingShared),
     );
     let local_shared = builder.decision(
         format!("{}.shared-local-connection", request.prefix),
@@ -66,13 +91,22 @@ fn lock_shared(builder: &mut Builder, local: &str, request: &ValidRequest) {
         DecisionStage::Coordination,
         "connection_present_update_shared_mask",
         locking_witness("pub(super) fn lock_connection", "held.shared_mask |= mask"),
-        Shape::success(0, 0)
-            .with_lock_effect(LockEffect::Acquired {
-                mode: request.action.mode(),
-                mask: request.range.mask(),
-                native: false,
-            })
-            .with_dms_lock(DmsLockCustody::ExistingShared),
+        Shape::success(
+            local_descriptor(
+                request,
+                LockPrestateV1::SiblingSharedCoalesced,
+                LockOperationV1::LocalAcquire,
+                PhaseV1::Success,
+            ),
+            0,
+            0,
+        )
+        .with_lock_effect(LockEffect::Acquired {
+            mode: request.action.mode(),
+            mask: request.range.mask(),
+            native: false,
+        })
+        .with_dms_lock(DmsLockCustody::ExistingShared),
     );
     acquire::expand(builder, local, request, "own_clear_no_sibling_overlap");
 }
@@ -88,7 +122,17 @@ fn lock_exclusive(builder: &mut Builder, local: &str, request: &ValidRequest) {
             "fn require_unlocked",
             "NODE_MANAGED_SQLITE_SHM_LOCK_TRANSITION_NOT_UNLOCKED",
         ),
-        protocol("RequestValidation", 0, 0),
+        protocol(
+            local_descriptor(
+                request,
+                LockPrestateV1::OwnOverlap,
+                LockOperationV1::LocalAcquire,
+                PhaseV1::RequestValidation,
+            ),
+            "RequestValidation",
+            0,
+            0,
+        ),
     );
     safe_branch(
         builder,
@@ -100,7 +144,18 @@ fn lock_exclusive(builder: &mut Builder, local: &str, request: &ValidRequest) {
             "pub(super) fn lock_connection",
             "(sibling.shared_mask | sibling.exclusive_mask) & mask != 0",
         ),
-        Shape::busy(false, 0, 0).with_dms_lock(DmsLockCustody::ExistingShared),
+        Shape::busy(
+            local_descriptor(
+                request,
+                LockPrestateV1::SiblingAnyContention,
+                LockOperationV1::LocalAcquire,
+                PhaseV1::LockAcquire,
+            ),
+            false,
+            0,
+            0,
+        )
+        .with_dms_lock(DmsLockCustody::ExistingShared),
     );
     acquire::expand(builder, local, request, "own_clear_no_sibling_overlap");
 }
@@ -116,7 +171,17 @@ fn unlock_shared(builder: &mut Builder, local: &str, request: &ValidRequest) {
             "pub(super) fn lock_connection",
             "NODE_MANAGED_SQLITE_SHM_SHARED_UNLOCK_NOT_HELD",
         ),
-        protocol("RequestValidation", 0, 0),
+        protocol(
+            local_descriptor(
+                request,
+                LockPrestateV1::NoHeldLocks,
+                LockOperationV1::LocalRelease,
+                PhaseV1::RequestValidation,
+            ),
+            "RequestValidation",
+            0,
+            0,
+        ),
     );
     let exclusive_check = builder.decision(
         format!("{}.shared-unlock-own-exclusive-check", request.prefix),
@@ -168,13 +233,22 @@ fn unlock_shared(builder: &mut Builder, local: &str, request: &ValidRequest) {
         DecisionStage::Coordination,
         "connection_present_clear_shared_mask",
         locking_witness("pub(super) fn lock_connection", "held.shared_mask &= !mask"),
-        Shape::success(0, 0)
-            .with_lock_effect(LockEffect::Released {
-                mode: request.action.mode(),
-                mask: request.range.mask(),
-                native: false,
-            })
-            .with_dms_lock(DmsLockCustody::ExistingShared),
+        Shape::success(
+            local_descriptor(
+                request,
+                LockPrestateV1::SiblingSharedCoalesced,
+                LockOperationV1::LocalRelease,
+                PhaseV1::Success,
+            ),
+            0,
+            0,
+        )
+        .with_lock_effect(LockEffect::Released {
+            mode: request.action.mode(),
+            mask: request.range.mask(),
+            native: false,
+        })
+        .with_dms_lock(DmsLockCustody::ExistingShared),
     );
     release::expand(
         builder,
@@ -195,7 +269,17 @@ fn unlock_exclusive(builder: &mut Builder, local: &str, request: &ValidRequest) 
             "pub(super) fn lock_connection",
             "NODE_MANAGED_SQLITE_SHM_EXCLUSIVE_UNLOCK_NOT_HELD",
         ),
-        protocol("RequestValidation", 0, 0),
+        protocol(
+            local_descriptor(
+                request,
+                LockPrestateV1::NoHeldLocks,
+                LockOperationV1::LocalRelease,
+                PhaseV1::RequestValidation,
+            ),
+            "RequestValidation",
+            0,
+            0,
+        ),
     );
     let shared_check = builder.decision(
         format!("{}.exclusive-unlock-own-shared-check", request.prefix),
@@ -249,7 +333,17 @@ fn unlock_exclusive(builder: &mut Builder, local: &str, request: &ValidRequest) 
             "pub(super) fn lock_connection",
             "NODE_MANAGED_SQLITE_SHM_EXCLUSIVE_UNLOCK_RANGE_MISMATCH",
         ),
-        protocol("RequestValidation", 0, 0),
+        protocol(
+            local_descriptor(
+                request,
+                LockPrestateV1::ExclusiveRangeMismatch,
+                LockOperationV1::LocalRelease,
+                PhaseV1::RequestValidation,
+            ),
+            "RequestValidation",
+            0,
+            0,
+        ),
     );
     let sibling_overlap = builder.excluded(
         format!("{}.excluded.exclusive-sibling-overlap", request.prefix),
@@ -297,4 +391,21 @@ fn add_connection_disappeared_exclusion(
         DecisionStage::Coordination,
         "connection_disappeared",
     );
+}
+
+fn local_descriptor(
+    request: &ValidRequest,
+    prestate: LockPrestateV1,
+    operation: LockOperationV1,
+    phase: PhaseV1,
+) -> super::super::dynamic::SeedV1 {
+    request.descriptor(
+        SourceSiteV1::LockLocalState,
+        LockManagedStimulusV1::LocalState,
+        prestate,
+        operation,
+        phase,
+        TimingV1::Natural,
+        FaultSeamV1::Natural,
+    )
 }

@@ -15,7 +15,9 @@ pub(super) fn validate_node_payload(
                 graph.name, node.id
             ));
         }
-        NodeKind::Terminal { leaf_id, expected } => {
+        NodeKind::Terminal {
+            leaf_id, expected, ..
+        } => {
             if leaf_id.trim().is_empty() {
                 return Err(format!("{} {:?}: empty terminal leaf", graph.name, node.id));
             }

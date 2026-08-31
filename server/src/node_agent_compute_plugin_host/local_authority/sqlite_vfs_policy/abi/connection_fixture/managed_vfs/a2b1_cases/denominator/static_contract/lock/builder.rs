@@ -7,6 +7,7 @@ use super::super::{
         Expected, NodeKind, RootOperation,
     },
     source::SourceWitness,
+    terminal_descriptor::TerminalDescriptorV1,
 };
 
 pub(super) struct Builder {
@@ -51,6 +52,7 @@ impl Builder {
         &mut self,
         id: impl Into<String>,
         expected: Expected,
+        descriptor: TerminalDescriptorV1,
         source: SourceWitness,
     ) -> String {
         let id = id.into();
@@ -60,7 +62,15 @@ impl Builder {
             "duplicate Lock leaf: {leaf_id}"
         );
         self.terminal_count += 1;
-        self.node(id, NodeKind::Terminal { leaf_id, expected }, source)
+        self.node(
+            id,
+            NodeKind::Terminal {
+                leaf_id,
+                expected,
+                descriptor,
+            },
+            source,
+        )
     }
 
     #[allow(dead_code)]

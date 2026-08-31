@@ -12,6 +12,9 @@ use super::{
         ExclusionProof, FailureClass, MutationState, NodeKind, TerminalDisposition,
     },
     source::{witness, ProductionOwner, SourceWitness},
+    terminal_descriptor::{
+        InitializationProfileV1, InitializationStimulusV1, OccurrenceV1, PhaseV1, TimingV1,
+    },
 };
 
 #[derive(Debug, Default)]
@@ -28,6 +31,7 @@ pub(super) struct InitializationExpansion {
 pub(super) struct InitializationSuccess {
     pub(super) node: String,
     pub(super) label: &'static str,
+    pub(super) profile: InitializationProfileV1,
     pub(super) mutation: MutationState,
     pub(super) dms_lock: DmsLockCustody,
     pub(super) native_lock: u16,
@@ -39,6 +43,10 @@ pub(super) struct InitializationFailure {
     pub(super) node: String,
     pub(super) projection_prefix: String,
     pub(super) phase: &'static str,
+    pub(super) typed_phase: PhaseV1,
+    pub(super) stimulus: InitializationStimulusV1,
+    pub(super) timing: TimingV1,
+    pub(super) occurrence: OccurrenceV1,
     pub(super) class: FailureClass,
     pub(super) mutation: MutationState,
     pub(super) lock_uncertain: bool,
@@ -51,7 +59,10 @@ pub(super) struct InitializationFailure {
 
 #[derive(Debug, Clone, Copy)]
 struct FailureShape {
-    phase: &'static str,
+    phase: PhaseV1,
+    stimulus: InitializationStimulusV1,
+    timing: TimingV1,
+    occurrence: OccurrenceV1,
     class: FailureClass,
     mutation: MutationState,
     lock_uncertain: bool,
@@ -65,7 +76,12 @@ struct FailureShape {
 impl FailureShape {
     fn cleanup_rewrite(self) -> Self {
         Self {
-            phase: "FileClose",
+            phase: PhaseV1::FileClose,
+            stimulus: InitializationStimulusV1 {
+                cleanup_rewrite: true,
+                ..self.stimulus
+            },
+            timing: TimingV1::Cleanup,
             class: FailureClass::OutcomeUncertainPoisoned,
             disposition: TerminalDisposition::CleanupRewritten,
             file: CustodyState::Quarantined,
@@ -98,6 +114,7 @@ pub(super) fn build(prefix: &str) -> InitializationExpansion {
     builder.success(
         &node_presence,
         "node-live",
+        InitializationProfileV1::NodeLive,
         "node_already_live",
         false,
         MutationState::None,
@@ -186,7 +203,11 @@ impl InitBuilder {
         self.expansion.failures.push(InitializationFailure {
             node,
             projection_prefix: self.id(&format!("projection.{cell}")),
-            phase: shape.phase,
+            phase: shape.phase.static_name(),
+            typed_phase: shape.phase,
+            stimulus: shape.stimulus,
+            timing: shape.timing,
+            occurrence: shape.occurrence,
             class: shape.class,
             mutation: shape.mutation,
             lock_uncertain: shape.lock_uncertain,
@@ -203,6 +224,7 @@ impl InitBuilder {
         &mut self,
         from: &str,
         label: &'static str,
+        profile: InitializationProfileV1,
         branch: &str,
         opened_now: bool,
         mutation: MutationState,
@@ -210,6 +232,11 @@ impl InitBuilder {
         native_lock: u16,
         native_unlock: u16,
     ) {
+        assert_eq!(
+            label,
+            profile.static_label(),
+            "typed initialization profile drift"
+        );
         let installed = if opened_now {
             let returned = self.continuation(
                 &format!("success.{label}.open-node-returned"),
@@ -275,6 +302,7 @@ impl InitBuilder {
         self.expansion.successes.push(InitializationSuccess {
             node,
             label,
+            profile,
             mutation,
             dms_lock,
             native_lock,

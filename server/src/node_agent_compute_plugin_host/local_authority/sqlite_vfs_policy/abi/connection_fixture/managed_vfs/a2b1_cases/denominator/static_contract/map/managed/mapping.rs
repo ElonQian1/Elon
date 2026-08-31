@@ -4,7 +4,12 @@ use super::{
             DecisionStage, DmsLockCustody, ExclusionProof, FailureClass, ObservableCounts,
             TerminalDisposition,
         },
+        super::terminal_descriptor::{
+            FaultSeamV1, MapFilePathV1, MapManagedStimulusV1, MapOperationV1, MapProfileV1,
+            PhaseV1, SourceSiteV1, StimulusV1, TimingV1,
+        },
         builder::MapGraphBuilder,
+        dynamic,
         loop_expansion::{self, LoopSpec},
         projection, witnesses as w, MapMode,
     },
@@ -20,6 +25,7 @@ pub(super) fn build_file_size(
     prefix: &str,
     entry_branch: &str,
     mode: MapMode,
+    profile: MapProfileV1,
     prestate: RegionPrestate,
     initialization_mutated: bool,
     dms_lock: DmsLockCustody,
@@ -38,6 +44,16 @@ pub(super) fn build_file_size(
         FailureClass::ProtocolViolation,
         initialization_mutated,
         prestate,
+        dynamic::profile_seed(
+            profile,
+            SourceSiteV1::MapFileSize,
+            StimulusV1::MapManaged(MapManagedStimulusV1::FileSize),
+            prestate.descriptor(),
+            MapOperationV1::FileSize,
+            PhaseV1::RequestValidation,
+            TimingV1::AfterSuccess,
+            FaultSeamV1::ManagedRequest,
+        ),
     );
     existing_size_failure.quarantine = false;
     existing_size_failure.disposition = TerminalDisposition::Returned;
@@ -64,8 +80,22 @@ pub(super) fn build_file_size(
         ]
     };
     for &(suffix, branch, class) in native_classes {
-        let mut native_size_failure =
-            failure_with_prestate("FileSize", class, initialization_mutated, prestate);
+        let mut native_size_failure = failure_with_prestate(
+            "FileSize",
+            class,
+            initialization_mutated,
+            prestate,
+            dynamic::profile_seed(
+                profile,
+                SourceSiteV1::MapFileSize,
+                StimulusV1::MapManaged(MapManagedStimulusV1::FileSize),
+                prestate.descriptor(),
+                MapOperationV1::FileSize,
+                PhaseV1::FileSize,
+                TimingV1::AtCall,
+                FaultSeamV1::NativeOperation,
+            ),
+        );
         native_size_failure.dms_lock = dms_lock;
         native_size_failure.counts = baseline_counts;
         add_failure_branch(
@@ -93,6 +123,10 @@ pub(super) fn build_file_size(
 
     match mode {
         MapMode::Observe => {
+            let success_profile = MapProfileV1 {
+                file_path: MapFilePathV1::ObserveNotPresent,
+                ..profile
+            };
             let short = gate(
                 graph,
                 &file_size,
@@ -110,12 +144,23 @@ pub(super) fn build_file_size(
                 mutation(initialization_mutated),
                 dms_lock,
                 baseline_counts,
+                dynamic::profile_seed(
+                    success_profile,
+                    SourceSiteV1::MapFileSize,
+                    StimulusV1::MapManaged(MapManagedStimulusV1::Success),
+                    prestate.descriptor(),
+                    MapOperationV1::SuccessProjection,
+                    PhaseV1::Success,
+                    TimingV1::Natural,
+                    FaultSeamV1::Natural,
+                ),
             );
         }
         MapMode::Extend => build_grow(
             graph,
             &file_size,
             &format!("{prefix}.extend-grow"),
+            profile,
             prestate,
             initialization_mutated,
             dms_lock,
@@ -127,6 +172,10 @@ pub(super) fn build_file_size(
         &file_size,
         &format!("{prefix}.size-sufficient"),
         "current_size_sufficient",
+        MapProfileV1 {
+            file_path: MapFilePathV1::SizeSufficient,
+            ..profile
+        },
         prestate,
         initialization_mutated,
         false,
@@ -141,6 +190,7 @@ pub(super) fn build_map_or_reuse(
     from: &str,
     prefix: &str,
     branch: &str,
+    profile: MapProfileV1,
     prestate: RegionPrestate,
     initialization_mutated: bool,
     file_grew: bool,
@@ -179,6 +229,16 @@ pub(super) fn build_map_or_reuse(
             mutation(initialization_mutated || file_grew),
             dms_lock,
             baseline_counts,
+            dynamic::profile_seed(
+                profile,
+                SourceSiteV1::CoordinatorState,
+                StimulusV1::MapManaged(MapManagedStimulusV1::Success),
+                prestate.descriptor(),
+                MapOperationV1::SuccessProjection,
+                PhaseV1::Success,
+                TimingV1::Natural,
+                FaultSeamV1::Natural,
+            ),
         );
         return;
     }
@@ -196,6 +256,7 @@ pub(super) fn build_map_or_reuse(
             preexisting_mapping: prestate.has_mapping(),
             baseline_counts,
             dms_lock,
+            profile,
         },
     );
     graph.edge(from, &entry, DecisionStage::Coordination, branch);

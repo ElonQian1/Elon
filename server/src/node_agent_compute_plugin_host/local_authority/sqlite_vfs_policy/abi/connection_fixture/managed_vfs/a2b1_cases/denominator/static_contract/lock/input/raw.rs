@@ -1,11 +1,16 @@
 mod abandon;
 
+use super::super::super::terminal_descriptor::{
+    FaultSeamV1, LockOperationV1, ObserverV1, OccurrenceV1, PhaseV1, RawStateV1, SourceSiteV1,
+    StimulusV1, TimingV1,
+};
 use super::super::{
     super::{
         model::{CustodyState, DecisionStage, ExclusionProof, Expected, RootOperation},
         source::{witness, ProductionOwner, SourceWitness},
     },
     builder::Builder,
+    dynamic::{SeedV1, TerminalPathV1},
     outcome,
 };
 
@@ -57,9 +62,10 @@ fn add_pointer_exclusions(builder: &mut Builder, raw: &str) {
 }
 
 fn add_validation_rejections(builder: &mut Builder, raw: &str) {
-    for (shape, source, abandon_source, slots) in [
+    for (shape, raw_state, source, abandon_source, slots) in [
         (
             "null-file",
+            RawStateV1::NullFile,
             raw_witness(
                 "unsafe fn installed_envelope",
                 "RawSqliteFileStateRejection::NullFile",
@@ -74,6 +80,7 @@ fn add_validation_rejections(builder: &mut Builder, raw: &str) {
         ),
         (
             "uninstalled",
+            RawStateV1::Uninstalled,
             raw_witness(
                 "fn validate_installed",
                 "RawSqliteFileStateRejection::Uninstalled",
@@ -88,6 +95,7 @@ fn add_validation_rejections(builder: &mut Builder, raw: &str) {
         ),
         (
             "methods-null-state-present",
+            RawStateV1::MethodsNullStatePresent,
             raw_witness(
                 "fn validate_installed",
                 "RawSqliteFileStateRejection::ForeignMethods",
@@ -98,6 +106,7 @@ fn add_validation_rejections(builder: &mut Builder, raw: &str) {
         ),
         (
             "foreign-methods-state-null",
+            RawStateV1::ForeignMethodsStateNull,
             raw_witness(
                 "fn validate_installed",
                 "RawSqliteFileStateRejection::ForeignMethods",
@@ -108,6 +117,7 @@ fn add_validation_rejections(builder: &mut Builder, raw: &str) {
         ),
         (
             "foreign-methods-state-present",
+            RawStateV1::ForeignMethodsStatePresent,
             raw_witness(
                 "fn validate_installed",
                 "RawSqliteFileStateRejection::ForeignMethods",
@@ -118,6 +128,7 @@ fn add_validation_rejections(builder: &mut Builder, raw: &str) {
         ),
         (
             "exact-methods-state-null",
+            RawStateV1::ExactMethodsStateNull,
             raw_witness(
                 "fn validate_installed",
                 "RawSqliteFileStateRejection::StateMissing",
@@ -127,7 +138,15 @@ fn add_validation_rejections(builder: &mut Builder, raw: &str) {
             CustodyState::Retained,
         ),
     ] {
-        abandon::add_rejected_slots(builder, raw, shape, source, abandon_source, slots);
+        abandon::add_rejected_slots(
+            builder,
+            raw,
+            shape,
+            raw_state,
+            source,
+            abandon_source,
+            slots,
+        );
     }
 }
 
@@ -183,6 +202,7 @@ fn add_other_type(builder: &mut Builder, type_domain: &str) {
         "type-mismatch.payload-missing",
         "payload_missing",
         mismatch,
+        RawStateV1::OtherTypePayloadMissing,
         false,
     );
     abandon::add_envelope(
@@ -191,6 +211,7 @@ fn add_other_type(builder: &mut Builder, type_domain: &str) {
         "type-mismatch.payload-present",
         "payload_present",
         mismatch,
+        RawStateV1::OtherTypePayloadPresent,
         true,
     );
 }
@@ -213,6 +234,7 @@ fn add_expected_type(builder: &mut Builder, type_domain: &str) -> String {
             "expect(\"live raw SQLite state envelope must retain its payload\")",
             1,
         ),
+        RawStateV1::ExpectedTypePayloadMissing,
         false,
     );
     let typed = builder.decision(
@@ -306,6 +328,17 @@ fn add_file_domain(builder: &mut Builder, typed: &str) -> String {
     let terminal = builder.terminal(
         format!("{PREFIX}.terminal.handle-bound-file-missing"),
         missing,
+        SeedV1::early(
+            SourceSiteV1::AdapterDispatch,
+            StimulusV1::LockRaw(RawStateV1::HandleBoundFileMissing),
+            LockOperationV1::AdapterDispatch,
+            PhaseV1::Adapter,
+            TimingV1::BeforeCall,
+            OccurrenceV1::Natural,
+            FaultSeamV1::RawState,
+            ObserverV1::LockCallbackAndSnapshot,
+        )
+        .terminal(TerminalPathV1::Direct),
         outcome::abi_projection(super::super::super::model::SqliteResult::LockUnavailable),
     );
     builder.edge(

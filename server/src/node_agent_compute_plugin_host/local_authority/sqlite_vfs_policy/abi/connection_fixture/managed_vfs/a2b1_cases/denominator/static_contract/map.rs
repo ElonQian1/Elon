@@ -6,6 +6,7 @@
 
 mod abi_raw;
 mod builder;
+mod dynamic;
 mod expected;
 mod loop_expansion;
 mod managed;

@@ -7,6 +7,7 @@ use super::{
             source::{witness, ProductionOwner, SourceWitness},
         },
         builder::Builder,
+        dynamic::TerminalPathV1,
     },
     completion::{add_invariant_exclusions, owner_poisoned_witness, route_unknown_witness},
     projection::{adapter_projection, add_abi_terminal, expected},
@@ -188,6 +189,11 @@ fn add_unsafe_completion_terminal(
         &projection,
         &format!("{prefix}.terminal.{completion_branch}"),
         value,
+        shape.descriptor,
+        match retention {
+            Retention::Succeeded => TerminalPathV1::UnsafeRetentionSucceededThenRouteUnknown,
+            Retention::RouteUnknown => TerminalPathV1::UnsafeRetentionRouteUnknownThenRouteUnknown,
+        },
     );
 }
 

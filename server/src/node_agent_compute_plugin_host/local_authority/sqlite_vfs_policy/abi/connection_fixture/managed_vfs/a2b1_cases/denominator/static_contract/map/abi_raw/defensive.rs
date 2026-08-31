@@ -1,8 +1,16 @@
 use super::super::{
-    super::model::{
-        CustodyState, DecisionStage, ExclusionProof, Expected, RootOperation, TerminalDisposition,
+    super::{
+        model::{
+            CustodyState, DecisionStage, ExclusionProof, Expected, RootOperation,
+            TerminalDisposition,
+        },
+        terminal_descriptor::{
+            FaultSeamV1, MapAxesV1, MapOperationV1, MapPrestateV1, OccurrenceV1, PhaseV1,
+            RawStateV1, SourceSiteV1, StimulusV1, TimingV1,
+        },
     },
     builder::MapGraphBuilder,
+    dynamic::DescriptorSeedV1,
     expected, witnesses as w,
 };
 
@@ -69,9 +77,10 @@ fn add_pointer_exclusions(graph: &mut MapGraphBuilder, entry: &str) {
 }
 
 fn add_validation_rejections(graph: &mut MapGraphBuilder, entry: &str) {
-    for (shape, source, abandon_source, slots) in [
+    for (shape, raw_state, source, abandon_source, slots) in [
         (
             "null-file",
+            RawStateV1::NullFile,
             w::raw(
                 "unsafe fn installed_envelope",
                 "RawSqliteFileStateRejection::NullFile",
@@ -84,6 +93,7 @@ fn add_validation_rejections(graph: &mut MapGraphBuilder, entry: &str) {
         ),
         (
             "uninstalled",
+            RawStateV1::Uninstalled,
             w::raw(
                 "fn validate_installed",
                 "RawSqliteFileStateRejection::Uninstalled",
@@ -96,6 +106,7 @@ fn add_validation_rejections(graph: &mut MapGraphBuilder, entry: &str) {
         ),
         (
             "methods-null-state-present",
+            RawStateV1::MethodsNullStatePresent,
             w::raw(
                 "fn validate_installed",
                 "RawSqliteFileStateRejection::ForeignMethods",
@@ -108,6 +119,7 @@ fn add_validation_rejections(graph: &mut MapGraphBuilder, entry: &str) {
         ),
         (
             "foreign-methods-state-null",
+            RawStateV1::ForeignMethodsStateNull,
             w::raw(
                 "fn validate_installed",
                 "if !ptr::eq(methods, &INERT_IO_METHODS)",
@@ -120,6 +132,7 @@ fn add_validation_rejections(graph: &mut MapGraphBuilder, entry: &str) {
         ),
         (
             "foreign-methods-state-present",
+            RawStateV1::ForeignMethodsStatePresent,
             w::raw(
                 "fn validate_installed",
                 "if !ptr::eq(methods, &INERT_IO_METHODS)",
@@ -132,6 +145,7 @@ fn add_validation_rejections(graph: &mut MapGraphBuilder, entry: &str) {
         ),
         (
             "exact-methods-state-null",
+            RawStateV1::ExactMethodsStateNull,
             w::raw(
                 "fn validate_installed",
                 "RawSqliteFileStateRejection::StateMissing",
@@ -143,7 +157,15 @@ fn add_validation_rejections(graph: &mut MapGraphBuilder, entry: &str) {
             CustodyState::Retained,
         ),
     ] {
-        add_rejected_slots(graph, entry, shape, source, abandon_source, slots);
+        add_rejected_slots(
+            graph,
+            entry,
+            shape,
+            raw_state,
+            source,
+            abandon_source,
+            slots,
+        );
     }
 }
 
@@ -151,6 +173,7 @@ fn add_rejected_slots(
     graph: &mut MapGraphBuilder,
     entry: &str,
     shape: &str,
+    raw_state: RawStateV1,
     source: super::super::super::source::SourceWitness,
     abandon_source: super::super::super::source::SourceWitness,
     slots: CustodyState,
@@ -174,6 +197,7 @@ fn add_rejected_slots(
     graph.terminal(
         &terminal,
         value,
+        raw_descriptor(raw_state, MapOperationV1::RawAbandon, TimingV1::Cleanup).direct(),
         w::file_state("unsafe fn run_code", "Ok(Err(_)) | Err(_) =>"),
     );
     graph.edge(
@@ -233,6 +257,8 @@ fn add_other_type(graph: &mut MapGraphBuilder, type_domain: &str) {
             "return Err(RawSqliteFileStateRejection::TypeMismatch);",
         ),
         false,
+        RawStateV1::OtherTypePayloadMissing,
+        RawStateV1::OtherTypePayloadPresent,
     );
     abandon::add_envelope(
         graph,
@@ -244,6 +270,8 @@ fn add_other_type(graph: &mut MapGraphBuilder, type_domain: &str) {
             "return Err(RawSqliteFileStateRejection::TypeMismatch);",
         ),
         true,
+        RawStateV1::OtherTypePayloadMissing,
+        RawStateV1::OtherTypePayloadPresent,
     );
 }
 
@@ -265,6 +293,8 @@ fn add_expected_type(graph: &mut MapGraphBuilder, type_domain: &str) -> String {
             "expect(\"live raw SQLite state envelope must retain its payload\")",
         ),
         false,
+        RawStateV1::ExpectedTypePayloadMissing,
+        RawStateV1::ExpectedTypePayloadMissing,
     );
     let typed = graph.decision(
         &format!("{PREFIX}.typed-operation"),
@@ -357,6 +387,12 @@ fn add_handle_bound_file_domain(graph: &mut MapGraphBuilder, typed: &str) -> Str
     graph.terminal(
         &terminal,
         missing,
+        raw_descriptor(
+            RawStateV1::HandleBoundFileMissing,
+            MapOperationV1::AdapterDispatch,
+            TimingV1::AtCall,
+        )
+        .direct(),
         w::file_state("unsafe fn run_code", "Ok(Ok(code)) => code"),
     );
     graph.edge(
@@ -379,4 +415,30 @@ fn add_handle_bound_file_domain(graph: &mut MapGraphBuilder, typed: &str) -> Str
         "handle_bound_file_present",
     );
     present
+}
+
+fn raw_descriptor(
+    state: RawStateV1,
+    operation: MapOperationV1,
+    timing: TimingV1,
+) -> DescriptorSeedV1 {
+    DescriptorSeedV1::new(
+        if matches!(operation, MapOperationV1::AdapterDispatch) {
+            SourceSiteV1::AdapterDispatch
+        } else {
+            SourceSiteV1::RawStateAbandon
+        },
+        StimulusV1::MapRaw(state),
+        MapPrestateV1::NotReached,
+        operation,
+        if matches!(operation, MapOperationV1::AdapterDispatch) {
+            PhaseV1::Adapter
+        } else {
+            PhaseV1::RawAdmission
+        },
+        timing,
+        OccurrenceV1::Natural,
+        FaultSeamV1::RawState,
+        MapAxesV1::NOT_REACHED,
+    )
 }

@@ -1,7 +1,14 @@
 use super::super::super::super::source::SourceWitness;
 use super::super::super::{
-    super::model::{CustodyState, DecisionStage, Expected, TerminalDisposition},
+    super::{
+        model::{CustodyState, DecisionStage, Expected, TerminalDisposition},
+        terminal_descriptor::{
+            FaultSeamV1, MapAxesV1, MapOperationV1, MapPrestateV1, OccurrenceV1, PhaseV1,
+            RawStateV1, SourceSiteV1, StimulusV1, TimingV1,
+        },
+    },
     builder::MapGraphBuilder,
+    dynamic::DescriptorSeedV1,
     expected, witnesses as w,
 };
 
@@ -58,6 +65,8 @@ pub(super) fn add_envelope(
     branch: &str,
     trigger: SourceWitness,
     payload_present: bool,
+    missing_state: RawStateV1,
+    present_state: RawStateV1,
 ) {
     let cause = graph.decision(&format!("{PREFIX}.{label}.cause"), trigger);
     graph.edge(payload_domain, &cause, DecisionStage::RawAdmission, branch);
@@ -93,6 +102,7 @@ pub(super) fn add_envelope(
         graph.terminal(
             &terminal,
             raw_expected(CustodyState::Cleared, false),
+            raw_descriptor(missing_state).raw_drop_completed(),
             w::raw(
                 "fn drop(&mut self)",
                 "if let Some(payload) = self.payload.take()",
@@ -153,6 +163,11 @@ pub(super) fn add_envelope(
         graph.terminal(
             &terminal,
             raw_expected(payload, unwind),
+            if unwind {
+                raw_descriptor(present_state).raw_drop_unwind()
+            } else {
+                raw_descriptor(present_state).raw_drop_completed()
+            },
             w::file_state("unsafe fn run_code", "Ok(Err(_)) | Err(_) =>"),
         );
         graph.edge(&outcome, &terminal, DecisionStage::RawAbandon, branch);
@@ -165,4 +180,18 @@ fn raw_expected(payload: CustodyState, unwind: bool) -> Expected {
         value.disposition = TerminalDisposition::Quarantined;
     }
     value
+}
+
+fn raw_descriptor(state: RawStateV1) -> DescriptorSeedV1 {
+    DescriptorSeedV1::new(
+        SourceSiteV1::RawStateAbandon,
+        StimulusV1::MapRaw(state),
+        MapPrestateV1::NotReached,
+        MapOperationV1::RawAbandon,
+        PhaseV1::RawAdmission,
+        TimingV1::Cleanup,
+        OccurrenceV1::Natural,
+        FaultSeamV1::RawState,
+        MapAxesV1::NOT_REACHED,
+    )
 }

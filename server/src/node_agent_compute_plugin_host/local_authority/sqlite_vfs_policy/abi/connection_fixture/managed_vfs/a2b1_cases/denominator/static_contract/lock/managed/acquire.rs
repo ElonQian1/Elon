@@ -1,3 +1,7 @@
+use super::super::super::terminal_descriptor::{
+    FaultSeamV1, LockManagedStimulusV1, LockOperationV1, LockPrestateV1, PhaseV1, SourceSiteV1,
+    TimingV1,
+};
 use super::{
     super::{
         super::{
@@ -6,6 +10,7 @@ use super::{
             source::{witness, ProductionOwner},
         },
         builder::Builder,
+        dynamic::SeedV1,
         input::ValidRequest,
         outcome::{self, Shape},
     },
@@ -57,12 +62,24 @@ pub(super) fn expand(builder: &mut Builder, from: &str, request: &ValidRequest, 
     for success in successes {
         expand_after_initialization(builder, request, &prefix, &success);
     }
-    project_initialization_failures(builder, failures);
+    project_initialization_failures(builder, request, failures);
 }
 
-fn project_initialization_failures(builder: &mut Builder, failures: Vec<InitializationFailure>) {
+fn project_initialization_failures(
+    builder: &mut Builder,
+    request: &ValidRequest,
+    failures: Vec<InitializationFailure>,
+) {
     for failure in failures {
         let mut shape = Shape::failure(
+            SeedV1::initialization_failure(
+                request.action,
+                request.range,
+                failure.stimulus,
+                failure.typed_phase,
+                failure.timing,
+                failure.occurrence,
+            ),
             failure.phase,
             failure.class,
             failure.mutation,
@@ -147,6 +164,7 @@ fn expand_after_initialization(
             1,
         ),
         Shape::busy(
+            native_descriptor(request, success, PhaseV1::LockAcquire, TimingV1::AtCall),
             initialization_mutated,
             success.native_lock + 1,
             success.native_unlock,
@@ -167,6 +185,7 @@ fn expand_after_initialization(
                 1,
             ),
             Shape::failure(
+                native_descriptor(request, success, PhaseV1::LockAcquire, TimingV1::AtCall),
                 "LockAcquire",
                 FailureClass::MutatedButKnown,
                 success.mutation,
@@ -177,8 +196,16 @@ fn expand_after_initialization(
             .with_dms_lock(success.dms_lock),
         );
     } else {
-        add_warm_native_error(builder, &native, prefix, cell, "io", success);
-        add_warm_native_error(builder, &native, prefix, cell, "unsupported", success);
+        add_warm_native_error(builder, &native, request, prefix, cell, "io", success);
+        add_warm_native_error(
+            builder,
+            &native,
+            request,
+            prefix,
+            cell,
+            "unsupported",
+            success,
+        );
     }
 
     let installed = builder.decision(
@@ -229,19 +256,24 @@ fn expand_after_initialization(
                 "held.exclusive_mask |= request.mask()"
             },
         ),
-        Shape::success(success.native_lock + 1, success.native_unlock)
-            .with_lock_effect(LockEffect::Acquired {
-                mode: request.action.mode(),
-                mask: request.range.mask(),
-                native: true,
-            })
-            .with_dms_lock(success.dms_lock),
+        Shape::success(
+            native_descriptor(request, success, PhaseV1::Success, TimingV1::AfterSuccess),
+            success.native_lock + 1,
+            success.native_unlock,
+        )
+        .with_lock_effect(LockEffect::Acquired {
+            mode: request.action.mode(),
+            mask: request.range.mask(),
+            native: true,
+        })
+        .with_dms_lock(success.dms_lock),
     );
 }
 
 fn add_warm_native_error(
     builder: &mut Builder,
     native: &str,
+    request: &ValidRequest,
     prefix: &str,
     cell: &str,
     kind: &str,
@@ -261,6 +293,7 @@ fn add_warm_native_error(
         )
     };
     let shape = Shape::failure(
+        native_descriptor(request, success, PhaseV1::LockAcquire, TimingV1::AtCall),
         "LockAcquire",
         if kind == "unsupported" {
             FailureClass::PlatformUnsupported
@@ -283,4 +316,23 @@ fn add_warm_native_error(
         source,
         shape,
     );
+}
+
+fn native_descriptor(
+    request: &ValidRequest,
+    success: &InitializationSuccess,
+    phase: PhaseV1,
+    timing: TimingV1,
+) -> SeedV1 {
+    request
+        .descriptor(
+            SourceSiteV1::LockNativeAcquire,
+            LockManagedStimulusV1::NativeAcquire,
+            LockPrestateV1::NoHeldLocks,
+            LockOperationV1::NativeAcquire,
+            phase,
+            timing,
+            FaultSeamV1::NativeOperation,
+        )
+        .with_initialization(success.profile)
 }

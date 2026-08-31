@@ -1,14 +1,20 @@
 mod helpers;
 mod mapping;
+mod poison_profile;
 
 use super::{
     super::{
         initialization,
         model::{DecisionStage, DmsLockCustody, ExclusionProof, FailureClass, ObservableCounts},
         poison,
+        terminal_descriptor::{
+            FaultSeamV1, InitializationProfileV1, MapFilePathV1, MapManagedStimulusV1,
+            MapOperationV1, MapPrestateV1, MapRegionSizeArmV1, PhaseV1, SourceSiteV1, StimulusV1,
+            TimingV1,
+        },
     },
     builder::MapGraphBuilder,
-    witnesses as w, MapMode,
+    dynamic, witnesses as w, MapMode,
 };
 use helpers::{
     add_failure_branch, build_post_initialization, exclude_region_arm, failure,
@@ -63,7 +69,12 @@ pub(super) fn build(graph: &mut MapGraphBuilder, admitted: &str, mode: MapMode) 
             "fn validate_region_size",
             "NODE_MANAGED_SQLITE_SHM_REGION_SIZE_BUDGET",
         ),
-        failure("RequestValidation", FailureClass::ProtocolViolation, false),
+        failure(
+            "RequestValidation",
+            FailureClass::ProtocolViolation,
+            false,
+            request_seed(mode, MapManagedStimulusV1::RegionSizeBudget),
+        ),
     );
     let region_count = gate(
         graph,
@@ -83,7 +94,12 @@ pub(super) fn build(graph: &mut MapGraphBuilder, admitted: &str, mode: MapMode) 
             "fn validate_logical_end",
             "NODE_MANAGED_SQLITE_SHM_REGION_COUNT_BUDGET",
         ),
-        failure("RequestValidation", FailureClass::ProtocolViolation, false),
+        failure(
+            "RequestValidation",
+            FailureClass::ProtocolViolation,
+            false,
+            request_seed(mode, MapManagedStimulusV1::RegionCountBudget),
+        ),
     );
     let logical_end = gate(
         graph,
@@ -120,7 +136,12 @@ pub(super) fn build(graph: &mut MapGraphBuilder, admitted: &str, mode: MapMode) 
             "fn validate_logical_end",
             "NODE_MANAGED_SQLITE_SHM_LOGICAL_SIZE_BUDGET",
         ),
-        failure("RequestValidation", FailureClass::ProtocolViolation, false),
+        failure(
+            "RequestValidation",
+            FailureClass::ProtocolViolation,
+            false,
+            request_seed(mode, MapManagedStimulusV1::LogicalSizeBudget),
+        ),
     );
 
     let granularity = gate(
@@ -141,7 +162,21 @@ pub(super) fn build(graph: &mut MapGraphBuilder, admitted: &str, mode: MapMode) 
             "fn allocation_granularity",
             "NODE_MANAGED_SQLITE_SHM_ALLOCATION_GRANULARITY_ZERO",
         ),
-        failure("RequestValidation", FailureClass::IoBeforeMutation, false),
+        failure(
+            "RequestValidation",
+            FailureClass::IoBeforeMutation,
+            false,
+            dynamic::managed_seed(
+                mode,
+                SourceSiteV1::ManagedRequestValidation,
+                StimulusV1::MapManaged(MapManagedStimulusV1::AllocationGranularity),
+                MapPrestateV1::NotReached,
+                MapOperationV1::ManagedRequest,
+                PhaseV1::RequestValidation,
+                TimingV1::AtCall,
+                FaultSeamV1::NativeOperation,
+            ),
+        ),
     );
     let zero = format!("{prefix}.excluded.allocation-granularity-zero-after-ok");
     graph.excluded(
@@ -205,7 +240,7 @@ pub(super) fn build(graph: &mut MapGraphBuilder, admitted: &str, mode: MapMode) 
         "connection_id_attached",
         w::managed("if let Some(poison) = state.poisoned"),
     );
-    project_stored_poison(graph, &existing_poison, &prefix);
+    project_stored_poison(graph, &existing_poison, &prefix, mode);
 
     let init_prefix = format!("{prefix}.initialization");
     let (entry, successes, failures) =
@@ -219,7 +254,7 @@ pub(super) fn build(graph: &mut MapGraphBuilder, admitted: &str, mode: MapMode) 
     for success in successes {
         build_post_initialization(graph, mode, &success);
     }
-    helpers::project_initialization_failures(graph, failures);
+    helpers::project_initialization_failures(graph, failures, mode);
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -228,6 +263,7 @@ fn build_region_size(
     from: &str,
     prefix: &str,
     mode: MapMode,
+    initialization: InitializationProfileV1,
     prestate: RegionPrestate,
     new_node: bool,
     initialization_mutated: bool,
@@ -268,6 +304,14 @@ fn build_region_size(
             &format!("{profile}.region-size-unset"),
             "region_size_unset_assigned",
             mode,
+            helpers::profile(
+                mode,
+                initialization,
+                prestate,
+                MapRegionSizeArmV1::UnsetAssigned,
+                MapFilePathV1::NotReached,
+                initialization_mutated || prestate.has_mapping(),
+            ),
             prestate,
             initialization_mutated,
             dms_lock,
@@ -289,6 +333,23 @@ fn build_region_size(
                 FailureClass::ProtocolViolation,
                 false,
                 prestate,
+                dynamic::profile_seed(
+                    helpers::profile(
+                        mode,
+                        initialization,
+                        prestate,
+                        MapRegionSizeArmV1::Changed,
+                        MapFilePathV1::NotReached,
+                        initialization_mutated || prestate.has_mapping(),
+                    ),
+                    SourceSiteV1::ManagedRequestValidation,
+                    StimulusV1::MapManaged(MapManagedStimulusV1::RegionSize),
+                    prestate.descriptor(),
+                    MapOperationV1::ManagedRequest,
+                    PhaseV1::RequestValidation,
+                    TimingV1::BeforeCall,
+                    FaultSeamV1::ManagedRequest,
+                ),
             );
             spec.dms_lock = dms_lock;
             spec.counts = baseline_counts;
@@ -301,6 +362,14 @@ fn build_region_size(
         &format!("{profile}.region-size-same"),
         "region_size_same",
         mode,
+        helpers::profile(
+            mode,
+            initialization,
+            prestate,
+            MapRegionSizeArmV1::Same,
+            MapFilePathV1::NotReached,
+            initialization_mutated || prestate.has_mapping(),
+        ),
         prestate,
         false,
         dms_lock,
@@ -321,10 +390,31 @@ fn build_region_size(
             &format!("{profile}.region-size-unset"),
             "region_size_unset_assigned",
             mode,
+            helpers::profile(
+                mode,
+                initialization,
+                prestate,
+                MapRegionSizeArmV1::UnsetAssigned,
+                MapFilePathV1::NotReached,
+                initialization_mutated || prestate.has_mapping(),
+            ),
             prestate,
             false,
             dms_lock,
             baseline_counts,
         );
     }
+}
+
+fn request_seed(mode: MapMode, stimulus: MapManagedStimulusV1) -> dynamic::DescriptorSeedV1 {
+    dynamic::managed_seed(
+        mode,
+        SourceSiteV1::ManagedRequestValidation,
+        StimulusV1::MapManaged(stimulus),
+        MapPrestateV1::NotReached,
+        MapOperationV1::ManagedRequest,
+        PhaseV1::RequestValidation,
+        TimingV1::BeforeCall,
+        FaultSeamV1::ManagedRequest,
+    )
 }

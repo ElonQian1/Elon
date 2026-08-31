@@ -57,3 +57,31 @@ fn a2b1_map_lock_static_contract_is_exact() {
     );
     println!("Map StaticContract={map}/{map}; Lock StaticContract={lock}/{lock}");
 }
+
+#[test]
+fn a2b1_map_dynamic_quotient_candidate_is_atomically_runner_blocked() {
+    let error = denominator::validate_map_dynamic_quotient_candidate_gate()
+        .expect_err("Map quotient candidate must remain closed without an executable runner");
+    assert_eq!(
+        error,
+        denominator::DynamicQuotientCandidateGateErrorV1::RunnerCapabilityMissing {
+            count: 43_476,
+            gap: denominator::CapabilityGapV1::QuotientRunnerNotIntegrated,
+        },
+        "Map candidate must validate every static member and expose the exact root blocker"
+    );
+}
+
+#[test]
+fn a2b1_lock_dynamic_quotient_candidate_is_atomically_runner_blocked() {
+    let error = denominator::validate_lock_dynamic_quotient_candidate_gate()
+        .expect_err("Lock quotient candidate must remain closed without complete observation");
+    assert_eq!(
+        error,
+        denominator::DynamicQuotientCandidateGateErrorV1::RunnerCapabilityMissing {
+            count: 8_668,
+            gap: denominator::CapabilityGapV1::LockObservationIncomplete,
+        },
+        "Lock candidate must validate every static member and expose the exact root blocker"
+    );
+}

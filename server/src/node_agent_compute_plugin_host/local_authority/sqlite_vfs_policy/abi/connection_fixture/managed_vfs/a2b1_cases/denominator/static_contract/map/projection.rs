@@ -7,9 +7,14 @@ use super::{
             MutationState, ObservableCounts, TerminalDisposition,
         },
         poison,
+        terminal_descriptor::{
+            FaultSeamV1, MapManagedStimulusV1, MapOperationV1, MapPrestateV1, OccurrenceV1,
+            PhaseV1, SourceSiteV1, StimulusV1, TerminalDescriptorV1, TimingV1,
+        },
     },
     builder::MapGraphBuilder,
-    expected, witnesses as w,
+    dynamic::{self, DescriptorSeedV1},
+    expected, witnesses as w, MapMode,
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -26,6 +31,7 @@ pub(super) struct FailureSpec {
     pub(super) quarantine: bool,
     pub(super) lock_outcome_uncertain: bool,
     pub(super) dms_lock: DmsLockCustody,
+    pub(super) dynamic: DescriptorSeedV1,
 }
 
 pub(super) fn operation_failure(
@@ -41,7 +47,12 @@ pub(super) fn operation_failure(
     }
 }
 
-pub(super) fn callback_admission_failure(graph: &mut MapGraphBuilder, from: &str, prefix: &str) {
+pub(super) fn callback_admission_failure(
+    graph: &mut MapGraphBuilder,
+    from: &str,
+    prefix: &str,
+    mode: MapMode,
+) {
     exclude_owner_poison(
         graph,
         from,
@@ -49,9 +60,10 @@ pub(super) fn callback_admission_failure(graph: &mut MapGraphBuilder, from: &str
         DecisionStage::CallbackAdmission,
         "owner-poisoned",
     );
-    for (variant, route, disposition, witness) in [
+    for (variant, stimulus, route, disposition, witness) in [
         (
             "route-unknown-prior-quarantine",
+            MapManagedStimulusV1::CallbackRouteUnknownPriorQuarantine,
             CustodyState::Quarantined,
             TerminalDisposition::Returned,
             w::registry_owner(
@@ -61,6 +73,7 @@ pub(super) fn callback_admission_failure(graph: &mut MapGraphBuilder, from: &str
         ),
         (
             "callback-counter-overflow",
+            MapManagedStimulusV1::CallbackCounterOverflow,
             CustodyState::Quarantined,
             TerminalDisposition::Quarantined,
             w::registry_state(
@@ -83,7 +96,23 @@ pub(super) fn callback_admission_failure(graph: &mut MapGraphBuilder, from: &str
         value.route = route;
         value.callback = CustodyState::NotReached;
         value.file = CustodyState::Unchanged;
-        graph.terminal(&terminal_id, value, w::abi_failure());
+        graph.terminal(
+            &terminal_id,
+            value,
+            DescriptorSeedV1::new(
+                SourceSiteV1::RegistryCallbackAdmission,
+                StimulusV1::MapManaged(stimulus),
+                MapPrestateV1::NotReached,
+                MapOperationV1::CallbackAdmission,
+                PhaseV1::CallbackAdmission,
+                TimingV1::AtCall,
+                OccurrenceV1::Natural,
+                FaultSeamV1::RegistryAdmission,
+                dynamic::mode_axes(mode),
+            )
+            .direct(),
+            w::abi_failure(),
+        );
         graph.edge(from, &adapter, DecisionStage::CallbackAdmission, variant);
         graph.edge(
             &adapter,
@@ -151,6 +180,7 @@ pub(super) fn managed_success(
     mutation: MutationState,
     dms_lock: DmsLockCustody,
     mut counts: ObservableCounts,
+    dynamic: DescriptorSeedV1,
 ) {
     counts.callback_begin = 1;
     counts.callback_complete = 1;
@@ -189,7 +219,7 @@ pub(super) fn managed_success(
         value.mapping = CustodyState::Retained;
         value.view = CustodyState::Retained;
     }
-    graph.terminal(&terminal, value, w::abi_ok());
+    graph.terminal(&terminal, value, dynamic.completed(), w::abi_ok());
     graph.edge(
         &adapter,
         &terminal,
@@ -233,7 +263,12 @@ pub(super) fn managed_success(
         };
         value.view = value.mapping;
         value.payload = CustodyState::Released;
-        graph.terminal(&terminal, value, w::abi_failure());
+        graph.terminal(
+            &terminal,
+            value,
+            dynamic.after_success_completion().route_unknown(),
+            w::abi_failure(),
+        );
         graph.edge(
             &rejected,
             &terminal,
@@ -257,16 +292,18 @@ fn safe_failure(graph: &mut MapGraphBuilder, from: &str, prefix: &str, mut spec:
         "operation_error",
     );
     exclusions::normal_completion(graph, &completion, prefix);
-    for (variant, route, callback) in [
+    for (variant, route, callback, descriptor) in [
         (
             "completion-succeeded",
             CustodyState::Unchanged,
             CustodyState::Released,
+            spec.dynamic.completed(),
         ),
         (
             "completion-rejected-route-already-quarantined",
             CustodyState::Quarantined,
             CustodyState::Retained,
+            spec.dynamic.route_unknown(),
         ),
     ] {
         add_failure_terminal(
@@ -277,6 +314,7 @@ fn safe_failure(graph: &mut MapGraphBuilder, from: &str, prefix: &str, mut spec:
             route,
             callback,
             variant,
+            descriptor,
         );
     }
 }
@@ -324,6 +362,7 @@ fn unsafe_failure(graph: &mut MapGraphBuilder, from: &str, prefix: &str, mut spe
         CustodyState::Quarantined,
         CustodyState::Retained,
         "completion_rejected_route_already_quarantined",
+        spec.dynamic.unsafe_retention_succeeded(),
     );
 
     let identity_mismatch = graph.excluded(
@@ -376,6 +415,7 @@ fn unsafe_failure(graph: &mut MapGraphBuilder, from: &str, prefix: &str, mut spe
         CustodyState::Quarantined,
         CustodyState::Retained,
         "completion-rejected-route-already-quarantined",
+        spec.dynamic.unsafe_retention_route_unknown(),
     );
 }
 
@@ -405,6 +445,7 @@ fn add_failure_terminal(
     route: CustodyState,
     callback: CustodyState,
     branch: &str,
+    descriptor: TerminalDescriptorV1,
 ) {
     let adapter = graph.decision(
         &format!("{prefix}.adapter"),
@@ -430,7 +471,7 @@ fn add_failure_terminal(
     if callback == CustodyState::Retained && value.disposition == TerminalDisposition::Returned {
         value.disposition = TerminalDisposition::Quarantined;
     }
-    graph.terminal(&terminal, value, w::abi_failure());
+    graph.terminal(&terminal, value, descriptor, w::abi_failure());
     graph.edge(
         &adapter,
         &terminal,

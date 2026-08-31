@@ -7,6 +7,7 @@ use super::super::{
         Expected, NodeKind, RootOperation,
     },
     source::SourceWitness,
+    terminal_descriptor::TerminalDescriptorV1,
 };
 
 pub(super) struct MapGraphBuilder {
@@ -36,6 +37,7 @@ impl MapGraphBuilder {
         &mut self,
         id: &str,
         expected: Expected,
+        descriptor: TerminalDescriptorV1,
         source: SourceWitness,
     ) -> String {
         let leaf_id = id.to_owned();
@@ -44,7 +46,15 @@ impl MapGraphBuilder {
             "duplicate Map leaf {id}"
         );
         self.terminal_cases += 1;
-        self.push_node(id, NodeKind::Terminal { leaf_id, expected }, source)
+        self.push_node(
+            id,
+            NodeKind::Terminal {
+                leaf_id,
+                expected,
+                descriptor,
+            },
+            source,
+        )
     }
 
     pub(super) fn excluded(
