@@ -65,7 +65,7 @@ reviewed_at: 2026-09-01
 - 分布式算力≠“开放算力市场已完成”；状态见 `docs/distributed-compute/current-implementation-status.md`。
 - 外部矿池：V277/V278 uncompiled/unrun、#13-18 deny、eligible=0；V280 仅 ABI。
 - V279：source-only/uncompiled/unrun、零下游/经济效果；见 `docs/distributed-compute/user-node-provider-binding-authority.md`。
-- A2 Lock：stored-poison=2×1320，route-preemption actual runner/selector/payload源码桥；inventory未运行=`2754+5914 missing`。状态=`source_written/source_review_only/implementation_uncompiled/implementation_unrun, passed=0 failed=0 actual=not_run, Qlock=unknown, WindowsDynamic=not_opened, production closed`。
+- A2 Lock：q2 lifecycle=104；q3/q4 stored-poison=`2×1320`，route-preemption bridge 保留；q5 单列 `LockNativeAcquire+NodeLive+native-busy+Completed` 44 members（8 shared 单槽+36 exclusive 连续范围），以同一物理 SHM 独立句柄的真实 Win32 byte-range contention 和 exact receipt 约束 installed `xShmLock` 的 `SQLITE_BUSY`/native contended、状态不变与 holder cleanup。inventory 未运行预期=`2798 present+5870 missing`；inventory/review digest 未生成/缺失，coverage=`0/8668`。状态=`source_written/source_review_only/implementation_uncompiled/implementation_unrun, passed=0 failed=0 actual=not_run, Qlock=unknown, WindowsDynamic=not_opened, A2 not dynamically accepted, production VFS/A1/v15/Runtime/Provider/Offer/Job/Lease/dispatch/market/settlement/funds closed`。
 - `capacity_future`：source-only/uncompiled/unrun，无 API/effect；见 `AI_INDEX.md`。
 
 ## 已接受的产品方向
