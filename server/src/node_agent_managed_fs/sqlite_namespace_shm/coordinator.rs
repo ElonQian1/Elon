@@ -46,6 +46,9 @@ pub(super) struct ManagedSqliteShmCoordinator {
     #[cfg(test)]
     pub(super) test_faults: Mutex<super::test_faults::ManagedSqliteShmTestFaultController>,
     #[cfg(all(test, windows))]
+    pub(super) test_lock_runtime:
+        Mutex<super::test_lock_runtime::ManagedSqliteShmTestLockController>,
+    #[cfg(all(test, windows))]
     pub(super) test_unmap_runtime:
         Mutex<super::test_unmap_runtime::ManagedSqliteShmTestUnmapController>,
     pub(super) namespace: PinnedManagedSqliteNamespace,
@@ -140,6 +143,10 @@ impl PinnedManagedSqliteNamespace {
             #[cfg(test)]
             test_faults: Mutex::new(
                 super::test_faults::ManagedSqliteShmTestFaultController::default(),
+            ),
+            #[cfg(all(test, windows))]
+            test_lock_runtime: Mutex::new(
+                super::test_lock_runtime::ManagedSqliteShmTestLockController::default(),
             ),
             #[cfg(all(test, windows))]
             test_unmap_runtime: Mutex::new(

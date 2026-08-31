@@ -1,5 +1,6 @@
-//! Sealed admission bridge for the executable Lock managed-request-validation programs.
+//! Sealed admission bridge for the executable Lock dynamic-quotient programs.
 
+mod lifecycle;
 mod request_validation;
 
 #[cfg(windows)]
@@ -7,21 +8,28 @@ use std::fmt;
 
 use sha2::{Digest, Sha256};
 
+#[cfg(windows)]
+use super::super::super::terminal_descriptor::LockActionV1;
 use super::super::super::{
-    source_leaf_authority::Digest32,
-    terminal_descriptor::{LockActionV1, RunnerCapabilityV1},
+    source_leaf_authority::Digest32, terminal_descriptor::RunnerCapabilityV1,
 };
 use super::super::{DynamicClassKeyV1, StaticMemberSealV1};
 use super::CompiledRunnerPlanV1;
-use request_validation::program_spec_v1;
+#[cfg(windows)]
+use lifecycle::LockLifecyclePathSpecV1;
+use lifecycle::{program_spec_v1 as lifecycle_program_spec_v1, LockLifecycleProgramSpecV1};
+use request_validation::{
+    program_spec_v1 as request_validation_program_spec_v1, LockProgramSpecV1,
+};
 
 #[cfg(windows)]
 use request_validation::LockRequestValidationGuardV1;
 
 #[cfg(windows)]
 use crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::abi::connection_fixture::managed_vfs::a2_dynamic_evidence::{
-    run_lock_program_isolated, LockRunnerActionV1, LockRunnerEvidenceReceiptV1,
-    LockRunnerIsolatedEvidenceV1, LockRunnerProgramBindingV1, LockRunnerRequestValidationV1,
+    run_lock_lifecycle_program_isolated, run_lock_program_isolated, LockRunnerActionV1,
+    LockRunnerEvidenceReceiptV1, LockRunnerIsolatedEvidenceV1, LockRunnerLifecycleBindingV1,
+    LockRunnerLifecyclePathV1, LockRunnerProgramBindingV1, LockRunnerRequestValidationV1,
 };
 
 /// A real execution receipt. Private fields and the absent public constructor prevent digest-only
@@ -126,39 +134,75 @@ pub(in super::super) fn run_lock_isolated_for_test(
 ) -> Result<LockRunnerIsolatedOutcomeV1, LockRunnerExecutionErrorV1> {
     let program = program_v1(key, member, plan)
         .map_err(|violation| LockRunnerExecutionErrorV1(format!("{violation:?}")))?;
-    let binding = LockRunnerProgramBindingV1 {
-        action: match program.action {
-            LockActionV1::LockShared => LockRunnerActionV1::LockShared,
-            LockActionV1::LockExclusive => LockRunnerActionV1::LockExclusive,
-            LockActionV1::UnlockShared => LockRunnerActionV1::UnlockShared,
-            LockActionV1::UnlockExclusive => LockRunnerActionV1::UnlockExclusive,
-        },
-        request_validation: match program.guard {
-            LockRequestValidationGuardV1::RangeOverflow => {
-                LockRunnerRequestValidationV1::RangeOverflow
-            }
-            LockRequestValidationGuardV1::EndPastEight => {
-                LockRunnerRequestValidationV1::EndPastEight
-            }
-            LockRequestValidationGuardV1::SharedMultiSlot => {
-                LockRunnerRequestValidationV1::SharedMultiSlot
-            }
-        },
-        normalized_descriptor_sha256: program.normalized_descriptor_sha256.0,
-        case_key_sha256: member.case_key_sha256.0,
-        full_record_sha256: member.full_record_sha256.0,
-        plan_sha256: program.plan_sha256.0,
-        implementation_sha256: program.implementation_sha256.0,
+    let evidence = match program.case {
+        LockProgramCaseV1::RequestValidation { action, guard } => run_lock_program_isolated(
+            exact_test,
+            LockRunnerProgramBindingV1 {
+                action: runner_action_v1(action),
+                request_validation: match guard {
+                    LockRequestValidationGuardV1::RangeOverflow => {
+                        LockRunnerRequestValidationV1::RangeOverflow
+                    }
+                    LockRequestValidationGuardV1::EndPastEight => {
+                        LockRunnerRequestValidationV1::EndPastEight
+                    }
+                    LockRequestValidationGuardV1::SharedMultiSlot => {
+                        LockRunnerRequestValidationV1::SharedMultiSlot
+                    }
+                },
+                normalized_descriptor_sha256: program.normalized_descriptor_sha256.0,
+                case_key_sha256: member.case_key_sha256.0,
+                full_record_sha256: member.full_record_sha256.0,
+                plan_sha256: program.plan_sha256.0,
+                implementation_sha256: program.implementation_sha256.0,
+            },
+        ),
+        LockProgramCaseV1::Lifecycle(lifecycle) => run_lock_lifecycle_program_isolated(
+            exact_test,
+            LockRunnerLifecycleBindingV1 {
+                path: match lifecycle.path {
+                    LockLifecyclePathSpecV1::NativeAcquire => {
+                        LockRunnerLifecyclePathV1::NativeAcquire
+                    }
+                    LockLifecyclePathSpecV1::NativeRelease => {
+                        LockRunnerLifecyclePathV1::NativeRelease
+                    }
+                    LockLifecyclePathSpecV1::SharedLocalAcquire => {
+                        LockRunnerLifecyclePathV1::SharedLocalAcquire
+                    }
+                    LockLifecyclePathSpecV1::SharedLocalRelease => {
+                        LockRunnerLifecyclePathV1::SharedLocalRelease
+                    }
+                },
+                action: runner_action_v1(lifecycle.action),
+                first: lifecycle.first,
+                count: lifecycle.count,
+                mask: lifecycle.mask,
+                normalized_descriptor_sha256: program.normalized_descriptor_sha256.0,
+                case_key_sha256: member.case_key_sha256.0,
+                full_record_sha256: member.full_record_sha256.0,
+                plan_sha256: program.plan_sha256.0,
+                implementation_sha256: program.implementation_sha256.0,
+            },
+        ),
     };
-    match run_lock_program_isolated(exact_test, binding)
-        .map_err(|error| LockRunnerExecutionErrorV1(error.to_string()))?
-    {
+    match evidence.map_err(|error| LockRunnerExecutionErrorV1(error.to_string()))? {
         LockRunnerIsolatedEvidenceV1::ChildReported => {
             Ok(LockRunnerIsolatedOutcomeV1::ChildReported)
         }
         LockRunnerIsolatedEvidenceV1::ParentReceipt(evidence) => Ok(
             LockRunnerIsolatedOutcomeV1::ParentReceipt(seal_execution_receipt(program, evidence)),
         ),
+    }
+}
+
+#[cfg(windows)]
+const fn runner_action_v1(action: LockActionV1) -> LockRunnerActionV1 {
+    match action {
+        LockActionV1::LockShared => LockRunnerActionV1::LockShared,
+        LockActionV1::LockExclusive => LockRunnerActionV1::LockExclusive,
+        LockActionV1::UnlockShared => LockRunnerActionV1::UnlockShared,
+        LockActionV1::UnlockExclusive => LockRunnerActionV1::UnlockExclusive,
     }
 }
 
@@ -172,11 +216,29 @@ pub(in super::super) fn tamper_lock_implementation_digest_for_test(
 
 #[derive(Clone, Copy)]
 struct LockProgramV1 {
-    action: LockActionV1,
     #[cfg(windows)]
-    guard: LockRequestValidationGuardV1,
+    case: LockProgramCaseV1,
     normalized_descriptor_sha256: Digest32,
     member: StaticMemberSealV1,
+    plan_sha256: Digest32,
+    implementation_sha256: Digest32,
+}
+
+#[cfg(windows)]
+#[derive(Clone, Copy)]
+enum LockProgramCaseV1 {
+    RequestValidation {
+        action: LockActionV1,
+        guard: LockRequestValidationGuardV1,
+    },
+    Lifecycle(LockLifecycleProgramSpecV1),
+}
+
+#[derive(Clone, Copy)]
+struct SourceLockProgramSpecV1 {
+    #[cfg(windows)]
+    case: LockProgramCaseV1,
+    normalized_descriptor_sha256: Digest32,
     plan_sha256: Digest32,
     implementation_sha256: Digest32,
 }
@@ -185,7 +247,7 @@ pub(super) fn implementation_for_inventory_v1(
     key: &DynamicClassKeyV1,
     plan: CompiledRunnerPlanV1,
 ) -> Result<Option<Digest32>, LockRunnerExecutionViolationV1> {
-    match program_spec_v1(key, plan) {
+    match source_program_spec_v1(key, plan) {
         Ok(program) => Ok(Some(program.implementation_sha256)),
         Err(LockRunnerExecutionViolationV1::UnsupportedProgram) => Ok(None),
         Err(error) => Err(error),
@@ -197,19 +259,56 @@ fn program_v1(
     member: StaticMemberSealV1,
     plan: CompiledRunnerPlanV1,
 ) -> Result<LockProgramV1, LockRunnerExecutionViolationV1> {
-    let program = program_spec_v1(key, plan)?;
+    let program = source_program_spec_v1(key, plan)?;
     if key.recipe.capability != RunnerCapabilityV1::Supported {
         return Err(LockRunnerExecutionViolationV1::UnsupportedProgram);
     }
     Ok(LockProgramV1 {
-        action: program.action,
         #[cfg(windows)]
-        guard: program.guard,
+        case: program.case,
         normalized_descriptor_sha256: program.normalized_descriptor_sha256,
         member,
         plan_sha256: program.plan_sha256,
         implementation_sha256: program.implementation_sha256,
     })
+}
+
+fn source_program_spec_v1(
+    key: &DynamicClassKeyV1,
+    plan: CompiledRunnerPlanV1,
+) -> Result<SourceLockProgramSpecV1, LockRunnerExecutionViolationV1> {
+    match request_validation_program_spec_v1(key, plan) {
+        Ok(program) => Ok(from_request_validation_v1(program)),
+        Err(LockRunnerExecutionViolationV1::UnsupportedProgram) => {
+            lifecycle_program_spec_v1(key, plan).map(from_lifecycle_v1)
+        }
+        Err(error) => Err(error),
+    }
+}
+
+fn from_request_validation_v1(program: LockProgramSpecV1) -> SourceLockProgramSpecV1 {
+    #[cfg(not(windows))]
+    let _ = program.action;
+    SourceLockProgramSpecV1 {
+        #[cfg(windows)]
+        case: LockProgramCaseV1::RequestValidation {
+            action: program.action,
+            guard: program.guard,
+        },
+        normalized_descriptor_sha256: program.normalized_descriptor_sha256,
+        plan_sha256: program.plan_sha256,
+        implementation_sha256: program.implementation_sha256,
+    }
+}
+
+fn from_lifecycle_v1(program: LockLifecycleProgramSpecV1) -> SourceLockProgramSpecV1 {
+    SourceLockProgramSpecV1 {
+        #[cfg(windows)]
+        case: LockProgramCaseV1::Lifecycle(program),
+        normalized_descriptor_sha256: program.normalized_descriptor_sha256,
+        plan_sha256: program.plan_sha256,
+        implementation_sha256: program.implementation_sha256,
+    }
 }
 
 #[cfg(windows)]

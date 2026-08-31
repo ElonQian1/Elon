@@ -2,17 +2,17 @@ use super::super::{
     source_leaf_authority::{
         CaseKeyV1, CoordinateV1, CustodyStateV1, Digest32, DmsLockCustodyV1, ExpectedV1,
         FailureClassV1, FrozenStaticBindingV1, LeafIdentityV1, LeafOutcomeV1, LeafRecordV1,
-        LeafSealOutcomeV1, LeafSealV1, LockEffectV1, ManifestContextV1, MutationStateV1,
-        ObservableCountsV1, RootOperationV1, SourceWitnessV1, SqliteResultV1, StreamedLeafV1,
-        TerminalDispositionV1,
+        LeafSealOutcomeV1, LeafSealV1, LockEffectV1, LockModeV1, ManifestContextV1,
+        MutationStateV1, ObservableCountsV1, RootOperationV1, SourceWitnessV1, SqliteResultV1,
+        StreamedLeafV1, TerminalDispositionV1,
     },
     terminal_descriptor::{
         CallbackV1, CapabilityGapV1, CleanupV1, ExecutionRecipeV1, FaultSeamV1, FixtureV1,
-        LockActionV1, LockAxesV1, LockCompletionV1, LockManagedStimulusV1, LockOperationV1,
-        LockPrestateV1, MapAbiScalarV1, MapAxesV1, MapCompletionV1, MapManagedStimulusV1,
-        MapModeV1, MapOperationV1, MapPrestateV1, ObserverV1, OccurrenceV1, PhaseV1, PresenceV1,
-        PrestateV1, ReachabilityV1, RunnerCapabilityV1, SourceSiteV1, StimulusV1,
-        TerminalDescriptorV1, TimingV1, ValidityV1,
+        InitializationProfileV1, LockActionV1, LockAxesV1, LockCompletionV1, LockManagedStimulusV1,
+        LockOperationV1, LockPrestateV1, MapAbiScalarV1, MapAxesV1, MapCompletionV1,
+        MapManagedStimulusV1, MapModeV1, MapOperationV1, MapPrestateV1, ObserverV1, OccurrenceV1,
+        PhaseV1, PresenceV1, PrestateV1, ReachabilityV1, RunnerCapabilityV1, SourceSiteV1,
+        StimulusV1, TerminalDescriptorV1, TimingV1, ValidityV1,
     },
 };
 use super::*;
@@ -24,6 +24,8 @@ mod producer_coherence;
 mod program_admission;
 mod program_inventory;
 mod runner_admission;
+#[cfg(windows)]
+mod runner_admission_lock_lifecycle_supported;
 #[cfg(windows)]
 mod runner_admission_lock_supported;
 #[cfg(windows)]

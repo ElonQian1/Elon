@@ -3,9 +3,9 @@ use super::super::super::a2b2_cases::{
     UnmapSelector,
 };
 
-use super::{lock_request_validation, SanitizedPayloadFamily};
+use super::{lock_lifecycle, lock_request_validation, SanitizedPayloadFamily};
 
-const MAX_ACTUAL_PAYLOAD_BYTES: usize = 1_024;
+const MAX_ACTUAL_PAYLOAD_BYTES: usize = 2_048;
 const COMMON_REPORT_VALUE_COUNT: usize = 81;
 const JOINT_CLOSE_REPORT_VALUE_COUNT: usize = 83;
 const MAP_QUOTIENT_REPORT_VALUE_COUNT: usize = 67;
@@ -78,6 +78,11 @@ pub(super) fn validate_actual_payload(
                 MAP_QUOTIENT_REPORT_VALUE_COUNT,
             )
         }
+        lock_lifecycle::REPORT_VERSION => (
+            SanitizedPayloadFamily::LockQuotient,
+            lock_lifecycle::classify_header(version, selector)?
+                .ok_or("A2_DYNAMIC_CHILD_ACTUAL_VERSION_INVALID")?,
+        ),
         lock_request_validation::REPORT_VERSION => (
             SanitizedPayloadFamily::LockQuotient,
             lock_request_validation::classify_header(version, selector)?
