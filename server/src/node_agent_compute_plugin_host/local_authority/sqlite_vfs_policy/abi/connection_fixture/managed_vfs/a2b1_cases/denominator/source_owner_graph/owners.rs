@@ -1,6 +1,6 @@
 use super::model::{OwnerSnapshot, SourceOwnerId};
 
-pub(super) const SOURCE_BASELINE_COMMIT: &str = "47cb2652321b42cc9689319075d253fe2275ace1";
+pub(super) const SOURCE_BASELINE_COMMIT: &str = "28d61eb8d0a526c089e7ac886d8e137f9c9df016";
 
 const fn owner(
     id: SourceOwnerId,
@@ -29,7 +29,7 @@ pub(super) const OWNERS: &[OwnerSnapshot] = &[
     owner(SourceOwnerId::FixtureFaultFile, "src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/fault_script/file.rs", "f5640040a6da54ef88095e2991090e4be8a92c3b", "df951d65b7ee4e36293048a2f812e57a3b12333eec859a40f0a726b59e0ea0bd", &["struct ManagedTestFaultingFile", "fn shm_map", "fn shm_lock"]),
     owner(SourceOwnerId::FixtureFaultController, "src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/fault_script.rs", "a5f688bc87e9ca99ba429b4cbbd245ad21f68cf8", "bb635d55670ad5f4ad74736ad5e3f81ec1bd8009b13e739f6f03ebf1aca6cc96", &["fn begin_operation"]),
     owner(SourceOwnerId::FixtureRouteFile, "src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/route_file.rs", "7df50a671691a9758809e223422f125dd0539af6", "f881373617faf099da69732346e566b160dec1335fb594484d7756d26494aa3c", &["fn prepare_first_main_shm_map", "fn shm_map", "fn shm_lock"]),
-    owner(SourceOwnerId::FixtureFaultPlan, "src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/shm_fault_script.rs", "da70c2068effb0e804e9a0647d824fa570f93124", "3cc338324a33de42852513383cd8a1d8f05b23760e73d1cccf5788f0c312a634", &["fn claim", "fn record_installed", "fn record_promoted"]),
+    owner(SourceOwnerId::FixtureFaultPlan, "src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/shm_fault_script.rs", "5c083ec59e7ac747ff0b55ab3384bce2a4991cf2", "5822ed864a733f1dda6e74d9e0f84c1e0107a59e055339764b3704c656635211", &["pub(super) fn exact_target_presence", "fn claim", "fn record_installed", "fn record_promoted"]),
     owner(SourceOwnerId::RegistryTestBridge, "src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/registry/test_vfs_bridge/file.rs", "63756e8e172fd4207fbbb46ccfc2153ab7d4a739", "f372d6efee40f7ceabe0e782c2be46e7f7a5d2f1f41fbdaaf0daee934b6b9272", &["fn prepare_wal_main_shm_test_fault_script", "fn promote_main_to_wal_for_shm", "fn retain_test_fault_bridge_failure", "fn shm_map", "fn shm_lock"]),
     owner(SourceOwnerId::RegistryAbiFile, "src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/registry/file_custody/abi.rs", "67d9c0a6b3b27bdc9128d823ef424dfc3ecf37fa", "73da3e9cddc44db475ebbec961d74b7655f0f7faeedc5e7bc7b743d84930bc61", &["fn promote_main_to_wal", "fn install_exact_wal_main_shm_test_fault_script", "fn shm_map", "fn shm_lock"]),
     owner(SourceOwnerId::RegistryPromotion, "src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/registry/file_custody/promotion.rs", "b209174429aa8815239d59771ed3cd155f561abf", "2374b4a08d66f93f8032de623cc52ba4c65132757f650c9047c83c775d87612a", &["fn promote_main_to_wal", "fn promote_main_custody"]),
