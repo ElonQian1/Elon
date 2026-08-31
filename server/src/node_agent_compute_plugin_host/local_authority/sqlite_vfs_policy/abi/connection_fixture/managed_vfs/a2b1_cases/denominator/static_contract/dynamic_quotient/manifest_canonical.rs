@@ -80,8 +80,28 @@ pub(super) const PROJECTOR_SOURCE_SCOPE_V1: &[(&str, &str)] = &[
         include_str!("runner_admission/map.rs"),
     ),
     (
+        "dynamic_quotient/runner_admission/map_program.rs",
+        include_str!("runner_admission/map_program.rs"),
+    ),
+    (
         "dynamic_quotient/runner_admission/lock.rs",
         include_str!("runner_admission/lock.rs"),
+    ),
+    (
+        "managed_vfs/a2_dynamic_evidence/child.rs",
+        include_str!("../../../../a2_dynamic_evidence/child.rs"),
+    ),
+    (
+        "managed_vfs/a2_dynamic_evidence/child/payload.rs",
+        include_str!("../../../../a2_dynamic_evidence/child/payload.rs"),
+    ),
+    (
+        "managed_vfs/a2_dynamic_evidence/map_runner.rs",
+        include_str!("../../../../a2_dynamic_evidence/map_runner.rs"),
+    ),
+    (
+        "managed_vfs/connection/unmap.rs",
+        include_str!("../../../../connection/unmap.rs"),
     ),
     (
         "dynamic_quotient/candidate.rs",

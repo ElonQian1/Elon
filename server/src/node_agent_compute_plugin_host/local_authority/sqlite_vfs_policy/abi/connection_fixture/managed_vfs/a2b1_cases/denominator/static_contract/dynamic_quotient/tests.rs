@@ -9,9 +9,10 @@ use super::super::{
     terminal_descriptor::{
         CallbackV1, CapabilityGapV1, CleanupV1, ExecutionRecipeV1, FaultSeamV1, FixtureV1,
         LockActionV1, LockAxesV1, LockCompletionV1, LockManagedStimulusV1, LockOperationV1,
-        LockPrestateV1, MapAbiScalarV1, MapAxesV1, MapCompletionV1, MapOperationV1, MapPrestateV1,
-        ObserverV1, OccurrenceV1, PhaseV1, PresenceV1, PrestateV1, ReachabilityV1,
-        RunnerCapabilityV1, SourceSiteV1, StimulusV1, TerminalDescriptorV1, TimingV1, ValidityV1,
+        LockPrestateV1, MapAbiScalarV1, MapAxesV1, MapCompletionV1, MapManagedStimulusV1,
+        MapModeV1, MapOperationV1, MapPrestateV1, ObserverV1, OccurrenceV1, PhaseV1, PresenceV1,
+        PrestateV1, ReachabilityV1, RunnerCapabilityV1, SourceSiteV1, StimulusV1,
+        TerminalDescriptorV1, TimingV1, ValidityV1,
     },
 };
 use super::*;
@@ -21,6 +22,8 @@ mod manifest_validation;
 mod map_validation;
 mod producer_coherence;
 mod runner_admission;
+#[cfg(windows)]
+mod runner_admission_supported;
 mod runner_state;
 
 fn expected(phase: &str) -> ExpectedV1 {
@@ -165,12 +168,11 @@ fn seal(record: &LeafRecordV1) -> LeafSealV1 {
     }
 }
 
-fn supported_projection_for_test(
+fn synthetic_projection_for_test(
     record: &LeafRecordV1,
     descriptor: &TerminalDescriptorV1,
 ) -> DynamicProjectionV1 {
-    let mut validated = project_validated_dynamic_terminal_v1(record, descriptor).unwrap();
-    validated.semantic_key.recipe.capability = RunnerCapabilityV1::Supported;
+    let validated = project_validated_dynamic_terminal_v1(record, descriptor).unwrap();
     DynamicProjectionV1 {
         key: validated.semantic_key,
         class_key_sha256: digest_dynamic_class_key_v1(&validated.semantic_key),
@@ -178,13 +180,13 @@ fn supported_projection_for_test(
     }
 }
 
-fn observe_supported_for_test(
+fn observe_synthetic_for_test(
     builder: &mut DynamicCatalogBuilderV1,
     record: &LeafRecordV1,
     descriptor: &TerminalDescriptorV1,
 ) {
     builder
-        .observe_supported_projection_for_test(record, descriptor, &seal(record))
+        .observe_synthetic_projection_for_test(record, descriptor, &seal(record))
         .unwrap();
 }
 
@@ -195,8 +197,8 @@ fn semantic_projection_erases_leaf_and_case_identity_only() {
     let descriptor = descriptor(RunnerCapabilityV1::Missing(
         CapabilityGapV1::QuotientRunnerNotIntegrated,
     ));
-    let left_projection = supported_projection_for_test(&left, &descriptor);
-    let right_projection = supported_projection_for_test(&right, &descriptor);
+    let left_projection = synthetic_projection_for_test(&left, &descriptor);
+    let right_projection = synthetic_projection_for_test(&right, &descriptor);
 
     assert_eq!(left_projection.key, right_projection.key);
     assert_eq!(
@@ -218,8 +220,8 @@ fn catalog_forms_one_exact_class_and_manifest_commits_both_members() {
         CapabilityGapV1::QuotientRunnerNotIntegrated,
     ));
     let mut builder = DynamicCatalogBuilderV1::new(RootOperationV1::Map);
-    observe_supported_for_test(&mut builder, &right, &descriptor);
-    observe_supported_for_test(&mut builder, &left, &descriptor);
+    observe_synthetic_for_test(&mut builder, &right, &descriptor);
+    observe_synthetic_for_test(&mut builder, &left, &descriptor);
     let catalog = builder.finish().unwrap();
     assert_eq!(catalog.member_count(), 2);
     assert_eq!(catalog.classes().len(), 1);

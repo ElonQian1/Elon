@@ -4,7 +4,7 @@ status: current
 reviewed_at: 2026-08-31
 owners: node, security
 design_status: design_frozen
-implementation_status: typed_projector_candidate_prior_compiled_runner_admission_source_written_uncompiled_unrun
+implementation_status: typed_projector_candidate_prior_compiled_map_region_count_program_and_runner_admission_source_written_uncompiled_unrun
 verification_status: prior_targeted_unit_36_passed_current_source_not_run_manifests_not_frozen
 authority_scope: backend-a2-map-lock-dynamic-quotient-authority-v1
 ---
@@ -20,9 +20,10 @@ authority_scope: backend-a2-map-lock-dynamic-quotient-authority-v1
 
 动态分母分别记作 `Qmap` 与 `Qlock`。它们只能由本文规定的类型化生成器对完整静态记录机械投影、
 精确分区并冻结 manifest 后得出。typed descriptor、projector、内存 catalog/manifest builder 与两遍原子
-candidate 入口在前序基线已实现并通过编译和定向单元测试；本批又写入 sealed、root-bound、source-derived
-runner-admission plan/commitment，但当前源码未编译、未运行。没有任何商 manifest 被成功生成、复核或冻结，
-所以两个值仍是 `unknown`；不得根据历史 18+10 case、leaf 名称、人工抽样或 Expected 摘要预填。
+candidate 入口在前序基线已实现并通过编译和定向单元测试；本批又写入 sealed runner admission，以及仅覆盖
+Map `RegionCountBudget/Completed` 的 source-only executable program、私有 actual receipt 和 parent/child/cleanup
+合同，但当前源码未编译、未运行。默认 Map/Lock producers、完整 candidate 与 manifest 路径未因此接通；
+没有任何商 manifest 被成功生成、复核或冻结，所以两个值仍是 `unknown`。
 
 本合同是动态执行压缩合同，不是静态覆盖压缩合同：每个 included 静态 CaseKey 仍必须被完整承诺且
 恰好出现一次；每个冻结动态类将来才恰好对应一条真实、进程隔离的 Windows 记录。
@@ -138,16 +139,25 @@ manifest 中删除，也不能被计为动态完成；其存在会让 `WindowsDy
 真实 producer descriptor 还必须先通过 root-specific、有限且闭合的 typed coherence 关系；source site、
 stimulus、prestate、operation、phase、timing、occurrence、fixture/callback/seam/observer/cleanup 与关键 axes
 不能跨合法 tuple 拼接。未知 tuple、跨 root capability gap、Supported/Missing 混合状态，以及同一 catalog
-内不同 Missing gap 都失败关闭。此闭合只证明 producer 元数据没有被错配；它不证明正式 runner 或
-observation 已存在。
+内不同 Missing gap 都失败关闭。唯一新增的 capability 形状是 Map `RegionCountBudget` 且 completion 为
+`Completed`；它只允许进入私有 receipt 复验路径，不把 producer 声明本身变成许可。此闭合只证明 producer
+元数据没有被错配；它不证明正式 runner 或 observation 已存在。
 
 producer coherence 之后还必须由 projector 内部从同一个已验证 semantic key 机械编译 root-specific runner
 plan。plan commitment 域隔离地绑定 projector schema、root、capability-normalized descriptor digest、有序
 required stages 与 exact planned-missing gap；producer 不能提交、自签或替换该 plan。裸
-`RunnerCapabilityV1::Supported` 只是声明，不是 permit；没有私有 receipt、跨 root plan、同 root plan swap、
-semantic drift 或 gap 互换都失败关闭。本批 Map plan 仍只签发
-`Missing(QuotientRunnerNotIntegrated)` receipt，Lock plan 仍只签发
-`Missing(LockObservationIncomplete)` receipt，因此没有 class 被放行执行。
+`RunnerCapabilityV1::Supported` 只是声明，不是 permit；普通 `resolve_v1` 仍拒绝裸声明。仅
+`project_validated_dynamic_terminal_with_map_execution_v1` 可消费私有 `MapRunnerExecutionReceiptV1`；当它与
+exact member、normalized descriptor、内部 plan、program implementation 和 execution commitment 全部精确
+绑定时，窄 `RegionCountBudget/Completed` 路径才可形成
+`RunnerAdmissionDecisionV1::Supported { implementation_sha256, execution_sha256 }`。缺 receipt、跨 root/plan、
+semantic drift 或任一 commitment 替换都失败关闭。
+
+该窄 program 的 source design 固定 parent 拥有隔离根与最终删除责任，child 执行受管 VFS Map callback 并
+形成实际结果，parent 只在 child terminal/exit 与 cleanup receipt 都绑定后消费私有 actual receipt。它仍是
+未编译、未运行的程序合同，不是 Windows record。默认 Map producers 仍全量签发
+`Missing(QuotientRunnerNotIntegrated)`，Lock producers 与准入保持
+`Missing(LockObservationIncomplete)`；因此当前完整 candidate 没有 class 被放行。
 
 ## 8. Class catalog and member commitments
 
@@ -174,9 +184,9 @@ semantic drift 或 gap 互换都失败关闭。本批 Map plan 仍只签发
    admission commitment；它必须与 descriptor binding 的 member 和 normalized semantic digest 精确一致，
    并同时进入当前 blocker receipt、未来 catalog 与 quotient manifest body。
 
-capability 归一化只服务于 descriptor-binding commitment；生产 producer coherence 仍要求 Map 精确为
-`Missing(QuotientRunnerNotIntegrated)`、Lock 精确为 `Missing(LockObservationIncomplete)`，不接受
-`Supported` 或互换 gap。
+capability 归一化只服务于 descriptor-binding commitment；默认完整 producer inventory 仍要求 Map 为
+`Missing(QuotientRunnerNotIntegrated)`、Lock 为 `Missing(LockObservationIncomplete)`。仅窄 Map program-local
+descriptor 可声明 `Supported`，且仍须私有 actual receipt 精确复验；gap 互换和未密封声明继续失败关闭。
 
 Representative 只能从成员中机械选择，V1 固定为按 `case_key_sha256`、再按 `full_record_sha256` 的
 unsigned byte order最小者；不得按 `leaf_id`、测试名或人工偏好选择。代表成员只是该 class 的执行载体，
@@ -241,9 +251,10 @@ static 或 projector 漂移都要求全量重生成与重审。
 阻塞是完整 observation 尚未实现；二者都在 class catalog 或 manifest 冻结前失败，因此不产生
 `Qmap/Qlock`、member coverage 或 Windows numerator。
 
-上述回执全部是 runner-admission 改动前的 prior baseline。本批 current source 只达到
-`source_written/source_review_only/implementation_uncompiled/implementation_unrun`，新增准入与负向测试
-均为 `passed=0/failed=0/not_run`；不得把 prior `36/36` 或 exact blocker 回执当作 current-source 验证。
+上述回执全部是本批 Map program/receipt 改动前的 prior baseline。本批 current source 只达到
+`source_written/source_review_only/implementation_uncompiled/implementation_unrun`，新增窄 program、私有
+receipt、准入与负向测试均为 `passed=0/failed=0/not_run`；不得把 prior `36/36` 或 exact blocker 回执当作
+current-source 验证。
 
 前序基线验证回执为：
 
@@ -267,10 +278,10 @@ exact gate 接受。Lock/Map 全量回执仍只证明 exact blocker 与原子失
 
 负向守卫至少覆盖缺成员、额外成员、重复成员、excluded 混入、空类、representative 非成员、成员摘要
 漂移、class split/merge、semantic digest 漂移、未知 enum、leaf-text 分类、case-salted digest 误用、Map
-ordinal 非法消去与 Lock range 非法消去；还必须覆盖 naked `Supported`、缺少私有 admission receipt、跨 root
-plan、同 root plan swap、non-capability semantic drift 与 admission binding digest 漂移。本批已写裸
-`Supported`、gap mismatch、plan swap、non-capability semantic drift 与 manifest-body digest drift 的显式测试
-源码；private receipt 构造与完整 validator tamper acceptance 仍待补齐，全部均未运行。
+ordinal 非法消去与 Lock range 非法消去；还必须覆盖 naked `Supported`、缺少或替换私有 actual receipt、跨 root
+plan、同 root plan swap、non-capability semantic drift 与 admission binding digest 漂移。本批已写窄 Map
+receipt/准入及相应负向测试源码；完整 `43,476` integration、validator tamper acceptance 与 Windows execution
+仍待补齐，全部均未运行。
 
 ## 10. Windows evidence and atomic reducer
 
@@ -306,7 +317,11 @@ atomic_candidate=implemented_two_pass_in_memory_prior_compiled
 canonical_catalog_manifest_guards=implemented_prior_targeted_unit_passed
 producer_coherence=closed_typed_relations_mixed_state_and_gap_rejected
 sealed_runner_admission_plan=source_written_source_review_only_uncompiled_unrun
-runner_admission_raw_supported=fail_closed_by_source_contract_not_run
+map_region_count_budget_completed_program=source_written_private_actual_receipt_parent_child_cleanup_uncompiled_unrun
+map_supported_admission=private_exact_receipt_binding_only_source_contract_not_run
+map_default_producers=all_missing_quotient_runner_not_integrated
+lock_runner_admission=unchanged_all_missing_lock_observation_incomplete
+runner_admission_raw_supported=fail_closed_without_private_exact_receipt_not_run
 dynamic_quotient_targeted=prior_passed_36_of_36_current_source_not_run
 map_candidate_gate=prior_passed_expected_fail_closed_43476_current_source_not_run
 lock_candidate_gate=prior_passed_expected_fail_closed_8668_current_source_not_run

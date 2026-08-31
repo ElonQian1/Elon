@@ -20,7 +20,7 @@ fn partial_supported_and_missing_runner_state_is_rejected() {
     let supported = record("supported", "supported-branch");
     let missing = record("missing", "missing-branch");
     let mut builder = DynamicCatalogBuilderV1::new(RootOperationV1::Map);
-    observe_supported_for_test(
+    observe_synthetic_for_test(
         &mut builder,
         &supported,
         &descriptor(RunnerCapabilityV1::Missing(

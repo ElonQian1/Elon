@@ -2,11 +2,11 @@ use super::super::super::terminal_descriptor::{
     CallbackV1, CleanupV1, FaultSeamV1, FixtureV1, InitializationFaultSiteV1, InitializationPathV1,
     InitializationProfileV1, MapAxesV1, MapCompletionV1, MapFilePathV1, MapManagedStimulusV1,
     MapOperationV1, MapPrestateV1, MapRegionPrestateV1, MapTerminalDescriptorV1, ObserverV1,
-    OccurrenceV1, PhaseV1, PresenceV1, PrestateV1, RawStateV1, ReachabilityV1, SourceSiteV1,
-    StimulusV1, TimingV1, ValidityV1,
+    OccurrenceV1, PhaseV1, PresenceV1, PrestateV1, RawStateV1, ReachabilityV1, RunnerCapabilityV1,
+    SourceSiteV1, StimulusV1, TimingV1, ValidityV1,
 };
 use super::super::projector::{ProjectionErrorV1, ProjectionViolationV1};
-use super::{invalid, valid_initialization_tuple, valid_map_capability, valid_stored_poison_phase};
+use super::{invalid, valid_initialization_tuple, valid_stored_poison_phase};
 
 #[derive(Clone, Copy)]
 enum AxesShape {
@@ -57,12 +57,19 @@ fn validate_recipe(value: MapTerminalDescriptorV1) -> Result<(), ProjectionError
         && value.recipe.callback == CallbackV1::XShmMap
         && value.recipe.observer == observer
         && value.recipe.cleanup == cleanup
-        && valid_map_capability(value.recipe)
+        && valid_map_capability(value)
     {
         Ok(())
     } else {
         Err(invalid(ProjectionViolationV1::MapProducerRecipeMismatch))
     }
+}
+
+fn valid_map_capability(value: MapTerminalDescriptorV1) -> bool {
+    super::valid_map_capability(value.recipe)
+        || (value.recipe.capability == RunnerCapabilityV1::Supported
+            && value.stimulus == StimulusV1::MapManaged(MapManagedStimulusV1::RegionCountBudget)
+            && value.axes.completion == ReachabilityV1::Reached(MapCompletionV1::Completed))
 }
 
 fn valid_tuple(value: MapTerminalDescriptorV1) -> bool {

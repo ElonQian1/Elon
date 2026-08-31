@@ -32,7 +32,8 @@ use model::{
     StaticMemberSealV1, DYNAMIC_PROJECTOR_SCHEMA_V1,
 };
 use projector::{
-    project_dynamic_class_v1, project_validated_dynamic_terminal_v1, ProjectionErrorV1,
+    project_dynamic_class_v1, project_validated_dynamic_terminal_v1,
+    project_validated_dynamic_terminal_with_map_execution_v1, ProjectionErrorV1,
     ProjectionViolationV1,
 };
 

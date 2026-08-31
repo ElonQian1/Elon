@@ -1,20 +1,20 @@
 use super::*;
 use crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::abi::connection_fixture::managed_vfs::a2b1_cases::denominator::static_contract::terminal_descriptor::{
-    RunnerCapabilityV1, TerminalDescriptorV1,
+    TerminalDescriptorV1,
 };
 use crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::abi::connection_fixture::managed_vfs::a2b1_cases::denominator::static_contract::source_leaf_authority::{
     LeafRecordV1, LeafSealV1,
 };
 
 impl DynamicCatalogBuilderV1 {
-    pub(crate) fn observe_supported_projection_for_test(
+    pub(crate) fn observe_synthetic_projection_for_test(
         &mut self,
         record: &LeafRecordV1,
         descriptor: &TerminalDescriptorV1,
         seal: &LeafSealV1,
     ) -> Result<(), CatalogErrorV1> {
         let member = self.register_terminal_member_for_test(seal)?;
-        let mut validated = super::super::project_validated_dynamic_terminal_v1(record, descriptor)
+        let validated = super::super::project_validated_dynamic_terminal_v1(record, descriptor)
             .map_err(|error| CatalogErrorV1::ProjectionFailed {
                 count: 1,
                 first: ProjectionFailureV1 { member, error },
@@ -25,7 +25,9 @@ impl DynamicCatalogBuilderV1 {
             validated.descriptor_binding,
             validated.runner_admission,
         )?;
-        validated.semantic_key.recipe.capability = RunnerCapabilityV1::Supported;
+        // This helper exercises catalog/manifest structure only. It deliberately injects a
+        // successful projection while retaining the planned-missing admission receipt and key;
+        // no test fixture may manufacture a `Supported` admission decision.
         self.observe_projection(
             member,
             super::super::DynamicProjectionV1 {

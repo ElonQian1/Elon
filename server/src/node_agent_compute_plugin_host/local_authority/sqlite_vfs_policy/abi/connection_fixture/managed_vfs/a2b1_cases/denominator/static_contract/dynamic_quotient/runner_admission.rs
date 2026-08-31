@@ -2,11 +2,14 @@
 //!
 //! A producer-owned `RunnerCapabilityV1::Supported` value is only a declaration. It is never an
 //! execution permit. This module compiles the exact root plan from an already validated,
-//! producer-coherent semantic key and emits only the currently honest planned-missing receipt.
+//! producer-coherent semantic key. Missing declarations receive a planned-missing receipt; the
+//! one source-supported Map kernel can receive `Supported` only after consuming its private,
+//! process-isolated execution receipt.
 
 mod canonical;
 mod lock;
 mod map;
+mod map_program;
 
 use super::super::{
     source_leaf_authority::{Digest32, RootOperationV1},
@@ -19,7 +22,24 @@ pub(super) struct RunnerAdmissionReceiptV1 {
     member: StaticMemberSealV1,
     normalized_descriptor_sha256: Digest32,
     plan_sha256: Digest32,
-    exact_missing_gap: CapabilityGapV1,
+    decision: RunnerAdmissionDecisionV1,
+}
+
+#[cfg(all(test, windows))]
+pub(super) use map_program::tamper_implementation_digest_for_test;
+pub(super) use map_program::MapRunnerExecutionReceiptV1;
+#[cfg(all(test, windows))]
+pub(super) use map_program::{
+    run_isolated_for_test, MapRunnerExecutionErrorV1, MapRunnerIsolatedOutcomeV1,
+};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum RunnerAdmissionDecisionV1 {
+    Supported {
+        implementation_sha256: Digest32,
+        execution_sha256: Digest32,
+    },
+    Missing(CapabilityGapV1),
 }
 
 impl RunnerAdmissionReceiptV1 {
@@ -36,8 +56,15 @@ impl RunnerAdmissionReceiptV1 {
         self.plan_sha256
     }
 
-    pub(super) const fn exact_missing_gap(self) -> CapabilityGapV1 {
-        self.exact_missing_gap
+    pub(super) const fn decision(self) -> RunnerAdmissionDecisionV1 {
+        self.decision
+    }
+
+    pub(super) const fn exact_missing_gap(self) -> Option<CapabilityGapV1> {
+        match self.decision {
+            RunnerAdmissionDecisionV1::Missing(gap) => Some(gap),
+            RunnerAdmissionDecisionV1::Supported { .. } => None,
+        }
     }
 }
 
@@ -49,6 +76,7 @@ pub(super) enum RunnerAdmissionViolationV1 {
         actual: CapabilityGapV1,
     },
     PlanBindingMismatch,
+    MapExecutionReceiptMismatch,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -91,6 +119,15 @@ pub(super) fn resolve_v1(
 ) -> Result<RunnerAdmissionReceiptV1, RunnerAdmissionViolationV1> {
     let plan = compile_v1(key);
     resolve_with_plan_v1(key, member, plan)
+}
+
+pub(super) fn resolve_with_map_execution_v1(
+    key: &DynamicClassKeyV1,
+    member: StaticMemberSealV1,
+    execution: MapRunnerExecutionReceiptV1,
+) -> Result<RunnerAdmissionReceiptV1, RunnerAdmissionViolationV1> {
+    let plan = compile_v1(key);
+    resolve_supported_map_with_plan_v1(key, member, plan, execution)
 }
 
 pub(super) fn digest_binding_v1(
@@ -138,7 +175,32 @@ fn resolve_with_plan_v1(
         member,
         normalized_descriptor_sha256: plan.normalized_descriptor_sha256,
         plan_sha256: plan.plan_sha256,
-        exact_missing_gap: plan.expected_gap,
+        decision: RunnerAdmissionDecisionV1::Missing(plan.expected_gap),
+    })
+}
+
+fn resolve_supported_map_with_plan_v1(
+    key: &DynamicClassKeyV1,
+    member: StaticMemberSealV1,
+    plan: CompiledRunnerPlanV1,
+    execution: MapRunnerExecutionReceiptV1,
+) -> Result<RunnerAdmissionReceiptV1, RunnerAdmissionViolationV1> {
+    if plan != compile_v1(key) {
+        return Err(RunnerAdmissionViolationV1::PlanBindingMismatch);
+    }
+    if key.recipe.capability != RunnerCapabilityV1::Supported {
+        return Err(RunnerAdmissionViolationV1::UnsealedSupportedClaim);
+    }
+    let validated = map_program::validate_execution_receipt_v1(key, member, plan, execution)
+        .map_err(|_| RunnerAdmissionViolationV1::MapExecutionReceiptMismatch)?;
+    Ok(RunnerAdmissionReceiptV1 {
+        member,
+        normalized_descriptor_sha256: plan.normalized_descriptor_sha256,
+        plan_sha256: plan.plan_sha256,
+        decision: RunnerAdmissionDecisionV1::Supported {
+            implementation_sha256: validated.implementation_sha256(),
+            execution_sha256: validated.execution_sha256(),
+        },
     })
 }
 
@@ -154,4 +216,14 @@ pub(super) fn resolve_with_plan_for_test(
     plan: CompiledRunnerPlanV1,
 ) -> Result<RunnerAdmissionReceiptV1, RunnerAdmissionViolationV1> {
     resolve_with_plan_v1(key, member, plan)
+}
+
+#[cfg(test)]
+pub(super) fn resolve_with_map_execution_for_test(
+    key: &DynamicClassKeyV1,
+    member: StaticMemberSealV1,
+    plan: CompiledRunnerPlanV1,
+    execution: MapRunnerExecutionReceiptV1,
+) -> Result<RunnerAdmissionReceiptV1, RunnerAdmissionViolationV1> {
+    resolve_supported_map_with_plan_v1(key, member, plan, execution)
 }

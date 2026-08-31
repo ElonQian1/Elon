@@ -10,6 +10,7 @@ mod child;
 mod cleanup;
 mod environment;
 mod joint_close_family;
+mod map_runner;
 mod record;
 #[cfg(test)]
 mod tests;
@@ -25,6 +26,10 @@ pub(super) use joint_close_family::{
     JointCloseCandidateReportView, JointCloseFamilyCohort, RenderedJointCloseFamilyReport,
     ValidatedJointCloseCandidateRecord, ValidatedJointCloseCleanCheckoutReceipt,
     ValidatedJointCloseFamily, ValidatedJointCloseFamilyMemberReceipt,
+};
+pub(super) use map_runner::{
+    run_map_program_isolated, MapRunnerEvidenceReceiptV1, MapRunnerIsolatedEvidenceV1,
+    MapRunnerModeV1, MapRunnerProgramBindingV1,
 };
 pub(super) use record::{
     UnmapCandidateReportView, ValidatedUnmapCandidateRecord, ValidatedWindowsDynamicRecord,

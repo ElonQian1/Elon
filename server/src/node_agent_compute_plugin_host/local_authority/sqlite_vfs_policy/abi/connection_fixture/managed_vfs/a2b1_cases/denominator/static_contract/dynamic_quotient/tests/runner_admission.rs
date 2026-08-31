@@ -40,7 +40,7 @@ fn root_plans_preserve_the_exact_map_and_lock_gaps() {
     assert_eq!(map_receipt.member(), map_member);
     assert_eq!(
         map_receipt.exact_missing_gap(),
-        CapabilityGapV1::QuotientRunnerNotIntegrated
+        Some(CapabilityGapV1::QuotientRunnerNotIntegrated)
     );
     assert_ne!(map_receipt.plan_sha256(), Digest32::ZERO);
 
@@ -60,7 +60,7 @@ fn root_plans_preserve_the_exact_map_and_lock_gaps() {
     assert_eq!(lock_receipt.member(), lock_member);
     assert_eq!(
         lock_receipt.exact_missing_gap(),
-        CapabilityGapV1::LockObservationIncomplete
+        Some(CapabilityGapV1::LockObservationIncomplete)
     );
     assert_ne!(lock_receipt.plan_sha256(), Digest32::ZERO);
 }
@@ -128,8 +128,8 @@ fn catalog_blocker_and_future_manifest_both_commit_runner_admission() {
     let first = record("runner-admission-first", "runner-admission-first-branch");
     let second = record("runner-admission-second", "runner-admission-second-branch");
     let mut builder = DynamicCatalogBuilderV1::new(RootOperationV1::Map);
-    observe_supported_for_test(&mut builder, &first, &blocked_descriptor);
-    observe_supported_for_test(&mut builder, &second, &blocked_descriptor);
+    observe_synthetic_for_test(&mut builder, &first, &blocked_descriptor);
+    observe_synthetic_for_test(&mut builder, &second, &blocked_descriptor);
     let catalog = builder.finish().unwrap();
     let binding = FrozenStaticBindingV1 {
         context: ManifestContextV1 {

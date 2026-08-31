@@ -8,7 +8,7 @@ fn catalog_and_binding() -> (DynamicCatalogV1, FrozenStaticBindingV1) {
     ));
     let mut builder = DynamicCatalogBuilderV1::new(RootOperationV1::Map);
     for record in [&left, &right] {
-        observe_supported_for_test(&mut builder, record, &descriptor);
+        observe_synthetic_for_test(&mut builder, record, &descriptor);
     }
     let catalog = builder.finish().unwrap();
     let binding = FrozenStaticBindingV1 {
@@ -48,8 +48,8 @@ fn two_class_catalog_and_binding() -> (DynamicCatalogV1, FrozenStaticBindingV1) 
     };
     scalar.output = PresenceV1::Absent;
     let mut builder = DynamicCatalogBuilderV1::new(RootOperationV1::Map);
-    observe_supported_for_test(&mut builder, &left, &left_descriptor);
-    observe_supported_for_test(&mut builder, &right, &right_descriptor);
+    observe_synthetic_for_test(&mut builder, &left, &left_descriptor);
+    observe_synthetic_for_test(&mut builder, &right, &right_descriptor);
     let catalog = builder.finish().unwrap();
     assert_eq!(catalog.classes().len(), 2);
     let binding = FrozenStaticBindingV1 {
@@ -152,7 +152,12 @@ fn projector_provenance_binds_typed_descriptor_producers_and_wiring() {
         "dynamic_quotient/runner_admission.rs",
         "dynamic_quotient/runner_admission/canonical.rs",
         "dynamic_quotient/runner_admission/map.rs",
+        "dynamic_quotient/runner_admission/map_program.rs",
         "dynamic_quotient/runner_admission/lock.rs",
+        "managed_vfs/a2_dynamic_evidence/child.rs",
+        "managed_vfs/a2_dynamic_evidence/child/payload.rs",
+        "managed_vfs/a2_dynamic_evidence/map_runner.rs",
+        "managed_vfs/connection/unmap.rs",
     ];
     let source_names = PROJECTOR_SOURCE_SCOPE_V1
         .iter()

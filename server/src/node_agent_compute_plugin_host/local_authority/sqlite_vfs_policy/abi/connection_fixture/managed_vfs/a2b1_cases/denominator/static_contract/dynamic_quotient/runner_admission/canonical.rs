@@ -3,7 +3,9 @@ use sha2::{Digest as _, Sha256};
 use super::super::super::source_leaf_authority::{Digest32, RootOperationV1};
 use super::super::canonical_tags::gap_tag;
 use super::super::DYNAMIC_PROJECTOR_SCHEMA_V1;
-use super::{RunnerAdmissionReceiptV1, RunnerPlanBlueprintV1, RunnerPlanStageV1};
+use super::{
+    RunnerAdmissionDecisionV1, RunnerAdmissionReceiptV1, RunnerPlanBlueprintV1, RunnerPlanStageV1,
+};
 
 const RUNNER_PLAN_DOMAIN_V1: &str = "ELON-A2-MAP-LOCK-DYNAMIC-RUNNER-PLAN-V1";
 const RUNNER_ADMISSION_BINDING_DOMAIN_V1: &str =
@@ -42,7 +44,20 @@ pub(super) fn digest_runner_admission_binding_v1(
             receipt.normalized_descriptor_sha256,
         );
         out.digest("plan_sha256", receipt.plan_sha256);
-        out.u16("exact_missing_gap", gap_tag(receipt.exact_missing_gap));
+        match receipt.decision {
+            RunnerAdmissionDecisionV1::Missing(gap) => {
+                out.u16("decision", 1);
+                out.u16("exact_missing_gap", gap_tag(gap));
+            }
+            RunnerAdmissionDecisionV1::Supported {
+                implementation_sha256,
+                execution_sha256,
+            } => {
+                out.u16("decision", 2);
+                out.digest("implementation_sha256", implementation_sha256);
+                out.digest("execution_sha256", execution_sha256);
+            }
+        }
     }
     out.finish()
 }

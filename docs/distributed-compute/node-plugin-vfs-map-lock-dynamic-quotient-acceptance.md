@@ -4,7 +4,7 @@ status: current
 reviewed_at: 2026-08-31
 owners: node, security
 design_status: design_frozen
-implementation_status: typed_projector_candidate_prior_compiled_runner_admission_source_written_uncompiled_unrun
+implementation_status: typed_projector_candidate_prior_compiled_map_region_count_program_and_runner_admission_source_written_uncompiled_unrun
 verification_status: prior_targeted_unit_36_passed_current_source_not_run_manifests_not_frozen
 ---
 
@@ -26,8 +26,9 @@ Expected 或 source universe。
 
 当前仍只完成第 1 次晋级；同时已完成第 2 次晋级所需的部分基础设施，包括 typed descriptor/projector、
 两遍原子 candidate、exact member-pair set 与 catalog/manifest canonical guard；这些只有前序编译、定向单元
-测试和两个 root 完整失败关闭门禁的 prior baseline。本批新增 sealed runner-admission plan/commitment 源码，
-current source 未编译、未运行，也尚未成功产出或冻结任何真实商 manifest，所以不能把这批实现解释为第 2 次晋级完成。
+测试和两个 root 完整失败关闭门禁的 prior baseline。本批新增 sealed admission，以及仅覆盖 Map
+`RegionCountBudget/Completed` 的 source-only executable program、私有 actual receipt 和 parent/child/cleanup
+合同；current source 未编译、未运行，也尚未成功产出或冻结任何真实商 manifest。
 
 ## 2. Gate A — frozen static ingress
 
@@ -51,13 +52,16 @@ current source 未编译、未运行，也尚未成功产出或冻结任何真�
 - [x] semantic digest 不吸收 CaseKey，且与现有 case-key-salted摘要使用不同 domain。
 - [x] 不同 source site 不因相同 SQLite/Expected 合并。
 - [x] root-specific producer coherence 对全部真实 typed tuple 失败关闭：source/stimulus/prestate/operation/
-      phase/timing/occurrence/recipe/关键 axes 不可跨 tuple 拼接；未知 tuple、Supported、跨 root Missing gap、
-      mixed Supported/Missing state 与 mixed Missing gap 均被拒绝。
+      phase/timing/occurrence/recipe/关键 axes 不可跨 tuple 拼接；未知 tuple、跨 root Missing gap、mixed
+      Supported/Missing state 与 mixed Missing gap 均被拒绝。唯一 source-level `Supported` 形状是 Map
+      `RegionCountBudget/Completed`，且仍须进入私有 actual receipt 复验。
 - [x] projector provenance 覆盖 `producer_coherence/{map,map_axes,lock,lock_axes}.rs`、
       `descriptor_binding.rs`、`membership_commitment.rs`、`runner_admission.rs` 与
-      `runner_admission/{canonical,map,lock}.rs`。
-- [x] current source 从 validated/coherent typed key 内部编译 root-bound plan；producer 无法提交 plan，裸
-      `Supported`、跨 root/plan swap、semantic binding drift 与 gap 互换均失败关闭。
+      `runner_admission/{canonical,map,map_program,lock}.rs`。
+- [x] current source 从 validated/coherent typed key 内部编译 root-bound plan；producer 无法提交 plan。普通
+      `resolve_v1` 仍拒绝裸 `Supported`；只有 `project_validated_dynamic_terminal_with_map_execution_v1` 消费的
+      私有 `MapRunnerExecutionReceiptV1` 与 exact member、normalized descriptor、plan、implementation/execution
+      commitment 全部绑定时，才形成 `RunnerAdmissionDecisionV1::Supported`。跨 root/plan swap 与 drift 失败关闭。
 - [ ] 仅 run nonce、临时测试文件系统根、registration/route/runtime/connection/PID 等 harness binding 可 alpha-rename，
       并仍由每条 actual environment commitment 精确绑定。
 
@@ -91,10 +95,11 @@ member_reprojection_mismatch == 0
 - [x] Implementation/fixture：第二个冻结承诺绑定 root、schema、static manifest、included/entry count 与排序后的
       `member -> normalized full descriptor semantic key digest`；normalized key 只归一 capability，保留其余完整
       descriptor/class-key 语义，因此同 root、同 phase descriptor swap 也会失败。
-- [x] Implementation/fixture：归一 capability 不放宽生产 producer；Map 只接受
-      `Missing(QuotientRunnerNotIntegrated)`，Lock 只接受 `Missing(LockObservationIncomplete)`。
+- [x] Implementation/fixture：默认 producers 未放宽；Map 仍全量产生
+      `Missing(QuotientRunnerNotIntegrated)`，Lock 仍只产生 `Missing(LockObservationIncomplete)`。
 - [x] Source implementation：独立 runner-admission commitment 按 member 绑定 normalized descriptor、
-      root-specific plan digest 与 exact gap，并进入 blocker receipt、catalog 和 manifest body；本项尚未运行验证。
+      root-specific plan digest 与 exact decision；窄 Map `Supported` 还绑定私有 implementation/execution digest，
+      其余路径保留 exact gap。commitment 进入 receipt、catalog 和 manifest body；本项尚未运行验证。
 - [x] Implementation/fixture：内存 manifest builder 绑定 static source baseline/ledger/manifest、projector version/digest、class-key set、membership、
       representative map、class catalog 与反向索引摘要。
 - [x] Implementation/fixture：canonical bytes 长度分隔、enum 显式、整数定宽、成员排序稳定，和平台路径/locale/Debug 无关。
@@ -102,7 +107,7 @@ member_reprojection_mismatch == 0
 - [ ] 独立 review 复核生成器、frozen bytes、`Qmap/Qlock` 与 checked-in digest。
 
 Gate C 的前序实现与隔离于生产 projector 的 test-only catalog/manifest fixture 定向单元测试通过不等于
-real-root 商 manifest 通过。生产 producer 仍精确要求上述 root-specific Missing capability。Lock 全量
+real-root 商 manifest 通过。默认完整 producer inventory 仍精确产生上述 root-specific Missing capability。Lock 全量
 candidate 已验证 exact `8,668` 输入后按预期因
 `LockObservationIncomplete` 失败关闭；Map 全量 candidate 已验证 exact `43,476` 输入后按预期因
 `QuotientRunnerNotIntegrated` 失败关闭。由于两个 root 都没有成功形成可冻结 catalog，Gate C 整体仍未闭合。
@@ -139,8 +144,8 @@ Lock DynamicQuotientMemberCoverage=8668/8668
 - 同 root、同 phase 下交换任一完整 descriptor semantic axis，或只改 member→class / member→descriptor binding；
 - 把一个合法 class 人为 split，或把两个不同 typed key 的 class merge；
 - 构造 Supported/Missing 混合状态、跨 root capability gap 或同 catalog 的不同 Missing gap；
-- 裸 `Supported` 无私有 admission receipt、跨 root plan、同 root plan swap、非 capability 语义漂移，或
-  member/normalized descriptor/plan/gap admission binding 被替换；
+- 裸 `Supported` 无私有 actual receipt、跨 root plan、同 root plan swap、非 capability 语义漂移，或
+  member/normalized descriptor/plan/decision/implementation/execution admission binding 被替换；
 - 使用 `leaf_id`/test name/list index 分类，或使用 case-key-salted digest 当 semantic key；
 - 未知 enum 被默认化、unexecutable class 被跳过、`NotReached` 被当作 arbitrary；
 - 消去 Map ordinal/regions-to-create，或消去 Lock `first/count/mask`；
@@ -161,6 +166,10 @@ representative。验收逐字段比较：
 每条 record 必须绑定 class ID、完整 member-set digest、representative、static/quotient manifest、exact clean
 Git SHA、Windows build/arch/filesystem/SQLite、child PID/nonce、actual semantic digest、child exit、unsafe custody
 retention、parent root deletion receipt 与 validation fingerprint。
+
+本批 source-only Map program 已把 parent-owned isolated root、Windows child execution、child terminal/exit 与
+parent cleanup receipt 设计进私有 actual receipt；它只覆盖 `RegionCountBudget/Completed`，尚未编译或运行，
+没有生成上述正式 record，也不能增加 class/member coverage 或 Windows numerator。
 
 以下不算真实 record：直接调用 coordinator；从 Expected 合成 actual；仅观察注入器返回；复用另一 class
 或 A2b2 family 的 record；同进程 panic 测试；缺 child exit 或 parent cleanup；跨 commit、跨 manifest、跨
@@ -194,9 +203,10 @@ Map、Lock、既有 A2b2 `117/117` 与宽回归均闭合，聚合 A2 才可由�
 |---|---:|---:|---|
 | `StaticContract` | `43476/43476` | `8668/8668` | 静态 source-exhaustive合同已闭合 |
 | typed projector/candidate | `prior compiled; current source uncompiled/unrun` | `prior compiled; current source uncompiled/unrun` | 实现存在，不等于 current source 已验证或 manifest 冻结 |
-| sealed runner admission | `source written; exact Map gap retained; not run` | `source written; exact Lock gap retained; not run` | raw `Supported` 不能成为 permit；真实 runner/observer 尚缺 |
+| sealed runner admission | `source written; exact receipt-only narrow support; default gap retained; not run` | `source written; exact Lock gap retained; not run` | raw `Supported` 不能成为 permit；完整 runner/observer 尚缺 |
+| narrow executable program | `RegionCountBudget/Completed; source-only; private actual receipt + parent/child/cleanup; uncompiled/unrun` | `unchanged / none` | 仅证明代码形状已写入，不是动态执行证据 |
 | full candidate gate | `prior 43476 checked; current source not run` | `prior 8668 checked; current source not run` | prior baseline 只证明当时完整失败关闭，不产生 quotient denominator |
-| current blocker | `quotient runner not integrated` | `Lock observation incomplete` | 两者均阻止 catalog/manifest 冻结 |
+| current blocker | `default full candidate: quotient runner not integrated` | `Lock observation incomplete` | 窄 source program 不解除两个 root 的全局 blocker |
 | frozen descriptor binding | `d3ba08a5ba0019f9ccda99ace8b580ef06eb4d6653ba80c0db5497bec51bd870`；checked-in / exact gate accepted | `0cc951c8c979608fb9861167f8d880a74fd2e042c4d2cd42673100e14083e8ef`；checked-in / exact gate accepted | descriptor binding 已冻结；quotient manifest 仍未冻结 |
 | `DynamicQuotientMemberCoverage` | `0/43476` | `0/8668` | 尚无 frozen class/member commitment |
 | quotient denominator | `Qmap=unknown` | `Qlock=unknown` | 不得预估或人工填写 |
@@ -208,7 +218,7 @@ Map、Lock、既有 A2b2 `117/117` 与宽回归均闭合，聚合 A2 才可由�
 
 ## 9. Production isolation and current verdict
 
-当前 verdict：`design_frozen / typed_projector_candidate_prior_compiled / prior_dynamic_quotient 36/36 passed / sealed_runner_admission=current_source_written_uncompiled_unrun / current_source passed=0 failed=0 not_run / raw Supported fail_closed_by_source_contract / descriptor_bindings=frozen_and_prior_exact_gate_accepted / Lock exact gap retained / Map exact gap retained / producer coherence closed / quotient_manifests=not_frozen / Qmap=unknown / Qlock=unknown / member_coverage=0 / WindowsDynamic=not_opened`。
+当前 verdict：`design_frozen / typed_projector_candidate_prior_compiled / prior_dynamic_quotient 36/36 passed / Map RegionCountBudget-Completed program+private actual receipt+parent-child-cleanup=current_source_written_uncompiled_unrun / current_source passed=0 failed=0 not_run / Supported=private_exact_receipt_only / default Map producers=all Missing(QuotientRunnerNotIntegrated) / Lock unchanged=Missing(LockObservationIncomplete) / full 43476 candidate not rerun / quotient_manifests=not_frozen / Qmap=unknown / Qlock=unknown / member_coverage=0 / WindowsDynamic=not_opened`。
 
 本功能不注册生产 VFS，不调用 production open，不创建 Connection/Opened authority，不接 A1/v15、Runtime、
 Ready、Provider、route、Offer、Attempt、Lease、派发、市场、结算或资金。任何 Gate A-F 未闭合时，A2 都

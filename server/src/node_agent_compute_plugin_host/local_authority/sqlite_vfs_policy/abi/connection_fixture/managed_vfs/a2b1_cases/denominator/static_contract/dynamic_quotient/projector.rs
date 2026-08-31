@@ -18,7 +18,10 @@ use super::{
         DynamicProjectionV1, StaticMemberSealV1, DYNAMIC_PROJECTOR_SCHEMA_V1,
     },
     producer_coherence,
-    runner_admission::{self, RunnerAdmissionViolationV1},
+    runner_admission::{
+        self, MapRunnerExecutionReceiptV1, RunnerAdmissionDecisionV1, RunnerAdmissionReceiptV1,
+        RunnerAdmissionViolationV1,
+    },
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -58,6 +61,7 @@ pub(crate) enum ProjectionViolationV1 {
         actual: CapabilityGapV1,
     },
     RunnerAdmissionPlanBindingMismatch,
+    RunnerAdmissionMapExecutionReceiptMismatch,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -87,6 +91,34 @@ pub(super) fn project_validated_dynamic_terminal_v1(
     record: &LeafRecordV1,
     descriptor: &TerminalDescriptorV1,
 ) -> Result<ValidatedDynamicTerminalV1, ProjectionErrorV1> {
+    let prepared = prepare_dynamic_terminal_v1(record, descriptor)?;
+    let runner_admission = runner_admission::resolve_v1(&prepared.key, prepared.member)
+        .map_err(map_runner_admission_error)?;
+    Ok(finish_prepared_terminal(prepared, runner_admission))
+}
+
+pub(super) fn project_validated_dynamic_terminal_with_map_execution_v1(
+    record: &LeafRecordV1,
+    descriptor: &TerminalDescriptorV1,
+    execution: MapRunnerExecutionReceiptV1,
+) -> Result<ValidatedDynamicTerminalV1, ProjectionErrorV1> {
+    let prepared = prepare_dynamic_terminal_v1(record, descriptor)?;
+    let runner_admission =
+        runner_admission::resolve_with_map_execution_v1(&prepared.key, prepared.member, execution)
+            .map_err(map_runner_admission_error)?;
+    Ok(finish_prepared_terminal(prepared, runner_admission))
+}
+
+struct PreparedDynamicTerminalV1 {
+    descriptor_binding: DescriptorBindingEntryV1,
+    key: DynamicClassKeyV1,
+    member: StaticMemberSealV1,
+}
+
+fn prepare_dynamic_terminal_v1(
+    record: &LeafRecordV1,
+    descriptor: &TerminalDescriptorV1,
+) -> Result<PreparedDynamicTerminalV1, ProjectionErrorV1> {
     let static_expected = match &record.outcome {
         LeafOutcomeV1::Terminal(expected) => expected,
         LeafOutcomeV1::Excluded(_) => return Err(ProjectionErrorV1::ExcludedRecord),
@@ -150,16 +182,35 @@ pub(super) fn project_validated_dynamic_terminal_v1(
         member,
         descriptor_semantic_sha256: digest_normalized_descriptor_semantics_v1(&key),
     };
-    let runner_admission = runner_admission::resolve_v1(&key, member).map_err(|violation| {
-        ProjectionErrorV1::Invalid(map_runner_admission_violation(violation))
-    })?;
-    let projection = Err(runner_admission.exact_missing_gap());
-    Ok(ValidatedDynamicTerminalV1 {
+    Ok(PreparedDynamicTerminalV1 {
         descriptor_binding,
-        runner_admission,
-        semantic_key: key,
-        projection,
+        key,
+        member,
     })
+}
+
+fn finish_prepared_terminal(
+    prepared: PreparedDynamicTerminalV1,
+    runner_admission: RunnerAdmissionReceiptV1,
+) -> ValidatedDynamicTerminalV1 {
+    let projection = match runner_admission.decision() {
+        RunnerAdmissionDecisionV1::Missing(gap) => Err(gap),
+        RunnerAdmissionDecisionV1::Supported { .. } => Ok(DynamicProjectionV1 {
+            key: prepared.key,
+            class_key_sha256: super::digest_dynamic_class_key_v1(&prepared.key),
+            member: prepared.member,
+        }),
+    };
+    ValidatedDynamicTerminalV1 {
+        descriptor_binding: prepared.descriptor_binding,
+        runner_admission,
+        semantic_key: prepared.key,
+        projection,
+    }
+}
+
+fn map_runner_admission_error(value: RunnerAdmissionViolationV1) -> ProjectionErrorV1 {
+    ProjectionErrorV1::Invalid(map_runner_admission_violation(value))
 }
 
 fn map_runner_admission_violation(value: RunnerAdmissionViolationV1) -> ProjectionViolationV1 {
@@ -172,6 +223,9 @@ fn map_runner_admission_violation(value: RunnerAdmissionViolationV1) -> Projecti
         }
         RunnerAdmissionViolationV1::PlanBindingMismatch => {
             ProjectionViolationV1::RunnerAdmissionPlanBindingMismatch
+        }
+        RunnerAdmissionViolationV1::MapExecutionReceiptMismatch => {
+            ProjectionViolationV1::RunnerAdmissionMapExecutionReceiptMismatch
         }
     }
 }
