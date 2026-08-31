@@ -15,6 +15,9 @@ mod controller;
 mod internal_phase_tests;
 #[path = "test_faults/mapping.rs"]
 mod mapping;
+#[cfg(all(test, windows))]
+#[path = "test_faults/native_lock_contention.rs"]
+mod native_lock_contention;
 #[path = "test_faults/operation.rs"]
 mod operation;
 #[cfg(all(test, windows))]
@@ -31,6 +34,8 @@ pub(crate) use api::{
     ManagedSqliteShmTriggeredTestFaultObservation,
 };
 pub(super) use controller::ManagedSqliteShmTestFaultController;
+#[cfg(all(test, windows))]
+pub(crate) use native_lock_contention::ManagedSqliteShmTestNativeContentionReceipt;
 #[cfg(all(test, windows))]
 pub(crate) use stored_poison::{
     ManagedSqliteShmTestStoredPoisonReceiptV1, ManagedSqliteShmTestStoredPoisonV1,

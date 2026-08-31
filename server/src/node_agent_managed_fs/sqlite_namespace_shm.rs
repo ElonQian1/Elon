@@ -161,9 +161,9 @@ pub(crate) use coordinator::{
 pub(crate) use test_faults::ManagedSqliteShmTestFaultProbe;
 #[cfg(all(test, windows))]
 pub(crate) use test_faults::{
-    ManagedSqliteShmTestStoredPoisonReceiptV1, ManagedSqliteShmTestStoredPoisonV1,
-    ManagedSqliteShmTestTargetIdentity, ManagedSqliteShmTestTargetObserver,
-    ManagedSqliteShmTriggeredTestFaultObservation,
+    ManagedSqliteShmTestNativeContentionReceipt, ManagedSqliteShmTestStoredPoisonReceiptV1,
+    ManagedSqliteShmTestStoredPoisonV1, ManagedSqliteShmTestTargetIdentity,
+    ManagedSqliteShmTestTargetObserver, ManagedSqliteShmTriggeredTestFaultObservation,
 };
 #[cfg(all(test, windows))]
 pub(crate) use test_lock_runtime::{
