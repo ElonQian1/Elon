@@ -173,6 +173,17 @@ class WebChatConsumerStatusBannerTest {
         assertEquals("正在创建图片…", generating.message)
         assertEquals("图片已生成，正在准备预览…", preparing.message)
         assertEquals("图片已生成，预览同步失败，可在“图像”中重试", failed.message)
+        assertEquals(
+            "正在创建图片…",
+            WebChatConsumerComposerOperationPolicy.resolve(
+                provider = chatGpt,
+                attachmentPhase = "idle",
+                feedback = WebChatConsumerComposerFeedback(chatGpt.id, "已切换网页工具：创建图片"),
+                imageGenerationActive = true,
+                streaming = true,
+                imagePreviewState = "preparing",
+            ).message,
+        )
         assertFalse(
             WebChatConsumerComposerOperationPolicy.resolve(
                 provider = chatGpt,
@@ -180,6 +191,16 @@ class WebChatConsumerStatusBannerTest {
                 feedback = null,
                 imageGenerationActive = false,
                 imagePreviewState = "failed",
+            ).visible,
+        )
+        assertFalse(
+            WebChatConsumerComposerOperationPolicy.resolve(
+                provider = chatGpt,
+                attachmentPhase = "idle",
+                feedback = null,
+                imageGenerationActive = true,
+                streaming = false,
+                imagePreviewState = "idle",
             ).visible,
         )
     }

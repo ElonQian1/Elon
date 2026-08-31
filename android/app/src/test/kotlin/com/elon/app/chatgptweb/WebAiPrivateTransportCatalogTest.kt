@@ -29,6 +29,7 @@ class WebAiPrivateTransportCatalogTest {
         assertTrue("android_chatgpt_same_origin_text_transaction_v1" in enabledIds)
         assertTrue("android_chatgpt_attachment_transport_reconciliation_v1" in enabledIds)
         assertTrue("android_chatgpt_native_image_asset_gallery_v1" in enabledIds)
+        assertTrue("android_chatgpt_native_image_generation_status_v1" in enabledIds)
         assertTrue("android_chatgpt_private_rich_content_native_view_v1" in enabledIds)
         assertTrue("android_chatgpt_native_conversation_project_move_v1" in enabledIds)
         assertTrue("android_chatgpt_realtime_voice_background_overlay_v1" in enabledIds)
@@ -224,6 +225,23 @@ class WebAiPrivateTransportCatalogTest {
         assertTrue(imageGallery.getBoolean("runtime_enabled"))
         assertFalse(imageGallery.getBoolean("direct_post_enabled"))
         assertEquals("official_images_page", imageGallery.getString("fallback"))
+
+        val imageGenerationStatus = values.first {
+            it.getString("capability_id") ==
+                "android_chatgpt_native_image_generation_status_v1"
+        }
+        assertEquals("completed", imageGenerationStatus.getString("implementation_status"))
+        assertEquals(
+            "targeted_lifecycle_tests_passed_device_ui_pending",
+            imageGenerationStatus.getString("verification_status"),
+        )
+        assertTrue(imageGenerationStatus.getBoolean("production_default"))
+        assertTrue(imageGenerationStatus.getBoolean("runtime_enabled"))
+        assertFalse(imageGenerationStatus.getBoolean("direct_post_enabled"))
+        assertEquals(
+            "official_composer_and_images_page",
+            imageGenerationStatus.getString("fallback"),
+        )
 
         val richContent = values.first {
             it.getString("capability_id") ==

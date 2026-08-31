@@ -28,6 +28,7 @@ installed build; individual capability documents retain implementation evidence.
 | Interaction presets and deferred chat actions | ChatGPT | Completed, enabled, and device verified on research build `v1.1.1367 (1388)` | Current official control and WebView navigation |
 | Attachment upload reconciliation | ChatGPT | Completed, enabled, and device verified on published Release `v1.1.1374 (1395)`, adapter `207` | Official DOM attachment snapshot and bounded timeout |
 | Native image assets and cache-first gallery | ChatGPT | Completed, enabled, and device verified on Release candidate `v1.1.1375 (1396)`, adapter `208` | Bounded local image cache and official `/images` fallback |
+| Native image-generation operation status | ChatGPT | Completed and enabled; generation, preview preparation, preview failure, and terminal-hide lifecycle tests passed; consolidated device UI acceptance pending | Official composer and `/images` page |
 | Native private-response rich content | ChatGPT | Completed, enabled, and structurally device verified on Release `v1.1.1379 (1400)` for finance and line-chart cards | Official WebView rich content |
 | Native composer dictation | ChatGPT | Implemented and enabled; ASR/VAD draft, cancellation, and fallback tests passed; device acceptance pending | Official Web dictation after bounded local-engine cooldown |
 | Native response read aloud | ChatGPT | Implemented and enabled; full-answer chunking and message-action tests passed; device acceptance pending | Official message actions and WebView |
@@ -75,6 +76,17 @@ assets, opened the native viewer, returned to the same production chat, and prov
 fresh second open did not create another sync WebView. The completed capability is
 `android_chatgpt_native_image_asset_gallery_v1`; details are in
 `docs/chatgpt-native-image-assets-gallery.md`.
+
+The production composer projects image generation from existing authoritative state
+instead of owning another generation transaction. Selecting the official image tool arms
+the native operation banner; the official stream reports generation, and the opaque image
+asset queue reports preview preparation or bounded preview failure. Once streaming has
+ended and the preview queue is idle, the transient banner disappears while the selected
+tool remains visible in its existing chip. Attachment progress keeps higher priority, and
+unsupported or ambiguous states fall back to the official composer and `/images` page.
+The completed capability is `android_chatgpt_native_image_generation_status_v1`; its
+consolidated device UI acceptance remains pending and the state flow must not be
+reimplemented without current regression evidence.
 
 ChatGPT private response rich content now crosses the existing passive observer only as
 the versioned `yilong.rich-content.v1` projection. Android accepts only bounded finance
