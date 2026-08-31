@@ -16,7 +16,8 @@ use super::super::super::child::lock_stored_poison::{
 };
 use super::fixture::{phase_tag, snapshot_values};
 use super::{
-    action_tag, raw_flags, LockRunnerStoredPoisonBindingV1, LockRunnerStoredPoisonProfileV1,
+    action_tag, raw_flags, LockRunnerStoredPoisonBindingV1, LockRunnerStoredPoisonCompletionV1,
+    LockRunnerStoredPoisonProfileV1,
 };
 
 pub(in super::super) struct ValidatedStoredPoisonPayloadV1 {
@@ -106,6 +107,22 @@ pub(in super::super) fn validate_payload(
     let values = fields
         .map(parse_canonical_u64)
         .collect::<anyhow::Result<Vec<_>>>()?;
+    let registration_id = validate_common_values(
+        &values,
+        binding,
+        [2, 1, 0, 0, 1, 1, 1, 1, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0],
+    )?;
+    Ok(ValidatedStoredPoisonPayloadV1 {
+        registration_id,
+        native_receipt_sha256: digest_native_receipt(&values),
+    })
+}
+
+pub(in super::super) fn validate_common_values(
+    values: &[u64],
+    binding: LockRunnerStoredPoisonBindingV1,
+    terminal: [u64; 18],
+) -> anyhow::Result<u64> {
     if values.len() != REPORT_VALUE_COUNT || values[..22] != binding_values(binding) {
         return Err(anyhow!(
             "Lock stored-poison payload program binding mismatch"
@@ -146,7 +163,7 @@ pub(in super::super) fn validate_payload(
         || values[61..75] != poisoned
         || values[75..89] != poisoned
         || values[89..109] != expected_lower_receipt_values(binding, values[24], values[25])
-        || values[109..127] != [2, 1, 0, 0, 1, 1, 1, 1, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0]
+        || values[109..127] != terminal
         || values[127..131] != [1, 1, 1, 1]
         || values[131..134] != [1, 1, 3]
         || values[134] != 1
@@ -155,10 +172,7 @@ pub(in super::super) fn validate_payload(
             "Lock stored-poison payload retention receipt mismatch"
         ));
     }
-    Ok(ValidatedStoredPoisonPayloadV1 {
-        registration_id: values[22],
-        native_receipt_sha256: digest_native_receipt(&values),
-    })
+    Ok(values[22])
 }
 
 fn expected_lower_receipt_values(
@@ -312,7 +326,7 @@ fn managed_profile_tag(value: ManagedSqliteShmTestStoredPoisonV1) -> u64 {
     }
 }
 
-fn binding_values(binding: LockRunnerStoredPoisonBindingV1) -> Vec<u64> {
+pub(in super::super) fn binding_values(binding: LockRunnerStoredPoisonBindingV1) -> Vec<u64> {
     let mut values = vec![action_tag(binding.action), binding.profile.tag()];
     for digest in [
         binding.normalized_descriptor_sha256,
@@ -328,7 +342,7 @@ fn binding_values(binding: LockRunnerStoredPoisonBindingV1) -> Vec<u64> {
     values
 }
 
-pub(super) fn exact_selector(binding: LockRunnerStoredPoisonBindingV1) -> String {
+pub(in super::super) fn exact_selector(binding: LockRunnerStoredPoisonBindingV1) -> String {
     selector(
         action_tag(binding.action),
         binding.profile.tag(),
@@ -347,7 +361,7 @@ fn digest_native_receipt(values: &[u64]) -> [u8; 32] {
     hasher.finalize().into()
 }
 
-fn parse_canonical_u64(value: &str) -> anyhow::Result<u64> {
+pub(in super::super) fn parse_canonical_u64(value: &str) -> anyhow::Result<u64> {
     let parsed = value.parse::<u64>()?;
     if parsed.to_string() != value {
         return Err(anyhow!(
@@ -355,6 +369,43 @@ fn parse_canonical_u64(value: &str) -> anyhow::Result<u64> {
         ));
     }
     Ok(parsed)
+}
+
+#[cfg(test)]
+pub(in super::super) fn canonical_values_for_test(
+    binding: LockRunnerStoredPoisonBindingV1,
+    terminal: [u64; 18],
+) -> Vec<u64> {
+    let mut values = binding_values(binding);
+    values.extend([7, 1, 9, 11]);
+    values.extend([2, 1, 2, 6]);
+    values.extend(expected_poison_receipt_values(binding, 9, 11));
+    values.extend([
+        1,
+        1,
+        2,
+        raw_flags(binding.action) as u64,
+        ffi::SQLITE_IOERR_SHMLOCK as u64,
+        1,
+        1,
+        1,
+        1,
+    ]);
+    values.extend(expected_snapshot_values(binding.profile, false));
+    values.extend(expected_snapshot_values(binding.profile, true));
+    values.extend(expected_snapshot_values(binding.profile, true));
+    values.extend(expected_lower_receipt_values(binding, 9, 11));
+    values.extend(terminal);
+    values.extend([1, 1, 1, 1]);
+    values.extend([1, 1, 3]);
+    values.push(1);
+    assert_eq!(values.len(), REPORT_VALUE_COUNT);
+    values
+}
+
+#[cfg(test)]
+pub(in super::super) fn native_receipt_sha256_for_test(values: &[u64]) -> [u8; 32] {
+    digest_native_receipt(values)
 }
 
 #[cfg(test)]
@@ -369,40 +420,13 @@ mod tests {
             count: 2,
             mask: 6,
             profile,
+            completion: LockRunnerStoredPoisonCompletionV1::RetentionSucceeded,
             normalized_descriptor_sha256: [0x11; 32],
             case_key_sha256: [0x22; 32],
             full_record_sha256: [0x33; 32],
             plan_sha256: [0x44; 32],
             implementation_sha256: [0x55; 32],
         }
-    }
-
-    fn canonical_values(binding: LockRunnerStoredPoisonBindingV1) -> Vec<u64> {
-        let mut values = binding_values(binding);
-        values.extend([7, 1, 9, 11]);
-        values.extend([2, 1, 2, 6]);
-        values.extend(expected_poison_receipt_values(binding, 9, 11));
-        values.extend([
-            1,
-            1,
-            2,
-            raw_flags(binding.action) as u64,
-            ffi::SQLITE_IOERR_SHMLOCK as u64,
-            1,
-            1,
-            1,
-            1,
-        ]);
-        values.extend(expected_snapshot_values(binding.profile, false));
-        values.extend(expected_snapshot_values(binding.profile, true));
-        values.extend(expected_snapshot_values(binding.profile, true));
-        values.extend(expected_lower_receipt_values(binding, 9, 11));
-        values.extend([2, 1, 0, 0, 1, 1, 1, 1, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0]);
-        values.extend([1, 1, 1, 1]);
-        values.extend([1, 1, 3]);
-        values.push(1);
-        assert_eq!(values.len(), REPORT_VALUE_COUNT);
-        values
     }
 
     fn payload(binding: LockRunnerStoredPoisonBindingV1, values: &[u64]) -> String {
@@ -437,7 +461,10 @@ mod tests {
             LockRunnerStoredPoisonProfileV1::DmsSharedReleaseUncertain,
         ] {
             let binding = binding(profile);
-            let values = canonical_values(binding);
+            let values = canonical_values_for_test(
+                binding,
+                [2, 1, 0, 0, 1, 1, 1, 1, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0],
+            );
             assert!(validate_payload(&payload(binding, &values), binding).is_ok());
         }
     }
@@ -446,7 +473,10 @@ mod tests {
     fn q3_payload_rejects_tamper_in_each_bound_section() {
         let binding = binding(LockRunnerStoredPoisonProfileV1::FileGrowUncertain);
         for index in [0, 23, 24, 26, 30, 38, 47, 61, 75, 89, 109, 127, 131, 134] {
-            let mut values = canonical_values(binding);
+            let mut values = canonical_values_for_test(
+                binding,
+                [2, 1, 0, 0, 1, 1, 1, 1, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0],
+            );
             values[index] ^= 1;
             assert!(validate_payload(&payload(binding, &values), binding).is_err());
         }
