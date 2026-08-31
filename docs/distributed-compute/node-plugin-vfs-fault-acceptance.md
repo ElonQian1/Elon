@@ -31,7 +31,8 @@ owner 图只验证 baseline commit literal 形状、从 reviewed owner bytes 重
 - 首次真实运行：`VALIDATION_FINGERPRINT=6482de3afdddb8e8e9e97900d27489a3b5f16bbd1889360f18e8b47c026b05ca`，`2 passed / 2 failed / 1676 filtered`；owner graph 与 Map terminal ledger 均因 `source owner bytes changed after graph review` 失败。
 - 漂移审阅：39 个 owner 仅 `ManagedFsRoot`、`ManagedWindowsPlatform` 两项受此前 4 个 loader 提交影响，共 38 行模块声明/重导出新增；SQLite symbols、graph node、edge 与 ledger 语义未变化。
 - 历史前序快照刷新：source baseline 固定为当时已推送实现提交 `a75769029ba4abf5e30002f64846c0f7099d9ae7`；8 个既有变化 owner与新增 `AbiRawCloseWitness` owner 均重算 Git blob OID 与 LF 规范化 SHA-256，零偏差。Map/Lock graph 新增 operation-scoped state-abandon witness，fallback 保持原节点，Map-reachable Pending=5、resolved cross-links=9 不变。clean 验证在 `95d910f0dbc167138f913861efafa20ff11295cc`、`VALIDATION_FINGERPRINT=e7ea6855df7e6f0677a985d214dfcf467585e79c938c2a1e54b7ce7b6cdd4ad5` 上得到 `4 passed / 0 failed / 1722 filtered`。
-- 当前 source-owner 续绑：JointClose 完整源码固定为变基后主线祖先中的非自指 baseline `e3663e109039f38477de4d6ab5cd57483dbd0541`；ledger evidence commit `bfa1a1180d220e9a4c8e39251414fc9a1b0a9ace` 重算全部 40 个 owner，其中 17 个随 JointClose 实现变化、23 个保持不变，226 个 anchor tuple 零缺失。`VALIDATION_FINGERPRINT=f65d234bfb21a0351862d396cc4f1a9c4030d872d68fc571ad57a14529f1e3d7`、receipt `0239e121c80711e443f2ea7059485333a770bb47c5e53a79b48962583570a518` 得到 `4 passed / 0 failed / 1854 filtered`；owner/node/reachability、Pending=5、resolved cross-links=9 与两个 Map/Lock open frontier 均未扩张。
+- 前序 JointClose source-owner 续绑：完整源码固定为变基后主线祖先中的非自指 baseline `e3663e109039f38477de4d6ab5cd57483dbd0541`；ledger evidence commit `bfa1a1180d220e9a4c8e39251414fc9a1b0a9ace` 重算全部 40 个 owner，其中 17 个随 JointClose 实现变化、23 个保持不变，226 个 anchor tuple 零缺失。`VALIDATION_FINGERPRINT=f65d234bfb21a0351862d396cc4f1a9c4030d872d68fc571ad57a14529f1e3d7`、receipt `0239e121c80711e443f2ea7059485333a770bb47c5e53a79b48962583570a518` 得到 `4 passed / 0 failed / 1854 filtered`；owner/node/reachability、Pending=5、resolved cross-links=9 与两个 Map/Lock open frontier 均未扩张。
+- 本批 current source-owner 续绑：source-only baseline 为 `e23be4b4509039b8457f4e1c0c698c93a502bdbb`；五个随 Lock lifecycle 源级接线变化的 owner 已按该提交重算 Git blob OID 与 LF SHA-256，静态逐字节复核零偏差。按本批 no-compile/no-run 边界，targeted guard、编译与运行均未执行，`passed=0 failed=0 actual=not_run`；不得复用前序 `4/4` fingerprint 或 receipt。
 - 计数边界：这 4 项分别是 legacy non-denominator subset、incomplete branch-atom scaffold、source-owner graph 与 Map template ledger 自洽守卫；不形成完整 terminal universe、`CaseKey`、`Expected`、denominator、`StaticContract` 或 map/lock `WindowsDynamic`。
 
 ### 历史证据元组
@@ -123,7 +124,7 @@ Map/Lock 静态 scope、`CaseKey`、`SourceBranch`、`Expected`、exclusion 与 
 | Family | StaticContract | DynamicQuotientMemberCoverage | WindowsDynamic | 当前门槛 |
 |---|---:|---:|---:|---|
 | Map | `43476/43476` | `0/43476` | `not_opened` | 验证 current admission source，接入真实 quotient runner，冻结 exact class/member manifest，机械得到 `Qmap` |
-| Lock | `8668/8668` | `0/8668` | `not_opened` | 验证 current admission source，补齐完整 observation/native receipt，冻结 exact class/member manifest，机械得到 `Qlock` |
+| Lock | `8668/8668` | `0/8668` | `not_opened` | 验证 current admission source；当前 10 validation + 104 lifecycle 仅源级接线，仍有 `8554` planned-missing 且无 reviewed/frozen manifest；全部补齐后才可机械得到 `Qlock` |
 | **Map/Lock aggregate** | **verified** | **not_started** | **not_opened** | **逐 class Windows exact-set 后才可形成 `Q/Q`** |
 
 #### 2.1.1 静态闭合前 review provenance（历史）
@@ -283,7 +284,7 @@ A2 完成必须同时满足：
   `implementation_not_dynamically_accepted` 升级；
 - 任何证据缺失、环境不明、case key漂移、观察不完整或生产入口变化都维持失败关闭。
 
-当前正式结论是：Map `StaticContract=43476/43476`、Lock `StaticContract=8668/8668`；typed dynamic quotient projector/candidate 只有前序已编译、`36/36` 与 exact blocker 基线，本批 sealed runner-admission current source 严格为 `source_written/source_review_only/implementation_uncompiled/implementation_unrun`、`passed=0/failed=0/not_run`。Map 仍精确阻断于 `QuotientRunnerNotIntegrated`，Lock 仍精确阻断于 `LockObservationIncomplete`；manifests 未冻结，`DynamicQuotientMemberCoverage` 分别为 `0/43476`、`0/8668`，`Qmap/Qlock=unknown`，Map/Lock `WindowsDynamic=not_opened`。Barrier、RegistrationShutdown、RegistryLifecycle、Unmap 与 JointClose 分别为 `8/8`、`8/8`、`16/16`、`49/49`、`36/36`，A2b2=`117/117`。A2 仍为 `implementation_not_dynamically_accepted`；生产 open、A1、v15、Runtime、Ready、派发、市场与资金效果均未改变。
+当前正式结论是：Map `StaticContract=43476/43476`、Lock `StaticContract=8668/8668`；typed dynamic quotient projector/candidate 只有前序已编译、`36/36` 与 exact blocker 基线。本批 Lock 在原 10 个 request-validation 之外新增 104 个 positive lifecycle observation/native-receipt 源码程序，未运行 inventory 预期为 `114` source-present、`8,554` planned-missing；current source 严格为 `source_written/source_review_only/implementation_uncompiled/implementation_unrun`、`passed=0/failed=0/actual=not_run`。Map 仍精确阻断于 `QuotientRunnerNotIntegrated`，Lock 仍精确阻断于 `LockObservationIncomplete`；没有 actual inventory、reviewed digest 或 frozen manifest，`DynamicQuotientMemberCoverage` 分别为 `0/43476`、`0/8668`，`Qmap/Qlock=unknown`，Map/Lock `WindowsDynamic=not_opened`。Barrier、RegistrationShutdown、RegistryLifecycle、Unmap 与 JointClose 分别为 `8/8`、`8/8`、`16/16`、`49/49`、`36/36`，A2b2=`117/117`。A2 仍为 `implementation_not_dynamically_accepted`；生产 open、A1、v15、Runtime、Ready、派发、市场与资金效果均未改变。
 
 ### 9.1 静态闭合前 fragment provenance（历史）
 
