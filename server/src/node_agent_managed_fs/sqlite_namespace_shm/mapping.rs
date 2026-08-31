@@ -198,6 +198,13 @@ impl ManagedSqliteShmCoordinator {
 
         #[cfg(all(test, windows))]
         let mut mapped_new = false;
+        #[cfg(all(test, windows))]
+        let map_loop_start = state
+            .node
+            .as_ref()
+            .ok_or_else(|| protocol("NODE_MANAGED_SQLITE_SHM_NODE_MISSING_BEFORE_MAP"))?
+            .regions
+            .len();
         while state
             .node
             .as_ref()
@@ -216,6 +223,13 @@ impl ManagedSqliteShmCoordinator {
                 request_failure(io::Error::new(
                     io::ErrorKind::InvalidInput,
                     "NODE_MANAGED_SQLITE_SHM_REGION_INDEX_OVERFLOW",
+                ))
+            })?;
+            #[cfg(all(test, windows))]
+            let loop_ordinal = u16::try_from(existing_regions - map_loop_start).map_err(|_| {
+                request_failure(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "NODE_MANAGED_SQLITE_SHM_TEST_MAP_LOOP_ORDINAL_OVERFLOW",
                 ))
             })?;
             let region_offset = u64::from(index)
@@ -316,7 +330,7 @@ impl ManagedSqliteShmCoordinator {
                 test_request,
                 ManagedSqliteShmFailurePhase::MappingCreate,
                 true,
-                ManagedSqliteShmTestMapStep::MappingCreate,
+                ManagedSqliteShmTestMapStep::MappingCreate(loop_ordinal),
             )?;
             #[cfg(test)]
             let view_fault = match self.begin_test_fault(
@@ -443,7 +457,7 @@ impl ManagedSqliteShmCoordinator {
                 test_request,
                 ManagedSqliteShmFailurePhase::ViewMap,
                 true,
-                ManagedSqliteShmTestMapStep::ViewMap,
+                ManagedSqliteShmTestMapStep::ViewMap(loop_ordinal),
             )?;
             let node = state
                 .node
@@ -465,7 +479,7 @@ impl ManagedSqliteShmCoordinator {
                     test_request,
                     ManagedSqliteShmFailurePhase::ViewMap,
                     true,
-                    ManagedSqliteShmTestMapStep::Record,
+                    ManagedSqliteShmTestMapStep::Record(loop_ordinal),
                 )?;
                 mapped_new = true;
             }

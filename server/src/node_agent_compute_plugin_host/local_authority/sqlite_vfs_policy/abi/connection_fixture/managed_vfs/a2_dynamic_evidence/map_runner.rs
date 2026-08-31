@@ -1,8 +1,10 @@
 //! Process-isolated native receipts for Map request guards and positive region lifecycles.
 
 mod lifecycle;
+mod region_loop;
 mod request_budget;
 
+pub(in super::super) use region_loop::{MapRunnerRegionLoopBindingV1, MapRunnerRegionLoopFamilyV1};
 pub(in super::super) use request_budget::MapRunnerRequestBudgetV1;
 
 use std::{
@@ -27,6 +29,7 @@ use crate::node_agent_managed_fs::{
 use super::super::ManagedSqliteRoutedConnectionFixture;
 
 const CHILD_ROOT_ENV: &str = "ELON_SQLITE_A2_MAP_QUOTIENT_CHILD_ROOT";
+const REGION_LOOP_SELECTOR_ENV: &str = "ELON_SQLITE_A2_MAP_REGION_LOOP_SELECTOR";
 const PAYLOAD_VERSION: &str = "a2mapq2";
 const PAYLOAD_VALUE_COUNT: usize = 67;
 
@@ -146,6 +149,22 @@ pub(in super::super) fn run_map_lifecycle_program_isolated(
     run_lifecycle_parent(exact_test, binding)
 }
 
+pub(in super::super) fn run_map_region_loop_program_isolated(
+    exact_test: &str,
+    binding: MapRunnerRegionLoopBindingV1,
+) -> anyhow::Result<MapRunnerIsolatedEvidenceV1> {
+    region_loop::validate_binding(binding)?;
+    if let Some(root) = selected_child_root()? {
+        let selected = std::env::var(REGION_LOOP_SELECTOR_ENV)
+            .context("read parent-selected Map region-loop program")?;
+        if selected == region_loop::exact_selector(binding)? {
+            region_loop::exercise_child(&root, binding)?;
+        }
+        return Ok(MapRunnerIsolatedEvidenceV1::ChildReported);
+    }
+    run_region_loop_parent(exact_test, binding)
+}
+
 fn run_parent(
     exact_test: &str,
     binding: MapRunnerProgramBindingV1,
@@ -208,6 +227,39 @@ fn run_lifecycle_parent(
         .map_err(|error| cleanup_failed_root(&root, error))
 }
 
+fn run_region_loop_parent(
+    exact_test: &str,
+    binding: MapRunnerRegionLoopBindingV1,
+) -> anyhow::Result<MapRunnerIsolatedEvidenceV1> {
+    if exact_test.is_empty() {
+        return Err(anyhow!("Map region-loop exact test name is empty"));
+    }
+    let executable = std::env::current_exe().context("resolve current Map test executable")?;
+    let root = create_private_child_root()?;
+    let launch = ChildLaunchIdentity::new();
+    let selector = region_loop::exact_selector(binding)?;
+    let spawned = match Command::new(executable)
+        .args(["--exact", exact_test, "--nocapture"])
+        .env(CHILD_ROOT_ENV, &root)
+        .env(REGION_LOOP_SELECTOR_ENV, selector)
+        .env(A2_DYNAMIC_CHILD_NONCE_ENV, launch.env_value())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+    {
+        Ok(child) => child,
+        Err(error) => return Err(cleanup_failed_root(&root, anyhow!(error))),
+    };
+    let bound = launch
+        .bind(spawned)
+        .map_err(|failure| handle_child_failure(&root, failure))?;
+    let child = bound
+        .wait_for_successful_report()
+        .map_err(|failure| handle_child_failure(&root, failure))?;
+    validate_region_loop_parent_receipt(&root, binding, child)
+        .map_err(|error| cleanup_failed_root(&root, error))
+}
+
 fn validate_parent_receipt(
     root: &Path,
     binding: MapRunnerProgramBindingV1,
@@ -267,6 +319,45 @@ fn validate_lifecycle_parent_receipt(
         || child.registration_commitment != cleanup.registration_commitment
     {
         return Err(anyhow!("Map lifecycle parent cleanup binding mismatch"));
+    }
+    Ok(MapRunnerIsolatedEvidenceV1::ParentReceipt(
+        MapRunnerEvidenceReceiptV1 {
+            root_commitment_sha256: child.root_commitment.0,
+            child_fingerprint_sha256: child_fingerprint.0,
+            registration_commitment_sha256: child.registration_commitment.0,
+            payload_commitment_sha256: child.payload_commitment.0,
+            environment_sha256: digest_environment(&environment),
+            cleanup_sha256: digest_cleanup(&cleanup),
+            native_receipt_sha256: payload.native_receipt_sha256,
+            child_exit_code: child.exit_code,
+        },
+    ))
+}
+
+fn validate_region_loop_parent_receipt(
+    root: &Path,
+    binding: MapRunnerRegionLoopBindingV1,
+    child: ValidatedChildProcessReceipt,
+) -> anyhow::Result<MapRunnerIsolatedEvidenceV1> {
+    if !child.matches_family(SanitizedPayloadFamily::MapQuotient) {
+        return Err(anyhow!("Map region-loop child payload family mismatch"));
+    }
+    let payload = region_loop::validate_payload(child.actual_payload(), binding)?;
+    if !child.matches_registration_id(payload.registration_id) {
+        return Err(anyhow!(
+            "Map region-loop child registration binding mismatch"
+        ));
+    }
+    let environment =
+        WindowsDynamicEnvironment::capture(root, &child).map_err(anyhow::Error::msg)?;
+    let cleanup = ValidatedParentCleanupReceipt::remove_after_child_exit(&child, &environment)
+        .map_err(anyhow::Error::msg)?;
+    let child_fingerprint = child.fingerprint();
+    if child_fingerprint != cleanup.child_fingerprint
+        || child.root_commitment != cleanup.root_commitment
+        || child.registration_commitment != cleanup.registration_commitment
+    {
+        return Err(anyhow!("Map region-loop parent cleanup binding mismatch"));
     }
     Ok(MapRunnerIsolatedEvidenceV1::ParentReceipt(
         MapRunnerEvidenceReceiptV1 {

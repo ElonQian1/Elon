@@ -165,7 +165,7 @@ fn synthetic_manifest_zeros_and_binds_program_catalog_context() {
 fn projector_provenance_binds_typed_descriptor_producers_and_wiring() {
     use super::super::manifest_canonical::{
         digest_projector_source_entries_v1, digest_projector_source_scope_v1,
-        PROJECTOR_SOURCE_SCOPE_V1,
+        projector_source_scope_entries_v1,
     };
 
     let required_sources = [
@@ -181,6 +181,7 @@ fn projector_provenance_binds_typed_descriptor_producers_and_wiring() {
         "dynamic_quotient/producer_coherence/lock.rs",
         "dynamic_quotient/producer_coherence/lock_axes.rs",
         "dynamic_quotient/projector/lock_execution.rs",
+        "dynamic_quotient/map_runtime_source_scope.rs",
         "dynamic_quotient/membership_commitment.rs",
         "dynamic_quotient/descriptor_binding.rs",
         "dynamic_quotient/runner_admission.rs",
@@ -190,6 +191,10 @@ fn projector_provenance_binds_typed_descriptor_producers_and_wiring() {
         "dynamic_quotient/runner_admission/map_program/request_budget.rs",
         "dynamic_quotient/runner_admission/map_program/lifecycle.rs",
         "dynamic_quotient/runner_admission/map_program/lifecycle/source_scope.rs",
+        "dynamic_quotient/runner_admission/map_program/region_loop.rs",
+        "dynamic_quotient/runner_admission/map_program/region_loop/catalog.rs",
+        "dynamic_quotient/runner_admission/map_program/region_loop/region_loop_members.v1.tsv",
+        "dynamic_quotient/runner_admission/map_program/region_loop/source_scope.rs",
         "dynamic_quotient/runner_admission/lock.rs",
         "dynamic_quotient/runner_admission/lock_program.rs",
         "dynamic_quotient/runner_admission/lock_program/request_validation.rs",
@@ -200,6 +205,7 @@ fn projector_provenance_binds_typed_descriptor_producers_and_wiring() {
         "managed_vfs/a2_dynamic_evidence/child/lock_request_validation.rs",
         "managed_vfs/a2_dynamic_evidence/child/lock_lifecycle.rs",
         "managed_vfs/a2_dynamic_evidence/child/map_lifecycle.rs",
+        "managed_vfs/a2_dynamic_evidence/child/map_region_loop.rs",
         "managed_vfs/a2_dynamic_evidence/capture.rs",
         "managed_vfs/a2_dynamic_evidence/environment.rs",
         "managed_vfs/a2_dynamic_evidence/cleanup.rs",
@@ -208,6 +214,9 @@ fn projector_provenance_binds_typed_descriptor_producers_and_wiring() {
         "managed_vfs/a2_dynamic_evidence/map_runner/lifecycle.rs",
         "managed_vfs/a2_dynamic_evidence/map_runner/lifecycle/fixture.rs",
         "managed_vfs/a2_dynamic_evidence/map_runner/lifecycle/payload.rs",
+        "managed_vfs/a2_dynamic_evidence/map_runner/region_loop.rs",
+        "managed_vfs/a2_dynamic_evidence/map_runner/region_loop/fixture.rs",
+        "managed_vfs/a2_dynamic_evidence/map_runner/region_loop/payload.rs",
         "managed_vfs/a2_dynamic_evidence/lock_runner.rs",
         "managed_vfs/a2_dynamic_evidence/lock_runner/request_validation.rs",
         "managed_vfs/a2_dynamic_evidence/lock_runner/lifecycle.rs",
@@ -224,10 +233,44 @@ fn projector_provenance_binds_typed_descriptor_producers_and_wiring() {
         "managed_vfs/fault_script.rs",
         "managed_vfs/fault_script/file.rs",
         "managed_vfs/multi_connection.rs",
+        "managed_vfs/connection/registry_lifecycle.rs",
+        "managed_vfs/shared_namespace/registration_shutdown.rs",
+        "managed_vfs/shared_namespace/registry_lifecycle.rs",
+        "managed_vfs/lifecycle_faults.rs",
+        "managed_vfs/lifecycle_faults/native_gate.rs",
+        "managed_vfs/lifecycle_faults/registry_lifecycle.rs",
+        "managed_vfs/lifecycle_faults/registry_lifecycle/binding.rs",
+        "managed_vfs/lifecycle_faults/unmap.rs",
+        "managed_vfs/lifecycle_faults/joint_close.rs",
+        "managed_vfs/lifecycle_faults/registration_shutdown.rs",
+        "managed_vfs/registration_shutdown_custody.rs",
+        "registry.rs",
+        "registry/test_vfs_bridge.rs",
         "registry/test_vfs_bridge/file.rs",
+        "registry/file_custody.rs",
         "registry/file_custody/abi.rs",
+        "registry/file_custody/joint_close_runtime.rs",
+        "registry/file_custody/lifecycle_events.rs",
+        "registry/file_custody/promotion.rs",
+        "registry/file_custody/registry_lifecycle.rs",
+        "registry/file_custody/test_faults.rs",
         "registry/file_custody/operations.rs",
+        "registry/file_custody/operations/unmap.rs",
+        "registry/owner.rs",
+        "registry/owner/lifecycle.rs",
+        "registry/owner/vfs.rs",
+        "registry/process_owner.rs",
+        "registry/process_owner/joint_close_direct_xclose.rs",
+        "registry/process_owner/joint_close_fault.rs",
+        "registry/process_owner/lifecycle.rs",
+        "registry/process_owner/vfs.rs",
+        "registry/state.rs",
+        "registry/state/owner.rs",
+        "registry/state/test_lifecycle.rs",
+        "registry/state/test_snapshot.rs",
+        "registry/types.rs",
         "sqlite_vfs_abi.rs",
+        "sqlite_vfs_abi/boundary.rs",
         "sqlite_vfs_abi/io_shm.rs",
         "sqlite_vfs_abi/result_codes.rs",
         "sqlite_vfs_abi/file_state.rs",
@@ -235,17 +278,33 @@ fn projector_provenance_binds_typed_descriptor_producers_and_wiring() {
         "sqlite_vfs_abi/types.rs",
         "node_agent_managed_fs.rs",
         "node_agent_managed_fs/windows.rs",
+        "node_agent_managed_fs/windows_sqlite.rs",
         "node_agent_managed_fs/windows_sqlite_locking.rs",
         "node_agent_managed_fs/windows_sqlite_shm.rs",
         "node_agent_managed_fs/sqlite_api.rs",
         "node_agent_managed_fs/sqlite_namespace_io.rs",
         "node_agent_managed_fs/sqlite_namespace.rs",
+        "node_agent_managed_fs/sqlite_namespace_close.rs",
+        "node_agent_managed_fs/sqlite_namespace_close/main_close.rs",
+        "node_agent_managed_fs/sqlite_namespace_close/main_close_test_native.rs",
+        "node_agent_managed_fs/sqlite_namespace_close/test_faults.rs",
+        "node_agent_managed_fs/sqlite_namespace_main.rs",
+        "node_agent_managed_fs/sqlite_namespace_types.rs",
+        "node_agent_managed_fs/sqlite_namespace_validation.rs",
+        "node_agent_managed_fs/sqlite_namespace_lock_domain.rs",
+        "node_agent_managed_fs/sqlite_namespace_locking.rs",
+        "node_agent_managed_fs/sqlite_namespace_locking/test_native.rs",
         "node_agent_managed_fs/sqlite_namespace_shm.rs",
+        "node_agent_managed_fs/sqlite_namespace_shm/barrier.rs",
+        "node_agent_managed_fs/sqlite_namespace_shm/close.rs",
         "node_agent_managed_fs/sqlite_namespace_shm/coordinator.rs",
+        "node_agent_managed_fs/sqlite_namespace_shm/failure_custody.rs",
         "node_agent_managed_fs/sqlite_namespace_shm/types.rs",
         "node_agent_managed_fs/sqlite_namespace_shm/node_initialization.rs",
         "node_agent_managed_fs/sqlite_namespace_shm/mapping.rs",
         "node_agent_managed_fs/sqlite_namespace_shm/locking.rs",
+        "node_agent_managed_fs/sqlite_namespace_shm/unmap.rs",
+        "node_agent_managed_fs/sqlite_namespace_shm/teardown.rs",
         "node_agent_managed_fs/sqlite_namespace_shm/test_faults/api.rs",
         "node_agent_managed_fs/sqlite_namespace_shm/test_snapshot.rs",
         "node_agent_managed_fs/sqlite_namespace_shm/test_faults.rs",
@@ -254,11 +313,27 @@ fn projector_provenance_binds_typed_descriptor_producers_and_wiring() {
         "node_agent_managed_fs/sqlite_namespace_shm/test_faults/mapping.rs",
         "node_agent_managed_fs/sqlite_namespace_shm/test_lock_runtime.rs",
         "node_agent_managed_fs/sqlite_namespace_shm/test_map_runtime.rs",
+        "node_agent_managed_fs/sqlite_namespace_shm/test_map_runtime/mapping_sequence.rs",
+        "node_agent_managed_fs/sqlite_namespace_shm/test_unmap_runtime.rs",
+        "node_agent_managed_fs/sqlite_namespace_shm/test_unmap_runtime/authority.rs",
+        "node_agent_managed_fs/sqlite_namespace_shm/test_unmap_runtime/detach.rs",
+        "node_agent_managed_fs/sqlite_namespace_shm/test_unmap_runtime/native.rs",
+        "node_agent_managed_fs/sqlite_namespace_shm/test_unmap_runtime/prestate.rs",
     ];
-    let source_names = PROJECTOR_SOURCE_SCOPE_V1
+    let source_scope = projector_source_scope_entries_v1().collect::<Vec<_>>();
+    let source_names = source_scope
         .iter()
         .map(|(name, _)| *name)
         .collect::<Vec<_>>();
+    let unique_names = source_names
+        .iter()
+        .copied()
+        .collect::<std::collections::BTreeSet<_>>();
+    assert_eq!(
+        unique_names.len(),
+        source_names.len(),
+        "projector provenance source names must be unique"
+    );
 
     assert!(
         !source_names.contains(&"dynamic_quotient/program_inventory/review.rs"),
@@ -274,7 +349,7 @@ fn projector_provenance_binds_typed_descriptor_producers_and_wiring() {
 
     let baseline = digest_projector_source_scope_v1();
     for required in required_sources {
-        let mutated = PROJECTOR_SOURCE_SCOPE_V1
+        let mutated = source_scope
             .iter()
             .map(|(name, source)| {
                 let source = if *name == required {

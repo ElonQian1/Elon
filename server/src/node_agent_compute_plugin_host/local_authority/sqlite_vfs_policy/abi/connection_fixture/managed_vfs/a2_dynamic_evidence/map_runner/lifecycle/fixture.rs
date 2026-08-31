@@ -184,11 +184,11 @@ fn exact_map_receipt(
     path: MapRunnerLifecyclePathV1,
     value: ManagedSqliteShmTestMapReceipt,
 ) -> bool {
-    let created = u8::from(path.is_empty());
-    let live = u8::from(!path.is_empty());
-    let mapped = u8::from(path.is_mapped());
-    let mapped_new = u8::from(path.is_new_mapping());
-    let mapped_reuse = u8::from(path.is_reuse());
+    let created = u16::from(path.is_empty());
+    let live = u16::from(!path.is_empty());
+    let mapped = u16::from(path.is_mapped());
+    let mapped_new = u16::from(path.is_new_mapping());
+    let mapped_reuse = u16::from(path.is_reuse());
     let not_present = 1 - mapped;
     value.runtime_generation != 0
         && value.shm_connection_id != 0

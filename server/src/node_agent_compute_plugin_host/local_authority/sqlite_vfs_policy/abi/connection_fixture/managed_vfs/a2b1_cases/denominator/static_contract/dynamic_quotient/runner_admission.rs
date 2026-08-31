@@ -35,9 +35,12 @@ pub(super) use lock_program::{
 };
 #[cfg(all(test, windows))]
 pub(super) use map_program::tamper_implementation_digest_for_test;
-#[cfg(test)]
-pub(super) use map_program::validate_program_for_test as validate_map_program_for_test;
 pub(super) use map_program::MapRunnerExecutionReceiptV1;
+#[cfg(test)]
+pub(super) use map_program::{
+    region_loop_catalog_row_count_for_test,
+    validate_program_for_test as validate_map_program_for_test,
+};
 #[cfg(all(test, windows))]
 pub(super) use map_program::{
     run_isolated_for_test, MapRunnerExecutionErrorV1, MapRunnerIsolatedOutcomeV1,

@@ -1,7 +1,10 @@
+use std::collections::BTreeSet;
+
 use super::super::runner_admission::ExecutionProgramInventoryStatusV1;
 use super::map_program_cases::{
-    map_lifecycle_descriptor_v1, map_lifecycle_leaf_v1, request_budget_descriptor_v1,
-    request_budget_leaf_v1, MAP_LIFECYCLE_CASES,
+    frozen_map_region_loop_leaves_v1, map_lifecycle_descriptor_v1, map_lifecycle_leaf_v1,
+    request_budget_descriptor_v1, request_budget_leaf_v1, MapLifecycleProgramCaseV1,
+    MAP_LIFECYCLE_CASES, MAP_REGION_LOOP_MEMBER_COUNT,
 };
 use super::*;
 
@@ -489,9 +492,9 @@ fn full_map_program_inventory_accounts_for_every_frozen_member_without_opening_q
     let inventory = &bundle.inventory;
     assert_eq!(inventory.member_count, 43_476);
     assert_eq!(bundle.reverse_index.len(), 43_476);
-    assert_eq!(inventory.source_present_member_count, 12);
-    assert_eq!(inventory.source_present_group_count, 12);
-    assert_eq!(inventory.planned_missing_member_count, 43_464);
+    assert_eq!(inventory.source_present_member_count, 521);
+    assert_eq!(inventory.source_present_group_count, 521);
+    assert_eq!(inventory.planned_missing_member_count, 42_955);
     assert_eq!(
         inventory
             .source_present_member_count
@@ -521,11 +524,43 @@ fn full_map_program_inventory_accounts_for_every_frozen_member_without_opening_q
             )
         })
         .collect::<Vec<_>>();
-    assert_eq!(source_groups.len(), 12);
+    assert_eq!(source_groups.len(), 521);
     // `inventory_v1` is intentionally keyed by normalized program semantics. Keep every
     // source-present Map program a singleton so that status cannot cover a sibling member seal.
     assert!(source_groups.iter().all(|group| group.member_count == 1));
-    let mut expected_source_keys = REQUEST_BUDGET_STIMULI
+
+    let region_loop_leaves = frozen_map_region_loop_leaves_v1();
+    assert_eq!(region_loop_leaves.len(), MAP_REGION_LOOP_MEMBER_COUNT);
+    let region_loop_expected_groups = region_loop_leaves
+        .values()
+        .map(|leaf| {
+            (
+                prepare_dynamic_terminal_v1(&leaf.record, &leaf.descriptor)
+                    .unwrap()
+                    .key,
+                leaf.member,
+            )
+        })
+        .collect::<BTreeSet<_>>();
+    assert_eq!(
+        region_loop_expected_groups.len(),
+        MAP_REGION_LOOP_MEMBER_COUNT
+    );
+    let region_loop_source_keys = region_loop_expected_groups
+        .iter()
+        .map(|(key, _)| *key)
+        .collect::<BTreeSet<_>>();
+    let region_loop_source_members = region_loop_expected_groups
+        .iter()
+        .map(|(_, member)| *member)
+        .collect::<BTreeSet<_>>();
+    assert_eq!(region_loop_source_keys.len(), MAP_REGION_LOOP_MEMBER_COUNT);
+    assert_eq!(
+        region_loop_source_members.len(),
+        MAP_REGION_LOOP_MEMBER_COUNT
+    );
+
+    let mut legacy_expected_groups = REQUEST_BUDGET_STIMULI
         .into_iter()
         .flat_map(|stimulus| {
             [MapModeV1::Observe, MapModeV1::Extend].map(|mode| {
@@ -535,56 +570,86 @@ fn full_map_program_inventory_accounts_for_every_frozen_member_without_opening_q
                     mode,
                     RunnerCapabilityV1::Missing(CapabilityGapV1::QuotientRunnerNotIntegrated),
                 );
-                prepare_dynamic_terminal_v1(&leaf.record, &descriptor)
-                    .unwrap()
-                    .key
+                (
+                    prepare_dynamic_terminal_v1(&leaf.record, &descriptor)
+                        .unwrap()
+                        .key,
+                    leaf.member,
+                )
             })
         })
-        .collect::<Vec<_>>();
-    expected_source_keys.extend(MAP_LIFECYCLE_CASES.into_iter().map(|case| {
-        let leaf = map_lifecycle_leaf_v1(case);
-        let descriptor = map_lifecycle_descriptor_v1(
-            case,
-            RunnerCapabilityV1::Missing(CapabilityGapV1::QuotientRunnerNotIntegrated),
-        );
-        prepare_dynamic_terminal_v1(&leaf.record, &descriptor)
-            .unwrap()
-            .key
-    }));
-    assert_eq!(expected_source_keys.len(), 12);
-    let mut expected_source_members = REQUEST_BUDGET_STIMULI
-        .into_iter()
-        .flat_map(|stimulus| {
-            [MapModeV1::Observe, MapModeV1::Extend]
-                .map(|mode| request_budget_leaf_v1(stimulus, mode).member)
-        })
-        .collect::<Vec<_>>();
-    expected_source_members.extend(
+        .collect::<BTreeSet<_>>();
+    legacy_expected_groups.extend(
         MAP_LIFECYCLE_CASES
             .into_iter()
-            .map(|case| map_lifecycle_leaf_v1(case).member),
+            .filter(|case| {
+                !matches!(
+                    *case,
+                    MapLifecycleProgramCaseV1::EmptyExtendMapped
+                        | MapLifecycleProgramCaseV1::MissingExtendMapped
+                )
+            })
+            .map(|case| {
+                let leaf = map_lifecycle_leaf_v1(case);
+                let descriptor = map_lifecycle_descriptor_v1(
+                    case,
+                    RunnerCapabilityV1::Missing(CapabilityGapV1::QuotientRunnerNotIntegrated),
+                );
+                (
+                    prepare_dynamic_terminal_v1(&leaf.record, &descriptor)
+                        .unwrap()
+                        .key,
+                    leaf.member,
+                )
+            }),
     );
-    assert_eq!(expected_source_members.len(), 12);
-    assert!(source_groups
+    assert_eq!(legacy_expected_groups.len(), 10);
+    assert!(region_loop_expected_groups.is_disjoint(&legacy_expected_groups));
+    let expected_source_groups = region_loop_expected_groups
+        .union(&legacy_expected_groups)
+        .copied()
+        .collect::<BTreeSet<_>>();
+    assert_eq!(expected_source_groups.len(), 521);
+
+    let legacy_source_keys = legacy_expected_groups
         .iter()
-        .all(|group| expected_source_keys.contains(&group.normalized_key)));
-    assert!(expected_source_keys.iter().all(|expected| {
-        source_groups
-            .iter()
-            .filter(|group| group.normalized_key == *expected)
-            .count()
-            == 1
-    }));
-    assert!(source_groups
+        .map(|(key, _)| *key)
+        .collect::<BTreeSet<_>>();
+    assert_eq!(legacy_source_keys.len(), 10);
+    assert!(region_loop_source_keys.is_disjoint(&legacy_source_keys));
+    let expected_source_keys = region_loop_source_keys
+        .union(&legacy_source_keys)
+        .copied()
+        .collect::<BTreeSet<_>>();
+    assert_eq!(expected_source_keys.len(), 521);
+
+    let legacy_source_members = legacy_expected_groups
         .iter()
-        .all(|group| expected_source_members.contains(&group.members[0])));
-    assert!(expected_source_members.iter().all(|expected| {
-        source_groups
-            .iter()
-            .filter(|group| group.members.first() == Some(expected))
-            .count()
-            == 1
-    }));
+        .map(|(_, member)| *member)
+        .collect::<BTreeSet<_>>();
+    assert_eq!(legacy_source_members.len(), 10);
+    assert!(region_loop_source_members.is_disjoint(&legacy_source_members));
+    let expected_source_members = region_loop_source_members
+        .union(&legacy_source_members)
+        .copied()
+        .collect::<BTreeSet<_>>();
+    assert_eq!(expected_source_members.len(), 521);
+
+    let actual_source_keys = source_groups
+        .iter()
+        .map(|group| group.normalized_key)
+        .collect::<BTreeSet<_>>();
+    let actual_source_members = source_groups
+        .iter()
+        .map(|group| group.members[0])
+        .collect::<BTreeSet<_>>();
+    let actual_source_groups = source_groups
+        .iter()
+        .map(|group| (group.normalized_key, group.members[0]))
+        .collect::<BTreeSet<_>>();
+    assert_eq!(actual_source_keys, expected_source_keys);
+    assert_eq!(actual_source_members, expected_source_members);
+    assert_eq!(actual_source_groups, expected_source_groups);
     assert!(bundle.groups.iter().all(|group| match group.status {
         ExecutionProgramInventoryStatusV1::SourcePresentReceiptRequired { .. } => {
             expected_source_keys.contains(&group.normalized_key)

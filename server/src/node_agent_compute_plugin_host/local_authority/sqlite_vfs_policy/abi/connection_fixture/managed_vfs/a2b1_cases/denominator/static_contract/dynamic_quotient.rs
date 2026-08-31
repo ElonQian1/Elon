@@ -7,6 +7,7 @@ mod catalog;
 mod descriptor_binding;
 mod manifest;
 mod manifest_canonical;
+mod map_runtime_source_scope;
 mod membership_commitment;
 mod model;
 mod producer_coherence;

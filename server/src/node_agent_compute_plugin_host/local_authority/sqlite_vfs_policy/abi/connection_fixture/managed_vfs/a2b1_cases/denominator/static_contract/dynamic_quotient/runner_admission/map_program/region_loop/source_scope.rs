@@ -1,17 +1,19 @@
-//! Direct source commitment for the Map single-region lifecycle runner.
+//! Direct source commitment for the exact Map region-loop success programs.
 
 use sha2::{Digest, Sha256};
 
-use super::super::super::super::super::source_leaf_authority::Digest32;
 use super::super::super::super::map_runtime_source_scope::MAP_RUNTIME_DEPENDENCY_SOURCE_SCOPE_V1;
-use super::MapLifecyclePathSpecV1;
+use super::super::super::super::super::source_leaf_authority::Digest32;
+use super::MapRegionLoopProgramV1;
 
-pub(super) fn digest_implementation_v1(path: MapLifecyclePathSpecV1) -> Digest32 {
+pub(super) fn digest_implementation_v1(program: MapRegionLoopProgramV1) -> Digest32 {
     let mut hasher = Sha256::new();
-    hasher.update(b"elon-map-single-region-lifecycle-completed-implementation-v1\0");
+    hasher.update(b"elon-map-region-loop-success-completed-implementation-v1\0");
     for source in [
         include_str!("../../map_program.rs"),
-        include_str!("../lifecycle.rs"),
+        include_str!("../region_loop.rs"),
+        include_str!("catalog.rs"),
+        include_str!("region_loop_members.v1.tsv"),
         include_str!("source_scope.rs"),
         include_str!("../../../map_runtime_source_scope.rs"),
         include_str!(concat!(
@@ -32,19 +34,23 @@ pub(super) fn digest_implementation_v1(path: MapLifecyclePathSpecV1) -> Digest32
         )),
         include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
+            "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2_dynamic_evidence/child/map_region_loop.rs"
+        )),
+        include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
             "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2_dynamic_evidence/map_runner.rs"
         )),
         include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2_dynamic_evidence/map_runner/lifecycle.rs"
+            "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2_dynamic_evidence/map_runner/region_loop.rs"
         )),
         include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2_dynamic_evidence/map_runner/lifecycle/fixture.rs"
+            "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2_dynamic_evidence/map_runner/region_loop/fixture.rs"
         )),
         include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2_dynamic_evidence/map_runner/lifecycle/payload.rs"
+            "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2_dynamic_evidence/map_runner/region_loop/payload.rs"
         )),
         include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
@@ -234,6 +240,8 @@ pub(super) fn digest_implementation_v1(path: MapLifecyclePathSpecV1) -> Digest32
         hasher.update((source.len() as u64).to_le_bytes());
         hasher.update(source.as_bytes());
     }
-    hasher.update([path.implementation_tag()]);
+    hasher.update([program.implementation_tag()]);
+    hasher.update(program.target_region().to_le_bytes());
+    hasher.update(program.regions_to_create().to_le_bytes());
     Digest32(hasher.finalize().into())
 }

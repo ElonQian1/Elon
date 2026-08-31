@@ -1,6 +1,9 @@
 use sha2::{Digest as _, Sha256};
 
 use super::super::source_leaf_authority::Digest32;
+use super::map_runtime_source_scope::{
+    MAP_REGION_LOOP_SOURCE_SCOPE_V1, MAP_RUNTIME_DEPENDENCY_SOURCE_SCOPE_V1,
+};
 use super::{
     digest_dynamic_class_key_v1, DynamicClassKeyV1, DynamicClassSealV1, DynamicQuotientManifestV1,
     ReverseIndexEntryV1, StaticMemberSealV1, DYNAMIC_PROJECTOR_SCHEMA_V1,
@@ -30,6 +33,10 @@ pub(super) const PROJECTOR_SOURCE_SCOPE_V1: &[(&str, &str)] = &[
     ("map/dynamic.rs", include_str!("../map/dynamic.rs")),
     ("lock/dynamic.rs", include_str!("../lock/dynamic.rs")),
     ("dynamic_quotient/model.rs", include_str!("model.rs")),
+    (
+        "dynamic_quotient/map_runtime_source_scope.rs",
+        include_str!("map_runtime_source_scope.rs"),
+    ),
     (
         "dynamic_quotient/canonical.rs",
         include_str!("canonical.rs"),
@@ -268,6 +275,13 @@ pub(super) const PROJECTOR_SOURCE_SCOPE_V1: &[(&str, &str)] = &[
         )),
     ),
     (
+        "sqlite_vfs_abi/boundary.rs",
+        include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_abi/boundary.rs"
+        )),
+    ),
+    (
         "sqlite_vfs_abi/io_shm.rs",
         include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
@@ -436,17 +450,17 @@ pub(super) const PROJECTOR_SOURCE_SCOPE_V1: &[(&str, &str)] = &[
         )),
     ),
     (
-        "node_agent_managed_fs/sqlite_namespace_shm/test_lock_runtime.rs",
-        include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/src/node_agent_managed_fs/sqlite_namespace_shm/test_lock_runtime.rs"
-        )),
-    ),
-    (
         "node_agent_managed_fs/sqlite_namespace_shm/test_map_runtime.rs",
         include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/src/node_agent_managed_fs/sqlite_namespace_shm/test_map_runtime.rs"
+        )),
+    ),
+    (
+        "node_agent_managed_fs/sqlite_namespace_shm/test_map_runtime/mapping_sequence.rs",
+        include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/src/node_agent_managed_fs/sqlite_namespace_shm/test_map_runtime/mapping_sequence.rs"
         )),
     ),
     (
@@ -617,7 +631,16 @@ pub(super) fn digest_projector_schema_v1() -> Digest32 {
 }
 
 pub(super) fn digest_projector_source_scope_v1() -> Digest32 {
-    digest_projector_source_entries_v1(PROJECTOR_SOURCE_SCOPE_V1.iter().copied())
+    digest_projector_source_entries_v1(projector_source_scope_entries_v1())
+}
+
+pub(super) fn projector_source_scope_entries_v1(
+) -> impl Iterator<Item = (&'static str, &'static str)> {
+    PROJECTOR_SOURCE_SCOPE_V1
+        .iter()
+        .copied()
+        .chain(MAP_RUNTIME_DEPENDENCY_SOURCE_SCOPE_V1.iter().copied())
+        .chain(MAP_REGION_LOOP_SOURCE_SCOPE_V1.iter().copied())
 }
 
 pub(super) fn digest_projector_source_entries_v1<'a>(

@@ -31,6 +31,7 @@ mod runner_admission_lock_lifecycle_supported;
 mod runner_admission_lock_supported;
 #[cfg(windows)]
 mod runner_admission_map_lifecycle_supported;
+mod runner_admission_map_region_loop_supported;
 #[cfg(windows)]
 mod runner_admission_supported;
 mod runner_state;

@@ -7,6 +7,10 @@ use super::{
     types::{ManagedSqliteShmFailure, ManagedSqliteShmFailurePhase, ManagedSqliteShmMapMode},
 };
 
+mod mapping_sequence;
+
+use mapping_sequence::{validate_expectation, MappingSequence, MappingSequenceEvent};
+
 type ExactTarget = (u64, u64);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -26,6 +30,7 @@ pub(crate) enum ManagedSqliteShmTestMapDmsPath {
 pub(crate) struct ManagedSqliteShmTestMapExpectation {
     pub(crate) region: u32,
     pub(crate) region_size: u32,
+    pub(crate) regions_to_create: u16,
     pub(crate) mode: ManagedSqliteShmMapMode,
     pub(crate) path: ManagedSqliteShmTestMapPath,
     pub(crate) dms_path: ManagedSqliteShmTestMapDmsPath,
@@ -48,30 +53,30 @@ pub(crate) struct ManagedSqliteShmTestMapReceipt {
     pub(crate) runtime_generation: u64,
     pub(crate) shm_connection_id: u64,
     pub(crate) expectation: ManagedSqliteShmTestMapExpectation,
-    pub(crate) managed_attempts: u8,
-    pub(crate) created_first_shared: u8,
-    pub(crate) node_live: u8,
-    pub(crate) dms_exclusive_acquires: u8,
-    pub(crate) dms_truncates: u8,
-    pub(crate) dms_exclusive_releases: u8,
-    pub(crate) dms_shared_acquires: u8,
-    pub(crate) dms_ready: u8,
-    pub(crate) file_size_checks: u8,
+    pub(crate) managed_attempts: u16,
+    pub(crate) created_first_shared: u16,
+    pub(crate) node_live: u16,
+    pub(crate) dms_exclusive_acquires: u16,
+    pub(crate) dms_truncates: u16,
+    pub(crate) dms_exclusive_releases: u16,
+    pub(crate) dms_shared_acquires: u16,
+    pub(crate) dms_ready: u16,
+    pub(crate) file_size_checks: u16,
     pub(crate) file_size_before: u64,
     pub(crate) logical_end: u64,
-    pub(crate) file_grows: u8,
-    pub(crate) mapping_creates: u8,
-    pub(crate) view_maps: u8,
-    pub(crate) records: u8,
-    pub(crate) not_present: u8,
-    pub(crate) mapped: u8,
-    pub(crate) mapped_new: u8,
-    pub(crate) mapped_reuses: u8,
+    pub(crate) file_grows: u16,
+    pub(crate) mapping_creates: u16,
+    pub(crate) view_maps: u16,
+    pub(crate) records: u16,
+    pub(crate) not_present: u16,
+    pub(crate) mapped: u16,
+    pub(crate) mapped_new: u16,
+    pub(crate) mapped_reuses: u16,
     pub(crate) selected_pointer: Option<ManagedSqliteShmTestMapPointerIdentity>,
     pub(crate) selected_length: usize,
     pub(crate) selected_region: Option<u32>,
     pub(crate) selected_runtime_generation: Option<u64>,
-    pub(crate) managed_successes: u8,
+    pub(crate) managed_successes: u16,
     pub(crate) finished: bool,
 }
 
@@ -128,9 +133,9 @@ enum MapEvent {
         logical_end: u64,
     },
     FileGrow,
-    MappingCreate,
-    ViewMap,
-    Record,
+    MappingCreate(u16),
+    ViewMap(u16),
+    Record(u16),
     NotPresent,
     Selected {
         path: ManagedSqliteShmTestMapPath,
@@ -152,10 +157,8 @@ enum Progress {
     DmsSharedAcquired,
     DmsReady,
     FileSized,
-    FileGrown,
-    MappingCreated,
-    ViewMapped,
-    Recorded,
+    MappingSequence,
+    MappingSequenceCompleted,
     NotPresent,
     Mapped,
     ManagedSucceeded,
@@ -165,6 +168,7 @@ struct ArmedMapObservation {
     target: ExactTarget,
     receipt: ManagedSqliteShmTestMapReceipt,
     progress: Progress,
+    mapping_sequence: MappingSequence,
     invalid: bool,
 }
 
@@ -217,6 +221,7 @@ impl ManagedSqliteShmTestMapController {
                 finished: false,
             },
             progress: Progress::Armed,
+            mapping_sequence: MappingSequence::new(expectation.regions_to_create),
             invalid: false,
         });
         Ok(())
@@ -309,36 +314,21 @@ impl ManagedSqliteShmTestMapController {
                 once!(
                     file_grows,
                     Progress::FileSized,
-                    Progress::FileGrown,
+                    Progress::MappingSequence,
                     "NODE_MANAGED_SQLITE_SHM_TEST_MAP_FILE_GROW_DUPLICATE"
                 );
             }
-            MapEvent::MappingCreate => {
+            MapEvent::MappingCreate(ordinal) => {
                 require_path(armed, ManagedSqliteShmTestMapPath::MappedNew)?;
-                once!(
-                    mapping_creates,
-                    Progress::FileGrown,
-                    Progress::MappingCreated,
-                    "NODE_MANAGED_SQLITE_SHM_TEST_MAP_MAPPING_CREATE_DUPLICATE"
-                );
+                observe_mapping_sequence(armed, MappingSequenceEvent::MappingCreate(ordinal))?;
             }
-            MapEvent::ViewMap => {
+            MapEvent::ViewMap(ordinal) => {
                 require_path(armed, ManagedSqliteShmTestMapPath::MappedNew)?;
-                once!(
-                    view_maps,
-                    Progress::MappingCreated,
-                    Progress::ViewMapped,
-                    "NODE_MANAGED_SQLITE_SHM_TEST_MAP_VIEW_MAP_DUPLICATE"
-                );
+                observe_mapping_sequence(armed, MappingSequenceEvent::ViewMap(ordinal))?;
             }
-            MapEvent::Record => {
+            MapEvent::Record(ordinal) => {
                 require_path(armed, ManagedSqliteShmTestMapPath::MappedNew)?;
-                once!(
-                    records,
-                    Progress::ViewMapped,
-                    Progress::Recorded,
-                    "NODE_MANAGED_SQLITE_SHM_TEST_MAP_RECORD_DUPLICATE"
-                );
+                observe_mapping_sequence(armed, MappingSequenceEvent::Record(ordinal))?;
             }
             MapEvent::NotPresent => {
                 require_path(armed, ManagedSqliteShmTestMapPath::NotPresent)?;
@@ -357,7 +347,7 @@ impl ManagedSqliteShmTestMapController {
             } => {
                 require_path(armed, path)?;
                 let required = match path {
-                    ManagedSqliteShmTestMapPath::MappedNew => Progress::Recorded,
+                    ManagedSqliteShmTestMapPath::MappedNew => Progress::MappingSequenceCompleted,
                     ManagedSqliteShmTestMapPath::MappedReuse => Progress::FileSized,
                     ManagedSqliteShmTestMapPath::NotPresent => {
                         armed.invalid = true;
@@ -451,32 +441,23 @@ impl ManagedSqliteShmTestMapController {
     }
 }
 
-fn validate_expectation(
-    target: ExactTarget,
-    expectation: ManagedSqliteShmTestMapExpectation,
+fn observe_mapping_sequence(
+    armed: &mut ArmedMapObservation,
+    event: MappingSequenceEvent,
 ) -> Result<(), &'static str> {
-    if target.0 == 0 || target.1 == 0 {
-        return Err("NODE_MANAGED_SQLITE_SHM_TEST_MAP_TARGET_ZERO");
-    }
-    if expectation.region_size == 0 {
-        return Err("NODE_MANAGED_SQLITE_SHM_TEST_MAP_REGION_SIZE_ZERO");
-    }
-    let path_matches_mode = match expectation.path {
-        ManagedSqliteShmTestMapPath::NotPresent => {
-            expectation.mode == ManagedSqliteShmMapMode::Observe
+    require_progress(armed, Progress::MappingSequence)?;
+    let counts = match armed.mapping_sequence.observe(event) {
+        Ok(counts) => counts,
+        Err(error) => {
+            armed.invalid = true;
+            return Err(error);
         }
-        ManagedSqliteShmTestMapPath::MappedNew => {
-            expectation.mode == ManagedSqliteShmMapMode::Extend
-        }
-        ManagedSqliteShmTestMapPath::MappedReuse => true,
     };
-    if !path_matches_mode {
-        return Err("NODE_MANAGED_SQLITE_SHM_TEST_MAP_MODE_PATH_MISMATCH");
-    }
-    if expectation.path == ManagedSqliteShmTestMapPath::MappedReuse
-        && expectation.dms_path != ManagedSqliteShmTestMapDmsPath::NodeLive
-    {
-        return Err("NODE_MANAGED_SQLITE_SHM_TEST_MAP_REUSE_DMS_PATH_MISMATCH");
+    armed.receipt.mapping_creates = counts.mapping_creates;
+    armed.receipt.view_maps = counts.view_maps;
+    armed.receipt.records = counts.records;
+    if armed.mapping_sequence.is_complete() {
+        armed.progress = Progress::MappingSequenceCompleted;
     }
     Ok(())
 }
@@ -681,9 +662,9 @@ impl ManagedSqliteShmCoordinator {
     ) -> Result<(), ManagedSqliteShmFailure> {
         let event = match step {
             ManagedSqliteShmTestMapStep::FileGrow => MapEvent::FileGrow,
-            ManagedSqliteShmTestMapStep::MappingCreate => MapEvent::MappingCreate,
-            ManagedSqliteShmTestMapStep::ViewMap => MapEvent::ViewMap,
-            ManagedSqliteShmTestMapStep::Record => MapEvent::Record,
+            ManagedSqliteShmTestMapStep::MappingCreate(ordinal) => MapEvent::MappingCreate(ordinal),
+            ManagedSqliteShmTestMapStep::ViewMap(ordinal) => MapEvent::ViewMap(ordinal),
+            ManagedSqliteShmTestMapStep::Record(ordinal) => MapEvent::Record(ordinal),
             ManagedSqliteShmTestMapStep::NotPresent => MapEvent::NotPresent,
         };
         self.record_test_map_event(
@@ -783,9 +764,9 @@ impl ManagedSqliteShmCoordinator {
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) enum ManagedSqliteShmTestMapStep {
     FileGrow,
-    MappingCreate,
-    ViewMap,
-    Record,
+    MappingCreate(u16),
+    ViewMap(u16),
+    Record(u16),
     NotPresent,
 }
 

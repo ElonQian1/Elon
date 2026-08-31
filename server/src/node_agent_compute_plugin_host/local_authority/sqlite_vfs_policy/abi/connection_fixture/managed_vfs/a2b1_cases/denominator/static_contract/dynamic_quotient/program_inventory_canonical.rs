@@ -56,6 +56,22 @@ const SOURCE_SCOPE: &[(&str, &str)] = &[
         include_str!("runner_admission/map_program/lifecycle/source_scope.rs"),
     ),
     (
+        "runner_admission/map_program/region_loop.rs",
+        include_str!("runner_admission/map_program/region_loop.rs"),
+    ),
+    (
+        "runner_admission/map_program/region_loop/catalog.rs",
+        include_str!("runner_admission/map_program/region_loop/catalog.rs"),
+    ),
+    (
+        "runner_admission/map_program/region_loop/region_loop_members.v1.tsv",
+        include_str!("runner_admission/map_program/region_loop/region_loop_members.v1.tsv"),
+    ),
+    (
+        "runner_admission/map_program/region_loop/source_scope.rs",
+        include_str!("runner_admission/map_program/region_loop/source_scope.rs"),
+    ),
+    (
         "runner_admission/lock_program.rs",
         include_str!("runner_admission/lock_program.rs"),
     ),

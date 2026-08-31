@@ -1,6 +1,7 @@
 //! Sealed admission bridge for the executable Map dynamic-quotient programs.
 
 mod lifecycle;
+mod region_loop;
 mod request_budget;
 
 #[cfg(windows)]
@@ -14,13 +15,16 @@ use super::super::super::{
 use super::super::{DynamicClassKeyV1, StaticMemberSealV1};
 use super::CompiledRunnerPlanV1;
 use lifecycle::{program_spec_v1 as lifecycle_program_spec_v1, MapLifecyclePathSpecV1};
+use region_loop::{program_spec_v1 as region_loop_program_spec_v1, MapRegionLoopProgramV1};
 use request_budget::{program_spec_v1 as request_budget_program_spec_v1, MapRequestBudgetGuardV1};
 
 #[cfg(windows)]
 use crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::abi::connection_fixture::managed_vfs::a2_dynamic_evidence::{
-    run_map_lifecycle_program_isolated, run_map_program_isolated, MapRunnerEvidenceReceiptV1,
+    run_map_lifecycle_program_isolated, run_map_program_isolated,
+    run_map_region_loop_program_isolated, MapRunnerEvidenceReceiptV1,
     MapRunnerIsolatedEvidenceV1, MapRunnerLifecycleBindingV1, MapRunnerLifecyclePathV1,
-    MapRunnerModeV1, MapRunnerProgramBindingV1, MapRunnerRequestBudgetV1,
+    MapRunnerModeV1, MapRunnerProgramBindingV1, MapRunnerRegionLoopBindingV1,
+    MapRunnerRegionLoopFamilyV1, MapRunnerRequestBudgetV1,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -33,6 +37,7 @@ pub(super) enum ProgramModeV1 {
 enum MapProgramCaseV1 {
     RequestBudget(MapRequestBudgetGuardV1),
     Lifecycle(MapLifecyclePathSpecV1),
+    RegionLoop(MapRegionLoopProgramV1),
 }
 
 #[derive(Clone, Copy)]
@@ -83,6 +88,7 @@ pub(super) enum MapRunnerExecutionViolationV1 {
     UnsupportedProgram,
     PlanBindingMismatch,
     MemberSealMismatch,
+    MemberCatalogInvalid,
     ReceiptBindingMismatch,
     ExecutionSealMismatch,
 }
@@ -195,6 +201,26 @@ pub(in super::super) fn run_isolated_for_test(
                 implementation_sha256: program.implementation_sha256.0,
             },
         ),
+        MapProgramCaseV1::RegionLoop(region_loop) => run_map_region_loop_program_isolated(
+            exact_test,
+            MapRunnerRegionLoopBindingV1 {
+                family: match region_loop.family() {
+                    region_loop::MapRegionLoopFamilyV1::EmptyExtend => {
+                        MapRunnerRegionLoopFamilyV1::CreatedFirstEmptyExtendMapped
+                    }
+                    region_loop::MapRegionLoopFamilyV1::MissingExtend => {
+                        MapRunnerRegionLoopFamilyV1::NodeLiveMissingExtendMapped
+                    }
+                },
+                target_region: u32::from(region_loop.target_region()),
+                regions_to_create: region_loop.regions_to_create(),
+                normalized_descriptor_sha256: program.normalized_descriptor_sha256.0,
+                case_key_sha256: member.case_key_sha256.0,
+                full_record_sha256: member.full_record_sha256.0,
+                plan_sha256: program.plan_sha256.0,
+                implementation_sha256: program.implementation_sha256.0,
+            },
+        ),
     };
     match evidence.map_err(|error| MapRunnerExecutionErrorV1(error.to_string()))? {
         MapRunnerIsolatedEvidenceV1::ChildReported => Ok(MapRunnerIsolatedOutcomeV1::ChildReported),
@@ -253,10 +279,21 @@ fn source_program_spec_v1(
     match request_budget_program_spec_v1(key, plan) {
         Ok(program) => Ok(program),
         Err(MapRunnerExecutionViolationV1::UnsupportedProgram) => {
-            lifecycle_program_spec_v1(key, plan)
+            match region_loop_program_spec_v1(key, plan) {
+                Ok(program) => Ok(program),
+                Err(MapRunnerExecutionViolationV1::UnsupportedProgram) => {
+                    lifecycle_program_spec_v1(key, plan)
+                }
+                Err(error) => Err(error),
+            }
         }
         Err(error) => Err(error),
     }
+}
+
+#[cfg(test)]
+pub(super) fn region_loop_catalog_row_count_for_test() -> usize {
+    region_loop::catalog_row_count_for_test()
 }
 
 #[cfg(test)]

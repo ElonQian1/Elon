@@ -161,6 +161,7 @@ pub(super) fn map_expectation(
     ManagedSqliteShmTestMapExpectation {
         region: path.region(),
         region_size: REGION_SIZE,
+        regions_to_create: u16::from(path.is_new_mapping()),
         mode: path.managed_mode(),
         path: path.managed_path(),
         dms_path: path.managed_dms_path(),
