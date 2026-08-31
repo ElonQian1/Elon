@@ -111,9 +111,9 @@ fn full_lock_program_inventory_accounts_for_every_frozen_member_without_opening_
     let inventory = &bundle.inventory;
     assert_eq!(inventory.member_count, 8_668);
     assert_eq!(bundle.reverse_index.len(), 8_668);
-    assert_eq!(inventory.source_present_member_count, 1_434);
-    assert_eq!(inventory.source_present_group_count, 1_434);
-    assert_eq!(inventory.planned_missing_member_count, 7_234);
+    assert_eq!(inventory.source_present_member_count, 2_754);
+    assert_eq!(inventory.source_present_group_count, 2_754);
+    assert_eq!(inventory.planned_missing_member_count, 5_914);
     let source_groups = bundle
         .groups
         .iter()
@@ -124,7 +124,7 @@ fn full_lock_program_inventory_accounts_for_every_frozen_member_without_opening_
             )
         })
         .collect::<Vec<_>>();
-    assert_eq!(source_groups.len(), 1_434);
+    assert_eq!(source_groups.len(), 2_754);
     assert!(source_groups.iter().all(|group| group.member_count == 1));
 
     let record = lock_request_validation_record();
@@ -161,13 +161,13 @@ fn full_lock_program_inventory_accounts_for_every_frozen_member_without_opening_
             .key
     }));
     let expected_source_keys = expected_source_keys.into_iter().collect::<BTreeSet<_>>();
-    assert_eq!(expected_source_keys.len(), 1_434);
+    assert_eq!(expected_source_keys.len(), 2_754);
 
     let actual_source_groups = source_groups
         .iter()
         .map(|group| (group.normalized_key, group.members[0]))
         .collect::<BTreeSet<_>>();
-    assert_eq!(actual_source_groups.len(), 1_434);
+    assert_eq!(actual_source_groups.len(), 2_754);
     assert!(actual_source_groups
         .iter()
         .all(|(key, _)| expected_source_keys.contains(key)));

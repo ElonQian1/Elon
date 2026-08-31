@@ -96,6 +96,10 @@ const SOURCE_SCOPE: &[(&str, &str)] = &[
         include_str!("runner_admission/lock_program/stored_poison/stored_poison_retention_succeeded_members.v1.tsv"),
     ),
     (
+        "runner_admission/lock_program/stored_poison/stored_poison_retention_route_unknown_members.v1.tsv",
+        include_str!("runner_admission/lock_program/stored_poison/stored_poison_retention_route_unknown_members.v1.tsv"),
+    ),
+    (
         "runner_admission/lock_program/stored_poison/source_scope.rs",
         include_str!("runner_admission/lock_program/stored_poison/source_scope.rs"),
     ),

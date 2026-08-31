@@ -1,4 +1,4 @@
-//! Frozen exact fixtures for the retention-succeeded stored-poison Lock family.
+//! Frozen exact fixtures for both stored-poison Lock retention completions.
 
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -7,7 +7,8 @@ use std::{
 
 use super::*;
 
-pub(super) const LOCK_STORED_POISON_MEMBER_COUNT: usize = 1_320;
+pub(super) const LOCK_STORED_POISON_COMPLETION_MEMBER_COUNT: usize = 1_320;
+pub(super) const LOCK_STORED_POISON_MEMBER_COUNT: usize = 2_640;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(super) enum LockStoredPoisonActionV1 {
@@ -15,6 +16,12 @@ pub(super) enum LockStoredPoisonActionV1 {
     LockExclusive,
     UnlockShared,
     UnlockExclusive,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub(super) enum LockStoredPoisonCompletionV1 {
+    RetentionSucceeded,
+    RetentionRouteUnknown,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -60,6 +67,7 @@ pub(super) struct LockStoredPoisonKeyV1 {
     pub(super) first: u8,
     pub(super) count: u8,
     pub(super) profile: LockStoredPoisonProfileV1,
+    pub(super) completion: LockStoredPoisonCompletionV1,
 }
 
 #[derive(Clone)]
@@ -156,11 +164,18 @@ fn stored_poison_key_v1(
         || value.recipe.cleanup != CleanupV1::RetainUnsafeCustodyThenParentCleanup
         || value.recipe.capability
             != RunnerCapabilityV1::Missing(CapabilityGapV1::LockObservationIncomplete)
-        || value.axes.completion
-            != ReachabilityV1::Reached(LockCompletionV1::UnsafeRetentionSucceededThenRouteUnknown)
     {
         return None;
     }
+    let completion = match value.axes.completion {
+        ReachabilityV1::Reached(LockCompletionV1::UnsafeRetentionSucceededThenRouteUnknown) => {
+            LockStoredPoisonCompletionV1::RetentionSucceeded
+        }
+        ReachabilityV1::Reached(LockCompletionV1::UnsafeRetentionRouteUnknownThenRouteUnknown) => {
+            LockStoredPoisonCompletionV1::RetentionRouteUnknown
+        }
+        _ => return None,
+    };
     let (
         ReachabilityV1::Reached(action),
         ReachabilityV1::Reached(first),
@@ -191,6 +206,7 @@ fn stored_poison_key_v1(
         first,
         count,
         profile,
+        completion,
     })
 }
 
@@ -267,7 +283,7 @@ fn profile_v1(
 }
 
 #[test]
-fn frozen_stored_poison_family_is_exact_unique_and_retention_succeeded_only() {
+fn frozen_stored_poison_families_are_exact_unique_and_completion_partitioned() {
     let leaves = frozen_lock_stored_poison_leaves_v1();
     assert_eq!(leaves.len(), LOCK_STORED_POISON_MEMBER_COUNT);
     assert_eq!(
@@ -281,14 +297,26 @@ fn frozen_stored_poison_family_is_exact_unique_and_retention_succeeded_only() {
     for profile in LOCK_STORED_POISON_PROFILES {
         assert_eq!(
             leaves.keys().filter(|key| key.profile == profile).count(),
-            88
+            176
+        );
+    }
+    for completion in [
+        LockStoredPoisonCompletionV1::RetentionSucceeded,
+        LockStoredPoisonCompletionV1::RetentionRouteUnknown,
+    ] {
+        assert_eq!(
+            leaves
+                .keys()
+                .filter(|key| key.completion == completion)
+                .count(),
+            LOCK_STORED_POISON_COMPLETION_MEMBER_COUNT
         );
     }
     for (action, expected) in [
-        (LockStoredPoisonActionV1::LockShared, 120),
-        (LockStoredPoisonActionV1::LockExclusive, 540),
-        (LockStoredPoisonActionV1::UnlockShared, 120),
-        (LockStoredPoisonActionV1::UnlockExclusive, 540),
+        (LockStoredPoisonActionV1::LockShared, 240),
+        (LockStoredPoisonActionV1::LockExclusive, 1_080),
+        (LockStoredPoisonActionV1::UnlockShared, 240),
+        (LockStoredPoisonActionV1::UnlockExclusive, 1_080),
     ] {
         assert_eq!(
             leaves.keys().filter(|key| key.action == action).count(),
