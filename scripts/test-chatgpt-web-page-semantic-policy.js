@@ -177,6 +177,12 @@ expectEqual(policy.classify({
 }), 'save_to_project', 'save response to project label');
 
 expectEqual(policy.classify({
+  pathname: '/g/g-p-demo/c/conversation_123',
+  region: 'overlay',
+  label: '移至项目'
+}), 'save_to_project', 'current Chinese move-to-project menu label');
+
+expectEqual(policy.classify({
   pathname: '/c/conversation_123',
   region: 'overlay',
   signal: 'menu-item',

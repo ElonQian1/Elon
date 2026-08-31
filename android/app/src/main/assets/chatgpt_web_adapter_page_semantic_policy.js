@@ -132,8 +132,8 @@
       /project-save-turn-action-button/.test(signal) ||
       /^(?:save|add|move)(?:\s+(?:this|the))?\s+(?:chat|conversation)?\s*(?:to|into)?\s*project$/.test(label) ||
       /^(?:save|add|move)(?:\s+(?:this|the))?\s+(?:chat|conversation)?\s*(?:to|into)?\s*project$/.test(signal) ||
-      /^(?:保存|添加|移动|存入)(?:到|至)?项目$/.test(label) ||
-      /^(?:保存|添加|移动|存入)(?:到|至)?项目$/.test(signal)
+      /^(?:(?:保存|添加|移动|存入)(?:到|至)?|移至)项目$/.test(label) ||
+      /^(?:(?:保存|添加|移动|存入)(?:到|至)?|移至)项目$/.test(signal)
     ) {
       return 'save_to_project';
     }
