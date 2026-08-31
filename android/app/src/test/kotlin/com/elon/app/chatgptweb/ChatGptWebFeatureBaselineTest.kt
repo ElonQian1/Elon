@@ -425,7 +425,7 @@ class ChatGptWebFeatureBaselineTest {
         assertTrue(feature(baseline, "web_search").isNull("verification_gap"))
         assertEquals("deferred", feature(baseline, "session_continuity_and_recovery").getString("verification_status"))
         assertEquals(
-            "verification_case_inputs_changed_since_device_acceptance",
+            "verification_case_contract_changed_since_device_acceptance",
             feature(baseline, "session_continuity_and_recovery").getString("verification_gap"),
         )
         assertEquals("deferred", feature(baseline, "model_selection").getString("verification_status"))

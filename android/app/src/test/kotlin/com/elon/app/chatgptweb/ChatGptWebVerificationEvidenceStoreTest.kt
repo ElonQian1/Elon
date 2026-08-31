@@ -37,6 +37,69 @@ class ChatGptWebVerificationEvidenceStoreTest {
     }
 
     @Test
+    fun parsesOnlyKnownPositiveContractRevisions() {
+        val knownCase = ChatGptWebFeatureBaseline.evidenceCaseIds().first()
+        val revisions = ChatGptWebVerificationEvidenceStore.currentContractRevisions(
+            org.json.JSONObject()
+                .put(knownCase, 2)
+                .put("unknown/case", 3)
+                .put("safe/session_recovery", 0)
+                .toString(),
+        )
+
+        assertEquals(mapOf(knownCase to 2), revisions)
+        assertTrue(ChatGptWebVerificationEvidenceStore.currentContractRevisions("bad").isEmpty())
+    }
+
+    @Test
+    fun legacyEvidenceSurvivesImplementationDriftUntilItsContractChanges() {
+        val caseId = "safe/session_recovery"
+        val oldHash = "a".repeat(64)
+        val raw = evidenceRecord("elon.chatgpt_web.verification_evidence_record.v1", caseId, oldHash)
+
+        val sameContract = ChatGptWebVerificationEvidenceStore.parseRecord(
+            raw,
+            caseId,
+            "b".repeat(64),
+            currentContractRevision = 1,
+        )!!
+        val changedContract = ChatGptWebVerificationEvidenceStore.parseRecord(
+            raw,
+            caseId,
+            "b".repeat(64),
+            currentContractRevision = 2,
+        )!!
+
+        assertTrue(sameContract.current)
+        assertFalse(sameContract.implementationCurrent)
+        assertEquals(1, sameContract.contractRevision)
+        assertFalse(changedContract.current)
+    }
+
+    @Test
+    fun versionedEvidenceRequiresItsRecordedContractRevision() {
+        val caseId = "safe/session_recovery"
+        val hash = "c".repeat(64)
+        val raw = evidenceRecord(
+            "elon.chatgpt_web.verification_evidence_record.v2",
+            caseId,
+            hash,
+            contractRevision = 3,
+        )
+
+        val record = ChatGptWebVerificationEvidenceStore.parseRecord(
+            raw,
+            caseId,
+            hash,
+            currentContractRevision = 3,
+        )!!
+
+        assertTrue(record.current)
+        assertTrue(record.implementationCurrent)
+        assertEquals(3, record.contractRevision)
+    }
+
+    @Test
     fun snapshotReportsOnlyStructuralEvidenceAndCurrentCases() {
         val caseId = "safe/session_recovery"
         val currentHash = "c".repeat(64)
@@ -57,13 +120,32 @@ class ChatGptWebVerificationEvidenceStoreTest {
 
         val json = snapshot.toJson()
 
-        assertEquals("elon.chatgpt_web.verification_evidence.v1", json.getString("schema"))
+        assertEquals("elon.chatgpt_web.verification_evidence.v2", json.getString("schema"))
+        assertEquals("contract_revision", json.getString("current_basis"))
         assertEquals(1, json.getInt("registered_case_count"))
         assertEquals(1, json.getInt("current_case_count"))
+        assertEquals(1, json.getInt("implementation_current_case_count"))
+        assertEquals(0, json.getInt("implementation_drift_case_count"))
         assertEquals(caseId, json.getJSONArray("current_case_ids").getString(0))
         val serialized = json.toString()
         assertFalse(serialized.contains("cookie", ignoreCase = true))
         assertFalse(serialized.contains("conversation", ignoreCase = true))
         assertFalse(serialized.contains("account", ignoreCase = true))
     }
+
+    private fun evidenceRecord(
+        schema: String,
+        caseId: String,
+        inputSha256: String,
+        contractRevision: Int? = null,
+    ): String = org.json.JSONObject()
+        .put("schema", schema)
+        .put("case_id", caseId)
+        .put("input_sha256", inputSha256)
+        .put("contract_revision", contractRevision ?: org.json.JSONObject.NULL)
+        .put("adapter_version", 1)
+        .put("apk_version_name", "test")
+        .put("apk_version_code", 1)
+        .put("recorded_at_ms", 1L)
+        .toString()
 }

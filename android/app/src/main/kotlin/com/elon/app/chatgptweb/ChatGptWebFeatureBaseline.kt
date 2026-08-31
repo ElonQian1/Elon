@@ -311,9 +311,9 @@ internal object ChatGptWebFeatureBaseline {
             )
         }
         val gap = if (record == null) {
-            "device_acceptance_not_recorded_for_current_case_input"
+            "device_acceptance_not_recorded_for_current_case_contract"
         } else {
-            "verification_case_inputs_changed_since_device_acceptance"
+            "verification_case_contract_changed_since_device_acceptance"
         }
         return copy(
             verificationStatus = if (acceptance == Acceptance.USER_DRIVEN_DEVICE) {
