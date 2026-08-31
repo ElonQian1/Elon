@@ -88,6 +88,10 @@ pub(super) const PROJECTOR_SOURCE_SCOPE_V1: &[(&str, &str)] = &[
         include_str!("runner_admission/map_program.rs"),
     ),
     (
+        "dynamic_quotient/runner_admission/map_program/request_budget.rs",
+        include_str!("runner_admission/map_program/request_budget.rs"),
+    ),
+    (
         "dynamic_quotient/runner_admission/lock.rs",
         include_str!("runner_admission/lock.rs"),
     ),

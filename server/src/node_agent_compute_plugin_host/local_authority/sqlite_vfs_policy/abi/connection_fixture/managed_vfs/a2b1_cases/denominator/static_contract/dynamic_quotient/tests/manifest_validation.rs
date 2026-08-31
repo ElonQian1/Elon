@@ -186,6 +186,7 @@ fn projector_provenance_binds_typed_descriptor_producers_and_wiring() {
         "dynamic_quotient/runner_admission/canonical.rs",
         "dynamic_quotient/runner_admission/map.rs",
         "dynamic_quotient/runner_admission/map_program.rs",
+        "dynamic_quotient/runner_admission/map_program/request_budget.rs",
         "dynamic_quotient/runner_admission/lock.rs",
         "managed_vfs/a2_dynamic_evidence/child.rs",
         "managed_vfs/a2_dynamic_evidence/child/payload.rs",
