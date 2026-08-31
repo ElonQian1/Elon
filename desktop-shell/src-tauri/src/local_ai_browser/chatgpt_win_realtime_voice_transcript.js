@@ -40,18 +40,51 @@
   let acceptedEventCount = 0;
   let snapshotTimer = 0;
   let stateTimer = 0;
+  let managedState = Object.freeze({
+    phase: 'idle', active: false, microphoneActive: false, remoteAudio: false,
+    muted: false, routeBound: false, fallbackCode: '', revision: 0,
+  });
 
   function structuralState() {
     return Object.freeze({
-      version: 1,
-      active: connectedChannels.size > 0,
+      version: 2,
+      active: connectedChannels.size > 0 || managedState.active,
       observedChannelCount: openChannels.size,
       openChannelCount: connectedChannels.size,
       observedFrameCount,
       acceptedEventCount,
       streamCount: streams.size,
       revision,
+      managedPhase: managedState.phase,
+      managedActive: managedState.active,
+      microphoneActive: managedState.microphoneActive,
+      remoteAudio: managedState.remoteAudio,
+      muted: managedState.muted,
+      routeBound: managedState.routeBound,
+      fallbackCode: managedState.fallbackCode,
+      lifecycleRevision: managedState.revision,
     });
+  }
+
+  function updateManagedState(value) {
+    const source = value && typeof value === 'object' ? value : {};
+    const phase = typeof source.phase === 'string' && /^[a-z_]{2,40}$/.test(source.phase)
+      ? source.phase : 'failed';
+    const fallbackCode = typeof source.fallbackCode === 'string' &&
+      /^[a-z0-9_]{1,80}$/.test(source.fallbackCode) ? source.fallbackCode : '';
+    managedState = Object.freeze({
+      phase,
+      active: source.active === true,
+      microphoneActive: source.microphoneActive === true,
+      remoteAudio: source.remoteAudio === true,
+      muted: source.muted === true,
+      routeBound: source.routeBound === true,
+      fallbackCode,
+      revision: Number.isInteger(source.revision) && source.revision >= 0
+        ? Math.min(source.revision, 1_000_000_000) : managedState.revision + 1,
+    });
+    scheduleStructuralState();
+    return structuralState();
   }
 
   function emitStructuralState() {
@@ -457,12 +490,13 @@
   wrapPeerConnection('RTCPeerConnection');
   wrapPeerConnection('webkitRTCPeerConnection');
   root.__elonWinChatGptRealtimeVoiceTranscript = Object.freeze({
-    version: 1,
+    version: 2,
     acceptPayload,
     decodePayload,
     hookPeer,
     mergeMessageWindow,
     reset,
+    updateManagedState,
     status() {
       return structuralState();
     },

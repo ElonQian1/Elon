@@ -38,6 +38,7 @@ function harness({ microphoneDenied = false } = {}) {
   let relayResult = null
   let armedOffer = ''
   let transcriptHookCount = 0
+  const managedStates = []
   let remoteAnswer = ''
   let activePeer = null
 
@@ -130,6 +131,7 @@ function harness({ microphoneDenied = false } = {}) {
     __elonChatGptPrivateVoiceRelay: relay,
     __elonWinChatGptRealtimeVoiceTranscript: {
       hookPeer(peer) { transcriptHookCount += 1; return peer },
+      updateManagedState(state) { managedStates.push(JSON.parse(JSON.stringify(state))); return state },
     },
     __elonChatGptAdapterVersion: 206,
     __elonChatGptDocumentToken: 'doc_win_voice_contract',
@@ -166,6 +168,7 @@ function harness({ microphoneDenied = false } = {}) {
     get armedOffer() { return armedOffer },
     get remoteAnswer() { return remoteAnswer },
     get transcriptHookCount() { return transcriptHookCount },
+    get managedStates() { return managedStates },
     get activePeer() { return activePeer },
     runTimer(delay) {
       const entry = [...timers.entries()].find(([, value]) => value.delay === delay)
@@ -207,13 +210,22 @@ async function main() {
   assert.equal(active.remoteAnswer, answer)
   active.activePeer.connectionState = 'connected'
   active.activePeer.emit('connectionstatechange')
-  assert.deepEqual(
-    JSON.parse(JSON.stringify(active.context.__elonWinChatGptManagedVoicePeer.status())),
-    { version: 1, phase: 'active', active: true, routeBound: true },
-  )
+  const activeStatus = JSON.parse(JSON.stringify(active.context.__elonWinChatGptManagedVoicePeer.status()))
+  assert.equal(activeStatus.version, 2)
+  assert.equal(activeStatus.phase, 'active')
+  assert.equal(activeStatus.active, true)
+  assert.equal(activeStatus.microphoneActive, true)
+  assert.equal(activeStatus.remoteAudio, false)
+  assert.equal(activeStatus.muted, false)
+  assert.equal(activeStatus.routeBound, true)
+  assert.equal(activeStatus.fallbackCode, '')
+  assert.ok(activeStatus.revision >= 8)
+  assert.equal(active.managedStates.at(-1).phase, 'active')
+  assert.equal(active.managedStates.at(-1).microphoneActive, true)
 
   active.context.__elonChatGptBridge.command(command('control_managed_realtime_voice', 'mute'))
   assert.equal(active.tracks[0].enabled, false)
+  assert.equal(active.managedStates.at(-1).muted, true)
   active.context.__elonChatGptBridge.command(command('control_managed_realtime_voice', 'unmute'))
   assert.equal(active.tracks[0].enabled, true)
   active.context.__elonChatGptBridge.command(command('control_managed_realtime_voice', 'end'))
@@ -231,12 +243,35 @@ async function main() {
   assert.equal(routeBound.activePeer.closed, true)
   assert.equal(routeBound.context.__elonWinChatGptManagedVoicePeer.status().phase, 'closed')
 
+  const assignedRoute = harness()
+  assignedRoute.context.location.pathname = '/'
+  assignedRoute.context.__elonChatGptBridge.command(command('prepare_realtime_voice'))
+  await flush()
+  assignedRoute.context.location.pathname = '/c/voice-assigned'
+  assignedRoute.runTimer(500)
+  assert.equal(assignedRoute.activePeer.closed, false)
+  assert.equal(assignedRoute.context.__elonWinChatGptManagedVoicePeer.status().routeBound, true)
+
+  const stalled = harness()
+  stalled.context.__elonChatGptBridge.command(command('prepare_realtime_voice'))
+  await flush()
+  stalled.setRelayResult(JSON.stringify({ status: 'ok', answer }))
+  stalled.runTimer(120)
+  await flush()
+  stalled.runTimer(18000)
+  assert.equal(stalled.context.__elonWinChatGptManagedVoicePeer.status().phase, 'failed')
+  assert.equal(stalled.context.__elonWinChatGptManagedVoicePeer.status().fallbackCode, 'connection_timeout')
+  assert.equal(stalled.tracks[0].stopped, true)
+
   const denied = harness({ microphoneDenied: true })
   denied.context.__elonChatGptBridge.command(command('prepare_realtime_voice'))
   await flush()
   assert.equal(denied.posted.at(-1).ok, false)
   assert.match(denied.posted.at(-1).detail, /继续使用官网语音/)
   assert.equal(denied.context.__elonWinChatGptManagedVoicePeer.status().phase, 'failed')
+  assert.equal(denied.context.__elonWinChatGptManagedVoicePeer.status().fallbackCode, 'microphone_permission_required')
+  assert.equal(denied.managedStates.at(-1).microphoneActive, false)
+  assert.doesNotMatch(JSON.stringify(denied.managedStates), /offer|answer|authorization|credential/i)
 
   console.log('PASS ChatGPT Win-managed WebView2 realtime voice relay')
 }

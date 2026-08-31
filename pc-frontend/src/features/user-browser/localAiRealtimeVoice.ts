@@ -1,4 +1,4 @@
-import type { LocalAiRealtimeVoiceStateEvent } from './localAiBrowserApi'
+import type { LocalAiRealtimeVoiceStateEvent } from './localAiRealtimeVoiceEvent'
 import type { LocalAiUiControl } from './localAiBrowserProtocol'
 
 export type LocalAiRealtimeVoiceAction = 'start' | 'mute' | 'unmute' | 'end'
@@ -31,11 +31,43 @@ export function readLocalAiRealtimeVoicePrivateState(
   value: LocalAiRealtimeVoiceStateEvent | Record<string, unknown> | null | undefined,
 ) {
   if (!value || value.type !== 'realtime_voice_state' || value.version !== 1) {
-    return { observed: false, active: false }
+    if (!value || value.type !== 'realtime_voice_state' || value.version !== 2) {
+      return emptyPrivateState()
+    }
   }
   const openChannelCount = Number(value.openChannelCount)
+  const managedPhase = typeof value.managedPhase === 'string' && MANAGED_PHASES.has(value.managedPhase)
+    ? value.managedPhase : 'idle'
   return {
     observed: Number.isInteger(openChannelCount) && openChannelCount >= 0,
-    active: value.active === true && openChannelCount > 0,
+    active: openChannelCount > 0,
+    managedObserved: value.version >= 2,
+    managedPhase,
+    managedActive: value.managedActive === true && managedPhase === 'active',
+    microphoneActive: value.microphoneActive === true,
+    remoteAudio: value.remoteAudio === true,
+    muted: value.muted === true,
+    routeBound: value.routeBound === true,
+    fallbackCode: typeof value.fallbackCode === 'string' ? value.fallbackCode : '',
+  }
+}
+
+const MANAGED_PHASES = new Set([
+  'idle', 'requesting_microphone', 'creating_offer', 'armed', 'applying_answer',
+  'connecting', 'active', 'failed', 'closed',
+])
+
+function emptyPrivateState() {
+  return {
+    observed: false,
+    active: false,
+    managedObserved: false,
+    managedPhase: 'idle',
+    managedActive: false,
+    microphoneActive: false,
+    remoteAudio: false,
+    muted: false,
+    routeBound: false,
+    fallbackCode: '',
   }
 }

@@ -85,6 +85,7 @@ export default function useLocalAiRealtimeVoiceControl(web: AiWebChatBackend) {
       controlsTruncated: manifest?.controlsTruncated === true,
       voiceActive: voice.active,
       privateDataChannelActive: privateStateRef.current.active,
+      managedActive: privateStateRef.current.managedActive,
     })) return false
     activationGeneration.current += 1
     window.clearTimeout(activationTimer.current)
@@ -131,6 +132,7 @@ export default function useLocalAiRealtimeVoiceControl(web: AiWebChatBackend) {
       controlsTruncated: manifest?.controlsTruncated === true,
       voiceActive: voice.active,
       privateDataChannelActive: privateStateRef.current.active,
+      managedActive: privateStateRef.current.managedActive,
     })) {
       setActivationStatus('active')
     } else if (activationStatus === 'active'
@@ -186,6 +188,7 @@ export default function useLocalAiRealtimeVoiceControl(web: AiWebChatBackend) {
       controlsTruncated: manifest?.controlsTruncated === true,
       voiceActive: voice.active,
       privateDataChannelActive: privateStateRef.current.active,
+      managedActive: privateStateRef.current.managedActive,
     })
     const endedOnOfficialSurface = officialVoiceActive.current
       && !current
@@ -214,6 +217,7 @@ export default function useLocalAiRealtimeVoiceControl(web: AiWebChatBackend) {
         startAvailable: Boolean(voice.start),
         voiceActive: voice.active,
         privateDataChannelActive: privateStateRef.current.active,
+        managedActive: privateStateRef.current.managedActive,
       },
       Date.now(),
     )
@@ -331,5 +335,11 @@ export default function useLocalAiRealtimeVoiceControl(web: AiWebChatBackend) {
     transcriptSyncing,
     hangupStatus,
     privateDataChannelActive: privateStateRef.current.active,
+    managedVoiceActive: privateStateRef.current.managedActive,
+    managedVoicePhase: privateStateRef.current.managedPhase,
+    managedMicrophoneActive: privateStateRef.current.microphoneActive,
+    managedRemoteAudio: privateStateRef.current.remoteAudio,
+    managedMuted: privateStateRef.current.muted,
+    managedFallbackCode: privateStateRef.current.fallbackCode,
   }
 }

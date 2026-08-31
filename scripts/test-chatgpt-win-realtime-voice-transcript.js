@@ -78,7 +78,7 @@ vm.runInContext(deltaSource, context, { filename: 'chatgpt_win_realtime_voice_js
 vm.runInContext(transcriptSource, context, { filename: 'chatgpt_win_realtime_voice_transcript.js' });
 
 const runtime = windowValue.__elonWinChatGptRealtimeVoiceTranscript;
-assert.equal(runtime.version, 1);
+assert.equal(runtime.version, 2);
 assert.match(windowValue.__elonChatGptMessages.capabilities().join(','), /realtime_voice_private_transcript/);
 
 const privateMessage = (text, status) => ({
@@ -142,6 +142,19 @@ assert.equal(runtime.acceptPayload('x'.repeat(256 * 1024 + 1)), false);
 const structuralStatus = JSON.stringify(runtime.status());
 assert.doesNotMatch(structuralStatus, /你好|语音问题/);
 assert.equal(runtime.status().acceptedEventCount, 5);
+runtime.updateManagedState({
+  phase: 'active', active: true, microphoneActive: true, remoteAudio: true,
+  muted: false, routeBound: true, fallbackCode: '', revision: 4,
+});
+assert.equal(runtime.status().version, 2);
+assert.equal(runtime.status().managedActive, true);
+assert.equal(runtime.status().microphoneActive, true);
+assert.equal(runtime.status().remoteAudio, true);
+assert.doesNotMatch(JSON.stringify(runtime.status()), /credential|authorization|sdp/i);
+runtime.updateManagedState({
+  phase: 'closed', active: false, microphoneActive: false, remoteAudio: false,
+  muted: false, routeBound: false, fallbackCode: '', revision: 5,
+});
 
 const pollutionDecoder = windowValue.__elonWinChatGptRealtimeVoiceJsonDelta.create();
 assert.equal(pollutionDecoder.apply({ c: 0, o: 'add', p: '/__proto__/polluted', v: true }), null);

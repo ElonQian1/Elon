@@ -235,6 +235,13 @@ const CATALOG: Record<string, CapabilityDefinition[]> = {
       androidParityIds: ['android_chatgpt_web_private_voice_native_relay_v1'],
     },
     {
+      id: 'win_chatgpt_realtime_voice_lifecycle_isolation_v2',
+      label: 'Win 托管语音会话隔离与结构化生命周期',
+      requestMode: 'route_migration_aware_managed_peer_structural_state_v2',
+      fallback: 'official_voice_with_bounded_connection_timeout',
+      requiredActions: ['prepare_realtime_voice', 'control_managed_realtime_voice'],
+    },
+    {
       id: 'win_chatgpt_attachment_transport_reconciliation_v1',
       label: '官网附件上传完成态对账',
       requestMode: 'armed_same_origin_structural_upload_lifecycle_observer',

@@ -36,8 +36,10 @@ fn exposes_readiness_without_identity_or_page_content() {
         "local-ai-chatgpt-owner-secret",
         "realtime_voice_state",
         json!({
-            "type":"realtime_voice_state","version":1,"active":true,
+            "type":"realtime_voice_state","version":2,"active":true,
             "observedChannelCount":2,"openChannelCount":1,"acceptedEventCount":7,
+            "managedPhase":"active","managedActive":true,"microphoneActive":true,
+            "remoteAudio":true,"muted":false,"routeBound":true,"lifecycleRevision":9,
             "authorization":"private voice credential"
         }),
     );
@@ -100,6 +102,9 @@ fn exposes_readiness_without_identity_or_page_content() {
     );
     assert_eq!(diagnostic["realtime_voice"]["active"], true);
     assert_eq!(diagnostic["realtime_voice"]["acceptedEventCount"], 7);
+    assert_eq!(diagnostic["realtime_voice"]["managedPhase"], "active");
+    assert_eq!(diagnostic["realtime_voice"]["managedActive"], true);
+    assert_eq!(diagnostic["realtime_voice"]["remoteAudio"], true);
     assert_eq!(diagnostic["attachment_transport"]["state"], "completed");
     assert_eq!(diagnostic["attachment_transport"]["completedCount"], 1);
     assert_eq!(diagnostic["last_error_code"], "adapter_bootstrap_failed");

@@ -24,6 +24,47 @@ type Panel = 'model' | 'tools' | 'features' | null
 type ComposerSection = Exclude<Panel, 'features' | null>
 type CachedMenu<T> = { options: T[]; updatedAt: number }
 
+function realtimeVoiceStatusText(
+  control: ReturnType<typeof useLocalAiRealtimeVoiceControl>,
+  providerName: string,
+) {
+  if (control.hangupStatus === 'confirming') return '正在确认官网语音已结束…'
+  if (control.hangupStatus === 'unconfirmed') {
+    return '官网语音可能仍在通话，请再次挂断或打开官方页确认'
+  }
+  if (control.activationStatus === 'confirming') {
+    if (control.managedVoicePhase === 'requesting_microphone') return '正在请求麦克风权限…'
+    if (control.managedVoicePhase === 'creating_offer' || control.managedVoicePhase === 'armed'
+      || control.managedVoicePhase === 'applying_answer' || control.managedVoicePhase === 'connecting') {
+      return '正在建立 Win 托管实时语音…'
+    }
+    return '正在确认官网实时语音已连接…'
+  }
+  if (control.activationStatus === 'unconfirmed') {
+    return control.managedFallbackCode
+      ? 'Win 托管语音已自动回退；可继续使用官网语音或再次尝试'
+      : '官网语音连接尚未确认，可再次尝试或显示官方页'
+  }
+  if (control.activationStatus === 'active') {
+    if (control.managedFallbackCode && !control.managedVoiceActive) {
+      return '官网语音已连接 · Win 托管增强已自动回退'
+    }
+    if (control.managedVoiceActive) {
+      if (control.managedMuted) return 'Win 托管实时语音已连接 · 麦克风已静音'
+      if (control.privateDataChannelActive && control.managedRemoteAudio) {
+        return 'Win 托管实时语音已连接 · 音频与私有转写正常'
+      }
+      if (control.privateDataChannelActive) return 'Win 托管实时语音已连接 · 私有转写正常'
+      return 'Win 托管实时语音已连接'
+    }
+    return control.privateDataChannelActive
+      ? '官网实时语音已连接 · 私有转写通道正常'
+      : '官网实时语音已连接'
+  }
+  if (control.transcriptSyncing) return '正在同步语音转写与回复…'
+  return `${providerName} 官方网页会话`
+}
+
 export default function AiWebComposerControls({ web }: { web: AiWebChatBackend }) {
   const [panel, setPanel] = useState<Panel>(null)
   const busy = Boolean(web.controller.busyAction)
@@ -55,6 +96,7 @@ export default function AiWebComposerControls({ web }: { web: AiWebChatBackend }
     : null
   const attachmentState = attachmentTransport?.state ?? null
   const attachmentSequence = attachmentTransport?.sequence ?? 0
+  const voiceStatusText = realtimeVoiceStatusText(realtimeVoiceControl, web.provider.displayName)
 
   useEffect(() => {
     if (attachmentState === 'armed') {
@@ -254,21 +296,7 @@ export default function AiWebComposerControls({ web }: { web: AiWebChatBackend }
               ? `附件已上传${attachmentTransport && attachmentTransport.completedCount > 1 ? ` ${attachmentTransport.completedCount} 个` : ''}`
               : attachmentState === 'failed'
                 ? '附件上传失败，可重试或显示官方页检查'
-                : realtimeVoiceControl.hangupStatus === 'confirming'
-          ? '正在确认官网语音已结束…'
-            : realtimeVoiceControl.hangupStatus === 'unconfirmed'
-              ? '官网语音可能仍在通话，请再次挂断或打开官方页确认'
-            : realtimeVoiceControl.activationStatus === 'confirming'
-              ? '正在确认官网实时语音已连接…'
-            : realtimeVoiceControl.activationStatus === 'unconfirmed'
-              ? '官网语音连接尚未确认，可再次尝试或显示官方页'
-            : realtimeVoiceControl.activationStatus === 'active'
-              ? realtimeVoiceControl.privateDataChannelActive
-                ? '官网实时语音已连接 · 私有转写通道正常'
-                : '官网实时语音已连接'
-            : realtimeVoiceControl.transcriptSyncing
-              ? '正在同步语音转写与回复…'
-              : `${web.provider.displayName} 官方网页会话`}</span>
+                : voiceStatusText}</span>
       </div>
 
       {snapshot?.attachments?.length ? (

@@ -10,6 +10,7 @@ import {
   requiredLocalAiAdapterVersion,
 } from './localAiAdapterCompatibility'
 import { waitForLocalAiAdapterReceipts } from './localAiAdapterResultWaiter'
+import type { LocalAiRealtimeVoiceStateEvent } from './localAiRealtimeVoiceEvent'
 import type {
   LocalAiAttachment,
   LocalAiComposerControlsSnapshot,
@@ -208,18 +209,6 @@ export interface LocalAiCommandResult {
   ok: boolean
   detail: string
   requestId?: string | null
-}
-
-export interface LocalAiRealtimeVoiceStateEvent {
-  type: 'realtime_voice_state'
-  version: number
-  active: boolean
-  observedChannelCount: number
-  openChannelCount: number
-  observedFrameCount: number
-  acceptedEventCount: number
-  streamCount: number
-  revision: number
 }
 
 export interface LocalAiAttachmentTransportEvent {

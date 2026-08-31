@@ -7,12 +7,13 @@ export interface LocalAiRealtimeVoiceActivationEvidence {
   controlsTruncated: boolean
   voiceActive: boolean
   privateDataChannelActive: boolean
+  managedActive: boolean
 }
 
 export function localAiRealtimeVoiceActivationConfirmed(
   evidence: LocalAiRealtimeVoiceActivationEvidence,
 ) {
-  return evidence.privateDataChannelActive || (evidence.manifestHealthy
+  return evidence.managedActive || evidence.privateDataChannelActive || (evidence.manifestHealthy
     && !evidence.controlsTruncated
     && evidence.voiceActive)
 }

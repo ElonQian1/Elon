@@ -9,6 +9,7 @@ export interface LocalAiRealtimeVoiceHangupEvidence {
   startAvailable: boolean
   voiceActive: boolean
   privateDataChannelActive: boolean
+  managedActive: boolean
 }
 
 export interface LocalAiRealtimeVoiceHangupObservation {
@@ -31,6 +32,7 @@ export function observeLocalAiRealtimeVoiceHangup(
     && evidence.startAvailable
     && !evidence.voiceActive
     && !evidence.privateDataChannelActive
+    && !evidence.managedActive
   if (!ended) {
     return {
       observation: beginLocalAiRealtimeVoiceHangupObservation(),

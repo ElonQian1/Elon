@@ -198,6 +198,14 @@ every 1.5 seconds, then backs off to about every 6 seconds. The native transcrip
 visible while authoritative snapshots update it. A DOM snapshot is only a sparse watchdog
 about every 12 seconds and an exit fallback; failure emits no unsupported-capability error.
 
+The Win managed WebView2 peer now publishes a route-bound structural lifecycle version 2.
+A blank-chat `/` route may adopt the first official `/c/{id}` assigned during voice startup,
+while a later cross-conversation route still closes the peer. Microphone acquisition, offer,
+relay, answer, connection, remote-audio, mute, fallback, and close state can drive the native
+control surface without retaining SDP, ICE, credentials, headers, audio, or transcript text.
+A relay that answers but never connects is released after a bounded timeout and the official
+page-created voice path remains available.
+
 The native realtime peer also consumes the official WebRTC data channel directly for
 allowlisted user and assistant transcript delta/final events. Bounded UTF-8 JSON frames are
 accepted whether WebRTC marks them as text or binary. Bounded in-memory events

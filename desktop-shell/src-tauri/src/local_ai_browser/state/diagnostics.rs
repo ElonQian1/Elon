@@ -94,6 +94,19 @@ pub(super) fn realtime_voice_state(event: Option<&Value>) -> Value {
             .unwrap_or_default()
             .min(max)
     };
+    let identifier = |key: &str, max: usize| {
+        field(key)
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .chars()
+            .filter(|character| {
+                character.is_ascii_lowercase()
+                    || character.is_ascii_digit()
+                    || *character == '_'
+            })
+            .take(max)
+            .collect::<String>()
+    };
     if event.and_then(Value::as_object).is_none() {
         return Value::Null;
     }
@@ -107,6 +120,14 @@ pub(super) fn realtime_voice_state(event: Option<&Value>) -> Value {
         "acceptedEventCount": bounded("acceptedEventCount", 1_000_000_000),
         "streamCount": bounded("streamCount", 32),
         "revision": bounded("revision", 1_000_000_000),
+        "managedPhase": identifier("managedPhase", 40),
+        "managedActive": field("managedActive").and_then(Value::as_bool).unwrap_or(false),
+        "microphoneActive": field("microphoneActive").and_then(Value::as_bool).unwrap_or(false),
+        "remoteAudio": field("remoteAudio").and_then(Value::as_bool).unwrap_or(false),
+        "muted": field("muted").and_then(Value::as_bool).unwrap_or(false),
+        "routeBound": field("routeBound").and_then(Value::as_bool).unwrap_or(false),
+        "fallbackCode": identifier("fallbackCode", 80),
+        "lifecycleRevision": bounded("lifecycleRevision", 1_000_000_000),
     })
 }
 

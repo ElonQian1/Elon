@@ -131,6 +131,8 @@ assert.match(controls, /realtimeVoiceControl\.run\('end'/)
 assert.match(controls, /'正在连接' : '实时语音'/)
 assert.match(controls, /activationStatus === 'confirming'/)
 assert.match(controls, /官网实时语音已连接/)
+assert.match(controls, /Win 托管实时语音已连接/)
+assert.match(controls, /Win 托管语音已自动回退/)
 assert.match(controls, /正在确认挂断/)
 assert.match(controls, /再次挂断/)
 assert.match(controls, /'结束语音'/)
@@ -249,12 +251,31 @@ assert.equal(genericDialog.end, undefined)
 assert.equal(genericDialog.active, false)
 assert.deepEqual(realtimeVoice.readLocalAiRealtimeVoicePrivateState({
   type: 'realtime_voice_state', version: 1, active: true, openChannelCount: 1,
-}), { observed: true, active: true })
+}), {
+  observed: true, active: true, managedObserved: false, managedPhase: 'idle',
+  managedActive: false, microphoneActive: false, remoteAudio: false, muted: false,
+  routeBound: false, fallbackCode: '',
+})
 assert.deepEqual(realtimeVoice.readLocalAiRealtimeVoicePrivateState({
   type: 'realtime_voice_state', version: 1, active: false, openChannelCount: 0,
-}), { observed: true, active: false })
+}), {
+  observed: true, active: false, managedObserved: false, managedPhase: 'idle',
+  managedActive: false, microphoneActive: false, remoteAudio: false, muted: false,
+  routeBound: false, fallbackCode: '',
+})
+assert.deepEqual(realtimeVoice.readLocalAiRealtimeVoicePrivateState({
+  type: 'realtime_voice_state', version: 2, active: true, openChannelCount: 0,
+  managedPhase: 'active', managedActive: true, microphoneActive: true,
+  remoteAudio: true, muted: false, routeBound: true, fallbackCode: '',
+}), {
+  observed: true, active: false, managedObserved: true, managedPhase: 'active',
+  managedActive: true, microphoneActive: true, remoteAudio: true, muted: false,
+  routeBound: true, fallbackCode: '',
+})
 assert.deepEqual(realtimeVoice.readLocalAiRealtimeVoicePrivateState({ type: 'other' }), {
-  observed: false, active: false,
+  observed: false, active: false, managedObserved: false, managedPhase: 'idle',
+  managedActive: false, microphoneActive: false, remoteAudio: false, muted: false,
+  routeBound: false, fallbackCode: '',
 })
 
 const hangup = loadTypeScriptModule(realtimeVoiceHangupPath)
@@ -265,16 +286,19 @@ let hangupObservation = hangup.beginLocalAiRealtimeVoiceHangupObservation()
 let hangupResult = hangup.observeLocalAiRealtimeVoiceHangup(hangupObservation, {
   conversationPage: true, manifestHealthy: true, controlsTruncated: false,
   startAvailable: true, voiceActive: false, privateDataChannelActive: false,
+  managedActive: false,
 }, 1_000)
 assert.equal(hangupResult.confirmed, false)
 hangupResult = hangup.observeLocalAiRealtimeVoiceHangup(hangupResult.observation, {
   conversationPage: true, manifestHealthy: true, controlsTruncated: false,
   startAvailable: true, voiceActive: false, privateDataChannelActive: false,
+  managedActive: false,
 }, 3_000)
 assert.equal(hangupResult.confirmed, true)
 hangupResult = hangup.observeLocalAiRealtimeVoiceHangup(hangupResult.observation, {
   conversationPage: true, manifestHealthy: false, controlsTruncated: false,
   startAvailable: true, voiceActive: false, privateDataChannelActive: false,
+  managedActive: false,
 }, 4_000)
 assert.equal(hangupResult.confirmed, false)
 assert.deepEqual(hangupResult.observation, { stableSinceMs: 0, stableObservations: 0 })
@@ -287,27 +311,42 @@ assert.deepEqual(activation.LOCAL_AI_REALTIME_VOICE_ACTIVATION_WATCHDOG_DELAYS_M
 ])
 assert.equal(activation.localAiRealtimeVoiceActivationConfirmed({
   manifestHealthy: true, controlsTruncated: false, voiceActive: true,
-  privateDataChannelActive: false,
+  privateDataChannelActive: false, managedActive: false,
 }), true)
 assert.equal(activation.localAiRealtimeVoiceActivationConfirmed({
   manifestHealthy: false, controlsTruncated: false, voiceActive: true,
-  privateDataChannelActive: false,
+  privateDataChannelActive: false, managedActive: false,
 }), false)
 assert.equal(activation.localAiRealtimeVoiceActivationConfirmed({
   manifestHealthy: true, controlsTruncated: true, voiceActive: true,
-  privateDataChannelActive: false,
+  privateDataChannelActive: false, managedActive: false,
 }), false)
 assert.equal(activation.localAiRealtimeVoiceActivationConfirmed({
   manifestHealthy: false, controlsTruncated: true, voiceActive: false,
-  privateDataChannelActive: true,
+  privateDataChannelActive: true, managedActive: false,
+}), true)
+assert.equal(activation.localAiRealtimeVoiceActivationConfirmed({
+  manifestHealthy: false, controlsTruncated: true, voiceActive: false,
+  privateDataChannelActive: false, managedActive: true,
 }), true)
 hangupResult = hangup.observeLocalAiRealtimeVoiceHangup(
   hangup.beginLocalAiRealtimeVoiceHangupObservation(),
   {
     conversationPage: true, manifestHealthy: true, controlsTruncated: false,
     startAvailable: true, voiceActive: false, privateDataChannelActive: true,
+    managedActive: false,
   },
   10_000,
+)
+assert.equal(hangupResult.confirmed, false)
+hangupResult = hangup.observeLocalAiRealtimeVoiceHangup(
+  hangup.beginLocalAiRealtimeVoiceHangupObservation(),
+  {
+    conversationPage: true, manifestHealthy: true, controlsTruncated: false,
+    startAvailable: true, voiceActive: false, privateDataChannelActive: false,
+    managedActive: true,
+  },
+  12_000,
 )
 assert.equal(hangupResult.confirmed, false)
 assert.equal(activation.shouldRefreshLocalAiRealtimeVoiceActivationControls(0), true)
