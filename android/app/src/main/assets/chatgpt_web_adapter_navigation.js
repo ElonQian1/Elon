@@ -152,7 +152,12 @@
 
   function requestList(emitEvent, result) {
     const existing = emitSnapshot(emitEvent);
-    if (existing.length) return result('list_navigation', true, '');
+    const hasVisibleOfficialFeature = lastFeatures.some((feature) =>
+      feature.node && isVisible(feature.node)
+    );
+    if (existing.length && hasVisibleOfficialFeature) {
+      return result('list_navigation', true, '');
+    }
     const open = sidebarButton(true);
     if (open) {
       if (!emitTouchRequest('list_navigation', open, emitEvent)) {

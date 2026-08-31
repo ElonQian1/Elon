@@ -45,6 +45,8 @@ class ChatGptWebNavigationContractTest {
         val requestList = adapter.substringAfter("function requestList")
             .substringBefore("function collectList")
         assertTrue(requestList.indexOf("emitSnapshot") < requestList.indexOf("sidebarButton(true)"))
+        assertTrue(requestList.contains("hasVisibleOfficialFeature"))
+        assertTrue(requestList.contains("feature.node && isVisible(feature.node)"))
         listOf("document.cookie", "fetch(", "XMLHttpRequest", "WebSocket", "Authorization").forEach {
             assertFalse("navigation adapter must not contain $it", adapter.contains(it))
         }

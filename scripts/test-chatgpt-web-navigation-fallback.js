@@ -12,13 +12,24 @@ global.location = {
     assignedPath = path;
   }
 };
+const openSidebarButton = {
+  textContent: '',
+  getAttribute(name) {
+    return name === 'aria-label' ? 'Open sidebar' : null;
+  },
+  getBoundingClientRect() {
+    return { left: 8, top: 8, right: 48, bottom: 48, width: 40, height: 40 };
+  }
+};
 global.document = {
-  querySelectorAll() {
-    return [];
+  querySelectorAll(selector) {
+    return selector === 'button' ? [openSidebarButton] : [];
   }
 };
 global.window = {
   __elonChatGptNavigationPolicy: policy,
+  innerHeight: 800,
+  innerWidth: 400,
   getComputedStyle() {
     return { display: 'block', visibility: 'visible' };
   }
@@ -30,6 +41,14 @@ const events = [];
 const results = [];
 const emitEvent = (event) => events.push(event);
 const result = (action, ok, error) => results.push({ action, ok, error });
+
+window.__elonChatGptNavigation.requestList(emitEvent, result);
+if (!events.some((event) => event.type === 'web_touch_request' && event.purpose === 'list_navigation')) {
+  throw new Error('built-in fallback suppressed the official sidebar trigger');
+}
+if (!results.some((entry) => entry.action === 'list_navigation' && entry.ok)) {
+  throw new Error('official sidebar request did not succeed');
+}
 
 window.__elonChatGptNavigation.collectList(emitEvent, result);
 const snapshot = events.find((event) => event.type === 'navigation_snapshot');
