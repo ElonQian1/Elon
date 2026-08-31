@@ -42,6 +42,7 @@ if ($source.Contains('scripts/chatgpt-web-smoke-*.ps1')) {
 foreach ($forbidden in @(
     'scripts/chatgpt-web-smoke-runtime.ps1',
     'scripts/chatgpt-web-smoke-evidence.ps1',
+    'scripts/chatgpt-web-smoke-composer.ps1',
     'scripts/chatgpt-web-smoke-supervised-runtime.ps1',
     'scripts/chatgpt-web-smoke-conversation-sample.ps1',
     'filesMatching(["scripts/${smokeScript}"])'

@@ -19,13 +19,15 @@ $ErrorActionPreference = "Stop"
 
 $invokeMcp = Join-Path $PSScriptRoot "invoke-apk-mcp.ps1"
 $evidenceHelper = Join-Path $PSScriptRoot "chatgpt-web-smoke-evidence.ps1"
+$composerHelper = Join-Path $PSScriptRoot "chatgpt-web-smoke-composer.ps1"
 $runtimeHelper = Join-Path $PSScriptRoot "chatgpt-web-smoke-runtime.ps1"
-foreach ($helper in @($invokeMcp, $evidenceHelper, $runtimeHelper)) {
+foreach ($helper in @($invokeMcp, $evidenceHelper, $composerHelper, $runtimeHelper)) {
     if (-not (Test-Path -LiteralPath $helper -PathType Leaf)) {
         throw "Missing ChatGPT Web smoke helper: $helper"
     }
 }
 . $evidenceHelper
+. $composerHelper
 . $runtimeHelper
 $ExpectedAdapterVersion = Resolve-ChatGptWebSmokeExpectedAdapterVersion $ExpectedAdapterVersion
 if (-not (Test-Path -LiteralPath $Adb -PathType Leaf)) {
@@ -275,60 +277,29 @@ function Wait-AccountMenuClosed {
     throw "Timed out waiting for the ChatGPT account menu to close."
 }
 
-function Wait-ComposerOptionsReady {
-    param(
-        [Parameter(Mandatory = $true)][ValidateSet("model", "tools")][string]$Section,
-        [Parameter(Mandatory = $true)][long]$AfterMs,
-        [Parameter(Mandatory = $true)][int]$TimeoutSec
-    )
-
-    $deadline = [DateTimeOffset]::UtcNow.AddSeconds($TimeoutSec)
-    $expectedAction = if ($Section -eq "model") { "collect_model_options" } else { "collect_composer_tools" }
-    $lastState = $null
-    do {
-        $lastState = Invoke-ApkMcp -Tool "ui_state"
-        $navigation = Invoke-UiAction -Action "chatgpt_get_navigation" -Arguments @{ section = $Section }
-        $sectionProperty = $navigation.composer_sections.PSObject.Properties[$Section]
-        $options = if ($null -eq $sectionProperty) { @() } else { @($sectionProperty.Value) }
-        $command = $lastState.last_command
-        $freshCollection = $command.action -eq $expectedAction -and
-            $command.ok -eq $true -and
-            [long]$command.observed_at_ms -gt $AfterMs
-        $cachedSnapshot = $navigation.control_ok -eq $true -and $options.Count -gt 0
-        if ($freshCollection -or $cachedSnapshot) {
-            return [pscustomobject]@{
-                command_state = $lastState
-                options = $options
-            }
-        }
-        Start-Sleep -Seconds $PollIntervalSec
-    } while ([DateTimeOffset]::UtcNow -lt $deadline)
-    throw "Timed out waiting for $Section composer options. Last action=$($lastState.last_command.action)."
-}
-
 function Get-ComposerOptions {
     param(
         [Parameter(Mandatory = $true)][ValidateSet("model", "tools")][string]$Section,
         [int]$TimeoutSec = $ReadyTimeoutSec
     )
 
-    $beforeState = Invoke-ApkMcp -Tool "ui_state"
-    $afterMs = [long]$beforeState.last_command.observed_at_ms
-    Invoke-UiAction -Action "chatgpt_list_composer_options" -Arguments @{ section = $Section } | Out-Null
-    return Wait-ComposerOptionsReady -Section $Section -AfterMs $afterMs -TimeoutSec $TimeoutSec
+    Invoke-ChatGptWebSmokeComposerOptions -Section $Section -TimeoutSec $TimeoutSec `
+        -PollIntervalSec $PollIntervalSec `
+        -InvokeAction { param($action, $arguments) Invoke-UiAction -Action $action -Arguments $arguments } `
+        -InvokeUiState { Invoke-ApkMcp -Tool "ui_state" } `
+        -InvokeNavigation {
+            param($section)
+            Invoke-UiAction -Action "chatgpt_get_navigation" -Arguments @{ section = $section }
+        }
 }
 
 function Dismiss-ComposerOptions {
     param([int]$TimeoutSec = $ReadyTimeoutSec)
 
-    $beforeState = Invoke-ApkMcp -Tool "ui_state"
-    $afterMs = [long]$beforeState.last_command.observed_at_ms
-    Invoke-UiAction -Action "chatgpt_dismiss_composer_options" | Out-Null
-    $closed = Wait-CommandResult -Action "dismiss_composer_menu" `
-        -AfterMs $afterMs -TimeoutSec $TimeoutSec
-    if ($closed.last_command.ok -ne $true) {
-        throw "ChatGPT composer menu did not close cleanly."
-    }
+    Close-ChatGptWebSmokeComposerOptions -TimeoutSec $TimeoutSec `
+        -PollIntervalSec $PollIntervalSec `
+        -InvokeAction { param($action, $arguments) Invoke-UiAction -Action $action -Arguments $arguments } `
+        -InvokeUiState { Invoke-ApkMcp -Tool "ui_state" }
 }
 
 function Get-ForeignComposerLabels {

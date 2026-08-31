@@ -2,9 +2,12 @@ $ErrorActionPreference = "Stop"
 
 $sourcePath = Join-Path $PSScriptRoot "smoke-chatgpt-web-apk.ps1"
 $evidencePath = Join-Path $PSScriptRoot "chatgpt-web-smoke-evidence.ps1"
+$composerPath = Join-Path $PSScriptRoot "chatgpt-web-smoke-composer.ps1"
 $source = Get-Content -LiteralPath $sourcePath -Raw
 $evidenceSource = Get-Content -LiteralPath $evidencePath -Raw
+$composerSource = Get-Content -LiteralPath $composerPath -Raw
 . $evidencePath
+. $composerPath
 
 function Assert-Contains {
     param([Parameter(Mandatory = $true)][string]$Needle)
@@ -28,11 +31,8 @@ Assert-Contains 'foreach ($attempt in 1..3)'
 Assert-Contains 'UIAutomator dump failed after 3 attempts.'
 Assert-Contains 'function Wait-AccountMenuReady'
 Assert-Contains 'function Wait-AccountMenuClosed'
-Assert-Contains 'function Wait-ComposerOptionsReady'
+Assert-Contains 'Invoke-ChatGptWebSmokeComposerOptions -Section $Section'
 Assert-Contains 'function Wait-NewConversationReady'
-Assert-Contains '$freshCollection = $command.action -eq $expectedAction'
-Assert-Contains '$cachedSnapshot = $navigation.control_ok -eq $true -and $options.Count -gt 0'
-Assert-Contains 'Wait-ComposerOptionsReady -Section $Section -AfterMs $afterMs'
 Assert-Contains '$command.action -eq "collect_navigation"'
 Assert-Contains '$navigation = Invoke-UiAction -Action "chatgpt_get_navigation"'
 Assert-Contains '$features = @($navigation.features | Where-Object { $null -ne $_ })'
@@ -108,8 +108,7 @@ Assert-Contains 'schema = "elon.chatgpt_web.apk_smoke.v2"'
 Assert-Contains 'recorded_at_utc = [DateTimeOffset]::UtcNow.ToString("o")'
 Assert-Contains 'feature_baseline = $featureBaseline'
 Assert-Contains 'Invoke-Adb shell input keyevent 4'
-Assert-Contains 'Invoke-UiAction -Action "chatgpt_dismiss_composer_options"'
-Assert-Contains 'Wait-CommandResult -Action "dismiss_composer_menu"'
+Assert-Contains 'Close-ChatGptWebSmokeComposerOptions -TimeoutSec $TimeoutSec'
 Assert-Contains 'Get-ChatGptContextPagingEvidence'
 Assert-Contains 'Add-Check "context_cursor_roundtrip"'
 Assert-Contains 'Add-Check "context_cursor_next"'
@@ -142,6 +141,19 @@ if (-not $evidenceSource.Contains('message_cursor = [string]$first.message_curso
 }
 if (-not $evidenceSource.Contains('message_cursor = [string]$first.next_message_cursor')) {
     throw "Context paging evidence must follow the next MCP cursor."
+}
+foreach ($required in @(
+    'function Wait-ChatGptWebSmokeComposerOptions',
+    '$receipt = @($state.command_requests)',
+    '[string]$_.request_id -eq $RequestId',
+    'function Invoke-ChatGptWebSmokeComposerOptions',
+    'function Close-ChatGptWebSmokeComposerOptions',
+    '"chatgpt_dismiss_composer_options"',
+    'Wait-ChatGptCommandReceipt -RequestId $requestId'
+)) {
+    if (-not $composerSource.Contains($required)) {
+        throw "ChatGPT Web composer smoke helper is missing: $required"
+    }
 }
 
 $completeCollection = Get-ChatGptConversationCollectionCoverage `
@@ -274,6 +286,9 @@ if ($source.Contains('Wait-CommandResult -Action "collect_navigation" -AfterMs $
 }
 if ($source.Contains('Wait-CommandResult -Action $commandAction')) {
     throw "Composer smoke must tolerate a newer command overwriting last_command."
+}
+if ($source.Contains('Wait-ComposerOptionsReady')) {
+    throw "Composer receipt polling must remain in the focused smoke helper."
 }
 if ($source.Contains('ToUnixTimeMilliseconds()')) {
     throw "ChatGPT Web smoke must compare bridge timestamps from the same device clock."

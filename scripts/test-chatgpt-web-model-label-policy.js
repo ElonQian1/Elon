@@ -7,6 +7,7 @@ for (const label of [
   'GPT-5.6 Sol',
   '5.6 Terra 中',
   '5.5 Pro',
+  'Pro',
   '极速',
   '自动',
   '快速',
@@ -34,6 +35,7 @@ assert.equal(policy.isModelControl({
 for (const label of [
   '',
   'Workspace',
+  'Profile',
   '启动语音功能',
   '添加附件',
   '发送'

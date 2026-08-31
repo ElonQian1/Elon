@@ -42,6 +42,9 @@ class ChatGptWebComposerContractTest {
             "android/app/src/main/assets/chatgpt_web_adapter_layout.js",
         )
         val core = readRepositoryFile("android/app/src/main/assets/chatgpt_web_adapter.js")
+        val textTransactionOrchestrator = readRepositoryFile(
+            "android/app/src/main/assets/chatgpt_web_text_transaction_orchestrator.js",
+        )
         val pageAdapter = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebPageAdapter.kt",
         )
@@ -65,9 +68,9 @@ class ChatGptWebComposerContractTest {
         assertTrue(core.contains("composerAdapter.capabilities(composer)"))
         assertTrue(core.contains("action === 'list_model_options'"))
         assertTrue(core.contains("action === 'list_composer_tools'"))
-        assertTrue(core.contains("function waitForStableSendButton"))
-        assertTrue(core.contains("function waitForSendAccepted"))
-        assertTrue(core.contains("官方网页已确认发送"))
+        assertTrue(textTransactionOrchestrator.contains("function waitForStableSendButton"))
+        assertTrue(textTransactionOrchestrator.contains("function waitForSendAccepted"))
+        assertTrue(textTransactionOrchestrator.contains("官方网页已确认发送"))
         assertTrue(adapter.contains("#upload-fast-tools-files"))
         assertTrue(adapter.contains("#composer-plus-btn"))
         assertTrue(adapter.contains("layout.findSemanticNode('attachment', 'composer')"))
@@ -218,6 +221,9 @@ class ChatGptWebComposerContractTest {
         val backgroundWebView = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptBackgroundWebViewFactory.kt",
         )
+        val sendOwner = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebSendOwner.kt",
+        )
         val chooser = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebFileChooserController.kt",
         )
@@ -228,8 +234,10 @@ class ChatGptWebComposerContractTest {
             assertTrue(host.contains("allowContentAccess = true"))
         }
         assertTrue(official.contains("fileChooserController.show("))
-        assertTrue(background.contains("val values = queuedUploadUris"))
-        assertTrue(background.contains("queuedUploadUris = emptyList()"))
+        assertTrue(sendOwner.contains("private var queuedUploadUris"))
+        assertTrue(sendOwner.contains("fun consumeQueuedUploadUris()"))
+        assertTrue(sendOwner.contains("queuedUploadUris = emptyList()"))
+        assertTrue(background.contains("val values = sendOwner.consumeQueuedUploadUris()"))
         assertTrue(background.contains("callback.onReceiveValue("))
         assertFalse(background.contains("fileChooserController.show("))
         assertTrue(chooser.contains("Intent.ACTION_OPEN_DOCUMENT"))
