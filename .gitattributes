@@ -4,3 +4,4 @@
 *.service    text eol=lf
 .githooks/*  text eol=lf
 *.rs         text eol=lf
+*.tsv        text eol=lf
