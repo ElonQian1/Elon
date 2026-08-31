@@ -106,7 +106,7 @@
     const label = clean(input && input.label);
     const context = clean(input && input.context);
     const section = clean(input && input.section);
-    const combined = [signal, context, path].filter(Boolean).join(' ');
+    const combined = [signal, label, context, path].filter(Boolean).join(' ');
 
     if (/open[-\s]?sidebar|open sidebar|打开(?:侧边栏|边栏)/.test(signal)) {
       return 'navigation';
@@ -119,7 +119,13 @@
     if (/^\/c\/[a-z0-9_-]{1,160}$/.test(path) && !(input && input.isLink)) {
       return 'conversation_options';
     }
-    if (/project-save-turn-action-button|save.*project|保存.*项目|存入.*项目/.test(combined)) {
+    if (
+      /project-save-turn-action-button/.test(signal) ||
+      /^(?:save|add|move)(?:\s+(?:this|the))?\s+(?:chat|conversation)?\s*(?:to|into)?\s*project$/.test(label) ||
+      /^(?:save|add|move)(?:\s+(?:this|the))?\s+(?:chat|conversation)?\s*(?:to|into)?\s*project$/.test(signal) ||
+      /^(?:保存|添加|移动|存入)(?:到|至)?项目$/.test(label) ||
+      /^(?:保存|添加|移动|存入)(?:到|至)?项目$/.test(signal)
+    ) {
       return 'save_to_project';
     }
     if (/^\/g\/g-p-[a-z0-9_-]+(?:\/project)?$/.test(path) || /project|项目/.test(context)) {

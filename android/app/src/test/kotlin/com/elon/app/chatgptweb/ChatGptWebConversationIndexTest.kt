@@ -161,6 +161,32 @@ class ChatGptWebConversationIndexTest {
     }
 
     @Test
+    fun projectRefreshReassignsAnObservedConversationWithoutLeavingTheOldMembership() {
+        val original = conversation("shared", "昨天", "g-p-old").copy(
+            path = "/g/g-p-old/c/shared",
+            projectTitle = "旧项目",
+            projectPath = "/g/g-p-old/project",
+        )
+        val moved = original.copy(
+            path = "/g/g-p-target/c/shared",
+            projectId = "g-p-target",
+            projectTitle = "目标项目",
+            projectPath = "/g/g-p-target/project",
+        )
+
+        val merged = ChatGptWebConversationIndex.mergeProjectHistory(
+            previous = listOf(original),
+            observed = listOf(moved),
+            projectId = "g-p-target",
+            collectionComplete = false,
+        )
+
+        assertEquals(1, merged.size)
+        assertEquals("g-p-target", merged.single().projectId)
+        assertEquals("/g/g-p-target/c/shared", merged.single().path)
+    }
+
+    @Test
     fun completeOfficialRefreshDropsProjectsMissingFromTheOfficialList() {
         val current = ChatGptWebProject("g-p-current", "当前项目", "/g/g-p-current/project")
         val stale = ChatGptWebProject("g-p-stale", "过期项目", "/g/g-p-stale/project")

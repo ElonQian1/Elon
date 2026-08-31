@@ -165,11 +165,14 @@ internal object ChatGptWebConversationIndex {
         collectionComplete: Boolean,
     ): List<ChatGptWebConversation> {
         val canonicalId = ChatGptWebConversationPath.canonicalProjectId(projectId) ?: return previous
-        val outsideProject = previous.filter { it.projectId != canonicalId }
         val cachedProject = previous.filter { it.projectId == canonicalId }
         val scopedObserved = observed
             .map(::sanitize)
             .filter { it.projectId == canonicalId }
+        val observedIdentities = scopedObserved.mapTo(linkedSetOf(), ::identityOf)
+        val outsideProject = previous.filter {
+            it.projectId != canonicalId && identityOf(it) !in observedIdentities
+        }
         val projectValues = merge(
             cachedProject,
             scopedObserved,

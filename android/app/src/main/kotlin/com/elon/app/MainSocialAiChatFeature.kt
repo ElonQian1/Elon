@@ -260,6 +260,9 @@ internal class MainSocialAiChatFeature(
             currentConversationPath = { activeController().currentConversationPath() },
             currentState = { activeController().stateWireValue() },
             openConversation = ::openWebChatConversation,
+            consumerPort = ::chatGptConsumerPort,
+            conversationIndex = ::webChatConversationIndex,
+            refreshConversationIndex = ::refreshWebChatConversationIndex,
             showPageActions = {
                 prioritizeConsumerInteraction()
                 productionPageActions.show(WebChatProviderRegistry.get(providerId()))
@@ -439,15 +442,12 @@ internal class MainSocialAiChatFeature(
         onWebChatNavigationChanged = coordinator::onIndexChanged
         return coordinator
     }
-
     fun refreshWebChatConversationIndex(projectId: String? = null): Boolean =
         isChatModeActive() && webChatNavigationSession()?.refresh(projectId) == true
-
     fun startNewWebChatConversation(): Boolean {
         if (!isChatModeActive()) return false
         return webChatNavigationSession()?.newConversation() == true
     }
-
     fun openWebChatConversation(path: String): Boolean =
         isChatModeActive() &&
             webChatNavigationSession()?.openConversation(path) == true

@@ -29,6 +29,7 @@ installed build; individual capability documents retain implementation evidence.
 | Attachment upload reconciliation | ChatGPT | Completed, enabled, and device verified on published Release `v1.1.1374 (1395)`, adapter `207` | Official DOM attachment snapshot and bounded timeout |
 | Native image assets and cache-first gallery | ChatGPT | Completed, enabled, and device verified on Release candidate `v1.1.1375 (1396)`, adapter `208` | Bounded local image cache and official `/images` fallback |
 | Native private-response rich content | ChatGPT | Completed, enabled, and structurally device verified on Release `v1.1.1379 (1400)` for finance and line-chart cards | Official WebView rich content |
+| Native conversation project move | ChatGPT | Completed and enabled; exact-control and reconciliation tests passed, device round trip pending | Official conversation project menu |
 
 All web-account transports keep the official page authoritative. They do not export
 cookies, credentials, request headers, or private conversation content outside the
@@ -84,6 +85,18 @@ renderer on a Xiaomi device for finance, multi-series chart, and click-to-detail
 without reading a user conversation. The completed capability is
 `android_chatgpt_private_rich_content_native_view_v1` and must not be reimplemented
 without current regression evidence.
+
+Conversation rows now expose a native project destination picker backed by the bounded
+project-directory cache. The coordinator navigates to the exact conversation, opens its
+context-bound official options, resolves one exact project title in the official project
+chooser, and submits that choice once. The accepted command receipt and a scoped target
+directory refresh must agree before success is shown. A missing or duplicate title fails
+closed. Once the official bridge accepts the write, an absent or timed-out receipt never
+offers automatic retry; the user can refresh or confirm in the official menu instead.
+Refreshing a target project also removes the same conversation identity from its previous
+cached project, preventing duplicate sidebar membership. The completed capability is
+`android_chatgpt_native_conversation_project_move_v1`; it remains scheduled for one
+reversible device round trip after the first published build containing adapter `209`.
 
 The Google conversation directory persists the timestamp of the last successful
 official directory response. Cached rows render immediately; a legacy or expired cache

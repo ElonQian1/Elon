@@ -32,14 +32,67 @@ internal class WebChatProductionConversationActionsCoordinator(
     private val currentConversationPath: () -> String?,
     private val currentState: () -> String,
     private val openConversation: (String) -> Boolean,
+    private val consumerPort: () -> WebChatConsumerPort?,
+    private val conversationIndex: () -> com.elon.app.chatgptweb.ChatGptWebConversationIndexState,
+    private val refreshConversationIndex: (String?) -> Boolean,
     private val showPageActions: () -> Unit,
     private val openOfficialFallback: () -> Unit,
 ) {
     private var requestEpoch = 0
     private var activeSheet: WebChatActionSheetHandle? = null
+    private val projectMove = WebChatProductionConversationProjectMoveCoordinator(
+        activity = activity,
+        host = host,
+        activeProvider = activeProvider,
+        consumerPort = consumerPort,
+        currentConversationPath = currentConversationPath,
+        currentState = currentState,
+        openConversation = openConversation,
+        conversationIndex = conversationIndex,
+        refreshConversationIndex = refreshConversationIndex,
+        openOfficialFallback = openOfficialFallback,
+    )
 
     fun show(conversation: ChatGptWebConversation) {
         cancelPending()
+        val canMove = WebChatConversationProjectMovePolicy.destinations(
+            conversationIndex(),
+            conversation,
+        ).isNotEmpty()
+        val items = buildList {
+            if (canMove) add(WebChatActionSheetItem(
+                id = ACTION_MOVE_TO_PROJECT,
+                title = "移动到项目",
+                subtitle = "从已缓存的项目中选择",
+                contentDescription = "web-chat-conversation-action-move-to-project",
+            ))
+            add(WebChatActionSheetItem(
+                id = ACTION_MORE_SETTINGS,
+                title = "更多会话设置",
+                subtitle = "重命名、置顶、归档、分享或删除",
+                contentDescription = "web-chat-conversation-action-more-settings",
+            ))
+        }
+        activeSheet = WebChatActionSheet.showUpdatable(
+            activity = activity,
+            title = "会话操作",
+            items = items,
+            footerActions = listOf(WebChatActionSheetFooterAction(
+                label = "官网完成",
+                contentDescription = "web-chat-conversation-actions-official",
+                action = openOfficialFallback,
+            )),
+            onCancelled = { requestEpoch += 1 },
+            onDismissed = { activeSheet = null },
+        ) { item ->
+            when (item.id) {
+                ACTION_MOVE_TO_PROJECT -> host.post { projectMove.show(conversation) }
+                ACTION_MORE_SETTINGS -> host.post { showPageActionsFor(conversation) }
+            }
+        }
+    }
+
+    private fun showPageActionsFor(conversation: ChatGptWebConversation) {
         val targetPath = ChatGptWebConversationPath.normalize(conversation.path)
             ?: return showRecovery(conversation)
         val epoch = requestEpoch
@@ -59,6 +112,7 @@ internal class WebChatProductionConversationActionsCoordinator(
         val sheet = activeSheet
         activeSheet = null
         sheet?.dismiss()
+        projectMove.cancelPending()
     }
 
     private fun poll(
@@ -134,6 +188,8 @@ internal class WebChatProductionConversationActionsCoordinator(
     }
 
     private companion object {
+        const val ACTION_MOVE_TO_PROJECT = "move-to-project"
+        const val ACTION_MORE_SETTINGS = "more-settings"
         const val POLL_INTERVAL_MS = 250L
         const val MAX_POLL_ATTEMPTS = 24
     }
