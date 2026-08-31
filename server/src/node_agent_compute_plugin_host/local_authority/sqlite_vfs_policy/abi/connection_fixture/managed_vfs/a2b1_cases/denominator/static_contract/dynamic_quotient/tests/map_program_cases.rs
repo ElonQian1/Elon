@@ -58,9 +58,7 @@ impl MapLifecycleProgramCaseV1 {
     }
 }
 
-pub(super) fn map_lifecycle_leaf_v1(
-    case: MapLifecycleProgramCaseV1,
-) -> FrozenMapProgramLeafV1 {
+pub(super) fn map_lifecycle_leaf_v1(case: MapLifecycleProgramCaseV1) -> FrozenMapProgramLeafV1 {
     frozen_map_program_leaf_v1(case.leaf_id())
 }
 

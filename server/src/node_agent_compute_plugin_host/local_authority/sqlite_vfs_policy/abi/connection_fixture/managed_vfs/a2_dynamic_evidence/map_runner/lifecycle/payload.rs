@@ -5,9 +5,9 @@ use rusqlite::ffi;
 use sha2::{Digest, Sha256};
 
 use crate::node_agent_managed_fs::{
-    ManagedSqliteShmMapMode, ManagedSqliteShmTestDmsCustody,
-    ManagedSqliteShmTestMapDmsPath, ManagedSqliteShmTestMapPath,
-    ManagedSqliteShmTestMapReceipt, ManagedSqliteShmTestTargetSnapshot,
+    ManagedSqliteShmMapMode, ManagedSqliteShmTestDmsCustody, ManagedSqliteShmTestMapDmsPath,
+    ManagedSqliteShmTestMapPath, ManagedSqliteShmTestMapReceipt,
+    ManagedSqliteShmTestTargetSnapshot,
 };
 
 use super::super::super::super::connection::ManagedTestShmMapCallbackObservation;
@@ -86,8 +86,7 @@ pub(in super::super) fn validate_payload(
 ) -> anyhow::Result<ValidatedLifecyclePayloadV1> {
     super::validate_binding(binding)?;
     let mut fields = payload.split(',');
-    if fields.next() != Some(REPORT_VERSION)
-        || fields.next() != Some(exact_selector(binding.path))
+    if fields.next() != Some(REPORT_VERSION) || fields.next() != Some(exact_selector(binding.path))
     {
         return Err(anyhow!("Map lifecycle payload identity mismatch"));
     }
@@ -128,8 +127,7 @@ pub(in super::super) fn validate_payload(
     }
     if values[39..53] != expected_snapshot_values(binding.path, false)
         || values[53..67] != expected_snapshot_values(binding.path, true)
-        || values[67..100]
-            != expected_map_receipt_values(binding.path, values[24], values[25])
+        || values[67..100] != expected_map_receipt_values(binding.path, values[24], values[25])
         || values[100..104] != [1, 1, 1, 1]
         || values[104..107] != [1, 1, 3]
         || values[107..111] != [1, 1, 1, 1]
@@ -445,7 +443,8 @@ mod tests {
         fields = canonical.split(',').map(str::to_owned).collect();
         fields.pop();
         assert!(validate_payload(&fields.join(","), binding).is_err());
-        assert!(validate_payload(&canonical.replacen(REPORT_VERSION, "a2mapq2", 1), binding)
-            .is_err());
+        assert!(
+            validate_payload(&canonical.replacen(REPORT_VERSION, "a2mapq2", 1), binding).is_err()
+        );
     }
 }

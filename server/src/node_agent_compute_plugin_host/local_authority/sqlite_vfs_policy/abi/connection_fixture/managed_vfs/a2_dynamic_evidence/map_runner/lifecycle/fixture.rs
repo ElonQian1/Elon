@@ -31,11 +31,10 @@ pub(super) struct ValidatedPointerRelationV1 {
 
 pub(super) fn prepare(root: &Path) -> anyhow::Result<ManagedSqliteMultiConnectionFixture> {
     let fixture = ManagedSqliteMultiConnectionFixture::open_single(root, [0xa6; 16])?;
-    let mode: String = fixture.connection(SELECTED)?.query_row(
-        "PRAGMA journal_mode=WAL",
-        [],
-        |row| row.get(0),
-    )?;
+    let mode: String =
+        fixture
+            .connection(SELECTED)?
+            .query_row("PRAGMA journal_mode=WAL", [], |row| row.get(0))?;
     if !mode.eq_ignore_ascii_case("wal") {
         return Err(anyhow!("Map lifecycle fixture did not enter WAL mode"));
     }
@@ -214,10 +213,14 @@ fn exact_map_receipt(
         && value.mapped_new == mapped_new
         && value.mapped_reuses == mapped_reuse
         && value.selected_pointer.is_some() == path.is_mapped()
-        && value.selected_length == if path.is_mapped() { REGION_SIZE as usize } else { 0 }
+        && value.selected_length
+            == if path.is_mapped() {
+                REGION_SIZE as usize
+            } else {
+                0
+            }
         && value.selected_region == path.is_mapped().then_some(path.region())
-        && value.selected_runtime_generation
-            == path.is_mapped().then_some(value.runtime_generation)
+        && value.selected_runtime_generation == path.is_mapped().then_some(value.runtime_generation)
         && value.managed_successes == 1
         && value.finished
 }

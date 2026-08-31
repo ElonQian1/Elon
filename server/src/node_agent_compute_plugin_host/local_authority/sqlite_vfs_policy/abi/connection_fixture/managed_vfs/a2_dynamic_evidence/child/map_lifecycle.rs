@@ -49,10 +49,7 @@ mod tests {
 
     #[test]
     fn q3_header_rejects_wrong_version_and_selector() {
-        assert_eq!(
-            classify_header("a2mapq2", selector(1).unwrap()),
-            Ok(None)
-        );
+        assert_eq!(classify_header("a2mapq2", selector(1).unwrap()), Ok(None));
         assert_eq!(
             classify_header(REPORT_VERSION, "empty-observe-mapped-completed"),
             Err("A2_DYNAMIC_CHILD_ACTUAL_SELECTOR_INVALID")

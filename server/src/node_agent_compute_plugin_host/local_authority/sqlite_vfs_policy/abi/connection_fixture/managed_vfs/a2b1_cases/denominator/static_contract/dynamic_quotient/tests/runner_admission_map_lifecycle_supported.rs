@@ -70,7 +70,10 @@ exact_map_lifecycle_test!(empty_observe_not_present_completed, EmptyObserveNotPr
 exact_map_lifecycle_test!(empty_extend_mapped_completed, EmptyExtendMapped);
 exact_map_lifecycle_test!(reuse_observe_mapped_completed, ReuseObserveMapped);
 exact_map_lifecycle_test!(reuse_extend_mapped_completed, ReuseExtendMapped);
-exact_map_lifecycle_test!(target_missing_observe_not_present_completed, MissingObserveNotPresent);
+exact_map_lifecycle_test!(
+    target_missing_observe_not_present_completed,
+    MissingObserveNotPresent
+);
 exact_map_lifecycle_test!(target_missing_extend_mapped_completed, MissingExtendMapped);
 
 #[test]
@@ -100,8 +103,7 @@ fn lifecycle_program_rejects_expected_drift_before_spawn() {
 
 #[test]
 fn lifecycle_program_rejects_prestate_drift_before_spawn() {
-    let (mut key, member) =
-        supported_key_and_member(MapLifecycleProgramCaseV1::ReuseObserveMapped);
+    let (mut key, member) = supported_key_and_member(MapLifecycleProgramCaseV1::ReuseObserveMapped);
     key.prestate = PrestateV1::Map(MapPrestateV1::RegionsEmpty);
     assert!(validate_map_program_for_test(&key, member, compile_for_test(&key)).is_err());
 }
@@ -123,10 +125,12 @@ fn execution_for(
 ) -> anyhow::Result<Option<MapRunnerExecutionReceiptV1>> {
     let (key, member) = supported_key_and_member(case);
     let plan = compile_for_test(&key);
-    Ok(match run_isolated_for_test(exact_test, &key, member, plan)? {
-        MapRunnerIsolatedOutcomeV1::ChildReported => None,
-        MapRunnerIsolatedOutcomeV1::ParentReceipt(receipt) => Some(receipt),
-    })
+    Ok(
+        match run_isolated_for_test(exact_test, &key, member, plan)? {
+            MapRunnerIsolatedOutcomeV1::ChildReported => None,
+            MapRunnerIsolatedOutcomeV1::ParentReceipt(receipt) => Some(receipt),
+        },
+    )
 }
 
 #[test]

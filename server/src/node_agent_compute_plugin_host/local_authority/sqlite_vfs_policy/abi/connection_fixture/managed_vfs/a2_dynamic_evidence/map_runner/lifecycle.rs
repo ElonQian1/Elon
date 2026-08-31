@@ -8,9 +8,9 @@ use std::path::Path;
 use anyhow::Context;
 
 use crate::node_agent_managed_fs::{
-    ManagedSqliteShmMapMode, ManagedSqliteShmTestMapDmsPath,
-    ManagedSqliteShmTestMapExpectation, ManagedSqliteShmTestMapPath,
-    ManagedSqliteShmTestMapReceipt, ManagedSqliteShmTestTargetObserver,
+    ManagedSqliteShmMapMode, ManagedSqliteShmTestMapDmsPath, ManagedSqliteShmTestMapExpectation,
+    ManagedSqliteShmTestMapPath, ManagedSqliteShmTestMapReceipt,
+    ManagedSqliteShmTestTargetObserver,
 };
 
 use super::super::{SanitizedChildReport, A2_DYNAMIC_CHILD_NONCE_ENV};
@@ -96,14 +96,8 @@ pub(super) fn exercise_child(
         .map_err(anyhow::Error::msg)?;
     let after = observer.snapshot()?;
     let receipt = armed.finish()?;
-    let relation = fixture::validate_action(
-        binding.path,
-        prestate,
-        callback,
-        before,
-        after,
-        receipt,
-    )?;
+    let relation =
+        fixture::validate_action(binding.path, prestate, callback, before, after, receipt)?;
     let pending_count = target_binding.pending_count().map_err(anyhow::Error::msg)?;
     if pending_count != 0 {
         return Err(anyhow::anyhow!(
@@ -186,9 +180,9 @@ impl MapRunnerLifecyclePathV1 {
             Self::EmptyObserveNotPresent
             | Self::ReuseObserveMapped
             | Self::MissingObserveNotPresent => ManagedSqliteShmMapMode::Observe,
-            Self::EmptyExtendMapped
-            | Self::ReuseExtendMapped
-            | Self::MissingExtendMapped => ManagedSqliteShmMapMode::Extend,
+            Self::EmptyExtendMapped | Self::ReuseExtendMapped | Self::MissingExtendMapped => {
+                ManagedSqliteShmMapMode::Extend
+            }
         }
     }
 
@@ -219,10 +213,7 @@ impl MapRunnerLifecyclePathV1 {
     }
 
     pub(super) const fn is_empty(self) -> bool {
-        matches!(
-            self,
-            Self::EmptyObserveNotPresent | Self::EmptyExtendMapped
-        )
+        matches!(self, Self::EmptyObserveNotPresent | Self::EmptyExtendMapped)
     }
 
     pub(super) const fn is_missing(self) -> bool {
