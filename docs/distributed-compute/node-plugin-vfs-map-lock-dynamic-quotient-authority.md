@@ -418,7 +418,7 @@ planned-missing member、current source 未编译/未运行和 reviewed inventor
 源级 observation/native-receipt 接线表述为 actual verification。
 
 上述回执全部是本批 Map/Lock program/receipt 改动前的 prior baseline。本批 current source-only baseline
-固定为 `82d52bad8fd6e34c3fc7e82c5346430dcb26e9cf`，只达到
+固定为 `4edfcbcb32518fed8f93157b1983222f5f8ef74e`，只达到
 `source_written/source_review_only/implementation_uncompiled/implementation_unrun`，新增 Map 六个 lifecycle 与
 10+104 个 Lock 窄 program、私有
 actual receipt、program inventory、reviewed source-program admission provider、catalog/manifest binding 与负向

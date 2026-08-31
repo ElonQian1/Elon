@@ -190,7 +190,7 @@ source 新增的 reviewed source-admission path 尚未运行；按 source contra
 整体仍未闭合。
 
 前序基线测试事实如下；fingerprint 只标识相应验证回执，不提升验收层级。runner-admission 改动后的
-current source-only baseline 为 `82d52bad8fd6e34c3fc7e82c5346430dcb26e9cf`；其 admission、program-inventory
+current source-only baseline 为 `4edfcbcb32518fed8f93157b1983222f5f8ef74e`；其 admission、program-inventory
 与 reviewed source-admission source 均为 `not_run`，本批
 `passed=0/failed=0`：
 
