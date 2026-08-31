@@ -5,8 +5,10 @@ use anyhow::Context;
 use anyhow::Result;
 use std::path::Path;
 
+#[cfg(any(windows, test))]
+use super::paths;
 #[cfg(windows)]
-use super::{command as launcher_command, paths, APP_NAME, WATCHDOG_ARG};
+use super::{command as launcher_command, APP_NAME, WATCHDOG_ARG};
 
 pub(crate) const RUN_VALUE_NAME: &str = "ElonNodeAgent";
 pub(crate) const TASK_NAME: &str = "ElonNodeAgent";
@@ -257,6 +259,69 @@ pub(crate) fn refresh_existing_desktop_shortcut(install_dir: &Path) -> Result<()
         write_desktop_shortcut(install_dir, false)?;
     }
     Ok(())
+}
+
+/// Redirect shortcuts from the retired standalone ElonSpeed shell to the
+/// canonical launcher. The old installation and its WebView profile remain in
+/// place so account state can be migrated separately; only entry points whose
+/// resolved target is exactly `%LOCALAPPDATA%\ElonSpeed\elonspeed.exe` change.
+pub(crate) fn migrate_legacy_shell_shortcuts(install_dir: &Path) -> Result<()> {
+    #[cfg(not(windows))]
+    let _ = install_dir;
+    #[cfg(windows)]
+    {
+        let script = legacy_shell_shortcut_migration_script(install_dir);
+        let mut cmd = launcher_command::powershell_hidden_command(&script);
+        let status =
+            launcher_command::status_hidden(&mut cmd).context("无法迁移旧 ElonSpeed 快捷方式")?;
+        if !status.success() {
+            anyhow::bail!("迁移旧 ElonSpeed 快捷方式失败");
+        }
+    }
+    Ok(())
+}
+
+#[cfg(any(windows, test))]
+fn legacy_shell_shortcut_migration_script(install_dir: &Path) -> String {
+    let target = paths::client_exe(install_dir);
+    format!(
+        r#"
+$ErrorActionPreference = 'Stop'
+$localAppData = [Environment]::GetFolderPath('LocalApplicationData')
+$legacyTarget = [System.IO.Path]::GetFullPath((Join-Path $localAppData 'ElonSpeed\elonspeed.exe'))
+$target = '{}'
+$workdir = '{}'
+$roots = @(
+  [Environment]::GetFolderPath('Desktop'),
+  [Environment]::GetFolderPath('Programs'),
+  (Join-Path ([Environment]::GetFolderPath('ApplicationData')) 'Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar')
+) | Where-Object {{ -not [string]::IsNullOrWhiteSpace($_) -and (Test-Path -LiteralPath $_) }} | Select-Object -Unique
+$shell = New-Object -ComObject WScript.Shell
+foreach ($root in $roots) {{
+  Get-ChildItem -LiteralPath $root -Filter '*.lnk' -File -Recurse -ErrorAction SilentlyContinue | ForEach-Object {{
+    try {{
+      $link = $shell.CreateShortcut($_.FullName)
+      if (-not [string]::IsNullOrWhiteSpace($link.TargetPath)) {{
+        $resolvedTarget = [System.IO.Path]::GetFullPath($link.TargetPath)
+        if ($resolvedTarget.Equals($legacyTarget, [System.StringComparison]::OrdinalIgnoreCase)) {{
+          $link.TargetPath = $target
+          $link.Arguments = ''
+          $link.WorkingDirectory = $workdir
+          $link.IconLocation = "$target,0"
+          $link.Description = '打开一龙开发平台（已从旧 ElonSpeed 入口迁移）'
+          $link.Save()
+        }}
+      }}
+    }} catch {{
+      # A pinned shortcut can be locked by Explorer. Leave it untouched and
+      # continue migrating the other exact legacy entry points.
+    }}
+  }}
+}}
+"#,
+        launcher_command::ps_single_quote(&target.to_string_lossy()),
+        launcher_command::ps_single_quote(&install_dir.to_string_lossy()),
+    )
 }
 
 #[cfg(windows)]
@@ -538,6 +603,21 @@ mod tests {
         assert!(source.contains("$link.IconLocation = \"$client,0\""));
         assert!(source.contains("format!(\"\\\"{}\\\",0\", client.display())"));
         assert!(source.contains("refresh_existing_desktop_shortcut"));
+    }
+
+    #[test]
+    fn legacy_shell_shortcuts_are_redirected_without_deleting_profile_or_install() {
+        let script = super::legacy_shell_shortcut_migration_script(std::path::Path::new(
+            r"C:\Users\ELon\AppData\Local\ElonNode",
+        ));
+
+        assert!(script.contains(r"ElonSpeed\elonspeed.exe"));
+        assert!(script.contains(r"ElonNode\一龙开发平台.exe"));
+        assert!(script.contains("OrdinalIgnoreCase"));
+        assert!(script.contains("User Pinned\\TaskBar"));
+        assert!(script.contains("$link.TargetPath = $target"));
+        assert!(!script.contains("Remove-Item"));
+        assert!(!script.contains("Stop-Process"));
     }
 }
 

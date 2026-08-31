@@ -63,6 +63,9 @@ pub(crate) fn ensure_installed() -> Result<PathBuf> {
         if let Err(error) = windows_integration::refresh_existing_desktop_shortcut(&install_dir) {
             eprintln!("警告：刷新已有桌面快捷方式失败：{error:#}");
         }
+        if let Err(error) = windows_integration::migrate_legacy_shell_shortcuts(&install_dir) {
+            eprintln!("警告：迁移旧 ElonSpeed 快捷方式失败：{error:#}");
+        }
         if let Err(error) = windows_integration::create_start_menu_shortcuts(&install_dir) {
             eprintln!("警告：创建开始菜单入口失败：{error:#}");
         }
@@ -115,6 +118,9 @@ fn install_or_repair_with_desktop_policy(stop_desktop_shell: bool) -> Result<Pat
 
     if let Err(error) = windows_integration::create_desktop_shortcut(&install_dir) {
         eprintln!("警告：创建桌面快捷方式失败：{error:#}");
+    }
+    if let Err(error) = windows_integration::migrate_legacy_shell_shortcuts(&install_dir) {
+        eprintln!("警告：迁移旧 ElonSpeed 快捷方式失败：{error:#}");
     }
     if let Err(error) = windows_integration::create_start_menu_shortcuts(&install_dir) {
         eprintln!("警告：创建开始菜单入口失败：{error:#}");

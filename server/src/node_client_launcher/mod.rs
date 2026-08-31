@@ -184,6 +184,10 @@ fn repair_autostart_on_runtime_start() {
             windows_integration::refresh_existing_desktop_shortcut(&install_dir),
         ),
         (
+            "legacy_shell_shortcuts",
+            windows_integration::migrate_legacy_shell_shortcuts(&install_dir),
+        ),
+        (
             "start_menu_shortcuts",
             windows_integration::create_start_menu_shortcuts(&install_dir),
         ),
