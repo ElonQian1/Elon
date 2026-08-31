@@ -5,7 +5,7 @@ reviewed_at: 2026-09-01
 owners: node, security
 design_status: design_frozen
 implementation_status: implementation_not_dynamically_accepted
-verification_status: MapLockProjector_prior_verified_runner_admission_current_source_not_run_Q_unknown_Windows_not_opened_A2b2_117_of_117
+verification_status: MapLockProjector_prior_verified_runner_admission_and_private_execution_current_source_not_run_Q_unknown_Windows_not_opened_A2b2_117_of_117
 ---
 
 # 节点插件测试 VFS 故障动态验收
@@ -33,11 +33,14 @@ owner 图只验证 baseline commit literal 形状、从 reviewed owner bytes 重
 - 历史前序快照刷新：source baseline 固定为当时已推送实现提交 `a75769029ba4abf5e30002f64846c0f7099d9ae7`；8 个既有变化 owner与新增 `AbiRawCloseWitness` owner 均重算 Git blob OID 与 LF 规范化 SHA-256，零偏差。Map/Lock graph 新增 operation-scoped state-abandon witness，fallback 保持原节点，Map-reachable Pending=5、resolved cross-links=9 不变。clean 验证在 `95d910f0dbc167138f913861efafa20ff11295cc`、`VALIDATION_FINGERPRINT=e7ea6855df7e6f0677a985d214dfcf467585e79c938c2a1e54b7ce7b6cdd4ad5` 上得到 `4 passed / 0 failed / 1722 filtered`。
 - 前序 JointClose source-owner 续绑：完整源码固定为变基后主线祖先中的非自指 baseline `e3663e109039f38477de4d6ab5cd57483dbd0541`；ledger evidence commit `bfa1a1180d220e9a4c8e39251414fc9a1b0a9ace` 重算全部 40 个 owner，其中 17 个随 JointClose 实现变化、23 个保持不变，226 个 anchor tuple 零缺失。`VALIDATION_FINGERPRINT=f65d234bfb21a0351862d396cc4f1a9c4030d872d68fc571ad57a14529f1e3d7`、receipt `0239e121c80711e443f2ea7059485333a770bb47c5e53a79b48962583570a518` 得到 `4 passed / 0 failed / 1854 filtered`；owner/node/reachability、Pending=5、resolved cross-links=9 与两个 Map/Lock open frontier 均未扩张。
 - 前序 Map q3 source-owner 续绑基线为 `4edfcbcb32518fed8f93157b1983222f5f8ef74e`；q4 `MapRegionLoopSuccessV1` 的已知 clean source baseline 为 `10aa60fb42488854657dd30a4240ad5f949c894d`。这些只是前序 Map provenance，不是 current Lock 执行证据。
-- current Lock 新增 source-only `LockStoredPoisonRetentionSucceededV1`：仅
-  `UnsafeRetentionSucceededThenRouteUnknown`，15 profiles×88 action/range=1,320 frozen members；TSV 为
-  1,320 member rows/237,857 bytes，SHA-256=`4da94c20e91d97a0082116879718b1ccf0271eb235ed785e65a2e36e7a949d85`。
-  本批未编译、未 Cargo、未 Windows/真实运行，`passed=0 failed=0 actual=not_run`；不得复用前序
-  `4/4`、`36/36`、fingerprint 或 receipt。
+- current Lock stored-poison matcher 已覆盖 `UnsafeRetentionSucceededThenRouteUnknown` 与
+  `UnsafeRetentionRouteUnknownThenRouteUnknown` 两个 completion；每族 15 profiles×88 action/range=1,320 frozen
+  members。两份 TSV 各为 1,320 member rows/237,857 bytes，SHA-256 分别为
+  `4da94c20e91d97a0082116879718b1ccf0271eb235ed785e65a2e36e7a949d85` 与
+  `df931ad7725843098f228d07d9798d79e92f2beec4e1c23e83fc89219dfa1396`；route-unknown sibling 另有 test-only
+  route-preemption actual runner/selector/payload 源码桥。本批仍是
+  `source_written/source_review_only/implementation_uncompiled/implementation_unrun`，未 Cargo、未 Windows/真实运行，
+  `passed=0 failed=0 actual=not_run`；不得复用前序 `4/4`、`36/36`、fingerprint 或 receipt。
 - 计数边界：这 4 项分别是 legacy non-denominator subset、incomplete branch-atom scaffold、source-owner graph 与 Map template ledger 自洽守卫；不形成完整 terminal universe、`CaseKey`、`Expected`、denominator、`StaticContract` 或 map/lock `WindowsDynamic`。
 
 ### 历史证据元组
@@ -129,7 +132,7 @@ Map/Lock 静态 scope、`CaseKey`、`SourceBranch`、`Expected`、exclusion 与 
 | Family | StaticContract | DynamicQuotientMemberCoverage | WindowsDynamic | 当前门槛 |
 |---|---:|---:|---:|---|
 | Map | `43476/43476` | `0/43476` | `not_opened` | 验证 current source，补齐其余 `42,955` 个 program，冻结 exact class/member manifest，机械得到 `Qmap` |
-| Lock | `8668/8668` | `0/8668` | `not_opened` | current source 为 10 validation + 104 lifecycle + `LockStoredPoisonRetentionSucceededV1` 1320；未运行 inventory 预期 `1434 present + 7234 missing`，无 reviewed/frozen manifest，`Qlock` 仍 unknown |
+| Lock | `8668/8668` | `0/8668` | `not_opened` | current source 为 10 validation + 104 lifecycle + 两个 stored-poison completion 各 1320；未运行 inventory 预期 `2754 present + 5914 missing`，无 actual inventory/receipt/record 或 reviewed/frozen manifest，`Qlock` 仍 unknown |
 | **Map/Lock aggregate** | **verified** | **not_started** | **not_opened** | **逐 class Windows exact-set 后才可形成 `Q/Q`** |
 
 #### 2.1.1 静态闭合前 review provenance（历史）
@@ -289,7 +292,7 @@ A2 完成必须同时满足：
   `implementation_not_dynamically_accepted` 升级；
 - 任何证据缺失、环境不明、case key漂移、观察不完整或生产入口变化都维持失败关闭。
 
-当前正式结论是：Map `StaticContract=43476/43476`、Lock `StaticContract=8668/8668`；typed dynamic quotient projector/candidate 只有前序已编译、`36/36` 与 exact blocker 基线。Map 保留 source-only q4 `MapRegionLoopSuccessV1` 的 511 frozen members/净增 509，未运行 inventory 预期 `521` source-present、`42,955` planned-missing。Lock 在 10+104 个既有 program 上新增 source-only `LockStoredPoisonRetentionSucceededV1`：只覆盖 completion=`UnsafeRetentionSucceededThenRouteUnknown`，15 profiles×88 action/range=1,320 frozen members，catalog 为 1,320 member rows/237,857 bytes/SHA-256 `4da94c20e91d97a0082116879718b1ccf0271eb235ed785e65a2e36e7a949d85`；sibling `UnsafeRetentionRouteUnknownThenRouteUnknown` 的另 1,320 仍 missing。Lock 未运行 inventory 预期为 `1,434` source-present、`7,234` planned-missing。current source 严格为 `source_written/source_review_only/implementation_uncompiled/implementation_unrun`；本批未编译、未 Cargo、未 Windows/真实运行，`passed=0/failed=0/actual=not_run`。没有 actual inventory、reviewed/frozen manifest 或 Windows execution，`DynamicQuotientMemberCoverage` 分别为 `0/43476`、`0/8668`，`Qmap/Qlock=unknown`，Map/Lock `WindowsDynamic=not_opened`。global source-leaf authority scope 已静态确认 5 个 production source 有 baseline drift，其中本批继续改变 ManagedNamespace/ManagedShmRoot；本批不扩张续绑，未来编译/真实验收前须单独续绑。A2 仍为 `implementation_not_dynamically_accepted`；生产 open、A1、v15、Runtime、Ready、派发、市场与资金效果均未改变。
+当前正式结论是：Map `StaticContract=43476/43476`、Lock `StaticContract=8668/8668`；typed dynamic quotient projector/candidate 只有前序已编译、`36/36` 与 exact blocker 基线。Map 保留 source-only q4 `MapRegionLoopSuccessV1` 的 511 frozen members/净增 509，未运行 inventory 预期 `521` source-present、`42,955` planned-missing。Lock 在 10+104 个既有 program 上保留两个 source-only stored-poison completion：`UnsafeRetentionSucceededThenRouteUnknown` 与 `UnsafeRetentionRouteUnknownThenRouteUnknown` 各由 15 profiles×88 action/range 形成 1,320 frozen members；两份 catalog 各为 1,320 member rows/237,857 bytes，SHA-256 分别为 `4da94c20e91d97a0082116879718b1ccf0271eb235ed785e65a2e36e7a949d85` 与 `df931ad7725843098f228d07d9798d79e92f2beec4e1c23e83fc89219dfa1396`，后者另有 test-only route-preemption actual runner/selector/payload 源码桥。Lock 未运行 inventory 预期为 `2,754` source-present、`5,914` planned-missing。current source 严格为 `source_written/source_review_only/implementation_uncompiled/implementation_unrun`；本批未编译、未 Cargo、未 Windows/真实运行，`passed=0/failed=0/actual=not_run`。没有 actual inventory/receipt/record、reviewed/frozen manifest 或 Windows execution，`DynamicQuotientMemberCoverage` 分别为 `0/43476`、`0/8668`，`Qmap/Qlock=unknown`，Map/Lock `WindowsDynamic=not_opened`。global source-leaf authority scope 已静态确认 5 个 production source 有 baseline drift，其中本批继续改变 ManagedNamespace/ManagedShmRoot；本批不扩张续绑，未来编译/真实验收前须单独续绑。A2 仍为 `implementation_not_dynamically_accepted`；生产 open、A1、v15、Runtime、Ready、派发、市场与资金效果均未改变。
 
 ### 9.1 静态闭合前 fragment provenance（历史）
 

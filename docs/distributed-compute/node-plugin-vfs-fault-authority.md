@@ -1,7 +1,7 @@
 ---
 title: 节点插件测试 VFS 故障合同权威
 status: current
-reviewed_at: 2026-08-31
+reviewed_at: 2026-09-01
 owners: node, security
 ---
 
@@ -34,7 +34,7 @@ A2b1 前序 JointClose source baseline `e3663e109039f38477de4d6ab5cd57483dbd0541
 - registry/file-custody 已把 main、Journal/WAL sidecar、SHM lease、route 与 callback lease 不可拆持有；物理关闭失败会保留 exact custody，不能把 `Drop` 当作成功回执；
 - 测试受管 VFS 已让单个真实 SQLite Connection 经 main、Journal/WAL、SHM 和 `xClose` 进入 exact route，并在正常关闭后退休 route、注销 VFS 和删除测试根。
 
-A2a/A2b1 源码已把一个 registration 扩为 exact logical-name route 集合，每条 Connection 独立 route/authorizer/custody 并共享一个 WAL/SHM runtime；exact route 绑定 runtime generation + SHM connection ID，map 初始化与 lock 平台动作进入相邻 test-only hook。早期 owner graph、Map template ledger 与局部 ABI/raw fragments 只是在 static closure 前定位 gaps 的 provenance；完整 terminal projection、`SourceBranch`、`Expected`、`CaseKey`、exclusion 与 StaticContract 已由独立 static denominator authority 闭合为 Map `43476/43476`、Lock `8668/8668`。typed dynamic quotient projector/candidate 只有前序验证基线；current sealed runner-admission source 已写但未编译、未运行。Map 已包含三预算、q3 六成员与 source-only q4 `MapRegionLoopSuccessV1`（511 frozen、净增 509），未运行 inventory 预期 `521` source-present、`42,955` missing。Lock 在 10 request-validation+104 positive lifecycle 上新增 source-only `LockStoredPoisonRetentionSucceededV1`：仅 completion=`UnsafeRetentionSucceededThenRouteUnknown`，15 profiles×88 action/range=1,320 frozen members；未运行 inventory 预期 `1,434` source-present、`7,234` missing，对称 sibling 的另 1,320 仍 missing。这些都只是 source contract，`passed=0 failed=0 actual=not_run`；无 reviewed/frozen manifest、`Qmap/Qlock` 或逐 class Windows evidence，A2b2=`117/117` 不能替代该动态门，也不启用生产入口。
+A2a/A2b1 源码已把一个 registration 扩为 exact logical-name route 集合，每条 Connection 独立 route/authorizer/custody 并共享一个 WAL/SHM runtime；exact route 绑定 runtime generation + SHM connection ID，map 初始化与 lock 平台动作进入相邻 test-only hook。早期 owner graph、Map template ledger 与局部 ABI/raw fragments 只是在 static closure 前定位 gaps 的 provenance；完整 terminal projection、`SourceBranch`、`Expected`、`CaseKey`、exclusion 与 StaticContract 已由独立 static denominator authority 闭合为 Map `43476/43476`、Lock `8668/8668`。typed dynamic quotient projector/candidate 只有前序验证基线；current sealed runner-admission source 已写但未编译、未运行。Map 已包含三预算、q3 六成员与 source-only q4 `MapRegionLoopSuccessV1`（511 frozen、净增 509），未运行 inventory 预期 `521` source-present、`42,955` missing。Lock 在 10 request-validation+104 positive lifecycle 上保留两个 stored-poison completion，各为 15 profiles×88 action/range=1,320 frozen members；`UnsafeRetentionRouteUnknownThenRouteUnknown` 另有 test-only route-preemption actual runner/selector/payload 源码桥。两份 TSV 各为 1,320 rows/237,857 bytes，SHA-256 分别为 `4da94c20e91d97a0082116879718b1ccf0271eb235ed785e65a2e36e7a949d85` 与 `df931ad7725843098f228d07d9798d79e92f2beec4e1c23e83fc89219dfa1396`；Lock 未运行 inventory 预期 `2,754` source-present、`5,914` missing。这些都只是 `source_written/source_review_only/implementation_uncompiled/implementation_unrun` source contract，`passed=0 failed=0 actual=not_run`；无 actual inventory/receipt/record、reviewed/frozen manifest、`Qmap/Qlock` 或逐 class Windows evidence，A2b2=`117/117` 不能替代该动态门，也不启用生产入口。
 
 历史 A2c partial bridge 不产生 `WindowsDynamic` evidence。它们只覆盖 route-exact callback-before、两个 unregister shape 和四个 direct SHM physical subset；不能替代当前五个正式 family 的完整 record，也不能外推 Map/Lock、生产 open 或其他 case。
 
@@ -173,7 +173,7 @@ WAL-main 若仍持有 SHM connection，关闭顺序固定为：验证无 SHM 锁
 
 ## 9. 静态验收与后续门槛
 
-当前静态验收已经闭合：Map `StaticContract=43476/43476`，Lock `StaticContract=8668/8668`。类型化 projector/candidate 只保留前序验证基线，sealed runner-admission current source 为 `source_written/source_review_only/implementation_uncompiled/implementation_unrun`。未运行 inventory 预期为 Map `521` source-present / `42,955` planned-missing，Lock `1,434` source-present / `7,234` planned-missing；Lock 新增的 1,320 项只属于 `UnsafeRetentionSucceededThenRouteUnknown`，对称 sibling 仍 missing。observer/native-receipt 源码链不能替代 actual execution。本批未编译、未 Cargo、未 Windows/真实运行，`passed=0 failed=0 actual=not_run`；reviewed/frozen manifest 未生成，`Qmap/Qlock=unknown`、coverage 仍为 `0/43476 + 0/8668`。后续只有补齐全部 program source、冻结 exact quotient manifests 并在同一 exact clean Windows cohort 下让每个 class 恰好产生一条正式记录，才可原子形成 `Qmap/Qmap` 与 `Qlock/Qlock`。
+当前静态验收已经闭合：Map `StaticContract=43476/43476`，Lock `StaticContract=8668/8668`。类型化 projector/candidate 只保留前序验证基线，sealed runner-admission current source 为 `source_written/source_review_only/implementation_uncompiled/implementation_unrun`。未运行 inventory 预期为 Map `521` source-present / `42,955` planned-missing，Lock `2,754` source-present / `5,914` planned-missing；Lock 两个 stored-poison completion 各 1,320 项，route-unknown sibling 的 test-only actual bridge 也仅为源码。observer/native-receipt 源码链不能替代 actual execution。本批未编译、未 Cargo、未 Windows/真实运行，`passed=0 failed=0 actual=not_run`；无 actual inventory/receipt/record，reviewed/frozen manifest 未生成，`Qmap/Qlock=unknown`、coverage 仍为 `0/43476 + 0/8668`、`WindowsDynamic=not_opened`。后续只有补齐全部 program source、冻结 exact quotient manifests 并在同一 exact clean Windows cohort 下让每个 class 恰好产生一条正式记录，才可原子形成 `Qmap/Qmap` 与 `Qlock/Qlock`。
 
 ### 9.1 静态闭合前 fragment 结论（历史）
 
