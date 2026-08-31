@@ -35,11 +35,22 @@ installed build; individual capability documents retain implementation evidence.
 | Native response read aloud | ChatGPT | Implemented and enabled; full-answer chunking and message-action tests passed; device acceptance pending | Official message actions and WebView |
 | Native conversation project move | ChatGPT | Completed and enabled; exact-control and reconciliation tests passed, device round trip pending | Official conversation project menu |
 | Native conversation management | ChatGPT | Completed and enabled; rename, pin/unpin, archive/unarchive, delete confirmation, identity scoping, and adaptive-control tests passed; consolidated device mutation acceptance pending | Official conversation options |
+| Acceptance evidence contract revisions | ChatGPT and Google Web AI | Implemented and enabled; 44 scripted plus 2 manual-only cases are offline verified, installed-state migration pending | Retain implementation hashes as diagnostics without discarding accepted contracts |
 
 All web-account transports keep the official page authoritative. They do not export
 cookies, credentials, request headers, or private conversation content outside the
 device. Every observer is bounded and emits nothing on malformed or unsuccessful
 responses.
+
+Device acceptance evidence is versioned by its user-visible case contract rather than by
+every implementation or test-harness hash. The APK packages revisions for all 46 unique
+cases and the build fails when the acceptance catalog and fingerprint map diverge. Existing
+version 1 records migrate as contract revision 1; only an explicit revision bump invalidates
+the affected case. Product input SHA-256 values remain in the structural snapshot as
+diagnostic provenance and expose implementation drift without erasing a still-valid device
+result. The completed, default-enabled infrastructure capability is
+`android_chatgpt_verification_evidence_contract_revision_v1`; its installed-state migration
+remains pending until a published APK is upgraded without clearing application data.
 
 Conversation navigation now retains the normalized target identity across an official
 document replacement. If the old page disappears before it can emit a command result, a
