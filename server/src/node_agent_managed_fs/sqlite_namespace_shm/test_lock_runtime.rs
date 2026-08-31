@@ -267,6 +267,27 @@ impl ManagedSqliteShmTestLockController {
         Ok(receipt)
     }
 
+    /// Seals proof that a stored-poison guard returned before the managed Lock action began.
+    /// Any observed managed/native/local event moves the ledger away from `Armed` and is rejected.
+    pub(super) fn finish_stored_poison_without_attempt(
+        &mut self,
+        target: ExactTarget,
+    ) -> Result<ManagedSqliteShmTestLockReceipt, &'static str> {
+        if self.armed.as_ref().map(|armed| armed.target) != Some(target) {
+            return Err("NODE_MANAGED_SQLITE_SHM_TEST_LOCK_TARGET_MISMATCH");
+        }
+        let armed = self
+            .armed
+            .take()
+            .ok_or("NODE_MANAGED_SQLITE_SHM_TEST_LOCK_OBSERVATION_NOT_ARMED")?;
+        if armed.invalid || armed.progress != Progress::Armed {
+            return Err("NODE_MANAGED_SQLITE_SHM_TEST_LOCK_STORED_POISON_EVENT_OBSERVED");
+        }
+        let mut receipt = armed.receipt;
+        receipt.finished = true;
+        Ok(receipt)
+    }
+
     pub(super) fn cancel(&mut self, target: ExactTarget) -> Result<(), &'static str> {
         if self.armed.as_ref().map(|armed| armed.target) != Some(target) {
             return Err("NODE_MANAGED_SQLITE_SHM_TEST_LOCK_TARGET_MISMATCH");
@@ -621,6 +642,46 @@ mod tests {
         assert_eq!(
             controller.finish(TARGET),
             Err("NODE_MANAGED_SQLITE_SHM_TEST_LOCK_OBSERVATION_INCOMPLETE")
+        );
+        arm_local(&mut controller);
+    }
+
+    #[test]
+    fn stored_poison_finish_seals_zero_events_and_allows_rearm() {
+        let mut controller = ManagedSqliteShmTestLockController::default();
+        arm_local(&mut controller);
+
+        let receipt = controller
+            .finish_stored_poison_without_attempt(TARGET)
+            .unwrap();
+        assert!(receipt.finished);
+        assert_eq!(receipt.runtime_generation, TARGET.0);
+        assert_eq!(receipt.shm_connection_id, TARGET.1);
+        assert_eq!(receipt.expectation, local_expectation());
+        assert_eq!(receipt.managed_attempts, 0);
+        assert_eq!(receipt.managed_successes, 0);
+        assert_eq!(receipt.native_lock_attempts, 0);
+        assert_eq!(receipt.native_lock_acquired, 0);
+        assert_eq!(receipt.native_lock_contended, 0);
+        assert_eq!(receipt.native_lock_errors, 0);
+        assert_eq!(receipt.native_unlock_attempts, 0);
+        assert_eq!(receipt.native_unlock_successes, 0);
+        assert_eq!(receipt.native_unlock_errors, 0);
+        assert_eq!(receipt.local_transitions, 0);
+        arm_local(&mut controller);
+    }
+
+    #[test]
+    fn stored_poison_finish_rejects_any_managed_event_and_disarms() {
+        let mut controller = ManagedSqliteShmTestLockController::default();
+        arm_local(&mut controller);
+        controller
+            .record(TARGET, local_request(2), LockEvent::ManagedAttempt)
+            .unwrap();
+
+        assert_eq!(
+            controller.finish_stored_poison_without_attempt(TARGET),
+            Err("NODE_MANAGED_SQLITE_SHM_TEST_LOCK_STORED_POISON_EVENT_OBSERVED")
         );
         arm_local(&mut controller);
     }

@@ -28,10 +28,16 @@ pub(super) use joint_close_family::{
     ValidatedJointCloseCandidateRecord, ValidatedJointCloseCleanCheckoutReceipt,
     ValidatedJointCloseFamily, ValidatedJointCloseFamilyMemberReceipt,
 };
+#[cfg(all(test, windows))]
 pub(super) use lock_runner::{
-    run_lock_lifecycle_program_isolated, run_lock_program_isolated, LockRunnerActionV1,
-    LockRunnerEvidenceReceiptV1, LockRunnerIsolatedEvidenceV1, LockRunnerLifecycleBindingV1,
-    LockRunnerLifecyclePathV1, LockRunnerProgramBindingV1, LockRunnerRequestValidationV1,
+    lock_stored_poison_selector_for_test, selected_lock_stored_poison_selector_for_test,
+};
+pub(super) use lock_runner::{
+    run_lock_lifecycle_program_isolated, run_lock_program_isolated,
+    run_lock_stored_poison_program_isolated, LockRunnerActionV1, LockRunnerEvidenceReceiptV1,
+    LockRunnerIsolatedEvidenceV1, LockRunnerLifecycleBindingV1, LockRunnerLifecyclePathV1,
+    LockRunnerProgramBindingV1, LockRunnerRequestValidationV1, LockRunnerStoredPoisonBindingV1,
+    LockRunnerStoredPoisonProfileV1,
 };
 pub(super) use map_runner::{
     run_map_lifecycle_program_isolated, run_map_program_isolated,

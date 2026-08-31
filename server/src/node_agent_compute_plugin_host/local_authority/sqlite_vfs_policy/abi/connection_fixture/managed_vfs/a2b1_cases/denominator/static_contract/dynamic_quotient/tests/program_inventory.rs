@@ -32,7 +32,7 @@ const REQUEST_BUDGET_STIMULI: [MapManagedStimulusV1; 3] = [
     MapManagedStimulusV1::LogicalSizeBudget,
 ];
 
-const LOCK_REQUEST_VALIDATION_PROGRAMS: [(LockActionV1, LockManagedStimulusV1); 10] = [
+pub(super) const LOCK_REQUEST_VALIDATION_PROGRAMS: [(LockActionV1, LockManagedStimulusV1); 10] = [
     (
         LockActionV1::LockShared,
         LockManagedStimulusV1::RangeOverflow,
@@ -656,140 +656,6 @@ fn full_map_program_inventory_accounts_for_every_frozen_member_without_opening_q
         }
         ExecutionProgramInventoryStatusV1::PlannedMissing(gap) => {
             gap == CapabilityGapV1::QuotientRunnerNotIntegrated
-        }
-    }));
-}
-
-#[test]
-fn exact_lock_request_validation_programs_are_inventoried_without_granting_supported() {
-    let record = lock_request_validation_record();
-    for (action, stimulus) in LOCK_REQUEST_VALIDATION_PROGRAMS {
-        let descriptor = lock_request_validation_descriptor(
-            action,
-            stimulus,
-            RunnerCapabilityV1::Missing(CapabilityGapV1::LockObservationIncomplete),
-        );
-        let prepared = prepare_dynamic_terminal_v1(&record, &descriptor).unwrap();
-        let receipt = super::super::runner_admission::inventory_v1(&prepared.key).unwrap();
-        assert!(matches!(
-            receipt.status(),
-            ExecutionProgramInventoryStatusV1::SourcePresentReceiptRequired { .. }
-        ));
-        assert_eq!(
-            receipt.normalized_key().recipe.capability,
-            RunnerCapabilityV1::Missing(CapabilityGapV1::LockObservationIncomplete),
-        );
-        assert_eq!(
-            project_dynamic_class_v1(
-                &record,
-                &lock_request_validation_descriptor(
-                    action,
-                    stimulus,
-                    RunnerCapabilityV1::Supported,
-                ),
-            ),
-            Err(ProjectionErrorV1::Invalid(
-                ProjectionViolationV1::RunnerAdmissionUnsealedSupported,
-            )),
-        );
-    }
-}
-
-#[test]
-fn exact_lock_lifecycle_programs_are_inventoried_without_granting_supported() {
-    let cases = lock_lifecycle_cases();
-    assert_eq!(cases.len(), 104);
-    for case in cases {
-        let record = lock_lifecycle_record(case);
-        let descriptor = lock_lifecycle_descriptor(
-            case,
-            RunnerCapabilityV1::Missing(CapabilityGapV1::LockObservationIncomplete),
-        );
-        let prepared = prepare_dynamic_terminal_v1(&record, &descriptor).unwrap();
-        let receipt = super::super::runner_admission::inventory_v1(&prepared.key).unwrap();
-        assert!(matches!(
-            receipt.status(),
-            ExecutionProgramInventoryStatusV1::SourcePresentReceiptRequired { .. }
-        ));
-        assert_eq!(
-            project_dynamic_class_v1(
-                &record,
-                &lock_lifecycle_descriptor(case, RunnerCapabilityV1::Supported),
-            ),
-            Err(ProjectionErrorV1::Invalid(
-                ProjectionViolationV1::RunnerAdmissionUnsealedSupported,
-            )),
-        );
-    }
-}
-
-#[test]
-fn full_lock_program_inventory_accounts_for_every_frozen_member_without_opening_quotient() {
-    let bundle =
-        build_lock_execution_program_inventory_v1(&super::super::super::lock::graph()).unwrap();
-    let inventory = &bundle.inventory;
-    assert_eq!(inventory.member_count, 8_668);
-    assert_eq!(bundle.reverse_index.len(), 8_668);
-    assert_eq!(inventory.source_present_member_count, 114);
-    assert_eq!(inventory.source_present_group_count, 114);
-    assert_eq!(inventory.planned_missing_member_count, 8_554);
-    let source_groups = bundle
-        .groups
-        .iter()
-        .filter(|group| {
-            matches!(
-                group.status,
-                ExecutionProgramInventoryStatusV1::SourcePresentReceiptRequired { .. }
-            )
-        })
-        .collect::<Vec<_>>();
-    assert_eq!(source_groups.len(), 114);
-    assert!(source_groups.iter().all(|group| group.member_count == 1));
-    let record = lock_request_validation_record();
-    let mut expected_source_keys = LOCK_REQUEST_VALIDATION_PROGRAMS
-        .into_iter()
-        .map(|(action, stimulus)| {
-            prepare_dynamic_terminal_v1(
-                &record,
-                &lock_request_validation_descriptor(
-                    action,
-                    stimulus,
-                    RunnerCapabilityV1::Missing(CapabilityGapV1::LockObservationIncomplete),
-                ),
-            )
-            .unwrap()
-            .key
-        })
-        .collect::<Vec<_>>();
-    expected_source_keys.extend(lock_lifecycle_cases().into_iter().map(|case| {
-        let record = lock_lifecycle_record(case);
-        prepare_dynamic_terminal_v1(
-            &record,
-            &lock_lifecycle_descriptor(
-                case,
-                RunnerCapabilityV1::Missing(CapabilityGapV1::LockObservationIncomplete),
-            ),
-        )
-        .unwrap()
-        .key
-    }));
-    assert_eq!(expected_source_keys.len(), 114);
-    assert!(source_groups
-        .iter()
-        .all(|group| expected_source_keys.contains(&group.normalized_key)));
-    assert!(expected_source_keys.iter().all(|expected| {
-        source_groups
-            .iter()
-            .filter(|group| group.normalized_key == *expected)
-            .count()
-            == 1
-    }));
-    assert!(bundle.groups.iter().all(|group| match group.status {
-        ExecutionProgramInventoryStatusV1::SourcePresentReceiptRequired { .. } => {
-            expected_source_keys.contains(&group.normalized_key)
-        }
-        ExecutionProgramInventoryStatusV1::PlannedMissing(gap) => {
-            gap == CapabilityGapV1::LockObservationIncomplete
         }
     }));
 }

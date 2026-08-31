@@ -33,6 +33,7 @@ pub(crate) use super::sqlite_namespace::{
     ManagedSqliteShmTestLockReceipt, ManagedSqliteShmTestMapDmsPath,
     ManagedSqliteShmTestMapExpectation, ManagedSqliteShmTestMapPath,
     ManagedSqliteShmTestMapPointerIdentity, ManagedSqliteShmTestMapReceipt,
+    ManagedSqliteShmTestStoredPoisonReceiptV1, ManagedSqliteShmTestStoredPoisonV1,
     ManagedSqliteShmTestTargetIdentity, ManagedSqliteShmTestTargetObserver,
     ManagedSqliteShmTestTargetSnapshot, ManagedSqliteShmTestTopologySnapshot,
     ManagedSqliteShmTestUnmapActionEvent, ManagedSqliteShmTestUnmapActionOutcome,

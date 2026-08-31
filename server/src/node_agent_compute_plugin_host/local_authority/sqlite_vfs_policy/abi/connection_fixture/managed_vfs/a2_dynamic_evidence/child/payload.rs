@@ -4,7 +4,8 @@ use super::super::super::a2b2_cases::{
 };
 
 use super::{
-    lock_lifecycle, lock_request_validation, map_lifecycle, map_region_loop, SanitizedPayloadFamily,
+    lock_lifecycle, lock_request_validation, lock_stored_poison, map_lifecycle, map_region_loop,
+    SanitizedPayloadFamily,
 };
 
 const MAX_ACTUAL_PAYLOAD_BYTES: usize = 2_048;
@@ -93,6 +94,11 @@ pub(super) fn validate_actual_payload(
         lock_lifecycle::REPORT_VERSION => (
             SanitizedPayloadFamily::LockQuotient,
             lock_lifecycle::classify_header(version, selector)?
+                .ok_or("A2_DYNAMIC_CHILD_ACTUAL_VERSION_INVALID")?,
+        ),
+        lock_stored_poison::REPORT_VERSION => (
+            SanitizedPayloadFamily::LockQuotient,
+            lock_stored_poison::classify_header(version, selector)?
                 .ok_or("A2_DYNAMIC_CHILD_ACTUAL_VERSION_INVALID")?,
         ),
         lock_request_validation::REPORT_VERSION => (

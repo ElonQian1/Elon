@@ -5,6 +5,7 @@ mod canonical;
 mod canonical_tags;
 mod catalog;
 mod descriptor_binding;
+mod lock_stored_poison_source_scope;
 mod manifest;
 mod manifest_canonical;
 mod map_runtime_source_scope;

@@ -2,6 +2,7 @@
 
 mod lifecycle;
 mod request_validation;
+mod stored_poison;
 
 pub(in super::super) use request_validation::{LockRunnerActionV1, LockRunnerRequestValidationV1};
 
@@ -21,6 +22,7 @@ use super::{
 };
 
 const CHILD_ROOT_ENV: &str = "ELON_SQLITE_A2_LOCK_QUOTIENT_CHILD_ROOT";
+const STORED_POISON_SELECTOR_ENV: &str = "ELON_SQLITE_A2_LOCK_STORED_POISON_SELECTOR";
 pub(super) const PAYLOAD_VERSION: &str = "a2lockq1";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -49,6 +51,39 @@ pub(in super::super) struct LockRunnerLifecycleBindingV1 {
     pub(in super::super) first: u8,
     pub(in super::super) count: u8,
     pub(in super::super) mask: u8,
+    pub(in super::super) normalized_descriptor_sha256: [u8; 32],
+    pub(in super::super) case_key_sha256: [u8; 32],
+    pub(in super::super) full_record_sha256: [u8; 32],
+    pub(in super::super) plan_sha256: [u8; 32],
+    pub(in super::super) implementation_sha256: [u8; 32],
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(in super::super) enum LockRunnerStoredPoisonProfileV1 {
+    GateNoMutation,
+    FileCloseNoMutation,
+    ExactSiblingDeleteNoMutation,
+    ExactSiblingOpenUncertain,
+    DmsTruncateUncertain,
+    FileCloseUncertain,
+    ExactSiblingDeleteUncertain,
+    FileGrowUncertain,
+    MappingCloseUncertain,
+    ViewUnmapUncertain,
+    LockReleaseUncertain,
+    ConnectionDetachUncertain,
+    DeleteAuthorizationUncertain,
+    DmsExclusiveReleaseUncertain,
+    DmsSharedReleaseUncertain,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(in super::super) struct LockRunnerStoredPoisonBindingV1 {
+    pub(in super::super) action: LockRunnerActionV1,
+    pub(in super::super) first: u8,
+    pub(in super::super) count: u8,
+    pub(in super::super) mask: u8,
+    pub(in super::super) profile: LockRunnerStoredPoisonProfileV1,
     pub(in super::super) normalized_descriptor_sha256: [u8; 32],
     pub(in super::super) case_key_sha256: [u8; 32],
     pub(in super::super) full_record_sha256: [u8; 32],
@@ -123,6 +158,22 @@ pub(in super::super) fn run_lock_lifecycle_program_isolated(
     run_lifecycle_parent(exact_test, binding)
 }
 
+pub(in super::super) fn run_lock_stored_poison_program_isolated(
+    exact_test: &str,
+    binding: LockRunnerStoredPoisonBindingV1,
+) -> anyhow::Result<LockRunnerIsolatedEvidenceV1> {
+    stored_poison::validate_binding(binding)?;
+    if let Some(root) = selected_child_root()? {
+        let selected = std::env::var(STORED_POISON_SELECTOR_ENV)
+            .context("read parent-selected Lock stored-poison program")?;
+        if selected == stored_poison::exact_selector(binding) {
+            stored_poison::exercise_child(&root, binding)?;
+        }
+        return Ok(LockRunnerIsolatedEvidenceV1::ChildReported);
+    }
+    run_stored_poison_parent(exact_test, binding)
+}
+
 fn run_parent(
     exact_test: &str,
     binding: LockRunnerProgramBindingV1,
@@ -182,6 +233,40 @@ fn run_lifecycle_parent(
         .wait_for_successful_report()
         .map_err(|failure| handle_child_failure(&root, failure))?;
     validate_lifecycle_parent_receipt(&root, binding, child)
+        .map_err(|error| cleanup_failed_root(&root, error))
+}
+
+fn run_stored_poison_parent(
+    exact_test: &str,
+    binding: LockRunnerStoredPoisonBindingV1,
+) -> anyhow::Result<LockRunnerIsolatedEvidenceV1> {
+    if exact_test.is_empty() {
+        return Err(anyhow!("Lock stored-poison exact test name is empty"));
+    }
+    let executable =
+        std::env::current_exe().context("resolve current Lock stored-poison test executable")?;
+    let root = create_private_child_root()?;
+    let launch = ChildLaunchIdentity::new();
+    let selector = stored_poison::exact_selector(binding);
+    let spawned = match Command::new(executable)
+        .args(["--exact", exact_test, "--nocapture"])
+        .env(CHILD_ROOT_ENV, &root)
+        .env(STORED_POISON_SELECTOR_ENV, selector)
+        .env(super::A2_DYNAMIC_CHILD_NONCE_ENV, launch.env_value())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+    {
+        Ok(child) => child,
+        Err(error) => return Err(cleanup_failed_root(&root, anyhow!(error))),
+    };
+    let bound = launch
+        .bind(spawned)
+        .map_err(|failure| handle_child_failure(&root, failure))?;
+    let child = bound
+        .wait_for_successful_report()
+        .map_err(|failure| handle_child_failure(&root, failure))?;
+    validate_stored_poison_parent_receipt(&root, binding, child)
         .map_err(|error| cleanup_failed_root(&root, error))
 }
 
@@ -261,6 +346,47 @@ fn validate_lifecycle_parent_receipt(
     ))
 }
 
+fn validate_stored_poison_parent_receipt(
+    root: &Path,
+    binding: LockRunnerStoredPoisonBindingV1,
+    child: ValidatedChildProcessReceipt,
+) -> anyhow::Result<LockRunnerIsolatedEvidenceV1> {
+    if !child.matches_family(SanitizedPayloadFamily::LockQuotient) {
+        return Err(anyhow!("Lock stored-poison child payload family mismatch"));
+    }
+    let payload = stored_poison::validate_payload(child.actual_payload(), binding)?;
+    if !child.matches_registration_id(payload.registration_id) {
+        return Err(anyhow!(
+            "Lock stored-poison child registration binding mismatch"
+        ));
+    }
+    let environment =
+        WindowsDynamicEnvironment::capture(root, &child).map_err(anyhow::Error::msg)?;
+    let cleanup = ValidatedParentCleanupReceipt::remove_after_child_exit(&child, &environment)
+        .map_err(anyhow::Error::msg)?;
+    let child_fingerprint = child.fingerprint();
+    if child_fingerprint != cleanup.child_fingerprint
+        || child.root_commitment != cleanup.root_commitment
+        || child.registration_commitment != cleanup.registration_commitment
+    {
+        return Err(anyhow!(
+            "Lock stored-poison parent cleanup binding mismatch"
+        ));
+    }
+    Ok(LockRunnerIsolatedEvidenceV1::ParentReceipt(
+        LockRunnerEvidenceReceiptV1 {
+            root_commitment_sha256: child.root_commitment.0,
+            child_fingerprint_sha256: child_fingerprint.0,
+            registration_commitment_sha256: child.registration_commitment.0,
+            payload_commitment_sha256: child.payload_commitment.0,
+            environment_sha256: digest_environment(&environment),
+            cleanup_sha256: digest_cleanup(&cleanup),
+            native_receipt_sha256: payload.native_receipt_sha256,
+            child_exit_code: child.exit_code,
+        },
+    ))
+}
+
 fn selected_child_root() -> anyhow::Result<Option<PathBuf>> {
     let Some(root) = std::env::var_os(CHILD_ROOT_ENV).map(PathBuf::from) else {
         return Ok(None);
@@ -304,6 +430,22 @@ fn cleanup_failed_root(root: &Path, error: anyhow::Error) -> anyhow::Error {
         Err(cleanup) if cleanup.kind() == std::io::ErrorKind::NotFound => error,
         Err(cleanup) => error.context(format!("Lock quotient fallback cleanup failed: {cleanup}")),
     }
+}
+
+#[cfg(all(test, windows))]
+pub(in super::super) fn selected_lock_stored_poison_selector_for_test() -> Option<String> {
+    std::env::var_os(CHILD_ROOT_ENV)?;
+    std::env::var(STORED_POISON_SELECTOR_ENV).ok()
+}
+
+#[cfg(all(test, windows))]
+pub(in super::super) fn lock_stored_poison_selector_for_test(
+    action_tag: u64,
+    profile_tag: u64,
+    first: u8,
+    count: u8,
+) -> Result<String, &'static str> {
+    super::child::lock_stored_poison::selector(action_tag, profile_tag, first, count)
 }
 
 fn digest_native_receipt(payload: &str) -> [u8; 32] {

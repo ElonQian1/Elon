@@ -2,6 +2,7 @@
 
 mod lifecycle;
 mod request_validation;
+mod stored_poison;
 
 #[cfg(windows)]
 use std::fmt;
@@ -21,6 +22,11 @@ use lifecycle::{program_spec_v1 as lifecycle_program_spec_v1, LockLifecycleProgr
 use request_validation::{
     program_spec_v1 as request_validation_program_spec_v1, LockProgramSpecV1,
 };
+#[cfg(windows)]
+use stored_poison::LockStoredPoisonProfileV1;
+use stored_poison::{
+    program_spec_v1 as stored_poison_program_spec_v1, LockStoredPoisonProgramSpecV1,
+};
 
 #[cfg(windows)]
 use request_validation::LockRequestValidationGuardV1;
@@ -30,6 +36,8 @@ use crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::a
     run_lock_lifecycle_program_isolated, run_lock_program_isolated, LockRunnerActionV1,
     LockRunnerEvidenceReceiptV1, LockRunnerIsolatedEvidenceV1, LockRunnerLifecycleBindingV1,
     LockRunnerLifecyclePathV1, LockRunnerProgramBindingV1, LockRunnerRequestValidationV1,
+    LockRunnerStoredPoisonBindingV1, LockRunnerStoredPoisonProfileV1,
+    run_lock_stored_poison_program_isolated,
 };
 
 /// A real execution receipt. Private fields and the absent public constructor prevent digest-only
@@ -69,6 +77,8 @@ impl ValidatedLockRunnerExecutionV1 {
 pub(super) enum LockRunnerExecutionViolationV1 {
     UnsupportedProgram,
     PlanBindingMismatch,
+    MemberCatalogInvalid,
+    MemberSealMismatch,
     ReceiptBindingMismatch,
     ExecutionSealMismatch,
 }
@@ -185,6 +195,21 @@ pub(in super::super) fn run_lock_isolated_for_test(
                 implementation_sha256: program.implementation_sha256.0,
             },
         ),
+        LockProgramCaseV1::StoredPoison(stored) => run_lock_stored_poison_program_isolated(
+            exact_test,
+            LockRunnerStoredPoisonBindingV1 {
+                action: runner_action_v1(stored.action),
+                first: stored.first,
+                count: stored.count,
+                mask: stored.mask,
+                profile: runner_stored_poison_profile_v1(stored.profile),
+                normalized_descriptor_sha256: program.normalized_descriptor_sha256.0,
+                case_key_sha256: member.case_key_sha256.0,
+                full_record_sha256: member.full_record_sha256.0,
+                plan_sha256: program.plan_sha256.0,
+                implementation_sha256: program.implementation_sha256.0,
+            },
+        ),
     };
     match evidence.map_err(|error| LockRunnerExecutionErrorV1(error.to_string()))? {
         LockRunnerIsolatedEvidenceV1::ChildReported => {
@@ -193,6 +218,59 @@ pub(in super::super) fn run_lock_isolated_for_test(
         LockRunnerIsolatedEvidenceV1::ParentReceipt(evidence) => Ok(
             LockRunnerIsolatedOutcomeV1::ParentReceipt(seal_execution_receipt(program, evidence)),
         ),
+    }
+}
+
+#[cfg(windows)]
+const fn runner_stored_poison_profile_v1(
+    profile: LockStoredPoisonProfileV1,
+) -> LockRunnerStoredPoisonProfileV1 {
+    match profile {
+        LockStoredPoisonProfileV1::GateNoMutation => {
+            LockRunnerStoredPoisonProfileV1::GateNoMutation
+        }
+        LockStoredPoisonProfileV1::FileCloseNoMutation => {
+            LockRunnerStoredPoisonProfileV1::FileCloseNoMutation
+        }
+        LockStoredPoisonProfileV1::ExactSiblingDeleteNoMutation => {
+            LockRunnerStoredPoisonProfileV1::ExactSiblingDeleteNoMutation
+        }
+        LockStoredPoisonProfileV1::ExactSiblingOpenUncertain => {
+            LockRunnerStoredPoisonProfileV1::ExactSiblingOpenUncertain
+        }
+        LockStoredPoisonProfileV1::DmsTruncateUncertain => {
+            LockRunnerStoredPoisonProfileV1::DmsTruncateUncertain
+        }
+        LockStoredPoisonProfileV1::FileCloseUncertain => {
+            LockRunnerStoredPoisonProfileV1::FileCloseUncertain
+        }
+        LockStoredPoisonProfileV1::ExactSiblingDeleteUncertain => {
+            LockRunnerStoredPoisonProfileV1::ExactSiblingDeleteUncertain
+        }
+        LockStoredPoisonProfileV1::FileGrowUncertain => {
+            LockRunnerStoredPoisonProfileV1::FileGrowUncertain
+        }
+        LockStoredPoisonProfileV1::MappingCloseUncertain => {
+            LockRunnerStoredPoisonProfileV1::MappingCloseUncertain
+        }
+        LockStoredPoisonProfileV1::ViewUnmapUncertain => {
+            LockRunnerStoredPoisonProfileV1::ViewUnmapUncertain
+        }
+        LockStoredPoisonProfileV1::LockReleaseUncertain => {
+            LockRunnerStoredPoisonProfileV1::LockReleaseUncertain
+        }
+        LockStoredPoisonProfileV1::ConnectionDetachUncertain => {
+            LockRunnerStoredPoisonProfileV1::ConnectionDetachUncertain
+        }
+        LockStoredPoisonProfileV1::DeleteAuthorizationUncertain => {
+            LockRunnerStoredPoisonProfileV1::DeleteAuthorizationUncertain
+        }
+        LockStoredPoisonProfileV1::DmsExclusiveReleaseUncertain => {
+            LockRunnerStoredPoisonProfileV1::DmsExclusiveReleaseUncertain
+        }
+        LockStoredPoisonProfileV1::DmsSharedReleaseUncertain => {
+            LockRunnerStoredPoisonProfileV1::DmsSharedReleaseUncertain
+        }
     }
 }
 
@@ -232,6 +310,7 @@ enum LockProgramCaseV1 {
         guard: LockRequestValidationGuardV1,
     },
     Lifecycle(LockLifecycleProgramSpecV1),
+    StoredPoison(LockStoredPoisonProgramSpecV1),
 }
 
 #[derive(Clone, Copy)]
@@ -239,6 +318,7 @@ struct SourceLockProgramSpecV1 {
     #[cfg(windows)]
     case: LockProgramCaseV1,
     normalized_descriptor_sha256: Digest32,
+    expected_member: Option<StaticMemberSealV1>,
     plan_sha256: Digest32,
     implementation_sha256: Digest32,
 }
@@ -263,6 +343,12 @@ fn program_v1(
     if key.recipe.capability != RunnerCapabilityV1::Supported {
         return Err(LockRunnerExecutionViolationV1::UnsupportedProgram);
     }
+    if program
+        .expected_member
+        .is_some_and(|expected| expected != member)
+    {
+        return Err(LockRunnerExecutionViolationV1::MemberSealMismatch);
+    }
     Ok(LockProgramV1 {
         #[cfg(windows)]
         case: program.case,
@@ -280,7 +366,13 @@ fn source_program_spec_v1(
     match request_validation_program_spec_v1(key, plan) {
         Ok(program) => Ok(from_request_validation_v1(program)),
         Err(LockRunnerExecutionViolationV1::UnsupportedProgram) => {
-            lifecycle_program_spec_v1(key, plan).map(from_lifecycle_v1)
+            match lifecycle_program_spec_v1(key, plan) {
+                Ok(program) => Ok(from_lifecycle_v1(program)),
+                Err(LockRunnerExecutionViolationV1::UnsupportedProgram) => {
+                    stored_poison_program_spec_v1(key, plan).map(from_stored_poison_v1)
+                }
+                Err(error) => Err(error),
+            }
         }
         Err(error) => Err(error),
     }
@@ -296,6 +388,7 @@ fn from_request_validation_v1(program: LockProgramSpecV1) -> SourceLockProgramSp
             guard: program.guard,
         },
         normalized_descriptor_sha256: program.normalized_descriptor_sha256,
+        expected_member: None,
         plan_sha256: program.plan_sha256,
         implementation_sha256: program.implementation_sha256,
     }
@@ -306,9 +399,35 @@ fn from_lifecycle_v1(program: LockLifecycleProgramSpecV1) -> SourceLockProgramSp
         #[cfg(windows)]
         case: LockProgramCaseV1::Lifecycle(program),
         normalized_descriptor_sha256: program.normalized_descriptor_sha256,
+        expected_member: None,
         plan_sha256: program.plan_sha256,
         implementation_sha256: program.implementation_sha256,
     }
+}
+
+fn from_stored_poison_v1(program: LockStoredPoisonProgramSpecV1) -> SourceLockProgramSpecV1 {
+    SourceLockProgramSpecV1 {
+        #[cfg(windows)]
+        case: LockProgramCaseV1::StoredPoison(program),
+        normalized_descriptor_sha256: program.normalized_descriptor_sha256,
+        expected_member: Some(program.member),
+        plan_sha256: program.plan_sha256,
+        implementation_sha256: program.implementation_sha256,
+    }
+}
+
+#[cfg(test)]
+pub(super) fn stored_poison_catalog_row_count_for_test() -> usize {
+    stored_poison::catalog_row_count_for_test()
+}
+
+#[cfg(test)]
+pub(super) fn validate_program_for_test(
+    key: &DynamicClassKeyV1,
+    member: StaticMemberSealV1,
+    plan: CompiledRunnerPlanV1,
+) -> Result<(), LockRunnerExecutionViolationV1> {
+    program_v1(key, member, plan).map(|_| ())
 }
 
 #[cfg(windows)]

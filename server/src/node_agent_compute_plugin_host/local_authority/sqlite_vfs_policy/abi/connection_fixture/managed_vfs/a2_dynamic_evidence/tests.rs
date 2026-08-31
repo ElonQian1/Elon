@@ -265,7 +265,7 @@ fn child_payload_rejects_lock_lifecycle_widening_and_q1_q2_cross_family_headers(
 
     assert_eq!(
         validate_payload_for_test(&payload_with_count("a2lockq3", canonical, 103)),
-        Err("A2_DYNAMIC_CHILD_ACTUAL_VERSION_INVALID")
+        Err("A2_DYNAMIC_CHILD_ACTUAL_SELECTOR_INVALID")
     );
     assert_eq!(
         validate_payload_for_test(&payload_with_count("a2lockq1", canonical, 103)),
@@ -279,6 +279,30 @@ fn child_payload_rejects_lock_lifecycle_widening_and_q1_q2_cross_family_headers(
         )),
         Err("A2_DYNAMIC_CHILD_ACTUAL_SELECTOR_INVALID")
     );
+}
+
+#[test]
+fn child_payload_accepts_exact_lock_stored_poison_width_without_header_widening() {
+    let canonical = "lock-exclusive-first0-count1-gate-none-lock-certain-retention-succeeded";
+    validate_payload_for_test(&payload_with_count("a2lockq3", canonical, 135))
+        .expect("accept one exact canonical Lock stored-poison payload header");
+    for field_count in [134, 136] {
+        assert_eq!(
+            validate_payload_for_test(&payload_with_count("a2lockq3", canonical, field_count,)),
+            Err("A2_DYNAMIC_CHILD_ACTUAL_FIELDS_INVALID")
+        );
+    }
+    for selector in [
+        "lock-shared-first0-count2-gate-none-lock-certain-retention-succeeded",
+        "lock-exclusive-first7-count2-gate-none-lock-certain-retention-succeeded",
+        "lock-exclusive-first0-count1-gate-none-lock-certain-route-unknown",
+        "unknown-lock-stored-poison-member",
+    ] {
+        assert_eq!(
+            validate_payload_for_test(&payload_with_count("a2lockq3", selector, 135)),
+            Err("A2_DYNAMIC_CHILD_ACTUAL_SELECTOR_INVALID")
+        );
+    }
 }
 
 #[test]

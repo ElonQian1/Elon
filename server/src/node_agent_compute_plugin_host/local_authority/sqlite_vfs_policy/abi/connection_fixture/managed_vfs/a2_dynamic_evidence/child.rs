@@ -4,6 +4,7 @@ use sha2::{Digest, Sha256};
 
 pub(super) mod lock_lifecycle;
 mod lock_request_validation;
+pub(super) mod lock_stored_poison;
 pub(super) mod map_lifecycle;
 pub(super) mod map_region_loop;
 mod payload;

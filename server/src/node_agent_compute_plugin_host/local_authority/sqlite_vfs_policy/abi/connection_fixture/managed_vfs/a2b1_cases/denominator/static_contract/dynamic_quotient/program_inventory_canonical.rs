@@ -84,6 +84,22 @@ const SOURCE_SCOPE: &[(&str, &str)] = &[
         include_str!("runner_admission/lock_program/lifecycle.rs"),
     ),
     (
+        "runner_admission/lock_program/stored_poison.rs",
+        include_str!("runner_admission/lock_program/stored_poison.rs"),
+    ),
+    (
+        "runner_admission/lock_program/stored_poison/catalog.rs",
+        include_str!("runner_admission/lock_program/stored_poison/catalog.rs"),
+    ),
+    (
+        "runner_admission/lock_program/stored_poison/stored_poison_retention_succeeded_members.v1.tsv",
+        include_str!("runner_admission/lock_program/stored_poison/stored_poison_retention_succeeded_members.v1.tsv"),
+    ),
+    (
+        "runner_admission/lock_program/stored_poison/source_scope.rs",
+        include_str!("runner_admission/lock_program/stored_poison/source_scope.rs"),
+    ),
+    (
         "runner_admission/canonical.rs",
         include_str!("runner_admission/canonical.rs"),
     ),

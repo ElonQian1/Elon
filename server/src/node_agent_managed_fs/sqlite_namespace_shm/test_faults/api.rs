@@ -48,8 +48,8 @@ pub(crate) struct ManagedSqliteShmTestFaultProbe {
 #[derive(Clone)]
 #[must_use = "the exact-target observer must be retained for post-close observation"]
 pub(crate) struct ManagedSqliteShmTestTargetObserver {
-    coordinator: Arc<ManagedSqliteShmCoordinator>,
-    target: ManagedSqliteShmTestFaultTarget,
+    pub(super) coordinator: Arc<ManagedSqliteShmCoordinator>,
+    pub(super) target: ManagedSqliteShmTestFaultTarget,
 }
 
 /// Numeric identity observed from the exact live physical target. This copy-only value is
@@ -204,6 +204,18 @@ impl ManagedSqliteShmTestTargetObserver {
             .lock()
             .map_err(|_| "NODE_MANAGED_SQLITE_SHM_TEST_LOCK_RUNTIME_POISONED")?
             .finish(self.target.identity())
+    }
+
+    /// Seals an armed Lock ledger only when stored-poison admission returned before every managed,
+    /// native and local Lock event.
+    pub(crate) fn finish_stored_poison_lock_observation(
+        &self,
+    ) -> Result<ManagedSqliteShmTestLockReceipt, &'static str> {
+        self.coordinator
+            .test_lock_runtime
+            .lock()
+            .map_err(|_| "NODE_MANAGED_SQLITE_SHM_TEST_LOCK_RUNTIME_POISONED")?
+            .finish_stored_poison_without_attempt(self.target.identity())
     }
 
     /// Disarms an unfinished exact-target Lock ledger before fixture cleanup or unwind proceeds.

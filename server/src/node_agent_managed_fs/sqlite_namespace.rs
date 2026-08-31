@@ -63,6 +63,7 @@ pub(crate) use shm::{
     ManagedSqliteShmTestLockReceipt, ManagedSqliteShmTestMapDmsPath,
     ManagedSqliteShmTestMapExpectation, ManagedSqliteShmTestMapPath,
     ManagedSqliteShmTestMapPointerIdentity, ManagedSqliteShmTestMapReceipt,
+    ManagedSqliteShmTestStoredPoisonReceiptV1, ManagedSqliteShmTestStoredPoisonV1,
     ManagedSqliteShmTestTargetIdentity, ManagedSqliteShmTestTargetObserver,
     ManagedSqliteShmTestTargetSnapshot, ManagedSqliteShmTestTopologySnapshot,
     ManagedSqliteShmTestUnmapActionEvent, ManagedSqliteShmTestUnmapActionOutcome,

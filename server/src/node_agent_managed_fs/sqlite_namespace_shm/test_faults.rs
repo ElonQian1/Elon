@@ -17,6 +17,9 @@ mod internal_phase_tests;
 mod mapping;
 #[path = "test_faults/operation.rs"]
 mod operation;
+#[cfg(all(test, windows))]
+#[path = "test_faults/stored_poison.rs"]
+mod stored_poison;
 #[cfg(test)]
 #[path = "test_faults/tests.rs"]
 mod tests;
@@ -28,3 +31,7 @@ pub(crate) use api::{
     ManagedSqliteShmTriggeredTestFaultObservation,
 };
 pub(super) use controller::ManagedSqliteShmTestFaultController;
+#[cfg(all(test, windows))]
+pub(crate) use stored_poison::{
+    ManagedSqliteShmTestStoredPoisonReceiptV1, ManagedSqliteShmTestStoredPoisonV1,
+};
