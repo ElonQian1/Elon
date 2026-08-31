@@ -164,12 +164,12 @@ internal class ChatSideMenuController(
         overlay.animate().cancel()
         panel.animate()
             .translationX(closedTranslation())
-            .setDuration(DURATION_MS)
+            .setDuration(ChatSideMenuTransitionPolicy.ANIMATION_DURATION_MS)
             .setInterpolator(interpolator)
             .start()
         overlay.animate()
             .alpha(0f)
-            .setDuration(DURATION_MS)
+            .setDuration(ChatSideMenuTransitionPolicy.ANIMATION_DURATION_MS)
             .setInterpolator(interpolator)
             .setListener(object : AnimatorListenerAdapter() {
                 override fun onAnimationEnd(animation: Animator) {
@@ -349,12 +349,12 @@ internal class ChatSideMenuController(
         overlay.animate().cancel()
         panel.animate()
             .translationX(0f)
-            .setDuration(DURATION_MS)
+            .setDuration(ChatSideMenuTransitionPolicy.ANIMATION_DURATION_MS)
             .setInterpolator(interpolator)
             .start()
         overlay.animate()
             .alpha(1f)
-            .setDuration(DURATION_MS)
+            .setDuration(ChatSideMenuTransitionPolicy.ANIMATION_DURATION_MS)
             .setInterpolator(interpolator)
             .setListener(object : AnimatorListenerAdapter() {
                 override fun onAnimationEnd(animation: Animator) {
@@ -418,7 +418,7 @@ internal class ChatSideMenuController(
         sideMenus.social.attach(panel, { animate -> close(animate) }, { toggleSettingsBubble() }, dp, selectableForeground)
         sideMenus.webChat.attach(
             panel,
-            { animate -> close(animate) },
+            { action -> ChatSideMenuTransitionPolicy.handoffAfterAnimatedClose(overlay, { close(true) }, action) },
             { toggleSettingsBubble() },
             dp,
             selectableForeground,
@@ -917,7 +917,6 @@ internal class ChatSideMenuController(
     }
 
     private companion object {
-        private const val DURATION_MS = 260L
         private const val SIDE_MENU_HANDLE_PREFS = "chat_side_menu_handle"
         private const val SIDE_MENU_HANDLE_VISIBLE_KEY = "visible"
         private const val SIDE_MENU_HANDLE_DEFAULT_VISIBLE_MIGRATION_KEY = "default_visible_20260625"

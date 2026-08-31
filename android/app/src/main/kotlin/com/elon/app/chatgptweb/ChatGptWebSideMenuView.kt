@@ -36,7 +36,7 @@ internal class ChatGptWebSideMenuView(
     private val remoteConversationActionsAvailable: () -> Boolean,
     private val openRemoteConversationActions: (ChatGptWebConversation) -> Unit,
     private val openSettings: () -> Unit,
-    private val requestClose: (Boolean) -> Unit,
+    private val closeThen: (() -> Unit) -> Unit,
     private val dp: (Int) -> Int,
     private val selectableForeground: () -> Drawable?,
 ) : FrameLayout(activity) {
@@ -58,7 +58,7 @@ internal class ChatGptWebSideMenuView(
             localProjectActions = localProjectActions,
             remoteActionsAvailable = remoteConversationActionsAvailable,
             openRemoteActions = openRemoteConversationActions,
-            closeThen = ::closeThen,
+            closeThen = closeThen,
             render = ::render,
             dp = dp,
             selectableForeground = selectableForeground,
@@ -175,8 +175,7 @@ internal class ChatGptWebSideMenuView(
             requestIndexRefresh()
         })
         addView(iconButton(R.drawable.ic_side_menu_new_chat, ChatGptNativeNavigationSelector.NEW_CONVERSATION) {
-            requestClose(true)
-            postDelayed(newConversation, CLOSE_DELAY_MS)
+            closeThen(newConversation)
         })
     }
 
@@ -536,8 +535,7 @@ internal class ChatGptWebSideMenuView(
             if (selectedTab == ChatGptWebSideMenuTab.PROJECTS && projectActions != null) {
                 WebChatLocalProjectDialogs.showCreate(activity, projectActions, ::render)
             } else {
-                requestClose(true)
-                postDelayed(openFeatureNavigation, CLOSE_DELAY_MS)
+                closeThen(openFeatureNavigation)
             }
         }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f))
         addView(footerAction(
@@ -564,18 +562,9 @@ internal class ChatGptWebSideMenuView(
         setOnClickListener { onClick() }
     }
 
-    private fun closeThen(action: () -> Unit) {
-        requestClose(true)
-        postDelayed(action, CLOSE_DELAY_MS)
-    }
-
     private fun roundedBackground(color: String, radiusDp: Int) = GradientDrawable().apply {
         shape = GradientDrawable.RECTANGLE
         cornerRadius = dp(radiusDp).toFloat()
         setColor(Color.parseColor(color))
-    }
-
-    private companion object {
-        const val CLOSE_DELAY_MS = 180L
     }
 }

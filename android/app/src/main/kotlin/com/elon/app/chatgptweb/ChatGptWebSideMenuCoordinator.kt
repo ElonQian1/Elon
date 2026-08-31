@@ -43,7 +43,7 @@ internal class ChatGptWebSideMenuCoordinator(
 
     fun attach(
         panel: FrameLayout,
-        requestClose: (Boolean) -> Unit,
+        closeThen: (() -> Unit) -> Unit,
         openSettings: () -> Unit,
         dp: (Int) -> Int,
         selectableForeground: () -> Drawable?,
@@ -62,7 +62,7 @@ internal class ChatGptWebSideMenuCoordinator(
             remoteConversationActionsAvailable = remoteConversationActionsAvailable,
             openRemoteConversationActions = openRemoteConversationActions,
             openSettings = openSettings,
-            requestClose = requestClose,
+            closeThen = closeThen,
             dp = dp,
             selectableForeground = selectableForeground,
         )

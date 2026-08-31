@@ -30,6 +30,10 @@ class ChatGptWebSideMenuContractTest {
         assertTrue(view.contains("if (localProjectActions() == null) post { openProject(project.path) }"))
         assertTrue(view.contains("setOnClickListener { closeThen { openConversation(conversation.path) } }"))
         assertTrue(!view.contains("closeThen { openProject(project.path) }"))
+        assertTrue(view.contains("closeThen(newConversation)"))
+        assertTrue(view.contains("closeThen(openFeatureNavigation)"))
+        assertTrue(!view.contains("CLOSE_DELAY_MS"))
+        assertTrue(!view.contains("postDelayed(newConversation"))
         assertTrue(view.contains("conversationActions.button(conversation)"))
         assertTrue(view.contains("conversationActions.show(conversation)"))
         val actions = read(
@@ -51,6 +55,7 @@ class ChatGptWebSideMenuContractTest {
         assertTrue(dateStrip.contains("isSelected = selected"))
         assertTrue(controller.contains("applyChatSideMenuContentMode("))
         assertTrue(controller.contains("sideMenus.webChat.attach("))
+        assertTrue(controller.contains("ChatSideMenuTransitionPolicy.closeHandoffDelayMs"))
         assertTrue(controller.contains("ChatSideMenuWebChatControl("))
         assertTrue(webChatControl.contains("fun selectTab(tab: ChatGptWebSideMenuTab)"))
         assertTrue(webChatControl.contains("fun selectDate(date: LocalDate)"))
