@@ -7,6 +7,7 @@ use super::{
     types::{ManagedSqliteShmFailure, ManagedSqliteShmFailurePhase, ManagedSqliteShmMapMode},
 };
 
+#[path = "test_map_runtime/mapping_sequence.rs"]
 mod mapping_sequence;
 
 use mapping_sequence::{validate_expectation, MappingSequence, MappingSequenceEvent};

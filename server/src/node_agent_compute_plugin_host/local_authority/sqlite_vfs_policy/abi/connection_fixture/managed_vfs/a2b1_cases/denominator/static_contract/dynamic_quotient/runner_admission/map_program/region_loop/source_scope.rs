@@ -2,8 +2,8 @@
 
 use sha2::{Digest, Sha256};
 
-use super::super::super::super::map_runtime_source_scope::MAP_RUNTIME_DEPENDENCY_SOURCE_SCOPE_V1;
 use super::super::super::super::super::source_leaf_authority::Digest32;
+use super::super::super::super::map_runtime_source_scope::MAP_RUNTIME_DEPENDENCY_SOURCE_SCOPE_V1;
 use super::MapRegionLoopProgramV1;
 
 pub(super) fn digest_implementation_v1(program: MapRegionLoopProgramV1) -> Digest32 {
