@@ -31,13 +31,15 @@ Expected 或 source universe。
 program family、私有 actual receipt 和 parent/child/cleanup 合同；同时新增 Lock
 `RangeOverflow`、`EndPastEight` 与 shared action 专属 `SharedMultiSlot` 的 exact 10-member managed
 request-validation executable family，绑定真实安装的 `xShmLock`、原始 flags、`SQLITE_IOERR_SHMLOCK`、
-raw-slot 不变、连接存活与 parent/child/cleanup。另新增完整 Map/Lock 两个 root 的两遍
+raw-slot 不变、连接存活与 parent/child/cleanup；本批再新增 104 个 positive lifecycle source-wired program：
+native acquire 44、native release 44、shared-local acquire/release 16，并绑定 same-target pre/post、exact
+runtime/SHM identity、selected/sibling snapshot 与一次性 native/local ledger。另新增完整 Map/Lock 两个 root 的两遍
 pre-manifest execution-program inventory，以及
 `reviewed inventory -> source-program admission provider -> catalog/manifest binding` 的失败关闭源码桥。inventory
 仍只区分 `PlannedMissing` 与 `SourcePresentReceiptRequired`，不签发 `Supported`；只有完整无 planned-missing 且
 body digest 精确匹配 checked-in reviewed digest 时，provider authority 才可构造。current source 未编译、未运行，
 source test 对 Map 预期有 `6` 个 source-present member/group、`43,470` 个 planned-missing member；对 Lock
-预期有 `10` 个 source-present member/group、`8,658` 个 planned-missing member。两个 reviewed digest 均未
+预期有 `114` 个 source-present member/group、`8,554` 个 planned-missing member。两个 reviewed digest 均未
 checked-in/frozen，也尚未成功产出
 或冻结任何真实商 manifest。
 
@@ -65,12 +67,13 @@ checked-in/frozen，也尚未成功产出
 - [x] root-specific producer coherence 对全部真实 typed tuple 失败关闭：source/stimulus/prestate/operation/
       phase/timing/occurrence/recipe/关键 axes 不可跨 tuple 拼接；未知 tuple、跨 root Missing gap、mixed
       Supported/Missing state 与 mixed Missing gap 均被拒绝。source-level `Supported` 形状严格限于 Map
-      `RegionSizeBudget`、`RegionCountBudget`、`LogicalSizeBudget` 三类 `Completed` 请求和上述 Lock exact
-      10-member 请求校验族，且均仍须进入 root-specific 私有 actual receipt 复验。
+      `RegionSizeBudget`、`RegionCountBudget`、`LogicalSizeBudget` 三类 `Completed` 请求、上述 Lock exact
+      10-member 请求校验族和 104-member positive lifecycle 族，且均仍须进入 root-specific 私有 actual receipt 复验。
 - [x] projector provenance 覆盖 `producer_coherence/{map,map_axes,lock,lock_axes}.rs`、
       `descriptor_binding.rs`、`membership_commitment.rs`、`runner_admission.rs` 与
       `runner_admission/{canonical,map,map_program,lock,lock_program}.rs`、Map/Lock program 子模块、
-      `projector/lock_execution.rs` 与 `a2_dynamic_evidence/{map_runner,lock_runner}` 及其 request 子模块。
+      `projector/lock_execution.rs` 与 `a2_dynamic_evidence/{map_runner,lock_runner}` 及其 request/lifecycle 子模块，
+      并覆盖 Lock lower ledger 与 exact-target observer owner。
 - [x] current source 从 validated/coherent typed key 内部编译 root-bound plan；producer 无法提交 plan。普通
       `resolve_v1` 仍拒绝裸 `Supported`；只有 root-specific execution projector 消费的私有
       `MapRunnerExecutionReceiptV1` 或 `LockRunnerExecutionReceiptV1` 与 exact member、normalized descriptor、
@@ -96,11 +99,13 @@ offset/effect 与 custody 均保留。任何未版本化、未执行的“看起
 - [x] Test source：正式 denominator gate 与内部 bundle 测试锁定 Map 预期总成员 `43,476`，exact matcher 只允许
       `RegionSizeBudget`、`RegionCountBudget`、`LogicalSizeBudget` 三类 `Completed` 请求的 Observe/Extend 六组、
       各一 member；预期 source-present 为 `6` member / `6` group，其余 `43,470` member 保持 planned missing。
-- [x] Test source：Lock 预期总成员 `8,668`；exact matcher 只允许 Lock/Unlock × Shared/Exclusive 的
-      `RangeOverflow`、`EndPastEight`，以及 Lock/Unlock × Shared 的 `SharedMultiSlot`，共 `10` member / `10`
-      source-present group，其余 `8,658` member 保持 planned missing；exclusive `SharedMultiSlot` 失败关闭。
+- [x] Test source：Lock 预期总成员 `8,668`；exact matcher 保留 Lock/Unlock × Shared/Exclusive 的
+      `RangeOverflow`、`EndPastEight`，以及 Lock/Unlock × Shared 的 `SharedMultiSlot` 共 `10` member / `10` group，
+      并新增 native acquire 44、native release 44、shared-local acquire/release 16，共形成 `114` member / `114`
+      source-present group，其余 `8,554` member 保持 planned missing；任何范围、prestate、operation、Expected 或
+      native/local receipt identity 扩张均失败关闭。
 - [ ] Current-source verification：编译并运行上述 gate，记录实际 counts 与 inventory digest；本批按架构阶段约束
-      保持 `passed=0 failed=0 not_run`。
+      保持 `passed=0 failed=0 actual=not_run`。
 - [ ] Freeze：每个 root 的完整 program source 全部 source-present 后，由独立 review 分别冻结 inventory
       bytes/digest，并让同 root quotient manifest context 绑定该 digest。当前不得执行此项。
 
@@ -120,8 +125,8 @@ coverage 或 Windows numerator。
       source-program admission 精确成立后形成 class；本 gate 不生成 `Supported`、execution digest 或 Windows record。
 - [x] Source implementation：quotient manifest context/body 绑定 reviewed inventory membership/catalog/body 与
       source-program admission commitment，不能跨 inventory 或 manifest 重放 member→program→class 关系。
-- [ ] Current-source verification：本批不编译、不运行；`passed=0 failed=0 not_run`。
-- [ ] Current full admission：source test 预期 Map `43,470`、Lock `8,658` 个 member 仍 planned-missing，且两个 root
+- [ ] Current-source verification：本批不编译、不运行；`passed=0 failed=0 actual=not_run`。
+- [ ] Current full admission：source test 预期 Map `43,470`、Lock `8,554` 个 member 仍 planned-missing，且两个 root
       均没有 checked-in reviewed inventory digest，因此 provider authority 不可构造，full candidate 必须在
       catalog/manifest 前原子失败。
 
@@ -179,7 +184,8 @@ source 新增的 reviewed source-admission path 尚未运行；按 source contra
 整体仍未闭合。
 
 前序基线测试事实如下；fingerprint 只标识相应验证回执，不提升验收层级。runner-admission 改动后的
-current admission、program-inventory 与 reviewed source-admission source 均为 `not_run`，本批
+current source-only baseline 为 `2cdbd70f75e18a16352d7cd1002e8b711bc11375`；其 admission、program-inventory
+与 reviewed source-admission source 均为 `not_run`，本批
 `passed=0/failed=0`：
 
 | Verification | Result | Fingerprint / actual |
@@ -238,10 +244,11 @@ Git SHA、Windows build/arch/filesystem/SQLite、child PID/nonce、actual semant
 retention、parent root deletion receipt 与 validation fingerprint。
 
 本批 source-only Map/Lock program 已把 parent-owned isolated root、Windows child execution、child terminal/exit 与
-parent cleanup receipt 设计进私有 actual receipt。Map 只覆盖三类 request-budget/`Completed`；Lock 只覆盖 exact
-10-member managed request-validation 族，并逐条绑定真实安装的 `xShmLock` 原始调用、失败码、未创建 SHM target、
-raw-slot 不变、连接存活与 callback 后由 `sqlite3_vfs_find` 重证的 exact table/name/context/registered custody。
-源码尚未编译或运行，没有生成上述正式 record，也不能增加 class/member coverage 或 Windows numerator。
+parent cleanup receipt 设计进私有 actual receipt。Map 只覆盖三类 request-budget/`Completed`；Lock 保留 exact
+10-member managed request-validation 族，并新增 104-member positive lifecycle 族。前者绑定真实安装的 `xShmLock`
+拒绝结果、raw-slot 不变与 registration custody；后者绑定 same-target pre/post、exact runtime/SHM identity、
+selected/sibling masks 及一次性 native/local ledger。源码尚未编译或运行，`actual=not_run`，没有生成上述正式
+record，也不能增加 class/member coverage 或 Windows numerator。
 
 以下不算真实 record：直接调用 coordinator；从 Expected 合成 actual；仅观察注入器返回；复用另一 class
 或 A2b2 family 的 record；同进程 panic 测试；缺 child exit 或 parent cleanup；跨 commit、跨 manifest、跨
@@ -275,12 +282,12 @@ Map、Lock、既有 A2b2 `117/117` 与宽回归均闭合，聚合 A2 才可由�
 |---|---:|---:|---|
 | `StaticContract` | `43476/43476` | `8668/8668` | 静态 source-exhaustive合同已闭合 |
 | typed projector/candidate | `prior compiled; current source uncompiled/unrun` | `prior compiled; current source uncompiled/unrun` | 实现存在，不等于 current source 已验证或 manifest 冻结 |
-| sealed runner admission | `source written; exact receipt-only narrow support; default gap retained; not run` | `source written; exact receipt-only 10-member support; default gap retained; not run` | raw `Supported` 不能成为 permit；完整 runner/observer 尚缺 |
-| narrow executable program | `RegionSizeBudget+RegionCountBudget+LogicalSizeBudget / Completed; source-only; private actual receipt + parent/child/cleanup; uncompiled/unrun` | `RangeOverflow+EndPastEight across 4 actions, SharedMultiSlot across 2 shared actions; installed xShmLock + private actual receipt + parent/child/cleanup; uncompiled/unrun` | 仅证明代码形状已写入，不是动态执行证据 |
-| pre-manifest program inventory | `full-root two-pass source written; unrun expectation: 43476 total, 6 source-present members/groups, 43470 planned-missing members` | `full-root two-pass source written; unrun expectation: 8668 total, 10 source-present members/groups, 8658 planned-missing members` | 两个 digest 均未生成/冻结；不是 quotient、coverage 或 Windows evidence |
+| sealed runner admission | `source written; exact receipt-only narrow support; default gap retained; not run` | `source written; exact receipt-only 10 validation + 104 lifecycle support; default gap retained; not run` | raw `Supported` 不能成为 permit；current actual 仍缺 |
+| narrow executable program | `RegionSizeBudget+RegionCountBudget+LogicalSizeBudget / Completed; source-only; private actual receipt + parent/child/cleanup; uncompiled/unrun` | `10 request-validation + 104 positive lifecycle; same-target pre/post + exact identity + one-shot native/local ledger; source-only; uncompiled/unrun` | 仅证明 observation/native-receipt 代码形状已写入，不是动态执行证据 |
+| pre-manifest program inventory | `full-root two-pass source written; unrun expectation: 43476 total, 6 source-present members/groups, 43470 planned-missing members` | `full-root two-pass source written; unrun expectation: 8668 total, 114 source-present members/groups, 8554 planned-missing members` | 两个 digest 均未生成/冻结；不是 quotient、coverage 或 Windows evidence |
 | reviewed source-program admission | `provider + catalog/manifest binding source written; reviewed digest absent` | `root-specific provider + catalog/manifest binding source written; reviewed digest absent` | 均未编译/运行；零 planned-missing + exact reviewed digest 才可构造；不是 actual execution |
-| full candidate gate | `prior 43476 checked; current source expected to fail at 43470 missing` | `prior 8668 checked; current source expected to fail at 8658 missing` | current source 未运行；prior baseline 只证明当时失败关闭，不产生 quotient denominator |
-| current blocker | `43470 planned-missing source expectation + no reviewed inventory digest` | `8658 planned-missing source expectation + no reviewed inventory digest` | 完整 runner/observer 仍未集成，两个 root 的全局 blocker 均未解除 |
+| full candidate gate | `prior 43476 checked; current source expected to fail at 43470 missing` | `prior 8668 checked; current source expected to fail at 8554 missing` | current source 未运行；prior baseline 只证明当时失败关闭，不产生 quotient denominator |
+| current blocker | `43470 planned-missing source expectation + no reviewed inventory digest` | `8554 planned-missing source expectation + no reviewed inventory digest + actual not run` | 104 lifecycle 只完成源级 observation/native-receipt 接线，两个 root 的全局 blocker 均未解除 |
 | frozen descriptor binding | `d3ba08a5ba0019f9ccda99ace8b580ef06eb4d6653ba80c0db5497bec51bd870`；checked-in / exact gate accepted | `0cc951c8c979608fb9861167f8d880a74fd2e042c4d2cd42673100e14083e8ef`；checked-in / exact gate accepted | descriptor binding 已冻结；quotient manifest 仍未冻结 |
 | `DynamicQuotientMemberCoverage` | `0/43476` | `0/8668` | 尚无 frozen class/member commitment |
 | quotient denominator | `Qmap=unknown` | `Qlock=unknown` | 不得预估或人工填写 |
@@ -292,7 +299,7 @@ Map、Lock、既有 A2b2 `117/117` 与宽回归均闭合，聚合 A2 才可由�
 
 ## 9. Production isolation and current verdict
 
-当前 verdict：`design_frozen / typed_projector_candidate_prior_compiled / prior_dynamic_quotient 36/36 passed / Map exact 6-member executable family + Lock exact 10-member executable family + root-specific private actual receipt + parent-child-cleanup = current_source_written_uncompiled_unrun / Map+Lock pre-manifest program inventory = full-root source_written_non_authorizing_uncompiled_unrun_digest_not_frozen / reviewed inventory -> source-program admission provider -> catalog/manifest binding = source_written_uncompiled_unrun / source-program admission requires zero planned-missing + exact root-specific checked-in reviewed digest / current unrun expectations: Map source-present=6 members+6 groups and planned-missing=43470; Lock source-present=10 members+10 groups and planned-missing=8658; both reviewed digests absent, so providers unconstructible and full candidates atomically blocked / production actual path=not_opened / future acceptance order=post-manifest representative only / cfg(test,windows) helper=fixture_not_authority / current_source passed=0 failed=0 not_run / Supported=private_exact_actual_receipt_only / default Map producers=all Missing(QuotientRunnerNotIntegrated) / default Lock producers=all Missing(LockObservationIncomplete) / quotient_manifests=not_frozen / Qmap=unknown / Qlock=unknown / member_coverage=0 / WindowsDynamic=not_opened`。
+当前 verdict：`design_frozen / typed_projector_candidate_prior_compiled / prior_dynamic_quotient 36/36 passed / Map exact 6-member executable family + Lock exact 10-member validation family + Lock 104-member positive lifecycle source-wired family + root-specific private actual receipt + parent-child-cleanup = current_source_written_uncompiled_unrun / Lock lifecycle observation/native receipt=source_wired_actual_not_run / Map+Lock pre-manifest program inventory = full-root source_written_non_authorizing_uncompiled_unrun_digest_not_frozen / reviewed inventory -> source-program admission provider -> catalog/manifest binding = source_written_uncompiled_unrun / source-program admission requires zero planned-missing + exact root-specific checked-in reviewed digest / current unrun expectations: Map source-present=6 members+6 groups and planned-missing=43470; Lock source-present=114 members+114 groups and planned-missing=8554; both reviewed digests absent, so providers unconstructible and full candidates atomically blocked / production actual path=not_opened / future acceptance order=post-manifest frozen representative only / cfg(test,windows) helper=fixture_not_authority / current_source passed=0 failed=0 actual=not_run / Supported=private_exact_actual_receipt_only / default Map producers=all Missing(QuotientRunnerNotIntegrated) / default Lock producers=all Missing(LockObservationIncomplete) / quotient_manifests=not_frozen / Qmap=unknown / Qlock=unknown / member_coverage=0 / WindowsDynamic=not_opened`。
 
 本功能不注册生产 VFS，不调用 production open，不创建 Connection/Opened authority，不接 A1/v15、Runtime、
 Ready、Provider、route、Offer、Attempt、Lease、派发、市场、结算或资金。任何 Gate A-F 未闭合时，A2 都
