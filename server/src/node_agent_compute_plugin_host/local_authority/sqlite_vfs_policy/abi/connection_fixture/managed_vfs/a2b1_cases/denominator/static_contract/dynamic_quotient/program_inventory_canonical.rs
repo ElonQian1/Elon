@@ -84,6 +84,30 @@ const SOURCE_SCOPE: &[(&str, &str)] = &[
         include_str!("runner_admission/lock_program/lifecycle.rs"),
     ),
     (
+        "runner_admission/lock_program/source_program.rs",
+        include_str!("runner_admission/lock_program/source_program.rs"),
+    ),
+    (
+        "runner_admission/lock_program/native_acquire_busy.rs",
+        include_str!("runner_admission/lock_program/native_acquire_busy.rs"),
+    ),
+    (
+        "runner_admission/lock_program/native_acquire_busy/catalog.rs",
+        include_str!("runner_admission/lock_program/native_acquire_busy/catalog.rs"),
+    ),
+    (
+        "runner_admission/lock_program/native_acquire_busy/native_acquire_node_live_native_busy_completed_members.v1.tsv",
+        include_str!("runner_admission/lock_program/native_acquire_busy/native_acquire_node_live_native_busy_completed_members.v1.tsv"),
+    ),
+    (
+        "runner_admission/lock_program/native_acquire_busy/source_scope.rs",
+        include_str!("runner_admission/lock_program/native_acquire_busy/source_scope.rs"),
+    ),
+    (
+        "lock_native_acquire_busy_source_scope.rs",
+        include_str!("lock_native_acquire_busy_source_scope.rs"),
+    ),
+    (
         "runner_admission/lock_program/stored_poison.rs",
         include_str!("runner_admission/lock_program/stored_poison.rs"),
     ),

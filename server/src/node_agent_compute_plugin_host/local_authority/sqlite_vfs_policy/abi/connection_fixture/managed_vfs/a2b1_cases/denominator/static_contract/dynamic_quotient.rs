@@ -5,6 +5,7 @@ mod canonical;
 mod canonical_tags;
 mod catalog;
 mod descriptor_binding;
+mod lock_native_acquire_busy_source_scope;
 mod lock_stored_poison_source_scope;
 mod manifest;
 mod manifest_canonical;
