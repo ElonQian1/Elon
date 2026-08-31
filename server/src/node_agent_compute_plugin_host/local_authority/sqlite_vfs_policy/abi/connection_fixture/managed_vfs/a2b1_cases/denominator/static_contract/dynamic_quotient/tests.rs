@@ -25,6 +25,8 @@ mod program_admission;
 mod program_inventory;
 mod runner_admission;
 #[cfg(windows)]
+mod runner_admission_lock_supported;
+#[cfg(windows)]
 mod runner_admission_supported;
 mod runner_state;
 

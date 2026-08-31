@@ -10,6 +10,7 @@ mod child;
 mod cleanup;
 mod environment;
 mod joint_close_family;
+mod lock_runner;
 mod map_runner;
 mod record;
 #[cfg(test)]
@@ -26,6 +27,10 @@ pub(super) use joint_close_family::{
     JointCloseCandidateReportView, JointCloseFamilyCohort, RenderedJointCloseFamilyReport,
     ValidatedJointCloseCandidateRecord, ValidatedJointCloseCleanCheckoutReceipt,
     ValidatedJointCloseFamily, ValidatedJointCloseFamilyMemberReceipt,
+};
+pub(super) use lock_runner::{
+    run_lock_program_isolated, LockRunnerActionV1, LockRunnerEvidenceReceiptV1,
+    LockRunnerIsolatedEvidenceV1, LockRunnerProgramBindingV1, LockRunnerRequestValidationV1,
 };
 pub(super) use map_runner::{
     run_map_program_isolated, MapRunnerEvidenceReceiptV1, MapRunnerIsolatedEvidenceV1,

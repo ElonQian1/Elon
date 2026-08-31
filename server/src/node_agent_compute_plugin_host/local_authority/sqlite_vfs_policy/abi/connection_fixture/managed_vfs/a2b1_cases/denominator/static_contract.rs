@@ -90,7 +90,19 @@ pub(super) fn validate_lock_dynamic_quotient_candidate_gate(
 pub(super) fn inspect_map_execution_program_inventory_gate(
 ) -> Result<ExecutionProgramInventoryGateReceiptV1, String> {
     let inventory = dynamic_quotient::inspect_map_execution_program_inventory_v1(&map::graph())?;
-    Ok(ExecutionProgramInventoryGateReceiptV1 {
+    Ok(execution_program_inventory_gate_receipt(inventory))
+}
+
+pub(super) fn inspect_lock_execution_program_inventory_gate(
+) -> Result<ExecutionProgramInventoryGateReceiptV1, String> {
+    let inventory = dynamic_quotient::inspect_lock_execution_program_inventory_v1(&lock::graph())?;
+    Ok(execution_program_inventory_gate_receipt(inventory))
+}
+
+fn execution_program_inventory_gate_receipt(
+    inventory: dynamic_quotient::ExecutionProgramInventorySummaryV1,
+) -> ExecutionProgramInventoryGateReceiptV1 {
+    ExecutionProgramInventoryGateReceiptV1 {
         member_count: inventory.member_count,
         program_group_count: inventory.program_group_count,
         source_present_member_count: inventory.source_present_member_count,
@@ -98,7 +110,7 @@ pub(super) fn inspect_map_execution_program_inventory_gate(
         planned_missing_member_count: inventory.planned_missing_member_count,
         planned_missing_group_count: inventory.planned_missing_group_count,
         inventory_sha256: inventory.inventory_sha256,
-    })
+    }
 }
 
 fn classify_dynamic_candidate_error(

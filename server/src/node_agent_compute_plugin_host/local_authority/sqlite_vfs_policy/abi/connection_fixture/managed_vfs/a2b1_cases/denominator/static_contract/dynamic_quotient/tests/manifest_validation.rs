@@ -180,6 +180,7 @@ fn projector_provenance_binds_typed_descriptor_producers_and_wiring() {
         "dynamic_quotient/producer_coherence/map_axes.rs",
         "dynamic_quotient/producer_coherence/lock.rs",
         "dynamic_quotient/producer_coherence/lock_axes.rs",
+        "dynamic_quotient/projector/lock_execution.rs",
         "dynamic_quotient/membership_commitment.rs",
         "dynamic_quotient/descriptor_binding.rs",
         "dynamic_quotient/runner_admission.rs",
@@ -188,16 +189,31 @@ fn projector_provenance_binds_typed_descriptor_producers_and_wiring() {
         "dynamic_quotient/runner_admission/map_program.rs",
         "dynamic_quotient/runner_admission/map_program/request_budget.rs",
         "dynamic_quotient/runner_admission/lock.rs",
+        "dynamic_quotient/runner_admission/lock_program.rs",
+        "dynamic_quotient/runner_admission/lock_program/request_validation.rs",
+        "managed_vfs/a2_dynamic_evidence.rs",
         "managed_vfs/a2_dynamic_evidence/child.rs",
         "managed_vfs/a2_dynamic_evidence/child/payload.rs",
+        "managed_vfs/a2_dynamic_evidence/child/lock_request_validation.rs",
         "managed_vfs/a2_dynamic_evidence/map_runner.rs",
         "managed_vfs/a2_dynamic_evidence/map_runner/request_budget.rs",
+        "managed_vfs/a2_dynamic_evidence/lock_runner.rs",
+        "managed_vfs/a2_dynamic_evidence/lock_runner/request_validation.rs",
+        "managed_vfs/connection.rs",
+        "managed_vfs/live_registration.rs",
+        "managed_vfs/shared_namespace.rs",
+        "managed_vfs/shm_fault_script.rs",
         "managed_vfs/connection/unmap.rs",
     ];
     let source_names = PROJECTOR_SOURCE_SCOPE_V1
         .iter()
         .map(|(name, _)| *name)
         .collect::<Vec<_>>();
+
+    assert!(
+        !source_names.contains(&"dynamic_quotient/program_inventory/review.rs"),
+        "review digest must remain outside the source scope it freezes"
+    );
 
     for required in required_sources {
         assert!(

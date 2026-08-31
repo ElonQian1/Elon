@@ -14,8 +14,10 @@ mod review;
 pub(super) use admission::provider_for_source_program_for_test;
 pub(crate) use admission::ProgramCatalogAdmissionErrorV1;
 pub(super) use admission::{
-    review_map_execution_program_inventory_v1, ProgramCatalogBindingV1,
-    ProgramCatalogReceiptProviderV1, ReviewedExecutionProgramInventoryV1,
+    review_lock_execution_program_inventory_v1, review_map_execution_program_inventory_v1,
+    ProgramCatalogBindingV1, ProgramCatalogReceiptProviderV1, ReviewedExecutionProgramInventoryV1,
 };
-pub(super) use builder::build_map_execution_program_inventory_v1;
+pub(super) use builder::{
+    build_lock_execution_program_inventory_v1, build_map_execution_program_inventory_v1,
+};
 pub(super) use model::*;

@@ -239,6 +239,26 @@ pub(super) struct ManagedTestShmFaultPlanBinding {
 }
 
 impl ManagedTestShmFaultPlanBinding {
+    #[cfg(all(test, windows))]
+    pub(super) fn exact_target_presence(&self) -> Result<bool, &'static str> {
+        if self.target.role != ManagedSqliteLogicalFileRole::Main {
+            return Err("managed SHM target presence requires the exact main-file role");
+        }
+        let state = self
+            .slot
+            .state
+            .lock()
+            .map_err(|_| "managed SHM fault plan slot poisoned")?;
+        match &*state {
+            ManagedTestShmFaultPlanState::Empty => Ok(false),
+            ManagedTestShmFaultPlanState::Promoted(_)
+            | ManagedTestShmFaultPlanState::Installed(_) => Ok(true),
+            ManagedTestShmFaultPlanState::Pending(_) | ManagedTestShmFaultPlanState::Claimed => {
+                Err("managed SHM target presence is not observationally settled")
+            }
+        }
+    }
+
     pub(super) fn install(
         &self,
         before_call: &[(ManagedSqliteShmFailurePhase, u32)],
@@ -500,4 +520,80 @@ fn supports_after_success_class(
 
 fn permanently_retain_probe(probe: ManagedSqliteShmTestFaultProbe) {
     let _permanent_probe = Box::leak(Box::new(probe));
+}
+
+#[cfg(all(test, windows))]
+mod exact_target_presence_tests {
+    use std::sync::Arc;
+
+    use super::{
+        ManagedSqliteLogicalFileRole, ManagedSqliteShmFailurePhase, ManagedTestRegistrationId,
+        ManagedTestRouteOrdinal, ManagedTestShmFaultPlanBinding, ManagedTestShmFaultPlanSlot,
+    };
+
+    fn binding(role: ManagedSqliteLogicalFileRole) -> ManagedTestShmFaultPlanBinding {
+        let registration = ManagedTestRegistrationId::from_counter(1)
+            .expect("exact-target-presence registration must be non-zero");
+        let route = ManagedTestRouteOrdinal::test_value(1);
+        ManagedTestShmFaultPlanSlot::new(registration, route)
+            .binding(registration, route, role)
+            .expect("exact-target-presence binding must match the slot")
+    }
+
+    #[test]
+    fn exact_target_presence_reports_only_settled_empty_state_as_absent() {
+        let binding = binding(ManagedSqliteLogicalFileRole::Main);
+
+        assert_eq!(binding.exact_target_presence(), Ok(false));
+    }
+
+    #[test]
+    fn exact_target_presence_rejects_pending_and_claimed_states() {
+        let pending = binding(ManagedSqliteLogicalFileRole::Main);
+        pending
+            .install(&[(ManagedSqliteShmFailurePhase::FileSize, 1)], &[])
+            .expect("pending test plan must install");
+        assert_eq!(
+            pending.exact_target_presence(),
+            Err("managed SHM target presence is not observationally settled")
+        );
+
+        let claimed = binding(ManagedSqliteLogicalFileRole::Main);
+        claimed
+            .install(&[(ManagedSqliteShmFailurePhase::FileSize, 1)], &[])
+            .expect("claimed test plan must install");
+        let _plan = claimed
+            .claim()
+            .expect("claimed test plan query must succeed")
+            .expect("claimed test plan must be present");
+        assert_eq!(
+            claimed.exact_target_presence(),
+            Err("managed SHM target presence is not observationally settled")
+        );
+    }
+
+    #[test]
+    fn exact_target_presence_rejects_wrong_role_and_poisoned_state() {
+        let wrong_role = binding(ManagedSqliteLogicalFileRole::Journal);
+        assert_eq!(
+            wrong_role.exact_target_presence(),
+            Err("managed SHM target presence requires the exact main-file role")
+        );
+
+        let poisoned = binding(ManagedSqliteLogicalFileRole::Main);
+        let slot = Arc::clone(&poisoned.slot);
+        let join = std::thread::spawn(move || {
+            let _guard = slot
+                .state
+                .lock()
+                .expect("fresh exact-target-presence slot must lock");
+            panic!("poison exact-target-presence slot");
+        })
+        .join();
+        assert!(join.is_err());
+        assert_eq!(
+            poisoned.exact_target_presence(),
+            Err("managed SHM fault plan slot poisoned")
+        );
+    }
 }

@@ -206,7 +206,10 @@ fn exercise_child(root: &Path, binding: MapRunnerProgramBindingV1) -> anyhow::Re
     }
     fixture.into_schema_migration()?;
     fixture.into_runtime()?;
-    if fixture.installed_shm_fault_witness().is_ok() {
+    if fixture
+        .exact_main_shm_target_presence()
+        .map_err(anyhow::Error::msg)?
+    {
         return Err(anyhow!(
             "Map quotient target existed before its first xShmMap"
         ));

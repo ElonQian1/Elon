@@ -26,7 +26,10 @@ pub(super) use joint_close::ManagedTestCapturedMainCloseCall;
 #[cfg(all(test, windows))]
 mod unmap;
 #[cfg(all(test, windows))]
-pub(super) use unmap::{ManagedTestShmMapCallbackObservation, ManagedTestUnmapCallbackObservation};
+pub(super) use unmap::{
+    ManagedTestShmLockCallbackObservation, ManagedTestShmMapCallbackObservation,
+    ManagedTestUnmapCallbackObservation,
+};
 
 struct ManagedVfsAuthorizerContext {
     route: Arc<TestRoute>,
@@ -214,6 +217,25 @@ impl ManagedSqliteRoutedConnectionFixture {
     }
 
     #[cfg(all(test, windows))]
+    pub(super) fn registration_id_for_test(&self) -> u64 {
+        self.registration
+            .as_ref()
+            .expect("managed fixture owns its registration")
+            .registration_id()
+            .counter_value()
+    }
+
+    #[cfg(all(test, windows))]
+    pub(super) fn live_registration_snapshot_for_test(
+        &self,
+    ) -> anyhow::Result<ManagedTestVfsLiveRegistrationSnapshot> {
+        self.registration
+            .as_ref()
+            .expect("managed fixture owns its registration")
+            .live_registration_snapshot()
+    }
+
+    #[cfg(all(test, windows))]
     pub(super) fn route_custody_snapshot(
         &self,
     ) -> Result<ManagedSqliteTestVfsRouteCustodySnapshot, &'static str> {
@@ -279,6 +301,14 @@ impl ManagedSqliteRoutedConnectionFixture {
             .as_ref()
             .ok_or("managed fixture route entry is not live")?
             .installed_shm_fault_witness()
+    }
+
+    #[cfg(all(test, windows))]
+    pub(super) fn exact_main_shm_target_presence(&self) -> Result<bool, &'static str> {
+        self.route_entry
+            .as_ref()
+            .ok_or("managed fixture route entry is not live")?
+            .exact_main_shm_target_presence()
     }
 
     #[cfg(all(test, windows))]

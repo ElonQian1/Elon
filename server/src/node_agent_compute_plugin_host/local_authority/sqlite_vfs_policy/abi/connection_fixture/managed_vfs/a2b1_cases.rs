@@ -106,15 +106,41 @@ fn a2b1_map_execution_program_inventory_is_complete_but_non_authorizing() {
 }
 
 #[test]
-fn a2b1_lock_dynamic_quotient_candidate_is_atomically_runner_blocked() {
+fn a2b1_lock_dynamic_quotient_candidate_is_atomically_program_inventory_blocked() {
     let error = denominator::validate_lock_dynamic_quotient_candidate_gate()
-        .expect_err("Lock quotient candidate must remain closed without complete observation");
-    assert_eq!(
-        error,
-        denominator::DynamicQuotientCandidateGateErrorV1::RunnerCapabilityMissing {
-            count: 8_668,
-            gap: denominator::CapabilityGapV1::LockObservationIncomplete,
-        },
-        "Lock candidate must validate every static member and expose the exact root blocker"
+        .expect_err("Lock quotient candidate must remain closed before complete program review");
+    assert!(
+        matches!(
+            error,
+            denominator::DynamicQuotientCandidateGateErrorV1::ProgramInventoryIncomplete {
+                missing_member_count: 8_658,
+                missing_group_count,
+            } if missing_group_count > 0
+        ),
+        "Lock candidate must expose the exact incomplete source-program inventory"
     );
+}
+
+#[test]
+fn a2b1_lock_execution_program_inventory_is_complete_but_non_authorizing() {
+    let receipt = denominator::inspect_lock_execution_program_inventory_gate()
+        .expect("complete pre-manifest Lock execution-program inventory");
+    assert_eq!(receipt.member_count, 8_668);
+    assert_eq!(receipt.source_present_member_count, 10);
+    assert_eq!(receipt.source_present_group_count, 10);
+    assert_eq!(receipt.planned_missing_member_count, 8_658);
+    assert_eq!(
+        receipt
+            .source_present_member_count
+            .checked_add(receipt.planned_missing_member_count),
+        Some(receipt.member_count),
+    );
+    assert_eq!(
+        receipt
+            .source_present_group_count
+            .checked_add(receipt.planned_missing_group_count),
+        Some(receipt.program_group_count),
+    );
+    assert_eq!(receipt.inventory_sha256.len(), 64);
+    assert_ne!(receipt.inventory_sha256, "0".repeat(64));
 }

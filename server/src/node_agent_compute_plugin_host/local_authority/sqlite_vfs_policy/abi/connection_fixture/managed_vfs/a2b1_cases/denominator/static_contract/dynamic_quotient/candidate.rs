@@ -8,7 +8,8 @@ use super::super::{
     validate_source_owner_authority,
 };
 use super::program_inventory::{
-    build_map_execution_program_inventory_v1, review_map_execution_program_inventory_v1,
+    build_lock_execution_program_inventory_v1, build_map_execution_program_inventory_v1,
+    review_lock_execution_program_inventory_v1, review_map_execution_program_inventory_v1,
     ProgramCatalogAdmissionErrorV1,
 };
 use super::{
@@ -63,22 +64,20 @@ fn build_dynamic_candidate_v1(
         RootOperationV1::Map => {
             let inventory = build_map_execution_program_inventory_v1(graph)
                 .map_err(|error| DynamicCandidateErrorV1::ProgramInventory(format!("{error:?}")))?;
-            Some(
-                review_map_execution_program_inventory_v1(inventory, &trusted_binding)
-                    .map_err(DynamicCandidateErrorV1::ProgramCatalogAdmission)?,
-            )
+            review_map_execution_program_inventory_v1(inventory, &trusted_binding)
+                .map_err(DynamicCandidateErrorV1::ProgramCatalogAdmission)?
         }
-        RootOperationV1::Lock => None,
+        RootOperationV1::Lock => {
+            let inventory = build_lock_execution_program_inventory_v1(graph)
+                .map_err(|error| DynamicCandidateErrorV1::ProgramInventory(format!("{error:?}")))?;
+            review_lock_execution_program_inventory_v1(inventory, &trusted_binding)
+                .map_err(DynamicCandidateErrorV1::ProgramCatalogAdmission)?
+        }
     };
-    let mut catalog = match reviewed_inventory {
-        Some(reviewed) => {
-            DynamicCatalogBuilderV1::from_frozen_static_binding_and_reviewed_inventory(
-                &trusted_binding,
-                reviewed,
-            )
-        }
-        None => DynamicCatalogBuilderV1::from_frozen_static_binding(&trusted_binding),
-    }
+    let mut catalog = DynamicCatalogBuilderV1::from_frozen_static_binding_and_reviewed_inventory(
+        &trusted_binding,
+        reviewed_inventory,
+    )
     .map_err(DynamicCandidateErrorV1::Catalog)?;
     let mut catalog_error = None;
     let observed_binding = validate_frozen_pass(graph, root, |leaf| {

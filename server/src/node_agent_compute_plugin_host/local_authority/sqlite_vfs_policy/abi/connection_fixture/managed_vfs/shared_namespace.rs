@@ -164,6 +164,12 @@ impl ManagedTestVfsRouteEntry {
     }
 
     #[cfg(all(test, windows))]
+    pub(super) fn exact_main_shm_target_presence(&self) -> Result<bool, &'static str> {
+        self.readonly_main_shm_fault_binding()?
+            .exact_target_presence()
+    }
+
+    #[cfg(all(test, windows))]
     fn readonly_main_shm_fault_binding(
         &self,
     ) -> Result<ManagedTestShmFaultPlanBinding, &'static str> {

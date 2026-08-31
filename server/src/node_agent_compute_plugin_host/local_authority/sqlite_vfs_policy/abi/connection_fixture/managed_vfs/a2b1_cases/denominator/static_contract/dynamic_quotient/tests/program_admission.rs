@@ -2,7 +2,10 @@ use super::super::{
     program_inventory::{provider_for_source_program_for_test, ProgramCatalogAdmissionErrorV1},
     runner_admission::RunnerAdmissionDecisionV1,
 };
-use super::program_inventory::{budget_descriptor, request_budget_record};
+use super::program_inventory::{
+    budget_descriptor, lock_request_validation_descriptor, lock_request_validation_record,
+    request_budget_record,
+};
 use super::*;
 
 fn source_present_descriptor(mode: MapModeV1) -> TerminalDescriptorV1 {
@@ -36,6 +39,90 @@ fn source_program_provider_projects_without_granting_runner_supported() {
     );
 
     assert!(provider.finish().is_ok());
+}
+
+#[test]
+fn lock_source_program_provider_projects_without_granting_runner_supported() {
+    let record = lock_request_validation_record();
+    let descriptor = lock_request_validation_descriptor(
+        LockActionV1::LockShared,
+        LockManagedStimulusV1::RangeOverflow,
+        RunnerCapabilityV1::Missing(CapabilityGapV1::LockObservationIncomplete),
+    );
+    let prepared = prepare_dynamic_terminal_v1(&record, &descriptor).unwrap();
+    let mut provider =
+        provider_for_source_program_for_test(prepared.member, &prepared.key).unwrap();
+
+    let validated = project_validated_dynamic_terminal_with_program_catalog_v1(
+        &record,
+        &descriptor,
+        &mut provider,
+    )
+    .unwrap();
+    let projection = validated.projection.unwrap();
+    assert_eq!(projection.member, prepared.member);
+    assert_eq!(projection.key, prepared.key);
+    assert_eq!(
+        validated.runner_admission.decision(),
+        RunnerAdmissionDecisionV1::Missing(CapabilityGapV1::LockObservationIncomplete),
+    );
+
+    assert!(provider.finish().is_ok());
+}
+
+#[test]
+fn source_program_providers_reject_cross_root_without_consuming_their_receipt() {
+    let map_record = request_budget_record();
+    let map_descriptor = source_present_descriptor(MapModeV1::Extend);
+    let map_prepared = prepare_dynamic_terminal_v1(&map_record, &map_descriptor).unwrap();
+
+    let lock_record = lock_request_validation_record();
+    let lock_descriptor = lock_request_validation_descriptor(
+        LockActionV1::LockShared,
+        LockManagedStimulusV1::RangeOverflow,
+        RunnerCapabilityV1::Missing(CapabilityGapV1::LockObservationIncomplete),
+    );
+    let lock_prepared = prepare_dynamic_terminal_v1(&lock_record, &lock_descriptor).unwrap();
+
+    let mut map_provider =
+        provider_for_source_program_for_test(map_prepared.member, &map_prepared.key).unwrap();
+    assert_eq!(
+        project_validated_dynamic_terminal_with_program_catalog_v1(
+            &lock_record,
+            &lock_descriptor,
+            &mut map_provider,
+        ),
+        Err(ProjectionErrorV1::ProgramCatalogAdmission(
+            ProgramCatalogAdmissionErrorV1::RootMismatch,
+        )),
+    );
+    project_validated_dynamic_terminal_with_program_catalog_v1(
+        &map_record,
+        &map_descriptor,
+        &mut map_provider,
+    )
+    .unwrap();
+    assert!(map_provider.finish().is_ok());
+
+    let mut lock_provider =
+        provider_for_source_program_for_test(lock_prepared.member, &lock_prepared.key).unwrap();
+    assert_eq!(
+        project_validated_dynamic_terminal_with_program_catalog_v1(
+            &map_record,
+            &map_descriptor,
+            &mut lock_provider,
+        ),
+        Err(ProjectionErrorV1::ProgramCatalogAdmission(
+            ProgramCatalogAdmissionErrorV1::RootMismatch,
+        )),
+    );
+    project_validated_dynamic_terminal_with_program_catalog_v1(
+        &lock_record,
+        &lock_descriptor,
+        &mut lock_provider,
+    )
+    .unwrap();
+    assert!(lock_provider.finish().is_ok());
 }
 
 #[test]

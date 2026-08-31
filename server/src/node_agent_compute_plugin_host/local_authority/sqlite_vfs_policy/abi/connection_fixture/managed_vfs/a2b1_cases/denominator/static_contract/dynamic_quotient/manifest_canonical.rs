@@ -43,6 +43,10 @@ pub(super) const PROJECTOR_SOURCE_SCOPE_V1: &[(&str, &str)] = &[
         include_str!("projector.rs"),
     ),
     (
+        "dynamic_quotient/projector/lock_execution.rs",
+        include_str!("projector/lock_execution.rs"),
+    ),
+    (
         "dynamic_quotient/producer_coherence.rs",
         include_str!("producer_coherence.rs"),
     ),
@@ -96,6 +100,18 @@ pub(super) const PROJECTOR_SOURCE_SCOPE_V1: &[(&str, &str)] = &[
         include_str!("runner_admission/lock.rs"),
     ),
     (
+        "dynamic_quotient/runner_admission/lock_program.rs",
+        include_str!("runner_admission/lock_program.rs"),
+    ),
+    (
+        "dynamic_quotient/runner_admission/lock_program/request_validation.rs",
+        include_str!("runner_admission/lock_program/request_validation.rs"),
+    ),
+    (
+        "managed_vfs/a2_dynamic_evidence.rs",
+        include_str!("../../../../a2_dynamic_evidence.rs"),
+    ),
+    (
         "managed_vfs/a2_dynamic_evidence/child.rs",
         include_str!("../../../../a2_dynamic_evidence/child.rs"),
     ),
@@ -104,12 +120,40 @@ pub(super) const PROJECTOR_SOURCE_SCOPE_V1: &[(&str, &str)] = &[
         include_str!("../../../../a2_dynamic_evidence/child/payload.rs"),
     ),
     (
+        "managed_vfs/a2_dynamic_evidence/child/lock_request_validation.rs",
+        include_str!("../../../../a2_dynamic_evidence/child/lock_request_validation.rs"),
+    ),
+    (
         "managed_vfs/a2_dynamic_evidence/map_runner.rs",
         include_str!("../../../../a2_dynamic_evidence/map_runner.rs"),
     ),
     (
         "managed_vfs/a2_dynamic_evidence/map_runner/request_budget.rs",
         include_str!("../../../../a2_dynamic_evidence/map_runner/request_budget.rs"),
+    ),
+    (
+        "managed_vfs/a2_dynamic_evidence/lock_runner.rs",
+        include_str!("../../../../a2_dynamic_evidence/lock_runner.rs"),
+    ),
+    (
+        "managed_vfs/a2_dynamic_evidence/lock_runner/request_validation.rs",
+        include_str!("../../../../a2_dynamic_evidence/lock_runner/request_validation.rs"),
+    ),
+    (
+        "managed_vfs/connection.rs",
+        include_str!("../../../../connection.rs"),
+    ),
+    (
+        "managed_vfs/live_registration.rs",
+        include_str!("../../../../live_registration.rs"),
+    ),
+    (
+        "managed_vfs/shared_namespace.rs",
+        include_str!("../../../../shared_namespace.rs"),
+    ),
+    (
+        "managed_vfs/shm_fault_script.rs",
+        include_str!("../../../../shm_fault_script.rs"),
     ),
     (
         "managed_vfs/connection/unmap.rs",

@@ -8,6 +8,7 @@
 
 mod canonical;
 mod lock;
+mod lock_program;
 mod map;
 mod map_program;
 
@@ -25,6 +26,13 @@ pub(super) struct RunnerAdmissionReceiptV1 {
     decision: RunnerAdmissionDecisionV1,
 }
 
+#[cfg(all(test, windows))]
+pub(super) use lock_program::tamper_lock_implementation_digest_for_test;
+pub(super) use lock_program::LockRunnerExecutionReceiptV1;
+#[cfg(all(test, windows))]
+pub(super) use lock_program::{
+    run_lock_isolated_for_test, LockRunnerExecutionErrorV1, LockRunnerIsolatedOutcomeV1,
+};
 #[cfg(all(test, windows))]
 pub(super) use map_program::tamper_implementation_digest_for_test;
 pub(super) use map_program::MapRunnerExecutionReceiptV1;
@@ -61,6 +69,7 @@ pub(super) struct ExecutionProgramInventoryReceiptV1 {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum ExecutionProgramInventoryViolationV1 {
+    LockProgramLookupFailed,
     MapProgramLookupFailed,
 }
 
@@ -120,6 +129,7 @@ pub(super) enum RunnerAdmissionViolationV1 {
         actual: CapabilityGapV1,
     },
     PlanBindingMismatch,
+    LockExecutionReceiptMismatch,
     MapExecutionReceiptMismatch,
 }
 
@@ -174,6 +184,15 @@ pub(super) fn resolve_with_map_execution_v1(
     resolve_supported_map_with_plan_v1(key, member, plan, execution)
 }
 
+pub(super) fn resolve_with_lock_execution_v1(
+    key: &DynamicClassKeyV1,
+    member: StaticMemberSealV1,
+    execution: LockRunnerExecutionReceiptV1,
+) -> Result<RunnerAdmissionReceiptV1, RunnerAdmissionViolationV1> {
+    let plan = compile_v1(key);
+    resolve_supported_lock_with_plan_v1(key, member, plan, execution)
+}
+
 /// Preserve the planned-missing execution decision while a separately reviewed source-program
 /// receipt authorizes only pre-manifest semantic cataloging. This function never returns
 /// `Supported`; callers must already hold and consume the opaque program-catalog receipt.
@@ -207,7 +226,16 @@ pub(super) fn inventory_v1(
             }
         }
         RootOperationV1::Lock => {
-            ExecutionProgramInventoryStatusV1::PlannedMissing(plan.expected_gap)
+            match lock_program::implementation_for_inventory_v1(&normalized_key, plan)
+                .map_err(|_| ExecutionProgramInventoryViolationV1::LockProgramLookupFailed)?
+            {
+                None => ExecutionProgramInventoryStatusV1::PlannedMissing(plan.expected_gap),
+                Some(implementation_sha256) => {
+                    ExecutionProgramInventoryStatusV1::SourcePresentReceiptRequired {
+                        implementation_sha256,
+                    }
+                }
+            }
         }
     };
     Ok(ExecutionProgramInventoryReceiptV1 {
@@ -305,6 +333,31 @@ fn resolve_supported_map_with_plan_v1(
     })
 }
 
+fn resolve_supported_lock_with_plan_v1(
+    key: &DynamicClassKeyV1,
+    member: StaticMemberSealV1,
+    plan: CompiledRunnerPlanV1,
+    execution: LockRunnerExecutionReceiptV1,
+) -> Result<RunnerAdmissionReceiptV1, RunnerAdmissionViolationV1> {
+    if plan != compile_v1(key) {
+        return Err(RunnerAdmissionViolationV1::PlanBindingMismatch);
+    }
+    if key.recipe.capability != RunnerCapabilityV1::Supported {
+        return Err(RunnerAdmissionViolationV1::UnsealedSupportedClaim);
+    }
+    let validated = lock_program::validate_execution_receipt_v1(key, member, plan, execution)
+        .map_err(|_| RunnerAdmissionViolationV1::LockExecutionReceiptMismatch)?;
+    Ok(RunnerAdmissionReceiptV1 {
+        member,
+        normalized_descriptor_sha256: plan.normalized_descriptor_sha256,
+        plan_sha256: plan.plan_sha256,
+        decision: RunnerAdmissionDecisionV1::Supported {
+            implementation_sha256: validated.implementation_sha256(),
+            execution_sha256: validated.execution_sha256(),
+        },
+    })
+}
+
 #[cfg(test)]
 pub(super) fn compile_for_test(key: &DynamicClassKeyV1) -> CompiledRunnerPlanV1 {
     compile_v1(key)
@@ -327,4 +380,14 @@ pub(super) fn resolve_with_map_execution_for_test(
     execution: MapRunnerExecutionReceiptV1,
 ) -> Result<RunnerAdmissionReceiptV1, RunnerAdmissionViolationV1> {
     resolve_supported_map_with_plan_v1(key, member, plan, execution)
+}
+
+#[cfg(test)]
+pub(super) fn resolve_with_lock_execution_for_test(
+    key: &DynamicClassKeyV1,
+    member: StaticMemberSealV1,
+    plan: CompiledRunnerPlanV1,
+    execution: LockRunnerExecutionReceiptV1,
+) -> Result<RunnerAdmissionReceiptV1, RunnerAdmissionViolationV1> {
+    resolve_supported_lock_with_plan_v1(key, member, plan, execution)
 }

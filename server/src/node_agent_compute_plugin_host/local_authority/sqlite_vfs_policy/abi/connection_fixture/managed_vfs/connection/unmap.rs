@@ -29,6 +29,42 @@ pub(in super::super) struct ManagedTestShmMapCallbackObservation {
     after: HandleBoundSqliteAbiRawSlotSnapshot,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(in super::super) struct ManagedTestShmLockCallbackObservation {
+    offset: c_int,
+    count: c_int,
+    raw_flags: c_int,
+    result_code: c_int,
+    before: HandleBoundSqliteAbiRawSlotSnapshot,
+    after: HandleBoundSqliteAbiRawSlotSnapshot,
+}
+
+impl ManagedTestShmLockCallbackObservation {
+    pub(in super::super) fn offset(self) -> c_int {
+        self.offset
+    }
+
+    pub(in super::super) fn count(self) -> c_int {
+        self.count
+    }
+
+    pub(in super::super) fn raw_flags(self) -> c_int {
+        self.raw_flags
+    }
+
+    pub(in super::super) fn result_code(self) -> c_int {
+        self.result_code
+    }
+
+    pub(in super::super) fn before(self) -> HandleBoundSqliteAbiRawSlotSnapshot {
+        self.before
+    }
+
+    pub(in super::super) fn after(self) -> HandleBoundSqliteAbiRawSlotSnapshot {
+        self.after
+    }
+}
+
 impl ManagedTestShmMapCallbackObservation {
     pub(in super::super) fn region(self) -> c_int {
         self.region
@@ -165,8 +201,24 @@ impl ManagedSqliteRoutedConnectionFixture {
         count: c_int,
         flags: c_int,
     ) -> Result<c_int, &'static str> {
+        self.observe_main_shm_lock_raw(offset, count, flags)
+            .map(ManagedTestShmLockCallbackObservation::result_code)
+    }
+
+    pub(in super::super) fn observe_main_shm_lock_raw(
+        &self,
+        offset: c_int,
+        count: c_int,
+        raw_flags: c_int,
+    ) -> Result<ManagedTestShmLockCallbackObservation, &'static str> {
         let file = self.main_file_pointer()?;
         // SAFETY: `main_file_pointer` returned this test VFS's live main-file allocation.
+        let before = unsafe { super::super::observe_test_vfs_file_raw_slots(file) }
+            .ok_or("managed SHM-lock raw slots unavailable before callback")?;
+        if !before.methods_installed || !before.state_installed {
+            return Err("managed SHM-lock raw state was not installed before callback");
+        }
+        // SAFETY: the live allocation owns the installed method table observed above.
         let methods = unsafe { (*file).pMethods };
         if methods.is_null() {
             return Err("managed SHM-lock method table is unavailable");
@@ -175,8 +227,19 @@ impl ManagedSqliteRoutedConnectionFixture {
         let lock =
             unsafe { (*methods).xShmLock }.ok_or("managed SHM-lock callback is unavailable")?;
         // SAFETY: this calls SQLite's installed xShmLock with its owning live file. Callers use
-        // canonical SQLite flags and inspect the coordinator snapshot after the call.
-        Ok(unsafe { lock(file, offset, count, flags) })
+        // exact raw request-validation inputs and observe the same allocation after the call.
+        let result_code = unsafe { lock(file, offset, count, raw_flags) };
+        // SAFETY: request-validation rejection leaves the allocation owned by the live Connection.
+        let after = unsafe { super::super::observe_test_vfs_file_raw_slots(file) }
+            .ok_or("managed SHM-lock raw slots unavailable after callback")?;
+        Ok(ManagedTestShmLockCallbackObservation {
+            offset,
+            count,
+            raw_flags,
+            result_code,
+            before,
+            after,
+        })
     }
 
     pub(in super::super) fn call_main_file_lock_exclusive(&self) -> Result<c_int, &'static str> {

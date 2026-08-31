@@ -2,6 +2,7 @@ use std::{fmt, path::Path, process::Child};
 
 use sha2::{Digest, Sha256};
 
+mod lock_request_validation;
 mod payload;
 
 use payload::validate_actual_payload;
@@ -22,6 +23,7 @@ pub(super) enum SanitizedPayloadFamily {
     Unmap,
     JointClose,
     MapQuotient,
+    LockQuotient,
 }
 
 /// Parent-created nonce which must be installed in the child command before spawn.
@@ -451,6 +453,7 @@ fn registration_commitment(
         SanitizedPayloadFamily::Unmap => 4,
         SanitizedPayloadFamily::JointClose => 5,
         SanitizedPayloadFamily::MapQuotient => 6,
+        SanitizedPayloadFamily::LockQuotient => 7,
     }]);
     hasher.update(registration_id.to_le_bytes());
     RegistrationCommitment(hasher.finalize().into())

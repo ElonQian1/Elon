@@ -4,8 +4,8 @@ status: current
 reviewed_at: 2026-08-31
 owners: node, security
 design_status: design_frozen
-implementation_status: typed_projector_candidate_prior_compiled_pre_manifest_program_inventory_and_reviewed_source_admission_bridge_source_written_uncompiled_unrun
-verification_status: prior_targeted_unit_36_passed_current_source_inventory_and_source_admission_not_run_review_digest_and_manifests_not_frozen
+implementation_status: typed_projector_candidate_prior_compiled_map_and_lock_pre_manifest_program_inventory_and_reviewed_source_admission_bridge_source_written_uncompiled_unrun
+verification_status: prior_targeted_unit_36_passed_current_map_lock_inventory_and_source_admission_not_run_review_digests_and_manifests_not_frozen
 authority_scope: backend-a2-map-lock-dynamic-quotient-authority-v1
 ---
 
@@ -21,14 +21,16 @@ authority_scope: backend-a2-map-lock-dynamic-quotient-authority-v1
 动态分母分别记作 `Qmap` 与 `Qlock`。它们只能由本文规定的类型化生成器对完整静态记录机械投影、
 精确分区并冻结 manifest 后得出。typed descriptor、projector、内存 catalog/manifest builder 与两遍原子
 candidate 入口在前序基线已实现并通过编译和定向单元测试；本批又写入 sealed runner admission，以及覆盖
-Map `RegionSizeBudget`、`RegionCountBudget`、`LogicalSizeBudget` 三类 `Completed` 请求的 source-only executable
-program family、私有 actual receipt 和 parent/child/cleanup 合同。current source 进一步把“语义 program 分组”
+Map `RegionSizeBudget`、`RegionCountBudget`、`LogicalSizeBudget` 三类 `Completed` 请求和 Lock 四种 action 下完整
+`RangeOverflow`、`EndPastEight`、合法 `SharedMultiSlot` 请求拒绝矩阵的 source-only executable program family、
+私有 actual receipt 和 parent/child/cleanup 合同。current source 进一步把“语义 program 分组”
 “源码 program 存在”“reviewed source admission”与
-“actual execution verified”拆开，新增完整 Map 根的 pre-manifest execution-program inventory，以及
+“actual execution verified”拆开，新增完整 Map/Lock 两根各自的 pre-manifest execution-program inventory，以及
 `reviewed inventory -> source-program admission provider -> catalog/manifest binding` 的失败关闭源码桥。只有
 完整 inventory 不含任何 planned-missing，且其 body digest 与独立 review 后 checked-in 的 expected digest
 精确相等，provider 才可构造；原始 inventory status 不能直接授权 catalog。该路径尚未编译、未运行，当前
-source test 预期有 `6` 个 source-present member/group、`43,470` 个 planned-missing member，也没有 checked-in
+Map source test 预期有 `6` 个 source-present member/group、`43,470` 个 planned-missing member；Lock source test
+预期有 `10` 个 source-present member/group、`8,658` 个 planned-missing member；两根都没有 checked-in
 reviewed inventory digest。
 默认 Map/Lock producers、完整 candidate 与 manifest 路径未因此接通；
 没有任何商 manifest 被成功生成、复核或冻结，所以两个值仍是 `unknown`。
@@ -166,8 +168,10 @@ semantic drift 或任一 commitment 替换都失败关闭。
 region/size 执行受管 VFS Map callback 并
 形成实际结果，parent 只在 child terminal/exit 与 cleanup receipt 都绑定后消费私有 actual receipt。它仍是
 未编译、未运行的程序合同，不是 Windows record。默认 Map producers 仍全量签发
-`Missing(QuotientRunnerNotIntegrated)`，Lock producers 与准入保持
-`Missing(LockObservationIncomplete)`；因此当前完整 candidate 没有 class 被放行。
+`Missing(QuotientRunnerNotIntegrated)`，Lock 默认 producers 仍签发
+`Missing(LockObservationIncomplete)`。只有精确命中本批 request-validation program 且持有私有、进程隔离
+actual receipt 的 `Supported` Lock descriptor 才可通过 program-local 准入；因此当前完整 candidate 仍没有
+class 被放行。
 
 ### 7.1 Pre-manifest execution-program inventory
 
@@ -189,10 +193,18 @@ SourcePresentReceiptRequired { implementation_sha256 }
 
 本层禁止出现 `Supported` 或 `ExecutionVerified`。`SourcePresentReceiptRequired` 只表示 exact source matcher
 找到了实现，仍须后续正式 receipt；当前 matcher 只认 Map `RegionSizeBudget`、`RegionCountBudget`、
-`LogicalSizeBudget` 三类 `Completed` 请求各自的 Observe/Extend 形状。其他 Map program 继续是
-`PlannedMissing(QuotientRunnerNotIntegrated)`，Lock 不在本批 inventory 入口
-范围内。matcher 只把明确的 `UnsupportedProgram` 归为 planned missing；plan/binding 等内部错误必须携带 exact
-member 使整次 inventory 失败，禁止 fail-open-as-missing。
+`LogicalSizeBudget` 三类 `Completed` 请求各自的 Observe/Extend 形状，以及 Lock 四种 action 的
+`RangeOverflow`、`EndPastEight` 和仅 shared action 可用的 `SharedMultiSlot` 直接拒绝形状。其他 Map program
+继续是 `PlannedMissing(QuotientRunnerNotIntegrated)`，其他 Lock program 继续是
+`PlannedMissing(LockObservationIncomplete)`。matcher 只把明确的 `UnsupportedProgram` 归为 planned missing；
+plan/binding 等内部错误必须携带 exact member 使整次 inventory 失败，禁止 fail-open-as-missing。
+
+Lock 窄 program family 的 raw 输入固定为：range overflow 使用 `offset=255,count=1`；end-past-eight 使用
+`offset=8,count=1`；shared-multi-slot 使用 `offset=0,count=2`。flags 必须由 exact action 机械映射到 SQLite
+`LOCK/UNLOCK × SHARED/EXCLUSIVE` 位，且 shared-multi-slot 禁止匹配 exclusive action。child 必须真实调用已安装
+`xShmLock`，观察 `SQLITE_IOERR_SHMLOCK`、原始 slots 未变、未创建 SHM target、连接仍存活与 VFS 注册仍在；
+parent 只在 exact child exit、root/registration/payload/environment 与删除回执全部闭合后产生私有 execution
+receipt。调用方提交的 result code、digest 或 expected vector 均不能构造该 receipt。
 
 inventory context 必须绑定 static baseline/source scope/ledger/manifest、included/excluded/source-universe、
 exact included member-pair set、projector schema/source scope、frozen descriptor binding 与 inventory source scope。
@@ -201,11 +213,11 @@ exact included member-pair set、projector schema/source scope、frozen descript
 reverse index 并与逐叶 membership 相等；任一 missing member、extra、duplicate、collision、binding drift 或
 空 group 都使 inventory 原子失败。
 
-该 inventory 不是 quotient manifest，也不选择正式 representative，不产生 `Qmap`、
-`DynamicQuotientMemberCoverage`、Windows record 或任何 runtime permit。只有以后完整 Map program inventory
-全部达到 source-present、独立 review 冻结其 digest，并由 quotient manifest context 反向绑定后，才可进入
-manifest 冻结。生产 actual-execution path 当前仍未开放；验收规则要求未来 actual Windows execution 只能在
-manifest 后按 frozen class representative 发生。
+该 inventory 不是 quotient manifest，也不选择正式 representative，不产生 `Qmap/Qlock`、
+`DynamicQuotientMemberCoverage`、Windows record 或任何 runtime permit。只有以后相应 root 的完整 program
+inventory 全部达到 source-present、独立 review 冻结其 digest，并由 quotient manifest context 反向绑定后，
+才可进入 manifest 冻结。Map 与 Lock review digest 独立，不能跨 root 复用。生产 actual-execution path 当前仍
+未开放；验收规则要求未来 actual Windows execution 只能在 manifest 后按 frozen class representative 发生。
 
 ### 7.2 Reviewed source-program admission bridge
 
@@ -229,12 +241,14 @@ semantic key，只在另一个 source-program admission receipt 精确成立后�
 commitment 与 source-program admission binding，使同一 member 的 static seal、descriptor、program 与 class
 归属不能跨 inventory 或 manifest 重放。这是 manifest source completeness 的前置证明，不是 actual execution。
 本批源码尚未把 actual receipt 绑定到 manifest/class；现有 `#[cfg(all(test, windows))]` helper 只是
-implementation fixture，不是 acceptance authority。验收规则要求未来 actual `MapRunnerExecutionReceiptV1`
-只能在 manifest 冻结后，由 frozen class 的 canonical representative 执行真实 Windows child 后产生。
+implementation fixture，不是 acceptance authority。验收规则要求未来 actual
+`MapRunnerExecutionReceiptV1`/`LockRunnerExecutionReceiptV1` 只能在相应 manifest 冻结后，由 frozen class 的
+canonical representative 执行真实 Windows child 后产生。
 
-当前该 bridge 只能失败关闭：source test 预期 `43,476` member 中仅 `6` 个 source-present、`43,470` 个
-planned-missing，且 reviewed inventory digest 尚未 checked-in/frozen。因此 provider authority 不可构造，
-full Map candidate 必须在 catalog/manifest 前原子失败；该结论没有运行证据，current source 仍为
+当前该 bridge 只能失败关闭：Map source test 预期 `43,476` member 中仅 `6` 个 source-present、`43,470` 个
+planned-missing；Lock source test 预期 `8,668` member 中仅 `10` 个 source-present、`8,658` 个
+planned-missing；两根 reviewed inventory digest 均尚未 checked-in/frozen。因此 provider authority 不可构造，
+full Map/Lock candidate 必须在 catalog/manifest 前分别原子失败；该结论没有运行证据，current source 仍为
 `passed=0 failed=0 not_run`。
 
 ## 8. Class catalog and member commitments
@@ -348,7 +362,7 @@ static 或 projector 漂移都要求全量重生成与重审。
 阻塞是完整 observation 尚未实现；二者都在 class catalog 或 manifest 冻结前失败，因此不产生
 `Qmap/Qlock`、member coverage 或 Windows numerator。
 
-上述回执全部是本批 Map program/receipt 改动前的 prior baseline。本批 current source 只达到
+上述回执全部是本批 Map/Lock program/receipt 改动前的 prior baseline。本批 current source 只达到
 `source_written/source_review_only/implementation_uncompiled/implementation_unrun`，新增窄 program、私有
 actual receipt、program inventory、reviewed source-program admission provider、catalog/manifest binding 与负向
 测试源码均为 `passed=0/failed=0/not_run`；不得把 prior `36/36` 或 exact blocker 回执当作 current-source 验证。
@@ -376,9 +390,9 @@ exact gate 接受。Lock/Map 全量回执仍只证明 exact blocker 与原子失
 负向守卫至少覆盖缺成员、额外成员、重复成员、excluded 混入、空类、representative 非成员、成员摘要
 漂移、class split/merge、semantic digest 漂移、未知 enum、leaf-text 分类、case-salted digest 误用、Map
 ordinal 非法消去与 Lock range 非法消去；还必须覆盖 naked `Supported`、缺少或替换私有 actual receipt、跨 root
-plan、同 root plan swap、non-capability semantic drift 与 admission binding digest 漂移。本批已写窄 Map
-receipt/准入及相应负向测试源码；完整 `43,476` integration、validator tamper acceptance 与 Windows execution
-仍待补齐，全部均未运行。
+plan、同 root plan swap、non-capability semantic drift 与 admission binding digest 漂移。本批已写窄 Map/Lock
+receipt/准入及相应负向测试源码；完整 `43,476 + 8,668` source integration、validator tamper acceptance 与
+Windows execution 仍待补齐，全部均未运行。
 
 ## 10. Windows evidence and atomic reducer
 
@@ -428,16 +442,26 @@ map_source_program_admission_current=unconstructible_unrun_source_expectation_pl
 map_catalog_manifest_inventory_binding=source_written_uncompiled_unrun
 map_actual_execution_order=post_manifest_frozen_representative_only
 map_default_producers=all_missing_quotient_runner_not_integrated
-lock_runner_admission=unchanged_all_missing_lock_observation_incomplete
+lock_request_validation_programs=source_written_10_private_actual_receipt_parent_child_cleanup_uncompiled_unrun
+lock_supported_admission=private_exact_receipt_binding_only_source_contract_not_run
+lock_pre_manifest_program_inventory=source_written_full_root_two_pass_non_authorizing_uncompiled_unrun
+lock_program_inventory_status=planned_missing_or_source_present_receipt_required_only
+lock_program_inventory_digest=not_generated_not_frozen
+lock_program_inventory_member_and_group_counts=unknown_not_run
+lock_program_inventory_unrun_test_expectation=members_8668_source_present_members_10_source_present_groups_10_planned_missing_members_8658
+lock_reviewed_inventory_digest=not_checked_in_not_frozen
+lock_source_program_admission_provider=source_written_fail_closed_uncompiled_unrun
+lock_source_program_admission_current=unconstructible_unrun_source_expectation_planned_missing_members_8658_and_reviewed_digest_absent
+lock_default_producers=all_missing_lock_observation_incomplete
 runner_admission_raw_supported=fail_closed_without_private_exact_receipt_not_run
 dynamic_quotient_targeted=prior_passed_36_of_36_current_source_not_run
 map_candidate_gate=prior_passed_expected_fail_closed_43476_current_source_not_run
-lock_candidate_gate=prior_passed_expected_fail_closed_8668_current_source_not_run
+lock_candidate_gate=prior_passed_expected_fail_closed_8668_current_source_inventory_blocker_not_run
 map_bootstrap_descriptor_binding=expected_pre_freeze_drift_not_passed
 map_descriptor_binding=frozen_d3ba08a5ba0019f9ccda99ace8b580ef06eb4d6653ba80c0db5497bec51bd870_exact_gate_accepted
 lock_descriptor_binding=frozen_0cc951c8c979608fb9861167f8d880a74fd2e042c4d2cd42673100e14083e8ef_exact_gate_accepted
 map_blocker=program_inventory_incomplete_and_unreviewed_quotient_runner_not_integrated
-lock_blocker=lock_observation_incomplete
+lock_blocker=program_inventory_incomplete_and_unreviewed_lock_observation_incomplete
 quotient_manifests=not_frozen
 Qmap=unknown
 Qlock=unknown

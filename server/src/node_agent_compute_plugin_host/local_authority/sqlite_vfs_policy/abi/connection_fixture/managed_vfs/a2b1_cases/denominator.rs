@@ -61,3 +61,8 @@ pub(super) fn inspect_map_execution_program_inventory_gate(
 ) -> Result<ExecutionProgramInventoryGateReceiptV1, String> {
     static_contract::inspect_map_execution_program_inventory_gate()
 }
+
+pub(super) fn inspect_lock_execution_program_inventory_gate(
+) -> Result<ExecutionProgramInventoryGateReceiptV1, String> {
+    static_contract::inspect_lock_execution_program_inventory_gate()
+}

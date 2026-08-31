@@ -180,6 +180,53 @@ fn child_payload_accepts_exact_map_request_budget_family_without_legacy_widening
 }
 
 #[test]
+fn child_payload_accepts_exact_lock_request_validation_family_without_widening() {
+    for selector in [
+        "range-overflow-lock-shared-completed",
+        "range-overflow-lock-exclusive-completed",
+        "range-overflow-unlock-shared-completed",
+        "range-overflow-unlock-exclusive-completed",
+        "end-past-eight-lock-shared-completed",
+        "end-past-eight-lock-exclusive-completed",
+        "end-past-eight-unlock-shared-completed",
+        "end-past-eight-unlock-exclusive-completed",
+        "shared-multi-slot-lock-shared-completed",
+        "shared-multi-slot-unlock-shared-completed",
+    ] {
+        validate_payload_for_test(&payload_with_count("a2lockq1", selector, 51))
+            .expect("accept one exact Lock request-validation payload");
+    }
+    for field_count in [50, 52] {
+        assert_eq!(
+            validate_payload_for_test(&payload_with_count(
+                "a2lockq1",
+                "range-overflow-lock-shared-completed",
+                field_count,
+            )),
+            Err("A2_DYNAMIC_CHILD_ACTUAL_FIELDS_INVALID")
+        );
+    }
+    for selector in [
+        "shared-multi-slot-lock-exclusive-completed",
+        "shared-multi-slot-unlock-exclusive-completed",
+        "range-overflow-lock-unknown-completed",
+    ] {
+        assert_eq!(
+            validate_payload_for_test(&payload_with_count("a2lockq1", selector, 51)),
+            Err("A2_DYNAMIC_CHILD_ACTUAL_SELECTOR_INVALID")
+        );
+    }
+    assert_eq!(
+        validate_payload_for_test(&payload_with_count(
+            "a2lockq0",
+            "range-overflow-lock-shared-completed",
+            51,
+        )),
+        Err("A2_DYNAMIC_CHILD_ACTUAL_VERSION_INVALID")
+    );
+}
+
+#[test]
 fn unmap_candidate_record_accepts_one_fully_bound_observation() {
     let selector = UnmapSelector::SharedKeepSuccess;
     let payload = unmap_success_payload(7);

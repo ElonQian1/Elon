@@ -33,10 +33,13 @@ use model::{
     DynamicAxesV1, DynamicClassKeyV1, DynamicExpectedV1, DynamicOperationV1, DynamicProjectionV1,
     StaticMemberSealV1, DYNAMIC_PROJECTOR_SCHEMA_V1,
 };
-use program_inventory::build_map_execution_program_inventory_v1;
 pub(crate) use program_inventory::ProgramCatalogAdmissionErrorV1;
+use program_inventory::{
+    build_lock_execution_program_inventory_v1, build_map_execution_program_inventory_v1,
+};
 use projector::{
     prepare_dynamic_terminal_v1, project_dynamic_class_v1, project_validated_dynamic_terminal_v1,
+    project_validated_dynamic_terminal_with_lock_execution_v1,
     project_validated_dynamic_terminal_with_map_execution_v1,
     project_validated_dynamic_terminal_with_program_catalog_v1, ProjectionErrorV1,
     ProjectionViolationV1,
@@ -58,6 +61,20 @@ pub(super) fn inspect_map_execution_program_inventory_v1(
 ) -> Result<ExecutionProgramInventorySummaryV1, String> {
     let bundle =
         build_map_execution_program_inventory_v1(graph).map_err(|error| format!("{error:?}"))?;
+    summarize_execution_program_inventory_v1(bundle)
+}
+
+pub(super) fn inspect_lock_execution_program_inventory_v1(
+    graph: &super::model::ContractGraph,
+) -> Result<ExecutionProgramInventorySummaryV1, String> {
+    let bundle =
+        build_lock_execution_program_inventory_v1(graph).map_err(|error| format!("{error:?}"))?;
+    summarize_execution_program_inventory_v1(bundle)
+}
+
+fn summarize_execution_program_inventory_v1(
+    bundle: program_inventory::ExecutionProgramInventoryBundleV1,
+) -> Result<ExecutionProgramInventorySummaryV1, String> {
     let inventory = bundle.inventory;
     Ok(ExecutionProgramInventorySummaryV1 {
         member_count: inventory.member_count,

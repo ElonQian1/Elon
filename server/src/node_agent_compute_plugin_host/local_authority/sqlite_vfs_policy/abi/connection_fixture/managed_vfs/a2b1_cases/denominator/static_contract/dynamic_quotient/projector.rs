@@ -1,3 +1,7 @@
+mod lock_execution;
+
+pub(super) use lock_execution::project_validated_dynamic_terminal_with_lock_execution_v1;
+
 use super::super::{
     source_leaf_authority::{
         digest_case_key, digest_full_record, LeafOutcomeV1, LeafRecordV1, RootOperationV1,
@@ -20,8 +24,8 @@ use super::{
     producer_coherence,
     program_inventory::{ProgramCatalogAdmissionErrorV1, ProgramCatalogReceiptProviderV1},
     runner_admission::{
-        self, MapRunnerExecutionReceiptV1, RunnerAdmissionDecisionV1, RunnerAdmissionReceiptV1,
-        RunnerAdmissionViolationV1,
+        self, LockRunnerExecutionReceiptV1, MapRunnerExecutionReceiptV1, RunnerAdmissionDecisionV1,
+        RunnerAdmissionReceiptV1, RunnerAdmissionViolationV1,
     },
 };
 
@@ -62,6 +66,7 @@ pub(crate) enum ProjectionViolationV1 {
         actual: CapabilityGapV1,
     },
     RunnerAdmissionPlanBindingMismatch,
+    RunnerAdmissionLockExecutionReceiptMismatch,
     RunnerAdmissionMapExecutionReceiptMismatch,
 }
 
@@ -248,6 +253,9 @@ fn map_runner_admission_violation(value: RunnerAdmissionViolationV1) -> Projecti
         }
         RunnerAdmissionViolationV1::PlanBindingMismatch => {
             ProjectionViolationV1::RunnerAdmissionPlanBindingMismatch
+        }
+        RunnerAdmissionViolationV1::LockExecutionReceiptMismatch => {
+            ProjectionViolationV1::RunnerAdmissionLockExecutionReceiptMismatch
         }
         RunnerAdmissionViolationV1::MapExecutionReceiptMismatch => {
             ProjectionViolationV1::RunnerAdmissionMapExecutionReceiptMismatch

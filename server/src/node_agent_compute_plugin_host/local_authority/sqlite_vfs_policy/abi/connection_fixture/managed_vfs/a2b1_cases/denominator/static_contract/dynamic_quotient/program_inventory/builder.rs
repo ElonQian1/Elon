@@ -56,6 +56,12 @@ pub(in super::super) fn build_map_execution_program_inventory_v1(
     build_execution_program_inventory_v1(graph, RootOperationV1::Map)
 }
 
+pub(in super::super) fn build_lock_execution_program_inventory_v1(
+    graph: &ContractGraph,
+) -> Result<ExecutionProgramInventoryBundleV1, ExecutionProgramInventoryErrorV1> {
+    build_execution_program_inventory_v1(graph, RootOperationV1::Lock)
+}
+
 fn build_execution_program_inventory_v1(
     graph: &ContractGraph,
     root: RootOperationV1,

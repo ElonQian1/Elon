@@ -1,4 +1,4 @@
-//! Source-bound specification for the deterministic Map request-budget program.
+//! Source-bound specification for the deterministic Lock managed-request-validation programs.
 
 use sha2::{Digest, Sha256};
 
@@ -8,9 +8,9 @@ use super::super::super::super::{
         ObservableCountsV1, RootOperationV1, SqliteResultV1, TerminalDispositionV1,
     },
     terminal_descriptor::{
-        CallbackV1, CleanupV1, FaultSeamV1, FixtureV1, MapCompletionV1, MapManagedStimulusV1,
-        MapModeV1, MapOperationV1, MapPrestateV1, ObserverV1, OccurrenceV1, PhaseV1, PrestateV1,
-        ReachabilityV1, SourceSiteV1, StimulusV1, TimingV1,
+        CallbackV1, CleanupV1, FaultSeamV1, FixtureV1, LockActionV1, LockAxesV1, LockCompletionV1,
+        LockManagedStimulusV1, LockOperationV1, LockPrestateV1, ObserverV1, OccurrenceV1, PhaseV1,
+        PrestateV1, ReachabilityV1, SourceSiteV1, StimulusV1, TimingV1,
     },
 };
 use super::super::super::{
@@ -18,45 +18,31 @@ use super::super::super::{
     DYNAMIC_PROJECTOR_SCHEMA_V1,
 };
 use super::super::CompiledRunnerPlanV1;
-use super::MapRunnerExecutionViolationV1;
-
-#[derive(Clone, Copy)]
-pub(super) enum ProgramModeV1 {
-    Observe,
-    Extend,
-}
+use super::LockRunnerExecutionViolationV1;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum MapRequestBudgetGuardV1 {
-    RegionSize,
-    RegionCount,
-    LogicalSize,
+pub(super) enum LockRequestValidationGuardV1 {
+    RangeOverflow,
+    EndPastEight,
+    SharedMultiSlot,
 }
 
-impl MapRequestBudgetGuardV1 {
-    fn from_stimulus(value: MapManagedStimulusV1) -> Option<Self> {
+impl LockRequestValidationGuardV1 {
+    fn from_stimulus(value: LockManagedStimulusV1) -> Option<Self> {
         match value {
-            MapManagedStimulusV1::RegionSizeBudget => Some(Self::RegionSize),
-            MapManagedStimulusV1::RegionCountBudget => Some(Self::RegionCount),
-            MapManagedStimulusV1::LogicalSizeBudget => Some(Self::LogicalSize),
+            LockManagedStimulusV1::RangeOverflow => Some(Self::RangeOverflow),
+            LockManagedStimulusV1::EndPastEight => Some(Self::EndPastEight),
+            LockManagedStimulusV1::SharedMultiSlot => Some(Self::SharedMultiSlot),
             _ => None,
         }
     }
-
-    const fn implementation_tag(self) -> u8 {
-        match self {
-            Self::RegionSize => 1,
-            Self::RegionCount => 2,
-            Self::LogicalSize => 3,
-        }
-    }
 }
 
 #[derive(Clone, Copy)]
-pub(super) struct MapProgramSpecV1 {
-    pub(super) mode: ProgramModeV1,
+pub(super) struct LockProgramSpecV1 {
+    pub(super) action: LockActionV1,
     #[cfg(windows)]
-    pub(super) guard: MapRequestBudgetGuardV1,
+    pub(super) guard: LockRequestValidationGuardV1,
     pub(super) normalized_descriptor_sha256: Digest32,
     pub(super) plan_sha256: Digest32,
     pub(super) implementation_sha256: Digest32,
@@ -65,71 +51,94 @@ pub(super) struct MapProgramSpecV1 {
 pub(super) fn program_spec_v1(
     key: &DynamicClassKeyV1,
     plan: CompiledRunnerPlanV1,
-) -> Result<MapProgramSpecV1, MapRunnerExecutionViolationV1> {
+) -> Result<LockProgramSpecV1, LockRunnerExecutionViolationV1> {
     if plan != super::super::compile_v1(key) {
-        return Err(MapRunnerExecutionViolationV1::PlanBindingMismatch);
+        return Err(LockRunnerExecutionViolationV1::PlanBindingMismatch);
     }
-    let DynamicAxesV1::Map(axes) = key.axes else {
-        return Err(MapRunnerExecutionViolationV1::UnsupportedProgram);
+    let DynamicAxesV1::Lock(axes) = key.axes else {
+        return Err(LockRunnerExecutionViolationV1::UnsupportedProgram);
     };
-    let mode = match axes.mode {
-        ReachabilityV1::Reached(MapModeV1::Observe) => ProgramModeV1::Observe,
-        ReachabilityV1::Reached(MapModeV1::Extend) => ProgramModeV1::Extend,
-        ReachabilityV1::NotReached => {
-            return Err(MapRunnerExecutionViolationV1::UnsupportedProgram)
-        }
+    let ReachabilityV1::Reached(action) = axes.action else {
+        return Err(LockRunnerExecutionViolationV1::UnsupportedProgram);
     };
-    let StimulusV1::MapManaged(stimulus) = key.stimulus else {
-        return Err(MapRunnerExecutionViolationV1::UnsupportedProgram);
+    let StimulusV1::LockManaged(stimulus) = key.stimulus else {
+        return Err(LockRunnerExecutionViolationV1::UnsupportedProgram);
     };
-    let Some(guard) = MapRequestBudgetGuardV1::from_stimulus(stimulus) else {
-        return Err(MapRunnerExecutionViolationV1::UnsupportedProgram);
+    let Some(guard) = LockRequestValidationGuardV1::from_stimulus(stimulus) else {
+        return Err(LockRunnerExecutionViolationV1::UnsupportedProgram);
+    };
+    let Some(implementation_tag) = implementation_tag_v1(action, guard) else {
+        return Err(LockRunnerExecutionViolationV1::UnsupportedProgram);
+    };
+    let expected_axes = LockAxesV1 {
+        action: ReachabilityV1::Reached(action),
+        completion: ReachabilityV1::Reached(LockCompletionV1::Direct),
+        ..LockAxesV1::NOT_REACHED
     };
     if key.schema_version != DYNAMIC_PROJECTOR_SCHEMA_V1
-        || key.root != RootOperationV1::Map
-        || plan.root != RootOperationV1::Map
+        || key.root != RootOperationV1::Lock
+        || plan.root != RootOperationV1::Lock
         || key.source_site != SourceSiteV1::ManagedRequestValidation
-        || key.prestate != PrestateV1::Map(MapPrestateV1::NotReached)
-        || key.operation != DynamicOperationV1::Map(MapOperationV1::ManagedRequest)
+        || key.prestate != PrestateV1::Lock(LockPrestateV1::NotReached)
+        || key.operation != DynamicOperationV1::Lock(LockOperationV1::ManagedRequest)
         || key.phase != PhaseV1::RequestValidation
         || key.timing != TimingV1::BeforeCall
         || key.occurrence != OccurrenceV1::Natural
         || key.recipe.fixture != FixtureV1::ManagedWalMainSingleConnection
-        || key.recipe.callback != CallbackV1::XShmMap
+        || key.recipe.callback != CallbackV1::XShmLock
         || key.recipe.fault_seam != FaultSeamV1::ManagedRequest
-        || key.recipe.observer != ObserverV1::MapCallbackAndSnapshot
+        || key.recipe.observer != ObserverV1::LockCallbackAndSnapshot
         || key.recipe.cleanup != CleanupV1::ParentOwnedRoot
-        || axes.profile != ReachabilityV1::NotReached
-        || axes.ordinal != ReachabilityV1::NotReached
-        || axes.regions_to_create != ReachabilityV1::NotReached
-        || axes.completion != ReachabilityV1::Reached(MapCompletionV1::Completed)
+        || axes != expected_axes
         || key.expected != expected_v1()
     {
-        return Err(MapRunnerExecutionViolationV1::UnsupportedProgram);
+        return Err(LockRunnerExecutionViolationV1::UnsupportedProgram);
     }
-    Ok(MapProgramSpecV1 {
-        mode,
+    Ok(LockProgramSpecV1 {
+        action,
         #[cfg(windows)]
         guard,
         normalized_descriptor_sha256: plan.normalized_descriptor_sha256,
         plan_sha256: plan.plan_sha256,
-        implementation_sha256: digest_implementation_v1(guard),
+        implementation_sha256: digest_implementation_v1(implementation_tag),
     })
 }
 
-fn digest_implementation_v1(guard: MapRequestBudgetGuardV1) -> Digest32 {
+const fn implementation_tag_v1(
+    action: LockActionV1,
+    guard: LockRequestValidationGuardV1,
+) -> Option<u8> {
+    match (action, guard) {
+        (LockActionV1::LockShared, LockRequestValidationGuardV1::RangeOverflow) => Some(1),
+        (LockActionV1::LockShared, LockRequestValidationGuardV1::EndPastEight) => Some(2),
+        (LockActionV1::LockShared, LockRequestValidationGuardV1::SharedMultiSlot) => Some(3),
+        (LockActionV1::LockExclusive, LockRequestValidationGuardV1::RangeOverflow) => Some(4),
+        (LockActionV1::LockExclusive, LockRequestValidationGuardV1::EndPastEight) => Some(5),
+        (LockActionV1::UnlockShared, LockRequestValidationGuardV1::RangeOverflow) => Some(6),
+        (LockActionV1::UnlockShared, LockRequestValidationGuardV1::EndPastEight) => Some(7),
+        (LockActionV1::UnlockShared, LockRequestValidationGuardV1::SharedMultiSlot) => Some(8),
+        (LockActionV1::UnlockExclusive, LockRequestValidationGuardV1::RangeOverflow) => Some(9),
+        (LockActionV1::UnlockExclusive, LockRequestValidationGuardV1::EndPastEight) => Some(10),
+        (
+            LockActionV1::LockExclusive | LockActionV1::UnlockExclusive,
+            LockRequestValidationGuardV1::SharedMultiSlot,
+        ) => None,
+    }
+}
+
+fn digest_implementation_v1(implementation_tag: u8) -> Digest32 {
     let mut hasher = Sha256::new();
-    hasher.update(b"elon-map-managed-request-budget-completed-implementation-v1\0");
+    hasher.update(b"elon-lock-managed-request-validation-direct-implementation-v1\0");
     for source in [
-        include_str!("../map_program.rs"),
-        include_str!("request_budget.rs"),
+        include_str!("../lock_program.rs"),
+        include_str!("request_validation.rs"),
         include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2_dynamic_evidence/map_runner.rs"
+            "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2_dynamic_evidence/lock_runner.rs"
         )),
         include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2_dynamic_evidence/map_runner/request_budget.rs"
+            "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2_dynamic_evidence/lock_runner/request_validation.rs"
         )),
         include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
@@ -138,6 +147,10 @@ fn digest_implementation_v1(guard: MapRequestBudgetGuardV1) -> Digest32 {
         include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2_dynamic_evidence/child/payload.rs"
+        )),
+        include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2_dynamic_evidence/child/lock_request_validation.rs"
         )),
         include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
@@ -158,6 +171,10 @@ fn digest_implementation_v1(guard: MapRequestBudgetGuardV1) -> Digest32 {
         include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/connection.rs"
+        )),
+        include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/live_registration.rs"
         )),
         include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
@@ -205,10 +222,6 @@ fn digest_implementation_v1(guard: MapRequestBudgetGuardV1) -> Digest32 {
         )),
         include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_abi/boundary.rs"
-        )),
-        include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
             "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_abi/io_shm.rs"
         )),
         include_str!(concat!(
@@ -231,39 +244,31 @@ fn digest_implementation_v1(guard: MapRequestBudgetGuardV1) -> Digest32 {
             env!("CARGO_MANIFEST_DIR"),
             "/src/node_agent_managed_fs/sqlite_namespace_shm/types.rs"
         )),
-        include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/src/node_agent_managed_fs/sqlite_namespace_shm/mapping.rs"
-        )),
     ] {
         hasher.update((source.len() as u64).to_le_bytes());
         hasher.update(source.as_bytes());
     }
-    hasher.update([guard.implementation_tag()]);
+    hasher.update([implementation_tag]);
     Digest32(hasher.finalize().into())
 }
 
 fn expected_v1() -> DynamicExpectedV1 {
     DynamicExpectedV1 {
-        sqlite: SqliteResultV1::MapUnavailable,
+        sqlite: SqliteResultV1::LockUnavailable,
         disposition: TerminalDispositionV1::Returned,
         phase: PhaseV1::RequestValidation,
         failure: FailureClassV1::ProtocolViolation,
         mutation: MutationStateV1::None,
         lock_outcome_uncertain: false,
-        lock_effect: LockEffectV1::NotReached,
+        lock_effect: LockEffectV1::Unchanged,
         dms_lock: DmsLockCustodyV1::NotReached,
         raw_slots: CustodyStateV1::Unchanged,
-        route: CustodyStateV1::Unchanged,
-        callback: CustodyStateV1::Released,
-        file: CustodyStateV1::Retained,
+        route: CustodyStateV1::NotReached,
+        callback: CustodyStateV1::NotReached,
+        file: CustodyStateV1::Unchanged,
         mapping: CustodyStateV1::NotReached,
         view: CustodyStateV1::NotReached,
         payload: CustodyStateV1::NotReached,
-        counts: ObservableCountsV1 {
-            callback_begin: 1,
-            callback_complete: 1,
-            ..ObservableCountsV1::default()
-        },
+        counts: ObservableCountsV1::default(),
     }
 }

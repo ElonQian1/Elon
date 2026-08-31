@@ -1,13 +1,11 @@
 use super::super::super::terminal_descriptor::{
     CallbackV1, CleanupV1, FaultSeamV1, FixtureV1, LockActionV1, LockAxesV1, LockCompletionV1,
     LockManagedStimulusV1, LockOperationV1, LockPrestateV1, LockTerminalDescriptorV1, ObserverV1,
-    PhaseV1, PrestateV1, RawStateV1, ReachabilityV1, SourceSiteV1, StimulusV1, TimingV1,
-    ValidityV1,
+    PhaseV1, PrestateV1, RawStateV1, ReachabilityV1, RunnerCapabilityV1, SourceSiteV1, StimulusV1,
+    TimingV1, ValidityV1,
 };
 use super::super::projector::{ProjectionErrorV1, ProjectionViolationV1};
-use super::{
-    invalid, valid_initialization_tuple, valid_lock_capability, valid_stored_poison_phase,
-};
+use super::{invalid, valid_initialization_tuple, valid_stored_poison_phase};
 
 pub(super) fn validate(value: LockTerminalDescriptorV1) -> Result<(), ProjectionErrorV1> {
     validate_recipe(value)?;
@@ -60,12 +58,26 @@ fn validate_recipe(value: LockTerminalDescriptorV1) -> Result<(), ProjectionErro
         && value.recipe.callback == CallbackV1::XShmLock
         && value.recipe.observer == observer
         && value.recipe.cleanup == cleanup
-        && valid_lock_capability(value.recipe)
+        && valid_lock_capability(value)
     {
         Ok(())
     } else {
         Err(invalid(ProjectionViolationV1::LockProducerRecipeMismatch))
     }
+}
+
+fn valid_lock_capability(value: LockTerminalDescriptorV1) -> bool {
+    super::valid_lock_capability(value.recipe)
+        || (value.recipe.capability == RunnerCapabilityV1::Supported
+            && matches!(
+                value.stimulus,
+                StimulusV1::LockManaged(
+                    LockManagedStimulusV1::RangeOverflow
+                        | LockManagedStimulusV1::EndPastEight
+                        | LockManagedStimulusV1::SharedMultiSlot
+                )
+            )
+            && value.axes.completion == ReachabilityV1::Reached(LockCompletionV1::Direct))
 }
 
 fn valid_tuple(value: LockTerminalDescriptorV1) -> bool {

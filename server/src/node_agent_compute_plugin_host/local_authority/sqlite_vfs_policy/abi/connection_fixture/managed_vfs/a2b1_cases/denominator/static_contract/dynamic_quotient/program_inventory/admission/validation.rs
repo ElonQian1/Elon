@@ -37,8 +37,7 @@ pub(super) fn validate_complete_inventory_v1(
     let inventory = &bundle.inventory;
     let context = &inventory.context;
     if context.schema_version != EXECUTION_PROGRAM_INVENTORY_SCHEMA_V1
-        || context.root != RootOperationV1::Map
-        || binding.context.root != RootOperationV1::Map
+        || context.root != binding.context.root
     {
         return Err(ProgramCatalogAdmissionErrorV1::RootMismatch);
     }

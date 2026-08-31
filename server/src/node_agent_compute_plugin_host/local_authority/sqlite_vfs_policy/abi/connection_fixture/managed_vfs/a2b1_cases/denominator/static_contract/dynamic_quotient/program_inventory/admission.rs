@@ -18,7 +18,10 @@ use super::super::{
     runner_admission::{self, ExecutionProgramInventoryStatusV1},
     DynamicClassKeyV1, StaticMemberSealV1,
 };
-use super::review::REVIEWED_MAP_EXECUTION_PROGRAM_INVENTORY_SHA256_V1;
+use super::review::{
+    REVIEWED_LOCK_EXECUTION_PROGRAM_INVENTORY_SHA256_V1,
+    REVIEWED_MAP_EXECUTION_PROGRAM_INVENTORY_SHA256_V1,
+};
 use super::ExecutionProgramInventoryBundleV1;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -90,9 +93,38 @@ pub(in super::super) fn review_map_execution_program_inventory_v1(
     bundle: ExecutionProgramInventoryBundleV1,
     binding: &FrozenStaticBindingV1,
 ) -> Result<ReviewedExecutionProgramInventoryV1, ProgramCatalogAdmissionErrorV1> {
+    if binding.context.root != RootOperationV1::Map {
+        return Err(ProgramCatalogAdmissionErrorV1::RootMismatch);
+    }
+    review_execution_program_inventory_v1(
+        bundle,
+        binding,
+        REVIEWED_MAP_EXECUTION_PROGRAM_INVENTORY_SHA256_V1,
+    )
+}
+
+pub(in super::super) fn review_lock_execution_program_inventory_v1(
+    bundle: ExecutionProgramInventoryBundleV1,
+    binding: &FrozenStaticBindingV1,
+) -> Result<ReviewedExecutionProgramInventoryV1, ProgramCatalogAdmissionErrorV1> {
+    if binding.context.root != RootOperationV1::Lock {
+        return Err(ProgramCatalogAdmissionErrorV1::RootMismatch);
+    }
+    review_execution_program_inventory_v1(
+        bundle,
+        binding,
+        REVIEWED_LOCK_EXECUTION_PROGRAM_INVENTORY_SHA256_V1,
+    )
+}
+
+fn review_execution_program_inventory_v1(
+    bundle: ExecutionProgramInventoryBundleV1,
+    binding: &FrozenStaticBindingV1,
+    reviewed_sha256: Option<Digest32>,
+) -> Result<ReviewedExecutionProgramInventoryV1, ProgramCatalogAdmissionErrorV1> {
     let validated = validation::validate_complete_inventory_v1(bundle, binding)?;
     let actual = validated.binding.inventory_sha256;
-    let Some(expected) = REVIEWED_MAP_EXECUTION_PROGRAM_INVENTORY_SHA256_V1 else {
+    let Some(expected) = reviewed_sha256 else {
         return Err(ProgramCatalogAdmissionErrorV1::ReviewNotFrozen {
             inventory_sha256: actual,
         });
