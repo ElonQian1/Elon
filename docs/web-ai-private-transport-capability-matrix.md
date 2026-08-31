@@ -35,7 +35,7 @@ installed build; individual capability documents retain implementation evidence.
 | Native response read aloud | ChatGPT | Implemented and enabled; full-answer chunking and message-action tests passed; device acceptance pending | Official message actions and WebView |
 | Native conversation project move | ChatGPT | Completed and enabled; exact-control and reconciliation tests passed, device round trip pending | Official conversation project menu |
 | Native conversation management | ChatGPT | Completed and enabled; rename, pin/unpin, archive/unarchive, delete confirmation, identity scoping, and adaptive-control tests passed; consolidated device mutation acceptance pending | Official conversation options |
-| Acceptance evidence contract revisions | ChatGPT and Google Web AI | Implemented and enabled; 44 scripted plus 2 manual-only cases are offline verified, installed-state migration pending | Retain implementation hashes as diagnostics without discarding accepted contracts |
+| Acceptance evidence contract revisions | ChatGPT and Google Web AI | Completed, enabled, and installed-state migration verified on Release `v1.1.1393 (1414)`, adapter `212` | Retain implementation hashes as diagnostics without discarding accepted contracts |
 
 All web-account transports keep the official page authoritative. They do not export
 cookies, credentials, request headers, or private conversation content outside the
@@ -49,8 +49,11 @@ version 1 records migrate as contract revision 1; only an explicit revision bump
 the affected case. Product input SHA-256 values remain in the structural snapshot as
 diagnostic provenance and expose implementation drift without erasing a still-valid device
 result. The completed, default-enabled infrastructure capability is
-`android_chatgpt_verification_evidence_contract_revision_v1`; its installed-state migration
-remains pending until a published APK is upgraded without clearing application data.
+`android_chatgpt_verification_evidence_contract_revision_v1`. A read-only structural query
+after the data-preserving Release upgrade reported 25 registered and 25 contract-current
+historical records across 46 packaged cases. All 25 separately reported implementation hash
+drift, proving that provenance remains visible without erasing accepted device evidence. The
+query reported no private conversation content.
 
 Conversation navigation now retains the normalized target identity across an official
 document replacement. If the old page disappears before it can emit a command result, a
