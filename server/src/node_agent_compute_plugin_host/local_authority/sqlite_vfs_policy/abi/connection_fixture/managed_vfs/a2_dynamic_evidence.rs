@@ -29,7 +29,7 @@ pub(super) use joint_close_family::{
 };
 pub(super) use map_runner::{
     run_map_program_isolated, MapRunnerEvidenceReceiptV1, MapRunnerIsolatedEvidenceV1,
-    MapRunnerModeV1, MapRunnerProgramBindingV1,
+    MapRunnerModeV1, MapRunnerProgramBindingV1, MapRunnerRequestBudgetV1,
 };
 pub(super) use record::{
     UnmapCandidateReportView, ValidatedUnmapCandidateRecord, ValidatedWindowsDynamicRecord,

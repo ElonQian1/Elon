@@ -26,9 +26,37 @@ pub(super) enum ProgramModeV1 {
     Extend,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum MapRequestBudgetGuardV1 {
+    RegionSize,
+    RegionCount,
+    LogicalSize,
+}
+
+impl MapRequestBudgetGuardV1 {
+    fn from_stimulus(value: MapManagedStimulusV1) -> Option<Self> {
+        match value {
+            MapManagedStimulusV1::RegionSizeBudget => Some(Self::RegionSize),
+            MapManagedStimulusV1::RegionCountBudget => Some(Self::RegionCount),
+            MapManagedStimulusV1::LogicalSizeBudget => Some(Self::LogicalSize),
+            _ => None,
+        }
+    }
+
+    const fn implementation_tag(self) -> u8 {
+        match self {
+            Self::RegionSize => 1,
+            Self::RegionCount => 2,
+            Self::LogicalSize => 3,
+        }
+    }
+}
+
 #[derive(Clone, Copy)]
 pub(super) struct MapProgramSpecV1 {
     pub(super) mode: ProgramModeV1,
+    #[cfg(windows)]
+    pub(super) guard: MapRequestBudgetGuardV1,
     pub(super) normalized_descriptor_sha256: Digest32,
     pub(super) plan_sha256: Digest32,
     pub(super) implementation_sha256: Digest32,
@@ -51,11 +79,16 @@ pub(super) fn program_spec_v1(
             return Err(MapRunnerExecutionViolationV1::UnsupportedProgram)
         }
     };
+    let StimulusV1::MapManaged(stimulus) = key.stimulus else {
+        return Err(MapRunnerExecutionViolationV1::UnsupportedProgram);
+    };
+    let Some(guard) = MapRequestBudgetGuardV1::from_stimulus(stimulus) else {
+        return Err(MapRunnerExecutionViolationV1::UnsupportedProgram);
+    };
     if key.schema_version != DYNAMIC_PROJECTOR_SCHEMA_V1
         || key.root != RootOperationV1::Map
         || plan.root != RootOperationV1::Map
         || key.source_site != SourceSiteV1::ManagedRequestValidation
-        || key.stimulus != StimulusV1::MapManaged(MapManagedStimulusV1::RegionCountBudget)
         || key.prestate != PrestateV1::Map(MapPrestateV1::NotReached)
         || key.operation != DynamicOperationV1::Map(MapOperationV1::ManagedRequest)
         || key.phase != PhaseV1::RequestValidation
@@ -76,21 +109,27 @@ pub(super) fn program_spec_v1(
     }
     Ok(MapProgramSpecV1 {
         mode,
+        #[cfg(windows)]
+        guard,
         normalized_descriptor_sha256: plan.normalized_descriptor_sha256,
         plan_sha256: plan.plan_sha256,
-        implementation_sha256: digest_implementation_v1(),
+        implementation_sha256: digest_implementation_v1(guard),
     })
 }
 
-fn digest_implementation_v1() -> Digest32 {
+fn digest_implementation_v1(guard: MapRequestBudgetGuardV1) -> Digest32 {
     let mut hasher = Sha256::new();
-    hasher.update(b"elon-map-region-count-budget-completed-implementation-v1\0");
+    hasher.update(b"elon-map-managed-request-budget-completed-implementation-v1\0");
     for source in [
         include_str!("../map_program.rs"),
         include_str!("request_budget.rs"),
         include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2_dynamic_evidence/map_runner.rs"
+        )),
+        include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2_dynamic_evidence/map_runner/request_budget.rs"
         )),
         include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
@@ -172,8 +211,7 @@ fn digest_implementation_v1() -> Digest32 {
         hasher.update((source.len() as u64).to_le_bytes());
         hasher.update(source.as_bytes());
     }
-    hasher.update(256u32.to_le_bytes());
-    hasher.update(32_768u32.to_le_bytes());
+    hasher.update([guard.implementation_tag()]);
     Digest32(hasher.finalize().into())
 }
 

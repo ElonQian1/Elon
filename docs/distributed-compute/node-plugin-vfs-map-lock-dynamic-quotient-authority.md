@@ -20,14 +20,16 @@ authority_scope: backend-a2-map-lock-dynamic-quotient-authority-v1
 
 动态分母分别记作 `Qmap` 与 `Qlock`。它们只能由本文规定的类型化生成器对完整静态记录机械投影、
 精确分区并冻结 manifest 后得出。typed descriptor、projector、内存 catalog/manifest builder 与两遍原子
-candidate 入口在前序基线已实现并通过编译和定向单元测试；本批又写入 sealed runner admission，以及仅覆盖
-Map `RegionCountBudget/Completed` 的 source-only executable program、私有 actual receipt 和 parent/child/cleanup
-合同。current source 进一步把“语义 program 分组”“源码 program 存在”“reviewed source admission”与
+candidate 入口在前序基线已实现并通过编译和定向单元测试；本批又写入 sealed runner admission，以及覆盖
+Map `RegionSizeBudget`、`RegionCountBudget`、`LogicalSizeBudget` 三类 `Completed` 请求的 source-only executable
+program family、私有 actual receipt 和 parent/child/cleanup 合同。current source 进一步把“语义 program 分组”
+“源码 program 存在”“reviewed source admission”与
 “actual execution verified”拆开，新增完整 Map 根的 pre-manifest execution-program inventory，以及
 `reviewed inventory -> source-program admission provider -> catalog/manifest binding` 的失败关闭源码桥。只有
 完整 inventory 不含任何 planned-missing，且其 body digest 与独立 review 后 checked-in 的 expected digest
 精确相等，provider 才可构造；原始 inventory status 不能直接授权 catalog。该路径尚未编译、未运行，当前
-source test 预期仍有 `43,474` 个 planned-missing member，也没有 checked-in reviewed inventory digest。
+source test 预期有 `6` 个 source-present member/group、`43,470` 个 planned-missing member，也没有 checked-in
+reviewed inventory digest。
 默认 Map/Lock producers、完整 candidate 与 manifest 路径未因此接通；
 没有任何商 manifest 被成功生成、复核或冻结，所以两个值仍是 `unknown`。
 
@@ -145,8 +147,9 @@ manifest 中删除，也不能被计为动态完成；其存在会让 `WindowsDy
 真实 producer descriptor 还必须先通过 root-specific、有限且闭合的 typed coherence 关系；source site、
 stimulus、prestate、operation、phase、timing、occurrence、fixture/callback/seam/observer/cleanup 与关键 axes
 不能跨合法 tuple 拼接。未知 tuple、跨 root capability gap、Supported/Missing 混合状态，以及同一 catalog
-内不同 Missing gap 都失败关闭。唯一新增的 capability 形状是 Map `RegionCountBudget` 且 completion 为
-`Completed`；它只允许进入私有 receipt 复验路径，不把 producer 声明本身变成许可。此闭合只证明 producer
+内不同 Missing gap 都失败关闭。新增的 capability 形状严格限于 Map `RegionSizeBudget`、`RegionCountBudget`、
+`LogicalSizeBudget` 且 completion 为 `Completed`；它们只允许进入私有 receipt 复验路径，不把 producer 声明
+本身变成许可。此闭合只证明 producer
 元数据没有被错配；它不证明正式 runner 或 observation 已存在。
 
 producer coherence 之后还必须由 projector 内部从同一个已验证 semantic key 机械编译 root-specific runner
@@ -155,11 +158,12 @@ required stages 与 exact planned-missing gap；producer 不能提交、自签�
 `RunnerCapabilityV1::Supported` 只是声明，不是 permit；普通 `resolve_v1` 仍拒绝裸声明。仅
 `project_validated_dynamic_terminal_with_map_execution_v1` 可消费私有 `MapRunnerExecutionReceiptV1`；当它与
 exact member、normalized descriptor、内部 plan、program implementation 和 execution commitment 全部精确
-绑定时，窄 `RegionCountBudget/Completed` 路径才可形成
+绑定时，上述三类 request-budget/`Completed` 窄路径才可形成
 `RunnerAdmissionDecisionV1::Supported { implementation_sha256, execution_sha256 }`。缺 receipt、跨 root/plan、
 semantic drift 或任一 commitment 替换都失败关闭。
 
-该窄 program 的 source design 固定 parent 拥有隔离根与最终删除责任，child 执行受管 VFS Map callback 并
+该窄 program family 的 source design 固定 parent 拥有隔离根与最终删除责任，child 按 stimulus 绑定的
+region/size 执行受管 VFS Map callback 并
 形成实际结果，parent 只在 child terminal/exit 与 cleanup receipt 都绑定后消费私有 actual receipt。它仍是
 未编译、未运行的程序合同，不是 Windows record。默认 Map producers 仍全量签发
 `Missing(QuotientRunnerNotIntegrated)`，Lock producers 与准入保持
@@ -184,8 +188,9 @@ SourcePresentReceiptRequired { implementation_sha256 }
 ```
 
 本层禁止出现 `Supported` 或 `ExecutionVerified`。`SourcePresentReceiptRequired` 只表示 exact source matcher
-找到了实现，仍须后续正式 receipt；当前 matcher 只认既有 Map `RegionCountBudget/Completed` 的 Observe/Extend
-形状。其他 Map program 继续是 `PlannedMissing(QuotientRunnerNotIntegrated)`，Lock 不在本批 inventory 入口
+找到了实现，仍须后续正式 receipt；当前 matcher 只认 Map `RegionSizeBudget`、`RegionCountBudget`、
+`LogicalSizeBudget` 三类 `Completed` 请求各自的 Observe/Extend 形状。其他 Map program 继续是
+`PlannedMissing(QuotientRunnerNotIntegrated)`，Lock 不在本批 inventory 入口
 范围内。matcher 只把明确的 `UnsupportedProgram` 归为 planned missing；plan/binding 等内部错误必须携带 exact
 member 使整次 inventory 失败，禁止 fail-open-as-missing。
 
@@ -227,7 +232,7 @@ commitment 与 source-program admission binding，使同一 member 的 static se
 implementation fixture，不是 acceptance authority。验收规则要求未来 actual `MapRunnerExecutionReceiptV1`
 只能在 manifest 冻结后，由 frozen class 的 canonical representative 执行真实 Windows child 后产生。
 
-当前该 bridge 只能失败关闭：source test 预期 `43,476` member 中仅 `2` 个 source-present、`43,474` 个
+当前该 bridge 只能失败关闭：source test 预期 `43,476` member 中仅 `6` 个 source-present、`43,470` 个
 planned-missing，且 reviewed inventory digest 尚未 checked-in/frozen。因此 provider authority 不可构造，
 full Map candidate 必须在 catalog/manifest 前原子失败；该结论没有运行证据，current source 仍为
 `passed=0 failed=0 not_run`。
@@ -409,17 +414,17 @@ atomic_candidate=implemented_two_pass_in_memory_prior_compiled
 canonical_catalog_manifest_guards=implemented_prior_targeted_unit_passed
 producer_coherence=closed_typed_relations_mixed_state_and_gap_rejected
 sealed_runner_admission_plan=source_written_source_review_only_uncompiled_unrun
-map_region_count_budget_completed_program=source_written_private_actual_receipt_parent_child_cleanup_uncompiled_unrun
+map_three_request_budget_completed_programs=source_written_private_actual_receipt_parent_child_cleanup_uncompiled_unrun
 map_supported_admission=private_exact_receipt_binding_only_source_contract_not_run
 map_pre_manifest_program_inventory=source_written_full_root_two_pass_non_authorizing_uncompiled_unrun
 map_program_inventory_status=planned_missing_or_source_present_receipt_required_only
 map_program_inventory_digest=not_generated_not_frozen
 map_program_inventory_member_and_group_counts=unknown_not_run
-map_program_inventory_unrun_test_expectation=members_43476_source_present_members_2_source_present_groups_2_planned_missing_members_43474
+map_program_inventory_unrun_test_expectation=members_43476_source_present_members_6_source_present_groups_6_planned_missing_members_43470
 map_reviewed_inventory_digest=not_checked_in_not_frozen
 map_source_program_admission_provider=source_written_fail_closed_uncompiled_unrun
 map_source_program_admission_precondition=all_members_and_groups_source_present_plus_exact_checked_in_reviewed_digest
-map_source_program_admission_current=unconstructible_unrun_source_expectation_planned_missing_members_43474_and_reviewed_digest_absent
+map_source_program_admission_current=unconstructible_unrun_source_expectation_planned_missing_members_43470_and_reviewed_digest_absent
 map_catalog_manifest_inventory_binding=source_written_uncompiled_unrun
 map_actual_execution_order=post_manifest_frozen_representative_only
 map_default_producers=all_missing_quotient_runner_not_integrated

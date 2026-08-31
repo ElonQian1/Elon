@@ -191,6 +191,7 @@ fn projector_provenance_binds_typed_descriptor_producers_and_wiring() {
         "managed_vfs/a2_dynamic_evidence/child.rs",
         "managed_vfs/a2_dynamic_evidence/child/payload.rs",
         "managed_vfs/a2_dynamic_evidence/map_runner.rs",
+        "managed_vfs/a2_dynamic_evidence/map_runner/request_budget.rs",
         "managed_vfs/connection/unmap.rs",
     ];
     let source_names = PROJECTOR_SOURCE_SCOPE_V1

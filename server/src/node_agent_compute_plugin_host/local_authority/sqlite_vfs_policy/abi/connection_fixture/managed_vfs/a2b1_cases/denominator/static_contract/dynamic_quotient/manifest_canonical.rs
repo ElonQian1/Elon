@@ -108,6 +108,10 @@ pub(super) const PROJECTOR_SOURCE_SCOPE_V1: &[(&str, &str)] = &[
         include_str!("../../../../a2_dynamic_evidence/map_runner.rs"),
     ),
     (
+        "managed_vfs/a2_dynamic_evidence/map_runner/request_budget.rs",
+        include_str!("../../../../a2_dynamic_evidence/map_runner/request_budget.rs"),
+    ),
+    (
         "managed_vfs/connection/unmap.rs",
         include_str!("../../../../connection/unmap.rs"),
     ),

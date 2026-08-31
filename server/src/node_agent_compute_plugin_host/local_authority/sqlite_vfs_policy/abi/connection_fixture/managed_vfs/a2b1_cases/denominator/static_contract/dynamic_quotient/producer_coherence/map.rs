@@ -68,7 +68,14 @@ fn validate_recipe(value: MapTerminalDescriptorV1) -> Result<(), ProjectionError
 fn valid_map_capability(value: MapTerminalDescriptorV1) -> bool {
     super::valid_map_capability(value.recipe)
         || (value.recipe.capability == RunnerCapabilityV1::Supported
-            && value.stimulus == StimulusV1::MapManaged(MapManagedStimulusV1::RegionCountBudget)
+            && matches!(
+                value.stimulus,
+                StimulusV1::MapManaged(
+                    MapManagedStimulusV1::RegionSizeBudget
+                        | MapManagedStimulusV1::RegionCountBudget
+                        | MapManagedStimulusV1::LogicalSizeBudget
+                )
+            )
             && value.axes.completion == ReachabilityV1::Reached(MapCompletionV1::Completed))
 }
 

@@ -1,4 +1,8 @@
-//! Process-isolated native receipt for the one executable Map quotient program.
+//! Process-isolated native receipts for the executable Map request-budget programs.
+
+mod request_budget;
+
+pub(in super::super) use request_budget::MapRunnerRequestBudgetV1;
 
 use std::{
     fs,
@@ -22,11 +26,8 @@ use crate::node_agent_managed_fs::{
 use super::super::ManagedSqliteRoutedConnectionFixture;
 
 const CHILD_ROOT_ENV: &str = "ELON_SQLITE_A2_MAP_QUOTIENT_CHILD_ROOT";
-const PAYLOAD_VERSION: &str = "a2mapq1";
-const PAYLOAD_SELECTOR: &str = "region-count-budget-completed";
-const PAYLOAD_VALUE_COUNT: usize = 66;
-const REGION: i32 = 256;
-const REGION_SIZE: i32 = 32_768;
+const PAYLOAD_VERSION: &str = "a2mapq2";
+const PAYLOAD_VALUE_COUNT: usize = 67;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(in super::super) enum MapRunnerModeV1 {
@@ -50,6 +51,7 @@ impl MapRunnerModeV1 {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(in super::super) struct MapRunnerProgramBindingV1 {
     pub(in super::super) mode: MapRunnerModeV1,
+    pub(in super::super) request_budget: MapRunnerRequestBudgetV1,
     pub(in super::super) normalized_descriptor_sha256: [u8; 32],
     pub(in super::super) case_key_sha256: [u8; 32],
     pub(in super::super) full_record_sha256: [u8; 32],
@@ -210,14 +212,18 @@ fn exercise_child(root: &Path, binding: MapRunnerProgramBindingV1) -> anyhow::Re
         ));
     }
     let map = fixture
-        .call_main_shm_map_raw(REGION, REGION_SIZE, binding.mode.raw_extend())
+        .call_main_shm_map_raw(
+            binding.request_budget.region(),
+            binding.request_budget.region_size(),
+            binding.mode.raw_extend(),
+        )
         .map_err(anyhow::Error::msg)?;
     let witness = fixture
         .installed_shm_fault_witness()
         .map_err(anyhow::Error::msg)?;
     let target = witness.target_witness().map_err(anyhow::Error::msg)?;
     let after = witness.observer().map_err(anyhow::Error::msg)?.snapshot()?;
-    validate_native_map(binding.mode, map, after)?;
+    validate_native_map(binding.mode, binding.request_budget, map, after)?;
     let autocommit = fixture.connection().is_autocommit();
     let liveness: i64 = fixture
         .connection()
@@ -240,13 +246,14 @@ fn exercise_child(root: &Path, binding: MapRunnerProgramBindingV1) -> anyhow::Re
 
 fn validate_native_map(
     mode: MapRunnerModeV1,
+    request_budget: MapRunnerRequestBudgetV1,
     map: super::super::connection::ManagedTestShmMapCallbackObservation,
     after: ManagedSqliteShmTestTargetSnapshot,
 ) -> anyhow::Result<()> {
     let before_slots = map.before();
     let after_slots = map.after();
-    if map.region() != REGION
-        || map.region_size() != REGION_SIZE
+    if map.region() != request_budget.region()
+        || map.region_size() != request_budget.region_size()
         || map.raw_extend() != mode.raw_extend()
         || map.result_code() != ffi::SQLITE_IOERR_SHMMAP
         || !map.output_was_cleared()
@@ -306,7 +313,8 @@ fn encode_payload(
     values.extend([1, 1, 1, 1]);
     debug_assert_eq!(values.len(), PAYLOAD_VALUE_COUNT);
     format!(
-        "{PAYLOAD_VERSION},{PAYLOAD_SELECTOR},{}",
+        "{PAYLOAD_VERSION},{},{}",
+        binding.request_budget.selector(),
         values
             .into_iter()
             .map(|value| value.to_string())
@@ -317,18 +325,20 @@ fn encode_payload(
 
 fn validate_payload(payload: &str, binding: MapRunnerProgramBindingV1) -> anyhow::Result<u64> {
     let mut fields = payload.split(',');
-    if fields.next() != Some(PAYLOAD_VERSION) || fields.next() != Some(PAYLOAD_SELECTOR) {
+    if fields.next() != Some(PAYLOAD_VERSION)
+        || fields.next() != Some(binding.request_budget.selector())
+    {
         return Err(anyhow!("Map quotient payload identity mismatch"));
     }
     let values = fields
         .map(|value| value.parse::<u64>())
         .collect::<Result<Vec<_>, _>>()?;
-    if values.len() != PAYLOAD_VALUE_COUNT || values[..21] != binding_values(binding) {
+    if values.len() != PAYLOAD_VALUE_COUNT || values[..22] != binding_values(binding) {
         return Err(anyhow!("Map quotient payload program binding mismatch"));
     }
     let expected_request = [
-        REGION as u64,
-        REGION_SIZE as u64,
+        binding.request_budget.region() as u64,
+        binding.request_budget.region_size() as u64,
         binding.mode.raw_extend() as u64,
         ffi::SQLITE_IOERR_SHMMAP as u64,
         1,
@@ -338,19 +348,19 @@ fn validate_payload(payload: &str, binding: MapRunnerProgramBindingV1) -> anyhow
         1,
     ];
     let expected_after = [1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-    if values[21..25].contains(&0)
-        || values[25..34] != expected_request
-        || values[34..48] != [0; 14]
-        || values[48..62] != expected_after
-        || values[62..] != [1, 1, 1, 1]
+    if values[22..26].contains(&0)
+        || values[26..35] != expected_request
+        || values[35..49] != [0; 14]
+        || values[49..63] != expected_after
+        || values[63..] != [1, 1, 1, 1]
     {
         return Err(anyhow!("Map quotient payload native receipt mismatch"));
     }
-    Ok(values[21])
+    Ok(values[22])
 }
 
 fn binding_values(binding: MapRunnerProgramBindingV1) -> Vec<u64> {
-    let mut values = vec![binding.mode.tag()];
+    let mut values = vec![binding.mode.tag(), binding.request_budget.tag()];
     for digest in [
         binding.normalized_descriptor_sha256,
         binding.case_key_sha256,

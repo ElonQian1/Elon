@@ -1,4 +1,4 @@
-//! Sealed admission bridge for the one executable Map dynamic-quotient program.
+//! Sealed admission bridge for the executable Map request-budget dynamic-quotient programs.
 
 mod request_budget;
 
@@ -15,9 +15,12 @@ use super::CompiledRunnerPlanV1;
 use request_budget::{program_spec_v1, ProgramModeV1};
 
 #[cfg(windows)]
+use request_budget::MapRequestBudgetGuardV1;
+
+#[cfg(windows)]
 use crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::abi::connection_fixture::managed_vfs::a2_dynamic_evidence::{
     run_map_program_isolated, MapRunnerEvidenceReceiptV1, MapRunnerIsolatedEvidenceV1,
-    MapRunnerModeV1, MapRunnerProgramBindingV1,
+    MapRunnerModeV1, MapRunnerProgramBindingV1, MapRunnerRequestBudgetV1,
 };
 
 /// A real execution receipt. Private fields and the absent public constructor prevent digest-only
@@ -127,6 +130,11 @@ pub(in super::super) fn run_isolated_for_test(
             ProgramModeV1::Observe => MapRunnerModeV1::Observe,
             ProgramModeV1::Extend => MapRunnerModeV1::Extend,
         },
+        request_budget: match program.guard {
+            MapRequestBudgetGuardV1::RegionSize => MapRunnerRequestBudgetV1::RegionSize,
+            MapRequestBudgetGuardV1::RegionCount => MapRunnerRequestBudgetV1::RegionCount,
+            MapRequestBudgetGuardV1::LogicalSize => MapRunnerRequestBudgetV1::LogicalSize,
+        },
         normalized_descriptor_sha256: program.normalized_descriptor_sha256.0,
         case_key_sha256: member.case_key_sha256.0,
         full_record_sha256: member.full_record_sha256.0,
@@ -154,6 +162,8 @@ pub(in super::super) fn tamper_implementation_digest_for_test(
 #[derive(Clone, Copy)]
 struct MapProgramV1 {
     mode: ProgramModeV1,
+    #[cfg(windows)]
+    guard: MapRequestBudgetGuardV1,
     normalized_descriptor_sha256: Digest32,
     member: StaticMemberSealV1,
     plan_sha256: Digest32,
@@ -182,6 +192,8 @@ fn program_v1(
     }
     Ok(MapProgramV1 {
         mode: program.mode,
+        #[cfg(windows)]
+        guard: program.guard,
         normalized_descriptor_sha256: program.normalized_descriptor_sha256,
         member,
         plan_sha256: program.plan_sha256,

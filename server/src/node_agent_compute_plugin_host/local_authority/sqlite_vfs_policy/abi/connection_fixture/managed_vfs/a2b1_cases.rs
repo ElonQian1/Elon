@@ -66,7 +66,7 @@ fn a2b1_map_dynamic_quotient_candidate_is_atomically_program_inventory_blocked()
         matches!(
             error,
             denominator::DynamicQuotientCandidateGateErrorV1::ProgramInventoryIncomplete {
-                missing_member_count: 43_474,
+                missing_member_count: 43_470,
                 missing_group_count,
             } if missing_group_count > 0
         ),
@@ -79,9 +79,9 @@ fn a2b1_map_execution_program_inventory_is_complete_but_non_authorizing() {
     let receipt = denominator::inspect_map_execution_program_inventory_gate()
         .expect("complete pre-manifest Map execution-program inventory");
     assert_eq!(receipt.member_count, 43_476);
-    assert_eq!(receipt.source_present_member_count, 2);
-    assert_eq!(receipt.source_present_group_count, 2);
-    assert_eq!(receipt.planned_missing_member_count, 43_474);
+    assert_eq!(receipt.source_present_member_count, 6);
+    assert_eq!(receipt.source_present_group_count, 6);
+    assert_eq!(receipt.planned_missing_member_count, 43_470);
     assert_eq!(
         receipt
             .source_present_member_count

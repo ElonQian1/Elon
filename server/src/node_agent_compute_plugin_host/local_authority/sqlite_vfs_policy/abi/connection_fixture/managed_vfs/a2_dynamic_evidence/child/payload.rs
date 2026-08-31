@@ -8,14 +8,13 @@ use super::SanitizedPayloadFamily;
 const MAX_ACTUAL_PAYLOAD_BYTES: usize = 1_024;
 const COMMON_REPORT_VALUE_COUNT: usize = 81;
 const JOINT_CLOSE_REPORT_VALUE_COUNT: usize = 83;
-const MAP_QUOTIENT_REPORT_VALUE_COUNT: usize = 66;
+const MAP_QUOTIENT_REPORT_VALUE_COUNT: usize = 67;
 const REGISTRATION_REPORT_VERSION: &str = "a2b2rs1";
 const BARRIER_REPORT_VERSION: &str = "a2b2br1";
 const REGISTRY_LIFECYCLE_REPORT_VERSION: &str = "a2b2rl1";
 const UNMAP_REPORT_VERSION: &str = "a2b2un1";
 const JOINT_CLOSE_REPORT_VERSION: &str = "a2b2jc1";
-const MAP_QUOTIENT_REPORT_VERSION: &str = "a2mapq1";
-const MAP_QUOTIENT_SELECTOR: &str = "region-count-budget-completed";
+const MAP_QUOTIENT_REPORT_VERSION: &str = "a2mapq2";
 
 pub(super) fn validate_actual_payload(
     payload: &str,
@@ -66,7 +65,12 @@ pub(super) fn validate_actual_payload(
             )
         }
         MAP_QUOTIENT_REPORT_VERSION => {
-            if selector != MAP_QUOTIENT_SELECTOR {
+            if !matches!(
+                selector,
+                "region-size-budget-completed"
+                    | "region-count-budget-completed"
+                    | "logical-size-budget-completed"
+            ) {
                 return Err("A2_DYNAMIC_CHILD_ACTUAL_SELECTOR_INVALID");
             }
             (

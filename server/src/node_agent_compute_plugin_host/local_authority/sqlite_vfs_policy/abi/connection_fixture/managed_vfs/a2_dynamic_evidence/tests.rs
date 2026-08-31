@@ -142,6 +142,44 @@ fn child_payload_accepts_exact_joint_close_width_without_widening_other_families
 }
 
 #[test]
+fn child_payload_accepts_exact_map_request_budget_family_without_legacy_widening() {
+    for selector in [
+        "region-size-budget-completed",
+        "region-count-budget-completed",
+        "logical-size-budget-completed",
+    ] {
+        validate_payload_for_test(&payload_with_count("a2mapq2", selector, 67))
+            .expect("accept one exact Map request-budget payload");
+    }
+    for field_count in [66, 68] {
+        assert_eq!(
+            validate_payload_for_test(&payload_with_count(
+                "a2mapq2",
+                "region-count-budget-completed",
+                field_count,
+            )),
+            Err("A2_DYNAMIC_CHILD_ACTUAL_FIELDS_INVALID")
+        );
+    }
+    assert_eq!(
+        validate_payload_for_test(&payload_with_count(
+            "a2mapq2",
+            "allocation-granularity-completed",
+            67,
+        )),
+        Err("A2_DYNAMIC_CHILD_ACTUAL_SELECTOR_INVALID")
+    );
+    assert_eq!(
+        validate_payload_for_test(&payload_with_count(
+            "a2mapq1",
+            "region-count-budget-completed",
+            66,
+        )),
+        Err("A2_DYNAMIC_CHILD_ACTUAL_VERSION_INVALID")
+    );
+}
+
+#[test]
 fn unmap_candidate_record_accepts_one_fully_bound_observation() {
     let selector = UnmapSelector::SharedKeepSuccess;
     let payload = unmap_success_payload(7);

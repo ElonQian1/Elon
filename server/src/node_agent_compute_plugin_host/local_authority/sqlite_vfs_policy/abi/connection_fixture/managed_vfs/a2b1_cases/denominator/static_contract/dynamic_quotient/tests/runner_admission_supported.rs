@@ -6,7 +6,7 @@ use super::*;
 
 const EXACT_TEST_PREFIX: &str = "node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::abi::connection_fixture::managed_vfs::a2b1_cases::denominator::static_contract::dynamic_quotient::tests::runner_admission_supported::";
 
-fn region_count_budget_record() -> LeafRecordV1 {
+fn request_budget_record() -> LeafRecordV1 {
     let mut value = record(
         "map-region-count-budget-supported",
         "region-index-exceeds-authority-budget",
@@ -24,10 +24,14 @@ fn region_count_budget_record() -> LeafRecordV1 {
     value
 }
 
-fn region_count_budget_descriptor(capability: RunnerCapabilityV1) -> TerminalDescriptorV1 {
+fn request_budget_descriptor(
+    stimulus: MapManagedStimulusV1,
+    mode: MapModeV1,
+    capability: RunnerCapabilityV1,
+) -> TerminalDescriptorV1 {
     TerminalDescriptorV1::map(
         SourceSiteV1::ManagedRequestValidation,
-        StimulusV1::MapManaged(MapManagedStimulusV1::RegionCountBudget),
+        StimulusV1::MapManaged(stimulus),
         PrestateV1::Map(MapPrestateV1::NotReached),
         MapOperationV1::ManagedRequest,
         PhaseV1::RequestValidation,
@@ -42,18 +46,23 @@ fn region_count_budget_descriptor(capability: RunnerCapabilityV1) -> TerminalDes
             capability,
         ),
         MapAxesV1 {
-            mode: ReachabilityV1::Reached(MapModeV1::Extend),
+            mode: ReachabilityV1::Reached(mode),
             completion: ReachabilityV1::Reached(MapCompletionV1::Completed),
             ..MapAxesV1::NOT_REACHED
         },
     )
 }
 
-fn supported_key_and_member() -> (DynamicClassKeyV1, StaticMemberSealV1) {
-    let record = region_count_budget_record();
-    let descriptor = region_count_budget_descriptor(RunnerCapabilityV1::Missing(
-        CapabilityGapV1::QuotientRunnerNotIntegrated,
-    ));
+fn supported_key_and_member(
+    stimulus: MapManagedStimulusV1,
+    mode: MapModeV1,
+) -> (DynamicClassKeyV1, StaticMemberSealV1) {
+    let record = request_budget_record();
+    let descriptor = request_budget_descriptor(
+        stimulus,
+        mode,
+        RunnerCapabilityV1::Missing(CapabilityGapV1::QuotientRunnerNotIntegrated),
+    );
     let validated = project_validated_dynamic_terminal_v1(&record, &descriptor).unwrap();
     let mut key = validated.semantic_key;
     key.recipe.capability = RunnerCapabilityV1::Supported;
@@ -62,8 +71,12 @@ fn supported_key_and_member() -> (DynamicClassKeyV1, StaticMemberSealV1) {
 
 #[test]
 fn exact_supported_map_class_still_rejects_without_private_execution_receipt() {
-    let record = region_count_budget_record();
-    let descriptor = region_count_budget_descriptor(RunnerCapabilityV1::Supported);
+    let record = request_budget_record();
+    let descriptor = request_budget_descriptor(
+        MapManagedStimulusV1::RegionCountBudget,
+        MapModeV1::Extend,
+        RunnerCapabilityV1::Supported,
+    );
     assert_eq!(
         project_dynamic_class_v1(&record, &descriptor),
         Err(ProjectionErrorV1::Invalid(
@@ -74,12 +87,16 @@ fn exact_supported_map_class_still_rejects_without_private_execution_receipt() {
 
 #[test]
 fn supported_capability_is_limited_to_the_exact_programmed_map_class() {
-    let record = region_count_budget_record();
-    let mut descriptor = region_count_budget_descriptor(RunnerCapabilityV1::Supported);
+    let record = request_budget_record();
+    let mut descriptor = request_budget_descriptor(
+        MapManagedStimulusV1::RegionCountBudget,
+        MapModeV1::Extend,
+        RunnerCapabilityV1::Supported,
+    );
     let TerminalDescriptorV1::Map(value) = &mut descriptor else {
         unreachable!()
     };
-    value.stimulus = StimulusV1::MapManaged(MapManagedStimulusV1::LogicalSizeBudget);
+    value.stimulus = StimulusV1::MapManaged(MapManagedStimulusV1::AllocationGranularity);
     assert_eq!(
         project_dynamic_class_v1(&record, &descriptor),
         Err(ProjectionErrorV1::Invalid(
@@ -90,7 +107,8 @@ fn supported_capability_is_limited_to_the_exact_programmed_map_class() {
 
 #[test]
 fn exact_program_rejects_expected_semantics_drift_before_child_spawn() {
-    let (mut key, member) = supported_key_and_member();
+    let (mut key, member) =
+        supported_key_and_member(MapManagedStimulusV1::RegionCountBudget, MapModeV1::Extend);
     key.expected.callback = CustodyStateV1::NotReached;
     let plan = compile_for_test(&key);
     assert!(
@@ -99,16 +117,16 @@ fn exact_program_rejects_expected_semantics_drift_before_child_spawn() {
     );
 }
 
-#[test]
-fn isolated_installed_map_receipt_can_authorize_exact_supported_projection() -> anyhow::Result<()> {
-    let record = region_count_budget_record();
-    let descriptor = region_count_budget_descriptor(RunnerCapabilityV1::Supported);
-    let (key, member) = supported_key_and_member();
+fn exercise_supported_projection(
+    stimulus: MapManagedStimulusV1,
+    mode: MapModeV1,
+    exact_test: &str,
+) -> anyhow::Result<()> {
+    let record = request_budget_record();
+    let descriptor = request_budget_descriptor(stimulus, mode, RunnerCapabilityV1::Supported);
+    let (key, member) = supported_key_and_member(stimulus, mode);
     let plan = compile_for_test(&key);
-    let exact_test = format!(
-        "{EXACT_TEST_PREFIX}isolated_installed_map_receipt_can_authorize_exact_supported_projection"
-    );
-    let execution = match run_isolated_for_test(&exact_test, &key, member, plan)? {
+    let execution = match run_isolated_for_test(exact_test, &key, member, plan)? {
         MapRunnerIsolatedOutcomeV1::ChildReported => return Ok(()),
         MapRunnerIsolatedOutcomeV1::ParentReceipt(receipt) => receipt,
     };
@@ -124,10 +142,86 @@ fn isolated_installed_map_receipt_can_authorize_exact_supported_projection() -> 
 }
 
 #[test]
+fn isolated_region_size_budget_receipt_can_authorize_exact_supported_projection(
+) -> anyhow::Result<()> {
+    exercise_supported_projection(
+        MapManagedStimulusV1::RegionSizeBudget,
+        MapModeV1::Extend,
+        &format!(
+            "{EXACT_TEST_PREFIX}isolated_region_size_budget_receipt_can_authorize_exact_supported_projection"
+        ),
+    )
+}
+
+#[test]
+fn isolated_installed_map_receipt_can_authorize_exact_supported_projection() -> anyhow::Result<()> {
+    exercise_supported_projection(
+        MapManagedStimulusV1::RegionCountBudget,
+        MapModeV1::Extend,
+        &format!(
+            "{EXACT_TEST_PREFIX}isolated_installed_map_receipt_can_authorize_exact_supported_projection"
+        ),
+    )
+}
+
+#[test]
+fn isolated_logical_size_budget_receipt_can_authorize_exact_supported_projection(
+) -> anyhow::Result<()> {
+    exercise_supported_projection(
+        MapManagedStimulusV1::LogicalSizeBudget,
+        MapModeV1::Extend,
+        &format!(
+            "{EXACT_TEST_PREFIX}isolated_logical_size_budget_receipt_can_authorize_exact_supported_projection"
+        ),
+    )
+}
+
+#[test]
+fn isolated_observe_region_size_budget_receipt_can_authorize_exact_supported_projection(
+) -> anyhow::Result<()> {
+    exercise_supported_projection(
+        MapManagedStimulusV1::RegionSizeBudget,
+        MapModeV1::Observe,
+        &format!(
+            "{EXACT_TEST_PREFIX}isolated_observe_region_size_budget_receipt_can_authorize_exact_supported_projection"
+        ),
+    )
+}
+
+#[test]
+fn isolated_observe_region_count_budget_receipt_can_authorize_exact_supported_projection(
+) -> anyhow::Result<()> {
+    exercise_supported_projection(
+        MapManagedStimulusV1::RegionCountBudget,
+        MapModeV1::Observe,
+        &format!(
+            "{EXACT_TEST_PREFIX}isolated_observe_region_count_budget_receipt_can_authorize_exact_supported_projection"
+        ),
+    )
+}
+
+#[test]
+fn isolated_observe_logical_size_budget_receipt_can_authorize_exact_supported_projection(
+) -> anyhow::Result<()> {
+    exercise_supported_projection(
+        MapManagedStimulusV1::LogicalSizeBudget,
+        MapModeV1::Observe,
+        &format!(
+            "{EXACT_TEST_PREFIX}isolated_observe_logical_size_budget_receipt_can_authorize_exact_supported_projection"
+        ),
+    )
+}
+
+#[test]
 fn isolated_map_receipt_rejects_implementation_digest_tamper() -> anyhow::Result<()> {
-    let record = region_count_budget_record();
-    let descriptor = region_count_budget_descriptor(RunnerCapabilityV1::Supported);
-    let (key, member) = supported_key_and_member();
+    let record = request_budget_record();
+    let descriptor = request_budget_descriptor(
+        MapManagedStimulusV1::RegionCountBudget,
+        MapModeV1::Extend,
+        RunnerCapabilityV1::Supported,
+    );
+    let (key, member) =
+        supported_key_and_member(MapManagedStimulusV1::RegionCountBudget, MapModeV1::Extend);
     let plan = compile_for_test(&key);
     let exact_test =
         format!("{EXACT_TEST_PREFIX}isolated_map_receipt_rejects_implementation_digest_tamper");

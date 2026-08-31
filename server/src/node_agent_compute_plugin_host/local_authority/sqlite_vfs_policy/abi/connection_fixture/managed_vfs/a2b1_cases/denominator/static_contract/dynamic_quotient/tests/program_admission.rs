@@ -2,7 +2,7 @@ use super::super::{
     program_inventory::{provider_for_source_program_for_test, ProgramCatalogAdmissionErrorV1},
     runner_admission::RunnerAdmissionDecisionV1,
 };
-use super::program_inventory::{budget_descriptor, region_count_budget_record};
+use super::program_inventory::{budget_descriptor, request_budget_record};
 use super::*;
 
 fn source_present_descriptor(mode: MapModeV1) -> TerminalDescriptorV1 {
@@ -15,7 +15,7 @@ fn source_present_descriptor(mode: MapModeV1) -> TerminalDescriptorV1 {
 
 #[test]
 fn source_program_provider_projects_without_granting_runner_supported() {
-    let record = region_count_budget_record();
+    let record = request_budget_record();
     let descriptor = source_present_descriptor(MapModeV1::Extend);
     let prepared = prepare_dynamic_terminal_v1(&record, &descriptor).unwrap();
     let mut provider =
@@ -40,7 +40,7 @@ fn source_program_provider_projects_without_granting_runner_supported() {
 
 #[test]
 fn source_program_provider_rejects_duplicate_and_wrong_members() {
-    let record = region_count_budget_record();
+    let record = request_budget_record();
     let descriptor = source_present_descriptor(MapModeV1::Extend);
     let prepared = prepare_dynamic_terminal_v1(&record, &descriptor).unwrap();
     let mut provider =
@@ -84,7 +84,7 @@ fn source_program_provider_rejects_duplicate_and_wrong_members() {
 
 #[test]
 fn source_program_provider_rejects_semantic_drift_for_the_same_member() {
-    let record = region_count_budget_record();
+    let record = request_budget_record();
     let descriptor = source_present_descriptor(MapModeV1::Extend);
     let prepared = prepare_dynamic_terminal_v1(&record, &descriptor).unwrap();
     let mut provider =
