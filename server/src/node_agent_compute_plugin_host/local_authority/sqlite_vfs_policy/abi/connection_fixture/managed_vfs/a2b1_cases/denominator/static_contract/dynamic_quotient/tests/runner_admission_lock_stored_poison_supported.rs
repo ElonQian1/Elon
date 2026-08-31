@@ -1,8 +1,8 @@
-//! Exact admission tests for the 1,320 retention-succeeded stored-poison Lock programs.
+//! Exact admission tests for both 1,320-member stored-poison Lock completions.
 
 use super::lock_stored_poison_cases::{self,
     frozen_lock_stored_poison_leaves_v1, lock_stored_poison_descriptor_v1,
-    LOCK_STORED_POISON_MEMBER_COUNT,
+    LockStoredPoisonCompletionV1, LOCK_STORED_POISON_MEMBER_COUNT,
 };
 use super::super::runner_admission::{
     compile_for_test, stored_poison_catalog_row_count_for_test, validate_lock_program_for_test,
@@ -43,7 +43,7 @@ fn assert_rejected(key: DynamicClassKeyV1, member: StaticMemberSealV1, mutation:
 }
 
 #[test]
-fn all_1320_exact_descriptors_and_members_are_admitted() {
+fn all_2640_exact_descriptors_and_members_are_admitted() {
     let leaves = frozen_lock_stored_poison_leaves_v1();
     assert_eq!(leaves.len(), LOCK_STORED_POISON_MEMBER_COUNT);
     assert_eq!(
@@ -73,19 +73,37 @@ fn every_stored_poison_program_rejects_a_sibling_member_seal() {
 
 #[test]
 fn stored_poison_programs_reject_semantic_recipe_expected_and_range_drift() {
-    let (&case, _) = frozen_lock_stored_poison_leaves_v1()
-        .iter()
-        .next()
-        .expect("stored-poison fixture");
-    let (key, member) = supported_key_and_member(case);
+    let leaves = frozen_lock_stored_poison_leaves_v1();
+    for source_completion in [
+        LockStoredPoisonCompletionV1::RetentionSucceeded,
+        LockStoredPoisonCompletionV1::RetentionRouteUnknown,
+    ] {
+        let (&case, _) = leaves
+            .iter()
+            .find(|(case, _)| case.completion == source_completion)
+            .expect("stored-poison completion fixture");
+        let (key, member) = supported_key_and_member(case);
+        let mut completion = key;
+        let DynamicAxesV1::Lock(axes) = &mut completion.axes else {
+            unreachable!()
+        };
+        axes.completion = ReachabilityV1::Reached(match case.completion {
+            LockStoredPoisonCompletionV1::RetentionSucceeded => {
+                LockCompletionV1::UnsafeRetentionRouteUnknownThenRouteUnknown
+            }
+            LockStoredPoisonCompletionV1::RetentionRouteUnknown => {
+                LockCompletionV1::UnsafeRetentionSucceededThenRouteUnknown
+            }
+        });
+        assert_rejected(
+            completion,
+            member,
+            "the opposite completion with the original seal",
+        );
+    }
 
-    let mut completion = key;
-    let DynamicAxesV1::Lock(axes) = &mut completion.axes else {
-        unreachable!()
-    };
-    axes.completion =
-        ReachabilityV1::Reached(LockCompletionV1::UnsafeRetentionRouteUnknownThenRouteUnknown);
-    assert_rejected(completion, member, "the route-already-unknown completion");
+    let (&case, _) = leaves.iter().next().expect("stored-poison fixture");
+    let (key, member) = supported_key_and_member(case);
 
     let mut cleanup = key;
     cleanup.recipe.cleanup = CleanupV1::ParentOwnedRoot;
@@ -126,6 +144,7 @@ fn isolated_stored_poison_family_receipts_are_exact() -> anyhow::Result<()> {
                 stored_poison_profile_tag(case.profile),
                 case.first,
                 case.count,
+                stored_poison_completion_tag(case.completion),
             )
             .map_err(anyhow::Error::msg)?;
             if candidate != selected {
@@ -189,5 +208,13 @@ const fn stored_poison_profile_tag(value: LockStoredPoisonProfileV1) -> u64 {
         LockStoredPoisonProfileV1::DeleteAuthorizationUncertain => 13,
         LockStoredPoisonProfileV1::DmsExclusiveReleaseUncertain => 14,
         LockStoredPoisonProfileV1::DmsSharedReleaseUncertain => 15,
+    }
+}
+
+#[cfg(windows)]
+const fn stored_poison_completion_tag(value: LockStoredPoisonCompletionV1) -> u64 {
+    match value {
+        LockStoredPoisonCompletionV1::RetentionSucceeded => 3,
+        LockStoredPoisonCompletionV1::RetentionRouteUnknown => 4,
     }
 }
