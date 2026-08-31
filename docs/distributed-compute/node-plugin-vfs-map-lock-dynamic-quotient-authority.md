@@ -432,7 +432,7 @@ planned-missing member、current source 未编译/未运行和 reviewed inventor
 源级 observation/native-receipt 接线表述为 actual verification。
 
 上述回执全部是本批 Map/Lock program/receipt 改动前的 prior baseline。本批 current source-only baseline
-已冻结为 `2d76dc55ca18d1c236ea02aeb2b7c97150546fa9`，旧 `4edfcbcb32518fed8f93157b1983222f5f8ef74e` 仅是前序 q3 baseline；当前只达到
+已冻结为 `3e9ddf1860d8a744ccab62222622689d12fdc80a`，旧 `4edfcbcb32518fed8f93157b1983222f5f8ef74e` 仅是前序 q3 baseline；当前只达到
 `source_written/source_review_only/implementation_uncompiled/implementation_unrun`。Map 三预算、q3 六成员、q4
 511-member semantic scope/净新增509、55 项 q3/q4 共享运行时 source closure 与 171 项唯一 projector provenance，以及 10+104 个 Lock 窄 program、私有
 actual receipt、program inventory、reviewed source-program admission provider、catalog/manifest binding 与负向
