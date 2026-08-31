@@ -216,6 +216,7 @@ internal class GoogleWebSocialChatController(
 
     override fun destroy() {
         clearPendingSend()
+        productionMessageActions.release()
         session.destroy()
     }
 

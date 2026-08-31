@@ -29,6 +29,8 @@ installed build; individual capability documents retain implementation evidence.
 | Attachment upload reconciliation | ChatGPT | Completed, enabled, and device verified on published Release `v1.1.1374 (1395)`, adapter `207` | Official DOM attachment snapshot and bounded timeout |
 | Native image assets and cache-first gallery | ChatGPT | Completed, enabled, and device verified on Release candidate `v1.1.1375 (1396)`, adapter `208` | Bounded local image cache and official `/images` fallback |
 | Native private-response rich content | ChatGPT | Completed, enabled, and structurally device verified on Release `v1.1.1379 (1400)` for finance and line-chart cards | Official WebView rich content |
+| Native composer dictation | ChatGPT | Implemented and enabled; ASR/VAD draft, cancellation, and fallback tests passed; device acceptance pending | Official Web dictation after bounded local-engine cooldown |
+| Native response read aloud | ChatGPT | Implemented and enabled; full-answer chunking and message-action tests passed; device acceptance pending | Official message actions and WebView |
 | Native conversation project move | ChatGPT | Completed and enabled; exact-control and reconciliation tests passed, device round trip pending | Official conversation project menu |
 
 All web-account transports keep the official page authoritative. They do not export
@@ -85,6 +87,24 @@ renderer on a Xiaomi device for finance, multi-series chart, and click-to-detail
 without reading a user conversation. The completed capability is
 `android_chatgpt_private_rich_content_native_view_v1` and must not be reimplemented
 without current regression evidence.
+
+Production ChatGPT dictation now reuses the existing on-device `AgentVoiceBridge`
+instead of waiting for the official microphone DOM. The tap session writes partial and
+final recognition into the current native draft, never auto-sends, restores the exact
+pre-dictation draft on cancel, and immediately prewarms the next ASR/VAD session. Engine
+rotation remains owned by the existing bridge. A real engine failure opens a sixty-second
+cooldown so the next explicit tap can use the existing official Web dictation command;
+silence is only a retryable empty recognition and does not poison the engine. The stable
+capability is `android_chatgpt_native_dictation_v1`; device microphone acceptance remains
+pending.
+
+Assistant response read-aloud no longer depends on the official message control being
+present in the current DOM snapshot. Every non-empty ChatGPT assistant message exposes a
+native action that uses the existing `VoiceSpeaker`, splits the complete answer into
+bounded sentence chunks, and supports an immediate second-tap stop without logging or
+persisting text. Unsupported official message actions remain available through the same
+menu and full WebView fallback. The stable capability is
+`android_chatgpt_native_response_read_aloud_v1`; device audio acceptance remains pending.
 
 Conversation rows now expose a native project destination picker backed by the bounded
 project-directory cache. The coordinator navigates to the exact conversation, opens its

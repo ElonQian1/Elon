@@ -366,9 +366,9 @@ internal class ChatGptSocialChatController(
     override fun onHostResumed() = session.onHostResumed()
 
     override fun onHostPaused() = session.onHostPaused()
-
     override fun destroy() {
         clearPendingSend()
+        productionMessageActions.release()
         skinPresentation.destroy()
         session.destroy()
     }

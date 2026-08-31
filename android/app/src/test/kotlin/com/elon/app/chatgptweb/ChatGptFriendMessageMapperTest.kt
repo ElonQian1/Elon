@@ -36,7 +36,10 @@ class ChatGptFriendMessageMapperTest {
         assertEquals(false, result.first().webChatMessage?.renderMarkdown)
         assertEquals(true, result.last().webChatMessage?.renderMarkdown)
         assertEquals(setOf(WebChatMessageAction.COPY), result.first().webChatMessage?.actions)
-        assertEquals(setOf(WebChatMessageAction.COPY), result.last().webChatMessage?.actions)
+        assertEquals(
+            setOf(WebChatMessageAction.COPY, WebChatMessageAction.MORE),
+            result.last().webChatMessage?.actions,
+        )
     }
 
     @Test
@@ -57,7 +60,10 @@ class ChatGptFriendMessageMapperTest {
             timestampFor = { 42L },
         )
 
-        assertEquals(setOf(WebChatMessageAction.COPY), result.first().webChatMessage?.actions)
+        assertEquals(
+            setOf(WebChatMessageAction.COPY, WebChatMessageAction.MORE),
+            result.first().webChatMessage?.actions,
+        )
         assertEquals(
             setOf(WebChatMessageAction.COPY, WebChatMessageAction.REGENERATE, WebChatMessageAction.MORE),
             result.last().webChatMessage?.actions,

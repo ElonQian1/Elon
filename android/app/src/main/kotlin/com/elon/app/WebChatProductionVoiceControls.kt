@@ -14,6 +14,11 @@ internal data class WebChatProductionVoicePresentation(
     val realtimeVoice: WebChatProductionComposerCommand?,
 )
 
+internal data class WebChatProductionDictationPresentation(
+    val active: Boolean,
+    val inputHint: String?,
+)
+
 internal const val WEB_CHAT_REALTIME_VOICE_HIDDEN_TAG = "web-chat-realtime-voice-hidden"
 
 internal object WebChatProductionVoicePresentationPolicy {
@@ -49,25 +54,50 @@ internal class WebChatProductionVoiceControls(
         WebChatProviderIdentity,
         WebChatProductionComposerCommand,
     ) -> Boolean,
+    private val nativeDictation: WebChatNativeDictationPort,
+    private val onNativeStateChanged: () -> Unit,
 ) {
+    fun dictationPresentation(
+        officialActive: Boolean,
+    ): WebChatProductionDictationPresentation {
+        val state = nativeDictation.state()
+        val hint = when (state.phase) {
+            WebChatNativeDictationPhase.STARTING -> "正在准备本机听写…"
+            WebChatNativeDictationPhase.LISTENING -> "正在听写，点蓝色勾完成"
+            WebChatNativeDictationPhase.PROCESSING -> "正在完成本机听写…"
+            WebChatNativeDictationPhase.IDLE ->
+                if (officialActive) "正在听写，完成后不会自动发送" else null
+        }
+        return WebChatProductionDictationPresentation(officialActive || state.active, hint)
+    }
+
     fun render(
         provider: WebChatProviderIdentity,
         streaming: Boolean,
-        dictationActive: Boolean,
+        officialDictationActive: Boolean,
     ) {
         val views = inputComposerViews() ?: return
+        val nativeState = nativeDictation.state()
         val presentation = WebChatProductionVoicePresentationPolicy.resolve(
             provider = provider,
             streaming = streaming,
-            dictationActive = dictationActive,
+            dictationActive = officialDictationActive,
         )
         renderRealtimeVoice(
             views,
             provider,
             presentation.realtimeVoice,
             presentation.dictationCancel,
+            nativeState,
         )
-        renderDictation(views, provider, presentation.dictation)
+        renderDictation(
+            views = views,
+            provider = provider,
+            command = presentation.dictation,
+            streaming = streaming,
+            officialDictationActive = officialDictationActive,
+            nativeDictation = nativeState,
+        )
     }
 
     fun restoreLocalVoiceInput() {
@@ -99,22 +129,17 @@ internal class WebChatProductionVoiceControls(
         provider: WebChatProviderIdentity,
         command: WebChatProductionComposerCommand?,
         cancelDictation: WebChatProductionComposerCommand?,
+        nativeDictation: WebChatNativeDictationState,
     ) {
+        if (nativeDictation.active) {
+            renderDictationCancel(views, NATIVE_CANCEL_SELECTOR) {
+                this@WebChatProductionVoiceControls.nativeDictation.cancel()
+            }
+            return
+        }
         if (cancelDictation != null) {
-            views.inputModeButton.apply {
-                tag = cancelDictation.nativeSelector
-                background = InsetDrawable(
-                    GradientDrawable().apply {
-                        shape = GradientDrawable.OVAL
-                        setColor(Color.parseColor(DICTATION_CANCEL_SURFACE))
-                    },
-                    dp(3),
-                )
-                imageTintList = ColorStateList.valueOf(Color.WHITE)
-                setImageResource(R.drawable.ic_web_chat_dictation_cancel)
-                setPadding(dp(10), dp(10), dp(10), dp(10))
-                contentDescription = cancelDictation.nativeSelector
-                setOnClickListener { executeCommand(provider, cancelDictation) }
+            renderDictationCancel(views, cancelDictation.nativeSelector) {
+                executeCommand(provider, cancelDictation)
             }
             return
         }
@@ -155,16 +180,26 @@ internal class WebChatProductionVoiceControls(
         views: MainInputComposerViews,
         provider: WebChatProviderIdentity,
         command: WebChatProductionComposerCommand?,
+        streaming: Boolean,
+        officialDictationActive: Boolean,
+        nativeDictation: WebChatNativeDictationState,
     ) {
+        val nativeAvailable = provider.supports(WebChatProviderCapability.DICTATION) &&
+            !streaming && !officialDictationActive
+        val visible = nativeAvailable || command != null || nativeDictation.active
+        val finishing = nativeDictation.active || command?.action == "chatgpt_submit_dictation"
         views.webDictationButton.apply {
-            isActivated = command != null
-            tag = command?.nativeSelector
-            visibility = if (command != null && views.inputModeButton.visibility == View.VISIBLE) {
+            isActivated = visible
+            tag = when {
+                nativeDictation.active -> NATIVE_SUBMIT_SELECTOR
+                nativeAvailable -> NATIVE_START_SELECTOR
+                else -> command?.nativeSelector
+            }
+            visibility = if (visible && views.inputModeButton.visibility == View.VISIBLE) {
                 View.VISIBLE
             } else {
                 View.GONE
             }
-            val finishing = command?.action == "chatgpt_submit_dictation"
             background = if (finishing) {
                 InsetDrawable(
                     GradientDrawable().apply {
@@ -187,12 +222,38 @@ internal class WebChatProductionVoiceControls(
                 if (finishing) dp(10) else dp(8),
                 if (finishing) dp(10) else dp(9),
             )
-            contentDescription = command?.nativeSelector ?: UNBOUND_DICTATION_DESCRIPTION
-            setOnClickListener(
-                command?.let { resolved ->
-                    View.OnClickListener { executeCommand(provider, resolved) }
+            contentDescription = tag?.toString() ?: UNBOUND_DICTATION_DESCRIPTION
+            setOnClickListener(if (!visible) null else View.OnClickListener {
+                when {
+                    nativeDictation.active -> this@WebChatProductionVoiceControls.nativeDictation.submit()
+                    officialDictationActive && command != null -> executeCommand(provider, command)
+                    this@WebChatProductionVoiceControls.nativeDictation.start { onNativeStateChanged() } -> Unit
+                    command != null -> executeCommand(provider, command)
+                    else -> Unit
+                }
+            })
+        }
+    }
+
+    private fun renderDictationCancel(
+        views: MainInputComposerViews,
+        selector: String,
+        cancel: () -> Unit,
+    ) {
+        views.inputModeButton.apply {
+            tag = selector
+            background = InsetDrawable(
+                GradientDrawable().apply {
+                    shape = GradientDrawable.OVAL
+                    setColor(Color.parseColor(DICTATION_CANCEL_SURFACE))
                 },
+                dp(3),
             )
+            imageTintList = ColorStateList.valueOf(Color.WHITE)
+            setImageResource(R.drawable.ic_web_chat_dictation_cancel)
+            setPadding(dp(10), dp(10), dp(10), dp(10))
+            contentDescription = selector
+            setOnClickListener { cancel() }
         }
     }
 
@@ -201,5 +262,8 @@ internal class WebChatProductionVoiceControls(
         const val DICTATION_CANCEL_SURFACE = "#34363A"
         const val LOCAL_VOICE_DESCRIPTION = "切换语音输入"
         const val UNBOUND_DICTATION_DESCRIPTION = "web-chat-composer-command:not-bound:dictation"
+        const val NATIVE_START_SELECTOR = "web-chat-composer-command:native:start-dictation"
+        const val NATIVE_SUBMIT_SELECTOR = "web-chat-composer-command:native:submit-dictation"
+        const val NATIVE_CANCEL_SELECTOR = "web-chat-composer-command:native:cancel-dictation"
     }
 }

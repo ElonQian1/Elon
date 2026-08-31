@@ -37,6 +37,8 @@ internal object ChatGptFriendMessageMapper {
             }
             val renderMarkdown = message.role == "assistant" &&
                 provider.supports(WebChatProviderCapability.RICH_TEXT)
+            val hasOfficialMessageContext =
+                ChatGptNativeControlPresentation.stableContextId(message.id) in messageActionContextIds
             val actions = buildSet {
                 if (
                     message.content.isNotBlank() &&
@@ -56,7 +58,8 @@ internal object ChatGptFriendMessageMapper {
                 }
                 if (
                     provider.supports(WebChatProviderCapability.MESSAGE_CONTEXT_ACTIONS) &&
-                    ChatGptNativeControlPresentation.stableContextId(message.id) in messageActionContextIds
+                    message.role == "assistant" &&
+                    (message.content.isNotBlank() || hasOfficialMessageContext)
                 ) {
                     add(WebChatMessageAction.MORE)
                 }

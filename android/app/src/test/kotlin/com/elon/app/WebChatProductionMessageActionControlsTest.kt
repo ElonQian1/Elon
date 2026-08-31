@@ -47,6 +47,7 @@ class WebChatProductionMessageActionControlsTest {
             listOf(
                 WebChatContextAction(
                     "control_read_aloud",
+                    "read_aloud",
                     "朗读",
                     true,
                     "selector:control_read_aloud",

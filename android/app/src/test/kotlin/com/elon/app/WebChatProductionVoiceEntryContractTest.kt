@@ -50,6 +50,11 @@ class WebChatProductionVoiceEntryContractTest {
         val tools = read("android/app/src/main/kotlin/com/elon/app/WebChatProductionComposerTools.kt")
         val commands = read("android/app/src/main/kotlin/com/elon/app/WebChatProductionComposerCommands.kt")
         val controls = read("android/app/src/main/kotlin/com/elon/app/WebChatProductionVoiceControls.kt")
+        val speech = read("android/app/src/main/kotlin/com/elon/app/MainSpeechInputActions.kt")
+        val dictation = read("android/app/src/main/kotlin/com/elon/app/MainWebChatDictationActions.kt")
+        val messageActions = read(
+            "android/app/src/main/kotlin/com/elon/app/WebChatProductionMessageActions.kt",
+        )
         val composer = read("android/app/src/main/kotlin/com/elon/app/MainInputComposerSetup.kt")
         val directRoute = tools.substringAfter("fun startRealtimeVoice")
             .substringBefore("fun executeCommand")
@@ -88,8 +93,15 @@ class WebChatProductionVoiceEntryContractTest {
         assertTrue(tools.contains("pendingSessionCommand"))
         assertTrue(controls.contains("REALTIME_VOICE_BLUE"))
         assertTrue(controls.contains("views.webDictationButton"))
+        assertTrue(controls.contains("nativeDictation.start"))
+        assertTrue(controls.contains("command != null -> executeCommand(provider, command)"))
         assertTrue(controls.contains("ic_web_chat_dictation_cancel"))
         assertTrue(controls.contains("ic_web_chat_dictation_done"))
+        assertTrue(speech.contains("sharedAgentVoiceBridge"))
+        assertTrue(dictation.contains("WebChatNativeDictationSession"))
+        assertTrue(dictation.contains("FALLBACK_COOLDOWN_MS"))
+        assertTrue(messageActions.contains("WebChatNativeReadAloudController"))
+        assertTrue(messageActions.contains("observed.filterNot { it.semantic == READ_ALOUD_SEMANTIC }"))
         assertTrue(composer.contains("inputBarContainer.addView(webDictationButton)"))
     }
 

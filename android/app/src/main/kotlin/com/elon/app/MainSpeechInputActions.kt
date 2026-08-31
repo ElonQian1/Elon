@@ -182,6 +182,7 @@ internal class MainSpeechInputActions(
         resetSpeechRecognizer()
     }
 
+    fun sharedAgentVoiceBridge(): AgentVoiceBridge = agentBridge ?: AgentVoiceBridge(activity).also { agentBridge = it }
     fun destroy() {
         speechSessionId += 1
         translationGeneration += 1
@@ -204,7 +205,6 @@ internal class MainSpeechInputActions(
         voiceMessagePartialText = null
         voiceMessageAsrAllFailed = false
     }
-
     // ─── 手指拖动的 zone 反馈（仅端上模式生效） ─────────────────────
 
     /** 手指屏幕坐标。仅在 agent 语音中生效，用于选择 AI回复 / 转文字 / 取消。 */

@@ -78,6 +78,7 @@ internal object WebChatProductionMessageActionBinder {
 
 internal data class WebChatContextAction(
     val controlId: String,
+    val semantic: String,
     val label: String,
     val requiresUserConfirmation: Boolean,
     val nativeSelector: String,
@@ -116,6 +117,7 @@ internal object WebChatProductionMessageActionControls {
             val control = descriptor.control
             WebChatContextAction(
                 controlId = control.id,
+                semantic = control.semantic,
                 label = control.label.trim(),
                 requiresUserConfirmation = descriptor.requiresUserConfirmation,
                 nativeSelector = descriptor.nativeSelector
@@ -142,6 +144,7 @@ internal class WebChatProductionMessageActionCoordinator(
     private val openOfficialFallback: () -> Unit,
 ) {
     private val clipboard = ChatGptMessageClipboard(activity)
+    private val nativeReadAloud = WebChatNativeReadAloudController(activity)
 
     fun handle(message: ChatMessage, action: WebChatMessageAction) {
         val metadata = message.webChatMessage ?: return
@@ -157,17 +160,21 @@ internal class WebChatProductionMessageActionCoordinator(
                 ) { port -> port.executeSessionCommand("chatgpt_regenerate_response") }
                 if (accepted) showFeedback(WebChatProductionMessageActionFeedback.regenerateAccepted())
             }
-            WebChatMessageAction.MORE -> showMore(metadata)
+            WebChatMessageAction.MORE -> showMore(message, metadata)
         }
     }
 
-    private fun showMore(message: WebChatProductionMessage) {
-        val port = consumerPort() ?: return openOfficialFallback()
+    fun release() = nativeReadAloud.release()
+
+    private fun showMore(chatMessage: ChatMessage, message: WebChatProductionMessage) {
+        val port = consumerPort()
         val contextId = ChatGptNativeControlPresentation.stableContextId(message.sourceMessageId)
-        val actions = WebChatProductionMessageActionControls.contextActions(
-            port.state().controls,
+        val observed = WebChatProductionMessageActionControls.contextActions(
+            port?.state()?.controls.orEmpty(),
             contextId,
         )
+        val actions = nativeReadAloudAction(chatMessage, contextId) +
+            observed.filterNot { it.semantic == READ_ALOUD_SEMANTIC }
         if (actions.isEmpty()) {
             showOfficialFallback(
                 title = "消息操作",
@@ -194,10 +201,14 @@ internal class WebChatProductionMessageActionCoordinator(
                     action = openOfficialFallback,
                 ),
             ),
-        ) { item -> byId[item.id]?.let(::confirmAndInvoke) }
+        ) { item -> byId[item.id]?.let { confirmAndInvoke(chatMessage, it) } }
     }
 
-    private fun confirmAndInvoke(action: WebChatContextAction) {
+    private fun confirmAndInvoke(message: ChatMessage, action: WebChatContextAction) {
+        if (action.semantic == READ_ALOUD_SEMANTIC) {
+            toggleReadAloud(message)
+            return
+        }
         if (!action.requiresUserConfirmation) {
             invoke(action, userConfirmed = false)
             return
@@ -244,4 +255,37 @@ internal class WebChatProductionMessageActionCoordinator(
 
     private fun showFeedback(message: String) =
         Toast.makeText(activity, message, Toast.LENGTH_SHORT).show()
+
+    private fun nativeReadAloudAction(
+        message: ChatMessage,
+        contextId: String,
+    ): List<WebChatContextAction> {
+        val sourceId = message.webChatMessage?.sourceMessageId.orEmpty()
+        if (message.role == "user" || message.content.isBlank() || sourceId.isBlank()) return emptyList()
+        val active = nativeReadAloud.isActive(sourceId)
+        return listOf(
+            WebChatContextAction(
+                controlId = "$NATIVE_READ_ALOUD_CONTROL:$contextId",
+                semantic = READ_ALOUD_SEMANTIC,
+                label = if (active) "停止朗读" else "朗读",
+                requiresUserConfirmation = false,
+                nativeSelector = "web-chat-message-context-action:$contextId:read-aloud",
+            ),
+        )
+    }
+
+    private fun toggleReadAloud(message: ChatMessage) {
+        val sourceId = message.webChatMessage?.sourceMessageId ?: return
+        val feedback = when (nativeReadAloud.toggle(sourceId, message.content)) {
+            WebChatNativeReadAloudResult.STARTED -> "开始朗读"
+            WebChatNativeReadAloudResult.STOPPED -> "已停止朗读"
+            WebChatNativeReadAloudResult.EMPTY -> "当前回答没有可朗读文字"
+        }
+        showFeedback(feedback)
+    }
+
+    private companion object {
+        const val READ_ALOUD_SEMANTIC = "read_aloud"
+        const val NATIVE_READ_ALOUD_CONTROL = "native_read_aloud"
+    }
 }

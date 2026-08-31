@@ -22,7 +22,7 @@ internal class MainSocialAiChatFeature(
     collapseInputComposer: () -> Unit,
     private val inputComposerViews: () -> MainInputComposerViews?,
     pendingInputAttachmentCount: () -> Int,
-    prepareInputForProviderSwitch: (Boolean) -> Unit,
+    prepareInputForProviderSwitch: (Boolean) -> Unit, private val nativeDictation: WebChatNativeDictationPort,
     private val showWorkModelSelector: () -> Unit,
     private val updateWorkModel: () -> Unit,
     private val refreshInputComposerVisual: () -> Unit,
@@ -185,7 +185,7 @@ internal class MainSocialAiChatFeature(
         WebChatProductionVoiceControls(
             dp = ::dp,
             inputComposerViews = inputComposerViews,
-            executeCommand = productionComposerTools::executeCommand,
+            executeCommand = productionComposerTools::executeCommand, nativeDictation = nativeDictation, onNativeStateChanged = ::refreshConsumerComposerUi,
         )
     }
     private val productionVoiceControls by productionVoiceControlsDelegate
@@ -524,7 +524,7 @@ internal class MainSocialAiChatFeature(
         rebindWorkFriend()
     }
 
-    private fun deactivateChatProvider(releaseComposerDraft: Boolean = true) {
+    private fun deactivateChatProvider(releaseComposerDraft: Boolean = true) { nativeDictation.cancel()
         if (releaseComposerDraft) composerDrafts.release()
         clearComposerOperationFeedback()
         activeQuickComposerAction = null
@@ -654,11 +654,11 @@ internal class MainSocialAiChatFeature(
                 attachmentSupported = controller.attachmentSupported(),
                 warmSessionAvailable = controller.warmSessionAvailable(),
             )
-            val dictationActive = runCatching {
+            val officialDictationActive = runCatching {
                 controller.consumerPort()?.state()?.dictationActive == true
             }.getOrDefault(false)
             binding.inputEdit.hint = WebChatProductionComposerContext.inputHint(
-                if (dictationActive) "正在听写，完成后不会自动发送" else state.inputHint,
+                productionVoiceControls.dictationPresentation(officialDictationActive).inputHint ?: state.inputHint,
                 WebChatProductionComposerContext.projectTitle(
                     webChatConversationIndex(),
                     controller.currentConversationPath(),
@@ -670,7 +670,7 @@ internal class MainSocialAiChatFeature(
                     provider = provider,
                     attachmentPhase = controller.attachmentSendPhase(),
                     feedback = composerOperationFeedback,
-                    dictationActive = dictationActive,
+                    dictationActive = productionVoiceControls.dictationPresentation(officialDictationActive).active,
                     imageGenerationActive = activeQuickComposerAction ==
                         WebChatProductionQuickComposerAction.IMAGE_GENERATION,
                     streaming = controller.streaming(),
@@ -692,7 +692,7 @@ internal class MainSocialAiChatFeature(
             productionVoiceControls.render(
                 provider = provider,
                 streaming = controller.streaming(),
-                dictationActive = dictationActive,
+                officialDictationActive = officialDictationActive,
             )
             productionComposerTools.onSessionStateChanged(provider)
             productionSuggestions.render(provider, controller.consumerPort())

@@ -50,6 +50,7 @@ internal class MainInputActions(
     private var runningInputMode = RunningInputMode.REMIND_CURRENT
     private var suppressInputFocusAnimation = false
     private var speechInputActions: MainSpeechInputActions? = null
+    private var webChatDictationActions: MainWebChatDictationActions? = null
     private var keyboardInsetsAnimationActions: MainKeyboardInsetsAnimationActions? = null
     private var fullScreenEditorOverlay: FullScreenEditorOverlay? = null
     private var pendingImageEditIndex: Int = -1
@@ -165,6 +166,7 @@ internal class MainInputActions(
     }
 
     fun prepareForWebChatProviderSwitch(discardPendingAttachments: Boolean) {
+        webChatDictationActions?.cancel()
         fullScreenEditorOverlay?.takeIf(FullScreenEditorOverlay::isShowing)?.hide()
         emojiActions.collapseEmojiPanel()
         attachmentPanelActions.collapseAttachmentPanel()
@@ -188,9 +190,13 @@ internal class MainInputActions(
     }
 
     fun destroySpeechInput() {
+        webChatDictationActions?.destroy()
+        webChatDictationActions = null
         speechInputActions?.destroy()
         speechInputActions = null
     }
+
+    fun webChatDictationPort(): WebChatNativeDictationPort = webChatDictationActions()
 
     fun showVoiceAttachmentActions(message: ChatMessage, attachment: ChatAttachment) {
         speechInputActions().showVoiceAttachmentActions(message, attachment)
@@ -592,6 +598,20 @@ internal class MainInputActions(
                 sendMessageActions.sendMessage()
             }
         ).also { speechInputActions = it }
+    }
+
+    private fun webChatDictationActions(): MainWebChatDictationActions {
+        webChatDictationActions?.let { return it }
+        return MainWebChatDictationActions(
+            activity = activity,
+            speechPermissionRequest = speechPermissionRequest,
+            bridge = { speechInputActions().sharedAgentVoiceBridge() },
+            readDraft = { binding.inputEdit.text?.toString().orEmpty() },
+            writeDraft = { text ->
+                binding.inputEdit.setText(text)
+                binding.inputEdit.setSelection(text.length)
+            },
+        ).also { webChatDictationActions = it }
     }
 
     val sendEnabledActions: MainSendEnabledActions by lazy {
