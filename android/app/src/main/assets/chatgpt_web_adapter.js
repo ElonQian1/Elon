@@ -111,6 +111,20 @@
     });
   }
 
+  function requestPrivateProjectDirectory(command, respond) {
+    const projectId = String(command && command.projectScopeId || '').trim();
+    if (!/^g-p-[A-Za-z0-9_-]{1,160}$/.test(projectId) ||
+        !privateConversationDirectory ||
+        typeof privateConversationDirectory.refreshProject !== 'function') return false;
+    const fallback = () => conversationAdapter.requestList(command, emitEvent, respond);
+    Promise.resolve(privateConversationDirectory.refreshProject(projectId)).then((refreshed) => {
+      if (!refreshed) return fallback();
+      emitPrivateDirectorySnapshot();
+      respond('list_conversations', true, '');
+    }).catch(fallback);
+    return true;
+  }
+
   function cleanText(value) {
     return String(value || '').replace(/\u00a0/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
   }
@@ -583,6 +597,7 @@
       );
     }
     if (action === 'list_conversations' && conversationAdapter) {
+      if (requestPrivateProjectDirectory(command, respond)) return;
       return conversationAdapter.requestList(command, emitEvent, respond);
     }
     if (action === 'refresh_current_conversation') {

@@ -2,7 +2,7 @@
   'use strict';
 
   const existing = window.__elonChatGptPrivateConversationDirectory;
-  if (existing && Number(existing.version) >= 1) return;
+  if (existing && Number(existing.version) >= 2) return;
   if (location.origin !== 'https://chatgpt.com') return;
 
   const originalFetch = typeof window.fetch === 'function' ? window.fetch.bind(window) : null;
@@ -12,6 +12,7 @@
   const xhrMetadata = new WeakMap();
   const conversations = new Map();
   const projects = new Map();
+  const projectRefreshes = new Map();
   let listener = null;
   let revision = 0;
   const MAX_CONVERSATIONS = 200;
@@ -163,7 +164,7 @@
 
   function accept(metadata, text) {
     const payload = parsePayload(text);
-    if (!payload || !metadata) return;
+    if (!payload || !metadata) return false;
     let changed = false;
     if (metadata.family === 'projects') {
       collectProjects(payload).forEach((row) => {
@@ -172,6 +173,7 @@
       });
       trimMap(projects, MAX_PROJECTS);
     } else {
+      if (!candidateArrays(payload).length) return false;
       collectConversations(payload, metadata.projectId).forEach((row) => {
         conversations.set(row.id, row);
         changed = true;
@@ -179,6 +181,7 @@
       trimMap(conversations, MAX_CONVERSATIONS);
     }
     if (changed) notify();
+    return true;
   }
 
   function inspectFetchResponse(metadata, response) {
@@ -219,6 +222,28 @@
     };
   }
 
+  function refreshProject(rawProjectId) {
+    const projectId = cleanText(rawProjectId);
+    if (!originalFetch || !SAFE_PROJECT_ID.test(projectId)) return Promise.resolve(false);
+    const active = projectRefreshes.get(projectId);
+    if (active) return active;
+    const request = Promise.resolve().then(() => originalFetch(
+      '/backend-api/gizmos/' + encodeURIComponent(projectId) + '/conversations',
+      { method: 'GET', credentials: 'same-origin', cache: 'no-store' }
+    )).then((response) => {
+      if (!response || response.status < 200 || response.status >= 300 ||
+          typeof response.text !== 'function') return false;
+      return response.text().then((text) => accept({
+        family: 'project_conversations',
+        projectId
+      }, text));
+    }).catch(() => false).finally(() => {
+      if (projectRefreshes.get(projectId) === request) projectRefreshes.delete(projectId);
+    });
+    projectRefreshes.set(projectId, request);
+    return request;
+  }
+
   function snapshot() {
     const currentPath = location.pathname;
     const projectRows = Array.from(projects.values()).map((row) => Object.assign({}, row, {
@@ -242,8 +267,9 @@
   }
 
   window.__elonChatGptPrivateConversationDirectory = Object.freeze({
-    version: 1,
+    version: 2,
     snapshot,
+    refreshProject,
     setListener: (value) => { listener = typeof value === 'function' ? value : null; }
   });
 })();

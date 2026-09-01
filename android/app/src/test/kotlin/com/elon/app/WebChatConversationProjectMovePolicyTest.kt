@@ -32,6 +32,17 @@ class WebChatConversationProjectMovePolicyTest {
     }
 
     @Test
+    fun projectDirectoryRefreshesPeriodicallyOnlyDuringReconciliation() {
+        assertFalse(WebChatConversationProjectMoveTiming.shouldRefreshDirectory(0))
+        assertFalse(WebChatConversationProjectMoveTiming.shouldRefreshDirectory(1))
+        assertTrue(WebChatConversationProjectMoveTiming.shouldRefreshDirectory(10))
+        assertTrue(WebChatConversationProjectMoveTiming.shouldRefreshDirectory(20))
+        assertFalse(WebChatConversationProjectMoveTiming.shouldRefreshDirectory(59))
+        assertFalse(WebChatConversationProjectMoveTiming.shouldRefreshDirectory(60))
+        assertFalse(WebChatConversationProjectMoveTiming.shouldRefreshDirectory(-1))
+    }
+
+    @Test
     fun staleSheetCallbacksCannotReleaseTheCurrentProgressSheet() {
         val lease = WebChatConversationProjectMoveSheetLease()
         val picker = lease.issue()

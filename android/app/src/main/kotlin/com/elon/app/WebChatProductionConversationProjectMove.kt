@@ -355,6 +355,9 @@ internal class WebChatProductionConversationProjectMoveCoordinator(
             fail(conversation, destination, "目录尚未确认移动结果", epoch)
             return
         }
+        if (WebChatConversationProjectMoveTiming.shouldRefreshDirectory(attempt)) {
+            refreshConversationIndex(destination.id)
+        }
         host.postDelayed({
             pollReconciliation(conversation, destination, epoch, attempt + 1)
         }, POLL_INTERVAL_MS)

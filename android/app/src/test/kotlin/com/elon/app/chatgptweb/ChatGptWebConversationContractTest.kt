@@ -27,7 +27,7 @@ class ChatGptWebConversationContractTest {
             workflow.indexOf("const existing = findNewConversationNode()") <
                 workflow.indexOf("const open = findSidebarButton(true)"),
         )
-        assertTrue(core.contains("conversationAdapter.newConversation(respond)"))
+        assertTrue(core.contains("conversationAdapter.newConversation(inspect,"))
         assertFalse(core.contains("document.querySelectorAll('a[href=\"/\"]"))
     }
 
@@ -137,8 +137,7 @@ class ChatGptWebConversationContractTest {
         assertTrue(backgroundSession.contains("ChatGptConversationRefreshCoordinator("))
         assertTrue(backgroundSession.contains("conversationRefresh.onFailed()"))
         assertTrue(backgroundSession.contains("conversationRefresh.onSucceeded()"))
-        assertTrue(backgroundSession.contains("conversationCollection.officialLoadState !="))
-        assertTrue(backgroundSession.contains("ChatGptWebConversationCollection.LOAD_READY"))
+        assertTrue(backgroundSession.contains("conversationDirectory.needsOfficialRefresh()"))
         assertFalse(backgroundSession.contains("conversationListRequested"))
     }
 

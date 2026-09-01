@@ -89,6 +89,7 @@ class ChatGptWebProductIntegrationContractTest {
         assertTrue(mainMcp.contains("open_web_chat_conversation"))
         assertTrue(mainMcp.contains("open_web_chat_project"))
         assertTrue(mainMcp.contains("refresh_web_chat_conversations"))
+        assertTrue(mainMcp.contains("refreshWebChatConversationIndex(projectId)"))
         assertTrue(mainMcp.contains("get_web_chat_navigation"))
         assertTrue(mainMcp.contains("feature.webChatNavigationAvailable()"))
         assertTrue(mainMcp.contains("set_web_chat_sidebar"))

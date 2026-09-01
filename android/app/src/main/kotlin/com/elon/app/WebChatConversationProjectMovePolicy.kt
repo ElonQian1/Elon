@@ -115,6 +115,7 @@ internal object WebChatConversationProjectMoveTiming {
     const val COMMAND_POLL_LIMIT = 30
     const val RECONCILIATION_POLL_LIMIT = 60
     const val CONTROL_REFRESH_POLL = 4
+    const val DIRECTORY_REFRESH_POLL = 10
 
     const val NAVIGATION_TIMEOUT_MS = POLL_INTERVAL_MS * NAVIGATION_POLL_LIMIT
     const val CONTROL_TIMEOUT_MS = POLL_INTERVAL_MS * CONTROL_POLL_LIMIT
@@ -125,6 +126,11 @@ internal object WebChatConversationProjectMoveTiming {
         attempt >= 0 &&
             attempt < CONTROL_POLL_LIMIT &&
             attempt % CONTROL_REFRESH_POLL == 0
+
+    fun shouldRefreshDirectory(attempt: Int): Boolean =
+        attempt > 0 &&
+            attempt < RECONCILIATION_POLL_LIMIT &&
+            attempt % DIRECTORY_REFRESH_POLL == 0
 }
 
 internal class WebChatConversationProjectMoveSheetLease {

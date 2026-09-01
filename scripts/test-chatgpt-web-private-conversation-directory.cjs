@@ -21,6 +21,8 @@ assert(!/document\.cookie|\.headers\b|\.body\b/i.test(source));
 assert(source.includes("url.origin !== location.origin"));
 assert(source.includes("method !== 'GET'"));
 assert(adapterSource.includes('privateConversationDirectory.setListener(emitPrivateDirectorySnapshot)'));
+assert(adapterSource.includes('privateConversationDirectory.refreshProject(projectId)'));
+assert(adapterSource.includes('conversationAdapter.requestList(command, emitEvent, respond)'));
 assert(adapterSource.includes("source: 'official_private'"));
 assert.match(pageAdapterSource, /internal const val ADAPTER_VERSION = \d+/);
 assert(pageAdapterSource.includes('addDocumentStartJavaScript'));
@@ -121,7 +123,7 @@ async function flush() {
 (async () => {
   const directory = window.__elonChatGptPrivateConversationDirectory;
   assert(directory);
-  assert.strictEqual(directory.version, 1);
+  assert.strictEqual(directory.version, 2);
   let notifications = 0;
   directory.setListener(() => { notifications += 1; });
 
@@ -146,12 +148,42 @@ async function flush() {
   assert.strictEqual(fetchCalls.length, 3);
   assert.strictEqual(cloneCount, 3);
 
+  responses.set('/backend-api/gizmos/g-p-health123/conversations', JSON.stringify({
+    data: { conversations: [
+      { conversation_id: 'project-chat-12345', title: '健康记录' },
+      { conversation_id: 'moved-chat-12345', title: '移动后的会话' }
+    ] }
+  }));
+  const beforeProjectRefresh = fetchCalls.length;
+  const refreshResults = await Promise.all([
+    directory.refreshProject('g-p-health123'),
+    directory.refreshProject('g-p-health123')
+  ]);
+  await flush();
+  assert.deepStrictEqual(Array.from(refreshResults), [true, true]);
+  assert.strictEqual(fetchCalls.length, beforeProjectRefresh + 1);
+  const targetedRequest = fetchCalls[fetchCalls.length - 1];
+  assert.strictEqual(targetedRequest.input, '/backend-api/gizmos/g-p-health123/conversations');
+  assert.strictEqual(targetedRequest.init.method, 'GET');
+  assert.strictEqual(targetedRequest.init.credentials, 'same-origin');
+  assert.strictEqual(targetedRequest.init.cache, 'no-store');
+  assert.strictEqual(targetedRequest.init.headers, undefined);
+  assert.strictEqual(targetedRequest.init.body, undefined);
+  assert(directory.snapshot().conversations.some((row) => row.id === 'moved-chat-12345'));
+  const beforeInvalidRefresh = fetchCalls.length;
+  assert.strictEqual(await directory.refreshProject('not-a-project'), false);
+  assert.strictEqual(fetchCalls.length, beforeInvalidRefresh);
+
+  responses.set('/backend-api/gizmos/g-p-empty123/conversations', '{}');
+  assert.strictEqual(await directory.refreshProject('g-p-empty123'), false);
+
   const beforeIgnored = directory.snapshot().revision;
+  const beforeIgnoredCalls = fetchCalls.length;
   await window.fetch('https://chatgpt.com/backend-api/conversations', { method: 'POST' });
   await window.fetch('https://example.com/backend-api/conversations');
   await flush();
   assert.strictEqual(directory.snapshot().revision, beforeIgnored);
-  assert.strictEqual(fetchCalls.length, 5);
+  assert.strictEqual(fetchCalls.length, beforeIgnoredCalls + 2);
 
   const xhr = new window.XMLHttpRequest();
   xhr.open('GET', '/backend-api/conversations?offset=28&limit=28');

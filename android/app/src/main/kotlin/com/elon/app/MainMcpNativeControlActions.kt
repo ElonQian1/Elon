@@ -163,7 +163,8 @@ internal class MainMcpNativeControlActions(
                 uiState()
             }
             "refresh_web_chat_conversations" -> {
-                if (socialAiChatFeature()?.refreshWebChatConversationIndex() != true) {
+                val projectId = args.optString("project_id").trim().ifBlank { null }
+                if (socialAiChatFeature()?.refreshWebChatConversationIndex(projectId) != true) {
                     return errorJson(action, "web_chat_not_ready")
                 }
                 uiState()
