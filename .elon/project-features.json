@@ -1869,20 +1869,20 @@
         },
         {
           "path": "server/src/store/compute_federation_historical_causal_reference/source_contract_tests/capacity_future.rs",
-          "content_hash": "02178b384fcdc8a73fb3a25ec053d2ffbf4f30ae3711c6eaa25fdc47cd9f6865",
+          "content_hash": "376895a0e82d0229a63b52cd6f468e5ac7c406e5a64f8862ea049bc07e673d44",
           "locator": "historical owner call-chain static guard (unrun)",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "8b171d961e30ca6b783e9fe6957bac896b931139",
-            "head_blob_oid": "9b848d07ea847a03c13feb6940eb7a5dfa6f7de1",
-            "worktree_blob_oid": "9b848d07ea847a03c13feb6940eb7a5dfa6f7de1",
+            "head_commit": "1cad8399e4cb72ce395971dff1bba9fd6d7c43d0",
+            "head_blob_oid": "5562d7776921d0596fbdae3b8c281d9c9ea12267",
+            "worktree_blob_oid": "5562d7776921d0596fbdae3b8c281d9c9ea12267",
             "state": "tracked_clean"
           }
         }
       ],
       "created_at_ms": 1788301350474,
-      "updated_at_ms": 1788301413755
+      "updated_at_ms": 1788301562743
     },
     {
       "id": "compute-external-pool-adapter-authenticated-no-work-probe-v1",
@@ -14310,16 +14310,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_c1ebbc2aee4e4e36a54a386d671396a7",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "requirement_rebound",
-      "actor": "Codex q10",
-      "reason": "Bind the intentionally updated q10 authority text before re-reviewing and recording current source evidence.",
-      "from_status": "blocked",
-      "to_status": "proposed",
-      "at_ms": 1788252476440
-    },
-    {
       "id": "feature_event_e98513d7e93d44ae8dc2f92a19d1cd9a",
       "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
       "action": "transitioned",
@@ -16308,6 +16298,16 @@
       "from_status": "blocked",
       "to_status": "blocked",
       "at_ms": 1788301413755
+    },
+    {
+      "id": "feature_event_727672316ebf471b8615fd948e28d557",
+      "feature_id": "compute-capacity-future-settlement-lineage-bridge-v1",
+      "action": "evidence_recorded",
+      "actor": "Codex:/root",
+      "reason": "",
+      "from_status": "blocked",
+      "to_status": "blocked",
+      "at_ms": 1788301562743
     }
   ]
 }
