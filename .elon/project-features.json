@@ -2658,6 +2658,57 @@
       "updated_at_ms": 1786753990538
     },
     {
+      "id": "compute-federation-interactive-desktop-v1",
+      "title": "分布式算力联邦交互式云电脑 V1",
+      "summary": "Extend the shared Provider/Offer/Capacity/Price/Receipt control plane with a separate interactive desktop session plane for consent-bound Windows screen/audio streaming and optional input, without reclassifying batch ComputeJob or opening production media, input, or funds effects.",
+      "status": "accepted",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/interactive-desktop-federation-v1.md",
+        "content_hash": "ad1c2d721a5c95a4199ace299ef145c85e02ddba5ebc2afc739f8417d6f03b41",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "1474de9ea6b57ba555f4de292ed9bc26675001b5",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "c7d080c1f3ffa6f6c6801e0cd6871781202d502e",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "backend, node, pc, security, ai-economy",
+      "tags": [
+        "compute-federation",
+        "interactive-desktop",
+        "cloud-pc",
+        "cloud-gaming",
+        "webrtc",
+        "security"
+      ],
+      "task_paths": [
+        "docs/decisions/compute-federation-interactive-desktop-v1.md",
+        "docs/distributed-compute/interactive-desktop-architecture.md",
+        "docs/requirements/interactive-desktop-federation-v1.md",
+        "server/src/compute_federation/interactive_desktop",
+        "server/src/compute_federation/mod.rs"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "Use one federation control plane with separate batch-compute and interactive-desktop execution planes.",
+        "Keep existing ComputeWorkloadSpec task-kind validation closed and unchanged.",
+        "Bind every session to exact Provider, consumer, Offer, PriceSnapshot, Reservation/Claim, HostLease fencing, ViewerGrant, MediaEpoch, and ControlEpoch identities.",
+        "Default-deny capture, audio, input, clipboard, file, microphone, camera, and elevation permissions unless the exact contract allows them.",
+        "Persist only bounded metadata and aggregate integer usage; never persist media, input payloads, SDP, ICE candidates, bearer tokens, or credentials.",
+        "Separate provider-declared, transport-observed, consumer-observed, verified, and compensable usage.",
+        "Leave migrations, public APIs, node capabilities, signaling, TURN, real media/input, billing writes, and production activation out of this source-contract tranche.",
+        "Record source as uncompiled and unrun and keep all production and economic effects closed."
+      ],
+      "implementation_evidence": [],
+      "created_at_ms": 1788296237836,
+      "updated_at_ms": 1788296237836
+    },
+    {
       "id": "compute-v255-runtime-launch-profile-verification",
       "title": "V255 惰性 runtime launch profile 验收闭环",
       "summary": "编译并执行已落地的 V255 Domain、migration、Store、Service 与 HTTP 测试，修复真实缺口并把 passed=0 更新为可复核的局部验收证据；不扩张到 Sidecar、真实凭据、Provider activation、市场或结算。",
@@ -15544,6 +15595,16 @@
       "from_status": "blocked",
       "to_status": "blocked",
       "at_ms": 1788295841683
+    },
+    {
+      "id": "feature_event_7bd3fea8d59d4db4adef0a3c251835d4",
+      "feature_id": "compute-federation-interactive-desktop-v1",
+      "action": "registered",
+      "actor": "Codex",
+      "reason": "The product owner explicitly introduced paid cloud-PC/game-streaming supply and asked to integrate it with the existing distributed compute federation while preserving compatibility.",
+      "from_status": "",
+      "to_status": "accepted",
+      "at_ms": 1788296237836
     }
   ]
 }
