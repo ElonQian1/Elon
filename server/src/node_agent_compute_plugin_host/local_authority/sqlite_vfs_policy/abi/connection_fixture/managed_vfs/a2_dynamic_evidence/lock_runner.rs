@@ -7,6 +7,7 @@ mod local_protocol_rejection;
 mod local_sibling_contention;
 mod native_acquire_busy;
 mod pre_managed_rejection;
+mod raw_state_rejection;
 mod request_validation;
 #[cfg(all(test, windows))]
 mod selector_test_support;
@@ -14,7 +15,6 @@ mod stored_poison;
 mod stored_poison_dispatch;
 mod stored_poison_model;
 mod stored_poison_route_unknown;
-
 pub(in super::super) use abi_scalar_rejection::*;
 #[cfg(all(test, windows))]
 pub(in super::super) use callback_completion_route_unknown::{
@@ -58,6 +58,7 @@ pub(in super::super) use pre_managed_rejection::{
     run_lock_pre_managed_rejection_program_isolated, LockRunnerPreManagedCompletionV1,
     LockRunnerPreManagedRejectionBindingV1, LockRunnerPreManagedRejectionV1,
 };
+pub(in super::super) use raw_state_rejection::*;
 pub(in super::super) use request_validation::{LockRunnerActionV1, LockRunnerRequestValidationV1};
 #[cfg(all(test, windows))]
 pub(in super::super) use selector_test_support::{
@@ -67,7 +68,6 @@ pub(in super::super) use stored_poison_model::{
     LockRunnerStoredPoisonBindingV1, LockRunnerStoredPoisonCompletionV1,
     LockRunnerStoredPoisonProfileV1,
 };
-
 use std::{
     fs,
     path::{Path, PathBuf},

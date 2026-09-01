@@ -8,6 +8,7 @@ pub(super) mod lock_local_protocol_rejection;
 pub(super) mod lock_local_sibling_contention;
 pub(super) mod lock_native_acquire_busy;
 pub(super) mod lock_pre_managed_rejection;
+pub(super) mod lock_raw_state_rejection;
 mod lock_request_validation;
 pub(super) mod lock_stored_poison;
 pub(super) mod map_lifecycle;

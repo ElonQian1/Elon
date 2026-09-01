@@ -4,7 +4,7 @@ status: current
 reviewed_at: 2026-09-01
 owners: node, security
 design_status: design_frozen
-implementation_status: q5_q6_q7_q8_q9_q10_source_written_uncompiled_unrun
+implementation_status: q5_q6_q7_q8_q9_q10_q11_source_written_uncompiled_unrun
 verification_status: source_review_only_actual_not_run
 authority_scope: backend-a2-map-lock-dynamic-quotient-authority-v1
 ---
@@ -14,7 +14,7 @@ authority_scope: backend-a2-map-lock-dynamic-quotient-authority-v1
 ## 1. Scope
 
 本文维护 [`Map/Lock dynamic quotient authority`](node-plugin-vfs-map-lock-dynamic-quotient-authority.md)
-中 Lock q5–q10 窄执行切片的精确成员、lower 路径 source contract、回执形状和隔离约束。父权威仍唯一维护完整
+中 Lock q5–q11 窄执行切片的精确成员、lower 路径 source contract、回执形状和隔离约束。父权威仍唯一维护完整
 `8,668` 静态分母、商集冻结、reviewed inventory、`Qlock` 与生产门控；本文不创建第二套
 CaseKey、Expected、manifest 或 acceptance 状态。
 
@@ -227,23 +227,62 @@ exact route 武装 `AbiRejected` no-entry ledger；任一 registry `Event::Entry
 或 reviewed inventory digest。3,432 个 native-acquire initialization-failure member 与 q9 一样完全排除在 q10
 之外，不能以 ABI scalar rejection 代替。
 
-## 8. Current evidence and production boundary
+## 8. q11 raw-state rejection
 
-q7–q9 的既有 source scope 与 receipt 形状保持不变；q10 新增 ABI scalar 七种非全真 validity 组合的 exact
-matcher、installed-callback direct-rejection receipt shape 和 source-level contracts。q1–q10 未运行 inventory 的
-source-only 预期为 `3,657 present members / 3,657 present groups / 5,011 missing members / 4,483 missing groups /
-8,668 total members / 8,140 total groups`，且 q9 的 528 个 group 与 q10 的 7 个 group 都必须为 singleton。没有 current reviewed
+`LockRawStateRejectionV1` 精确承接冻结 Lock authority 中 q10 后的下一段连续边界：两个
+`lock.raw.excluded.invalid-*-pointer` leaf 只定义 C memory-safety premise，继续 excluded 且永不进入 runner；
+其后的 11 个 `lock.raw.terminal.*` member 全部进入 q11，并逐个形成 singleton normalized group。下一个 frozen
+terminal 已由 q9 的 `AdmissionCounterOverflow Direct` catalog 承接，因此 q11 不能向后吸收或跳过成员。
+
+matcher 只能由完整 typed 语义构造 case。十个 raw rejection 必须绑定
+`source=RawStateAbandon`、`stimulus=LockRaw(exact RawStateV1)`、`prestate=NotReached`、
+`operation=RawAbandon`、`phase=RawAdmission`、`timing=Cleanup`、`fault_seam=RawState`、
+`observer=CustodyAndCleanup`；`HandleBoundFileMissing` 单独绑定 `source=AdapterDispatch`、
+`operation=AdapterDispatch`、`phase=Adapter`、`timing=BeforeCall`、
+`observer=LockCallbackAndSnapshot`。所有 case 还必须精确匹配 `completion=Direct | RawDropCompleted |
+RawDropUnwindCaught`、完整 Expected、case/full-record seals 与 `ParentOwnedRoot` cleanup。leaf id、行号、展示文本
+和 catalog row position 均不得参与分类。
+
+冻结成员文件为 `raw_state_rejection_members.v1.tsv`，固定五列
+`source_site/raw_state/completion/case_key_sha256/full_record_sha256` 与 11 行数据。它覆盖：六个
+raw-slot validation direct、两个 payload-missing drop-completed、一个 other-type payload drop-completed、一个
+other-type payload drop-unwind-caught 与一个 handle-bound file missing direct。两个 pointer exclusion 没有
+selector、case enum 或控制器入口。该文件固定为 `2,092 bytes`，SHA-256 为
+`b57a57bec7aa00c29b842c5307a6a5569ecbe251713edb7363e9416cca6d648d`。
+
+future actual source seam 必须进入真实 installed SQLite ABI `xShmLock`：合法固定 scalar 先进入
+`file_state::run_code`，再走 production `raw_state::with_installed_state`、失败后的
+`abandon_installed_state`、slot clear/retain、envelope/payload Drop 或 adapter file-missing fallback。独立 32 槽
+one-shot ledger 必须绑定 live file/null sentinel、线程、exact case、raw slots、validation/type/payload、abandon、
+drop completed/unwind、callback return 与 observation id；错文件、错线程、错 case、乱序、重复、并发占用或
+未消费 guard 全部失败关闭。同一 exact route 的 `RawRejected` no-entry ledger 必须保持全零，证明 registry、
+managed/native/local lower 未被误入。
+
+11 个 raw premise 在安全生产状态机中都不可自然到达，因此只允许 test-only、Windows、memory-safe 的受控
+unsafe fixture 构造；corrupt/retained state 不得正常 close，只能由隔离 child 退出形成终止边界。未来真实运行
+所得证据也只能标记 `controlled_fault_actual`：它证明真实 production callback/control/cleanup 在 synthetic
+premise 下的行为，不是自然生产可达、普通 runtime coverage 或用户现场 actual。current source 仍未编译、
+未运行，没有 child receipt、Windows record 或 coverage 增量。
+
+## 9. Current evidence and production boundary
+
+q7–q10 的既有 source scope 与 receipt 形状保持不变；q11 新增 raw-state 11 个 exact singleton、production
+raw admission/abandon/drop ledger、受控 fixture、isolated child/runner/payload 与 source-level contracts。
+q1–q11 未运行 inventory 的 source-only 预期为 `3,668 present members / 3,668 present groups /
+5,000 missing members / 4,472 missing groups / 8,668 total members / 8,140 total groups`，且 q9 的 528 个、
+q10 的 7 个与 q11 的 11 个 group 都必须为 singleton。没有 current reviewed
 source-scope 或 inventory digest，member coverage 仍为 `0/8,668`。
 
-q9 曾把 `with_shm` 的生产实现拆入 `operations/shm.rs`；q10 又为真实负向回执更新了 ABI scalar gate 的
-test-only observation source。仓库级 `SourceOwnerGraph` 与 source-leaf frozen authority 仍绑定此前物理快照。
-它们必须在 q9/q10 checkpoint 后，以新 baseline 运行显式 ignored candidate generator，并人工复核 16 份 Map
-leaf、Map manifest、Lock leaf 与 Lock manifest 共 19 份 frozen artifacts。q10 不做也不替代这项独立 deferred
+q9 曾把 `with_shm` 的生产实现拆入 `operations/shm.rs`；q10 更新 ABI scalar gate observation，q11 又新增
+真实 raw-state rejection/cleanup observation source。仓库级 `SourceOwnerGraph` 与 source-leaf frozen authority
+仍绑定此前物理快照。它们必须在 q9–q11 checkpoint 后，以新 baseline 运行显式 ignored candidate generator，
+并人工复核 16 份 Map leaf、Map manifest、Lock leaf 与 Lock manifest 共 19 份 frozen artifacts。q11 不做也不替代这项独立 deferred
 refresh；当前架构铺设阶段不留下只改 owner/needle、却没有同步重生成 frozen artifacts 的半套权威。
 
 本批没有运行 Cargo、编译、SQLite、Windows 或真实 runtime；因此仍是
 `passed=0 failed=0 actual=not_run`，没有 actual record、reviewed inventory digest、frozen manifest、
 `Qlock`（仍为 `unknown`）或 Windows numerator，`WindowsDynamic=not_opened`。最终 Lock 功能继续 blocked：
-仍缺 5,011 members / 4,483 groups，且 compile/runtime/actual receipts/reviewed digest 全部缺失。q10 是
-7/7 exact singleton source-only、uncompiled、unrun，production 保持 closed。它不打开生产 VFS/open、
+仍缺 5,000 members / 4,472 groups，且 compile/runtime/actual receipts/reviewed digest 全部缺失。q11 是
+11/11 exact singleton source-only、uncompiled、unrun，`controlled_fault_actual` 也只是未运行 source seam，
+production 保持 closed。它不打开生产 VFS/open、
 Runtime/Ready、Provider、Offer、Job、Attempt、Lease、dispatch、market、settlement 或 funds effects。

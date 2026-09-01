@@ -10,6 +10,7 @@ use super::map_runtime_source_scope::{
 };
 use super::runner_admission::{
     ABI_SCALAR_REJECTION_PROJECTOR_DELTA_V1, PRE_MANAGED_CALLBACK_REJECTION_PROJECTOR_DELTA_V1,
+    RAW_STATE_REJECTION_PROJECTOR_DELTA_V1,
 };
 use super::{
     digest_dynamic_class_key_v1, DynamicClassKeyV1, DynamicClassSealV1, DynamicQuotientManifestV1,
@@ -652,6 +653,7 @@ pub(super) fn projector_source_scope_entries_v1(
                 .copied(),
         )
         .chain(ABI_SCALAR_REJECTION_PROJECTOR_DELTA_V1.iter().copied())
+        .chain(RAW_STATE_REJECTION_PROJECTOR_DELTA_V1.iter().copied())
 }
 
 pub(super) fn digest_projector_source_entries_v1<'a>(

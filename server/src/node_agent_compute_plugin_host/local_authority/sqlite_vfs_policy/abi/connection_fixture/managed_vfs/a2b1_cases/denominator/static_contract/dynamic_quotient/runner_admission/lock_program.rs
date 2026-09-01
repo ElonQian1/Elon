@@ -8,6 +8,7 @@ mod local_protocol_rejection;
 mod local_sibling_contention;
 mod native_acquire_busy;
 mod pre_managed_callback_rejection;
+mod raw_state_rejection;
 mod request_validation;
 mod source_program;
 mod stored_poison;
@@ -39,6 +40,7 @@ use local_sibling_contention::LockLocalSiblingContentionProgramSpecV1;
 #[cfg(windows)]
 use native_acquire_busy::LockNativeAcquireBusyProgramSpecV1;
 pub(super) use pre_managed_callback_rejection::PRE_MANAGED_CALLBACK_REJECTION_PROJECTOR_DELTA_V1;
+pub(super) use raw_state_rejection::RAW_STATE_REJECTION_PROJECTOR_DELTA_V1;
 #[cfg(windows)]
 use request_validation::LockRequestValidationGuardV1;
 use source_program::program_spec_v1 as source_program_spec_v1;
@@ -258,6 +260,9 @@ pub(in super::super) fn run_lock_isolated_for_test(
         LockProgramCaseV1::PreManagedCallbackRejection(rejection) => {
             pre_managed_callback_rejection::run_isolated_v1(exact_test, rejection, member)
         }
+        LockProgramCaseV1::RawStateRejection(rejection) => {
+            raw_state_rejection::run_isolated_v1(exact_test, rejection, member)
+        }
         LockProgramCaseV1::StoredPoison(stored) => run_lock_stored_poison_program_isolated(
             exact_test,
             LockRunnerStoredPoisonBindingV1 {
@@ -389,6 +394,7 @@ enum LockProgramCaseV1 {
     PreManagedCallbackRejection(
         pre_managed_callback_rejection::LockPreManagedCallbackRejectionProgramSpecV1,
     ),
+    RawStateRejection(raw_state_rejection::LockRawStateRejectionProgramSpecV1),
     StoredPoison(LockStoredPoisonProgramSpecV1),
 }
 
@@ -456,6 +462,11 @@ pub(super) fn local_protocol_rejection_catalog_row_count_for_test() -> usize {
 #[cfg(test)]
 pub(super) fn pre_managed_callback_rejection_catalog_row_count_for_test() -> usize {
     pre_managed_callback_rejection::catalog_row_count_for_test()
+}
+
+#[cfg(test)]
+pub(super) fn raw_state_rejection_catalog_row_count_for_test() -> usize {
+    raw_state_rejection::catalog_row_count_for_test()
 }
 
 #[cfg(test)]

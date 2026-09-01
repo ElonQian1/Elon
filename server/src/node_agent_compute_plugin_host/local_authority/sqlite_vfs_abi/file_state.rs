@@ -258,7 +258,14 @@ impl HandleBoundSqliteFileState {
     }
 
     fn file_mut(&mut self) -> Result<&mut (dyn HandleBoundSqliteFileOperations + 'static), ()> {
-        self.file.as_deref_mut().ok_or(())
+        match self.file.as_deref_mut() {
+            Some(file) => Ok(file),
+            None => {
+                #[cfg(all(test, windows))]
+                super::raw_lock_observation::record_handle_file_missing();
+                Err(())
+            }
+        }
     }
 
     pub(super) fn read_at_zero_filled(
@@ -336,6 +343,17 @@ impl HandleBoundSqliteFileState {
             file: Some(Box::new(file)),
         }
     }
+
+    /// Removes the exact concrete file without running its Drop. This exists only for q11's
+    /// process-isolated, controlled raw-state fixture; the child process is the terminal custodian.
+    #[cfg(all(test, windows))]
+    pub(super) fn detach_file_for_raw_lock_rejection(&mut self) -> bool {
+        let Some(file) = self.file.take() else {
+            return false;
+        };
+        std::mem::forget(file);
+        true
+    }
 }
 
 /// Runs one typed callback. Any missing/mismatched raw state or Rust panic abandons the installed
@@ -350,8 +368,20 @@ pub(super) unsafe fn run_code(
         unsafe { raw_state::with_installed_state(file, operation) }
     }));
     match result {
-        Ok(Ok(code)) => code,
-        Ok(Err(_)) | Err(_) => {
+        Ok(Ok(code)) => {
+            #[cfg(all(test, windows))]
+            super::raw_lock_observation::record_run_code_normal(file);
+            code
+        }
+        Ok(Err(_)) => {
+            #[cfg(all(test, windows))]
+            super::raw_lock_observation::record_run_code_rejection(file);
+            unsafe { abandon_without_unwind(file) };
+            fallback
+        }
+        Err(_) => {
+            #[cfg(all(test, windows))]
+            super::raw_lock_observation::record_run_code_unwind(file);
             unsafe { abandon_without_unwind(file) };
             fallback
         }

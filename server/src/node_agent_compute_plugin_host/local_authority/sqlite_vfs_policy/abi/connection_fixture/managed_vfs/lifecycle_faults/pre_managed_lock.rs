@@ -1,6 +1,7 @@
 //! Exact-route observation of Lock callbacks rejected before managed/native dispatch.
 
 mod abi_rejected;
+mod raw_rejected;
 
 use std::collections::{hash_map::Entry as MapEntry, HashMap};
 
@@ -20,6 +21,7 @@ use crate::node_agent_managed_fs::ManagedSqliteShmLockRequest;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(in super::super) enum ManagedTestPreManagedLockPath {
     AbiRejected,
+    RawRejected,
     AdmissionRouteUnknown,
     AdmissionCounterOverflow,
     UnsupportedCompleted,
@@ -32,6 +34,7 @@ impl ManagedTestPreManagedLockPath {
     const fn tag(self) -> u64 {
         match self {
             Self::AbiRejected => 7,
+            Self::RawRejected => 8,
             Self::AdmissionRouteUnknown => 1,
             Self::AdmissionCounterOverflow => 2,
             Self::UnsupportedCompleted => 3,
@@ -225,6 +228,13 @@ impl ManagedTestPreManagedLockState {
     ) -> Result<ManagedTestPreManagedLockSnapshot, &'static str> {
         abi_rejected::finish(self, route)
     }
+
+    fn finish_raw_rejected_without_entry(
+        &mut self,
+        route: ManagedTestRouteOrdinal,
+    ) -> Result<ManagedTestPreManagedLockSnapshot, &'static str> {
+        raw_rejected::finish(self, route)
+    }
 }
 
 fn validate_snapshot(
@@ -234,6 +244,9 @@ fn validate_snapshot(
     let expected = match path {
         ManagedTestPreManagedLockPath::AbiRejected => {
             [1, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        }
+        ManagedTestPreManagedLockPath::RawRejected => {
+            [1, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
         }
         ManagedTestPreManagedLockPath::AdmissionRouteUnknown => {
             [1, 1, 1, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
@@ -377,6 +390,17 @@ impl ManagedTestLifecycleFaultController {
             .map_err(|_| "lifecycle fault controller poisoned")?
             .pre_managed_lock
             .finish_abi_rejected_without_entry(route)
+    }
+
+    pub(in super::super) fn finish_raw_rejected_lock_observation(
+        &self,
+        route: ManagedTestRouteOrdinal,
+    ) -> Result<ManagedTestPreManagedLockSnapshot, &'static str> {
+        self.state
+            .lock()
+            .map_err(|_| "lifecycle fault controller poisoned")?
+            .pre_managed_lock
+            .finish_raw_rejected_without_entry(route)
     }
 }
 

@@ -54,6 +54,8 @@ pub(super) unsafe extern "C" fn lock(
 ) -> c_int {
     #[cfg(all(test, windows))]
     super::lock_observation::record_entry(file, offset, count, flags);
+    #[cfg(all(test, windows))]
+    super::raw_lock_observation::record_entry(file);
     let (offset_value, count_value, action_value) = (
         u8::try_from(offset).ok(),
         u8::try_from(count).ok().and_then(NonZeroU8::new),
@@ -84,6 +86,8 @@ pub(super) unsafe extern "C" fn lock(
     };
     #[cfg(all(test, windows))]
     super::lock_observation::record_run_code_entry(file, offset, count, flags);
+    #[cfg(all(test, windows))]
+    super::raw_lock_observation::record_scalar_admitted(file);
     // SAFETY: the callback contract serializes this exact file allocation.
     let result = unsafe {
         file_state::run_code(
@@ -98,6 +102,8 @@ pub(super) unsafe extern "C" fn lock(
     };
     #[cfg(all(test, windows))]
     super::lock_observation::record_returned(file, offset, count, flags, result);
+    #[cfg(all(test, windows))]
+    super::raw_lock_observation::record_returned(file, result);
     result
 }
 

@@ -37,6 +37,7 @@ pub(super) use lock_program::{
     local_sibling_contention_catalog_row_count_for_test,
     native_acquire_busy_catalog_row_count_for_test,
     pre_managed_callback_rejection_catalog_row_count_for_test,
+    raw_state_rejection_catalog_row_count_for_test,
     stored_poison_catalog_row_count_for_test,
     validate_program_for_test as validate_lock_program_for_test,
 };
@@ -46,6 +47,7 @@ pub(super) use lock_program::{
 };
 pub(super) use lock_program::{
     ABI_SCALAR_REJECTION_PROJECTOR_DELTA_V1, PRE_MANAGED_CALLBACK_REJECTION_PROJECTOR_DELTA_V1,
+    RAW_STATE_REJECTION_PROJECTOR_DELTA_V1,
 };
 #[cfg(all(test, windows))]
 pub(super) use map_program::tamper_implementation_digest_for_test;

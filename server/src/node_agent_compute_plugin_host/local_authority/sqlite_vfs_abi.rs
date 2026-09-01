@@ -15,6 +15,8 @@ mod io_core;
 mod io_shm;
 #[cfg(all(test, windows))]
 mod lock_observation;
+#[cfg(all(test, windows))]
+mod raw_lock_observation;
 mod raw_state;
 mod result_codes;
 mod types;
@@ -33,6 +35,12 @@ pub(in crate::node_agent_compute_plugin_host::local_authority) use file_state::{
 pub(in crate::node_agent_compute_plugin_host::local_authority) use lock_observation::{
     arm_test_x_shm_lock_observation, HandleBoundSqliteAbiShmLockObservationGuard,
     HandleBoundSqliteAbiShmLockObservationReceipt,
+};
+#[cfg(all(test, windows))]
+pub(in crate::node_agent_compute_plugin_host::local_authority) use raw_lock_observation::{
+    arm_test_x_shm_lock_raw_state_rejection_v1, HandleBoundSqliteAbiRawLockEvidenceV1,
+    HandleBoundSqliteAbiRawLockRejectionCaseV1, HandleBoundSqliteAbiRawLockRejectionGuardV1,
+    HandleBoundSqliteAbiRawLockRejectionReceiptV1,
 };
 #[cfg(all(test, windows))]
 pub(in crate::node_agent_compute_plugin_host::local_authority) use raw_state::{

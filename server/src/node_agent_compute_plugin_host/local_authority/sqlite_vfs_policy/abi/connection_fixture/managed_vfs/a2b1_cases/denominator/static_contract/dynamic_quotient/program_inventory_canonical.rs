@@ -10,7 +10,7 @@ use super::program_inventory::{
 };
 use super::runner_admission::{
     ExecutionProgramInventoryStatusV1, ABI_SCALAR_REJECTION_PROJECTOR_DELTA_V1,
-    PRE_MANAGED_CALLBACK_REJECTION_PROJECTOR_DELTA_V1,
+    PRE_MANAGED_CALLBACK_REJECTION_PROJECTOR_DELTA_V1, RAW_STATE_REJECTION_PROJECTOR_DELTA_V1,
 };
 
 const SOURCE_SCOPE_DOMAIN: &str = "ELON-A2-MAP-LOCK-EXECUTION-PROGRAM-INVENTORY-SOURCE-SCOPE-V1";
@@ -221,7 +221,8 @@ pub(super) fn digest_execution_program_inventory_source_scope_v1() -> Digest32 {
         "entry_count",
         (SOURCE_SCOPE.len()
             + PRE_MANAGED_CALLBACK_REJECTION_PROJECTOR_DELTA_V1.len()
-            + ABI_SCALAR_REJECTION_PROJECTOR_DELTA_V1.len()) as u64,
+            + ABI_SCALAR_REJECTION_PROJECTOR_DELTA_V1.len()
+            + RAW_STATE_REJECTION_PROJECTOR_DELTA_V1.len()) as u64,
     );
     for (path, source) in SOURCE_SCOPE
         .iter()
@@ -239,6 +240,17 @@ pub(super) fn digest_execution_program_inventory_source_scope_v1() -> Digest32 {
         )
         .chain(
             ABI_SCALAR_REJECTION_PROJECTOR_DELTA_V1
+                .iter()
+                .copied()
+                .map(|(path, source)| {
+                    (
+                        path.strip_prefix("dynamic_quotient/").unwrap_or(path),
+                        source,
+                    )
+                }),
+        )
+        .chain(
+            RAW_STATE_REJECTION_PROJECTOR_DELTA_V1
                 .iter()
                 .copied()
                 .map(|(path, source)| {

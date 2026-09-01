@@ -18,6 +18,8 @@ use super::{types::InertHandleBoundSqliteFile, INERT_IO_METHODS};
 mod close_control;
 #[cfg(all(test, windows))]
 mod close_witness;
+#[cfg(all(test, windows))]
+pub(super) mod lock_raw_control;
 
 #[cfg(all(test, windows))]
 pub(in crate::node_agent_compute_plugin_host::local_authority) use close_witness::{
@@ -56,6 +58,10 @@ impl RawSqliteFileStateEnvelope {
         self.type_id == TypeId::of::<State>()
     }
 
+    fn has_payload(&self) -> bool {
+        self.payload.is_some()
+    }
+
     unsafe fn with_typed<State: 'static, Output>(
         &mut self,
         operation: impl FnOnce(&mut State) -> Output,
@@ -89,9 +95,15 @@ impl RawSqliteFileStateEnvelope {
 
 impl Drop for RawSqliteFileStateEnvelope {
     fn drop(&mut self) {
+        #[cfg(all(test, windows))]
+        super::raw_lock_observation::record_envelope_drop(self.payload.is_some());
         if let Some(payload) = self.payload.take() {
+            #[cfg(all(test, windows))]
+            let observation = super::raw_lock_observation::begin_payload_drop();
             // SAFETY: the function pointer was paired with this payload in `new`.
             unsafe { (self.drop_payload)(payload) };
+            #[cfg(all(test, windows))]
+            observation.complete();
         }
     }
 }
@@ -178,9 +190,27 @@ pub(super) unsafe fn with_installed_state<State: 'static, Output>(
     file: *mut ffi::sqlite3_file,
     operation: impl FnOnce(&mut State) -> Output,
 ) -> Result<Output, RawSqliteFileStateRejection> {
-    let envelope = unsafe { installed_envelope(file)? };
-    if !envelope.is::<State>() {
+    let envelope = match unsafe { installed_envelope(file) } {
+        Ok(envelope) => envelope,
+        Err(rejection) => {
+            #[cfg(all(test, windows))]
+            super::raw_lock_observation::record_raw_rejection(file, rejection);
+            return Err(rejection);
+        }
+    };
+    let type_matches = envelope.is::<State>();
+    #[cfg(all(test, windows))]
+    super::raw_lock_observation::record_envelope_snapshot(
+        file,
+        type_matches,
+        envelope.has_payload(),
+    );
+    if !type_matches {
         return Err(RawSqliteFileStateRejection::TypeMismatch);
+    }
+    #[cfg(all(test, windows))]
+    if envelope.has_payload() {
+        super::raw_lock_observation::record_typed_operation_entry(file);
     }
     // SAFETY: exact method and TypeId gates passed, with exclusivity required by this function.
     Ok(unsafe { envelope.with_typed(operation) })
@@ -342,8 +372,19 @@ pub(super) unsafe fn release_test_raw_close_control_if_unretained(file: *mut ffi
 pub(super) unsafe fn abandon_installed_state(
     file: *mut ffi::sqlite3_file,
 ) -> Result<bool, RawSqliteFileStateRejection> {
-    let file = NonNull::new(file.cast::<InertHandleBoundSqliteFile>())
-        .ok_or(RawSqliteFileStateRejection::NullFile)?;
+    #[cfg(all(test, windows))]
+    super::raw_lock_observation::record_abandon_entry(file);
+    let file = match NonNull::new(file.cast::<InertHandleBoundSqliteFile>()) {
+        Some(file) => file,
+        None => {
+            #[cfg(all(test, windows))]
+            super::raw_lock_observation::record_abandon_rejection(
+                file,
+                RawSqliteFileStateRejection::NullFile,
+            );
+            return Err(RawSqliteFileStateRejection::NullFile);
+        }
+    };
     // SAFETY: guaranteed by the initialized-file contract above.
     let (methods, state) = unsafe {
         (
@@ -353,24 +394,37 @@ pub(super) unsafe fn abandon_installed_state(
     };
     if methods.is_null() && state.is_null() {
         #[cfg(all(test, windows))]
+        super::raw_lock_observation::record_abandon_empty(file.as_ptr().cast());
+        #[cfg(all(test, windows))]
         // SAFETY: this is the same serialized initialized allocation. Retained custody is preserved.
         unsafe {
             release_test_raw_close_control_if_unretained(file.as_ptr().cast());
         }
         return Ok(false);
     }
-    validate_installed(methods, state)?;
+    if let Err(rejection) = validate_installed(methods, state) {
+        #[cfg(all(test, windows))]
+        super::raw_lock_observation::record_abandon_rejection(file.as_ptr().cast(), rejection);
+        return Err(rejection);
+    }
     #[cfg(all(test, windows))]
     // SAFETY: validation and the caller contract prove this exact allocation is serialized.
     if let Some(control) = unsafe { test_raw_close_control(file.as_ptr().cast()) } {
         control.record_state_abandon(file.as_ptr().cast());
     }
     // SAFETY: validation proves this module's exact table and a non-null envelope.
+    #[cfg(all(test, windows))]
+    let drop_observation =
+        super::raw_lock_observation::begin_abandon_drop(file.as_ptr().cast());
     unsafe {
         ptr::addr_of_mut!((*file.as_ptr()).base.pMethods).write(ptr::null());
         ptr::addr_of_mut!((*file.as_ptr()).state).write(ptr::null_mut());
+        #[cfg(all(test, windows))]
+        super::raw_lock_observation::record_slots_cleared(file.as_ptr().cast());
         drop(Box::from_raw(state.cast::<RawSqliteFileStateEnvelope>()));
     }
+    #[cfg(all(test, windows))]
+    drop_observation.complete();
     #[cfg(all(test, windows))]
     // SAFETY: raw state has reached an ordinary terminal abandonment path.
     unsafe {
