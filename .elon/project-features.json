@@ -4663,7 +4663,7 @@
       "id": "esk-paper-asset-account-v1",
       "title": "ESK Paper 资产账户与卖回申请 V1",
       "summary": "主项目建立 ESK 唯一余额真源、精确用户资产视图、管理员幂等 Paper 登记与追加式卖回申请；PC/Android 明确未上链、未移动资金，量化接入另走版本化投影。",
-      "status": "verified",
+      "status": "released",
       "priority": "p0",
       "requirement": {
         "path": "docs/requirements/esk-paper-asset-account-v1.md",
@@ -4856,7 +4856,7 @@
         }
       ],
       "created_at_ms": 1788300027572,
-      "updated_at_ms": 1788300136729
+      "updated_at_ms": 1788301003983
     },
     {
       "id": "external-pool-adapter-credential-reattestation-v253-verification",
@@ -14045,16 +14045,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_0d4fb07f0c394fe8a12a9318926b9a95",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex-root-q9",
-      "reason": "q9 source-only checkpoint recorded: 528 exact singleton members advance Lock source-present to 3650/3650; 5018 members and 4490 groups remain, including 3432 initialization failures. Cargo/compile/tests/Windows actual receipts/reviewed inventory/Qlock remain not run or unknown. The operations/shm split also requires a later checkpoint-baselined ignored generator plus review of 19 global frozen source-owner artifacts. Production remains closed.",
-      "from_status": "in_progress",
-      "to_status": "blocked",
-      "at_ms": 1788246890181
-    },
-    {
       "id": "feature_event_d42b603c3ae34cbfae7a3f15943888ca",
       "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
       "action": "requirement_rebound",
@@ -16043,6 +16033,16 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1788300136729
+    },
+    {
+      "id": "feature_event_45759048ec4c49579056643f3d618f8e",
+      "feature_id": "esk-paper-asset-account-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "服务端与 PC 前端已发布 v0.3.1712，线上 SHA 9ba1c3bbaa42379668b9f0cd0dbaad6037df9aa0；health、版本、PC release marker 和 ESK 未登录 401 均复核通过。生产 ESK 写入仍保持默认 disabled。",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1788301003983
     }
   ]
 }
