@@ -13482,199 +13482,108 @@
       ],
       "created_at_ms": 1788288231346,
       "updated_at_ms": 1788289651051
+    },
+    {
+      "id": "yilong-quant-paper-public-deployment-contract-sync-v1",
+      "title": "一龙量化 Paper 公开部署合同同步 V1",
+      "summary": "同步量化 V9 构建身份、安全部署模板与公网只读验收边界；主项目保持客户端 planned 和入口失败关闭，真实环境继续 deferred。",
+      "status": "verified",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/yilong-quant-paper-public-deployment-contract-sync-v1.md",
+        "content_hash": "e0159774ac9402603d7aa57ac414053c66072eab477d3cbf30fcb1dbdac91c86",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "36d5c783088a9d49b3b21ece3905caa654aa5d6c",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "5155efd414a90861fb74099c7db8a621c7e10d5a",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "platform-integration",
+      "tags": [
+        "quant",
+        "paper-only",
+        "deployment",
+        "documentation",
+        "cross-repo"
+      ],
+      "task_paths": [
+        "AI_INDEX.md",
+        "docs/requirements/yilong-quant-paper-public-deployment-contract-sync-v1.md",
+        "docs/yilong-quant-integration.md",
+        "scripts/test-yilong-quant-paper-public-deployment-sync.ps1"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "接入文档绑定量化 V9 实现提交和三态部署语义。",
+        "量化环境真实公网验收前保持 deferred，主项目入口失败关闭。",
+        "AI_INDEX 可定位需求与接入文档，官方目录和运行代码不变。",
+        "文档门禁和跨仓库合同检查通过，Registry 零漂移。",
+        "提交推送 main 且不触发任何运行环境发布。"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "AI_INDEX.md",
+          "content_hash": "43bb9f20f80fd38fb928c228ad6c56bea72f4ee6a63819df232541e9ade9bc02",
+          "locator": "quant V9 navigation entry",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "36d5c783088a9d49b3b21ece3905caa654aa5d6c",
+            "head_blob_oid": "27469b0da802d02bfc123d901738da8c10a2e4d2",
+            "worktree_blob_oid": "2856f1bd585b1d035dbc4b0d03ec368d63a4077b",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "docs/requirements/yilong-quant-paper-public-deployment-contract-sync-v1.md",
+          "content_hash": "e0159774ac9402603d7aa57ac414053c66072eab477d3cbf30fcb1dbdac91c86",
+          "locator": "verified main-project sync requirement",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "36d5c783088a9d49b3b21ece3905caa654aa5d6c",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "5155efd414a90861fb74099c7db8a621c7e10d5a",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "docs/yilong-quant-integration.md",
+          "content_hash": "4c71513b42bae5042a0ef9b342be3c287beba887568b82f58e98358b795f5917",
+          "locator": "V9 cross-repository deployment states",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "36d5c783088a9d49b3b21ece3905caa654aa5d6c",
+            "head_blob_oid": "a0fb1932f70c9994531788afd2a0eaf7eafd63fc",
+            "worktree_blob_oid": "80fd1b2eb4248dca771e503482fa74c47c9bd8fc",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "scripts/test-yilong-quant-paper-public-deployment-sync.ps1",
+          "content_hash": "31eab9e8bf12eb6fb0289d9179e9b7f6319ce3e04fb507ef40687a0e6838bfa1",
+          "locator": "commit, state, receipt, and planned catalog contract",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "36d5c783088a9d49b3b21ece3905caa654aa5d6c",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "356b9a186db64ca95d6506a3153fac011ce1cb85",
+            "state": "untracked"
+          }
+        }
+      ],
+      "created_at_ms": 1788292671946,
+      "updated_at_ms": 1788293063213
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_33a11a7531054c95a6cfadd722b8e917",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-lock-q6",
-      "reason": "reviewed q6 typed source-only scope, exact 44-member sibling-contention tranche, and closed runtime gates",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1788220524292
-    },
-    {
-      "id": "feature_event_432958c410d74a28a0a5f5e1246ea9a3",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-lock-q6",
-      "reason": "accepted q6 requirement is ready for evidence-bound source implementation",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1788220535437
-    },
-    {
-      "id": "feature_event_a57d9e4627e444f3a88ad34f02671e61",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "claimed",
-      "actor": "codex-goal-lock-q6",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788220545304
-    },
-    {
-      "id": "feature_event_46e866ebc283499daa10b84fea26fc96",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-lock-q6",
-      "reason": "record q6 source-only implementation and static proof receipts; compile and Windows gates remain deferred",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788220556576
-    },
-    {
-      "id": "feature_event_678e0c01dab4486e93a064db9a0c3e69",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-goal-lock-q6",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788220681124
-    },
-    {
-      "id": "feature_event_2b39808b57194a89993ead9f0f8e923b",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-goal-lock-q6",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788220740481
-    },
-    {
-      "id": "feature_event_238269a9be584f4aa2fe6c2036c9ad75",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-goal-lock-q6",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788220797883
-    },
-    {
-      "id": "feature_event_8032c46c6b2846338f39f4454224946d",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-lock-q6",
-      "reason": "q6 source-only evidence recorded; 5826 Lock members, Cargo compile, Windows execution, reviewed quotient digest, and production gates remain outstanding",
-      "from_status": "in_progress",
-      "to_status": "blocked",
-      "at_ms": 1788220814219
-    },
-    {
-      "id": "feature_event_da1b784eabba4cb0b4525b14d13f9162",
-      "feature_id": "backend-external-pool-service-managed-admission-runner-v1",
-      "action": "registered",
-      "actor": "codex/root",
-      "reason": "长期 Goal 的最短真实执行主链；正式登记现有 current authority，并显式保留不可由代理伪造的双人审批硬门。",
-      "from_status": "",
-      "to_status": "accepted",
-      "at_ms": 1788222056465
-    },
-    {
-      "id": "feature_event_b52cd29693fc49b292833ccf6ba79c61",
-      "feature_id": "backend-external-pool-service-managed-admission-runner-v1",
-      "action": "transitioned",
-      "actor": "codex/root",
-      "reason": "需求与验收边界已冻结，进入认领以记录真实外部审批阻塞，不开始伪造实现。",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1788222077713
-    },
-    {
-      "id": "feature_event_f9c062613c8544fab87a319a5c929ff5",
-      "feature_id": "backend-external-pool-service-managed-admission-runner-v1",
-      "action": "claimed",
-      "actor": "codex/root",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788222087400
-    },
-    {
-      "id": "feature_event_ac906f34bcc64290b4131c4f29acb196",
-      "feature_id": "backend-external-pool-service-managed-admission-runner-v1",
-      "action": "transitioned",
-      "actor": "codex/root",
-      "reason": "执行 claim-time gate audit；不生成任何 profile、wire 或运行效果。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788222107877
-    },
-    {
-      "id": "feature_event_b5e0035df36d41dcba10b2b483cfdef6",
-      "feature_id": "backend-external-pool-service-managed-admission-runner-v1",
-      "action": "transitioned",
-      "actor": "codex/root",
-      "reason": "非代理硬门未满足：缺两名不同 authenticated admin|owner 的真实四眼 market profile 审批及五类 semantic wire profile/evidence set；按 authority 禁止 placeholder、代理 actor 或半纵切。",
-      "from_status": "in_progress",
-      "to_status": "blocked",
-      "at_ms": 1788222118342
-    },
-    {
-      "id": "feature_event_5b10ff52ac574aa287079f84a0818644",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex/root",
-      "reason": "开始 q7 192-member ordinary callback-completion RouteUnknown source tranche；复用真实 lower outcomes，继续保持未编译/未运行与生产关闭。",
-      "from_status": "blocked",
-      "to_status": "ready",
-      "at_ms": 1788222128265
-    },
-    {
-      "id": "feature_event_d0322da9d0024861bd80d4b860a0a3b4",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "claimed",
-      "actor": "codex/root",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788222137725
-    },
-    {
-      "id": "feature_event_ed39798b5be44a8c86358c715042e5c1",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex/root",
-      "reason": "实现 q7 192-member callback-completion RouteUnknown source tranche；严格不编译、不运行，不开放生产效果。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788222148129
-    },
-    {
-      "id": "feature_event_cb36ba4de0fc47a4b288e962b7c40232",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex/root",
-      "reason": "q7 source tranche is written and statically reviewed; requirement docs intentionally changed, while 5634 programs, compile/runtime execution, and reviewed inventory digest remain missing.",
-      "from_status": "in_progress",
-      "to_status": "blocked",
-      "at_ms": 1788225149309
-    },
-    {
-      "id": "feature_event_0bc14fb7b0684deebcb74afbf4cac9a5",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "requirement_rebound",
-      "actor": "codex/root",
-      "reason": "Rebind the intentional q7 authority update after source-only review and modularity split.",
-      "from_status": "blocked",
-      "to_status": "proposed",
-      "at_ms": 1788225178483
-    },
-    {
-      "id": "feature_event_a99641127f9c48dd97fb9123552c27a1",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "metadata_updated",
-      "actor": "codex/root",
-      "reason": "Document modularity guard required the q5-q7 detailed contract to move into a focused sibling authority document.",
-      "from_status": "proposed",
-      "to_status": "proposed",
-      "at_ms": 1788225208447
-    },
     {
       "id": "feature_event_db1da42cf66c40b8bd047975f8b64356",
       "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
@@ -15484,6 +15393,196 @@
       "from_status": "in_progress",
       "to_status": "blocked",
       "at_ms": 1788291452639
+    },
+    {
+      "id": "feature_event_969b1480a18043b5b552ef683754c57a",
+      "feature_id": "yilong-quant-paper-public-deployment-contract-sync-v1",
+      "action": "registered",
+      "actor": "codex-goal-quant-public-deployment-sync-v1",
+      "reason": "",
+      "from_status": "",
+      "to_status": "accepted",
+      "at_ms": 1788292671946
+    },
+    {
+      "id": "feature_event_d004e77cc0484df3b4fcfcfa096aa76b",
+      "feature_id": "yilong-quant-paper-public-deployment-contract-sync-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-quant-public-deployment-sync-v1",
+      "reason": "量化 V9 已在独立仓库验证并推送，主项目同步范围明确且无运行代码依赖。",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1788292681479
+    },
+    {
+      "id": "feature_event_1d13bff21a1f464bbbcc513365d9551a",
+      "feature_id": "yilong-quant-paper-public-deployment-contract-sync-v1",
+      "action": "claimed",
+      "actor": "codex-goal-quant-public-deployment-sync-v1",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788292691071
+    },
+    {
+      "id": "feature_event_e7474ef0ee9d47d6b3587d5c69bd2416",
+      "feature_id": "yilong-quant-paper-public-deployment-contract-sync-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-quant-public-deployment-sync-v1",
+      "reason": "已认领量化 V9 主项目文档同步责任区。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788292700667
+    },
+    {
+      "id": "feature_event_b6f35129252440e19c21892247209b10",
+      "feature_id": "yilong-quant-paper-public-deployment-contract-sync-v1",
+      "action": "claim_released",
+      "actor": "codex-goal-quant-public-deployment-sync-v1",
+      "reason": "在实现前补入可重复的跨仓库文案与 catalog planned 状态合同测试路径。",
+      "from_status": "in_progress",
+      "to_status": "ready",
+      "at_ms": 1788292735735
+    },
+    {
+      "id": "feature_event_b1af0da85f9f4aeba49032a6cd603c4f",
+      "feature_id": "yilong-quant-paper-public-deployment-contract-sync-v1",
+      "action": "metadata_updated",
+      "actor": "codex-goal-quant-public-deployment-sync-v1",
+      "reason": "新增可重复验证量化提交、三态语义和官方目录 planned 状态的合同测试。",
+      "from_status": "ready",
+      "to_status": "proposed",
+      "at_ms": 1788292745836
+    },
+    {
+      "id": "feature_event_079f00e3f76c45a7b95f2d58ae5f8023",
+      "feature_id": "yilong-quant-paper-public-deployment-contract-sync-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-quant-public-deployment-sync-v1",
+      "reason": "已复核新增测试只固化现有 V9 文档与 planned 边界，不引入运行代码或部署动作。",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1788292754780
+    },
+    {
+      "id": "feature_event_7eebdd8cfdcd4bd1a3d7140b4bfdd017",
+      "feature_id": "yilong-quant-paper-public-deployment-contract-sync-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-quant-public-deployment-sync-v1",
+      "reason": "文档与合同测试范围已接受，无依赖阻塞。",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1788292763470
+    },
+    {
+      "id": "feature_event_7725e421d169434fb0db5ef809101d5b",
+      "feature_id": "yilong-quant-paper-public-deployment-contract-sync-v1",
+      "action": "claimed",
+      "actor": "codex-goal-quant-public-deployment-sync-v1",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788292772249
+    },
+    {
+      "id": "feature_event_2a2d8f142639461da749655fd0a56a9c",
+      "feature_id": "yilong-quant-paper-public-deployment-contract-sync-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-quant-public-deployment-sync-v1",
+      "reason": "已认领主项目 V9 文档和合同测试责任区。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788292781191
+    },
+    {
+      "id": "feature_event_e18d556830354a80b165f61f6a5f5379",
+      "feature_id": "yilong-quant-paper-public-deployment-contract-sync-v1",
+      "action": "claim_released",
+      "actor": "codex-goal-quant-public-deployment-sync-v1",
+      "reason": "同步文档与合同测试已通过，更新正式需求实现状态后重绑最终正文。",
+      "from_status": "in_progress",
+      "to_status": "blocked",
+      "at_ms": 1788292956762
+    },
+    {
+      "id": "feature_event_2c2484ec743648c6a778371f62153653",
+      "feature_id": "yilong-quant-paper-public-deployment-contract-sync-v1",
+      "action": "requirement_rebound",
+      "actor": "codex-goal-quant-public-deployment-sync-v1",
+      "reason": "文档与合同验证完成，正式需求实现元数据更新为 verified。",
+      "from_status": "blocked",
+      "to_status": "proposed",
+      "at_ms": 1788292965666
+    },
+    {
+      "id": "feature_event_d18bbacd6bbf473e8361662503e60aed",
+      "feature_id": "yilong-quant-paper-public-deployment-contract-sync-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-quant-public-deployment-sync-v1",
+      "reason": "最终需求正文、三态边界和测试范围已复核，真实环境仍 deferred。",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1788292974858
+    },
+    {
+      "id": "feature_event_10543e8b236b4718845d5786ebc064fc",
+      "feature_id": "yilong-quant-paper-public-deployment-contract-sync-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-quant-public-deployment-sync-v1",
+      "reason": "最终 V9 同步需求已接受且无依赖阻塞。",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1788292985004
+    },
+    {
+      "id": "feature_event_581f8ea04829490da191042a0353a424",
+      "feature_id": "yilong-quant-paper-public-deployment-contract-sync-v1",
+      "action": "claimed",
+      "actor": "codex-goal-quant-public-deployment-sync-v1",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788292997973
+    },
+    {
+      "id": "feature_event_2a7762cef1ee48eba2f81d02a4a7e503",
+      "feature_id": "yilong-quant-paper-public-deployment-contract-sync-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-quant-public-deployment-sync-v1",
+      "reason": "最终 V9 同步文件已锁定，准备绑定文档与测试证据。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788293014394
+    },
+    {
+      "id": "feature_event_801a94ff46cf415bbe890a8679a31024",
+      "feature_id": "yilong-quant-paper-public-deployment-contract-sync-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-goal-quant-public-deployment-sync-v1",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788293042686
+    },
+    {
+      "id": "feature_event_29eea5ae30d14cca8a2f3f1c9ce3066a",
+      "feature_id": "yilong-quant-paper-public-deployment-contract-sync-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-quant-public-deployment-sync-v1",
+      "reason": "主项目 V9 接入文档、AI 导航和 planned 状态合同测试已实现并绑定。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1788293052210
+    },
+    {
+      "id": "feature_event_f601211a2cd0407388b8662938c017b8",
+      "feature_id": "yilong-quant-paper-public-deployment-contract-sync-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-quant-public-deployment-sync-v1",
+      "reason": "V9 同步合同、官方目录 planned 合同、源码体积与文档模块化门禁均通过；没有发布运行环境。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1788293063213
     }
   ]
 }

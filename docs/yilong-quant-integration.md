@@ -51,6 +51,8 @@
 - 子仓库实现提交 `7e943798050a63929e439a342cefa9b4f589028c`（交付证据 `520d15bb6b88d4f281efb4dd3ac46fc71877e847`）已完成 Paper 模拟仓位操作 V6：运营令牌可为已有活跃仓位追加模拟 NET 配额并按当前 NAV 增发内部份额；用户既有 `paper.redemption.request` scope 可申请部分或全额退出，部分结算后剩余份额继续按模拟 NAV 承担盈亏。新事件追加写入 SQLite 并兼容历史全额退出事件；用户不能自行增加余额，所有数据仍是 `simulated=true`。
 - 子仓库提交 `2c9327ec94ff2a80e1a94115de9aa784eb63b5f7` 已完成 Paper 授权密钥轮换 V7：量化 verifier 固定信任 1–8 个公开 Ed25519 key，支持新 active 与旧 retiring key 按签发时间窗重叠验证，并让 revoked key 立即失败关闭；旧单 key 配置保持兼容但不能与 managed keyring 混用。主项目仍只持有一个当前签名私钥，双方不共享 seed、subject secret 或动态网络信任。
 - 子仓库提交 `ba56940dffdffda6e487a5ae8ea2a577431119fc` 已完成 Paper 单次授权持久撤销 V8：用户只能撤销当前已验签 grant；量化服务只在本地 SQLite 保存 `grant_id`、过期时间和撤销时间，重启后继续拒绝该 grant，不保存完整 token、participant、账户或仓位。该动作只结束本次访问授权，不退出模拟仓位、不修改主项目会话，也不构成真实提现。主项目 grant 载荷、五分钟有效期、scope、签发和 exact-origin 内存传递协议保持不变。
+- 子仓库提交 `0b87604e9105d7b0c1e4ba0da6b8b2c3c43d6ddc` 已完成 Paper 公开部署合同 V9：API `/api/health` 绑定编译时 40 位 Git SHA，仓库提供不含秘密的 loopback systemd、标准 HTTPS 443 Nginx 和环境模板，以及只发送 PWA `/`、`/api/health`、`/api/v1/runtime` 三个无凭据 GET 的公网验收器。它会拒绝 HTTP/loopback、错误提交、宽松 CSP/CORS、响应秘密标记、非 Paper runtime、`live_trading_enabled=true`、`funds_moved=true` 或错误 parent origin。离线 fixture 已验证但没有访问目标环境，因此当前只达到 `deployment_contract_verified`。
+- V9 固定区分三种状态：`configuration_ready` 只证明量化进程配置形状，`deployment_contract_verified` 只证明模板和离线合同，`environment_deployed` 才表示批准的量化 HTTPS origin 已由 `scripts/check-paper-public-deployment.ps1` 真实读取并返回 `scope=public_https_read_only`、`network_calls_made=true`、`status=ready`。主项目只能在第三种状态后配置量化 Paper Web URL；不得用当前 HTTP 主站、未知 HTTPS 主机、关闭证书校验或放宽 exact-origin/CSP 临时上线。
 - `contracts/quant/net-balance-lock-receipt-v1.schema.json` 已定义主项目未来锁定 NET 后交给量化项目消费的版本化回执形状；详细语义见 `docs/yilong-quant-net-lock-receipt-v1.md`。
 - `POST /api/me/quant/paper-access-grants` 已复用主项目现有 bearer 会话，可在独立签名配置启用后签发最多五分钟的 Ed25519 paper grant；量化项目只获得项目专用脱敏 subject 和明确 scope，不获得主项目 bearer 或用户资料。契约见 `docs/yilong-quant-paper-access-grant-v1.md` 与 `contracts/quant/paper-access-grant-v1.schema.json`。
 - `GET /api/me/quant/paper-launch` 与 `POST /api/me/quant/paper-launches` 提供失败关闭的 readiness 和一次性启动票据；PC 项目主页通过 exact-origin iframe、`event.source`、nonce、attempt ID 和过期时间绑定，把 grant 只传给当前量化子页面。双方契约见 `docs/yilong-quant-paper-launch-v1.md` 与 `contracts/quant/paper-launch-v1.schema.json`。
@@ -59,7 +61,7 @@
 
 ## 尚未完成
 
-- 在目标环境执行 Paper 部署配置预检和脱敏运营快照检查，以及完成公开 Web 部署、CSP/`frame-ancestors` 上线配置、主项目签名私钥托管和一次真实轮换演练。代码已支持量化端多 key 重叠、密钥级撤销和单 grant 跨重启撤销；当前用户 grant 仍只绑定 paper 模拟参与者，不证明付款、KYC、钱包或真实准入。
+- 为量化项目分配并批准独立 HTTPS origin、证书和服务器权限，在目标环境执行 Paper 配置预检与脱敏运营快照检查，发布由提交身份绑定的 PWA/API，再运行 V9 公网只读验收；通过前官方目录 Web 继续为 `planned`，主项目不得配置 Paper Web URL。随后还需完成主项目签名私钥托管和一次真实轮换演练。代码已支持量化端多 key 重叠、密钥级撤销和单 grant 跨重启撤销；当前用户 grant 仍只绑定 paper 模拟参与者，不证明付款、KYC、钱包或真实准入。
 - 经来源与许可评审的真实公开历史行情、多策略比较、回测结果持久化和共享算力分片；当前只有仓库内置 CC0 确定性研究 fixture 与单机基准策略。
 - 将已付款用户数据经审核、脱敏、对账后导入生产系统；paper 子项目只允许脱敏标识和模拟锁定回执，继续禁止把聊天或付款截图写入代码。
 - 用户自助追加模拟配额、真实申购或真实 NET 锁定；当前 V6 追加能力只接受独立运营令牌，主项目 grant 不获得增加余额的 scope。
