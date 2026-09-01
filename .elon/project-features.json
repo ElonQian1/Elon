@@ -13487,7 +13487,7 @@
       "id": "yilong-quant-paper-public-deployment-contract-sync-v1",
       "title": "一龙量化 Paper 公开部署合同同步 V1",
       "summary": "同步量化 V9 构建身份、安全部署模板与公网只读验收边界；主项目保持客户端 planned 和入口失败关闭，真实环境继续 deferred。",
-      "status": "verified",
+      "status": "released",
       "priority": "p1",
       "requirement": {
         "path": "docs/requirements/yilong-quant-paper-public-deployment-contract-sync-v1.md",
@@ -13580,20 +13580,10 @@
         }
       ],
       "created_at_ms": 1788292671946,
-      "updated_at_ms": 1788293063213
+      "updated_at_ms": 1788293158845
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_db1da42cf66c40b8bd047975f8b64356",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex/root",
-      "reason": "Reviewed the rebound q7 authority and focused tranche document against the frozen static denominator and source-only red-team evidence.",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1788225218751
-    },
     {
       "id": "feature_event_5f24a4f5fb44499a82d5fddfdb61f1f3",
       "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
@@ -15583,6 +15573,16 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1788293063213
+    },
+    {
+      "id": "feature_event_90a2fb58ccb445e08c435bdbe748ee73",
+      "feature_id": "yilong-quant-paper-public-deployment-contract-sync-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-quant-public-deployment-sync-v1",
+      "reason": "主项目文档提交 11387a04755985e35e1f5c075e8335124ea1a9c2 已推送 origin/main；本次不发布任何运行环境。",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1788293158845
     }
   ]
 }
