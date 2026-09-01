@@ -16,6 +16,7 @@ use super::{
 };
 
 #[cfg(all(test, windows))]
+#[path = "node_initialization/created_first_truncate_error_release_succeeded.rs"]
 mod created_first_truncate_error_release_succeeded;
 impl ManagedSqliteShmCoordinator {
     pub(super) fn ensure_node<'state>(

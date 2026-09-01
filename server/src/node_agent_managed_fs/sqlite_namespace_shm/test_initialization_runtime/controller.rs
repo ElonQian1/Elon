@@ -13,6 +13,7 @@ use super::model::{
     ManagedSqliteShmTestInitializationNativeReceiptV1, ManagedSqliteShmTestInitializationReceiptV1,
 };
 
+#[path = "controller/created_first_truncate_error_release_succeeded.rs"]
 mod created_first_truncate_error_release_succeeded;
 
 type ExactTarget = (u64, u64);
