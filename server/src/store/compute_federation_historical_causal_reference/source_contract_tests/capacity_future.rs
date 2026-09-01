@@ -4,8 +4,22 @@ const CAPACITY: &str = include_str!("../capacity_future/capacity.rs");
 const INSTRUMENT_HISTORY: &str = include_str!("../../compute_capacity_instruments/historical.rs");
 const INSTRUMENT_READ: &str = include_str!("../../compute_capacity_instruments/read.rs");
 const ALLOCATION_HISTORY: &str = include_str!("../../compute_delivery_allocations/historical.rs");
+const ALLOCATION_READ: &str = include_str!("../../compute_delivery_allocations/read.rs");
 const ALLOCATION_AUDIT: &str = include_str!("../../compute_delivery_allocations/read/audit.rs");
 const OFFER_PUBLICATIONS: &str = include_str!("../../compute_offer_publications.rs");
+const PRICE_SNAPSHOTS: &str = include_str!("../../compute_price_snapshot_registry.rs");
+const ATTEMPT_EXECUTION_RECEIPTS: &str = include_str!("../../compute_attempt_execution_receipts.rs");
+const ATTEMPT_VERIFICATIONS: &str = include_str!("../../compute_attempt_verifications.rs");
+const ATTEMPT_SETTLEMENTS: &str = include_str!("../../compute_attempt_settlements.rs");
+const ATTEMPT_SETTLEMENT_SUPPORT: &str =
+    include_str!("../../compute_attempt_settlements/support.rs");
+const ATTEMPT_RELEASES: &str = include_str!("../../compute_attempt_settlement_releases.rs");
+const ATTEMPT_RELEASE_SUPPORT: &str =
+    include_str!("../../compute_attempt_settlement_releases/support.rs");
+const EXECUTION_RESOLVER: &str = include_str!("../execution.rs");
+const VERIFICATION_RESOLVER: &str = include_str!("../verification.rs");
+const SETTLEMENT_RESOLVER: &str = include_str!("../settlement.rs");
+const RELEASE_RESOLVER: &str = include_str!("../release.rs");
 const COMMITMENT_VALIDATION: &str =
     include_str!("../../compute_capacity_commitments/validation.rs");
 const VERIFICATION_AUDIT: &str =
@@ -165,6 +179,81 @@ fn capacity_and_usage_equations_reuse_native_owner_formulas() {
     assert!(SETTLEMENT_AUDIT.contains("calculate_settlement(&snapshot, &execution.receipt"));
     assert!(!OWNERS.contains("verified_usage_digest =="));
     assert!(!OWNERS.contains("compensable_usage_digest =="));
+}
+
+#[test]
+fn capacity_future_historical_owner_chain_reaches_native_audits() {
+    for marker in [
+        "SELECT COUNT(*), MIN(grant_id), MIN(reservation_claim_id)",
+        "WHERE terminal_status='exercised' AND reservation_id=?1",
+        "owner_count != 1",
+        "stored_claim_id != claim_id",
+    ] {
+        assert!(
+            ALLOCATION_READ.contains(marker),
+            "missing v228 owner fence {marker}"
+        );
+    }
+    for (source, marker) in [
+        (
+            PRICE_SNAPSHOTS,
+            "audited_price_snapshot_with_offer_policy_on(conn, &stored, true)",
+        ),
+        (
+            ATTEMPT_EXECUTION_RECEIPTS,
+            "execution_receipt_historical_envelope_on(conn, stored)",
+        ),
+        (
+            ATTEMPT_VERIFICATIONS,
+            "verification_decision_receipt_with_source_policy_on(conn, stored, false, true)",
+        ),
+        (ATTEMPT_SETTLEMENTS, "stored.into_historical_receipt(conn)"),
+        (
+            ATTEMPT_SETTLEMENT_SUPPORT,
+            "audit::audited_historical_settlement_on(conn, self)",
+        ),
+        (ATTEMPT_RELEASES, "stored.into_historical_receipt(conn)"),
+        (
+            ATTEMPT_RELEASE_SUPPORT,
+            "audit::audited_historical_release_on(conn, self)",
+        ),
+        (
+            EXECUTION_RESOLVER,
+            "compute_attempt_execution_receipt_by_id_on(conn, execution_receipt_id)",
+        ),
+        (
+            VERIFICATION_RESOLVER,
+            "compute_attempt_historical_verification_decision_on(conn, lease_id)",
+        ),
+        (
+            SETTLEMENT_RESOLVER,
+            "compute_attempt_settlement_by_receipt_id_on(conn, settlement_receipt_id)",
+        ),
+        (
+            RELEASE_RESOLVER,
+            "compute_attempt_historical_settlement_by_lease_on(conn, &release.lease_id)",
+        ),
+    ] {
+        assert!(source.contains(marker), "historical owner chain lost {marker}");
+    }
+    assert!(VERIFICATION_AUDIT.contains("audit_verification_decision("));
+    assert!(VERIFICATION_AUDIT
+        .contains("verification_usage_digest(\"verified\", &expected_verified)"));
+    assert!(SETTLEMENT_AUDIT.contains("audited_historical_settlement_on("));
+    assert!(SETTLEMENT_AUDIT.contains("calculate_settlement(&snapshot, &execution.receipt"));
+    assert!(SETTLEMENT_AUDIT.contains(".settlement_account_id"));
+    assert!(SETTLEMENT_AUDIT
+        .contains(".unwrap_or(provider.provider.owner_account_id.as_str())"));
+    assert!(SETTLEMENT_AUDIT
+        .contains("receipt.settlement.provider_account_id != provider_account_id"));
+    for source in [
+        EXECUTION_RESOLVER,
+        VERIFICATION_RESOLVER,
+        SETTLEMENT_RESOLVER,
+        RELEASE_RESOLVER,
+    ] {
+        assert_static_read_only(source);
+    }
 }
 
 #[test]

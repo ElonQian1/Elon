@@ -410,17 +410,34 @@ pub(in crate::store) fn persisted_historical_delivery_allocation_reservation_aut
     reservation_id: &str,
     claim_id: &str,
 ) -> Result<Option<DeliveryAllocationReservationAuthority>> {
-    let grant_id = conn
-        .query_row(
-            "SELECT grant_id FROM compute_delivery_allocation_terminal_receipts
-              WHERE terminal_status='exercised' AND reservation_id=?1 AND reservation_claim_id=?2",
-            params![reservation_id, claim_id],
-            |row| row.get::<_, String>(0),
-        )
-        .optional()?;
-    let Some(grant_id) = grant_id else {
+    let (owner_count, grant_id, stored_claim_id) = conn.query_row(
+        "SELECT COUNT(*), MIN(grant_id), MIN(reservation_claim_id)
+           FROM compute_delivery_allocation_terminal_receipts
+          WHERE terminal_status='exercised' AND reservation_id=?1",
+        params![reservation_id],
+        |row| {
+            Ok((
+                row.get::<_, i64>(0)?,
+                row.get::<_, Option<String>>(1)?,
+                row.get::<_, Option<String>>(2)?,
+            ))
+        },
+    )?;
+    if owner_count == 0 {
         return Ok(None);
-    };
+    }
+    if owner_count != 1 {
+        bail!("persisted historical DeliveryAllocation authority cardinality drifted");
+    }
+    let grant_id = grant_id.ok_or_else(|| {
+        anyhow!("persisted historical DeliveryAllocation authority lacks Grant index")
+    })?;
+    let stored_claim_id = stored_claim_id.ok_or_else(|| {
+        anyhow!("persisted historical DeliveryAllocation authority lacks Claim index")
+    })?;
+    if stored_claim_id != claim_id {
+        bail!("persisted historical DeliveryAllocation authority Claim index drifted");
+    }
     let grant = historical_grant_by_id_on(conn, &grant_id)?
         .ok_or_else(|| anyhow!("persisted historical DeliveryAllocation authority 缺少 Grant"))?;
     let terminal = raw_terminal_by_grant_on(conn, &grant)?.ok_or_else(|| {

@@ -433,7 +433,12 @@ fn validate_execution_source_equations(
                 "Execution Receipt Offer version"
             )? == execution.offer.offer_version
             && execution_receipt.offer_digest == execution.offer.offer_digest
-            && execution_receipt.verification.status == VERIFICATION_STATUS_ACCEPTED,
+            && execution_receipt.verification.status == VERIFICATION_STATUS_ACCEPTED
+            && execution_receipt.verification.decision_digest
+                == canonical_sources
+                    .verification
+                    .verification_decision
+                    .verification_event_digest,
         "capacity-future v193 Execution Receipt differs from execution source"
     );
     ensure!(

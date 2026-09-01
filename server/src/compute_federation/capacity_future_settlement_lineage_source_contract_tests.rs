@@ -95,6 +95,8 @@ fn source_equations_keep_v192_and_v195_usage_digest_domains_distinct() {
         "execution_verification_source",
         "execution_receipt.receipt_id",
         "execution_receipt.verification.status",
+        "execution_receipt.verification.decision_digest",
+        "verification_event_digest",
         "settlement_usage_digests",
         "verified_usage_digest: sources",
         "compensable_usage_digest: sources",
