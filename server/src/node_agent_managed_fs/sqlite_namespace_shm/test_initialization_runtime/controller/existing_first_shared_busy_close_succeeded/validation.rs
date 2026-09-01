@@ -2,18 +2,16 @@
 
 use crate::node_agent_managed_fs::ManagedSqliteFileKind;
 
-use super::state::{ArmedQ19ObservationV1, EventCounts, Stage};
-use super::super::super::model::lock_action_tag;
 use super::super::super::super::{
     test_lock_runtime::{ManagedSqliteShmTestLockPath, ManagedSqliteShmTestLockReceipt},
     test_snapshot::{ManagedSqliteShmTestDmsCustody, ManagedSqliteShmTestTargetSnapshot},
     types::SHM_DMS_OFFSET,
 };
+use super::super::super::model::lock_action_tag;
 use super::super::ExactTarget;
+use super::state::{ArmedQ19ObservationV1, EventCounts, Stage};
 
-pub(super) fn validate_completion(
-    active: &ArmedQ19ObservationV1,
-) -> Result<(), &'static str> {
+pub(super) fn validate_completion(active: &ArmedQ19ObservationV1) -> Result<(), &'static str> {
     if active.violation.is_some()
         || active.stage != Stage::TargetCloseSucceeded
         || active.pending != 0

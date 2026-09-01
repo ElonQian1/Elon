@@ -4,8 +4,7 @@ use crate::node_agent_managed_fs::ManagedSqliteFileKind;
 
 use super::super::super::{
     test_lock_runtime::ManagedSqliteShmTestLockReceipt,
-    test_snapshot::ManagedSqliteShmTestTargetSnapshot,
-    types::ManagedSqliteShmLockRequest,
+    test_snapshot::ManagedSqliteShmTestTargetSnapshot, types::ManagedSqliteShmLockRequest,
 };
 use super::super::{
     existing_first_shared_busy_close_succeeded::ManagedSqliteShmTestQ19DmsHolderLeaseV1,
@@ -336,7 +335,8 @@ impl ExistingFirstSharedBusyCloseSucceededControllerV1 {
         counter: impl FnOnce(&mut EventCounts) -> &mut u8,
         code: &'static str,
     ) -> Result<bool, &'static str> {
-        self.require(target)?.advance(required, next, counter, code)?;
+        self.require(target)?
+            .advance(required, next, counter, code)?;
         Ok(true)
     }
 

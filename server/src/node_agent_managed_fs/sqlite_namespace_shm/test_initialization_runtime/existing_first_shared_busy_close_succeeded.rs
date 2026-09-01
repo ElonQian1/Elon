@@ -10,6 +10,7 @@ use crate::node_agent_managed_fs::{
     PinnedManagedSqliteFile, PlatformManagedSqliteLockAttempt,
 };
 
+use super::super::{test_faults::ManagedSqliteShmTestTargetObserver, types::SHM_DMS_OFFSET};
 use super::{
     model::{
         ManagedSqliteShmTestExistingFirstSharedBusyCloseSucceededReceiptV1,
@@ -17,10 +18,6 @@ use super::{
         ManagedSqliteShmTestInitializationFailureV1,
     },
     CONTROLLER_POISONED,
-};
-use super::super::{
-    test_faults::ManagedSqliteShmTestTargetObserver,
-    types::SHM_DMS_OFFSET,
 };
 
 pub(in crate::node_agent_managed_fs::sqlite_namespace::shm) struct ManagedSqliteShmTestQ19DmsHolderLeaseV1

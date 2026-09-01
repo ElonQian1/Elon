@@ -20,12 +20,12 @@ mod created_first_shared_busy_close_succeeded;
 mod created_first_truncate_error_release_failed;
 #[path = "controller/created_first_truncate_error_release_succeeded.rs"]
 mod created_first_truncate_error_release_succeeded;
+#[path = "controller/existing_first_shared_busy_close_succeeded.rs"]
+mod existing_first_shared_busy_close_succeeded;
 #[path = "controller/existing_first_truncate_error_release_failed.rs"]
 mod existing_first_truncate_error_release_failed;
 #[path = "controller/existing_first_truncate_error_release_succeeded.rs"]
 mod existing_first_truncate_error_release_succeeded;
-#[path = "controller/existing_first_shared_busy_close_succeeded.rs"]
-mod existing_first_shared_busy_close_succeeded;
 type ExactTarget = (u64, u64);
 
 macro_rules! delegate_shared_busy {

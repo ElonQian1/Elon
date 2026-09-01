@@ -16,9 +16,7 @@ pub(super) fn lock_q19_expected_groups_after_v1(
         groups.len(),
         LOCK_EXISTING_FIRST_SHARED_BUSY_CLOSE_SUCCEEDED_MEMBER_COUNT
     );
-    assert!(groups
-        .iter()
-        .all(|(key, _)| !prior_keys.contains(key)));
+    assert!(groups.iter().all(|(key, _)| !prior_keys.contains(key)));
     assert_eq!(
         groups
             .iter()

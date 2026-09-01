@@ -147,8 +147,10 @@ impl ManagedSqliteRoutedConnectionFixture {
         &self,
         expectation: ManagedSqliteShmTestInitializationExpectationV1,
         raw_flags: c_int,
-    ) -> Result<PendingManagedTestLockExistingFirstSharedBusyCloseSucceededObservationV1, &'static str>
-    {
+    ) -> Result<
+        PendingManagedTestLockExistingFirstSharedBusyCloseSucceededObservationV1,
+        &'static str,
+    > {
         let witness = self
             .route_entry
             .as_ref()

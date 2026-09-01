@@ -4,11 +4,11 @@ use std::thread::ThreadId;
 
 use crate::node_agent_managed_fs::ManagedSqliteFileKind;
 
-use super::super::{ColdPrestateV1, ExactTarget};
 use super::super::super::{
     existing_first_shared_busy_close_succeeded::ManagedSqliteShmTestQ19DmsHolderLeaseV1,
     model::ManagedSqliteShmTestInitializationExpectationV1,
 };
+use super::super::{ColdPrestateV1, ExactTarget};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum Stage {

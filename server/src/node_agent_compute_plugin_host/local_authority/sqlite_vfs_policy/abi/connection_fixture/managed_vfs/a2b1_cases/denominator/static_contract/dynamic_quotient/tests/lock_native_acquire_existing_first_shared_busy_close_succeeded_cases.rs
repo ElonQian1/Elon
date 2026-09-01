@@ -43,7 +43,8 @@ pub(super) struct FrozenLockExistingFirstSharedBusyCloseSucceededLeafV1 {
     pub(super) member: StaticMemberSealV1,
 }
 
-pub(super) fn frozen_lock_existing_first_shared_busy_close_succeeded_leaves_v1() -> &'static BTreeMap<
+pub(super) fn frozen_lock_existing_first_shared_busy_close_succeeded_leaves_v1(
+) -> &'static BTreeMap<
     FrozenLockExistingFirstSharedBusyCloseSucceededCaseV1,
     FrozenLockExistingFirstSharedBusyCloseSucceededLeafV1,
 > {
