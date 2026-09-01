@@ -1,17 +1,17 @@
 use serde::{Deserialize, Serialize};
 
-use crate::compute_federation::capacity::{
-    ComputeCapacityClaimBinding, ComputeCapacityPoolBinding,
-};
-
 pub(crate) use super::authority::{
     InteractiveDesktopHostConsentBinding, InteractiveDesktopRelayAuthorityBinding,
 };
+pub(crate) use super::authority_head::InteractiveDesktopAuthorityHead;
+pub(crate) use super::reservation::{
+    InteractiveDesktopFederationBinding, InteractiveDesktopPriceSnapshotBinding,
+    InteractiveDesktopReservationBinding, InteractiveDesktopSessionReservationBinding,
+};
 use super::{
     offer::{
-        InteractiveDesktopConnectivityPolicy, InteractiveDesktopMarketAccess,
-        InteractiveDesktopOfferBinding, InteractiveDesktopProductMode,
-        InteractiveDesktopSurfaceKind, InteractiveDesktopTransportPath,
+        InteractiveDesktopProductMode, InteractiveDesktopSurfaceKind,
+        InteractiveDesktopTransportPath,
     },
     INTERACTIVE_DESKTOP_SERVICE_CLASS,
 };
@@ -41,61 +41,6 @@ pub(crate) const INTERACTIVE_DESKTOP_MEDIA_EPOCH_DIGEST_DOMAIN: &str =
     "ELON-COMPUTE-INTERACTIVE-DESKTOP-MEDIA-EPOCH-V1";
 pub(crate) const INTERACTIVE_DESKTOP_CONTROL_EPOCH_DIGEST_DOMAIN: &str =
     "ELON-COMPUTE-INTERACTIVE-DESKTOP-CONTROL-EPOCH-V1";
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
-pub(crate) struct InteractiveDesktopPriceSnapshotBinding {
-    pub price_snapshot_id: String,
-    pub price_snapshot_digest: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
-pub(crate) struct InteractiveDesktopReservationBinding {
-    pub reservation_id: String,
-    pub reservation_revision: i64,
-    pub reservation_digest: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
-pub(crate) struct InteractiveDesktopFederationBinding {
-    pub binding_digest: String,
-    pub provider_id: String,
-    pub consumer_account_id: String,
-    pub offer: InteractiveDesktopOfferBinding,
-    pub price_snapshot: InteractiveDesktopPriceSnapshotBinding,
-    pub reservation: InteractiveDesktopReservationBinding,
-    pub capacity_pool: ComputeCapacityPoolBinding,
-    pub capacity_claim: ComputeCapacityClaimBinding,
-}
-
-impl InteractiveDesktopFederationBinding {
-    pub(crate) fn has_complete_reference(&self) -> bool {
-        !self.binding_digest.is_empty()
-            && !self.provider_id.is_empty()
-            && !self.consumer_account_id.is_empty()
-            && self.offer.provider_id == self.provider_id
-            && !self.offer.offer_id.is_empty()
-            && self.offer.offer_version > 0
-            && !self.offer.offer_digest.is_empty()
-            && !self.offer.profile_id.is_empty()
-            && self.offer.profile_version > 0
-            && !self.offer.profile_digest.is_empty()
-            && !self.price_snapshot.price_snapshot_id.is_empty()
-            && !self.price_snapshot.price_snapshot_digest.is_empty()
-            && !self.reservation.reservation_id.is_empty()
-            && self.reservation.reservation_revision > 0
-            && !self.reservation.reservation_digest.is_empty()
-            && !self.capacity_pool.pool_id.is_empty()
-            && self.capacity_pool.capacity_epoch > 0
-            && self.capacity_pool.pool_revision > 0
-            && !self.capacity_pool.pool_digest.is_empty()
-            && !self.capacity_claim.claim_id.is_empty()
-            && self.capacity_claim.claim_revision > 0
-            && !self.capacity_claim.claim_digest.is_empty()
-    }
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -198,7 +143,8 @@ pub(crate) struct InteractiveDesktopSessionRequest {
     pub request_digest: String,
     pub session_id: String,
     pub idempotency_key: String,
-    pub binding: InteractiveDesktopFederationBinding,
+    pub consumer_account_id: String,
+    pub requested_product_mode: InteractiveDesktopProductMode,
     pub viewer_relationship: InteractiveDesktopViewerRelationship,
     pub requested_surface_kind: InteractiveDesktopSurfaceKind,
     pub requested_permissions: InteractiveDesktopPermissionSet,
@@ -206,20 +152,25 @@ pub(crate) struct InteractiveDesktopSessionRequest {
     pub requested_height_px: u32,
     pub requested_frame_rate_milli_hz: u64,
     pub requested_duration_ms: u64,
+    pub requested_currency: String,
+    pub consumer_max_amount_micros: u64,
+    pub acceptable_transport_paths: Vec<InteractiveDesktopTransportPath>,
+    pub requested_region_or_data_zone: String,
     pub requested_at_ms: i64,
     pub connect_deadline_ms: i64,
 }
 
 impl InteractiveDesktopSessionRequest {
-    pub(crate) fn has_safe_product_boundary(&self) -> bool {
+    /// Demand shape only. Provider, Offer, Price, Claim and relationship authority are selected by
+    /// and frozen in a later `InteractiveDesktopSessionReservation`.
+    pub(crate) fn has_safe_request_shape(&self) -> bool {
         self.schema == INTERACTIVE_DESKTOP_SESSION_REQUEST_SCHEMA
             && self.service_class == INTERACTIVE_DESKTOP_SERVICE_CLASS
             && !self.request_id.is_empty()
             && !self.request_digest.is_empty()
             && !self.session_id.is_empty()
             && !self.idempotency_key.is_empty()
-            && self.binding.has_complete_reference()
-            && self.binding.offer.has_safe_market_boundary()
+            && !self.consumer_account_id.is_empty()
             && self.requested_permissions.is_v1_safe()
             && self.requested_permissions.capture_selected_surface
             && self.requested_permissions.view_video
@@ -227,9 +178,17 @@ impl InteractiveDesktopSessionRequest {
             && self.requested_height_px > 0
             && self.requested_frame_rate_milli_hz > 0
             && self.requested_duration_ms > 0
+            && !self.requested_currency.is_empty()
+            && !self.acceptable_transport_paths.is_empty()
+            && self
+                .acceptable_transport_paths
+                .iter()
+                .enumerate()
+                .all(|(index, path)| !self.acceptable_transport_paths[..index].contains(path))
+            && !self.requested_region_or_data_zone.is_empty()
             && self.connect_deadline_ms > self.requested_at_ms
             && matches!(
-                (self.binding.offer.product_mode, self.viewer_relationship,),
+                (self.requested_product_mode, self.viewer_relationship,),
                 (
                     InteractiveDesktopProductMode::SameOwnerRemoteAccess,
                     InteractiveDesktopViewerRelationship::SameOwner
@@ -241,12 +200,15 @@ impl InteractiveDesktopSessionRequest {
                     InteractiveDesktopViewerRelationship::MarketplaceStranger
                 )
             )
-            && (self.viewer_relationship
-                != InteractiveDesktopViewerRelationship::MarketplaceStranger
-                || (self.binding.offer.connectivity_policy
-                    == InteractiveDesktopConnectivityPolicy::RelayOnly
-                    && self.binding.offer.market_access
-                        == InteractiveDesktopMarketAccess::PaidMarketplace))
+            && match self.requested_product_mode {
+                InteractiveDesktopProductMode::SameOwnerRemoteAccess
+                | InteractiveDesktopProductMode::FriendCoPlay => {
+                    self.consumer_max_amount_micros == 0
+                }
+                InteractiveDesktopProductMode::LicensedCloudSeat => {
+                    self.consumer_max_amount_micros > 0
+                }
+            }
     }
 }
 
@@ -312,18 +274,11 @@ pub(crate) struct InteractiveDesktopSession {
     pub session_digest: String,
     pub request_id: String,
     pub request_digest: String,
+    pub session_reservation: InteractiveDesktopSessionReservationBinding,
     pub binding: InteractiveDesktopFederationBinding,
     pub viewer_relationship: InteractiveDesktopViewerRelationship,
     pub state: InteractiveDesktopSessionState,
-    pub host_lease_id: String,
-    pub selected_surface_digest: String,
-    pub viewer_grant_id: String,
-    pub viewer_grant_generation: u64,
-    pub media_epoch_id: String,
-    pub media_epoch_sequence: u64,
-    pub control_epoch_id: String,
-    pub control_epoch_sequence: u64,
-    pub fencing_generation: u64,
+    pub authority_head: InteractiveDesktopAuthorityHead,
     pub created_at_ms: i64,
     pub updated_at_ms: i64,
     pub maximum_end_at_ms: i64,
@@ -348,6 +303,7 @@ pub(crate) struct InteractiveDesktopHostLease {
     pub host_lease_id: String,
     pub host_lease_digest: String,
     pub session_id: String,
+    pub session_reservation_digest: String,
     pub binding_digest: String,
     pub provider_id: String,
     pub host_node_id: String,
@@ -358,6 +314,7 @@ pub(crate) struct InteractiveDesktopHostLease {
     pub fencing_generation: u64,
     pub host_consent: InteractiveDesktopHostConsentBinding,
     pub issued_at_ms: i64,
+    pub activated_at_ms: Option<i64>,
     pub last_heartbeat_at_ms: Option<i64>,
     pub expires_at_ms: i64,
     pub hard_deadline_at_ms: i64,
@@ -382,6 +339,7 @@ pub(crate) struct InteractiveDesktopViewerGrant {
     pub viewer_grant_digest: String,
     pub grant_generation: u64,
     pub session_id: String,
+    pub session_reservation_digest: String,
     pub binding_digest: String,
     pub consumer_account_id: String,
     pub consumer_account_session_digest: String,
@@ -414,6 +372,7 @@ pub(crate) struct InteractiveDesktopMediaEpoch {
     pub media_epoch_digest: String,
     pub epoch_sequence: u64,
     pub session_id: String,
+    pub session_reservation_digest: String,
     pub binding_digest: String,
     pub host_lease_id: String,
     pub viewer_grant_id: String,
@@ -440,11 +399,15 @@ pub(crate) struct InteractiveDesktopControlEpoch {
     pub control_epoch_digest: String,
     pub epoch_sequence: u64,
     pub session_id: String,
+    pub session_reservation_digest: String,
     pub binding_digest: String,
     pub host_lease_id: String,
     pub viewer_grant_id: String,
     pub viewer_grant_generation: u64,
     pub media_epoch_id: String,
+    pub media_epoch_digest: String,
+    pub media_epoch_sequence: u64,
+    pub viewer_transport_identity_digest: String,
     pub selected_surface_digest: String,
     pub fencing_generation: u64,
     pub permissions: InteractiveDesktopPermissionSet,

@@ -14,6 +14,14 @@ use super::{
     offer::{
         INTERACTIVE_DESKTOP_OFFER_PROFILE_DIGEST_DOMAIN, INTERACTIVE_DESKTOP_OFFER_PROFILE_SCHEMA,
     },
+    product_authority::{
+        INTERACTIVE_DESKTOP_PRODUCT_AUTHORITY_DIGEST_DOMAIN,
+        INTERACTIVE_DESKTOP_PRODUCT_AUTHORITY_SCHEMA,
+    },
+    reservation::{
+        INTERACTIVE_DESKTOP_SESSION_RESERVATION_DIGEST_DOMAIN,
+        INTERACTIVE_DESKTOP_SESSION_RESERVATION_SCHEMA,
+    },
     session::{
         InteractiveDesktopSessionState, INTERACTIVE_DESKTOP_CONTROL_EPOCH_DIGEST_DOMAIN,
         INTERACTIVE_DESKTOP_CONTROL_EPOCH_SCHEMA, INTERACTIVE_DESKTOP_HOST_LEASE_DIGEST_DOMAIN,
@@ -39,6 +47,8 @@ fn interactive_contract_has_independent_schemas_and_digest_domains() {
         INTERACTIVE_DESKTOP_USAGE_VERIFICATION_RECEIPT_SCHEMA,
         INTERACTIVE_DESKTOP_HOST_CONSENT_SCHEMA,
         INTERACTIVE_DESKTOP_RELAY_AUTHORITY_SCHEMA,
+        INTERACTIVE_DESKTOP_PRODUCT_AUTHORITY_SCHEMA,
+        INTERACTIVE_DESKTOP_SESSION_RESERVATION_SCHEMA,
     ];
     let domains = [
         INTERACTIVE_DESKTOP_OFFER_PROFILE_DIGEST_DOMAIN,
@@ -52,6 +62,8 @@ fn interactive_contract_has_independent_schemas_and_digest_domains() {
         INTERACTIVE_DESKTOP_USAGE_VERIFICATION_RECEIPT_DIGEST_DOMAIN,
         INTERACTIVE_DESKTOP_HOST_CONSENT_DIGEST_DOMAIN,
         INTERACTIVE_DESKTOP_RELAY_AUTHORITY_DIGEST_DOMAIN,
+        INTERACTIVE_DESKTOP_PRODUCT_AUTHORITY_DIGEST_DOMAIN,
+        INTERACTIVE_DESKTOP_SESSION_RESERVATION_DIGEST_DOMAIN,
     ];
 
     assert_eq!(
@@ -121,7 +133,10 @@ fn persistent_contracts_do_not_declare_sensitive_transport_or_content_fields() {
         include_str!("offer.rs"),
         include_str!("session.rs"),
         include_str!("authority.rs"),
+        include_str!("authority_head.rs"),
         include_str!("metering.rs"),
+        include_str!("product_authority.rs"),
+        include_str!("reservation.rs"),
     ];
     let forbidden_fields = [
         "sdp",

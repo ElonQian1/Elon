@@ -83,9 +83,11 @@ Profile 是不可变 Offer 扩展，至少包含：
 
 Profile 声明最大能力，不是当前 Ready 证明。节点必须另行提供短 TTL `NodeInteractiveDesktopReadyCapability`，绑定当前登录会话、显示器、编码器、音频、输入和网络探测。
 
+C0 源合同现在把 Profile 的 `resource_boundary` 纳入 fail-closed 结构校验：Pool ID/epoch/revision/digest、resource scope 和 GPU/encoder/egress/login 四个唯一 meter 都必须完整。这个校验只证明不可变 Profile 自洽；它尚不等于节点 Ready，也尚未通过 Store 证明 Claim 的真实行项目与共享余额。
+
 ### 4.2 InteractiveSessionRequest
 
-Consumer 请求期望的分辨率、FPS、audio/input、最大时长、区域、SLA、数据等级和最大消费者收费。Request 不携带主机地址、SDP、ICE 或凭据。
+Consumer 请求期望的产品模式、分辨率、FPS、audio/input、最大时长、币种、消费者最高金额、区域和可接受 transport。Request 是纯 Demand，不携带 Broker 才能选择的 Provider、Offer、Profile、PriceSnapshot、Reservation、CapacityPool 或 Claim，也不携带主机地址、SDP、ICE 或凭据；Broker 生成的金额不能超过 Request 中的显式上限。
 
 ### 4.3 InteractiveSessionReservation
 
@@ -98,13 +100,19 @@ Broker 选择一个 active Offer/Profile 和 PriceSnapshot，在单一容量边�
 
 Reservation 精确绑定 SessionRequest、Offer 版本/摘要、Profile digest、PriceSnapshot、Claim revision/digest 和到期时间。
 
+C0 源合同使用独立 `InteractiveDesktopSessionReservation` 冻结上述选择，而不是把它们塞回 Request。共享控制面的 Reservation/Claim 引用保留在 federation binding；交互执行面的 SessionReservation 另有自己的 ID/revision/digest，并由 Session 精确钉住，不能在保留共享 Reservation 的同时替换权限、codec 或 ProductAuthority。它还绑定 Provider policy revision/digest/owner、Consumer、resource scope、协商后的权限/画质/codec/transport、整数消费上限和四类容量预算；Profile、SessionReservation 与联邦 binding 的 Offer/Pool/resource scope 任一错接都失败关闭。完整 Claim 行、PriceSnapshot、Provider 和 SessionReservation 摘要的真源解析仍属于后续 Store/Service 阶段，当前结构校验不得冒充已解析权威。
+
+`SameOwner`、`TrustedFriend` 和 `MarketplaceStranger` 不再只依赖 Consumer 自报枚举。Reservation 必须携带有 schema/revision/digest/currentness/期限的 ProductAuthority：同账号模式绑定 Provider ownership snapshot，好友模式绑定 Host owner 签发给精确 Consumer/Session 的邀请，付费陌生人模式绑定 Consumer entitlement 与当前 TitlePolicy snapshot。运行时仍必须从权威 owner 解析并验证这些摘要；仅构造一个形状正确的对象不构成证明。
+
 ### 4.4 InteractiveHostLease
 
-HostLease 授权一台精确 Provider/Executor 提供一段 Session。它包含 `lease_id`、`session_id`、`fencing_generation`、soft expiry 和 hard deadline。续租只能在 hard deadline 内延长；过期或旧 generation 不可复活。
+HostLease 授权一台精确 Provider/Executor 提供一段 Session。它包含 `lease_id`、`session_id`、`fencing_generation`、显式 `activated_at`、soft expiry 和 hard deadline。SessionReservation 分开保存 activation deadline 与已激活会话的 authorization expiry：Host 必须在 Consumer connect deadline 前激活，但成功激活后不会仅因 connect deadline 经过而中断；续租只能在 hard deadline 内延长，过期或旧 generation 不可复活。
 
 HostLease 不包含可重放认证材料。节点身份、一次性 ticket 与短期 TURN credential 由私密信道传递，业务 Store 只保存不可逆引用或摘要。
 
-Host 本地同意不是一个孤立摘要，而是带 schema、policy/revision/currentness 和有效期的权限绑定；它精确约束 Session、binding、HostLease、fencing、所选 surface 以及允许的画面、音频和输入权限。ViewerGrant 与 ControlEpoch 都必须是这份 Host 同意的子集，任何一层都不能把“仅观看”升级成键鼠控制。
+Host 本地同意不是一个孤立摘要，而是带 schema、policy/revision/currentness 和有效期的权限绑定；它只能在 SessionReservation 后签发，并精确约束 SessionReservation digest、federation binding、HostLease、fencing、所选 surface 以及允许的画面、音频和输入权限。ViewerGrant 与 ControlEpoch 都必须是这份 Host 同意的子集，任何一层都不能把“仅观看”升级成键鼠控制。
+
+Session 当前头必须保存 HostLease、ViewerGrant、MediaEpoch、ControlEpoch 的精确 digest，而不只是 ID、generation 或 sequence；这四类运行权威和 TURN scope 还必须逐层携带同一个 SessionReservation digest，重新预留后不能复用旧执行权威。ControlEpoch 同时绑定当前 Media digest/sequence 与 Viewer transport identity；相同浅 ID 但内容摘要不同的对象、旧 Media takeover 后的 ControlEpoch 或旧 transport identity 都不能替换当前权威。
 
 ### 4.5 ViewerGrant
 
@@ -120,7 +128,7 @@ ViewerGrant 精确绑定 Consumer account、Consumer device、Session、角色�
 
 Session ID 在有限重连期间稳定。每次 WebRTC connection takeover 或重连创建递增 `media_epoch`；旧 epoch 的媒体、统计和信令失效。每次控制权授予、撤销或重新连接创建递增 `control_epoch`；输入消息必须同时匹配当前 HostLease fencing、MediaEpoch 和 ControlEpoch。
 
-TURN authority 只保存不可逆 allocation/grant 摘要，但其 scope 必须逐字段绑定 Session、federation binding、HostLease/fencing、ViewerGrant/generation、Viewer transport identity 和 MediaEpoch/sequence；另一会话或旧 epoch 的 relay authority 不能替换复用。
+TURN authority 只保存不可逆 allocation/grant 摘要，但其 scope 必须逐字段绑定 Session、federation binding、HostLease/fencing、ViewerGrant/generation、Viewer transport identity、MediaEpoch/sequence 和 Profile 冻结的 region/data zone；另一会话、区域或旧 epoch 的 relay authority 不能替换复用。
 
 Provider 本地按键、鼠标或紧急热键优先。断开时 Host 必须合成完整 key-up/button-up 恢复，避免远端按键卡住。
 
@@ -137,6 +145,8 @@ Provider 本地按键、鼠标或紧急热键优先。断开时 Host 必须合�
 每份 Usage Receipt 使用单调 `usage_sequence` 和前序回执摘要，各 source layer 也绑定前序 sample 摘要；下一累计 opening 必须等于上一 closing，区间不得重叠。后续 Store 必须以 Session 单头 CAS 追加，拒绝两个 sequence-1 根、重放、重置或并行分叉，结构自洽不能替代这项事务权威。
 
 Raw Usage 只包含 declared/transport/consumer 事实，不前向引用验证结果。Verification 作为后继 DAG 节点单向绑定 Usage digest、当前验证策略和实际 verified/compensable layer；跨对象校验必须核对 receipt id/digest/status、Session 和 binding。TURN 字节属于平台/中继成本层，不能进入 Provider compensable meter 集合。
+
+当前 C0 仍未闭合 Usage 与精确 authority head 的跨对象验证，也未把 `media_active_ms` 强制限制在共同有效时间窗内；这些是下一批 `metering_authority` 源合同的显式阻断项。在它们完成并经过编译/运行验证前，任何 Usage 都不能进入真实计费或 Provider 收益。
 
 终态回执绑定上述证据摘要、终止原因、最终 HostLease/MediaEpoch/ControlEpoch、Offer、Profile、PriceSnapshot 和容量因果链。原始画面、音频、输入、SDP、ICE 和密钥不进入回执。
 

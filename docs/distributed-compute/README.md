@@ -9,7 +9,7 @@ owners: backend, node, pc, security, ai-economy
 
 本目录是“一龙成为 AI 算力矿池与联邦入口”的权威设计入口。目标不是只共享一个本地模型的推理接口，而是把用户闲置节点、平台集群和外部算力池统一成可发现、可报价、可预留、可执行、可验证、可结算的任务级算力网络。各纵切面的最新成熟度统一见 [`current-implementation-status.md`](current-implementation-status.md)。
 
-交互式云电脑是同一联邦的独立执行平面：它复用 Provider、Offer、容量、价格和分层计量原则，但使用 Session/HostLease/ViewerGrant/MediaEpoch/ControlEpoch，不复用批处理 Attempt。当前仅铺设未编译、未运行的源码合同，媒体、输入、计费和付费市场均未开放；入口见 [`interactive-desktop-architecture.md`](interactive-desktop-architecture.md)。
+交互式云电脑是同一联邦的独立执行平面：它复用 Provider、Offer、容量、价格和分层计量原则，但使用纯 Demand Request、SessionReservation、Session/HostLease/ViewerGrant/MediaEpoch/ControlEpoch，不复用批处理 Attempt。当前仅铺设未编译、未运行的源码合同，Usage-authority 闭环、媒体、输入、计费和付费市场均未开放；入口见 [`interactive-desktop-architecture.md`](interactive-desktop-architecture.md)。
 
 ## 北极星
 

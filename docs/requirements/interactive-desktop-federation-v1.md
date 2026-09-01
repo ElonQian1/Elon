@@ -4,7 +4,7 @@ version_status: current
 status: accepted
 reviewed_at: 2026-09-02
 owners: backend, node, pc, security, ai-economy
-implementation_status: source_contract_planned
+implementation_status: source_contract_only_uncompiled_unrun
 ---
 
 # 分布式算力联邦交互式云电脑 V1 需求

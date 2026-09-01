@@ -1,17 +1,10 @@
 use super::{
-    authority::{
-        InteractiveDesktopAuthorityCurrentness, InteractiveDesktopRelayAuthorityBinding,
-        InteractiveDesktopRelayAuthorityScope, INTERACTIVE_DESKTOP_RELAY_AUTHORITY_SCHEMA,
-    },
+    authority::InteractiveDesktopAuthorityCurrentness,
     offer::{
-        InteractiveDesktopConnectivityPolicy, InteractiveDesktopMarketAccess,
-        InteractiveDesktopProductMode, InteractiveDesktopTitlePolicyBinding,
-        InteractiveDesktopTransportPath,
+        InteractiveDesktopConnectivityPolicy, InteractiveDesktopTransportPath,
     },
-    session::{
-        InteractiveDesktopAction, InteractiveDesktopPermissionSet,
-        InteractiveDesktopViewerRelationship,
-    },
+    session::{InteractiveDesktopAction, InteractiveDesktopPermissionSet},
+    reservation_test_support::{active_profile, active_request, active_reservation},
     test_support::{
         active_control_epoch, active_grant, active_lease, active_media_epoch, active_session,
         authorized,
@@ -25,9 +18,13 @@ fn host_consent_is_the_upper_bound_for_remote_permissions() {
     let mut grant = active_grant();
     let media = active_media_epoch();
     let mut control = active_control_epoch();
+    let profile = active_profile();
+    let reservation = active_reservation();
 
     lease.host_consent.scope.permissions.send_keyboard_input = false;
     assert!(!session.structurally_authorizes(
+        &profile,
+        &reservation,
         &lease,
         &grant,
         &media,
@@ -44,6 +41,8 @@ fn host_consent_is_the_upper_bound_for_remote_permissions() {
     grant.permissions.send_keyboard_input = false;
     control.permissions.send_keyboard_input = false;
     assert!(session.structurally_authorizes(
+        &profile,
+        &reservation,
         &lease,
         &grant,
         &media,
@@ -57,6 +56,8 @@ fn host_consent_is_the_upper_bound_for_remote_permissions() {
         1_500,
     ));
     assert!(!session.structurally_authorizes(
+        &profile,
+        &reservation,
         &lease,
         &grant,
         &media,
@@ -71,6 +72,19 @@ fn host_consent_is_the_upper_bound_for_remote_permissions() {
     ));
 
     lease.host_consent.currentness = InteractiveDesktopAuthorityCurrentness::Revoked;
+    assert!(!authorized(
+        &session, &lease, &grant, &media, &control, 1_500
+    ));
+
+    lease.host_consent.currentness = InteractiveDesktopAuthorityCurrentness::Current;
+    lease.host_consent.issued_at_ms = active_reservation().issued_at_ms - 1;
+    assert!(!authorized(
+        &session, &lease, &grant, &media, &control, 1_500
+    ));
+
+    lease.host_consent.issued_at_ms = active_reservation().issued_at_ms;
+    lease.host_consent.scope.session_reservation_digest =
+        "other-session-reservation".to_string();
     assert!(!authorized(
         &session, &lease, &grant, &media, &control, 1_500
     ));
@@ -111,8 +125,12 @@ fn current_epoch_fencing_and_expiry_are_all_required_for_authority() {
     let grant = active_grant();
     let media = active_media_epoch();
     let control = active_control_epoch();
+    let profile = active_profile();
+    let reservation = active_reservation();
 
     assert!(session.structurally_authorizes(
+        &profile,
+        &reservation,
         &lease,
         &grant,
         &media,
@@ -126,6 +144,8 @@ fn current_epoch_fencing_and_expiry_are_all_required_for_authority() {
         1_500,
     ));
     assert!(session.structurally_authorizes(
+        &profile,
+        &reservation,
         &lease,
         &grant,
         &media,
@@ -217,7 +237,7 @@ fn current_epoch_fencing_and_expiry_are_all_required_for_authority() {
     ));
 
     let mut zero_generation_session = session.clone();
-    zero_generation_session.fencing_generation = 0;
+    zero_generation_session.authority_head.fencing_generation = 0;
     let mut zero_generation_lease = lease.clone();
     zero_generation_lease.fencing_generation = 0;
     let mut zero_generation_media = media.clone();
@@ -260,55 +280,20 @@ fn current_epoch_fencing_and_expiry_are_all_required_for_authority() {
 }
 
 #[test]
-fn paid_stranger_sessions_are_licensed_and_relay_only() {
-    let mut session = active_session();
-    session.binding.offer.product_mode = InteractiveDesktopProductMode::LicensedCloudSeat;
-    session.binding.offer.market_access = InteractiveDesktopMarketAccess::PaidMarketplace;
-    session.binding.offer.connectivity_policy = InteractiveDesktopConnectivityPolicy::RelayOnly;
-    session.viewer_relationship = InteractiveDesktopViewerRelationship::MarketplaceStranger;
-    assert!(!session.has_safe_product_boundary(InteractiveDesktopTransportPath::Turn));
-    session.binding.offer.title_policy = Some(InteractiveDesktopTitlePolicyBinding {
-        title_catalog_id: "catalog-title-1".to_string(),
-        title_policy_snapshot_id: "title-policy-1".to_string(),
-        title_policy_version: 1,
-        title_policy_snapshot_digest: "title-policy-digest".to_string(),
-        rights_evidence_digest: "rights-evidence-digest".to_string(),
-        territory: "CN".to_string(),
-        valid_until_ms: 3_000,
-    });
-    assert!(session.has_safe_product_boundary(InteractiveDesktopTransportPath::Turn));
-    assert!(!session.has_safe_product_boundary(InteractiveDesktopTransportPath::Direct));
-    assert!(!session.binding.offer.has_current_market_authority(3_000));
-
-    let lease = active_lease();
-    let grant = active_grant();
+fn activation_deadline_expires_only_unstarted_sessions() {
+    let session = active_session();
+    let mut lease = active_lease();
+    let mut grant = active_grant();
     let mut media = active_media_epoch();
-    let control = active_control_epoch();
-    media.transport_path = InteractiveDesktopTransportPath::Turn;
-    media.relay_authority = Some(InteractiveDesktopRelayAuthorityBinding {
-        schema: INTERACTIVE_DESKTOP_RELAY_AUTHORITY_SCHEMA.to_string(),
-        service_class: super::INTERACTIVE_DESKTOP_SERVICE_CLASS.to_string(),
-        relay_authority_id: "relay-authority-1".to_string(),
-        relay_authority_digest: "relay-authority-digest".to_string(),
-        relay_allocation_ref_digest: "relay-allocation-digest".to_string(),
-        relay_grant_digest: "relay-grant-digest".to_string(),
-        relay_region: "CN".to_string(),
-        currentness: InteractiveDesktopAuthorityCurrentness::Current,
-        scope: InteractiveDesktopRelayAuthorityScope {
-            session_id: "session-1".to_string(),
-            binding_digest: "binding-digest".to_string(),
-            host_lease_id: "lease-1".to_string(),
-            fencing_generation: 9,
-            viewer_grant_id: "grant-1".to_string(),
-            viewer_grant_generation: 2,
-            viewer_transport_identity_digest: "viewer-transport-digest".to_string(),
-            media_epoch_id: "media-2".to_string(),
-            media_epoch_sequence: 2,
-        },
-        issued_at_ms: 1_000,
-        expires_at_ms: 2_000,
-    });
+    let mut control = active_control_epoch();
+    let request = active_request();
+    let profile = active_profile();
+    let reservation = active_reservation();
+
+    assert!(request.connect_deadline_ms < 1_500);
     assert!(session.structurally_authorizes(
+        &profile,
+        &reservation,
         &lease,
         &grant,
         &media,
@@ -321,18 +306,163 @@ fn paid_stranger_sessions_are_licensed_and_relay_only() {
         InteractiveDesktopAction::ViewVideo,
         1_500,
     ));
-    media.relay_authority.as_mut().unwrap().scope.session_id = "other-session".to_string();
-    assert!(!authorized(
-        &session, &lease, &grant, &media, &control, 1_500
+
+    let late_activation = reservation.activation_deadline_ms + 1;
+    lease.activated_at_ms = Some(late_activation);
+    grant.issued_at_ms = late_activation;
+    media.issued_at_ms = late_activation;
+    control.issued_at_ms = late_activation;
+    assert!(!session.structurally_authorizes(
+        &profile,
+        &reservation,
+        &lease,
+        &grant,
+        &media,
+        &control,
+        "consumer-1",
+        "account-session-digest",
+        4,
+        "viewer-device-1",
+        "viewer-transport-digest",
+        InteractiveDesktopAction::ViewVideo,
+        1_500,
     ));
-    media.relay_authority.as_mut().unwrap().scope.session_id = "session-1".to_string();
-    media.relay_authority = None;
-    assert!(!authorized(
-        &session, &lease, &grant, &media, &control, 1_500
+}
+
+#[test]
+fn exact_session_reservation_and_temporal_authority_chain_are_required() {
+    let session = active_session();
+    let lease = active_lease();
+    let grant = active_grant();
+    let media = active_media_epoch();
+    let control = active_control_epoch();
+    let profile = active_profile();
+    let reservation = active_reservation();
+
+    let mut replaced_reservation = reservation.clone();
+    replaced_reservation
+        .session_reservation
+        .session_reservation_digest = "replacement-reservation-digest".to_string();
+    assert!(replaced_reservation.has_safe_shape(&profile, 1_500));
+    assert!(!session.structurally_authorizes(
+        &profile,
+        &replaced_reservation,
+        &lease,
+        &grant,
+        &media,
+        &control,
+        "consumer-1",
+        "account-session-digest",
+        4,
+        "viewer-device-1",
+        "viewer-transport-digest",
+        InteractiveDesktopAction::ViewVideo,
+        1_500,
     ));
 
-    session.binding.offer.market_access = InteractiveDesktopMarketAccess::PrivateUnpaid;
-    assert!(!session.has_safe_product_boundary(InteractiveDesktopTransportPath::Turn));
-    session.binding.offer.product_mode = InteractiveDesktopProductMode::FriendCoPlay;
-    assert!(!session.has_safe_product_boundary(InteractiveDesktopTransportPath::Turn));
+    let mut replaced_session = session.clone();
+    replaced_session
+        .session_reservation
+        .session_reservation_digest = "replacement-reservation-digest".to_string();
+    assert!(replaced_session.has_safe_product_boundary(
+        &profile,
+        &replaced_reservation,
+        media.transport_path,
+        1_500,
+    ));
+    assert!(!replaced_session.structurally_authorizes(
+        &profile,
+        &replaced_reservation,
+        &lease,
+        &grant,
+        &media,
+        &control,
+        "consumer-1",
+        "account-session-digest",
+        4,
+        "viewer-device-1",
+        "viewer-transport-digest",
+        InteractiveDesktopAction::ViewVideo,
+        1_500,
+    ));
+
+    let mut grant_after_media = grant.clone();
+    grant_after_media.issued_at_ms = media.issued_at_ms + 1;
+    assert!(!authorized(
+        &session,
+        &lease,
+        &grant_after_media,
+        &media,
+        &control,
+        1_500,
+    ));
+
+    let mut future_session_revision = session;
+    future_session_revision.updated_at_ms = 1_501;
+    assert!(!authorized(
+        &future_session_revision,
+        &lease,
+        &grant,
+        &media,
+        &control,
+        1_500,
+    ));
+}
+
+#[test]
+fn reservation_profile_is_the_upper_bound_for_grants_codecs_and_transport() {
+    let session = active_session();
+    let lease = active_lease();
+    let grant = active_grant();
+    let media = active_media_epoch();
+    let control = active_control_epoch();
+    let profile = active_profile();
+    let reservation = active_reservation();
+
+    let mut view_only = reservation.clone();
+    view_only.reserved_permissions.send_keyboard_input = false;
+    view_only.reserved_permissions.send_pointer_input = false;
+    assert!(!session.structurally_authorizes(
+        &profile,
+        &view_only,
+        &lease,
+        &grant,
+        &media,
+        &control,
+        "consumer-1",
+        "account-session-digest",
+        4,
+        "viewer-device-1",
+        "viewer-transport-digest",
+        InteractiveDesktopAction::ViewVideo,
+        1_500,
+    ));
+
+    let mut substituted_codec = media.clone();
+    substituted_codec.video_codec = "other-codec".to_string();
+    assert!(!authorized(
+        &session,
+        &lease,
+        &grant,
+        &substituted_codec,
+        &control,
+        1_500,
+    ));
+
+    let mut relay_only_profile = profile;
+    relay_only_profile.offer.connectivity_policy =
+        InteractiveDesktopConnectivityPolicy::RelayOnly;
+    relay_only_profile.transport_paths = vec![InteractiveDesktopTransportPath::Turn];
+    let mut relay_only_reservation = reservation;
+    relay_only_reservation.binding.offer.connectivity_policy =
+        InteractiveDesktopConnectivityPolicy::RelayOnly;
+    relay_only_reservation.permitted_transport_paths = vec![InteractiveDesktopTransportPath::Turn];
+    let mut relay_only_session = session;
+    relay_only_session.binding = relay_only_reservation.binding.clone();
+    assert!(!relay_only_session.has_safe_product_boundary(
+        &relay_only_profile,
+        &relay_only_reservation,
+        InteractiveDesktopTransportPath::Direct,
+        1_500,
+    ));
 }

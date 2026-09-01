@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+
 use serde::{Deserialize, Serialize};
 
 use crate::compute_federation::capacity::ComputeCapacityPoolBinding;
@@ -74,13 +76,23 @@ pub(crate) struct InteractiveDesktopOfferBinding {
 impl InteractiveDesktopOfferBinding {
     /// Structural market check only; callers must separately verify referenced digests.
     pub(crate) fn has_safe_market_boundary(&self) -> bool {
-        self.market_access != InteractiveDesktopMarketAccess::PaidMarketplace
-            || (self.product_mode == InteractiveDesktopProductMode::LicensedCloudSeat
-                && self.connectivity_policy == InteractiveDesktopConnectivityPolicy::RelayOnly
-                && self
-                    .title_policy
-                    .as_ref()
-                    .is_some_and(InteractiveDesktopTitlePolicyBinding::has_complete_reference))
+        match (self.product_mode, self.market_access) {
+            (
+                InteractiveDesktopProductMode::SameOwnerRemoteAccess
+                | InteractiveDesktopProductMode::FriendCoPlay,
+                InteractiveDesktopMarketAccess::PrivateUnpaid,
+            ) => self.title_policy.is_none(),
+            (
+                InteractiveDesktopProductMode::LicensedCloudSeat,
+                InteractiveDesktopMarketAccess::PaidMarketplace,
+            ) => {
+                self.connectivity_policy == InteractiveDesktopConnectivityPolicy::RelayOnly
+                    && self.title_policy.as_ref().is_some_and(
+                        InteractiveDesktopTitlePolicyBinding::has_complete_reference,
+                    )
+            }
+            _ => false,
+        }
     }
 
     pub(crate) fn has_current_market_authority(&self, now_ms: i64) -> bool {
@@ -100,7 +112,7 @@ pub(crate) enum InteractiveDesktopSurfaceKind {
     Window,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum InteractiveDesktopTransportPath {
     Direct,
@@ -162,6 +174,33 @@ pub(crate) struct InteractiveDesktopResourceBoundary {
     pub interactive_login_slot_meter: String,
 }
 
+impl InteractiveDesktopResourceBoundary {
+    pub(crate) fn has_v1_shape(&self) -> bool {
+        let pool = &self.capacity_pool;
+        let meters = [
+            self.gpu_meter.as_str(),
+            self.encoder_slot_meter.as_str(),
+            self.network_egress_meter.as_str(),
+            self.interactive_login_slot_meter.as_str(),
+        ];
+        let unique = meters.into_iter().collect::<BTreeSet<_>>();
+
+        !pool.pool_id.is_empty()
+            && pool.capacity_epoch > 0
+            && pool.pool_revision > 0
+            && !pool.pool_digest.is_empty()
+            && !self.resource_scope_digest.is_empty()
+            && unique.len() == meters.len()
+            && meters.iter().all(|meter| {
+                !meter.is_empty()
+                    && meter.len() <= 64
+                    && meter.bytes().all(|byte| {
+                        byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-' | b'.')
+                    })
+            })
+    }
+}
+
 /// Immutable interactive extension for one exact federation Offer version.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -203,31 +242,49 @@ impl InteractiveDesktopOfferProfile {
             && self.offer.has_safe_market_boundary()
             && self.capture.max_selected_surfaces == 1
             && !self.capture.allowed_surface_kinds.is_empty()
+            && self
+                .capture
+                .allowed_surface_kinds
+                .iter()
+                .enumerate()
+                .all(|(index, kind)| {
+                    !self.capture.allowed_surface_kinds[..index].contains(kind)
+                })
             && !self.capture.protected_content_supported
             && !self.capture.secure_desktop_supported
             && self.video.codec == "h264"
+            && !self.video.codec_profile.is_empty()
             && self.video.max_width_px > 0
             && self.video.max_height_px > 0
             && self.video.max_frame_rate_milli_hz > 0
             && self.video.max_bitrate_bits_per_second > 0
             && self.video.sdr_only
+            && (!self.audio.system_audio_available
+                || (self.audio.codec == "opus"
+                    && self.audio.max_channels > 0
+                    && self.audio.max_sample_rate_hz > 0))
             && !self.audio.microphone_uplink_available
             && !self.input.gamepad_available
             && !self.input.clipboard_available
             && !self.input.file_transfer_available
             && !self.input.privilege_elevation_available
             && self.has_transport_shape()
+            && self.resource_boundary.has_v1_shape()
             && !self.region_or_data_zone.is_empty()
             && self.minimum_session_duration_ms > 0
             && self.maximum_session_duration_ms >= self.minimum_session_duration_ms
             && self.valid_until_ms > self.valid_from_ms
+            && self.created_at_ms <= self.valid_from_ms
             && self.created_at_ms <= self.valid_until_ms
             && (self.offer.market_access != InteractiveDesktopMarketAccess::PaidMarketplace
                 || self
                     .offer
                     .title_policy
                     .as_ref()
-                    .is_some_and(|policy| policy.valid_until_ms >= self.valid_until_ms))
+                    .is_some_and(|policy| {
+                        policy.territory == self.region_or_data_zone
+                            && policy.valid_until_ms >= self.valid_until_ms
+                    }))
     }
 
     fn has_transport_shape(&self) -> bool {

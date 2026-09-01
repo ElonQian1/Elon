@@ -3,8 +3,10 @@ use serde::{Deserialize, Serialize};
 use super::{
     offer::{
         InteractiveDesktopConnectivityPolicy, InteractiveDesktopMarketAccess,
-        InteractiveDesktopProductMode, InteractiveDesktopTransportPath,
+        InteractiveDesktopOfferProfile, InteractiveDesktopProductMode,
+        InteractiveDesktopTransportPath,
     },
+    reservation::InteractiveDesktopSessionReservation,
     session::{
         InteractiveDesktopAction, InteractiveDesktopControlEpoch, InteractiveDesktopEpochState,
         InteractiveDesktopGrantState, InteractiveDesktopHostLease,
@@ -39,6 +41,7 @@ pub(crate) enum InteractiveDesktopAuthorityCurrentness {
 #[serde(deny_unknown_fields)]
 pub(crate) struct InteractiveDesktopHostConsentScope {
     pub session_id: String,
+    pub session_reservation_digest: String,
     pub binding_digest: String,
     pub host_lease_id: String,
     pub fencing_generation: u64,
@@ -67,6 +70,7 @@ pub(crate) struct InteractiveDesktopHostConsentBinding {
 #[serde(deny_unknown_fields)]
 pub(crate) struct InteractiveDesktopRelayAuthorityScope {
     pub session_id: String,
+    pub session_reservation_digest: String,
     pub binding_digest: String,
     pub host_lease_id: String,
     pub fencing_generation: u64,
@@ -96,7 +100,10 @@ pub(crate) struct InteractiveDesktopRelayAuthorityBinding {
 impl InteractiveDesktopSession {
     pub(crate) fn has_safe_product_boundary(
         &self,
+        profile: &InteractiveDesktopOfferProfile,
+        reservation: &InteractiveDesktopSessionReservation,
         transport_path: InteractiveDesktopTransportPath,
+        now_ms: i64,
     ) -> bool {
         let mode_matches_relationship = matches!(
             (self.binding.offer.product_mode, self.viewer_relationship),
@@ -112,16 +119,27 @@ impl InteractiveDesktopSession {
             )
         );
         self.binding.offer.has_safe_market_boundary()
+            && reservation.has_safe_shape(profile, now_ms)
+            && self.request_id == reservation.request_id
+            && self.request_digest == reservation.request_digest
+            && self.session_id == reservation.session_id
+            && self.session_reservation == reservation.session_reservation
+            && self.binding == reservation.binding
+            && self.viewer_relationship == reservation.product_authority.viewer_relationship
+            && self.maximum_end_at_ms <= reservation.maximum_end_at_ms
             && mode_matches_relationship
             && (self.binding.offer.market_access != InteractiveDesktopMarketAccess::PaidMarketplace
                 || self.binding.offer.product_mode
                     == InteractiveDesktopProductMode::LicensedCloudSeat)
+            && reservation.permitted_transport_paths.contains(&transport_path)
+            && profile.transport_paths.contains(&transport_path)
+            && (self.binding.offer.connectivity_policy
+                != InteractiveDesktopConnectivityPolicy::RelayOnly
+                || transport_path == InteractiveDesktopTransportPath::Turn)
             && (self.viewer_relationship
                 != InteractiveDesktopViewerRelationship::MarketplaceStranger
-                || (self.binding.offer.connectivity_policy
-                    == InteractiveDesktopConnectivityPolicy::RelayOnly
-                    && self.binding.offer.market_access
-                        == InteractiveDesktopMarketAccess::PaidMarketplace
+                || (self.binding.offer.market_access
+                    == InteractiveDesktopMarketAccess::PaidMarketplace
                     && transport_path == InteractiveDesktopTransportPath::Turn))
     }
 
@@ -129,6 +147,8 @@ impl InteractiveDesktopSession {
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn structurally_authorizes(
         &self,
+        profile: &InteractiveDesktopOfferProfile,
+        reservation: &InteractiveDesktopSessionReservation,
         lease: &InteractiveDesktopHostLease,
         grant: &InteractiveDesktopViewerGrant,
         media: &InteractiveDesktopMediaEpoch,
@@ -155,30 +175,47 @@ impl InteractiveDesktopSession {
             && self.terminal_reason_code.is_none()
             && has_nonempty_authority_roots(self, lease, grant, media, control)
             && self.binding.has_complete_reference()
-            && self.has_safe_product_boundary(media.transport_path)
+            && self.has_safe_product_boundary(profile, reservation, media.transport_path, now_ms)
             && self.binding.offer.has_current_market_authority(now_ms)
+            && reservation.issued_at_ms <= lease.host_consent.issued_at_ms
             && has_host_consent_authority(self, lease, grant, control, action, now_ms)
-            && has_transport_authority(media, lease, grant, now_ms)
+            && has_transport_authority(
+                media,
+                lease,
+                grant,
+                &profile.region_or_data_zone,
+                now_ms,
+            )
             && self.binding.offer.provider_id == self.binding.provider_id
-            && self.host_lease_id == lease.host_lease_id
-            && self.viewer_grant_id == grant.viewer_grant_id
-            && self.viewer_grant_generation == grant.grant_generation
+            && self.authority_head.matches(lease, grant, media, control)
             && grant.grant_generation == media.viewer_grant_generation
             && grant.grant_generation == control.viewer_grant_generation
             && grant.viewer_transport_identity_digest == media.viewer_transport_identity_digest
-            && self.media_epoch_id == media.media_epoch_id
-            && self.media_epoch_sequence == media.epoch_sequence
-            && self.control_epoch_id == control.control_epoch_id
-            && self.control_epoch_sequence == control.epoch_sequence
-            && self.fencing_generation == lease.fencing_generation
-            && self.fencing_generation == media.fencing_generation
-            && self.fencing_generation == control.fencing_generation
+            && grant.viewer_transport_identity_digest
+                == control.viewer_transport_identity_digest
             && self.binding.binding_digest == lease.binding_digest
             && self.binding.binding_digest == grant.binding_digest
             && self.binding.binding_digest == media.binding_digest
             && self.binding.binding_digest == control.binding_digest
+            && self.session_reservation.session_reservation_digest
+                == lease.session_reservation_digest
+            && self.session_reservation.session_reservation_digest
+                == grant.session_reservation_digest
+            && self.session_reservation.session_reservation_digest
+                == media.session_reservation_digest
+            && self.session_reservation.session_reservation_digest
+                == control.session_reservation_digest
             && self.binding.provider_id == lease.provider_id
             && self.binding.consumer_account_id == grant.consumer_account_id
+            && lease.selected_surface.surface_kind == reservation.reserved_surface_kind
+            && grant
+                .permissions
+                .is_subset_of(&reservation.reserved_permissions)
+            && control
+                .permissions
+                .is_subset_of(&reservation.reserved_permissions)
+            && media.video_codec == reservation.video_codec
+            && media.audio_codec == reservation.audio_codec
             && self.session_id == lease.session_id
             && self.session_id == grant.session_id
             && self.session_id == media.session_id
@@ -188,9 +225,8 @@ impl InteractiveDesktopSession {
             && grant.viewer_grant_id == media.viewer_grant_id
             && grant.viewer_grant_id == control.viewer_grant_id
             && media.media_epoch_id == control.media_epoch_id
-            && self.selected_surface_digest == lease.selected_surface.selection_digest
-            && self.selected_surface_digest == media.selected_surface_digest
-            && self.selected_surface_digest == control.selected_surface_digest
+            && media.media_epoch_digest == control.media_epoch_digest
+            && media.epoch_sequence == control.media_epoch_sequence
             && lease.state == InteractiveDesktopHostLeaseState::Active
             && grant.state == InteractiveDesktopGrantState::Active
             && media.state == InteractiveDesktopEpochState::Active
@@ -206,16 +242,36 @@ impl InteractiveDesktopSession {
             && !grant.consumer_account_session_digest.is_empty()
             && !grant.viewer_device_key_digest.is_empty()
             && !grant.viewer_transport_identity_digest.is_empty()
+            && self.created_at_ms <= self.updated_at_ms
+            && reservation.issued_at_ms <= self.updated_at_ms
+            && self.updated_at_ms <= now_ms
             && lease.issued_at_ms <= now_ms
+            && lease.issued_at_ms >= reservation.issued_at_ms
+            && lease.activated_at_ms.is_some_and(|activated_at_ms| {
+                lease.issued_at_ms <= activated_at_ms
+                    && activated_at_ms <= reservation.activation_deadline_ms
+                    && activated_at_ms <= now_ms
+                    && activated_at_ms <= self.updated_at_ms
+                    && activated_at_ms <= grant.issued_at_ms
+                    && activated_at_ms <= media.issued_at_ms
+            })
             && now_ms < lease.expires_at_ms
             && now_ms < lease.hard_deadline_at_ms
             && grant.issued_at_ms <= now_ms
             && now_ms < grant.expires_at_ms
             && media.issued_at_ms <= now_ms
+            && grant.issued_at_ms <= media.issued_at_ms
             && now_ms < media.expires_at_ms
             && control.issued_at_ms <= now_ms
+            && media.issued_at_ms <= control.issued_at_ms
+            && control.issued_at_ms <= self.updated_at_ms
             && now_ms < control.expires_at_ms
             && now_ms < self.maximum_end_at_ms
+            && lease.expires_at_ms <= self.maximum_end_at_ms
+            && lease.hard_deadline_at_ms <= self.maximum_end_at_ms
+            && grant.expires_at_ms <= self.maximum_end_at_ms
+            && media.expires_at_ms <= self.maximum_end_at_ms
+            && control.expires_at_ms <= self.maximum_end_at_ms
             && grant.consumer_account_id == viewer_account_id
             && grant.consumer_account_session_digest == viewer_account_session_digest
             && grant.account_auth_epoch == viewer_account_auth_epoch
@@ -244,6 +300,7 @@ fn has_nonempty_authority_roots(
         && !session.binding.binding_digest.is_empty()
         && !session.binding.provider_id.is_empty()
         && !session.binding.consumer_account_id.is_empty()
+        && session.authority_head.has_complete_reference()
         && !lease.host_lease_id.is_empty()
         && !lease.host_lease_digest.is_empty()
         && !lease.host_node_id.is_empty()
@@ -285,11 +342,13 @@ fn has_host_consent_authority(
         && lease.expires_at_ms <= consent.expires_at_ms
         && now_ms < consent.expires_at_ms
         && scope.session_id == session.session_id
+        && scope.session_reservation_digest
+            == session.session_reservation.session_reservation_digest
         && scope.binding_digest == session.binding.binding_digest
         && scope.host_lease_id == lease.host_lease_id
         && scope.fencing_generation == lease.fencing_generation
-        && scope.fencing_generation == session.fencing_generation
-        && scope.selected_surface_digest == session.selected_surface_digest
+        && scope.fencing_generation == session.authority_head.fencing_generation
+        && scope.selected_surface_digest == session.authority_head.selected_surface_digest
         && scope.selected_surface_digest == lease.selected_surface.selection_digest
         && scope.selected_surface_digest == control.selected_surface_digest
         && scope.permissions.is_v1_safe()
@@ -304,6 +363,7 @@ fn has_transport_authority(
     media: &InteractiveDesktopMediaEpoch,
     lease: &InteractiveDesktopHostLease,
     grant: &InteractiveDesktopViewerGrant,
+    expected_region_or_data_zone: &str,
     now_ms: i64,
 ) -> bool {
     match media.transport_path {
@@ -317,13 +377,14 @@ fn has_transport_authority(
                     && !authority.relay_authority_digest.is_empty()
                     && !authority.relay_allocation_ref_digest.is_empty()
                     && !authority.relay_grant_digest.is_empty()
-                    && !authority.relay_region.is_empty()
+                    && authority.relay_region == expected_region_or_data_zone
                     && authority.currentness == InteractiveDesktopAuthorityCurrentness::Current
                     && authority.issued_at_ms == media.issued_at_ms
                     && authority.expires_at_ms == media.expires_at_ms
                     && authority.issued_at_ms <= now_ms
                     && now_ms < authority.expires_at_ms
                     && scope.session_id == media.session_id
+                    && scope.session_reservation_digest == media.session_reservation_digest
                     && scope.binding_digest == media.binding_digest
                     && scope.host_lease_id == media.host_lease_id
                     && scope.host_lease_id == lease.host_lease_id
