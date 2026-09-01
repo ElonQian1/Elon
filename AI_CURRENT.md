@@ -65,7 +65,7 @@ reviewed_at: 2026-09-02
 - 外部矿池：V277/V278 uncompiled/unrun、#13-18 deny、eligible=0；V280 P0 feature 因缺两名独立 authenticated admin|owner 对真实 market/wire profile 的批准而 `blocked`，禁止伪造开放。
 - V279：source-only/uncompiled/unrun、零下游/经济效果；见 `docs/distributed-compute/user-node-provider-binding-authority.md`。
 - A2 Lock q18/q19 CreatedFirst/ExistingFirst shared-busy 各88；q19=`a2lockq19`/194，含物理预建、cold `was_created=false`、同FileId独立holder/target真争用和显式close。`P4372/4372 M4296/3768 T8668/8140`，init=`2728/2200`；仍source-only/uncompiled/unrun、coverage=0、`Qlock=unknown`、production/economic closed，refresh须含q15–q19。
-- `capacity_future`：source-only/uncompiled/unrun，无 API/effect；见 `AI_INDEX.md`。
+- `capacity_future`：已登记并因动态证据推迟而 `blocked`；source-only/uncompiled/unrun，无 API/effect；见 `AI_INDEX.md`。
 
 ## 已接受的产品方向
 

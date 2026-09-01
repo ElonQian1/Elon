@@ -1,16 +1,16 @@
 ---
-title: capacity_future pricing-mode 交付结算谱系桥 V1 验收草案
-status: draft
-reviewed_at: 2026-08-25
+title: capacity_future pricing-mode 交付结算谱系桥 V1 验收
+status: current
+reviewed_at: 2026-09-02
 owners: backend, ai-economy
-proposed_feature_id: compute-capacity-future-settlement-lineage-bridge-v1
-registration_status: unregistered_feature_workflow_unavailable
-design_status: draft_frozen
+feature_id: compute-capacity-future-settlement-lineage-bridge-v1
+registration_status: blocked
+design_status: design_frozen
 implementation_status: store_resolver_source_written_uncompiled
 verification_status: source_review_only
 ---
 
-# `capacity_future` pricing-mode 交付结算谱系桥 V1 验收草案
+# `capacity_future` pricing-mode 交付结算谱系桥 V1 验收
 
 ## 1. 当前证据强度
 
@@ -20,12 +20,12 @@ verification_status: source_review_only
 crate-visible、private-field Store seal 与未运行的 static source-contract guard：
 
 ```text
-proposed_feature=compute-capacity-future-settlement-lineage-bridge-v1
-registry=unregistered
-claim=none
-design=draft_frozen
-domain_implementation=source_draft_written
-source_equations=source_draft_written
+feature=compute-capacity-future-settlement-lineage-bridge-v1
+registry=blocked
+claim=closed_after_source_delivery
+design=design_frozen
+domain_implementation=source_written
+source_equations=source_written
 store_retained_resolver=source_written_not_run
 store_sealed_view=source_written_not_run
 source_contract_guard=source_written_not_run
@@ -43,8 +43,8 @@ acceptance=deferred
 ```
 
 本批没有编译、测试、执行 migration、SQLite、runtime、network、HTTP、MCP 或 PC；旧 v171/v192/v195/
-v198/v225/v228/v238/F0 的任何通过计数都不能冒充本 bridge 的 positive evidence。当前工具目录不含
-`project_feature_workflow`，因此没有登记或 claim 证据，且注册表保持未修改。
+v198/v225/v228/v238/F0 的任何通过计数都不能冒充本 bridge 的 positive evidence。正式 requirement 已通过
+`project_feature_workflow` 登记、复审和认领；源码交付后因动态证据明确推迟而收口为 `blocked`。
 
 ## 2. Canonical 与 shape matrix
 
@@ -66,10 +66,10 @@ v198/v225/v228/v238/F0 的任何通过计数都不能冒充本 bridge 的 positi
 | Instrument | registration/activation/adoption identity一致，activation不晚于adoption。 |
 | Commitment | revision 1 committed root；Instrument、Offer、Snapshot、Provider、window exact。 |
 | Allocation | Grant r1 granted、owner/cutoff exact；terminal r2 exercised、consumer actor exact；Claim 1→2/child r1、Reservation r2、reserved Job exact ref=quoted+1。 |
-| execution | supplied carrier 的 Provider/Pool/Offer/Snapshot 对上容量来源；running Job、active Reservation/Claim 分别严格+1；v193 inner receipt identity/Offer/Lease 同源且 accepted。 |
+| execution | supplied carrier 的 Provider/Pool/Offer/Snapshot 对上容量来源；running Job、active Reservation/Claim 分别严格+1；v193 inner receipt identity/Offer/Lease 同源且 accepted，`decision_digest` 精确绑定 v192 event。 |
 | verification | exact ExecutionReceiptRef；verification的execution digest等于 supplied execution carrier。 |
 | usage | v192 verification-role 与 v195 settlement-role digest 分字段保存，禁止判相等；Store resolver source 分别复用两套 owner 公式核对同一 v193 readings，尚未运行。 |
-| settlement | v195 inner receipt、carrier、ExecutionReceipt、Snapshot、Reservation 同源且 Job/Reservation revision 严格递进；untrusted outer audit view 对齐 event/finalization/budget/provider/job，Store resolver source 再从 historical v195 owner 构造，尚未运行。 |
+| settlement | v195 inner receipt、carrier、ExecutionReceipt、Snapshot、Reservation 同源且 Job/Reservation revision 严格递进；untrusted outer audit view 对齐 event/finalization/budget/provider/job。payee 不直接等同 Provider owner，由 Store historical audit 按 `settlement_account_id`、缺省回退 owner 证明；尚未运行。 |
 | release | available 分支必须有 exact v198 carrier，并引用同一 settlement ref/digest。 |
 | projection | Domain 必须拒绝已表达的 source ref、exact exercise revision 或 digest 漂移；完整 retained lifecycle drift 由本批已写但未运行的 Store owner resolver source 失败关闭。 |
 
@@ -98,11 +98,14 @@ serialized Domain 不得出现 `Option`/`null` release。pending 与 available �
    错用为历史读取门；
 3. Claim lines 与 Instrument contract units 的共同 multiplier、meter exact set、父 release→子 hold 守恒通过
    Store/SQLite positive 与 negative；
-4. v192 accepted 与 v195 settlement digest 必须分别从同一 v193 verified/compensable arrays 按各自 owner
-   公式重算；两套 role-specific digest 不得直接判相等，declared/observed 替代必须失败；
-5. pending/available 两分支 golden、negative、corruption、cross-splice、reopen 与 participant scope 测试；
-6. Service/HTTP/MCP 若后续采用，必须保持 F0 脱敏、project isolation、响应 exact shape 和零业务写入；
-7. 完整 Rust target 编译、fresh/repeat migration（预期仍无新 migration）、定向 Store 测试与真实历史文件
+4. Reservation 下没有 exercised v228 才能判不适用；已有 owner 时，cardinality 或 Claim index drift 必须作为
+   integrity failure；
+5. v193 `decision_digest` 必须绑定 v192 event；v192 accepted 与 v195 settlement digest 分别从同一 v193
+   verified/compensable arrays 按各自 owner 公式重算，两套 digest 不得直接判相等；v195 payee 必须按 historical
+   Provider settlement-account fallback 重审；
+6. pending/available 两分支 golden、negative、corruption、cross-splice、reopen 与 participant scope 测试；
+7. Service/HTTP/MCP 若后续采用，必须保持 F0 脱敏、project isolation、响应 exact shape 和零业务写入；
+8. 完整 Rust target 编译、fresh/repeat migration（预期仍无新 migration）、定向 Store 测试与真实历史文件
    重开留下独立指纹和通过计数。
 
 ## 6. Store resolver source matrix
@@ -110,11 +113,12 @@ serialized Domain 不得出现 `Option`/`null` release。pending 与 available �
 | Case | 源码必须结果 |
 |---|---|
 | root | facade 只接收 `lease_id`，且一次 `TransactionBehavior::Deferred` 覆盖全部 owner read。 |
-| not applicable | 无 settlement、非 `capacity_future` 或无 exact exercised v228 返回 `None`。 |
-| integrity | exact v228 存在后，部分 owner、cross-splice、native/canonical digest drift 全部失败关闭。 |
+| not applicable | 无 settlement、非 `capacity_future` 或 Reservation 下确无 exercised v228 返回 `None`。 |
+| integrity | Reservation 已有 exercised v228 后，cardinality、Claim index、部分 owner、cross-splice、native/canonical digest drift 全部失败关闭。 |
 | historical | Instrument retired、Offer draining 或历史 head 后移不否定 exact registration/activation/adoption/publication。 |
 | contract | Claim/contract unit meter 顺序、集合、`unit_size/quantum_units` 与共同正整数 multiplier exact。 |
 | usage | v192 与 v195 分别调用原 owner audit 重算各自 digest；源码不得出现二者直接相等比较。 |
+| payee | v195 payee 由 historical Provider `settlement_account_id` 审计，未配置才回退 owner；不得直接比较两类账户。 |
 | stage | release absent 仅构造 pending-origin 分支；release present 必须 exact 同源。 |
 | scope | sealed view 不可 Clone/Serde，scope 不进 canonical envelope、日志、缓存或 persistence。 |
 | effect | read-only；无 INSERT/UPDATE/DELETE、状态、容量、结算、资金或提款效果。 |
@@ -125,12 +129,12 @@ serialized Domain 不得出现 `Option`/`null` release。pending 与 available �
 
 | 轴 | 状态 |
 |---|---|
-| implementation | `unregistered_store_resolver_source_written`（Domain/source equations + Store retained resolver） |
+| implementation | `registered_blocked_store_resolver_source_written`（Domain/source equations + Store retained resolver） |
 | source review | `done_with_red_team_corrections`；不等于编译或测试。 |
 | compile/test/runtime | `not_run/not_run/not_run`；仅允许本批结束时记录 formatter 与静态源码守卫，不计为测试通过。 |
-| delivery | 提交推送前为 `not_delivered`；推送后才可改报 `pushed`。 |
+| registry | requirement 已绑定，源码交付后按动态证据缺口收口为 `blocked`。 |
 | acceptance | `deferred`；Store/API/runtime/product acceptance 均未开始。 |
 
-因此，本批完成后也只能宣称“unregistered reference-only bridge Domain 与 Store retained resolver source 已写入”。不能宣称
-feature 已登记/认领、F0 exit gate 已满足、`capacity_future` 市场可用、交付清算完成、Provider 收益可提取或
+因此，本批完成后只能宣称“registered/blocked reference-only bridge Domain 与 Store retained resolver source 已写入并静态复核”。不能宣称
+F0 exit gate 已满足、`capacity_future` 市场可用、交付清算完成、Provider 收益可提取或
 真实资金已结算。

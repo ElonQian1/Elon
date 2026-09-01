@@ -1,25 +1,25 @@
 ---
-title: capacity_future pricing-mode 交付结算谱系桥 V1 权威草案
-status: draft
-reviewed_at: 2026-08-25
+title: capacity_future pricing-mode 交付结算谱系桥 V1 权威
+status: current
+reviewed_at: 2026-09-02
 owners: backend, ai-economy
-proposed_feature_id: compute-capacity-future-settlement-lineage-bridge-v1
-registration_status: unregistered_feature_workflow_unavailable
-design_status: draft_frozen
+feature_id: compute-capacity-future-settlement-lineage-bridge-v1
+registration_status: blocked
+design_status: design_frozen
 implementation_status: store_resolver_source_written_uncompiled
 verification_status: source_review_only
 ---
 
-# `capacity_future` pricing-mode 交付结算谱系桥 V1 权威草案
+# `capacity_future` pricing-mode 交付结算谱系桥 V1 权威
 
 ## 1. 唯一结论与当前现实
 
-本未登记草案只冻结一份 API-free、reference-only 的 source projection：把一份已经
+本已登记 V1 冻结一份 API-free、reference-only 的 source projection：把一份已经
 `exercised` 的 v228 DeliveryAllocation，沿既有 v238 CapacityInstrument、v225
 CapacityCommitment、v171 immutable Price Snapshot、F0 execution/verification/settlement
 carrier，连接到 v195 SettlementReceipt ref；若调用方提供 v198 release carrier，则用独立封闭
-分支引用。只有未来 Store resolver 重审 outer v195 event 与 owner bodies 后，才能称 exact retained
-Attempt Settlement。
+分支引用。Lease-rooted Store resolver source 已能从 outer v195 event 与历史 owner bodies 重建并封存 exact
+retained Attempt Settlement，但该路径仍未编译或运行。
 
 它解决的是“这笔已验证用量结算来自哪一个未来容量合约、交付窗口、锁价快照和 whole-only
 行权”的历史可解释性缺口。它不是新的价格、计量、结算或资金权威，不创建 ClearingReceipt，
@@ -29,10 +29,9 @@ owner proof。
 本批在既有 Domain、canonical/shape validator 与跨来源等式投影之上，写入 Lease-rooted Store retained
 resolver、历史 CapacityInstrument/DeliveryAllocation owner reader、crate-visible、private-field Store seal 和未运行的
 source-contract guard。Service、HTTP、MCP、PC、table、migration、writer 与资金动作仍不存在；状态严格为
-`unregistered / draft_frozen / store_resolver_source_written / source_review_only /
-implementation_uncompiled / implementation_unrun`、`passed=0 / failed=0`。当前会话没有
-`project_feature_workflow`，所以 proposed feature ID 未登记、未认领，也不能宣称已排除并发重复；禁止手改
-`.elon/project-features.json`。
+`registered_blocked / design_frozen / store_resolver_source_written / source_review_only /
+implementation_uncompiled / implementation_unrun`、`passed=0 / failed=0`。Feature Registry 已通过
+`project_feature_workflow` 登记、复审和独占认领后按本批动态证据缺口收口为 `blocked`；注册表仍禁止手改。
 
 ## 2. 复用的单一 owner
 
@@ -153,15 +152,18 @@ API-free source projection 对调用方提供的对象失败关闭检查：
 5. 传入的自摘要 execution carrier 之 Provider/Pool/Offer/Snapshot 与 Commitment 一致，Job、Reservation、
    child Claim ID 一致，且 running Job、active Reservation、active Claim 分别严格为 exercise refs+1；另要求
    v193 inner receipt 的 ID/digest、Job、Reservation、Lease、Provider、Offer 与该 carrier 相等且
-   verification status 为 accepted；
+   verification status 为 accepted，并且 v193 `decision_digest` 精确等于 v192
+   `verification_event_digest`；
 6. verification carrier 的 ExecutionReceiptRef 与 execution carrier 相等，且
    `execution_lineage_digest` 等于传入 execution carrier digest；
 7. settlement carrier 的 execution digest/ref、Snapshot、Provider、Job、Reservation 与同一 execution
    chain 一致，并固定 verification-pending Job=running Job+1、settled Job=前者+1、terminal Reservation=
    active Reservation+1；
-8. v195 inner receipt 的 ExecutionReceipt、Snapshot、Reservation 与 settlement carrier 一致；v192
+8. v195 inner receipt 的 ExecutionReceipt、Snapshot、Reservation 与 settlement carrier 一致，consumer 与
+   Allocation consumer 一致；v192
    VerificationDecision 的两个 digest 和 v195 inner receipt 的两个 digest 分别保留为 role-specific refs，
-   不判相等，也不在本草案复制两套 owner digest 算法；
+   不判相等，也不在 Domain 复制两套 owner digest 算法；v195 payee 不直接等同 Provider owner，Store
+   historical audit 按 exact Provider `settlement_account_id`、缺省回退 owner 的既有规则证明；
 9. Domain-owned untrusted v195 audit view 还必须对齐 event digest、Lease、Finalization、Provider、source/terminal
    Job，以及 v228 budget ID/amount；它表达 outer 字段等式但不证明 view 确由 Store owner body 构造；
 10. available 分支的 release carrier 必须引用同一 AttemptSettlementRef 和 settlement carrier digest。
@@ -182,9 +184,10 @@ participant/project 判定；`Projected...`、parser 结果和任意 caller DTO 
 
 profile 与错误语义固定为：
 
-- settlement Lease 不存在、Snapshot 不是逐字 `capacity_future`，或该 Reservation/Claim 没有 exercised v228
+- settlement Lease 不存在、Snapshot 不是逐字 `capacity_future`，或该 Reservation 确实没有 exercised v228
   owner 时返回 `None`，表示本 profile 不适用；普通 future Broker Reservation 不得被误收；
-- 一旦发现 exact v228 root，任一 Instrument/activation/adoption/publication、Commitment/Claim、F0 carrier、
+- 一旦该 Reservation 存在 exercised v228 owner，owner cardinality 不为一或 Claim index 不同即为 integrity
+  failure；不得把 cross-splice 降格为 `None`。其后任一 Instrument/activation/adoption/publication、Commitment/Claim、F0 carrier、
   v195 outer owner 缺失、错接、非 canonical 或摘要漂移均为 integrity failure；若存在 v198 owner，
   则它的缺失依赖、错接、非 canonical 或摘要漂移同样属于 integrity failure；
 - connection、begin/commit、busy、I/O 与 SQL/schema operational failure 单独分类；未来 participant surface
@@ -199,9 +202,11 @@ resolver source 必须证明：
 - v223 reference binding 与 Price Snapshot 的审批/application 历史完整，不能读取 mutable latest curve；
 - Commitment Claim lines 与 Instrument contract units 是同一个正整数 multiplier，meter 集合、顺序、粒度和
   quantity 全部一致；父 Claim whole release 与子 Reservation Claim whole hold 守恒；
-- v192 decision 是 accepted，v193 verified/compensable arrays 是共同 readings owner；必须分别按 v192
+- v192 decision 是 accepted，v193 `decision_digest` 精确绑定该 v192 event；v193 verified/compensable arrays
+  是共同 readings owner；必须分别按 v192
   `compute_attempt_verification_usage` 公式与 v195 `settlement_usage_digest.v1` 公式重算并核对各自 digest，
-  禁止直接比较两套 digest；v195 outer event、owner audit 和 posting 仍由现有 Store 完成；
+  禁止直接比较两套 digest；v195 payee 由 historical Provider settlement-account fallback 审计，outer event、
+  owner audit 和 posting 仍由现有 Store 完成；
 - historical Offer/publication 读取不能因后来 bucket head、Offer draining 或 Instrument retirement 误拒；
 - participant/admin scope、missing/integrity/nonparticipant 脱敏与 project isolation 复用 F0 retained read 边界。
 
@@ -227,9 +232,8 @@ v225 的共同整数 multiplier 校验，并补验 meter 顺序与 `unit_size ==
 
 ## 9. 冻结状态
 
-源码文件只建立未登记的独立 Domain ABI、JCS/SHA-256、shape validator、source projection equations、
+正式需求见 [`compute-capacity-future-settlement-lineage-bridge-v1.md`](../requirements/compute-capacity-future-settlement-lineage-bridge-v1.md)。源码文件只建立已登记的独立 Domain ABI、JCS/SHA-256、shape validator、source projection equations、
 Lease-rooted Store retained resolver 与 crate-visible、private-field Store seal。验收证据以
 [`capacity-future-settlement-lineage-acceptance.md`](capacity-future-settlement-lineage-acceptance.md)
-为准。没有 feature workflow 登记、编译或运行证据时，只能称“`capacity_future` 交付结算谱系 bridge
-unregistered Store resolver source 已写入”，不能称正式 feature 已认领，也不能称容量期货清算、验证计量或资金
-结算已生产闭环。
+为准。Feature Registry 当前为 `blocked`；在没有编译或运行证据时，只能称“已登记的 `capacity_future`
+交付结算谱系 bridge 与 Store resolver source 已写入并静态复核”，不能称容量期货清算、验证计量或资金结算已生产闭环。
