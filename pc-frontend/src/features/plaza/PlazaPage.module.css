@@ -257,6 +257,7 @@
 .apkBtn,
 .openBtn,
 .joinBtn,
+.installBtn,
 .loadMoreBtn {
   height: 32px;
   display: inline-flex;
@@ -270,6 +271,12 @@
   text-decoration: none;
   cursor: pointer;
 }
+.installBtn {
+  border: 1px solid rgba(37, 211, 102, .34);
+  background: #1d6f42;
+  color: #fff;
+}
+.installBtn:hover { background: #248652; }
 .apkBtn {
   border: 1px solid rgba(255, 255, 255, .1);
   background: rgba(255, 255, 255, .045);

@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Download, LayoutGrid, Loader2, LogIn, Search, UsersRound } from 'lucide-react'
+import { Download, LayoutGrid, Loader2, LogIn, Search, Store, UsersRound } from 'lucide-react'
 import { api } from '../../api/client'
 import { useProjectStore } from '../conversation/useProjectStore'
+import MarketplaceErpInstallDialog from './MarketplaceErpInstallDialog'
 import styles from './PlazaPage.module.css'
 
 export interface PlazaProject {
@@ -17,6 +18,10 @@ export interface PlazaProject {
   viewer_role?: string
   latest_apk_url?: string
   icon_data_url?: string
+  install_action?: {
+    kind: string
+    label: string
+  }
   created_at: string
   updated_at?: string
 }
@@ -61,6 +66,7 @@ export default function ProjectPlazaView() {
   const [total, setTotal] = useState<number | null>(null)
   const [nextCursor, setNextCursor] = useState<string | null>(null)
   const [hasMore, setHasMore] = useState(false)
+  const [installProject, setInstallProject] = useState<PlazaProject | null>(null)
 
   const load = useCallback(async (options?: { append?: boolean; cursor?: string | null }) => {
     const append = options?.append ?? false
@@ -162,6 +168,13 @@ export default function ProjectPlazaView() {
     }
   }
 
+  async function handleInstanceCreated(result: { instance: { project_id: string }; target_route: string }) {
+    await useProjectStore.getState().loadProjects()
+    await useProjectStore.getState().selectProject(result.instance.project_id)
+    setInstallProject(null)
+    navigate(result.target_route)
+  }
+
   const canLoadMore = activeFilter !== 'joined' && hasMore
 
   return (
@@ -225,6 +238,7 @@ export default function ProjectPlazaView() {
                 joinStatus={joinStatus[project.id]}
                 onJoin={handleJoin}
                 onOpen={openProject}
+                onInstall={setInstallProject}
               />
             ))}
           </div>
@@ -243,6 +257,13 @@ export default function ProjectPlazaView() {
           )}
         </div>
       )}
+      {installProject && (
+        <MarketplaceErpInstallDialog
+          project={installProject}
+          onClose={() => setInstallProject(null)}
+          onCreated={handleInstanceCreated}
+        />
+      )}
     </section>
   )
 }
@@ -253,12 +274,14 @@ function ProjectCard({
   joinStatus,
   onJoin,
   onOpen,
+  onInstall,
 }: {
   project: PlazaProject
   joining: boolean
   joinStatus?: JoinStatus
   onJoin: (project: PlazaProject) => void
   onOpen: (project: PlazaProject) => void
+  onInstall: (project: PlazaProject) => void
 }) {
   const title = project.display_name || project.name
   const alreadyJoined = Boolean(project.viewer_role) || joinStatus === 'joined'
@@ -274,8 +297,8 @@ function ProjectCard({
           <strong title={title}>{title}</strong>
           <span title={project.owner_account}>@{project.owner_account}</span>
         </div>
-        <span className={styles.statusPill} data-mode={project.latest_apk_url ? 'installable' : project.join_mode}>
-          {project.latest_apk_url ? '可安装' : joinModeLabel(project.join_mode)}
+        <span className={styles.statusPill} data-mode={project.install_action ? 'installable' : project.latest_apk_url ? 'installable' : project.join_mode}>
+          {project.install_action ? '可创建' : project.latest_apk_url ? '可安装' : joinModeLabel(project.join_mode)}
         </span>
       </header>
 
@@ -288,6 +311,12 @@ function ProjectCard({
       </div>
 
       <div className={styles.cardActions}>
+        {project.install_action?.kind === 'erp_blueprint' && (
+          <button className={styles.installBtn} type="button" onClick={() => onInstall(project)}>
+            <Store size={14} aria-hidden="true" />
+            <span>{project.install_action.label}</span>
+          </button>
+        )}
         {project.latest_apk_url && (
           <a
             href={project.latest_apk_url}

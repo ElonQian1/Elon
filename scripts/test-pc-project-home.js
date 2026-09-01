@@ -5,6 +5,7 @@ const path = require('node:path')
 const root = path.resolve(__dirname, '..')
 const projectsPage = read('pc-frontend/src/features/projects/ProjectsPage.tsx')
 const projectPlaza = read('pc-frontend/src/features/plaza/ProjectPlazaView.tsx')
+const marketplaceInstall = read('pc-frontend/src/features/plaza/MarketplaceErpInstallDialog.tsx')
 const landing = read('pc-frontend/src/features/conversation/ProjectLanding.tsx')
 const landingDownloads = read('pc-frontend/src/features/conversation/ProjectLandingDownloads.tsx')
 const landingCss = read('pc-frontend/src/features/conversation/ProjectLanding.module.css')
@@ -19,6 +20,10 @@ assert.match(
 )
 assert.doesNotMatch(projectsPage, /function ProjectHome\(/, 'project center should not keep a duplicate project-home intermediary')
 assert.match(projectsPage, /<ProjectPlazaView \/>/, 'project center should delegate to the current project plaza')
+assert.match(projectPlaza, /project\.install_action\?\.kind === 'erp_blueprint'/, 'plaza should expose published ERP blueprints')
+assert.match(projectPlaza, /<MarketplaceErpInstallDialog/, 'plaza should use the dedicated ERP onboarding dialog')
+assert.match(marketplaceInstall, /\/api\/store\/projects\/\$\{encodeURIComponent\(project\.id\)\}\/erp-instances/, 'ERP onboarding should call the marketplace instance endpoint')
+assert.match(marketplaceInstall, /平台账号登录和商户经营数据不会写入公开模板项目/, 'ERP onboarding should explain tenant data isolation')
 
 for (const contract of ['workflowGrid', 'landing?.highlights', 'landing?.target_users', 'quickChannels', 'projectResources']) {
   assert.ok(landing.includes(contract), `project landing should include ${contract}`)
