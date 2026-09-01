@@ -405,14 +405,14 @@
         },
         {
           "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2_dynamic_evidence/lock_runner/existing_first_truncate_error_release_succeeded/fixture.rs",
-          "content_hash": "7eab325824c391c293533fc9052955f79da2346697a89813f123957e6802535d",
+          "content_hash": "270eaab1a45f6995208b6e435fbe9672dc8256145275599e657ca6f74ab62536",
           "locator": "ExistingFirst precreation, installed xShmLock, and custody validation",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "775a910ca4f5fbcae1410bfa04853172e98b668b",
-            "head_blob_oid": "c568079b561060d1828963506a272a62ad95262b",
-            "worktree_blob_oid": "c568079b561060d1828963506a272a62ad95262b",
+            "head_commit": "1186ac655ef89277dfcf3845f51892e567a0cea4",
+            "head_blob_oid": "9db094950bc02112c88660a438675cc693a190e9",
+            "worktree_blob_oid": "9db094950bc02112c88660a438675cc693a190e9",
             "state": "tracked_clean"
           }
         },
@@ -522,59 +522,59 @@
         },
         {
           "path": "server/src/node_agent_managed_fs/sqlite_namespace_shm/node_initialization.rs",
-          "content_hash": "0f41ed771b5d7ec84407604fa54fcfec358ee33cb652ac45b476b9ce517ac37b",
+          "content_hash": "4d9c6999c366b6fada09270e26aa48dbbcedee921185fb4748e1be8d4ac74727",
           "locator": "Explicit Q15 node-initialization submodule and ordering",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "775a910ca4f5fbcae1410bfa04853172e98b668b",
-            "head_blob_oid": "666c31c9486854b95d369977f4654ef5a45279e3",
-            "worktree_blob_oid": "666c31c9486854b95d369977f4654ef5a45279e3",
+            "head_commit": "1186ac655ef89277dfcf3845f51892e567a0cea4",
+            "head_blob_oid": "d4455791e2b5f56a37a0af1eae87c7877c1ac199",
+            "worktree_blob_oid": "d4455791e2b5f56a37a0af1eae87c7877c1ac199",
             "state": "tracked_clean"
           }
         },
         {
           "path": "server/src/node_agent_managed_fs/sqlite_namespace_shm/node_initialization/existing_first_truncate_error_release_succeeded.rs",
-          "content_hash": "9b8c22ef7acac9aedf26ca64a8992197623ba403fa0e128f36c3b95572986fab",
+          "content_hash": "1e8da7513f354f9554ff7681eb7008a3a24e6a000804e95c10437ae93ae05f7c",
           "locator": "ExistingFirst truncate unavailable then release succeeded",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "775a910ca4f5fbcae1410bfa04853172e98b668b",
-            "head_blob_oid": "85dee27c7c3b5ade9574dd815cc6773f7d1abad7",
-            "worktree_blob_oid": "85dee27c7c3b5ade9574dd815cc6773f7d1abad7",
+            "head_commit": "1186ac655ef89277dfcf3845f51892e567a0cea4",
+            "head_blob_oid": "1c209f206347267a12e60fae2329abd2ff9afcab",
+            "worktree_blob_oid": "1c209f206347267a12e60fae2329abd2ff9afcab",
             "state": "tracked_clean"
           }
         },
         {
           "path": "server/src/node_agent_managed_fs/sqlite_namespace_shm/test_initialization_runtime/controller.rs",
-          "content_hash": "7974d9703c2fa6e489a5091c32991f0da44903a1a68472866fa0766412c131ff",
+          "content_hash": "9cb838e264aed56f30c6e9d4297f674ed7aada0f1c4640c886b4004bbd961047",
           "locator": "Explicit Q15 controller submodule and case dispatch",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "775a910ca4f5fbcae1410bfa04853172e98b668b",
-            "head_blob_oid": "f05050f7106c2750a6890088dba444962d9fa5c6",
-            "worktree_blob_oid": "f05050f7106c2750a6890088dba444962d9fa5c6",
+            "head_commit": "1186ac655ef89277dfcf3845f51892e567a0cea4",
+            "head_blob_oid": "dfc049037d98f57279f017e82352443e618a3721",
+            "worktree_blob_oid": "dfc049037d98f57279f017e82352443e618a3721",
             "state": "tracked_clean"
           }
         },
         {
           "path": "server/src/node_agent_managed_fs/sqlite_namespace_shm/test_initialization_runtime/controller/existing_first_truncate_error_release_succeeded.rs",
-          "content_hash": "7fae1475eff319b98472c52f5653fdc2ab94b2404bf528334e12c8cdd14337d4",
+          "content_hash": "be8918434236fa5e2334b3fa794563fb0ecb7ad9d44c14746d8c3533c29a3993",
           "locator": "Q15 ordered events, counts, and terminal validation",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "775a910ca4f5fbcae1410bfa04853172e98b668b",
-            "head_blob_oid": "663f6f8c8f8b8b50c27c8a5466c27c22e8a78b65",
-            "worktree_blob_oid": "663f6f8c8f8b8b50c27c8a5466c27c22e8a78b65",
+            "head_commit": "1186ac655ef89277dfcf3845f51892e567a0cea4",
+            "head_blob_oid": "f59db490d94776351341604a1fb04e4d36f84479",
+            "worktree_blob_oid": "f59db490d94776351341604a1fb04e4d36f84479",
             "state": "tracked_clean"
           }
         }
       ],
       "created_at_ms": 1788116827147,
-      "updated_at_ms": 1788278245796
+      "updated_at_ms": 1788278636850
     },
     {
       "id": "backend-a2-map-lock-static-denominator-v1",
@@ -13192,16 +13192,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_bd5f9d2ec3884b29b96c1a751abe9d21",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-map-region-loop-20260901",
-      "reason": "Requirement review is accepted and the verified static-denominator dependency has no blocker; ready only for source-evidence recording.",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1788199504710
-    },
-    {
       "id": "feature_event_2ff882c11cd24cfa8b922373f1aff104",
       "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
       "action": "claimed",
@@ -15190,6 +15180,16 @@
       "from_status": "in_progress",
       "to_status": "blocked",
       "at_ms": 1788278245796
+    },
+    {
+      "id": "feature_event_a429a23a84b843979f173b1648284920",
+      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-root-019fc8bf-q15-style",
+      "reason": "",
+      "from_status": "blocked",
+      "to_status": "blocked",
+      "at_ms": 1788278636850
     }
   ]
 }
