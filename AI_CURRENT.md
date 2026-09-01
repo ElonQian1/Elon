@@ -65,7 +65,7 @@ reviewed_at: 2026-09-01
 - 分布式算力≠“开放算力市场已完成”；状态见 `docs/distributed-compute/current-implementation-status.md`。
 - 外部矿池：V277/V278 uncompiled/unrun、#13-18 deny、eligible=0；V280 仅 ABI。
 - V279：source-only/uncompiled/unrun、零下游/经济效果；见 `docs/distributed-compute/user-node-provider-binding-authority.md`。
-- A2 Lock：q2=`104`，q3/q4=`2×1320`，q5=`44`（8 shared 单槽+36 exclusive 连续范围；独立句柄真实 Win32 byte-range contention 与 exact receipt 源码）；未运行 inventory=`2798 present/5870 missing`、coverage=`0/8668`。仍为 `uncompiled/unrun, passed=0 failed=0 actual=not_run, Qlock=unknown, WindowsDynamic=not_opened, production closed`；详见 `docs/distributed-compute/node-plugin-vfs-map-lock-dynamic-quotient-authority.md`。
+- A2 Lock：q2=`104`，q3/q4=`2×1320`，q5=`44` distinct-handle native-busy，q6 `LockLocalSiblingContentionCompletedV1`=`44`（8 shared/sibling-exclusive + 36 exclusive/sibling-any；真实双连接 installed `xShmLock` local sibling gate，selected 零 native call/状态漂移）；未运行 inventory=`2842 present/5826 missing`、coverage=`0/8668`。仍为 `uncompiled/unrun, passed=0 failed=0 actual=not_run, Qlock=unknown, WindowsDynamic=not_opened, production closed`；详见 `docs/distributed-compute/node-plugin-vfs-map-lock-dynamic-quotient-authority.md`。
 - `capacity_future`：source-only/uncompiled/unrun，无 API/effect；见 `AI_INDEX.md`。
 
 ## 已接受的产品方向
