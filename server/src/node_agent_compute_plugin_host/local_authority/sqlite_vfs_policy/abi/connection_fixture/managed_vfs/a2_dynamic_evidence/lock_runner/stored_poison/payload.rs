@@ -253,6 +253,7 @@ fn managed_path_tag(value: ManagedSqliteShmTestLockPath) -> u64 {
         ManagedSqliteShmTestLockPath::Local => 3,
         ManagedSqliteShmTestLockPath::SiblingContention => 4,
         ManagedSqliteShmTestLockPath::LocalProtocolRejection => 5,
+        ManagedSqliteShmTestLockPath::InitializationFailure => 6,
     }
 }
 

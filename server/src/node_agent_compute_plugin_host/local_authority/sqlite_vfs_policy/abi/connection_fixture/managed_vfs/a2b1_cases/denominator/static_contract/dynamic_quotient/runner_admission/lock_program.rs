@@ -7,6 +7,7 @@ mod lifecycle;
 mod local_protocol_rejection;
 mod local_sibling_contention;
 mod native_acquire_busy;
+mod native_acquire_created_first_exclusive_release_error;
 mod pre_managed_callback_rejection;
 mod raw_state_rejection;
 mod request_validation;
@@ -39,6 +40,9 @@ use local_protocol_rejection::LockLocalProtocolRejectionProgramSpecV1;
 use local_sibling_contention::LockLocalSiblingContentionProgramSpecV1;
 #[cfg(windows)]
 use native_acquire_busy::LockNativeAcquireBusyProgramSpecV1;
+#[cfg(windows)]
+use native_acquire_created_first_exclusive_release_error::LockNativeAcquireCreatedFirstExclusiveReleaseErrorProgramSpecV1;
+pub(super) use native_acquire_created_first_exclusive_release_error::NATIVE_ACQUIRE_CREATED_FIRST_EXCLUSIVE_RELEASE_ERROR_PROJECTOR_DELTA_V1;
 pub(super) use pre_managed_callback_rejection::PRE_MANAGED_CALLBACK_REJECTION_PROJECTOR_DELTA_V1;
 pub(super) use raw_state_rejection::RAW_STATE_REJECTION_PROJECTOR_DELTA_V1;
 #[cfg(windows)]
@@ -257,6 +261,13 @@ pub(in super::super) fn run_lock_isolated_for_test(
                 },
             )
         }
+        LockProgramCaseV1::NativeAcquireCreatedFirstExclusiveReleaseError(initialization) => {
+            native_acquire_created_first_exclusive_release_error::run_isolated_v1(
+                exact_test,
+                initialization,
+                member,
+            )
+        }
         LockProgramCaseV1::PreManagedCallbackRejection(rejection) => {
             pre_managed_callback_rejection::run_isolated_v1(exact_test, rejection, member)
         }
@@ -391,6 +402,9 @@ enum LockProgramCaseV1 {
     LocalProtocolRejection(LockLocalProtocolRejectionProgramSpecV1),
     LocalSiblingContention(LockLocalSiblingContentionProgramSpecV1),
     NativeAcquireBusy(LockNativeAcquireBusyProgramSpecV1),
+    NativeAcquireCreatedFirstExclusiveReleaseError(
+        LockNativeAcquireCreatedFirstExclusiveReleaseErrorProgramSpecV1,
+    ),
     PreManagedCallbackRejection(
         pre_managed_callback_rejection::LockPreManagedCallbackRejectionProgramSpecV1,
     ),
@@ -437,6 +451,12 @@ fn program_v1(
 #[cfg(test)]
 pub(super) fn native_acquire_busy_catalog_row_count_for_test() -> usize {
     native_acquire_busy::catalog_row_count_for_test()
+}
+
+#[cfg(test)]
+pub(super) fn native_acquire_created_first_exclusive_release_error_catalog_row_count_for_test(
+) -> usize {
+    native_acquire_created_first_exclusive_release_error::catalog_row_count_for_test()
 }
 
 #[cfg(test)]

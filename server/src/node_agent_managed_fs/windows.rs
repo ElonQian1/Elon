@@ -73,6 +73,7 @@ pub(super) use sqlite::{
 pub(super) use sqlite_locking::{try_lock_sqlite_byte_range, unlock_sqlite_byte_range};
 #[cfg(all(test, windows))]
 pub(super) use sqlite_locking::{
+    unlock_sqlite_byte_range_outcome_uncertain_for_initialization_test,
     unlock_sqlite_byte_range_outcome_uncertain_for_test,
     unlock_sqlite_byte_range_return_receipt_unavailable_for_main_close_test,
     PlatformManagedSqliteUnlockReturnReceiptUnavailable,

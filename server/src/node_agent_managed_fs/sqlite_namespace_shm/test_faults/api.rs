@@ -176,6 +176,12 @@ impl ManagedSqliteShmTestTargetObserver {
         }
     }
 
+    pub(in crate::node_agent_managed_fs::sqlite_namespace::shm) fn initialization_authority_v1(
+        &self,
+    ) -> (Arc<ManagedSqliteShmCoordinator>, (u64, u64)) {
+        (Arc::clone(&self.coordinator), self.target.identity())
+    }
+
     /// Arms one exact managed Lock action after any setup transitions are complete.
     pub(crate) fn begin_lock_action_observation(
         &self,

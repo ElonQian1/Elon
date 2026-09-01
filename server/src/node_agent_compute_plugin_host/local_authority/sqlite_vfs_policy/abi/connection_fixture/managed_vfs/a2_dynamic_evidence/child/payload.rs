@@ -4,7 +4,8 @@ use super::super::super::a2b2_cases::{
 };
 
 use super::{
-    lock_abi_scalar_rejection, lock_callback_route_unknown, lock_lifecycle,
+    lock_abi_scalar_rejection, lock_callback_route_unknown,
+    lock_created_first_exclusive_release_error, lock_lifecycle,
     lock_local_protocol_rejection, lock_local_sibling_contention, lock_native_acquire_busy,
     lock_pre_managed_rejection, lock_raw_state_rejection, lock_request_validation,
     lock_stored_poison, map_lifecycle, map_region_loop, SanitizedPayloadFamily,
@@ -146,6 +147,11 @@ pub(super) fn validate_actual_payload(
         lock_raw_state_rejection::REPORT_VERSION => (
             SanitizedPayloadFamily::LockQuotient,
             lock_raw_state_rejection::classify_header(version, selector)?
+                .ok_or("A2_DYNAMIC_CHILD_ACTUAL_VERSION_INVALID")?,
+        ),
+        lock_created_first_exclusive_release_error::REPORT_VERSION => (
+            SanitizedPayloadFamily::LockQuotient,
+            lock_created_first_exclusive_release_error::classify_header(version, selector)?
                 .ok_or("A2_DYNAMIC_CHILD_ACTUAL_VERSION_INVALID")?,
         ),
         _ => return Err("A2_DYNAMIC_CHILD_ACTUAL_VERSION_INVALID"),

@@ -42,7 +42,7 @@ owner 图只验证 baseline commit literal 形状、从 reviewed owner bytes 重
   `source_written/source_review_only/implementation_uncompiled/implementation_unrun`，未 Cargo、未 Windows/真实运行，
   `passed=0 failed=0 actual=not_run`；不得复用前序 `4/4`、`36/36`、fingerprint 或 receipt。
 - 计数边界：这 4 项分别是 legacy non-denominator subset、incomplete branch-atom scaffold、source-owner graph 与 Map template ledger 自洽守卫；不形成完整 terminal universe、`CaseKey`、`Expected`、denominator、`StaticContract` 或 map/lock `WindowsDynamic`。
-- current Lock source 已推进到 q11 `LockRawStateRejectionV1`：在两个 pointer safety-premise exclusion 后新增 11 个 exact singleton normalized groups，使 q1–q11 source-present=`3668 members/3668 groups`；q10 的 7 个与 q9 的 528 个 singleton（6×88）保持不变。精确 matcher、production seam、`controlled_fault_actual`/natural actual、custody 与 receipt 边界只见[`Lock tranches`](node-plugin-vfs-lock-dynamic-tranches-authority.md)。q11 与既有 q5–q10 均未编译、未运行，不构成 actual、Windows record、动态接受或生产开放事实；3,432 initialization failures 仍 missing 且不属于 q9–q11，q9–q11 source changes 对应的 19-artifact global frozen/source-owner refresh 继续独立 deferred。
+- current Lock source 已推进到 q12 `LockNativeAcquireCreatedFirstExclusiveReleaseErrorV1`：CreatedFirst DMS release outcome uncertain 精确增加 88 个 singleton normalized groups，使 q1–q12 source-present=`3756 members/3756 groups`；完整 initialization umbrella=`3432 members/2904 groups`，q12 取 88/88 后 remaining=`3344/2816`。精确 matcher、production seam、`controlled_fault_actual`/natural actual、custody 与 receipt 边界只见[`Lock tranches`](node-plugin-vfs-lock-dynamic-tranches-authority.md)。q12 与既有 q5–q11 均未编译、未运行，`controlled_fault_actual=source_only_unrun`，不构成 actual、Windows record、动态接受或生产开放事实；q9–q12 source changes 对应的 19-artifact global frozen/source-owner refresh 继续独立 deferred。
 
 ### 历史证据元组
 
@@ -133,7 +133,7 @@ Map/Lock 静态 scope、`CaseKey`、`SourceBranch`、`Expected`、exclusion 与 
 | Family | StaticContract | DynamicQuotientMemberCoverage | WindowsDynamic | 当前门槛 |
 |---|---:|---:|---:|---|
 | Map | `43476/43476` | `0/43476` | `not_opened` | 验证 current source，补齐其余 `42,955` 个 program，冻结 exact class/member manifest，机械得到 `Qmap` |
-| Lock | `8668/8668` | `0/8668` | `not_opened` | q11 `LockRawStateRejectionV1`=11 exact singleton、2 pointer premises excluded；unrun inventory members/groups=`3668/3668 present, 5000/4472 missing, 8668/8140 total`；3,432 initialization failures 仍 missing、非 q9–q11；无 actual，`Qlock=unknown`；q9–q11 source changes 对应的 19-artifact refresh 独立 deferred；详见 [Lock tranches](node-plugin-vfs-lock-dynamic-tranches-authority.md) |
+| Lock | `8668/8668` | `0/8668` | `not_opened` | q12 `LockNativeAcquireCreatedFirstExclusiveReleaseErrorV1`=88 exact singleton；unrun inventory members/groups=`3756/3756 present, 4912/4384 missing, 8668/8140 total`；initialization umbrella=`3432/2904`、remaining=`3344/2816`；无 actual，`Qlock=unknown`；q9–q12 source changes 对应的 19-artifact refresh 独立 deferred；详见 [Lock tranches](node-plugin-vfs-lock-dynamic-tranches-authority.md) |
 | **Map/Lock aggregate** | **verified** | **not_started** | **not_opened** | **逐 class Windows exact-set 后才可形成 `Q/Q`** |
 
 #### 2.1.1 静态闭合前 review provenance（历史）
@@ -232,7 +232,7 @@ phase 与 terminal phase，不能把 cleanup failure 归并回最初注入点或
 | map outcome uncertain | FileId/domain 永久 tombstone；同 domain sibling 不得重建 runtime 或继续 SHM。 |
 | lock success | `LockShared/LockExclusive/UnlockShared/UnlockExclusive` 四动作分别覆盖 local success、shared coalescing、exact range/mask transition 与 OS acquire/release；不得用 exclusive shape代表 shared。 |
 | local lock contention | 合法 sibling 冲突只返回 `SQLITE_BUSY`，不触发脚本、不 poison、不篡改持锁 mask。 |
-| OS lock outcome | shared/exclusive sibling relation 分别对账 success/contended/error；q5–q8 的真实 lower/guard 要求保持不变。q9 是 pre-managed callback rejection，q10 是 raw/registry/managed lower 前的 ABI scalar direct rejection，q11 是受控 raw-state admission/abandon rejection；三者都不得伪装成 OS lower，q11 也不得把 `controlled_fault_actual` 冒充自然生产可达；其 exact actual 门槛只见 [Lock tranches](node-plugin-vfs-lock-dynamic-tranches-authority.md)。`SQLITE_BUSY` 不得与 I/O failure、mutation 或 uncertainty 合并。 |
+| OS lock outcome | shared/exclusive sibling relation 分别对账 success/contended/error；q5–q8 的真实 lower/guard 要求保持不变。q9 是 pre-managed callback rejection，q10 是 raw/registry/managed lower 前的 ABI scalar direct rejection，q11 是受控 raw-state rejection；三者不得伪装成 OS lower。q12 则在真实 CreatedFirst DMS exclusive-release 点调用一次 `UnlockFileEx` 并故意不读取 BOOL，保留 `ExclusiveOutcomeUncertain` 与 quarantine；该未运行 source seam 只能形成 `controlled_fault_actual`，不得冒充 natural actual。精确门槛只见 [Lock tranches](node-plugin-vfs-lock-dynamic-tranches-authority.md)。`SQLITE_BUSY` 不得与 I/O failure、mutation 或 uncertainty 合并。 |
 | lock release uncertainty | 不清本地 mask，不释放对应 custody；domain terminal 与后续 sibling 行为逐项匹配。 |
 | cleanup rewrite | DMS unlock/file close、mapping close或exact-open cleanup改写 terminal phase/custody时，保留 cause phase并命中独立 key；不得归并原失败 phase。 |
 | barrier no-return | 通过真实无结果码通道执行；失败清 raw state一次并保留 terminal custody，不伪造 `SQLITE_IOERR` 或正常 completion。 |
@@ -293,7 +293,7 @@ A2 完成必须同时满足：
   `implementation_not_dynamically_accepted` 升级；
 - 任何证据缺失、环境不明、case key漂移、观察不完整或生产入口变化都维持失败关闭。
 
-当前正式结论：Map `StaticContract=43476/43476`、Lock `StaticContract=8668/8668`。Lock q11 `LockRawStateRejectionV1` 为 source-only 11 exact singleton、2 pointer premises excluded；q1–q11 未运行 inventory（members/groups）=`3668/3668 present, 5000/4472 missing, 8668/8140 total`，3,432 initialization failures 仍 missing 且不属于 q9–q11。current source=`source_written/source_review_only/implementation_uncompiled/implementation_unrun`（uncompiled/unrun），`passed=0 failed=0 actual=not_run`；无 actual inventory/receipt/record、reviewed digest 或 frozen manifest，coverage=`0/43476 + 0/8668`、`Qmap/Qlock=unknown`、`WindowsDynamic=not_opened`。q9–q11 source changes 对应的 19-artifact global frozen/source-owner refresh 仍独立 deferred；A2 仍为 `implementation_not_dynamically_accepted`，production closed。q9–q11 细节只见[`Lock tranches`](node-plugin-vfs-lock-dynamic-tranches-authority.md)。
+当前正式结论：Map `StaticContract=43476/43476`、Lock `StaticContract=8668/8668`。Lock q12 `LockNativeAcquireCreatedFirstExclusiveReleaseErrorV1` 为 source-only 88 exact singleton；q1–q12 未运行 inventory（members/groups）=`3756/3756 present, 4912/4384 missing, 8668/8140 total`，完整 initialization umbrella=`3432/2904`，q12 取 88/88 后 remaining=`3344/2816`。current source=`source_written/source_review_only/implementation_uncompiled/implementation_unrun`（uncompiled/unrun），`passed=0 failed=0 actual=not_run`、`controlled_fault_actual=source_only_unrun`；无 actual inventory/receipt/record、reviewed digest 或 frozen manifest，coverage=`0/43476 + 0/8668`、`Qmap/Qlock=unknown`、`WindowsDynamic=not_opened`。q9–q12 source changes 对应的 19-artifact global frozen/source-owner refresh 仍独立 deferred；A2 仍为 `implementation_not_dynamically_accepted`，production closed。q9–q12 细节只见[`Lock tranches`](node-plugin-vfs-lock-dynamic-tranches-authority.md)。
 
 ### 9.1 静态闭合前 fragment provenance（历史）
 

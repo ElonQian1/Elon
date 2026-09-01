@@ -36,6 +36,8 @@ impl ManagedSqliteShmCoordinator {
         let mask = request.mask();
         #[cfg(all(test, windows))]
         self.begin_test_lock_action(connection_id, request)?;
+        #[cfg(all(test, windows))]
+        self.record_test_initialization_request_v1(&mut state, connection_id, request)?;
         match request.action() {
             ManagedSqliteShmLockAction::LockShared => {
                 if let Err(failure) = require_unlocked(current, mask) {

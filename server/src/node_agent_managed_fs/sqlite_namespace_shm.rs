@@ -32,6 +32,9 @@ mod test_faults;
 #[path = "sqlite_namespace_shm/test_lock_runtime.rs"]
 mod test_lock_runtime;
 #[cfg(all(test, windows))]
+#[path = "sqlite_namespace_shm/test_initialization_runtime.rs"]
+mod test_initialization_runtime;
+#[cfg(all(test, windows))]
 #[path = "sqlite_namespace_shm/test_map_runtime.rs"]
 mod test_map_runtime;
 #[cfg(all(test, windows))]
@@ -169,6 +172,15 @@ pub(crate) use test_faults::{
 pub(crate) use test_lock_runtime::{
     ManagedSqliteShmTestLockExpectation, ManagedSqliteShmTestLockPath,
     ManagedSqliteShmTestLockReceipt,
+};
+#[cfg(all(test, windows))]
+pub(crate) use test_initialization_runtime::{
+    ManagedSqliteShmTestInitializationEvidenceV1,
+    ManagedSqliteShmTestInitializationExpectationV1,
+    ManagedSqliteShmTestInitializationFailureV1,
+    ManagedSqliteShmTestInitializationNativeObservationV1,
+    ManagedSqliteShmTestInitializationNativeReceiptV1,
+    ManagedSqliteShmTestInitializationReceiptV1,
 };
 #[cfg(all(test, windows))]
 pub(crate) use test_map_runtime::{

@@ -17,6 +17,7 @@ pub(crate) enum ManagedSqliteShmTestLockPath {
     Local,
     SiblingContention,
     LocalProtocolRejection,
+    InitializationFailure,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -185,6 +186,12 @@ impl ManagedSqliteShmTestLockController {
                             "NODE_MANAGED_SQLITE_SHM_TEST_LOCK_LOCAL_PROTOCOL_REJECTION_SUCCEEDED",
                         );
                     }
+                    ManagedSqliteShmTestLockPath::InitializationFailure => {
+                        armed.invalid = true;
+                        return Err(
+                            "NODE_MANAGED_SQLITE_SHM_TEST_LOCK_INITIALIZATION_FAILURE_SUCCEEDED",
+                        );
+                    }
                 };
                 record_once!(
                     managed_successes,
@@ -331,6 +338,41 @@ impl ManagedSqliteShmTestLockController {
         Ok(receipt)
     }
 
+    /// Seals a Lock request that entered the managed action but failed while initializing the
+    /// SHM node, before the requested range reached any native or local transition.
+    pub(super) fn finish_initialization_failure_after_managed_attempt(
+        &mut self,
+        target: ExactTarget,
+    ) -> Result<ManagedSqliteShmTestLockReceipt, &'static str> {
+        if self.armed.as_ref().map(|armed| armed.target) != Some(target) {
+            return Err("NODE_MANAGED_SQLITE_SHM_TEST_LOCK_TARGET_MISMATCH");
+        }
+        let armed = self
+            .armed
+            .take()
+            .ok_or("NODE_MANAGED_SQLITE_SHM_TEST_LOCK_OBSERVATION_NOT_ARMED")?;
+        if armed.invalid
+            || armed.receipt.expectation.path
+                != ManagedSqliteShmTestLockPath::InitializationFailure
+            || armed.progress != Progress::ManagedAttempted
+            || armed.receipt.managed_attempts != 1
+            || armed.receipt.managed_successes != 0
+            || armed.receipt.native_lock_attempts != 0
+            || armed.receipt.native_lock_acquired != 0
+            || armed.receipt.native_lock_contended != 0
+            || armed.receipt.native_lock_errors != 0
+            || armed.receipt.native_unlock_attempts != 0
+            || armed.receipt.native_unlock_successes != 0
+            || armed.receipt.native_unlock_errors != 0
+            || armed.receipt.local_transitions != 0
+        {
+            return Err("NODE_MANAGED_SQLITE_SHM_TEST_LOCK_INITIALIZATION_LEDGER_INVALID");
+        }
+        let mut receipt = armed.receipt;
+        receipt.finished = true;
+        Ok(receipt)
+    }
+
     pub(super) fn cancel(&mut self, target: ExactTarget) -> Result<(), &'static str> {
         if self.armed.as_ref().map(|armed| armed.target) != Some(target) {
             return Err("NODE_MANAGED_SQLITE_SHM_TEST_LOCK_TARGET_MISMATCH");
@@ -386,6 +428,10 @@ fn validate_expectation(
                 | ManagedSqliteShmLockAction::LockExclusive
                 | ManagedSqliteShmLockAction::UnlockShared
                 | ManagedSqliteShmLockAction::UnlockExclusive
+        ),
+        ManagedSqliteShmTestLockPath::InitializationFailure => matches!(
+            expectation.action,
+            ManagedSqliteShmLockAction::LockShared | ManagedSqliteShmLockAction::LockExclusive
         ),
     };
     let shared_range_invalid = expectation.count != 1

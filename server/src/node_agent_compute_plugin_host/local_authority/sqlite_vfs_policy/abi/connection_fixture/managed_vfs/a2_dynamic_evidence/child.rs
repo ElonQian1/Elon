@@ -3,6 +3,7 @@ use std::{fmt, path::Path, process::Child};
 use sha2::{Digest, Sha256};
 pub(super) mod lock_abi_scalar_rejection;
 pub(super) mod lock_callback_route_unknown;
+pub(super) mod lock_created_first_exclusive_release_error;
 pub(super) mod lock_lifecycle;
 pub(super) mod lock_local_protocol_rejection;
 pub(super) mod lock_local_sibling_contention;

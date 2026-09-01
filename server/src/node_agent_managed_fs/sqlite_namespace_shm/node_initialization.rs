@@ -52,6 +52,8 @@ impl ManagedSqliteShmCoordinator {
         state: &mut ManagedSqliteShmCoordinatorState,
         _connection_id: u64,
     ) -> Result<ManagedSqliteShmNode, ManagedSqliteShmFailure> {
+        #[cfg(all(test, windows))]
+        self.record_test_initialization_open_attempt_v1(state, _connection_id)?;
         #[cfg(test)]
         let open_fault = self.begin_test_fault(
             state,
@@ -61,10 +63,32 @@ impl ManagedSqliteShmCoordinator {
         )?;
         let mut file = match self.namespace.open_shm_for_wal() {
             Ok(file) => file,
-            Err(failure) => return Err(self.consume_open_failure(state, failure)),
+            Err(failure) => {
+                let open_failure = self.consume_open_failure(state, failure);
+                #[cfg(all(test, windows))]
+                if let Err(controller_failure) = self.reject_test_initialization_path_v1(
+                    state,
+                    _connection_id,
+                    ManagedSqliteShmFailurePhase::ExactSiblingOpen,
+                    true,
+                    false,
+                    "NODE_MANAGED_SQLITE_SHM_TEST_INITIALIZATION_OPEN_FAILED",
+                ) {
+                    return Err(controller_failure);
+                }
+                return Err(open_failure);
+            }
         };
 
         let file_created = file.was_created();
+        #[cfg(all(test, windows))]
+        if let Err(failure) = self.record_test_initialization_open_created_v1(
+            state,
+            _connection_id,
+            file_created,
+        ) {
+            return Err(self.close_failed_open_file(state, file, failure));
+        }
         #[cfg(test)]
         if let Some(fault) = open_fault {
             state.node = Some(new_node(
@@ -85,9 +109,26 @@ impl ManagedSqliteShmCoordinator {
             Ok(fault) => fault,
             Err(failure) => return Err(self.close_failed_open_file(state, file, failure)),
         };
+        #[cfg(all(test, windows))]
+        if let Err(failure) =
+            self.record_test_initialization_dms_lock_attempt_v1(state, _connection_id)
+        {
+            return Err(self.close_failed_open_file(state, file, failure));
+        }
         let first_process =
             match platform::try_lock_sqlite_byte_range(&file.file, SHM_DMS_OFFSET, 1, true) {
                 Ok(PlatformManagedSqliteLockAttempt::Acquired) => {
+                    #[cfg(all(test, windows))]
+                    if let Err(failure) =
+                        self.record_test_initialization_dms_acquired_v1(state, _connection_id)
+                    {
+                        state.node = Some(new_node(
+                            file,
+                            ManagedSqliteShmDmsCustody::ExclusiveKnown,
+                            file_created,
+                        ));
+                        return Err(failure);
+                    }
                     #[cfg(test)]
                     if let Some(fault) = exclusive_acquire_fault {
                         state.node = Some(new_node(
@@ -99,8 +140,32 @@ impl ManagedSqliteShmCoordinator {
                     }
                     true
                 }
-                Ok(PlatformManagedSqliteLockAttempt::Contended) => false,
+                Ok(PlatformManagedSqliteLockAttempt::Contended) => {
+                    #[cfg(all(test, windows))]
+                    if let Err(failure) = self.reject_test_initialization_path_v1(
+                        state,
+                        _connection_id,
+                        ManagedSqliteShmFailurePhase::DmsExclusiveAcquire,
+                        file_created,
+                        false,
+                        "NODE_MANAGED_SQLITE_SHM_TEST_INITIALIZATION_DMS_LOCK_CONTENDED",
+                    ) {
+                        return Err(self.close_failed_open_file(state, file, failure));
+                    }
+                    false
+                }
                 Err(error) => {
+                    #[cfg(all(test, windows))]
+                    if let Err(failure) = self.reject_test_initialization_path_v1(
+                        state,
+                        _connection_id,
+                        ManagedSqliteShmFailurePhase::DmsExclusiveAcquire,
+                        file_created,
+                        false,
+                        "NODE_MANAGED_SQLITE_SHM_TEST_INITIALIZATION_DMS_LOCK_FAILED",
+                    ) {
+                        return Err(self.close_failed_open_file(state, file, failure));
+                    }
                     let failure = ManagedSqliteShmFailure::new(
                         ManagedSqliteShmFailurePhase::DmsExclusiveAcquire,
                         if file_created {
@@ -160,7 +225,34 @@ impl ManagedSqliteShmCoordinator {
                     return Err(self.close_failed_open_file(state, file, failure));
                 }
             };
+            #[cfg(all(test, windows))]
+            if let Err(failure) =
+                self.record_test_initialization_truncate_attempt_v1(state, _connection_id)
+            {
+                state.node = Some(new_node(
+                    file,
+                    ManagedSqliteShmDmsCustody::ExclusiveKnown,
+                    file_created,
+                ));
+                return Err(failure);
+            }
             if let Err(error) = file.truncate(0) {
+                #[cfg(all(test, windows))]
+                if let Err(failure) = self.reject_test_initialization_path_v1(
+                    state,
+                    _connection_id,
+                    ManagedSqliteShmFailurePhase::DmsTruncate,
+                    true,
+                    false,
+                    "NODE_MANAGED_SQLITE_SHM_TEST_INITIALIZATION_TRUNCATE_FAILED",
+                ) {
+                    state.node = Some(new_node(
+                        file,
+                        ManagedSqliteShmDmsCustody::ExclusiveKnown,
+                        file_created,
+                    ));
+                    return Err(failure);
+                }
                 let truncate_error = io::Error::other(error);
                 let release = platform::unlock_sqlite_byte_range(&file.file, SHM_DMS_OFFSET, 1);
                 let (phase, dms, retained_error, lock_uncertain) = match release {
@@ -185,6 +277,17 @@ impl ManagedSqliteShmCoordinator {
                     true,
                     lock_uncertain,
                 ));
+            }
+            #[cfg(all(test, windows))]
+            if let Err(failure) =
+                self.record_test_initialization_truncated_v1(state, _connection_id)
+            {
+                state.node = Some(new_node(
+                    file,
+                    ManagedSqliteShmDmsCustody::ExclusiveKnown,
+                    true,
+                ));
+                return Err(failure);
             }
             truncated = true;
             #[cfg(test)]
@@ -214,6 +317,43 @@ impl ManagedSqliteShmCoordinator {
                     return Err(failure);
                 }
             };
+            #[cfg(all(test, windows))]
+            match self.execute_test_initialization_dms_unlock_v1(
+                state,
+                _connection_id,
+                &file.file,
+            ) {
+                Ok(Some(error)) => {
+                    state.node = Some(new_node(
+                        file,
+                        ManagedSqliteShmDmsCustody::ExclusiveOutcomeUncertain,
+                        true,
+                    ));
+                    self.mark_poisoned(
+                        state,
+                        ManagedSqliteShmFailurePhase::DmsExclusiveRelease,
+                        true,
+                        true,
+                    );
+                    self.record_test_initialization_poisoned_v1(state, _connection_id)?;
+                    return Err(ManagedSqliteShmFailure::poisoned(
+                        ManagedSqliteShmFailurePhase::DmsExclusiveRelease,
+                        error,
+                        true,
+                        true,
+                    ));
+                }
+                Ok(None) => {}
+                Err(failure) => {
+                    let dms = if failure.lock_outcome_uncertain() {
+                        ManagedSqliteShmDmsCustody::ExclusiveOutcomeUncertain
+                    } else {
+                        ManagedSqliteShmDmsCustody::ExclusiveKnown
+                    };
+                    state.node = Some(new_node(file, dms, true));
+                    return Err(failure);
+                }
+            }
             if let Err(error) = platform::unlock_sqlite_byte_range(&file.file, SHM_DMS_OFFSET, 1) {
                 state.node = Some(new_node(
                     file,

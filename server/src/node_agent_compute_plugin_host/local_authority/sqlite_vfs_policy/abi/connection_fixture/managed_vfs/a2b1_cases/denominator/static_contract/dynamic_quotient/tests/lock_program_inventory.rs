@@ -23,6 +23,10 @@ use super::lock_native_acquire_busy_cases::{
     frozen_lock_native_acquire_busy_leaves_v1, lock_native_acquire_busy_descriptor_v1,
     LOCK_NATIVE_ACQUIRE_BUSY_MEMBER_COUNT,
 };
+use super::lock_native_acquire_created_first_exclusive_release_error_cases::{
+    lock_created_first_exclusive_release_error_expected_groups_v1,
+    LOCK_CREATED_FIRST_EXCLUSIVE_RELEASE_ERROR_MEMBER_COUNT,
+};
 use super::lock_pre_managed_callback_rejection_cases::{
     frozen_lock_pre_managed_callback_rejection_leaves_v1,
     LOCK_PRE_MANAGED_CALLBACK_REJECTION_MEMBER_COUNT,
@@ -254,10 +258,10 @@ fn full_lock_program_inventory_accounts_for_every_frozen_member_without_opening_
     assert_eq!(inventory.member_count, 8_668);
     assert_eq!(bundle.reverse_index.len(), 8_668);
     assert_eq!(inventory.program_group_count, 8_140);
-    assert_eq!(inventory.source_present_member_count, 3_668);
-    assert_eq!(inventory.source_present_group_count, 3_668);
-    assert_eq!(inventory.planned_missing_member_count, 5_000);
-    assert_eq!(inventory.planned_missing_group_count, 4_472);
+    assert_eq!(inventory.source_present_member_count, 3_756);
+    assert_eq!(inventory.source_present_group_count, 3_756);
+    assert_eq!(inventory.planned_missing_member_count, 4_912);
+    assert_eq!(inventory.planned_missing_group_count, 4_384);
     let source_groups = bundle
         .groups
         .iter()
@@ -268,7 +272,7 @@ fn full_lock_program_inventory_accounts_for_every_frozen_member_without_opening_
             )
         })
         .collect::<Vec<_>>();
-    assert_eq!(source_groups.len(), 3_668);
+    assert_eq!(source_groups.len(), 3_756);
     assert!(source_groups.iter().all(|group| group.member_count == 1));
 
     let record = lock_request_validation_record();
@@ -392,20 +396,34 @@ fn full_lock_program_inventory_accounts_for_every_frozen_member_without_opening_
         .iter()
         .all(|(key, _)| !q1_through_q10_source_keys.contains(key)));
     expected_source_keys.extend(q11_expected_groups.iter().map(|(key, _)| *key));
+    let q1_through_q11_source_keys =
+        expected_source_keys.iter().copied().collect::<BTreeSet<_>>();
+    assert_eq!(q1_through_q11_source_keys.len(), 3_668);
+    let q12_expected_groups =
+        lock_created_first_exclusive_release_error_expected_groups_v1();
+    assert_eq!(
+        q12_expected_groups.len(),
+        LOCK_CREATED_FIRST_EXCLUSIVE_RELEASE_ERROR_MEMBER_COUNT
+    );
+    assert!(q12_expected_groups
+        .iter()
+        .all(|(key, _)| !q1_through_q11_source_keys.contains(key)));
+    expected_source_keys.extend(q12_expected_groups.iter().map(|(key, _)| *key));
     let expected_source_keys = expected_source_keys.into_iter().collect::<BTreeSet<_>>();
-    assert_eq!(expected_source_keys.len(), 3_668);
+    assert_eq!(expected_source_keys.len(), 3_756);
 
     let actual_source_groups = source_groups
         .iter()
         .map(|group| (group.normalized_key, group.members[0]))
         .collect::<BTreeSet<_>>();
-    assert_eq!(actual_source_groups.len(), 3_668);
+    assert_eq!(actual_source_groups.len(), 3_756);
     assert!(actual_source_groups
         .iter()
         .all(|(key, _)| expected_source_keys.contains(key)));
     assert!(q9_expected_groups.is_subset(&actual_source_groups));
     assert!(q10_expected_groups.is_subset(&actual_source_groups));
     assert!(q11_expected_groups.is_subset(&actual_source_groups));
+    assert!(q12_expected_groups.is_subset(&actual_source_groups));
     let q9_members = q9_expected_groups
         .iter()
         .map(|(_, member)| *member)
@@ -439,6 +457,17 @@ fn full_lock_program_inventory_accounts_for_every_frozen_member_without_opening_
         .collect::<BTreeSet<_>>();
     assert_eq!(q1_through_q10_members.len(), 3_657);
     assert!(q11_members.is_disjoint(&q1_through_q10_members));
+    let q12_members = q12_expected_groups
+        .iter()
+        .map(|(_, member)| *member)
+        .collect::<BTreeSet<_>>();
+    let q1_through_q11_members = actual_source_groups
+        .iter()
+        .filter(|(key, _)| q1_through_q11_source_keys.contains(key))
+        .map(|(_, member)| *member)
+        .collect::<BTreeSet<_>>();
+    assert_eq!(q1_through_q11_members.len(), 3_668);
+    assert!(q12_members.is_disjoint(&q1_through_q11_members));
     let callback_route_unknown_expected_groups =
         frozen_lock_callback_completion_route_unknown_leaves_v1()
             .values()

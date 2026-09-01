@@ -23,6 +23,14 @@ pub(in crate::node_agent_managed_fs) struct PlatformManagedSqliteUnlockReturnRec
     pub(in crate::node_agent_managed_fs) exact_call_occurrence: std::num::NonZeroU32,
 }
 
+#[cfg(all(test, windows))]
+pub(in crate::node_agent_managed_fs) struct PlatformManagedSqliteInitializationUnlockReturnReceiptUnavailableV1 {
+    pub(in crate::node_agent_managed_fs) error: std::io::Error,
+    pub(in crate::node_agent_managed_fs) offset: u64,
+    pub(in crate::node_agent_managed_fs) length: u64,
+    pub(in crate::node_agent_managed_fs) exact_call_occurrence: std::num::NonZeroU32,
+}
+
 pub(in crate::node_agent_managed_fs) fn try_lock_sqlite_byte_range(
     file: &File,
     offset: u64,
@@ -96,6 +104,27 @@ pub(in crate::node_agent_managed_fs) fn unlock_sqlite_byte_range_outcome_uncerta
         )),
         Some(ManagedSqliteShmTestUnmapNativeObservation::ReturnReceiptUnavailable),
     )
+}
+
+/// Executes the production CreatedFirst DMS UnlockFileEx call exactly once while deliberately
+/// leaving its BOOL return receipt unread. Only the initialization controller can consume this
+/// typed witness.
+#[cfg(all(test, windows))]
+pub(in crate::node_agent_managed_fs) fn unlock_sqlite_byte_range_outcome_uncertain_for_initialization_test(
+    file: &File,
+    offset: u64,
+    length: u64,
+) -> PlatformManagedSqliteInitializationUnlockReturnReceiptUnavailableV1 {
+    unlock_sqlite_byte_range_without_return_receipt(file, offset, length);
+    PlatformManagedSqliteInitializationUnlockReturnReceiptUnavailableV1 {
+        error: test_native_return_receipt_unavailable_error(
+            "UnlockFileEx(SQLite SHM initialization DMS)",
+        ),
+        offset,
+        length,
+        exact_call_occurrence: std::num::NonZeroU32::new(1)
+            .expect("one exact initialization UnlockFileEx call is non-zero"),
+    }
 }
 
 /// Executes the production-parameter UnlockFileEx call once and returns only a typed witness that
