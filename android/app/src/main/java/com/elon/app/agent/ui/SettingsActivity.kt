@@ -13,6 +13,8 @@ import android.os.Bundle
 import android.view.Gravity
 import android.view.View
 import android.widget.*
+import com.elon.app.EXTRA_OPEN_PROJECT_PLAZA
+import com.elon.app.MainActivity
 import com.elon.app.agent.AgentConfigActivity
 import com.elon.app.agent.infrastructure.auth.AuthService
 
@@ -324,7 +326,10 @@ class SettingsActivity : Activity() {
                     LinearLayout.LayoutParams.MATCH_PARENT, 120
                 ).apply { topMargin = 12 }
                 setOnClickListener {
-                    startActivity(Intent(context, ProjectPlazaActivity::class.java))
+                    startActivity(Intent(context, MainActivity::class.java).apply {
+                        putExtra(EXTRA_OPEN_PROJECT_PLAZA, true)
+                        addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                    })
                 }
             })
         }

@@ -14,6 +14,7 @@ import com.elon.app.update.UpdateCheckWorker
 
 internal const val EXTRA_OPEN_PROJECT_SPACE_ID = "com.elon.app.extra.OPEN_PROJECT_SPACE_ID"
 internal const val EXTRA_OPEN_PROJECT_SPACE_TITLE = "com.elon.app.extra.OPEN_PROJECT_SPACE_TITLE"
+internal const val EXTRA_OPEN_PROJECT_PLAZA = "com.elon.app.extra.OPEN_PROJECT_PLAZA"
 internal const val EXTRA_OPEN_WORK_SUMMARY_PROJECT_TITLE = "com.elon.app.extra.OPEN_WORK_SUMMARY_PROJECT_TITLE"
 internal const val EXTRA_WORK_SUMMARY_AI_PROMPT = "com.elon.app.extra.WORK_SUMMARY_AI_PROMPT"
 internal const val EXTRA_WORK_SUMMARY_AUTO_SEND = "com.elon.app.extra.WORK_SUMMARY_AUTO_SEND"
@@ -91,6 +92,10 @@ internal class MainCreateActions(
         if (intent?.getBooleanExtra(TaskWorkService.EXTRA_SHOW_APP_UPDATE, false) == true) {
             intent.removeExtra(TaskWorkService.EXTRA_SHOW_APP_UPDATE)
             AppUpdateManager(activity).openFromNotification()
+        }
+        if (intent?.getBooleanExtra(EXTRA_OPEN_PROJECT_PLAZA, false) == true) {
+            intent.removeExtra(EXTRA_OPEN_PROJECT_PLAZA)
+            binding.projectPlazaTopTabWrap.performClick()
         }
         val projectId = intent?.getStringExtra(EXTRA_OPEN_PROJECT_SPACE_ID)?.trim().orEmpty()
         if (projectId.isNotBlank()) {

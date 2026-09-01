@@ -231,6 +231,21 @@ class ProjectPlazaLayoutContractTest {
     }
 
     @Test
+    fun settingsEntryRoutesToTheCurrentProjectPlaza() {
+        val settings = readRepositoryFile(
+            "android/app/src/main/java/com/elon/app/agent/ui/SettingsActivity.kt"
+        )
+        val createActions = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/MainCreateActions.kt"
+        )
+
+        assertTrue(settings.contains("MainActivity::class.java"))
+        assertTrue(settings.contains("putExtra(EXTRA_OPEN_PROJECT_PLAZA, true)"))
+        assertFalse(settings.contains("Intent(context, ProjectPlazaActivity::class.java)"))
+        assertTrue(createActions.contains("binding.projectPlazaTopTabWrap.performClick()"))
+    }
+
+    @Test
     fun mobilePwaAutoOpensTheVisibleLateLoadedPlazaModule() {
         val script = readRepositoryFile("server/src/assets/project_plaza.js")
         val mobileWeb = readRepositoryFile("server/src/assets/web_page.html")
