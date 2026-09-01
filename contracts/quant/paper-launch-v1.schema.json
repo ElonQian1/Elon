@@ -34,6 +34,7 @@
         "protocol": { "$ref": "#/$defs/protocol" },
         "launch_url": { "type": "string", "format": "uri", "maxLength": 2048 },
         "access_token": { "type": "string", "pattern": "^ypg1\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+$", "maxLength": 8192 },
+        "esk_asset_projection": { "type": "string", "pattern": "^yep1\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+$", "maxLength": 8192 },
         "expires_in": { "type": "integer", "minimum": 1, "maximum": 300 },
         "simulated": { "const": true }
       }
@@ -44,7 +45,11 @@
       "properties": {
         "schema": { "const": "yilong.quant.paper_launch.ready.v1" },
         "protocol": { "$ref": "#/$defs/protocol" },
-        "channel_nonce": { "$ref": "#/$defs/nonce" }
+        "channel_nonce": { "$ref": "#/$defs/nonce" },
+        "capabilities": {
+          "type": "array", "maxItems": 8, "uniqueItems": true,
+          "items": { "enum": ["yilong.esk.asset_projection.v1"] }
+        }
       }
     },
     "grantMessage": {
@@ -56,6 +61,7 @@
         "channel_nonce": { "$ref": "#/$defs/nonce" },
         "attempt_id": { "$ref": "#/$defs/attemptId" },
         "access_grant": { "type": "string", "pattern": "^ypg1\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+$", "maxLength": 8192 },
+        "esk_asset_projection": { "type": "string", "pattern": "^yep1\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+$", "maxLength": 8192 },
         "expires_at_unix": { "type": "integer", "minimum": 1 }
       }
     },

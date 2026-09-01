@@ -14109,6 +14109,188 @@
       "updated_at_ms": 1787431017596
     },
     {
+      "id": "yilong-quant-esk-paper-asset-projection-v1",
+      "title": "一龙量化 ESK Paper 资产投影 V1",
+      "summary": "主项目从唯一 ESK 账本签发最长五分钟的只读资产投影，并通过既有安全启动通道交给量化项目验签、绑定同一用户和独立展示；不复制余额、不锁仓、不申购、不移动资金。",
+      "status": "verified",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/yilong-quant-esk-paper-asset-projection-v1.md",
+        "content_hash": "dbc529c1d432e068bcdf25e7ff33b90ab84412d895a681378b0f1f01b760d7d0",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "69dc0ee45f91071df2ae35ddc3528adb8becbd26",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "04dfb2a30b27afb640b4961613d099dd1d61068a",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "platform-assets, quant-integration",
+      "tags": [
+        "esk",
+        "quant",
+        "paper-only",
+        "asset-projection",
+        "cross-repo"
+      ],
+      "task_paths": [
+        "contracts/quant/esk-paper-asset-projection-v1.schema.json",
+        "docs/yilong-quant-integration.md",
+        "pc-frontend/src/features/conversation/QuantPaperLaunch.tsx",
+        "scripts/test-quant-esk-asset-projection.js",
+        "server/src/quant_esk_asset_projection.rs",
+        "server/src/quant_paper_access.rs",
+        "server/src/quant_paper_launch.rs"
+      ],
+      "dependencies": [
+        "esk-paper-asset-account-v1"
+      ],
+      "acceptance_criteria": [
+        "主项目签发与同次 grant 绑定同一脱敏用户、最长五分钟且携带精确余额和源修订的 ESK 只读投影。",
+        "只有量化页声明精确 capability 时才通过 existing exact-origin 内存通道发送投影，旧页面保持兼容且 token 不持久化。",
+        "量化服务拒绝篡改、过期、错误 key/资产/金额关系和跨用户投影，失败不返回余额。",
+        "量化 PWA 无论是否存在模拟仓位都独立显示已验证 ESK 摘要和 Paper/未上链/零资金边界。",
+        "双仓库合同一致并通过 Rust、TypeScript、生产构建、Paper E2E 与文档门禁；公开部署状态不提前升级。"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "contracts/quant/esk-paper-asset-projection-v1.schema.json",
+          "content_hash": "5cdb4f2d4323d5762445de238e9858f584048bc6bd708c765fe9c0a06dc55462",
+          "locator": "yilong.esk.asset_projection.v1",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "69dc0ee45f91071df2ae35ddc3528adb8becbd26",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "b8d07356b158e5d254a589cf1f5287e501e45ce3",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "contracts/quant/paper-launch-v1.schema.json",
+          "content_hash": "585382d0369260742aceff5a01358a1f2d45f0310128ecabe0a7dce547a942da",
+          "locator": "esk_asset_projection",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "69dc0ee45f91071df2ae35ddc3528adb8becbd26",
+            "head_blob_oid": "73723c96b081719cf2c87d78c97ac6da4d3ebea8",
+            "worktree_blob_oid": "5c9971a9621c566b85cb2a1474322366621c0e91",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "docs/requirements/yilong-quant-esk-paper-asset-projection-v1.md",
+          "content_hash": "dbc529c1d432e068bcdf25e7ff33b90ab84412d895a681378b0f1f01b760d7d0",
+          "locator": "验收",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "69dc0ee45f91071df2ae35ddc3528adb8becbd26",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "04dfb2a30b27afb640b4961613d099dd1d61068a",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "docs/yilong-quant-integration.md",
+          "content_hash": "9106a5c2b7589fc3308f3330fe226fc9bf6b0142630c508c96ff7374b02a89f0",
+          "locator": "yilong.esk.asset_projection.v1",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "69dc0ee45f91071df2ae35ddc3528adb8becbd26",
+            "head_blob_oid": "80fd1b2eb4248dca771e503482fa74c47c9bd8fc",
+            "worktree_blob_oid": "42154be17ab5dd7c7fa618b2ac054facb0460d47",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/conversation/QuantPaperLaunch.tsx",
+          "content_hash": "731284b002295423692e3a7a33bdc8f50d1b71e3c658210a40c2a007c81a21d6",
+          "locator": "ESK_PROJECTION_SCHEMA",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "69dc0ee45f91071df2ae35ddc3528adb8becbd26",
+            "head_blob_oid": "25ff18e085a63245bfd3010781fb8ae865bf4dcc",
+            "worktree_blob_oid": "d4ff936d843a792636fd939a538091934c45559c",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "scripts/test-official-project-catalog.js",
+          "content_hash": "58c002efec43c7d4872a94a330d277032c6eaec77eca32a83d69b94659d4a803",
+          "locator": "主项目 ESK 余额",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "69dc0ee45f91071df2ae35ddc3528adb8becbd26",
+            "head_blob_oid": "b816f32bbdf6f0629683f3a5119ba0ae823bb997",
+            "worktree_blob_oid": "b73174b9119a63f432375d40b3dff7ee18890065",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "scripts/test-quant-esk-asset-projection.js",
+          "content_hash": "8ee71150ac9f766afd39ca0e25c77eb821c2610e98e49cc70e33423e084c7fb4",
+          "locator": "contract checks",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "69dc0ee45f91071df2ae35ddc3528adb8becbd26",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "b0719bb584c385f185884fcf27683e4ebc7b4ff1",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/official_project_catalog/catalog.json",
+          "content_hash": "3f580c8c6f0ed088e2005a27b2b0caf409e7bb14cb85aa06e5b9edefc18b1dfa",
+          "locator": "ESK Paper 余额",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "69dc0ee45f91071df2ae35ddc3528adb8becbd26",
+            "head_blob_oid": "a1120e69c322f959b5849ff4ad41229bbb0301c9",
+            "worktree_blob_oid": "68b0d2e474800610bd2f0ed8fb24c0715c52c139",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/quant_esk_asset_projection.rs",
+          "content_hash": "3366a7c96c18e64fd037f7e9e060ef30841e22a1ab7e6f3c7e8a476774db73f3",
+          "locator": "issue_esk_projection",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "69dc0ee45f91071df2ae35ddc3528adb8becbd26",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "246ac9dcaad42b17a5fff36f3c24ca4f9fc62ae0",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/quant_paper_launch.rs",
+          "content_hash": "2f04849385fbfa3192b4553a97634f86fd5abd8e7aa6cb1b2c8d167a15d51c5d",
+          "locator": "IssuePaperLaunchRequest",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "69dc0ee45f91071df2ae35ddc3528adb8becbd26",
+            "head_blob_oid": "91f57b926c758395c8b7d89f46b7bb11881aed2c",
+            "worktree_blob_oid": "d282d87113187728be52bd7716873440b6a3fd5c",
+            "state": "tracked_modified"
+          }
+        }
+      ],
+      "created_at_ms": 1788302491486,
+      "updated_at_ms": 1788304732296
+    },
+    {
       "id": "yilong-quant-paper-grant-revocation-sync-v1",
       "title": "一龙量化 Paper 单次授权撤销公开同步 V1",
       "summary": "把量化仓库已验证的单个 Paper grant 跨重启撤销能力同步到主项目官方目录、公开预览和协作文档；主项目签发契约保持不变，继续 paper-only。",
@@ -14309,66 +14491,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_e98513d7e93d44ae8dc2f92a19d1cd9a",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "Codex q10",
-      "reason": "Reviewed the rebound q10 authority against the exact 7-member typed contract, source-only evidence boundary, true ABI/route ledgers, and unchanged production-closed acceptance criteria.",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1788252485658
-    },
-    {
-      "id": "feature_event_7b84dd70e4cd4c04a871848c181d1613",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "Codex q10",
-      "reason": "The rebound q10 requirement is current, reviewed, dependency-valid, and ready for the already-scoped source-only implementation/evidence batch.",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1788252493963
-    },
-    {
-      "id": "feature_event_ffb0337ff7444938bc50ff294df2c485",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "claimed",
-      "actor": "Codex q10",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788252502238
-    },
-    {
-      "id": "feature_event_62768518e5844d0fa42e8748326accda",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "Codex q10",
-      "reason": "Resume the rebound q10 source-only batch under the current claim for final evidence recording and accurate blocked closure.",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788252513182
-    },
-    {
-      "id": "feature_event_974596fb06f5458db604ff29c566ec5f",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "evidence_recorded",
-      "actor": "Codex q10",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788252651073
-    },
-    {
-      "id": "feature_event_b3efb062b59e4ebf972a8e49a13173c5",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "Codex q10",
-      "reason": "q10 7/7 source seam is written and statically reviewed only. Per architecture-stage instruction, no Rust compile/runtime was run; no actual Windows receipt, reviewed inventory digest, or frozen manifest exists. Full Lock still misses 5,011 members/4,483 groups including 3,432 initialization failures; q9/q10 19-artifact frozen/source-owner refresh remains deferred. Qlock unknown, coverage 0/8668, production closed.",
-      "from_status": "in_progress",
-      "to_status": "blocked",
-      "at_ms": 1788252665326
-    },
     {
       "id": "feature_event_d3d2f3067e3b4383817d01ec1fa5c405",
       "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
@@ -16308,6 +16430,66 @@
       "from_status": "blocked",
       "to_status": "blocked",
       "at_ms": 1788301562743
+    },
+    {
+      "id": "feature_event_d0830d48561c44e19fc353bfd9a9ddf3",
+      "feature_id": "yilong-quant-esk-paper-asset-projection-v1",
+      "action": "registered",
+      "actor": "codex-root-esk-projection",
+      "reason": "用户优先需要在量化子项目看到主项目 ESK，现有 ESK 账户已 released，且远端不存在投影功能。",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1788302491486
+    },
+    {
+      "id": "feature_event_87162b83174847a097c7e994abfcfeb6",
+      "feature_id": "yilong-quant-esk-paper-asset-projection-v1",
+      "action": "claimed",
+      "actor": "codex-root-esk-projection",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788302499372
+    },
+    {
+      "id": "feature_event_0064361558224a5cb3c4054c7ebd3791",
+      "feature_id": "yilong-quant-esk-paper-asset-projection-v1",
+      "action": "transitioned",
+      "actor": "codex-root-esk-projection",
+      "reason": "跨仓库正式需求已建立，进入实现。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788302507752
+    },
+    {
+      "id": "feature_event_e4b3ea7cc9e74d2b87d0c17161c77d5c",
+      "feature_id": "yilong-quant-esk-paper-asset-projection-v1",
+      "action": "evidence_recorded",
+      "actor": "codex/root",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788304675180
+    },
+    {
+      "id": "feature_event_fc1fc0517fcd44c383bd874fd6dbc96c",
+      "feature_id": "yilong-quant-esk-paper-asset-projection-v1",
+      "action": "transitioned",
+      "actor": "codex/root",
+      "reason": "主项目签发、能力协商、exact-origin 投递、官方目录同步和契约测试已实现。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1788304724124
+    },
+    {
+      "id": "feature_event_6dc3c4e3fbfe493a90ec345ff48bce95",
+      "feature_id": "yilong-quant-esk-paper-asset-projection-v1",
+      "action": "transitioned",
+      "actor": "codex/root",
+      "reason": "主项目生产 Rust check、PC TypeScript/Vite build、ESK/项目目录契约、量化完整 validate 与扩展 Paper E2E 已通过；主项目完整 test target 的既有 SQLite VFS 编译阻塞已留证。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1788304732296
     }
   ]
 }

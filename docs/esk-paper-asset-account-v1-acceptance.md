@@ -1,6 +1,6 @@
 # ESK Paper 资产账户 V1 验收
 
-状态：实现候选已闭合，等待合并发布；真实发行和真实结算仍关闭。
+状态：主项目 ESK Paper 账户已实现并发布；真实发行和真实结算仍关闭。
 
 对应需求：[`requirements/esk-paper-asset-account-v1.md`](requirements/esk-paper-asset-account-v1.md)
 
@@ -43,6 +43,6 @@
 - UI 工作台没有空闲 Android 模拟器，Android 像素验收状态为 `VERIFICATION_DEFERRED`；它不能由 PWA 截图冒充。Android 源码编译已通过，后续模拟器可用时补跨端截图。
 - 本验收不证明链上发行、真实购买、官方批准卖回或付款。进入这些阶段必须另立需求并通过法域、KYC/AML、托管、多签、安全、流动性和结算门禁。
 
-## 子项目后续
+## 子项目只读投影
 
-量化子项目不得复制本账本。下一功能应由主项目签发短期、只读、版本化 ESK 资产投影，量化项目只显示来源修订和同步时间；历史 NET Paper 仓位不得自动改名为 ESK。
+量化子项目没有复制本账本。主项目现签发最长五分钟、与同次 Paper grant 绑定的版本化 ESK 只读投影；量化端验签后只显示余额、来源修订和同步时间，不提供 ESK 写操作。量化实现提交为 `3efcd23cbe8baac370bbc65ba25335763ddd6b1f`，历史 NET Paper 仓位仍不得自动改名、兑换或并入 ESK。

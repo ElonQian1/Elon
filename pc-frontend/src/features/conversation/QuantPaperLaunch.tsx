@@ -11,8 +11,10 @@ const READY_SCHEMA = 'yilong.quant.paper_launch.ready.v1'
 const GRANT_SCHEMA = 'yilong.quant.paper_launch.grant.v1'
 const CONSUMED_SCHEMA = 'yilong.quant.paper_launch.consumed.v1'
 const ERROR_SCHEMA = 'yilong.quant.paper_launch.error.v1'
+const ESK_PROJECTION_SCHEMA = 'yilong.esk.asset_projection.v1'
 const NONCE_PATTERN = /^[A-Za-z0-9_-]{32,128}$/
 const GRANT_PATTERN = /^ypg1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/
+const ESK_PROJECTION_PATTERN = /^yep1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/
 
 type Stage = 'checking' | 'unavailable' | 'ready' | 'authorizing' | 'loading_page' | 'waiting' | 'connected' | 'error'
 type Readiness = {
@@ -28,6 +30,7 @@ type LaunchTicket = {
   protocol: typeof PROTOCOL
   launch_url: string
   access_token: string
+  esk_asset_projection?: string
   expires_in: number
   simulated: true
 }
@@ -44,7 +47,7 @@ export default function QuantPaperLaunch({
   const [frameUrl, setFrameUrl] = useState('')
   const [message, setMessage] = useState('正在检查签名与量化 Web 配置。')
   const frameRef = useRef<HTMLIFrameElement>(null)
-  const ticketRef = useRef<{ grant: string; expiresAtUnix: number }>()
+  const ticketRef = useRef<{ grant: string; eskProjection?: string; expiresAtUnix: number }>()
   const expectedOriginRef = useRef('')
   const attemptIdRef = useRef('')
   const channelNonceRef = useRef('')
@@ -99,7 +102,6 @@ export default function QuantPaperLaunch({
     void inspectReadiness()
     return clearSensitiveState
     // Readiness is intentionally checked once for this project-home mount.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [previewMode])
 
   useEffect(() => {
@@ -114,14 +116,21 @@ export default function QuantPaperLaunch({
           return
         }
         channelNonceRef.current = event.data.channel_nonce
-        frameWindow.postMessage({
+        const supportsEskProjection = event.data.capabilities?.includes(ESK_PROJECTION_SCHEMA) === true
+        if (supportsEskProjection && !ticket.eskProjection) {
+          failLaunch('ESK 资产投影未能随本次授权生成，请重新进入。')
+          return
+        }
+        const grantMessage: Record<string, unknown> = {
           schema: GRANT_SCHEMA,
           protocol: PROTOCOL,
           channel_nonce: event.data.channel_nonce,
           attempt_id: attemptIdRef.current,
           access_grant: ticket.grant,
           expires_at_unix: ticket.expiresAtUnix,
-        }, expectedOrigin)
+        }
+        if (supportsEskProjection) grantMessage.esk_asset_projection = ticket.eskProjection
+        frameWindow.postMessage(grantMessage, expectedOrigin)
         ticketRef.current = undefined
         setStage('waiting')
         setMessage('授权已交给量化页面，正在读取本人模拟仓位。')
@@ -147,7 +156,9 @@ export default function QuantPaperLaunch({
     setStage('authorizing')
     setMessage('正在为当前一龙账号签发五分钟 Paper 授权。')
     try {
-      const value = await api.post<unknown>('/api/me/quant/paper-launches', {})
+      const value = await api.post<unknown>('/api/me/quant/paper-launches', {
+        capabilities: [ESK_PROJECTION_SCHEMA],
+      })
       const ticket = parseTicket(value)
       if (!ticket) throw new Error('服务器返回了无法识别的启动票据。')
       const target = normalizeLaunchUrl(ticket.launch_url)
@@ -158,6 +169,7 @@ export default function QuantPaperLaunch({
       attemptIdRef.current = `qpl_${crypto.randomUUID().replace(/-/g, '')}`
       ticketRef.current = {
         grant: ticket.access_token,
+        eskProjection: ticket.esk_asset_projection,
         expiresAtUnix: Math.floor(Date.now() / 1000) + ticket.expires_in,
       }
       setFrameUrl(target.url)
@@ -234,16 +246,25 @@ function parseReadiness(value: unknown): Readiness | null {
 }
 
 function parseTicket(value: unknown): LaunchTicket | null {
-  if (!isRecord(value) || !exactKeys(value, ['schema', 'protocol', 'launch_url', 'access_token', 'expires_in', 'simulated'])) return null
+  if (!isRecord(value) || !exactKeys(value, ['schema', 'protocol', 'launch_url', 'access_token', 'expires_in', 'simulated'], ['esk_asset_projection'])) return null
   if (value.schema !== TICKET_SCHEMA || value.protocol !== PROTOCOL || value.simulated !== true || typeof value.launch_url !== 'string') return null
   if (typeof value.access_token !== 'string' || value.access_token.length > 8192 || !GRANT_PATTERN.test(value.access_token)) return null
+  if (value.esk_asset_projection !== undefined
+    && (typeof value.esk_asset_projection !== 'string'
+      || value.esk_asset_projection.length > 8192
+      || !ESK_PROJECTION_PATTERN.test(value.esk_asset_projection))) return null
   if (!Number.isInteger(value.expires_in) || Number(value.expires_in) < 1 || Number(value.expires_in) > 300) return null
   return value as LaunchTicket
 }
 
-function isReadyMessage(value: unknown): value is { schema: string; protocol: string; channel_nonce: string } {
-  return isRecord(value) && exactKeys(value, ['schema', 'protocol', 'channel_nonce'])
-    && value.schema === READY_SCHEMA && value.protocol === PROTOCOL
+function isReadyMessage(value: unknown): value is { schema: string; protocol: string; channel_nonce: string; capabilities?: string[] } {
+  if (!isRecord(value) || !exactKeys(value, ['schema', 'protocol', 'channel_nonce'], ['capabilities'])) return false
+  const capabilities = value.capabilities
+  if (capabilities !== undefined
+    && (!Array.isArray(capabilities)
+      || capabilities.length !== 1
+      || capabilities[0] !== ESK_PROJECTION_SCHEMA)) return false
+  return value.schema === READY_SCHEMA && value.protocol === PROTOCOL
     && typeof value.channel_nonce === 'string' && NONCE_PATTERN.test(value.channel_nonce)
 }
 

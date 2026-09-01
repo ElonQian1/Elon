@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://yilong.example/contracts/quant/esk-paper-asset-projection-v1.schema.json",
+  "title": "Yilong ESK Paper Asset Projection V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "projection_id",
+    "issuer",
+    "audience",
+    "key_id",
+    "grant_id",
+    "participant_ref",
+    "asset_id",
+    "symbol",
+    "name",
+    "decimals",
+    "mode",
+    "issuance_mode",
+    "chain_status",
+    "total",
+    "available",
+    "reserved_for_sellback",
+    "total_base_units",
+    "available_base_units",
+    "reserved_base_units",
+    "source_revision",
+    "source_updated_at",
+    "observed_at_unix",
+    "expires_at_unix",
+    "simulated",
+    "funds_moved"
+  ],
+  "properties": {
+    "schema": { "const": "yilong.esk.asset_projection.v1" },
+    "projection_id": { "type": "string", "pattern": "^qep_[0-9a-f]{32}$" },
+    "issuer": { "const": "yilong-main" },
+    "audience": { "const": "yilong-quant" },
+    "key_id": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 64,
+      "pattern": "^[A-Za-z0-9._-]+$"
+    },
+    "participant_ref": { "type": "string", "pattern": "^yp1_[0-9a-f]{40}$" },
+    "grant_id": { "type": "string", "pattern": "^qpg_[0-9a-f]{32}$" },
+    "asset_id": { "const": "esk" },
+    "symbol": { "const": "ESK" },
+    "name": { "const": "一龙 ESK" },
+    "decimals": { "const": 6 },
+    "mode": { "enum": ["disabled", "paper"] },
+    "issuance_mode": { "const": "paper_recorded" },
+    "chain_status": { "const": "not_deployed" },
+    "total": { "$ref": "#/$defs/amount" },
+    "available": { "$ref": "#/$defs/amount" },
+    "reserved_for_sellback": { "$ref": "#/$defs/amount" },
+    "total_base_units": { "$ref": "#/$defs/baseUnits" },
+    "available_base_units": { "$ref": "#/$defs/baseUnits" },
+    "reserved_base_units": { "$ref": "#/$defs/baseUnits" },
+    "source_revision": { "type": "integer", "minimum": 0 },
+    "source_updated_at": {
+      "oneOf": [
+        { "type": "string", "format": "date-time", "maxLength": 64 },
+        { "type": "null" }
+      ]
+    },
+    "observed_at_unix": { "type": "integer", "minimum": 1 },
+    "expires_at_unix": { "type": "integer", "minimum": 1 },
+    "simulated": { "const": true },
+    "funds_moved": { "const": false }
+  },
+  "$defs": {
+    "amount": {
+      "type": "string",
+      "pattern": "^(?:0|[1-9][0-9]*)\\.[0-9]{6}$",
+      "maxLength": 32
+    },
+    "baseUnits": {
+      "type": "string",
+      "pattern": "^(?:0|[1-9][0-9]*)$",
+      "maxLength": 19
+    }
+  }
+}

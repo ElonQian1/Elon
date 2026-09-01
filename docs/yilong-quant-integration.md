@@ -9,7 +9,7 @@
 ## 用户现在能看到什么
 
 - 项目广场中的“一龙量化交易”标题、简介、目标用户、当前更新和 GitHub/文档入口。
-- 登录用户在配置就绪后可以从量化项目主页一键打开本人 Paper 模拟仓位；短期授权不进入 URL 或浏览器持久存储。
+- 登录用户在主项目账号页可以查看本人 ESK Paper 总额、可用额和卖回申请占用；在量化公开环境配置就绪后，从量化项目主页一键进入还会看到同一主项目余额的签名只读投影。短期授权和投影不进入 URL 或浏览器持久存储。
 - 项目主页当前更新会说明已经验证的 `BACKTEST / SIMULATION` 研究能力：行情来源、策略版本、费用、滑点、权益曲线、回撤和确定性摘要均可追溯。
 - 明确的 `paper` 阶段：模拟委托、运营审核追加模拟份额、NAV 与用户部分/全额退出结算。
 - 6% 仅为非保证目标；当前不导入真实付款名单、不移动资金、不连接实盘。
@@ -22,8 +22,8 @@
 | 责任 | 主项目 | `yilong-quant` |
 |---|---|---|
 | 项目广场、公开只读入口 | 负责 | 提供 `.elon/project-landing.json` 内容真源 |
-| 用户身份与未来 NET 锁定 | 负责 | 只消费版本化授权/锁定回执 |
-| NET 发行和可用余额 | 负责 | 不铸造、不直接修改 |
+| 用户身份、ESK Paper 账本和未来锁定 | 负责 | 只消费版本化授权/只读投影/未来锁定回执 |
+| ESK 发行和可用余额 | 主项目是真源；当前只完成 Paper 登记 | 不铸造、不直接修改、不保存余额副本 |
 | 模拟份额、运营追加与部分/全额退出规则 | 不复制 | 负责 |
 | 行情、策略、风控、OMS、交易所 | 不直接控制 | 负责 |
 | 真实资金、NAV 和退出 | 未来提供准入/回执边界 | 未来在独立托管和会计门禁后负责 |
@@ -56,8 +56,9 @@
 - `contracts/quant/net-balance-lock-receipt-v1.schema.json` 已定义主项目未来锁定 NET 后交给量化项目消费的版本化回执形状；详细语义见 `docs/yilong-quant-net-lock-receipt-v1.md`。
 - `POST /api/me/quant/paper-access-grants` 已复用主项目现有 bearer 会话，可在独立签名配置启用后签发最多五分钟的 Ed25519 paper grant；量化项目只获得项目专用脱敏 subject 和明确 scope，不获得主项目 bearer 或用户资料。契约见 `docs/yilong-quant-paper-access-grant-v1.md` 与 `contracts/quant/paper-access-grant-v1.schema.json`。
 - `GET /api/me/quant/paper-launch` 与 `POST /api/me/quant/paper-launches` 提供失败关闭的 readiness 和一次性启动票据；PC 项目主页通过 exact-origin iframe、`event.source`、nonce、attempt ID 和过期时间绑定，把 grant 只传给当前量化子页面。双方契约见 `docs/yilong-quant-paper-launch-v1.md` 与 `contracts/quant/paper-launch-v1.schema.json`。
+- 主项目现按 `yilong.esk.asset_projection.v1` 从唯一 ESK Paper 账本签发最长五分钟的 `yep1` 只读投影；它与同次 grant 的 grant ID、脱敏 participant、签发和到期边界绑定。量化端只有声明该 capability 才接收投影，并通过 `/api/v1/paper/me/esk-asset` 验签后显示总额、可用额、卖回占用、源修订和同步时间。量化实现 `3efcd23cbe8baac370bbc65ba25335763ddd6b1f`、首页/文档同步 `f4c9666a73e32fa2cebdc18878432bc55d45149a` 已推送；契约见 `contracts/quant/esk-paper-asset-projection-v1.schema.json`。
 - 加入前公开预览与 Paper 启动严格分离：预览是匿名 GET，只展示内置目录白名单；它不登录、不加入、不签发 grant，也不触发量化页面或任何写接口。需求与验收边界见 `docs/requirements/yilong-quant-public-project-preview-v1.md`。
-- 当前 Schema 只用于 paper 联调。主项目尚无真实 NET 余额运行时、发行方签名和用户准入，因此不能签发或接受真实回执。
+- 既有 `net-balance-lock-receipt-v1` 是 ESK 定名前的 legacy Paper 合同，不会自动改名、兑换或并入 ESK。当前 ESK Schema 也只用于 Paper 只读联调；主项目尚未部署链上 ESK、真实锁定/结算、价格或生产准入，因此不能把投影当作真实发行或量化申购回执。
 
 ## 尚未完成
 

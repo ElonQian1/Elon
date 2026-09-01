@@ -4,13 +4,14 @@ use axum::{
     response::{IntoResponse, Response},
     Json,
 };
-use serde::Serialize;
-use std::{net::IpAddr, sync::Arc};
+use serde::{Deserialize, Serialize};
+use std::{collections::HashSet, net::IpAddr, sync::Arc};
 
+use super::quant_esk_asset_projection::{issue_esk_projection, ESK_PROJECTION_SCHEMA};
 use super::quant_paper_access::{
     PaperAccessGrantResponse, PaperAccessScope, PaperGrantSigner, SignerConfigError,
 };
-use crate::{project_auth::auth_from_headers, types::AppState};
+use crate::{esk_asset::EskAssetMode, project_auth::auth_from_headers, types::AppState};
 
 const PROTOCOL: &str = "yilong.quant.paper_launch.v1";
 const READINESS_SCHEMA: &str = "yilong.quant.paper_launch_readiness.v1";
@@ -34,8 +35,17 @@ struct PaperLaunchTicket {
     protocol: &'static str,
     launch_url: String,
     access_token: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    esk_asset_projection: Option<String>,
     expires_in: i64,
     simulated: bool,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct IssuePaperLaunchRequest {
+    #[serde(default)]
+    capabilities: Vec<String>,
 }
 
 #[derive(Serialize)]
@@ -80,7 +90,11 @@ pub(crate) async fn readiness(State(state): State<Arc<AppState>>, headers: Heade
     .into_response()
 }
 
-pub(crate) async fn issue(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Response {
+pub(crate) async fn issue(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(request): Json<IssuePaperLaunchRequest>,
+) -> Response {
     let user_id = match authorize_active_user(&state, &headers) {
         Ok(user_id) => user_id,
         Err(response) => return response,
@@ -109,13 +123,24 @@ pub(crate) async fn issue(State(state): State<Arc<AppState>>, headers: HeaderMap
             )
         }
     };
+    let wants_esk_projection = match validate_capabilities(&request.capabilities) {
+        Ok(value) => value,
+        Err(()) => {
+            return error_response(
+                StatusCode::BAD_REQUEST,
+                "invalid_quant_paper_capabilities",
+                "量化 Paper 启动 capability 无效",
+            )
+        }
+    };
+    let now_unix = chrono::Utc::now().timestamp();
     let grant = match signer.issue(
         &user_id,
         vec![
             PaperAccessScope::PositionRead,
             PaperAccessScope::RedemptionRequest,
         ],
-        chrono::Utc::now().timestamp(),
+        now_unix,
     ) {
         Ok(grant) => grant,
         Err(()) => {
@@ -125,7 +150,42 @@ pub(crate) async fn issue(State(state): State<Arc<AppState>>, headers: HeaderMap
             )
         }
     };
-    Json(build_ticket(target, grant)).into_response()
+    let esk_asset_projection = if wants_esk_projection {
+        let mode = EskAssetMode::from_env();
+        if matches!(mode, EskAssetMode::Invalid) {
+            return unavailable("quant_esk_projection_misconfigured", "ESK 资产投影配置无效");
+        }
+        let ledger = match state.store.esk_account_ledger(&user_id) {
+            Ok(ledger) => ledger,
+            Err(error) => {
+                tracing::warn!(error = %error, "failed to read ESK account for quant projection");
+                return unavailable(
+                    "quant_esk_projection_unavailable",
+                    "暂时无法读取 ESK 资产投影",
+                );
+            }
+        };
+        match issue_esk_projection(
+            &signer,
+            &grant.grant_id,
+            &grant.participant_ref,
+            mode,
+            ledger,
+            now_unix,
+            now_unix + grant.expires_in,
+        ) {
+            Ok(token) => Some(token),
+            Err(()) => {
+                return unavailable(
+                    "quant_esk_projection_unavailable",
+                    "暂时无法创建 ESK 资产投影",
+                )
+            }
+        }
+    } else {
+        None
+    };
+    Json(build_ticket(target, grant, esk_asset_projection)).into_response()
 }
 
 fn authorize_active_user(state: &Arc<AppState>, headers: &HeaderMap) -> Result<String, Response> {
@@ -185,15 +245,37 @@ fn is_loopback(host: &str) -> bool {
             .is_ok_and(|address| address.is_loopback())
 }
 
-fn build_ticket(target: PaperLaunchTarget, grant: PaperAccessGrantResponse) -> PaperLaunchTicket {
+fn build_ticket(
+    target: PaperLaunchTarget,
+    grant: PaperAccessGrantResponse,
+    esk_asset_projection: Option<String>,
+) -> PaperLaunchTicket {
     PaperLaunchTicket {
         schema: TICKET_SCHEMA,
         protocol: PROTOCOL,
         launch_url: target.url,
         access_token: grant.access_token,
+        esk_asset_projection,
         expires_in: grant.expires_in,
         simulated: true,
     }
+}
+
+fn validate_capabilities(capabilities: &[String]) -> Result<bool, ()> {
+    if capabilities.len() > 8 {
+        return Err(());
+    }
+    let mut seen = HashSet::with_capacity(capabilities.len());
+    for capability in capabilities {
+        if capability.is_empty()
+            || capability.len() > 96
+            || capability.chars().any(char::is_control)
+            || !seen.insert(capability.as_str())
+        {
+            return Err(());
+        }
+    }
+    Ok(seen.contains(ESK_PROJECTION_SCHEMA))
 }
 
 fn unavailable(code: &'static str, message: &'static str) -> Response {
@@ -239,5 +321,23 @@ mod tests {
             schema["$defs"]["launchTicket"]["properties"]["schema"]["const"],
             TICKET_SCHEMA
         );
+        assert_eq!(
+            schema["$defs"]["launchTicket"]["properties"]["esk_asset_projection"]["pattern"],
+            "^yep1\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+$"
+        );
+    }
+
+    #[test]
+    fn capability_negotiation_is_explicit_and_bounded() {
+        assert_eq!(validate_capabilities(&[]), Ok(false));
+        assert_eq!(
+            validate_capabilities(&[ESK_PROJECTION_SCHEMA.to_owned()]),
+            Ok(true)
+        );
+        assert!(validate_capabilities(&[
+            ESK_PROJECTION_SCHEMA.to_owned(),
+            ESK_PROJECTION_SCHEMA.to_owned(),
+        ])
+        .is_err());
     }
 }

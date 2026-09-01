@@ -7,6 +7,8 @@ use axum::{
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 use hmac::{Hmac, Mac};
 use ring::signature::Ed25519KeyPair;
+#[cfg(test)]
+use ring::signature::KeyPair;
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use std::sync::Arc;
@@ -59,8 +61,10 @@ struct PaperAccessGrantClaims {
 pub(crate) struct PaperAccessGrantResponse {
     token_type: &'static str,
     pub(crate) access_token: String,
+    #[serde(skip_serializing)]
+    pub(crate) grant_id: String,
     pub(crate) expires_in: i64,
-    participant_ref: String,
+    pub(crate) participant_ref: String,
     scopes: Vec<PaperAccessScope>,
     simulated: bool,
 }
@@ -162,7 +166,7 @@ impl PaperGrantSigner {
         }
     }
 
-    fn from_material(
+    pub(crate) fn from_material(
         key_id: String,
         signing_seed: &[u8],
         subject_secret: &[u8],
@@ -191,9 +195,10 @@ impl PaperGrantSigner {
             return Err(());
         }
         let participant_ref = self.participant_ref(user_id)?;
+        let grant_id = format!("qpg_{}", Uuid::new_v4().simple());
         let claims = PaperAccessGrantClaims {
             schema: SCHEMA,
-            grant_id: format!("qpg_{}", Uuid::new_v4().simple()),
+            grant_id: grant_id.clone(),
             issuer: ISSUER,
             audience: AUDIENCE,
             key_id: self.key_id.clone(),
@@ -204,20 +209,34 @@ impl PaperGrantSigner {
             expires_at_unix: now_unix + GRANT_LIFETIME_SECONDS,
             simulated: true,
         };
-        let payload = serde_json::to_vec(&claims).map_err(|_| ())?;
-        let signature = self.signing_key.sign(&payload);
         Ok(PaperAccessGrantResponse {
             token_type: "Bearer",
-            access_token: format!(
-                "{TOKEN_PREFIX}.{}.{}",
-                URL_SAFE_NO_PAD.encode(&payload),
-                URL_SAFE_NO_PAD.encode(signature.as_ref())
-            ),
+            access_token: self.sign_token(TOKEN_PREFIX, &claims)?,
+            grant_id,
             expires_in: GRANT_LIFETIME_SECONDS,
             participant_ref,
             scopes,
             simulated: true,
         })
+    }
+
+    pub(crate) fn key_id(&self) -> &str {
+        &self.key_id
+    }
+
+    #[cfg(test)]
+    pub(crate) fn public_key_bytes(&self) -> &[u8] {
+        self.signing_key.public_key().as_ref()
+    }
+
+    pub(crate) fn sign_token<T: Serialize>(&self, prefix: &str, claims: &T) -> Result<String, ()> {
+        let payload = serde_json::to_vec(claims).map_err(|_| ())?;
+        let signature = self.signing_key.sign(&payload);
+        Ok(format!(
+            "{prefix}.{}.{}",
+            URL_SAFE_NO_PAD.encode(&payload),
+            URL_SAFE_NO_PAD.encode(signature.as_ref())
+        ))
     }
 
     fn participant_ref(&self, user_id: &str) -> Result<String, ()> {

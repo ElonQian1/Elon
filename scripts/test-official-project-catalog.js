@@ -42,17 +42,19 @@ assert.doesNotMatch(previewDialogSource, /\/join|paper-launch|paper\/launch/)
 
 const quantProject = catalog.projects.find((project) => project.id === 'yilong-quant')
 assert.ok(quantProject, 'yilong-quant must remain in the official catalog')
-assert.equal(
-  quantProject.landing.highlights[3],
+assert.ok(quantProject.landing.highlights.includes(
+  '主项目 ESK 余额通过最长五分钟签名投影只读显示，总额、可用额、卖回占用和源修订可核对',
+))
+assert.ok(quantProject.landing.highlights.includes(
   '短期签名授权只允许用户查看和退出自己的模拟仓位，支持密钥级撤销及单个授权跨重启撤销',
-)
+))
 assert.equal(
   quantProject.landing.recent_updates[0],
-  '新增单个 Paper 授权持久撤销：用户可结束当前授权，SQLite 重启后仍拒绝旧授权且不保存 token 或 participant',
+  '新增一龙 ESK 只读资产卡片：验签主项目短期投影并绑定同次用户授权，无量化仓位时也可显示且不保存余额副本',
 )
 assert.equal(
   quantProject.landing.paper_launch.description,
-  '由一龙账号签发五分钟短期授权，在内存通道中打开本人模拟仓位；固定公钥密钥环支持安全轮换，用户可撤销当前授权，未配置 Web 地址或可信密钥时保持不可用。',
+  '由一龙账号签发五分钟短期授权，并在页面声明能力时附带同用户、同授权、同有效期的 ESK 只读投影；固定公钥密钥环支持安全轮换，用户可撤销当前授权，未配置 Web 地址或可信密钥时保持不可用。',
 )
 assert.equal(quantProject.landing.downloads.web.status, 'planned')
 assert.match(quantProject.landing.summary, /paper 模拟交易/)

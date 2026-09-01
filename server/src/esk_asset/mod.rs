@@ -12,7 +12,7 @@ mod service;
 
 pub(crate) use model::{
     EskAccountLedger, EskAllocationInput, EskAllocationReceipt, EskAssetMode, EskSellbackInput,
-    EskSellbackRecord,
+    EskSellbackRecord, ESK_ASSET_ID, ESK_DECIMALS, ESK_NAME, ESK_SYMBOL,
 };
 pub(crate) use service::{format_esk_amount, parse_esk_amount};
 
