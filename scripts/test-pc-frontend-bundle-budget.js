@@ -73,6 +73,20 @@ assert.strictEqual(gzipFailure.status, 1)
 assert.match(gzipFailure.stdout, /failure: gzip .* > hard 140\.00 KiB/)
 assert.match(gzipFailure.stderr, /PC_BUNDLE_BUDGET=failed failures=1 warnings=0/)
 
+const splitStoreChunks = runCase('a'.repeat(470 * KiB), {
+  'store-icon-fixture.js': 'icon'.repeat(1000),
+})
+assert.strictEqual(splitStoreChunks.status, 0, splitStoreChunks.stderr)
+assert.match(splitStoreChunks.stdout, /PC_BUNDLE_BUDGET_CHECK=passed store js/)
+assert.match(splitStoreChunks.stdout, /store-fixture\.js, store-icon-fixture\.js/)
+
+const splitStoreGrowth = runCase('a'.repeat(470 * KiB), {
+  'store-icon-fixture.js': 'a'.repeat(24 * KiB),
+})
+assert.strictEqual(splitStoreGrowth.status, 1)
+assert.match(splitStoreGrowth.stdout, /PC_BUNDLE_BUDGET_CHECK=failed store js/)
+assert.match(splitStoreGrowth.stdout, /failure: raw .* > hard 24\.00 KiB/)
+
 const totalJsGrowth = runCase('a'.repeat(470 * KiB), {
   'FeatureOne-fixture.js': 'a'.repeat(450 * KiB),
   'FeatureTwo-fixture.js': 'b'.repeat(450 * KiB),
@@ -117,4 +131,4 @@ assert.match(totalGzipGrowth.stdout, /PC_BUNDLE_BUDGET_CHECK=warning total css/)
 assert.match(totalGzipGrowth.stdout, /warning: gzip .* > soft 120\.00 KiB/)
 assert.match(totalGzipGrowth.stdout, /PC_BUNDLE_BUDGET=passed assets=20 warnings=2/)
 
-console.log('PC_FRONTEND_BUNDLE_BUDGET_TEST=passed cases=7')
+console.log('PC_FRONTEND_BUNDLE_BUDGET_TEST=passed cases=9')

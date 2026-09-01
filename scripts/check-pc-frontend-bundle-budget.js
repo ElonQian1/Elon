@@ -182,12 +182,6 @@ const namedBudgets = [
     maxGzipBytes: 75 * KiB,
   },
   {
-    label: 'store js',
-    pattern: /^store-[A-Za-z0-9_-]+\.js$/,
-    maxBytes: 24 * KiB,
-    maxGzipBytes: 10 * KiB,
-  },
-  {
     label: 'conversation page js',
     pattern: /^ConversationPage-[A-Za-z0-9_-]+\.js$/,
     maxBytes: 420 * KiB,
@@ -196,6 +190,12 @@ const namedBudgets = [
 ]
 
 const groupedBudgets = [
+  {
+    label: 'store js',
+    pattern: /^store-[A-Za-z0-9_-]+\.js$/,
+    maxBytes: 24 * KiB,
+    maxGzipBytes: 10 * KiB,
+  },
   {
     label: 'conversation page css',
     pattern: /^ConversationPage-[A-Za-z0-9_-]+\.css$/,
