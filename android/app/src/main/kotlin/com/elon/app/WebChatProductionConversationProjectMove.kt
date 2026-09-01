@@ -156,11 +156,6 @@ internal class WebChatProductionConversationProjectMoveCoordinator(
             )
             return
         }
-        val request = port.requestControls()
-        if (!request.accepted) {
-            fail(conversation, destination, "会话设置尚未就绪", epoch)
-            return
-        }
         pollForConversationOptions(conversation, destination, port, epoch, attempt = 0)
     }
 
@@ -187,6 +182,18 @@ internal class WebChatProductionConversationProjectMoveCoordinator(
                 },
                 onFailed = { fail(conversation, destination, "无法打开会话设置", epoch) },
             )
+            return
+        }
+        if (WebChatConversationProjectMoveTiming.shouldRefreshControls(attempt)) {
+            refreshControlsThen(port, epoch) {
+                pollForConversationOptions(
+                    conversation,
+                    destination,
+                    port,
+                    epoch,
+                    attempt + 1,
+                )
+            }
             return
         }
         if (attempt >= MAX_CONTROL_POLLS) {
