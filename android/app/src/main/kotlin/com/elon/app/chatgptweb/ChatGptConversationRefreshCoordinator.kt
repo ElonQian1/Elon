@@ -10,6 +10,7 @@ internal class ChatGptConversationRefreshCoordinator(
     private var refreshAgain = false
     private var retryIndex = 0
     private var scheduledRetry: Runnable? = null
+    private var suppressCurrentCompletion = false
 
     val isBusy: Boolean
         get() = inFlight || scheduledRetry != null
@@ -38,6 +39,7 @@ internal class ChatGptConversationRefreshCoordinator(
     }
 
     fun onSucceeded() {
+        if (consumeSuppressedCompletion()) return
         inFlight = false
         retryIndex = 0
         cancelScheduledRetry()
@@ -45,14 +47,23 @@ internal class ChatGptConversationRefreshCoordinator(
     }
 
     fun onFailed() {
+        if (consumeSuppressedCompletion()) return
         inFlight = false
         if (!dispatchQueuedRefresh()) scheduleNextRetry()
+    }
+
+    fun yieldToUserNavigation() {
+        refreshAgain = false
+        retryIndex = 0
+        cancelScheduledRetry()
+        suppressCurrentCompletion = inFlight
     }
 
     fun reset() {
         inFlight = false
         refreshAgain = false
         retryIndex = 0
+        suppressCurrentCompletion = false
         cancelScheduledRetry()
     }
 
@@ -84,6 +95,15 @@ internal class ChatGptConversationRefreshCoordinator(
         if (!refreshAgain) return false
         refreshAgain = false
         return dispatchIfIdle()
+    }
+
+    private fun consumeSuppressedCompletion(): Boolean {
+        if (!suppressCurrentCompletion) return false
+        suppressCurrentCompletion = false
+        inFlight = false
+        retryIndex = 0
+        cancelScheduledRetry()
+        return true
     }
 
     private fun cancelScheduledRetry() {

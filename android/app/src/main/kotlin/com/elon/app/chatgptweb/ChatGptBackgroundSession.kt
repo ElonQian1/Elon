@@ -212,6 +212,7 @@ internal class ChatGptBackgroundSession(
             },
             { latestSnapshot }, { snapshot -> latestSnapshot = snapshot; onSnapshot(snapshot) },
             { updateState(State.LOADING) }, ::ensureInitialized,
+            { requestedConversationProjectId = null; conversationRefresh.yieldToUserNavigation() },
             newConversationRecovery::cancel, newConversationRecovery::schedule,
             conversationNavigation,
         )

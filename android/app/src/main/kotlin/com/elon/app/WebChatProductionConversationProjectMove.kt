@@ -123,6 +123,9 @@ internal class WebChatProductionConversationProjectMoveCoordinator(
                     fail(conversation, destination, "切换会话超时", epoch)
                     return
                 }
+                if (WebChatConversationProjectMoveTiming.shouldRetryNavigation(attempt)) {
+                    openConversation(targetPath)
+                }
                 host.postDelayed({
                     pollUntilReady(conversation, destination, targetPath, epoch, attempt + 1)
                 }, POLL_INTERVAL_MS)

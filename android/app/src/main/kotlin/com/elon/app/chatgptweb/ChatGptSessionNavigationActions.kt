@@ -12,6 +12,7 @@ internal class ChatGptSessionNavigationActions(
     private val presentSnapshot: (ChatGptWebSnapshot) -> Unit,
     private val updateLoading: () -> Unit,
     private val ensureInitialized: () -> Unit,
+    private val prioritizeUserNavigation: () -> Unit,
     private val cancelNewConversationRecovery: () -> Unit,
     private val scheduleNewConversationRecovery: () -> Unit,
     private val conversationNavigation: ChatGptConversationNavigationCoordinator,
@@ -22,6 +23,7 @@ internal class ChatGptSessionNavigationActions(
     fun startNewConversation(): Boolean {
         if (pendingNewConversation || conversationNavigation.hasPending()) return false
         if (!sessionReady() && !sessionCanDefer()) return false
+        prioritizeUserNavigation()
         ensureInitialized()
         conversationOpenQueue.clear()
         cancelNewConversationRecovery()
@@ -33,6 +35,7 @@ internal class ChatGptSessionNavigationActions(
 
     fun openConversation(path: String): Boolean {
         val normalized = ChatGptWebConversationPath.normalize(path) ?: return false
+        prioritizeUserNavigation()
         ensureInitialized()
         if (conversationNavigation.hasPending()) return false
         if (conversationOpenQueue.hasPending()) {
@@ -48,6 +51,7 @@ internal class ChatGptSessionNavigationActions(
 
     fun openProject(path: String): Boolean {
         val normalized = ChatGptWebConversationPath.normalizeProject(path) ?: return false
+        prioritizeUserNavigation()
         if (!canDispatch()) return false
         if (!commandAvailable()) return false
         conversationOpenQueue.clear()

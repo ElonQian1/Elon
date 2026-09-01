@@ -43,6 +43,17 @@ class WebChatConversationProjectMovePolicyTest {
     }
 
     @Test
+    fun conversationNavigationRetriesOnlyTwiceBeforeAnyWrite() {
+        assertFalse(WebChatConversationProjectMoveTiming.shouldRetryNavigation(0))
+        assertFalse(WebChatConversationProjectMoveTiming.shouldRetryNavigation(19))
+        assertTrue(WebChatConversationProjectMoveTiming.shouldRetryNavigation(20))
+        assertFalse(WebChatConversationProjectMoveTiming.shouldRetryNavigation(21))
+        assertTrue(WebChatConversationProjectMoveTiming.shouldRetryNavigation(40))
+        assertFalse(WebChatConversationProjectMoveTiming.shouldRetryNavigation(41))
+        assertFalse(WebChatConversationProjectMoveTiming.shouldRetryNavigation(60))
+    }
+
+    @Test
     fun staleSheetCallbacksCannotReleaseTheCurrentProgressSheet() {
         val lease = WebChatConversationProjectMoveSheetLease()
         val picker = lease.issue()

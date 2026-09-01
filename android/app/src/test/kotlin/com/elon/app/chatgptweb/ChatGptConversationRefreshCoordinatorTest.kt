@@ -154,6 +154,38 @@ class ChatGptConversationRefreshCoordinatorTest {
     }
 
     @Test
+    fun userNavigationDropsQueuedProjectRefreshAndItsStaleCompletion() {
+        val scheduled = mutableListOf<Scheduled>()
+        var dispatches = 0
+        val coordinator = coordinator(scheduled) {
+            dispatches += 1
+            true
+        }
+
+        assertTrue(coordinator.requestNow())
+        assertTrue(coordinator.requestAfterCurrent())
+        coordinator.yieldToUserNavigation()
+        coordinator.onSucceeded()
+
+        assertEquals(1, dispatches)
+        assertFalse(coordinator.isBusy)
+        assertTrue(scheduled.isEmpty())
+    }
+
+    @Test
+    fun userNavigationCancelsRetryWithoutSchedulingFromAStaleFailure() {
+        val scheduled = mutableListOf<Scheduled>()
+        val coordinator = coordinator(scheduled) { true }
+
+        assertTrue(coordinator.requestNow())
+        coordinator.yieldToUserNavigation()
+        coordinator.onFailed()
+
+        assertFalse(coordinator.isBusy)
+        assertTrue(scheduled.isEmpty())
+    }
+
+    @Test
     fun scopedProjectRefreshSurvivesAConcurrentGenericRefresh() {
         assertEquals(
             "g-p-target",

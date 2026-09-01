@@ -17,6 +17,7 @@ class ChatGptSessionNavigationActionsTest {
     private var loadingTransitions = 0
     private var initializationCount = 0
     private var newConversationCommands = 0
+    private var navigationPriorities = 0
     private val actions = ChatGptSessionNavigationActions(
         sessionReady = { ready },
         sessionCanDefer = { loading },
@@ -29,6 +30,7 @@ class ChatGptSessionNavigationActionsTest {
         presentSnapshot = { value -> current = value; presented += value },
         updateLoading = { loadingTransitions += 1 },
         ensureInitialized = { initializationCount += 1 },
+        prioritizeUserNavigation = { navigationPriorities += 1 },
         cancelNewConversationRecovery = {},
         scheduleNewConversationRecovery = {},
         conversationNavigation = navigation,
@@ -43,6 +45,7 @@ class ChatGptSessionNavigationActionsTest {
         assertEquals(listOf("cached"), presented.last().messages.map { it.content })
         assertTrue(opened.isEmpty())
         assertEquals(0, loadingTransitions)
+        assertEquals(1, navigationPriorities)
 
         ready = true
         loading = false
@@ -70,6 +73,7 @@ class ChatGptSessionNavigationActionsTest {
         assertTrue(presented.last().messages.isEmpty())
         assertEquals("home", presented.last().pageKind)
         assertEquals(1, initializationCount)
+        assertEquals(1, navigationPriorities)
         assertEquals(0, newConversationCommands)
         assertEquals(0, loadingTransitions)
 
@@ -89,6 +93,7 @@ class ChatGptSessionNavigationActionsTest {
         assertFalse(actions.startNewConversation())
         assertTrue(presented.isEmpty())
         assertEquals(0, initializationCount)
+        assertEquals(0, navigationPriorities)
         assertEquals(0, newConversationCommands)
     }
 
