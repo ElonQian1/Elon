@@ -178,6 +178,44 @@ class WebChatConversationProjectMovePolicyTest {
     }
 
     @Test
+    fun moveConfirmationIsUniqueAndBoundToTheCurrentConversation() {
+        val current = conversation()
+        val confirm = descriptor(
+            id = "control_confirm_move",
+            semantic = "confirm",
+            label = "确认",
+            region = "overlay",
+            contextId = current.id,
+        )
+        assertEquals(
+            confirm,
+            WebChatConversationProjectMovePolicy.confirmation(state(confirm), current),
+        )
+
+        val stale = descriptor(
+            id = "control_stale_confirm",
+            semantic = "confirm",
+            label = "确认",
+            region = "overlay",
+            contextId = "another-conversation",
+        )
+        assertNull(WebChatConversationProjectMovePolicy.confirmation(state(stale), current))
+        val duplicate = descriptor(
+            id = "duplicate",
+            semantic = "confirm",
+            label = "确认",
+            region = "overlay",
+            contextId = current.id,
+        )
+        assertNull(
+            WebChatConversationProjectMovePolicy.confirmation(
+                state(confirm, duplicate),
+                current,
+            ),
+        )
+    }
+
+    @Test
     fun commandStatusIsBoundToTheExactRequestId() {
         val state = state().copy(
             commandRequests = listOf(

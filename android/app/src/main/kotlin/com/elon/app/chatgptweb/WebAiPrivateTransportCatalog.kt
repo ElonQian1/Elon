@@ -249,12 +249,12 @@ internal object WebAiPrivateTransportCatalog {
         Entry(
             id = "android_chatgpt_native_conversation_project_move_v1",
             provider = "chatgpt",
-            status = "completed",
-            verification = "targeted_tests_passed_device_pending",
+            status = "implemented_device_pending",
+            verification = "direct_dom_activation_confirmation_and_scoped_refresh_tests_pending",
             productionDefault = true,
             runtimeEnabled = true,
             requestMode =
-                "cached_native_destination_then_exact_official_control_single_write",
+                "cached_native_destination_then_exact_official_dom_activation_and_optional_confirmation",
             healthPolicy =
                 "request_receipt_target_directory_reconciliation_and_no_ambiguous_replay",
             fallback = "official_conversation_project_menu",

@@ -34,7 +34,7 @@ installed build; individual capability documents retain implementation evidence.
 | Native composer dictation | ChatGPT | Implemented and enabled; ASR/VAD draft, cancellation, and fallback tests passed; device acceptance pending | Official Web dictation after bounded local-engine cooldown |
 | Native response read aloud | ChatGPT | Implemented and enabled; full-answer chunking and message-action tests passed; device acceptance pending | Official message actions and WebView |
 | Native conversation management | ChatGPT | Completed, enabled, and reversible pin round trip device verified on `v1.1.1399 (1420)`, adapter `218` | Context-bound official conversation options without automatic write replay |
-| Native conversation project move | ChatGPT | Completed and enabled; exact-control and reconciliation tests passed, device round trip pending | Official conversation project menu |
+| Native conversation project move | ChatGPT | Implemented and enabled; direct DOM activation, optional confirmation, scoped refresh, and reversible device round trip pending | Official conversation project menu |
 | Native conversation management | ChatGPT | Completed and enabled; rename, pin/unpin, archive/unarchive, delete confirmation, identity scoping, and adaptive-control tests passed; consolidated device mutation acceptance pending | Official conversation options |
 | Acceptance evidence contract revisions | ChatGPT and Google Web AI | Completed, enabled, and installed-state migration verified on Release `v1.1.1393 (1414)`, adapter `212` | Retain implementation hashes as diagnostics without discarding accepted contracts |
 | Compact `Pro` model control classification | ChatGPT | Completed, enabled, and production-surface device verified on Release `v1.1.1394 (1415)`, adapter `213` | Official model menu remains authoritative |
@@ -178,17 +178,19 @@ persisting text. Unsupported official message actions remain available through t
 menu and full WebView fallback. The stable capability is
 `android_chatgpt_native_response_read_aloud_v1`; device audio acceptance remains pending.
 
-Conversation rows now expose a native project destination picker backed by the bounded
+Conversation rows expose a native project destination picker backed by the bounded
 project-directory cache. The coordinator navigates to the exact conversation, opens its
 context-bound official options, resolves one exact project title in the official project
-chooser, and submits that choice once. The accepted command receipt and a scoped target
-directory refresh must agree before success is shown. A missing or duplicate title fails
-closed. Once the official bridge accepts the write, an absent or timed-out receipt never
-offers automatic retry; the user can refresh or confirm in the official menu instead.
+chooser, activates that exact official control once, and handles at most one matching
+second-stage confirmation. The accepted command receipt and a scoped target directory
+refresh must agree before success is shown. A missing or duplicate title or confirmation
+fails closed. Once the official bridge accepts the write, an absent or timed-out receipt
+never offers automatic retry; the user can refresh or confirm in the official menu instead.
 Refreshing a target project also removes the same conversation identity from its previous
-cached project, preventing duplicate sidebar membership. The completed capability is
-`android_chatgpt_native_conversation_project_move_v1`; it remains scheduled for one
-reversible device round trip after the first published build containing adapter `209`.
+cached project, preventing duplicate sidebar membership. The stable capability is
+`android_chatgpt_native_conversation_project_move_v1`; a current reversible device round
+trip remains required before its status returns from `implemented_device_pending` to
+`completed`.
 
 Other conversation management actions use the existing context-bound official controls
 through native sheets and typed adaptive forms. Rename, pin or unpin, archive or unarchive,

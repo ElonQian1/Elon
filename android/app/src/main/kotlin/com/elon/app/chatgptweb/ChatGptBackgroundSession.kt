@@ -262,7 +262,11 @@ internal class ChatGptBackgroundSession(
     fun conversationNavigationActive(): Boolean = conversationNavigation.isNavigating()
     fun conversationIndex(): ChatGptWebConversationIndexState = conversationDirectory.index()
     fun requestConversationIndex(projectId: String? = null): Boolean {
-        requestedConversationProjectId = ChatGptWebConversationPath.canonicalProjectId(projectId)
+        requestedConversationProjectId = ChatGptConversationRefreshScopePolicy.select(
+            pendingProjectId = requestedConversationProjectId,
+            requestedProjectId = ChatGptWebConversationPath.canonicalProjectId(projectId),
+            refreshBusy = conversationRefresh.isBusy,
+        )
         return conversationRefresh.requestAfterCurrent()
     }
 

@@ -261,7 +261,14 @@ internal class WebChatProductionConversationProjectMoveCoordinator(
                 onSucceeded = {
                     updateProgress(destination, "正在同步会话目录")
                     refreshConversationIndex(destination.id)
-                    pollReconciliation(conversation, destination, epoch, attempt = 0)
+                    pollReconciliation(
+                        conversation,
+                        destination,
+                        port,
+                        epoch,
+                        attempt = 0,
+                        confirmationAttempted = false,
+                    )
                 },
                 onFailed = { fail(conversation, destination, "官网未确认移动结果", epoch) },
             )
@@ -338,8 +345,10 @@ internal class WebChatProductionConversationProjectMoveCoordinator(
     private fun pollReconciliation(
         conversation: ChatGptWebConversation,
         destination: ChatGptWebProject,
+        port: WebChatConsumerPort,
         epoch: Int,
         attempt: Int,
+        confirmationAttempted: Boolean,
     ) {
         if (!isCurrent(epoch)) return
         if (WebChatConversationProjectMovePolicy.reconciled(
@@ -351,6 +360,38 @@ internal class WebChatProductionConversationProjectMoveCoordinator(
             complete(destination)
             return
         }
+        if (!confirmationAttempted) {
+            val confirmation = WebChatConversationProjectMovePolicy.confirmation(
+                port.state(),
+                conversation,
+            )
+            if (confirmation != null) {
+                updateProgress(destination, "正在确认移动")
+                invokeAndWait(
+                    port = port,
+                    control = confirmation,
+                    userConfirmed = true,
+                    epoch = epoch,
+                    onSucceeded = {
+                        updateProgress(destination, "正在同步会话目录")
+                        refreshConversationIndex(destination.id)
+                        pollReconciliation(
+                            conversation,
+                            destination,
+                            port,
+                            epoch,
+                            attempt = 0,
+                            confirmationAttempted = true,
+                        )
+                    },
+                    onFailed = { fail(conversation, destination, "官网未确认移动结果", epoch) },
+                )
+                return
+            }
+            if (WebChatConversationProjectMoveTiming.shouldRefreshControls(attempt)) {
+                port.requestControls()
+            }
+        }
         if (attempt >= MAX_RECONCILIATION_POLLS) {
             fail(conversation, destination, "目录尚未确认移动结果", epoch)
             return
@@ -359,7 +400,14 @@ internal class WebChatProductionConversationProjectMoveCoordinator(
             refreshConversationIndex(destination.id)
         }
         host.postDelayed({
-            pollReconciliation(conversation, destination, epoch, attempt + 1)
+            pollReconciliation(
+                conversation,
+                destination,
+                port,
+                epoch,
+                attempt + 1,
+                confirmationAttempted,
+            )
         }, POLL_INTERVAL_MS)
     }
 

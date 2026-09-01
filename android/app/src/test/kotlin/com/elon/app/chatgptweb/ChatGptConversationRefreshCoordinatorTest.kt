@@ -113,6 +113,34 @@ class ChatGptConversationRefreshCoordinatorTest {
         assertTrue(scheduled.isEmpty())
     }
 
+    @Test
+    fun scopedProjectRefreshSurvivesAConcurrentGenericRefresh() {
+        assertEquals(
+            "g-p-target",
+            ChatGptConversationRefreshScopePolicy.select(
+                pendingProjectId = "g-p-target",
+                requestedProjectId = null,
+                refreshBusy = true,
+            ),
+        )
+        assertEquals(
+            "g-p-latest",
+            ChatGptConversationRefreshScopePolicy.select(
+                pendingProjectId = "g-p-target",
+                requestedProjectId = "g-p-latest",
+                refreshBusy = true,
+            ),
+        )
+        assertEquals(
+            null,
+            ChatGptConversationRefreshScopePolicy.select(
+                pendingProjectId = "g-p-stale",
+                requestedProjectId = null,
+                refreshBusy = false,
+            ),
+        )
+    }
+
     private fun coordinator(
         scheduled: MutableList<Scheduled>,
         dispatch: () -> Boolean,

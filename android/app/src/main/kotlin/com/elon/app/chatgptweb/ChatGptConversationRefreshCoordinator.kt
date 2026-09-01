@@ -89,3 +89,15 @@ internal class ChatGptConversationRefreshCoordinator(
         val DEFAULT_RETRY_DELAYS_MS = listOf(2_000L, 5_000L, 15_000L, 30_000L)
     }
 }
+
+internal object ChatGptConversationRefreshScopePolicy {
+    fun select(
+        pendingProjectId: String?,
+        requestedProjectId: String?,
+        refreshBusy: Boolean,
+    ): String? = when {
+        requestedProjectId != null -> requestedProjectId
+        refreshBusy -> pendingProjectId
+        else -> null
+    }
+}

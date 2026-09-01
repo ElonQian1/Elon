@@ -88,6 +88,25 @@ function Get-Navigation {
     }
 }
 
+function Request-ScopedNavigationRefresh {
+    param([Parameter(Mandatory = $true)][string]$ProjectId)
+
+    Invoke-MainAction -Action "refresh_web_chat_conversations" -Arguments @{
+        project_id = $ProjectId
+    } | Out-Null
+}
+
+function Request-MembershipRefresh {
+    param(
+        [Parameter(Mandatory = $true)][string]$OriginProjectId,
+        [Parameter(Mandatory = $true)][string]$TargetProjectId
+    )
+
+    Request-ScopedNavigationRefresh -ProjectId $OriginProjectId
+    Start-Sleep -Seconds 2
+    Request-ScopedNavigationRefresh -ProjectId $TargetProjectId
+}
+
 function Get-UiNodes {
     $remotePath = "/sdcard/elon-chatgpt-project-move.xml"
     try {
@@ -237,7 +256,11 @@ function Wait-ConversationMembership {
     )
 
     $deadline = [DateTimeOffset]::UtcNow.AddSeconds($TimeoutSec)
+    $poll = 0
     do {
+        if ($poll -eq 0 -or $poll % 4 -eq 0) {
+            Request-ScopedNavigationRefresh -ProjectId $ProjectId
+        }
         if (-not $WriteSelected.Value -and (Test-ProjectMoveWriteObserved)) {
             $WriteSelected.Value = $true
         }
@@ -249,6 +272,7 @@ function Wait-ConversationMembership {
             $WriteSelected.Value = $true
             return $current
         }
+        $poll += 1
         Start-Sleep -Seconds 2
     } while ([DateTimeOffset]::UtcNow -lt $deadline)
     throw "Native navigation did not reconcile the project move."
@@ -306,6 +330,18 @@ try {
     if ($null -eq $targetProject) { throw "No alternate project is available."
     }
 
+    Request-MembershipRefresh -OriginProjectId ([string]$originProject.id) `
+        -TargetProjectId ([string]$targetProject.id)
+    Start-Sleep -Seconds 2
+    $navigation = Get-Navigation
+    $candidate = @($navigation.conversations | Where-Object {
+        [string]$_.id -eq [string]$candidate.id -and
+            [string]$_.project_id -eq [string]$originProject.id
+    }) | Select-Object -First 1
+    if ($null -eq $candidate) {
+        throw "The reversible conversation membership changed during the read-only baseline refresh."
+    }
+
     if ($ConfirmRoundTrip) {
         $moved = Invoke-ProjectMove -Conversation $candidate `
             -SourceProjectId ([string]$originProject.id) `
@@ -346,6 +382,9 @@ try {
 } finally {
     if ($forwardWriteSelected -and -not $restored -and $null -ne $candidate) {
         try {
+            Request-MembershipRefresh -OriginProjectId ([string]$originProject.id) `
+                -TargetProjectId ([string]$targetProject.id)
+            Start-Sleep -Seconds 2
             $recoveryNavigation = Get-Navigation
             $current = @($recoveryNavigation.conversations | Where-Object {
                 [string]$_.id -eq [string]$candidate.id
@@ -362,10 +401,28 @@ try {
                     -WriteSelected ([ref]$recoveryWriteSelected)
                 $restored = [string]$recovered.project_id -eq [string]$originProject.id
             } elseif (
-                $currentProjectId -eq [string]$originProject.id -and
-                ($forwardMoveVerified -or $restoreWriteSelected)
+                $currentProjectId -eq [string]$originProject.id
             ) {
                 $restored = $true
+            } elseif (
+                $currentProjectId -eq [string]$targetProject.id -and
+                $restoreWriteSelected
+            ) {
+                $recoveryDeadline = [DateTimeOffset]::UtcNow.AddSeconds($TimeoutSec)
+                do {
+                    Request-MembershipRefresh -OriginProjectId ([string]$originProject.id) `
+                        -TargetProjectId ([string]$targetProject.id)
+                    Start-Sleep -Seconds 2
+                    $recoveryNavigation = Get-Navigation
+                    $current = @($recoveryNavigation.conversations | Where-Object {
+                        [string]$_.id -eq [string]$candidate.id
+                    }) | Select-Object -First 1
+                    if ([string]$current.project_id -eq [string]$originProject.id) {
+                        $restored = $true
+                        break
+                    }
+                } while ([DateTimeOffset]::UtcNow -lt $recoveryDeadline)
+                if (-not $restored) { $recoveryUnknown = $true }
             } else {
                 $recoveryUnknown = $true
             }

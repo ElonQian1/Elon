@@ -61,6 +61,22 @@ internal object WebChatConversationProjectMovePolicy {
             .singleOrNull()
     }
 
+    fun confirmation(
+        state: WebChatConsumerState,
+        conversation: ChatGptWebConversation,
+    ): WebChatConsumerControlDescriptor? {
+        val identity = ChatGptWebConversationIndex.identityOf(conversation)
+        val candidates = state.controls.asSequence()
+            .filter { it.control.enabled && it.control.region == "overlay" }
+            .filter { it.control.role in PROJECT_MOVE_CONFIRMATION_ROLES }
+            .filter { it.control.contextId == null || it.control.contextId == identity }
+            .toList()
+        return candidates.singleOrNull { it.control.semantic == "confirm" }
+            ?: candidates.singleOrNull {
+                PROJECT_MOVE_CONFIRMATION_LABEL.matches(normalizedLabel(it.control.label))
+            }
+    }
+
     fun commandStatus(
         state: WebChatConsumerState,
         requestId: String?,
@@ -105,6 +121,12 @@ internal object WebChatConversationProjectMovePolicy {
         "menuitemradio",
         "option",
         "radio",
+    )
+    private val PROJECT_MOVE_CONFIRMATION_ROLES = setOf("button", "menuitem")
+    private val PROJECT_MOVE_CONFIRMATION_LABEL = Regex(
+        "^(?:confirm|move(?: chat| conversation)?|save|add|done|ok|" +
+            "确定|确认|移动(?:会话|聊天)?|保存|添加|完成)$",
+        RegexOption.IGNORE_CASE,
     )
 }
 

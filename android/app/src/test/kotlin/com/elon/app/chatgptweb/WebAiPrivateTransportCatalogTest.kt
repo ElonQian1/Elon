@@ -97,13 +97,20 @@ class WebAiPrivateTransportCatalogTest {
             it.getString("capability_id") ==
                 "android_chatgpt_native_conversation_project_move_v1"
         }
-        assertEquals("completed", projectMove.getString("implementation_status"))
         assertEquals(
-            "targeted_tests_passed_device_pending",
+            "implemented_device_pending",
+            projectMove.getString("implementation_status"),
+        )
+        assertEquals(
+            "direct_dom_activation_confirmation_and_scoped_refresh_tests_pending",
             projectMove.getString("verification_status"),
         )
         assertTrue(projectMove.getBoolean("production_default"))
         assertTrue(projectMove.getBoolean("runtime_enabled"))
+        assertEquals(
+            "cached_native_destination_then_exact_official_dom_activation_and_optional_confirmation",
+            projectMove.getString("request_mode"),
+        )
         assertEquals(
             "official_conversation_project_menu",
             projectMove.getString("fallback"),
