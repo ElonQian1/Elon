@@ -21,9 +21,10 @@ pub(super) fn finish(
 pub(super) fn snapshot_entry(
     entry: &Entry,
 ) -> Result<ManagedTestPreManagedLockSnapshot, &'static str> {
-    let (custody, shm_present, rejection, managed_reached) = entry
-        .dispatch
-        .unwrap_or((Custody::Sidecar, false, None, false));
+    let (custody, shm_present, rejection, managed_reached) =
+        entry
+            .dispatch
+            .unwrap_or((Custody::Sidecar, false, None, false));
     let receipt = entry
         .receipt
         .map(PreemptionReceipt::ordered_values)
@@ -73,7 +74,11 @@ mod tests {
         let route = ManagedTestRouteOrdinal::test_value(6);
         let mut clean = ManagedTestPreManagedLockState::default();
         clean
-            .arm(route, ManagedTestPreManagedLockPath::AbiRejected, request(0))
+            .arm(
+                route,
+                ManagedTestPreManagedLockPath::AbiRejected,
+                request(0),
+            )
             .unwrap();
         assert_eq!(
             finish(&mut clean, route).unwrap().ordered_values(),
@@ -84,7 +89,11 @@ mod tests {
         for observed in [request(0), request(1)] {
             let mut contaminated = ManagedTestPreManagedLockState::default();
             contaminated
-                .arm(route, ManagedTestPreManagedLockPath::AbiRejected, request(0))
+                .arm(
+                    route,
+                    ManagedTestPreManagedLockPath::AbiRejected,
+                    request(0),
+                )
                 .unwrap();
             contaminated.observe(route, Event::Entry { request: observed });
             assert!(finish(&mut contaminated, route).is_err());

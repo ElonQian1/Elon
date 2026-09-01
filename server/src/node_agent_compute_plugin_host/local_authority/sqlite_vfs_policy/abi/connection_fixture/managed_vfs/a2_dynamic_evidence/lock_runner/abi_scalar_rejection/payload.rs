@@ -4,8 +4,8 @@ use anyhow::anyhow;
 use rusqlite::ffi;
 
 use super::super::super::super::{
-    connection::ManagedTestShmLockAbiLedgerObservation,
-    ManagedSqliteTestVfsRouteCustodySnapshot, ManagedSqliteTestVfsRoutePhase,
+    connection::ManagedTestShmLockAbiLedgerObservation, ManagedSqliteTestVfsRouteCustodySnapshot,
+    ManagedSqliteTestVfsRoutePhase,
 };
 use super::super::super::child::lock_abi_scalar_rejection;
 use super::{
@@ -94,7 +94,9 @@ pub(super) fn validate_payload(
     if values.len() != lock_abi_scalar_rejection::REPORT_VALUE_COUNT
         || values[..23] != binding_values(binding)
     {
-        return Err(anyhow!("q10 Lock ABI-scalar payload program binding mismatch"));
+        return Err(anyhow!(
+            "q10 Lock ABI-scalar payload program binding mismatch"
+        ));
     }
     let (offset, count, raw_flags) = raw_tuple(binding);
     let callback = [
@@ -125,8 +127,7 @@ pub(super) fn validate_payload(
         || values[29..37] != [1; 8]
         || values[37] == 0
         || values[38..49] != abi
-        || values[49..67]
-            != [1, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        || values[49..67] != [1, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
         || values[67..69] != [0, 0]
         || route_before != route_after
         || route_before[0] != phase_tag(ManagedSqliteTestVfsRoutePhase::Active)
@@ -166,9 +167,8 @@ fn binding_values(binding: LockRunnerAbiScalarRejectionBindingV1) -> Vec<u64> {
 }
 
 fn scalar_validity(binding: LockRunnerAbiScalarRejectionBindingV1) -> [u64; 3] {
-    [binding.offset, binding.count, binding.flags].map(|value| {
-        u64::from(matches!(value, LockRunnerAbiScalarValidityV1::Valid))
-    })
+    [binding.offset, binding.count, binding.flags]
+        .map(|value| u64::from(matches!(value, LockRunnerAbiScalarValidityV1::Valid)))
 }
 
 fn route_values(snapshot: ManagedSqliteTestVfsRouteCustodySnapshot) -> [u64; 6] {

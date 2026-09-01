@@ -24,6 +24,7 @@ use super::super::{DynamicClassKeyV1, StaticMemberSealV1};
 use super::CompiledRunnerPlanV1;
 #[cfg(windows)]
 use abi_scalar_rejection::LockAbiScalarRejectionProgramSpecV1;
+pub(super) use abi_scalar_rejection::ABI_SCALAR_REJECTION_PROJECTOR_DELTA_V1;
 #[cfg(windows)]
 use callback_completion_route_unknown::LockCallbackCompletionRouteUnknownProgramSpecV1;
 use execution_receipt::digest_execution_receipt_v1;
@@ -37,15 +38,14 @@ use local_protocol_rejection::LockLocalProtocolRejectionProgramSpecV1;
 use local_sibling_contention::LockLocalSiblingContentionProgramSpecV1;
 #[cfg(windows)]
 use native_acquire_busy::LockNativeAcquireBusyProgramSpecV1;
-pub(super) use abi_scalar_rejection::ABI_SCALAR_REJECTION_PROJECTOR_DELTA_V1;
 pub(super) use pre_managed_callback_rejection::PRE_MANAGED_CALLBACK_REJECTION_PROJECTOR_DELTA_V1;
+#[cfg(windows)]
+use request_validation::LockRequestValidationGuardV1;
 use source_program::program_spec_v1 as source_program_spec_v1;
 #[cfg(windows)]
 use stored_poison::{
     LockStoredPoisonCompletionV1, LockStoredPoisonProfileV1, LockStoredPoisonProgramSpecV1,
 };
-#[cfg(windows)]
-use request_validation::LockRequestValidationGuardV1;
 
 #[cfg(windows)]
 use crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::abi::connection_fixture::managed_vfs::a2_dynamic_evidence::{

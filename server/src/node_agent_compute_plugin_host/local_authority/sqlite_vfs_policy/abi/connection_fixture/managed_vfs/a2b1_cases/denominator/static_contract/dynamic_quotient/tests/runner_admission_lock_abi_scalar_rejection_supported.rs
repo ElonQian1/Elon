@@ -16,9 +16,7 @@ use crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::a
 
 const EXACT_TEST: &str = "node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::abi::connection_fixture::managed_vfs::a2b1_cases::denominator::static_contract::dynamic_quotient::tests::runner_admission_lock_abi_scalar_rejection_supported::isolated_abi_scalar_rejection_family_receipts_are_exact";
 
-fn supported_key_and_member(
-    scalar: LockAbiScalarV1,
-) -> (DynamicClassKeyV1, StaticMemberSealV1) {
+fn supported_key_and_member(scalar: LockAbiScalarV1) -> (DynamicClassKeyV1, StaticMemberSealV1) {
     let leaf = &frozen_lock_abi_scalar_rejection_leaves_v1()[&scalar];
     let descriptor = lock_abi_scalar_rejection_descriptor_v1(
         scalar,
@@ -55,10 +53,8 @@ fn isolated_abi_scalar_rejection_family_receipts_are_exact() -> anyhow::Result<(
         {
             continue;
         }
-        let descriptor = lock_abi_scalar_rejection_descriptor_v1(
-            scalar,
-            RunnerCapabilityV1::Supported,
-        );
+        let descriptor =
+            lock_abi_scalar_rejection_descriptor_v1(scalar, RunnerCapabilityV1::Supported);
         let (key, member) = supported_key_and_member(scalar);
         let plan = compile_for_test(&key);
         let execution = match run_lock_isolated_for_test(EXACT_TEST, &key, member, plan)? {

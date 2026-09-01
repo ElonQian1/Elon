@@ -67,14 +67,16 @@ fn ledger() -> &'static Mutex<ObservationLedger> {
 }
 
 #[must_use = "the guard must be finished to obtain the linear ABI observation receipt"]
-pub(in crate::node_agent_compute_plugin_host::local_authority) struct HandleBoundSqliteAbiShmLockObservationGuard {
+pub(in crate::node_agent_compute_plugin_host::local_authority) struct HandleBoundSqliteAbiShmLockObservationGuard
+{
     observation_id: u64,
     owner_thread: ThreadId,
     finished: bool,
     not_send_or_sync: PhantomData<Rc<()>>,
 }
 
-pub(in crate::node_agent_compute_plugin_host::local_authority) struct HandleBoundSqliteAbiShmLockObservationReceipt {
+pub(in crate::node_agent_compute_plugin_host::local_authority) struct HandleBoundSqliteAbiShmLockObservationReceipt
+{
     observation_id: u64,
     raw: RawTuple,
     entry_count: u64,
@@ -170,9 +172,7 @@ impl HandleBoundSqliteAbiShmLockObservationGuard {
             ledger.active = Some(active);
             return Err("installed xShmLock ABI observation guard was stale");
         }
-        if active.owner_thread != self.owner_thread
-            || thread::current().id() != self.owner_thread
-        {
+        if active.owner_thread != self.owner_thread || thread::current().id() != self.owner_thread {
             return Err("installed xShmLock ABI observation finished on the wrong thread");
         }
         if let Some(violation) = active.violation {
@@ -188,11 +188,7 @@ impl HandleBoundSqliteAbiShmLockObservationGuard {
         let result_code = active
             .result_code
             .ok_or("installed xShmLock ABI observation return was missing")?;
-        let validation = (
-            active.offset_valid,
-            active.count_valid,
-            active.flags_valid,
-        );
+        let validation = (active.offset_valid, active.count_valid, active.flags_valid);
         if active.scalar_rejection_count == 1
             && (!matches!(validation, (Some(_), Some(_), Some(_)))
                 || validation == (Some(true), Some(true), Some(true)))
@@ -222,12 +218,7 @@ impl Drop for HandleBoundSqliteAbiShmLockObservationGuard {
         let Ok(mut ledger) = ledger().lock() else {
             return;
         };
-        if ledger
-            .active
-            .as_ref()
-            .map(|active| active.observation_id)
-            == Some(self.observation_id)
-        {
+        if ledger.active.as_ref().map(|active| active.observation_id) == Some(self.observation_id) {
             ledger.active = None;
         }
     }
@@ -302,7 +293,10 @@ pub(super) fn record_entry(
 ) {
     with_matching_active(file, offset, count, flags, |active| {
         if active.stage != Stage::Armed || active.entry_count != 0 {
-            mark_violation(active, "installed xShmLock ABI entry was duplicated or reordered");
+            mark_violation(
+                active,
+                "installed xShmLock ABI entry was duplicated or reordered",
+            );
             return;
         }
         active.entry_count = 1;
@@ -366,7 +360,10 @@ pub(super) fn record_returned(
             || active.return_count != 0
             || active.result_code.is_some()
         {
-            mark_violation(active, "installed xShmLock return was duplicated or reordered");
+            mark_violation(
+                active,
+                "installed xShmLock return was duplicated or reordered",
+            );
             return;
         }
         active.return_count = 1;
@@ -406,7 +403,10 @@ fn with_matching_active(
             flags,
         })
     {
-        mark_violation(active, "installed xShmLock ABI observation raw tuple mismatch");
+        mark_violation(
+            active,
+            "installed xShmLock ABI observation raw tuple mismatch",
+        );
         return;
     }
     event(active);

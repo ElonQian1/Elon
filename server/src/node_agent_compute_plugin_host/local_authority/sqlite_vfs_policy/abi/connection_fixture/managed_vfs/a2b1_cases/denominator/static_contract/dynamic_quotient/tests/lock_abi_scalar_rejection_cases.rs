@@ -7,11 +7,13 @@ use super::*;
 
 pub(super) const LOCK_ABI_SCALAR_REJECTION_MEMBER_COUNT: usize = 7;
 
-pub(super) const LOCK_ABI_SCALAR_REJECTION_PROFILES_V1: [
-    LockAbiScalarV1;
-    LOCK_ABI_SCALAR_REJECTION_MEMBER_COUNT
-] = [
-    scalar(ValidityV1::Invalid, ValidityV1::Invalid, ValidityV1::Invalid),
+pub(super) const LOCK_ABI_SCALAR_REJECTION_PROFILES_V1: [LockAbiScalarV1;
+    LOCK_ABI_SCALAR_REJECTION_MEMBER_COUNT] = [
+    scalar(
+        ValidityV1::Invalid,
+        ValidityV1::Invalid,
+        ValidityV1::Invalid,
+    ),
     scalar(ValidityV1::Invalid, ValidityV1::Invalid, ValidityV1::Valid),
     scalar(ValidityV1::Invalid, ValidityV1::Valid, ValidityV1::Invalid),
     scalar(ValidityV1::Invalid, ValidityV1::Valid, ValidityV1::Valid),
@@ -29,9 +31,8 @@ pub(super) struct FrozenLockAbiScalarRejectionLeafV1 {
 
 pub(super) fn frozen_lock_abi_scalar_rejection_leaves_v1(
 ) -> &'static BTreeMap<LockAbiScalarV1, FrozenLockAbiScalarRejectionLeafV1> {
-    static LEAVES: OnceLock<
-        BTreeMap<LockAbiScalarV1, FrozenLockAbiScalarRejectionLeafV1>,
-    > = OnceLock::new();
+    static LEAVES: OnceLock<BTreeMap<LockAbiScalarV1, FrozenLockAbiScalarRejectionLeafV1>> =
+        OnceLock::new();
     LEAVES.get_or_init(|| {
         let graph = super::super::super::lock::graph();
         let mut leaves = BTreeMap::new();
@@ -133,11 +134,7 @@ fn abi_scalar_rejection_v1(
     (expected == &expected_v1()).then_some(scalar)
 }
 
-const fn scalar(
-    offset: ValidityV1,
-    count: ValidityV1,
-    flags: ValidityV1,
-) -> LockAbiScalarV1 {
+const fn scalar(offset: ValidityV1, count: ValidityV1, flags: ValidityV1) -> LockAbiScalarV1 {
     LockAbiScalarV1 {
         offset,
         count,

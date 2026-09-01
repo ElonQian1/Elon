@@ -10,9 +10,7 @@ use super::lock_abi_scalar_rejection_cases::{
 };
 use super::*;
 
-fn supported_key_and_member(
-    scalar: LockAbiScalarV1,
-) -> (DynamicClassKeyV1, StaticMemberSealV1) {
+fn supported_key_and_member(scalar: LockAbiScalarV1) -> (DynamicClassKeyV1, StaticMemberSealV1) {
     let leaf = &frozen_lock_abi_scalar_rejection_leaves_v1()[&scalar];
     let descriptor = lock_abi_scalar_rejection_descriptor_v1(
         scalar,
@@ -59,10 +57,7 @@ fn all_seven_q10_programs_are_inventory_present_without_granting_supported() {
         assert_eq!(
             project_dynamic_class_v1(
                 &leaf.record,
-                &lock_abi_scalar_rejection_descriptor_v1(
-                    scalar,
-                    RunnerCapabilityV1::Supported,
-                ),
+                &lock_abi_scalar_rejection_descriptor_v1(scalar, RunnerCapabilityV1::Supported,),
             ),
             Err(ProjectionErrorV1::Invalid(
                 ProjectionViolationV1::RunnerAdmissionUnsealedSupported,
@@ -144,16 +139,30 @@ fn q10_matcher_rejects_typed_identity_recipe_and_every_lock_axis_drift() {
     assert_rejected(capability, member, "capability drift");
 
     let axis_mutations: [(&str, fn(&mut LockAxesV1)); 10] = [
-        ("action", |axes| axes.action = ReachabilityV1::Reached(LockActionV1::LockShared)),
+        ("action", |axes| {
+            axes.action = ReachabilityV1::Reached(LockActionV1::LockShared)
+        }),
         ("first", |axes| axes.first = ReachabilityV1::Reached(0)),
         ("count", |axes| axes.count = ReachabilityV1::Reached(1)),
         ("mask", |axes| axes.mask = ReachabilityV1::Reached(1)),
-        ("initialization", |axes| axes.initialization = ReachabilityV1::Reached(InitializationProfileV1::NodeLive)),
-        ("held-shared", |axes| axes.held_shared_mask = ReachabilityV1::Reached(0)),
-        ("held-exclusive", |axes| axes.held_exclusive_mask = ReachabilityV1::Reached(0)),
-        ("sibling-shared", |axes| axes.sibling_shared_mask = ReachabilityV1::Reached(0)),
-        ("sibling-exclusive", |axes| axes.sibling_exclusive_mask = ReachabilityV1::Reached(0)),
-        ("completion", |axes| axes.completion = ReachabilityV1::Reached(LockCompletionV1::Completed)),
+        ("initialization", |axes| {
+            axes.initialization = ReachabilityV1::Reached(InitializationProfileV1::NodeLive)
+        }),
+        ("held-shared", |axes| {
+            axes.held_shared_mask = ReachabilityV1::Reached(0)
+        }),
+        ("held-exclusive", |axes| {
+            axes.held_exclusive_mask = ReachabilityV1::Reached(0)
+        }),
+        ("sibling-shared", |axes| {
+            axes.sibling_shared_mask = ReachabilityV1::Reached(0)
+        }),
+        ("sibling-exclusive", |axes| {
+            axes.sibling_exclusive_mask = ReachabilityV1::Reached(0)
+        }),
+        ("completion", |axes| {
+            axes.completion = ReachabilityV1::Reached(LockCompletionV1::Completed)
+        }),
     ];
     for (name, mutate) in axis_mutations {
         let mut candidate = key;

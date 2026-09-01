@@ -10,7 +10,11 @@ const HEADER: &str = "offset\tcount\tflags\tcase_key_sha256\tfull_record_sha256"
 const MEMBER_CATALOG: &str = include_str!("abi_scalar_rejection_members.v1.tsv");
 
 const EXPECTED_ROWS_V1: [LockAbiScalarV1; ABI_SCALAR_REJECTION_MEMBER_COUNT] = [
-    scalar(ValidityV1::Invalid, ValidityV1::Invalid, ValidityV1::Invalid),
+    scalar(
+        ValidityV1::Invalid,
+        ValidityV1::Invalid,
+        ValidityV1::Invalid,
+    ),
     scalar(ValidityV1::Invalid, ValidityV1::Invalid, ValidityV1::Valid),
     scalar(ValidityV1::Invalid, ValidityV1::Valid, ValidityV1::Invalid),
     scalar(ValidityV1::Invalid, ValidityV1::Valid, ValidityV1::Valid),
@@ -79,11 +83,7 @@ pub(super) fn exact_member_v1(
     selected.ok_or(LockRunnerExecutionViolationV1::MemberCatalogInvalid)
 }
 
-const fn scalar(
-    offset: ValidityV1,
-    count: ValidityV1,
-    flags: ValidityV1,
-) -> LockAbiScalarV1 {
+const fn scalar(offset: ValidityV1, count: ValidityV1, flags: ValidityV1) -> LockAbiScalarV1 {
     LockAbiScalarV1 {
         offset,
         count,

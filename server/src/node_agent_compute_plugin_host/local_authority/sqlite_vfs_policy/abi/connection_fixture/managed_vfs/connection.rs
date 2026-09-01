@@ -30,8 +30,7 @@ mod unmap;
 #[cfg(all(test, windows))]
 pub(super) use unmap::{
     ManagedTestShmLockAbiLedgerObservation, ManagedTestShmLockCallbackObservation,
-    ManagedTestShmMapCallbackObservation,
-    ManagedTestUnmapCallbackObservation,
+    ManagedTestShmMapCallbackObservation, ManagedTestUnmapCallbackObservation,
 };
 
 struct ManagedVfsAuthorizerContext {

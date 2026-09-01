@@ -8,7 +8,9 @@ use super::lock_stored_poison_source_scope::STORED_POISON_PROJECTOR_DELTA_V1;
 use super::map_runtime_source_scope::{
     MAP_REGION_LOOP_SOURCE_SCOPE_V1, MAP_RUNTIME_DEPENDENCY_SOURCE_SCOPE_V1,
 };
-use super::runner_admission::{ABI_SCALAR_REJECTION_PROJECTOR_DELTA_V1, PRE_MANAGED_CALLBACK_REJECTION_PROJECTOR_DELTA_V1};
+use super::runner_admission::{
+    ABI_SCALAR_REJECTION_PROJECTOR_DELTA_V1, PRE_MANAGED_CALLBACK_REJECTION_PROJECTOR_DELTA_V1,
+};
 use super::{
     digest_dynamic_class_key_v1, DynamicClassKeyV1, DynamicClassSealV1, DynamicQuotientManifestV1,
     ReverseIndexEntryV1, StaticMemberSealV1, DYNAMIC_PROJECTOR_SCHEMA_V1,

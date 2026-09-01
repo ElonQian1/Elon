@@ -29,10 +29,6 @@ pub(super) struct RunnerAdmissionReceiptV1 {
 #[cfg(all(test, windows))]
 pub(super) use lock_program::tamper_lock_implementation_digest_for_test;
 pub(super) use lock_program::LockRunnerExecutionReceiptV1;
-pub(super) use lock_program::{
-    ABI_SCALAR_REJECTION_PROJECTOR_DELTA_V1,
-    PRE_MANAGED_CALLBACK_REJECTION_PROJECTOR_DELTA_V1,
-};
 #[cfg(test)]
 pub(super) use lock_program::{
     abi_scalar_rejection_catalog_row_count_for_test,
@@ -47,6 +43,9 @@ pub(super) use lock_program::{
 #[cfg(all(test, windows))]
 pub(super) use lock_program::{
     run_lock_isolated_for_test, LockRunnerExecutionErrorV1, LockRunnerIsolatedOutcomeV1,
+};
+pub(super) use lock_program::{
+    ABI_SCALAR_REJECTION_PROJECTOR_DELTA_V1, PRE_MANAGED_CALLBACK_REJECTION_PROJECTOR_DELTA_V1,
 };
 #[cfg(all(test, windows))]
 pub(super) use map_program::tamper_implementation_digest_for_test;

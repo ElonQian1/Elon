@@ -19,12 +19,8 @@ use super::super::{
     ChildLaunchIdentity, SanitizedChildReport, ValidatedChildProcessReceipt,
     ValidatedParentCleanupReceipt, WindowsDynamicEnvironment, A2_DYNAMIC_CHILD_NONCE_ENV,
 };
-use super::{
-    LockRunnerEvidenceReceiptV1, LockRunnerIsolatedEvidenceV1, CHILD_ROOT_ENV,
-};
-use crate::node_agent_managed_fs::{
-    ManagedSqliteShmLockAction, ManagedSqliteShmLockRequest,
-};
+use super::{LockRunnerEvidenceReceiptV1, LockRunnerIsolatedEvidenceV1, CHILD_ROOT_ENV};
+use crate::node_agent_managed_fs::{ManagedSqliteShmLockAction, ManagedSqliteShmLockRequest};
 
 mod payload;
 
@@ -131,7 +127,9 @@ fn validate_parent_receipt(
         || child.root_commitment != cleanup.root_commitment
         || child.registration_commitment != cleanup.registration_commitment
     {
-        return Err(anyhow!("q10 Lock ABI-scalar parent cleanup binding mismatch"));
+        return Err(anyhow!(
+            "q10 Lock ABI-scalar parent cleanup binding mismatch"
+        ));
     }
     Ok(LockRunnerIsolatedEvidenceV1::ParentReceipt(
         LockRunnerEvidenceReceiptV1 {
@@ -164,9 +162,10 @@ fn exercise_child(
             "q10 Lock ABI-scalar fixture registration/route identity is zero"
         ));
     }
-    let journal_mode: String = fixture
-        .connection()
-        .query_row("PRAGMA journal_mode=WAL", [], |row| row.get(0))?;
+    let journal_mode: String =
+        fixture
+            .connection()
+            .query_row("PRAGMA journal_mode=WAL", [], |row| row.get(0))?;
     if !journal_mode.eq_ignore_ascii_case("wal") {
         return Err(anyhow!(
             "q10 Lock ABI-scalar fixture did not enter WAL mode"
@@ -196,10 +195,7 @@ fn exercise_child(
     )
     .map_err(anyhow::Error::msg)?;
     fixture
-        .arm_pre_managed_lock_observation(
-            ManagedTestPreManagedLockPath::AbiRejected,
-            route_request,
-        )
+        .arm_pre_managed_lock_observation(ManagedTestPreManagedLockPath::AbiRejected, route_request)
         .map_err(anyhow::Error::msg)?;
     let observation = fixture
         .observe_main_shm_lock_raw_with_abi_ledger(offset, count, raw_flags)
@@ -277,9 +273,7 @@ fn exercise_child(
     Ok(())
 }
 
-fn validate_live_route(
-    route: ManagedSqliteTestVfsRouteCustodySnapshot,
-) -> anyhow::Result<()> {
+fn validate_live_route(route: ManagedSqliteTestVfsRouteCustodySnapshot) -> anyhow::Result<()> {
     if route.phase() != ManagedSqliteTestVfsRoutePhase::Active
         || !route.connection_owner()
         || route.main_file_lock_owner_lease()
@@ -306,9 +300,8 @@ fn validate_observation(
     let abi = observation.abi();
     let before = callback.before();
     let after = callback.after();
-    let expected_validity = [binding.offset, binding.count, binding.flags].map(|validity| {
-        matches!(validity, LockRunnerAbiScalarValidityV1::Valid)
-    });
+    let expected_validity = [binding.offset, binding.count, binding.flags]
+        .map(|validity| matches!(validity, LockRunnerAbiScalarValidityV1::Valid));
     validate_live_route(route_after)?;
     if callback.offset() != offset
         || callback.count() != count
@@ -327,8 +320,7 @@ fn validate_observation(
         || abi.run_code_entry_count() != 0
         || abi.return_count() != 1
         || abi.result_code() != callback.result_code()
-        || route_no_entry
-            != [1, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        || route_no_entry != [1, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
         || route_before != route_after
     {
         return Err(anyhow!(
