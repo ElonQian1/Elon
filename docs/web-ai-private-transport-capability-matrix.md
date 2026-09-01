@@ -10,7 +10,7 @@ installed build; individual capability documents retain implementation evidence.
 |---|---|---|---|
 | Conversation and project directory | ChatGPT | Completed and enabled | Official DOM directory |
 | Conversation body prefetch | ChatGPT | Completed and enabled | Official WebView navigation |
-| Conversation navigation receipt reconciliation | ChatGPT | Implemented and enabled; exact-identity lifecycle tests passed, consolidated device acceptance pending | Official WebView navigation without write replay |
+| Conversation navigation receipt reconciliation | ChatGPT | Completed, enabled, and device verified on `v1.1.1399 (1420)`, adapter `218` | Official WebView navigation without write replay |
 | Send dispatch acknowledgement | ChatGPT | Completed and enabled | Official DOM confirmation |
 | Streaming reply observer | ChatGPT | Completed and enabled; completion and sparse-watchdog timer/bridge device verified | Official DOM snapshot |
 | Private stream completion settlement | ChatGPT | Completed, enabled, and device verified on `v1.1.1302 (1312)` | Official DOM snapshot |
@@ -33,6 +33,7 @@ installed build; individual capability documents retain implementation evidence.
 | Native private-response rich content | ChatGPT | Completed, enabled, and structurally device verified on Release `v1.1.1379 (1400)` for finance and line-chart cards | Official WebView rich content |
 | Native composer dictation | ChatGPT | Implemented and enabled; ASR/VAD draft, cancellation, and fallback tests passed; device acceptance pending | Official Web dictation after bounded local-engine cooldown |
 | Native response read aloud | ChatGPT | Implemented and enabled; full-answer chunking and message-action tests passed; device acceptance pending | Official message actions and WebView |
+| Native conversation management | ChatGPT | Completed, enabled, and reversible pin round trip device verified on `v1.1.1399 (1420)`, adapter `218` | Context-bound official conversation options without automatic write replay |
 | Native conversation project move | ChatGPT | Completed and enabled; exact-control and reconciliation tests passed, device round trip pending | Official conversation project menu |
 | Native conversation management | ChatGPT | Completed and enabled; rename, pin/unpin, archive/unarchive, delete confirmation, identity scoping, and adaptive-control tests passed; consolidated device mutation acceptance pending | Official conversation options |
 | Acceptance evidence contract revisions | ChatGPT and Google Web AI | Completed, enabled, and installed-state migration verified on Release `v1.1.1393 (1414)`, adapter `212` | Retain implementation hashes as diagnostics without discarding accepted contracts |
@@ -195,9 +196,14 @@ and delete stay scoped to the exact conversation identity; destructive or state-
 controls require explicit user confirmation. Stale controls are rejected and write
 operations are never replayed automatically. Sharing and any unsupported flow continue in
 the official conversation options. The completed capability is
-`android_chatgpt_native_conversation_management_v1`; consolidated device mutation
-acceptance remains pending and this control path must not be duplicated without current
-regression evidence.
+`android_chatgpt_native_conversation_management_v1`. Release `v1.1.1399 (1420)`,
+adapter `218`, completed the reversible device acceptance: the exact conversation menu
+opened, pin state changed and was restored, the production surface remained active, and
+no message, Cookie clear, or app-data clear occurred. Navigation success is now settled
+only by an exact target snapshot, commands stay bound to their observed document token,
+and the smoke closes the hidden official menu through its context-bound trigger instead
+of backing out of the production chat. This control path must not be duplicated without
+current regression evidence.
 
 The Google conversation directory persists the timestamp of the last successful
 official directory response. Cached rows render immediately; a legacy or expired cache

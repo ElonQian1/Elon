@@ -33,6 +33,7 @@ foreach ($required in @(
     "Get-ConversationPinState",
     "Open-ConversationManagementMenu",
     "Wait-ConversationManagementMenuClosed",
+    'toggleArguments = @{ semantic = "conversation_options"; limit = 100 }',
     "Invoke-ConversationPinToggle",
     'user_confirmed = $true',
     "Restore-ConversationPinState",

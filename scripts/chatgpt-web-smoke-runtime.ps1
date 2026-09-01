@@ -690,7 +690,11 @@ function Wait-ChatGptWebSmokeAuthenticatedReady {
             -Description "authenticated ChatGPT Web bridge" -Predicate $ready
     } catch {
         # Native state is cache-first; do not turn a slow identity-layer resume into
-        # a destructive page reload. The bounded recovery coordinator remains authoritative.
+        # a destructive page reload. Rebind the existing foreground task once because
+        # a warm MCP endpoint can outlive its previous native chat target after an update.
+        $Runtime.mcp_bootstrapped = $false
+        Invoke-ChatGptWebSmokeMcp -Runtime $Runtime -Tool "ui_state" `
+            -EnsureMainActivity | Out-Null
         $remaining = [int][Math]::Ceiling(
             ($deadline - [DateTimeOffset]::UtcNow).TotalSeconds
         )

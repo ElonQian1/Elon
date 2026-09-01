@@ -49,6 +49,8 @@ if ($readyFunction.Contains('chatgpt_refresh')) {
 }
 Assert-Contains $readyFunction 'resumed authenticated ChatGPT Web bridge' `
     "Runtime must keep waiting for the existing bounded recovery coordinator."
+Assert-Contains $readyFunction '-EnsureMainActivity | Out-Null' `
+    "Runtime must rebind a warm MCP endpoint to the existing foreground task without reloading."
 Assert-Contains $runtime '$state.adapter_current -eq $true' `
     "Runtime must accept only the current trusted adapter."
 Assert-Contains $smoke "Wait-ChatGptWebSmokeAuthenticatedReady -Runtime `$runtime" `

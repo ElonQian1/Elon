@@ -190,6 +190,27 @@ function Close-ConversationManagementMenu {
     $menu = Invoke-ChatGptWebSmokeAction -Runtime $runtime `
         -Action "chatgpt_find_controls" -Arguments $arguments
     if (@($menu.controls).Count -gt 0) {
+        $toggleArguments = @{ semantic = "conversation_options"; limit = 100 }
+        if ($script:conversationContextId) {
+            $toggleArguments.context_id = $script:conversationContextId
+        }
+        $togglePage = Invoke-ChatGptWebSmokeAction -Runtime $runtime `
+            -Action "chatgpt_find_controls" -Arguments $toggleArguments
+        $toggle = @($togglePage.controls | Where-Object {
+            $_.enabled -eq $true -and
+                -not [string]::IsNullOrWhiteSpace([string]$_.context_id)
+        }) | Select-Object -First 1
+        if ($null -ne $toggle) {
+            Invoke-ChatGptWebSmokeReceiptAction -Runtime $runtime `
+                -Action "chatgpt_invoke_control" -ExpectedAction "invoke_ui_control" `
+                -Arguments @{ control_id = [string]$toggle.control_id } `
+                -TimeoutSec ([Math]::Min($TimeoutSec, 30)) | Out-Null
+            if (Wait-ConversationManagementMenuClosed `
+                -ContextId ([string]$toggle.context_id)) {
+                $script:menuOpened = $false
+                return
+            }
+        }
         Invoke-ChatGptWebSmokeAdb -Runtime $runtime `
             -Arguments @("shell", "input", "keyevent", "4") `
             -TimeoutSec 8 -Label "close conversation management menu" | Out-Null
