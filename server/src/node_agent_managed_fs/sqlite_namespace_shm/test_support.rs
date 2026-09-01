@@ -1,8 +1,6 @@
 //! Deterministic failure injection for custody tests. This module is absent from production builds.
 
-use super::{
-    coordinator::PinnedManagedSqliteWalRuntime, types::ManagedSqliteShmFailurePhase,
-};
+use super::{coordinator::PinnedManagedSqliteWalRuntime, types::ManagedSqliteShmFailurePhase};
 #[cfg(all(test, windows))]
 use crate::node_agent_managed_fs::ManagedSqliteFileKind;
 

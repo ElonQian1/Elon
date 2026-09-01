@@ -57,15 +57,11 @@ fn isolated_q13_receipts_are_exact_controlled_fault_actual() -> anyhow::Result<(
             RunnerCapabilityV1::Supported,
         );
         let (key, member) = supported_key_and_member(case);
-        let execution = match run_lock_isolated_for_test(
-            EXACT_TEST,
-            &key,
-            member,
-            compile_for_test(&key),
-        )? {
-            LockRunnerIsolatedOutcomeV1::ChildReported => return Ok(()),
-            LockRunnerIsolatedOutcomeV1::ParentReceipt(receipt) => receipt,
-        };
+        let execution =
+            match run_lock_isolated_for_test(EXACT_TEST, &key, member, compile_for_test(&key))? {
+                LockRunnerIsolatedOutcomeV1::ChildReported => return Ok(()),
+                LockRunnerIsolatedOutcomeV1::ParentReceipt(receipt) => receipt,
+            };
         let validated = project_validated_dynamic_terminal_with_lock_execution_v1(
             &leaf.record,
             &descriptor,

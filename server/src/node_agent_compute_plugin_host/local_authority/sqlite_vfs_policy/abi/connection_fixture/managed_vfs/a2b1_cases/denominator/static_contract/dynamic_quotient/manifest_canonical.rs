@@ -658,7 +658,11 @@ pub(super) fn projector_source_scope_entries_v1(
         .chain(ABI_SCALAR_REJECTION_PROJECTOR_DELTA_V1.iter().copied())
         .chain(RAW_STATE_REJECTION_PROJECTOR_DELTA_V1.iter().copied())
         .chain(NATIVE_RELEASE_DELTA.iter().copied())
-        .chain(NATIVE_ACQUIRE_EXISTING_FIRST_EXCLUSIVE_RELEASE_ERROR_PROJECTOR_DELTA_V1.iter().copied())
+        .chain(
+            NATIVE_ACQUIRE_EXISTING_FIRST_EXCLUSIVE_RELEASE_ERROR_PROJECTOR_DELTA_V1
+                .iter()
+                .copied(),
+        )
 }
 
 pub(super) fn digest_projector_source_entries_v1<'a>(

@@ -9,10 +9,10 @@ use super::{
     EXISTING_FIRST_EXCLUSIVE_RELEASE_ERROR_MEMBER_COUNT,
 };
 
-const HEADER: &str = "action\tfirst\tcount\tmask\tfault_site\tpath\tcompletion\tcase_key_sha256\tfull_record_sha256";
-const MEMBER_CATALOG: &str = include_str!(
-    "native_acquire_existing_first_exclusive_release_error_members.v1.tsv"
-);
+const HEADER: &str =
+    "action\tfirst\tcount\tmask\tfault_site\tpath\tcompletion\tcase_key_sha256\tfull_record_sha256";
+const MEMBER_CATALOG: &str =
+    include_str!("native_acquire_existing_first_exclusive_release_error_members.v1.tsv");
 
 pub(super) fn exact_member_v1(
     action: LockActionV1,

@@ -414,11 +414,12 @@ fn full_lock_program_inventory_accounts_for_every_frozen_member_without_opening_
         .iter()
         .all(|(key, _)| !q1_through_q11_source_keys.contains(key)));
     expected_source_keys.extend(q12_expected_groups.iter().map(|(key, _)| *key));
-    let q1_through_q12_source_keys =
-        expected_source_keys.iter().copied().collect::<BTreeSet<_>>();
+    let q1_through_q12_source_keys = expected_source_keys
+        .iter()
+        .copied()
+        .collect::<BTreeSet<_>>();
     assert_eq!(q1_through_q12_source_keys.len(), 3_756);
-    let q13_expected_groups =
-        lock_existing_first_exclusive_release_error_expected_groups_v1();
+    let q13_expected_groups = lock_existing_first_exclusive_release_error_expected_groups_v1();
     assert_eq!(
         q13_expected_groups.len(),
         LOCK_EXISTING_FIRST_EXCLUSIVE_RELEASE_ERROR_MEMBER_COUNT

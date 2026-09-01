@@ -8,16 +8,14 @@ use rusqlite::ffi;
 use crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::registry::ManagedSqliteRegistryTerminalCustodyTestSnapshot;
 use crate::node_agent_managed_fs::{
     ManagedSqliteShmTestDmsCustody, ManagedSqliteShmTestInitializationEvidenceV1,
-    ManagedSqliteShmTestInitializationExpectationV1,
-    ManagedSqliteShmTestInitializationFailureV1,
+    ManagedSqliteShmTestInitializationExpectationV1, ManagedSqliteShmTestInitializationFailureV1,
     ManagedSqliteShmTestInitializationNativeObservationV1, ManagedSqliteShmTestLockPath,
     ManagedSqliteShmTestLockReceipt, ManagedSqliteShmTestTargetSnapshot,
 };
 
 use super::super::super::super::{
     connection::{
-        ManagedTestLockInitializationFailureObservationV1,
-        ManagedTestShmMapCallbackObservation,
+        ManagedTestLockInitializationFailureObservationV1, ManagedTestShmMapCallbackObservation,
     },
     multi_connection::{
         ManagedSqliteMultiConnectionFixture, ManagedTestExistingShmPrecreationReceiptV1,
@@ -110,9 +108,13 @@ pub(super) fn exercise_child(
                 .map_err(anyhow::Error::msg)?
                 .ordered_values();
             if receipt != [1; 5] {
-                return Err(anyhow!("q13 Lock route-unknown preemption receipt mismatch"));
+                return Err(anyhow!(
+                    "q13 Lock route-unknown preemption receipt mismatch"
+                ));
             }
-            [1, receipt[0], receipt[1], receipt[2], receipt[3], receipt[4]]
+            [
+                1, receipt[0], receipt[1], receipt[2], receipt[3], receipt[4],
+            ]
         }
     };
 
@@ -135,7 +137,9 @@ pub(super) fn exercise_child(
         || route_values != [1, 1, 3]
         || !root_shape_present
     {
-        return Err(anyhow!("q13 Lock retained registration/root shape mismatch"));
+        return Err(anyhow!(
+            "q13 Lock retained registration/root shape mismatch"
+        ));
     }
 
     let payload = payload::encode(
@@ -179,7 +183,9 @@ fn prepare(root: &Path) -> anyhow::Result<RetainedInitializationFailureFixture> 
         .query_row("PRAGMA journal_mode=WAL", [], |row| row.get(0))
         .context("enable WAL for q13 cold initialization")?;
     if !mode.eq_ignore_ascii_case("wal") || !target_absent_before {
-        return Err(anyhow!("q13 Lock fixture was not cold before WAL-main attach"));
+        return Err(anyhow!(
+            "q13 Lock fixture was not cold before WAL-main attach"
+        ));
     }
     route.into_schema_migration()?;
     route.into_runtime()?;
@@ -221,7 +227,9 @@ fn prepare(root: &Path) -> anyhow::Result<RetainedInitializationFailureFixture> 
         || !cold_map.after().state_installed
         || snapshot_values(cold_snapshot) != [1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     {
-        return Err(anyhow!("q13 Lock existing-file cold attach receipt mismatch"));
+        return Err(anyhow!(
+            "q13 Lock existing-file cold attach receipt mismatch"
+        ));
     }
     Ok(RetainedInitializationFailureFixture {
         fixture: Some(fixture),

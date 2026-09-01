@@ -160,7 +160,9 @@ pub(in super::super) fn validate_payload(
         || values[164..167] != [1, 1, 3]
         || values[167] != 1
     {
-        return Err(anyhow!("q13 controlled initialization receipt/custody mismatch"));
+        return Err(anyhow!(
+            "q13 controlled initialization receipt/custody mismatch"
+        ));
     }
     Ok(ValidatedExistingFirstExclusiveReleaseErrorPayloadV1 {
         registration_id: values[25],
@@ -256,7 +258,9 @@ fn digest_receipt(values: &[u64]) -> [u8; 32] {
 fn parse_canonical_u64(value: &str) -> anyhow::Result<u64> {
     let parsed = value.parse::<u64>()?;
     if parsed.to_string() != value {
-        return Err(anyhow!("q13 Lock initialization payload scalar is not canonical"));
+        return Err(anyhow!(
+            "q13 Lock initialization payload scalar is not canonical"
+        ));
     }
     Ok(parsed)
 }

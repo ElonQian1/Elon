@@ -32,6 +32,11 @@ pub(in super::super) use created_first_exclusive_release_error::{
     lock_native_acquire_created_first_exclusive_release_error_selector_for_test,
     selected_lock_native_acquire_created_first_exclusive_release_error_selector_for_test,
 };
+pub(in super::super) use created_first_exclusive_release_error::{
+    run_lock_native_acquire_created_first_exclusive_release_error_program_isolated,
+    LockRunnerCreatedFirstExclusiveReleaseCompletionV1,
+    LockRunnerNativeAcquireCreatedFirstExclusiveReleaseErrorBindingV1,
+};
 #[cfg(all(test, windows))]
 pub(in super::super) use existing_first_exclusive_release_error::{
     lock_native_acquire_existing_first_exclusive_release_error_selector_for_test,
@@ -41,11 +46,6 @@ pub(in super::super) use existing_first_exclusive_release_error::{
     run_lock_native_acquire_existing_first_exclusive_release_error_program_isolated,
     LockRunnerExistingFirstExclusiveReleaseCompletionV1,
     LockRunnerNativeAcquireExistingFirstExclusiveReleaseErrorBindingV1,
-};
-pub(in super::super) use created_first_exclusive_release_error::{
-    run_lock_native_acquire_created_first_exclusive_release_error_program_isolated,
-    LockRunnerCreatedFirstExclusiveReleaseCompletionV1,
-    LockRunnerNativeAcquireCreatedFirstExclusiveReleaseErrorBindingV1,
 };
 #[cfg(all(test, windows))]
 pub(in super::super) use local_protocol_rejection::{

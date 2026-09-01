@@ -14,9 +14,7 @@ pub(in super::super) fn classify_header(
         for first in 0..8 {
             for count in 1..=8 - first {
                 for completion_tag in 1..=2 {
-                    if selector(action_tag, first, count, completion_tag).as_deref()
-                        == Ok(selected)
-                    {
+                    if selector(action_tag, first, count, completion_tag).as_deref() == Ok(selected) {
                         return Ok(Some(REPORT_VALUE_COUNT));
                     }
                 }
@@ -65,9 +63,8 @@ mod tests {
         for first in 0..8 {
             for count in 1..=8 - first {
                 for completion in 1..=2 {
-                    selectors.insert(
-                        selector(2, first, count, completion).expect("exclusive selector"),
-                    );
+                    selectors
+                        .insert(selector(2, first, count, completion).expect("exclusive selector"));
                 }
             }
             for completion in 1..=2 {

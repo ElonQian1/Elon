@@ -43,8 +43,7 @@ pub(super) struct FrozenLockExistingFirstExclusiveReleaseErrorLeafV1 {
     pub(super) member: StaticMemberSealV1,
 }
 
-pub(super) fn frozen_lock_existing_first_exclusive_release_error_leaves_v1(
-) -> &'static BTreeMap<
+pub(super) fn frozen_lock_existing_first_exclusive_release_error_leaves_v1() -> &'static BTreeMap<
     FrozenLockExistingFirstExclusiveReleaseErrorCaseV1,
     FrozenLockExistingFirstExclusiveReleaseErrorLeafV1,
 > {
