@@ -2661,19 +2661,19 @@
       "id": "compute-federation-interactive-desktop-v1",
       "title": "分布式算力联邦交互式云电脑 V1",
       "summary": "Extend the shared Provider/Offer/Capacity/Price/Receipt control plane with a separate interactive desktop session plane for consent-bound Windows screen/audio streaming and optional input, without reclassifying batch ComputeJob or opening production media, input, or funds effects.",
-      "status": "in_progress",
+      "status": "blocked",
       "priority": "p0",
       "requirement": {
         "path": "docs/requirements/interactive-desktop-federation-v1.md",
-        "content_hash": "ad1c2d721a5c95a4199ace299ef145c85e02ddba5ebc2afc739f8417d6f03b41",
+        "content_hash": "2e0728dabca0d1b4cbf31e5551358a533295da3ac6e77798d8b49232af0d2caf",
         "locator": "",
         "evidence_kind": "document",
         "git_identity": {
           "schema": "elon.project_context_git_identity.v1",
-          "head_commit": "1474de9ea6b57ba555f4de292ed9bc26675001b5",
-          "head_blob_oid": "",
-          "worktree_blob_oid": "c7d080c1f3ffa6f6c6801e0cd6871781202d502e",
-          "state": "untracked"
+          "head_commit": "91a7a7dfd98009250d8a6b27dbeb8854f4408941",
+          "head_blob_oid": "7ef64582d45bd96e4c8d8749da00cef1e33812a7",
+          "worktree_blob_oid": "7ef64582d45bd96e4c8d8749da00cef1e33812a7",
+          "state": "tracked_clean"
         }
       },
       "knowledge_node_id": "",
@@ -2704,15 +2704,218 @@
         "Leave migrations, public APIs, node capabilities, signaling, TURN, real media/input, billing writes, and production activation out of this source-contract tranche.",
         "Record source as uncompiled and unrun and keep all production and economic effects closed."
       ],
-      "implementation_evidence": [],
-      "claim": {
-        "claim_id": "claim_e5cd49a50be748cabbf5b7c49294a254",
-        "agent_id": "Codex:/root",
-        "claimed_at_ms": 1788296275005,
-        "expires_at_ms": 1788382675005
-      },
+      "implementation_evidence": [
+        {
+          "path": "AI_ARCHITECTURE.md",
+          "content_hash": "62d0d19d2853c079abb1787ffc6685e3b1ef65e98b4fd6803054dc899a748967",
+          "locator": "交互式桌面架构入口",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e70c1bf827ebfb2a06390802f78af30d60e88f00",
+            "head_blob_oid": "986e1dd94284fe6910cac8d3c7368276813d9563",
+            "worktree_blob_oid": "986e1dd94284fe6910cac8d3c7368276813d9563",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "docs/decisions/compute-federation-interactive-desktop-v1.md",
+          "content_hash": "46f968fc9abfad26a7649cfd59f247f5a3f710f19fdc510ed0f31d028b8e3b79",
+          "locator": "一套控制面、两个执行平面",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e70c1bf827ebfb2a06390802f78af30d60e88f00",
+            "head_blob_oid": "27c78ac23d57a097f6c898505c89a3880e9e560b",
+            "worktree_blob_oid": "27c78ac23d57a097f6c898505c89a3880e9e560b",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "docs/distributed-compute/README.md",
+          "content_hash": "ddba61b1a5a78e30799ebf95173783027d60588d321950275e189202256299ee",
+          "locator": "交互式桌面导航入口",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e70c1bf827ebfb2a06390802f78af30d60e88f00",
+            "head_blob_oid": "44a195a870de4c1422371875c56e174c1bf4ecd0",
+            "worktree_blob_oid": "44a195a870de4c1422371875c56e174c1bf4ecd0",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "docs/distributed-compute/current-implementation-status.md",
+          "content_hash": "1e131cd56a16d05c0122b08496e683f7c0309943ad685de8180d1981e0ffca01",
+          "locator": "source_contract_only_uncompiled_unrun 状态",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e70c1bf827ebfb2a06390802f78af30d60e88f00",
+            "head_blob_oid": "c7a72b14fd80def9f193ac45ec4fe3415ace0be6",
+            "worktree_blob_oid": "c7a72b14fd80def9f193ac45ec4fe3415ace0be6",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "docs/distributed-compute/interactive-desktop-architecture.md",
+          "content_hash": "d197b3db48ab7ed48e0edda34b0a3272772a7f2fff89d6f7d0ebeeac1d18e892",
+          "locator": "C0 架构、权限、计量与后续门禁",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e70c1bf827ebfb2a06390802f78af30d60e88f00",
+            "head_blob_oid": "0dbeb65d3dd459e1461ac895bc92afc36ba29866",
+            "worktree_blob_oid": "0dbeb65d3dd459e1461ac895bc92afc36ba29866",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "docs/requirements/interactive-desktop-federation-v1.md",
+          "content_hash": "2e0728dabca0d1b4cbf31e5551358a533295da3ac6e77798d8b49232af0d2caf",
+          "locator": "验收标准与 source-contract-only 边界",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e70c1bf827ebfb2a06390802f78af30d60e88f00",
+            "head_blob_oid": "7ef64582d45bd96e4c8d8749da00cef1e33812a7",
+            "worktree_blob_oid": "7ef64582d45bd96e4c8d8749da00cef1e33812a7",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/interactive_desktop/authority.rs",
+          "content_hash": "0bb5dfa3fc231b1cd5f7fa29a64357e87412aeb37b7bacc55dd5e5795078f868",
+          "locator": "Host consent、relay scope 与结构授权门",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e70c1bf827ebfb2a06390802f78af30d60e88f00",
+            "head_blob_oid": "f82ef470c0623f8c0b8d1fda930cf006529815ab",
+            "worktree_blob_oid": "f82ef470c0623f8c0b8d1fda930cf006529815ab",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/interactive_desktop/authority_tests.rs",
+          "content_hash": "ec87b98fdedee1a77bf64f5c5062c203d9af1111f1ea550e8b379d1964f9eb05",
+          "locator": "权限与 relay 负向测试源码，未运行",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e70c1bf827ebfb2a06390802f78af30d60e88f00",
+            "head_blob_oid": "d151b44a0d947a591f104829070c0e2969e5c5d8",
+            "worktree_blob_oid": "d151b44a0d947a591f104829070c0e2969e5c5d8",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/interactive_desktop/metering.rs",
+          "content_hash": "705f69df39453a8691959dc9804ced5850172ae4dfc6f2be5825b37232803114",
+          "locator": "Raw Usage 到 Verification 的单向 DAG",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e70c1bf827ebfb2a06390802f78af30d60e88f00",
+            "head_blob_oid": "f1c1d2d44936e545cf9a717b982987056e79f105",
+            "worktree_blob_oid": "f1c1d2d44936e545cf9a717b982987056e79f105",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/interactive_desktop/metering_tests.rs",
+          "content_hash": "fe068ebc9cd10cc6b85829bf96a6e29b8edeeff9beac2a195aaa74ac44a11215",
+          "locator": "计量与 DAG 负向测试源码，未运行",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e70c1bf827ebfb2a06390802f78af30d60e88f00",
+            "head_blob_oid": "9a7fce9e9a282e363f25a9c431d52eb5fbc67b85",
+            "worktree_blob_oid": "9a7fce9e9a282e363f25a9c431d52eb5fbc67b85",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/interactive_desktop/mod.rs",
+          "content_hash": "797530163274a8247e27021d2e449d1bd6a2a811e8ae45f35541b04514afe8a8",
+          "locator": "独立 service class 与模块声明",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e70c1bf827ebfb2a06390802f78af30d60e88f00",
+            "head_blob_oid": "8d5ea5df7f114da5cd1dc0deb4bf096b1867d12f",
+            "worktree_blob_oid": "8d5ea5df7f114da5cd1dc0deb4bf096b1867d12f",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/interactive_desktop/offer.rs",
+          "content_hash": "251ca3cfa16d5a3800bb0249b307dfa0ae0ef55dde4a10008b193ca1fe1167db",
+          "locator": "产品模式、市场与 title-policy 合同",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e70c1bf827ebfb2a06390802f78af30d60e88f00",
+            "head_blob_oid": "db12aad8f46f03ac08a4e64c0e21266284e83f0a",
+            "worktree_blob_oid": "db12aad8f46f03ac08a4e64c0e21266284e83f0a",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/interactive_desktop/session.rs",
+          "content_hash": "24131a6e258e45eb4a008ef4f478e9dfd40dda214a1020e2c4b840f9023a6d2e",
+          "locator": "Session/Lease/Grant/Epoch 合同",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e70c1bf827ebfb2a06390802f78af30d60e88f00",
+            "head_blob_oid": "a0daaec8f9ec9d6cd5a38e392013b6444774fe81",
+            "worktree_blob_oid": "a0daaec8f9ec9d6cd5a38e392013b6444774fe81",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/interactive_desktop/test_support.rs",
+          "content_hash": "1e6ea3d5c97f9aacbed5336986518f040de0c0aa09516381ef739c89bd7a2a3b",
+          "locator": "合同测试构造器源码，未运行",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e70c1bf827ebfb2a06390802f78af30d60e88f00",
+            "head_blob_oid": "1a38c28164ea9d5c41f48941af387232060c6eb4",
+            "worktree_blob_oid": "1a38c28164ea9d5c41f48941af387232060c6eb4",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/interactive_desktop/tests.rs",
+          "content_hash": "fa0415a728ff7e41b10099a3f1e260e457520d69be6150213df3dd4cef751e12",
+          "locator": "schema 与 batch 闭集静态测试源码，未运行",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e70c1bf827ebfb2a06390802f78af30d60e88f00",
+            "head_blob_oid": "ced857ca6f7bd338151bacddf0cfefa0fc5e9ce6",
+            "worktree_blob_oid": "ced857ca6f7bd338151bacddf0cfefa0fc5e9ce6",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/mod.rs",
+          "content_hash": "12fc9078cdf861edbbe25406b2b2a15adc75b7b54385dd4e6e6f8b7a121d348d",
+          "locator": "interactive_desktop module boundary",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e70c1bf827ebfb2a06390802f78af30d60e88f00",
+            "head_blob_oid": "2c38a2cea2c4c6fbd53bd9ea439f87732307a617",
+            "worktree_blob_oid": "2c38a2cea2c4c6fbd53bd9ea439f87732307a617",
+            "state": "tracked_clean"
+          }
+        }
+      ],
       "created_at_ms": 1788296237836,
-      "updated_at_ms": 1788296285296
+      "updated_at_ms": 1788299278785
     },
     {
       "id": "compute-v255-runtime-launch-profile-verification",
@@ -13643,86 +13846,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_d076360059b34d3f88d3db257a6a83f2",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex/root",
-      "reason": "Begin q8 exact 88-member LockLocalOwnOverlapOrNotHeldCompletedV1 source-only tranche after independent denominator and runtime-seam review; preserve compile/runtime/actual receipt gates.",
-      "from_status": "blocked",
-      "to_status": "ready",
-      "at_ms": 1788226783870
-    },
-    {
-      "id": "feature_event_d1e6676a0ebd44b4827e57f472e5f195",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "claimed",
-      "actor": "codex/root",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788226800623
-    },
-    {
-      "id": "feature_event_03439297a34546c2b1145e9182b35923",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex/root",
-      "reason": "Implement q8 source-only exact local own-overlap or not-held Completed tranche; do not compile or run.",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788226829316
-    },
-    {
-      "id": "feature_event_5b4da19c04c74025ab9ced2645d30d89",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "claim_released",
-      "actor": "codex/root",
-      "reason": "Release the pre-q8 claim so the intentionally updated requirement can be hash-rebound and explicitly re-reviewed.",
-      "from_status": "in_progress",
-      "to_status": "blocked",
-      "at_ms": 1788229423737
-    },
-    {
-      "id": "feature_event_636b1cf6e8af4697b6f3a2676aaf4cac",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "requirement_rebound",
-      "actor": "codex/root",
-      "reason": "Bind the intentionally updated q8 exact 88-member source-only authority before renewed review.",
-      "from_status": "blocked",
-      "to_status": "proposed",
-      "at_ms": 1788229894524
-    },
-    {
-      "id": "feature_event_192a17bf5960401299192cd534a79013",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex/root",
-      "reason": "Reviewed q8 exact 88-member source-only authority, exclusions, zero-overlap proof, and fail-closed uncompiled boundary.",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1788229904431
-    },
-    {
-      "id": "feature_event_e43bbce9ecb74899b70e18de61ce0766",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex/root",
-      "reason": "Accepted q8 source-only scope is ready for bounded implementation evidence recording.",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1788229939433
-    },
-    {
-      "id": "feature_event_41a72763c95044c39e996a1595ac20ff",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "claimed",
-      "actor": "codex/root",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788229965022
-    },
-    {
       "id": "feature_event_d05f06c581ee4430bdc2f8b5a14b58b3",
       "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
       "action": "transitioned",
@@ -15641,6 +15764,86 @@
       "from_status": "claimed",
       "to_status": "in_progress",
       "at_ms": 1788296285296
+    },
+    {
+      "id": "feature_event_1ce6eaee8493499098c8cfbfe7ecd99f",
+      "feature_id": "compute-federation-interactive-desktop-v1",
+      "action": "claim_released",
+      "actor": "Codex:/root",
+      "reason": "Requirement intentionally clarified product modes, licensed paid-market rights, and relay-only stranger safety before source evidence.",
+      "from_status": "in_progress",
+      "to_status": "blocked",
+      "at_ms": 1788298248837
+    },
+    {
+      "id": "feature_event_6c02530b5dcb4a9dbdd834fe82718653",
+      "feature_id": "compute-federation-interactive-desktop-v1",
+      "action": "requirement_rebound",
+      "actor": "Codex:/root",
+      "reason": "Rebind the intentionally reviewed requirement after adding product-mode, licensed-title, and relay-only safety boundaries.",
+      "from_status": "blocked",
+      "to_status": "proposed",
+      "at_ms": 1788298260915
+    },
+    {
+      "id": "feature_event_7b0209158a904f1d978419b5aaa89970",
+      "feature_id": "compute-federation-interactive-desktop-v1",
+      "action": "transitioned",
+      "actor": "Codex:/root",
+      "reason": "Reviewed the clarified product modes, licensed-title market boundary, relay-only stranger rule, and source-contract-only scope.",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1788298393395
+    },
+    {
+      "id": "feature_event_152dcdd0af984324be665769bb89cc5f",
+      "feature_id": "compute-federation-interactive-desktop-v1",
+      "action": "transitioned",
+      "actor": "Codex:/root",
+      "reason": "The clarified C0 scope is accepted, dependency-free, and ready for isolated contract implementation with runtime and economic gates closed.",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1788298402144
+    },
+    {
+      "id": "feature_event_cbbf37446b5a4a18b4cf0fa6dfc91bc5",
+      "feature_id": "compute-federation-interactive-desktop-v1",
+      "action": "claimed",
+      "actor": "Codex:/root",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788298422804
+    },
+    {
+      "id": "feature_event_540a0b7b107c4f04bf7478d013fc81b6",
+      "feature_id": "compute-federation-interactive-desktop-v1",
+      "action": "transitioned",
+      "actor": "Codex:/root",
+      "reason": "Implement and statically review the isolated interactive-desktop contract tranche; runtime, media, input, billing, and production effects remain closed.",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788298430882
+    },
+    {
+      "id": "feature_event_d6c8f4d06e2b4e2da3322984139b3f46",
+      "feature_id": "compute-federation-interactive-desktop-v1",
+      "action": "evidence_recorded",
+      "actor": "Codex:/root",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788299267146
+    },
+    {
+      "id": "feature_event_300fa9ac5b5a46a58b7be36b129767f1",
+      "feature_id": "compute-federation-interactive-desktop-v1",
+      "action": "transitioned",
+      "actor": "Codex:/root",
+      "reason": "C0 requirements, architecture, source contracts, negative test source, size/document/ownership/registry guards, and two independent static reviews are complete. The active tranche explicitly forbids compile/runtime validation and leaves migrations, APIs, signaling, TURN/media/input, billing, and production activation closed; therefore it is recorded as blocked rather than implemented.",
+      "from_status": "in_progress",
+      "to_status": "blocked",
+      "at_ms": 1788299278785
     }
   ]
 }
