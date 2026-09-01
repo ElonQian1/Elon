@@ -44,6 +44,10 @@ implementation_status: source_contract_planned
 
 ## V1 产品边界
 
+- 产品模式必须显式区分：`same_owner_remote_access`（同账号远程访问自己的 PC，不产生 Provider 分成）、`friend_co_play`（邀请式、非公开市场）与 `licensed_cloud_seat`（具备发布商、平台及反作弊兼容授权的付费云座位）。
+- 只有 `licensed_cloud_seat` 可以进入陌生用户付费市场；个人账号或个人游戏库不得被默认包装成可出租云座位。标题、版本、地区、年龄、DRM、反作弊或商业串流权利任一未知时失败关闭。
+- 陌生用户模式首期强制 `relay_only`，避免向交易双方暴露对端网络地址；同账号或受信好友是否允许直连由独立策略决定。
+- 一龙不得索取、保存或转交 Steam 等游戏平台密码；通用任意桌面、浏览器、终端和宿主局域网访问不属于本产品首期。
 - 单个 Provider PC、单个 Consumer、单个 Controller。
 - 首期 Windows Host；消费者优先 PC Web/Tauri，Android/TV 与手柄在后续阶段。
 - 首期一个显示器或一个窗口、SDR、H.264、系统音频可选、键盘和鼠标可选。

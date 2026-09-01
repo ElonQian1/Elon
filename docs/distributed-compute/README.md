@@ -1,13 +1,15 @@
 ---
 title: 一龙任务级分布式算力联邦
 status: current
-reviewed_at: 2026-08-31
-owners: backend, node, ai-economy
+reviewed_at: 2026-09-02
+owners: backend, node, pc, security, ai-economy
 ---
 
 # 一龙任务级分布式算力联邦
 
 本目录是“一龙成为 AI 算力矿池与联邦入口”的权威设计入口。目标不是只共享一个本地模型的推理接口，而是把用户闲置节点、平台集群和外部算力池统一成可发现、可报价、可预留、可执行、可验证、可结算的任务级算力网络。各纵切面的最新成熟度统一见 [`current-implementation-status.md`](current-implementation-status.md)。
+
+交互式云电脑是同一联邦的独立执行平面：它复用 Provider、Offer、容量、价格和分层计量原则，但使用 Session/HostLease/ViewerGrant/MediaEpoch/ControlEpoch，不复用批处理 Attempt。当前仅铺设未编译、未运行的源码合同，媒体、输入、计费和付费市场均未开放；入口见 [`interactive-desktop-architecture.md`](interactive-desktop-architecture.md)。
 
 ## 北极星
 
@@ -92,6 +94,7 @@ owners: backend, node, ai-economy
 
 1. `docs/decisions/distributed-compute-federation-v1.md`：不可随意改变的架构决定。
 2. `docs/distributed-compute/architecture.md`：Provider、控制面、数据面和任务状态。
+   - `docs/decisions/compute-federation-interactive-desktop-v1.md`、`docs/requirements/interactive-desktop-federation-v1.md` 与 `docs/distributed-compute/interactive-desktop-architecture.md`：交互式云电脑的一套控制面/两个执行平面、产品模式、安全和当前关闭边界。
 3. `docs/distributed-compute/node-client-and-plugins.md`：客户端按需启用与插件边界。
 4. `docs/distributed-compute/node-endpoint-session-authority.md`、`docs/distributed-compute/node-plugin-local-authority.md`、`docs/distributed-compute/node-plugin-manifest-catalog-authority.md`、`docs/distributed-compute/node-plugin-vfs-fault-authority.md`、`docs/distributed-compute/node-plugin-vfs-fault-acceptance.md`、`docs/distributed-compute/node-plugin-handle-bound-open-attempt-authority.md`、`docs/distributed-compute/node-plugin-handle-bound-open-attempt-acceptance.md`、`docs/distributed-compute/node-plugin-planning-snapshot-authority.md`、`docs/distributed-compute/node-ready-capability.md`、`docs/distributed-compute/user-node-ready-source-lineage-authority.md`、`docs/distributed-compute/user-node-ready-source-lineage-acceptance.md`、`docs/distributed-compute/user-node-ready-local-currentness-authority.md`、`docs/distributed-compute/user-node-ready-local-currentness-acceptance.md`、`docs/distributed-compute/user-node-windows-runner-extraction-directory-share-custody-authority.md`、`docs/distributed-compute/user-node-windows-runner-extraction-directory-share-custody-acceptance.md`、`docs/distributed-compute/user-node-windows-runner-launch-path-discovery-authority.md`、`docs/distributed-compute/user-node-windows-runner-launch-path-discovery-acceptance.md`、`docs/distributed-compute/user-node-windows-runner-launch-context-selection-authority.md`、`docs/distributed-compute/user-node-windows-runner-launch-context-selection-acceptance.md`、`docs/distributed-compute/user-node-windows-runner-recursive-policy-currentness-authority.md`、`docs/distributed-compute/user-node-windows-runner-recursive-policy-currentness-acceptance.md`、`docs/distributed-compute/user-node-windows-runner-recursive-system-image-acquisition-custody-authority.md`、`docs/distributed-compute/user-node-windows-runner-recursive-system-image-acquisition-custody-acceptance.md`、`docs/distributed-compute/user-node-windows-runner-recursive-system-image-closure-authority.md`、`docs/distributed-compute/user-node-windows-runner-recursive-system-image-closure-acceptance.md`、`docs/distributed-compute/user-node-windows-runner-loader-load-set-authority.md`、`docs/distributed-compute/user-node-windows-runner-loader-load-set-acceptance.md`、`docs/distributed-compute/user-node-windows-runner-process-custody-authority.md`、`docs/distributed-compute/user-node-windows-runner-process-custody-acceptance.md`、`docs/distributed-compute/node-plugin-candidate-cleanup.md` 与 `docs/distributed-compute/windows-compute-namespace-fence-wire-v1.json`：端点 currentness、SQLite 真源、目录/回滚、测试 VFS 故障及动态验收、不可达 open-attempt custody、Planning 投影、短期就绪源谱系与 transaction-scoped local-currentness seal、Windows Runner extraction directory share、launch-path discovery、exact context/GrantReady、recursive policy signature/currentness、per-wave custody、post-lease recursive final projection、loader/process 前置、失败清理与 Windows hard-fence ABI。
 5. `docs/decisions/distributed-compute-capacity-ledger-v1.md` 与 `docs/distributed-compute/capacity-ledger.md`：共享容量池、跨 Offer 防超卖和追加式容量账本。
