@@ -17,9 +17,7 @@ use super::super::{
         ManagedSqliteShmTestInitializationFailureV1,
     },
 };
-use super::{
-    ColdPrestateV1, ExactTarget, ManagedSqliteShmTestInitializationControllerV1,
-};
+use super::{ColdPrestateV1, ExactTarget, ManagedSqliteShmTestInitializationControllerV1};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Stage {
@@ -127,7 +125,10 @@ impl CreatedFirstSharedBusyCloseSucceededControllerV1 {
     pub(super) fn cancel_after_arm(&mut self, target: ExactTarget) -> Result<(), &'static str> {
         let active = self.require(target)?;
         if active.stage != Stage::Armed || active.pending != 1 || active.consumed {
-            return fail(active, "NODE_MANAGED_SQLITE_SHM_TEST_Q18_CANCEL_AFTER_PROGRESS");
+            return fail(
+                active,
+                "NODE_MANAGED_SQLITE_SHM_TEST_Q18_CANCEL_AFTER_PROGRESS",
+            );
         }
         self.active.take();
         Ok(())
@@ -295,7 +296,10 @@ impl CreatedFirstSharedBusyCloseSucceededControllerV1 {
     ) -> Result<(), &'static str> {
         let active = self.require(target)?;
         if active.stage != Stage::HolderAcquired || active.counts.target_shared_attempt != 0 {
-            return fail(active, "NODE_MANAGED_SQLITE_SHM_TEST_Q18_SHARED_SEQUENCE_INVALID");
+            return fail(
+                active,
+                "NODE_MANAGED_SQLITE_SHM_TEST_Q18_SHARED_SEQUENCE_INVALID",
+            );
         }
         active
             .holder
@@ -314,7 +318,10 @@ impl CreatedFirstSharedBusyCloseSucceededControllerV1 {
     ) -> Result<(), &'static str> {
         let active = self.require(target)?;
         if active.stage != Stage::TargetSharedContended || active.counts.target_close_attempt != 0 {
-            return fail(active, "NODE_MANAGED_SQLITE_SHM_TEST_Q18_CLOSE_ATTEMPT_SEQUENCE_INVALID");
+            return fail(
+                active,
+                "NODE_MANAGED_SQLITE_SHM_TEST_Q18_CLOSE_ATTEMPT_SEQUENCE_INVALID",
+            );
         }
         active
             .holder
@@ -333,7 +340,10 @@ impl CreatedFirstSharedBusyCloseSucceededControllerV1 {
     ) -> Result<(), &'static str> {
         let active = self.require(target)?;
         if kind != ManagedSqliteFileKind::Shm {
-            return fail(active, "NODE_MANAGED_SQLITE_SHM_TEST_Q18_CLOSE_KIND_INVALID");
+            return fail(
+                active,
+                "NODE_MANAGED_SQLITE_SHM_TEST_Q18_CLOSE_KIND_INVALID",
+            );
         }
         advance(
             active,
@@ -348,10 +358,7 @@ impl CreatedFirstSharedBusyCloseSucceededControllerV1 {
         Ok(())
     }
 
-    pub(super) fn abort_and_release(
-        &mut self,
-        target: ExactTarget,
-    ) -> Result<(), &'static str> {
+    pub(super) fn abort_and_release(&mut self, target: ExactTarget) -> Result<(), &'static str> {
         let active = self
             .active
             .as_ref()
@@ -496,7 +503,10 @@ impl ManagedSqliteShmTestInitializationControllerV1 {
     }
 }
 
-fn validate_target(active: &ArmedQ18ObservationV1, target: ExactTarget) -> Result<(), &'static str> {
+fn validate_target(
+    active: &ArmedQ18ObservationV1,
+    target: ExactTarget,
+) -> Result<(), &'static str> {
     if active.target != target {
         return Err("NODE_MANAGED_SQLITE_SHM_TEST_Q18_TARGET_MISMATCH");
     }

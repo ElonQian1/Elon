@@ -149,9 +149,7 @@ impl ManagedSqliteShmTestTargetObserver {
             }
         };
         let requested_lock = match coordinator.test_lock_runtime.lock() {
-            Ok(mut runtime) => {
-                runtime.finish_initialization_failure_after_managed_attempt(target)
-            }
+            Ok(mut runtime) => runtime.finish_initialization_failure_after_managed_attempt(target),
             Err(_) => Err("NODE_MANAGED_SQLITE_SHM_TEST_LOCK_RUNTIME_POISONED"),
         };
         let requested_lock = match requested_lock {

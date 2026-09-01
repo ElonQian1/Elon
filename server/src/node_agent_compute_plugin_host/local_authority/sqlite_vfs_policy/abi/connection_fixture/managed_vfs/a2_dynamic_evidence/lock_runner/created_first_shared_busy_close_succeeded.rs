@@ -17,8 +17,7 @@ use super::{
     ValidatedParentCleanupReceipt, WindowsDynamicEnvironment, CHILD_ROOT_ENV,
 };
 
-const SELECTOR_ENV: &str =
-    "ELON_SQLITE_A2_LOCK_CREATED_FIRST_SHARED_BUSY_CLOSE_SUCCEEDED_SELECTOR";
+const SELECTOR_ENV: &str = "ELON_SQLITE_A2_LOCK_CREATED_FIRST_SHARED_BUSY_CLOSE_SUCCEEDED_SELECTOR";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(in super::super::super) enum LockRunnerCreatedFirstSharedBusyCloseSucceededCompletionV1 {

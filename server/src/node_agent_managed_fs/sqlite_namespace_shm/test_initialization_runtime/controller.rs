@@ -13,10 +13,10 @@ use super::model::{
     ManagedSqliteShmTestInitializationNativeReceiptV1, ManagedSqliteShmTestInitializationReceiptV1,
 };
 
-#[path = "controller/created_first_truncate_error_release_failed.rs"]
-mod created_first_truncate_error_release_failed;
 #[path = "controller/created_first_shared_busy_close_succeeded.rs"]
 mod created_first_shared_busy_close_succeeded;
+#[path = "controller/created_first_truncate_error_release_failed.rs"]
+mod created_first_truncate_error_release_failed;
 #[path = "controller/created_first_truncate_error_release_succeeded.rs"]
 mod created_first_truncate_error_release_succeeded;
 #[path = "controller/existing_first_truncate_error_release_failed.rs"]
@@ -105,7 +105,8 @@ struct ArmedInitializationObservationV1 {
 pub(in crate::node_agent_managed_fs::sqlite_namespace::shm) struct ManagedSqliteShmTestInitializationControllerV1
 {
     armed: Option<ArmedInitializationObservationV1>,
-    q18: created_first_shared_busy_close_succeeded::CreatedFirstSharedBusyCloseSucceededControllerV1,
+    q18:
+        created_first_shared_busy_close_succeeded::CreatedFirstSharedBusyCloseSucceededControllerV1,
 }
 
 impl ManagedSqliteShmTestInitializationControllerV1 {

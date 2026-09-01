@@ -127,8 +127,16 @@ fn q18_source_closure_aborts_every_post_arm_error_before_the_only_terminal_finis
             "finish_after_terminal_custody_observed()",
         ],
     );
-    assert_eq!(fixture.matches("abort_after_inspection_failure()").count(), 1);
-    assert_eq!(fixture.matches("finish_after_terminal_custody_observed()").count(), 1);
+    assert_eq!(
+        fixture.matches("abort_after_inspection_failure()").count(),
+        1
+    );
+    assert_eq!(
+        fixture
+            .matches("finish_after_terminal_custody_observed()")
+            .count(),
+        1
+    );
 }
 
 #[test]
@@ -169,7 +177,12 @@ fn q18_source_closure_uses_real_same_file_contention_and_never_synthesizes_busy(
         ],
     );
     assert_eq!(target.matches("try_lock_sqlite_byte_range").count(), 1);
-    assert_eq!(target.matches("ManagedSqliteShmTestQ18DmsHolderLeaseV1::acquire").count(), 1);
+    assert_eq!(
+        target
+            .matches("ManagedSqliteShmTestQ18DmsHolderLeaseV1::acquire")
+            .count(),
+        1
+    );
     assert_eq!(target.matches("file.close()").count(), 1);
     assert!(!target.contains("begin_test_fault"));
     assert!(!target.contains("activate_after_test_fault"));

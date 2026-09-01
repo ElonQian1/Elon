@@ -134,12 +134,7 @@ impl ManagedSqliteShmCoordinator {
             Ok(receipt) => {
                 if let Err(code) = self.record_q18_target_close_succeeded(target, receipt.kind()) {
                     let _ = self.release_q18_holder(target);
-                    self.mark_poisoned(
-                        state,
-                        ManagedSqliteShmFailurePhase::FileClose,
-                        true,
-                        false,
-                    );
+                    self.mark_poisoned(state, ManagedSqliteShmFailurePhase::FileClose, true, false);
                     return Err(ManagedSqliteShmFailure::poisoned_code(
                         ManagedSqliteShmFailurePhase::FileClose,
                         code,
@@ -154,12 +149,7 @@ impl ManagedSqliteShmCoordinator {
                     .quarantined_file_close
                     .push(ManagedSqliteShmFileCloseCustody::Pinned(close_failure));
                 let _ = self.release_q18_holder(target);
-                self.mark_poisoned(
-                    state,
-                    ManagedSqliteShmFailurePhase::FileClose,
-                    true,
-                    false,
-                );
+                self.mark_poisoned(state, ManagedSqliteShmFailurePhase::FileClose, true, false);
                 return Err(ManagedSqliteShmFailure::poisoned(
                     ManagedSqliteShmFailurePhase::FileClose,
                     report,
@@ -193,20 +183,14 @@ impl ManagedSqliteShmCoordinator {
         }
     }
 
-    fn record_q18_target_shared_contended(
-        &self,
-        target: (u64, u64),
-    ) -> Result<(), &'static str> {
+    fn record_q18_target_shared_contended(&self, target: (u64, u64)) -> Result<(), &'static str> {
         self.test_initialization_runtime
             .lock()
             .map_err(|_| "NODE_MANAGED_SQLITE_SHM_TEST_Q18_CONTROLLER_POISONED")?
             .q18_record_target_shared_contended(target)
     }
 
-    fn record_q18_target_close_attempt(
-        &self,
-        target: (u64, u64),
-    ) -> Result<(), &'static str> {
+    fn record_q18_target_close_attempt(&self, target: (u64, u64)) -> Result<(), &'static str> {
         self.test_initialization_runtime
             .lock()
             .map_err(|_| "NODE_MANAGED_SQLITE_SHM_TEST_Q18_CONTROLLER_POISONED")?

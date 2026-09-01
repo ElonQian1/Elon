@@ -92,29 +92,30 @@ pub(super) fn exercise_child(
 
     // The Q18 holder is still locked here. Every inspection failure consumes `pending` through
     // the explicit abort path; only a complete terminal snapshot reaches the finish call below.
-    let inspection = (|| {
-        let terminal = fixture
-            .route(SELECTED)?
-            .terminal_custody_test_snapshot()
-            .map_err(anyhow::Error::msg)?;
-        let terminal_values = terminal_values(terminal, binding.completion)?;
-        let preemption_values = match binding.completion {
-            LockRunnerCreatedFirstSharedBusyCloseSucceededCompletionV1::RetentionSucceeded => {
-                [0; 6]
-            }
-            LockRunnerCreatedFirstSharedBusyCloseSucceededCompletionV1::RetentionRouteUnknown => {
-                let receipt = fixture
-                    .unsafe_shm_route_preemption_snapshot(SELECTED)
-                    .map_err(anyhow::Error::msg)?
-                    .ordered_values();
-                if receipt != [1; 5] {
-                    return Err(anyhow!("q18 route-unknown preemption receipt mismatch"));
+    let inspection =
+        (|| {
+            let terminal = fixture
+                .route(SELECTED)?
+                .terminal_custody_test_snapshot()
+                .map_err(anyhow::Error::msg)?;
+            let terminal_values = terminal_values(terminal, binding.completion)?;
+            let preemption_values = match binding.completion {
+                LockRunnerCreatedFirstSharedBusyCloseSucceededCompletionV1::RetentionSucceeded => {
+                    [0; 6]
                 }
-                [1, receipt[0], receipt[1], receipt[2], receipt[3], receipt[4]]
-            }
-        };
-        Ok((terminal_values, preemption_values))
-    })();
+                LockRunnerCreatedFirstSharedBusyCloseSucceededCompletionV1::RetentionRouteUnknown => {
+                    let receipt = fixture
+                        .unsafe_shm_route_preemption_snapshot(SELECTED)
+                        .map_err(anyhow::Error::msg)?
+                        .ordered_values();
+                    if receipt != [1; 5] {
+                        return Err(anyhow!("q18 route-unknown preemption receipt mismatch"));
+                    }
+                    [1, receipt[0], receipt[1], receipt[2], receipt[3], receipt[4]]
+                }
+            };
+            Ok((terminal_values, preemption_values))
+        })();
     let (terminal_values, preemption_values) = match inspection {
         Ok(values) => values,
         Err(error) => {

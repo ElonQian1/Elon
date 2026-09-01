@@ -43,8 +43,7 @@ pub(super) struct FrozenLockCreatedFirstSharedBusyCloseSucceededLeafV1 {
     pub(super) member: StaticMemberSealV1,
 }
 
-pub(super) fn frozen_lock_created_first_shared_busy_close_succeeded_leaves_v1(
-) -> &'static BTreeMap<
+pub(super) fn frozen_lock_created_first_shared_busy_close_succeeded_leaves_v1() -> &'static BTreeMap<
     FrozenLockCreatedFirstSharedBusyCloseSucceededCaseV1,
     FrozenLockCreatedFirstSharedBusyCloseSucceededLeafV1,
 > {
@@ -198,7 +197,9 @@ fn created_first_shared_busy_close_succeeded_v1(
     (expected == &expected_v1()).then_some(case)
 }
 
-const fn expected_axes_v1(case: FrozenLockCreatedFirstSharedBusyCloseSucceededCaseV1) -> LockAxesV1 {
+const fn expected_axes_v1(
+    case: FrozenLockCreatedFirstSharedBusyCloseSucceededCaseV1,
+) -> LockAxesV1 {
     LockAxesV1 {
         action: ReachabilityV1::Reached(case.action),
         first: ReachabilityV1::Reached(case.first),

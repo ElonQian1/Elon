@@ -36,9 +36,7 @@ impl ManagedSqliteShmTestQ18DmsHolderLeaseV1 {
         if target.0 == 0 || target.1 == 0 {
             return Err("NODE_MANAGED_SQLITE_SHM_TEST_Q18_TARGET_ZERO");
         }
-        if file.kind != ManagedSqliteFileKind::Shm
-            || file.access != ManagedSqliteAccess::ReadWrite
-        {
+        if file.kind != ManagedSqliteFileKind::Shm || file.access != ManagedSqliteAccess::ReadWrite {
             return Err("NODE_MANAGED_SQLITE_SHM_TEST_Q18_TARGET_FILE_INVALID");
         }
         let target_identity = platform::inspect(&file.file)

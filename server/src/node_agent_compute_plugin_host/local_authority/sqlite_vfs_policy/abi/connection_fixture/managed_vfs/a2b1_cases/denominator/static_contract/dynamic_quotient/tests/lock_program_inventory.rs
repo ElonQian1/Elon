@@ -531,8 +531,7 @@ fn full_lock_program_inventory_accounts_for_every_frozen_member_without_opening_
         .copied()
         .collect::<BTreeSet<_>>();
     assert_eq!(q1_through_q17_source_keys.len(), 4_196);
-    let q18_expected_groups =
-        lock_created_first_shared_busy_close_succeeded_expected_groups_v1();
+    let q18_expected_groups = lock_created_first_shared_busy_close_succeeded_expected_groups_v1();
     assert_eq!(
         q18_expected_groups.len(),
         LOCK_CREATED_FIRST_SHARED_BUSY_CLOSE_SUCCEEDED_MEMBER_COUNT

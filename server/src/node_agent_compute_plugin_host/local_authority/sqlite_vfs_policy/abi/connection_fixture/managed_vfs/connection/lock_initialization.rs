@@ -25,7 +25,8 @@ pub(in super::super) struct ManagedTestLockInitializationFailureObservationV1 {
     pub(in super::super) pending_count: usize,
 }
 
-pub(in super::super) struct PendingManagedTestLockCreatedFirstSharedBusyCloseSucceededObservationV1 {
+pub(in super::super) struct PendingManagedTestLockCreatedFirstSharedBusyCloseSucceededObservationV1
+{
     pub(in super::super) callback: ManagedTestShmLockCallbackObservation,
     pub(in super::super) before: ManagedSqliteShmTestTargetSnapshot,
     pub(in super::super) after: ManagedSqliteShmTestTargetSnapshot,

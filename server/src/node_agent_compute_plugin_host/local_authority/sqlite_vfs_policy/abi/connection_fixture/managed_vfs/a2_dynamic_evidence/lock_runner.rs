@@ -37,6 +37,11 @@ pub(in super::super) use created_first_exclusive_release_error::{
     lock_native_acquire_created_first_exclusive_release_error_selector_for_test,
     selected_lock_native_acquire_created_first_exclusive_release_error_selector_for_test,
 };
+pub(in super::super) use created_first_exclusive_release_error::{
+    run_lock_native_acquire_created_first_exclusive_release_error_program_isolated,
+    LockRunnerCreatedFirstExclusiveReleaseCompletionV1,
+    LockRunnerNativeAcquireCreatedFirstExclusiveReleaseErrorBindingV1,
+};
 #[cfg(all(test, windows))]
 pub(in super::super) use created_first_shared_busy_close_succeeded::{
     lock_native_acquire_created_first_shared_busy_close_succeeded_selector_for_test,
@@ -46,11 +51,6 @@ pub(in super::super) use created_first_shared_busy_close_succeeded::{
     run_lock_native_acquire_created_first_shared_busy_close_succeeded_program_isolated,
     LockRunnerCreatedFirstSharedBusyCloseSucceededCompletionV1,
     LockRunnerNativeAcquireCreatedFirstSharedBusyCloseSucceededBindingV1,
-};
-pub(in super::super) use created_first_exclusive_release_error::{
-    run_lock_native_acquire_created_first_exclusive_release_error_program_isolated,
-    LockRunnerCreatedFirstExclusiveReleaseCompletionV1,
-    LockRunnerNativeAcquireCreatedFirstExclusiveReleaseErrorBindingV1,
 };
 #[cfg(all(test, windows))]
 pub(in super::super) use created_first_truncate_error_release_failed::{

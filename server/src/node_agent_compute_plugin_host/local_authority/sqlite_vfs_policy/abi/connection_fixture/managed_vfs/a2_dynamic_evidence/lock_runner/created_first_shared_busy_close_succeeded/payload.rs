@@ -91,9 +91,7 @@ pub(in super::super) fn validate_payload(
     let values = fields
         .map(parse_canonical_u64)
         .collect::<anyhow::Result<Vec<_>>>()?;
-    if values.len() != REPORT_VALUE_COUNT
-        || values[..BINDING_END] != binding_values(binding)
-    {
+    if values.len() != REPORT_VALUE_COUNT || values[..BINDING_END] != binding_values(binding) {
         return Err(anyhow!("q18 Lock initialization payload binding mismatch"));
     }
 
@@ -145,9 +143,7 @@ pub(in super::super) fn validate_payload(
     };
     let expected_preemption = match binding.completion {
         LockRunnerCreatedFirstSharedBusyCloseSucceededCompletionV1::RetentionSucceeded => [0; 6],
-        LockRunnerCreatedFirstSharedBusyCloseSucceededCompletionV1::RetentionRouteUnknown => {
-            [1; 6]
-        }
+        LockRunnerCreatedFirstSharedBusyCloseSucceededCompletionV1::RetentionRouteUnknown => [1; 6],
     };
     let runtime_generation = values[27];
     let shm_connection_id = values[28];
@@ -167,8 +163,7 @@ pub(in super::super) fn validate_payload(
         )
         || values[HOLDER_START..HOLDER_END]
             != expected_holder_values(runtime_generation, shm_connection_id)
-        || values[135..153]
-            != expected_lock_values(binding, runtime_generation, shm_connection_id)
+        || values[135..153] != expected_lock_values(binding, runtime_generation, shm_connection_id)
         || values[153] != 0
         || values[154..172] != expected_terminal
         || values[172..178] != expected_preemption
@@ -178,12 +173,10 @@ pub(in super::super) fn validate_payload(
     {
         return Err(anyhow!("q18 actual receipt/custody mismatch"));
     }
-    Ok(
-        ValidatedCreatedFirstSharedBusyCloseSucceededPayloadV1 {
-            registration_id: values[25],
-            native_receipt_sha256: digest_receipt(&values),
-        },
-    )
+    Ok(ValidatedCreatedFirstSharedBusyCloseSucceededPayloadV1 {
+        registration_id: values[25],
+        native_receipt_sha256: digest_receipt(&values),
+    })
 }
 
 fn binding_values(
@@ -301,8 +294,8 @@ fn parse_canonical_u64(value: &str) -> anyhow::Result<u64> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::LockRunnerActionV1;
+    use super::*;
 
     fn binding() -> LockRunnerNativeAcquireCreatedFirstSharedBusyCloseSucceededBindingV1 {
         LockRunnerNativeAcquireCreatedFirstSharedBusyCloseSucceededBindingV1 {
@@ -310,7 +303,8 @@ mod tests {
             first: 2,
             count: 1,
             mask: 4,
-            completion: LockRunnerCreatedFirstSharedBusyCloseSucceededCompletionV1::RetentionSucceeded,
+            completion:
+                LockRunnerCreatedFirstSharedBusyCloseSucceededCompletionV1::RetentionSucceeded,
             normalized_descriptor_sha256: [1; 32],
             case_key_sha256: [2; 32],
             full_record_sha256: [3; 32],
@@ -324,20 +318,53 @@ mod tests {
         let runtime = 101;
         let connection = 202;
         let mut initialization = [1; 43];
-        initialization[0..13].copy_from_slice(&[
-            1, 7, 1, runtime, connection, 1, 2, 1, 4, 1, 1, 1, 0,
-        ]);
-        initialization[23..43].copy_from_slice(&[
-            0, 1, 0, 1, 1, 0, 2, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 1,
-        ]);
+        initialization[0..13]
+            .copy_from_slice(&[1, 7, 1, runtime, connection, 1, 2, 1, 4, 1, 1, 1, 0]);
+        initialization[23..43]
+            .copy_from_slice(&[0, 1, 0, 1, 1, 0, 2, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 1]);
         encode(
             binding,
             303,
             1,
             runtime,
             connection,
-            [1, 1, 256, 32 * 1024, 0, ffi::SQLITE_IOERR_SHMMAP as u64, 1, 1, 1, 1, 1, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [2, 1, lifecycle::raw_flags(binding.action) as u64, ffi::SQLITE_IOERR_SHMLOCK as u64, 1, 1, 1, 1],
+            [
+                1,
+                1,
+                256,
+                32 * 1024,
+                0,
+                ffi::SQLITE_IOERR_SHMMAP as u64,
+                1,
+                1,
+                1,
+                1,
+                1,
+                1,
+                0,
+                0,
+                1,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+            ],
+            [
+                2,
+                1,
+                lifecycle::raw_flags(binding.action) as u64,
+                ffi::SQLITE_IOERR_SHMLOCK as u64,
+                1,
+                1,
+                1,
+                1,
+            ],
             [1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
             initialization,
             expected_holder_values(runtime, connection),
@@ -376,8 +403,20 @@ mod tests {
 
     #[test]
     fn wrong_file_id_handle_and_close_receipts_fail_closed() {
-        assert!(validate_payload(&mutate_value(&valid_payload(), HOLDER_START + 6, 0), binding()).is_err());
-        assert!(validate_payload(&mutate_value(&valid_payload(), HOLDER_START + 7, 0), binding()).is_err());
-        assert!(validate_payload(&mutate_value(&valid_payload(), INITIALIZATION_START + 27, 0), binding()).is_err());
+        assert!(validate_payload(
+            &mutate_value(&valid_payload(), HOLDER_START + 6, 0),
+            binding()
+        )
+        .is_err());
+        assert!(validate_payload(
+            &mutate_value(&valid_payload(), HOLDER_START + 7, 0),
+            binding()
+        )
+        .is_err());
+        assert!(validate_payload(
+            &mutate_value(&valid_payload(), INITIALIZATION_START + 27, 0),
+            binding()
+        )
+        .is_err());
     }
 }

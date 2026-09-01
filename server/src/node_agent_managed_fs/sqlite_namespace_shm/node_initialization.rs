@@ -16,11 +16,11 @@ use super::{
 };
 
 #[cfg(all(test, windows))]
-#[path = "node_initialization/created_first_truncate_error_release_failed.rs"]
-mod created_first_truncate_error_release_failed;
-#[cfg(all(test, windows))]
 #[path = "node_initialization/created_first_shared_busy_close_succeeded.rs"]
 mod created_first_shared_busy_close_succeeded;
+#[cfg(all(test, windows))]
+#[path = "node_initialization/created_first_truncate_error_release_failed.rs"]
+mod created_first_truncate_error_release_failed;
 #[cfg(all(test, windows))]
 #[path = "node_initialization/created_first_truncate_error_release_succeeded.rs"]
 mod created_first_truncate_error_release_succeeded;
@@ -394,10 +394,7 @@ impl ManagedSqliteShmCoordinator {
                 ));
             }
             #[cfg(all(test, windows))]
-            self.record_test_initialization_q18_dms_unlock_succeeded_v1(
-                state,
-                _connection_id,
-            )?;
+            self.record_test_initialization_q18_dms_unlock_succeeded_v1(state, _connection_id)?;
             #[cfg(test)]
             if let Some(fault) = exclusive_release_fault {
                 state.node = Some(new_node(file, ManagedSqliteShmDmsCustody::Released, true));
