@@ -2785,53 +2785,53 @@
         },
         {
           "path": "server/src/compute_federation/interactive_desktop/authority.rs",
-          "content_hash": "0bb5dfa3fc231b1cd5f7fa29a64357e87412aeb37b7bacc55dd5e5795078f868",
+          "content_hash": "baf60672068a0908f069736c2393b778d85e49c4062d350db54333f27341dbe0",
           "locator": "Host consent、relay scope 与结构授权门",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "e70c1bf827ebfb2a06390802f78af30d60e88f00",
-            "head_blob_oid": "f82ef470c0623f8c0b8d1fda930cf006529815ab",
-            "worktree_blob_oid": "f82ef470c0623f8c0b8d1fda930cf006529815ab",
+            "head_commit": "6fb36b74439e8172d41e1eb7d751a730d22c70fc",
+            "head_blob_oid": "5066f811e4608788786154725048dc9e6f1ecfab",
+            "worktree_blob_oid": "5066f811e4608788786154725048dc9e6f1ecfab",
             "state": "tracked_clean"
           }
         },
         {
           "path": "server/src/compute_federation/interactive_desktop/authority_tests.rs",
-          "content_hash": "ec87b98fdedee1a77bf64f5c5062c203d9af1111f1ea550e8b379d1964f9eb05",
+          "content_hash": "9df633f90e6afaa9704d0f0997833d5ce567055eddb06d9f14bfa5c7dc11d479",
           "locator": "权限与 relay 负向测试源码，未运行",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "e70c1bf827ebfb2a06390802f78af30d60e88f00",
-            "head_blob_oid": "d151b44a0d947a591f104829070c0e2969e5c5d8",
-            "worktree_blob_oid": "d151b44a0d947a591f104829070c0e2969e5c5d8",
+            "head_commit": "6fb36b74439e8172d41e1eb7d751a730d22c70fc",
+            "head_blob_oid": "ae8315ef8fa6257841233494b5bee5664a5ef8ae",
+            "worktree_blob_oid": "ae8315ef8fa6257841233494b5bee5664a5ef8ae",
             "state": "tracked_clean"
           }
         },
         {
           "path": "server/src/compute_federation/interactive_desktop/metering.rs",
-          "content_hash": "705f69df39453a8691959dc9804ced5850172ae4dfc6f2be5825b37232803114",
+          "content_hash": "9966b8d012402df19f9721c55d860bf9f5e1467c3618de50f0b37c37ab2b79c6",
           "locator": "Raw Usage 到 Verification 的单向 DAG",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "e70c1bf827ebfb2a06390802f78af30d60e88f00",
-            "head_blob_oid": "f1c1d2d44936e545cf9a717b982987056e79f105",
-            "worktree_blob_oid": "f1c1d2d44936e545cf9a717b982987056e79f105",
+            "head_commit": "6fb36b74439e8172d41e1eb7d751a730d22c70fc",
+            "head_blob_oid": "0cca786cbe7fae7f98d749af0a6cb8b8e40d7202",
+            "worktree_blob_oid": "0cca786cbe7fae7f98d749af0a6cb8b8e40d7202",
             "state": "tracked_clean"
           }
         },
         {
           "path": "server/src/compute_federation/interactive_desktop/metering_tests.rs",
-          "content_hash": "fe068ebc9cd10cc6b85829bf96a6e29b8edeeff9beac2a195aaa74ac44a11215",
+          "content_hash": "e861b9410085c17859a4a84cfb6873c9ed5486585c2494b3aa866a29d83edcd0",
           "locator": "计量与 DAG 负向测试源码，未运行",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "e70c1bf827ebfb2a06390802f78af30d60e88f00",
-            "head_blob_oid": "9a7fce9e9a282e363f25a9c431d52eb5fbc67b85",
-            "worktree_blob_oid": "9a7fce9e9a282e363f25a9c431d52eb5fbc67b85",
+            "head_commit": "6fb36b74439e8172d41e1eb7d751a730d22c70fc",
+            "head_blob_oid": "40ead415bf0659d0a24675b3335a67a8758914fd",
+            "worktree_blob_oid": "40ead415bf0659d0a24675b3335a67a8758914fd",
             "state": "tracked_clean"
           }
         },
@@ -2850,53 +2850,53 @@
         },
         {
           "path": "server/src/compute_federation/interactive_desktop/offer.rs",
-          "content_hash": "251ca3cfa16d5a3800bb0249b307dfa0ae0ef55dde4a10008b193ca1fe1167db",
+          "content_hash": "b78775ee629f8c6a3a17fbf6b3d022f1f5cf3b2d8e914d799775b3f23147d7e5",
           "locator": "产品模式、市场与 title-policy 合同",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "e70c1bf827ebfb2a06390802f78af30d60e88f00",
-            "head_blob_oid": "db12aad8f46f03ac08a4e64c0e21266284e83f0a",
-            "worktree_blob_oid": "db12aad8f46f03ac08a4e64c0e21266284e83f0a",
+            "head_commit": "6fb36b74439e8172d41e1eb7d751a730d22c70fc",
+            "head_blob_oid": "ff2881dbd6210476e08a9bc761e8b639bf620b7d",
+            "worktree_blob_oid": "ff2881dbd6210476e08a9bc761e8b639bf620b7d",
             "state": "tracked_clean"
           }
         },
         {
           "path": "server/src/compute_federation/interactive_desktop/session.rs",
-          "content_hash": "24131a6e258e45eb4a008ef4f478e9dfd40dda214a1020e2c4b840f9023a6d2e",
+          "content_hash": "5047ce40efa6c90801bec54b72466a75188525dccbfcc150346139545a7c6437",
           "locator": "Session/Lease/Grant/Epoch 合同",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "e70c1bf827ebfb2a06390802f78af30d60e88f00",
-            "head_blob_oid": "a0daaec8f9ec9d6cd5a38e392013b6444774fe81",
-            "worktree_blob_oid": "a0daaec8f9ec9d6cd5a38e392013b6444774fe81",
+            "head_commit": "6fb36b74439e8172d41e1eb7d751a730d22c70fc",
+            "head_blob_oid": "83fac4ba9a8a5bed66e13345e6260d83ade2e3d1",
+            "worktree_blob_oid": "83fac4ba9a8a5bed66e13345e6260d83ade2e3d1",
             "state": "tracked_clean"
           }
         },
         {
           "path": "server/src/compute_federation/interactive_desktop/test_support.rs",
-          "content_hash": "1e6ea3d5c97f9aacbed5336986518f040de0c0aa09516381ef739c89bd7a2a3b",
+          "content_hash": "bae0c8f7351f838013b2d4b5889fda01f73e2c9223b4016faf98a918dc04a3fa",
           "locator": "合同测试构造器源码，未运行",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "e70c1bf827ebfb2a06390802f78af30d60e88f00",
-            "head_blob_oid": "1a38c28164ea9d5c41f48941af387232060c6eb4",
-            "worktree_blob_oid": "1a38c28164ea9d5c41f48941af387232060c6eb4",
+            "head_commit": "6fb36b74439e8172d41e1eb7d751a730d22c70fc",
+            "head_blob_oid": "1554700e2ac7f5a30bf1611435263a48c50b2724",
+            "worktree_blob_oid": "1554700e2ac7f5a30bf1611435263a48c50b2724",
             "state": "tracked_clean"
           }
         },
         {
           "path": "server/src/compute_federation/interactive_desktop/tests.rs",
-          "content_hash": "fa0415a728ff7e41b10099a3f1e260e457520d69be6150213df3dd4cef751e12",
+          "content_hash": "6157e965f3b3944b809bde0172851a629cd6cc8d0a54c9f678384a3d859230c6",
           "locator": "schema 与 batch 闭集静态测试源码，未运行",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "e70c1bf827ebfb2a06390802f78af30d60e88f00",
-            "head_blob_oid": "ced857ca6f7bd338151bacddf0cfefa0fc5e9ce6",
-            "worktree_blob_oid": "ced857ca6f7bd338151bacddf0cfefa0fc5e9ce6",
+            "head_commit": "6fb36b74439e8172d41e1eb7d751a730d22c70fc",
+            "head_blob_oid": "3bfb93b0d841281e689deee5c75bcd943bd09d12",
+            "worktree_blob_oid": "3bfb93b0d841281e689deee5c75bcd943bd09d12",
             "state": "tracked_clean"
           }
         },
@@ -2915,7 +2915,7 @@
         }
       ],
       "created_at_ms": 1788296237836,
-      "updated_at_ms": 1788299278785
+      "updated_at_ms": 1788299508659
     },
     {
       "id": "compute-v255-runtime-launch-profile-verification",
@@ -13846,16 +13846,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_d05f06c581ee4430bdc2f8b5a14b58b3",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex/root",
-      "reason": "Implement and bind the reviewed q8 source-only runtime seam, runner, static admission, inventory seal, and authority updates.",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788229987965
-    },
-    {
       "id": "feature_event_fb7983949d7243289b56723f210db955",
       "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
       "action": "evidence_recorded",
@@ -15844,6 +15834,16 @@
       "from_status": "in_progress",
       "to_status": "blocked",
       "at_ms": 1788299278785
+    },
+    {
+      "id": "feature_event_a669827ef7f246b481e8ec61cf210a69",
+      "feature_id": "compute-federation-interactive-desktop-v1",
+      "action": "evidence_recorded",
+      "actor": "Codex:/root",
+      "reason": "",
+      "from_status": "blocked",
+      "to_status": "blocked",
+      "at_ms": 1788299508659
     }
   ]
 }
