@@ -7,10 +7,11 @@ use super::{
     lock_abi_scalar_rejection, lock_callback_route_unknown,
     lock_created_first_exclusive_release_error,
     lock_created_first_truncate_error_release_succeeded,
-    lock_existing_first_exclusive_release_error, lock_lifecycle, lock_local_protocol_rejection,
-    lock_local_sibling_contention, lock_native_acquire_busy, lock_pre_managed_rejection,
-    lock_raw_state_rejection, lock_request_validation, lock_stored_poison, map_lifecycle,
-    map_region_loop, SanitizedPayloadFamily,
+    lock_existing_first_exclusive_release_error,
+    lock_existing_first_truncate_error_release_succeeded, lock_lifecycle,
+    lock_local_protocol_rejection, lock_local_sibling_contention, lock_native_acquire_busy,
+    lock_pre_managed_rejection, lock_raw_state_rejection, lock_request_validation,
+    lock_stored_poison, map_lifecycle, map_region_loop, SanitizedPayloadFamily,
 };
 
 const MAX_ACTUAL_PAYLOAD_BYTES: usize = 2_048;
@@ -167,6 +168,13 @@ pub(super) fn validate_actual_payload(
             SanitizedPayloadFamily::LockQuotient,
             lock_existing_first_exclusive_release_error::classify_header(version, selector)?
                 .ok_or("A2_DYNAMIC_CHILD_ACTUAL_VERSION_INVALID")?,
+        ),
+        lock_existing_first_truncate_error_release_succeeded::REPORT_VERSION => (
+            SanitizedPayloadFamily::LockQuotient,
+            lock_existing_first_truncate_error_release_succeeded::classify_header(
+                version, selector,
+            )?
+            .ok_or("A2_DYNAMIC_CHILD_ACTUAL_VERSION_INVALID")?,
         ),
         _ => return Err("A2_DYNAMIC_CHILD_ACTUAL_VERSION_INVALID"),
     };

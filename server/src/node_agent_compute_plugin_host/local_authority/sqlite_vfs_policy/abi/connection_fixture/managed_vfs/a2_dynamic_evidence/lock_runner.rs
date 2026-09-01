@@ -5,6 +5,7 @@ mod callback_completion_route_unknown;
 mod created_first_exclusive_release_error;
 mod created_first_truncate_error_release_succeeded;
 mod existing_first_exclusive_release_error;
+mod existing_first_truncate_error_release_succeeded;
 mod lifecycle;
 mod local_protocol_rejection;
 mod local_sibling_contention;
@@ -57,6 +58,16 @@ pub(in super::super) use existing_first_exclusive_release_error::{
     run_lock_native_acquire_existing_first_exclusive_release_error_program_isolated,
     LockRunnerExistingFirstExclusiveReleaseCompletionV1,
     LockRunnerNativeAcquireExistingFirstExclusiveReleaseErrorBindingV1,
+};
+#[cfg(all(test, windows))]
+pub(in super::super) use existing_first_truncate_error_release_succeeded::{
+    lock_native_acquire_existing_first_truncate_error_release_succeeded_selector_for_test,
+    selected_lock_native_acquire_existing_first_truncate_error_release_succeeded_selector_for_test,
+};
+pub(in super::super) use existing_first_truncate_error_release_succeeded::{
+    run_lock_native_acquire_existing_first_truncate_error_release_succeeded_program_isolated,
+    LockRunnerExistingFirstTruncateErrorReleaseSucceededCompletionV1,
+    LockRunnerNativeAcquireExistingFirstTruncateErrorReleaseSucceededBindingV1,
 };
 #[cfg(all(test, windows))]
 pub(in super::super) use local_protocol_rejection::{

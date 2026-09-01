@@ -10,6 +10,7 @@ mod native_acquire_busy;
 mod native_acquire_created_first_exclusive_release_error;
 mod native_acquire_created_first_truncate_error_release_succeeded;
 mod native_acquire_existing_first_exclusive_release_error;
+mod native_acquire_existing_first_truncate_error_release_succeeded;
 mod pre_managed_callback_rejection;
 mod raw_state_rejection;
 mod request_validation;
@@ -51,6 +52,9 @@ pub(super) use native_acquire_created_first_truncate_error_release_succeeded::NA
 #[cfg(windows)]
 use native_acquire_existing_first_exclusive_release_error::LockNativeAcquireExistingFirstExclusiveReleaseErrorProgramSpecV1;
 pub(super) use native_acquire_existing_first_exclusive_release_error::NATIVE_ACQUIRE_EXISTING_FIRST_EXCLUSIVE_RELEASE_ERROR_PROJECTOR_DELTA_V1;
+#[cfg(windows)]
+use native_acquire_existing_first_truncate_error_release_succeeded::LockNativeAcquireExistingFirstTruncateErrorReleaseSucceededProgramSpecV1;
+pub(super) use native_acquire_existing_first_truncate_error_release_succeeded::NATIVE_ACQUIRE_EXISTING_FIRST_TRUNCATE_ERROR_RELEASE_SUCCEEDED_PROJECTOR_DELTA_V1;
 pub(super) use pre_managed_callback_rejection::PRE_MANAGED_CALLBACK_REJECTION_PROJECTOR_DELTA_V1;
 pub(super) use raw_state_rejection::RAW_STATE_REJECTION_PROJECTOR_DELTA_V1;
 #[cfg(windows)]
@@ -290,6 +294,13 @@ pub(in super::super) fn run_lock_isolated_for_test(
                 member,
             )
         }
+        LockProgramCaseV1::NativeAcquireExistingFirstTruncateErrorReleaseSucceeded(
+            initialization,
+        ) => native_acquire_existing_first_truncate_error_release_succeeded::run_isolated_v1(
+            exact_test,
+            initialization,
+            member,
+        ),
         LockProgramCaseV1::PreManagedCallbackRejection(rejection) => {
             pre_managed_callback_rejection::run_isolated_v1(exact_test, rejection, member)
         }
@@ -433,6 +444,9 @@ enum LockProgramCaseV1 {
     NativeAcquireExistingFirstExclusiveReleaseError(
         LockNativeAcquireExistingFirstExclusiveReleaseErrorProgramSpecV1,
     ),
+    NativeAcquireExistingFirstTruncateErrorReleaseSucceeded(
+        LockNativeAcquireExistingFirstTruncateErrorReleaseSucceededProgramSpecV1,
+    ),
     PreManagedCallbackRejection(
         pre_managed_callback_rejection::LockPreManagedCallbackRejectionProgramSpecV1,
     ),
@@ -497,6 +511,12 @@ pub(super) fn native_acquire_created_first_truncate_error_release_succeeded_cata
 pub(super) fn native_acquire_existing_first_exclusive_release_error_catalog_row_count_for_test(
 ) -> usize {
     native_acquire_existing_first_exclusive_release_error::catalog_row_count_for_test()
+}
+
+#[cfg(test)]
+pub(super) fn native_acquire_existing_first_truncate_error_release_succeeded_catalog_row_count_for_test(
+) -> usize {
+    native_acquire_existing_first_truncate_error_release_succeeded::catalog_row_count_for_test()
 }
 
 #[cfg(test)]
