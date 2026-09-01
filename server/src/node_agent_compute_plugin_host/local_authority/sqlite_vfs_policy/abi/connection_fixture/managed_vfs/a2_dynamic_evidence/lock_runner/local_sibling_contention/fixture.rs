@@ -20,7 +20,9 @@ use super::LockRunnerLocalSiblingContentionBindingV1;
 pub(super) const SELECTED: usize = 0;
 pub(super) const SIBLING: usize = 1;
 
-pub(super) fn prepare(root: &Path) -> anyhow::Result<ManagedSqliteMultiConnectionFixture> {
+pub(in super::super) fn prepare(
+    root: &Path,
+) -> anyhow::Result<ManagedSqliteMultiConnectionFixture> {
     lifecycle::fixture::prepare(root, LockRunnerLifecyclePathV1::SharedLocalAcquire)
 }
 
@@ -48,7 +50,7 @@ pub(super) fn action_tag(action: LockRunnerActionV1) -> u64 {
     lifecycle::action_tag(action)
 }
 
-pub(super) fn install_prestate(
+pub(in super::super) fn install_prestate(
     fixture: &ManagedSqliteMultiConnectionFixture,
     binding: LockRunnerLocalSiblingContentionBindingV1,
 ) -> anyhow::Result<()> {
@@ -80,7 +82,7 @@ pub(super) fn install_prestate(
     }
 }
 
-pub(super) fn cleanup_locks(
+pub(in super::super) fn cleanup_locks(
     fixture: &ManagedSqliteMultiConnectionFixture,
     binding: LockRunnerLocalSiblingContentionBindingV1,
 ) -> anyhow::Result<()> {

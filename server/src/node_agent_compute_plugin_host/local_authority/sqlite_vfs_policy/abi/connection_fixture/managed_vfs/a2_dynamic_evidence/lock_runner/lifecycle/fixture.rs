@@ -63,7 +63,7 @@ pub(in super::super) fn prepare(
     Ok(fixture)
 }
 
-pub(super) fn install_prestate(
+pub(in super::super) fn install_prestate(
     fixture: &ManagedSqliteMultiConnectionFixture,
     binding: LockRunnerLifecycleBindingV1,
 ) -> anyhow::Result<()> {
@@ -147,6 +147,26 @@ pub(super) fn cleanup_locks(
             LockRunnerActionV1::UnlockShared,
             "shared-local-release sibling cleanup",
         ),
+    }
+}
+
+pub(in super::super) fn cleanup_route_unknown_sibling(
+    fixture: &ManagedSqliteMultiConnectionFixture,
+    binding: LockRunnerLifecycleBindingV1,
+) -> anyhow::Result<()> {
+    match binding.path {
+        LockRunnerLifecyclePathV1::SharedLocalAcquire
+        | LockRunnerLifecyclePathV1::SharedLocalRelease => call_ok(
+            fixture,
+            SIBLING,
+            binding.first,
+            1,
+            LockRunnerActionV1::UnlockShared,
+            "shared-local route-unknown sibling cleanup",
+        ),
+        LockRunnerLifecyclePathV1::NativeAcquire | LockRunnerLifecyclePathV1::NativeRelease => {
+            Ok(())
+        }
     }
 }
 

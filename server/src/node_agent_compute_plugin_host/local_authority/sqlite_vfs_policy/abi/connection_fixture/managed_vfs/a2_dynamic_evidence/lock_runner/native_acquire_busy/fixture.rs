@@ -20,7 +20,9 @@ use super::LockRunnerNativeAcquireBusyBindingV1;
 
 pub(super) const SELECTED: usize = 0;
 
-pub(super) fn prepare(root: &Path) -> anyhow::Result<ManagedSqliteMultiConnectionFixture> {
+pub(in super::super) fn prepare(
+    root: &Path,
+) -> anyhow::Result<ManagedSqliteMultiConnectionFixture> {
     lifecycle::fixture::prepare(root, super::super::LockRunnerLifecyclePathV1::NativeAcquire)
 }
 

@@ -1,5 +1,6 @@
 //! Process-isolated native receipts for executable Lock request-validation programs.
 
+mod callback_completion_route_unknown;
 mod lifecycle;
 mod local_sibling_contention;
 mod native_acquire_busy;
@@ -9,6 +10,15 @@ mod stored_poison_dispatch;
 mod stored_poison_model;
 mod stored_poison_route_unknown;
 
+#[cfg(all(test, windows))]
+pub(in super::super) use callback_completion_route_unknown::{
+    lock_callback_route_unknown_selector_for_test,
+    selected_lock_callback_route_unknown_selector_for_test,
+};
+pub(in super::super) use callback_completion_route_unknown::{
+    run_lock_callback_route_unknown_program_isolated, LockRunnerCallbackRouteUnknownBindingV1,
+    LockRunnerCallbackRouteUnknownPathV1,
+};
 #[cfg(all(test, windows))]
 pub(in super::super) use local_sibling_contention::{
     lock_local_sibling_contention_selector_for_test,

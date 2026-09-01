@@ -1,6 +1,6 @@
 //! Exact installed-ABI execution for real native-acquire contention.
 
-mod fixture;
+pub(super) mod fixture;
 mod payload;
 
 use std::{
