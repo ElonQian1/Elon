@@ -27,7 +27,14 @@ pub(in crate::node_agent_compute_plugin_host::local_authority) use owner::Manage
 pub(in crate::node_agent_compute_plugin_host::local_authority) use process_owner::ManagedSqliteRegistryNonceSource;
 
 #[cfg(all(test, windows))]
-pub(super) use file_custody::test_faults::ManagedSqliteRegistryOrdinaryShmLockRoutePreemptionReceipt;
+pub(super) use file_custody::test_faults::{
+    ManagedSqliteRegistryOrdinaryShmLockRoutePreemptionReceipt,
+    ManagedSqliteRegistryPreManagedLockAdmissionOutcome,
+    ManagedSqliteRegistryPreManagedLockCompletionOutcome,
+    ManagedSqliteRegistryPreManagedLockCustody, ManagedSqliteRegistryPreManagedLockEvent,
+    ManagedSqliteRegistryPreManagedLockRejection,
+    ManagedSqliteRegistryPreManagedLockRoutePreemptionReceipt,
+};
 #[cfg(test)]
 pub(super) use file_custody::ManagedSqliteRegistryUnmapRuntimeEvent;
 #[cfg(all(test, windows))]
@@ -47,4 +54,6 @@ pub(super) use test_vfs_bridge::{
     ManagedSqliteTestVfsRouteCustodySnapshot, ManagedSqliteTestVfsRoutePhase,
 };
 #[cfg(all(test, windows))]
-pub(super) use types::ManagedSqliteRegistryRetirementReceipt;
+pub(super) use types::{
+    ManagedSqliteRegistryCallbackCounterPrimeReceipt, ManagedSqliteRegistryRetirementReceipt,
+};

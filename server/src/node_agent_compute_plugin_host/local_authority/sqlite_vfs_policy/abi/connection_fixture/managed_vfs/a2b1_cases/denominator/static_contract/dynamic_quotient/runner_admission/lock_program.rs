@@ -1,18 +1,18 @@
 //! Sealed admission bridge for the executable Lock dynamic-quotient programs.
 
 mod callback_completion_route_unknown;
+mod execution_receipt;
 mod lifecycle;
 mod local_protocol_rejection;
 mod local_sibling_contention;
 mod native_acquire_busy;
+mod pre_managed_callback_rejection;
 mod request_validation;
 mod source_program;
 mod stored_poison;
 
 #[cfg(windows)]
 use std::fmt;
-
-use sha2::{Digest, Sha256};
 
 #[cfg(windows)]
 use super::super::super::terminal_descriptor::LockActionV1;
@@ -32,10 +32,14 @@ use local_sibling_contention::LockLocalSiblingContentionProgramSpecV1;
 #[cfg(windows)]
 use native_acquire_busy::LockNativeAcquireBusyProgramSpecV1;
 use source_program::program_spec_v1 as source_program_spec_v1;
+use execution_receipt::digest_execution_receipt_v1;
+#[cfg(windows)]
+use execution_receipt::seal_execution_receipt;
 #[cfg(windows)]
 use stored_poison::{
     LockStoredPoisonCompletionV1, LockStoredPoisonProfileV1, LockStoredPoisonProgramSpecV1,
 };
+pub(super) use pre_managed_callback_rejection::PRE_MANAGED_CALLBACK_REJECTION_PROJECTOR_DELTA_V1;
 
 #[cfg(windows)]
 use request_validation::LockRequestValidationGuardV1;
@@ -44,8 +48,7 @@ use request_validation::LockRequestValidationGuardV1;
 use crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::abi::connection_fixture::managed_vfs::a2_dynamic_evidence::{
     run_lock_lifecycle_program_isolated, run_lock_local_sibling_contention_program_isolated,
     run_lock_native_acquire_busy_program_isolated, run_lock_program_isolated,
-    run_lock_stored_poison_program_isolated, LockRunnerActionV1, LockRunnerEvidenceReceiptV1,
-    LockRunnerIsolatedEvidenceV1,
+    run_lock_stored_poison_program_isolated, LockRunnerActionV1, LockRunnerIsolatedEvidenceV1,
     LockRunnerLifecycleBindingV1, LockRunnerLifecyclePathV1,
     LockRunnerLocalSiblingContentionBindingV1, LockRunnerNativeAcquireBusyBindingV1,
     LockRunnerProgramBindingV1, LockRunnerRequestValidationV1,
@@ -246,6 +249,9 @@ pub(in super::super) fn run_lock_isolated_for_test(
                 },
             )
         }
+        LockProgramCaseV1::PreManagedCallbackRejection(rejection) => {
+            pre_managed_callback_rejection::run_isolated_v1(exact_test, rejection, member)
+        }
         LockProgramCaseV1::StoredPoison(stored) => run_lock_stored_poison_program_isolated(
             exact_test,
             LockRunnerStoredPoisonBindingV1 {
@@ -373,6 +379,9 @@ enum LockProgramCaseV1 {
     LocalProtocolRejection(LockLocalProtocolRejectionProgramSpecV1),
     LocalSiblingContention(LockLocalSiblingContentionProgramSpecV1),
     NativeAcquireBusy(LockNativeAcquireBusyProgramSpecV1),
+    PreManagedCallbackRejection(
+        pre_managed_callback_rejection::LockPreManagedCallbackRejectionProgramSpecV1,
+    ),
     StoredPoison(LockStoredPoisonProgramSpecV1),
 }
 
@@ -433,6 +442,11 @@ pub(super) fn local_protocol_rejection_catalog_row_count_for_test() -> usize {
 }
 
 #[cfg(test)]
+pub(super) fn pre_managed_callback_rejection_catalog_row_count_for_test() -> usize {
+    pre_managed_callback_rejection::catalog_row_count_for_test()
+}
+
+#[cfg(test)]
 pub(super) fn stored_poison_catalog_row_count_for_test() -> usize {
     stored_poison::catalog_row_count_for_test()
 }
@@ -444,53 +458,4 @@ pub(super) fn validate_program_for_test(
     plan: CompiledRunnerPlanV1,
 ) -> Result<(), LockRunnerExecutionViolationV1> {
     program_v1(key, member, plan).map(|_| ())
-}
-
-#[cfg(windows)]
-fn seal_execution_receipt(
-    program: LockProgramV1,
-    evidence: LockRunnerEvidenceReceiptV1,
-) -> LockRunnerExecutionReceiptV1 {
-    let (root, child, registration, payload, environment, cleanup, native, exit_code) =
-        evidence.into_bindings();
-    let mut receipt = LockRunnerExecutionReceiptV1 {
-        normalized_descriptor_sha256: program.normalized_descriptor_sha256,
-        member: program.member,
-        plan_sha256: program.plan_sha256,
-        implementation_sha256: program.implementation_sha256,
-        root_commitment_sha256: Digest32(root),
-        child_fingerprint_sha256: Digest32(child),
-        registration_commitment_sha256: Digest32(registration),
-        payload_commitment_sha256: Digest32(payload),
-        environment_sha256: Digest32(environment),
-        cleanup_sha256: Digest32(cleanup),
-        native_receipt_sha256: Digest32(native),
-        child_exit_code: exit_code,
-        execution_sha256: Digest32::ZERO,
-    };
-    receipt.execution_sha256 = digest_execution_receipt_v1(&receipt);
-    receipt
-}
-
-fn digest_execution_receipt_v1(receipt: &LockRunnerExecutionReceiptV1) -> Digest32 {
-    let mut hasher = Sha256::new();
-    hasher.update(b"elon-lock-quotient-real-execution-v1\0");
-    for digest in [
-        receipt.normalized_descriptor_sha256,
-        receipt.member.case_key_sha256,
-        receipt.member.full_record_sha256,
-        receipt.plan_sha256,
-        receipt.implementation_sha256,
-        receipt.root_commitment_sha256,
-        receipt.child_fingerprint_sha256,
-        receipt.registration_commitment_sha256,
-        receipt.payload_commitment_sha256,
-        receipt.environment_sha256,
-        receipt.cleanup_sha256,
-        receipt.native_receipt_sha256,
-    ] {
-        hasher.update(digest.0);
-    }
-    hasher.update(receipt.child_exit_code.to_le_bytes());
-    Digest32(hasher.finalize().into())
 }

@@ -11,6 +11,7 @@ macro_rules! source {
 
 pub(super) const LOCK_STORED_POISON_SOURCE_SCOPE_V1: &[(&str, &str)] = &[
     source!("dynamic_quotient/runner_admission/lock_program.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/dynamic_quotient/runner_admission/lock_program.rs"),
+    source!("dynamic_quotient/runner_admission/lock_program/execution_receipt.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/dynamic_quotient/runner_admission/lock_program/execution_receipt.rs"),
     source!("dynamic_quotient/runner_admission/lock_program/source_program.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/dynamic_quotient/runner_admission/lock_program/source_program.rs"),
     source!("dynamic_quotient/runner_admission/lock_program/stored_poison.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/dynamic_quotient/runner_admission/lock_program/stored_poison.rs"),
     source!("dynamic_quotient/runner_admission/lock_program/stored_poison/catalog.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/dynamic_quotient/runner_admission/lock_program/stored_poison/catalog.rs"),
@@ -41,6 +42,7 @@ pub(super) const LOCK_STORED_POISON_SOURCE_SCOPE_V1: &[(&str, &str)] = &[
     source!("managed_vfs/live_registration.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/live_registration.rs"),
     source!("managed_vfs/shared_namespace.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/shared_namespace.rs"),
     source!("registry/file_custody/operations.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/registry/file_custody/operations.rs"),
+    source!("registry/file_custody/operations/shm.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/registry/file_custody/operations/shm.rs"),
     source!("node_agent_managed_fs/sqlite_namespace.rs", "/src/node_agent_managed_fs/sqlite_namespace.rs"),
     source!("node_agent_managed_fs/sqlite_namespace_shm.rs", "/src/node_agent_managed_fs/sqlite_namespace_shm.rs"),
     source!("node_agent_managed_fs/sqlite_namespace_shm/coordinator.rs", "/src/node_agent_managed_fs/sqlite_namespace_shm/coordinator.rs"),

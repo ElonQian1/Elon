@@ -16,6 +16,7 @@ use crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_abi::{
 };
 
 mod registry_lifecycle;
+#[cfg(all(test, windows))] mod lock_pre_managed;
 pub(super) use registry_lifecycle::{
     ManagedTestRegistryLifecycleCloseOutcome, ManagedTestRegistryLifecycleRouteObserver,
 };

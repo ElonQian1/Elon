@@ -5,6 +5,7 @@ mod lifecycle;
 mod local_protocol_rejection;
 mod local_sibling_contention;
 mod native_acquire_busy;
+mod pre_managed_rejection;
 mod request_validation;
 #[cfg(all(test, windows))]
 mod selector_test_support;
@@ -42,6 +43,15 @@ pub(in super::super) use local_sibling_contention::{
 #[cfg(all(test, windows))]
 pub(in super::super) use native_acquire_busy::{
     lock_native_acquire_busy_selector_for_test, selected_lock_native_acquire_busy_selector_for_test,
+};
+pub(in super::super) use pre_managed_rejection::{
+    run_lock_pre_managed_rejection_program_isolated, LockRunnerPreManagedCompletionV1,
+    LockRunnerPreManagedRejectionBindingV1, LockRunnerPreManagedRejectionV1,
+};
+#[cfg(all(test, windows))]
+pub(in super::super) use pre_managed_rejection::{
+    lock_pre_managed_rejection_selector_for_test,
+    selected_lock_pre_managed_rejection_selector_for_test,
 };
 pub(in super::super) use native_acquire_busy::{
     run_lock_native_acquire_busy_program_isolated, LockRunnerNativeAcquireBusyBindingV1,

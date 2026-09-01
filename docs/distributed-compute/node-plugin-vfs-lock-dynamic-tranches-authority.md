@@ -4,7 +4,7 @@ status: current
 reviewed_at: 2026-09-01
 owners: node, security
 design_status: design_frozen
-implementation_status: q5_q6_q7_q8_source_written_uncompiled_unrun
+implementation_status: q5_q6_q7_q8_q9_source_written_uncompiled_unrun
 verification_status: source_review_only_actual_not_run
 authority_scope: backend-a2-map-lock-dynamic-quotient-authority-v1
 ---
@@ -14,7 +14,7 @@ authority_scope: backend-a2-map-lock-dynamic-quotient-authority-v1
 ## 1. Scope
 
 本文维护 [`Map/Lock dynamic quotient authority`](node-plugin-vfs-map-lock-dynamic-quotient-authority.md)
-中 Lock q5–q8 窄执行切片的精确成员、lower 路径 source contract、回执形状和隔离约束。父权威仍唯一维护完整
+中 Lock q5–q9 窄执行切片的精确成员、lower 路径 source contract、回执形状和隔离约束。父权威仍唯一维护完整
 `8,668` 静态分母、商集冻结、reviewed inventory、`Qlock` 与生产门控；本文不创建第二套
 CaseKey、Expected、manifest 或 acceptance 状态。
 
@@ -115,19 +115,96 @@ q8 catalog 精确为 88 data rows（另 1 header）、15,716 bytes、LF-only、�
 `8cb3fcef3eb2f65fe54694396cdcff32aef576dc5f299879f5e072699428c936`；其 88 对 member seals 与 q3–q7
 既有 2,920 对 member seals 的交集为 0。
 
-## 6. Current evidence and production boundary
+## 6. q9 pre-managed callback rejection
 
-q7 的 matcher、catalog、source scope、child header、isolated runner、fixture、141-scalar payload、
-ordinary route-preemption seam 与 source-level tests 已写入；full source scope 为 119 identities，q7 delta
-为 13 identities。q8 source scope 为 132 个唯一 identity：继承 q7 全量 119，加上已在全局
-scope 但 q7 scope 漏列的 `stored_poison/payload` 1 项，再加 q8 delta 12 项。q8 的 exact matcher、catalog、
-installed-callback child/fixture、guard-witness lower ledger、active-route completion payload 与 source-level tests
-已写入，但没有 current reviewed source scope digest。当前未运行 inventory 预期为
-`3,122 present / 5,546 missing / 8,668 total`，coverage 仍为
-`0/8,668`。
+`LockPreManagedCallbackRejectionV1` 冻结 528 个 member，且每个 member 都是一个独立 normalized
+program group。它是 88 个合法 Lock request 与六个精确终态族的笛卡尔积；88 个 request 固定为
+`LockShared` 8 个单槽、`LockExclusive` 36 个连续范围、`UnlockShared` 8 个单槽和
+`UnlockExclusive` 36 个连续范围。六族各 88，且只允许下列配对：
 
-本批按架构铺设约束没有运行 Cargo、编译、SQLite、Windows 或真实 runtime；因此仍是
+| family | source / stimulus | completion | members/groups |
+|---|---|---|---:|
+| AdmissionRouteUnknown Direct | `RegistryCallbackAdmission / AdmissionRouteUnknown` | `Direct` | 88/88 |
+| AdmissionCounterOverflow Direct | `RegistryCallbackAdmission / AdmissionCounterOverflow` | `Direct` | 88/88 |
+| UnsupportedFileRole Completed | `AdapterDispatch / UnsupportedFileRole` | `Completed` | 88/88 |
+| UnsupportedFileRole RouteUnknown | `AdapterDispatch / UnsupportedFileRole` | `RouteUnknown` | 88/88 |
+| ShmDetached Completed | `AdapterDispatch / ShmDetached` | `Completed` | 88/88 |
+| ShmDetached RouteUnknown | `AdapterDispatch / ShmDetached` | `RouteUnknown` | 88/88 |
+
+matcher 必须全向量匹配 `root=Lock`、`operation/phase=CallbackAdmission`、`timing=BeforeCall`、
+`occurrence=Natural`、`callback=XShmLock`、`fault_seam=RegistryAdmission`、
+`observer=LockCallbackAndSnapshot`、`cleanup=ParentOwnedRoot` 和完整 Expected。action、first、count、mask
+必须为 exact `Reached` 合法 request，mask 必须由 range 重算；initialization、held/sibling masks 全部为
+`NotReached`，completion 只接受上表配对。Expected 的 `lock_effect` 必须按实际到达层级分裂：
+`AdmissionRouteUnknown`、`AdmissionCounterOverflow` 两个 admission-direct 族为 `Unchanged`；
+`UnsupportedFileRole`、`ShmDetached` 的四个 `AdapterDispatch` 族为 `NotReached`，禁止六族共用
+`Unchanged`。catalog 按六个语义 shard 各保存 88 个
+`(action, first, count, mask, case_key_sha256, full_record_sha256)` seal；不得用 `leaf_id`、branch 或展示文本分类。
+528 个 member seals 与 q1–q8 的 3,122 个 source-present seals 必须零交集，528 个 normalized keys 也必须
+唯一且与旧 source-present keys 零交集。
+
+### 6.1 Production actual chain
+
+所有六族的目标入口都是 installed SQLite ABI `xShmLock`，继而进入 registry pinned-file
+`shm_lock -> with_shm`；不得直接调用 state、coordinator 或 managed-fs lower 来代替 installed callback。
+
+- `AdmissionRouteUnknown`：fixture 先用 production `retain_terminal_custody` 移除 exact route；随后真实
+  `begin_callback` 返回 `UnknownOrRetired`。没有 callback lease，dispatch/lower/completion 均不得到达。
+- `AdmissionCounterOverflow`：test-only prime 只能在 exact active route、当前 callback count 为 0 且 shape
+  合法时把计数预置为 `u32::MAX`；随后 production `begin_callback` 的真实 `checked_add` 失败、写入
+  `CallbackCounterOverflow` terminal reason。prime 不是 actual，actual 是 production rejection。
+- `UnsupportedFileRole`：真实 callback admission 成功后，`with_shm` 观察到 actual custody 为 `Main`，由
+  production WalMain pattern check 返回 `UnsupportedFileRole`。这里的
+  `ManagedWalMainSingleConnection` fixture 枚举只表示 managed single-connection harness class，不表示 actual
+  custody；receipt 必须明确封口 `role=Main`，否则这 176 个 member 不得 admission。
+- `ShmDetached`：fixture 必须经真实 attach/detach 得到 actual `WalMain` 且 `shm=None`；真实 admission 成功后，
+  production `file.shm_mut()` 检查返回 `ShmDetached`。
+
+Completed 两族不得移除 route，必须调用真实 `callback.complete()` 并观察成功。RouteUnknown 两族只能在
+真实 `UnsupportedFileRole` 或 `ShmDetached` 已形成后，由 exact route/request/rejection 绑定的一次性 test-only
+seam claim，再调用 production `retain_terminal_custody`，最后调用真实 `callback.complete()` 并观察
+`UnknownOrRetired`。顺序固定为：
+
+```text
+installed xShmLock
+  -> production callback admission
+  -> production custody-role/shm-present rejection
+  -> exact one-shot claim (RouteUnknown only)
+  -> production terminal-custody retention and route removal (RouteUnknown only)
+  -> production callback completion
+  -> private actual receipt
+```
+
+operation rejection 在 production `(result, callback.complete())` 中保持优先，公开 SQLite 结果不足以区分内部
+rejection 或 completion；因此 receipt 必须独立绑定 exact raw request/result、route/registration、callback lease、
+actual role 与 shm-present、真实 rejection、completion result、terminal reason、route removal/retention、零
+managed/native lock ledger、child exit 和 parent cleanup。seam 只能观察真实结果和安排上述 one-shot route
+removal，不得注入 rejection、completion 或伪造 actual。
+
+### 6.2 Explicit exclusion
+
+3,432 个 native-acquire initialization-failure 静态 member 完全排除在 q9 之外：它们不是 q9 member、group、
+catalog、matcher、runner 或 receipt，也不得计入本批 source-present。当前通用 fault controller 对其 exact
+full vector 的可命中数为 0；未来只有独立 initialization namespace/native/DMS/cleanup controller 与真实
+Windows 回执闭合后，才可另立 tranche。本批不得把 injected generic phase failure 写成 native actual。
+
+## 7. Current evidence and production boundary
+
+q7/q8 的既有 source scope 与 receipt 形状保持不变；q9 又新增六个 exact matcher/catalog shards、installed
+callback runner、production-observation seam 和 source-level contracts。q1–q9 未运行 inventory 的 source-only
+预期为 `3,650 present members / 3,650 present groups / 5,018 missing members / 4,490 missing groups /
+8,668 total members / 8,140 total groups`，且 528 个 q9 group 必须全部为 singleton。没有 current reviewed
+source-scope 或 inventory digest，member coverage 仍为 `0/8,668`。
+
+本批把 `with_shm` 的生产实现拆入 `operations/shm.rs`，q1–q9 各 tranche 的 implementation closure 已纳入该
+物理源码；但仓库级 `SourceOwnerGraph` 与 source-leaf frozen authority 仍绑定拆分前的物理快照。它们必须在本批
+checkpoint 提交后，以新的 baseline 运行显式 ignored candidate generator，并人工复核 16 份 Map leaf、Map
+manifest、Lock leaf 与 Lock manifest 共 19 份 frozen artifacts。由于当前架构铺设阶段明确禁止运行 Rust，本批
+不留下只改 owner/needle、却没有同步重生成 frozen artifacts 的半套权威；这项全局刷新继续作为后续验收阻塞项。
+
+本批没有运行 Cargo、编译、SQLite、Windows 或真实 runtime；因此仍是
 `passed=0 failed=0 actual=not_run`，没有 actual record、reviewed inventory digest、frozen manifest、
 `Qlock`（仍为 `unknown`）或 Windows numerator，`WindowsDynamic=not_opened`。最终 Lock 功能继续 blocked：
-仍缺 5,546 个 program，且 compile/runtime/actual receipts/reviewed digest 全部缺失。它不打开生产 VFS/open、
+仍缺 5,018 members / 4,490 groups，且 compile/runtime/actual receipts/reviewed digest 全部缺失。q9 是
+source-only、uncompiled、unrun，production 保持 closed。它不打开生产 VFS/open、
 Runtime/Ready、Provider、Offer、Job、Attempt、Lease、dispatch、market、settlement 或 funds effects。

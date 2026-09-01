@@ -34,6 +34,7 @@ use crate::node_agent_compute_plugin_host::local_authority::{
 };
 
 mod lifecycle;
+#[cfg(all(test, windows))] mod test_lock_callback_admission;
 mod vfs;
 
 /// Future production specialization. No instance or nonce provider exists in the current build.

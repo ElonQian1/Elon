@@ -21,6 +21,10 @@ use super::{
     native_acquire_busy::{
         program_spec_v1 as native_acquire_busy_program_spec_v1, LockNativeAcquireBusyProgramSpecV1,
     },
+    pre_managed_callback_rejection::{
+        program_spec_v1 as pre_managed_callback_rejection_program_spec_v1,
+        LockPreManagedCallbackRejectionProgramSpecV1,
+    },
     request_validation::{
         program_spec_v1 as request_validation_program_spec_v1, LockProgramSpecV1,
     },
@@ -63,8 +67,14 @@ pub(super) fn program_spec_v1(
                                             match native_acquire_busy_program_spec_v1(key, plan) {
                                                 Ok(program) => Ok(from_native_acquire_busy_v1(program)),
                                                 Err(LockRunnerExecutionViolationV1::UnsupportedProgram) => {
-                                                    stored_poison_program_spec_v1(key, plan)
-                                                        .map(from_stored_poison_v1)
+                                                    match stored_poison_program_spec_v1(key, plan) {
+                                                        Ok(program) => Ok(from_stored_poison_v1(program)),
+                                                        Err(LockRunnerExecutionViolationV1::UnsupportedProgram) => {
+                                                            pre_managed_callback_rejection_program_spec_v1(key, plan)
+                                                                .map(from_pre_managed_callback_rejection_v1)
+                                                        }
+                                                        Err(error) => Err(error),
+                                                    }
                                                 }
                                                 Err(error) => Err(error),
                                             }
@@ -168,6 +178,19 @@ fn from_stored_poison_v1(program: LockStoredPoisonProgramSpecV1) -> SourceLockPr
     SourceLockProgramSpecV1 {
         #[cfg(windows)]
         case: LockProgramCaseV1::StoredPoison(program),
+        normalized_descriptor_sha256: program.normalized_descriptor_sha256,
+        expected_member: Some(program.member),
+        plan_sha256: program.plan_sha256,
+        implementation_sha256: program.implementation_sha256,
+    }
+}
+
+fn from_pre_managed_callback_rejection_v1(
+    program: LockPreManagedCallbackRejectionProgramSpecV1,
+) -> SourceLockProgramSpecV1 {
+    SourceLockProgramSpecV1 {
+        #[cfg(windows)]
+        case: LockProgramCaseV1::PreManagedCallbackRejection(program),
         normalized_descriptor_sha256: program.normalized_descriptor_sha256,
         expected_member: Some(program.member),
         plan_sha256: program.plan_sha256,

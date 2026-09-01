@@ -9,6 +9,7 @@ use super::program_inventory::{
     EXECUTION_PROGRAM_INVENTORY_SCHEMA_V1,
 };
 use super::runner_admission::ExecutionProgramInventoryStatusV1;
+use super::runner_admission::PRE_MANAGED_CALLBACK_REJECTION_PROJECTOR_DELTA_V1;
 
 const SOURCE_SCOPE_DOMAIN: &str = "ELON-A2-MAP-LOCK-EXECUTION-PROGRAM-INVENTORY-SOURCE-SCOPE-V1";
 const MEMBERSHIP_DOMAIN: &str = "ELON-A2-MAP-LOCK-EXECUTION-PROGRAM-MEMBERSHIP-V1";
@@ -74,6 +75,10 @@ const SOURCE_SCOPE: &[(&str, &str)] = &[
     (
         "runner_admission/lock_program.rs",
         include_str!("runner_admission/lock_program.rs"),
+    ),
+    (
+        "runner_admission/lock_program/execution_receipt.rs",
+        include_str!("runner_admission/lock_program/execution_receipt.rs"),
     ),
     (
         "runner_admission/lock_program/request_validation.rs",
@@ -209,8 +214,26 @@ pub(super) fn digest_execution_program_inventory_source_scope_v1() -> Digest32 {
         "schema_version",
         EXECUTION_PROGRAM_INVENTORY_SCHEMA_V1,
     );
-    add_u64(&mut out, "entry_count", SOURCE_SCOPE.len() as u64);
-    for (path, source) in SOURCE_SCOPE {
+    add_u64(
+        &mut out,
+        "entry_count",
+        (SOURCE_SCOPE.len() + PRE_MANAGED_CALLBACK_REJECTION_PROJECTOR_DELTA_V1.len()) as u64,
+    );
+    for (path, source) in SOURCE_SCOPE
+        .iter()
+        .copied()
+        .chain(
+            PRE_MANAGED_CALLBACK_REJECTION_PROJECTOR_DELTA_V1
+                .iter()
+                .copied()
+                .map(|(path, source)| {
+                    (
+                        path.strip_prefix("dynamic_quotient/").unwrap_or(path),
+                        source,
+                    )
+                }),
+        )
+    {
         add_bytes(&mut out, "path", path.as_bytes());
         add_bytes(&mut out, "source", source.as_bytes());
     }

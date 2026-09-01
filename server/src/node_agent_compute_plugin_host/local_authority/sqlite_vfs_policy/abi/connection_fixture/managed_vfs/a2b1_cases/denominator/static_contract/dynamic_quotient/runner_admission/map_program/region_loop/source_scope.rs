@@ -122,6 +122,10 @@ pub(super) fn digest_implementation_v1(program: MapRegionLoopProgramV1) -> Diges
         )),
         include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
+            "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/registry/file_custody/operations/shm.rs"
+        )),
+        include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
             "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_abi.rs"
         )),
         include_str!(concat!(

@@ -8,6 +8,7 @@ use super::lock_stored_poison_source_scope::STORED_POISON_PROJECTOR_DELTA_V1;
 use super::map_runtime_source_scope::{
     MAP_REGION_LOOP_SOURCE_SCOPE_V1, MAP_RUNTIME_DEPENDENCY_SOURCE_SCOPE_V1,
 };
+use super::runner_admission::PRE_MANAGED_CALLBACK_REJECTION_PROJECTOR_DELTA_V1;
 use super::{
     digest_dynamic_class_key_v1, DynamicClassKeyV1, DynamicClassSealV1, DynamicQuotientManifestV1,
     ReverseIndexEntryV1, StaticMemberSealV1, DYNAMIC_PROJECTOR_SCHEMA_V1,
@@ -643,6 +644,7 @@ pub(super) fn projector_source_scope_entries_v1(
         .chain(NATIVE_BUSY_PROJECTOR_DELTA_V1.iter().copied())
         .chain(callback_completion_route_unknown_projector_delta_entries_v1())
         .chain(LOCAL_PROTOCOL_REJECTION_PROJECTOR_DELTA_V1.iter().copied())
+        .chain(PRE_MANAGED_CALLBACK_REJECTION_PROJECTOR_DELTA_V1.iter().copied())
 }
 
 pub(super) fn digest_projector_source_entries_v1<'a>(

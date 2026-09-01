@@ -103,6 +103,99 @@ impl ManagedSqliteRegistryOrdinaryShmLockRoutePreemptionReceipt {
     }
 }
 
+#[cfg(windows)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(in super::super::super) enum ManagedSqliteRegistryPreManagedLockCustody {
+    Main,
+    WalMain,
+    Sidecar,
+}
+
+#[cfg(windows)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(in super::super::super) enum ManagedSqliteRegistryPreManagedLockRejection {
+    UnsupportedFileRole,
+    ShmDetached,
+}
+
+#[cfg(windows)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(in super::super::super) enum ManagedSqliteRegistryPreManagedLockAdmissionOutcome {
+    Succeeded,
+    RouteUnknown,
+    CounterOverflow,
+    OtherRejection,
+}
+
+#[cfg(windows)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(in super::super::super) enum ManagedSqliteRegistryPreManagedLockCompletionOutcome {
+    Succeeded,
+    RouteUnknown,
+    OtherRejection,
+}
+
+/// Passive events are emitted around the production callback admission/dispatch/completion path.
+/// Observers may reject their own receipt, but their return value is never allowed to replace the
+/// callback's actual result.
+#[cfg(windows)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(in super::super::super) enum ManagedSqliteRegistryPreManagedLockEvent {
+    Entry {
+        request: ManagedSqliteShmLockRequest,
+    },
+    Admission {
+        request: ManagedSqliteShmLockRequest,
+        outcome: ManagedSqliteRegistryPreManagedLockAdmissionOutcome,
+    },
+    Dispatch {
+        request: ManagedSqliteShmLockRequest,
+        custody: ManagedSqliteRegistryPreManagedLockCustody,
+        shm_present: bool,
+        rejection: Option<ManagedSqliteRegistryPreManagedLockRejection>,
+        managed_reached: bool,
+    },
+    Completion {
+        request: ManagedSqliteShmLockRequest,
+        outcome: ManagedSqliteRegistryPreManagedLockCompletionOutcome,
+    },
+}
+
+#[cfg(windows)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(in super::super::super) struct ManagedSqliteRegistryPreManagedLockRoutePreemptionReceipt {
+    request_matched: bool,
+    rejection_matched: bool,
+    preemption_retained: bool,
+    callback_completion_route_unknown: bool,
+}
+
+#[cfg(windows)]
+impl ManagedSqliteRegistryPreManagedLockRoutePreemptionReceipt {
+    pub(in super::super::super) const fn new(
+        request_matched: bool,
+        rejection_matched: bool,
+        preemption_retained: bool,
+        callback_completion_route_unknown: bool,
+    ) -> Self {
+        Self {
+            request_matched,
+            rejection_matched,
+            preemption_retained,
+            callback_completion_route_unknown,
+        }
+    }
+
+    pub(in super::super::super) const fn ordered_values(self) -> [u64; 4] {
+        [
+            self.request_matched as u64,
+            self.rejection_matched as u64,
+            self.preemption_retained as u64,
+            self.callback_completion_route_unknown as u64,
+        ]
+    }
+}
+
 pub(in super::super::super) trait ManagedSqliteRegistryCloseLifecycleFaults:
     Send + Sync + 'static
 {
@@ -150,6 +243,34 @@ pub(in super::super::super) trait ManagedSqliteRegistryCloseLifecycleFaults:
     fn record_ordinary_shm_lock_route_preemption_receipt(
         &self,
         receipt: ManagedSqliteRegistryOrdinaryShmLockRoutePreemptionReceipt,
+    ) -> Result<(), ()> {
+        let _ = receipt;
+        Ok(())
+    }
+
+    #[cfg(windows)]
+    fn observe_pre_managed_shm_lock_event(
+        &self,
+        event: ManagedSqliteRegistryPreManagedLockEvent,
+    ) -> Result<(), ()> {
+        let _ = event;
+        Ok(())
+    }
+
+    #[cfg(windows)]
+    fn claim_pre_managed_shm_lock_route_preemption(
+        &self,
+        request: ManagedSqliteShmLockRequest,
+        rejection: ManagedSqliteRegistryPreManagedLockRejection,
+    ) -> Result<bool, ()> {
+        let _ = (request, rejection);
+        Ok(false)
+    }
+
+    #[cfg(windows)]
+    fn record_pre_managed_shm_lock_route_preemption_receipt(
+        &self,
+        receipt: ManagedSqliteRegistryPreManagedLockRoutePreemptionReceipt,
     ) -> Result<(), ()> {
         let _ = receipt;
         Ok(())

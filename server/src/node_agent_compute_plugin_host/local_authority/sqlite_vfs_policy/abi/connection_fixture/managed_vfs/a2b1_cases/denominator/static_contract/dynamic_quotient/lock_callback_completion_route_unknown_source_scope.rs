@@ -13,6 +13,7 @@ macro_rules! source {
 
 pub(super) const LOCK_CALLBACK_COMPLETION_ROUTE_UNKNOWN_SOURCE_SCOPE_V1: &[(&str, &str)] = &[
     source!("dynamic_quotient/runner_admission/lock_program.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/dynamic_quotient/runner_admission/lock_program.rs"),
+    source!("dynamic_quotient/runner_admission/lock_program/execution_receipt.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/dynamic_quotient/runner_admission/lock_program/execution_receipt.rs"),
     source!("dynamic_quotient/runner_admission/lock_program/source_program.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/dynamic_quotient/runner_admission/lock_program/source_program.rs"),
     source!("dynamic_quotient/runner_admission/lock_program/request_validation.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/dynamic_quotient/runner_admission/lock_program/request_validation.rs"),
     source!("dynamic_quotient/runner_admission/lock_program/lifecycle.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/dynamic_quotient/runner_admission/lock_program/lifecycle.rs"),
@@ -88,6 +89,7 @@ pub(super) const LOCK_CALLBACK_COMPLETION_ROUTE_UNKNOWN_SOURCE_SCOPE_V1: &[(&str
     source!("registry/file_custody/promotion.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/registry/file_custody/promotion.rs"),
     source!("registry/file_custody/registry_lifecycle.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/registry/file_custody/registry_lifecycle.rs"),
     source!("registry/file_custody/operations.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/registry/file_custody/operations.rs"),
+    source!("registry/file_custody/operations/shm.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/registry/file_custody/operations/shm.rs"),
     source!("registry/file_custody/operations/ordinary_shm_lock_preemption.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/registry/file_custody/operations/ordinary_shm_lock_preemption.rs"),
     source!("registry/file_custody/operations/unmap.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/registry/file_custody/operations/unmap.rs"),
     source!("registry/file_custody/test_faults.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/registry/file_custody/test_faults.rs"),
@@ -135,6 +137,7 @@ pub(super) const LOCK_CALLBACK_COMPLETION_ROUTE_UNKNOWN_SOURCE_SCOPE_V1: &[(&str
 
 /// New identities not already present in the shared projector source scope.
 pub(super) const CALLBACK_COMPLETION_ROUTE_UNKNOWN_PROJECTOR_DELTA_V1: &[(&str, &str)] = &[
+    source!("dynamic_quotient/runner_admission/lock_program/execution_receipt.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/dynamic_quotient/runner_admission/lock_program/execution_receipt.rs"),
     source!("dynamic_quotient/lock_callback_completion_route_unknown_source_scope.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/dynamic_quotient/lock_callback_completion_route_unknown_source_scope.rs"),
     source!("dynamic_quotient/runner_admission/lock_program/callback_completion_route_unknown.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/dynamic_quotient/runner_admission/lock_program/callback_completion_route_unknown.rs"),
     source!("dynamic_quotient/runner_admission/lock_program/callback_completion_route_unknown/catalog.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/dynamic_quotient/runner_admission/lock_program/callback_completion_route_unknown/catalog.rs"),

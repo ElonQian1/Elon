@@ -8,6 +8,8 @@ use crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::r
     ManagedSqliteRegistryCloseLifecycleFaults, ManagedSqliteRegistryCloseLifecyclePhase,
     ManagedSqliteRegistryLifecycleStage,
     ManagedSqliteRegistryOrdinaryShmLockRoutePreemptionReceipt,
+    ManagedSqliteRegistryPreManagedLockEvent, ManagedSqliteRegistryPreManagedLockRejection,
+    ManagedSqliteRegistryPreManagedLockRoutePreemptionReceipt,
     ManagedSqliteRegistryUnsafeShmRoutePreemptionReceipt,
 };
 use crate::node_agent_managed_fs::PinnedManagedSqliteFile;

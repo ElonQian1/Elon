@@ -186,6 +186,41 @@ pub(super) enum ManagedSqliteRegistryTransitionRejection {
     StateInvariantViolated,
 }
 
+/// Test-only proof that an exact active route's callback counter was moved from its natural
+/// quiescent value to the sole value which makes production `checked_add(1)` overflow.
+#[cfg(all(test, windows))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy) struct ManagedSqliteRegistryCallbackCounterPrimeReceipt
+{
+    active_route: bool,
+    before: u32,
+    after: u32,
+    primed: bool,
+}
+
+#[cfg(all(test, windows))]
+impl ManagedSqliteRegistryCallbackCounterPrimeReceipt {
+    pub(super) const fn exact_active_zero_to_max() -> Self {
+        Self {
+            active_route: true,
+            before: 0,
+            after: u32::MAX,
+            primed: true,
+        }
+    }
+
+    pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy) const fn ordered_values(
+        self,
+    ) -> [u64; 4] {
+        [
+            self.active_route as u64,
+            self.before as u64,
+            self.after as u64,
+            self.primed as u64,
+        ]
+    }
+}
+
 #[derive(Clone, Copy)]
 pub(super) struct ManagedSqliteRegistryLeaseRecord {
     pub(super) ordinal: NonZeroU64,

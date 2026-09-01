@@ -342,6 +342,7 @@ fn digest_implementation_v1(implementation_tag: u8) -> Digest32 {
     hasher.update(b"elon-lock-positive-lifecycle-implementation-v1\0");
     for source in [
         include_str!("../lock_program.rs"),
+        include_str!("execution_receipt.rs"),
         include_str!("source_program.rs"),
         include_str!("lifecycle.rs"),
         include_str!(concat!(
@@ -432,10 +433,8 @@ fn digest_implementation_v1(implementation_tag: u8) -> Digest32 {
             env!("CARGO_MANIFEST_DIR"),
             "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/registry/file_custody/abi.rs"
         )),
-        include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/registry/file_custody/operations.rs"
-        )),
+        include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/registry/file_custody/operations.rs")),
+        include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/registry/file_custody/operations/shm.rs")),
         include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_abi.rs"

@@ -129,6 +129,31 @@ impl ManagedSqliteRegistryCloseLifecycleFaults for ManagedTestLifecycleFaultBind
         )
     }
 
+    #[cfg(windows)]
+    fn observe_pre_managed_shm_lock_event(
+        &self,
+        event: ManagedSqliteRegistryPreManagedLockEvent,
+    ) -> Result<(), ()> {
+        self.observe_pre_managed_lock(event)
+    }
+
+    #[cfg(windows)]
+    fn claim_pre_managed_shm_lock_route_preemption(
+        &self,
+        request: crate::node_agent_managed_fs::ManagedSqliteShmLockRequest,
+        rejection: ManagedSqliteRegistryPreManagedLockRejection,
+    ) -> Result<bool, ()> {
+        self.claim_pre_managed_lock(request, rejection)
+    }
+
+    #[cfg(windows)]
+    fn record_pre_managed_shm_lock_route_preemption_receipt(
+        &self,
+        receipt: ManagedSqliteRegistryPreManagedLockRoutePreemptionReceipt,
+    ) -> Result<(), ()> {
+        self.record_pre_managed_lock(receipt)
+    }
+
     fn take_connection_observation_sidecar(&self) -> Result<Option<PinnedManagedSqliteFile>, ()> {
         self.controller
             .take_connection_observation_sidecar(self.route)

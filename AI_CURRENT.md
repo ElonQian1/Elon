@@ -62,10 +62,9 @@ reviewed_at: 2026-09-01
 - 已实现并通过 6 项 Rust/SQLite V5 服务端定向回归：V4/V5 可携带经私钥持有证明的商户 RSA 公钥指纹，V5 另含商户未核验删除证明。零条/一条证明导出、幂等摘要、安全字段、语义篡改、超 5000 条和 V4 字段夹带失败关闭已验证；普通及来源运营方 RSA 签名 V5 包可完整进入用户/项目隔离快照并保留删除证明，不复制关系、Grant、删除请求或证明主表，同一信封不能更换来源运营方身份，撤销密钥不能用于新导入。只有来源运营方签名可信时才生成已发布商户的精确指纹候选，映射仍需消费者确认和商户重新授权。SDK 签名及 PC/SDK 归档互操作有独立证据，但客户端加密 V5 归档上传全链路、V1-V4 固定字节样本和 PC 浏览器下载仍未验证。
 - 已实现、只预演：项目 AI 资源控制面可盘点自己的 Codex、本人节点、已授权共享 Codex 和平台模型并保存策略；它不启动任务、不验证外部额度，也未接管真实调度。
 - 已实现、默认关闭，Node 离线适配与服务端本地任务路径已验证：AI 任务与开放商业调用的链外影子经济层，可生成幂等用量凭证、验收后双分录，以及未提交网络的 Sui 链下投影包；追加式争议可阻断投影，已接受争议可创建独立纠正 Matter，人工验收后原子追加冲销与替换双分录而不改写原凭证。两条腿可共同保存为原子纠正包；系统还能从任意标准、冲销或替换凭证只读解析根、纠正步骤和当前有效凭证，异常循环或分叉失败关闭。标准包和纠正包可导出统一离线交接文件；项目还能签发限时、限网络和限包类型的离线预检机器凭据，外部工具只有在服务端只读重建交接包且摘要一致时才能追加 `passed/rejected` 报告。项目编辑者可将当前可导出的投影显式加入预检队列，机器按权限领取 60 至 900 秒短时租约，交接摘要漂移会阻断任务，报告与任务完成原子写入。连接器 SDK、CLI 和自动续租工作器已通过本机假服务及 Node 测试；客户端会拒绝摘要漂移、空领取夹带任务、跨任务响应和不匹配报告，机器凭据不接受命令行参数。服务端已有 21 项 Rust 测试，覆盖 V159 新库/V158 升级与约束、Axum 鉴权、租约并发/恢复/隔离/失效、摘要与争议阻断、纠正包领取、幂等冲突、两阶段写入故障回滚和本地 SQLite 一致性备份恢复；真实一小时工作器、操作系统级磁盘故障、生产库备份恢复和 PC 交互仍未验证。报告和任务不改变投影状态，也不授权签名、广播、最终性或资金移动。当前没有 Sui 网络适配器，不移动真实资金。
-- 分布式算力≠“开放算力市场已完成”；状态见 `docs/distributed-compute/current-implementation-status.md`。
 - 外部矿池：V277/V278 uncompiled/unrun、#13-18 deny、eligible=0；V280 P0 feature 因缺两名独立 authenticated admin|owner 对真实 market/wire profile 的批准而 `blocked`，禁止伪造开放。
 - V279：source-only/uncompiled/unrun、零下游/经济效果；见 `docs/distributed-compute/user-node-provider-binding-authority.md`。
-- A2 Lock：q8 source-only 新增 88 项；未运行 inventory=`3122 present/5546 missing/8668 total`、coverage=`0/8668`，`actual=not_run, Qlock=unknown, WindowsDynamic=not_opened, production closed`；详见 `docs/distributed-compute/node-plugin-vfs-lock-dynamic-tranches-authority.md`。
+- A2 Lock q9 `LockPreManagedCallbackRejectionV1`：source-only 528=6×88 singleton；inventory m/g=`P3650/3650 M5018/4490 T8668/8140`；coverage=`0/8668`；`passed=0 failed=0 actual=not_run Qlock=unknown WindowsDynamic=not_opened`；uncompiled/unrun、production closed；3,432 initialization failures missing、非 q9；详见 `docs/distributed-compute/node-plugin-vfs-lock-dynamic-tranches-authority.md`。
 - `capacity_future`：source-only/uncompiled/unrun，无 API/effect；见 `AI_INDEX.md`。
 
 ## 已接受的产品方向

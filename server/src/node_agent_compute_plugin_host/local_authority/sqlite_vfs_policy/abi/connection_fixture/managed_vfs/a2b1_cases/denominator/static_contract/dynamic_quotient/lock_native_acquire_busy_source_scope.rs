@@ -11,6 +11,7 @@ macro_rules! source {
 
 pub(super) const LOCK_NATIVE_ACQUIRE_BUSY_SOURCE_SCOPE_V1: &[(&str, &str)] = &[
     source!("dynamic_quotient/runner_admission/lock_program.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/dynamic_quotient/runner_admission/lock_program.rs"),
+    source!("dynamic_quotient/runner_admission/lock_program/execution_receipt.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/dynamic_quotient/runner_admission/lock_program/execution_receipt.rs"),
     source!("dynamic_quotient/runner_admission/lock_program/source_program.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/dynamic_quotient/runner_admission/lock_program/source_program.rs"),
     source!("dynamic_quotient/runner_admission/lock_program/lifecycle.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/dynamic_quotient/runner_admission/lock_program/lifecycle.rs"),
     source!("dynamic_quotient/runner_admission/lock_program/native_acquire_busy.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/dynamic_quotient/runner_admission/lock_program/native_acquire_busy.rs"),
@@ -47,6 +48,7 @@ pub(super) const LOCK_NATIVE_ACQUIRE_BUSY_SOURCE_SCOPE_V1: &[(&str, &str)] = &[
     source!("registry/test_vfs_bridge/file.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/registry/test_vfs_bridge/file.rs"),
     source!("registry/file_custody/abi.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/registry/file_custody/abi.rs"),
     source!("registry/file_custody/operations.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/registry/file_custody/operations.rs"),
+    source!("registry/file_custody/operations/shm.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/registry/file_custody/operations/shm.rs"),
     source!("sqlite_vfs_abi.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_abi.rs"),
     source!("sqlite_vfs_abi/io_shm.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_abi/io_shm.rs"),
     source!("sqlite_vfs_abi/result_codes.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_abi/result_codes.rs"),

@@ -50,8 +50,8 @@ mod joint_close_direct_xclose;
 #[cfg(all(test, windows))]
 mod joint_close_fault;
 mod lifecycle;
-#[cfg(all(test, windows))]
-mod test_registry_lifecycle;
+#[cfg(all(test, windows))] mod test_lock_callback_admission;
+#[cfg(all(test, windows))] mod test_registry_lifecycle;
 mod vfs;
 
 #[cfg(test)]
