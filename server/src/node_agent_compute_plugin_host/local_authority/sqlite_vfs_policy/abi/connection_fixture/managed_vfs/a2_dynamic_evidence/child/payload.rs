@@ -5,8 +5,7 @@ use super::super::super::a2b2_cases::{
 
 use super::{
     lock_abi_scalar_rejection, lock_callback_route_unknown,
-    lock_created_first_exclusive_release_error,
-    lock_created_first_truncate_error_release_failed,
+    lock_created_first_exclusive_release_error, lock_created_first_truncate_error_release_failed,
     lock_created_first_truncate_error_release_succeeded,
     lock_existing_first_exclusive_release_error,
     lock_existing_first_truncate_error_release_succeeded, lock_lifecycle,

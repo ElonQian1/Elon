@@ -34,7 +34,8 @@ fn supported_key_and_member(
 #[test]
 fn isolated_q16_receipts_are_exact_controlled_fault_actual() -> anyhow::Result<()> {
     let selected_child =
-        selected_lock_native_acquire_created_first_truncate_error_release_failed_selector_for_test();
+        selected_lock_native_acquire_created_first_truncate_error_release_failed_selector_for_test(
+        );
     let mut parent_receipts = 0;
     for (&case, leaf) in frozen_lock_created_first_truncate_error_release_failed_leaves_v1() {
         let candidate =

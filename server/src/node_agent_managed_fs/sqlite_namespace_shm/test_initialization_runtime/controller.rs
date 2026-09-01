@@ -13,10 +13,10 @@ use super::model::{
     ManagedSqliteShmTestInitializationNativeReceiptV1, ManagedSqliteShmTestInitializationReceiptV1,
 };
 
-#[path = "controller/created_first_truncate_error_release_succeeded.rs"]
-mod created_first_truncate_error_release_succeeded;
 #[path = "controller/created_first_truncate_error_release_failed.rs"]
 mod created_first_truncate_error_release_failed;
+#[path = "controller/created_first_truncate_error_release_succeeded.rs"]
+mod created_first_truncate_error_release_succeeded;
 #[path = "controller/existing_first_truncate_error_release_succeeded.rs"]
 mod existing_first_truncate_error_release_succeeded;
 

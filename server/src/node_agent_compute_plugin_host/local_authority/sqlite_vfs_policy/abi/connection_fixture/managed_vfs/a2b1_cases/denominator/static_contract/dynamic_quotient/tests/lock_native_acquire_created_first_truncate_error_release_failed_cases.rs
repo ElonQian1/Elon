@@ -198,7 +198,9 @@ fn created_first_truncate_error_release_failed_v1(
     (expected == &expected_v1()).then_some(case)
 }
 
-const fn expected_axes_v1(case: FrozenLockCreatedFirstTruncateErrorReleaseFailedCaseV1) -> LockAxesV1 {
+const fn expected_axes_v1(
+    case: FrozenLockCreatedFirstTruncateErrorReleaseFailedCaseV1,
+) -> LockAxesV1 {
     LockAxesV1 {
         action: ReachabilityV1::Reached(case.action),
         first: ReachabilityV1::Reached(case.first),

@@ -475,8 +475,7 @@ fn full_lock_program_inventory_accounts_for_every_frozen_member_without_opening_
         .copied()
         .collect::<BTreeSet<_>>();
     assert_eq!(q1_through_q15_source_keys.len(), 4_020);
-    let q16_expected_groups =
-        lock_created_first_truncate_error_release_failed_expected_groups_v1();
+    let q16_expected_groups = lock_created_first_truncate_error_release_failed_expected_groups_v1();
     assert_eq!(
         q16_expected_groups.len(),
         LOCK_CREATED_FIRST_TRUNCATE_ERROR_RELEASE_FAILED_MEMBER_COUNT

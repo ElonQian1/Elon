@@ -332,10 +332,7 @@ fn exact_created_first_truncate_unavailable_then_release_failed_seals_two_receip
         exact_call_occurrence: 1,
     };
     controller
-        .record_created_first_truncate_error_release_failed_cleanup_receipt(
-            TARGET,
-            cleanup_native,
-        )
+        .record_created_first_truncate_error_release_failed_cleanup_receipt(TARGET, cleanup_native)
         .unwrap();
     controller.record_poisoned(TARGET).unwrap();
     let receipt = controller

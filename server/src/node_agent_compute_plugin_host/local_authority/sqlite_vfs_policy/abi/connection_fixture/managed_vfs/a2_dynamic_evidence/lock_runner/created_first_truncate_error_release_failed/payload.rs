@@ -139,9 +139,7 @@ pub(in super::super) fn validate_payload(
         }
     };
     let expected_preemption = match binding.completion {
-        LockRunnerCreatedFirstTruncateErrorReleaseFailedCompletionV1::RetentionSucceeded => {
-            [0; 6]
-        }
+        LockRunnerCreatedFirstTruncateErrorReleaseFailedCompletionV1::RetentionSucceeded => [0; 6],
         LockRunnerCreatedFirstTruncateErrorReleaseFailedCompletionV1::RetentionRouteUnknown => {
             [1; 6]
         }
@@ -252,9 +250,8 @@ fn exact_initialization_values(
 
 fn digest_receipt(values: &[u64]) -> [u8; 32] {
     let mut hasher = Sha256::new();
-    hasher.update(
-        b"elon-a2-lock-created-first-truncate-error-release-failed-controlled-fault-v1\0",
-    );
+    hasher
+        .update(b"elon-a2-lock-created-first-truncate-error-release-failed-controlled-fault-v1\0");
     hasher.update((values.len() as u64).to_le_bytes());
     for value in values {
         hasher.update(value.to_le_bytes());

@@ -234,8 +234,8 @@ pub(super) fn digest_execution_program_inventory_source_scope_v1() -> Digest32 {
                 .len()
             + NATIVE_ACQUIRE_EXISTING_FIRST_TRUNCATE_ERROR_RELEASE_SUCCEEDED_PROJECTOR_DELTA_V1
                 .len()
-            + NATIVE_ACQUIRE_CREATED_FIRST_TRUNCATE_ERROR_RELEASE_FAILED_PROJECTOR_DELTA_V1
-                .len()) as u64,
+            + NATIVE_ACQUIRE_CREATED_FIRST_TRUNCATE_ERROR_RELEASE_FAILED_PROJECTOR_DELTA_V1.len())
+            as u64,
     );
     for (path, source) in SOURCE_SCOPE
         .iter()

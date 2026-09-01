@@ -20,8 +20,7 @@ impl ManagedSqliteShmCoordinator {
             true,
             false,
             |controller, target| {
-                selected =
-                    controller.begin_created_first_truncate_error_release_failed(target)?;
+                selected = controller.begin_created_first_truncate_error_release_failed(target)?;
                 Ok(())
             },
         )?;
@@ -60,8 +59,7 @@ impl ManagedSqliteShmCoordinator {
             true,
             false,
             |controller, target| {
-                controller
-                    .begin_created_first_truncate_error_release_failed_cleanup_unlock(target)
+                controller.begin_created_first_truncate_error_release_failed_cleanup_unlock(target)
             },
         )
     }

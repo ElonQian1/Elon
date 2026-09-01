@@ -98,9 +98,7 @@ pub(super) fn exercise_child(
         .map_err(anyhow::Error::msg)?;
     let terminal_values = terminal_values(terminal, binding.completion)?;
     let preemption_values = match binding.completion {
-        LockRunnerCreatedFirstTruncateErrorReleaseFailedCompletionV1::RetentionSucceeded => {
-            [0; 6]
-        }
+        LockRunnerCreatedFirstTruncateErrorReleaseFailedCompletionV1::RetentionSucceeded => [0; 6],
         LockRunnerCreatedFirstTruncateErrorReleaseFailedCompletionV1::RetentionRouteUnknown => {
             let receipt = fixture
                 .unsafe_shm_route_preemption_snapshot(SELECTED)
