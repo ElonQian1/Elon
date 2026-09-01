@@ -6,8 +6,10 @@ use crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::r
 impl ManagedSqliteRegistrySessionState {
     pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::registry) fn prime_lock_callback_counter_overflow_for_test(
         &mut self,
-    ) -> Result<ManagedSqliteRegistryCallbackCounterPrimeReceipt, ManagedSqliteRegistryTransitionRejection>
-    {
+    ) -> Result<
+        ManagedSqliteRegistryCallbackCounterPrimeReceipt,
+        ManagedSqliteRegistryTransitionRejection,
+    > {
         self.ensure_shape()?;
         if self.phase != ManagedSqliteRegistrySessionPhase::Active {
             return Err(self.phase_rejection());

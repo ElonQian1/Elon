@@ -44,17 +44,17 @@ pub(in super::super) use local_sibling_contention::{
 pub(in super::super) use native_acquire_busy::{
     lock_native_acquire_busy_selector_for_test, selected_lock_native_acquire_busy_selector_for_test,
 };
-pub(in super::super) use pre_managed_rejection::{
-    run_lock_pre_managed_rejection_program_isolated, LockRunnerPreManagedCompletionV1,
-    LockRunnerPreManagedRejectionBindingV1, LockRunnerPreManagedRejectionV1,
+pub(in super::super) use native_acquire_busy::{
+    run_lock_native_acquire_busy_program_isolated, LockRunnerNativeAcquireBusyBindingV1,
 };
 #[cfg(all(test, windows))]
 pub(in super::super) use pre_managed_rejection::{
     lock_pre_managed_rejection_selector_for_test,
     selected_lock_pre_managed_rejection_selector_for_test,
 };
-pub(in super::super) use native_acquire_busy::{
-    run_lock_native_acquire_busy_program_isolated, LockRunnerNativeAcquireBusyBindingV1,
+pub(in super::super) use pre_managed_rejection::{
+    run_lock_pre_managed_rejection_program_isolated, LockRunnerPreManagedCompletionV1,
+    LockRunnerPreManagedRejectionBindingV1, LockRunnerPreManagedRejectionV1,
 };
 pub(in super::super) use request_validation::{LockRunnerActionV1, LockRunnerRequestValidationV1};
 #[cfg(all(test, windows))]

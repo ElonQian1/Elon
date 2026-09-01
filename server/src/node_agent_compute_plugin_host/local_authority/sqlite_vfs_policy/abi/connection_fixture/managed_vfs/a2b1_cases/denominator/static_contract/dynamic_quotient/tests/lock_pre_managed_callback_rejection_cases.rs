@@ -49,10 +49,7 @@ pub(super) fn frozen_lock_pre_managed_callback_rejection_leaves_v1() -> &'static
     FrozenLockPreManagedCallbackRejectionLeafV1,
 > {
     static LEAVES: OnceLock<
-        BTreeMap<
-            LockPreManagedCallbackRejectionKeyV1,
-            FrozenLockPreManagedCallbackRejectionLeafV1,
-        >,
+        BTreeMap<LockPreManagedCallbackRejectionKeyV1, FrozenLockPreManagedCallbackRejectionLeafV1>,
     > = OnceLock::new();
     LEAVES.get_or_init(|| {
         let graph = super::super::super::lock::graph();
@@ -168,12 +165,36 @@ fn family_v1(
 ) -> Option<LockPreManagedCallbackRejectionFamilyV1> {
     use LockPreManagedCallbackRejectionFamilyV1 as F;
     match (source, stimulus, completion) {
-        (SourceSiteV1::RegistryCallbackAdmission, StimulusV1::LockManaged(LockManagedStimulusV1::AdmissionRouteUnknown), ReachabilityV1::Reached(LockCompletionV1::Direct)) => Some(F::AdmissionRouteUnknownDirect),
-        (SourceSiteV1::RegistryCallbackAdmission, StimulusV1::LockManaged(LockManagedStimulusV1::AdmissionCounterOverflow), ReachabilityV1::Reached(LockCompletionV1::Direct)) => Some(F::AdmissionCounterOverflowDirect),
-        (SourceSiteV1::AdapterDispatch, StimulusV1::LockManaged(LockManagedStimulusV1::UnsupportedFileRole), ReachabilityV1::Reached(LockCompletionV1::Completed)) => Some(F::UnsupportedFileRoleCompleted),
-        (SourceSiteV1::AdapterDispatch, StimulusV1::LockManaged(LockManagedStimulusV1::UnsupportedFileRole), ReachabilityV1::Reached(LockCompletionV1::RouteUnknown)) => Some(F::UnsupportedFileRoleRouteUnknown),
-        (SourceSiteV1::AdapterDispatch, StimulusV1::LockManaged(LockManagedStimulusV1::ShmDetached), ReachabilityV1::Reached(LockCompletionV1::Completed)) => Some(F::ShmDetachedCompleted),
-        (SourceSiteV1::AdapterDispatch, StimulusV1::LockManaged(LockManagedStimulusV1::ShmDetached), ReachabilityV1::Reached(LockCompletionV1::RouteUnknown)) => Some(F::ShmDetachedRouteUnknown),
+        (
+            SourceSiteV1::RegistryCallbackAdmission,
+            StimulusV1::LockManaged(LockManagedStimulusV1::AdmissionRouteUnknown),
+            ReachabilityV1::Reached(LockCompletionV1::Direct),
+        ) => Some(F::AdmissionRouteUnknownDirect),
+        (
+            SourceSiteV1::RegistryCallbackAdmission,
+            StimulusV1::LockManaged(LockManagedStimulusV1::AdmissionCounterOverflow),
+            ReachabilityV1::Reached(LockCompletionV1::Direct),
+        ) => Some(F::AdmissionCounterOverflowDirect),
+        (
+            SourceSiteV1::AdapterDispatch,
+            StimulusV1::LockManaged(LockManagedStimulusV1::UnsupportedFileRole),
+            ReachabilityV1::Reached(LockCompletionV1::Completed),
+        ) => Some(F::UnsupportedFileRoleCompleted),
+        (
+            SourceSiteV1::AdapterDispatch,
+            StimulusV1::LockManaged(LockManagedStimulusV1::UnsupportedFileRole),
+            ReachabilityV1::Reached(LockCompletionV1::RouteUnknown),
+        ) => Some(F::UnsupportedFileRoleRouteUnknown),
+        (
+            SourceSiteV1::AdapterDispatch,
+            StimulusV1::LockManaged(LockManagedStimulusV1::ShmDetached),
+            ReachabilityV1::Reached(LockCompletionV1::Completed),
+        ) => Some(F::ShmDetachedCompleted),
+        (
+            SourceSiteV1::AdapterDispatch,
+            StimulusV1::LockManaged(LockManagedStimulusV1::ShmDetached),
+            ReachabilityV1::Reached(LockCompletionV1::RouteUnknown),
+        ) => Some(F::ShmDetachedRouteUnknown),
         _ => None,
     }
 }
@@ -214,16 +235,39 @@ fn expected_v1(family: LockPreManagedCallbackRejectionFamilyV1) -> ExpectedV1 {
     );
     ExpectedV1 {
         sqlite: SqliteResultV1::LockUnavailable,
-        disposition: if matches!(family, F::AdmissionCounterOverflowDirect | F::UnsupportedFileRoleRouteUnknown | F::ShmDetachedRouteUnknown) { TerminalDispositionV1::Quarantined } else { TerminalDispositionV1::Returned },
+        disposition: if matches!(
+            family,
+            F::AdmissionCounterOverflowDirect
+                | F::UnsupportedFileRoleRouteUnknown
+                | F::ShmDetachedRouteUnknown
+        ) {
+            TerminalDispositionV1::Quarantined
+        } else {
+            TerminalDispositionV1::Returned
+        },
         phase: "CallbackAdmission".to_owned(),
         failure: FailureClassV1::RegistryRejected,
         mutation: MutationStateV1::None,
         lock_outcome_uncertain: false,
-        lock_effect: if direct { LockEffectV1::Unchanged } else { LockEffectV1::NotReached },
+        lock_effect: if direct {
+            LockEffectV1::Unchanged
+        } else {
+            LockEffectV1::NotReached
+        },
         dms_lock: DmsLockCustodyV1::NotReached,
         raw_slots: CustodyStateV1::Unchanged,
-        route: if route_unknown { CustodyStateV1::Quarantined } else { CustodyStateV1::Unchanged },
-        callback: if direct { CustodyStateV1::NotReached } else if route_unknown { CustodyStateV1::Retained } else { CustodyStateV1::Released },
+        route: if route_unknown {
+            CustodyStateV1::Quarantined
+        } else {
+            CustodyStateV1::Unchanged
+        },
+        callback: if direct {
+            CustodyStateV1::NotReached
+        } else if route_unknown {
+            CustodyStateV1::Retained
+        } else {
+            CustodyStateV1::Released
+        },
         file: CustodyStateV1::Unchanged,
         mapping: CustodyStateV1::NotReached,
         view: CustodyStateV1::NotReached,
@@ -236,14 +280,16 @@ fn expected_v1(family: LockPreManagedCallbackRejectionFamilyV1) -> ExpectedV1 {
     }
 }
 
-const fn completion_v1(
-    family: LockPreManagedCallbackRejectionFamilyV1,
-) -> LockCompletionV1 {
+const fn completion_v1(family: LockPreManagedCallbackRejectionFamilyV1) -> LockCompletionV1 {
     use LockPreManagedCallbackRejectionFamilyV1 as F;
     match family {
-        F::AdmissionRouteUnknownDirect | F::AdmissionCounterOverflowDirect => LockCompletionV1::Direct,
+        F::AdmissionRouteUnknownDirect | F::AdmissionCounterOverflowDirect => {
+            LockCompletionV1::Direct
+        }
         F::UnsupportedFileRoleCompleted | F::ShmDetachedCompleted => LockCompletionV1::Completed,
-        F::UnsupportedFileRoleRouteUnknown | F::ShmDetachedRouteUnknown => LockCompletionV1::RouteUnknown,
+        F::UnsupportedFileRoleRouteUnknown | F::ShmDetachedRouteUnknown => {
+            LockCompletionV1::RouteUnknown
+        }
     }
 }
 
@@ -263,11 +309,25 @@ fn range_mask_v1(action: LockActionV1, first: u8, count: u8) -> Option<u8> {
 #[test]
 fn frozen_q9_family_is_six_by_eighty_eight_with_unique_seals_and_keys() {
     let leaves = frozen_lock_pre_managed_callback_rejection_leaves_v1();
-    assert_eq!(leaves.len(), LOCK_PRE_MANAGED_CALLBACK_REJECTION_MEMBER_COUNT);
-    assert_eq!(leaves.values().map(|leaf| leaf.member).collect::<BTreeSet<_>>().len(), 528);
+    assert_eq!(
+        leaves.len(),
+        LOCK_PRE_MANAGED_CALLBACK_REJECTION_MEMBER_COUNT
+    );
+    assert_eq!(
+        leaves
+            .values()
+            .map(|leaf| leaf.member)
+            .collect::<BTreeSet<_>>()
+            .len(),
+        528
+    );
     let normalized_keys = leaves
         .values()
-        .map(|leaf| project_validated_dynamic_terminal_v1(&leaf.record, &leaf.descriptor).unwrap().semantic_key)
+        .map(|leaf| {
+            project_validated_dynamic_terminal_v1(&leaf.record, &leaf.descriptor)
+                .unwrap()
+                .semantic_key
+        })
         .collect::<BTreeSet<_>>();
     assert_eq!(normalized_keys.len(), 528);
     for family in LockPreManagedCallbackRejectionFamilyV1::ALL {
@@ -279,6 +339,9 @@ fn frozen_q9_family_is_six_by_eighty_eight_with_unique_seals_and_keys() {
         (LockActionV1::UnlockShared, 8),
         (LockActionV1::UnlockExclusive, 36),
     ] {
-        assert_eq!(leaves.keys().filter(|key| key.action == action).count(), per_family * 6);
+        assert_eq!(
+            leaves.keys().filter(|key| key.action == action).count(),
+            per_family * 6
+        );
     }
 }

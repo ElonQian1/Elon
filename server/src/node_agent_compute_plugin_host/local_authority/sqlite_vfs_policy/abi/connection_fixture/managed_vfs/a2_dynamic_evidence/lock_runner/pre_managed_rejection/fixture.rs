@@ -79,15 +79,14 @@ pub(super) fn exercise_child(
     let observation = fixture
         .pre_managed_lock_snapshot()
         .map_err(anyhow::Error::msg)?;
-    let counter_terminal = if binding.rejection
-        == LockRunnerPreManagedRejectionV1::AdmissionCounterOverflow
-    {
-        fixture
-            .lock_callback_counter_overflow_terminal()
-            .map_err(anyhow::Error::msg)?
-    } else {
-        false
-    };
+    let counter_terminal =
+        if binding.rejection == LockRunnerPreManagedRejectionV1::AdmissionCounterOverflow {
+            fixture
+                .lock_callback_counter_overflow_terminal()
+                .map_err(anyhow::Error::msg)?
+        } else {
+            false
+        };
     let terminal = terminal_values(
         fixture
             .terminal_custody_test_snapshot()
@@ -128,13 +127,9 @@ pub(super) fn exercise_child(
         registration,
         cleanup,
     );
-    let report = SanitizedChildReport::encode_for_current_child(
-        &nonce,
-        root,
-        registration_id,
-        &payload,
-    )
-    .map_err(anyhow::Error::msg)?;
+    let report =
+        SanitizedChildReport::encode_for_current_child(&nonce, root, registration_id, &payload)
+            .map_err(anyhow::Error::msg)?;
     println!("{report}");
     Ok(())
 }
@@ -158,10 +153,7 @@ fn prepare_prestate(
     let present_after_map = fixture
         .exact_main_shm_target_presence()
         .map_err(anyhow::Error::msg)?;
-    if map.result_code() != ffi::SQLITE_OK
-        || map.output_pointer().is_null()
-        || !present_after_map
-    {
+    if map.result_code() != ffi::SQLITE_OK || map.output_pointer().is_null() || !present_after_map {
         return Err(anyhow!("q9 detached prestate real xShmMap mismatch"));
     }
     let unmap = fixture
@@ -213,12 +205,22 @@ fn observation_path(
     use LockRunnerPreManagedCompletionV1 as C;
     use LockRunnerPreManagedRejectionV1 as R;
     match (binding.rejection, binding.completion) {
-        (R::AdmissionRouteUnknown, C::Direct) => Ok(ManagedTestPreManagedLockPath::AdmissionRouteUnknown),
-        (R::AdmissionCounterOverflow, C::Direct) => Ok(ManagedTestPreManagedLockPath::AdmissionCounterOverflow),
-        (R::UnsupportedFileRole, C::Completed) => Ok(ManagedTestPreManagedLockPath::UnsupportedCompleted),
-        (R::UnsupportedFileRole, C::RouteUnknown) => Ok(ManagedTestPreManagedLockPath::UnsupportedRouteUnknown),
+        (R::AdmissionRouteUnknown, C::Direct) => {
+            Ok(ManagedTestPreManagedLockPath::AdmissionRouteUnknown)
+        }
+        (R::AdmissionCounterOverflow, C::Direct) => {
+            Ok(ManagedTestPreManagedLockPath::AdmissionCounterOverflow)
+        }
+        (R::UnsupportedFileRole, C::Completed) => {
+            Ok(ManagedTestPreManagedLockPath::UnsupportedCompleted)
+        }
+        (R::UnsupportedFileRole, C::RouteUnknown) => {
+            Ok(ManagedTestPreManagedLockPath::UnsupportedRouteUnknown)
+        }
         (R::ShmDetached, C::Completed) => Ok(ManagedTestPreManagedLockPath::ShmDetachedCompleted),
-        (R::ShmDetached, C::RouteUnknown) => Ok(ManagedTestPreManagedLockPath::ShmDetachedRouteUnknown),
+        (R::ShmDetached, C::RouteUnknown) => {
+            Ok(ManagedTestPreManagedLockPath::ShmDetachedRouteUnknown)
+        }
         _ => Err(anyhow!("q9 Lock observation path mismatch")),
     }
 }
@@ -239,7 +241,9 @@ fn terminal_values(
         snapshot.route_removal_count() as u64,
         u64::from(snapshot.active_route_present()),
         u64::from(counter_terminal),
-        u64::from(terminal.is_some_and(|route| route.terminal_reason_is_failure_custody_retained())),
+        u64::from(
+            terminal.is_some_and(|route| route.terminal_reason_is_failure_custody_retained()),
+        ),
         terminal.map_or(0, |route| route.callbacks_in_flight() as u64),
         u64::from(terminal.is_some_and(|route| route.access_callback_allowed())),
         u64::from(terminal.is_some_and(|route| route.connection_owner())),
@@ -250,7 +254,9 @@ fn terminal_values(
 }
 
 fn route_values(snapshot: Option<ManagedSqliteTestVfsRouteCustodySnapshot>) -> [u64; 7] {
-    let Some(snapshot) = snapshot else { return [0; 7]; };
+    let Some(snapshot) = snapshot else {
+        return [0; 7];
+    };
     [
         1,
         phase_tag(snapshot.phase()),

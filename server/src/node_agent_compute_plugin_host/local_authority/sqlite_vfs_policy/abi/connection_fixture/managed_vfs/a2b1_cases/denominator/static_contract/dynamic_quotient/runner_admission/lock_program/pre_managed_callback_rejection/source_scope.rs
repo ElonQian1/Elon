@@ -2,9 +2,9 @@
 
 use sha2::{Digest, Sha256};
 
-use super::super::super::super::lock_local_protocol_rejection_source_scope::lock_local_protocol_rejection_source_scope_entries_v1;
 use super::super::super::super::super::source_leaf_authority::Digest32;
 use super::super::super::super::super::terminal_descriptor::LockActionV1;
+use super::super::super::super::lock_local_protocol_rejection_source_scope::lock_local_protocol_rejection_source_scope_entries_v1;
 use super::LockPreManagedCallbackRejectionFamilyV1;
 
 macro_rules! source {
@@ -51,14 +51,12 @@ pub(super) fn digest_implementation_v1(
     let mut hasher = Sha256::new();
     hasher.update(b"elon-lock-pre-managed-callback-rejection-implementation-v1\0");
     // The shared SHM dispatch split is already present in the inherited q1-q8 closure.
-    for (name, source) in lock_local_protocol_rejection_source_scope_entries_v1()
-        .chain(
-            PRE_MANAGED_CALLBACK_REJECTION_PROJECTOR_DELTA_V1
-                .iter()
-                .copied()
-                .filter(|(name, _)| *name != "registry/file_custody/operations/shm.rs"),
-        )
-    {
+    for (name, source) in lock_local_protocol_rejection_source_scope_entries_v1().chain(
+        PRE_MANAGED_CALLBACK_REJECTION_PROJECTOR_DELTA_V1
+            .iter()
+            .copied()
+            .filter(|(name, _)| *name != "registry/file_custody/operations/shm.rs"),
+    ) {
         hasher.update((name.len() as u64).to_le_bytes());
         hasher.update(name.as_bytes());
         hasher.update((source.len() as u64).to_le_bytes());

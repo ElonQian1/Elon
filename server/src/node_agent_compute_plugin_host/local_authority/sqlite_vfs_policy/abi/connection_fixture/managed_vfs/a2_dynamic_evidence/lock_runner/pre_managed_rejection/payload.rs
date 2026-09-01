@@ -5,9 +5,8 @@ use rusqlite::ffi;
 use sha2::{Digest, Sha256};
 
 use super::super::super::super::connection::ManagedTestShmLockCallbackObservation;
-use super::super::super::child::lock_pre_managed_rejection::{
-    REPORT_VALUE_COUNT, REPORT_VERSION,
-};
+use super::super::super::super::lifecycle_faults::ManagedTestPreManagedLockSnapshot;
+use super::super::super::child::lock_pre_managed_rejection::{REPORT_VALUE_COUNT, REPORT_VERSION};
 use super::super::{lifecycle, LockRunnerActionV1};
 use super::fixture::{lifecycle_values, lock_effect};
 use super::{
@@ -15,7 +14,6 @@ use super::{
     LockRunnerPreManagedCompletionV1, LockRunnerPreManagedRejectionBindingV1,
     LockRunnerPreManagedRejectionV1,
 };
-use super::super::super::super::lifecycle_faults::ManagedTestPreManagedLockSnapshot;
 
 pub(in super::super) struct ValidatedPreManagedRejectionPayloadV1 {
     pub(in super::super) registration_id: u64,
@@ -147,8 +145,25 @@ fn binding_values(binding: LockRunnerPreManagedRejectionBindingV1) -> Vec<u64> {
 fn expected_setup(binding: LockRunnerPreManagedRejectionBindingV1) -> [u64; 19] {
     if binding.rejection == LockRunnerPreManagedRejectionV1::ShmDetached {
         [
-            1, 0, 32_768, 1, ffi::SQLITE_OK as u64, 1, 1, 1, 1, 1, 1, 1, 0,
-            ffi::SQLITE_OK as u64, 1, 1, 1, 1, 0,
+            1,
+            0,
+            32_768,
+            1,
+            ffi::SQLITE_OK as u64,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            0,
+            ffi::SQLITE_OK as u64,
+            1,
+            1,
+            1,
+            1,
+            0,
         ]
     } else {
         [0; 19]
@@ -163,9 +178,7 @@ fn expected_prime(binding: LockRunnerPreManagedRejectionBindingV1) -> [u64; 4] {
     }
 }
 
-const fn expected_admission_quarantine(
-    binding: LockRunnerPreManagedRejectionBindingV1,
-) -> u64 {
+const fn expected_admission_quarantine(binding: LockRunnerPreManagedRejectionBindingV1) -> u64 {
     matches!(
         binding.rejection,
         LockRunnerPreManagedRejectionV1::AdmissionRouteUnknown
@@ -188,12 +201,8 @@ fn expected_observation(binding: LockRunnerPreManagedRejectionBindingV1) -> [u64
         (R::UnsupportedFileRole, C::RouteUnknown) => {
             [1, 4, 1, 1, 1, 1, 1, 0, 1, 0, 1, 2, 1, 1, 1, 1, 1, 0]
         }
-        (R::ShmDetached, C::Completed) => {
-            [1, 5, 1, 1, 1, 1, 2, 0, 2, 0, 1, 1, 0, 0, 0, 0, 0, 0]
-        }
-        (R::ShmDetached, C::RouteUnknown) => {
-            [1, 6, 1, 1, 1, 1, 2, 0, 2, 0, 1, 2, 1, 1, 1, 1, 1, 0]
-        }
+        (R::ShmDetached, C::Completed) => [1, 5, 1, 1, 1, 1, 2, 0, 2, 0, 1, 1, 0, 0, 0, 0, 0, 0],
+        (R::ShmDetached, C::RouteUnknown) => [1, 6, 1, 1, 1, 1, 2, 0, 2, 0, 1, 2, 1, 1, 1, 1, 1, 0],
         _ => [0; 18],
     }
 }
@@ -214,17 +223,21 @@ fn expected_terminal(binding: LockRunnerPreManagedRejectionBindingV1) -> [u64; 1
         (R::UnsupportedFileRole, C::RouteUnknown) => {
             [2, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1, 0, 1, 1, 0, 0]
         }
-        (R::ShmDetached, C::RouteUnknown) => {
-            [2, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1, 0]
-        }
+        (R::ShmDetached, C::RouteUnknown) => [2, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1, 0],
         _ => [0; 17],
     }
 }
 
 fn expected_route(binding: LockRunnerPreManagedRejectionBindingV1) -> [u64; 7] {
     match (binding.rejection, binding.completion) {
-        (LockRunnerPreManagedRejectionV1::UnsupportedFileRole, LockRunnerPreManagedCompletionV1::Completed) => [1, 3, 1, 1, 0, 0, 1],
-        (LockRunnerPreManagedRejectionV1::ShmDetached, LockRunnerPreManagedCompletionV1::Completed) => [1, 3, 1, 1, 1, 0, 1],
+        (
+            LockRunnerPreManagedRejectionV1::UnsupportedFileRole,
+            LockRunnerPreManagedCompletionV1::Completed,
+        ) => [1, 3, 1, 1, 0, 0, 1],
+        (
+            LockRunnerPreManagedRejectionV1::ShmDetached,
+            LockRunnerPreManagedCompletionV1::Completed,
+        ) => [1, 3, 1, 1, 1, 0, 1],
         _ => [0; 7],
     }
 }
@@ -263,14 +276,36 @@ mod tests {
     fn source_vectors_keep_admission_unchanged_and_adapter_not_reached() {
         let binding = |rejection| LockRunnerPreManagedRejectionBindingV1 {
             rejection,
-            completion: if matches!(rejection, LockRunnerPreManagedRejectionV1::AdmissionRouteUnknown | LockRunnerPreManagedRejectionV1::AdmissionCounterOverflow) { LockRunnerPreManagedCompletionV1::Direct } else { LockRunnerPreManagedCompletionV1::Completed },
+            completion: if matches!(
+                rejection,
+                LockRunnerPreManagedRejectionV1::AdmissionRouteUnknown
+                    | LockRunnerPreManagedRejectionV1::AdmissionCounterOverflow
+            ) {
+                LockRunnerPreManagedCompletionV1::Direct
+            } else {
+                LockRunnerPreManagedCompletionV1::Completed
+            },
             action: LockRunnerActionV1::LockShared,
             first: 0,
             count: 1,
             mask: 1,
-            normalized_descriptor_sha256: [1; 32], case_key_sha256: [2; 32], full_record_sha256: [3; 32], plan_sha256: [4; 32], implementation_sha256: [5; 32],
+            normalized_descriptor_sha256: [1; 32],
+            case_key_sha256: [2; 32],
+            full_record_sha256: [3; 32],
+            plan_sha256: [4; 32],
+            implementation_sha256: [5; 32],
         };
-        assert_eq!(lock_effect(binding(LockRunnerPreManagedRejectionV1::AdmissionRouteUnknown)), 1);
-        assert_eq!(lock_effect(binding(LockRunnerPreManagedRejectionV1::UnsupportedFileRole)), 2);
+        assert_eq!(
+            lock_effect(binding(
+                LockRunnerPreManagedRejectionV1::AdmissionRouteUnknown
+            )),
+            1
+        );
+        assert_eq!(
+            lock_effect(binding(
+                LockRunnerPreManagedRejectionV1::UnsupportedFileRole
+            )),
+            2
+        );
     }
 }

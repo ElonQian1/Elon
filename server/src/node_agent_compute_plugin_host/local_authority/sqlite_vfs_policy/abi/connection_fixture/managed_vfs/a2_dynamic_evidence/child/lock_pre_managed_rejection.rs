@@ -60,9 +60,7 @@ pub(in super::super) fn selector(
     if shared && count != 1 {
         return Err("A2_DYNAMIC_CHILD_ACTUAL_SELECTOR_INVALID");
     }
-    Ok(format!(
-        "{profile}-{action}-first-{first}-count-{count}"
-    ))
+    Ok(format!("{profile}-{action}-first-{first}-count-{count}"))
 }
 
 #[cfg(test)]

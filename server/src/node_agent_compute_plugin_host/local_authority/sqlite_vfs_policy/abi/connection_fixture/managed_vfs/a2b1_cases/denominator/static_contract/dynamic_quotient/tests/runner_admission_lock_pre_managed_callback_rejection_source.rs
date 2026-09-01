@@ -6,9 +6,8 @@ use super::super::runner_admission::{
 };
 use super::lock_pre_managed_callback_rejection_cases::{
     frozen_lock_pre_managed_callback_rejection_leaves_v1,
-    lock_pre_managed_callback_rejection_descriptor_v1,
-    LockPreManagedCallbackRejectionFamilyV1, LockPreManagedCallbackRejectionKeyV1,
-    LOCK_PRE_MANAGED_CALLBACK_REJECTION_MEMBER_COUNT,
+    lock_pre_managed_callback_rejection_descriptor_v1, LockPreManagedCallbackRejectionFamilyV1,
+    LockPreManagedCallbackRejectionKeyV1, LOCK_PRE_MANAGED_CALLBACK_REJECTION_MEMBER_COUNT,
 };
 use super::*;
 
@@ -27,11 +26,7 @@ fn supported_key_and_member(
     (key, leaf.member)
 }
 
-fn assert_rejected(
-    key: DynamicClassKeyV1,
-    member: StaticMemberSealV1,
-    mutation: &str,
-) {
+fn assert_rejected(key: DynamicClassKeyV1, member: StaticMemberSealV1, mutation: &str) {
     assert!(
         validate_lock_program_for_test(&key, member, compile_for_test(&key)).is_err(),
         "q9 admission accepted {mutation}"
@@ -41,7 +36,10 @@ fn assert_rejected(
 #[test]
 fn all_528_exact_q9_descriptors_and_catalog_seals_are_source_present() {
     let leaves = frozen_lock_pre_managed_callback_rejection_leaves_v1();
-    assert_eq!(leaves.len(), LOCK_PRE_MANAGED_CALLBACK_REJECTION_MEMBER_COUNT);
+    assert_eq!(
+        leaves.len(),
+        LOCK_PRE_MANAGED_CALLBACK_REJECTION_MEMBER_COUNT
+    );
     assert_eq!(
         pre_managed_callback_rejection_catalog_row_count_for_test(),
         LOCK_PRE_MANAGED_CALLBACK_REJECTION_MEMBER_COUNT
@@ -106,8 +104,7 @@ fn q9_matcher_rejects_typed_identity_recipe_axes_and_expected_drift() {
     assert_rejected(source, member, "source-site drift");
 
     let mut stimulus = key;
-    stimulus.stimulus =
-        StimulusV1::LockManaged(LockManagedStimulusV1::AdmissionCounterOverflow);
+    stimulus.stimulus = StimulusV1::LockManaged(LockManagedStimulusV1::AdmissionCounterOverflow);
     assert_rejected(stimulus, member, "stimulus drift");
 
     let mut prestate = key;

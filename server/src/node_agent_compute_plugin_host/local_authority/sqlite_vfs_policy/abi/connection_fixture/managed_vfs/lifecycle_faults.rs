@@ -26,17 +26,28 @@ pub(super) use registry_lifecycle::{
 mod unmap;
 pub(super) use unmap::ManagedTestUnmapCompletionFault;
 
-#[cfg(all(test, windows))] mod unsafe_shm_preemption;
-#[cfg(all(test, windows))] pub(super) use unsafe_shm_preemption::ManagedTestUnsafeShmRoutePreemptionSnapshot;
-#[cfg(all(test, windows))] use unsafe_shm_preemption::ManagedTestUnsafeShmRoutePreemptionState;
+#[cfg(all(test, windows))]
+mod unsafe_shm_preemption;
+#[cfg(all(test, windows))]
+pub(super) use unsafe_shm_preemption::ManagedTestUnsafeShmRoutePreemptionSnapshot;
+#[cfg(all(test, windows))]
+use unsafe_shm_preemption::ManagedTestUnsafeShmRoutePreemptionState;
 
-#[cfg(all(test, windows))] mod ordinary_shm_lock_preemption;
-#[cfg(all(test, windows))] pub(super) use ordinary_shm_lock_preemption::ManagedTestOrdinaryShmLockRoutePreemptionSnapshot;
-#[cfg(all(test, windows))] use ordinary_shm_lock_preemption::ManagedTestOrdinaryShmLockRoutePreemptionState;
+#[cfg(all(test, windows))]
+mod ordinary_shm_lock_preemption;
+#[cfg(all(test, windows))]
+pub(super) use ordinary_shm_lock_preemption::ManagedTestOrdinaryShmLockRoutePreemptionSnapshot;
+#[cfg(all(test, windows))]
+use ordinary_shm_lock_preemption::ManagedTestOrdinaryShmLockRoutePreemptionState;
 
-#[cfg(all(test, windows))] mod pre_managed_lock;
-#[cfg(all(test, windows))] pub(super) use pre_managed_lock::{ManagedTestPreManagedLockPath, ManagedTestPreManagedLockSnapshot};
-#[cfg(all(test, windows))] use pre_managed_lock::ManagedTestPreManagedLockState;
+#[cfg(all(test, windows))]
+mod pre_managed_lock;
+#[cfg(all(test, windows))]
+use pre_managed_lock::ManagedTestPreManagedLockState;
+#[cfg(all(test, windows))]
+pub(super) use pre_managed_lock::{
+    ManagedTestPreManagedLockPath, ManagedTestPreManagedLockSnapshot,
+};
 
 #[cfg(all(test, windows))]
 mod joint_close;

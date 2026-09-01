@@ -55,8 +55,8 @@ pub(in super::super::super) fn run_lock_pre_managed_rejection_program_isolated(
 ) -> anyhow::Result<LockRunnerIsolatedEvidenceV1> {
     validate_binding(binding)?;
     if let Some(root) = super::selected_child_root()? {
-        let selected = std::env::var(SELECTOR_ENV)
-            .context("read parent-selected q9 Lock program")?;
+        let selected =
+            std::env::var(SELECTOR_ENV).context("read parent-selected q9 Lock program")?;
         if selected == exact_selector(binding) {
             fixture::exercise_child(&root, binding)?;
         }

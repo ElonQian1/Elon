@@ -40,9 +40,7 @@ impl ManagedSqliteRoutedConnectionFixture {
             .map_err(|()| "pre-managed Lock callback counter prime rejected")
     }
 
-    pub(in super::super) fn quarantine_for_lock_admission_test(
-        &self,
-    ) -> Result<(), &'static str> {
+    pub(in super::super) fn quarantine_for_lock_admission_test(&self) -> Result<(), &'static str> {
         self.route
             .retain_failure("pre-managed Lock admission RouteUnknown sentinel")
             .map_err(|()| "pre-managed Lock admission route quarantine failed")

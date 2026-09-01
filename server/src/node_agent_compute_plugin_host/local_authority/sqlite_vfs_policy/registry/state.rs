@@ -11,10 +11,14 @@ use super::types::{
 use crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::types::ManagedSqliteLogicalFileRole;
 
 mod owner;
-#[cfg(all(test, windows))] mod test_lock_callback_admission;
-#[cfg(test)] mod test_lifecycle;
-#[cfg(test)] mod test_snapshot;
-#[cfg(test)] mod tests;
+#[cfg(test)]
+mod test_lifecycle;
+#[cfg(all(test, windows))]
+mod test_lock_callback_admission;
+#[cfg(test)]
+mod test_snapshot;
+#[cfg(test)]
+mod tests;
 #[cfg(test)]
 pub(super) use test_snapshot::{
     ManagedSqliteRegistrySessionTestSnapshot, ManagedSqliteRegistryTerminalRouteTestSnapshot,

@@ -23,8 +23,10 @@ use super::super::{
     types::{ManagedSqliteRegistryCallbackKind, ManagedSqliteRegistryTerminalReason},
 };
 
-#[cfg(all(test, windows))] mod ordinary_shm_lock_preemption;
-#[cfg(all(test, windows))] mod pre_managed_lock;
+#[cfg(all(test, windows))]
+mod ordinary_shm_lock_preemption;
+#[cfg(all(test, windows))]
+mod pre_managed_lock;
 mod shm;
 mod unmap;
 

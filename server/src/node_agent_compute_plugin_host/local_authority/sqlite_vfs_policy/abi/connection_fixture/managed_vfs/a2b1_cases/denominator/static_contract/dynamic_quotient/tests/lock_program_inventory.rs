@@ -334,7 +334,10 @@ fn full_lock_program_inventory_accounts_for_every_frozen_member_without_opening_
             .unwrap()
             .key
     }));
-    let prior_source_keys = expected_source_keys.iter().copied().collect::<BTreeSet<_>>();
+    let prior_source_keys = expected_source_keys
+        .iter()
+        .copied()
+        .collect::<BTreeSet<_>>();
     assert_eq!(prior_source_keys.len(), 3_122);
     let q9_expected_groups = frozen_lock_pre_managed_callback_rejection_leaves_v1()
         .values()

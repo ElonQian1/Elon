@@ -161,9 +161,12 @@ impl ManagedTestPreManagedLockState {
             return false;
         };
         let expected_dispatch = match entry.path {
-            ManagedTestPreManagedLockPath::UnsupportedRouteUnknown => {
-                Some((Custody::Main, false, Some(Rejection::UnsupportedFileRole), false))
-            }
+            ManagedTestPreManagedLockPath::UnsupportedRouteUnknown => Some((
+                Custody::Main,
+                false,
+                Some(Rejection::UnsupportedFileRole),
+                false,
+            )),
             ManagedTestPreManagedLockPath::ShmDetachedRouteUnknown => {
                 Some((Custody::WalMain, false, Some(Rejection::ShmDetached), false))
             }
@@ -204,7 +207,9 @@ impl ManagedTestPreManagedLockState {
             .get(&route)
             .ok_or("pre-managed Lock observation was not armed")?;
         let (custody, shm_present, rejection, managed_reached) =
-            entry.dispatch.unwrap_or((Custody::Sidecar, false, None, false));
+            entry
+                .dispatch
+                .unwrap_or((Custody::Sidecar, false, None, false));
         let receipt = entry
             .receipt
             .map(PreemptionReceipt::ordered_values)
@@ -234,7 +239,10 @@ impl ManagedTestPreManagedLockState {
     }
 }
 
-fn validate_snapshot(path: ManagedTestPreManagedLockPath, values: [u64; 18]) -> Result<(), &'static str> {
+fn validate_snapshot(
+    path: ManagedTestPreManagedLockPath,
+    values: [u64; 18],
+) -> Result<(), &'static str> {
     let expected = match path {
         ManagedTestPreManagedLockPath::AdmissionRouteUnknown => {
             [1, 1, 1, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
@@ -312,12 +320,23 @@ impl ManagedTestLifecycleFaultController {
         path: ManagedTestPreManagedLockPath,
         request: ManagedSqliteShmLockRequest,
     ) -> Result<(), &'static str> {
-        self.state.lock().map_err(|_| "lifecycle fault controller poisoned")?
-            .pre_managed_lock.arm(route, path, request)
+        self.state
+            .lock()
+            .map_err(|_| "lifecycle fault controller poisoned")?
+            .pre_managed_lock
+            .arm(route, path, request)
     }
 
-    fn observe_pre_managed_lock(&self, route: ManagedTestRouteOrdinal, event: Event) -> Result<(), ()> {
-        self.state.lock().map_err(|_| ())?.pre_managed_lock.observe(route, event);
+    fn observe_pre_managed_lock(
+        &self,
+        route: ManagedTestRouteOrdinal,
+        event: Event,
+    ) -> Result<(), ()> {
+        self.state
+            .lock()
+            .map_err(|_| ())?
+            .pre_managed_lock
+            .observe(route, event);
         Ok(())
     }
 
@@ -327,19 +346,35 @@ impl ManagedTestLifecycleFaultController {
         request: ManagedSqliteShmLockRequest,
         rejection: Rejection,
     ) -> Result<bool, ()> {
-        Ok(self.state.lock().map_err(|_| ())?.pre_managed_lock.claim(route, request, rejection))
+        Ok(self
+            .state
+            .lock()
+            .map_err(|_| ())?
+            .pre_managed_lock
+            .claim(route, request, rejection))
     }
 
-    fn record_pre_managed_lock(&self, route: ManagedTestRouteOrdinal, receipt: PreemptionReceipt) -> Result<(), ()> {
-        self.state.lock().map_err(|_| ())?.pre_managed_lock.record(route, receipt)
+    fn record_pre_managed_lock(
+        &self,
+        route: ManagedTestRouteOrdinal,
+        receipt: PreemptionReceipt,
+    ) -> Result<(), ()> {
+        self.state
+            .lock()
+            .map_err(|_| ())?
+            .pre_managed_lock
+            .record(route, receipt)
     }
 
     pub(in super::super) fn pre_managed_lock_snapshot(
         &self,
         route: ManagedTestRouteOrdinal,
     ) -> Result<ManagedTestPreManagedLockSnapshot, &'static str> {
-        self.state.lock().map_err(|_| "lifecycle fault controller poisoned")?
-            .pre_managed_lock.snapshot(route)
+        self.state
+            .lock()
+            .map_err(|_| "lifecycle fault controller poisoned")?
+            .pre_managed_lock
+            .snapshot(route)
     }
 }
 
@@ -353,7 +388,8 @@ impl ManagedTestLifecycleFaultBinding {
         request: ManagedSqliteShmLockRequest,
         rejection: Rejection,
     ) -> Result<bool, ()> {
-        self.controller.claim_pre_managed_lock(self.route, request, rejection)
+        self.controller
+            .claim_pre_managed_lock(self.route, request, rejection)
     }
 
     pub(super) fn record_pre_managed_lock(&self, receipt: PreemptionReceipt) -> Result<(), ()> {
@@ -363,62 +399,211 @@ impl ManagedTestLifecycleFaultBinding {
 
 #[cfg(test)]
 mod tests {
-    use std::num::NonZeroU8;
     use super::*;
     use crate::node_agent_managed_fs::ManagedSqliteShmLockAction;
+    use std::num::NonZeroU8;
 
     fn request(first: u8) -> ManagedSqliteShmLockRequest {
-        ManagedSqliteShmLockRequest::new(first, NonZeroU8::new(1).unwrap(), ManagedSqliteShmLockAction::LockShared).unwrap()
+        ManagedSqliteShmLockRequest::new(
+            first,
+            NonZeroU8::new(1).unwrap(),
+            ManagedSqliteShmLockAction::LockShared,
+        )
+        .unwrap()
     }
 
     #[test]
     fn route_unknown_preemption_requires_real_exact_lower_event_and_is_one_shot() {
         let route = ManagedTestRouteOrdinal::test_value(7);
         let mut state = ManagedTestPreManagedLockState::default();
-        state.arm(route, ManagedTestPreManagedLockPath::UnsupportedRouteUnknown, request(1)).unwrap();
+        state
+            .arm(
+                route,
+                ManagedTestPreManagedLockPath::UnsupportedRouteUnknown,
+                request(1),
+            )
+            .unwrap();
         assert!(!state.claim(route, request(2), Rejection::UnsupportedFileRole));
-        state.observe(route, Event::Entry { request: request(1) });
-        state.observe(route, Event::Admission { request: request(1), outcome: Admission::Succeeded });
-        state.observe(route, Event::Dispatch { request: request(1), custody: Custody::Main, shm_present: false, rejection: Some(Rejection::UnsupportedFileRole), managed_reached: false });
+        state.observe(
+            route,
+            Event::Entry {
+                request: request(1),
+            },
+        );
+        state.observe(
+            route,
+            Event::Admission {
+                request: request(1),
+                outcome: Admission::Succeeded,
+            },
+        );
+        state.observe(
+            route,
+            Event::Dispatch {
+                request: request(1),
+                custody: Custody::Main,
+                shm_present: false,
+                rejection: Some(Rejection::UnsupportedFileRole),
+                managed_reached: false,
+            },
+        );
         assert!(state.claim(route, request(1), Rejection::UnsupportedFileRole));
         assert!(!state.claim(route, request(1), Rejection::UnsupportedFileRole));
-        state.observe(route, Event::Completion { request: request(1), outcome: Completion::RouteUnknown });
-        state.record(route, PreemptionReceipt::new(true, true, true, true)).unwrap();
-        assert_eq!(state.snapshot(route).unwrap().ordered_values(), [1, 4, 1, 1, 1, 1, 1, 0, 1, 0, 1, 2, 1, 1, 1, 1, 1, 0]);
+        state.observe(
+            route,
+            Event::Completion {
+                request: request(1),
+                outcome: Completion::RouteUnknown,
+            },
+        );
+        state
+            .record(route, PreemptionReceipt::new(true, true, true, true))
+            .unwrap();
+        assert_eq!(
+            state.snapshot(route).unwrap().ordered_values(),
+            [1, 4, 1, 1, 1, 1, 1, 0, 1, 0, 1, 2, 1, 1, 1, 1, 1, 0]
+        );
     }
 
     #[test]
     fn wrong_dispatch_actual_or_prior_violation_cannot_consume_preemption() {
         for (index, dispatch) in [
-            (Custody::Sidecar, false, Some(Rejection::UnsupportedFileRole), false),
-            (Custody::Main, true, Some(Rejection::UnsupportedFileRole), false),
-            (Custody::Main, false, Some(Rejection::UnsupportedFileRole), true),
-        ].into_iter().enumerate() {
+            (
+                Custody::Sidecar,
+                false,
+                Some(Rejection::UnsupportedFileRole),
+                false,
+            ),
+            (
+                Custody::Main,
+                true,
+                Some(Rejection::UnsupportedFileRole),
+                false,
+            ),
+            (
+                Custody::Main,
+                false,
+                Some(Rejection::UnsupportedFileRole),
+                true,
+            ),
+        ]
+        .into_iter()
+        .enumerate()
+        {
             let route = ManagedTestRouteOrdinal::test_value(20 + index as u64);
             let mut state = ManagedTestPreManagedLockState::default();
-            state.arm(route, ManagedTestPreManagedLockPath::UnsupportedRouteUnknown, request(1)).unwrap();
-            state.observe(route, Event::Entry { request: request(1) });
-            state.observe(route, Event::Admission { request: request(1), outcome: Admission::Succeeded });
-            state.observe(route, Event::Dispatch { request: request(1), custody: dispatch.0, shm_present: dispatch.1, rejection: dispatch.2, managed_reached: dispatch.3 });
+            state
+                .arm(
+                    route,
+                    ManagedTestPreManagedLockPath::UnsupportedRouteUnknown,
+                    request(1),
+                )
+                .unwrap();
+            state.observe(
+                route,
+                Event::Entry {
+                    request: request(1),
+                },
+            );
+            state.observe(
+                route,
+                Event::Admission {
+                    request: request(1),
+                    outcome: Admission::Succeeded,
+                },
+            );
+            state.observe(
+                route,
+                Event::Dispatch {
+                    request: request(1),
+                    custody: dispatch.0,
+                    shm_present: dispatch.1,
+                    rejection: dispatch.2,
+                    managed_reached: dispatch.3,
+                },
+            );
             assert!(!state.claim(route, request(1), Rejection::UnsupportedFileRole));
         }
 
         let route = ManagedTestRouteOrdinal::test_value(30);
         let mut state = ManagedTestPreManagedLockState::default();
-        state.arm(route, ManagedTestPreManagedLockPath::UnsupportedRouteUnknown, request(1)).unwrap();
-        state.observe(route, Event::Entry { request: request(2) });
-        state.observe(route, Event::Entry { request: request(1) });
-        state.observe(route, Event::Admission { request: request(1), outcome: Admission::Succeeded });
-        state.observe(route, Event::Dispatch { request: request(1), custody: Custody::Main, shm_present: false, rejection: Some(Rejection::UnsupportedFileRole), managed_reached: false });
+        state
+            .arm(
+                route,
+                ManagedTestPreManagedLockPath::UnsupportedRouteUnknown,
+                request(1),
+            )
+            .unwrap();
+        state.observe(
+            route,
+            Event::Entry {
+                request: request(2),
+            },
+        );
+        state.observe(
+            route,
+            Event::Entry {
+                request: request(1),
+            },
+        );
+        state.observe(
+            route,
+            Event::Admission {
+                request: request(1),
+                outcome: Admission::Succeeded,
+            },
+        );
+        state.observe(
+            route,
+            Event::Dispatch {
+                request: request(1),
+                custody: Custody::Main,
+                shm_present: false,
+                rejection: Some(Rejection::UnsupportedFileRole),
+                managed_reached: false,
+            },
+        );
         assert!(!state.claim(route, request(1), Rejection::UnsupportedFileRole));
 
         let route = ManagedTestRouteOrdinal::test_value(31);
         let mut state = ManagedTestPreManagedLockState::default();
-        state.arm(route, ManagedTestPreManagedLockPath::UnsupportedRouteUnknown, request(1)).unwrap();
-        state.observe(route, Event::Entry { request: request(1) });
-        state.observe(route, Event::Admission { request: request(1), outcome: Admission::Succeeded });
-        state.observe(route, Event::Dispatch { request: request(1), custody: Custody::Main, shm_present: false, rejection: Some(Rejection::UnsupportedFileRole), managed_reached: false });
-        state.observe(route, Event::Completion { request: request(1), outcome: Completion::Succeeded });
+        state
+            .arm(
+                route,
+                ManagedTestPreManagedLockPath::UnsupportedRouteUnknown,
+                request(1),
+            )
+            .unwrap();
+        state.observe(
+            route,
+            Event::Entry {
+                request: request(1),
+            },
+        );
+        state.observe(
+            route,
+            Event::Admission {
+                request: request(1),
+                outcome: Admission::Succeeded,
+            },
+        );
+        state.observe(
+            route,
+            Event::Dispatch {
+                request: request(1),
+                custody: Custody::Main,
+                shm_present: false,
+                rejection: Some(Rejection::UnsupportedFileRole),
+                managed_reached: false,
+            },
+        );
+        state.observe(
+            route,
+            Event::Completion {
+                request: request(1),
+                outcome: Completion::Succeeded,
+            },
+        );
         assert!(!state.claim(route, request(1), Rejection::UnsupportedFileRole));
     }
 }

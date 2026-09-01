@@ -1,11 +1,10 @@
 //! Passive q9 observation plus exact post-lower route preemption.
 
-use super::*;
 use super::super::test_faults::{
-    ManagedSqliteRegistryPreManagedLockEvent,
-    ManagedSqliteRegistryPreManagedLockRejection,
+    ManagedSqliteRegistryPreManagedLockEvent, ManagedSqliteRegistryPreManagedLockRejection,
     ManagedSqliteRegistryPreManagedLockRoutePreemptionReceipt,
 };
+use super::*;
 
 #[derive(Debug, Clone, Copy)]
 struct Marker {

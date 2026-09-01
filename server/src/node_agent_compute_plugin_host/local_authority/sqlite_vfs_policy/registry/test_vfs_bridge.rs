@@ -34,7 +34,8 @@ use crate::{
 };
 
 mod file;
-#[cfg(all(test, windows))] mod lock_callback_admission;
+#[cfg(all(test, windows))]
+mod lock_callback_admission;
 
 pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy) use file::ManagedSqliteTestVfsFile;
 

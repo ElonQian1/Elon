@@ -3,6 +3,8 @@
 use super::*;
 
 #[cfg(all(test, windows))]
+use super::super::super::types::ManagedSqliteRegistryTransitionRejection;
+#[cfg(all(test, windows))]
 use super::super::test_faults::{
     ManagedSqliteRegistryPreManagedLockAdmissionOutcome as Admission,
     ManagedSqliteRegistryPreManagedLockCompletionOutcome as Completion,
@@ -11,8 +13,6 @@ use super::super::test_faults::{
     ManagedSqliteRegistryPreManagedLockRejection as PreManagedRejection,
     ManagedSqliteRegistryUnsafeShmRoutePreemptionReceipt,
 };
-#[cfg(all(test, windows))]
-use super::super::super::types::ManagedSqliteRegistryTransitionRejection;
 
 #[derive(Debug, Clone, Copy)]
 struct ManagedSqliteRegistryUnsafeShmFailureMarker {
@@ -41,7 +41,10 @@ where
         ) -> Result<T, ManagedSqliteShmFailure>,
         _ordinary_lock_result: impl FnOnce(
             &T,
-        ) -> Option<(ManagedSqliteShmLockRequest, ManagedSqliteShmLockAttempt)>,
+        ) -> Option<(
+            ManagedSqliteShmLockRequest,
+            ManagedSqliteShmLockAttempt,
+        )>,
     ) -> Result<T, ManagedSqliteRegistryPinnedFileOperationRejection> {
         #[cfg(all(test, windows))]
         let lock_request = _lock_request;
@@ -89,10 +92,14 @@ where
                 ManagedSqliteRegistryPinnedFileCustody::Main { .. } => {
                     #[cfg(all(test, windows))]
                     observed_custody = ObservedCustody::Main;
-                    return Err(ManagedSqliteRegistryPinnedFileOperationRejection::UnsupportedFileRole);
+                    return Err(
+                        ManagedSqliteRegistryPinnedFileOperationRejection::UnsupportedFileRole,
+                    );
                 }
                 ManagedSqliteRegistryPinnedFileCustody::Sidecar { .. } => {
-                    return Err(ManagedSqliteRegistryPinnedFileOperationRejection::UnsupportedFileRole);
+                    return Err(
+                        ManagedSqliteRegistryPinnedFileOperationRejection::UnsupportedFileRole,
+                    );
                 }
                 ManagedSqliteRegistryPinnedFileCustody::WalMain { file, .. } => {
                     #[cfg(all(test, windows))]
@@ -122,9 +129,8 @@ where
         }
         #[cfg(all(test, windows))]
         let pre_managed_preemption = lock_request.and_then(|request| {
-            pre_managed_rejection(&result).and_then(|rejection| {
-                self.preempt_pre_managed_lock_route(request, rejection)
-            })
+            pre_managed_rejection(&result)
+                .and_then(|rejection| self.preempt_pre_managed_lock_route(request, rejection))
         });
         #[cfg(all(test, windows))]
         let mut unsafe_preemption = None;
@@ -168,10 +174,7 @@ where
                 request,
                 outcome: completion_outcome(&callback_completion),
             });
-            self.record_pre_managed_lock_preemption(
-                pre_managed_preemption,
-                &callback_completion,
-            );
+            self.record_pre_managed_lock_preemption(pre_managed_preemption, &callback_completion);
         }
         #[cfg(all(test, windows))]
         if let Some((retained, unsafe_route_unknown)) = unsafe_preemption {
@@ -258,7 +261,9 @@ fn admission_outcome(rejection: &ManagedSqliteRegistryProcessRouteRejection) -> 
 }
 
 #[cfg(all(test, windows))]
-fn completion_outcome(result: &Result<(), ManagedSqliteRegistryProcessRouteRejection>) -> Completion {
+fn completion_outcome(
+    result: &Result<(), ManagedSqliteRegistryProcessRouteRejection>,
+) -> Completion {
     if result.is_ok() {
         Completion::Succeeded
     } else if route_was_unknown(result) {

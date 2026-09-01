@@ -11,8 +11,10 @@ where
     pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy) fn prime_lock_callback_counter_overflow_for_test(
         &self,
         route: ManagedSqliteRegistryRouteHandle,
-    ) -> Result<ManagedSqliteRegistryCallbackCounterPrimeReceipt, ManagedSqliteRegistryProcessRouteRejection>
-    {
+    ) -> Result<
+        ManagedSqliteRegistryCallbackCounterPrimeReceipt,
+        ManagedSqliteRegistryProcessRouteRejection,
+    > {
         self.apply_route(route, |routes| {
             routes.prime_lock_callback_counter_overflow_for_test(route)
         })

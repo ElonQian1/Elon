@@ -6,8 +6,8 @@ use super::super::super::a2b2_cases::{
 use super::{
     lock_callback_route_unknown, lock_lifecycle, lock_local_protocol_rejection,
     lock_local_sibling_contention, lock_native_acquire_busy, lock_pre_managed_rejection,
-    lock_request_validation,
-    lock_stored_poison, map_lifecycle, map_region_loop, SanitizedPayloadFamily,
+    lock_request_validation, lock_stored_poison, map_lifecycle, map_region_loop,
+    SanitizedPayloadFamily,
 };
 
 const MAX_ACTUAL_PAYLOAD_BYTES: usize = 2_048;
