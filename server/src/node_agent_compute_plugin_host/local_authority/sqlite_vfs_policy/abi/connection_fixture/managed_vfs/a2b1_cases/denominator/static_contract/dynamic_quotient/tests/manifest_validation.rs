@@ -170,6 +170,8 @@ fn projector_provenance_binds_typed_descriptor_producers_and_wiring() {
 
     let required_sources = [
         "dynamic_quotient.rs",
+        "dynamic_quotient/manifest_canonical.rs",
+        "dynamic_quotient/manifest_canonical/projector_source_scope.rs",
         "terminal_descriptor.rs",
         "terminal_descriptor/axes.rs",
         "terminal_descriptor/recipe.rs",
