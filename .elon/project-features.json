@@ -316,7 +316,7 @@
       "id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
       "title": "A2 Map/Lock dynamic quotient authority V1",
       "summary": "Freeze the typed exact-partition contract that maps every verified Map/Lock static included leaf into one auditable dynamic execution class, derives Qmap/Qlock mechanically, and requires one process-isolated Windows record per frozen class without opening production effects.",
-      "status": "in_progress",
+      "status": "blocked",
       "priority": "p0",
       "requirement": {
         "path": "docs/distributed-compute/node-plugin-vfs-map-lock-dynamic-quotient-authority.md",
@@ -362,15 +362,218 @@
         "Each frozen class later requires exactly one process-isolated Windows record under one exact clean cohort; partial records do not advance acceptance.",
         "Until quotient and Windows gates pass, no production VFS, Runtime, Ready, dispatch, market, settlement, or funds effects may open."
       ],
-      "implementation_evidence": [],
-      "claim": {
-        "claim_id": "claim_57df1166e0914d7ab83ae73c1f69f99c",
-        "agent_id": "codex-root-q9",
-        "claimed_at_ms": 1788233061552,
-        "expires_at_ms": 1788247461552
-      },
+      "implementation_evidence": [
+        {
+          "path": "docs/distributed-compute/node-plugin-vfs-lock-dynamic-tranches-authority.md",
+          "content_hash": "e55976d599cc56db68e927442a315e59c5bb5d0be43b1c0330484eecb5336146",
+          "locator": "q9 pre-managed callback rejection; source-only and 19-artifact blocker",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "f2d533885bf5815f660b2d3e62c711e7baa94768",
+            "head_blob_oid": "4104b8f8aa352fb9157a2b99c535bacf17774acd",
+            "worktree_blob_oid": "4104b8f8aa352fb9157a2b99c535bacf17774acd",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "docs/distributed-compute/node-plugin-vfs-map-lock-dynamic-quotient-acceptance.md",
+          "content_hash": "4b717bb4e41566bb71876a1b459c7089dcab69e0a416763eba2c67aeb03652ca",
+          "locator": "q9 source acceptance and actual=not_run boundary",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "f2d533885bf5815f660b2d3e62c711e7baa94768",
+            "head_blob_oid": "a6999174f063e29b63d84c6c609ffbe7e2bc7331",
+            "worktree_blob_oid": "a6999174f063e29b63d84c6c609ffbe7e2bc7331",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "docs/distributed-compute/node-plugin-vfs-map-lock-dynamic-quotient-authority.md",
+          "content_hash": "7bccbf0b2783d9baf69aebf965e7bb031070d7afb785bccad8e6fa57209b7ce9",
+          "locator": "LockPreManagedCallbackRejectionV1 and 3650/5018 inventory",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "f2d533885bf5815f660b2d3e62c711e7baa94768",
+            "head_blob_oid": "7678172ec8b7f39304f7ee4af934aabfde549cb0",
+            "worktree_blob_oid": "7678172ec8b7f39304f7ee4af934aabfde549cb0",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2_dynamic_evidence/child/lock_pre_managed_rejection.rs",
+          "content_hash": "040ad7f144fdd5c4f493c71a1ba39e8b0a705a0c7fbe2bf6b057b77d9dd33987",
+          "locator": "a2lockq9 child selector and receipt emission",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "f2d533885bf5815f660b2d3e62c711e7baa94768",
+            "head_blob_oid": "67ca99be25101a0b93d52424e4cf3b1ba91dc16b",
+            "worktree_blob_oid": "67ca99be25101a0b93d52424e4cf3b1ba91dc16b",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2_dynamic_evidence/lock_runner/pre_managed_rejection.rs",
+          "content_hash": "d46051acf43c1a5561f34e65afe9778847125ac3a6198b936e5e102a01907fd5",
+          "locator": "process-isolated q9 parent/child runner",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "f2d533885bf5815f660b2d3e62c711e7baa94768",
+            "head_blob_oid": "959fb43e92ad2165f4ffaf95a28722e0fbe022f7",
+            "worktree_blob_oid": "959fb43e92ad2165f4ffaf95a28722e0fbe022f7",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2_dynamic_evidence/lock_runner/pre_managed_rejection/fixture.rs",
+          "content_hash": "2644a1009431668a141028b5bc09217c4cad7b39bd2efef44e034c399fbe92db",
+          "locator": "real custody and SHM prestates plus cleanup fixture",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "f2d533885bf5815f660b2d3e62c711e7baa94768",
+            "head_blob_oid": "d429e34d20f3ce386d36ee0632ede35217da2da7",
+            "worktree_blob_oid": "d429e34d20f3ce386d36ee0632ede35217da2da7",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2_dynamic_evidence/lock_runner/pre_managed_rejection/payload.rs",
+          "content_hash": "da056ae9e00c8dc551ee16cf9516615a8bfb007437d1847de4fa3d9afe9256cb",
+          "locator": "115-scalar canonical receipt validation",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "f2d533885bf5815f660b2d3e62c711e7baa94768",
+            "head_blob_oid": "07354127b19cdc8ea5dc7d885064c7c4f8d1b8d6",
+            "worktree_blob_oid": "07354127b19cdc8ea5dc7d885064c7c4f8d1b8d6",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/dynamic_quotient/program_inventory_canonical.rs",
+          "content_hash": "30f45b39c7691440f67e6709f89d164b67134a1e0f4c4f4862a06f389ed46398",
+          "locator": "Lock source-present 3650 and missing 5018/4490",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "f2d533885bf5815f660b2d3e62c711e7baa94768",
+            "head_blob_oid": "f0b767b53493c702e1c4fab3dc35fc52ea961c1b",
+            "worktree_blob_oid": "f0b767b53493c702e1c4fab3dc35fc52ea961c1b",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/dynamic_quotient/runner_admission/lock_program/pre_managed_callback_rejection.rs",
+          "content_hash": "5f06f2a8ed374da5d2633fe417578264946d34e7c83ce7194b54d59c15665fc1",
+          "locator": "exact matcher, program_spec_v1, expected_v1",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "f2d533885bf5815f660b2d3e62c711e7baa94768",
+            "head_blob_oid": "a8c831eea00647f5ca337fd5d28c2887ac5d6e69",
+            "worktree_blob_oid": "a8c831eea00647f5ca337fd5d28c2887ac5d6e69",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/dynamic_quotient/runner_admission/lock_program/pre_managed_callback_rejection/catalog.rs",
+          "content_hash": "e5aa0beb1de08e7c1511cd78eaea8a3e2c797c87acf70692f2b956378fc09fd0",
+          "locator": "six exact 88-row catalogs and member seals",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "f2d533885bf5815f660b2d3e62c711e7baa94768",
+            "head_blob_oid": "5a38c7ceae4cc93cca1bd42bdf59a39be851f14a",
+            "worktree_blob_oid": "5a38c7ceae4cc93cca1bd42bdf59a39be851f14a",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/dynamic_quotient/runner_admission/lock_program/pre_managed_callback_rejection/source_scope.rs",
+          "content_hash": "34056d13e9ba0bf938f2559614ab928cae6ad817c829971fe8d5c9f0d0151ab6",
+          "locator": "q9 projector delta and implementation digest closure",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "f2d533885bf5815f660b2d3e62c711e7baa94768",
+            "head_blob_oid": "dd4e5db6bf44144e666fd31db8cbe62c5c06ae0d",
+            "worktree_blob_oid": "dd4e5db6bf44144e666fd31db8cbe62c5c06ae0d",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/dynamic_quotient/tests/lock_pre_managed_callback_rejection_cases.rs",
+          "content_hash": "784c421c0a2d4e2498947f64abfc64e7d3480aaa75d036a1075b991dad238426",
+          "locator": "528 exact singleton source tests and mutation rejection",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "f2d533885bf5815f660b2d3e62c711e7baa94768",
+            "head_blob_oid": "b7a6b8dc8b956e65512a1207e005241369d9cc75",
+            "worktree_blob_oid": "b7a6b8dc8b956e65512a1207e005241369d9cc75",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/connection/lock_pre_managed.rs",
+          "content_hash": "774b6434a2d6b3b918536c41e7c8684592061224c9133e4391b3a00fd7546aa4",
+          "locator": "connection binding for q9 observation",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "f2d533885bf5815f660b2d3e62c711e7baa94768",
+            "head_blob_oid": "997495cd16f4e9274b8f22be97b4cac61955c0ba",
+            "worktree_blob_oid": "997495cd16f4e9274b8f22be97b4cac61955c0ba",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/lifecycle_faults/pre_managed_lock.rs",
+          "content_hash": "71d443ff482097f5fe7b9acc8399a6b665ccf6eb3d174e50e632f157049bcfaf",
+          "locator": "exact claim and fail-closed snapshot validation",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "f2d533885bf5815f660b2d3e62c711e7baa94768",
+            "head_blob_oid": "201862c2b3b863b712a71dcad6876ac8aaf6529f",
+            "worktree_blob_oid": "201862c2b3b863b712a71dcad6876ac8aaf6529f",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/registry/file_custody/operations/pre_managed_lock.rs",
+          "content_hash": "a73a0c84daa2b281556331ca3af1fb0bf4c831fd84bc0b73bcea90e96003e804",
+          "locator": "passive observer and post-rejection exact route preemption",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "f2d533885bf5815f660b2d3e62c711e7baa94768",
+            "head_blob_oid": "21210fda5e1c4e551d03ec8b733c91395cae63a5",
+            "worktree_blob_oid": "21210fda5e1c4e551d03ec8b733c91395cae63a5",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/registry/file_custody/operations/shm.rs",
+          "content_hash": "94e25eb19ef56c7d62bee3ca3f320e60273883a21c148f781c33b0e737ec152c",
+          "locator": "production with_shm observation and actual precedence",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "f2d533885bf5815f660b2d3e62c711e7baa94768",
+            "head_blob_oid": "d1a13e188b3b18c0a86f15694ac24965bb9c1c97",
+            "worktree_blob_oid": "d1a13e188b3b18c0a86f15694ac24965bb9c1c97",
+            "state": "tracked_clean"
+          }
+        }
+      ],
       "created_at_ms": 1788116827147,
-      "updated_at_ms": 1788233070022
+      "updated_at_ms": 1788246890181
     },
     {
       "id": "backend-a2-map-lock-static-denominator-v1",
@@ -12988,26 +13191,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_fd32dc7e27eb43f196bbfce496ac6a0c",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "Codex ai助手",
-      "reason": "真实 Map quotient runner 尚未集成，Lock observation 尚未完成；Qmap/Qlock、frozen quotient manifests、Windows class records 与生产 effects 继续关闭。",
-      "from_status": "in_progress",
-      "to_status": "blocked",
-      "at_ms": 1788142331666
-    },
-    {
-      "id": "feature_event_4aa59da05d3e4901a042255cbabfe50b",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex-root",
-      "reason": "Resume the existing dynamic quotient feature for the sealed source-level runner and observer admission slice; compilation and runtime acceptance remain deferred by user constraint.",
-      "from_status": "blocked",
-      "to_status": "ready",
-      "at_ms": 1788160652844
-    },
-    {
       "id": "feature_event_0a01c0d96ca7417fb78c671aeb8067ea",
       "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
       "action": "claimed",
@@ -14986,6 +15169,26 @@
       "from_status": "claimed",
       "to_status": "in_progress",
       "at_ms": 1788233070022
+    },
+    {
+      "id": "feature_event_22ee34c6dbf14058a2c219975f36a6fd",
+      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-root-q9",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788246870978
+    },
+    {
+      "id": "feature_event_0d4fb07f0c394fe8a12a9318926b9a95",
+      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
+      "action": "transitioned",
+      "actor": "codex-root-q9",
+      "reason": "q9 source-only checkpoint recorded: 528 exact singleton members advance Lock source-present to 3650/3650; 5018 members and 4490 groups remain, including 3432 initialization failures. Cargo/compile/tests/Windows actual receipts/reviewed inventory/Qlock remain not run or unknown. The operations/shm split also requires a later checkpoint-baselined ignored generator plus review of 19 global frozen source-owner artifacts. Production remains closed.",
+      "from_status": "in_progress",
+      "to_status": "blocked",
+      "at_ms": 1788246890181
     }
   ]
 }
