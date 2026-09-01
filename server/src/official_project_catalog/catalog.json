@@ -26,8 +26,11 @@
             "label": "一龙商户管理 APK",
             "kind": "mobile_client",
             "version": "1.0.0",
-            "status": "not_deployed",
-            "note": "签名 APK 已构建；公开下载地址由项目发布记录提供"
+            "manifest_url": "https://182.254.168.75/downloads/android/version.json",
+            "url": "https://182.254.168.75/downloads/android/CofficeMerchant-latest.apk",
+            "size_label": "3.5 MB",
+            "status": "available",
+            "note": "Android 6.0 及以上；安装后从一龙店铺项目绑定账号"
           }
         },
         "privacy_notes": [
