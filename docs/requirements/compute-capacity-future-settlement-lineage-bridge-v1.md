@@ -54,7 +54,8 @@ pending、Provider 已收款、余额已提现或外部付款已经完成。
   whole-only parent release 与 child hold 必须守恒。
 - v193 必须精确绑定 v192 VerificationDecision event digest；v192 verification-role 与 v195
   settlement-role usage digest 必须分别由各自 owner 公式从同一 v193 readings 重算，禁止直接比较两套摘要。
-- v195 consumer 必须绑定 Allocation consumer，payee 必须绑定 Allocation Provider owner。
+- v195 consumer 必须绑定 Allocation consumer；payee 必须由 exact historical Provider 的
+  `settlement_account_id` 审计，未配置时才回退 Provider owner，不得把两者直接判等。
 - Store seal 保持 crate-visible、private-field、non-Clone、non-Serde，并携带不进入 canonical envelope 的
   participant/project scope。
 
@@ -84,7 +85,8 @@ pending、Provider 已收款、余额已提现或外部付款已经完成。
 4. 真正无 exercised v228 才返回 `None`；存在后的 Claim 错接、cardinality、owner 缺失和摘要漂移均失败关闭。
 5. retired/draining 历史 owner 可审计，禁止 current/latest fallback。
 6. meter、顺序、granularity、共同 multiplier 和 parent-release/child-hold 守恒精确成立。
-7. v193→v192 decision digest、v195 payee→Allocation owner 和其余跨 owner 根均逐字闭合。
+7. v193→v192 decision digest 和其余跨 owner 根逐字闭合；v195 payee 由 historical Provider 的
+   settlement-account fallback 规则审计，不错误等同 Provider owner。
 8. v192/v195 usage digest 分别复用原 owner 公式，不比较彼此，也不用 declared/observed usage 替代。
 9. pending/available 是封闭历史分支，不外推 current pending、withdrawn、external paid 或 clearing。
 10. 本批只有 source/document evidence；无 migration、API、写入或经济效果，并保持 uncompiled/unrun、
