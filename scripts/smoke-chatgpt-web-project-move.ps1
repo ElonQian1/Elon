@@ -275,9 +275,6 @@ function Invoke-ProjectMove {
             -Stage "move-action" `
             -Optional
         if ($pickerOpened) { break }
-        Invoke-ChatGptWebSmokeAdb -Runtime $runtime `
-            -Arguments @("shell", "input", "keyevent", "4") `
-            -TimeoutSec 5 -Label "dismiss incomplete project-move menu" | Out-Null
         Close-Sidebar
         Start-Sleep -Milliseconds 1200
     }

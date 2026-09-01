@@ -418,7 +418,7 @@ internal class ChatSideMenuController(
         sideMenus.social.attach(panel, { animate -> close(animate) }, { toggleSettingsBubble() }, dp, selectableForeground)
         sideMenus.webChat.attach(
             panel,
-            { action -> ChatSideMenuTransitionPolicy.handoffAfterAnimatedClose(overlay, { close(true) }, action) },
+            { action -> ChatSideMenuTransitionPolicy.handoffAfterAnimatedClose(overlayHost, { close(true) }, action) },
             { toggleSettingsBubble() },
             dp,
             selectableForeground,

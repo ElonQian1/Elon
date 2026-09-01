@@ -20,6 +20,7 @@ function Assert-Contains([string]$Needle) {
     "chatgpt-conversation-actions:",
     "-Prefix",
     "-Optional",
+    "Close-Sidebar",
     'for ($attempt = 1; $attempt -le 2; $attempt++)',
     "one safe retry",
     "web-chat-conversation-action-move-to-project",
@@ -39,6 +40,10 @@ function Assert-Contains([string]$Needle) {
     "if (`$null -ne `$cleanupFailure) { throw `$cleanupFailure }",
     "CHATGPT_WEB_PROJECT_MOVE_STATUS=passed"
 ) | ForEach-Object { Assert-Contains $_ }
+
+if ($source.Contains('@("shell", "input", "keyevent", "4")')) {
+    throw "Project-move retry must not leave the production chat surface with Android Back."
+}
 
 $guardStart = $source.IndexOf("if (`$ConfirmRoundTrip)")
 $guardEnd = $source.IndexOf("Close-Sidebar", $guardStart)
