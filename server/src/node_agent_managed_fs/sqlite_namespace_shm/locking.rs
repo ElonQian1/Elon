@@ -39,6 +39,8 @@ impl ManagedSqliteShmCoordinator {
             ManagedSqliteShmLockAction::LockShared => {
                 require_unlocked(current, mask)?;
                 if sibling.exclusive_mask & mask != 0 {
+                    #[cfg(all(test, windows))]
+                    self.record_test_local_lock_contention(connection_id, request)?;
                     return Ok(ManagedSqliteShmLockAttempt::Contended);
                 }
                 if sibling.shared_mask & mask == 0 {
@@ -58,6 +60,8 @@ impl ManagedSqliteShmCoordinator {
             ManagedSqliteShmLockAction::LockExclusive => {
                 require_unlocked(current, mask)?;
                 if (sibling.shared_mask | sibling.exclusive_mask) & mask != 0 {
+                    #[cfg(all(test, windows))]
+                    self.record_test_local_lock_contention(connection_id, request)?;
                     return Ok(ManagedSqliteShmLockAttempt::Contended);
                 }
                 let attempt = self.try_os_lock(&mut state, connection_id, request, true)?;

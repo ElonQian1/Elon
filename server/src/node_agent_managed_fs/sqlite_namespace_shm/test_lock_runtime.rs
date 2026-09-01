@@ -15,6 +15,7 @@ pub(crate) enum ManagedSqliteShmTestLockPath {
     NativeAcquire,
     NativeRelease,
     Local,
+    SiblingContention,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -63,6 +64,7 @@ enum LockEvent {
     NativeUnlockAttempt,
     NativeUnlockOutcome(ManagedSqliteShmTestNativeUnlockOutcome),
     LocalTransition,
+    LocalContention,
 }
 
 #[derive(PartialEq, Eq)]
@@ -77,6 +79,7 @@ enum Progress {
     NativeUnlockSucceeded,
     NativeUnlockError,
     LocalTransitioned,
+    LocalContended,
     ManagedSucceeded,
 }
 
@@ -160,6 +163,12 @@ impl ManagedSqliteShmTestLockController {
                     ManagedSqliteShmTestLockPath::NativeAcquire => Progress::NativeLockAcquired,
                     ManagedSqliteShmTestLockPath::NativeRelease => Progress::NativeUnlockSucceeded,
                     ManagedSqliteShmTestLockPath::Local => Progress::LocalTransitioned,
+                    ManagedSqliteShmTestLockPath::SiblingContention => {
+                        armed.invalid = true;
+                        return Err(
+                            "NODE_MANAGED_SQLITE_SHM_TEST_LOCK_SIBLING_CONTENTION_SUCCEEDED",
+                        );
+                    }
                 };
                 record_once!(
                     managed_successes,
@@ -235,6 +244,11 @@ impl ManagedSqliteShmTestLockController {
                     "NODE_MANAGED_SQLITE_SHM_TEST_LOCK_LOCAL_TRANSITION_DUPLICATE"
                 );
             }
+            LockEvent::LocalContention => {
+                require_path(armed, ManagedSqliteShmTestLockPath::SiblingContention)?;
+                require_progress(armed, Progress::ManagedAttempted)?;
+                armed.progress = Progress::LocalContended;
+            }
         }
         Ok(())
     }
@@ -259,6 +273,7 @@ impl ManagedSqliteShmTestLockController {
                 | Progress::NativeLockContended
                 | Progress::NativeLockError
                 | Progress::NativeUnlockError
+                | Progress::LocalContended
         ) {
             return Err("NODE_MANAGED_SQLITE_SHM_TEST_LOCK_OBSERVATION_INCOMPLETE");
         }
@@ -332,6 +347,10 @@ fn validate_expectation(
         ManagedSqliteShmTestLockPath::Local => matches!(
             expectation.action,
             ManagedSqliteShmLockAction::LockShared | ManagedSqliteShmLockAction::UnlockShared
+        ),
+        ManagedSqliteShmTestLockPath::SiblingContention => matches!(
+            expectation.action,
+            ManagedSqliteShmLockAction::LockShared | ManagedSqliteShmLockAction::LockExclusive
         ),
     };
     let shared_range_invalid = expectation.count != 1
@@ -477,6 +496,19 @@ impl ManagedSqliteShmCoordinator {
             lock_phase(request.action()),
             false,
             |controller, target| controller.record(target, request, LockEvent::LocalTransition),
+        )
+    }
+
+    pub(super) fn record_test_local_lock_contention(
+        &self,
+        connection_id: u64,
+        request: ManagedSqliteShmLockRequest,
+    ) -> Result<(), ManagedSqliteShmFailure> {
+        self.record_test_lock_event(
+            connection_id,
+            ManagedSqliteShmFailurePhase::LockAcquire,
+            false,
+            |controller, target| controller.record(target, request, LockEvent::LocalContention),
         )
     }
 
