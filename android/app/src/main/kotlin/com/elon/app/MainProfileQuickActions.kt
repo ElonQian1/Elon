@@ -4,6 +4,7 @@ import android.view.View
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
+import com.elon.app.esk.EskAssetCard
 import com.elon.app.databinding.ActivityMainBinding
 import com.elon.app.update.AppUpdateManager
 import okhttp3.OkHttpClient
@@ -27,6 +28,7 @@ internal class MainProfileQuickActions(
     private val confirmLogout: () -> Unit
 ) {
     private val tokenUsageCard by lazy { ProfileTokenUsageCard(activity, binding) }
+    private val eskAssetCard by lazy { EskAssetCard(activity, binding, http, serverUrl) }
     private val nodeMarketSheet by lazy { NodeMarketSheet(activity, http, serverUrl) }
     private val nodeTransactionSheet by lazy { NodeTransactionSheet(activity, http, serverUrl) }
     private val nodeBalanceCard by lazy {
@@ -91,6 +93,7 @@ internal class MainProfileQuickActions(
                 openProfileDetails
             )
             tokenUsageCard.attachAndRefresh()
+            eskAssetCard.attachAndRefresh()
             renderNodeResourcePanel()
             if (nodeResourceExpanded) {
                 refreshNodeResourceCards()

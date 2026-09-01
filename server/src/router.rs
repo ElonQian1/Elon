@@ -689,6 +689,7 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             "/api/storage-git/:node_id/:token/*path",
             axum::routing::any(project_storage_git::storage_git_handler),
         )
+        .merge(crate::esk_asset::routes())
         .merge(admin_routes::routes())
         .layer(CompressionLayer::new())
         .layer(cors)

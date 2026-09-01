@@ -14,6 +14,13 @@ const AiWorkSummaryPage = lazy(() => import('./features/ai/AiWorkSummaryPage'))
 const FriendsPage = lazy(() => import('./features/friends/FriendsPage'))
 const PlazaPage = lazy(() => import('./features/plaza/PlazaPage'))
 const AccountPage = lazy(() => import('./features/account/AccountPage'))
+const EskAssetCard = lazy(() => import('./features/assets/EskAssetCard'))
+const EskAssetPreview = lazy(async () => {
+  const data = await import('./features/assets/eskAssetApi')
+  return {
+    default: () => <EskAssetCard previewMode initialSnapshot={data.ESK_PREVIEW_SNAPSHOT} initialRequests={data.ESK_PREVIEW_REQUESTS} />,
+  }
+})
 const UserBrowserLauncherPage = lazy(() => import('./features/user-browser/UserBrowserLauncherPage'))
 const OpenAiChatKitPage = lazy(() => import('./features/chatkit/OpenAiChatKitPage'))
 const UserProfilePage = lazy(() => import('./features/users/UserProfilePage'))
@@ -55,6 +62,9 @@ function lazyRoute(element: ReactNode) {
 }
 
 export default function App() {
+  if (import.meta.env.DEV && new URLSearchParams(window.location.search).get('ui_preview') === 'esk-asset') {
+    return <main className={styles.uiPreviewSurface}>{lazyRoute(<EskAssetPreview />)}</main>
+  }
   if (import.meta.env.DEV && new URLSearchParams(window.location.search).get('ui_preview') === 'quant-paper-launch') {
     return (
       <main className={styles.uiPreviewSurface}>

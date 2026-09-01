@@ -4660,6 +4660,205 @@
       "updated_at_ms": 1787310311513
     },
     {
+      "id": "esk-paper-asset-account-v1",
+      "title": "ESK Paper 资产账户与卖回申请 V1",
+      "summary": "主项目建立 ESK 唯一余额真源、精确用户资产视图、管理员幂等 Paper 登记与追加式卖回申请；PC/Android 明确未上链、未移动资金，量化接入另走版本化投影。",
+      "status": "verified",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/esk-paper-asset-account-v1.md",
+        "content_hash": "58835c38eb969de679cf0b29efb36bf92dc9571f0145923d92ef4f985f95b0f9",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "ae533491dead47a27b13de6244cb7e9bb6474bc9",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "a1818e9a4d7c4a8692c95a0241c9e95e618d3ac7",
+          "state": "index_only"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "platform-assets",
+      "tags": [
+        "esk",
+        "assets",
+        "paper-only",
+        "sellback",
+        "pc",
+        "android"
+      ],
+      "task_paths": [
+        "android/app/src/main/kotlin/com/elon/app/MainProfileQuickActions.kt",
+        "android/app/src/main/kotlin/com/elon/app/esk",
+        "android/app/src/main/res/layout/activity_main.xml",
+        "docs/decisions/esk-asset-naming-v1.md",
+        "docs/esk-paper-asset-account-v1-acceptance.md",
+        "docs/requirements/esk-paper-asset-account-v1.md",
+        "pc-frontend/src/features/assets",
+        "scripts/test-esk-asset-contract.js",
+        "server/src/esk_asset",
+        "server/src/esk_asset_migration.rs",
+        "server/src/store/common/esk_assets.rs"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "未登录请求被拒绝，用户只能读取和操作自己的 ESK 账户。",
+        "disabled 默认拒绝写入；paper 响应固定 simulated=true、funds_moved=false、chain_status=not_deployed。",
+        "管理员登记、余额聚合、幂等重放、冲突与并发占用有服务端测试。",
+        "卖回申请不超过可用余额，取消后占用恢复且事件历史保留。",
+        "PC 与 Android 精确显示余额、错误、空状态和申请状态。",
+        "量化接入另立版本化投影，旧 NET 不冒充真实 ESK。"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/esk/EskAssetCard.kt",
+          "content_hash": "3a05b85591a1764b7c91aa4ffc8ef42f9c6109280adc96b1001cc8231443a7d8",
+          "locator": "attachAndRefresh",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ae533491dead47a27b13de6244cb7e9bb6474bc9",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "ee7b272bd0a1fcae0c0f7f8d4a57eedb23b09e4b",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/esk/EskSellbackDialog.kt",
+          "content_hash": "1b50a222baeeeff9499cfe295f7bb1188fe5faf66a1b104af14430c1fbb77102",
+          "locator": "show",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ae533491dead47a27b13de6244cb7e9bb6474bc9",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "fc98780572a4d3f8e3971cac069963b7d213eb3d",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "docs/esk-paper-asset-account-v1-acceptance.md",
+          "content_hash": "b0161136e80871ae98480eac0a4a7813d681e74d344da4b7bece99c1ddcee2ea",
+          "locator": "验收证据",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ae533491dead47a27b13de6244cb7e9bb6474bc9",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "131a7b5e61c316dc0fdfc1a2295ca0cb3113d59b",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/assets/EskAssetCard.tsx",
+          "content_hash": "5b584d477dc7189521f9dbf0920c5f6f8148bb4d0dd2c6c0a0d283923eb7589c",
+          "locator": "EskAssetCard",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ae533491dead47a27b13de6244cb7e9bb6474bc9",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "4e16ec1730b0b52ff962a74d053d2a70943c115d",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "scripts/test-esk-asset-contract.js",
+          "content_hash": "964cfbf261974f6ac2dc41b9e1bbd4a5d3437f6e4d7c40fe1e6e337c536ceb9c",
+          "locator": "ESK_ASSET_CONTRACT_TEST",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ae533491dead47a27b13de6244cb7e9bb6474bc9",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "c9e4c9b879d3d2bfcec4d7e7a72419f4be0fcb0c",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/src/esk_asset/api.rs",
+          "content_hash": "25ab31a27d2dab9ae992abd433a2d8efe3313f8fb7b6a989d3fc22465cd55dbf",
+          "locator": "get_my_account",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ae533491dead47a27b13de6244cb7e9bb6474bc9",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "60848e72b1a4afbc4266161e9ae9c9dd72dddb90",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/src/esk_asset/mod.rs",
+          "content_hash": "e6a8490f6a7a4e2bfdef921a480e88beaba2aaf231f5dfdcb8c819e26a016831",
+          "locator": "routes",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ae533491dead47a27b13de6244cb7e9bb6474bc9",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "f8a52644012a385d3451d62ade02b79cc304737f",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/src/esk_asset/service.rs",
+          "content_hash": "23b18ce9ba54ce0df1034601078009749e8529a949fce9723b26f7bff8b115d0",
+          "locator": "account_view",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ae533491dead47a27b13de6244cb7e9bb6474bc9",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "7875bac7c2a4a2a2fac08b1015b2eedaeb927659",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/src/esk_asset/tests.rs",
+          "content_hash": "157b45503f52ceefb52b3096d12187dd6d30994285ff0a45b1461ac0fbf87485",
+          "locator": "concurrent_sellback_cannot_over_reserve_one_balance",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ae533491dead47a27b13de6244cb7e9bb6474bc9",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "e6c896c75991837703b97daa5e00d90c2d4c69bc",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/src/esk_asset_migration.rs",
+          "content_hash": "dc4e7b3c2b55194fff1d4edbc4bb5f031dbb4f06a1f6c2709a78edc70eeafae6",
+          "locator": "migration_v281",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ae533491dead47a27b13de6244cb7e9bb6474bc9",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "259c91a3ce5a0e2664bbdbf074ccdf893f905115",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/src/store/common/esk_assets.rs",
+          "content_hash": "44774604c38c65756f689477afba1c0759a2aa6e05f78f2c4ecd03e258899e03",
+          "locator": "impl Store",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ae533491dead47a27b13de6244cb7e9bb6474bc9",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "337e52b9fa3dc7b682b03aaadd8c6ddfcf97e671",
+            "state": "index_only"
+          }
+        }
+      ],
+      "created_at_ms": 1788300027572,
+      "updated_at_ms": 1788300136729
+    },
+    {
       "id": "external-pool-adapter-credential-reattestation-v253-verification",
       "title": "V253 Provider 凭据续签运行验收",
       "summary": "把已接线但 passed=0 的 V253 Provider-specific credential re-attestation 推进到真实 Rust 编译、SQLite migration 和进程内 HTTP 验证，并修复暴露的局部缺陷。",
@@ -13846,86 +14045,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_fb7983949d7243289b56723f210db955",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "evidence_recorded",
-      "actor": "codex/root",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788230033927
-    },
-    {
-      "id": "feature_event_325b2a07fedb4bcbb37420a205ea1c1f",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex/root",
-      "reason": "q8 exact 88-member source and authority are written and source-reviewed only; 5,546 programs plus compilation, Windows runtime actual receipts, and reviewed inventory digest remain absent; coverage 0/8668, Qlock unknown, actual not_run, WindowsDynamic not_opened.",
-      "from_status": "in_progress",
-      "to_status": "blocked",
-      "at_ms": 1788230047922
-    },
-    {
-      "id": "feature_event_04f6e51aed4c4dbb8308e6b2e37675bf",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "requirement_rebound",
-      "actor": "codex-root-q9",
-      "reason": "Rebind the q9 LockPreManagedCallbackRejectionV1 exact 528-member requirement and corrected member/group inventory.",
-      "from_status": "blocked",
-      "to_status": "proposed",
-      "at_ms": 1788233033660
-    },
-    {
-      "id": "feature_event_5b640418854b42aa8ee26603a62c358c",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex-root-q9",
-      "reason": "Reviewed q9 exact six-family requirement, truthful production path, source-only boundary, and corrected member/group counts.",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1788233045850
-    },
-    {
-      "id": "feature_event_5b8eb0be60494ad69a5cdda327d87bd0",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex-root-q9",
-      "reason": "q9 requirement review complete; dependency verified and implementation boundary is ready to claim.",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1788233054347
-    },
-    {
-      "id": "feature_event_1156e8614860480fafeb2927de6e7479",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "claimed",
-      "actor": "codex-root-q9",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788233061553
-    },
-    {
-      "id": "feature_event_f73a11851b0e4895b6011883ca3c698c",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex-root-q9",
-      "reason": "Implementing the claimed q9 source-only exact matcher, singleton catalog, real production observation seams, isolated runner, and evidence wiring.",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788233070022
-    },
-    {
-      "id": "feature_event_22ee34c6dbf14058a2c219975f36a6fd",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-root-q9",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788246870978
-    },
-    {
       "id": "feature_event_0d4fb07f0c394fe8a12a9318926b9a95",
       "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
       "action": "transitioned",
@@ -15844,6 +15963,86 @@
       "from_status": "blocked",
       "to_status": "blocked",
       "at_ms": 1788299508659
+    },
+    {
+      "id": "feature_event_beee0ba9d4734305886954259e11dfeb",
+      "feature_id": "esk-paper-asset-account-v1",
+      "action": "registered",
+      "actor": "codex-root",
+      "reason": "重放 ESK 功能登记到最新远端注册表，保留并发协作者的权威记录。",
+      "from_status": "",
+      "to_status": "proposed",
+      "at_ms": 1788300027572
+    },
+    {
+      "id": "feature_event_8a6f5b9535d84f41aafbc6e3bd86f0d8",
+      "feature_id": "esk-paper-asset-account-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "重放后复核范围仍为站内 Paper 资产账户和卖回申请，不上链、不移动资金、不承诺价格或收益。",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1788300045862
+    },
+    {
+      "id": "feature_event_d931d0743eba4424a9ba952482ccb5e6",
+      "feature_id": "esk-paper-asset-account-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "需求、任务边界、六项验收标准和 Paper 安全门禁均已明确。",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1788300058952
+    },
+    {
+      "id": "feature_event_ff89470eaf14496a974468db14853590",
+      "feature_id": "esk-paper-asset-account-v1",
+      "action": "claimed",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788300071029
+    },
+    {
+      "id": "feature_event_7f3e9356525a4d2eb7de6e4b97bcb3e3",
+      "feature_id": "esk-paper-asset-account-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "在最新远端基线重新绑定当前实现与测试证据。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788300084267
+    },
+    {
+      "id": "feature_event_5957d4353a044ae7823567080d9862e6",
+      "feature_id": "esk-paper-asset-account-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788300109345
+    },
+    {
+      "id": "feature_event_7f06c8181f4e42d087c9813e9d33fc16",
+      "feature_id": "esk-paper-asset-account-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "ESK 服务端、PC、Android 与治理文档已在最新远端基线上无源码冲突重放完成。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1788300122801
+    },
+    {
+      "id": "feature_event_f79056f128774f2f9cf90dc73d3c0734",
+      "feature_id": "esk-paper-asset-account-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "此前生产构建、临时库 HTTP Paper 流程、PC 构建/ESLint、Android Kotlin 编译和跨端契约均通过；重放仅涉及注册表冲突，源码无冲突。Android 像素验证仍因无空闲模拟器延期。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1788300136729
     }
   ]
 }

@@ -9,6 +9,8 @@ use std::num::NonZeroU32;
 use std::{marker::PhantomData, rc::Rc};
 use uuid::Uuid;
 
+mod esk_assets;
+
 #[cfg(not(test))]
 const PASSWORD_PBKDF2_ITERATIONS: u32 = 310_000;
 #[cfg(test)]

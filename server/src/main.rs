@@ -2,7 +2,6 @@ use anyhow::Result;
 use dotenvy::dotenv;
 use std::sync::Arc;
 use tracing::info;
-
 mod account_identity_migration;
 mod account_lifecycle;
 mod account_security;
@@ -185,6 +184,8 @@ mod erp_blueprint_workflow_tests;
 mod erp_instance_merchant_binding_migration;
 mod erp_instance_onboarding_migration;
 mod errors;
+mod esk_asset;
+mod esk_asset_migration;
 mod external_app_api;
 mod external_app_chat_bootstrap;
 mod external_app_context;
@@ -715,7 +716,6 @@ mod wechat_pay;
 mod ws_client_transport;
 mod ws_message;
 mod ws_transport;
-
 pub use types::AppState;
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 4)]

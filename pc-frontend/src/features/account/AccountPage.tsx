@@ -6,6 +6,7 @@ import LinkedIdentitiesCard from './LinkedIdentitiesCard'
 import AccountSecurityCard from './AccountSecurityCard'
 import ChatGptAccountCard from './ChatGptAccountCard'
 import OpenAiChatKitCard from './OpenAiChatKitCard'
+import EskAssetCard from '../assets/EskAssetCard'
 import styles from './AccountPage.module.css'
 
 interface Balance {
@@ -99,6 +100,11 @@ export default function AccountPage() {
       </header>
 
       <div className={styles.sections}>
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>我的 ESK 资产</h2>
+          <EskAssetCard />
+        </section>
+
         {/* 账号信息 */}
         <section className={styles.section}>
           <h2 className={styles.sectionTitle}>账号信息</h2>

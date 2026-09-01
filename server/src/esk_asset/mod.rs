@@ -1,0 +1,37 @@
+use axum::{
+    routing::{get, post},
+    Router,
+};
+use std::sync::Arc;
+
+use crate::types::AppState;
+
+mod api;
+mod model;
+mod service;
+
+pub(crate) use model::{
+    EskAccountLedger, EskAllocationInput, EskAllocationReceipt, EskAssetMode, EskSellbackInput,
+    EskSellbackRecord,
+};
+pub(crate) use service::{format_esk_amount, parse_esk_amount};
+
+pub(crate) fn routes() -> Router<Arc<AppState>> {
+    Router::new()
+        .route("/api/me/assets/esk", get(api::get_my_account))
+        .route(
+            "/api/me/assets/esk/sellback-requests",
+            get(api::list_my_sellback_requests).post(api::create_my_sellback_request),
+        )
+        .route(
+            "/api/me/assets/esk/sellback-requests/:request_id/cancel",
+            post(api::cancel_my_sellback_request),
+        )
+        .route(
+            "/api/admin/assets/esk/paper-allocations",
+            post(api::create_paper_allocation),
+        )
+}
+
+#[cfg(test)]
+mod tests;
