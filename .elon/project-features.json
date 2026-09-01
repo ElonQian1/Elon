@@ -13382,139 +13382,109 @@
       ],
       "created_at_ms": 1787428343067,
       "updated_at_ms": 1787431017596
+    },
+    {
+      "id": "yilong-quant-paper-grant-revocation-sync-v1",
+      "title": "一龙量化 Paper 单次授权撤销公开同步 V1",
+      "summary": "把量化仓库已验证的单个 Paper grant 跨重启撤销能力同步到主项目官方目录、公开预览和协作文档；主项目签发契约保持不变，继续 paper-only。",
+      "status": "verified",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/yilong-quant-paper-grant-revocation-sync-v1.md",
+        "content_hash": "fca72829539d2e41e410756042444d96856ea79972117a5130ea59bf10d5aaa6",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "248cce6706991413f1a1824680d582e9f1f38f95",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "0b7c36a0711d9d430677d47bc0f75f613437d5b4",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "project-marketplace",
+      "tags": [
+        "quant",
+        "project-plaza",
+        "public-preview",
+        "paper-only",
+        "revocation"
+      ],
+      "task_paths": [
+        "AI_CURRENT.md",
+        "AI_INDEX.md",
+        "docs/yilong-quant-integration.md",
+        "scripts/test-official-project-catalog.js",
+        "server/src/official_project_catalog/catalog.json"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "官方目录量化快照与量化仓库 V8 真源一致，首条更新说明单个授权跨重启撤销且不保存 token 或 participant。",
+        "功能亮点和 Paper 入口同时说明密钥级与当前授权撤销，不把撤销描述为退出仓位或真实提现。",
+        "官方目录合同测试固定 V8 文案并继续验证公开预览不暴露敏感字段。",
+        "接入文档记录量化实现提交、数据归属和主项目签发契约不变。",
+        "Server 定向测试、门禁、发布和线上匿名只读预览核验通过。"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "AI_INDEX.md",
+          "content_hash": "6d0879609d8e7b08d7728d7977e122204c824958000c9e8de548272ccff47212",
+          "locator": "官方公开项目目录与一龙量化交易接入",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "248cce6706991413f1a1824680d582e9f1f38f95",
+            "head_blob_oid": "7c9ce1bccac75d95daa3b752ad4f03e17db2516b",
+            "worktree_blob_oid": "a555b7d78b5241aef1d9493d9fb23e7ccdc0feed",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "docs/yilong-quant-integration.md",
+          "content_hash": "44907cb026447759506a26ede9df427340bb34144efa07902857666fb29cd731",
+          "locator": "当前技术接入 / Paper 单次授权持久撤销 V8",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "248cce6706991413f1a1824680d582e9f1f38f95",
+            "head_blob_oid": "1d5593ffd0cc4f2e7782d3ed63c162f8d03ee4d8",
+            "worktree_blob_oid": "a0fb1932f70c9994531788afd2a0eaf7eafd63fc",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "scripts/test-official-project-catalog.js",
+          "content_hash": "d8504e04f8b61e3e37386d461b3555faba17620ebe35fb65d3675951ba7a58eb",
+          "locator": "quantProject V8 contract assertions",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "248cce6706991413f1a1824680d582e9f1f38f95",
+            "head_blob_oid": "acfc0951e47e19b4bf74bc203a26dc799384c397",
+            "worktree_blob_oid": "b816f32bbdf6f0629683f3a5119ba0ae823bb997",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/official_project_catalog/catalog.json",
+          "content_hash": "17c3ec7d09969cbb95683dd3f8c08898142f3edff41e2436936832e80a4bb991",
+          "locator": "projects[id=yilong-quant].landing",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "248cce6706991413f1a1824680d582e9f1f38f95",
+            "head_blob_oid": "a95387fb13e74912f2e6c1a5b21ff04532e1c76d",
+            "worktree_blob_oid": "a1120e69c322f959b5849ff4ad41229bbb0301c9",
+            "state": "tracked_modified"
+          }
+        }
+      ],
+      "created_at_ms": 1788288231346,
+      "updated_at_ms": 1788288937517
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_1ec282258a4940aa8a4376e3d2ab7859",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-goal-lock-route-unknown",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788211802466
-    },
-    {
-      "id": "feature_event_b27c67c741ed48eaa84b9453e2721088",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-lock-route-unknown",
-      "reason": "source_written/source_review_only/implementation_uncompiled/implementation_unrun; no Cargo, Windows, or runtime execution; passed=0 failed=0 actual=not_run; Lock unrun expectation is 2754 source-present and 5914 planned-missing; reviewed inventory digest, manifest, Qlock, and WindowsDynamic are not formed.",
-      "from_status": "in_progress",
-      "to_status": "blocked",
-      "at_ms": 1788211825607
-    },
-    {
-      "id": "feature_event_9a762c2c383d4adbbd50d856627b7034",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-lock-native-busy",
-      "reason": "Continue the active Goal with the exact source-only 44-member native-acquire native-busy completed tranche backed by real OS byte-range contention; compile, Windows execution, runtime, and production gates remain closed",
-      "from_status": "blocked",
-      "to_status": "ready",
-      "at_ms": 1788214168449
-    },
-    {
-      "id": "feature_event_c95fa906e5a542059fc20537ec8a86cc",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "claimed",
-      "actor": "codex-goal-lock-native-busy",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788214184334
-    },
-    {
-      "id": "feature_event_d613bf4695aa4e3592a2bda58cd5d700",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-lock-native-busy",
-      "reason": "Implement the exact 44-member native-acquire native-busy completed source tranche with process-isolated real byte-range contention evidence; current batch remains uncompiled and unrun",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788214202589
-    },
-    {
-      "id": "feature_event_9dc904416d7d41c59feec9a13a4f614c",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-lock-native-busy",
-      "reason": "本批权威合同已更新，先关闭旧认领并重绑当前需求；源码仍明确未编译、未运行，完整 Lock 尚余 5,870 members。",
-      "from_status": "in_progress",
-      "to_status": "blocked",
-      "at_ms": 1788217424844
-    },
-    {
-      "id": "feature_event_0e83480d0df8431ba85a3f72d36fd2ca",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "requirement_rebound",
-      "actor": "codex-goal-lock-native-busy",
-      "reason": "权威需求新增 q5 的 44-member 真实原生 contention 合同，并把 Lock 未运行预期更新为 2,798/5,870；已静态复核且继续保持未编译、未运行。",
-      "from_status": "blocked",
-      "to_status": "proposed",
-      "at_ms": 1788217473514
-    },
-    {
-      "id": "feature_event_b960a0751869416499fc3c7b4db1f4b5",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-lock-native-busy",
-      "reason": "已复核重绑后的 q5 权威合同：只增加 44 个 typed exact members，保持 Qlock unknown、coverage 0/8668、Windows not_run 与全部生产闸门关闭。",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1788217484462
-    },
-    {
-      "id": "feature_event_2e33d0ee788b48ab9b243a4eb5538a5f",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-lock-native-busy",
-      "reason": "重绑需求已接受，唯一依赖 backend-a2-map-lock-static-denominator-v1 已 verified，可进入本批继续认领。",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1788217494506
-    },
-    {
-      "id": "feature_event_a504f94be83948fa9b98788433536350",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "claimed",
-      "actor": "codex-goal-lock-native-busy",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788217506376
-    },
-    {
-      "id": "feature_event_d20eef6ddfb94507a51dec6d1ebbd02f",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-lock-native-busy",
-      "reason": "继续登记本批 q5 源码、catalog、source-scope 与权威文档的哈希证据；运行与生产验收不在本批打开。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788217517440
-    },
-    {
-      "id": "feature_event_eac58b5d22a74720be39a8693bcf5861",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-goal-lock-native-busy",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788217560739
-    },
-    {
-      "id": "feature_event_c4c79575124442b7b4684dbc0c8e2894",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-goal-lock-native-busy",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788217607392
-    },
     {
       "id": "feature_event_f37e1380d8874c0992ff1901be307a59",
       "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
@@ -15384,6 +15354,136 @@
       "from_status": "in_progress",
       "to_status": "blocked",
       "at_ms": 1788287062469
+    },
+    {
+      "id": "feature_event_c5986be44eef48fe8c8cd5e1d738fd13",
+      "feature_id": "yilong-quant-paper-grant-revocation-sync-v1",
+      "action": "registered",
+      "actor": "codex-goal-quant-grant-revocation-sync",
+      "reason": "",
+      "from_status": "",
+      "to_status": "accepted",
+      "at_ms": 1788288231346
+    },
+    {
+      "id": "feature_event_2ef2bff8594149af9cdb70a78e4b7aaf",
+      "feature_id": "yilong-quant-paper-grant-revocation-sync-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-quant-grant-revocation-sync",
+      "reason": "需求范围和安全边界已接受，可开始官方目录同步。",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1788288242160
+    },
+    {
+      "id": "feature_event_a29a7fdd922549d4987e238388c0d546",
+      "feature_id": "yilong-quant-paper-grant-revocation-sync-v1",
+      "action": "claimed",
+      "actor": "codex-goal-quant-grant-revocation-sync",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788288251721
+    },
+    {
+      "id": "feature_event_dc535a0ed7e74df298a59dd8e1559012",
+      "feature_id": "yilong-quant-paper-grant-revocation-sync-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-quant-grant-revocation-sync",
+      "reason": "已认领并开始同步量化 V8 公开目录与文档。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788288261660
+    },
+    {
+      "id": "feature_event_ae0b402ac0654e0eb8a0c15fc4b4e767",
+      "feature_id": "yilong-quant-paper-grant-revocation-sync-v1",
+      "action": "claim_released",
+      "actor": "codex-goal-quant-grant-revocation-sync",
+      "reason": "实现和关键合同验证完成，先释放认领以更新需求实现状态并显式重审。",
+      "from_status": "in_progress",
+      "to_status": "ready",
+      "at_ms": 1788288801053
+    },
+    {
+      "id": "feature_event_3b3a38a6472e41c1937b1b6c3bd23570",
+      "feature_id": "yilong-quant-paper-grant-revocation-sync-v1",
+      "action": "requirement_rebound",
+      "actor": "codex-goal-quant-grant-revocation-sync",
+      "reason": "合同测试和 Server 非测试编译检查通过，正式需求实现状态更新为 verified。",
+      "from_status": "ready",
+      "to_status": "proposed",
+      "at_ms": 1788288816730
+    },
+    {
+      "id": "feature_event_e99b6d439daa4ae28c187876d80ef710",
+      "feature_id": "yilong-quant-paper-grant-revocation-sync-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-quant-grant-revocation-sync",
+      "reason": "已复核 verified 元数据仅反映完成的 V8 目录同步，不扩大安全或真实资产范围。",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1788288829021
+    },
+    {
+      "id": "feature_event_e83f2bf4532a4fdca05d605831fb7324",
+      "feature_id": "yilong-quant-paper-grant-revocation-sync-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-quant-grant-revocation-sync",
+      "reason": "复核通过，可重新认领并绑定最终证据。",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1788288838197
+    },
+    {
+      "id": "feature_event_bcf294f42b7548daa54ef8779d847621",
+      "feature_id": "yilong-quant-paper-grant-revocation-sync-v1",
+      "action": "claimed",
+      "actor": "codex-goal-quant-grant-revocation-sync",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788288846938
+    },
+    {
+      "id": "feature_event_747530ee3cdb4a5681d5348a799f267c",
+      "feature_id": "yilong-quant-paper-grant-revocation-sync-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-quant-grant-revocation-sync",
+      "reason": "重新认领后绑定最终实现与测试证据。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788288856904
+    },
+    {
+      "id": "feature_event_bb2c8cc006304c7f82abfda2b6927ebe",
+      "feature_id": "yilong-quant-paper-grant-revocation-sync-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-goal-quant-grant-revocation-sync",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788288916904
+    },
+    {
+      "id": "feature_event_9813dd289d254e0aa1a898d912f5b43e",
+      "feature_id": "yilong-quant-paper-grant-revocation-sync-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-quant-grant-revocation-sync",
+      "reason": "官方目录、合同测试、接入文档与 AI 索引已完成。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1788288927095
+    },
+    {
+      "id": "feature_event_9619dad49fb0466bb821a72b66c89e30",
+      "feature_id": "yilong-quant-paper-grant-revocation-sync-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-quant-grant-revocation-sync",
+      "reason": "目录合同、V8 精确快照、Server 非测试编译、源码体积与文档模块化门禁通过；Rust 全测试被无关基线 VFS 测试编译错误阻断并保留证据。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1788288937517
     }
   ]
 }

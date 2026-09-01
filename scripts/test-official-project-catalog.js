@@ -40,6 +40,25 @@ assert.match(plazaSource, /<OfficialProjectPreviewDialog/)
 assert.match(previewDialogSource, /了解项目详情/)
 assert.doesNotMatch(previewDialogSource, /\/join|paper-launch|paper\/launch/)
 
+const quantProject = catalog.projects.find((project) => project.id === 'yilong-quant')
+assert.ok(quantProject, 'yilong-quant must remain in the official catalog')
+assert.equal(
+  quantProject.landing.highlights[3],
+  '短期签名授权只允许用户查看和退出自己的模拟仓位，支持密钥级撤销及单个授权跨重启撤销',
+)
+assert.equal(
+  quantProject.landing.recent_updates[0],
+  '新增单个 Paper 授权持久撤销：用户可结束当前授权，SQLite 重启后仍拒绝旧授权且不保存 token 或 participant',
+)
+assert.equal(
+  quantProject.landing.paper_launch.description,
+  '由一龙账号签发五分钟短期授权，在内存通道中打开本人模拟仓位；固定公钥密钥环支持安全轮换，用户可撤销当前授权，未配置 Web 地址或可信密钥时保持不可用。',
+)
+assert.equal(quantProject.landing.downloads.web.status, 'planned')
+assert.match(quantProject.landing.summary, /paper 模拟交易/)
+assert.match(quantProject.landing.summary, /6% 是非保证目标/)
+assert.doesNotMatch(JSON.stringify(quantProject.landing), /真实提现|保本收益|固定收益/)
+
 for (const project of catalog.projects) {
   assert.ok(project.id && project.name && project.display_name && project.description)
   assert.ok(project.landing.title && project.landing.summary)
