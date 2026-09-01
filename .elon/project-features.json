@@ -2661,7 +2661,7 @@
       "id": "compute-federation-interactive-desktop-v1",
       "title": "分布式算力联邦交互式云电脑 V1",
       "summary": "Extend the shared Provider/Offer/Capacity/Price/Receipt control plane with a separate interactive desktop session plane for consent-bound Windows screen/audio streaming and optional input, without reclassifying batch ComputeJob or opening production media, input, or funds effects.",
-      "status": "accepted",
+      "status": "in_progress",
       "priority": "p0",
       "requirement": {
         "path": "docs/requirements/interactive-desktop-federation-v1.md",
@@ -2705,8 +2705,14 @@
         "Record source as uncompiled and unrun and keep all production and economic effects closed."
       ],
       "implementation_evidence": [],
+      "claim": {
+        "claim_id": "claim_e5cd49a50be748cabbf5b7c49294a254",
+        "agent_id": "Codex:/root",
+        "claimed_at_ms": 1788296275005,
+        "expires_at_ms": 1788382675005
+      },
       "created_at_ms": 1788296237836,
-      "updated_at_ms": 1788296237836
+      "updated_at_ms": 1788296285296
     },
     {
       "id": "compute-v255-runtime-launch-profile-verification",
@@ -15605,6 +15611,36 @@
       "from_status": "",
       "to_status": "accepted",
       "at_ms": 1788296237836
+    },
+    {
+      "id": "feature_event_6d8a29f002db48f9836a31fe23056252",
+      "feature_id": "compute-federation-interactive-desktop-v1",
+      "action": "transitioned",
+      "actor": "Codex",
+      "reason": "Requirement is committed, current, accepted, and has no dependency blocker; begin the isolated source-contract tranche.",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1788296266677
+    },
+    {
+      "id": "feature_event_c22c0b06518f4f2ebee5aa1bbe264ce0",
+      "feature_id": "compute-federation-interactive-desktop-v1",
+      "action": "claimed",
+      "actor": "Codex:/root",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788296275006
+    },
+    {
+      "id": "feature_event_9dbbf3c107a34b388616e13fd1a1a364",
+      "feature_id": "compute-federation-interactive-desktop-v1",
+      "action": "transitioned",
+      "actor": "Codex",
+      "reason": "Implement the isolated source-contract tranche in the planned document and compute_federation module boundaries.",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788296285296
     }
   ]
 }
