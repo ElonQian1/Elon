@@ -8,7 +8,8 @@ const ALLOCATION_READ: &str = include_str!("../../compute_delivery_allocations/r
 const ALLOCATION_AUDIT: &str = include_str!("../../compute_delivery_allocations/read/audit.rs");
 const OFFER_PUBLICATIONS: &str = include_str!("../../compute_offer_publications.rs");
 const PRICE_SNAPSHOTS: &str = include_str!("../../compute_price_snapshot_registry.rs");
-const ATTEMPT_EXECUTION_RECEIPTS: &str = include_str!("../../compute_attempt_execution_receipts.rs");
+const ATTEMPT_EXECUTION_RECEIPTS: &str =
+    include_str!("../../compute_attempt_execution_receipts.rs");
 const ATTEMPT_VERIFICATIONS: &str = include_str!("../../compute_attempt_verifications.rs");
 const ATTEMPT_SETTLEMENTS: &str = include_str!("../../compute_attempt_settlements.rs");
 const ATTEMPT_SETTLEMENT_SUPPORT: &str =
@@ -234,18 +235,22 @@ fn capacity_future_historical_owner_chain_reaches_native_audits() {
             "compute_attempt_historical_settlement_by_lease_on(conn, &release.lease_id)",
         ),
     ] {
-        assert!(source.contains(marker), "historical owner chain lost {marker}");
+        assert!(
+            source.contains(marker),
+            "historical owner chain lost {marker}"
+        );
     }
     assert!(VERIFICATION_AUDIT.contains("audit_verification_decision("));
-    assert!(VERIFICATION_AUDIT
-        .contains("verification_usage_digest(\"verified\", &expected_verified)"));
+    assert!(
+        VERIFICATION_AUDIT.contains("verification_usage_digest(\"verified\", &expected_verified)")
+    );
     assert!(SETTLEMENT_AUDIT.contains("audited_historical_settlement_on("));
     assert!(SETTLEMENT_AUDIT.contains("calculate_settlement(&snapshot, &execution.receipt"));
     assert!(SETTLEMENT_AUDIT.contains(".settlement_account_id"));
-    assert!(SETTLEMENT_AUDIT
-        .contains(".unwrap_or(provider.provider.owner_account_id.as_str())"));
-    assert!(SETTLEMENT_AUDIT
-        .contains("receipt.settlement.provider_account_id != provider_account_id"));
+    assert!(SETTLEMENT_AUDIT.contains(".unwrap_or(provider.provider.owner_account_id.as_str())"));
+    assert!(
+        SETTLEMENT_AUDIT.contains("receipt.settlement.provider_account_id != provider_account_id")
+    );
     for source in [
         EXECUTION_RESOLVER,
         VERIFICATION_RESOLVER,
