@@ -1,6 +1,7 @@
 //! Process-isolated native receipts for executable Lock request-validation programs.
 
 mod lifecycle;
+mod local_sibling_contention;
 mod native_acquire_busy;
 mod request_validation;
 mod stored_poison;
@@ -8,6 +9,14 @@ mod stored_poison_dispatch;
 mod stored_poison_model;
 mod stored_poison_route_unknown;
 
+#[cfg(all(test, windows))]
+pub(in super::super) use local_sibling_contention::{
+    lock_local_sibling_contention_selector_for_test,
+    selected_lock_local_sibling_contention_selector_for_test,
+};
+pub(in super::super) use local_sibling_contention::{
+    run_lock_local_sibling_contention_program_isolated, LockRunnerLocalSiblingContentionBindingV1,
+};
 #[cfg(all(test, windows))]
 pub(in super::super) use native_acquire_busy::{
     lock_native_acquire_busy_selector_for_test, selected_lock_native_acquire_busy_selector_for_test,

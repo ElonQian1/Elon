@@ -251,6 +251,7 @@ fn managed_path_tag(value: ManagedSqliteShmTestLockPath) -> u64 {
         ManagedSqliteShmTestLockPath::NativeAcquire => 1,
         ManagedSqliteShmTestLockPath::NativeRelease => 2,
         ManagedSqliteShmTestLockPath::Local => 3,
+        ManagedSqliteShmTestLockPath::SiblingContention => 4,
     }
 }
 

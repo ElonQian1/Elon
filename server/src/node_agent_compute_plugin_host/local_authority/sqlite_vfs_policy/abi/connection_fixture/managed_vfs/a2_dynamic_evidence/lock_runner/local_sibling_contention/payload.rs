@@ -1,4 +1,4 @@
-//! Canonical q5 payload and independent parent-side native-busy validation.
+//! Canonical q6 payload and independent parent-side sibling-contention validation.
 
 use anyhow::anyhow;
 use rusqlite::ffi;
@@ -6,30 +6,37 @@ use sha2::{Digest, Sha256};
 
 use crate::node_agent_managed_fs::{
     ManagedSqliteShmLockAction, ManagedSqliteShmTestLockPath, ManagedSqliteShmTestLockReceipt,
-    ManagedSqliteShmTestNativeContentionReceipt, ManagedSqliteShmTestTargetSnapshot,
+    ManagedSqliteShmTestTargetSnapshot,
 };
 
 use super::super::super::super::connection::ManagedTestShmLockCallbackObservation;
-use super::super::super::child::lock_native_acquire_busy::{REPORT_VALUE_COUNT, REPORT_VERSION};
-use super::fixture::{raw_flags, snapshot_values};
-use super::{action_tag, exact_selector, LockRunnerNativeAcquireBusyBindingV1};
+use super::super::super::child::lock_local_sibling_contention::{
+    REPORT_VALUE_COUNT, REPORT_VERSION,
+};
+use super::fixture::{raw_flags, sibling_values, snapshot_values};
+use super::{action_tag, exact_selector, LockRunnerLocalSiblingContentionBindingV1};
 
-pub(in super::super) struct ValidatedNativeAcquireBusyPayloadV1 {
+const SIBLING_CONTENTION_PATH_TAG: u64 = 4;
+
+pub(in super::super) struct ValidatedLocalSiblingContentionPayloadV1 {
     pub(in super::super) registration_id: u64,
     pub(in super::super) native_receipt_sha256: [u8; 32],
 }
 
 #[allow(clippy::too_many_arguments)]
 pub(super) fn encode(
-    binding: LockRunnerNativeAcquireBusyBindingV1,
+    binding: LockRunnerLocalSiblingContentionBindingV1,
     registration_id: u64,
     route_ordinal: u64,
     runtime_generation: u64,
     shm_connection_id: u64,
     callback: ManagedTestShmLockCallbackObservation,
-    before: ManagedSqliteShmTestTargetSnapshot,
-    after: ManagedSqliteShmTestTargetSnapshot,
-    holder: ManagedSqliteShmTestNativeContentionReceipt,
+    selected_before: ManagedSqliteShmTestTargetSnapshot,
+    selected_after: ManagedSqliteShmTestTargetSnapshot,
+    sibling_before: ManagedSqliteShmTestTargetSnapshot,
+    sibling_after: ManagedSqliteShmTestTargetSnapshot,
+    selected_cleaned: ManagedSqliteShmTestTargetSnapshot,
+    sibling_cleaned: ManagedSqliteShmTestTargetSnapshot,
     lower: ManagedSqliteShmTestLockReceipt,
     pending_count: usize,
     registration: [u64; 4],
@@ -58,11 +65,12 @@ pub(super) fn encode(
         u64::from(callback.after().methods_installed),
         u64::from(callback.after().state_installed),
     ]);
-    values.extend(snapshot_values(before));
-    values.extend(snapshot_values(after));
-    values.extend([0; 3]);
-    values.extend([0; 3]);
-    values.extend(holder_values(holder));
+    values.extend(snapshot_values(selected_before));
+    values.extend(snapshot_values(selected_after));
+    values.extend(sibling_values(sibling_before));
+    values.extend(sibling_values(sibling_after));
+    values.extend(sibling_values(selected_cleaned));
+    values.extend(sibling_values(sibling_cleaned));
     values.extend(lower_values(lower, pending_count));
     values.extend(registration);
     values.extend(route);
@@ -81,19 +89,23 @@ pub(super) fn encode(
 
 pub(in super::super) fn validate_payload(
     payload: &str,
-    binding: LockRunnerNativeAcquireBusyBindingV1,
-) -> anyhow::Result<ValidatedNativeAcquireBusyPayloadV1> {
+    binding: LockRunnerLocalSiblingContentionBindingV1,
+) -> anyhow::Result<ValidatedLocalSiblingContentionPayloadV1> {
     super::validate_binding(binding)?;
     let mut fields = payload.split(',');
     let selector = exact_selector(binding);
     if fields.next() != Some(REPORT_VERSION) || fields.next() != Some(selector.as_str()) {
-        return Err(anyhow!("Lock native-busy payload identity mismatch"));
+        return Err(anyhow!(
+            "Lock local sibling-contention payload identity mismatch"
+        ));
     }
     let values = fields
         .map(parse_canonical_u64)
         .collect::<anyhow::Result<Vec<_>>>()?;
     if values.len() != REPORT_VALUE_COUNT || values[..22] != binding_values(binding) {
-        return Err(anyhow!("Lock native-busy payload program binding mismatch"));
+        return Err(anyhow!(
+            "Lock local sibling-contention payload program binding mismatch"
+        ));
     }
     let identity = [
         values[22],
@@ -122,25 +134,35 @@ pub(in super::super) fn validate_payload(
                 1,
                 1,
             ]
-        || values[39..53] != expected_snapshot()
-        || values[53..67] != expected_snapshot()
-        || values[67..73] != [0; 6]
-        || values[73..85] != expected_holder(binding, values[24], values[25])
-        || values[85..104] != expected_lower(binding, values[24], values[25])
-        || values[104..108] != [1, 1, 1, 1]
-        || values[108..111] != [1, 1, 3]
-        || values[111..115] != [1, 1, 1, 1]
     {
-        return Err(anyhow!("Lock native-busy payload native receipt mismatch"));
+        return Err(anyhow!(
+            "Lock local sibling-contention payload installed-ABI binding mismatch"
+        ));
     }
-    Ok(ValidatedNativeAcquireBusyPayloadV1 {
+    let sibling = expected_sibling(binding);
+    if values[39..53] != expected_selected_snapshot()
+        || values[53..67] != expected_selected_snapshot()
+        || values[67..70] != sibling
+        || values[70..73] != sibling
+        || values[73..76] != [1, 0, 0]
+        || values[76..79] != [1, 0, 0]
+        || values[79..98] != expected_lower(binding, values[24], values[25])
+        || values[98..102] != [1, 1, 1, 1]
+        || values[102..105] != [2, 2, 6]
+        || values[105..109] != [1, 1, 1, 1]
+    {
+        return Err(anyhow!(
+            "Lock local sibling-contention payload native receipt mismatch"
+        ));
+    }
+    Ok(ValidatedLocalSiblingContentionPayloadV1 {
         registration_id: values[22],
         native_receipt_sha256: digest_native_receipt(&values),
     })
 }
 
-fn binding_values(binding: LockRunnerNativeAcquireBusyBindingV1) -> Vec<u64> {
-    let mut values = vec![action_tag(binding.action), 1];
+fn binding_values(binding: LockRunnerLocalSiblingContentionBindingV1) -> Vec<u64> {
+    let mut values = vec![action_tag(binding.action), SIBLING_CONTENTION_PATH_TAG];
     for digest in [
         binding.normalized_descriptor_sha256,
         binding.case_key_sha256,
@@ -155,33 +177,20 @@ fn binding_values(binding: LockRunnerNativeAcquireBusyBindingV1) -> Vec<u64> {
     values
 }
 
-fn expected_snapshot() -> [u64; 14] {
-    [1, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0]
+fn expected_selected_snapshot() -> [u64; 14] {
+    [1, 0, 0, 2, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0]
 }
 
-fn expected_holder(
-    binding: LockRunnerNativeAcquireBusyBindingV1,
-    runtime_generation: u64,
-    shm_connection_id: u64,
-) -> [u64; 12] {
-    [
-        runtime_generation,
-        shm_connection_id,
-        120 + u64::from(binding.first),
-        u64::from(binding.count),
-        1,
-        1,
-        1,
-        1,
-        1,
-        1,
-        1,
-        1,
-    ]
+fn expected_sibling(binding: LockRunnerLocalSiblingContentionBindingV1) -> [u64; 3] {
+    match binding.action {
+        super::LockRunnerActionV1::LockShared => [1, 0, u64::from(binding.mask)],
+        super::LockRunnerActionV1::LockExclusive => [1, u64::from(binding.mask), 0],
+        _ => [0; 3],
+    }
 }
 
 fn expected_lower(
-    binding: LockRunnerNativeAcquireBusyBindingV1,
+    binding: LockRunnerLocalSiblingContentionBindingV1,
     runtime_generation: u64,
     shm_connection_id: u64,
 ) -> [u64; 19] {
@@ -192,11 +201,7 @@ fn expected_lower(
         u64::from(binding.first),
         u64::from(binding.count),
         u64::from(binding.mask),
-        1,
-        1,
-        0,
-        1,
-        0,
+        SIBLING_CONTENTION_PATH_TAG,
         1,
         0,
         0,
@@ -204,24 +209,11 @@ fn expected_lower(
         0,
         0,
         0,
+        0,
+        0,
+        0,
+        0,
         1,
-    ]
-}
-
-fn holder_values(value: ManagedSqliteShmTestNativeContentionReceipt) -> [u64; 12] {
-    [
-        value.runtime_generation,
-        value.shm_connection_id,
-        value.absolute_offset,
-        value.length,
-        u64::from(value.target_identity_verified),
-        u64::from(value.holder_identity_verified),
-        u64::from(value.distinct_handle),
-        u64::from(value.exclusive_holder),
-        u64::from(value.acquire_attempts),
-        u64::from(value.acquired),
-        u64::from(value.held_during_callback),
-        u64::from(value.released),
     ]
 }
 
@@ -263,14 +255,14 @@ fn managed_path_tag(value: ManagedSqliteShmTestLockPath) -> u64 {
         ManagedSqliteShmTestLockPath::NativeAcquire => 1,
         ManagedSqliteShmTestLockPath::NativeRelease => 2,
         ManagedSqliteShmTestLockPath::Local => 3,
-        ManagedSqliteShmTestLockPath::SiblingContention => 4,
+        ManagedSqliteShmTestLockPath::SiblingContention => SIBLING_CONTENTION_PATH_TAG,
     }
 }
 
 fn digest_native_receipt(values: &[u64]) -> [u8; 32] {
     let mut hasher = Sha256::new();
-    hasher.update(b"elon-lock-native-acquire-busy-receipt-v1\0");
-    for value in &values[22..104] {
+    hasher.update(b"elon-lock-local-sibling-contention-receipt-v1\0");
+    for value in &values[22..98] {
         hasher.update(value.to_le_bytes());
     }
     hasher.finalize().into()
@@ -279,7 +271,9 @@ fn digest_native_receipt(values: &[u64]) -> [u8; 32] {
 fn parse_canonical_u64(value: &str) -> anyhow::Result<u64> {
     let parsed = value.parse::<u64>()?;
     if parsed.to_string() != value {
-        return Err(anyhow!("Lock native-busy payload scalar is not canonical"));
+        return Err(anyhow!(
+            "Lock local sibling-contention payload scalar is not canonical"
+        ));
     }
     Ok(parsed)
 }
