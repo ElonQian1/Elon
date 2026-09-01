@@ -101,7 +101,7 @@
       "id": "yilong-quant",
       "name": "yilong-quant",
       "display_name": "一龙量化交易",
-      "description": "面向全球加密资产交易者的量化技术测试子项目；当前只提供 paper 模拟委托和模拟参与份额账本。",
+      "description": "面向全球加密资产交易者的量化技术测试子项目；当前提供 paper 模拟委托、模拟参与份额账本和可复现研究回测。",
       "repo_url": "git@github.com:ElonQian1/yilong-quant.git",
       "branch": "main",
       "landing": {
@@ -110,6 +110,7 @@
         "tagline": "面向全球加密资产交易者的量化交易技术测试平台",
         "summary": "当前只提供 paper 模拟交易和模拟参与份额账本；6% 是非保证目标，不接收或移动真实用户资金，也不连接实盘。",
         "highlights": [
+          "版本化研究行情与单机可复现回测已建立，结果携带来源、策略、费用、滑点和确定性摘要",
           "Rust 风控、订单、交易所端口和追加式参与账本按领域分层",
           "模拟 NET 锁定配额可换算为内部份额，按 NAV 同比例承担盈亏并申请退出",
           "短期签名授权只允许用户查看和退出自己的模拟仓位，证明不会写入浏览器持久存储",
@@ -141,6 +142,7 @@
           "本地开发需要 Rust 1.97、Node.js 22 和 PowerShell 7"
         ],
         "recent_updates": [
+          "新增 BACKTEST / SIMULATION 研究面板：内置 CC0 fixture、无未来数据基准策略、费用/滑点、权益曲线与回撤",
           "新增主项目一键进入 Paper 持仓：五分钟授权只经 exact-origin 内存通道传递，未配置时保持关闭",
           "新增一龙账号短期 Ed25519 paper grant 与本人持仓/全额退出接口",
           "旧 participant 路径、直接建仓和 NAV 发布改为独立运营令牌门禁",

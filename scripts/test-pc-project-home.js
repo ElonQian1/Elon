@@ -54,6 +54,17 @@ assert.match(quantLaunchCss, /height:\s*min\(720px, 72vh\)/, 'embedded quant sur
 assert.equal(launchSchema.$defs.protocol.const, 'yilong.quant.paper_launch.v1')
 const quantCatalog = officialCatalog.projects.find((project) => project.id === 'yilong-quant')
 assert.equal(quantCatalog.landing.paper_launch.schema, 'yilong.quant.paper_launch.v1')
+assert.match(quantCatalog.description, /可复现研究回测/, 'quant catalog should expose the verified research backtest')
+assert.ok(
+  quantCatalog.landing.highlights.includes('版本化研究行情与单机可复现回测已建立，结果携带来源、策略、费用、滑点和确定性摘要'),
+  'quant catalog should preserve the subproject research highlight',
+)
+assert.match(
+  quantCatalog.landing.recent_updates[0],
+  /BACKTEST \/ SIMULATION[\s\S]*CC0 fixture[\s\S]*权益曲线与回撤/,
+  'quant catalog should surface the latest traceable simulation update first',
+)
+assert.match(quantCatalog.landing.summary, /不接收或移动真实用户资金，也不连接实盘/, 'research update must not weaken the paper-only boundary')
 
 assert.match(conversationPage, /onSelectChannel=\{\(id\) => \{ void openDevelopmentDraft\(id\) \}\}/, 'continue development should open a draft conversation')
 assert.ok(conversationPage.includes("channels.find((channel) => channel.id === id)?.kind === 'ai_development') openDevelopmentDraft(id)"), 'clicking the AI development channel should open the same draft conversation')
