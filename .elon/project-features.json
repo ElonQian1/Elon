@@ -320,14 +320,14 @@
       "priority": "p0",
       "requirement": {
         "path": "docs/distributed-compute/node-plugin-vfs-map-lock-dynamic-quotient-authority.md",
-        "content_hash": "fb6e02862cdcbb7b633a827533472eea7f66084d6e9982db03af2ade9f62e74c",
+        "content_hash": "746738153ffbff6e45d0d8c486a11fd87909f11c44791f4913736530a4e61b46",
         "locator": "",
         "evidence_kind": "document",
         "git_identity": {
           "schema": "elon.project_context_git_identity.v1",
-          "head_commit": "74f81c0205b5db93e325e601b9d33e7d7f6e1aa8",
-          "head_blob_oid": "032b7dec394cc6826e8bda3b1152a57d59c5edbf",
-          "worktree_blob_oid": "2a388eb4f99804ff07ffbea7684007ca064e9279",
+          "head_commit": "585a0c6f23bc0392685b851fd13ff1420945bf7b",
+          "head_blob_oid": "2a388eb4f99804ff07ffbea7684007ca064e9279",
+          "worktree_blob_oid": "c18584a6ee0f284e78846df625ae3b0abf529b27",
           "state": "tracked_modified"
         }
       },
@@ -365,215 +365,215 @@
       "implementation_evidence": [
         {
           "path": "docs/distributed-compute/node-plugin-vfs-lock-dynamic-tranches-authority.md",
-          "content_hash": "9b10b1a50cac5327aa837af6cd7aea75c93b0df9ef7035892cfb1ea874641c5e",
-          "locator": "q5-q7 exact tranche authority and source-only boundary",
+          "content_hash": "73770730cbfca67d4334514d1e8bded5311191ce95d6cce57bd74d3ea1e913a7",
+          "locator": "q8 exact 88-member authority and source-only boundary",
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "74f81c0205b5db93e325e601b9d33e7d7f6e1aa8",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "08a92ba0e79633ab4a5552669d456560e99a9eb8",
-            "state": "untracked"
-          }
-        },
-        {
-          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2_dynamic_evidence/child/lock_callback_route_unknown.rs",
-          "content_hash": "aeac7c757c50c504c442ade48e40cd5628c162bd0e002391cc0ca2e304ab20df",
-          "locator": "a2lockq7 child header and selector",
-          "evidence_kind": "source",
-          "git_identity": {
-            "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "74f81c0205b5db93e325e601b9d33e7d7f6e1aa8",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "e522dd771fb4b09889210280b85670ed5477ab76",
-            "state": "untracked"
-          }
-        },
-        {
-          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2_dynamic_evidence/lock_runner/callback_completion_route_unknown.rs",
-          "content_hash": "56a7bb15819cbda1ab3ae9b85b61ee6d9d32d121c97ff50c8bd4107e423bf06d",
-          "locator": "process-isolated q7 runner",
-          "evidence_kind": "source",
-          "git_identity": {
-            "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "74f81c0205b5db93e325e601b9d33e7d7f6e1aa8",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "1204009f2c406c864d6c9e952cbfe49f77d37e29",
-            "state": "untracked"
-          }
-        },
-        {
-          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2_dynamic_evidence/lock_runner/callback_completion_route_unknown/fixture.rs",
-          "content_hash": "4edfdbd451e9942fb3cac55c46cb95abc605b44fc6126411cd90bc784e1e18bb",
-          "locator": "real lower invocation and route preemption fixture",
-          "evidence_kind": "source",
-          "git_identity": {
-            "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "74f81c0205b5db93e325e601b9d33e7d7f6e1aa8",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "e29c73d4bc9e40e1a0dd0f174d8ce2e479b03a6b",
-            "state": "untracked"
-          }
-        },
-        {
-          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2_dynamic_evidence/lock_runner/callback_completion_route_unknown/fixture/validation.rs",
-          "content_hash": "d851cd994e85d54cbb5e3b8869c4b48a5484d40de65c0d5d739bd3374945dcdc",
-          "locator": "lower snapshot and terminal validation",
-          "evidence_kind": "source",
-          "git_identity": {
-            "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "74f81c0205b5db93e325e601b9d33e7d7f6e1aa8",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "399c8770e25553ae03f48c3a54b166020af07026",
-            "state": "untracked"
-          }
-        },
-        {
-          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2_dynamic_evidence/lock_runner/callback_completion_route_unknown/payload.rs",
-          "content_hash": "2259fed8bc379fa11f9696b32fcf5b0f03d36291240e51765b1770740665e1bd",
-          "locator": "141-scalar strict payload",
-          "evidence_kind": "source",
-          "git_identity": {
-            "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "74f81c0205b5db93e325e601b9d33e7d7f6e1aa8",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "10b3ec1f4901c1fd650b6cc8791c56151863d256",
-            "state": "untracked"
-          }
-        },
-        {
-          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/dynamic_quotient/lock_callback_completion_route_unknown_source_scope.rs",
-          "content_hash": "ce4b5e9ae52c5c8bcdea380f64e2a0c94dd52f6705b94d204d730a60ccde79a4",
-          "locator": "119 full and 13 delta source identities",
-          "evidence_kind": "source",
-          "git_identity": {
-            "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "74f81c0205b5db93e325e601b9d33e7d7f6e1aa8",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "4b8572552ea8d1a6ac2e73715cb3d4c8e513464b",
-            "state": "untracked"
-          }
-        },
-        {
-          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/dynamic_quotient/runner_admission/lock_program.rs",
-          "content_hash": "cfddd246c11edf79cea92829092b630393e6a2b91a7ad483cb8da5c021b8a248",
-          "locator": "private exact receipt execution dispatch",
-          "evidence_kind": "source",
-          "git_identity": {
-            "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "74f81c0205b5db93e325e601b9d33e7d7f6e1aa8",
-            "head_blob_oid": "495341d40fd862893044fd20743737136d9dc020",
-            "worktree_blob_oid": "bc526ea6104a26cf0e49c7171fc52303d4ce3765",
+            "head_commit": "585a0c6f23bc0392685b851fd13ff1420945bf7b",
+            "head_blob_oid": "08a92ba0e79633ab4a5552669d456560e99a9eb8",
+            "worktree_blob_oid": "793e0adb397824da93b7abe311c5deb9fd0ffe38",
             "state": "tracked_modified"
           }
         },
         {
-          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/dynamic_quotient/runner_admission/lock_program/callback_completion_route_unknown.rs",
-          "content_hash": "425b4eace3ff28982b4268e7ad9bfc81476eca347158d52a0b181d3802738c40",
-          "locator": "typed q7 matcher and exact Expected",
-          "evidence_kind": "source",
+          "path": "docs/distributed-compute/node-plugin-vfs-map-lock-dynamic-quotient-acceptance.md",
+          "content_hash": "4ef34a1e4eee258440431cf3ef65c0422a7fb4c79409f5888709d9ad9336a8df",
+          "locator": "q8 source-only acceptance state and remaining 5546 gap",
+          "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "74f81c0205b5db93e325e601b9d33e7d7f6e1aa8",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "122b8f5596b1f97de5eb302aa76044c47cf30d9e",
-            "state": "untracked"
-          }
-        },
-        {
-          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/dynamic_quotient/runner_admission/lock_program/callback_completion_route_unknown/callback_completion_route_unknown_members.v1.tsv",
-          "content_hash": "e9f509d52d294405dd1a7ae528c514a31ba4e0758959374b633bdca2b571d631",
-          "locator": "192 frozen member seals",
-          "evidence_kind": "source",
-          "git_identity": {
-            "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "74f81c0205b5db93e325e601b9d33e7d7f6e1aa8",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "9b7625e6a51c02167fd3768dbce93ab3f136d065",
-            "state": "untracked"
-          }
-        },
-        {
-          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/dynamic_quotient/runner_admission/lock_program/callback_completion_route_unknown/catalog.rs",
-          "content_hash": "4c9a3cf633890a7fb42361125d8433ef48c7b84ee49583bf96a54776de5d25ba",
-          "locator": "canonical 192-row catalog parser",
-          "evidence_kind": "source",
-          "git_identity": {
-            "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "74f81c0205b5db93e325e601b9d33e7d7f6e1aa8",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "4a715d5b3e75f04de9977acfcb17c678b6b77f8f",
-            "state": "untracked"
-          }
-        },
-        {
-          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/dynamic_quotient/runner_admission/lock_program/callback_completion_route_unknown/runtime.rs",
-          "content_hash": "8845bfd028435fb9dec03aeb51f1a0f7aa4129188bbd50d6e4fd81673282ee58",
-          "locator": "static-to-runtime exact binding bridge",
-          "evidence_kind": "source",
-          "git_identity": {
-            "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "74f81c0205b5db93e325e601b9d33e7d7f6e1aa8",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "a8cb22c171214cbba23af86a2662b64bf50c83b5",
-            "state": "untracked"
-          }
-        },
-        {
-          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/dynamic_quotient/runner_admission/lock_program/source_program.rs",
-          "content_hash": "0cef0fb504ac015272c0960e7369db23d823d5b0439d1a79e077612caea7391e",
-          "locator": "source inventory classifier dispatch",
-          "evidence_kind": "source",
-          "git_identity": {
-            "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "74f81c0205b5db93e325e601b9d33e7d7f6e1aa8",
-            "head_blob_oid": "3e1b671eeee871e8b2e91db69240f0d3d778b1bf",
-            "worktree_blob_oid": "c8e2e11c1da1412da952e345647585c508dd8915",
+            "head_commit": "585a0c6f23bc0392685b851fd13ff1420945bf7b",
+            "head_blob_oid": "778349a8527d1dfdd3858896d5bfa1b2b0efc095",
+            "worktree_blob_oid": "567c82c91080752681388b92492b5fdd16ccb5d8",
             "state": "tracked_modified"
           }
         },
         {
-          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/lifecycle_faults/ordinary_shm_lock_preemption.rs",
-          "content_hash": "5cd036a5e297f9e7238041869dcaf9b15660fdc732678cc30135cf9a837f4d2b",
-          "locator": "exact one-shot route/request/outcome state",
-          "evidence_kind": "source",
+          "path": "docs/distributed-compute/node-plugin-vfs-map-lock-dynamic-quotient-authority.md",
+          "content_hash": "746738153ffbff6e45d0d8c486a11fd87909f11c44791f4913736530a4e61b46",
+          "locator": "3122 of 8668 written inventory and fail-closed quotient boundary",
+          "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "74f81c0205b5db93e325e601b9d33e7d7f6e1aa8",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "4cc7bc56ae6f01a0dd6844e72fab297da626a408",
-            "state": "untracked"
-          }
-        },
-        {
-          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/registry/file_custody/operations.rs",
-          "content_hash": "a54f0e1e4ede0d4dd4ccef5d36946ec306950e86c3f11914d414706d022ddeaa",
-          "locator": "lower result then real callback completion ordering",
-          "evidence_kind": "source",
-          "git_identity": {
-            "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "74f81c0205b5db93e325e601b9d33e7d7f6e1aa8",
-            "head_blob_oid": "1c02ee84f066fe1df632d52d9e9427d6de49fa47",
-            "worktree_blob_oid": "ae648ef416fcf665f54ec2f5e605c7ce41afd12b",
+            "head_commit": "585a0c6f23bc0392685b851fd13ff1420945bf7b",
+            "head_blob_oid": "2a388eb4f99804ff07ffbea7684007ca064e9279",
+            "worktree_blob_oid": "c18584a6ee0f284e78846df625ae3b0abf529b27",
             "state": "tracked_modified"
           }
         },
         {
-          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/registry/file_custody/operations/ordinary_shm_lock_preemption.rs",
-          "content_hash": "7714fa55d7d782c2dc1978406b38b6c852ded05b0b549328e00d0a5a4dc34197",
-          "locator": "production terminal-custody retention seam",
+          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2_dynamic_evidence/child/lock_local_protocol_rejection.rs",
+          "content_hash": "eae5546426174385541fe6fcccb4c50cf84f874480647c28bbe93ca4bbaaa0cc",
+          "locator": "a2lockq8 child selector and expected header",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "74f81c0205b5db93e325e601b9d33e7d7f6e1aa8",
+            "head_commit": "585a0c6f23bc0392685b851fd13ff1420945bf7b",
             "head_blob_oid": "",
-            "worktree_blob_oid": "9aa25f730b8677ff78f0aa295a8ab66aa166c945",
+            "worktree_blob_oid": "3c0111ec6f5ab8876b05fc37bc5f162345f6eb00",
             "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2_dynamic_evidence/lock_runner/local_protocol_rejection.rs",
+          "content_hash": "10273de8bd8850a6b971c8ebb3e7eeee747f9fa51fa7bb68e7925c6d6dce5f4b",
+          "locator": "process-isolated q8 parent runner",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "585a0c6f23bc0392685b851fd13ff1420945bf7b",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "e880e0b057e63940b8f4e26f7b6a9ecdff56ba92",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2_dynamic_evidence/lock_runner/local_protocol_rejection/fixture.rs",
+          "content_hash": "7c265ae160bb74ba1d915be4777b0fe704404b3f13b6dd5f5919fbc34712e517",
+          "locator": "real installed ABI setup observation and cleanup fixture",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "585a0c6f23bc0392685b851fd13ff1420945bf7b",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "d01db80c1e45de67abab3bf4e0cafd6e13bbed5a",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2_dynamic_evidence/lock_runner/local_protocol_rejection/payload.rs",
+          "content_hash": "41438a505b69482f14f38b46f937b1b01abdbe9f8bcddbf6a161636cdf9cab27",
+          "locator": "134-scalar strict q8 payload and native receipt split",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "585a0c6f23bc0392685b851fd13ff1420945bf7b",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "af6f5912cf3f80d6c493bb64f9027bb83a42207a",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/dynamic_quotient/lock_local_protocol_rejection_source_scope.rs",
+          "content_hash": "bbd19be896e36b688fc25522f9c8cc1ebba3fa8903330244a758af56dd08101d",
+          "locator": "132 full and 12 delta source identity seals",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "585a0c6f23bc0392685b851fd13ff1420945bf7b",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "82c7d15bf409c215aaff705bfd0afd187d51aba1",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/dynamic_quotient/manifest_canonical.rs",
+          "content_hash": "ade5207ae48b3985adb5ae76f670c15ff3088c6b5f794bba4865ec14cc5e347e",
+          "locator": "226-source global manifest identity chain",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "585a0c6f23bc0392685b851fd13ff1420945bf7b",
+            "head_blob_oid": "83728810662d3bec1fede9c1b56aa07aa5f48e81",
+            "worktree_blob_oid": "91a5c2379c77d1ea1b84c4901a87bfe0d60dd815",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/dynamic_quotient/program_inventory_canonical.rs",
+          "content_hash": "9fca562d9793d59324bdd7a43b05abd5aa617f3ed1f3234555a1f6815f531376",
+          "locator": "Lock written inventory 3122 present 5546 missing",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "585a0c6f23bc0392685b851fd13ff1420945bf7b",
+            "head_blob_oid": "875ddc5a1754a4217396614cc11e17de269ff6fa",
+            "worktree_blob_oid": "816b9b0812588ede323577824058a22433a78acf",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/dynamic_quotient/runner_admission/lock_program/local_protocol_rejection.rs",
+          "content_hash": "4d42e0cf92ad126ae584ba67878e03a31ba4a14a2ce741994e4becee3d186e5a",
+          "locator": "typed exact q8 receipt matcher",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "585a0c6f23bc0392685b851fd13ff1420945bf7b",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "a2773f06e231af580a94555018a25e7282fe1839",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/dynamic_quotient/runner_admission/lock_program/local_protocol_rejection/catalog.rs",
+          "content_hash": "00a8245e44623bdb1f3f08d0b5d2c75582e58e74b9d990f7d9858dd174f32ab8",
+          "locator": "canonical exact 88-row catalog parser",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "585a0c6f23bc0392685b851fd13ff1420945bf7b",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "0ba88e3fedda278d97329a778c63248acdc6b3c1",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/dynamic_quotient/runner_admission/lock_program/local_protocol_rejection/local_protocol_own_overlap_or_not_held_completed_members.v1.tsv",
+          "content_hash": "8cb3fcef3eb2f65fe54694396cdcff32aef576dc5f299879f5e072699428c936",
+          "locator": "88 frozen local protocol member seals",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "585a0c6f23bc0392685b851fd13ff1420945bf7b",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "329cebc4a567702ea9a31890bddae41a83fba013",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/dynamic_quotient/runner_admission/lock_program/local_protocol_rejection/runtime.rs",
+          "content_hash": "6fcbea23c2d15aa5a4d4cfb23420f6f0acaa70b4c7780d2385c1fb8693c0f5e0",
+          "locator": "static-to-runtime exact q8 binding bridge",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "585a0c6f23bc0392685b851fd13ff1420945bf7b",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "b5888d4bf994dd85e79b58ccb4a4f6ce32efd16f",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/node_agent_managed_fs/sqlite_namespace_shm/locking.rs",
+          "content_hash": "0bbd681689614720caf3d9b28cb3fe4236f04fe03e88d617e87d5aeb6a3965ba",
+          "locator": "narrow own-overlap and unlock-not-held instrumentation seam",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "585a0c6f23bc0392685b851fd13ff1420945bf7b",
+            "head_blob_oid": "db8081dbf34f1f73a8c4a3dc083dcc2da5f32802",
+            "worktree_blob_oid": "b71f46ef201b3ee8990a06579d4cfd7c5464579b",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/node_agent_managed_fs/sqlite_namespace_shm/test_lock_runtime.rs",
+          "content_hash": "924b326bfa7eeb9a7a6252acee3011b32236c2fb5773a8ee842b0b1b86e1d371",
+          "locator": "fail-closed local protocol test runtime state machine",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "585a0c6f23bc0392685b851fd13ff1420945bf7b",
+            "head_blob_oid": "4e2608321a45f11b7a468aa756ebeff67c7fc694",
+            "worktree_blob_oid": "d88cee42a7447b783c133254e20b0aee4ba4cf8f",
+            "state": "tracked_modified"
           }
         }
       ],
       "created_at_ms": 1788116827147,
-      "updated_at_ms": 1788225323785
+      "updated_at_ms": 1788230047922
     },
     {
       "id": "backend-a2-map-lock-static-denominator-v1",
@@ -13191,116 +13191,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_fa96e575b5c04776be71946d35928788",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "claimed",
-      "actor": "codex/task-20260831-034948-8340-af76ccd6",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788119481169
-    },
-    {
-      "id": "feature_event_2ed906bcd7544269bd3c077e079ff2e6",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex/task-20260831-034948-8340-af76ccd6",
-      "reason": "Implement the frozen typed projector, deterministic exact-partition manifests, canonical digests, and failure-closed validation before opening any Windows or production gate.",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788119490237
-    },
-    {
-      "id": "feature_event_13887c2871004fb09771d1ea987570ee",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "claim_released",
-      "actor": "codex/task-20260831-034948-8340-af76ccd6",
-      "reason": "Release expired architecture claim before explicitly rebinding the intentionally updated dynamic-quotient authority.",
-      "from_status": "in_progress",
-      "to_status": "blocked",
-      "at_ms": 1788141156951
-    },
-    {
-      "id": "feature_event_fe702aa34cde492691b68ea683620829",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "requirement_rebound",
-      "actor": "codex/task-20260831-034948-8340-af76ccd6",
-      "reason": "Intentionally rebind the reviewed dynamic-quotient authority after adding producer coherence and frozen descriptor-binding requirements.",
-      "from_status": "blocked",
-      "to_status": "proposed",
-      "at_ms": 1788141179042
-    },
-    {
-      "id": "feature_event_55b18022351544b28300f1f98a833e60",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex/task-20260831-034948-8340-af76ccd6",
-      "reason": "Accept the reviewed authority update for producer coherence and descriptor binding.",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1788141198832
-    },
-    {
-      "id": "feature_event_e51b22b613284151966c7e5e9253a3df",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex/task-20260831-034948-8340-af76ccd6",
-      "reason": "Mark the accepted authority milestone ready for evidence-bound implementation closure.",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1788141313221
-    },
-    {
-      "id": "feature_event_33151dcaa5314da7bc581e7b0bc536b2",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "claimed",
-      "actor": "codex/task-20260831-034948-8340-af76ccd6",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788141438013
-    },
-    {
-      "id": "feature_event_175d200fadaf4a0c8d939196ea5474aa",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex/task-20260831-034948-8340-af76ccd6",
-      "reason": "Bind the completed architecture milestone to a fresh claim before recording current source, test, and authority evidence.",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788141491896
-    },
-    {
-      "id": "feature_event_d44d967c53a04e2181c04f42bcdbe03f",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "evidence_recorded",
-      "actor": "codex/task-20260831-034948-8340-af76ccd6",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788141588532
-    },
-    {
-      "id": "feature_event_078e5986408c440ea303fccb24478167",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex/task-20260831-034948-8340-af76ccd6",
-      "reason": "Architecture milestone is evidence-bound, but the real Map quotient runner is not integrated and Lock observation is incomplete; Qmap/Qlock, frozen manifests, Windows class records, and production effects remain closed.",
-      "from_status": "in_progress",
-      "to_status": "blocked",
-      "at_ms": 1788141642142
-    },
-    {
-      "id": "feature_event_50be25b1ec434a9eac7194f6afed6abc",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "requirement_rebound",
-      "actor": "Codex ai助手",
-      "reason": "审计修正 descriptor-binding 当前状态后，显式重绑权威需求文档哈希。",
-      "from_status": "blocked",
-      "to_status": "proposed",
-      "at_ms": 1788142280970
-    },
-    {
       "id": "feature_event_c96920b78855493db3b15caa95404402",
       "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
       "action": "transitioned",
@@ -15189,6 +15079,116 @@
       "from_status": "in_progress",
       "to_status": "blocked",
       "at_ms": 1788225323785
+    },
+    {
+      "id": "feature_event_d076360059b34d3f88d3db257a6a83f2",
+      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
+      "action": "transitioned",
+      "actor": "codex/root",
+      "reason": "Begin q8 exact 88-member LockLocalOwnOverlapOrNotHeldCompletedV1 source-only tranche after independent denominator and runtime-seam review; preserve compile/runtime/actual receipt gates.",
+      "from_status": "blocked",
+      "to_status": "ready",
+      "at_ms": 1788226783870
+    },
+    {
+      "id": "feature_event_d1e6676a0ebd44b4827e57f472e5f195",
+      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
+      "action": "claimed",
+      "actor": "codex/root",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788226800623
+    },
+    {
+      "id": "feature_event_03439297a34546c2b1145e9182b35923",
+      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
+      "action": "transitioned",
+      "actor": "codex/root",
+      "reason": "Implement q8 source-only exact local own-overlap or not-held Completed tranche; do not compile or run.",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788226829316
+    },
+    {
+      "id": "feature_event_5b4da19c04c74025ab9ced2645d30d89",
+      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
+      "action": "claim_released",
+      "actor": "codex/root",
+      "reason": "Release the pre-q8 claim so the intentionally updated requirement can be hash-rebound and explicitly re-reviewed.",
+      "from_status": "in_progress",
+      "to_status": "blocked",
+      "at_ms": 1788229423737
+    },
+    {
+      "id": "feature_event_636b1cf6e8af4697b6f3a2676aaf4cac",
+      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
+      "action": "requirement_rebound",
+      "actor": "codex/root",
+      "reason": "Bind the intentionally updated q8 exact 88-member source-only authority before renewed review.",
+      "from_status": "blocked",
+      "to_status": "proposed",
+      "at_ms": 1788229894524
+    },
+    {
+      "id": "feature_event_192a17bf5960401299192cd534a79013",
+      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
+      "action": "transitioned",
+      "actor": "codex/root",
+      "reason": "Reviewed q8 exact 88-member source-only authority, exclusions, zero-overlap proof, and fail-closed uncompiled boundary.",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1788229904431
+    },
+    {
+      "id": "feature_event_e43bbce9ecb74899b70e18de61ce0766",
+      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
+      "action": "transitioned",
+      "actor": "codex/root",
+      "reason": "Accepted q8 source-only scope is ready for bounded implementation evidence recording.",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1788229939433
+    },
+    {
+      "id": "feature_event_41a72763c95044c39e996a1595ac20ff",
+      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
+      "action": "claimed",
+      "actor": "codex/root",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788229965022
+    },
+    {
+      "id": "feature_event_d05f06c581ee4430bdc2f8b5a14b58b3",
+      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
+      "action": "transitioned",
+      "actor": "codex/root",
+      "reason": "Implement and bind the reviewed q8 source-only runtime seam, runner, static admission, inventory seal, and authority updates.",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788229987965
+    },
+    {
+      "id": "feature_event_fb7983949d7243289b56723f210db955",
+      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
+      "action": "evidence_recorded",
+      "actor": "codex/root",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788230033927
+    },
+    {
+      "id": "feature_event_325b2a07fedb4bcbb37420a205ea1c1f",
+      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
+      "action": "transitioned",
+      "actor": "codex/root",
+      "reason": "q8 exact 88-member source and authority are written and source-reviewed only; 5,546 programs plus compilation, Windows runtime actual receipts, and reviewed inventory digest remain absent; coverage 0/8668, Qlock unknown, actual not_run, WindowsDynamic not_opened.",
+      "from_status": "in_progress",
+      "to_status": "blocked",
+      "at_ms": 1788230047922
     }
   ]
 }
