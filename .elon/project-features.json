@@ -1620,6 +1620,271 @@
       "updated_at_ms": 1786625457423
     },
     {
+      "id": "compute-capacity-future-settlement-lineage-bridge-v1",
+      "title": "capacity_future 交付结算谱系桥 V1",
+      "summary": "从单一 Lease 在只读历史快照中重建 CapacityInstrument、Commitment、exercised DeliveryAllocation、锁价 Snapshot 与既有 F0 execution/verification/settlement/release owner，生成独立 reference-only retained lineage；本批仅 source/document，禁止 API、写入和经济效果。",
+      "status": "blocked",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/compute-capacity-future-settlement-lineage-bridge-v1.md",
+        "content_hash": "8581b324fcadf2766f1cc8ced04123329ef520f5bc03d74378e1f10e26f4d699",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "8b171d961e30ca6b783e9fe6957bac896b931139",
+          "head_blob_oid": "7b8075e7dfa4b1a63aa43da6c85ee697bb5c93b8",
+          "worktree_blob_oid": "7b8075e7dfa4b1a63aa43da6c85ee697bb5c93b8",
+          "state": "tracked_clean"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "backend, ai-economy",
+      "tags": [
+        "compute-federation",
+        "capacity-future",
+        "settlement-lineage",
+        "source-contract"
+      ],
+      "task_paths": [
+        "docs/distributed-compute/capacity-future-settlement-lineage-acceptance.md",
+        "docs/distributed-compute/capacity-future-settlement-lineage-authority.md",
+        "server/src/compute_federation/capacity_future_settlement_lineage.rs",
+        "server/src/compute_federation/capacity_future_settlement_lineage/settlement_equations.rs",
+        "server/src/compute_federation/capacity_future_settlement_lineage/source_equations.rs",
+        "server/src/compute_federation/capacity_future_settlement_lineage_source_contract_tests.rs",
+        "server/src/store/compute_delivery_allocations/read.rs",
+        "server/src/store/compute_federation_historical_causal_reference/capacity_future.rs",
+        "server/src/store/compute_federation_historical_causal_reference/capacity_future/capacity.rs",
+        "server/src/store/compute_federation_historical_causal_reference/capacity_future/owners.rs",
+        "server/src/store/compute_federation_historical_causal_reference/source_contract_tests/capacity_future.rs"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "正式 current requirement 绑定权威与验收文档，并明确该 feature 是容量 owner 到既有 F0 carrier 的组合桥，不创建平行 owner。",
+        "exact 6-key envelope、独立 schema/domain、RFC8785 JCS/SHA-256、字节与数值上限及固定 zero-effect 值保持失败关闭；parser/Projected 不构成 Store authority。",
+        "唯一 Store facade 仅接 lease_id，在单一 Deferred snapshot 重建 v238→v225→v228→F0→v195，并在存在时精确重建 v198；caller 不得提交 owner refs、digests 或 scope。",
+        "无 settlement、非逐字 capacity_future、确无 exercised v228 返回 None；一旦 exercised owner 存在，claim 错接、cardinality、owner 缺失或摘要漂移均为 integrity failure。",
+        "historical Instrument retired、Offer draining 或 current head 前移不否定 exact retained history；禁止 current/latest fallback。",
+        "Commitment、Claim、Instrument 的 meters、顺序、granularity、共同正整数 multiplier 与 parent whole release→child whole hold 必须精确一致。",
+        "v193→v192 decision digest 精确闭合；v195 payee 由 historical Provider settlement_account_id（缺省回退 owner）审计；v192/v195 usage digest 分别从同一 v193 readings 按各自 owner 公式重算。",
+        "pending/available 为封闭 union；只表达 historical pending origin 或 internal available history，不外推 current pending、withdrawn、external paid 或 clearing。",
+        "本批仅 source/document evidence：无 migration、table、writer、Service、API、MCP、PC 或经济效果；保持 uncompiled/unrun、passed=0/failed=0 并以 blocked 收口。"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "docs/distributed-compute/capacity-future-settlement-lineage-acceptance.md",
+          "content_hash": "732a6caa5ee770de07db4fbf55cd6eaae139dccda1ab241661d927c1a6d40007",
+          "locator": "source-review acceptance matrix",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "8b171d961e30ca6b783e9fe6957bac896b931139",
+            "head_blob_oid": "87bc4ca038e7a9681c89798e63ffc31111bd8795",
+            "worktree_blob_oid": "87bc4ca038e7a9681c89798e63ffc31111bd8795",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "docs/distributed-compute/capacity-future-settlement-lineage-authority.md",
+          "content_hash": "74669a71c1ecae3419a5d5aa283217c7e412f258d53e5204b25e0c810840f625",
+          "locator": "current registered/blocked authority",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "8b171d961e30ca6b783e9fe6957bac896b931139",
+            "head_blob_oid": "0163d3bf6bc0a524facd0bc069391a4fd2462276",
+            "worktree_blob_oid": "0163d3bf6bc0a524facd0bc069391a4fd2462276",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "docs/requirements/compute-capacity-future-settlement-lineage-bridge-v1.md",
+          "content_hash": "8581b324fcadf2766f1cc8ced04123329ef520f5bc03d74378e1f10e26f4d699",
+          "locator": "accepted source-only requirement",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "8b171d961e30ca6b783e9fe6957bac896b931139",
+            "head_blob_oid": "7b8075e7dfa4b1a63aa43da6c85ee697bb5c93b8",
+            "worktree_blob_oid": "7b8075e7dfa4b1a63aa43da6c85ee697bb5c93b8",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/capacity_future_settlement_lineage.rs",
+          "content_hash": "70ed6f8868f0d1b35c6b13d8e06c1e1e784065ec702638ee70140c277d40f310",
+          "locator": "API-free domain facade",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "8b171d961e30ca6b783e9fe6957bac896b931139",
+            "head_blob_oid": "c391f7bfd709ea65870f23000bcc407995661b99",
+            "worktree_blob_oid": "c391f7bfd709ea65870f23000bcc407995661b99",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/capacity_future_settlement_lineage/canonical.rs",
+          "content_hash": "095e681ad96064834ff9113f1151dfc5521ef08b6f91337b4fdc41dc82bc5d0f",
+          "locator": "JCS and domain-separated digest",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "8b171d961e30ca6b783e9fe6957bac896b931139",
+            "head_blob_oid": "2ccc2c31c180df92e21dbe587d85fdfd9c44e6ca",
+            "worktree_blob_oid": "2ccc2c31c180df92e21dbe587d85fdfd9c44e6ca",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/capacity_future_settlement_lineage/settlement_equations.rs",
+          "content_hash": "38be4e35674985919a137dd82fb9342fd91af08442c4fe7321aceaf9b4aa6938",
+          "locator": "v195 source equations",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "8b171d961e30ca6b783e9fe6957bac896b931139",
+            "head_blob_oid": "98b52ed3302d029eb4b2bce5a2182aa7660ef0db",
+            "worktree_blob_oid": "98b52ed3302d029eb4b2bce5a2182aa7660ef0db",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/capacity_future_settlement_lineage/source_equations.rs",
+          "content_hash": "1324fa2ca60dff2263ceb5fc22e87b9b2694ecbe322b8ff1513799c92ced648c",
+          "locator": "v193 decision digest and cross-owner equations",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "8b171d961e30ca6b783e9fe6957bac896b931139",
+            "head_blob_oid": "1397e35c501dd7952aec4357b5851f11b06b24c5",
+            "worktree_blob_oid": "1397e35c501dd7952aec4357b5851f11b06b24c5",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/capacity_future_settlement_lineage/types.rs",
+          "content_hash": "e11f8e241d5b0ea12543d3e6ce886504a96c5699b537f27289637a71abe1f724",
+          "locator": "exact envelope and closed economic stage",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "8b171d961e30ca6b783e9fe6957bac896b931139",
+            "head_blob_oid": "c7177260e44fe66f7c46431900821749f11989e7",
+            "worktree_blob_oid": "c7177260e44fe66f7c46431900821749f11989e7",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/capacity_future_settlement_lineage/validation.rs",
+          "content_hash": "ff3b66b8780a9c8bfbb49bc1113653252b44544024ce43867dc49dc86f0cdfc5",
+          "locator": "shape and zero-effect validation",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "8b171d961e30ca6b783e9fe6957bac896b931139",
+            "head_blob_oid": "fdffd1a887913cbd4d6c87fb1444ed59c5f22d31",
+            "worktree_blob_oid": "fdffd1a887913cbd4d6c87fb1444ed59c5f22d31",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/compute_federation/capacity_future_settlement_lineage_source_contract_tests.rs",
+          "content_hash": "8fd4f3362cca031e0596a5fa134e7ecd415c9bdbfee5850560339660b30e239d",
+          "locator": "domain static source guards (unrun)",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "8b171d961e30ca6b783e9fe6957bac896b931139",
+            "head_blob_oid": "81842aaacfc0b93a2a4c3bffc77ef0499d01cb40",
+            "worktree_blob_oid": "81842aaacfc0b93a2a4c3bffc77ef0499d01cb40",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/store/compute_delivery_allocations/historical.rs",
+          "content_hash": "16f555a90c2e2e67efbb50422fd67e21742fb31ba4cafdbca2ab360020839605",
+          "locator": "audited historical v228 settlement source",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "8b171d961e30ca6b783e9fe6957bac896b931139",
+            "head_blob_oid": "e1aa4a68e93bf5b765274ebd35d0fe3d1c0cae6f",
+            "worktree_blob_oid": "e1aa4a68e93bf5b765274ebd35d0fe3d1c0cae6f",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/store/compute_delivery_allocations/read.rs",
+          "content_hash": "5268a23c8d4fbc2f008fe94bc2d4c2570d2714044a0f6b628a4c39e8dd9dc8b4",
+          "locator": "reservation-first v228 cardinality and Claim index fence",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "8b171d961e30ca6b783e9fe6957bac896b931139",
+            "head_blob_oid": "9f45ed952101c23d86ca39d66f0efcda1780837b",
+            "worktree_blob_oid": "9f45ed952101c23d86ca39d66f0efcda1780837b",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/store/compute_federation_historical_causal_reference/capacity_future.rs",
+          "content_hash": "83b9df7284b53f1dd319ced861324fa683ddad02506b65e3cfa9af8d3fcf71c4",
+          "locator": "Lease-rooted Deferred resolver and private seal",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "8b171d961e30ca6b783e9fe6957bac896b931139",
+            "head_blob_oid": "ed7bb85a9bf92b7d8d022f5ee1552832746fa7ba",
+            "worktree_blob_oid": "ed7bb85a9bf92b7d8d022f5ee1552832746fa7ba",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/store/compute_federation_historical_causal_reference/capacity_future/capacity.rs",
+          "content_hash": "a521a0965e3f1111e415ca5637996ad9f87058185e47e07325234f06a37f9e11",
+          "locator": "contract multiplier and whole transfer audit",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "8b171d961e30ca6b783e9fe6957bac896b931139",
+            "head_blob_oid": "0ea04ff63306fac80e1238c96a56d1d3d1436463",
+            "worktree_blob_oid": "0ea04ff63306fac80e1238c96a56d1d3d1436463",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/store/compute_federation_historical_causal_reference/capacity_future/owners.rs",
+          "content_hash": "d4f581f7dd3bb6683569688831aff8b3462954c6f0b2b63dfb181baddfb0e581",
+          "locator": "historical owner reconstruction",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "8b171d961e30ca6b783e9fe6957bac896b931139",
+            "head_blob_oid": "89d6705a6f4481920f375cd4d744e501994f4db1",
+            "worktree_blob_oid": "89d6705a6f4481920f375cd4d744e501994f4db1",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/store/compute_federation_historical_causal_reference/source_contract_tests/capacity_future.rs",
+          "content_hash": "02178b384fcdc8a73fb3a25ec053d2ffbf4f30ae3711c6eaa25fdc47cd9f6865",
+          "locator": "historical owner call-chain static guard (unrun)",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "8b171d961e30ca6b783e9fe6957bac896b931139",
+            "head_blob_oid": "9b848d07ea847a03c13feb6940eb7a5dfa6f7de1",
+            "worktree_blob_oid": "9b848d07ea847a03c13feb6940eb7a5dfa6f7de1",
+            "state": "tracked_clean"
+          }
+        }
+      ],
+      "created_at_ms": 1788301350474,
+      "updated_at_ms": 1788301413755
+    },
+    {
       "id": "compute-external-pool-adapter-authenticated-no-work-probe-v1",
       "title": "外部矿池 Adapter authenticated no-work probe V1",
       "summary": "让已取得 V256 短时 bundle 的 authenticated child 生成严格有界 no-work request，由服务端 Broker 通过 V258 TLS target 完成一次 exact response relay，再由同一 child 验证并形成进程内短时 observation；不领取任务或激活 Provider。",
@@ -14045,66 +14310,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_d42b603c3ae34cbfae7a3f15943888ca",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "requirement_rebound",
-      "actor": "Codex q10",
-      "reason": "Bind the reviewed q10 seven-member Lock ABI scalar rejection requirement before implementation.",
-      "from_status": "blocked",
-      "to_status": "proposed",
-      "at_ms": 1788248275456
-    },
-    {
-      "id": "feature_event_2d423f2aa9984e3085b3e182e86e2511",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "Codex q10",
-      "reason": "Accept the exact seven-member ABI validity-vector tranche and unchanged fail-closed aggregate gates.",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1788248285288
-    },
-    {
-      "id": "feature_event_e76f3e41b9dc474d9ff4631bf8d0c602",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "Codex q10",
-      "reason": "q10 LockAbiScalarRejectionV1 exact seven-member contract reviewed against current source and frozen seals",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1788248545577
-    },
-    {
-      "id": "feature_event_a109e5e24a8b45dc80e95246f1421479",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "claimed",
-      "actor": "Codex q10",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788248554993
-    },
-    {
-      "id": "feature_event_5b8625090a024ab29d958df0e0696f8a",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "Codex q10",
-      "reason": "Implementing the exact seven-member Lock ABI scalar rejection tranche without opening production effects",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788248565494
-    },
-    {
-      "id": "feature_event_bab8b350456041328721ee59349f359e",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "claim_released",
-      "actor": "Codex q10",
-      "reason": "Release the old q10 claim because the authority document was intentionally updated and must be rebound before current evidence can be recorded.",
-      "from_status": "in_progress",
-      "to_status": "blocked",
-      "at_ms": 1788252467998
-    },
-    {
       "id": "feature_event_c1ebbc2aee4e4e36a54a386d671396a7",
       "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
       "action": "requirement_rebound",
@@ -16043,6 +16248,66 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1788301003983
+    },
+    {
+      "id": "feature_event_6a55f4487f914c6dae8faaf9f7c50f55",
+      "feature_id": "compute-capacity-future-settlement-lineage-bridge-v1",
+      "action": "registered",
+      "actor": "Codex:/root",
+      "reason": "在最新远端注册表基线上重放已接受的 current source-only 需求，保留并发 ESK 功能记录。",
+      "from_status": "",
+      "to_status": "accepted",
+      "at_ms": 1788301350474
+    },
+    {
+      "id": "feature_event_2ceb0bdf65a94b52a0d073f927b6734d",
+      "feature_id": "compute-capacity-future-settlement-lineage-bridge-v1",
+      "action": "transitioned",
+      "actor": "Codex:/root",
+      "reason": "current requirement、owner 范围、9 项验收标准及 source-only 边界已复核；无登记型依赖，可进入独占认领。",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1788301360785
+    },
+    {
+      "id": "feature_event_87339e498c3f4364ad8fb081a110379f",
+      "feature_id": "compute-capacity-future-settlement-lineage-bridge-v1",
+      "action": "claimed",
+      "actor": "Codex:/root",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788301368837
+    },
+    {
+      "id": "feature_event_8498db64333b4066a009173f395dffac",
+      "feature_id": "compute-capacity-future-settlement-lineage-bridge-v1",
+      "action": "transitioned",
+      "actor": "Codex:/root",
+      "reason": "已取得最新注册表上的独占认领；重放已经完成的 source-only owner splice 修复与文档证据。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788301379067
+    },
+    {
+      "id": "feature_event_5c7cb98436bf4bf6b1989bb8aab59bc6",
+      "feature_id": "compute-capacity-future-settlement-lineage-bridge-v1",
+      "action": "transitioned",
+      "actor": "Codex:/root",
+      "reason": "source/document 合同及静态守卫已落地；按架构铺设阶段约束未运行 Cargo、rustfmt、Rust 测试、SQLite、migration、服务或真实流程，compiled=0、run=0、passed=0、failed=0，动态证据明确延期。",
+      "from_status": "in_progress",
+      "to_status": "blocked",
+      "at_ms": 1788301389281
+    },
+    {
+      "id": "feature_event_ecd53787feb7455596a4307a1801f396",
+      "feature_id": "compute-capacity-future-settlement-lineage-bridge-v1",
+      "action": "evidence_recorded",
+      "actor": "Codex:/root",
+      "reason": "",
+      "from_status": "blocked",
+      "to_status": "blocked",
+      "at_ms": 1788301413755
     }
   ]
 }
