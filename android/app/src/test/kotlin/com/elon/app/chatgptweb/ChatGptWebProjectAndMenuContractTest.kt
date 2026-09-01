@@ -53,6 +53,15 @@ class ChatGptWebProjectAndMenuContractTest {
         assertTrue(layout.contains("contextMenuPolicy.activate(control, node)"))
     }
 
+    @Test
+    fun webCommandsRemainBoundToTheObservedDocumentGeneration() {
+        val adapter = read("android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebPageAdapter.kt")
+
+        assertTrue(adapter.contains(".put(\"documentToken\", documentSession.snapshot().documentToken)"))
+        assertTrue(adapter.contains("window.__elonChatGptBridge.command(\$encoded)"))
+        assertFalse(adapter.contains("command.documentToken=window.__elonChatGptDocumentToken"))
+    }
+
     private fun read(relativePath: String): String =
         String(Files.readAllBytes(root().resolve(relativePath)), StandardCharsets.UTF_8)
 

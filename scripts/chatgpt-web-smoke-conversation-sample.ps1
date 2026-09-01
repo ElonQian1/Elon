@@ -35,11 +35,23 @@ function Open-ChatGptWebSmokeConversationSample {
                         param($candidate)
                         [string]$candidate.conversation.url -like "*$path*" -and
                             $candidate.bridge_state -eq "ready" -and
+                            $candidate.adapter_current -eq $true -and
                             [int]$candidate.conversation.message_count -ge $MinimumMessageCount
                     }.GetNewClosure()
+                Start-Sleep -Seconds $Runtime.poll_interval_sec
+                $settled = Invoke-ChatGptWebSmokeMcp -Runtime $Runtime -Tool "ui_state"
+                if (
+                    $settled.bridge_state -ne "ready" -or
+                    $settled.adapter_current -ne $true -or
+                    [string]$settled.conversation.url -notlike "*$path*" -or
+                    [long]$settled.page_generation -ne [long]$state.page_generation -or
+                    [long]$settled.adapter_generation -ne [long]$state.adapter_generation
+                ) {
+                    continue
+                }
                 return [pscustomobject]@{
                     path = $path
-                    state = $state
+                    state = $settled
                 }
             } catch {
                 if ([DateTimeOffset]::UtcNow -ge $deadline) { throw }

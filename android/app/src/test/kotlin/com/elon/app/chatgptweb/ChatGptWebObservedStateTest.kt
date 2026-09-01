@@ -251,6 +251,17 @@ class ChatGptWebObservedStateTest {
         state.updateDocument(document(page = 1, adapter = 1))
         val request = state.beginOpenConversationCommand("/g/g-p-demo/c/target")
 
+        state.accept(ChatGptWebEvent.CommandResult(
+            "open_conversation",
+            true,
+            "",
+            requestId = request.id,
+        ))
+        assertEquals(
+            ChatGptWebObservedState.CommandRequest.PENDING,
+            state.snapshot().commandRequests.single().status,
+        )
+
         now += 10
         state.updateDocument(document(page = 2, adapter = 0))
         assertEquals(

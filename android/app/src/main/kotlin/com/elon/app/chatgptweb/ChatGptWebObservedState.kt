@@ -251,6 +251,17 @@ internal class ChatGptWebObservedState(
                 it.expectedAction == event.action
         }
         if (index < 0) return
+        val request = commandRequests[index]
+        if (
+            event.ok &&
+            event.action == OPEN_CONVERSATION &&
+            event.detail != OPEN_CONVERSATION_CONFIRMED_BY_SNAPSHOT &&
+            request.targetConversationPath != null
+        ) {
+            // The page acknowledges this command before its route transition begins.
+            // Keep the receipt pending until a snapshot confirms the exact target.
+            return
+        }
         commandRequests = commandRequests.toMutableList().apply {
             this[index] = this[index].copy(
                 status = if (event.ok) CommandRequest.SUCCEEDED else CommandRequest.FAILED,
