@@ -93,6 +93,62 @@
           "instructions": "保留上一不可变发布和数据库备份，失败时恢复上一版本并重新绑定 Runtime Binding。"
         }
       }
+    },
+    {
+      "id": "yilong-quant",
+      "name": "yilong-quant",
+      "display_name": "一龙量化交易",
+      "description": "面向全球加密资产交易者的量化技术测试子项目；当前只提供 paper 模拟委托和模拟参与份额账本。",
+      "repo_url": "git@github.com:ElonQian1/yilong-quant.git",
+      "branch": "main",
+      "landing": {
+        "schema_version": 1,
+        "title": "一龙量化交易",
+        "tagline": "面向全球加密资产交易者的量化交易技术测试平台",
+        "summary": "当前只提供 paper 模拟交易和模拟参与份额账本；6% 是非保证目标，不接收或移动真实用户资金，也不连接实盘。",
+        "highlights": [
+          "Rust 风控、订单、交易所端口和参与份额账本按领域分层",
+          "模拟 NET 锁定配额可换算为内部份额，按 NAV 同比例承担盈亏并申请退出",
+          "主项目负责项目广场和未来 NET 锁定，量化仓库不铸造 NET、不共享密钥或资金账本"
+        ],
+        "target_users": [
+          "希望参与量化交易技术测试的全球加密资产玩家",
+          "策略、风控、交易系统和产品会计开发者"
+        ],
+        "downloads": {
+          "web": {
+            "label": "Web 技术测试面板",
+            "status": "planned",
+            "note": "本地版本已建立，公开测试地址尚未部署"
+          },
+          "windows": {
+            "label": "Windows 桌面端",
+            "status": "planned",
+            "note": "后续复用一龙 Tauri 2 桌面技术栈"
+          },
+          "android": {
+            "label": "Android 客户端",
+            "status": "planned",
+            "note": "待核心交易测试稳定后再立项"
+          }
+        },
+        "recent_updates": [
+          "建立 paper 模拟委托纵向切片",
+          "建立模拟参与份额、NAV 和下一快照退出结算",
+          "补齐远程 Git 分工、权威需求和 AI 开发入口"
+        ],
+        "privacy_notes": [
+          "当前不导入已付款用户真实名单、交易所密钥、钱包密钥或用户资金",
+          "所有参与仓位和 NAV 都是内存模拟数据，服务重启后不会保留"
+        ],
+        "resources": [
+          { "label": "GitHub 源码", "url": "https://github.com/ElonQian1/yilong-quant" },
+          { "label": "当前能力", "url": "https://github.com/ElonQian1/yilong-quant/blob/main/docs/capability-baseline.md" },
+          { "label": "远程协作", "url": "https://github.com/ElonQian1/yilong-quant/blob/main/docs/remote-collaboration.md" },
+          { "label": "与一龙主项目关系", "url": "https://github.com/ElonQian1/yilong-quant/blob/main/docs/relationship-with-yilong.md" }
+        ],
+        "custom_landing_url": "https://github.com/ElonQian1/yilong-quant"
+      }
     }
   ]
 }

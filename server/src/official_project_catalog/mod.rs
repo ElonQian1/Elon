@@ -34,8 +34,8 @@ struct OfficialProjectDefinition {
     repo_url: String,
     branch: String,
     landing: Value,
-    blueprint: ErpBlueprintDefinition,
-    release: ErpReleaseManifest,
+    blueprint: Option<ErpBlueprintDefinition>,
+    release: Option<ErpReleaseManifest>,
 }
 
 pub(crate) fn ensure(store: &Store) -> Result<bool> {
@@ -57,7 +57,9 @@ pub(crate) fn ensure(store: &Store) -> Result<bool> {
     for project in &catalog.projects {
         ensure_project(store, &owner_user_id, project)?;
         ensure_landing(store, &owner_user_id, project)?;
-        ensure_blueprint(store, &owner_user_id, project)?;
+        if project.blueprint.is_some() {
+            ensure_blueprint(store, &owner_user_id, project)?;
+        }
     }
     Ok(true)
 }
@@ -76,15 +78,20 @@ fn parse_catalog() -> Result<OfficialProjectCatalog> {
         if !ids.insert(project.id.as_str()) {
             bail!("官方项目目录包含重复项目: {}", project.id);
         }
-        if project.blueprint.schema != BLUEPRINT_SCHEMA
-            || project.blueprint.source_project_id != project.id
-        {
-            bail!("官方项目 {} 的蓝图来源不匹配", project.id);
-        }
-        if project.release.schema != RELEASE_SCHEMA
-            || project.release.blueprint_key != project.blueprint.blueprint_key
-        {
-            bail!("官方项目 {} 的发布清单与蓝图不匹配", project.id);
+        match (&project.blueprint, &project.release) {
+            (Some(blueprint), Some(release)) => {
+                if blueprint.schema != BLUEPRINT_SCHEMA || blueprint.source_project_id != project.id
+                {
+                    bail!("官方项目 {} 的蓝图来源不匹配", project.id);
+                }
+                if release.schema != RELEASE_SCHEMA
+                    || release.blueprint_key != blueprint.blueprint_key
+                {
+                    bail!("官方项目 {} 的发布清单与蓝图不匹配", project.id);
+                }
+            }
+            (None, None) => {}
+            _ => bail!("官方项目 {} 必须同时提供蓝图和发布清单", project.id),
         }
     }
     Ok(catalog)
@@ -184,9 +191,17 @@ fn ensure_blueprint(
     owner_user_id: &str,
     project: &OfficialProjectDefinition,
 ) -> Result<()> {
+    let definition = project
+        .blueprint
+        .as_ref()
+        .with_context(|| format!("官方项目 {} 缺少蓝图", project.id))?;
+    let release = project
+        .release
+        .as_ref()
+        .with_context(|| format!("官方项目 {} 缺少发布清单", project.id))?;
     let blueprint = match store.erp_blueprint_for_project(&project.id)? {
         Some(blueprint) => {
-            if blueprint.definition.blueprint_key != project.blueprint.blueprint_key
+            if blueprint.definition.blueprint_key != definition.blueprint_key
                 || blueprint.definition.source_project_id != project.id
             {
                 bail!("官方项目 {} 已绑定不兼容蓝图", project.id);
@@ -198,21 +213,21 @@ fn ensure_blueprint(
             &project.id,
             owner_user_id,
             CreateBlueprintRequest {
-                blueprint_key: project.blueprint.blueprint_key.clone(),
-                name: project.blueprint.name.clone(),
-                description: project.blueprint.description.clone(),
-                modules: project.blueprint.modules.clone(),
-                capabilities: project.blueprint.capabilities.clone(),
-                themes: project.blueprint.themes.clone(),
-                extension_points: project.blueprint.extension_points.clone(),
-                proposal_threshold: project.blueprint.proposal_threshold,
+                blueprint_key: definition.blueprint_key.clone(),
+                name: definition.name.clone(),
+                description: definition.description.clone(),
+                modules: definition.modules.clone(),
+                capabilities: definition.capabilities.clone(),
+                themes: definition.themes.clone(),
+                extension_points: definition.extension_points.clone(),
+                proposal_threshold: definition.proposal_threshold,
             },
         )?,
     };
     if store
         .list_erp_blueprint_versions(&blueprint.id)?
         .iter()
-        .any(|version| version.manifest.version == project.release.version)
+        .any(|version| version.manifest.version == release.version)
     {
         return Ok(());
     }
@@ -222,7 +237,7 @@ fn ensure_blueprint(
         &blueprint.id,
         owner_user_id,
         CreateBlueprintVersionRequest {
-            manifest: project.release.clone(),
+            manifest: release.clone(),
         },
     )?;
     Ok(())
@@ -253,23 +268,35 @@ mod tests {
         for project in &catalog.projects {
             ensure_project(&store, &owner.id, project).unwrap();
             ensure_landing(&store, &owner.id, project).unwrap();
-            ensure_blueprint(&store, &owner.id, project).unwrap();
+            if project.blueprint.is_some() {
+                ensure_blueprint(&store, &owner.id, project).unwrap();
+            }
             ensure_project(&store, &owner.id, project).unwrap();
             ensure_landing(&store, &owner.id, project).unwrap();
-            ensure_blueprint(&store, &owner.id, project).unwrap();
+            if project.blueprint.is_some() {
+                ensure_blueprint(&store, &owner.id, project).unwrap();
+            }
 
             let public_project = store.get_public_project(&project.id).unwrap();
             assert_eq!(
                 public_project.display_name.as_deref(),
                 Some(project.display_name.as_str())
             );
+            let expected_install_action = project.blueprint.as_ref().map(|_| "erp_blueprint");
             assert_eq!(
                 public_project
                     .install_action
                     .as_ref()
                     .map(|action| action.kind),
-                Some("erp_blueprint")
+                expected_install_action
             );
         }
+
+        let quant = catalog
+            .projects
+            .iter()
+            .find(|project| project.id == "yilong-quant")
+            .expect("一龙量化交易必须登记在官方项目目录");
+        assert!(quant.blueprint.is_none());
     }
 }
