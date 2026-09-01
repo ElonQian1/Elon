@@ -2,12 +2,12 @@
 
 use sha2::{Digest, Sha256};
 
+use super::super::super::super::super::source_leaf_authority::Digest32;
+use super::super::super::super::super::terminal_descriptor::LockActionV1;
+use super::super::super::super::lock_local_protocol_rejection_source_scope::lock_local_protocol_rejection_source_scope_entries_v1;
 use super::super::abi_scalar_rejection::ABI_SCALAR_REJECTION_PROJECTOR_DELTA_V1;
 use super::super::pre_managed_callback_rejection::PRE_MANAGED_CALLBACK_REJECTION_PROJECTOR_DELTA_V1;
 use super::super::raw_state_rejection::RAW_STATE_REJECTION_PROJECTOR_DELTA_V1;
-use super::super::super::super::lock_local_protocol_rejection_source_scope::lock_local_protocol_rejection_source_scope_entries_v1;
-use super::super::super::super::super::source_leaf_authority::Digest32;
-use super::super::super::super::super::terminal_descriptor::LockActionV1;
 
 macro_rules! source {
     ($name:literal, $path:literal) => {
@@ -110,13 +110,7 @@ pub(super) fn digest_implementation_v1(
         hasher.update((source.len() as u64).to_le_bytes());
         hasher.update(source.as_bytes());
     }
-    hasher.update([
-        action_tag_v1(action),
-        first,
-        count,
-        mask,
-        completion_tag,
-    ]);
+    hasher.update([action_tag_v1(action), first, count, mask, completion_tag]);
     Digest32(hasher.finalize().into())
 }
 

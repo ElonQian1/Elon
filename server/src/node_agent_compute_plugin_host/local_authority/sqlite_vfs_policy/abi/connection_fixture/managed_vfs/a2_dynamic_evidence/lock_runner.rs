@@ -22,6 +22,10 @@ pub(in super::super) use callback_completion_route_unknown::{
     lock_callback_route_unknown_selector_for_test,
     selected_lock_callback_route_unknown_selector_for_test,
 };
+pub(in super::super) use callback_completion_route_unknown::{
+    run_lock_callback_route_unknown_program_isolated, LockRunnerCallbackRouteUnknownBindingV1,
+    LockRunnerCallbackRouteUnknownPathV1,
+};
 #[cfg(all(test, windows))]
 pub(in super::super) use created_first_exclusive_release_error::{
     lock_native_acquire_created_first_exclusive_release_error_selector_for_test,
@@ -31,10 +35,6 @@ pub(in super::super) use created_first_exclusive_release_error::{
     run_lock_native_acquire_created_first_exclusive_release_error_program_isolated,
     LockRunnerCreatedFirstExclusiveReleaseCompletionV1,
     LockRunnerNativeAcquireCreatedFirstExclusiveReleaseErrorBindingV1,
-};
-pub(in super::super) use callback_completion_route_unknown::{
-    run_lock_callback_route_unknown_program_isolated, LockRunnerCallbackRouteUnknownBindingV1,
-    LockRunnerCallbackRouteUnknownPathV1,
 };
 #[cfg(all(test, windows))]
 pub(in super::super) use local_protocol_rejection::{

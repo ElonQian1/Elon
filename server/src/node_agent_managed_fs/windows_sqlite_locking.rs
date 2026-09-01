@@ -24,7 +24,8 @@ pub(in crate::node_agent_managed_fs) struct PlatformManagedSqliteUnlockReturnRec
 }
 
 #[cfg(all(test, windows))]
-pub(in crate::node_agent_managed_fs) struct PlatformManagedSqliteInitializationUnlockReturnReceiptUnavailableV1 {
+pub(in crate::node_agent_managed_fs) struct PlatformManagedSqliteInitializationUnlockReturnReceiptUnavailableV1
+{
     pub(in crate::node_agent_managed_fs) error: std::io::Error,
     pub(in crate::node_agent_managed_fs) offset: u64,
     pub(in crate::node_agent_managed_fs) length: u64,

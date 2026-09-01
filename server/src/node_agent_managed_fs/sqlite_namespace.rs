@@ -58,13 +58,11 @@ pub(crate) use shm::{
 };
 #[cfg(all(test, windows))]
 pub(crate) use shm::{
-    ManagedSqliteShmTestInitializationEvidenceV1,
-    ManagedSqliteShmTestInitializationExpectationV1,
+    ManagedSqliteShmTestConnectionDetachReceipt, ManagedSqliteShmTestDmsCustody,
+    ManagedSqliteShmTestInitializationEvidenceV1, ManagedSqliteShmTestInitializationExpectationV1,
     ManagedSqliteShmTestInitializationFailureV1,
     ManagedSqliteShmTestInitializationNativeObservationV1,
-    ManagedSqliteShmTestInitializationNativeReceiptV1,
-    ManagedSqliteShmTestInitializationReceiptV1,
-    ManagedSqliteShmTestConnectionDetachReceipt, ManagedSqliteShmTestDmsCustody,
+    ManagedSqliteShmTestInitializationNativeReceiptV1, ManagedSqliteShmTestInitializationReceiptV1,
     ManagedSqliteShmTestLockExpectation, ManagedSqliteShmTestLockPath,
     ManagedSqliteShmTestLockReceipt, ManagedSqliteShmTestMapDmsPath,
     ManagedSqliteShmTestMapExpectation, ManagedSqliteShmTestMapPath,

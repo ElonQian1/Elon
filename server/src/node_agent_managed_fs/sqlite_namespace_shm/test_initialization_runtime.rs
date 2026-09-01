@@ -5,9 +5,7 @@ use std::fs::File;
 use super::{
     coordinator::{ManagedSqliteShmCoordinator, ManagedSqliteShmCoordinatorState},
     test_faults::ManagedSqliteShmTestTargetObserver,
-    test_lock_runtime::{
-        ManagedSqliteShmTestLockExpectation, ManagedSqliteShmTestLockPath,
-    },
+    test_lock_runtime::{ManagedSqliteShmTestLockExpectation, ManagedSqliteShmTestLockPath},
     test_snapshot::ManagedSqliteShmTestDmsCustody,
     types::{
         ManagedSqliteShmFailure, ManagedSqliteShmFailurePhase, ManagedSqliteShmLockRequest,
@@ -20,19 +18,16 @@ mod controller;
 #[path = "test_initialization_runtime/model.rs"]
 mod model;
 
-use controller::{ColdPrestateV1, TerminalStateV1};
 pub(in crate::node_agent_managed_fs::sqlite_namespace::shm) use controller::ManagedSqliteShmTestInitializationControllerV1;
+use controller::{ColdPrestateV1, TerminalStateV1};
 pub(crate) use model::{
-    ManagedSqliteShmTestInitializationEvidenceV1,
-    ManagedSqliteShmTestInitializationExpectationV1,
+    ManagedSqliteShmTestInitializationEvidenceV1, ManagedSqliteShmTestInitializationExpectationV1,
     ManagedSqliteShmTestInitializationFailureV1,
     ManagedSqliteShmTestInitializationNativeObservationV1,
-    ManagedSqliteShmTestInitializationNativeReceiptV1,
-    ManagedSqliteShmTestInitializationReceiptV1,
+    ManagedSqliteShmTestInitializationNativeReceiptV1, ManagedSqliteShmTestInitializationReceiptV1,
 };
 
-const CONTROLLER_POISONED: &str =
-    "NODE_MANAGED_SQLITE_SHM_TEST_INITIALIZATION_CONTROLLER_POISONED";
+const CONTROLLER_POISONED: &str = "NODE_MANAGED_SQLITE_SHM_TEST_INITIALIZATION_CONTROLLER_POISONED";
 
 impl ManagedSqliteShmTestTargetObserver {
     pub(crate) fn begin_lock_initialization_failure_observation_v1(
@@ -193,9 +188,7 @@ impl ManagedSqliteShmCoordinator {
             ManagedSqliteShmFailurePhase::DmsExclusiveAcquire,
             true,
             false,
-            |controller, target| {
-                controller.record_dms_exclusive_acquired(target).map(|_| ())
-            },
+            |controller, target| controller.record_dms_exclusive_acquired(target).map(|_| ()),
         )
     }
 
@@ -291,7 +284,8 @@ impl ManagedSqliteShmCoordinator {
                 1,
             );
         let native = ManagedSqliteShmTestInitializationNativeReceiptV1 {
-            observation: ManagedSqliteShmTestInitializationNativeObservationV1::ReturnReceiptUnavailable,
+            observation:
+                ManagedSqliteShmTestInitializationNativeObservationV1::ReturnReceiptUnavailable,
             offset: platform_receipt.offset,
             length: platform_receipt.length,
             exact_call_occurrence: platform_receipt.exact_call_occurrence.get(),

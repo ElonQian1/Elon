@@ -1,9 +1,7 @@
 use std::num::NonZeroU8;
 
 use super::{
-    controller::{
-        ColdPrestateV1, ManagedSqliteShmTestInitializationControllerV1, TerminalStateV1,
-    },
+    controller::{ColdPrestateV1, ManagedSqliteShmTestInitializationControllerV1, TerminalStateV1},
     model::{
         ManagedSqliteShmTestInitializationExpectationV1,
         ManagedSqliteShmTestInitializationFailureV1,
@@ -16,9 +14,7 @@ use crate::node_agent_managed_fs::sqlite_namespace::shm::{
         ManagedSqliteShmTestLockExpectation, ManagedSqliteShmTestLockPath,
         ManagedSqliteShmTestLockReceipt,
     },
-    types::{
-        ManagedSqliteShmLockAction, ManagedSqliteShmLockRequest, SHM_DMS_OFFSET,
-    },
+    types::{ManagedSqliteShmLockAction, ManagedSqliteShmLockRequest, SHM_DMS_OFFSET},
 };
 
 const TARGET: (u64, u64) = (17, 23);
@@ -105,9 +101,7 @@ fn advance_to_terminal(controller: &mut ManagedSqliteShmTestInitializationContro
     assert!(controller
         .record_dms_exclusive_lock_attempt(TARGET)
         .unwrap());
-    assert!(controller
-        .record_dms_exclusive_acquired(TARGET)
-        .unwrap());
+    assert!(controller.record_dms_exclusive_acquired(TARGET).unwrap());
     assert!(controller.record_truncate_attempt(TARGET).unwrap());
     assert!(controller.record_truncate_success(TARGET).unwrap());
     assert!(controller.begin_dms_exclusive_unlock(TARGET).unwrap());

@@ -3,16 +3,14 @@ use std::thread::ThreadId;
 use super::super::{
     test_lock_runtime::{ManagedSqliteShmTestLockPath, ManagedSqliteShmTestLockReceipt},
     types::{
-        ManagedSqliteShmLockAction, ManagedSqliteShmLockRequest, SHM_DMS_OFFSET,
-        SHM_LOCK_COUNT,
+        ManagedSqliteShmLockAction, ManagedSqliteShmLockRequest, SHM_DMS_OFFSET, SHM_LOCK_COUNT,
     },
 };
 use super::model::{
     lock_action_tag, ManagedSqliteShmTestInitializationEvidenceV1,
     ManagedSqliteShmTestInitializationExpectationV1,
     ManagedSqliteShmTestInitializationNativeObservationV1,
-    ManagedSqliteShmTestInitializationNativeReceiptV1,
-    ManagedSqliteShmTestInitializationReceiptV1,
+    ManagedSqliteShmTestInitializationNativeReceiptV1, ManagedSqliteShmTestInitializationReceiptV1,
 };
 
 type ExactTarget = (u64, u64);
@@ -87,7 +85,8 @@ struct ArmedInitializationObservationV1 {
 }
 
 #[derive(Default)]
-pub(in crate::node_agent_managed_fs::sqlite_namespace::shm) struct ManagedSqliteShmTestInitializationControllerV1 {
+pub(in crate::node_agent_managed_fs::sqlite_namespace::shm) struct ManagedSqliteShmTestInitializationControllerV1
+{
     armed: Option<ArmedInitializationObservationV1>,
 }
 
@@ -146,7 +145,10 @@ impl ManagedSqliteShmTestInitializationControllerV1 {
             || active.expectation.count != request.count()
             || active.expectation.mask != request.mask()
         {
-            return fail(active, "NODE_MANAGED_SQLITE_SHM_TEST_INITIALIZATION_REQUEST_MISMATCH");
+            return fail(
+                active,
+                "NODE_MANAGED_SQLITE_SHM_TEST_INITIALIZATION_REQUEST_MISMATCH",
+            );
         }
         advance(
             active,
@@ -180,7 +182,10 @@ impl ManagedSqliteShmTestInitializationControllerV1 {
             return Ok(false);
         };
         if !created {
-            return fail(active, "NODE_MANAGED_SQLITE_SHM_TEST_INITIALIZATION_NOT_CREATED_FIRST");
+            return fail(
+                active,
+                "NODE_MANAGED_SQLITE_SHM_TEST_INITIALIZATION_NOT_CREATED_FIRST",
+            );
         }
         advance(
             active,
@@ -270,7 +275,10 @@ impl ManagedSqliteShmTestInitializationControllerV1 {
             || native.exact_call_occurrence != 1
             || active.native.is_some()
         {
-            return fail(active, "NODE_MANAGED_SQLITE_SHM_TEST_INITIALIZATION_NATIVE_RECEIPT_INVALID");
+            return fail(
+                active,
+                "NODE_MANAGED_SQLITE_SHM_TEST_INITIALIZATION_NATIVE_RECEIPT_INVALID",
+            );
         }
         advance(
             active,
@@ -285,10 +293,7 @@ impl ManagedSqliteShmTestInitializationControllerV1 {
         Ok(())
     }
 
-    pub(super) fn record_poisoned(
-        &mut self,
-        target: ExactTarget,
-    ) -> Result<(), &'static str> {
+    pub(super) fn record_poisoned(&mut self, target: ExactTarget) -> Result<(), &'static str> {
         let active = self.require_active_for_event(target)?;
         advance(
             active,
@@ -448,8 +453,7 @@ fn validate_expectation(
         .ok_or("NODE_MANAGED_SQLITE_SHM_TEST_INITIALIZATION_RANGE_OVERFLOW")?;
     if expectation.count == 0
         || end > SHM_LOCK_COUNT
-        || (expectation.action == ManagedSqliteShmLockAction::LockShared
-            && expectation.count != 1)
+        || (expectation.action == ManagedSqliteShmLockAction::LockShared && expectation.count != 1)
     {
         return Err("NODE_MANAGED_SQLITE_SHM_TEST_INITIALIZATION_RANGE_INVALID");
     }

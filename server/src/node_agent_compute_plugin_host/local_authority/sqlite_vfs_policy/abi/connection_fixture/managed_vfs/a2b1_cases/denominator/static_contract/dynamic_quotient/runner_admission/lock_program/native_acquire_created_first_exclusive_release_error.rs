@@ -15,16 +15,14 @@ pub(super) use source_scope::NATIVE_ACQUIRE_CREATED_FIRST_EXCLUSIVE_RELEASE_ERRO
 
 use super::super::super::super::{
     source_leaf_authority::{
-        CustodyStateV1, Digest32, DmsLockCustodyV1, FailureClassV1, LockEffectV1,
-        MutationStateV1, ObservableCountsV1, RootOperationV1, SqliteResultV1,
-        TerminalDispositionV1,
+        CustodyStateV1, Digest32, DmsLockCustodyV1, FailureClassV1, LockEffectV1, MutationStateV1,
+        ObservableCountsV1, RootOperationV1, SqliteResultV1, TerminalDispositionV1,
     },
     terminal_descriptor::{
-        CallbackV1, CapabilityGapV1, CleanupV1, FaultSeamV1, FixtureV1,
-        InitializationFaultSiteV1, InitializationPathV1, InitializationStimulusV1, LockActionV1,
-        LockAxesV1, LockCompletionV1, LockOperationV1, LockPrestateV1, ObserverV1, OccurrenceV1,
-        PhaseV1, PrestateV1, ReachabilityV1, RunnerCapabilityV1, SourceSiteV1, StimulusV1,
-        TimingV1,
+        CallbackV1, CapabilityGapV1, CleanupV1, FaultSeamV1, FixtureV1, InitializationFaultSiteV1,
+        InitializationPathV1, InitializationStimulusV1, LockActionV1, LockAxesV1, LockCompletionV1,
+        LockOperationV1, LockPrestateV1, ObserverV1, OccurrenceV1, PhaseV1, PrestateV1,
+        ReachabilityV1, RunnerCapabilityV1, SourceSiteV1, StimulusV1, TimingV1,
     },
 };
 use super::super::super::{
@@ -171,9 +169,9 @@ fn completion_v1(
         ReachabilityV1::Reached(LockCompletionV1::UnsafeRetentionSucceededThenRouteUnknown) => {
             Some(LockCreatedFirstExclusiveReleaseCompletionV1::RetentionSucceeded)
         }
-        ReachabilityV1::Reached(
-            LockCompletionV1::UnsafeRetentionRouteUnknownThenRouteUnknown,
-        ) => Some(LockCreatedFirstExclusiveReleaseCompletionV1::RetentionRouteUnknown),
+        ReachabilityV1::Reached(LockCompletionV1::UnsafeRetentionRouteUnknownThenRouteUnknown) => {
+            Some(LockCreatedFirstExclusiveReleaseCompletionV1::RetentionRouteUnknown)
+        }
         _ => None,
     }
 }

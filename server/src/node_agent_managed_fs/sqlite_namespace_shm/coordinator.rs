@@ -49,9 +49,8 @@ pub(super) struct ManagedSqliteShmCoordinator {
     pub(super) test_lock_runtime:
         Mutex<super::test_lock_runtime::ManagedSqliteShmTestLockController>,
     #[cfg(all(test, windows))]
-    pub(super) test_initialization_runtime: Mutex<
-        super::test_initialization_runtime::ManagedSqliteShmTestInitializationControllerV1,
-    >,
+    pub(super) test_initialization_runtime:
+        Mutex<super::test_initialization_runtime::ManagedSqliteShmTestInitializationControllerV1>,
     #[cfg(all(test, windows))]
     pub(super) test_map_runtime: Mutex<super::test_map_runtime::ManagedSqliteShmTestMapController>,
     #[cfg(all(test, windows))]

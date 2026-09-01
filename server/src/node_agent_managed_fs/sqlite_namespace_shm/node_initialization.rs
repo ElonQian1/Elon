@@ -82,11 +82,9 @@ impl ManagedSqliteShmCoordinator {
 
         let file_created = file.was_created();
         #[cfg(all(test, windows))]
-        if let Err(failure) = self.record_test_initialization_open_created_v1(
-            state,
-            _connection_id,
-            file_created,
-        ) {
+        if let Err(failure) =
+            self.record_test_initialization_open_created_v1(state, _connection_id, file_created)
+        {
             return Err(self.close_failed_open_file(state, file, failure));
         }
         #[cfg(test)]
@@ -318,11 +316,8 @@ impl ManagedSqliteShmCoordinator {
                 }
             };
             #[cfg(all(test, windows))]
-            match self.execute_test_initialization_dms_unlock_v1(
-                state,
-                _connection_id,
-                &file.file,
-            ) {
+            match self.execute_test_initialization_dms_unlock_v1(state, _connection_id, &file.file)
+            {
                 Ok(Some(error)) => {
                     state.node = Some(new_node(
                         file,

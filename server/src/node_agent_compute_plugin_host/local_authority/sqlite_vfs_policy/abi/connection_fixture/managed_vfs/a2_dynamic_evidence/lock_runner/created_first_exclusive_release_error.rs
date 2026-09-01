@@ -21,8 +21,7 @@ use super::{
     ValidatedParentCleanupReceipt, WindowsDynamicEnvironment, CHILD_ROOT_ENV,
 };
 
-const SELECTOR_ENV: &str =
-    "ELON_SQLITE_A2_LOCK_CREATED_FIRST_EXCLUSIVE_RELEASE_ERROR_SELECTOR";
+const SELECTOR_ENV: &str = "ELON_SQLITE_A2_LOCK_CREATED_FIRST_EXCLUSIVE_RELEASE_ERROR_SELECTOR";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(in super::super::super) enum LockRunnerCreatedFirstExclusiveReleaseCompletionV1 {
@@ -31,13 +30,13 @@ pub(in super::super::super) enum LockRunnerCreatedFirstExclusiveReleaseCompletio
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(in super::super::super) struct LockRunnerNativeAcquireCreatedFirstExclusiveReleaseErrorBindingV1 {
+pub(in super::super::super) struct LockRunnerNativeAcquireCreatedFirstExclusiveReleaseErrorBindingV1
+{
     pub(in super::super::super) action: LockRunnerActionV1,
     pub(in super::super::super) first: u8,
     pub(in super::super::super) count: u8,
     pub(in super::super::super) mask: u8,
-    pub(in super::super::super) completion:
-        LockRunnerCreatedFirstExclusiveReleaseCompletionV1,
+    pub(in super::super::super) completion: LockRunnerCreatedFirstExclusiveReleaseCompletionV1,
     pub(in super::super::super) normalized_descriptor_sha256: [u8; 32],
     pub(in super::super::super) case_key_sha256: [u8; 32],
     pub(in super::super::super) full_record_sha256: [u8; 32],
@@ -100,7 +99,9 @@ fn validate_parent_receipt(
     child: ValidatedChildProcessReceipt,
 ) -> anyhow::Result<LockRunnerIsolatedEvidenceV1> {
     if !child.matches_family(SanitizedPayloadFamily::LockQuotient) {
-        return Err(anyhow!("q12 Lock initialization child payload family mismatch"));
+        return Err(anyhow!(
+            "q12 Lock initialization child payload family mismatch"
+        ));
     }
     let payload = payload::validate_payload(child.actual_payload(), binding)?;
     if !child.matches_registration_id(payload.registration_id) {
@@ -117,7 +118,9 @@ fn validate_parent_receipt(
         || child.root_commitment != cleanup.root_commitment
         || child.registration_commitment != cleanup.registration_commitment
     {
-        return Err(anyhow!("q12 Lock initialization parent cleanup binding mismatch"));
+        return Err(anyhow!(
+            "q12 Lock initialization parent cleanup binding mismatch"
+        ));
     }
     Ok(LockRunnerIsolatedEvidenceV1::ParentReceipt(
         LockRunnerEvidenceReceiptV1 {
@@ -141,10 +144,14 @@ pub(super) fn validate_binding(
         .checked_add(binding.count)
         .ok_or_else(|| anyhow!("q12 Lock initialization range overflow"))?;
     if binding.count == 0 || binding.first >= 8 || end > 8 {
-        return Err(anyhow!("q12 Lock initialization range is outside eight slots"));
+        return Err(anyhow!(
+            "q12 Lock initialization range is outside eight slots"
+        ));
     }
     if binding.action == LockRunnerActionV1::LockShared && binding.count != 1 {
-        return Err(anyhow!("q12 shared Lock initialization range is not one slot"));
+        return Err(anyhow!(
+            "q12 shared Lock initialization range is not one slot"
+        ));
     }
     if !matches!(
         binding.action,

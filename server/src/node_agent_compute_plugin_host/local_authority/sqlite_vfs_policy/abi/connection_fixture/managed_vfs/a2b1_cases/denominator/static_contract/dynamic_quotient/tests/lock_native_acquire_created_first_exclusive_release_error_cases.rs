@@ -43,8 +43,7 @@ pub(super) struct FrozenLockCreatedFirstExclusiveReleaseErrorLeafV1 {
     pub(super) member: StaticMemberSealV1,
 }
 
-pub(super) fn frozen_lock_created_first_exclusive_release_error_leaves_v1(
-) -> &'static BTreeMap<
+pub(super) fn frozen_lock_created_first_exclusive_release_error_leaves_v1() -> &'static BTreeMap<
     FrozenLockCreatedFirstExclusiveReleaseErrorCaseV1,
     FrozenLockCreatedFirstExclusiveReleaseErrorLeafV1,
 > {
@@ -171,11 +170,11 @@ fn created_first_exclusive_release_error_v1(
     if range_mask_v1(action, first, count) != Some(mask)
         || value.source_site != SourceSiteV1::InitializationDms
         || stimulus
-            != InitializationStimulusV1 {
+            != (InitializationStimulusV1 {
                 fault_site: InitializationFaultSiteV1::DmsExclusiveRelease,
                 path: InitializationPathV1::CreatedFirst,
                 cleanup_rewrite: false,
-            }
+            })
         || value.prestate != PrestateV1::Lock(LockPrestateV1::NoHeldLocks)
         || value.operation != LockOperationV1::Initialization
         || value.phase != PhaseV1::DmsExclusiveRelease

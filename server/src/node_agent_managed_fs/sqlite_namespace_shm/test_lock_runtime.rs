@@ -352,8 +352,7 @@ impl ManagedSqliteShmTestLockController {
             .take()
             .ok_or("NODE_MANAGED_SQLITE_SHM_TEST_LOCK_OBSERVATION_NOT_ARMED")?;
         if armed.invalid
-            || armed.receipt.expectation.path
-                != ManagedSqliteShmTestLockPath::InitializationFailure
+            || armed.receipt.expectation.path != ManagedSqliteShmTestLockPath::InitializationFailure
             || armed.progress != Progress::ManagedAttempted
             || armed.receipt.managed_attempts != 1
             || armed.receipt.managed_successes != 0

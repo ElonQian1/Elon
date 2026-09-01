@@ -7,9 +7,8 @@
 use std::os::raw::c_int;
 
 use crate::node_agent_managed_fs::{
-    ManagedSqliteShmTestInitializationExpectationV1,
-    ManagedSqliteShmTestInitializationReceiptV1, ManagedSqliteShmTestLockReceipt,
-    ManagedSqliteShmTestTargetSnapshot,
+    ManagedSqliteShmTestInitializationExpectationV1, ManagedSqliteShmTestInitializationReceiptV1,
+    ManagedSqliteShmTestLockReceipt, ManagedSqliteShmTestTargetSnapshot,
 };
 
 use super::{ManagedSqliteRoutedConnectionFixture, ManagedTestShmLockCallbackObservation};

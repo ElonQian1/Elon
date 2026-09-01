@@ -1,6 +1,5 @@
 use super::super::{
-    test_lock_runtime::ManagedSqliteShmTestLockReceipt,
-    types::ManagedSqliteShmLockAction,
+    test_lock_runtime::ManagedSqliteShmTestLockReceipt, types::ManagedSqliteShmLockAction,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -94,9 +93,7 @@ impl ManagedSqliteShmTestInitializationReceiptV1 {
         self.expectation
     }
 
-    pub(crate) const fn native_receipt(
-        self,
-    ) -> ManagedSqliteShmTestInitializationNativeReceiptV1 {
+    pub(crate) const fn native_receipt(self) -> ManagedSqliteShmTestInitializationNativeReceiptV1 {
         self.native
     }
 
