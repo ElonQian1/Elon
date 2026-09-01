@@ -189,9 +189,7 @@ fn is_q15(active: &ArmedInitializationObservationV1) -> bool {
         == ManagedSqliteShmTestInitializationFailureV1::ExistingFirstTruncateOutcomeUncertainReleaseSucceeded
 }
 
-fn record_poisoned(
-    active: &mut ArmedInitializationObservationV1,
-) -> Result<(), &'static str> {
+fn record_poisoned(active: &mut ArmedInitializationObservationV1) -> Result<(), &'static str> {
     advance(
         active,
         Stage::DmsExclusiveUnlockSucceeded,

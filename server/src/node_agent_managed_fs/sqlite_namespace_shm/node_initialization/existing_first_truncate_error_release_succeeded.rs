@@ -107,10 +107,7 @@ impl ManagedSqliteShmCoordinator {
             true,
             false,
         );
-        self.record_test_initialization_existing_first_truncate_poisoned_v1(
-            state,
-            connection_id,
-        )?;
+        self.record_test_initialization_existing_first_truncate_poisoned_v1(state, connection_id)?;
         Err(ManagedSqliteShmFailure::poisoned(
             ManagedSqliteShmFailurePhase::DmsTruncate,
             io::Error::other("NODE_MANAGED_SQLITE_SHM_TRUNCATE_RETURN_RECEIPT_UNAVAILABLE"),

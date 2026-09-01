@@ -241,8 +241,7 @@ impl ManagedSqliteShmCoordinator {
                 return Err(failure);
             }
             #[cfg(all(test, windows))]
-            let file =
-                self.execute_q14_truncate_release_ok_test_v1(state, _connection_id, file)?;
+            let file = self.execute_q14_truncate_release_ok_test_v1(state, _connection_id, file)?;
             #[cfg(all(test, windows))]
             let mut file =
                 self.execute_q15_truncate_release_ok_test_v1(state, _connection_id, file)?;

@@ -312,8 +312,7 @@ fn initialization_open_existence_is_case_specific() {
     assert!(existing_first.record_open_attempt(TARGET).unwrap());
     assert!(existing_first.record_open_created(TARGET, true).is_err());
 
-    let mut existing_first_truncate =
-        ManagedSqliteShmTestInitializationControllerV1::default();
+    let mut existing_first_truncate = ManagedSqliteShmTestInitializationControllerV1::default();
     existing_first_truncate
         .arm(
             TARGET,
@@ -324,9 +323,7 @@ fn initialization_open_existence_is_case_specific() {
     assert!(existing_first_truncate
         .record_request(TARGET, request())
         .unwrap());
-    assert!(existing_first_truncate
-        .record_open_attempt(TARGET)
-        .unwrap());
+    assert!(existing_first_truncate.record_open_attempt(TARGET).unwrap());
     assert!(existing_first_truncate
         .record_open_created(TARGET, true)
         .is_err());

@@ -300,7 +300,9 @@ impl ManagedSqliteShmTestInitializationControllerV1 {
     ) -> Result<(), &'static str> {
         let active = self.require_active_for_event(target)?;
         created_first_truncate_error_release_succeeded::reject_release_receipt_if_selected(active)?;
-        existing_first_truncate_error_release_succeeded::reject_release_receipt_if_selected(active)?;
+        existing_first_truncate_error_release_succeeded::reject_release_receipt_if_selected(
+            active,
+        )?;
         if native.observation
             != ManagedSqliteShmTestInitializationNativeObservationV1::ReturnReceiptUnavailable
             || native.length != 1
