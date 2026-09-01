@@ -41,6 +41,8 @@ pub struct PublicProjectItem {
     pub icon_data_url: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub install_action: Option<PublicProjectInstallAction>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub preview_action: Option<PublicProjectPreviewAction>,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -56,6 +58,21 @@ impl PublicProjectInstallAction {
         Self {
             kind: "erp_blueprint",
             label: "创建我的店铺",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct PublicProjectPreviewAction {
+    pub kind: &'static str,
+    pub label: &'static str,
+}
+
+impl PublicProjectPreviewAction {
+    pub(crate) fn official_preview() -> Self {
+        Self {
+            kind: "official_project_preview",
+            label: "了解详情",
         }
     }
 }

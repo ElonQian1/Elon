@@ -14,7 +14,9 @@ use serde::Deserialize;
 use std::sync::Arc;
 
 use crate::{
+    official_project_catalog,
     project_auth::{auth_from_headers, json_error},
+    store::{PublicProjectItem, PublicProjectPreviewAction},
     types::AppState,
 };
 
@@ -56,7 +58,7 @@ pub async fn list_store_projects(
             .is_some_and(|cursor| !cursor.trim().is_empty());
 
     if cursor_mode {
-        let page = match state.store.list_public_projects_cursor_page_for_viewer(
+        let mut page = match state.store.list_public_projects_cursor_page_for_viewer(
             q.q.as_deref(),
             q.join_mode.as_deref(),
             q.has_apk,
@@ -71,6 +73,7 @@ pub async fn list_store_projects(
             }
             Err(e) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
         };
+        decorate_public_previews(&mut page.projects);
 
         return Json(serde_json::json!({
             "projects": page.projects,
@@ -85,7 +88,7 @@ pub async fn list_store_projects(
     }
 
     let offset = q.offset.unwrap_or(0).max(0);
-    let projects = match state.store.list_public_projects_for_viewer(
+    let mut projects = match state.store.list_public_projects_for_viewer(
         q.q.as_deref(),
         q.join_mode.as_deref(),
         q.has_apk,
@@ -97,6 +100,7 @@ pub async fn list_store_projects(
         Ok(projects) => projects,
         Err(e) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
     };
+    decorate_public_previews(&mut projects);
     let total =
         match state
             .store
@@ -126,8 +130,29 @@ pub async fn get_store_project(
         .store
         .get_public_project_for_viewer(&project_id, viewer_user_id.as_deref())
     {
-        Ok(project) => Json(serde_json::json!({ "project": project })).into_response(),
+        Ok(mut project) => {
+            decorate_public_preview(&mut project);
+            Json(serde_json::json!({ "project": project })).into_response()
+        }
         Err(e) => json_error(StatusCode::NOT_FOUND, e.to_string()),
+    }
+}
+
+/// GET /api/store/projects/:id/preview — 官方公开项目的加入前净化预览（无需登录）
+pub async fn get_store_project_preview(
+    State(state): State<Arc<AppState>>,
+    Path(project_id): Path<String>,
+) -> Response {
+    if state.store.get_public_project(&project_id).is_err() {
+        return json_error(StatusCode::NOT_FOUND, "项目不存在或未公开");
+    }
+    match official_project_catalog::public_preview(&project_id) {
+        Ok(Some(preview)) => Json(serde_json::json!({ "preview": preview })).into_response(),
+        Ok(None) => json_error(StatusCode::NOT_FOUND, "该项目没有公开预览"),
+        Err(error) => {
+            tracing::error!(project_id = %project_id, error = %error, "读取官方项目公开预览失败");
+            json_error(StatusCode::INTERNAL_SERVER_ERROR, "公开预览暂时不可用")
+        }
     }
 }
 
@@ -141,7 +166,21 @@ pub async fn list_joined_projects(
         Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
     };
     match state.store.list_joined_projects(&user.id) {
-        Ok(projects) => Json(serde_json::json!({ "projects": projects })).into_response(),
+        Ok(mut projects) => {
+            decorate_public_previews(&mut projects);
+            Json(serde_json::json!({ "projects": projects })).into_response()
+        }
         Err(e) => json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
     }
+}
+
+fn decorate_public_previews(projects: &mut [PublicProjectItem]) {
+    for project in projects {
+        decorate_public_preview(project);
+    }
+}
+
+fn decorate_public_preview(project: &mut PublicProjectItem) {
+    project.preview_action = official_project_catalog::has_public_preview(&project.id)
+        .then(PublicProjectPreviewAction::official_preview);
 }

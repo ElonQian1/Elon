@@ -185,6 +185,7 @@ fn public_project(name: &str, icon_data_url: Option<String>) -> PublicProjectIte
         latest_apk_url: None,
         icon_data_url,
         install_action: None,
+        preview_action: None,
         created_at: "now".to_string(),
         updated_at: "now".to_string(),
     }

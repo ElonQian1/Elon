@@ -16,6 +16,9 @@ use crate::{
     store::Store,
 };
 
+mod public_preview;
+pub(crate) use public_preview::{has_public_preview, public_preview};
+
 const CATALOG_JSON: &str = include_str!("catalog.json");
 const CATALOG_SCHEMA: &str = "yilong.official_project_catalog.v1";
 
@@ -303,5 +306,44 @@ mod tests {
             .get("paper_launch")
             .expect("一龙量化交易必须登记受控 Paper 启动入口");
         assert_eq!(paper_launch["schema"], "yilong.quant.paper_launch.v1");
+    }
+
+    #[test]
+    fn official_public_preview_is_allowlisted_and_quant_stays_paper_only() {
+        let preview = public_preview("yilong-quant")
+            .unwrap()
+            .expect("一龙量化交易必须提供加入前公开预览");
+        assert_eq!(preview.schema, "yilong.official_project_preview.v1");
+        assert_eq!(preview.project_id, "yilong-quant");
+        assert!(preview.summary.contains("不接收或移动真实用户资金"));
+        assert!(preview
+            .downloads
+            .iter()
+            .all(|download| download.status == "planned"));
+        let launch = preview
+            .paper_launch
+            .as_ref()
+            .expect("量化预览必须保留净化 Paper 边界");
+        assert_eq!(launch.mode, "paper");
+        assert!(launch.simulated);
+        assert!(!launch.funds_moved);
+        assert!(!launch.target_is_guaranteed);
+
+        let serialized = serde_json::to_value(preview).unwrap();
+        let serialized = serde_json::to_string(&serialized).unwrap();
+        for forbidden in [
+            "\"manifest_url\":",
+            "\"custom_landing_url\":",
+            "\"resources\":",
+            "\"participant\":",
+            "\"grant\":",
+        ] {
+            assert!(
+                !serialized.contains(forbidden),
+                "公开预览泄露字段: {forbidden}"
+            );
+        }
+        assert!(public_preview("unknown-project").unwrap().is_none());
+        assert!(!has_public_preview("unknown-project"));
     }
 }

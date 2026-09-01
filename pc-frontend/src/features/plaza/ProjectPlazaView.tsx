@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Download, LayoutGrid, Loader2, LogIn, Search, Store, UsersRound } from 'lucide-react'
+import { Download, Info, LayoutGrid, Loader2, LogIn, Search, Store, UsersRound } from 'lucide-react'
 import { api } from '../../api/client'
 import { useProjectStore } from '../conversation/useProjectStore'
 import MarketplaceErpInstallDialog from './MarketplaceErpInstallDialog'
+import OfficialProjectPreviewDialog from './OfficialProjectPreviewDialog'
 import styles from './PlazaPage.module.css'
 
 export interface PlazaProject {
@@ -19,6 +20,10 @@ export interface PlazaProject {
   latest_apk_url?: string
   icon_data_url?: string
   install_action?: {
+    kind: string
+    label: string
+  }
+  preview_action?: {
     kind: string
     label: string
   }
@@ -67,6 +72,7 @@ export default function ProjectPlazaView() {
   const [nextCursor, setNextCursor] = useState<string | null>(null)
   const [hasMore, setHasMore] = useState(false)
   const [installProject, setInstallProject] = useState<PlazaProject | null>(null)
+  const [previewProject, setPreviewProject] = useState<PlazaProject | null>(null)
 
   const load = useCallback(async (options?: { append?: boolean; cursor?: string | null }) => {
     const append = options?.append ?? false
@@ -239,6 +245,7 @@ export default function ProjectPlazaView() {
                 onJoin={handleJoin}
                 onOpen={openProject}
                 onInstall={setInstallProject}
+                onPreview={setPreviewProject}
               />
             ))}
           </div>
@@ -264,6 +271,9 @@ export default function ProjectPlazaView() {
           onCreated={handleInstanceCreated}
         />
       )}
+      {previewProject && (
+        <OfficialProjectPreviewDialog project={previewProject} onClose={() => setPreviewProject(null)} />
+      )}
     </section>
   )
 }
@@ -275,6 +285,7 @@ function ProjectCard({
   onJoin,
   onOpen,
   onInstall,
+  onPreview,
 }: {
   project: PlazaProject
   joining: boolean
@@ -282,6 +293,7 @@ function ProjectCard({
   onJoin: (project: PlazaProject) => void
   onOpen: (project: PlazaProject) => void
   onInstall: (project: PlazaProject) => void
+  onPreview: (project: PlazaProject) => void
 }) {
   const title = project.display_name || project.name
   const alreadyJoined = Boolean(project.viewer_role) || joinStatus === 'joined'
@@ -311,6 +323,12 @@ function ProjectCard({
       </div>
 
       <div className={styles.cardActions}>
+        {project.preview_action?.kind === 'official_project_preview' && (
+          <button className={styles.previewBtn} type="button" onClick={() => onPreview(project)}>
+            <Info size={14} aria-hidden="true" />
+            <span>{project.preview_action.label || '了解详情'}</span>
+          </button>
+        )}
         {project.install_action?.kind === 'erp_blueprint' && (
           <button className={styles.installBtn} type="button" onClick={() => onInstall(project)}>
             <Store size={14} aria-hidden="true" />

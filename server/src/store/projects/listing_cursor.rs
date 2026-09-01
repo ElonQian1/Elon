@@ -271,6 +271,7 @@ fn project_listing_row(
         latest_apk_url: row.get(9)?,
         icon_data_url: row.get(10)?,
         install_action: install_action(row.get::<_, i64>(18)? != 0),
+        preview_action: None,
         created_at: row.get(11)?,
         updated_at: row.get(12)?,
         owner_id: row.get(13).unwrap_or_default(),

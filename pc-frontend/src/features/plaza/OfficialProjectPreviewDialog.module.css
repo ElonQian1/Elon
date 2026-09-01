@@ -1,0 +1,287 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(4, 6, 10, .76);
+  backdrop-filter: blur(6px);
+}
+
+.dialog {
+  width: min(720px, 100%);
+  max-height: min(820px, calc(100vh - 36px));
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  overflow: hidden;
+  border: 1px solid rgba(168, 199, 250, .18);
+  border-radius: 10px;
+  background: #15181e;
+  color: var(--text);
+  box-shadow: 0 28px 90px rgba(0, 0, 0, .58);
+}
+
+.header {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) 34px;
+  align-items: center;
+  gap: 12px;
+  padding: 17px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, .08);
+  background: linear-gradient(120deg, rgba(48, 90, 155, .2), transparent 58%);
+}
+
+.icon {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: rgba(168, 199, 250, .14);
+  color: #cfe1ff;
+}
+
+.header > div {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.eyebrow {
+  color: #8fb5ef !important;
+  font-size: 10px !important;
+  font-weight: 900;
+  letter-spacing: .08em;
+}
+
+.header strong {
+  overflow: hidden;
+  font-size: 17px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.header span {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.close {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.close:hover,
+.close:focus-visible {
+  outline: none;
+  background: rgba(255, 255, 255, .08);
+  color: var(--text);
+}
+
+.body {
+  overflow: auto;
+  padding: 18px;
+}
+
+.feedback {
+  min-height: 260px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 9px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.feedback strong { color: var(--text-soft); font-size: 14px; }
+.feedback span { max-width: 420px; font-size: 12px; line-height: 1.65; }
+.spinner { animation: spin 900ms linear infinite; }
+
+.retry {
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 5px;
+  padding: 0 13px;
+  border: 1px solid rgba(168, 199, 250, .24);
+  border-radius: 6px;
+  background: rgba(168, 199, 250, .12);
+  color: #dce9ff;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.summary {
+  display: grid;
+  gap: 7px;
+  padding: 15px;
+  border: 1px solid rgba(255, 255, 255, .08);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, .035);
+}
+
+.summary p,
+.summary span { margin: 0; line-height: 1.7; }
+.summary p { color: var(--text); font-size: 14px; font-weight: 780; }
+.summary span { color: var(--text-muted); font-size: 12px; }
+
+.paperNotice {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  gap: 10px;
+  margin-top: 13px;
+  padding: 13px 14px;
+  border: 1px solid rgba(37, 211, 102, .22);
+  border-radius: 8px;
+  background: rgba(37, 211, 102, .08);
+  color: #9fe5ba;
+}
+
+.paperNotice > div { display: grid; gap: 5px; }
+.paperNotice strong { color: #dff6e8; font-size: 13px; }
+.paperNotice span { color: var(--text-soft); font-size: 12px; line-height: 1.6; }
+.paperNotice small { color: #8fc9a6; font-size: 10px; font-weight: 800; }
+
+.section {
+  margin-top: 18px;
+}
+
+.section h3 {
+  margin: 0 0 9px;
+  color: var(--text-soft);
+  font-size: 12px;
+  letter-spacing: .03em;
+}
+
+.section ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.section li {
+  position: relative;
+  padding-left: 16px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.section li::before {
+  content: '';
+  position: absolute;
+  top: .66em;
+  left: 2px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #78a8ef;
+}
+
+.section[data-compact] ul { gap: 5px; }
+.section[data-warning] {
+  padding: 12px 13px;
+  border: 1px solid rgba(229, 184, 92, .18);
+  border-radius: 8px;
+  background: rgba(229, 184, 92, .055);
+}
+.section[data-warning] li::before { background: #d8b263; }
+
+.downloads {
+  display: grid;
+  gap: 7px;
+}
+
+.downloads article {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 11px;
+  border: 1px solid rgba(255, 255, 255, .07);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, .025);
+}
+
+.downloadIcon {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, .05);
+  color: var(--text-muted);
+}
+
+.downloads article > div { min-width: 0; display: grid; gap: 3px; }
+.downloads strong { font-size: 12px; }
+.downloads span { color: var(--text-muted); font-size: 10px; line-height: 1.45; }
+.downloads em {
+  padding: 4px 7px;
+  border-radius: 999px;
+  background: rgba(229, 184, 92, .1);
+  color: #e4c785;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 850;
+  white-space: nowrap;
+}
+.downloads em[data-status='available'] { background: rgba(37, 211, 102, .1); color: #9fe5ba; }
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 18px;
+  border-top: 1px solid rgba(255, 255, 255, .08);
+  background: #12151a;
+}
+
+.footer span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.footer button {
+  height: 34px;
+  padding: 0 15px;
+  border: 1px solid rgba(168, 199, 250, .28);
+  border-radius: 6px;
+  background: rgba(168, 199, 250, .14);
+  color: #e2edff;
+  font-size: 12px;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.footer button:hover { background: rgba(168, 199, 250, .2); }
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 620px) {
+  .backdrop { padding: 8px; }
+  .dialog { max-height: calc(100vh - 16px); }
+  .header { padding: 14px; }
+  .body { padding: 14px; }
+  .footer { padding: 11px 14px; }
+  .downloads article { grid-template-columns: 30px minmax(0, 1fr); }
+  .downloads em { grid-column: 2; justify-self: start; }
+}

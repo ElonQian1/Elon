@@ -98,6 +98,10 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
         get(project_store::get_store_project),
     )
     .route(
+        "/api/store/projects/:id/preview",
+        get(project_store::get_store_project_preview),
+    )
+    .route(
         "/api/store/joined",
         get(project_store::list_joined_projects),
     )

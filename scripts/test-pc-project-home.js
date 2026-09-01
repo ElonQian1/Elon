@@ -60,9 +60,9 @@ assert.ok(
   'quant catalog should preserve the subproject research highlight',
 )
 assert.match(
-  quantCatalog.landing.recent_updates[0],
+  quantCatalog.landing.recent_updates.join('\n'),
   /BACKTEST \/ SIMULATION[\s\S]*CC0 fixture[\s\S]*权益曲线与回撤/,
-  'quant catalog should surface the latest traceable simulation update first',
+  'quant catalog should preserve the traceable simulation update after newer safety updates',
 )
 assert.match(quantCatalog.landing.summary, /不接收或移动真实用户资金，也不连接实盘/, 'research update must not weaken the paper-only boundary')
 

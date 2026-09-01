@@ -42,6 +42,7 @@
 
 - `server/src/official_project_catalog/catalog.json` 保存官方公开项目元数据和净化首页快照。
 - `server/src/official_project_catalog/mod.rs` 支持两类官方项目：带 ERP 蓝图的可安装项目，以及不带蓝图的普通公开产品项目。
+- `GET /api/store/projects/:id/preview` 只为当前公开且存在于内置官方目录的项目返回 `yilong.official_project_preview.v1`。PC 项目广场在用户加入前按需展示能力、目标用户、最近更新、隐私边界、客户端计划和净化 Paper 说明；下载/资源 URL、工作区内容、grant、participant、密钥和仓位不会进入该响应。
 - 量化项目属于第二类，因此不会显示 ERP 安装动作。
 - 子仓库自身的 `.elon/project-landing.json` 仍是后续同步更新的内容真源；官方目录快照变更必须与它保持一致。
 - 子仓库 `77ff21c6ce3d0984273ad6e3ad526faff0d46b7c` 已验证版本化研究行情和单机可复现回测 V1；主项目只同步净化后的能力摘要与文档入口，不接收行情数据、策略代码、订单或回测结果。
@@ -52,6 +53,7 @@
 - `contracts/quant/net-balance-lock-receipt-v1.schema.json` 已定义主项目未来锁定 NET 后交给量化项目消费的版本化回执形状；详细语义见 `docs/yilong-quant-net-lock-receipt-v1.md`。
 - `POST /api/me/quant/paper-access-grants` 已复用主项目现有 bearer 会话，可在独立签名配置启用后签发最多五分钟的 Ed25519 paper grant；量化项目只获得项目专用脱敏 subject 和明确 scope，不获得主项目 bearer 或用户资料。契约见 `docs/yilong-quant-paper-access-grant-v1.md` 与 `contracts/quant/paper-access-grant-v1.schema.json`。
 - `GET /api/me/quant/paper-launch` 与 `POST /api/me/quant/paper-launches` 提供失败关闭的 readiness 和一次性启动票据；PC 项目主页通过 exact-origin iframe、`event.source`、nonce、attempt ID 和过期时间绑定，把 grant 只传给当前量化子页面。双方契约见 `docs/yilong-quant-paper-launch-v1.md` 与 `contracts/quant/paper-launch-v1.schema.json`。
+- 加入前公开预览与 Paper 启动严格分离：预览是匿名 GET，只展示内置目录白名单；它不登录、不加入、不签发 grant，也不触发量化页面或任何写接口。需求与验收边界见 `docs/requirements/yilong-quant-public-project-preview-v1.md`。
 - 当前 Schema 只用于 paper 联调。主项目尚无真实 NET 余额运行时、发行方签名和用户准入，因此不能签发或接受真实回执。
 
 ## 尚未完成

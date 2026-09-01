@@ -250,6 +250,7 @@
 
 .cardActions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   min-height: 32px;
@@ -258,6 +259,7 @@
 .openBtn,
 .joinBtn,
 .installBtn,
+.previewBtn,
 .loadMoreBtn {
   height: 32px;
   display: inline-flex;
@@ -277,6 +279,12 @@
   color: #fff;
 }
 .installBtn:hover { background: #248652; }
+.previewBtn {
+  border: 1px solid rgba(168, 199, 250, .2);
+  background: rgba(168, 199, 250, .08);
+  color: #d5e5ff;
+}
+.previewBtn:hover { background: rgba(168, 199, 250, .15); }
 .apkBtn {
   border: 1px solid rgba(255, 255, 255, .1);
   background: rgba(255, 255, 255, .045);

@@ -11,12 +11,34 @@ const source = fs.readFileSync(
   path.join(root, 'server/src/official_project_catalog/mod.rs'),
   'utf8',
 )
+const previewSource = fs.readFileSync(
+  path.join(root, 'server/src/official_project_catalog/public_preview.rs'),
+  'utf8',
+)
+const storeSource = fs.readFileSync(path.join(root, 'server/src/project_store.rs'), 'utf8')
+const routesSource = fs.readFileSync(path.join(root, 'server/src/router/social_routes.rs'), 'utf8')
+const plazaSource = fs.readFileSync(
+  path.join(root, 'pc-frontend/src/features/plaza/ProjectPlazaView.tsx'),
+  'utf8',
+)
+const previewDialogSource = fs.readFileSync(
+  path.join(root, 'pc-frontend/src/features/plaza/OfficialProjectPreviewDialog.tsx'),
+  'utf8',
+)
 
 assert.equal(catalog.schema, 'yilong.official_project_catalog.v1')
 assert.ok(Array.isArray(catalog.projects) && catalog.projects.length > 0)
 assert.equal(new Set(catalog.projects.map((project) => project.id)).size, catalog.projects.length)
 assert.match(source, /include_str!\("catalog\.json"\)/)
 assert.match(source, /for project in &catalog\.projects/)
+assert.match(previewSource, /yilong\.official_project_preview\.v1/)
+assert.match(previewSource, /manifest_url/)
+assert.match(previewSource, /resource URLs are intentionally excluded/)
+assert.match(storeSource, /get_store_project_preview/)
+assert.match(routesSource, /\/api\/store\/projects\/:id\/preview/)
+assert.match(plazaSource, /<OfficialProjectPreviewDialog/)
+assert.match(previewDialogSource, /了解项目详情/)
+assert.doesNotMatch(previewDialogSource, /\/join|paper-launch|paper\/launch/)
 
 for (const project of catalog.projects) {
   assert.ok(project.id && project.name && project.display_name && project.description)

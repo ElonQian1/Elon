@@ -6812,6 +6812,200 @@
       "updated_at_ms": 1786625470065
     },
     {
+      "id": "quant-public-project-preview-v1",
+      "title": "一龙量化交易加入前公开预览 V1",
+      "summary": "让用户无需登录或加入项目即可从官方目录读取净化后的量化项目能力、Paper-only 风险边界和客户端下载计划；不公开任意项目 landing 或执行任何写操作。",
+      "status": "verified",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/yilong-quant-public-project-preview-v1.md",
+        "content_hash": "176020833c81a72391b613fe5260e86a5dfaf9e5d68ba0d4ac9bd804e634cc32",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "ca7f592e0c5164c730bbd9a45265f18b3b002f03",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "4c39fc4495ffbb910818dac924644b702a13ddf5",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "project-marketplace",
+      "tags": [
+        "quant",
+        "project-plaza",
+        "public-preview",
+        "paper-only",
+        "security"
+      ],
+      "task_paths": [
+        "docs/project-store-architecture.md",
+        "docs/yilong-quant-integration.md",
+        "pc-frontend/src/features/plaza",
+        "scripts/test-official-project-catalog.js",
+        "server/src/official_project_catalog",
+        "server/src/project_store.rs",
+        "server/src/router/social_routes.rs"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "匿名请求只为当前公开的官方目录项目返回 V1 白名单预览，非官方项目 404。",
+        "量化预览明确 Paper-only、非保证目标、不移动真实资金且客户端下载保持 planned。",
+        "预览不包含下载或资源 URL、grant、participant、账户、密钥或仓位数据。",
+        "PC 广场加入前详情具备加载、失败重试、关闭和可访问对话框语义，不触发任何写接口。",
+        "现有筛选、cursor 分页、加入、申请和 ERP 创建路径保持兼容。",
+        "合同、Rust、PC 类型/构建及线上匿名只读验收通过。"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "docs/project-store-architecture.md",
+          "content_hash": "ed225772bbd50cce30ba333d8f2d16f8a1e2b54616ba527f600720898c4952f8",
+          "locator": "官方项目加入前预览",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ca7f592e0c5164c730bbd9a45265f18b3b002f03",
+            "head_blob_oid": "941d652aaf8db4dafbdf6eebbeffdf1ac27c1556",
+            "worktree_blob_oid": "5805396fa0a26e1da9c21b6e0af8f8ec43949164",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "docs/requirements/yilong-quant-public-project-preview-v1.md",
+          "content_hash": "176020833c81a72391b613fe5260e86a5dfaf9e5d68ba0d4ac9bd804e634cc32",
+          "locator": "验收标准",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ca7f592e0c5164c730bbd9a45265f18b3b002f03",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "4c39fc4495ffbb910818dac924644b702a13ddf5",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "docs/yilong-quant-integration.md",
+          "content_hash": "1d2bb721650622b47c79504f9ea83cb63b3e536d66e60c09636c18cae8e38690",
+          "locator": "加入前公开预览",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ca7f592e0c5164c730bbd9a45265f18b3b002f03",
+            "head_blob_oid": "45e8101a34f0b37bfa5e568268eaeb32af9e28cd",
+            "worktree_blob_oid": "1d5593ffd0cc4f2e7782d3ed63c162f8d03ee4d8",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/plaza/OfficialProjectPreviewDialog.tsx",
+          "content_hash": "2a3b25ad32f5d99b44de1cfb5ac2432dd594b6b3ebf129659b08be70ccbab1d5",
+          "locator": "OfficialProjectPreviewDialog",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ca7f592e0c5164c730bbd9a45265f18b3b002f03",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "1ad281c86718273ed74779eb1d78929751d6fcc8",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/plaza/ProjectPlazaView.tsx",
+          "content_hash": "ac36a1c4f27edf6a7fe99af9054e01aaeebbabcaaed7ffaade9261d07e4d0f0d",
+          "locator": "preview_action",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ca7f592e0c5164c730bbd9a45265f18b3b002f03",
+            "head_blob_oid": "c30d9ec9864603296da05a55cd6be0441f5f427c",
+            "worktree_blob_oid": "d596abf04502b1dfabe273e86b08660adbcd392f",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "scripts/test-official-project-catalog.js",
+          "content_hash": "524f477fa9933539df3ab0718212a36158398108aab93f0b9fca71660f8f316c",
+          "locator": "Official project public preview",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ca7f592e0c5164c730bbd9a45265f18b3b002f03",
+            "head_blob_oid": "bc520309e836b21d3bc9321ff74ee6bba1daddac",
+            "worktree_blob_oid": "acfc0951e47e19b4bf74bc203a26dc799384c397",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "scripts/test-pc-project-home.js",
+          "content_hash": "19b6fb69b527faeb27ddb0814c1ebd3630a58510304a5de2aac94a4a2420de47",
+          "locator": "traceable simulation update",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ca7f592e0c5164c730bbd9a45265f18b3b002f03",
+            "head_blob_oid": "80bc27b887aa32e268fd12be6e7f786e8d0f0efb",
+            "worktree_blob_oid": "85aacbbc1e9465e84e77eab7093ad6fc5097dc3b",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/official_project_catalog/mod.rs",
+          "content_hash": "1505734ecbc91aabca4342e6b789707605a04c2f8c20cc4914e8c92d146d6aec",
+          "locator": "official_public_preview_is_allowlisted_and_quant_stays_paper_only",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ca7f592e0c5164c730bbd9a45265f18b3b002f03",
+            "head_blob_oid": "1a4a1ecc948ea2906284206aa6555ec1d1263e1a",
+            "worktree_blob_oid": "304ac87c5ea08f2ec9818a8361c6630c9a87db84",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/official_project_catalog/public_preview.rs",
+          "content_hash": "c25dc0db893ebd98f2d3cd8723c56ba8f88941f852dd5c829e39a9689a085aff",
+          "locator": "public_preview",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ca7f592e0c5164c730bbd9a45265f18b3b002f03",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "17b23513f0dc9864cdd1c257d07bff8946faa069",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/project_store.rs",
+          "content_hash": "832174958d938b1386a732cd78316ade6a74aff18b6800771fb856d6330ec7ff",
+          "locator": "get_store_project_preview",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ca7f592e0c5164c730bbd9a45265f18b3b002f03",
+            "head_blob_oid": "7c3d7b7fcda2863fe5f4fd473cf28f42fb4b2274",
+            "worktree_blob_oid": "de87bb9099bd5cffb67bf87024dce0752a5b5a45",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/router/social_routes.rs",
+          "content_hash": "8ec0e152264396b2a24cd44098210a34cc2c642c9e13aa9f3d1a54df1b033965",
+          "locator": "/api/store/projects/:id/preview",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ca7f592e0c5164c730bbd9a45265f18b3b002f03",
+            "head_blob_oid": "acc602f35325dfa8182860f53c99d649b9784a4a",
+            "worktree_blob_oid": "7445dbfd5f8902e3a1c92e4959fb703ee50e0417",
+            "state": "tracked_modified"
+          }
+        }
+      ],
+      "created_at_ms": 1788284311917,
+      "updated_at_ms": 1788285189947
+    },
+    {
       "id": "rust-cache-portable-file-hash-v1",
       "title": "Rust cache portable file hashing V1",
       "summary": "Remove the fleet export dependency on PowerShell Get-FileHash so installed cache reporting and outbox staging work consistently across Windows PowerShell and PowerShell 7 hosts.",
@@ -13192,66 +13386,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_f5a0133b868e4d978ec88c8344c6906a",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-goal-lock-stored-poison",
-      "reason": "",
-      "from_status": "blocked",
-      "to_status": "blocked",
-      "at_ms": 1788206457876
-    },
-    {
-      "id": "feature_event_c13e8a7933f24927b257e6d46d938bd3",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-goal-lock-stored-poison",
-      "reason": "",
-      "from_status": "blocked",
-      "to_status": "blocked",
-      "at_ms": 1788206687334
-    },
-    {
-      "id": "feature_event_8757e48a14ce449e89b53033e7222b82",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-goal-lock-stored-poison",
-      "reason": "",
-      "from_status": "blocked",
-      "to_status": "blocked",
-      "at_ms": 1788206744246
-    },
-    {
-      "id": "feature_event_586109ea637345c0b858af9bfcb9b77d",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-goal-lock-stored-poison",
-      "reason": "",
-      "from_status": "blocked",
-      "to_status": "blocked",
-      "at_ms": 1788206959284
-    },
-    {
-      "id": "feature_event_5fb15def22ed44f1926a89e5408ac9d0",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-lock-route-unknown",
-      "reason": "Begin the next exact source-only Lock route-unknown tranche under the current reviewed requirement; runtime and production gates remain closed",
-      "from_status": "blocked",
-      "to_status": "ready",
-      "at_ms": 1788208464758
-    },
-    {
-      "id": "feature_event_b6a1a80d772245238e10f8e2169fb8ae",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "claimed",
-      "actor": "codex-goal-lock-route-unknown",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788208477183
-    },
-    {
       "id": "feature_event_b5b2d1be623a4f7bb8daba2ed7d0bc10",
       "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
       "action": "transitioned",
@@ -15190,6 +15324,66 @@
       "from_status": "in_progress",
       "to_status": "blocked",
       "at_ms": 1788282900905
+    },
+    {
+      "id": "feature_event_8e09b07d29744e93a6d11e3b0d368c22",
+      "feature_id": "quant-public-project-preview-v1",
+      "action": "registered",
+      "actor": "codex-goal-quant-public-preview",
+      "reason": "长期 Goal 的项目广场能力同步下一纵向切片。",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1788284311917
+    },
+    {
+      "id": "feature_event_0ddf8871ccec4680b0fc4e9da3cbf9cd",
+      "feature_id": "quant-public-project-preview-v1",
+      "action": "claimed",
+      "actor": "codex-goal-quant-public-preview",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788284321733
+    },
+    {
+      "id": "feature_event_32abc0c59c1741bcbe9034a0219f2de2",
+      "feature_id": "quant-public-project-preview-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-quant-public-preview",
+      "reason": "查重和所有权审计完成，开始实现官方目录安全预览纵向切片。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788284333637
+    },
+    {
+      "id": "feature_event_df8c0878d9ca4ddb8fcab4f7ad14fa27",
+      "feature_id": "quant-public-project-preview-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-goal-quant-public-preview",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788285168040
+    },
+    {
+      "id": "feature_event_b743118f79eb4a6eb62dc887d277e0a6",
+      "feature_id": "quant-public-project-preview-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-quant-public-preview",
+      "reason": "公开预览白名单投影、匿名只读接口和 PC 加入前详情弹窗已实现，源码与文档证据已绑定。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1788285178158
+    },
+    {
+      "id": "feature_event_78fe3bdbdcac477b83596df815a64cc3",
+      "feature_id": "quant-public-project-preview-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-quant-public-preview",
+      "reason": "Rust 精确测试、官方目录/项目中心/渐进列表合同、PC 类型检查/生产构建和定向 ESLint 均通过；线上匿名接口待发布后验收。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1788285189947
     }
   ]
 }
