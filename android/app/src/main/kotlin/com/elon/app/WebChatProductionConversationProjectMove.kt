@@ -225,7 +225,16 @@ internal class WebChatProductionConversationProjectMoveCoordinator(
             return
         }
         if (WebChatConversationProjectMoveTiming.shouldRefreshControls(attempt)) {
-            port.requestControls()
+            refreshControlsThen(port, epoch) {
+                waitForMoveTrigger(
+                    conversation,
+                    destination,
+                    port,
+                    epoch,
+                    attempt + 1,
+                )
+            }
+            return
         }
         if (attempt >= MAX_CONTROL_POLLS) {
             fail(conversation, destination, "官网项目入口暂不可用", epoch)
@@ -275,7 +284,16 @@ internal class WebChatProductionConversationProjectMoveCoordinator(
             return
         }
         if (WebChatConversationProjectMoveTiming.shouldRefreshControls(attempt)) {
-            port.requestControls()
+            refreshControlsThen(port, epoch) {
+                waitForProjectChoice(
+                    conversation,
+                    destination,
+                    port,
+                    epoch,
+                    attempt + 1,
+                )
+            }
+            return
         }
         if (attempt >= MAX_CONTROL_POLLS) {
             fail(conversation, destination, "未找到所选项目", epoch)
@@ -389,7 +407,17 @@ internal class WebChatProductionConversationProjectMoveCoordinator(
                 return
             }
             if (WebChatConversationProjectMoveTiming.shouldRefreshControls(attempt)) {
-                port.requestControls()
+                refreshControlsThen(port, epoch) {
+                    pollReconciliation(
+                        conversation,
+                        destination,
+                        port,
+                        epoch,
+                        attempt + 1,
+                        confirmationAttempted,
+                    )
+                }
+                return
             }
         }
         if (attempt >= MAX_RECONCILIATION_POLLS) {
@@ -409,6 +437,27 @@ internal class WebChatProductionConversationProjectMoveCoordinator(
                 confirmationAttempted,
             )
         }, POLL_INTERVAL_MS)
+    }
+
+    private fun refreshControlsThen(
+        port: WebChatConsumerPort,
+        epoch: Int,
+        continuation: () -> Unit,
+    ) {
+        val request = port.requestControls()
+        val requestId = request.requestId
+        if (!request.accepted || requestId.isNullOrBlank()) {
+            host.postDelayed(continuation, POLL_INTERVAL_MS)
+            return
+        }
+        waitForCommand(
+            port = port,
+            requestId = requestId,
+            epoch = epoch,
+            attempt = 0,
+            onSucceeded = continuation,
+            onFailed = { host.postDelayed(continuation, POLL_INTERVAL_MS) },
+        )
     }
 
     private fun readiness(targetPath: String): WebChatConversationActionReadiness =
