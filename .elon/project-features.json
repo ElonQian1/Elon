@@ -320,14 +320,14 @@
       "priority": "p0",
       "requirement": {
         "path": "docs/distributed-compute/node-plugin-vfs-map-lock-dynamic-quotient-authority.md",
-        "content_hash": "6d16300300d368d944cbd853b50d62cdd513d9dbe41f657deeec8453292fcf85",
+        "content_hash": "21f8b6998dd68a94f789917a9abf0f42362f1b135cee9e75511bf5dff5512696",
         "locator": "",
         "evidence_kind": "document",
         "git_identity": {
           "schema": "elon.project_context_git_identity.v1",
-          "head_commit": "775a910ca4f5fbcae1410bfa04853172e98b668b",
-          "head_blob_oid": "bac1e7224d3a360cea5f77146034b043f9b303d9",
-          "worktree_blob_oid": "bac1e7224d3a360cea5f77146034b043f9b303d9",
+          "head_commit": "541b3840eb02c0ba8110c1f8d5d1f91637fd477b",
+          "head_blob_oid": "b9aba2910b6ec988f356534e0af193605e7ab184",
+          "worktree_blob_oid": "b9aba2910b6ec988f356534e0af193605e7ab184",
           "state": "tracked_clean"
         }
       },
@@ -365,216 +365,216 @@
       ],
       "implementation_evidence": [
         {
-          "path": "docs/distributed-compute/node-plugin-vfs-lock-dynamic-tranches-authority.md",
-          "content_hash": "0ce0312d13e22c1c976495254e00e9bb1a388a2ada72579415e19706762d5f27",
-          "locator": "Q15 exact 88-member tranche and controlled-fault boundary",
+          "path": "docs/distributed-compute/node-plugin-vfs-execution-program-inventory-authority.md",
+          "content_hash": "88158c9225bd6ca26246af604e8a82ff1064b82aab3008b896c9dd5c770134a6",
+          "locator": "LockNativeAcquireCreatedFirstTruncateErrorReleaseFailedV1",
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "775a910ca4f5fbcae1410bfa04853172e98b668b",
-            "head_blob_oid": "58ac3f7677ed802242c9236e67974207a0bdc70e",
-            "worktree_blob_oid": "58ac3f7677ed802242c9236e67974207a0bdc70e",
+            "head_commit": "541b3840eb02c0ba8110c1f8d5d1f91637fd477b",
+            "head_blob_oid": "e9db3f99be58895f698ef7f0300e97bb68cd67b4",
+            "worktree_blob_oid": "e9db3f99be58895f698ef7f0300e97bb68cd67b4",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "docs/distributed-compute/node-plugin-vfs-lock-dynamic-tranches-authority.md",
+          "content_hash": "6aaee424fa016ca2c4d486662e8448cb69b29230d0dde876b377032a425f318e",
+          "locator": "Lock q16 double-uncertainty tranche",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "541b3840eb02c0ba8110c1f8d5d1f91637fd477b",
+            "head_blob_oid": "921c32dcdaeb1219757c342483d191a7df928e51",
+            "worktree_blob_oid": "921c32dcdaeb1219757c342483d191a7df928e51",
             "state": "tracked_clean"
           }
         },
         {
           "path": "docs/distributed-compute/node-plugin-vfs-map-lock-dynamic-quotient-authority.md",
-          "content_hash": "6d16300300d368d944cbd853b50d62cdd513d9dbe41f657deeec8453292fcf85",
-          "locator": "Current Q15 quotient authority verdict",
+          "content_hash": "21f8b6998dd68a94f789917a9abf0f42362f1b135cee9e75511bf5dff5512696",
+          "locator": "Q16 source-written inventory and closed gates",
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "775a910ca4f5fbcae1410bfa04853172e98b668b",
-            "head_blob_oid": "bac1e7224d3a360cea5f77146034b043f9b303d9",
-            "worktree_blob_oid": "bac1e7224d3a360cea5f77146034b043f9b303d9",
+            "head_commit": "541b3840eb02c0ba8110c1f8d5d1f91637fd477b",
+            "head_blob_oid": "b9aba2910b6ec988f356534e0af193605e7ab184",
+            "worktree_blob_oid": "b9aba2910b6ec988f356534e0af193605e7ab184",
             "state": "tracked_clean"
           }
         },
         {
-          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2_dynamic_evidence/lock_runner/existing_first_truncate_error_release_succeeded.rs",
-          "content_hash": "1e272e24e85546d59ac6be390b39be0afcc07acac6c9bbfde03e8573adcd7303",
-          "locator": "Process-isolated Q15 controlled-fault runner",
+          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2_dynamic_evidence/child/lock_created_first_truncate_error_release_failed.rs",
+          "content_hash": "0a65104f4f216b13206985596a01ced9c5765587e976d67b53b3ea8863583161",
+          "locator": "a2lockq16 164-value header",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "775a910ca4f5fbcae1410bfa04853172e98b668b",
-            "head_blob_oid": "dfa0cbf3e21332852bd20fc9fb242a0408e20024",
-            "worktree_blob_oid": "dfa0cbf3e21332852bd20fc9fb242a0408e20024",
+            "head_commit": "541b3840eb02c0ba8110c1f8d5d1f91637fd477b",
+            "head_blob_oid": "72449619ddf8ef0d467cf78384f5f404163de837",
+            "worktree_blob_oid": "72449619ddf8ef0d467cf78384f5f404163de837",
             "state": "tracked_clean"
           }
         },
         {
-          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2_dynamic_evidence/lock_runner/existing_first_truncate_error_release_succeeded/fixture.rs",
-          "content_hash": "270eaab1a45f6995208b6e435fbe9672dc8256145275599e657ca6f74ab62536",
-          "locator": "ExistingFirst precreation, installed xShmLock, and custody validation",
+          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2_dynamic_evidence/lock_runner/created_first_truncate_error_release_failed.rs",
+          "content_hash": "e5ce9beccedb215bb03e1719eb41db074a67aaf874499b59dbd69ee36b8fb893",
+          "locator": "isolated parent runner",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "1186ac655ef89277dfcf3845f51892e567a0cea4",
-            "head_blob_oid": "9db094950bc02112c88660a438675cc693a190e9",
-            "worktree_blob_oid": "9db094950bc02112c88660a438675cc693a190e9",
+            "head_commit": "541b3840eb02c0ba8110c1f8d5d1f91637fd477b",
+            "head_blob_oid": "1bbe3b15aab6555b7a81afb0d00ac35a91dafd5f",
+            "worktree_blob_oid": "1bbe3b15aab6555b7a81afb0d00ac35a91dafd5f",
             "state": "tracked_clean"
           }
         },
         {
-          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2_dynamic_evidence/lock_runner/existing_first_truncate_error_release_succeeded/payload.rs",
-          "content_hash": "a2984c1457258dfa872dde3b86566eef94adfc00e1fac1bf0ebb0b1a0b35fde1",
-          "locator": "168-value Q15 payload encode and validation",
+          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2_dynamic_evidence/lock_runner/created_first_truncate_error_release_failed/fixture.rs",
+          "content_hash": "3b2801f8a5a20099144cb933d3e5714b42b0ba7db1ff00250af249f06c9085d7",
+          "locator": "exercise_child",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "775a910ca4f5fbcae1410bfa04853172e98b668b",
-            "head_blob_oid": "845381c9239d96a00d38df0d42e386ecb3a7c72b",
-            "worktree_blob_oid": "845381c9239d96a00d38df0d42e386ecb3a7c72b",
+            "head_commit": "541b3840eb02c0ba8110c1f8d5d1f91637fd477b",
+            "head_blob_oid": "0362d6477280e66cce4404eb56e4b151a8d55c94",
+            "worktree_blob_oid": "0362d6477280e66cce4404eb56e4b151a8d55c94",
             "state": "tracked_clean"
           }
         },
         {
-          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/dynamic_quotient/runner_admission/lock_program/native_acquire_existing_first_truncate_error_release_succeeded.rs",
-          "content_hash": "a420deabd457ef4ef7446da2ff073923c8303351ec180fe63b525b91f105684d",
-          "locator": "LockNativeAcquireExistingFirstTruncateErrorReleaseSucceededProgramSpecV1",
+          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2_dynamic_evidence/lock_runner/created_first_truncate_error_release_failed/payload.rs",
+          "content_hash": "393472b4509dd1300b4726c5d29aaca174e0d3a5f33e3f14436dd7f1c22d834e",
+          "locator": "dual-receipt payload validation",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "775a910ca4f5fbcae1410bfa04853172e98b668b",
-            "head_blob_oid": "455d230b24eee8ce218f202f77add05ae93f5b19",
-            "worktree_blob_oid": "455d230b24eee8ce218f202f77add05ae93f5b19",
+            "head_commit": "541b3840eb02c0ba8110c1f8d5d1f91637fd477b",
+            "head_blob_oid": "2b8f003186c8ff0d52be9014fb0da54b169ac5ea",
+            "worktree_blob_oid": "2b8f003186c8ff0d52be9014fb0da54b169ac5ea",
             "state": "tracked_clean"
           }
         },
         {
-          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/dynamic_quotient/runner_admission/lock_program/native_acquire_existing_first_truncate_error_release_succeeded/native_acquire_existing_first_truncate_error_release_succeeded_members.v1.tsv",
-          "content_hash": "d8ac9985f433b9fbd089a8804136f107cf37bd21566b5852611e98674f52911b",
-          "locator": "88 frozen Q15 member seals",
+          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/dynamic_quotient/runner_admission/lock_program/native_acquire_created_first_truncate_error_release_failed.rs",
+          "content_hash": "e105450ab748f8c61a83e41e3aa02e3d6b3f84ad173b55b57606aa7273b3fc63",
+          "locator": "program_spec_v1",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "541b3840eb02c0ba8110c1f8d5d1f91637fd477b",
+            "head_blob_oid": "ff3b332c07e1adf264f41644303b667179eccaf7",
+            "worktree_blob_oid": "ff3b332c07e1adf264f41644303b667179eccaf7",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/dynamic_quotient/runner_admission/lock_program/native_acquire_created_first_truncate_error_release_failed/native_acquire_created_first_truncate_error_release_failed_members.v1.tsv",
+          "content_hash": "f51b7d0df30afda4a8844ee4c4e227a6cf757b2f7b0c16e0bc0e8dbfaad05718",
+          "locator": "88 exact singleton members",
           "evidence_kind": "configuration",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "775a910ca4f5fbcae1410bfa04853172e98b668b",
-            "head_blob_oid": "f24ce063a5d9519a7f242b69a0cd2e12c5c685ef",
-            "worktree_blob_oid": "f24ce063a5d9519a7f242b69a0cd2e12c5c685ef",
+            "head_commit": "541b3840eb02c0ba8110c1f8d5d1f91637fd477b",
+            "head_blob_oid": "0faf10d49e6d815bf1c26a80239586114d38fefb",
+            "worktree_blob_oid": "0faf10d49e6d815bf1c26a80239586114d38fefb",
             "state": "tracked_clean"
           }
         },
         {
-          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/dynamic_quotient/runner_admission/lock_program/native_acquire_existing_first_truncate_error_release_succeeded/runtime.rs",
-          "content_hash": "4ad89c68d46f0a8fb02d169b825689ec34df4be800a6a395aa81ef9a9e00e03d",
-          "locator": "Q15 static-to-isolated-runner binding",
+          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/dynamic_quotient/runner_admission/lock_program/native_acquire_created_first_truncate_error_release_failed/runtime.rs",
+          "content_hash": "0819913df1b2782f44ab65265107a5b48edffdb5831159dd43684b5f92b67445",
+          "locator": "run_isolated_v1",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "775a910ca4f5fbcae1410bfa04853172e98b668b",
-            "head_blob_oid": "265f8b07be8186be28fa3f12d55bf94db2ea37d8",
-            "worktree_blob_oid": "265f8b07be8186be28fa3f12d55bf94db2ea37d8",
+            "head_commit": "541b3840eb02c0ba8110c1f8d5d1f91637fd477b",
+            "head_blob_oid": "d9b88a7ab8159372e235393d0c02c0edec6b7414",
+            "worktree_blob_oid": "d9b88a7ab8159372e235393d0c02c0edec6b7414",
             "state": "tracked_clean"
           }
         },
         {
-          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/dynamic_quotient/runner_admission/lock_program/native_acquire_existing_first_truncate_error_release_succeeded/source_scope.rs",
-          "content_hash": "539a0812baf6436c32dd5feaaee6ea00cc804c9362e315abb8ad5b28344c003e",
-          "locator": "Q1-Q15 implementation source closure",
+          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/dynamic_quotient/runner_admission/lock_program/native_acquire_created_first_truncate_error_release_failed/source_scope.rs",
+          "content_hash": "fc7651bdc6d5f45b7706b8c7c617d7ce8e94aa5c3fe9db4a3679137b331e936e",
+          "locator": "Q16 12-path projector delta",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "775a910ca4f5fbcae1410bfa04853172e98b668b",
-            "head_blob_oid": "da8bd2c0f6d68c5f9086618e79659ed837ba5def",
-            "worktree_blob_oid": "da8bd2c0f6d68c5f9086618e79659ed837ba5def",
+            "head_commit": "541b3840eb02c0ba8110c1f8d5d1f91637fd477b",
+            "head_blob_oid": "1827812084dcf957a2ae3766c8c6083b1247fe95",
+            "worktree_blob_oid": "1827812084dcf957a2ae3766c8c6083b1247fe95",
             "state": "tracked_clean"
           }
         },
         {
-          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/dynamic_quotient/tests/lock_native_acquire_existing_first_truncate_error_release_succeeded_cases.rs",
-          "content_hash": "dd160e5dca0931da3a7046d45e5d555f08c8854c7a472c425c18ccc088dfd7b7",
-          "locator": "Exact typed Q15 frozen cases; not run",
+          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/dynamic_quotient/tests/lock_native_acquire_created_first_truncate_error_release_failed_cases.rs",
+          "content_hash": "33ce602b71970b38d72c906a179f481297fecd632cb707cb8aa086eb44958aae",
+          "locator": "88 frozen case contracts",
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "775a910ca4f5fbcae1410bfa04853172e98b668b",
-            "head_blob_oid": "44f4c8c6020896d6b54f33d24a667fcbfbc8eded",
-            "worktree_blob_oid": "44f4c8c6020896d6b54f33d24a667fcbfbc8eded",
+            "head_commit": "541b3840eb02c0ba8110c1f8d5d1f91637fd477b",
+            "head_blob_oid": "afe1ec8d536b7791db825575e9f7ca4344e8bc06",
+            "worktree_blob_oid": "afe1ec8d536b7791db825575e9f7ca4344e8bc06",
             "state": "tracked_clean"
           }
         },
         {
-          "path": "server/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/dynamic_quotient/tests/runner_admission_lock_native_acquire_existing_first_truncate_error_release_succeeded_supported.rs",
-          "content_hash": "7312acafcb102a9205e606aeaf7e9af30858904447f790906e16810522d2ff71",
-          "locator": "Windows isolated Q15 receipt contract; not run",
+          "path": "server/src/node_agent_managed_fs/sqlite_namespace_shm/node_initialization/created_first_truncate_error_release_failed.rs",
+          "content_hash": "ad879881debcfd812cf464536136c4431d8e88372846544d20e7156fc67fdaf2",
+          "locator": "execute_q16_truncate_release_failed_test_v1",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "541b3840eb02c0ba8110c1f8d5d1f91637fd477b",
+            "head_blob_oid": "2a90a3a7e7dddbe1777a5daccba332594080db57",
+            "worktree_blob_oid": "2a90a3a7e7dddbe1777a5daccba332594080db57",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/node_agent_managed_fs/sqlite_namespace_shm/test_initialization_runtime/controller/created_first_truncate_error_release_failed.rs",
+          "content_hash": "daba54d9fda5392b866c15d042b864d120a73960e2ee2f18190e1fd5918ddb76",
+          "locator": "ordered double-receipt controller",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "541b3840eb02c0ba8110c1f8d5d1f91637fd477b",
+            "head_blob_oid": "95c4b1b9a582a7a912e34aad150857d1c47731ae",
+            "worktree_blob_oid": "95c4b1b9a582a7a912e34aad150857d1c47731ae",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/node_agent_managed_fs/sqlite_namespace_shm/test_initialization_runtime/model.rs",
+          "content_hash": "703ac275a76f91d138c52479941c36f203aa3c0b9e16f611201bcef4771ed9c7",
+          "locator": "cleanup_native receipt slot",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "541b3840eb02c0ba8110c1f8d5d1f91637fd477b",
+            "head_blob_oid": "dd34633c46eb115818b788709d968c34cfa8523d",
+            "worktree_blob_oid": "dd34633c46eb115818b788709d968c34cfa8523d",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/node_agent_managed_fs/sqlite_namespace_shm/test_initialization_runtime/tests.rs",
+          "content_hash": "87939746a33b276e32009d4d668d87e60c669217c0c4a4f4df0bf1193836fbe0",
+          "locator": "Q16 success and fail-closed receipt order",
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "775a910ca4f5fbcae1410bfa04853172e98b668b",
-            "head_blob_oid": "faa618a72c9b6a66b5b12f04ccdc9414655627e9",
-            "worktree_blob_oid": "faa618a72c9b6a66b5b12f04ccdc9414655627e9",
-            "state": "tracked_clean"
-          }
-        },
-        {
-          "path": "server/src/node_agent_managed_fs/sqlite_namespace_io.rs",
-          "content_hash": "581ec5bdd80bfd07fb9fae669068283690904f2f689aa28b8688070678af48d0",
-          "locator": "Production truncate_with and unread-return test seam",
-          "evidence_kind": "source",
-          "git_identity": {
-            "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "775a910ca4f5fbcae1410bfa04853172e98b668b",
-            "head_blob_oid": "ec7fd440a597d6bc274727f2faf1c153b996b031",
-            "worktree_blob_oid": "ec7fd440a597d6bc274727f2faf1c153b996b031",
-            "state": "tracked_clean"
-          }
-        },
-        {
-          "path": "server/src/node_agent_managed_fs/sqlite_namespace_shm/node_initialization.rs",
-          "content_hash": "4d9c6999c366b6fada09270e26aa48dbbcedee921185fb4748e1be8d4ac74727",
-          "locator": "Explicit Q15 node-initialization submodule and ordering",
-          "evidence_kind": "source",
-          "git_identity": {
-            "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "1186ac655ef89277dfcf3845f51892e567a0cea4",
-            "head_blob_oid": "d4455791e2b5f56a37a0af1eae87c7877c1ac199",
-            "worktree_blob_oid": "d4455791e2b5f56a37a0af1eae87c7877c1ac199",
-            "state": "tracked_clean"
-          }
-        },
-        {
-          "path": "server/src/node_agent_managed_fs/sqlite_namespace_shm/node_initialization/existing_first_truncate_error_release_succeeded.rs",
-          "content_hash": "1e8da7513f354f9554ff7681eb7008a3a24e6a000804e95c10437ae93ae05f7c",
-          "locator": "ExistingFirst truncate unavailable then release succeeded",
-          "evidence_kind": "source",
-          "git_identity": {
-            "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "1186ac655ef89277dfcf3845f51892e567a0cea4",
-            "head_blob_oid": "1c209f206347267a12e60fae2329abd2ff9afcab",
-            "worktree_blob_oid": "1c209f206347267a12e60fae2329abd2ff9afcab",
-            "state": "tracked_clean"
-          }
-        },
-        {
-          "path": "server/src/node_agent_managed_fs/sqlite_namespace_shm/test_initialization_runtime/controller.rs",
-          "content_hash": "9cb838e264aed56f30c6e9d4297f674ed7aada0f1c4640c886b4004bbd961047",
-          "locator": "Explicit Q15 controller submodule and case dispatch",
-          "evidence_kind": "source",
-          "git_identity": {
-            "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "1186ac655ef89277dfcf3845f51892e567a0cea4",
-            "head_blob_oid": "dfc049037d98f57279f017e82352443e618a3721",
-            "worktree_blob_oid": "dfc049037d98f57279f017e82352443e618a3721",
-            "state": "tracked_clean"
-          }
-        },
-        {
-          "path": "server/src/node_agent_managed_fs/sqlite_namespace_shm/test_initialization_runtime/controller/existing_first_truncate_error_release_succeeded.rs",
-          "content_hash": "be8918434236fa5e2334b3fa794563fb0ecb7ad9d44c14746d8c3533c29a3993",
-          "locator": "Q15 ordered events, counts, and terminal validation",
-          "evidence_kind": "source",
-          "git_identity": {
-            "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "1186ac655ef89277dfcf3845f51892e567a0cea4",
-            "head_blob_oid": "f59db490d94776351341604a1fb04e4d36f84479",
-            "worktree_blob_oid": "f59db490d94776351341604a1fb04e4d36f84479",
+            "head_commit": "541b3840eb02c0ba8110c1f8d5d1f91637fd477b",
+            "head_blob_oid": "4fab78df2f6be764b9ba18fbdae9d8c92366b772",
+            "worktree_blob_oid": "4fab78df2f6be764b9ba18fbdae9d8c92366b772",
             "state": "tracked_clean"
           }
         }
       ],
       "created_at_ms": 1788116827147,
-      "updated_at_ms": 1788278636850
+      "updated_at_ms": 1788282130278
     },
     {
       "id": "backend-a2-map-lock-static-denominator-v1",
@@ -13192,116 +13192,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_2ff882c11cd24cfa8b922373f1aff104",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "claimed",
-      "actor": "codex-goal-map-region-loop-20260901",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788199504746
-    },
-    {
-      "id": "feature_event_f9e9015ecfb04ad2baf79b3ce7cd23d2",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-goal-map-region-loop-20260901",
-      "reason": "",
-      "from_status": "claimed",
-      "to_status": "claimed",
-      "at_ms": 1788199512300
-    },
-    {
-      "id": "feature_event_8c5112b75fad49628f8b443c03f15989",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-map-region-loop-20260901",
-      "reason": "Source-only q4 tranche recorded: Map is 521 source-present plus 42,955 planned-missing; Lock remains 114 plus 8,554. Compilation, Windows 511-family execution, reviewed manifests, Qmap/Qlock, and dynamic acceptance remain not run or missing.",
-      "from_status": "claimed",
-      "to_status": "blocked",
-      "at_ms": 1788199512363
-    },
-    {
-      "id": "feature_event_02108b59aac24eef93379e894c93e83e",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "requirement_rebound",
-      "actor": "codex",
-      "reason": "Rebind the source-only authority after the final explicit mapping_sequence module-path fix changed the frozen source baseline.",
-      "from_status": "blocked",
-      "to_status": "proposed",
-      "at_ms": 1788200232818
-    },
-    {
-      "id": "feature_event_09d78258668c4275884ca612e3ed1c02",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "Review accepts the unchanged dynamic-quotient scope with the corrected final source baseline and the same source-only no-run boundary.",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1788200246209
-    },
-    {
-      "id": "feature_event_d557debc264e4a58aab25f4f64f75671",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "The verified static-denominator dependency remains complete and the corrected source-only tranche is ready for evidence rebinding.",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1788200253337
-    },
-    {
-      "id": "feature_event_43b89aad2738458ea3d82e6bc2b742e8",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "claimed",
-      "actor": "codex-task-36736",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788200260131
-    },
-    {
-      "id": "feature_event_a5043f66bc8c4f7a95502f0d66db4e26",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "evidence_recorded",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "claimed",
-      "to_status": "claimed",
-      "at_ms": 1788200325808
-    },
-    {
-      "id": "feature_event_89ccaff23dd14b069849662482c316ae",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "The corrected source-only tranche is evidence-bound, but compilation, Windows execution, reviewed quotient manifests, Qmap/Qlock, and production effects remain intentionally unopened.",
-      "from_status": "claimed",
-      "to_status": "blocked",
-      "at_ms": 1788200334126
-    },
-    {
-      "id": "feature_event_4471fda96fa743fca67d9fda343c472d",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "requirement_rebound",
-      "actor": "codex",
-      "reason": "Rebind the unchanged source-only authority to the rebased final source commit after a confirmed non-fast-forward.",
-      "from_status": "blocked",
-      "to_status": "proposed",
-      "at_ms": 1788200704467
-    },
-    {
-      "id": "feature_event_eda65c9d85bb4db7b0d594d9c1fce325",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "Review accepts the same bounded source-only scope after the mandatory non-fast-forward rebase.",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1788200716948
-    },
-    {
       "id": "feature_event_1f75fafd521f48d39f0eb62d40621409",
       "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
       "action": "transitioned",
@@ -15190,6 +15080,116 @@
       "from_status": "blocked",
       "to_status": "blocked",
       "at_ms": 1788278636850
+    },
+    {
+      "id": "feature_event_aaeb4037142a463da05f26d3136cd933",
+      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
+      "action": "transitioned",
+      "actor": "codex-root-019fc8bf-q16",
+      "reason": "Continue the next exact source-only Lock initialization tranche from current Q15 authority; dependency and evidence are current, with compile/runtime acceptance still explicitly deferred.",
+      "from_status": "blocked",
+      "to_status": "ready",
+      "at_ms": 1788279308703
+    },
+    {
+      "id": "feature_event_0f2f4d4422e349a1bb9aa22ae8679e4f",
+      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
+      "action": "claimed",
+      "actor": "codex-root-019fc8bf-q16",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788279345934
+    },
+    {
+      "id": "feature_event_20e1c32f0bd14b029cf4cb8bf524f9a9",
+      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
+      "action": "transitioned",
+      "actor": "codex-root-019fc8bf-q16",
+      "reason": "Implement the next exact Q16 source-only CreatedFirst truncate-error/release-failed initialization tranche without opening compile, runtime, production, or economic effects.",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788279480226
+    },
+    {
+      "id": "feature_event_55e19f4411ee4aafbb3fc388d6ee889f",
+      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
+      "action": "claim_released",
+      "actor": "codex-root-019fc8bf-q16",
+      "reason": "Q16 source and authority update complete; release the pre-edit claim before explicitly rebinding the reviewed requirement hash.",
+      "from_status": "in_progress",
+      "to_status": "blocked",
+      "at_ms": 1788281598696
+    },
+    {
+      "id": "feature_event_8e341843d4ef4296a1037f28e5d0d103",
+      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
+      "action": "requirement_rebound",
+      "actor": "codex-root-019fc8bf-q16",
+      "reason": "Bind the committed Q16 authority requirement at 541b3840e for explicit review and evidence closure.",
+      "from_status": "blocked",
+      "to_status": "proposed",
+      "at_ms": 1788282027648
+    },
+    {
+      "id": "feature_event_ecfb1c43834e4243a5212c74b49981cf",
+      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
+      "action": "transitioned",
+      "actor": "codex-root-019fc8bf-q16-review",
+      "reason": "Independent contract, runtime, documentation, catalog, source-closure, and line-budget audits passed; compile and Windows runtime claims remain explicitly deferred.",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1788282056170
+    },
+    {
+      "id": "feature_event_705ffc8ad4e64333919f8c60ba40e1a0",
+      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
+      "action": "transitioned",
+      "actor": "codex-root-019fc8bf-q16-review",
+      "reason": "The committed Q16 requirement is current and its static-denominator dependency remains verified; open a bounded evidence-binding claim.",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1788282066798
+    },
+    {
+      "id": "feature_event_fa4ad28b7e094a7e98afd33513e44692",
+      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
+      "action": "claimed",
+      "actor": "codex-root-019fc8bf-q16-evidence",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788282076073
+    },
+    {
+      "id": "feature_event_b66ffd51dcf84012b506b37d3dcc7824",
+      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
+      "action": "transitioned",
+      "actor": "codex-root-019fc8bf-q16-evidence",
+      "reason": "Bind the committed Q16 source, catalog, dynamic runner, managed controller, tests, and authority evidence without claiming compile or runtime acceptance.",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788282086779
+    },
+    {
+      "id": "feature_event_2d7ae6a2a36d42f58a1542ab2a5fcbe3",
+      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-root-019fc8bf-q16-evidence",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788282117236
+    },
+    {
+      "id": "feature_event_89f036ac0b5f4923bc343116dddc154b",
+      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
+      "action": "transitioned",
+      "actor": "codex-root-019fc8bf-q16-evidence",
+      "reason": "Q16 exact 88-member source tranche and 16 current hash-bound evidence items are closed. The full A2 Lock quotient still lacks 4,560 members/4,032 groups plus compiler, process-isolated Windows receipts, reviewed manifests, Qlock, and WindowsDynamic evidence; production and economic effects remain closed.",
+      "from_status": "in_progress",
+      "to_status": "blocked",
+      "at_ms": 1788282130278
     }
   ]
 }
