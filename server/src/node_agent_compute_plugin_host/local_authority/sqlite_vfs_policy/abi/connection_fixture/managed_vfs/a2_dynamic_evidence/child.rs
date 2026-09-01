@@ -3,6 +3,7 @@ use std::{fmt, path::Path, process::Child};
 use sha2::{Digest, Sha256};
 
 pub(super) mod lock_lifecycle;
+pub(super) mod lock_local_sibling_contention;
 pub(super) mod lock_native_acquire_busy;
 mod lock_request_validation;
 pub(super) mod lock_stored_poison;
