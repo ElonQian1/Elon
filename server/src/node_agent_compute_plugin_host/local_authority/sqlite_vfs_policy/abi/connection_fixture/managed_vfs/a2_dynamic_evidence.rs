@@ -30,11 +30,9 @@ pub(super) use joint_close_family::{
 };
 #[cfg(all(test, windows))]
 pub(super) use lock_runner::{
-    lock_callback_route_unknown_selector_for_test,
-    lock_local_protocol_rejection_selector_for_test,
+    lock_callback_route_unknown_selector_for_test, lock_local_protocol_rejection_selector_for_test,
     lock_local_sibling_contention_selector_for_test, lock_native_acquire_busy_selector_for_test,
-    lock_stored_poison_selector_for_test,
-    selected_lock_callback_route_unknown_selector_for_test,
+    lock_stored_poison_selector_for_test, selected_lock_callback_route_unknown_selector_for_test,
     selected_lock_local_protocol_rejection_selector_for_test,
     selected_lock_local_sibling_contention_selector_for_test,
     selected_lock_native_acquire_busy_selector_for_test,
@@ -45,13 +43,12 @@ pub(super) use lock_runner::{
     run_lock_local_protocol_rejection_program_isolated,
     run_lock_local_sibling_contention_program_isolated,
     run_lock_native_acquire_busy_program_isolated, run_lock_program_isolated,
-    run_lock_stored_poison_program_isolated, LockRunnerActionV1,
+    run_lock_stored_poison_program_isolated, LocalProtocolRejectionPathV1, LockRunnerActionV1,
     LockRunnerCallbackRouteUnknownBindingV1, LockRunnerCallbackRouteUnknownPathV1,
     LockRunnerEvidenceReceiptV1, LockRunnerIsolatedEvidenceV1, LockRunnerLifecycleBindingV1,
-    LockRunnerLifecyclePathV1, LocalProtocolRejectionPathV1,
-    LockRunnerLocalProtocolRejectionBindingV1, LockRunnerLocalSiblingContentionBindingV1,
-    LockRunnerNativeAcquireBusyBindingV1, LockRunnerProgramBindingV1,
-    LockRunnerRequestValidationV1, LockRunnerStoredPoisonBindingV1,
+    LockRunnerLifecyclePathV1, LockRunnerLocalProtocolRejectionBindingV1,
+    LockRunnerLocalSiblingContentionBindingV1, LockRunnerNativeAcquireBusyBindingV1,
+    LockRunnerProgramBindingV1, LockRunnerRequestValidationV1, LockRunnerStoredPoisonBindingV1,
     LockRunnerStoredPoisonCompletionV1, LockRunnerStoredPoisonProfileV1,
 };
 pub(super) use map_runner::{

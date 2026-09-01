@@ -15,12 +15,9 @@ pub(in super::super::super) fn lock_stored_poison_selector_for_test(
     completion_tag: u64,
 ) -> Result<String, &'static str> {
     match completion_tag {
-        3 => super::super::child::lock_stored_poison::selector(
-            action_tag,
-            profile_tag,
-            first,
-            count,
-        ),
+        3 => {
+            super::super::child::lock_stored_poison::selector(action_tag, profile_tag, first, count)
+        }
         4 => super::super::child::lock_stored_poison::route_unknown::selector(
             action_tag,
             profile_tag,

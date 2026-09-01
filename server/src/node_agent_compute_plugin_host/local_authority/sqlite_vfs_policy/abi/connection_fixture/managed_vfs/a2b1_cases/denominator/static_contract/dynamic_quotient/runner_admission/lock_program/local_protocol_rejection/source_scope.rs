@@ -15,7 +15,8 @@ pub(super) fn digest_implementation_v1(
     mask: u8,
 ) -> Digest32 {
     let mut hasher = Sha256::new();
-    hasher.update(b"elon-lock-local-protocol-own-overlap-or-not-held-completed-implementation-v1\0");
+    hasher
+        .update(b"elon-lock-local-protocol-own-overlap-or-not-held-completed-implementation-v1\0");
     for (name, source) in lock_local_protocol_rejection_source_scope_entries_v1() {
         hasher.update((name.len() as u64).to_le_bytes());
         hasher.update(name.as_bytes());

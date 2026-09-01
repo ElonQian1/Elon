@@ -6,17 +6,21 @@ mod local_protocol_rejection;
 mod local_sibling_contention;
 mod native_acquire_busy;
 mod request_validation;
+#[cfg(all(test, windows))]
+mod selector_test_support;
 mod stored_poison;
 mod stored_poison_dispatch;
 mod stored_poison_model;
 mod stored_poison_route_unknown;
-#[cfg(all(test, windows))]
-mod selector_test_support;
 
 #[cfg(all(test, windows))]
 pub(in super::super) use callback_completion_route_unknown::{
     lock_callback_route_unknown_selector_for_test,
     selected_lock_callback_route_unknown_selector_for_test,
+};
+pub(in super::super) use callback_completion_route_unknown::{
+    run_lock_callback_route_unknown_program_isolated, LockRunnerCallbackRouteUnknownBindingV1,
+    LockRunnerCallbackRouteUnknownPathV1,
 };
 #[cfg(all(test, windows))]
 pub(in super::super) use local_protocol_rejection::{
@@ -26,10 +30,6 @@ pub(in super::super) use local_protocol_rejection::{
 pub(in super::super) use local_protocol_rejection::{
     run_lock_local_protocol_rejection_program_isolated, LocalProtocolRejectionPathV1,
     LockRunnerLocalProtocolRejectionBindingV1,
-};
-pub(in super::super) use callback_completion_route_unknown::{
-    run_lock_callback_route_unknown_program_isolated, LockRunnerCallbackRouteUnknownBindingV1,
-    LockRunnerCallbackRouteUnknownPathV1,
 };
 #[cfg(all(test, windows))]
 pub(in super::super) use local_sibling_contention::{
@@ -47,13 +47,13 @@ pub(in super::super) use native_acquire_busy::{
     run_lock_native_acquire_busy_program_isolated, LockRunnerNativeAcquireBusyBindingV1,
 };
 pub(in super::super) use request_validation::{LockRunnerActionV1, LockRunnerRequestValidationV1};
-pub(in super::super) use stored_poison_model::{
-    LockRunnerStoredPoisonBindingV1, LockRunnerStoredPoisonCompletionV1,
-    LockRunnerStoredPoisonProfileV1,
-};
 #[cfg(all(test, windows))]
 pub(in super::super) use selector_test_support::{
     lock_stored_poison_selector_for_test, selected_lock_stored_poison_selector_for_test,
+};
+pub(in super::super) use stored_poison_model::{
+    LockRunnerStoredPoisonBindingV1, LockRunnerStoredPoisonCompletionV1,
+    LockRunnerStoredPoisonProfileV1,
 };
 
 use std::{
@@ -72,8 +72,7 @@ use super::{
 };
 
 const CHILD_ROOT_ENV: &str = "ELON_SQLITE_A2_LOCK_QUOTIENT_CHILD_ROOT";
-pub(super) const STORED_POISON_SELECTOR_ENV: &str =
-    "ELON_SQLITE_A2_LOCK_STORED_POISON_SELECTOR";
+pub(super) const STORED_POISON_SELECTOR_ENV: &str = "ELON_SQLITE_A2_LOCK_STORED_POISON_SELECTOR";
 pub(super) const PAYLOAD_VERSION: &str = "a2lockq1";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -642,11 +642,7 @@ pub(super) fn projector_source_scope_entries_v1(
         .chain(STORED_POISON_PROJECTOR_DELTA_V1.iter().copied())
         .chain(NATIVE_BUSY_PROJECTOR_DELTA_V1.iter().copied())
         .chain(callback_completion_route_unknown_projector_delta_entries_v1())
-        .chain(
-            LOCAL_PROTOCOL_REJECTION_PROJECTOR_DELTA_V1
-                .iter()
-                .copied(),
-        )
+        .chain(LOCAL_PROTOCOL_REJECTION_PROJECTOR_DELTA_V1.iter().copied())
 }
 
 pub(super) fn digest_projector_source_entries_v1<'a>(

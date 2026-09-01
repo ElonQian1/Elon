@@ -17,8 +17,7 @@ use super::super::super::super::{
 };
 use super::super::{lifecycle, LockRunnerActionV1, LockRunnerLifecyclePathV1};
 use super::{
-    lock_expectation, LocalProtocolRejectionPathV1,
-    LockRunnerLocalProtocolRejectionBindingV1,
+    lock_expectation, LocalProtocolRejectionPathV1, LockRunnerLocalProtocolRejectionBindingV1,
 };
 
 pub(super) const SELECTED: usize = 0;
@@ -160,9 +159,7 @@ pub(super) fn validate_cleanup(
     if cleanup.is_some() != (binding.path == LocalProtocolRejectionPathV1::OwnOverlap)
         || !exact_live_snapshot(cleaned, 0, 0)
     {
-        return Err(anyhow!(
-            "Lock local protocol-rejection cleanup mismatch"
-        ));
+        return Err(anyhow!("Lock local protocol-rejection cleanup mismatch"));
     }
     Ok(())
 }
@@ -241,9 +238,7 @@ fn exact_lower_receipt(
         && value.finished
 }
 
-fn expected_held_masks(
-    binding: LockRunnerLocalProtocolRejectionBindingV1,
-) -> (u8, u8) {
+fn expected_held_masks(binding: LockRunnerLocalProtocolRejectionBindingV1) -> (u8, u8) {
     if binding.path == LocalProtocolRejectionPathV1::NotHeld {
         return (0, 0);
     }
@@ -274,7 +269,11 @@ pub(super) fn snapshot_values(value: ManagedSqliteShmTestTargetSnapshot) -> [u64
     ]
 }
 
-fn exact_live_snapshot(value: ManagedSqliteShmTestTargetSnapshot, shared: u8, exclusive: u8) -> bool {
+fn exact_live_snapshot(
+    value: ManagedSqliteShmTestTargetSnapshot,
+    shared: u8,
+    exclusive: u8,
+) -> bool {
     snapshot_values(value)
         == [
             1,

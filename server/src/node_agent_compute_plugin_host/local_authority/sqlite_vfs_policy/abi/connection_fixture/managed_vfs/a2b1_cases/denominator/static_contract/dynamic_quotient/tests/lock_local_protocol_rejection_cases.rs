@@ -29,10 +29,8 @@ pub(super) struct FrozenLockLocalProtocolRejectionLeafV1 {
     pub(super) member: StaticMemberSealV1,
 }
 
-pub(super) fn frozen_lock_local_protocol_rejection_leaves_v1() -> &'static BTreeMap<
-    LockLocalProtocolRejectionKeyV1,
-    FrozenLockLocalProtocolRejectionLeafV1,
-> {
+pub(super) fn frozen_lock_local_protocol_rejection_leaves_v1(
+) -> &'static BTreeMap<LockLocalProtocolRejectionKeyV1, FrozenLockLocalProtocolRejectionLeafV1> {
     static LEAVES: OnceLock<
         BTreeMap<LockLocalProtocolRejectionKeyV1, FrozenLockLocalProtocolRejectionLeafV1>,
     > = OnceLock::new();
@@ -253,7 +251,10 @@ fn frozen_local_protocol_rejection_family_is_exact_unique_and_partitioned() {
         (LockActionV1::UnlockShared, 8),
         (LockActionV1::UnlockExclusive, 36),
     ] {
-        assert_eq!(leaves.keys().filter(|key| key.action == action).count(), count);
+        assert_eq!(
+            leaves.keys().filter(|key| key.action == action).count(),
+            count
+        );
     }
     assert_eq!(
         leaves

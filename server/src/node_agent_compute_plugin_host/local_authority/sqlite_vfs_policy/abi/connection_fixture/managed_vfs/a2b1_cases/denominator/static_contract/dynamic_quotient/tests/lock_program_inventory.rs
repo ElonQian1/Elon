@@ -9,8 +9,8 @@ use super::lock_callback_completion_route_unknown_cases::{
     LOCK_CALLBACK_COMPLETION_ROUTE_UNKNOWN_MEMBER_COUNT,
 };
 use super::lock_local_protocol_rejection_cases::{
-    frozen_lock_local_protocol_rejection_leaves_v1,
-    lock_local_protocol_rejection_descriptor_v1, LOCK_LOCAL_PROTOCOL_REJECTION_MEMBER_COUNT,
+    frozen_lock_local_protocol_rejection_leaves_v1, lock_local_protocol_rejection_descriptor_v1,
+    LOCK_LOCAL_PROTOCOL_REJECTION_MEMBER_COUNT,
 };
 use super::lock_local_sibling_contention_cases::{
     frozen_lock_local_sibling_contention_leaves_v1, lock_local_sibling_contention_descriptor_v1,
@@ -173,10 +173,7 @@ fn exact_lock_local_protocol_rejection_programs_are_inventoried_without_granting
         assert_eq!(
             project_dynamic_class_v1(
                 &leaf.record,
-                &lock_local_protocol_rejection_descriptor_v1(
-                    case,
-                    RunnerCapabilityV1::Supported,
-                ),
+                &lock_local_protocol_rejection_descriptor_v1(case, RunnerCapabilityV1::Supported,),
             ),
             Err(ProjectionErrorV1::Invalid(
                 ProjectionViolationV1::RunnerAdmissionUnsealedSupported,
@@ -375,18 +372,17 @@ fn full_lock_program_inventory_accounts_for_every_frozen_member_without_opening_
         LOCK_LOCAL_SIBLING_CONTENTION_MEMBER_COUNT
     );
     assert!(local_contention_expected_groups.is_subset(&actual_source_groups));
-    let local_protocol_rejection_expected_groups =
-        frozen_lock_local_protocol_rejection_leaves_v1()
-            .values()
-            .map(|leaf| {
-                (
-                    prepare_dynamic_terminal_v1(&leaf.record, &leaf.descriptor)
-                        .unwrap()
-                        .key,
-                    leaf.member,
-                )
-            })
-            .collect::<BTreeSet<_>>();
+    let local_protocol_rejection_expected_groups = frozen_lock_local_protocol_rejection_leaves_v1()
+        .values()
+        .map(|leaf| {
+            (
+                prepare_dynamic_terminal_v1(&leaf.record, &leaf.descriptor)
+                    .unwrap()
+                    .key,
+                leaf.member,
+            )
+        })
+        .collect::<BTreeSet<_>>();
     assert_eq!(
         local_protocol_rejection_expected_groups.len(),
         LOCK_LOCAL_PROTOCOL_REJECTION_MEMBER_COUNT

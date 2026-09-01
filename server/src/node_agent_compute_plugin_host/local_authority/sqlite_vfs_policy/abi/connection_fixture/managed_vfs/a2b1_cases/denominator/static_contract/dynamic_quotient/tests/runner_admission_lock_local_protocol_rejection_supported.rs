@@ -93,7 +93,11 @@ fn q8_programs_reject_completion_prestate_expected_recipe_and_range_drift() {
 
     let mut range_mismatch = key;
     range_mismatch.prestate = PrestateV1::Lock(LockPrestateV1::ExclusiveRangeMismatch);
-    assert_rejected(range_mismatch, member, "an exclusive-range-mismatch prestate");
+    assert_rejected(
+        range_mismatch,
+        member,
+        "an exclusive-range-mismatch prestate",
+    );
 
     let mut operation = key;
     operation.operation = DynamicOperationV1::Lock(LockOperationV1::LocalRelease);

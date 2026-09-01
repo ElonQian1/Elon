@@ -266,10 +266,7 @@ impl ManagedSqliteShmTestLockController {
                 armed.progress = Progress::LocalContended;
             }
             LockEvent::LocalProtocolRejected(kind) => {
-                require_path(
-                    armed,
-                    ManagedSqliteShmTestLockPath::LocalProtocolRejection,
-                )?;
+                require_path(armed, ManagedSqliteShmTestLockPath::LocalProtocolRejection)?;
                 if kind != local_protocol_rejection_kind(armed.receipt.expectation.action) {
                     armed.invalid = true;
                     return Err(
@@ -439,17 +436,13 @@ fn require_progress(
     Ok(())
 }
 
-fn local_protocol_rejection_kind(
-    action: ManagedSqliteShmLockAction,
-) -> LocalProtocolRejectionKind {
+fn local_protocol_rejection_kind(action: ManagedSqliteShmLockAction) -> LocalProtocolRejectionKind {
     match action {
         ManagedSqliteShmLockAction::LockShared | ManagedSqliteShmLockAction::LockExclusive => {
             LocalProtocolRejectionKind::OwnOverlap
         }
         ManagedSqliteShmLockAction::UnlockShared => LocalProtocolRejectionKind::SharedNotHeld,
-        ManagedSqliteShmLockAction::UnlockExclusive => {
-            LocalProtocolRejectionKind::ExclusiveNotHeld
-        }
+        ManagedSqliteShmLockAction::UnlockExclusive => LocalProtocolRejectionKind::ExclusiveNotHeld,
     }
 }
 

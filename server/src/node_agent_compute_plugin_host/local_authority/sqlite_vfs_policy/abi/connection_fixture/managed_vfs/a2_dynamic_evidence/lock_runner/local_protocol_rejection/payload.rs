@@ -158,9 +158,7 @@ fn expected_setup(binding: LockRunnerLocalProtocolRejectionBindingV1) -> [u64; 9
     expected_callback(binding.action, binding.first, binding.count, ffi::SQLITE_OK)
 }
 
-fn expected_target_callback(
-    binding: LockRunnerLocalProtocolRejectionBindingV1,
-) -> [u64; 9] {
+fn expected_target_callback(binding: LockRunnerLocalProtocolRejectionBindingV1) -> [u64; 9] {
     expected_callback(
         binding.action,
         binding.first,
@@ -181,12 +179,7 @@ fn expected_cleanup(binding: LockRunnerLocalProtocolRejectionBindingV1) -> [u64;
     )
 }
 
-fn expected_callback(
-    action: LockRunnerActionV1,
-    first: u8,
-    count: u8,
-    result: i32,
-) -> [u64; 9] {
+fn expected_callback(action: LockRunnerActionV1, first: u8, count: u8, result: i32) -> [u64; 9] {
     [
         1,
         u64::from(first),
@@ -200,9 +193,7 @@ fn expected_callback(
     ]
 }
 
-fn expected_live_snapshot(
-    binding: LockRunnerLocalProtocolRejectionBindingV1,
-) -> [u64; 14] {
+fn expected_live_snapshot(binding: LockRunnerLocalProtocolRejectionBindingV1) -> [u64; 14] {
     let (shared, exclusive) = match (binding.path, binding.action) {
         (LocalProtocolRejectionPathV1::OwnOverlap, LockRunnerActionV1::LockShared) => {
             (binding.mask, 0)
@@ -277,9 +268,7 @@ fn callback_values(value: ManagedTestShmLockCallbackObservation) -> [u64; 9] {
     ]
 }
 
-fn optional_callback_values(
-    value: Option<ManagedTestShmLockCallbackObservation>,
-) -> [u64; 9] {
+fn optional_callback_values(value: Option<ManagedTestShmLockCallbackObservation>) -> [u64; 9] {
     value.map(callback_values).unwrap_or([0; 9])
 }
 
@@ -330,9 +319,7 @@ fn raw_flags(value: LockRunnerActionV1) -> i32 {
         LockRunnerActionV1::LockShared => ffi::SQLITE_SHM_LOCK | ffi::SQLITE_SHM_SHARED,
         LockRunnerActionV1::LockExclusive => ffi::SQLITE_SHM_LOCK | ffi::SQLITE_SHM_EXCLUSIVE,
         LockRunnerActionV1::UnlockShared => ffi::SQLITE_SHM_UNLOCK | ffi::SQLITE_SHM_SHARED,
-        LockRunnerActionV1::UnlockExclusive => {
-            ffi::SQLITE_SHM_UNLOCK | ffi::SQLITE_SHM_EXCLUSIVE
-        }
+        LockRunnerActionV1::UnlockExclusive => ffi::SQLITE_SHM_UNLOCK | ffi::SQLITE_SHM_EXCLUSIVE,
     }
 }
 
@@ -350,9 +337,7 @@ fn managed_path_tag(value: ManagedSqliteShmTestLockPath) -> u64 {
         ManagedSqliteShmTestLockPath::NativeRelease => 2,
         ManagedSqliteShmTestLockPath::Local => 3,
         ManagedSqliteShmTestLockPath::SiblingContention => 4,
-        ManagedSqliteShmTestLockPath::LocalProtocolRejection => {
-            LOCAL_PROTOCOL_REJECTION_PATH_TAG
-        }
+        ManagedSqliteShmTestLockPath::LocalProtocolRejection => LOCAL_PROTOCOL_REJECTION_PATH_TAG,
     }
 }
 

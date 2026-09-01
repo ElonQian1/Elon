@@ -161,10 +161,7 @@ fn exercise_child(
     let before = observer.snapshot()?;
     fixture::validate_prestate(binding, before, setup)?;
 
-    let observation = fixture::ArmedLockObservation::begin(
-        &observer,
-        lock_expectation(binding),
-    )?;
+    let observation = fixture::ArmedLockObservation::begin(&observer, lock_expectation(binding))?;
     let callback = fixture
         .route(fixture::SELECTED)?
         .observe_main_shm_lock_raw(
@@ -207,11 +204,10 @@ fn exercise_child(
         logical_names as u64,
     ];
     let autocommit = fixture.connection(fixture::SELECTED)?.is_autocommit();
-    let liveness: i64 = fixture.connection(fixture::SELECTED)?.query_row(
-        "SELECT 1",
-        [],
-        |row| row.get(0),
-    )?;
+    let liveness: i64 =
+        fixture
+            .connection(fixture::SELECTED)?
+            .query_row("SELECT 1", [], |row| row.get(0))?;
     fixture.close()?;
     let terminal_values = [
         u64::from(autocommit),
@@ -263,9 +259,7 @@ pub(super) fn validate_binding(
     }
     let mask = (((1_u16 << binding.count) - 1) << binding.first) as u8;
     if binding.mask != mask {
-        return Err(anyhow!(
-            "Lock local protocol-rejection range mask mismatch"
-        ));
+        return Err(anyhow!("Lock local protocol-rejection range mask mismatch"));
     }
     super::super::child::lock_local_protocol_rejection::selector(
         path_tag(binding.path),
@@ -320,10 +314,5 @@ pub(in super::super::super) fn lock_local_protocol_rejection_selector_for_test(
     first: u8,
     count: u8,
 ) -> Result<String, &'static str> {
-    super::super::child::lock_local_protocol_rejection::selector(
-        path_tag,
-        action_tag,
-        first,
-        count,
-    )
+    super::super::child::lock_local_protocol_rejection::selector(path_tag, action_tag, first, count)
 }

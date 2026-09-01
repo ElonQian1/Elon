@@ -15,9 +15,7 @@ mod payload;
 mod test_support;
 use payload::validate_actual_payload;
 #[cfg(test)]
-pub(super) use test_support::{
-    validate_payload_for_test, validated_receipt_for_record_test,
-};
+pub(super) use test_support::{validate_payload_for_test, validated_receipt_for_record_test};
 
 pub(in super::super) const A2_DYNAMIC_CHILD_NONCE_ENV: &str = "ELON_SQLITE_A2_DYNAMIC_CHILD_NONCE";
 

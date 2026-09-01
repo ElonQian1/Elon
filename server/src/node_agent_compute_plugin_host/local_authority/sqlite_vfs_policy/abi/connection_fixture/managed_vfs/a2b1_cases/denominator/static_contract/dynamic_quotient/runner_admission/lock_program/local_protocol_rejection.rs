@@ -13,19 +13,18 @@ pub(super) use runtime::run_isolated_v1;
 
 use super::super::super::super::{
     source_leaf_authority::{
-        CustodyStateV1, Digest32, DmsLockCustodyV1, FailureClassV1, LockEffectV1,
-        MutationStateV1, ObservableCountsV1, RootOperationV1, SqliteResultV1,
-        TerminalDispositionV1,
+        CustodyStateV1, Digest32, DmsLockCustodyV1, FailureClassV1, LockEffectV1, MutationStateV1,
+        ObservableCountsV1, RootOperationV1, SqliteResultV1, TerminalDispositionV1,
     },
     terminal_descriptor::{
-        CallbackV1, CleanupV1, FaultSeamV1, FixtureV1, LockActionV1, LockAxesV1,
-        LockCompletionV1, LockManagedStimulusV1, LockOperationV1, LockPrestateV1, ObserverV1,
-        OccurrenceV1, PhaseV1, PrestateV1, ReachabilityV1, SourceSiteV1, StimulusV1, TimingV1,
+        CallbackV1, CleanupV1, FaultSeamV1, FixtureV1, LockActionV1, LockAxesV1, LockCompletionV1,
+        LockManagedStimulusV1, LockOperationV1, LockPrestateV1, ObserverV1, OccurrenceV1, PhaseV1,
+        PrestateV1, ReachabilityV1, SourceSiteV1, StimulusV1, TimingV1,
     },
 };
 use super::super::super::{
-    DynamicAxesV1, DynamicClassKeyV1, DynamicExpectedV1, DynamicOperationV1,
-    StaticMemberSealV1, DYNAMIC_PROJECTOR_SCHEMA_V1,
+    DynamicAxesV1, DynamicClassKeyV1, DynamicExpectedV1, DynamicOperationV1, StaticMemberSealV1,
+    DYNAMIC_PROJECTOR_SCHEMA_V1,
 };
 use super::super::CompiledRunnerPlanV1;
 use super::LockRunnerExecutionViolationV1;
