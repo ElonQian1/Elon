@@ -48,6 +48,7 @@
 - 子仓库 `25ee7df69fecabb696e7b8329fd388bc8a19da11` 已新增只读、脱敏的 Paper 部署配置预检：`scripts/check-paper-deployment.ps1` 检查本机绑定、非零固定端口、绝对数据库路径、主项目 HTTPS 来源、grant 验签公钥和操作员令牌等必需配置。输出不包含密钥或令牌，执行时不绑定端口、不打开数据库、不访问外部网络，因此只证明配置是否就绪，不证明目标环境已部署。
 - 子仓库 `effef80b65647b2341cb902e64bd9aa171fdb613` 已实现受独立运营令牌保护的 `yilong.quant.paper_operations_snapshot.v1`：它只汇总模拟仓位状态、精确金额、NAV 修订、SQLite 事件头和导入批次，不返回参与者标识。主项目不复制或直接修改该账本，快照也不证明真实付款、NET 锁定、官方 NAV 或可提现余额。
 - 子仓库实现提交 `7e943798050a63929e439a342cefa9b4f589028c`（交付证据 `520d15bb6b88d4f281efb4dd3ac46fc71877e847`）已完成 Paper 模拟仓位操作 V6：运营令牌可为已有活跃仓位追加模拟 NET 配额并按当前 NAV 增发内部份额；用户既有 `paper.redemption.request` scope 可申请部分或全额退出，部分结算后剩余份额继续按模拟 NAV 承担盈亏。新事件追加写入 SQLite 并兼容历史全额退出事件；用户不能自行增加余额，所有数据仍是 `simulated=true`。
+- 子仓库提交 `2c9327ec94ff2a80e1a94115de9aa784eb63b5f7` 已完成 Paper 授权密钥轮换 V7：量化 verifier 固定信任 1–8 个公开 Ed25519 key，支持新 active 与旧 retiring key 按签发时间窗重叠验证，并让 revoked key 立即失败关闭；旧单 key 配置保持兼容但不能与 managed keyring 混用。主项目仍只持有一个当前签名私钥，双方不共享 seed、subject secret 或动态网络信任。
 - `contracts/quant/net-balance-lock-receipt-v1.schema.json` 已定义主项目未来锁定 NET 后交给量化项目消费的版本化回执形状；详细语义见 `docs/yilong-quant-net-lock-receipt-v1.md`。
 - `POST /api/me/quant/paper-access-grants` 已复用主项目现有 bearer 会话，可在独立签名配置启用后签发最多五分钟的 Ed25519 paper grant；量化项目只获得项目专用脱敏 subject 和明确 scope，不获得主项目 bearer 或用户资料。契约见 `docs/yilong-quant-paper-access-grant-v1.md` 与 `contracts/quant/paper-access-grant-v1.schema.json`。
 - `GET /api/me/quant/paper-launch` 与 `POST /api/me/quant/paper-launches` 提供失败关闭的 readiness 和一次性启动票据；PC 项目主页通过 exact-origin iframe、`event.source`、nonce、attempt ID 和过期时间绑定，把 grant 只传给当前量化子页面。双方契约见 `docs/yilong-quant-paper-launch-v1.md` 与 `contracts/quant/paper-launch-v1.schema.json`。
@@ -55,7 +56,7 @@
 
 ## 尚未完成
 
-- 在目标环境执行 Paper 部署配置预检和脱敏运营快照检查，以及完成公开 Web 部署、CSP/`frame-ancestors` 上线配置、签名密钥托管与多 key 重叠轮换；当前用户 grant 只绑定 paper 模拟参与者，不证明付款、KYC、钱包或真实准入。
+- 在目标环境执行 Paper 部署配置预检和脱敏运营快照检查，以及完成公开 Web 部署、CSP/`frame-ancestors` 上线配置、主项目签名私钥托管和一次真实轮换演练；代码已支持量化端多 key 重叠和密钥级撤销，但尚无单 grant 持久化吊销。当前用户 grant 只绑定 paper 模拟参与者，不证明付款、KYC、钱包或真实准入。
 - 经来源与许可评审的真实公开历史行情、多策略比较、回测结果持久化和共享算力分片；当前只有仓库内置 CC0 确定性研究 fixture 与单机基准策略。
 - 将已付款用户数据经审核、脱敏、对账后导入生产系统；paper 子项目只允许脱敏标识和模拟锁定回执，继续禁止把聊天或付款截图写入代码。
 - 用户自助追加模拟配额、真实申购或真实 NET 锁定；当前 V6 追加能力只接受独立运营令牌，主项目 grant 不获得增加余额的 scope。

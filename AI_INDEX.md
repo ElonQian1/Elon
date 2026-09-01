@@ -123,7 +123,7 @@
 | PC 前端迁移规则 | `.github/instructions/pc-frontend-migration.instructions.md`、`docs/pc-frontend-migration.md` |
 | 代码归属与 legacy 迁移规则 | `docs/architecture/source-of-truth.md`、`docs/architecture/legacy-inventory.md`、`docs/architecture/feature-parity-matrix.md`、`scripts/check-source-ownership.ps1` |
 | 项目广场/项目主页脚本 | `server/src/assets/project_*.js` |
-| 官方公开项目目录、一龙量化交易接入、研究回测/Paper 仓位操作摘要、Paper 用户 grant、NET 锁定回执契约 | `server/src/official_project_catalog/`、`server/src/quant_paper_access.rs`、`docs/yilong-quant-integration.md`、`docs/yilong-quant-paper-access-grant-v1.md`、`contracts/quant/paper-access-grant-v1.schema.json`、`docs/yilong-quant-net-lock-receipt-v1.md`、`contracts/quant/net-balance-lock-receipt-v1.schema.json` |
+| 官方公开项目目录、一龙量化交易接入、研究回测/Paper 仓位操作摘要、Paper 用户 grant/验签 keyring、NET 锁定回执契约 | `server/src/official_project_catalog/`、`server/src/quant_paper_access.rs`、`docs/yilong-quant-integration.md`、`docs/yilong-quant-paper-access-grant-v1.md`、`contracts/quant/paper-access-grant-v1.schema.json`、`contracts/quant/paper-access-keyring-v1.schema.json`、`docs/yilong-quant-net-lock-receipt-v1.md`、`contracts/quant/net-balance-lock-receipt-v1.schema.json` |
 | 节点管理本地页 | `server/src/node_agent_admin.html` |
 
 ## 脚本入口
