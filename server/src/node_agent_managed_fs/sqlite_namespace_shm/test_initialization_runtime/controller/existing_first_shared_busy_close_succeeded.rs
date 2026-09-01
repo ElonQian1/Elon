@@ -17,7 +17,9 @@ use super::super::{
 };
 use super::{ColdPrestateV1, ExactTarget, ManagedSqliteShmTestInitializationControllerV1};
 
+#[path = "existing_first_shared_busy_close_succeeded/state.rs"]
 mod state;
+#[path = "existing_first_shared_busy_close_succeeded/validation.rs"]
 mod validation;
 
 use state::{ArmedQ19ObservationV1, EventCounts, Stage};
