@@ -6815,7 +6815,7 @@
       "id": "quant-public-project-preview-v1",
       "title": "一龙量化交易加入前公开预览 V1",
       "summary": "让用户无需登录或加入项目即可从官方目录读取净化后的量化项目能力、Paper-only 风险边界和客户端下载计划；不公开任意项目 landing 或执行任何写操作。",
-      "status": "verified",
+      "status": "released",
       "priority": "p1",
       "requirement": {
         "path": "docs/requirements/yilong-quant-public-project-preview-v1.md",
@@ -7003,7 +7003,7 @@
         }
       ],
       "created_at_ms": 1788284311917,
-      "updated_at_ms": 1788285189947
+      "updated_at_ms": 1788285995839
     },
     {
       "id": "rust-cache-portable-file-hash-v1",
@@ -13386,16 +13386,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_b5b2d1be623a4f7bb8daba2ed7d0bc10",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-lock-route-unknown",
-      "reason": "Implement the exact source-only Lock route-unknown tranche under the current claim; compile, Windows, runtime, and production gates remain closed",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788208489740
-    },
-    {
       "id": "feature_event_bd25f320063e4d87bdb5777d709eab5d",
       "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
       "action": "claim_released",
@@ -15384,6 +15374,16 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1788285189947
+    },
+    {
+      "id": "feature_event_fb0477f0a50b4e419ec608460c7d1579",
+      "feature_id": "quant-public-project-preview-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-quant-public-preview",
+      "reason": "主项目 Server v0.3.1709 / 7e56f95df 与 PC 前端已发布；线上匿名量化预览、Paper 安全边界、普通非官方 404 和已发布前端详情合同均验收通过。",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1788285995839
     }
   ]
 }
