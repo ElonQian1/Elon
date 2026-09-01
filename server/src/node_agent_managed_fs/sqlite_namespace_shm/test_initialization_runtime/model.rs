@@ -6,6 +6,7 @@ use super::super::{
 pub(crate) enum ManagedSqliteShmTestInitializationFailureV1 {
     CreatedFirstExclusiveReleaseOutcomeUncertain,
     ExistingFirstExclusiveReleaseOutcomeUncertain,
+    CreatedFirstTruncateOutcomeUncertainReleaseSucceeded,
 }
 
 impl ManagedSqliteShmTestInitializationFailureV1 {
@@ -13,6 +14,7 @@ impl ManagedSqliteShmTestInitializationFailureV1 {
         match self {
             Self::CreatedFirstExclusiveReleaseOutcomeUncertain => 1,
             Self::ExistingFirstExclusiveReleaseOutcomeUncertain => 2,
+            Self::CreatedFirstTruncateOutcomeUncertainReleaseSucceeded => 3,
         }
     }
 }

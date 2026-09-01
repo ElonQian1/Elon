@@ -47,9 +47,10 @@ body digest 精确匹配 checked-in reviewed digest 时，provider authority 才
 source test 对 Map 预期有 `521` 个 source-present member/group、`42,955` 个 planned-missing member。Lock q9
 `LockPreManagedCallbackRejectionV1` 保持 528 个 exact singleton normalized groups（6×88），q10
 `LockAbiScalarRejectionV1` 保持 7 个，q11 `LockRawStateRejectionV1` 保持 11 个；q12/q13
-`LockNativeAcquire{CreatedFirst,ExistingFirst}ExclusiveReleaseErrorV1` 各增加 88 个 exact singleton，故 q1–q13 未运行
-inventory（members/groups）=`3844/3844 present, 4824/4296 missing, 8668/8140 total`。完整 3,432-member
-initialization umbrella 中仍有 `3256 members/2728 groups` missing。q9–q13 细节只见
+`LockNativeAcquire{CreatedFirst,ExistingFirst}ExclusiveReleaseErrorV1` 各增加 88 个 exact singleton，q14
+`LockNativeAcquireCreatedFirstTruncateErrorReleaseSucceededV1` 再增加 88 个 exact singleton，故 q1–q14 未运行
+inventory（members/groups）=`3932/3932 present, 4736/4208 missing, 8668/8140 total`。完整 3,432-member
+initialization umbrella 中仍有 `3168 members/2640 groups` missing。q9–q14 细节只见
 [`Lock dynamic tranches authority`](node-plugin-vfs-lock-dynamic-tranches-authority.md)。两个 root 的 reviewed
 inventory digest 均未 checked-in/frozen，也尚未成功产出或冻结任何真实商 manifest。
 
@@ -82,8 +83,9 @@ inventory digest 均未 checked-in/frozen，也尚未成功产出或冻结任何
       10-member 请求校验族、q2 104-member positive lifecycle 族、q3/q4 两个 stored-poison completion 各
       1,320-member exact 族、q5 44-member native-busy 族、q6 44-member local sibling-contention 族、q7
       192-member callback-completion route-unknown 族、q8 88-member Completed source shape、q9 528-member
-      exact singleton（6×88）、q10 7-member ABI scalar、q11 11-member raw-state 与 q12/q13 各 88-member
-      CreatedFirst/ExistingFirst DMS exclusive-release exact-singleton source shape，
+      exact singleton（6×88）、q10 7-member ABI scalar、q11 11-member raw-state、q12/q13 各 88-member
+      CreatedFirst/ExistingFirst DMS exclusive-release 与 q14 88-member CreatedFirst DMS truncate-error/
+      release-succeeded exact-singleton source shape，
       且均仍须进入 root-specific 私有 actual receipt 复验。
 - [x] projector provenance 覆盖 `producer_coherence/{map,map_axes,lock,lock_axes}.rs`、
       `descriptor_binding.rs`、`membership_commitment.rs`、`runner_admission.rs` 与
@@ -91,8 +93,8 @@ inventory digest 均未 checked-in/frozen，也尚未成功产出或冻结任何
       `projector/lock_execution.rs` 与 `a2_dynamic_evidence/{map_runner,lock_runner}` 及其 request/lifecycle 子模块，
       并覆盖两个 stored-poison catalog/source-scope/TSV、`a2lockq3` child/runner/fixture/payload/test-fault seam、
       test-only unsafe-retention route-preemption bridge、q5 native-busy、q6 local sibling-contention 与 q7 ordinary completion route-unknown 的 catalog/source-scope/TSV/child/runner/payload、exact-target one-shot seam，
-      以及 q8 local-protocol、q9 pre-managed rejection、q10 ABI scalar、q11 raw-state rejection 与 q12/q13
-      initialization release-outcome source scope（精确文件清单只见
+      以及 q8 local-protocol、q9 pre-managed rejection、q10 ABI scalar、q11 raw-state rejection、q12/q13
+      initialization release-outcome 与 q14 truncate-outcome/release-success source scope（精确文件清单只见
       [`Lock tranches`](node-plugin-vfs-lock-dynamic-tranches-authority.md)），
       Map/Lock lower ledger、installed callback observation 与 exact-target observer owner。
 - [x] current source 从 validated/coherent typed key 内部编译 root-bound plan；producer 无法提交 plan。普通
@@ -153,8 +155,8 @@ offset/effect 与 custody 均保留。任何未版本化、未执行的“看起
       不能把 Expected、catalog 或源码字段称为 lower receipt。
 - [x] Test source：q9 `LockPreManagedCallbackRejectionV1` 精确增加 528 个 singleton member/group（6×88）；
       source-only/actual 边界与真实 production chain/seam 只见[`Lock tranches`](node-plugin-vfs-lock-dynamic-tranches-authority.md)，
-      完整 initialization umbrella=`3,432 members/2,904 groups` 且不属于 q9；q12/q13 各承接 88/88，
-      remaining=`3,256 members/2,728 groups`。
+      完整 initialization umbrella=`3,432 members/2,904 groups` 且不属于 q9；q12/q13/q14 各承接 88/88，
+      remaining=`3,168 members/2,640 groups`。
 - [x] Test source：q10 `LockAbiScalarRejectionV1` 精确增加 7 个 singleton member/group，即
       `offset/count/flags` validity 的七个非全真组合；真实 installed `xShmLock` 必须在 raw-state admission/dereference、registry
       callback 与 managed lower 前由 production scalar gate 直接返回 `SQLITE_IOERR_SHMLOCK`。它不得吸收全真组合、
@@ -176,9 +178,16 @@ offset/effect 与 custody 均保留。任何未版本化、未执行的“看起
       `03b883842b3fd1886779dcb07573521d14ca3125894b38c4d341a462137424f4`。typed precreation receipt 必须先证明
       SHM 物理预创建并关闭，随后 cold attach 必须观察 ExistingFirst；q12 CreatedFirst 和任何 receipt/case swap 失败关闭。
       one-shot `UnlockFileEx` BOOL 仍故意不读，因此未来证据也只能是 `controlled_fault_actual`，不得写为 natural actual。
-- [x] Unrun inventory expectation：q1–q13 Lock 为 `3,844` source-present members/groups，静态总数为
-      `8,668 members/8,140 groups`，仍缺 `4,824 members/4,296 groups`；完整 initialization umbrella=
-      `3,432 members/2,904 groups`，q12/q13 各取 88/88 后 remaining=`3,256 members/2,728 groups`。
+- [x] Test source：q14 `LockNativeAcquireCreatedFirstTruncateErrorReleaseSucceededV1` 精确增加 88 个
+      singleton member/group；catalog 88 rows / 17,594 bytes、SHA-256=
+      `95f1c8e40da35ac23cc46e20310178c2aef09adacf777155d9b67e5802d69abd`。dedicated controller 只在同一
+      production truncate validation 点调用一次真实 `File::set_len(0)` 并故意不读取其 `Result`/return receipt，
+      形成 typed `ReturnReceiptUnavailable`；随后 normal production `UnlockFileEx` success 必须被观察，DMS
+      到达 `Released`，mutation uncertain 但 lock certain、file retained。未来证据只能是
+      `controlled_fault_actual`，不得写为 natural actual。
+- [x] Unrun inventory expectation：q1–q14 Lock 为 `3,932` source-present members/groups，静态总数为
+      `8,668 members/8,140 groups`，仍缺 `4,736 members/4,208 groups`；完整 initialization umbrella=
+      `3,432 members/2,904 groups`，q12/q13/q14 各取 88/88 后 remaining=`3,168 members/2,640 groups`。
       `a2b1_cases.rs` assertions 已在源码批次同步修复；未运行测试，不能称通过。
 - [x] Test source：`a2lockq3` retention-succeeded 回执源码绑定 exact member/plan/implementation、installed
       `xShmLock`、`SQLITE_IOERR_SHMLOCK`、pre/poison/post snapshot、零 lower lock attempt、unsafe custody retention、
@@ -209,7 +218,7 @@ coverage 或 Windows numerator。
       source-program admission commitment，不能跨 inventory 或 manifest 重放 member→program→class 关系。
 - [ ] Current-source verification：本批不编译、不运行 Cargo、Windows 或真实 runtime；
       `passed=0 failed=0 actual=not_run`。
-- [ ] Current full admission：source test 预期 Map `42,955` members、Lock `4,824 members/4,296 groups` 仍
+- [ ] Current full admission：source test 预期 Map `42,955` members、Lock `4,736 members/4,208 groups` 仍
       planned-missing，且两个 root 均没有 checked-in reviewed inventory digest，因此 provider authority 不可构造，full candidate 必须在
       catalog/manifest 前原子失败。
 
@@ -371,6 +380,13 @@ q13 的 88 个 ExistingFirst singleton 将同一 release-outcome seam 绑定到�
 cold attach `was_created=false` observation。当前 matcher/catalog、case-aware controller、receipt、child/runner/payload 与
 cleanup 仍只是 uncompiled/unrun source；它不复用 q12 receipt，也不产生 natural actual、coverage 或生产许可。
 
+q14 的 88 个 CreatedFirst singleton 将 DMS truncate outcome uncertainty 与随后可观察的 normal production
+release success 严格分开：同一 production truncate validation 点真实调用一次 `File::set_len(0)`，故意不读
+`Result`/return receipt 并形成 typed `ReturnReceiptUnavailable`；随后真实 `UnlockFileEx` success 必须被 receipt
+观察，最终 DMS=`Released`、native lock/unlock=`1/1`、mutation uncertain、lock certain、file retained。
+当前 matcher/catalog/controller/receipt/child/runner/payload 与 cleanup 仍只是 uncompiled/unrun source；它只能支撑
+未来 `controlled_fault_actual`，不产生 natural actual、coverage 或生产许可。
+
 q3 只保持 `a2lockq3` version、selector 语义、135-value wire width 与 native digest domain；扩大后的共同
 source scope 会有意改变它的 `implementation_sha256` 和完整 payload commitment。旧 q3 payload、receipt 或
 implementation seal 不得作为本批 current-source evidence 复用。
@@ -407,26 +423,26 @@ Map、Lock、既有 A2b2 `117/117` 与宽回归均闭合，聚合 A2 才可由�
 |---|---:|---:|---|
 | `StaticContract` | `43476/43476` | `8668/8668` | 静态 source-exhaustive合同已闭合 |
 | typed projector/candidate | `prior compiled; current source uncompiled/unrun` | `prior compiled; current source uncompiled/unrun` | 实现存在，不等于 current source 已验证或 manifest 冻结 |
-| sealed runner admission | `source written; exact receipt-only 6 request-budget + 6 q3 lifecycle + q4 511-member semantic scope/509 net-new support; default gap retained; not run` | `source written through q13; q11=11 exact singleton after 2 exclusions, q12/q13=88 each; default gap retained; not run` | raw `Supported` 不能成为 permit；current actual 仍缺 |
-| narrow executable program | `MapRegionLoopSuccessV1 q4: two exact families, exact N ordered mapping ledger, typed matcher, per-member seal/source digest; source-only; uncompiled/unrun` | `q1–q13 source-only; q9–q13 exact scope and receipt contract only in Lock tranches; uncompiled/unrun` | 源码形状不是动态执行证据 |
+| sealed runner admission | `source written; exact receipt-only 6 request-budget + 6 q3 lifecycle + q4 511-member semantic scope/509 net-new support; default gap retained; not run` | `source written through q14; q11=11 exact singleton after 2 exclusions, q12/q13/q14=88 each; default gap retained; not run` | raw `Supported` 不能成为 permit；current actual 仍缺 |
+| narrow executable program | `MapRegionLoopSuccessV1 q4: two exact families, exact N ordered mapping ledger, typed matcher, per-member seal/source digest; source-only; uncompiled/unrun` | `q1–q14 source-only; q9–q14 exact scope and receipt contract only in Lock tranches; uncompiled/unrun` | 源码形状不是动态执行证据 |
 | stored-poison member catalog | `n/a` | `each 1320 rows / 237857 bytes; SHA-256 4da94c20e91d97a0082116879718b1ccf0271eb235ed785e65a2e36e7a949d85 and df931ad7725843098f228d07d9798d79e92f2beec4e1c23e83fc89219dfa1396` | 只是 checked-in source seal；不是 reviewed inventory 或 runtime receipt |
-| pre-manifest program inventory | `full-root two-pass source written; unrun expectation: 43476 total, 521 source-present members/groups, 42955 planned-missing members` | `unrun members/groups: 3844/3844 present, 4824/4296 missing, 8668/8140 total` | 两个 digest 均未生成/冻结；不是 quotient、coverage 或 Windows evidence |
+| pre-manifest program inventory | `full-root two-pass source written; unrun expectation: 43476 total, 521 source-present members/groups, 42955 planned-missing members` | `unrun members/groups: 3932/3932 present, 4736/4208 missing, 8668/8140 total` | 两个 digest 均未生成/冻结；不是 quotient、coverage 或 Windows evidence |
 | reviewed source-program admission | `provider + catalog/manifest binding source written; reviewed digest absent` | `root-specific provider + catalog/manifest binding source written; reviewed digest absent` | 均未编译/运行；零 planned-missing + exact reviewed digest 才可构造；不是 actual execution |
-| full candidate gate | `prior 43476 checked; current source expected to fail at 42955 missing` | `prior 8668 checked; current source expected to fail at 4824 members/4296 groups missing` | current source 未运行；prior baseline 只证明当时失败关闭，不产生 quotient denominator |
-| current blocker | `42955 planned-missing source expectation + no reviewed inventory digest + actual not run` | `4824 members/4296 groups missing + compile/runtime/actual receipts/reviewed digest absent` | q3–q13 只有 source；两个 root 的全局 blocker 均未解除 |
+| full candidate gate | `prior 43476 checked; current source expected to fail at 42955 missing` | `prior 8668 checked; current source expected to fail at 4736 members/4208 groups missing` | current source 未运行；prior baseline 只证明当时失败关闭，不产生 quotient denominator |
+| current blocker | `42955 planned-missing source expectation + no reviewed inventory digest + actual not run` | `4736 members/4208 groups missing + compile/runtime/actual receipts/reviewed digest absent` | q3–q14 只有 source；两个 root 的全局 blocker 均未解除 |
 | frozen descriptor binding | `d3ba08a5ba0019f9ccda99ace8b580ef06eb4d6653ba80c0db5497bec51bd870`；checked-in / exact gate accepted | `0cc951c8c979608fb9861167f8d880a74fd2e042c4d2cd42673100e14083e8ef`；checked-in / exact gate accepted | descriptor binding 已冻结；quotient manifest 仍未冻结 |
 | `DynamicQuotientMemberCoverage` | `0/43476` | `0/8668` | 尚无 frozen class/member commitment |
 | quotient denominator | `Qmap=unknown` | `Qlock=unknown` | 不得预估或人工填写 |
 | `WindowsDynamic` | `not_opened` | `not_opened` | 尚无正式 class record |
 | current-batch compile/run/Windows execution | `not_run / not_run / not_run` | `not_run / not_run / not_run` | `passed=0 failed=0`；不是 Windows 动态证据 |
-| global source-leaf authority scope | `shared blocker` | `q9–q13 source changes leave 19 frozen/source-owner artifacts for checkpoint-based regeneration and review` | 禁止只改 owner/needle 的半套权威；未来编译或真实验收前须单独续绑，不构成新运行证据 |
+| global source-leaf authority scope | `shared blocker` | `q9–q14 source changes leave 19 frozen/source-owner artifacts for checkpoint-based regeneration and review` | 禁止只改 owner/needle 的半套权威；未来编译或真实验收前须单独续绑，不构成新运行证据 |
 
 禁止用 `43476/43476` 或 `8668/8668` 表示 Windows dynamic；禁止把一条 representative record 解释为
 在没有 frozen member commitment 时天然覆盖其他静态成员。
 
 ## 9. Production isolation and current verdict
 
-当前 verdict：`design_frozen / Lock q13=LockNativeAcquireExistingFirstExclusiveReleaseErrorV1, 88 exact singleton / current_source=source_written/source_review_only/implementation_uncompiled/implementation_unrun / Lock inventory members/groups=3844/3844 present, 4824/4296 missing, 8668/8140 total / initialization remaining=3256 members/2728 groups / passed=0 failed=0 actual=not_run / controlled_fault_actual=source_seam_only_unrun / natural_actual=none / actual inventory/receipt/record=none / Qmap/Qlock=unknown / member_coverage=0/43476+0/8668 / WindowsDynamic=not_opened / q9_q13 global frozen-source-owner refresh=19 artifacts independently deferred / production=closed`。q9–q13 细节只见[`Lock tranches`](node-plugin-vfs-lock-dynamic-tranches-authority.md)。
+当前 verdict：`design_frozen / Lock q14=LockNativeAcquireCreatedFirstTruncateErrorReleaseSucceededV1, 88 exact singleton / current_source=source_written/source_review_only/implementation_uncompiled/implementation_unrun / Lock inventory members/groups=3932/3932 present, 4736/4208 missing, 8668/8140 total / initialization remaining=3168 members/2640 groups / passed=0 failed=0 actual=not_run / controlled_fault_actual=source_seam_only_unrun / natural_actual=none / actual inventory/receipt/record=none / Qmap/Qlock=unknown / member_coverage=0/43476+0/8668 / WindowsDynamic=not_opened / q9_q14 global frozen-source-owner refresh=19 artifacts independently deferred / production=closed`。q9–q14 细节只见[`Lock tranches`](node-plugin-vfs-lock-dynamic-tranches-authority.md)。
 
 本功能不注册生产 VFS，不调用 production open，不创建 Connection/Opened authority，不接 A1/v15、Runtime、
 Ready、Provider、route、Offer、Job、Attempt、Lease、派发、市场、结算或资金。任何 Gate A-F 未闭合时，A2 都

@@ -38,6 +38,14 @@ fn existing_first_expectation() -> ManagedSqliteShmTestInitializationExpectation
     }
 }
 
+fn truncate_release_succeeded_expectation() -> ManagedSqliteShmTestInitializationExpectationV1 {
+    ManagedSqliteShmTestInitializationExpectationV1 {
+        case_v1:
+            ManagedSqliteShmTestInitializationFailureV1::CreatedFirstTruncateOutcomeUncertainReleaseSucceeded,
+        ..expectation()
+    }
+}
+
 fn request() -> ManagedSqliteShmLockRequest {
     ManagedSqliteShmLockRequest::new(
         0,
@@ -67,12 +75,22 @@ fn terminal() -> TerminalStateV1 {
         node_present: true,
         shm_file_present: true,
         dms_exclusive_outcome_uncertain: true,
+        dms_released: false,
         poisoned: true,
         mutation_may_have_occurred: true,
         lock_outcome_uncertain: true,
         domain_terminal: true,
         shared_mask: 0,
         exclusive_mask: 0,
+    }
+}
+
+fn truncate_release_succeeded_terminal() -> TerminalStateV1 {
+    TerminalStateV1 {
+        dms_exclusive_outcome_uncertain: false,
+        dms_released: true,
+        lock_outcome_uncertain: false,
+        ..terminal()
     }
 }
 
@@ -165,6 +183,54 @@ fn exact_existing_first_release_sequence_requires_created_false() {
     let receipt = controller.finish(TARGET, terminal(), lock).unwrap();
     assert_eq!(receipt.case_v1(), expected.case_v1);
     assert_eq!(receipt.ordered_values()[1], 2);
+}
+
+#[test]
+fn exact_created_first_truncate_unavailable_then_release_success_is_case_specific() {
+    let mut controller = ManagedSqliteShmTestInitializationControllerV1::default();
+    let expected = truncate_release_succeeded_expectation();
+    controller.arm(TARGET, expected, cold()).unwrap();
+    assert!(controller.record_request(TARGET, request()).unwrap());
+    assert!(controller.record_open_attempt(TARGET).unwrap());
+    assert!(controller.record_open_created(TARGET, true).unwrap());
+    assert!(controller
+        .record_dms_exclusive_lock_attempt(TARGET)
+        .unwrap());
+    assert!(controller.record_dms_exclusive_acquired(TARGET).unwrap());
+    assert!(controller.record_truncate_attempt(TARGET).unwrap());
+    assert!(controller
+        .begin_created_first_truncate_outcome_unavailable(TARGET)
+        .unwrap());
+    controller
+        .record_created_first_truncate_return_receipt_unavailable(
+            TARGET,
+            ManagedSqliteShmTestInitializationNativeReceiptV1 {
+                observation:
+                    ManagedSqliteShmTestInitializationNativeObservationV1::ReturnReceiptUnavailable,
+                offset: 0,
+                length: 0,
+                exact_call_occurrence: 1,
+            },
+        )
+        .unwrap();
+    controller
+        .begin_created_first_truncate_cleanup_unlock(TARGET)
+        .unwrap();
+    controller
+        .record_created_first_truncate_cleanup_unlock_succeeded(TARGET)
+        .unwrap();
+    controller.record_poisoned(TARGET).unwrap();
+    let receipt = controller
+        .finish(
+            TARGET,
+            truncate_release_succeeded_terminal(),
+            requested_lock_receipt(),
+        )
+        .unwrap();
+    assert_eq!(receipt.case_v1(), expected.case_v1);
+    assert_eq!(receipt.ordered_values()[1], 3);
+    assert_eq!(receipt.ordered_values()[19..28], [0, 1, 1, 0, 0, 1, 1, 1, 0]);
+    assert_eq!(receipt.ordered_values()[28], 447);
 }
 
 #[test]

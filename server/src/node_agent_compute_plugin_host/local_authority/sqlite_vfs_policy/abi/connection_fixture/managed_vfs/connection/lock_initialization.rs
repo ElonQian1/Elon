@@ -1,4 +1,4 @@
-//! Exact installed-ABI bridge for the q12/q13 initialization release failures.
+//! Exact installed-ABI bridge for controlled q12-q14 initialization failures.
 //!
 //! This bridge arms the managed initialization controller only after a real WAL-main target is
 //! attached, invokes the installed `xShmLock`, then seals both initialization and requested-range
@@ -36,6 +36,17 @@ impl ManagedSqliteRoutedConnectionFixture {
     }
 
     pub(in super::super) fn observe_main_shm_lock_existing_first_exclusive_release_failure_v1(
+        &self,
+        expectation: ManagedSqliteShmTestInitializationExpectationV1,
+        raw_flags: c_int,
+    ) -> Result<ManagedTestLockInitializationFailureObservationV1, &'static str> {
+        self.observe_main_shm_lock_initialization_exclusive_release_failure_v1(
+            expectation,
+            raw_flags,
+        )
+    }
+
+    pub(in super::super) fn observe_main_shm_lock_created_first_truncate_error_release_succeeded_v1(
         &self,
         expectation: ManagedSqliteShmTestInitializationExpectationV1,
         raw_flags: c_int,

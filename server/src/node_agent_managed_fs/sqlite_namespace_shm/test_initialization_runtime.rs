@@ -15,6 +15,8 @@ use super::{
 
 #[path = "test_initialization_runtime/controller.rs"]
 mod controller;
+#[path = "test_initialization_runtime/created_first_truncate_error_release_succeeded.rs"]
+mod created_first_truncate_error_release_succeeded;
 #[path = "test_initialization_runtime/model.rs"]
 mod model;
 
@@ -89,6 +91,7 @@ impl ManagedSqliteShmTestTargetObserver {
             shm_file_present: snapshot.topology.shm_file_present,
             dms_exclusive_outcome_uncertain: snapshot.topology.dms
                 == ManagedSqliteShmTestDmsCustody::ExclusiveOutcomeUncertain,
+            dms_released: snapshot.topology.dms == ManagedSqliteShmTestDmsCustody::Released,
             poisoned: snapshot.topology.poisoned,
             mutation_may_have_occurred: snapshot.topology.mutation_may_have_occurred,
             lock_outcome_uncertain: snapshot.topology.lock_outcome_uncertain,

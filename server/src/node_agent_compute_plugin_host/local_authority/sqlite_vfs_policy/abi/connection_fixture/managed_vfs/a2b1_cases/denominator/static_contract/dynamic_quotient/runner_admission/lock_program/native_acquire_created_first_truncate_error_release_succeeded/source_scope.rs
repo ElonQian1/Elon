@@ -1,0 +1,128 @@
+//! Source closure and implementation seals for the q14 truncate-error release-ok tranche.
+
+use sha2::{Digest, Sha256};
+
+use super::super::super::super::super::source_leaf_authority::Digest32;
+use super::super::super::super::super::terminal_descriptor::LockActionV1;
+use super::super::super::super::lock_local_protocol_rejection_source_scope::lock_local_protocol_rejection_source_scope_entries_v1;
+use super::super::abi_scalar_rejection::ABI_SCALAR_REJECTION_PROJECTOR_DELTA_V1;
+use super::super::native_acquire_created_first_exclusive_release_error::NATIVE_ACQUIRE_CREATED_FIRST_EXCLUSIVE_RELEASE_ERROR_PROJECTOR_DELTA_V1;
+use super::super::native_acquire_existing_first_exclusive_release_error::NATIVE_ACQUIRE_EXISTING_FIRST_EXCLUSIVE_RELEASE_ERROR_PROJECTOR_DELTA_V1;
+use super::super::pre_managed_callback_rejection::PRE_MANAGED_CALLBACK_REJECTION_PROJECTOR_DELTA_V1;
+use super::super::raw_state_rejection::RAW_STATE_REJECTION_PROJECTOR_DELTA_V1;
+
+macro_rules! source {
+    ($name:literal, $path:literal) => {
+        (
+            $name,
+            include_str!(concat!(env!("CARGO_MANIFEST_DIR"), $path)),
+        )
+    };
+}
+
+/// New source identities introduced by q14. Modified shared roots remain in the inherited closure.
+pub(super) const NATIVE_ACQUIRE_CREATED_FIRST_TRUNCATE_ERROR_RELEASE_SUCCEEDED_PROJECTOR_DELTA_V1: &[(&str, &str)] = &[
+    (
+        "dynamic_quotient/runner_admission/lock_program/native_acquire_created_first_truncate_error_release_succeeded.rs",
+        include_str!("../native_acquire_created_first_truncate_error_release_succeeded.rs"),
+    ),
+    (
+        "dynamic_quotient/runner_admission/lock_program/native_acquire_created_first_truncate_error_release_succeeded/catalog.rs",
+        include_str!("catalog.rs"),
+    ),
+    (
+        "dynamic_quotient/runner_admission/lock_program/native_acquire_created_first_truncate_error_release_succeeded/runtime.rs",
+        include_str!("runtime.rs"),
+    ),
+    (
+        "dynamic_quotient/runner_admission/lock_program/native_acquire_created_first_truncate_error_release_succeeded/source_scope.rs",
+        include_str!("source_scope.rs"),
+    ),
+    (
+        "dynamic_quotient/runner_admission/lock_program/native_acquire_created_first_truncate_error_release_succeeded/native_acquire_created_first_truncate_error_release_succeeded_members.v1.tsv",
+        include_str!("native_acquire_created_first_truncate_error_release_succeeded_members.v1.tsv"),
+    ),
+    source!(
+        "managed_vfs/a2_dynamic_evidence/child/lock_created_first_truncate_error_release_succeeded.rs",
+        "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2_dynamic_evidence/child/lock_created_first_truncate_error_release_succeeded.rs"
+    ),
+    source!(
+        "managed_vfs/a2_dynamic_evidence/lock_runner/created_first_truncate_error_release_succeeded.rs",
+        "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2_dynamic_evidence/lock_runner/created_first_truncate_error_release_succeeded.rs"
+    ),
+    source!(
+        "managed_vfs/a2_dynamic_evidence/lock_runner/created_first_truncate_error_release_succeeded/fixture.rs",
+        "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2_dynamic_evidence/lock_runner/created_first_truncate_error_release_succeeded/fixture.rs"
+    ),
+    source!(
+        "managed_vfs/a2_dynamic_evidence/lock_runner/created_first_truncate_error_release_succeeded/payload.rs",
+        "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2_dynamic_evidence/lock_runner/created_first_truncate_error_release_succeeded/payload.rs"
+    ),
+    source!(
+        "node_agent_managed_fs/sqlite_namespace_shm/test_initialization_runtime/controller/created_first_truncate_error_release_succeeded.rs",
+        "/src/node_agent_managed_fs/sqlite_namespace_shm/test_initialization_runtime/controller/created_first_truncate_error_release_succeeded.rs"
+    ),
+    source!(
+        "node_agent_managed_fs/sqlite_namespace_shm/test_initialization_runtime/created_first_truncate_error_release_succeeded.rs",
+        "/src/node_agent_managed_fs/sqlite_namespace_shm/test_initialization_runtime/created_first_truncate_error_release_succeeded.rs"
+    ),
+    source!(
+        "node_agent_managed_fs/sqlite_namespace_shm/node_initialization/created_first_truncate_error_release_succeeded.rs",
+        "/src/node_agent_managed_fs/sqlite_namespace_shm/node_initialization/created_first_truncate_error_release_succeeded.rs"
+    ),
+];
+
+pub(super) fn digest_implementation_v1(
+    action: LockActionV1,
+    first: u8,
+    count: u8,
+    mask: u8,
+    completion_tag: u8,
+) -> Digest32 {
+    let mut hasher = Sha256::new();
+    hasher.update(
+        b"elon-lock-native-acquire-created-first-truncate-error-release-succeeded-implementation-v1\0",
+    );
+    // Q14 extends the exact q1-q13 closure once, then adds only its new source identities.
+    for (name, source) in lock_local_protocol_rejection_source_scope_entries_v1()
+        .chain(
+            PRE_MANAGED_CALLBACK_REJECTION_PROJECTOR_DELTA_V1
+                .iter()
+                .copied()
+                .filter(|(name, _)| *name != "registry/file_custody/operations/shm.rs"),
+        )
+        .chain(ABI_SCALAR_REJECTION_PROJECTOR_DELTA_V1.iter().copied())
+        .chain(RAW_STATE_REJECTION_PROJECTOR_DELTA_V1.iter().copied())
+        .chain(
+            NATIVE_ACQUIRE_CREATED_FIRST_EXCLUSIVE_RELEASE_ERROR_PROJECTOR_DELTA_V1
+                .iter()
+                .copied(),
+        )
+        .chain(
+            NATIVE_ACQUIRE_EXISTING_FIRST_EXCLUSIVE_RELEASE_ERROR_PROJECTOR_DELTA_V1
+                .iter()
+                .copied(),
+        )
+        .chain(
+            NATIVE_ACQUIRE_CREATED_FIRST_TRUNCATE_ERROR_RELEASE_SUCCEEDED_PROJECTOR_DELTA_V1
+                .iter()
+                .copied(),
+        )
+    {
+        hasher.update((name.len() as u64).to_le_bytes());
+        hasher.update(name.as_bytes());
+        hasher.update((source.len() as u64).to_le_bytes());
+        hasher.update(source.as_bytes());
+    }
+    hasher.update([action_tag_v1(action), first, count, mask, completion_tag]);
+    Digest32(hasher.finalize().into())
+}
+
+const fn action_tag_v1(action: LockActionV1) -> u8 {
+    match action {
+        LockActionV1::LockShared => 1,
+        LockActionV1::LockExclusive => 2,
+        LockActionV1::UnlockShared => 3,
+        LockActionV1::UnlockExclusive => 4,
+    }
+}

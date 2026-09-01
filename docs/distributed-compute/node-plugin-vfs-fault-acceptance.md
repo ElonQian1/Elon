@@ -42,7 +42,7 @@ owner 图只验证 baseline commit literal 形状、从 reviewed owner bytes 重
   `source_written/source_review_only/implementation_uncompiled/implementation_unrun`，未 Cargo、未 Windows/真实运行，
   `passed=0 failed=0 actual=not_run`；不得复用前序 `4/4`、`36/36`、fingerprint 或 receipt。
 - 计数边界：这 4 项分别是 legacy non-denominator subset、incomplete branch-atom scaffold、source-owner graph 与 Map template ledger 自洽守卫；不形成完整 terminal universe、`CaseKey`、`Expected`、denominator、`StaticContract` 或 map/lock `WindowsDynamic`。
-- current Lock source 已推进到 q13 `LockNativeAcquireExistingFirstExclusiveReleaseErrorV1`：它与 q12 CreatedFirst 各承接 DMS release outcome uncertain 88 个 singleton，严格区分 ExistingFirst/CreatedFirst；q13 catalog=88 rows/18,474 bytes，SHA-256=`03b883842b3fd1886779dcb07573521d14ca3125894b38c4d341a462137424f4`。q1–q13 source-present=`3844 members/3844 groups`，initialization umbrella=`3432/2904`、remaining=`3256/2728`。两批和 q5–q11 均未编译/未运行，`passed=0 failed=0 actual=not_run`、`controlled_fault_actual=source_only_unrun`；不构成 natural actual、Windows record、动态接受或生产开放。精确边界只见[`Lock tranches`](node-plugin-vfs-lock-dynamic-tranches-authority.md)；q9–q13 的 19-artifact refresh 继续独立 deferred。
+- current Lock source 已推进到 q14 `LockNativeAcquireCreatedFirstTruncateErrorReleaseSucceededV1`：q12/q13 分别承接 CreatedFirst/ExistingFirst DMS release outcome uncertain 88 个 singleton，q14 再承接 CreatedFirst DMS truncate outcome uncertain、release success observed 的 88 个 singleton；q14 catalog=88 rows/17,594 bytes，SHA-256=`95f1c8e40da35ac23cc46e20310178c2aef09adacf777155d9b67e5802d69abd`。q1–q14 source-present=`3932 members/3932 groups`，initialization umbrella=`3432/2904`、remaining=`3168/2640`。三批和 q5–q11 均未编译/未运行，`passed=0 failed=0 actual=not_run`、`controlled_fault_actual=source_only_unrun`；不构成 natural actual、Windows record、动态接受或生产开放。精确边界只见[`Lock tranches`](node-plugin-vfs-lock-dynamic-tranches-authority.md)；q9–q14 的 19-artifact refresh 继续独立 deferred。
 
 ### 历史证据元组
 
@@ -133,7 +133,7 @@ Map/Lock 静态 scope、`CaseKey`、`SourceBranch`、`Expected`、exclusion 与 
 | Family | StaticContract | DynamicQuotientMemberCoverage | WindowsDynamic | 当前门槛 |
 |---|---:|---:|---:|---|
 | Map | `43476/43476` | `0/43476` | `not_opened` | 验证 current source，补齐其余 `42,955` 个 program，冻结 exact class/member manifest，机械得到 `Qmap` |
-| Lock | `8668/8668` | `0/8668` | `not_opened` | q13 `LockNativeAcquireExistingFirstExclusiveReleaseErrorV1`=88 exact singleton；q1–q13 unrun inventory m/g=`3844/3844 present, 4824/4296 missing, 8668/8140 total`；initialization remaining=`3256/2728`；无 actual，`Qlock=unknown`；q9–q13 的 19-artifact refresh 独立 deferred；详见 [Lock tranches](node-plugin-vfs-lock-dynamic-tranches-authority.md) |
+| Lock | `8668/8668` | `0/8668` | `not_opened` | q14 `LockNativeAcquireCreatedFirstTruncateErrorReleaseSucceededV1`=88 exact singleton；q1–q14 unrun inventory m/g=`3932/3932 present, 4736/4208 missing, 8668/8140 total`；initialization remaining=`3168/2640`；无 actual，`Qlock=unknown`；q9–q14 的 19-artifact refresh 独立 deferred；详见 [Lock tranches](node-plugin-vfs-lock-dynamic-tranches-authority.md) |
 | **Map/Lock aggregate** | **verified** | **not_started** | **not_opened** | **逐 class Windows exact-set 后才可形成 `Q/Q`** |
 
 #### 2.1.1 静态闭合前 review provenance（历史）
@@ -232,7 +232,7 @@ phase 与 terminal phase，不能把 cleanup failure 归并回最初注入点或
 | map outcome uncertain | FileId/domain 永久 tombstone；同 domain sibling 不得重建 runtime 或继续 SHM。 |
 | lock success | `LockShared/LockExclusive/UnlockShared/UnlockExclusive` 四动作分别覆盖 local success、shared coalescing、exact range/mask transition 与 OS acquire/release；不得用 exclusive shape代表 shared。 |
 | local lock contention | 合法 sibling 冲突只返回 `SQLITE_BUSY`，不触发脚本、不 poison、不篡改持锁 mask。 |
-| OS lock outcome | shared/exclusive sibling relation 分别对账 success/contended/error；q5–q11 边界保持不变。q12/q13 分别在 CreatedFirst/ExistingFirst DMS exclusive-release 点调用一次 `UnlockFileEx` 并故意不读 BOOL，保留 `ExclusiveOutcomeUncertain` 与 quarantine；两条未运行 source seam 未来也只能形成 `controlled_fault_actual`，不得冒充 natural actual。精确门槛只见 [Lock tranches](node-plugin-vfs-lock-dynamic-tranches-authority.md)。`SQLITE_BUSY` 不得与 I/O failure、mutation 或 uncertainty 合并。 |
+| OS lock outcome | shared/exclusive sibling relation 分别对账 success/contended/error；q5–q11 边界保持不变。q12/q13 分别在 CreatedFirst/ExistingFirst DMS exclusive-release 点调用一次 `UnlockFileEx` 并故意不读 BOOL，保留 `ExclusiveOutcomeUncertain` 与 quarantine；q14 在 CreatedFirst DMS truncate 点形成 `OutcomeUncertainPoisoned`，随后必须观察 release success、DMS `Released` 与 native lock/unlock=`1/1`，mutation uncertain 但 lock certain、file retained。三条未运行 source seam 未来也只能形成 `controlled_fault_actual`，不得冒充 natural actual。精确门槛只见 [Lock tranches](node-plugin-vfs-lock-dynamic-tranches-authority.md)。`SQLITE_BUSY` 不得与 I/O failure、mutation 或 uncertainty 合并。 |
 | lock release uncertainty | 不清本地 mask，不释放对应 custody；domain terminal 与后续 sibling 行为逐项匹配。 |
 | cleanup rewrite | DMS unlock/file close、mapping close或exact-open cleanup改写 terminal phase/custody时，保留 cause phase并命中独立 key；不得归并原失败 phase。 |
 | barrier no-return | 通过真实无结果码通道执行；失败清 raw state一次并保留 terminal custody，不伪造 `SQLITE_IOERR` 或正常 completion。 |
@@ -293,7 +293,7 @@ A2 完成必须同时满足：
   `implementation_not_dynamically_accepted` 升级；
 - 任何证据缺失、环境不明、case key漂移、观察不完整或生产入口变化都维持失败关闭。
 
-当前正式结论：Map `StaticContract=43476/43476`、Lock `StaticContract=8668/8668`。Lock q12 CreatedFirst 与 q13 `LockNativeAcquireExistingFirstExclusiveReleaseErrorV1` 各为 source-only 88 exact singleton；q1–q13 未运行 inventory（members/groups）=`3844/3844 present, 4824/4296 missing, 8668/8140 total`，initialization umbrella=`3432/2904`、remaining=`3256/2728`。current source=`source_written/source_review_only/implementation_uncompiled/implementation_unrun`，`passed=0 failed=0 actual=not_run`、`controlled_fault_actual=source_only_unrun`；无 actual inventory/receipt/record、reviewed digest 或 frozen manifest，coverage=`0/43476 + 0/8668`、`Qmap/Qlock=unknown`、`WindowsDynamic=not_opened`。q9–q13 的 19-artifact refresh 仍独立 deferred；A2 仍为 `implementation_not_dynamically_accepted`，production、Ready、dispatch、market 与 settlement closed。q9–q13 细节只见[`Lock tranches`](node-plugin-vfs-lock-dynamic-tranches-authority.md)。
+当前正式结论：Map `StaticContract=43476/43476`、Lock `StaticContract=8668/8668`。Lock q12/q13 release-error slices 与 q14 `LockNativeAcquireCreatedFirstTruncateErrorReleaseSucceededV1` 各为 source-only 88 exact singleton；q1–q14 未运行 inventory（members/groups）=`3932/3932 present, 4736/4208 missing, 8668/8140 total`，initialization umbrella=`3432/2904`、remaining=`3168/2640`。current source=`source_written/source_review_only/implementation_uncompiled/implementation_unrun`，`passed=0 failed=0 actual=not_run`、`controlled_fault_actual=source_only_unrun`；无 actual inventory/receipt/record、reviewed digest 或 frozen manifest，coverage=`0/43476 + 0/8668`、`Qmap/Qlock=unknown`、`WindowsDynamic=not_opened`。q9–q14 的 19-artifact refresh 仍独立 deferred；A2 仍为 `implementation_not_dynamically_accepted`，production、Ready、dispatch、market 与 settlement closed。q9–q14 细节只见[`Lock tranches`](node-plugin-vfs-lock-dynamic-tranches-authority.md)。
 
 ### 9.1 静态闭合前 fragment provenance（历史）
 

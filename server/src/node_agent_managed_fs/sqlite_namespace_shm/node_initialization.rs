@@ -15,6 +15,8 @@ use super::{
     },
 };
 
+#[cfg(all(test, windows))]
+mod created_first_truncate_error_release_succeeded;
 impl ManagedSqliteShmCoordinator {
     pub(super) fn ensure_node<'state>(
         &self,
@@ -234,6 +236,9 @@ impl ManagedSqliteShmCoordinator {
                 ));
                 return Err(failure);
             }
+            #[cfg(all(test, windows))]
+            let mut file =
+                self.execute_q14_truncate_release_ok_test_v1(state, _connection_id, file)?;
             if let Err(error) = file.truncate(0) {
                 #[cfg(all(test, windows))]
                 if let Err(failure) = self.reject_test_initialization_path_v1(

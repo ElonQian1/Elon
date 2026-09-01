@@ -13,6 +13,8 @@ use super::model::{
     ManagedSqliteShmTestInitializationNativeReceiptV1, ManagedSqliteShmTestInitializationReceiptV1,
 };
 
+mod created_first_truncate_error_release_succeeded;
+
 type ExactTarget = (u64, u64);
 
 #[derive(Debug, Clone, Copy)]
@@ -34,6 +36,7 @@ pub(super) struct TerminalStateV1 {
     pub(super) node_present: bool,
     pub(super) shm_file_present: bool,
     pub(super) dms_exclusive_outcome_uncertain: bool,
+    pub(super) dms_released: bool,
     pub(super) poisoned: bool,
     pub(super) mutation_may_have_occurred: bool,
     pub(super) lock_outcome_uncertain: bool,
@@ -53,6 +56,7 @@ enum Stage {
     TruncateAttempted,
     Truncated,
     DmsExclusiveUnlockAttempted,
+    DmsExclusiveUnlockSucceeded,
     ReturnReceiptUnavailable,
     Poisoned,
 }
@@ -67,6 +71,7 @@ struct EventCounts {
     truncate_attempt: u8,
     truncate_success: u8,
     dms_unlock_attempt: u8,
+    dms_unlock_success: u8,
     return_receipt_unavailable: u8,
     poisoned: u8,
 }
@@ -183,11 +188,13 @@ impl ManagedSqliteShmTestInitializationControllerV1 {
         };
         let violation = match (active.expectation.case_v1, created) {
             (
-                super::model::ManagedSqliteShmTestInitializationFailureV1::CreatedFirstExclusiveReleaseOutcomeUncertain,
+                super::model::ManagedSqliteShmTestInitializationFailureV1::CreatedFirstExclusiveReleaseOutcomeUncertain
+                | super::model::ManagedSqliteShmTestInitializationFailureV1::CreatedFirstTruncateOutcomeUncertainReleaseSucceeded,
                 false,
             ) => Some("NODE_MANAGED_SQLITE_SHM_TEST_INITIALIZATION_NOT_CREATED_FIRST"),
             (
-                super::model::ManagedSqliteShmTestInitializationFailureV1::CreatedFirstExclusiveReleaseOutcomeUncertain,
+                super::model::ManagedSqliteShmTestInitializationFailureV1::CreatedFirstExclusiveReleaseOutcomeUncertain
+                | super::model::ManagedSqliteShmTestInitializationFailureV1::CreatedFirstTruncateOutcomeUncertainReleaseSucceeded,
                 true,
             ) => None,
             (
@@ -255,6 +262,7 @@ impl ManagedSqliteShmTestInitializationControllerV1 {
         &mut self,
         target: ExactTarget,
     ) -> Result<bool, &'static str> {
+        self.reject_q14_truncate_success_if_selected(target)?;
         self.advance_if_armed(
             target,
             Stage::TruncateAttempted,
@@ -268,6 +276,7 @@ impl ManagedSqliteShmTestInitializationControllerV1 {
         &mut self,
         target: ExactTarget,
     ) -> Result<bool, &'static str> {
+        self.reject_q14_release_path_if_selected(target)?;
         self.advance_if_armed(
             target,
             Stage::Truncated,
@@ -283,6 +292,7 @@ impl ManagedSqliteShmTestInitializationControllerV1 {
         native: ManagedSqliteShmTestInitializationNativeReceiptV1,
     ) -> Result<(), &'static str> {
         let active = self.require_active_for_event(target)?;
+        created_first_truncate_error_release_succeeded::reject_release_receipt_if_selected(active)?;
         if native.observation
             != ManagedSqliteShmTestInitializationNativeObservationV1::ReturnReceiptUnavailable
             || native.length != 1
@@ -310,6 +320,9 @@ impl ManagedSqliteShmTestInitializationControllerV1 {
 
     pub(super) fn record_poisoned(&mut self, target: ExactTarget) -> Result<(), &'static str> {
         let active = self.require_active_for_event(target)?;
+        if created_first_truncate_error_release_succeeded::record_poisoned_if_selected(active)? {
+            return Ok(());
+        }
         advance(
             active,
             Stage::ReturnReceiptUnavailable,
@@ -349,13 +362,15 @@ impl ManagedSqliteShmTestInitializationControllerV1 {
         {
             return Err("NODE_MANAGED_SQLITE_SHM_TEST_INITIALIZATION_INCOMPLETE_OR_INVALID");
         }
-        validate_exact_counts(&active.counts)?;
-        validate_terminal(terminal)?;
+        created_first_truncate_error_release_succeeded::validate_finish(&active, terminal)?;
         validate_requested_lock(active.target, active.expectation, requested_lock)?;
         let native = active
             .native
             .ok_or("NODE_MANAGED_SQLITE_SHM_TEST_INITIALIZATION_NATIVE_RECEIPT_MISSING")?;
-        let ordered_values = ordered_values(&active, native, terminal);
+        let ordered_values =
+            created_first_truncate_error_release_succeeded::ordered_values_for_case(
+                &active, native, terminal,
+            );
         Ok(ManagedSqliteShmTestInitializationReceiptV1::new(
             active.expectation,
             native,
@@ -454,6 +469,7 @@ fn validate_expectation(
         expectation.case_v1,
         super::model::ManagedSqliteShmTestInitializationFailureV1::CreatedFirstExclusiveReleaseOutcomeUncertain
             | super::model::ManagedSqliteShmTestInitializationFailureV1::ExistingFirstExclusiveReleaseOutcomeUncertain
+            | super::model::ManagedSqliteShmTestInitializationFailureV1::CreatedFirstTruncateOutcomeUncertainReleaseSucceeded
     ) {
         return Err("NODE_MANAGED_SQLITE_SHM_TEST_INITIALIZATION_CASE_INVALID");
     }
@@ -505,6 +521,7 @@ fn validate_exact_counts(counts: &EventCounts) -> Result<(), &'static str> {
         || counts.truncate_attempt != 1
         || counts.truncate_success != 1
         || counts.dms_unlock_attempt != 1
+        || counts.dms_unlock_success != 0
         || counts.return_receipt_unavailable != 1
         || counts.poisoned != 1
     {
@@ -519,6 +536,7 @@ fn validate_terminal(terminal: TerminalStateV1) -> Result<(), &'static str> {
         || !terminal.node_present
         || !terminal.shm_file_present
         || !terminal.dms_exclusive_outcome_uncertain
+        || terminal.dms_released
         || !terminal.poisoned
         || !terminal.mutation_may_have_occurred
         || !terminal.lock_outcome_uncertain
