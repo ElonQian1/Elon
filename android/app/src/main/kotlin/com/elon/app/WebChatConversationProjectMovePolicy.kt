@@ -37,14 +37,16 @@ internal object WebChatConversationProjectMovePolicy {
         val identity = ChatGptWebConversationIndex.identityOf(conversation)
         val candidates = state.controls.asSequence()
             .filter { it.control.enabled && it.control.region == "overlay" }
-            .filter { it.control.contextId == identity }
             .filter { descriptor ->
                 descriptor.control.semantic == "save_to_project" ||
                     isGenericMoveLabel(descriptor.control.label)
             }
             .toList()
-        return candidates.singleOrNull { it.control.semantic == "save_to_project" }
-            ?: candidates.singleOrNull()
+        selectMoveTrigger(candidates.filter { it.control.contextId == identity })?.let {
+            return it
+        }
+        if (candidates.any { it.control.contextId != null }) return null
+        return selectMoveTrigger(candidates)
     }
 
     fun projectChoice(
@@ -107,6 +109,12 @@ internal object WebChatConversationProjectMovePolicy {
         .trim()
         .replace(WHITESPACE, " ")
         .lowercase(Locale.ROOT)
+
+    private fun selectMoveTrigger(
+        candidates: List<WebChatConsumerControlDescriptor>,
+    ): WebChatConsumerControlDescriptor? =
+        candidates.singleOrNull { it.control.semantic == "save_to_project" }
+            ?: candidates.singleOrNull()
 
     private const val MAX_PROJECTS = 40
     private val WHITESPACE = Regex("\\s+")

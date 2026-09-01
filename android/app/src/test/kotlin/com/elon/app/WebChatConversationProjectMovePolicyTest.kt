@@ -151,6 +151,32 @@ class WebChatConversationProjectMovePolicyTest {
     }
 
     @Test
+    fun acceptsOneUnscopedOfficialMoveTriggerButRejectsAnotherConversationContext() {
+        val current = conversation()
+        val unscoped = descriptor(
+            id = "control_unscoped_move",
+            semantic = "save_to_project",
+            label = "移至项目",
+            region = "overlay",
+            contextId = null,
+        )
+        assertEquals(
+            unscoped,
+            WebChatConversationProjectMovePolicy.moveTrigger(state(unscoped), current),
+        )
+
+        val foreign = descriptor(
+            id = "control_foreign_move",
+            semantic = "save_to_project",
+            label = "移至项目",
+            region = "overlay",
+            contextId = "another-conversation",
+        )
+        assertNull(WebChatConversationProjectMovePolicy.moveTrigger(state(foreign), current))
+        assertNull(WebChatConversationProjectMovePolicy.moveTrigger(state(unscoped, foreign), current))
+    }
+
+    @Test
     fun reconciliationRequiresTheSameConversationInTheSelectedProject() {
         val current = conversation()
         val destination = project("g-p-target", "目标项目")
