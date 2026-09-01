@@ -42,10 +42,12 @@
 - `server/src/official_project_catalog/mod.rs` 支持两类官方项目：带 ERP 蓝图的可安装项目，以及不带蓝图的普通公开产品项目。
 - 量化项目属于第二类，因此不会显示 ERP 安装动作。
 - 子仓库自身的 `.elon/project-landing.json` 仍是后续同步更新的内容真源；官方目录快照变更必须与它保持一致。
+- `contracts/quant/net-balance-lock-receipt-v1.schema.json` 已定义主项目未来锁定 NET 后交给量化项目消费的版本化回执形状；详细语义见 `docs/yilong-quant-net-lock-receipt-v1.md`。
+- 当前 Schema 只用于 paper 联调。主项目尚无真实 NET 余额运行时、发行方签名和用户准入，因此不能签发或接受真实回执。
 
 ## 尚未完成
 
-- 主项目统一身份、用户授权和真实 NET 锁定回执。
-- 将已付款用户数据经审核、脱敏、对账后导入；当前禁止直接把聊天或付款截图写入代码。
-- 量化持久化账本、官方 NAV、交易所 sandbox/live、托管、KYC/地区准入和真实提现。
+- 主项目统一身份、用户授权、真实 NET 余额迁移和签名回执；当前只定义了回执 Schema。
+- 将已付款用户数据经审核、脱敏、对账后导入生产系统；paper 子项目只允许脱敏标识和模拟锁定回执，继续禁止把聊天或付款截图写入代码。
+- 官方 NAV、交易所 sandbox/live、托管、KYC/地区准入和真实提现。
 - Feature Registry 工具可用后，需分别登记项目广场接入、paper 参与账本、身份授权和 NET 锁定，不把未完成范围提前标记为 verified。

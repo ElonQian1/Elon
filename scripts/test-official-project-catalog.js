@@ -20,12 +20,15 @@ assert.match(source, /for project in &catalog\.projects/)
 
 for (const project of catalog.projects) {
   assert.ok(project.id && project.name && project.display_name && project.description)
+  assert.ok(project.landing.title && project.landing.summary)
+
+  if (!project.blueprint && !project.release) continue
+  assert.ok(project.blueprint && project.release, `${project.id}: blueprint and release must appear together`)
   assert.equal(project.blueprint.schema, 'yilong.erp.blueprint.v1')
   assert.equal(project.blueprint.source_project_id, project.id)
   assert.equal(project.release.schema, 'yilong.erp.release.v1')
   assert.equal(project.release.blueprint_key, project.blueprint.blueprint_key)
   assert.match(project.release.source_git_commit, /^[0-9a-f]{40}$/)
-  assert.ok(project.landing.title && project.landing.summary)
 
   const blueprintModules = new Set(project.blueprint.modules.map((module) => module.module_key))
   for (const module of project.release.modules) {

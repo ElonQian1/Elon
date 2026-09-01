@@ -123,7 +123,7 @@
 | PC 前端迁移规则 | `.github/instructions/pc-frontend-migration.instructions.md`、`docs/pc-frontend-migration.md` |
 | 代码归属与 legacy 迁移规则 | `docs/architecture/source-of-truth.md`、`docs/architecture/legacy-inventory.md`、`docs/architecture/feature-parity-matrix.md`、`scripts/check-source-ownership.ps1` |
 | 项目广场/项目主页脚本 | `server/src/assets/project_*.js` |
-| 官方公开项目目录、一龙量化交易接入 | `server/src/official_project_catalog/`、`docs/yilong-quant-integration.md` |
+| 官方公开项目目录、一龙量化交易接入、NET 锁定回执契约 | `server/src/official_project_catalog/`、`docs/yilong-quant-integration.md`、`docs/yilong-quant-net-lock-receipt-v1.md`、`contracts/quant/net-balance-lock-receipt-v1.schema.json` |
 | 节点管理本地页 | `server/src/node_agent_admin.html` |
 
 ## 脚本入口

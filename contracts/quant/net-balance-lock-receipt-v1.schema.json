@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://yilong.example/contracts/quant/net-balance-lock-receipt-v1.schema.json",
+  "title": "Yilong NET balance lock receipt V1",
+  "description": "Versioned receipt for a NET available-to-locked balance transition. Schema validity does not prove issuer authenticity or authorize real funds.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "receipt_id",
+    "request_id",
+    "participant_ref",
+    "lock_id",
+    "asset",
+    "purpose",
+    "amount",
+    "status",
+    "balance_revision",
+    "available_before",
+    "available_after",
+    "locked_before",
+    "locked_after",
+    "simulated",
+    "occurred_at",
+    "previous_receipt_digest"
+  ],
+  "properties": {
+    "schema": {
+      "const": "yilong.net.balance_lock_receipt.v1"
+    },
+    "receipt_id": { "$ref": "#/$defs/opaqueIdentifier" },
+    "request_id": { "$ref": "#/$defs/opaqueIdentifier" },
+    "participant_ref": { "$ref": "#/$defs/opaqueIdentifier" },
+    "lock_id": { "$ref": "#/$defs/opaqueIdentifier" },
+    "asset": {
+      "const": "NET"
+    },
+    "purpose": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "project_id"],
+      "properties": {
+        "kind": { "const": "quant_position" },
+        "project_id": { "const": "yilong-quant" }
+      }
+    },
+    "amount": { "$ref": "#/$defs/positiveDecimal" },
+    "status": {
+      "enum": ["locked", "released"]
+    },
+    "balance_revision": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "available_before": { "$ref": "#/$defs/nonNegativeDecimal" },
+    "available_after": { "$ref": "#/$defs/nonNegativeDecimal" },
+    "locked_before": { "$ref": "#/$defs/nonNegativeDecimal" },
+    "locked_after": { "$ref": "#/$defs/nonNegativeDecimal" },
+    "simulated": {
+      "type": "boolean"
+    },
+    "occurred_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "previous_receipt_digest": {
+      "oneOf": [
+        { "type": "null" },
+        { "$ref": "#/$defs/sha256" }
+      ]
+    }
+  },
+  "$defs": {
+    "opaqueIdentifier": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{3,128}$"
+    },
+    "positiveDecimal": {
+      "type": "string",
+      "pattern": "^(?:0\\.(?=[0-9]{0,7}[1-9])[0-9]{1,8}|[1-9][0-9]*(?:\\.[0-9]{1,8})?)$"
+    },
+    "nonNegativeDecimal": {
+      "type": "string",
+      "pattern": "^(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,8})?$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}
