@@ -21,10 +21,10 @@ authority_scope: backend-a2-map-lock-dynamic-quotient-authority-v1
 动态分母分别记作 `Qmap` 与 `Qlock`。它们只能由本文规定的类型化生成器机械投影、精确分区并冻结
 manifest 后得出。current source 将 program grouping、source presence、reviewed admission 与 actual execution
 分层，任何 planned-missing 或 reviewed digest 缺失都会在 manifest 前失败关闭。未运行 inventory 的 Map
-预期为 `521 present / 42,955 missing / 43,476 total`。Lock q1–q8 原有 3,122 个 source-present program；
-q9 冻结 `LockPreManagedCallbackRejectionV1`，以 88 个合法 request × 六个精确 pre-managed rejection 族新增
-528 个 singleton member/group，故 q1–q9 预期为 `3,650 present members / 3,650 present groups /
-5,018 missing members / 4,490 missing groups / 8,668 total members / 8,140 total groups`。q9 的
+预期为 `521 present / 42,955 missing / 43,476 total`。Lock q1–q9 已有 3,650 个 source-present program；
+q10 冻结 `LockAbiScalarRejectionV1`，以 `offset/count/flags` 三个 validity 轴的 `2^3-1` 个非法组合新增
+7 个 singleton member/group，故 q1–q10 预期为 `3,657 present members / 3,657 present groups /
+5,011 missing members / 4,483 missing groups / 8,668 total members / 8,140 total groups`。q10 与既有 q9 的
 成员、production actual chain、receipt 和排除边界由
 [`Lock dynamic tranches authority`](node-plugin-vfs-lock-dynamic-tranches-authority.md) 维护。两根均未编译、
 未运行，没有 checked-in reviewed inventory digest、manifest 或 actual acceptance。
@@ -230,15 +230,18 @@ q3 的 `a2lockq3` version、selector 语义、135-value wire width 与 native-re
 对称 sibling 的 test-only route-preemption runner/selector/payload 源码桥只在同一 exact callback 已 admission 且 installed `xShmLock` 返回 `SQLITE_IOERR_SHMLOCK` 后、unsafe-retention lookup 前 one-shot 移除 route，再绑定 callback completion route-unknown、零 lower lock attempt、terminal custody 与 parent cleanup。它同样只是未编译、未运行的非授权 actual-receipt 源码形状。
 retention-succeeded 与 route-unknown sibling catalogs 各保持 1,320 rows/237,857 bytes，SHA-256 为 `4da94c20e91d97a0082116879718b1ccf0271eb235ed785e65a2e36e7a949d85`、`df931ad7725843098f228d07d9798d79e92f2beec4e1c23e83fc89219dfa1396`，逐行绑定 action/range/profile 与 `(case_key_sha256, full_record_sha256)`。
 
-### 7.0.2–7.0.6 Lock q5–q9 exact tranches
+### 7.0.2–7.0.7 Lock q5–q10 exact tranches
 
-q5–q9 的精确成员、lower/receipt source contract、catalog 与隔离约束由
+q5–q10 的精确成员、lower/receipt source contract、catalog 与隔离约束由
 [`Lock dynamic tranches authority`](node-plugin-vfs-lock-dynamic-tranches-authority.md) 维护。q9 只新增
 `LockPreManagedCallbackRejectionV1` 的 528 个 singleton member/group：88 个合法 request ×
 AdmissionRouteUnknown Direct、AdmissionCounterOverflow Direct、UnsupportedFileRole Completed/RouteUnknown、
-ShmDetached Completed/RouteUnknown 六族。3,432 个 initialization-failure member 完全排除。聚合未运行
-inventory 预期为 `3,650 present members / 3,650 present groups / 5,018 missing members /
-4,490 missing groups / 8,668 total members / 8,140 total groups`；member coverage 仍为 `0/8,668`，无 actual
+ShmDetached Completed/RouteUnknown 六族。q10 只新增 `LockAbiScalarRejectionV1` 的 7 个 singleton：
+`offset/count/flags` validity 的七个非全真组合；完整 typed matcher、Expected 与 frozen member seals 必须
+精确相等，真实 installed `xShmLock` 必须在进入 raw state、registry callback 或 managed lower 前由 production
+ABI scalar gate 返回 `SQLITE_IOERR_SHMLOCK`。3,432 个 initialization-failure member 完全排除。聚合未运行
+inventory 预期为 `3,657 present members / 3,657 present groups / 5,011 missing members /
+4,483 missing groups / 8,668 total members / 8,140 total groups`；member coverage 仍为 `0/8,668`，无 actual
 record、reviewed digest、`Qlock` 或 Windows numerator。
 
 ### 7.1 Pre-manifest execution-program inventory
@@ -324,7 +327,7 @@ canonical representative 执行真实 Windows child 后产生。
 
 当前该 bridge 只能失败关闭：Map source test 预期 `43,476` member 中有 `521` 个 source-present、`42,955` 个
 planned-missing；Lock source test 预期 `8,668 members / 8,140 groups` 中有
-`3,650 present members/groups`、`5,018 missing members / 4,490 missing groups`；两根 reviewed inventory
+`3,657 present members/groups`、`5,011 missing members / 4,483 missing groups`；两根 reviewed inventory
 digest 均尚未 checked-in/frozen。因此 provider authority 不可构造，
 full Map/Lock candidate 必须在 catalog/manifest 前分别原子失败；该结论没有运行证据，current source 仍为
 `passed=0 failed=0 actual=not_run`。
@@ -395,7 +398,7 @@ projector provenance commitment 精确纳入 producer coherence 的
 `producer_coherence/{map,map_axes,lock,lock_axes}.rs`、`descriptor_binding.rs`、
 `membership_commitment.rs`、`runner_admission.rs`、
 `runner_admission/{canonical,map,map_program,map_program/request_budget,lock,lock_program,lock_program/request_validation,lock_program/lifecycle}.rs`，
-以及 Lock stored-poison 两 completion 与 q5–q9 exact tranche 的 program/catalog/source-scope/runner seams；
+以及 Lock stored-poison 两 completion 与 q5–q10 exact tranche 的 program/catalog/source-scope/runner seams；
 其中任一接受关系或 commitment 编码变化都必须触发 projector provenance drift 和全量重审。
 
 同一 commitment 还绑定真实执行 envelope：`a2_dynamic_evidence` 的 child/capture/environment/cleanup 与
@@ -453,12 +456,13 @@ seal 与 source digest 净新增 509 个 source-present member。其真实阻塞
 reviewed inventory digest 缺失。Lock 的真实
 阻塞是完整 observation 尚未实现；二者都在 class catalog 或 manifest 冻结前失败，因此不产生
 `Qmap/Qlock`、coverage 或 Windows numerator。Lock q3/q4 各 1,320、q5/q6 各 44、q7 为 192、q8 为
-88、q9 为 528；仍缺 5,018 members / 4,490 groups、编译/运行、actual receipts 与 reviewed digest。q9 的
-pre-managed production rejection 与 completion observation 也只是 source-only receipt shape。
+88、q9 为 528、q10 为 7；仍缺 5,011 members / 4,483 groups、编译/运行、actual receipts 与 reviewed digest。
+q9 的 pre-managed production rejection/completion observation 与 q10 的 ABI scalar installed-callback receipt
+都只是 source-only receipt shape。
 
 上述回执全部早于 current Map/Lock program/receipt source。Map q4 的已知 clean source baseline
 `10aa60fb42488854657dd30a4240ad5f949c894d` 只是前序 Map provenance，不是本批 Lock 执行证据；当前只达到
-`source_written/source_review_only/implementation_uncompiled/implementation_unrun`。Map q3/q4 与 Lock 10+104、q3-q9 的 receipt/inventory/admission/binding source 均为 `passed=0/failed=0/not_run`；prior `36/36` 不是 current 验证。
+`source_written/source_review_only/implementation_uncompiled/implementation_unrun`。Map q3/q4 与 Lock 10+104、q3-q10 的 receipt/inventory/admission/binding source 均为 `passed=0/failed=0/not_run`；prior `36/36` 不是 current 验证。
 
 前序基线验证回执为：
 
@@ -548,15 +552,16 @@ lock_callback_completion_route_unknown_v1=source_written_q7_192_native_acquire_a
 lock_callback_completion_route_unknown_catalog=rows_192_bytes_39203_sha256_e9f509d52d294405dd1a7ae528c514a31ba4e0758959374b633bdca2b571d631
 lock_local_protocol_own_overlap_or_not_held_completed_v1=source_written_q8_88_exact_members_uncompiled_unrun_details_in_lock_tranches_authority
 lock_pre_managed_callback_rejection_v1=source_written_q9_528_exact_singleton_members_and_groups_six_families_of_88_uncompiled_unrun_details_in_lock_tranches_authority
+lock_abi_scalar_rejection_v1=source_written_q10_7_exact_singleton_members_offset_count_flags_validity_2_pow_3_minus_1_installed_xshmlock_direct_rejection_uncompiled_unrun_details_in_lock_tranches_authority
 lock_supported_admission=private_exact_receipt_binding_only_source_contract_not_run
 lock_pre_manifest_program_inventory=source_written_full_root_two_pass_non_authorizing_uncompiled_unrun
 lock_program_inventory_status=planned_missing_or_source_present_receipt_required_only
 lock_program_inventory_digest=not_generated_not_frozen
 lock_program_inventory_member_and_group_counts=unknown_not_run
-lock_program_inventory_unrun_test_expectation=members_8668_groups_8140_source_present_members_3650_source_present_groups_3650_planned_missing_members_5018_planned_missing_groups_4490
+lock_program_inventory_unrun_test_expectation=members_8668_groups_8140_source_present_members_3657_source_present_groups_3657_planned_missing_members_5011_planned_missing_groups_4483
 lock_reviewed_inventory_digest=not_checked_in_not_frozen
 lock_source_program_admission_provider=source_written_fail_closed_uncompiled_unrun
-lock_source_program_admission_current=unconstructible_unrun_source_expectation_planned_missing_members_5018_planned_missing_groups_4490_compile_runtime_actual_receipts_and_reviewed_digest_absent
+lock_source_program_admission_current=unconstructible_unrun_source_expectation_planned_missing_members_5011_planned_missing_groups_4483_compile_runtime_actual_receipts_and_reviewed_digest_absent
 lock_default_producers=all_missing_lock_observation_incomplete
 runner_admission_raw_supported=fail_closed_without_private_exact_receipt_not_run
 dynamic_quotient_targeted=prior_passed_36_of_36_current_source_not_run
@@ -574,7 +579,7 @@ map_dynamic_member_coverage=0/43476
 lock_dynamic_member_coverage=0/8668
 WindowsDynamic=not_opened
 map_region_loop_windows_execution=not_run
-lock_q3_q4_stored_poison_q5_native_busy_q6_local_sibling_contention_q7_callback_completion_route_unknown_q8_local_protocol_rejection_q9_pre_managed_callback_rejection_windows_execution=not_run
+lock_q3_q4_stored_poison_q5_native_busy_q6_local_sibling_contention_q7_callback_completion_route_unknown_q8_local_protocol_rejection_q9_pre_managed_callback_rejection_q10_abi_scalar_rejection_windows_execution=not_run
 global_source_leaf_authority_scope=static_confirmed_preexisting_drift_5_production_sources_including_current_managed_namespace_and_managed_shm_root_not_rebound_separate_rebind_required_before_compile_or_runtime_acceptance
 compilation=not_run
 cargo=not_run

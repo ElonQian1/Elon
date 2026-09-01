@@ -52,25 +52,53 @@ pub(super) unsafe extern "C" fn lock(
     count: c_int,
     flags: c_int,
 ) -> c_int {
-    let (Ok(offset), Some(count), Some(action)) = (
-        u8::try_from(offset),
+    #[cfg(all(test, windows))]
+    super::lock_observation::record_entry(file, offset, count, flags);
+    let (offset_value, count_value, action_value) = (
+        u8::try_from(offset).ok(),
         u8::try_from(count).ok().and_then(NonZeroU8::new),
         shm_lock_action(flags),
-    ) else {
-        return result_codes::SHM_LOCK_UNAVAILABLE;
+    );
+    let scalar_validity = (
+        offset_value.is_some(),
+        count_value.is_some(),
+        action_value.is_some(),
+    );
+    let (Some(offset_value), Some(count_value), Some(action_value)) =
+        (offset_value, count_value, action_value)
+    else {
+        #[cfg(all(test, windows))]
+        super::lock_observation::record_scalar_rejected(
+            file,
+            offset,
+            count,
+            flags,
+            scalar_validity.0,
+            scalar_validity.1,
+            scalar_validity.2,
+        );
+        let result = result_codes::SHM_LOCK_UNAVAILABLE;
+        #[cfg(all(test, windows))]
+        super::lock_observation::record_returned(file, offset, count, flags, result);
+        return result;
     };
+    #[cfg(all(test, windows))]
+    super::lock_observation::record_run_code_entry(file, offset, count, flags);
     // SAFETY: the callback contract serializes this exact file allocation.
-    unsafe {
+    let result = unsafe {
         file_state::run_code(
             file,
             result_codes::SHM_LOCK_UNAVAILABLE,
-            |state| match state.shm_lock(offset, count, action) {
+            |state| match state.shm_lock(offset_value, count_value, action_value) {
                 Ok(HandleBoundSqliteAbiAttempt::Acquired) => ffi::SQLITE_OK,
                 Ok(HandleBoundSqliteAbiAttempt::Busy) => ffi::SQLITE_BUSY,
                 Err(()) => result_codes::SHM_LOCK_UNAVAILABLE,
             },
         )
-    }
+    };
+    #[cfg(all(test, windows))]
+    super::lock_observation::record_returned(file, offset, count, flags, result);
+    result
 }
 
 pub(super) unsafe extern "C" fn barrier(file: *mut ffi::sqlite3_file) {

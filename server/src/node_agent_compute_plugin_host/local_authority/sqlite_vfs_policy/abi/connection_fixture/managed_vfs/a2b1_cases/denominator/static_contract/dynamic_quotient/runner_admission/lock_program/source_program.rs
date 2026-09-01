@@ -5,6 +5,10 @@ use super::super::CompiledRunnerPlanV1;
 #[cfg(windows)]
 use super::LockProgramCaseV1;
 use super::{
+    abi_scalar_rejection::{
+        program_spec_v1 as abi_scalar_rejection_program_spec_v1,
+        LockAbiScalarRejectionProgramSpecV1,
+    },
     callback_completion_route_unknown::{
         program_spec_v1 as callback_completion_route_unknown_program_spec_v1,
         LockCallbackCompletionRouteUnknownProgramSpecV1,
@@ -49,29 +53,35 @@ pub(super) fn program_spec_v1(
     key: &DynamicClassKeyV1,
     plan: CompiledRunnerPlanV1,
 ) -> Result<SourceLockProgramSpecV1, LockRunnerExecutionViolationV1> {
-    match request_validation_program_spec_v1(key, plan) {
-        Ok(program) => Ok(from_request_validation_v1(program)),
+    match abi_scalar_rejection_program_spec_v1(key, plan) {
+        Ok(program) => Ok(from_abi_scalar_rejection_v1(program)),
         Err(LockRunnerExecutionViolationV1::UnsupportedProgram) => {
-            match lifecycle_program_spec_v1(key, plan) {
-                Ok(program) => Ok(from_lifecycle_v1(program)),
+            match request_validation_program_spec_v1(key, plan) {
+                Ok(program) => Ok(from_request_validation_v1(program)),
                 Err(LockRunnerExecutionViolationV1::UnsupportedProgram) => {
-                    match callback_completion_route_unknown_program_spec_v1(key, plan) {
-                        Ok(program) => Ok(from_callback_completion_route_unknown_v1(program)),
+                    match lifecycle_program_spec_v1(key, plan) {
+                        Ok(program) => Ok(from_lifecycle_v1(program)),
                         Err(LockRunnerExecutionViolationV1::UnsupportedProgram) => {
-                            match local_sibling_contention_program_spec_v1(key, plan) {
-                                Ok(program) => Ok(from_local_sibling_contention_v1(program)),
+                            match callback_completion_route_unknown_program_spec_v1(key, plan) {
+                                Ok(program) => Ok(from_callback_completion_route_unknown_v1(program)),
                                 Err(LockRunnerExecutionViolationV1::UnsupportedProgram) => {
-                                    match local_protocol_rejection_program_spec_v1(key, plan) {
-                                        Ok(program) => Ok(from_local_protocol_rejection_v1(program)),
+                                    match local_sibling_contention_program_spec_v1(key, plan) {
+                                        Ok(program) => Ok(from_local_sibling_contention_v1(program)),
                                         Err(LockRunnerExecutionViolationV1::UnsupportedProgram) => {
-                                            match native_acquire_busy_program_spec_v1(key, plan) {
-                                                Ok(program) => Ok(from_native_acquire_busy_v1(program)),
+                                            match local_protocol_rejection_program_spec_v1(key, plan) {
+                                                Ok(program) => Ok(from_local_protocol_rejection_v1(program)),
                                                 Err(LockRunnerExecutionViolationV1::UnsupportedProgram) => {
-                                                    match stored_poison_program_spec_v1(key, plan) {
-                                                        Ok(program) => Ok(from_stored_poison_v1(program)),
+                                                    match native_acquire_busy_program_spec_v1(key, plan) {
+                                                        Ok(program) => Ok(from_native_acquire_busy_v1(program)),
                                                         Err(LockRunnerExecutionViolationV1::UnsupportedProgram) => {
-                                                            pre_managed_callback_rejection_program_spec_v1(key, plan)
-                                                                .map(from_pre_managed_callback_rejection_v1)
+                                                            match stored_poison_program_spec_v1(key, plan) {
+                                                                Ok(program) => Ok(from_stored_poison_v1(program)),
+                                                                Err(LockRunnerExecutionViolationV1::UnsupportedProgram) => {
+                                                                    pre_managed_callback_rejection_program_spec_v1(key, plan)
+                                                                        .map(from_pre_managed_callback_rejection_v1)
+                                                                }
+                                                                Err(error) => Err(error),
+                                                            }
                                                         }
                                                         Err(error) => Err(error),
                                                     }
@@ -92,6 +102,19 @@ pub(super) fn program_spec_v1(
             }
         }
         Err(error) => Err(error),
+    }
+}
+
+fn from_abi_scalar_rejection_v1(
+    program: LockAbiScalarRejectionProgramSpecV1,
+) -> SourceLockProgramSpecV1 {
+    SourceLockProgramSpecV1 {
+        #[cfg(windows)]
+        case: LockProgramCaseV1::AbiScalarRejection(program),
+        normalized_descriptor_sha256: program.normalized_descriptor_sha256,
+        expected_member: Some(program.member),
+        plan_sha256: program.plan_sha256,
+        implementation_sha256: program.implementation_sha256,
     }
 }
 

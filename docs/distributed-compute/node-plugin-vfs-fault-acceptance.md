@@ -42,7 +42,7 @@ owner 图只验证 baseline commit literal 形状、从 reviewed owner bytes 重
   `source_written/source_review_only/implementation_uncompiled/implementation_unrun`，未 Cargo、未 Windows/真实运行，
   `passed=0 failed=0 actual=not_run`；不得复用前序 `4/4`、`36/36`、fingerprint 或 receipt。
 - 计数边界：这 4 项分别是 legacy non-denominator subset、incomplete branch-atom scaffold、source-owner graph 与 Map template ledger 自洽守卫；不形成完整 terminal universe、`CaseKey`、`Expected`、denominator、`StaticContract` 或 map/lock `WindowsDynamic`。
-- current Lock source 已推进到 q9 `LockPreManagedCallbackRejectionV1`：新增 528 个 exact singleton normalized groups（6×88），使 q1–q9 source-present=`3650 members/3650 groups`；精确 matcher、production seam、actual custody 与 receipt 边界只见[`Lock tranches`](node-plugin-vfs-lock-dynamic-tranches-authority.md)。q9 与既有 q5–q8 均未编译、未运行，不构成 actual、Windows record、动态接受或生产开放事实；3,432 initialization failures 仍 missing 且不属于 q9。
+- current Lock source 已推进到 q10 `LockAbiScalarRejectionV1`：新增 7 个 exact singleton normalized groups，使 q1–q10 source-present=`3657 members/3657 groups`；q9 的 528 个 singleton（6×88）保持不变。精确 matcher、production seam、actual custody 与 receipt 边界只见[`Lock tranches`](node-plugin-vfs-lock-dynamic-tranches-authority.md)。q10 与既有 q5–q9 均未编译、未运行，不构成 actual、Windows record、动态接受或生产开放事实；3,432 initialization failures 仍 missing 且不属于 q9/q10，q9/q10 source changes 对应的 19-artifact global frozen/source-owner refresh 继续独立 deferred。
 
 ### 历史证据元组
 
@@ -133,7 +133,7 @@ Map/Lock 静态 scope、`CaseKey`、`SourceBranch`、`Expected`、exclusion 与 
 | Family | StaticContract | DynamicQuotientMemberCoverage | WindowsDynamic | 当前门槛 |
 |---|---:|---:|---:|---|
 | Map | `43476/43476` | `0/43476` | `not_opened` | 验证 current source，补齐其余 `42,955` 个 program，冻结 exact class/member manifest，机械得到 `Qmap` |
-| Lock | `8668/8668` | `0/8668` | `not_opened` | q9 `LockPreManagedCallbackRejectionV1`=528 exact singleton（6×88）；unrun inventory members/groups=`3650/3650 present, 5018/4490 missing, 8668/8140 total`；3,432 initialization failures 仍 missing、非 q9；无 actual，`Qlock=unknown`；详见 [Lock tranches](node-plugin-vfs-lock-dynamic-tranches-authority.md) |
+| Lock | `8668/8668` | `0/8668` | `not_opened` | q10 `LockAbiScalarRejectionV1`=7 exact singleton；unrun inventory members/groups=`3657/3657 present, 5011/4483 missing, 8668/8140 total`；3,432 initialization failures 仍 missing、非 q9/q10；无 actual，`Qlock=unknown`；q9/q10 source changes 对应的 19-artifact refresh 独立 deferred；详见 [Lock tranches](node-plugin-vfs-lock-dynamic-tranches-authority.md) |
 | **Map/Lock aggregate** | **verified** | **not_started** | **not_opened** | **逐 class Windows exact-set 后才可形成 `Q/Q`** |
 
 #### 2.1.1 静态闭合前 review provenance（历史）
@@ -232,7 +232,7 @@ phase 与 terminal phase，不能把 cleanup failure 归并回最初注入点或
 | map outcome uncertain | FileId/domain 永久 tombstone；同 domain sibling 不得重建 runtime 或继续 SHM。 |
 | lock success | `LockShared/LockExclusive/UnlockShared/UnlockExclusive` 四动作分别覆盖 local success、shared coalescing、exact range/mask transition 与 OS acquire/release；不得用 exclusive shape代表 shared。 |
 | local lock contention | 合法 sibling 冲突只返回 `SQLITE_BUSY`，不触发脚本、不 poison、不篡改持锁 mask。 |
-| OS lock outcome | shared/exclusive sibling relation 分别对账 success/contended/error；q5–q8 的真实 lower/guard 要求保持不变。q9 是 pre-managed callback rejection，不得伪装成 OS lower；其 exact actual 门槛只见 [Lock tranches](node-plugin-vfs-lock-dynamic-tranches-authority.md)。`SQLITE_BUSY` 不得与 I/O failure、mutation 或 uncertainty 合并。 |
+| OS lock outcome | shared/exclusive sibling relation 分别对账 success/contended/error；q5–q8 的真实 lower/guard 要求保持不变。q9 是 pre-managed callback rejection，q10 是 raw/registry/managed lower 前的 ABI scalar direct rejection，二者都不得伪装成 OS lower；其 exact actual 门槛只见 [Lock tranches](node-plugin-vfs-lock-dynamic-tranches-authority.md)。`SQLITE_BUSY` 不得与 I/O failure、mutation 或 uncertainty 合并。 |
 | lock release uncertainty | 不清本地 mask，不释放对应 custody；domain terminal 与后续 sibling 行为逐项匹配。 |
 | cleanup rewrite | DMS unlock/file close、mapping close或exact-open cleanup改写 terminal phase/custody时，保留 cause phase并命中独立 key；不得归并原失败 phase。 |
 | barrier no-return | 通过真实无结果码通道执行；失败清 raw state一次并保留 terminal custody，不伪造 `SQLITE_IOERR` 或正常 completion。 |
@@ -293,7 +293,7 @@ A2 完成必须同时满足：
   `implementation_not_dynamically_accepted` 升级；
 - 任何证据缺失、环境不明、case key漂移、观察不完整或生产入口变化都维持失败关闭。
 
-当前正式结论：Map `StaticContract=43476/43476`、Lock `StaticContract=8668/8668`。Lock q9 `LockPreManagedCallbackRejectionV1` 为 source-only 528 exact singleton（6×88）；q1–q9 未运行 inventory（members/groups）=`3650/3650 present, 5018/4490 missing, 8668/8140 total`，3,432 initialization failures 仍 missing 且不属于 q9。current source=`source_written/source_review_only/implementation_uncompiled/implementation_unrun`（uncompiled/unrun），`passed=0 failed=0 actual=not_run`；无 actual inventory/receipt/record、reviewed digest 或 frozen manifest，coverage=`0/43476 + 0/8668`、`Qmap/Qlock=unknown`、`WindowsDynamic=not_opened`。A2 仍为 `implementation_not_dynamically_accepted`，production closed；q9 细节只见[`Lock tranches`](node-plugin-vfs-lock-dynamic-tranches-authority.md)。
+当前正式结论：Map `StaticContract=43476/43476`、Lock `StaticContract=8668/8668`。Lock q10 `LockAbiScalarRejectionV1` 为 source-only 7 exact singleton；q1–q10 未运行 inventory（members/groups）=`3657/3657 present, 5011/4483 missing, 8668/8140 total`，3,432 initialization failures 仍 missing 且不属于 q9/q10。current source=`source_written/source_review_only/implementation_uncompiled/implementation_unrun`（uncompiled/unrun），`passed=0 failed=0 actual=not_run`；无 actual inventory/receipt/record、reviewed digest 或 frozen manifest，coverage=`0/43476 + 0/8668`、`Qmap/Qlock=unknown`、`WindowsDynamic=not_opened`。q9/q10 source changes 对应的 19-artifact global frozen/source-owner refresh 仍独立 deferred；A2 仍为 `implementation_not_dynamically_accepted`，production closed。q9/q10 细节只见[`Lock tranches`](node-plugin-vfs-lock-dynamic-tranches-authority.md)。
 
 ### 9.1 静态闭合前 fragment provenance（历史）
 

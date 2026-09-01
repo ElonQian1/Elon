@@ -4,7 +4,7 @@ status: current
 reviewed_at: 2026-09-01
 owners: node, security
 design_status: design_frozen
-implementation_status: q5_q6_q7_q8_q9_source_written_uncompiled_unrun
+implementation_status: q5_q6_q7_q8_q9_q10_source_written_uncompiled_unrun
 verification_status: source_review_only_actual_not_run
 authority_scope: backend-a2-map-lock-dynamic-quotient-authority-v1
 ---
@@ -14,7 +14,7 @@ authority_scope: backend-a2-map-lock-dynamic-quotient-authority-v1
 ## 1. Scope
 
 本文维护 [`Map/Lock dynamic quotient authority`](node-plugin-vfs-map-lock-dynamic-quotient-authority.md)
-中 Lock q5–q9 窄执行切片的精确成员、lower 路径 source contract、回执形状和隔离约束。父权威仍唯一维护完整
+中 Lock q5–q10 窄执行切片的精确成员、lower 路径 source contract、回执形状和隔离约束。父权威仍唯一维护完整
 `8,668` 静态分母、商集冻结、reviewed inventory、`Qlock` 与生产门控；本文不创建第二套
 CaseKey、Expected、manifest 或 acceptance 状态。
 
@@ -188,23 +188,62 @@ catalog、matcher、runner 或 receipt，也不得计入本批 source-present。
 full vector 的可命中数为 0；未来只有独立 initialization namespace/native/DMS/cleanup controller 与真实
 Windows 回执闭合后，才可另立 tranche。本批不得把 injected generic phase failure 写成 native actual。
 
-## 7. Current evidence and production boundary
+## 7. q10 ABI scalar rejection
 
-q7/q8 的既有 source scope 与 receipt 形状保持不变；q9 又新增六个 exact matcher/catalog shards、installed
-callback runner、production-observation seam 和 source-level contracts。q1–q9 未运行 inventory 的 source-only
-预期为 `3,650 present members / 3,650 present groups / 5,018 missing members / 4,490 missing groups /
-8,668 total members / 8,140 total groups`，且 528 个 q9 group 必须全部为 singleton。没有 current reviewed
+`LockAbiScalarRejectionV1` 的 source set 精确为 7 个 member / 7 个 singleton normalized group，来自
+`offset_valid/count_valid/flags_valid` 三个 typed validity 轴的 `2^3-1` 个非全真组合。全真组合必须继续进入
+后续 raw/registry/managed 路径，不属于 q10；七个非法组合之间不得合并，也不得按 leaf ID、展示文本或枚举位置
+分类。
+
+matcher 必须完整绑定 `root=Lock`、`source=LockAbiBoundary`、typed `LockAbi` stimulus、
+`prestate=NotReached`、`operation/phase=AbiValidation`、`timing=BeforeCall`、`occurrence=Natural`、
+`fixture=AbiRawOnly`、`callback=XShmLock`、`fault_seam=AbiBoundary`、
+`observer=LockCallbackAndSnapshot`、除 `completion=Reached(Direct)` 外其余 Lock axes 均为 `NotReached`，并精确复核
+Expected 与 frozen case/full-record seals。任一 validity 轴、Expected、source site 或 seal 漂移都必须失败关闭。
+
+冻结成员文件为 `abi_scalar_rejection_members.v1.tsv`，固定 5 列
+`offset/count/flags/case_key_sha256/full_record_sha256`、7 行数据、`1114` bytes、LF-only、无 BOM，SHA-256 为
+`6458242a0140730d87f019340ceb9bf1a378f1bbac714b9c7982db9b64216280`。七个 case/full-record seal 与 q1–q9
+既有成员的交集必须均为零。
+
+未来 actual 只能从真实 installed SQLite ABI `xShmLock` 进入 production scalar gate：
+`offset` 转 `u8`、`count` 转非零 `u8`、`flags` 转 exact Lock action，任一转换失败便直接返回
+`SQLITE_IOERR_SHMLOCK`。该返回必须发生在 `file_state::run_code`、raw-state admission/dereference、registry
+callback admission、managed-fs lower 与 native/local lock 之前；installed methods/state 只是调用前已经存在且保持不变的
+夹具，`NotReached` 指其 admission/custody effect 未到达，并不表示方法表或状态从未安装。私有 receipt 因而必须绑定原始三个 scalar、exact validity
+组合、返回码、零 callback/managed/native/local attempt、零 route/custody/mask mutation 与 parent cleanup；调用方提交
+Expected 或结果码不能构造 actual。
+
+current source 已把该 receipt 形状落实为两份线性、一次性观测账本。ABI 账本在确认 exact installed methods 与
+type-erased state identity 后，绑定 live file address、调用线程、原始三元组和单调 observation id，并由 production
+`xShmLock` 本身依序写入 `Entry -> ScalarRejected | RunCodeEntered -> Returned`；q10 只接受真实三项 validity、
+`Entry=1 / ScalarRejected=1 / RunCodeEntered=0 / Returned=1` 与真实 `SQLITE_IOERR_SHMLOCK`。同一 child 同时为
+exact route 武装 `AbiRejected` no-entry ledger；任一 registry `Event::Entry`（包括错 request）都会污染并拒绝消费，
+只有完整 18 槽零事件向量可封口。registry entry 是 managed/native/local 的支配前哨，所以不需要、也禁止为了观测而
+先创建 SHM target；target before/after 必须都不存在。全局 ABI ledger 只允许一个 active guard，错文件、错线程、
+错 tuple、重复/乱序、stale guard、并发占用或重放都只能使 child 失败关闭，不能产生 receipt。
+
+以上只是 7/7 exact singleton 的 source contract；本批没有编译或执行，未生成 actual receipt、Windows record
+或 reviewed inventory digest。3,432 个 native-acquire initialization-failure member 与 q9 一样完全排除在 q10
+之外，不能以 ABI scalar rejection 代替。
+
+## 8. Current evidence and production boundary
+
+q7–q9 的既有 source scope 与 receipt 形状保持不变；q10 新增 ABI scalar 七种非全真 validity 组合的 exact
+matcher、installed-callback direct-rejection receipt shape 和 source-level contracts。q1–q10 未运行 inventory 的
+source-only 预期为 `3,657 present members / 3,657 present groups / 5,011 missing members / 4,483 missing groups /
+8,668 total members / 8,140 total groups`，且 q9 的 528 个 group 与 q10 的 7 个 group 都必须为 singleton。没有 current reviewed
 source-scope 或 inventory digest，member coverage 仍为 `0/8,668`。
 
-本批把 `with_shm` 的生产实现拆入 `operations/shm.rs`，q1–q9 各 tranche 的 implementation closure 已纳入该
-物理源码；但仓库级 `SourceOwnerGraph` 与 source-leaf frozen authority 仍绑定拆分前的物理快照。它们必须在本批
-checkpoint 提交后，以新的 baseline 运行显式 ignored candidate generator，并人工复核 16 份 Map leaf、Map
-manifest、Lock leaf 与 Lock manifest 共 19 份 frozen artifacts。由于当前架构铺设阶段明确禁止运行 Rust，本批
-不留下只改 owner/needle、却没有同步重生成 frozen artifacts 的半套权威；这项全局刷新继续作为后续验收阻塞项。
+q9 曾把 `with_shm` 的生产实现拆入 `operations/shm.rs`；q10 又为真实负向回执更新了 ABI scalar gate 的
+test-only observation source。仓库级 `SourceOwnerGraph` 与 source-leaf frozen authority 仍绑定此前物理快照。
+它们必须在 q9/q10 checkpoint 后，以新 baseline 运行显式 ignored candidate generator，并人工复核 16 份 Map
+leaf、Map manifest、Lock leaf 与 Lock manifest 共 19 份 frozen artifacts。q10 不做也不替代这项独立 deferred
+refresh；当前架构铺设阶段不留下只改 owner/needle、却没有同步重生成 frozen artifacts 的半套权威。
 
 本批没有运行 Cargo、编译、SQLite、Windows 或真实 runtime；因此仍是
 `passed=0 failed=0 actual=not_run`，没有 actual record、reviewed inventory digest、frozen manifest、
 `Qlock`（仍为 `unknown`）或 Windows numerator，`WindowsDynamic=not_opened`。最终 Lock 功能继续 blocked：
-仍缺 5,018 members / 4,490 groups，且 compile/runtime/actual receipts/reviewed digest 全部缺失。q9 是
-source-only、uncompiled、unrun，production 保持 closed。它不打开生产 VFS/open、
+仍缺 5,011 members / 4,483 groups，且 compile/runtime/actual receipts/reviewed digest 全部缺失。q10 是
+7/7 exact singleton source-only、uncompiled、unrun，production 保持 closed。它不打开生产 VFS/open、
 Runtime/Ready、Provider、Offer、Job、Attempt、Lease、dispatch、market、settlement 或 funds effects。

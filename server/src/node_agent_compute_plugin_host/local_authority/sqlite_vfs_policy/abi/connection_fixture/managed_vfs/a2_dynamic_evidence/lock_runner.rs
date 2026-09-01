@@ -1,5 +1,6 @@
 //! Process-isolated native receipts for executable Lock request-validation programs.
 
+mod abi_scalar_rejection;
 mod callback_completion_route_unknown;
 mod lifecycle;
 mod local_protocol_rejection;
@@ -14,6 +15,7 @@ mod stored_poison_dispatch;
 mod stored_poison_model;
 mod stored_poison_route_unknown;
 
+pub(in super::super) use abi_scalar_rejection::*;
 #[cfg(all(test, windows))]
 pub(in super::super) use callback_completion_route_unknown::{
     lock_callback_route_unknown_selector_for_test,

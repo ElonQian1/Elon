@@ -32,6 +32,16 @@ impl ManagedSqliteRoutedConnectionFixture {
             .pre_managed_lock_snapshot(self.route_ordinal())
     }
 
+    pub(in super::super) fn finish_abi_rejected_lock_observation(
+        &self,
+    ) -> Result<ManagedTestPreManagedLockSnapshot, &'static str> {
+        self.registration
+            .as_ref()
+            .ok_or("ABI-rejected Lock fixture registration missing")?
+            .lifecycle()
+            .finish_abi_rejected_lock_observation(self.route_ordinal())
+    }
+
     pub(in super::super) fn prime_lock_callback_counter_overflow(
         &self,
     ) -> Result<ManagedSqliteRegistryCallbackCounterPrimeReceipt, &'static str> {

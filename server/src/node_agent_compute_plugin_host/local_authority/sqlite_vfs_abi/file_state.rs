@@ -163,13 +163,15 @@ pub(in crate::node_agent_compute_plugin_host::local_authority) struct HandleBoun
 }
 
 /// Redacted test-only observation of the two raw ownership slots. It exposes neither pointer and
-/// can only distinguish the installed/cleared states needed by the void-callback evidence path.
+/// additionally proves the exact inert method table and typed-state identity while installed.
 #[cfg(test)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(in crate::node_agent_compute_plugin_host::local_authority) struct HandleBoundSqliteAbiRawSlotSnapshot
 {
     pub(in crate::node_agent_compute_plugin_host::local_authority) methods_installed: bool,
     pub(in crate::node_agent_compute_plugin_host::local_authority) state_installed: bool,
+    pub(in crate::node_agent_compute_plugin_host::local_authority) methods_exact: bool,
+    pub(in crate::node_agent_compute_plugin_host::local_authority) state_type_exact: bool,
 }
 
 /// Observes the raw slots of one live allocation owned by this test VFS without borrowing or
@@ -191,9 +193,19 @@ pub(in crate::node_agent_compute_plugin_host::local_authority) unsafe fn observe
             std::ptr::addr_of!((*file.as_ptr()).state).read(),
         )
     };
+    let methods_exact = std::ptr::eq(methods, &super::INERT_IO_METHODS);
+    // SAFETY: the caller's serialized-allocation contract also covers this exact TypeId check.
+    let state_type_exact = methods_exact
+        && unsafe {
+            raw_state::test_vfs_file_has_exact_installed_state::<HandleBoundSqliteFileState>(
+                file.as_ptr().cast(),
+            )
+        };
     Some(HandleBoundSqliteAbiRawSlotSnapshot {
         methods_installed: !methods.is_null(),
         state_installed: !state.is_null(),
+        methods_exact,
+        state_type_exact,
     })
 }
 

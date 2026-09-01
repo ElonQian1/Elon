@@ -29,7 +29,8 @@ pub(super) use joint_close::ManagedTestCapturedMainCloseCall;
 mod unmap;
 #[cfg(all(test, windows))]
 pub(super) use unmap::{
-    ManagedTestShmLockCallbackObservation, ManagedTestShmMapCallbackObservation,
+    ManagedTestShmLockAbiLedgerObservation, ManagedTestShmLockCallbackObservation,
+    ManagedTestShmMapCallbackObservation,
     ManagedTestUnmapCallbackObservation,
 };
 

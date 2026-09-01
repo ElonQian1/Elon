@@ -1,5 +1,6 @@
 //! Sealed admission bridge for the executable Lock dynamic-quotient programs.
 
+mod abi_scalar_rejection;
 mod callback_completion_route_unknown;
 mod execution_receipt;
 mod lifecycle;
@@ -22,6 +23,8 @@ use super::super::super::{
 use super::super::{DynamicClassKeyV1, StaticMemberSealV1};
 use super::CompiledRunnerPlanV1;
 #[cfg(windows)]
+use abi_scalar_rejection::LockAbiScalarRejectionProgramSpecV1;
+#[cfg(windows)]
 use callback_completion_route_unknown::LockCallbackCompletionRouteUnknownProgramSpecV1;
 use execution_receipt::digest_execution_receipt_v1;
 #[cfg(windows)]
@@ -34,13 +37,13 @@ use local_protocol_rejection::LockLocalProtocolRejectionProgramSpecV1;
 use local_sibling_contention::LockLocalSiblingContentionProgramSpecV1;
 #[cfg(windows)]
 use native_acquire_busy::LockNativeAcquireBusyProgramSpecV1;
+pub(super) use abi_scalar_rejection::ABI_SCALAR_REJECTION_PROJECTOR_DELTA_V1;
 pub(super) use pre_managed_callback_rejection::PRE_MANAGED_CALLBACK_REJECTION_PROJECTOR_DELTA_V1;
 use source_program::program_spec_v1 as source_program_spec_v1;
 #[cfg(windows)]
 use stored_poison::{
     LockStoredPoisonCompletionV1, LockStoredPoisonProfileV1, LockStoredPoisonProgramSpecV1,
 };
-
 #[cfg(windows)]
 use request_validation::LockRequestValidationGuardV1;
 
@@ -161,6 +164,9 @@ pub(in super::super) fn run_lock_isolated_for_test(
     let program = program_v1(key, member, plan)
         .map_err(|violation| LockRunnerExecutionErrorV1(format!("{violation:?}")))?;
     let evidence = match program.case {
+        LockProgramCaseV1::AbiScalarRejection(rejection) => {
+            abi_scalar_rejection::run_isolated_v1(exact_test, rejection, member)
+        }
         LockProgramCaseV1::RequestValidation { action, guard } => run_lock_program_isolated(
             exact_test,
             LockRunnerProgramBindingV1 {
@@ -370,6 +376,7 @@ struct LockProgramV1 {
 #[cfg(windows)]
 #[derive(Clone, Copy)]
 enum LockProgramCaseV1 {
+    AbiScalarRejection(LockAbiScalarRejectionProgramSpecV1),
     RequestValidation {
         action: LockActionV1,
         guard: LockRequestValidationGuardV1,
@@ -424,6 +431,11 @@ fn program_v1(
 #[cfg(test)]
 pub(super) fn native_acquire_busy_catalog_row_count_for_test() -> usize {
     native_acquire_busy::catalog_row_count_for_test()
+}
+
+#[cfg(test)]
+pub(super) fn abi_scalar_rejection_catalog_row_count_for_test() -> usize {
+    abi_scalar_rejection::catalog_row_count_for_test()
 }
 
 #[cfg(test)]

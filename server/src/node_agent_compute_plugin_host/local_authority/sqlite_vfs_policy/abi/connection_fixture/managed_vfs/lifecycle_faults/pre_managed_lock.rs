@@ -1,5 +1,7 @@
 //! Exact-route observation of Lock callbacks rejected before managed/native dispatch.
 
+mod abi_rejected;
+
 use std::collections::{hash_map::Entry as MapEntry, HashMap};
 
 use super::{
@@ -17,6 +19,7 @@ use crate::node_agent_managed_fs::ManagedSqliteShmLockRequest;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(in super::super) enum ManagedTestPreManagedLockPath {
+    AbiRejected,
     AdmissionRouteUnknown,
     AdmissionCounterOverflow,
     UnsupportedCompleted,
@@ -28,6 +31,7 @@ pub(in super::super) enum ManagedTestPreManagedLockPath {
 impl ManagedTestPreManagedLockPath {
     const fn tag(self) -> u64 {
         match self {
+            Self::AbiRejected => 7,
             Self::AdmissionRouteUnknown => 1,
             Self::AdmissionCounterOverflow => 2,
             Self::UnsupportedCompleted => 3,
@@ -60,7 +64,11 @@ impl ManagedTestPreManagedLockSnapshot {
     /// Native Lock is downstream of managed Lock, so a pre-managed rejection proves both ledgers
     /// are zero without accepting caller-supplied counts.
     pub(in super::super) const fn lower_ledger_values(self) -> [u64; 3] {
-        let effect = if self.values[1] <= 2 { 1 } else { 2 };
+        let effect = match self.values[1] {
+            1 | 2 => 1,
+            3..=6 => 2,
+            _ => 0,
+        };
         [effect, self.values[9], self.values[9]]
     }
 }
@@ -206,36 +214,16 @@ impl ManagedTestPreManagedLockState {
             .entries
             .get(&route)
             .ok_or("pre-managed Lock observation was not armed")?;
-        let (custody, shm_present, rejection, managed_reached) =
-            entry
-                .dispatch
-                .unwrap_or((Custody::Sidecar, false, None, false));
-        let receipt = entry
-            .receipt
-            .map(PreemptionReceipt::ordered_values)
-            .unwrap_or([0; 4]);
-        let values = [
-            1,
-            entry.path.tag(),
-            entry.entry_count,
-            entry.admission.is_some() as u64,
-            admission_tag(entry.admission),
-            entry.dispatch.is_some() as u64,
-            custody_tag(entry.dispatch.map(|_| custody)),
-            shm_present as u64,
-            rejection_tag(rejection),
-            managed_reached as u64,
-            entry.completion.is_some() as u64,
-            completion_tag(entry.completion),
-            entry.claim_count,
-            receipt[0],
-            receipt[1],
-            receipt[2],
-            receipt[3],
-            entry.violations,
-        ];
-        validate_snapshot(entry.path, values)?;
-        Ok(ManagedTestPreManagedLockSnapshot { values })
+        abi_rejected::snapshot_entry(entry)
+    }
+
+    /// Consumes the exact-route ledger only when the installed ABI rejected before registry
+    /// `Event::Entry`. Any same-route request, including a mismatched one, invalidates the seal.
+    fn finish_abi_rejected_without_entry(
+        &mut self,
+        route: ManagedTestRouteOrdinal,
+    ) -> Result<ManagedTestPreManagedLockSnapshot, &'static str> {
+        abi_rejected::finish(self, route)
     }
 }
 
@@ -244,6 +232,9 @@ fn validate_snapshot(
     values: [u64; 18],
 ) -> Result<(), &'static str> {
     let expected = match path {
+        ManagedTestPreManagedLockPath::AbiRejected => {
+            [1, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        }
         ManagedTestPreManagedLockPath::AdmissionRouteUnknown => {
             [1, 1, 1, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
         }
@@ -375,6 +366,17 @@ impl ManagedTestLifecycleFaultController {
             .map_err(|_| "lifecycle fault controller poisoned")?
             .pre_managed_lock
             .snapshot(route)
+    }
+
+    pub(in super::super) fn finish_abi_rejected_lock_observation(
+        &self,
+        route: ManagedTestRouteOrdinal,
+    ) -> Result<ManagedTestPreManagedLockSnapshot, &'static str> {
+        self.state
+            .lock()
+            .map_err(|_| "lifecycle fault controller poisoned")?
+            .pre_managed_lock
+            .finish_abi_rejected_without_entry(route)
     }
 }
 

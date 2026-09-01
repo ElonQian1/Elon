@@ -8,16 +8,16 @@ use super::super::{
     },
     terminal_descriptor::{
         CallbackV1, CapabilityGapV1, CleanupV1, ExecutionRecipeV1, FaultSeamV1, FixtureV1,
-        InitializationProfileV1, LockActionV1, LockAxesV1, LockCompletionV1, LockManagedStimulusV1,
-        LockOperationV1, LockPrestateV1, MapAbiScalarV1, MapAxesV1, MapCompletionV1,
+        InitializationProfileV1, LockAbiScalarV1, LockActionV1, LockAxesV1, LockCompletionV1,
+        LockManagedStimulusV1, LockOperationV1, LockPrestateV1, MapAbiScalarV1, MapAxesV1, MapCompletionV1,
         MapManagedStimulusV1, MapModeV1, MapOperationV1, MapPrestateV1, ObserverV1, OccurrenceV1,
         PhaseV1, PresenceV1, PrestateV1, ReachabilityV1, RunnerCapabilityV1, SourceSiteV1,
         StimulusV1, TerminalDescriptorV1, TimingV1, ValidityV1,
     },
 };
 use super::*;
-
 mod descriptor_binding;
+mod lock_abi_scalar_rejection_cases;
 mod lock_callback_completion_route_unknown_cases;
 mod lock_local_protocol_rejection_cases;
 mod lock_local_sibling_contention_cases;
@@ -32,6 +32,8 @@ mod producer_coherence;
 mod program_admission;
 mod program_inventory;
 mod runner_admission;
+mod runner_admission_lock_abi_scalar_rejection_source;
+#[cfg(windows)] mod runner_admission_lock_abi_scalar_rejection_supported;
 mod runner_admission_lock_callback_completion_route_unknown_supported;
 #[cfg(windows)]
 mod runner_admission_lock_lifecycle_supported;

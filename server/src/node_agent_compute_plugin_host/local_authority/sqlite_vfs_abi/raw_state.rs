@@ -419,6 +419,18 @@ unsafe fn test_raw_close_control<'file>(
         .then_some(control)
 }
 
+/// Confirms both the exact installed method table and the type-erased payload identity without
+/// borrowing the payload itself. The caller must serialize this read with callback access.
+#[cfg(test)]
+pub(super) unsafe fn test_vfs_file_has_exact_installed_state<State: 'static>(
+    file: *mut ffi::sqlite3_file,
+) -> bool {
+    match unsafe { installed_envelope(file) } {
+        Ok(envelope) => envelope.is::<State>(),
+        Err(_) => false,
+    }
+}
+
 unsafe fn installed_envelope<'file>(
     file: *mut ffi::sqlite3_file,
 ) -> Result<&'file mut RawSqliteFileStateEnvelope, RawSqliteFileStateRejection> {

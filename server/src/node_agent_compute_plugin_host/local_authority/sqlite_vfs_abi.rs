@@ -13,6 +13,8 @@ mod boundary;
 mod file_state;
 mod io_core;
 mod io_shm;
+#[cfg(all(test, windows))]
+mod lock_observation;
 mod raw_state;
 mod result_codes;
 mod types;
@@ -26,6 +28,11 @@ pub(in crate::node_agent_compute_plugin_host::local_authority) use file_state::{
     initialize_test_vfs_file, install_test_vfs_file, observe_test_vfs_file_raw_slots,
     test_vfs_file_size, HandleBoundSqliteAbiRawSlotSnapshot, HandleBoundSqliteAbiTestFile,
     HandleBoundSqliteFileOperations,
+};
+#[cfg(all(test, windows))]
+pub(in crate::node_agent_compute_plugin_host::local_authority) use lock_observation::{
+    arm_test_x_shm_lock_observation, HandleBoundSqliteAbiShmLockObservationGuard,
+    HandleBoundSqliteAbiShmLockObservationReceipt,
 };
 #[cfg(all(test, windows))]
 pub(in crate::node_agent_compute_plugin_host::local_authority) use raw_state::{

@@ -9,7 +9,10 @@ use std::{
 use rusqlite::ffi;
 
 use super::ManagedSqliteRoutedConnectionFixture;
-use crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_abi::HandleBoundSqliteAbiRawSlotSnapshot;
+use crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_abi::{
+    arm_test_x_shm_lock_observation, HandleBoundSqliteAbiRawSlotSnapshot,
+    HandleBoundSqliteAbiShmLockObservationReceipt,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(in super::super) struct ManagedTestUnmapCallbackObservation {
@@ -62,6 +65,21 @@ pub(in super::super) struct ManagedTestShmLockCallbackObservation {
     result_code: c_int,
     before: HandleBoundSqliteAbiRawSlotSnapshot,
     after: HandleBoundSqliteAbiRawSlotSnapshot,
+}
+
+pub(in super::super) struct ManagedTestShmLockAbiLedgerObservation {
+    callback: ManagedTestShmLockCallbackObservation,
+    abi: HandleBoundSqliteAbiShmLockObservationReceipt,
+}
+
+impl ManagedTestShmLockAbiLedgerObservation {
+    pub(in super::super) fn callback(&self) -> ManagedTestShmLockCallbackObservation {
+        self.callback
+    }
+
+    pub(in super::super) fn abi(&self) -> &HandleBoundSqliteAbiShmLockObservationReceipt {
+        &self.abi
+    }
 }
 
 impl ManagedTestShmLockCallbackObservation {
@@ -245,6 +263,31 @@ impl ManagedSqliteRoutedConnectionFixture {
         raw_flags: c_int,
     ) -> Result<ManagedTestShmLockCallbackObservation, &'static str> {
         let file = self.main_file_pointer()?;
+        self.observe_main_shm_lock_raw_at(file, offset, count, raw_flags)
+    }
+
+    pub(in super::super) fn observe_main_shm_lock_raw_with_abi_ledger(
+        &self,
+        offset: c_int,
+        count: c_int,
+        raw_flags: c_int,
+    ) -> Result<ManagedTestShmLockAbiLedgerObservation, &'static str> {
+        let file = self.main_file_pointer()?;
+        // SAFETY: the fixture owns this live serialized allocation until the observation and
+        // linear finish both complete. Arming also validates exact methods and typed state.
+        let guard = unsafe { arm_test_x_shm_lock_observation(file, offset, count, raw_flags) }?;
+        let callback = self.observe_main_shm_lock_raw_at(file, offset, count, raw_flags)?;
+        let abi = guard.finish()?;
+        Ok(ManagedTestShmLockAbiLedgerObservation { callback, abi })
+    }
+
+    fn observe_main_shm_lock_raw_at(
+        &self,
+        file: *mut ffi::sqlite3_file,
+        offset: c_int,
+        count: c_int,
+        raw_flags: c_int,
+    ) -> Result<ManagedTestShmLockCallbackObservation, &'static str> {
         // SAFETY: `main_file_pointer` returned this test VFS's live main-file allocation.
         let before = unsafe { super::super::observe_test_vfs_file_raw_slots(file) }
             .ok_or("managed SHM-lock raw slots unavailable before callback")?;
