@@ -18,6 +18,7 @@ use super::super::{
 use super::*;
 
 mod descriptor_binding;
+mod lock_callback_completion_route_unknown_cases;
 mod lock_local_sibling_contention_cases;
 mod lock_native_acquire_busy_cases;
 mod lock_program_inventory;
@@ -29,6 +30,7 @@ mod producer_coherence;
 mod program_admission;
 mod program_inventory;
 mod runner_admission;
+mod runner_admission_lock_callback_completion_route_unknown_supported;
 #[cfg(windows)]
 mod runner_admission_lock_lifecycle_supported;
 mod runner_admission_lock_local_sibling_contention_supported;
