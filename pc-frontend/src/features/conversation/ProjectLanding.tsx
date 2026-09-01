@@ -19,6 +19,7 @@ import ProjectLandingDownloads, {
   isLandingDownloadEnabled,
   landingDownloadUrl,
 } from './ProjectLandingDownloads'
+import QuantPaperLaunch from './QuantPaperLaunch'
 import styles from './ProjectLanding.module.css'
 
 interface Props {
@@ -64,6 +65,10 @@ export default function ProjectLanding({ project, channels, landing, onSelectCha
   const updatedAt = project.updated_at ? formatTime(project.updated_at) : ''
   const primaryAction = buildPrimaryAction({ devChannel, buildChannel, firstDownload, resources, onSelectChannel })
   const workflow = buildWorkflow({ devChannel, buildChannel, availableDownloads, onSelectChannel })
+  const quantPaperLaunch = project.id === 'yilong-quant'
+    && landing?.paper_launch?.schema === 'yilong.quant.paper_launch.v1'
+    ? landing.paper_launch
+    : null
 
   return (
     <div className={styles.landing}>
@@ -103,6 +108,8 @@ export default function ProjectLanding({ project, channels, landing, onSelectCha
           </button>
         </div>
       </section>
+
+      {quantPaperLaunch && <QuantPaperLaunch integration={quantPaperLaunch} />}
 
       <section className={styles.startSection} aria-label="项目工作流程">
         <div className={styles.startHeader}>

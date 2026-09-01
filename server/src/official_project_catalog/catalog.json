@@ -141,6 +141,7 @@
           "本地开发需要 Rust 1.97、Node.js 22 和 PowerShell 7"
         ],
         "recent_updates": [
+          "新增主项目一键进入 Paper 持仓：五分钟授权只经 exact-origin 内存通道传递，未配置时保持关闭",
           "新增一龙账号短期 Ed25519 paper grant 与本人持仓/全额退出接口",
           "旧 participant 路径、直接建仓和 NAV 发布改为独立运营令牌门禁",
           "用户持仓页不再手工输入 participant，授权证明只保存在组件内存"
@@ -151,6 +152,11 @@
           "Paper grant 不证明付款、钱包所有权、KYC、地区或投资准入",
           "请勿在问题、日志或提交中粘贴私钥、助记词和访问令牌"
         ],
+        "paper_launch": {
+          "schema": "yilong.quant.paper_launch.v1",
+          "label": "进入 Paper 模拟持仓",
+          "description": "由一龙账号签发五分钟短期授权，在内存通道中打开本人模拟仓位；未配置 Web 地址或签名材料时保持不可用。"
+        },
         "resources": [
           { "label": "GitHub 源码", "url": "https://github.com/ElonQian1/yilong-quant" },
           { "label": "项目说明", "url": "https://github.com/ElonQian1/yilong-quant/blob/main/AI_PROJECT.md" },

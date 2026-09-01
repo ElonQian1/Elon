@@ -144,6 +144,34 @@ fn normalize_landing_snapshot_rewrites_source_and_filters_urls() {
     assert!(has_display_content(&snapshot));
 }
 
+#[test]
+fn normalizes_only_the_fixed_quant_paper_launch_contract() {
+    let snapshot = normalize_landing_snapshot(&json!({
+        "title": "Quant",
+        "paper_launch": {
+            "schema": "yilong.quant.paper_launch.v1",
+            "label": "进入 Paper 模拟持仓",
+            "description": "五分钟短期授权",
+            "launch_url": "https://attacker.example/?grant=secret",
+            "funds_moved": true,
+            "target_is_guaranteed": true
+        }
+    }))
+    .unwrap();
+
+    assert_eq!(snapshot["paper_launch"]["mode"], "paper");
+    assert_eq!(snapshot["paper_launch"]["simulated"], true);
+    assert_eq!(snapshot["paper_launch"]["funds_moved"], false);
+    assert_eq!(snapshot["paper_launch"]["target_is_guaranteed"], false);
+    assert!(snapshot["paper_launch"].get("launch_url").is_none());
+    let unknown = normalize_landing_snapshot(&json!({
+        "title": "Other",
+        "paper_launch": { "schema": "unknown.launch.v1" }
+    }))
+    .unwrap();
+    assert!(unknown.get("paper_launch").is_none());
+}
+
 fn temp_workspace(label: &str) -> PathBuf {
     let id = SystemTime::now()
         .duration_since(UNIX_EPOCH)

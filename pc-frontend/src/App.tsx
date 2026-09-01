@@ -19,6 +19,7 @@ const OpenAiChatKitPage = lazy(() => import('./features/chatkit/OpenAiChatKitPag
 const UserProfilePage = lazy(() => import('./features/users/UserProfilePage'))
 const DoctorPage = lazy(() => import('./features/doctor/DoctorPage'))
 const VoicePage = lazy(() => import('./features/voice/VoicePage'))
+const QuantPaperLaunch = lazy(() => import('./features/conversation/QuantPaperLaunch'))
 const NodePage = lazy(() => import('./features/node/NodePage'))
 const PublicDevSmokePage = lazy(() => import('./features/node/PublicDevSmokePage'))
 const DevTasksPage = lazy(() => import('./features/dev/DevTasksPage'))
@@ -54,6 +55,26 @@ function lazyRoute(element: ReactNode) {
 }
 
 export default function App() {
+  if (import.meta.env.DEV && new URLSearchParams(window.location.search).get('ui_preview') === 'quant-paper-launch') {
+    return (
+      <main className={styles.uiPreviewSurface}>
+        <Suspense fallback={<RouteFallback />}>
+          <QuantPaperLaunch
+            previewMode="ready"
+            integration={{
+              schema: 'yilong.quant.paper_launch.v1',
+              mode: 'paper',
+              label: '进入 Paper 模拟持仓',
+              description: '由一龙账号签发五分钟短期授权，在内存通道中打开本人模拟仓位。',
+              simulated: true,
+              funds_moved: false,
+              target_is_guaranteed: false,
+            }}
+          />
+        </Suspense>
+      </main>
+    )
+  }
   const defaultPath = isLocalWorkbench() ? '/local-tasks' : '/ai'
   return (
     <Routes>

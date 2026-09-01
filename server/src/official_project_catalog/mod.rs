@@ -298,5 +298,10 @@ mod tests {
             .find(|project| project.id == "yilong-quant")
             .expect("一龙量化交易必须登记在官方项目目录");
         assert!(quant.blueprint.is_none());
+        let paper_launch = quant
+            .landing
+            .get("paper_launch")
+            .expect("一龙量化交易必须登记受控 Paper 启动入口");
+        assert_eq!(paper_launch["schema"], "yilong.quant.paper_launch.v1");
     }
 }

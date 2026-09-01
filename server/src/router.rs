@@ -38,6 +38,8 @@ mod admin_routes;
 mod node_routes;
 #[path = "quant_paper_access.rs"]
 mod quant_paper_access;
+#[path = "quant_paper_launch.rs"]
+mod quant_paper_launch;
 mod social_routes;
 
 /// 读取 `CORS_ALLOW_ORIGINS` 环境变量构造 CORS 策略。
@@ -270,6 +272,14 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .route(
             "/api/me/quant/paper-access-grants",
             post(quant_paper_access::issue),
+        )
+        .route(
+            "/api/me/quant/paper-launch",
+            get(quant_paper_launch::readiness),
+        )
+        .route(
+            "/api/me/quant/paper-launches",
+            post(quant_paper_launch::issue),
         )
         .merge(account_security::routes())
         .merge(account_security_events::routes())

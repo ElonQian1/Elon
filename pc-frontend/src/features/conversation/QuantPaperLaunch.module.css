@@ -1,0 +1,164 @@
+.launchCard {
+  box-sizing: border-box;
+  width: min(1120px, 100%);
+  margin: 0 auto 20px;
+  padding: 22px;
+  border: 1px solid rgba(82, 217, 148, 0.2);
+  border-radius: 24px;
+  background: linear-gradient(145deg, rgba(18, 48, 34, 0.94), rgba(7, 20, 14, 0.96));
+  box-shadow: 0 22px 62px rgba(0, 0, 0, 0.24);
+}
+
+.launchHeader {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 16px;
+}
+
+.shield {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  place-items: center;
+  border-radius: 15px;
+  color: #75edac;
+  background: rgba(82, 217, 148, 0.12);
+}
+
+.eyebrow {
+  color: #6cda9e;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .14em;
+}
+
+.launchHeader h3 {
+  margin: 5px 0 6px;
+  color: #eef9f2;
+  font-size: 20px;
+}
+
+.launchHeader p {
+  max-width: 650px;
+  margin: 0;
+  color: #99aea3;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.riskPills {
+  display: flex;
+  max-width: 320px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 7px;
+}
+
+.riskPills span {
+  padding: 6px 9px;
+  border: 1px solid rgba(164, 211, 184, 0.14);
+  border-radius: 999px;
+  color: #a9bdb2;
+  background: rgba(4, 13, 8, 0.5);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.launchAction {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 13px;
+  margin-top: 18px;
+  padding: 14px 16px;
+  border: 1px solid rgba(116, 183, 148, 0.18);
+  border-radius: 16px;
+  background: rgba(1, 9, 5, 0.42);
+}
+
+.stateIcon {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border-radius: 12px;
+  color: #67d99b;
+  background: rgba(82, 217, 148, 0.1);
+}
+
+.launchAction[data-tone="warning"] .stateIcon {
+  color: #f0bd67;
+  background: rgba(214, 145, 39, 0.12);
+}
+
+.stateCopy {
+  display: grid;
+  gap: 3px;
+}
+
+.stateCopy strong { color: #e2f1e8; font-size: 13px; }
+.stateCopy small { color: #82978c; font-size: 11px; line-height: 1.45; }
+
+.launchAction button {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 11px;
+  color: #062013;
+  background: #67dfa0;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.launchAction .retryButton {
+  border: 1px solid rgba(240, 189, 103, 0.28);
+  color: #f2d198;
+  background: rgba(214, 145, 39, 0.1);
+}
+
+.frameShell {
+  margin-top: 16px;
+  overflow: hidden;
+  border: 1px solid rgba(153, 194, 171, 0.16);
+  border-radius: 18px;
+  background: #08100d;
+}
+
+.frameBar {
+  display: flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 14px;
+  border-bottom: 1px solid rgba(153, 194, 171, 0.13);
+  color: #c4d9cd;
+  font-size: 11px;
+}
+
+.frameBar em { color: #71877b; font-style: normal; }
+
+.frame {
+  display: block;
+  width: 100%;
+  height: min(720px, 72vh);
+  border: 0;
+  background: #08100d;
+}
+
+.spin { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+@media (max-width: 760px) {
+  .launchHeader { grid-template-columns: auto minmax(0, 1fr); }
+  .riskPills { grid-column: 1 / -1; justify-content: flex-start; }
+  .launchAction { grid-template-columns: auto minmax(0, 1fr); }
+  .launchAction button { grid-column: 1 / -1; width: 100%; }
+  .frame { height: 620px; }
+}

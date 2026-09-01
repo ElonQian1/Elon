@@ -9,6 +9,7 @@
 ## 用户现在能看到什么
 
 - 项目广场中的“一龙量化交易”标题、简介、目标用户、当前更新和 GitHub/文档入口。
+- 登录用户在配置就绪后可以从量化项目主页一键打开本人 Paper 模拟仓位；短期授权不进入 URL 或浏览器持久存储。
 - 明确的 `paper` 阶段：模拟委托、模拟参与份额、NAV 与退出结算。
 - 6% 仅为非保证目标；当前不导入真实付款名单、不移动资金、不连接实盘。
 - Web、Windows 和 Android 尚未公开部署时继续显示“计划中”，不生成虚假下载入口。
@@ -44,11 +45,12 @@
 - 子仓库自身的 `.elon/project-landing.json` 仍是后续同步更新的内容真源；官方目录快照变更必须与它保持一致。
 - `contracts/quant/net-balance-lock-receipt-v1.schema.json` 已定义主项目未来锁定 NET 后交给量化项目消费的版本化回执形状；详细语义见 `docs/yilong-quant-net-lock-receipt-v1.md`。
 - `POST /api/me/quant/paper-access-grants` 已复用主项目现有 bearer 会话，可在独立签名配置启用后签发最多五分钟的 Ed25519 paper grant；量化项目只获得项目专用脱敏 subject 和明确 scope，不获得主项目 bearer 或用户资料。契约见 `docs/yilong-quant-paper-access-grant-v1.md` 与 `contracts/quant/paper-access-grant-v1.schema.json`。
+- `GET /api/me/quant/paper-launch` 与 `POST /api/me/quant/paper-launches` 提供失败关闭的 readiness 和一次性启动票据；PC 项目主页通过 exact-origin iframe、`event.source`、nonce、attempt ID 和过期时间绑定，把 grant 只传给当前量化子页面。双方契约见 `docs/yilong-quant-paper-launch-v1.md` 与 `contracts/quant/paper-launch-v1.schema.json`。
 - 当前 Schema 只用于 paper 联调。主项目尚无真实 NET 余额运行时、发行方签名和用户准入，因此不能签发或接受真实回执。
 
 ## 尚未完成
 
-- 生产跨站自动换证、签名密钥托管/轮换、真实 NET 余额迁移和签名锁定回执；当前用户 grant 只绑定 paper 模拟参与者，不证明付款、KYC、钱包或真实准入。
+- 一键 Paper 接入的公开 Web 部署、CSP/`frame-ancestors` 上线配置、签名密钥托管与多 key 重叠轮换；当前用户 grant 只绑定 paper 模拟参与者，不证明付款、KYC、钱包或真实准入。
 - 将已付款用户数据经审核、脱敏、对账后导入生产系统；paper 子项目只允许脱敏标识和模拟锁定回执，继续禁止把聊天或付款截图写入代码。
 - 官方 NAV、交易所 sandbox/live、托管、KYC/地区准入和真实提现。
 - Feature Registry 工具可用后，需分别登记项目广场接入、paper 参与账本、身份授权和 NET 锁定，不把未完成范围提前标记为 verified。

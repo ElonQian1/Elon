@@ -210,6 +210,16 @@ export interface ProjectLandingResource {
   url?: string
 }
 
+export interface ProjectLandingPaperLaunch {
+  schema?: string
+  mode?: 'paper'
+  label?: string
+  description?: string
+  simulated?: boolean
+  funds_moved?: boolean
+  target_is_guaranteed?: boolean
+}
+
 export interface ProjectLanding {
   title?: string
   tagline?: string
@@ -221,6 +231,7 @@ export interface ProjectLanding {
   resources?: ProjectLandingResource[]
   custom_landing_url?: string
   web_url?: string
+  paper_launch?: ProjectLandingPaperLaunch
   source?: { mode?: string; status?: string }
 }
 

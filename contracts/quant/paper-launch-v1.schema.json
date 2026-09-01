@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://yilong.example/contracts/quant/paper-launch-v1.schema.json",
+  "title": "Yilong Quant Paper Launch V1",
+  "oneOf": [
+    { "$ref": "#/$defs/readiness" },
+    { "$ref": "#/$defs/launchTicket" },
+    { "$ref": "#/$defs/readyMessage" },
+    { "$ref": "#/$defs/grantMessage" },
+    { "$ref": "#/$defs/consumedMessage" },
+    { "$ref": "#/$defs/errorMessage" }
+  ],
+  "$defs": {
+    "protocol": { "type": "string", "const": "yilong.quant.paper_launch.v1" },
+    "nonce": { "type": "string", "pattern": "^[A-Za-z0-9_-]{32,128}$" },
+    "attemptId": { "type": "string", "pattern": "^qpl_[a-f0-9]{32}$" },
+    "readiness": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schema", "protocol", "enabled", "simulated", "reason"],
+      "properties": {
+        "schema": { "const": "yilong.quant.paper_launch_readiness.v1" },
+        "protocol": { "$ref": "#/$defs/protocol" },
+        "enabled": { "type": "boolean" },
+        "simulated": { "const": true },
+        "reason": { "enum": ["ready", "configuration_required", "configuration_invalid"] },
+        "launch_origin": { "type": "string", "format": "uri", "maxLength": 2048 }
+      }
+    },
+    "launchTicket": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schema", "protocol", "launch_url", "access_token", "expires_in", "simulated"],
+      "properties": {
+        "schema": { "const": "yilong.quant.paper_launch_ticket.v1" },
+        "protocol": { "$ref": "#/$defs/protocol" },
+        "launch_url": { "type": "string", "format": "uri", "maxLength": 2048 },
+        "access_token": { "type": "string", "pattern": "^ypg1\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+$", "maxLength": 8192 },
+        "expires_in": { "type": "integer", "minimum": 1, "maximum": 300 },
+        "simulated": { "const": true }
+      }
+    },
+    "readyMessage": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schema", "protocol", "channel_nonce"],
+      "properties": {
+        "schema": { "const": "yilong.quant.paper_launch.ready.v1" },
+        "protocol": { "$ref": "#/$defs/protocol" },
+        "channel_nonce": { "$ref": "#/$defs/nonce" }
+      }
+    },
+    "grantMessage": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schema", "protocol", "channel_nonce", "attempt_id", "access_grant", "expires_at_unix"],
+      "properties": {
+        "schema": { "const": "yilong.quant.paper_launch.grant.v1" },
+        "protocol": { "$ref": "#/$defs/protocol" },
+        "channel_nonce": { "$ref": "#/$defs/nonce" },
+        "attempt_id": { "$ref": "#/$defs/attemptId" },
+        "access_grant": { "type": "string", "pattern": "^ypg1\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+$", "maxLength": 8192 },
+        "expires_at_unix": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "consumedMessage": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schema", "protocol", "channel_nonce", "attempt_id"],
+      "properties": {
+        "schema": { "const": "yilong.quant.paper_launch.consumed.v1" },
+        "protocol": { "$ref": "#/$defs/protocol" },
+        "channel_nonce": { "$ref": "#/$defs/nonce" },
+        "attempt_id": { "$ref": "#/$defs/attemptId" }
+      }
+    },
+    "errorMessage": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schema", "protocol", "channel_nonce", "attempt_id", "code"],
+      "properties": {
+        "schema": { "const": "yilong.quant.paper_launch.error.v1" },
+        "protocol": { "$ref": "#/$defs/protocol" },
+        "channel_nonce": { "$ref": "#/$defs/nonce" },
+        "attempt_id": { "$ref": "#/$defs/attemptId" },
+        "code": { "enum": ["grant_rejected", "position_load_failed"] }
+      }
+    }
+  }
+}

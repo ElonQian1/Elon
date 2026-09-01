@@ -4,6 +4,8 @@ use std::path::{Path, PathBuf};
 use super::normalize_helpers::*;
 use super::{MANIFEST_PATHS, MAX_ITEMS, MAX_LONG_TEXT, MAX_SHORT_TEXT, MAX_URL, MAX_VARIANTS};
 
+const QUANT_PAPER_LAUNCH_SCHEMA: &str = "yilong.quant.paper_launch.v1";
+
 pub(super) fn normalize_manifest(value: Value) -> Option<Map<String, Value>> {
     let object = value.as_object()?;
     let mut output = Map::new();
@@ -82,6 +84,10 @@ pub(super) fn normalize_manifest(value: Value) -> Option<Map<String, Value>> {
         first_url(object, &["release_manifest_url", "releaseManifestUrl"]),
     );
 
+    if let Some(paper_launch) = normalize_quant_paper_launch(object.get("paper_launch")) {
+        output.insert("paper_launch".to_string(), paper_launch);
+    }
+
     insert_text_array(
         &mut output,
         "highlights",
@@ -142,6 +148,33 @@ pub(super) fn normalize_manifest(value: Value) -> Option<Map<String, Value>> {
     }
 
     Some(output)
+}
+
+fn normalize_quant_paper_launch(value: Option<&Value>) -> Option<Value> {
+    let source = value?.as_object()?;
+    if source.get("schema")?.as_str()? != QUANT_PAPER_LAUNCH_SCHEMA {
+        return None;
+    }
+    let mut output = Map::new();
+    output.insert(
+        "schema".to_string(),
+        Value::String(QUANT_PAPER_LAUNCH_SCHEMA.to_string()),
+    );
+    output.insert("mode".to_string(), Value::String("paper".to_string()));
+    output.insert("simulated".to_string(), Value::Bool(true));
+    output.insert("funds_moved".to_string(), Value::Bool(false));
+    output.insert("target_is_guaranteed".to_string(), Value::Bool(false));
+    insert_string(
+        &mut output,
+        "label",
+        first_string(source, &["label", "title"], MAX_SHORT_TEXT),
+    );
+    insert_string(
+        &mut output,
+        "description",
+        first_string(source, &["description", "summary"], MAX_LONG_TEXT),
+    );
+    Some(Value::Object(output))
 }
 
 pub(super) fn normalize_sections(value: Option<&Value>) -> Option<Value> {

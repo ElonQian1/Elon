@@ -9,6 +9,11 @@ const marketplaceInstall = read('pc-frontend/src/features/plaza/MarketplaceErpIn
 const landing = read('pc-frontend/src/features/conversation/ProjectLanding.tsx')
 const landingDownloads = read('pc-frontend/src/features/conversation/ProjectLandingDownloads.tsx')
 const landingCss = read('pc-frontend/src/features/conversation/ProjectLanding.module.css')
+const quantLaunch = read('pc-frontend/src/features/conversation/QuantPaperLaunch.tsx')
+const quantLaunchCss = read('pc-frontend/src/features/conversation/QuantPaperLaunch.module.css')
+const landingTypes = read('pc-frontend/src/features/conversation/types.ts')
+const launchSchema = JSON.parse(read('contracts/quant/paper-launch-v1.schema.json'))
+const officialCatalog = JSON.parse(read('server/src/official_project_catalog/catalog.json'))
 const conversationPage = read('pc-frontend/src/features/conversation/ConversationPage.tsx')
 const conversationDraft = read('pc-frontend/src/features/conversation/NewConversationDraft.tsx')
 const conversationDraftCss = read('pc-frontend/src/features/conversation/NewConversationDraft.module.css')
@@ -31,6 +36,24 @@ for (const contract of ['workflowGrid', 'landing?.highlights', 'landing?.target_
 assert.ok(landing.includes('ProjectLandingDownloads'), 'project landing should render the complete download surface')
 assert.ok(landingDownloads.includes('variantList'), 'download variants should stay independently actionable')
 assert.match(landingCss, /width:\s*min\(1120px, 100%\)/, 'project landing should restore the wider desktop composition')
+
+assert.match(landing, /project\.id === 'yilong-quant'[\s\S]*yilong\.quant\.paper_launch\.v1/, 'Paper launch must be limited to the official quant project')
+assert.ok(landing.includes('<QuantPaperLaunch integration={quantPaperLaunch} />'), 'quant project home should render its controlled launch surface')
+assert.ok(landingTypes.includes('ProjectLandingPaperLaunch'), 'landing types should expose the sanitized paper launch contract')
+for (const route of ['/api/me/quant/paper-launch', '/api/me/quant/paper-launches']) {
+  assert.ok(quantLaunch.includes(route), `quant launch should call ${route}`)
+}
+assert.match(quantLaunch, /sandbox="allow-scripts allow-same-origin"/, 'quant iframe must keep a minimal sandbox')
+assert.match(quantLaunch, /referrerPolicy="strict-origin"/, 'quant iframe must not leak main page paths')
+assert.match(quantLaunch, /event\.source !== frameWindow \|\| event\.origin !== expectedOrigin/, 'message receipt must bind exact source and origin')
+assert.match(quantLaunch, /frameWindow\.postMessage\([\s\S]*expectedOrigin\)/, 'grant delivery must use the exact quant origin')
+for (const forbidden of ['localStorage', 'sessionStorage', 'clipboard', "postMessage('*'", '?grant=']) {
+  assert.equal(quantLaunch.includes(forbidden), false, `quant launch must not contain ${forbidden}`)
+}
+assert.match(quantLaunchCss, /height:\s*min\(720px, 72vh\)/, 'embedded quant surface should remain usable on desktop')
+assert.equal(launchSchema.$defs.protocol.const, 'yilong.quant.paper_launch.v1')
+const quantCatalog = officialCatalog.projects.find((project) => project.id === 'yilong-quant')
+assert.equal(quantCatalog.landing.paper_launch.schema, 'yilong.quant.paper_launch.v1')
 
 assert.match(conversationPage, /onSelectChannel=\{\(id\) => \{ void openDevelopmentDraft\(id\) \}\}/, 'continue development should open a draft conversation')
 assert.ok(conversationPage.includes("channels.find((channel) => channel.id === id)?.kind === 'ai_development') openDevelopmentDraft(id)"), 'clicking the AI development channel should open the same draft conversation')

@@ -56,10 +56,10 @@ struct PaperAccessGrantClaims {
 }
 
 #[derive(Debug, Serialize)]
-struct PaperAccessGrantResponse {
+pub(crate) struct PaperAccessGrantResponse {
     token_type: &'static str,
-    access_token: String,
-    expires_in: i64,
+    pub(crate) access_token: String,
+    pub(crate) expires_in: i64,
     participant_ref: String,
     scopes: Vec<PaperAccessScope>,
     simulated: bool,
@@ -71,14 +71,14 @@ struct ErrorResponse {
     message: &'static str,
 }
 
-struct PaperGrantSigner {
+pub(crate) struct PaperGrantSigner {
     key_id: String,
     signing_key: Ed25519KeyPair,
     subject_secret: [u8; 32],
 }
 
 #[derive(Debug)]
-enum SignerConfigError {
+pub(crate) enum SignerConfigError {
     Disabled,
     Invalid,
 }
@@ -143,7 +143,7 @@ pub(crate) async fn issue(
 }
 
 impl PaperGrantSigner {
-    fn from_env() -> Result<Self, SignerConfigError> {
+    pub(crate) fn from_env() -> Result<Self, SignerConfigError> {
         let key_id = std::env::var(KEY_ID_ENV).ok();
         let signing_seed = std::env::var(SIGNING_SEED_ENV).ok();
         let subject_secret = std::env::var(SUBJECT_SECRET_ENV).ok();
@@ -181,7 +181,7 @@ impl PaperGrantSigner {
         })
     }
 
-    fn issue(
+    pub(crate) fn issue(
         &self,
         user_id: &str,
         scopes: Vec<PaperAccessScope>,
