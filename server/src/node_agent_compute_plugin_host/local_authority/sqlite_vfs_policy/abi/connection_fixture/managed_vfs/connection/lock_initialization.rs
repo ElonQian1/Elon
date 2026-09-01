@@ -1,4 +1,4 @@
-//! Exact installed-ABI bridge for controlled q12-q17 initialization failures.
+//! Exact installed-ABI bridge for controlled q12-q18 initialization outcomes.
 //!
 //! This bridge arms the managed initialization controller only after a real WAL-main target is
 //! attached, invokes the installed `xShmLock`, then seals both initialization and requested-range
@@ -7,8 +7,10 @@
 use std::os::raw::c_int;
 
 use crate::node_agent_managed_fs::{
+    ManagedSqliteShmTestCreatedFirstSharedBusyCloseSucceededReceiptV1,
     ManagedSqliteShmTestInitializationExpectationV1, ManagedSqliteShmTestInitializationReceiptV1,
-    ManagedSqliteShmTestLockReceipt, ManagedSqliteShmTestTargetSnapshot,
+    ManagedSqliteShmTestLockReceipt, ManagedSqliteShmTestTargetObserver,
+    ManagedSqliteShmTestTargetSnapshot,
 };
 
 use super::{ManagedSqliteRoutedConnectionFixture, ManagedTestShmLockCallbackObservation};
@@ -23,7 +25,110 @@ pub(in super::super) struct ManagedTestLockInitializationFailureObservationV1 {
     pub(in super::super) pending_count: usize,
 }
 
+pub(in super::super) struct PendingManagedTestLockCreatedFirstSharedBusyCloseSucceededObservationV1 {
+    pub(in super::super) callback: ManagedTestShmLockCallbackObservation,
+    pub(in super::super) before: ManagedSqliteShmTestTargetSnapshot,
+    pub(in super::super) after: ManagedSqliteShmTestTargetSnapshot,
+    observer: ManagedSqliteShmTestTargetObserver,
+    pending_count: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(in super::super) struct ManagedTestLockCreatedFirstSharedBusyCloseSucceededObservationV1 {
+    pub(in super::super) callback: ManagedTestShmLockCallbackObservation,
+    pub(in super::super) before: ManagedSqliteShmTestTargetSnapshot,
+    pub(in super::super) after: ManagedSqliteShmTestTargetSnapshot,
+    pub(in super::super) initialization:
+        ManagedSqliteShmTestCreatedFirstSharedBusyCloseSucceededReceiptV1,
+    pub(in super::super) lock_no_requested_native: ManagedSqliteShmTestLockReceipt,
+    pub(in super::super) pending_count: usize,
+}
+
+impl PendingManagedTestLockCreatedFirstSharedBusyCloseSucceededObservationV1 {
+    pub(in super::super) fn abort_after_inspection_failure(self) -> Result<(), &'static str> {
+        self.observer
+            .abort_created_first_shared_busy_close_succeeded_observation_v1()
+    }
+
+    /// The caller must inspect registry terminal custody before consuming this method. Q18's DMS
+    /// holder remains locked until this exact finish call explicitly releases it.
+    pub(in super::super) fn finish_after_terminal_custody_observed(
+        self,
+    ) -> Result<ManagedTestLockCreatedFirstSharedBusyCloseSucceededObservationV1, &'static str>
+    {
+        let initialization = match self
+            .observer
+            .finish_created_first_shared_busy_close_succeeded_observation_v1()
+        {
+            Ok(receipt) => receipt,
+            Err(error) => {
+                let _ = self
+                    .observer
+                    .abort_created_first_shared_busy_close_succeeded_observation_v1();
+                return Err(error);
+            }
+        };
+        let lock_no_requested_native = initialization.requested_lock_receipt();
+        Ok(
+            ManagedTestLockCreatedFirstSharedBusyCloseSucceededObservationV1 {
+                callback: self.callback,
+                before: self.before,
+                after: self.after,
+                initialization,
+                lock_no_requested_native,
+                pending_count: self.pending_count,
+            },
+        )
+    }
+}
+
 impl ManagedSqliteRoutedConnectionFixture {
+    pub(in super::super) fn observe_main_shm_lock_created_first_shared_busy_close_succeeded_v1(
+        &self,
+        expectation: ManagedSqliteShmTestInitializationExpectationV1,
+        raw_flags: c_int,
+    ) -> Result<PendingManagedTestLockCreatedFirstSharedBusyCloseSucceededObservationV1, &'static str>
+    {
+        let witness = self
+            .route_entry
+            .as_ref()
+            .ok_or("managed Q18 initialization fixture route entry is not live")?
+            .installed_shm_fault_witness()?;
+        let observer = witness.observer()?;
+        let before = observer
+            .snapshot()
+            .map_err(|_| "managed Q18 initialization pre-snapshot failed")?;
+        observer.begin_lock_initialization_failure_observation_v1(expectation)?;
+        let after_arm = (|| {
+            let callback = self.observe_main_shm_lock_raw(
+                i32::from(expectation.first),
+                i32::from(expectation.count),
+                raw_flags,
+            )?;
+            let after = observer
+                .snapshot()
+                .map_err(|_| "managed Q18 initialization post-snapshot failed")?;
+            let pending_count = witness.pending_count()?;
+            Ok((callback, after, pending_count))
+        })();
+        let (callback, after, pending_count) = match after_arm {
+            Ok(values) => values,
+            Err(error) => {
+                observer.abort_created_first_shared_busy_close_succeeded_observation_v1()?;
+                return Err(error);
+            }
+        };
+        Ok(
+            PendingManagedTestLockCreatedFirstSharedBusyCloseSucceededObservationV1 {
+                callback,
+                before,
+                after,
+                observer,
+                pending_count,
+            },
+        )
+    }
+
     pub(in super::super) fn observe_main_shm_lock_created_first_exclusive_release_failure_v1(
         &self,
         expectation: ManagedSqliteShmTestInitializationExpectationV1,

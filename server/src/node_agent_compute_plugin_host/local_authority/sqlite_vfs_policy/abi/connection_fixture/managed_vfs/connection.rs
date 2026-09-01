@@ -22,7 +22,10 @@ mod lock_pre_managed;
 #[cfg(all(test, windows))]
 mod lock_raw;
 #[cfg(all(test, windows))]
-pub(super) use lock_initialization::ManagedTestLockInitializationFailureObservationV1;
+pub(super) use lock_initialization::{
+    ManagedTestLockCreatedFirstSharedBusyCloseSucceededObservationV1,
+    ManagedTestLockInitializationFailureObservationV1,
+};
 #[cfg(all(test, windows))]
 pub(super) use lock_raw::ManagedTestLockRawStateRejectionObservationV1;
 mod registry_lifecycle;

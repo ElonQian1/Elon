@@ -4,7 +4,7 @@ status: current
 reviewed_at: 2026-09-02
 owners: node, security
 design_status: design_frozen
-implementation_status: map_q4_lock_q17_source_written_uncompiled_unrun
+implementation_status: map_q4_lock_q18_source_written_uncompiled_unrun
 verification_status: source_review_only_current_not_run
 authority_scope: backend-a2-map-lock-dynamic-quotient-authority-v1
 ---
@@ -76,9 +76,9 @@ q3 的 `a2lockq3` version、selector 语义、135-value wire width 与 native-re
 对称 sibling 的 test-only route-preemption runner/selector/payload 源码桥只在同一 exact callback 已 admission 且 installed `xShmLock` 返回 `SQLITE_IOERR_SHMLOCK` 后、unsafe-retention lookup 前 one-shot 移除 route，再绑定 callback completion route-unknown、零 lower lock attempt、terminal custody 与 parent cleanup。它同样只是未编译、未运行的非授权 actual-receipt 源码形状。
 retention-succeeded 与 route-unknown sibling catalogs 各保持 1,320 rows/237,857 bytes，SHA-256 为 `4da94c20e91d97a0082116879718b1ccf0271eb235ed785e65a2e36e7a949d85`、`df931ad7725843098f228d07d9798d79e92f2beec4e1c23e83fc89219dfa1396`，逐行绑定 action/range/profile 与 `(case_key_sha256, full_record_sha256)`。
 
-## 4. Lock q5–q17 exact tranches
+## 4. Lock q5–q18 exact tranches
 
-q5–q17 的精确成员、lower/receipt source contract、catalog 与隔离约束由
+q5–q18 的精确成员、lower/receipt source contract、catalog 与隔离约束由
 [`Lock dynamic tranches authority`](node-plugin-vfs-lock-dynamic-tranches-authority.md) 维护。q9 只新增
 `LockPreManagedCallbackRejectionV1` 的 528 个 singleton member/group：88 个合法 request ×
 AdmissionRouteUnknown Direct、AdmissionCounterOverflow Direct、UnsupportedFileRole Completed/RouteUnknown、
@@ -89,7 +89,7 @@ ABI scalar gate 返回 `SQLITE_IOERR_SHMLOCK`。q11 只新增 `LockRawStateRejec
 两个 invalid-pointer premise 保持 excluded；typed matcher、seals、memory-safe child 和 production
 `xShmLock` raw admission/abandon/adapter/cleanup 的精确合同只由 Lock tranches authority 维护。未来回执只能标为
 `controlled_fault_actual`，不得冒充自然生产可达或普通 coverage。完整 3,432-member initialization umbrella
-仍在 q11 外；q12–q17 各承接 88 个，余下 2,904 members / 2,376 groups 保持 planned-missing。
+仍在 q11 外；q12–q18 各承接 88 个，余下 2,816 members / 2,288 groups 保持 planned-missing。
 
 q12 的首个冻结纵切命名为 `LockNativeAcquireCreatedFirstExclusiveReleaseErrorV1`，只承接 initialization
 namespace 中 `dms.created-first.exclusive-release-error` 的 88 个 singleton：44 个合法 native-acquire
@@ -167,13 +167,32 @@ future controlled-fault actual 必须先物理预创建并关闭 SHM，再从 co
 natural actual。q17 catalog 为 88 rows / 18,474 bytes，SHA-256=
 `5ce129843d33b279c9ec70dd282d59cc79455c8f1a1b652718bb04b72777adff`。
 
-完整 `LockNativeAcquireInitializationFailureV1` 仍是 3,432 members / 2,904 normalized groups，而不是
-q12–q17 六段的别名。其机械分期为 Open `792/792`、DMS exclusive acquire `528/440`、first-process
-truncate/release `528/528`、shared acquire `1,584/1,144`；六批共 528 个 source-only member/group 只建立可扩展 typed
-controller 的六个连续 vertical slice，后续 2,904 members / 2,376 groups 继续 planned-missing，不得由已写纵切推导完成。
+q18 的第七个冻结纵切命名为 `LockNativeAcquireCreatedFirstSharedBusyCloseSucceededV1`，只承接
+initialization namespace 中 `dms.created-first.shared-busy.close-ok` 的 88 个 singleton：同一 8 个 shared 单槽与
+36 个 exclusive 连续非空 range 各配两个 terminal，即 `16+72`，两个 completion 各 `44/44`。exact selector
+冻结为
+`initialization-{lock-shared|lock-exclusive}-first-{first}-count-{count}-created-first-shared-busy-close-succeeded-{retention-succeeded|retention-route-unknown-prior-quarantine}-terminal-route-unknown`；
+typed shape 固定 `phase/fault_site=DmsSharedAcquire`、`path=CreatedFirst`、`timing=AtCall`、
+`occurrence=Natural`、`class=BusyAfterKnownMutation`、`cleanup_rewrite=false`、source disposition=`Returned`、
+mutation known、lock certain、file/DMS=`Released`、DMS native lock/unlock=`2/1`，unsafe retention 后 terminal=
+`Quarantined`、callback/payload retained。future controlled-fault actual 必须经 test-only contention source seam
+让同一 `FileId` 的 distinct holder/target handles 真实争用：cold CreatedFirst target 完成 exclusive lock/truncate/
+unlock 后，holder 在 `SHM_DMS_OFFSET` 持 exclusive lock，target shared `LockFileEx` 恰一次 Contended，再显式
+成功关闭 target；holder/target attempts 与 cleanup 分账，terminal ledger 读取后才释放 holder。target DMS
+lock=`2/1/1`、unlock=`1/1`、close=`1/1`，holder acquire/unlock=`1/1`，requested-range native/local=`0/0`、
+managed=`1/0`、callback=`1/1`。`a2lockq18` 精确为 186 scalars，分区为
+`25+5+25+8+14+43+15+18+1+18+6+4+3+1`，绝对位置为 `[0,25) [25,30) [30,55) [55,63)
+[63,77) [77,120) [120,135) [135,153) [153] [154,172) [172,178) [178,182) [182,185) [185]`；它仍只能标记
+`controlled_fault_actual`，不得冒充 natural actual。q18 catalog 为 88 rows / 18,122 bytes，SHA-256=
+`4f78ff1678c93b1c06bad92e838423e4202598fd8e0b5b83f79cde0c528a07cd`。
 
-聚合未运行 inventory 预期现为 `4,196 present members /
-4,196 present groups / 4,472 missing members / 3,944 missing groups / 8,668 total members /
+完整 `LockNativeAcquireInitializationFailureV1` 仍是 3,432 members / 2,904 normalized groups，而不是
+q12–q18 七段的别名。其机械分期为 Open `792/792`、DMS exclusive acquire `528/440`、first-process
+truncate/release `528/528`、shared acquire `1,584/1,144`；七批共 616 个 source-only member/group 只建立可扩展 typed
+controller 的七个连续 vertical slice，后续 2,816 members / 2,288 groups 继续 planned-missing，不得由已写纵切推导完成。
+
+聚合未运行 inventory 预期现为 `4,284 present members /
+4,284 present groups / 4,384 missing members / 3,856 missing groups / 8,668 total members /
 8,140 total groups`；member coverage 仍为 `0/8,668`，无 actual
 record、reviewed digest、`Qlock` 或 Windows numerator。
 
@@ -260,9 +279,9 @@ canonical representative 执行真实 Windows child 后产生。
 
 当前该 bridge 只能失败关闭：Map source test 预期 `43,476` member 中有 `521` 个 source-present、`42,955` 个
 planned-missing；Lock source test 预期 `8,668 members / 8,140 groups` 中有
-`4,196 present members/groups`、`4,472 missing members / 3,944 missing groups`；两根 reviewed inventory
+`4,284 present members/groups`、`4,384 missing members / 3,856 missing groups`；两根 reviewed inventory
 digest 均尚未 checked-in/frozen。因此 provider authority 不可构造，
 full Map/Lock candidate 必须在 catalog/manifest 前分别原子失败；该结论没有运行证据，current source 仍为
 `passed=0 failed=0 actual=not_run`。Lock coverage=`0/8668`、`Qlock=unknown`、
 `WindowsDynamic=not_opened`、production closed；q9–q14 checkpoint 的 19-artifact global frozen/source-owner
-refresh 已逾期并继续独立 deferred，未来编译或 runtime acceptance 前的重生成/复核必须覆盖 q15–q17。
+refresh 已逾期并继续独立 deferred，未来编译或 runtime acceptance 前的重生成/复核必须覆盖 q15–q18。

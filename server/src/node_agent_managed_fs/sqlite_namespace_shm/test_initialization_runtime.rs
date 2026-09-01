@@ -15,6 +15,8 @@ use super::{
 
 #[path = "test_initialization_runtime/controller.rs"]
 mod controller;
+#[path = "test_initialization_runtime/created_first_shared_busy_close_succeeded.rs"]
+mod created_first_shared_busy_close_succeeded;
 #[path = "test_initialization_runtime/created_first_truncate_error_release_failed.rs"]
 mod created_first_truncate_error_release_failed;
 #[path = "test_initialization_runtime/created_first_truncate_error_release_succeeded.rs"]
@@ -27,8 +29,10 @@ mod existing_first_truncate_error_release_succeeded;
 mod model;
 
 pub(in crate::node_agent_managed_fs::sqlite_namespace::shm) use controller::ManagedSqliteShmTestInitializationControllerV1;
+pub(in crate::node_agent_managed_fs::sqlite_namespace::shm) use created_first_shared_busy_close_succeeded::ManagedSqliteShmTestQ18DmsHolderLeaseV1;
 use controller::{ColdPrestateV1, TerminalStateV1};
 pub(crate) use model::{
+    ManagedSqliteShmTestCreatedFirstSharedBusyCloseSucceededReceiptV1,
     ManagedSqliteShmTestInitializationEvidenceV1, ManagedSqliteShmTestInitializationExpectationV1,
     ManagedSqliteShmTestInitializationFailureV1,
     ManagedSqliteShmTestInitializationNativeObservationV1,
@@ -38,6 +42,20 @@ pub(crate) use model::{
 const CONTROLLER_POISONED: &str = "NODE_MANAGED_SQLITE_SHM_TEST_INITIALIZATION_CONTROLLER_POISONED";
 
 impl ManagedSqliteShmTestTargetObserver {
+    pub(crate) fn abort_created_first_shared_busy_close_succeeded_observation_v1(
+        &self,
+    ) -> Result<(), &'static str> {
+        let (coordinator, target) = self.initialization_authority_v1();
+        match coordinator.test_initialization_runtime.lock() {
+            Ok(mut controller) => controller.q18_abort_and_release(target),
+            Err(poisoned) => {
+                let mut controller = poisoned.into_inner();
+                let _ = controller.q18_abort_and_release(target);
+                Err(CONTROLLER_POISONED)
+            }
+        }
+    }
+
     pub(crate) fn begin_lock_initialization_failure_observation_v1(
         &self,
         expectation: ManagedSqliteShmTestInitializationExpectationV1,
@@ -116,6 +134,48 @@ impl ManagedSqliteShmTestTargetObserver {
             .lock()
             .map_err(|_| CONTROLLER_POISONED)?
             .finish(target, terminal, requested_lock)
+    }
+
+    pub(crate) fn finish_created_first_shared_busy_close_succeeded_observation_v1(
+        &self,
+    ) -> Result<ManagedSqliteShmTestCreatedFirstSharedBusyCloseSucceededReceiptV1, &'static str>
+    {
+        let (coordinator, target) = self.initialization_authority_v1();
+        let snapshot = match self.snapshot() {
+            Ok(snapshot) => snapshot,
+            Err(_) => {
+                self.abort_created_first_shared_busy_close_succeeded_observation_v1()?;
+                return Err("NODE_MANAGED_SQLITE_SHM_TEST_Q18_SNAPSHOT_FAILED");
+            }
+        };
+        let requested_lock = match coordinator.test_lock_runtime.lock() {
+            Ok(mut runtime) => {
+                runtime.finish_initialization_failure_after_managed_attempt(target)
+            }
+            Err(_) => Err("NODE_MANAGED_SQLITE_SHM_TEST_LOCK_RUNTIME_POISONED"),
+        };
+        let requested_lock = match requested_lock {
+            Ok(receipt) => receipt,
+            Err(error) => {
+                self.abort_created_first_shared_busy_close_succeeded_observation_v1()?;
+                return Err(error);
+            }
+        };
+        let finished = match coordinator.test_initialization_runtime.lock() {
+            Ok(mut controller) => controller.finish_q18(target, snapshot, requested_lock),
+            Err(poisoned) => {
+                let mut controller = poisoned.into_inner();
+                let _ = controller.q18_abort_and_release(target);
+                return Err(CONTROLLER_POISONED);
+            }
+        };
+        match finished {
+            Ok(receipt) => Ok(receipt),
+            Err(error) => {
+                let _ = self.abort_created_first_shared_busy_close_succeeded_observation_v1();
+                Err(error)
+            }
+        }
     }
 }
 

@@ -29,6 +29,7 @@ pub(crate) use super::sqlite_namespace::{
     ManagedSqliteMainCloseTestNativeRequest, ManagedSqliteMainCloseTestProtocolFailure,
     ManagedSqliteMainLockHeldRangePrestate, ManagedSqliteMainLockOffsetClass,
     ManagedSqliteShmTestConnectionDetachReceipt, ManagedSqliteShmTestDmsCustody,
+    ManagedSqliteShmTestCreatedFirstSharedBusyCloseSucceededReceiptV1,
     ManagedSqliteShmTestInitializationEvidenceV1, ManagedSqliteShmTestInitializationExpectationV1,
     ManagedSqliteShmTestInitializationFailureV1,
     ManagedSqliteShmTestInitializationNativeObservationV1,

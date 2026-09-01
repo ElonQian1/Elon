@@ -10,6 +10,7 @@ pub(crate) enum ManagedSqliteShmTestInitializationFailureV1 {
     ExistingFirstTruncateOutcomeUncertainReleaseSucceeded,
     CreatedFirstTruncateOutcomeUncertainReleaseFailed,
     ExistingFirstTruncateOutcomeUncertainReleaseFailed,
+    CreatedFirstSharedBusyCloseSucceeded,
 }
 
 impl ManagedSqliteShmTestInitializationFailureV1 {
@@ -21,7 +22,50 @@ impl ManagedSqliteShmTestInitializationFailureV1 {
             Self::ExistingFirstTruncateOutcomeUncertainReleaseSucceeded => 4,
             Self::CreatedFirstTruncateOutcomeUncertainReleaseFailed => 5,
             Self::ExistingFirstTruncateOutcomeUncertainReleaseFailed => 6,
+            Self::CreatedFirstSharedBusyCloseSucceeded => 7,
         }
+    }
+}
+
+/// Q18 keeps its successful native initialization and explicit close evidence outside the
+/// q12-q17 32-scalar failure ABI. The holder ledger is independently sealed as 15 scalars.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct ManagedSqliteShmTestCreatedFirstSharedBusyCloseSucceededReceiptV1 {
+    expectation: ManagedSqliteShmTestInitializationExpectationV1,
+    requested_lock: ManagedSqliteShmTestLockReceipt,
+    initialization_values: [u64; 43],
+    holder_values: [u64; 15],
+}
+
+impl ManagedSqliteShmTestCreatedFirstSharedBusyCloseSucceededReceiptV1 {
+    pub(super) const fn new(
+        expectation: ManagedSqliteShmTestInitializationExpectationV1,
+        requested_lock: ManagedSqliteShmTestLockReceipt,
+        initialization_values: [u64; 43],
+        holder_values: [u64; 15],
+    ) -> Self {
+        Self {
+            expectation,
+            requested_lock,
+            initialization_values,
+            holder_values,
+        }
+    }
+
+    pub(crate) const fn expectation(self) -> ManagedSqliteShmTestInitializationExpectationV1 {
+        self.expectation
+    }
+
+    pub(crate) const fn requested_lock_receipt(self) -> ManagedSqliteShmTestLockReceipt {
+        self.requested_lock
+    }
+
+    pub(crate) const fn initialization_values(self) -> [u64; 43] {
+        self.initialization_values
+    }
+
+    pub(crate) const fn holder_values(self) -> [u64; 15] {
+        self.holder_values
     }
 }
 
