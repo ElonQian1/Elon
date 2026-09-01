@@ -1,6 +1,7 @@
 package com.elon.app
 
 internal enum class ProjectPlazaPrimaryActionKind {
+    INSTALL,
     OPEN,
     JOIN,
     REQUEST_JOIN
@@ -29,6 +30,31 @@ internal fun projectPlazaPrimaryAction(
     requestPending: Boolean = false,
     busy: Boolean = false
 ): ProjectPlazaPrimaryAction {
+    val installAction = projectPlazaInstallAction(project, busy)
+    if (installAction != null) return installAction
+    return projectPlazaMembershipAction(project, joined, requestPending, busy)
+}
+
+internal fun projectPlazaInstallAction(
+    project: StoreProject,
+    busy: Boolean = false
+): ProjectPlazaPrimaryAction? {
+    val installAction = project.installAction
+        ?.takeIf { it.kind.equals("erp_blueprint", ignoreCase = true) }
+        ?: return null
+    return ProjectPlazaPrimaryAction(
+        kind = ProjectPlazaPrimaryActionKind.INSTALL,
+        label = if (busy) "正在创建…" else installAction.label,
+        enabled = !busy
+    )
+}
+
+internal fun projectPlazaMembershipAction(
+    project: StoreProject,
+    joined: Boolean,
+    requestPending: Boolean = false,
+    busy: Boolean = false
+): ProjectPlazaPrimaryAction {
     val action = when {
         joined -> ProjectPlazaPrimaryAction(ProjectPlazaPrimaryActionKind.OPEN, "进入空间")
         requestPending -> ProjectPlazaPrimaryAction(
@@ -51,6 +77,9 @@ internal fun projectPlazaPrimaryAction(
 }
 
 internal fun projectPlazaAccessStatus(project: StoreProject, joined: Boolean): ProjectPlazaStatus {
+    if (projectPlazaInstallAction(project) != null) {
+        return ProjectPlazaStatus("可创建", ProjectPlazaTone.SUCCESS)
+    }
     if (joined) return ProjectPlazaStatus("已加入", ProjectPlazaTone.SUCCESS)
     return when (normalizeProjectJoinMode(project.joinMode)) {
         PROJECT_JOIN_MODE_APPROVAL -> ProjectPlazaStatus("需审批", ProjectPlazaTone.DANGER)

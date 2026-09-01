@@ -25,6 +25,7 @@ internal data class StoreProject(
     val viewerRole: String? = null,
     val lastTaskStatus: String?,
     val latestApkUrl: String? = null,
+    val installAction: StoreProjectInstallAction? = null,
     val installCount: Int? = null,
     val commentCount: Int? = null,
     val apkSizeBytes: Long? = null,
@@ -42,6 +43,18 @@ internal data class StoreProject(
     val memoryScopeType: String? = null,
     val memoryScopeId: String? = null,
     val workspacePending: Boolean = false
+)
+
+internal data class StoreProjectInstallAction(
+    val kind: String,
+    val label: String
+)
+
+internal data class MarketplaceErpInstanceResult(
+    val sourceProjectId: String,
+    val projectId: String,
+    val projectName: String,
+    val targetRoute: String
 )
 
 internal fun StoreProject.displayTitle(): String {
@@ -202,6 +215,45 @@ internal fun fetchAllStoreProjects(
         offset += limit
     }
     return projects
+}
+
+internal fun createMarketplaceErpInstance(
+    http: OkHttpClient,
+    serverUrl: String,
+    sourceProjectId: String,
+    projectName: String,
+    industry: String,
+    token: String
+): MarketplaceErpInstanceResult {
+    val payload = JSONObject().apply {
+        put("project_name", projectName)
+        put("industry", industry)
+    }
+    val response = http.newCall(
+        Request.Builder()
+            .url("$serverUrl/api/store/projects/${storeUrlPart(sourceProjectId)}/erp-instances")
+            .post(payload.toString().toRequestBody("application/json".toMediaType()))
+            .header("Authorization", "Bearer $token")
+            .build()
+    ).execute()
+    val body = response.body?.string().orEmpty()
+    if (!response.isSuccessful) error(apiErrorMessage(body, response.code))
+    return parseMarketplaceErpInstanceResult(JSONObject(body), projectName)
+}
+
+internal fun parseMarketplaceErpInstanceResult(
+    root: JSONObject,
+    projectName: String
+): MarketplaceErpInstanceResult {
+    val instance = root.optJSONObject("instance") ?: error("响应缺少 instance")
+    val projectId = instance.optString("project_id").trim()
+    if (projectId.isBlank()) error("响应缺少 instance.project_id")
+    return MarketplaceErpInstanceResult(
+        sourceProjectId = root.optString("source_project_id").trim(),
+        projectId = projectId,
+        projectName = projectName.trim(),
+        targetRoute = root.optString("target_route").trim()
+    )
 }
 
 /** POST /api/projects — 创建私有 PC 托管项目，发布为联合项目时再设置公开 */
@@ -523,6 +575,7 @@ internal fun parseStoreProject(obj: JSONObject) = StoreProject(
     lastTaskStatus = obj.optString("last_task_status").takeIf { it.isNotBlank() },
     latestApkUrl = cleanProjectApkUrl(obj.optCleanStoreString("latest_apk_url"))
         ?: cleanProjectApkUrl(obj.optCleanStoreString("last_apk_url")),
+    installAction = parseStoreProjectInstallAction(obj.optJSONObject("install_action")),
     installCount = obj.optNullableInt("install_count")
         ?: obj.optNullableInt("installCount")
         ?: obj.optNullableInt("download_count")
@@ -560,6 +613,13 @@ internal fun parseStoreProject(obj: JSONObject) = StoreProject(
     memoryScopeType = obj.optCleanStoreString("memory_scope_type"),
     memoryScopeId = obj.optCleanStoreString("memory_scope_id")
 )
+
+internal fun parseStoreProjectInstallAction(obj: JSONObject?): StoreProjectInstallAction? {
+    val kind = obj?.optString("kind")?.trim().orEmpty()
+    if (kind.isBlank()) return null
+    val label = obj?.optString("label")?.trim().orEmpty().ifBlank { "创建项目" }
+    return StoreProjectInstallAction(kind = kind, label = label)
+}
 
 private fun parseCreatedStoreProject(obj: JSONObject, ownerAccount: String?) = StoreProject(
     id = obj.getString("id"),

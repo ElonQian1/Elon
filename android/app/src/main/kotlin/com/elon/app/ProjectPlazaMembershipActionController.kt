@@ -16,7 +16,7 @@ internal class ProjectPlazaMembershipActionController(
     private val busyProjectIds = mutableSetOf<String>()
     private val pendingRequestIds = mutableSetOf<String>()
 
-    fun presentation(project: StoreProject): ProjectPlazaPrimaryAction = projectPlazaPrimaryAction(
+    fun presentation(project: StoreProject): ProjectPlazaPrimaryAction = projectPlazaMembershipAction(
         project = project,
         joined = isJoined(project),
         requestPending = pendingRequestIds.contains(project.id),
@@ -27,6 +27,7 @@ internal class ProjectPlazaMembershipActionController(
         val action = presentation(project)
         if (!action.enabled) return
         when (action.kind) {
+            ProjectPlazaPrimaryActionKind.INSTALL -> return
             ProjectPlazaPrimaryActionKind.OPEN -> openProjectSpace(project)
             ProjectPlazaPrimaryActionKind.JOIN,
             ProjectPlazaPrimaryActionKind.REQUEST_JOIN -> performMembershipAction(project, action.kind)

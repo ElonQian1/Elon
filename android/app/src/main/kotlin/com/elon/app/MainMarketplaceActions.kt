@@ -56,6 +56,18 @@ internal class MainMarketplaceActions(
             onStateChanged = ::rerenderCurrentProjects
         )
     }
+    private val installActions by lazy {
+        ProjectPlazaInstallActionController(
+            activity = activity,
+            http = http,
+            serverUrl = serverUrl,
+            onCreated = { project ->
+                joinedIds.add(project.id)
+                openProjectSpace(project)
+            },
+            onStateChanged = ::rerenderCurrentProjects
+        )
+    }
     private val featuredSection by lazy {
         ProjectPlazaFeaturedSection(
             activity = activity,
@@ -64,8 +76,14 @@ internal class MainMarketplaceActions(
             reactionPrefs = reactionPrefs,
             openProjectSpace = openProjectSpace,
             isProjectJoined = ::isProjectJoined,
-            primaryAction = membershipActions::presentation,
-            onPrimaryAction = { project -> membershipActions.handle(project, openProjectSpace) }
+            primaryAction = { project ->
+                installActions.presentation(project) ?: membershipActions.presentation(project)
+            },
+            onPrimaryAction = { project ->
+                if (!installActions.handle(project)) {
+                    membershipActions.handle(project, openProjectSpace)
+                }
+            }
         )
     }
     private val filterChipViews = LinkedHashMap<String, TextView>()

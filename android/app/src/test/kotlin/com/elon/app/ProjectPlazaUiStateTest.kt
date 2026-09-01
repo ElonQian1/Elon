@@ -42,6 +42,33 @@ class ProjectPlazaUiStateTest {
     }
 
     @Test
+    fun installActionTakesPriorityAndUsesServerLabel() {
+        val installable = project("readonly").copy(
+            installAction = StoreProjectInstallAction("erp_blueprint", "创建我的店铺")
+        )
+        assertEquals(
+            ProjectPlazaPrimaryAction(ProjectPlazaPrimaryActionKind.INSTALL, "创建我的店铺"),
+            projectPlazaPrimaryAction(installable, joined = true)
+        )
+        assertEquals("可创建", projectPlazaAccessStatus(installable, joined = true).label)
+
+        val busy = projectPlazaPrimaryAction(installable, joined = false, busy = true)
+        assertEquals("正在创建…", busy.label)
+        assertFalse(busy.enabled)
+    }
+
+    @Test
+    fun unknownInstallKindsKeepMembershipFallback() {
+        val future = project("open").copy(
+            installAction = StoreProjectInstallAction("future_kind", "未来动作")
+        )
+        assertEquals(
+            ProjectPlazaPrimaryAction(ProjectPlazaPrimaryActionKind.JOIN, "加入项目"),
+            projectPlazaPrimaryAction(future, joined = false)
+        )
+    }
+
+    @Test
     fun approvalStatusTakesPriorityOverInstallability() {
         val approval = projectPlazaAccessStatus(
             project("approval").copy(latestApkUrl = "https://example.test/app.apk"),

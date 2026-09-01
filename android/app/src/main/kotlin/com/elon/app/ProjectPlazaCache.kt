@@ -49,42 +49,11 @@ internal class ProjectPlazaCache(context: Context) {
         val payload = JSONObject().apply {
             put("saved_at_ms", snapshot.savedAtMillis)
             put("projects", JSONArray().apply {
-                snapshot.projects.forEach { put(it.toCacheJson()) }
+                snapshot.projects.forEach { put(it.toProjectPlazaCacheJson()) }
             })
             put("joined_ids", JSONArray(snapshot.joinedIds.toList()))
         }
         preferences.edit().putString(KEY_PAYLOAD, payload.toString()).apply()
-    }
-
-    private fun StoreProject.toCacheJson(): JSONObject = JSONObject().apply {
-        put("id", id)
-        put("name", name)
-        displayName?.let { put("display_name", it) }
-        description?.let { put("description", it) }
-        put("template", template)
-        put("owner_account", ownerAccount)
-        put("owner_id", ownerUserId)
-        put("member_count", memberCount)
-        put("is_public", isPublic)
-        put("join_mode", joinMode)
-        viewerRole?.let { put("viewer_role", it) }
-        lastTaskStatus?.let { put("last_task_status", it) }
-        latestApkUrl?.let { put("latest_apk_url", it) }
-        installCount?.let { put("install_count", it) }
-        commentCount?.let { put("comment_count", it) }
-        apkSizeBytes?.let { put("latest_apk_size_bytes", it) }
-        apkSizeLabel?.let { put("apk_size_label", it) }
-        iconDataUrl?.let { put("icon_data_url", it) }
-        projectOriginType?.let { put("project_origin_type", it) }
-        projectOriginLabel?.let { put("project_origin_label", it) }
-        remoteConversationCount?.let { put("conversation_count", it) }
-        workspaceKind?.let { put("workspace_kind", it) }
-        workspaceHealthLabel?.let { put("workspace_health_label", it) }
-        workspaceHealthTone?.let { put("workspace_health_tone", it) }
-        archiveEntryKey?.let { put("archive_entry_key", it) }
-        archiveConversationTitle?.let { put("archive_conversation_title", it) }
-        memoryScopeType?.let { put("memory_scope_type", it) }
-        memoryScopeId?.let { put("memory_scope_id", it) }
     }
 
     private fun JSONArray?.toStringSet(): Set<String> {
@@ -99,4 +68,41 @@ internal class ProjectPlazaCache(context: Context) {
     private companion object {
         const val KEY_PAYLOAD = "project_plaza_snapshot_v1"
     }
+}
+
+internal fun StoreProject.toProjectPlazaCacheJson(): JSONObject = JSONObject().apply {
+    put("id", id)
+    put("name", name)
+    displayName?.let { put("display_name", it) }
+    description?.let { put("description", it) }
+    put("template", template)
+    put("owner_account", ownerAccount)
+    put("owner_id", ownerUserId)
+    put("member_count", memberCount)
+    put("is_public", isPublic)
+    put("join_mode", joinMode)
+    viewerRole?.let { put("viewer_role", it) }
+    lastTaskStatus?.let { put("last_task_status", it) }
+    latestApkUrl?.let { put("latest_apk_url", it) }
+    installAction?.let { action ->
+        put("install_action", JSONObject().apply {
+            put("kind", action.kind)
+            put("label", action.label)
+        })
+    }
+    installCount?.let { put("install_count", it) }
+    commentCount?.let { put("comment_count", it) }
+    apkSizeBytes?.let { put("latest_apk_size_bytes", it) }
+    apkSizeLabel?.let { put("apk_size_label", it) }
+    iconDataUrl?.let { put("icon_data_url", it) }
+    projectOriginType?.let { put("project_origin_type", it) }
+    projectOriginLabel?.let { put("project_origin_label", it) }
+    remoteConversationCount?.let { put("conversation_count", it) }
+    workspaceKind?.let { put("workspace_kind", it) }
+    workspaceHealthLabel?.let { put("workspace_health_label", it) }
+    workspaceHealthTone?.let { put("workspace_health_tone", it) }
+    archiveEntryKey?.let { put("archive_entry_key", it) }
+    archiveConversationTitle?.let { put("archive_conversation_title", it) }
+    memoryScopeType?.let { put("memory_scope_type", it) }
+    memoryScopeId?.let { put("memory_scope_id", it) }
 }
