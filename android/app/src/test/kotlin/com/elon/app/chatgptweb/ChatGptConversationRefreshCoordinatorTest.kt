@@ -44,6 +44,46 @@ class ChatGptConversationRefreshCoordinatorTest {
     }
 
     @Test
+    fun explicitRefreshQueuesUntilThePageBecomesReady() {
+        val scheduled = mutableListOf<Scheduled>()
+        var ready = false
+        var dispatches = 0
+        val coordinator = coordinator(scheduled) {
+            dispatches += 1
+            ready
+        }
+
+        assertTrue(coordinator.requestNow())
+        assertEquals(1, dispatches)
+        assertEquals(1_000L, scheduled.single().delayMs)
+        assertTrue(coordinator.isBusy)
+
+        ready = true
+        scheduled.removeAt(0).task.run()
+
+        assertEquals(2, dispatches)
+        assertTrue(coordinator.isBusy)
+        coordinator.onSucceeded()
+        assertFalse(coordinator.isBusy)
+    }
+
+    @Test
+    fun refreshAfterCurrentQueuesUntilThePageBecomesReady() {
+        val scheduled = mutableListOf<Scheduled>()
+        var ready = false
+        val coordinator = coordinator(scheduled) { ready }
+
+        assertTrue(coordinator.requestAfterCurrent())
+        assertEquals(1_000L, scheduled.single().delayMs)
+
+        ready = true
+        scheduled.removeAt(0).task.run()
+        assertTrue(coordinator.isBusy)
+        coordinator.onSucceeded()
+        assertFalse(coordinator.isBusy)
+    }
+
+    @Test
     fun explicitRefreshCancelsAWaitingRetryAndStartsImmediately() {
         val scheduled = mutableListOf<Scheduled>()
         var dispatches = 0

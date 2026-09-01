@@ -18,7 +18,7 @@ internal class ChatGptConversationRefreshCoordinator(
         if (inFlight) return true
         cancelScheduledRetry()
         retryIndex = 0
-        return dispatchIfIdle()
+        return dispatchOrScheduleRetry()
     }
 
     fun requestIfIdle(): Boolean {
@@ -34,7 +34,7 @@ internal class ChatGptConversationRefreshCoordinator(
             refreshAgain = true
             return true
         }
-        return dispatchIfIdle()
+        return dispatchOrScheduleRetry()
     }
 
     fun onSucceeded() {
@@ -59,6 +59,12 @@ internal class ChatGptConversationRefreshCoordinator(
     private fun dispatchIfIdle(): Boolean {
         if (inFlight) return false
         return dispatch().also { inFlight = it }
+    }
+
+    private fun dispatchOrScheduleRetry(): Boolean {
+        if (dispatchIfIdle()) return true
+        scheduleNextRetry()
+        return scheduledRetry != null
     }
 
     private fun scheduleNextRetry() {
