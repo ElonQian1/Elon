@@ -2,10 +2,17 @@
 
 use std::{path::Path, sync::Arc};
 
+#[cfg(all(test, windows))]
+use std::num::NonZeroU8;
+
 use anyhow::anyhow;
 use rusqlite::Connection;
 
 use super::*;
+#[cfg(all(test, windows))]
+use crate::node_agent_managed_fs::{
+    ManagedSqliteShmLockAttempt, ManagedSqliteShmLockRequest, ManagedSqliteShmTestLockExpectation,
+};
 
 const CONNECTION_COUNT: usize = 2;
 
@@ -156,6 +163,49 @@ impl ManagedSqliteMultiConnectionFixture {
             .expect("managed VFS registration")
             .lifecycle()
             .unsafe_shm_route_preemption_snapshot(route)
+    }
+
+    #[cfg(all(test, windows))]
+    pub(super) fn arm_ordinary_shm_lock_route_preemption(
+        &self,
+        index: usize,
+        expectation: ManagedSqliteShmTestLockExpectation,
+        expected_outcome: ManagedSqliteShmLockAttempt,
+    ) -> Result<(), &'static str> {
+        let route = self
+            .route_ordinal(index)
+            .map_err(|_| "managed route missing")?;
+        let request = ManagedSqliteShmLockRequest::new(
+            expectation.first,
+            NonZeroU8::new(expectation.count).ok_or("SHM Lock count must be non-zero")?,
+            expectation.action,
+        )
+        .map_err(|_| "SHM Lock expectation could not recreate exact request")?;
+        let low = 1u16 << expectation.first;
+        let high = 1u16 << (expectation.first + expectation.count);
+        if (high - low) as u8 != expectation.mask {
+            return Err("SHM Lock expectation mask does not match exact request");
+        }
+        self.registration
+            .as_ref()
+            .expect("managed VFS registration")
+            .lifecycle()
+            .arm_ordinary_shm_lock_route_preemption(route, request, expected_outcome)
+    }
+
+    #[cfg(all(test, windows))]
+    pub(super) fn ordinary_shm_lock_route_preemption_snapshot(
+        &self,
+        index: usize,
+    ) -> Result<ManagedTestOrdinaryShmLockRoutePreemptionSnapshot, &'static str> {
+        let route = self
+            .route_ordinal(index)
+            .map_err(|_| "managed route missing")?;
+        self.registration
+            .as_ref()
+            .expect("managed VFS registration")
+            .lifecycle()
+            .ordinary_shm_lock_route_preemption_snapshot(route)
     }
 
     #[cfg(all(test, windows))]

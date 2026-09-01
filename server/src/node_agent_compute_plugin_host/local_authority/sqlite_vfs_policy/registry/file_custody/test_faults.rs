@@ -11,11 +11,13 @@ use super::{
     ManagedSqliteRegistryPinnedFile, ManagedSqliteRegistryPinnedFileCloseRejection,
     ManagedSqliteRegistryPinnedFileCustody, ManagedSqliteRegistryUnmapRuntimeEvent,
 };
-#[cfg(windows)]
-use crate::node_agent_managed_fs::PinnedManagedSqliteFile;
 use crate::node_agent_managed_fs::{
     ManagedSqliteShmFailureClass, ManagedSqliteShmFailurePhase, ManagedSqliteShmTestFaultProbe,
     ManagedSqliteShmTestTargetObserver, ManagedSqliteWalMainCloseReceipt,
+};
+#[cfg(windows)]
+use crate::node_agent_managed_fs::{
+    ManagedSqliteShmLockAttempt, ManagedSqliteShmLockRequest, PinnedManagedSqliteFile,
 };
 
 use super::super::{
@@ -67,6 +69,40 @@ impl ManagedSqliteRegistryUnsafeShmRoutePreemptionReceipt {
     }
 }
 
+/// Ordered proof that an exact ordinary Lock result preceded test-only terminal preemption.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(in super::super::super) struct ManagedSqliteRegistryOrdinaryShmLockRoutePreemptionReceipt {
+    request_matched: bool,
+    lower_outcome_matched: bool,
+    preemption_retained: bool,
+    callback_completion_route_unknown: bool,
+}
+
+impl ManagedSqliteRegistryOrdinaryShmLockRoutePreemptionReceipt {
+    pub(in super::super::super) const fn new(
+        request_matched: bool,
+        lower_outcome_matched: bool,
+        preemption_retained: bool,
+        callback_completion_route_unknown: bool,
+    ) -> Self {
+        Self {
+            request_matched,
+            lower_outcome_matched,
+            preemption_retained,
+            callback_completion_route_unknown,
+        }
+    }
+
+    pub(in super::super::super) const fn ordered_values(self) -> [u64; 4] {
+        [
+            self.request_matched as u64,
+            self.lower_outcome_matched as u64,
+            self.preemption_retained as u64,
+            self.callback_completion_route_unknown as u64,
+        ]
+    }
+}
+
 pub(in super::super::super) trait ManagedSqliteRegistryCloseLifecycleFaults:
     Send + Sync + 'static
 {
@@ -95,6 +131,25 @@ pub(in super::super::super) trait ManagedSqliteRegistryCloseLifecycleFaults:
     fn record_unsafe_shm_route_preemption_receipt(
         &self,
         receipt: ManagedSqliteRegistryUnsafeShmRoutePreemptionReceipt,
+    ) -> Result<(), ()> {
+        let _ = receipt;
+        Ok(())
+    }
+
+    #[cfg(windows)]
+    fn claim_ordinary_shm_lock_route_preemption(
+        &self,
+        request: ManagedSqliteShmLockRequest,
+        outcome: ManagedSqliteShmLockAttempt,
+    ) -> Result<bool, ()> {
+        let _ = (request, outcome);
+        Ok(false)
+    }
+
+    #[cfg(windows)]
+    fn record_ordinary_shm_lock_route_preemption_receipt(
+        &self,
+        receipt: ManagedSqliteRegistryOrdinaryShmLockRoutePreemptionReceipt,
     ) -> Result<(), ()> {
         let _ = receipt;
         Ok(())

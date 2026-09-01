@@ -96,14 +96,16 @@ use fault_script::{
     ManagedTestCallbackFaultOperation, ManagedTestCallbackFaultStep,
     ManagedTestCallbackFaultTiming, ManagedTestFaultingFile, ManagedTestRouteOrdinal,
 };
-#[cfg(all(test, windows))]
-use lifecycle_faults::ManagedTestUnsafeShmRoutePreemptionSnapshot;
 use lifecycle_faults::{
     ManagedTestJointCloseControl, ManagedTestJointCloseControlSnapshot,
     ManagedTestLifecycleFaultBinding, ManagedTestLifecycleFaultController,
     ManagedTestLifecycleFaultObservation, ManagedTestLifecycleFaultPhase,
     ManagedTestLifecycleFaultStep, ManagedTestLifecycleFaultTiming,
     ManagedTestRegistryLifecycleControl, ManagedTestRegistryLifecycleTraceSnapshot,
+};
+#[cfg(all(test, windows))]
+use lifecycle_faults::{
+    ManagedTestOrdinaryShmLockRoutePreemptionSnapshot, ManagedTestUnsafeShmRoutePreemptionSnapshot,
 };
 #[cfg(all(test, windows))]
 use live_registration::ManagedTestVfsLiveRegistrationSnapshot;

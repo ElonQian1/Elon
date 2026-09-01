@@ -34,6 +34,13 @@ pub(super) use unsafe_shm_preemption::ManagedTestUnsafeShmRoutePreemptionSnapsho
 use unsafe_shm_preemption::ManagedTestUnsafeShmRoutePreemptionState;
 
 #[cfg(all(test, windows))]
+mod ordinary_shm_lock_preemption;
+#[cfg(all(test, windows))]
+pub(super) use ordinary_shm_lock_preemption::ManagedTestOrdinaryShmLockRoutePreemptionSnapshot;
+#[cfg(all(test, windows))]
+use ordinary_shm_lock_preemption::ManagedTestOrdinaryShmLockRoutePreemptionState;
+
+#[cfg(all(test, windows))]
 mod joint_close;
 #[cfg(all(test, windows))]
 pub(super) use joint_close::{ManagedTestJointCloseControl, ManagedTestJointCloseControlSnapshot};
@@ -144,6 +151,8 @@ struct ManagedTestLifecycleFaultState {
     joint_close: joint_close::ManagedTestJointCloseState,
     #[cfg(all(test, windows))]
     unsafe_shm_preemption: ManagedTestUnsafeShmRoutePreemptionState,
+    #[cfg(all(test, windows))]
+    ordinary_shm_lock_preemption: ManagedTestOrdinaryShmLockRoutePreemptionState,
     installed: bool,
     #[cfg(all(test, windows))]
     registration_shutdown_quarantine: ManagedTestRegistrationShutdownQuarantineState,
@@ -169,6 +178,9 @@ impl ManagedTestLifecycleFaultController {
                 joint_close: joint_close::ManagedTestJointCloseState::default(),
                 #[cfg(all(test, windows))]
                 unsafe_shm_preemption: ManagedTestUnsafeShmRoutePreemptionState::default(),
+                #[cfg(all(test, windows))]
+                ordinary_shm_lock_preemption:
+                    ManagedTestOrdinaryShmLockRoutePreemptionState::default(),
                 installed: false,
                 #[cfg(all(test, windows))]
                 registration_shutdown_quarantine:

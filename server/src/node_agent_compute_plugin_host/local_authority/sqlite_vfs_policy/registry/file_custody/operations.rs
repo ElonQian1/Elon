@@ -25,6 +25,8 @@ use super::super::{
     types::{ManagedSqliteRegistryCallbackKind, ManagedSqliteRegistryTerminalReason},
 };
 
+#[cfg(all(test, windows))]
+mod ordinary_shm_lock_preemption;
 mod unmap;
 
 #[derive(Debug, Clone, Copy)]
@@ -193,7 +195,7 @@ where
         region_size: NonZeroU32,
         mode: ManagedSqliteShmMapMode,
     ) -> Result<ManagedSqliteShmMapOutcome, ManagedSqliteRegistryPinnedFileOperationRejection> {
-        self.with_shm(|shm| shm.map(region, region_size, mode))
+        self.with_shm(|shm| shm.map(region, region_size, mode), |_| None)
     }
 
     pub(super) fn shm_lock(
@@ -201,7 +203,7 @@ where
         request: ManagedSqliteShmLockRequest,
     ) -> Result<ManagedSqliteShmLockAttempt, ManagedSqliteRegistryPinnedFileOperationRejection>
     {
-        self.with_shm(|shm| shm.lock(request))
+        self.with_shm(|shm| shm.lock(request), |outcome| Some((request, *outcome)))
     }
 
     pub(super) fn shm_barrier(
@@ -338,6 +340,12 @@ where
         operation: impl FnOnce(
             &mut crate::node_agent_managed_fs::PinnedManagedSqliteShmConnection,
         ) -> Result<T, ManagedSqliteShmFailure>,
+        _ordinary_lock_result: impl FnOnce(
+            &T,
+        ) -> Option<(
+            ManagedSqliteShmLockRequest,
+            ManagedSqliteShmLockAttempt,
+        )>,
     ) -> Result<T, ManagedSqliteRegistryPinnedFileOperationRejection> {
         let callback = self
             .owner
@@ -358,6 +366,8 @@ where
         })();
         #[cfg(all(test, windows))]
         let mut preemption_receipt = None;
+        #[cfg(all(test, windows))]
+        let ordinary_lock_preemption_receipt;
         if let Err(ManagedSqliteRegistryPinnedFileOperationRejection::Shm(failure)) = &result {
             #[cfg(all(test, windows))]
             let preemption_retained = unsafe_shm_failure_marker(failure).and_then(|marker| {
@@ -385,6 +395,16 @@ where
                 ));
             }
         }
+        #[cfg(all(test, windows))]
+        {
+            ordinary_lock_preemption_receipt = result
+                .as_ref()
+                .ok()
+                .and_then(_ordinary_lock_result)
+                .and_then(|(request, outcome)| {
+                    self.preempt_ordinary_shm_lock_route(request, outcome)
+                });
+        }
         let callback_completion = callback.complete();
         #[cfg(all(test, windows))]
         if let Some((preemption_retained, unsafe_retention_route_unknown)) = preemption_receipt {
@@ -398,6 +418,11 @@ where
                 );
             }
         }
+        #[cfg(all(test, windows))]
+        self.record_ordinary_shm_lock_route_preemption(
+            ordinary_lock_preemption_receipt,
+            &callback_completion,
+        );
         match (result, callback_completion) {
             (Err(rejection), _) => Err(rejection),
             (Ok(value), Err(rejection)) => Err(

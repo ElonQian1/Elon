@@ -26,6 +26,8 @@ pub(in crate::node_agent_compute_plugin_host::local_authority) use file_custody:
 pub(in crate::node_agent_compute_plugin_host::local_authority) use owner::ManagedSqliteRegistryCustody;
 pub(in crate::node_agent_compute_plugin_host::local_authority) use process_owner::ManagedSqliteRegistryNonceSource;
 
+#[cfg(all(test, windows))]
+pub(super) use file_custody::test_faults::ManagedSqliteRegistryOrdinaryShmLockRoutePreemptionReceipt;
 #[cfg(test)]
 pub(super) use file_custody::ManagedSqliteRegistryUnmapRuntimeEvent;
 #[cfg(all(test, windows))]

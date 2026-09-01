@@ -38,7 +38,7 @@ mod promotion;
 #[cfg(all(test, windows))]
 mod registry_lifecycle;
 #[cfg(test)]
-mod test_faults;
+pub(super) mod test_faults;
 
 #[cfg(test)]
 pub(in super::super) use lifecycle_events::ManagedSqliteRegistryUnmapRuntimeEvent;

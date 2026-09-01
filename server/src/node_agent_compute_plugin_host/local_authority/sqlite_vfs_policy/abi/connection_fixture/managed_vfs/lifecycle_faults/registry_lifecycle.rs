@@ -6,7 +6,9 @@ use std::sync::atomic::Ordering;
 use super::*;
 use crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::registry::{
     ManagedSqliteRegistryCloseLifecycleFaults, ManagedSqliteRegistryCloseLifecyclePhase,
-    ManagedSqliteRegistryLifecycleStage, ManagedSqliteRegistryUnsafeShmRoutePreemptionReceipt,
+    ManagedSqliteRegistryLifecycleStage,
+    ManagedSqliteRegistryOrdinaryShmLockRoutePreemptionReceipt,
+    ManagedSqliteRegistryUnsafeShmRoutePreemptionReceipt,
 };
 use crate::node_agent_managed_fs::PinnedManagedSqliteFile;
 
