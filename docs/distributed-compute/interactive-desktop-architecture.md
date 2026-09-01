@@ -104,6 +104,8 @@ HostLease 授权一台精确 Provider/Executor 提供一段 Session。它包含 
 
 HostLease 不包含可重放认证材料。节点身份、一次性 ticket 与短期 TURN credential 由私密信道传递，业务 Store 只保存不可逆引用或摘要。
 
+Host 本地同意不是一个孤立摘要，而是带 schema、policy/revision/currentness 和有效期的权限绑定；它精确约束 Session、binding、HostLease、fencing、所选 surface 以及允许的画面、音频和输入权限。ViewerGrant 与 ControlEpoch 都必须是这份 Host 同意的子集，任何一层都不能把“仅观看”升级成键鼠控制。
+
 ### 4.5 ViewerGrant
 
 ViewerGrant 精确绑定 Consumer account、Consumer device、Session、角色和过期时间：
@@ -118,6 +120,8 @@ ViewerGrant 精确绑定 Consumer account、Consumer device、Session、角色�
 
 Session ID 在有限重连期间稳定。每次 WebRTC connection takeover 或重连创建递增 `media_epoch`；旧 epoch 的媒体、统计和信令失效。每次控制权授予、撤销或重新连接创建递增 `control_epoch`；输入消息必须同时匹配当前 HostLease fencing、MediaEpoch 和 ControlEpoch。
 
+TURN authority 只保存不可逆 allocation/grant 摘要，但其 scope 必须逐字段绑定 Session、federation binding、HostLease/fencing、ViewerGrant/generation、Viewer transport identity 和 MediaEpoch/sequence；另一会话或旧 epoch 的 relay authority 不能替换复用。
+
 Provider 本地按键、鼠标或紧急热键优先。断开时 Host 必须合成完整 key-up/button-up 恢复，避免远端按键卡住。
 
 ### 4.7 Usage 与 Terminal Receipt
@@ -129,6 +133,10 @@ Provider 本地按键、鼠标或紧急热键优先。断开时 Host 必须合�
 - `consumer_observed`：解码、播放、掉帧和输入 ACK；
 - `verified`：Verification 接受的有效区间与 meter；
 - `compensable`：受 Offer、Reservation 和 SLA 上限约束的 Provider 可补偿用量。
+
+每份 Usage Receipt 使用单调 `usage_sequence` 和前序回执摘要，各 source layer 也绑定前序 sample 摘要；下一累计 opening 必须等于上一 closing，区间不得重叠。后续 Store 必须以 Session 单头 CAS 追加，拒绝两个 sequence-1 根、重放、重置或并行分叉，结构自洽不能替代这项事务权威。
+
+Raw Usage 只包含 declared/transport/consumer 事实，不前向引用验证结果。Verification 作为后继 DAG 节点单向绑定 Usage digest、当前验证策略和实际 verified/compensable layer；跨对象校验必须核对 receipt id/digest/status、Session 和 binding。TURN 字节属于平台/中继成本层，不能进入 Provider compensable meter 集合。
 
 终态回执绑定上述证据摘要、终止原因、最终 HostLease/MediaEpoch/ControlEpoch、Offer、Profile、PriceSnapshot 和容量因果链。原始画面、音频、输入、SDP、ICE 和密钥不进入回执。
 
