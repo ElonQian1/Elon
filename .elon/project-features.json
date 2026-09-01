@@ -14112,7 +14112,7 @@
       "id": "yilong-quant-esk-paper-asset-projection-v1",
       "title": "一龙量化 ESK Paper 资产投影 V1",
       "summary": "主项目从唯一 ESK 账本签发最长五分钟的只读资产投影，并通过既有安全启动通道交给量化项目验签、绑定同一用户和独立展示；不复制余额、不锁仓、不申购、不移动资金。",
-      "status": "verified",
+      "status": "released",
       "priority": "p0",
       "requirement": {
         "path": "docs/requirements/yilong-quant-esk-paper-asset-projection-v1.md",
@@ -14288,7 +14288,7 @@
         }
       ],
       "created_at_ms": 1788302491486,
-      "updated_at_ms": 1788304732296
+      "updated_at_ms": 1788305520651
     },
     {
       "id": "yilong-quant-paper-grant-revocation-sync-v1",
@@ -14491,16 +14491,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_b1d58295f6a8496fb6137cfaed85b1e0",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "claimed",
-      "actor": "Codex q11 root",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788255360820
-    },
     {
       "id": "feature_event_50230f5a25284695afac043667436c8d",
       "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
@@ -16490,6 +16480,16 @@
       "from_status": "in_progress",
       "to_status": "blocked",
       "at_ms": 1788305044753
+    },
+    {
+      "id": "feature_event_d7750a856952468bac75d497bde472dd",
+      "feature_id": "yilong-quant-esk-paper-asset-projection-v1",
+      "action": "transitioned",
+      "actor": "codex/root",
+      "reason": "主项目 00920f77a619eed52744efa854d8d360a5a42641 已推送并发布 Server v0.3.1713/PC；量化 3efcd23 与 f4c9666 已推送，公开量化环境仍 planned。",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1788305520651
     }
   ]
 }
