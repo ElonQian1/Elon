@@ -19,6 +19,7 @@ use super::super::{
     clean_optional, is_system_project_source_type, normalize_account, now, project_branding,
     ProjectDeletionTarget, ProjectMemberEntry, PublicProjectItem, Store,
 };
+use super::install_action;
 
 impl Store {
     // ─── 商店浏览 ────────────────────────────────────────────────────────────
@@ -92,7 +93,17 @@ impl Store {
                p.source_type,
                p.workspace_path,
                p.display_name,
-               pm.role
+               pm.role,
+               EXISTS(
+                 SELECT 1
+                   FROM erp_blueprints eb
+                  WHERE eb.source_project_id = p.id
+                    AND eb.status = 'active'
+                    AND EXISTS(
+                      SELECT 1 FROM erp_blueprint_versions ebv
+                       WHERE ebv.blueprint_id = eb.id AND ebv.status = 'published'
+                    )
+               ) AS has_installable_erp_blueprint
              FROM projects p
              JOIN project_members pm ON pm.project_id = p.id
              LEFT JOIN users u ON u.id = p.created_by
@@ -116,6 +127,7 @@ impl Store {
                     last_task_status: row.get(8)?,
                     latest_apk_url: row.get(9)?,
                     icon_data_url: row.get(10)?,
+                    install_action: install_action(row.get::<_, i64>(18)? != 0),
                     created_at: row.get(11)?,
                     updated_at: row.get(12)?,
                     owner_id: row.get(13).unwrap_or_default(),

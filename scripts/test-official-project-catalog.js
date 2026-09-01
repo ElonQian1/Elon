@@ -1,0 +1,36 @@
+const assert = require('node:assert/strict')
+const fs = require('node:fs')
+const path = require('node:path')
+
+const root = path.resolve(__dirname, '..')
+const catalog = JSON.parse(fs.readFileSync(
+  path.join(root, 'server/src/official_project_catalog/catalog.json'),
+  'utf8',
+))
+const source = fs.readFileSync(
+  path.join(root, 'server/src/official_project_catalog/mod.rs'),
+  'utf8',
+)
+
+assert.equal(catalog.schema, 'yilong.official_project_catalog.v1')
+assert.ok(Array.isArray(catalog.projects) && catalog.projects.length > 0)
+assert.equal(new Set(catalog.projects.map((project) => project.id)).size, catalog.projects.length)
+assert.match(source, /include_str!\("catalog\.json"\)/)
+assert.match(source, /for project in &catalog\.projects/)
+
+for (const project of catalog.projects) {
+  assert.ok(project.id && project.name && project.display_name && project.description)
+  assert.equal(project.blueprint.schema, 'yilong.erp.blueprint.v1')
+  assert.equal(project.blueprint.source_project_id, project.id)
+  assert.equal(project.release.schema, 'yilong.erp.release.v1')
+  assert.equal(project.release.blueprint_key, project.blueprint.blueprint_key)
+  assert.match(project.release.source_git_commit, /^[0-9a-f]{40}$/)
+  assert.ok(project.landing.title && project.landing.summary)
+
+  const blueprintModules = new Set(project.blueprint.modules.map((module) => module.module_key))
+  for (const module of project.release.modules) {
+    assert.ok(blueprintModules.has(module.module_key), `${project.id}: release module ${module.module_key} is missing from blueprint`)
+  }
+}
+
+console.log(`Official project catalog contracts passed (${catalog.projects.length} project(s))`)

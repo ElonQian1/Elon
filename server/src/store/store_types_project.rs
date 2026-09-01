@@ -39,8 +39,25 @@ pub struct PublicProjectItem {
     pub last_task_status: Option<String>,
     pub latest_apk_url: Option<String>,
     pub icon_data_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub install_action: Option<PublicProjectInstallAction>,
     pub created_at: String,
     pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct PublicProjectInstallAction {
+    pub kind: &'static str,
+    pub label: &'static str,
+}
+
+impl PublicProjectInstallAction {
+    pub(crate) fn erp_blueprint() -> Self {
+        Self {
+            kind: "erp_blueprint",
+            label: "创建我的店铺",
+        }
+    }
 }
 
 /// 项目成员条目（商店/成员列表用）

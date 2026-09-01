@@ -17,7 +17,8 @@ use super::project_roles::{
 };
 use super::{
     clean_optional, is_system_project_source_type, normalize_account, now, project_branding,
-    ProjectDeletionTarget, ProjectMemberEntry, PublicProjectItem, Store,
+    ProjectDeletionTarget, ProjectMemberEntry, PublicProjectInstallAction, PublicProjectItem,
+    Store,
 };
 
 impl Store {
@@ -89,7 +90,17 @@ impl Store {
               p.display_name,
               (SELECT pm.role FROM project_members pm
                WHERE pm.project_id = p.id AND pm.user_id = ?6
-               LIMIT 1) AS viewer_role
+               LIMIT 1) AS viewer_role,
+              EXISTS(
+                SELECT 1
+                  FROM erp_blueprints eb
+                 WHERE eb.source_project_id = p.id
+                   AND eb.status = 'active'
+                   AND EXISTS(
+                     SELECT 1 FROM erp_blueprint_versions ebv
+                      WHERE ebv.blueprint_id = eb.id AND ebv.status = 'published'
+                   )
+              ) AS has_installable_erp_blueprint
             FROM projects p
             LEFT JOIN users u ON u.id = p.created_by
              WHERE p.is_public = 1
@@ -150,6 +161,7 @@ impl Store {
                         last_task_status: row.get(8)?,
                         latest_apk_url: row.get(9)?,
                         icon_data_url: row.get(10)?,
+                        install_action: install_action(row.get::<_, i64>(18)? != 0),
                         created_at: row.get(11)?,
                         updated_at: row.get(12)?,
                         owner_id: row.get(13).unwrap_or_default(),
@@ -264,7 +276,17 @@ impl Store {
                p.display_name,
                (SELECT pm.role FROM project_members pm
                 WHERE pm.project_id = p.id AND pm.user_id = ?2
-                LIMIT 1) AS viewer_role
+                LIMIT 1) AS viewer_role,
+               EXISTS(
+                 SELECT 1
+                   FROM erp_blueprints eb
+                  WHERE eb.source_project_id = p.id
+                    AND eb.status = 'active'
+                    AND EXISTS(
+                      SELECT 1 FROM erp_blueprint_versions ebv
+                       WHERE ebv.blueprint_id = eb.id AND ebv.status = 'published'
+                    )
+               ) AS has_installable_erp_blueprint
              FROM projects p
              LEFT JOIN users u ON u.id = p.created_by
              WHERE p.id = ?1
@@ -288,6 +310,7 @@ impl Store {
                         last_task_status: row.get(8)?,
                         latest_apk_url: row.get(9)?,
                         icon_data_url: row.get(10)?,
+                        install_action: install_action(row.get::<_, i64>(18)? != 0),
                         created_at: row.get(11)?,
                         updated_at: row.get(12)?,
                         owner_id: row.get(13).unwrap_or_default(),
@@ -456,6 +479,12 @@ impl Store {
         )?;
         Ok(())
     }
+}
+
+pub(super) fn install_action(
+    has_installable_erp_blueprint: bool,
+) -> Option<PublicProjectInstallAction> {
+    has_installable_erp_blueprint.then(PublicProjectInstallAction::erp_blueprint)
 }
 
 pub(crate) mod listing_cursor;

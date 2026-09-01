@@ -213,6 +213,9 @@ impl AppState {
                 .unwrap_or_else(|| data_dir.join("elon.db").to_string_lossy().to_string()),
         );
         let store = Store::open(&database_path)?;
+        if crate::official_project_catalog::ensure(&store)? {
+            tracing::info!("官方商户 ERP 项目目录已就绪");
+        }
 
         let project_root_str =
             std::env::var("WORKSPACE_ROOT").unwrap_or_else(|_| "/opt/elon/workspaces".into());

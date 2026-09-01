@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use super::super::project_roles::project_member_effective_role_locked;
 use super::super::{project_branding, PublicProjectItem, Store};
+use super::install_action;
 
 const STORE_CURSOR_VERSION: u8 = 1;
 
@@ -120,7 +121,17 @@ impl Store {
                 p.display_name,
                 (SELECT pm.role FROM project_members pm
                  WHERE pm.project_id = p.id AND pm.user_id = ?5
-                 LIMIT 1) AS viewer_role
+                 LIMIT 1) AS viewer_role,
+                EXISTS(
+                  SELECT 1
+                    FROM erp_blueprints eb
+                   WHERE eb.source_project_id = p.id
+                     AND eb.status = 'active'
+                     AND EXISTS(
+                       SELECT 1 FROM erp_blueprint_versions ebv
+                        WHERE ebv.blueprint_id = eb.id AND ebv.status = 'published'
+                     )
+                ) AS has_installable_erp_blueprint
               FROM projects p
               LEFT JOIN users u ON u.id = p.created_by
               WHERE p.is_public = 1
@@ -259,6 +270,7 @@ fn project_listing_row(
         last_task_status: row.get(8)?,
         latest_apk_url: row.get(9)?,
         icon_data_url: row.get(10)?,
+        install_action: install_action(row.get::<_, i64>(18)? != 0),
         created_at: row.get(11)?,
         updated_at: row.get(12)?,
         owner_id: row.get(13).unwrap_or_default(),

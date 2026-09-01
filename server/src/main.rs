@@ -277,6 +277,7 @@ mod node_registry;
 mod node_router;
 mod node_runtime;
 mod node_scheduler;
+mod official_project_catalog;
 mod offline_completion_migration;
 mod open_commerce_action_confirmation_api;
 mod open_commerce_action_confirmation_mcp;
@@ -770,8 +771,7 @@ async fn main() -> Result<()> {
     const STALE_RUNNING_TASK_TIMEOUT_SECS: u64 = 45 * 60;
 
     // 定期清理：长期 running 的任务自动标记为 failed。
-    // PC 节点上的 Codex 发布/首次编译可能因为 cargo build、上传和服务重启超过 10 分钟；
-    // 阈值需要覆盖真实发布窗口，避免发布已成功但频道任务先被标记失败。
+    // 阈值覆盖 PC 节点的构建、上传和重启窗口，避免发布成功前频道任务被标记失败。
     {
         let state_cleanup = state.clone();
         tokio::spawn(async move {

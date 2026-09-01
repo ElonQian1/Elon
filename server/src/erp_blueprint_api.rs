@@ -13,7 +13,7 @@ use std::sync::Arc;
 
 use crate::{
     erp_blueprint::{
-        catalog_service, instance_service, managed_rollout, materialization,
+        catalog_service, instance_service, managed_rollout, marketplace, materialization,
         model::{
             CreateBlueprintRequest, CreateBlueprintVersionRequest, CreateErpInstanceRequest,
             DecideProposalRequest, DecideUpgradeRequest, EvolveBlueprintRequest,
@@ -109,6 +109,7 @@ pub fn routes() -> Router<Arc<AppState>> {
             post(decide_upgrade),
         )
         .merge(managed_rollout::api::routes())
+        .merge(marketplace::api::routes())
 }
 
 async fn overview(
