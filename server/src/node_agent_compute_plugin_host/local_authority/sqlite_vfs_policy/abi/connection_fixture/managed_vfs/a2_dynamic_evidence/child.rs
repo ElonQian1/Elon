@@ -7,6 +7,7 @@ pub(super) mod lock_created_first_exclusive_release_error;
 pub(super) mod lock_created_first_truncate_error_release_failed;
 pub(super) mod lock_created_first_truncate_error_release_succeeded;
 pub(super) mod lock_existing_first_exclusive_release_error;
+pub(super) mod lock_existing_first_truncate_error_release_failed;
 pub(super) mod lock_existing_first_truncate_error_release_succeeded;
 pub(super) mod lock_lifecycle;
 pub(super) mod lock_local_protocol_rejection;

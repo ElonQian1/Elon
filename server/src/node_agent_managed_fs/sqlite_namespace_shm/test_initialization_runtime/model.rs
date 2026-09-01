@@ -9,6 +9,7 @@ pub(crate) enum ManagedSqliteShmTestInitializationFailureV1 {
     CreatedFirstTruncateOutcomeUncertainReleaseSucceeded,
     ExistingFirstTruncateOutcomeUncertainReleaseSucceeded,
     CreatedFirstTruncateOutcomeUncertainReleaseFailed,
+    ExistingFirstTruncateOutcomeUncertainReleaseFailed,
 }
 
 impl ManagedSqliteShmTestInitializationFailureV1 {
@@ -19,6 +20,7 @@ impl ManagedSqliteShmTestInitializationFailureV1 {
             Self::CreatedFirstTruncateOutcomeUncertainReleaseSucceeded => 3,
             Self::ExistingFirstTruncateOutcomeUncertainReleaseSucceeded => 4,
             Self::CreatedFirstTruncateOutcomeUncertainReleaseFailed => 5,
+            Self::ExistingFirstTruncateOutcomeUncertainReleaseFailed => 6,
         }
     }
 }

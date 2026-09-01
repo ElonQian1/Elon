@@ -40,6 +40,7 @@ pub(super) use lock_program::{
     native_acquire_created_first_truncate_error_release_failed_catalog_row_count_for_test,
     native_acquire_created_first_truncate_error_release_succeeded_catalog_row_count_for_test,
     native_acquire_existing_first_exclusive_release_error_catalog_row_count_for_test,
+    native_acquire_existing_first_truncate_error_release_failed_catalog_row_count_for_test,
     native_acquire_existing_first_truncate_error_release_succeeded_catalog_row_count_for_test,
     pre_managed_callback_rejection_catalog_row_count_for_test,
     raw_state_rejection_catalog_row_count_for_test, stored_poison_catalog_row_count_for_test,
@@ -55,6 +56,7 @@ pub(super) use lock_program::{
     NATIVE_ACQUIRE_CREATED_FIRST_TRUNCATE_ERROR_RELEASE_FAILED_PROJECTOR_DELTA_V1,
     NATIVE_ACQUIRE_CREATED_FIRST_TRUNCATE_ERROR_RELEASE_SUCCEEDED_PROJECTOR_DELTA_V1,
     NATIVE_ACQUIRE_EXISTING_FIRST_EXCLUSIVE_RELEASE_ERROR_PROJECTOR_DELTA_V1,
+    NATIVE_ACQUIRE_EXISTING_FIRST_TRUNCATE_ERROR_RELEASE_FAILED_PROJECTOR_DELTA_V1,
     NATIVE_ACQUIRE_EXISTING_FIRST_TRUNCATE_ERROR_RELEASE_SUCCEEDED_PROJECTOR_DELTA_V1,
     PRE_MANAGED_CALLBACK_REJECTION_PROJECTOR_DELTA_V1, RAW_STATE_REJECTION_PROJECTOR_DELTA_V1,
 };

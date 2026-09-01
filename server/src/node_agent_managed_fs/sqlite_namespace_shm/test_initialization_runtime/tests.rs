@@ -63,6 +63,15 @@ fn truncate_release_failed_expectation() -> ManagedSqliteShmTestInitializationEx
     }
 }
 
+fn existing_first_truncate_release_failed_expectation(
+) -> ManagedSqliteShmTestInitializationExpectationV1 {
+    ManagedSqliteShmTestInitializationExpectationV1 {
+        case_v1:
+            ManagedSqliteShmTestInitializationFailureV1::ExistingFirstTruncateOutcomeUncertainReleaseFailed,
+        ..expectation()
+    }
+}
+
 fn request() -> ManagedSqliteShmLockRequest {
     ManagedSqliteShmLockRequest::new(
         0,
@@ -179,6 +188,26 @@ fn advance_q16_to_truncate_attempt(
     assert!(controller.record_request(TARGET, request()).unwrap());
     assert!(controller.record_open_attempt(TARGET).unwrap());
     assert!(controller.record_open_created(TARGET, true).unwrap());
+    assert!(controller
+        .record_dms_exclusive_lock_attempt(TARGET)
+        .unwrap());
+    assert!(controller.record_dms_exclusive_acquired(TARGET).unwrap());
+    assert!(controller.record_truncate_attempt(TARGET).unwrap());
+}
+
+fn advance_q17_to_truncate_attempt(
+    controller: &mut ManagedSqliteShmTestInitializationControllerV1,
+) {
+    controller
+        .arm(
+            TARGET,
+            existing_first_truncate_release_failed_expectation(),
+            cold(),
+        )
+        .unwrap();
+    assert!(controller.record_request(TARGET, request()).unwrap());
+    assert!(controller.record_open_attempt(TARGET).unwrap());
+    assert!(controller.record_open_created(TARGET, false).unwrap());
     assert!(controller
         .record_dms_exclusive_lock_attempt(TARGET)
         .unwrap());
@@ -421,6 +450,126 @@ fn q16_missing_reordered_and_duplicate_receipts_fail_closed() {
 }
 
 #[test]
+fn exact_existing_first_truncate_unavailable_then_release_failed_seals_two_receipts() {
+    let mut controller = ManagedSqliteShmTestInitializationControllerV1::default();
+    let expected = existing_first_truncate_release_failed_expectation();
+    advance_q17_to_truncate_attempt(&mut controller);
+    assert!(controller
+        .begin_existing_first_truncate_error_release_failed(TARGET)
+        .unwrap());
+    let truncate_native = q16_truncate_native();
+    controller
+        .record_existing_first_truncate_error_release_failed_truncate_receipt(
+            TARGET,
+            truncate_native,
+        )
+        .unwrap();
+    controller
+        .begin_existing_first_truncate_error_release_failed_cleanup_unlock(TARGET)
+        .unwrap();
+    let cleanup_native = q16_cleanup_native();
+    controller
+        .record_existing_first_truncate_error_release_failed_cleanup_receipt(
+            TARGET,
+            cleanup_native,
+        )
+        .unwrap();
+    controller.record_poisoned(TARGET).unwrap();
+    let receipt = controller
+        .finish(TARGET, terminal(), requested_lock_receipt())
+        .unwrap();
+    assert_eq!(receipt.case_v1(), expected.case_v1);
+    assert_eq!(receipt.native_receipt(), truncate_native);
+    assert_eq!(receipt.cleanup_native_receipt(), Some(cleanup_native));
+    assert_eq!(receipt.ordered_values()[1], 6);
+    assert_eq!(
+        receipt.ordered_values()[19..28],
+        [0, 1, 1, 0, 0, 1, 1, 0, 1]
+    );
+    assert_eq!(receipt.ordered_values()[28], 511);
+    assert_eq!(receipt.ordered_values()[29..32], [0, 1, 1]);
+}
+
+#[test]
+fn q17_missing_reordered_and_duplicate_receipts_fail_closed() {
+    let mut missing_primary = ManagedSqliteShmTestInitializationControllerV1::default();
+    advance_q17_to_truncate_attempt(&mut missing_primary);
+    assert!(missing_primary
+        .begin_existing_first_truncate_error_release_failed_cleanup_unlock(TARGET)
+        .is_err());
+
+    let mut missing_cleanup = ManagedSqliteShmTestInitializationControllerV1::default();
+    advance_q17_to_truncate_attempt(&mut missing_cleanup);
+    assert!(missing_cleanup
+        .begin_existing_first_truncate_error_release_failed(TARGET)
+        .unwrap());
+    missing_cleanup
+        .record_existing_first_truncate_error_release_failed_truncate_receipt(
+            TARGET,
+            q16_truncate_native(),
+        )
+        .unwrap();
+    missing_cleanup
+        .begin_existing_first_truncate_error_release_failed_cleanup_unlock(TARGET)
+        .unwrap();
+    assert!(missing_cleanup.record_poisoned(TARGET).is_err());
+
+    let mut reordered_cleanup = ManagedSqliteShmTestInitializationControllerV1::default();
+    advance_q17_to_truncate_attempt(&mut reordered_cleanup);
+    assert!(reordered_cleanup
+        .record_existing_first_truncate_error_release_failed_cleanup_receipt(
+            TARGET,
+            q16_cleanup_native(),
+        )
+        .is_err());
+
+    let mut duplicate_primary = ManagedSqliteShmTestInitializationControllerV1::default();
+    advance_q17_to_truncate_attempt(&mut duplicate_primary);
+    assert!(duplicate_primary
+        .begin_existing_first_truncate_error_release_failed(TARGET)
+        .unwrap());
+    duplicate_primary
+        .record_existing_first_truncate_error_release_failed_truncate_receipt(
+            TARGET,
+            q16_truncate_native(),
+        )
+        .unwrap();
+    assert!(duplicate_primary
+        .record_existing_first_truncate_error_release_failed_truncate_receipt(
+            TARGET,
+            q16_truncate_native(),
+        )
+        .is_err());
+
+    let mut duplicate_cleanup = ManagedSqliteShmTestInitializationControllerV1::default();
+    advance_q17_to_truncate_attempt(&mut duplicate_cleanup);
+    assert!(duplicate_cleanup
+        .begin_existing_first_truncate_error_release_failed(TARGET)
+        .unwrap());
+    duplicate_cleanup
+        .record_existing_first_truncate_error_release_failed_truncate_receipt(
+            TARGET,
+            q16_truncate_native(),
+        )
+        .unwrap();
+    duplicate_cleanup
+        .begin_existing_first_truncate_error_release_failed_cleanup_unlock(TARGET)
+        .unwrap();
+    duplicate_cleanup
+        .record_existing_first_truncate_error_release_failed_cleanup_receipt(
+            TARGET,
+            q16_cleanup_native(),
+        )
+        .unwrap();
+    assert!(duplicate_cleanup
+        .record_existing_first_truncate_error_release_failed_cleanup_receipt(
+            TARGET,
+            q16_cleanup_native(),
+        )
+        .is_err());
+}
+
+#[test]
 fn exact_existing_first_truncate_unavailable_then_release_success_is_case_specific() {
     let mut controller = ManagedSqliteShmTestInitializationControllerV1::default();
     let expected = existing_first_truncate_release_succeeded_expectation();
@@ -501,6 +650,20 @@ fn initialization_open_existence_is_case_specific() {
         .unwrap());
     assert!(existing_first_truncate.record_open_attempt(TARGET).unwrap());
     assert!(existing_first_truncate
+        .record_open_created(TARGET, true)
+        .is_err());
+
+    let mut q17_existing_first = ManagedSqliteShmTestInitializationControllerV1::default();
+    q17_existing_first
+        .arm(
+            TARGET,
+            existing_first_truncate_release_failed_expectation(),
+            cold(),
+        )
+        .unwrap();
+    assert!(q17_existing_first.record_request(TARGET, request()).unwrap());
+    assert!(q17_existing_first.record_open_attempt(TARGET).unwrap());
+    assert!(q17_existing_first
         .record_open_created(TARGET, true)
         .is_err());
 }

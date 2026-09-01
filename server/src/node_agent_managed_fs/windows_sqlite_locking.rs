@@ -107,9 +107,9 @@ pub(in crate::node_agent_managed_fs) fn unlock_sqlite_byte_range_outcome_uncerta
     )
 }
 
-/// Executes the production CreatedFirst DMS UnlockFileEx call exactly once while deliberately
+/// Executes the production initialization DMS UnlockFileEx call exactly once while deliberately
 /// leaving its BOOL return receipt unread. Only the initialization controller can consume this
-/// typed witness.
+/// typed witness, independent of whether the physical SHM file was newly created or pre-existing.
 #[cfg(all(test, windows))]
 pub(in crate::node_agent_managed_fs) fn unlock_sqlite_byte_range_outcome_uncertain_for_initialization_test(
     file: &File,

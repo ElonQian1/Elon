@@ -6,6 +6,7 @@ mod created_first_exclusive_release_error;
 mod created_first_truncate_error_release_failed;
 mod created_first_truncate_error_release_succeeded;
 mod existing_first_exclusive_release_error;
+mod existing_first_truncate_error_release_failed;
 mod existing_first_truncate_error_release_succeeded;
 mod lifecycle;
 mod local_protocol_rejection;
@@ -69,6 +70,16 @@ pub(in super::super) use existing_first_exclusive_release_error::{
     run_lock_native_acquire_existing_first_exclusive_release_error_program_isolated,
     LockRunnerExistingFirstExclusiveReleaseCompletionV1,
     LockRunnerNativeAcquireExistingFirstExclusiveReleaseErrorBindingV1,
+};
+#[cfg(all(test, windows))]
+pub(in super::super) use existing_first_truncate_error_release_failed::{
+    lock_native_acquire_existing_first_truncate_error_release_failed_selector_for_test,
+    selected_lock_native_acquire_existing_first_truncate_error_release_failed_selector_for_test,
+};
+pub(in super::super) use existing_first_truncate_error_release_failed::{
+    run_lock_native_acquire_existing_first_truncate_error_release_failed_program_isolated,
+    LockRunnerExistingFirstTruncateErrorReleaseFailedCompletionV1,
+    LockRunnerNativeAcquireExistingFirstTruncateErrorReleaseFailedBindingV1,
 };
 #[cfg(all(test, windows))]
 pub(in super::super) use existing_first_truncate_error_release_succeeded::{

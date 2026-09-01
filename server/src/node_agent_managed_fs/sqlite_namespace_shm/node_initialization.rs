@@ -24,6 +24,9 @@ mod created_first_truncate_error_release_succeeded;
 #[cfg(all(test, windows))]
 #[path = "node_initialization/existing_first_truncate_error_release_succeeded.rs"]
 mod existing_first_truncate_error_release_succeeded;
+#[cfg(all(test, windows))]
+#[path = "node_initialization/existing_first_truncate_error_release_failed.rs"]
+mod existing_first_truncate_error_release_failed;
 impl ManagedSqliteShmCoordinator {
     pub(super) fn ensure_node<'state>(
         &self,
@@ -248,8 +251,11 @@ impl ManagedSqliteShmCoordinator {
             #[cfg(all(test, windows))]
             let file = self.execute_q15_truncate_release_ok_test_v1(state, _connection_id, file)?;
             #[cfg(all(test, windows))]
-            let mut file =
+            let file =
                 self.execute_q16_truncate_release_failed_test_v1(state, _connection_id, file)?;
+            #[cfg(all(test, windows))]
+            let mut file =
+                self.execute_q17_truncate_release_failed_test_v1(state, _connection_id, file)?;
             if let Err(error) = file.truncate(0) {
                 #[cfg(all(test, windows))]
                 if let Err(failure) = self.reject_test_initialization_path_v1(
