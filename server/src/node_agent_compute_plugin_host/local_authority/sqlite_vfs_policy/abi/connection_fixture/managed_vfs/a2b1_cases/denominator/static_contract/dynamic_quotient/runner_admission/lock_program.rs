@@ -1,5 +1,6 @@
 //! Sealed admission bridge for the executable Lock dynamic-quotient programs.
 
+mod callback_completion_route_unknown;
 mod lifecycle;
 mod local_sibling_contention;
 mod native_acquire_busy;
@@ -19,6 +20,8 @@ use super::super::super::{
 };
 use super::super::{DynamicClassKeyV1, StaticMemberSealV1};
 use super::CompiledRunnerPlanV1;
+#[cfg(windows)]
+use callback_completion_route_unknown::LockCallbackCompletionRouteUnknownProgramSpecV1;
 #[cfg(windows)]
 use lifecycle::{LockLifecyclePathSpecV1, LockLifecycleProgramSpecV1};
 #[cfg(windows)]
@@ -172,6 +175,9 @@ pub(in super::super) fn run_lock_isolated_for_test(
                 implementation_sha256: program.implementation_sha256.0,
             },
         ),
+        LockProgramCaseV1::CallbackCompletionRouteUnknown(route_unknown) => {
+            callback_completion_route_unknown::run_isolated_v1(exact_test, route_unknown, member)
+        }
         LockProgramCaseV1::Lifecycle(lifecycle) => run_lock_lifecycle_program_isolated(
             exact_test,
             LockRunnerLifecycleBindingV1 {
@@ -354,6 +360,7 @@ enum LockProgramCaseV1 {
         action: LockActionV1,
         guard: LockRequestValidationGuardV1,
     },
+    CallbackCompletionRouteUnknown(LockCallbackCompletionRouteUnknownProgramSpecV1),
     Lifecycle(LockLifecycleProgramSpecV1),
     LocalSiblingContention(LockLocalSiblingContentionProgramSpecV1),
     NativeAcquireBusy(LockNativeAcquireBusyProgramSpecV1),
@@ -399,6 +406,11 @@ fn program_v1(
 #[cfg(test)]
 pub(super) fn native_acquire_busy_catalog_row_count_for_test() -> usize {
     native_acquire_busy::catalog_row_count_for_test()
+}
+
+#[cfg(test)]
+pub(super) fn callback_completion_route_unknown_catalog_row_count_for_test() -> usize {
+    callback_completion_route_unknown::catalog_row_count_for_test()
 }
 
 #[cfg(test)]

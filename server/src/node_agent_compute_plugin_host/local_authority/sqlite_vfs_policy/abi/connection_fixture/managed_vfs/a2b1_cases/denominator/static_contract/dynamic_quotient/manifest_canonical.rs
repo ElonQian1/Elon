@@ -1,7 +1,7 @@
 use sha2::{Digest as _, Sha256};
 
 use super::super::source_leaf_authority::Digest32;
-use super::lock_local_sibling_contention_source_scope::LOCAL_SIBLING_CONTENTION_PROJECTOR_DELTA_V1;
+use super::lock_callback_completion_route_unknown_source_scope::callback_completion_route_unknown_projector_delta_entries_v1;
 use super::lock_native_acquire_busy_source_scope::NATIVE_BUSY_PROJECTOR_DELTA_V1;
 use super::lock_stored_poison_source_scope::STORED_POISON_PROJECTOR_DELTA_V1;
 use super::map_runtime_source_scope::{
@@ -640,7 +640,7 @@ pub(super) fn projector_source_scope_entries_v1(
         .chain(MAP_REGION_LOOP_SOURCE_SCOPE_V1.iter().copied())
         .chain(STORED_POISON_PROJECTOR_DELTA_V1.iter().copied())
         .chain(NATIVE_BUSY_PROJECTOR_DELTA_V1.iter().copied())
-        .chain(LOCAL_SIBLING_CONTENTION_PROJECTOR_DELTA_V1.iter().copied())
+        .chain(callback_completion_route_unknown_projector_delta_entries_v1())
 }
 
 pub(super) fn digest_projector_source_entries_v1<'a>(

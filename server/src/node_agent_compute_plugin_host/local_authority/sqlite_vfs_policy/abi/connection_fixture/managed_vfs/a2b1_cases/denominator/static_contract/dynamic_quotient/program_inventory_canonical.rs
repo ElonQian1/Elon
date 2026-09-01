@@ -88,6 +88,30 @@ const SOURCE_SCOPE: &[(&str, &str)] = &[
         include_str!("runner_admission/lock_program/source_program.rs"),
     ),
     (
+        "runner_admission/lock_program/callback_completion_route_unknown.rs",
+        include_str!("runner_admission/lock_program/callback_completion_route_unknown.rs"),
+    ),
+    (
+        "runner_admission/lock_program/callback_completion_route_unknown/catalog.rs",
+        include_str!("runner_admission/lock_program/callback_completion_route_unknown/catalog.rs"),
+    ),
+    (
+        "runner_admission/lock_program/callback_completion_route_unknown/runtime.rs",
+        include_str!("runner_admission/lock_program/callback_completion_route_unknown/runtime.rs"),
+    ),
+    (
+        "runner_admission/lock_program/callback_completion_route_unknown/callback_completion_route_unknown_members.v1.tsv",
+        include_str!("runner_admission/lock_program/callback_completion_route_unknown/callback_completion_route_unknown_members.v1.tsv"),
+    ),
+    (
+        "runner_admission/lock_program/callback_completion_route_unknown/source_scope.rs",
+        include_str!("runner_admission/lock_program/callback_completion_route_unknown/source_scope.rs"),
+    ),
+    (
+        "lock_callback_completion_route_unknown_source_scope.rs",
+        include_str!("lock_callback_completion_route_unknown_source_scope.rs"),
+    ),
+    (
         "runner_admission/lock_program/local_sibling_contention.rs",
         include_str!("runner_admission/lock_program/local_sibling_contention.rs"),
     ),

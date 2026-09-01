@@ -31,6 +31,7 @@ pub(super) use lock_program::tamper_lock_implementation_digest_for_test;
 pub(super) use lock_program::LockRunnerExecutionReceiptV1;
 #[cfg(test)]
 pub(super) use lock_program::{
+    callback_completion_route_unknown_catalog_row_count_for_test,
     local_sibling_contention_catalog_row_count_for_test,
     native_acquire_busy_catalog_row_count_for_test, stored_poison_catalog_row_count_for_test,
     validate_program_for_test as validate_lock_program_for_test,
