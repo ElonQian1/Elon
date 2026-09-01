@@ -14,7 +14,8 @@ pub(in super::super) fn classify_header(
         for first in 0..8 {
             for count in 1..=8 - first {
                 for completion_tag in 1..=2 {
-                    if selector(action_tag, first, count, completion_tag).as_deref() == Ok(selected) {
+                    if selector(action_tag, first, count, completion_tag).as_deref() == Ok(selected)
+                    {
                         return Ok(Some(REPORT_VALUE_COUNT));
                     }
                 }

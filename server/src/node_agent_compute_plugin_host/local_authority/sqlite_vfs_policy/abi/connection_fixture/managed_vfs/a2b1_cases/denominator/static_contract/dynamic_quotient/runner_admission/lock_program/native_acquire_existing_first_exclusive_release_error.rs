@@ -169,9 +169,7 @@ fn completion_v1(
         ReachabilityV1::Reached(LockCompletionV1::UnsafeRetentionSucceededThenRouteUnknown) => {
             Some(LockExistingFirstExclusiveReleaseCompletionV1::RetentionSucceeded)
         }
-        ReachabilityV1::Reached(
-            LockCompletionV1::UnsafeRetentionRouteUnknownThenRouteUnknown,
-        ) => {
+        ReachabilityV1::Reached(LockCompletionV1::UnsafeRetentionRouteUnknownThenRouteUnknown) => {
             Some(LockExistingFirstExclusiveReleaseCompletionV1::RetentionRouteUnknown)
         }
         _ => None,
