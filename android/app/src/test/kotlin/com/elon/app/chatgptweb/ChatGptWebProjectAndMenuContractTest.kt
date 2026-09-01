@@ -31,6 +31,9 @@ class ChatGptWebProjectAndMenuContractTest {
         val project = read("android/app/src/main/assets/chatgpt_web_adapter_project_policy.js")
         val conversations = read("android/app/src/main/assets/chatgpt_web_adapter_conversations.js")
         val menu = read("android/app/src/main/assets/chatgpt_web_adapter_context_menu_policy.js")
+        val invocation = read(
+            "android/app/src/main/assets/chatgpt_web_adapter_context_menu_invocation.js",
+        )
         val layout = read("android/app/src/main/assets/chatgpt_web_adapter_layout.js")
 
         listOf("document.cookie", "fetch(", "XMLHttpRequest", "WebSocket", "Authorization")
@@ -47,11 +50,17 @@ class ChatGptWebProjectAndMenuContractTest {
         assertTrue(conversations.contains("enrichProjectConversations"))
         assertTrue(menu.contains("hasNewRoot"))
         assertTrue(menu.contains("function observe(onOpened, onTimedOut)"))
+        assertTrue(menu.contains("observe.isOpen = opened"))
         assertTrue(menu.contains("elapsed >= timeout"))
         assertFalse(menu.contains("retry();"))
+        assertTrue(invocation.contains("function createCoordinator()"))
+        assertTrue(invocation.contains("candidate.observation.isOpen()"))
+        assertTrue(invocation.contains("if (!candidate.retried)"))
         assertTrue(layout.contains("overlayPolicy.contextMenuSignature"))
         assertTrue(layout.contains("overlays.forEach"))
         assertTrue(layout.contains("contextMenuPolicy.prepare"))
+        assertTrue(layout.contains("contextMenuInvocation?.reconcile()"))
+        assertTrue(layout.contains("contextMenuInvocation.start"))
         assertTrue(layout.contains("官网会话设置未打开，请重试。"))
     }
 

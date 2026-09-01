@@ -34,6 +34,7 @@ assert.equal(missingMenu(
   () => { openedCount += 1; },
   () => { timedOutCount += 1; }
 ), true);
+assert.equal(missingMenu.isOpen(), false);
 drain(tasks);
 assert.equal(openedCount, 0);
 assert.equal(timedOutCount, 1, 'a missing menu must fail after a bounded observation window');
@@ -53,6 +54,7 @@ newlyMountedMenu(
   () => { timedOutCount += 1; }
 );
 roots = [sidebar, menu];
+assert.equal(newlyMountedMenu.isOpen(), true);
 drain(tasks);
 assert.equal(openedCount, 1, 'a newly mounted menu confirms the command');
 assert.equal(timedOutCount, 1);

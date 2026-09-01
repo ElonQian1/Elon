@@ -13,7 +13,7 @@
   const composerToolStatePolicy = window.__elonChatGptComposerToolStatePolicy;
   const temporaryChatAdapter = window.__elonChatGptTemporaryChat;
   const realtimeVoicePolicy = window.__elonChatGptRealtimeVoicePolicy;
-  const overlayPolicy = window.__elonChatGptOverlayPolicy; const contextMenuPolicy = window.__elonChatGptContextMenuPolicy;
+  const overlayPolicy = window.__elonChatGptOverlayPolicy; const contextMenuPolicy = window.__elonChatGptContextMenuPolicy; const contextMenuInvocation = window.__elonChatGptContextMenuInvocation?.createCoordinator();
   let controlsById = new Map();
   let controlMetadataById = new Map();
   let lastFingerprint = '';
@@ -608,8 +608,7 @@
     });
   }
 
-  function emitSnapshot(emitEvent, force) {
-    const event = snapshot();
+  function emitSnapshot(emitEvent, force) { contextMenuInvocation?.reconcile(); const event = snapshot();
     const fingerprint = manifestFingerprint(event);
     if (!force && fingerprint === lastFingerprint) return;
     lastFingerprint = fingerprint;
@@ -671,11 +670,12 @@
         );
         if (!remembered) overlayOwnership.cancelPending(ownershipPageKey());
       }
-      emitEvent({ type: 'web_touch_request', purpose: 'invoke_ui_control', controlId: id, xRatio, yRatio });
-      if (contextMenuObservation) return contextMenuObservation(
-        () => finish(true, '', 0),
-        () => { if (overlayOwnership) overlayOwnership.cancelPending(ownershipPageKey()); finish(false, '官网会话设置未打开，请重试。', 0); }
-      );
+      const emitTouch = () => { emitEvent({ type: 'web_touch_request', purpose: 'invoke_ui_control', controlId: id, xRatio, yRatio }); return true; };
+      if (contextMenuObservation && contextMenuInvocation) return contextMenuInvocation.start(contextMenuObservation, emitTouch, (ok) => {
+        if (!ok && overlayOwnership) overlayOwnership.cancelPending(ownershipPageKey());
+        finish(ok, ok ? '' : '官网会话设置未打开，请重试。', 0);
+      });
+      emitTouch();
       finish(true, '', 180);
     }
     const rect = node.getBoundingClientRect();

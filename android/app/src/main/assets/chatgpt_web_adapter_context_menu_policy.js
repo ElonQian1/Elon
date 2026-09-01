@@ -52,7 +52,7 @@
       ? timeoutMs
       : 1800;
     const opened = () => hasNewOrChangedRoot(before, visibleRoots(), signatureFor);
-    return function observe(onOpened, onTimedOut) {
+    function observe(onOpened, onTimedOut) {
       if (typeof onOpened !== 'function' || typeof onTimedOut !== 'function') return false;
       let elapsed = 0;
       function poll() {
@@ -63,7 +63,9 @@
       }
       schedule(poll, interval);
       return true;
-    };
+    }
+    observe.isOpen = opened;
+    return observe;
   }
 
   return Object.freeze({ hasNewOrChangedRoot, hasNewRoot, prepare, shouldArm, snapshotRoots });
