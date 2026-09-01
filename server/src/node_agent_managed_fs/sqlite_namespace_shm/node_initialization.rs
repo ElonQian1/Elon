@@ -30,6 +30,9 @@ mod existing_first_truncate_error_release_failed;
 #[cfg(all(test, windows))]
 #[path = "node_initialization/existing_first_truncate_error_release_succeeded.rs"]
 mod existing_first_truncate_error_release_succeeded;
+#[cfg(all(test, windows))]
+#[path = "node_initialization/existing_first_shared_busy_close_succeeded.rs"]
+mod existing_first_shared_busy_close_succeeded;
 impl ManagedSqliteShmCoordinator {
     pub(super) fn ensure_node<'state>(
         &self,
@@ -395,6 +398,8 @@ impl ManagedSqliteShmCoordinator {
             }
             #[cfg(all(test, windows))]
             self.record_test_initialization_q18_dms_unlock_succeeded_v1(state, _connection_id)?;
+            #[cfg(all(test, windows))]
+            self.record_test_initialization_q19_dms_unlock_succeeded_v1(state, _connection_id)?;
             #[cfg(test)]
             if let Some(fault) = exclusive_release_fault {
                 state.node = Some(new_node(file, ManagedSqliteShmDmsCustody::Released, true));
@@ -404,6 +409,12 @@ impl ManagedSqliteShmCoordinator {
 
         #[cfg(all(test, windows))]
         let file = self.execute_q18_created_first_shared_busy_close_succeeded_test_v1(
+            state,
+            _connection_id,
+            file,
+        )?;
+        #[cfg(all(test, windows))]
+        let file = self.execute_q19_existing_first_shared_busy_close_succeeded_test_v1(
             state,
             _connection_id,
             file,
@@ -467,6 +478,7 @@ impl ManagedSqliteShmCoordinator {
         original: ManagedSqliteShmFailure,
     ) -> ManagedSqliteShmFailure {
         let mutation = original.mutation_may_have_occurred();
+        let lock_outcome_uncertain = original.lock_outcome_uncertain();
         match file.close() {
             Ok(_) => original,
             Err(close_failure) => {
@@ -478,13 +490,13 @@ impl ManagedSqliteShmCoordinator {
                     state,
                     ManagedSqliteShmFailurePhase::FileClose,
                     mutation,
-                    false,
+                    lock_outcome_uncertain,
                 );
                 ManagedSqliteShmFailure::poisoned(
                     ManagedSqliteShmFailurePhase::FileClose,
                     report,
                     mutation,
-                    false,
+                    lock_outcome_uncertain,
                 )
             }
         }

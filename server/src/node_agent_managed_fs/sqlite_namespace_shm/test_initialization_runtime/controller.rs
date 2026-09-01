@@ -9,6 +9,7 @@ use super::super::{
 use super::model::{
     lock_action_tag, ManagedSqliteShmTestInitializationEvidenceV1,
     ManagedSqliteShmTestInitializationExpectationV1,
+    ManagedSqliteShmTestInitializationFailureV1 as InitializationFailure,
     ManagedSqliteShmTestInitializationNativeObservationV1,
     ManagedSqliteShmTestInitializationNativeReceiptV1, ManagedSqliteShmTestInitializationReceiptV1,
 };
@@ -23,8 +24,19 @@ mod created_first_truncate_error_release_succeeded;
 mod existing_first_truncate_error_release_failed;
 #[path = "controller/existing_first_truncate_error_release_succeeded.rs"]
 mod existing_first_truncate_error_release_succeeded;
-
+#[path = "controller/existing_first_shared_busy_close_succeeded.rs"]
+mod existing_first_shared_busy_close_succeeded;
 type ExactTarget = (u64, u64);
+
+macro_rules! delegate_shared_busy {
+    ($controller:ident, $method:ident($($argument:expr),* $(,)?)) => {
+        if $controller.q18.is_armed() {
+            return $controller.q18.$method($($argument),*);
+        } else if $controller.q19.is_armed() {
+            return $controller.q19.$method($($argument),*);
+        }
+    };
+}
 
 #[derive(Debug, Clone, Copy)]
 pub(super) struct ColdPrestateV1 {
@@ -107,6 +119,8 @@ pub(in crate::node_agent_managed_fs::sqlite_namespace::shm) struct ManagedSqlite
     armed: Option<ArmedInitializationObservationV1>,
     q18:
         created_first_shared_busy_close_succeeded::CreatedFirstSharedBusyCloseSucceededControllerV1,
+    q19:
+        existing_first_shared_busy_close_succeeded::ExistingFirstSharedBusyCloseSucceededControllerV1,
 }
 
 impl ManagedSqliteShmTestInitializationControllerV1 {
@@ -118,15 +132,19 @@ impl ManagedSqliteShmTestInitializationControllerV1 {
     ) -> Result<(), &'static str> {
         validate_expectation(target, expectation)?;
         validate_cold_prestate(cold)?;
-        if expectation.case_v1
-            == super::model::ManagedSqliteShmTestInitializationFailureV1::CreatedFirstSharedBusyCloseSucceeded
-        {
-            if self.armed.is_some() {
+        if expectation.case_v1 == InitializationFailure::CreatedFirstSharedBusyCloseSucceeded {
+            if self.armed.is_some() || self.q19.is_armed() {
                 return Err("NODE_MANAGED_SQLITE_SHM_TEST_INITIALIZATION_ALREADY_ARMED");
             }
             return self.q18.arm(target, expectation, cold);
         }
-        if self.armed.is_some() || self.q18.is_armed() {
+        if expectation.case_v1 == InitializationFailure::ExistingFirstSharedBusyCloseSucceeded {
+            if self.armed.is_some() || self.q18.is_armed() {
+                return Err("NODE_MANAGED_SQLITE_SHM_TEST_INITIALIZATION_ALREADY_ARMED");
+            }
+            return self.q19.arm(target, expectation, cold);
+        }
+        if self.armed.is_some() || self.q18.is_armed() || self.q19.is_armed() {
             return Err("NODE_MANAGED_SQLITE_SHM_TEST_INITIALIZATION_ALREADY_ARMED");
         }
         self.armed = Some(ArmedInitializationObservationV1 {
@@ -146,9 +164,7 @@ impl ManagedSqliteShmTestInitializationControllerV1 {
     }
 
     pub(super) fn cancel_after_arm(&mut self, target: ExactTarget) -> Result<(), &'static str> {
-        if self.q18.is_armed() {
-            return self.q18.cancel_after_arm(target);
-        }
+        delegate_shared_busy!(self, cancel_after_arm(target));
         let active = self
             .armed
             .as_ref()
@@ -168,9 +184,7 @@ impl ManagedSqliteShmTestInitializationControllerV1 {
         target: ExactTarget,
         request: ManagedSqliteShmLockRequest,
     ) -> Result<bool, &'static str> {
-        if self.q18.is_armed() {
-            return self.q18.record_request(target, request);
-        }
+        delegate_shared_busy!(self, record_request(target, request));
         let Some(active) = self.active_for_event(target)? else {
             return Ok(false);
         };
@@ -198,9 +212,7 @@ impl ManagedSqliteShmTestInitializationControllerV1 {
         &mut self,
         target: ExactTarget,
     ) -> Result<bool, &'static str> {
-        if self.q18.is_armed() {
-            return self.q18.record_open_attempt(target);
-        }
+        delegate_shared_busy!(self, record_open_attempt(target));
         self.advance_if_armed(
             target,
             Stage::Requested,
@@ -215,41 +227,23 @@ impl ManagedSqliteShmTestInitializationControllerV1 {
         target: ExactTarget,
         created: bool,
     ) -> Result<bool, &'static str> {
-        if self.q18.is_armed() {
-            return self.q18.record_open_created(target, created);
-        }
+        delegate_shared_busy!(self, record_open_created(target, created));
         let Some(active) = self.active_for_event(target)? else {
             return Ok(false);
         };
-        let violation = match (active.expectation.case_v1, created) {
-            (
-                super::model::ManagedSqliteShmTestInitializationFailureV1::CreatedFirstExclusiveReleaseOutcomeUncertain
-                | super::model::ManagedSqliteShmTestInitializationFailureV1::CreatedFirstTruncateOutcomeUncertainReleaseSucceeded
-                | super::model::ManagedSqliteShmTestInitializationFailureV1::CreatedFirstTruncateOutcomeUncertainReleaseFailed
-                | super::model::ManagedSqliteShmTestInitializationFailureV1::CreatedFirstSharedBusyCloseSucceeded,
-                false,
-            ) => Some("NODE_MANAGED_SQLITE_SHM_TEST_INITIALIZATION_NOT_CREATED_FIRST"),
-            (
-                super::model::ManagedSqliteShmTestInitializationFailureV1::CreatedFirstExclusiveReleaseOutcomeUncertain
-                | super::model::ManagedSqliteShmTestInitializationFailureV1::CreatedFirstTruncateOutcomeUncertainReleaseSucceeded
-                | super::model::ManagedSqliteShmTestInitializationFailureV1::CreatedFirstTruncateOutcomeUncertainReleaseFailed
-                | super::model::ManagedSqliteShmTestInitializationFailureV1::CreatedFirstSharedBusyCloseSucceeded,
-                true,
-            ) => None,
-            (
-                super::model::ManagedSqliteShmTestInitializationFailureV1::ExistingFirstExclusiveReleaseOutcomeUncertain
-                | super::model::ManagedSqliteShmTestInitializationFailureV1::ExistingFirstTruncateOutcomeUncertainReleaseSucceeded
-                | super::model::ManagedSqliteShmTestInitializationFailureV1::ExistingFirstTruncateOutcomeUncertainReleaseFailed,
-                true,
-            ) => Some("NODE_MANAGED_SQLITE_SHM_TEST_INITIALIZATION_NOT_EXISTING_FIRST"),
-            (
-                super::model::ManagedSqliteShmTestInitializationFailureV1::ExistingFirstExclusiveReleaseOutcomeUncertain
-                | super::model::ManagedSqliteShmTestInitializationFailureV1::ExistingFirstTruncateOutcomeUncertainReleaseSucceeded
-                | super::model::ManagedSqliteShmTestInitializationFailureV1::ExistingFirstTruncateOutcomeUncertainReleaseFailed,
-                false,
-            ) => None,
-        };
-        if let Some(code) = violation {
+        let existing_first = matches!(
+            active.expectation.case_v1,
+            InitializationFailure::ExistingFirstExclusiveReleaseOutcomeUncertain
+                | InitializationFailure::ExistingFirstTruncateOutcomeUncertainReleaseSucceeded
+                | InitializationFailure::ExistingFirstTruncateOutcomeUncertainReleaseFailed
+                | InitializationFailure::ExistingFirstSharedBusyCloseSucceeded
+        );
+        if created == existing_first {
+            let code = if created {
+                "NODE_MANAGED_SQLITE_SHM_TEST_INITIALIZATION_NOT_EXISTING_FIRST"
+            } else {
+                "NODE_MANAGED_SQLITE_SHM_TEST_INITIALIZATION_NOT_CREATED_FIRST"
+            };
             return fail(active, code);
         }
         advance(
@@ -266,9 +260,7 @@ impl ManagedSqliteShmTestInitializationControllerV1 {
         &mut self,
         target: ExactTarget,
     ) -> Result<bool, &'static str> {
-        if self.q18.is_armed() {
-            return self.q18.record_dms_exclusive_lock_attempt(target);
-        }
+        delegate_shared_busy!(self, record_dms_exclusive_lock_attempt(target));
         self.advance_if_armed(
             target,
             Stage::OpenCreated,
@@ -282,9 +274,7 @@ impl ManagedSqliteShmTestInitializationControllerV1 {
         &mut self,
         target: ExactTarget,
     ) -> Result<bool, &'static str> {
-        if self.q18.is_armed() {
-            return self.q18.record_dms_exclusive_acquired(target);
-        }
+        delegate_shared_busy!(self, record_dms_exclusive_acquired(target));
         self.advance_if_armed(
             target,
             Stage::DmsExclusiveLockAttempted,
@@ -298,9 +288,7 @@ impl ManagedSqliteShmTestInitializationControllerV1 {
         &mut self,
         target: ExactTarget,
     ) -> Result<bool, &'static str> {
-        if self.q18.is_armed() {
-            return self.q18.record_truncate_attempt(target);
-        }
+        delegate_shared_busy!(self, record_truncate_attempt(target));
         self.advance_if_armed(
             target,
             Stage::DmsExclusiveAcquired,
@@ -314,9 +302,7 @@ impl ManagedSqliteShmTestInitializationControllerV1 {
         &mut self,
         target: ExactTarget,
     ) -> Result<bool, &'static str> {
-        if self.q18.is_armed() {
-            return self.q18.record_truncate_success(target);
-        }
+        delegate_shared_busy!(self, record_truncate_success(target));
         self.reject_q14_truncate_success_if_selected(target)?;
         self.reject_q15_truncate_success_if_selected(target)?;
         self.reject_q16_truncate_success_if_selected(target)?;
@@ -335,7 +321,12 @@ impl ManagedSqliteShmTestInitializationControllerV1 {
         target: ExactTarget,
     ) -> Result<bool, &'static str> {
         if self.q18.is_armed() {
-            return self.q18.begin_dms_exclusive_unlock(target);
+            self.q18.begin_dms_exclusive_unlock(target)?;
+            return Ok(false);
+        }
+        if self.q19.is_armed() {
+            self.q19.begin_dms_exclusive_unlock(target)?;
+            return Ok(false);
         }
         self.reject_q14_release_path_if_selected(target)?;
         self.reject_q15_release_path_if_selected(target)?;
@@ -358,6 +349,10 @@ impl ManagedSqliteShmTestInitializationControllerV1 {
         if self.q18.is_armed() {
             self.q18.abort_and_release(target)?;
             return Err("NODE_MANAGED_SQLITE_SHM_TEST_Q18_UNEXPECTED_UNCERTAIN_RECEIPT");
+        }
+        if self.q19.is_armed() {
+            self.q19.abort_and_release(target)?;
+            return Err("NODE_MANAGED_SQLITE_SHM_TEST_Q19_UNEXPECTED_UNCERTAIN_RECEIPT");
         }
         let active = self.require_active_for_event(target)?;
         created_first_truncate_error_release_succeeded::reject_release_receipt_if_selected(active)?;
@@ -396,6 +391,10 @@ impl ManagedSqliteShmTestInitializationControllerV1 {
             self.q18.abort_and_release(target)?;
             return Err("NODE_MANAGED_SQLITE_SHM_TEST_Q18_UNEXPECTED_POISON");
         }
+        if self.q19.is_armed() {
+            self.q19.abort_and_release(target)?;
+            return Err("NODE_MANAGED_SQLITE_SHM_TEST_Q19_UNEXPECTED_POISON");
+        }
         let active = self.require_active_for_event(target)?;
         if created_first_truncate_error_release_failed::record_poisoned_if_selected(active)? {
             return Ok(());
@@ -427,6 +426,10 @@ impl ManagedSqliteShmTestInitializationControllerV1 {
             self.q18.abort_and_release(target)?;
             return Err(code);
         }
+        if self.q19.is_armed() {
+            self.q19.abort_and_release(target)?;
+            return Err(code);
+        }
         let Some(active) = self.active_for_event(target)? else {
             return Ok(());
         };
@@ -442,6 +445,10 @@ impl ManagedSqliteShmTestInitializationControllerV1 {
         if self.q18.is_armed() {
             self.q18.abort_and_release(target)?;
             return Err("NODE_MANAGED_SQLITE_SHM_TEST_Q18_LEGACY_RECEIPT_FORBIDDEN");
+        }
+        if self.q19.is_armed() {
+            self.q19.abort_and_release(target)?;
+            return Err("NODE_MANAGED_SQLITE_SHM_TEST_Q19_LEGACY_RECEIPT_FORBIDDEN");
         }
         let active = self
             .armed
@@ -599,13 +606,14 @@ fn validate_expectation(
     }
     if !matches!(
         expectation.case_v1,
-        super::model::ManagedSqliteShmTestInitializationFailureV1::CreatedFirstExclusiveReleaseOutcomeUncertain
-            | super::model::ManagedSqliteShmTestInitializationFailureV1::ExistingFirstExclusiveReleaseOutcomeUncertain
-            | super::model::ManagedSqliteShmTestInitializationFailureV1::CreatedFirstTruncateOutcomeUncertainReleaseSucceeded
-            | super::model::ManagedSqliteShmTestInitializationFailureV1::ExistingFirstTruncateOutcomeUncertainReleaseSucceeded
-            | super::model::ManagedSqliteShmTestInitializationFailureV1::CreatedFirstTruncateOutcomeUncertainReleaseFailed
-            | super::model::ManagedSqliteShmTestInitializationFailureV1::ExistingFirstTruncateOutcomeUncertainReleaseFailed
-            | super::model::ManagedSqliteShmTestInitializationFailureV1::CreatedFirstSharedBusyCloseSucceeded
+        InitializationFailure::CreatedFirstExclusiveReleaseOutcomeUncertain
+            | InitializationFailure::ExistingFirstExclusiveReleaseOutcomeUncertain
+            | InitializationFailure::CreatedFirstTruncateOutcomeUncertainReleaseSucceeded
+            | InitializationFailure::ExistingFirstTruncateOutcomeUncertainReleaseSucceeded
+            | InitializationFailure::CreatedFirstTruncateOutcomeUncertainReleaseFailed
+            | InitializationFailure::ExistingFirstTruncateOutcomeUncertainReleaseFailed
+            | InitializationFailure::CreatedFirstSharedBusyCloseSucceeded
+            | InitializationFailure::ExistingFirstSharedBusyCloseSucceeded
     ) {
         return Err("NODE_MANAGED_SQLITE_SHM_TEST_INITIALIZATION_CASE_INVALID");
     }

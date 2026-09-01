@@ -60,6 +60,7 @@ pub(crate) use shm::{
 pub(crate) use shm::{
     ManagedSqliteShmTestConnectionDetachReceipt,
     ManagedSqliteShmTestCreatedFirstSharedBusyCloseSucceededReceiptV1,
+    ManagedSqliteShmTestExistingFirstSharedBusyCloseSucceededReceiptV1,
     ManagedSqliteShmTestDmsCustody, ManagedSqliteShmTestInitializationEvidenceV1,
     ManagedSqliteShmTestInitializationExpectationV1, ManagedSqliteShmTestInitializationFailureV1,
     ManagedSqliteShmTestInitializationNativeObservationV1,

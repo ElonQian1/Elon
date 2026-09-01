@@ -25,14 +25,18 @@ mod created_first_truncate_error_release_succeeded;
 mod existing_first_truncate_error_release_failed;
 #[path = "test_initialization_runtime/existing_first_truncate_error_release_succeeded.rs"]
 mod existing_first_truncate_error_release_succeeded;
+#[path = "test_initialization_runtime/existing_first_shared_busy_close_succeeded.rs"]
+mod existing_first_shared_busy_close_succeeded;
 #[path = "test_initialization_runtime/model.rs"]
 mod model;
 
 pub(in crate::node_agent_managed_fs::sqlite_namespace::shm) use controller::ManagedSqliteShmTestInitializationControllerV1;
 pub(in crate::node_agent_managed_fs::sqlite_namespace::shm) use created_first_shared_busy_close_succeeded::ManagedSqliteShmTestQ18DmsHolderLeaseV1;
+pub(in crate::node_agent_managed_fs::sqlite_namespace::shm) use existing_first_shared_busy_close_succeeded::ManagedSqliteShmTestQ19DmsHolderLeaseV1;
 use controller::{ColdPrestateV1, TerminalStateV1};
 pub(crate) use model::{
     ManagedSqliteShmTestCreatedFirstSharedBusyCloseSucceededReceiptV1,
+    ManagedSqliteShmTestExistingFirstSharedBusyCloseSucceededReceiptV1,
     ManagedSqliteShmTestInitializationEvidenceV1, ManagedSqliteShmTestInitializationExpectationV1,
     ManagedSqliteShmTestInitializationFailureV1,
     ManagedSqliteShmTestInitializationNativeObservationV1,
@@ -327,8 +331,8 @@ impl ManagedSqliteShmCoordinator {
                 ));
             }
         };
-        let armed = match controller.begin_dms_exclusive_unlock(target) {
-            Ok(armed) => armed,
+        let inject_uncertain_unlock = match controller.begin_dms_exclusive_unlock(target) {
+            Ok(inject_uncertain_unlock) => inject_uncertain_unlock,
             Err(code) => {
                 drop(controller);
                 return Err(self.initialization_controller_failure(
@@ -340,7 +344,7 @@ impl ManagedSqliteShmCoordinator {
                 ));
             }
         };
-        if !armed {
+        if !inject_uncertain_unlock {
             return Ok(None);
         }
 

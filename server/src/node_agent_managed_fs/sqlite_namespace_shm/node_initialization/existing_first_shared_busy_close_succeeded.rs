@@ -1,4 +1,4 @@
-//! Q18 production seam: real DMS busy after successful CreatedFirst initialization and close.
+//! Q19 production seam: ExistingFirst real DMS busy and exact target-close success.
 
 use super::super::super::{platform, PinnedManagedSqliteFile, PlatformManagedSqliteLockAttempt};
 use super::super::{
@@ -6,7 +6,7 @@ use super::super::{
         ManagedSqliteShmCoordinator, ManagedSqliteShmCoordinatorState,
         ManagedSqliteShmFileCloseCustody,
     },
-    test_initialization_runtime::ManagedSqliteShmTestQ18DmsHolderLeaseV1,
+    test_initialization_runtime::ManagedSqliteShmTestQ19DmsHolderLeaseV1,
     types::{
         ManagedSqliteShmFailure, ManagedSqliteShmFailureClass, ManagedSqliteShmFailurePhase,
         SHM_DMS_OFFSET,
@@ -14,7 +14,7 @@ use super::super::{
 };
 
 impl ManagedSqliteShmCoordinator {
-    pub(super) fn record_test_initialization_q18_dms_unlock_succeeded_v1(
+    pub(super) fn record_test_initialization_q19_dms_unlock_succeeded_v1(
         &self,
         state: &mut ManagedSqliteShmCoordinatorState,
         connection_id: u64,
@@ -27,13 +27,13 @@ impl ManagedSqliteShmCoordinator {
             false,
             |controller, target| {
                 controller
-                    .q18_record_dms_exclusive_unlock_succeeded(target)
+                    .q19_record_dms_exclusive_unlock_succeeded(target)
                     .map(|_| ())
             },
         )
     }
 
-    pub(super) fn execute_q18_created_first_shared_busy_close_succeeded_test_v1(
+    pub(super) fn execute_q19_existing_first_shared_busy_close_succeeded_test_v1(
         &self,
         state: &mut ManagedSqliteShmCoordinatorState,
         connection_id: u64,
@@ -41,8 +41,8 @@ impl ManagedSqliteShmCoordinator {
     ) -> Result<PinnedManagedSqliteFile, ManagedSqliteShmFailure> {
         let target = (self.generation.get(), connection_id);
         let selected = match self.test_initialization_runtime.lock() {
-            Ok(controller) => controller.q18_is_selected(target),
-            Err(_) => Err("NODE_MANAGED_SQLITE_SHM_TEST_Q18_CONTROLLER_POISONED"),
+            Ok(controller) => controller.q19_is_selected(target),
+            Err(_) => Err("NODE_MANAGED_SQLITE_SHM_TEST_Q19_CONTROLLER_POISONED"),
         };
         let selected = selected.map_err(|code| {
             self.initialization_controller_failure(
@@ -57,10 +57,10 @@ impl ManagedSqliteShmCoordinator {
             return Ok(file);
         }
 
-        let holder = match ManagedSqliteShmTestQ18DmsHolderLeaseV1::acquire(target, &file) {
+        let holder = match ManagedSqliteShmTestQ19DmsHolderLeaseV1::acquire(target, &file) {
             Ok(holder) => holder,
             Err(code) => {
-                return Err(self.abort_q18_and_close(
+                return Err(self.abort_q19_and_close(
                     state,
                     target,
                     file,
@@ -70,10 +70,10 @@ impl ManagedSqliteShmCoordinator {
                 ));
             }
         };
-        if let Err(code) = self.store_q18_holder(target, holder) {
+        if let Err(code) = self.store_q19_holder(target, holder) {
             let holder_release_failed =
-                code == "NODE_MANAGED_SQLITE_SHM_TEST_Q18_HOLDER_RELEASE_FAILED";
-            return Err(self.abort_q18_and_close(
+                code == "NODE_MANAGED_SQLITE_SHM_TEST_Q19_HOLDER_RELEASE_FAILED";
+            return Err(self.abort_q19_and_close(
                 state,
                 target,
                 file,
@@ -87,8 +87,8 @@ impl ManagedSqliteShmCoordinator {
             platform::try_lock_sqlite_byte_range(&file.file, SHM_DMS_OFFSET, 1, false);
         match target_shared {
             Ok(PlatformManagedSqliteLockAttempt::Contended) => {
-                if let Err(code) = self.record_q18_target_shared_contended(target) {
-                    return Err(self.abort_q18_and_close(
+                if let Err(code) = self.record_q19_target_shared_contended(target) {
+                    return Err(self.abort_q19_and_close(
                         state,
                         target,
                         file,
@@ -101,29 +101,29 @@ impl ManagedSqliteShmCoordinator {
             Ok(PlatformManagedSqliteLockAttempt::Acquired) => {
                 let target_unlock_failed =
                     platform::unlock_sqlite_byte_range(&file.file, SHM_DMS_OFFSET, 1).is_err();
-                return Err(self.abort_q18_and_close(
+                return Err(self.abort_q19_and_close(
                     state,
                     target,
                     file,
                     ManagedSqliteShmFailurePhase::DmsSharedAcquire,
-                    "NODE_MANAGED_SQLITE_SHM_TEST_Q18_TARGET_SHARED_NOT_CONTENDED",
+                    "NODE_MANAGED_SQLITE_SHM_TEST_Q19_TARGET_SHARED_NOT_CONTENDED",
                     target_unlock_failed,
                 ));
             }
             Err(_) => {
-                return Err(self.abort_q18_and_close(
+                return Err(self.abort_q19_and_close(
                     state,
                     target,
                     file,
                     ManagedSqliteShmFailurePhase::DmsSharedAcquire,
-                    "NODE_MANAGED_SQLITE_SHM_TEST_Q18_TARGET_SHARED_ERROR",
+                    "NODE_MANAGED_SQLITE_SHM_TEST_Q19_TARGET_SHARED_ERROR",
                     false,
                 ));
             }
         }
 
-        if let Err(code) = self.record_q18_target_close_attempt(target) {
-            return Err(self.abort_q18_and_close(
+        if let Err(code) = self.record_q19_target_close_attempt(target) {
+            return Err(self.abort_q19_and_close(
                 state,
                 target,
                 file,
@@ -134,19 +134,19 @@ impl ManagedSqliteShmCoordinator {
         }
         match file.close() {
             Ok(receipt) => {
-                if let Err(code) = self.record_q18_target_close_succeeded(target, receipt.kind()) {
-                    let holder_release_failed = self.release_q18_holder(target).is_err();
+                if let Err(code) = self.record_q19_target_close_succeeded(target, receipt.kind()) {
+                    let release_failed = self.release_q19_holder(target).is_err();
                     self.mark_poisoned(
                         state,
                         ManagedSqliteShmFailurePhase::FileClose,
                         true,
-                        holder_release_failed,
+                        release_failed,
                     );
                     return Err(ManagedSqliteShmFailure::poisoned_code(
                         ManagedSqliteShmFailurePhase::FileClose,
                         code,
                         true,
-                        holder_release_failed,
+                        release_failed,
                     ));
                 }
             }
@@ -155,18 +155,18 @@ impl ManagedSqliteShmCoordinator {
                 state
                     .quarantined_file_close
                     .push(ManagedSqliteShmFileCloseCustody::Pinned(close_failure));
-                let holder_release_failed = self.release_q18_holder(target).is_err();
+                let release_failed = self.release_q19_holder(target).is_err();
                 self.mark_poisoned(
                     state,
                     ManagedSqliteShmFailurePhase::FileClose,
                     true,
-                    holder_release_failed,
+                    release_failed,
                 );
                 return Err(ManagedSqliteShmFailure::poisoned(
                     ManagedSqliteShmFailurePhase::FileClose,
                     report,
                     true,
-                    holder_release_failed,
+                    release_failed,
                 ));
             }
         }
@@ -178,60 +178,60 @@ impl ManagedSqliteShmCoordinator {
         ))
     }
 
-    fn store_q18_holder(
+    fn store_q19_holder(
         &self,
         target: (u64, u64),
-        holder: ManagedSqliteShmTestQ18DmsHolderLeaseV1,
+        holder: ManagedSqliteShmTestQ19DmsHolderLeaseV1,
     ) -> Result<(), &'static str> {
         match self.test_initialization_runtime.lock() {
-            Ok(mut controller) => controller.q18_store_holder(target, holder),
+            Ok(mut controller) => controller.q19_store_holder(target, holder),
             Err(poisoned) => {
                 let release = holder.release_explicit();
                 let mut controller = poisoned.into_inner();
-                let _ = controller.q18_abort_and_release(target);
+                let _ = controller.q19_abort_and_release(target);
                 release.map_err(|code| code)?;
-                Err("NODE_MANAGED_SQLITE_SHM_TEST_Q18_CONTROLLER_POISONED")
+                Err("NODE_MANAGED_SQLITE_SHM_TEST_Q19_CONTROLLER_POISONED")
             }
         }
     }
 
-    fn record_q18_target_shared_contended(&self, target: (u64, u64)) -> Result<(), &'static str> {
+    fn record_q19_target_shared_contended(&self, target: (u64, u64)) -> Result<(), &'static str> {
         self.test_initialization_runtime
             .lock()
-            .map_err(|_| "NODE_MANAGED_SQLITE_SHM_TEST_Q18_CONTROLLER_POISONED")?
-            .q18_record_target_shared_contended(target)
+            .map_err(|_| "NODE_MANAGED_SQLITE_SHM_TEST_Q19_CONTROLLER_POISONED")?
+            .q19_record_target_shared_contended(target)
     }
 
-    fn record_q18_target_close_attempt(&self, target: (u64, u64)) -> Result<(), &'static str> {
+    fn record_q19_target_close_attempt(&self, target: (u64, u64)) -> Result<(), &'static str> {
         self.test_initialization_runtime
             .lock()
-            .map_err(|_| "NODE_MANAGED_SQLITE_SHM_TEST_Q18_CONTROLLER_POISONED")?
-            .q18_record_target_close_attempt(target)
+            .map_err(|_| "NODE_MANAGED_SQLITE_SHM_TEST_Q19_CONTROLLER_POISONED")?
+            .q19_record_target_close_attempt(target)
     }
 
-    fn record_q18_target_close_succeeded(
+    fn record_q19_target_close_succeeded(
         &self,
         target: (u64, u64),
         kind: crate::node_agent_managed_fs::ManagedSqliteFileKind,
     ) -> Result<(), &'static str> {
         self.test_initialization_runtime
             .lock()
-            .map_err(|_| "NODE_MANAGED_SQLITE_SHM_TEST_Q18_CONTROLLER_POISONED")?
-            .q18_record_target_close_succeeded(target, kind)
+            .map_err(|_| "NODE_MANAGED_SQLITE_SHM_TEST_Q19_CONTROLLER_POISONED")?
+            .q19_record_target_close_succeeded(target, kind)
     }
 
-    fn release_q18_holder(&self, target: (u64, u64)) -> Result<(), &'static str> {
+    fn release_q19_holder(&self, target: (u64, u64)) -> Result<(), &'static str> {
         match self.test_initialization_runtime.lock() {
-            Ok(mut controller) => controller.q18_abort_and_release(target),
+            Ok(mut controller) => controller.q19_abort_and_release(target),
             Err(poisoned) => {
                 let mut controller = poisoned.into_inner();
-                let _ = controller.q18_abort_and_release(target);
-                Err("NODE_MANAGED_SQLITE_SHM_TEST_Q18_CONTROLLER_POISONED")
+                let _ = controller.q19_abort_and_release(target);
+                Err("NODE_MANAGED_SQLITE_SHM_TEST_Q19_CONTROLLER_POISONED")
             }
         }
     }
 
-    fn abort_q18_and_close(
+    fn abort_q19_and_close(
         &self,
         state: &mut ManagedSqliteShmCoordinatorState,
         target: (u64, u64),
@@ -240,7 +240,7 @@ impl ManagedSqliteShmCoordinator {
         code: &'static str,
         lock_outcome_uncertain: bool,
     ) -> ManagedSqliteShmFailure {
-        let release_failed = self.release_q18_holder(target).is_err();
+        let release_failed = self.release_q19_holder(target).is_err();
         let uncertain = lock_outcome_uncertain || release_failed;
         self.mark_poisoned(state, phase, true, uncertain);
         let failure = ManagedSqliteShmFailure::poisoned_code(phase, code, true, uncertain);

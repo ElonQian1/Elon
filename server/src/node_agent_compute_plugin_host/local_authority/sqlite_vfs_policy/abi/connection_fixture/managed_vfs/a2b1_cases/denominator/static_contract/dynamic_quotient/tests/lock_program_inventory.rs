@@ -55,6 +55,7 @@ use super::lock_pre_managed_callback_rejection_cases::{
     frozen_lock_pre_managed_callback_rejection_leaves_v1,
     LOCK_PRE_MANAGED_CALLBACK_REJECTION_MEMBER_COUNT,
 };
+use super::lock_program_inventory_q19::lock_q19_expected_groups_after_v1;
 use super::lock_raw_state_rejection_cases::{
     lock_raw_state_rejection_expected_groups_v1, LOCK_RAW_STATE_REJECTION_MEMBER_COUNT,
 };
@@ -282,10 +283,10 @@ fn full_lock_program_inventory_accounts_for_every_frozen_member_without_opening_
     assert_eq!(inventory.member_count, 8_668);
     assert_eq!(bundle.reverse_index.len(), 8_668);
     assert_eq!(inventory.program_group_count, 8_140);
-    assert_eq!(inventory.source_present_member_count, 4_284);
-    assert_eq!(inventory.source_present_group_count, 4_284);
-    assert_eq!(inventory.planned_missing_member_count, 4_384);
-    assert_eq!(inventory.planned_missing_group_count, 3_856);
+    assert_eq!(inventory.source_present_member_count, 4_372);
+    assert_eq!(inventory.source_present_group_count, 4_372);
+    assert_eq!(inventory.planned_missing_member_count, 4_296);
+    assert_eq!(inventory.planned_missing_group_count, 3_768);
     let source_groups = bundle
         .groups
         .iter()
@@ -296,7 +297,7 @@ fn full_lock_program_inventory_accounts_for_every_frozen_member_without_opening_
             )
         })
         .collect::<Vec<_>>();
-    assert_eq!(source_groups.len(), 4_284);
+    assert_eq!(source_groups.len(), 4_372);
     assert!(source_groups.iter().all(|group| group.member_count == 1));
     let initialization_missing_groups = bundle
         .groups
@@ -309,13 +310,13 @@ fn full_lock_program_inventory_accounts_for_every_frozen_member_without_opening_
                 )
         })
         .collect::<Vec<_>>();
-    assert_eq!(initialization_missing_groups.len(), 2_288);
+    assert_eq!(initialization_missing_groups.len(), 2_200);
     assert_eq!(
         initialization_missing_groups
             .iter()
             .map(|group| group.member_count)
             .sum::<u64>(),
-        2_816
+        2_728
     );
 
     let record = lock_request_validation_record();
@@ -540,7 +541,10 @@ fn full_lock_program_inventory_accounts_for_every_frozen_member_without_opening_
         .iter()
         .all(|(key, _)| !q1_through_q17_source_keys.contains(key)));
     expected_source_keys.extend(q18_expected_groups.iter().map(|(key, _)| *key));
-    let q12_through_q18_groups = q12_expected_groups
+    let q1_through_q18_source_keys = expected_source_keys.iter().copied().collect();
+    let q19_expected_groups = lock_q19_expected_groups_after_v1(&q1_through_q18_source_keys);
+    expected_source_keys.extend(q19_expected_groups.iter().map(|(key, _)| *key));
+    let q12_through_q19_groups = q12_expected_groups
         .iter()
         .chain(q13_expected_groups.iter())
         .chain(q14_expected_groups.iter())
@@ -548,25 +552,26 @@ fn full_lock_program_inventory_accounts_for_every_frozen_member_without_opening_
         .chain(q16_expected_groups.iter())
         .chain(q17_expected_groups.iter())
         .chain(q18_expected_groups.iter())
+        .chain(q19_expected_groups.iter())
         .copied()
         .collect::<BTreeSet<_>>();
-    assert_eq!(q12_through_q18_groups.len(), 616);
+    assert_eq!(q12_through_q19_groups.len(), 704);
     assert_eq!(
-        q12_through_q18_groups
+        q12_through_q19_groups
             .iter()
             .map(|(_, member)| *member)
             .collect::<BTreeSet<_>>()
             .len(),
-        616
+        704
     );
     let expected_source_keys = expected_source_keys.into_iter().collect::<BTreeSet<_>>();
-    assert_eq!(expected_source_keys.len(), 4_284);
+    assert_eq!(expected_source_keys.len(), 4_372);
 
     let actual_source_groups = source_groups
         .iter()
         .map(|group| (group.normalized_key, group.members[0]))
         .collect::<BTreeSet<_>>();
-    assert_eq!(actual_source_groups.len(), 4_284);
+    assert_eq!(actual_source_groups.len(), 4_372);
     assert!(actual_source_groups
         .iter()
         .all(|(key, _)| expected_source_keys.contains(key)));
@@ -580,6 +585,7 @@ fn full_lock_program_inventory_accounts_for_every_frozen_member_without_opening_
     assert!(q16_expected_groups.is_subset(&actual_source_groups));
     assert!(q17_expected_groups.is_subset(&actual_source_groups));
     assert!(q18_expected_groups.is_subset(&actual_source_groups));
+    assert!(q19_expected_groups.is_subset(&actual_source_groups));
     let q9_members = q9_expected_groups
         .iter()
         .map(|(_, member)| *member)

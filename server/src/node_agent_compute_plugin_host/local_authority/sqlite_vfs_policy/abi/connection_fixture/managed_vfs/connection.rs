@@ -24,6 +24,7 @@ mod lock_raw;
 #[cfg(all(test, windows))]
 pub(super) use lock_initialization::{
     ManagedTestLockCreatedFirstSharedBusyCloseSucceededObservationV1,
+    ManagedTestLockExistingFirstSharedBusyCloseSucceededObservationV1,
     ManagedTestLockInitializationFailureObservationV1,
 };
 #[cfg(all(test, windows))]

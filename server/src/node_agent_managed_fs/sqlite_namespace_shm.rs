@@ -171,6 +171,7 @@ pub(crate) use test_faults::{
 #[cfg(all(test, windows))]
 pub(crate) use test_initialization_runtime::{
     ManagedSqliteShmTestCreatedFirstSharedBusyCloseSucceededReceiptV1,
+    ManagedSqliteShmTestExistingFirstSharedBusyCloseSucceededReceiptV1,
     ManagedSqliteShmTestInitializationEvidenceV1, ManagedSqliteShmTestInitializationExpectationV1,
     ManagedSqliteShmTestInitializationFailureV1,
     ManagedSqliteShmTestInitializationNativeObservationV1,

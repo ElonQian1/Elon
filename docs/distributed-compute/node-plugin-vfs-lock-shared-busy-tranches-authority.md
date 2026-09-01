@@ -4,8 +4,8 @@ status: current
 reviewed_at: 2026-09-02
 owners: node, security
 design_status: design_frozen
-implementation_status: q18_source_written_q19_requirement_frozen_source_not_started
-verification_status: catalog_derivation_verified_source_review_only_actual_not_run
+implementation_status: q18_q19_source_written_uncompiled_unrun
+verification_status: q19_catalog_static_verified_source_review_only_actual_not_run
 authority_scope: backend-a2-map-lock-dynamic-quotient-authority-v1
 ---
 
@@ -18,9 +18,9 @@ authority_scope: backend-a2-map-lock-dynamic-quotient-authority-v1
 生产门和其它 q5+ family；[`Map/Lock dynamic quotient authority`](node-plugin-vfs-map-lock-dynamic-quotient-authority.md)
 仍是登记功能的正式 requirement。
 
-当前只有 q18 CreatedFirst 源码已写入；q19 ExistingFirst 在本文冻结需求，但在源码、测试、program inventory
-和 implementation evidence 落位前仍是 `source_not_started/planned_missing`。设计、实现、静态验证和真实
-Windows actual 四种状态不得互相推导。
+q18 CreatedFirst 与 q19 ExistingFirst 源码、测试、program inventory 和 implementation evidence 均已落位；
+当前仍是 `source_written/source_review_only/implementation_uncompiled/implementation_unrun`。设计、实现、
+静态验证和真实 Windows actual 四种状态不得互相推导。
 
 ## 2. Shared exact-family contract
 
@@ -58,10 +58,10 @@ target lock attempt/success/contended=`2/1/1`、unlock=`1/1`、close=`1/1`；hol
 18,122 bytes，SHA-256=`4f78ff1678c93b1c06bad92e838423e4202598fd8e0b5b83f79cde0c528a07cd`。
 这些均为 uncompiled/unrun source contract，不是 actual。
 
-## 4. q19 ExistingFirst frozen requirement
+## 4. q19 ExistingFirst current source
 
 `LockNativeAcquireExistingFirstSharedBusyCloseSucceededV1` 是 q18 的 path 对切，只承接
-`dms.existing-first.shared-busy.close-ok`。selector 冻结为：
+`dms.existing-first.shared-busy.close-ok`。selector 为：
 
 ```text
 initialization-{lock-shared|lock-exclusive}-first-{first}-count-{count}-existing-first-shared-busy-close-succeeded-{retention-succeeded|retention-route-unknown-prior-quarantine}-terminal-route-unknown
@@ -69,7 +69,7 @@ initialization-{lock-shared|lock-exclusive}-first-{first}-count-{count}-existing
 
 ### 4.1 Real native sequence
 
-q19 必须组合既有、互不替代的两段真实边界：
+q19 source seam 组合既有、互不替代的两段真实边界：
 
 1. 先物理预创建并关闭 exact SHM file，绑定有序 precreation receipt=`[1,1,1,4,1,1,4,1]`；不得附着
    coordinator target，随后 cold attach 必须观察 `was_created=false`。
@@ -85,7 +85,7 @@ requested-range 与 callback ledger 必须与 q18 同形且分账。
 
 ### 4.2 Wire and catalog
 
-协议冻结为 `a2lockq19`、194 scalars：
+协议为 `a2lockq19`、194 scalars：
 
 ```text
 25 binding + 5 metadata + 8 physical-precreation + 25 cold + 8 callback +
@@ -98,17 +98,16 @@ requested-range 与 callback ledger 必须与 q18 同形且分账。
 换序或未关闭的 precreation receipt，拒绝 CreatedFirst、FileId/handle identity 错误、holder 未持锁、target
 没有 production attempt、close receipt 失败或缺失、两侧 ledger 串账以及 receipt/case swap。
 
-以 frozen Lock leaf 和 q18 已验证 canonical 顺序机械生成：先重建 q18 得到逐字节相等，再生成 q19；q19
-目标 catalog 精确为 88 rows / 18,210 bytes / 89 LF / no BOM / trailing LF，SHA-256=
+以 frozen Lock leaf 和 q18 canonical 顺序机械生成：先重建 q18 得到逐字节相等，再生成 q19；committed q19
+catalog 精确为 88 rows / 18,210 bytes / 89 LF / no BOM / trailing LF，SHA-256=
 `eb318d91edbd0bbcd7e68ff626504a007a3f3c96d5eb60b965c9e362a421eee8`。88 个 case/full digest 各自唯一，
-与 q1–q18 的 4,284 个 source-present member 零交集。该值是 q19 实现必须逐字节满足的 source target，
-不是已写源码或 runtime evidence。
+与 q1–q18 的 4,284 个 source-present member 零交集。静态字节、顺序、唯一性与不相交已核对；它仍不是
+编译、runtime 或 actual evidence。
 
-## 5. Planned aggregate and closed boundary
+## 5. Current aggregate and closed boundary
 
-q19 完整进入 source inventory 后，计划聚合才可从 `4,284/4,284 present + 4,384/3,856 missing` 变为
-`4,372/4,372 present + 4,296/3,768 missing`，total 保持 `8,668/8,140`；q12–q19=`704/704`，
-initialization remaining=`2,728/2,200`。在此之前 current 聚合仍以 q18 为止。
+q19 已完整进入 source inventory：current 聚合为 `4,372/4,372 present + 4,296/3,768 missing`，total
+保持 `8,668/8,140`；q12–q19=`704/704`，initialization remaining=`2,728/2,200`。
 
 q18/q19 的 descriptor `occurrence=Natural` 不等于 current natural actual。两批均不注册生产 VFS、不调用
 production open，不创建 Runtime/Ready/Provider/Offer/Job/Lease，也不产生 market、settlement 或 funds effect。

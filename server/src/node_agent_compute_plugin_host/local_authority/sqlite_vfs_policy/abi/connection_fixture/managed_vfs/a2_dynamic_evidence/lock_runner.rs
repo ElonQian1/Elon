@@ -7,6 +7,7 @@ mod created_first_shared_busy_close_succeeded;
 mod created_first_truncate_error_release_failed;
 mod created_first_truncate_error_release_succeeded;
 mod existing_first_exclusive_release_error;
+mod existing_first_shared_busy_close_succeeded;
 mod existing_first_truncate_error_release_failed;
 mod existing_first_truncate_error_release_succeeded;
 mod lifecycle;
@@ -81,6 +82,16 @@ pub(in super::super) use existing_first_exclusive_release_error::{
     run_lock_native_acquire_existing_first_exclusive_release_error_program_isolated,
     LockRunnerExistingFirstExclusiveReleaseCompletionV1,
     LockRunnerNativeAcquireExistingFirstExclusiveReleaseErrorBindingV1,
+};
+#[cfg(all(test, windows))]
+pub(in super::super) use existing_first_shared_busy_close_succeeded::{
+    lock_native_acquire_existing_first_shared_busy_close_succeeded_selector_for_test,
+    selected_lock_native_acquire_existing_first_shared_busy_close_succeeded_selector_for_test,
+};
+pub(in super::super) use existing_first_shared_busy_close_succeeded::{
+    run_lock_native_acquire_existing_first_shared_busy_close_succeeded_program_isolated,
+    LockRunnerExistingFirstSharedBusyCloseSucceededCompletionV1,
+    LockRunnerNativeAcquireExistingFirstSharedBusyCloseSucceededBindingV1,
 };
 #[cfg(all(test, windows))]
 pub(in super::super) use existing_first_truncate_error_release_failed::{

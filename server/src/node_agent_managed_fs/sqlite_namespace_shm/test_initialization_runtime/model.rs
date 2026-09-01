@@ -11,6 +11,7 @@ pub(crate) enum ManagedSqliteShmTestInitializationFailureV1 {
     CreatedFirstTruncateOutcomeUncertainReleaseFailed,
     ExistingFirstTruncateOutcomeUncertainReleaseFailed,
     CreatedFirstSharedBusyCloseSucceeded,
+    ExistingFirstSharedBusyCloseSucceeded,
 }
 
 impl ManagedSqliteShmTestInitializationFailureV1 {
@@ -23,6 +24,7 @@ impl ManagedSqliteShmTestInitializationFailureV1 {
             Self::CreatedFirstTruncateOutcomeUncertainReleaseFailed => 5,
             Self::ExistingFirstTruncateOutcomeUncertainReleaseFailed => 6,
             Self::CreatedFirstSharedBusyCloseSucceeded => 7,
+            Self::ExistingFirstSharedBusyCloseSucceeded => 8,
         }
     }
 }
@@ -38,6 +40,48 @@ pub(crate) struct ManagedSqliteShmTestCreatedFirstSharedBusyCloseSucceededReceip
 }
 
 impl ManagedSqliteShmTestCreatedFirstSharedBusyCloseSucceededReceiptV1 {
+    pub(super) const fn new(
+        expectation: ManagedSqliteShmTestInitializationExpectationV1,
+        requested_lock: ManagedSqliteShmTestLockReceipt,
+        initialization_values: [u64; 43],
+        holder_values: [u64; 15],
+    ) -> Self {
+        Self {
+            expectation,
+            requested_lock,
+            initialization_values,
+            holder_values,
+        }
+    }
+
+    pub(crate) const fn expectation(self) -> ManagedSqliteShmTestInitializationExpectationV1 {
+        self.expectation
+    }
+
+    pub(crate) const fn requested_lock_receipt(self) -> ManagedSqliteShmTestLockReceipt {
+        self.requested_lock
+    }
+
+    pub(crate) const fn initialization_values(self) -> [u64; 43] {
+        self.initialization_values
+    }
+
+    pub(crate) const fn holder_values(self) -> [u64; 15] {
+        self.holder_values
+    }
+}
+
+/// Q19 seals the ExistingFirst successful initialization, real target contention, target close,
+/// and independent holder-release ledgers without widening the q12-q17 failure ABI.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct ManagedSqliteShmTestExistingFirstSharedBusyCloseSucceededReceiptV1 {
+    expectation: ManagedSqliteShmTestInitializationExpectationV1,
+    requested_lock: ManagedSqliteShmTestLockReceipt,
+    initialization_values: [u64; 43],
+    holder_values: [u64; 15],
+}
+
+impl ManagedSqliteShmTestExistingFirstSharedBusyCloseSucceededReceiptV1 {
     pub(super) const fn new(
         expectation: ManagedSqliteShmTestInitializationExpectationV1,
         requested_lock: ManagedSqliteShmTestLockReceipt,

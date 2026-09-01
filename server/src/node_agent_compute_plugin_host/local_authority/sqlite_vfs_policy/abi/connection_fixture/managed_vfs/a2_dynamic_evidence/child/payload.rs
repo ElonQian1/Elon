@@ -8,7 +8,9 @@ use super::{
     lock_created_first_exclusive_release_error, lock_created_first_shared_busy_close_succeeded,
     lock_created_first_truncate_error_release_failed,
     lock_created_first_truncate_error_release_succeeded,
-    lock_existing_first_exclusive_release_error, lock_existing_first_truncate_error_release_failed,
+    lock_existing_first_exclusive_release_error,
+    lock_existing_first_shared_busy_close_succeeded,
+    lock_existing_first_truncate_error_release_failed,
     lock_existing_first_truncate_error_release_succeeded, lock_lifecycle,
     lock_local_protocol_rejection, lock_local_sibling_contention, lock_native_acquire_busy,
     lock_pre_managed_rejection, lock_raw_state_rejection, lock_request_validation,
@@ -178,6 +180,11 @@ pub(super) fn validate_actual_payload(
         lock_existing_first_exclusive_release_error::REPORT_VERSION => (
             SanitizedPayloadFamily::LockQuotient,
             lock_existing_first_exclusive_release_error::classify_header(version, selector)?
+                .ok_or("A2_DYNAMIC_CHILD_ACTUAL_VERSION_INVALID")?,
+        ),
+        lock_existing_first_shared_busy_close_succeeded::REPORT_VERSION => (
+            SanitizedPayloadFamily::LockQuotient,
+            lock_existing_first_shared_busy_close_succeeded::classify_header(version, selector)?
                 .ok_or("A2_DYNAMIC_CHILD_ACTUAL_VERSION_INVALID")?,
         ),
         lock_existing_first_truncate_error_release_failed::REPORT_VERSION => (
