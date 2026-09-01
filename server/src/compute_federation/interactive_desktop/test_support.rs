@@ -24,15 +24,13 @@ use super::{
     reservation_test_support::{active_profile, active_reservation},
     session::{
         InteractiveDesktopAction, InteractiveDesktopAuthorityHead, InteractiveDesktopControlEpoch,
-        InteractiveDesktopEpochState, InteractiveDesktopGrantState,
-        InteractiveDesktopHostLease, InteractiveDesktopHostLeaseState,
-        InteractiveDesktopMediaEpoch, InteractiveDesktopPermissionSet,
-        InteractiveDesktopSession, InteractiveDesktopSessionState,
+        InteractiveDesktopEpochState, InteractiveDesktopGrantState, InteractiveDesktopHostLease,
+        InteractiveDesktopHostLeaseState, InteractiveDesktopMediaEpoch,
+        InteractiveDesktopPermissionSet, InteractiveDesktopSession, InteractiveDesktopSessionState,
         InteractiveDesktopSurfaceSelection, InteractiveDesktopViewerGrant,
-        InteractiveDesktopViewerRelationship,
-        INTERACTIVE_DESKTOP_CONTROL_EPOCH_SCHEMA, INTERACTIVE_DESKTOP_HOST_LEASE_SCHEMA,
-        INTERACTIVE_DESKTOP_MEDIA_EPOCH_SCHEMA, INTERACTIVE_DESKTOP_SESSION_SCHEMA,
-        INTERACTIVE_DESKTOP_VIEWER_GRANT_SCHEMA,
+        InteractiveDesktopViewerRelationship, INTERACTIVE_DESKTOP_CONTROL_EPOCH_SCHEMA,
+        INTERACTIVE_DESKTOP_HOST_LEASE_SCHEMA, INTERACTIVE_DESKTOP_MEDIA_EPOCH_SCHEMA,
+        INTERACTIVE_DESKTOP_SESSION_SCHEMA, INTERACTIVE_DESKTOP_VIEWER_GRANT_SCHEMA,
     },
 };
 

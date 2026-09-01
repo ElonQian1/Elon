@@ -5,12 +5,11 @@ use super::{
         InteractiveDesktopMarketAccess, InteractiveDesktopOfferProfile,
         InteractiveDesktopProductMode, InteractiveDesktopResourceBoundary,
         InteractiveDesktopSurfaceKind, InteractiveDesktopTitlePolicyBinding,
-        InteractiveDesktopTransportPath,
-        InteractiveDesktopVideoProfile, INTERACTIVE_DESKTOP_OFFER_PROFILE_SCHEMA,
+        InteractiveDesktopTransportPath, InteractiveDesktopVideoProfile,
+        INTERACTIVE_DESKTOP_OFFER_PROFILE_SCHEMA,
     },
     product_authority::{
-        InteractiveDesktopProductAuthorityBinding,
-        InteractiveDesktopProductAuthorityCurrentness,
+        InteractiveDesktopProductAuthorityBinding, InteractiveDesktopProductAuthorityCurrentness,
         InteractiveDesktopProductAuthorityProof, INTERACTIVE_DESKTOP_PRODUCT_AUTHORITY_SCHEMA,
     },
     reservation::{

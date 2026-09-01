@@ -10,7 +10,9 @@ fn exact_authority_head_rejects_same_id_with_different_digest() {
     let media = active_media_epoch();
     let control = active_control_epoch();
 
-    assert!(session.authority_head.matches(&lease, &grant, &media, &control));
+    assert!(session
+        .authority_head
+        .matches(&lease, &grant, &media, &control));
 
     let mut substituted_lease = lease.clone();
     substituted_lease.host_lease_digest = "other-lease-digest".to_string();
@@ -46,13 +48,19 @@ fn control_epoch_cannot_cross_a_media_takeover() {
     let mut control = active_control_epoch();
 
     control.media_epoch_digest = "stale-media-digest".to_string();
-    assert!(!session.authority_head.matches(&lease, &grant, &media, &control));
+    assert!(!session
+        .authority_head
+        .matches(&lease, &grant, &media, &control));
 
     control = active_control_epoch();
     control.media_epoch_sequence -= 1;
-    assert!(!session.authority_head.matches(&lease, &grant, &media, &control));
+    assert!(!session
+        .authority_head
+        .matches(&lease, &grant, &media, &control));
 
     control = active_control_epoch();
     control.viewer_transport_identity_digest = "stale-transport".to_string();
-    assert!(!session.authority_head.matches(&lease, &grant, &media, &control));
+    assert!(!session
+        .authority_head
+        .matches(&lease, &grant, &media, &control));
 }

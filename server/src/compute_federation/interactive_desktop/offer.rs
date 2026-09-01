@@ -87,9 +87,10 @@ impl InteractiveDesktopOfferBinding {
                 InteractiveDesktopMarketAccess::PaidMarketplace,
             ) => {
                 self.connectivity_policy == InteractiveDesktopConnectivityPolicy::RelayOnly
-                    && self.title_policy.as_ref().is_some_and(
-                        InteractiveDesktopTitlePolicyBinding::has_complete_reference,
-                    )
+                    && self
+                        .title_policy
+                        .as_ref()
+                        .is_some_and(InteractiveDesktopTitlePolicyBinding::has_complete_reference)
             }
             _ => false,
         }
@@ -247,9 +248,7 @@ impl InteractiveDesktopOfferProfile {
                 .allowed_surface_kinds
                 .iter()
                 .enumerate()
-                .all(|(index, kind)| {
-                    !self.capture.allowed_surface_kinds[..index].contains(kind)
-                })
+                .all(|(index, kind)| !self.capture.allowed_surface_kinds[..index].contains(kind))
             && !self.capture.protected_content_supported
             && !self.capture.secure_desktop_supported
             && self.video.codec == "h264"
@@ -277,14 +276,10 @@ impl InteractiveDesktopOfferProfile {
             && self.created_at_ms <= self.valid_from_ms
             && self.created_at_ms <= self.valid_until_ms
             && (self.offer.market_access != InteractiveDesktopMarketAccess::PaidMarketplace
-                || self
-                    .offer
-                    .title_policy
-                    .as_ref()
-                    .is_some_and(|policy| {
-                        policy.territory == self.region_or_data_zone
-                            && policy.valid_until_ms >= self.valid_until_ms
-                    }))
+                || self.offer.title_policy.as_ref().is_some_and(|policy| {
+                    policy.territory == self.region_or_data_zone
+                        && policy.valid_until_ms >= self.valid_until_ms
+                }))
     }
 
     fn has_transport_shape(&self) -> bool {

@@ -131,7 +131,9 @@ impl InteractiveDesktopSession {
             && (self.binding.offer.market_access != InteractiveDesktopMarketAccess::PaidMarketplace
                 || self.binding.offer.product_mode
                     == InteractiveDesktopProductMode::LicensedCloudSeat)
-            && reservation.permitted_transport_paths.contains(&transport_path)
+            && reservation
+                .permitted_transport_paths
+                .contains(&transport_path)
             && profile.transport_paths.contains(&transport_path)
             && (self.binding.offer.connectivity_policy
                 != InteractiveDesktopConnectivityPolicy::RelayOnly
@@ -179,20 +181,13 @@ impl InteractiveDesktopSession {
             && self.binding.offer.has_current_market_authority(now_ms)
             && reservation.issued_at_ms <= lease.host_consent.issued_at_ms
             && has_host_consent_authority(self, lease, grant, control, action, now_ms)
-            && has_transport_authority(
-                media,
-                lease,
-                grant,
-                &profile.region_or_data_zone,
-                now_ms,
-            )
+            && has_transport_authority(media, lease, grant, &profile.region_or_data_zone, now_ms)
             && self.binding.offer.provider_id == self.binding.provider_id
             && self.authority_head.matches(lease, grant, media, control)
             && grant.grant_generation == media.viewer_grant_generation
             && grant.grant_generation == control.viewer_grant_generation
             && grant.viewer_transport_identity_digest == media.viewer_transport_identity_digest
-            && grant.viewer_transport_identity_digest
-                == control.viewer_transport_identity_digest
+            && grant.viewer_transport_identity_digest == control.viewer_transport_identity_digest
             && self.binding.binding_digest == lease.binding_digest
             && self.binding.binding_digest == grant.binding_digest
             && self.binding.binding_digest == media.binding_digest

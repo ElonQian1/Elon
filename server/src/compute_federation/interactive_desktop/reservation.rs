@@ -209,7 +209,9 @@ impl InteractiveDesktopSessionReservation {
             && self
                 .maximum_end_at_ms
                 .checked_sub(self.issued_at_ms)
-                .is_some_and(|duration| duration >= 0 && duration as u64 <= self.reserved_duration_ms)
+                .is_some_and(|duration| {
+                    duration >= 0 && duration as u64 <= self.reserved_duration_ms
+                })
     }
 
     pub(crate) fn cross_validates_request(
@@ -237,9 +239,10 @@ impl InteractiveDesktopSessionReservation {
             && self.reserved_duration_ms <= request.requested_duration_ms
             && self.currency == request.requested_currency
             && self.consumer_max_amount_micros <= request.consumer_max_amount_micros
-            && self.permitted_transport_paths.iter().all(|path| {
-                request.acceptable_transport_paths.contains(path)
-            })
+            && self
+                .permitted_transport_paths
+                .iter()
+                .all(|path| request.acceptable_transport_paths.contains(path))
             && self.issued_at_ms >= request.requested_at_ms
             && self.issued_at_ms < request.connect_deadline_ms
             && self.activation_deadline_ms <= request.connect_deadline_ms
@@ -283,8 +286,7 @@ fn transport_paths_fit(
             .permitted_transport_paths
             .iter()
             .all(|path| paths.insert(*path) && profile.transport_paths.contains(path))
-        && (profile.offer.connectivity_policy
-            != InteractiveDesktopConnectivityPolicy::RelayOnly
+        && (profile.offer.connectivity_policy != InteractiveDesktopConnectivityPolicy::RelayOnly
             || reservation
                 .permitted_transport_paths
                 .iter()
@@ -316,13 +318,10 @@ fn meter_budgets_fit(
     ];
     let mut meters = BTreeSet::new();
     reservation.meter_budgets.len() == required.len()
-        && reservation
-            .meter_budgets
-            .iter()
-            .all(|budget| {
-                budget.maximum_quantity > 0
-                    && meters.insert(budget.meter.as_str())
-                    && required.contains(&budget.meter.as_str())
-            })
+        && reservation.meter_budgets.iter().all(|budget| {
+            budget.maximum_quantity > 0
+                && meters.insert(budget.meter.as_str())
+                && required.contains(&budget.meter.as_str())
+        })
         && required.iter().all(|meter| meters.contains(*meter))
 }

@@ -14,17 +14,17 @@ pub(crate) mod session;
 pub(crate) const INTERACTIVE_DESKTOP_SERVICE_CLASS: &str = "interactive_desktop";
 
 #[cfg(test)]
-mod authority_tests;
-#[cfg(test)]
 mod authority_head_tests;
 #[cfg(test)]
-mod metering_tests;
+mod authority_tests;
 #[cfg(test)]
 mod market_authority_tests;
 #[cfg(test)]
-mod reservation_tests;
+mod metering_tests;
 #[cfg(test)]
 mod reservation_test_support;
+#[cfg(test)]
+mod reservation_tests;
 #[cfg(test)]
 mod test_support;
 #[cfg(test)]

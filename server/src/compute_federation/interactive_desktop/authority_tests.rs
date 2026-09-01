@@ -1,10 +1,8 @@
 use super::{
     authority::InteractiveDesktopAuthorityCurrentness,
-    offer::{
-        InteractiveDesktopConnectivityPolicy, InteractiveDesktopTransportPath,
-    },
-    session::{InteractiveDesktopAction, InteractiveDesktopPermissionSet},
+    offer::{InteractiveDesktopConnectivityPolicy, InteractiveDesktopTransportPath},
     reservation_test_support::{active_profile, active_request, active_reservation},
+    session::{InteractiveDesktopAction, InteractiveDesktopPermissionSet},
     test_support::{
         active_control_epoch, active_grant, active_lease, active_media_epoch, active_session,
         authorized,
@@ -83,8 +81,7 @@ fn host_consent_is_the_upper_bound_for_remote_permissions() {
     ));
 
     lease.host_consent.issued_at_ms = active_reservation().issued_at_ms;
-    lease.host_consent.scope.session_reservation_digest =
-        "other-session-reservation".to_string();
+    lease.host_consent.scope.session_reservation_digest = "other-session-reservation".to_string();
     assert!(!authorized(
         &session, &lease, &grant, &media, &control, 1_500
     ));
@@ -450,8 +447,7 @@ fn reservation_profile_is_the_upper_bound_for_grants_codecs_and_transport() {
     ));
 
     let mut relay_only_profile = profile;
-    relay_only_profile.offer.connectivity_policy =
-        InteractiveDesktopConnectivityPolicy::RelayOnly;
+    relay_only_profile.offer.connectivity_policy = InteractiveDesktopConnectivityPolicy::RelayOnly;
     relay_only_profile.transport_paths = vec![InteractiveDesktopTransportPath::Turn];
     let mut relay_only_reservation = reservation;
     relay_only_reservation.binding.offer.connectivity_policy =

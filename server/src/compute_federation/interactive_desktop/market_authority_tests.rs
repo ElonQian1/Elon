@@ -52,8 +52,7 @@ fn paid_market_requires_exact_mode_budget_and_current_entitlement() {
     assert!(reservation.cross_validates_request(&request, &profile, 1_500));
 
     let mut underfunded_request = request.clone();
-    underfunded_request.consumer_max_amount_micros =
-        reservation.consumer_max_amount_micros - 1;
+    underfunded_request.consumer_max_amount_micros = reservation.consumer_max_amount_micros - 1;
     assert!(underfunded_request.has_safe_request_shape());
     assert!(!reservation.cross_validates_request(&underfunded_request, &profile, 1_500));
 
@@ -63,8 +62,7 @@ fn paid_market_requires_exact_mode_budget_and_current_entitlement() {
     assert!(!reservation.cross_validates_request(&wrong_currency, &profile, 1_500));
 
     let mut revoked = reservation.clone();
-    revoked.product_authority.currentness =
-        InteractiveDesktopProductAuthorityCurrentness::Revoked;
+    revoked.product_authority.currentness = InteractiveDesktopProductAuthorityCurrentness::Revoked;
     assert!(!revoked.cross_validates_request(&request, &profile, 1_500));
 
     let mut expired = reservation.clone();
@@ -95,7 +93,12 @@ fn paid_market_requires_exact_mode_budget_and_current_entitlement() {
     assert!(!licensed_unpaid.has_v1_shape());
 
     let mut wrong_territory = profile.clone();
-    wrong_territory.offer.title_policy.as_mut().unwrap().territory = "US".to_string();
+    wrong_territory
+        .offer
+        .title_policy
+        .as_mut()
+        .unwrap()
+        .territory = "US".to_string();
     assert!(!wrong_territory.has_v1_shape());
 
     let mut private_offer = active_profile();

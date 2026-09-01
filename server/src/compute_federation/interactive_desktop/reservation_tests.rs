@@ -81,60 +81,35 @@ fn request_and_permissions_cannot_expand_the_offer_profile() {
     let mut lower_resolution_request = request.clone();
     lower_resolution_request.requested_width_px = reservation.reserved_width_px - 1;
     assert!(lower_resolution_request.has_safe_request_shape());
-    assert!(!reservation.cross_validates_request(
-        &lower_resolution_request,
-        &profile,
-        1_500,
-    ));
+    assert!(!reservation.cross_validates_request(&lower_resolution_request, &profile, 1_500,));
 
     let mut view_only_request = request.clone();
     view_only_request.requested_permissions.send_keyboard_input = false;
     assert!(view_only_request.has_safe_request_shape());
-    assert!(!reservation.cross_validates_request(
-        &view_only_request,
-        &profile,
-        1_500,
-    ));
+    assert!(!reservation.cross_validates_request(&view_only_request, &profile, 1_500,));
 
     let mut shorter_request = request.clone();
     shorter_request.requested_duration_ms = reservation.reserved_duration_ms - 1;
     assert!(shorter_request.has_safe_request_shape());
-    assert!(!reservation.cross_validates_request(
-        &shorter_request,
-        &profile,
-        1_500,
-    ));
+    assert!(!reservation.cross_validates_request(&shorter_request, &profile, 1_500,));
 
     let mut turn_only_request = request.clone();
     turn_only_request.acceptable_transport_paths = vec![InteractiveDesktopTransportPath::Turn];
     assert!(turn_only_request.has_safe_request_shape());
-    assert!(!reservation.cross_validates_request(
-        &turn_only_request,
-        &profile,
-        1_500,
-    ));
+    assert!(!reservation.cross_validates_request(&turn_only_request, &profile, 1_500,));
 
     let mut unsupported_audio_profile = profile.clone();
     unsupported_audio_profile.audio.system_audio_available = false;
-    assert!(!reservation.cross_validates_request(
-        &request,
-        &unsupported_audio_profile,
-        1_500,
-    ));
+    assert!(!reservation.cross_validates_request(&request, &unsupported_audio_profile, 1_500,));
 
     let mut relay_only_profile = profile.clone();
-    relay_only_profile.offer.connectivity_policy =
-        InteractiveDesktopConnectivityPolicy::RelayOnly;
+    relay_only_profile.offer.connectivity_policy = InteractiveDesktopConnectivityPolicy::RelayOnly;
     relay_only_profile.transport_paths = vec![InteractiveDesktopTransportPath::Turn];
     let mut direct_reservation = reservation.clone();
     direct_reservation.binding.offer.connectivity_policy =
         InteractiveDesktopConnectivityPolicy::RelayOnly;
     direct_reservation.permitted_transport_paths = vec![InteractiveDesktopTransportPath::Direct];
-    assert!(!direct_reservation.cross_validates_request(
-        &request,
-        &relay_only_profile,
-        1_500,
-    ));
+    assert!(!direct_reservation.cross_validates_request(&request, &relay_only_profile, 1_500,));
 }
 
 #[test]
@@ -152,11 +127,7 @@ fn profile_must_preexist_reservation_and_declare_usable_codecs() {
     let mut not_yet_active_when_reserved = profile.clone();
     not_yet_active_when_reserved.valid_from_ms = 1_100;
     assert!(not_yet_active_when_reserved.has_v1_shape());
-    assert!(!reservation.cross_validates_request(
-        &request,
-        &not_yet_active_when_reserved,
-        1_500,
-    ));
+    assert!(!reservation.cross_validates_request(&request, &not_yet_active_when_reserved, 1_500,));
 
     let mut missing_video_profile = profile.clone();
     missing_video_profile.video.codec_profile.clear();
@@ -194,7 +165,9 @@ fn relationship_labels_require_the_matching_current_proof() {
     friend_reservation.product_authority.product_mode = InteractiveDesktopProductMode::FriendCoPlay;
     friend_reservation.product_authority.viewer_relationship =
         InteractiveDesktopViewerRelationship::TrustedFriend;
-    friend_reservation.product_authority.provider_owner_account_id = "owner-1".to_string();
+    friend_reservation
+        .product_authority
+        .provider_owner_account_id = "owner-1".to_string();
     friend_reservation.product_authority.proof =
         InteractiveDesktopProductAuthorityProof::HostInvitation {
             invitation_id: "invitation-1".to_string(),
@@ -203,27 +176,18 @@ fn relationship_labels_require_the_matching_current_proof() {
             inviter_account_id: "owner-1".to_string(),
             invitee_account_id: "consumer-1".to_string(),
         };
-    assert!(friend_reservation.cross_validates_request(
-        &friend_request,
-        &friend_profile,
-        1_500,
-    ));
+    assert!(friend_reservation.cross_validates_request(&friend_request, &friend_profile, 1_500,));
 
     let mut self_invitation = friend_reservation.clone();
     self_invitation.binding.provider_owner_account_id = "consumer-1".to_string();
     self_invitation.product_authority.provider_owner_account_id = "consumer-1".to_string();
     if let InteractiveDesktopProductAuthorityProof::HostInvitation {
-        inviter_account_id,
-        ..
+        inviter_account_id, ..
     } = &mut self_invitation.product_authority.proof
     {
         *inviter_account_id = "consumer-1".to_string();
     }
-    assert!(!self_invitation.cross_validates_request(
-        &friend_request,
-        &friend_profile,
-        1_500,
-    ));
+    assert!(!self_invitation.cross_validates_request(&friend_request, &friend_profile, 1_500,));
 
     friend_reservation.product_authority.proof =
         InteractiveDesktopProductAuthorityProof::SameOwnerAccount {
@@ -231,9 +195,5 @@ fn relationship_labels_require_the_matching_current_proof() {
             ownership_snapshot_digest: "ownership-snapshot-digest".to_string(),
             account_id: "consumer-1".to_string(),
         };
-    assert!(!friend_reservation.cross_validates_request(
-        &friend_request,
-        &friend_profile,
-        1_500,
-    ));
+    assert!(!friend_reservation.cross_validates_request(&friend_request, &friend_profile, 1_500,));
 }
