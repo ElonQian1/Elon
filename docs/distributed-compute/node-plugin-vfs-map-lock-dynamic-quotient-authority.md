@@ -41,8 +41,8 @@ selected-region pointer 的仅进程内等值验证以及 parent/child/cleanup �
 `MapRegionLoopSuccessV1`：Created-first empty Extend `n=1..256` 与 Node-live target-missing Extend `n=1..255`
 两个 exact 子族共 511 frozen members，扣除 q3 已覆盖的两个 ordinal-001 后净新增 509；q4 固定精确 N 次有序
 mapping ledger、完整 typed matcher、逐成员 seal catalog 与 source digest。Map source test 因而预期有
-`521` 个 source-present member/group、`42,955` 个 planned-missing member；Lock 在 10+104 个既有 program 上保留 q3/q4 的 2,640 项并新增 q5 的 44 项，
-source test 预期有 `2,798` 个 source-present member/group、`5,870` 个 planned-missing member；两根都没有 checked-in
+`521` 个 source-present member/group、`42,955` 个 planned-missing member；Lock 在 10+104 个既有 program 与 q3/q4 的 2,640 项上新增 q5/q6 各 44 项，
+source test 预期有 `2,842` 个 source-present member/group、`5,826` 个 planned-missing member；两根都没有 checked-in
 reviewed inventory digest。
 默认 Map/Lock producers、完整 candidate 与 manifest 路径未因此接通；
 没有任何商 manifest 被成功生成、复核或冻结，所以两个值仍是 `unknown`。
@@ -248,10 +248,14 @@ retention-succeeded 与 route-unknown sibling catalogs 各保持 1,320 rows/237,
 
 ### 7.0.2 Lock native-acquire NodeLive busy tranche
 
-独立 `a2lockq5` 协议的 `LockNativeAcquire + NodeLive + native-busy + Completed` 只匹配 44 个合法 acquire range：8 个 shared 单槽与 36 个 exclusive 非空连续范围；不解析 `leaf_id`，不与 q2 的 104 个 positive lifecycle 或 q3/q4 各 1,320 个 stored-poison members 合并。
-test-only child 必须先让同一物理 SHM 的独立句柄以 Win32 byte-range lock 持有 `120+first`、长度 `count` 的目标范围，再调用真实 installed `xShmLock`；q5 exact receipt 同时绑定同文件身份、不同句柄、持锁跨越 callback、真实 `SQLITE_BUSY`/native contended、零 mutation/poison/mask drift、holder 显式释放与 parent cleanup，禁止 same-handle overlap 或合成 Busy。
-checked-in q5 catalog 必须为 44 member rows，先 8 个 shared 单槽、再按 count/first 排序 36 个 exclusive range，并以 SHA-256 `b12bd411f7fa63f822e65a679351dfc103a6368e2887355d5b03c530fc162e2f` 逐项绑定 action/range/completion 与 member seal。
-三族使 Lock 未运行 inventory 预期变为 `2,798 source-present / 5,870 planned-missing`；这不产生 actual inventory/receipt/record、reviewed digest、`Qlock`、coverage 或 Windows numerator。
+`a2lockq5` 只匹配 44 个 `LockNativeAcquire + NodeLive + native-busy + Completed` acquire range（8 shared 单槽+36 exclusive 连续范围）。独立 Win32 handle 持锁跨越 installed `xShmLock`；receipt 绑定同 FileId/不同 handle、真实 Busy、零状态漂移与 cleanup，拒绝 synthetic Busy/same-handle overlap。
+q5 catalog 为 44 rows，SHA-256=`b12bd411f7fa63f822e65a679351dfc103a6368e2887355d5b03c530fc162e2f`；仍是 uncompiled/unrun source contract。
+
+### 7.0.3 Lock local sibling-contention completed tranche
+
+`LockLocalSiblingContentionCompletedV1` 精确匹配 q6 44 个 `LockLocalState + Completed + BusyNoMutation` member：8 个 `LockShared + SiblingExclusiveContention` 单槽和 36 个 `LockExclusive + SiblingAnyContention` 连续范围；不解析 `leaf_id` 或合并 q2-q5。
+双连接 sibling 先经 installed `xShmLock` 持锁（shared case 同槽 exclusive；exclusive case 逐槽 shared），selected 再在真实 coordinator gate 返回 `SQLITE_BUSY`。receipt 要求 selected 零 native call/mutation/poison drift、setup/cleanup ledger 隔离，sibling 跨 callback 持有后显式清理。
+未运行 inventory 预期=`2,842 present / 5,826 missing`。`a2b1_cases.rs` 的 q5-era `2,754/5,914` assertions 已在源码批次修复但未运行；仍无 actual record、reviewed digest、`Qlock`、coverage 或 Windows numerator。
 
 ### 7.1 Pre-manifest execution-program inventory
 
@@ -335,7 +339,7 @@ implementation fixture，不是 acceptance authority。验收规则要求未来 
 canonical representative 执行真实 Windows child 后产生。
 
 当前该 bridge 只能失败关闭：Map source test 预期 `43,476` member 中有 `521` 个 source-present、`42,955` 个
-planned-missing；Lock source test 预期 `8,668` member 中有 `2,798` 个 source-present、`5,870` 个
+planned-missing；Lock source test 预期 `8,668` member 中有 `2,842` 个 source-present、`5,826` 个
 planned-missing；两根 reviewed inventory digest 均尚未 checked-in/frozen。因此 provider authority 不可构造，
 full Map/Lock candidate 必须在 catalog/manifest 前分别原子失败；该结论没有运行证据，current source 仍为
 `passed=0 failed=0 actual=not_run`。
@@ -463,16 +467,11 @@ runner/ledger/receipt；后续又以独立 q4 `MapRegionLoopSuccessV1`、精确 
 seal 与 source digest 净新增 509 个 source-present member。其真实阻塞已细化为剩余 `42,955` 个 planned-missing、current source 未编译/未运行和
 reviewed inventory digest 缺失。Lock 的真实
 阻塞是完整 observation 尚未实现；二者都在 class catalog 或 manifest 冻结前失败，因此不产生
-`Qmap/Qlock`、member coverage 或 Windows numerator。Lock 当前 source-only 覆盖 stored-poison 两 completion 各 1,320 项，并以 q5 为 44 个 NodeLive native-acquire range 写入独立句柄真实 Win32 contention 与 exact receipt 源码；
-因而阻塞细化为剩余 `5,870` 个 planned-missing member、current source 未编译/未运行和 reviewed inventory digest 缺失；
-不能把 10+104+1,320+1,320+44 项源级 observation/actual-receipt 接线表述为 actual verification。
+`Qmap/Qlock`、coverage 或 Windows numerator。Lock q3/q4 各 1,320、q5/q6 各 44；仍缺 5,826 programs、编译/运行和 reviewed digest。q5 独立句柄 native contention 与 q6 双连接 local sibling gate 都只是 receipt source。
 
 上述回执全部早于 current Map/Lock program/receipt source。Map q4 的已知 clean source baseline
 `10aa60fb42488854657dd30a4240ad5f949c894d` 只是前序 Map provenance，不是本批 Lock 执行证据；当前只达到
-`source_written/source_review_only/implementation_uncompiled/implementation_unrun`。Map 三预算、q3 六成员、q4
-511-member semantic scope/净新增 509，以及 Lock 10+104 个既有窄 program、两个 1,320-member stored-poison 族与 q5 44-member native-busy 族的私有
-actual receipt source、program inventory、reviewed source-program admission provider、catalog/manifest binding 与负向
-测试源码均为 `passed=0/failed=0/not_run`；不得把 prior `36/36` 或 exact blocker 回执当作 current-source 验证。
+`source_written/source_review_only/implementation_uncompiled/implementation_unrun`。Map q3/q4 与 Lock 10+104、q3-q6 的 receipt/inventory/admission/binding source 均为 `passed=0/failed=0/not_run`；prior `36/36` 不是 current 验证。
 
 前序基线验证回执为：
 
@@ -557,15 +556,16 @@ lock_stored_poison_retention_succeeded_v1=source_written_q3_1320_frozen_members_
 lock_stored_poison_route_unknown_then_route_unknown_v1=source_written_q4_1320_frozen_members_catalog_rows_1320_bytes_237857_sha256_df931ad7725843098f228d07d9798d79e92f2beec4e1c23e83fc89219dfa1396_route_preemption_bridge_uncompiled_unrun
 lock_native_acquire_node_live_native_busy_completed_v1=source_written_q5_44_members_8_shared_single_slot_36_exclusive_contiguous_real_distinct_handle_win32_byte_range_contention_exact_receipt_uncompiled_unrun
 lock_native_acquire_busy_catalog=rows_44_sha256_b12bd411f7fa63f822e65a679351dfc103a6368e2887355d5b03c530fc162e2f
+lock_local_sibling_contention_completed_v1=source_written_q6_44_8_shared_sibling_exclusive_36_exclusive_sibling_any_real_two_connection_local_busy_zero_selected_native_or_mutation_uncompiled_unrun
 lock_supported_admission=private_exact_receipt_binding_only_source_contract_not_run
 lock_pre_manifest_program_inventory=source_written_full_root_two_pass_non_authorizing_uncompiled_unrun
 lock_program_inventory_status=planned_missing_or_source_present_receipt_required_only
 lock_program_inventory_digest=not_generated_not_frozen
 lock_program_inventory_member_and_group_counts=unknown_not_run
-lock_program_inventory_unrun_test_expectation=members_8668_source_present_members_2798_source_present_groups_2798_planned_missing_members_5870
+lock_program_inventory_unrun_test_expectation=members_8668_source_present_members_2842_source_present_groups_2842_planned_missing_members_5826
 lock_reviewed_inventory_digest=not_checked_in_not_frozen
 lock_source_program_admission_provider=source_written_fail_closed_uncompiled_unrun
-lock_source_program_admission_current=unconstructible_unrun_source_expectation_planned_missing_members_5870_and_reviewed_digest_absent
+lock_source_program_admission_current=unconstructible_unrun_source_expectation_planned_missing_members_5826_and_reviewed_digest_absent
 lock_default_producers=all_missing_lock_observation_incomplete
 runner_admission_raw_supported=fail_closed_without_private_exact_receipt_not_run
 dynamic_quotient_targeted=prior_passed_36_of_36_current_source_not_run
@@ -583,7 +583,7 @@ map_dynamic_member_coverage=0/43476
 lock_dynamic_member_coverage=0/8668
 WindowsDynamic=not_opened
 map_region_loop_windows_execution=not_run
-lock_q3_q4_stored_poison_and_q5_native_busy_windows_execution=not_run
+lock_q3_q4_stored_poison_q5_native_busy_q6_local_sibling_contention_windows_execution=not_run
 global_source_leaf_authority_scope=static_confirmed_preexisting_drift_5_production_sources_including_current_managed_namespace_and_managed_shm_root_not_rebound_separate_rebind_required_before_compile_or_runtime_acceptance
 compilation=not_run
 cargo=not_run
