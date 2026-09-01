@@ -113,7 +113,7 @@ fn a2b1_lock_dynamic_quotient_candidate_is_atomically_program_inventory_blocked(
         matches!(
             error,
             denominator::DynamicQuotientCandidateGateErrorV1::ProgramInventoryIncomplete {
-                missing_member_count: 5_914,
+                missing_member_count: 5_826,
                 missing_group_count,
             } if missing_group_count > 0
         ),
@@ -126,9 +126,9 @@ fn a2b1_lock_execution_program_inventory_is_complete_but_non_authorizing() {
     let receipt = denominator::inspect_lock_execution_program_inventory_gate()
         .expect("complete pre-manifest Lock execution-program inventory");
     assert_eq!(receipt.member_count, 8_668);
-    assert_eq!(receipt.source_present_member_count, 2_754);
-    assert_eq!(receipt.source_present_group_count, 2_754);
-    assert_eq!(receipt.planned_missing_member_count, 5_914);
+    assert_eq!(receipt.source_present_member_count, 2_842);
+    assert_eq!(receipt.source_present_group_count, 2_842);
+    assert_eq!(receipt.planned_missing_member_count, 5_826);
     assert_eq!(
         receipt
             .source_present_member_count

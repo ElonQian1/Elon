@@ -18,6 +18,7 @@ use super::super::{
 use super::*;
 
 mod descriptor_binding;
+mod lock_local_sibling_contention_cases;
 mod lock_native_acquire_busy_cases;
 mod lock_program_inventory;
 mod lock_stored_poison_cases;
@@ -30,6 +31,7 @@ mod program_inventory;
 mod runner_admission;
 #[cfg(windows)]
 mod runner_admission_lock_lifecycle_supported;
+mod runner_admission_lock_local_sibling_contention_supported;
 mod runner_admission_lock_native_acquire_busy_supported;
 mod runner_admission_lock_stored_poison_supported;
 #[cfg(windows)]
