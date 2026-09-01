@@ -2,6 +2,7 @@
 
 mod callback_completion_route_unknown;
 mod lifecycle;
+mod local_protocol_rejection;
 mod local_sibling_contention;
 mod native_acquire_busy;
 mod request_validation;
@@ -25,6 +26,8 @@ use callback_completion_route_unknown::LockCallbackCompletionRouteUnknownProgram
 #[cfg(windows)]
 use lifecycle::{LockLifecyclePathSpecV1, LockLifecycleProgramSpecV1};
 #[cfg(windows)]
+use local_protocol_rejection::LockLocalProtocolRejectionProgramSpecV1;
+#[cfg(windows)]
 use local_sibling_contention::LockLocalSiblingContentionProgramSpecV1;
 #[cfg(windows)]
 use native_acquire_busy::LockNativeAcquireBusyProgramSpecV1;
@@ -42,10 +45,12 @@ use crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::a
     run_lock_lifecycle_program_isolated, run_lock_local_sibling_contention_program_isolated,
     run_lock_native_acquire_busy_program_isolated, run_lock_program_isolated,
     run_lock_stored_poison_program_isolated, LockRunnerActionV1, LockRunnerEvidenceReceiptV1,
-    LockRunnerIsolatedEvidenceV1, LockRunnerLifecycleBindingV1, LockRunnerLifecyclePathV1,
+    LockRunnerIsolatedEvidenceV1,
+    LockRunnerLifecycleBindingV1, LockRunnerLifecyclePathV1,
     LockRunnerLocalSiblingContentionBindingV1, LockRunnerNativeAcquireBusyBindingV1,
-    LockRunnerProgramBindingV1, LockRunnerRequestValidationV1, LockRunnerStoredPoisonBindingV1,
-    LockRunnerStoredPoisonCompletionV1, LockRunnerStoredPoisonProfileV1,
+    LockRunnerProgramBindingV1, LockRunnerRequestValidationV1,
+    LockRunnerStoredPoisonBindingV1, LockRunnerStoredPoisonCompletionV1,
+    LockRunnerStoredPoisonProfileV1,
 };
 
 /// A real execution receipt. Private fields and the absent public constructor prevent digest-only
@@ -206,6 +211,9 @@ pub(in super::super) fn run_lock_isolated_for_test(
                 implementation_sha256: program.implementation_sha256.0,
             },
         ),
+        LockProgramCaseV1::LocalProtocolRejection(rejection) => {
+            local_protocol_rejection::run_isolated_v1(exact_test, rejection, member)
+        }
         LockProgramCaseV1::LocalSiblingContention(contention) => {
             run_lock_local_sibling_contention_program_isolated(
                 exact_test,
@@ -362,6 +370,7 @@ enum LockProgramCaseV1 {
     },
     CallbackCompletionRouteUnknown(LockCallbackCompletionRouteUnknownProgramSpecV1),
     Lifecycle(LockLifecycleProgramSpecV1),
+    LocalProtocolRejection(LockLocalProtocolRejectionProgramSpecV1),
     LocalSiblingContention(LockLocalSiblingContentionProgramSpecV1),
     NativeAcquireBusy(LockNativeAcquireBusyProgramSpecV1),
     StoredPoison(LockStoredPoisonProgramSpecV1),
@@ -416,6 +425,11 @@ pub(super) fn callback_completion_route_unknown_catalog_row_count_for_test() -> 
 #[cfg(test)]
 pub(super) fn local_sibling_contention_catalog_row_count_for_test() -> usize {
     local_sibling_contention::catalog_row_count_for_test()
+}
+
+#[cfg(test)]
+pub(super) fn local_protocol_rejection_catalog_row_count_for_test() -> usize {
+    local_protocol_rejection::catalog_row_count_for_test()
 }
 
 #[cfg(test)]

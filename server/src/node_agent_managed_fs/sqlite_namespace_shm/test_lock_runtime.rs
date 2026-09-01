@@ -16,6 +16,7 @@ pub(crate) enum ManagedSqliteShmTestLockPath {
     NativeRelease,
     Local,
     SiblingContention,
+    LocalProtocolRejection,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -56,6 +57,13 @@ pub(super) enum ManagedSqliteShmTestNativeUnlockOutcome {
     Error,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum LocalProtocolRejectionKind {
+    OwnOverlap,
+    SharedNotHeld,
+    ExclusiveNotHeld,
+}
+
 enum LockEvent {
     ManagedAttempt,
     ManagedSuccess,
@@ -65,6 +73,7 @@ enum LockEvent {
     NativeUnlockOutcome(ManagedSqliteShmTestNativeUnlockOutcome),
     LocalTransition,
     LocalContention,
+    LocalProtocolRejected(LocalProtocolRejectionKind),
 }
 
 #[derive(PartialEq, Eq)]
@@ -80,6 +89,7 @@ enum Progress {
     NativeUnlockError,
     LocalTransitioned,
     LocalContended,
+    LocalRejected,
     ManagedSucceeded,
 }
 
@@ -169,6 +179,12 @@ impl ManagedSqliteShmTestLockController {
                             "NODE_MANAGED_SQLITE_SHM_TEST_LOCK_SIBLING_CONTENTION_SUCCEEDED",
                         );
                     }
+                    ManagedSqliteShmTestLockPath::LocalProtocolRejection => {
+                        armed.invalid = true;
+                        return Err(
+                            "NODE_MANAGED_SQLITE_SHM_TEST_LOCK_LOCAL_PROTOCOL_REJECTION_SUCCEEDED",
+                        );
+                    }
                 };
                 record_once!(
                     managed_successes,
@@ -249,6 +265,20 @@ impl ManagedSqliteShmTestLockController {
                 require_progress(armed, Progress::ManagedAttempted)?;
                 armed.progress = Progress::LocalContended;
             }
+            LockEvent::LocalProtocolRejected(kind) => {
+                require_path(
+                    armed,
+                    ManagedSqliteShmTestLockPath::LocalProtocolRejection,
+                )?;
+                if kind != local_protocol_rejection_kind(armed.receipt.expectation.action) {
+                    armed.invalid = true;
+                    return Err(
+                        "NODE_MANAGED_SQLITE_SHM_TEST_LOCK_LOCAL_PROTOCOL_REJECTION_KIND_MISMATCH",
+                    );
+                }
+                require_progress(armed, Progress::ManagedAttempted)?;
+                armed.progress = Progress::LocalRejected;
+            }
         }
         Ok(())
     }
@@ -274,6 +304,7 @@ impl ManagedSqliteShmTestLockController {
                 | Progress::NativeLockError
                 | Progress::NativeUnlockError
                 | Progress::LocalContended
+                | Progress::LocalRejected
         ) {
             return Err("NODE_MANAGED_SQLITE_SHM_TEST_LOCK_OBSERVATION_INCOMPLETE");
         }
@@ -352,6 +383,13 @@ fn validate_expectation(
             expectation.action,
             ManagedSqliteShmLockAction::LockShared | ManagedSqliteShmLockAction::LockExclusive
         ),
+        ManagedSqliteShmTestLockPath::LocalProtocolRejection => matches!(
+            expectation.action,
+            ManagedSqliteShmLockAction::LockShared
+                | ManagedSqliteShmLockAction::LockExclusive
+                | ManagedSqliteShmLockAction::UnlockShared
+                | ManagedSqliteShmLockAction::UnlockExclusive
+        ),
     };
     let shared_range_invalid = expectation.count != 1
         && matches!(
@@ -399,6 +437,20 @@ fn require_progress(
         return Err("NODE_MANAGED_SQLITE_SHM_TEST_LOCK_EVENT_SEQUENCE_INVALID");
     }
     Ok(())
+}
+
+fn local_protocol_rejection_kind(
+    action: ManagedSqliteShmLockAction,
+) -> LocalProtocolRejectionKind {
+    match action {
+        ManagedSqliteShmLockAction::LockShared | ManagedSqliteShmLockAction::LockExclusive => {
+            LocalProtocolRejectionKind::OwnOverlap
+        }
+        ManagedSqliteShmLockAction::UnlockShared => LocalProtocolRejectionKind::SharedNotHeld,
+        ManagedSqliteShmLockAction::UnlockExclusive => {
+            LocalProtocolRejectionKind::ExclusiveNotHeld
+        }
+    }
 }
 
 impl ManagedSqliteShmCoordinator {
@@ -512,6 +564,22 @@ impl ManagedSqliteShmCoordinator {
         )
     }
 
+    pub(super) fn record_test_local_protocol_rejection(
+        &self,
+        connection_id: u64,
+        request: ManagedSqliteShmLockRequest,
+        kind: LocalProtocolRejectionKind,
+    ) -> Result<(), ManagedSqliteShmFailure> {
+        self.record_test_lock_event(
+            connection_id,
+            ManagedSqliteShmFailurePhase::RequestValidation,
+            false,
+            |controller, target| {
+                controller.record(target, request, LockEvent::LocalProtocolRejected(kind))
+            },
+        )
+    }
+
     fn record_test_lock_event(
         &self,
         connection_id: u64,
@@ -559,187 +627,5 @@ fn lock_phase(action: ManagedSqliteShmLockAction) -> ManagedSqliteShmFailurePhas
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use std::num::NonZeroU8;
-
-    const TARGET: ExactTarget = (7, 11);
-
-    fn local_expectation() -> ManagedSqliteShmTestLockExpectation {
-        ManagedSqliteShmTestLockExpectation {
-            action: ManagedSqliteShmLockAction::LockShared,
-            first: 2,
-            count: 1,
-            mask: 4,
-            path: ManagedSqliteShmTestLockPath::Local,
-        }
-    }
-
-    fn local_request(first: u8) -> ManagedSqliteShmLockRequest {
-        ManagedSqliteShmLockRequest::new(
-            first,
-            NonZeroU8::new(1).unwrap(),
-            ManagedSqliteShmLockAction::LockShared,
-        )
-        .unwrap()
-    }
-
-    fn arm_local(controller: &mut ManagedSqliteShmTestLockController) {
-        controller.arm(TARGET, local_expectation()).unwrap();
-    }
-
-    #[test]
-    fn cancelling_exact_target_disarms_the_one_shot_observation() {
-        let mut controller = ManagedSqliteShmTestLockController::default();
-        arm_local(&mut controller);
-        controller.cancel(TARGET).unwrap();
-        arm_local(&mut controller);
-    }
-
-    #[test]
-    fn cancelling_another_target_preserves_the_armed_observation() {
-        let mut controller = ManagedSqliteShmTestLockController::default();
-        arm_local(&mut controller);
-        assert_eq!(
-            controller.cancel((7, 12)),
-            Err("NODE_MANAGED_SQLITE_SHM_TEST_LOCK_TARGET_MISMATCH")
-        );
-        assert_eq!(
-            controller.arm(TARGET, local_expectation()),
-            Err("NODE_MANAGED_SQLITE_SHM_TEST_LOCK_OBSERVATION_ALREADY_ARMED")
-        );
-    }
-
-    #[test]
-    fn wrong_request_invalidates_then_finish_disarms_the_observation() {
-        let mut controller = ManagedSqliteShmTestLockController::default();
-        arm_local(&mut controller);
-
-        assert_eq!(
-            controller.record(TARGET, local_request(3), LockEvent::ManagedAttempt),
-            Err("NODE_MANAGED_SQLITE_SHM_TEST_LOCK_REQUEST_MISMATCH")
-        );
-        assert_eq!(
-            controller.finish(TARGET),
-            Err("NODE_MANAGED_SQLITE_SHM_TEST_LOCK_OBSERVATION_INVALID")
-        );
-        arm_local(&mut controller);
-    }
-
-    #[test]
-    fn wrong_path_invalidates_then_finish_disarms_the_observation() {
-        let mut controller = ManagedSqliteShmTestLockController::default();
-        let request = local_request(2);
-        arm_local(&mut controller);
-        controller
-            .record(TARGET, request, LockEvent::ManagedAttempt)
-            .unwrap();
-
-        assert_eq!(
-            controller.record(TARGET, request, LockEvent::NativeLockAttempt),
-            Err("NODE_MANAGED_SQLITE_SHM_TEST_LOCK_PATH_MISMATCH")
-        );
-        assert_eq!(
-            controller.finish(TARGET),
-            Err("NODE_MANAGED_SQLITE_SHM_TEST_LOCK_OBSERVATION_INVALID")
-        );
-        arm_local(&mut controller);
-    }
-
-    #[test]
-    fn duplicate_event_invalidates_then_finish_disarms_the_observation() {
-        let mut controller = ManagedSqliteShmTestLockController::default();
-        let request = local_request(2);
-        arm_local(&mut controller);
-        controller
-            .record(TARGET, request, LockEvent::ManagedAttempt)
-            .unwrap();
-
-        assert_eq!(
-            controller.record(TARGET, request, LockEvent::ManagedAttempt),
-            Err("NODE_MANAGED_SQLITE_SHM_TEST_LOCK_EVENT_SEQUENCE_INVALID")
-        );
-        assert_eq!(
-            controller.finish(TARGET),
-            Err("NODE_MANAGED_SQLITE_SHM_TEST_LOCK_OBSERVATION_INVALID")
-        );
-        arm_local(&mut controller);
-    }
-
-    #[test]
-    fn unfinished_finish_disarms_the_observation() {
-        let mut controller = ManagedSqliteShmTestLockController::default();
-        arm_local(&mut controller);
-
-        assert_eq!(
-            controller.finish(TARGET),
-            Err("NODE_MANAGED_SQLITE_SHM_TEST_LOCK_OBSERVATION_INCOMPLETE")
-        );
-        arm_local(&mut controller);
-    }
-
-    #[test]
-    fn stored_poison_finish_seals_zero_events_and_allows_rearm() {
-        let mut controller = ManagedSqliteShmTestLockController::default();
-        arm_local(&mut controller);
-
-        let receipt = controller
-            .finish_stored_poison_without_attempt(TARGET)
-            .unwrap();
-        assert!(receipt.finished);
-        assert_eq!(receipt.runtime_generation, TARGET.0);
-        assert_eq!(receipt.shm_connection_id, TARGET.1);
-        assert_eq!(receipt.expectation, local_expectation());
-        assert_eq!(receipt.managed_attempts, 0);
-        assert_eq!(receipt.managed_successes, 0);
-        assert_eq!(receipt.native_lock_attempts, 0);
-        assert_eq!(receipt.native_lock_acquired, 0);
-        assert_eq!(receipt.native_lock_contended, 0);
-        assert_eq!(receipt.native_lock_errors, 0);
-        assert_eq!(receipt.native_unlock_attempts, 0);
-        assert_eq!(receipt.native_unlock_successes, 0);
-        assert_eq!(receipt.native_unlock_errors, 0);
-        assert_eq!(receipt.local_transitions, 0);
-        arm_local(&mut controller);
-    }
-
-    #[test]
-    fn stored_poison_finish_rejects_any_managed_event_and_disarms() {
-        let mut controller = ManagedSqliteShmTestLockController::default();
-        arm_local(&mut controller);
-        controller
-            .record(TARGET, local_request(2), LockEvent::ManagedAttempt)
-            .unwrap();
-
-        assert_eq!(
-            controller.finish_stored_poison_without_attempt(TARGET),
-            Err("NODE_MANAGED_SQLITE_SHM_TEST_LOCK_STORED_POISON_EVENT_OBSERVED")
-        );
-        arm_local(&mut controller);
-    }
-
-    #[test]
-    fn successful_local_sequence_returns_finished_receipt_and_allows_rearm() {
-        let mut controller = ManagedSqliteShmTestLockController::default();
-        let request = local_request(2);
-        arm_local(&mut controller);
-        controller
-            .record(TARGET, request, LockEvent::ManagedAttempt)
-            .unwrap();
-        controller
-            .record(TARGET, request, LockEvent::LocalTransition)
-            .unwrap();
-        controller
-            .record(TARGET, request, LockEvent::ManagedSuccess)
-            .unwrap();
-
-        let receipt = controller.finish(TARGET).unwrap();
-        assert!(receipt.finished);
-        assert_eq!(receipt.runtime_generation, TARGET.0);
-        assert_eq!(receipt.shm_connection_id, TARGET.1);
-        assert_eq!(receipt.managed_attempts, 1);
-        assert_eq!(receipt.local_transitions, 1);
-        assert_eq!(receipt.managed_successes, 1);
-        arm_local(&mut controller);
-    }
-}
+#[path = "test_lock_runtime/tests.rs"]
+mod tests;

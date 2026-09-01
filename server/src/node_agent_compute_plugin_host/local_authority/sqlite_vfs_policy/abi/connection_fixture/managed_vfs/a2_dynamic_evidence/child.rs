@@ -3,6 +3,7 @@ use std::{fmt, path::Path, process::Child};
 use sha2::{Digest, Sha256};
 pub(super) mod lock_callback_route_unknown;
 pub(super) mod lock_lifecycle;
+pub(super) mod lock_local_protocol_rejection;
 pub(super) mod lock_local_sibling_contention;
 pub(super) mod lock_native_acquire_busy;
 mod lock_request_validation;
@@ -10,7 +11,13 @@ pub(super) mod lock_stored_poison;
 pub(super) mod map_lifecycle;
 pub(super) mod map_region_loop;
 mod payload;
+#[cfg(test)]
+mod test_support;
 use payload::validate_actual_payload;
+#[cfg(test)]
+pub(super) use test_support::{
+    validate_payload_for_test, validated_receipt_for_record_test,
+};
 
 pub(in super::super) const A2_DYNAMIC_CHILD_NONCE_ENV: &str = "ELON_SQLITE_A2_DYNAMIC_CHILD_NONCE";
 
@@ -462,43 +469,4 @@ fn registration_commitment(
     }]);
     hasher.update(registration_id.to_le_bytes());
     RegistrationCommitment(hasher.finalize().into())
-}
-
-#[cfg(test)]
-pub(super) fn validate_payload_for_test(payload: &str) -> Result<(), &'static str> {
-    validate_actual_payload(payload).map(|_| ())
-}
-
-#[cfg(test)]
-pub(super) fn validated_receipt_for_record_test(
-    payload: &str,
-    registration_id: u64,
-) -> Result<ValidatedChildProcessReceipt, &'static str> {
-    if registration_id == 0 {
-        return Err("A2_DYNAMIC_REGISTRATION_ID_INVALID");
-    }
-    let family = validate_actual_payload(payload)?;
-    let identity = ReportedChildIdentity {
-        process_id: std::process::id(),
-        nonce: "0123456789abcdef0123456789abcdef".to_owned(),
-    };
-    let root_commitment = RootCommitment([0x5a; 32]);
-    let payload_commitment = payload_commitment(payload);
-    let registration_commitment = registration_commitment(
-        identity.process_id,
-        &identity.nonce,
-        &root_commitment,
-        &payload_commitment,
-        family,
-        registration_id,
-    );
-    Ok(ValidatedChildProcessReceipt {
-        identity,
-        root_commitment,
-        registration_commitment,
-        actual_payload: payload.to_owned(),
-        payload_commitment,
-        family,
-        exit_code: 0,
-    })
 }

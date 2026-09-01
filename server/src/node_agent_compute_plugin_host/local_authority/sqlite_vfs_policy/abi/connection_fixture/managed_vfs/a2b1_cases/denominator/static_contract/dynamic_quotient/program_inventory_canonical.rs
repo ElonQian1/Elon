@@ -132,6 +132,30 @@ const SOURCE_SCOPE: &[(&str, &str)] = &[
         include_str!("lock_local_sibling_contention_source_scope.rs"),
     ),
     (
+        "runner_admission/lock_program/local_protocol_rejection.rs",
+        include_str!("runner_admission/lock_program/local_protocol_rejection.rs"),
+    ),
+    (
+        "runner_admission/lock_program/local_protocol_rejection/catalog.rs",
+        include_str!("runner_admission/lock_program/local_protocol_rejection/catalog.rs"),
+    ),
+    (
+        "runner_admission/lock_program/local_protocol_rejection/runtime.rs",
+        include_str!("runner_admission/lock_program/local_protocol_rejection/runtime.rs"),
+    ),
+    (
+        "runner_admission/lock_program/local_protocol_rejection/local_protocol_own_overlap_or_not_held_completed_members.v1.tsv",
+        include_str!("runner_admission/lock_program/local_protocol_rejection/local_protocol_own_overlap_or_not_held_completed_members.v1.tsv"),
+    ),
+    (
+        "runner_admission/lock_program/local_protocol_rejection/source_scope.rs",
+        include_str!("runner_admission/lock_program/local_protocol_rejection/source_scope.rs"),
+    ),
+    (
+        "lock_local_protocol_rejection_source_scope.rs",
+        include_str!("lock_local_protocol_rejection_source_scope.rs"),
+    ),
+    (
         "runner_admission/lock_program/native_acquire_busy.rs",
         include_str!("runner_admission/lock_program/native_acquire_busy.rs"),
     ),

@@ -2,6 +2,7 @@
 
 mod callback_completion_route_unknown;
 mod lifecycle;
+mod local_protocol_rejection;
 mod local_sibling_contention;
 mod native_acquire_busy;
 mod request_validation;
@@ -9,11 +10,22 @@ mod stored_poison;
 mod stored_poison_dispatch;
 mod stored_poison_model;
 mod stored_poison_route_unknown;
+#[cfg(all(test, windows))]
+mod selector_test_support;
 
 #[cfg(all(test, windows))]
 pub(in super::super) use callback_completion_route_unknown::{
     lock_callback_route_unknown_selector_for_test,
     selected_lock_callback_route_unknown_selector_for_test,
+};
+#[cfg(all(test, windows))]
+pub(in super::super) use local_protocol_rejection::{
+    lock_local_protocol_rejection_selector_for_test,
+    selected_lock_local_protocol_rejection_selector_for_test,
+};
+pub(in super::super) use local_protocol_rejection::{
+    run_lock_local_protocol_rejection_program_isolated, LocalProtocolRejectionPathV1,
+    LockRunnerLocalProtocolRejectionBindingV1,
 };
 pub(in super::super) use callback_completion_route_unknown::{
     run_lock_callback_route_unknown_program_isolated, LockRunnerCallbackRouteUnknownBindingV1,
@@ -39,6 +51,10 @@ pub(in super::super) use stored_poison_model::{
     LockRunnerStoredPoisonBindingV1, LockRunnerStoredPoisonCompletionV1,
     LockRunnerStoredPoisonProfileV1,
 };
+#[cfg(all(test, windows))]
+pub(in super::super) use selector_test_support::{
+    lock_stored_poison_selector_for_test, selected_lock_stored_poison_selector_for_test,
+};
 
 use std::{
     fs,
@@ -56,7 +72,8 @@ use super::{
 };
 
 const CHILD_ROOT_ENV: &str = "ELON_SQLITE_A2_LOCK_QUOTIENT_CHILD_ROOT";
-const STORED_POISON_SELECTOR_ENV: &str = "ELON_SQLITE_A2_LOCK_STORED_POISON_SELECTOR";
+pub(super) const STORED_POISON_SELECTOR_ENV: &str =
+    "ELON_SQLITE_A2_LOCK_STORED_POISON_SELECTOR";
 pub(super) const PAYLOAD_VERSION: &str = "a2lockq1";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -430,32 +447,6 @@ fn cleanup_failed_root(root: &Path, error: anyhow::Error) -> anyhow::Error {
         Ok(()) => error,
         Err(cleanup) if cleanup.kind() == std::io::ErrorKind::NotFound => error,
         Err(cleanup) => error.context(format!("Lock quotient fallback cleanup failed: {cleanup}")),
-    }
-}
-
-#[cfg(all(test, windows))]
-pub(in super::super) fn selected_lock_stored_poison_selector_for_test() -> Option<String> {
-    std::env::var_os(CHILD_ROOT_ENV)?;
-    std::env::var(STORED_POISON_SELECTOR_ENV).ok()
-}
-
-#[cfg(all(test, windows))]
-pub(in super::super) fn lock_stored_poison_selector_for_test(
-    action_tag: u64,
-    profile_tag: u64,
-    first: u8,
-    count: u8,
-    completion_tag: u64,
-) -> Result<String, &'static str> {
-    match completion_tag {
-        3 => super::child::lock_stored_poison::selector(action_tag, profile_tag, first, count),
-        4 => super::child::lock_stored_poison::route_unknown::selector(
-            action_tag,
-            profile_tag,
-            first,
-            count,
-        ),
-        _ => Err("A2_DYNAMIC_CHILD_ACTUAL_SELECTOR_INVALID"),
     }
 }
 

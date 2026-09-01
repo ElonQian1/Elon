@@ -3,7 +3,8 @@ use std::io;
 use super::super::{platform, PlatformManagedSqliteLockAttempt};
 #[cfg(all(test, windows))]
 use super::test_lock_runtime::{
-    ManagedSqliteShmTestNativeLockOutcome, ManagedSqliteShmTestNativeUnlockOutcome,
+    LocalProtocolRejectionKind, ManagedSqliteShmTestNativeLockOutcome,
+    ManagedSqliteShmTestNativeUnlockOutcome,
 };
 use super::{
     coordinator::{
@@ -37,7 +38,15 @@ impl ManagedSqliteShmCoordinator {
         self.begin_test_lock_action(connection_id, request)?;
         match request.action() {
             ManagedSqliteShmLockAction::LockShared => {
-                require_unlocked(current, mask)?;
+                if let Err(failure) = require_unlocked(current, mask) {
+                    #[cfg(all(test, windows))]
+                    self.record_test_local_protocol_rejection(
+                        connection_id,
+                        request,
+                        LocalProtocolRejectionKind::OwnOverlap,
+                    )?;
+                    return Err(failure);
+                }
                 if sibling.exclusive_mask & mask != 0 {
                     #[cfg(all(test, windows))]
                     self.record_test_local_lock_contention(connection_id, request)?;
@@ -58,7 +67,15 @@ impl ManagedSqliteShmCoordinator {
                 }
             }
             ManagedSqliteShmLockAction::LockExclusive => {
-                require_unlocked(current, mask)?;
+                if let Err(failure) = require_unlocked(current, mask) {
+                    #[cfg(all(test, windows))]
+                    self.record_test_local_protocol_rejection(
+                        connection_id,
+                        request,
+                        LocalProtocolRejectionKind::OwnOverlap,
+                    )?;
+                    return Err(failure);
+                }
                 if (sibling.shared_mask | sibling.exclusive_mask) & mask != 0 {
                     #[cfg(all(test, windows))]
                     self.record_test_local_lock_contention(connection_id, request)?;
@@ -71,6 +88,12 @@ impl ManagedSqliteShmCoordinator {
             }
             ManagedSqliteShmLockAction::UnlockShared => {
                 if current.shared_mask & mask != mask || current.exclusive_mask & mask != 0 {
+                    #[cfg(all(test, windows))]
+                    self.record_test_local_protocol_rejection(
+                        connection_id,
+                        request,
+                        LocalProtocolRejectionKind::SharedNotHeld,
+                    )?;
                     return Err(protocol("NODE_MANAGED_SQLITE_SHM_SHARED_UNLOCK_NOT_HELD"));
                 }
                 if sibling.shared_mask & mask == 0 {
@@ -86,6 +109,12 @@ impl ManagedSqliteShmCoordinator {
             }
             ManagedSqliteShmLockAction::UnlockExclusive => {
                 if current.exclusive_mask & mask != mask || current.shared_mask & mask != 0 {
+                    #[cfg(all(test, windows))]
+                    self.record_test_local_protocol_rejection(
+                        connection_id,
+                        request,
+                        LocalProtocolRejectionKind::ExclusiveNotHeld,
+                    )?;
                     return Err(protocol(
                         "NODE_MANAGED_SQLITE_SHM_EXCLUSIVE_UNLOCK_NOT_HELD",
                     ));

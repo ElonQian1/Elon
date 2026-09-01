@@ -6,6 +6,7 @@ mod canonical_tags;
 mod catalog;
 mod descriptor_binding;
 mod lock_callback_completion_route_unknown_source_scope;
+mod lock_local_protocol_rejection_source_scope;
 mod lock_local_sibling_contention_source_scope;
 mod lock_native_acquire_busy_source_scope;
 mod lock_stored_poison_source_scope;

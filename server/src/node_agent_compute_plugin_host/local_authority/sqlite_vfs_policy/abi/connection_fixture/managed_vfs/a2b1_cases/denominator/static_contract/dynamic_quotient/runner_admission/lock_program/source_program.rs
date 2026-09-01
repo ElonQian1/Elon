@@ -10,6 +10,10 @@ use super::{
         LockCallbackCompletionRouteUnknownProgramSpecV1,
     },
     lifecycle::{program_spec_v1 as lifecycle_program_spec_v1, LockLifecycleProgramSpecV1},
+    local_protocol_rejection::{
+        program_spec_v1 as local_protocol_rejection_program_spec_v1,
+        LockLocalProtocolRejectionProgramSpecV1,
+    },
     local_sibling_contention::{
         program_spec_v1 as local_sibling_contention_program_spec_v1,
         LockLocalSiblingContentionProgramSpecV1,
@@ -53,11 +57,17 @@ pub(super) fn program_spec_v1(
                             match local_sibling_contention_program_spec_v1(key, plan) {
                                 Ok(program) => Ok(from_local_sibling_contention_v1(program)),
                                 Err(LockRunnerExecutionViolationV1::UnsupportedProgram) => {
-                                    match native_acquire_busy_program_spec_v1(key, plan) {
-                                        Ok(program) => Ok(from_native_acquire_busy_v1(program)),
+                                    match local_protocol_rejection_program_spec_v1(key, plan) {
+                                        Ok(program) => Ok(from_local_protocol_rejection_v1(program)),
                                         Err(LockRunnerExecutionViolationV1::UnsupportedProgram) => {
-                                            stored_poison_program_spec_v1(key, plan)
-                                                .map(from_stored_poison_v1)
+                                            match native_acquire_busy_program_spec_v1(key, plan) {
+                                                Ok(program) => Ok(from_native_acquire_busy_v1(program)),
+                                                Err(LockRunnerExecutionViolationV1::UnsupportedProgram) => {
+                                                    stored_poison_program_spec_v1(key, plan)
+                                                        .map(from_stored_poison_v1)
+                                                }
+                                                Err(error) => Err(error),
+                                            }
                                         }
                                         Err(error) => Err(error),
                                     }
@@ -121,6 +131,19 @@ fn from_local_sibling_contention_v1(
     SourceLockProgramSpecV1 {
         #[cfg(windows)]
         case: LockProgramCaseV1::LocalSiblingContention(program),
+        normalized_descriptor_sha256: program.normalized_descriptor_sha256,
+        expected_member: Some(program.member),
+        plan_sha256: program.plan_sha256,
+        implementation_sha256: program.implementation_sha256,
+    }
+}
+
+fn from_local_protocol_rejection_v1(
+    program: LockLocalProtocolRejectionProgramSpecV1,
+) -> SourceLockProgramSpecV1 {
+    SourceLockProgramSpecV1 {
+        #[cfg(windows)]
+        case: LockProgramCaseV1::LocalProtocolRejection(program),
         normalized_descriptor_sha256: program.normalized_descriptor_sha256,
         expected_member: Some(program.member),
         plan_sha256: program.plan_sha256,

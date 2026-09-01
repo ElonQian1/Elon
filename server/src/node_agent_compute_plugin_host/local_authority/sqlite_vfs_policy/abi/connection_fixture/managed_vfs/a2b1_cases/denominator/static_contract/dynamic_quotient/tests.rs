@@ -19,6 +19,7 @@ use super::*;
 
 mod descriptor_binding;
 mod lock_callback_completion_route_unknown_cases;
+mod lock_local_protocol_rejection_cases;
 mod lock_local_sibling_contention_cases;
 mod lock_native_acquire_busy_cases;
 mod lock_program_inventory;
@@ -34,6 +35,7 @@ mod runner_admission_lock_callback_completion_route_unknown_supported;
 #[cfg(windows)]
 mod runner_admission_lock_lifecycle_supported;
 mod runner_admission_lock_local_sibling_contention_supported;
+mod runner_admission_lock_local_protocol_rejection_supported;
 mod runner_admission_lock_native_acquire_busy_supported;
 mod runner_admission_lock_stored_poison_supported;
 #[cfg(windows)]
