@@ -13387,7 +13387,7 @@
       "id": "yilong-quant-paper-grant-revocation-sync-v1",
       "title": "一龙量化 Paper 单次授权撤销公开同步 V1",
       "summary": "把量化仓库已验证的单个 Paper grant 跨重启撤销能力同步到主项目官方目录、公开预览和协作文档；主项目签发契约保持不变，继续 paper-only。",
-      "status": "verified",
+      "status": "released",
       "priority": "p1",
       "requirement": {
         "path": "docs/requirements/yilong-quant-paper-grant-revocation-sync-v1.md",
@@ -13481,20 +13481,10 @@
         }
       ],
       "created_at_ms": 1788288231346,
-      "updated_at_ms": 1788288937517
+      "updated_at_ms": 1788289651051
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_f37e1380d8874c0992ff1901be307a59",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-lock-native-busy",
-      "reason": "q5 的 44-member 真实独立句柄 Win32 contention 源码与哈希证据已记录；完整功能仍阻塞于其余 5,870 Lock members、current source 未编译/未运行、reviewed inventory digest/manifest/Windows records 缺失。",
-      "from_status": "in_progress",
-      "to_status": "blocked",
-      "at_ms": 1788217618716
-    },
     {
       "id": "feature_event_4bc6cc80a3f94c6f83545d3e3deb1a42",
       "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
@@ -15484,6 +15474,16 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1788288937517
+    },
+    {
+      "id": "feature_event_4465f7a282b94d2abe4d074744375b40",
+      "feature_id": "yilong-quant-paper-grant-revocation-sync-v1",
+      "action": "transitioned",
+      "actor": "codex-goal-quant-grant-revocation-sync",
+      "reason": "Server v0.3.1710 已发布 SHA 5a0a5631c，匿名公开预览回读 V8 文案及 paper-only 安全字段。",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1788289651051
     }
   ]
 }
