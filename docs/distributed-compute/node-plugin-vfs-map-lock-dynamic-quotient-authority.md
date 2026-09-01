@@ -4,8 +4,8 @@ status: current
 reviewed_at: 2026-09-02
 owners: node, security
 design_status: design_frozen
-implementation_status: typed_projector_candidate_prior_compiled_map_and_lock_q18_pre_manifest_program_inventory_reviewed_source_admission_and_exact_private_execution_bridge_source_written_uncompiled_unrun
-verification_status: prior_targeted_unit_36_passed_current_map_lock_q18_inventory_source_admission_and_private_execution_not_run_review_digests_and_manifests_not_frozen
+implementation_status: typed_projector_candidate_prior_compiled_map_and_lock_q18_source_written_q19_requirement_frozen_source_not_started_uncompiled_unrun
+verification_status: prior_targeted_unit_36_passed_current_map_lock_q18_not_run_q19_catalog_derivation_verified_actual_not_run_review_digests_and_manifests_not_frozen
 authority_scope: backend-a2-map-lock-dynamic-quotient-authority-v1
 ---
 
@@ -31,12 +31,15 @@ truncate outcome uncertain 后 cleanup release outcome uncertain 各写成相同
 严格有序，`cleanup_rewrite=false`、terminal=`CleanupRewritten`。q17 另绑定 physical SHM precreation/close 与 cold
 `was_created=false`；q18 `LockNativeAcquireCreatedFirstSharedBusyCloseSucceededV1` 再把 CreatedFirst shared-busy/
 close-ok 的相同 44×2 组合写成 88 singleton，并绑定 same-FileId distinct holder/target 真争用、attempt 分账和
-explicit close success。故 q1–q18 未运行 inventory 预期为 `4,284 present members / 4,284 present groups /
-4,384 missing members / 3,856 missing groups / 8,668 total members / 8,140 total groups`；q12–q18=`616/616`，
-完整 initialization umbrella 仍缺 2,816 members / 2,288 groups。q9–q18 的成员、
-production/controlled-fault actual chain、receipt 和排除边界由
-[`Lock dynamic tranches authority`](node-plugin-vfs-lock-dynamic-tranches-authority.md) 维护。两根均未编译、
-未运行，没有 checked-in reviewed inventory digest、manifest 或 actual acceptance。
+explicit close success。q19 requirement 冻结对应 ExistingFirst 对切：物理 SHM precreation/cold
+`was_created=false` 加同一真实争用/close-success 链，88 singleton、`a2lockq19`=194，源码仍未开始。
+
+因此 current q1–q18 未运行 inventory 仍为 `4,284/4,284 present + 4,384/3,856 missing`，total
+`8,668/8,140`，initialization remaining=`2,816/2,288`。只有 q19 source/evidence 落位后，计划值才变为
+`4,372/4,372 present + 4,296/3,768 missing`、q12–q19=`704/704`、initialization remaining=`2,728/2,200`。
+q9–q19 合同见 [`Lock dynamic tranches authority`](node-plugin-vfs-lock-dynamic-tranches-authority.md)，共享争用
+细节见 [`Lock DMS shared-busy tranches authority`](node-plugin-vfs-lock-shared-busy-tranches-authority.md)。两根均无
+current compile/runtime、checked-in reviewed inventory digest、manifest 或 actual acceptance。
 默认 Map/Lock producers、完整 candidate 与 manifest 路径未因此接通；
 没有任何商 manifest 被成功生成、复核或冻结，所以两个值仍是 `unknown`。
 
@@ -255,7 +258,8 @@ projector provenance commitment 精确纳入 producer coherence 的
 `producer_coherence/{map,map_axes,lock,lock_axes}.rs`、`descriptor_binding.rs`、
 `membership_commitment.rs`、`runner_admission.rs`、
 `runner_admission/{canonical,map,map_program,map_program/request_budget,lock,lock_program,lock_program/request_validation,lock_program/lifecycle}.rs`，
-以及 Lock stored-poison 两 completion 与 q5–q18 exact tranche 的 program/catalog/source-scope/runner seams；
+以及 Lock stored-poison 两 completion、q5–q18 exact source 与 q19 frozen program target 的
+program/catalog/source-scope/runner seams；
 其中任一接受关系或 commitment 编码变化都必须触发 projector provenance drift 和全量重审。
 
 同一 commitment 还绑定真实执行 envelope：`a2_dynamic_evidence` 的 child/capture/environment/cleanup 与
@@ -313,7 +317,7 @@ seal 与 source digest 净新增 509 个 source-present member。其真实阻塞
 reviewed inventory digest 缺失。Lock 的真实
 阻塞是完整 observation 尚未实现；二者都在 class catalog 或 manifest 冻结前失败，因此不产生
 `Qmap/Qlock`、coverage 或 Windows numerator。Lock q3/q4 各 1,320、q5/q6 各 44、q7 为 192、q8 为
-88、q9 为 528、q10 为 7、q11 为 11、q12–q18 各为 88；仍缺 4,384 members / 3,856 groups、编译/运行、actual
+88、q9 为 528、q10 为 7、q11 为 11、q12–q18 各为 88；current 仍缺 4,384 members / 3,856 groups、编译/运行、actual
 receipts 与 reviewed digest。q9 的 pre-managed production rejection/completion observation、q10 的 ABI
 scalar installed-callback receipt、q11 的 production raw-state rejection/cleanup ledger、q12/q13 在
 CreatedFirst/ExistingFirst DMS release 点故意丢弃 `UnlockFileEx` BOOL 的 receipt，以及 q14/q15 在
@@ -324,11 +328,12 @@ source-only shape。q17 还要求 physical precreation/close 与 cold `was_creat
 `cleanup_rewrite=false`，只有 terminal disposition 是 `CleanupRewritten`。q18 则要求 cold CreatedFirst target、
 同 `FileId` distinct holder 在 `SHM_DMS_OFFSET` 真实持锁、target shared attempt 恰一次 Contended、两侧 ledger
 分账及 explicit target close success；最终 DMS/file Released、mutation known、lock certain，但 unsafe terminal
-仍 Quarantined。该 seam 也只是 uncompiled/unrun source。
+仍 Quarantined。该 seam 也只是 uncompiled/unrun source。q19 requirement 只把 Q17 的 physical precreation/
+cold ExistingFirst 与 q18 contention/close-success 组合为下一个 88-member 对切；其 source 未开始，不得计入 current inventory。
 
 上述回执全部早于 current Map/Lock program/receipt source。Map q4 的已知 clean source baseline
 `10aa60fb42488854657dd30a4240ad5f949c894d` 只是前序 Map provenance，不是本批 Lock 执行证据；当前只达到
-`source_written/source_review_only/implementation_uncompiled/implementation_unrun`。Map q3/q4 与 Lock 10+104、q3-q18 的 receipt/inventory/admission/binding source 均为 `passed=0/failed=0/not_run`；prior `36/36` 不是 current 验证。
+`source_written/source_review_only/implementation_uncompiled/implementation_unrun`。Map q3/q4 与 Lock 10+104、q3-q18 的 receipt/inventory/admission/binding source 均为 `passed=0/failed=0/not_run`；q19 仍是 requirement-only，prior `36/36` 不是 current 验证。
 
 前序基线验证回执为：
 
@@ -435,6 +440,9 @@ lock_native_acquire_existing_first_truncate_error_release_failed_catalog=rows_88
 lock_native_acquire_created_first_shared_busy_close_succeeded_v1=source_written_q18_88_exact_singleton_members_16_shared_plus_72_exclusive_44_each_terminal_completion_same_file_id_distinct_holder_target_real_shm_dms_contention_target_lock_2_1_1_unlock_1_1_close_1_1_holder_acquire_unlock_1_1_separate_ledgers_requested_native_local_0_0_managed_1_0_callback_1_1_cleanup_rewrite_false_dms_and_file_released_mutation_known_lock_certain_unsafe_terminal_quarantined_controlled_fault_actual_only_uncompiled_unrun
 lock_native_acquire_created_first_shared_busy_close_succeeded_protocol=a2lockq18_payload_expected_186_values_partition_25_5_25_8_14_43_15_18_1_18_6_4_3_1
 lock_native_acquire_created_first_shared_busy_close_succeeded_catalog=rows_88_bytes_18122_sha256_4f78ff1678c93b1c06bad92e838423e4202598fd8e0b5b83f79cde0c528a07cd
+lock_native_acquire_existing_first_shared_busy_close_succeeded_requirement=q19_frozen_88_exact_singleton_members_16_shared_plus_72_exclusive_physical_precreation_cold_was_created_false_same_file_id_distinct_holder_target_real_contention_explicit_target_close_success_source_not_started
+lock_native_acquire_existing_first_shared_busy_close_succeeded_protocol=a2lockq19_payload_target_194_values_partition_25_5_8_25_8_14_43_15_18_1_18_6_4_3_1
+lock_native_acquire_existing_first_shared_busy_close_succeeded_catalog_target=rows_88_bytes_18210_sha256_eb318d91edbd0bbcd7e68ff626504a007a3f3c96d5eb60b965c9e362a421eee8_not_checked_in
 lock_supported_admission=private_exact_receipt_binding_only_source_contract_not_run
 lock_pre_manifest_program_inventory=source_written_full_root_two_pass_non_authorizing_uncompiled_unrun
 lock_program_inventory_status=planned_missing_or_source_present_receipt_required_only
@@ -462,7 +470,8 @@ lock_dynamic_member_coverage=0/8668
 WindowsDynamic=not_opened
 map_region_loop_windows_execution=not_run
 lock_q3_q4_stored_poison_q5_native_busy_q6_local_sibling_contention_q7_callback_completion_route_unknown_q8_local_protocol_rejection_q9_pre_managed_callback_rejection_q10_abi_scalar_rejection_q11_raw_state_rejection_q12_created_first_exclusive_release_error_q13_existing_first_exclusive_release_error_q14_created_first_truncate_error_release_succeeded_q15_existing_first_truncate_error_release_succeeded_q16_created_first_truncate_error_release_failed_q17_existing_first_truncate_error_release_failed_q18_created_first_shared_busy_close_succeeded_windows_execution=not_run
-global_source_leaf_authority_scope=static_confirmed_preexisting_q9_q14_checkpoint_drift_19_artifact_refresh_overdue_independently_deferred_q15_q16_q17_q18_must_be_included_production_sources_including_current_managed_namespace_and_managed_shm_root_not_rebound_separate_rebind_required_before_compile_or_runtime_acceptance
+lock_q19_existing_first_shared_busy_close_succeeded=requirement_frozen_source_not_started_windows_execution_not_run
+global_source_leaf_authority_scope=static_confirmed_preexisting_q9_q14_checkpoint_drift_19_artifact_refresh_overdue_independently_deferred_q15_q16_q17_q18_q19_must_be_included_production_sources_including_current_managed_namespace_and_managed_shm_root_not_rebound_separate_rebind_required_before_compile_or_runtime_acceptance
 compilation=not_run
 cargo=not_run
 targeted_unit_tests=not_run_passed_0_failed_0
@@ -472,7 +481,7 @@ lock_production=closed
 ```
 
 q9–q14 checkpoint 的 19-artifact refresh 仍独立 deferred；未来编译或 runtime acceptance 前必须一次覆盖
-q15–q18，禁止只重绑 owner/needle 而不重生成并复核完整 frozen set。
+q15–q19，禁止只重绑 owner/needle 而不重生成并复核完整 frozen set。
 
 本文不完成 A2，不注册生产 VFS，不调用生产 open，不创建 Connection/Opened authority，不获取 process
 fence，不启动 A1/v15/Runtime/Ready，不产生 Provider、route、Offer、Job、Attempt、Lease、派发、市场、结算或
