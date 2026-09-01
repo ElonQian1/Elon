@@ -71,7 +71,9 @@ fn host_consent_is_the_upper_bound_for_remote_permissions() {
     ));
 
     lease.host_consent.currentness = InteractiveDesktopAuthorityCurrentness::Revoked;
-    assert!(!authorized(&session, &lease, &grant, &media, &control, 1_500));
+    assert!(!authorized(
+        &session, &lease, &grant, &media, &control, 1_500
+    ));
 }
 
 #[test]
@@ -139,31 +141,80 @@ fn current_epoch_fencing_and_expiry_are_all_required_for_authority() {
 
     let mut stale_media = media.clone();
     stale_media.epoch_sequence -= 1;
-    assert!(!authorized(&session, &lease, &grant, &stale_media, &control, 1_500));
+    assert!(!authorized(
+        &session,
+        &lease,
+        &grant,
+        &stale_media,
+        &control,
+        1_500
+    ));
 
     let mut stale_control = control.clone();
     stale_control.epoch_sequence -= 1;
-    assert!(!authorized(&session, &lease, &grant, &media, &stale_control, 1_500));
+    assert!(!authorized(
+        &session,
+        &lease,
+        &grant,
+        &media,
+        &stale_control,
+        1_500
+    ));
 
     let mut stale_grant_media = media.clone();
     stale_grant_media.viewer_grant_generation -= 1;
-    assert!(!authorized(&session, &lease, &grant, &stale_grant_media, &control, 1_500));
+    assert!(!authorized(
+        &session,
+        &lease,
+        &grant,
+        &stale_grant_media,
+        &control,
+        1_500
+    ));
 
     let mut wrong_surface = media.clone();
     wrong_surface.selected_surface_digest = "other-surface".to_string();
-    assert!(!authorized(&session, &lease, &grant, &wrong_surface, &control, 1_500));
+    assert!(!authorized(
+        &session,
+        &lease,
+        &grant,
+        &wrong_surface,
+        &control,
+        1_500
+    ));
 
     let mut stale_auth_grant = grant.clone();
     stale_auth_grant.account_auth_epoch -= 1;
-    assert!(!authorized(&session, &lease, &stale_auth_grant, &media, &control, 1_500));
+    assert!(!authorized(
+        &session,
+        &lease,
+        &stale_auth_grant,
+        &media,
+        &control,
+        1_500
+    ));
 
     let mut inconsistent_grant = grant.clone();
     inconsistent_grant.revoked_at_ms = Some(1_400);
-    assert!(!authorized(&session, &lease, &inconsistent_grant, &media, &control, 1_500));
+    assert!(!authorized(
+        &session,
+        &lease,
+        &inconsistent_grant,
+        &media,
+        &control,
+        1_500
+    ));
 
     let mut terminal_session = session.clone();
     terminal_session.terminal_reason_code = Some("owner_revoked".to_string());
-    assert!(!authorized(&terminal_session, &lease, &grant, &media, &control, 1_500));
+    assert!(!authorized(
+        &terminal_session,
+        &lease,
+        &grant,
+        &media,
+        &control,
+        1_500
+    ));
 
     let mut zero_generation_session = session.clone();
     zero_generation_session.fencing_generation = 0;
@@ -184,12 +235,28 @@ fn current_epoch_fencing_and_expiry_are_all_required_for_authority() {
 
     let mut stale_lease = lease.clone();
     stale_lease.fencing_generation -= 1;
-    assert!(!authorized(&session, &stale_lease, &grant, &media, &control, 1_500));
+    assert!(!authorized(
+        &session,
+        &stale_lease,
+        &grant,
+        &media,
+        &control,
+        1_500
+    ));
 
     let mut expired_grant = grant.clone();
     expired_grant.expires_at_ms = 1_500;
-    assert!(!authorized(&session, &lease, &expired_grant, &media, &control, 1_500));
-    assert!(!authorized(&session, &lease, &grant, &media, &control, 2_000));
+    assert!(!authorized(
+        &session,
+        &lease,
+        &expired_grant,
+        &media,
+        &control,
+        1_500
+    ));
+    assert!(!authorized(
+        &session, &lease, &grant, &media, &control, 2_000
+    ));
 }
 
 #[test]
@@ -254,21 +321,15 @@ fn paid_stranger_sessions_are_licensed_and_relay_only() {
         InteractiveDesktopAction::ViewVideo,
         1_500,
     ));
-    media
-        .relay_authority
-        .as_mut()
-        .unwrap()
-        .scope
-        .session_id = "other-session".to_string();
-    assert!(!authorized(&session, &lease, &grant, &media, &control, 1_500));
-    media
-        .relay_authority
-        .as_mut()
-        .unwrap()
-        .scope
-        .session_id = "session-1".to_string();
+    media.relay_authority.as_mut().unwrap().scope.session_id = "other-session".to_string();
+    assert!(!authorized(
+        &session, &lease, &grant, &media, &control, 1_500
+    ));
+    media.relay_authority.as_mut().unwrap().scope.session_id = "session-1".to_string();
     media.relay_authority = None;
-    assert!(!authorized(&session, &lease, &grant, &media, &control, 1_500));
+    assert!(!authorized(
+        &session, &lease, &grant, &media, &control, 1_500
+    ));
 
     session.binding.offer.market_access = InteractiveDesktopMarketAccess::PrivateUnpaid;
     assert!(!session.has_safe_product_boundary(InteractiveDesktopTransportPath::Turn));

@@ -169,9 +169,7 @@ impl InteractiveDesktopPermissionSet {
 
     pub(crate) fn allows(&self, action: InteractiveDesktopAction) -> bool {
         match action {
-            InteractiveDesktopAction::ViewVideo => {
-                self.capture_selected_surface && self.view_video
-            }
+            InteractiveDesktopAction::ViewVideo => self.capture_selected_surface && self.view_video,
             InteractiveDesktopAction::ReceiveSystemAudio => {
                 self.capture_selected_surface && self.view_video && self.receive_system_audio
             }
@@ -231,10 +229,7 @@ impl InteractiveDesktopSessionRequest {
             && self.requested_duration_ms > 0
             && self.connect_deadline_ms > self.requested_at_ms
             && matches!(
-                (
-                    self.binding.offer.product_mode,
-                    self.viewer_relationship,
-                ),
+                (self.binding.offer.product_mode, self.viewer_relationship,),
                 (
                     InteractiveDesktopProductMode::SameOwnerRemoteAccess,
                     InteractiveDesktopViewerRelationship::SameOwner
@@ -276,17 +271,28 @@ impl InteractiveDesktopSessionState {
         self == next
             || matches!(
                 (self, next),
-                (Self::Requested, Self::Reserved | Self::Canceled | Self::Failed)
-                    | (Self::Reserved, Self::HostLeased | Self::Canceled | Self::Failed)
-                    | (Self::HostLeased, Self::ViewerGranted | Self::Ending | Self::Failed)
-                    | (Self::ViewerGranted, Self::Connecting | Self::Ending | Self::Failed)
-                    | (
-                        Self::Connecting,
-                        Self::Active | Self::Reconnecting | Self::Ending | Self::Failed
-                    )
-                    | (Self::Active, Self::Reconnecting | Self::Ending | Self::Failed)
-                    | (Self::Reconnecting, Self::Connecting | Self::Ending | Self::Failed)
-                    | (Self::Ending, Self::Ended | Self::Failed)
+                (
+                    Self::Requested,
+                    Self::Reserved | Self::Canceled | Self::Failed
+                ) | (
+                    Self::Reserved,
+                    Self::HostLeased | Self::Canceled | Self::Failed
+                ) | (
+                    Self::HostLeased,
+                    Self::ViewerGranted | Self::Ending | Self::Failed
+                ) | (
+                    Self::ViewerGranted,
+                    Self::Connecting | Self::Ending | Self::Failed
+                ) | (
+                    Self::Connecting,
+                    Self::Active | Self::Reconnecting | Self::Ending | Self::Failed
+                ) | (
+                    Self::Active,
+                    Self::Reconnecting | Self::Ending | Self::Failed
+                ) | (
+                    Self::Reconnecting,
+                    Self::Connecting | Self::Ending | Self::Failed
+                ) | (Self::Ending, Self::Ended | Self::Failed)
             )
     }
 

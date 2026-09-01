@@ -5,8 +5,7 @@ use super::{
         InteractiveDesktopUsageSourceKind, InteractiveDesktopUsageVerificationBinding,
         InteractiveDesktopUsageVerificationDagNode,
         InteractiveDesktopUsageVerificationPolicyBinding,
-        InteractiveDesktopUsageVerificationReceipt,
-        InteractiveDesktopUsageVerificationStatus,
+        InteractiveDesktopUsageVerificationReceipt, InteractiveDesktopUsageVerificationStatus,
         INTERACTIVE_DESKTOP_USAGE_VERIFICATION_DAG_NODE_SCHEMA,
         INTERACTIVE_DESKTOP_USAGE_VERIFICATION_RECEIPT_SCHEMA,
     },
@@ -207,20 +206,12 @@ fn verification_is_a_one_way_cross_validated_dag_node() {
         compensable: Some(compensable),
     };
 
-    assert!(node.cross_validates_raw_usage(
-        &usage,
-        &expected,
-        "verification-policy-digest",
-    ));
+    assert!(node.cross_validates_raw_usage(&usage, &expected, "verification-policy-digest",));
     assert!(!node.cross_validates_raw_usage(&usage, &expected, "other-policy-digest"));
 
     let mut wrong_usage = usage;
     wrong_usage.binding.binding_digest = "other-binding-digest".to_string();
-    assert!(!node.cross_validates_raw_usage(
-        &wrong_usage,
-        &expected,
-        "verification-policy-digest",
-    ));
+    assert!(!node.cross_validates_raw_usage(&wrong_usage, &expected, "verification-policy-digest",));
 }
 
 fn advance_usage_layer(layer: &mut InteractiveDesktopUsageLayer, closing_quantity: u64) {

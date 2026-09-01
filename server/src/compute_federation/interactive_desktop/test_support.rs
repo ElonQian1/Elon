@@ -8,9 +8,9 @@ use super::{
         InteractiveDesktopHostConsentScope, INTERACTIVE_DESKTOP_HOST_CONSENT_SCHEMA,
     },
     metering::{
-        InteractiveDesktopCumulativeCounter, InteractiveDesktopMeter,
-        InteractiveDesktopUsageLayer, InteractiveDesktopUsageReceipt,
-        InteractiveDesktopUsageSourceKind, INTERACTIVE_DESKTOP_USAGE_RECEIPT_SCHEMA,
+        InteractiveDesktopCumulativeCounter, InteractiveDesktopMeter, InteractiveDesktopUsageLayer,
+        InteractiveDesktopUsageReceipt, InteractiveDesktopUsageSourceKind,
+        INTERACTIVE_DESKTOP_USAGE_RECEIPT_SCHEMA,
     },
     offer::{
         InteractiveDesktopConnectivityPolicy, InteractiveDesktopMarketAccess,
@@ -24,11 +24,10 @@ use super::{
         InteractiveDesktopMediaEpoch, InteractiveDesktopPermissionSet,
         InteractiveDesktopPriceSnapshotBinding, InteractiveDesktopReservationBinding,
         InteractiveDesktopSession, InteractiveDesktopSessionState,
-        InteractiveDesktopSurfaceSelection,
-        InteractiveDesktopViewerGrant, InteractiveDesktopViewerRelationship,
-        INTERACTIVE_DESKTOP_CONTROL_EPOCH_SCHEMA, INTERACTIVE_DESKTOP_HOST_LEASE_SCHEMA,
-        INTERACTIVE_DESKTOP_MEDIA_EPOCH_SCHEMA, INTERACTIVE_DESKTOP_SESSION_SCHEMA,
-        INTERACTIVE_DESKTOP_VIEWER_GRANT_SCHEMA,
+        InteractiveDesktopSurfaceSelection, InteractiveDesktopViewerGrant,
+        InteractiveDesktopViewerRelationship, INTERACTIVE_DESKTOP_CONTROL_EPOCH_SCHEMA,
+        INTERACTIVE_DESKTOP_HOST_LEASE_SCHEMA, INTERACTIVE_DESKTOP_MEDIA_EPOCH_SCHEMA,
+        INTERACTIVE_DESKTOP_SESSION_SCHEMA, INTERACTIVE_DESKTOP_VIEWER_GRANT_SCHEMA,
     },
 };
 

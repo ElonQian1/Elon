@@ -54,13 +54,11 @@ impl InteractiveDesktopMeter {
 
     /// Compatibility name for the provider-compensable v1 meter set.
     pub(crate) fn is_compensable_v1(self) -> bool {
-        self.settlement_class_v1()
-            == InteractiveDesktopMeterSettlementClass::ProviderCompensable
+        self.settlement_class_v1() == InteractiveDesktopMeterSettlementClass::ProviderCompensable
     }
 
     pub(crate) fn is_platform_relay_cost_v1(self) -> bool {
-        self.settlement_class_v1()
-            == InteractiveDesktopMeterSettlementClass::PlatformRelayCost
+        self.settlement_class_v1() == InteractiveDesktopMeterSettlementClass::PlatformRelayCost
     }
 }
 
@@ -117,8 +115,7 @@ impl InteractiveDesktopUsageLayer {
         self.source_kind == previous.source_kind
             && self.source_ref_digest == previous.source_ref_digest
             && previous.sample_sequence.checked_add(1) == Some(self.sample_sequence)
-            && self.previous_sample_digest.as_deref()
-                == Some(previous.observation_digest.as_str())
+            && self.previous_sample_digest.as_deref() == Some(previous.observation_digest.as_str())
             && self.counters.len() == previous.counters.len()
             && self.counters.iter().all(|counter| {
                 previous.counters.iter().any(|prior| {
@@ -232,16 +229,19 @@ impl InteractiveDesktopUsageReceipt {
                 != InteractiveDesktopConnectivityPolicy::RelayOnly
                 || self.transport_path == InteractiveDesktopTransportPath::Turn)
             && (self.transport_path == InteractiveDesktopTransportPath::Turn
-                || !usage_layers(&self.declared, &self.transport_observed, &self.consumer_observed)
-                    .any(|layer| {
-                        layer
-                            .counters
-                            .iter()
-                            .any(|counter| counter.meter.is_platform_relay_cost_v1())
-                    }))
+                || !usage_layers(
+                    &self.declared,
+                    &self.transport_observed,
+                    &self.consumer_observed,
+                )
+                .any(|layer| {
+                    layer
+                        .counters
+                        .iter()
+                        .any(|counter| counter.meter.is_platform_relay_cost_v1())
+                }))
             && self.interval_ended_at_ms >= self.interval_started_at_ms
-            && self.declared.source_kind
-                == InteractiveDesktopUsageSourceKind::ProviderDeclared
+            && self.declared.source_kind == InteractiveDesktopUsageSourceKind::ProviderDeclared
             && self.transport_observed.source_kind
                 == InteractiveDesktopUsageSourceKind::TransportObserved
             && self.consumer_observed.source_kind
@@ -333,8 +333,7 @@ impl InteractiveDesktopUsageVerificationReceipt {
                 InteractiveDesktopUsageVerificationStatus::Pending
                 | InteractiveDesktopUsageVerificationStatus::Rejected
                 | InteractiveDesktopUsageVerificationStatus::Disputed => {
-                    self.verified_usage_digest.is_none()
-                        && self.compensable_usage_digest.is_none()
+                    self.verified_usage_digest.is_none() && self.compensable_usage_digest.is_none()
                 }
             }
     }

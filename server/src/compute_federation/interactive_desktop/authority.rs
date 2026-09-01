@@ -113,8 +113,7 @@ impl InteractiveDesktopSession {
         );
         self.binding.offer.has_safe_market_boundary()
             && mode_matches_relationship
-            && (self.binding.offer.market_access
-                != InteractiveDesktopMarketAccess::PaidMarketplace
+            && (self.binding.offer.market_access != InteractiveDesktopMarketAccess::PaidMarketplace
                 || self.binding.offer.product_mode
                     == InteractiveDesktopProductMode::LicensedCloudSeat)
             && (self.viewer_relationship
@@ -309,10 +308,8 @@ fn has_transport_authority(
 ) -> bool {
     match media.transport_path {
         InteractiveDesktopTransportPath::Direct => media.relay_authority.is_none(),
-        InteractiveDesktopTransportPath::Turn => media
-            .relay_authority
-            .as_ref()
-            .is_some_and(|authority| {
+        InteractiveDesktopTransportPath::Turn => {
+            media.relay_authority.as_ref().is_some_and(|authority| {
                 let scope = &authority.scope;
                 authority.schema == INTERACTIVE_DESKTOP_RELAY_AUTHORITY_SCHEMA
                     && authority.service_class == INTERACTIVE_DESKTOP_SERVICE_CLASS
@@ -342,6 +339,7 @@ fn has_transport_authority(
                         == grant.viewer_transport_identity_digest
                     && scope.media_epoch_id == media.media_epoch_id
                     && scope.media_epoch_sequence == media.epoch_sequence
-            }),
+            })
+        }
     }
 }

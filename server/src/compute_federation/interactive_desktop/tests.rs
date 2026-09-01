@@ -2,31 +2,26 @@ use std::collections::BTreeSet;
 
 use super::{
     authority::{
-        INTERACTIVE_DESKTOP_HOST_CONSENT_DIGEST_DOMAIN,
-        INTERACTIVE_DESKTOP_HOST_CONSENT_SCHEMA,
+        INTERACTIVE_DESKTOP_HOST_CONSENT_DIGEST_DOMAIN, INTERACTIVE_DESKTOP_HOST_CONSENT_SCHEMA,
         INTERACTIVE_DESKTOP_RELAY_AUTHORITY_DIGEST_DOMAIN,
         INTERACTIVE_DESKTOP_RELAY_AUTHORITY_SCHEMA,
     },
     metering::{
-        INTERACTIVE_DESKTOP_USAGE_RECEIPT_DIGEST_DOMAIN,
-        INTERACTIVE_DESKTOP_USAGE_RECEIPT_SCHEMA,
+        INTERACTIVE_DESKTOP_USAGE_RECEIPT_DIGEST_DOMAIN, INTERACTIVE_DESKTOP_USAGE_RECEIPT_SCHEMA,
         INTERACTIVE_DESKTOP_USAGE_VERIFICATION_RECEIPT_DIGEST_DOMAIN,
         INTERACTIVE_DESKTOP_USAGE_VERIFICATION_RECEIPT_SCHEMA,
     },
     offer::{
-        INTERACTIVE_DESKTOP_OFFER_PROFILE_DIGEST_DOMAIN,
-        INTERACTIVE_DESKTOP_OFFER_PROFILE_SCHEMA,
+        INTERACTIVE_DESKTOP_OFFER_PROFILE_DIGEST_DOMAIN, INTERACTIVE_DESKTOP_OFFER_PROFILE_SCHEMA,
     },
     session::{
         InteractiveDesktopSessionState, INTERACTIVE_DESKTOP_CONTROL_EPOCH_DIGEST_DOMAIN,
-        INTERACTIVE_DESKTOP_CONTROL_EPOCH_SCHEMA,
-        INTERACTIVE_DESKTOP_HOST_LEASE_DIGEST_DOMAIN, INTERACTIVE_DESKTOP_HOST_LEASE_SCHEMA,
-        INTERACTIVE_DESKTOP_MEDIA_EPOCH_DIGEST_DOMAIN, INTERACTIVE_DESKTOP_MEDIA_EPOCH_SCHEMA,
-        INTERACTIVE_DESKTOP_SESSION_DIGEST_DOMAIN,
+        INTERACTIVE_DESKTOP_CONTROL_EPOCH_SCHEMA, INTERACTIVE_DESKTOP_HOST_LEASE_DIGEST_DOMAIN,
+        INTERACTIVE_DESKTOP_HOST_LEASE_SCHEMA, INTERACTIVE_DESKTOP_MEDIA_EPOCH_DIGEST_DOMAIN,
+        INTERACTIVE_DESKTOP_MEDIA_EPOCH_SCHEMA, INTERACTIVE_DESKTOP_SESSION_DIGEST_DOMAIN,
         INTERACTIVE_DESKTOP_SESSION_REQUEST_DIGEST_DOMAIN,
         INTERACTIVE_DESKTOP_SESSION_REQUEST_SCHEMA, INTERACTIVE_DESKTOP_SESSION_SCHEMA,
-        INTERACTIVE_DESKTOP_VIEWER_GRANT_DIGEST_DOMAIN,
-        INTERACTIVE_DESKTOP_VIEWER_GRANT_SCHEMA,
+        INTERACTIVE_DESKTOP_VIEWER_GRANT_DIGEST_DOMAIN, INTERACTIVE_DESKTOP_VIEWER_GRANT_SCHEMA,
     },
 };
 
@@ -59,8 +54,14 @@ fn interactive_contract_has_independent_schemas_and_digest_domains() {
         INTERACTIVE_DESKTOP_RELAY_AUTHORITY_DIGEST_DOMAIN,
     ];
 
-    assert_eq!(schemas.into_iter().collect::<BTreeSet<_>>().len(), schemas.len());
-    assert_eq!(domains.into_iter().collect::<BTreeSet<_>>().len(), domains.len());
+    assert_eq!(
+        schemas.into_iter().collect::<BTreeSet<_>>().len(),
+        schemas.len()
+    );
+    assert_eq!(
+        domains.into_iter().collect::<BTreeSet<_>>().len(),
+        domains.len()
+    );
     assert!(schemas
         .iter()
         .all(|schema| schema.starts_with("compute_federation.interactive_desktop.")));
@@ -141,7 +142,10 @@ fn persistent_contracts_do_not_declare_sensitive_transport_or_content_fields() {
     ];
 
     for source in sources {
-        for line in source.lines().filter(|line| line.trim_start().starts_with("pub ")) {
+        for line in source
+            .lines()
+            .filter(|line| line.trim_start().starts_with("pub "))
+        {
             assert!(!forbidden_fields.iter().any(|field| line.contains(field)));
         }
         for (offset, _) in source.match_indices("pub(crate) struct ") {

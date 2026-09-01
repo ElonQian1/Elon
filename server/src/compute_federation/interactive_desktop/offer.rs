@@ -237,8 +237,7 @@ impl InteractiveDesktopOfferProfile {
                 .iter()
                 .enumerate()
                 .all(|(index, path)| !self.transport_paths[..index].contains(path))
-            && (self.offer.connectivity_policy
-                != InteractiveDesktopConnectivityPolicy::RelayOnly
+            && (self.offer.connectivity_policy != InteractiveDesktopConnectivityPolicy::RelayOnly
                 || self
                     .transport_paths
                     .iter()
