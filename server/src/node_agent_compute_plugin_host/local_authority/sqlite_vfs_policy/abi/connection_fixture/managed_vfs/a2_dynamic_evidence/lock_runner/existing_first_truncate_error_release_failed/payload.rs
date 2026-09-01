@@ -275,8 +275,8 @@ fn parse_canonical_u64(value: &str) -> anyhow::Result<u64> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::super::LockRunnerActionV1;
+    use super::*;
 
     fn binding() -> LockRunnerNativeAcquireExistingFirstTruncateErrorReleaseFailedBindingV1 {
         LockRunnerNativeAcquireExistingFirstTruncateErrorReleaseFailedBindingV1 {
@@ -342,8 +342,8 @@ mod tests {
             ],
             [1, 0, 0, 1, 1, 0, 0, 4, 1, 1, 1, 1, 1, 0],
             [
-                1, 6, 1, 17, 23, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 0, 1, 1, 0,
-                0, 1, 1, 0, 1, 511, 0, 1, 1,
+                1, 6, 1, 17, 23, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 0, 1, 1, 0, 0, 1, 1, 0,
+                1, 511, 0, 1, 1,
             ],
             [1, 128, 1, 1],
             [17, 23, 1, 0, 1, 1, 6, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],

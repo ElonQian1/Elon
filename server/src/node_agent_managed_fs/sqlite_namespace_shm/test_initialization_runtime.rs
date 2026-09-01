@@ -19,10 +19,10 @@ mod controller;
 mod created_first_truncate_error_release_failed;
 #[path = "test_initialization_runtime/created_first_truncate_error_release_succeeded.rs"]
 mod created_first_truncate_error_release_succeeded;
-#[path = "test_initialization_runtime/existing_first_truncate_error_release_succeeded.rs"]
-mod existing_first_truncate_error_release_succeeded;
 #[path = "test_initialization_runtime/existing_first_truncate_error_release_failed.rs"]
 mod existing_first_truncate_error_release_failed;
+#[path = "test_initialization_runtime/existing_first_truncate_error_release_succeeded.rs"]
+mod existing_first_truncate_error_release_succeeded;
 #[path = "test_initialization_runtime/model.rs"]
 mod model;
 

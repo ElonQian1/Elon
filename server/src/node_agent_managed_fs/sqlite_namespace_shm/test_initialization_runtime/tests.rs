@@ -469,10 +469,7 @@ fn exact_existing_first_truncate_unavailable_then_release_failed_seals_two_recei
         .unwrap();
     let cleanup_native = q16_cleanup_native();
     controller
-        .record_existing_first_truncate_error_release_failed_cleanup_receipt(
-            TARGET,
-            cleanup_native,
-        )
+        .record_existing_first_truncate_error_release_failed_cleanup_receipt(TARGET, cleanup_native)
         .unwrap();
     controller.record_poisoned(TARGET).unwrap();
     let receipt = controller
@@ -661,7 +658,9 @@ fn initialization_open_existence_is_case_specific() {
             cold(),
         )
         .unwrap();
-    assert!(q17_existing_first.record_request(TARGET, request()).unwrap());
+    assert!(q17_existing_first
+        .record_request(TARGET, request())
+        .unwrap());
     assert!(q17_existing_first.record_open_attempt(TARGET).unwrap());
     assert!(q17_existing_first
         .record_open_created(TARGET, true)

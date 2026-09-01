@@ -22,11 +22,11 @@ mod created_first_truncate_error_release_failed;
 #[path = "node_initialization/created_first_truncate_error_release_succeeded.rs"]
 mod created_first_truncate_error_release_succeeded;
 #[cfg(all(test, windows))]
-#[path = "node_initialization/existing_first_truncate_error_release_succeeded.rs"]
-mod existing_first_truncate_error_release_succeeded;
-#[cfg(all(test, windows))]
 #[path = "node_initialization/existing_first_truncate_error_release_failed.rs"]
 mod existing_first_truncate_error_release_failed;
+#[cfg(all(test, windows))]
+#[path = "node_initialization/existing_first_truncate_error_release_succeeded.rs"]
+mod existing_first_truncate_error_release_succeeded;
 impl ManagedSqliteShmCoordinator {
     pub(super) fn ensure_node<'state>(
         &self,

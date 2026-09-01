@@ -68,7 +68,8 @@ pub(super) fn frozen_lock_existing_first_truncate_error_release_failed_leaves_v1
                 else {
                     return Ok(());
                 };
-                let Some(case) = existing_first_truncate_error_release_failed_v1(record, descriptor)
+                let Some(case) =
+                    existing_first_truncate_error_release_failed_v1(record, descriptor)
                 else {
                     return Ok(());
                 };
