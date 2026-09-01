@@ -36,6 +36,8 @@ use crate::{
 
 mod admin_routes;
 mod node_routes;
+#[path = "quant_paper_access.rs"]
+mod quant_paper_access;
 mod social_routes;
 
 /// 读取 `CORS_ALLOW_ORIGINS` 环境变量构造 CORS 策略。
@@ -265,6 +267,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             post(auth_api::trust_current_device),
         )
         .route("/api/me", get(auth_api::me))
+        .route(
+            "/api/me/quant/paper-access-grants",
+            post(quant_paper_access::issue),
+        )
         .merge(account_security::routes())
         .merge(account_security_events::routes())
         .merge(account_lifecycle::routes())

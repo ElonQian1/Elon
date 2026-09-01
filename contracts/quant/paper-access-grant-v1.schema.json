@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://yilong.example/contracts/quant/paper-access-grant-v1.schema.json",
+  "title": "Yilong Quant Paper Access Grant V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "grant_id",
+    "issuer",
+    "audience",
+    "key_id",
+    "participant_ref",
+    "scopes",
+    "risk_revision",
+    "issued_at_unix",
+    "expires_at_unix",
+    "simulated"
+  ],
+  "properties": {
+    "schema": { "const": "yilong.quant.paper_access_grant.v1" },
+    "grant_id": { "type": "string", "pattern": "^qpg_[0-9a-f]{32}$" },
+    "issuer": { "const": "yilong-main" },
+    "audience": { "const": "yilong-quant" },
+    "key_id": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 64,
+      "pattern": "^[A-Za-z0-9._-]+$"
+    },
+    "participant_ref": { "type": "string", "pattern": "^yp1_[0-9a-f]{40}$" },
+    "scopes": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 2,
+      "uniqueItems": true,
+      "items": {
+        "enum": ["paper.position.read", "paper.redemption.request"]
+      }
+    },
+    "risk_revision": { "const": "paper-participation-risk-v1" },
+    "issued_at_unix": { "type": "integer", "minimum": 1 },
+    "expires_at_unix": { "type": "integer", "minimum": 1 },
+    "simulated": { "const": true }
+  }
+}
