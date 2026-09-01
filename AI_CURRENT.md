@@ -65,7 +65,7 @@ reviewed_at: 2026-09-01
 - 分布式算力≠“开放算力市场已完成”；状态见 `docs/distributed-compute/current-implementation-status.md`。
 - 外部矿池：V277/V278 uncompiled/unrun、#13-18 deny、eligible=0；V280 P0 feature 因缺两名独立 authenticated admin|owner 对真实 market/wire profile 的批准而 `blocked`，禁止伪造开放。
 - V279：source-only/uncompiled/unrun、零下游/经济效果；见 `docs/distributed-compute/user-node-provider-binding-authority.md`。
-- A2 Lock：q7 新增 `192` 个 real-lower-result→route removal→completion unknown source members；未运行 inventory=`3034/5634`、coverage=`0/8668`，仍为 `uncompiled/unrun, actual=not_run, Qlock=unknown, production closed`；详见 `docs/distributed-compute/node-plugin-vfs-lock-dynamic-tranches-authority.md`。
+- A2 Lock：q8 source-only 新增 88 项；未运行 inventory=`3122 present/5546 missing/8668 total`、coverage=`0/8668`，`actual=not_run, Qlock=unknown, WindowsDynamic=not_opened, production closed`；详见 `docs/distributed-compute/node-plugin-vfs-lock-dynamic-tranches-authority.md`。
 - `capacity_future`：source-only/uncompiled/unrun，无 API/effect；见 `AI_INDEX.md`。
 
 ## 已接受的产品方向
