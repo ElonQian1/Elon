@@ -1,0 +1,196 @@
+//! Source-only admission contracts for all 88 q16 initialization cleanup-release members.
+
+use super::super::super::terminal_descriptor::{InitializationFaultSiteV1, InitializationPathV1};
+use super::super::runner_admission::{
+    compile_for_test,
+    native_acquire_created_first_truncate_error_release_failed_catalog_row_count_for_test,
+    validate_lock_program_for_test,
+};
+use super::lock_native_acquire_created_first_exclusive_release_error_cases::frozen_lock_created_first_exclusive_release_error_leaves_v1;
+use super::lock_native_acquire_created_first_truncate_error_release_failed_cases::{
+    frozen_lock_created_first_truncate_error_release_failed_leaves_v1,
+    lock_created_first_truncate_error_release_failed_descriptor_v1,
+    FrozenLockCreatedFirstTruncateErrorReleaseFailedCaseV1,
+    LOCK_CREATED_FIRST_TRUNCATE_ERROR_RELEASE_FAILED_MEMBER_COUNT,
+};
+use super::lock_native_acquire_created_first_truncate_error_release_succeeded_cases::frozen_lock_created_first_truncate_error_release_succeeded_leaves_v1;
+use super::lock_native_acquire_existing_first_truncate_error_release_succeeded_cases::frozen_lock_existing_first_truncate_error_release_succeeded_leaves_v1;
+use super::*;
+
+fn supported_key_and_member(
+    case: FrozenLockCreatedFirstTruncateErrorReleaseFailedCaseV1,
+) -> (DynamicClassKeyV1, StaticMemberSealV1) {
+    let leaf = &frozen_lock_created_first_truncate_error_release_failed_leaves_v1()[&case];
+    let validated = project_validated_dynamic_terminal_v1(&leaf.record, &leaf.descriptor).unwrap();
+    assert_eq!(validated.descriptor_binding.member, leaf.member);
+    let mut key = validated.semantic_key;
+    key.recipe.capability = RunnerCapabilityV1::Supported;
+    (key, leaf.member)
+}
+
+fn assert_rejected(key: DynamicClassKeyV1, member: StaticMemberSealV1, mutation: &str) {
+    assert!(
+        validate_lock_program_for_test(&key, member, compile_for_test(&key)).is_err(),
+        "q16 initialization admission accepted {mutation}"
+    );
+}
+
+#[test]
+fn all_88_q16_descriptors_and_exact_catalog_seals_are_source_present() {
+    let leaves = frozen_lock_created_first_truncate_error_release_failed_leaves_v1();
+    assert_eq!(
+        leaves.len(),
+        LOCK_CREATED_FIRST_TRUNCATE_ERROR_RELEASE_FAILED_MEMBER_COUNT
+    );
+    assert_eq!(
+        native_acquire_created_first_truncate_error_release_failed_catalog_row_count_for_test(),
+        LOCK_CREATED_FIRST_TRUNCATE_ERROR_RELEASE_FAILED_MEMBER_COUNT
+    );
+    for &case in leaves.keys() {
+        let (key, member) = supported_key_and_member(case);
+        validate_lock_program_for_test(&key, member, compile_for_test(&key))
+            .unwrap_or_else(|error| panic!("exact q16 member {case:?} was rejected: {error:?}"));
+    }
+}
+
+#[test]
+fn q16_is_inventory_present_without_granting_supported() {
+    for (&case, leaf) in frozen_lock_created_first_truncate_error_release_failed_leaves_v1() {
+        let prepared = prepare_dynamic_terminal_v1(&leaf.record, &leaf.descriptor).unwrap();
+        let receipt = super::super::runner_admission::inventory_v1(&prepared.key).unwrap();
+        assert!(matches!(
+            receipt.status(),
+            super::super::runner_admission::ExecutionProgramInventoryStatusV1::SourcePresentReceiptRequired { .. }
+        ));
+        assert_eq!(
+            project_dynamic_class_v1(
+                &leaf.record,
+                &lock_created_first_truncate_error_release_failed_descriptor_v1(
+                    case,
+                    RunnerCapabilityV1::Supported,
+                ),
+            ),
+            Err(ProjectionErrorV1::Invalid(
+                ProjectionViolationV1::RunnerAdmissionUnsealedSupported,
+            )),
+        );
+    }
+}
+
+#[test]
+fn q16_rejects_neighboring_seals_and_every_cleanup_contract_mutation() {
+    let leaves = frozen_lock_created_first_truncate_error_release_failed_leaves_v1();
+    let (&case, leaf) = leaves.first_key_value().unwrap();
+    let (key, member) = supported_key_and_member(case);
+    let sibling = leaves
+        .values()
+        .find(|candidate| candidate.member != leaf.member)
+        .unwrap()
+        .member;
+    assert_rejected(key, sibling, "a sibling frozen seal");
+    for (neighbor, label) in [
+        (
+            frozen_lock_created_first_exclusive_release_error_leaves_v1()
+                .first_key_value()
+                .unwrap()
+                .1
+                .member,
+            "a q12 at-call release seal",
+        ),
+        (
+            frozen_lock_created_first_truncate_error_release_succeeded_leaves_v1()
+                .first_key_value()
+                .unwrap()
+                .1
+                .member,
+            "a q14 cleanup-release-succeeded seal",
+        ),
+        (
+            frozen_lock_existing_first_truncate_error_release_succeeded_leaves_v1()
+                .first_key_value()
+                .unwrap()
+                .1
+                .member,
+            "a q15 existing-first seal",
+        ),
+    ] {
+        assert_rejected(key, neighbor, label);
+    }
+
+    let mut unlock = key;
+    let DynamicAxesV1::Lock(axes) = &mut unlock.axes else {
+        unreachable!()
+    };
+    axes.action = ReachabilityV1::Reached(LockActionV1::UnlockExclusive);
+    assert_rejected(unlock, member, "an unlock action");
+
+    let mut mask = key;
+    let DynamicAxesV1::Lock(axes) = &mut mask.axes else {
+        unreachable!()
+    };
+    axes.mask = ReachabilityV1::Reached(0);
+    assert_rejected(mask, member, "a mismatched request mask");
+
+    let mut profile = key;
+    let DynamicAxesV1::Lock(axes) = &mut profile.axes else {
+        unreachable!()
+    };
+    axes.initialization = ReachabilityV1::Reached(InitializationProfileV1::CreatedFirstShared);
+    assert_rejected(profile, member, "a post-initialization profile");
+
+    let mut fault = key;
+    let StimulusV1::Initialization(stimulus) = &mut fault.stimulus else {
+        unreachable!()
+    };
+    stimulus.fault_site = InitializationFaultSiteV1::DmsTruncate;
+    assert_rejected(fault, member, "the primary truncate fault site");
+
+    let mut cleanup_rewrite = key;
+    let StimulusV1::Initialization(stimulus) = &mut cleanup_rewrite.stimulus else {
+        unreachable!()
+    };
+    stimulus.cleanup_rewrite = true;
+    assert_rejected(
+        cleanup_rewrite,
+        member,
+        "cleanup_rewrite=true despite the cleanup-rewritten disposition",
+    );
+
+    let mut path = key;
+    let StimulusV1::Initialization(stimulus) = &mut path.stimulus else {
+        unreachable!()
+    };
+    stimulus.path = InitializationPathV1::ExistingFirst;
+    assert_rejected(path, member, "the existing-first path");
+
+    let mut phase = key;
+    phase.phase = PhaseV1::DmsTruncate;
+    assert_rejected(phase, member, "the primary truncate phase");
+
+    let mut timing = key;
+    timing.timing = TimingV1::AtCall;
+    assert_rejected(timing, member, "at-call timing instead of cleanup timing");
+
+    let mut completion = key;
+    let DynamicAxesV1::Lock(axes) = &mut completion.axes else {
+        unreachable!()
+    };
+    axes.completion = ReachabilityV1::Reached(LockCompletionV1::RouteUnknown);
+    assert_rejected(completion, member, "a non-retention completion");
+
+    let mut disposition = key;
+    disposition.expected.disposition = TerminalDispositionV1::Quarantined;
+    assert_rejected(
+        disposition,
+        member,
+        "a quarantined disposition instead of CleanupRewritten",
+    );
+
+    let mut lock_uncertainty = key;
+    lock_uncertainty.expected.lock_outcome_uncertain = false;
+    assert_rejected(lock_uncertainty, member, "a known cleanup release outcome");
+
+    let mut dms = key;
+    dms.expected.dms_lock = DmsLockCustodyV1::Released;
+    assert_rejected(dms, member, "released DMS custody");
+}

@@ -8,6 +8,7 @@ pub(crate) enum ManagedSqliteShmTestInitializationFailureV1 {
     ExistingFirstExclusiveReleaseOutcomeUncertain,
     CreatedFirstTruncateOutcomeUncertainReleaseSucceeded,
     ExistingFirstTruncateOutcomeUncertainReleaseSucceeded,
+    CreatedFirstTruncateOutcomeUncertainReleaseFailed,
 }
 
 impl ManagedSqliteShmTestInitializationFailureV1 {
@@ -17,6 +18,7 @@ impl ManagedSqliteShmTestInitializationFailureV1 {
             Self::ExistingFirstExclusiveReleaseOutcomeUncertain => 2,
             Self::CreatedFirstTruncateOutcomeUncertainReleaseSucceeded => 3,
             Self::ExistingFirstTruncateOutcomeUncertainReleaseSucceeded => 4,
+            Self::CreatedFirstTruncateOutcomeUncertainReleaseFailed => 5,
         }
     }
 }
@@ -68,6 +70,7 @@ pub(crate) struct ManagedSqliteShmTestInitializationNativeReceiptV1 {
 pub(crate) struct ManagedSqliteShmTestInitializationReceiptV1 {
     expectation: ManagedSqliteShmTestInitializationExpectationV1,
     native: ManagedSqliteShmTestInitializationNativeReceiptV1,
+    cleanup_native: Option<ManagedSqliteShmTestInitializationNativeReceiptV1>,
     requested_lock: ManagedSqliteShmTestLockReceipt,
     ordered_values: [u64; 32],
 }
@@ -76,12 +79,14 @@ impl ManagedSqliteShmTestInitializationReceiptV1 {
     pub(super) const fn new(
         expectation: ManagedSqliteShmTestInitializationExpectationV1,
         native: ManagedSqliteShmTestInitializationNativeReceiptV1,
+        cleanup_native: Option<ManagedSqliteShmTestInitializationNativeReceiptV1>,
         requested_lock: ManagedSqliteShmTestLockReceipt,
         ordered_values: [u64; 32],
     ) -> Self {
         Self {
             expectation,
             native,
+            cleanup_native,
             requested_lock,
             ordered_values,
         }
@@ -101,6 +106,12 @@ impl ManagedSqliteShmTestInitializationReceiptV1 {
 
     pub(crate) const fn native_receipt(self) -> ManagedSqliteShmTestInitializationNativeReceiptV1 {
         self.native
+    }
+
+    pub(crate) const fn cleanup_native_receipt(
+        self,
+    ) -> Option<ManagedSqliteShmTestInitializationNativeReceiptV1> {
+        self.cleanup_native
     }
 
     pub(crate) const fn requested_lock_receipt(self) -> ManagedSqliteShmTestLockReceipt {

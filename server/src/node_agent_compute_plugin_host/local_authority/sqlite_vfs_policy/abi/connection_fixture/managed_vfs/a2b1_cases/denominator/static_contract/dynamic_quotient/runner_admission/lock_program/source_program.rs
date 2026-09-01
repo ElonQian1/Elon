@@ -29,6 +29,10 @@ use super::{
         program_spec_v1 as native_acquire_created_first_exclusive_release_error_program_spec_v1,
         LockNativeAcquireCreatedFirstExclusiveReleaseErrorProgramSpecV1,
     },
+    native_acquire_created_first_truncate_error_release_failed::{
+        program_spec_v1 as native_acquire_created_first_truncate_error_release_failed_program_spec_v1,
+        LockNativeAcquireCreatedFirstTruncateErrorReleaseFailedProgramSpecV1,
+    },
     native_acquire_created_first_truncate_error_release_succeeded::{
         program_spec_v1 as native_acquire_created_first_truncate_error_release_succeeded_program_spec_v1,
         LockNativeAcquireCreatedFirstTruncateErrorReleaseSucceededProgramSpecV1,
@@ -111,8 +115,14 @@ pub(super) fn program_spec_v1(
                                                                                                     match native_acquire_created_first_truncate_error_release_succeeded_program_spec_v1(key, plan) {
                                                                                                         Ok(program) => Ok(from_native_acquire_created_first_truncate_error_release_succeeded_v1(program)),
                                                                                                         Err(LockRunnerExecutionViolationV1::UnsupportedProgram) => {
-                                                                                                            native_acquire_existing_first_truncate_error_release_succeeded_program_spec_v1(key, plan)
-                                                                                                                .map(from_native_acquire_existing_first_truncate_error_release_succeeded_v1)
+                                                                                                            match native_acquire_existing_first_truncate_error_release_succeeded_program_spec_v1(key, plan) {
+                                                                                                                Ok(program) => Ok(from_native_acquire_existing_first_truncate_error_release_succeeded_v1(program)),
+                                                                                                                Err(LockRunnerExecutionViolationV1::UnsupportedProgram) => {
+                                                                                                                    native_acquire_created_first_truncate_error_release_failed_program_spec_v1(key, plan)
+                                                                                                                        .map(from_native_acquire_created_first_truncate_error_release_failed_v1)
+                                                                                                                }
+                                                                                                                Err(error) => Err(error),
+                                                                                                            }
                                                                                                         }
                                                                                                         Err(error) => Err(error),
                                                                                                     }
@@ -328,6 +338,19 @@ fn from_native_acquire_existing_first_truncate_error_release_succeeded_v1(
     SourceLockProgramSpecV1 {
         #[cfg(windows)]
         case: LockProgramCaseV1::NativeAcquireExistingFirstTruncateErrorReleaseSucceeded(program),
+        normalized_descriptor_sha256: program.normalized_descriptor_sha256,
+        expected_member: Some(program.member),
+        plan_sha256: program.plan_sha256,
+        implementation_sha256: program.implementation_sha256,
+    }
+}
+
+fn from_native_acquire_created_first_truncate_error_release_failed_v1(
+    program: LockNativeAcquireCreatedFirstTruncateErrorReleaseFailedProgramSpecV1,
+) -> SourceLockProgramSpecV1 {
+    SourceLockProgramSpecV1 {
+        #[cfg(windows)]
+        case: LockProgramCaseV1::NativeAcquireCreatedFirstTruncateErrorReleaseFailed(program),
         normalized_descriptor_sha256: program.normalized_descriptor_sha256,
         expected_member: Some(program.member),
         plan_sha256: program.plan_sha256,
