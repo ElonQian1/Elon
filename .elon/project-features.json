@@ -370,7 +370,7 @@
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "222b132ba0658907ed5fc18d62975833d4f1b79e",
+            "head_commit": "70f55bddaa0b89ebdd60eda46d880b73059e8e76",
             "head_blob_oid": "9bad3115569d6d20c99f0cd5384d9622ab0965e5",
             "worktree_blob_oid": "9bad3115569d6d20c99f0cd5384d9622ab0965e5",
             "state": "tracked_clean"
@@ -383,7 +383,7 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "222b132ba0658907ed5fc18d62975833d4f1b79e",
+            "head_commit": "70f55bddaa0b89ebdd60eda46d880b73059e8e76",
             "head_blob_oid": "eaa2cb2d1c74489f8bec4469b142c8dc307be2c1",
             "worktree_blob_oid": "eaa2cb2d1c74489f8bec4469b142c8dc307be2c1",
             "state": "tracked_clean"
@@ -396,7 +396,7 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "222b132ba0658907ed5fc18d62975833d4f1b79e",
+            "head_commit": "70f55bddaa0b89ebdd60eda46d880b73059e8e76",
             "head_blob_oid": "84ffd2dbf27c3e9db112647d6b9da3ad9a512dc2",
             "worktree_blob_oid": "84ffd2dbf27c3e9db112647d6b9da3ad9a512dc2",
             "state": "tracked_clean"
@@ -409,7 +409,7 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "222b132ba0658907ed5fc18d62975833d4f1b79e",
+            "head_commit": "70f55bddaa0b89ebdd60eda46d880b73059e8e76",
             "head_blob_oid": "d5d2f4e8524d13f56d7f3822ea5932ac8ac238e2",
             "worktree_blob_oid": "d5d2f4e8524d13f56d7f3822ea5932ac8ac238e2",
             "state": "tracked_clean"
@@ -422,7 +422,7 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "222b132ba0658907ed5fc18d62975833d4f1b79e",
+            "head_commit": "70f55bddaa0b89ebdd60eda46d880b73059e8e76",
             "head_blob_oid": "1ad3205ee5486e8705c3e8013325cca594158ee8",
             "worktree_blob_oid": "1ad3205ee5486e8705c3e8013325cca594158ee8",
             "state": "tracked_clean"
@@ -435,7 +435,7 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "222b132ba0658907ed5fc18d62975833d4f1b79e",
+            "head_commit": "70f55bddaa0b89ebdd60eda46d880b73059e8e76",
             "head_blob_oid": "dfdfeac1f414b305f58ca04dc950a364a68425c5",
             "worktree_blob_oid": "dfdfeac1f414b305f58ca04dc950a364a68425c5",
             "state": "tracked_clean"
@@ -448,7 +448,7 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "222b132ba0658907ed5fc18d62975833d4f1b79e",
+            "head_commit": "70f55bddaa0b89ebdd60eda46d880b73059e8e76",
             "head_blob_oid": "671eab8b22437094a2d0d0bebe9f4074f0054cfe",
             "worktree_blob_oid": "671eab8b22437094a2d0d0bebe9f4074f0054cfe",
             "state": "tracked_clean"
@@ -461,7 +461,7 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "222b132ba0658907ed5fc18d62975833d4f1b79e",
+            "head_commit": "70f55bddaa0b89ebdd60eda46d880b73059e8e76",
             "head_blob_oid": "52649cdc903d5bf878e7023052dc82fa3a5e8e07",
             "worktree_blob_oid": "52649cdc903d5bf878e7023052dc82fa3a5e8e07",
             "state": "tracked_clean"
@@ -474,7 +474,7 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "222b132ba0658907ed5fc18d62975833d4f1b79e",
+            "head_commit": "70f55bddaa0b89ebdd60eda46d880b73059e8e76",
             "head_blob_oid": "9121ca9e1babd15150e01429f5a77b232f76b51f",
             "worktree_blob_oid": "9121ca9e1babd15150e01429f5a77b232f76b51f",
             "state": "tracked_clean"
@@ -487,7 +487,7 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "222b132ba0658907ed5fc18d62975833d4f1b79e",
+            "head_commit": "70f55bddaa0b89ebdd60eda46d880b73059e8e76",
             "head_blob_oid": "e4047e783537f678fab568d76e949df55c0b30bc",
             "worktree_blob_oid": "e4047e783537f678fab568d76e949df55c0b30bc",
             "state": "tracked_clean"
@@ -500,7 +500,7 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "222b132ba0658907ed5fc18d62975833d4f1b79e",
+            "head_commit": "70f55bddaa0b89ebdd60eda46d880b73059e8e76",
             "head_blob_oid": "15bb3f3b500ed5ee2fea2ad5889d7c1bdbe7caaa",
             "worktree_blob_oid": "15bb3f3b500ed5ee2fea2ad5889d7c1bdbe7caaa",
             "state": "tracked_clean"
@@ -513,7 +513,7 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "222b132ba0658907ed5fc18d62975833d4f1b79e",
+            "head_commit": "70f55bddaa0b89ebdd60eda46d880b73059e8e76",
             "head_blob_oid": "c4796d948ddc8abe25df0c31853b596bdef83dad",
             "worktree_blob_oid": "c4796d948ddc8abe25df0c31853b596bdef83dad",
             "state": "tracked_clean"
@@ -526,7 +526,7 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "222b132ba0658907ed5fc18d62975833d4f1b79e",
+            "head_commit": "70f55bddaa0b89ebdd60eda46d880b73059e8e76",
             "head_blob_oid": "f5f69b8a9578d0337bc8a6aed2194ec2f570120e",
             "worktree_blob_oid": "f5f69b8a9578d0337bc8a6aed2194ec2f570120e",
             "state": "tracked_clean"
@@ -539,7 +539,7 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "222b132ba0658907ed5fc18d62975833d4f1b79e",
+            "head_commit": "70f55bddaa0b89ebdd60eda46d880b73059e8e76",
             "head_blob_oid": "6278d9d18ac59032fb8d311e1bb11f0ca9765ce5",
             "worktree_blob_oid": "6278d9d18ac59032fb8d311e1bb11f0ca9765ce5",
             "state": "tracked_clean"
@@ -552,7 +552,7 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "222b132ba0658907ed5fc18d62975833d4f1b79e",
+            "head_commit": "70f55bddaa0b89ebdd60eda46d880b73059e8e76",
             "head_blob_oid": "187779c609dc607a8914cf7d4b5b1bc5b551e1c2",
             "worktree_blob_oid": "187779c609dc607a8914cf7d4b5b1bc5b551e1c2",
             "state": "tracked_clean"
@@ -565,7 +565,7 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "222b132ba0658907ed5fc18d62975833d4f1b79e",
+            "head_commit": "70f55bddaa0b89ebdd60eda46d880b73059e8e76",
             "head_blob_oid": "ae39a5d7f8e1a328f7f8d223d79e6c4091e7b9e3",
             "worktree_blob_oid": "ae39a5d7f8e1a328f7f8d223d79e6c4091e7b9e3",
             "state": "tracked_clean"
@@ -578,7 +578,7 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "222b132ba0658907ed5fc18d62975833d4f1b79e",
+            "head_commit": "70f55bddaa0b89ebdd60eda46d880b73059e8e76",
             "head_blob_oid": "98f32895c9970482b87107769b605a78e86d99a8",
             "worktree_blob_oid": "98f32895c9970482b87107769b605a78e86d99a8",
             "state": "tracked_clean"
@@ -586,7 +586,7 @@
         }
       ],
       "created_at_ms": 1788116827147,
-      "updated_at_ms": 1788254061711
+      "updated_at_ms": 1788254269444
     },
     {
       "id": "backend-a2-map-lock-static-denominator-v1",
@@ -13204,26 +13204,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_7e25268a8c6643beb52a327c3c51ec1d",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex/task-20260831-155900-36972-bea3628a",
-      "reason": "Reviewed rebound authority: narrow receipt-gated Map source slice remains fail-closed, uncompiled and unrun; global quotient and Windows gates remain blocked.",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1788165415122
-    },
-    {
-      "id": "feature_event_b4efa4077b32480a82926ae1fb5e31ff",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex/task-20260831-155900-36972-bea3628a",
-      "reason": "Requirement review accepted and dependency backend-a2-map-lock-static-denominator-v1 remains verified.",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1788165421944
-    },
-    {
       "id": "feature_event_3278e41346e44892a47a8abc22747dcc",
       "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
       "action": "claimed",
@@ -15202,6 +15182,26 @@
       "from_status": "blocked",
       "to_status": "blocked",
       "at_ms": 1788254061711
+    },
+    {
+      "id": "feature_event_2de6d9c495fc4b99896a007abd5e17f2",
+      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
+      "action": "evidence_recorded",
+      "actor": "Codex q10 post-rebase",
+      "reason": "",
+      "from_status": "blocked",
+      "to_status": "blocked",
+      "at_ms": 1788254255789
+    },
+    {
+      "id": "feature_event_fab2d3efa6e0480db9af7a436c4f9f77",
+      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
+      "action": "evidence_recorded",
+      "actor": "Codex q10 post-rebase",
+      "reason": "",
+      "from_status": "blocked",
+      "to_status": "blocked",
+      "at_ms": 1788254269444
     }
   ]
 }
