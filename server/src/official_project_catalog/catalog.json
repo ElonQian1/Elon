@@ -53,8 +53,8 @@
           { "module_key": "customer", "version": "1.0.0", "kind": "core", "required": false, "dependencies": [] },
           { "module_key": "finance", "version": "1.0.0", "kind": "core", "required": true, "dependencies": ["order"] },
           { "module_key": "reporting", "version": "1.0.0", "kind": "core", "required": false, "dependencies": ["order", "finance"] },
-          { "module_key": "platform_order", "version": "1.0.0", "kind": "connector", "required": false, "dependencies": ["order"] },
-          { "module_key": "open_commerce", "version": "1.0.0", "kind": "gateway", "required": false, "dependencies": ["catalog", "order"] }
+          { "module_key": "platform_order", "version": "1.0.0", "kind": "integration", "required": false, "dependencies": ["order"] },
+          { "module_key": "open_commerce", "version": "1.0.0", "kind": "integration", "required": false, "dependencies": ["catalog", "order"] }
         ],
         "capabilities": [
           { "capability_key": "catalog.query", "display_name": "查询商品", "description": "查询统一商品目录", "category": "catalog", "module_key": "catalog", "aliases": [], "composable_with": [] },
