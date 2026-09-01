@@ -95,6 +95,31 @@ drain(tasks);
 assert.equal(openedCount, 2);
 assert.equal(timedOutCount, 2, 'an unchanged pre-existing overlay is not mistaken for this menu');
 
+let expanded = false;
+const expandedTransition = policy.prepare(
+  { semantic: 'conversation_options', contextId: 'conversation_1' },
+  () => [sidebar],
+  (task) => { tasks.push(task); },
+  100,
+  (root) => root.menu,
+  300,
+  () => expanded
+);
+assert.equal(expandedTransition.isOpen(), false);
+expanded = true;
+assert.equal(expandedTransition.isOpen(), true, 'a false-to-true trigger transition confirms the menu');
+
+const alreadyExpanded = policy.prepare(
+  { semantic: 'conversation_options', contextId: 'conversation_1' },
+  () => [sidebar],
+  (task) => { tasks.push(task); },
+  100,
+  (root) => root.menu,
+  300,
+  () => true
+);
+assert.equal(alreadyExpanded.isOpen(), false, 'a pre-existing expanded state is not fresh evidence');
+
 assert.equal(policy.prepare(
   { semantic: 'more', contextId: 'conversation_1' },
   () => [],

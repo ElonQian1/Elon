@@ -51,6 +51,8 @@ class ChatGptWebProjectAndMenuContractTest {
         assertTrue(menu.contains("hasNewRoot"))
         assertTrue(menu.contains("function observe(onOpened, onTimedOut)"))
         assertTrue(menu.contains("observe.isOpen = opened"))
+        assertTrue(menu.contains("!expandedBefore"))
+        assertTrue(menu.contains("isExpanded() === true"))
         assertTrue(menu.contains("elapsed >= timeout"))
         assertFalse(menu.contains("retry();"))
         assertTrue(invocation.contains("function createCoordinator()"))
@@ -61,6 +63,7 @@ class ChatGptWebProjectAndMenuContractTest {
         assertTrue(layout.contains("contextMenuPolicy.prepare"))
         assertTrue(layout.contains("contextMenuInvocation?.reconcile()"))
         assertTrue(layout.contains("contextMenuInvocation.start"))
+        assertTrue(layout.contains("node.getAttribute('aria-expanded')"))
         assertTrue(layout.contains("官网会话设置未打开，请重试。"))
     }
 

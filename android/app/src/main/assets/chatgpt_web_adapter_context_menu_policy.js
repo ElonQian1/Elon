@@ -40,10 +40,12 @@
     scheduleTask,
     pollIntervalMs,
     signatureFor,
-    timeoutMs
+    timeoutMs,
+    isExpanded
   ) {
     if (!shouldArm(control) || typeof visibleRoots !== 'function') return null;
     const before = snapshotRoots(visibleRoots(), signatureFor);
+    const expandedBefore = typeof isExpanded === 'function' && isExpanded() === true;
     const schedule = typeof scheduleTask === 'function' ? scheduleTask : setTimeout;
     const interval = Number.isFinite(pollIntervalMs) && pollIntervalMs > 0
       ? pollIntervalMs
@@ -51,7 +53,10 @@
     const timeout = Number.isFinite(timeoutMs) && timeoutMs >= interval
       ? timeoutMs
       : 1800;
-    const opened = () => hasNewOrChangedRoot(before, visibleRoots(), signatureFor);
+    const opened = () => (
+      (!expandedBefore && typeof isExpanded === 'function' && isExpanded() === true) ||
+      hasNewOrChangedRoot(before, visibleRoots(), signatureFor)
+    );
     function observe(onOpened, onTimedOut) {
       if (typeof onOpened !== 'function' || typeof onTimedOut !== 'function') return false;
       let elapsed = 0;

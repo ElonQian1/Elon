@@ -649,7 +649,7 @@
     const node = controlsById.get(String(id || '')); const control = controlMetadataById.get(String(id || ''));
     if (!node || !isVisible(node)) return result('invoke_ui_control', false, '官网控件已变化，请刷新结构后重试。');
     const contextMenuObservation = contextMenuPolicy && contextMenuPolicy.prepare(control, visibleOverlayRoots, undefined, undefined,
-      (root) => overlayPolicy.contextMenuSignature(root, isVisible, actionableNodes)
+      (root) => overlayPolicy.contextMenuSignature(root, isVisible, actionableNodes), undefined, () => String(node.getAttribute('aria-expanded') || '').toLowerCase() === 'true'
     );
     const finish = (ok, detail, delayMs) => { result('invoke_ui_control', ok, detail); window.setTimeout(() => emitSnapshot(emitEvent, true), delayMs); };
     function dispatch() {
