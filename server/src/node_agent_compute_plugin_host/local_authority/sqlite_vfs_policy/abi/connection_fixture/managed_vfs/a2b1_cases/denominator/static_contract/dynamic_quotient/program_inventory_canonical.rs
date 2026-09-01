@@ -88,6 +88,26 @@ const SOURCE_SCOPE: &[(&str, &str)] = &[
         include_str!("runner_admission/lock_program/source_program.rs"),
     ),
     (
+        "runner_admission/lock_program/local_sibling_contention.rs",
+        include_str!("runner_admission/lock_program/local_sibling_contention.rs"),
+    ),
+    (
+        "runner_admission/lock_program/local_sibling_contention/catalog.rs",
+        include_str!("runner_admission/lock_program/local_sibling_contention/catalog.rs"),
+    ),
+    (
+        "runner_admission/lock_program/local_sibling_contention/local_sibling_contention_completed_members.v1.tsv",
+        include_str!("runner_admission/lock_program/local_sibling_contention/local_sibling_contention_completed_members.v1.tsv"),
+    ),
+    (
+        "runner_admission/lock_program/local_sibling_contention/source_scope.rs",
+        include_str!("runner_admission/lock_program/local_sibling_contention/source_scope.rs"),
+    ),
+    (
+        "lock_local_sibling_contention_source_scope.rs",
+        include_str!("lock_local_sibling_contention_source_scope.rs"),
+    ),
+    (
         "runner_admission/lock_program/native_acquire_busy.rs",
         include_str!("runner_admission/lock_program/native_acquire_busy.rs"),
     ),

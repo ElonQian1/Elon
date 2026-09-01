@@ -1,0 +1,80 @@
+//! Transitive source commitment for exact local sibling contention.
+
+macro_rules! source {
+    ($name:literal, $path:literal) => {
+        (
+            $name,
+            include_str!(concat!(env!("CARGO_MANIFEST_DIR"), $path)),
+        )
+    };
+}
+
+pub(super) const LOCK_LOCAL_SIBLING_CONTENTION_SOURCE_SCOPE_V1: &[(&str, &str)] = &[
+    source!("dynamic_quotient/runner_admission/lock_program.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/dynamic_quotient/runner_admission/lock_program.rs"),
+    source!("dynamic_quotient/runner_admission/lock_program/source_program.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/dynamic_quotient/runner_admission/lock_program/source_program.rs"),
+    source!("dynamic_quotient/runner_admission/lock_program/local_sibling_contention.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/dynamic_quotient/runner_admission/lock_program/local_sibling_contention.rs"),
+    source!("dynamic_quotient/runner_admission/lock_program/local_sibling_contention/catalog.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/dynamic_quotient/runner_admission/lock_program/local_sibling_contention/catalog.rs"),
+    source!("dynamic_quotient/runner_admission/lock_program/local_sibling_contention/source_scope.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/dynamic_quotient/runner_admission/lock_program/local_sibling_contention/source_scope.rs"),
+    source!("dynamic_quotient/runner_admission/lock_program/local_sibling_contention/local_sibling_contention_completed_members.v1.tsv", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/dynamic_quotient/runner_admission/lock_program/local_sibling_contention/local_sibling_contention_completed_members.v1.tsv"),
+    source!("dynamic_quotient/lock_local_sibling_contention_source_scope.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/dynamic_quotient/lock_local_sibling_contention_source_scope.rs"),
+    source!("managed_vfs/a2_dynamic_evidence.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2_dynamic_evidence.rs"),
+    source!("managed_vfs/a2_dynamic_evidence/child.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2_dynamic_evidence/child.rs"),
+    source!("managed_vfs/a2_dynamic_evidence/child/payload.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2_dynamic_evidence/child/payload.rs"),
+    source!("managed_vfs/a2_dynamic_evidence/child/lock_local_sibling_contention.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2_dynamic_evidence/child/lock_local_sibling_contention.rs"),
+    source!("managed_vfs/a2_dynamic_evidence/lock_runner.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2_dynamic_evidence/lock_runner.rs"),
+    source!("managed_vfs/a2_dynamic_evidence/lock_runner/lifecycle.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2_dynamic_evidence/lock_runner/lifecycle.rs"),
+    source!("managed_vfs/a2_dynamic_evidence/lock_runner/lifecycle/fixture.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2_dynamic_evidence/lock_runner/lifecycle/fixture.rs"),
+    source!("managed_vfs/a2_dynamic_evidence/lock_runner/local_sibling_contention.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2_dynamic_evidence/lock_runner/local_sibling_contention.rs"),
+    source!("managed_vfs/a2_dynamic_evidence/lock_runner/local_sibling_contention/fixture.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2_dynamic_evidence/lock_runner/local_sibling_contention/fixture.rs"),
+    source!("managed_vfs/a2_dynamic_evidence/lock_runner/local_sibling_contention/payload.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2_dynamic_evidence/lock_runner/local_sibling_contention/payload.rs"),
+    source!("managed_vfs/a2_dynamic_evidence/lock_runner/lifecycle/payload.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2_dynamic_evidence/lock_runner/lifecycle/payload.rs"),
+    source!("managed_vfs/a2_dynamic_evidence/lock_runner/native_acquire_busy/payload.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2_dynamic_evidence/lock_runner/native_acquire_busy/payload.rs"),
+    source!("managed_vfs/a2_dynamic_evidence/lock_runner/stored_poison/payload.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2_dynamic_evidence/lock_runner/stored_poison/payload.rs"),
+    source!("managed_vfs/a2_dynamic_evidence/capture.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2_dynamic_evidence/capture.rs"),
+    source!("managed_vfs/a2_dynamic_evidence/environment.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2_dynamic_evidence/environment.rs"),
+    source!("managed_vfs/a2_dynamic_evidence/cleanup.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2_dynamic_evidence/cleanup.rs"),
+    source!("managed_vfs.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs.rs"),
+    source!("managed_vfs/connection.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/connection.rs"),
+    source!("managed_vfs/callbacks.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/callbacks.rs"),
+    source!("managed_vfs/route_file.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/route_file.rs"),
+    source!("managed_vfs/live_registration.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/live_registration.rs"),
+    source!("managed_vfs/shared_namespace.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/shared_namespace.rs"),
+    source!("managed_vfs/multi_connection.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/multi_connection.rs"),
+    source!("registry/test_vfs_bridge/file.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/registry/test_vfs_bridge/file.rs"),
+    source!("registry/file_custody/abi.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/registry/file_custody/abi.rs"),
+    source!("registry/file_custody/operations.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/registry/file_custody/operations.rs"),
+    source!("sqlite_vfs_abi.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_abi.rs"),
+    source!("sqlite_vfs_abi/io_shm.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_abi/io_shm.rs"),
+    source!("sqlite_vfs_abi/result_codes.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_abi/result_codes.rs"),
+    source!("sqlite_vfs_abi/file_state.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_abi/file_state.rs"),
+    source!("sqlite_vfs_abi/raw_state.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_abi/raw_state.rs"),
+    source!("sqlite_vfs_abi/types.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_abi/types.rs"),
+    source!("node_agent_managed_fs.rs", "/src/node_agent_managed_fs.rs"),
+    source!("node_agent_managed_fs/windows.rs", "/src/node_agent_managed_fs/windows.rs"),
+    source!("node_agent_managed_fs/windows_sqlite_locking.rs", "/src/node_agent_managed_fs/windows_sqlite_locking.rs"),
+    source!("node_agent_managed_fs/windows_sqlite_shm.rs", "/src/node_agent_managed_fs/windows_sqlite_shm.rs"),
+    source!("node_agent_managed_fs/sqlite_api.rs", "/src/node_agent_managed_fs/sqlite_api.rs"),
+    source!("node_agent_managed_fs/sqlite_namespace.rs", "/src/node_agent_managed_fs/sqlite_namespace.rs"),
+    source!("node_agent_managed_fs/sqlite_namespace_types.rs", "/src/node_agent_managed_fs/sqlite_namespace_types.rs"),
+    source!("node_agent_managed_fs/sqlite_namespace_shm.rs", "/src/node_agent_managed_fs/sqlite_namespace_shm.rs"),
+    source!("node_agent_managed_fs/sqlite_namespace_shm/types.rs", "/src/node_agent_managed_fs/sqlite_namespace_shm/types.rs"),
+    source!("node_agent_managed_fs/sqlite_namespace_shm/coordinator.rs", "/src/node_agent_managed_fs/sqlite_namespace_shm/coordinator.rs"),
+    source!("node_agent_managed_fs/sqlite_namespace_shm/node_initialization.rs", "/src/node_agent_managed_fs/sqlite_namespace_shm/node_initialization.rs"),
+    source!("node_agent_managed_fs/sqlite_namespace_shm/mapping.rs", "/src/node_agent_managed_fs/sqlite_namespace_shm/mapping.rs"),
+    source!("node_agent_managed_fs/sqlite_namespace_shm/locking.rs", "/src/node_agent_managed_fs/sqlite_namespace_shm/locking.rs"),
+    source!("node_agent_managed_fs/sqlite_namespace_shm/test_snapshot.rs", "/src/node_agent_managed_fs/sqlite_namespace_shm/test_snapshot.rs"),
+    source!("node_agent_managed_fs/sqlite_namespace_shm/test_lock_runtime.rs", "/src/node_agent_managed_fs/sqlite_namespace_shm/test_lock_runtime.rs"),
+];
+
+/// New identities not already present in the shared projector source scope.
+pub(super) const LOCAL_SIBLING_CONTENTION_PROJECTOR_DELTA_V1: &[(&str, &str)] = &[
+    source!("dynamic_quotient/lock_local_sibling_contention_source_scope.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/dynamic_quotient/lock_local_sibling_contention_source_scope.rs"),
+    source!("dynamic_quotient/runner_admission/lock_program/local_sibling_contention.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/dynamic_quotient/runner_admission/lock_program/local_sibling_contention.rs"),
+    source!("dynamic_quotient/runner_admission/lock_program/local_sibling_contention/catalog.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/dynamic_quotient/runner_admission/lock_program/local_sibling_contention/catalog.rs"),
+    source!("dynamic_quotient/runner_admission/lock_program/local_sibling_contention/source_scope.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/dynamic_quotient/runner_admission/lock_program/local_sibling_contention/source_scope.rs"),
+    source!("dynamic_quotient/runner_admission/lock_program/local_sibling_contention/local_sibling_contention_completed_members.v1.tsv", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2b1_cases/denominator/static_contract/dynamic_quotient/runner_admission/lock_program/local_sibling_contention/local_sibling_contention_completed_members.v1.tsv"),
+    source!("managed_vfs/a2_dynamic_evidence/child/lock_local_sibling_contention.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2_dynamic_evidence/child/lock_local_sibling_contention.rs"),
+    source!("managed_vfs/a2_dynamic_evidence/lock_runner/local_sibling_contention.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2_dynamic_evidence/lock_runner/local_sibling_contention.rs"),
+    source!("managed_vfs/a2_dynamic_evidence/lock_runner/local_sibling_contention/fixture.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2_dynamic_evidence/lock_runner/local_sibling_contention/fixture.rs"),
+    source!("managed_vfs/a2_dynamic_evidence/lock_runner/local_sibling_contention/payload.rs", "/src/node_agent_compute_plugin_host/local_authority/sqlite_vfs_policy/abi/connection_fixture/managed_vfs/a2_dynamic_evidence/lock_runner/local_sibling_contention/payload.rs"),
+];

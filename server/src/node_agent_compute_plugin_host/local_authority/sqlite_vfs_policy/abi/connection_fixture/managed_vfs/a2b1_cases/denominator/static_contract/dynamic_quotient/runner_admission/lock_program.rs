@@ -1,6 +1,7 @@
 //! Sealed admission bridge for the executable Lock dynamic-quotient programs.
 
 mod lifecycle;
+mod local_sibling_contention;
 mod native_acquire_busy;
 mod request_validation;
 mod source_program;
@@ -21,6 +22,8 @@ use super::CompiledRunnerPlanV1;
 #[cfg(windows)]
 use lifecycle::{LockLifecyclePathSpecV1, LockLifecycleProgramSpecV1};
 #[cfg(windows)]
+use local_sibling_contention::LockLocalSiblingContentionProgramSpecV1;
+#[cfg(windows)]
 use native_acquire_busy::LockNativeAcquireBusyProgramSpecV1;
 use source_program::program_spec_v1 as source_program_spec_v1;
 #[cfg(windows)]
@@ -33,11 +36,12 @@ use request_validation::LockRequestValidationGuardV1;
 
 #[cfg(windows)]
 use crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::abi::connection_fixture::managed_vfs::a2_dynamic_evidence::{
-    run_lock_lifecycle_program_isolated, run_lock_native_acquire_busy_program_isolated,
-    run_lock_program_isolated, run_lock_stored_poison_program_isolated, LockRunnerActionV1,
-    LockRunnerEvidenceReceiptV1, LockRunnerIsolatedEvidenceV1, LockRunnerLifecycleBindingV1,
-    LockRunnerLifecyclePathV1, LockRunnerNativeAcquireBusyBindingV1, LockRunnerProgramBindingV1,
-    LockRunnerRequestValidationV1, LockRunnerStoredPoisonBindingV1,
+    run_lock_lifecycle_program_isolated, run_lock_local_sibling_contention_program_isolated,
+    run_lock_native_acquire_busy_program_isolated, run_lock_program_isolated,
+    run_lock_stored_poison_program_isolated, LockRunnerActionV1, LockRunnerEvidenceReceiptV1,
+    LockRunnerIsolatedEvidenceV1, LockRunnerLifecycleBindingV1, LockRunnerLifecyclePathV1,
+    LockRunnerLocalSiblingContentionBindingV1, LockRunnerNativeAcquireBusyBindingV1,
+    LockRunnerProgramBindingV1, LockRunnerRequestValidationV1, LockRunnerStoredPoisonBindingV1,
     LockRunnerStoredPoisonCompletionV1, LockRunnerStoredPoisonProfileV1,
 };
 
@@ -196,6 +200,22 @@ pub(in super::super) fn run_lock_isolated_for_test(
                 implementation_sha256: program.implementation_sha256.0,
             },
         ),
+        LockProgramCaseV1::LocalSiblingContention(contention) => {
+            run_lock_local_sibling_contention_program_isolated(
+                exact_test,
+                LockRunnerLocalSiblingContentionBindingV1 {
+                    action: runner_action_v1(contention.action),
+                    first: contention.first,
+                    count: contention.count,
+                    mask: contention.mask,
+                    normalized_descriptor_sha256: program.normalized_descriptor_sha256.0,
+                    case_key_sha256: member.case_key_sha256.0,
+                    full_record_sha256: member.full_record_sha256.0,
+                    plan_sha256: program.plan_sha256.0,
+                    implementation_sha256: program.implementation_sha256.0,
+                },
+            )
+        }
         LockProgramCaseV1::NativeAcquireBusy(busy) => {
             run_lock_native_acquire_busy_program_isolated(
                 exact_test,
@@ -335,6 +355,7 @@ enum LockProgramCaseV1 {
         guard: LockRequestValidationGuardV1,
     },
     Lifecycle(LockLifecycleProgramSpecV1),
+    LocalSiblingContention(LockLocalSiblingContentionProgramSpecV1),
     NativeAcquireBusy(LockNativeAcquireBusyProgramSpecV1),
     StoredPoison(LockStoredPoisonProgramSpecV1),
 }
@@ -378,6 +399,11 @@ fn program_v1(
 #[cfg(test)]
 pub(super) fn native_acquire_busy_catalog_row_count_for_test() -> usize {
     native_acquire_busy::catalog_row_count_for_test()
+}
+
+#[cfg(test)]
+pub(super) fn local_sibling_contention_catalog_row_count_for_test() -> usize {
+    local_sibling_contention::catalog_row_count_for_test()
 }
 
 #[cfg(test)]
