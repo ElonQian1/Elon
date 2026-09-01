@@ -8,13 +8,10 @@ use super::ManagedSqliteRoutedConnectionFixture;
 use crate::{
     node_agent_compute_plugin_host::local_authority::{
         sqlite_vfs_abi::{
-            arm_test_x_shm_lock_raw_state_rejection_v1,
-            HandleBoundSqliteAbiRawLockRejectionCaseV1,
+            arm_test_x_shm_lock_raw_state_rejection_v1, HandleBoundSqliteAbiRawLockRejectionCaseV1,
             HandleBoundSqliteAbiRawLockRejectionReceiptV1,
         },
-        sqlite_vfs_policy::abi::connection_fixture::managed_vfs::lifecycle_faults::{
-            ManagedTestPreManagedLockPath,
-        },
+        sqlite_vfs_policy::abi::connection_fixture::managed_vfs::lifecycle_faults::ManagedTestPreManagedLockPath,
     },
     node_agent_managed_fs::{ManagedSqliteShmLockAction, ManagedSqliteShmLockRequest},
 };

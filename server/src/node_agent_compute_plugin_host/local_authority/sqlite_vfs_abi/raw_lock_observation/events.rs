@@ -4,9 +4,7 @@ use std::thread;
 
 use rusqlite::ffi;
 
-use super::model::{
-    ledger, AbandonOutcome, ActiveObservation, RawValidation, RunCodeOutcome,
-};
+use super::model::{ledger, AbandonOutcome, ActiveObservation, RawValidation, RunCodeOutcome};
 use crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_abi::raw_state::RawSqliteFileStateRejection;
 
 pub(super) fn cancel_observation(observation_id: u64) {
@@ -29,11 +27,17 @@ fn with_active(file: *mut ffi::sqlite3_file, event: impl FnOnce(&mut ActiveObser
         return;
     }
     if active.owner_thread != thread::current().id() {
-        mark_violation(active, "raw Lock rejection event occurred on the wrong thread");
+        mark_violation(
+            active,
+            "raw Lock rejection event occurred on the wrong thread",
+        );
         return;
     }
     if active.invocation_file_address != file as usize {
-        mark_violation(active, "raw Lock rejection event file did not match invocation");
+        mark_violation(
+            active,
+            "raw Lock rejection event file did not match invocation",
+        );
         return;
     }
     event(active);
@@ -50,7 +54,10 @@ fn with_active_without_file(event: impl FnOnce(&mut ActiveObservation)) -> bool 
         return false;
     }
     if active.owner_thread != thread::current().id() {
-        mark_violation(active, "raw Lock rejection Drop occurred on the wrong thread");
+        mark_violation(
+            active,
+            "raw Lock rejection Drop occurred on the wrong thread",
+        );
         return false;
     }
     event(active);
@@ -72,11 +79,7 @@ fn mark_violation(active: &mut ActiveObservation, violation: &'static str) {
     }
 }
 
-pub(super) fn record_fixture_prepared(
-    file: *mut ffi::sqlite3_file,
-    slots: u64,
-    retained: u64,
-) {
+pub(super) fn record_fixture_prepared(file: *mut ffi::sqlite3_file, slots: u64, retained: u64) {
     let Ok(mut ledger) = ledger().lock() else {
         return;
     };
@@ -87,7 +90,10 @@ pub(super) fn record_fixture_prepared(
         || active.owner_thread != thread::current().id()
         || active.counts.fixture_prepare != 0
     {
-        mark_violation(active, "raw Lock rejection fixture preparation was mismatched or repeated");
+        mark_violation(
+            active,
+            "raw Lock rejection fixture preparation was mismatched or repeated",
+        );
         return;
     }
     active.counts.fixture_prepare = 1;
@@ -95,20 +101,30 @@ pub(super) fn record_fixture_prepared(
     active.retained_fixture_tag = Some(retained);
 }
 
-pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_abi) fn record_entry(file: *mut ffi::sqlite3_file) {
+pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_abi) fn record_entry(
+    file: *mut ffi::sqlite3_file,
+) {
     with_active(file, |active| {
         if active.counts.fixture_prepare != 1 || active.counts.entry != 0 {
-            mark_violation(active, "raw Lock rejection xShmLock entry was reordered or repeated");
+            mark_violation(
+                active,
+                "raw Lock rejection xShmLock entry was reordered or repeated",
+            );
         } else {
             active.counts.entry = 1;
         }
     });
 }
 
-pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_abi) fn record_scalar_admitted(file: *mut ffi::sqlite3_file) {
+pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_abi) fn record_scalar_admitted(
+    file: *mut ffi::sqlite3_file,
+) {
     with_active(file, |active| {
         if active.counts.entry != 1 || active.counts.scalar_admitted != 0 {
-            mark_violation(active, "raw Lock rejection scalar admission was reordered or repeated");
+            mark_violation(
+                active,
+                "raw Lock rejection scalar admission was reordered or repeated",
+            );
         } else {
             active.counts.scalar_admitted = 1;
         }
@@ -129,7 +145,10 @@ pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_abi) f
     };
     with_active(file, |active| {
         if active.counts.scalar_admitted != 1 || active.counts.raw_validation != 0 {
-            mark_violation(active, "raw Lock rejection validation was reordered or repeated");
+            mark_violation(
+                active,
+                "raw Lock rejection validation was reordered or repeated",
+            );
             return;
         }
         active.counts.raw_validation = 1;
@@ -144,7 +163,10 @@ pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_abi) f
 ) {
     with_active(file, |active| {
         if active.counts.scalar_admitted != 1 || active.counts.raw_validation != 0 {
-            mark_violation(active, "raw Lock envelope snapshot was reordered or repeated");
+            mark_violation(
+                active,
+                "raw Lock envelope snapshot was reordered or repeated",
+            );
             return;
         }
         active.counts.raw_validation = 1;
@@ -160,20 +182,29 @@ pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_abi) f
     });
 }
 
-pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_abi) fn record_typed_operation_entry(file: *mut ffi::sqlite3_file) {
+pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_abi) fn record_typed_operation_entry(
+    file: *mut ffi::sqlite3_file,
+) {
     with_active(file, |active| {
         if active.counts.raw_validation != 1 || active.counts.typed_operation_entry != 0 {
-            mark_violation(active, "raw Lock typed operation entry was reordered or repeated");
+            mark_violation(
+                active,
+                "raw Lock typed operation entry was reordered or repeated",
+            );
         } else {
             active.counts.typed_operation_entry = 1;
         }
     });
 }
 
-pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_abi) fn record_handle_file_missing() {
+pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_abi) fn record_handle_file_missing(
+) {
     with_active_without_file(|active| {
         if active.counts.typed_operation_entry != 1 || active.counts.handle_file_missing != 0 {
-            mark_violation(active, "raw Lock missing HandleBound file was reordered or repeated");
+            mark_violation(
+                active,
+                "raw Lock missing HandleBound file was reordered or repeated",
+            );
         } else {
             active.counts.handle_file_missing = 1;
         }
@@ -206,7 +237,9 @@ pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_abi) f
     record_run_code_outcome(file, RunCodeOutcome::Unwind);
 }
 
-pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_abi) fn record_abandon_entry(file: *mut ffi::sqlite3_file) {
+pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_abi) fn record_abandon_entry(
+    file: *mut ffi::sqlite3_file,
+) {
     with_active(file, |active| {
         if active.counts.abandon_entry != 0 {
             mark_violation(active, "raw Lock abandonment entry was repeated");
@@ -233,7 +266,9 @@ pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_abi) f
     });
 }
 
-pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_abi) fn record_abandon_empty(file: *mut ffi::sqlite3_file) {
+pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_abi) fn record_abandon_empty(
+    file: *mut ffi::sqlite3_file,
+) {
     with_active(file, |active| {
         if !set_once(&mut active.abandon_outcome, AbandonOutcome::Empty) {
             mark_violation(active, "raw Lock empty abandonment was repeated");
@@ -241,7 +276,9 @@ pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_abi) f
     });
 }
 
-pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_abi) fn record_slots_cleared(file: *mut ffi::sqlite3_file) {
+pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_abi) fn record_slots_cleared(
+    file: *mut ffi::sqlite3_file,
+) {
     with_active(file, |active| {
         if active.counts.slots_clear != 0 {
             mark_violation(active, "raw Lock slot clear was repeated");
@@ -251,7 +288,9 @@ pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_abi) f
     });
 }
 
-pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_abi) fn record_envelope_drop(payload_present: bool) {
+pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_abi) fn record_envelope_drop(
+    payload_present: bool,
+) {
     with_active_without_file(|active| {
         if active.counts.slots_clear != 1 || active.counts.envelope_drop != 0 {
             mark_violation(active, "raw Lock envelope Drop was reordered or repeated");
@@ -270,14 +309,17 @@ enum DropKind {
     Abandon,
 }
 
-pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_abi) struct RawLockDropCompletionGuard {
+pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_abi) struct RawLockDropCompletionGuard
+{
     kind: DropKind,
     active: bool,
     completed: bool,
 }
 
 impl RawLockDropCompletionGuard {
-    pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_abi) fn complete(mut self) {
+    pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_abi) fn complete(
+        mut self,
+    ) {
         self.completed = true;
         if !self.active {
             return;
@@ -290,7 +332,10 @@ impl RawLockDropCompletionGuard {
                     &mut active.abandon_outcome,
                     AbandonOutcome::InstalledDropCompleted,
                 ) {
-                    mark_violation(active, "raw Lock installed abandonment outcome was repeated");
+                    mark_violation(
+                        active,
+                        "raw Lock installed abandonment outcome was repeated",
+                    );
                 }
             }
         });
@@ -320,7 +365,8 @@ impl Drop for RawLockDropCompletionGuard {
     }
 }
 
-pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_abi) fn begin_payload_drop() -> RawLockDropCompletionGuard {
+pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_abi) fn begin_payload_drop(
+) -> RawLockDropCompletionGuard {
     let active = with_active_without_file(|active| active.counts.payload_drop_attempt += 1);
     RawLockDropCompletionGuard {
         kind: DropKind::Payload,
@@ -329,7 +375,9 @@ pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_abi) f
     }
 }
 
-pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_abi) fn begin_abandon_drop(file: *mut ffi::sqlite3_file) -> RawLockDropCompletionGuard {
+pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_abi) fn begin_abandon_drop(
+    file: *mut ffi::sqlite3_file,
+) -> RawLockDropCompletionGuard {
     let mut active_guard = false;
     with_active(file, |active| {
         if active.counts.abandon_entry != 1 {
@@ -345,7 +393,10 @@ pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_abi) f
     }
 }
 
-pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_abi) fn record_returned(file: *mut ffi::sqlite3_file, result_code: i32) {
+pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_abi) fn record_returned(
+    file: *mut ffi::sqlite3_file,
+    result_code: i32,
+) {
     with_active(file, |active| {
         if active.counts.returned != 0 || active.result_code.is_some() {
             mark_violation(active, "raw Lock callback return was repeated");

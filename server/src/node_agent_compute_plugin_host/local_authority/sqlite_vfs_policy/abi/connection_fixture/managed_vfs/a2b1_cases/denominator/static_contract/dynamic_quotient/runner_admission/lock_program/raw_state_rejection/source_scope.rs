@@ -2,10 +2,10 @@
 
 use sha2::{Digest, Sha256};
 
+use super::super::super::super::super::source_leaf_authority::Digest32;
+use super::super::super::super::lock_local_protocol_rejection_source_scope::lock_local_protocol_rejection_source_scope_entries_v1;
 use super::super::abi_scalar_rejection::ABI_SCALAR_REJECTION_PROJECTOR_DELTA_V1;
 use super::super::pre_managed_callback_rejection::PRE_MANAGED_CALLBACK_REJECTION_PROJECTOR_DELTA_V1;
-use super::super::super::super::lock_local_protocol_rejection_source_scope::lock_local_protocol_rejection_source_scope_entries_v1;
-use super::super::super::super::super::source_leaf_authority::Digest32;
 use super::case::LockRawStateRejectionCaseV1;
 
 macro_rules! source {

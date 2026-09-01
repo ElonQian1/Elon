@@ -18,8 +18,8 @@ pub(super) use source_scope::RAW_STATE_REJECTION_PROJECTOR_DELTA_V1;
 use super::super::super::super::{
     source_leaf_authority::{Digest32, RootOperationV1},
     terminal_descriptor::{
-        CallbackV1, CapabilityGapV1, CleanupV1, FaultSeamV1, FixtureV1, LockPrestateV1,
-        ObserverV1, OccurrenceV1, PrestateV1, ReachabilityV1, RunnerCapabilityV1, StimulusV1,
+        CallbackV1, CapabilityGapV1, CleanupV1, FaultSeamV1, FixtureV1, LockPrestateV1, ObserverV1,
+        OccurrenceV1, PrestateV1, ReachabilityV1, RunnerCapabilityV1, StimulusV1,
     },
 };
 use super::super::super::{
@@ -61,8 +61,7 @@ pub(super) fn program_spec_v1(
     let ReachabilityV1::Reached(completion) = axes.completion else {
         return Err(LockRunnerExecutionViolationV1::UnsupportedProgram);
     };
-    let Some(rejection) = LockRawStateRejectionCaseV1::from_typed_v1(raw_state, completion)
-    else {
+    let Some(rejection) = LockRawStateRejectionCaseV1::from_typed_v1(raw_state, completion) else {
         return Err(LockRunnerExecutionViolationV1::UnsupportedProgram);
     };
     if key.schema_version != DYNAMIC_PROJECTOR_SCHEMA_V1

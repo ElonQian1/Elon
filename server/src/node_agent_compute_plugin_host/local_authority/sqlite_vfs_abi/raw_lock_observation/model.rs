@@ -5,7 +5,8 @@ use std::{
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(in crate::node_agent_compute_plugin_host::local_authority) enum HandleBoundSqliteAbiRawLockRejectionCaseV1 {
+pub(in crate::node_agent_compute_plugin_host::local_authority) enum HandleBoundSqliteAbiRawLockRejectionCaseV1
+{
     NullFileDirect,
     UninstalledDirect,
     MethodsNullStatePresentDirect,
@@ -42,7 +43,8 @@ impl HandleBoundSqliteAbiRawLockRejectionCaseV1 {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(in crate::node_agent_compute_plugin_host::local_authority) enum HandleBoundSqliteAbiRawLockEvidenceV1 {
+pub(in crate::node_agent_compute_plugin_host::local_authority) enum HandleBoundSqliteAbiRawLockEvidenceV1
+{
     ControlledFaultActual,
 }
 
@@ -178,7 +180,8 @@ pub(super) fn ledger() -> &'static Mutex<ObservationLedger> {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(in crate::node_agent_compute_plugin_host::local_authority) struct HandleBoundSqliteAbiRawLockRejectionReceiptV1 {
+pub(in crate::node_agent_compute_plugin_host::local_authority) struct HandleBoundSqliteAbiRawLockRejectionReceiptV1
+{
     case_v1: HandleBoundSqliteAbiRawLockRejectionCaseV1,
     observation_id: u64,
     result_code: c_int,

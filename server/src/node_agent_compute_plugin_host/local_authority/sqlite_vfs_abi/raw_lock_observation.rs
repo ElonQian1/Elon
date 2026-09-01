@@ -20,23 +20,24 @@ mod events;
 mod expected;
 mod model;
 
+pub(super) use events::{
+    begin_abandon_drop, begin_payload_drop, record_abandon_empty, record_abandon_entry,
+    record_abandon_rejection, record_entry, record_envelope_drop, record_envelope_snapshot,
+    record_handle_file_missing, record_raw_rejection, record_returned, record_run_code_normal,
+    record_run_code_rejection, record_run_code_unwind, record_scalar_admitted,
+    record_slots_cleared, record_typed_operation_entry,
+};
 pub(in crate::node_agent_compute_plugin_host::local_authority) use model::{
     HandleBoundSqliteAbiRawLockEvidenceV1, HandleBoundSqliteAbiRawLockRejectionCaseV1,
     HandleBoundSqliteAbiRawLockRejectionReceiptV1,
-};
-pub(super) use events::{
-    begin_abandon_drop, begin_payload_drop, record_abandon_empty, record_abandon_entry,
-    record_abandon_rejection, record_envelope_drop, record_envelope_snapshot, record_entry,
-    record_handle_file_missing, record_raw_rejection, record_returned,
-    record_run_code_normal, record_run_code_rejection, record_run_code_unwind,
-    record_scalar_admitted, record_slots_cleared, record_typed_operation_entry,
 };
 
 use events::{cancel_observation, record_fixture_prepared};
 use model::{ledger, ActiveObservation, EventCounts};
 
 #[must_use = "the controlled raw Lock guard must invoke and finish exactly once"]
-pub(in crate::node_agent_compute_plugin_host::local_authority) struct HandleBoundSqliteAbiRawLockRejectionGuardV1 {
+pub(in crate::node_agent_compute_plugin_host::local_authority) struct HandleBoundSqliteAbiRawLockRejectionGuardV1
+{
     observation_id: u64,
     source_file: *mut ffi::sqlite3_file,
     invocation_file: *mut ffi::sqlite3_file,

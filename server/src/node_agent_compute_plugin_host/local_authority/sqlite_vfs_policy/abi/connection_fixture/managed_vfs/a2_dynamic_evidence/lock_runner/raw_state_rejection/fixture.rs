@@ -19,8 +19,7 @@ use super::super::super::super::{
 };
 use super::super::super::{SanitizedChildReport, A2_DYNAMIC_CHILD_NONCE_ENV};
 use super::{
-    payload, validate_binding, LockRunnerRawStateRejectionBindingV1,
-    LockRunnerRawStateRejectionV1,
+    payload, validate_binding, LockRunnerRawStateRejectionBindingV1, LockRunnerRawStateRejectionV1,
 };
 
 pub(super) fn exercise_child(
@@ -41,9 +40,10 @@ pub(super) fn exercise_child(
             "q11 Lock raw-state fixture registration/route identity mismatch"
         ));
     }
-    let journal_mode: String = fixture
-        .connection()
-        .query_row("PRAGMA journal_mode=WAL", [], |row| row.get(0))?;
+    let journal_mode: String =
+        fixture
+            .connection()
+            .query_row("PRAGMA journal_mode=WAL", [], |row| row.get(0))?;
     if !journal_mode.eq_ignore_ascii_case("wal") {
         return Err(anyhow!("q11 Lock raw-state fixture did not enter WAL mode"));
     }
@@ -76,8 +76,7 @@ pub(super) fn exercise_child(
         || abi.observation_id() == 0
         || abi.result_code() != ffi::SQLITE_IOERR_SHMLOCK
         || abi.ordered_values()[3] != abi.observation_id()
-        || route_no_entry
-            != [1, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        || route_no_entry != [1, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     {
         return Err(anyhow!(
             "q11 Lock controlled raw-state ABI/route receipt mismatch"
@@ -134,9 +133,7 @@ pub(super) fn exercise_child(
     Ok(())
 }
 
-fn validate_live_route(
-    route: ManagedSqliteTestVfsRouteCustodySnapshot,
-) -> anyhow::Result<()> {
+fn validate_live_route(route: ManagedSqliteTestVfsRouteCustodySnapshot) -> anyhow::Result<()> {
     if route_values(route) != [3, 1, 0, 0, 0, 1] {
         return Err(anyhow!(
             "q11 Lock raw-state route was not active and callback-free"

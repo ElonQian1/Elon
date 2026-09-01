@@ -263,7 +263,12 @@ fn expected_v1(case: FrozenLockRawStateRejectionCaseV1) -> ExpectedV1 {
     let mut expected = ExpectedV1 {
         sqlite: SqliteResultV1::LockUnavailable,
         disposition: TerminalDispositionV1::Returned,
-        phase: (if handle_bound { "Adapter" } else { "RawAdmission" }).to_owned(),
+        phase: (if handle_bound {
+            "Adapter"
+        } else {
+            "RawAdmission"
+        })
+        .to_owned(),
         failure: FailureClassV1::ProtocolViolation,
         mutation: MutationStateV1::None,
         lock_outcome_uncertain: false,
@@ -337,10 +342,9 @@ fn frozen_q11_family_is_exact_unique_and_excludes_sentinel_raw_states() {
             LockCompletionV1::RawDropCompleted,
             LockCompletionV1::RawDropUnwindCaught,
         ] {
-            assert!(FrozenLockRawStateRejectionCaseV1::from_typed_v1(
-                sentinel, completion
-            )
-            .is_none());
+            assert!(
+                FrozenLockRawStateRejectionCaseV1::from_typed_v1(sentinel, completion).is_none()
+            );
         }
     }
 }

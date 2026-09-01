@@ -120,7 +120,9 @@ fn validate_parent_receipt(
         || child.root_commitment != cleanup.root_commitment
         || child.registration_commitment != cleanup.registration_commitment
     {
-        return Err(anyhow!("q11 Lock raw-state parent cleanup binding mismatch"));
+        return Err(anyhow!(
+            "q11 Lock raw-state parent cleanup binding mismatch"
+        ));
     }
     Ok(LockRunnerIsolatedEvidenceV1::ParentReceipt(
         LockRunnerEvidenceReceiptV1 {

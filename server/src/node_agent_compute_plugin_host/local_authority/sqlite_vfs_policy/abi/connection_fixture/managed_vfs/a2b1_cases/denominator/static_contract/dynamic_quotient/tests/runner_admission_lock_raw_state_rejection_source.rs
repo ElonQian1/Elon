@@ -1,5 +1,6 @@
 //! Source-only admission contracts for all eleven q11 Lock raw-state rejections.
 
+use super::super::super::terminal_descriptor::RawStateV1;
 use super::super::runner_admission::{
     compile_for_test, raw_state_rejection_catalog_row_count_for_test,
     validate_lock_program_for_test,
@@ -8,7 +9,6 @@ use super::lock_raw_state_rejection_cases::{
     frozen_lock_raw_state_rejection_leaves_v1, lock_raw_state_rejection_descriptor_v1,
     FrozenLockRawStateRejectionCaseV1, LOCK_RAW_STATE_REJECTION_MEMBER_COUNT,
 };
-use super::super::super::terminal_descriptor::RawStateV1;
 use super::*;
 
 fn supported_key_and_member(
@@ -138,16 +138,30 @@ fn q11_matcher_rejects_typed_identity_recipe_and_every_lock_axis_drift() {
     assert_rejected(capability, member, "capability drift");
 
     let axis_mutations: [(&str, fn(&mut LockAxesV1)); 10] = [
-        ("action", |axes| axes.action = ReachabilityV1::Reached(LockActionV1::LockShared)),
+        ("action", |axes| {
+            axes.action = ReachabilityV1::Reached(LockActionV1::LockShared)
+        }),
         ("first", |axes| axes.first = ReachabilityV1::Reached(0)),
         ("count", |axes| axes.count = ReachabilityV1::Reached(1)),
         ("mask", |axes| axes.mask = ReachabilityV1::Reached(1)),
-        ("initialization", |axes| axes.initialization = ReachabilityV1::Reached(InitializationProfileV1::NodeLive)),
-        ("held-shared", |axes| axes.held_shared_mask = ReachabilityV1::Reached(0)),
-        ("held-exclusive", |axes| axes.held_exclusive_mask = ReachabilityV1::Reached(0)),
-        ("sibling-shared", |axes| axes.sibling_shared_mask = ReachabilityV1::Reached(0)),
-        ("sibling-exclusive", |axes| axes.sibling_exclusive_mask = ReachabilityV1::Reached(0)),
-        ("completion", |axes| axes.completion = ReachabilityV1::Reached(LockCompletionV1::Completed)),
+        ("initialization", |axes| {
+            axes.initialization = ReachabilityV1::Reached(InitializationProfileV1::NodeLive)
+        }),
+        ("held-shared", |axes| {
+            axes.held_shared_mask = ReachabilityV1::Reached(0)
+        }),
+        ("held-exclusive", |axes| {
+            axes.held_exclusive_mask = ReachabilityV1::Reached(0)
+        }),
+        ("sibling-shared", |axes| {
+            axes.sibling_shared_mask = ReachabilityV1::Reached(0)
+        }),
+        ("sibling-exclusive", |axes| {
+            axes.sibling_exclusive_mask = ReachabilityV1::Reached(0)
+        }),
+        ("completion", |axes| {
+            axes.completion = ReachabilityV1::Reached(LockCompletionV1::Completed)
+        }),
     ];
     for (name, mutate) in axis_mutations {
         let mut candidate = key;

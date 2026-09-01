@@ -1,16 +1,15 @@
 //! Exact frozen-member authority for the eleven q11 Lock raw-state rejection cases.
 
 use super::super::super::super::super::source_leaf_authority::Digest32;
+use super::super::super::super::super::terminal_descriptor::{
+    LockCompletionV1, RawStateV1, SourceSiteV1,
+};
 use super::super::super::super::StaticMemberSealV1;
 use super::super::LockRunnerExecutionViolationV1;
 use super::case::LockRawStateRejectionCaseV1;
 use super::RAW_STATE_REJECTION_MEMBER_COUNT;
-use super::super::super::super::super::terminal_descriptor::{
-    LockCompletionV1, RawStateV1, SourceSiteV1,
-};
 
-const HEADER: &str =
-    "source_site\traw_state\tcompletion\tcase_key_sha256\tfull_record_sha256";
+const HEADER: &str = "source_site\traw_state\tcompletion\tcase_key_sha256\tfull_record_sha256";
 const MEMBER_CATALOG: &str = include_str!("raw_state_rejection_members.v1.tsv");
 const EXPECTED_ROWS_V1: [LockRawStateRejectionCaseV1; RAW_STATE_REJECTION_MEMBER_COUNT] =
     LockRawStateRejectionCaseV1::ALL_V1;

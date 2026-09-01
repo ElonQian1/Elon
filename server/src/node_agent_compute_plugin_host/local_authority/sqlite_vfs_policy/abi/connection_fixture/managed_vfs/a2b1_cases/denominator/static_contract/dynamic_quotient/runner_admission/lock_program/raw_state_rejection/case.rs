@@ -1,8 +1,8 @@
 //! Closed typed identity for the eleven q11 Lock raw-state rejection programs.
 
 use super::super::super::super::super::terminal_descriptor::{
-    LockAxesV1, LockCompletionV1, LockOperationV1, ObserverV1, PhaseV1, RawStateV1,
-    ReachabilityV1, SourceSiteV1, TimingV1,
+    LockAxesV1, LockCompletionV1, LockOperationV1, ObserverV1, PhaseV1, RawStateV1, ReachabilityV1,
+    SourceSiteV1, TimingV1,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]

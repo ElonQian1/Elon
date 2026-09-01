@@ -64,14 +64,14 @@ pub(in super::super) use request_validation::{LockRunnerActionV1, LockRunnerRequ
 pub(in super::super) use selector_test_support::{
     lock_stored_poison_selector_for_test, selected_lock_stored_poison_selector_for_test,
 };
-pub(in super::super) use stored_poison_model::{
-    LockRunnerStoredPoisonBindingV1, LockRunnerStoredPoisonCompletionV1,
-    LockRunnerStoredPoisonProfileV1,
-};
 use std::{
     fs,
     path::{Path, PathBuf},
     process::{Command, Stdio},
+};
+pub(in super::super) use stored_poison_model::{
+    LockRunnerStoredPoisonBindingV1, LockRunnerStoredPoisonCompletionV1,
+    LockRunnerStoredPoisonProfileV1,
 };
 
 use anyhow::{anyhow, Context};

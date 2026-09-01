@@ -63,9 +63,7 @@ mod tests {
     fn eleven_raw_state_selectors_are_unique_and_fail_closed() {
         let selectors = RAW_COMPLETION_TAGS
             .iter()
-            .map(|&(raw_state, completion)| {
-                selector(raw_state, completion).expect("q11 selector")
-            })
+            .map(|&(raw_state, completion)| selector(raw_state, completion).expect("q11 selector"))
             .collect::<BTreeSet<_>>();
         assert_eq!(selectors.len(), 11);
         for unknown in [0, 11, u64::MAX] {

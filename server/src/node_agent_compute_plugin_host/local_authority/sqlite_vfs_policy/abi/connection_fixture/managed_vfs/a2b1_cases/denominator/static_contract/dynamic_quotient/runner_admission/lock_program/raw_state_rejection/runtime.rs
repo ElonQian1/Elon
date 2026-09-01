@@ -26,9 +26,7 @@ pub(super) fn run_isolated_v1(
     )
 }
 
-const fn runtime_rejection_v1(
-    value: LockRawStateRejectionCaseV1,
-) -> LockRunnerRawStateRejectionV1 {
+const fn runtime_rejection_v1(value: LockRawStateRejectionCaseV1) -> LockRunnerRawStateRejectionV1 {
     match value {
         LockRawStateRejectionCaseV1::NullFileDirect => {
             LockRunnerRawStateRejectionV1::NullFileDirect

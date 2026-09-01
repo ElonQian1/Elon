@@ -3,8 +3,8 @@
 use rusqlite::ffi;
 
 use super::model::{
-    ActiveObservation, HandleBoundSqliteAbiRawLockEvidenceV1,
-    HandleBoundSqliteAbiRawLockRejectionCaseV1, RawValidation, RunCodeOutcome, AbandonOutcome,
+    AbandonOutcome, ActiveObservation, HandleBoundSqliteAbiRawLockEvidenceV1,
+    HandleBoundSqliteAbiRawLockRejectionCaseV1, RawValidation, RunCodeOutcome,
 };
 
 pub(super) fn ordered_values(active: &ActiveObservation) -> Result<[u64; 32], &'static str> {
@@ -29,7 +29,10 @@ pub(super) fn ordered_values(active: &ActiveObservation) -> Result<[u64; 32], &'
         u64::from(active.payload_present.unwrap_or(false)),
         active.counts.typed_operation_entry,
         active.counts.handle_file_missing,
-        active.run_code_outcome.map(RunCodeOutcome::tag).unwrap_or(0),
+        active
+            .run_code_outcome
+            .map(RunCodeOutcome::tag)
+            .unwrap_or(0),
         active.counts.abandon_entry,
         active.abandon_outcome.map(AbandonOutcome::tag).unwrap_or(0),
         active.counts.slots_clear,
@@ -81,43 +84,41 @@ pub(super) fn validate_exact_values(
         .ok_or("raw Lock rejection case ledger vector was not exact")
 }
 
-const fn expected_case_values(
-    case_v1: HandleBoundSqliteAbiRawLockRejectionCaseV1,
-) -> [u64; 22] {
+const fn expected_case_values(case_v1: HandleBoundSqliteAbiRawLockRejectionCaseV1) -> [u64; 22] {
     use HandleBoundSqliteAbiRawLockRejectionCaseV1 as Case;
     match case_v1 {
-        Case::NullFileDirect => {
-            [1, 1, 7, 1, 0, 0, 0, 0, 0, 0, 2, 1, 2, 0, 0, 0, 0, 0, 0, 0, 7, 0]
-        }
-        Case::UninstalledDirect => {
-            [2, 0, 0, 2, 0, 0, 0, 0, 0, 0, 2, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 5]
-        }
-        Case::MethodsNullStatePresentDirect => {
-            [3, 0, 2, 3, 0, 0, 0, 0, 0, 0, 2, 1, 3, 0, 0, 0, 0, 0, 0, 0, 2, 4]
-        }
-        Case::ForeignMethodsStateNullDirect => {
-            [4, 0, 1, 3, 0, 0, 0, 0, 0, 0, 2, 1, 3, 0, 0, 0, 0, 0, 0, 0, 1, 5]
-        }
-        Case::ForeignMethodsStatePresentDirect => {
-            [5, 0, 3, 3, 0, 0, 0, 0, 0, 0, 2, 1, 3, 0, 0, 0, 0, 0, 0, 0, 3, 4]
-        }
-        Case::ExactMethodsStateNullDirect => {
-            [6, 0, 5, 4, 0, 0, 0, 0, 0, 0, 2, 1, 4, 0, 0, 0, 0, 0, 0, 0, 5, 5]
-        }
-        Case::OtherTypePayloadMissingDropCompleted => {
-            [7, 0, 7, 5, 1, 0, 1, 0, 0, 0, 2, 1, 5, 1, 1, 0, 0, 0, 1, 0, 0, 5]
-        }
-        Case::OtherTypePayloadPresentDropCompleted => {
-            [8, 0, 7, 5, 1, 0, 1, 1, 0, 0, 2, 1, 5, 1, 1, 1, 1, 0, 1, 0, 0, 5]
-        }
-        Case::OtherTypePayloadPresentDropUnwindCaught => {
-            [9, 0, 7, 5, 1, 0, 1, 1, 0, 0, 2, 1, 6, 1, 1, 1, 0, 1, 0, 1, 0, 5]
-        }
-        Case::ExpectedTypePayloadMissingDropCompleted => {
-            [10, 0, 7, 6, 1, 1, 1, 0, 0, 0, 3, 1, 5, 1, 1, 0, 0, 0, 1, 0, 0, 5]
-        }
-        Case::HandleBoundFileMissingDirect => {
-            [11, 0, 7, 6, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 6]
-        }
+        Case::NullFileDirect => [
+            1, 1, 7, 1, 0, 0, 0, 0, 0, 0, 2, 1, 2, 0, 0, 0, 0, 0, 0, 0, 7, 0,
+        ],
+        Case::UninstalledDirect => [
+            2, 0, 0, 2, 0, 0, 0, 0, 0, 0, 2, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 5,
+        ],
+        Case::MethodsNullStatePresentDirect => [
+            3, 0, 2, 3, 0, 0, 0, 0, 0, 0, 2, 1, 3, 0, 0, 0, 0, 0, 0, 0, 2, 4,
+        ],
+        Case::ForeignMethodsStateNullDirect => [
+            4, 0, 1, 3, 0, 0, 0, 0, 0, 0, 2, 1, 3, 0, 0, 0, 0, 0, 0, 0, 1, 5,
+        ],
+        Case::ForeignMethodsStatePresentDirect => [
+            5, 0, 3, 3, 0, 0, 0, 0, 0, 0, 2, 1, 3, 0, 0, 0, 0, 0, 0, 0, 3, 4,
+        ],
+        Case::ExactMethodsStateNullDirect => [
+            6, 0, 5, 4, 0, 0, 0, 0, 0, 0, 2, 1, 4, 0, 0, 0, 0, 0, 0, 0, 5, 5,
+        ],
+        Case::OtherTypePayloadMissingDropCompleted => [
+            7, 0, 7, 5, 1, 0, 1, 0, 0, 0, 2, 1, 5, 1, 1, 0, 0, 0, 1, 0, 0, 5,
+        ],
+        Case::OtherTypePayloadPresentDropCompleted => [
+            8, 0, 7, 5, 1, 0, 1, 1, 0, 0, 2, 1, 5, 1, 1, 1, 1, 0, 1, 0, 0, 5,
+        ],
+        Case::OtherTypePayloadPresentDropUnwindCaught => [
+            9, 0, 7, 5, 1, 0, 1, 1, 0, 0, 2, 1, 6, 1, 1, 1, 0, 1, 0, 1, 0, 5,
+        ],
+        Case::ExpectedTypePayloadMissingDropCompleted => [
+            10, 0, 7, 6, 1, 1, 1, 0, 0, 0, 3, 1, 5, 1, 1, 0, 0, 0, 1, 0, 0, 5,
+        ],
+        Case::HandleBoundFileMissingDirect => [
+            11, 0, 7, 6, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 6,
+        ],
     }
 }

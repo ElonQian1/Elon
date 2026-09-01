@@ -414,8 +414,7 @@ pub(super) unsafe fn abandon_installed_state(
     }
     // SAFETY: validation proves this module's exact table and a non-null envelope.
     #[cfg(all(test, windows))]
-    let drop_observation =
-        super::raw_lock_observation::begin_abandon_drop(file.as_ptr().cast());
+    let drop_observation = super::raw_lock_observation::begin_abandon_drop(file.as_ptr().cast());
     unsafe {
         ptr::addr_of_mut!((*file.as_ptr()).base.pMethods).write(ptr::null());
         ptr::addr_of_mut!((*file.as_ptr()).state).write(ptr::null_mut());

@@ -30,8 +30,7 @@ use super::{
         LockPreManagedCallbackRejectionProgramSpecV1,
     },
     raw_state_rejection::{
-        program_spec_v1 as raw_state_rejection_program_spec_v1,
-        LockRawStateRejectionProgramSpecV1,
+        program_spec_v1 as raw_state_rejection_program_spec_v1, LockRawStateRejectionProgramSpecV1,
     },
     request_validation::{
         program_spec_v1 as request_validation_program_spec_v1, LockProgramSpecV1,

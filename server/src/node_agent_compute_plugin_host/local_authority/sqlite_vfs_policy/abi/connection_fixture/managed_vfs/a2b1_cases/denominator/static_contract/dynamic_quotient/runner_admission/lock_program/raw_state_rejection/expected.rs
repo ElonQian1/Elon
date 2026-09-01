@@ -4,8 +4,8 @@ use super::super::super::super::super::source_leaf_authority::{
     CustodyStateV1, DmsLockCustodyV1, FailureClassV1, LockEffectV1, MutationStateV1,
     ObservableCountsV1, SqliteResultV1, TerminalDispositionV1,
 };
-use super::super::super::super::{DynamicExpectedV1};
 use super::super::super::super::super::terminal_descriptor::PhaseV1;
+use super::super::super::super::DynamicExpectedV1;
 use super::case::LockRawStateRejectionCaseV1;
 
 pub(super) fn expected_v1(case: LockRawStateRejectionCaseV1) -> DynamicExpectedV1 {

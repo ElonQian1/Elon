@@ -101,10 +101,7 @@ pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_abi) u
         }
         HandleBoundSqliteAbiRawLockRejectionCaseV1::OtherTypePayloadMissingDropCompleted => {
             unsafe {
-                replace_envelope(
-                    file,
-                    empty_envelope::<OtherTypePayloadMissing>(),
-                );
+                replace_envelope(file, empty_envelope::<OtherTypePayloadMissing>());
             }
             0b101
         }

@@ -37,8 +37,7 @@ pub(super) use lock_program::{
     local_sibling_contention_catalog_row_count_for_test,
     native_acquire_busy_catalog_row_count_for_test,
     pre_managed_callback_rejection_catalog_row_count_for_test,
-    raw_state_rejection_catalog_row_count_for_test,
-    stored_poison_catalog_row_count_for_test,
+    raw_state_rejection_catalog_row_count_for_test, stored_poison_catalog_row_count_for_test,
     validate_program_for_test as validate_lock_program_for_test,
 };
 #[cfg(all(test, windows))]

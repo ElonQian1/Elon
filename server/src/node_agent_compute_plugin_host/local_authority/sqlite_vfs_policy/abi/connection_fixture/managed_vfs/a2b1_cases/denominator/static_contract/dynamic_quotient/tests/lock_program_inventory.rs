@@ -378,8 +378,10 @@ fn full_lock_program_inventory_accounts_for_every_frozen_member_without_opening_
         .iter()
         .all(|(key, _)| !q1_through_q9_source_keys.contains(key)));
     expected_source_keys.extend(q10_expected_groups.iter().map(|(key, _)| *key));
-    let q1_through_q10_source_keys =
-        expected_source_keys.iter().copied().collect::<BTreeSet<_>>();
+    let q1_through_q10_source_keys = expected_source_keys
+        .iter()
+        .copied()
+        .collect::<BTreeSet<_>>();
     assert_eq!(q1_through_q10_source_keys.len(), 3_657);
     let q11_expected_groups = lock_raw_state_rejection_expected_groups_v1();
     assert_eq!(

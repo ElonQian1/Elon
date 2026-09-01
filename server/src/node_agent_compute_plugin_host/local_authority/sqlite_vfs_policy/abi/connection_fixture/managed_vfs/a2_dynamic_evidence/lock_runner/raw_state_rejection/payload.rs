@@ -4,9 +4,7 @@ use anyhow::anyhow;
 use rusqlite::ffi;
 use sha2::{Digest, Sha256};
 
-use super::super::super::child::lock_raw_state_rejection::{
-    REPORT_VALUE_COUNT, REPORT_VERSION,
-};
+use super::super::super::child::lock_raw_state_rejection::{REPORT_VALUE_COUNT, REPORT_VERSION};
 use super::{
     completion_tag, exact_selector, raw_state_tag, rejection_tag, validate_binding,
     LockRunnerRawStateRejectionBindingV1,
@@ -33,11 +31,7 @@ pub(super) fn encode(
     retained_values: [u64; 4],
 ) -> String {
     let mut values = binding_values(binding);
-    values.extend([
-        registration_id,
-        route_ordinal,
-        CONTROLLED_FAULT_ACTUAL_TAG,
-    ]);
+    values.extend([registration_id, route_ordinal, CONTROLLED_FAULT_ACTUAL_TAG]);
     values.extend(abi_values);
     values.extend(route_no_entry);
     values.extend(target_values);
@@ -63,16 +57,16 @@ pub(in super::super) fn validate_payload(
 ) -> anyhow::Result<ValidatedRawStateRejectionPayloadV1> {
     validate_binding(binding)?;
     let mut fields = payload.split(',');
-    if fields.next() != Some(REPORT_VERSION)
-        || fields.next() != Some(exact_selector(binding))
-    {
+    if fields.next() != Some(REPORT_VERSION) || fields.next() != Some(exact_selector(binding)) {
         return Err(anyhow!("q11 Lock raw-state payload identity mismatch"));
     }
     let values = fields
         .map(parse_canonical_u64)
         .collect::<anyhow::Result<Vec<_>>>()?;
     if values.len() != REPORT_VALUE_COUNT || values[..23] != binding_values(binding) {
-        return Err(anyhow!("q11 Lock raw-state payload program binding mismatch"));
+        return Err(anyhow!(
+            "q11 Lock raw-state payload program binding mismatch"
+        ));
     }
     let abi_values: [u64; 32] = values[26..58]
         .try_into()
@@ -137,8 +131,7 @@ fn expected_abi_values(
     values[29] = ffi::SQLITE_IOERR_SHMLOCK as u64;
     let row = expected_case_values(binding);
     for (slot, value) in [
-        1, 5, 7, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26,
-        27, 30, 31,
+        1, 5, 7, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 30, 31,
     ]
     .into_iter()
     .zip(row)
@@ -151,17 +144,39 @@ fn expected_abi_values(
 fn expected_case_values(binding: LockRunnerRawStateRejectionBindingV1) -> [u64; 22] {
     use super::LockRunnerRawStateRejectionV1 as R;
     match binding.rejection {
-        R::NullFileDirect => [1, 1, 7, 1, 0, 0, 0, 0, 0, 0, 2, 1, 2, 0, 0, 0, 0, 0, 0, 0, 7, 0],
-        R::UninstalledDirect => [2, 0, 0, 2, 0, 0, 0, 0, 0, 0, 2, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 5],
-        R::MethodsNullStatePresentDirect => [3, 0, 2, 3, 0, 0, 0, 0, 0, 0, 2, 1, 3, 0, 0, 0, 0, 0, 0, 0, 2, 4],
-        R::ForeignMethodsStateNullDirect => [4, 0, 1, 3, 0, 0, 0, 0, 0, 0, 2, 1, 3, 0, 0, 0, 0, 0, 0, 0, 1, 5],
-        R::ForeignMethodsStatePresentDirect => [5, 0, 3, 3, 0, 0, 0, 0, 0, 0, 2, 1, 3, 0, 0, 0, 0, 0, 0, 0, 3, 4],
-        R::ExactMethodsStateNullDirect => [6, 0, 5, 4, 0, 0, 0, 0, 0, 0, 2, 1, 4, 0, 0, 0, 0, 0, 0, 0, 5, 5],
-        R::OtherTypePayloadMissingDropCompleted => [7, 0, 7, 5, 1, 0, 1, 0, 0, 0, 2, 1, 5, 1, 1, 0, 0, 0, 1, 0, 0, 5],
-        R::OtherTypePayloadPresentDropCompleted => [8, 0, 7, 5, 1, 0, 1, 1, 0, 0, 2, 1, 5, 1, 1, 1, 1, 0, 1, 0, 0, 5],
-        R::OtherTypePayloadPresentDropUnwindCaught => [9, 0, 7, 5, 1, 0, 1, 1, 0, 0, 2, 1, 6, 1, 1, 1, 0, 1, 0, 1, 0, 5],
-        R::ExpectedTypePayloadMissingDropCompleted => [10, 0, 7, 6, 1, 1, 1, 0, 0, 0, 3, 1, 5, 1, 1, 0, 0, 0, 1, 0, 0, 5],
-        R::HandleBoundFileMissingDirect => [11, 0, 7, 6, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 6],
+        R::NullFileDirect => [
+            1, 1, 7, 1, 0, 0, 0, 0, 0, 0, 2, 1, 2, 0, 0, 0, 0, 0, 0, 0, 7, 0,
+        ],
+        R::UninstalledDirect => [
+            2, 0, 0, 2, 0, 0, 0, 0, 0, 0, 2, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 5,
+        ],
+        R::MethodsNullStatePresentDirect => [
+            3, 0, 2, 3, 0, 0, 0, 0, 0, 0, 2, 1, 3, 0, 0, 0, 0, 0, 0, 0, 2, 4,
+        ],
+        R::ForeignMethodsStateNullDirect => [
+            4, 0, 1, 3, 0, 0, 0, 0, 0, 0, 2, 1, 3, 0, 0, 0, 0, 0, 0, 0, 1, 5,
+        ],
+        R::ForeignMethodsStatePresentDirect => [
+            5, 0, 3, 3, 0, 0, 0, 0, 0, 0, 2, 1, 3, 0, 0, 0, 0, 0, 0, 0, 3, 4,
+        ],
+        R::ExactMethodsStateNullDirect => [
+            6, 0, 5, 4, 0, 0, 0, 0, 0, 0, 2, 1, 4, 0, 0, 0, 0, 0, 0, 0, 5, 5,
+        ],
+        R::OtherTypePayloadMissingDropCompleted => [
+            7, 0, 7, 5, 1, 0, 1, 0, 0, 0, 2, 1, 5, 1, 1, 0, 0, 0, 1, 0, 0, 5,
+        ],
+        R::OtherTypePayloadPresentDropCompleted => [
+            8, 0, 7, 5, 1, 0, 1, 1, 0, 0, 2, 1, 5, 1, 1, 1, 1, 0, 1, 0, 0, 5,
+        ],
+        R::OtherTypePayloadPresentDropUnwindCaught => [
+            9, 0, 7, 5, 1, 0, 1, 1, 0, 0, 2, 1, 6, 1, 1, 1, 0, 1, 0, 1, 0, 5,
+        ],
+        R::ExpectedTypePayloadMissingDropCompleted => [
+            10, 0, 7, 6, 1, 1, 1, 0, 0, 0, 3, 1, 5, 1, 1, 0, 0, 0, 1, 0, 0, 5,
+        ],
+        R::HandleBoundFileMissingDirect => [
+            11, 0, 7, 6, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 6,
+        ],
     }
 }
 
@@ -178,7 +193,9 @@ fn digest_receipt(values: &[u64]) -> [u8; 32] {
 fn parse_canonical_u64(value: &str) -> anyhow::Result<u64> {
     let parsed = value.parse::<u64>()?;
     if parsed.to_string() != value {
-        return Err(anyhow!("q11 Lock raw-state payload scalar is not canonical"));
+        return Err(anyhow!(
+            "q11 Lock raw-state payload scalar is not canonical"
+        ));
     }
     Ok(parsed)
 }
