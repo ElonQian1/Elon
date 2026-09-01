@@ -13,7 +13,7 @@
   const composerToolStatePolicy = window.__elonChatGptComposerToolStatePolicy;
   const temporaryChatAdapter = window.__elonChatGptTemporaryChat;
   const realtimeVoicePolicy = window.__elonChatGptRealtimeVoicePolicy;
-  const overlayPolicy = window.__elonChatGptOverlayPolicy; const contextMenuPolicy = window.__elonChatGptContextMenuPolicy; const contextMenuInvocation = window.__elonChatGptContextMenuInvocation?.createCoordinator();
+  const overlayPolicy = window.__elonChatGptOverlayPolicy; const contextMenuPolicy = window.__elonChatGptContextMenuPolicy;
   let controlsById = new Map();
   let controlMetadataById = new Map();
   let lastFingerprint = '';
@@ -608,7 +608,8 @@
     });
   }
 
-  function emitSnapshot(emitEvent, force) { contextMenuInvocation?.reconcile(); const event = snapshot();
+  function emitSnapshot(emitEvent, force) {
+    const event = snapshot();
     const fingerprint = manifestFingerprint(event);
     if (!force && fingerprint === lastFingerprint) return;
     lastFingerprint = fingerprint;
@@ -648,9 +649,6 @@
     discover();
     const node = controlsById.get(String(id || '')); const control = controlMetadataById.get(String(id || ''));
     if (!node || !isVisible(node)) return result('invoke_ui_control', false, '官网控件已变化，请刷新结构后重试。');
-    const contextMenuObservation = contextMenuPolicy && contextMenuPolicy.prepare(control, visibleOverlayRoots, undefined, undefined,
-      (root) => overlayPolicy.contextMenuSignature(root, isVisible, actionableNodes), undefined, () => String(node.getAttribute('aria-expanded') || '').toLowerCase() === 'true'
-    );
     const finish = (ok, detail, delayMs) => { result('invoke_ui_control', ok, detail); window.setTimeout(() => emitSnapshot(emitEvent, true), delayMs); };
     function dispatch() {
       if (!node.isConnected || !isVisible(node)) {
@@ -670,11 +668,8 @@
         );
         if (!remembered) overlayOwnership.cancelPending(ownershipPageKey());
       }
+      if (contextMenuPolicy && contextMenuPolicy.activate(control, node)) return finish(true, '', 0);
       const emitTouch = () => { emitEvent({ type: 'web_touch_request', purpose: 'invoke_ui_control', controlId: id, xRatio, yRatio }); return true; };
-      if (contextMenuObservation && contextMenuInvocation) return contextMenuInvocation.start(contextMenuObservation, emitTouch, (ok) => {
-        if (!ok && overlayOwnership) overlayOwnership.cancelPending(ownershipPageKey());
-        finish(ok, ok ? '' : '官网会话设置未打开，请重试。', 0);
-      });
       emitTouch();
       finish(true, '', 180);
     }

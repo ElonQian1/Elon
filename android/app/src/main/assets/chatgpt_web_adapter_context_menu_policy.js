@@ -11,67 +11,15 @@
     return !!control && control.semantic === 'conversation_options' && !!control.contextId;
   }
 
-  function hasNewRoot(before, after) {
-    const existing = new Set(Array.isArray(before) ? before : []);
-    return (Array.isArray(after) ? after : []).some((root) => !existing.has(root));
-  }
-
-  function snapshotRoots(roots, signatureFor) {
-    const snapshot = new Map();
-    (Array.isArray(roots) ? roots : []).forEach((root) => {
-      snapshot.set(root, typeof signatureFor === 'function' ? String(signatureFor(root) || '') : '');
-    });
-    return snapshot;
-  }
-
-  function hasNewOrChangedRoot(before, after, signatureFor) {
-    const current = Array.isArray(after) ? after : [];
-    if (current.some((root) => !before.has(root))) return true;
-    if (typeof signatureFor !== 'function') return false;
-    return current.some((root) => {
-      const next = String(signatureFor(root) || '');
-      return next && next !== before.get(root);
-    });
-  }
-
-  function prepare(
-    control,
-    visibleRoots,
-    scheduleTask,
-    pollIntervalMs,
-    signatureFor,
-    timeoutMs,
-    isExpanded
-  ) {
-    if (!shouldArm(control) || typeof visibleRoots !== 'function') return null;
-    const before = snapshotRoots(visibleRoots(), signatureFor);
-    const expandedBefore = typeof isExpanded === 'function' && isExpanded() === true;
-    const schedule = typeof scheduleTask === 'function' ? scheduleTask : setTimeout;
-    const interval = Number.isFinite(pollIntervalMs) && pollIntervalMs > 0
-      ? pollIntervalMs
-      : 100;
-    const timeout = Number.isFinite(timeoutMs) && timeoutMs >= interval
-      ? timeoutMs
-      : 1800;
-    const opened = () => (
-      (!expandedBefore && typeof isExpanded === 'function' && isExpanded() === true) ||
-      hasNewOrChangedRoot(before, visibleRoots(), signatureFor)
-    );
-    function observe(onOpened, onTimedOut) {
-      if (typeof onOpened !== 'function' || typeof onTimedOut !== 'function') return false;
-      let elapsed = 0;
-      function poll() {
-        elapsed += interval;
-        if (opened()) return onOpened();
-        if (elapsed >= timeout) return onTimedOut();
-        schedule(poll, interval);
-      }
-      schedule(poll, interval);
+  function activate(control, node) {
+    if (!shouldArm(control) || !node || typeof node.click !== 'function') return false;
+    try {
+      node.click();
       return true;
+    } catch {
+      return false;
     }
-    observe.isOpen = opened;
-    return observe;
   }
 
-  return Object.freeze({ hasNewOrChangedRoot, hasNewRoot, prepare, shouldArm, snapshotRoots });
+  return Object.freeze({ activate, shouldArm });
 });
