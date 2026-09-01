@@ -4,7 +4,7 @@ status: current
 reviewed_at: 2026-09-01
 owners: node, security
 design_status: design_frozen
-implementation_status: map_q4_lock_q12_source_written_uncompiled_unrun
+implementation_status: map_q4_lock_q13_source_written_uncompiled_unrun
 verification_status: source_review_only_current_not_run
 authority_scope: backend-a2-map-lock-dynamic-quotient-authority-v1
 ---
@@ -76,9 +76,9 @@ q3 的 `a2lockq3` version、selector 语义、135-value wire width 与 native-re
 对称 sibling 的 test-only route-preemption runner/selector/payload 源码桥只在同一 exact callback 已 admission 且 installed `xShmLock` 返回 `SQLITE_IOERR_SHMLOCK` 后、unsafe-retention lookup 前 one-shot 移除 route，再绑定 callback completion route-unknown、零 lower lock attempt、terminal custody 与 parent cleanup。它同样只是未编译、未运行的非授权 actual-receipt 源码形状。
 retention-succeeded 与 route-unknown sibling catalogs 各保持 1,320 rows/237,857 bytes，SHA-256 为 `4da94c20e91d97a0082116879718b1ccf0271eb235ed785e65a2e36e7a949d85`、`df931ad7725843098f228d07d9798d79e92f2beec4e1c23e83fc89219dfa1396`，逐行绑定 action/range/profile 与 `(case_key_sha256, full_record_sha256)`。
 
-## 4. Lock q5–q12 exact tranches
+## 4. Lock q5–q13 exact tranches
 
-q5–q12 的精确成员、lower/receipt source contract、catalog 与隔离约束由
+q5–q13 的精确成员、lower/receipt source contract、catalog 与隔离约束由
 [`Lock dynamic tranches authority`](node-plugin-vfs-lock-dynamic-tranches-authority.md) 维护。q9 只新增
 `LockPreManagedCallbackRejectionV1` 的 528 个 singleton member/group：88 个合法 request ×
 AdmissionRouteUnknown Direct、AdmissionCounterOverflow Direct、UnsupportedFileRole Completed/RouteUnknown、
@@ -89,7 +89,7 @@ ABI scalar gate 返回 `SQLITE_IOERR_SHMLOCK`。q11 只新增 `LockRawStateRejec
 两个 invalid-pointer premise 保持 excluded；typed matcher、seals、memory-safe child 和 production
 `xShmLock` raw admission/abandon/adapter/cleanup 的精确合同只由 Lock tranches authority 维护。未来回执只能标为
 `controlled_fault_actual`，不得冒充自然生产可达或普通 coverage。完整 3,432-member initialization umbrella
-仍在 q11 外；其中 q12 已承接 88 个，余下 3,344 members / 2,816 groups 保持 planned-missing。
+仍在 q11 外；q12/q13 各承接 88 个，余下 3,256 members / 2,728 groups 保持 planned-missing。
 
 q12 的首个冻结纵切命名为 `LockNativeAcquireCreatedFirstExclusiveReleaseErrorV1`，只承接 initialization
 namespace 中 `dms.created-first.exclusive-release-error` 的 88 个 singleton：44 个合法 native-acquire
@@ -106,13 +106,22 @@ Lock no-entry ledger、unsafe quarantine、隔离 child exit 与 parent-owned cl
 production one-shot seam、requested-range no-entry ledger、isolated child/runner/payload 与全部 source-scope 接线；
 catalog 为 88 rows / 18,386 bytes，SHA-256=`51d675ee9b2fe990b71a924a6f7cf016c6738e7f88872449f91a20ba6d2566df`。
 
-完整 `LockNativeAcquireInitializationFailureV1` 仍是 3,432 members / 2,904 normalized groups，而不是
-q12 首段的别名。其机械分期为 Open `792/792`、DMS exclusive acquire `528/440`、first-process
-truncate/release `528/528`、shared acquire `1,584/1,144`；本批 88 只建立可扩展 typed controller 的首个
-连续 vertical slice，后续 3,344 members / 2,816 groups 继续 planned-missing，不得由首段推导完成。
+q13 的第二个冻结纵切命名为 `LockNativeAcquireExistingFirstExclusiveReleaseErrorV1`，只承接
+initialization namespace 中 `dms.existing-first.exclusive-release-error` 的 88 个 singleton：同样由 44 个
+合法 native-acquire request 乘两个 unsafe terminal 组成，但 `path=ExistingFirst`，不得被 q12
+CreatedFirst 匹配器或回执吸收。future controlled-fault actual 必须先用 typed precreation receipt 证明物理 SHM
+已创建并关闭，再从 cold WAL-main attach 观察 `was_created=false`，随后进入与 q12 同类型但
+case-bound 的 DMS lock/truncate/release、requested-range no-entry ledger、quarantine、child exit 与 parent cleanup。
+`UnlockFileEx` BOOL 仍必须故意不读，因此只能形成 `controlled_fault_actual`，不得冒充 natural actual。
+q13 catalog 为 88 rows / 18,474 bytes，SHA-256=`03b883842b3fd1886779dcb07573521d14ca3125894b38c4d341a462137424f4`。
 
-聚合未运行 inventory 预期现为 `3,756 present members /
-3,756 present groups / 4,912 missing members / 4,384 missing groups / 8,668 total members /
+完整 `LockNativeAcquireInitializationFailureV1` 仍是 3,432 members / 2,904 normalized groups，而不是
+q12/q13 两段的别名。其机械分期为 Open `792/792`、DMS exclusive acquire `528/440`、first-process
+truncate/release `528/528`、shared acquire `1,584/1,144`；两批共 176 个 source-only member/group 只建立可扩展 typed
+controller 的两个连续 vertical slice，后续 3,256 members / 2,728 groups 继续 planned-missing，不得由已写纵切推导完成。
+
+聚合未运行 inventory 预期现为 `3,844 present members /
+3,844 present groups / 4,824 missing members / 4,296 missing groups / 8,668 total members /
 8,140 total groups`；member coverage 仍为 `0/8,668`，无 actual
 record、reviewed digest、`Qlock` 或 Windows numerator。
 
@@ -199,9 +208,9 @@ canonical representative 执行真实 Windows child 后产生。
 
 当前该 bridge 只能失败关闭：Map source test 预期 `43,476` member 中有 `521` 个 source-present、`42,955` 个
 planned-missing；Lock source test 预期 `8,668 members / 8,140 groups` 中有
-`3,756 present members/groups`、`4,912 missing members / 4,384 missing groups`；两根 reviewed inventory
+`3,844 present members/groups`、`4,824 missing members / 4,296 missing groups`；两根 reviewed inventory
 digest 均尚未 checked-in/frozen。因此 provider authority 不可构造，
 full Map/Lock candidate 必须在 catalog/manifest 前分别原子失败；该结论没有运行证据，current source 仍为
 `passed=0 failed=0 actual=not_run`。Lock coverage=`0/8668`、`Qlock=unknown`、
-`WindowsDynamic=not_opened`、production closed；q9–q12 的 19-artifact global frozen/source-owner refresh
+`WindowsDynamic=not_opened`、production closed；q9–q13 的 19-artifact global frozen/source-owner refresh
 继续独立 deferred。

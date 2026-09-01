@@ -30,6 +30,14 @@ fn expectation() -> ManagedSqliteShmTestInitializationExpectationV1 {
     }
 }
 
+fn existing_first_expectation() -> ManagedSqliteShmTestInitializationExpectationV1 {
+    ManagedSqliteShmTestInitializationExpectationV1 {
+        case_v1:
+            ManagedSqliteShmTestInitializationFailureV1::ExistingFirstExclusiveReleaseOutcomeUncertain,
+        ..expectation()
+    }
+}
+
 fn request() -> ManagedSqliteShmLockRequest {
     ManagedSqliteShmLockRequest::new(
         0,
@@ -94,10 +102,13 @@ fn requested_lock_receipt() -> ManagedSqliteShmTestLockReceipt {
     }
 }
 
-fn advance_to_terminal(controller: &mut ManagedSqliteShmTestInitializationControllerV1) {
+fn advance_to_terminal_with_open(
+    controller: &mut ManagedSqliteShmTestInitializationControllerV1,
+    created: bool,
+) {
     assert!(controller.record_request(TARGET, request()).unwrap());
     assert!(controller.record_open_attempt(TARGET).unwrap());
-    assert!(controller.record_open_created(TARGET, true).unwrap());
+    assert!(controller.record_open_created(TARGET, created).unwrap());
     assert!(controller
         .record_dms_exclusive_lock_attempt(TARGET)
         .unwrap());
@@ -120,6 +131,10 @@ fn advance_to_terminal(controller: &mut ManagedSqliteShmTestInitializationContro
     controller.record_poisoned(TARGET).unwrap();
 }
 
+fn advance_to_terminal(controller: &mut ManagedSqliteShmTestInitializationControllerV1) {
+    advance_to_terminal_with_open(controller, true);
+}
+
 #[test]
 fn exact_created_first_release_sequence_seals_one_controlled_receipt() {
     let mut controller = ManagedSqliteShmTestInitializationControllerV1::default();
@@ -137,6 +152,36 @@ fn exact_created_first_release_sequence_seals_one_controlled_receipt() {
     assert_eq!(ordered[23], 1);
     assert_eq!(ordered[24], 1);
     assert_eq!(ordered[29..32], [0, 1, 1]);
+}
+
+#[test]
+fn exact_existing_first_release_sequence_requires_created_false() {
+    let mut controller = ManagedSqliteShmTestInitializationControllerV1::default();
+    let expected = existing_first_expectation();
+    controller.arm(TARGET, expected, cold()).unwrap();
+    advance_to_terminal_with_open(&mut controller, false);
+    let mut lock = requested_lock_receipt();
+    lock.expectation.action = expected.action;
+    let receipt = controller.finish(TARGET, terminal(), lock).unwrap();
+    assert_eq!(receipt.case_v1(), expected.case_v1);
+    assert_eq!(receipt.ordered_values()[1], 2);
+}
+
+#[test]
+fn initialization_open_existence_is_case_specific() {
+    let mut created_first = ManagedSqliteShmTestInitializationControllerV1::default();
+    created_first.arm(TARGET, expectation(), cold()).unwrap();
+    assert!(created_first.record_request(TARGET, request()).unwrap());
+    assert!(created_first.record_open_attempt(TARGET).unwrap());
+    assert!(created_first.record_open_created(TARGET, false).is_err());
+
+    let mut existing_first = ManagedSqliteShmTestInitializationControllerV1::default();
+    existing_first
+        .arm(TARGET, existing_first_expectation(), cold())
+        .unwrap();
+    assert!(existing_first.record_request(TARGET, request()).unwrap());
+    assert!(existing_first.record_open_attempt(TARGET).unwrap());
+    assert!(existing_first.record_open_created(TARGET, true).is_err());
 }
 
 #[test]

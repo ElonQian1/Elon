@@ -181,11 +181,26 @@ impl ManagedSqliteShmTestInitializationControllerV1 {
         let Some(active) = self.active_for_event(target)? else {
             return Ok(false);
         };
-        if !created {
-            return fail(
-                active,
-                "NODE_MANAGED_SQLITE_SHM_TEST_INITIALIZATION_NOT_CREATED_FIRST",
-            );
+        let violation = match (active.expectation.case_v1, created) {
+            (
+                super::model::ManagedSqliteShmTestInitializationFailureV1::CreatedFirstExclusiveReleaseOutcomeUncertain,
+                false,
+            ) => Some("NODE_MANAGED_SQLITE_SHM_TEST_INITIALIZATION_NOT_CREATED_FIRST"),
+            (
+                super::model::ManagedSqliteShmTestInitializationFailureV1::CreatedFirstExclusiveReleaseOutcomeUncertain,
+                true,
+            ) => None,
+            (
+                super::model::ManagedSqliteShmTestInitializationFailureV1::ExistingFirstExclusiveReleaseOutcomeUncertain,
+                true,
+            ) => Some("NODE_MANAGED_SQLITE_SHM_TEST_INITIALIZATION_NOT_EXISTING_FIRST"),
+            (
+                super::model::ManagedSqliteShmTestInitializationFailureV1::ExistingFirstExclusiveReleaseOutcomeUncertain,
+                false,
+            ) => None,
+        };
+        if let Some(code) = violation {
+            return fail(active, code);
         }
         advance(
             active,
@@ -438,6 +453,7 @@ fn validate_expectation(
     if !matches!(
         expectation.case_v1,
         super::model::ManagedSqliteShmTestInitializationFailureV1::CreatedFirstExclusiveReleaseOutcomeUncertain
+            | super::model::ManagedSqliteShmTestInitializationFailureV1::ExistingFirstExclusiveReleaseOutcomeUncertain
     ) {
         return Err("NODE_MANAGED_SQLITE_SHM_TEST_INITIALIZATION_CASE_INVALID");
     }

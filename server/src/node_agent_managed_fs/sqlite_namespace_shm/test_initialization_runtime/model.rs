@@ -5,12 +5,14 @@ use super::super::{
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ManagedSqliteShmTestInitializationFailureV1 {
     CreatedFirstExclusiveReleaseOutcomeUncertain,
+    ExistingFirstExclusiveReleaseOutcomeUncertain,
 }
 
 impl ManagedSqliteShmTestInitializationFailureV1 {
     pub(super) const fn tag(self) -> u64 {
         match self {
             Self::CreatedFirstExclusiveReleaseOutcomeUncertain => 1,
+            Self::ExistingFirstExclusiveReleaseOutcomeUncertain => 2,
         }
     }
 }

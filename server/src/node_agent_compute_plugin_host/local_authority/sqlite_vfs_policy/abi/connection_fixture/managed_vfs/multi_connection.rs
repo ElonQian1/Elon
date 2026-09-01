@@ -28,6 +28,19 @@ pub(super) struct ManagedSqliteMultiConnectionFixture {
     connections: [Option<ManagedSqliteRoutedConnectionFixture>; CONNECTION_COUNT],
 }
 
+#[cfg(all(test, windows))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) struct ManagedTestExistingShmPrecreationReceiptV1 {
+    ordered_values: [u64; 8],
+}
+
+#[cfg(all(test, windows))]
+impl ManagedTestExistingShmPrecreationReceiptV1 {
+    pub(super) const fn ordered_values(self) -> [u64; 8] {
+        self.ordered_values
+    }
+}
+
 impl ManagedSqliteMultiConnectionFixture {
     pub(super) fn open(root: &Path, nonce_seed: [u8; 16]) -> anyhow::Result<Self> {
         Self::open_with_count(root, nonce_seed, 2)
@@ -36,6 +49,25 @@ impl ManagedSqliteMultiConnectionFixture {
     #[cfg(all(test, windows))]
     pub(super) fn open_single(root: &Path, nonce_seed: [u8; 16]) -> anyhow::Result<Self> {
         Self::open_with_count(root, nonce_seed, 1)
+    }
+
+    #[cfg(all(test, windows))]
+    pub(super) fn precreate_existing_shm_for_initialization_v1(
+        &self,
+    ) -> Result<ManagedTestExistingShmPrecreationReceiptV1, &'static str> {
+        let context = self
+            .registration
+            .as_ref()
+            .and_then(|registration| registration.context.as_ref())
+            .ok_or("managed VFS registration context is not live")?;
+        let ordered_values = context
+            .runtime
+            .precreate_existing_shm_for_initialization_test_v1()?
+            .ordered_values();
+        if ordered_values != [1, 1, 1, 4, 1, 1, 4, 1] {
+            return Err("managed existing SHM precreation receipt mismatch");
+        }
+        Ok(ManagedTestExistingShmPrecreationReceiptV1 { ordered_values })
     }
 
     fn open_with_count(
