@@ -229,7 +229,10 @@ fn exact_created_first_truncate_unavailable_then_release_success_is_case_specifi
         .unwrap();
     assert_eq!(receipt.case_v1(), expected.case_v1);
     assert_eq!(receipt.ordered_values()[1], 3);
-    assert_eq!(receipt.ordered_values()[19..28], [0, 1, 1, 0, 0, 1, 1, 1, 0]);
+    assert_eq!(
+        receipt.ordered_values()[19..28],
+        [0, 1, 1, 0, 0, 1, 1, 1, 0]
+    );
     assert_eq!(receipt.ordered_values()[28], 447);
 }
 

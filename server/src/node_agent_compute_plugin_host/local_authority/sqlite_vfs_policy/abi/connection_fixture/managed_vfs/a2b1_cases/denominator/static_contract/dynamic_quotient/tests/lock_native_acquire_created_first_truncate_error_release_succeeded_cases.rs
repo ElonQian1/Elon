@@ -43,7 +43,8 @@ pub(super) struct FrozenLockCreatedFirstTruncateErrorReleaseSucceededLeafV1 {
     pub(super) member: StaticMemberSealV1,
 }
 
-pub(super) fn frozen_lock_created_first_truncate_error_release_succeeded_leaves_v1() -> &'static BTreeMap<
+pub(super) fn frozen_lock_created_first_truncate_error_release_succeeded_leaves_v1(
+) -> &'static BTreeMap<
     FrozenLockCreatedFirstTruncateErrorReleaseSucceededCaseV1,
     FrozenLockCreatedFirstTruncateErrorReleaseSucceededLeafV1,
 > {
@@ -67,7 +68,8 @@ pub(super) fn frozen_lock_created_first_truncate_error_release_succeeded_leaves_
                 else {
                     return Ok(());
                 };
-                let Some(case) = created_first_truncate_error_release_succeeded_v1(record, descriptor)
+                let Some(case) =
+                    created_first_truncate_error_release_succeeded_v1(record, descriptor)
                 else {
                     return Ok(());
                 };
@@ -197,7 +199,9 @@ fn created_first_truncate_error_release_succeeded_v1(
     (expected == &expected_v1()).then_some(case)
 }
 
-const fn expected_axes_v1(case: FrozenLockCreatedFirstTruncateErrorReleaseSucceededCaseV1) -> LockAxesV1 {
+const fn expected_axes_v1(
+    case: FrozenLockCreatedFirstTruncateErrorReleaseSucceededCaseV1,
+) -> LockAxesV1 {
     LockAxesV1 {
         action: ReachabilityV1::Reached(case.action),
         first: ReachabilityV1::Reached(case.first),

@@ -154,7 +154,9 @@ const fn completion_tag_v1(
     completion: LockCreatedFirstTruncateErrorReleaseSucceededCompletionV1,
 ) -> &'static str {
     match completion {
-        LockCreatedFirstTruncateErrorReleaseSucceededCompletionV1::RetentionSucceeded => "succeeded",
+        LockCreatedFirstTruncateErrorReleaseSucceededCompletionV1::RetentionSucceeded => {
+            "succeeded"
+        }
         LockCreatedFirstTruncateErrorReleaseSucceededCompletionV1::RetentionRouteUnknown => {
             "route-unknown-prior-quarantine"
         }

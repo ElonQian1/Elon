@@ -164,10 +164,12 @@ pub(in super::super) fn validate_payload(
             "q14 controlled initialization receipt/custody mismatch"
         ));
     }
-    Ok(ValidatedCreatedFirstTruncateErrorReleaseSucceededPayloadV1 {
-        registration_id: values[25],
-        native_receipt_sha256: digest_receipt(&values),
-    })
+    Ok(
+        ValidatedCreatedFirstTruncateErrorReleaseSucceededPayloadV1 {
+            registration_id: values[25],
+            native_receipt_sha256: digest_receipt(&values),
+        },
+    )
 }
 
 fn binding_values(

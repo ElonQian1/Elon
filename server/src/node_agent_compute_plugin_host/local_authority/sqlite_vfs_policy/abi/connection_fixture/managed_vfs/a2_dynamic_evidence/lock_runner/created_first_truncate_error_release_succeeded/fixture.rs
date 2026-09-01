@@ -22,8 +22,7 @@ use super::super::super::super::{
 use super::super::super::{SanitizedChildReport, A2_DYNAMIC_CHILD_NONCE_ENV};
 use super::super::{lifecycle, LockRunnerActionV1};
 use super::{
-    payload, validate_binding,
-    LockRunnerCreatedFirstTruncateErrorReleaseSucceededCompletionV1,
+    payload, validate_binding, LockRunnerCreatedFirstTruncateErrorReleaseSucceededCompletionV1,
     LockRunnerNativeAcquireCreatedFirstTruncateErrorReleaseSucceededBindingV1,
 };
 

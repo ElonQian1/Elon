@@ -40,8 +40,7 @@ impl ManagedSqliteShmCoordinator {
             true,
             false,
             |controller, target| {
-                controller
-                    .record_created_first_truncate_return_receipt_unavailable(target, native)
+                controller.record_created_first_truncate_return_receipt_unavailable(target, native)
             },
         )
     }
@@ -57,9 +56,7 @@ impl ManagedSqliteShmCoordinator {
             ManagedSqliteShmFailurePhase::DmsExclusiveRelease,
             true,
             false,
-            |controller, target| {
-                controller.begin_created_first_truncate_cleanup_unlock(target)
-            },
+            |controller, target| controller.begin_created_first_truncate_cleanup_unlock(target),
         )
     }
 

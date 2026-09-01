@@ -1,12 +1,10 @@
 //! Source-only admission contracts for all 88 q14 initialization truncate-release members.
 
+use super::super::super::terminal_descriptor::{InitializationFaultSiteV1, InitializationPathV1};
 use super::super::runner_admission::{
     compile_for_test,
     native_acquire_created_first_truncate_error_release_succeeded_catalog_row_count_for_test,
     validate_lock_program_for_test,
-};
-use super::super::super::terminal_descriptor::{
-    InitializationFaultSiteV1, InitializationPathV1,
 };
 use super::lock_native_acquire_created_first_truncate_error_release_succeeded_cases::{
     frozen_lock_created_first_truncate_error_release_succeeded_leaves_v1,

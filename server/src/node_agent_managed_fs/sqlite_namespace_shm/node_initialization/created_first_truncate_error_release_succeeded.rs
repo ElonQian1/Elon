@@ -2,10 +2,10 @@
 
 use std::io;
 
+use super::super::super::{platform, PinnedManagedSqliteFile};
 use super::super::{
     coordinator::{
-        ManagedSqliteShmCoordinator, ManagedSqliteShmCoordinatorState,
-        ManagedSqliteShmDmsCustody,
+        ManagedSqliteShmCoordinator, ManagedSqliteShmCoordinatorState, ManagedSqliteShmDmsCustody,
     },
     test_initialization_runtime::{
         ManagedSqliteShmTestInitializationNativeObservationV1,
@@ -13,7 +13,6 @@ use super::super::{
     },
     types::{ManagedSqliteShmFailure, ManagedSqliteShmFailurePhase, SHM_DMS_OFFSET},
 };
-use super::super::super::{platform, PinnedManagedSqliteFile};
 use super::new_node;
 
 impl ManagedSqliteShmCoordinator {
@@ -30,21 +29,21 @@ impl ManagedSqliteShmCoordinator {
             return Ok(file);
         }
 
-        let platform_receipt =
-            match file.truncate_outcome_unavailable_for_initialization_test_v1(0) {
-                Ok(receipt) if receipt.native_attempts() == 1 => receipt,
-                Ok(_) | Err(_) => {
-                    return Err(self.retain_after_q14_controller_rejection(
-                        state,
-                        connection_id,
-                        file,
-                        ManagedSqliteShmDmsCustody::ExclusiveKnown,
-                        ManagedSqliteShmFailurePhase::DmsTruncate,
-                        false,
-                        "NODE_MANAGED_SQLITE_SHM_TEST_INITIALIZATION_Q14_TRUNCATE_SEAM_FAILED",
-                    ));
-                }
-            };
+        let platform_receipt = match file.truncate_outcome_unavailable_for_initialization_test_v1(0)
+        {
+            Ok(receipt) if receipt.native_attempts() == 1 => receipt,
+            Ok(_) | Err(_) => {
+                return Err(self.retain_after_q14_controller_rejection(
+                    state,
+                    connection_id,
+                    file,
+                    ManagedSqliteShmDmsCustody::ExclusiveKnown,
+                    ManagedSqliteShmFailurePhase::DmsTruncate,
+                    false,
+                    "NODE_MANAGED_SQLITE_SHM_TEST_INITIALIZATION_Q14_TRUNCATE_SEAM_FAILED",
+                ));
+            }
+        };
         let native = ManagedSqliteShmTestInitializationNativeReceiptV1 {
             observation:
                 ManagedSqliteShmTestInitializationNativeObservationV1::ReturnReceiptUnavailable,
@@ -97,34 +96,21 @@ impl ManagedSqliteShmCoordinator {
                 connection_id,
             )
         {
-            state.node = Some(new_node(
-                file,
-                ManagedSqliteShmDmsCustody::Released,
-                true,
-            ));
+            state.node = Some(new_node(file, ManagedSqliteShmDmsCustody::Released, true));
             return Err(failure);
         }
 
-        state.node = Some(new_node(
-            file,
-            ManagedSqliteShmDmsCustody::Released,
-            true,
-        ));
+        state.node = Some(new_node(file, ManagedSqliteShmDmsCustody::Released, true));
         self.mark_poisoned(
             state,
             ManagedSqliteShmFailurePhase::DmsTruncate,
             true,
             false,
         );
-        self.record_test_initialization_created_first_truncate_poisoned_v1(
-            state,
-            connection_id,
-        )?;
+        self.record_test_initialization_created_first_truncate_poisoned_v1(state, connection_id)?;
         Err(ManagedSqliteShmFailure::poisoned(
             ManagedSqliteShmFailurePhase::DmsTruncate,
-            io::Error::other(
-                "NODE_MANAGED_SQLITE_SHM_TRUNCATE_RETURN_RECEIPT_UNAVAILABLE",
-            ),
+            io::Error::other("NODE_MANAGED_SQLITE_SHM_TRUNCATE_RETURN_RECEIPT_UNAVAILABLE"),
             true,
             false,
         ))
@@ -153,12 +139,7 @@ impl ManagedSqliteShmCoordinator {
             Err(failure) => failure,
             Ok(()) => {
                 self.mark_poisoned(state, phase, true, lock_outcome_uncertain);
-                ManagedSqliteShmFailure::poisoned_code(
-                    phase,
-                    code,
-                    true,
-                    lock_outcome_uncertain,
-                )
+                ManagedSqliteShmFailure::poisoned_code(phase, code, true, lock_outcome_uncertain)
             }
         }
     }
