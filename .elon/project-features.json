@@ -5505,28 +5505,41 @@
       "implementation_evidence": [
         {
           "path": "contracts/quant/esk-paper-cross-repo-asset-view-v1.fixture.json",
-          "content_hash": "3984e97f16ce83ec401dcf4494f10f11f5f7e8379d26f367fa68a4a8fd9ddf8e",
+          "content_hash": "0baa8770ecca8b564df99dbeeee86340511563813c593e7e911bd15d3e469eec",
           "locator": "yep2 + expected.view",
           "evidence_kind": "configuration",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "ae6e0e6c056e4a3dcc2080ec310224ef2d050b64",
-            "head_blob_oid": "",
+            "head_commit": "ca95b093c988ce0e804fadf81f552dd799c62d34",
+            "head_blob_oid": "e52cfb5751a630f82a63467251bece82175e2011",
             "worktree_blob_oid": "e52cfb5751a630f82a63467251bece82175e2011",
-            "state": "untracked"
+            "state": "tracked_clean"
           }
         },
         {
           "path": "scripts/test-esk-paper-cross-repo-asset-view.ps1",
-          "content_hash": "a0945b60cc0d1f98225a3f83aff5555614bdc413256a2d1fdf595a51b8e4921f",
+          "content_hash": "c39c1b84d79124e1f3eb52f1e5b35ff141f45580d115a3f0fe682163488332fa",
           "locator": "cross-repository receipt",
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "ae6e0e6c056e4a3dcc2080ec310224ef2d050b64",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "7df74397f68267b128576ee2ce6f345b6a530d87",
-            "state": "untracked"
+            "head_commit": "ca95b093c988ce0e804fadf81f552dd799c62d34",
+            "head_blob_oid": "7df74397f68267b128576ee2ce6f345b6a530d87",
+            "worktree_blob_oid": "ce93d38502cfe5f77f8b4a0ec0f0169676d3600c",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "scripts/test-esk-paper-cross-repo-asset-view.ps1",
+          "content_hash": "c39c1b84d79124e1f3eb52f1e5b35ff141f45580d115a3f0fe682163488332fa",
+          "locator": "cross-repository receipt with canonical LF contract hash",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ca95b093c988ce0e804fadf81f552dd799c62d34",
+            "head_blob_oid": "7df74397f68267b128576ee2ce6f345b6a530d87",
+            "worktree_blob_oid": "ce93d38502cfe5f77f8b4a0ec0f0169676d3600c",
+            "state": "tracked_modified"
           }
         },
         {
@@ -5536,10 +5549,10 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "ae6e0e6c056e4a3dcc2080ec310224ef2d050b64",
-            "head_blob_oid": "",
+            "head_commit": "ca95b093c988ce0e804fadf81f552dd799c62d34",
+            "head_blob_oid": "f2e5b2b579be4a8e8bc950701add1a1ecd8b7226",
             "worktree_blob_oid": "f2e5b2b579be4a8e8bc950701add1a1ecd8b7226",
-            "state": "untracked"
+            "state": "tracked_clean"
           }
         },
         {
@@ -5549,10 +5562,10 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "ae6e0e6c056e4a3dcc2080ec310224ef2d050b64",
-            "head_blob_oid": "ba215534cb12ba8dc65c1831a149e8d418a7474e",
+            "head_commit": "ca95b093c988ce0e804fadf81f552dd799c62d34",
+            "head_blob_oid": "84bf7181b214a1d28950c82774c2df1ddc32e6ef",
             "worktree_blob_oid": "84bf7181b214a1d28950c82774c2df1ddc32e6ef",
-            "state": "tracked_modified"
+            "state": "tracked_clean"
           }
         },
         {
@@ -5562,10 +5575,10 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "ae6e0e6c056e4a3dcc2080ec310224ef2d050b64",
-            "head_blob_oid": "0bfb21c620c136659b6bf6c582444b83333e678a",
+            "head_commit": "ca95b093c988ce0e804fadf81f552dd799c62d34",
+            "head_blob_oid": "5d29b9347da3fb960689741053fa3cac69824888",
             "worktree_blob_oid": "5d29b9347da3fb960689741053fa3cac69824888",
-            "state": "tracked_modified"
+            "state": "tracked_clean"
           }
         },
         {
@@ -5575,23 +5588,23 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "ae6e0e6c056e4a3dcc2080ec310224ef2d050b64",
-            "head_blob_oid": "",
+            "head_commit": "ca95b093c988ce0e804fadf81f552dd799c62d34",
+            "head_blob_oid": "11aaedbc5c8be2acae41c40e7a4299b76b5ca677",
             "worktree_blob_oid": "11aaedbc5c8be2acae41c40e7a4299b76b5ca677",
-            "state": "untracked"
+            "state": "tracked_clean"
           }
         },
         {
           "path": "tools/esk-paper-contract-tests/Cargo.toml",
-          "content_hash": "0eaad1d6fa435fd62f3d6a11e1e2e8c390eec4595878b1db36d6f94826a42ce0",
+          "content_hash": "ce46a5158d8de9c94dc9f19313589ac93c88dba875276c15ca599245203c2cb4",
           "locator": "isolated locked test crate",
           "evidence_kind": "configuration",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "ae6e0e6c056e4a3dcc2080ec310224ef2d050b64",
-            "head_blob_oid": "",
+            "head_commit": "ca95b093c988ce0e804fadf81f552dd799c62d34",
+            "head_blob_oid": "7ebed9a084b3af0fa2ffa9cfd4904c983fd90db7",
             "worktree_blob_oid": "7ebed9a084b3af0fa2ffa9cfd4904c983fd90db7",
-            "state": "untracked"
+            "state": "tracked_clean"
           }
         },
         {
@@ -5601,15 +5614,15 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "ae6e0e6c056e4a3dcc2080ec310224ef2d050b64",
-            "head_blob_oid": "",
+            "head_commit": "ca95b093c988ce0e804fadf81f552dd799c62d34",
+            "head_blob_oid": "d5f28562427c802f7983fa2d21262f600acfbdde",
             "worktree_blob_oid": "d5f28562427c802f7983fa2d21262f600acfbdde",
-            "state": "untracked"
+            "state": "tracked_clean"
           }
         }
       ],
       "created_at_ms": 1788336989115,
-      "updated_at_ms": 1788341594446
+      "updated_at_ms": 1788342430773
     },
     {
       "id": "esk-paper-quant-cross-repo-interoperability-v4",
@@ -15289,26 +15302,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_a7c76e61908945a183d41ee99f28ee69",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex-root-019fc8bf-q15-review",
-      "reason": "独立静态合同、完整代码、文档/Registry 三路审查完成；Q15 scope 与失败关闭边界可接受，仍不声称编译或运行。",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1788278163373
-    },
-    {
-      "id": "feature_event_c8df4c85105d4572871a91fe02fe74ff",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex-root-019fc8bf-q15-review",
-      "reason": "Q15 accepted requirement 已准备进入证据绑定；静态分母依赖仍 verified。",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1788278174918
-    },
-    {
       "id": "feature_event_86aa5569e66f47718236484975626611",
       "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
       "action": "claimed",
@@ -17287,6 +17280,26 @@
       "from_status": "in_progress",
       "to_status": "implemented",
       "at_ms": 1788341594446
+    },
+    {
+      "id": "feature_event_b2b55e8e05234b68b209b0b848621ca3",
+      "feature_id": "esk-paper-quant-cross-repo-asset-view-v5",
+      "action": "evidence_recorded",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "implemented",
+      "to_status": "implemented",
+      "at_ms": 1788342409192
+    },
+    {
+      "id": "feature_event_4b79a3129c0940bb997930ec1b96bcab",
+      "feature_id": "esk-paper-quant-cross-repo-asset-view-v5",
+      "action": "evidence_recorded",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "implemented",
+      "to_status": "implemented",
+      "at_ms": 1788342430773
     }
   ]
 }

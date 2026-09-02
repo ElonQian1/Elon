@@ -69,7 +69,7 @@ $sharedFiles = @(
     [pscustomobject]@{
         name = "fixture"
         path = "contracts/quant/esk-paper-cross-repo-asset-view-v1.fixture.json"
-        normalize = $false
+        normalize = $true
     },
     [pscustomobject]@{
         name = "projection_schema_v2"
