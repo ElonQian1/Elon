@@ -182,7 +182,7 @@ fn error_response(status: StatusCode, code: &'static str, message: &'static str)
 mod tests {
     use super::*;
     use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
-    use ring::signature::{KeyPair, UnparsedPublicKey, ED25519};
+    use ring::signature::{UnparsedPublicKey, ED25519};
 
     const SEED: [u8; 32] = [7; 32];
     const SUBJECT_SECRET: [u8; 32] = [11; 32];
@@ -259,7 +259,7 @@ mod tests {
         );
         assert!(!first.access_token.contains("private-user-id-123"));
         let (payload, signature) = decode_token(&first.access_token);
-        UnparsedPublicKey::new(&ED25519, signer.signing_key.public_key().as_ref())
+        UnparsedPublicKey::new(&ED25519, signer.public_key_bytes())
             .verify(&payload, &signature)
             .unwrap();
         let claims: serde_json::Value = serde_json::from_slice(&payload).unwrap();

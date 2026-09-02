@@ -334,7 +334,10 @@ pub(super) fn insert_task_apk_release_locked(
 }
 
 impl Store {
-    fn sync_project_landing_download_from_release(&self, release: &ProjectRelease) -> Result<()> {
+    pub(crate) fn sync_project_landing_download_from_release(
+        &self,
+        release: &ProjectRelease,
+    ) -> Result<()> {
         if release.status != "published" || clean_optional(release.file_path.as_deref()).is_none() {
             return Ok(());
         }

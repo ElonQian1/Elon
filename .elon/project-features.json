@@ -14932,6 +14932,132 @@
       "updated_at_ms": 1787431017596
     },
     {
+      "id": "yilong-quant-android-main-hosting-v6",
+      "title": "一龙量化 Android 客户端与主服务器 APK 托管",
+      "summary": "主 APK 继续显示用户 ESK Paper 资产并作为项目广场入口；主服务器安全托管正式量化 APK，量化 APK 连接同机独立 HTTPS Paper 服务。",
+      "status": "verified",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/yilong-quant-android-main-hosting-v6.md",
+        "content_hash": "4f2f128df3a3ed26589d1ecbfff2a71cc4c53e5f2fb63f635431f414f282abf3",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "7e234cbd2a26a8a0bc3687434bb652a2811ad8d6",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "8a0f14e3ec69e7b71ecb17b6d446e4d9052c036b",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "yilong-platform",
+      "tags": [
+        "yilong-quant",
+        "android",
+        "project-store",
+        "paper-only"
+      ],
+      "task_paths": [
+        "docs/yilong-quant-integration.md",
+        "scripts/test-official-project-catalog.js",
+        "server/src/official_project_catalog/catalog.json",
+        "server/src/official_project_catalog/mod.rs",
+        "server/src/project_store/apk.rs",
+        "server/src/store/project_releases.rs"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "受管 APK 仅从 DATA_DIR/project-releases 返回并校验大小与 SHA-256",
+        "官方目录重建后保留最新已发布 Android release",
+        "外部 APK 跳转不携带主项目凭据",
+        "无正式 release 时继续显示 planned",
+        "正式 APK、HTTPS 服务和设备验收分别取证"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "docs/yilong-quant-android-main-hosting-v6-acceptance.md",
+          "content_hash": "c3d1e7b4aa211a94211ad87cadcfea289c63aaf6d7b459a0abc1b4063362a5b6",
+          "locator": "V6 acceptance matrix",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7e234cbd2a26a8a0bc3687434bb652a2811ad8d6",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "9eaa76c65803ee89002e72c2bab4849a0f735025",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/test-official-project-catalog.js",
+          "content_hash": "af98cee74ff0d70698f51b99ea1cd5bdb04bace49d9b20a2489bf0209de9b8d9",
+          "locator": "Android planned/release receipt assertions",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7e234cbd2a26a8a0bc3687434bb652a2811ad8d6",
+            "head_blob_oid": "b73174b9119a63f432375d40b3dff7ee18890065",
+            "worktree_blob_oid": "9b6a3808ed44986e9b918744c5f8da3f56a4571f",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/official_project_catalog/mod.rs",
+          "content_hash": "3e8293bd897fdb08f0afcd12b26599be5ce850b563aa734e49f84ed4c8ded672",
+          "locator": "yilong_quant_android_official_catalog_reapplies_latest_release",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7e234cbd2a26a8a0bc3687434bb652a2811ad8d6",
+            "head_blob_oid": "304ac87c5ea08f2ec9818a8361c6630c9a87db84",
+            "worktree_blob_oid": "b8d9ddd9cea5e67b7951686cdf9617055a5af33c",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/project_store/apk.rs",
+          "content_hash": "f430f586d71a89a9d1ea29dadbda8bedcd22b5858c79319ce8810d4ba79b5de6",
+          "locator": "serve_managed_public_release",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7e234cbd2a26a8a0bc3687434bb652a2811ad8d6",
+            "head_blob_oid": "655651c23f597020de4b48cbfc06ed1c8fb5b236",
+            "worktree_blob_oid": "e402344a95509eb0054cb975102e4f82e87167a7",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/project_store/apk.rs",
+          "content_hash": "f430f586d71a89a9d1ea29dadbda8bedcd22b5858c79319ce8810d4ba79b5de6",
+          "locator": "yilong_quant_android_managed_release_payload_requires_exact_size_and_sha256",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7e234cbd2a26a8a0bc3687434bb652a2811ad8d6",
+            "head_blob_oid": "655651c23f597020de4b48cbfc06ed1c8fb5b236",
+            "worktree_blob_oid": "e402344a95509eb0054cb975102e4f82e87167a7",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/store/project_releases.rs",
+          "content_hash": "f0300487d680139cd77b375bbce2a45cd92e25d07c8a3b9be8735cd5c2c87a8a",
+          "locator": "sync_project_landing_download_from_release",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7e234cbd2a26a8a0bc3687434bb652a2811ad8d6",
+            "head_blob_oid": "2896d3c4462cbdf6a1e57334d6a5cd38c9d751d0",
+            "worktree_blob_oid": "50ac7584b2993fe5908bc5b0497d6e9db821f803",
+            "state": "tracked_modified"
+          }
+        }
+      ],
+      "created_at_ms": 1788346205433,
+      "updated_at_ms": 1788346445288
+    },
+    {
       "id": "yilong-quant-esk-paper-asset-projection-v1",
       "title": "一龙量化 ESK Paper 资产投影 V1",
       "summary": "主项目从唯一 ESK 账本签发最长五分钟的只读资产投影，并通过既有安全启动通道交给量化项目验签、绑定同一用户和独立展示；不复制余额、不锁仓、不申购、不移动资金。",
@@ -15314,66 +15440,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_7ad24db967df4412a6788193e47c86da",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex-root-019fc8bf-q15-evidence",
-      "reason": "Q15 88-member source-present tranche 与 current hash evidence 已闭合；完整 A2 Lock 仍缺 4648 members/4120 groups，以及 compile/runtime/actual receipts、reviewed digest、frozen manifest，故保持 blocked 且 production closed。",
-      "from_status": "in_progress",
-      "to_status": "blocked",
-      "at_ms": 1788278245796
-    },
-    {
-      "id": "feature_event_a429a23a84b843979f173b1648284920",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-root-019fc8bf-q15-style",
-      "reason": "",
-      "from_status": "blocked",
-      "to_status": "blocked",
-      "at_ms": 1788278636850
-    },
-    {
-      "id": "feature_event_aaeb4037142a463da05f26d3136cd933",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex-root-019fc8bf-q16",
-      "reason": "Continue the next exact source-only Lock initialization tranche from current Q15 authority; dependency and evidence are current, with compile/runtime acceptance still explicitly deferred.",
-      "from_status": "blocked",
-      "to_status": "ready",
-      "at_ms": 1788279308703
-    },
-    {
-      "id": "feature_event_0f2f4d4422e349a1bb9aa22ae8679e4f",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "claimed",
-      "actor": "codex-root-019fc8bf-q16",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788279345934
-    },
-    {
-      "id": "feature_event_20e1c32f0bd14b029cf4cb8bf524f9a9",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex-root-019fc8bf-q16",
-      "reason": "Implement the next exact Q16 source-only CreatedFirst truncate-error/release-failed initialization tranche without opening compile, runtime, production, or economic effects.",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788279480226
-    },
-    {
-      "id": "feature_event_55e19f4411ee4aafbb3fc388d6ee889f",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "claim_released",
-      "actor": "codex-root-019fc8bf-q16",
-      "reason": "Q16 source and authority update complete; release the pre-edit claim before explicitly rebinding the reviewed requirement hash.",
-      "from_status": "in_progress",
-      "to_status": "blocked",
-      "at_ms": 1788281598696
-    },
     {
       "id": "feature_event_8e341843d4ef4296a1037f28e5d0d103",
       "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
@@ -17313,6 +17379,66 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1788342885642
+    },
+    {
+      "id": "feature_event_c5a0c97f8d08459a9cd5fb790155499a",
+      "feature_id": "yilong-quant-android-main-hosting-v6",
+      "action": "registered",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1788346205433
+    },
+    {
+      "id": "feature_event_76e1b1e7d5b84d97ac7d897c1e0c8c07",
+      "feature_id": "yilong-quant-android-main-hosting-v6",
+      "action": "claimed",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788346224447
+    },
+    {
+      "id": "feature_event_763cab3be5594d798441511de9d84e46",
+      "feature_id": "yilong-quant-android-main-hosting-v6",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "主服务器受管 APK 下载与目录 release 保留实现已完成，进入证据闭环。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788346443817
+    },
+    {
+      "id": "feature_event_9e63ca23cc8a4774a18036c8e271810b",
+      "feature_id": "yilong-quant-android-main-hosting-v6",
+      "action": "evidence_recorded",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788346445242
+    },
+    {
+      "id": "feature_event_5f2ed96404bf4fb19f143f94ed58872d",
+      "feature_id": "yilong-quant-android-main-hosting-v6",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "受管路径、大小、SHA-256、目录重建 release 保留和目录契约已实现。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1788346445266
+    },
+    {
+      "id": "feature_event_38cb582f87b84cbf89d89fa0c4bc7b38",
+      "feature_id": "yilong-quant-android-main-hosting-v6",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "2 个 Rust 定向测试、官方目录 Node 契约和功能注册表采用检查通过；生产发布与设备验收仍独立 pending。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1788346445288
     }
   ]
 }

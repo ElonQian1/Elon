@@ -48,15 +48,19 @@ assert.ok(quantProject.landing.highlights.includes(
 assert.ok(quantProject.landing.highlights.includes(
   '短期签名授权只允许用户查看和退出自己的模拟仓位，支持密钥级撤销及单个授权跨重启撤销',
 ))
-assert.equal(
-  quantProject.landing.recent_updates[0],
+assert.ok(quantProject.landing.recent_updates.includes(
   '新增一龙 ESK 只读资产卡片：验签主项目短期投影并绑定同次用户授权，无量化仓位时也可显示且不保存余额副本',
-)
+))
 assert.equal(
   quantProject.landing.paper_launch.description,
   '由一龙账号签发五分钟短期授权，并在页面声明能力时附带同用户、同授权、同有效期的 ESK 只读投影；固定公钥密钥环支持安全轮换，用户可撤销当前授权，未配置 Web 地址或可信密钥时保持不可用。',
 )
 assert.equal(quantProject.landing.downloads.web.status, 'planned')
+assert.equal(quantProject.landing.downloads.android.status, 'planned')
+assert.match(quantProject.landing.downloads.android.note, /正式签名/)
+assert.match(quantProject.landing.downloads.android.note, /主服务器发布回执/)
+assert.match(quantProject.landing.recent_updates[0], /独立 Android Paper/)
+assert.ok(quantProject.landing.recent_updates.some((item) => /只读资产卡片/.test(item)))
 assert.match(quantProject.landing.summary, /paper 模拟交易/)
 assert.match(quantProject.landing.summary, /6% 是非保证目标/)
 assert.doesNotMatch(JSON.stringify(quantProject.landing), /真实提现|保本收益|固定收益/)

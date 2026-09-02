@@ -135,7 +135,7 @@
           "android": {
             "label": "Android 客户端",
             "status": "planned",
-            "note": "待核心交易测试稳定后再立项"
+            "note": "V16 已建立独立 Paper 客户端源码；待 HTTPS 量化站点、正式签名、主服务器发布回执和设备验收后开放"
           }
         },
         "system_requirements": [
@@ -143,6 +143,7 @@
           "本地开发需要 Rust 1.97、Node.js 22 和 PowerShell 7"
         ],
         "recent_updates": [
+          "新增独立 Android Paper 客户端源码与主服务器发布合同：正式包只加载指定 HTTPS 量化站点，APK 托管和量化服务部署分别验收",
           "新增一龙 ESK 只读资产卡片：验签主项目短期投影并绑定同次用户授权，无量化仓位时也可显示且不保存余额副本",
           "新增单个 Paper 授权持久撤销：用户可结束当前授权，SQLite 重启后仍拒绝旧授权且不保存 token 或 participant",
           "新增 Paper 授权 fixed keyring：新旧 Ed25519 公钥可重叠验证，撤销密钥会自动关闭对应入口",

@@ -60,6 +60,9 @@ pub(crate) fn ensure(store: &Store) -> Result<bool> {
     for project in &catalog.projects {
         ensure_project(store, &owner_user_id, project)?;
         ensure_landing(store, &owner_user_id, project)?;
+        if let Some(release) = store.latest_project_release(&project.id)? {
+            store.sync_project_landing_download_from_release(&release)?;
+        }
         if project.blueprint.is_some() {
             ensure_blueprint(store, &owner_user_id, project)?;
         }
@@ -345,5 +348,67 @@ mod tests {
         }
         assert!(public_preview("unknown-project").unwrap().is_none());
         assert!(!has_public_preview("unknown-project"));
+    }
+
+    #[test]
+    fn yilong_quant_android_official_catalog_reapplies_latest_release() {
+        let catalog = parse_catalog().unwrap();
+        let quant = catalog
+            .projects
+            .iter()
+            .find(|project| project.id == "yilong-quant")
+            .unwrap();
+        let store = temp_store();
+        let owner = store
+            .create_user("catalog-release-owner@example.com", "secret1", None, None)
+            .unwrap();
+        ensure_project(&store, &owner.id, quant).unwrap();
+        ensure_landing(&store, &owner.id, quant).unwrap();
+
+        let release_sha256 = "0".repeat(64);
+        let source_git_sha = "1".repeat(40);
+        let release = store
+            .create_project_release(crate::store::project_releases::ProjectReleaseWrite {
+                id: Some("rel_quant_android_v16"),
+                project_id: "yilong-quant",
+                task_id: None,
+                uploaded_by: Some(&owner.id),
+                version_name: Some("0.1.0"),
+                package_name: Some("com.elon.quant"),
+                version_code: Some(1),
+                channel: Some("paper"),
+                status: Some("published"),
+                apk_url:
+                    "https://main.example/api/projects/yilong-quant/download/ElonSpeed-latest.apk",
+                file_name: "YilongQuant-release.apk",
+                file_path: Some("/managed/project-releases/yilong-quant/release.apk"),
+                sha256: Some(&release_sha256),
+                size_bytes: Some(1024),
+                changelog: Some("Paper Android V16"),
+                build_started_at: None,
+                source_git_sha: Some(&source_git_sha),
+                source_worktree: None,
+                metadata_json: None,
+            })
+            .unwrap();
+        assert!(store
+            .project_android_download("yilong-quant")
+            .unwrap()
+            .is_some());
+
+        ensure_landing(&store, &owner.id, quant).unwrap();
+        assert!(store
+            .project_android_download("yilong-quant")
+            .unwrap()
+            .is_none());
+        store
+            .sync_project_landing_download_from_release(&release)
+            .unwrap();
+
+        let (url, _) = store
+            .project_android_download("yilong-quant")
+            .unwrap()
+            .expect("latest release must survive catalog reconciliation");
+        assert_eq!(url, release.apk_url);
     }
 }
