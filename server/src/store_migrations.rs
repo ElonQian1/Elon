@@ -383,6 +383,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (280, "ERP 商户托管不可变发布计划", crate::erp_blueprint::managed_rollout::migration::migration_v280),
     (281, "ESK Paper 资产账本与卖回申请", crate::esk_asset_migration::migration_v281),
     (282, "ESK Paper 首批用户批量登记回执", crate::esk_asset_migration::migration_v282),
+    (283, "交互式云电脑不可变 AuthorityRecord 与单 Session 当前头", crate::compute_interactive_desktop_authority_migration::migration_v283),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {

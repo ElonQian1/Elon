@@ -39,7 +39,9 @@ pub(in crate::store) use provider_binding::{
     CurrentNodeEndpointCredentialForUserNodeProviderBinding,
 };
 pub(crate) use session_permit::NodeEndpointSessionPermit;
-pub(in crate::store) use sessions::require_current_node_endpoint_session_on;
+pub(in crate::store) use sessions::{
+    require_current_node_endpoint_runtime_session_on, require_current_node_endpoint_session_on,
+};
 
 pub(in crate::store) struct NodeEndpointOwnerReauthenticationReceipt {
     envelope: NodeEndpointOwnerReauthenticationEnvelope,

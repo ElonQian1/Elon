@@ -120,6 +120,7 @@ mod compute_external_pool_adapter_vulnerability_reattestation;
 mod compute_external_pool_onboarding;
 mod compute_external_pool_provider_activation_candidate;
 pub(crate) mod compute_federation_historical_causal_reference;
+mod compute_interactive_desktop_authority;
 mod compute_job_contract_validation;
 mod compute_job_registry;
 mod compute_metering;

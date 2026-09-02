@@ -247,6 +247,19 @@ pub(in crate::store) fn require_current_node_endpoint_session_on(
     Ok(current)
 }
 
+/// Reproves socket and credential currentness for an interactive runtime transaction.
+/// This deliberately does not assert Planning, Ready, capture, encoder, input, or route authority.
+pub(in crate::store) fn require_current_node_endpoint_runtime_session_on(
+    connection: &Connection,
+    permit: &super::NodeEndpointSessionPermit,
+    checked_at: DateTime<Utc>,
+) -> Result<super::NodeEndpointSessionPermit> {
+    let current = current_session_at_on(connection, permit.binding(), false, checked_at)?;
+    let current = super::NodeEndpointSessionPermit::from_verified(&current)?;
+    permit.ensure_exact_authority(&current)?;
+    Ok(current)
+}
+
 fn terminate_exact_current_on(
     transaction: &Transaction<'_>,
     binding: &NodeEndpointSessionBinding,

@@ -13,7 +13,8 @@ mod reproof;
 mod write;
 
 pub(super) use reproof::{
-    current_user_node_provider_binding_on, require_user_node_provider_activation_binding_on,
+    current_user_node_provider_binding_by_digest_on, current_user_node_provider_binding_on,
+    require_user_node_provider_activation_binding_on,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

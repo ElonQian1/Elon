@@ -144,6 +144,7 @@ mod compute_federation_settlement_withdrawal_terminal_api;
 mod compute_federation_settlement_withdrawal_terminal_service;
 mod compute_federation_user_node_binding_api;
 mod compute_federation_user_node_binding_service;
+mod compute_interactive_desktop_authority_migration;
 mod compute_job_migration;
 mod compute_offer_lifecycle_migration;
 mod compute_offer_migration;

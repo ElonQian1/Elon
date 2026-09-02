@@ -95,6 +95,26 @@ pub(in crate::store) fn current_user_node_provider_binding_on<'tx, 'conn>(
     )))
 }
 
+pub(in crate::store) fn current_user_node_provider_binding_by_digest_on<'tx, 'conn>(
+    transaction: &'tx Transaction<'conn>,
+    provider_id: &str,
+    expected_binding_digest: &str,
+    expected_owner_user_id: &str,
+) -> Result<Option<CurrentUserNodeProviderBindingAuthority<'tx, 'conn>>> {
+    let Some(receipt) = binding_by_provider_on(transaction, provider_id)? else {
+        return Ok(None);
+    };
+    if receipt.binding_digest() != expected_binding_digest {
+        return Ok(None);
+    }
+    current_user_node_provider_binding_on(
+        transaction,
+        provider_id,
+        receipt.binding_id(),
+        expected_owner_user_id,
+    )
+}
+
 pub(in crate::store) fn require_user_node_provider_activation_binding_on(
     transaction: &Transaction<'_>,
     provider_id: &str,
