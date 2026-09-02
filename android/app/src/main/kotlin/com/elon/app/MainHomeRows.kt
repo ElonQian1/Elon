@@ -80,7 +80,7 @@ internal class MainHomeRows(
         val row = LinearLayout(activity).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(72)
+                dp(68)
             )
             setBackgroundColor(activity.elonColor(R.color.elon_bg_app))
             gravity = Gravity.CENTER_VERTICAL
@@ -141,7 +141,7 @@ internal class MainHomeRows(
         val row = LinearLayout(activity).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(72)
+                dp(68)
             )
             setBackgroundColor(activity.elonColor(R.color.elon_bg_app))
             gravity = Gravity.CENTER_VERTICAL
@@ -215,8 +215,8 @@ internal class MainHomeRows(
                     )
                     includeFontPadding = false
                     text = formatHomeListTime(value)
-                    setTextColor(Color.parseColor(HOME_LIST_PREVIEW_COLOR))
-                    textSize = 12f; typeface = Typeface.create("sans-serif", Typeface.NORMAL); fontFeatureSettings = "tnum"
+                    setTextColor(Color.parseColor("#7DF4FF"))
+                    textSize = 11f; typeface = Typeface.create("sans-serif", Typeface.NORMAL); fontFeatureSettings = "tnum"
                 })
             }
 
@@ -559,14 +559,14 @@ internal class MainHomeRows(
         showProjectMarker: Boolean = false,
         projectCompletionCount: Int = 0
     ): View {
-        val size = dp(48)
+        val size = dp(44)
         return FrameLayout(activity).apply {
             layoutParams = LinearLayout.LayoutParams(size, size)
             clipChildren = false
             clipToPadding = false
             elevation = dp(4).toFloat()
             translationZ = dp(4).toFloat()
-            val avatar = createAvatarView(friend.name, 48, 18f, friend.avatarDataUrl).apply {
+            val avatar = createAvatarView(friend.name, 44, 17f, friend.avatarDataUrl).apply {
                 layoutParams = FrameLayout.LayoutParams(size, size)
             }
             addView(avatar)
@@ -587,7 +587,7 @@ internal class MainHomeRows(
         showProjectMarker: Boolean = false,
         projectCompletionCount: Int = 0
     ): View {
-        val size = dp(48)
+        val size = dp(44)
         return FrameLayout(activity).apply {
             layoutParams = LinearLayout.LayoutParams(size, size)
             clipChildren = false

@@ -20,10 +20,11 @@ class HomeConversationHeaderContractTest {
         assertTrue(androidHeader.contains("HomeListFilterMode.Projects to"))
         assertTrue(androidHeader.contains("HomeListFilterMode.Conversations to"))
         assertTrue(androidHeader.contains("createFilterTab"))
-        assertTrue(androidHeader.contains("if (selected) \"#9CBAD5\" else \"#00000000\""))
-        assertTrue(androidHeader.contains("LinearLayout.LayoutParams.WRAP_CONTENT, dp(20)"))
-        assertTrue(androidHeader.contains("minWidth = dp(24)"))
-        assertFalse(androidHeader.contains("pillBackground"))
+        assertTrue(androidHeader.contains("if (selected) \"#303536\" else \"#00000000\""))
+        assertTrue(androidHeader.contains("LinearLayout.LayoutParams.WRAP_CONTENT, dp(18)"))
+        assertTrue(androidHeader.contains("minWidth = dp(20)"))
+        assertTrue(androidHeader.contains("roundedWithStroke"))
+        assertTrue(androidHeader.contains("\"#C7FAFF\""))
 
         val web = readRepositoryFile("server/src/assets/web_page.html")
         assertFalse(web.contains("全部已读"))
@@ -31,8 +32,9 @@ class HomeConversationHeaderContractTest {
         assertTrue(web.contains("className = 'home-filter-tabs'"))
         assertTrue(web.contains("['all', '全部', counts.all]"))
         assertTrue(web.contains("['conversations', '对话', counts.conversations]"))
-        assertTrue(web.contains(".home-filter-tab.active::after { background: #9cbad5; }"))
-        assertTrue(web.contains(".home-filter-count { min-width: 24px; height: 20px;"))
+        assertTrue(web.contains(".home-filter-tab.active { border-color: rgba(125,244,255,.4);"))
+        assertTrue(web.contains(".home-filter-count { min-width: 20px; height: 18px;"))
+        assertTrue(web.contains("background: #111617"))
     }
 
     private fun readRepositoryFile(relativePath: String): String {

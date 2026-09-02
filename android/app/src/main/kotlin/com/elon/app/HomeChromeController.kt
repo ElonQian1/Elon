@@ -40,15 +40,15 @@ internal class HomeChromeController(
         setNavigationBarColor(R.color.elon_bg_app)
         setBottomMenuVisible(true)
         binding.projectSpaceAiMenu.visibility = android.view.View.GONE
-        binding.homeMenuButton.visibility = android.view.View.GONE
+        binding.homeMenuButton.visibility = android.view.View.VISIBLE
         binding.topTitleText.apply {
             text = "消息"
             textSize = 20f
-            typeface = android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.NORMAL)
+            typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
             gravity = Gravity.CENTER_VERTICAL
             layoutParams = (layoutParams as FrameLayout.LayoutParams).apply {
                 gravity = Gravity.START or Gravity.CENTER_VERTICAL
-                marginStart = dp(16)
+                marginStart = dp(58)
             }
         }
         projectCreateFab.hide()

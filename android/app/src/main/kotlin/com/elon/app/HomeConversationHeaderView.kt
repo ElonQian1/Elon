@@ -44,10 +44,10 @@ internal class HomeConversationHeaderView(
         counts: HomeConversationCounts,
         onSelect: (HomeListFilterMode) -> Unit
     ): View = LinearLayout(activity).apply {
-        layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(64))
+        layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(54))
         gravity = Gravity.CENTER_VERTICAL
         orientation = LinearLayout.HORIZONTAL
-        setPadding(dp(10), dp(3), dp(10), 0)
+        setPadding(dp(12), dp(7), dp(12), dp(5))
         val items = listOf(
             HomeListFilterMode.All to ("全部" to counts.all),
             HomeListFilterMode.Friends to ("好友" to counts.friends),
@@ -64,49 +64,51 @@ internal class HomeConversationHeaderView(
 
     private fun createFilterTab(label: String, count: Int, selected: Boolean, onClick: () -> Unit): View =
         LinearLayout(activity).apply {
-            gravity = Gravity.CENTER_HORIZONTAL
-            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            orientation = LinearLayout.HORIZONTAL
             isClickable = true
             isFocusable = true
             foreground = selectableForeground()
             setOnClickListener { onClick() }
             contentDescription = "$label，${count.coerceAtMost(99)}"
+            background = roundedWithStroke(
+                if (selected) "#303536" else "#00000000",
+                16,
+                if (selected) "#667DF4FF" else null
+            )
             addView(LinearLayout(activity).apply {
                 gravity = Gravity.CENTER
                 orientation = LinearLayout.HORIZONTAL
                 addView(TextView(activity).apply {
                     includeFontPadding = false
                     text = label
-                    textSize = 17f
+                    textSize = 12f
                     typeface = regular
-                    setTextColor(Color.parseColor("#DDDBD5"))
+                    setTextColor(Color.parseColor(if (selected) "#FFFFFF" else "#C7FAFF"))
                 })
                 addView(TextView(activity).apply {
-                    minWidth = dp(24)
-                    layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, dp(20)).apply {
+                    minWidth = dp(20)
+                    layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, dp(18)).apply {
                         marginStart = dp(4)
                     }
-                    background = rounded("#9CBAD5", 10)
+                    background = rounded(if (selected) "#7A8B8C" else "#343839", 9)
                     gravity = Gravity.CENTER
                     includeFontPadding = false
-                    setPadding(dp(5), 0, dp(5), 0)
+                    setPadding(dp(4), 0, dp(4), 0)
                     text = count.coerceAtMost(99).toString()
-                    textSize = 12f
+                    textSize = 10f
                     typeface = medium
                     fontFeatureSettings = "tnum"
-                    setTextColor(Color.parseColor("#111820"))
+                    setTextColor(Color.parseColor("#F8F8F8"))
                 })
-            }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, dp(47)))
-            addView(View(activity).apply {
-                background = rounded(if (selected) "#9CBAD5" else "#00000000", 2)
-            }, LinearLayout.LayoutParams(dp(42), dp(3)))
+            }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, dp(30)))
         }
 
     private fun createSummaryCard(counts: HomeConversationCounts, onOpenSummary: () -> Unit): View = LinearLayout(activity).apply {
         layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(126)).apply {
             marginStart = dp(16); marginEnd = dp(16); topMargin = dp(7)
         }
-        background = rounded("#171C22", 18)
+        background = roundedWithStroke("#111617", 16, "#3D00A0AA")
         gravity = Gravity.CENTER_VERTICAL
         orientation = LinearLayout.HORIZONTAL
         setPadding(dp(20), 0, dp(18), 0)
@@ -137,7 +139,7 @@ internal class HomeConversationHeaderView(
                     text = "Beta"
                     textSize = 10f
                     typeface = regular
-                    setTextColor(Color.parseColor("#8FAEC5"))
+                    setTextColor(Color.parseColor("#D2BBFF"))
                 })
             })
             addView(TextView(activity).apply {
@@ -159,7 +161,7 @@ internal class HomeConversationHeaderView(
         }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { marginStart = dp(15) })
         addView(TextView(activity).apply {
             layoutParams = LinearLayout.LayoutParams(dp(82), dp(34)).apply { marginStart = dp(8) }
-            background = rounded("#353A42", 17)
+            background = rounded("#343839", 17)
             gravity = Gravity.CENTER
             includeFontPadding = false
             text = "查看详情  ❯"
@@ -181,11 +183,18 @@ internal class HomeConversationHeaderView(
         setPadding(dp(16), dp(5), dp(16), 0)
         addView(TextView(activity).apply {
             includeFontPadding = false; text = "最近"; textSize = 14f; typeface = regular
-            setTextColor(Color.parseColor("#B3DDDBD5"))
+            setTextColor(Color.parseColor("#C7FAFF"))
         })
     }
 
     private fun rounded(color: String, radius: Int) = GradientDrawable().apply {
         setColor(Color.parseColor(color)); cornerRadius = dp(radius).toFloat()
     }
+
+    private fun roundedWithStroke(color: String, radius: Int, strokeColor: String?) =
+        GradientDrawable().apply {
+            setColor(Color.parseColor(color))
+            cornerRadius = dp(radius).toFloat()
+            strokeColor?.let { setStroke(dp(1), Color.parseColor(it)) }
+        }
 }
