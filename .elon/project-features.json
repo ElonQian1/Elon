@@ -5142,7 +5142,7 @@
       "id": "esk-paper-first-user-allocation-operations-v1",
       "title": "ESK Paper 首批用户批量登记运营闭环 V1",
       "summary": "管理员先 dry-run 校验首批用户 ESK Paper 清单，再以摘要锁定内容并原子提交；批次和条目均幂等、追加审计，不接触链上发行、真实资金或交易。",
-      "status": "verified",
+      "status": "released",
       "priority": "p0",
       "requirement": {
         "path": "docs/requirements/esk-paper-first-user-allocation-operations-v1.md",
@@ -5248,7 +5248,7 @@
         }
       ],
       "created_at_ms": 1788306010546,
-      "updated_at_ms": 1788308397936
+      "updated_at_ms": 1788309438774
     },
     {
       "id": "external-pool-adapter-credential-reattestation-v253-verification",

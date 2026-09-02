@@ -1,6 +1,6 @@
 # ESK Paper 首批用户批量登记运营闭环 V1 验收
 
-状态：实现与假数据验收已完成，等待本批服务端发布；仍为 Paper-only，不涉及链上发行或真实资金。
+状态：实现、假数据验收和服务端发布已完成；仍为 Paper-only，不涉及链上发行或真实资金。
 
 对应需求：[`requirements/esk-paper-first-user-allocation-operations-v1.md`](requirements/esk-paper-first-user-allocation-operations-v1.md)
 
@@ -51,6 +51,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\esk-paper-allocation
 - PowerShell 脚本语法和示例 JSON 解析通过。
 - 临时真实 HTTP 服务、全新数据库和两名假用户端到端通过：dry-run 后 Alice 仍为 `0.000000 ESK / revision 0`；commit 后 Alice 为 `12.500000 / revision 1`、Bob 为 `3.250000 / revision 1`；相同 commit 重放返回 `replayed=true`，两人修订号保持 `1`。
 - 端到端 dry-run 与 commit 的合计均为 `15.750000 ESK`、摘要一致；用户账户继续返回 `simulated=true`、`funds_moved=false`。临时服务、数据库和回执已在验收后删除。
+- 服务端已发布为 `v0.3.1714`；线上健康与版本检查返回实现提交 `0be0a348ddb37220c7c31d0827873d714c8beb00`，`CODE_SYNC_STATUS=synced`、`SERVER_RELEASE_STATUS=published`。本批未在生产接口创建假用户或写入假 ESK。
 
 ## 兼容与边界
 
