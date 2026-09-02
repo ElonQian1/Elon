@@ -5,6 +5,8 @@
 
 mod authority;
 mod authority_head;
+pub(crate) mod authority_record;
+pub(crate) mod canonical;
 pub(crate) mod metering;
 pub(crate) mod offer;
 pub(crate) mod product_authority;
