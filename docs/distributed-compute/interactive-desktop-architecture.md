@@ -313,9 +313,9 @@ android feature/cloudpc/                             # 后续消费者播放器
 
 ## 13. 当前实现状态
 
-2026-09-02 当前仓库已有外围能力：节点 WSS、Provider/Offer/Capacity/Price/Receipt 控制面、签名插件设计、Tauri 生命周期和单帧 GDI 证据截图；本批又写入 V282 AuthorityRecord 不可变版本/单头迁移定义与内部 Store 源码。仍没有游戏级连续捕获、硬件编码、WASAPI loopback、Windows 输入注入、通用 WebRTC/ICE/TURN、公开 Session 服务或付费会话接线。
+2026-09-02 当前仓库已有外围能力：节点 WSS、Provider/Offer/Capacity/Price/Receipt 控制面、签名插件设计、Tauri 生命周期和单帧 GDI 证据截图；本批又写入 V283 AuthorityRecord 不可变版本/单头迁移定义与内部 Store 源码。仍没有游戏级连续捕获、硬件编码、WASAPI loopback、Windows 输入注入、通用 WebRTC/ICE/TURN、公开 Session 服务或付费会话接线。
 
-本批状态是 `authority_kernel_source_written_fail_closed_uncompiled_unrun`。V282 未执行，源码未编译/测试；没有公开 route、节点 interactive capability、媒体、输入、计量写入、结算或生产效果。活动 permit 还被缺失的 Profile、HostConsent、Viewer handshake 与 RelayAuthority Store 显式拒绝。
+本批状态是 `authority_kernel_source_written_fail_closed_uncompiled_unrun`。V283 未执行，源码未编译/测试；没有公开 route、节点 interactive capability、媒体、输入、计量写入、结算或生产效果。活动 permit 还被缺失的 Profile、HostConsent、Viewer handshake 与 RelayAuthority Store 显式拒绝。
 
 ## 14. 相关文档
 

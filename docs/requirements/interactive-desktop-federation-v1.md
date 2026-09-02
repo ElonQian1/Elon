@@ -100,7 +100,7 @@ implementation_status: authority_kernel_source_written_fail_closed_uncompiled_un
 - 已写入：对象专属规范摘要、原子 AuthorityRecord、不可变版本/单 Session 当前头、三元 CAS、SameOwner 可用来源重取、共享 Claim 四 meter 精确核对、外部 Viewer 摘要比较，以及不授予 action 的 reconnecting/ending/terminal revision 规则。
 - 仍失败关闭：InteractiveOfferProfile 权威版本、云电脑专用本机同意及撤销头、Viewer 设备签名/一次性 ticket/transport 握手、TURN allocation/grant 当前来源，以及区分 owner/consumer/expiry-reconciler 的 typed termination authority。任何一项活动来源缺失时，活动 AuthorityRecord 不可提交或读取为当前许可；终止源码只验证冻结 successor，目前仍保持 Store-private，不能直接接 route。
 - Consumer `account_auth_epoch` 在 C1 是登录 session 规范摘要导出的非零 I-JSON 安全代次，不冒充账号级全局安全 epoch；密码修改、恢复与风险处置仍依赖现有 session 撤销语义。后续若引入账号级 epoch，必须作为新的独立真源迁移。
-- 本批没有编译、测试、执行 V282 或打开 SQLite，所有结论仅为源码静态审查；测试计数固定为 `passed=0, failed=0`。
+- 本批没有编译、测试、执行 V283 或打开 SQLite，所有结论仅为源码静态审查；测试计数固定为 `passed=0, failed=0`。
 
 ## 后续真实完成门槛
 
