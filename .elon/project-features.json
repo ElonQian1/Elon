@@ -5254,7 +5254,7 @@
       "id": "esk_paper_quant_allocation_request_v2",
       "title": "ESK Paper 量化分配申请与只读占用投影 V2",
       "summary": "用户可在主项目把可用 ESK 提交为可取消的 Paper 量化分配申请；主项目分别核算卖回、量化与总占用，并通过最长五分钟签名 V2 投影让量化 PWA 只读展示，不自动建仓、交易或产生收益。",
-      "status": "verified",
+      "status": "released",
       "priority": "p0",
       "requirement": {
         "path": "docs/requirements/esk-paper-quant-allocation-request-v2.md",
@@ -5428,7 +5428,7 @@
         }
       ],
       "created_at_ms": 1788310321752,
-      "updated_at_ms": 1788314210966
+      "updated_at_ms": 1788315316771
     },
     {
       "id": "external-pool-adapter-credential-reattestation-v253-verification",
@@ -14799,16 +14799,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_faf4b691a86442ce9b08429cef280d23",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex-q12-019fc8bf",
-      "reason": "Record and close the Q12 source-only vertical slice while retaining the broader quotient as incomplete.",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788264374623
-    },
-    {
       "id": "feature_event_88d0d3dcb75d444fb5b120f050b2d08a",
       "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
       "action": "evidence_recorded",
@@ -16797,6 +16787,16 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1788314210966
+    },
+    {
+      "id": "feature_event_2177250826d34da3ac7d048997ff4ba9",
+      "feature_id": "esk_paper_quant_allocation_request_v2",
+      "action": "transitioned",
+      "actor": "codex-desktop",
+      "reason": "Main commit 3d7b568f45d1bc3710dfa4708f142ab37d500865 is published as v0.3.1715 with matching remote health/version smoke; quant compatibility commits are on main.",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1788315316771
     }
   ]
 }
