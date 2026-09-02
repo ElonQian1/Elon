@@ -7,6 +7,9 @@ pub(crate) use batch::migration_v282;
 #[path = "esk_quant_allocation_migration.rs"]
 mod quant_allocation;
 pub(crate) use quant_allocation::migration_v284;
+#[path = "esk_quant_allocation_binding_migration.rs"]
+mod quant_allocation_binding;
+pub(crate) use quant_allocation_binding::migration_v285;
 
 pub(crate) fn migration_v281(conn: &Connection) -> Result<()> {
     conn.execute_batch(

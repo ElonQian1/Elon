@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://yilong.example/contracts/quant/esk-paper-allocation-receipt-v1.schema.json",
+  "title": "Yilong Quant ESK Paper Allocation Receipt V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema", "receipt_id", "issuer", "audience", "project_id", "key_id", "event",
+    "binding_id", "binding_status", "request_id", "participant_ref", "amount",
+    "amount_base_units", "authorization_id", "binding_revision", "previous_receipt_digest",
+    "occurred_at_unix", "simulated", "funds_moved", "position_kind",
+    "quant_units_issued", "nav_participation", "trading_started"
+  ],
+  "properties": {
+    "schema": { "const": "yilong.quant.esk_allocation_receipt.v1" },
+    "receipt_id": { "type": "string", "pattern": "^eskrcpt_[0-9a-f]{32}$" },
+    "issuer": { "const": "yilong-quant" },
+    "audience": { "const": "yilong-main" },
+    "project_id": { "const": "esk" },
+    "key_id": { "$ref": "#/$defs/keyId" },
+    "event": { "enum": ["accepted", "released"] },
+    "binding_id": { "type": "string", "pattern": "^eskbind_[0-9a-f]{32}$" },
+    "binding_status": { "enum": ["accepted", "released"] },
+    "request_id": { "type": "string", "pattern": "^eskq_[0-9a-f]{32}$" },
+    "participant_ref": { "type": "string", "pattern": "^yp1_[0-9a-f]{40}$" },
+    "amount": { "$ref": "#/$defs/amount" },
+    "amount_base_units": { "$ref": "#/$defs/baseUnits" },
+    "authorization_id": { "type": "string", "pattern": "^eskauth_[0-9a-f]{32}$" },
+    "binding_revision": { "type": "integer", "minimum": 1, "maximum": 2 },
+    "previous_receipt_digest": {
+      "oneOf": [
+        { "type": "null" },
+        { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+      ]
+    },
+    "occurred_at_unix": { "type": "integer", "minimum": 1 },
+    "simulated": { "const": true },
+    "funds_moved": { "const": false },
+    "position_kind": { "const": "esk_paper_allocation_binding" },
+    "quant_units_issued": { "const": false },
+    "nav_participation": { "const": false },
+    "trading_started": { "const": false }
+  },
+  "$defs": {
+    "keyId": { "type": "string", "minLength": 3, "maxLength": 64, "pattern": "^[A-Za-z0-9._-]+$" },
+    "amount": { "type": "string", "pattern": "^(?:0|[1-9][0-9]*)\\.[0-9]{6}$", "maxLength": 32 },
+    "baseUnits": { "type": "string", "pattern": "^(?:0|[1-9][0-9]*)$", "maxLength": 19 }
+  }
+}

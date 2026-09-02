@@ -104,7 +104,7 @@ export default function EskQuantAllocationPanel({ available, enabled, requests, 
           <div className={styles.request} key={request.request_id}>
             <div>
               <strong>{request.amount} ESK</strong>
-              <span>{formatDateTime(request.submitted_at)} · {request.status === 'submitted' ? '已占用，尚未形成仓位' : '已撤销'}</span>
+              <span>{formatDateTime(request.updated_at)} · {statusText(request.status)}</span>
             </div>
             {request.status === 'submitted' && (
               <button type="button" onClick={() => void cancel(request.request_id)} disabled={working !== null}>
@@ -116,6 +116,13 @@ export default function EskQuantAllocationPanel({ available, enabled, requests, 
       </div>
     </section>
   )
+}
+
+function statusText(status: EskQuantAllocationRequest['status']) {
+  if (status === 'submitted') return '已占用，等待量化端接收'
+  if (status === 'accepted') return '量化端已签名接收，仍为 Paper 绑定'
+  if (status === 'released') return '量化端已释放，ESK 占用已解除'
+  return '已撤销'
 }
 
 function newIdempotencyKey() {

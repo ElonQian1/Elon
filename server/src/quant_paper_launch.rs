@@ -5,6 +5,7 @@ use axum::{
     Json,
 };
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::{collections::HashSet, net::IpAddr, sync::Arc};
 
 use super::quant_esk_asset_projection::{
@@ -20,6 +21,7 @@ const PROTOCOL: &str = "yilong.quant.paper_launch.v1";
 const READINESS_SCHEMA: &str = "yilong.quant.paper_launch_readiness.v1";
 const TICKET_SCHEMA: &str = "yilong.quant.paper_launch_ticket.v1";
 const WEB_URL_ENV: &str = "YILONG_QUANT_PAPER_WEB_URL";
+const ESK_ALLOCATION_AUTHORIZATION_SCHEMA: &str = "yilong.esk.quant_allocation_authorization.v1";
 
 #[derive(Debug, Serialize)]
 struct PaperLaunchReadiness {
@@ -40,6 +42,8 @@ struct PaperLaunchTicket {
     access_token: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     esk_asset_projection: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    esk_quant_allocation_authorization: Option<String>,
     expires_in: i64,
     simulated: bool,
 }
@@ -49,6 +53,30 @@ struct PaperLaunchTicket {
 pub(crate) struct IssuePaperLaunchRequest {
     #[serde(default)]
     capabilities: Vec<String>,
+    #[serde(default)]
+    esk_quant_allocation_request_id: Option<String>,
+}
+
+#[derive(Serialize)]
+struct EskAllocationAuthorizationClaims<'a> {
+    schema: &'static str,
+    authorization_id: String,
+    issuer: &'static str,
+    audience: &'static str,
+    project_id: &'static str,
+    key_id: &'a str,
+    grant_id: &'a str,
+    participant_ref: &'a str,
+    request_id: &'a str,
+    amount: String,
+    amount_base_units: String,
+    request_revision: i64,
+    risk_revision: &'a str,
+    issued_at_unix: i64,
+    expires_at_unix: i64,
+    simulated: bool,
+    funds_moved: bool,
+    quant_units_issued: bool,
 }
 
 #[derive(Serialize)]
@@ -126,7 +154,7 @@ pub(crate) async fn issue(
             )
         }
     };
-    let esk_projection_version = match validate_capabilities(&request.capabilities) {
+    let capabilities = match validate_capabilities(&request.capabilities) {
         Ok(value) => value,
         Err(()) => {
             return error_response(
@@ -135,6 +163,51 @@ pub(crate) async fn issue(
                 "量化 Paper 启动 capability 无效",
             )
         }
+    };
+    let selected_request = if let Some(request_id) = request
+        .esk_quant_allocation_request_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    {
+        if !capabilities.esk_allocation_authorization {
+            return error_response(
+                StatusCode::BAD_REQUEST,
+                "quant_allocation_capability_required",
+                "量化页面未声明 ESK 分配授权能力",
+            );
+        }
+        match state
+            .store
+            .esk_quant_allocation_request(&user_id, request_id)
+        {
+            Ok(Some(record)) if matches!(record.status.as_str(), "submitted" | "accepted") => {
+                Some(record)
+            }
+            Ok(Some(_)) => {
+                return error_response(
+                    StatusCode::CONFLICT,
+                    "quant_allocation_request_not_launchable",
+                    "当前 ESK 量化申请状态不能进入绑定流程",
+                )
+            }
+            Ok(None) => {
+                return error_response(
+                    StatusCode::NOT_FOUND,
+                    "quant_allocation_request_not_found",
+                    "ESK 量化申请不存在",
+                )
+            }
+            Err(error) => {
+                tracing::warn!(error = %error, "failed to read selected ESK quant allocation request");
+                return unavailable(
+                    "quant_allocation_request_unavailable",
+                    "暂时无法读取 ESK 量化申请",
+                );
+            }
+        }
+    } else {
+        None
     };
     let now_unix = chrono::Utc::now().timestamp();
     let grant = match signer.issue(
@@ -153,7 +226,7 @@ pub(crate) async fn issue(
             )
         }
     };
-    let esk_asset_projection = if let Some(version) = esk_projection_version {
+    let esk_asset_projection = if let Some(version) = capabilities.esk_projection_version {
         let mode = EskAssetMode::from_env();
         if matches!(mode, EskAssetMode::Invalid) {
             return unavailable("quant_esk_projection_misconfigured", "ESK 资产投影配置无效");
@@ -200,7 +273,29 @@ pub(crate) async fn issue(
     } else {
         None
     };
-    Json(build_ticket(target, grant, esk_asset_projection)).into_response()
+    let esk_quant_allocation_authorization = match selected_request
+        .as_ref()
+        .filter(|record| record.status == "submitted")
+    {
+        Some(record) => match issue_esk_allocation_authorization(&signer, &grant, record, now_unix)
+        {
+            Ok(token) => Some(token),
+            Err(()) => {
+                return unavailable(
+                    "quant_allocation_authorization_unavailable",
+                    "暂时无法创建 ESK 量化申请授权",
+                )
+            }
+        },
+        None => None,
+    };
+    Json(build_ticket(
+        target,
+        grant,
+        esk_asset_projection,
+        esk_quant_allocation_authorization,
+    ))
+    .into_response()
 }
 
 fn authorize_active_user(state: &Arc<AppState>, headers: &HeaderMap) -> Result<String, Response> {
@@ -264,6 +359,7 @@ fn build_ticket(
     target: PaperLaunchTarget,
     grant: PaperAccessGrantResponse,
     esk_asset_projection: Option<String>,
+    esk_quant_allocation_authorization: Option<String>,
 ) -> PaperLaunchTicket {
     PaperLaunchTicket {
         schema: TICKET_SCHEMA,
@@ -271,6 +367,7 @@ fn build_ticket(
         launch_url: target.url,
         access_token: grant.access_token,
         esk_asset_projection,
+        esk_quant_allocation_authorization,
         expires_in: grant.expires_in,
         simulated: true,
     }
@@ -282,7 +379,13 @@ enum EskProjectionVersion {
     V2,
 }
 
-fn validate_capabilities(capabilities: &[String]) -> Result<Option<EskProjectionVersion>, ()> {
+#[derive(Debug, PartialEq, Eq)]
+struct LaunchCapabilities {
+    esk_projection_version: Option<EskProjectionVersion>,
+    esk_allocation_authorization: bool,
+}
+
+fn validate_capabilities(capabilities: &[String]) -> Result<LaunchCapabilities, ()> {
     if capabilities.len() > 8 {
         return Err(());
     }
@@ -296,13 +399,54 @@ fn validate_capabilities(capabilities: &[String]) -> Result<Option<EskProjection
             return Err(());
         }
     }
-    Ok(if seen.contains(ESK_PROJECTION_SCHEMA_V2) {
+    let esk_projection_version = if seen.contains(ESK_PROJECTION_SCHEMA_V2) {
         Some(EskProjectionVersion::V2)
     } else if seen.contains(ESK_PROJECTION_SCHEMA_V1) {
         Some(EskProjectionVersion::V1)
     } else {
         None
+    };
+    Ok(LaunchCapabilities {
+        esk_projection_version,
+        esk_allocation_authorization: seen.contains(ESK_ALLOCATION_AUTHORIZATION_SCHEMA),
     })
+}
+
+fn issue_esk_allocation_authorization(
+    signer: &PaperGrantSigner,
+    grant: &PaperAccessGrantResponse,
+    request: &crate::esk_asset::EskQuantAllocationRecord,
+    issued_at_unix: i64,
+) -> Result<String, ()> {
+    let claims = EskAllocationAuthorizationClaims {
+        schema: ESK_ALLOCATION_AUTHORIZATION_SCHEMA,
+        authorization_id: esk_allocation_authorization_id(&request.request_id),
+        issuer: "yilong-main",
+        audience: "yilong-quant",
+        project_id: "esk",
+        key_id: signer.key_id(),
+        grant_id: &grant.grant_id,
+        participant_ref: &grant.participant_ref,
+        request_id: &request.request_id,
+        amount: crate::esk_asset::format_esk_amount(request.amount_base_units),
+        amount_base_units: request.amount_base_units.to_string(),
+        request_revision: request.revision,
+        risk_revision: &request.risk_disclosure_revision,
+        issued_at_unix,
+        expires_at_unix: issued_at_unix + grant.expires_in,
+        simulated: true,
+        funds_moved: false,
+        quant_units_issued: false,
+    };
+    signer.sign_token("yeqa1", &claims)
+}
+
+pub(crate) fn esk_allocation_authorization_id(request_id: &str) -> String {
+    let mut digest = Sha256::new();
+    digest.update(b"yilong-main-esk-quant-authorization-v1\0");
+    digest.update(request_id.as_bytes());
+    let encoded = format!("{:x}", digest.finalize());
+    format!("eskauth_{}", &encoded[..32])
 }
 
 fn unavailable(code: &'static str, message: &'static str) -> Response {
@@ -316,6 +460,7 @@ fn error_response(status: StatusCode, code: &'static str, message: &'static str)
 #[cfg(test)]
 mod tests {
     use super::*;
+    use base64::Engine as _;
 
     #[test]
     fn accepts_https_and_loopback_targets_without_query_or_fragment() {
@@ -356,22 +501,86 @@ mod tests {
 
     #[test]
     fn capability_negotiation_is_explicit_and_bounded() {
-        assert_eq!(validate_capabilities(&[]), Ok(None));
+        assert_eq!(
+            validate_capabilities(&[]),
+            Ok(LaunchCapabilities {
+                esk_projection_version: None,
+                esk_allocation_authorization: false,
+            })
+        );
         assert_eq!(
             validate_capabilities(&[ESK_PROJECTION_SCHEMA_V1.to_owned()]),
-            Ok(Some(EskProjectionVersion::V1))
+            Ok(LaunchCapabilities {
+                esk_projection_version: Some(EskProjectionVersion::V1),
+                esk_allocation_authorization: false,
+            })
         );
         assert_eq!(
             validate_capabilities(&[
                 ESK_PROJECTION_SCHEMA_V1.to_owned(),
                 ESK_PROJECTION_SCHEMA_V2.to_owned(),
             ]),
-            Ok(Some(EskProjectionVersion::V2))
+            Ok(LaunchCapabilities {
+                esk_projection_version: Some(EskProjectionVersion::V2),
+                esk_allocation_authorization: false,
+            })
         );
         assert!(validate_capabilities(&[
             ESK_PROJECTION_SCHEMA_V1.to_owned(),
             ESK_PROJECTION_SCHEMA_V1.to_owned(),
         ])
         .is_err());
+    }
+
+    #[test]
+    fn allocation_authorization_is_deterministic_and_grant_bound() {
+        let signer =
+            PaperGrantSigner::from_material("main-paper-key-1".to_owned(), &[81; 32], &[82; 32])
+                .unwrap();
+        let grant = signer
+            .issue(
+                "private-user",
+                vec![PaperAccessScope::PositionRead],
+                1_788_192_000,
+            )
+            .unwrap();
+        let request = crate::esk_asset::EskQuantAllocationRecord {
+            request_id: "eskq_0123456789abcdef0123456789abcdef".to_owned(),
+            user_id: "private-user".to_owned(),
+            amount_base_units: 12_345_678,
+            idempotency_key: "test".to_owned(),
+            risk_disclosure_revision: crate::esk_asset::ESK_QUANT_RISK_DISCLOSURE_REVISION
+                .to_owned(),
+            status: "submitted".to_owned(),
+            revision: 1,
+            submitted_at: "2026-09-02T00:00:00Z".to_owned(),
+            updated_at: "2026-09-02T00:00:00Z".to_owned(),
+            replayed: false,
+            binding_id: None,
+            receipt_id: None,
+            receipt_digest: None,
+            receipt_key_id: None,
+            quant_binding_revision: None,
+            occurred_at_unix: None,
+        };
+        let token =
+            issue_esk_allocation_authorization(&signer, &grant, &request, 1_788_192_000).unwrap();
+        let segments = token.split('.').collect::<Vec<_>>();
+        assert_eq!(segments[0], "yeqa1");
+        let payload = base64::engine::general_purpose::URL_SAFE_NO_PAD
+            .decode(segments[1])
+            .unwrap();
+        let claims: serde_json::Value = serde_json::from_slice(&payload).unwrap();
+        assert_eq!(claims["request_id"], request.request_id);
+        assert_eq!(claims["amount"], "12.345678");
+        assert_eq!(claims["grant_id"], grant.grant_id);
+        assert_eq!(claims["participant_ref"], grant.participant_ref);
+        assert_eq!(claims["expires_at_unix"], 1_788_192_300_i64);
+        assert_eq!(
+            claims["authorization_id"],
+            esk_allocation_authorization_id(&request.request_id)
+        );
+        assert_eq!(claims["funds_moved"], false);
+        assert_eq!(claims["quant_units_issued"], false);
     }
 }

@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://yilong.example/contracts/quant/esk-allocation-receipt-keyring-v1.schema.json",
+  "title": "Yilong Quant ESK Allocation Receipt Keyring V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "keys"],
+  "properties": {
+    "schema": { "const": "yilong.quant.esk_allocation_receipt_keyring.v1" },
+    "keys": { "type": "array", "minItems": 1, "maxItems": 8, "items": { "$ref": "#/$defs/key" } }
+  },
+  "$defs": {
+    "key": {
+      "type": "object", "additionalProperties": false,
+      "required": ["key_id", "public_key_base64url", "status"],
+      "properties": {
+        "key_id": { "type": "string", "minLength": 3, "maxLength": 64, "pattern": "^[A-Za-z0-9._-]+$" },
+        "public_key_base64url": { "type": "string", "pattern": "^[A-Za-z0-9_-]{43}$" },
+        "status": { "enum": ["active", "retiring", "revoked"] },
+        "issued_at_not_before_unix": { "type": "integer", "minimum": 1 },
+        "issued_at_not_after_unix": { "type": "integer", "minimum": 1 }
+      }
+    }
+  }
+}

@@ -123,7 +123,7 @@
 | PC 前端迁移规则 | `.github/instructions/pc-frontend-migration.instructions.md`、`docs/pc-frontend-migration.md` |
 | 代码归属与 legacy 迁移规则 | `docs/architecture/source-of-truth.md`、`docs/architecture/legacy-inventory.md`、`docs/architecture/feature-parity-matrix.md`、`scripts/check-source-ownership.ps1` |
 | 项目广场/项目主页脚本 | `server/src/assets/project_*.js` |
-| 官方公开项目目录、加入前安全预览、一龙量化交易接入、研究回测/Paper 仓位操作摘要、Paper 用户 grant/验签 keyring/单次撤销、ESK 只读资产投影、V9 公开部署合同、legacy NET 锁定回执契约 | `server/src/official_project_catalog/`、`server/src/project_store.rs`、`pc-frontend/src/features/plaza/OfficialProjectPreviewDialog.tsx`、`server/src/quant_paper_access.rs`、`server/src/quant_esk_asset_projection.rs`、`server/src/quant_paper_launch.rs`、`pc-frontend/src/features/conversation/QuantPaperLaunch.tsx`、`docs/requirements/yilong-quant-esk-paper-asset-projection-v1.md`、`docs/yilong-quant-esk-paper-asset-projection-v1-acceptance.md`、`contracts/quant/esk-paper-asset-projection-v1.schema.json`、`scripts/test-quant-esk-asset-projection.js`、`docs/yilong-quant-integration.md`、`docs/yilong-quant-paper-access-grant-v1.md`、`contracts/quant/paper-access-grant-v1.schema.json`、`contracts/quant/paper-access-keyring-v1.schema.json`、`docs/yilong-quant-net-lock-receipt-v1.md`、`contracts/quant/net-balance-lock-receipt-v1.schema.json` |
+| 一龙量化接入、ESK Paper 投影与单申请绑定 | `docs/yilong-quant-integration.md`、`docs/yilong-quant-esk-allocation-binding-v1.md`、`server/src/quant_paper_launch.rs`、`server/src/quant_esk_allocation_receipt.rs`、`pc-frontend/src/features/conversation/QuantPaperLaunch.tsx` |
 | 节点管理本地页 | `server/src/node_agent_admin.html` |
 
 ## 脚本入口

@@ -204,16 +204,16 @@ pub(super) fn account_ledger_on(conn: &Connection, user_id: &str) -> Result<EskA
     let (quant_reserved, quant_event_count, quant_updated_at): (i64, i64, Option<String>) =
         conn.query_row(
             "SELECT
-               COALESCE(SUM(CASE WHEN latest.status = 'submitted' THEN r.amount_base_units ELSE 0 END), 0),
+               COALESCE(SUM(CASE WHEN latest.status IN ('submitted', 'accepted') THEN r.amount_base_units ELSE 0 END), 0),
                COALESCE(SUM(latest.revision), 0),
                MAX(latest.created_at)
              FROM esk_quant_allocation_requests r
              JOIN (
                SELECT e.request_id, e.status, e.revision, e.created_at
-                 FROM esk_quant_allocation_request_events e
+                 FROM esk_quant_allocation_request_state_events e
                 WHERE e.revision = (
                   SELECT MAX(candidate.revision)
-                    FROM esk_quant_allocation_request_events candidate
+                    FROM esk_quant_allocation_request_state_events candidate
                    WHERE candidate.request_id = e.request_id
                 )
              ) latest ON latest.request_id = r.request_id

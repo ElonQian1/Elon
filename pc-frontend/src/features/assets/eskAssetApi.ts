@@ -47,13 +47,17 @@ export interface EskQuantAllocationRequest {
   amount: string
   amount_base_units: string
   risk_disclosure_revision: 'esk-quant-paper-allocation-v2'
-  status: 'submitted' | 'canceled'
+  status: 'submitted' | 'canceled' | 'accepted' | 'released'
   revision: number
   submitted_at: string
   updated_at: string
   simulated: true
   funds_moved: false
   position_created: false
+  allocation_binding_created: boolean
+  binding_id?: string
+  quant_binding_revision?: number
+  occurred_at_unix?: number
   replayed: boolean
 }
 
@@ -108,6 +112,10 @@ export const eskAssetApi = {
   cancelQuantAllocation: (requestId: string) =>
     api.post<EskQuantAllocationRequest>(`/api/me/assets/esk/quant-allocation-requests/${encodeURIComponent(requestId)}/cancel`, {
       confirmation: 'CANCEL PAPER ESK QUANT ALLOCATION',
+    }),
+  applyQuantAllocationReceipt: (receiptToken: string) =>
+    api.post<EskQuantAllocationRequest>('/api/me/assets/esk/quant-allocation-receipts', {
+      receipt_token: receiptToken,
     }),
 }
 
@@ -174,5 +182,6 @@ export const ESK_PREVIEW_QUANT_REQUESTS: EskQuantAllocationRequest[] = [{
   simulated: true,
   funds_moved: false,
   position_created: false,
+  allocation_binding_created: false,
   replayed: false,
 }]

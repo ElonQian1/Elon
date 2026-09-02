@@ -1,4 +1,5 @@
 use crate::store::*;
+use rusqlite::params;
 use uuid::Uuid;
 
 fn temp_store() -> Store {

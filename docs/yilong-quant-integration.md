@@ -9,7 +9,7 @@
 ## 用户现在能看到什么
 
 - 项目广场中的“一龙量化交易”标题、简介、目标用户、当前更新和 GitHub/文档入口。
-- 登录用户在主项目账号页可以查看本人 ESK Paper 总额、可用额、卖回占用、量化分配申请占用和总占用，并可提交或取消尚未被量化端接收的 Paper 申请；在量化公开环境配置就绪后，从量化项目主页一键进入还会看到同一组余额的签名只读投影。短期授权和投影不进入 URL 或浏览器持久存储。
+- 登录用户在主项目账号页可以查看本人 ESK Paper 总额、可用额、卖回占用、量化分配申请占用和总占用，并可提交或取消尚未被量化端接收的 Paper 申请；在量化公开环境配置就绪后，用户可明确选择一笔申请进入量化页面，看到同一组余额的签名只读投影，并创建或释放独立模拟 binding。量化端返回的 accepted/released 回执只有经主项目验签后才改变状态。短期授权和投影不进入 URL 或浏览器持久存储。
 - 项目主页当前更新会说明已经验证的 `BACKTEST / SIMULATION` 研究能力：行情来源、策略版本、费用、滑点、权益曲线、回撤和确定性摘要均可追溯。
 - 明确的 `paper` 阶段：模拟委托、运营审核追加模拟份额、NAV 与用户部分/全额退出结算。
 - 6% 仅为非保证目标；当前不导入真实付款名单、不移动资金、不连接实盘。
@@ -22,7 +22,7 @@
 | 责任 | 主项目 | `yilong-quant` |
 |---|---|---|
 | 项目广场、公开只读入口 | 负责 | 提供 `.elon/project-landing.json` 内容真源 |
-| 用户身份、ESK Paper 账本、卖回/量化申请占用和未来锁定 | 负责 | 只消费版本化授权/只读投影/未来接收回执，不从投影创建仓位 |
+| 用户身份、ESK Paper 账本、卖回/量化申请占用 | 负责，并验签量化回执后推进状态 | 消费版本化授权并维护独立模拟 binding；不从只读投影、客户端自报或旧 NET 创建仓位 |
 | ESK 发行和可用余额 | 主项目是真源；当前只完成 Paper 登记 | 不铸造、不直接修改、不保存余额副本 |
 | 模拟份额、运营追加与部分/全额退出规则 | 不复制 | 负责 |
 | 行情、策略、风控、OMS、交易所 | 不直接控制 | 负责 |
@@ -57,6 +57,7 @@
 - `POST /api/me/quant/paper-access-grants` 已复用主项目现有 bearer 会话，可在独立签名配置启用后签发最多五分钟的 Ed25519 paper grant；量化项目只获得项目专用脱敏 subject 和明确 scope，不获得主项目 bearer 或用户资料。契约见 `docs/yilong-quant-paper-access-grant-v1.md` 与 `contracts/quant/paper-access-grant-v1.schema.json`。
 - `GET /api/me/quant/paper-launch` 与 `POST /api/me/quant/paper-launches` 提供失败关闭的 readiness 和一次性启动票据；PC 项目主页通过 exact-origin iframe、`event.source`、nonce、attempt ID 和过期时间绑定，把 grant 只传给当前量化子页面。双方契约见 `docs/yilong-quant-paper-launch-v1.md` 与 `contracts/quant/paper-launch-v1.schema.json`。
 - 主项目从唯一 ESK Paper 账本签发最长五分钟的只读资产投影：量化页面优先声明并接收 `yilong.esk.asset_projection.v2` / `yep2`，显示总额、可用额、卖回占用、量化申请占用、总占用、源修订和同步时间；旧页面仅在量化占用为零时安全回退 V1。投影与同次 grant 的 grant ID、脱敏 participant、key、签发和到期边界精确绑定，既不是申购回执，也不会创建仓位、交易或收益。主项目已随 `v0.3.1715` 发布，回执见 `docs/esk-paper-quant-allocation-request-v2-release-v0.3.1715.md`；量化子仓库实现提交 `1210e8b`、功能登记发布提交 `bc9d3de` 已推送，双方 V2 Schema SHA-256 均为 `ba3748fe22122e99271b5b6a0aeaa7fd61206557f22e67c807c26a0a97036c57`；契约见 `contracts/quant/esk-paper-asset-projection-v2.schema.json`，V1 继续兼容。
+- ESK 申请绑定 V3/V13 已建立双向签名闭环：主项目只为用户明确选择的 submitted 申请签发与同次 grant 精确绑定的 `yeqa1` 授权；量化端验证后创建独立 `esk_paper_allocation_binding`，accepted/released 事件追加写入其 Paper SQLite，并用独立 Ed25519 域签发 `yqar1` 回执。主项目以 `YILONG_QUANT_ESK_RECEIPT_KEYRING_JSON` 验签后追加原请求状态，只保存回执摘要和 key/binding 元数据，不保存完整 token。submitted/accepted 继续占用 ESK，canceled/released 释放占用；该 binding 不调用 legacy NET 账本、不发行 QSHARE、不参与 NAV、不启动交易或收益。合同见 `contracts/quant/esk-paper-allocation-authorization-v1.schema.json`、`contracts/quant/esk-paper-allocation-receipt-v1.schema.json`，操作与恢复说明见 `docs/yilong-quant-esk-allocation-binding-v1.md`。
 - 加入前公开预览与 Paper 启动严格分离：预览是匿名 GET，只展示内置目录白名单；它不登录、不加入、不签发 grant，也不触发量化页面或任何写接口。需求与验收边界见 `docs/requirements/yilong-quant-public-project-preview-v1.md`。
 - 既有 `net-balance-lock-receipt-v1` 是 ESK 定名前的 legacy Paper 合同，不会自动改名、兑换或并入 ESK。当前 ESK Schema 也只用于 Paper 只读联调；主项目尚未部署链上 ESK、真实锁定/结算、价格或生产准入，因此不能把投影当作真实发行或量化申购回执。
 

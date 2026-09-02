@@ -239,7 +239,7 @@ impl PaperGrantSigner {
         ))
     }
 
-    fn participant_ref(&self, user_id: &str) -> Result<String, ()> {
+    pub(crate) fn participant_ref(&self, user_id: &str) -> Result<String, ()> {
         let mut mac = SubjectMac::new_from_slice(&self.subject_secret).map_err(|_| ())?;
         mac.update(b"yilong.quant.paper.subject.v1\0");
         mac.update(user_id.as_bytes());

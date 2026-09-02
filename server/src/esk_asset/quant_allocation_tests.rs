@@ -7,7 +7,10 @@ use uuid::Uuid;
 
 use crate::store::Store;
 
-use super::{EskAllocationInput, EskQuantAllocationInput, ESK_QUANT_RISK_DISCLOSURE_REVISION};
+use super::{
+    EskAllocationInput, EskQuantAllocationInput, EskQuantAllocationReceiptInput,
+    ESK_QUANT_RISK_DISCLOSURE_REVISION,
+};
 
 fn temp_store() -> (Store, PathBuf) {
     let path = std::env::temp_dir().join(format!(
@@ -49,6 +52,184 @@ fn quant_request(user_id: &str, amount_base_units: i64, key: &str) -> EskQuantAl
         idempotency_key: key.to_owned(),
         risk_disclosure_revision: ESK_QUANT_RISK_DISCLOSURE_REVISION.to_owned(),
     }
+}
+
+fn quant_receipt(
+    user_id: &str,
+    request_id: &str,
+    amount_base_units: i64,
+    event: &str,
+) -> EskQuantAllocationReceiptInput {
+    let released = event == "released";
+    EskQuantAllocationReceiptInput {
+        user_id: user_id.to_owned(),
+        participant_ref: "yp1_0123456789abcdef0123456789abcdef01234567".to_owned(),
+        request_id: request_id.to_owned(),
+        amount_base_units,
+        risk_disclosure_revision: ESK_QUANT_RISK_DISCLOSURE_REVISION.to_owned(),
+        event: event.to_owned(),
+        binding_id: "eskbind_0123456789abcdef0123456789abcdef".to_owned(),
+        receipt_id: if released {
+            "eskrcpt_89abcdef0123456789abcdef01234567"
+        } else {
+            "eskrcpt_0123456789abcdef0123456789abcdef"
+        }
+        .to_owned(),
+        receipt_digest: format!("sha256:{}", if released { "2" } else { "1" }.repeat(64)),
+        receipt_key_id: "quant-receipt-key-1".to_owned(),
+        previous_receipt_digest: released.then(|| format!("sha256:{}", "1".repeat(64))),
+        quant_binding_revision: if released { 2 } else { 1 },
+        occurred_at_unix: if released {
+            1_788_192_020
+        } else {
+            1_788_192_010
+        },
+    }
+}
+
+#[test]
+fn signed_binding_receipts_keep_accepted_reserved_and_release_it_idempotently() {
+    let (store, path) = temp_store();
+    let user = create_user(&store, "binding-lifecycle");
+    credit(&store, &user.id, 10_000_000, "credit-binding-lifecycle");
+    let request = store
+        .create_esk_quant_allocation_request(&quant_request(
+            &user.id,
+            4_000_000,
+            "binding-lifecycle",
+        ))
+        .unwrap();
+    let accepted_input = quant_receipt(&user.id, &request.request_id, 4_000_000, "accepted");
+    let accepted = store
+        .apply_esk_quant_allocation_receipt(&accepted_input)
+        .unwrap();
+    assert_eq!(accepted.status, "accepted");
+    assert_eq!(accepted.revision, 2);
+    assert_eq!(
+        accepted.binding_id.as_deref(),
+        Some("eskbind_0123456789abcdef0123456789abcdef")
+    );
+    assert_eq!(
+        store
+            .esk_account_ledger(&user.id)
+            .unwrap()
+            .quant_reserved_base_units,
+        4_000_000
+    );
+    assert!(
+        store
+            .apply_esk_quant_allocation_receipt(&accepted_input)
+            .unwrap()
+            .replayed
+    );
+
+    let other_request = store
+        .create_esk_quant_allocation_request(&quant_request(
+            &user.id,
+            1_000_000,
+            "binding-id-reuse",
+        ))
+        .unwrap();
+    let mut reused_binding =
+        quant_receipt(&user.id, &other_request.request_id, 1_000_000, "accepted");
+    reused_binding.receipt_id = "eskrcpt_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_owned();
+    reused_binding.receipt_digest = format!("sha256:{}", "a".repeat(64));
+    assert!(store
+        .apply_esk_quant_allocation_receipt(&reused_binding)
+        .unwrap_err()
+        .to_string()
+        .contains("binding ID already"));
+    store
+        .cancel_esk_quant_allocation_request(&user.id, &other_request.request_id)
+        .unwrap();
+
+    let released_input = quant_receipt(&user.id, &request.request_id, 4_000_000, "released");
+    let released = store
+        .apply_esk_quant_allocation_receipt(&released_input)
+        .unwrap();
+    assert_eq!(released.status, "released");
+    assert_eq!(released.revision, 3);
+    assert_eq!(
+        store
+            .esk_account_ledger(&user.id)
+            .unwrap()
+            .quant_reserved_base_units,
+        0
+    );
+    assert!(
+        store
+            .apply_esk_quant_allocation_receipt(&released_input)
+            .unwrap()
+            .replayed
+    );
+
+    let conn = store.conn().unwrap();
+    assert!(conn
+        .execute(
+            "DELETE FROM esk_quant_allocation_binding_events WHERE request_id = ?1",
+            rusqlite::params![request.request_id],
+        )
+        .unwrap_err()
+        .to_string()
+        .contains("append-only"));
+    drop(conn);
+    drop(store);
+    let reopened = Store::open(&path).unwrap();
+    assert_eq!(
+        reopened
+            .esk_quant_allocation_request(&user.id, &request.request_id)
+            .unwrap()
+            .unwrap()
+            .status,
+        "released"
+    );
+    drop(reopened);
+    let _ = std::fs::remove_file(path);
+}
+
+#[test]
+fn cancel_and_signed_acceptance_are_serialized_to_one_winner() {
+    let (store, path) = temp_store();
+    let user = create_user(&store, "binding-race");
+    credit(&store, &user.id, 8_000_000, "credit-binding-race");
+    let request = store
+        .create_esk_quant_allocation_request(&quant_request(&user.id, 3_000_000, "binding-race"))
+        .unwrap();
+    drop(store);
+
+    let barrier = Arc::new(Barrier::new(2));
+    let cancel_path = path.clone();
+    let cancel_user = user.id.clone();
+    let cancel_request = request.request_id.clone();
+    let cancel_barrier = Arc::clone(&barrier);
+    let cancel = std::thread::spawn(move || {
+        let store = Store::open(&cancel_path).unwrap();
+        cancel_barrier.wait();
+        store.cancel_esk_quant_allocation_request(&cancel_user, &cancel_request)
+    });
+    let accept_path = path.clone();
+    let accept_user = user.id.clone();
+    let accept_request = request.request_id.clone();
+    let accept_barrier = Arc::clone(&barrier);
+    let accept = std::thread::spawn(move || {
+        let store = Store::open(&accept_path).unwrap();
+        let receipt = quant_receipt(&accept_user, &accept_request, 3_000_000, "accepted");
+        accept_barrier.wait();
+        store.apply_esk_quant_allocation_receipt(&receipt)
+    });
+    let results = [cancel.join().unwrap(), accept.join().unwrap()];
+    assert_eq!(results.iter().filter(|result| result.is_ok()).count(), 1);
+    let store = Store::open(&path).unwrap();
+    let final_state = store
+        .esk_quant_allocation_request(&user.id, &request.request_id)
+        .unwrap()
+        .unwrap();
+    assert!(matches!(
+        final_state.status.as_str(),
+        "canceled" | "accepted"
+    ));
+    drop(store);
+    let _ = std::fs::remove_file(path);
 }
 
 #[test]
@@ -123,7 +304,7 @@ fn quant_request_rejects_drift_overage_and_cross_user_cancel() {
         .create_esk_quant_allocation_request(&disclosure_drift)
         .unwrap_err()
         .to_string()
-        .contains("幂等键"));
+        .contains("风险披露"));
     assert!(store
         .create_esk_quant_allocation_request(&quant_request(&owner.id, 3_000_000, "quant-overage"))
         .unwrap_err()

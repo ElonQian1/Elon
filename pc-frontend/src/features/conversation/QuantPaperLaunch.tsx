@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { AlertTriangle, CircleCheck, LoaderCircle, RefreshCw, ShieldCheck } from 'lucide-react'
 import { api } from '../../api/client'
+import { eskAssetApi, type EskQuantAllocationRequest } from '../assets/eskAssetApi'
 import type { ProjectLandingPaperLaunch } from './types'
 import styles from './QuantPaperLaunch.module.css'
 
@@ -11,12 +12,17 @@ const READY_SCHEMA = 'yilong.quant.paper_launch.ready.v1'
 const GRANT_SCHEMA = 'yilong.quant.paper_launch.grant.v1'
 const CONSUMED_SCHEMA = 'yilong.quant.paper_launch.consumed.v1'
 const ERROR_SCHEMA = 'yilong.quant.paper_launch.error.v1'
+const ALLOCATION_RECEIPT_MESSAGE_SCHEMA = 'yilong.quant.paper_launch.allocation_receipt.v1'
 const ESK_PROJECTION_SCHEMA_V1 = 'yilong.esk.asset_projection.v1'
 const ESK_PROJECTION_SCHEMA_V2 = 'yilong.esk.asset_projection.v2'
 const ESK_PROJECTION_SCHEMAS = [ESK_PROJECTION_SCHEMA_V2, ESK_PROJECTION_SCHEMA_V1] as const
+const ESK_ALLOCATION_AUTHORIZATION_SCHEMA = 'yilong.esk.quant_allocation_authorization.v1'
+const READY_CAPABILITIES = [...ESK_PROJECTION_SCHEMAS, ESK_ALLOCATION_AUTHORIZATION_SCHEMA] as const
 const NONCE_PATTERN = /^[A-Za-z0-9_-]{32,128}$/
 const GRANT_PATTERN = /^ypg1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/
 const ESK_PROJECTION_PATTERN = /^yep[12]\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/
+const ESK_ALLOCATION_AUTHORIZATION_PATTERN = /^yeqa1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/
+const ESK_ALLOCATION_RECEIPT_PATTERN = /^yqar1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/
 
 type Stage = 'checking' | 'unavailable' | 'ready' | 'authorizing' | 'loading_page' | 'waiting' | 'connected' | 'error'
 type Readiness = {
@@ -33,6 +39,7 @@ type LaunchTicket = {
   launch_url: string
   access_token: string
   esk_asset_projection?: string
+  esk_quant_allocation_authorization?: string
   expires_in: number
   simulated: true
 }
@@ -48,18 +55,30 @@ export default function QuantPaperLaunch({
   const [readiness, setReadiness] = useState<Readiness>()
   const [frameUrl, setFrameUrl] = useState('')
   const [message, setMessage] = useState('正在检查签名与量化 Web 配置。')
+  const [allocationRequests, setAllocationRequests] = useState<EskQuantAllocationRequest[]>([])
+  const [selectedRequestId, setSelectedRequestId] = useState('')
   const frameRef = useRef<HTMLIFrameElement>(null)
-  const ticketRef = useRef<{ grant: string; eskProjection?: string; expiresAtUnix: number }>()
+  const ticketRef = useRef<{
+    grant: string
+    eskProjection?: string
+    eskAllocationAuthorization?: string
+    expiresAtUnix: number
+  }>()
   const expectedOriginRef = useRef('')
   const attemptIdRef = useRef('')
   const channelNonceRef = useRef('')
   const timeoutRef = useRef<number>()
 
-  const clearSensitiveState = () => {
+  const clearTicket = () => {
     ticketRef.current = undefined
-    channelNonceRef.current = ''
     if (timeoutRef.current !== undefined) window.clearTimeout(timeoutRef.current)
     timeoutRef.current = undefined
+  }
+  const clearSensitiveState = () => {
+    clearTicket()
+    channelNonceRef.current = ''
+    attemptIdRef.current = ''
+    expectedOriginRef.current = ''
   }
 
   const inspectReadiness = async () => {
@@ -78,6 +97,7 @@ export default function QuantPaperLaunch({
       })
       setStage('ready')
       setMessage('配置已就绪。点击后授权只通过当前页面内存传递。')
+      setAllocationRequests([])
       return
     }
     try {
@@ -94,6 +114,13 @@ export default function QuantPaperLaunch({
       }
       setStage('ready')
       setMessage('配置已就绪。点击后授权只通过当前页面内存传递。')
+      void eskAssetApi.quantAllocationRequests().then((value) => {
+        const launchable = value.requests.filter((item) => ['submitted', 'accepted'].includes(item.status))
+        setAllocationRequests(launchable)
+        setSelectedRequestId((current) => launchable.some((item) => item.request_id === current)
+          ? current
+          : launchable[0]?.request_id ?? '')
+      }).catch(() => undefined)
     } catch (error) {
       setStage('error')
       setMessage(errorMessage(error, '暂时无法检查量化 Paper 启动配置。'))
@@ -121,8 +148,13 @@ export default function QuantPaperLaunch({
         const projectionSchema = projectionCapability(ticket.eskProjection)
         const supportsEskProjection = projectionSchema !== null
           && event.data.capabilities?.includes(projectionSchema) === true
+        const supportsEskAllocation = event.data.capabilities?.includes(ESK_ALLOCATION_AUTHORIZATION_SCHEMA) === true
         if (event.data.capabilities?.length && (!ticket.eskProjection || !supportsEskProjection)) {
           failLaunch('ESK 资产投影未能随本次授权生成，请重新进入。')
+          return
+        }
+        if (ticket.eskAllocationAuthorization && !supportsEskAllocation) {
+          failLaunch('量化页面未声明 ESK 申请接收能力，请重新进入。')
           return
         }
         const grantMessage: Record<string, unknown> = {
@@ -134,14 +166,28 @@ export default function QuantPaperLaunch({
           expires_at_unix: ticket.expiresAtUnix,
         }
         if (supportsEskProjection) grantMessage.esk_asset_projection = ticket.eskProjection
+        if (ticket.eskAllocationAuthorization) {
+          grantMessage.esk_quant_allocation_authorization = ticket.eskAllocationAuthorization
+        }
         frameWindow.postMessage(grantMessage, expectedOrigin)
         ticketRef.current = undefined
         setStage('waiting')
         setMessage('授权已交给量化页面，正在读取本人模拟仓位。')
         return
       }
+      if (isAllocationReceiptMessage(event.data, channelNonceRef.current, attemptIdRef.current)) {
+        void eskAssetApi.applyQuantAllocationReceipt(event.data.receipt_token)
+          .then((request) => {
+            setAllocationRequests((items) => items.map((item) => item.request_id === request.request_id ? request : item))
+            setMessage(request.status === 'released'
+              ? '主项目已验签量化释放回执，对应 ESK 已恢复为可用。'
+              : '主项目已验签量化接收回执，对应 ESK 继续作为 Paper 绑定占用。')
+          })
+          .catch((error) => setMessage(errorMessage(error, '量化回执同步失败；保留当前页面后可重试。')))
+        return
+      }
       if (!isTerminalMessage(event.data, channelNonceRef.current, attemptIdRef.current)) return
-      clearSensitiveState()
+      clearTicket()
       if (event.data.schema === CONSUMED_SCHEMA) {
         setStage('connected')
         setMessage('已安全连接。下方量化页面正在展示本人 Paper 模拟仓位。')
@@ -161,7 +207,8 @@ export default function QuantPaperLaunch({
     setMessage('正在为当前一龙账号签发五分钟 Paper 授权。')
     try {
       const value = await api.post<unknown>('/api/me/quant/paper-launches', {
-        capabilities: [...ESK_PROJECTION_SCHEMAS],
+        capabilities: [...READY_CAPABILITIES],
+        ...(selectedRequestId ? { esk_quant_allocation_request_id: selectedRequestId } : {}),
       })
       const ticket = parseTicket(value)
       if (!ticket) throw new Error('服务器返回了无法识别的启动票据。')
@@ -174,6 +221,7 @@ export default function QuantPaperLaunch({
       ticketRef.current = {
         grant: ticket.access_token,
         eskProjection: ticket.esk_asset_projection,
+        eskAllocationAuthorization: ticket.esk_quant_allocation_authorization,
         expiresAtUnix: Math.floor(Date.now() / 1000) + ticket.expires_in,
       }
       setFrameUrl(target.url)
@@ -218,6 +266,21 @@ export default function QuantPaperLaunch({
         )}
       </div>
 
+      {stage === 'ready' && allocationRequests.length > 0 && (
+        <label className={styles.requestPicker} htmlFor="esk-quant-launch-request">
+          <span>本次要进入的 ESK Paper 申请</span>
+          <select id="esk-quant-launch-request" value={selectedRequestId} onChange={(event) => setSelectedRequestId(event.target.value)}>
+            <option value="">仅查看已有 Paper 记录</option>
+            {allocationRequests.map((request) => (
+              <option key={request.request_id} value={request.request_id}>
+                {request.amount} ESK · {request.status === 'submitted' ? '等待接收' : '已接收，可恢复同步'} · …{request.request_id.slice(-8)}
+              </option>
+            ))}
+          </select>
+          <small>量化页面仍会要求你再次确认；这里只建立模拟绑定，不入金、不成交、不开始收益。</small>
+        </label>
+      )}
+
       {frameUrl && (
         <div className={styles.frameShell}>
           <div className={styles.frameBar}><span>一龙量化交易 · Paper</span><em>安全嵌入 / 短期内存授权</em></div>
@@ -250,13 +313,17 @@ function parseReadiness(value: unknown): Readiness | null {
 }
 
 function parseTicket(value: unknown): LaunchTicket | null {
-  if (!isRecord(value) || !exactKeys(value, ['schema', 'protocol', 'launch_url', 'access_token', 'expires_in', 'simulated'], ['esk_asset_projection'])) return null
+  if (!isRecord(value) || !exactKeys(value, ['schema', 'protocol', 'launch_url', 'access_token', 'expires_in', 'simulated'], ['esk_asset_projection', 'esk_quant_allocation_authorization'])) return null
   if (value.schema !== TICKET_SCHEMA || value.protocol !== PROTOCOL || value.simulated !== true || typeof value.launch_url !== 'string') return null
   if (typeof value.access_token !== 'string' || value.access_token.length > 8192 || !GRANT_PATTERN.test(value.access_token)) return null
   if (value.esk_asset_projection !== undefined
     && (typeof value.esk_asset_projection !== 'string'
       || value.esk_asset_projection.length > 8192
       || !ESK_PROJECTION_PATTERN.test(value.esk_asset_projection))) return null
+  if (value.esk_quant_allocation_authorization !== undefined
+    && (typeof value.esk_quant_allocation_authorization !== 'string'
+      || value.esk_quant_allocation_authorization.length > 8192
+      || !ESK_ALLOCATION_AUTHORIZATION_PATTERN.test(value.esk_quant_allocation_authorization))) return null
   if (!Number.isInteger(value.expires_in) || Number(value.expires_in) < 1 || Number(value.expires_in) > 300) return null
   return value as LaunchTicket
 }
@@ -267,9 +334,9 @@ function isReadyMessage(value: unknown): value is { schema: string; protocol: st
   if (capabilities !== undefined
     && (!Array.isArray(capabilities)
       || capabilities.length < 1
-      || capabilities.length > ESK_PROJECTION_SCHEMAS.length
+      || capabilities.length > READY_CAPABILITIES.length
       || new Set(capabilities).size !== capabilities.length
-      || capabilities.some((capability) => !ESK_PROJECTION_SCHEMAS.includes(capability as typeof ESK_PROJECTION_SCHEMAS[number])))) return false
+      || capabilities.some((capability) => !READY_CAPABILITIES.includes(capability as typeof READY_CAPABILITIES[number])))) return false
   return value.schema === READY_SCHEMA && value.protocol === PROTOCOL
     && typeof value.channel_nonce === 'string' && NONCE_PATTERN.test(value.channel_nonce)
 }
@@ -284,6 +351,22 @@ function isTerminalMessage(value: unknown, nonce: string, attemptId: string): va
   if (!isRecord(value) || value.protocol !== PROTOCOL || value.channel_nonce !== nonce || value.attempt_id !== attemptId) return false
   if (value.schema === CONSUMED_SCHEMA) return exactKeys(value, ['schema', 'protocol', 'channel_nonce', 'attempt_id'])
   return value.schema === ERROR_SCHEMA && exactKeys(value, ['schema', 'protocol', 'channel_nonce', 'attempt_id', 'code'])
+}
+
+function isAllocationReceiptMessage(
+  value: unknown,
+  nonce: string,
+  attemptId: string,
+): value is { schema: string; receipt_token: string } {
+  return isRecord(value)
+    && exactKeys(value, ['schema', 'protocol', 'channel_nonce', 'attempt_id', 'receipt_token'])
+    && value.schema === ALLOCATION_RECEIPT_MESSAGE_SCHEMA
+    && value.protocol === PROTOCOL
+    && value.channel_nonce === nonce
+    && value.attempt_id === attemptId
+    && typeof value.receipt_token === 'string'
+    && value.receipt_token.length <= 8192
+    && ESK_ALLOCATION_RECEIPT_PATTERN.test(value.receipt_token)
 }
 
 function normalizeLaunchUrl(raw: string): { url: string; origin: string } | null {

@@ -36,12 +36,14 @@ use crate::{
 
 mod admin_routes;
 mod node_routes;
+#[path = "quant_esk_allocation_receipt.rs"]
+pub(crate) mod quant_esk_allocation_receipt;
 #[path = "quant_esk_asset_projection.rs"]
 mod quant_esk_asset_projection;
 #[path = "quant_paper_access.rs"]
-mod quant_paper_access;
+pub(crate) mod quant_paper_access;
 #[path = "quant_paper_launch.rs"]
-mod quant_paper_launch;
+pub(crate) mod quant_paper_launch;
 mod social_routes;
 
 /// 读取 `CORS_ALLOW_ORIGINS` 环境变量构造 CORS 策略。

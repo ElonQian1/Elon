@@ -130,6 +130,27 @@
   background: #08100d;
 }
 
+.requestPicker {
+  display: grid;
+  gap: 7px;
+  margin-top: 14px;
+  padding: 14px 16px;
+  border: 1px solid rgba(114, 191, 240, 0.18);
+  border-radius: 16px;
+  background: rgba(35, 91, 125, 0.1);
+}
+
+.requestPicker span { color: #c8e8fa; font-size: 12px; font-weight: 800; }
+.requestPicker select {
+  min-height: 40px;
+  padding: 0 11px;
+  border: 1px solid rgba(153, 194, 171, 0.2);
+  border-radius: 10px;
+  color: #e2f1e8;
+  background: #07140e;
+}
+.requestPicker small { color: #82978c; font-size: 11px; line-height: 1.5; }
+
 .frameBar {
   display: flex;
   min-height: 38px;

@@ -5251,6 +5251,202 @@
       "updated_at_ms": 1788309438774
     },
     {
+      "id": "esk-paper-quant-allocation-binding-v3",
+      "title": "ESK Paper 量化申请授权、接收回执与释放 V3",
+      "summary": "用户选择单个 submitted ESK Paper 申请安全进入量化；主项目签发短期授权并验签量化 accepted/released 回执，以追加事件维持占用或释放，不创建资金、份额、交易或收益。",
+      "status": "verified",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/esk-paper-quant-allocation-binding-v3.md",
+        "content_hash": "a398e635aea7a3f1e7cd3648e99a3fc173409897d150b650bf5606fe33905142",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "18270a173b5fabd35cf4694d98d7cb90dc6c466f",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "efd1fd1e1eda0eb0d3e3bb22d3351ab279f10515",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "platform-assets, quant-integration, pc",
+      "tags": [
+        "esk",
+        "paper",
+        "allocation-binding",
+        "receipt",
+        "cross-repo"
+      ],
+      "task_paths": [
+        "contracts/quant",
+        "docs/requirements/esk-paper-quant-allocation-binding-v3.md",
+        "pc-frontend/src/features/assets",
+        "pc-frontend/src/features/conversation",
+        "server/src/esk_asset",
+        "server/src/quant_paper_launch.rs",
+        "server/src/store/common"
+      ],
+      "dependencies": [
+        "esk_paper_quant_allocation_request_v2"
+      ],
+      "acceptance_criteria": [
+        "单申请授权只为当前用户 submitted 请求签发并与同次 grant/participant/TTL 精确绑定。",
+        "量化 accepted/released 回执用独立 keyring 验签且不保存完整 token。",
+        "submitted/accepted 保持占用，canceled/released 释放；取消与 accepted 并发最多一个分支成功。",
+        "PC 明确选择请求并通过 exact-origin 内存桥同步可重试回执。",
+        "不转换旧 NET，不创建 QSHARE/NAV/订单/收益或资金移动。",
+        "双仓合同和 E2E 通过，量化公网未部署继续 deferred。"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "contracts/quant/esk-allocation-receipt-keyring-v1.schema.json",
+          "content_hash": "edd81388903b6036b54483739915f74e7a45572854f7e103b3a2b96d9eac0f62",
+          "locator": "receipt keyring",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "18270a173b5fabd35cf4694d98d7cb90dc6c466f",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "385259d1bc32233fed38f59bd0cd4a72bf194a13",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "contracts/quant/esk-paper-allocation-receipt-v1.schema.json",
+          "content_hash": "67eac3c1051c83e78220a3aa80a0f14edc739e95f062f7e4132ef94a1f841687",
+          "locator": "yilong.quant.esk_allocation_receipt.v1",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "18270a173b5fabd35cf4694d98d7cb90dc6c466f",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "293b80cf04dbcfd902a4ec017ef4aef56462de97",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "docs/esk-paper-quant-allocation-binding-v3-acceptance.md",
+          "content_hash": "8922bb41a322a4de21f2ce2d2d6d1bc597bebefdb219c85faeef69cd8d0964c3",
+          "locator": "local acceptance evidence",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "18270a173b5fabd35cf4694d98d7cb90dc6c466f",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "c55b1bc3b4c929f0c9114cbb1d63414acce94f96",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/conversation/QuantPaperLaunch.tsx",
+          "content_hash": "4660464ab12105e30fcadf9a6e46b1001c3972f5bb4bc13491847f76d8f20130",
+          "locator": "receipt postMessage adoption",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "18270a173b5fabd35cf4694d98d7cb90dc6c466f",
+            "head_blob_oid": "b7c7f98c5d65430b3914aaa44a50111eb637aff6",
+            "worktree_blob_oid": "f4b0f40e0604e7d4d22d28739b9898e67765a56e",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "scripts/test-esk-asset-contract.js",
+          "content_hash": "acdffc6bce991046dc3fe056d3bb017ee76efc82028bfb452d44154af570f74d",
+          "locator": "ESK_ASSET_CONTRACT_TEST=passed",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "18270a173b5fabd35cf4694d98d7cb90dc6c466f",
+            "head_blob_oid": "bcd9eacc481550272fa7f2f1e9f2056a91660874",
+            "worktree_blob_oid": "6422bec0e44e0378fc8243be888255a366eb40d5",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/esk_asset/quant_allocation_api.rs",
+          "content_hash": "45bfea6a78f6e475a9add19dfeb9233bd3563aef920476b6afb156e6d6a303b3",
+          "locator": "apply_my_receipt",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "18270a173b5fabd35cf4694d98d7cb90dc6c466f",
+            "head_blob_oid": "e06c4212a432248b80a2bacb12076f2e357cad49",
+            "worktree_blob_oid": "239d740ed271112d70447444edc6d46e610b0d06",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/esk_asset/quant_allocation_tests.rs",
+          "content_hash": "1f7997d321ed24720180051caf6f09581c2cd3aeea6b9a05df20f1e8f92ea501",
+          "locator": "quant_allocation_tests 6/6",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "18270a173b5fabd35cf4694d98d7cb90dc6c466f",
+            "head_blob_oid": "b792fed5b70f2f9df4d703bed2fe24e8266eaa98",
+            "worktree_blob_oid": "c775ba3350ccb7528d37b0fe895f2652907d4db1",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/esk_quant_allocation_binding_migration.rs",
+          "content_hash": "497209a728c506841e171450ffd90393637d5c9ad4123250f8a642039e489051",
+          "locator": "migration_v285",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "18270a173b5fabd35cf4694d98d7cb90dc6c466f",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "1478c3f01cc0db37ddd180f62892717d2ba4268b",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/quant_esk_allocation_receipt.rs",
+          "content_hash": "f24971694556d0b5629b1bc095b46cd1829a271a531199eee23ba15142ffc1c3",
+          "locator": "EskAllocationReceiptVerifier",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "18270a173b5fabd35cf4694d98d7cb90dc6c466f",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "7b700dc6b21a6f2c4e7c544bbba53a8679a22c68",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/quant_paper_launch.rs",
+          "content_hash": "9b2560fe632963c4b0ba17737bc3d6cf7d203906e0ad92bb89da2f35026cda0b",
+          "locator": "issue_esk_allocation_authorization",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "18270a173b5fabd35cf4694d98d7cb90dc6c466f",
+            "head_blob_oid": "3b1d0cd7f0e1e3cb27be453083c3a1e02466b80b",
+            "worktree_blob_oid": "9e6f0464430d03f97df8944bd1d15d8ffbe2ac50",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/store/common/esk_quant_allocations.rs",
+          "content_hash": "1e711981fa8fd37224b012ebe9e442a0cd38b2b0a38d0f8ae9cc71b37a18531e",
+          "locator": "apply_esk_quant_allocation_receipt",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "18270a173b5fabd35cf4694d98d7cb90dc6c466f",
+            "head_blob_oid": "502311b51f04dfc9d0665e3bb2c388144df8640d",
+            "worktree_blob_oid": "584d89b16c4b4d35aee5ace520be6854b3bbd8ab",
+            "state": "tracked_modified"
+          }
+        }
+      ],
+      "created_at_ms": 1788315967384,
+      "updated_at_ms": 1788321279149
+    },
+    {
       "id": "esk_paper_quant_allocation_request_v2",
       "title": "ESK Paper 量化分配申请与只读占用投影 V2",
       "summary": "用户可在主项目把可用 ESK 提交为可取消的 Paper 量化分配申请；主项目分别核算卖回、量化与总占用，并通过最长五分钟签名 V2 投影让量化 PWA 只读展示，不自动建仓、交易或产生收益。",
@@ -14799,126 +14995,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_88d0d3dcb75d444fb5b120f050b2d08a",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-q12-019fc8bf",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788265417783
-    },
-    {
-      "id": "feature_event_9948ce5ea12145f3be3256d3f7e810b2",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex-q12-019fc8bf",
-      "reason": "Q12 source contracts are complete and statically reviewed, but the broader Qlock still lacks 4,912 members/4,384 groups; compilation, Windows actual records, reviewed inventory digests/manifests and production opening remain intentionally deferred.",
-      "from_status": "in_progress",
-      "to_status": "blocked",
-      "at_ms": 1788265433153
-    },
-    {
-      "id": "feature_event_b004274c4a8f4911b092f91299fd4f2d",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex-q13-019fc8bf",
-      "reason": "Resume the next exact source-only initialization tranche after Q12; dependency is verified and the requirement is current.",
-      "from_status": "blocked",
-      "to_status": "ready",
-      "at_ms": 1788266460768
-    },
-    {
-      "id": "feature_event_0f860ecf7099483a92a5bbec73cfbec7",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "claimed",
-      "actor": "codex-q13-019fc8bf",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788266471047
-    },
-    {
-      "id": "feature_event_b87b12d5fe8b45debe5566f8fe993adb",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex-q13-019fc8bf",
-      "reason": "Implement the exact 88-member ExistingFirst DMS exclusive-release outcome-uncertain source tranche without compilation or runtime execution.",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788266480292
-    },
-    {
-      "id": "feature_event_8ef0e81ceb4446d4b2fc76fdbf2dc900",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "claim_released",
-      "actor": "codex-q13-019fc8bf",
-      "reason": "Release the Q13 claim before rebinding the intentionally updated authoritative requirement; current drift must remain explicit.",
-      "from_status": "in_progress",
-      "to_status": "blocked",
-      "at_ms": 1788268715624
-    },
-    {
-      "id": "feature_event_fb3b1e2681fb4544a334b4687610af3f",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "requirement_rebound",
-      "actor": "codex-q13-019fc8bf",
-      "reason": "Bind the authoritative requirement to the Q13 ExistingFirst 88-member source checkpoint, its exact inventory delta, controlled-fault-only boundary, and explicit remaining quotient gaps.",
-      "from_status": "blocked",
-      "to_status": "proposed",
-      "at_ms": 1788268724913
-    },
-    {
-      "id": "feature_event_50cde497b221490490c39ee6ebc31f1d",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex-q13-019fc8bf",
-      "reason": "Reviewed the rebound Q13 requirement: exact 88-member ExistingFirst scope, frozen catalog seals, source-only controlled-fault boundary, inventory arithmetic, and all production/downstream gates remain explicit without narrowing the full quotient.",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1788268734958
-    },
-    {
-      "id": "feature_event_c48b4ff61f0049809cbbcaa9336b787a",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex-q13-019fc8bf",
-      "reason": "The accepted Q13 source batch has a current requirement, verified static-denominator dependency, bounded task paths, exact source-only evidence contract, and explicit fail-closed remaining gaps.",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1788268744013
-    },
-    {
-      "id": "feature_event_bd42b4f75f8f4aa08a0f5e2f3cb42d32",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "claimed",
-      "actor": "codex-q13-019fc8bf",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788268752752
-    },
-    {
-      "id": "feature_event_5c53ed681f544354a3ab421e32053f78",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex-q13-019fc8bf",
-      "reason": "Record the reviewed Q13 source-only vertical slice and then close it accurately against the still-incomplete full dynamic quotient.",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788268762752
-    },
-    {
-      "id": "feature_event_c492e2dc00d642e8b5d8ecce29e30cbb",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-q13-019fc8bf",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788268958043
-    },
-    {
       "id": "feature_event_6874a9edfd3445f69b6314bd971b18b1",
       "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
       "action": "transitioned",
@@ -16797,6 +16873,126 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1788315316771
+    },
+    {
+      "id": "feature_event_be73c6481fc24f8bb9a9fc88a8094ed0",
+      "feature_id": "esk-paper-quant-allocation-binding-v3",
+      "action": "registered",
+      "actor": "codex-desktop",
+      "reason": "Extend released V2 reservation requests with a Paper-only quant acceptance and release receipt lifecycle.",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1788315967384
+    },
+    {
+      "id": "feature_event_c1785549564f4f8caaa900969d8d7516",
+      "feature_id": "esk-paper-quant-allocation-binding-v3",
+      "action": "claimed",
+      "actor": "codex-desktop",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788315977552
+    },
+    {
+      "id": "feature_event_f8c2cac7ba4e4e90b7584c587863f63f",
+      "feature_id": "esk-paper-quant-allocation-binding-v3",
+      "action": "transitioned",
+      "actor": "codex-desktop",
+      "reason": "Implement the accepted cross-repository Paper authorization and signed receipt lifecycle.",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788315987154
+    },
+    {
+      "id": "feature_event_c8c0f0bc5cf044c59e695ad48813f155",
+      "feature_id": "esk-paper-quant-allocation-binding-v3",
+      "action": "claim_released",
+      "actor": "codex-desktop",
+      "reason": "需求状态元数据随实现完成更新，先释放认领以重新绑定当前需求哈希。",
+      "from_status": "in_progress",
+      "to_status": "blocked",
+      "at_ms": 1788321158694
+    },
+    {
+      "id": "feature_event_e118c7e4161f443faad38cc28223bc0e",
+      "feature_id": "esk-paper-quant-allocation-binding-v3",
+      "action": "requirement_rebound",
+      "actor": "codex-desktop",
+      "reason": "重新绑定实现完成后的权威需求文档哈希并重新评审。",
+      "from_status": "blocked",
+      "to_status": "proposed",
+      "at_ms": 1788321169719
+    },
+    {
+      "id": "feature_event_79a5e37ee5004a49acbff62be5373d2e",
+      "feature_id": "esk-paper-quant-allocation-binding-v3",
+      "action": "transitioned",
+      "actor": "codex-desktop",
+      "reason": "重新审阅实现状态更新；范围、Paper 边界和验收标准未改变。",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1788321180533
+    },
+    {
+      "id": "feature_event_361337d10b3548ddbc7e53686529b76f",
+      "feature_id": "esk-paper-quant-allocation-binding-v3",
+      "action": "transitioned",
+      "actor": "codex-desktop",
+      "reason": "依赖已发布，范围与验收标准完整，重新进入可认领状态。",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1788321191344
+    },
+    {
+      "id": "feature_event_f55ed5e20026483f9550f9dc644e2a3c",
+      "feature_id": "esk-paper-quant-allocation-binding-v3",
+      "action": "claimed",
+      "actor": "codex-desktop",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788321201927
+    },
+    {
+      "id": "feature_event_e416d1dbff41430cac12d8a13cff8ecb",
+      "feature_id": "esk-paper-quant-allocation-binding-v3",
+      "action": "transitioned",
+      "actor": "codex-desktop",
+      "reason": "恢复同一实现任务并登记最终验证证据。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788321214890
+    },
+    {
+      "id": "feature_event_9bf4839121fc4b17bcf15051053b620f",
+      "feature_id": "esk-paper-quant-allocation-binding-v3",
+      "action": "evidence_recorded",
+      "actor": "codex-desktop",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788321248751
+    },
+    {
+      "id": "feature_event_418f3af017514d04af43cb0c2937434a",
+      "feature_id": "esk-paper-quant-allocation-binding-v3",
+      "action": "transitioned",
+      "actor": "codex-desktop",
+      "reason": "主项目授权、验签、V285 追加事件、PC 同步与状态机实现完成。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1788321265231
+    },
+    {
+      "id": "feature_event_353fea58549d48e18c719dcc9cb48540",
+      "feature_id": "esk-paper-quant-allocation-binding-v3",
+      "action": "transitioned",
+      "actor": "codex-desktop",
+      "reason": "主程序编译、6 项 ESK 状态机测试、授权/回执专项、PC 构建、静态合同和双仓哈希均通过。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1788321279149
     }
   ]
 }

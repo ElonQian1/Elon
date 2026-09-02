@@ -21,7 +21,8 @@ pub(crate) use model::{
     ESK_DECIMALS, ESK_NAME, ESK_SYMBOL,
 };
 pub(crate) use quant_allocation::{
-    EskQuantAllocationInput, EskQuantAllocationRecord, ESK_QUANT_RISK_DISCLOSURE_REVISION,
+    EskQuantAllocationInput, EskQuantAllocationReceiptInput, EskQuantAllocationRecord,
+    ESK_QUANT_RISK_DISCLOSURE_REVISION,
 };
 pub(crate) use service::{format_esk_amount, parse_esk_amount};
 
@@ -44,6 +45,10 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
         .route(
             "/api/me/assets/esk/quant-allocation-requests/:request_id/cancel",
             post(quant_allocation_api::cancel_my_request),
+        )
+        .route(
+            "/api/me/assets/esk/quant-allocation-receipts",
+            post(quant_allocation_api::apply_my_receipt),
         )
         .route(
             "/api/admin/assets/esk/paper-allocations",

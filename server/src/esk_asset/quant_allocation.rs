@@ -26,6 +26,29 @@ pub(crate) struct EskQuantAllocationRecord {
     pub submitted_at: String,
     pub updated_at: String,
     pub replayed: bool,
+    pub binding_id: Option<String>,
+    pub receipt_id: Option<String>,
+    pub receipt_digest: Option<String>,
+    pub receipt_key_id: Option<String>,
+    pub quant_binding_revision: Option<i64>,
+    pub occurred_at_unix: Option<i64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct EskQuantAllocationReceiptInput {
+    pub user_id: String,
+    pub participant_ref: String,
+    pub request_id: String,
+    pub amount_base_units: i64,
+    pub risk_disclosure_revision: String,
+    pub event: String,
+    pub binding_id: String,
+    pub receipt_id: String,
+    pub receipt_digest: String,
+    pub receipt_key_id: String,
+    pub previous_receipt_digest: Option<String>,
+    pub quant_binding_revision: i64,
+    pub occurred_at_unix: i64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -41,6 +64,12 @@ pub(crate) struct CreateEskQuantAllocationBody {
 #[serde(deny_unknown_fields)]
 pub(crate) struct CancelEskQuantAllocationBody {
     pub confirmation: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ApplyEskQuantAllocationReceiptBody {
+    pub receipt_token: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -66,10 +95,18 @@ pub(crate) struct EskQuantAllocationView {
     pub simulated: bool,
     pub funds_moved: bool,
     pub position_created: bool,
+    pub allocation_binding_created: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub binding_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub quant_binding_revision: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub occurred_at_unix: Option<i64>,
     pub replayed: bool,
 }
 
 pub(crate) fn view(record: EskQuantAllocationRecord) -> EskQuantAllocationView {
+    let allocation_binding_created = matches!(record.status.as_str(), "accepted" | "released");
     EskQuantAllocationView {
         request_id: record.request_id,
         amount: format_esk_amount(record.amount_base_units),
@@ -82,6 +119,10 @@ pub(crate) fn view(record: EskQuantAllocationRecord) -> EskQuantAllocationView {
         simulated: true,
         funds_moved: false,
         position_created: false,
+        allocation_binding_created,
+        binding_id: record.binding_id,
+        quant_binding_revision: record.quant_binding_revision,
+        occurred_at_unix: record.occurred_at_unix,
         replayed: record.replayed,
     }
 }

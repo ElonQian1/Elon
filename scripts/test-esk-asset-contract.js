@@ -11,6 +11,8 @@ const serverService = read('server/src/esk_asset/service.rs')
 const pcCard = read('pc-frontend/src/features/assets/EskAssetCard.tsx')
 const pcQuantPanel = read('pc-frontend/src/features/assets/EskQuantAllocationPanel.tsx')
 const pcApi = read('pc-frontend/src/features/assets/eskAssetApi.ts')
+const pcQuantLaunch = read('pc-frontend/src/features/conversation/QuantPaperLaunch.tsx')
+const quantReceiptVerifier = read('server/src/quant_esk_allocation_receipt.rs')
 const androidCard = read('android/app/src/main/kotlin/com/elon/app/esk/EskAssetCard.kt')
 const androidDialog = read('android/app/src/main/kotlin/com/elon/app/esk/EskSellbackDialog.kt')
 const androidApi = read('android/app/src/main/kotlin/com/elon/app/esk/EskAssetApi.kt')
@@ -19,6 +21,7 @@ for (const endpoint of [
   '/api/me/assets/esk',
   '/api/me/assets/esk/sellback-requests',
   '/api/me/assets/esk/quant-allocation-requests',
+  '/api/me/assets/esk/quant-allocation-receipts',
   '/api/admin/assets/esk/paper-allocations',
 ]) assert.ok(router.includes(endpoint), `missing ESK route: ${endpoint}`)
 
@@ -48,8 +51,23 @@ assert.ok(androidApi.includes('CANCEL ESK SELLBACK REQUEST'), 'Android cancellat
 assert.ok(pcApi.includes('REQUEST PAPER ESK QUANT ALLOCATION'), 'PC quant allocation must use explicit confirmation')
 assert.ok(pcApi.includes('CANCEL PAPER ESK QUANT ALLOCATION'), 'PC quant cancellation must use explicit confirmation')
 assert.ok(pcApi.includes('esk-quant-paper-allocation-v2'), 'PC quant allocation must bind the reviewed disclosure revision')
+assert.ok(pcApi.includes('applyQuantAllocationReceipt'), 'PC must return signed quant receipts to the main project')
 for (const boundary of ['尚未形成量化仓位', '不转移资金', '不创建仓位', '不承诺收益']) {
   assert.ok(pcQuantPanel.includes(boundary), `quant Paper boundary must be visible: ${boundary}`)
+}
+for (const boundary of ['量化端已签名接收', '量化端已释放']) {
+  assert.ok(pcQuantPanel.includes(boundary), `quant binding state must be visible: ${boundary}`)
+}
+for (const contract of [
+  'yilong.esk.quant_allocation_authorization.v1',
+  'yilong.quant.paper_launch.allocation_receipt.v1',
+  'esk_quant_allocation_request_id',
+]) assert.ok(pcQuantLaunch.includes(contract), `missing secure quant launch contract: ${contract}`)
+for (const boundary of ['quant_units_issued', 'nav_participation', 'trading_started', 'funds_moved']) {
+  assert.ok(quantReceiptVerifier.includes(boundary), `receipt verifier must fail closed on ${boundary}`)
+}
+for (const forbidden of ['localStorage', 'sessionStorage', 'indexedDB', 'receipt_token=']) {
+  assert.equal(pcQuantLaunch.includes(forbidden), false, `launch bridge persisted or placed a credential in URL: ${forbidden}`)
 }
 for (const field of ['reserved_for_sellback', 'reserved_for_quant', 'reserved_total']) {
   assert.ok(serverModel.includes(field), `server must publish split reservation field: ${field}`)

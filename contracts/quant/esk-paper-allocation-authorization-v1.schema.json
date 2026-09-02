@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://yilong.example/contracts/quant/esk-paper-allocation-authorization-v1.schema.json",
+  "title": "Yilong ESK Paper Quant Allocation Authorization V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema", "authorization_id", "issuer", "audience", "project_id", "key_id",
+    "grant_id", "participant_ref", "request_id", "amount", "amount_base_units",
+    "request_revision", "risk_revision", "issued_at_unix", "expires_at_unix",
+    "simulated", "funds_moved", "quant_units_issued"
+  ],
+  "properties": {
+    "schema": { "const": "yilong.esk.quant_allocation_authorization.v1" },
+    "authorization_id": { "type": "string", "pattern": "^eskauth_[0-9a-f]{32}$" },
+    "issuer": { "const": "yilong-main" },
+    "audience": { "const": "yilong-quant" },
+    "project_id": { "const": "esk" },
+    "key_id": { "$ref": "#/$defs/keyId" },
+    "grant_id": { "type": "string", "pattern": "^qpg_[0-9a-f]{32}$" },
+    "participant_ref": { "type": "string", "pattern": "^yp1_[0-9a-f]{40}$" },
+    "request_id": { "type": "string", "pattern": "^eskq_[0-9a-f]{32}$" },
+    "amount": { "$ref": "#/$defs/amount" },
+    "amount_base_units": { "$ref": "#/$defs/baseUnits" },
+    "request_revision": { "type": "integer", "minimum": 1 },
+    "risk_revision": { "const": "esk-quant-paper-allocation-v2" },
+    "issued_at_unix": { "type": "integer", "minimum": 1 },
+    "expires_at_unix": { "type": "integer", "minimum": 1 },
+    "simulated": { "const": true },
+    "funds_moved": { "const": false },
+    "quant_units_issued": { "const": false }
+  },
+  "$defs": {
+    "keyId": { "type": "string", "minLength": 3, "maxLength": 64, "pattern": "^[A-Za-z0-9._-]+$" },
+    "amount": { "type": "string", "pattern": "^(?:0|[1-9][0-9]*)\\.[0-9]{6}$", "maxLength": 32 },
+    "baseUnits": { "type": "string", "pattern": "^(?:0|[1-9][0-9]*)$", "maxLength": 19 }
+  }
+}
