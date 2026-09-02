@@ -1,0 +1,28 @@
+.panel { display: grid; gap: 11px; padding: 14px; border: 1px solid rgba(96, 165, 250, .22); border-radius: 12px; background: linear-gradient(145deg, rgba(37, 99, 235, .10), rgba(0, 0, 0, .13)); }
+.heading { display: flex; align-items: flex-start; gap: 9px; }
+.icon { display: grid; flex: 0 0 32px; height: 32px; place-items: center; border-radius: 9px; color: #93c5fd; background: rgba(59, 130, 246, .14); }
+.heading strong { color: #dbeafe; font-size: 13px; }
+.heading p { margin: 4px 0 0; color: #aeb8c7; font-size: 11px; line-height: 1.5; }
+.available { display: flex; justify-content: space-between; gap: 12px; padding: 9px 10px; border-radius: 8px; color: #aeb8c7; background: rgba(0, 0, 0, .13); font-size: 11px; }
+.available strong { color: #bfdbfe; }
+.form { display: grid; gap: 7px; }
+.form label { font-size: 12px; font-weight: 750; }
+.form > div { display: flex; gap: 8px; }
+.form input { min-width: 0; flex: 1; height: 40px; padding: 0 11px; border: 1px solid var(--line); border-radius: 9px; outline: none; color: var(--text); background: #17191e; }
+.form input:focus { border-color: #60a5fa; }
+.form button { min-width: 112px; border: 0; border-radius: 9px; color: #07111f; font-size: 12px; font-weight: 800; background: #60a5fa; }
+.form button:disabled, .request button:disabled { opacity: .45; cursor: not-allowed; }
+.hint, .success, .error, .empty { margin: 0; font-size: 11px; line-height: 1.5; }
+.hint, .empty { color: var(--text-muted); }
+.success { color: #86efac; }
+.error { color: #fca5a5; }
+.history { display: grid; gap: 8px; }
+.historyTitle { display: flex; justify-content: space-between; color: var(--text-muted); font-size: 11px; }
+.historyTitle strong { color: var(--text); font-size: 12px; }
+.request { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 9px; border-top: 1px solid rgba(255, 255, 255, .07); }
+.request > div { min-width: 0; }
+.request strong, .request span { display: block; }
+.request strong { font-size: 12px; }
+.request span { margin-top: 3px; color: var(--text-muted); font-size: 10px; }
+.request button { display: inline-flex; align-items: center; gap: 5px; min-height: 32px; padding: 0 10px; border: 1px solid rgba(96, 165, 250, .22); border-radius: 8px; color: #93c5fd; background: rgba(0, 0, 0, .15); }
+@media (max-width: 520px) { .form > div { flex-direction: column; } .form button { min-height: 40px; } }

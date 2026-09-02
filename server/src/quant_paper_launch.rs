@@ -7,7 +7,10 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, net::IpAddr, sync::Arc};
 
-use super::quant_esk_asset_projection::{issue_esk_projection, ESK_PROJECTION_SCHEMA};
+use super::quant_esk_asset_projection::{
+    issue_esk_projection, issue_esk_projection_v2, ESK_PROJECTION_SCHEMA_V1,
+    ESK_PROJECTION_SCHEMA_V2,
+};
 use super::quant_paper_access::{
     PaperAccessGrantResponse, PaperAccessScope, PaperGrantSigner, SignerConfigError,
 };
@@ -123,7 +126,7 @@ pub(crate) async fn issue(
             )
         }
     };
-    let wants_esk_projection = match validate_capabilities(&request.capabilities) {
+    let esk_projection_version = match validate_capabilities(&request.capabilities) {
         Ok(value) => value,
         Err(()) => {
             return error_response(
@@ -150,7 +153,7 @@ pub(crate) async fn issue(
             )
         }
     };
-    let esk_asset_projection = if wants_esk_projection {
+    let esk_asset_projection = if let Some(version) = esk_projection_version {
         let mode = EskAssetMode::from_env();
         if matches!(mode, EskAssetMode::Invalid) {
             return unavailable("quant_esk_projection_misconfigured", "ESK 资产投影配置无效");
@@ -165,15 +168,27 @@ pub(crate) async fn issue(
                 );
             }
         };
-        match issue_esk_projection(
-            &signer,
-            &grant.grant_id,
-            &grant.participant_ref,
-            mode,
-            ledger,
-            now_unix,
-            now_unix + grant.expires_in,
-        ) {
+        let projection = match version {
+            EskProjectionVersion::V1 => issue_esk_projection(
+                &signer,
+                &grant.grant_id,
+                &grant.participant_ref,
+                mode,
+                ledger,
+                now_unix,
+                now_unix + grant.expires_in,
+            ),
+            EskProjectionVersion::V2 => issue_esk_projection_v2(
+                &signer,
+                &grant.grant_id,
+                &grant.participant_ref,
+                mode,
+                ledger,
+                now_unix,
+                now_unix + grant.expires_in,
+            ),
+        };
+        match projection {
             Ok(token) => Some(token),
             Err(()) => {
                 return unavailable(
@@ -261,7 +276,13 @@ fn build_ticket(
     }
 }
 
-fn validate_capabilities(capabilities: &[String]) -> Result<bool, ()> {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum EskProjectionVersion {
+    V1,
+    V2,
+}
+
+fn validate_capabilities(capabilities: &[String]) -> Result<Option<EskProjectionVersion>, ()> {
     if capabilities.len() > 8 {
         return Err(());
     }
@@ -275,7 +296,13 @@ fn validate_capabilities(capabilities: &[String]) -> Result<bool, ()> {
             return Err(());
         }
     }
-    Ok(seen.contains(ESK_PROJECTION_SCHEMA))
+    Ok(if seen.contains(ESK_PROJECTION_SCHEMA_V2) {
+        Some(EskProjectionVersion::V2)
+    } else if seen.contains(ESK_PROJECTION_SCHEMA_V1) {
+        Some(EskProjectionVersion::V1)
+    } else {
+        None
+    })
 }
 
 fn unavailable(code: &'static str, message: &'static str) -> Response {
@@ -323,20 +350,27 @@ mod tests {
         );
         assert_eq!(
             schema["$defs"]["launchTicket"]["properties"]["esk_asset_projection"]["pattern"],
-            "^yep1\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+$"
+            "^yep[12]\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+$"
         );
     }
 
     #[test]
     fn capability_negotiation_is_explicit_and_bounded() {
-        assert_eq!(validate_capabilities(&[]), Ok(false));
+        assert_eq!(validate_capabilities(&[]), Ok(None));
         assert_eq!(
-            validate_capabilities(&[ESK_PROJECTION_SCHEMA.to_owned()]),
-            Ok(true)
+            validate_capabilities(&[ESK_PROJECTION_SCHEMA_V1.to_owned()]),
+            Ok(Some(EskProjectionVersion::V1))
+        );
+        assert_eq!(
+            validate_capabilities(&[
+                ESK_PROJECTION_SCHEMA_V1.to_owned(),
+                ESK_PROJECTION_SCHEMA_V2.to_owned(),
+            ]),
+            Ok(Some(EskProjectionVersion::V2))
         );
         assert!(validate_capabilities(&[
-            ESK_PROJECTION_SCHEMA.to_owned(),
-            ESK_PROJECTION_SCHEMA.to_owned(),
+            ESK_PROJECTION_SCHEMA_V1.to_owned(),
+            ESK_PROJECTION_SCHEMA_V1.to_owned(),
         ])
         .is_err());
     }

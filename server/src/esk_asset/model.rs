@@ -46,6 +46,8 @@ impl EskAssetMode {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct EskAccountLedger {
     pub total_base_units: i64,
+    pub sellback_reserved_base_units: i64,
+    pub quant_reserved_base_units: i64,
     pub reserved_base_units: i64,
     pub revision: i64,
     pub updated_at: Option<String>,
@@ -184,8 +186,12 @@ pub(crate) struct EskBalanceView {
     pub total: String,
     pub available: String,
     pub reserved_for_sellback: String,
+    pub reserved_for_quant: String,
+    pub reserved_total: String,
     pub total_base_units: String,
     pub available_base_units: String,
+    pub sellback_reserved_base_units: String,
+    pub quant_reserved_base_units: String,
     pub reserved_base_units: String,
     pub revision: i64,
     pub updated_at: Option<String>,

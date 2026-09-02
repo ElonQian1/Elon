@@ -11,6 +11,7 @@ use uuid::Uuid;
 
 mod esk_asset_batches;
 mod esk_assets;
+mod esk_quant_allocations;
 
 #[cfg(not(test))]
 const PASSWORD_PBKDF2_ITERATIONS: u32 = 310_000;

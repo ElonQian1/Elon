@@ -28,6 +28,8 @@
 
 首批用户批量登记的操作合同、幂等回执和工具见 [`esk-paper-first-user-allocation-operations-v1-acceptance.md`](esk-paper-first-user-allocation-operations-v1-acceptance.md)。
 
+后续 V2 在不改写 V1 账本历史的前提下增加量化分配申请占用、卖回/量化分项余额及跨项目只读投影；验收见 [`esk-paper-quant-allocation-request-v2-acceptance.md`](esk-paper-quant-allocation-request-v2-acceptance.md)。
+
 ## 运行证据
 
 2026-09-02 在隔离 worktree 和临时数据库完成：

@@ -18,7 +18,12 @@ const EskAssetCard = lazy(() => import('./features/assets/EskAssetCard'))
 const EskAssetPreview = lazy(async () => {
   const data = await import('./features/assets/eskAssetApi')
   return {
-    default: () => <EskAssetCard previewMode initialSnapshot={data.ESK_PREVIEW_SNAPSHOT} initialRequests={data.ESK_PREVIEW_REQUESTS} />,
+    default: () => <EskAssetCard
+      previewMode
+      initialSnapshot={data.ESK_PREVIEW_SNAPSHOT}
+      initialRequests={data.ESK_PREVIEW_REQUESTS}
+      initialQuantRequests={data.ESK_PREVIEW_QUANT_REQUESTS}
+    />,
   }
 })
 const UserBrowserLauncherPage = lazy(() => import('./features/user-browser/UserBrowserLauncherPage'))

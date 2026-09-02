@@ -125,7 +125,7 @@ server/src/
 改动过 `pc-frontend/` 的提交；只要其中任一提交同时改动服务器/API，发布立即失败。通过后
 发布标记绑定当前线上服务器 SHA，服务器不会重新编译或重启，统一收尾会重复验证该隔离证明。
 | 绑定手机/邮箱 | 🟢 低 | `src/features/account/` | ⬜ 未开始 |
-| 积分/余额查看 | 🟢 低 | `src/features/account/AccountPage.tsx`、`src/features/billing/` | 🟡 部分完成：账号页已展示余额、试用额度和最近账单；独立账单分页/充值页继续补 |
+| 积分/余额查看 | 🟢 低 | `src/features/account/AccountPage.tsx`、`src/features/billing/`、`src/features/assets/` | 🟡 部分完成：账号页已展示余额、试用额度和最近账单；ESK Paper 资产卡已完成 V2 总额、可用额、卖回/量化/总占用及量化申请/取消源码与隔离验收，仍不代表链上发行、资金或仓位；独立账单分页/充值页继续补 |
 
 ### 阶段 P7 — 移动端适配 & 收尾
 

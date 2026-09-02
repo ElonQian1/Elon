@@ -4,19 +4,23 @@ import { CircleDollarSign, RefreshCw, ShieldCheck } from 'lucide-react'
 import {
   eskAssetApi,
   type EskAssetSnapshot,
+  type EskQuantAllocationRequest,
   type EskSellbackRequest,
 } from './eskAssetApi'
+import EskQuantAllocationPanel from './EskQuantAllocationPanel'
 import styles from './EskAssetCard.module.css'
 
 interface Props {
   initialSnapshot?: EskAssetSnapshot
   initialRequests?: EskSellbackRequest[]
+  initialQuantRequests?: EskQuantAllocationRequest[]
   previewMode?: boolean
 }
 
-export default function EskAssetCard({ initialSnapshot, initialRequests, previewMode = false }: Props) {
+export default function EskAssetCard({ initialSnapshot, initialRequests, initialQuantRequests, previewMode = false }: Props) {
   const [snapshot, setSnapshot] = useState<EskAssetSnapshot | null>(initialSnapshot ?? null)
   const [requests, setRequests] = useState<EskSellbackRequest[]>(initialRequests ?? [])
+  const [quantRequests, setQuantRequests] = useState<EskQuantAllocationRequest[]>(initialQuantRequests ?? [])
   const [amount, setAmount] = useState('')
   const [idempotencyKey, setIdempotencyKey] = useState(newIdempotencyKey)
   const [loading, setLoading] = useState(!initialSnapshot)
@@ -29,12 +33,14 @@ export default function EskAssetCard({ initialSnapshot, initialRequests, preview
     setLoading(true)
     setError('')
     try {
-      const [account, history] = await Promise.all([
+      const [account, history, quantHistory] = await Promise.all([
         eskAssetApi.account(),
         eskAssetApi.sellbackRequests(),
+        eskAssetApi.quantAllocationRequests(),
       ])
       setSnapshot(account)
       setRequests(history.requests)
+      setQuantRequests(quantHistory.requests)
     } catch (reason) {
       setError(errorMessage(reason, '暂时无法读取 ESK 资产'))
     } finally {
@@ -123,7 +129,17 @@ export default function EskAssetCard({ initialSnapshot, initialRequests, preview
       <div className={styles.balanceGrid}>
         <div><span>当前可用</span><strong>{snapshot.balance.available} ESK</strong></div>
         <div><span>卖回申请冻结</span><strong>{snapshot.balance.reserved_for_sellback} ESK</strong></div>
+        <div><span>量化申请占用</span><strong>{snapshot.balance.reserved_for_quant} ESK</strong></div>
+        <div><span>全部申请占用</span><strong>{snapshot.balance.reserved_total} ESK</strong></div>
       </div>
+
+      <EskQuantAllocationPanel
+        available={snapshot.balance.available}
+        enabled={snapshot.mode === 'paper'}
+        requests={quantRequests}
+        previewMode={previewMode}
+        onChanged={load}
+      />
 
       <div className={styles.notice}>
         <strong>当前是可核对的 Paper 资产记录</strong>

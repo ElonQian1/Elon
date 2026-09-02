@@ -181,7 +181,7 @@ impl Store {
     }
 }
 
-fn account_ledger_on(conn: &Connection, user_id: &str) -> Result<EskAccountLedger> {
+pub(super) fn account_ledger_on(conn: &Connection, user_id: &str) -> Result<EskAccountLedger> {
     let (total, revision, updated_at): (i64, i64, Option<String>) = conn.query_row(
         "SELECT COALESCE(SUM(amount_base_units), 0), COUNT(*), MAX(created_at)
            FROM esk_asset_ledger_entries
@@ -189,7 +189,7 @@ fn account_ledger_on(conn: &Connection, user_id: &str) -> Result<EskAccountLedge
         params![user_id],
         |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
     )?;
-    let reserved: i64 = conn.query_row(
+    let sellback_reserved: i64 = conn.query_row(
         "SELECT COALESCE(SUM(r.amount_base_units), 0)
            FROM esk_sellback_requests r
           WHERE r.user_id = ?1
@@ -201,11 +201,54 @@ fn account_ledger_on(conn: &Connection, user_id: &str) -> Result<EskAccountLedge
         params![user_id],
         |row| row.get(0),
     )?;
+    let (quant_reserved, quant_event_count, quant_updated_at): (i64, i64, Option<String>) =
+        conn.query_row(
+            "SELECT
+               COALESCE(SUM(CASE WHEN latest.status = 'submitted' THEN r.amount_base_units ELSE 0 END), 0),
+               COALESCE(SUM(latest.revision), 0),
+               MAX(latest.created_at)
+             FROM esk_quant_allocation_requests r
+             JOIN (
+               SELECT e.request_id, e.status, e.revision, e.created_at
+                 FROM esk_quant_allocation_request_events e
+                WHERE e.revision = (
+                  SELECT MAX(candidate.revision)
+                    FROM esk_quant_allocation_request_events candidate
+                   WHERE candidate.request_id = e.request_id
+                )
+             ) latest ON latest.request_id = r.request_id
+            WHERE r.user_id = ?1",
+            params![user_id],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        )?;
+    let (sellback_event_count, sellback_updated_at): (i64, Option<String>) = conn.query_row(
+        "SELECT COUNT(*), MAX(created_at)
+           FROM esk_sellback_request_events
+          WHERE request_id IN (SELECT request_id FROM esk_sellback_requests WHERE user_id = ?1)",
+        params![user_id],
+        |row| Ok((row.get(0)?, row.get(1)?)),
+    )?;
+    let sellback_reserved = sellback_reserved.max(0);
+    let quant_reserved = quant_reserved.max(0);
+    let reserved = sellback_reserved
+        .checked_add(quant_reserved)
+        .ok_or_else(|| anyhow!("ESK 占用余额超出范围"))?;
+    if reserved > total.max(0) {
+        bail!("ESK 占用余额超过总余额");
+    }
     Ok(EskAccountLedger {
         total_base_units: total.max(0),
-        reserved_base_units: reserved.max(0),
-        revision: revision.max(0),
-        updated_at,
+        sellback_reserved_base_units: sellback_reserved,
+        quant_reserved_base_units: quant_reserved,
+        reserved_base_units: reserved,
+        revision: revision
+            .saturating_add(sellback_event_count)
+            .saturating_add(quant_event_count)
+            .max(0),
+        updated_at: [updated_at, sellback_updated_at, quant_updated_at]
+            .into_iter()
+            .flatten()
+            .max(),
     })
 }
 
@@ -290,7 +333,7 @@ fn map_sellback(row: &rusqlite::Row<'_>) -> rusqlite::Result<EskSellbackRecord> 
     })
 }
 
-fn ensure_user_exists(conn: &Connection, user_id: &str) -> Result<()> {
+pub(super) fn ensure_user_exists(conn: &Connection, user_id: &str) -> Result<()> {
     let exists: bool = conn.query_row(
         "SELECT EXISTS(SELECT 1 FROM users WHERE id = ?1)",
         params![user_id],
@@ -319,7 +362,7 @@ fn validate_sellback(input: &EskSellbackInput) -> Result<()> {
     validate_key(&input.idempotency_key, "幂等键", 160)
 }
 
-fn validate_key(value: &str, label: &str, max_chars: usize) -> Result<()> {
+pub(super) fn validate_key(value: &str, label: &str, max_chars: usize) -> Result<()> {
     let value = value.trim();
     let length = value.chars().count();
     if length == 0 || length > max_chars || value.chars().any(char::is_control) {

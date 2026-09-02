@@ -10,6 +10,8 @@ mod api;
 mod batch;
 mod batch_api;
 mod model;
+mod quant_allocation;
+mod quant_allocation_api;
 mod service;
 
 pub(crate) use batch::prepare_paper_allocation_batch;
@@ -17,6 +19,9 @@ pub(crate) use model::{
     EskAccountLedger, EskAllocationBatchInput, EskAllocationBatchReceipt, EskAllocationInput,
     EskAllocationReceipt, EskAssetMode, EskSellbackInput, EskSellbackRecord, ESK_ASSET_ID,
     ESK_DECIMALS, ESK_NAME, ESK_SYMBOL,
+};
+pub(crate) use quant_allocation::{
+    EskQuantAllocationInput, EskQuantAllocationRecord, ESK_QUANT_RISK_DISCLOSURE_REVISION,
 };
 pub(crate) use service::{format_esk_amount, parse_esk_amount};
 
@@ -32,6 +37,15 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
             post(api::cancel_my_sellback_request),
         )
         .route(
+            "/api/me/assets/esk/quant-allocation-requests",
+            get(quant_allocation_api::list_my_requests)
+                .post(quant_allocation_api::create_my_request),
+        )
+        .route(
+            "/api/me/assets/esk/quant-allocation-requests/:request_id/cancel",
+            post(quant_allocation_api::cancel_my_request),
+        )
+        .route(
             "/api/admin/assets/esk/paper-allocations",
             post(api::create_paper_allocation),
         )
@@ -43,5 +57,7 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
 
 #[cfg(test)]
 mod batch_tests;
+#[cfg(test)]
+mod quant_allocation_tests;
 #[cfg(test)]
 mod tests;

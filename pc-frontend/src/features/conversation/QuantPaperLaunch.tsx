@@ -11,10 +11,12 @@ const READY_SCHEMA = 'yilong.quant.paper_launch.ready.v1'
 const GRANT_SCHEMA = 'yilong.quant.paper_launch.grant.v1'
 const CONSUMED_SCHEMA = 'yilong.quant.paper_launch.consumed.v1'
 const ERROR_SCHEMA = 'yilong.quant.paper_launch.error.v1'
-const ESK_PROJECTION_SCHEMA = 'yilong.esk.asset_projection.v1'
+const ESK_PROJECTION_SCHEMA_V1 = 'yilong.esk.asset_projection.v1'
+const ESK_PROJECTION_SCHEMA_V2 = 'yilong.esk.asset_projection.v2'
+const ESK_PROJECTION_SCHEMAS = [ESK_PROJECTION_SCHEMA_V2, ESK_PROJECTION_SCHEMA_V1] as const
 const NONCE_PATTERN = /^[A-Za-z0-9_-]{32,128}$/
 const GRANT_PATTERN = /^ypg1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/
-const ESK_PROJECTION_PATTERN = /^yep1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/
+const ESK_PROJECTION_PATTERN = /^yep[12]\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/
 
 type Stage = 'checking' | 'unavailable' | 'ready' | 'authorizing' | 'loading_page' | 'waiting' | 'connected' | 'error'
 type Readiness = {
@@ -116,8 +118,10 @@ export default function QuantPaperLaunch({
           return
         }
         channelNonceRef.current = event.data.channel_nonce
-        const supportsEskProjection = event.data.capabilities?.includes(ESK_PROJECTION_SCHEMA) === true
-        if (supportsEskProjection && !ticket.eskProjection) {
+        const projectionSchema = projectionCapability(ticket.eskProjection)
+        const supportsEskProjection = projectionSchema !== null
+          && event.data.capabilities?.includes(projectionSchema) === true
+        if (event.data.capabilities?.length && (!ticket.eskProjection || !supportsEskProjection)) {
           failLaunch('ESK 资产投影未能随本次授权生成，请重新进入。')
           return
         }
@@ -157,7 +161,7 @@ export default function QuantPaperLaunch({
     setMessage('正在为当前一龙账号签发五分钟 Paper 授权。')
     try {
       const value = await api.post<unknown>('/api/me/quant/paper-launches', {
-        capabilities: [ESK_PROJECTION_SCHEMA],
+        capabilities: [...ESK_PROJECTION_SCHEMAS],
       })
       const ticket = parseTicket(value)
       if (!ticket) throw new Error('服务器返回了无法识别的启动票据。')
@@ -262,10 +266,18 @@ function isReadyMessage(value: unknown): value is { schema: string; protocol: st
   const capabilities = value.capabilities
   if (capabilities !== undefined
     && (!Array.isArray(capabilities)
-      || capabilities.length !== 1
-      || capabilities[0] !== ESK_PROJECTION_SCHEMA)) return false
+      || capabilities.length < 1
+      || capabilities.length > ESK_PROJECTION_SCHEMAS.length
+      || new Set(capabilities).size !== capabilities.length
+      || capabilities.some((capability) => !ESK_PROJECTION_SCHEMAS.includes(capability as typeof ESK_PROJECTION_SCHEMAS[number])))) return false
   return value.schema === READY_SCHEMA && value.protocol === PROTOCOL
     && typeof value.channel_nonce === 'string' && NONCE_PATTERN.test(value.channel_nonce)
+}
+
+function projectionCapability(token?: string): string | null {
+  if (token?.startsWith('yep2.')) return ESK_PROJECTION_SCHEMA_V2
+  if (token?.startsWith('yep1.')) return ESK_PROJECTION_SCHEMA_V1
+  return null
 }
 
 function isTerminalMessage(value: unknown, nonce: string, attemptId: string): value is { schema: string } {
