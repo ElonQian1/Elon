@@ -1,6 +1,6 @@
 # 一龙 ESK 量化 Paper 模拟绑定与释放
 
-状态：代码已实现并完成本地合同验证；主项目发布和量化独立 HTTPS 环境仍待验收。本文不代表链上 ESK、真实资金或量化产品已经上线。
+状态：主项目代码与 PC 页面已随 `v0.3.1716` 发布，量化子仓代码已推送至 `origin/main@424b530`；量化独立 HTTPS 环境与双方生产密钥配置仍待验收。本文不代表链上 ESK、真实资金或量化产品已经上线。
 
 ## 用户看到的流程
 
@@ -44,4 +44,4 @@ submitted -> accepted -> released
 - accepted/released 同步失败时，不手工改数据库；用户用同一申请重新进入，量化端重放原签名回执。
 - 回滚先停止签发新 `yeqa1`，保留本人 binding 列表、release 和回执同步，直至 accepted binding 全部释放或由后续正式迁移接管。
 
-权威需求为 `docs/requirements/esk-paper-quant-allocation-binding-v3.md`；双仓合同为 `contracts/quant/esk-paper-allocation-authorization-v1.schema.json` 与 `contracts/quant/esk-paper-allocation-receipt-v1.schema.json`。
+权威需求为 `docs/requirements/esk-paper-quant-allocation-binding-v3.md`；发布回执为 `docs/esk-paper-quant-allocation-binding-v3-release-v0.3.1716.md`；双仓合同为 `contracts/quant/esk-paper-allocation-authorization-v1.schema.json` 与 `contracts/quant/esk-paper-allocation-receipt-v1.schema.json`。

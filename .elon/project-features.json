@@ -5254,7 +5254,7 @@
       "id": "esk-paper-quant-allocation-binding-v3",
       "title": "ESK Paper 量化申请授权、接收回执与释放 V3",
       "summary": "用户选择单个 submitted ESK Paper 申请安全进入量化；主项目签发短期授权并验签量化 accepted/released 回执，以追加事件维持占用或释放，不创建资金、份额、交易或收益。",
-      "status": "verified",
+      "status": "released",
       "priority": "p0",
       "requirement": {
         "path": "docs/requirements/esk-paper-quant-allocation-binding-v3.md",
@@ -5444,7 +5444,7 @@
         }
       ],
       "created_at_ms": 1788315967384,
-      "updated_at_ms": 1788321279149
+      "updated_at_ms": 1788322411689
     },
     {
       "id": "esk_paper_quant_allocation_request_v2",
@@ -14995,16 +14995,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_6874a9edfd3445f69b6314bd971b18b1",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex-q13-019fc8bf",
-      "reason": "Q13 ExistingFirst 88/88 source contracts and controlled-fault seam are written and independently statically reviewed, but the full Lock quotient still misses 4,824 members/4,296 groups. Compilation and Windows execution were intentionally not run; no actual receipt, reviewed inventory digest, frozen complete manifest, Qlock value, or production opening exists.",
-      "from_status": "in_progress",
-      "to_status": "blocked",
-      "at_ms": 1788268969479
-    },
-    {
       "id": "feature_event_bcf8616c9e844564b79848147e5a0b28",
       "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
       "action": "evidence_recorded",
@@ -16993,6 +16983,16 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1788321279149
+    },
+    {
+      "id": "feature_event_88fa621b873a45af9c5d7ced8fb35020",
+      "feature_id": "esk-paper-quant-allocation-binding-v3",
+      "action": "transitioned",
+      "actor": "codex/root",
+      "reason": "Main server and PC frontend published as v0.3.1716 at commit 00e5756d1; quant child code is on origin/main at 424b530 while independent public HTTPS remains explicitly deferred.",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1788322411689
     }
   ]
 }
