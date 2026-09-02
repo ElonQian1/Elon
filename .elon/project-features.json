@@ -5450,7 +5450,7 @@
       "id": "esk-paper-quant-cross-repo-asset-view-v5",
       "title": "ESK Paper 双仓可见余额互操作 V5",
       "summary": "用同字节固定向量证明主项目真实 ypg1/yep2 签名、量化真实 verifier/API 脱敏视图与 ESK 卡片显示同一组精确余额；全程离线 Paper-only。",
-      "status": "implemented",
+      "status": "released",
       "priority": "p0",
       "requirement": {
         "path": "docs/requirements/esk-paper-quant-cross-repo-asset-view-v5.md",
@@ -5514,6 +5514,19 @@
             "head_blob_oid": "e52cfb5751a630f82a63467251bece82175e2011",
             "worktree_blob_oid": "e52cfb5751a630f82a63467251bece82175e2011",
             "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "docs/esk-paper-quant-cross-repo-asset-view-v5-acceptance.md",
+          "content_hash": "2d2dab14878b4fadef80d9ac93c5edb8ab34d9fcc1059d286a2811cd4bfcf005",
+          "locator": "clean two-repository acceptance and residual boundary",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "73b6f09f1e50307c7e490e768e1206e92c54489b",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "237620b0c48c1952c2f6a53ccc408c7cb8a7a521",
+            "state": "untracked"
           }
         },
         {
@@ -5622,7 +5635,7 @@
         }
       ],
       "created_at_ms": 1788336989115,
-      "updated_at_ms": 1788342430773
+      "updated_at_ms": 1788342885642
     },
     {
       "id": "esk-paper-quant-cross-repo-interoperability-v4",
@@ -15302,36 +15315,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_86aa5569e66f47718236484975626611",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "claimed",
-      "actor": "codex-root-019fc8bf-q15-evidence",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788278185257
-    },
-    {
-      "id": "feature_event_8605340c652746839460c9fac2d5cdc8",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex-root-019fc8bf-q15-evidence",
-      "reason": "绑定 Q15 commit 775a910ca 的 current hash evidence；不晋级 implemented/verified。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788278197761
-    },
-    {
-      "id": "feature_event_e46318d4d80e4e45a806c8b795325a84",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-root-019fc8bf-q15-evidence",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788278232115
-    },
-    {
       "id": "feature_event_7ad24db967df4412a6788193e47c86da",
       "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
       "action": "transitioned",
@@ -17300,6 +17283,36 @@
       "from_status": "implemented",
       "to_status": "implemented",
       "at_ms": 1788342430773
+    },
+    {
+      "id": "feature_event_c7d06f2b551f4dba9c0d90e6e8bc5733",
+      "feature_id": "esk-paper-quant-cross-repo-asset-view-v5",
+      "action": "evidence_recorded",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "implemented",
+      "to_status": "implemented",
+      "at_ms": 1788342844374
+    },
+    {
+      "id": "feature_event_04ed13a104d14141a3a7641f523d0994",
+      "feature_id": "esk-paper-quant-cross-repo-asset-view-v5",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "主项目核心 9 项、量化完整验证与 15 项前端、双仓干净提交 runner 均通过；全服务器 check 的主机 OOM 已在验收文档列为边界。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1788342868116
+    },
+    {
+      "id": "feature_event_c846e404d40540d0900d854fae0a6921",
+      "feature_id": "esk-paper-quant-cross-repo-asset-view-v5",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "实现提交已推送主项目 main，量化实现提交已推送其 main；released 仅表示代码/文档交付，不表示环境部署。",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1788342885642
     }
   ]
 }

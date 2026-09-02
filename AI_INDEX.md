@@ -123,7 +123,7 @@
 | PC 前端迁移规则 | `.github/instructions/pc-frontend-migration.instructions.md`、`docs/pc-frontend-migration.md` |
 | 代码归属与 legacy 迁移规则 | `docs/architecture/source-of-truth.md`、`docs/architecture/legacy-inventory.md`、`docs/architecture/feature-parity-matrix.md`、`scripts/check-source-ownership.ps1` |
 | 项目广场/项目主页脚本 | `server/src/assets/project_*.js` |
-| 一龙量化接入、ESK Paper 投影、单申请绑定与双仓互操作 | `docs/yilong-quant-integration.md`、`docs/yilong-quant-esk-allocation-binding-v1.md`、`docs/esk-paper-quant-cross-repo-interoperability-v4-acceptance.md`、`server/src/quant_paper_launch.rs`、`server/src/quant_esk_allocation_receipt.rs`、`pc-frontend/src/features/conversation/QuantPaperLaunch.tsx` |
+| 一龙量化接入、ESK Paper 投影、申请绑定与双仓可见余额 | `docs/yilong-quant-integration.md`、`docs/yilong-quant-esk-allocation-binding-v1.md`、`docs/esk-paper-quant-cross-repo-interoperability-v4-acceptance.md`、`docs/esk-paper-quant-cross-repo-asset-view-v5-acceptance.md` |
 | 节点管理本地页 | `server/src/node_agent_admin.html` |
 
 ## 脚本入口
@@ -134,7 +134,7 @@
 | 跨项目 Rust 缓存、重复 worktree 分区、按需共享接入、Fleet 报告与回滚 | `.agents/skills/manage-shared-build-cache/SKILL.md`、`docs/rust-cache-on-demand-adoption.md`、`docs/rust-cache-platform.md`、`docs/rust-cache-fleet-operations.md`、`scripts/rust-cache.ps1` |
 | 发布前代码已推送检查 | `powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind CodePushed` |
 | 首批已确认用户 ESK Paper 批量预检与原子登记 | `docs/requirements/esk-paper-first-user-allocation-operations-v1.md`、`docs/esk-paper-first-user-allocation-operations-v1-acceptance.md`、`docs/examples/esk-paper-allocation-batch.example.json`、`scripts/esk-paper-allocation-batch.ps1`、`server/src/esk_asset/batch_api.rs` |
-| ESK Paper 主项目与量化项目双仓签名互操作复验 | `docs/requirements/esk-paper-quant-cross-repo-interoperability-v4.md`、`docs/esk-paper-quant-cross-repo-interoperability-v4-acceptance.md`、`scripts/test-esk-paper-cross-repo-interoperability.ps1` |
+| ESK Paper 主项目与量化项目双仓签名及可见余额复验 | `docs/requirements/esk-paper-quant-cross-repo-interoperability-v4.md`、`docs/requirements/esk-paper-quant-cross-repo-asset-view-v5.md`、`scripts/test-esk-paper-cross-repo-asset-view.ps1` |
 | 后端发布 | `powershell -ExecutionPolicy Bypass -File scripts\publish-server.ps1` |
 | PC 前端本地预览 | `powershell -ExecutionPolicy Bypass -File scripts\start-pc-frontend-dev.ps1` |
 | APK 发布 | `powershell -ExecutionPolicy Bypass -File scripts\publish-apk.ps1 -Changelog "<用户可见改动>"` |
