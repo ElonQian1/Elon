@@ -63,6 +63,7 @@ impl Store {
             _ => "p.updated_at DESC",
         };
 
+        let installable_apk_exists = installable_apk::EXISTS_SQL;
         let sql = format!(
             "
             SELECT
@@ -118,18 +119,8 @@ impl Store {
               AND (?2 IS NULL OR p.join_mode = ?2)
               AND (
                 ?3 IS NULL
-                OR (?3 = 1 AND EXISTS (
-                  SELECT 1 FROM tasks t_apk
-                  WHERE t_apk.project_id = p.id
-                    AND t_apk.apk_url IS NOT NULL
-                    AND t_apk.apk_url != ''
-                ))
-                OR (?3 = 0 AND NOT EXISTS (
-                  SELECT 1 FROM tasks t_apk
-                  WHERE t_apk.project_id = p.id
-                    AND t_apk.apk_url IS NOT NULL
-                    AND t_apk.apk_url != ''
-                ))
+                OR (?3 = 1 AND {installable_apk_exists})
+                OR (?3 = 0 AND NOT {installable_apk_exists})
               )
             ORDER BY {order_by}
             LIMIT ?4 OFFSET ?5"
@@ -204,7 +195,8 @@ impl Store {
         });
         let has_apk_filter = has_apk.map(|value| if value { 1_i64 } else { 0_i64 });
 
-        conn.query_row(
+        let installable_apk_exists = installable_apk::EXISTS_SQL;
+        let sql = format!(
             "
             SELECT COUNT(*)
             FROM projects p
@@ -224,19 +216,12 @@ impl Store {
               AND (?2 IS NULL OR p.join_mode = ?2)
               AND (
                 ?3 IS NULL
-                OR (?3 = 1 AND EXISTS (
-                  SELECT 1 FROM tasks t_apk
-                  WHERE t_apk.project_id = p.id
-                    AND t_apk.apk_url IS NOT NULL
-                    AND t_apk.apk_url != ''
-                ))
-                OR (?3 = 0 AND NOT EXISTS (
-                  SELECT 1 FROM tasks t_apk
-                  WHERE t_apk.project_id = p.id
-                    AND t_apk.apk_url IS NOT NULL
-                    AND t_apk.apk_url != ''
-                ))
+                OR (?3 = 1 AND {installable_apk_exists})
+                OR (?3 = 0 AND NOT {installable_apk_exists})
               )",
+        );
+        conn.query_row(
+            &sql,
             params![pattern, join_mode_filter, has_apk_filter],
             |row| row.get(0),
         )
@@ -489,6 +474,9 @@ pub(super) fn install_action(
     has_installable_erp_blueprint.then(PublicProjectInstallAction::erp_blueprint)
 }
 
+mod installable_apk;
+#[cfg(test)]
+mod installable_apk_tests;
 pub(crate) mod listing_cursor;
 #[cfg(test)]
 mod listing_cursor_tests;

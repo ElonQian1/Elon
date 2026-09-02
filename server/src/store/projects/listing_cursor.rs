@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use super::super::project_roles::project_member_effective_role_locked;
 use super::super::{project_branding, PublicProjectItem, Store};
-use super::install_action;
+use super::{install_action, installable_apk};
 
 const STORE_CURSOR_VERSION: u8 = 1;
 
@@ -93,6 +93,7 @@ impl Store {
                 "(?6 IS NULL OR member_count < ?6 OR (member_count = ?6 AND (updated_at < ?7 OR (updated_at = ?7 AND id < ?8))))"
             }
         };
+        let installable_apk_exists = installable_apk::EXISTS_SQL;
         let sql = format!(
             "
             WITH store_rows AS (
@@ -149,18 +150,8 @@ impl Store {
                 AND (?2 IS NULL OR p.join_mode = ?2)
                 AND (
                   ?3 IS NULL
-                  OR (?3 = 1 AND EXISTS (
-                    SELECT 1 FROM tasks t_apk
-                    WHERE t_apk.project_id = p.id
-                      AND t_apk.apk_url IS NOT NULL
-                      AND t_apk.apk_url != ''
-                  ))
-                  OR (?3 = 0 AND NOT EXISTS (
-                    SELECT 1 FROM tasks t_apk
-                    WHERE t_apk.project_id = p.id
-                      AND t_apk.apk_url IS NOT NULL
-                      AND t_apk.apk_url != ''
-                  ))
+                  OR (?3 = 1 AND {installable_apk_exists})
+                  OR (?3 = 0 AND NOT {installable_apk_exists})
                 )
             )
             SELECT *

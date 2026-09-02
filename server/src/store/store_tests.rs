@@ -142,6 +142,62 @@ fn project_landing_snapshot_is_normalized_and_readable() {
 }
 
 #[test]
+fn project_android_download_uses_available_landing_and_respects_visibility() {
+    let store = temp_store();
+    let user = store
+        .create_user("android-landing@example.com", "secret1", None, None)
+        .expect("user should be created");
+    let project = store
+        .create_project(&user.id, "Android Landing", None, None)
+        .expect("project should be created")
+        .project;
+
+    store
+        .update_project_landing_snapshot(
+            &user.id,
+            &project.id,
+            &serde_json::json!({
+                "title": "Android Landing",
+                "downloads": [
+                    {
+                        "platform": "android",
+                        "status": "planned",
+                        "url": "https://download.example/planned.apk"
+                    },
+                    {
+                        "platform": "android",
+                        "status": "available",
+                        "url": "https://download.example/merchant.apk"
+                    }
+                ]
+            }),
+        )
+        .expect("landing snapshot should update");
+
+    let private_download = store
+        .project_android_download(&project.id)
+        .expect("member download should resolve")
+        .expect("available Android download should exist");
+    assert_eq!(private_download.0, "https://download.example/merchant.apk");
+    assert!(store
+        .public_project_android_download(&project.id)
+        .expect("public lookup should run")
+        .is_none());
+
+    store
+        .set_project_visibility(&project.id, true, "open")
+        .expect("project should become public");
+    assert_eq!(
+        store
+            .public_project_android_download(&project.id)
+            .expect("public download should resolve")
+            .map(|download| download.0)
+            .as_deref(),
+        Some("https://download.example/merchant.apk")
+    );
+}
+
+#[test]
 fn project_landing_upload_token_is_project_scoped() {
     let store = temp_store();
     let user = store

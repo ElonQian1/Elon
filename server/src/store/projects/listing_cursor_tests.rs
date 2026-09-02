@@ -148,3 +148,45 @@ fn public_projects_cursor_paginates_member_sort() {
     );
     assert!(!page_two.has_more);
 }
+
+#[test]
+fn public_projects_cursor_apk_filter_includes_landing_downloads() {
+    let store = temp_store();
+    let owner = store
+        .create_user("cursor-apk-owner@example.com", "secret1", None, None)
+        .expect("owner should be created");
+    let landing_project = store
+        .create_project(&owner.id, "Landing APK", None, None)
+        .expect("landing project should be created")
+        .project;
+    let empty_project = store
+        .create_project(&owner.id, "No APK", None, None)
+        .expect("empty project should be created")
+        .project;
+    for project in [&landing_project, &empty_project] {
+        store
+            .set_project_visibility(&project.id, true, "open")
+            .expect("project should become public");
+    }
+    store
+        .update_project_landing_snapshot(
+            &owner.id,
+            &landing_project.id,
+            &serde_json::json!({
+                "title": "Landing APK",
+                "downloads": {
+                    "android": {
+                        "status": "available",
+                        "url": "https://example.test/landing.apk"
+                    }
+                }
+            }),
+        )
+        .expect("landing snapshot should update");
+
+    let page = store
+        .list_public_projects_cursor_page_for_viewer(None, None, Some(true), None, 10, None, None)
+        .expect("cursor apk filter should list");
+    assert_eq!(page.projects.len(), 1);
+    assert_eq!(page.projects[0].id, landing_project.id);
+}

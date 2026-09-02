@@ -516,7 +516,22 @@ fn latest_project_apk_delivery(
             "读取项目历史 APK 交付记录失败"
         ),
     }
-    None
+    match state.store.project_android_download(&project.id) {
+        Ok(Some((external_url, updated_at))) => Some(LatestProjectApkDelivery {
+            url: crate::project_store::apk::android_download_route(&state.public_url, &project.id),
+            identity: format!("landing:{}:{}", updated_at, external_url),
+            updated_at: Some(updated_at),
+        }),
+        Ok(None) => None,
+        Err(error) => {
+            tracing::warn!(
+                project_id = %project.id,
+                error = %error,
+                "读取项目首页 APK 交付记录失败"
+            );
+            None
+        }
+    }
 }
 
 fn project_landing_manifest(

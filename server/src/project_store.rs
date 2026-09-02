@@ -20,6 +20,8 @@ use crate::{
     types::AppState,
 };
 
+pub(crate) mod apk;
+
 // ─── 请求参数 ─────────────────────────────────────────────────────────────────
 
 #[derive(Deserialize)]
@@ -74,6 +76,7 @@ pub async fn list_store_projects(
             Err(e) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
         };
         decorate_public_previews(&mut page.projects);
+        apk::decorate_public_projects(&state, &mut page.projects);
 
         return Json(serde_json::json!({
             "projects": page.projects,
@@ -101,6 +104,7 @@ pub async fn list_store_projects(
         Err(e) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
     };
     decorate_public_previews(&mut projects);
+    apk::decorate_public_projects(&state, &mut projects);
     let total =
         match state
             .store
@@ -132,6 +136,7 @@ pub async fn get_store_project(
     {
         Ok(mut project) => {
             decorate_public_preview(&mut project);
+            apk::decorate_public_projects(&state, std::slice::from_mut(&mut project));
             Json(serde_json::json!({ "project": project })).into_response()
         }
         Err(e) => json_error(StatusCode::NOT_FOUND, e.to_string()),
@@ -168,6 +173,7 @@ pub async fn list_joined_projects(
     match state.store.list_joined_projects(&user.id) {
         Ok(mut projects) => {
             decorate_public_previews(&mut projects);
+            apk::decorate_joined_projects(&state, &mut projects);
             Json(serde_json::json!({ "projects": projects })).into_response()
         }
         Err(e) => json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),

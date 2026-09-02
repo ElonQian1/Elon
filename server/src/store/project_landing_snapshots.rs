@@ -7,6 +7,47 @@ use super::{new_id, now, Store};
 const MAX_LANDING_JSON_BYTES: usize = 256 * 1024;
 
 impl Store {
+    pub fn project_android_download(&self, project_id: &str) -> Result<Option<(String, String)>> {
+        self.project_android_download_with_visibility(project_id, false)
+    }
+
+    pub fn public_project_android_download(
+        &self,
+        project_id: &str,
+    ) -> Result<Option<(String, String)>> {
+        self.project_android_download_with_visibility(project_id, true)
+    }
+
+    fn project_android_download_with_visibility(
+        &self,
+        project_id: &str,
+        public_only: bool,
+    ) -> Result<Option<(String, String)>> {
+        let conn = self.conn()?;
+        let visibility_clause = if public_only {
+            "AND p.is_public = 1 AND p.join_mode != 'invite'"
+        } else {
+            ""
+        };
+        let sql = format!(
+            "SELECT p.landing_json, p.updated_at
+             FROM projects p
+             WHERE p.id = ?1
+               AND p.status != 'deleted'
+               {visibility_clause}"
+        );
+        let row: Option<(Option<String>, String)> = conn
+            .query_row(&sql, params![project_id], |row| {
+                Ok((row.get(0)?, row.get(1)?))
+            })
+            .optional()?;
+        let Some((Some(landing_json), updated_at)) = row else {
+            return Ok(None);
+        };
+        let snapshot = parse_snapshot(&landing_json)?;
+        Ok(android_download_url(&snapshot).map(|url| (url, updated_at)))
+    }
+
     pub fn project_landing_snapshot(
         &self,
         user_id: &str,
@@ -155,4 +196,30 @@ fn parse_snapshot(value: &str) -> Result<Value> {
     let parsed = serde_json::from_str::<Value>(value)?;
     crate::project_landing::normalize_landing_snapshot(&parsed)
         .ok_or_else(|| anyhow!("项目首页快照为空或格式无效"))
+}
+
+fn android_download_url(snapshot: &Value) -> Option<String> {
+    snapshot
+        .get("downloads")?
+        .as_array()?
+        .iter()
+        .find_map(|download| {
+            let download = download.as_object()?;
+            let platform = download.get("platform")?.as_str()?;
+            let status = download.get("status")?.as_str()?;
+            if platform != "android" || !matches!(status, "available" | "external") {
+                return None;
+            }
+            let raw = download.get("url")?.as_str()?.trim();
+            let parsed = reqwest::Url::parse(raw).ok()?;
+            if !matches!(parsed.scheme(), "http" | "https")
+                || parsed.host_str().is_none()
+                || !parsed.username().is_empty()
+                || parsed.password().is_some()
+                || parsed.fragment().is_some()
+            {
+                return None;
+            }
+            Some(raw.to_string())
+        })
 }
