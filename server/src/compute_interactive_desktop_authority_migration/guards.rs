@@ -240,7 +240,7 @@ fn install_version_guards(connection: &Connection) -> Result<()> {
         DROP TRIGGER IF EXISTS v283_interactive_authority_version_current_source;
         CREATE TRIGGER v283_interactive_authority_version_current_source
         BEFORE INSERT ON compute_interactive_desktop_authority_versions
-        WHEN NOT EXISTS (
+        WHEN NEW.session_state='active' AND NOT EXISTS (
             SELECT 1
               FROM compute_providers provider
               JOIN compute_provider_versions version
