@@ -3,7 +3,7 @@ title: 分布式算力联邦交互式云电脑架构
 status: current
 reviewed_at: 2026-09-02
 owners: backend, node, pc, security, ai-economy
-implementation_status: source_contract_only_uncompiled_unrun
+implementation_status: authority_kernel_source_written_fail_closed_uncompiled_unrun
 ---
 
 # 分布式算力联邦交互式云电脑架构
@@ -146,9 +146,28 @@ Provider 本地按键、鼠标或紧急热键优先。断开时 Host 必须合�
 
 Raw Usage 只包含 declared/transport/consumer 事实，不前向引用验证结果。Verification 作为后继 DAG 节点单向绑定 Usage digest、当前验证策略和实际 verified/compensable layer；跨对象校验必须核对 receipt id/digest/status、Session 和 binding。TURN 字节属于平台/中继成本层，不能进入 Provider compensable meter 集合。
 
-当前 C0 仍未闭合 Usage 与精确 authority head 的跨对象验证，也未把 `media_active_ms` 强制限制在共同有效时间窗内；这些是下一批 `metering_authority` 源合同的显式阻断项。在它们完成并经过编译/运行验证前，任何 Usage 都不能进入真实计费或 Provider 收益。
+Usage 与精确 authority head 的跨对象验证，以及把 `media_active_ms` 强制限制在共同有效时间窗内，仍是后续 `metering_authority` 源合同的显式阻断项。C1 先建立可被计量层消费的规范 AuthorityRecord 与 Store 单头；在这些层次完成并经过编译/运行验证前，任何 Usage 都不能进入真实计费或 Provider 收益。
 
 终态回执绑定上述证据摘要、终止原因、最终 HostLease/MediaEpoch/ControlEpoch、Offer、Profile、PriceSnapshot 和容量因果链。原始画面、音频、输入、SDP、ICE 和密钥不进入回执。
+
+### 4.8 AuthorityRecord 与当前头
+
+C1 把同一 Session revision 的 Request、Profile、SessionReservation、Session、HostLease、ViewerGrant、MediaEpoch 和 ControlEpoch 封装为一个不可变 `InteractiveDesktopAuthorityRecord`。每个对象先把自己的 digest 字段置空，再以 RFC 8785/I-JSON 规范 JSON、对象专属 domain、零字节分隔符和 SHA-256 重算；总 record 再绑定全部规范对象摘要。这样可以区分“调用方给了一个看起来完整的摘要”和“Store 对精确内容重新计算得到该摘要”。
+
+Store 只维护两类持久对象：
+
+- immutable authority versions：以 `(session_id, session_revision)` 唯一保存完整规范 record 和精确投影，禁止更新、删除或同 ID 换内容；
+- one head per Session：只指向当前 `session_revision/session_digest/authority_record_digest`，新版本必须连续，并以旧 revision、旧 Session digest、旧 record digest 完成 CAS。
+
+一次提交必须在同一个 `BEGIN IMMEDIATE` 事务中重算摘要、解析当前来源、插入不可变版本、移动当前头并规范 readback。相同版本只有在内容完全相同且仍是当前头时才是 exact replay；历史版本重放、同 revision 不同内容、跳 revision、终态复活或 CAS 竞争全部失败关闭。Store 返回的当前权威是受事务生命周期约束、不可序列化且无公共构造器的 sealed value；`structurally_authorizes` 只允许被这个内核调用，不能作为 API、Relay、Host 或计量层的独立授权入口。
+
+C1 首条解析分支限定为 `same_owner_remote_access`。它在 AuthorityRecord 的同一事务中重取当前注册 Provider、V279 user-node 安装绑定、endpoint credential/session、共享 Reservation/Claim/Pool 和 Consumer 登录 session，并证明 Provider owner、Consumer、Host endpoint owner 是同一账号。Consumer bearer 仅在事务内散列和核对，不进入 record；登录 session 的规范摘要绑定当前 session row，摘要派生的非零安全代次与撤销、过期或字段变化共同使旧 ViewerGrant 失效，但它不是账号级全局安全 epoch。endpoint session 只证明当前安全连接和 credential，绝不等价于显示器、编码器、音频、输入、网络、登录槽位 Ready 或用户已同意云电脑分享。
+
+共享容量解析不再只比较 Claim ID/digest：四个 Interactive meter 必须同时存在于 Reservation budget、当前 Claim line 和被审计 Pool meter policy，数量、mode、quantum、policy digest 与 bucket Pool binding 必须精确一致；Claim 还必须是未过期的 `compute_reservation` Reservation 类型且处于 held/active。这样真实 Claim 不能和自报的 GPU、encoder、egress 或 login 预算拼接。
+
+活动权威仍由显式不可用来源门卫关闭。InteractiveOfferProfile 还没有独立不可变版本 Store；HostConsent 的 policy 三元组目前只能绑定 endpoint session，不能证明本机用户针对精确画面、音频和输入作出同意；Viewer device/transport 参数虽已改为外部观测值，仍缺签名挑战、一次性 ticket 与握手 Store；TURN 路径也缺 Relay allocation/grant 当前来源。因此任何活动 record 都不能在 C1 返回 sealed permit。非活动 successor 则只允许冻结 Request/Profile/Reservation/Lease/Grant/Media/Control 后改变 Session revision/state/time/reason，使未来可以在活动来源过期后关闭当前头，而不要求失效的媒体权威继续成立；但 commit seam 仍是 Store-private，在 owner、consumer 与 expiry-reconciler 的 typed termination authority 完成前不得向 Service/API 放宽可见性。Ending/terminal reason 只允许 1–128 字节的 ASCII code 字符集，不能把任意文本或敏感内容写入原因字段。
+
+`friend_co_play` 需要 Host owner 针对精确 Consumer/Session 的不可变邀请与撤销头；`licensed_cloud_seat` 还需要 entitlement、TitlePolicy、地区/年龄/DRM/反作弊与商业串流权利、支付授权的权威 Store。相关 Store 尚未落地时，即使对象结构和摘要正确也必须失败关闭。共享 Offer、PriceSnapshot、Reservation、CapacityPool 和 Claim 也必须逐项解析，不能因 SameOwner 不收费就绕过资源防超卖。
 
 ## 5. 状态机
 
@@ -294,9 +313,9 @@ android feature/cloudpc/                             # 后续消费者播放器
 
 ## 13. 当前实现状态
 
-2026-09-02 当前仓库只有外围能力：节点 WSS、Provider/Offer/Capacity/Price/Receipt 控制面、签名插件设计、Tauri 生命周期和单帧 GDI 证据截图。没有游戏级连续捕获、硬件编码、WASAPI loopback、Windows 输入注入、通用 WebRTC/ICE/TURN、Session Store 或付费会话接线。
+2026-09-02 当前仓库已有外围能力：节点 WSS、Provider/Offer/Capacity/Price/Receipt 控制面、签名插件设计、Tauri 生命周期和单帧 GDI 证据截图；本批又写入 V282 AuthorityRecord 不可变版本/单头迁移定义与内部 Store 源码。仍没有游戏级连续捕获、硬件编码、WASAPI loopback、Windows 输入注入、通用 WebRTC/ICE/TURN、公开 Session 服务或付费会话接线。
 
-本批新增内部源合同仍是 `source_contract_only_uncompiled_unrun`。没有 migration、公开 route、节点 capability、媒体、输入、计量写入、结算或生产效果。
+本批状态是 `authority_kernel_source_written_fail_closed_uncompiled_unrun`。V282 未执行，源码未编译/测试；没有公开 route、节点 interactive capability、媒体、输入、计量写入、结算或生产效果。活动 permit 还被缺失的 Profile、HostConsent、Viewer handshake 与 RelayAuthority Store 显式拒绝。
 
 ## 14. 相关文档
 

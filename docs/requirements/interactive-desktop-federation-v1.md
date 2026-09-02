@@ -4,7 +4,7 @@ version_status: current
 status: accepted
 reviewed_at: 2026-09-02
 owners: backend, node, pc, security, ai-economy
-implementation_status: source_contract_only_uncompiled_unrun
+implementation_status: authority_kernel_source_written_fail_closed_uncompiled_unrun
 ---
 
 # 分布式算力联邦交互式云电脑 V1 需求
@@ -66,6 +66,19 @@ implementation_status: source_contract_only_uncompiled_unrun
 
 第一批不新增 migration、公开 API、节点 capability、信令入口、TURN 凭据、真实媒体、输入注入、计费写入或生产开关。按当前架构铺设约束，源码只做静态验收，不编译、不运行。
 
+## 第二批源码范围：C1 权威内核
+
+第二批在仍不开放生产入口的前提下，把第一批“调用方必须自行解析”的摘要约束下沉为可复用的权威内核源码：
+
+- 使用 RFC 8785/I-JSON 规范 JSON、对象专属摘要域和 SHA-256 重算 Request、Profile、ProductAuthority、SessionReservation、Session、HostLease、ViewerGrant、MediaEpoch、ControlEpoch、HostConsent、RelayAuthority、AuthorityHead 与完整 AuthorityRecord；对象携带的摘要不得作为计算输入或信任来源；
+- 一个 `InteractiveDesktopAuthorityRecord` 原子封装同一 Session revision 的完整授权对象，跨对象 ID、digest、generation、sequence、fencing、Consumer、Provider、权限和时间窗必须整体一致；
+- Store 保存不可变 AuthorityRecord 版本和每个 Session 唯一当前头；提交在一个 `BEGIN IMMEDIATE` 事务中完成 exact replay、连续 revision、旧 revision/digest 三元组 CAS 与规范 readback；历史版本即使字节完全相同也不重新获得当前权限；
+- 第一条解析分支只允许 `same_owner_remote_access`：同一事务内重取当前 Provider owner、V279 user-node 安装绑定、endpoint credential/session、共享 Reservation/Claim/Pool 与 Consumer 登录 session，并要求 Consumer 等于 Provider owner；Claim 的四个交互式 meter、数量、bucket 与 Pool policy 必须精确相等；
+- `friend_co_play` 在精确 Session 邀请 Store 完成前失败关闭；`licensed_cloud_seat` 在 entitlement、TitlePolicy、商业串流权利与支付授权 Store 完成前失败关闭；
+- Store 产生的当前权威类型必须不可序列化、不可由普通结构体构造，并受事务生命周期约束；原有 `structurally_authorizes` 继续只是内部结构谓词，不能成为运行时旁路。
+
+第二批只写源码和迁移定义：不执行迁移，不接公开 API/Broker/节点运行时，不创建 WebRTC、TURN、捕获、编码、输入或计费效果，也不把 endpoint 在线等同于 Interactive Ready。当前源码显式拒绝产生活动权威，因为 InteractiveOfferProfile、云电脑专用本机 HostConsent、Viewer 握手/一次性 ticket 与 TURN RelayAuthority 的独立 Store 尚不存在；这些来源不能由 AuthorityRecord 自证。Viewer device/transport 摘要接口已要求传入外部观测值，但在专用握手 Store 完成前仍由不可用来源门卫拒绝。非活动 revision 只允许冻结全部权威对象后推进 Session 状态，以便未来即使活动来源失效仍可进入 reconnecting/ending/terminal，而不会继续授予媒体或输入权限。
+
 ## 验收标准
 
 1. 文档明确“一套联邦控制面、两个执行平面”，并给出共享和独立合同的精确边界。
@@ -76,6 +89,18 @@ implementation_status: source_contract_only_uncompiled_unrun
 6. 合同源码明确旧 MediaEpoch、旧 ControlEpoch、过期 Grant、过期 HostLease 和非当前 fencing generation 不具备权限。
 7. 现有 `llm_chat`、图像/视频生成、GPU batch、旧节点共享和批处理结算合同保持不变。
 8. 生产、媒体、输入和资金效果均保持关闭，未编译/未运行状态被明确记录。
+9. 所有交互式权威对象与总 AuthorityRecord 都从去除自身摘要字段后的规范投影重算摘要；调用方自报摘要不能单独通过当前性校验。
+10. 每个 Session 只有一个 Store 当前头，版本不可变且 revision 连续；exact historical replay、旧 head CAS、混合 Lease/Grant/Media/Control 代次均失败关闭。
+11. `same_owner_remote_access` 必须在同一 Store 事务中证明当前 Provider/V279 binding/endpoint 与 Consumer 登录 session 属于同一账号。
+12. 好友邀请与陌生人付费模式在各自权威 Store 缺失时不可通过；结构正确的 invitation、entitlement 或 TitlePolicy 摘要不是当前授权。
+13. C1 结果只登记为源码级、未编译、未运行、迁移未执行；不得据此开启 Session、媒体、输入、计费或 Provider 收益。
+
+## C1 静态结论与显式阻断
+
+- 已写入：对象专属规范摘要、原子 AuthorityRecord、不可变版本/单 Session 当前头、三元 CAS、SameOwner 可用来源重取、共享 Claim 四 meter 精确核对、外部 Viewer 摘要比较，以及不授予 action 的 reconnecting/ending/terminal revision 规则。
+- 仍失败关闭：InteractiveOfferProfile 权威版本、云电脑专用本机同意及撤销头、Viewer 设备签名/一次性 ticket/transport 握手、TURN allocation/grant 当前来源，以及区分 owner/consumer/expiry-reconciler 的 typed termination authority。任何一项活动来源缺失时，活动 AuthorityRecord 不可提交或读取为当前许可；终止源码只验证冻结 successor，目前仍保持 Store-private，不能直接接 route。
+- Consumer `account_auth_epoch` 在 C1 是登录 session 规范摘要导出的非零 I-JSON 安全代次，不冒充账号级全局安全 epoch；密码修改、恢复与风险处置仍依赖现有 session 撤销语义。后续若引入账号级 epoch，必须作为新的独立真源迁移。
+- 本批没有编译、测试、执行 V282 或打开 SQLite，所有结论仅为源码静态审查；测试计数固定为 `passed=0, failed=0`。
 
 ## 后续真实完成门槛
 
