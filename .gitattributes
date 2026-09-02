@@ -5,3 +5,4 @@
 .githooks/*  text eol=lf
 *.rs         text eol=lf
 *.tsv        text eol=lf
+contracts/quant/*.json text eol=lf
