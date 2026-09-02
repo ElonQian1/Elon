@@ -1,5 +1,8 @@
 use serde::{Deserialize, Serialize};
 
+#[cfg(test)]
+use std::cell::Cell;
+
 pub(crate) const ESK_ASSET_ID: &str = "esk";
 pub(crate) const ESK_SYMBOL: &str = "ESK";
 pub(crate) const ESK_NAME: &str = "一龙 ESK";
@@ -17,8 +20,33 @@ pub(crate) enum EskAssetMode {
     Invalid,
 }
 
+#[cfg(test)]
+thread_local! {
+    static TEST_MODE_OVERRIDE: Cell<Option<EskAssetMode>> = const { Cell::new(None) };
+}
+
+#[cfg(test)]
+pub(crate) struct EskAssetModeOverride(Option<EskAssetMode>);
+
+#[cfg(test)]
+impl Drop for EskAssetModeOverride {
+    fn drop(&mut self) {
+        TEST_MODE_OVERRIDE.with(|value| value.set(self.0));
+    }
+}
+
+#[cfg(test)]
+pub(crate) fn override_esk_asset_mode_for_test(mode: EskAssetMode) -> EskAssetModeOverride {
+    let previous = TEST_MODE_OVERRIDE.with(|value| value.replace(Some(mode)));
+    EskAssetModeOverride(previous)
+}
+
 impl EskAssetMode {
     pub(crate) fn from_env() -> Self {
+        #[cfg(test)]
+        if let Some(mode) = TEST_MODE_OVERRIDE.with(Cell::get) {
+            return mode;
+        }
         Self::from_value(std::env::var("ESK_ASSET_MODE").ok().as_deref())
     }
 

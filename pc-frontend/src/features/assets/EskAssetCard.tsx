@@ -8,6 +8,7 @@ import {
   type EskSellbackRequest,
 } from './eskAssetApi'
 import EskQuantAllocationPanel from './EskQuantAllocationPanel'
+import EskPaperExchangePanel from './EskPaperExchangePanel'
 import styles from './EskAssetCard.module.css'
 
 interface Props {
@@ -140,6 +141,8 @@ export default function EskAssetCard({ initialSnapshot, initialRequests, initial
         previewMode={previewMode}
         onChanged={load}
       />
+
+      <EskPaperExchangePanel previewMode={previewMode} onChanged={load} />
 
       <div className={styles.notice}>
         <strong>当前是可核对的 Paper 资产记录</strong>

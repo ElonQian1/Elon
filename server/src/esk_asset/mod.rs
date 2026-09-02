@@ -10,6 +10,8 @@ mod amount;
 mod api;
 mod batch;
 mod batch_api;
+#[path = "../esk_exchange/mod.rs"]
+pub(crate) mod exchange;
 mod model;
 mod quant_allocation;
 mod quant_allocation_api;
@@ -17,6 +19,8 @@ mod service;
 
 pub(crate) use amount::{format_esk_amount, parse_esk_amount};
 pub(crate) use batch::prepare_paper_allocation_batch;
+#[cfg(test)]
+pub(crate) use model::override_esk_asset_mode_for_test;
 pub(crate) use model::{
     EskAccountLedger, EskAllocationBatchInput, EskAllocationBatchReceipt, EskAllocationInput,
     EskAllocationReceipt, EskAssetMode, EskSellbackInput, EskSellbackRecord, ESK_ASSET_ID,

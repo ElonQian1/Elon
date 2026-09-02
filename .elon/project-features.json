@@ -5878,6 +5878,193 @@
       "updated_at_ms": 1788335912192
     },
     {
+      "id": "esk-paper-usdt-exchange-v1",
+      "title": "ESK / USDT Paper 双向兑换与手续费结算 V1",
+      "summary": "用户在 ESK 资产区以版本化短时报价双向兑换 USDT/ESK Paper 余额，手续费透明、原子记账、幂等审计；真实 USDT 收款、钱包、私钥和链上结算保持失败关闭。",
+      "status": "verified",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/esk-paper-usdt-exchange-v1.md",
+        "content_hash": "852796e11114534f806ebe26cb5cb6bdb1bf7f88c62d2a7a11769f531292dc0f",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "ca03ab5db730aff34602ff5c9f3866ae93804c5e",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "55eb4885394cb01b258d63c2d8a5a3cbff2d6294",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "platform-assets",
+      "tags": [
+        "esk",
+        "usdt",
+        "paper-only",
+        "exchange",
+        "settlement",
+        "android",
+        "pwa"
+      ],
+      "task_paths": [
+        "android/app/src/main/kotlin/com/elon/app/esk",
+        "docs/requirements/esk-paper-usdt-exchange-v1.md",
+        "pc-frontend/src/features/assets",
+        "scripts/test-esk-paper-exchange-contract.js",
+        "server/src/assets/web_page.html",
+        "server/src/esk_exchange",
+        "server/src/esk_exchange_migration.rs",
+        "server/src/store/common/esk_assets.rs",
+        "server/src/store/common/esk_exchange.rs"
+      ],
+      "dependencies": [
+        "esk-paper-asset-account-v1"
+      ],
+      "acceptance_criteria": [
+        "精确整数算法覆盖双向换算、舍入、手续费、溢出和净额为零，不使用浮点数。",
+        "原子追加账本证明两种兑换守恒、手续费独立入账、ESK 占用不可被兑换且账本不可篡改。",
+        "API 覆盖鉴权、模式和配置失败关闭、报价过期/篡改、幂等漂移、重复使用和并发竞争。",
+        "Android、移动 Web 与 PC 消费同一协议，报价后再次确认并显示 Paper 安全边界。",
+        "原有 ESK 登记、卖回、量化占用与跨仓投影回归通过。",
+        "发布后仍只有 Paper 模式，响应明确未移动资金且无真实 USDT 钱包或链上结算能力。"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/esk/EskPaperExchangeDialog.kt",
+          "content_hash": "19764876f8ce887c067b7d0704e5590d835a7486fb8c02cb52f0f50095e580b4",
+          "locator": "EskPaperExchangeDialog",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ca03ab5db730aff34602ff5c9f3866ae93804c5e",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "a5e4cb7a31b9a4a2be94b9de7858788c25a9df72",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "docs/requirements/esk-paper-usdt-exchange-v1.md",
+          "content_hash": "852796e11114534f806ebe26cb5cb6bdb1bf7f88c62d2a7a11769f531292dc0f",
+          "locator": "验收标准",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ca03ab5db730aff34602ff5c9f3866ae93804c5e",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "55eb4885394cb01b258d63c2d8a5a3cbff2d6294",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/assets/EskPaperExchangePanel.tsx",
+          "content_hash": "be3a3dc50b3e767b65e3b893ce22efa765bf3ed704bd4279a4792586b753c476",
+          "locator": "EskPaperExchangePanel",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ca03ab5db730aff34602ff5c9f3866ae93804c5e",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "1290750ef776ae2fff557babc5085f2ffd695e8c",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "scripts/test-esk-paper-exchange-contract.js",
+          "content_hash": "b751aaf3b43f629093bbab3c7e9b8e1e884523bc855c4047d93b633da1ce50ff",
+          "locator": "ESK_PAPER_EXCHANGE_CONTRACT_TEST",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ca03ab5db730aff34602ff5c9f3866ae93804c5e",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "cffc1c6c0a9bd64e8b85ac673f75f2420f7bda67",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/src/assets/esk_exchange.js",
+          "content_hash": "4913935ad44156802294fe5ecf9270fff9124dbd35c71f630f9120132e775f06",
+          "locator": "yilongEskExchangeBridge",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ca03ab5db730aff34602ff5c9f3866ae93804c5e",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "6544695dc6f29a7e94b309b28bc85c5d3f754493",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/src/esk_asset/model.rs",
+          "content_hash": "b3d928684c5010fdd127be7c531194e8235f73731adb1f2cb798fc18fbed2360",
+          "locator": "override_esk_asset_mode_for_test",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ca03ab5db730aff34602ff5c9f3866ae93804c5e",
+            "head_blob_oid": "a43f29643db6ab6e421749e45ab985650325f897",
+            "worktree_blob_oid": "9af9eb7d88935d0f124335a066c09d0c47044d2f",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/esk_exchange/api.rs",
+          "content_hash": "95829cb08999710b85047897eca25238937216d64fce81a43eee4caf92845844",
+          "locator": "get_my_exchange_account",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ca03ab5db730aff34602ff5c9f3866ae93804c5e",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "264cbcda451b03f2cc719fbac7603b18390f8569",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/src/esk_exchange/tests.rs",
+          "content_hash": "2dbfd346f0f6b1645711acf74e189e9d1c54799aa57c0d503bc43a856c0e1ded",
+          "locator": "api_requires_login_fails_closed_and_returns_safe_receipts",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ca03ab5db730aff34602ff5c9f3866ae93804c5e",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "4fc86fdf3a91eaf657fa308755b54eadfe1b6b28",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/src/esk_exchange_migration.rs",
+          "content_hash": "7631fc43922f7dbf84c9c8d46f50eac38920e8b07ab1caa15d201e9ad9e4bece",
+          "locator": "migration_v286",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ca03ab5db730aff34602ff5c9f3866ae93804c5e",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "a491c299659ab5ff5529d426f45106078c87eb37",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/src/store/common/esk_exchange.rs",
+          "content_hash": "cf3086f98ac8709fbbdf3c448955bd14f0ccde5001c3e01e2e7a8c1f47ac67f3",
+          "locator": "execute_esk_exchange",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ca03ab5db730aff34602ff5c9f3866ae93804c5e",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "7e3e24192eaa493dfd785c826e842549f9e7244a",
+            "state": "index_only"
+          }
+        }
+      ],
+      "created_at_ms": 1788385089794,
+      "updated_at_ms": 1788388061133
+    },
+    {
       "id": "esk_paper_quant_allocation_request_v2",
       "title": "ESK Paper 量化分配申请与只读占用投影 V2",
       "summary": "用户可在主项目把可用 ESK 提交为可取消的 Paper 量化分配申请；主项目分别核算卖回、量化与总占用，并通过最长五分钟签名 V2 投影让量化 PWA 只读展示，不自动建仓、交易或产生收益。",
@@ -15552,126 +15739,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_03dfabd20b3e432ead661a3ae32a8f23",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex-root-019fc8bf-q16",
-      "reason": "Q16 requirement remains accepted and dependency is unchanged; prepare the second rebased evidence refresh.",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1788282895955
-    },
-    {
-      "id": "feature_event_edb6057dd4f24279acf900dec4f03dd9",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "claimed",
-      "actor": "codex-root-019fc8bf-q16-rebase2-evidence",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788282896128
-    },
-    {
-      "id": "feature_event_665bd3c299854d40ac5e5b4f9c809ffa",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex-root-019fc8bf-q16",
-      "reason": "Bind the reviewed Q16 implementation evidence to the second rebased commit chain.",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788282896324
-    },
-    {
-      "id": "feature_event_26a71007f8ca464aae9d4d1d26931c90",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-root-019fc8bf-q16",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788282900765
-    },
-    {
-      "id": "feature_event_b1766ddbbc514e21af2441062f8ff994",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex-root-019fc8bf-q16",
-      "reason": "Q16 source tranche and 16 rebased evidence bindings are complete, but the parent feature remains gated: Qlock is not fully enumerated, WindowsDynamic is not opened, and Cargo/Rust/real runtime validation is intentionally deferred; production and economic effects remain closed.",
-      "from_status": "in_progress",
-      "to_status": "blocked",
-      "at_ms": 1788282900905
-    },
-    {
-      "id": "feature_event_8e09b07d29744e93a6d11e3b0d368c22",
-      "feature_id": "quant-public-project-preview-v1",
-      "action": "registered",
-      "actor": "codex-goal-quant-public-preview",
-      "reason": "长期 Goal 的项目广场能力同步下一纵向切片。",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1788284311917
-    },
-    {
-      "id": "feature_event_0ddf8871ccec4680b0fc4e9da3cbf9cd",
-      "feature_id": "quant-public-project-preview-v1",
-      "action": "claimed",
-      "actor": "codex-goal-quant-public-preview",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788284321733
-    },
-    {
-      "id": "feature_event_32abc0c59c1741bcbe9034a0219f2de2",
-      "feature_id": "quant-public-project-preview-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-quant-public-preview",
-      "reason": "查重和所有权审计完成，开始实现官方目录安全预览纵向切片。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788284333637
-    },
-    {
-      "id": "feature_event_df8c0878d9ca4ddb8fcab4f7ad14fa27",
-      "feature_id": "quant-public-project-preview-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-goal-quant-public-preview",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788285168040
-    },
-    {
-      "id": "feature_event_b743118f79eb4a6eb62dc887d277e0a6",
-      "feature_id": "quant-public-project-preview-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-quant-public-preview",
-      "reason": "公开预览白名单投影、匿名只读接口和 PC 加入前详情弹窗已实现，源码与文档证据已绑定。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1788285178158
-    },
-    {
-      "id": "feature_event_78fe3bdbdcac477b83596df815a64cc3",
-      "feature_id": "quant-public-project-preview-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-quant-public-preview",
-      "reason": "Rust 精确测试、官方目录/项目中心/渐进列表合同、PC 类型检查/生产构建和定向 ESLint 均通过；线上匿名接口待发布后验收。",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1788285189947
-    },
-    {
-      "id": "feature_event_fb0477f0a50b4e419ec608460c7d1579",
-      "feature_id": "quant-public-project-preview-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-quant-public-preview",
-      "reason": "主项目 Server v0.3.1709 / 7e56f95df 与 PC 前端已发布；线上匿名量化预览、Paper 安全边界、普通非官方 404 和已发布前端详情合同均验收通过。",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1788285995839
-    },
-    {
       "id": "feature_event_2fb831165f4442158aa708a414ad873c",
       "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
       "action": "requirement_rebound",
@@ -17550,6 +17617,126 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1788366843075
+    },
+    {
+      "id": "feature_event_cd15e26da8a143f0a13f30374d46b69c",
+      "feature_id": "esk-paper-usdt-exchange-v1",
+      "action": "registered",
+      "actor": "codex-root",
+      "reason": "用户要求 USDT 与 ESK 随时兑换并收取手续费；先交付安全、可验证、可发布的 Paper 结算闭环。",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1788385089794
+    },
+    {
+      "id": "feature_event_f28509db8729426bb9da4faffcbe48d5",
+      "feature_id": "esk-paper-usdt-exchange-v1",
+      "action": "claimed",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788385100862
+    },
+    {
+      "id": "feature_event_bfddd633aa3a43189469297429101c78",
+      "feature_id": "esk-paper-usdt-exchange-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "正式需求和依赖已确认，开始实现 Paper 兑换垂直闭环。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788385110847
+    },
+    {
+      "id": "feature_event_c74096bfaa08461e92c5f84ebafb02c1",
+      "feature_id": "esk-paper-usdt-exchange-v1",
+      "action": "evidence_recorded",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788387222174
+    },
+    {
+      "id": "feature_event_0d74ee083fd3456f8f9ec2b2e4a8cceb",
+      "feature_id": "esk-paper-usdt-exchange-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "后端原子账本、三端报价确认界面和跨端协议已实现，定向编译与测试通过。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1788387242447
+    },
+    {
+      "id": "feature_event_549d02adfd404c209de7c6795bf92385",
+      "feature_id": "esk-paper-usdt-exchange-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "Rust 定向测试、跨端契约、PC 类型检查/生产构建、Android Debug 编译和移动 PWA 语法检查通过；隔离渲染器准备超时仅延期视觉截图。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1788387252008
+    },
+    {
+      "id": "feature_event_60ba7784818b4f33aed394e6da8efae0",
+      "feature_id": "esk-paper-usdt-exchange-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "并行回归暴露测试环境开关竞争；回退到 ready，修正并刷新验证证据。",
+      "from_status": "verified",
+      "to_status": "ready",
+      "at_ms": 1788387701289
+    },
+    {
+      "id": "feature_event_53d30963eaf24e62b9bed8f371eebf93",
+      "feature_id": "esk-paper-usdt-exchange-v1",
+      "action": "claimed",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788387710282
+    },
+    {
+      "id": "feature_event_ae15219f7bcd4597a1142b4a3e582ef3",
+      "feature_id": "esk-paper-usdt-exchange-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "修复测试环境竞争并重新执行 ESK 回归。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788387719487
+    },
+    {
+      "id": "feature_event_9e262e446cec4e7bb418b4383f6f8d3b",
+      "feature_id": "esk-paper-usdt-exchange-v1",
+      "action": "evidence_recorded",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788388048533
+    },
+    {
+      "id": "feature_event_f7582042f025450dbcd173006379818b",
+      "feature_id": "esk-paper-usdt-exchange-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "测试环境隔离修复完成，联合回归已通过。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1788388060966
+    },
+    {
+      "id": "feature_event_a2df688942e94aae83c4cdb4022c0873",
+      "feature_id": "esk-paper-usdt-exchange-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "Rust 新功能与旧 ESK 联合回归、跨端契约、PC 构建、Android 编译及 PWA 检查全部通过。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1788388061133
     }
   ]
 }

@@ -30,6 +30,32 @@ internal data class EskSellbackRequest(
     val submittedAt: String,
 )
 
+internal data class EskExchangeAccount(
+    val enabled: Boolean,
+    val eskAvailable: String,
+    val usdtAvailable: String,
+    val usdtPerEsk: String?,
+    val feePercent: String?,
+    val statusMessage: String,
+)
+
+internal data class EskExchangeQuote(
+    val quoteId: String,
+    val direction: String,
+    val inputAsset: String,
+    val outputAsset: String,
+    val inputAmount: String,
+    val grossOutputAmount: String,
+    val feeAmount: String,
+    val netOutputAmount: String,
+    val expiresAt: String,
+)
+
+internal data class EskExchangeExecution(
+    val executionId: String,
+    val quote: EskExchangeQuote,
+)
+
 internal class EskAssetApi(
     private val context: Context,
     private val http: OkHttpClient,
@@ -76,6 +102,49 @@ internal class EskAssetApi(
         }
     }
 
+    fun exchangeAccount(): EskExchangeAccount {
+        val root = execute(authenticated(Request.Builder().url(url("/api/me/assets/esk/exchange-account")).get()))
+        requirePaperExchangeEnvelope(root, "yilong.esk.paper_exchange_account.v1")
+        val balances = root.optJSONObject("balances") ?: error("Paper 兑换余额缺失")
+        val esk = balances.optJSONObject("esk") ?: error("ESK Paper 兑换余额缺失")
+        val usdt = balances.optJSONObject("usdt") ?: error("USDT Paper 兑换余额缺失")
+        val pricing = root.optJSONObject("pricing")
+        return EskExchangeAccount(
+            enabled = root.optBoolean("enabled") && pricing != null,
+            eskAvailable = exactAmount(esk, "available"),
+            usdtAvailable = exactAmount(usdt, "available"),
+            usdtPerEsk = pricing?.let { exactAmount(it, "usdt_per_esk") },
+            feePercent = pricing?.optString("fee_percent")?.takeIf { it.matches(FEE_PERCENT) },
+            statusMessage = root.optString("status_message", "Paper 兑换状态未知"),
+        )
+    }
+
+    fun createExchangeQuote(direction: String, inputAmount: String): EskExchangeQuote {
+        require(direction == "usdt_to_esk" || direction == "esk_to_usdt") { "兑换方向无效" }
+        val body = JSONObject().put("direction", direction).put("input_amount", inputAmount)
+        val root = execute(authenticated(
+            Request.Builder().url(url("/api/me/assets/esk/exchange-quotes"))
+                .post(body.toString().toRequestBody(JSON)),
+        ))
+        return parseExchangeQuote(root)
+    }
+
+    fun executeExchange(quoteId: String, idempotencyKey: String): EskExchangeExecution {
+        val body = JSONObject()
+            .put("quote_id", quoteId)
+            .put("idempotency_key", idempotencyKey)
+            .put("confirmation", "CONFIRM PAPER ESK USDT EXCHANGE")
+        val root = execute(authenticated(
+            Request.Builder().url(url("/api/me/assets/esk/exchanges"))
+                .post(body.toString().toRequestBody(JSON)),
+        ))
+        requirePaperExchangeEnvelope(root, "yilong.esk.paper_exchange_execution.v1")
+        return EskExchangeExecution(
+            executionId = root.optString("execution_id").ifBlank { error("Paper 兑换流水号缺失") },
+            quote = parseExchangeQuote(root.optJSONObject("quote") ?: error("Paper 兑换回执缺少报价")),
+        )
+    }
+
     fun createSellback(amount: String, idempotencyKey: String): EskSellbackRequest {
         val body = JSONObject().put("amount", amount).put("idempotency_key", idempotencyKey)
         return parseRequest(execute(authenticated(
@@ -105,6 +174,38 @@ internal class EskAssetApi(
         )
     }
 
+    private fun parseExchangeQuote(value: JSONObject): EskExchangeQuote {
+        requirePaperExchangeEnvelope(value, "yilong.esk.paper_exchange_quote.v1")
+        val inputAsset = assetSymbol(value, "input_asset")
+        val outputAsset = assetSymbol(value, "output_asset")
+        require(value.optString("fee_asset") == outputAsset) { "Paper 兑换手续费资产不匹配" }
+        return EskExchangeQuote(
+            quoteId = value.optString("quote_id").ifBlank { error("Paper 兑换报价 ID 缺失") },
+            direction = value.optString("direction"),
+            inputAsset = inputAsset,
+            outputAsset = outputAsset,
+            inputAmount = exactAmount(value, "input_amount"),
+            grossOutputAmount = exactAmount(value, "gross_output_amount"),
+            feeAmount = exactAmount(value, "fee_amount"),
+            netOutputAmount = exactAmount(value, "net_output_amount"),
+            expiresAt = value.optString("expires_at").ifBlank { error("Paper 兑换报价有效期缺失") },
+        )
+    }
+
+    private fun requirePaperExchangeEnvelope(value: JSONObject, schema: String) {
+        require(value.optString("schema") == schema) { "Paper 兑换协议版本不匹配" }
+        require(value.optBoolean("simulated") && !value.optBoolean("funds_moved", true)) {
+            "Paper 兑换资金安全标识不匹配"
+        }
+        require(!value.optBoolean("on_chain_settlement", true) && value.optString("trading_mode") == "paper") {
+            "Paper 兑换链上安全标识不匹配"
+        }
+    }
+
+    private fun assetSymbol(value: JSONObject, key: String): String =
+        value.optString(key).takeIf { it == "ESK" || it == "USDT" }
+            ?: error("Paper 兑换资产标识无效")
+
     private fun exactAmount(value: JSONObject, key: String): String =
         value.optString(key).takeIf { it.matches(EXACT_AMOUNT) }
             ?: error("ESK 金额格式无效")
@@ -126,5 +227,6 @@ internal class EskAssetApi(
     private companion object {
         val JSON = "application/json".toMediaType()
         val EXACT_AMOUNT = Regex("^\\d+\\.\\d{6}$")
+        val FEE_PERCENT = Regex("^\\d+\\.\\d{2}%$")
     }
 }

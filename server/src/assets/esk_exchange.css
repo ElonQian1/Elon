@@ -1,0 +1,180 @@
+.esk-exchange-panel {
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+  padding-top: 14px;
+}
+
+.esk-exchange-heading,
+.esk-exchange-balances,
+.esk-exchange-form,
+.esk-exchange-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.esk-exchange-heading,
+.esk-exchange-actions {
+  align-items: center;
+  justify-content: space-between;
+}
+
+.esk-exchange-heading strong {
+  color: var(--ink-strong);
+  font-size: 15px;
+}
+
+.esk-exchange-paper-badge {
+  background: rgba(65, 192, 129, 0.12);
+  border: 1px solid rgba(65, 192, 129, 0.35);
+  border-radius: 999px;
+  color: #74d9a5;
+  font-size: 11px;
+  padding: 3px 8px;
+}
+
+.esk-exchange-balances > div {
+  background: var(--panel-3);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  flex: 1;
+  min-width: 0;
+  padding: 10px;
+}
+
+.esk-exchange-balances span,
+.esk-exchange-balances small,
+.esk-exchange-rate,
+.esk-exchange-safety,
+.esk-exchange-history,
+.esk-exchange-message {
+  color: var(--ink-soft);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.esk-exchange-balances strong {
+  color: var(--ink-strong);
+  display: block;
+  font-size: 15px;
+  margin: 3px 0;
+  overflow-wrap: anywhere;
+}
+
+.esk-exchange-form {
+  align-items: stretch;
+  flex-wrap: wrap;
+}
+
+.esk-exchange-form select,
+.esk-exchange-form input {
+  background: var(--panel-3);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  color: var(--ink-strong);
+  font-size: 13px;
+  min-height: 40px;
+  outline: none;
+  padding: 8px 10px;
+}
+
+.esk-exchange-form select {
+  flex: 1 1 138px;
+}
+
+.esk-exchange-form input {
+  flex: 2 1 150px;
+  min-width: 0;
+}
+
+.esk-exchange-button {
+  background: var(--brand);
+  border: 0;
+  border-radius: 7px;
+  color: var(--brand-ink);
+  cursor: pointer;
+  font-size: 13px;
+  min-height: 40px;
+  padding: 8px 14px;
+}
+
+.esk-exchange-button.secondary {
+  background: var(--panel-3);
+  border: 1px solid var(--line);
+  color: var(--ink);
+}
+
+.esk-exchange-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.esk-exchange-quote {
+  background: rgba(255, 185, 62, 0.08);
+  border: 1px solid rgba(255, 185, 62, 0.25);
+  border-radius: 8px;
+  display: grid;
+  gap: 5px;
+  padding: 11px;
+}
+
+.esk-exchange-quote[hidden],
+.esk-exchange-history[hidden] {
+  display: none;
+}
+
+.esk-exchange-quote-row {
+  display: flex;
+  font-size: 12px;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.esk-exchange-quote-row strong {
+  color: var(--ink-strong);
+  font-weight: 600;
+  text-align: right;
+}
+
+.esk-exchange-safety {
+  background: rgba(90, 140, 255, 0.08);
+  border-radius: 7px;
+  margin: 0;
+  padding: 8px 10px;
+}
+
+.esk-exchange-message {
+  margin: 0;
+  min-height: 18px;
+  white-space: pre-wrap;
+}
+
+.esk-exchange-message.error {
+  color: var(--bubble-error-ink);
+}
+
+.esk-exchange-history {
+  border-top: 1px dashed var(--line);
+  display: grid;
+  gap: 6px;
+  padding-top: 10px;
+}
+
+.esk-exchange-history-item {
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+@media (max-width: 420px) {
+  .esk-exchange-actions,
+  .esk-exchange-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .esk-exchange-button {
+    width: 100%;
+  }
+}

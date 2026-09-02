@@ -29,8 +29,11 @@ internal class EskAssetCard(
     private lateinit var sellbackReservedValue: TextView
     private lateinit var quantReservedValue: TextView
     private lateinit var totalReservedValue: TextView
+    private lateinit var paperUsdtValue: TextView
+    private lateinit var exchangeFeeValue: TextView
     private lateinit var statusValue: TextView
     private lateinit var requestButton: TextView
+    private lateinit var exchangeButton: TextView
 
     fun attachAndRefresh() {
         val host = binding.profileEskAssetContainer
@@ -53,23 +56,25 @@ internal class EskAssetCard(
         statusValue.text = "正在读取 ESK 资产…"
         requestButton.isEnabled = false
         thread(name = "profile-esk-asset") {
-            val result = runCatching(api::account)
+            val result = runCatching { api.account() to runCatching(api::exchangeAccount).getOrNull() }
             activity.runOnUiThread {
                 if (serial != loadSerial || activity.isFinishing || activity.isDestroyed) return@runOnUiThread
-                result.onSuccess(::render).onFailure {
+                result.onSuccess { render(it.first, it.second) }.onFailure {
                     renderUnavailable(it.message ?: "ESK 资产暂不可用")
                 }
             }
         }
     }
 
-    private fun render(value: EskAssetSnapshot) {
+    private fun render(value: EskAssetSnapshot, exchange: EskExchangeAccount?) {
         snapshot = value
         totalValue.text = "${value.total} ESK"
         availableValue.text = "${value.available} ESK"
         sellbackReservedValue.text = "${value.reservedForSellback} ESK"
         quantReservedValue.text = "${value.reservedForQuant} ESK"
         totalReservedValue.text = "${value.reservedTotal} ESK"
+        paperUsdtValue.text = exchange?.let { "${it.usdtAvailable} USDT" } ?: "—"
+        exchangeFeeValue.text = exchange?.feePercent ?: "未配置"
         val syncLabel = value.updatedAt?.let { "最近同步：$it" } ?: "最近同步：暂无记录"
         statusValue.text = value.statusMessage +
             "\n余额修订：${value.balanceRevision} · $syncLabel" +
@@ -77,6 +82,8 @@ internal class EskAssetCard(
         root?.contentDescription = "我的 ESK 资产，Paper 登记，${if (value.chainStatus == "not_deployed") "尚未上链" else "上链状态未知"}"
         requestButton.isEnabled = value.mode == "paper" && value.enabled && value.sellbackRequestEnabled
         requestButton.alpha = if (requestButton.isEnabled) 1f else .45f
+        exchangeButton.isEnabled = exchange?.enabled == true
+        exchangeButton.alpha = if (exchangeButton.isEnabled) 1f else .45f
     }
 
     private fun renderUnavailable(message: String) {
@@ -86,14 +93,22 @@ internal class EskAssetCard(
         sellbackReservedValue.text = "—"
         quantReservedValue.text = "—"
         totalReservedValue.text = "—"
+        paperUsdtValue.text = "—"
+        exchangeFeeValue.text = "—"
         statusValue.text = message
         requestButton.isEnabled = false
         requestButton.alpha = .45f
+        exchangeButton.isEnabled = false
+        exchangeButton.alpha = .45f
     }
 
     private fun openSellback() {
         val current = snapshot ?: return
         EskSellbackDialog(activity, api, current, ::refresh).show()
+    }
+
+    private fun openExchange() {
+        EskPaperExchangeDialog(activity, api, ::refresh).show()
     }
 
     private fun buildCard(): LinearLayout = LinearLayout(activity).apply {
@@ -136,6 +151,15 @@ internal class EskAssetCard(
         })
 
         addView(LinearLayout(activity).apply {
+            layoutParams = LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) }
+            orientation = LinearLayout.HORIZONTAL
+            paperUsdtValue = metric("Paper USDT 可用")
+            exchangeFeeValue = metric("当前兑换费率")
+            addView(paperUsdtValue.parent as View, LinearLayout.LayoutParams(0, -2, 1f))
+            addView(exchangeFeeValue.parent as View, LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(8) })
+        })
+
+        addView(LinearLayout(activity).apply {
             layoutParams = LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(13) }
             orientation = LinearLayout.HORIZONTAL
             addView(chip("Paper 登记", "#FDE68A", "#493A1A"))
@@ -168,6 +192,14 @@ internal class EskAssetCard(
             background = pill("#342D1C", "#5A4922", 9)
         }
         addView(statusValue)
+
+        exchangeButton = label("USDT / ESK Paper 兑换", 13f, "#111111", true).apply {
+            layoutParams = LinearLayout.LayoutParams(-1, dp(42)).apply { topMargin = dp(13) }
+            gravity = Gravity.CENTER
+            background = pill("#86EFAC", "#86EFAC", 10)
+            setOnClickListener { openExchange() }
+        }
+        addView(exchangeButton)
 
         requestButton = label("申请卖回 ESK", 13f, "#111111", true).apply {
             layoutParams = LinearLayout.LayoutParams(-1, dp(42)).apply { topMargin = dp(13) }

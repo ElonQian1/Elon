@@ -14,6 +14,7 @@
   <link rel="stylesheet" href="/assets/project_plaza.css" />
   <link rel="stylesheet" href="/assets/project_home.css" />
   <link rel="stylesheet" href="/assets/orbital_mobile_theme.css" />
+  <link rel="stylesheet" href="/assets/esk_exchange.css" />
   <link rel="stylesheet" href="/assets/ai_provider_accounts.css" />
   <script src="https://cdn.platform.openai.com/deployments/chatkit/chatkit.js" async></script>
   <link rel="stylesheet" href="/assets/federated_auth.css" />
@@ -12226,17 +12227,14 @@ if (window.visualViewport) {
       hidePrompt(true);
     }
   });
-
   laterBtn.addEventListener('click', () => hidePrompt(true));
   closeBtn.addEventListener('click', () => hidePrompt(true));
-
   window.addEventListener('load', () => {
     window.setTimeout(() => {
       if (deferredInstallPrompt || isIosDevice() || forcePrompt) showPrompt();
     }, 900);
   });
 })();
-
 // ===== Service Worker 注册（离线缓存 / PWA 壳） =====
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
@@ -12245,7 +12243,9 @@ if ('serviceWorker' in navigator) {
     });
   });
 }
+globalThis.yilongEskExchangeBridge = { api, isLoggedIn, reloadAsset: loadProfileEskAsset };
 </script>
+<script src="/assets/esk_exchange.js"></script>
 <script src="/assets/project_plaza_cache.js"></script>
 <script src="/assets/project_plaza.js"></script>
 <script src="/assets/project_home.js"></script>

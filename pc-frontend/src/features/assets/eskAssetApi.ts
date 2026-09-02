@@ -89,10 +89,89 @@ interface EskSellbackList {
   requests: EskSellbackRequest[]
 }
 
+export type EskExchangeDirection = 'usdt_to_esk' | 'esk_to_usdt'
+
+export interface EskExchangeAccount {
+  schema: 'yilong.esk.paper_exchange_account.v1'
+  mode: 'disabled' | 'paper' | 'invalid'
+  enabled: boolean
+  simulated: true
+  funds_moved: false
+  on_chain_settlement: false
+  trading_mode: 'paper'
+  balances: {
+    esk: { total: string; available: string; revision: number; updated_at: string | null }
+    usdt: { total: string; available: string; revision: number; updated_at: string | null }
+  }
+  pricing: null | {
+    usdt_per_esk: string
+    fee_bps: number
+    fee_percent: string
+    config_revision: string
+    quote_ttl_seconds: 60
+  }
+  status_message: string
+}
+
+export interface EskExchangeQuote {
+  schema: 'yilong.esk.paper_exchange_quote.v1'
+  quote_id: string
+  direction: EskExchangeDirection
+  input_asset: 'ESK' | 'USDT'
+  output_asset: 'ESK' | 'USDT'
+  input_amount: string
+  gross_output_amount: string
+  fee_asset: 'ESK' | 'USDT'
+  fee_amount: string
+  net_output_amount: string
+  usdt_per_esk: string
+  fee_bps: number
+  created_at: string
+  expires_at: string
+  simulated: true
+  funds_moved: false
+  on_chain_settlement: false
+  trading_mode: 'paper'
+}
+
+export interface EskExchangeExecution {
+  schema: 'yilong.esk.paper_exchange_execution.v1'
+  execution_id: string
+  executed_at: string
+  replayed: boolean
+  quote: EskExchangeQuote
+  simulated: true
+  funds_moved: false
+  on_chain_settlement: false
+  trading_mode: 'paper'
+}
+
+interface EskExchangeExecutionList {
+  schema: 'yilong.esk.paper_exchange_execution_list.v1'
+  simulated: true
+  funds_moved: false
+  on_chain_settlement: false
+  trading_mode: 'paper'
+  executions: EskExchangeExecution[]
+}
+
 export const eskAssetApi = {
   account: () => api.get<EskAssetSnapshot>('/api/me/assets/esk'),
   sellbackRequests: () => api.get<EskSellbackList>('/api/me/assets/esk/sellback-requests?limit=20'),
   quantAllocationRequests: () => api.get<EskQuantAllocationList>('/api/me/assets/esk/quant-allocation-requests?limit=20'),
+  exchangeAccount: () => api.get<EskExchangeAccount>('/api/me/assets/esk/exchange-account'),
+  exchangeHistory: () => api.get<EskExchangeExecutionList>('/api/me/assets/esk/exchanges?limit=20'),
+  createExchangeQuote: (direction: EskExchangeDirection, inputAmount: string) =>
+    api.post<EskExchangeQuote>('/api/me/assets/esk/exchange-quotes', {
+      direction,
+      input_amount: inputAmount,
+    }),
+  executeExchange: (quoteId: string, idempotencyKey: string) =>
+    api.post<EskExchangeExecution>('/api/me/assets/esk/exchanges', {
+      quote_id: quoteId,
+      idempotency_key: idempotencyKey,
+      confirmation: 'CONFIRM PAPER ESK USDT EXCHANGE',
+    }),
   createSellback: (amount: string, idempotencyKey: string) =>
     api.post<EskSellbackRequest>('/api/me/assets/esk/sellback-requests', {
       amount,

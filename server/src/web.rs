@@ -142,6 +142,8 @@ const FEDERATED_AUTH_CSS: &str = include_str!("assets/federated_auth.css");
 const FEDERATED_AUTH_JS: &str = include_str!("assets/federated_auth.js");
 const ACCOUNT_SECURITY_CSS: &str = include_str!("assets/account_security.css");
 const ACCOUNT_SECURITY_JS: &str = include_str!("assets/account_security.js");
+const ESK_EXCHANGE_CSS: &str = include_str!("assets/esk_exchange.css");
+const ESK_EXCHANGE_JS: &str = include_str!("assets/esk_exchange.js");
 const VOICE_TTS_SDK_JS: &str = include_str!("assets/voice_tts_sdk.js");
 const ELON_ROUTE_C_SDK_JS: &str = include_str!("assets/elon_route_c_sdk.js");
 const UI_TUNER_PWA_AUTH_BOOTSTRAP_JS: &str = include_str!("assets/ui_tuner_pwa_auth_bootstrap.js");
@@ -661,6 +663,29 @@ pub async fn account_security_js() -> impl IntoResponse {
             (header::CACHE_CONTROL, "no-store, no-cache, must-revalidate"),
         ],
         ACCOUNT_SECURITY_JS,
+    )
+}
+
+pub async fn esk_exchange_css() -> impl IntoResponse {
+    (
+        [
+            (header::CONTENT_TYPE, "text/css; charset=utf-8"),
+            (header::CACHE_CONTROL, "no-store, no-cache, must-revalidate"),
+        ],
+        ESK_EXCHANGE_CSS,
+    )
+}
+
+pub async fn esk_exchange_js() -> impl IntoResponse {
+    (
+        [
+            (
+                header::CONTENT_TYPE,
+                "application/javascript; charset=utf-8",
+            ),
+            (header::CACHE_CONTROL, "no-store, no-cache, must-revalidate"),
+        ],
+        ESK_EXCHANGE_JS,
     )
 }
 

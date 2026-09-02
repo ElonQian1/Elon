@@ -1,7 +1,7 @@
 use anyhow::{anyhow, bail, Result};
 use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
 
-use super::{new_id, now};
+use super::{esk_exchange::user_esk_exchange_delta_on, new_id, now};
 use crate::esk_asset::{
     EskAccountLedger, EskAllocationInput, EskAllocationReceipt, EskSellbackInput, EskSellbackRecord,
 };
@@ -182,13 +182,21 @@ impl Store {
 }
 
 pub(super) fn account_ledger_on(conn: &Connection, user_id: &str) -> Result<EskAccountLedger> {
-    let (total, revision, updated_at): (i64, i64, Option<String>) = conn.query_row(
+    let (allocated_total, revision, updated_at): (i64, i64, Option<String>) = conn.query_row(
         "SELECT COALESCE(SUM(amount_base_units), 0), COUNT(*), MAX(created_at)
            FROM esk_asset_ledger_entries
           WHERE user_id = ?1",
         params![user_id],
         |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
     )?;
+    let (exchange_delta, exchange_entry_count, exchange_updated_at) =
+        user_esk_exchange_delta_on(conn, user_id)?;
+    let total = allocated_total
+        .checked_add(exchange_delta)
+        .ok_or_else(|| anyhow!("ESK 兑换后余额超出范围"))?;
+    if total < 0 {
+        bail!("ESK 兑换后余额状态无效");
+    }
     let sellback_reserved: i64 = conn.query_row(
         "SELECT COALESCE(SUM(r.amount_base_units), 0)
            FROM esk_sellback_requests r
@@ -242,13 +250,19 @@ pub(super) fn account_ledger_on(conn: &Connection, user_id: &str) -> Result<EskA
         quant_reserved_base_units: quant_reserved,
         reserved_base_units: reserved,
         revision: revision
+            .saturating_add(exchange_entry_count)
             .saturating_add(sellback_event_count)
             .saturating_add(quant_event_count)
             .max(0),
-        updated_at: [updated_at, sellback_updated_at, quant_updated_at]
-            .into_iter()
-            .flatten()
-            .max(),
+        updated_at: [
+            updated_at,
+            exchange_updated_at,
+            sellback_updated_at,
+            quant_updated_at,
+        ]
+        .into_iter()
+        .flatten()
+        .max(),
     })
 }
 

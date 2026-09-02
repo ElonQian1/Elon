@@ -243,6 +243,8 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .route("/assets/federated_auth.js", get(web::federated_auth_js))
         .route("/assets/account_security.css", get(web::account_security_css))
         .route("/assets/account_security.js", get(web::account_security_js))
+        .route("/assets/esk_exchange.css", get(web::esk_exchange_css))
+        .route("/assets/esk_exchange.js", get(web::esk_exchange_js))
         .route("/assets/voice_tts_sdk.js", get(web::voice_tts_sdk_js))
         .route("/assets/elon_route_c_sdk.js", get(web::elon_route_c_sdk_js))
         .route("/health", get(api::health))
@@ -696,6 +698,7 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             axum::routing::any(project_storage_git::storage_git_handler),
         )
         .merge(crate::esk_asset::routes())
+        .merge(crate::esk_asset::exchange::routes())
         .merge(admin_routes::routes())
         .layer(CompressionLayer::new())
         .layer(cors)
