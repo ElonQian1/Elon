@@ -1,4 +1,3 @@
-use anyhow::Result;
 use dotenvy::dotenv;
 use std::sync::Arc;
 use tracing::info;
@@ -720,7 +719,7 @@ mod ws_transport;
 pub use types::AppState;
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 4)]
-async fn main() -> Result<()> {
+async fn main() -> anyhow::Result<()> {
     dotenv().ok();
     tracing_subscriber::fmt()
         .with_env_filter(

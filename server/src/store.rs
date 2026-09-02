@@ -1,5 +1,4 @@
 use anyhow::{anyhow, Result};
-use rusqlite::{params, Connection, OptionalExtension};
 mod account_identities;
 #[cfg(test)]
 mod account_identities_tests;
@@ -741,7 +740,7 @@ pub use user_memories::{UserMemory, MEMORY_SCOPE_CHAT, MEMORY_SCOPE_GLOBAL};
 pub use user_memories::{MEMORY_SCOPE_PHONE_CONTROL, MEMORY_SCOPE_PROJECT};
 pub use user_progression::UserProgressionLedger;
 pub struct Store {
-    conn: std::sync::Mutex<Connection>,
+    conn: std::sync::Mutex<rusqlite::Connection>,
 }
 const MAX_TASK_EVENTS_PER_TASK: i64 = 1000;
 impl Store {
@@ -749,7 +748,7 @@ impl Store {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)?;
         }
-        let conn = Connection::open(path)?;
+        let conn = rusqlite::Connection::open(path)?;
         conn.pragma_update(None, "journal_mode", "WAL")?;
         conn.pragma_update(None, "foreign_keys", "ON")?;
         conn.pragma_update(None, "busy_timeout", 5000)?;
@@ -767,7 +766,7 @@ impl Store {
                 id, phone, email, password_hash, nickname, role, status, created_at, updated_at
              )
              VALUES (?1, ?2, NULL, 'device-user', 'APK 用户', 'user', 'active', ?3, ?3)",
-            params![
+            rusqlite::params![
                 id,
                 format!("device-{}", safe_external_id(user_id, "default")),
                 now
@@ -775,7 +774,7 @@ impl Store {
         )?;
         let user = conn.query_row(
             "SELECT id, phone, email, nickname, role, status FROM users WHERE id = ?1",
-            params![safe_external_id(user_id, "default")],
+            rusqlite::params![safe_external_id(user_id, "default")],
             |row| {
                 let phone: Option<String> = row.get(1)?;
                 let email: Option<String> = row.get(2)?;
@@ -794,7 +793,7 @@ impl Store {
         drop(conn);
         Ok(user)
     }
-    pub(crate) fn conn(&self) -> Result<std::sync::MutexGuard<'_, Connection>> {
+    pub(crate) fn conn(&self) -> Result<std::sync::MutexGuard<'_, rusqlite::Connection>> {
         self.conn.lock().map_err(|_| anyhow!("数据库连接锁已损坏"))
     }
 }
