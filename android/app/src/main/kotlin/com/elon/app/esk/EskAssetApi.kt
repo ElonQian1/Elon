@@ -13,7 +13,12 @@ internal data class EskAssetSnapshot(
     val enabled: Boolean,
     val total: String,
     val available: String,
-    val reserved: String,
+    val reservedForSellback: String,
+    val reservedForQuant: String,
+    val reservedTotal: String,
+    val balanceRevision: Long,
+    val updatedAt: String?,
+    val sellbackRequestEnabled: Boolean,
     val chainStatus: String,
     val statusMessage: String,
 )
@@ -34,6 +39,10 @@ internal class EskAssetApi(
         val root = execute(authenticated(Request.Builder().url(url("/api/me/assets/esk")).get()))
         val asset = root.optJSONObject("asset") ?: error("ESK 资产身份缺失")
         val balance = root.optJSONObject("balance") ?: error("ESK 余额缺失")
+        val sellback = root.optJSONObject("sellback") ?: error("ESK 卖回策略缺失")
+        require(root.optString("schema") == "yilong.esk.asset_account.v2") {
+            "ESK 资产协议版本不匹配"
+        }
         require(asset.optString("symbol") == "ESK") { "ESK 资产标识不匹配" }
         require(asset.optString("chain_status") == "not_deployed") { "ESK 上链状态不匹配" }
         require(root.optBoolean("simulated") && !root.optBoolean("funds_moved", true)) {
@@ -44,7 +53,13 @@ internal class EskAssetApi(
             enabled = root.optBoolean("enabled"),
             total = exactAmount(balance, "total"),
             available = exactAmount(balance, "available"),
-            reserved = exactAmount(balance, "reserved_for_sellback"),
+            reservedForSellback = exactAmount(balance, "reserved_for_sellback"),
+            reservedForQuant = exactAmount(balance, "reserved_for_quant"),
+            reservedTotal = exactAmount(balance, "reserved_total"),
+            balanceRevision = balance.optLong("revision").takeIf { balance.has("revision") && it >= 0 }
+                ?: error("ESK 余额修订无效"),
+            updatedAt = balance.optString("updated_at").ifBlank { null },
+            sellbackRequestEnabled = sellback.optBoolean("request_enabled"),
             chainStatus = asset.optString("chain_status", "unknown"),
             statusMessage = root.optString("status_message", "ESK 资产状态未知"),
         )

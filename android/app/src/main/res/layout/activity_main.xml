@@ -733,15 +733,28 @@
                     android:layout_height="0dp"
                     android:visibility="gone" />
 
-                <LinearLayout
-                    android:id="@+id/profileUsageContainer"
+                <TextView
+                    android:id="@+id/profileAssetsTitle"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="14dp"
-                    android:orientation="vertical" />
+                    android:layout_marginStart="2dp"
+                    android:layout_marginTop="18dp"
+                    android:layout_marginEnd="2dp"
+                    android:includeFontPadding="false"
+                    android:text="我的资产"
+                    android:textColor="@color/elon_text_primary"
+                    android:textSize="17sp"
+                    android:textStyle="bold" />
 
                 <LinearLayout
                     android:id="@+id/profileEskAssetContainer"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:orientation="vertical" />
+
+                <LinearLayout
+                    android:id="@+id/profileUsageContainer"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="14dp"

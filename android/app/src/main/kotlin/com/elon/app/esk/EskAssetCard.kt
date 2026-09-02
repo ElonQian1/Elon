@@ -26,7 +26,9 @@ internal class EskAssetCard(
     private var snapshot: EskAssetSnapshot? = null
     private lateinit var totalValue: TextView
     private lateinit var availableValue: TextView
-    private lateinit var reservedValue: TextView
+    private lateinit var sellbackReservedValue: TextView
+    private lateinit var quantReservedValue: TextView
+    private lateinit var totalReservedValue: TextView
     private lateinit var statusValue: TextView
     private lateinit var requestButton: TextView
 
@@ -65,10 +67,15 @@ internal class EskAssetCard(
         snapshot = value
         totalValue.text = "${value.total} ESK"
         availableValue.text = "${value.available} ESK"
-        reservedValue.text = "${value.reserved} ESK"
-        statusValue.text = value.statusMessage + "\n未设置官方卖回价格；申请不代表成交或付款。"
+        sellbackReservedValue.text = "${value.reservedForSellback} ESK"
+        quantReservedValue.text = "${value.reservedForQuant} ESK"
+        totalReservedValue.text = "${value.reservedTotal} ESK"
+        val syncLabel = value.updatedAt?.let { "最近同步：$it" } ?: "最近同步：暂无记录"
+        statusValue.text = value.statusMessage +
+            "\n余额修订：${value.balanceRevision} · $syncLabel" +
+            "\n未设置官方卖回价格；申请不代表成交或付款。"
         root?.contentDescription = "我的 ESK 资产，Paper 登记，${if (value.chainStatus == "not_deployed") "尚未上链" else "上链状态未知"}"
-        requestButton.isEnabled = value.mode == "paper" && value.enabled
+        requestButton.isEnabled = value.mode == "paper" && value.enabled && value.sellbackRequestEnabled
         requestButton.alpha = if (requestButton.isEnabled) 1f else .45f
     }
 
@@ -76,7 +83,9 @@ internal class EskAssetCard(
         snapshot = null
         totalValue.text = "— ESK"
         availableValue.text = "—"
-        reservedValue.text = "—"
+        sellbackReservedValue.text = "—"
+        quantReservedValue.text = "—"
+        totalReservedValue.text = "—"
         statusValue.text = message
         requestButton.isEnabled = false
         requestButton.alpha = .45f
@@ -94,13 +103,7 @@ internal class EskAssetCard(
         )
         orientation = LinearLayout.VERTICAL
         setPadding(dp(16), dp(17), dp(16), dp(16))
-        background = GradientDrawable(
-            GradientDrawable.Orientation.TL_BR,
-            intArrayOf(Color.parseColor("#21342D"), Color.parseColor("#202126")),
-        ).apply {
-            cornerRadius = dp(16).toFloat()
-            setStroke(dp(1), Color.parseColor("#325D49"))
-        }
+        background = pill("#151515", "#303030", 16)
         contentDescription = "我的 ESK 资产，Paper 登记，尚未上链"
 
         addView(LinearLayout(activity).apply {
@@ -112,8 +115,8 @@ internal class EskAssetCard(
                 text = "E"
                 textSize = 23f
                 setTypeface(typeface, Typeface.BOLD)
-                setTextColor(Color.parseColor("#86EFAC"))
-                background = pill("#173B29", "#47765F", 14)
+                setTextColor(Color.parseColor("#D9D9D9"))
+                background = pill("#23272A", "#4B5257", 14)
             })
             addView(LinearLayout(activity).apply {
                 layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
@@ -125,9 +128,9 @@ internal class EskAssetCard(
                 addView(totalValue)
                 addView(label("我的 ESK 总持有量", 10f, "#858B96", false))
             })
-            addView(label("刷新", 11f, "#86EFAC", true).apply {
+            addView(label("刷新", 11f, "#D9D9D9", true).apply {
                 setPadding(dp(10), dp(8), dp(10), dp(8))
-                background = pill("#17251F", "#385648", 9)
+                background = pill("#252525", "#454545", 9)
                 setOnClickListener { refresh() }
             })
         })
@@ -144,9 +147,18 @@ internal class EskAssetCard(
             layoutParams = LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(14) }
             orientation = LinearLayout.HORIZONTAL
             availableValue = metric("当前可用")
-            reservedValue = metric("卖回申请冻结")
+            sellbackReservedValue = metric("卖回申请占用")
             addView(availableValue.parent as View, LinearLayout.LayoutParams(0, -2, 1f))
-            addView(reservedValue.parent as View, LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(8) })
+            addView(sellbackReservedValue.parent as View, LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(8) })
+        })
+
+        addView(LinearLayout(activity).apply {
+            layoutParams = LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) }
+            orientation = LinearLayout.HORIZONTAL
+            quantReservedValue = metric("量化申请占用")
+            totalReservedValue = metric("全部申请占用")
+            addView(quantReservedValue.parent as View, LinearLayout.LayoutParams(0, -2, 1f))
+            addView(totalReservedValue.parent as View, LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(8) })
         })
 
         statusValue = label("正在读取 ESK 资产…", 11f, "#D6D3D1", false).apply {
@@ -157,10 +169,10 @@ internal class EskAssetCard(
         }
         addView(statusValue)
 
-        requestButton = label("申请卖回 ESK", 13f, "#07150D", true).apply {
+        requestButton = label("申请卖回 ESK", 13f, "#111111", true).apply {
             layoutParams = LinearLayout.LayoutParams(-1, dp(42)).apply { topMargin = dp(13) }
             gravity = Gravity.CENTER
-            background = pill("#4ADE80", "#4ADE80", 10)
+            background = pill("#D9D9D9", "#D9D9D9", 10)
             setOnClickListener { openSellback() }
         }
         addView(requestButton)

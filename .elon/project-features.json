@@ -4940,6 +4940,117 @@
       "updated_at_ms": 1787310311513
     },
     {
+      "id": "esk-asset-profile-first-screen-v2",
+      "title": "ESK 资产个人中心首屏可见 V2",
+      "summary": "将 ESK 资产前置到主 APK 与移动 Web 个人中心首屏，补齐卖回、量化和总占用精确余额；不改变 Paper、未上链和未移动资金边界。",
+      "status": "verified",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/esk-asset-profile-first-screen-v2.md",
+        "content_hash": "0e9cfcd3517cd3ee18cb4785b898fd8c3e91dcb84fd60ee842978d17a04340da",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "6aaf5c4e0650bd2f688f4dd5a82eaec9c648dbd7",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "8589db5adb238c22a095c8ac3fca8af13c1db567",
+          "state": "index_only"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "platform-assets",
+      "tags": [
+        "esk",
+        "android",
+        "pwa",
+        "profile",
+        "user-visible"
+      ],
+      "task_paths": [
+        "android/app/src/main/kotlin/com/elon/app/esk",
+        "android/app/src/main/res/layout/activity_main.xml",
+        "scripts/test-esk-profile-asset-visibility.js",
+        "server/src/assets/web_page.html"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "Android ESK 容器位于 Token 额度容器之前并显示“我的资产”标题",
+        "Android 显示总额、可用、卖回、量化和总占用精确余额",
+        "移动 Web 个人页使用当前会话加载同一 ESK 资产视图并区分失败和零余额",
+        "Android 编译与跨端静态合同通过，发布和真机状态单独报告"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/esk/EskAssetApi.kt",
+          "content_hash": "2e135543e55409d7590e499ab19f1ea5950eef695cd14bb0b2863f7c3a5dbd5f",
+          "locator": "EskAssetSnapshot/account",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "6aaf5c4e0650bd2f688f4dd5a82eaec9c648dbd7",
+            "head_blob_oid": "c0c14fbdf2364fbc0a033cf6fc8341b617ccd6a9",
+            "worktree_blob_oid": "2e121578544e0dc4baf630bc613191081779a899",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/esk/EskAssetCard.kt",
+          "content_hash": "ab6f67805399afd2db59a2eccf83a49cdf91817767beff1de2ddbf5d4031ef95",
+          "locator": "EskAssetCard.render/buildCard",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "6aaf5c4e0650bd2f688f4dd5a82eaec9c648dbd7",
+            "head_blob_oid": "ee7b272bd0a1fcae0c0f7f8d4a57eedb23b09e4b",
+            "worktree_blob_oid": "bc7d2bfd0044fc2e09bf5a7e1aee1651e8dd4e4a",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/main/res/layout/activity_main.xml",
+          "content_hash": "9022ff7e6df604bd3391ce824ceda238bd05ca3a7ef1c08f6e80457fb02924e6",
+          "locator": "profileAssetsTitle/profileEskAssetContainer/profileUsageContainer",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "6aaf5c4e0650bd2f688f4dd5a82eaec9c648dbd7",
+            "head_blob_oid": "0ed8aa311a7bd459740c7b2a1cb6a87f227a383c",
+            "worktree_blob_oid": "dcc49d2c65fb6a5f6f432b1a114f501eb20eb744",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "scripts/test-esk-profile-asset-visibility.js",
+          "content_hash": "a85dea803ca743bb9f69b7c7b844924da06348214e4d5ffede7e51937daff90c",
+          "locator": "ESK profile asset visibility contract",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "6aaf5c4e0650bd2f688f4dd5a82eaec9c648dbd7",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "6b6ead67dee68dd66966926e89425c0bd036fec8",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/src/assets/web_page.html",
+          "content_hash": "d413efeacddd9a60d6737f8e000e7455037a2fc49c4512721ff377a451b97363",
+          "locator": "profileEskAssetCard/loadProfileEskAsset",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "6aaf5c4e0650bd2f688f4dd5a82eaec9c648dbd7",
+            "head_blob_oid": "970bca0da88bbee4e1d17156035b2d270b77d8bd",
+            "worktree_blob_oid": "4997e0c5b6cb29c19449a58287c178441f808563",
+            "state": "tracked_modified"
+          }
+        }
+      ],
+      "created_at_ms": 1788361435924,
+      "updated_at_ms": 1788362663102
+    },
+    {
       "id": "esk-paper-asset-account-v1",
       "title": "ESK Paper 资产账户与卖回申请 V1",
       "summary": "主项目建立 ESK 唯一余额真源、精确用户资产视图、管理员幂等 Paper 登记与追加式卖回申请；PC/Android 明确未上链、未移动资金，量化接入另走版本化投影。",
@@ -15441,166 +15552,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_8e341843d4ef4296a1037f28e5d0d103",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "requirement_rebound",
-      "actor": "codex-root-019fc8bf-q16",
-      "reason": "Bind the committed Q16 authority requirement at 541b3840e for explicit review and evidence closure.",
-      "from_status": "blocked",
-      "to_status": "proposed",
-      "at_ms": 1788282027648
-    },
-    {
-      "id": "feature_event_ecfb1c43834e4243a5212c74b49981cf",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex-root-019fc8bf-q16-review",
-      "reason": "Independent contract, runtime, documentation, catalog, source-closure, and line-budget audits passed; compile and Windows runtime claims remain explicitly deferred.",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1788282056170
-    },
-    {
-      "id": "feature_event_705ffc8ad4e64333919f8c60ba40e1a0",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex-root-019fc8bf-q16-review",
-      "reason": "The committed Q16 requirement is current and its static-denominator dependency remains verified; open a bounded evidence-binding claim.",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1788282066798
-    },
-    {
-      "id": "feature_event_fa4ad28b7e094a7e98afd33513e44692",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "claimed",
-      "actor": "codex-root-019fc8bf-q16-evidence",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788282076073
-    },
-    {
-      "id": "feature_event_b66ffd51dcf84012b506b37d3dcc7824",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex-root-019fc8bf-q16-evidence",
-      "reason": "Bind the committed Q16 source, catalog, dynamic runner, managed controller, tests, and authority evidence without claiming compile or runtime acceptance.",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788282086779
-    },
-    {
-      "id": "feature_event_2d7ae6a2a36d42f58a1542ab2a5fcbe3",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-root-019fc8bf-q16-evidence",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788282117236
-    },
-    {
-      "id": "feature_event_89f036ac0b5f4923bc343116dddc154b",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex-root-019fc8bf-q16-evidence",
-      "reason": "Q16 exact 88-member source tranche and 16 current hash-bound evidence items are closed. The full A2 Lock quotient still lacks 4,560 members/4,032 groups plus compiler, process-isolated Windows receipts, reviewed manifests, Qlock, and WindowsDynamic evidence; production and economic effects remain closed.",
-      "from_status": "in_progress",
-      "to_status": "blocked",
-      "at_ms": 1788282130278
-    },
-    {
-      "id": "feature_event_2d77e2c8c0be48c6831135e6e7fe29a7",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-root-019fc8bf-q16-style",
-      "reason": "",
-      "from_status": "blocked",
-      "to_status": "blocked",
-      "at_ms": 1788282344638
-    },
-    {
-      "id": "feature_event_bbd303940516472e8fce6624d6324f8c",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "requirement_rebound",
-      "actor": "codex-root-019fc8bf-q16",
-      "reason": "Refresh requirement Git identity after authorized non-fast-forward rebase; requirement body and scope are unchanged.",
-      "from_status": "blocked",
-      "to_status": "proposed",
-      "at_ms": 1788282604528
-    },
-    {
-      "id": "feature_event_c5ae2ea871124a25833d0a12909b1e19",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex-root-019fc8bf-q16",
-      "reason": "Re-reviewed unchanged Q16 requirement and acceptance boundary after clean rebase.",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1788282623286
-    },
-    {
-      "id": "feature_event_eddd40cc3e984664950a8542375dd6e4",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex-root-019fc8bf-q16",
-      "reason": "Q16 requirement remains accepted and dependency is unchanged; prepare the rebased evidence refresh.",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1788282630851
-    },
-    {
-      "id": "feature_event_edfb0d2a854c4d4c8eeb732eb0798954",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "claimed",
-      "actor": "codex-root-019fc8bf-q16-rebase-evidence",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788282639165
-    },
-    {
-      "id": "feature_event_c3fe8764e6c34c8899a5a4b313119913",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex-root-019fc8bf-q16",
-      "reason": "Bind the already-reviewed Q16 implementation evidence to the rebased commit chain.",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788282647795
-    },
-    {
-      "id": "feature_event_a5c92c5b55a04ffcb553a48348a722fd",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-root-019fc8bf-q16",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788282679444
-    },
-    {
-      "id": "feature_event_db11292843f74c28b741269e63f8ee86",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex-root-019fc8bf-q16",
-      "reason": "Q16 source tranche and 16 rebased evidence bindings are complete, but the parent feature remains gated: Qlock is not fully enumerated, WindowsDynamic is not opened, and Cargo/Rust/real runtime validation is intentionally deferred; production and economic effects remain closed.",
-      "from_status": "in_progress",
-      "to_status": "blocked",
-      "at_ms": 1788282691023
-    },
-    {
-      "id": "feature_event_5b37d29d19074a98960ed5eacc2cac4d",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "requirement_rebound",
-      "actor": "codex-root-019fc8bf-q16",
-      "reason": "Refresh Q16 requirement Git identity after the second authorized non-fast-forward rebase; content and scope are unchanged.",
-      "from_status": "blocked",
-      "to_status": "proposed",
-      "at_ms": 1788282895666
-    },
-    {
       "id": "feature_event_70640a7d1b77422fa40d9a8090879767",
       "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
       "action": "transitioned",
@@ -17439,6 +17390,166 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1788346445288
+    },
+    {
+      "id": "feature_event_55cb9352a338487490d734b048f8980a",
+      "feature_id": "esk-asset-profile-first-screen-v2",
+      "action": "registered",
+      "actor": "codex",
+      "reason": "用户反馈主 APK 个人中心看不到资产；现有卡片位于高卡片之后且 Android 未单列量化占用。",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1788361435924
+    },
+    {
+      "id": "feature_event_e7193539592f44f69bb3c43a64ede8f7",
+      "feature_id": "esk-asset-profile-first-screen-v2",
+      "action": "claimed",
+      "actor": "codex-desktop-root",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788361453832
+    },
+    {
+      "id": "feature_event_d107b70f2d3e44eea7cc071c0ac7ecb5",
+      "feature_id": "esk-asset-profile-first-screen-v2",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "开始实现个人中心 ESK 首屏可见与跨端同步。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788361470026
+    },
+    {
+      "id": "feature_event_59202aaff8c640cd991f8b23587dd94a",
+      "feature_id": "esk-asset-profile-first-screen-v2",
+      "action": "evidence_recorded",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788361921389
+    },
+    {
+      "id": "feature_event_7f7d29f470564801949e282b65b74716",
+      "feature_id": "esk-asset-profile-first-screen-v2",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "Android 与移动 Web ESK 首屏资产视图已实现，跨端静态合同与 Android Kotlin 编译通过。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1788361938468
+    },
+    {
+      "id": "feature_event_1e57356c6754491abfd0d7769d475c78",
+      "feature_id": "esk-asset-profile-first-screen-v2",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "ESK 首屏静态合同、既有 ESK 跨端合同、移动 PWA 脚本语法和 Android Kotlin 编译均通过；真机因无可用物理设备延期。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1788361957309
+    },
+    {
+      "id": "feature_event_a5bae3c28c2e4a05b4f355af524d3a68",
+      "feature_id": "esk-asset-profile-first-screen-v2",
+      "action": "transitioned",
+      "actor": "codex-desktop ai助手",
+      "reason": "显式重新打开已验证功能，以接受需求文档结尾格式修正并重新绑定当前哈希。",
+      "from_status": "verified",
+      "to_status": "retired",
+      "at_ms": 1788362483652
+    },
+    {
+      "id": "feature_event_8bc0f48d10fd4f94ab4e679ac0f825be",
+      "feature_id": "esk-asset-profile-first-screen-v2",
+      "action": "transitioned",
+      "actor": "codex-desktop ai助手",
+      "reason": "重新打开功能并准备重绑当前需求哈希，避免已验证记录继续引用漂移版本。",
+      "from_status": "retired",
+      "to_status": "proposed",
+      "at_ms": 1788362495799
+    },
+    {
+      "id": "feature_event_d1c303adea83423a8a0f6e0795c2569d",
+      "feature_id": "esk-asset-profile-first-screen-v2",
+      "action": "requirement_rebound",
+      "actor": "codex-desktop ai助手",
+      "reason": "重绑无多余结尾空行的当前需求文档，并重新执行评审、实现和验证生命周期。",
+      "from_status": "proposed",
+      "to_status": "proposed",
+      "at_ms": 1788362508519
+    },
+    {
+      "id": "feature_event_b3d49c8d187841dda5c3d8f836bab757",
+      "feature_id": "esk-asset-profile-first-screen-v2",
+      "action": "transitioned",
+      "actor": "codex-desktop ai助手",
+      "reason": "需求范围与安全边界复审通过。",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1788362660669
+    },
+    {
+      "id": "feature_event_bf6161e09d6a42ffb2a060f1b6cf5886",
+      "feature_id": "esk-asset-profile-first-screen-v2",
+      "action": "transitioned",
+      "actor": "codex-desktop ai助手",
+      "reason": "依赖为空且验收标准可执行，进入实现准备。",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1788362660856
+    },
+    {
+      "id": "feature_event_0e88c3dbba5041b8bce260da20e19621",
+      "feature_id": "esk-asset-profile-first-screen-v2",
+      "action": "claimed",
+      "actor": "codex-desktop ai助手",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788362661049
+    },
+    {
+      "id": "feature_event_be81d30a5a054b10a61a75d5980acb38",
+      "feature_id": "esk-asset-profile-first-screen-v2",
+      "action": "transitioned",
+      "actor": "codex-desktop ai助手",
+      "reason": "继续已完成的个人中心资产实现与发布验证。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788362661227
+    },
+    {
+      "id": "feature_event_ea75533c517d46d5a82e2501fd7d513b",
+      "feature_id": "esk-asset-profile-first-screen-v2",
+      "action": "evidence_recorded",
+      "actor": "codex-desktop ai助手",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788362662778
+    },
+    {
+      "id": "feature_event_9ed3e7abf9b94643a804b1821aa3c751",
+      "feature_id": "esk-asset-profile-first-screen-v2",
+      "action": "transitioned",
+      "actor": "codex-desktop ai助手",
+      "reason": "Android 与移动 Web 资产首屏实现完成，定向合同和编译已通过。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1788362662927
+    },
+    {
+      "id": "feature_event_9d191048de2b48d5bf7289c00a3cacae",
+      "feature_id": "esk-asset-profile-first-screen-v2",
+      "action": "transitioned",
+      "actor": "codex-desktop ai助手",
+      "reason": "定向静态合同、现有 ESK 合同与 Android Kotlin 编译验证通过；真机状态单独记录为 deferred。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1788362663102
     }
   ]
 }

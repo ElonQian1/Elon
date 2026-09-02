@@ -2781,6 +2781,128 @@
     #profilePage .profile-level-track .shared { background: #E58F46; }
     #profilePage .profile-level-track .provided { background: #E7B86A; }
     #profilePage .profile-qr-thumb { width: 34px; height: 34px; }
+    #profilePage .profile-section-title {
+      margin: 18px 2px 10px;
+      color: #D9D9D9;
+      font-size: 17px;
+      font-weight: 650;
+      line-height: 1.2;
+    }
+    #profilePage .esk-profile-card {
+      box-sizing: border-box;
+      padding: 17px 16px 16px;
+      border: 1px solid #303030;
+      border-radius: 16px;
+      background: #151515;
+    }
+    #profilePage .esk-profile-hero {
+      display: flex;
+      align-items: center;
+      gap: 13px;
+    }
+    #profilePage .esk-profile-mark {
+      width: 48px;
+      height: 48px;
+      flex: 0 0 48px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid #4B5257;
+      border-radius: 14px;
+      background: #23272A;
+      color: #D9D9D9;
+      font-size: 23px;
+      font-weight: 700;
+    }
+    #profilePage .esk-profile-balance { min-width: 0; flex: 1; }
+    #profilePage .esk-profile-balance span,
+    #profilePage .esk-profile-balance small {
+      display: block;
+      color: #858B96;
+      font-size: 11px;
+      font-weight: 400;
+    }
+    #profilePage .esk-profile-balance strong {
+      display: block;
+      margin: 3px 0;
+      color: #F8FAFC;
+      font-size: 25px;
+      line-height: 1.1;
+      overflow-wrap: anywhere;
+    }
+    #profilePage .esk-profile-refresh {
+      min-width: 48px;
+      min-height: 48px;
+      border: 1px solid #454545;
+      border-radius: 12px;
+      background: #252525;
+      color: #D9D9D9;
+      cursor: pointer;
+    }
+    #profilePage .esk-profile-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 13px;
+    }
+    #profilePage .esk-profile-badges span {
+      padding: 5px 8px;
+      border-radius: 999px;
+      background: #2A2A2A;
+      color: #D9D9D9;
+      font-size: 10px;
+      font-weight: 650;
+    }
+    #profilePage .esk-profile-metrics {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 14px;
+    }
+    #profilePage .esk-profile-metric {
+      min-width: 0;
+      padding: 10px 11px;
+      border: 1px solid #30363B;
+      border-radius: 9px;
+      background: #191D20;
+    }
+    #profilePage .esk-profile-metric span {
+      display: block;
+      color: #858B96;
+      font-size: 10px;
+    }
+    #profilePage .esk-profile-metric strong {
+      display: block;
+      margin-top: 4px;
+      color: #F8FAFC;
+      font-size: 13px;
+      overflow-wrap: anywhere;
+    }
+    #profilePage .esk-profile-status {
+      margin: 13px 0 0;
+      padding: 10px 11px;
+      border: 1px solid #4C4432;
+      border-radius: 9px;
+      background: #29251D;
+      color: #D6D3D1;
+      font-size: 11px;
+      line-height: 1.5;
+      white-space: pre-line;
+    }
+    #profilePage .esk-profile-action {
+      width: 100%;
+      min-height: 48px;
+      margin-top: 13px;
+      border: 1px solid #D9D9D9;
+      border-radius: 10px;
+      background: #D9D9D9;
+      color: #111111;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    #profilePage .esk-profile-action:disabled,
+    #profilePage .esk-profile-refresh:disabled { opacity: .4; cursor: default; }
     #profilePage .usage-section {
       position: relative;
       min-height: 284px;
@@ -4700,6 +4822,30 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
         </div>
       </div>
 
+      <h3 class="profile-section-title">我的资产</h3>
+      <section class="esk-profile-card" id="profileEskAssetCard" aria-label="我的 ESK 资产" data-state="loading">
+        <div class="esk-profile-hero">
+          <span class="esk-profile-mark" aria-hidden="true">E</span>
+          <div class="esk-profile-balance">
+            <span>一龙 ESK</span>
+            <strong id="profileEskTotal">… ESK</strong>
+            <small>我的 ESK 总持有量</small>
+          </div>
+          <button class="esk-profile-refresh" id="profileEskRefreshBtn" type="button" aria-label="刷新 ESK 资产">刷新</button>
+        </div>
+        <div class="esk-profile-badges" aria-label="ESK 资产状态">
+          <span>Paper 登记</span><span>尚未上链</span><span>未划转资金</span>
+        </div>
+        <div class="esk-profile-metrics">
+          <div class="esk-profile-metric"><span>当前可用</span><strong id="profileEskAvailable">—</strong></div>
+          <div class="esk-profile-metric"><span>卖回申请占用</span><strong id="profileEskSellbackReserved">—</strong></div>
+          <div class="esk-profile-metric"><span>量化申请占用</span><strong id="profileEskQuantReserved">—</strong></div>
+          <div class="esk-profile-metric"><span>全部申请占用</span><strong id="profileEskTotalReserved">—</strong></div>
+        </div>
+        <p class="esk-profile-status" id="profileEskStatus" role="status">正在读取 ESK 资产…</p>
+        <button class="esk-profile-action" id="profileEskSellbackBtn" type="button" disabled>申请卖回 ESK</button>
+      </section>
+
       <div class="usage-section">
         <h3>Token 额度</h3>
         <div class="usage-period-actions">
@@ -5990,6 +6136,15 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
   const profileLevel = $('profileLevel');
   const profileLevelPercent = $('profileLevelPercent');
   const profileLevelTrack = $('profileLevelTrack');
+  const profileEskAssetCard = $('profileEskAssetCard');
+  const profileEskTotal = $('profileEskTotal');
+  const profileEskAvailable = $('profileEskAvailable');
+  const profileEskSellbackReserved = $('profileEskSellbackReserved');
+  const profileEskQuantReserved = $('profileEskQuantReserved');
+  const profileEskTotalReserved = $('profileEskTotalReserved');
+  const profileEskStatus = $('profileEskStatus');
+  const profileEskRefreshBtn = $('profileEskRefreshBtn');
+  const profileEskSellbackBtn = $('profileEskSellbackBtn');
   const versionText = $('versionText');
   const deleteConfirmMask = $('deleteConfirmMask');
   const deleteConfirmText = $('deleteConfirmText');
@@ -7194,6 +7349,7 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
     if (tabId === 'profilePage') {
       refreshDownloadPage();
       loadWebSideMenuProgression().catch((e) => console.warn('load progression failed:', e));
+      loadProfileEskAsset().catch((e) => console.warn('loadProfileEskAsset failed:', e));
       loadUsageStats().catch((e) => console.warn('loadUsageStats failed:', e));
       renderNodeResourcePanel();
       if (nodeResourceExpanded) {
@@ -10068,6 +10224,98 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
     }
   }
 
+  // ====== ESK Paper 资产 ======
+  function isExactEskAmount(value) {
+    return typeof value === 'string' && /^\d+\.\d{6}$/.test(value);
+  }
+  function setProfileEskUnavailable(message) {
+    profileEskAssetCard.dataset.state = 'unavailable';
+    profileEskTotal.textContent = '— ESK';
+    profileEskAvailable.textContent = '—';
+    profileEskSellbackReserved.textContent = '—';
+    profileEskQuantReserved.textContent = '—';
+    profileEskTotalReserved.textContent = '—';
+    profileEskStatus.textContent = message;
+    profileEskSellbackBtn.disabled = true;
+  }
+  function renderProfileEskAsset(snapshot) {
+    const balance = snapshot && snapshot.balance;
+    const asset = snapshot && snapshot.asset;
+    if (!snapshot || snapshot.schema !== 'yilong.esk.asset_account.v2' ||
+        !snapshot.simulated || snapshot.funds_moved ||
+        !asset || asset.symbol !== 'ESK' || asset.chain_status !== 'not_deployed' ||
+        !balance || ![
+          balance.total,
+          balance.available,
+          balance.reserved_for_sellback,
+          balance.reserved_for_quant,
+          balance.reserved_total
+        ].every(isExactEskAmount) || !Number.isInteger(balance.revision) || balance.revision < 0) {
+      throw new Error('ESK 资产安全标识或金额格式不匹配');
+    }
+    profileEskAssetCard.dataset.state = 'ready';
+    profileEskTotal.textContent = balance.total + ' ESK';
+    profileEskAvailable.textContent = balance.available + ' ESK';
+    profileEskSellbackReserved.textContent = balance.reserved_for_sellback + ' ESK';
+    profileEskQuantReserved.textContent = balance.reserved_for_quant + ' ESK';
+    profileEskTotalReserved.textContent = balance.reserved_total + ' ESK';
+    const synced = balance.updated_at || '暂无记录';
+    profileEskStatus.textContent = (snapshot.status_message || 'ESK 资产状态未知') +
+      '\n余额修订：' + String(balance.revision ?? 0) + ' · 最近同步：' + synced +
+      '\n未设置官方卖回价格；申请不代表成交或付款。';
+    profileEskSellbackBtn.disabled = !(snapshot.mode === 'paper' && snapshot.enabled && snapshot.sellback && snapshot.sellback.request_enabled);
+  }
+  async function loadProfileEskAsset() {
+    if (!isLoggedIn()) {
+      setProfileEskUnavailable('登录后查看 ESK 资产');
+      return;
+    }
+    profileEskAssetCard.dataset.state = 'loading';
+    profileEskTotal.textContent = '… ESK';
+    profileEskStatus.textContent = '正在读取 ESK 资产…';
+    profileEskRefreshBtn.disabled = true;
+    profileEskSellbackBtn.disabled = true;
+    try {
+      const res = await api('/api/me/assets/esk', { cache: 'no-store' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || ('ESK 资产读取失败：HTTP ' + res.status));
+      renderProfileEskAsset(data);
+    } catch (error) {
+      setProfileEskUnavailable((error && error.message) || 'ESK 资产暂不可用');
+    } finally {
+      profileEskRefreshBtn.disabled = false;
+    }
+  }
+  async function requestProfileEskSellback() {
+    if (!isLoggedIn()) {
+      alert('请先登录后再申请卖回 ESK');
+      return;
+    }
+    const amount = String(prompt('请输入申请卖回的 ESK 数量（最多六位小数）：', '') || '').trim();
+    if (!amount) return;
+    if (!/^\d+(\.\d{1,6})?$/.test(amount) || /^0+(\.0+)?$/.test(amount)) {
+      alert('请输入大于 0、最多六位小数的 ESK 数量');
+      return;
+    }
+    profileEskSellbackBtn.disabled = true;
+    try {
+      const suffix = globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function'
+        ? globalThis.crypto.randomUUID()
+        : Date.now() + '-' + Math.random().toString(16).slice(2);
+      const res = await api('/api/me/assets/esk/sellback-requests', {
+        method: 'POST',
+        body: JSON.stringify({ amount, idempotency_key: 'esk-pwa-sellback-' + suffix })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || ('卖回申请失败：HTTP ' + res.status));
+      alert('卖回申请已提交；这不代表成交或付款。');
+      await loadProfileEskAsset();
+    } catch (error) {
+      alert((error && error.message) || '卖回申请失败，请稍后重试');
+      await loadProfileEskAsset();
+    }
+  }
+
   // ====== Token 消耗统计 ======
   function formatUsageCount(n) {
     const value = Number(n || 0);
@@ -11385,6 +11633,13 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
       copyLinkBtn.classList.remove('copied');
       copyLinkBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> 复制下载链接';
     }, 2200);
+  });
+
+  profileEskRefreshBtn?.addEventListener('click', () => {
+    loadProfileEskAsset().catch((e) => console.warn('loadProfileEskAsset failed:', e));
+  });
+  profileEskSellbackBtn?.addEventListener('click', () => {
+    requestProfileEskSellback().catch((e) => console.warn('requestProfileEskSellback failed:', e));
   });
 
   function selectProfileUsageDays(days) {
