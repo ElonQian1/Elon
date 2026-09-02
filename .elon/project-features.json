@@ -5124,6 +5124,118 @@
       "updated_at_ms": 1788301003983
     },
     {
+      "id": "esk-paper-first-user-allocation-operations-v1",
+      "title": "ESK Paper 首批用户批量登记运营闭环 V1",
+      "summary": "管理员先 dry-run 校验首批用户 ESK Paper 清单，再以摘要锁定内容并原子提交；批次和条目均幂等、追加审计，不接触链上发行、真实资金或交易。",
+      "status": "verified",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/esk-paper-first-user-allocation-operations-v1.md",
+        "content_hash": "1113e231c022ab115f8a4f806c8439b6e84c771722b76e237a7930b7d5bd496f",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "876d6a03b62ab7fd38fd7a9d03f5a751d16bfa17",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "3126cb050b048e760ece8226de7c7f1537636ebf",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "platform-assets",
+      "tags": [
+        "esk",
+        "paper",
+        "assets",
+        "operations"
+      ],
+      "task_paths": [
+        "docs/esk-paper-first-user-allocation-operations-v1-acceptance.md",
+        "scripts/esk-paper-allocation-batch.ps1",
+        "server/src/esk_asset",
+        "server/src/esk_asset_batch_migration.rs",
+        "server/src/store/common/esk_asset_batches.rs"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "dry-run 返回确定摘要和精确合计且不写数据库",
+        "commit 仅在摘要和确认文本匹配时整批原子入账",
+        "完整重放不重复增加余额，批次或条目幂等漂移整批失败",
+        "任一无效条目使全部条目回滚，现有单笔和用户读取保持兼容",
+        "运营工具从环境变量读取管理员令牌并默认只预检"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "scripts/esk-paper-allocation-batch.ps1",
+          "content_hash": "909c33a60a3d66fa5691cb39a72e723e1f9bb0f3183198ba793886accf6e9921",
+          "locator": "dry_run; Commit; ExpectedRequestDigest",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "876d6a03b62ab7fd38fd7a9d03f5a751d16bfa17",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "9a6802adcd4dacade212d1ee08cb6409cff48320",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/esk_asset/batch_api.rs",
+          "content_hash": "a7fc84e8a8a88931b1ea83bdb0156e9fff9abc97039c21b46de74d0744d2e8e1",
+          "locator": "create_paper_allocation_batch",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "876d6a03b62ab7fd38fd7a9d03f5a751d16bfa17",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "47248a38a68a5d2e893920982a7f1beb412c3697",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/esk_asset/batch_tests.rs",
+          "content_hash": "569760dacc6d0dde038f891f841c5c36d4eb3133d1f7a77a2a5035533f2cbf2c",
+          "locator": "ESK Paper batch store and HTTP regression",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "876d6a03b62ab7fd38fd7a9d03f5a751d16bfa17",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "e3e0aa2ecf1e1a0a4ed23860049b4b20ea7087cf",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/esk_asset_batch_migration.rs",
+          "content_hash": "ba1dd15125680bb484326a5c369814def70f6b440451806d8fc0322d5cbc7dc3",
+          "locator": "migration_v282",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "876d6a03b62ab7fd38fd7a9d03f5a751d16bfa17",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "58965d185c053e1903bc34b863c9f7e62ca92055",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/store/common/esk_asset_batches.rs",
+          "content_hash": "08f9ff4e8672c2d5471ed296b14482a6c55d471f0a4acb17dbae5e2eff458ed2",
+          "locator": "validate_esk_paper_allocation_batch; create_esk_paper_allocation_batch",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "876d6a03b62ab7fd38fd7a9d03f5a751d16bfa17",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "d3aeac2d1b8f15bce3b97a4531ca926e8d753786",
+            "state": "untracked"
+          }
+        }
+      ],
+      "created_at_ms": 1788306010546,
+      "updated_at_ms": 1788308397936
+    },
+    {
       "id": "external-pool-adapter-credential-reattestation-v253-verification",
       "title": "V253 Provider 凭据续签运行验收",
       "summary": "把已接线但 passed=0 的 V253 Provider-specific credential re-attestation 推进到真实 Rust 编译、SQLite migration 和进程内 HTTP 验证，并修复暴露的局部缺陷。",
@@ -14492,76 +14604,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_50230f5a25284695afac043667436c8d",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "Codex q11",
-      "reason": "Begin the claimed q11 vertical slice: typed exact catalog and matcher, production raw-state ledger/control seam, isolated child runner, static proof sources, and synchronized blocked-state documentation.",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788255369806
-    },
-    {
-      "id": "feature_event_eb07f561e4c64bcf86f9f6a110d416a7",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "claim_released",
-      "actor": "Codex q11 root",
-      "reason": "Release the q11 claim so the intentionally corrected requirement hash can be rebound and reviewed without hiding drift.",
-      "from_status": "in_progress",
-      "to_status": "blocked",
-      "at_ms": 1788256620678
-    },
-    {
-      "id": "feature_event_35a3ea40f1bb4afba8a90f3dc529c9b9",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "requirement_rebound",
-      "actor": "Codex q11",
-      "reason": "修正 q11 最后一处桥接清单统计口径后，重新绑定当前权威需求正文。",
-      "from_status": "blocked",
-      "to_status": "proposed",
-      "at_ms": 1788256782167
-    },
-    {
-      "id": "feature_event_fff818d02dc54495a57374d50c199b5b",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "Codex q11",
-      "reason": "已复核 q11 11 个 raw terminal 拒绝成员、两项非法指针排除及 controlled_fault_actual 安全边界。",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1788256792709
-    },
-    {
-      "id": "feature_event_8fdcc5c55ab24168aaf9a578aa323b8f",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "Codex q11",
-      "reason": "q11 需求范围与验收口径已重新接受，依赖保持有效，进入可认领状态。",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1788256801251
-    },
-    {
-      "id": "feature_event_e631421e9d894cd19aee7fd2d4359409",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "claimed",
-      "actor": "Codex q11 root",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788256817444
-    },
-    {
-      "id": "feature_event_60af3676d0f14b1dad35547ea5451f26",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "Codex q11",
-      "reason": "开始 q11 11 个 raw terminal 拒绝场景的 typed matcher、运行时账本与进程隔离 runner 实现。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788256827106
-    },
-    {
       "id": "feature_event_9e666782c98040569fc10617826853de",
       "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
       "action": "claim_released",
@@ -16490,6 +16532,76 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1788305520651
+    },
+    {
+      "id": "feature_event_d18c19e4cdfe45beba5fc87de76f325b",
+      "feature_id": "esk-paper-first-user-allocation-operations-v1",
+      "action": "registered",
+      "actor": "codex-root",
+      "reason": "用户急需把首批已付款用户安全映射到可见的 ESK Paper 余额；先建立可审计、可重放且不接触真实资产的运营闭环。",
+      "from_status": "",
+      "to_status": "accepted",
+      "at_ms": 1788306010546
+    },
+    {
+      "id": "feature_event_482e45d27e74418f9935195b0ba88193",
+      "feature_id": "esk-paper-first-user-allocation-operations-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "需求边界、Paper-only 安全约束、两阶段提交和验收标准已评审接受，可以进入实现。",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1788306036129
+    },
+    {
+      "id": "feature_event_1a398bcfc86745bcbca21d3cfd97ea95",
+      "feature_id": "esk-paper-first-user-allocation-operations-v1",
+      "action": "claimed",
+      "actor": "codex-root-4364-4cbd3eee",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788306051642
+    },
+    {
+      "id": "feature_event_1de0037b02db40afa2eafea4ccc8bb3e",
+      "feature_id": "esk-paper-first-user-allocation-operations-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "已完成查重和独占认领，开始按测试驱动实现批量预检与原子提交。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788306070950
+    },
+    {
+      "id": "feature_event_1fd2b02e01a44c4798d1c0a3aa8f62ad",
+      "feature_id": "esk-paper-first-user-allocation-operations-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788308355058
+    },
+    {
+      "id": "feature_event_2d4c2732495b4d9c835c8c3894dba03a",
+      "feature_id": "esk-paper-first-user-allocation-operations-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "批量预检、摘要确认、原子提交、追加式回执、运营脚本和测试均已实现。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1788308378286
+    },
+    {
+      "id": "feature_event_c8081e44c7464875951b181606d2d164",
+      "feature_id": "esk-paper-first-user-allocation-operations-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "全部 10 项 ESK 回归、生产服务端 check/build、PowerShell 解析和临时真实 HTTP 两用户端到端均通过。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1788308397936
     }
   ]
 }

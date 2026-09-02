@@ -1,6 +1,10 @@
 use anyhow::Result;
 use rusqlite::Connection;
 
+#[path = "esk_asset_batch_migration.rs"]
+mod batch;
+pub(crate) use batch::migration_v282;
+
 pub(crate) fn migration_v281(conn: &Connection) -> Result<()> {
     conn.execute_batch(
         "CREATE TABLE IF NOT EXISTS esk_asset_ledger_entries (

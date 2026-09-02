@@ -6,7 +6,9 @@ pub(crate) const ESK_NAME: &str = "一龙 ESK";
 pub(crate) const ESK_DECIMALS: u32 = 6;
 pub(crate) const ESK_SCALE: i64 = 1_000_000;
 pub(crate) const PAPER_ALLOCATION_CONFIRMATION: &str = "RECORD PAPER ESK";
+pub(crate) const PAPER_ALLOCATION_BATCH_CONFIRMATION: &str = "RECORD PAPER ESK BATCH";
 pub(crate) const SELLBACK_CANCEL_CONFIRMATION: &str = "CANCEL ESK SELLBACK REQUEST";
+pub(crate) const MAX_PAPER_ALLOCATION_BATCH_ENTRIES: usize = 100;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum EskAssetMode {
@@ -69,6 +71,24 @@ pub(crate) struct EskAllocationReceipt {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct EskAllocationBatchInput {
+    pub batch_id: String,
+    pub request_digest: String,
+    pub total_base_units: i64,
+    pub entries: Vec<EskAllocationInput>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct EskAllocationBatchReceipt {
+    pub batch_id: String,
+    pub request_digest: String,
+    pub total_base_units: i64,
+    pub entries: Vec<EskAllocationReceipt>,
+    pub created_at: String,
+    pub replayed: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct EskSellbackInput {
     pub user_id: String,
     pub amount_base_units: i64,
@@ -95,6 +115,34 @@ pub(crate) struct PaperAllocationBody {
     pub reference: String,
     pub idempotency_key: String,
     pub confirmation: String,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum EskAllocationBatchMode {
+    DryRun,
+    Commit,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct PaperAllocationBatchEntryBody {
+    pub user_id: String,
+    pub amount: String,
+    pub reference: String,
+    pub idempotency_key: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct PaperAllocationBatchBody {
+    pub batch_id: String,
+    pub mode: EskAllocationBatchMode,
+    #[serde(default)]
+    pub expected_request_digest: Option<String>,
+    #[serde(default)]
+    pub confirmation: String,
+    pub entries: Vec<PaperAllocationBatchEntryBody>,
 }
 
 #[derive(Debug, Deserialize)]

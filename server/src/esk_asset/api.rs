@@ -179,7 +179,7 @@ pub(crate) async fn create_paper_allocation(
     }
 }
 
-fn require_paper_mode() -> Option<Response> {
+pub(super) fn require_paper_mode() -> Option<Response> {
     match EskAssetMode::from_env() {
         EskAssetMode::Paper => None,
         EskAssetMode::Disabled => Some(json_error(
@@ -193,15 +193,16 @@ fn require_paper_mode() -> Option<Response> {
     }
 }
 
-fn domain_error(error: anyhow::Error) -> Response {
+pub(super) fn domain_error(error: anyhow::Error) -> Response {
     let message = error.to_string();
-    let status = if message.contains("幂等键") {
+    let status = if message.contains("幂等键") || message.contains("批次 ID 不能用于") {
         StatusCode::CONFLICT
     } else if message.contains("不存在") {
         StatusCode::NOT_FOUND
     } else if message.contains("超过")
         || message.contains("必须")
         || message.contains("无效")
+        || message.contains("重复")
         || message.contains("不能取消")
     {
         StatusCode::BAD_REQUEST
@@ -212,7 +213,7 @@ fn domain_error(error: anyhow::Error) -> Response {
     json_error(status, message)
 }
 
-fn internal_error(context: &'static str, error: anyhow::Error) -> Response {
+pub(super) fn internal_error(context: &'static str, error: anyhow::Error) -> Response {
     tracing::warn!(error = %error, context, "ESK asset storage failed");
     json_error(StatusCode::INTERNAL_SERVER_ERROR, context)
 }

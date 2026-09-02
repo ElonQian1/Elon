@@ -9,6 +9,7 @@ use std::num::NonZeroU32;
 use std::{marker::PhantomData, rc::Rc};
 use uuid::Uuid;
 
+mod esk_asset_batches;
 mod esk_assets;
 
 #[cfg(not(test))]

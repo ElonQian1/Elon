@@ -22,8 +22,11 @@
 | `POST` | `/api/me/assets/esk/sellback-requests` | 登录用户 + `paper` | 提交并占用本人可用额 |
 | `POST` | `/api/me/assets/esk/sellback-requests/:request_id/cancel` | 登录用户 + `paper` | 追加取消事件并释放占用额 |
 | `POST` | `/api/admin/assets/esk/paper-allocations` | 平台管理员 + `paper` | 追加 Paper 登记，不转移资金 |
+| `POST` | `/api/admin/assets/esk/paper-allocation-batches` | 平台管理员 + `paper` | 先 dry-run，再以摘要锁定内容并原子追加 1..100 笔 Paper 登记 |
 
 默认 `ESK_ASSET_MODE=disabled`，未知值失败关闭。V1 不存在 `live` 或 `mainnet` 模式。
+
+首批用户批量登记的操作合同、幂等回执和工具见 [`esk-paper-first-user-allocation-operations-v1-acceptance.md`](esk-paper-first-user-allocation-operations-v1-acceptance.md)。
 
 ## 运行证据
 
