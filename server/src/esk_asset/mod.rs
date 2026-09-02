@@ -6,6 +6,7 @@ use std::sync::Arc;
 
 use crate::types::AppState;
 
+mod amount;
 mod api;
 mod batch;
 mod batch_api;
@@ -14,6 +15,7 @@ mod quant_allocation;
 mod quant_allocation_api;
 mod service;
 
+pub(crate) use amount::{format_esk_amount, parse_esk_amount};
 pub(crate) use batch::prepare_paper_allocation_batch;
 pub(crate) use model::{
     EskAccountLedger, EskAllocationBatchInput, EskAllocationBatchReceipt, EskAllocationInput,
@@ -24,7 +26,6 @@ pub(crate) use quant_allocation::{
     EskQuantAllocationInput, EskQuantAllocationReceiptInput, EskQuantAllocationRecord,
     ESK_QUANT_RISK_DISCLOSURE_REVISION,
 };
-pub(crate) use service::{format_esk_amount, parse_esk_amount};
 
 pub(crate) fn routes() -> Router<Arc<AppState>> {
     Router::new()

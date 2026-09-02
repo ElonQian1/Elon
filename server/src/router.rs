@@ -44,6 +44,8 @@ mod quant_esk_asset_projection;
 pub(crate) mod quant_paper_access;
 #[path = "quant_paper_launch.rs"]
 pub(crate) mod quant_paper_launch;
+#[path = "quant_paper_signer.rs"]
+mod quant_paper_signer;
 mod social_routes;
 
 /// 读取 `CORS_ALLOW_ORIGINS` 环境变量构造 CORS 策略。

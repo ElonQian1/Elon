@@ -5447,6 +5447,171 @@
       "updated_at_ms": 1788322411689
     },
     {
+      "id": "esk-paper-quant-cross-repo-asset-view-v5",
+      "title": "ESK Paper 双仓可见余额互操作 V5",
+      "summary": "用同字节固定向量证明主项目真实 ypg1/yep2 签名、量化真实 verifier/API 脱敏视图与 ESK 卡片显示同一组精确余额；全程离线 Paper-only。",
+      "status": "implemented",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/esk-paper-quant-cross-repo-asset-view-v5.md",
+        "content_hash": "fdd0e698bb1763296976fe899094880aaa7a33df9cdb2995c930bc7c309c92d7",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "ae6e0e6c056e4a3dcc2080ec310224ef2d050b64",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "75d92802b9aeb792199017c4b52e93ba7f7d64de",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "platform-assets, quant-integration",
+      "tags": [
+        "esk",
+        "paper",
+        "cross-repo",
+        "asset-view",
+        "user-visible"
+      ],
+      "task_paths": [
+        "contracts/quant/esk-paper-cross-repo-asset-view-v1.fixture.json",
+        "docs/esk-paper-quant-cross-repo-asset-view-v5-acceptance.md",
+        "docs/requirements/esk-paper-quant-cross-repo-asset-view-v5.md",
+        "scripts/format-rust.ps1",
+        "scripts/test-esk-paper-cross-repo-asset-view.ps1",
+        "server/src/esk_asset/amount.rs",
+        "server/src/esk_asset/mod.rs",
+        "server/src/esk_asset/service.rs",
+        "server/src/quant_esk_asset_projection.rs",
+        "server/src/quant_paper_access.rs",
+        "server/src/quant_paper_signer.rs",
+        "server/src/router.rs",
+        "tools/esk-paper-contract-tests/Cargo.lock",
+        "tools/esk-paper-contract-tests/Cargo.toml",
+        "tools/esk-paper-contract-tests/src/lib.rs"
+      ],
+      "dependencies": [
+        "esk-paper-quant-cross-repo-interoperability-v4"
+      ],
+      "acceptance_criteria": [
+        "两仓 fixture 原始字节与 V2 Schema 规范换行摘要一致。",
+        "主项目真实 signer/serializer 逐字节复算固定 ypg1/yep2。",
+        "量化真实 verifier 接受绑定投影并拒绝篡改、交叉绑定和余额错误。",
+        "量化前端运行时校验 API 视图，React 实际渲染五组相同 ESK 数值与安全提示。",
+        "主项目轻量核心套件覆盖金额、签名与 V1/V2 投影并通过统一离线门禁。",
+        "离线双仓 runner 不输出 token、不访问外网、不使用生产秘密或移动资金。"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "contracts/quant/esk-paper-cross-repo-asset-view-v1.fixture.json",
+          "content_hash": "3984e97f16ce83ec401dcf4494f10f11f5f7e8379d26f367fa68a4a8fd9ddf8e",
+          "locator": "yep2 + expected.view",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ae6e0e6c056e4a3dcc2080ec310224ef2d050b64",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "e52cfb5751a630f82a63467251bece82175e2011",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/test-esk-paper-cross-repo-asset-view.ps1",
+          "content_hash": "a0945b60cc0d1f98225a3f83aff5555614bdc413256a2d1fdf595a51b8e4921f",
+          "locator": "cross-repository receipt",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ae6e0e6c056e4a3dcc2080ec310224ef2d050b64",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "7df74397f68267b128576ee2ce6f345b6a530d87",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/esk_asset/amount.rs",
+          "content_hash": "874997680edf81aeff3bb7ca5d2c31778152ca042a1c0eed954900e2e524c8c2",
+          "locator": "six-decimal amount core",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ae6e0e6c056e4a3dcc2080ec310224ef2d050b64",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "f2e5b2b579be4a8e8bc950701add1a1ecd8b7226",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/quant_esk_asset_projection.rs",
+          "content_hash": "5c83f43223095f56d134871b717128e79fec1249c6d39dd11bf1823614935d76",
+          "locator": "issue_esk_projection_v2_with_id",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ae6e0e6c056e4a3dcc2080ec310224ef2d050b64",
+            "head_blob_oid": "ba215534cb12ba8dc65c1831a149e8d418a7474e",
+            "worktree_blob_oid": "84bf7181b214a1d28950c82774c2df1ddc32e6ef",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/quant_paper_access.rs",
+          "content_hash": "14d0239eb6b349f93c66157b5ddff4f50a470bb9e5742be6223e86babfaba279",
+          "locator": "PaperGrantSigner API reuse",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ae6e0e6c056e4a3dcc2080ec310224ef2d050b64",
+            "head_blob_oid": "0bfb21c620c136659b6bf6c582444b83333e678a",
+            "worktree_blob_oid": "5d29b9347da3fb960689741053fa3cac69824888",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/quant_paper_signer.rs",
+          "content_hash": "7921492c1d79ffa7969c2a54460a48c0b66e0a20cebef7155c4c2da358d08917",
+          "locator": "PaperGrantSigner",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ae6e0e6c056e4a3dcc2080ec310224ef2d050b64",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "11aaedbc5c8be2acae41c40e7a4299b76b5ca677",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "tools/esk-paper-contract-tests/Cargo.toml",
+          "content_hash": "0eaad1d6fa435fd62f3d6a11e1e2e8c390eec4595878b1db36d6f94826a42ce0",
+          "locator": "isolated locked test crate",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ae6e0e6c056e4a3dcc2080ec310224ef2d050b64",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "7ebed9a084b3af0fa2ffa9cfd4904c983fd90db7",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "tools/esk-paper-contract-tests/src/lib.rs",
+          "content_hash": "fb799a5d8cc1ce650b81ad0e7fd1542d35dce256a22acc7ccd8346369e2e3ff6",
+          "locator": "production source inclusion",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ae6e0e6c056e4a3dcc2080ec310224ef2d050b64",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "d5f28562427c802f7983fa2d21262f600acfbdde",
+            "state": "untracked"
+          }
+        }
+      ],
+      "created_at_ms": 1788336989115,
+      "updated_at_ms": 1788341594446
+    },
+    {
       "id": "esk-paper-quant-cross-repo-interoperability-v4",
       "title": "ESK Paper 双仓签名互操作验收 V4",
       "summary": "用两仓字节一致的固定测试向量证明主项目真实 ypg1/yeqa1 签名可被量化验证，量化真实 yqar1 accepted/released 回执可被主项目验证；全程离线 Paper-only。",
@@ -15124,136 +15289,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_93f1cc6923c942d1a087a795cd373c9d",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex-root-019fc8bf",
-      "reason": "Q14 exact 88-member source-only tranche is committed and bound to 16 current evidence items. Full A2 remains incomplete: 4,736 members/4,208 groups and initialization 3,168/2,640 are still missing; compile/runtime/actual receipts, reviewed digest, Qlock and WindowsDynamic are absent, so production and economic effects remain closed.",
-      "from_status": "in_progress",
-      "to_status": "blocked",
-      "at_ms": 1788274227407
-    },
-    {
-      "id": "feature_event_a1f34a6544484083bbdbab38f7f893c8",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-root-019fc8bf",
-      "reason": "",
-      "from_status": "blocked",
-      "to_status": "blocked",
-      "at_ms": 1788274400516
-    },
-    {
-      "id": "feature_event_954caa9b65314b7d8cb331bb89d3aab4",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex-root-019fc8bf",
-      "reason": "Reopen only to replace the Q14 evidence set after the push guard exposed and the source commit fixed two explicit nested-module path bindings; all full-feature blockers remain unchanged.",
-      "from_status": "blocked",
-      "to_status": "ready",
-      "at_ms": 1788274431537
-    },
-    {
-      "id": "feature_event_624e613472914badb6b8b1d2c943605a",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "claimed",
-      "actor": "codex-root-019fc8bf-q14-evidence-refresh",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788274443719
-    },
-    {
-      "id": "feature_event_7c7042a69e16445b93f8983de1960fb3",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex-root-019fc8bf",
-      "reason": "Replace the Q14 evidence set after the explicit nested-module binding fix, without changing the accepted scope or opening any runtime gate.",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788274453680
-    },
-    {
-      "id": "feature_event_72040a7da03a419b9adb406782e3ae75",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-root-019fc8bf",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788274488386
-    },
-    {
-      "id": "feature_event_488155c46c9b4b16a13ba88fee81b00f",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex-root-019fc8bf",
-      "reason": "Q14 exact source-only tranche and the explicit nested-module binding fix are committed and bound to exactly 16 current evidence items. Full A2 still lacks 4,736 members/4,208 groups, initialization 3,168/2,640, compilation/runtime/actual receipts, reviewed digest, Qlock and WindowsDynamic; production and economic effects remain closed.",
-      "from_status": "in_progress",
-      "to_status": "blocked",
-      "at_ms": 1788274500631
-    },
-    {
-      "id": "feature_event_5a612cc6a0374f89944f7c63de4f35ab",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-q14-format-refresh",
-      "reason": "",
-      "from_status": "blocked",
-      "to_status": "blocked",
-      "at_ms": 1788275242675
-    },
-    {
-      "id": "feature_event_cbec3188351e498e85d9b9962103128d",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex-root-019fc8bf-q15",
-      "reason": "Q14 已完成统一收尾；重新打开同一 A2 Lock 动态商功能以认领 Q15 ExistingFirst truncate-outcome-unavailable/release-succeeded 的 88-member source-present 切片。",
-      "from_status": "blocked",
-      "to_status": "ready",
-      "at_ms": 1788276324707
-    },
-    {
-      "id": "feature_event_e56c459218b74955a37d45807687029f",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "claimed",
-      "actor": "codex-root-019fc8bf-q15",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788276334857
-    },
-    {
-      "id": "feature_event_35c8bd3117e848228411a20f0fa91254",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex-root-019fc8bf-q15",
-      "reason": "开始实现 Q15 source-present 架构切片；手动编译与真实运行仍按用户边界保持关闭。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788276345008
-    },
-    {
-      "id": "feature_event_07ff725ccf734ab88be1046c90260f7e",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "claim_released",
-      "actor": "codex-root-019fc8bf-q15",
-      "reason": "Q15 源码与权威文档已提交为 775a910ca；释放旧需求哈希下的 claim，准备显式重绑已接受的 Q15 requirement。",
-      "from_status": "in_progress",
-      "to_status": "blocked",
-      "at_ms": 1788278141721
-    },
-    {
-      "id": "feature_event_aef8bbc5f859462e8978bdaf09718c99",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "requirement_rebound",
-      "actor": "codex-root-019fc8bf-q15",
-      "reason": "有意将 requirement 重绑到已提交的 Q15 ExistingFirst truncate-outcome-unavailable/release-succeeded 88-member 权威正文。",
-      "from_status": "blocked",
-      "to_status": "proposed",
-      "at_ms": 1788278152881
-    },
-    {
       "id": "feature_event_a7c76e61908945a183d41ee99f28ee69",
       "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
       "action": "transitioned",
@@ -17122,6 +17157,136 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1788335912192
+    },
+    {
+      "id": "feature_event_fd579b069a264f829b76ef3811d4d17e",
+      "feature_id": "esk-paper-quant-cross-repo-asset-view-v5",
+      "action": "registered",
+      "actor": "Codex",
+      "reason": "The persistent Paper-only goal explicitly prioritizes a verified main-to-quant user-visible ESK balance flow.",
+      "from_status": "",
+      "to_status": "accepted",
+      "at_ms": 1788336989115
+    },
+    {
+      "id": "feature_event_0ab397adf3e24a4e804ba276a14a05c2",
+      "feature_id": "esk-paper-quant-cross-repo-asset-view-v5",
+      "action": "transitioned",
+      "actor": "Codex",
+      "reason": "Requirement and non-goals are reviewed; V4 dependency is released and the file boundary is independent.",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1788337009387
+    },
+    {
+      "id": "feature_event_269f7fdc4f184c46a996ec1be17d4139",
+      "feature_id": "esk-paper-quant-cross-repo-asset-view-v5",
+      "action": "claimed",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788337026360
+    },
+    {
+      "id": "feature_event_1df87bbf9b8a402687828e90bf95a573",
+      "feature_id": "esk-paper-quant-cross-repo-asset-view-v5",
+      "action": "transitioned",
+      "actor": "Codex",
+      "reason": "Implementation started in the isolated main-project worktree.",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788337047264
+    },
+    {
+      "id": "feature_event_c209423c1f8e40b0ab985c319282d43e",
+      "feature_id": "esk-paper-quant-cross-repo-asset-view-v5",
+      "action": "claim_released",
+      "actor": "codex-root",
+      "reason": "需求增加资源受限下的轻量真实契约测试入口，先释放当前认领以重新绑定并复审范围。",
+      "from_status": "in_progress",
+      "to_status": "blocked",
+      "at_ms": 1788341471439
+    },
+    {
+      "id": "feature_event_0a395a512cae456694bbd9e8030f1559",
+      "feature_id": "esk-paper-quant-cross-repo-asset-view-v5",
+      "action": "requirement_rebound",
+      "actor": "codex-root",
+      "reason": "重新绑定已评审的轻量真实契约测试补充，解决巨型服务器链接 OOM 而不改变业务语义。",
+      "from_status": "blocked",
+      "to_status": "proposed",
+      "at_ms": 1788341485503
+    },
+    {
+      "id": "feature_event_5f21eb33466c46cb85b8d4b77853fad8",
+      "feature_id": "esk-paper-quant-cross-repo-asset-view-v5",
+      "action": "metadata_updated",
+      "actor": "codex-root",
+      "reason": "登记因主服务器测试链接 OOM 新增的纯核心模块与隔离契约测试包；业务验收范围不变。",
+      "from_status": "proposed",
+      "to_status": "proposed",
+      "at_ms": 1788341506394
+    },
+    {
+      "id": "feature_event_2b07c8654cbb46308c648769d5dd267d",
+      "feature_id": "esk-paper-quant-cross-repo-asset-view-v5",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "已复审轻量契约测试补充；仍只验证同一生产源码与 Paper-only 资产显示，不扩张真实资产范围。",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1788341518470
+    },
+    {
+      "id": "feature_event_eff4e461402d44f384deca39d92af4da",
+      "feature_id": "esk-paper-quant-cross-repo-asset-view-v5",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "依赖已发布，需求与任务路径已复审，进入可认领状态。",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1788341533645
+    },
+    {
+      "id": "feature_event_b865cf0985564fba88e64d5b5e4314fe",
+      "feature_id": "esk-paper-quant-cross-repo-asset-view-v5",
+      "action": "claimed",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788341544778
+    },
+    {
+      "id": "feature_event_15ef5dad8f024c12bd208c781006c92f",
+      "feature_id": "esk-paper-quant-cross-repo-asset-view-v5",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "继续登记并验证已完成的实现。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788341555677
+    },
+    {
+      "id": "feature_event_e625052f53634bdda3225a9dfd6e395e",
+      "feature_id": "esk-paper-quant-cross-repo-asset-view-v5",
+      "action": "evidence_recorded",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788341580295
+    },
+    {
+      "id": "feature_event_dfc9d7be95f04b00af8a136381a25c3b",
+      "feature_id": "esk-paper-quant-cross-repo-asset-view-v5",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "共享向量、真实投影序列化、核心签名/金额模块、轻量测试包与双仓 runner 已实现。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1788341594446
     }
   ]
 }

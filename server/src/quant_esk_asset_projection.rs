@@ -1,7 +1,7 @@
 use serde::Serialize;
 use uuid::Uuid;
 
-use super::quant_paper_access::PaperGrantSigner;
+use super::quant_paper_signer::PaperGrantSigner;
 use crate::esk_asset::{
     format_esk_amount, EskAccountLedger, EskAssetMode, ESK_ASSET_ID, ESK_DECIMALS, ESK_NAME,
     ESK_SYMBOL,
@@ -143,6 +143,28 @@ pub(crate) fn issue_esk_projection_v2(
     observed_at_unix: i64,
     expires_at_unix: i64,
 ) -> Result<String, ()> {
+    issue_esk_projection_v2_with_id(
+        signer,
+        format!("qep_{}", Uuid::new_v4().simple()),
+        grant_id,
+        participant_ref,
+        mode,
+        ledger,
+        observed_at_unix,
+        expires_at_unix,
+    )
+}
+
+fn issue_esk_projection_v2_with_id(
+    signer: &PaperGrantSigner,
+    projection_id: String,
+    grant_id: &str,
+    participant_ref: &str,
+    mode: EskAssetMode,
+    ledger: EskAccountLedger,
+    observed_at_unix: i64,
+    expires_at_unix: i64,
+) -> Result<String, ()> {
     if invalid_projection(
         mode,
         &ledger,
@@ -150,7 +172,8 @@ pub(crate) fn issue_esk_projection_v2(
         participant_ref,
         observed_at_unix,
         expires_at_unix,
-    ) {
+    ) || !valid_prefixed_hex(&projection_id, "qep_", 32)
+    {
         return Err(());
     }
     let available_base_units = ledger
@@ -159,7 +182,7 @@ pub(crate) fn issue_esk_projection_v2(
         .ok_or(())?;
     let claims = EskAssetProjectionClaimsV2 {
         schema: ESK_PROJECTION_SCHEMA_V2,
-        projection_id: format!("qep_{}", Uuid::new_v4().simple()),
+        projection_id,
         issuer: ISSUER,
         audience: AUDIENCE,
         key_id: signer.key_id(),
@@ -315,6 +338,75 @@ mod tests {
         assert_eq!(claims["reserved_for_sellback"], "3.000000");
         assert_eq!(claims["reserved_for_quant"], "5.000000");
         assert_eq!(claims["reserved_total"], "8.000000");
+    }
+
+    #[test]
+    fn cross_repository_asset_view_fixture_uses_the_main_projection_serializer() {
+        // Public deterministic test material only; never deploy this seed.
+        const INTEROP_TEST_SEED: [u8; 32] = [61; 32];
+        let fixture: serde_json::Value = serde_json::from_str(include_str!(
+            "../../contracts/quant/esk-paper-cross-repo-asset-view-v1.fixture.json"
+        ))
+        .unwrap();
+        let expected = &fixture["expected"];
+        let view = &expected["view"];
+        let balance = &view["balance"];
+        let signer = PaperGrantSigner::from_material(
+            fixture["main"]["key_id"].as_str().unwrap().to_owned(),
+            &INTEROP_TEST_SEED,
+            &[63; 32],
+        )
+        .unwrap();
+        let ledger = EskAccountLedger {
+            total_base_units: balance["total_base_units"]
+                .as_str()
+                .unwrap()
+                .parse()
+                .unwrap(),
+            sellback_reserved_base_units: balance["sellback_reserved_base_units"]
+                .as_str()
+                .unwrap()
+                .parse()
+                .unwrap(),
+            quant_reserved_base_units: balance["quant_reserved_base_units"]
+                .as_str()
+                .unwrap()
+                .parse()
+                .unwrap(),
+            reserved_base_units: balance["reserved_base_units"]
+                .as_str()
+                .unwrap()
+                .parse()
+                .unwrap(),
+            revision: view["source_revision"].as_i64().unwrap(),
+            updated_at: Some(view["source_updated_at"].as_str().unwrap().to_owned()),
+        };
+        let token = issue_esk_projection_v2_with_id(
+            &signer,
+            expected["projection_id"].as_str().unwrap().to_owned(),
+            expected["grant_id"].as_str().unwrap(),
+            expected["participant_ref"].as_str().unwrap(),
+            EskAssetMode::Paper,
+            ledger,
+            expected["issued_at_unix"].as_i64().unwrap(),
+            expected["expires_at_unix"].as_i64().unwrap(),
+        )
+        .unwrap();
+
+        assert_eq!(
+            URL_SAFE_NO_PAD.encode(signer.public_key_bytes()),
+            fixture["main"]["public_key_base64url"].as_str().unwrap()
+        );
+        assert!(
+            token == fixture["main"]["asset_projection_token"].as_str().unwrap(),
+            "signed projection bytes differ from the public fixture"
+        );
+        assert_eq!(view["simulated"], true);
+        assert_eq!(view["funds_moved"], false);
+        assert_eq!(view["position_created"], false);
+        assert_eq!(fixture["safety"]["chain_token_issued"], false);
+        assert_eq!(fixture["safety"]["trading_started"], false);
+        assert_eq!(fixture["safety"]["yield_started"], false);
     }
 
     #[test]
