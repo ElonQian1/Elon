@@ -4943,7 +4943,7 @@
       "id": "esk-asset-profile-first-screen-v2",
       "title": "ESK 资产个人中心首屏可见 V2",
       "summary": "将 ESK 资产前置到主 APK 与移动 Web 个人中心首屏，补齐卖回、量化和总占用精确余额；不改变 Paper、未上链和未移动资金边界。",
-      "status": "verified",
+      "status": "released",
       "priority": "p0",
       "requirement": {
         "path": "docs/requirements/esk-asset-profile-first-screen-v2.md",
@@ -5048,7 +5048,7 @@
         }
       ],
       "created_at_ms": 1788361435924,
-      "updated_at_ms": 1788362663102
+      "updated_at_ms": 1788366843075
     },
     {
       "id": "esk-paper-asset-account-v1",
@@ -15552,16 +15552,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_70640a7d1b77422fa40d9a8090879767",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex-root-019fc8bf-q16",
-      "reason": "Re-reviewed unchanged Q16 requirement and acceptance boundary after the second clean rebase.",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1788282895808
-    },
-    {
       "id": "feature_event_03dfabd20b3e432ead661a3ae32a8f23",
       "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
       "action": "transitioned",
@@ -17550,6 +17540,16 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1788362663102
+    },
+    {
+      "id": "feature_event_b2b5fd7c51df45d49b25993a767ce1b8",
+      "feature_id": "esk-asset-profile-first-screen-v2",
+      "action": "transitioned",
+      "actor": "codex-desktop ai助手",
+      "reason": "主服务 v0.3.1718 与主 APK v1.1.1412 (1433) 已发布并回读同一源码提交 a8f7ea9817e6321aabb23ee66154775687ace400。",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1788366843075
     }
   ]
 }
