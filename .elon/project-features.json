@@ -5450,7 +5450,7 @@
       "id": "esk-paper-quant-cross-repo-interoperability-v4",
       "title": "ESK Paper 双仓签名互操作验收 V4",
       "summary": "用两仓字节一致的固定测试向量证明主项目真实 ypg1/yeqa1 签名可被量化验证，量化真实 yqar1 accepted/released 回执可被主项目验证；全程离线 Paper-only。",
-      "status": "implemented",
+      "status": "released",
       "priority": "p0",
       "requirement": {
         "path": "docs/requirements/esk-paper-quant-cross-repo-interoperability-v4.md",
@@ -5503,6 +5503,19 @@
             "head_commit": "b58bda999b4be4bbe5a851c46e6bd61a3ed7cf9c",
             "head_blob_oid": "",
             "worktree_blob_oid": "e480b7563a9437b334ae957927c40999fd3c9fd0",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "docs/esk-paper-quant-cross-repo-interoperability-v4-acceptance.md",
+          "content_hash": "b1cb33e5de10d1bcbc8ed2766a6cb6dede26e9bbf234007eaa8dfb012cec2e58",
+          "locator": "clean two-repository offline acceptance receipt",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "701457943501f270983410daed4382688387200a",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "5796ef15dda8e84b62bdb7de3b3ffc2d4e3ccaae",
             "state": "untracked"
           }
         },
@@ -5560,7 +5573,7 @@
         }
       ],
       "created_at_ms": 1788323364987,
-      "updated_at_ms": 1788334743460
+      "updated_at_ms": 1788335912192
     },
     {
       "id": "esk_paper_quant_allocation_request_v2",
@@ -15111,36 +15124,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_523ce12b9e4a41df8bb5d4d90c8207b3",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "claimed",
-      "actor": "codex-root-019fc8bf-q14-final",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788274163788
-    },
-    {
-      "id": "feature_event_01150f690c0645e9a62c1072422a3d86",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex-root-019fc8bf",
-      "reason": "Bind the committed Q14 source, source-only tests, isolated controlled-fault bridge, and authority checkpoint as fresh implementation evidence.",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788274175242
-    },
-    {
-      "id": "feature_event_28e428832fa045f8b26007dea21b1b61",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-root-019fc8bf",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788274213823
-    },
-    {
       "id": "feature_event_93f1cc6923c942d1a087a795cd373c9d",
       "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
       "action": "transitioned",
@@ -17109,6 +17092,36 @@
       "from_status": "in_progress",
       "to_status": "implemented",
       "at_ms": 1788334743460
+    },
+    {
+      "id": "feature_event_17d97a9111f54488b04c542c4f2b475a",
+      "feature_id": "esk-paper-quant-cross-repo-interoperability-v4",
+      "action": "evidence_recorded",
+      "actor": "Codex",
+      "reason": "",
+      "from_status": "implemented",
+      "to_status": "implemented",
+      "at_ms": 1788335876488
+    },
+    {
+      "id": "feature_event_3b3a346643ea487199fc363587e74cda",
+      "feature_id": "esk-paper-quant-cross-repo-interoperability-v4",
+      "action": "transitioned",
+      "actor": "Codex",
+      "reason": "Clean two-repository offline runner passed 4 main and 1 quant interoperability tests; full validation evidence is recorded.",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1788335895219
+    },
+    {
+      "id": "feature_event_aafcbe7a53aa4e44aecabadd4f7ff3d4",
+      "feature_id": "esk-paper-quant-cross-repo-interoperability-v4",
+      "action": "transitioned",
+      "actor": "Codex",
+      "reason": "Verified implementation and acceptance documentation are ready for the shared main branch; this release does not claim environment deployment.",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1788335912192
     }
   ]
 }
