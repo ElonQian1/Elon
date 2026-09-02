@@ -2925,19 +2925,19 @@
     {
       "id": "compute-federation-interactive-desktop-v1",
       "title": "分布式算力联邦交互式云电脑 V1",
-      "summary": "Extend the shared Provider/Offer/Capacity/Price/Receipt control plane with a separate interactive desktop session plane for consent-bound Windows screen/audio streaming and optional input, without reclassifying batch ComputeJob or opening production media, input, or funds effects.",
+      "summary": "Share one AI-compute and cloud-PC federation control plane while keeping separate execution planes. C1 adds canonical digests, an AuthorityRecord, immutable single-head CAS, SameOwner/current-capacity reproof and explicit unavailable-source gates; it remains uncompiled, unrun and non-authorizing.",
       "status": "blocked",
       "priority": "p0",
       "requirement": {
         "path": "docs/requirements/interactive-desktop-federation-v1.md",
-        "content_hash": "dea866100a3786083cf0661239f95516d4f30d2acb7c985ad6bc1accc20ff542",
+        "content_hash": "c17195b6245b4384e3f4068777ef18bd50abf8447136bd406c1848fce021710f",
         "locator": "",
         "evidence_kind": "document",
         "git_identity": {
           "schema": "elon.project_context_git_identity.v1",
-          "head_commit": "1dbe540842c024bfd97ab71124d2a8b38710b462",
-          "head_blob_oid": "dd1e2634bfe40263c539679892c4b5882f2483d5",
-          "worktree_blob_oid": "dd1e2634bfe40263c539679892c4b5882f2483d5",
+          "head_commit": "1f88831bb037ff7f19895e92d787cf38d23b83f5",
+          "head_blob_oid": "f24d8abc443caca1977f447bdc7a9cb727f2b271",
+          "worktree_blob_oid": "f24d8abc443caca1977f447bdc7a9cb727f2b271",
           "state": "tracked_clean"
         }
       },
@@ -2956,231 +2956,246 @@
         "docs/distributed-compute/interactive-desktop-architecture.md",
         "docs/requirements/interactive-desktop-federation-v1.md",
         "server/src/compute_federation/interactive_desktop",
-        "server/src/compute_federation/mod.rs"
+        "server/src/compute_federation/mod.rs",
+        "server/src/compute_interactive_desktop_authority_migration",
+        "server/src/compute_interactive_desktop_authority_migration.rs",
+        "server/src/main.rs",
+        "server/src/store.rs",
+        "server/src/store/compute_interactive_desktop_authority",
+        "server/src/store/compute_interactive_desktop_authority.rs",
+        "server/src/store/compute_user_node_provider_bindings/reproof.rs",
+        "server/src/store/node_credentials/endpoint_authority/sessions.rs",
+        "server/src/store_migrations.rs"
       ],
       "dependencies": [],
       "acceptance_criteria": [
         "Use one federation control plane with separate batch-compute and interactive-desktop execution planes.",
         "Keep existing ComputeWorkloadSpec task-kind validation closed and unchanged.",
-        "Bind every session to exact Provider, consumer, Offer, PriceSnapshot, Reservation/Claim, HostLease fencing, ViewerGrant, MediaEpoch, and ControlEpoch identities.",
-        "Default-deny capture, audio, input, clipboard, file, microphone, camera, and elevation permissions unless the exact contract allows them.",
-        "Persist only bounded metadata and aggregate integer usage; never persist media, input payloads, SDP, ICE candidates, bearer tokens, or credentials.",
-        "Separate provider-declared, transport-observed, consumer-observed, verified, and compensable usage.",
-        "Leave migrations, public APIs, node capabilities, signaling, TURN, real media/input, billing writes, and production activation out of this source-contract tranche.",
-        "Record source as uncompiled and unrun and keep all production and economic effects closed."
+        "Recompute each interactive object and AuthorityRecord digest from RFC8785/I-JSON canonical content with an object-specific domain.",
+        "Persist immutable AuthorityRecord versions and one current head per Session with continuous revision and old revision/session digest/record digest CAS.",
+        "Resolve current SameOwner Provider, V279 node binding, endpoint session, shared Reservation/Offer/Price/Claim/Pool and Consumer session inside one transaction.",
+        "Match all four interactive meter budgets exactly to current Claim lines and audited Pool meter policies, including quantity, mode, quantum and policy digest.",
+        "Require externally observed Viewer device and transport digests; never let record fields prove themselves.",
+        "Fail closed while InteractiveOfferProfile, dedicated HostConsent, Viewer handshake/ticket and RelayAuthority Stores are unavailable.",
+        "Fail closed for FriendCoPlay and LicensedCloudSeat until invitation, entitlement, title-policy and commercial-rights Stores exist.",
+        "Allow only frozen non-authorizing Session successors for reconnecting/ending/terminal states; current action reads must still require Active.",
+        "Keep commit/current authority Store-private and sealed; typed termination authority is required before any Service/API wiring.",
+        "Never persist media, input payloads, SDP, ICE candidates, bearer tokens, cookies or credentials.",
+        "Keep V283 unexecuted and public API, Broker, runtime, WebRTC, capture, input, metering and billing effects closed.",
+        "Record source as uncompiled and unrun with passed=0 and failed=0."
       ],
       "implementation_evidence": [
         {
-          "path": "AI_ARCHITECTURE.md",
-          "content_hash": "8e740857552efeebfd97eeb8185a933e61c4eabe4b7d60bb23198b8c46a629f9",
-          "locator": "one control plane and two execution planes",
-          "evidence_kind": "document",
-          "git_identity": {
-            "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "1dbe540842c024bfd97ab71124d2a8b38710b462",
-            "head_blob_oid": "7a1e1acda0d7721b53eee9893dc6d870a89b2006",
-            "worktree_blob_oid": "7a1e1acda0d7721b53eee9893dc6d870a89b2006",
-            "state": "tracked_clean"
-          }
-        },
-        {
-          "path": "docs/decisions/compute-federation-interactive-desktop-v1.md",
-          "content_hash": "c5eebb2a3b2358ba58248f5a1a4e8dc02ad64363d82fe9380f1dfbad84e11bd0",
-          "locator": "accepted ADR: one control plane and two execution planes",
-          "evidence_kind": "document",
-          "git_identity": {
-            "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "1dbe540842c024bfd97ab71124d2a8b38710b462",
-            "head_blob_oid": "27c78ac23d57a097f6c898505c89a3880e9e560b",
-            "worktree_blob_oid": "27c78ac23d57a097f6c898505c89a3880e9e560b",
-            "state": "tracked_clean"
-          }
-        },
-        {
-          "path": "docs/distributed-compute/README.md",
-          "content_hash": "da95f1f8980fa8d8103610b2a4de9ffa7770fa31503c6f2fb756127f90ccbd5b",
-          "locator": "interactive desktop federation navigation entry",
-          "evidence_kind": "document",
-          "git_identity": {
-            "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "1dbe540842c024bfd97ab71124d2a8b38710b462",
-            "head_blob_oid": "1e15a2b9f92e7edaa5e30ffde15218ea859f53cd",
-            "worktree_blob_oid": "1e15a2b9f92e7edaa5e30ffde15218ea859f53cd",
-            "state": "tracked_clean"
-          }
-        },
-        {
-          "path": "docs/distributed-compute/current-implementation-status.md",
-          "content_hash": "753aed21112e3413125adf98ba1c53023d9fb1327bb0bad427f5acee80f93318",
-          "locator": "source-only implementation status and remaining blockers",
-          "evidence_kind": "document",
-          "git_identity": {
-            "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "1dbe540842c024bfd97ab71124d2a8b38710b462",
-            "head_blob_oid": "7f9e4ccd6a704615ef24983143659c4110b12fb7",
-            "worktree_blob_oid": "7f9e4ccd6a704615ef24983143659c4110b12fb7",
-            "state": "tracked_clean"
-          }
-        },
-        {
           "path": "docs/distributed-compute/interactive-desktop-architecture.md",
-          "content_hash": "2303973dc962356fbe240a2bc98b7e8f0cc7f0f128a09107b9031029a0c4f31b",
-          "locator": "C0 contract and phased architecture",
+          "content_hash": "f686e88200694fc2dca0b45e2c9a442e2357dce63353e394215e1a20ae4683e6",
+          "locator": "AuthorityRecord current head",
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "1dbe540842c024bfd97ab71124d2a8b38710b462",
-            "head_blob_oid": "7bf15e32e01b053848f60705cdcf0731ea205e1b",
-            "worktree_blob_oid": "7bf15e32e01b053848f60705cdcf0731ea205e1b",
+            "head_commit": "1f88831bb037ff7f19895e92d787cf38d23b83f5",
+            "head_blob_oid": "b8bf56632f5c8680101da06db9497bc92f69e563",
+            "worktree_blob_oid": "b8bf56632f5c8680101da06db9497bc92f69e563",
             "state": "tracked_clean"
           }
         },
         {
-          "path": "server/src/compute_federation/interactive_desktop/authority.rs",
-          "content_hash": "69e0598002eabbd23388dfa660c078cc1fabcc2eb67911029ead0c4ba264ae34",
-          "locator": "structural runtime authorization gate",
-          "evidence_kind": "source",
+          "path": "docs/requirements/interactive-desktop-federation-v1.md",
+          "content_hash": "c17195b6245b4384e3f4068777ef18bd50abf8447136bd406c1848fce021710f",
+          "locator": "C1 static blockers",
+          "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "1dbe540842c024bfd97ab71124d2a8b38710b462",
-            "head_blob_oid": "84f05f0806de3714f2fab637ae63519cf52ba921",
-            "worktree_blob_oid": "84f05f0806de3714f2fab637ae63519cf52ba921",
+            "head_commit": "1f88831bb037ff7f19895e92d787cf38d23b83f5",
+            "head_blob_oid": "f24d8abc443caca1977f447bdc7a9cb727f2b271",
+            "worktree_blob_oid": "f24d8abc443caca1977f447bdc7a9cb727f2b271",
             "state": "tracked_clean"
           }
         },
         {
-          "path": "server/src/compute_federation/interactive_desktop/authority_head.rs",
-          "content_hash": "8dcaf5a3b85eb01c4d474cb57b1f1b40b10d967433e636120755fd0f724924bd",
-          "locator": "exact current authority head and fencing",
+          "path": "server/src/compute_federation/interactive_desktop/authority_record.rs",
+          "content_hash": "875bc76ff785768d208b7ec0b2156b5e0fb348e4c3d0b723239fee71a27101da",
+          "locator": "InteractiveDesktopAuthorityRecord",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "1dbe540842c024bfd97ab71124d2a8b38710b462",
-            "head_blob_oid": "1860ac62cd4a22e8f0516ae78c52eea5894aeb6e",
-            "worktree_blob_oid": "1860ac62cd4a22e8f0516ae78c52eea5894aeb6e",
+            "head_commit": "1f88831bb037ff7f19895e92d787cf38d23b83f5",
+            "head_blob_oid": "0dcd7a8df6c1d038e83615d77f801faf01391c1e",
+            "worktree_blob_oid": "0dcd7a8df6c1d038e83615d77f801faf01391c1e",
             "state": "tracked_clean"
           }
         },
         {
-          "path": "server/src/compute_federation/interactive_desktop/authority_tests.rs",
-          "content_hash": "5363f38c57ed16917cd54523dd7f3c13f1ad0f24fa54d20a75a7b735c0806e03",
-          "locator": "authority-chain negative test source; uncompiled and unrun",
+          "path": "server/src/compute_federation/interactive_desktop/canonical.rs",
+          "content_hash": "f0301e1ecdf51d6c1db141fd6bcb89ede518655890bc01f4cd4f7cc226fddc81",
+          "locator": "canonical_interactive_desktop_authority_record_json_and_digest",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "1dbe540842c024bfd97ab71124d2a8b38710b462",
-            "head_blob_oid": "79e0e6be0cf92b55488d647d1d2bb0556b5dda12",
-            "worktree_blob_oid": "79e0e6be0cf92b55488d647d1d2bb0556b5dda12",
+            "head_commit": "1f88831bb037ff7f19895e92d787cf38d23b83f5",
+            "head_blob_oid": "1f2c1358be87276b75ee2225ffd39f1712befbe2",
+            "worktree_blob_oid": "1f2c1358be87276b75ee2225ffd39f1712befbe2",
             "state": "tracked_clean"
           }
         },
         {
-          "path": "server/src/compute_federation/interactive_desktop/market_authority_tests.rs",
-          "content_hash": "93502553927b94c76c3d57009c638745868b8aea2fb9a72f20b63201bfa89c34",
-          "locator": "paid-market and TURN negative test source; uncompiled and unrun",
+          "path": "server/src/compute_interactive_desktop_authority_migration.rs",
+          "content_hash": "2abc91c2e5be1dfb57436c27804619ed72cc3dc8629951ab0107467845330402",
+          "locator": "migration_v283",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "1dbe540842c024bfd97ab71124d2a8b38710b462",
-            "head_blob_oid": "70906b5c502265ab19246695346e386437f55533",
-            "worktree_blob_oid": "70906b5c502265ab19246695346e386437f55533",
+            "head_commit": "1f88831bb037ff7f19895e92d787cf38d23b83f5",
+            "head_blob_oid": "a6d3138b6df39c3a891ca3792f65297703f83878",
+            "worktree_blob_oid": "a6d3138b6df39c3a891ca3792f65297703f83878",
             "state": "tracked_clean"
           }
         },
         {
-          "path": "server/src/compute_federation/interactive_desktop/mod.rs",
-          "content_hash": "e2dcbbd8ce72e18d7102d46486ba0b1591ae9ca985cdda2c5cfe9629a0737b85",
-          "locator": "interactive desktop source module boundary",
+          "path": "server/src/compute_interactive_desktop_authority_migration/guards.rs",
+          "content_hash": "6485cfde724e13da298d38d81d6d63a43800948ad9f3df95327ed74b367b7ccb",
+          "locator": "install",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "1dbe540842c024bfd97ab71124d2a8b38710b462",
-            "head_blob_oid": "9e535c8d83b07bcbafc06f3fa4fe37523a24ce4c",
-            "worktree_blob_oid": "9e535c8d83b07bcbafc06f3fa4fe37523a24ce4c",
+            "head_commit": "1f88831bb037ff7f19895e92d787cf38d23b83f5",
+            "head_blob_oid": "b8ec4caef530f45752c02ca31ac4736d8f6ed94c",
+            "worktree_blob_oid": "b8ec4caef530f45752c02ca31ac4736d8f6ed94c",
             "state": "tracked_clean"
           }
         },
         {
-          "path": "server/src/compute_federation/interactive_desktop/offer.rs",
-          "content_hash": "3fb3026a5efab3524ce1780c16fc20c39b2abcc6dc8a73740ac4795a859993d0",
-          "locator": "OfferProfile and exact resource boundary",
+          "path": "server/src/compute_interactive_desktop_authority_migration/tables.rs",
+          "content_hash": "7dd5a779a830b6593b624d5bf5548949f8030d1b767f1c0fe7ca67c890282451",
+          "locator": "create",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "1dbe540842c024bfd97ab71124d2a8b38710b462",
-            "head_blob_oid": "841d0c67848ec37377d77a03c6ac43b837e76432",
-            "worktree_blob_oid": "841d0c67848ec37377d77a03c6ac43b837e76432",
+            "head_commit": "1f88831bb037ff7f19895e92d787cf38d23b83f5",
+            "head_blob_oid": "393cf15ecdbe1984c25fe998ee822da71628b7e2",
+            "worktree_blob_oid": "393cf15ecdbe1984c25fe998ee822da71628b7e2",
             "state": "tracked_clean"
           }
         },
         {
-          "path": "server/src/compute_federation/interactive_desktop/product_authority.rs",
-          "content_hash": "20f5c0e524dc125a739471520dc4ab9de639e7d279ec9adfb4f0ca9238424260",
-          "locator": "relationship and licensed product authority proofs",
+          "path": "server/src/main.rs",
+          "content_hash": "e25db3b42ed00061914f18c3ebb8b7822a5778bc4c8971b3033224955eccaa4c",
+          "locator": "compute_interactive_desktop_authority_migration",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "1dbe540842c024bfd97ab71124d2a8b38710b462",
-            "head_blob_oid": "4a997425a6d9b5e5e3e3081107ed53a988e5c28a",
-            "worktree_blob_oid": "4a997425a6d9b5e5e3e3081107ed53a988e5c28a",
+            "head_commit": "1f88831bb037ff7f19895e92d787cf38d23b83f5",
+            "head_blob_oid": "312fdcc4e4c8543693cbc196ed90576c14ac10fc",
+            "worktree_blob_oid": "312fdcc4e4c8543693cbc196ed90576c14ac10fc",
             "state": "tracked_clean"
           }
         },
         {
-          "path": "server/src/compute_federation/interactive_desktop/reservation.rs",
-          "content_hash": "4918536f568331f0c41ee5d87f935e6de46cd1adff41a321451f9301a9a80795",
-          "locator": "SessionReservation cross-contract validation",
+          "path": "server/src/store.rs",
+          "content_hash": "882d9be0e4bebdcdd2259550e15785274d542139a361962e931c4e69a15af0ed",
+          "locator": "compute_interactive_desktop_authority",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "1dbe540842c024bfd97ab71124d2a8b38710b462",
-            "head_blob_oid": "fe244672083b24427262c19aa517c4171fef81a7",
-            "worktree_blob_oid": "fe244672083b24427262c19aa517c4171fef81a7",
+            "head_commit": "1f88831bb037ff7f19895e92d787cf38d23b83f5",
+            "head_blob_oid": "609c62b0a71d5169c55cb235f233cb42c6febf1c",
+            "worktree_blob_oid": "609c62b0a71d5169c55cb235f233cb42c6febf1c",
             "state": "tracked_clean"
           }
         },
         {
-          "path": "server/src/compute_federation/interactive_desktop/reservation_tests.rs",
-          "content_hash": "061239389a3b07aa3fac4abc66c7af1b1bc25eea6b0b56fd62b9768635051cd8",
-          "locator": "request reservation profile negative test source; uncompiled and unrun",
+          "path": "server/src/store/compute_interactive_desktop_authority.rs",
+          "content_hash": "723e0e468b94f36ffa3ad98306c3b018ae135607ec1e39e6a2eb30a8edc01185",
+          "locator": "CurrentInteractiveDesktopAuthority",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "1dbe540842c024bfd97ab71124d2a8b38710b462",
-            "head_blob_oid": "f5a72073a166400b9b3d6879d529954224268c11",
-            "worktree_blob_oid": "f5a72073a166400b9b3d6879d529954224268c11",
+            "head_commit": "1f88831bb037ff7f19895e92d787cf38d23b83f5",
+            "head_blob_oid": "ebf7431f08eca35896f99faaaf8f74ff2f77f68a",
+            "worktree_blob_oid": "ebf7431f08eca35896f99faaaf8f74ff2f77f68a",
             "state": "tracked_clean"
           }
         },
         {
-          "path": "server/src/compute_federation/interactive_desktop/session.rs",
-          "content_hash": "62a65d576c6ca98f8fa9808f6808c777d337e5b072b6a292c9eedc30bfc0d7c0",
-          "locator": "Request Session and execution authority types",
+          "path": "server/src/store/compute_interactive_desktop_authority/read.rs",
+          "content_hash": "e33226f68f76fd8083b20d5ef125fa97cb8e85576adc2238f3c36edad0675a79",
+          "locator": "require_current_on",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "1dbe540842c024bfd97ab71124d2a8b38710b462",
-            "head_blob_oid": "ef552ec6bb5630ac9a325bc34544b8112edb4b2b",
-            "worktree_blob_oid": "ef552ec6bb5630ac9a325bc34544b8112edb4b2b",
+            "head_commit": "1f88831bb037ff7f19895e92d787cf38d23b83f5",
+            "head_blob_oid": "68fd76dd4abcc3b2599bafa5bc661ad0e44dca60",
+            "worktree_blob_oid": "68fd76dd4abcc3b2599bafa5bc661ad0e44dca60",
             "state": "tracked_clean"
           }
         },
         {
-          "path": "server/src/compute_federation/interactive_desktop/tests.rs",
-          "content_hash": "6eddd6498ea850071b766c5547bcc3f356262763778e2b167a5e9a6b2bf7c919",
-          "locator": "schema-sensitive and batch-closure test source; uncompiled and unrun",
+          "path": "server/src/store/compute_interactive_desktop_authority/sources.rs",
+          "content_hash": "ef32bccbcc6a2e18b1d9f2d06c89dea834d39152d5ce9b0944ed4841748274cd",
+          "locator": "require_same_owner_sources_on",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "1dbe540842c024bfd97ab71124d2a8b38710b462",
-            "head_blob_oid": "e852b80532fbee0edfdd9cc12c4d2d4e566ae267",
-            "worktree_blob_oid": "e852b80532fbee0edfdd9cc12c4d2d4e566ae267",
+            "head_commit": "1f88831bb037ff7f19895e92d787cf38d23b83f5",
+            "head_blob_oid": "6ec16cf944122179109f8d4f93dbc4b263d2d7ae",
+            "worktree_blob_oid": "6ec16cf944122179109f8d4f93dbc4b263d2d7ae",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/store/compute_interactive_desktop_authority/write.rs",
+          "content_hash": "75ce22aac2e53bcf423c4d2730f2bd45efc4041e389e9fa7d85cd4e4dede7be3",
+          "locator": "commit",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "1f88831bb037ff7f19895e92d787cf38d23b83f5",
+            "head_blob_oid": "930d4f594663dd296a36114b0de2ab7a73465f9e",
+            "worktree_blob_oid": "930d4f594663dd296a36114b0de2ab7a73465f9e",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/store/compute_user_node_provider_bindings/reproof.rs",
+          "content_hash": "0444b779dc3a822667b68d6025dc04f82f56903a2c5377c64817b82f450ab882",
+          "locator": "current_user_node_provider_binding_by_digest_on",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "1f88831bb037ff7f19895e92d787cf38d23b83f5",
+            "head_blob_oid": "c26ba18a13684b579ecbd192ce0cd1ae4b380b27",
+            "worktree_blob_oid": "c26ba18a13684b579ecbd192ce0cd1ae4b380b27",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/store/node_credentials/endpoint_authority/sessions.rs",
+          "content_hash": "a0ce322b62d4636d360d7cdcd0e7a8c2d3ab8fa31258b273c3e56dd23cdc9f16",
+          "locator": "require_current_node_endpoint_runtime_session_on",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "1f88831bb037ff7f19895e92d787cf38d23b83f5",
+            "head_blob_oid": "849f66454c003813780a54fbc88373e604522b3d",
+            "worktree_blob_oid": "849f66454c003813780a54fbc88373e604522b3d",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/store_migrations.rs",
+          "content_hash": "b3befd4ab33061cb08923696e0e496de27336df6665bda23d61b5991ca8aee48",
+          "locator": "MIGRATIONS 283",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "1f88831bb037ff7f19895e92d787cf38d23b83f5",
+            "head_blob_oid": "016093afc926c1dc41c12f8172f2d24fa4a28c9f",
+            "worktree_blob_oid": "016093afc926c1dc41c12f8172f2d24fa4a28c9f",
             "state": "tracked_clean"
           }
         }
       ],
       "created_at_ms": 1788296237836,
-      "updated_at_ms": 1788305044753
+      "updated_at_ms": 1788309269498
     },
     {
       "id": "compute-v255-runtime-launch-profile-verification",
@@ -14604,86 +14619,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_9e666782c98040569fc10617826853de",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "claim_released",
-      "actor": "Codex q11 root",
-      "reason": "文档模块化门禁要求压缩总权威页并把 q11 细节留在专责 Lock tranche 文档，先释放认领再显式重绑。",
-      "from_status": "in_progress",
-      "to_status": "blocked",
-      "at_ms": 1788258050561
-    },
-    {
-      "id": "feature_event_e2309b91cd224bcdbb16e473a0a0eaa1",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "requirement_rebound",
-      "actor": "Codex q11",
-      "reason": "按正式文档 50KB 模块化门禁压缩总权威页，q11 详细合同仍由专责 Lock tranche authority 完整维护。",
-      "from_status": "blocked",
-      "to_status": "proposed",
-      "at_ms": 1788258061352
-    },
-    {
-      "id": "feature_event_0f0c8b94ff73439dac1dc314f4314c40",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "Codex q11",
-      "reason": "已复核压缩后的总权威页仍完整保留 q11 范围、计数、受控故障边界和专责 Lock tranche 引用，且文档模块化门禁通过。",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1788258072794
-    },
-    {
-      "id": "feature_event_06d107f1d227449890fe683ac38a4e9f",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "Codex q11",
-      "reason": "压缩后的 q11 权威范围已接受，依赖有效并可重新认领。",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1788258083064
-    },
-    {
-      "id": "feature_event_3652483452cc481c8693210b3484c550",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "claimed",
-      "actor": "Codex q11 root",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788258092451
-    },
-    {
-      "id": "feature_event_9b9315a3364649b196c4cb1408c5cbbd",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "Codex q11",
-      "reason": "继续 q11 最终静态审计、证据登记与交付收尾。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788258106974
-    },
-    {
-      "id": "feature_event_36275b82f6b546808019dd5d054135fc",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "evidence_recorded",
-      "actor": "Codex q11 root",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788258652041
-    },
-    {
-      "id": "feature_event_3c9fa0c959ce46658d250352cadee28c",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "Codex q11 root",
-      "reason": "q11 source contracts and controlled_fault_actual seam are source-only, uncompiled, and unrun. There is no actual receipt, reviewed digest, frozen complete manifest, or process-isolated Windows record. 5000 members / 4472 groups remain missing, including 3432 initialization-failure members. Qlock is unknown; production remains closed.",
-      "from_status": "in_progress",
-      "to_status": "blocked",
-      "at_ms": 1788258862403
-    },
-    {
       "id": "feature_event_75f22bfd994c41a1936dc79307846be7",
       "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
       "action": "evidence_recorded",
@@ -16602,6 +16537,86 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1788308397936
+    },
+    {
+      "id": "feature_event_90f71445ce704645939b8cbe0b6d2025",
+      "feature_id": "compute-federation-interactive-desktop-v1",
+      "action": "requirement_rebound",
+      "actor": "codex/root/interactive-authority-c1",
+      "reason": "Bind the reviewed C1 authority-kernel requirement after source commits and migration renumbering.",
+      "from_status": "blocked",
+      "to_status": "proposed",
+      "at_ms": 1788309263518
+    },
+    {
+      "id": "feature_event_2172887cf4ac4fdcaafc8736a3a7165d",
+      "feature_id": "compute-federation-interactive-desktop-v1",
+      "action": "metadata_updated",
+      "actor": "codex/root/interactive-authority-c1",
+      "reason": "Review the C1 fail-closed authority-kernel scope after rebase and V283 allocation.",
+      "from_status": "proposed",
+      "to_status": "proposed",
+      "at_ms": 1788309263653
+    },
+    {
+      "id": "feature_event_6d8fd05529644f6297c8456b6e4efb77",
+      "feature_id": "compute-federation-interactive-desktop-v1",
+      "action": "transitioned",
+      "actor": "codex/root/interactive-authority-c1",
+      "reason": "C1 requirement and fail-closed acceptance criteria reviewed.",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1788309263795
+    },
+    {
+      "id": "feature_event_0ce0271fdeb643e8ae77b6aaba11b3d1",
+      "feature_id": "compute-federation-interactive-desktop-v1",
+      "action": "transitioned",
+      "actor": "codex/root/interactive-authority-c1",
+      "reason": "C1 has no feature dependency blocker; implementation evidence will remain source-only.",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1788309264251
+    },
+    {
+      "id": "feature_event_c187488e868e45d4beb9c0b5fa7dd31e",
+      "feature_id": "compute-federation-interactive-desktop-v1",
+      "action": "claimed",
+      "actor": "codex/root/interactive-authority-c1",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788309264446
+    },
+    {
+      "id": "feature_event_db4fbf9643904cc99833e991fb6af074",
+      "feature_id": "compute-federation-interactive-desktop-v1",
+      "action": "transitioned",
+      "actor": "codex/root/interactive-authority-c1",
+      "reason": "Bind the completed source-only C1 tranche without claiming runtime readiness.",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788309264679
+    },
+    {
+      "id": "feature_event_4abf963bbe45436cb9b63cccb0715945",
+      "feature_id": "compute-federation-interactive-desktop-v1",
+      "action": "evidence_recorded",
+      "actor": "codex/root/interactive-authority-c1",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788309269317
+    },
+    {
+      "id": "feature_event_dab482d04dd94b27821a7fd11a47b9b9",
+      "feature_id": "compute-federation-interactive-desktop-v1",
+      "action": "transitioned",
+      "actor": "codex/root/interactive-authority-c1",
+      "reason": "C1 is source-only and uncompiled/unrun. V283, SQLite, Store and runtime checks were not executed. Profile, independent HostConsent, Viewer, Relay, typed termination, WebRTC, capture, input, metering and billing remain unavailable.",
+      "from_status": "in_progress",
+      "to_status": "blocked",
+      "at_ms": 1788309269498
     }
   ]
 }
