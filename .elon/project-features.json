@@ -5447,6 +5447,122 @@
       "updated_at_ms": 1788322411689
     },
     {
+      "id": "esk-paper-quant-cross-repo-interoperability-v4",
+      "title": "ESK Paper 双仓签名互操作验收 V4",
+      "summary": "用两仓字节一致的固定测试向量证明主项目真实 ypg1/yeqa1 签名可被量化验证，量化真实 yqar1 accepted/released 回执可被主项目验证；全程离线 Paper-only。",
+      "status": "implemented",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/esk-paper-quant-cross-repo-interoperability-v4.md",
+        "content_hash": "36ed88dd963ea87c9f3b6795873b4d37cf79a149268aa94efc86754454e77524",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "b58bda999b4be4bbe5a851c46e6bd61a3ed7cf9c",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "34667e17fff11bade7533cbbf242ffe7bd080502",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "platform-assets, quant-integration",
+      "tags": [
+        "esk",
+        "paper",
+        "cross-repo",
+        "interoperability",
+        "signed-vectors"
+      ],
+      "task_paths": [
+        "contracts/quant",
+        "docs/requirements/esk-paper-quant-cross-repo-interoperability-v4.md",
+        "scripts/test-esk-paper-cross-repo-interoperability.ps1",
+        "server/src/quant_esk_allocation_receipt.rs",
+        "server/src/quant_paper_access.rs",
+        "server/src/quant_paper_launch.rs"
+      ],
+      "dependencies": [
+        "esk-paper-quant-allocation-binding-v3"
+      ],
+      "acceptance_criteria": [
+        "两仓 fixture 及 authorization/receipt schema 的 SHA-256 字节一致。",
+        "主项目真实签名代码生成的 ypg1/yeqa1 与 fixture 完全一致。",
+        "主项目真实 verifier 接受量化 accepted/released yqar1，并拒绝篡改和 revoked key。",
+        "双仓离线 runner 运行两仓定向测试且不输出 token、不访问外网。",
+        "不发行代币、不移动资金、不创建份额/NAV/交易/收益，不推进公网部署。"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "contracts/quant/esk-paper-cross-repo-interoperability-v1.fixture.json",
+          "content_hash": "9499dcb52d911a0b999568c02d5ae1b8a13e9ca791481746abb6507550d82c97",
+          "locator": "fixed public Paper-only vector",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "b58bda999b4be4bbe5a851c46e6bd61a3ed7cf9c",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "e480b7563a9437b334ae957927c40999fd3c9fd0",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/test-esk-paper-cross-repo-interoperability.ps1",
+          "content_hash": "345c041505d2663751f561e56f3a2d2d581388d5381a0b928432f9c12edcd044",
+          "locator": "offline two-worktree hash and test runner",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "b58bda999b4be4bbe5a851c46e6bd61a3ed7cf9c",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "5f1ad40708e41bef384cb96c9807d3d8cbf55012",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/quant_esk_allocation_receipt.rs",
+          "content_hash": "3ce895fd942d9c3a119e5163f8f331a0ff891383bd37625eb866b19cc2af3844",
+          "locator": "verifies_cross_repository_quant_receipt_vectors",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "b58bda999b4be4bbe5a851c46e6bd61a3ed7cf9c",
+            "head_blob_oid": "7b700dc6b21a6f2c4e7c544bbba53a8679a22c68",
+            "worktree_blob_oid": "a87aaa6e573e1745969b971d01c08fdf972302a8",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/quant_paper_access.rs",
+          "content_hash": "0f1504e3b35a9063de8de4698cc3b859da532542559fb4eb9664a31e8fc5bee0",
+          "locator": "cross_repository_fixture_uses_the_main_grant_serializer",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "b58bda999b4be4bbe5a851c46e6bd61a3ed7cf9c",
+            "head_blob_oid": "414cacae220508aec83fbad48571ecd22cc739cf",
+            "worktree_blob_oid": "0bfb21c620c136659b6bf6c582444b83333e678a",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/quant_paper_launch.rs",
+          "content_hash": "cb6c851774651026a0ff1ad9ea2c5aee0c5da0a72cf8d471c3246dea60c69e83",
+          "locator": "cross_repository_fixture_uses_the_main_allocation_serializer",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "b58bda999b4be4bbe5a851c46e6bd61a3ed7cf9c",
+            "head_blob_oid": "9e6f0464430d03f97df8944bd1d15d8ffbe2ac50",
+            "worktree_blob_oid": "9fa6c4d8f1eb5b449434bd5e8b310059568409ed",
+            "state": "tracked_modified"
+          }
+        }
+      ],
+      "created_at_ms": 1788323364987,
+      "updated_at_ms": 1788334743460
+    },
+    {
       "id": "esk_paper_quant_allocation_request_v2",
       "title": "ESK Paper 量化分配申请与只读占用投影 V2",
       "summary": "用户可在主项目把可用 ESK 提交为可取消的 Paper 量化分配申请；主项目分别核算卖回、量化与总占用，并通过最长五分钟签名 V2 投影让量化 PWA 只读展示，不自动建仓、交易或产生收益。",
@@ -14995,116 +15111,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_bcf8616c9e844564b79848147e5a0b28",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "evidence_recorded",
-      "actor": "Codex ai助手",
-      "reason": "",
-      "from_status": "blocked",
-      "to_status": "blocked",
-      "at_ms": 1788269556369
-    },
-    {
-      "id": "feature_event_5e932c44d8084309aa096e6ea2696070",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "evidence_recorded",
-      "actor": "Codex ai助手",
-      "reason": "",
-      "from_status": "blocked",
-      "to_status": "blocked",
-      "at_ms": 1788269861291
-    },
-    {
-      "id": "feature_event_a4f9f2d2f06845e4a63fdfca5fbc364d",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "evidence_recorded",
-      "actor": "Codex ai助手",
-      "reason": "",
-      "from_status": "blocked",
-      "to_status": "blocked",
-      "at_ms": 1788270175163
-    },
-    {
-      "id": "feature_event_0cf8c37fdcf14ae7b7fcc94929748add",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "evidence_recorded",
-      "actor": "Codex ai助手",
-      "reason": "",
-      "from_status": "blocked",
-      "to_status": "blocked",
-      "at_ms": 1788270679301
-    },
-    {
-      "id": "feature_event_9de8b58aeb624620bad81e5f58bc2641",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex-root-019fc8bf",
-      "reason": "Q14 CreatedFirst truncate-error release-ok is an exact non-overlapping 88-member source-only tranche; dependencies and registered requirement are current.",
-      "from_status": "blocked",
-      "to_status": "ready",
-      "at_ms": 1788271923488
-    },
-    {
-      "id": "feature_event_6a81af8c0633451686c54d2e422d8ea4",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "claimed",
-      "actor": "codex-root-019fc8bf-q14",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788271932232
-    },
-    {
-      "id": "feature_event_f89499c4c5c74a289bbfeb2811d53123",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex-root-019fc8bf",
-      "reason": "Implementing the exact Q14 CreatedFirst truncate-error release-ok source contract, production seam, isolated evidence program, and authority updates.",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788271941015
-    },
-    {
-      "id": "feature_event_37ee83f6b0e24bb3955688aae42db2aa",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "claim_released",
-      "actor": "codex-root-019fc8bf-q14",
-      "reason": "Q14 source and authority are committed; release the claim so the intentionally updated requirement hash can be rebound before fresh evidence is recorded.",
-      "from_status": "in_progress",
-      "to_status": "blocked",
-      "at_ms": 1788274124527
-    },
-    {
-      "id": "feature_event_71f4a278e053487c8f0423026ef988de",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "requirement_rebound",
-      "actor": "codex-root-019fc8bf",
-      "reason": "Review and bind the committed Q14 authority update: exact 88-member truncate-outcome/release-success tranche, unchanged full-feature acceptance gates, and truthful source-only boundary.",
-      "from_status": "blocked",
-      "to_status": "proposed",
-      "at_ms": 1788274135053
-    },
-    {
-      "id": "feature_event_584a093d1a844af1adab53fcf299f5ae",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex-root-019fc8bf",
-      "reason": "The committed Q14 authority delta was reviewed against the frozen 8,668-member denominator and preserves all existing production, quotient, Windows, and economic fail-closed gates.",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1788274144190
-    },
-    {
-      "id": "feature_event_972953e5e18e48a2a7a06474875953a4",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex-root-019fc8bf",
-      "reason": "The rebound authority is current, its verified static-denominator dependency is complete, and Q14 is ready for fresh hash-bound evidence registration.",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1788274154446
-    },
-    {
       "id": "feature_event_523ce12b9e4a41df8bb5d4d90c8207b3",
       "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
       "action": "claimed",
@@ -16993,6 +16999,116 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1788322411689
+    },
+    {
+      "id": "feature_event_163f033d7eb64d06a312cc292143ac12",
+      "feature_id": "esk-paper-quant-cross-repo-interoperability-v4",
+      "action": "registered",
+      "actor": "codex-root-esk-interop-v4",
+      "reason": "Close the remaining byte-level interoperability gap after released V3 binding.",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1788323364987
+    },
+    {
+      "id": "feature_event_db11c99943014b098651236d4f8aaaaa",
+      "feature_id": "esk-paper-quant-cross-repo-interoperability-v4",
+      "action": "claimed",
+      "actor": "codex-root-esk-interop-v4",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788323374679
+    },
+    {
+      "id": "feature_event_b8df5df3751e4f58867c40db371962eb",
+      "feature_id": "esk-paper-quant-cross-repo-interoperability-v4",
+      "action": "transitioned",
+      "actor": "codex-root-esk-interop-v4",
+      "reason": "Implement the accepted fixed-vector cross-repository Paper interoperability slice.",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788323385658
+    },
+    {
+      "id": "feature_event_d771d11724b64e9bb8b7af8dec339534",
+      "feature_id": "esk-paper-quant-cross-repo-interoperability-v4",
+      "action": "claim_released",
+      "actor": "codex-root-esk-interop-v4",
+      "reason": "Temporarily release claim to rebind the reviewed cross-platform newline clarification.",
+      "from_status": "in_progress",
+      "to_status": "blocked",
+      "at_ms": 1788334360557
+    },
+    {
+      "id": "feature_event_acb4db7aaf1848cdac0f40f0fc4d5010",
+      "feature_id": "esk-paper-quant-cross-repo-interoperability-v4",
+      "action": "requirement_rebound",
+      "actor": "codex-root-esk-interop-v4",
+      "reason": "Bind the reviewed cross-platform newline clarification; signed fixture bytes remain exact.",
+      "from_status": "blocked",
+      "to_status": "proposed",
+      "at_ms": 1788334379506
+    },
+    {
+      "id": "feature_event_903f756adf894371a3eada553498be13",
+      "feature_id": "esk-paper-quant-cross-repo-interoperability-v4",
+      "action": "transitioned",
+      "actor": "codex-root-esk-interop-v4",
+      "reason": "Reviewed newline-only portability clarification; scope and safety boundaries are unchanged.",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1788334399378
+    },
+    {
+      "id": "feature_event_5270900e0d174025902c65b7f3f901c3",
+      "feature_id": "esk-paper-quant-cross-repo-interoperability-v4",
+      "action": "transitioned",
+      "actor": "codex-root-esk-interop-v4",
+      "reason": "Requirement is reviewed and dependencies are released.",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1788334417258
+    },
+    {
+      "id": "feature_event_05b3456a784c479b9bbf4d3d158dec6e",
+      "feature_id": "esk-paper-quant-cross-repo-interoperability-v4",
+      "action": "claimed",
+      "actor": "codex-root-esk-interop-v4",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788334434848
+    },
+    {
+      "id": "feature_event_fb325832de214679963c5b945d72b7c2",
+      "feature_id": "esk-paper-quant-cross-repo-interoperability-v4",
+      "action": "transitioned",
+      "actor": "codex-root-esk-interop-v4",
+      "reason": "Continue implementation after reviewed portability clarification.",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788334454751
+    },
+    {
+      "id": "feature_event_b671cba3f09c4ebfb955bffbe4099a46",
+      "feature_id": "esk-paper-quant-cross-repo-interoperability-v4",
+      "action": "evidence_recorded",
+      "actor": "codex-root-esk-interop-v4",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788334720453
+    },
+    {
+      "id": "feature_event_9fbf6604abb04d72a87a0123cba6826b",
+      "feature_id": "esk-paper-quant-cross-repo-interoperability-v4",
+      "action": "transitioned",
+      "actor": "codex-root-esk-interop-v4",
+      "reason": "Fixed vector, main serializer/verifier tests, and offline two-repository runner are implemented.",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1788334743460
     }
   ]
 }

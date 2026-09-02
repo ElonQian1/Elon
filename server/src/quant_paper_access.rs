@@ -291,6 +291,48 @@ mod tests {
     const SUBJECT_SECRET: [u8; 32] = [11; 32];
 
     #[test]
+    fn cross_repository_fixture_uses_the_main_grant_serializer() {
+        // Public deterministic test material only; never deploy this seed.
+        const INTEROP_TEST_SEED: [u8; 32] = [61; 32];
+        let fixture: serde_json::Value = serde_json::from_str(include_str!(
+            "../../contracts/quant/esk-paper-cross-repo-interoperability-v1.fixture.json"
+        ))
+        .unwrap();
+        let key_id = fixture["main"]["key_id"].as_str().unwrap();
+        let signer =
+            PaperGrantSigner::from_material(key_id.to_owned(), &INTEROP_TEST_SEED, &[63; 32])
+                .unwrap();
+        let claims = PaperAccessGrantClaims {
+            schema: SCHEMA,
+            grant_id: fixture["expected"]["grant_id"].as_str().unwrap().to_owned(),
+            issuer: ISSUER,
+            audience: AUDIENCE,
+            key_id: key_id.to_owned(),
+            participant_ref: fixture["expected"]["participant_ref"]
+                .as_str()
+                .unwrap()
+                .to_owned(),
+            scopes: vec![
+                PaperAccessScope::PositionRead,
+                PaperAccessScope::RedemptionRequest,
+            ],
+            risk_revision: RISK_REVISION,
+            issued_at_unix: fixture["expected"]["issued_at_unix"].as_i64().unwrap(),
+            expires_at_unix: fixture["expected"]["expires_at_unix"].as_i64().unwrap(),
+            simulated: true,
+        };
+
+        assert_eq!(
+            signer.sign_token(TOKEN_PREFIX, &claims).unwrap(),
+            fixture["main"]["grant_token"].as_str().unwrap()
+        );
+        assert_eq!(
+            URL_SAFE_NO_PAD.encode(signer.public_key_bytes()),
+            fixture["main"]["public_key_base64url"].as_str().unwrap()
+        );
+    }
+
+    #[test]
     fn issues_a_verifiable_short_lived_grant_without_raw_account_identity() {
         let signer =
             PaperGrantSigner::from_material("paper-key-2026-09".to_owned(), &SEED, &SUBJECT_SECRET)

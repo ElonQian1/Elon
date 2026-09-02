@@ -306,6 +306,83 @@ mod tests {
     use ring::signature::{Ed25519KeyPair, KeyPair};
 
     #[test]
+    fn verifies_cross_repository_quant_receipt_vectors() {
+        let fixture: serde_json::Value = serde_json::from_str(include_str!(
+            "../../contracts/quant/esk-paper-cross-repo-interoperability-v1.fixture.json"
+        ))
+        .unwrap();
+        assert_eq!(fixture["test_only"], true);
+        assert_eq!(fixture["paper_only"], true);
+        assert_eq!(fixture["expected"]["funds_moved"], false);
+        assert_eq!(fixture["expected"]["quant_units_issued"], false);
+        assert_eq!(fixture["expected"]["nav_participation"], false);
+        assert_eq!(fixture["expected"]["trading_started"], false);
+        let keyring = serde_json::json!({
+            "schema": KEYRING_SCHEMA,
+            "keys": [{
+                "key_id": fixture["quant"]["key_id"],
+                "public_key_base64url": fixture["quant"]["public_key_base64url"],
+                "status": "active"
+            }]
+        })
+        .to_string();
+        let verifier = EskAllocationReceiptVerifier::from_keyring_json(&keyring).unwrap();
+        let accepted_token = fixture["quant"]["accepted_receipt"]["receipt_token"]
+            .as_str()
+            .unwrap();
+        let released_token = fixture["quant"]["released_receipt"]["receipt_token"]
+            .as_str()
+            .unwrap();
+        let now = fixture["expected"]["released_at_unix"].as_i64().unwrap();
+        let accepted = verifier.verify(accepted_token, now).unwrap();
+        assert_eq!(accepted.event, "accepted");
+        assert_eq!(accepted.binding_revision, 1);
+        assert_eq!(
+            accepted.binding_id,
+            fixture["expected"]["binding_id"].as_str().unwrap()
+        );
+        assert_eq!(
+            accepted.request_id,
+            fixture["expected"]["request_id"].as_str().unwrap()
+        );
+        assert_eq!(
+            accepted.authorization_id,
+            fixture["expected"]["authorization_id"].as_str().unwrap()
+        );
+        assert_eq!(
+            accepted.receipt_digest,
+            fixture["quant"]["accepted_receipt"]["receipt_digest"]
+                .as_str()
+                .unwrap()
+        );
+        let released = verifier.verify(released_token, now).unwrap();
+        assert_eq!(released.event, "released");
+        assert_eq!(released.binding_revision, 2);
+        assert_eq!(
+            released.previous_receipt_digest.as_deref(),
+            fixture["quant"]["accepted_receipt"]["receipt_digest"].as_str()
+        );
+        assert_eq!(
+            released.receipt_digest,
+            fixture["quant"]["released_receipt"]["receipt_digest"]
+                .as_str()
+                .unwrap()
+        );
+
+        let mut tampered = accepted_token.as_bytes().to_vec();
+        let last = tampered.last_mut().unwrap();
+        *last = if *last == b'A' { b'B' } else { b'A' };
+        assert!(verifier
+            .verify(&String::from_utf8(tampered).unwrap(), now)
+            .is_err());
+        let revoked = keyring.replace("\"active\"", "\"revoked\"");
+        assert!(EskAllocationReceiptVerifier::from_keyring_json(&revoked)
+            .unwrap()
+            .verify(accepted_token, now)
+            .is_err());
+    }
+
+    #[test]
     fn verifies_receipts_and_rejects_unsafe_or_revoked_claims() {
         let pair = Ed25519KeyPair::from_seed_unchecked(&[71; 32]).unwrap();
         let keyring = serde_json::json!({

@@ -463,6 +463,56 @@ mod tests {
     use base64::Engine as _;
 
     #[test]
+    fn cross_repository_fixture_uses_the_main_allocation_serializer() {
+        // Public deterministic test material only; never deploy this seed.
+        const INTEROP_TEST_SEED: [u8; 32] = [61; 32];
+        let fixture: serde_json::Value = serde_json::from_str(include_str!(
+            "../../contracts/quant/esk-paper-cross-repo-interoperability-v1.fixture.json"
+        ))
+        .unwrap();
+        let key_id = fixture["main"]["key_id"].as_str().unwrap();
+        let request_id = fixture["expected"]["request_id"].as_str().unwrap();
+        let authorization_id = esk_allocation_authorization_id(request_id);
+        assert_eq!(
+            authorization_id,
+            fixture["expected"]["authorization_id"].as_str().unwrap()
+        );
+        let signer =
+            PaperGrantSigner::from_material(key_id.to_owned(), &INTEROP_TEST_SEED, &[63; 32])
+                .unwrap();
+        let claims = EskAllocationAuthorizationClaims {
+            schema: ESK_ALLOCATION_AUTHORIZATION_SCHEMA,
+            authorization_id,
+            issuer: "yilong-main",
+            audience: "yilong-quant",
+            project_id: "esk",
+            key_id,
+            grant_id: fixture["expected"]["grant_id"].as_str().unwrap(),
+            participant_ref: fixture["expected"]["participant_ref"].as_str().unwrap(),
+            request_id,
+            amount: fixture["expected"]["amount"].as_str().unwrap().to_owned(),
+            amount_base_units: fixture["expected"]["amount_base_units"]
+                .as_str()
+                .unwrap()
+                .to_owned(),
+            request_revision: 1,
+            risk_revision: fixture["expected"]["risk_revision"].as_str().unwrap(),
+            issued_at_unix: fixture["expected"]["issued_at_unix"].as_i64().unwrap(),
+            expires_at_unix: fixture["expected"]["expires_at_unix"].as_i64().unwrap(),
+            simulated: true,
+            funds_moved: false,
+            quant_units_issued: false,
+        };
+
+        assert_eq!(
+            signer.sign_token("yeqa1", &claims).unwrap(),
+            fixture["main"]["allocation_authorization_token"]
+                .as_str()
+                .unwrap()
+        );
+    }
+
+    #[test]
     fn accepts_https_and_loopback_targets_without_query_or_fragment() {
         let target = PaperLaunchTarget::from_value("https://quant.example/paper").unwrap();
         assert_eq!(target.origin, "https://quant.example");
