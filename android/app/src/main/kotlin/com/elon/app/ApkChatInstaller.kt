@@ -84,14 +84,29 @@ internal object ApkChatInstaller {
                     }
                     activity.runOnUiThread {
                         progressDialog.dismiss()
-                        val packageName = projectApkPackageName(activity, apkFile)
-                        rememberProjectApkPackage(activity, projectId, packageName)
+                        val signatureInspection = inspectProjectApkSignature(activity, apkFile)
+                        val signatureDecision = projectApkSignatureDecision(
+                            signatureInspection.compatibility
+                        )
+                        if (!signatureDecision.allowed) {
+                            AlertDialog.Builder(activity)
+                                .setTitle(signatureDecision.title)
+                                .setMessage(signatureDecision.message)
+                                .setPositiveButton("知道了", null)
+                                .show()
+                            return@runOnUiThread
+                        }
+                        rememberProjectApkPackage(
+                            activity,
+                            projectId,
+                            signatureInspection.packageName
+                        )
                         rememberPendingProjectApkInstall(
                             activity,
                             projectId,
                             apkIdentity,
                             apkUpdatedAt,
-                            projectApkVersionCode(activity, apkFile)
+                            signatureInspection.versionCode
                         )
                         installApk(activity, apkFile)
                     }
