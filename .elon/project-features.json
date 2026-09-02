@@ -5881,7 +5881,7 @@
       "id": "esk-paper-usdt-exchange-v1",
       "title": "ESK / USDT Paper 双向兑换与手续费结算 V1",
       "summary": "用户在 ESK 资产区以版本化短时报价双向兑换 USDT/ESK Paper 余额，手续费透明、原子记账、幂等审计；真实 USDT 收款、钱包、私钥和链上结算保持失败关闭。",
-      "status": "verified",
+      "status": "released",
       "priority": "p0",
       "requirement": {
         "path": "docs/requirements/esk-paper-usdt-exchange-v1.md",
@@ -6062,7 +6062,7 @@
         }
       ],
       "created_at_ms": 1788385089794,
-      "updated_at_ms": 1788388061133
+      "updated_at_ms": 1788389637404
     },
     {
       "id": "esk_paper_quant_allocation_request_v2",
@@ -15739,16 +15739,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_2fb831165f4442158aa708a414ad873c",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "requirement_rebound",
-      "actor": "codex-root-019fc8bf-q17-rebase",
-      "reason": "Rebind the intentional Q17 authority update after the required non-fast-forward rebase; preserve the remote project-preview registry changes and bind the rebased Q17 requirement identity.",
-      "from_status": "blocked",
-      "to_status": "proposed",
-      "at_ms": 1788286953544
-    },
-    {
       "id": "feature_event_88a8133cb14e4466a1b4787a8cfa8efd",
       "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
       "action": "transitioned",
@@ -17737,6 +17727,16 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1788388061133
+    },
+    {
+      "id": "feature_event_32c0585db35942c4bb46279a6fe6d877",
+      "feature_id": "esk-paper-usdt-exchange-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "Server v0.3.1719 and Android APK v1.1.1413 build 1434 are published from source 7b9db96; online asset route, auth boundary, APK version and SHA-256 were verified.",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1788389637404
     }
   ]
 }
