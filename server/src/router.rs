@@ -40,6 +40,7 @@ mod node_routes;
 pub(crate) mod quant_esk_allocation_receipt;
 #[path = "quant_esk_asset_projection.rs"]
 mod quant_esk_asset_projection;
+mod quant_http_preview;
 #[path = "quant_paper_access.rs"]
 pub(crate) mod quant_paper_access;
 #[path = "quant_paper_launch.rs"]
@@ -141,6 +142,7 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .nest_service("/pc", pc_router)
         .nest_service("/pc-next", pc_next_router)
         .nest_service("/pc-legacy", pc_legacy_svc)
+        .merge(quant_http_preview::routes(&state.data_dir))
         .route("/manifest.json", get(web::pwa_manifest))
         .route("/sw.js", get(web::service_worker))
         .route("/assets/project_plaza.css", get(web::project_plaza_css))
