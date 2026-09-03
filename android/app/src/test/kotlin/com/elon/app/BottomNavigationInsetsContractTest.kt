@@ -13,7 +13,7 @@ class BottomNavigationInsetsContractTest {
         val dimens = readRepositoryFile("android/app/src/main/res/values/dimens.xml")
         val layout = readRepositoryFile("android/app/src/main/res/layout/activity_main.xml")
         assertTrue(dimens.contains("name=\"main_bottom_menu_fade_height\">4dp</dimen>"))
-        assertTrue(dimens.contains("name=\"main_bottom_menu_container_height\">76dp</dimen>"))
+        assertTrue(dimens.contains("name=\"main_bottom_menu_container_height\">88dp</dimen>"))
         assertTrue(
             Regex(
                 """android:id="@\+id/pageTabs"[^>]*android:layout_height="@dimen/main_bottom_menu_container_height"[^>]*android:background="@android:color/transparent"""",
@@ -24,22 +24,17 @@ class BottomNavigationInsetsContractTest {
         assertTrue(!layout.contains("android:id=\"@+id/bottomMenuFade\""))
 
         val web = readRepositoryFile("server/src/assets/web_page.html")
-        assertTrue(
-            Regex(
-                """\.tabs-bar\s*\{[^}]*background:\s*transparent;""",
-                RegexOption.DOT_MATCHES_ALL
-            ).containsMatchIn(web)
-        )
+        assertTrue(web.contains("background: rgba(32,31,31,.8);"))
         assertTrue(!web.contains(".tabs-bar::before"))
     }
 
     @Test
-    fun androidEdgeSelectionsKeepFiveDpInsets() {
+    fun androidBottomMenuMatchesStitchGeometryWhileKeepingExistingIcons() {
         val dimens = readRepositoryFile("android/app/src/main/res/values/dimens.xml")
-        assertTrue(dimens.contains("name=\"main_bottom_menu_content_width\">320dp</dimen>"))
-        assertTrue(dimens.contains("name=\"main_bottom_menu_selection_inset\">5dp</dimen>"))
-        assertTrue(dimens.contains("name=\"main_bottom_menu_selection_width\">58dp</dimen>"))
-        assertTrue(dimens.contains("name=\"main_bottom_menu_selection_height\">46dp</dimen>"))
+        assertTrue(dimens.contains("name=\"main_bottom_menu_content_width\">326dp</dimen>"))
+        assertTrue(dimens.contains("name=\"main_bottom_menu_edge_gap\">24dp</dimen>"))
+        assertTrue(dimens.contains("name=\"main_bottom_menu_selection_width\">56dp</dimen>"))
+        assertTrue(dimens.contains("name=\"main_bottom_menu_selection_height\">48dp</dimen>"))
 
         val layout = readRepositoryFile("android/app/src/main/res/layout/activity_main.xml")
         val content = linearLayoutBlock(layout, "bottomNavContent")
@@ -62,27 +57,31 @@ class BottomNavigationInsetsContractTest {
                 .contains("android:layout_marginStart=\"@dimen/main_bottom_menu_selection_inset\"")
         )
         assertTrue(!layout.contains("android:id=\"@+id/bottomMenuSelection\""))
+        assertTrue(layout.contains("@drawable/ic_bottom_nav_chat"))
+        assertTrue(layout.contains("@drawable/ic_bottom_nav_project_selector"))
+        assertTrue(layout.contains("@drawable/ic_bottom_nav_profile_selector"))
+        assertTrue(layout.contains("@drawable/ic_bottom_nav_menu_selector"))
     }
 
     @Test
-    fun webMirrorKeepsTheSameFivePixelGeometry() {
+    fun webMirrorUsesTheSameStitchGeometry() {
         val web = readRepositoryFile("server/src/assets/web_page.html")
         assertTrue(
-            Regex("""\.tabs-bar\s*\{[^}]*max-width:\s*360px;""", RegexOption.DOT_MATCHES_ALL)
+            Regex("""\.tabs-bar\s*\{[^}]*width:\s*326px;""", RegexOption.DOT_MATCHES_ALL)
                 .containsMatchIn(web)
         )
         assertTrue(
             Regex(
-                """\.tabs-bar\s*\{[^}]*padding:\s*8px\s+max\(0px,\s*calc\(50%\s*-\s*160px\)\)""",
+                """\.tabs-bar\s*\{[^}]*padding:\s*8px\s+16px;""",
                 RegexOption.DOT_MATCHES_ALL
             ).containsMatchIn(web)
         )
         assertTrue(
-            Regex("""\.tab-selection\s*\{[^}]*width:\s*58px;[^}]*height:\s*46px;""", RegexOption.DOT_MATCHES_ALL)
+            Regex("""\.tab-selection\s*\{[^}]*width:\s*56px;[^}]*height:\s*48px;""", RegexOption.DOT_MATCHES_ALL)
                 .containsMatchIn(web)
         )
         assertTrue(
-            Regex("""\.tabs-panel\s*>\s*\.tab:first-child\s+\.tab-selection\s*\{[^}]*left:\s*5px;""", RegexOption.DOT_MATCHES_ALL)
+            Regex("""\.tabs-panel\s*>\s*\.tab:first-child\s+\.tab-selection\s*\{[^}]*left:\s*0;""", RegexOption.DOT_MATCHES_ALL)
                 .containsMatchIn(web)
         )
         val menuButton = Regex(
@@ -94,7 +93,7 @@ class BottomNavigationInsetsContractTest {
     }
 
     @Test
-    fun primaryPanelUsesMatchingDarkBackdropGlassOnAndroidAndWeb() {
+    fun unifiedStitchContainerWrapsPreservedNavigationIcons() {
         val settings = readRepositoryFile("android/settings.gradle")
         val layout = readRepositoryFile("android/app/src/main/res/layout/activity_main.xml")
         val controller = readRepositoryFile(
@@ -130,19 +129,17 @@ class BottomNavigationInsetsContractTest {
         val web = readRepositoryFile("server/src/assets/web_page.html")
         val panel = Regex("""\.tabs-panel\s*\{[^}]*}""", RegexOption.DOT_MATCHES_ALL)
             .find(web)?.value ?: error("Missing tabs panel styles")
-        assertTrue(panel.contains("background: var(--nav-glass-overlay);"))
-        assertTrue(panel.contains("backdrop-filter: blur(18px) saturate(108%);"))
+        assertTrue(panel.contains("background: transparent;"))
         assertTrue(!panel.contains("linear-gradient"))
-        assertTrue(panel.contains("border-radius: 28px;"))
+        assertTrue(panel.contains("border-radius: 0;"))
         val compose = Regex("""\.bottom-compose-button\s*\{[^}]*}""", RegexOption.DOT_MATCHES_ALL)
             .find(web)?.value ?: error("Missing compose button styles")
-        assertTrue(compose.contains("background: var(--nav-glass-overlay);"))
-        assertTrue(compose.contains("backdrop-filter: blur(18px) saturate(108%);"))
+        assertTrue(compose.contains("background: #353534;"))
         assertTrue(!compose.contains("linear-gradient"))
         assertTrue(compose.contains("border-radius: 50%;"))
 
         val theme = readRepositoryFile("server/src/assets/orbital_mobile_theme.css")
-        assertTrue(Regex("""\.tabs-bar\s*\{[^}]*background:\s*transparent;""").containsMatchIn(theme))
+        assertTrue(Regex("""\.tabs-bar\s*\{[^}]*background:\s*rgba\(32, 31, 31, 0\.8\);""").containsMatchIn(theme))
         assertTrue(!Regex("""\.tabs-panel\s*\{[^}]*linear-gradient""", RegexOption.DOT_MATCHES_ALL).containsMatchIn(theme))
         assertTrue(!Regex("""\.bottom-compose-button\s*\{[^}]*linear-gradient""", RegexOption.DOT_MATCHES_ALL).containsMatchIn(theme))
     }

@@ -40,6 +40,9 @@ class HomeConversationHeaderContractTest {
         assertTrue(web.contains("min-height:192px"))
         assertTrue(web.contains("background: rgba(26,26,26,.8)"))
         assertTrue(web.contains("work-summary-entry-beta"))
+        assertTrue(web.contains("appView.classList.toggle('stitch-home-active', isChatHome)"))
+        assertTrue(web.contains("const showMenu = options.showMenu === true"))
+        assertTrue(web.contains("searchBtn.style.display = isChatHome ? '' : 'none'"))
     }
 
     private fun readRepositoryFile(relativePath: String): String {

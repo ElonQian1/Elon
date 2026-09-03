@@ -165,6 +165,29 @@
       font-weight: normal;
       color: var(--ink);
     }
+    .app.stitch-home-active {
+      grid-template-rows: calc(64px + var(--top-safe-area)) 1fr auto;
+    }
+    .app.stitch-home-active .toolbar {
+      height: calc(64px + var(--top-safe-area));
+      padding: var(--top-safe-area) 8px 0 0;
+      background: #131313;
+      border-bottom: 0;
+    }
+    .app.stitch-home-active .toolbar h1 {
+      flex: 0 1 auto;
+      height: 48px;
+      line-height: 48px;
+      margin-left: 0;
+      text-align: left;
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: 0;
+    }
+    .app.stitch-home-active #homeMenuBtn { width:48px; height:48px; flex:0 0 48px; margin-left:0; padding:8px; }
+    .app.stitch-home-active #searchBtn { width:48px; height:48px; margin-left:auto; padding:8px; }
+    .app.stitch-home-active #chatPage,
+    .app.stitch-home-active .conversation-list { background:#131313; }
     .project-top-tabs {
       flex: 1;
       display: flex;
@@ -348,6 +371,7 @@
     .home-filter-tab:focus-visible { outline: 2px solid #9cbad5; outline-offset: -2px; border-radius: 8px; }
     .work-summary-entry { min-height:192px; margin: 16px 16px 32px; padding: 20px; border: 1px solid rgba(255,255,255,.1); border-radius: 12px; background: rgba(26,26,26,.8); box-shadow:0 0 30px rgba(0,240,255,.15); color: #e5e2e1; width: calc(100% - 32px); text-align: left; display: flex; align-items: center; gap: 16px; }
     .work-summary-entry-icon { width:48px; height:48px; flex:none; border-radius:12px; background:#2a2a2a; display:grid; place-items:center; color:#b9cacb; font-size:20px; }
+    .work-summary-entry-icon img { width:32px; height:32px; object-fit:contain; }
     .work-summary-entry-copy { flex: 1; min-width: 0; display: grid; gap: 8px; }
     .work-summary-entry-title-row { display:flex; align-items:center; gap:8px; }
     .work-summary-entry-title { font-size: 18px; font-weight:700; }
@@ -3791,30 +3815,33 @@
       position: fixed;
       left: 50%;
       right: auto;
-      bottom: 0;
-      width: 100%;
-      max-width: 360px;
+      bottom: 24px;
+      width: 326px;
       transform: translateX(-50%);
       z-index: 20;
       background: transparent;
       display: flex;
       flex-direction: row;
-      align-items: flex-start;
-      gap: 12px;
-      min-height: calc(var(--bottom-menu-height) + env(safe-area-inset-bottom));
-      padding: 8px max(0px, calc(50% - 160px)) max(8px, env(safe-area-inset-bottom));
+      align-items: center;
+      gap: 8px;
+      height: 64px;
+      min-height: 64px;
+      padding: 8px 16px;
+      border: 1px solid rgba(255,255,255,.1);
+      border-radius: 32px;
+      background: rgba(32,31,31,.8);
+      -webkit-backdrop-filter: blur(20px);
+      backdrop-filter: blur(20px);
     }
     .tabs-panel {
       min-width: 0;
-      height: 56px;
+      height: 48px;
       display: flex;
       align-items: stretch;
       flex: 1;
-      border: 1px solid var(--nav-glass-border);
-      border-radius: 28px;
-      background: var(--nav-glass-overlay);
-      -webkit-backdrop-filter: blur(18px) saturate(108%);
-      backdrop-filter: blur(18px) saturate(108%);
+      border: 0;
+      border-radius: 0;
+      background: transparent;
       box-shadow: none;
       overflow: hidden;
     }
@@ -3824,7 +3851,7 @@
       position: relative;
       z-index: 1;
       min-width: 0;
-      height: 56px;
+      height: 48px;
       background: transparent;
       border: 0;
       color: var(--tab-icon);
@@ -3838,14 +3865,14 @@
       position: absolute;
       left: 50%;
       top: 50%;
-      width: 58px;
-      height: 46px;
+      width: 56px;
+      height: 48px;
       transform: translate(-50%, -50%);
       object-fit: fill;
       display: none;
     }
     .tabs-panel > .tab:first-child .tab-selection {
-      left: 5px;
+      left: 0;
       transform: translateY(-50%);
     }
     .tab.active .tab-selection { display: block; }
@@ -3853,8 +3880,8 @@
     .bottom-menu-tab .ic {
       position: relative;
       z-index: 1;
-      width: 28px;
-      height: 28px;
+      width: 24px;
+      height: 24px;
       display: block;
     }
     .tab .ic img,
@@ -3867,18 +3894,17 @@
     .bottom-menu-tab.drawer-open .drawer-open-icon { display: block; }
     .bottom-compose-button {
       position: relative;
-      flex: 0 0 56px;
-      width: 56px;
-      height: 56px;
-      border: 1px solid var(--nav-glass-border);
+      flex: 0 0 48px;
+      width: 48px;
+      height: 48px;
+      border: 1px solid rgba(255,255,255,.1);
       border-radius: 50%;
       padding: 0;
-      background: var(--nav-glass-overlay);
-      -webkit-backdrop-filter: blur(18px) saturate(108%);
-      backdrop-filter: blur(18px) saturate(108%);
+      background: #353534;
       box-shadow: none;
       cursor: pointer;
     }
+    .bottom-nav-divider { width:1px; height:32px; flex:none; background:rgba(255,255,255,.1); }
     .bottom-compose-button img {
       display: none;
     }
@@ -5289,6 +5315,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
         </span>
       </button>
     </div>
+    <span class="bottom-nav-divider" aria-hidden="true"></span>
     <button class="bottom-compose-button" id="bottomComposeBtn" type="button" aria-label="打开新建菜单" aria-expanded="false">
       <img src="data:image/png;base64,__BOTTOM_NAV_COMPOSE_ICON_PNG_B64__" alt="" aria-hidden="true" />
     </button>
@@ -5843,7 +5870,7 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
 
   function setHomeChromeVisible(visible, options = {}) {
     if (typeof options === 'string') options = { mode: options };
-    const showMenu = false;
+    const showMenu = options.showMenu === true;
     const floatingMode = options.mode === 'home' ? 'home' : 'project';
     if (homeMenuBtn) homeMenuBtn.classList.toggle('hidden', !visible || !showMenu);
     if (homeProjectCreateMenu) {
@@ -7286,6 +7313,7 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
     const inGroupChat = tabId === 'chatPage' && !!currentGroup;
     const inChat = inProjectChat || inFriendChat || inGroupChat;
     const isChatHome = tabId === 'chatPage' && !inChat;
+    appView.classList.toggle('stitch-home-active', isChatHome);
     const inProjectHome = tabId === 'projectPage';
     const isProfileHome = tabId === 'profilePage';
     if (tabId !== 'chatPage') {
@@ -7346,9 +7374,9 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
     // 新建按钮：聊天首页和项目首页都显示；项目首页同时有页内入口，保持与 APK 一致。
     const addAsFriend = tabId === 'chatPage' && !inChat;
     const addAsProject = inProjectHome;
-    addBtn.style.display = (addAsFriend || addAsProject) ? '' : 'none';
+    addBtn.style.display = addAsProject ? '' : 'none';
     setAddButtonMode(addAsProject ? 'project' : 'friend');
-    searchBtn.style.display = 'none';
+    searchBtn.style.display = isChatHome ? '' : 'none';
     updateSendButtonState();
     // 下载页：切入"我的"时刷新版本信息
     if (tabId === 'profilePage') {
@@ -7873,7 +7901,7 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
     const summaryMeta = todaySummary.attention.length > 0
       ? `今天有 ${todaySummary.attention.length} 个项目需要你关注`
       : `今天暂无待处理事项，已分析 ${todaySummary.projectCount} 个项目`;
-    summaryEntry.innerHTML = `<span class="work-summary-entry-icon" aria-hidden="true">••</span><span class="work-summary-entry-copy"><span class="work-summary-entry-title-row"><span class="work-summary-entry-title">AI 工作摘要</span><span class="work-summary-entry-beta">Beta</span></span><span class="work-summary-entry-attention">${escapeHtml(summaryMeta)}</span><span class="work-summary-entry-meta">${todaySummary.attention.length} 条重要消息 · ${todaySummary.projectCount} 个待处理事项</span></span><span class="work-summary-entry-action">查看详情 ›</span>`;
+    summaryEntry.innerHTML = `<span class="work-summary-entry-icon" aria-hidden="true"><img src="data:image/png;base64,__HOME_AI_AVATAR_PNG_B64__" alt=""></span><span class="work-summary-entry-copy"><span class="work-summary-entry-title-row"><span class="work-summary-entry-title">AI 工作摘要</span><span class="work-summary-entry-beta">Beta</span></span><span class="work-summary-entry-attention">${escapeHtml(summaryMeta)}</span><span class="work-summary-entry-meta">${todaySummary.attention.length} 条重要消息 · ${todaySummary.projectCount} 个待处理事项</span></span><span class="work-summary-entry-action">查看详情 ›</span>`;
     summaryEntry.addEventListener('click', openWorkSummaryPage);
     conversationList.appendChild(summaryEntry);
     allItems.forEach((item) => conversationList.appendChild(createContactRow(item)));

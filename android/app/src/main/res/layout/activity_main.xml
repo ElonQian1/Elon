@@ -50,7 +50,7 @@
                 android:layout_marginStart="0dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:contentDescription="主菜单"
-                android:padding="12dp"
+                android:padding="8dp"
                 android:scaleType="fitCenter"
                 android:src="@drawable/ic_home_menu_custom"
                 android:visibility="gone" />
@@ -153,7 +153,7 @@
                 android:layout_marginEnd="8dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:contentDescription="搜索"
-                android:padding="12dp"
+                android:padding="8dp"
                 android:scaleType="fitCenter"
                 android:src="@drawable/ic_top_search_custom" />
 
@@ -1328,6 +1328,9 @@
                 android:clipToPadding="false"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
+                android:background="@drawable/bg_bottom_nav_stitch_container"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
                 android:paddingTop="8dp"
                 android:paddingBottom="@dimen/main_bottom_menu_edge_gap">
 
@@ -1346,6 +1349,7 @@
                         android:background="@drawable/bg_bottom_nav_glass"
                         android:clipToOutline="true"
                         android:contentDescription="@null"
+                        android:visibility="invisible"
                         app:blurOverlayColor="@color/elon_nav_glass_overlay" />
 
                     <LinearLayout
@@ -1372,8 +1376,8 @@
                         <!-- The chat icon's selected and unselected assets are switched explicitly in code. -->
                         <ImageView
                             android:id="@+id/tabChatIcon"
-                            android:layout_width="28dp"
-                            android:layout_height="28dp"
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
                             android:layout_gravity="center"
                             android:contentDescription="@null"
                             android:src="@drawable/ic_bottom_nav_chat" />
@@ -1421,8 +1425,8 @@
 
                         <ImageView
                             android:id="@+id/tabProjectIcon"
-                            android:layout_width="28dp"
-                            android:layout_height="28dp"
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
                             android:layout_gravity="center"
                             android:contentDescription="@null"
                             android:src="@drawable/ic_bottom_nav_project_selector" />
@@ -1455,8 +1459,8 @@
 
                         <ImageView
                             android:id="@+id/tabProfileIcon"
-                            android:layout_width="28dp"
-                            android:layout_height="28dp"
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
                             android:layout_gravity="center"
                             android:contentDescription="@null"
                             android:src="@drawable/ic_bottom_nav_profile_selector" />
@@ -1484,8 +1488,8 @@
 
                         <ImageView
                             android:id="@+id/bottomMenuIcon"
-                            android:layout_width="28dp"
-                            android:layout_height="28dp"
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
                             android:layout_gravity="center"
                             android:contentDescription="@null"
                             android:src="@drawable/ic_bottom_nav_menu_selector" />
@@ -1494,9 +1498,12 @@
                     </LinearLayout>
                 </FrameLayout>
 
-                <Space
-                    android:layout_width="12dp"
-                    android:layout_height="1dp" />
+                <View
+                    android:layout_width="1dp"
+                    android:layout_height="32dp"
+                    android:layout_marginStart="8dp"
+                    android:layout_marginEnd="8dp"
+                    android:background="#1AFFFFFF" />
 
                 <FrameLayout
                     android:id="@+id/bottomComposeButton"
@@ -1511,9 +1518,10 @@
                         android:id="@+id/bottomComposeGlass"
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
-                        android:background="@drawable/bg_bottom_nav_glass_circle"
+                        android:background="@android:color/transparent"
                         android:clipToOutline="true"
                         android:contentDescription="@null"
+                        android:visibility="invisible"
                         app:blurOverlayColor="@color/elon_nav_glass_overlay" />
 
                     <ImageView

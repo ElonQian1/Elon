@@ -50,7 +50,7 @@ internal class HomeChromeController(
             gravity = Gravity.CENTER_VERTICAL
             layoutParams = (layoutParams as FrameLayout.LayoutParams).apply {
                 gravity = Gravity.START or Gravity.CENTER_VERTICAL
-                marginStart = dp(56)
+                marginStart = dp(52)
             }
         }
         projectCreateFab.hide()
