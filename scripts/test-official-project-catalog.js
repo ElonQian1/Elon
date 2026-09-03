@@ -55,14 +55,19 @@ assert.equal(
   quantProject.landing.paper_launch.description,
   '由一龙账号签发五分钟短期授权，并在页面声明能力时附带同用户、同授权、同有效期的 ESK 只读投影；固定公钥密钥环支持安全轮换，用户可撤销当前授权，未配置 Web 地址或可信密钥时保持不可用。',
 )
-assert.equal(quantProject.landing.downloads.web.status, 'planned')
-assert.equal(quantProject.landing.downloads.android.status, 'planned')
-assert.match(quantProject.landing.downloads.android.note, /正式签名/)
+assert.equal(quantProject.landing.downloads.web.status, 'available')
+assert.equal(quantProject.landing.downloads.web.url, 'http://43.139.149.158:8080/quant/')
+assert.equal(quantProject.landing.downloads.android.status, 'available')
+assert.equal(quantProject.landing.downloads.android.version, '0.2.0')
+assert.equal(quantProject.landing.downloads.android.version_code, 2)
+assert.equal(quantProject.landing.downloads.android.source_git_sha, '9b0d9170d532072db02500130ea02359e8c84a74')
+assert.equal(quantProject.landing.downloads.android.sha256, 'c17ab5abe800547f41acc95594021abb6cec92fc14cb6de3b2db202ce4b94b89')
+assert.match(quantProject.landing.downloads.android.note, /独立证书签名/)
 assert.match(quantProject.landing.downloads.android.note, /主服务器发布回执/)
-assert.match(quantProject.landing.recent_updates[0], /独立 Android Paper/)
+assert.match(quantProject.landing.recent_updates[0], /V20 基金式 Paper/)
 assert.ok(quantProject.landing.recent_updates.some((item) => /只读资产卡片/.test(item)))
-assert.match(quantProject.landing.summary, /paper 模拟交易/)
-assert.match(quantProject.landing.summary, /6% 是非保证目标/)
+assert.match(quantProject.landing.summary, /可复现 BTC 基准研究组合/)
+assert.match(quantProject.landing.summary, /不是可申购基金/)
 assert.doesNotMatch(JSON.stringify(quantProject.landing), /真实提现|保本收益|固定收益/)
 
 for (const project of catalog.projects) {
