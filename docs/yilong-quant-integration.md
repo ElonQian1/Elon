@@ -59,6 +59,7 @@
 - 子仓库提交 `0b87604e9105d7b0c1e4ba0da6b8b2c3c43d6ddc` 已完成 Paper 公开部署合同 V9：API `/api/health` 绑定编译时 40 位 Git SHA，仓库提供不含秘密的 loopback systemd、标准 HTTPS 443 Nginx 和环境模板，以及只发送 PWA `/`、`/api/health`、`/api/v1/runtime` 三个无凭据 GET 的公网验收器。它会拒绝 HTTP/loopback、错误提交、宽松 CSP/CORS、响应秘密标记、非 Paper runtime、`live_trading_enabled=true`、`funds_moved=true` 或错误 parent origin。离线 fixture 已验证但没有访问目标环境，因此当前只达到 `deployment_contract_verified`。
 - V9 固定区分三种状态：`configuration_ready` 只证明量化进程配置形状，`deployment_contract_verified` 只证明模板和离线合同，`environment_deployed` 才表示批准的量化 HTTPS origin 已由 `scripts/check-paper-public-deployment.ps1` 真实读取并返回 `scope=public_https_read_only`、`network_calls_made=true`、`status=ready`。主项目只能在第三种状态后配置量化 Paper Web URL；不得用当前 HTTP 主站、未知 HTTPS 主机、关闭证书校验或放宽 exact-origin/CSP 临时上线。
 - 子仓库提交 `e3359e4f0075163c30f2d54717a351530f1daa5d` 新增 V17 显式无凭据 HTTP Paper 预览。当前测试环境不使用 Nginx：主项目 Rust/Axum 在 `/quant/` 托管构建后的 PWA，并只转发 `/api/health`、`/api/v1/runtime`、研究快照与回测四个白名单接口到 `127.0.0.1:8787`。此例外只允许显示公开模拟研究结果，页面必须提示明文传输风险；登录、主项目 bearer、Paper grant、ESK 投影、本人仓位、订单、运营、导入、交易所密钥与真实资金全部禁止进入该通道。V9 的 HTTPS 要求继续约束未来的本人授权功能，不能从 V17 的公开预览状态推导为已满足。
+- 主项目提交 `68bd2a314` 为 V19 新增精确的 `GET /quant/api/v1/markets/spot/overview` 白名单：查询参数按原字节保留但限制为 2 KiB，上游 origin 与 path 固定为 loopback，不转发入站 header、Cookie 或 Authorization，失败日志只记录固定错误类别。`HEAD`、写方法、相邻路径和既有敏感量化 API 继续拒绝。该提交只证明主项目代理代码与定向测试通过；量化 API/PWA、APK 和主服务器运行版本仍须分别发布及在线取证。
 - `contracts/quant/net-balance-lock-receipt-v1.schema.json` 已定义主项目未来锁定 NET 后交给量化项目消费的版本化回执形状；详细语义见 `docs/yilong-quant-net-lock-receipt-v1.md`。
 - `POST /api/me/quant/paper-access-grants` 已复用主项目现有 bearer 会话，可在独立签名配置启用后签发最多五分钟的 Ed25519 paper grant；量化项目只获得项目专用脱敏 subject 和明确 scope，不获得主项目 bearer 或用户资料。契约见 `docs/yilong-quant-paper-access-grant-v1.md` 与 `contracts/quant/paper-access-grant-v1.schema.json`。
 - `GET /api/me/quant/paper-launch` 与 `POST /api/me/quant/paper-launches` 提供失败关闭的 readiness 和一次性启动票据；PC 项目主页通过 exact-origin iframe、`event.source`、nonce、attempt ID 和过期时间绑定，把 grant 只传给当前量化子页面。双方契约见 `docs/yilong-quant-paper-launch-v1.md` 与 `contracts/quant/paper-launch-v1.schema.json`。
@@ -74,7 +75,7 @@
 
 - 在真实 Android 设备完成项目广场下载、系统安装、签名兼容、打开 `/quant/`、返回/重试和公开 Paper 回测验收；当前正式 APK、主服务器发布回执和公网 HTTP 路径已通过离线及网络验证。独立量化 APK 的本人 ESK/仓位仍需后续安全应用绑定协议，V17 不传主项目 bearer、Paper grant 或 ESK 投影。
 - 本人 ESK/仓位、量化申请 accepted/released 回执等敏感能力仍需批准的加密传输和应用绑定方案；当前 HTTP `/quant/` 不得启用这些功能。随后还需完成主项目签名私钥托管和一次真实轮换演练。代码已支持量化端多 key 重叠、密钥级撤销和单 grant 跨重启撤销；当前用户 grant 仍只绑定 paper 模拟参与者，不证明付款、KYC、钱包或真实准入。
-- 经来源与许可评审的真实公开历史行情、多策略比较、回测结果持久化和共享算力分片；当前只有仓库内置 CC0 确定性研究 fixture 与单机基准策略。
+- 经来源与许可评审、版本化落盘并用于可复现回测的真实公开历史行情、多策略比较、回测结果持久化和共享算力分片；V19 的 Binance Spot REST 数据只是按需公开展示快照，不写入研究 `market-data`、不进入回测或 NAV。
 - 将已付款用户数据经审核、脱敏、对账后导入生产系统；paper 子项目只允许脱敏标识和模拟锁定回执，继续禁止把聊天或付款截图写入代码。
 - 用户自助追加模拟配额、真实申购或真实 NET 锁定；当前 V6 追加能力只接受独立运营令牌，主项目 grant 不获得增加余额的 scope。
 - 官方 NAV、交易所 sandbox/live、托管、KYC/地区准入和真实提现。
