@@ -161,24 +161,26 @@ without reading a user conversation. The completed capability is
 `android_chatgpt_private_rich_content_native_view_v1` and must not be reimplemented
 without current regression evidence.
 
-Production ChatGPT dictation uses one explicit ordered router: verified same-origin private
-transport first, the existing work-mode `AgentVoiceBridge` second, and the official DOM
-dictation control last. Active sessions remain owned by the layer that started them, so a
-submit or cancel cannot cross transports. Immediate rejection advances once to the next
-layer; an asynchronous private implementation may request fallback only before it captures
-audio. The official DOM is not described as a private API.
+Production ChatGPT dictation is an explicit two-mode choice on the same white microphone.
+The default after app process start is the verified same-origin private transport. A short
+tap starts only the selected mode; an idle long press toggles between private dictation and
+the existing work-mode `AgentVoiceBridge`. A start, submit, cancel, timeout, or asynchronous
+failure never changes the selected mode and never starts the other recorder. There is no
+automatic second-level fallback and the white microphone does not start an official DOM
+third level. Existing official DOM session controls remain only so an official session that
+was opened outside this entry can still be safely submitted or cancelled.
 
 The first layer now uses the verified ordinary dictation contract: page-local identity,
 `MediaRecorder`, and a bounded same-origin buffered transcription request. Credentials,
 request headers, audio, and transcript never cross the WebView boundary; only lifecycle
 receipts and the reconciled draft reach Android. A start is accepted only after capture is
 confirmed, and a submit completes only after a fresh official composer snapshot contains
-the new draft. Authentication failures before capture may fall through once to the
-unchanged work-mode bridge; failures after capture stay owned by the private layer so two
-recorders cannot run. The final DOM fallback also requires capture evidence and cannot
-treat a dispatched touch or a focused composer as success. The stable capability IDs are
-`android_chatgpt_private_dictation_transport_v1` and
-`android_chatgpt_native_dictation_v1`; both are implemented and production enabled.
+the new draft. Any failure stays owned by the selected layer and returns that layer to an
+idle/retryable state; it cannot be interpreted as permission to start another transport.
+The stable capability IDs are `android_chatgpt_private_dictation_transport_v1` and
+`android_chatgpt_native_dictation_v1`; both are production enabled. The private mode is
+device verified, while the optional work-mode bridge retains its separate device-acceptance
+status in the catalog.
 
 The rejected `1.1.1470` experiment must not be reintroduced as private composer dictation.
 It reused the full realtime-voice `/realtime/wm` takeover: Android microphone capture,
