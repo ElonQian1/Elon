@@ -28,7 +28,7 @@ internal class WebChatProductionTranscript(
     private val list: RecyclerView,
     private val setChatAdapter: (ChatAdapter) -> Unit,
     onMessageLongPress: (android.view.View, ChatMessage) -> Unit,
-    onMessageAction: (ChatMessage, WebChatMessageAction) -> Unit,
+    private val onMessageAction: (ChatMessage, WebChatMessageAction) -> Unit,
     onContentOpen: (ChatMessage, WebChatProductionContentPart) -> Unit,
 ) {
     private val state = WebChatProductionTranscriptState()
@@ -40,6 +40,7 @@ internal class WebChatProductionTranscript(
     private val updater = WebChatProductionMessageListUpdater(messages, adapter)
 
     fun activate() {
+        adapter.onWebChatMessageAction = onMessageAction
         setChatAdapter(adapter)
         list.adapter = adapter
         if (messages.isNotEmpty()) list.jumpToLatestMessageBeforeNextDraw()

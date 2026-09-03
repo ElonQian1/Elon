@@ -71,6 +71,11 @@ internal object WebChatProductionContextPager {
             .put("model_used", message.modelUsed ?: JSONObject.NULL)
             .put("source_message_id", metadata?.sourceMessageId ?: JSONObject.NULL)
             .put("render_markdown", metadata?.renderMarkdown == true)
+            .put("actions", JSONArray().apply {
+                WebChatProductionMessageActionPolicy.resolve(message)
+                    .sortedBy(WebChatMessageAction::wireValue)
+                    .forEach { put(it.wireValue) }
+            })
             .put("parts", JSONArray().apply {
                 metadata?.contentParts.orEmpty().take(MAX_PARTS).forEach { part ->
                     put(JSONObject()

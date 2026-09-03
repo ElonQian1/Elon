@@ -68,6 +68,7 @@ class WebChatProductionContextPagerTest {
         assertEquals(1, encoded.getInt("part_count"))
         assertEquals(1, encoded.getInt("attachment_count"))
         assertEquals("notes.txt", encoded.getJSONArray("attachments").getJSONObject(0).getString("display_name"))
+        assertEquals("copy", encoded.getJSONArray("actions").getString(0))
         assertFalse(encoded.toString().contains("private.example"))
         assertFalse(encoded.toString().contains("C:/private"))
     }

@@ -17,7 +17,7 @@ internal object WebChatProductionMessageActionBinder {
     ) {
         val row = itemView.findViewById<LinearLayout>(R.id.webChatMessageActionBar) ?: return
         val metadata = message.webChatMessage
-        val actions = metadata?.actions.orEmpty()
+        val actions = WebChatProductionMessageActionPolicy.resolve(message)
         val visible = metadata != null && actions.isNotEmpty() && onAction != null
         row.visibility = if (visible) View.VISIBLE else View.GONE
         if (!visible || metadata == null) {
@@ -151,7 +151,7 @@ internal class WebChatProductionMessageActionCoordinator(
 
     fun handle(message: ChatMessage, action: WebChatMessageAction) {
         val metadata = message.webChatMessage ?: return
-        if (action !in metadata.actions) return
+        if (action !in WebChatProductionMessageActionPolicy.resolve(message)) return
         when (action) {
             WebChatMessageAction.COPY -> {
                 clipboard.copy(message.content)
