@@ -52,6 +52,7 @@ class ChatGptWebConsumerPortAdapterTest {
                     dictationCapturePending = false,
                     pageKind = "health",
                     url = "https://chatgpt.com/health",
+                    draft = "pending",
                 )
             },
             uiManifest = { manifest() },
@@ -66,6 +67,7 @@ class ChatGptWebConsumerPortAdapterTest {
         assertFalse(state.dictationActive)
         assertTrue(state.dictationCaptureActive)
         assertFalse(state.dictationCapturePending)
+        assertTrue(state.draftPresent)
         assertEquals("health", state.pageKind)
         assertEquals("https://chatgpt.com/health", state.pageUrl)
         assertEquals("search", state.composerSections.getValue("tools").single().id)
@@ -102,6 +104,7 @@ class ChatGptWebConsumerPortAdapterTest {
         assertFalse(state.streaming)
         assertFalse(state.adapterCurrent)
         assertFalse(state.dictationActive)
+        assertFalse(state.draftPresent)
         assertTrue(state.composerSections.isEmpty())
         assertTrue(state.features.isEmpty())
         assertTrue(state.controls.isEmpty())
@@ -191,10 +194,11 @@ class ChatGptWebConsumerPortAdapterTest {
         dictationCapturePending: Boolean = false,
         pageKind: String = "unknown",
         url: String = "https://chatgpt.com/",
+        draft: String = "",
     ) = ChatGptWebSnapshot(
         title = "",
         url = url,
-        draft = "",
+        draft = draft,
         messages = emptyList(),
         authenticated = false,
         composerReady = true,

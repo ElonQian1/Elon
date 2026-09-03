@@ -37,7 +37,7 @@ internal class WebChatProductionConversationActionsCoordinator(
     private val activeProvider: () -> WebChatProviderId?,
     private val currentConversationPath: () -> String?,
     private val currentState: () -> String,
-    private val openConversation: (String) -> Boolean,
+    private val openConversationTracked: (String) -> WebChatConsumerCommandResult,
     private val consumerPort: () -> WebChatConsumerPort?,
     private val conversationIndex: () -> com.elon.app.chatgptweb.ChatGptWebConversationIndexState,
     private val refreshConversationIndex: (String?) -> Boolean,
@@ -56,7 +56,7 @@ internal class WebChatProductionConversationActionsCoordinator(
         consumerPort = consumerPort,
         currentConversationPath = currentConversationPath,
         currentState = currentState,
-        openConversation = openConversation,
+        openConversation = openConversationTracked,
         conversationIndex = conversationIndex,
         refreshConversationIndex = refreshConversationIndex,
         probeConversationProject = probeConversationProject,
@@ -126,12 +126,21 @@ internal class WebChatProductionConversationActionsCoordinator(
     private fun showPageActionsFor(conversation: ChatGptWebConversation) {
         val targetPath = ChatGptWebConversationPath.normalize(conversation.path)
             ?: return showRecovery(conversation)
+        if (WebChatConversationDraftNavigation.blocks(
+                targetPath = targetPath,
+                currentPath = currentConversationPath(),
+                draftPresent = consumerPort()?.state()?.draftPresent == true,
+            )
+        ) {
+            showDraftBlocked()
+            return
+        }
         val epoch = requestEpoch
         when (readiness(targetPath)) {
             WebChatConversationActionReadiness.SHOW -> showPageActions()
             WebChatConversationActionReadiness.CANCEL -> Unit
             WebChatConversationActionReadiness.WAIT -> {
-                if (!openConversation(targetPath)) return showRecovery(conversation)
+                if (!openConversationTracked(targetPath).accepted) return showRecovery(conversation)
                 showTransition(conversation)
                 poll(conversation, targetPath, epoch, attempt = 0)
             }
@@ -218,6 +227,12 @@ internal class WebChatProductionConversationActionsCoordinator(
             .setPositiveButton("官网完成") { _, _ -> openOfficialFallback() }
             .setNegativeButton("取消", null)
             .show()
+    }
+
+    private fun showDraftBlocked() {
+        if (activity.isFinishing || activity.isDestroyed) return
+        dismissTransition()
+        WebChatConversationDraftNavigation.dialog(activity).show()
     }
 
     private companion object {

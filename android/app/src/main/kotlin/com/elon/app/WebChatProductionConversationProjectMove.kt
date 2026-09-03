@@ -14,7 +14,7 @@ internal class WebChatProductionConversationProjectMoveCoordinator(
     private val consumerPort: () -> WebChatConsumerPort?,
     private val currentConversationPath: () -> String?,
     private val currentState: () -> String,
-    private val openConversation: (String) -> Boolean,
+    private val openConversation: (String) -> WebChatConsumerCommandResult,
     private val conversationIndex: () -> ChatGptWebConversationIndexState,
     private val refreshConversationIndex: (String?) -> Boolean,
     private val probeConversationProject: (String, String) -> Boolean,
@@ -49,6 +49,7 @@ internal class WebChatProductionConversationProjectMoveCoordinator(
     private var lastRecoveryAttemptKey: String? = null
     private var projectChoiceRevealRequested = false
     private var projectChoiceRevealRequestId: String? = null
+    private var navigationRequestId: String? = null
 
     fun show(conversation: ChatGptWebConversation) {
         cancelPending()
@@ -138,6 +139,7 @@ internal class WebChatProductionConversationProjectMoveCoordinator(
         recoveryActive = false
         projectChoiceRevealRequested = false
         projectChoiceRevealRequestId = null
+        navigationRequestId = null
         destinationFallback.reset()
         clearPreparedRecovery()
         releaseConversationRefresh()
@@ -154,16 +156,22 @@ internal class WebChatProductionConversationProjectMoveCoordinator(
         recoveryDirectoryRequested = false
         projectChoiceRevealRequested = false
         projectChoiceRevealRequestId = null
+        navigationRequestId = null
         destinationFallback.reset()
-        holdConversationRefresh()
-        showProgress(destination, "正在准备当前会话")
         val targetPath = ChatGptWebConversationPath.normalize(conversation.path)
             ?: return fail(conversation, destination, "会话地址已经变化", epoch)
+        val initialReadiness = readiness(targetPath)
+        if (initialReadiness == WebChatConversationActionReadiness.WAIT && blocksForDraft(targetPath)) {
+            blockForDraft(epoch)
+            return
+        }
+        holdConversationRefresh()
+        showProgress(destination, "正在准备当前会话")
         if (recoveryStore.prepare(conversation, destination) == null) {
             fail(conversation, destination, "无法建立安全恢复记录", epoch)
             return
         }
-        when (readiness(targetPath)) {
+        when (initialReadiness) {
             WebChatConversationActionReadiness.SHOW -> openConversationOptions(
                 conversation,
                 destination,
@@ -174,10 +182,12 @@ internal class WebChatProductionConversationProjectMoveCoordinator(
                 releaseConversationRefresh()
             }
             WebChatConversationActionReadiness.WAIT -> {
-                if (!openConversation(targetPath)) {
+                val navigation = openConversation(targetPath)
+                if (!navigation.accepted) {
                     fail(conversation, destination, "暂时无法打开该会话", epoch)
                     return
                 }
+                navigationRequestId = navigation.requestId
                 updateProgress(destination, "正在切换到该会话")
                 pollUntilReady(conversation, destination, targetPath, epoch, attempt = 0)
             }
@@ -203,12 +213,35 @@ internal class WebChatProductionConversationProjectMoveCoordinator(
                 releaseConversationRefresh()
             }
             WebChatConversationActionReadiness.WAIT -> {
+                if (blocksForDraft(targetPath)) {
+                    blockForDraft(epoch)
+                    return
+                }
+                val navigationStatus = consumerPort()?.state()?.let { state ->
+                    WebChatConversationProjectMovePolicy.commandStatus(state, navigationRequestId)
+                } ?: WebChatConsumerCommandStatus.UNKNOWN
+                if (navigationStatus == WebChatConsumerCommandStatus.FAILED) {
+                    fail(conversation, destination, "官网拒绝切换会话", epoch)
+                    return
+                }
+                if (navigationStatus == WebChatConsumerCommandStatus.TIMED_OUT) {
+                    fail(conversation, destination, "官网未确认切换会话", epoch)
+                    return
+                }
                 if (attempt >= MAX_NAVIGATION_POLLS) {
                     fail(conversation, destination, "切换会话超时", epoch)
                     return
                 }
-                if (WebChatConversationProjectMoveTiming.shouldRetryNavigation(attempt)) {
-                    openConversation(targetPath)
+                if (
+                    navigationRequestId == null &&
+                    WebChatConversationProjectMoveTiming.shouldRetryNavigation(attempt)
+                ) {
+                    val navigation = openConversation(targetPath)
+                    if (!navigation.accepted) {
+                        fail(conversation, destination, "暂时无法打开该会话", epoch)
+                        return
+                    }
+                    navigationRequestId = navigation.requestId
                 }
                 host.postDelayed({
                     pollUntilReady(conversation, destination, targetPath, epoch, attempt + 1)
@@ -223,6 +256,7 @@ internal class WebChatProductionConversationProjectMoveCoordinator(
         epoch: Int,
     ) {
         if (!isCurrent(epoch)) return
+        navigationRequestId = null
         val port = consumerPort()
             ?: return fail(conversation, destination, "网页会话正在恢复", epoch)
         updateProgress(destination, "正在打开会话设置")
@@ -674,6 +708,7 @@ internal class WebChatProductionConversationProjectMoveCoordinator(
         writeAttempted = false
         recoveryActive = false
         lastRecoveryAttemptKey = null
+        navigationRequestId = null
         recoveryStore.clear()
         releaseConversationRefresh()
     }
@@ -688,6 +723,7 @@ internal class WebChatProductionConversationProjectMoveCoordinator(
         releaseConversationRefresh()
         if (activity.isFinishing || activity.isDestroyed) return
         val attempted = writeAttempted
+        navigationRequestId = null
         recoveryActive = false
         if (!attempted) recoveryStore.clear()
         ui.showFailure(
@@ -701,6 +737,16 @@ internal class WebChatProductionConversationProjectMoveCoordinator(
             },
             onRetry = { show(conversation) },
         )
+    }
+
+    private fun blocksForDraft(targetPath: String) = WebChatConversationDraftNavigation.blocks(
+        targetPath, currentConversationPath(), consumerPort()?.state()?.draftPresent == true,
+    )
+
+    private fun blockForDraft(epoch: Int) {
+        if (!isCurrent(epoch)) return
+        cancelPending()
+        if (!activity.isFinishing && !activity.isDestroyed) ui.showDraftBlocked()
     }
 
     private fun holdConversationRefresh() {

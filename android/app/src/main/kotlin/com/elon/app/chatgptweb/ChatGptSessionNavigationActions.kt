@@ -1,12 +1,14 @@
 package com.elon.app.chatgptweb
 
+import com.elon.app.WebChatConsumerCommandResult
+
 internal class ChatGptSessionNavigationActions(
     private val sessionReady: () -> Boolean,
     private val sessionCanDefer: () -> Boolean,
     private val bridgeReady: () -> Boolean,
     private val commandAvailable: () -> Boolean,
     private val startNewConversationCommand: () -> Unit,
-    private val openConversationCommand: (String) -> Unit,
+    private val openConversationCommand: (String) -> String?,
     private val openProjectCommand: (String) -> Boolean,
     private val latestSnapshot: () -> ChatGptWebSnapshot?,
     private val presentSnapshot: (ChatGptWebSnapshot) -> Unit,
@@ -19,6 +21,7 @@ internal class ChatGptSessionNavigationActions(
 ) {
     private val conversationOpenQueue = ChatGptConversationOpenQueue()
     private var pendingNewConversation = false
+    private var lastOpenConversationRequestId: String? = null
 
     fun startNewConversation(): Boolean {
         if (pendingNewConversation || conversationNavigation.hasPending()) return false
@@ -35,6 +38,8 @@ internal class ChatGptSessionNavigationActions(
 
     fun openConversation(path: String): Boolean {
         val normalized = ChatGptWebConversationPath.normalize(path) ?: return false
+        if (conversationNavigation.isOpening(normalized)) return true
+        lastOpenConversationRequestId = null
         prioritizeUserNavigation()
         ensureInitialized()
         if (conversationNavigation.hasPending()) return false
@@ -49,6 +54,15 @@ internal class ChatGptSessionNavigationActions(
         return true
     }
 
+    fun openConversationTracked(path: String): WebChatConsumerCommandResult {
+        val accepted = openConversation(path)
+        return WebChatConsumerCommandResult(
+            accepted = accepted,
+            error = if (accepted) null else "conversation_navigation_unavailable",
+            requestId = lastOpenConversationRequestId,
+        )
+    }
+
     fun openProject(path: String): Boolean {
         val normalized = ChatGptWebConversationPath.normalizeProject(path) ?: return false
         prioritizeUserNavigation()
@@ -57,6 +71,8 @@ internal class ChatGptSessionNavigationActions(
         conversationOpenQueue.clear()
         return openProjectCommand(normalized)
     }
+
+    fun lastOpenRequestId(): String? = lastOpenConversationRequestId
 
     fun onBridgeReady() {
         dispatchPendingNewConversation()
@@ -84,7 +100,7 @@ internal class ChatGptSessionNavigationActions(
         cancelNewConversationRecovery()
         presentSnapshot(conversationNavigation.beginOpen(path, previousSnapshot))
         updateLoading()
-        openConversationCommand(path)
+        lastOpenConversationRequestId = openConversationCommand(path)
         return true
     }
 

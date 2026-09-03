@@ -10,6 +10,27 @@ import org.junit.Test
 
 class WebChatConversationProjectMoveContractTest {
     @Test
+    fun pendingDraftIsProtectedBeforeRecoveryOrOfficialNavigationStarts() {
+        val source = read(
+            "android/app/src/main/kotlin/com/elon/app/" +
+                "WebChatProductionConversationProjectMove.kt",
+        )
+        val start = source.indexOf("private fun beginMove")
+        val end = source.indexOf("private fun pollUntilReady", start)
+        assertTrue(start >= 0 && end > start)
+        val begin = source.substring(start, end)
+        val guard = begin.indexOf("blocksForDraft(targetPath)")
+
+        assertTrue(guard >= 0)
+        assertTrue(guard < begin.indexOf("holdConversationRefresh()"))
+        assertTrue(guard < begin.indexOf("recoveryStore.prepare(conversation, destination)"))
+        assertTrue(guard < begin.indexOf("openConversation(targetPath)"))
+        assertTrue(source.contains("ui.showDraftBlocked()"))
+        assertTrue(source.contains("navigationRequestId = navigation.requestId"))
+        assertTrue(source.contains("WebChatConsumerCommandStatus.FAILED"))
+    }
+
+    @Test
     fun controlRefreshPollsManifestWithoutTreatingDispatchReceiptAsDomReadiness() {
         val source = read(
             "android/app/src/main/kotlin/com/elon/app/" +
@@ -137,7 +158,10 @@ class WebChatConversationProjectMoveContractTest {
         assertTrue(start >= 0 && end > start)
         val choice = source.substring(start, end)
 
-        assertTrue(choice.contains("onSucceeded = {\n                    beginReadOnlyReconciliation"))
+        assertTrue(
+            Regex("""onSucceeded\s*=\s*\{\s*beginReadOnlyReconciliation""")
+                .containsMatchIn(choice),
+        )
         assertTrue(choice.contains("onFailed = {"))
         assertTrue(choice.contains("beginReadOnlyReconciliation(conversation, destination, port, epoch)"))
         assertTrue(choice.contains("private fun beginReadOnlyReconciliation"))

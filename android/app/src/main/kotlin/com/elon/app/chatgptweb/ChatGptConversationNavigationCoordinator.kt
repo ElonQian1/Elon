@@ -71,6 +71,12 @@ internal class ChatGptConversationNavigationCoordinator(
 
     fun hasPending(): Boolean = pendingConversationPath != null || awaitingNewConversationBoundary
 
+    fun isOpening(path: String): Boolean {
+        val pending = pendingConversationPath ?: return false
+        return ChatGptWebConversationPath.identity(pending) ==
+            ChatGptWebConversationPath.identity(path)
+    }
+
     fun isNavigating(): Boolean = navigationActive
 
     fun complete() = clear()

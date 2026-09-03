@@ -1,6 +1,8 @@
 package com.elon.app
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class WebChatProductionConversationActionsTest {
@@ -56,5 +58,24 @@ class WebChatProductionConversationActionsTest {
                 state = "ready",
             ),
         )
+    }
+
+    @Test
+    fun pendingDraftOnlyBlocksNavigationToAnotherConversation() {
+        assertTrue(WebChatConversationDraftNavigation.blocks(
+            targetPath = "/c/target",
+            currentPath = "/c/current",
+            draftPresent = true,
+        ))
+        assertFalse(WebChatConversationDraftNavigation.blocks(
+            targetPath = "/g/g-p-project/c/current",
+            currentPath = "/c/current",
+            draftPresent = true,
+        ))
+        assertFalse(WebChatConversationDraftNavigation.blocks(
+            targetPath = "/c/target",
+            currentPath = "/c/current",
+            draftPresent = false,
+        ))
     }
 }

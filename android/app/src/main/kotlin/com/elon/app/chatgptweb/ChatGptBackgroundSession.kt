@@ -234,8 +234,7 @@ internal class ChatGptBackgroundSession(
             { state == State.READY }, { state == State.IDLE || state == State.LOADING },
             { latestBridgeState == ChatGptWebPageAdapter.State.READY }, { pageAdapter != null },
             { pageAdapter?.startNewConversation() }, { path ->
-                pageAdapter?.openConversation(path)
-                conversationOpenRecovery.schedule(path)
+                conversationOpenRecovery.openTracked(path, observedMcpState, pageAdapter)
             },
             { path ->
                 if (!conversationDirectory.requestProject(path)) false else {
@@ -383,7 +382,7 @@ internal class ChatGptBackgroundSession(
     fun currentOfficialUrl(): String? = latestSnapshot?.url
         ?.takeIf(ChatGptWebNavigationPolicy::allows)
 
-    fun openConversation(path: String): Boolean = navigationActions.openConversation(path)
+    fun openConversationTracked(path: String) = navigationActions.openConversationTracked(path)
 
     fun openProject(path: String): Boolean = navigationActions.openProject(path)
 

@@ -253,7 +253,7 @@ internal class MainSocialAiChatFeature(
             activeProvider = ::activeProviderOrNull,
             currentConversationPath = { activeController().currentConversationPath() },
             currentState = { activeController().stateWireValue() },
-            openConversation = ::openWebChatConversation,
+            openConversationTracked = chatGptController::openConversationTracked,
             consumerPort = ::chatGptConsumerPort,
             conversationIndex = ::webChatConversationIndex,
             refreshConversationIndex = ::refreshWebChatConversationIndex,

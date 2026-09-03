@@ -324,14 +324,18 @@ internal class ChatGptSocialChatController(
         session.resumeConversationRefreshAfterUserAction()
 
     override fun openConversation(path: String): Boolean {
+        return openConversationTracked(path).accepted
+    }
+
+    fun openConversationTracked(path: String): WebChatConsumerCommandResult {
         realtimeVoiceTranscript.reset()
         clearPendingSend()
         latestSendCommandStatus = null
         pendingAttachmentPrompt = null
         lastMessageSnapshot = null
         transcript.requestFollowLatest()
-        return session.openConversation(path).also { opened ->
-            if (!opened) transcript.cancelFollowLatest()
+        return session.openConversationTracked(path).also { result ->
+            if (!result.accepted) transcript.cancelFollowLatest()
         }
     }
 

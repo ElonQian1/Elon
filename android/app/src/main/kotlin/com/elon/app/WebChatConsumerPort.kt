@@ -45,6 +45,7 @@ internal data class WebChatConsumerState(
     val adapterCurrent: Boolean = true,
     val dictationCaptureActive: Boolean = false,
     val dictationCapturePending: Boolean = false,
+    val draftPresent: Boolean = false,
 )
 
 internal data class WebChatConsumerCommandResult(

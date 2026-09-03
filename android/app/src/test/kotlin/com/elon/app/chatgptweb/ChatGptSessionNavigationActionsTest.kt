@@ -24,7 +24,10 @@ class ChatGptSessionNavigationActionsTest {
         bridgeReady = { bridgeReady },
         commandAvailable = { true },
         startNewConversationCommand = { newConversationCommands += 1 },
-        openConversationCommand = opened::add,
+        openConversationCommand = { path ->
+            opened += path
+            "open-${opened.size}"
+        },
         openProjectCommand = { true },
         latestSnapshot = { current },
         presentSnapshot = { value -> current = value; presented += value },
@@ -54,6 +57,11 @@ class ChatGptSessionNavigationActionsTest {
 
         assertEquals(listOf("/c/target"), opened)
         assertEquals(1, loadingTransitions)
+        assertEquals("open-1", actions.lastOpenRequestId())
+        val repeated = actions.openConversationTracked("/g/g-p-project/c/target")
+        assertTrue(repeated.accepted)
+        assertEquals("open-1", repeated.requestId)
+        assertEquals(listOf("/c/target"), opened)
     }
 
     @Test
@@ -64,6 +72,11 @@ class ChatGptSessionNavigationActionsTest {
 
         assertEquals(listOf("/c/target"), opened)
         assertEquals(1, loadingTransitions)
+        assertEquals("open-1", actions.lastOpenRequestId())
+        val repeated = actions.openConversationTracked("/c/target")
+        assertTrue(repeated.accepted)
+        assertEquals("open-1", repeated.requestId)
+        assertEquals(listOf("/c/target"), opened)
     }
 
     @Test

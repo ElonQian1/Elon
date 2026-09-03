@@ -89,6 +89,7 @@ internal class ChatGptWebConsumerPortAdapter(
             adapterCurrent = observed.adapterCurrent,
             dictationCaptureActive = current?.dictationCaptureActive == true,
             dictationCapturePending = current?.dictationCapturePending == true,
+            draftPresent = current?.draft?.isNotBlank() == true,
         )
     }
 

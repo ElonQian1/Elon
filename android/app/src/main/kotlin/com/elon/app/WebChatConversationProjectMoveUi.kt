@@ -90,6 +90,13 @@ internal class WebChatConversationProjectMoveUi(
         Toast.makeText(activity, "已移动到“${destination.title}”", Toast.LENGTH_SHORT).show()
     }
 
+    fun showDraftBlocked() {
+        if (activity.isFinishing || activity.isDestroyed) return
+        dismissDestinationPicker()
+        dismissProgress()
+        trackDialog(WebChatConversationDraftNavigation.dialog(activity))
+    }
+
     fun showFailure(
         attempted: Boolean,
         detail: String,

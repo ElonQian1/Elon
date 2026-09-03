@@ -468,6 +468,9 @@ function Test-ProjectMoveWriteObserved {
 
 function Get-ProjectMoveUiStage {
     $texts = @(Get-UiNodes | ForEach-Object { [string]$_.text })
+    if (@($texts | Where-Object { $_.Contains("当前输入框有未发送内容") }).Count -gt 0) {
+        return "draft_blocked"
+    }
     if (@($texts | Where-Object { $_.Contains("已经提交过一次操作") }).Count -gt 0) {
         return "failed_after_write"
     }
@@ -537,6 +540,9 @@ function Wait-ConversationMembership {
         }
         if ($uiStage -eq "failed_before_write") {
             throw "Native project move failed before the official write was submitted."
+        }
+        if ($uiStage -eq "draft_blocked") {
+            throw "Native project move preserved an unsent draft before any official write."
         }
         if ($uiStage -eq "failed_after_write") {
             $WriteSelected.Value = $true

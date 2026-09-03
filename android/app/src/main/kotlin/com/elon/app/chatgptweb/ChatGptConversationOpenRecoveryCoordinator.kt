@@ -13,6 +13,18 @@ internal class ChatGptConversationOpenRecoveryCoordinator(
 ) {
     private var recoveryTask: Runnable? = null
 
+    fun openTracked(
+        path: String,
+        observedState: ChatGptWebObservedState,
+        pageAdapter: ChatGptWebPageAdapter?,
+    ): String? {
+        val adapter = pageAdapter ?: return null
+        val request = observedState.beginOpenConversationCommand(path)
+        adapter.openConversation(path, request.id)
+        schedule(path)
+        return request.id
+    }
+
     fun schedule(path: String) {
         cancel()
         val normalized = ChatGptWebConversationPath.normalize(path) ?: return
