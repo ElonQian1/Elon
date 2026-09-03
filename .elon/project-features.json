@@ -6068,7 +6068,7 @@
       "id": "esk-sui-genesis-foundation-v1",
       "title": "ESK Sui 创世基础与可验证发行门禁 V1",
       "summary": "固定 ESK 上 Sui 的创世参数、供应守恒、阶段证据与历史付费用户映射门禁，并交付固定供应 Currency 源码和自动验证；本轮不签名、不广播、不移动真实资金。",
-      "status": "verified",
+      "status": "released",
       "priority": "p0",
       "requirement": {
         "path": "docs/requirements/esk-sui-genesis-foundation-v1.md",
@@ -6222,7 +6222,7 @@
         }
       ],
       "created_at_ms": 1788454885588,
-      "updated_at_ms": 1788460247007
+      "updated_at_ms": 1788460650761
     },
     {
       "id": "esk_paper_quant_allocation_request_v2",
@@ -15899,16 +15899,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_56ab4b18e5034348a61220f529daa66c",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex-q18-rebase",
-      "reason": "Q18 source tranche is scoped, dependency is verified, and all compile/runtime/production gates remain explicitly deferred and closed.",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1788291378129
-    },
-    {
       "id": "feature_event_687c8e47e31346b9badd1d709c755fd6",
       "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
       "action": "claimed",
@@ -17897,6 +17887,16 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1788460247007
+    },
+    {
+      "id": "feature_event_048a81b7288541acade7087278c9906e",
+      "feature_id": "esk-sui-genesis-foundation-v1",
+      "action": "transitioned",
+      "actor": "Codex Desktop",
+      "reason": "ESK Sui 本地创世基础源码与验证证据已安全推送至远程 main；released 仅表示代码交付，不表示测试网或主网发币、资金接入或生产密钥启用。",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1788460650761
     }
   ]
 }
