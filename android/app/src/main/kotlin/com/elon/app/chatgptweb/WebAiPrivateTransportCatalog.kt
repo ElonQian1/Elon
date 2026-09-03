@@ -188,8 +188,8 @@ internal object WebAiPrivateTransportCatalog {
         Entry(
             id = "android_chatgpt_native_attachment_progress_v1",
             provider = "chatgpt",
-            status = "implemented_device_pending",
-            verification = "targeted_monotonic_progress_and_presentation_tests_passed",
+            status = "completed",
+            verification = "device_verified_v1_1_1491_adapter_239_visible_progress_and_restore",
             productionDefault = true,
             runtimeEnabled = true,
             requestMode = "redacted_monotonic_completed_count_projection",
@@ -277,9 +277,8 @@ internal object WebAiPrivateTransportCatalog {
         Entry(
             id = "android_chatgpt_native_conversation_project_move_v1",
             provider = "chatgpt",
-            status = "implemented_device_pending",
-            verification =
-                "targeted_dom_activation_confirmation_and_scoped_refresh_tests_passed_device_pending",
+            status = "completed",
+            verification = "device_round_trip_v1_1_1493_adapter_239_exact_two_writes_restored",
             productionDefault = true,
             runtimeEnabled = true,
             requestMode =

@@ -132,7 +132,10 @@ separately from upload progress, so a stable official-page gate cannot look like
 upload. Missing or malformed evidence keeps the previous indeterminate native status and the
 official DOM attachment snapshot remains authoritative. This UI-only slice is registered as
 `android_chatgpt_native_attachment_progress_v1`; filenames, bytes, credentials, and request
-headers do not cross this progress contract.
+headers do not cross this progress contract. Release `v1.1.1491 (1491)`, adapter `239`,
+completed a supervised fixed-fixture upload with visible native progress, one settled send,
+and restoration of the original conversation. The capability is completed and remains
+production-default.
 
 Native image content keeps the official page as the identity, byte-fetch, generation,
 and conversation authority. Adapter `208` maps allowlisted same-origin image content to
@@ -217,15 +220,15 @@ Conversation rows expose a native project destination picker backed by the bound
 project-directory cache. The coordinator navigates to the exact conversation, opens its
 context-bound official options, resolves one exact project title in the official project
 chooser, activates that exact official control once, and handles at most one matching
-second-stage confirmation. The accepted command receipt and a scoped target directory
-refresh must agree before success is shown. A missing or duplicate title or confirmation
-fails closed. Once the official bridge accepts the write, an absent or timed-out receipt
-never offers automatic retry; the user can refresh or confirm in the official menu instead.
-Refreshing a target project also removes the same conversation identity from its previous
-cached project, preventing duplicate sidebar membership. The stable capability is
-`android_chatgpt_native_conversation_project_move_v1`; a current reversible device round
-trip remains required before its status returns from `implemented_device_pending` to
-`completed`.
+second-stage confirmation. Recovery is armed before that one write. An absent or timed-out
+receipt never replays it: scoped membership probes and low-frequency full-directory refreshes
+reconcile the result, while only fresh, unique path-and-project agreement can report success
+or prove that the conversation remains at its source. Ambiguous results remain pending with
+the official menu available. Release `v1.1.1493 (1493)`, adapter `239`, completed one
+reversible device round trip with exactly one forward and one restore write, no cleanup
+write, no unknown recovery state, and the conversation restored to its original project.
+The completed, production-default capability is
+`android_chatgpt_native_conversation_project_move_v1`.
 
 Other conversation management actions use the existing context-bound official controls
 through native sheets and typed adaptive forms. Rename, pin or unpin, archive or unarchive,

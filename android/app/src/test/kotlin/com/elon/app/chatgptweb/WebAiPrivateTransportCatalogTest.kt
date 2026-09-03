@@ -127,11 +127,11 @@ class WebAiPrivateTransportCatalogTest {
                 "android_chatgpt_native_conversation_project_move_v1"
         }
         assertEquals(
-            "implemented_device_pending",
+            "completed",
             projectMove.getString("implementation_status"),
         )
         assertEquals(
-            "targeted_dom_activation_confirmation_and_scoped_refresh_tests_passed_device_pending",
+            "device_round_trip_v1_1_1493_adapter_239_exact_two_writes_restored",
             projectMove.getString("verification_status"),
         )
         assertTrue(projectMove.getBoolean("production_default"))
@@ -301,11 +301,11 @@ class WebAiPrivateTransportCatalogTest {
             it.getString("capability_id") == "android_chatgpt_native_attachment_progress_v1"
         }
         assertEquals(
-            "implemented_device_pending",
+            "completed",
             attachmentProgress.getString("implementation_status"),
         )
         assertEquals(
-            "targeted_monotonic_progress_and_presentation_tests_passed",
+            "device_verified_v1_1_1491_adapter_239_visible_progress_and_restore",
             attachmentProgress.getString("verification_status"),
         )
         assertTrue(attachmentProgress.getBoolean("production_default"))

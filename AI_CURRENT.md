@@ -8,7 +8,7 @@ reviewed_at: 2026-09-03
 
 ## 当前产品主链
 
-- Android Web AI 默认使用已验证的私有观察、预设和有界缓存，失败回退官网且不导出凭证或盲目重放写请求。ChatGPT 已真机验证附件对账、缓存图库、私有富内容、同来源重入和紧凑 `Pro` 模型控件；`android_chatgpt_official_feature_sidebar_trigger_v1` 已在正式版 `v1.1.1395 (1416)`、adapter `214` 验证官网功能侧栏直达。`android_chatgpt_native_conversation_management_v1` 又在正式版 `v1.1.1399 (1420)`、adapter `218` 完成上下文绑定菜单、置顶切换及原状态恢复的可逆真机验收；导航只在目标快照确认后成功，跨页命令绑定原文档令牌。悬浮层人工操作仍待验收；完整状态见 `docs/web-ai-private-transport-capability-matrix.md`，已完成项禁止无回归证据的重复实现。
+- Android Web AI 默认使用已验证的私有观察、预设和有界缓存，失败回退官网，不导出凭证或盲目重放写请求。近期真机验收：附件进度在 `v1.1.1491 (1491)`、adapter `239` 完成可见进度、单次发送和原会话恢复；项目移动在 `v1.1.1493 (1493)`、adapter `239` 完成恰好两次写入的移入/移回，无额外清理写入或未知恢复状态。朗读听感与停止仍待人工验收。完整能力及旧版本证据见 `docs/web-ai-private-transport-capability-matrix.md`，已完成项禁止无回归证据的重复实现。
 - Android ChatGPT 已完成并默认启用 `android_chatgpt_conversation_project_directory_cache_v1` 与 `android_chatgpt_webview_proxy_prepare_fail_open_v1`：目录约 0.3 秒从有界缓存恢复；代理回调超过 750ms 会一次性放行，正式版 `v1.1.1240 (1250)` 冷启动约 2.2 秒、后台返回约 1.9 秒恢复可输入。两项均已真机验收且不再重复研究，详见 `docs/chatgpt-conversation-project-directory-cache.md`、`docs/chatgpt-webview-proxy-prepare-recovery.md`。
 - 多 PC Rust 缓存平台已具备可安装工具与 Skill、脱敏 Fleet 观测，以及不上传路径、绑定精确摘要并由目标节点复扫加锁的远程 GC 审批。远程只覆盖机器级普通/老化策略；项目级治理与高风险操作仍在本机。生产 TLS、节点发布升级和真实多 PC 验收未完成，边界见 `docs/rust-cache-fleet-operations.md`。
 - 已实现：用户通过 Android APK 或 PC 工作台描述需求，AI CLI/API 代理在真实 Git 工作区开发、验证、构建和发布应用。
