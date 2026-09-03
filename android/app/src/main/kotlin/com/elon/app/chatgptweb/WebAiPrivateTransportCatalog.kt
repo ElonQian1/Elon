@@ -237,8 +237,8 @@ internal object WebAiPrivateTransportCatalog {
         Entry(
             id = "android_chatgpt_native_dictation_v1",
             provider = "chatgpt",
-            status = "implemented_device_pending",
-            verification = "targeted_explicit_two_mode_bridge_and_composer_tests_passed_device_pending",
+            status = "completed",
+            verification = "device_verified_v1_1_1483_explicit_private_and_work_mode_selection",
             productionDefault = true,
             runtimeEnabled = true,
             requestMode = "existing_work_mode_agent_voice_bridge_to_current_draft",

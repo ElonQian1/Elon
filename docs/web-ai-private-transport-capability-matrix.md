@@ -33,7 +33,7 @@ installed build; individual capability documents retain implementation evidence.
 | Native image-generation operation status | ChatGPT | Completed and enabled; generation, preview preparation, preview failure, and terminal-hide lifecycle tests passed; consolidated device UI acceptance pending | Official composer and `/images` page |
 | Native private-response rich content | ChatGPT | Completed, enabled, and structurally device verified on Release `v1.1.1379 (1400)` for finance and line-chart cards | Official WebView rich content |
 | Private composer dictation | ChatGPT | Completed and enabled; page-local identity, synthetic-audio endpoint proof, strict capture ownership, buffered transcription, draft reconciliation, timeout/circuit protection, and targeted integration tests passed | No automatic fallback; idle long press explicitly selects work-mode dictation |
-| Selectable work-mode composer dictation | ChatGPT | Implemented and enabled by direct reuse of the unchanged work-mode `AgentVoiceBridge`; device acceptance pending | No cross-mode fallback; idle long press switches back to private dictation |
+| Selectable work-mode composer dictation | ChatGPT | Completed and enabled by direct reuse of the unchanged work-mode `AgentVoiceBridge`; explicit private/work selection user-verified on `v1.1.1483 (1483)` | No cross-mode fallback; idle long press switches back to private dictation |
 | Native response read aloud | ChatGPT | Implemented and enabled; full-answer chunking and message-action tests passed; device acceptance pending | Official message actions and WebView |
 | Native conversation management | ChatGPT | Completed and enabled; reversible pin round trip device verified on `v1.1.1399 (1420)`, adapter `218`; other mutation acceptance pending | Context-bound official conversation options without automatic write replay |
 | Native conversation project move | ChatGPT | Implemented and enabled; direct DOM activation, optional confirmation, scoped refresh, and reversible device round trip pending | Official conversation project menu |
@@ -187,9 +187,9 @@ confirmed, and a submit completes only after a fresh official composer snapshot 
 the new draft. Any failure stays owned by the selected layer and returns that layer to an
 idle/retryable state; it cannot be interpreted as permission to start another transport.
 The stable capability IDs are `android_chatgpt_private_dictation_transport_v1` and
-`android_chatgpt_native_dictation_v1`; both are production enabled. The private mode is
-device verified, while the optional work-mode bridge retains its separate device-acceptance
-status in the catalog.
+`android_chatgpt_native_dictation_v1`; both are production enabled and device verified.
+Release `v1.1.1483 (1483)` received user-supervised acceptance for the explicit private/work
+selection, including the absence of automatic cross-mode fallback.
 
 The rejected `1.1.1470` experiment must not be reintroduced as private composer dictation.
 It reused the full realtime-voice `/realtime/wm` takeover: Android microphone capture,
