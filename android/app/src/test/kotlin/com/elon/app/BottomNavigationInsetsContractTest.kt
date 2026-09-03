@@ -31,7 +31,7 @@ class BottomNavigationInsetsContractTest {
     @Test
     fun androidBottomMenuMatchesStitchGeometryWhileKeepingExistingIcons() {
         val dimens = readRepositoryFile("android/app/src/main/res/values/dimens.xml")
-        assertTrue(dimens.contains("name=\"main_bottom_menu_content_width\">326dp</dimen>"))
+        assertTrue(dimens.contains("name=\"main_bottom_menu_content_width\">337dp</dimen>"))
         assertTrue(dimens.contains("name=\"main_bottom_menu_edge_gap\">24dp</dimen>"))
         assertTrue(dimens.contains("name=\"main_bottom_menu_selection_width\">56dp</dimen>"))
         assertTrue(dimens.contains("name=\"main_bottom_menu_selection_height\">48dp</dimen>"))
@@ -57,6 +57,8 @@ class BottomNavigationInsetsContractTest {
                 .contains("android:layout_marginStart=\"@dimen/main_bottom_menu_selection_inset\"")
         )
         assertTrue(!layout.contains("android:id=\"@+id/bottomMenuSelection\""))
+        assertTrue(!layout.contains("android:layout_weight=\"1\"\n                        android:layout_marginStart=\"8dp\""))
+        assertTrue(linearLayoutBlock(layout, "bottomNavContent").contains("android:layout_marginBottom=\"@dimen/main_bottom_menu_edge_gap\""))
         assertTrue(layout.contains("@drawable/ic_bottom_nav_chat"))
         assertTrue(layout.contains("@drawable/ic_bottom_nav_project_selector"))
         assertTrue(layout.contains("@drawable/ic_bottom_nav_profile_selector"))
@@ -67,7 +69,7 @@ class BottomNavigationInsetsContractTest {
     fun webMirrorUsesTheSameStitchGeometry() {
         val web = readRepositoryFile("server/src/assets/web_page.html")
         assertTrue(
-            Regex("""\.tabs-bar\s*\{[^}]*width:\s*326px;""", RegexOption.DOT_MATCHES_ALL)
+            Regex("""\.tabs-bar\s*\{[^}]*width:\s*337px;""", RegexOption.DOT_MATCHES_ALL)
                 .containsMatchIn(web)
         )
         assertTrue(
@@ -107,14 +109,10 @@ class BottomNavigationInsetsContractTest {
         assertTrue(settings.contains("url = uri('https://jitpack.io')"))
         assertTrue(settings.contains("includeGroup('com.github.Dimezis')"))
         assertTrue(layout.contains("<eightbitlab.com.blurview.BlurTarget"))
-        assertTrue(layout.contains("android:id=\"@+id/bottomNavGlass\""))
-        assertTrue(layout.contains("android:id=\"@+id/bottomComposeGlass\""))
-        assertTrue(
-            Regex("""app:blurOverlayColor="@color/elon_nav_glass_overlay"""")
-                .findAll(layout).count() == 2
-        )
-        assertTrue(controller.contains("listOf(binding.bottomNavGlass, binding.bottomComposeGlass)"))
-        assertTrue(controller.contains(".setBlurRadius(18f)"))
+        assertTrue(!layout.contains("android:id=\"@+id/bottomNavGlass\""))
+        assertTrue(!layout.contains("android:id=\"@+id/bottomComposeGlass\""))
+        assertTrue(!controller.contains("listOf(binding.bottomNavGlass, binding.bottomComposeGlass)"))
+        assertTrue(controller.contains("binding.bottomNavContent.clipToOutline = true"))
         assertTrue(colors.contains("<color name=\"elon_nav_glass_overlay\">#73353A42</color>"))
         assertTrue(colors.contains("<color name=\"elon_nav_glass_border\">#1FFFFFFF</color>"))
         assertTrue(glass.contains("android:radius=\"28dp\""))

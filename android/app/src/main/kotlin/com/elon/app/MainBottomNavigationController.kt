@@ -14,13 +14,8 @@ internal class MainBottomNavigationController(
     private val showHomeActions: (View, TextView) -> Unit
 ) {
     fun setup() {
-        listOf(binding.bottomNavGlass, binding.bottomComposeGlass).forEach { glass ->
-            glass.setupWith(binding.bottomNavBlurTarget)
-                .setFrameClearDrawable(activity.window.decorView.background)
-                .setBlurRadius(18f)
-            glass.outlineProvider = ViewOutlineProvider.BACKGROUND
-            glass.clipToOutline = true
-        }
+        binding.bottomNavContent.outlineProvider = ViewOutlineProvider.BACKGROUND
+        binding.bottomNavContent.clipToOutline = true
 
         binding.tabChat.setOnClickListener { selectTab(binding.tabChat) }
         binding.tabProject.setOnClickListener { selectTab(binding.tabProject) }

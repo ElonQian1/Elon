@@ -34,6 +34,8 @@ internal class HomeConversationHeaderView(
         onOpenSummary: () -> Unit,
     ): View = LinearLayout(activity).apply {
         orientation = LinearLayout.VERTICAL
+        clipChildren = false
+        clipToPadding = false
         setBackgroundColor(Color.parseColor("#131313"))
         addView(createFilters(selected, counts, onSelect))
         addView(createSummaryCard(counts, onOpenSummary))
@@ -117,6 +119,12 @@ internal class HomeConversationHeaderView(
             marginStart = dp(16); marginEnd = dp(16)
         }
         background = roundedWithStroke("#CC1A1A1A", 12, "#1AFFFFFF")
+        elevation = dp(12).toFloat()
+        translationZ = dp(4).toFloat()
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+            outlineAmbientShadowColor = Color.parseColor("#2600F0FF")
+            outlineSpotShadowColor = Color.parseColor("#2600F0FF")
+        }
         gravity = Gravity.CENTER_VERTICAL
         orientation = LinearLayout.HORIZONTAL
         setPadding(dp(20), dp(20), dp(20), dp(20))

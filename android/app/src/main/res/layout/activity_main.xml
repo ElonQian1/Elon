@@ -1324,6 +1324,7 @@
                 android:layout_width="@dimen/main_bottom_menu_content_width"
                 android:layout_height="@dimen/main_bottom_menu_outer_height"
                 android:layout_gravity="bottom|center_horizontal"
+                android:layout_marginBottom="@dimen/main_bottom_menu_edge_gap"
                 android:clipChildren="false"
                 android:clipToPadding="false"
                 android:gravity="center_vertical"
@@ -1332,25 +1333,14 @@
                 android:paddingStart="16dp"
                 android:paddingEnd="16dp"
                 android:paddingTop="8dp"
-                android:paddingBottom="@dimen/main_bottom_menu_edge_gap">
+                android:paddingBottom="8dp">
 
                 <FrameLayout
                     android:id="@+id/bottomNavPrimaryPanel"
-                    android:layout_width="0dp"
+                    android:layout_width="224dp"
                     android:layout_height="@dimen/main_bottom_menu_height"
-                    android:layout_weight="1"
                     android:clipChildren="false"
                     android:clipToPadding="false">
-
-                    <eightbitlab.com.blurview.BlurView
-                        android:id="@+id/bottomNavGlass"
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:background="@drawable/bg_bottom_nav_glass"
-                        android:clipToOutline="true"
-                        android:contentDescription="@null"
-                        android:visibility="invisible"
-                        app:blurOverlayColor="@color/elon_nav_glass_overlay" />
 
                     <LinearLayout
                         android:layout_width="match_parent"
@@ -1359,9 +1349,9 @@
 
                     <FrameLayout
                         android:id="@+id/tabChatWrap"
-                        android:layout_width="0dp"
+                        android:layout_width="56dp"
                         android:layout_height="match_parent"
-                        android:layout_weight="1">
+                        >
 
                         <ImageView
                             android:id="@+id/tabChatSelection"
@@ -1410,9 +1400,9 @@
 
                     <FrameLayout
                         android:id="@+id/tabProjectWrap"
-                        android:layout_width="0dp"
+                        android:layout_width="48dp"
                         android:layout_height="match_parent"
-                        android:layout_weight="1">
+                        android:layout_marginStart="8dp">
 
                         <ImageView
                             android:id="@+id/tabProjectSelection"
@@ -1444,9 +1434,9 @@
 
                     <FrameLayout
                         android:id="@+id/tabProfileWrap"
-                        android:layout_width="0dp"
+                        android:layout_width="48dp"
                         android:layout_height="match_parent"
-                        android:layout_weight="1">
+                        android:layout_marginStart="8dp">
 
                         <ImageView
                             android:id="@+id/tabProfileSelection"
@@ -1478,9 +1468,9 @@
 
                     <FrameLayout
                         android:id="@+id/bottomMenuButton"
-                        android:layout_width="0dp"
+                        android:layout_width="48dp"
                         android:layout_height="match_parent"
-                        android:layout_weight="1"
+                        android:layout_marginStart="8dp"
                         android:clickable="true"
                         android:contentDescription="主菜单"
                         android:focusable="true"
@@ -1501,8 +1491,8 @@
                 <View
                     android:layout_width="1dp"
                     android:layout_height="32dp"
-                    android:layout_marginStart="8dp"
-                    android:layout_marginEnd="8dp"
+                    android:layout_marginStart="16dp"
+                    android:layout_marginEnd="16dp"
                     android:background="#1AFFFFFF" />
 
                 <FrameLayout
@@ -1513,16 +1503,6 @@
                     android:contentDescription="打开新建菜单"
                     android:focusable="true"
                     android:foreground="?attr/selectableItemBackgroundBorderless">
-
-                    <eightbitlab.com.blurview.BlurView
-                        android:id="@+id/bottomComposeGlass"
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:background="@android:color/transparent"
-                        android:clipToOutline="true"
-                        android:contentDescription="@null"
-                        android:visibility="invisible"
-                        app:blurOverlayColor="@color/elon_nav_glass_overlay" />
 
                     <ImageView
                         android:id="@+id/bottomActionPlusIcon"

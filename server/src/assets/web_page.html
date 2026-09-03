@@ -3816,7 +3816,7 @@
       left: 50%;
       right: auto;
       bottom: 24px;
-      width: 326px;
+      width: 337px;
       transform: translateX(-50%);
       z-index: 20;
       background: transparent;
@@ -3838,16 +3838,17 @@
       height: 48px;
       display: flex;
       align-items: stretch;
-      flex: 1;
+      flex: 0 0 224px;
       border: 0;
       border-radius: 0;
       background: transparent;
       box-shadow: none;
       overflow: hidden;
+      gap: 8px;
     }
     .tab,
     .bottom-menu-tab {
-      flex: 1;
+      flex: 0 0 48px;
       position: relative;
       z-index: 1;
       min-width: 0;
@@ -3861,6 +3862,7 @@
       padding: 0;
       cursor: pointer;
     }
+    .tabs-panel > .tab:first-child { flex-basis:56px; width:56px; }
     .tab-selection {
       position: absolute;
       left: 50%;
@@ -3904,7 +3906,7 @@
       box-shadow: none;
       cursor: pointer;
     }
-    .bottom-nav-divider { width:1px; height:32px; flex:none; background:rgba(255,255,255,.1); }
+    .bottom-nav-divider { width:1px; height:32px; flex:none; margin:0 8px; background:rgba(255,255,255,.1); }
     .bottom-compose-button img {
       display: none;
     }
