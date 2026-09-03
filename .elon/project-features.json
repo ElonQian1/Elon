@@ -6072,15 +6072,15 @@
       "priority": "p0",
       "requirement": {
         "path": "docs/requirements/esk-sui-genesis-foundation-v1.md",
-        "content_hash": "1ef3992fa3c7eb75b9afd6cc1754057b2065058d48f7cdefd2fad3ac33e14e00",
+        "content_hash": "8ed627786a32238a44d5f36c4ec9076567f50ea5ffaada1445f9f66b76ba7406",
         "locator": "",
         "evidence_kind": "document",
         "git_identity": {
           "schema": "elon.project_context_git_identity.v1",
-          "head_commit": "d78c0d3ec802b03b75336772e87a1640a50e7db3",
-          "head_blob_oid": "",
-          "worktree_blob_oid": "ce27f0c553f6776a60521c2ea818471db1d24c61",
-          "state": "untracked"
+          "head_commit": "a65e9ad0fe34fea1b486e7b23c9338c5e4b7be45",
+          "head_blob_oid": "c22846621cc1284f1d74d8530a103c1f555ae36a",
+          "worktree_blob_oid": "c22846621cc1284f1d74d8530a103c1f555ae36a",
+          "state": "tracked_clean"
         }
       },
       "knowledge_node_id": "",
@@ -6118,111 +6118,111 @@
       "implementation_evidence": [
         {
           "path": "contracts/sui/esk-genesis-manifest-v1.fixture.json",
-          "content_hash": "786b9d4a4c8def4864be6270720ea2293b157538b9b9c3a495363a19e2b9727f",
+          "content_hash": "400475ee4d35d555382a2660f98e66150eefdc6d0f4d83725210d95410117449",
           "locator": "local_verified testnet foundation fixture",
           "evidence_kind": "configuration",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "d78c0d3ec802b03b75336772e87a1640a50e7db3",
-            "head_blob_oid": "",
+            "head_commit": "a65e9ad0fe34fea1b486e7b23c9338c5e4b7be45",
+            "head_blob_oid": "976bfade1f29b931290133ea233298425f0086cd",
             "worktree_blob_oid": "976bfade1f29b931290133ea233298425f0086cd",
-            "state": "untracked"
+            "state": "tracked_clean"
           }
         },
         {
           "path": "contracts/sui/esk-genesis-manifest-v1.schema.json",
-          "content_hash": "14c85b05dca4e0398793f5c0cc16295eb334c95fe494b20198dee3146ffe0ddc",
+          "content_hash": "0db4579769d2c6af4359d4b2cbbb9bb25054a6deeb300fb34fa017a8c59b2927",
           "locator": "root schema and lifecycle conditionals",
           "evidence_kind": "configuration",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "d78c0d3ec802b03b75336772e87a1640a50e7db3",
-            "head_blob_oid": "",
+            "head_commit": "a65e9ad0fe34fea1b486e7b23c9338c5e4b7be45",
+            "head_blob_oid": "0a740d1a8cee44fbbe1e68a371fc5ae26ef8d985",
             "worktree_blob_oid": "0a740d1a8cee44fbbe1e68a371fc5ae26ef8d985",
-            "state": "untracked"
+            "state": "tracked_clean"
           }
         },
         {
           "path": "contracts/sui/esk_currency/Move.toml",
-          "content_hash": "cf2cb75dbefb4c662a211bcf91813e0eea7efc423a766d4e73b4dcd021370485",
+          "content_hash": "db79c49346b565d4c6b1e9758cd92279b4135e9d14a5c790f8c8fd602c985370",
           "locator": "pinned Sui framework dependency",
           "evidence_kind": "configuration",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "d78c0d3ec802b03b75336772e87a1640a50e7db3",
-            "head_blob_oid": "",
+            "head_commit": "a65e9ad0fe34fea1b486e7b23c9338c5e4b7be45",
+            "head_blob_oid": "b28da1bc83d3fe6bbf9c63f6b60485fd17609b54",
             "worktree_blob_oid": "b28da1bc83d3fe6bbf9c63f6b60485fd17609b54",
-            "state": "untracked"
+            "state": "tracked_clean"
           }
         },
         {
           "path": "contracts/sui/esk_currency/sources/esk.move",
-          "content_hash": "c340a254e0bfa63b252401410fc9d2a8a9613a8aaf2bf3195de7d13950c2e42e",
+          "content_hash": "2de302840cd2f9b871f7c1961460a574df3e4761053c8872c68ffdd3267ac23a",
           "locator": "fixed-supply ESK currency initializer",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "d78c0d3ec802b03b75336772e87a1640a50e7db3",
-            "head_blob_oid": "",
+            "head_commit": "a65e9ad0fe34fea1b486e7b23c9338c5e4b7be45",
+            "head_blob_oid": "688b0deee2e7e4bd363e80216ea5850275a5e124",
             "worktree_blob_oid": "688b0deee2e7e4bd363e80216ea5850275a5e124",
-            "state": "untracked"
+            "state": "tracked_clean"
           }
         },
         {
           "path": "contracts/sui/esk_currency/tests/esk_tests.move",
-          "content_hash": "b9d37147ff4c6207835f221b883e391985ad24bce36b22d7139865c507511055",
+          "content_hash": "c2a6e11377a32dc061cd75eca6181f6fdb8805ece945b2d9c09a98020e72de83",
           "locator": "supply, decimals and TreasuryCap lifecycle tests",
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "d78c0d3ec802b03b75336772e87a1640a50e7db3",
-            "head_blob_oid": "",
+            "head_commit": "a65e9ad0fe34fea1b486e7b23c9338c5e4b7be45",
+            "head_blob_oid": "52077a77560fac10244d850ec447f0b40d82146f",
             "worktree_blob_oid": "52077a77560fac10244d850ec447f0b40d82146f",
-            "state": "untracked"
+            "state": "tracked_clean"
           }
         },
         {
           "path": "docs/decisions/esk-sui-economic-foundation-v1.md",
-          "content_hash": "27a49de043475c24ef88bd6f45aeabdd342e85544cd1595c0755b9b787767351",
+          "content_hash": "db1a708c6d30a0d46f9b48f8bcd2184478645aba47f171e8d7d3c5bff34a52be",
           "locator": "accepted Sui and ESK economic boundary ADR",
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "d78c0d3ec802b03b75336772e87a1640a50e7db3",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "4a64367027df245cd16025cddbfd2ddf24a416e7",
-            "state": "untracked"
+            "head_commit": "a65e9ad0fe34fea1b486e7b23c9338c5e4b7be45",
+            "head_blob_oid": "dd193bbf735cedff706ec45abb2121650f4ffbae",
+            "worktree_blob_oid": "dd193bbf735cedff706ec45abb2121650f4ffbae",
+            "state": "tracked_clean"
           }
         },
         {
           "path": "docs/requirements/esk-sui-genesis-foundation-v1.md",
-          "content_hash": "1ef3992fa3c7eb75b9afd6cc1754057b2065058d48f7cdefd2fad3ac33e14e00",
+          "content_hash": "8ed627786a32238a44d5f36c4ec9076567f50ea5ffaada1445f9f66b76ba7406",
           "locator": "accepted local_verified requirement",
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "d78c0d3ec802b03b75336772e87a1640a50e7db3",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "ce27f0c553f6776a60521c2ea818471db1d24c61",
-            "state": "untracked"
+            "head_commit": "a65e9ad0fe34fea1b486e7b23c9338c5e4b7be45",
+            "head_blob_oid": "c22846621cc1284f1d74d8530a103c1f555ae36a",
+            "worktree_blob_oid": "c22846621cc1284f1d74d8530a103c1f555ae36a",
+            "state": "tracked_clean"
           }
         },
         {
           "path": "scripts/test-esk-sui-genesis-foundation.js",
-          "content_hash": "5a1980cdd3d90ad889058707a9458cd7ce2f81b7f11a11ce599320db515197d0",
-          "locator": "schema, semantic, source binding and adversarial checks",
+          "content_hash": "e57d82ee619d01db487f9c71bd51824441edd97ed85c214b7cc8e7d4b383f947",
+          "locator": "portable schema, semantic, source binding and adversarial checks",
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "d78c0d3ec802b03b75336772e87a1640a50e7db3",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "d841d0fd790732766e7ff345806f06650eb336fc",
-            "state": "untracked"
+            "head_commit": "a65e9ad0fe34fea1b486e7b23c9338c5e4b7be45",
+            "head_blob_oid": "a6126035921bb26e4b779a8650d343807e96930b",
+            "worktree_blob_oid": "a6126035921bb26e4b779a8650d343807e96930b",
+            "state": "tracked_clean"
           }
         }
       ],
       "created_at_ms": 1788454885588,
-      "updated_at_ms": 1788459656794
+      "updated_at_ms": 1788460247007
     },
     {
       "id": "esk_paper_quant_allocation_request_v2",
@@ -15899,106 +15899,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_e99b6d439daa4ae28c187876d80ef710",
-      "feature_id": "yilong-quant-paper-grant-revocation-sync-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-quant-grant-revocation-sync",
-      "reason": "已复核 verified 元数据仅反映完成的 V8 目录同步，不扩大安全或真实资产范围。",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1788288829021
-    },
-    {
-      "id": "feature_event_e83f2bf4532a4fdca05d605831fb7324",
-      "feature_id": "yilong-quant-paper-grant-revocation-sync-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-quant-grant-revocation-sync",
-      "reason": "复核通过，可重新认领并绑定最终证据。",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1788288838197
-    },
-    {
-      "id": "feature_event_bcf294f42b7548daa54ef8779d847621",
-      "feature_id": "yilong-quant-paper-grant-revocation-sync-v1",
-      "action": "claimed",
-      "actor": "codex-goal-quant-grant-revocation-sync",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788288846938
-    },
-    {
-      "id": "feature_event_747530ee3cdb4a5681d5348a799f267c",
-      "feature_id": "yilong-quant-paper-grant-revocation-sync-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-quant-grant-revocation-sync",
-      "reason": "重新认领后绑定最终实现与测试证据。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788288856904
-    },
-    {
-      "id": "feature_event_bb2c8cc006304c7f82abfda2b6927ebe",
-      "feature_id": "yilong-quant-paper-grant-revocation-sync-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-goal-quant-grant-revocation-sync",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788288916904
-    },
-    {
-      "id": "feature_event_9813dd289d254e0aa1a898d912f5b43e",
-      "feature_id": "yilong-quant-paper-grant-revocation-sync-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-quant-grant-revocation-sync",
-      "reason": "官方目录、合同测试、接入文档与 AI 索引已完成。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1788288927095
-    },
-    {
-      "id": "feature_event_9619dad49fb0466bb821a72b66c89e30",
-      "feature_id": "yilong-quant-paper-grant-revocation-sync-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-quant-grant-revocation-sync",
-      "reason": "目录合同、V8 精确快照、Server 非测试编译、源码体积与文档模块化门禁通过；Rust 全测试被无关基线 VFS 测试编译错误阻断并保留证据。",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1788288937517
-    },
-    {
-      "id": "feature_event_4465f7a282b94d2abe4d074744375b40",
-      "feature_id": "yilong-quant-paper-grant-revocation-sync-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-quant-grant-revocation-sync",
-      "reason": "Server v0.3.1710 已发布 SHA 5a0a5631c，匿名公开预览回读 V8 文案及 paper-only 安全字段。",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1788289651051
-    },
-    {
-      "id": "feature_event_fe3af5a6cf534640a0a246bde6077b60",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "requirement_rebound",
-      "actor": "codex-q18-rebase",
-      "reason": "Accept the reviewed Q18 source-only authority update after rebasing onto the current remote registry; runtime and production gates remain closed.",
-      "from_status": "blocked",
-      "to_status": "proposed",
-      "at_ms": 1788291296196
-    },
-    {
-      "id": "feature_event_495453bc5fa74bdc8dae557d3376ad76",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex-q18-rebase",
-      "reason": "Reviewed Q18 authority, source-only acceptance boundaries, exact 88-member contract, and unchanged production closure.",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1788291302922
-    },
-    {
       "id": "feature_event_56ab4b18e5034348a61220f529daa66c",
       "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
       "action": "transitioned",
@@ -17897,6 +17797,106 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1788459656794
+    },
+    {
+      "id": "feature_event_346de5269371448ead4e9bd10e436179",
+      "feature_id": "esk-sui-genesis-foundation-v1",
+      "action": "transitioned",
+      "actor": "Codex Desktop",
+      "reason": "显式重新打开已验证功能，以修复 Windows CRLF 导致的跨平台源码摘要漂移并重新绑定证据。",
+      "from_status": "verified",
+      "to_status": "retired",
+      "at_ms": 1788460006679
+    },
+    {
+      "id": "feature_event_d593c7e90b2e483ebb4dcd5b6de7ada1",
+      "feature_id": "esk-sui-genesis-foundation-v1",
+      "action": "transitioned",
+      "actor": "Codex Desktop",
+      "reason": "重新打开功能以重绑跨平台摘要修订后的需求和当前源码证据。",
+      "from_status": "retired",
+      "to_status": "proposed",
+      "at_ms": 1788460016176
+    },
+    {
+      "id": "feature_event_d8a6ad38d4e249549a46fe02433b83cd",
+      "feature_id": "esk-sui-genesis-foundation-v1",
+      "action": "requirement_rebound",
+      "actor": "Codex Desktop",
+      "reason": "将需求重新绑定到规范化 UTF-8/LF 摘要规则，保证 Windows 与 Linux 检出得到相同源码身份。",
+      "from_status": "proposed",
+      "to_status": "proposed",
+      "at_ms": 1788460072084
+    },
+    {
+      "id": "feature_event_2f8c04bd7d894d8e8d7809181cddc4ed",
+      "feature_id": "esk-sui-genesis-foundation-v1",
+      "action": "transitioned",
+      "actor": "Codex Desktop",
+      "reason": "跨平台摘要修复经主线重放测试确认，需求内容保持原架构与安全边界并予以接受。",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1788460171178
+    },
+    {
+      "id": "feature_event_29f87e8c2af9436ab35d56571dde23d6",
+      "feature_id": "esk-sui-genesis-foundation-v1",
+      "action": "transitioned",
+      "actor": "Codex Desktop",
+      "reason": "修复范围已复核，依赖与验收标准仍满足，准备刷新实现证据。",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1788460181585
+    },
+    {
+      "id": "feature_event_103f96efd72c4d269468401257c4f53f",
+      "feature_id": "esk-sui-genesis-foundation-v1",
+      "action": "claimed",
+      "actor": "codex:01a05b8d-2a7e-79b1-b798-f46874ff9a87",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788460191063
+    },
+    {
+      "id": "feature_event_241fcfc6ec004d3aa115c02d8764b00d",
+      "feature_id": "esk-sui-genesis-foundation-v1",
+      "action": "transitioned",
+      "actor": "Codex Desktop",
+      "reason": "开始对最新主线上的规范化摘要实现重新登记证据并完成验证。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788460200733
+    },
+    {
+      "id": "feature_event_5445eb7d61f44860a32b7cd1b2e97627",
+      "feature_id": "esk-sui-genesis-foundation-v1",
+      "action": "evidence_recorded",
+      "actor": "Codex Desktop",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788460217830
+    },
+    {
+      "id": "feature_event_178df2c877bf48008145732843b59265",
+      "feature_id": "esk-sui-genesis-foundation-v1",
+      "action": "transitioned",
+      "actor": "Codex Desktop",
+      "reason": "跨平台规范化摘要修复已实现，最新主线全部八项证据已重新绑定。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1788460236077
+    },
+    {
+      "id": "feature_event_2ab71568032a471cbe22d5f2b2798c09",
+      "feature_id": "esk-sui-genesis-foundation-v1",
+      "action": "transitioned",
+      "actor": "Codex Desktop",
+      "reason": "最新主线复测通过 Node 语义/负例、AJV 2020、ESK 回归及源码/文档门禁；Windows CRLF 与 Git LF 现产生相同规范化摘要。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1788460247007
     }
   ]
 }
