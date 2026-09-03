@@ -7,7 +7,7 @@ use std::{path::Path, sync::OnceLock, time::Duration};
 
 use axum::{
     body::{Body, Bytes},
-    extract::DefaultBodyLimit,
+    extract::{DefaultBodyLimit, RawQuery},
     http::{header, HeaderName, HeaderValue, Method, StatusCode},
     response::{IntoResponse, Redirect, Response},
     routing::{get, post},
@@ -22,12 +22,14 @@ use tower_http::{
 
 const QUANT_LOOPBACK_ORIGIN: &str = "http://127.0.0.1:8787";
 const MAX_BACKTEST_REQUEST_BYTES: usize = 32 * 1024;
+const MAX_PUBLIC_QUERY_BYTES: usize = 2 * 1024;
 const MAX_UPSTREAM_RESPONSE_BYTES: u64 = 2 * 1024 * 1024;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum PublicQuantEndpoint {
     Health,
     Runtime,
+    MarketOverview,
     ResearchSnapshots,
     ResearchBacktests,
 }
@@ -36,7 +38,9 @@ impl PublicQuantEndpoint {
     fn method(self) -> Method {
         match self {
             Self::ResearchBacktests => Method::POST,
-            Self::Health | Self::Runtime | Self::ResearchSnapshots => Method::GET,
+            Self::Health | Self::Runtime | Self::MarketOverview | Self::ResearchSnapshots => {
+                Method::GET
+            }
         }
     }
 
@@ -44,6 +48,7 @@ impl PublicQuantEndpoint {
         match self {
             Self::Health => "/api/health",
             Self::Runtime => "/api/v1/runtime",
+            Self::MarketOverview => "/api/v1/markets/spot/overview",
             Self::ResearchSnapshots => "/api/v1/research/snapshots",
             Self::ResearchBacktests => "/api/v1/research/backtests",
         }
@@ -105,6 +110,10 @@ where
         .route("/quant/api/health", get(proxy_health))
         .route("/quant/api/v1/runtime", get(proxy_runtime))
         .route(
+            "/quant/api/v1/markets/spot/overview",
+            get(proxy_market_overview),
+        )
+        .route(
             "/quant/api/v1/research/snapshots",
             get(proxy_research_snapshots),
         )
@@ -115,23 +124,34 @@ where
 }
 
 async fn proxy_health() -> Response {
-    proxy(PublicQuantEndpoint::Health, None).await
+    proxy(PublicQuantEndpoint::Health, None, None).await
 }
 
 async fn proxy_runtime() -> Response {
-    proxy(PublicQuantEndpoint::Runtime, None).await
+    proxy(PublicQuantEndpoint::Runtime, None, None).await
+}
+
+async fn proxy_market_overview(RawQuery(query): RawQuery) -> Response {
+    proxy(PublicQuantEndpoint::MarketOverview, None, query.as_deref()).await
 }
 
 async fn proxy_research_snapshots() -> Response {
-    proxy(PublicQuantEndpoint::ResearchSnapshots, None).await
+    proxy(PublicQuantEndpoint::ResearchSnapshots, None, None).await
 }
 
 async fn proxy_research_backtest(body: Bytes) -> Response {
-    proxy(PublicQuantEndpoint::ResearchBacktests, Some(body)).await
+    proxy(PublicQuantEndpoint::ResearchBacktests, Some(body), None).await
 }
 
-async fn proxy(endpoint: PublicQuantEndpoint, body: Option<Bytes>) -> Response {
-    let url = format!("{QUANT_LOOPBACK_ORIGIN}{}", endpoint.path());
+async fn proxy(
+    endpoint: PublicQuantEndpoint,
+    body: Option<Bytes>,
+    raw_query: Option<&str>,
+) -> Response {
+    let url = match upstream_url(endpoint, raw_query) {
+        Ok(url) => url,
+        Err(response) => return response,
+    };
     let mut request = direct_loopback_client().request(endpoint.method(), url);
     if let Some(body) = body {
         request = request
@@ -183,6 +203,28 @@ async fn proxy(endpoint: PublicQuantEndpoint, body: Option<Bytes>) -> Response {
     response
 }
 
+fn upstream_url(
+    endpoint: PublicQuantEndpoint,
+    raw_query: Option<&str>,
+) -> Result<reqwest::Url, Response> {
+    if raw_query.is_some_and(|query| query.len() > MAX_PUBLIC_QUERY_BYTES) {
+        return Err((
+            StatusCode::URI_TOO_LONG,
+            Json(json!({
+                "code": "quant_http_preview_query_too_long",
+                "message": "公开行情查询参数过长。"
+            })),
+        )
+            .into_response());
+    }
+
+    let mut url = reqwest::Url::parse(QUANT_LOOPBACK_ORIGIN)
+        .expect("fixed quant loopback origin must be a valid URL");
+    url.set_path(endpoint.path());
+    url.set_query(raw_query.filter(|query| !query.is_empty()));
+    Ok(url)
+}
+
 fn unavailable() -> Response {
     (
         StatusCode::SERVICE_UNAVAILABLE,
@@ -218,6 +260,7 @@ mod tests {
         let endpoints = [
             PublicQuantEndpoint::Health,
             PublicQuantEndpoint::Runtime,
+            PublicQuantEndpoint::MarketOverview,
             PublicQuantEndpoint::ResearchSnapshots,
             PublicQuantEndpoint::ResearchBacktests,
         ];
@@ -227,6 +270,7 @@ mod tests {
             [
                 "/api/health",
                 "/api/v1/runtime",
+                "/api/v1/markets/spot/overview",
                 "/api/v1/research/snapshots",
                 "/api/v1/research/backtests",
             ]
@@ -240,6 +284,35 @@ mod tests {
         }));
     }
 
+    #[test]
+    fn market_overview_url_preserves_query_on_fixed_loopback_path() {
+        let url = upstream_url(
+            PublicQuantEndpoint::MarketOverview,
+            Some("symbol=BTCUSDT&interval=1m&limit=240"),
+        )
+        .expect("bounded public query must be accepted");
+
+        assert_eq!(url.origin().ascii_serialization(), QUANT_LOOPBACK_ORIGIN);
+        assert_eq!(url.path(), "/api/v1/markets/spot/overview");
+        assert_eq!(url.query(), Some("symbol=BTCUSDT&interval=1m&limit=240"));
+    }
+
+    #[tokio::test]
+    async fn oversized_market_query_is_rejected_before_upstream_access() {
+        let app: Router = routes(Path::new("missing-quant-preview-dist"));
+        let query = "x".repeat(MAX_PUBLIC_QUERY_BYTES + 1);
+        let response = app
+            .oneshot(
+                Request::get(format!("/quant/api/v1/markets/spot/overview?{query}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::URI_TOO_LONG);
+    }
+
     #[tokio::test]
     async fn sensitive_quant_paths_are_not_routed() {
         let app: Router = routes(Path::new("missing-quant-preview-dist"));
@@ -248,6 +321,8 @@ mod tests {
             "/quant/api/v1/paper/orders",
             "/quant/api/v1/paper/operator/operations-snapshot",
             "/quant/api/v1/paper/imports/paid-supporters",
+            "/quant/api/v1/markets/spot/overview/private",
+            "/quant/api/v1/markets/spot/orders",
         ] {
             let response = app
                 .clone()
