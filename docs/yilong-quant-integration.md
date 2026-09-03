@@ -47,7 +47,7 @@
 - `GET /api/store/projects/:id/preview` 只为当前公开且存在于内置官方目录的项目返回 `yilong.official_project_preview.v1`。PC 项目广场在用户加入前按需展示能力、目标用户、最近更新、隐私边界、客户端计划和净化 Paper 说明；下载/资源 URL、工作区内容、grant、participant、密钥和仓位不会进入该响应。
 - 量化项目属于第二类，因此不会显示 ERP 安装动作。
 - 子仓库自身的 `.elon/project-landing.json` 仍是后续同步更新的内容真源；官方目录快照变更必须与它保持一致。
-- Android 主服务器托管 V6/V16 要求公开下载路由只直接返回 `DATA_DIR/project-releases` 下且大小和 SHA-256 与发布记录一致的 APK；服务器启动同步官方目录后重新叠加最新 release。当前目录仍是 `planned`，详见 `docs/requirements/yilong-quant-android-main-hosting-v6.md`。
+- Android 主服务器托管 V6/V17 要求公开下载路由只直接返回 `DATA_DIR/project-releases` 下且大小和 SHA-256 与发布记录一致的 APK；服务器启动同步官方目录后重新叠加最新 release。当前 `com.elon.quant 0.1.0 (1)` 已由 Server `v0.3.1721 / 725f91f0a` 托管，目录下载地址非空且真实下载摘要与发布回执一致；真机安装/打开仍待验收，详见 `docs/yilong-quant-android-main-hosting-v6-acceptance.md`。
 - 子仓库 `77ff21c6ce3d0984273ad6e3ad526faff0d46b7c` 已验证版本化研究行情和单机可复现回测 V1；主项目只同步净化后的能力摘要与文档入口，不接收行情数据、策略代码、订单或回测结果。
 - 子仓库 `25ee7df69fecabb696e7b8329fd388bc8a19da11` 已新增只读、脱敏的 Paper 部署配置预检：`scripts/check-paper-deployment.ps1` 检查本机绑定、非零固定端口、绝对数据库路径、主项目 HTTPS 来源、grant 验签公钥和操作员令牌等必需配置。输出不包含密钥或令牌，执行时不绑定端口、不打开数据库、不访问外部网络，因此只证明配置是否就绪，不证明目标环境已部署。
 - 子仓库 `effef80b65647b2341cb902e64bd9aa171fdb613` 已实现受独立运营令牌保护的 `yilong.quant.paper_operations_snapshot.v1`：它只汇总模拟仓位状态、精确金额、NAV 修订、SQLite 事件头和导入批次，不返回参与者标识。主项目不复制或直接修改该账本，快照也不证明真实付款、NET 锁定、官方 NAV 或可提现余额。
@@ -69,7 +69,7 @@
 
 ## 尚未完成
 
-- 生成绑定主项目 `http://<main-host>:8080/quant/`、干净 Git SHA 和独立正式签名的 `com.elon.quant` release APK，通过主项目 owner 发布接口上传并核对 SHA-256；随后完成项目广场安装/更新/打开和公开 Paper 结果的用户路径验收。独立量化 APK 的本人 ESK/仓位仍需后续安全应用绑定协议，V17 不传主项目 bearer、Paper grant 或 ESK 投影。
+- 在真实 Android 设备完成项目广场下载、系统安装、签名兼容、打开 `/quant/`、返回/重试和公开 Paper 回测验收；当前正式 APK、主服务器发布回执和公网 HTTP 路径已通过离线及网络验证。独立量化 APK 的本人 ESK/仓位仍需后续安全应用绑定协议，V17 不传主项目 bearer、Paper grant 或 ESK 投影。
 - 本人 ESK/仓位、量化申请 accepted/released 回执等敏感能力仍需批准的加密传输和应用绑定方案；当前 HTTP `/quant/` 不得启用这些功能。随后还需完成主项目签名私钥托管和一次真实轮换演练。代码已支持量化端多 key 重叠、密钥级撤销和单 grant 跨重启撤销；当前用户 grant 仍只绑定 paper 模拟参与者，不证明付款、KYC、钱包或真实准入。
 - 经来源与许可评审的真实公开历史行情、多策略比较、回测结果持久化和共享算力分片；当前只有仓库内置 CC0 确定性研究 fixture 与单机基准策略。
 - 将已付款用户数据经审核、脱敏、对账后导入生产系统；paper 子项目只允许脱敏标识和模拟锁定回执，继续禁止把聊天或付款截图写入代码。
