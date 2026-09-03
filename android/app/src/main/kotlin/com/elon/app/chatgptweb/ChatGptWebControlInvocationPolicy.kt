@@ -56,7 +56,6 @@ internal object ChatGptWebControlInvocationPolicy {
         "personalization",
         "pin",
         "plan",
-        "read_aloud",
         "rename",
         "save_to_project",
         "share",

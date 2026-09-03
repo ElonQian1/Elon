@@ -262,17 +262,31 @@ internal object WebAiPrivateTransportCatalog {
             directPostEnabled = BuildConfig.CHATGPT_PRIVATE_DICTATION_ENABLED,
         ),
         Entry(
+            id = "android_chatgpt_official_response_read_aloud_bridge_v1",
+            provider = "chatgpt",
+            status = "implemented_device_pending",
+            verification =
+                "live_official_control_discovered_and_targeted_semantic_menu_tests_passed_device_audio_pending",
+            productionDefault = true,
+            runtimeEnabled = true,
+            requestMode =
+                "context_bound_official_read_aloud_control_via_persistent_identity_webview",
+            healthPolicy =
+                "explicit_label_precedence_bounded_overlay_discovery_and_no_missing_dom_capability_claim",
+            fallback = "manual_official_page_or_explicit_system_read_aloud_selection",
+        ),
+        Entry(
             id = "android_chatgpt_native_response_read_aloud_v1",
             provider = "chatgpt",
             status = "implemented_device_pending",
             verification =
-                "targeted_chunk_sequence_stale_callback_sync_failure_timeout_and_message_action_tests_passed_device_pending",
-            productionDefault = true,
+                "device_audio_start_user_confirmed_targeted_stop_and_failure_tests_passed_stop_acceptance_pending",
+            productionDefault = false,
             runtimeEnabled = true,
-            requestMode = "native_bounded_chunk_tts_for_current_response",
+            requestMode = "explicit_android_system_tts_for_current_response",
             healthPolicy =
                 "single_active_message_generation_guarded_chunks_failure_recreate_and_bounded_watchdog",
-            fallback = "official_message_actions_and_webview",
+            fallback = "none_explicit_user_selection_only",
         ),
         Entry(
             id = "android_chatgpt_native_conversation_project_move_v1",

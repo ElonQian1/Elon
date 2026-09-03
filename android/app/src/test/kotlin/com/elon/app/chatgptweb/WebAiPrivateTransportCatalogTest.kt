@@ -346,24 +346,44 @@ class WebAiPrivateTransportCatalogTest {
             imageGenerationStatus.getString("fallback"),
         )
 
-        val responseReadAloud = values.first {
+        val officialResponseReadAloud = values.first {
+            it.getString("capability_id") ==
+                "android_chatgpt_official_response_read_aloud_bridge_v1"
+        }
+        assertEquals(
+            "implemented_device_pending",
+            officialResponseReadAloud.getString("implementation_status"),
+        )
+        assertEquals(
+            "live_official_control_discovered_and_targeted_semantic_menu_tests_passed_device_audio_pending",
+            officialResponseReadAloud.getString("verification_status"),
+        )
+        assertTrue(officialResponseReadAloud.getBoolean("production_default"))
+        assertTrue(officialResponseReadAloud.getBoolean("runtime_enabled"))
+        assertFalse(officialResponseReadAloud.getBoolean("direct_post_enabled"))
+        assertEquals(
+            "manual_official_page_or_explicit_system_read_aloud_selection",
+            officialResponseReadAloud.getString("fallback"),
+        )
+
+        val systemResponseReadAloud = values.first {
             it.getString("capability_id") ==
                 "android_chatgpt_native_response_read_aloud_v1"
         }
         assertEquals(
             "implemented_device_pending",
-            responseReadAloud.getString("implementation_status"),
+            systemResponseReadAloud.getString("implementation_status"),
         )
         assertEquals(
-            "targeted_chunk_sequence_stale_callback_sync_failure_timeout_and_message_action_tests_passed_device_pending",
-            responseReadAloud.getString("verification_status"),
+            "device_audio_start_user_confirmed_targeted_stop_and_failure_tests_passed_stop_acceptance_pending",
+            systemResponseReadAloud.getString("verification_status"),
         )
-        assertTrue(responseReadAloud.getBoolean("production_default"))
-        assertTrue(responseReadAloud.getBoolean("runtime_enabled"))
-        assertFalse(responseReadAloud.getBoolean("direct_post_enabled"))
+        assertFalse(systemResponseReadAloud.getBoolean("production_default"))
+        assertTrue(systemResponseReadAloud.getBoolean("runtime_enabled"))
+        assertFalse(systemResponseReadAloud.getBoolean("direct_post_enabled"))
         assertEquals(
-            "official_message_actions_and_webview",
-            responseReadAloud.getString("fallback"),
+            "none_explicit_user_selection_only",
+            systemResponseReadAloud.getString("fallback"),
         )
 
         val richContent = values.first {

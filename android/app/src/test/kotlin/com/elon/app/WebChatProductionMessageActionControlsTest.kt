@@ -30,8 +30,10 @@ class WebChatProductionMessageActionControlsTest {
                 contextId = "message-1",
                 enabled = true,
                 controlId = "control_read_aloud",
+                region = "overlay",
                 confirmation = true,
             ),
+            control("more", "更多操作", "message-1", enabled = true),
             control(
                 semantic = "action",
                 label = "官网专用",
@@ -48,12 +50,75 @@ class WebChatProductionMessageActionControlsTest {
                 WebChatContextAction(
                     "control_read_aloud",
                     "read_aloud",
-                    "朗读",
+                    "官网朗读",
                     true,
-                    "selector:control_read_aloud",
+                    "web-chat-message-context-action:message-1:official-read-aloud",
                 ),
             ),
             WebChatProductionMessageActionControls.contextActions(controls, "message-1"),
+        )
+    }
+
+    @Test
+    fun resolvesTheContextBoundMessageOverflowWithoutDisplayingItAgain() {
+        val overflow = control("more", "更多操作", "message-1", enabled = true)
+        val controls = listOf(
+            control("more", "其他消息", "message-2", enabled = true),
+            overflow,
+        )
+
+        assertEquals(
+            overflow,
+            WebChatProductionMessageActionControls.messageOverflowControl(controls, "message-1"),
+        )
+        assertEquals(
+            emptyList<WebChatContextAction>(),
+            WebChatProductionMessageActionControls.contextActions(listOf(overflow), "message-1"),
+        )
+    }
+
+    @Test
+    fun readAloudSourcesHaveExplicitLabelsAndStableSelectors() {
+        assertEquals("官网朗读", WebChatProductionReadAloudActionPolicy.officialLabel("朗读"))
+        assertEquals("停止官网朗读", WebChatProductionReadAloudActionPolicy.officialLabel("停止朗读"))
+        assertEquals("系统朗读", WebChatProductionReadAloudActionPolicy.systemLabel(active = false))
+        assertEquals("停止系统朗读", WebChatProductionReadAloudActionPolicy.systemLabel(active = true))
+        assertEquals(
+            "web-chat-message-context-action:message-1:official-read-aloud",
+            WebChatProductionReadAloudActionPolicy.officialSelector("message-1"),
+        )
+        assertEquals(
+            "web-chat-message-context-action:message-1:system-read-aloud",
+            WebChatProductionReadAloudActionPolicy.systemSelector("message-1"),
+        )
+        assertEquals(
+            true,
+            WebChatProductionReadAloudActionPolicy.needsOfficialPreparation(
+                actions = emptyList(),
+                portAvailable = true,
+            ),
+        )
+        assertEquals(
+            false,
+            WebChatProductionReadAloudActionPolicy.needsOfficialPreparation(
+                actions = emptyList(),
+                portAvailable = false,
+            ),
+        )
+        assertEquals(
+            false,
+            WebChatProductionReadAloudActionPolicy.needsOfficialPreparation(
+                actions = listOf(
+                    WebChatContextAction(
+                        "official",
+                        "read_aloud",
+                        "官网朗读",
+                        false,
+                        "selector:official",
+                    ),
+                ),
+                portAvailable = true,
+            ),
         )
     }
 

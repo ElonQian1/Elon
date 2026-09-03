@@ -21,7 +21,6 @@ class ChatGptWebControlInvocationPolicyTest {
             "personalization",
             "pin",
             "plan",
-            "read_aloud",
             "rename",
             "save_to_project",
             "share",
@@ -32,6 +31,11 @@ class ChatGptWebControlInvocationPolicyTest {
                 ChatGptWebControlInvocationPolicy.risk(semantic),
             )
         }
+
+        assertEquals(
+            ChatGptWebControlInvocationPolicy.Risk.STANDARD,
+            ChatGptWebControlInvocationPolicy.risk("read_aloud"),
+        )
     }
 
     @Test

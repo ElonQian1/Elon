@@ -82,6 +82,8 @@ internal data class WebChatContextAction(
     val label: String,
     val requiresUserConfirmation: Boolean,
     val nativeSelector: String,
+    val subtitle: String? = null,
+    val enabled: Boolean = true,
 )
 
 internal object WebChatProductionMessageActionFeedback {
@@ -107,24 +109,35 @@ internal object WebChatProductionMessageActionControls {
     ): List<WebChatContextAction> = controls.asSequence()
         .filter { descriptor ->
             val control = descriptor.control
-            control.region == "message" &&
+            control.region in CONTEXT_REGIONS &&
                 control.enabled &&
                 control.contextId?.let(ChatGptNativeControlPresentation::stableContextId) == contextId &&
                 !isPrimaryCopy(control) &&
+                control.semantic != "more" &&
                 descriptor.presentation != WebChatConsumerControlPresentation.OFFICIAL_FALLBACK
         }
         .map { descriptor ->
             val control = descriptor.control
+            val officialReadAloud = control.semantic ==
+                WebChatProductionReadAloudActionPolicy.OFFICIAL_SEMANTIC
             WebChatContextAction(
                 controlId = control.id,
                 semantic = control.semantic,
-                label = control.label.trim(),
+                label = if (officialReadAloud) {
+                    WebChatProductionReadAloudActionPolicy.officialLabel(control.label)
+                } else {
+                    control.label.trim()
+                },
                 requiresUserConfirmation = descriptor.requiresUserConfirmation,
-                nativeSelector = descriptor.nativeSelector
-                    ?.trim()
-                    ?.takeIf(String::isNotBlank)
-                    ?: "web-chat-message-context-action:" +
-                    ChatGptNativeControlPresentation.stableContextId(control.id),
+                nativeSelector = if (officialReadAloud) {
+                    WebChatProductionReadAloudActionPolicy.officialSelector(contextId)
+                } else {
+                    descriptor.nativeSelector
+                        ?.trim()
+                        ?.takeIf(String::isNotBlank)
+                        ?: "web-chat-message-context-action:" +
+                        ChatGptNativeControlPresentation.stableContextId(control.id)
+                },
             )
         }
         .filter { it.controlId.isNotBlank() && it.label.isNotBlank() }
@@ -132,10 +145,22 @@ internal object WebChatProductionMessageActionControls {
         .take(MAX_CONTEXT_ACTIONS)
         .toList()
 
+    fun messageOverflowControl(
+        controls: List<WebChatConsumerControlDescriptor>,
+        contextId: String,
+    ): WebChatConsumerControlDescriptor? = controls.firstOrNull { descriptor ->
+        val control = descriptor.control
+        control.region == "message" &&
+            control.semantic == "more" &&
+            control.enabled &&
+            control.contextId?.let(ChatGptNativeControlPresentation::stableContextId) == contextId
+    }
+
     private fun isPrimaryCopy(control: WebChatConsumerControl): Boolean =
         control.semantic == "copy" || control.label.trim() in setOf("复制", "Copy")
 
     private const val MAX_CONTEXT_ACTIONS = 50
+    private val CONTEXT_REGIONS = setOf("message", "overlay")
 }
 
 internal class WebChatProductionMessageActionCoordinator(
@@ -148,6 +173,9 @@ internal class WebChatProductionMessageActionCoordinator(
         context = activity,
         onFailure = { showFeedback("朗读暂时不可用，请检查系统语音设置后重试") },
     )
+    private var requestEpoch = 0
+    private var activeSheet: WebChatActionSheetHandle? = null
+    private var actionById = emptyMap<String, WebChatContextAction>()
 
     fun handle(message: ChatMessage, action: WebChatMessageAction) {
         val metadata = message.webChatMessage ?: return
@@ -167,36 +195,82 @@ internal class WebChatProductionMessageActionCoordinator(
         }
     }
 
-    fun release() = nativeReadAloud.release()
+    fun release() {
+        cancelPending()
+        nativeReadAloud.release()
+    }
 
     private fun showMore(chatMessage: ChatMessage, message: WebChatProductionMessage) {
+        cancelPending()
         val port = consumerPort()
         val contextId = ChatGptNativeControlPresentation.stableContextId(message.sourceMessageId)
+        val state = port?.state()
         val observed = WebChatProductionMessageActionControls.contextActions(
-            port?.state()?.controls.orEmpty(),
+            state?.controls.orEmpty(),
             contextId,
         )
-        val actions = nativeReadAloudAction(chatMessage, contextId) +
-            observed.filterNot { it.semantic == READ_ALOUD_SEMANTIC }
-        if (actions.isEmpty()) {
-            showOfficialFallback(
-                title = "消息操作",
-                message = "当前消息操作已变化，可以在官方页面继续。",
+        val overflow = state?.let {
+            WebChatProductionMessageActionControls.messageOverflowControl(it.controls, contextId)
+        }
+        val needsOfficialPreparation =
+            WebChatProductionReadAloudActionPolicy.needsOfficialPreparation(
+                actions = observed,
+                portAvailable = port != null,
             )
+        val epoch = requestEpoch
+        presentMoreSheet(chatMessage, contextId, observed, needsOfficialPreparation)
+        if (port == null || observed.any(WebChatProductionReadAloudActionPolicy::isOfficial)) return
+
+        val request = overflow?.let { port.invokeControl(it.control.id, userConfirmed = false) }
+            ?: port.requestControls()
+        if (request.accepted) {
+            pollOfficialActions(
+                message = chatMessage,
+                contextId = contextId,
+                port = port,
+                epoch = epoch,
+                overlayRequested = overflow != null,
+                attempt = 0,
+            )
+        } else {
+            presentMoreSheet(chatMessage, contextId, observed, officialPending = false)
+        }
+    }
+
+    private fun presentMoreSheet(
+        message: ChatMessage,
+        contextId: String,
+        observed: List<WebChatContextAction>,
+        officialPending: Boolean,
+    ) {
+        val official = observed.filter(WebChatProductionReadAloudActionPolicy::isOfficial)
+        val actions = official +
+            observed.filterNot(WebChatProductionReadAloudActionPolicy::isOfficial) +
+            systemReadAloudAction(message, contextId)
+        actionById = actions.associateBy(WebChatContextAction::controlId)
+        val presented = buildList {
+            if (officialPending && official.isEmpty()) {
+                add(WebChatProductionReadAloudActionPolicy.pendingOfficialAction(contextId))
+            }
+            addAll(actions)
+        }
+        val items = presented.map { action ->
+            WebChatActionSheetItem(
+                id = action.controlId,
+                title = action.label,
+                subtitle = action.subtitle ?: if (action.requiresUserConfirmation) "执行前需要确认" else null,
+                enabled = action.enabled,
+                contentDescription = action.nativeSelector,
+            )
+        }
+        activeSheet?.let { sheet ->
+            sheet.updateItems(items)
             return
         }
-        val byId = actions.associateBy(WebChatContextAction::controlId)
-        WebChatActionSheet.show(
+        activeSheet = WebChatActionSheet.showUpdatable(
             activity = activity,
             title = "消息操作",
-            items = actions.map { action ->
-                WebChatActionSheetItem(
-                    id = action.controlId,
-                    title = action.label,
-                    subtitle = if (action.requiresUserConfirmation) "执行前需要确认" else null,
-                    contentDescription = action.nativeSelector,
-                )
-            },
+            items = items,
             footerActions = listOf(
                 WebChatActionSheetFooterAction(
                     label = "官网功能",
@@ -204,14 +278,74 @@ internal class WebChatProductionMessageActionCoordinator(
                     action = openOfficialFallback,
                 ),
             ),
-        ) { item -> byId[item.id]?.let { confirmAndInvoke(chatMessage, it) } }
+            onDismissed = {
+                requestEpoch += 1
+                activeSheet = null
+                actionById = emptyMap()
+            },
+        ) { item -> actionById[item.id]?.let { confirmAndInvoke(message, it) } }
+    }
+
+    private fun pollOfficialActions(
+        message: ChatMessage,
+        contextId: String,
+        port: WebChatConsumerPort,
+        epoch: Int,
+        overlayRequested: Boolean,
+        attempt: Int,
+    ) {
+        if (epoch != requestEpoch || activeSheet == null) return
+        val state = port.state()
+        val observed = WebChatProductionMessageActionControls.contextActions(
+            state.controls,
+            contextId,
+        )
+        if (observed.any(WebChatProductionReadAloudActionPolicy::isOfficial)) {
+            presentMoreSheet(message, contextId, observed, officialPending = false)
+            return
+        }
+        var requested = overlayRequested
+        if (!requested) {
+            val overflow = WebChatProductionMessageActionControls.messageOverflowControl(
+                state.controls,
+                contextId,
+            )
+            if (overflow != null) {
+                requested = port.invokeControl(overflow.control.id, userConfirmed = false).accepted
+            }
+        }
+        if (attempt >= MAX_OFFICIAL_ACTION_POLL_ATTEMPTS) {
+            presentMoreSheet(message, contextId, observed, officialPending = false)
+            return
+        }
+        activity.window.decorView.postDelayed(
+            {
+                pollOfficialActions(
+                    message,
+                    contextId,
+                    port,
+                    epoch,
+                    requested,
+                    attempt + 1,
+                )
+            },
+            OFFICIAL_ACTION_POLL_INTERVAL_MS,
+        )
+    }
+
+    private fun cancelPending() {
+        requestEpoch += 1
+        activeSheet?.dismiss()
+        activeSheet = null
+        actionById = emptyMap()
     }
 
     private fun confirmAndInvoke(message: ChatMessage, action: WebChatContextAction) {
-        if (action.semantic == READ_ALOUD_SEMANTIC) {
-            toggleReadAloud(message)
+        if (action.semantic == WebChatProductionReadAloudActionPolicy.SYSTEM_SEMANTIC) {
+            toggleSystemReadAloud(message)
             return
         }
+        if (WebChatProductionReadAloudActionPolicy.isOfficial(action)) nativeReadAloud.stop()
         if (!action.requiresUserConfirmation) {
             invoke(action, userConfirmed = false)
             return
@@ -259,7 +393,7 @@ internal class WebChatProductionMessageActionCoordinator(
     private fun showFeedback(message: String) =
         Toast.makeText(activity, message, Toast.LENGTH_SHORT).show()
 
-    private fun nativeReadAloudAction(
+    private fun systemReadAloudAction(
         message: ChatMessage,
         contextId: String,
     ): List<WebChatContextAction> {
@@ -268,27 +402,37 @@ internal class WebChatProductionMessageActionCoordinator(
         val active = nativeReadAloud.isActive(sourceId)
         return listOf(
             WebChatContextAction(
-                controlId = "$NATIVE_READ_ALOUD_CONTROL:$contextId",
-                semantic = READ_ALOUD_SEMANTIC,
-                label = if (active) "停止朗读" else "朗读",
+                controlId = "$SYSTEM_READ_ALOUD_CONTROL:$contextId",
+                semantic = WebChatProductionReadAloudActionPolicy.SYSTEM_SEMANTIC,
+                label = WebChatProductionReadAloudActionPolicy.systemLabel(active),
                 requiresUserConfirmation = false,
-                nativeSelector = "web-chat-message-context-action:$contextId:read-aloud",
+                nativeSelector = WebChatProductionReadAloudActionPolicy.systemSelector(contextId),
             ),
         )
     }
 
-    private fun toggleReadAloud(message: ChatMessage) {
+    private fun toggleSystemReadAloud(message: ChatMessage) {
         val sourceId = message.webChatMessage?.sourceMessageId ?: return
+        if (!nativeReadAloud.isActive(sourceId)) stopOfficialReadAloudIfActive()
         val feedback = when (nativeReadAloud.toggle(sourceId, message.content)) {
-            WebChatNativeReadAloudResult.STARTED -> "开始朗读"
-            WebChatNativeReadAloudResult.STOPPED -> "已停止朗读"
+            WebChatNativeReadAloudResult.STARTED -> "开始系统朗读"
+            WebChatNativeReadAloudResult.STOPPED -> "已停止系统朗读"
             WebChatNativeReadAloudResult.EMPTY -> "当前回答没有可朗读文字"
         }
         showFeedback(feedback)
     }
 
+    private fun stopOfficialReadAloudIfActive() {
+        val stopAction = actionById.values.firstOrNull { action ->
+            WebChatProductionReadAloudActionPolicy.isOfficial(action) &&
+                WebChatProductionReadAloudActionPolicy.isStopLabel(action.label)
+        } ?: return
+        consumerPort()?.invokeControl(stopAction.controlId, userConfirmed = false)
+    }
+
     private companion object {
-        const val READ_ALOUD_SEMANTIC = "read_aloud"
-        const val NATIVE_READ_ALOUD_CONTROL = "native_read_aloud"
+        const val SYSTEM_READ_ALOUD_CONTROL = "system_read_aloud"
+        const val MAX_OFFICIAL_ACTION_POLL_ATTEMPTS = 12
+        const val OFFICIAL_ACTION_POLL_INTERVAL_MS = 200L
     }
 }

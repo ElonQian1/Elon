@@ -75,6 +75,17 @@ class ChatGptWebProjectAndMenuContractTest {
     }
 
     @Test
+    fun explicitMessageActionsWinOverTheOwningProjectRoute() {
+        val layout = read("android/app/src/main/assets/chatgpt_web_adapter_layout.js")
+        val readAloud = layout.indexOf("if (/read.aloud|朗读/.test(signal)) return 'read_aloud';")
+        val project = layout.indexOf("if (/project|项目/.test(signal + ' ' + path)) return 'project';")
+
+        assertTrue(readAloud >= 0)
+        assertTrue(project >= 0)
+        assertTrue(readAloud < project)
+    }
+
+    @Test
     fun projectChoiceRevealIsReadOnlyAndWiredThroughTheExistingCommandPort() {
         val reveal = read(
             "android/app/src/main/assets/chatgpt_web_adapter_project_choice_reveal.js",

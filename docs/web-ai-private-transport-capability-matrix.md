@@ -34,7 +34,8 @@ installed build; individual capability documents retain implementation evidence.
 | Native private-response rich content | ChatGPT | Completed, enabled, and structurally device verified on Release `v1.1.1379 (1400)` for finance and line-chart cards | Official WebView rich content |
 | Private composer dictation | ChatGPT | Completed and enabled; page-local identity, synthetic-audio endpoint proof, strict capture ownership, buffered transcription, draft reconciliation, timeout/circuit protection, and targeted integration tests passed | No automatic fallback; idle long press explicitly selects work-mode dictation |
 | Selectable work-mode composer dictation | ChatGPT | Completed and enabled by direct reuse of the unchanged work-mode `AgentVoiceBridge`; explicit private/work selection user-verified on `v1.1.1483 (1483)` | No cross-mode fallback; idle long press switches back to private dictation |
-| Native response read aloud | ChatGPT | Implemented and enabled; full-answer chunking and message-action tests passed; device acceptance pending | Official message actions and WebView |
+| Official response read aloud bridge | ChatGPT | Implemented, enabled, and production-default; live official control discovery plus semantic/menu tests passed; device audio acceptance pending | Manual official page or explicit system-read-aloud selection |
+| Android system response read aloud | ChatGPT | Implemented and enabled as an explicitly named alternate; audio start user-confirmed, stop acceptance pending | No automatic fallback |
 | Native conversation management | ChatGPT | Completed and enabled; reversible pin round trip device verified on `v1.1.1399 (1420)`, adapter `218`; other mutation acceptance pending | Context-bound official conversation options without automatic write replay |
 | Native conversation project move | ChatGPT | Implemented and enabled; direct DOM activation, optional confirmation, scoped refresh, and reversible device round trip pending | Official conversation project menu |
 | Acceptance evidence contract revisions | ChatGPT and Google Web AI | Completed, enabled, and installed-state migration verified on Release `v1.1.1393 (1414)`, adapter `212` | Retain implementation hashes as diagnostics without discarding accepted contracts |
@@ -204,17 +205,22 @@ removed. Research builds now observe only bounded session-profile and data-chann
 shapes so the actual official dictation mode can be distinguished without recording audio
 or recognized text.
 
-Assistant response read-aloud no longer depends on the official message control being
-present in the current DOM snapshot. Every non-empty ChatGPT assistant message exposes a
-native action that uses the existing `VoiceSpeaker`, splits the complete answer into
-bounded sentence chunks, and supports an immediate second-tap stop without logging or
-persisting text. Each chunk now has a unique completion token, so a late callback from a
-stopped utterance cannot advance a newer request. Initialization, callback, and synchronous
-playback failures settle the active action, rebuild the speaker on the next attempt, and a
-bounded watchdog
-prevents the UI from remaining stuck in the playing state. Unsupported official message
-actions remain available through the same menu and full WebView fallback. The stable capability is
-`android_chatgpt_native_response_read_aloud_v1`; device audio acceptance remains pending.
+Assistant response read-aloud now exposes two explicit native actions instead of silently
+substituting Android TTS for the website capability. `Official read aloud` is first and is the
+production default. It opens the exact context-bound official message menu in the persistent
+identity WebView, discovers the official `read_aloud` control with bounded polling, and invokes
+that control directly from the native sheet. A missing transient DOM node is shown only as
+preparation and is never reported as an absent website capability. The stable capability is
+`android_chatgpt_official_response_read_aloud_bridge_v1`. It is an official-control bridge,
+not yet a claimed private audio endpoint; device audio acceptance remains pending.
+
+`System read aloud` remains a separately named, non-default alternate backed by the existing
+`VoiceSpeaker`. It splits the complete answer into bounded sentence chunks, supports stop,
+does not log or persist text, rejects stale completion callbacks, rebuilds after failures, and
+uses a bounded watchdog. Selecting either mode stops the other when its current state is known;
+there is no automatic cross-mode fallback and no hidden long-press mode switch. The stable
+system capability remains `android_chatgpt_native_response_read_aloud_v1`. Audio start was
+user-confirmed on the previous installed build; explicit stop acceptance remains pending.
 
 Conversation rows expose a native project destination picker backed by the bounded
 project-directory cache. The coordinator navigates to the exact conversation, opens its

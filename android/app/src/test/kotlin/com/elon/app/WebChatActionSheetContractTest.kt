@@ -53,19 +53,20 @@ class WebChatActionSheetContractTest {
     }
 
     @Test
-    fun unavailableMessageActionsOfferTheOfficialConversationFallback() {
+    fun messageActionsKeepTheOfficialConversationFallback() {
         val source = read(
             "android/app/src/main/kotlin/com/elon/app/WebChatProductionMessageActions.kt",
         )
-        val noActions = source.substringAfter("if (actions.isEmpty())")
-            .substringBefore("val byId")
+        val sheet = source.substringAfter("private fun presentMoreSheet")
+            .substringBefore("private fun pollOfficialActions")
         val dispatch = source.substringAfter("private fun dispatch")
             .substringBefore("private fun showFeedback")
 
-        assertTrue(noActions.contains("showOfficialFallback"))
+        assertTrue(sheet.contains("label = \"官网功能\""))
+        assertTrue(sheet.contains("action = openOfficialFallback"))
         assertTrue(dispatch.contains("setPositiveButton(\"打开官方页\")"))
         assertTrue(dispatch.contains("openOfficialFallback()"))
-        assertFalse(noActions.contains("Toast.makeText"))
+        assertFalse(sheet.contains("Toast.makeText"))
     }
 
     private fun read(relativePath: String): String =

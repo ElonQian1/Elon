@@ -252,12 +252,16 @@
     if (/^\/images?(?:\/|$)/.test(path) || /^(?:images?|图像|图片)$/.test(signal)) return 'images';
     if (/library|sidebar-item-recall|文件库|资料库/.test(signal + ' ' + path)) return 'library';
     if (/scheduled|schedule|已安排|任务/.test(signal + ' ' + path)) return 'tasks';
+    // Message-menu actions can inherit a project route from their owning turn.
+    // Classify their explicit labels before the generic project-route fallback.
+    if (/sources?|citations?|文件和来源|查看来源|来源/.test(signal)) return 'sources';
+    if (/open.*(?:image|photo|media)|打开.*(?:图片|照片|媒体)/.test(signal)) return 'open_media';
+    if (/read.aloud|朗读/.test(signal)) return 'read_aloud';
+    if (/branch|分支/.test(signal)) return 'branch';
     if (/project|项目/.test(signal + ' ' + path)) return 'project';
     if (/\bgpt(s)?\b|探索.?gpt|发现.?gpt/.test(signal + ' ' + path)) return 'gpts';
     if (/setting|设置/.test(signal + ' ' + path)) return 'settings';
     if (/create.*(?:file|website)|创建.*(?:文件|网站)/.test(signal)) return 'create_asset';
-    if (/sources?|citations?|文件和来源|查看来源|来源/.test(signal)) return 'sources';
-    if (/open.*(?:image|photo|media)|打开.*(?:图片|照片|媒体)/.test(signal)) return 'open_media';
     if (/composer-plus|attach|upload|添加|附件|上传/.test(signal)) return 'attachment';
     if (
       region === 'composer'
@@ -266,7 +270,6 @@
     ) return 'model';
     if (/regenerate|try.again|\bretry\b|重新生成|重试/.test(signal)) return 'regenerate';
     if (/model|模型|gpt-|sol/.test(signal)) return 'model';
-    if (/read.aloud|朗读/.test(signal)) return 'read_aloud';
     if (/previous.response|previous.answer|上一回复|上一答案/.test(signal)) return 'previous_response';
     if (/next.response|next.answer|下一回复|下一答案/.test(signal)) return 'next_response';
     if (/dictat|听写|语音输入/.test(signal)) return 'dictation';
@@ -277,7 +280,6 @@
     if (/stop|停止/.test(signal)) return 'stop';
     if (/copy|复制/.test(signal)) return 'copy';
     if (/edit|编辑/.test(signal)) return 'edit';
-    if (/branch|分支/.test(signal)) return 'branch';
     if (/feedback|good.response|bad.response|点赞|点踩|反馈/.test(signal)) return 'feedback';
     if (/close|dismiss|关闭|取消/.test(signal)) return 'close';
     if (/confirm|确定|确认/.test(signal)) return 'confirm';
