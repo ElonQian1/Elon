@@ -6,6 +6,7 @@
     <dimen name="main_bottom_menu_outer_height">64dp</dimen>
     <dimen name="main_bottom_menu_container_height">88dp</dimen>
     <dimen name="main_bottom_menu_content_width">337dp</dimen>
+    <dimen name="main_bottom_menu_design_viewport_width">411dp</dimen>
     <dimen name="main_bottom_menu_selection_width">56dp</dimen>
     <dimen name="main_bottom_menu_selection_height">48dp</dimen>
     <dimen name="main_bottom_menu_selection_inset">0dp</dimen>

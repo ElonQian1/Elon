@@ -1,7 +1,13 @@
 package com.elon.app
 
 import android.graphics.Color
+import android.graphics.Canvas
+import android.graphics.ColorFilter
+import android.graphics.Paint
+import android.graphics.PixelFormat
+import android.graphics.RectF
 import android.graphics.Typeface
+import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.view.View
@@ -47,7 +53,7 @@ internal class HomeConversationHeaderView(
         counts: HomeConversationCounts,
         onSelect: (HomeListFilterMode) -> Unit
     ): View = HorizontalScrollView(activity).apply {
-        layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(78))
+        layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(95))
         isHorizontalScrollBarEnabled = false
         overScrollMode = View.OVER_SCROLL_NEVER
         val items = listOf(
@@ -59,11 +65,11 @@ internal class HomeConversationHeaderView(
         addView(LinearLayout(activity).apply {
             gravity = Gravity.CENTER_VERTICAL
             orientation = LinearLayout.HORIZONTAL
-            setPadding(dp(16), dp(16), dp(16), dp(14))
+            setPadding(dp(16), dp(24), dp(16), dp(33))
             items.forEachIndexed { index, (mode, label) ->
                 addView(
                     createFilterTab(label.first, label.second, mode == selected) { onSelect(mode) },
-                    LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, dp(48)).apply {
+                    LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, dp(38)).apply {
                         if (index > 0) marginStart = dp(16)
                     }
                 )
@@ -118,13 +124,8 @@ internal class HomeConversationHeaderView(
         layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(192)).apply {
             marginStart = dp(16); marginEnd = dp(16)
         }
-        background = roundedWithStroke("#CC1A1A1A", 12, "#1AFFFFFF")
-        elevation = dp(12).toFloat()
-        translationZ = dp(4).toFloat()
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
-            outlineAmbientShadowColor = Color.parseColor("#2600F0FF")
-            outlineSpotShadowColor = Color.parseColor("#2600F0FF")
-        }
+        setLayerType(View.LAYER_TYPE_SOFTWARE, null)
+        background = SummaryGlowDrawable(activity.resources.displayMetrics.density)
         gravity = Gravity.CENTER_VERTICAL
         orientation = LinearLayout.HORIZONTAL
         setPadding(dp(20), dp(20), dp(20), dp(20))
@@ -193,7 +194,7 @@ internal class HomeConversationHeaderView(
     }
 
     private fun createRecentHeader(): View = LinearLayout(activity).apply {
-        layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(78)).apply { topMargin = dp(16) }
+        layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(62)).apply { topMargin = dp(16) }
         gravity = Gravity.CENTER_VERTICAL
         orientation = LinearLayout.HORIZONTAL
         setPadding(dp(16), dp(16), dp(16), dp(16))
@@ -214,4 +215,29 @@ internal class HomeConversationHeaderView(
             cornerRadius = dp(radius).toFloat()
             strokeColor?.let { setStroke(dp(1), Color.parseColor(it)) }
         }
+
+    private class SummaryGlowDrawable(density: Float) : Drawable() {
+        private val radius = 12f * density
+        private val inset = 1f * density
+        private val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#CC1A1A1A")
+            setShadowLayer(30f * density, 0f, 0f, Color.parseColor("#2600F0FF"))
+        }
+        private val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = density
+            color = Color.parseColor("#1AFFFFFF")
+        }
+
+        override fun draw(canvas: Canvas) {
+            val rect = RectF(bounds).apply { inset(inset, inset) }
+            canvas.drawRoundRect(rect, radius, radius, fill)
+            canvas.drawRoundRect(rect, radius, radius, stroke)
+        }
+
+        override fun setAlpha(alpha: Int) { fill.alpha = alpha }
+        override fun setColorFilter(colorFilter: ColorFilter?) { fill.colorFilter = colorFilter }
+        @Deprecated("Deprecated in Android")
+        override fun getOpacity(): Int = PixelFormat.TRANSLUCENT
+    }
 }

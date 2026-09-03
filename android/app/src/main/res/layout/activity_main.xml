@@ -1375,7 +1375,7 @@
 
             <LinearLayout
             android:id="@+id/bottomNavContent"
-                android:layout_width="match_parent"
+                android:layout_width="@dimen/main_bottom_menu_content_width"
                 android:layout_height="@dimen/main_bottom_menu_outer_height"
                 android:layout_gravity="bottom|center_horizontal"
                 android:layout_marginBottom="@dimen/main_bottom_menu_edge_gap"
@@ -1554,6 +1554,7 @@
                     android:layout_width="@dimen/main_bottom_menu_height"
                     android:layout_height="@dimen/main_bottom_menu_height"
                     android:clickable="true"
+                    android:background="@drawable/bg_bottom_nav_compose"
                     android:contentDescription="打开新建菜单"
                     android:focusable="true"
                     android:foreground="?attr/selectableItemBackgroundBorderless">

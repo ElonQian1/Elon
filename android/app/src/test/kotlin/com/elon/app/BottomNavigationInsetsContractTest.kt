@@ -24,7 +24,7 @@ class BottomNavigationInsetsContractTest {
         assertTrue(!layout.contains("android:id=\"@+id/bottomMenuFade\""))
 
         val web = readRepositoryFile("server/src/assets/web_page.html")
-        assertTrue(web.contains("background: rgba(32,31,31,.8);"))
+        assertTrue(web.contains("background: #201f1f;"))
         assertTrue(!web.contains(".tabs-bar::before"))
     }
 
@@ -32,6 +32,7 @@ class BottomNavigationInsetsContractTest {
     fun androidBottomMenuMatchesStitchGeometryWhileKeepingExistingIcons() {
         val dimens = readRepositoryFile("android/app/src/main/res/values/dimens.xml")
         assertTrue(dimens.contains("name=\"main_bottom_menu_content_width\">337dp</dimen>"))
+        assertTrue(dimens.contains("name=\"main_bottom_menu_design_viewport_width\">411dp</dimen>"))
         assertTrue(dimens.contains("name=\"main_bottom_menu_edge_gap\">24dp</dimen>"))
         assertTrue(dimens.contains("name=\"main_bottom_menu_selection_width\">56dp</dimen>"))
         assertTrue(dimens.contains("name=\"main_bottom_menu_selection_height\">48dp</dimen>"))
@@ -63,6 +64,11 @@ class BottomNavigationInsetsContractTest {
         assertTrue(layout.contains("@drawable/ic_bottom_nav_project_selector"))
         assertTrue(layout.contains("@drawable/ic_bottom_nav_profile_selector"))
         assertTrue(layout.contains("@drawable/ic_bottom_nav_menu_selector"))
+        assertTrue(layout.contains("android:background=\"@drawable/bg_bottom_nav_compose\""))
+        val controller = readRepositoryFile("android/app/src/main/kotlin/com/elon/app/MainBottomNavigationController.kt")
+        assertTrue(controller.contains("binding.pageTabs.width / designViewport"))
+        assertTrue(controller.contains("scaleX = scale"))
+        assertTrue(controller.contains("scaleY = scale"))
     }
 
     @Test
@@ -72,6 +78,7 @@ class BottomNavigationInsetsContractTest {
             Regex("""\.tabs-bar\s*\{[^}]*width:\s*337px;""", RegexOption.DOT_MATCHES_ALL)
                 .containsMatchIn(web)
         )
+        assertTrue(web.contains("viewportWidth / 411"))
         assertTrue(
             Regex(
                 """\.tabs-bar\s*\{[^}]*padding:\s*8px\s+16px;""",
@@ -137,7 +144,7 @@ class BottomNavigationInsetsContractTest {
         assertTrue(compose.contains("border-radius: 50%;"))
 
         val theme = readRepositoryFile("server/src/assets/orbital_mobile_theme.css")
-        assertTrue(Regex("""\.tabs-bar\s*\{[^}]*background:\s*rgba\(32, 31, 31, 0\.8\);""").containsMatchIn(theme))
+        assertTrue(Regex("""\.tabs-bar\s*\{[^}]*background:\s*#201f1f;""").containsMatchIn(theme))
         assertTrue(!Regex("""\.tabs-panel\s*\{[^}]*linear-gradient""", RegexOption.DOT_MATCHES_ALL).containsMatchIn(theme))
         assertTrue(!Regex("""\.bottom-compose-button\s*\{[^}]*linear-gradient""", RegexOption.DOT_MATCHES_ALL).containsMatchIn(theme))
     }

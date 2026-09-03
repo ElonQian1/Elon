@@ -27,6 +27,9 @@ class HomeConversationHeaderContractTest {
         assertTrue(androidHeader.contains("\"#DBFCFF\""))
         assertTrue(androidHeader.contains("HorizontalScrollView(activity)"))
         assertTrue(androidHeader.contains("dp(192)"))
+        assertTrue(androidHeader.contains("dp(95)"))
+        assertTrue(androidHeader.contains("SummaryGlowDrawable"))
+        assertTrue(androidHeader.contains("30f * density"))
         assertTrue(androidHeader.contains("textSize = 18f"))
 
         val web = readRepositoryFile("server/src/assets/web_page.html")
@@ -38,6 +41,7 @@ class HomeConversationHeaderContractTest {
         assertTrue(web.contains(".home-filter-tab.active { border-color: rgba(219,252,255,.3);"))
         assertTrue(web.contains(".home-filter-count { min-width: 20px; height: 18px;"))
         assertTrue(web.contains("min-height:192px"))
+        assertTrue(web.contains(".home-filter-tabs { height: 95px; padding: 24px 16px 33px;"))
         assertTrue(web.contains("background: rgba(26,26,26,.8)"))
         assertTrue(web.contains("work-summary-entry-beta"))
         assertTrue(web.contains("appView.classList.toggle('stitch-home-active', isChatHome)"))
