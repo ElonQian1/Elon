@@ -10,7 +10,7 @@ use axum::{
     extract::{DefaultBodyLimit, RawQuery},
     http::{header, HeaderName, HeaderValue, Method, StatusCode},
     response::{IntoResponse, Redirect, Response},
-    routing::{get, post},
+    routing::{get, on, post, MethodFilter},
     Json, Router,
 };
 use serde_json::json;
@@ -111,7 +111,7 @@ where
         .route("/quant/api/v1/runtime", get(proxy_runtime))
         .route(
             "/quant/api/v1/markets/spot/overview",
-            get(proxy_market_overview),
+            on(MethodFilter::GET, proxy_market_overview),
         )
         .route(
             "/quant/api/v1/research/snapshots",
@@ -131,7 +131,10 @@ async fn proxy_runtime() -> Response {
     proxy(PublicQuantEndpoint::Runtime, None, None).await
 }
 
-async fn proxy_market_overview(RawQuery(query): RawQuery) -> Response {
+async fn proxy_market_overview(method: Method, RawQuery(query): RawQuery) -> Response {
+    if method != Method::GET {
+        return StatusCode::METHOD_NOT_ALLOWED.into_response();
+    }
     proxy(PublicQuantEndpoint::MarketOverview, None, query.as_deref()).await
 }
 
@@ -161,7 +164,11 @@ async fn proxy(
     let upstream = match request.send().await {
         Ok(response) => response,
         Err(error) => {
-            tracing::warn!(endpoint = endpoint.path(), %error, "quant HTTP preview upstream unavailable");
+            tracing::warn!(
+                endpoint = endpoint.path(),
+                failure = upstream_failure_class(&error),
+                "quant HTTP preview upstream unavailable"
+            );
             return unavailable();
         }
     };
@@ -187,7 +194,11 @@ async fn proxy(
             return unavailable();
         }
         Err(error) => {
-            tracing::warn!(endpoint = endpoint.path(), %error, "quant HTTP preview response failed");
+            tracing::warn!(
+                endpoint = endpoint.path(),
+                failure = upstream_failure_class(&error),
+                "quant HTTP preview response failed"
+            );
             return unavailable();
         }
     };
@@ -223,6 +234,22 @@ fn upstream_url(
     url.set_path(endpoint.path());
     url.set_query(raw_query.filter(|query| !query.is_empty()));
     Ok(url)
+}
+
+fn upstream_failure_class(error: &reqwest::Error) -> &'static str {
+    if error.is_timeout() {
+        "timeout"
+    } else if error.is_connect() {
+        "connect"
+    } else if error.is_request() {
+        "request"
+    } else if error.is_body() {
+        "body"
+    } else if error.is_decode() {
+        "decode"
+    } else {
+        "other"
+    }
 }
 
 fn unavailable() -> Response {
@@ -286,15 +313,27 @@ mod tests {
 
     #[test]
     fn market_overview_url_preserves_query_on_fixed_loopback_path() {
-        let url = upstream_url(
-            PublicQuantEndpoint::MarketOverview,
-            Some("symbol=BTCUSDT&interval=1m&limit=240"),
-        )
-        .expect("bounded public query must be accepted");
+        let raw_query = "symbol=BTCUSDT&symbol=ETHUSDT&note=a%26b+c&encoded=%2f%2F&limit=240";
+        let url = upstream_url(PublicQuantEndpoint::MarketOverview, Some(raw_query))
+            .expect("bounded public query must be accepted");
 
         assert_eq!(url.origin().ascii_serialization(), QUANT_LOOPBACK_ORIGIN);
         assert_eq!(url.path(), "/api/v1/markets/spot/overview");
-        assert_eq!(url.query(), Some("symbol=BTCUSDT&interval=1m&limit=240"));
+        assert_eq!(url.query(), Some(raw_query));
+    }
+
+    #[test]
+    fn market_overview_query_limit_is_inclusive_and_measured_in_bytes() {
+        let exact_limit = "x".repeat(MAX_PUBLIC_QUERY_BYTES);
+        assert!(upstream_url(PublicQuantEndpoint::MarketOverview, Some(&exact_limit)).is_ok());
+
+        let multibyte_over_limit = "市".repeat((MAX_PUBLIC_QUERY_BYTES / 3) + 1);
+        let response = upstream_url(
+            PublicQuantEndpoint::MarketOverview,
+            Some(&multibyte_over_limit),
+        )
+        .expect_err("UTF-8 byte length above the limit must be rejected");
+        assert_eq!(response.status(), StatusCode::URI_TOO_LONG);
     }
 
     #[tokio::test]
@@ -311,6 +350,39 @@ mod tests {
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::URI_TOO_LONG);
+    }
+
+    #[tokio::test]
+    async fn market_overview_rejects_every_non_get_method() {
+        let app: Router = routes(Path::new("missing-quant-preview-dist"));
+        for method in [Method::HEAD, Method::POST, Method::PUT] {
+            let response = app
+                .clone()
+                .oneshot(
+                    Request::builder()
+                        .method(method.clone())
+                        .uri("/quant/api/v1/markets/spot/overview?symbol=BTCUSDT")
+                        .body(Body::empty())
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(
+                response.status(),
+                StatusCode::METHOD_NOT_ALLOWED,
+                "{method}"
+            );
+        }
+    }
+
+    #[test]
+    fn reqwest_errors_are_never_formatted_into_proxy_logs() {
+        let source = include_str!("quant_http_preview.rs");
+        let display_error = ["%", "error"].concat();
+        let debug_error = ["?", "error"].concat();
+        assert!(!source.contains(&display_error));
+        assert!(!source.contains(&debug_error));
+        assert!(source.contains("failure = upstream_failure_class(&error)"));
     }
 
     #[tokio::test]
