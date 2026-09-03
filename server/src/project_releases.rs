@@ -11,6 +11,10 @@ use sha2::{Digest, Sha256};
 use std::{collections::HashMap, path::PathBuf, sync::Arc};
 use uuid::Uuid;
 
+#[cfg(test)]
+#[path = "project_releases_tests.rs"]
+mod tests;
+
 use crate::{
     project_auth::{
         auth_from_headers, auth_from_headers_or_query, can_edit, json_error, project_access,
@@ -142,7 +146,7 @@ pub async fn upload_project_release(
             id: Some(&release_id),
             project_id: &project_id,
             task_id: query.task_id.as_deref(),
-            uploaded_by: Some(&user.id),
+            uploaded_by: persisted_release_uploader(&user.id),
             version_name: query.version_name.as_deref(),
             package_name: query.package_name.as_deref(),
             version_code: query.version_code,
@@ -168,8 +172,21 @@ pub async fn upload_project_release(
             )
         }))
         .into_response(),
-        Err(e) => json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+        Err(e) => {
+            if let Err(cleanup_error) = tokio::fs::remove_dir_all(&release_dir).await {
+                tracing::warn!(
+                    path = %release_dir.display(),
+                    %cleanup_error,
+                    "failed to clean rejected project release files"
+                );
+            }
+            json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+        }
     }
+}
+
+pub(crate) fn persisted_release_uploader(user_id: &str) -> Option<&str> {
+    (user_id != "local-owner").then_some(user_id)
 }
 
 pub async fn download_project_release_apk(
