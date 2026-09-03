@@ -1,0 +1,372 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:yilong:contracts:sui:esk-genesis-manifest:v1",
+  "title": "Yilong ESK Sui Genesis Manifest V1",
+  "$comment": "Structural schema only. The repository semantic validator is mandatory and currently refuses all mainnet manifests and testnet published attestations until compatible governed online verification exists.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "schema", "manifest_id", "lifecycle", "asset", "chain", "toolchain", "supply", "allocations", "roles", "upgrade_policy", "ledger_boundaries", "paid_user_migration", "assurances", "mainnet_gates", "evidence"],
+  "properties": {
+    "$schema": { "const": "./esk-genesis-manifest-v1.schema.json" },
+    "schema": { "const": "yilong.esk.sui.genesis_manifest.v1" },
+    "manifest_id": { "$ref": "#/$defs/manifestId" },
+    "lifecycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "revision", "predecessor_manifest_id", "predecessor_revision", "predecessor_digest", "updated_at"],
+      "properties": {
+        "state": { "enum": ["planned", "local_verified", "testnet_published", "mainnet_ready", "mainnet_published"] },
+        "revision": { "type": "integer", "minimum": 1 },
+        "predecessor_manifest_id": { "type": ["string", "null"], "pattern": "^esk-sui-[a-z0-9-]{3,64}-v[1-9][0-9]*$" },
+        "predecessor_revision": { "type": ["integer", "null"], "minimum": 1 },
+        "predecessor_digest": { "$ref": "#/$defs/optionalSha256" },
+        "updated_at": { "$ref": "#/$defs/rfc3339" }
+      }
+    },
+    "asset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["asset_id", "symbol", "name", "decimals", "description", "icon_url"],
+      "properties": {
+        "asset_id": { "const": "esk" },
+        "symbol": { "const": "ESK" },
+        "name": { "const": "Yilong ESK" },
+        "decimals": { "const": 6 },
+        "description": { "type": "string", "minLength": 20, "maxLength": 500 },
+        "icon_url": { "type": ["string", "null"], "format": "uri", "pattern": "^(https://[^\\s@?#]+|ipfs://[^\\s@?#]+)$", "maxLength": 500 }
+      }
+    },
+    "chain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["platform", "standard", "network", "registry_object_id", "rpc_family"],
+      "properties": {
+        "platform": { "const": "sui" },
+        "standard": { "const": "sui_currency_standard" },
+        "network": { "enum": ["testnet", "mainnet"] },
+        "registry_object_id": { "const": "0xc" },
+        "rpc_family": { "enum": ["grpc", "graphql"] }
+      }
+    },
+    "toolchain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sui_release", "sui_source_commit", "move_edition", "verification_status", "package_input_digest", "move_source_digest", "move_test_source_digest", "build_evidence_digest", "test_evidence_digest"],
+      "properties": {
+        "sui_release": { "type": "string", "pattern": "^(testnet|mainnet)-v[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$" },
+        "sui_source_commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+        "move_edition": { "const": "2024" },
+        "verification_status": { "enum": ["uncompiled", "verified"] },
+        "package_input_digest": { "$ref": "#/$defs/optionalSha256" },
+        "move_source_digest": { "$ref": "#/$defs/optionalSha256" },
+        "move_test_source_digest": { "$ref": "#/$defs/optionalSha256" },
+        "build_evidence_digest": { "$ref": "#/$defs/optionalSha256" },
+        "test_evidence_digest": { "$ref": "#/$defs/optionalSha256" }
+      }
+    },
+    "supply": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["policy", "display_units", "base_units", "decimals", "treasury_cap_retained"],
+      "properties": {
+        "policy": { "const": "fixed" },
+        "display_units": { "const": "1000000000" },
+        "base_units": { "const": "1000000000000000" },
+        "decimals": { "const": 6 },
+        "treasury_cap_retained": { "const": false }
+      }
+    },
+    "allocations": { "type": "array", "minItems": 6, "maxItems": 6, "items": { "$ref": "#/$defs/allocation" } },
+    "roles": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["deployer", "treasury", "upgrade", "metadata", "distribution", "pause", "gas_sponsor", "team_vesting", "liquidity"],
+      "properties": {
+        "deployer": { "allOf": [{ "$ref": "#/$defs/role" }, { "properties": { "role_id": { "const": "genesis_deployer" } } }] },
+        "treasury": { "$ref": "#/$defs/multisigTreasury" },
+        "upgrade": { "$ref": "#/$defs/multisigUpgrade" },
+        "metadata": { "$ref": "#/$defs/multisigMetadata" },
+        "distribution": { "$ref": "#/$defs/multisigDistribution" },
+        "pause": { "$ref": "#/$defs/multisigPause" },
+        "gas_sponsor": { "allOf": [{ "$ref": "#/$defs/role" }, { "properties": { "role_id": { "const": "gas_sponsor_service" }, "custody": { "const": "service_principal" }, "minimum_approvals": { "const": 1 } } }] },
+        "team_vesting": { "$ref": "#/$defs/multisigTeamVesting" },
+        "liquidity": { "$ref": "#/$defs/multisigLiquidity" }
+      }
+    },
+    "upgrade_policy": { "enum": ["pending", "compatible", "additive", "dep_only", "immutable"] },
+    "ledger_boundaries": { "type": "array", "minItems": 8, "maxItems": 8, "items": { "$ref": "#/$defs/ledgerBoundary" } },
+    "paid_user_migration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "claims_enabled", "claim_schema_status", "automatic_paper_conversion", "one_payment_one_purpose", "allowed_purposes", "required_claim_fields"],
+      "properties": {
+        "mode": { "const": "claim_after_reconciliation" },
+        "claims_enabled": { "type": "boolean" },
+        "claim_schema_status": { "enum": ["not_implemented", "verified", "enabled"] },
+        "automatic_paper_conversion": { "const": false },
+        "one_payment_one_purpose": { "const": true },
+        "allowed_purposes": { "type": "array", "minItems": 3, "maxItems": 3, "uniqueItems": true, "items": { "enum": ["esk_purchase", "service_purchase", "qshare_subscription"] } },
+        "required_claim_fields": {
+          "type": "array",
+          "minItems": 13,
+          "maxItems": 13,
+          "uniqueItems": true,
+          "items": { "enum": ["opaque_subject", "reconciled_payment_asset", "reconciled_payment_amount", "external_payment_reference", "payment_observed_at", "commercial_purpose", "sale_batch_id", "esk_base_units", "disclosure_revision", "eligibility_decision", "address_control_proof", "idempotency_key", "approval_digest"] }
+        }
+      }
+    },
+    "assurances": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["supply_policy", "currency_regulation", "permanent_usdt_peg", "guaranteed_yield", "unlimited_loss_guarantee", "legal_equity", "automatic_paper_conversion", "customer_funds_moved", "publication_transactions_signed", "publication_transactions_broadcast"],
+      "properties": {
+        "supply_policy": { "const": "fixed" },
+        "currency_regulation": { "const": "unregulated" },
+        "permanent_usdt_peg": { "const": false },
+        "guaranteed_yield": { "const": false },
+        "unlimited_loss_guarantee": { "const": false },
+        "legal_equity": { "const": false },
+        "automatic_paper_conversion": { "const": false },
+        "customer_funds_moved": { "const": false },
+        "publication_transactions_signed": { "type": "boolean" },
+        "publication_transactions_broadcast": { "type": "boolean" }
+      }
+    },
+    "mainnet_gates": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["all_approved", "legal", "security_audit", "multisig", "recovery", "migration", "treasury_reconciliation"],
+      "properties": {
+        "all_approved": { "type": "boolean" },
+        "legal": { "$ref": "#/$defs/gate" },
+        "security_audit": { "$ref": "#/$defs/gate" },
+        "multisig": { "$ref": "#/$defs/gate" },
+        "recovery": { "$ref": "#/$defs/gate" },
+        "migration": { "$ref": "#/$defs/gate" },
+        "treasury_reconciliation": { "$ref": "#/$defs/gate" }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["chain_identifier", "publication_endpoint_ref", "package_id", "type_tag", "pending_currency_object_id", "registered_currency_object_id", "metadata_cap_object_id", "upgrade_cap_object_id", "initial_supply_coin_object_id", "publish_tx_digest", "currency_registration_tx_digest", "allocation_tx_digest", "allocation_receipts", "role_handoff_tx_digest", "publish_checkpoint", "registration_checkpoint", "verify_source_status", "verify_source_result_digest", "independent_verification"],
+      "properties": {
+        "chain_identifier": { "type": ["string", "null"], "pattern": "^[0-9a-f]{8,64}$" },
+        "publication_endpoint_ref": { "type": ["string", "null"], "pattern": "^https://[^\\s@?#]+$", "maxLength": 500 },
+        "package_id": { "$ref": "#/$defs/optionalObjectId" },
+        "type_tag": { "type": ["string", "null"], "pattern": "^0x[0-9a-f]{64}::esk::ESK$" },
+        "pending_currency_object_id": { "$ref": "#/$defs/optionalObjectId" },
+        "registered_currency_object_id": { "$ref": "#/$defs/optionalObjectId" },
+        "metadata_cap_object_id": { "$ref": "#/$defs/optionalObjectId" },
+        "upgrade_cap_object_id": { "$ref": "#/$defs/optionalObjectId" },
+        "initial_supply_coin_object_id": { "$ref": "#/$defs/optionalObjectId" },
+        "publish_tx_digest": { "$ref": "#/$defs/optionalDigest" },
+        "currency_registration_tx_digest": { "$ref": "#/$defs/optionalDigest" },
+        "allocation_tx_digest": { "$ref": "#/$defs/optionalDigest" },
+        "allocation_receipts": { "type": ["array", "null"], "minItems": 6, "maxItems": 6, "items": { "$ref": "#/$defs/allocationReceipt" } },
+        "role_handoff_tx_digest": { "$ref": "#/$defs/optionalDigest" },
+        "publish_checkpoint": { "$ref": "#/$defs/optionalIntegerString" },
+        "registration_checkpoint": { "$ref": "#/$defs/optionalIntegerString" },
+        "verify_source_status": { "enum": ["not_run", "verified", "failed"] },
+        "verify_source_result_digest": { "$ref": "#/$defs/optionalSha256" },
+        "independent_verification": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "transport", "endpoint_ref", "observed_at", "evidence_digest"],
+          "properties": {
+            "status": { "enum": ["not_run", "verified", "failed"] },
+            "transport": { "enum": ["none", "grpc", "graphql"] },
+            "endpoint_ref": { "type": ["string", "null"], "pattern": "^https://[^\\s@?#]+$", "maxLength": 500 },
+            "observed_at": { "$ref": "#/$defs/optionalRfc3339" },
+            "evidence_digest": { "$ref": "#/$defs/optionalSha256" }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "manifestId": { "type": "string", "pattern": "^esk-sui-[a-z0-9-]{3,64}-v[1-9][0-9]*$" },
+    "rfc3339": { "type": "string", "format": "date-time", "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-([0-2][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\\.[0-9]+)?(Z|[+-]([01][0-9]|2[0-3]):[0-5][0-9])$" },
+    "optionalRfc3339": { "type": ["string", "null"], "format": "date-time", "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-([0-2][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\\.[0-9]+)?(Z|[+-]([01][0-9]|2[0-3]):[0-5][0-9])$" },
+    "allocation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bucket_id", "base_units", "basis_points", "recipient_role", "vesting_policy_ref"],
+      "properties": {
+        "bucket_id": { "enum": ["user_migration_and_ecosystem", "team_vesting", "project_treasury", "liquidity", "community_contributors", "security_operations_reserve"] },
+        "base_units": { "type": "string", "pattern": "^[1-9][0-9]*$" },
+        "basis_points": { "type": "integer", "minimum": 1, "maximum": 10000 },
+        "recipient_role": { "enum": ["distribution", "treasury", "liquidity", "team_vesting"] },
+        "vesting_policy_ref": { "type": "string", "pattern": "^policy:[a-z0-9._-]{3,96}$" }
+      }
+    },
+    "allocationReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bucket_id", "base_units", "recipient_role", "recipient_holder_ref", "vesting_policy_ref", "enforcement", "resulting_object_id", "tx_digest", "checkpoint"],
+      "properties": {
+        "bucket_id": { "enum": ["user_migration_and_ecosystem", "team_vesting", "project_treasury", "liquidity", "community_contributors", "security_operations_reserve"] },
+        "base_units": { "type": "string", "pattern": "^[1-9][0-9]*$" },
+        "recipient_role": { "enum": ["distribution", "treasury", "liquidity", "team_vesting"] },
+        "recipient_holder_ref": { "type": "string", "pattern": "^(sui:0x[0-9a-f]{64}|object:0x[0-9a-f]{64})$" },
+        "vesting_policy_ref": { "type": "string", "pattern": "^policy:[a-z0-9._-]{3,96}$" },
+        "enforcement": { "enum": ["move_contract", "approved_custody"] },
+        "resulting_object_id": { "type": "string", "pattern": "^0x[0-9a-f]{64}$" },
+        "tx_digest": { "type": "string", "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,64}$" },
+        "checkpoint": { "type": "string", "pattern": "^(0|[1-9][0-9]*)$" }
+      }
+    },
+    "role": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role_id", "custody", "holder_ref", "minimum_approvals"],
+      "properties": {
+        "role_id": { "type": "string", "pattern": "^[a-z][a-z0-9_]{2,48}$" },
+        "custody": { "enum": ["ephemeral_deployer", "multisig_required", "service_principal"] },
+        "holder_ref": { "type": ["string", "null"], "pattern": "^(sui:0x[0-9a-f]{64}|object:0x[0-9a-f]{64})$" },
+        "minimum_approvals": { "type": "integer", "minimum": 1, "maximum": 32 }
+      }
+    },
+    "multisig": { "properties": { "custody": { "const": "multisig_required" }, "minimum_approvals": { "type": "integer", "minimum": 2 } } },
+    "multisigTreasury": { "allOf": [{ "$ref": "#/$defs/role" }, { "$ref": "#/$defs/multisig" }, { "properties": { "role_id": { "const": "treasury_multisig" } } }] },
+    "multisigUpgrade": { "allOf": [{ "$ref": "#/$defs/role" }, { "$ref": "#/$defs/multisig" }, { "properties": { "role_id": { "const": "upgrade_multisig" } } }] },
+    "multisigMetadata": { "allOf": [{ "$ref": "#/$defs/role" }, { "$ref": "#/$defs/multisig" }, { "properties": { "role_id": { "const": "metadata_multisig" } } }] },
+    "multisigDistribution": { "allOf": [{ "$ref": "#/$defs/role" }, { "$ref": "#/$defs/multisig" }, { "properties": { "role_id": { "const": "distribution_multisig" } } }] },
+    "multisigPause": { "allOf": [{ "$ref": "#/$defs/role" }, { "$ref": "#/$defs/multisig" }, { "properties": { "role_id": { "const": "participation_pause_multisig" } } }] },
+    "multisigTeamVesting": { "allOf": [{ "$ref": "#/$defs/role" }, { "$ref": "#/$defs/multisig" }, { "properties": { "role_id": { "const": "team_vesting_multisig" } } }] },
+    "multisigLiquidity": { "allOf": [{ "$ref": "#/$defs/role" }, { "$ref": "#/$defs/multisig" }, { "properties": { "role_id": { "const": "liquidity_multisig" } } }] },
+    "ledgerBoundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ledger_id", "authority", "asset_or_fact", "may_revalue_esk"],
+      "properties": {
+        "ledger_id": { "enum": ["esk_balance", "esk_onchain_ownership", "esk_profit_distribution", "service_order", "project_treasury", "qshare_nav", "customer_quant_principal", "legal_equity_register"] },
+        "authority": { "enum": ["yilong_main", "sui", "yilong_quant", "legal_entity_register"] },
+        "asset_or_fact": { "type": "string", "minLength": 3, "maxLength": 160 },
+        "may_revalue_esk": { "const": false }
+      }
+    },
+    "gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "evidence_ref"],
+      "properties": {
+        "status": { "enum": ["pending", "approved"] },
+        "evidence_ref": { "type": ["string", "null"], "pattern": "^evidence:[a-zA-Z0-9._:/-]{3,240}$" }
+      }
+    },
+    "approvedGate": { "properties": { "status": { "const": "approved" }, "evidence_ref": { "type": "string" } } },
+    "optionalObjectId": { "type": ["string", "null"], "pattern": "^0x[0-9a-f]{64}$" },
+    "optionalDigest": { "type": ["string", "null"], "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,64}$" },
+    "optionalSha256": { "type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$" },
+    "optionalIntegerString": { "type": ["string", "null"], "pattern": "^(0|[1-9][0-9]*)$" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "lifecycle": { "properties": { "revision": { "maximum": 1 } } } } },
+      "then": { "properties": { "lifecycle": { "properties": { "predecessor_manifest_id": { "type": "null" }, "predecessor_revision": { "type": "null" }, "predecessor_digest": { "type": "null" } } } } }
+    },
+    {
+      "if": { "properties": { "lifecycle": { "properties": { "revision": { "minimum": 2 } } } } },
+      "then": { "properties": { "lifecycle": { "properties": { "predecessor_manifest_id": { "type": "string" }, "predecessor_revision": { "type": "integer" }, "predecessor_digest": { "type": "string" } } } } }
+    },
+    {
+      "if": { "properties": { "chain": { "properties": { "network": { "const": "testnet" } } } } },
+      "then": {
+        "properties": {
+          "lifecycle": { "properties": { "state": { "enum": ["planned", "local_verified", "testnet_published"] } } },
+          "toolchain": { "properties": { "sui_release": { "pattern": "^testnet-v" } } },
+          "roles": { "properties": { "deployer": { "properties": { "custody": { "const": "ephemeral_deployer" }, "holder_ref": { "type": "null" }, "minimum_approvals": { "const": 1 } } } } }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "chain": { "properties": { "network": { "const": "mainnet" } } } } },
+      "then": {
+        "properties": {
+          "lifecycle": { "properties": { "state": { "enum": ["planned", "local_verified", "mainnet_ready", "mainnet_published"] } } },
+          "toolchain": { "properties": { "sui_release": { "pattern": "^mainnet-v" } } },
+          "roles": { "properties": { "deployer": { "properties": { "custody": { "const": "multisig_required" }, "minimum_approvals": { "type": "integer", "minimum": 2 } } } } }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "lifecycle": { "properties": { "state": { "enum": ["planned", "local_verified", "mainnet_ready"] } } } } },
+      "then": {
+        "properties": {
+          "assurances": { "properties": { "publication_transactions_signed": { "const": false }, "publication_transactions_broadcast": { "const": false } } },
+          "evidence": {
+            "properties": {
+              "chain_identifier": { "type": "null" }, "publication_endpoint_ref": { "type": "null" }, "package_id": { "type": "null" }, "type_tag": { "type": "null" }, "pending_currency_object_id": { "type": "null" }, "registered_currency_object_id": { "type": "null" }, "metadata_cap_object_id": { "type": "null" }, "upgrade_cap_object_id": { "type": "null" }, "initial_supply_coin_object_id": { "type": "null" }, "publish_tx_digest": { "type": "null" }, "currency_registration_tx_digest": { "type": "null" }, "allocation_tx_digest": { "type": "null" }, "allocation_receipts": { "type": "null" }, "role_handoff_tx_digest": { "type": "null" }, "publish_checkpoint": { "type": "null" }, "registration_checkpoint": { "type": "null" }, "verify_source_status": { "const": "not_run" }, "verify_source_result_digest": { "type": "null" },
+              "independent_verification": { "properties": { "status": { "const": "not_run" }, "transport": { "const": "none" }, "endpoint_ref": { "type": "null" }, "observed_at": { "type": "null" }, "evidence_digest": { "type": "null" } } }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "lifecycle": { "properties": { "state": { "enum": ["testnet_published", "mainnet_published"] } } } } },
+      "then": {
+        "properties": {
+          "lifecycle": { "properties": { "revision": { "minimum": 2 } } },
+          "assurances": { "properties": { "publication_transactions_signed": { "const": true }, "publication_transactions_broadcast": { "const": true } } },
+          "evidence": {
+            "properties": {
+              "chain_identifier": { "type": "string" }, "publication_endpoint_ref": { "type": "string" }, "package_id": { "type": "string" }, "type_tag": { "type": "string" }, "pending_currency_object_id": { "type": "string" }, "registered_currency_object_id": { "type": "string" }, "metadata_cap_object_id": { "type": "string" }, "upgrade_cap_object_id": { "type": "string" }, "initial_supply_coin_object_id": { "type": "string" }, "publish_tx_digest": { "type": "string" }, "currency_registration_tx_digest": { "type": "string" }, "allocation_tx_digest": { "type": "string" }, "allocation_receipts": { "type": "array" }, "role_handoff_tx_digest": { "type": "string" }, "publish_checkpoint": { "type": "string" }, "registration_checkpoint": { "type": "string" }, "verify_source_status": { "const": "verified" }, "verify_source_result_digest": { "type": "string" },
+              "independent_verification": { "properties": { "status": { "const": "verified" }, "transport": { "enum": ["grpc", "graphql"] }, "endpoint_ref": { "type": "string" }, "observed_at": { "type": "string" }, "evidence_digest": { "type": "string" } } }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "lifecycle": { "properties": { "state": { "enum": ["testnet_published", "mainnet_ready", "mainnet_published"] } } } } },
+      "then": {
+        "properties": {
+          "roles": {
+            "properties": {
+              "treasury": { "properties": { "holder_ref": { "type": "string" } } }, "upgrade": { "properties": { "holder_ref": { "type": "string" } } }, "metadata": { "properties": { "holder_ref": { "type": "string" } } }, "distribution": { "properties": { "holder_ref": { "type": "string" } } }, "pause": { "properties": { "holder_ref": { "type": "string" } } }, "gas_sponsor": { "properties": { "holder_ref": { "type": "string" } } }, "team_vesting": { "properties": { "holder_ref": { "type": "string" } } }, "liquidity": { "properties": { "holder_ref": { "type": "string" } } }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "lifecycle": { "properties": { "state": { "enum": ["mainnet_ready", "mainnet_published"] } } } } },
+      "then": {
+        "properties": {
+          "chain": { "properties": { "network": { "const": "mainnet" } } },
+          "lifecycle": { "properties": { "revision": { "minimum": 2 } } },
+          "roles": { "properties": { "deployer": { "properties": { "holder_ref": { "type": "string" } } } } },
+          "upgrade_policy": { "enum": ["compatible", "additive", "dep_only", "immutable"] },
+          "mainnet_gates": {
+            "properties": {
+              "all_approved": { "const": true },
+              "legal": { "$ref": "#/$defs/approvedGate" }, "security_audit": { "$ref": "#/$defs/approvedGate" }, "multisig": { "$ref": "#/$defs/approvedGate" }, "recovery": { "$ref": "#/$defs/approvedGate" }, "migration": { "$ref": "#/$defs/approvedGate" }, "treasury_reconciliation": { "$ref": "#/$defs/approvedGate" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "lifecycle": { "properties": { "state": { "const": "mainnet_published" } } } } },
+      "then": { "properties": { "lifecycle": { "properties": { "revision": { "minimum": 3 } } } } }
+    },
+    {
+      "if": { "properties": { "lifecycle": { "properties": { "state": { "const": "planned" } } } } },
+      "then": { "properties": { "toolchain": { "properties": { "verification_status": { "const": "uncompiled" }, "package_input_digest": { "type": "null" }, "move_source_digest": { "type": "null" }, "move_test_source_digest": { "type": "null" }, "build_evidence_digest": { "type": "null" }, "test_evidence_digest": { "type": "null" } } } } }
+    },
+    {
+      "if": { "properties": { "lifecycle": { "properties": { "state": { "enum": ["local_verified", "testnet_published", "mainnet_ready", "mainnet_published"] } } } } },
+      "then": { "properties": { "toolchain": { "properties": { "verification_status": { "const": "verified" }, "package_input_digest": { "type": "string" }, "move_source_digest": { "type": "string" }, "move_test_source_digest": { "type": "string" }, "build_evidence_digest": { "type": "string" }, "test_evidence_digest": { "type": "string" } } } } }
+    },
+    {
+      "if": { "properties": { "paid_user_migration": { "properties": { "claims_enabled": { "const": true } } } } },
+      "then": { "properties": { "paid_user_migration": { "properties": { "claim_schema_status": { "const": "enabled" } } }, "lifecycle": { "properties": { "state": { "enum": ["testnet_published", "mainnet_published"] } } } } }
+    },
+    {
+      "if": { "properties": { "paid_user_migration": { "properties": { "claim_schema_status": { "const": "enabled" } } } } },
+      "then": { "properties": { "paid_user_migration": { "properties": { "claims_enabled": { "const": true } } } } }
+    }
+  ]
+}

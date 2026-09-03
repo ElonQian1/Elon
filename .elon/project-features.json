@@ -6065,6 +6065,166 @@
       "updated_at_ms": 1788389637404
     },
     {
+      "id": "esk-sui-genesis-foundation-v1",
+      "title": "ESK Sui 创世基础与可验证发行门禁 V1",
+      "summary": "固定 ESK 上 Sui 的创世参数、供应守恒、阶段证据与历史付费用户映射门禁，并交付固定供应 Currency 源码和自动验证；本轮不签名、不广播、不移动真实资金。",
+      "status": "verified",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/esk-sui-genesis-foundation-v1.md",
+        "content_hash": "1ef3992fa3c7eb75b9afd6cc1754057b2065058d48f7cdefd2fad3ac33e14e00",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "d78c0d3ec802b03b75336772e87a1640a50e7db3",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "ce27f0c553f6776a60521c2ea818471db1d24c61",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "platform-assets,protocol",
+      "tags": [
+        "esk",
+        "sui",
+        "token",
+        "genesis",
+        "security"
+      ],
+      "task_paths": [
+        "contracts/sui/esk-genesis-manifest-v1.fixture.json",
+        "contracts/sui/esk-genesis-manifest-v1.schema.json",
+        "contracts/sui/esk_currency/Move.toml",
+        "contracts/sui/esk_currency/sources/esk.move",
+        "contracts/sui/esk_currency/tests/esk_tests.move",
+        "docs/decisions/esk-sui-economic-foundation-v1.md",
+        "docs/requirements/esk-sui-genesis-foundation-v1.md",
+        "scripts/test-esk-sui-genesis-foundation.js"
+      ],
+      "dependencies": [
+        "esk-paper-asset-account-v1",
+        "esk-paper-first-user-allocation-operations-v1",
+        "esk-paper-quant-allocation-binding-v3"
+      ],
+      "acceptance_criteria": [
+        "机器可验证清单固定 ESK 身份、六位精度、Sui Currency Standard、供应与分配守恒以及职责分离。",
+        "计划态不能伪造链上证据；测试网或主网状态缺少 package、type tag、交易摘要、checkpoint 与独立验证时必须失败。",
+        "历史付费用户必须逐条对账并选择唯一商业用途，不得把 Paper 余额自动转换为链上余额。",
+        "ESK 单币经济参与决定保留，QSHARE、公司股权、服务订单和量化资金保持独立账本。",
+        "最小 Move 包一次预铸并固定供应，不保留公开增发入口；无 Sui 工具链时明确 UNCOMPILED。",
+        "测试通过且不包含秘密、不签名、不广播、不移动真实资产。"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "contracts/sui/esk-genesis-manifest-v1.fixture.json",
+          "content_hash": "786b9d4a4c8def4864be6270720ea2293b157538b9b9c3a495363a19e2b9727f",
+          "locator": "local_verified testnet foundation fixture",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "d78c0d3ec802b03b75336772e87a1640a50e7db3",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "976bfade1f29b931290133ea233298425f0086cd",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "contracts/sui/esk-genesis-manifest-v1.schema.json",
+          "content_hash": "14c85b05dca4e0398793f5c0cc16295eb334c95fe494b20198dee3146ffe0ddc",
+          "locator": "root schema and lifecycle conditionals",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "d78c0d3ec802b03b75336772e87a1640a50e7db3",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "0a740d1a8cee44fbbe1e68a371fc5ae26ef8d985",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "contracts/sui/esk_currency/Move.toml",
+          "content_hash": "cf2cb75dbefb4c662a211bcf91813e0eea7efc423a766d4e73b4dcd021370485",
+          "locator": "pinned Sui framework dependency",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "d78c0d3ec802b03b75336772e87a1640a50e7db3",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "b28da1bc83d3fe6bbf9c63f6b60485fd17609b54",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "contracts/sui/esk_currency/sources/esk.move",
+          "content_hash": "c340a254e0bfa63b252401410fc9d2a8a9613a8aaf2bf3195de7d13950c2e42e",
+          "locator": "fixed-supply ESK currency initializer",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "d78c0d3ec802b03b75336772e87a1640a50e7db3",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "688b0deee2e7e4bd363e80216ea5850275a5e124",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "contracts/sui/esk_currency/tests/esk_tests.move",
+          "content_hash": "b9d37147ff4c6207835f221b883e391985ad24bce36b22d7139865c507511055",
+          "locator": "supply, decimals and TreasuryCap lifecycle tests",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "d78c0d3ec802b03b75336772e87a1640a50e7db3",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "52077a77560fac10244d850ec447f0b40d82146f",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "docs/decisions/esk-sui-economic-foundation-v1.md",
+          "content_hash": "27a49de043475c24ef88bd6f45aeabdd342e85544cd1595c0755b9b787767351",
+          "locator": "accepted Sui and ESK economic boundary ADR",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "d78c0d3ec802b03b75336772e87a1640a50e7db3",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "4a64367027df245cd16025cddbfd2ddf24a416e7",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "docs/requirements/esk-sui-genesis-foundation-v1.md",
+          "content_hash": "1ef3992fa3c7eb75b9afd6cc1754057b2065058d48f7cdefd2fad3ac33e14e00",
+          "locator": "accepted local_verified requirement",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "d78c0d3ec802b03b75336772e87a1640a50e7db3",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "ce27f0c553f6776a60521c2ea818471db1d24c61",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/test-esk-sui-genesis-foundation.js",
+          "content_hash": "5a1980cdd3d90ad889058707a9458cd7ce2f81b7f11a11ce599320db515197d0",
+          "locator": "schema, semantic, source binding and adversarial checks",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "d78c0d3ec802b03b75336772e87a1640a50e7db3",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "d841d0fd790732766e7ff345806f06650eb336fc",
+            "state": "untracked"
+          }
+        }
+      ],
+      "created_at_ms": 1788454885588,
+      "updated_at_ms": 1788459656794
+    },
+    {
       "id": "esk_paper_quant_allocation_request_v2",
       "title": "ESK Paper 量化分配申请与只读占用投影 V2",
       "summary": "用户可在主项目把可用 ESK 提交为可取消的 Paper 量化分配申请；主项目分别核算卖回、量化与总占用，并通过最长五分钟签名 V2 投影让量化 PWA 只读展示，不自动建仓、交易或产生收益。",
@@ -15739,126 +15899,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_88a8133cb14e4466a1b4787a8cfa8efd",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex-root-019fc8bf-q17-rebase",
-      "reason": "Reviewed the rebased Q17 authority against the exact 88-member catalog, 172-scalar payload partition, 12-path source scope, aggregate counts, and closed production boundary.",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1788286976219
-    },
-    {
-      "id": "feature_event_fbf141df9b8941a19319e6aec68fc3e4",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex-root-019fc8bf-q17-rebase",
-      "reason": "The rebased Q17 requirement is accepted, its verified dependency remains satisfied, and the fresh evidence-binding pass is ready.",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1788287001092
-    },
-    {
-      "id": "feature_event_e1f153963f554ed1b08d4ca437453981",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "claimed",
-      "actor": "codex-root-019fc8bf-q17-rebase-evidence",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788287010635
-    },
-    {
-      "id": "feature_event_4b4721a978ad4a139b2e6e5fc46c393c",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex-root-019fc8bf-q17-rebase-evidence",
-      "reason": "Bind the rebased Q17 source, frozen catalog, static contract, managed dual-unavailable receipt, tests, and authority evidence before returning to the known full-quotient blocker.",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788287034148
-    },
-    {
-      "id": "feature_event_4941c44934584e569f8fc04d9ce3ebe4",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-root-019fc8bf-q17-rebase-evidence",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788287050994
-    },
-    {
-      "id": "feature_event_c8ab4d2b7f944d7faebf042f6ee2cdb8",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex-root-019fc8bf-q17-rebase-evidence",
-      "reason": "Q17 rebased source/docs/static evidence is complete and current. Full feature remains blocked: 4,472 Lock members/3,944 groups are PlannedMissing; Qmap/Qlock, reviewed inventory digest and canonical manifests remain absent; Windows process-isolated actual receipts, compile and runtime validation are intentionally not run; the 19-artifact refresh must include q15-q17. Production VFS/Runtime/Ready/dispatch/market/settlement/funds remain closed.",
-      "from_status": "in_progress",
-      "to_status": "blocked",
-      "at_ms": 1788287062469
-    },
-    {
-      "id": "feature_event_c5986be44eef48fe8c8cd5e1d738fd13",
-      "feature_id": "yilong-quant-paper-grant-revocation-sync-v1",
-      "action": "registered",
-      "actor": "codex-goal-quant-grant-revocation-sync",
-      "reason": "",
-      "from_status": "",
-      "to_status": "accepted",
-      "at_ms": 1788288231346
-    },
-    {
-      "id": "feature_event_2ef2bff8594149af9cdb70a78e4b7aaf",
-      "feature_id": "yilong-quant-paper-grant-revocation-sync-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-quant-grant-revocation-sync",
-      "reason": "需求范围和安全边界已接受，可开始官方目录同步。",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1788288242160
-    },
-    {
-      "id": "feature_event_a29a7fdd922549d4987e238388c0d546",
-      "feature_id": "yilong-quant-paper-grant-revocation-sync-v1",
-      "action": "claimed",
-      "actor": "codex-goal-quant-grant-revocation-sync",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788288251721
-    },
-    {
-      "id": "feature_event_dc535a0ed7e74df298a59dd8e1559012",
-      "feature_id": "yilong-quant-paper-grant-revocation-sync-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-quant-grant-revocation-sync",
-      "reason": "已认领并开始同步量化 V8 公开目录与文档。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788288261660
-    },
-    {
-      "id": "feature_event_ae0b402ac0654e0eb8a0c15fc4b4e767",
-      "feature_id": "yilong-quant-paper-grant-revocation-sync-v1",
-      "action": "claim_released",
-      "actor": "codex-goal-quant-grant-revocation-sync",
-      "reason": "实现和关键合同验证完成，先释放认领以更新需求实现状态并显式重审。",
-      "from_status": "in_progress",
-      "to_status": "ready",
-      "at_ms": 1788288801053
-    },
-    {
-      "id": "feature_event_3b3a38a6472e41c1937b1b6c3bd23570",
-      "feature_id": "yilong-quant-paper-grant-revocation-sync-v1",
-      "action": "requirement_rebound",
-      "actor": "codex-goal-quant-grant-revocation-sync",
-      "reason": "合同测试和 Server 非测试编译检查通过，正式需求实现状态更新为 verified。",
-      "from_status": "ready",
-      "to_status": "proposed",
-      "at_ms": 1788288816730
-    },
-    {
       "id": "feature_event_e99b6d439daa4ae28c187876d80ef710",
       "feature_id": "yilong-quant-paper-grant-revocation-sync-v1",
       "action": "transitioned",
@@ -17737,6 +17777,126 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1788389637404
+    },
+    {
+      "id": "feature_event_271e563aab6a4c058b99d924000deedc",
+      "feature_id": "esk-sui-genesis-foundation-v1",
+      "action": "registered",
+      "actor": "Codex Desktop",
+      "reason": "用户已确认最终上链方向并要求立即开始；先建立可验证且不越权的创世基础，避免未来发行与现有 Paper/量化账本混淆。",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1788454885588
+    },
+    {
+      "id": "feature_event_c04d88cd2f894053997b4177755993cf",
+      "feature_id": "esk-sui-genesis-foundation-v1",
+      "action": "claimed",
+      "actor": "codex:01a05b8d-2a7e-79b1-b798-f46874ff9a87",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788454909651
+    },
+    {
+      "id": "feature_event_809bb375150c4a8d8cf7d362b662f3b8",
+      "feature_id": "esk-sui-genesis-foundation-v1",
+      "action": "transitioned",
+      "actor": "Codex Desktop",
+      "reason": "已完成查重、双仓边界审查和文件规模预案，开始实现创世清单、固定供应 Move 包与自动门禁。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788454948570
+    },
+    {
+      "id": "feature_event_3fd86c57f7f34a0cb0cac57a35366cc3",
+      "feature_id": "esk-sui-genesis-foundation-v1",
+      "action": "claim_released",
+      "actor": "codex:01a05b8d-2a7e-79b1-b798-f46874ff9a87",
+      "reason": "需求与验证合同经安全审查发生有意修订，先释放认领以按治理流程重新绑定。",
+      "from_status": "in_progress",
+      "to_status": "blocked",
+      "at_ms": 1788459463797
+    },
+    {
+      "id": "feature_event_aa15fc0e60ac449fadd0568fdf9b7137",
+      "feature_id": "esk-sui-genesis-foundation-v1",
+      "action": "requirement_rebound",
+      "actor": "Codex Desktop",
+      "reason": "根据三轮安全审查修正网络状态机、QSHARE V21 边界、链上权威、逐桶回执、前序链与 fail-closed 验证合同。",
+      "from_status": "blocked",
+      "to_status": "proposed",
+      "at_ms": 1788459488296
+    },
+    {
+      "id": "feature_event_61b9b9ceb1c54755a6e10ac4b7ea6ca9",
+      "feature_id": "esk-sui-genesis-foundation-v1",
+      "action": "transitioned",
+      "actor": "Codex Desktop",
+      "reason": "需求已由架构、Move 与清单安全三类独立审查复核，V21 边界、主链权威和 fail-closed 证据模型均已接受。",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1788459496821
+    },
+    {
+      "id": "feature_event_f4bfb4290ffd41619eeceedc23616f84",
+      "feature_id": "esk-sui-genesis-foundation-v1",
+      "action": "transitioned",
+      "actor": "Codex Desktop",
+      "reason": "依赖均已满足，任务路径、验收边界与本地/上线状态隔离已明确，可重新认领交付。",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1788459522033
+    },
+    {
+      "id": "feature_event_b30534fcf12742d4b61ff2ed5ce1971b",
+      "feature_id": "esk-sui-genesis-foundation-v1",
+      "action": "claimed",
+      "actor": "codex:01a05b8d-2a7e-79b1-b798-f46874ff9a87",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788459543090
+    },
+    {
+      "id": "feature_event_cda3f655c3e7484988947096474fafb8",
+      "feature_id": "esk-sui-genesis-foundation-v1",
+      "action": "transitioned",
+      "actor": "Codex Desktop",
+      "reason": "审查修订、机器验证与负例测试已完成，进入最终证据登记、提交和同步阶段。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788459554828
+    },
+    {
+      "id": "feature_event_327a14c4412d4193b56a9ea95846bfbd",
+      "feature_id": "esk-sui-genesis-foundation-v1",
+      "action": "evidence_recorded",
+      "actor": "Codex Desktop",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788459604410
+    },
+    {
+      "id": "feature_event_7e30f17dcbf8451283c53ea2bcb48afa",
+      "feature_id": "esk-sui-genesis-foundation-v1",
+      "action": "transitioned",
+      "actor": "Codex Desktop",
+      "reason": "固定供应 Move 包、创世 Schema/fixture、V21 架构边界和离线 fail-closed 校验器均已实现并绑定当前证据。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1788459644745
+    },
+    {
+      "id": "feature_event_667fa4a096014848a5c5757dbc2ca97a",
+      "feature_id": "esk-sui-genesis-foundation-v1",
+      "action": "transitioned",
+      "actor": "Codex Desktop",
+      "reason": "Node Schema/语义/负例测试、AJV Draft 2020 独立验证、既有 ESK 合同回归、源码与文档门禁均通过；官方 Sui 1.79.0 build/test 证据已绑定。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1788459656794
     }
   ]
 }

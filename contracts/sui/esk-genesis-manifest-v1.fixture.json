@@ -1,0 +1,272 @@
+{
+  "$schema": "./esk-genesis-manifest-v1.schema.json",
+  "schema": "yilong.esk.sui.genesis_manifest.v1",
+  "manifest_id": "esk-sui-testnet-foundation-v1",
+  "lifecycle": {
+    "state": "local_verified",
+    "revision": 1,
+    "predecessor_manifest_id": null,
+    "predecessor_revision": null,
+    "predecessor_digest": null,
+    "updated_at": "2026-09-03T17:31:02Z"
+  },
+  "asset": {
+    "asset_id": "esk",
+    "symbol": "ESK",
+    "name": "Yilong ESK",
+    "decimals": 6,
+    "description": "Yilong ecosystem token for service payment, governance, and approved distributable-profit snapshot participation; not legal equity, a deposit, a stablecoin, or a guaranteed return.",
+    "icon_url": null
+  },
+  "chain": {
+    "platform": "sui",
+    "standard": "sui_currency_standard",
+    "network": "testnet",
+    "registry_object_id": "0xc",
+    "rpc_family": "grpc"
+  },
+  "toolchain": {
+    "sui_release": "testnet-v1.79.0",
+    "sui_source_commit": "46f18562f1f5af2438d35828e8b62d5e0b972db7",
+    "move_edition": "2024",
+    "verification_status": "verified",
+    "package_input_digest": "sha256:aaede98ca5312786fcfca8586865c3f2b83d2b9ae27eacb2c47eb58b7e5ebc7d",
+    "move_source_digest": "sha256:c340a254e0bfa63b252401410fc9d2a8a9613a8aaf2bf3195de7d13950c2e42e",
+    "move_test_source_digest": "sha256:b9d37147ff4c6207835f221b883e391985ad24bce36b22d7139865c507511055",
+    "build_evidence_digest": "sha256:b1881cd12ebf1fae560f71f668cd768a2c8838f2e0298eeb2e95e273bfd97472",
+    "test_evidence_digest": "sha256:e1f934234dd2b6d9236d8e46a1430c732836962787067234368dc1a84212244a"
+  },
+  "supply": {
+    "policy": "fixed",
+    "display_units": "1000000000",
+    "base_units": "1000000000000000",
+    "decimals": 6,
+    "treasury_cap_retained": false
+  },
+  "allocations": [
+    {
+      "bucket_id": "user_migration_and_ecosystem",
+      "base_units": "250000000000000",
+      "basis_points": 2500,
+      "recipient_role": "distribution",
+      "vesting_policy_ref": "policy:user-migration-v1"
+    },
+    {
+      "bucket_id": "team_vesting",
+      "base_units": "200000000000000",
+      "basis_points": 2000,
+      "recipient_role": "team_vesting",
+      "vesting_policy_ref": "policy:team-vesting-v1"
+    },
+    {
+      "bucket_id": "project_treasury",
+      "base_units": "250000000000000",
+      "basis_points": 2500,
+      "recipient_role": "treasury",
+      "vesting_policy_ref": "policy:project-treasury-v1"
+    },
+    {
+      "bucket_id": "liquidity",
+      "base_units": "150000000000000",
+      "basis_points": 1500,
+      "recipient_role": "liquidity",
+      "vesting_policy_ref": "policy:liquidity-v1"
+    },
+    {
+      "bucket_id": "community_contributors",
+      "base_units": "100000000000000",
+      "basis_points": 1000,
+      "recipient_role": "distribution",
+      "vesting_policy_ref": "policy:community-contributors-v1"
+    },
+    {
+      "bucket_id": "security_operations_reserve",
+      "base_units": "50000000000000",
+      "basis_points": 500,
+      "recipient_role": "treasury",
+      "vesting_policy_ref": "policy:security-operations-reserve-v1"
+    }
+  ],
+  "roles": {
+    "deployer": {
+      "role_id": "genesis_deployer",
+      "custody": "ephemeral_deployer",
+      "holder_ref": null,
+      "minimum_approvals": 1
+    },
+    "treasury": {
+      "role_id": "treasury_multisig",
+      "custody": "multisig_required",
+      "holder_ref": null,
+      "minimum_approvals": 2
+    },
+    "upgrade": {
+      "role_id": "upgrade_multisig",
+      "custody": "multisig_required",
+      "holder_ref": null,
+      "minimum_approvals": 2
+    },
+    "metadata": {
+      "role_id": "metadata_multisig",
+      "custody": "multisig_required",
+      "holder_ref": null,
+      "minimum_approvals": 2
+    },
+    "distribution": {
+      "role_id": "distribution_multisig",
+      "custody": "multisig_required",
+      "holder_ref": null,
+      "minimum_approvals": 2
+    },
+    "pause": {
+      "role_id": "participation_pause_multisig",
+      "custody": "multisig_required",
+      "holder_ref": null,
+      "minimum_approvals": 2
+    },
+    "gas_sponsor": {
+      "role_id": "gas_sponsor_service",
+      "custody": "service_principal",
+      "holder_ref": null,
+      "minimum_approvals": 1
+    },
+    "team_vesting": {
+      "role_id": "team_vesting_multisig",
+      "custody": "multisig_required",
+      "holder_ref": null,
+      "minimum_approvals": 2
+    },
+    "liquidity": {
+      "role_id": "liquidity_multisig",
+      "custody": "multisig_required",
+      "holder_ref": null,
+      "minimum_approvals": 2
+    }
+  },
+  "upgrade_policy": "pending",
+  "ledger_boundaries": [
+    {
+      "ledger_id": "esk_balance",
+      "authority": "yilong_main",
+      "asset_or_fact": "ESK Paper and platform-recorded entries plus finalized chain index projection",
+      "may_revalue_esk": false
+    },
+    {
+      "ledger_id": "esk_onchain_ownership",
+      "authority": "sui",
+      "asset_or_fact": "Final onchain ESK quantity, ownership, transfers, and transaction finality",
+      "may_revalue_esk": false
+    },
+    {
+      "ledger_id": "esk_profit_distribution",
+      "authority": "yilong_main",
+      "asset_or_fact": "Approved distributable-profit eligibility snapshots and allocations",
+      "may_revalue_esk": false
+    },
+    {
+      "ledger_id": "service_order",
+      "authority": "yilong_main",
+      "asset_or_fact": "Service quote, invoice, ESK payment reference, and delivery receipt",
+      "may_revalue_esk": false
+    },
+    {
+      "ledger_id": "project_treasury",
+      "authority": "yilong_main",
+      "asset_or_fact": "Project financing proceeds, self-funded quant allocation, and recognized income",
+      "may_revalue_esk": false
+    },
+    {
+      "ledger_id": "qshare_nav",
+      "authority": "yilong_quant",
+      "asset_or_fact": "Independent QSHARE units, NAV, subscription, redemption, fees, and distribution epochs",
+      "may_revalue_esk": false
+    },
+    {
+      "ledger_id": "customer_quant_principal",
+      "authority": "yilong_quant",
+      "asset_or_fact": "Segregated customer subscription principal and redemption liabilities",
+      "may_revalue_esk": false
+    },
+    {
+      "ledger_id": "legal_equity_register",
+      "authority": "legal_entity_register",
+      "asset_or_fact": "Legal shares and shareholder register if separately created",
+      "may_revalue_esk": false
+    }
+  ],
+  "paid_user_migration": {
+    "mode": "claim_after_reconciliation",
+    "claims_enabled": false,
+    "claim_schema_status": "not_implemented",
+    "automatic_paper_conversion": false,
+    "one_payment_one_purpose": true,
+    "allowed_purposes": [
+      "esk_purchase",
+      "service_purchase",
+      "qshare_subscription"
+    ],
+    "required_claim_fields": [
+      "opaque_subject",
+      "reconciled_payment_asset",
+      "reconciled_payment_amount",
+      "external_payment_reference",
+      "payment_observed_at",
+      "commercial_purpose",
+      "sale_batch_id",
+      "esk_base_units",
+      "disclosure_revision",
+      "eligibility_decision",
+      "address_control_proof",
+      "idempotency_key",
+      "approval_digest"
+    ]
+  },
+  "assurances": {
+    "supply_policy": "fixed",
+    "currency_regulation": "unregulated",
+    "permanent_usdt_peg": false,
+    "guaranteed_yield": false,
+    "unlimited_loss_guarantee": false,
+    "legal_equity": false,
+    "automatic_paper_conversion": false,
+    "customer_funds_moved": false,
+    "publication_transactions_signed": false,
+    "publication_transactions_broadcast": false
+  },
+  "mainnet_gates": {
+    "all_approved": false,
+    "legal": { "status": "pending", "evidence_ref": null },
+    "security_audit": { "status": "pending", "evidence_ref": null },
+    "multisig": { "status": "pending", "evidence_ref": null },
+    "recovery": { "status": "pending", "evidence_ref": null },
+    "migration": { "status": "pending", "evidence_ref": null },
+    "treasury_reconciliation": { "status": "pending", "evidence_ref": null }
+  },
+  "evidence": {
+    "chain_identifier": null,
+    "publication_endpoint_ref": null,
+    "package_id": null,
+    "type_tag": null,
+    "pending_currency_object_id": null,
+    "registered_currency_object_id": null,
+    "metadata_cap_object_id": null,
+    "upgrade_cap_object_id": null,
+    "initial_supply_coin_object_id": null,
+    "publish_tx_digest": null,
+    "currency_registration_tx_digest": null,
+    "allocation_tx_digest": null,
+    "allocation_receipts": null,
+    "role_handoff_tx_digest": null,
+    "publish_checkpoint": null,
+    "registration_checkpoint": null,
+    "verify_source_status": "not_run",
+    "verify_source_result_digest": null,
+    "independent_verification": {
+      "status": "not_run",
+      "transport": "none",
+      "endpoint_ref": null,
+      "observed_at": null,
+      "evidence_digest": null
+    }
+  }
+}
