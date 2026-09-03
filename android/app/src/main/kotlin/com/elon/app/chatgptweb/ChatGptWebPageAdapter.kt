@@ -599,6 +599,7 @@ internal class ChatGptWebPageAdapter(
             "chatgpt_web_adapter_attachment_policy.js",
             "chatgpt_web_dictation_runtime.js",
             "chatgpt_web_adapter_dictation_session_policy.js",
+            "chatgpt_web_adapter_dictation_actions.js",
             "chatgpt_web_adapter_composer.js",
             "chatgpt_web_adapter_navigation_policy.js",
             "chatgpt_web_adapter_navigation.js",

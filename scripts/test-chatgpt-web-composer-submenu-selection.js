@@ -4,6 +4,9 @@ const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const dictationActionsModule = require(
+  '../android/app/src/main/assets/chatgpt_web_adapter_dictation_actions.js'
+);
 
 const source = fs.readFileSync(
   path.resolve(
@@ -133,6 +136,8 @@ const sandbox = {
 sandbox.window.window = sandbox.window;
 sandbox.window.document = document;
 sandbox.window.location = sandbox.location;
+sandbox.window.__elonChatGptDictationActions =
+  dictationActionsModule.createForRoot(sandbox.window);
 
 vm.runInNewContext(submenuSource, sandbox, {
   filename: 'chatgpt_web_adapter_composer_submenu.js'

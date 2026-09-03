@@ -179,6 +179,10 @@ internal class ChatGptBackgroundSession(
                 latestSnapshot?.streaming == true ||
                 conversationNavigation.hasPending() || sendOwner.hasAttachmentSend()
         }
+    private val privateDictation = ChatGptBackgroundPrivateDictation(
+        { pageAdapter }, { state == State.READY }, audioPermissionController,
+        webExecution::interactionRequested,
+    )
     private val touchRequestHandler by lazy(LazyThreadSafetyMode.NONE) {
         ChatGptWebTouchRequestHandler(
             { webView }, { pageAdapter }, { touchDispatcher },
@@ -366,32 +370,11 @@ internal class ChatGptBackgroundSession(
         nativeDraft: String,
         expectedOfficialDraft: String,
         onPermissionDenied: () -> Unit,
-    ): Boolean {
-        val adapter = pageAdapter ?: return false
-        if (state != State.READY) return false
-        audioPermissionController.runWithMicrophone(
-            action = {
-                adapter.startPrivateDictation(nativeDraft, expectedOfficialDraft)
-                webExecution.interactionRequested()
-            },
-            onPermissionDenied = onPermissionDenied,
-        )
-        return true
-    }
+    ): Boolean = privateDictation.start(nativeDraft, expectedOfficialDraft, onPermissionDenied)
 
-    fun submitPrivateDictation(): Boolean {
-        val adapter = pageAdapter ?: return false
-        adapter.submitPrivateDictation()
-        webExecution.interactionRequested()
-        return true
-    }
+    fun submitPrivateDictation(): Boolean = privateDictation.submit()
 
-    fun cancelPrivateDictation(): Boolean {
-        val adapter = pageAdapter ?: return false
-        adapter.cancelPrivateDictation()
-        webExecution.interactionRequested()
-        return true
-    }
+    fun cancelPrivateDictation(): Boolean = privateDictation.cancel()
 
     fun startNewConversation(): Boolean = navigationActions.startNewConversation()
 

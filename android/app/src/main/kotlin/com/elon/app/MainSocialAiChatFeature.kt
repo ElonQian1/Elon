@@ -42,7 +42,7 @@ internal class MainSocialAiChatFeature(
     private var composerOperationFeedback: WebChatConsumerComposerFeedback? = null
     private var composerOperationFeedbackEpoch = 0
     private var activeQuickComposerAction: WebChatProductionQuickComposerAction? = null
-    private var projectMoveRecoveryChecked = false
+    private val projectMoveRecovery = WebChatProjectMoveRecoveryGate()
     private val composerDrafts = SocialAiComposerDraftCoordinator(
         providerDrafts = providerDrafts,
         readText = { binding.inputEdit.text },
@@ -359,16 +359,10 @@ internal class MainSocialAiChatFeature(
 
     fun webChatComposerReady(): Boolean = activeController().composerReady()
 
-    fun webChatDictationActive(): Boolean {
-        if (!isChatModeActive()) return false
-        val consumerState = runCatching {
-            activeController().consumerPort()?.state()
-        }.getOrNull()
-        return productionVoiceControls.dictationPresentation(
-            officialActive = consumerState?.dictationActive == true,
-            officialCaptureActive = consumerState?.dictationCaptureActive == true,
-        ).active
-    }
+    fun webChatDictationActive(): Boolean = isChatModeActive() &&
+        productionVoiceControls.dictationActive(
+            runCatching { activeController().consumerPort()?.state() }.getOrNull(),
+        )
 
     fun webChatComposerCanSubmit(): Boolean {
         if (!isChatModeActive()) return true
@@ -451,18 +445,10 @@ internal class MainSocialAiChatFeature(
     fun refreshWebChatConversationIndex(
         projectId: String? = null,
         conversationPath: String? = null,
-    ): Boolean {
-        if (!isChatModeActive()) return false
-        val requestedPath = conversationPath?.trim()?.takeIf(String::isNotEmpty)
-        val requestedProjectId = projectId?.trim()?.takeIf(String::isNotEmpty)
-        if (requestedPath != null) {
-            if (requestedProjectId == null || providerId() != WebChatProviderId.CHATGPT_WEB) {
-                return false
-            }
-            return chatGptController.probeConversationProject(requestedPath, requestedProjectId)
-        }
-        return webChatNavigationSession()?.refresh(requestedProjectId) == true
-    }
+    ): Boolean = MainSocialAiChatNavigationPolicy.refreshIndex(
+        isChatModeActive(), providerId(), projectId, conversationPath,
+        chatGptController::probeConversationProject,
+    ) { webChatNavigationSession()?.refresh(it) == true }
     fun startNewWebChatConversation(): Boolean {
         if (!isChatModeActive()) return false
         return webChatNavigationSession()?.newConversation() == true
@@ -664,12 +650,7 @@ internal class MainSocialAiChatFeature(
         if (isChatModeActive()) {
             val provider = WebChatProviderRegistry.get(providerId())
             val controller = activeController()
-            if (
-                !projectMoveRecoveryChecked &&
-                provider.id == WebChatProviderId.CHATGPT_WEB &&
-                controller.stateWireValue() == "ready"
-            ) {
-                projectMoveRecoveryChecked = true
+            projectMoveRecovery.observe(provider.id, controller.stateWireValue()) {
                 binding.root.post { productionConversationActions.recoverPending() }
             }
             controller.consumerPort()?.state()?.let { realtimeVoiceLaunchCache.observe(provider.id, it) }

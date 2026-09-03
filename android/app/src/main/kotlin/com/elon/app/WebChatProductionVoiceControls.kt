@@ -90,6 +90,11 @@ internal class WebChatProductionVoiceControls(
         )
     }
 
+    fun dictationActive(state: WebChatConsumerState?): Boolean = dictationPresentation(
+        officialActive = state?.dictationActive == true,
+        officialCaptureActive = state?.dictationCaptureActive == true,
+    ).active
+
     fun onDomCommandResult(action: String, ok: Boolean) {
         if (action !in DOM_RESULT_ACTIONS) return
         domSession.commandResult(action, ok)

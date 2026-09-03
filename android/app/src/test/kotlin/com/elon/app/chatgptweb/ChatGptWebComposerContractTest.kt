@@ -35,6 +35,9 @@ class ChatGptWebComposerContractTest {
         val dictationSessionPolicy = readRepositoryFile(
             "android/app/src/main/assets/chatgpt_web_adapter_dictation_session_policy.js",
         )
+        val dictationActions = readRepositoryFile(
+            "android/app/src/main/assets/chatgpt_web_adapter_dictation_actions.js",
+        )
         val modelLabelPolicy = readRepositoryFile(
             "android/app/src/main/assets/chatgpt_web_adapter_model_label_policy.js",
         )
@@ -55,6 +58,7 @@ class ChatGptWebComposerContractTest {
         val toolSelectionAsset = pageAdapter.indexOf("chatgpt_web_adapter_composer_tool_selection.js")
         val actionTargetAsset = pageAdapter.indexOf("chatgpt_web_adapter_action_target_policy.js")
         val dictationSessionAsset = pageAdapter.indexOf("chatgpt_web_adapter_dictation_session_policy.js")
+        val dictationActionsAsset = pageAdapter.indexOf("chatgpt_web_adapter_dictation_actions.js")
         val modelLabelAsset = pageAdapter.indexOf("chatgpt_web_adapter_model_label_policy.js")
         val composerAsset = pageAdapter.indexOf("chatgpt_web_adapter_composer.js")
         assertTrue(modelLabelAsset >= 0)
@@ -64,7 +68,10 @@ class ChatGptWebComposerContractTest {
         assertTrue(toolSelectionAsset > toolStateAsset)
         assertTrue(actionTargetAsset > toolSelectionAsset)
         assertTrue(dictationSessionAsset > actionTargetAsset)
-        assertTrue(composerAsset > dictationSessionAsset)
+        assertTrue(dictationActionsAsset > dictationSessionAsset)
+        assertTrue(composerAsset > dictationActionsAsset)
+        assertTrue(dictationActions.contains("confirmed === true ? 'capture_started'"))
+        assertTrue(dictationActions.contains("confirmed === true ? 'capture_finished'"))
         assertTrue(core.contains("composerAdapter.capabilities(composer)"))
         assertTrue(core.contains("action === 'list_model_options'"))
         assertTrue(core.contains("action === 'list_composer_tools'"))
@@ -178,7 +185,7 @@ class ChatGptWebComposerContractTest {
         assertTrue(attachmentPolicy.contains("isRemoveActionLabel(label)"))
         assertTrue(adapter.contains("dictationActive"))
         assertTrue(adapter.contains("layout.findSemanticNode('dictation', 'composer')"))
-        assertTrue(adapter.contains("layout.requestSemanticTouch('dictation', 'start_dictation'"))
+        assertTrue(dictationActions.contains("layout.requestSemanticTouch('dictation', 'start_dictation'"))
         assertTrue(adapter.contains("dictationSessionPolicy.find"))
         assertTrue(adapter.contains("dictationSessionPolicy.active"))
         assertTrue(dictationSessionPolicy.contains("cancel dictation"))
@@ -265,6 +272,9 @@ class ChatGptWebComposerContractTest {
         val background = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptBackgroundSession.kt",
         )
+        val privateDictation = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptBackgroundPrivateDictation.kt",
+        )
         val optionRequests = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptComposerOptionRequestCoordinator.kt",
         )
@@ -282,7 +292,8 @@ class ChatGptWebComposerContractTest {
         assertTrue(optionInteraction.contains("pageAdapter()?.listComposerTools"))
         assertTrue(optionRequests.contains("dismissMenu(requestId)"))
         assertTrue(optionRequests.contains("dispatchRequest(request.section, request.requestId)"))
-        assertTrue(background.contains("adapter.startDictation"))
+        assertTrue(background.contains("ChatGptBackgroundPrivateDictation("))
+        assertTrue(privateDictation.contains("activeAdapter.startPrivateDictation"))
         val permissionController = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebAudioPermissionController.kt",
         )
@@ -320,7 +331,7 @@ class ChatGptWebComposerContractTest {
         assertFalse(dispatcher.contains("AccessibilityService"))
         assertTrue(handler.contains("adapter::collectModelOptions"))
         assertTrue(handler.contains("adapter::collectComposerTools"))
-        assertTrue(handler.contains("runBackgroundInteraction(dispatch)"))
+        assertTrue(handler.contains("runBackgroundInteraction(interactionKind, dispatch)"))
         assertTrue(background.contains("is ChatGptWebEvent.WebTouchRequest -> touchRequestHandler.handle(event)"))
     }
 

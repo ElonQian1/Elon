@@ -181,10 +181,10 @@ class WebChatProductionVoiceEntryContractTest {
 
     @Test
     fun officialDomDictationActivatesOnlyTheRedactedResearchObserver() {
-        val composer = read("android/app/src/main/assets/chatgpt_web_adapter_composer.js")
+        val actions = read("android/app/src/main/assets/chatgpt_web_adapter_dictation_actions.js")
 
-        val start = composer.substringAfter("function startDictation")
-            .substringBefore("function finishDictation")
+        val start = actions.substringAfter("function start(composer")
+            .substringBefore("function finish(kind")
         assertTrue(start.contains("__elonChatGptRealtimeVoiceResearch"))
         assertTrue(start.contains("research.activate()"))
         assertFalse(start.contains("authorization"))

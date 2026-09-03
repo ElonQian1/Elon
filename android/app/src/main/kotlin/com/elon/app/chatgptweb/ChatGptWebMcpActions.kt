@@ -63,10 +63,7 @@ internal class ChatGptWebMcpActions(
             .put("last_command", ChatGptWebCommandReceipts.lastResultJson(observed))
             .put(
                 "last_project_membership_probe",
-                ChatGptWebCommandReceipts.recentResultJson(
-                    observed,
-                    "probe_conversation_project",
-                ),
+                ChatGptWebCommandReceipts.recentProjectMembershipProbeJson(observed),
             )
             .put("command_requests", ChatGptWebCommandReceipts.requestsJson(observed))
             .put("available_actions", JSONArray(ChatGptWebMcpActionCatalog.availableActions))

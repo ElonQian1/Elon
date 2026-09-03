@@ -28,6 +28,9 @@ internal object ChatGptWebCommandReceipts {
         return resultJson(observed.result, request?.id, observed.observedAtMs)
     }
 
+    fun recentProjectMembershipProbeJson(value: ChatGptWebObservedState.Snapshot): Any =
+        recentResultJson(value, "probe_conversation_project")
+
     private fun resultJson(
         value: ChatGptWebEvent.CommandResult?,
         requestId: String? = null,
