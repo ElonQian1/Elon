@@ -75,6 +75,7 @@ internal class ChatGptSocialChatController(
     private var lastMessageSnapshot: ChatGptWebSnapshot? = null
     private val sentAttachments = linkedMapOf<String, List<ChatAttachment>>()
     private var waitingForAttachmentCompletion = false
+    private var latestAttachmentCompletedCount = 0
     private var latestCommandStatus: WebChatCommandStatus? = null
     private var latestSendCommandStatus: WebChatCommandStatus? = null
     private var latestStateDetail: String? = null
@@ -192,6 +193,7 @@ internal class ChatGptSocialChatController(
     override fun attachmentSendPhase(): String = session.attachmentSendPhase()
 
     override fun pendingAttachmentCount(): Int = maxOf(session.pendingAttachmentCount(), pendingAttachments.size)
+    override fun completedAttachmentCount(): Int = latestAttachmentCompletedCount
     override fun imagePreviewState(): String = session.imagePreviewState().name.lowercase()
 
     override fun showNativeImageGallery(): Boolean = session.showImageGallery(onCreateImageRequested)
@@ -554,6 +556,7 @@ internal class ChatGptSocialChatController(
     }
 
     private fun handleAttachmentSendUpdate(update: ChatGptWebAttachmentSendUpdate) {
+        latestAttachmentCompletedCount = update.completedAttachmentCount
         when (update.phase) {
             "completed" -> {
                 update.userMessageId?.let { id ->
@@ -576,6 +579,7 @@ internal class ChatGptSocialChatController(
                 session.currentSnapshot()?.let(::renderSnapshot)
             }
         }
+        if (active) onComposerStateChanged()
     }
 
     private fun handlePendingSendTimeout(result: WebChatPendingSendState.TimeoutResult) {

@@ -8,6 +8,7 @@ internal class ChatGptWebAttachmentSendTracker private constructor(
 ) {
     private var transportSequence = 0L
     private var transportCompletedCount = 0
+    private var domCompletedCount = 0
 
     enum class Phase(val wireValue: String) {
         UPLOADING("uploading"),
@@ -25,11 +26,16 @@ internal class ChatGptWebAttachmentSendTracker private constructor(
     var phase: Phase = Phase.UPLOADING
         private set
 
+    val completedAttachmentCount: Int
+        get() = maxOf(domCompletedCount, transportCompletedCount)
+            .coerceIn(0, localAttachmentCount)
+
     fun observe(snapshot: ChatGptWebSnapshot): Observation {
         newUserMessage(snapshot)?.let { return Observation.Complete(it.id) }
         if (phase != Phase.UPLOADING) return Observation.Wait
 
         val uploaded = snapshot.attachments.filterNot { it.id in baselineAttachmentIds }
+        domCompletedCount = maxOf(domCompletedCount, uploaded.count { it.state == "ready" })
         if (uploaded.any { it.state == "error" }) {
             phase = Phase.FAILED
             return Observation.Failed("附件上传失败，请重试或打开官网功能。")
@@ -102,6 +108,7 @@ internal class ChatGptWebAttachmentSendTracker private constructor(
 internal data class ChatGptWebAttachmentSendUpdate(
     val phase: String,
     val attachmentCount: Int,
+    val completedAttachmentCount: Int = 0,
     val detail: String? = null,
     val userMessageId: String? = null,
 )

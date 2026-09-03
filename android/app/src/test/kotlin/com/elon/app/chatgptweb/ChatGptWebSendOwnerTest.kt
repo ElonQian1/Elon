@@ -144,6 +144,32 @@ class ChatGptWebSendOwnerTest {
     }
 
     @Test
+    fun partialTransportCompletionPublishesNativeProgressWithoutDispatchingEarly() {
+        val fixture = Fixture()
+        assertTrue(
+            fixture.owner.beginAttachments(
+                "with two files",
+                listOf(pendingAttachment(), pendingAttachment()),
+            ),
+        )
+
+        fixture.owner.acceptAttachmentTransport(
+            ChatGptWebAttachmentTransportEvidence(
+                version = 1,
+                sequence = 1,
+                state = ChatGptWebAttachmentTransportState.COMPLETED,
+                completedCount = 1,
+            ),
+        )
+
+        assertTrue(fixture.transport.commands.isEmpty())
+        assertEquals(1, fixture.owner.completedAttachmentCount())
+        assertEquals("uploading", fixture.attachmentUpdates.last().phase)
+        assertEquals(2, fixture.attachmentUpdates.last().attachmentCount)
+        assertEquals(1, fixture.attachmentUpdates.last().completedAttachmentCount)
+    }
+
+    @Test
     fun localStagingFailureReleasesTheReservationWithoutDispatching() {
         val fixture = Fixture(stageSucceeds = false)
 

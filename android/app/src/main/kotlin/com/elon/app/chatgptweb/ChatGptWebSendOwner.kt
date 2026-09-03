@@ -81,6 +81,7 @@ internal class ChatGptWebSendOwner(
     private var queuedUploadUris = emptyList<Uri>()
     private var attachmentTimeout: Runnable? = null
     private var lastAttachmentPhase = ATTACHMENT_PHASE_IDLE
+    private var lastAttachmentCompletedCount = 0
 
     fun isReady(): Boolean = coordinator.isReady()
 
@@ -146,6 +147,8 @@ internal class ChatGptWebSendOwner(
 
     fun pendingAttachmentCount(): Int = attachmentTracker?.localAttachmentCount ?: 0
 
+    fun completedAttachmentCount(): Int = attachmentTracker?.completedAttachmentCount ?: 0
+
     fun hasAttachmentSend(): Boolean = attachmentTracker != null
 
     fun observeSnapshot(current: ChatGptWebSnapshot) {
@@ -156,7 +159,12 @@ internal class ChatGptWebSendOwner(
     }
 
     fun acceptAttachmentTransport(evidence: ChatGptWebAttachmentTransportEvidence) {
-        attachmentTracker?.observeTransport(evidence) ?: return
+        val tracker = attachmentTracker ?: return
+        val previousCompletedCount = tracker.completedAttachmentCount
+        tracker.observeTransport(evidence)
+        if (tracker.completedAttachmentCount != previousCompletedCount) {
+            publishAttachmentPhase(tracker.phase)
+        }
         snapshot()?.let(::processAttachmentSnapshot)
     }
 
@@ -229,8 +237,13 @@ internal class ChatGptWebSendOwner(
 
     private fun processAttachmentSnapshot(current: ChatGptWebSnapshot) {
         val tracker = attachmentTracker ?: return
+        val previousCompletedCount = tracker.completedAttachmentCount
         when (val observation = tracker.observe(current)) {
-            ChatGptWebAttachmentSendTracker.Observation.Wait -> Unit
+            ChatGptWebAttachmentSendTracker.Observation.Wait -> {
+                if (tracker.completedAttachmentCount != previousCompletedCount) {
+                    publishAttachmentPhase(tracker.phase)
+                }
+            }
             ChatGptWebAttachmentSendTracker.Observation.SendPrompt -> {
                 publishAttachmentPhase(tracker.phase)
                 val commandId = coordinator.commandId()
@@ -252,6 +265,7 @@ internal class ChatGptWebSendOwner(
                     ChatGptWebAttachmentSendUpdate(
                         phase = ATTACHMENT_PHASE_COMPLETED,
                         attachmentCount = tracker.localAttachmentCount,
+                        completedAttachmentCount = tracker.localAttachmentCount,
                         userMessageId = observation.userMessageId,
                     ),
                 )
@@ -262,11 +276,19 @@ internal class ChatGptWebSendOwner(
     }
 
     private fun publishAttachmentPhase(phase: ChatGptWebAttachmentSendTracker.Phase) {
+        val completedCount = attachmentTracker?.completedAttachmentCount ?: 0
+        if (lastAttachmentPhase == phase.wireValue &&
+            lastAttachmentCompletedCount == completedCount
+        ) {
+            return
+        }
         lastAttachmentPhase = phase.wireValue
+        lastAttachmentCompletedCount = completedCount
         onAttachmentChanged(
             ChatGptWebAttachmentSendUpdate(
                 phase = phase.wireValue,
                 attachmentCount = attachmentTracker?.localAttachmentCount ?: 0,
+                completedAttachmentCount = completedCount,
             ),
         )
     }
@@ -290,6 +312,7 @@ internal class ChatGptWebSendOwner(
             ChatGptWebAttachmentSendUpdate(
                 phase = tracker.phase.wireValue,
                 attachmentCount = tracker.localAttachmentCount,
+                completedAttachmentCount = tracker.completedAttachmentCount,
                 detail = detail,
             ),
         )
@@ -302,6 +325,7 @@ internal class ChatGptWebSendOwner(
         queuedUploadUris = emptyList()
         attachmentTracker = null
         lastAttachmentPhase = ATTACHMENT_PHASE_IDLE
+        lastAttachmentCompletedCount = 0
     }
 
     private fun scheduleAttachmentTimeout() {

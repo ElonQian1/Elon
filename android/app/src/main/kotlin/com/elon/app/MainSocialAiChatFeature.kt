@@ -681,7 +681,7 @@ internal class MainSocialAiChatFeature(
             consumerStatusBanner.render(
                 if (recovery.visible) recovery else WebChatConsumerComposerOperationPolicy.resolve(
                     provider = provider,
-                    attachmentPhase = controller.attachmentSendPhase(),
+                    attachmentProgress = controller.attachmentProgress(),
                     feedback = composerOperationFeedback,
                     dictationActive = dictationPresentation.active,
                     imageGenerationActive = activeQuickComposerAction ==

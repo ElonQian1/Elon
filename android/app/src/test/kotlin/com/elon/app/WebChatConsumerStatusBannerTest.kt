@@ -112,6 +112,29 @@ class WebChatConsumerStatusBannerTest {
     }
 
     @Test
+    fun attachmentProgressShowsBoundedCompletedAndTotalCounts() {
+        val uploading = WebChatConsumerComposerOperationPolicy.resolve(
+            provider = chatGpt,
+            attachmentProgress = WebChatAttachmentProgress("uploading", 3, 1),
+            feedback = null,
+        )
+        val ready = WebChatConsumerComposerOperationPolicy.resolve(
+            provider = chatGpt,
+            attachmentProgress = WebChatAttachmentProgress("uploading", 3, 9),
+            feedback = null,
+        )
+        val sending = WebChatConsumerComposerOperationPolicy.resolve(
+            provider = chatGpt,
+            attachmentProgress = WebChatAttachmentProgress("sending", 3, 3),
+            feedback = null,
+        )
+
+        assertEquals("正在上传附件 1/3，完成后会自动发送", uploading.message)
+        assertEquals("附件已上传 3/3，正在准备发送", ready.message)
+        assertEquals("附件上传完成，正在发送", sending.message)
+    }
+
+    @Test
     fun attachmentFailureExplainsThatTheSelectionCanBeRetried() {
         val state = WebChatConsumerComposerOperationPolicy.resolve(
             provider = chatGpt,

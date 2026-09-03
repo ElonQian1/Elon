@@ -28,6 +28,7 @@ installed build; individual capability documents retain implementation evidence.
 | Same-origin text transaction | ChatGPT | Completed, enabled, and device verified on `v1.1.1365 (1386)`, adapter `206`; current dynamic proof selects immediate official fallback | Official-page transaction without automatic write replay |
 | Interaction presets and deferred chat actions | ChatGPT | Completed, enabled, and device verified on research build `v1.1.1367 (1388)` | Current official control and WebView navigation |
 | Attachment upload reconciliation | ChatGPT | Completed, enabled, and device verified on published Release `v1.1.1374 (1395)`, adapter `207` | Official DOM attachment snapshot and bounded timeout |
+| Native attachment upload progress | ChatGPT | Implemented and enabled; monotonic count propagation and presentation tests passed, device UI acceptance pending | Indeterminate native status and official DOM attachment snapshot |
 | Native image assets and cache-first gallery | ChatGPT | Completed, enabled, and device verified on Release candidate `v1.1.1375 (1396)`, adapter `208` | Bounded local image cache and official `/images` fallback |
 | Native image-generation operation status | ChatGPT | Completed and enabled; generation, preview preparation, preview failure, and terminal-hide lifecycle tests passed; consolidated device UI acceptance pending | Official composer and `/images` page |
 | Native private-response rich content | ChatGPT | Completed, enabled, and structurally device verified on Release `v1.1.1379 (1400)` for finance and line-chart cards | Official WebView rich content |
@@ -123,6 +124,15 @@ reply, restored the original conversation, and registered
 `supervised/attachment_lifecycle`. The completed capability is
 `android_chatgpt_attachment_transport_reconciliation_v1` and must not be reimplemented
 without current regression evidence.
+
+The production composer now projects that existing redacted observer into a determinate
+native upload status. Completed counts are monotonic, clamped to the locally selected total,
+and refreshed without waiting for a full conversation snapshot. The sending phase is shown
+separately from upload progress, so a stable official-page gate cannot look like a stalled
+upload. Missing or malformed evidence keeps the previous indeterminate native status and the
+official DOM attachment snapshot remains authoritative. This UI-only slice is registered as
+`android_chatgpt_native_attachment_progress_v1`; filenames, bytes, credentials, and request
+headers do not cross this progress contract.
 
 Native image content keeps the official page as the identity, byte-fetch, generation,
 and conversation authority. Adapter `208` maps allowlisted same-origin image content to

@@ -71,12 +71,28 @@ class ChatGptWebAttachmentSendTrackerTest {
         val tracker = ChatGptWebAttachmentSendTracker.begin("分析附件", 2, snapshot())
 
         tracker.observeTransport(transport(2, "completed", 1))
+        assertEquals(1, tracker.completedAttachmentCount)
         assertTrue(tracker.observe(snapshot()) is ChatGptWebAttachmentSendTracker.Observation.Wait)
         tracker.observeTransport(transport(1, "completed", 2))
+        assertEquals(1, tracker.completedAttachmentCount)
         assertTrue(tracker.observe(snapshot()) is ChatGptWebAttachmentSendTracker.Observation.Wait)
         tracker.observeTransport(transport(3, "completed", 2))
 
+        assertEquals(2, tracker.completedAttachmentCount)
         assertTrue(tracker.observe(snapshot()) is ChatGptWebAttachmentSendTracker.Observation.SendPrompt)
+    }
+
+    @Test
+    fun completedProgressUsesMonotonicDomAndTransportEvidenceWithinTheLocalTotal() {
+        val tracker = ChatGptWebAttachmentSendTracker.begin("分析附件", 2, snapshot())
+
+        tracker.observe(snapshot(attachments = listOf(attachment("a", "ready"))))
+        assertEquals(1, tracker.completedAttachmentCount)
+        tracker.observe(snapshot())
+        assertEquals(1, tracker.completedAttachmentCount)
+        tracker.observeTransport(transport(3, "completed", 9))
+
+        assertEquals(2, tracker.completedAttachmentCount)
     }
 
     @Test

@@ -29,6 +29,7 @@ class WebAiPrivateTransportCatalogTest {
         assertTrue("android_web_ai_unified_send_coordinator_v1" in enabledIds)
         assertTrue("android_chatgpt_same_origin_text_transaction_v1" in enabledIds)
         assertTrue("android_chatgpt_attachment_transport_reconciliation_v1" in enabledIds)
+        assertTrue("android_chatgpt_native_attachment_progress_v1" in enabledIds)
         assertTrue("android_chatgpt_native_image_asset_gallery_v1" in enabledIds)
         assertTrue("android_chatgpt_native_image_generation_status_v1" in enabledIds)
         assertTrue("android_chatgpt_private_rich_content_native_view_v1" in enabledIds)
@@ -294,6 +295,25 @@ class WebAiPrivateTransportCatalogTest {
         assertEquals(
             "official_dom_attachment_snapshot_and_bounded_timeout",
             attachmentTransport.getString("fallback"),
+        )
+
+        val attachmentProgress = values.first {
+            it.getString("capability_id") == "android_chatgpt_native_attachment_progress_v1"
+        }
+        assertEquals(
+            "implemented_device_pending",
+            attachmentProgress.getString("implementation_status"),
+        )
+        assertEquals(
+            "targeted_monotonic_progress_and_presentation_tests_passed",
+            attachmentProgress.getString("verification_status"),
+        )
+        assertTrue(attachmentProgress.getBoolean("production_default"))
+        assertTrue(attachmentProgress.getBoolean("runtime_enabled"))
+        assertFalse(attachmentProgress.getBoolean("direct_post_enabled"))
+        assertEquals(
+            "indeterminate_native_status_and_official_dom_attachment_snapshot",
+            attachmentProgress.getString("fallback"),
         )
 
         val imageGallery = values.first {

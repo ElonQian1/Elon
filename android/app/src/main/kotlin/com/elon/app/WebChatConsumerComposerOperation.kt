@@ -8,14 +8,39 @@ internal data class WebChatConsumerComposerFeedback(
 internal object WebChatConsumerComposerOperationPolicy {
     fun resolve(
         provider: WebChatProviderIdentity,
-        attachmentPhase: String,
+        attachmentProgress: WebChatAttachmentProgress,
         feedback: WebChatConsumerComposerFeedback?,
         dictationActive: Boolean = false,
         imageGenerationActive: Boolean = false,
         streaming: Boolean = false,
         imagePreviewState: String = "idle",
+    ): WebChatConsumerRecoveryState = resolve(
+        provider = provider,
+        attachmentPhase = attachmentProgress.phase,
+        feedback = feedback,
+        attachmentTotalCount = attachmentProgress.totalCount,
+        attachmentCompletedCount = attachmentProgress.completedCount,
+        dictationActive = dictationActive,
+        imageGenerationActive = imageGenerationActive,
+        streaming = streaming,
+        imagePreviewState = imagePreviewState,
+    )
+
+    fun resolve(
+        provider: WebChatProviderIdentity,
+        attachmentPhase: String,
+        feedback: WebChatConsumerComposerFeedback?,
+        attachmentTotalCount: Int = 0,
+        attachmentCompletedCount: Int = 0,
+        dictationActive: Boolean = false,
+        imageGenerationActive: Boolean = false,
+        streaming: Boolean = false,
+        imagePreviewState: String = "idle",
     ): WebChatConsumerRecoveryState = when (attachmentPhase) {
-        "uploading", "sending" -> status("附件上传中，完成后会自动发送")
+        "uploading" -> status(
+            attachmentUploadMessage(attachmentTotalCount, attachmentCompletedCount),
+        )
+        "sending" -> status("附件上传完成，正在发送")
         "failed" -> status("附件发送失败，附件已保留，可重新发送")
         else -> when {
             imageGenerationActive && streaming -> status("正在创建图片…")
@@ -65,4 +90,14 @@ internal object WebChatConsumerComposerOperationPolicy {
         retryVisible = false,
         officialVisible = false,
     )
+
+    private fun attachmentUploadMessage(totalCount: Int, completedCount: Int): String {
+        if (totalCount <= 0) return "附件上传中，完成后会自动发送"
+        val completed = completedCount.coerceIn(0, totalCount)
+        return if (completed == totalCount) {
+            "附件已上传 $completed/$totalCount，正在准备发送"
+        } else {
+            "正在上传附件 $completed/$totalCount，完成后会自动发送"
+        }
+    }
 }

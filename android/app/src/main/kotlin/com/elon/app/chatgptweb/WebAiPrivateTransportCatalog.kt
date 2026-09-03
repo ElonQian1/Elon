@@ -186,6 +186,17 @@ internal object WebAiPrivateTransportCatalog {
             fallback = "official_dom_attachment_snapshot_and_bounded_timeout",
         ),
         Entry(
+            id = "android_chatgpt_native_attachment_progress_v1",
+            provider = "chatgpt",
+            status = "implemented_device_pending",
+            verification = "targeted_monotonic_progress_and_presentation_tests_passed",
+            productionDefault = true,
+            runtimeEnabled = true,
+            requestMode = "redacted_monotonic_completed_count_projection",
+            healthPolicy = "clamped_local_total_and_phase_bound_native_updates",
+            fallback = "indeterminate_native_status_and_official_dom_attachment_snapshot",
+        ),
+        Entry(
             id = "android_chatgpt_native_image_asset_gallery_v1",
             provider = "chatgpt",
             status = "completed",
