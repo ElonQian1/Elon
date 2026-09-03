@@ -61,6 +61,13 @@ internal class ChatGptWebMcpActions(
             .put("ui_manifest", manifestJson(currentManifest))
             .put("navigation", navigationSummary(observed))
             .put("last_command", ChatGptWebCommandReceipts.lastResultJson(observed))
+            .put(
+                "last_project_membership_probe",
+                ChatGptWebCommandReceipts.recentResultJson(
+                    observed,
+                    "probe_conversation_project",
+                ),
+            )
             .put("command_requests", ChatGptWebCommandReceipts.requestsJson(observed))
             .put("available_actions", JSONArray(ChatGptWebMcpActionCatalog.availableActions))
     }
@@ -101,6 +108,7 @@ internal class ChatGptWebMcpActions(
             "send_input", "chatgpt_send_page_input" -> dispatch("send_prompt", commands::sendInput)
             "chatgpt_invoke_control" -> {
                 val controlId = args.optString("control_id")
+                val afterTouchMiss = args.optBoolean("after_touch_miss", false)
                 if (!CONTROL_ID.matches(controlId)) return error(action, "invalid_control_id")
                 val control = uiManifest()?.controls?.firstOrNull { it.id == controlId }
                     ?: return error(action, "stale_control_id")
@@ -115,8 +123,16 @@ internal class ChatGptWebMcpActions(
                 if (control.role == "slider" && !control.supportsSliderValue) {
                     return error(action, "control_requires_official_fallback")
                 }
-                dispatch("invoke_ui_control") { requestId ->
-                    commands.invokeControl(controlId, requestId)
+                if (afterTouchMiss) {
+                    ChatGptWebControlInvocationPolicy.afterTouchMissRejection(
+                        control,
+                        snapshot()?.url,
+                        uiManifest()?.controls.orEmpty(),
+                    )?.let { return error(action, it) }
+                }
+                dispatch(if (afterTouchMiss) "invoke_ui_control_after_touch_miss" else "invoke_ui_control") { requestId ->
+                    if (afterTouchMiss) commands.invokeControlAfterTouchMiss(controlId, requestId)
+                    else commands.invokeControl(controlId, requestId)
                 }
             }
             "chatgpt_set_control_text" -> {
@@ -213,10 +229,15 @@ internal class ChatGptWebMcpActions(
             "chatgpt_start_dictation" -> {
                 val current = snapshot()
                 if (current?.dictationActive == true) return error(action, "dictation_already_active")
-                if (!ChatGptDictationPolicy.isAvailable(current, uiManifest())) {
+                if (!ChatGptDictationPolicy.canAttemptStart(current, uiManifest())) {
                     return error(action, "dictation_unavailable")
                 }
-                dispatch("start_dictation", commands::startDictation)
+                val nativeDraft = inputText().take(MAX_INPUT_CHARS)
+                val expectedOfficialDraft = current?.draft?.take(MAX_INPUT_CHARS)
+                    ?: return error(action, "draft_unavailable")
+                dispatch("start_dictation") { requestId ->
+                    commands.startDictation(nativeDraft, expectedOfficialDraft, requestId)
+                }
             }
             "chatgpt_prepare_realtime_voice" -> {
                 if (inputText().isNotEmpty()) return error(action, "native_draft_not_empty")
@@ -257,6 +278,13 @@ internal class ChatGptWebMcpActions(
             }
             "chatgpt_refresh" -> refresh()
             "chatgpt_refresh_controls" -> dispatch("snapshot_ui_manifest", commands::refreshControls)
+            "chatgpt_reveal_project_choice" -> {
+                val title = args.optString("project_title").trim().take(MAX_PROJECT_TITLE_CHARS)
+                if (title.isBlank()) return error(action, "invalid_project_title")
+                dispatch("reveal_project_choice") { requestId ->
+                    commands.revealProjectChoice(title, requestId)
+                }
+            }
             "chatgpt_list_conversations" -> dispatch("list_conversations", commands::listConversations)
             "chatgpt_list_composer_options" -> {
                 val section = args.optString("section").trim().lowercase()
@@ -752,6 +780,7 @@ internal class ChatGptWebMcpActions(
         const val MAX_MESSAGE_ID_CHARS = 200
         const val MAX_INPUT_CHARS = 20_000
         const val MAX_ATTACHMENT_ID_CHARS = 96
+        const val MAX_PROJECT_TITLE_CHARS = 160
         const val DEFAULT_CONTEXT_PAGE_SIZE = 20
         const val MAX_CONTEXT_PAGE_SIZE = 40
         const val DEFAULT_CONTROL_PAGE_SIZE = 30

@@ -17,6 +17,7 @@ import android.widget.ProgressBar
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
+import com.elon.app.BuildConfig
 import com.elon.app.R
 
 /** Full-screen official-page fallback for login and capabilities not mirrored natively. */
@@ -33,7 +34,7 @@ class ChatGptWebOfficialActivity : AppCompatActivity() {
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        WebView.setWebContentsDebuggingEnabled(false)
+        WebView.setWebContentsDebuggingEnabled(BuildConfig.CHATGPT_PRIVATE_RESEARCH_ENABLED)
         fileChooserController = ChatGptWebFileChooserController(this)
         audioPermissionController = ChatGptWebAudioPermissionController(
             this,

@@ -61,13 +61,59 @@ class ChatGptWebControlInvocationPolicyTest {
         assertNull(ChatGptWebControlInvocationPolicy.rejection(control, userConfirmed = true))
     }
 
-    private fun control(semantic: String) = ChatGptWebUiControl(
+    @Test
+    fun touchMissFallbackIsLimitedToTheCurrentHeaderConversationMenu() {
+        val current = control(
+            semantic = "conversation_options",
+            region = ChatGptWebUiRegion.HEADER,
+            contextId = "conversation-id",
+        )
+        val projectUrl =
+            "https://chatgpt.com/g/g-p-1234567890abcdef1234567890abcdef/c/conversation-id"
+
+        assertNull(ChatGptWebControlInvocationPolicy.afterTouchMissRejection(
+            current,
+            projectUrl,
+            listOf(current),
+        ))
+        assertEquals(
+            "touch_miss_fallback_context_changed",
+            ChatGptWebControlInvocationPolicy.afterTouchMissRejection(
+                current.copy(contextId = "other-conversation"),
+                projectUrl,
+                listOf(current),
+            ),
+        )
+        assertEquals(
+            "touch_miss_fallback_overlay_present",
+            ChatGptWebControlInvocationPolicy.afterTouchMissRejection(
+                current,
+                projectUrl,
+                listOf(current, control("project")),
+            ),
+        )
+        assertEquals(
+            "touch_miss_fallback_not_supported",
+            ChatGptWebControlInvocationPolicy.afterTouchMissRejection(
+                current.copy(region = ChatGptWebUiRegion.CONTENT),
+                projectUrl,
+                listOf(current),
+            ),
+        )
+    }
+
+    private fun control(
+        semantic: String,
+        region: String = ChatGptWebUiRegion.OVERLAY,
+        contextId: String? = null,
+    ) = ChatGptWebUiControl(
         id = "control_demo",
         semantic = semantic,
         label = "Demo",
-        region = ChatGptWebUiRegion.OVERLAY,
+        region = region,
         role = "button",
         enabled = true,
         selected = false,
+        contextId = contextId,
     )
 }

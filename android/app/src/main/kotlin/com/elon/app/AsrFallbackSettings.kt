@@ -14,7 +14,7 @@ import android.content.Context
  *
  *  - [serverFallbackEnabled]：本地所有（未被排除的）引擎全部失败后，
  *    是否把录音上传到服务器 Whisper 转写（默认开启）。
- *    仅对"语音消息"模式的转写路径有效，对"端上识别"模式无影响。
+ *    用于语音消息和 Web AI 原生听写的转写恢复路径。
  */
 object AsrFallbackSettings {
 

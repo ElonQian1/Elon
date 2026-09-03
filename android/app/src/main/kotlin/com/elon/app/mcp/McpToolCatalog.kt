@@ -193,7 +193,7 @@ internal fun mcpToolsListResult(): JSONObject {
                     title = "Native UI Control",
                     description = "Control project chat and provider-backed social AI chat through stable native actions and semantic control ids.",
                     properties = JSONObject()
-                        .put("action", stringProperty("Includes open_main, state, project actions, social AI mode/provider actions, isolated web chat conversation actions, get_web_chat_context, local acceptance attachment actions, set_input_text, send_input, and chatgpt_* actions returned by ui_state."))
+                        .put("action", stringProperty("Includes open_main, state, project actions, social AI mode/provider actions, start/submit/cancel_web_chat_dictation, isolated web chat conversation actions, get_web_chat_context, local acceptance attachment actions, set_input_text, send_input, and chatgpt_* actions returned by ui_state."))
                         .put("project_id", stringProperty("Optional project id or project space id."))
                         .put("project_index", intProperty("Optional project index."))
                         .put("conversation_id", stringProperty("Optional local conversation id."))
@@ -210,7 +210,7 @@ internal fun mcpToolsListResult(): JSONObject {
                         .put("semantic", stringProperty("Optional semantic filter for chatgpt_find_controls."))
                         .put("region", stringProperty("Optional region filter for chatgpt_find_controls."))
                         .put("context_id", stringProperty("Optional message or conversation context id for chatgpt_find_controls."))
-                        .put("conversation_path", stringProperty("Provider-scoped path returned by get_web_chat_navigation; treat it as opaque."))
+                        .put("conversation_path", stringProperty("Provider-scoped path returned by get_web_chat_navigation; treat it as opaque. With refresh_web_chat_conversations and project_id, performs a read-only fresh membership reconciliation before refreshing."))
                         .put("project_path", stringProperty("Provider-scoped project path returned by get_web_chat_navigation; treat it as opaque."))
                         .put("view_mode", stringProperty("ChatGPT view mode: native, skin, official, or login."))
                         .put("section", stringProperty("ChatGPT composer section model or tools; also filters chatgpt_get_navigation."))

@@ -22,8 +22,18 @@ class ChatGptWebProjectAndMenuContractTest {
             adapter.indexOf("chatgpt_web_adapter_context_menu_policy.js") <
                 adapter.indexOf("chatgpt_web_adapter_layout.js"),
         )
+        assertTrue(
+            adapter.indexOf("chatgpt_web_adapter_control_labels.js") <
+                adapter.indexOf("chatgpt_web_adapter_layout.js"),
+        )
+        assertTrue(
+            adapter.indexOf("chatgpt_web_adapter_project_choice_reveal.js") <
+                adapter.indexOf("chatgpt_web_adapter_layout.js"),
+        )
         assertTrue(bootstrap.contains("'__elonChatGptProjectPolicy'"))
         assertTrue(bootstrap.contains("'__elonChatGptContextMenuPolicy'"))
+        assertTrue(bootstrap.contains("'__elonChatGptControlLabels'"))
+        assertTrue(bootstrap.contains("'__elonChatGptProjectChoiceReveal'"))
     }
 
     @Test
@@ -51,6 +61,8 @@ class ChatGptWebProjectAndMenuContractTest {
         assertTrue(layout.contains("overlayPolicy.contextMenuSignature"))
         assertTrue(layout.contains("overlays.forEach"))
         assertTrue(layout.contains("contextMenuPolicy.activate(control, node)"))
+        assertTrue(menu.contains("requiresNativeTouch(control)"))
+        assertTrue(menu.contains("if (requiresNativeTouch(control) || !isProjectMoveStep(control)"))
     }
 
     @Test
@@ -60,6 +72,25 @@ class ChatGptWebProjectAndMenuContractTest {
         assertTrue(adapter.contains(".put(\"documentToken\", documentSession.snapshot().documentToken)"))
         assertTrue(adapter.contains("window.__elonChatGptBridge.command(\$encoded)"))
         assertFalse(adapter.contains("command.documentToken=window.__elonChatGptDocumentToken"))
+    }
+
+    @Test
+    fun projectChoiceRevealIsReadOnlyAndWiredThroughTheExistingCommandPort() {
+        val reveal = read(
+            "android/app/src/main/assets/chatgpt_web_adapter_project_choice_reveal.js",
+        )
+        val adapter = read("android/app/src/main/assets/chatgpt_web_adapter.js")
+        val actions = read(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebMcpActions.kt",
+        )
+
+        assertTrue(reveal.contains("scrollPositions(container)"))
+        assertTrue(reveal.contains("project_choice_revealed"))
+        assertFalse(reveal.contains(".click()"))
+        assertFalse(reveal.contains("fetch("))
+        assertTrue(adapter.contains("action === 'reveal_project_choice'"))
+        assertTrue(actions.contains("\"chatgpt_reveal_project_choice\""))
+        assertTrue(actions.contains("commands.revealProjectChoice(title, requestId)"))
     }
 
     private fun read(relativePath: String): String =

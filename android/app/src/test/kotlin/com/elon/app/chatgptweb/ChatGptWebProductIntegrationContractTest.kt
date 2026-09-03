@@ -66,10 +66,15 @@ class ChatGptWebProductIntegrationContractTest {
         assertTrue(feature.contains("activateWorkMode"))
         assertTrue(feature.contains("activateChatProvider"))
         assertTrue(feature.contains("deactivateChatProvider"))
+        assertTrue(feature.contains("productionConversationActions.recoverPending()"))
         assertTrue(feature.contains("webChatNavigationSessions.session(providerId())"))
         assertTrue(feature.contains("providerId = WebChatProviderId.GOOGLE_WEB"))
         assertTrue(feature.contains("fun startDefaultRealtimeVoice(): Boolean"))
-        assertTrue(feature.contains("!selectChatProvider(WebChatProviderId.CHATGPT_WEB)"))
+        assertTrue(
+            feature.contains(
+                "!providerSwitchCoordinator.selectWithoutPrompt(WebChatProviderId.CHATGPT_WEB)",
+            ),
+        )
         assertTrue(feature.contains("WEB_CHAT_MODEL_BUTTON_OWNER"))
         assertTrue(mainMcp.contains("set_social_ai_interaction_mode"))
         assertTrue(mainMcp.contains("select_web_chat_provider"))
@@ -89,7 +94,9 @@ class ChatGptWebProductIntegrationContractTest {
         assertTrue(mainMcp.contains("open_web_chat_conversation"))
         assertTrue(mainMcp.contains("open_web_chat_project"))
         assertTrue(mainMcp.contains("refresh_web_chat_conversations"))
-        assertTrue(mainMcp.contains("refreshWebChatConversationIndex(projectId)"))
+        assertTrue(mainMcp.contains("conversation_project_probe_requires_project_id"))
+        assertTrue(mainMcp.contains("conversationPath = conversationPath"))
+        assertTrue(feature.contains("chatGptController.probeConversationProject(requestedPath, requestedProjectId)"))
         assertTrue(mainMcp.contains("get_web_chat_navigation"))
         assertTrue(mainMcp.contains("feature.webChatNavigationAvailable()"))
         assertTrue(mainMcp.contains("set_web_chat_sidebar"))
@@ -282,7 +289,9 @@ class ChatGptWebProductIntegrationContractTest {
         val lifecycle = read("android/app/src/main/kotlin/com/elon/app/MainChatGptWebLifecycle.kt")
         val feature = read("android/app/src/main/kotlin/com/elon/app/MainSocialAiChatFeature.kt")
         val controller = read("android/app/src/main/kotlin/com/elon/app/ChatGptSocialChatController.kt")
-        val session = read("android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptBackgroundSession.kt")
+        val portFactory = read(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebPortFactory.kt",
+        )
         val backgroundWebView = read(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptBackgroundWebViewFactory.kt",
         )
@@ -299,8 +308,8 @@ class ChatGptWebProductIntegrationContractTest {
         assertTrue(backgroundWebView.contains("override fun onPermissionRequest(request: PermissionRequest)"))
         assertTrue(backgroundWebView.contains("audioPermissionController.handle(request)"))
         assertTrue(backgroundWebView.contains("audioPermissionController.cancel(request)"))
-        assertTrue(session.contains("audioPermissionState = audioPermissionController::snapshot"))
-        assertTrue(session.contains("microphone_permission_denied"))
+        assertTrue(portFactory.contains("audioPermissionState = audioPermissionController::snapshot"))
+        assertTrue(portFactory.contains("microphone_permission_denied"))
     }
 
     private fun read(relative: String): String =

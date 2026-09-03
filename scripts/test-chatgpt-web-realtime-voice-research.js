@@ -10,6 +10,10 @@ const source = fs.readFileSync(path.join(
   root, 'android', 'app', 'src', 'main', 'assets',
   'chatgpt_web_realtime_voice_research.js'
 ), 'utf8');
+const dataChannelSource = fs.readFileSync(path.join(
+  root, 'android', 'app', 'src', 'main', 'assets',
+  'chatgpt_web_realtime_data_channel_research.js'
+), 'utf8');
 const adapter = fs.readFileSync(path.join(
   root, 'android', 'app', 'src', 'main', 'kotlin', 'com', 'elon', 'app',
   'chatgptweb', 'ChatGptWebPageAdapter.kt'
@@ -20,10 +24,25 @@ const recorder = fs.readFileSync(path.join(
 ), 'utf8');
 
 assert.match(adapter, /PRIVATE_REALTIME_VOICE_RESEARCH_ASSET/);
+assert.match(adapter, /PRIVATE_REALTIME_DATA_CHANNEL_RESEARCH_ASSET/);
 assert.match(adapter, /addDocumentStartJavaScript\([\s\S]*?privateRealtimeVoiceResearchScript/);
 assert.match(adapter, /"chatgpt_web_realtime_voice_research\.js"/);
+assert.match(adapter, /"chatgpt_web_realtime_data_channel_research\.js"/);
 assert.match(recorder, /ChatGptWebRealtimeVoiceResearchObservation\.parse\(event\.detail\)/);
 assert.match(recorder, /chatgpt_private_voice_research_observation/);
+assert.match(source, /Number\(existing\.version\) >= 4/);
+assert.match(source, /expiresAt = Date\.now\(\) \+ observationLifetimeMs/);
+
+class FakeDataChannel {
+  constructor() {
+    this.listeners = new Map();
+    this.readyState = 'open';
+    this.negotiated = false;
+  }
+  addEventListener(name, callback) { this.listeners.set(name, callback); }
+  dispatch(name, event = {}) { const callback = this.listeners.get(name); if (callback) callback(event); }
+  send() {}
+}
 
 class FakePeerConnection {
   constructor() {
@@ -38,7 +57,7 @@ class FakePeerConnection {
   createAnswer() { return Promise.resolve({ type: 'answer', sdp: 'must-not-cross-bridge' }); }
   setLocalDescription() { return Promise.resolve(); }
   setRemoteDescription() { return Promise.resolve(); }
-  createDataChannel() { return { readyState: 'open' }; }
+  createDataChannel() { return new FakeDataChannel(); }
 }
 
 class FakeXhr {
@@ -108,6 +127,9 @@ async function run(enabled) {
     Blob,
     ArrayBuffer
   };
+  vm.runInNewContext(dataChannelSource, context, {
+    filename: 'chatgpt_web_realtime_data_channel_research.js'
+  });
   vm.runInNewContext(source, context, { filename: 'chatgpt_web_realtime_voice_research.js' });
   if (!enabled) return { events, window };
 
@@ -115,6 +137,10 @@ async function run(enabled) {
   const realtimeBody = new FormData();
   realtimeBody.append('sdp', 'v=0\r\nm=audio 9 UDP/TLS/RTP/SAVPF 111\r\nx-private: must-not-cross-bridge');
   realtimeBody.append('session', JSON.stringify({
+    chat_mode: 'dictation',
+    input_audio_transcription: { model: 'must-not-cross-bridge' },
+    turn_detection: { type: 'server_vad' },
+    modalities: ['audio', 'text'],
     voice: 'must-not-cross-bridge',
     token: 'must-not-cross-bridge'
   }));
@@ -135,7 +161,17 @@ async function run(enabled) {
   await peer.createOffer();
   await peer.setLocalDescription({ type: 'offer', sdp: 'must-not-cross-bridge' });
   await peer.setRemoteDescription({ type: 'answer', sdp: 'must-not-cross-bridge' });
-  peer.createDataChannel('must-not-cross-bridge');
+  const channel = peer.createDataChannel('must-not-cross-bridge');
+  channel.send(JSON.stringify({
+    type: 'session.update',
+    transcript: 'must-not-cross-bridge',
+    client_secret: 'must-not-cross-bridge'
+  }));
+  channel.dispatch('message', { data: JSON.stringify({
+    type: 'conversation.item.input_audio_transcription.delta',
+    delta: 'must-not-cross-bridge'
+  }) });
+  channel.dispatch('open');
   peer.connectionState = 'connected';
   peer.dispatch('connectionstatechange');
   peer.iceConnectionState = 'connected';
@@ -159,7 +195,10 @@ async function run(enabled) {
     'v1|network-start|post|chatgpt_origin|/realtime/wm|none|form|unknown|ephemeral-field-offer-like.session-text'
   )));
   assert.ok(details.includes(
-    'v1|network-form-shape|chatgpt_origin|/realtime/wm|json-ephemeral-field.voice'
+    'v1|network-form-shape|chatgpt_origin|/realtime/wm|json-chat_mode.ephemeral-field.input_audio_transcription.modalities.turn_detection.voice'
+  ));
+  assert.ok(details.includes(
+    'v1|network-session-profile|chatgpt_origin|/realtime/wm|chat-mode-dictation|input-transcription-present|turn-detection-present|modalities-2'
   ));
   assert.ok(details.some((value) => value.includes('|network-shape|')));
   assert.ok(details.some((value) => value.startsWith(
@@ -172,6 +211,14 @@ async function run(enabled) {
   assert.ok(details.includes('v1|media-granted|a1v0'));
   assert.ok(details.includes('v1|peer-created'));
   assert.ok(details.includes('v1|peer-create-offer'));
+  assert.ok(details.includes('v1|data-channel-bind|local|in-band'));
+  assert.ok(details.some((value) => value.startsWith(
+    'v1|data-channel-send|local|json|b1|sensitive-field.transcript.type|session.update'
+  )));
+  assert.ok(details.some((value) => value.startsWith(
+    'v1|data-channel-message|local|json|b1|delta.type|conversation.item.input_audio_transcription.delta'
+  )));
+  assert.ok(details.includes('v1|data-channel-open|local'));
   assert.ok(details.some((value) => value.startsWith('v1|peer-local-description|offer|')));
   assert.ok(details.some((value) => value.startsWith('v1|peer-remote-description|answer|')));
   assert.ok(details.includes('v1|peer-connection|connected'));
@@ -179,6 +226,7 @@ async function run(enabled) {
   assert.ok(details.includes('v1|peer-track|audio'));
   assert.ok(enabled.events.every((event) => event.action === 'research_voice_observation'));
   assert.equal(enabled.window.__elonChatGptRealtimeVoiceResearch.snapshot().windows, 2);
+  assert.equal(enabled.window.__elonChatGptRealtimeVoiceResearch.version, 4);
 
   const emitted = JSON.stringify(enabled.events).toLowerCase();
   assert.doesNotMatch(emitted, /must-not-cross-bridge|client_secret|authorization|cookie/);

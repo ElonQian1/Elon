@@ -42,6 +42,7 @@ internal class MainSocialAiChatFeature(
     private var composerOperationFeedback: WebChatConsumerComposerFeedback? = null
     private var composerOperationFeedbackEpoch = 0
     private var activeQuickComposerAction: WebChatProductionQuickComposerAction? = null
+    private var projectMoveRecoveryChecked = false
     private val composerDrafts = SocialAiComposerDraftCoordinator(
         providerDrafts = providerDrafts,
         readText = { binding.inputEdit.text },
@@ -65,6 +66,7 @@ internal class MainSocialAiChatFeature(
             onConversationIndexChanged = ::handleConversationIndexChanged,
             onComposerStateChanged = ::refreshConsumerComposerUi,
             onConsumerStateObserved = ::handleChatGptConsumerStateObserved,
+            onDictationCommandResult = ::handleChatGptDictationCommandResult,
             interactionCache = webChatInteractionCache,
             audioPermissionController = chatGptWebLifecycle.audioPermissionController,
         )
@@ -138,9 +140,7 @@ internal class MainSocialAiChatFeature(
             webLifecycle = chatGptWebLifecycle,
             modeController = modeController,
             nativeRoot = binding.root,
-            activeProvider = {
-                if (isChatModeActive()) providerId() else null
-            },
+            activeProvider = ::activeProviderOrNull,
             serverUrl = serverUrl,
             userId = userId,
             launchCache = realtimeVoiceLaunchCache,
@@ -154,16 +154,19 @@ internal class MainSocialAiChatFeature(
             realtimeVoices.onConsumerStateChanged(state)
         }
     }
+
+    private fun handleChatGptDictationCommandResult(action: String, ok: Boolean) {
+        if (productionVoiceControlsDelegate.isInitialized()) {
+            productionVoiceControls.onDomCommandResult(action, ok)
+        }
+    }
+
     private val productionComposerToolsDelegate = lazy {
         WebChatProductionComposerToolsCoordinator(
             activity = activity,
             host = binding.root,
-            consumerPort = {
-                if (isChatModeActive()) activeController().consumerPort() else null
-            },
-            activeProvider = {
-                if (isChatModeActive()) providerId() else null
-            },
+            consumerPort = ::activeConsumerPortOrNull,
+            activeProvider = ::activeProviderOrNull,
             openOfficialFallback = ::openOfficialFallback,
             startWebRealtimeVoice = realtimeVoices::startDefaultOfficialWebRtc,
             onOperationFeedback = ::showComposerOperationFeedback,
@@ -179,13 +182,17 @@ internal class MainSocialAiChatFeature(
         )
     }
     private val productionComposerTools by productionComposerToolsDelegate
-    private val productionImageActions by lazy {
-        ChatGptProductionImageActions(productionComposerTools, ::activeController) }
+    private val productionImageActions by lazy { ChatGptProductionImageActions(productionComposerTools, ::activeController) }
     private val productionVoiceControlsDelegate = lazy {
         WebChatProductionVoiceControls(
             dp = ::dp,
             inputComposerViews = inputComposerViews,
-            executeCommand = productionComposerTools::executeCommand, nativeDictation = nativeDictation, onNativeStateChanged = ::refreshConsumerComposerUi,
+            executeCommand = productionComposerTools::executeCommand,
+            privateDictation = chatGptController.privateDictationPort(),
+            sharedDictation = nativeDictation,
+            onNativeStateChanged = ::refreshConsumerComposerUi,
+            readDraft = { binding.inputEdit.text?.toString().orEmpty() },
+            writeDraft = { binding.inputEdit.setText(it) },
         )
     }
     private val productionVoiceControls by productionVoiceControlsDelegate
@@ -194,9 +201,7 @@ internal class MainSocialAiChatFeature(
             activity = activity,
             host = binding.root,
             consumerPort = ::chatGptConsumerPort,
-            activeProvider = {
-                if (isChatModeActive()) providerId() else null
-            },
+            activeProvider = ::activeProviderOrNull,
             openOfficialFallback = ::openOfficialFallback,
             openNativeFeature = productionImageActions::openNativeFeature,
             interactionCache = webChatInteractionCache,
@@ -208,9 +213,7 @@ internal class MainSocialAiChatFeature(
             activity = activity,
             host = binding.root,
             consumerPort = ::chatGptConsumerPort,
-            activeProvider = {
-                if (isChatModeActive()) providerId() else null
-            },
+            activeProvider = ::activeProviderOrNull,
             openOfficialFallback = ::openOfficialFallback,
             interactionCache = webChatInteractionCache,
         )
@@ -221,15 +224,9 @@ internal class MainSocialAiChatFeature(
             activity = activity,
             host = binding.root,
             consumerPort = ::chatGptConsumerPort,
-            activeProvider = {
-                if (isChatModeActive()) providerId() else null
-            },
-            currentSessionState = {
-                if (isChatModeActive()) activeController().stateWireValue() else "inactive"
-            },
-            currentConversationPath = {
-                if (isChatModeActive()) activeController().currentConversationPath() else null
-            },
+            activeProvider = ::activeProviderOrNull,
+            currentSessionState = ::activeSessionState,
+            currentConversationPath = ::activeConversationPath,
             openConversationSettings = {
                 prioritizeConsumerInteraction()
                 productionPageActions.show(WebChatProviderRegistry.get(providerId()))
@@ -242,12 +239,8 @@ internal class MainSocialAiChatFeature(
     private val productionHeaderActions by productionHeaderActionsDelegate
     private val productionCapabilityPrewarmerDelegate = lazy {
         WebChatProductionCapabilityPrewarmer(
-            consumerPort = {
-                if (isChatModeActive()) activeController().consumerPort() else null
-            },
-            activeProvider = {
-                if (isChatModeActive()) providerId() else null
-            },
+            consumerPort = ::activeConsumerPortOrNull,
+            activeProvider = ::activeProviderOrNull,
             interactionCache = webChatInteractionCache,
             scheduleAction = { delayMs, action -> binding.root.postDelayed(action, delayMs) },
         )
@@ -256,13 +249,16 @@ internal class MainSocialAiChatFeature(
     private val productionConversationActions by lazy {
         WebChatProductionConversationActionsCoordinator(
             activity, binding.root,
-            activeProvider = { providerId().takeIf { isChatModeActive() } },
+            activeProvider = ::activeProviderOrNull,
             currentConversationPath = { activeController().currentConversationPath() },
             currentState = { activeController().stateWireValue() },
             openConversation = ::openWebChatConversation,
             consumerPort = ::chatGptConsumerPort,
             conversationIndex = ::webChatConversationIndex,
             refreshConversationIndex = ::refreshWebChatConversationIndex,
+            probeConversationProject = chatGptController::probeConversationProject,
+            suspendConversationRefresh = chatGptController::suspendConversationRefreshForUserAction,
+            resumeConversationRefresh = chatGptController::resumeConversationRefreshAfterUserAction,
             showPageActions = {
                 prioritizeConsumerInteraction()
                 productionPageActions.show(WebChatProviderRegistry.get(providerId()))
@@ -335,7 +331,7 @@ internal class MainSocialAiChatFeature(
 
     fun startDefaultRealtimeVoice(): Boolean {
         if (providerId() != WebChatProviderId.CHATGPT_WEB &&
-            !selectChatProvider(WebChatProviderId.CHATGPT_WEB)
+            !providerSwitchCoordinator.selectWithoutPrompt(WebChatProviderId.CHATGPT_WEB)
         ) return false
         return productionComposerTools.startRealtimeVoice(
             WebChatProviderRegistry.get(WebChatProviderId.CHATGPT_WEB),
@@ -362,6 +358,17 @@ internal class MainSocialAiChatFeature(
     fun webChatAuthenticated(): Boolean = activeController().authenticated()
 
     fun webChatComposerReady(): Boolean = activeController().composerReady()
+
+    fun webChatDictationActive(): Boolean {
+        if (!isChatModeActive()) return false
+        val consumerState = runCatching {
+            activeController().consumerPort()?.state()
+        }.getOrNull()
+        return productionVoiceControls.dictationPresentation(
+            officialActive = consumerState?.dictationActive == true,
+            officialCaptureActive = consumerState?.dictationCaptureActive == true,
+        ).active
+    }
 
     fun webChatComposerCanSubmit(): Boolean {
         if (!isChatModeActive()) return true
@@ -423,7 +430,6 @@ internal class MainSocialAiChatFeature(
             refreshIndex = ::refreshWebChatConversationIndex,
             newConversation = { startNewWebChatConversation() },
             openConversation = ::openWebChatConversation,
-            openProject = ::openWebChatProject,
             openFeatureNavigation = ::openProductionFeatureNavigation,
             providerId = { providerId().wireValue },
             providerName = ::providerName,
@@ -442,8 +448,21 @@ internal class MainSocialAiChatFeature(
         onWebChatNavigationChanged = coordinator::onIndexChanged
         return coordinator
     }
-    fun refreshWebChatConversationIndex(projectId: String? = null): Boolean =
-        isChatModeActive() && webChatNavigationSession()?.refresh(projectId) == true
+    fun refreshWebChatConversationIndex(
+        projectId: String? = null,
+        conversationPath: String? = null,
+    ): Boolean {
+        if (!isChatModeActive()) return false
+        val requestedPath = conversationPath?.trim()?.takeIf(String::isNotEmpty)
+        val requestedProjectId = projectId?.trim()?.takeIf(String::isNotEmpty)
+        if (requestedPath != null) {
+            if (requestedProjectId == null || providerId() != WebChatProviderId.CHATGPT_WEB) {
+                return false
+            }
+            return chatGptController.probeConversationProject(requestedPath, requestedProjectId)
+        }
+        return webChatNavigationSession()?.refresh(requestedProjectId) == true
+    }
     fun startNewWebChatConversation(): Boolean {
         if (!isChatModeActive()) return false
         return webChatNavigationSession()?.newConversation() == true
@@ -477,7 +496,7 @@ internal class MainSocialAiChatFeature(
 
     fun selectProvider(value: String): Boolean {
         val id = WebChatProviderId.fromWireValue(value)
-        return value == id.wireValue && selectChatProvider(id)
+        return value == id.wireValue && providerSwitchCoordinator.selectWithoutPrompt(id)
     }
 
     fun onHostResumed(resumeWorkChat: () -> Unit) {
@@ -645,6 +664,14 @@ internal class MainSocialAiChatFeature(
         if (isChatModeActive()) {
             val provider = WebChatProviderRegistry.get(providerId())
             val controller = activeController()
+            if (
+                !projectMoveRecoveryChecked &&
+                provider.id == WebChatProviderId.CHATGPT_WEB &&
+                controller.stateWireValue() == "ready"
+            ) {
+                projectMoveRecoveryChecked = true
+                binding.root.post { productionConversationActions.recoverPending() }
+            }
             controller.consumerPort()?.state()?.let { realtimeVoiceLaunchCache.observe(provider.id, it) }
             productionHeaderActions.render(binding.moreButton, provider, controller.stateWireValue())
             val state = WebChatConsumerComposerStateResolver.resolve(
@@ -654,11 +681,15 @@ internal class MainSocialAiChatFeature(
                 attachmentSupported = controller.attachmentSupported(),
                 warmSessionAvailable = controller.warmSessionAvailable(),
             )
-            val officialDictationActive = runCatching {
-                controller.consumerPort()?.state()?.dictationActive == true
-            }.getOrDefault(false)
+            val consumerState = runCatching { controller.consumerPort()?.state() }.getOrNull()
+            val officialDictationActive = consumerState?.dictationActive == true
+            val officialDictationCaptureActive = consumerState?.dictationCaptureActive == true
+            val dictationPresentation = productionVoiceControls.dictationPresentation(
+                officialActive = officialDictationActive,
+                officialCaptureActive = officialDictationCaptureActive,
+            )
             binding.inputEdit.hint = WebChatProductionComposerContext.inputHint(
-                productionVoiceControls.dictationPresentation(officialDictationActive).inputHint ?: state.inputHint,
+                dictationPresentation.inputHint ?: state.inputHint,
                 WebChatProductionComposerContext.projectTitle(
                     webChatConversationIndex(),
                     controller.currentConversationPath(),
@@ -670,7 +701,7 @@ internal class MainSocialAiChatFeature(
                     provider = provider,
                     attachmentPhase = controller.attachmentSendPhase(),
                     feedback = composerOperationFeedback,
-                    dictationActive = productionVoiceControls.dictationPresentation(officialDictationActive).active,
+                    dictationActive = dictationPresentation.active,
                     imageGenerationActive = activeQuickComposerAction ==
                         WebChatProductionQuickComposerAction.IMAGE_GENERATION,
                     streaming = controller.streaming(),
@@ -693,6 +724,7 @@ internal class MainSocialAiChatFeature(
                 provider = provider,
                 streaming = controller.streaming(),
                 officialDictationActive = officialDictationActive,
+                officialDictationCaptureActive = officialDictationCaptureActive,
             )
             productionComposerTools.onSessionStateChanged(provider)
             productionSuggestions.render(provider, controller.consumerPort())
@@ -752,20 +784,16 @@ internal class MainSocialAiChatFeature(
     }
 
     private fun activeController(): WebChatSocialController = controllerFor(providerId())
+    private fun activeProviderOrNull() = providerId().takeIf { isChatModeActive() }
+    private fun activeConsumerPortOrNull() =
+        if (isChatModeActive()) activeController().consumerPort() else null
 
-    private fun retryConsumerSession() {
-        val controller = activeController()
-        val retried = if (controller.stateWireValue() == "login_required") {
-            controller.retryGuestAccess()
-        } else {
-            controller.retryConnection()
-        }
-        if (!retried) controller.onHostResumed()
-    }
+    private fun activeSessionState() =
+        if (isChatModeActive()) activeController().stateWireValue() else "inactive"
+    private fun activeConversationPath() =
+        if (isChatModeActive()) activeController().currentConversationPath() else null
 
-    private fun selectChatProvider(id: WebChatProviderId): Boolean {
-        return providerSwitchCoordinator.selectWithoutPrompt(id)
-    }
+    private fun retryConsumerSession() = retryWebChatConsumerSession(activeController())
 
     private fun scheduleProviderDraftSave() {
         binding.root.removeCallbacks(persistProviderDrafts)
@@ -787,14 +815,4 @@ internal class MainSocialAiChatFeature(
 
     private fun dp(value: Int): Int = (value * activity.resources.displayMetrics.density).toInt()
 
-    private companion object {
-        const val MODEL_BUTTON_WORK_WIDTH_DP = 76
-        const val MODEL_BUTTON_CHATGPT_WIDTH_DP = 92
-        const val MODEL_BUTTON_CHAT_WIDTH_DP = 144
-        const val DRAFT_SAVE_DELAY_MS = 500L
-        const val COMPOSER_FEEDBACK_DURATION_MS = 4_000L
-    }
-
 }
-
-internal const val WEB_CHAT_MODEL_BUTTON_OWNER = "web_chat_model_button"

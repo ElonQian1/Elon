@@ -36,17 +36,27 @@ class WebChatProductionComposerVisualModeTest {
         )
     }
 
+    @Test
+    fun activeDictationKeepsCompletionControlsAfterTranscriptAddsText() {
+        assertEquals(
+            WebChatProductionComposerVisualMode.INPUT_MODE,
+            resolve(hasText = true, dictationActive = true),
+        )
+    }
+
     private fun resolve(
         streaming: Boolean = false,
         hasText: Boolean = false,
         hasAttachments: Boolean = false,
         voiceMode: Boolean = false,
         composerExpanded: Boolean = true,
+        dictationActive: Boolean = false,
     ) = WebChatProductionComposerVisualModeResolver.resolve(
         streaming = streaming,
         hasText = hasText,
         hasAttachments = hasAttachments,
         voiceMode = voiceMode,
         composerExpanded = composerExpanded,
+        dictationActive = dictationActive,
     )
 }

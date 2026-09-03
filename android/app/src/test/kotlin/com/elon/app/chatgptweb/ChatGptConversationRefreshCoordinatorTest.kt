@@ -213,6 +213,51 @@ class ChatGptConversationRefreshCoordinatorTest {
         )
     }
 
+    @Test
+    fun suspendedSessionKeepsTheRequestWithoutDispatchingUntilExplicitlyResumed() {
+        val scheduled = mutableListOf<Scheduled>()
+        var dispatches = 0
+        lateinit var session: ChatGptConversationRefreshSession
+        val coordinator = coordinator(scheduled) {
+            dispatches += 1
+            session.beginDispatch() != null
+        }
+        session = ChatGptConversationRefreshSession(coordinator)
+
+        session.suspend({})
+        assertTrue(session.request("g-p-target"))
+        assertEquals(0, dispatches)
+
+        session.resume()
+        assertTrue(session.request("g-p-target"))
+        assertEquals(1, dispatches)
+    }
+
+    @Test
+    fun autoRefreshDecisionSuppressesBackgroundWorkDuringAUserAction() {
+        val session = ChatGptConversationRefreshSession(coordinator(mutableListOf()) { true })
+        session.suspend({})
+
+        assertEquals(
+            ChatGptConversationAutoRefreshDecision.Action.NONE,
+            session.autoRefreshDecision(
+                postVoiceRefresh = true,
+                supported = true,
+                projectRefreshNeeded = true,
+                officialRefreshNeeded = true,
+            ).action,
+        )
+        session.resume()
+        val decision = session.autoRefreshDecision(
+            postVoiceRefresh = true,
+            supported = true,
+            projectRefreshNeeded = false,
+            officialRefreshNeeded = false,
+        )
+        assertEquals(ChatGptConversationAutoRefreshDecision.Action.AFTER_CURRENT, decision.action)
+        assertTrue(decision.consumePostVoiceRefresh)
+    }
+
     private fun coordinator(
         scheduled: MutableList<Scheduled>,
         dispatch: () -> Boolean,

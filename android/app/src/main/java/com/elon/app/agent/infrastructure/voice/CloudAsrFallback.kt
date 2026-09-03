@@ -197,7 +197,7 @@ class CloudAsrFallback(
             }
             val transcript = JSONObject(body).optString("transcript")
             if (transcript.isBlank()) throw RuntimeException("转写结果为空")
-            Log.i(TAG, "☁️ 转写完成: $transcript")
+            Log.i(TAG, "☁️ 转写完成 (length=${transcript.length})")
             return transcript
         }
     }

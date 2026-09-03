@@ -1,6 +1,5 @@
 package com.elon.app
 
-import android.graphics.Rect
 import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -16,6 +15,7 @@ import com.elon.app.chatgptweb.ChatGptWebEvent
 import com.elon.app.chatgptweb.ChatGptWebNativeVoiceTranscriptEvent
 import com.elon.app.chatgptweb.ChatGptWebPresentationMode
 import com.elon.app.chatgptweb.ChatGptWebPrivateTextReceiptPolicy
+import com.elon.app.chatgptweb.ChatGptWebPrivateDictationTransport
 import com.elon.app.chatgptweb.ChatGptWebSendOrigin
 import com.elon.app.chatgptweb.ChatGptWebSendReceipt
 import com.elon.app.chatgptweb.ChatGptWebSnapshot
@@ -35,6 +35,7 @@ internal class ChatGptSocialChatController(
     private val onConversationIndexChanged: () -> Unit,
     private val onComposerStateChanged: () -> Unit,
     private val onConsumerStateObserved: (WebChatConsumerState) -> Unit,
+    private val onDictationCommandResult: (String, Boolean) -> Unit,
     private val interactionCache: WebChatProductionInteractionCache,
     audioPermissionController: ChatGptWebAudioPermissionController,
 ) : WebChatSocialController {
@@ -45,6 +46,11 @@ internal class ChatGptSocialChatController(
         onMessageLongPress = showMessageActions,
         onMessageAction = ::handleWebChatMessageAction,
         onContentOpen = { _, part -> imageContent.open(part) },
+    )
+    private val messageReveal = ChatGptSocialMessageRevealCoordinator(
+        binding.chatList,
+        { provider.id },
+        transcript,
     )
     private val messageClipboard = ChatGptMessageClipboard(activity)
     private val session = ChatGptBackgroundSession(
@@ -78,21 +84,42 @@ internal class ChatGptSocialChatController(
     private var modelRangeSelectionById = emptyMap<String, WebChatModelRangeSelection>()
     private var modelPickerActive = false
     private var pendingPresetModelLabel: String? = null
+    private var pendingOfficialDictationDraft = false
     private val realtimeVoiceTranscript = WebChatRealtimeVoiceTranscriptContinuity()
-    private val socialMcpPort: WebChatSocialMcpPort by lazy {
-        session.createMcpPort(
-            inputText = { binding.inputEdit.text?.toString().orEmpty() },
-            setInputText = ::setInputTextFromMcp,
-            copyMessage = messageClipboard::copy,
-            selectMode = { mode ->
-                when (mode) {
-                    ChatGptWebPresentationMode.NATIVE -> skinPresentation.exit()
-                    ChatGptWebPresentationMode.SKIN -> skinPresentation.enter()
-                    ChatGptWebPresentationMode.QUICK,
-                    ChatGptWebPresentationMode.WEB -> openOfficialFallback()
-                }
+    private val privateDictation: WebChatPrivateDictationPort =
+        ChatGptWebPrivateDictationTransport(
+            enabled = BuildConfig.CHATGPT_PRIVATE_DICTATION_ENABLED,
+            readyCheck = {
+                session.state() == ChatGptBackgroundSession.State.READY &&
+                    session.currentSnapshot()?.composerReady == true
             },
-            revealMessage = ::revealMessageFromMcp,
+            currentOfficialDraft = { session.currentSnapshot()?.draft },
+            readDraft = { binding.inputEdit.text?.toString().orEmpty() },
+            writeDraft = ::setInputTextFromMcp,
+            dispatchStart = session::startPrivateDictation,
+            dispatchSubmit = session::submitPrivateDictation,
+            dispatchCancel = session::cancelPrivateDictation,
+            onFailure = { message -> Toast.makeText(activity, message, Toast.LENGTH_SHORT).show() },
+        )
+    private val socialMcpPort: WebChatSocialMcpPort by lazy {
+        WebChatPrivateDictationMcpPort(
+            delegate = session.createMcpPort(
+                inputText = { binding.inputEdit.text?.toString().orEmpty() },
+                setInputText = ::setInputTextFromMcp,
+                copyMessage = messageClipboard::copy,
+                selectMode = { mode ->
+                    when (mode) {
+                        ChatGptWebPresentationMode.NATIVE -> skinPresentation.exit()
+                        ChatGptWebPresentationMode.SKIN -> skinPresentation.enter()
+                        ChatGptWebPresentationMode.QUICK,
+                        ChatGptWebPresentationMode.WEB -> openOfficialFallback()
+                    }
+                },
+                revealMessage = messageReveal::reveal,
+            ),
+            dictation = privateDictation,
+            readyCheck = privateDictation::ready,
+            enabled = BuildConfig.CHATGPT_PRIVATE_DICTATION_ENABLED,
         )
     }
     private val socialConsumerPort: WebChatConsumerPort by lazy {
@@ -285,6 +312,15 @@ internal class ChatGptSocialChatController(
     override fun requestConversationIndex(projectId: String?): Boolean =
         session.requestConversationIndex(projectId)
 
+    fun probeConversationProject(path: String, projectId: String): Boolean =
+        session.probeConversationProject(path, projectId)
+
+    fun suspendConversationRefreshForUserAction() =
+        session.suspendConversationRefreshForUserAction()
+
+    fun resumeConversationRefreshAfterUserAction() =
+        session.resumeConversationRefreshAfterUserAction()
+
     override fun openConversation(path: String): Boolean {
         realtimeVoiceTranscript.reset()
         clearPendingSend()
@@ -309,6 +345,8 @@ internal class ChatGptSocialChatController(
     override fun mcpPort(): WebChatSocialMcpPort = socialMcpPort
 
     override fun consumerPort(): WebChatConsumerPort = socialConsumerPort
+
+    fun privateDictationPort(): WebChatPrivateDictationPort = privateDictation
 
     override fun beginRealtimeVoiceBacking(): Boolean {
         val started = session.beginRealtimeVoiceBacking()
@@ -368,6 +406,7 @@ internal class ChatGptSocialChatController(
     override fun onHostPaused() = session.onHostPaused()
     override fun destroy() {
         clearPendingSend()
+        privateDictation.destroy()
         productionMessageActions.release()
         skinPresentation.destroy()
         session.destroy()
@@ -378,84 +417,12 @@ internal class ChatGptSocialChatController(
         binding.inputEdit.setSelection(binding.inputEdit.text?.length ?: 0)
     }
 
-    private fun revealMessageFromMcp(messageId: String, partIndex: Int?, target: String): Boolean {
-        val nativeId = "${provider.id.wireValue}:$messageId"
-        val index = transcript.indexOfMessageId(nativeId)
-        if (index < 0) return false
-        val message = transcript.messageAt(index) ?: return false
-        if (partIndex != null && partIndex !in message.webChatMessage?.contentParts.orEmpty().indices) {
-            return false
-        }
-        val requiredAction = when (target) {
-            "copy" -> WebChatMessageAction.COPY
-            "regenerate" -> WebChatMessageAction.REGENERATE
-            "actions" -> WebChatMessageAction.MORE
-            else -> null
-        }
-        if (requiredAction != null && requiredAction !in message.webChatMessage?.actions.orEmpty()) {
-            return false
-        }
-        binding.chatList.scrollToPosition(index)
-        revealMessageTarget(index, messageId, partIndex, target, attempt = 0)
-        return true
-    }
-
-    private fun revealMessageTarget(
-        index: Int,
-        messageId: String,
-        partIndex: Int?,
-        target: String,
-        attempt: Int,
-    ) {
-        binding.chatList.postDelayed({
-            val itemView = binding.chatList.findViewHolderForAdapterPosition(index)?.itemView
-            val targetView = itemView?.let { row ->
-                partIndex?.let {
-                    row.findViewById<android.widget.LinearLayout>(R.id.webChatMessagePartList)
-                        ?.getChildAt(it)
-                } ?: when (target) {
-                    "copy" -> row.findViewById<View>(R.id.webChatMessageCopy)
-                    "regenerate" -> row.findViewById<View>(R.id.webChatMessageRegenerate)
-                    "actions" -> row.findViewById<View>(R.id.webChatMessageMore)
-                    else -> row
-                }
-            }
-            if (itemView == null || targetView == null || targetView.visibility != View.VISIBLE) {
-                retryRevealMessageTarget(index, messageId, partIndex, target, attempt)
-                return@postDelayed
-            }
-
-            itemView.contentDescription = "web-chat-message:${provider.id.wireValue}:" +
-                com.elon.app.chatgptweb.ChatGptNativeControlPresentation.stableContextId(messageId)
-            val targetRect = Rect(0, 0, targetView.width.coerceAtLeast(1), targetView.height.coerceAtLeast(1))
-            binding.chatList.offsetDescendantRectToMyCoords(targetView, targetRect)
-            val itemRect = Rect(0, 0, itemView.width.coerceAtLeast(1), itemView.height.coerceAtLeast(1))
-            binding.chatList.offsetDescendantRectToMyCoords(itemView, itemRect)
-            targetRect.offset(-itemRect.left, -itemRect.top)
-            binding.chatList.requestChildRectangleOnScreen(itemView, targetRect, true)
-            targetView.requestFocus()
-            val visibleRect = Rect()
-            val fullyVisible = targetView.getGlobalVisibleRect(visibleRect) &&
-                visibleRect.width() >= targetView.width &&
-                visibleRect.height() >= targetView.height
-            if (!fullyVisible) {
-                retryRevealMessageTarget(index, messageId, partIndex, target, attempt)
-            }
-        }, if (attempt == 0) 0L else REVEAL_RETRY_DELAY_MS)
-    }
-
-    private fun retryRevealMessageTarget(
-        index: Int,
-        messageId: String,
-        partIndex: Int?,
-        target: String,
-        attempt: Int,
-    ) {
-        if (attempt >= MAX_REVEAL_ATTEMPTS) return
-        revealMessageTarget(index, messageId, partIndex, target, attempt + 1)
-    }
-
     private fun renderSnapshot(snapshot: ChatGptWebSnapshot) {
+        privateDictation.observeOfficialDraft(snapshot.draft)
+        if (pendingOfficialDictationDraft) {
+            setInputTextFromMcp(snapshot.draft)
+            pendingOfficialDictationDraft = false
+        }
         onConsumerStateObserved(socialConsumerPort.state())
         val voicePresentation = realtimeVoiceTranscript.resolve(snapshot)
         if (voicePresentation == null) {
@@ -549,6 +516,9 @@ internal class ChatGptSocialChatController(
         event: ChatGptWebEvent.CommandResult,
         sendReceipt: ChatGptWebSendReceipt?,
     ) {
+        privateDictation.onCommandResult(event.action, event.ok, event.detail)
+        if (event.action == "submit_dictation" && event.ok) pendingOfficialDictationDraft = true
+        if (event.action == "cancel_dictation" && event.ok) pendingOfficialDictationDraft = false
         val status = WebChatCommandStatus(
             action = event.action,
             ok = event.ok,
@@ -557,6 +527,9 @@ internal class ChatGptSocialChatController(
         )
         latestCommandStatus = status
         if (event.action == "send_prompt") latestSendCommandStatus = status
+        if (event.action in DICTATION_COMMAND_RESULTS) {
+            onDictationCommandResult(event.action, event.ok)
+        }
         if (sendReceipt?.origin != ChatGptWebSendOrigin.SOCIAL) return
         if (sendReceipt.indeterminate) {
             session.currentSnapshot()?.let(::renderSnapshot)
@@ -660,7 +633,7 @@ internal class ChatGptSocialChatController(
     private fun showModelOptions(options: List<ChatGptWebComposerOption>) {
         if (!active) return
         val observed = socialConsumerPort.state().composerSections[MODEL_SECTION].orEmpty()
-            .ifEmpty { options.mapNotNull(::consumerModelOption) }
+            .ifEmpty { options.mapNotNull(ChatGptConsumerModelOptionMapper::map) }
         val resolved = interactionCache.replaceComposerOptions(provider.id, MODEL_SECTION, observed)
         if (modelPickerActive) {
             presentModelOptions(
@@ -766,23 +739,6 @@ internal class ChatGptSocialChatController(
         modelPopup?.dismiss()
     }
 
-    private fun consumerModelOption(option: ChatGptWebComposerOption): WebChatConsumerOption? {
-        val id = option.id.trim()
-        val label = option.label.trim()
-        if (id.isBlank() || label.isBlank()) return null
-        return WebChatConsumerOption(
-            id = id,
-            label = label,
-            selected = option.selected,
-            semantic = option.semantic,
-            opensSubmenu = option.opensSubmenu,
-            nativeSelector = "web-chat-model-option:" +
-                ChatGptNativeControlPresentation.stableContextId(id),
-            parentId = option.parentId,
-            parentLabel = option.parentLabel,
-        )
-    }
-
     private fun updateComposerModel(model: String) {
         if (!active) return
         WebChatComposerProviderPresentation.applyChatGptModelLevel(
@@ -793,8 +749,11 @@ internal class ChatGptSocialChatController(
     }
 
     private companion object {
+        val DICTATION_COMMAND_RESULTS = setOf(
+            "start_dictation",
+            "submit_dictation",
+            "cancel_dictation",
+        )
         const val MODEL_SECTION = "model"
-        const val MAX_REVEAL_ATTEMPTS = 8
-        const val REVEAL_RETRY_DELAY_MS = 80L
     }
 }

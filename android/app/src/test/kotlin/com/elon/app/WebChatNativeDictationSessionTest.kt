@@ -26,7 +26,7 @@ class WebChatNativeDictationSessionTest {
         engine.onPartial("你好")
         assertEquals("已有内容 你好", draft)
 
-        engine.onFinal("你好世界")
+        engine.deliverFinal("你好世界")
 
         assertEquals("已有内容 你好世界", draft)
         assertEquals(WebChatNativeDictationPhase.IDLE, session.state().phase)
@@ -73,6 +73,88 @@ class WebChatNativeDictationSessionTest {
         assertEquals(1, engine.stopCount)
     }
 
+    @Test
+    fun submitUsesTheActiveEngineResultTimeoutForServerFallback() {
+        val engine = FakeEngine().apply { resultTimeoutMs = 65_000L }
+        val scheduler = FakeScheduler()
+        val session = WebChatNativeDictationSession(
+            bridge = { engine },
+            readDraft = { "" },
+            writeDraft = {},
+            onStateChanged = {},
+            onUnavailable = {},
+            scheduler = scheduler,
+        )
+
+        session.start()
+        session.submit()
+
+        assertEquals(65_000L, scheduler.lastDelayMs)
+    }
+
+    @Test
+    fun speechEndWaitsForTheFinalResultWithoutHidingThePartialDraft() {
+        val engine = FakeEngine()
+        val scheduler = FakeScheduler()
+        var draft = ""
+        val session = WebChatNativeDictationSession(
+            bridge = { engine },
+            readDraft = { draft },
+            writeDraft = { draft = it },
+            onStateChanged = {},
+            onUnavailable = {},
+            scheduler = scheduler,
+        )
+
+        assertTrue(session.start())
+        engine.onPartial("部分")
+        engine.onEnd()
+
+        assertEquals("部分", draft)
+        assertEquals(WebChatNativeDictationPhase.PROCESSING, session.state().phase)
+
+        engine.deliverFinal("完整结果")
+
+        assertEquals("完整结果", draft)
+        assertEquals(WebChatNativeDictationPhase.IDLE, session.state().phase)
+        assertEquals(0, engine.cancelCount)
+    }
+
+    @Test
+    fun settlementCancelsAnOrphanedEngineAndAllowsTheNextStart() {
+        val engine = FakeEngine()
+        val scheduler = FakeScheduler()
+        val session = WebChatNativeDictationSession(
+            bridge = { engine },
+            readDraft = { "" },
+            writeDraft = {},
+            onStateChanged = {},
+            onUnavailable = {},
+            scheduler = scheduler,
+        )
+
+        assertTrue(session.start())
+        engine.onEnd()
+        scheduler.runPending()
+
+        assertEquals(WebChatNativeDictationPhase.IDLE, session.state().phase)
+        assertEquals(1, engine.cancelCount)
+        assertTrue(session.start())
+        assertEquals(2, engine.startCount)
+    }
+
+    @Test
+    fun destroyReleasesTheCapturedEngineEvenAfterItBecameIdle() {
+        val engine = FakeEngine()
+        val session = session(engine, { "" }, {})
+
+        session.start()
+        engine.deliverFinal("完成")
+        session.destroy()
+
+        assertEquals(1, engine.destroyCount)
+    }
+
     private fun session(
         engine: FakeEngine,
         readDraft: () -> String,
@@ -88,8 +170,10 @@ class WebChatNativeDictationSessionTest {
 
     private class FakeScheduler : WebChatNativeDictationScheduler {
         private val tasks = linkedSetOf<Runnable>()
+        var lastDelayMs: Long? = null
         override fun postDelayed(task: Runnable, delayMs: Long) {
             tasks += task
+            lastDelayMs = delayMs
         }
         override fun remove(task: Runnable) {
             tasks -= task
@@ -108,12 +192,16 @@ class WebChatNativeDictationSessionTest {
         override var onError: (String) -> Unit = {}
         override var onVolume: (Float) -> Unit = {}
         override var isRunning: Boolean = false
+        override var resultTimeoutMs: Long = WebChatNativeDictationEngine.DEFAULT_RESULT_TIMEOUT_MS
         var stopCount = 0
         var cancelCount = 0
         var prewarmCount = 0
+        var startCount = 0
+        var destroyCount = 0
 
         override fun start() {
             isRunning = true
+            startCount += 1
         }
         override fun stop() {
             isRunning = false
@@ -125,6 +213,15 @@ class WebChatNativeDictationSessionTest {
         }
         override fun prewarm() {
             prewarmCount += 1
+        }
+        override fun destroy() {
+            isRunning = false
+            destroyCount += 1
+        }
+
+        fun deliverFinal(value: String) {
+            isRunning = false
+            onFinal(value)
         }
     }
 }

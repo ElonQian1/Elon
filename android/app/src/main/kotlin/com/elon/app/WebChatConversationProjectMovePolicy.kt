@@ -3,6 +3,7 @@ package com.elon.app
 import com.elon.app.chatgptweb.ChatGptWebConversation
 import com.elon.app.chatgptweb.ChatGptWebConversationIndex
 import com.elon.app.chatgptweb.ChatGptWebConversationIndexState
+import com.elon.app.chatgptweb.ChatGptWebConversationPath
 import com.elon.app.chatgptweb.ChatGptWebProject
 import java.util.Locale
 
@@ -17,17 +18,38 @@ internal object WebChatConversationProjectMovePolicy {
         .take(MAX_PROJECTS)
         .toList()
 
+    fun officialDestinations(
+        index: ChatGptWebConversationIndexState,
+        conversation: ChatGptWebConversation,
+        state: WebChatConsumerState,
+    ): List<ChatGptWebProject> = destinations(index, conversation)
+        .filter { projectChoice(state, it) != null }
+
     fun conversationOptions(
         state: WebChatConsumerState,
         conversation: ChatGptWebConversation,
     ): WebChatConsumerControlDescriptor? {
         val identity = ChatGptWebConversationIndex.identityOf(conversation)
-        return state.controls.asSequence()
-            .filter { it.control.enabled }
+        val visibleOptions = state.controls.asSequence()
+            .filter { it.control.enabled && it.control.inViewport }
             .filter { it.control.semantic == "conversation_options" }
+            .toList()
+        if (visibleOptions.any { it.control.region == "overlay" }) return null
+        return visibleOptions.asSequence()
             .filter { it.control.region == "header" }
             .filter { it.control.contextId == identity }
             .singleOrNull()
+    }
+
+    fun retryableConversationOptions(
+        state: WebChatConsumerState,
+        conversation: ChatGptWebConversation,
+    ): WebChatConsumerControlDescriptor? {
+        val visibleOverlay = state.controls.any {
+            it.control.enabled && it.control.inViewport && it.control.region == "overlay"
+        }
+        if (visibleOverlay) return null
+        return conversationOptions(state, conversation)
     }
 
     fun moveTrigger(
@@ -95,10 +117,19 @@ internal object WebChatConversationProjectMovePolicy {
         destination: ChatGptWebProject,
     ): Boolean {
         val identity = ChatGptWebConversationIndex.identityOf(conversation)
-        return index.conversations.any { current ->
-            ChatGptWebConversationIndex.identityOf(current) == identity &&
-                current.projectId == destination.id
+        val matches = index.conversations.filter { current ->
+            ChatGptWebConversationIndex.identityOf(current) == identity
         }
+        val destinationConfirmed = matches.any { current ->
+            current.projectId == destination.id &&
+                ChatGptWebConversationPath.projectId(current.path) == destination.id
+        }
+        val sourceProjectId = conversation.projectId
+            ?: ChatGptWebConversationPath.projectId(conversation.path)
+        val sourceStillPresent = sourceProjectId != null && matches.any { current ->
+            current.projectId == sourceProjectId
+        }
+        return destinationConfirmed && !sourceStillPresent
     }
 
     fun isGenericMoveLabel(value: String): Boolean = GENERIC_MOVE_LABEL.matches(
@@ -145,6 +176,7 @@ internal object WebChatConversationProjectMoveTiming {
     const val COMMAND_POLL_LIMIT = 30
     const val RECONCILIATION_POLL_LIMIT = 60
     const val CONTROL_REFRESH_POLL = 4
+    const val CONVERSATION_OPTIONS_RETRY_POLL = 8
     const val DIRECTORY_REFRESH_POLL = 10
     private val NAVIGATION_RETRY_POLLS = setOf(20, 40)
 
@@ -154,9 +186,12 @@ internal object WebChatConversationProjectMoveTiming {
     const val RECONCILIATION_TIMEOUT_MS = POLL_INTERVAL_MS * RECONCILIATION_POLL_LIMIT
 
     fun shouldRefreshControls(attempt: Int): Boolean =
-        attempt >= 0 &&
+        attempt > 0 &&
             attempt < CONTROL_POLL_LIMIT &&
             attempt % CONTROL_REFRESH_POLL == 0
+
+    fun shouldRetryConversationOptions(attempt: Int, retries: Int): Boolean =
+        retries == 0 && attempt >= CONVERSATION_OPTIONS_RETRY_POLL
 
     fun shouldRefreshDirectory(attempt: Int): Boolean =
         attempt > 0 &&

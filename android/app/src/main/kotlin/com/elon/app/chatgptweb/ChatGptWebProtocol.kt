@@ -40,6 +40,8 @@ internal data class ChatGptWebSnapshot(
     val accessSource: String = "",
     val messageWindowStart: Int = 0,
     val observedMessageCount: Int = messages.size,
+    val dictationCaptureActive: Boolean = false,
+    val dictationCapturePending: Boolean = false,
 )
 
 internal data class ChatGptWebComposerOption(
@@ -291,6 +293,8 @@ internal object ChatGptWebProtocol {
             accessSource = event.optString("accessSource").takeIf { it in ACCESS_SOURCES }.orEmpty(),
             messageWindowStart = messageWindowStart,
             observedMessageCount = observedMessageCount,
+            dictationCaptureActive = event.optBoolean("dictationCaptureActive"),
+            dictationCapturePending = event.optBoolean("dictationCapturePending"),
         )
     }
 

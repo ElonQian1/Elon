@@ -62,7 +62,8 @@ class WebChatProductionVoiceEntryContractTest {
             .substringBefore("fun cancelPending")
 
         assertTrue(feature.contains("fun startDefaultRealtimeVoice(): Boolean"))
-        assertTrue(feature.contains("selectChatProvider(WebChatProviderId.CHATGPT_WEB)"))
+        assertTrue(feature.contains("providerSwitchCoordinator.selectWithoutPrompt(WebChatProviderId.CHATGPT_WEB)"))
+        assertFalse(feature.contains("selectChatProvider(WebChatProviderId.CHATGPT_WEB)"))
         assertTrue(feature.contains("productionComposerTools.startRealtimeVoice"))
         assertTrue(feature.contains("productionVoiceControls.render"))
         assertTrue(feature.contains("productionVoiceControls.restoreLocalVoiceInput"))
@@ -93,13 +94,25 @@ class WebChatProductionVoiceEntryContractTest {
         assertTrue(tools.contains("pendingSessionCommand"))
         assertTrue(controls.contains("REALTIME_VOICE_BLUE"))
         assertTrue(controls.contains("views.webDictationButton"))
-        assertTrue(controls.contains("nativeDictation.start"))
-        assertTrue(controls.contains("command != null -> executeCommand(provider, command)"))
+        assertTrue(controls.contains("WebChatDictationStartChain.start"))
+        assertTrue(controls.contains("privateDictation.start"))
+        assertTrue(controls.contains("sharedDictation.start"))
+        assertTrue(controls.contains("startSharedDictation"))
+        assertTrue(controls.contains("startDomDictation"))
+        assertTrue(controls.contains("web_chat_dictation_dom_fallback"))
+        assertTrue(controls.contains("onDomCommandResult"))
+        assertFalse(controls.contains("providerDictationReady"))
+        assertFalse(controls.contains("startProviderDictation"))
         assertTrue(controls.contains("ic_web_chat_dictation_cancel"))
         assertTrue(controls.contains("ic_web_chat_dictation_done"))
         assertTrue(speech.contains("sharedAgentVoiceBridge"))
         assertTrue(dictation.contains("WebChatNativeDictationSession"))
+        assertTrue(dictation.contains("AgentVoiceDictationEngine(bridge())"))
         assertTrue(dictation.contains("FALLBACK_COOLDOWN_MS"))
+        assertTrue(dictation.contains("onUnavailableBeforeCapture"))
+        assertTrue(dictation.contains("fallback_accepted"))
+        assertFalse(dictation.contains("再点一次可使用官网听写"))
+        assertFalse(dictation.contains("WebChatResilientDictationEngine"))
         assertTrue(messageActions.contains("WebChatNativeReadAloudController"))
         assertTrue(messageActions.contains("observed.filterNot { it.semantic == READ_ALOUD_SEMANTIC }"))
         assertTrue(composer.contains("inputBarContainer.addView(webDictationButton)"))
@@ -133,6 +146,68 @@ class WebChatProductionVoiceEntryContractTest {
         assertNull(google.dictation)
         assertNull(google.dictationCancel)
         assertNull(google.realtimeVoice)
+    }
+
+    @Test
+    fun productionDictationDoesNotMislabelOfficialDomAsPrivateTransport() {
+        assertEquals(
+            WebChatProductionDictationTapRoute.START,
+            WebChatProductionDictationRoutePolicy.resolve(
+                privateActive = false,
+                sharedActive = false,
+                domActive = false,
+                startAvailable = true,
+            ),
+        )
+        assertEquals(
+            WebChatProductionDictationTapRoute.SUBMIT_DOM,
+            WebChatProductionDictationRoutePolicy.resolve(
+                privateActive = false,
+                sharedActive = false,
+                domActive = true,
+                startAvailable = true,
+            ),
+        )
+        assertEquals(
+            WebChatProductionDictationTapRoute.SUBMIT_PRIVATE,
+            WebChatProductionDictationRoutePolicy.resolve(
+                privateActive = true,
+                sharedActive = false,
+                domActive = true,
+                startAvailable = true,
+            ),
+        )
+    }
+
+    @Test
+    fun officialDomDictationActivatesOnlyTheRedactedResearchObserver() {
+        val composer = read("android/app/src/main/assets/chatgpt_web_adapter_composer.js")
+
+        val start = composer.substringAfter("function startDictation")
+            .substringBefore("function finishDictation")
+        assertTrue(start.contains("__elonChatGptRealtimeVoiceResearch"))
+        assertTrue(start.contains("research.activate()"))
+        assertFalse(start.contains("authorization"))
+        assertFalse(start.contains("cookie"))
+    }
+
+    @Test
+    fun bufferedPrivateDictationCannotReintroduceRealtimeVoiceReuse() {
+        val controller = read(
+            "android/app/src/main/kotlin/com/elon/app/ChatGptSocialChatController.kt",
+        )
+        val session = read(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptBackgroundSession.kt",
+        )
+        val build = read("android/app/build.gradle")
+
+        assertTrue(controller.contains("ChatGptWebPrivateDictationTransport("))
+        assertFalse(controller.contains("WebChatPrivateDictationSessionPort("))
+        assertFalse(session.contains("ChatGptWebPrivateDictationHost("))
+        assertTrue(build.contains("ELON_CHATGPT_PRIVATE_DICTATION"))
+        assertTrue(build.contains("CHATGPT_PRIVATE_DICTATION_ENABLED"))
+        assertFalse(build.contains("ELON_CHATGPT_PRIVATE_DICTATION_NATIVE_RTC"))
+        assertFalse(build.contains("CHATGPT_PRIVATE_DICTATION_NATIVE_RTC_ENABLED"))
     }
 
     @Test

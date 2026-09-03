@@ -550,7 +550,7 @@ internal class MainSpeechInputActions(
                     bridge.onFinal = { text ->
                         if (text.isNotBlank()) voiceMessageTranscription = text
                         voiceOverlay?.updatePartial(text)
-                        DebugTraceStore.record("voice_message_asr_result", mapOf("text" to text))
+                        DebugTraceStore.record("voice_message_asr_result", mapOf("text_length" to text.length))
                     }
                     bridge.onError = { msg ->
                         // 所有本地引擎失败（Honor 抢麦冲突等）；finishVoiceMessageRecording
@@ -747,7 +747,7 @@ internal class MainSpeechInputActions(
                     val body = resp.body?.string() ?: ""
                     if (resp.isSuccessful) {
                         val text = JSONObject(body).optString("text", "").trim()
-                        DebugTraceStore.record("voice_asr_server_result", mapOf("text" to text))
+                        DebugTraceStore.record("voice_asr_server_result", mapOf("text_length" to text.length))
                         callback(text.ifBlank { null })
                     } else {
                         DebugTraceStore.record("voice_asr_server_error", mapOf("code" to resp.code, "body" to body))

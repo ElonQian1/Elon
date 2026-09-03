@@ -150,8 +150,12 @@ class StreamingASR(private val context: Context) {
 
             Log.i(TAG, "🎤 开始流式识别 (smartVAD=$useSmartVAD)")
         } catch (e: Exception) {
+            isListening = false
+            stopSilenceCheck()
             Log.e(TAG, "启动失败", e)
-            callback?.onError("启动失败: ${e.message}")
+            val message = "启动失败: ${e.message}"
+            callback?.onErrorCode(SpeechRecognizer.ERROR_CLIENT, message)
+            callback?.onError(message)
         }
     }
     
@@ -268,7 +272,7 @@ class StreamingASR(private val context: Context) {
 
             if (finalResult.isNotEmpty() && !finalDelivered) {
                 finalDelivered = true
-                Log.i(TAG, "✅ 最终结果: $finalResult")
+                Log.i(TAG, "✅ 最终结果已生成 (length=${finalResult.length})")
                 callback?.onFinalResult(finalResult)
             }
         }
@@ -285,7 +289,7 @@ class StreamingASR(private val context: Context) {
             // 计算置信度（简单估算）
             val confidence = if (partialText.length > 3) 0.8f else 0.5f
             
-            Log.d(TAG, "📝 部分结果: $partialText")
+            Log.d(TAG, "📝 部分结果已更新 (length=${partialText.length})")
             callback?.onPartialResult(partialText, confidence)
         }
         
@@ -322,7 +326,7 @@ class StreamingASR(private val context: Context) {
                     handler.postDelayed({
                         if (!finalDelivered && savedPartial.isNotEmpty()) {
                             finalDelivered = true
-                            Log.w(TAG, "⚠️ onResults 超时，降级使用 partial: $savedPartial")
+                            Log.w(TAG, "⚠️ onResults 超时，降级使用 partial (length=${savedPartial.length})")
                             callback?.onFinalResult(savedPartial)
                         }
                     }, 2000)

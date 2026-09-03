@@ -4,6 +4,9 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+const dictationRuntimeModule = require('../android/app/src/main/assets/chatgpt_web_dictation_runtime.js');
+
+async function main() {
 
 const source = fs.readFileSync(path.join(
   __dirname,
@@ -412,6 +415,24 @@ const dictationComposer = {
     return selector === 'form' ? dictationScope : null;
   }
 };
+let resolveDictationMedia;
+let dictationTrackEnded;
+const dictationTrack = {
+  kind: 'audio',
+  readyState: 'live',
+  addEventListener(eventName, listener) {
+    if (eventName === 'ended') dictationTrackEnded = listener;
+  }
+};
+const dictationMediaDevices = {
+  getUserMedia() {
+    return {
+      then(resolve) {
+        resolveDictationMedia = resolve;
+      }
+    };
+  }
+};
 const dictationSandbox = {
   document: {
     querySelector: () => null,
@@ -421,6 +442,7 @@ const dictationSandbox = {
   window: {
     innerWidth: 400,
     innerHeight: 800,
+    navigator: { mediaDevices: dictationMediaDevices },
     getComputedStyle: () => ({ display: 'block', visibility: 'visible' }),
     __elonChatGptActionTargetPolicy: {
       actionPoint: () => null,
@@ -447,6 +469,10 @@ const dictationSandbox = {
 dictationSandbox.window.window = dictationSandbox.window;
 dictationSandbox.window.document = dictationSandbox.document;
 dictationSandbox.window.location = dictationSandbox.location;
+dictationSandbox.window.setTimeout = setTimeout;
+dictationSandbox.window.clearTimeout = clearTimeout;
+dictationSandbox.window.__elonChatGptDictationRuntime =
+  dictationRuntimeModule.create(dictationSandbox.window);
 
 runComposer(dictationSandbox);
 assert.ok(
@@ -459,11 +485,29 @@ dictationSandbox.window.__elonChatGptComposer.startDictation(
   (event) => dictationEvents.push(event),
   (...args) => dictationResults.push(args)
 );
-assert.deepEqual(Array.from(dictationResults[0]), ['start_dictation', true, '']);
+assert.equal(dictationResults.length, 0, 'touch dispatch alone must not report dictation started');
 assert.equal(dictationEvents[0].type, 'web_touch_request');
 assert.equal(dictationEvents[0].purpose, 'start_dictation');
 assert.equal(dictationEvents[0].xRatio, 0.825);
 assert.equal(dictationEvents[0].yRatio, 0.8375);
+dictationMediaDevices.getUserMedia({ audio: true });
+assert.equal(
+  dictationSandbox.window.__elonChatGptComposer.dictationCapturePending(),
+  true,
+  'an armed official microphone request must remain pending until media is granted'
+);
+resolveDictationMedia({ getAudioTracks: () => [dictationTrack] });
+await new Promise((resolve) => setTimeout(resolve, 100));
+assert.equal(dictationSandbox.window.__elonChatGptComposer.dictationCapturePending(), false);
+assert.equal(
+  dictationSandbox.window.__elonChatGptComposer.dictationCaptureActive(),
+  true,
+  'official controls alone are insufficient; the live audio track confirms capture'
+);
+assert.deepEqual(Array.from(dictationResults[0]), ['start_dictation', true, 'capture_started']);
+dictationTrack.readyState = 'ended';
+dictationTrackEnded();
+assert.equal(dictationSandbox.window.__elonChatGptComposer.dictationCaptureActive(), false);
 
 const sessionEvents = [];
 const sessionResults = [];
@@ -510,6 +554,13 @@ const sessionSandbox = {
       filter: (_section, options) => options
     },
     __elonChatGptDictationSessionPolicy: dictationSessionPolicy
+    ,__elonChatGptDictationRuntime: {
+      createCaptureTracker: () => ({
+        arm() {}, finish() {}, active: () => false, pending: () => false,
+        waitForActive: () => Promise.resolve(false), waitForInactive: () => Promise.resolve(true)
+      }),
+      waitUntil: () => Promise.resolve(true)
+    }
   }
 };
 sessionSandbox.window.window = sessionSandbox.window;
@@ -518,16 +569,16 @@ sessionSandbox.window.location = sessionSandbox.location;
 
 runComposer(sessionSandbox);
 assert.equal(sessionSandbox.window.__elonChatGptComposer.dictationActive(null), true);
-sessionSandbox.window.__elonChatGptComposer.cancelDictation(
+await sessionSandbox.window.__elonChatGptComposer.cancelDictation(
   (event) => sessionEvents.push(event),
   (...args) => sessionResults.push(args)
 );
-sessionSandbox.window.__elonChatGptComposer.submitDictation(
+await sessionSandbox.window.__elonChatGptComposer.submitDictation(
   (event) => sessionEvents.push(event),
   (...args) => sessionResults.push(args)
 );
-assert.deepEqual(Array.from(sessionResults[0]), ['cancel_dictation', true, '']);
-assert.deepEqual(Array.from(sessionResults[1]), ['submit_dictation', true, '']);
+assert.deepEqual(Array.from(sessionResults[0]), ['cancel_dictation', true, 'capture_finished']);
+assert.deepEqual(Array.from(sessionResults[1]), ['submit_dictation', true, 'capture_finished']);
 assert.equal(sessionEvents[0].purpose, 'cancel_dictation');
 assert.equal(sessionEvents[0].xRatio, 0.775);
 assert.equal(sessionEvents[1].purpose, 'submit_dictation');
@@ -537,11 +588,11 @@ sessionEvents.length = 0;
 sessionResults.length = 0;
 sessionSandbox.window.__elonChatGptActionTargetPolicy.actionPoint = () => null;
 assert.equal(sessionSandbox.window.__elonChatGptComposer.dictationActive(null), true);
-sessionSandbox.window.__elonChatGptComposer.cancelDictation(
+await sessionSandbox.window.__elonChatGptComposer.cancelDictation(
   (event) => sessionEvents.push(event),
   (...args) => sessionResults.push(args)
 );
-assert.deepEqual(Array.from(sessionResults[0]), ['cancel_dictation', true, '']);
+assert.deepEqual(Array.from(sessionResults[0]), ['cancel_dictation', true, 'capture_finished']);
 assert.equal(sessionEvents[0].purpose, 'cancel_dictation');
 assert.equal(sessionEvents[0].xRatio, 0.775);
 
@@ -789,3 +840,10 @@ assert.equal(currentEvents[0].xRatio, 0.1);
 assert.equal(currentEvents[0].yRatio, 0.875);
 
 process.stdout.write('CHATGPT_COMPOSER_TRIGGER_POLICY=passed\n');
+
+}
+
+main().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});

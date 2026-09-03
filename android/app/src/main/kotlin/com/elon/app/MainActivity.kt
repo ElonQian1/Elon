@@ -214,7 +214,7 @@ class MainActivity : AppCompatActivity() {
             },
             isSocialAiChatActive = {
                 friendChatActions.isActive() || groupChatActions.isActive()
-            }, isWebChatStreaming = { socialAiChatFeature.webChatStreaming() }, webChatComposerCanSubmit = { socialAiChatFeature.webChatComposerCanSubmit() }, isWebChatModeActive = { socialAiChatFeature.isChatModeActive() }, onComposerTextChanged = { value -> socialAiChatFeature.onComposerTextChanged(value) }, stopWebChatGeneration = { socialAiChatFeature.stopWebChatGeneration() },
+            }, isWebChatStreaming = { socialAiChatFeature.webChatStreaming() }, isWebChatDictationActive = { socialAiChatFeature.webChatDictationActive() }, webChatComposerCanSubmit = { socialAiChatFeature.webChatComposerCanSubmit() }, isWebChatModeActive = { socialAiChatFeature.isChatModeActive() }, onComposerTextChanged = { value -> socialAiChatFeature.onComposerTextChanged(value) }, stopWebChatGeneration = { socialAiChatFeature.stopWebChatGeneration() },
             trySendFriendMessage = { text, attachments ->
                 socialAiChatFeature.trySendMessage(text, attachments) ||
                     projectSpaceController.trySendMessage(text, attachments.isNotEmpty()) ||
@@ -273,7 +273,7 @@ class MainActivity : AppCompatActivity() {
                     friendChatActions.currentMessages()
                 }
             },
-            socialAiChatFeature = { socialAiChatFeature }, chatSideMenuControl = ChatSideMenuMcpControl(chatSideMenuController),
+            socialAiChatFeature = { socialAiChatFeature }, inputComposerViews = inputActions::inputComposerViewsOrNull, chatSideMenuControl = ChatSideMenuMcpControl(chatSideMenuController),
             chatGptAttachmentFixtureActions = createChatGptWebAcceptanceAttachmentActions(socialAiChatFeature, inputActions.pendingAttachmentActions),
             rememberMcpConversationSeed = { seed ->
                 rememberPendingMcpConversationSeed(prefs, s.gson, seed)

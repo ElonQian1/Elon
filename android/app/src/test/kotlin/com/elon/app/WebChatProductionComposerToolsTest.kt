@@ -88,6 +88,40 @@ class WebChatProductionComposerToolsTest {
         }
     }
 
+    @Test
+    fun activeDictationCanFinishWhileTheOfficialComposerIsTransientlyUnavailable() {
+        val activeDictation = WebChatConsumerState(
+            streaming = false,
+            dictationActive = true,
+            composerSections = emptyMap(),
+            pageKind = "home",
+            pageUrl = "https://chatgpt.com/",
+            features = emptyList(),
+            commandRequests = emptyList(),
+            adapterCurrent = true,
+        )
+
+        listOf("chatgpt_submit_dictation", "chatgpt_cancel_dictation").forEach { action ->
+            assertTrue(WebChatProductionSessionCommandPolicy.canDispatch(
+                action = action,
+                sessionReady = false,
+                consumerState = activeDictation,
+            ))
+            assertFalse(WebChatProductionSessionCommandPolicy.mayRecoverSession(action))
+        }
+        assertFalse(WebChatProductionSessionCommandPolicy.canDispatch(
+            action = "chatgpt_start_dictation",
+            sessionReady = false,
+            consumerState = activeDictation,
+        ))
+        assertFalse(WebChatProductionSessionCommandPolicy.canDispatch(
+            action = "chatgpt_cancel_dictation",
+            sessionReady = false,
+            consumerState = activeDictation.copy(adapterCurrent = false),
+        ))
+        assertTrue(WebChatProductionSessionCommandPolicy.mayRecoverSession("chatgpt_start_dictation"))
+    }
+
     private fun tool(
         id: String,
         label: String,

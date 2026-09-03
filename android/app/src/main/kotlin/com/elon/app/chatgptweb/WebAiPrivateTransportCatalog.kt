@@ -227,13 +227,28 @@ internal object WebAiPrivateTransportCatalog {
             id = "android_chatgpt_native_dictation_v1",
             provider = "chatgpt",
             status = "implemented_device_pending",
-            verification = "targeted_asr_vad_composer_tests_passed",
+            verification = "targeted_shared_bridge_composer_tests_pending",
             productionDefault = true,
             runtimeEnabled = true,
-            requestMode = "native_agent_asr_smart_vad_to_current_composer_draft",
+            requestMode = "existing_work_mode_agent_voice_bridge_to_current_draft",
             healthPolicy =
-                "engine_rotation_no_auto_send_cancel_restore_and_sixty_second_fallback_cooldown",
-            fallback = "official_web_dictation",
+                "existing_engine_ownership_and_bounded_unavailable_cooldown",
+            fallback = "official_dom_dictation",
+        ),
+        Entry(
+            id = "android_chatgpt_private_dictation_transport_v1",
+            provider = "chatgpt",
+            status = "completed",
+            verification =
+                "device_same_origin_synthetic_audio_endpoint_and_targeted_integration_tests_passed",
+            productionDefault = true,
+            runtimeEnabled = BuildConfig.CHATGPT_PRIVATE_DICTATION_ENABLED,
+            requestMode =
+                "same_origin_page_local_media_recorder_buffered_transcription",
+            healthPolicy =
+                "pre_capture_auth_gate_capture_ownership_bounded_timeouts_and_session_circuit_breaker",
+            fallback = "shared_work_mode_bridge_then_official_dom_dictation",
+            directPostEnabled = BuildConfig.CHATGPT_PRIVATE_DICTATION_ENABLED,
         ),
         Entry(
             id = "android_chatgpt_native_response_read_aloud_v1",

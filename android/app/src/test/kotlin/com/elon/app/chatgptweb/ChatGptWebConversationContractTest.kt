@@ -65,6 +65,72 @@ class ChatGptWebConversationContractTest {
     }
 
     @Test
+    fun conversationNavigationFallsBackWhenAnOfficialLinkDoesNotChangeLocation() {
+        val conversations = readRepositoryFile(
+            "android/app/src/main/assets/chatgpt_web_adapter_conversations.js",
+        )
+        val core = readRepositoryFile(
+            "android/app/src/main/assets/chatgpt_web_adapter.js",
+        )
+        val workflow = conversations.substringAfter("function openConversation")
+            .substringBefore("function openProject")
+        val dispatch = core.substringAfter("if (action === 'open_conversation'")
+            .substringBefore("if (action === 'open_project'")
+
+        assertTrue(workflow.contains("target.click()"))
+        assertTrue(workflow.contains("cancelDirectoryWork(false)"))
+        assertTrue(workflow.contains("window.setTimeout(closeSidebarIfOpen, 120)"))
+        assertTrue(workflow.contains("closeSidebarIfOpen()"))
+        assertTrue(workflow.contains("if (location.pathname !== path) assignTarget()"))
+        assertTrue(workflow.contains("}, 800)"))
+        assertFalse(workflow.contains("fetch("))
+        assertTrue(dispatch.contains("prefetchConversation(path, emitEvent, null)"))
+        assertTrue(dispatch.contains("return navigate()"))
+        assertFalse(dispatch.contains("prefetchConversation(path, emitEvent, navigate)"))
+    }
+
+    @Test
+    fun conversationNavigationCancelsAnOlderBackgroundDirectoryScan() {
+        val conversations = readRepositoryFile(
+            "android/app/src/main/assets/chatgpt_web_adapter_conversations.js",
+        )
+        val requestList = conversations.substringAfter("function requestList")
+            .substringBefore("function newConversation")
+
+        assertTrue(requestList.contains("const generation = ++directoryGeneration"))
+        assertTrue(requestList.contains("isCurrentDirectoryGeneration(generation)"))
+        assertTrue(requestList.contains("closeSidebarIfOpen()"))
+        assertTrue(conversations.contains("collectProjects(observedProjects, (projects) =>"))
+        assertTrue(conversations.contains("}, generation);"))
+    }
+
+    @Test
+    fun projectInteractionSuspendsNewDirectoryRefreshesUntilTheWritePhaseEnds() {
+        val adapter = readRepositoryFile(
+            "android/app/src/main/assets/chatgpt_web_adapter.js",
+        )
+        val directoryRequests = readRepositoryFile(
+            "android/app/src/main/assets/" +
+                "chatgpt_web_adapter_conversation_directory_requests.js",
+        )
+        val session = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptBackgroundSession.kt",
+        )
+        val move = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/WebChatProductionConversationProjectMove.kt",
+        )
+
+        assertTrue(directoryRequests.contains("generation += 1"))
+        assertTrue(adapter.contains("action === 'cancel_conversation_directory'"))
+        assertTrue(directoryRequests.contains("if (!current()) return;"))
+        assertTrue(session.contains("ChatGptConversationRefreshSession(conversationRefresh)"))
+        assertTrue(session.contains("conversationRefreshSession.suspend"))
+        assertTrue(session.contains("pageAdapter?.cancelConversationDirectoryWork()"))
+        assertTrue(move.contains("holdConversationRefresh()"))
+        assertTrue(move.contains("releaseConversationRefresh()"))
+    }
+
+    @Test
     fun conversationAdapterEmitsDailyActivityAndProjectMembership() {
         val conversations = readRepositoryFile(
             "android/app/src/main/assets/chatgpt_web_adapter_conversations.js",

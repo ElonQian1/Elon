@@ -34,7 +34,12 @@ internal class ChatGptConversationNavigationCoordinator(
     fun shouldAccept(incoming: ChatGptWebSnapshot): Boolean {
         pendingConversationPath?.let { targetPath ->
             if (ChatGptWebConversationPath.fromUrl(incoming.url) == targetPath) {
-                clearBoundary()
+                if (
+                    ChatGptWebAccessPolicy.canChat(incoming) ||
+                    ChatGptWebAccessPolicy.requiresLogin(incoming)
+                ) {
+                    clearBoundary()
+                }
                 return true
             }
             val transition = boundaryTransition(incoming)

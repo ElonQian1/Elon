@@ -22,6 +22,12 @@ internal object ChatGptWebCommandReceipts {
         return resultJson(command, request?.id, value.lastCommandObservedAtMs)
     }
 
+    fun recentResultJson(value: ChatGptWebObservedState.Snapshot, action: String): Any {
+        val observed = value.recentCommandResults[action] ?: return JSONObject.NULL
+        val request = value.commandRequests.lastOrNull { it.result == observed.result }
+        return resultJson(observed.result, request?.id, observed.observedAtMs)
+    }
+
     private fun resultJson(
         value: ChatGptWebEvent.CommandResult?,
         requestId: String? = null,

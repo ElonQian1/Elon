@@ -31,12 +31,16 @@ class WebChatBackgroundWebViewContractTest {
         assertTrue(presentation.contains("beginWebChatRealtimeVoiceInteraction()"))
         assertTrue(presentation.contains("isFocusableInTouchMode = true"))
         assertTrue(presentation.contains("endWebChatBackgroundInteraction()"))
-        assertTrue(presentation.contains("const val MAX_LEASE_MS = 2_500L"))
+        assertTrue(presentation.contains("const val TRANSIENT_LEASE_MS = 2_500L"))
+        assertTrue(presentation.contains("const val DICTATION_START_LEASE_MS = 10_000L"))
+        assertTrue(presentation.contains("continuesDictationLease"))
+        assertTrue(presentation.contains("captureActive ->"))
         assertFalse(presentation.contains("View.GONE"))
         assertFalse(presentation.contains("pauseTimers"))
         assertTrue(chatGptWebView.contains("configureWebChatBackgroundSurface()"))
         assertTrue(chatGpt.contains("composerOptionInteraction::dispatch"))
-        assertTrue(chatGpt.contains("backgroundInteractionLease::run"))
+        assertTrue(chatGpt.contains("backgroundInteractionLease.run(kind, action)"))
+        assertTrue(chatGpt.contains("backgroundInteractionLease.observeDictationState("))
         assertTrue(chatGpt.contains("surfaceMode.isSkin() || realtimeVoiceBacking.isActive()"))
         val voiceBacking = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptRealtimeVoiceBackingController.kt",

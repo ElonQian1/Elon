@@ -146,6 +146,26 @@ class ChatGptWebObservedStateTest {
     }
 
     @Test
+    fun retainsMembershipProbeAfterDirectoryRefreshOverwritesLastCommand() {
+        var now = 3_000L
+        val state = ChatGptWebObservedState { now }
+        state.accept(ChatGptWebEvent.CommandResult(
+            "probe_conversation_project",
+            true,
+            "",
+        ))
+
+        now += 10
+        state.accept(ChatGptWebEvent.CommandResult("list_conversations", true, ""))
+
+        val snapshot = state.snapshot()
+        assertEquals("list_conversations", snapshot.lastCommand?.action)
+        val membership = snapshot.recentCommandResults.getValue("probe_conversation_project")
+        assertTrue(membership.result.ok)
+        assertEquals(3_000L, membership.observedAtMs)
+    }
+
+    @Test
     fun concurrentCommandsCompleteOnlyTheirCorrelatedRequest() {
         var now = 2_000L
         val state = ChatGptWebObservedState { now }

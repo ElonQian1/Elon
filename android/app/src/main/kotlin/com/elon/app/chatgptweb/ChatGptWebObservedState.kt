@@ -17,6 +17,7 @@ internal class ChatGptWebObservedState(
     private var composerSections: Map<String, List<ChatGptWebComposerOption>> = emptyMap()
     private var lastCommand: ChatGptWebEvent.CommandResult? = null
     private var lastCommandObservedAtMs: Long? = null
+    private var recentCommandResults: Map<String, ObservedCommandResult> = emptyMap()
     private var commandRequests: List<CommandRequest> = emptyList()
     private var nextCommandId = 0L
     private var updatedAtMs: Long = 0L
@@ -67,6 +68,11 @@ internal class ChatGptWebObservedState(
             is ChatGptWebEvent.CommandResult -> {
                 lastCommand = event
                 lastCommandObservedAtMs = observedAtMs
+                recentCommandResults = (
+                    (recentCommandResults - event.action) +
+                        (event.action to ObservedCommandResult(event, observedAtMs))
+                    ).entries.toList().takeLast(MAX_RECENT_COMMAND_ACTIONS)
+                    .associate { it.key to it.value }
                 completeRequest(event, observedAtMs)
                 if (event.action == "list_conversations" && !event.ok) {
                     conversationCollection = conversationCollection.copy(
@@ -107,6 +113,7 @@ internal class ChatGptWebObservedState(
             composerSections = emptyMap()
             lastCommand = null
             lastCommandObservedAtMs = null
+            recentCommandResults = emptyMap()
             commandRequests = commandRequests.map { request ->
                 if (request.status != CommandRequest.PENDING) return@map request
                 if (request.canReconcileAfterDocumentChange()) return@map request
@@ -231,6 +238,7 @@ internal class ChatGptWebObservedState(
             features = features,
             composerSections = composerSections,
             lastCommand = lastCommand,
+            recentCommandResults = recentCommandResults,
             commandRequests = commandRequests,
             updatedAtMs = updatedAtMs,
             lastCommandObservedAtMs = lastCommandObservedAtMs,
@@ -292,6 +300,7 @@ internal class ChatGptWebObservedState(
         val features: List<ChatGptWebFeature>,
         val composerSections: Map<String, List<ChatGptWebComposerOption>>,
         val lastCommand: ChatGptWebEvent.CommandResult?,
+        val recentCommandResults: Map<String, ObservedCommandResult> = emptyMap(),
         val commandRequests: List<CommandRequest>,
         val updatedAtMs: Long,
         val lastCommandObservedAtMs: Long? = null,
@@ -338,8 +347,14 @@ internal class ChatGptWebObservedState(
         }
     }
 
+    internal data class ObservedCommandResult(
+        val result: ChatGptWebEvent.CommandResult,
+        val observedAtMs: Long,
+    )
+
     private companion object {
         const val MAX_COMMAND_REQUESTS = 20
+        const val MAX_RECENT_COMMAND_ACTIONS = 20
         const val COMMAND_TIMEOUT_MS = 20_000L
         const val PAGE_GENERATION_CHANGED = "page_generation_changed"
         const val OPEN_CONVERSATION = "open_conversation"

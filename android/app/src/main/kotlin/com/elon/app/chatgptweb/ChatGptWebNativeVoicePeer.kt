@@ -56,6 +56,7 @@ internal class ChatGptWebNativeVoicePeer(
     private val onRelayArmed: () -> Boolean,
     private val onTranscript: (ChatGptWebNativeVoiceTranscriptEvent) -> Unit,
     private val onState: (ChatGptWebNativeVoiceState) -> Unit,
+    private val audioPlayoutEnabled: Boolean = true,
     private val mainHandler: Handler = Handler(Looper.getMainLooper()),
 ) {
     private val audioRoute = ChatGptWebNativeVoiceAudioRoute(context)
@@ -82,7 +83,7 @@ internal class ChatGptWebNativeVoicePeer(
             fail("microphone_permission_required")
             return false
         }
-        if (!audioRoute.acquire()) {
+        if (audioPlayoutEnabled && !audioRoute.acquire()) {
             fail("audio_route_unavailable")
             return false
         }
@@ -103,6 +104,8 @@ internal class ChatGptWebNativeVoicePeer(
         val createdPeer = factory.createPeerConnection(configuration, observer(token))
             ?: return fail("peer_creation_failed")
         peer = createdPeer
+        createdPeer.setAudioPlayout(audioPlayoutEnabled)
+        createdPeer.setAudioRecording(true)
         audioSource = factory.createAudioSource(MediaConstraints())
         audioTrack = factory.createAudioTrack(AUDIO_TRACK_ID, audioSource).also {
             it.setEnabled(true)

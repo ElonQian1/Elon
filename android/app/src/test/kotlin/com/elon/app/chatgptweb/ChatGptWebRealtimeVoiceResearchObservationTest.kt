@@ -23,6 +23,16 @@ class ChatGptWebRealtimeVoiceResearchObservationTest {
                 "v1|network-form-shape|chatgpt-origin|/realtime/wm|json-voice.model",
             ),
         )
+        assertNotNull(
+            ChatGptWebRealtimeVoiceResearchObservation.parse(
+                "v1|network-session-profile|chatgpt-origin|/realtime/wm|chat-mode-dictation|input-transcription-present|turn-detection-present|modalities-2",
+            ),
+        )
+        assertNotNull(
+            ChatGptWebRealtimeVoiceResearchObservation.parse(
+                "v1|data-channel-message|local|json|b1|delta.type|conversation.item.input_audio_transcription.delta",
+            ),
+        )
     }
 
     @Test
@@ -48,5 +58,14 @@ class ChatGptWebRealtimeVoiceResearchObservationTest {
 
         assertEquals(setOf("channel", "summary"), observation.traceDetails().keys)
         assertTrue(observation.traceDetails().values.all { it.length <= 160 })
+    }
+
+    @Test
+    fun acceptsNativeResourceRequestShape() {
+        val observation = ChatGptWebRealtimeVoiceResearchObservation.parse(
+            "v1|resource-start|post|chatgpt|/backend-api/speech/{id}|audio",
+        )
+
+        assertEquals("resource-start", observation?.channel)
     }
 }

@@ -15,6 +15,7 @@ internal class ChatGptWebViewClient(
     private val onBlockedNavigation: (String) -> Unit,
     private val onPageError: (String) -> Unit,
     private val rewriteAllowedMainFrameUrl: (String) -> String?,
+    private val onResourceRequest: (WebResourceRequest) -> Unit = {},
 ) : WebViewClient() {
     override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
         if (!request.isForMainFrame) return false
@@ -46,6 +47,14 @@ internal class ChatGptWebViewClient(
 
     override fun onPageFinished(view: WebView, url: String) {
         onPageReady(url)
+    }
+
+    override fun shouldInterceptRequest(
+        view: WebView,
+        request: WebResourceRequest,
+    ): WebResourceResponse? {
+        runCatching { onResourceRequest(request) }
+        return super.shouldInterceptRequest(view, request)
     }
 
     override fun onReceivedError(

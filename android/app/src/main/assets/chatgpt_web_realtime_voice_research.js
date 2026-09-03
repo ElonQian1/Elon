@@ -4,18 +4,20 @@
   if (window.__elonChatGptPrivateResearchEnabled !== true) return;
   if (location.origin !== 'https://chatgpt.com') return;
   const existing = window.__elonChatGptRealtimeVoiceResearch;
-  if (existing && Number(existing.version) >= 2) return;
+  if (existing && Number(existing.version) >= 4) return;
 
   const startedAt = Date.now();
-  const expiresAt = startedAt + (10 * 60 * 1000);
+  const observationLifetimeMs = 10 * 60 * 1000;
+  let expiresAt = startedAt + observationLifetimeMs;
   const maxObservationsPerWindow = 96;
-  const maxVoiceWindows = 3;
+  const maxVoiceWindows = 12;
   const voicePathHint = /(voice|realtime|webrtc|rtc|audio|speech|\/backend-api\/f\/conversation\/prepare|\/backend-api\/sentinel\/[^/]+\/(prepare|finalize))/i;
   const sensitiveKeyHint = /(token|secret|credential|authorization|cookie|proof|sdp|candidate)/i;
   let observationCount = 0;
   let windowObservationCount = 0;
   let voiceWindowCount = 0;
   let voiceWindowUntil = 0;
+  const dataChannelResearch = window.__elonChatGptRealtimeDataChannelResearch;
 
   function bridgeReady() {
     return window.elonChatGptNative &&
@@ -50,6 +52,10 @@
   }
 
   function activateVoiceWindow() {
+    if (Date.now() > expiresAt) {
+      expiresAt = Date.now() + observationLifetimeMs;
+      voiceWindowCount = 0;
+    }
     if (voiceWindowCount >= maxVoiceWindows) return false;
     voiceWindowCount += 1;
     windowObservationCount = 0;
@@ -242,6 +248,10 @@
       ]);
       if (info && info.path === '/realtime/wm') {
         emit(['network-form-shape', info.family, info.path, formSessionShape(init && init.body)]);
+        if (dataChannelResearch && typeof dataChannelResearch.sessionProfile === 'function') {
+          const profile = dataChannelResearch.sessionProfile(init && init.body);
+          if (profile.length) emit(['network-session-profile', info.family, info.path].concat(profile));
+        }
       }
       return originalFetch.apply(this, arguments).then((response) => {
         if (info) {
@@ -378,7 +388,12 @@
           if (eventName === 'iceconnectionstatechange') emit(['peer-ice', peer.iceConnectionState || 'unknown']);
           if (eventName === 'signalingstatechange') emit(['peer-signaling', peer.signalingState || 'unknown']);
           if (eventName === 'track') emit(['peer-track', event && event.track && event.track.kind || 'unknown']);
-          if (eventName === 'datachannel') emit(['peer-data-channel', 'remote']);
+          if (eventName === 'datachannel') {
+            emit(['peer-data-channel', 'remote']);
+            if (dataChannelResearch && typeof dataChannelResearch.observe === 'function') {
+              dataChannelResearch.observe(event && event.channel, 'remote', emit);
+            }
+          }
         });
       } catch (_) {}
     });
@@ -391,7 +406,19 @@
     wrapPeerMethod(peer, 'setRemoteDescription', (args) => {
       emit(['peer-remote-description'].concat(descriptionSummary(args[0])));
     });
-    wrapPeerMethod(peer, 'createDataChannel', () => emit(['peer-data-channel', 'local']));
+    if (typeof peer.createDataChannel === 'function') {
+      try {
+        const originalCreateDataChannel = peer.createDataChannel.bind(peer);
+        peer.createDataChannel = function () {
+          emit(['peer-data-channel', 'local']);
+          const channel = originalCreateDataChannel.apply(null, arguments);
+          if (dataChannelResearch && typeof dataChannelResearch.observe === 'function') {
+            dataChannelResearch.observe(channel, 'local', emit);
+          }
+          return channel;
+        };
+      } catch (_) {}
+    }
   }
 
   function wrapPeerMethod(peer, name, before) {
@@ -425,7 +452,7 @@
   installPeerObserver();
 
   window.__elonChatGptRealtimeVoiceResearch = Object.freeze({
-    version: 2,
+    version: 4,
     activate: activateVoiceWindow,
     snapshot: function () {
       return Object.freeze({

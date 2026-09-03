@@ -17,6 +17,7 @@
     '[data-slot="menu-content"]'
   ].join(', ');
   const MANAGEMENT_ACTION = /view.*files.*chat|rename|unpin|pin.chat|unarchive|archive|share|delete|在聊天中查看文件|重命名|重新命名|取消置顶|置顶聊天|取消归档|归档|分享|删除/i;
+  const MAX_OVERLAY_ACTIONS = 64;
 
   function signal(node) {
     return [
@@ -87,12 +88,18 @@
         return {
           root,
           index,
+          visibleActionCount: visibleActions.length,
           score: managementCount * 1000 + menuItemCount * 100 +
             (explicitMenuRoot(root) ? 25 : 0) - Math.min(visibleActions.length, 24)
         };
       })
+      .filter((candidate) =>
+        candidate.visibleActionCount > 0 && candidate.visibleActionCount <= MAX_OVERLAY_ACTIONS)
       .sort((left, right) => right.score - left.score || right.index - left.index)
-      .map((candidate) => candidate.root);
+      .map((candidate) => candidate.root)
+      .filter((root, index, ranked) => !ranked.slice(0, index).some((narrower) =>
+        root !== narrower && typeof root.contains === 'function' && root.contains(narrower)
+      ));
   }
 
   function inferredRoot(node, isVisible, actionableNodes) {

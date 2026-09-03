@@ -43,6 +43,8 @@ internal data class WebChatConsumerState(
     val controls: List<WebChatConsumerControlDescriptor> = emptyList(),
     val commandRequests: List<WebChatConsumerCommandRequest>,
     val adapterCurrent: Boolean = true,
+    val dictationCaptureActive: Boolean = false,
+    val dictationCapturePending: Boolean = false,
 )
 
 internal data class WebChatConsumerCommandResult(
@@ -59,7 +61,13 @@ internal interface WebChatConsumerPort {
     fun requestFeatures(): WebChatConsumerCommandResult
     fun selectFeature(featureId: String, userConfirmed: Boolean): WebChatConsumerCommandResult
     fun requestControls(): WebChatConsumerCommandResult
+    fun revealProjectChoice(label: String): WebChatConsumerCommandResult =
+        WebChatConsumerCommandResult(false, "unsupported_consumer_command")
     fun invokeControl(controlId: String, userConfirmed: Boolean): WebChatConsumerCommandResult
+    fun invokeControlAfterTouchMiss(
+        controlId: String,
+        userConfirmed: Boolean,
+    ): WebChatConsumerCommandResult = invokeControl(controlId, userConfirmed)
     fun updateControl(
         controlId: String,
         mutation: WebChatConsumerControlMutation,

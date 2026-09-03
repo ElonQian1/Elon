@@ -36,10 +36,13 @@ internal class MainMcpNativeControlActions(
     private val activeFriend: () -> AppFriend? = { null },
     private val activeFriendMessages: () -> List<ChatMessage> = { emptyList() },
     private val socialAiChatFeature: () -> MainSocialAiChatFeature? = { null },
+    inputComposerViews: () -> MainInputComposerViews? = { null },
     private val chatSideMenuControl: ChatSideMenuMcpControl? = null,
     private val chatGptAttachmentFixtureActions: ChatGptWebAcceptanceAttachmentNativeActions? = null,
     private val rememberMcpConversationSeed: (McpConversationSeed) -> Unit = {}
 ) {
+    private val webChatDictation = WebChatDictationMcpActions(inputComposerViews)
+
     fun uiState(): JSONObject {
         val project = activeProject()
         val conversation = activeConversation()
@@ -57,6 +60,7 @@ internal class MainMcpNativeControlActions(
             .put("projects", projectsJson())
             .put("active_conversation", conversationJson(conversation, activeConversationIndex(), lastMessage))
             .put("social_chat", socialChatJson())
+            .put("web_chat_dictation", webChatDictation.stateJson())
             .put(
                 "chatgpt_web_mcp",
                 socialAiChatFeature()?.chatGptMcpPort()?.uiState() ?: JSONObject.NULL,
@@ -142,6 +146,12 @@ internal class MainMcpNativeControlActions(
                 }
                 uiState()
             }
+            in WebChatDictationMcpPolicy.ACTIONS -> {
+                if (!webChatDictation.control(action)) {
+                    return errorJson(action, "web_chat_dictation_action_unavailable")
+                }
+                uiState()
+            }
             "start_new_web_chat_conversation" -> {
                 if (socialAiChatFeature()?.startNewWebChatConversation() != true) {
                     return errorJson(action, "web_chat_not_ready")
@@ -164,7 +174,16 @@ internal class MainMcpNativeControlActions(
             }
             "refresh_web_chat_conversations" -> {
                 val projectId = args.optString("project_id").trim().ifBlank { null }
-                if (socialAiChatFeature()?.refreshWebChatConversationIndex(projectId) != true) {
+                val conversationPath = args.optString("conversation_path").trim().ifBlank { null }
+                if (conversationPath != null && projectId == null) {
+                    return errorJson(action, "conversation_project_probe_requires_project_id")
+                }
+                if (
+                    socialAiChatFeature()?.refreshWebChatConversationIndex(
+                        projectId = projectId,
+                        conversationPath = conversationPath,
+                    ) != true
+                ) {
                     return errorJson(action, "web_chat_not_ready")
                 }
                 uiState()

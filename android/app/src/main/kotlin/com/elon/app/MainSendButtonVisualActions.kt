@@ -22,6 +22,7 @@ internal class MainSendButtonVisualActions(
     private val inputCanSend: () -> Boolean,
     private val composerCanSubmit: () -> Boolean,
     private val isWebChatStreaming: () -> Boolean,
+    private val isWebChatDictationActive: () -> Boolean,
     private val activeConversation: () -> AppConversation,
     private val isFriendChatActive: () -> Boolean
 ) {
@@ -36,6 +37,7 @@ internal class MainSendButtonVisualActions(
             hasAttachments = hasAttachments,
             voiceMode = isVoiceMode(),
             composerExpanded = composerExpanded,
+            dictationActive = isWebChatDictationActive(),
         )
         val params = binding.sendButton.layoutParams as? FrameLayout.LayoutParams
         if (visualMode != WebChatProductionComposerVisualMode.INPUT_MODE) {

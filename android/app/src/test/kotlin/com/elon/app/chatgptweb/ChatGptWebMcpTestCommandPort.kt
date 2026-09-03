@@ -8,6 +8,7 @@ internal class ChatGptWebMcpTestCommandPort(
     private val onSetControlSlider: (String, Double) -> Unit = { _, _ -> },
     private val onSetControlExpanded: (String, Boolean) -> Unit = { _, _ -> },
     private val onStartDictation: () -> Unit = {},
+    private val onStartDictationDrafts: (String, String) -> Unit = { _, _ -> },
     private val onCancelDictation: () -> Unit = {},
     private val onSubmitDictation: () -> Unit = {},
     private val onRemoveAttachment: (String) -> Unit = {},
@@ -29,6 +30,11 @@ internal class ChatGptWebMcpTestCommandPort(
     override fun invokeControl(controlId: String, requestId: String) {
         onInvoke(controlId)
         dispatch("invoke_ui_control", requestId)
+    }
+
+    override fun invokeControlAfterTouchMiss(controlId: String, requestId: String) {
+        onInvoke(controlId)
+        dispatch("invoke_ui_control_after_touch_miss", requestId)
     }
 
     override fun setControlText(controlId: String, text: String, requestId: String) {
@@ -62,8 +68,13 @@ internal class ChatGptWebMcpTestCommandPort(
         dispatch("verify_private_stream_watchdog", requestId)
     override fun regenerateResponse(requestId: String) = dispatch("regenerate_response", requestId)
 
-    override fun startDictation(requestId: String) {
+    override fun startDictation(
+        nativeDraft: String,
+        expectedOfficialDraft: String,
+        requestId: String,
+    ) {
         onStartDictation()
+        onStartDictationDrafts(nativeDraft, expectedOfficialDraft)
         dispatch("start_dictation", requestId)
     }
 
@@ -83,6 +94,8 @@ internal class ChatGptWebMcpTestCommandPort(
     }
 
     override fun refreshControls(requestId: String) = dispatch("snapshot_ui_manifest", requestId)
+    override fun revealProjectChoice(label: String, requestId: String) =
+        dispatch("reveal_project_choice", requestId)
     override fun listConversations(requestId: String) = dispatch("list_conversations", requestId)
 
     override fun requestComposerOptions(section: String, requestId: String) {

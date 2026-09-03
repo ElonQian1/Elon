@@ -31,7 +31,8 @@ installed build; individual capability documents retain implementation evidence.
 | Native image assets and cache-first gallery | ChatGPT | Completed, enabled, and device verified on Release candidate `v1.1.1375 (1396)`, adapter `208` | Bounded local image cache and official `/images` fallback |
 | Native image-generation operation status | ChatGPT | Completed and enabled; generation, preview preparation, preview failure, and terminal-hide lifecycle tests passed; consolidated device UI acceptance pending | Official composer and `/images` page |
 | Native private-response rich content | ChatGPT | Completed, enabled, and structurally device verified on Release `v1.1.1379 (1400)` for finance and line-chart cards | Official WebView rich content |
-| Native composer dictation | ChatGPT | Implemented and enabled; ASR/VAD draft, cancellation, and fallback tests passed; device acceptance pending | Official Web dictation after bounded local-engine cooldown |
+| Private composer dictation | ChatGPT | Completed and enabled; page-local identity, synthetic-audio endpoint proof, strict capture ownership, buffered transcription, draft reconciliation, timeout/circuit protection, and targeted integration tests passed | Existing work-mode voice bridge, then confirmed official DOM dictation |
+| Shared composer dictation fallback | ChatGPT | Implemented and enabled by direct reuse of the unchanged work-mode `AgentVoiceBridge`; device acceptance pending | Official DOM dictation after a bounded unavailable cooldown |
 | Native response read aloud | ChatGPT | Implemented and enabled; full-answer chunking and message-action tests passed; device acceptance pending | Official message actions and WebView |
 | Native conversation management | ChatGPT | Completed, enabled, and reversible pin round trip device verified on `v1.1.1399 (1420)`, adapter `218` | Context-bound official conversation options without automatic write replay |
 | Native conversation project move | ChatGPT | Implemented and enabled; direct DOM activation, optional confirmation, scoped refresh, and reversible device round trip pending | Official conversation project menu |
@@ -160,15 +161,34 @@ without reading a user conversation. The completed capability is
 `android_chatgpt_private_rich_content_native_view_v1` and must not be reimplemented
 without current regression evidence.
 
-Production ChatGPT dictation now reuses the existing on-device `AgentVoiceBridge`
-instead of waiting for the official microphone DOM. The tap session writes partial and
-final recognition into the current native draft, never auto-sends, restores the exact
-pre-dictation draft on cancel, and immediately prewarms the next ASR/VAD session. Engine
-rotation remains owned by the existing bridge. A real engine failure opens a sixty-second
-cooldown so the next explicit tap can use the existing official Web dictation command;
-silence is only a retryable empty recognition and does not poison the engine. The stable
-capability is `android_chatgpt_native_dictation_v1`; device microphone acceptance remains
-pending.
+Production ChatGPT dictation uses one explicit ordered router: verified same-origin private
+transport first, the existing work-mode `AgentVoiceBridge` second, and the official DOM
+dictation control last. Active sessions remain owned by the layer that started them, so a
+submit or cancel cannot cross transports. Immediate rejection advances once to the next
+layer; an asynchronous private implementation may request fallback only before it captures
+audio. The official DOM is not described as a private API.
+
+The first layer now uses the verified ordinary dictation contract: page-local identity,
+`MediaRecorder`, and a bounded same-origin buffered transcription request. Credentials,
+request headers, audio, and transcript never cross the WebView boundary; only lifecycle
+receipts and the reconciled draft reach Android. A start is accepted only after capture is
+confirmed, and a submit completes only after a fresh official composer snapshot contains
+the new draft. Authentication failures before capture may fall through once to the
+unchanged work-mode bridge; failures after capture stay owned by the private layer so two
+recorders cannot run. The final DOM fallback also requires capture evidence and cannot
+treat a dispatched touch or a focused composer as success. The stable capability IDs are
+`android_chatgpt_private_dictation_transport_v1` and
+`android_chatgpt_native_dictation_v1`; both are implemented and production enabled.
+
+The rejected `1.1.1470` experiment must not be reintroduced as private composer dictation.
+It reused the full realtime-voice `/realtime/wm` takeover: Android microphone capture,
+peer connection, and the data channel all became ready, but the channel produced no
+composer transcription event and the official socket later emitted a voice-conversation
+commit. That behavior creates a voice turn instead of a draft and therefore cannot own the
+production microphone button. The experimental engine and its production wiring were
+removed. Research builds now observe only bounded session-profile and data-channel event
+shapes so the actual official dictation mode can be distinguished without recording audio
+or recognized text.
 
 Assistant response read-aloud no longer depends on the official message control being
 present in the current DOM snapshot. Every non-empty ChatGPT assistant message exposes a

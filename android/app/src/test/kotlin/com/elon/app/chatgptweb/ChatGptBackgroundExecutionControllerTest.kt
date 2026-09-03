@@ -38,7 +38,7 @@ class ChatGptBackgroundExecutionControllerTest {
     }
 
     @Test
-    fun hostPauseCancelsWorkAndDoesNotResumeFromBackgroundInteraction() {
+    fun explicitBackgroundInteractionGetsABoundedExecutionLease() {
         val fixture = Fixture()
         fixture.controller.hostResumed()
         fixture.controller.hostPaused()
@@ -46,7 +46,12 @@ class ChatGptBackgroundExecutionControllerTest {
         assertEquals(1, fixture.pauseCount)
         assertFalse(fixture.scheduler.hasTasks())
         fixture.controller.interactionRequested()
-        assertEquals(1, fixture.resumeCount)
+        assertEquals(2, fixture.resumeCount)
+        assertTrue(fixture.scheduler.hasTasks())
+
+        fixture.scheduler.runNext()
+        assertEquals(2, fixture.pauseCount)
+        assertFalse(fixture.scheduler.hasTasks())
     }
 
     private class Fixture {

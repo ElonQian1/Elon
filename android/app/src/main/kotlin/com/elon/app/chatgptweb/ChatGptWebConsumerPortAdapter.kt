@@ -87,6 +87,8 @@ internal class ChatGptWebConsumerPortAdapter(
                 )
             },
             adapterCurrent = observed.adapterCurrent,
+            dictationCaptureActive = current?.dictationCaptureActive == true,
+            dictationCapturePending = current?.dictationCapturePending == true,
         )
     }
 
@@ -120,6 +122,11 @@ internal class ChatGptWebConsumerPortAdapter(
     override fun requestControls(): WebChatConsumerCommandResult =
         execute(JSONObject().put("action", "chatgpt_refresh_controls"))
 
+    override fun revealProjectChoice(label: String): WebChatConsumerCommandResult =
+        execute(JSONObject()
+            .put("action", "chatgpt_reveal_project_choice")
+            .put("project_title", label))
+
     override fun invokeControl(
         controlId: String,
         userConfirmed: Boolean,
@@ -127,6 +134,15 @@ internal class ChatGptWebConsumerPortAdapter(
         .put("action", "chatgpt_invoke_control")
         .put("control_id", controlId)
         .put("user_confirmed", userConfirmed))
+
+    override fun invokeControlAfterTouchMiss(
+        controlId: String,
+        userConfirmed: Boolean,
+    ): WebChatConsumerCommandResult = execute(JSONObject()
+        .put("action", "chatgpt_invoke_control")
+        .put("control_id", controlId)
+        .put("user_confirmed", userConfirmed)
+        .put("after_touch_miss", true))
 
     override fun updateControl(
         controlId: String,
@@ -193,6 +209,7 @@ internal class ChatGptWebConsumerPortAdapter(
         val SESSION_COMMANDS = setOf(
             "chatgpt_stop_generation",
             "chatgpt_start_dictation",
+            "chatgpt_cancel_dictation",
             "chatgpt_prepare_realtime_voice",
             "chatgpt_start_realtime_voice",
             "chatgpt_submit_dictation",

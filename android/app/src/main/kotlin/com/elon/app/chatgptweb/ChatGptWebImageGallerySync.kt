@@ -12,6 +12,7 @@ import android.widget.FrameLayout
 import androidx.appcompat.app.AppCompatActivity
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
+import com.elon.app.BuildConfig
 import com.elon.app.configureWebChatBackgroundSurface
 import java.nio.charset.StandardCharsets
 import org.json.JSONArray
@@ -46,7 +47,7 @@ internal class ChatGptWebImageGallerySync(
             ))
             return false
         }
-        WebView.setWebContentsDebuggingEnabled(false)
+        WebView.setWebContentsDebuggingEnabled(BuildConfig.CHATGPT_PRIVATE_RESEARCH_ENABLED)
         val view = WebView(activity).apply {
             configureWebChatBackgroundSurface()
             settings.apply {

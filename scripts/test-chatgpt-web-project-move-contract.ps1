@@ -10,10 +10,24 @@ function Assert-Contains([string]$Needle) {
 
 @(
     "[switch]`$ConfirmRoundTrip",
+    "[ValidateRange(0, 39)][int]`$TargetProjectOffset = 0",
     "Wait-ProductionReady",
+    "Ensure-ProductionReady",
+    "Invoke-ReadActionWithSurfaceRecovery",
+    'web_chat_mode_inactive|web_chat_not_ready',
+    "The project sidebar did not settle after its background refresh.",
+    "expectedByToken",
     "Open-ChatGptWebNativeChatSurface",
     "get_web_chat_navigation",
     "ConvertTo-NativeToken",
+    "Get-ConversationProjectIdFromPath",
+    "Get-CanonicalConversationMembership",
+    "Get-LiveConversationMembership",
+    "Wait-ReadOnlyOriginalMembership",
+    "Select-OfficialFallbackProject",
+    "Get-ConversationProjectIdFromPath -Path ([string]`$_.path)",
+    '$orderedProjects = @($Navigation.projects | Sort-Object',
+    '$expectedByToken[[string]$_].active -eq $true',
     '-Stage "conversation-actions"',
     '-Stage "move-action"',
     '-Stage "project-destination"',
@@ -23,15 +37,35 @@ function Assert-Contains([string]$Needle) {
     "Close-Sidebar",
     'for ($attempt = 1; $attempt -le 2; $attempt++)',
     "one safe retry",
+    'Select-Object -Skip $TargetProjectOffset -First 1',
     "web-chat-conversation-action-move-to-project",
+    '$visibleToUser -ne "false"',
+    '"tap", "$x", "$y"',
+    '/data/local/tmp/elon-chatgpt-project-move-$PID.xml',
+    'for ($attempt = 1; $attempt -le 3; $attempt++)',
     "web-chat-conversation-project-destination:",
     "Wait-ConversationMembership",
+    "Restore-WebChatNativeConversation -Runtime `$runtime",
+    "The moved conversation did not reopen before the restore operation.",
+    "The moved conversation did not reopen for cleanup.",
     "Test-ProjectMoveWriteObserved",
-    'text -eq "正在提交一次移动操作"',
-    'text -eq "正在同步会话目录"',
+    "Get-ProjectMoveUiStage",
+    "Dismiss-StalePreWriteMoveFailure",
+    "dismiss stale pre-write project-move failure",
+    'Write-Host "CHATGPT_WEB_PROJECT_MOVE_PROGRESS=$uiStage"',
+    '"failed_before_write"',
+    '"failed_after_write"',
+    '"正在提交一次移动操作" -in $texts',
+    '"正在同步会话目录" -in $texts',
     "[ref]`$WriteSelected",
+    "[ref]`$DestinationProject",
+    "[switch]`$AllowFallbackDestination",
+    "CHATGPT_WEB_PROJECT_MOVE_PROGRESS=official_destination_selected",
     "-not `$restoreWriteSelected",
     "original_membership_restored",
+    "CHATGPT_WEB_PROJECT_MOVE_RECOVERY=",
+    "cleanup_write_selected=",
+    "recovery_unknown=",
     "private_content_emitted = `$false",
     "cleared_cookies = `$false",
     "cleared_app_data = `$false",
@@ -41,8 +75,19 @@ function Assert-Contains([string]$Needle) {
     "CHATGPT_WEB_PROJECT_MOVE_STATUS=passed"
 ) | ForEach-Object { Assert-Contains $_ }
 
-if ($source.Contains('@("shell", "input", "keyevent", "4")')) {
-    throw "Project-move retry must not leave the production chat surface with Android Back."
+${backAction} = '@("shell", "input", "keyevent", "4")'
+${backMatches} = [regex]::Matches(${source}, [regex]::Escape(${backAction}))
+${dismissStart} = ${source}.IndexOf("function Dismiss-StalePreWriteMoveFailure")
+${dismissEnd} = ${source}.IndexOf("function Wait-ConversationMembership", ${dismissStart})
+if (${backMatches}.Count -ne 1 -or ${dismissStart} -lt 0 -or ${dismissEnd} -le ${dismissStart}) {
+    throw "Android Back must be limited to one guarded stale pre-write dialog dismissal."
+}
+${dismissGuard} = ${source}.Substring(${dismissStart}, ${dismissEnd} - ${dismissStart})
+if (
+    -not ${dismissGuard}.Contains('Get-ProjectMoveUiStage) -ne "failed_before_write"') -or
+    -not ${dismissGuard}.Contains(${backAction})
+) {
+    throw "Android Back must remain guarded by the pre-write failure stage."
 }
 
 $guardStart = $source.IndexOf("if (`$ConfirmRoundTrip)")
@@ -53,6 +98,15 @@ if ($guardStart -lt 0 -or $guardEnd -le $guardStart) {
 $guardedWrite = $source.Substring($guardStart, $guardEnd - $guardStart)
 if (-not $guardedWrite.Contains("Invoke-ProjectMove")) {
     throw "Round-trip write must remain behind explicit confirmation."
+}
+if (-not $guardedWrite.Contains("-AllowFallbackDestination")) {
+    throw "Only the forward reversible move may choose an officially eligible fallback project."
+}
+$restoreStart = $guardedWrite.IndexOf('$restoreDestination = $originProject')
+if ($restoreStart -lt 0) { throw "Original-project restoration could not be inspected." }
+$restoreBlock = $guardedWrite.Substring($restoreStart)
+if ($restoreBlock.Contains("-AllowFallbackDestination")) {
+    throw "Original-project restoration must never substitute another destination."
 }
 
 Write-Output "CHATGPT_WEB_PROJECT_MOVE_CONTRACT=passed"

@@ -169,54 +169,6 @@ class ChatGptWebMcpActionsTest {
     }
 
     @Test
-    fun stateAndChoiceControlsDispatchIdempotentCommandsWithoutPrivateValues() {
-        var selectedTarget: Pair<String, Boolean>? = null
-        var choiceTarget: Pair<String, Int>? = null
-        val actions = actions(
-            includeFormControls = true,
-            onSetControlSelected = { id, selected -> selectedTarget = id to selected },
-            onSelectControlChoice = { id, index -> choiceTarget = id to index },
-        )
-
-        val selected = actions.control(JSONObject()
-            .put("action", "chatgpt_set_control_selected")
-            .put("control_id", "control_toggle_demo")
-            .put("selected", true))
-        val choice = actions.control(JSONObject()
-            .put("action", "chatgpt_select_control_choice")
-            .put("control_id", "control_model_demo")
-            .put("choice_index", 1))
-        val controls = actions.uiState().getJSONObject("ui_manifest").getJSONArray("controls")
-        val toggle = controls.getJSONObject(2)
-        val model = controls.getJSONObject(3)
-
-        assertTrue(selected.getBoolean("control_ok"))
-        assertEquals("control_toggle_demo" to true, selectedTarget)
-        assertTrue(choice.getBoolean("control_ok"))
-        assertEquals("control_model_demo" to 1, choiceTarget)
-        assertTrue(toggle.getBoolean("state_settable"))
-        assertEquals(2, model.getJSONArray("choice_labels").length())
-        assertEquals(0, model.getInt("selected_choice_index"))
-        assertFalse(model.has("value"))
-        assertEquals(
-            "chatgpt-control-choice:control_model_demo:1",
-            model.getJSONArray("native_choice_content_descriptions").getString(1),
-        )
-
-        val missingState = actions.control(JSONObject()
-            .put("action", "chatgpt_set_control_selected")
-            .put("control_id", "control_toggle_demo"))
-        val fractionalChoice = actions.control(JSONObject()
-            .put("action", "chatgpt_select_control_choice")
-            .put("control_id", "control_model_demo")
-            .put("choice_index", 1.5))
-        assertFalse(missingState.getBoolean("control_ok"))
-        assertEquals("missing_selected", missingState.getString("error"))
-        assertFalse(fractionalChoice.getBoolean("control_ok"))
-        assertEquals("invalid_choice_index", fractionalChoice.getString("error"))
-    }
-
-    @Test
     fun nativeSlidersExposeBoundsAndDispatchTargetValues() {
         var sliderTarget: Pair<String, Double>? = null
         val actions = actions(
@@ -722,7 +674,8 @@ class ChatGptWebMcpActionsTest {
         assertEquals("invalid_attachment_id", invalid.getString("error"))
     }
 
-    private fun actions(
+    internal fun actions(
+        snapshotUrl: String = "https://chatgpt.com/c/demo",
         dictationActive: Boolean = false,
         dictationSupported: Boolean = false,
         regenerateSupported: Boolean = false,
@@ -739,6 +692,8 @@ class ChatGptWebMcpActionsTest {
         includeExpandedControl: Boolean = false,
         includeDictationControl: Boolean = false,
         includeRealtimeVoiceControl: Boolean = false,
+        includeProjectConversationControl: Boolean = false,
+        includeOverlayControl: Boolean = false,
         onSetControlText: (String, String) -> Unit = { _, _ -> },
         onSetControlSelected: (String, Boolean) -> Unit = { _, _ -> },
         onSelectControlChoice: (String, Int) -> Unit = { _, _ -> },
@@ -758,7 +713,7 @@ class ChatGptWebMcpActionsTest {
     ): ChatGptWebMcpActions {
         val snapshot = ChatGptWebSnapshot(
             title = "工作",
-            url = "https://chatgpt.com/c/demo",
+            url = snapshotUrl,
             draft = "",
             messages = List(availableMessageCount) { index ->
                 ChatGptWebMessage(
@@ -820,6 +775,30 @@ class ChatGptWebMcpActionsTest {
                     selected = false,
                     contextId = "conversation-turn-1",
                 ))
+                if (includeProjectConversationControl) {
+                    add(ChatGptWebUiControl(
+                        id = "control_project_conversation_options",
+                        semantic = "conversation_options",
+                        label = "更多",
+                        region = ChatGptWebUiRegion.HEADER,
+                        role = "button",
+                        enabled = true,
+                        selected = false,
+                        contextId = "conversation-demo",
+                    ))
+                }
+                if (includeOverlayControl) {
+                    add(ChatGptWebUiControl(
+                        id = "control_project_choice",
+                        semantic = "project",
+                        label = "Project Alpha",
+                        region = ChatGptWebUiRegion.OVERLAY,
+                        role = "menuitem",
+                        enabled = true,
+                        selected = false,
+                        inViewport = true,
+                    ))
+                }
                 if (includeWritableControl) {
                     add(
                         ChatGptWebUiControl(

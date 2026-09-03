@@ -2,7 +2,7 @@
   'use strict';
 
   const existing = window.__elonChatGptPrivateConversationDirectory;
-  if (existing && Number(existing.version) >= 2) return;
+  if (existing && Number(existing.version) >= 4) return;
   if (location.origin !== 'https://chatgpt.com') return;
 
   const originalFetch = typeof window.fetch === 'function' ? window.fetch.bind(window) : null;
@@ -21,6 +21,7 @@
   const MAX_TITLE_LENGTH = 160;
   const SAFE_ID = /^[A-Za-z0-9_-]{1,160}$/;
   const SAFE_PROJECT_ID = /^g-p-[A-Za-z0-9_-]{1,160}$/;
+  const PROJECT_REFRESH_TIMEOUT_MS = 4000;
 
   function cleanText(value) {
     return String(value || '').replace(/\s+/g, ' ').trim().slice(0, MAX_TITLE_LENGTH);
@@ -110,6 +111,35 @@
     return rows;
   }
 
+  function acceptConversationMembership(rawId, rawTitle, rawProjectId) {
+    const id = cleanText(rawId);
+    const projectId = cleanText(rawProjectId);
+    const previous = conversations.get(id);
+    const title = cleanText(rawTitle) || (previous && previous.title) || '';
+    if (!SAFE_ID.test(id) || !SAFE_PROJECT_ID.test(projectId) || !title) return false;
+    const path = '/g/' + projectId + '/c/' + id;
+    const project = projects.get(projectId);
+    const next = Object.freeze({
+      id,
+      title,
+      path,
+      active: location.pathname === path,
+      pinned: previous ? previous.pinned === true : false,
+      groupLabel: previous && previous.groupLabel || '',
+      projectId,
+      projectTitle: project ? project.title : null,
+      projectPath: '/g/' + projectId + '/project',
+      activityDates: previous && Array.isArray(previous.activityDates)
+        ? previous.activityDates.slice(0, 32)
+        : [],
+      order: previous && Number.isFinite(previous.order) ? previous.order : conversations.size
+    });
+    conversations.set(id, next);
+    trimMap(conversations, MAX_CONVERSATIONS);
+    if (!previous || previous.path !== next.path || previous.title !== next.title) notify();
+    return true;
+  }
+
   function projectTitle(value) {
     const gizmo = value && value.gizmo && typeof value.gizmo === 'object' ? value.gizmo : null;
     const display = value && value.display && typeof value.display === 'object' ? value.display : null;
@@ -157,12 +187,12 @@
     while (values.size > maximum) values.delete(values.keys().next().value);
   }
 
-  function notify() {
+  function notify(emitListener) {
     revision += 1;
-    if (typeof listener === 'function') listener();
+    if (emitListener !== false && typeof listener === 'function') listener();
   }
 
-  function accept(metadata, text) {
+  function accept(metadata, text, emitListener) {
     const payload = parsePayload(text);
     if (!payload || !metadata) return false;
     let changed = false;
@@ -180,7 +210,19 @@
       });
       trimMap(conversations, MAX_CONVERSATIONS);
     }
-    if (changed) notify();
+    if (changed) notify(emitListener);
+    return true;
+  }
+
+  function replaceProjectConversations(projectId, text) {
+    const payload = parsePayload(text);
+    if (!payload || !candidateArrays(payload).length) return false;
+    const rows = collectConversations(payload, projectId);
+    Array.from(conversations.entries()).forEach(([id, row]) => {
+      if (row && row.projectId === projectId) conversations.delete(id);
+    });
+    rows.forEach((row) => conversations.set(row.id, row));
+    trimMap(conversations, MAX_CONVERSATIONS);
     return true;
   }
 
@@ -227,17 +269,28 @@
     if (!originalFetch || !SAFE_PROJECT_ID.test(projectId)) return Promise.resolve(false);
     const active = projectRefreshes.get(projectId);
     if (active) return active;
-    const request = Promise.resolve().then(() => originalFetch(
+    const fetchResult = Promise.resolve().then(() => originalFetch(
       '/backend-api/gizmos/' + encodeURIComponent(projectId) + '/conversations',
       { method: 'GET', credentials: 'same-origin', cache: 'no-store' }
     )).then((response) => {
       if (!response || response.status < 200 || response.status >= 300 ||
           typeof response.text !== 'function') return false;
-      return response.text().then((text) => accept({
-        family: 'project_conversations',
-        projectId
-      }, text));
-    }).catch(() => false).finally(() => {
+      return response.text().then((text) => replaceProjectConversations(projectId, text));
+    }).catch(() => false);
+    const request = new Promise((resolve) => {
+      let settled = false;
+      const timeout = window.setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        resolve(false);
+      }, PROJECT_REFRESH_TIMEOUT_MS);
+      fetchResult.then((value) => {
+        if (settled) return;
+        settled = true;
+        window.clearTimeout(timeout);
+        resolve(value);
+      });
+    }).finally(() => {
       if (projectRefreshes.get(projectId) === request) projectRefreshes.delete(projectId);
     });
     projectRefreshes.set(projectId, request);
@@ -267,9 +320,10 @@
   }
 
   window.__elonChatGptPrivateConversationDirectory = Object.freeze({
-    version: 2,
+    version: 4,
     snapshot,
     refreshProject,
+    acceptConversationMembership,
     setListener: (value) => { listener = typeof value === 'function' ? value : null; }
   });
 })();

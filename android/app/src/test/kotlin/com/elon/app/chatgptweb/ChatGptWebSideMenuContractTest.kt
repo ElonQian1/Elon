@@ -27,7 +27,12 @@ class ChatGptWebSideMenuContractTest {
         assertTrue(view.contains("renderProjectConversations(this, it)"))
         assertTrue(view.contains("selectedProjectId = project.id"))
         assertTrue(view.contains("ChatGptNativeNavigationSelector.projectBack(project)"))
-        assertTrue(view.contains("if (localProjectActions() == null) post { openProject(project.path) }"))
+        assertTrue(view.contains(
+            "if (localProjectActions() == null) post { requestIndexRefreshIfStale(project.id) }",
+        ))
+        assertTrue(view.contains("state.projectCollections[projectId]"))
+        assertTrue(view.contains("lastProjectRefreshRequestedAtMs"))
+        assertTrue(!view.contains("openProject(project.path)"))
         assertTrue(view.contains("setOnClickListener { closeThen { openConversation(conversation.path) } }"))
         assertTrue(!view.contains("closeThen { openProject(project.path) }"))
         assertTrue(view.contains("closeThen(newConversation)"))

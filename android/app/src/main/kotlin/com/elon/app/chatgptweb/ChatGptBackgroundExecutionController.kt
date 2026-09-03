@@ -27,7 +27,9 @@ internal class WebChatBackgroundExecutionController(
     }
 
     fun interactionRequested() {
-        if (hostActive) resumeAndSchedule()
+        // Explicit native actions need a bounded WebView execution lease even when an
+        // OEM reports the host as paused while a system or app overlay is visible.
+        resumeAndSchedule()
     }
 
     fun activitySettled() {
@@ -49,7 +51,7 @@ internal class WebChatBackgroundExecutionController(
         cancelScheduledPause()
         lateinit var pause: Runnable
         pause = Runnable {
-            if (scheduledPause !== pause || !hostActive) return@Runnable
+            if (scheduledPause !== pause) return@Runnable
             scheduledPause = null
             if (isBusy()) schedulePause(busyRetryMs) else pause()
         }

@@ -23,6 +23,25 @@ internal object ChatGptWebControlInvocationPolicy {
             null
         }
 
+    fun afterTouchMissRejection(
+        control: ChatGptWebUiControl,
+        currentUrl: String?,
+        controls: List<ChatGptWebUiControl>,
+    ): String? {
+        val currentIdentity = ChatGptWebConversationPath.identity(
+            ChatGptWebConversationPath.fromUrl(currentUrl),
+        )
+        return when {
+            control.semantic != "conversation_options" || control.region != ChatGptWebUiRegion.HEADER ->
+                "touch_miss_fallback_not_supported"
+            currentIdentity == null || control.contextId != currentIdentity ->
+                "touch_miss_fallback_context_changed"
+            controls.any { it.enabled && it.inViewport && it.region == ChatGptWebUiRegion.OVERLAY } ->
+                "touch_miss_fallback_overlay_present"
+            else -> null
+        }
+    }
+
     private val USER_CONFIRMED_SEMANTICS = setOf(
         "action",
         "archive",

@@ -18,6 +18,8 @@
     '__elonChatGptProjectHints',
     '__elonChatGptProjectPolicy',
     '__elonChatGptContextMenuPolicy',
+    '__elonChatGptControlLabels',
+    '__elonChatGptProjectChoiceReveal',
     '__elonChatGptConversationHistory',
     '__elonChatGptMessageActionPolicy',
     '__elonChatGptMessagePortalPolicy',

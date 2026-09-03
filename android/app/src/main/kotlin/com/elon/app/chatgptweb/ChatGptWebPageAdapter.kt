@@ -41,6 +41,8 @@ internal class ChatGptWebPageAdapter(
                 ${BuildConfig.CHATGPT_PRIVATE_STREAM_OBSERVER_ENABLED};
             window.__elonChatGptPrivateTextTransactionsEnabled =
                 ${BuildConfig.CHATGPT_PRIVATE_TEXT_TRANSACTIONS_ENABLED};
+            window.__elonChatGptPrivateDictationEnabled =
+                ${BuildConfig.CHATGPT_PRIVATE_DICTATION_ENABLED};
             if (!/^doc_[a-z0-9_]{3,80}$/.test(String(window.__elonChatGptDocumentToken || ""))) {
                 window.__elonChatGptDocumentToken =
                     "doc_android_" + Math.random().toString(36).slice(2) + Date.now().toString(36);
@@ -78,6 +80,7 @@ internal class ChatGptWebPageAdapter(
         }
     """.trimIndent() + "\n" + listOf(
         PRIVATE_REALTIME_VOICE_RELAY_ASSET,
+        PRIVATE_REALTIME_DATA_CHANNEL_RESEARCH_ASSET,
         PRIVATE_REALTIME_VOICE_RESEARCH_ASSET,
     ).joinToString("\n") { asset ->
         context.assets.open(asset).use { input -> input.reader(StandardCharsets.UTF_8).readText() }
@@ -268,6 +271,20 @@ internal class ChatGptWebPageAdapter(
 
     fun listConversations(requestId: String) = runCommand("list_conversations", requestId = requestId)
 
+    fun cancelConversationDirectoryWork() = runCommand("cancel_conversation_directory")
+
+    fun probeConversationProject(path: String, projectId: String): Boolean {
+        val normalizedPath = ChatGptWebConversationPath.normalize(path) ?: return false
+        val normalizedProjectId = ChatGptWebConversationPath.canonicalProjectId(projectId)
+            ?: return false
+        runCommand(
+            action = "probe_conversation_project",
+            value = normalizedPath,
+            projectScopeId = normalizedProjectId,
+        )
+        return true
+    }
+
     fun openConversation(path: String) = runCommand(
         action = "open_conversation",
         value = path.take(MAX_CONVERSATION_PATH_LENGTH),
@@ -311,9 +328,24 @@ internal class ChatGptWebPageAdapter(
 
     fun requestAttachmentUpload() = runCommand("request_attachment_upload")
 
-    fun startDictation() = runCommand("start_dictation")
+    fun startDictation() {
+        ChatGptWebPrivateResearchEventRecorder.beginVoiceWindow()
+        runCommand("start_dictation")
+    }
 
-    fun startDictation(requestId: String) = runCommand("start_dictation", requestId = requestId)
+    fun startDictation(
+        nativeDraft: String,
+        expectedOfficialDraft: String,
+        requestId: String,
+    ) {
+        ChatGptWebPrivateResearchEventRecorder.beginVoiceWindow()
+        runCommand(
+            action = "start_dictation",
+            value = nativeDraft.take(MAX_PROMPT_LENGTH),
+            expectedDraft = expectedOfficialDraft.take(MAX_PROMPT_LENGTH),
+            requestId = requestId,
+        )
+    }
 
     fun cancelDictation() = runCommand("cancel_dictation")
 
@@ -322,6 +354,16 @@ internal class ChatGptWebPageAdapter(
     fun submitDictation() = runCommand("submit_dictation")
 
     fun submitDictation(requestId: String) = runCommand("submit_dictation", requestId = requestId)
+
+    fun startPrivateDictation(nativeDraft: String, expectedOfficialDraft: String) = runCommand(
+        action = "private_start_dictation",
+        value = nativeDraft.take(MAX_PROMPT_LENGTH),
+        expectedDraft = expectedOfficialDraft.take(MAX_PROMPT_LENGTH),
+    )
+
+    fun cancelPrivateDictation() = runCommand("private_cancel_dictation")
+
+    fun submitPrivateDictation() = runCommand("private_submit_dictation")
 
     fun removeAttachment(id: String) = runCommand("remove_attachment", id.take(MAX_OPTION_ID_LENGTH))
 
@@ -359,6 +401,18 @@ internal class ChatGptWebPageAdapter(
     fun invokeUiControl(id: String, requestId: String? = null) = runCommand(
         "invoke_ui_control",
         id.take(MAX_UI_CONTROL_ID_LENGTH),
+        requestId = requestId,
+    )
+
+    fun invokeUiControlAfterTouchMiss(id: String, requestId: String) = runCommand(
+        "invoke_ui_control_after_touch_miss",
+        id.take(MAX_UI_CONTROL_ID_LENGTH),
+        requestId = requestId,
+    )
+
+    fun revealProjectChoice(label: String, requestId: String) = runCommand(
+        action = "reveal_project_choice",
+        value = label.take(MAX_PROJECT_TITLE_LENGTH),
         requestId = requestId,
     )
 
@@ -501,25 +555,35 @@ internal class ChatGptWebPageAdapter(
             }
             .toString()
         val encoded = JSONObject.quote(command)
-        webView.evaluateJavascript(
-            "window.__elonChatGptBridge && window.__elonChatGptBridge.command($encoded);",
-            null,
-        )
+        // onWebExecutionRequested() can resume a WebView that Android just paused. Post the
+        // command to the next UI turn so Chromium has resumed before evaluating JavaScript.
+        webView.post {
+            if (!listenerInstalled || !ChatGptWebNavigationPolicy.supportsEnhancedMode(webView.url)) {
+                return@post
+            }
+            webView.evaluateJavascript(
+                "window.__elonChatGptBridge && window.__elonChatGptBridge.command($encoded);",
+                null,
+            )
+        }
     }
 
     private fun isAllowedOrigin(origin: Uri): Boolean =
         origin.scheme == "https" && origin.host == "chatgpt.com" && origin.port == -1
 
     companion object {
-        internal const val ADAPTER_VERSION = 220
+        internal const val ADAPTER_VERSION = 239
 
         private val ADAPTER_ASSETS = listOf(
             "chatgpt_web_adapter_bootstrap.js",
             "chatgpt_web_adapter_authentication_policy.js",
             "chatgpt_web_private_conversation_directory.js",
+            "chatgpt_web_adapter_conversation_directory_requests.js",
             "chatgpt_web_adapter_project_policy.js",
             "chatgpt_web_adapter_project_hints.js",
             "chatgpt_web_adapter_context_menu_policy.js",
+            "chatgpt_web_adapter_control_labels.js",
+            "chatgpt_web_adapter_project_choice_reveal.js",
             "chatgpt_web_adapter_conversation_history.js",
             "chatgpt_web_adapter_conversations.js",
             "chatgpt_web_adapter_message_action_policy.js",
@@ -533,6 +597,7 @@ internal class ChatGptWebPageAdapter(
             "chatgpt_web_adapter_composer_tool_selection.js",
             "chatgpt_web_adapter_action_target_policy.js",
             "chatgpt_web_adapter_attachment_policy.js",
+            "chatgpt_web_dictation_runtime.js",
             "chatgpt_web_adapter_dictation_session_policy.js",
             "chatgpt_web_adapter_composer.js",
             "chatgpt_web_adapter_navigation_policy.js",
@@ -553,9 +618,12 @@ internal class ChatGptWebPageAdapter(
             "chatgpt_web_adapter_layout.js",
             "chatgpt_web_private_research_probe.js",
             "chatgpt_web_private_voice_relay.js",
+            "chatgpt_web_realtime_data_channel_research.js",
             "chatgpt_web_realtime_voice_research.js",
             "chatgpt_web_private_transport_policy.js",
             "chatgpt_web_private_transport.js",
+            "chatgpt_web_private_dictation_transport.js",
+            "chatgpt_web_private_dictation_orchestrator.js",
             "chatgpt_web_private_text_transaction_policy.js",
             "chatgpt_web_private_text_transaction_relay.js",
             "chatgpt_web_private_stream_policy.js",
@@ -575,6 +643,8 @@ internal class ChatGptWebPageAdapter(
             "chatgpt_web_private_text_transaction_relay.js"
         private const val PRIVATE_REALTIME_VOICE_RESEARCH_ASSET =
             "chatgpt_web_realtime_voice_research.js"
+        private const val PRIVATE_REALTIME_DATA_CHANNEL_RESEARCH_ASSET =
+            "chatgpt_web_realtime_data_channel_research.js"
         private const val PRIVATE_REALTIME_VOICE_RELAY_ASSET =
             "chatgpt_web_private_voice_relay.js"
         private const val PRIVATE_CONVERSATION_DIRECTORY_ASSET =

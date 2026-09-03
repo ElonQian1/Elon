@@ -4,15 +4,18 @@
   const existingTransport = window.__elonChatGptPrivateTransport;
   const prefetchEnabled = window.__elonChatGptPrivateConversationPrefetchEnabled === true;
   const researchEnabled = window.__elonChatGptPrivateResearchEnabled === true;
-  if ((existingTransport && Number(existingTransport.version) >= 11) ||
+  if ((existingTransport && Number(existingTransport.version) >= 15) ||
       (!prefetchEnabled && !researchEnabled) ||
       location.origin !== 'https://chatgpt.com') return;
 
   const policyModule = window.__elonChatGptPrivateTransportPolicy;
   if (!policyModule || typeof policyModule.create !== 'function') return;
   const MAX_MESSAGES = 80;
+  const SAFE_PROJECT_ID = /^g-p-[A-Za-z0-9_-]{1,160}$/;
   const inheritedHeaders = new Map();
   const activeConversationRequests = new Map();
+  const activeMembershipRequests = new Map();
+  const privateConversationDirectory = window.__elonChatGptPrivateConversationDirectory;
   const delegateFetch = typeof window.fetch === 'function' ? window.fetch.bind(window) : null;
   let privateFetchDepth = 0;
 
@@ -114,7 +117,7 @@
       : null;
   }
 
-  async function fetchConversation(id) {
+  async function fetchConversation(id, freshMembership) {
     const inherited = copiedRequestHeaders();
     if (!inherited) throw new Error('missing_context');
     const startedAt = Date.now();
@@ -131,10 +134,12 @@
       const response = await window.fetch('/backend-api/conversations/' + encodeURIComponent(id), {
         method: 'GET',
         credentials: 'include',
-        cache: 'default',
+        cache: freshMembership === true ? 'no-store' : 'default',
         headers,
         signal: controller ? controller.signal : undefined,
-        __elonPrivateTransport: 'conversation_prefetch'
+        __elonPrivateTransport: freshMembership === true
+          ? 'conversation_membership'
+          : 'conversation_prefetch'
       });
       if (!response || !response.ok) throw new Error('http_' + Number(response && response.status));
       return { payload: await response.json(), elapsedMs: Date.now() - startedAt };
@@ -219,6 +224,95 @@
       value.mapping && typeof value.mapping === 'object') || payload;
   }
 
+  function copySameOriginRequestHeaders() {
+    const copied = copiedRequestHeaders();
+    if (!copied) return null;
+    const result = {};
+    copied.forEach((value, name) => { result[String(name)] = String(value); });
+    return result;
+  }
+
+  function conversationProjectId(payload) {
+    const normalized = normalizedConversationPayload(payload);
+    const values = [
+      normalized,
+      payload,
+      payload && payload.conversation,
+      payload && payload.data,
+      payload && payload.data && payload.data.conversation,
+      payload && payload.result,
+      payload && payload.result && payload.result.conversation
+    ];
+    for (const value of values) {
+      if (!value || typeof value !== 'object') continue;
+      const gizmo = value.gizmo && typeof value.gizmo === 'object' ? value.gizmo : null;
+      const candidates = [
+        value.project_id,
+        value.projectId,
+        value.gizmo_id,
+        value.conversation_template_id,
+        value.conversationTemplateId,
+        value.workspace_id,
+        value.workspaceId,
+        gizmo && gizmo.id,
+        value.project && value.project.id,
+        value.project && value.project.project_id
+      ];
+      const match = candidates.map((candidate) => cleanText(candidate, 180))
+        .find((candidate) => SAFE_PROJECT_ID.test(candidate));
+      if (match) return match;
+    }
+    return '';
+  }
+
+  function canonicalProjectId(value) {
+    const cleaned = cleanText(value, 180);
+    const production = cleaned.match(/^(g-p-[A-Fa-f0-9]{32})(?:-[A-Za-z0-9_-]+)?$/);
+    if (production) return production[1];
+    return SAFE_PROJECT_ID.test(cleaned) ? cleaned : '';
+  }
+
+  function conversationHasProject(payload, expectedProjectId) {
+    const expected = canonicalProjectId(expectedProjectId);
+    if (!expected) return false;
+    if (canonicalProjectId(conversationProjectId(payload)) === expected) return true;
+    const seen = new Set();
+    let visited = 0;
+    function visit(value, depth, projectContext) {
+      if (depth > 6 || visited >= 512 || value == null) return false;
+      if (typeof value === 'string') {
+        return projectContext && canonicalProjectId(value) === expected;
+      }
+      if (typeof value !== 'object' || seen.has(value)) return false;
+      seen.add(value);
+      visited += 1;
+      if (Array.isArray(value)) {
+        return value.slice(0, 64).some((entry) => visit(entry, depth + 1, projectContext));
+      }
+      return Object.keys(value).slice(0, 96).some((key) => {
+        const semantic = projectContext || /project|gizmo|template|scope|workspace/i.test(key);
+        return visit(value[key], depth + 1, semantic);
+      });
+    }
+    return visit(payload, 0, false);
+  }
+
+  function projectDirectoryHasConversation(conversationId, expectedProjectId) {
+    if (!privateConversationDirectory ||
+        typeof privateConversationDirectory.refreshProject !== 'function' ||
+        typeof privateConversationDirectory.snapshot !== 'function') {
+      return Promise.resolve(false);
+    }
+    return Promise.resolve(privateConversationDirectory.refreshProject(expectedProjectId))
+      .then((refreshed) => {
+        if (!refreshed) return false;
+        const snapshot = privateConversationDirectory.snapshot();
+        return Boolean(snapshot && Array.isArray(snapshot.conversations) &&
+          snapshot.conversations.some((row) => row && row.id === conversationId &&
+            canonicalProjectId(row.projectId) === canonicalProjectId(expectedProjectId)));
+      }).catch(() => false);
+  }
+
   function conversationPrefetchReady() {
     return policy.canAttempt(Boolean(copiedRequestHeaders()));
   }
@@ -248,8 +342,12 @@
   }
 
   function conversationTarget(path) {
-    const match = String(path || '').match(/\/c\/([A-Za-z0-9_-]{1,160})$/);
-    return match ? { path: '/c/' + match[1], id: match[1] } : null;
+    const value = String(path || '').trim();
+    const match = value.match(
+      /^(?:\/c\/([A-Za-z0-9_-]{1,160})|\/g\/g-p-[A-Za-z0-9_-]{1,160}\/c\/([A-Za-z0-9_-]{1,160}))$/
+    );
+    if (!match) return null;
+    return { path: value, id: match[1] || match[2] };
   }
 
   function emitConversationSnapshot(target, result, emitEvent) {
@@ -321,14 +419,54 @@
     return requestConversationSnapshot(target.path, emitEvent, null);
   }
 
+  function probeConversationProject(path, expectedProjectId, onSettled) {
+    const target = conversationTarget(path);
+    const expected = cleanText(expectedProjectId, 180);
+    if (!target || !SAFE_PROJECT_ID.test(expected) || !conversationPrefetchReady() ||
+        !privateConversationDirectory ||
+        typeof privateConversationDirectory.acceptConversationMembership !== 'function') return false;
+    const key = target.id + ':' + expected;
+    let request = activeMembershipRequests.get(key);
+    if (!request) {
+      request = fetchConversation(target.id, true).then((result) => {
+        const payload = normalizedConversationPayload(result.payload);
+        const directMatch = conversationHasProject(result.payload, expected);
+        const membership = directMatch
+          ? Promise.resolve(true)
+          : projectDirectoryHasConversation(target.id, expected);
+        return membership.then((matched) => {
+          if (matched) {
+            privateConversationDirectory.acceptConversationMembership(
+              target.id,
+              cleanText(payload && payload.title, 160),
+              expected
+            );
+          }
+          policy.recordSuccess(result.elapsedMs);
+          return matched;
+        });
+      }).catch((error) => {
+        policy.recordFailure(failureKind(error));
+        return false;
+      }).finally(() => {
+        if (activeMembershipRequests.get(key) === request) activeMembershipRequests.delete(key);
+      });
+      activeMembershipRequests.set(key, request);
+    }
+    request.then((matched) => settle(() => onSettled && onSettled(matched)));
+    return true;
+  }
+
   window.__elonChatGptPrivateTransport = Object.freeze({
-    version: 11,
+    version: 15,
     conversationPrefetchEnabled: prefetchEnabled,
     conversationPrefetchAvailable: true,
     experimentalConversationPrefetchAvailable: true,
     conversationPrefetchReady,
     prefetchConversation,
     refreshCurrentConversation,
+    probeConversationProject,
+    copySameOriginRequestHeaders,
     health: policy.snapshot
   });
 })();

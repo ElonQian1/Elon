@@ -6,12 +6,12 @@ import android.webkit.CookieManager
 import android.webkit.WebView
 import android.widget.FrameLayout
 import androidx.appcompat.app.AppCompatActivity
+import com.elon.app.BuildConfig
 import com.elon.app.PendingAttachment
 import com.elon.app.WebChatBackgroundInteractionLease
 import com.elon.app.WebChatConsumerPort
 import com.elon.app.WebChatManagedRealtimeVoiceState
 import com.elon.app.WebChatPendingSendState
-import com.elon.app.WebChatSendCoordinator
 import com.elon.app.WebChatSessionRecoveryCoordinator
 import com.elon.app.WebChatSocialMcpPort
 import java.time.LocalDate
@@ -101,6 +101,7 @@ internal class ChatGptBackgroundSession(
         schedule = { task, delayMs -> conversationRefreshHandler.postDelayed(task, delayMs) },
         cancel = conversationRefreshHandler::removeCallbacks,
     )
+    private val conversationRefreshSession = ChatGptConversationRefreshSession(conversationRefresh)
     private val composerOptionRequests = ChatGptComposerOptionRequestCoordinator(
         dismissMenu = composerOptionInteraction::dismiss,
         dispatchRequest = composerOptionInteraction::dispatch,
@@ -136,7 +137,6 @@ internal class ChatGptBackgroundSession(
     private var latestBridgeState = ChatGptWebPageAdapter.State.WEB_ONLY
     private var state = State.IDLE
     private var forceConversationRefreshAfterVoice = false
-    private var requestedConversationProjectId: String? = null
     private var loadPendingAfterPause = false
     private val realtimeVoiceBacking: ChatGptRealtimeVoiceBackingController by
         lazy(LazyThreadSafetyMode.NONE) {
@@ -183,12 +183,32 @@ internal class ChatGptBackgroundSession(
         ChatGptWebTouchRequestHandler(
             { webView }, { pageAdapter }, { touchDispatcher },
             { surfaceMode.isSkin() || realtimeVoiceBacking.isActive() },
-            backgroundInteractionLease::run,
+            { kind, action -> backgroundInteractionLease.run(kind, action) },
             webExecution::interactionRequested,
             composerOptionRequests::dismiss,
             { composerOptionRequests.scheduleCollection("model") },
             { composerOptionRequests.scheduleCollection("tools") },
             { onStateChanged(state, "官网控件操作未就绪") },
+        )
+    }
+    private val portFactory by lazy(LazyThreadSafetyMode.NONE) {
+        ChatGptWebPortFactory(
+            ensureInitialized = ::ensureInitialized,
+            pageAdapter = { pageAdapter },
+            sendOwner = sendOwner,
+            observedState = observedMcpState,
+            audioPermissionController = audioPermissionController,
+            snapshot = { latestSnapshot },
+            uiManifest = { latestUiManifest },
+            bridgeState = { latestBridgeState },
+            presentationMode = ::presentationMode,
+            verificationEvidenceStore = verificationEvidenceStore,
+            requestComposerOptions = { section, requestId ->
+                composerOptionRequests.request(section, requestId)
+            },
+            dismissComposerOptions = composerOptionRequests::dismiss,
+            refresh = { webView?.reload() },
+            realtimeVoiceBacking = realtimeVoiceBacking,
         )
     }
     private val newConversationRecovery = ChatGptNewConversationRecoveryCoordinator(
@@ -198,11 +218,21 @@ internal class ChatGptBackgroundSession(
         composerReady = { latestSnapshot?.composerReady == true },
         interactionRequested = webExecution::interactionRequested,
     )
+    private val conversationOpenRecovery = createChatGptConversationOpenRecoveryCoordinator(
+        webView = { webView },
+        navigationPending = conversationNavigation::hasPending,
+        schedule = { task, delayMs -> recoveryHandler.postDelayed(task, delayMs) },
+        cancelTask = recoveryHandler::removeCallbacks,
+        interactionRequested = webExecution::interactionRequested,
+    )
     private val navigationActions by lazy(LazyThreadSafetyMode.NONE) {
         ChatGptSessionNavigationActions(
             { state == State.READY }, { state == State.IDLE || state == State.LOADING },
             { latestBridgeState == ChatGptWebPageAdapter.State.READY }, { pageAdapter != null },
-            { pageAdapter?.startNewConversation() }, { path -> pageAdapter?.openConversation(path) },
+            { pageAdapter?.startNewConversation() }, { path ->
+                pageAdapter?.openConversation(path)
+                conversationOpenRecovery.schedule(path)
+            },
             { path ->
                 if (!conversationDirectory.requestProject(path)) false else {
                     onConversationIndexChanged(conversationIndex())
@@ -212,7 +242,7 @@ internal class ChatGptBackgroundSession(
             },
             { latestSnapshot }, { snapshot -> latestSnapshot = snapshot; onSnapshot(snapshot) },
             { updateState(State.LOADING) }, ::ensureInitialized,
-            { requestedConversationProjectId = null; conversationRefresh.yieldToUserNavigation() },
+            conversationRefreshSession::yieldToUserNavigation,
             newConversationRecovery::cancel, newConversationRecovery::schedule,
             conversationNavigation,
         )
@@ -262,20 +292,29 @@ internal class ChatGptBackgroundSession(
     fun warmSessionAvailable(): Boolean = warmSessionAvailable
     fun conversationNavigationActive(): Boolean = conversationNavigation.isNavigating()
     fun conversationIndex(): ChatGptWebConversationIndexState = conversationDirectory.index()
-    fun requestConversationIndex(projectId: String? = null): Boolean {
-        requestedConversationProjectId = ChatGptConversationRefreshScopePolicy.select(
-            pendingProjectId = requestedConversationProjectId,
-            requestedProjectId = ChatGptWebConversationPath.canonicalProjectId(projectId),
-            refreshBusy = conversationRefresh.isBusy,
-        )
-        return conversationRefresh.requestAfterCurrent()
+    fun requestConversationIndex(projectId: String? = null): Boolean =
+        conversationRefreshSession.request(projectId)
+
+    fun probeConversationProject(path: String, projectId: String): Boolean {
+        if (state != State.READY) return false
+        return pageAdapter?.probeConversationProject(path, projectId) == true
     }
+
+    fun suspendConversationRefreshForUserAction() {
+        conversationRefreshSession.suspend({
+            conversationDirectory.failRefresh()
+            onConversationIndexChanged(conversationIndex())
+            pageAdapter?.cancelConversationDirectoryWork()
+        })
+    }
+
+    fun resumeConversationRefreshAfterUserAction() = conversationRefreshSession.resume()
 
     private fun dispatchConversationIndexRequest(): Boolean {
         val adapter = pageAdapter ?: return false
         if (state != State.READY) return false
-        val refreshRequest = conversationDirectory.beginRefresh(requestedConversationProjectId)
-        requestedConversationProjectId = null
+        val dispatch = conversationRefreshSession.beginDispatch() ?: return false
+        val refreshRequest = conversationDirectory.beginRefresh(dispatch.projectId)
         onConversationIndexChanged(conversationIndex())
         adapter.listConversations(
             projectHints = refreshRequest.projectHints,
@@ -323,6 +362,37 @@ internal class ChatGptBackgroundSession(
         pageAdapter?.stopGeneration()
     }
 
+    fun startPrivateDictation(
+        nativeDraft: String,
+        expectedOfficialDraft: String,
+        onPermissionDenied: () -> Unit,
+    ): Boolean {
+        val adapter = pageAdapter ?: return false
+        if (state != State.READY) return false
+        audioPermissionController.runWithMicrophone(
+            action = {
+                adapter.startPrivateDictation(nativeDraft, expectedOfficialDraft)
+                webExecution.interactionRequested()
+            },
+            onPermissionDenied = onPermissionDenied,
+        )
+        return true
+    }
+
+    fun submitPrivateDictation(): Boolean {
+        val adapter = pageAdapter ?: return false
+        adapter.submitPrivateDictation()
+        webExecution.interactionRequested()
+        return true
+    }
+
+    fun cancelPrivateDictation(): Boolean {
+        val adapter = pageAdapter ?: return false
+        adapter.cancelPrivateDictation()
+        webExecution.interactionRequested()
+        return true
+    }
+
     fun startNewConversation(): Boolean = navigationActions.startNewConversation()
 
     fun currentConversationPath(): String? = ChatGptWebConversationPath.fromUrl(latestSnapshot?.url)
@@ -340,82 +410,16 @@ internal class ChatGptBackgroundSession(
         copyMessage: (String) -> ChatGptClipboardMetadata,
         selectMode: (ChatGptWebPresentationMode) -> Unit,
         revealMessage: (String, Int?, String) -> Boolean,
-    ): WebChatSocialMcpPort {
-        ensureInitialized()
-        val adapter = checkNotNull(pageAdapter) { "ChatGPT background session is not active" }
-        val commands = ChatGptWebMcpCommandAdapter(
-            pageAdapter = adapter,
-            sendInputAction = { requestId ->
-                val result = sendOwner.dispatchMcp(inputText().trim(), requestId)
-                if (result.outcome != WebChatSendCoordinator.DispatchOutcome.DISPATCHED) {
-                    observedMcpState.failCommand(
-                        requestId,
-                        "send_prompt",
-                        when (result.outcome) {
-                            WebChatSendCoordinator.DispatchOutcome.BUSY -> "send_busy"
-                            WebChatSendCoordinator.DispatchOutcome.NOT_READY ->
-                                "send_not_ready"
-                            WebChatSendCoordinator.DispatchOutcome.REJECTED ->
-                                "send_rejected"
-                            WebChatSendCoordinator.DispatchOutcome.DISPATCHED ->
-                                "send_dispatched"
-                        },
-                    )
-                }
-            },
-            invokeControlAction = adapter::invokeUiControl,
-            startDictationAction = { requestId ->
-                audioPermissionController.runWithMicrophone(
-                    action = { adapter.startDictation(requestId) },
-                    onPermissionDenied = {
-                        observedMcpState.failCommand(
-                            requestId,
-                            "start_dictation",
-                            "microphone_permission_denied",
-                        )
-                    },
-                )
-            },
-            requestComposerOptionsAction = { section, requestId ->
-                composerOptionRequests.request(section, requestId)
-            },
-            dismissComposerOptionsAction = composerOptionRequests::dismiss,
-        )
-        val officialPort = ChatGptWebMcpActions(
-            snapshot = { latestSnapshot },
-            uiManifest = { latestUiManifest },
-            observedState = observedMcpState::snapshot,
-            beginCommand = observedMcpState::beginCommand,
-            bridgeState = { latestBridgeState },
-            mode = ::presentationMode,
-            inputText = inputText,
-            audioPermissionState = audioPermissionController::snapshot,
-            verificationEvidence = verificationEvidenceStore::snapshot,
-            recordVerificationCases = verificationEvidenceStore::record,
-            setInputText = setInputText,
-            copyMessage = copyMessage,
-            commands = commands,
-            refresh = { webView?.reload() },
-            selectMode = selectMode,
-            revealMessage = revealMessage,
-            beginOpenConversationCommand = observedMcpState::beginOpenConversationCommand,
-        )
-        return ChatGptWebNativeVoiceResearchMcpPort(
-            delegate = officialPort,
-            startNative = realtimeVoiceBacking::beginNativePrivateVoiceResearch,
-            muteNative = realtimeVoiceBacking::muteNativePrivateVoiceResearch,
-            stopNative = { realtimeVoiceBacking.end(gracefulExit = true) },
-            currentState = realtimeVoiceBacking::nativePrivateVoiceState,
-        )
-    }
+    ): WebChatSocialMcpPort = portFactory.createMcpPort(
+        inputText,
+        setInputText,
+        copyMessage,
+        selectMode,
+        revealMessage,
+    )
 
     fun createConsumerPort(mcpPort: WebChatSocialMcpPort): WebChatConsumerPort =
-        ChatGptWebConsumerPortAdapter(
-            snapshot = { latestSnapshot },
-            uiManifest = { latestUiManifest },
-            observedState = observedMcpState::snapshot,
-            executeControl = mcpPort::control,
-        )
+        portFactory.createConsumerPort(mcpPort)
 
     private fun invokeRealtimeVoiceControl(): Boolean {
         val adapter = pageAdapter ?: return false
@@ -455,8 +459,9 @@ internal class ChatGptBackgroundSession(
         pageAdapter?.dispose()
         sendOwner.dispose()
         sendHandler.removeCallbacksAndMessages(null)
-        conversationRefresh.reset()
+        conversationRefreshSession.reset()
         forceConversationRefreshAfterVoice = false
+        conversationOpenRecovery.cancel()
         conversationRefreshHandler.removeCallbacksAndMessages(null)
         composerOptionHandler.removeCallbacksAndMessages(null)
         sessionContinuityHandler.removeCallbacksAndMessages(null)
@@ -479,7 +484,8 @@ internal class ChatGptBackgroundSession(
 
     private fun ensureInitialized() {
         if (webView != null) return
-        WebView.setWebContentsDebuggingEnabled(false)
+        WebView.setWebContentsDebuggingEnabled(BuildConfig.CHATGPT_PRIVATE_RESEARCH_ENABLED)
+        ChatGptWebResearchServiceWorkerObserver.install()
         val view = createChatGptBackgroundWebView(
             activity, audioPermissionController, recovery::onNavigationProgress,
         ) { callback ->
@@ -533,6 +539,15 @@ internal class ChatGptBackgroundSession(
                 if (ChatGptWebNavigationPolicy.supportsEnhancedMode(view.url)) recovery.onFailure() else recovery.onTerminal()
             },
             rewriteAllowedMainFrameUrl = { null },
+            onResourceRequest = { request ->
+                ChatGptWebPrivateResearchEventRecorder.recordResourceRequest(
+                    method = request.method,
+                    url = request.url.toString(),
+                    contentType = request.requestHeaders.entries.firstOrNull {
+                        it.key.equals("content-type", ignoreCase = true)
+                    }?.value,
+                )
+            },
         )
         host.addView(
             view,
@@ -589,6 +604,11 @@ internal class ChatGptBackgroundSession(
                 scheduleSessionContinuityRecheck(reconciliation.recheckAfterMs)
                 if (reconciliation.clearConversationHistory) clearConversationHistory()
                 latestSnapshot = snapshot
+                backgroundInteractionLease.observeDictationState(
+                    controlActive = snapshot.dictationActive,
+                    capturePending = snapshot.dictationCapturePending,
+                    captureActive = snapshot.dictationCaptureActive,
+                )
                 realtimeVoiceRecovery.accept(snapshot)
                 ChatGptWebConversationPath.fromUrl(snapshot.url)?.let {
                     conversationDirectory.observeCurrent(snapshot, LocalDate.now())
@@ -597,6 +617,7 @@ internal class ChatGptBackgroundSession(
                 }
                 when {
                     ChatGptWebAccessPolicy.requiresLogin(snapshot) -> {
+                        conversationOpenRecovery.cancel()
                         navigationActions.clearDeferred()
                         newConversationRecovery.cancel()
                         conversationNavigation.complete()
@@ -607,6 +628,7 @@ internal class ChatGptBackgroundSession(
                         updateState(State.LOGIN_REQUIRED)
                     }
                     ChatGptWebAccessPolicy.canChat(snapshot) -> {
+                        conversationOpenRecovery.cancel()
                         newConversationRecovery.cancel()
                         conversationNavigation.complete()
                         if (!snapshot.streaming) {
@@ -619,23 +641,17 @@ internal class ChatGptBackgroundSession(
                         pageAdapter?.markReady()
                         recovery.onReady()
                         updateState(State.READY)
-                        if (
-                            forceConversationRefreshAfterVoice &&
-                            snapshot.capabilities.supports(ChatGptWebCapabilityId.CONVERSATION_LIST)
-                        ) {
-                            forceConversationRefreshAfterVoice = false
-                            conversationRefresh.requestAfterCurrent()
-                        } else if (
-                            snapshot.capabilities.supports(ChatGptWebCapabilityId.CONVERSATION_LIST) &&
-                            conversationDirectory.needsProjectRefresh(snapshot.url)
-                        ) {
-                            conversationRefresh.requestAfterCurrent()
-                        } else if (
-                            snapshot.capabilities.supports(ChatGptWebCapabilityId.CONVERSATION_LIST) &&
-                            conversationDirectory.needsOfficialRefresh()
-                        ) {
-                            conversationRefresh.requestIfIdle()
-                        }
+                        forceConversationRefreshAfterVoice =
+                            conversationRefreshSession.refreshOnReady(
+                            postVoiceRefresh = forceConversationRefreshAfterVoice,
+                            supported = snapshot.capabilities.supports(
+                                ChatGptWebCapabilityId.CONVERSATION_LIST,
+                            ),
+                            projectRefreshNeeded = conversationDirectory.needsProjectRefresh(
+                                snapshot.url,
+                            ),
+                            officialRefreshNeeded = conversationDirectory.needsOfficialRefresh(),
+                        )
                     }
                     else -> updateState(State.LOADING)
                 }
@@ -660,6 +676,7 @@ internal class ChatGptBackgroundSession(
                     pageAdapter?.requestSnapshot()
                 } else {
                     if (event.action == "open_conversation" || event.action == "new_conversation") {
+                        if (event.action == "open_conversation") conversationOpenRecovery.cancel()
                         newConversationRecovery.cancel()
                         conversationNavigation.restoreAfterFailure(event.action)?.let { previous ->
                             latestSnapshot = previous

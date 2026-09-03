@@ -28,11 +28,13 @@ function createContext(
   fetchImpl,
   researchEnabled = true,
   prefetchEnabled = true,
-  storage = new MemoryStorage()
+  storage = new MemoryStorage(),
+  directoryRows = []
 ) {
   const timers = new Set();
   const outcomes = [];
   const shapes = [];
+  const membershipAccepts = [];
   const location = {
     origin: 'https://chatgpt.com',
     pathname: '/',
@@ -42,6 +44,14 @@ function createContext(
     __elonChatGptPrivateResearchEnabled: researchEnabled,
     __elonChatGptPrivateConversationPrefetchEnabled: prefetchEnabled,
     fetch: fetchImpl,
+    __elonChatGptPrivateConversationDirectory: {
+      acceptConversationMembership: (id, title, projectId) => {
+        membershipAccepts.push({ id, title, projectId });
+        return true;
+      },
+      refreshProject: async () => true,
+      snapshot: () => ({ conversations: directoryRows })
+    },
     sessionStorage: storage,
     setTimeout: (callback) => {
       const id = setTimeout(callback, 10000);
@@ -81,7 +91,7 @@ function createContext(
     filename: 'chatgpt_web_private_transport_policy.js'
   });
   vm.runInNewContext(source, context, { filename: 'chatgpt_web_private_transport.js' });
-  return { window, timers, storage, outcomes, shapes };
+  return { window, timers, storage, outcomes, shapes, membershipAccepts };
 }
 
 async function flush() {
@@ -118,7 +128,7 @@ const detailPayload = {
   assert.equal(disabled.window.__elonChatGptPrivateTransport, undefined);
 
   const gated = createContext(async () => jsonResponse(detailPayload), true, false);
-  assert.equal(gated.window.__elonChatGptPrivateTransport.version, 11);
+  assert.equal(gated.window.__elonChatGptPrivateTransport.version, 14);
   assert.equal(gated.window.__elonChatGptPrivateTransport.conversationPrefetchEnabled, false);
   assert.equal(gated.window.__elonChatGptPrivateTransport.conversationPrefetchReady(), false);
 
@@ -130,7 +140,7 @@ const detailPayload = {
     return jsonResponse(detailPayload);
   }, false, true);
   const transport = detail.window.__elonChatGptPrivateTransport;
-  assert.equal(transport.version, 11);
+  assert.equal(transport.version, 14);
   assert.equal(transport.conversationPrefetchEnabled, true);
   assert.equal(transport.conversationPrefetchAvailable, true);
   assert.equal(transport.experimentalConversationPrefetchAvailable, true);
@@ -180,6 +190,20 @@ const detailPayload = {
   assert.equal(requests.length, 3);
   assert.equal(requests[2].url, '/backend-api/conversations/voice-chat');
   assert.equal(snapshots.length, 2);
+
+  detail.window.location.pathname = '/g/g-p-family/c/project-voice-chat';
+  assert.equal(transport.refreshCurrentConversation(
+    '/g/g-p-family/c/project-voice-chat',
+    (event) => snapshots.push(event)
+  ), true);
+  await flush();
+  assert.equal(requests.length, 4);
+  assert.equal(requests[3].url, '/backend-api/conversations/project-voice-chat');
+  assert.equal(snapshots.length, 3);
+  assert.equal(
+    snapshots[2].url,
+    'https://chatgpt.com/g/g-p-family/c/project-voice-chat'
+  );
 
   let resolveSingleFlight;
   let singleFlightCalls = 0;
@@ -263,6 +287,90 @@ const detailPayload = {
   assert.equal(linearSnapshots.length, 1);
   assert.equal(linearSnapshots[0].messages.length, 2);
   assert.equal(failed.window.__elonChatGptPrivateTransport.conversationPrefetchReady(), false);
+
+  const membershipPayload = Object.assign({}, detailPayload, { gizmo_id: 'g-p-destination' });
+  const membershipResults = [];
+  const membershipRequests = [];
+  const membership = createContext(async (url, options) => {
+    membershipRequests.push({ url, options });
+    return jsonResponse(membershipPayload);
+  });
+  await membership.window.fetch('/backend-api/conversations/current-chat-id-12345', {
+    headers: { Authorization: 'page-scoped-value' }
+  });
+  assert.equal(membership.window.__elonChatGptPrivateTransport.probeConversationProject(
+    '/g/g-p-origin/c/moved-chat',
+    'g-p-destination',
+    (matched) => membershipResults.push(matched)
+  ), true);
+  await flush();
+  assert.deepEqual(membershipResults, [true]);
+  assert.deepEqual(membership.membershipAccepts, [{
+    id: 'moved-chat',
+    title: 'Visible title',
+    projectId: 'g-p-destination'
+  }]);
+  assert.equal(membershipRequests.length, 2);
+  assert.equal(membershipRequests[1].options.cache, 'no-store');
+  assert.equal(
+    membershipRequests[1].options.__elonPrivateTransport,
+    'conversation_membership'
+  );
+
+  const scopedMembershipResults = [];
+  const scopedMembership = createContext(async () => jsonResponse(Object.assign({}, detailPayload, {
+    context_scopes: [{ scope_type: 'project', scope_id: 'g-p-destination' }]
+  })));
+  await scopedMembership.window.fetch('/backend-api/conversations/current-chat-id-12345', {
+    headers: { Authorization: 'page-scoped-value' }
+  });
+  assert.equal(scopedMembership.window.__elonChatGptPrivateTransport.probeConversationProject(
+    '/g/g-p-origin/c/moved-chat',
+    'g-p-destination',
+    (matched) => scopedMembershipResults.push(matched)
+  ), true);
+  await flush();
+  assert.deepEqual(scopedMembershipResults, [true]);
+
+  const templateMembershipResults = [];
+  const templateMembership = createContext(async () => jsonResponse(Object.assign({}, detailPayload, {
+    conversation_template_id: 'g-p-destination'
+  })));
+  await templateMembership.window.fetch('/backend-api/conversations/current-chat-id-12345', {
+    headers: { Authorization: 'page-scoped-value' }
+  });
+  assert.equal(templateMembership.window.__elonChatGptPrivateTransport.probeConversationProject(
+    '/g/g-p-origin/c/moved-chat',
+    'g-p-destination',
+    (matched) => templateMembershipResults.push(matched)
+  ), true);
+  await flush();
+  assert.deepEqual(templateMembershipResults, [true]);
+
+  const directoryMembershipResults = [];
+  const directoryMembership = createContext(
+    async () => jsonResponse(detailPayload),
+    true,
+    true,
+    new MemoryStorage(),
+    [{ id: 'moved-chat', projectId: 'g-p-destination' }]
+  );
+  await directoryMembership.window.fetch('/backend-api/conversations/current-chat-id-12345', {
+    headers: { Authorization: 'page-scoped-value' }
+  });
+  assert.equal(directoryMembership.window.__elonChatGptPrivateTransport.probeConversationProject(
+    '/g/g-p-origin/c/moved-chat',
+    'g-p-destination',
+    (matched) => directoryMembershipResults.push(matched)
+  ), true);
+  await flush();
+  assert.deepEqual(directoryMembershipResults, [true]);
+
+  assert.equal(membership.window.__elonChatGptPrivateTransport.probeConversationProject(
+    '/g/g-p-origin/c/moved-chat',
+    'not-a-project',
+    () => assert.fail('invalid membership probes must not dispatch')
+  ), false);
 
   console.log('CHATGPT_WEB_PRIVATE_TRANSPORT_TESTS=passed');
 })().catch((error) => {

@@ -7,6 +7,7 @@ param(
     [string]$ExpectedHardwareSerial = "",
     [ValidateRange(0, 9999)][int]$ExpectedAdapterVersion = 0,
     [ValidateRange(30, 300)][int]$TimeoutSec = 150,
+    [ValidateRange(0, 39)][int]$TargetProjectOffset = 0,
     [switch]$ConfirmRoundTrip
 )
 
@@ -26,6 +27,7 @@ $targetProject = $null
 $forwardWriteSelected = $false
 $forwardMoveVerified = $false
 $restoreWriteSelected = $false
+$cleanupWriteSelected = $false
 $restored = $false
 $recoveryUnknown = $false
 $primaryFailure = $null
@@ -65,12 +67,47 @@ function Wait-ProductionReady {
     throw "The production ChatGPT surface did not become ready for project-move acceptance."
 }
 
+function Ensure-ProductionReady {
+    try {
+        $state = Invoke-ChatGptWebSmokeMcp -Runtime $runtime -Tool "ui_state" -MainState
+        if (
+            [string]$state.active_surface -eq "social_ai" -and
+            [string]$state.social_chat.interaction_mode -eq "chat" -and
+            [string]$state.social_chat.web_chat_provider_id -eq "chatgpt_web" -and
+            [string]$state.social_chat.web_chat_state -eq "ready" -and
+            $state.social_chat.web_chat_composer_ready -eq $true
+        ) {
+            return $state
+        }
+    } catch {}
+    Open-ChatGptWebNativeChatSurface -Runtime $runtime -TimeoutSec $TimeoutSec | Out-Null
+    return Wait-ProductionReady
+}
+
+function Invoke-ReadActionWithSurfaceRecovery {
+    param(
+        [Parameter(Mandatory = $true)][string]$Action,
+        [hashtable]$Arguments = @{}
+    )
+
+    try {
+        return Invoke-MainAction -Action $Action -Arguments $Arguments
+    } catch {
+        if ([string]$_.Exception.Message -notmatch "web_chat_mode_inactive|web_chat_not_ready") {
+            throw
+        }
+        Ensure-ProductionReady | Out-Null
+        return Invoke-MainAction -Action $Action -Arguments $Arguments
+    }
+}
+
 function Get-Navigation {
     $conversations = [System.Collections.Generic.List[object]]::new()
     $projects = [System.Collections.Generic.List[object]]::new()
     $offset = 0
     do {
-        $page = Invoke-MainAction -Action "get_web_chat_navigation" -Arguments @{
+        $page = Invoke-ReadActionWithSurfaceRecovery `
+            -Action "get_web_chat_navigation" -Arguments @{
             offset = $offset
             limit = 50
         }
@@ -89,35 +126,59 @@ function Get-Navigation {
 }
 
 function Request-ScopedNavigationRefresh {
-    param([Parameter(Mandatory = $true)][string]$ProjectId)
+    param(
+        [Parameter(Mandatory = $true)][string]$ProjectId,
+        [string]$ConversationPath = ""
+    )
 
-    Invoke-MainAction -Action "refresh_web_chat_conversations" -Arguments @{
-        project_id = $ProjectId
-    } | Out-Null
+    $arguments = @{ project_id = $ProjectId }
+    if ($ConversationPath.Trim()) {
+        $arguments.conversation_path = $ConversationPath.Trim()
+    }
+    Invoke-ReadActionWithSurfaceRecovery `
+        -Action "refresh_web_chat_conversations" -Arguments $arguments | Out-Null
 }
 
 function Request-MembershipRefresh {
     param(
         [Parameter(Mandatory = $true)][string]$OriginProjectId,
-        [Parameter(Mandatory = $true)][string]$TargetProjectId
+        [Parameter(Mandatory = $true)][string]$TargetProjectId,
+        [string]$ConversationPath = ""
     )
 
-    Request-ScopedNavigationRefresh -ProjectId $OriginProjectId
+    Request-ScopedNavigationRefresh -ProjectId $OriginProjectId `
+        -ConversationPath $ConversationPath
     Start-Sleep -Seconds 2
-    Request-ScopedNavigationRefresh -ProjectId $TargetProjectId
+    Request-ScopedNavigationRefresh -ProjectId $TargetProjectId `
+        -ConversationPath $ConversationPath
 }
 
 function Get-UiNodes {
-    $remotePath = "/sdcard/elon-chatgpt-project-move.xml"
+    $remotePath = "/data/local/tmp/elon-chatgpt-project-move-$PID.xml"
+    $lastFailure = $null
     try {
-        Invoke-ChatGptWebSmokeAdb -Runtime $runtime `
-            -Arguments @("shell", "uiautomator", "dump", $remotePath) `
-            -TimeoutSec 30 -Label "dump native project-move selectors" | Out-Null
-        $raw = Invoke-ChatGptWebSmokeAdb -Runtime $runtime `
-            -Arguments @("shell", "cat", $remotePath) `
-            -TimeoutSec 30 -Label "read native project-move selectors"
-        $document = [xml]$raw
-        return @($document.SelectNodes("//node"))
+        for ($attempt = 1; $attempt -le 3; $attempt++) {
+            try {
+                Invoke-ChatGptWebSmokeAdb -Runtime $runtime `
+                    -Arguments @("shell", "rm", "-f", $remotePath) `
+                    -TimeoutSec 5 -Label "reset native project-move selector dump" | Out-Null
+                Invoke-ChatGptWebSmokeAdb -Runtime $runtime `
+                    -Arguments @("shell", "uiautomator", "dump", $remotePath) `
+                    -TimeoutSec 30 -Label "dump native project-move selectors" | Out-Null
+                $raw = Invoke-ChatGptWebSmokeAdb -Runtime $runtime `
+                    -Arguments @("shell", "cat", $remotePath) `
+                    -TimeoutSec 30 -Label "read native project-move selectors"
+                if ([string]$raw -notmatch '<hierarchy') {
+                    throw "Native selector dump was not complete."
+                }
+                $document = [xml]$raw
+                return @($document.SelectNodes("//node"))
+            } catch {
+                $lastFailure = $_
+                if ($attempt -lt 3) { Start-Sleep -Milliseconds 400 }
+            }
+        }
+        throw $lastFailure
     } finally {
         Invoke-ChatGptWebSmokeAdb -Runtime $runtime `
             -Arguments @("shell", "rm", "-f", $remotePath) `
@@ -134,6 +195,93 @@ function ConvertTo-NativeToken {
     return $token
 }
 
+function Get-ConversationProjectIdFromPath {
+    param([AllowEmptyString()][string]$Path)
+
+    $match = [regex]::Match(
+        $Path.Trim(),
+        '^/g/(g-p-[A-Za-z0-9_-]{1,160})/c/[A-Za-z0-9_-]{1,160}$'
+    )
+    if (-not $match.Success) { return "" }
+    $value = [string]$match.Groups[1].Value
+    $production = [regex]::Match($value, '^(g-p-[A-Fa-f0-9]{32})(?:-[A-Za-z0-9_-]+)?$')
+    if ($production.Success) { return [string]$production.Groups[1].Value }
+    return $value
+}
+
+function Get-ConversationIdentityFromPath {
+    param([AllowEmptyString()][string]$Path)
+
+    $match = [regex]::Match(
+        $Path.Trim(),
+        '^/g/g-p-[A-Za-z0-9_-]{1,160}/c/([A-Za-z0-9_-]{1,160})$'
+    )
+    if (-not $match.Success) { return "" }
+    return [string]$match.Groups[1].Value
+}
+
+function Get-CanonicalConversationMembership {
+    param(
+        [Parameter(Mandatory = $true)]$Navigation,
+        [Parameter(Mandatory = $true)][string]$ConversationId
+    )
+
+    $matches = @($Navigation.conversations | Where-Object {
+        [string]$_.id -eq $ConversationId -and
+            [string]$_.project_id -and
+            (Get-ConversationProjectIdFromPath -Path ([string]$_.path)) -eq
+                [string]$_.project_id
+    })
+    if ($matches.Count -ne 1) { return $null }
+    return $matches[0]
+}
+
+function Get-LiveConversationMembership {
+    param([Parameter(Mandatory = $true)][string]$ConversationId)
+
+    $state = Invoke-ChatGptWebSmokeMcp -Runtime $runtime -Tool "ui_state" -MainState
+    $path = [string]$state.social_chat.web_chat_conversation_path
+    if ((Get-ConversationIdentityFromPath -Path $path) -ne $ConversationId) {
+        return $null
+    }
+    $projectId = Get-ConversationProjectIdFromPath -Path $path
+    if (-not $projectId) { return $null }
+    return [pscustomobject]@{
+        id = $ConversationId
+        path = $path
+        project_id = $projectId
+    }
+}
+
+function Wait-ReadOnlyOriginalMembership {
+    param(
+        [Parameter(Mandatory = $true)][string]$ConversationId,
+        [Parameter(Mandatory = $true)][string]$ConversationPath,
+        [Parameter(Mandatory = $true)][string]$OriginProjectId,
+        [Parameter(Mandatory = $true)][string]$TargetProjectId
+    )
+
+    $deadline = [DateTimeOffset]::UtcNow.AddSeconds($TimeoutSec)
+    do {
+        Request-MembershipRefresh -OriginProjectId $OriginProjectId `
+            -TargetProjectId $TargetProjectId -ConversationPath $ConversationPath
+        Start-Sleep -Seconds 2
+        $navigation = Get-Navigation
+        $current = Get-CanonicalConversationMembership `
+            -Navigation $navigation -ConversationId $ConversationId
+        if ($null -ne $current -and [string]$current.project_id -eq $OriginProjectId) {
+            return $current
+        }
+        if ($null -eq $current) {
+            $live = Get-LiveConversationMembership -ConversationId $ConversationId
+            if ($null -ne $live -and [string]$live.project_id -eq $OriginProjectId) {
+                return $live
+            }
+        }
+    } while ([DateTimeOffset]::UtcNow -lt $deadline)
+    return $null
+}
+
 function Invoke-NativeSelector {
     param(
         [Parameter(Mandatory = $true)][string]$Selector,
@@ -146,11 +294,13 @@ function Invoke-NativeSelector {
     do {
         $node = @(Get-UiNodes | Where-Object {
             $contentDescription = [string]$_.GetAttribute("content-desc")
-            if ($Prefix) {
+            $visibleToUser = [string]$_.GetAttribute("visible-to-user")
+            $matchesSelector = if ($Prefix) {
                 $contentDescription.StartsWith($Selector, [StringComparison]::Ordinal)
             } else {
                 $contentDescription -eq $Selector
             }
+            $matchesSelector -and $visibleToUser -ne "false"
         }) | Select-Object -First 1
         if ($null -ne $node) {
             $bounds = [regex]::Match(
@@ -162,7 +312,7 @@ function Invoke-NativeSelector {
             $y = [int](([int]$bounds.Groups[2].Value + [int]$bounds.Groups[4].Value) / 2)
             Invoke-ChatGptWebSmokeAdb -Runtime $runtime `
                 -Arguments @("shell", "input", "tap", "$x", "$y") `
-                -TimeoutSec 5 -Label "invoke native project-move selector" | Out-Null
+                -TimeoutSec 5 -Label "tap native project-move selector" | Out-Null
             Start-Sleep -Milliseconds 500
             return $true
         }
@@ -188,15 +338,60 @@ function Invoke-NativeSelector {
     )
 }
 
+function Select-OfficialFallbackProject {
+    param(
+        [Parameter(Mandatory = $true)][string]$SourceProjectId,
+        [string]$PreferredProjectId = ""
+    )
+
+    $destinationIds = @(Get-UiNodes | ForEach-Object {
+        $description = [string]$_.GetAttribute("content-desc")
+        $match = [regex]::Match(
+            $description,
+            '^web-chat-conversation-project-destination:(g-p-[A-Za-z0-9_-]{1,160})$'
+        )
+        if ($match.Success) { [string]$match.Groups[1].Value }
+    } | Where-Object { $_ -and $_ -ne $SourceProjectId } | Select-Object -Unique)
+    if ($destinationIds.Count -eq 0) { return $null }
+    $navigation = Get-Navigation
+    $projects = @($navigation.projects | Where-Object {
+        [string]$_.id -in $destinationIds
+    })
+    $selected = @($projects | Sort-Object @{
+        Expression = { if ([string]$_.id -eq $PreferredProjectId) { 0 } else { 1 } }
+    }) | Select-Object -First 1
+    if ($null -eq $selected) { return $null }
+    $pressed = Invoke-NativeSelector -Selector (
+        "web-chat-conversation-project-destination:" + [string]$selected.id
+    ) -Stage "official-project-destination" -Optional
+    if (-not $pressed) { return $null }
+    return $selected
+}
+
 function Open-ProjectSidebar {
     param([Parameter(Mandatory = $true)][string]$ProjectId)
 
-    Invoke-MainAction -Action "open_chat_side_menu" | Out-Null
-    Invoke-MainAction -Action "set_web_chat_sidebar" -Arguments @{
-        section = "projects"
-        project_id = $ProjectId
-    } | Out-Null
-    Start-Sleep -Milliseconds 800
+    for ($attempt = 1; $attempt -le 2; $attempt++) {
+        Ensure-ProductionReady | Out-Null
+        Invoke-ReadActionWithSurfaceRecovery -Action "open_chat_side_menu" | Out-Null
+        Invoke-ReadActionWithSurfaceRecovery -Action "set_web_chat_sidebar" -Arguments @{
+            section = "projects"
+            project_id = $ProjectId
+        } | Out-Null
+        Start-Sleep -Milliseconds 800
+        try {
+            $state = Invoke-ChatGptWebSmokeMcp -Runtime $runtime -Tool "ui_state" -MainState
+            if (
+                [string]$state.active_surface -eq "social_ai" -and
+                [string]$state.social_chat.web_chat_state -eq "ready" -and
+                $state.social_chat.web_chat_composer_ready -eq $true
+            ) {
+                return
+            }
+        } catch {}
+        Wait-ProductionReady | Out-Null
+    }
+    throw "The project sidebar did not settle after its background refresh."
 }
 
 function Close-Sidebar {
@@ -206,30 +401,53 @@ function Close-Sidebar {
 function Find-VisibleProjectConversation {
     param([Parameter(Mandatory = $true)]$Navigation)
 
-    foreach ($project in @($Navigation.projects)) {
+    $orderedProjects = @($Navigation.projects | Sort-Object @{
+        Expression = { if ($_.active -eq $true) { 0 } else { 1 } }
+    })
+    foreach ($project in $orderedProjects) {
         $projectId = [string]$project.id
         if (-not $projectId) { continue }
-        Open-ProjectSidebar -ProjectId $projectId
-        $visibleTokens = @(Get-UiNodes | ForEach-Object {
-            [string]$_.GetAttribute("content-desc")
+        $expectedByToken = @{}
+        @($Navigation.conversations | Where-Object {
+            [string]$_.project_id -eq $projectId -and
+                (Get-ConversationProjectIdFromPath -Path ([string]$_.path)) -eq $projectId
+        }) | Group-Object {
+            ConvertTo-NativeToken -Value ([string]$_.id)
         } | Where-Object {
-            $_ -like "chatgpt-conversation-actions:*"
+            $_.Count -eq 1
         } | ForEach-Object {
-            $match = [regex]::Match($_, '^chatgpt-conversation-actions:([^:]+):')
-            if ($match.Success) { $match.Groups[1].Value }
-        })
-        foreach ($visibleToken in $visibleTokens) {
-            $matches = @($Navigation.conversations | Where-Object {
-                [string]$_.project_id -eq $projectId -and
-                    (ConvertTo-NativeToken -Value ([string]$_.id)) -eq $visibleToken
+            $expectedByToken[[string]$_.Name] = $_.Group[0]
+        }
+        if ($expectedByToken.Count -eq 0) { continue }
+
+        Open-ProjectSidebar -ProjectId $projectId
+        $deadline = [DateTimeOffset]::UtcNow.AddSeconds(12)
+        do {
+            $visibleTokens = @(Get-UiNodes | ForEach-Object {
+                [string]$_.GetAttribute("content-desc")
+            } | Where-Object {
+                $_ -like "chatgpt-conversation-actions:*"
+            } | ForEach-Object {
+                $match = [regex]::Match($_, '^chatgpt-conversation-actions:([^:]+):')
+                if ($match.Success) { $match.Groups[1].Value }
             })
-            if ($matches.Count -eq 1) {
+            $orderedVisibleTokens = @($visibleTokens | Sort-Object @{
+                Expression = {
+                    if (
+                        $expectedByToken.ContainsKey([string]$_) -and
+                        $expectedByToken[[string]$_].active -eq $true
+                    ) { 0 } else { 1 }
+                }
+            })
+            foreach ($visibleToken in $orderedVisibleTokens) {
+                if (-not $expectedByToken.ContainsKey($visibleToken)) { continue }
                 return [pscustomobject]@{
-                    conversation = $matches[0]
+                    conversation = $expectedByToken[$visibleToken]
                     project = $project
                 }
             }
-        }
+            Start-Sleep -Milliseconds 500
+        } while ([DateTimeOffset]::UtcNow -lt $deadline)
         Close-Sidebar
     }
     throw "No visible project conversation is available for reversible acceptance."
@@ -237,31 +455,103 @@ function Find-VisibleProjectConversation {
 
 function Test-ProjectMoveWriteObserved {
     try {
-        return @((Get-UiNodes) | Where-Object {
-            $text = [string]$_.text
-            $text -eq "正在提交一次移动操作" -or
-                $text -eq "正在同步会话目录" -or
-                $text.Contains("已经提交过一次操作")
-        }).Count -gt 0
+        return (Get-ProjectMoveUiStage) -in @(
+            "submitting",
+            "syncing",
+            "failed_after_write",
+            "completed"
+        )
     } catch {
         return $false
+    }
+}
+
+function Get-ProjectMoveUiStage {
+    $texts = @(Get-UiNodes | ForEach-Object { [string]$_.text })
+    if (@($texts | Where-Object { $_.Contains("已经提交过一次操作") }).Count -gt 0) {
+        return "failed_after_write"
+    }
+    if (@($texts | Where-Object { $_.Contains("尚未提交移动操作") }).Count -gt 0) {
+        return "failed_before_write"
+    }
+    if (@($texts | Where-Object { $_ -like "已移动到*" }).Count -gt 0) {
+        return "completed"
+    }
+    if ("正在同步会话目录" -in $texts) { return "syncing" }
+    if ("正在确认移动" -in $texts) { return "confirming" }
+    if ("正在提交一次移动操作" -in $texts) { return "submitting" }
+    if ("正在打开项目列表" -in $texts) { return "opening_project_list" }
+    if ("正在打开会话设置" -in $texts) { return "opening_conversation_options" }
+    if ("正在切换到该会话" -in $texts) { return "opening_conversation" }
+    if ("正在准备当前会话" -in $texts) { return "preparing" }
+    return "idle"
+}
+
+function Dismiss-StalePreWriteMoveFailure {
+    if ((Get-ProjectMoveUiStage) -ne "failed_before_write") { return }
+    Invoke-ChatGptWebSmokeAdb -Runtime $runtime `
+        -Arguments @("shell", "input", "keyevent", "4") `
+        -TimeoutSec 5 -Label "dismiss stale pre-write project-move failure" | Out-Null
+    Start-Sleep -Seconds 1
+    if ((Get-ProjectMoveUiStage) -eq "failed_before_write") {
+        throw "The stale pre-write move failure did not close."
     }
 }
 
 function Wait-ConversationMembership {
     param(
         [Parameter(Mandatory = $true)][string]$ConversationId,
-        [Parameter(Mandatory = $true)][string]$ProjectId,
-        [Parameter(Mandatory = $true)][ref]$WriteSelected
+        [Parameter(Mandatory = $true)][string]$ConversationPath,
+        [Parameter(Mandatory = $true)][string]$SourceProjectId,
+        [Parameter(Mandatory = $true)][ref]$DestinationProject,
+        [Parameter(Mandatory = $true)][ref]$WriteSelected,
+        [switch]$AllowFallbackDestination
     )
 
     $deadline = [DateTimeOffset]::UtcNow.AddSeconds($TimeoutSec)
     $poll = 0
+    $lastUiStage = ""
+    $fallbackSelected = $false
     do {
-        if ($poll -eq 0 -or $poll % 4 -eq 0) {
-            Request-ScopedNavigationRefresh -ProjectId $ProjectId
+        $projectId = [string]$DestinationProject.Value.id
+        $uiStage = Get-ProjectMoveUiStage
+        if ($uiStage -ne $lastUiStage) {
+            Write-Host "CHATGPT_WEB_PROJECT_MOVE_PROGRESS=$uiStage"
+            $lastUiStage = $uiStage
         }
-        if (-not $WriteSelected.Value -and (Test-ProjectMoveWriteObserved)) {
+        if (
+            $AllowFallbackDestination -and
+            -not $WriteSelected.Value -and
+            -not $fallbackSelected -and
+            $uiStage -eq "idle"
+        ) {
+            $fallback = Select-OfficialFallbackProject `
+                -SourceProjectId $SourceProjectId -PreferredProjectId $projectId
+            if ($null -ne $fallback) {
+                $DestinationProject.Value = $fallback
+                $fallbackSelected = $true
+                Write-Host "CHATGPT_WEB_PROJECT_MOVE_PROGRESS=official_destination_selected"
+                Start-Sleep -Milliseconds 700
+                continue
+            }
+        }
+        if ($uiStage -eq "failed_before_write") {
+            throw "Native project move failed before the official write was submitted."
+        }
+        if ($uiStage -eq "failed_after_write") {
+            $WriteSelected.Value = $true
+            throw "Native project move requires read-only recovery after one submitted write."
+        }
+        if ($poll -eq 0 -or $poll % 4 -eq 0) {
+            Request-ScopedNavigationRefresh -ProjectId $ProjectId `
+                -ConversationPath $ConversationPath
+        }
+        if (-not $WriteSelected.Value -and $uiStage -in @(
+                "submitting",
+                "syncing",
+                "completed"
+            )
+        ) {
             $WriteSelected.Value = $true
         }
         $navigation = Get-Navigation
@@ -282,10 +572,12 @@ function Invoke-ProjectMove {
     param(
         [Parameter(Mandatory = $true)]$Conversation,
         [Parameter(Mandatory = $true)][string]$SourceProjectId,
-        [Parameter(Mandatory = $true)][string]$DestinationProjectId,
-        [Parameter(Mandatory = $true)][ref]$WriteSelected
+        [Parameter(Mandatory = $true)][ref]$DestinationProject,
+        [Parameter(Mandatory = $true)][ref]$WriteSelected,
+        [switch]$AllowFallbackDestination
     )
 
+    $destinationProjectId = [string]$DestinationProject.Value.id
     $conversationToken = ConvertTo-NativeToken -Value ([string]$Conversation.id)
     $pickerOpened = $false
     for ($attempt = 1; $attempt -le 2; $attempt++) {
@@ -306,16 +598,19 @@ function Invoke-ProjectMove {
         throw "The native move-to-project picker did not open after one safe retry."
     }
     $null = Invoke-NativeSelector -Selector (
-        "web-chat-conversation-project-destination:" + $DestinationProjectId
+        "web-chat-conversation-project-destination:" + $destinationProjectId
     ) -Stage "project-destination"
     return Wait-ConversationMembership -ConversationId ([string]$Conversation.id) `
-        -ProjectId $DestinationProjectId -WriteSelected $WriteSelected
+        -ConversationPath ([string]$Conversation.path) `
+        -SourceProjectId $SourceProjectId -DestinationProject $DestinationProject `
+        -WriteSelected $WriteSelected -AllowFallbackDestination:$AllowFallbackDestination
 }
 
 Start-ChatGptWebSmokeAwakeLease -Runtime $runtime | Out-Null
 try {
     Open-ChatGptWebNativeChatSurface -Runtime $runtime -TimeoutSec $TimeoutSec | Out-Null
     $ready = Wait-ProductionReady
+    Dismiss-StalePreWriteMoveFailure
     $originPath = [string]$ready.social_chat.web_chat_conversation_path
     $navigation = Get-Navigation
     if (@($navigation.projects).Count -lt 2) {
@@ -326,31 +621,46 @@ try {
     $originProject = $sample.project
     $targetProject = @($navigation.projects | Where-Object {
         [string]$_.id -ne [string]$originProject.id
-    }) | Select-Object -First 1
+    }) | Select-Object -Skip $TargetProjectOffset -First 1
     if ($null -eq $targetProject) { throw "No alternate project is available."
     }
 
     Request-MembershipRefresh -OriginProjectId ([string]$originProject.id) `
-        -TargetProjectId ([string]$targetProject.id)
+        -TargetProjectId ([string]$targetProject.id) `
+        -ConversationPath ([string]$candidate.path)
     Start-Sleep -Seconds 2
     $navigation = Get-Navigation
-    $candidate = @($navigation.conversations | Where-Object {
+    $candidateMemberships = @($navigation.conversations | Where-Object {
         [string]$_.id -eq [string]$candidate.id -and
-            [string]$_.project_id -eq [string]$originProject.id
+            [string]$_.project_id -and
+            (Get-ConversationProjectIdFromPath -Path ([string]$_.path)) -eq
+                [string]$_.project_id
+    })
+    $candidate = @($candidateMemberships | Where-Object {
+        [string]$_.id -eq [string]$candidate.id -and
+            [string]$_.project_id -eq [string]$originProject.id -and
+            (Get-ConversationProjectIdFromPath -Path ([string]$_.path)) -eq
+                [string]$originProject.id
     }) | Select-Object -First 1
-    if ($null -eq $candidate) {
+    if ($null -eq $candidate -or $candidateMemberships.Count -ne 1) {
         throw "The reversible conversation membership changed during the read-only baseline refresh."
     }
 
     if ($ConfirmRoundTrip) {
         $moved = Invoke-ProjectMove -Conversation $candidate `
             -SourceProjectId ([string]$originProject.id) `
-            -DestinationProjectId ([string]$targetProject.id) `
-            -WriteSelected ([ref]$forwardWriteSelected)
+            -DestinationProject ([ref]$targetProject) `
+            -WriteSelected ([ref]$forwardWriteSelected) -AllowFallbackDestination
         $forwardMoveVerified = $true
+        if (-not (Restore-WebChatNativeConversation -Runtime $runtime `
+                -ProviderId "chatgpt_web" -ConversationPath ([string]$moved.path) `
+                -TimeoutSec ([Math]::Min($TimeoutSec, 120)))) {
+            throw "The moved conversation did not reopen before the restore operation."
+        }
+        $restoreDestination = $originProject
         $restoredConversation = Invoke-ProjectMove -Conversation $moved `
             -SourceProjectId ([string]$targetProject.id) `
-            -DestinationProjectId ([string]$originProject.id) `
+            -DestinationProject ([ref]$restoreDestination) `
             -WriteSelected ([ref]$restoreWriteSelected)
         $restored = [string]$restoredConversation.project_id -eq [string]$originProject.id
     }
@@ -383,22 +693,31 @@ try {
     if ($forwardWriteSelected -and -not $restored -and $null -ne $candidate) {
         try {
             Request-MembershipRefresh -OriginProjectId ([string]$originProject.id) `
-                -TargetProjectId ([string]$targetProject.id)
+                -TargetProjectId ([string]$targetProject.id) `
+                -ConversationPath ([string]$candidate.path)
             Start-Sleep -Seconds 2
             $recoveryNavigation = Get-Navigation
-            $current = @($recoveryNavigation.conversations | Where-Object {
-                [string]$_.id -eq [string]$candidate.id
-            }) | Select-Object -First 1
+            $current = Get-CanonicalConversationMembership `
+                -Navigation $recoveryNavigation -ConversationId ([string]$candidate.id)
+            if ($null -eq $current) {
+                $current = Get-LiveConversationMembership `
+                    -ConversationId ([string]$candidate.id)
+            }
             $currentProjectId = [string]$current.project_id
             if (
                 $currentProjectId -eq [string]$targetProject.id -and
                 -not $restoreWriteSelected
             ) {
-                $recoveryWriteSelected = $false
+                if (-not (Restore-WebChatNativeConversation -Runtime $runtime `
+                        -ProviderId "chatgpt_web" -ConversationPath ([string]$current.path) `
+                        -TimeoutSec ([Math]::Min($TimeoutSec, 120)))) {
+                    throw "The moved conversation did not reopen for cleanup."
+                }
+                $cleanupDestination = $originProject
                 $recovered = Invoke-ProjectMove -Conversation $current `
                     -SourceProjectId $currentProjectId `
-                    -DestinationProjectId ([string]$originProject.id) `
-                    -WriteSelected ([ref]$recoveryWriteSelected)
+                    -DestinationProject ([ref]$cleanupDestination) `
+                    -WriteSelected ([ref]$cleanupWriteSelected)
                 $restored = [string]$recovered.project_id -eq [string]$originProject.id
             } elseif (
                 $currentProjectId -eq [string]$originProject.id
@@ -411,12 +730,13 @@ try {
                 $recoveryDeadline = [DateTimeOffset]::UtcNow.AddSeconds($TimeoutSec)
                 do {
                     Request-MembershipRefresh -OriginProjectId ([string]$originProject.id) `
-                        -TargetProjectId ([string]$targetProject.id)
+                        -TargetProjectId ([string]$targetProject.id) `
+                        -ConversationPath ([string]$candidate.path)
                     Start-Sleep -Seconds 2
                     $recoveryNavigation = Get-Navigation
-                    $current = @($recoveryNavigation.conversations | Where-Object {
-                        [string]$_.id -eq [string]$candidate.id
-                    }) | Select-Object -First 1
+                    $current = Get-CanonicalConversationMembership `
+                        -Navigation $recoveryNavigation `
+                        -ConversationId ([string]$candidate.id)
                     if ([string]$current.project_id -eq [string]$originProject.id) {
                         $restored = $true
                         break
@@ -427,7 +747,17 @@ try {
                 $recoveryUnknown = $true
             }
         } catch {
-            $recoveryUnknown = $true
+            if ($restoreWriteSelected -or $cleanupWriteSelected) {
+                $recovered = Wait-ReadOnlyOriginalMembership `
+                    -ConversationId ([string]$candidate.id) `
+                    -ConversationPath ([string]$candidate.path) `
+                    -OriginProjectId ([string]$originProject.id) `
+                    -TargetProjectId ([string]$targetProject.id)
+                $restored = $null -ne $recovered
+                $recoveryUnknown = -not $restored
+            } else {
+                $recoveryUnknown = $true
+            }
         }
     }
     try { Close-Sidebar } catch { $cleanupFailure = $_ }
@@ -445,6 +775,14 @@ try {
     }
 }
 
+Write-Output (
+    "CHATGPT_WEB_PROJECT_MOVE_RECOVERY=" +
+    "forward_write_selected=$([bool]$forwardWriteSelected);" +
+    "restore_write_selected=$([bool]$restoreWriteSelected);" +
+    "cleanup_write_selected=$([bool]$cleanupWriteSelected);" +
+    "restored=$([bool]$restored);" +
+    "recovery_unknown=$([bool]$recoveryUnknown)"
+)
 if ($recoveryUnknown) {
     $recoveryDetail = "Project-move recovery is ambiguous; inspect the official project menu before retrying."
     if ($null -ne $primaryFailure) {

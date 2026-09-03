@@ -22,13 +22,21 @@ class WebChatConversationProjectMovePolicyTest {
 
     @Test
     fun controlStateRefreshesPeriodicallyOnlyWhileTheUserActionIsWaiting() {
-        assertTrue(WebChatConversationProjectMoveTiming.shouldRefreshControls(0))
+        assertFalse(WebChatConversationProjectMoveTiming.shouldRefreshControls(0))
         assertFalse(WebChatConversationProjectMoveTiming.shouldRefreshControls(1))
         assertTrue(WebChatConversationProjectMoveTiming.shouldRefreshControls(4))
         assertTrue(WebChatConversationProjectMoveTiming.shouldRefreshControls(8))
         assertFalse(WebChatConversationProjectMoveTiming.shouldRefreshControls(29))
         assertFalse(WebChatConversationProjectMoveTiming.shouldRefreshControls(30))
         assertFalse(WebChatConversationProjectMoveTiming.shouldRefreshControls(-1))
+    }
+
+    @Test
+    fun conversationOptionsRetryRunsOnceAfterAStableReadWindow() {
+        assertFalse(WebChatConversationProjectMoveTiming.shouldRetryConversationOptions(0, 0))
+        assertFalse(WebChatConversationProjectMoveTiming.shouldRetryConversationOptions(7, 0))
+        assertTrue(WebChatConversationProjectMoveTiming.shouldRetryConversationOptions(8, 0))
+        assertFalse(WebChatConversationProjectMoveTiming.shouldRetryConversationOptions(8, 1))
     }
 
     @Test
@@ -118,6 +126,96 @@ class WebChatConversationProjectMovePolicyTest {
                 project("g-p-target", "目标项目"),
             ),
         )
+        assertEquals(
+            listOf("g-p-target"),
+            WebChatConversationProjectMovePolicy.officialDestinations(
+                ChatGptWebConversationIndexState(
+                    projects = listOf(
+                        project("g-p-current", "当前项目"),
+                        project("g-p-target", "目标项目"),
+                        project("g-p-hidden", "未开放项目"),
+                    ),
+                ),
+                current,
+                state,
+            ).map(ChatGptWebProject::id),
+        )
+    }
+
+    @Test
+    fun waitsForTheOfficialSidebarToCloseBeforeOpeningConversationOptions() {
+        val current = conversation()
+        val header = descriptor(
+            id = "control_conversation_options",
+            semantic = "conversation_options",
+            label = "会话设置",
+            region = "header",
+            contextId = current.id,
+        )
+        val sidebarConversation = descriptor(
+            id = "control_sidebar_conversation_options",
+            semantic = "conversation_options",
+            label = "其他会话设置",
+            region = "overlay",
+            contextId = "another-conversation",
+        )
+
+        assertNull(
+            WebChatConversationProjectMovePolicy.conversationOptions(
+                state(header, sidebarConversation),
+                current,
+            ),
+        )
+        assertEquals(
+            header,
+            WebChatConversationProjectMovePolicy.conversationOptions(
+                state(
+                    header,
+                    descriptor(
+                        id = "control_hidden_sidebar_conversation_options",
+                        semantic = "conversation_options",
+                        label = "其他会话设置",
+                        region = "overlay",
+                        contextId = "another-conversation",
+                        inViewport = false,
+                    ),
+                ),
+                current,
+            ),
+        )
+    }
+
+    @Test
+    fun retriesTheHeaderMenuOnlyWhenNoOfficialOverlayIsVisible() {
+        val current = conversation()
+        val header = descriptor(
+            id = "control_conversation_options",
+            semantic = "conversation_options",
+            label = "会话设置",
+            region = "header",
+            contextId = current.id,
+        )
+        val unrelatedOverlay = descriptor(
+            id = "control_overlay",
+            semantic = "archive",
+            label = "归档",
+            region = "overlay",
+            contextId = current.id,
+        )
+
+        assertEquals(
+            header,
+            WebChatConversationProjectMovePolicy.retryableConversationOptions(
+                state(header),
+                current,
+            ),
+        )
+        assertNull(
+            WebChatConversationProjectMovePolicy.retryableConversationOptions(
+                state(header, unrelatedOverlay),
+                current,
+            ),
+        )
     }
 
     @Test
@@ -201,6 +299,22 @@ class WebChatConversationProjectMovePolicyTest {
         assertTrue(
             WebChatConversationProjectMovePolicy.reconciled(
                 ChatGptWebConversationIndexState(conversations = listOf(moved)),
+                current,
+                destination,
+            ),
+        )
+        assertFalse(
+            WebChatConversationProjectMovePolicy.reconciled(
+                ChatGptWebConversationIndexState(conversations = listOf(current, moved)),
+                current,
+                destination,
+            ),
+        )
+        assertFalse(
+            WebChatConversationProjectMovePolicy.reconciled(
+                ChatGptWebConversationIndexState(
+                    conversations = listOf(moved.copy(path = current.path)),
+                ),
                 current,
                 destination,
             ),
@@ -319,6 +433,7 @@ class WebChatConversationProjectMovePolicyTest {
         region: String,
         contextId: String?,
         role: String = "button",
+        inViewport: Boolean = true,
     ) = WebChatConsumerControlDescriptor(
         control = ChatGptWebUiControl(
             id = id,
@@ -329,6 +444,7 @@ class WebChatConversationProjectMovePolicyTest {
             enabled = true,
             selected = false,
             contextId = contextId,
+            inViewport = inViewport,
         ),
         requiresUserConfirmation = semantic == "save_to_project",
         presentation = WebChatConsumerControlPresentation.DIRECT,

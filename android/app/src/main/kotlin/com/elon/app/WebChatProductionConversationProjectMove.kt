@@ -1,9 +1,8 @@
 package com.elon.app
 
-import android.widget.Toast
-import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.chatgptweb.ChatGptWebConversation
+import com.elon.app.chatgptweb.ChatGptWebConversationIndex
 import com.elon.app.chatgptweb.ChatGptWebConversationIndexState
 import com.elon.app.chatgptweb.ChatGptWebConversationPath
 import com.elon.app.chatgptweb.ChatGptWebProject
@@ -18,17 +17,42 @@ internal class WebChatProductionConversationProjectMoveCoordinator(
     private val openConversation: (String) -> Boolean,
     private val conversationIndex: () -> ChatGptWebConversationIndexState,
     private val refreshConversationIndex: (String?) -> Boolean,
+    private val probeConversationProject: (String, String) -> Boolean,
+    private val suspendConversationRefresh: () -> Unit,
+    private val resumeConversationRefresh: () -> Unit,
     private val openOfficialFallback: () -> Unit,
 ) {
+    private val recoveryStore = WebChatConversationProjectMoveRecoveryStore(activity)
+    private val ui = WebChatConversationProjectMoveUi(activity, host)
+    private val readTransition = WebChatConversationProjectMoveReadTransition(host, ::isCurrent)
+    private val destinationFallback = WebChatConversationProjectMoveDestinationFallback(
+        ui,
+        recoveryStore,
+        openOfficialFallback,
+        ::isCurrent,
+        ::cancelPending,
+        onPrepared = { conversation, selected, port, epoch ->
+            projectChoiceRevealRequested = false
+            projectChoiceRevealRequestId = null
+            showProgress(selected, "正在提交一次移动操作")
+            waitForProjectChoice(conversation, selected, port, epoch, attempt = 0)
+        },
+        onPrepareFailed = { conversation, selected, epoch ->
+            fail(conversation, selected, "无法更新安全恢复记录", epoch)
+        },
+    )
     private var requestEpoch = 0
-    private var activeSheet: WebChatActionSheetHandle? = null
-    private var activeDialog: AlertDialog? = null
-    private var destinationsById = emptyMap<String, ChatGptWebProject>()
     private var writeAttempted = false
-    private val sheetLease = WebChatConversationProjectMoveSheetLease()
+    private var conversationRefreshHeld = false
+    private var recoveryActive = false
+    private var recoveryDirectoryRequested = false
+    private var lastRecoveryAttemptKey: String? = null
+    private var projectChoiceRevealRequested = false
+    private var projectChoiceRevealRequestId: String? = null
 
     fun show(conversation: ChatGptWebConversation) {
         cancelPending()
+        if (recoverPending(interactive = true)) return
         val destinations = WebChatConversationProjectMovePolicy.destinations(
             conversationIndex(),
             conversation,
@@ -37,43 +61,86 @@ internal class WebChatProductionConversationProjectMoveCoordinator(
             showNoDestinations()
             return
         }
-        destinationsById = destinations.associateBy(ChatGptWebProject::id)
-        val lease = sheetLease.issue()
-        activeSheet = WebChatActionSheet.showUpdatable(
-            activity = activity,
-            title = "移动到项目",
-            items = destinations.map { project ->
-                WebChatActionSheetItem(
-                    id = project.id,
-                    title = project.title,
-                    subtitle = if (project.active) "当前打开" else null,
-                    contentDescription = "web-chat-conversation-project-destination:${project.id}",
-                )
+        val epoch = requestEpoch
+        ui.showDestinationPicker(
+            destinations = destinations,
+            onCancelled = { requestEpoch += 1 },
+            onSelected = { destination ->
+                if (isCurrent(epoch)) beginMove(conversation, destination)
             },
-            footerActions = listOf(officialFooter()),
-            onCancelled = {
-                if (sheetLease.owns(lease)) requestEpoch += 1
-            },
-            onDismissed = {
-                if (sheetLease.owns(lease)) {
-                    activeSheet = null
-                    destinationsById = emptyMap()
-                }
-            },
-        ) { item ->
-            val destination = destinationsById[item.id] ?: return@showUpdatable
-            destinationsById = emptyMap()
-            host.post { beginMove(conversation, destination) }
+            openOfficialFallback = openOfficialFallback,
+        )
+    }
+
+    fun recoverPending(interactive: Boolean = false): Boolean {
+        val record = recoveryStore.restore() ?: return false
+        if (record.stage == WebChatConversationProjectMoveStage.PREPARED) {
+            recoveryStore.clear()
+            return false
         }
+        if (recoveryActive) return true
+        val attemptKey = "${record.updatedAtMs}:${record.destinationProjectId}"
+        if (lastRecoveryAttemptKey == attemptKey) {
+            if (interactive) showPendingRecovery()
+            return true
+        }
+        if (
+            activeProvider() != WebChatProviderId.CHATGPT_WEB ||
+            currentState() != "ready"
+        ) return true
+        val index = conversationIndex()
+        val destination = index.projects.singleOrNull { it.id == record.destinationProjectId }
+        if (destination == null) {
+            if (!recoveryDirectoryRequested) {
+                recoveryDirectoryRequested = true
+                refreshConversationIndex(null)
+            }
+            if (interactive) showPendingRecovery()
+            return true
+        }
+        val identity = ChatGptWebConversationPath.identity(record.conversationPath)
+            ?: run {
+                recoveryStore.clear()
+                return false
+            }
+        val conversation = index.conversations.firstOrNull {
+            ChatGptWebConversationIndex.identityOf(it) == identity
+        } ?: ChatGptWebConversation(
+            id = identity,
+            title = "当前会话",
+            path = record.conversationPath,
+            active = false,
+            projectId = record.sourceProjectId,
+        )
+        val port = consumerPort() ?: return true
+        requestEpoch += 1
+        val epoch = requestEpoch
+        lastRecoveryAttemptKey = attemptKey
+        recoveryActive = true
+        recoveryDirectoryRequested = false
+        writeAttempted = true
+        holdConversationRefresh()
+        showProgress(destination, "正在恢复移动结果")
+        beginReadOnlyReconciliation(
+            conversation,
+            destination,
+            port,
+            epoch,
+            allowConfirmation = false,
+        )
+        return true
     }
 
     fun cancelPending() {
         requestEpoch += 1
-        dismissActiveSheet()
-        activeDialog?.dismiss()
-        activeDialog = null
-        destinationsById = emptyMap()
+        ui.dismissAll()
         writeAttempted = false
+        recoveryActive = false
+        projectChoiceRevealRequested = false
+        projectChoiceRevealRequestId = null
+        destinationFallback.reset()
+        clearPreparedRecovery()
+        releaseConversationRefresh()
     }
 
     private fun beginMove(
@@ -82,16 +149,30 @@ internal class WebChatProductionConversationProjectMoveCoordinator(
     ) {
         val epoch = requestEpoch
         writeAttempted = false
+        recoveryActive = false
+        lastRecoveryAttemptKey = null
+        recoveryDirectoryRequested = false
+        projectChoiceRevealRequested = false
+        projectChoiceRevealRequestId = null
+        destinationFallback.reset()
+        holdConversationRefresh()
         showProgress(destination, "正在准备当前会话")
         val targetPath = ChatGptWebConversationPath.normalize(conversation.path)
             ?: return fail(conversation, destination, "会话地址已经变化", epoch)
+        if (recoveryStore.prepare(conversation, destination) == null) {
+            fail(conversation, destination, "无法建立安全恢复记录", epoch)
+            return
+        }
         when (readiness(targetPath)) {
             WebChatConversationActionReadiness.SHOW -> openConversationOptions(
                 conversation,
                 destination,
                 epoch,
             )
-            WebChatConversationActionReadiness.CANCEL -> Unit
+            WebChatConversationActionReadiness.CANCEL -> {
+                recoveryStore.clear()
+                releaseConversationRefresh()
+            }
             WebChatConversationActionReadiness.WAIT -> {
                 if (!openConversation(targetPath)) {
                     fail(conversation, destination, "暂时无法打开该会话", epoch)
@@ -117,7 +198,10 @@ internal class WebChatProductionConversationProjectMoveCoordinator(
                 destination,
                 epoch,
             )
-            WebChatConversationActionReadiness.CANCEL -> Unit
+            WebChatConversationActionReadiness.CANCEL -> {
+                recoveryStore.clear()
+                releaseConversationRefresh()
+            }
             WebChatConversationActionReadiness.WAIT -> {
                 if (attempt >= MAX_NAVIGATION_POLLS) {
                     fail(conversation, destination, "切换会话超时", epoch)
@@ -147,19 +231,35 @@ internal class WebChatProductionConversationProjectMoveCoordinator(
             conversation,
         )
         if (initial != null) {
-            invokeAndWait(
+            readTransition.invoke(
                 port = port,
                 control = initial,
                 userConfirmed = false,
                 epoch = epoch,
-                onSucceeded = {
+                onAccepted = {
                     waitForMoveTrigger(conversation, destination, port, epoch, attempt = 0)
                 },
-                onFailed = { fail(conversation, destination, "无法打开会话设置", epoch) },
+                onRejected = {
+                    retryConversationOptionsAfterReadRejection(
+                        conversation,
+                        destination,
+                        port,
+                        epoch,
+                        pollAttempt = 0,
+                        invokeRetry = 0,
+                    )
+                },
             )
             return
         }
-        pollForConversationOptions(conversation, destination, port, epoch, attempt = 0)
+        pollForConversationOptions(
+            conversation,
+            destination,
+            port,
+            epoch,
+            attempt = 0,
+            invokeRetry = 0,
+        )
     }
 
     private fun pollForConversationOptions(
@@ -168,6 +268,7 @@ internal class WebChatProductionConversationProjectMoveCoordinator(
         port: WebChatConsumerPort,
         epoch: Int,
         attempt: Int,
+        invokeRetry: Int,
     ) {
         if (!isCurrent(epoch)) return
         val control = WebChatConversationProjectMovePolicy.conversationOptions(
@@ -175,26 +276,36 @@ internal class WebChatProductionConversationProjectMoveCoordinator(
             conversation,
         )
         if (control != null) {
-            invokeAndWait(
+            readTransition.invoke(
                 port = port,
                 control = control,
                 userConfirmed = false,
                 epoch = epoch,
-                onSucceeded = {
+                onAccepted = {
                     waitForMoveTrigger(conversation, destination, port, epoch, attempt = 0)
                 },
-                onFailed = { fail(conversation, destination, "无法打开会话设置", epoch) },
+                onRejected = {
+                    retryConversationOptionsAfterReadRejection(
+                        conversation,
+                        destination,
+                        port,
+                        epoch,
+                        pollAttempt = attempt,
+                        invokeRetry = invokeRetry,
+                    )
+                },
             )
             return
         }
         if (WebChatConversationProjectMoveTiming.shouldRefreshControls(attempt)) {
-            refreshControlsThen(port, epoch) {
+            readTransition.refreshControls(port, epoch) {
                 pollForConversationOptions(
                     conversation,
                     destination,
                     port,
                     epoch,
                     attempt + 1,
+                    invokeRetry,
                 )
             }
             return
@@ -204,8 +315,40 @@ internal class WebChatProductionConversationProjectMoveCoordinator(
             return
         }
         host.postDelayed({
-            pollForConversationOptions(conversation, destination, port, epoch, attempt + 1)
+            pollForConversationOptions(
+                conversation,
+                destination,
+                port,
+                epoch,
+                attempt + 1,
+                invokeRetry,
+            )
         }, POLL_INTERVAL_MS)
+    }
+
+    private fun retryConversationOptionsAfterReadRejection(
+        conversation: ChatGptWebConversation,
+        destination: ChatGptWebProject,
+        port: WebChatConsumerPort,
+        epoch: Int,
+        pollAttempt: Int,
+        invokeRetry: Int,
+    ) {
+        if (!isCurrent(epoch)) return
+        if (invokeRetry >= MAX_READ_CONTROL_INVOKE_RETRIES) {
+            fail(conversation, destination, "无法打开会话设置", epoch)
+            return
+        }
+        readTransition.refreshControls(port, epoch) {
+            pollForConversationOptions(
+                conversation,
+                destination,
+                port,
+                epoch,
+                attempt = pollAttempt + 1,
+                invokeRetry = invokeRetry + 1,
+            )
+        }
     }
 
     private fun waitForMoveTrigger(
@@ -215,44 +358,17 @@ internal class WebChatProductionConversationProjectMoveCoordinator(
         epoch: Int,
         attempt: Int,
     ) {
-        if (!isCurrent(epoch)) return
-        val trigger = WebChatConversationProjectMovePolicy.moveTrigger(
-            port.state(),
-            conversation,
+        readTransition.waitForMoveTrigger(
+            conversation = conversation,
+            port = port,
+            epoch = epoch,
+            attempt = attempt,
+            onProgress = { updateProgress(destination, it) },
+            onReady = {
+                waitForProjectChoice(conversation, destination, port, epoch, attempt = 0)
+            },
+            onFailure = { fail(conversation, destination, it, epoch) },
         )
-        if (trigger != null) {
-            updateProgress(destination, "正在打开项目列表")
-            invokeAndWait(
-                port = port,
-                control = trigger,
-                userConfirmed = true,
-                epoch = epoch,
-                onSucceeded = {
-                    waitForProjectChoice(conversation, destination, port, epoch, attempt = 0)
-                },
-                onFailed = { fail(conversation, destination, "无法打开项目列表", epoch) },
-            )
-            return
-        }
-        if (WebChatConversationProjectMoveTiming.shouldRefreshControls(attempt)) {
-            refreshControlsThen(port, epoch) {
-                waitForMoveTrigger(
-                    conversation,
-                    destination,
-                    port,
-                    epoch,
-                    attempt + 1,
-                )
-            }
-            return
-        }
-        if (attempt >= MAX_CONTROL_POLLS) {
-            fail(conversation, destination, "官网项目入口暂不可用", epoch)
-            return
-        }
-        host.postDelayed({
-            waitForMoveTrigger(conversation, destination, port, epoch, attempt + 1)
-        }, POLL_INTERVAL_MS)
     }
 
     private fun waitForProjectChoice(
@@ -266,10 +382,20 @@ internal class WebChatProductionConversationProjectMoveCoordinator(
         val choice = WebChatConversationProjectMovePolicy.projectChoice(port.state(), destination)
         if (choice != null) {
             updateProgress(destination, "正在提交一次移动操作")
+            if (recoveryStore.armWrite() == null) {
+                fail(conversation, destination, "无法保存移动恢复状态", epoch)
+                return
+            }
+            writeAttempted = true
             val result = port.invokeControl(choice.control.id, userConfirmed = true)
-            writeAttempted = WebChatConversationProjectMovePolicy.writeMayHaveBeenSubmitted(result)
-            if (!result.accepted || result.requestId.isNullOrBlank()) {
+            if (!result.accepted) {
+                writeAttempted = false
+                recoveryStore.clear()
                 fail(conversation, destination, "移动操作未提交", epoch)
+                return
+            }
+            if (result.requestId.isNullOrBlank()) {
+                beginReadOnlyReconciliation(conversation, destination, port, epoch)
                 return
             }
             waitForCommand(
@@ -278,23 +404,49 @@ internal class WebChatProductionConversationProjectMoveCoordinator(
                 epoch = epoch,
                 attempt = 0,
                 onSucceeded = {
-                    updateProgress(destination, "正在同步会话目录")
-                    refreshConversationIndex(destination.id)
-                    pollReconciliation(
-                        conversation,
-                        destination,
-                        port,
-                        epoch,
-                        attempt = 0,
-                        confirmationAttempted = false,
-                    )
+                    beginReadOnlyReconciliation(conversation, destination, port, epoch)
                 },
-                onFailed = { fail(conversation, destination, "官网未确认移动结果", epoch) },
+                onFailed = {
+                    // The official page may navigate while handling the project choice and lose
+                    // its command receipt. Never replay the write; reconcile the observed owner.
+                    beginReadOnlyReconciliation(conversation, destination, port, epoch)
+                },
             )
             return
         }
+        if (!projectChoiceRevealRequested) {
+            projectChoiceRevealRequested = true
+            updateProgress(destination, "正在查找目标项目")
+            val result = port.revealProjectChoice(destination.title)
+            projectChoiceRevealRequestId = result.requestId
+            if (!result.accepted) {
+                if (destinationFallback.show(
+                        conversationIndex(), conversation, port, epoch,
+                    )) return
+                fail(conversation, destination, "所选项目当前不可用", epoch)
+                return
+            }
+            host.postDelayed({
+                waitForProjectChoice(conversation, destination, port, epoch, attempt + 1)
+            }, POLL_INTERVAL_MS)
+            return
+        }
+        val revealStatus = WebChatConversationProjectMovePolicy.commandStatus(
+            port.state(),
+            projectChoiceRevealRequestId,
+        )
+        if (
+            revealStatus == WebChatConsumerCommandStatus.FAILED ||
+            revealStatus == WebChatConsumerCommandStatus.TIMED_OUT
+        ) {
+            if (destinationFallback.show(
+                    conversationIndex(), conversation, port, epoch,
+                )) return
+            fail(conversation, destination, "所选项目当前不可用", epoch)
+            return
+        }
         if (WebChatConversationProjectMoveTiming.shouldRefreshControls(attempt)) {
-            refreshControlsThen(port, epoch) {
+            readTransition.refreshControls(port, epoch) {
                 waitForProjectChoice(
                     conversation,
                     destination,
@@ -306,12 +458,37 @@ internal class WebChatProductionConversationProjectMoveCoordinator(
             return
         }
         if (attempt >= MAX_CONTROL_POLLS) {
-            fail(conversation, destination, "未找到所选项目", epoch)
+            if (destinationFallback.show(
+                    conversationIndex(), conversation, port, epoch,
+                )) return
+            fail(conversation, destination, "所选项目当前不可用", epoch)
             return
         }
         host.postDelayed({
             waitForProjectChoice(conversation, destination, port, epoch, attempt + 1)
         }, POLL_INTERVAL_MS)
+    }
+
+    private fun beginReadOnlyReconciliation(
+        conversation: ChatGptWebConversation,
+        destination: ChatGptWebProject,
+        port: WebChatConsumerPort,
+        epoch: Int,
+        allowConfirmation: Boolean = true,
+    ) {
+        if (!isCurrent(epoch)) return
+        releaseConversationRefresh()
+        updateProgress(destination, "正在同步会话目录")
+        requestMembershipReconciliation(conversation, destination)
+        pollReconciliation(
+            conversation,
+            destination,
+            port,
+            epoch,
+            attempt = 0,
+            confirmationAttempted = false,
+            confirmationAllowed = allowConfirmation,
+        )
     }
 
     private fun invokeAndWait(
@@ -377,10 +554,26 @@ internal class WebChatProductionConversationProjectMoveCoordinator(
         epoch: Int,
         attempt: Int,
         confirmationAttempted: Boolean,
+        confirmationAllowed: Boolean,
     ) {
         if (!isCurrent(epoch)) return
+        val index = conversationIndex()
+        val state = port.state()
+        if (
+            attempt == 0 ||
+            WebChatConversationProjectMoveTiming.shouldRefreshDirectory(attempt) ||
+            attempt >= MAX_RECONCILIATION_POLLS
+        ) {
+            WebChatConversationProjectMoveDiagnostics.recordReconciliation(
+                attempt,
+                index,
+                state,
+                conversation,
+                destination,
+            )
+        }
         if (WebChatConversationProjectMovePolicy.reconciled(
-                conversationIndex(),
+                index,
                 conversation,
                 destination,
             )
@@ -388,9 +581,9 @@ internal class WebChatProductionConversationProjectMoveCoordinator(
             complete(destination)
             return
         }
-        if (!confirmationAttempted) {
+        if (confirmationAllowed && !confirmationAttempted) {
             val confirmation = WebChatConversationProjectMovePolicy.confirmation(
-                port.state(),
+                state,
                 conversation,
             )
             if (confirmation != null) {
@@ -402,7 +595,7 @@ internal class WebChatProductionConversationProjectMoveCoordinator(
                     epoch = epoch,
                     onSucceeded = {
                         updateProgress(destination, "正在同步会话目录")
-                        refreshConversationIndex(destination.id)
+                        requestMembershipReconciliation(conversation, destination)
                         pollReconciliation(
                             conversation,
                             destination,
@@ -410,6 +603,7 @@ internal class WebChatProductionConversationProjectMoveCoordinator(
                             epoch,
                             attempt = 0,
                             confirmationAttempted = true,
+                            confirmationAllowed = true,
                         )
                     },
                     onFailed = { fail(conversation, destination, "官网未确认移动结果", epoch) },
@@ -417,7 +611,7 @@ internal class WebChatProductionConversationProjectMoveCoordinator(
                 return
             }
             if (WebChatConversationProjectMoveTiming.shouldRefreshControls(attempt)) {
-                refreshControlsThen(port, epoch) {
+                readTransition.refreshControls(port, epoch) {
                     pollReconciliation(
                         conversation,
                         destination,
@@ -425,6 +619,7 @@ internal class WebChatProductionConversationProjectMoveCoordinator(
                         epoch,
                         attempt + 1,
                         confirmationAttempted,
+                        confirmationAllowed,
                     )
                 }
                 return
@@ -435,7 +630,7 @@ internal class WebChatProductionConversationProjectMoveCoordinator(
             return
         }
         if (WebChatConversationProjectMoveTiming.shouldRefreshDirectory(attempt)) {
-            refreshConversationIndex(destination.id)
+            requestMembershipReconciliation(conversation, destination)
         }
         host.postDelayed({
             pollReconciliation(
@@ -445,29 +640,9 @@ internal class WebChatProductionConversationProjectMoveCoordinator(
                 epoch,
                 attempt + 1,
                 confirmationAttempted,
+                confirmationAllowed,
             )
         }, POLL_INTERVAL_MS)
-    }
-
-    private fun refreshControlsThen(
-        port: WebChatConsumerPort,
-        epoch: Int,
-        continuation: () -> Unit,
-    ) {
-        val request = port.requestControls()
-        val requestId = request.requestId
-        if (!request.accepted || requestId.isNullOrBlank()) {
-            host.postDelayed(continuation, POLL_INTERVAL_MS)
-            return
-        }
-        waitForCommand(
-            port = port,
-            requestId = requestId,
-            epoch = epoch,
-            attempt = 0,
-            onSucceeded = continuation,
-            onFailed = { host.postDelayed(continuation, POLL_INTERVAL_MS) },
-        )
     }
 
     private fun readiness(targetPath: String): WebChatConversationActionReadiness =
@@ -479,41 +654,28 @@ internal class WebChatProductionConversationProjectMoveCoordinator(
         )
 
     private fun showProgress(destination: ChatGptWebProject, subtitle: String) {
-        dismissActiveSheet()
-        val lease = sheetLease.issue()
-        activeSheet = WebChatActionSheet.showUpdatable(
-            activity = activity,
-            title = "移动到项目",
-            items = listOf(progressItem(destination, subtitle)),
-            footerActions = listOf(officialFooter()),
-            onCancelled = {
-                if (sheetLease.owns(lease)) requestEpoch += 1
-            },
-            onDismissed = {
-                if (sheetLease.owns(lease)) activeSheet = null
-            },
-        ) {}
+        ui.showProgress(destination, subtitle)
+    }
+
+    private fun requestMembershipReconciliation(
+        conversation: ChatGptWebConversation,
+        destination: ChatGptWebProject,
+    ) {
+        probeConversationProject(conversation.path, destination.id)
+        refreshConversationIndex(destination.id)
     }
 
     private fun updateProgress(destination: ChatGptWebProject, subtitle: String) {
-        activeSheet?.updateItems(listOf(progressItem(destination, subtitle)))
+        ui.updateProgress(destination, subtitle)
     }
 
-    private fun progressItem(
-        destination: ChatGptWebProject,
-        subtitle: String,
-    ) = WebChatActionSheetItem(
-        id = "project-move-progress",
-        title = destination.title,
-        subtitle = subtitle,
-        enabled = false,
-        contentDescription = "web-chat-conversation-project-move-progress",
-    )
-
     private fun complete(destination: ChatGptWebProject) {
-        dismissActiveSheet()
+        ui.complete(destination)
         writeAttempted = false
-        Toast.makeText(activity, "已移动到“${destination.title}”", Toast.LENGTH_SHORT).show()
+        recoveryActive = false
+        lastRecoveryAttemptKey = null
+        recoveryStore.clear()
+        releaseConversationRefresh()
     }
 
     private fun fail(
@@ -522,61 +684,59 @@ internal class WebChatProductionConversationProjectMoveCoordinator(
         detail: String,
         epoch: Int,
     ) {
-        if (!isCurrent(epoch) || activity.isFinishing || activity.isDestroyed) return
-        dismissActiveSheet()
+        if (!isCurrent(epoch)) return
+        releaseConversationRefresh()
+        if (activity.isFinishing || activity.isDestroyed) return
         val attempted = writeAttempted
-        val message = if (attempted) {
-            "$detail。已经提交过一次操作，为避免重复移动，应用不会自动重试。可以刷新目录或在官网确认。"
-        } else {
-            "$detail。尚未提交移动操作，可以重试或在官网完成。"
-        }
-        val builder = AlertDialog.Builder(activity)
-            .setTitle(if (attempted) "移动结果待确认" else "暂时无法移动")
-            .setMessage(message)
-            .setPositiveButton("官网确认") { _, _ -> openOfficialFallback() }
-            .setNegativeButton("取消", null)
-        if (attempted) {
-            builder.setNeutralButton("刷新目录") { _, _ ->
+        recoveryActive = false
+        if (!attempted) recoveryStore.clear()
+        ui.showFailure(
+            attempted = attempted,
+            detail = detail,
+            onOfficialFallback = openOfficialFallback,
+            onRefresh = {
+                lastRecoveryAttemptKey = null
                 refreshConversationIndex(destination.id)
-            }
-        } else {
-            builder.setNeutralButton("重试") { _, _ -> show(conversation) }
+                host.postDelayed({ recoverPending(interactive = true) }, POLL_INTERVAL_MS)
+            },
+            onRetry = { show(conversation) },
+        )
+    }
+
+    private fun holdConversationRefresh() {
+        if (conversationRefreshHeld) return
+        conversationRefreshHeld = true
+        suspendConversationRefresh()
+    }
+
+    private fun releaseConversationRefresh() {
+        if (!conversationRefreshHeld) return
+        conversationRefreshHeld = false
+        resumeConversationRefresh()
+    }
+
+    private fun clearPreparedRecovery() {
+        if (recoveryStore.restore()?.stage == WebChatConversationProjectMoveStage.PREPARED) {
+            recoveryStore.clear()
         }
-        val dialog = builder.create()
-        activeDialog = dialog
-        dialog.setOnDismissListener {
-            if (activeDialog === dialog) activeDialog = null
-        }
-        dialog.show()
+    }
+
+    private fun showPendingRecovery() {
+        ui.showPendingRecovery(
+            onRefresh = {
+                lastRecoveryAttemptKey = null
+                refreshConversationIndex(null)
+                host.postDelayed({ recoverPending(interactive = true) }, POLL_INTERVAL_MS)
+            },
+            onOfficialFallback = openOfficialFallback,
+        )
     }
 
     private fun showNoDestinations() {
-        if (activity.isFinishing || activity.isDestroyed) return
-        val dialog = AlertDialog.Builder(activity)
-            .setTitle("没有其他项目")
-            .setMessage("项目目录已经保留在本机。创建或同步其他项目后即可移动会话。")
-            .setNeutralButton("刷新目录") { _, _ -> refreshConversationIndex(null) }
-            .setPositiveButton("官网查看") { _, _ -> openOfficialFallback() }
-            .setNegativeButton("取消", null)
-            .create()
-        activeDialog = dialog
-        dialog.setOnDismissListener {
-            if (activeDialog === dialog) activeDialog = null
-        }
-        dialog.show()
-    }
-
-    private fun officialFooter() = WebChatActionSheetFooterAction(
-        label = "官网完成",
-        contentDescription = "web-chat-conversation-project-move-official",
-        action = openOfficialFallback,
-    )
-
-    private fun dismissActiveSheet() {
-        sheetLease.invalidate()
-        val sheet = activeSheet
-        activeSheet = null
-        sheet?.dismiss()
+        ui.showNoDestinations(
+            onRefresh = { refreshConversationIndex(null) },
+            onOfficialFallback = openOfficialFallback,
+        )
     }
 
     private fun isCurrent(epoch: Int): Boolean =
@@ -589,5 +749,6 @@ internal class WebChatProductionConversationProjectMoveCoordinator(
         const val MAX_COMMAND_POLLS = WebChatConversationProjectMoveTiming.COMMAND_POLL_LIMIT
         const val MAX_RECONCILIATION_POLLS =
             WebChatConversationProjectMoveTiming.RECONCILIATION_POLL_LIMIT
+        const val MAX_READ_CONTROL_INVOKE_RETRIES = 1
     }
 }

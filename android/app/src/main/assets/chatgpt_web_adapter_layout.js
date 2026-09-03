@@ -14,6 +14,8 @@
   const temporaryChatAdapter = window.__elonChatGptTemporaryChat;
   const realtimeVoicePolicy = window.__elonChatGptRealtimeVoicePolicy;
   const overlayPolicy = window.__elonChatGptOverlayPolicy; const contextMenuPolicy = window.__elonChatGptContextMenuPolicy;
+  const projectChoiceReveal = window.__elonChatGptProjectChoiceReveal;
+  const defaultLabel = window.__elonChatGptControlLabels.defaultLabel;
   let controlsById = new Map();
   let controlMetadataById = new Map();
   let lastFingerprint = '';
@@ -171,6 +173,19 @@
       : Array.from(document.querySelectorAll('[role="dialog"], [role="menu"]')).filter(isVisible);
   }
 
+  const projectChoiceRevealAdapter = projectChoiceReveal &&
+    typeof projectChoiceReveal.create === 'function'
+    ? projectChoiceReveal.create({
+        actionableNodes,
+        visibleOverlayRoots,
+        isVisible,
+        labelOf,
+        roleOf,
+        setTimeout: window.setTimeout.bind(window),
+        createScrollEvent: () => new Event('scroll', { bubbles: true })
+      })
+    : null;
+
   function semanticFor(node, region, index) {
     const form = formAdapter && formAdapter.describe(node);
     const path = relatedSameOriginPath(node);
@@ -274,65 +289,6 @@
     if (region === 'header' && /workspace|工作区|(^|\s)工作($|\s)|personal|team|business/.test(signal)) return 'title';
     if (pageSemantic) return pageSemantic;
     return 'action';
-  }
-
-  function defaultLabel(semantic) {
-    return ({
-      navigation: '打开导航',
-      title: '切换工作区',
-      profile: '账户',
-      new_conversation: '新建会话',
-      temporary_chat: '临时聊天',
-      attachment: '添加附件', image_generation: '创建图片',
-      model: '选择模型',
-      dictation: '开始听写',
-      voice_mode: '启动语音功能',
-      send: '发送',
-      stop: '停止生成',
-      suggestion: '使用建议',
-      copy: '复制',
-      regenerate: '重新生成',
-      edit: '编辑',
-      share: '分享',
-      feedback: '反馈',
-      read_aloud: '朗读',
-      previous_response: '上一回复',
-      next_response: '下一回复',
-      branch: '创建分支',
-      delete: '删除',
-      close: '关闭',
-      confirm: '确认',
-      conversation: '打开会话',
-      search: '搜索聊天',
-      text_input: '输入内容',
-      selection: '选择选项',
-      toggle: '切换选项',
-      slider: '调整数值',
-      library: '文件库',
-      apps: '应用',
-      tasks: '任务',
-      project: '项目',
-      save_to_project: '保存到项目',
-      gpts: 'GPT',
-      settings: '设置',
-      health: '健康',
-      finances: '财务',
-      work: '工作',
-      create_asset: '创建文件或网站',
-      sources: '文件和来源',
-      conversation_files: '在聊天中查看文件',
-      rename: '重命名会话',
-      pin: '置顶聊天',
-      archive: '归档',
-      more: '更多操作',
-      personalization: '个性化',
-      help: '帮助',
-      logout: '退出登录',
-      plan: '套餐',
-      open_media: '打开媒体',
-      reasoning_details: '查看思考过程',
-      timestamp: '消息时间'
-    })[semantic] || '操作';
   }
 
   function controlId(semantic, node, label, region, used, contextId) {
@@ -645,6 +601,18 @@
     return true;
   }
 
+  function rememberContextTrigger(control, node) {
+    if (!overlayOwnership) return;
+    const remembered = overlayOwnership.rememberContextTrigger(
+      control,
+      node,
+      visibleOverlayRoots(),
+      ownershipPageKey(),
+      (root) => overlayPolicy.contextMenuSignature(root, isVisible, actionableNodes)
+    );
+    if (!remembered) overlayOwnership.cancelPending(ownershipPageKey());
+  }
+
   function invoke(id, emitEvent, result) {
     discover();
     const node = controlsById.get(String(id || '')); const control = controlMetadataById.get(String(id || ''));
@@ -659,15 +627,7 @@
       if (!isInViewport(rect) || xRatio < 0 || xRatio > 1 || yRatio < 0 || yRatio > 1) {
         return result('invoke_ui_control', false, '官网控件滚动后仍不在可操作区域。');
       }
-      if (overlayOwnership) {
-        const remembered = overlayOwnership.rememberContextTrigger(
-          control,
-          node,
-          visibleOverlayRoots(),
-          ownershipPageKey(), (root) => overlayPolicy.contextMenuSignature(root, isVisible, actionableNodes)
-        );
-        if (!remembered) overlayOwnership.cancelPending(ownershipPageKey());
-      }
+      rememberContextTrigger(control, node);
       if (contextMenuPolicy && contextMenuPolicy.activate(control, node)) return finish(true, '', 0);
       const emitTouch = () => { emitEvent({ type: 'web_touch_request', purpose: 'invoke_ui_control', controlId: id, xRatio, yRatio }); return true; };
       emitTouch();
@@ -677,6 +637,30 @@
     if (isInViewport(rect)) return dispatch();
     node.scrollIntoView({ block: 'center', inline: 'nearest' });
     window.setTimeout(dispatch, 120);
+  }
+
+  function invokeAfterTouchMiss(id, emitEvent, result) {
+    discover();
+    const node = controlsById.get(String(id || ''));
+    const control = controlMetadataById.get(String(id || ''));
+    const currentConversationId = window.__elonChatGptProjectPolicy.conversationId(location.pathname);
+    const overlays = visibleOverlayRoots();
+    const allowed = node && isVisible(node) && isInViewport(node.getBoundingClientRect()) &&
+      contextMenuPolicy && contextMenuPolicy.canUseAfterTouchMiss(
+        control, currentConversationId, overlays.length
+      );
+    if (!allowed) {
+      return result('invoke_ui_control_after_touch_miss', false, '当前会话设置已经变化，请刷新后重试。');
+    }
+    rememberContextTrigger(control, node);
+    if (!contextMenuPolicy.activateAfterTouchMiss(
+      control, node, currentConversationId, overlays.length
+    )) {
+      overlayOwnership && overlayOwnership.cancelPending(ownershipPageKey());
+      return result('invoke_ui_control_after_touch_miss', false, '无法重新打开当前会话设置。');
+    }
+    result('invoke_ui_control_after_touch_miss', true, '');
+    window.setTimeout(() => emitSnapshot(emitEvent, true), 180);
   }
 
   function setText(id, value, emitEvent, result) {
@@ -695,6 +679,17 @@
     }
     result('set_ui_control_text', true, '');
     window.setTimeout(() => emitSnapshot(emitEvent, true), 180);
+  }
+
+  function revealProjectChoice(label, emitEvent, result) {
+    if (!projectChoiceRevealAdapter) {
+      return result('reveal_project_choice', false, 'project_choice_reveal_unavailable');
+    }
+    return projectChoiceRevealAdapter.reveal(
+      label,
+      () => emitSnapshot(emitEvent, true),
+      (ok, detail) => result('reveal_project_choice', ok, detail)
+    );
   }
 
   function setSelected(id, selected, emitEvent, result) {
@@ -783,7 +778,9 @@
     emitSnapshot,
     findSemanticNode,
     invoke,
+    invokeAfterTouchMiss,
     pageKind,
+    revealProjectChoice,
     requestSemanticTouch,
     selectChoice,
     setExpanded,

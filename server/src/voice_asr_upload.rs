@@ -155,7 +155,7 @@ pub async fn asr_upload_handler(
             .into_response()
         }
         Ok(t) => {
-            info!(target: "voice_asr", "ASR 转写成功：{}", &t[..t.len().min(80)]);
+            info!(target: "voice_asr", "ASR 转写成功，字符数 {}", t.chars().count());
             Json(AsrResponse { text: t }).into_response()
         }
         Err(e) => {

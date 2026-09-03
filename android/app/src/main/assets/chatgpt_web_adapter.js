@@ -15,10 +15,14 @@
   const streamWatchdogAcceptanceModule = window.__elonChatGptStreamWatchdogAcceptance;
   const skinAdapter = window.__elonChatGptSkin;
   const privateTransport = window.__elonChatGptPrivateTransport;
+  const privateDictationTransport = window.__elonChatGptPrivateDictationTransport;
+  const privateDictationOrchestratorModule = window.__elonChatGptPrivateDictationOrchestrator;
   const textTransactionOrchestratorModule = window.__elonChatGptTextTransactionOrchestrator;
   const privateStreamTransport = window.__elonChatGptPrivateStreamTransport;
   const attachmentTransportObserver = window.__elonChatGptAttachmentTransportObserver;
   const privateConversationDirectory = window.__elonChatGptPrivateConversationDirectory;
+  const conversationDirectoryRequestsModule =
+    window.__elonChatGptConversationDirectoryRequests;
   const authenticationPolicy = window.__elonChatGptAuthenticationPolicy;
   const adapterVersion = Number(window.__elonChatGptAdapterVersion || 0);
   const documentToken = String(window.__elonChatGptDocumentToken || '');
@@ -31,7 +35,6 @@
   let snapshotScheduler = null;
   let privateStreamUnsubscribe = null;
   let privateStreamRevision = 0;
-  let lastPrivateDirectorySnapshot = '';
   let streamingSnapshotMode = false;
   let privateStreamingSnapshotMode = false;
   let skinMode = false;
@@ -81,49 +84,27 @@
     }));
   }
 
-  function emitPrivateDirectorySnapshot() {
-    if (!privateConversationDirectory ||
-        typeof privateConversationDirectory.snapshot !== 'function') return;
-    const value = optional(null, () => privateConversationDirectory.snapshot());
-    if (!value || !Array.isArray(value.conversations) || !Array.isArray(value.projects) ||
-        (!value.conversations.length && !value.projects.length)) return;
-    const fingerprint = JSON.stringify(value);
-    if (fingerprint === lastPrivateDirectorySnapshot) return;
-    lastPrivateDirectorySnapshot = fingerprint;
-    emitEvent({
-      type: 'conversation_snapshot',
-      conversations: value.conversations,
-      projects: value.projects,
-      scopeProjectId: null,
-      collection: {
-        scrollerFound: false,
-        scrolled: false,
-        scrollRestored: true,
-        reachedEnd: false,
-        truncated: value.conversations.length >= 200,
-        timedOut: false,
-        observedCount: value.conversations.length,
-        steps: 0,
-        complete: false,
-        source: 'official_private',
-        officialLoadState: 'ready'
-      }
-    });
-  }
-
-  function requestPrivateProjectDirectory(command, respond) {
-    const projectId = String(command && command.projectScopeId || '').trim();
-    if (!/^g-p-[A-Za-z0-9_-]{1,160}$/.test(projectId) ||
-        !privateConversationDirectory ||
-        typeof privateConversationDirectory.refreshProject !== 'function') return false;
-    const fallback = () => conversationAdapter.requestList(command, emitEvent, respond);
-    Promise.resolve(privateConversationDirectory.refreshProject(projectId)).then((refreshed) => {
-      if (!refreshed) return fallback();
-      emitPrivateDirectorySnapshot();
-      respond('list_conversations', true, '');
-    }).catch(fallback);
-    return true;
-  }
+  const conversationDirectoryRequests = conversationDirectoryRequestsModule &&
+    typeof conversationDirectoryRequestsModule.create === 'function'
+    ? conversationDirectoryRequestsModule.create({
+      conversationAdapter,
+      privateDirectory: privateConversationDirectory,
+      privateTransport,
+      emitEvent,
+      optional
+    })
+    : null;
+  const privateDictationOrchestrator = privateDictationOrchestratorModule &&
+    typeof privateDictationOrchestratorModule.create === 'function'
+    ? privateDictationOrchestratorModule.create({
+      transport: privateDictationTransport,
+      findComposer,
+      composerValue,
+      setComposerValue,
+      comparableText,
+      scheduleSnapshot
+    })
+    : null;
 
   function cleanText(value) {
     return String(value || '').replace(/\u00a0/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
@@ -285,6 +266,14 @@
       accessDecision(pageKind, composer, privateAccess));
     const loginRequired = access.loginRequired === true;
     const dictationActive = optional(false, () => composerAdapter ? composerAdapter.dictationActive(composer) : false);
+    const dictationCaptureActive = optional(false, () => composerAdapter &&
+      typeof composerAdapter.dictationCaptureActive === 'function'
+      ? composerAdapter.dictationCaptureActive()
+      : false);
+    const dictationCapturePending = optional(false, () => composerAdapter &&
+      typeof composerAdapter.dictationCapturePending === 'function'
+      ? composerAdapter.dictationCapturePending()
+      : false);
     const privateStream = optional(null, () => privateStreamTransport &&
       typeof privateStreamTransport.current === 'function'
       ? privateStreamTransport.current(location.pathname)
@@ -334,6 +323,8 @@
       currentModel: optional('', () => composerAdapter ? composerAdapter.currentModel(composer) : ''),
       attachments: optional([], () => composerAdapter ? composerAdapter.readAttachments(composer) : []),
       dictationActive,
+      dictationCaptureActive,
+      dictationCapturePending,
       capabilities: optional([], () => detectCapabilities(composer))
     };
     const fingerprint = JSON.stringify(event);
@@ -485,6 +476,12 @@
     if (action === 'invoke_ui_control' && layoutAdapter) {
       return layoutAdapter.invoke(String(command.value || ''), emitEvent, respond);
     }
+    if (action === 'invoke_ui_control_after_touch_miss' && layoutAdapter) {
+      return layoutAdapter.invokeAfterTouchMiss(String(command.value || ''), emitEvent, respond);
+    }
+    if (action === 'reveal_project_choice' && layoutAdapter) {
+      return layoutAdapter.revealProjectChoice(String(command.value || ''), emitEvent, respond);
+    }
     if (action === 'send_prompt') {
       if (!textTransactionOrchestrator) {
         return respond(action, false, '发送事务模块尚未就绪，请重试。');
@@ -540,6 +537,19 @@
     }
     if (action === 'open_composer_tools' && composerAdapter) {
       return composerAdapter.openOfficial('tools', findComposer(), emitEvent, respond);
+    }
+    if (action === 'private_start_dictation' && privateDictationOrchestrator) {
+      return privateDictationOrchestrator.start(
+        String(command.value || '').slice(0, 20000),
+        String(command.expectedDraft || '').slice(0, 20000),
+        respond
+      );
+    }
+    if (action === 'private_cancel_dictation' && privateDictationOrchestrator) {
+      return privateDictationOrchestrator.cancel(respond);
+    }
+    if (action === 'private_submit_dictation' && privateDictationOrchestrator) {
+      return privateDictationOrchestrator.submit(respond);
     }
     if (action === 'start_dictation' && composerAdapter) {
       return composerAdapter.startDictation(findComposer(), emitEvent, respond);
@@ -597,8 +607,19 @@
       );
     }
     if (action === 'list_conversations' && conversationAdapter) {
-      if (requestPrivateProjectDirectory(command, respond)) return;
+      if (conversationDirectoryRequests) {
+        return conversationDirectoryRequests.requestList(command, respond);
+      }
       return conversationAdapter.requestList(command, emitEvent, respond);
+    }
+    if (action === 'cancel_conversation_directory') {
+      if (conversationDirectoryRequests) conversationDirectoryRequests.cancel();
+      return respond(action, true, '');
+    }
+    if (action === 'probe_conversation_project') {
+      if (conversationDirectoryRequests &&
+          conversationDirectoryRequests.probeMembership(command, respond)) return;
+      return respond(action, false, 'membership_probe_unavailable');
     }
     if (action === 'refresh_current_conversation') {
       if (privateTransport && privateTransport.conversationPrefetchEnabled === true &&
@@ -618,13 +639,13 @@
       if (comparableText(composerValue(findComposer()))) {
         return respond(action, false, '网页中有未发送草稿，请先处理草稿。');
       }
+      if (conversationDirectoryRequests) conversationDirectoryRequests.cancel();
       invalidatePrivateTextContext();
       const path = String(command.value || '');
       const navigate = () => conversationAdapter.openConversation(path, respond);
       if (privateTransport && privateTransport.conversationPrefetchEnabled === true &&
           typeof privateTransport.prefetchConversation === 'function') {
-        const handled = privateTransport.prefetchConversation(path, emitEvent, navigate);
-        if (handled) return;
+        privateTransport.prefetchConversation(path, emitEvent, null);
       }
       return navigate();
     }
@@ -736,11 +757,7 @@
       scheduleSnapshot(true);
     })
     : null);
-  if (privateConversationDirectory &&
-      typeof privateConversationDirectory.setListener === 'function') {
-    privateConversationDirectory.setListener(emitPrivateDirectorySnapshot);
-    emitPrivateDirectorySnapshot();
-  }
+  if (conversationDirectoryRequests) conversationDirectoryRequests.installListener();
   observer = new MutationObserver(scheduleSnapshot);
   const observeDocument = () => {
     const root = document.documentElement;

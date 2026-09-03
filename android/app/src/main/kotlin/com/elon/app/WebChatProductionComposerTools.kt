@@ -56,6 +56,25 @@ internal object WebChatProductionQuickActionSyncPolicy {
     }
 }
 
+internal object WebChatProductionSessionCommandPolicy {
+    fun canDispatch(
+        action: String,
+        sessionReady: Boolean,
+        consumerState: WebChatConsumerState?,
+    ): Boolean = sessionReady || (
+        action in DICTATION_FINISH_ACTIONS &&
+            consumerState?.adapterCurrent == true &&
+            consumerState.dictationActive
+        )
+
+    fun mayRecoverSession(action: String): Boolean = action !in DICTATION_FINISH_ACTIONS
+
+    private val DICTATION_FINISH_ACTIONS = setOf(
+        "chatgpt_submit_dictation",
+        "chatgpt_cancel_dictation",
+    )
+}
+
 internal class WebChatProductionComposerToolsCoordinator(
     private val activity: AppCompatActivity,
     private val host: View,
@@ -220,7 +239,21 @@ internal class WebChatProductionComposerToolsCoordinator(
         }
         val pending = PendingSessionCommand(provider.id, command, requestEpoch)
         pendingSessionCommand = pending
-        if (!sessionReady()) {
+        val port = consumerPort()
+        if (!WebChatProductionSessionCommandPolicy.canDispatch(
+                action = command.action,
+                sessionReady = sessionReady(),
+                consumerState = port?.state(),
+            )
+        ) {
+            if (!WebChatProductionSessionCommandPolicy.mayRecoverSession(command.action)) {
+                pendingSessionCommand = null
+                onOperationFeedback(WebChatConsumerComposerFeedback(
+                    providerId = provider.id,
+                    message = "听写状态正在同步，请重试",
+                ))
+                return false
+            }
             requestSessionRecovery()
             onOperationFeedback(WebChatConsumerComposerFeedback(
                 providerId = provider.id,

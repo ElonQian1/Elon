@@ -32,6 +32,7 @@ class WebAiPrivateTransportCatalogTest {
         assertTrue("android_chatgpt_native_image_asset_gallery_v1" in enabledIds)
         assertTrue("android_chatgpt_native_image_generation_status_v1" in enabledIds)
         assertTrue("android_chatgpt_private_rich_content_native_view_v1" in enabledIds)
+        assertTrue("android_chatgpt_private_dictation_transport_v1" in enabledIds)
         assertTrue("android_chatgpt_native_conversation_project_move_v1" in enabledIds)
         assertTrue("android_chatgpt_native_conversation_management_v1" in enabledIds)
         assertTrue("android_chatgpt_realtime_voice_background_overlay_v1" in enabledIds)
@@ -62,8 +63,10 @@ class WebAiPrivateTransportCatalogTest {
         )
 
         values.forEach { row ->
-            if (row.getString("capability_id") !=
-                "android_chatgpt_same_origin_text_transaction_v1"
+            if (row.getString("capability_id") !in setOf(
+                    "android_chatgpt_same_origin_text_transaction_v1",
+                    "android_chatgpt_private_dictation_transport_v1",
+                )
             ) {
                 assertFalse(row.getBoolean("direct_post_enabled"))
             }
@@ -91,6 +94,31 @@ class WebAiPrivateTransportCatalogTest {
         assertEquals(
             "single_flight_timeout_cooldown_circuit_breaker_and_sparse_dom_watchdog",
             voiceRefresh.getString("health_policy"),
+        )
+
+        val privateDictation = values.first {
+            it.getString("capability_id") == "android_chatgpt_private_dictation_transport_v1"
+        }
+        assertEquals(
+            "completed",
+            privateDictation.getString("implementation_status"),
+        )
+        assertTrue(privateDictation.getBoolean("production_default"))
+        assertEquals(
+            BuildConfig.CHATGPT_PRIVATE_DICTATION_ENABLED,
+            privateDictation.getBoolean("runtime_enabled"),
+        )
+        assertEquals(
+            BuildConfig.CHATGPT_PRIVATE_DICTATION_ENABLED,
+            privateDictation.getBoolean("direct_post_enabled"),
+        )
+        assertEquals(
+            "same_origin_page_local_media_recorder_buffered_transcription",
+            privateDictation.getString("request_mode"),
+        )
+        assertEquals(
+            "shared_work_mode_bridge_then_official_dom_dictation",
+            privateDictation.getString("fallback"),
         )
 
         val projectMove = values.first {

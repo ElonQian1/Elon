@@ -41,6 +41,9 @@ internal class WebChatProductionConversationActionsCoordinator(
     private val consumerPort: () -> WebChatConsumerPort?,
     private val conversationIndex: () -> com.elon.app.chatgptweb.ChatGptWebConversationIndexState,
     private val refreshConversationIndex: (String?) -> Boolean,
+    private val probeConversationProject: (String, String) -> Boolean,
+    private val suspendConversationRefresh: () -> Unit,
+    private val resumeConversationRefresh: () -> Unit,
     private val showPageActions: () -> Unit,
     private val openOfficialFallback: () -> Unit,
 ) {
@@ -56,11 +59,17 @@ internal class WebChatProductionConversationActionsCoordinator(
         openConversation = openConversation,
         conversationIndex = conversationIndex,
         refreshConversationIndex = refreshConversationIndex,
+        probeConversationProject = probeConversationProject,
+        suspendConversationRefresh = suspendConversationRefresh,
+        resumeConversationRefresh = resumeConversationRefresh,
         openOfficialFallback = openOfficialFallback,
     )
 
     fun show(conversation: ChatGptWebConversation) {
         cancelPending()
+        if (projectMove.recoverPending(interactive = true)) return
+        val epoch = requestEpoch
+        var selectedActionId: String? = null
         val canMove = WebChatConversationProjectMovePolicy.destinations(
             conversationIndex(),
             conversation,
@@ -89,12 +98,28 @@ internal class WebChatProductionConversationActionsCoordinator(
                 action = openOfficialFallback,
             )),
             onCancelled = { requestEpoch += 1 },
-            onDismissed = { activeSheet = null },
+            onDismissed = {
+                activeSheet = null
+                val actionId = selectedActionId
+                selectedActionId = null
+                if (actionId != null) {
+                    host.postDelayed({
+                        if (epoch == requestEpoch) dispatchSelectedAction(actionId, conversation)
+                    }, ACTION_SHEET_HANDOFF_SETTLE_MS)
+                }
+            },
         ) { item ->
-            when (item.id) {
-                ACTION_MOVE_TO_PROJECT -> host.post { projectMove.show(conversation) }
-                ACTION_MORE_SETTINGS -> host.post { showPageActionsFor(conversation) }
-            }
+            selectedActionId = item.id
+        }
+    }
+
+    private fun dispatchSelectedAction(
+        actionId: String,
+        conversation: ChatGptWebConversation,
+    ) {
+        when (actionId) {
+            ACTION_MOVE_TO_PROJECT -> projectMove.show(conversation)
+            ACTION_MORE_SETTINGS -> showPageActionsFor(conversation)
         }
     }
 
@@ -120,6 +145,8 @@ internal class WebChatProductionConversationActionsCoordinator(
         sheet?.dismiss()
         projectMove.cancelPending()
     }
+
+    fun recoverPending(): Boolean = projectMove.recoverPending()
 
     private fun poll(
         conversation: ChatGptWebConversation,
@@ -196,6 +223,7 @@ internal class WebChatProductionConversationActionsCoordinator(
     private companion object {
         const val ACTION_MOVE_TO_PROJECT = "move-to-project"
         const val ACTION_MORE_SETTINGS = "more-settings"
+        const val ACTION_SHEET_HANDOFF_SETTLE_MS = 48L
         const val POLL_INTERVAL_MS = 250L
         const val MAX_POLL_ATTEMPTS = 24
     }

@@ -24,10 +24,16 @@ internal interface WebChatNativeDictationEngine {
     var onError: (String) -> Unit
     var onVolume: (Float) -> Unit
     val isRunning: Boolean
+    val resultTimeoutMs: Long get() = DEFAULT_RESULT_TIMEOUT_MS
     fun start()
     fun stop()
     fun cancel()
     fun prewarm()
+    fun destroy() = cancel()
+
+    companion object {
+        const val DEFAULT_RESULT_TIMEOUT_MS = 2_500L
+    }
 }
 
 internal class AgentVoiceDictationEngine(
@@ -59,6 +65,7 @@ internal class AgentVoiceDictationEngine(
     override fun stop() = delegate.stop()
     override fun cancel() = delegate.cancel()
     override fun prewarm() = delegate.prewarm()
+    override fun destroy() = delegate.destroy()
 }
 
 internal interface WebChatNativeDictationScheduler {
@@ -79,7 +86,7 @@ internal class MainWebChatNativeDictationScheduler : WebChatNativeDictationSched
 /**
  * Tap-to-dictate session for the production Web AI composer.
  *
- * Recognition remains owned by the existing [AgentVoiceBridge]. This class only
+ * Recognition remains owned by the injected voice engine. This class only
  * applies partial/final text to the native draft and restores the original draft
  * on cancellation. No recognized text is persisted or logged here.
  */
@@ -96,22 +103,29 @@ internal class WebChatNativeDictationSession(
     private var originalDraft = ""
     private var transcript = ""
     private var settleTask: Runnable? = null
+    private var activeEngine: WebChatNativeDictationEngine? = null
+    private var retainedEngine: WebChatNativeDictationEngine? = null
 
     fun state(): WebChatNativeDictationState = state
 
     fun start(): Boolean {
         if (state.active) return true
-        val activeBridge = bridge()
-        if (activeBridge.isRunning) return false
+        val engine = bridge()
+        if (engine.isRunning) return false
+        if (retainedEngine !== engine) {
+            retainedEngine?.destroy()
+            retainedEngine = engine
+        }
 
         generation += 1
         val token = generation
+        activeEngine = engine
         originalDraft = readDraft()
         transcript = ""
         cancelSettleTask()
-        configure(activeBridge, token)
+        configure(engine, token)
         updateState(WebChatNativeDictationPhase.STARTING)
-        activeBridge.start()
+        engine.start()
         return true
     }
 
@@ -119,8 +133,8 @@ internal class WebChatNativeDictationSession(
         if (!state.active) return false
         val token = generation
         updateState(WebChatNativeDictationPhase.PROCESSING)
-        bridge().stop()
         scheduleSettlement(token)
+        activeEngine?.stop()
         return true
     }
 
@@ -128,20 +142,22 @@ internal class WebChatNativeDictationSession(
         if (!state.active) return false
         generation += 1
         cancelSettleTask()
-        bridge().cancel()
+        val engine = activeEngine
+        engine?.cancel()
         writeDraft(originalDraft)
         clearState()
-        bridge().prewarm()
+        activeEngine = null
+        engine?.prewarm()
         return true
     }
 
     fun destroy() {
-        if (state.active) {
-            generation += 1
-            bridge().cancel()
-        }
+        generation += 1
         cancelSettleTask()
+        (activeEngine ?: retainedEngine)?.destroy()
         clearState()
+        activeEngine = null
+        retainedEngine = null
     }
 
     private fun configure(activeBridge: WebChatNativeDictationEngine, token: Int) {
@@ -166,11 +182,11 @@ internal class WebChatNativeDictationSession(
         }
         activeBridge.onEnd = end@{
             if (!isCurrent(token)) return@end
-            if (state.phase == WebChatNativeDictationPhase.PROCESSING || transcript.isNotBlank()) {
-                settle(token, reportEmpty = true)
-            } else {
-                scheduleSettlement(token)
-            }
+            // SmartVAD reports speech end before SpeechRecognizer delivers its
+            // final result. Keep the partial draft visible while allowing that
+            // final callback (or its 2 s fallback) to arrive.
+            updateState(WebChatNativeDictationPhase.PROCESSING)
+            scheduleSettlement(token)
         }
         activeBridge.onError = error@{ message ->
             if (!isCurrent(token)) return@error
@@ -196,7 +212,10 @@ internal class WebChatNativeDictationSession(
     private fun scheduleSettlement(token: Int) {
         cancelSettleTask()
         settleTask = Runnable { settle(token, reportEmpty = true) }.also {
-            scheduler.postDelayed(it, SETTLE_TIMEOUT_MS)
+            scheduler.postDelayed(
+                it,
+                activeEngine?.resultTimeoutMs ?: WebChatNativeDictationEngine.DEFAULT_RESULT_TIMEOUT_MS,
+            )
         }
     }
 
@@ -205,8 +224,12 @@ internal class WebChatNativeDictationSession(
         cancelSettleTask()
         val hadTranscript = transcript.isNotBlank()
         if (hadTranscript) renderTranscript()
+        val engine = activeEngine
+        generation += 1
+        if (engine?.isRunning == true) engine.cancel()
         clearState()
-        bridge().prewarm()
+        activeEngine = null
+        engine?.prewarm()
         if (reportEmpty && !hadTranscript) onUnavailable("没有识别到语音")
     }
 
@@ -228,9 +251,5 @@ internal class WebChatNativeDictationSession(
     private fun cancelSettleTask() {
         settleTask?.let(scheduler::remove)
         settleTask = null
-    }
-
-    private companion object {
-        const val SETTLE_TIMEOUT_MS = 1_500L
     }
 }

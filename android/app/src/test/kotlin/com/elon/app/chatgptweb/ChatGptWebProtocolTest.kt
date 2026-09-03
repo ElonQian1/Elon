@@ -88,6 +88,8 @@ class ChatGptWebProtocolTest {
                 "privateStreamState":"completed",
                 "currentModel":"5.6 Sol 轻度",
                 "dictationActive":true,
+                "dictationCaptureActive":true,
+                "dictationCapturePending":false,
                 "observedMessageCount":43,
                 "messageWindowStart":40,
                 "attachments":[
@@ -127,6 +129,8 @@ class ChatGptWebProtocolTest {
         assertEquals("completed", event.value.privateStreamState)
         assertEquals("5.6 Sol 轻度", event.value.currentModel)
         assertTrue(event.value.dictationActive)
+        assertTrue(event.value.dictationCaptureActive)
+        assertFalse(event.value.dictationCapturePending)
         assertEquals("需求.txt", event.value.attachments.single().name)
         assertTrue(event.value.attachments.single().removable)
         assertEquals(2, event.value.messages.size)

@@ -34,6 +34,7 @@ internal class MainInputActions(
     private val isDirectSocialAiChatActive: () -> Boolean,
     private val isSocialAiChatActive: () -> Boolean,
     private val isWebChatStreaming: () -> Boolean,
+    private val isWebChatDictationActive: () -> Boolean,
     private val webChatComposerCanSubmit: () -> Boolean,
     private val isWebChatModeActive: () -> Boolean,
     private val onComposerTextChanged: (CharSequence?) -> Unit,
@@ -567,6 +568,7 @@ internal class MainInputActions(
             inputCanSend = { inputCanSend },
             composerCanSubmit = webChatComposerCanSubmit,
             isWebChatStreaming = isWebChatStreaming,
+            isWebChatDictationActive = isWebChatDictationActive,
             activeConversation = projectStateActions()::activeConversation,
             isFriendChatActive = isFriendChatActive
         )

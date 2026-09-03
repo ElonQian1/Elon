@@ -48,6 +48,8 @@ class ChatGptWebConsumerPortAdapterTest {
                 snapshot(
                     streaming = true,
                     dictationActive = false,
+                    dictationCaptureActive = true,
+                    dictationCapturePending = false,
                     pageKind = "health",
                     url = "https://chatgpt.com/health",
                 )
@@ -62,6 +64,8 @@ class ChatGptWebConsumerPortAdapterTest {
         assertTrue(state.streaming)
         assertTrue(state.adapterCurrent)
         assertFalse(state.dictationActive)
+        assertTrue(state.dictationCaptureActive)
+        assertFalse(state.dictationCapturePending)
         assertEquals("health", state.pageKind)
         assertEquals("https://chatgpt.com/health", state.pageUrl)
         assertEquals("search", state.composerSections.getValue("tools").single().id)
@@ -125,12 +129,16 @@ class ChatGptWebConsumerPortAdapterTest {
         val features = port.requestFeatures()
         val feature = port.selectFeature("health", userConfirmed = true)
         val controls = port.requestControls()
+        val revealed = port.revealProjectChoice("Project Alpha")
         val invoked = port.invokeControl("temporary", userConfirmed = false)
+        val retried = port.invokeControlAfterTouchMiss("temporary", userConfirmed = false)
         val updated = port.updateControl(
             "temporary",
             WebChatConsumerControlMutation.Selected(true),
         )
         val dictation = port.executeSessionCommand("chatgpt_start_dictation")
+        val cancelDictation = port.executeSessionCommand("chatgpt_cancel_dictation")
+        val submitDictation = port.executeSessionCommand("chatgpt_submit_dictation")
         val prepareRealtimeVoice = port.executeSessionCommand("chatgpt_prepare_realtime_voice")
         val realtimeVoice = port.executeSessionCommand("chatgpt_start_realtime_voice")
         val dismissed = port.dismissComposerOptions()
@@ -143,21 +151,31 @@ class ChatGptWebConsumerPortAdapterTest {
         assertEquals("health", requests[3].getString("feature_id"))
         assertTrue(requests[3].getBoolean("user_confirmed"))
         assertEquals("chatgpt_refresh_controls", requests[4].getString("action"))
-        assertEquals("temporary", requests[5].getString("control_id"))
-        assertEquals("chatgpt_set_control_selected", requests[6].getString("action"))
-        assertTrue(requests[6].getBoolean("selected"))
-        assertEquals("chatgpt_start_dictation", requests[7].getString("action"))
-        assertEquals("chatgpt_prepare_realtime_voice", requests[8].getString("action"))
-        assertEquals("chatgpt_start_realtime_voice", requests[9].getString("action"))
-        assertEquals("chatgpt_dismiss_composer_options", requests[10].getString("action"))
+        assertEquals("chatgpt_reveal_project_choice", requests[5].getString("action"))
+        assertEquals("Project Alpha", requests[5].getString("project_title"))
+        assertEquals("temporary", requests[6].getString("control_id"))
+        assertEquals("chatgpt_invoke_control", requests[7].getString("action"))
+        assertTrue(requests[7].getBoolean("after_touch_miss"))
+        assertEquals("chatgpt_set_control_selected", requests[8].getString("action"))
+        assertTrue(requests[8].getBoolean("selected"))
+        assertEquals("chatgpt_start_dictation", requests[9].getString("action"))
+        assertEquals("chatgpt_cancel_dictation", requests[10].getString("action"))
+        assertEquals("chatgpt_submit_dictation", requests[11].getString("action"))
+        assertEquals("chatgpt_prepare_realtime_voice", requests[12].getString("action"))
+        assertEquals("chatgpt_start_realtime_voice", requests[13].getString("action"))
+        assertEquals("chatgpt_dismiss_composer_options", requests[14].getString("action"))
         assertTrue(requested.accepted)
         assertTrue(selected.accepted)
         assertTrue(features.accepted)
         assertTrue(feature.accepted)
         assertTrue(controls.accepted)
+        assertTrue(revealed.accepted)
         assertTrue(invoked.accepted)
+        assertTrue(retried.accepted)
         assertTrue(updated.accepted)
         assertEquals("mcp_1", dictation.requestId)
+        assertEquals("mcp_1", cancelDictation.requestId)
+        assertEquals("mcp_1", submitDictation.requestId)
         assertEquals("mcp_1", prepareRealtimeVoice.requestId)
         assertEquals("mcp_1", realtimeVoice.requestId)
         assertTrue(dismissed.accepted)
@@ -169,6 +187,8 @@ class ChatGptWebConsumerPortAdapterTest {
     private fun snapshot(
         streaming: Boolean,
         dictationActive: Boolean,
+        dictationCaptureActive: Boolean = false,
+        dictationCapturePending: Boolean = false,
         pageKind: String = "unknown",
         url: String = "https://chatgpt.com/",
     ) = ChatGptWebSnapshot(
@@ -182,6 +202,8 @@ class ChatGptWebConsumerPortAdapterTest {
         currentModel = "",
         attachments = emptyList(),
         dictationActive = dictationActive,
+        dictationCaptureActive = dictationCaptureActive,
+        dictationCapturePending = dictationCapturePending,
         capabilities = ChatGptWebCapabilities.EMPTY,
         pageKind = pageKind,
     )

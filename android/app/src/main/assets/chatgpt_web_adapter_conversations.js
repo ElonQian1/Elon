@@ -12,6 +12,7 @@
   const GROUP_LABEL = /^(?:today|yesterday|previous \d+ days|last \d+ days|older|今天|昨天|前 ?\d+ ?天|过去 ?\d+ ?天|更早)$/i;
   const PINNED_LABEL = /^(?:pinned|已置顶|置顶)$/i;
   let sidebarOpenedByAdapter = false;
+  let directoryGeneration = 0;
 
   function cleanText(value) {
     return String(value || '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
@@ -293,6 +294,27 @@
     ) || null;
   }
 
+  function closeSidebarIfOpen() {
+    const close = findSidebarButton(false);
+    if (!close) return false;
+    try {
+      close.click();
+      sidebarOpenedByAdapter = false;
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function isCurrentDirectoryGeneration(generation) {
+    return generation === directoryGeneration;
+  }
+
+  function cancelDirectoryWork(closeSidebar) {
+    directoryGeneration += 1;
+    if (closeSidebar !== false) closeSidebarIfOpen();
+  }
+
   function findNewConversationNode() {
     const stableControl = document.querySelector(
       '[data-testid="create-new-chat-button"], [data-testid="new-chat-button"]'
@@ -383,7 +405,7 @@
     poll();
   }
 
-  function collectProjects(initial, onDone) {
+  function collectProjects(initial, onDone, generation) {
     if (!projectPolicy || typeof projectPolicy.unresolved !== 'function') return onDone(initial);
     const originalPath = location.pathname;
     const values = initial.slice();
@@ -395,13 +417,21 @@
     const seen = new Set(values.map((project) => project.id));
     let index = 0;
 
+    function cancelIfStale() {
+      if (isCurrentDirectoryGeneration(generation)) return false;
+      closeSidebarIfOpen();
+      return true;
+    }
+
     function ensureSidebar(next) {
+      if (cancelIfStale()) return;
       if (projectPolicy.unresolved(document, isVisible, projectLabel).length) return next();
       const open = findSidebarButton(true);
       if (!open) return onDone(values);
       open.click();
       const started = Date.now();
       function poll() {
+        if (cancelIfStale()) return;
         if (projectPolicy.unresolved(document, isVisible, projectLabel).length) return next();
         if (Date.now() - started >= 3000) return onDone(values);
         window.setTimeout(poll, 80);
@@ -410,16 +440,22 @@
     }
 
     function restore(next) {
+      if (cancelIfStale()) return;
       if (location.pathname === originalPath) return ensureSidebar(next);
       history.back();
       waitForRoute(
         (path) => path === originalPath,
-        () => ensureSidebar(next),
-        () => onDone(values)
+        () => {
+          if (!cancelIfStale()) ensureSidebar(next);
+        },
+        () => {
+          if (!cancelIfStale()) onDone(values);
+        }
       );
     }
 
     function visitNext() {
+      if (cancelIfStale()) return;
       if (index >= titles.length) return restore(() => onDone(values));
       const title = titles[index++];
       const candidate = projectPolicy.unresolved(document, isVisible, projectLabel)
@@ -434,6 +470,7 @@
       waitForRoute(
         (path) => path !== before && /^\/g\/g-p-[A-Za-z0-9_-]{1,160}\/project$/.test(path),
         (path) => {
+          if (cancelIfStale()) return;
           const id = projectIdFromPath(path);
           if (id && !seen.has(id)) {
             seen.add(id);
@@ -446,7 +483,9 @@
           }
           restore(visitNext);
         },
-        () => restore(visitNext)
+        () => {
+          if (!cancelIfStale()) restore(visitNext);
+        }
       );
     }
 
@@ -477,7 +516,9 @@
     return Object.assign({}, collection, { observedCount: conversations.length });
   }
 
-  function emitFastDirectorySnapshots(initial, command, emitEvent, result, closeAfter) {
+  function emitFastDirectorySnapshots(
+    initial, command, emitEvent, result, closeAfter, generation
+  ) {
     const initialProjects = initialProjectsFor(command);
     const scopeProjectId = projectScopeFor(command);
     const scopedInitial = conversationsForScope(initial, scopeProjectId);
@@ -500,6 +541,7 @@
     });
     result('list_conversations', true, '官网当前可见目录已同步，完整历史继续在后台加载。');
     collectConversationHistory(initial, (snapshot) => {
+      if (!isCurrentDirectoryGeneration(generation)) return closeSidebarIfOpen();
       if (scopeProjectId) {
         const scoped = conversationsForScope(snapshot.conversations, scopeProjectId);
         emitEvent({
@@ -517,6 +559,7 @@
         return;
       }
       collectProjectHistory(initialProjects, (projects) => {
+        if (!isCurrentDirectoryGeneration(generation)) return closeSidebarIfOpen();
         emitEvent({
           type: 'conversation_snapshot',
           conversations: enrichProjectConversations(snapshot.conversations, projects),
@@ -533,7 +576,10 @@
     });
   }
 
-  function emitConversationSnapshot(snapshot, command, emitEvent, result, closeAfter) {
+  function emitConversationSnapshot(
+    snapshot, command, emitEvent, result, closeAfter, generation
+  ) {
+    if (!isCurrentDirectoryGeneration(generation)) return closeSidebarIfOpen();
     const initialProjects = initialProjectsFor(command);
     const scopeProjectId = projectScopeFor(command);
     if (scopeProjectId) {
@@ -554,7 +600,9 @@
       return;
     }
     collectProjectHistory(initialProjects, (observedProjects) => {
+      if (!isCurrentDirectoryGeneration(generation)) return closeSidebarIfOpen();
       collectProjects(observedProjects, (projects) => {
+        if (!isCurrentDirectoryGeneration(generation)) return closeSidebarIfOpen();
         emitEvent({
           type: 'conversation_snapshot',
           conversations: enrichProjectConversations(snapshot.conversations, projects),
@@ -568,31 +616,46 @@
           if (close) close.click();
           sidebarOpenedByAdapter = false;
         }
-      });
+      }, generation);
     });
   }
 
-  function collectAndEmitDirectory(initial, command, emitEvent, result, closeAfter) {
+  function collectAndEmitDirectory(
+    initial, command, emitEvent, result, closeAfter, generation
+  ) {
     if (command && command.fastDirectoryAck === true) {
-      return emitFastDirectorySnapshots(initial, command, emitEvent, result, closeAfter);
+      return emitFastDirectorySnapshots(
+        initial, command, emitEvent, result, closeAfter, generation
+      );
     }
     collectConversationHistory(initial, (snapshot) => {
-      emitConversationSnapshot(snapshot, command, emitEvent, result, closeAfter);
+      if (!isCurrentDirectoryGeneration(generation)) return closeSidebarIfOpen();
+      emitConversationSnapshot(
+        snapshot, command, emitEvent, result, closeAfter, generation
+      );
     });
   }
 
   function requestList(command, emitEvent, result) {
+    const generation = ++directoryGeneration;
     const open = findSidebarButton(true);
     if (open) {
       sidebarOpenedByAdapter = true;
       open.click();
       return waitForConversations(
         (conversations) => {
+          if (!isCurrentDirectoryGeneration(generation)) return closeSidebarIfOpen();
           collectAndEmitDirectory(
-            conversations, command, emitEvent, result, sidebarOpenedByAdapter
+            conversations, command, emitEvent, result, sidebarOpenedByAdapter, generation
           );
         },
-        () => result('list_conversations', false, '官网会话列表尚未加载完成。')
+        () => {
+          if (isCurrentDirectoryGeneration(generation)) {
+            result('list_conversations', false, '官网会话列表尚未加载完成。');
+          } else {
+            closeSidebarIfOpen();
+          }
+        }
       );
     }
 
@@ -600,13 +663,22 @@
     if (!existing.length && sidebarOpenedByAdapter && findSidebarButton(false)) {
       return waitForConversations(
         (conversations) => {
-          collectAndEmitDirectory(conversations, command, emitEvent, result, true);
+          if (!isCurrentDirectoryGeneration(generation)) return closeSidebarIfOpen();
+          collectAndEmitDirectory(
+            conversations, command, emitEvent, result, true, generation
+          );
         },
-        () => result('list_conversations', false, '官网会话列表尚未加载完成。')
+        () => {
+          if (isCurrentDirectoryGeneration(generation)) {
+            result('list_conversations', false, '官网会话列表尚未加载完成。');
+          } else {
+            closeSidebarIfOpen();
+          }
+        }
       );
     }
     if (!existing.length) return result('list_conversations', false, '未找到官网会话侧栏入口。');
-    collectAndEmitDirectory(existing, command, emitEvent, result, false);
+    collectAndEmitDirectory(existing, command, emitEvent, result, false, generation);
   }
 
   function newConversation(inspect, result) {
@@ -645,9 +717,22 @@
       return result('open_conversation', false, '会话地址无效。');
     }
     const target = conversationLinks().find((node) => conversationPath(node) === path);
+    cancelDirectoryWork(false);
     result('open_conversation', true, '');
-    if (target) target.click();
-    else location.assign(new URL(path, location.origin).href);
+    const assignTarget = () => location.assign(new URL(path, location.origin).href);
+    if (!target) return assignTarget();
+    try {
+      target.click();
+    } catch (_) {
+      return assignTarget();
+    }
+    // A conversation link can change the mobile route without dismissing the official
+    // sidebar. Close it before native code inspects the new conversation header.
+    window.setTimeout(closeSidebarIfOpen, 120);
+    window.setTimeout(() => {
+      closeSidebarIfOpen();
+      if (location.pathname !== path) assignTarget();
+    }, 800);
   }
 
   function openProject(path, result) {
@@ -674,6 +759,7 @@
   }
 
   window.__elonChatGptConversations = Object.freeze({
+    cancelDirectoryWork,
     capabilities,
     newConversation,
     openConversation,

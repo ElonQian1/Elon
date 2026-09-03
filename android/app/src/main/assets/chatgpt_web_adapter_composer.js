@@ -10,6 +10,7 @@
   const attachmentPolicy = window.__elonChatGptAttachmentPolicy;
   const modelLabelPolicy = window.__elonChatGptModelLabelPolicy;
   const dictationSessionPolicy = window.__elonChatGptDictationSessionPolicy;
+  const dictationRuntime = window.__elonChatGptDictationRuntime;
   const composerToolStatePolicy = window.__elonChatGptComposerToolStatePolicy;
   const composerToolSelectionAdapter = window.__elonChatGptComposerToolSelection;
   const composerToolSelection = composerToolStatePolicy &&
@@ -19,6 +20,17 @@
   let lastOptions = { model: [], tools: [] };
   let pendingOptions = { model: null, tools: null };
   let lastAttachments = [];
+  const dictationCapture = dictationRuntime &&
+    typeof dictationRuntime.createCaptureTracker === 'function'
+    ? dictationRuntime.createCaptureTracker()
+    : Object.freeze({
+      arm() {},
+      finish() {},
+      active: () => false,
+      pending: () => false,
+      waitForActive: () => Promise.resolve(false),
+      waitForInactive: () => Promise.resolve(false)
+    });
   const submenuRecovery = composerSubmenu.createRecovery({
     captureOptionBaseline,
     emitOptions,
@@ -714,14 +726,34 @@
   function startDictation(composer, emitEvent, result) {
     const button = findDictationButton(composer);
     if (!button) return result('start_dictation', false, '官网当前没有听写入口。');
+    dictationCapture.arm();
+    const research = window.__elonChatGptRealtimeVoiceResearch;
+    if (research && typeof research.activate === 'function') {
+      try { research.activate(); } catch (_) {}
+    }
     if (!emitTouchRequest('start_dictation', button, emitEvent)) {
       const layout = window.__elonChatGptLayout;
       if (!layout || typeof layout.requestSemanticTouch !== 'function' ||
           !layout.requestSemanticTouch('dictation', 'start_dictation', emitEvent, 'composer')) {
+        dictationCapture.finish();
         return result('start_dictation', false, '官网听写入口当前不可见。');
       }
     }
-    result('start_dictation', true, '');
+    return Promise.resolve(dictationRuntime && typeof dictationRuntime.waitUntil === 'function'
+      ? dictationRuntime.waitUntil(() => {
+        if (dictationCapture.active()) return true;
+        return !!findDictationSessionButton('cancel', null) &&
+          !!findDictationSessionButton('submit', null);
+      }, 8000)
+      : dictationCapture.waitForActive(8000)
+    ).then((confirmed) => {
+      if (!confirmed) dictationCapture.finish();
+      result(
+        'start_dictation',
+        confirmed === true,
+        confirmed === true ? 'capture_started' : 'dictation_start_unconfirmed'
+      );
+    });
   }
 
   function finishDictation(kind, emitEvent, result) {
@@ -731,7 +763,21 @@
     if (!emitVisibleNodeTouch(action, button, emitEvent)) {
       return result(action, false, '官网听写操作当前不可见。');
     }
-    result(action, true, '');
+    return Promise.resolve(dictationRuntime && typeof dictationRuntime.waitUntil === 'function'
+      ? dictationRuntime.waitUntil(() => {
+        const controlsGone = !findDictationSessionButton('cancel', null) &&
+          !findDictationSessionButton('submit', null);
+        return controlsGone && !dictationCapture.active() && !dictationCapture.pending();
+      }, 10000)
+      : dictationCapture.waitForInactive(10000)
+    ).then((confirmed) => {
+      if (confirmed) dictationCapture.finish();
+      result(
+        action,
+        confirmed === true,
+        confirmed === true ? 'capture_finished' : 'dictation_finish_unconfirmed'
+      );
+    });
   }
 
   function removeAttachment(id, emitEvent, result) {
@@ -778,6 +824,8 @@
     readAttachments,
     requestAttachmentUpload,
     dictationActive,
+    dictationCaptureActive: dictationCapture.active,
+    dictationCapturePending: dictationCapture.pending,
     requestOptions,
     collectRequestedOptions,
     ownsOptionNode,

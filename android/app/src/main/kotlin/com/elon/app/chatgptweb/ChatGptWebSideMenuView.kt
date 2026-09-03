@@ -28,7 +28,6 @@ internal class ChatGptWebSideMenuView(
     private val refreshIndex: (String?) -> Boolean,
     private val newConversation: () -> Unit,
     private val openConversation: (String) -> Unit,
-    private val openProject: (String) -> Unit,
     private val openFeatureNavigation: () -> Unit,
     private val providerId: () -> String,
     private val providerName: () -> String,
@@ -50,7 +49,8 @@ internal class ChatGptWebSideMenuView(
     private var selectedProjectId: String? = null
     private var searchVisible = false
     private var searchQuery = ""
-    private var lastRefreshRequestedAtMs = 0L
+    private var lastRootRefreshRequestedAtMs = 0L
+    private val lastProjectRefreshRequestedAtMs = mutableMapOf<String, Long>()
     private val conversationActions by lazy {
         ChatGptWebSideMenuConversationActions(
             activity = activity,
@@ -97,16 +97,7 @@ internal class ChatGptWebSideMenuView(
 
     fun refresh() {
         render()
-        val nowMs = System.currentTimeMillis()
-        if (WebChatSideMenuRefreshPolicy.shouldRefreshOnOpen(
-                collection = index().collection,
-                nowMs = nowMs,
-                lastRequestedAtMs = lastRefreshRequestedAtMs,
-            )
-        ) {
-            lastRefreshRequestedAtMs = nowMs
-            refreshIndex(selectedProjectId)
-        }
+        requestIndexRefreshIfStale(selectedProjectId)
     }
 
     fun state() = ChatGptWebSideMenuState(selectedTab, selectedDate, selectedProjectId)
@@ -450,7 +441,7 @@ internal class ChatGptWebSideMenuView(
         selectedProjectId = project.id
         searchQuery = ""
         render()
-        if (localProjectActions() == null) post { openProject(project.path) }
+        if (localProjectActions() == null) post { requestIndexRefreshIfStale(project.id) }
     }
 
     private fun conversationRow(
@@ -510,9 +501,40 @@ internal class ChatGptWebSideMenuView(
     )
 
     private fun requestIndexRefresh() {
-        lastRefreshRequestedAtMs = System.currentTimeMillis()
-        refreshIndex(selectedProjectId)
+        val projectId = selectedProjectId
+        markRefreshRequested(projectId, System.currentTimeMillis())
+        refreshIndex(projectId)
         render()
+    }
+
+    private fun requestIndexRefreshIfStale(projectId: String?) {
+        val state = index()
+        val collection = if (projectId == null) {
+            state.collection
+        } else {
+            state.projectCollections[projectId] ?: ChatGptWebConversationCollection()
+        }
+        val nowMs = System.currentTimeMillis()
+        if (!WebChatSideMenuRefreshPolicy.shouldRefreshOnOpen(
+                collection = collection,
+                nowMs = nowMs,
+                lastRequestedAtMs = lastRefreshRequestedAt(projectId),
+            )
+        ) return
+        markRefreshRequested(projectId, nowMs)
+        refreshIndex(projectId)
+    }
+
+    private fun lastRefreshRequestedAt(projectId: String?): Long = projectId
+        ?.let { lastProjectRefreshRequestedAtMs[it] }
+        ?: lastRootRefreshRequestedAtMs
+
+    private fun markRefreshRequested(projectId: String?, nowMs: Long) {
+        if (projectId == null) {
+            lastRootRefreshRequestedAtMs = nowMs
+        } else {
+            lastProjectRefreshRequestedAtMs[projectId] = nowMs
+        }
     }
 
     private fun footer() = LinearLayout(activity).apply {
