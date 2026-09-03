@@ -237,7 +237,7 @@ internal class MainNavigationController(
             applyMarketplaceChrome()
             return
         }
-        binding.toolbar.setBackgroundColor(activity.getColor(R.color.elon_bg_app))
+        binding.toolbar.setBackgroundColor(activity.getColor(R.color.elon_bg_app)); binding.marketplaceToolbarHeader.visibility = View.GONE; binding.topTitleText.visibility = View.VISIBLE
         updateBottomTabSelection(tab)
         binding.conversationPage.visibility = if (tab == binding.tabChat) View.VISIBLE else View.GONE
         binding.chatPage.visibility = View.GONE
@@ -269,7 +269,6 @@ internal class MainNavigationController(
             refreshServerVersion()
         }
     }
-
     private fun finishBottomTabSelection(tab: TextView) {
         binding.conversationPage.visibility = if (tab == binding.tabChat) View.VISIBLE else View.GONE
         binding.projectPage.visibility = View.GONE
@@ -805,9 +804,9 @@ internal class MainNavigationController(
             .create()
         exitConfirmDialog?.show()
     }
-
     private fun applyChatChrome() {
         binding.restoreChatToolbar(activity.getColor(R.color.elon_bg_app))
+        binding.marketplaceToolbarHeader.visibility = View.GONE; binding.topTitleText.visibility = View.VISIBLE
         binding.conversationPage.visibility = View.GONE
         binding.chatPage.visibility = View.VISIBLE
         binding.projectPage.visibility = View.GONE
@@ -834,9 +833,8 @@ internal class MainNavigationController(
             true
         }
     }
-
     private fun applyConversationHomeChrome() {
-        binding.toolbar.setBackgroundColor(activity.getColor(R.color.elon_bg_app))
+        binding.toolbar.setBackgroundColor(activity.getColor(R.color.elon_bg_app)); binding.marketplaceToolbarHeader.visibility = View.GONE; binding.topTitleText.visibility = View.VISIBLE
         updateBottomTabSelection(binding.tabChat)
         binding.conversationPage.visibility = View.VISIBLE
         binding.projectPage.visibility = View.GONE
@@ -858,9 +856,9 @@ internal class MainNavigationController(
         binding.topTitleText.text = conversationHomeTitle()
         refreshFriends()
     }
-
     private fun applyFriendChatChrome(title: String) {
         binding.restoreChatToolbar(activity.getColor(R.color.elon_bg_app))
+        binding.marketplaceToolbarHeader.visibility = View.GONE; binding.topTitleText.visibility = View.VISIBLE
         updateBottomTabSelection(binding.tabChat)
         binding.conversationPage.visibility = View.GONE
         binding.chatPage.visibility = View.VISIBLE
@@ -886,7 +884,7 @@ internal class MainNavigationController(
     }
 
     private fun applyProjectHomeChrome() {
-        binding.toolbar.setBackgroundColor(activity.getColor(R.color.elon_bg_app))
+        binding.toolbar.setBackgroundColor(activity.getColor(R.color.elon_bg_app)); binding.marketplaceToolbarHeader.visibility = View.GONE; binding.topTitleText.visibility = View.VISIBLE
         updateBottomTabSelection(binding.tabProject)
         binding.conversationPage.visibility = View.GONE
         binding.projectPage.visibility = View.VISIBLE
@@ -915,7 +913,7 @@ internal class MainNavigationController(
     }
 
     private fun applyMarketplaceChrome() {
-        binding.toolbar.setBackgroundColor(activity.getColor(R.color.elon_bg_plaza))
+        binding.toolbar.setBackgroundColor(activity.getColor(R.color.elon_bg_plaza)); binding.marketplaceToolbarHeader.visibility = View.VISIBLE
         updateBottomTabSelection(binding.tabProject)
         binding.conversationPage.visibility = View.GONE
         binding.chatPage.visibility = View.GONE
@@ -934,11 +932,11 @@ internal class MainNavigationController(
         hideVoiceCallButton()
         binding.moreButton.visibility = View.GONE
         binding.topTitleText.setOnLongClickListener(null)
-        binding.topTitleText.text = "项目广场"
+        binding.topTitleText.text = "项目广场"; binding.topTitleText.visibility = View.GONE
     }
 
     private fun applyProjectSpaceChrome(title: String) {
-        binding.toolbar.setBackgroundColor(activity.getColor(R.color.elon_store_detail_bg))
+        binding.toolbar.setBackgroundColor(activity.getColor(R.color.elon_store_detail_bg)); binding.marketplaceToolbarHeader.visibility = View.GONE
         updateBottomTabSelection(binding.tabProject)
         binding.conversationPage.visibility = View.GONE
         binding.chatPage.visibility = View.GONE
@@ -972,6 +970,7 @@ internal class MainNavigationController(
 
     private fun applyProjectChannelChrome(title: String) {
         binding.restoreChatToolbar(activity.getColor(R.color.elon_bg_app))
+        binding.marketplaceToolbarHeader.visibility = View.GONE; binding.topTitleText.visibility = View.VISIBLE
         updateBottomTabSelection(binding.tabProject)
         binding.conversationPage.visibility = View.GONE
         binding.chatPage.visibility = View.VISIBLE

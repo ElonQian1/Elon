@@ -6,11 +6,11 @@
   const FRESH_MS = 60 * 1000;
   const SKELETON_DELAY_MS = 180;
   const filters = [
-    { key: 'all', label: '全部' },
-    { key: 'installable', label: '可安装', hasApk: true },
-    { key: 'no_approval', label: '无审批', noApprovalOnly: true },
-    { key: 'joined', label: '已加入', joinedOnly: true },
-    { key: 'popular', label: '最热门', sort: 'members' }
+    { key: 'all', label: '热门推荐 🔥' },
+    { key: 'installable', label: '独立应用', hasApk: true },
+    { key: 'no_approval', label: 'AI Agent', noApprovalOnly: true },
+    { key: 'joined', label: '开源共创', joinedOnly: true },
+    { key: 'popular', label: '声波社群', sort: 'members' }
   ];
 
   const state = {
@@ -367,12 +367,16 @@
     if (!el) return;
     const searchArtwork = el.dataset.searchArtwork || '/assets/project_view_search_icon.png';
     el.innerHTML = `
+      <header class="project-plaza-mobile-header">
+        <div><h1>项目广场 <i aria-hidden="true"></i></h1><p>探索前沿协同空间与自主 Agent 应用</p></div>
+        <button type="button" aria-label="项目通知与更新"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg></button>
+      </header>
       <div class="project-plaza-search-bar">
         <span class="project-plaza-search-icon" aria-hidden="true">
           <img src="${escapeHtml(searchArtwork)}" alt="" />
         </span>
-        <input class="project-plaza-search-input" type="search" placeholder="搜索项目" value="${escapeHtml(state.query)}" data-plaza-action="search" aria-label="搜索项目" />
-        <span class="project-plaza-search-chevron" aria-hidden="true">⌄</span>
+        <input class="project-plaza-search-input" type="search" placeholder="搜索项目、创意或协作团队..." value="${escapeHtml(state.query)}" data-plaza-action="search" aria-label="搜索项目" />
+        <span class="project-plaza-search-chevron" aria-hidden="true">全部⌄</span>
       </div>
       <div class="project-plaza-filter-row">
         ${filters.map(renderFilter).join('')}
@@ -415,6 +419,8 @@
       ${state.cacheNotice ? renderCacheNotice(state.cacheNotice) : ''}
       <div class="project-plaza-featured-label">
         <strong>推荐</strong>
+        <small>左右滑动探索标杆</small>
+        <span>换一换 ↻</span>
       </div>
       <div class="project-plaza-featured-scroller" aria-label="精选项目">
         <div class="project-plaza-featured-track">
@@ -491,6 +497,7 @@
     return `
       <div class="project-plaza-section-heading">
         <h2>全部</h2>
+        <div class="project-plaza-sort"><b>综合</b><span>最新</span><span>热度</span></div>
       </div>
     `;
   }
@@ -560,18 +567,20 @@
               ${escapeHtml(cover)}
               ${icon ? `<img src="${escapeHtml(icon)}" alt="" loading="lazy" onerror="this.remove()" />` : ''}
             </span>
+            <span class="project-plaza-featured-status ${status.tone === 'danger' ? 'is-danger' : status.tone === 'neutral' ? 'is-neutral' : ''}"><i aria-hidden="true"></i>${escapeHtml(status.label)}</span>
             <div class="project-plaza-featured-copy">
               <h3>${escapeHtml(identity.title)}</h3>
               <p>${escapeHtml(description)}</p>
             </div>
           </div>
+          <div class="project-plaza-featured-facts"><div class="project-plaza-featured-fact"><b>${members} 协同者　·　${escapeHtml(String(project.favorite_count || project.install_count || 0))} 收藏</b></div></div>
         </div>
         <div class="project-plaza-featured-actions">
           <div class="project-plaza-reactions" aria-label="项目偏好">
             <button class="project-plaza-reaction is-star ${reactionSelected(project, 'favorite') ? 'is-selected' : ''}" type="button" data-plaza-action="favorite" data-id="${escapeHtml(project.id)}" aria-label="${reactionSelected(project, 'favorite') ? '取消收藏' : '收藏'}${escapeHtml(identity.title)}"></button>
             <button class="project-plaza-reaction is-heart ${reactionSelected(project, 'liked') ? 'is-selected' : ''}" type="button" data-plaza-action="liked" data-id="${escapeHtml(project.id)}" aria-label="${reactionSelected(project, 'liked') ? '取消点赞' : '点赞'}${escapeHtml(identity.title)}"></button>
           </div>
-          <button class="project-plaza-featured-primary" type="button" data-plaza-action="open" data-id="${escapeHtml(project.id)}" aria-label="打开${escapeHtml(identity.title)}">›</button>
+          <button class="project-plaza-featured-primary" type="button" data-plaza-action="open" data-id="${escapeHtml(project.id)}" aria-label="打开${escapeHtml(identity.title)}">进入空间</button>
         </div>
       </article>
     `;
@@ -593,6 +602,7 @@
         <div class="project-plaza-title-block">
           <h3 class="project-plaza-name">${escapeHtml(identity.title)}</h3>
           <p class="project-plaza-desc">${escapeHtml(description)}</p>
+          <div class="project-plaza-list-meta"><span>#${escapeHtml(cleanText(project.category) || 'AI CodeGen')}　·　${members} 协同者</span></div>
         </div>
         <button class="project-plaza-open" type="button" data-plaza-action="open" data-id="${escapeHtml(project.id)}" aria-label="打开${escapeHtml(identity.title)}"><img src="/assets/project_view_chevron.png" alt="" /></button>
       </article>

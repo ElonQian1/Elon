@@ -66,6 +66,60 @@
                 android:textColor="@color/elon_text_primary"
                 android:textSize="16sp" />
 
+            <LinearLayout
+                android:id="@+id/marketplaceToolbarHeader"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="20dp"
+                android:paddingEnd="20dp"
+                android:visibility="gone">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:includeFontPadding="false"
+                            android:text="项目广场"
+                            android:textColor="@color/elon_plaza_text_primary"
+                            android:textSize="24sp"
+                            android:textStyle="bold" />
+                        <View
+                            android:layout_width="8dp"
+                            android:layout_height="8dp"
+                            android:layout_marginStart="9dp"
+                            android:background="@drawable/bg_plaza_signal_dot" />
+                    </LinearLayout>
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:includeFontPadding="false"
+                        android:text="探索前沿协同空间与自主 Agent 应用"
+                        android:textColor="@color/elon_plaza_text_quiet"
+                        android:textSize="11sp" />
+                </LinearLayout>
+
+                <ImageButton
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:background="@drawable/bg_plaza_header_action"
+                    android:contentDescription="项目通知与更新"
+                    android:padding="11dp"
+                    android:src="@drawable/ic_plaza_bell" />
+            </LinearLayout>
+
             <FrameLayout
                 android:id="@+id/socialAiModeControlHost"
                 android:layout_width="160dp"
@@ -1320,8 +1374,8 @@
             android:visibility="gone">
 
             <LinearLayout
-                android:id="@+id/bottomNavContent"
-                android:layout_width="@dimen/main_bottom_menu_content_width"
+            android:id="@+id/bottomNavContent"
+                android:layout_width="match_parent"
                 android:layout_height="@dimen/main_bottom_menu_outer_height"
                 android:layout_gravity="bottom|center_horizontal"
                 android:layout_marginBottom="@dimen/main_bottom_menu_edge_gap"

@@ -98,11 +98,11 @@ internal class MainMarketplaceActions(
     private var refreshNotice: String? = null
 
     private val filters = listOf(
-        MarketplaceFilter(FILTER_ALL, "全部"),
-        MarketplaceFilter("installable", "可安装", hasApk = true),
-        MarketplaceFilter("no_approval", "无审批", noApprovalOnly = true),
-        MarketplaceFilter("joined", "已加入", joinedOnly = true),
-        MarketplaceFilter("popular", "最热门", sort = "members")
+        MarketplaceFilter(FILTER_ALL, "热门推荐 🔥"),
+        MarketplaceFilter("installable", "独立应用", hasApk = true),
+        MarketplaceFilter("no_approval", "AI Agent", noApprovalOnly = true),
+        MarketplaceFilter("joined", "开源共创", joinedOnly = true),
+        MarketplaceFilter("popular", "声波社群", sort = "members")
     )
 
     fun loadProjects(search: String? = null, force: Boolean = false) {
@@ -171,7 +171,10 @@ internal class MainMarketplaceActions(
             )
         }
         shell.addView(buildSearchBar())
-        shell.addView(buildFilterScroller(), LinearLayout.LayoutParams(0, 0))
+        shell.addView(buildFilterScroller(), LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            dp(FILTER_SCROLLER_HEIGHT_DP)
+        ))
         val results = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(0, 0, 0, 0)
@@ -192,25 +195,26 @@ internal class MainMarketplaceActions(
         return searchBar.apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            background = metalRoundedGradient(
-                radiusDp = SEARCH_RADIUS_DP,
-                strokeColor = activity.elonColor(R.color.elon_plaza_border),
+            background = rect(
+                activity.elonColor(R.color.elon_plaza_surface_search),
+                SEARCH_RADIUS_DP,
+                activity.elonColor(R.color.elon_plaza_border)
             )
-            setPadding(dp(20), 0, dp(18), 0)
+            setPadding(dp(16), 0, dp(12), 0)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 dp(SEARCH_HEIGHT_DP)
             ).apply {
                 marginStart = dp(PLAZA_SIDE_MARGIN_DP)
                 marginEnd = dp(PLAZA_SIDE_MARGIN_DP)
-                topMargin = dp(16)
+                topMargin = dp(12)
             }
             addView(ImageView(activity).apply {
                 setImageResource(R.drawable.ic_top_search_custom)
                 setColorFilter(activity.elonColor(R.color.elon_plaza_text_quiet))
                 contentDescription = null
             }, LinearLayout.LayoutParams(dp(24), dp(24)).apply {
-                marginEnd = dp(12)
+                marginEnd = dp(10)
             })
             val field = buildSearchField().apply {
                 setOnFocusChangeListener { _, focused ->
@@ -228,13 +232,13 @@ internal class MainMarketplaceActions(
                 1f
             ))
             addView(TextView(activity).apply {
-                text = "⌄"
+                text = "全部 ⌄"
                 includeFontPadding = false
                 gravity = Gravity.CENTER
                 setTextColor(activity.elonColor(R.color.elon_plaza_text_primary))
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 24f)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
                 contentDescription = null
-            }, LinearLayout.LayoutParams(dp(32), LinearLayout.LayoutParams.MATCH_PARENT))
+            }, LinearLayout.LayoutParams(dp(64), LinearLayout.LayoutParams.MATCH_PARENT))
         }
     }
 
@@ -242,17 +246,17 @@ internal class MainMarketplaceActions(
         return EditText(activity).apply {
             searchField = this
             background = null
-            hint = "搜索项目"
+            hint = "搜索项目、创意或协作团队..."
             setText(searchQuery)
             setSingleLine(true)
             inputType = InputType.TYPE_CLASS_TEXT
             imeOptions = EditorInfo.IME_ACTION_SEARCH
             includeFontPadding = false
-            gravity = Gravity.CENTER
+            gravity = Gravity.CENTER_VERTICAL
             setPadding(0, 0, 0, 0)
             setTextColor(activity.elonColor(R.color.elon_plaza_text_primary))
             setHintTextColor(activity.elonColor(R.color.elon_plaza_text_quiet))
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
             addTextChangedListener(object : TextWatcher {
                 override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
                 override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
@@ -294,7 +298,7 @@ internal class MainMarketplaceActions(
             minWidth = 0
             minHeight = 0
             setPadding(0, 0, 0, 0)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, FONT_PAGE_TITLE_SP)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
             isClickable = true
             foreground = selectableForeground()
             layoutParams = LinearLayout.LayoutParams(
@@ -321,23 +325,18 @@ internal class MainMarketplaceActions(
             )
             chip.paint.isUnderlineText = false
             chip.setTypeface(chip.typeface, Typeface.NORMAL)
-            chip.background = if (selected) {
-                metalRoundedGradient(
-                    radiusDp = FILTER_CHIP_RADIUS_DP,
-                    strokeColor = activity.elonColor(R.color.elon_plaza_border),
-                    highColor = activity.elonColor(R.color.elon_plaza_surface_card_high),
-                    lowColor = activity.elonColor(R.color.elon_plaza_segment_selected),
-                )
-            } else {
-                null
-            }
+            chip.background = rect(
+                activity.elonColor(if (selected) R.color.elon_plaza_signal_soft else R.color.elon_plaza_surface_card),
+                FILTER_CHIP_RADIUS_DP,
+                activity.elonColor(if (selected) R.color.elon_plaza_signal else R.color.elon_plaza_border)
+            )
             (chip.layoutParams as? LinearLayout.LayoutParams)?.let { params ->
-                params.width = if (selected) dp(FILTER_CHIP_SELECTED_WIDTH_DP) else LinearLayout.LayoutParams.WRAP_CONTENT
+                params.width = LinearLayout.LayoutParams.WRAP_CONTENT
                 params.height = dp(FILTER_CHIP_HEIGHT_DP)
                 chip.layoutParams = params
             }
-            chip.minWidth = if (selected) dp(FILTER_CHIP_SELECTED_WIDTH_DP) else 0
-            chip.setPadding(0, 0, 0, 0)
+            chip.minWidth = 0
+            chip.setPadding(dp(16), 0, dp(16), 0)
         }
     }
 
@@ -373,7 +372,7 @@ internal class MainMarketplaceActions(
         container.addView(featuredSection.build(projects.take(5)), LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
             featuredSection.heightPx()
-        ).apply { topMargin = dp(4) })
+        ).apply { topMargin = dp(2) })
         container.addView(buildResultsHeading(projects), LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
             LinearLayout.LayoutParams.WRAP_CONTENT
@@ -402,14 +401,33 @@ internal class MainMarketplaceActions(
             includeFontPadding = false
             setTextColor(activity.elonColor(R.color.elon_plaza_text_primary))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
+            typeface = Typeface.DEFAULT_BOLD
         }, LinearLayout.LayoutParams(0, dp(38), 1f).apply { gravity = Gravity.CENTER_VERTICAL })
+        addView(buildSortControl())
+    }
+
+    private fun buildSortControl() = LinearLayout(activity).apply {
+        gravity = Gravity.CENTER
+        background = rect(activity.elonColor(R.color.elon_plaza_surface_search), 10, activity.elonColor(R.color.elon_plaza_border))
+        setPadding(dp(4), dp(4), dp(4), dp(4))
+        listOf("综合", "最新", "热度").forEachIndexed { index, label ->
+            addView(TextView(activity).apply {
+                text = label
+                gravity = Gravity.CENTER
+                includeFontPadding = false
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+                setTextColor(activity.elonColor(if (index == 0) R.color.elon_plaza_text_primary else R.color.elon_plaza_text_quiet))
+                background = if (index == 0) rect(activity.elonColor(R.color.elon_plaza_surface_card_high), 7) else null
+            }, LinearLayout.LayoutParams(dp(48), dp(30)))
+        }
     }
 
     private fun buildProjectListRow(project: StoreProject) = LinearLayout(activity).apply {
         orientation = LinearLayout.HORIZONTAL
         gravity = Gravity.CENTER_VERTICAL
         minimumHeight = dp(LIST_ROW_MIN_HEIGHT_DP)
-        setPadding(0, dp(14), 0, dp(14))
+        setPadding(dp(16), dp(14), dp(8), dp(14))
+        background = rect(activity.elonColor(R.color.elon_plaza_surface_card), LIST_ROW_RADIUS_DP, activity.elonColor(R.color.elon_plaza_border))
         isClickable = true
         foreground = selectableForeground()
         setOnClickListener { openProjectSpace(project) }
@@ -431,6 +449,10 @@ internal class MainMarketplaceActions(
                 maxLines = 1; ellipsize = TextUtils.TruncateAt.END; includeFontPadding = false
                 setTextColor(activity.elonColor(R.color.elon_plaza_text_quiet)); setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
             }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(5) })
+            addView(buildProjectListMeta(project), LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = dp(7) })
         }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { marginStart = dp(16) })
         addView(FrameLayout(activity).apply {
             contentDescription = "进入${project.displayTitle()}"
@@ -447,8 +469,8 @@ internal class MainMarketplaceActions(
     private fun buildProjectListMeta(project: StoreProject) = LinearLayout(activity).apply {
         gravity = Gravity.CENTER_VERTICAL
         addView(TextView(activity).apply {
-            val owner = project.ownerAccount.trim().takeIf { it.isNotBlank() && it != "?" } ?: "未知"
-            text = "$owner · ${project.memberCount.coerceAtLeast(0)} 人"
+            val tag = project.template.trim().takeIf { it.isNotBlank() } ?: "协作项目"
+            text = "#$tag · ${project.memberCount.coerceAtLeast(0)} 协同者"
             includeFontPadding = false
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.END
@@ -553,17 +575,19 @@ internal class MainMarketplaceActions(
         const val FILTER_ALL = "all"
         const val DEFAULT_CRITERIA_KEY = "all|"
         const val FONT_PAGE_TITLE_SP = 16f
-        const val SEARCH_HEIGHT_DP = 56
-        const val SEARCH_RADIUS_DP = 28
+        const val SEARCH_HEIGHT_DP = 52
+        const val SEARCH_RADIUS_DP = 26
         const val PLAZA_SIDE_MARGIN_DP = 20
-        const val FILTER_CHIP_HEIGHT_DP = 48
+        const val FILTER_SCROLLER_HEIGHT_DP = 58
+        const val FILTER_CHIP_HEIGHT_DP = 36
         const val FILTER_CHIP_SELECTED_WIDTH_DP = 70
         const val FILTER_CHIP_RADIUS_DP = 24
         const val FILTER_SIDE_PADDING_DP = 16
         const val FILTER_ITEM_GAP_DP = 14
         const val LIST_FIRST_ROW_TOP_DP = 2
-        const val LIST_ROW_GAP_DP = 4
-        const val LIST_ROW_MIN_HEIGHT_DP = 112
+        const val LIST_ROW_GAP_DP = 12
+        const val LIST_ROW_MIN_HEIGHT_DP = 104
+        const val LIST_ROW_RADIUS_DP = 18
         const val LIST_COVER_SIZE_DP = 60
         const val LIST_COVER_RADIUS_DP = 12
         const val LIST_CHEVRON_DP = 16
