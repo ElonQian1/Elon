@@ -7,10 +7,22 @@
 完整 `.zip` 是首选输入。导入前运行：
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\inspect-stitch-export.ps1 -ZipPath <导出文件.zip>
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\inspect-stitch-export.ps1 `
+  -ZipPath <导出文件.zip> `
+  -OutputPath .ai-tmp\stitch-export-inspection.json `
+  -RequireFull
 ```
 
 工具必须至少确认 `screen.png`；同时存在 `code.html` 与 `DESIGN.md` 时为 `FULL`，缺少任一结构化文件时为 `PARTIAL`，只能把缺失参数标成推断值。
+
+检查器使用稳定的 `elon.stitch_export_inspection.v1` JSON 回执；`-OutputPath` 以无 BOM UTF-8 原子写入，标准输出也保留同一份 JSON。退出合同如下：
+
+- `exit 0`：导出可用于当前模式；使用 `-RequireFull` 时只接受 `FULL`；
+- `exit 2`：`INSUFFICIENT`，缺少目标截图，停止实现；
+- `exit 3`：存在截图但不是 `FULL`，被 `-RequireFull` 精确导入门禁拒绝；
+- `exit 1`：ZIP、重复必需文件或 PNG 结构无效。
+
+回执中的 `claimPolicy.oneToOneClaimFromExportAlone` 永远是 `false`：`FULL` 只证明精确参数来源可用，不证明 APK/PWA 的运行时视觉已经一致。
 
 同一属性发生冲突时按以下顺序裁决：
 
@@ -34,6 +46,21 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\inspect-stitch-expor
 - 每项实现参数的来源：`EXACT_CODE`、`EXACT_DESIGN`、`MEASURED_IMAGE` 或 `INFERRED`。
 
 `INFERRED` 参数不能被描述为“1:1”。
+
+## 项目约束怎样参与导入
+
+项目约束分为两类，不能混用：
+
+- 业务、导航、状态、无障碍、触控安全区和 APK/PWA 同步约束必须保留，它们帮助导出页面成为可用产品；
+- 旧页面的宽高、padding、weight、透明度、背景、圆角和视觉 token 只是兜底。与当前 Stitch 目标冲突时，必须在目标页面作用域内移除或覆盖，不能反向限制设计稿。
+
+Stitch 导出的 HTML/CSS 可以直接提供布局关系、精确数值和响应模式，但不是 Android 源码，也不能整页覆盖带业务逻辑的移动 PWA。实施时必须建立并保存参数映射：
+
+| 目标组件/属性 | 证据来源 | Stitch 值 | Android 实现 | PWA 实现 | 状态 |
+|---|---|---:|---|---|---|
+| 示例：底部导航总宽 | `code.html` | `337px` | 固定内在宽度，窄屏统一缩放 | `width: 337px` | `EXACT_CODE` |
+
+状态只能是 `EXACT_CODE`、`EXACT_DESIGN`、`MEASURED_IMAGE` 或 `INFERRED`。关键参数仍为 `INFERRED` 时，应继续补证据或明确交付为近似实现。
 
 ## 画布、单位与响应式换算
 
@@ -85,6 +112,8 @@ Android 还必须区分：
 6. 用户报告刚交付结果不正确时，设置 `realDeviceRequired=true`，但仍遵守发布与验证分离规则。
 
 以下情况必须阻止“1:1 完成”的结论：导出不完整、画布边界未知、字体或素材缺失、目标状态无法复现、运行时截图缺失，或关键参数仍为 `INFERRED`。
+
+自动化由 `scripts/test-stitch-design-import-workflow.ps1` 覆盖，并接入本地静态质量入口与 CI。回归至少验证 `FULL`、`PARTIAL`、`INSUFFICIENT`、损坏 PNG、重复必需文件、无 BOM 回执和项目路由；修改检查器或本合同时必须同步更新该测试。
 
 ## 与现有项目规范的关系
 

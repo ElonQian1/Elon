@@ -109,6 +109,7 @@ Invoke-RepoPowerShellScript -Name "PC Frontend Publish Guard" -ScriptPath "scrip
 Invoke-RepoPowerShellScript -Name "PC Static Publish Guard" -ScriptPath "scripts\test-pc-static-publish.ps1"
 Invoke-RepoPowerShellScript -Name "CI Quality Gates Guard" -ScriptPath "scripts\check-ci-quality-gates.ps1"
 Invoke-RepoPowerShellScript -Name "APP UI Fast Lane Guard" -ScriptPath "scripts\test-app-ui-fast-lane.ps1"
+Invoke-RepoPowerShellScript -Name "Stitch Design Import Guard" -ScriptPath "scripts\test-stitch-design-import-workflow.ps1"
 Invoke-RepoPowerShellScript -Name "Realtime Runbook Guard" -ScriptPath "scripts\check-realtime-runbook.ps1"
 Invoke-RepoPowerShellScript -Name "Realtime Ownership Guard" -ScriptPath "scripts\check-realtime-ownership.ps1"
 Invoke-RepoPowerShellScript -Name "Realtime Diagnostics Snapshot Guard" -ScriptPath "scripts\check-realtime-diagnostics-snapshot.ps1" -Arguments $snapshotArgs

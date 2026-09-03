@@ -20,6 +20,23 @@ Ripple、颜色、间距、圆角、字号和轻量动画等低风险纯视觉�
 
 AI 代理修改任一侧 UI 时，必须在同一 commit 中完成两侧的同步修改。
 
+## Stitch/Figma 整页导入门禁
+
+整页设计导入不进入低风险快速通道。修改源码前必须按 `docs/stitch-design-import.md` 运行：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\inspect-stitch-export.ps1 `
+  -ZipPath <导出文件.zip> `
+  -OutputPath .ai-tmp\stitch-export-inspection.json `
+  -RequireFull
+```
+
+- 只有 `quality=FULL` 才通过精确参数来源门禁；`PARTIAL` 可以作为有明确标注的近似参考，但不得沿用 `-RequireFull` 流程或宣称 1:1。
+- 先建立“Stitch 组件/属性 → Android View/token → PWA DOM/CSS”的逐项映射，再编辑两端。导出的 HTML/CSS 不得整页覆盖现有业务逻辑。
+- 业务状态、导航语义、无障碍和安全区域继续服从项目约束；旧视觉几何与 Stitch 冲突时，仅在目标页面作用域内移除旧约束，由导出证据优先。
+- 同一属性必须在两端引用同一证据值和响应模式；CSS `px`、Android `dp/sp` 与系统栏分别换算，禁止机械复制或二次比例缩放。
+- ZIP 回执只证明输入完整。最终 1:1 结论仍要求同视口运行时截图、无关键 `INFERRED` 参数和视觉阈值通过。
+
 ---
 
 ## APK 文件 → 网页对照表
@@ -142,6 +159,8 @@ AI 代理不要尝试在网页端"模拟"以下原生能力，标注说明即可
 - [ ] 新增设置项 → 网页"我的"页已同步
 - [ ] 新增对话框 → 网页 `.modal-mask` 已同步
 - [ ] **新增底部 UI 元素 → 已加 `padding-bottom: env(safe-area-inset-bottom)`（iOS 安全区域）**
+- [ ] Stitch/Figma 整页导入 → `.ai-tmp/stitch-export-inspection.json` 为 `FULL`，映射表已记录，关键参数无 `INFERRED`
+- [ ] 宣称 1:1 → 同视口运行时截图与视觉比较均已通过，未把 ZIP 完整误当成视觉验收
 - [ ] 同一 commit 包含 APK 和网页两侧的修改
 
 ---

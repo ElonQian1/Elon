@@ -29,8 +29,8 @@
 | 非简单功能/重构/迁移/生产修复 | `.agents/skills/deliver-feature-end-to-end/SKILL.md`，再叠加领域 Skill |
 | Android APK 发布 | Git/发布手册的发布入口；环境异常再读 `docs/android-setup.md` |
 | Android WebView/MCP/ADB | `.agents/skills/android-webview-feature-delivery/SKILL.md` |
-| APP 低风险视觉微调 | `docs/app-ui-fast-lane.md`；默认不用真机、模拟器或 Renderer |
-| APP 复杂 UI、主题、导航、按图还原 | `docs/Design.md`、`docs/APP 颜色规范.md`；涉及 APK/网页同步再读 `.github/instructions/apk-web-ui-sync.instructions.md` |
+| APP 低风险视觉微调 | `docs/app-ui-fast-lane.md` |
+| Stitch/Figma 导出、APP 复杂 UI/按图还原 | `docs/stitch-design-import.md`（导入）、`docs/Design.md`、`docs/APP 颜色规范.md`；双端再读 `.github/instructions/apk-web-ui-sync.instructions.md` |
 | APP 版本记忆 | `docs/app-version-memory.md` |
 | 一龙自身品牌 Logo 替换 | `docs/brand-logo-workflow.md`；统一运行 `scripts/replace-brand-logo.ps1` |
 | Prompt/Agent/Skill | 仅按目标读取；去重先运行 `scripts/audit-ai-prompt-assets.ps1` |

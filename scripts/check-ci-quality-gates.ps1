@@ -76,6 +76,8 @@ $requiredEntries = @(
     "scripts\check-ci-quality-gates.ps1",
     "APP UI Fast Lane Guard",
     "scripts\test-app-ui-fast-lane.ps1",
+    "Stitch Design Import Guard",
+    "scripts\test-stitch-design-import-workflow.ps1",
     "Realtime Runbook Guard",
     "scripts\check-realtime-runbook.ps1",
     "Realtime Ownership Guard",

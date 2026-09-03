@@ -72,6 +72,10 @@ jobs:
         shell: powershell
         run: scripts\test-app-ui-fast-lane.ps1
 
+      - name: Stitch Design Import Guard
+        shell: powershell
+        run: scripts\test-stitch-design-import-workflow.ps1
+
       - name: Realtime Runbook Guard
         shell: pwsh
         run: scripts\check-realtime-runbook.ps1
