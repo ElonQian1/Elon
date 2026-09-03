@@ -20,6 +20,8 @@ elon 是一个云端应用开发平台。用户在手机 APK 或 PC 工作台里
 
 开放商业方向复用这条应用开发主干：商户可把应用生成、群体 AI、节点执行和商业能力授权组合成自己的 AI 经营节点。当前事实、已接受的开放商业 V1 和尚未实现的 Sui 经济层必须分开理解，统一入口见 `docs/open-commerce/README.md`。
 
+ESK 是一个有意采用多效用的单一资产：支付一龙服务、参与治理，并按未来快照参与团队已批准的可分配利润。用户消费或转出 ESK 会主动放弃对应的之后权重；这不授权代理另发权益币。单币只统一资产，不统一订单、资产、利润分配和量化基金会计；`QSHARE` 与量化 NAV 保持独立。实现前先读 `docs/decisions/esk-consumable-economic-participation-v1.md` 和 `docs/requirements/esk-consumable-economic-participation-v1.md`。
+
 ## 当前项目理解能力
 
 项目已经不只是基础 repo map。当前已有分层上下文系统：

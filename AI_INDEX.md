@@ -124,6 +124,7 @@
 | 代码归属与 legacy 迁移规则 | `docs/architecture/source-of-truth.md`、`docs/architecture/legacy-inventory.md`、`docs/architecture/feature-parity-matrix.md`、`scripts/check-source-ownership.ps1` |
 | 项目广场/项目主页脚本 | `server/src/assets/project_*.js` |
 | 一龙量化接入、ESK Paper 投影、申请绑定、双仓可见余额、Android 托管与主服务 `/quant/` 预览 | `docs/yilong-quant-integration.md`、`docs/yilong-quant-esk-allocation-binding-v1.md`、`docs/esk-paper-quant-cross-repo-interoperability-v4-acceptance.md`、`docs/esk-paper-quant-cross-repo-asset-view-v5-acceptance.md`、`docs/requirements/yilong-quant-android-main-hosting-v6.md`、`server/src/router/quant_http_preview.rs` |
+| ESK 单币服务支付、治理、团队利润参与及 QSHARE 会计边界 | `docs/decisions/esk-consumable-economic-participation-v1.md`、`docs/requirements/esk-consumable-economic-participation-v1.md`、`docs/decisions/esk-asset-naming-v1.md`、`docs/yilong-quant-integration.md` |
 | 节点管理本地页 | `server/src/node_agent_admin.html` |
 
 ## 脚本入口
