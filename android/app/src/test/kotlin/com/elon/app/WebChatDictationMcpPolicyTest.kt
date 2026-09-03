@@ -7,9 +7,18 @@ import org.junit.Test
 class WebChatDictationMcpPolicyTest {
     @Test
     fun routesProductionStartSubmitAndCancelSelectors() {
-        val idle = WebChatDictationMcpPolicy.snapshot(START, null)
+        val idle = WebChatDictationMcpPolicy.snapshot(PRIVATE_START, null)
         assertEquals("idle", idle.phase)
+        assertEquals("private", idle.transport)
         assertEquals(WebChatDictationMcpTarget.START_OR_SUBMIT, route("start_web_chat_dictation", idle))
+        assertEquals(
+            WebChatDictationMcpTarget.TOGGLE_MODE,
+            route("toggle_web_chat_dictation_mode", idle),
+        )
+
+        val sharedIdle = WebChatDictationMcpPolicy.snapshot(SHARED_START, null)
+        assertEquals("shared", sharedIdle.transport)
+        assertEquals(WebChatDictationMcpTarget.START_OR_SUBMIT, route("start_web_chat_dictation", sharedIdle))
 
         val privateActive = WebChatDictationMcpPolicy.snapshot(PRIVATE_SUBMIT, PRIVATE_CANCEL)
         assertEquals("active", privateActive.phase)
@@ -51,10 +60,10 @@ class WebChatDictationMcpPolicyTest {
 
     @Test
     fun ignoresRealtimeVoiceSelectorWhileDictationIsIdle() {
-        val idle = WebChatDictationMcpPolicy.snapshot(START, REALTIME_VOICE)
+        val idle = WebChatDictationMcpPolicy.snapshot(PRIVATE_START, REALTIME_VOICE)
 
         assertEquals("idle", idle.phase)
-        assertNull(idle.transport)
+        assertEquals("private", idle.transport)
         assertNull(idle.cancelSelector)
     }
 
@@ -62,7 +71,8 @@ class WebChatDictationMcpPolicyTest {
         WebChatDictationMcpPolicy.target(action, state)
 
     private companion object {
-        const val START = "web-chat-composer-command:start-dictation"
+        const val PRIVATE_START = "web-chat-composer-command:private:start-dictation"
+        const val SHARED_START = "web-chat-composer-command:shared:start-dictation"
         const val PRIVATE_SUBMIT = "web-chat-composer-command:private:submit-dictation"
         const val PRIVATE_CANCEL = "web-chat-composer-command:private:cancel-dictation"
         const val SHARED_SUBMIT = "web-chat-composer-command:shared:submit-dictation"

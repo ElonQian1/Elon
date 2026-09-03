@@ -193,7 +193,7 @@ internal fun mcpToolsListResult(): JSONObject {
                     title = "Native UI Control",
                     description = "Control project chat and provider-backed social AI chat through stable native actions and semantic control ids.",
                     properties = JSONObject()
-                        .put("action", stringProperty("Includes open_main, state, project actions, social AI mode/provider actions, start/submit/cancel_web_chat_dictation, isolated web chat conversation actions, get_web_chat_context, local acceptance attachment actions, set_input_text, send_input, and chatgpt_* actions returned by ui_state."))
+                        .put("action", stringProperty("Includes open_main, state, project actions, social AI mode/provider actions, start/submit/cancel/toggle_web_chat_dictation_mode actions, isolated web chat conversation actions, get_web_chat_context, local acceptance attachment actions, set_input_text, send_input, and chatgpt_* actions returned by ui_state."))
                         .put("project_id", stringProperty("Optional project id or project space id."))
                         .put("project_index", intProperty("Optional project index."))
                         .put("conversation_id", stringProperty("Optional local conversation id."))

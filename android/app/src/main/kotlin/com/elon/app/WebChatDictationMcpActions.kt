@@ -3,7 +3,7 @@ package com.elon.app
 import android.view.View
 import org.json.JSONObject
 
-internal enum class WebChatDictationMcpTarget { START_OR_SUBMIT, CANCEL }
+internal enum class WebChatDictationMcpTarget { START_OR_SUBMIT, CANCEL, TOGGLE_MODE }
 
 internal data class WebChatDictationMcpSnapshot(
     val phase: String,
@@ -16,7 +16,7 @@ internal object WebChatDictationMcpPolicy {
     fun snapshot(startOrSubmitSelector: String?, cancelSelector: String?): WebChatDictationMcpSnapshot {
         val dictationCancelSelector = cancelSelector.takeIf { it.isCancelSelector() }
         val dictationStartOrSubmitSelector = startOrSubmitSelector.takeIf {
-            it == START_SELECTOR || it == DOM_STARTING_SELECTOR ||
+            it.isStartSelector() || it == DOM_STARTING_SELECTOR ||
                 it == DOM_START_FAILED_SELECTOR || it.isSubmitSelector()
         }
         return WebChatDictationMcpSnapshot(
@@ -38,11 +38,13 @@ internal object WebChatDictationMcpPolicy {
     fun target(action: String, snapshot: WebChatDictationMcpSnapshot): WebChatDictationMcpTarget? =
         when (action) {
             ACTION_START -> WebChatDictationMcpTarget.START_OR_SUBMIT
-                .takeIf { snapshot.startOrSubmitSelector == START_SELECTOR }
+                .takeIf { snapshot.startOrSubmitSelector.isStartSelector() }
             ACTION_SUBMIT -> WebChatDictationMcpTarget.START_OR_SUBMIT
                 .takeIf { snapshot.startOrSubmitSelector.isSubmitSelector() }
             ACTION_CANCEL -> WebChatDictationMcpTarget.CANCEL
                 .takeIf { snapshot.cancelSelector.isCancelSelector() }
+            ACTION_TOGGLE_MODE -> WebChatDictationMcpTarget.TOGGLE_MODE
+                .takeIf { snapshot.startOrSubmitSelector.isStartSelector() }
             else -> null
         }
 
@@ -56,12 +58,18 @@ internal object WebChatDictationMcpPolicy {
 
     private fun String?.isSubmitSelector(): Boolean = this?.endsWith(":submit-dictation") == true
     private fun String?.isCancelSelector(): Boolean = this?.endsWith(":cancel-dictation") == true
+    private fun String?.isStartSelector(): Boolean = this == PRIVATE_START_SELECTOR ||
+        this == SHARED_START_SELECTOR
 
     const val ACTION_START = "start_web_chat_dictation"
     const val ACTION_SUBMIT = "submit_web_chat_dictation"
     const val ACTION_CANCEL = "cancel_web_chat_dictation"
-    val ACTIONS = setOf(ACTION_START, ACTION_SUBMIT, ACTION_CANCEL)
-    private const val START_SELECTOR = "web-chat-composer-command:start-dictation"
+    const val ACTION_TOGGLE_MODE = "toggle_web_chat_dictation_mode"
+    val ACTIONS = setOf(ACTION_START, ACTION_SUBMIT, ACTION_CANCEL, ACTION_TOGGLE_MODE)
+    private const val PRIVATE_START_SELECTOR =
+        "web-chat-composer-command:private:start-dictation"
+    private const val SHARED_START_SELECTOR =
+        "web-chat-composer-command:shared:start-dictation"
     private const val DOM_STARTING_SELECTOR = "web-chat-composer-command:dom:starting-dictation"
     private const val DOM_START_FAILED_SELECTOR =
         "web-chat-composer-command:dom:start-failed-dictation"
@@ -90,8 +98,12 @@ internal class WebChatDictationMcpActions(
         val view = when (target) {
             WebChatDictationMcpTarget.START_OR_SUBMIT -> currentViews.webDictationButton
             WebChatDictationMcpTarget.CANCEL -> currentViews.inputModeButton
+            WebChatDictationMcpTarget.TOGGLE_MODE -> currentViews.webDictationButton
         }
-        return view.visibility == View.VISIBLE && view.isEnabled && view.performClick()
+        return view.visibility == View.VISIBLE && view.isEnabled && when (target) {
+            WebChatDictationMcpTarget.TOGGLE_MODE -> view.performLongClick()
+            else -> view.performClick()
+        }
     }
 
     private fun snapshot(currentViews: MainInputComposerViews?) =

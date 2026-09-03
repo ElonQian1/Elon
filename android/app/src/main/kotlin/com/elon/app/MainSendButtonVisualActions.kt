@@ -116,7 +116,10 @@ internal class MainSendButtonVisualActions(
             button.alpha = if (conversationEnded) 0.55f else 1f
         }
         webDictationButton()?.let { button ->
-            button.isEnabled = !conversationEnded && !streaming
+            // Voice controls own transient STARTING/PROCESSING disablement. This layer may
+            // only add global restrictions; re-enabling here can turn one finish gesture
+            // into a second recording after the control is rebound to its idle action.
+            button.isEnabled = button.isEnabled && !conversationEnded && !streaming
             button.alpha = if (button.isEnabled) 1f else 0.55f
         }
     }

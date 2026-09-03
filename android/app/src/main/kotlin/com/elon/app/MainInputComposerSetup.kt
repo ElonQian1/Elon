@@ -170,7 +170,7 @@ internal class MainInputComposerSetup(
         }
 
         val webDictationButton = ImageButton(activity).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(40), dp(48))
+            layoutParams = LinearLayout.LayoutParams(dp(48), dp(48))
             background = ColorDrawable(Color.TRANSPARENT)
             setImageResource(R.drawable.ic_web_chat_dictation)
             scaleType = ImageView.ScaleType.FIT_CENTER

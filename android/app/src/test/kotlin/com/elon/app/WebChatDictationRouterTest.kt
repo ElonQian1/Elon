@@ -1,55 +1,19 @@
 package com.elon.app
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class WebChatDictationRouterTest {
     @Test
-    fun startUsesPrivateThenSharedThenDom() {
-        val calls = mutableListOf<String>()
-        val selected = WebChatDictationStartChain.start(
-            privateReady = true,
-            startPrivate = { calls += "private"; false },
-            startShared = { calls += "shared"; false },
-            startDom = { calls += "dom"; true },
-        )
+    fun modeDefaultsToPrivateAndChangesOnlyOnExplicitToggle() {
+        val selector = WebChatDictationModeSelector()
 
-        assertEquals(WebChatDictationTransport.DOM, selected)
-        assertEquals(listOf("private", "shared", "dom"), calls)
-    }
-
-    @Test
-    fun successfulPrivateStartDoesNotTouchFallbacks() {
-        val calls = mutableListOf<String>()
-        val selected = WebChatDictationStartChain.start(
-            privateReady = true,
-            startPrivate = { calls += "private"; true },
-            startShared = { calls += "shared"; true },
-            startDom = { calls += "dom"; true },
-        )
-
-        assertEquals(WebChatDictationTransport.PRIVATE, selected)
-        assertEquals(listOf("private"), calls)
-    }
-
-    @Test
-    fun unavailablePrivateStartsSharedImmediately() {
-        val calls = mutableListOf<String>()
-        val selected = WebChatDictationStartChain.start(
-            privateReady = false,
-            startPrivate = { calls += "private"; true },
-            startShared = { calls += "shared"; true },
-            startDom = { calls += "dom"; true },
-        )
-
-        assertEquals(WebChatDictationTransport.SHARED, selected)
-        assertEquals(listOf("shared"), calls)
-    }
-
-    @Test
-    fun returnsNullWhenEveryLayerRejectsStart() {
-        assertNull(WebChatDictationStartChain.start(false, { false }, { false }, { false }))
+        assertEquals(WebChatDictationMode.PRIVATE, selector.selected)
+        assertEquals(WebChatDictationMode.SHARED, selector.toggle())
+        assertEquals(WebChatDictationMode.SHARED, selector.selected)
+        assertEquals(WebChatDictationMode.PRIVATE, selector.toggle())
     }
 
     @Test
@@ -66,5 +30,22 @@ class WebChatDictationRouterTest {
             WebChatProductionDictationTapRoute.SUBMIT_DOM,
             WebChatProductionDictationRoutePolicy.resolve(false, false, true, true),
         )
+    }
+
+    @Test
+    fun completedSessionCannotImmediatelyRearm() {
+        var now = 1_000L
+        val gate = WebChatDictationRearmGate(clock = { now }, settleMs = 600L)
+
+        assertTrue(gate.canStart())
+        assertFalse(gate.observe(true))
+        assertTrue(gate.canStart())
+        assertTrue(gate.observe(false))
+        assertFalse(gate.canStart())
+
+        now += 599L
+        assertFalse(gate.canStart())
+        now += 1L
+        assertTrue(gate.canStart())
     }
 }

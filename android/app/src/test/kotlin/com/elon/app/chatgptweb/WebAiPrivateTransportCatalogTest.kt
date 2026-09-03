@@ -117,7 +117,7 @@ class WebAiPrivateTransportCatalogTest {
             privateDictation.getString("request_mode"),
         )
         assertEquals(
-            "shared_work_mode_bridge_then_official_dom_dictation",
+            "none_explicit_long_press_shared_work_mode_selection",
             privateDictation.getString("fallback"),
         )
 

@@ -191,6 +191,7 @@ internal class MainSocialAiChatFeature(
             privateDictation = chatGptController.privateDictationPort(),
             sharedDictation = nativeDictation,
             onNativeStateChanged = ::refreshConsumerComposerUi,
+            prepareDictationCapture = collapseInputComposer,
             readDraft = { binding.inputEdit.text?.toString().orEmpty() },
             writeDraft = { binding.inputEdit.setText(it) },
         )

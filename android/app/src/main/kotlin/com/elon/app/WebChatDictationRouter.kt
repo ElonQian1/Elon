@@ -1,9 +1,14 @@
 package com.elon.app
 
-internal enum class WebChatDictationTransport {
+internal enum class WebChatDictationMode {
     PRIVATE,
     SHARED,
-    DOM,
+    ;
+
+    fun toggled(): WebChatDictationMode = when (this) {
+        PRIVATE -> SHARED
+        SHARED -> PRIVATE
+    }
 }
 
 internal enum class WebChatProductionDictationTapRoute {
@@ -26,6 +31,18 @@ internal object WebChatProductionDictationRoutePolicy {
         domActive -> WebChatProductionDictationTapRoute.SUBMIT_DOM
         startAvailable -> WebChatProductionDictationTapRoute.START
         else -> WebChatProductionDictationTapRoute.NONE
+    }
+}
+
+internal class WebChatDictationModeSelector(
+    initialMode: WebChatDictationMode = WebChatDictationMode.PRIVATE,
+) {
+    var selected: WebChatDictationMode = initialMode
+        private set
+
+    fun toggle(): WebChatDictationMode {
+        selected = selected.toggled()
+        return selected
     }
 }
 
@@ -60,16 +77,25 @@ internal object WebChatUnavailablePrivateDictationPort : WebChatPrivateDictation
     override fun destroy() = Unit
 }
 
-internal object WebChatDictationStartChain {
-    fun start(
-        privateReady: Boolean,
-        startPrivate: () -> Boolean,
-        startShared: () -> Boolean,
-        startDom: () -> Boolean,
-    ): WebChatDictationTransport? {
-        if (privateReady && startPrivate()) return WebChatDictationTransport.PRIVATE
-        if (startShared()) return WebChatDictationTransport.SHARED
-        if (startDom()) return WebChatDictationTransport.DOM
-        return null
+internal class WebChatDictationRearmGate(
+    private val clock: () -> Long,
+    private val settleMs: Long = DEFAULT_SETTLE_MS,
+) {
+    private var observedActive = false
+    private var blockedUntilMs = 0L
+
+    fun observe(active: Boolean): Boolean {
+        val completed = observedActive && !active
+        observedActive = active
+        if (completed) blockedUntilMs = clock() + settleMs
+        return completed
+    }
+
+    fun canStart(): Boolean = clock() >= blockedUntilMs
+
+    fun remainingMs(): Long = (blockedUntilMs - clock()).coerceAtLeast(0L)
+
+    private companion object {
+        const val DEFAULT_SETTLE_MS = 600L
     }
 }

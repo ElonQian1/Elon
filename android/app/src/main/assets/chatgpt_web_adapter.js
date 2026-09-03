@@ -100,7 +100,7 @@
       transport: privateDictationTransport,
       findComposer,
       composerValue,
-      setComposerValue,
+      setComposerValue: setComposerValueWithoutFocus,
       comparableText,
       scheduleSnapshot
     })
@@ -350,8 +350,8 @@
     snapshotScheduler.schedule(active);
   }
 
-  function setComposerValue(composer, value) {
-    composer.focus();
+  function updateComposerValue(composer, value, focusComposer) {
+    if (focusComposer) composer.focus();
     if (composer instanceof HTMLTextAreaElement || composer instanceof HTMLInputElement) {
       const prototype = composer instanceof HTMLTextAreaElement
         ? HTMLTextAreaElement.prototype
@@ -359,17 +359,29 @@
       const setter = Object.getOwnPropertyDescriptor(prototype, 'value').set;
       setter.call(composer, value);
     } else {
-      const selection = window.getSelection();
-      const range = document.createRange();
-      range.selectNodeContents(composer);
-      selection.removeAllRanges();
-      selection.addRange(range);
-      const inserted = document.execCommand('insertText', false, value);
-      if (!inserted) composer.replaceChildren(document.createTextNode(value));
+      if (focusComposer) {
+        const selection = window.getSelection();
+        const range = document.createRange();
+        range.selectNodeContents(composer);
+        selection.removeAllRanges();
+        selection.addRange(range);
+        const inserted = document.execCommand('insertText', false, value);
+        if (!inserted) composer.replaceChildren(document.createTextNode(value));
+      } else {
+        composer.replaceChildren(document.createTextNode(value));
+      }
     }
     composer.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: value }));
     composer.dispatchEvent(new Event('change', { bubbles: true }));
     return comparableText(composerValue(composer)) === comparableText(value);
+  }
+
+  function setComposerValue(composer, value) {
+    return updateComposerValue(composer, value, true);
+  }
+
+  function setComposerValueWithoutFocus(composer, value) {
+    return updateComposerValue(composer, value, false);
   }
 
   function result(action, ok, detail, requestId) {

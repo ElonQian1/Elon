@@ -6,8 +6,10 @@ import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.InsetDrawable
 import android.os.SystemClock
+import android.view.HapticFeedbackConstants
 import android.view.View
 import android.widget.ImageButton
+import android.widget.Toast
 
 internal data class WebChatProductionVoicePresentation(
     val dictation: WebChatProductionComposerCommand?,
@@ -59,10 +61,13 @@ internal class WebChatProductionVoiceControls(
         WebChatUnavailablePrivateDictationPort,
     private val sharedDictation: WebChatNativeDictationPort,
     private val onNativeStateChanged: () -> Unit,
+    private val prepareDictationCapture: () -> Unit,
     private val readDraft: () -> String,
     private val writeDraft: (String) -> Unit,
 ) {
     private val domSession = WebChatDomDictationSession(SystemClock::elapsedRealtime)
+    private val rearmGate = WebChatDictationRearmGate(SystemClock::elapsedRealtime)
+    private val modeSelector = WebChatDictationModeSelector()
 
     fun dictationPresentation(
         officialActive: Boolean,
@@ -115,6 +120,14 @@ internal class WebChatProductionVoiceControls(
             readDraft(),
             officialDictationCaptureActive,
         )
+        val dictationSessionActive = privateState.active || sharedState.active ||
+            domState.controlsActive || officialDictationActive
+        if (rearmGate.observe(dictationSessionActive)) {
+            views.webDictationButton.postDelayed(
+                { onNativeStateChanged() },
+                rearmGate.remainingMs().coerceAtLeast(1L),
+            )
+        }
         val presentation = WebChatProductionVoicePresentationPolicy.resolve(
             provider = provider,
             streaming = streaming,
@@ -166,6 +179,7 @@ internal class WebChatProductionVoiceControls(
             setPadding(dp(8), dp(9), dp(8), dp(9))
             contentDescription = UNBOUND_DICTATION_DESCRIPTION
             setOnClickListener(null)
+            setOnLongClickListener(null)
         }
     }
 
@@ -252,21 +266,24 @@ internal class WebChatProductionVoiceControls(
         sharedState: WebChatNativeDictationState,
         domState: WebChatDomDictationState,
     ) {
-        val sharedAvailable = provider.supports(WebChatProviderCapability.DICTATION) &&
-            !streaming && !officialDictationActive
-        val domStartAvailable = command?.action == DOM_START_COMMAND_ACTION
+        val providerSupportsDictation = provider.supports(WebChatProviderCapability.DICTATION)
         val startAvailable = !streaming && !domState.controlsActive &&
-            (privateDictation.ready() || sharedAvailable || domStartAvailable)
-        val visible = startAvailable || command != null || privateState.active ||
+            rearmGate.canStart() && providerSupportsDictation
+        val visible = providerSupportsDictation || command != null || privateState.active ||
             sharedState.active || domState.controlsActive
         val finishing = privateState.active || sharedState.active ||
             domState.canFinish || domState.finishPending
+        val actionEnabled = when {
+            privateState.active -> privateState.phase == WebChatNativeDictationPhase.LISTENING
+            sharedState.active -> sharedState.phase == WebChatNativeDictationPhase.LISTENING
+            domState.reviewPending -> true
+            officialDictationActive -> domState.canFinish && !domState.finishPending
+            else -> startAvailable
+        }
         views.webDictationButton.apply {
             isActivated = visible
-            isEnabled = visible &&
-                domState.phase != WebChatDomDictationPhase.STARTING &&
-                !domState.startFailed &&
-                !domState.finishPending
+            isEnabled = visible && actionEnabled &&
+                domState.phase != WebChatDomDictationPhase.STARTING && !domState.startFailed
             alpha = if (isEnabled) 1f else 0.62f
             tag = when {
                 privateState.active -> PRIVATE_SUBMIT_SELECTOR
@@ -275,7 +292,7 @@ internal class WebChatProductionVoiceControls(
                 domState.phase == WebChatDomDictationPhase.STARTING -> DOM_STARTING_SELECTOR
                 domState.startFailed -> DOM_START_FAILED_SELECTOR
                 officialDictationActive && domState.canFinish -> command?.nativeSelector
-                startAvailable -> DICTATION_START_SELECTOR
+                startAvailable -> startSelector(modeSelector.selected)
                 else -> command?.nativeSelector
             }
             visibility = if (visible && views.inputModeButton.visibility == View.VISIBLE) {
@@ -283,18 +300,18 @@ internal class WebChatProductionVoiceControls(
             } else {
                 View.GONE
             }
-            background = if (finishing) {
-                InsetDrawable(
-                    GradientDrawable().apply {
-                        shape = GradientDrawable.OVAL
-                        setColor(Color.parseColor(REALTIME_VOICE_BLUE))
-                    },
-                    dp(3),
-                )
-            } else {
-                ColorDrawable(Color.TRANSPARENT)
+            background = when {
+                finishing -> ovalBackground(REALTIME_VOICE_BLUE)
+                modeSelector.selected == WebChatDictationMode.SHARED ->
+                    ovalBackground(WORK_DICTATION_SURFACE)
+                else -> ColorDrawable(Color.TRANSPARENT)
             }
-            imageTintList = if (finishing) ColorStateList.valueOf(Color.WHITE) else null
+            imageTintList = when {
+                finishing -> ColorStateList.valueOf(Color.WHITE)
+                modeSelector.selected == WebChatDictationMode.SHARED ->
+                    ColorStateList.valueOf(Color.parseColor(WORK_DICTATION_TINT))
+                else -> null
+            }
             setImageResource(
                 if (finishing) R.drawable.ic_web_chat_dictation_done
                 else R.drawable.ic_web_chat_dictation,
@@ -305,14 +322,26 @@ internal class WebChatProductionVoiceControls(
                 if (finishing) dp(10) else dp(8),
                 if (finishing) dp(10) else dp(9),
             )
-            contentDescription = tag?.toString() ?: UNBOUND_DICTATION_DESCRIPTION
+            contentDescription = when (tag) {
+                PRIVATE_START_SELECTOR -> "官网语音输入，长按切换模式"
+                SHARED_START_SELECTOR -> "工作语音输入，长按切换模式"
+                else -> tag?.toString() ?: UNBOUND_DICTATION_DESCRIPTION
+            }
             setOnClickListener(if (!visible) null else View.OnClickListener {
-                when (WebChatProductionDictationRoutePolicy.resolve(
+                val route = WebChatProductionDictationRoutePolicy.resolve(
                     privateActive = this@WebChatProductionVoiceControls.privateDictation.state().active,
                     sharedActive = this@WebChatProductionVoiceControls.sharedDictation.state().active,
                     domActive = officialDictationActive || domState.reviewPending,
                     startAvailable = startAvailable,
-                )) {
+                )
+                DebugTraceStore.record(
+                    "web_chat_dictation_tap",
+                    mapOf(
+                        "route" to route.name.lowercase(),
+                        "enabled" to isEnabled,
+                    ),
+                )
+                when (route) {
                     WebChatProductionDictationTapRoute.SUBMIT_PRIVATE ->
                         this@WebChatProductionVoiceControls.privateDictation.submit()
                     WebChatProductionDictationTapRoute.SUBMIT_SHARED ->
@@ -331,76 +360,66 @@ internal class WebChatProductionVoiceControls(
                             }
                         }
                     WebChatProductionDictationTapRoute.START ->
-                        startDictation(provider, command?.takeIf { it.action == DOM_START_COMMAND_ACTION })
+                        startDictation(modeSelector.selected)
                     WebChatProductionDictationTapRoute.NONE -> Unit
                 }
             })
-        }
-    }
-
-    private fun startDictation(
-        provider: WebChatProviderIdentity,
-        domCommand: WebChatProductionComposerCommand?,
-    ) {
-        WebChatDictationStartChain.start(
-            privateReady = privateDictation.ready(),
-            startPrivate = {
-                privateDictation.start(
-                    onStateChanged = { onNativeStateChanged() },
-                    onUnavailableBeforeCapture = { startSharedThenDom(provider, domCommand) },
-                )
-            },
-            startShared = { startSharedDictation(provider, domCommand) },
-            startDom = { startDomDictation(provider, domCommand) },
-        )
-        onNativeStateChanged()
-    }
-
-    private fun startSharedThenDom(
-        provider: WebChatProviderIdentity,
-        domCommand: WebChatProductionComposerCommand?,
-    ): Boolean {
-        val accepted = startSharedDictation(provider, domCommand) ||
-            startDomDictation(provider, domCommand)
-        onNativeStateChanged()
-        return accepted
-    }
-
-    private fun startSharedDictation(
-        provider: WebChatProviderIdentity,
-        domCommand: WebChatProductionComposerCommand?,
-    ): Boolean = sharedDictation.start(
-        onStateChanged = { onNativeStateChanged() },
-        onUnavailableBeforeCapture = {
-            startDomDictation(provider, domCommand).also { accepted ->
-                DebugTraceStore.record(
-                    "web_chat_dictation_dom_fallback",
-                    mapOf("accepted" to accepted),
-                )
-                onNativeStateChanged()
-            }
-        },
-    )
-
-    private fun startDomDictation(
-        provider: WebChatProviderIdentity,
-        command: WebChatProductionComposerCommand?,
-    ): Boolean {
-        if (command?.action != DOM_START_COMMAND_ACTION || !domSession.startRequested(readDraft())) {
-            return false
-        }
-        onNativeStateChanged()
-        inputComposerViews()?.webDictationButton?.postDelayed(
-            { onNativeStateChanged() },
-            WebChatDomDictationSession.DEFAULT_START_TIMEOUT_MS,
-        )
-        return executeCommand(provider, command).also { accepted ->
-            if (!accepted) domSession.commandResult(DOM_START_RESULT_ACTION, false)
-            DebugTraceStore.record(
-                "web_chat_dictation_dom_start",
-                mapOf("accepted" to accepted),
+            setOnLongClickListener(
+                if (privateState.active || sharedState.active || domState.controlsActive || streaming) {
+                    null
+                } else {
+                    View.OnLongClickListener { source ->
+                        source.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                        val selected = modeSelector.toggle()
+                        DebugTraceStore.record(
+                            "web_chat_dictation_mode_changed",
+                            mapOf("mode" to selected.wireValue),
+                        )
+                        showDictationFeedback(
+                            if (selected == WebChatDictationMode.PRIVATE) {
+                                "已切换到官网语音输入"
+                            } else {
+                                "已切换到工作语音输入"
+                            },
+                        )
+                        onNativeStateChanged()
+                        true
+                    }
+                },
             )
         }
+    }
+
+    private fun startDictation(mode: WebChatDictationMode) {
+        prepareDictationCapture()
+        val accepted = when (mode) {
+            WebChatDictationMode.PRIVATE -> privateDictation.ready() &&
+                privateDictation.start(
+                    onStateChanged = { onNativeStateChanged() },
+                    onUnavailableBeforeCapture = {
+                        showDictationFeedback("官网语音输入未能启动，请重试")
+                        onNativeStateChanged()
+                    },
+                )
+            WebChatDictationMode.SHARED -> sharedDictation.start(
+                onStateChanged = { onNativeStateChanged() },
+                onUnavailableBeforeCapture = { false },
+            )
+        }
+        DebugTraceStore.record(
+            "web_chat_dictation_explicit_start",
+            mapOf("mode" to mode.wireValue, "accepted" to accepted),
+        )
+        if (!accepted) {
+            showDictationFeedback(
+                if (mode == WebChatDictationMode.PRIVATE) {
+                    "官网语音正在连接，请稍后重试"
+                } else {
+                    "工作语音暂时不可用，请稍后重试"
+                },
+            )
+        }
+        onNativeStateChanged()
     }
 
     private fun finishDomDictation(
@@ -454,12 +473,36 @@ internal class WebChatProductionVoiceControls(
         }
     }
 
+    private fun ovalBackground(color: String) = InsetDrawable(
+        GradientDrawable().apply {
+            shape = GradientDrawable.OVAL
+            setColor(Color.parseColor(color))
+        },
+        dp(3),
+    )
+
+    private fun showDictationFeedback(message: String) {
+        val context = inputComposerViews()?.webDictationButton?.context ?: return
+        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+    }
+
+    private fun startSelector(mode: WebChatDictationMode): String = when (mode) {
+        WebChatDictationMode.PRIVATE -> PRIVATE_START_SELECTOR
+        WebChatDictationMode.SHARED -> SHARED_START_SELECTOR
+    }
+
+    private val WebChatDictationMode.wireValue: String
+        get() = name.lowercase()
+
     private companion object {
         const val REALTIME_VOICE_BLUE = "#2F80ED"
         const val DICTATION_CANCEL_SURFACE = "#34363A"
+        const val WORK_DICTATION_SURFACE = "#25312E"
+        const val WORK_DICTATION_TINT = "#A7D8C8"
         const val LOCAL_VOICE_DESCRIPTION = "切换语音输入"
         const val UNBOUND_DICTATION_DESCRIPTION = "web-chat-composer-command:not-bound:dictation"
-        const val DICTATION_START_SELECTOR = "web-chat-composer-command:start-dictation"
+        const val PRIVATE_START_SELECTOR = "web-chat-composer-command:private:start-dictation"
+        const val SHARED_START_SELECTOR = "web-chat-composer-command:shared:start-dictation"
         const val PRIVATE_SUBMIT_SELECTOR = "web-chat-composer-command:private:submit-dictation"
         const val PRIVATE_CANCEL_SELECTOR = "web-chat-composer-command:private:cancel-dictation"
         const val SHARED_SUBMIT_SELECTOR = "web-chat-composer-command:shared:submit-dictation"
@@ -468,7 +511,6 @@ internal class WebChatProductionVoiceControls(
         const val DOM_REVIEW_CANCEL_SELECTOR = "web-chat-composer-command:dom:review:cancel-dictation"
         const val DOM_STARTING_SELECTOR = "web-chat-composer-command:dom:starting-dictation"
         const val DOM_START_FAILED_SELECTOR = "web-chat-composer-command:dom:start-failed-dictation"
-        const val DOM_START_COMMAND_ACTION = "chatgpt_start_dictation"
         const val DOM_START_RESULT_ACTION = "start_dictation"
         val DOM_RESULT_ACTIONS = setOf(
             DOM_START_RESULT_ACTION,

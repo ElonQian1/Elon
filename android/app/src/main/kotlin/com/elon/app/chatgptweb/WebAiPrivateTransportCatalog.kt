@@ -233,7 +233,7 @@ internal object WebAiPrivateTransportCatalog {
             requestMode = "existing_work_mode_agent_voice_bridge_to_current_draft",
             healthPolicy =
                 "existing_engine_ownership_and_bounded_unavailable_cooldown",
-            fallback = "official_dom_dictation",
+            fallback = "none_explicit_long_press_selection_only",
         ),
         Entry(
             id = "android_chatgpt_private_dictation_transport_v1",
@@ -247,7 +247,7 @@ internal object WebAiPrivateTransportCatalog {
                 "same_origin_page_local_media_recorder_buffered_transcription",
             healthPolicy =
                 "pre_capture_auth_gate_capture_ownership_bounded_timeouts_and_session_circuit_breaker",
-            fallback = "shared_work_mode_bridge_then_official_dom_dictation",
+            fallback = "none_explicit_long_press_shared_work_mode_selection",
             directPostEnabled = BuildConfig.CHATGPT_PRIVATE_DICTATION_ENABLED,
         ),
         Entry(
