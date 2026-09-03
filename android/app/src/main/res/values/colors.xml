@@ -3,6 +3,7 @@
     <!-- Orbital metal workbench: APK is the canonical palette for every surface. -->
     <color name="ic_launcher_background">#07090D</color>
     <color name="elon_bg_app">#07090D</color>
+    <color name="elon_home_bg">#131313</color>
     <color name="elon_bg_canvas">#07090D</color>
     <color name="elon_bg_plaza">#07090D</color>
     <color name="elon_bg_chrome">#05070A</color>

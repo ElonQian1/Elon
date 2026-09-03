@@ -28,7 +28,7 @@ private val homeListClockFormatter = DateTimeFormatter.ofPattern("HH:mm", Locale
 private val homeListMonthDayFormatter = DateTimeFormatter.ofPattern("M月d日", Locale.CHINA)
 private val homeListYearMonthDayFormatter = DateTimeFormatter.ofPattern("yyyy年M月d日", Locale.CHINA)
 private val homeListWeekdays = arrayOf("周一", "周二", "周三", "周四", "周五", "周六", "周日")
-private const val HOME_LIST_PREVIEW_COLOR = "#80BEBEBA"
+private const val HOME_LIST_PREVIEW_COLOR = "#B9CACB"
 
 private fun formatHomeListTime(timestampMs: Long, nowMs: Long = System.currentTimeMillis()): String {
     if (timestampMs <= 0L) return ""
@@ -80,12 +80,12 @@ internal class MainHomeRows(
         val row = LinearLayout(activity).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(68)
+                dp(72)
             )
-            setBackgroundColor(activity.elonColor(R.color.elon_bg_app))
+            setBackgroundColor(Color.parseColor("#131313"))
             gravity = Gravity.CENTER_VERTICAL
             orientation = LinearLayout.HORIZONTAL
-            setPadding(dp(16), 0, dp(16), 0)
+            setPadding(dp(16), dp(12), dp(16), dp(12))
             clipChildren = false
             clipToPadding = false
             isClickable = true
@@ -97,7 +97,7 @@ internal class MainHomeRows(
 
         val middle = LinearLayout(activity).apply {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
-                marginStart = dp(13)
+                marginStart = dp(16)
             }
             orientation = LinearLayout.VERTICAL
         }
@@ -121,7 +121,7 @@ internal class MainHomeRows(
             maxLines = 1
             text = friend.lastMessage ?: "\u6682\u65e0\u6d88\u606f"
             setTextColor(Color.parseColor(HOME_LIST_PREVIEW_COLOR))
-            textSize = 13f; typeface = Typeface.create("sans-serif", Typeface.NORMAL)
+            textSize = 14f; typeface = Typeface.create("sans-serif", Typeface.NORMAL)
         })
         row.addView(middle)
 
@@ -141,12 +141,12 @@ internal class MainHomeRows(
         val row = LinearLayout(activity).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(68)
+                dp(72)
             )
-            setBackgroundColor(activity.elonColor(R.color.elon_bg_app))
+            setBackgroundColor(Color.parseColor("#131313"))
             gravity = Gravity.CENTER_VERTICAL
             orientation = LinearLayout.HORIZONTAL
-            setPadding(dp(16), 0, dp(16), 0)
+            setPadding(dp(16), dp(12), dp(16), dp(12))
             clipChildren = false
             clipToPadding = false
             isClickable = true
@@ -158,7 +158,7 @@ internal class MainHomeRows(
 
         val middle = LinearLayout(activity).apply {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
-                marginStart = dp(13)
+                marginStart = dp(16)
             }
             orientation = LinearLayout.VERTICAL
         }
@@ -178,7 +178,7 @@ internal class MainHomeRows(
             maxLines = 1
             text = group.lastMessage ?: "${group.memberCount} 位成员"
             setTextColor(Color.parseColor(HOME_LIST_PREVIEW_COLOR))
-            textSize = 13f; typeface = Typeface.create("sans-serif", Typeface.NORMAL)
+            textSize = 14f; typeface = Typeface.create("sans-serif", Typeface.NORMAL)
         })
         row.addView(middle)
 
@@ -203,7 +203,7 @@ internal class MainHomeRows(
             }
             gravity = Gravity.END
             orientation = LinearLayout.VERTICAL
-            setPadding(0, dp(14), 0, 0)
+            setPadding(0, dp(12), 0, 0)
             clipChildren = false
             clipToPadding = false
 
@@ -215,8 +215,8 @@ internal class MainHomeRows(
                     )
                     includeFontPadding = false
                     text = formatHomeListTime(value)
-                    setTextColor(Color.parseColor("#7DF4FF"))
-                    textSize = 11f; typeface = Typeface.create("sans-serif", Typeface.NORMAL); fontFeatureSettings = "tnum"
+                    setTextColor(Color.parseColor("#B9CACB"))
+                    textSize = 12f; typeface = Typeface.create("sans-serif", Typeface.NORMAL); fontFeatureSettings = "tnum"
                 })
             }
 
@@ -559,14 +559,14 @@ internal class MainHomeRows(
         showProjectMarker: Boolean = false,
         projectCompletionCount: Int = 0
     ): View {
-        val size = dp(44)
+        val size = dp(48)
         return FrameLayout(activity).apply {
             layoutParams = LinearLayout.LayoutParams(size, size)
             clipChildren = false
             clipToPadding = false
             elevation = dp(4).toFloat()
             translationZ = dp(4).toFloat()
-            val avatar = createAvatarView(friend.name, 44, 17f, friend.avatarDataUrl).apply {
+            val avatar = createAvatarView(friend.name, 48, 18f, friend.avatarDataUrl).apply {
                 layoutParams = FrameLayout.LayoutParams(size, size)
             }
             addView(avatar)
@@ -587,7 +587,7 @@ internal class MainHomeRows(
         showProjectMarker: Boolean = false,
         projectCompletionCount: Int = 0
     ): View {
-        val size = dp(44)
+        val size = dp(48)
         return FrameLayout(activity).apply {
             layoutParams = LinearLayout.LayoutParams(size, size)
             clipChildren = false

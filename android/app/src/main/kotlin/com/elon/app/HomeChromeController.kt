@@ -37,24 +37,28 @@ internal class HomeChromeController(
     }
 
     fun showHome() {
-        setNavigationBarColor(R.color.elon_bg_app)
+        setNavigationBarColor(R.color.elon_home_bg)
+        binding.toolbar.setBackgroundColor(activity.elonColor(R.color.elon_home_bg))
+        binding.contentContainer.setBackgroundColor(activity.elonColor(R.color.elon_home_bg))
         setBottomMenuVisible(true)
         binding.projectSpaceAiMenu.visibility = android.view.View.GONE
         binding.homeMenuButton.visibility = android.view.View.VISIBLE
         binding.topTitleText.apply {
             text = "消息"
-            textSize = 20f
-            typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
+            textSize = 24f
+            typeface = android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.BOLD)
             gravity = Gravity.CENTER_VERTICAL
             layoutParams = (layoutParams as FrameLayout.LayoutParams).apply {
                 gravity = Gravity.START or Gravity.CENTER_VERTICAL
-                marginStart = dp(58)
+                marginStart = dp(56)
             }
         }
         projectCreateFab.hide()
     }
 
     fun showProjectPlazaEntry() {
+        binding.toolbar.setBackgroundColor(activity.elonColor(R.color.elon_bg_app))
+        binding.contentContainer.setBackgroundColor(activity.elonColor(R.color.elon_bg_app))
         setNavigationBarColor(R.color.elon_bg_app)
         setBottomMenuVisible(true)
         binding.projectSpaceAiMenu.visibility = android.view.View.GONE
@@ -63,6 +67,8 @@ internal class HomeChromeController(
     }
 
     fun showMenuOnly() {
+        binding.toolbar.setBackgroundColor(activity.elonColor(R.color.elon_bg_app))
+        binding.contentContainer.setBackgroundColor(activity.elonColor(R.color.elon_bg_app))
         setNavigationBarColor(R.color.elon_bg_app)
         setBottomMenuVisible(true)
         binding.projectSpaceAiMenu.visibility = android.view.View.GONE

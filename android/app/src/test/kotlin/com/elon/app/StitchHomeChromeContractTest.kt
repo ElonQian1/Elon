@@ -14,8 +14,10 @@ class StitchHomeChromeContractTest {
             "android/app/src/main/kotlin/com/elon/app/HomeChromeController.kt"
         )
         assertTrue(source.contains("homeMenuButton.visibility = android.view.View.VISIBLE"))
-        assertTrue(source.contains("Typeface.create(\"sans-serif-medium\""))
-        assertTrue(source.contains("marginStart = dp(58)"))
+        assertTrue(source.contains("textSize = 24f"))
+        assertTrue(source.contains("Typeface.create(\"sans-serif\", android.graphics.Typeface.BOLD)"))
+        assertTrue(source.contains("marginStart = dp(56)"))
+        assertTrue(source.contains("R.color.elon_home_bg"))
     }
 
     private fun readRepositoryFile(relativePath: String): String {

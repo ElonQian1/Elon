@@ -339,18 +339,22 @@
       will-change: transform;
     }
     .conversation-list.pulling { transition: none; }
-    .home-filter-tabs { height: 54px; padding: 7px 12px 5px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; box-sizing: border-box; }
-    .home-filter-tab { min-width: 0; height: 30px; align-self: center; padding: 0 7px; border: 1px solid transparent; border-radius: 16px; background: transparent; color: #c7faff; display: flex; align-items: center; justify-content: center; font: inherit; cursor: pointer; }
-    .home-filter-tab.active { border-color: rgba(125,244,255,.4); background: #303536; color: #fff; }
-    .home-filter-label { display: flex; align-items: center; justify-content: center; font-size: 12px; white-space: nowrap; }
-    .home-filter-count { min-width: 20px; height: 18px; margin-left: 4px; padding: 0 4px; border-radius: 999px; background: #343839; color: #f8f8f8; display: inline-grid; place-items: center; box-sizing: border-box; font-size: 10px; line-height: 1; font-variant-numeric: tabular-nums; }
-    .home-filter-tab.active .home-filter-count { background: #7a8b8c; }
+    .home-filter-tabs { height: 78px; padding: 16px; display: flex; gap: 16px; overflow-x: auto; box-sizing: border-box; background:#131313; }
+    .home-filter-tab { flex:none; min-width: 0; height: 48px; padding: 0 16px; border: 1px solid transparent; border-radius: 24px; background: transparent; color: #b9cacb; display: flex; align-items: center; justify-content: center; font: inherit; cursor: pointer; }
+    .home-filter-tab.active { border-color: rgba(219,252,255,.3); background: #2a2a2a; color: #dbfcff; }
+    .home-filter-label { display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight:500; letter-spacing:.05em; white-space: nowrap; }
+    .home-filter-count { min-width: 20px; height: 18px; margin-left: 8px; padding: 0 8px; border-radius: 999px; background: #353534; color: #b9cacb; display: inline-grid; place-items: center; box-sizing: border-box; font-size: 12px; line-height: 1; font-variant-numeric: tabular-nums; }
+    .home-filter-tab.active .home-filter-count { background: rgba(219,252,255,.2); color:#dbfcff; }
     .home-filter-tab:focus-visible { outline: 2px solid #9cbad5; outline-offset: -2px; border-radius: 8px; }
-    .work-summary-entry { margin: 14px 16px 8px; padding: 18px; border: 1px solid rgba(0,160,170,.24); border-radius: 16px; background: #111617; color: #f8f7f4; width: calc(100% - 32px); text-align: left; display: flex; align-items: center; gap: 14px; }
+    .work-summary-entry { min-height:192px; margin: 16px 16px 32px; padding: 20px; border: 1px solid rgba(255,255,255,.1); border-radius: 12px; background: rgba(26,26,26,.8); box-shadow:0 0 30px rgba(0,240,255,.15); color: #e5e2e1; width: calc(100% - 32px); text-align: left; display: flex; align-items: center; gap: 16px; }
+    .work-summary-entry-icon { width:48px; height:48px; flex:none; border-radius:12px; background:#2a2a2a; display:grid; place-items:center; color:#b9cacb; font-size:20px; }
     .work-summary-entry-copy { flex: 1; min-width: 0; display: grid; gap: 8px; }
-    .work-summary-entry-title { font-size: 15px; }
-    .work-summary-entry-meta { color: #9aa09f; font-size: 13px; }
-    .work-summary-entry-action { padding: 9px 13px; border-radius: 999px; background: #353a42; white-space: nowrap; }
+    .work-summary-entry-title-row { display:flex; align-items:center; gap:8px; }
+    .work-summary-entry-title { font-size: 18px; font-weight:700; }
+    .work-summary-entry-beta { padding:2px 8px; border:1px solid rgba(86,51,152,.5); border-radius:999px; background:rgba(86,51,152,.3); color:#d2bbff; font-size:12px; }
+    .work-summary-entry-attention { color:#e5e2e1; font-size:16px; font-weight:500; }
+    .work-summary-entry-meta { color: #b9cacb; font-size: 14px; }
+    .work-summary-entry-action { padding: 6px 12px; border-radius: 999px; background: #353534; white-space: nowrap; font-size:14px; }
     .work-summary-page { position: absolute; inset: 0; overflow-y: auto; z-index: 20; padding: 0 19px max(40px, env(safe-area-inset-bottom)) 15px; background: #07090d; color: #f8f7f4; box-sizing: border-box; }
     .work-summary-page.hidden { display: none; }
     .work-summary-date { position: relative; display: grid; place-items: center; height: 38px; font-size: 15px; }
@@ -443,12 +447,12 @@
     .search-bar input { width: 100%; background: var(--bg-hint,var(--panel-2)); border: 1px solid var(--line); border-radius: 20px; padding: 7px 14px; color: var(--ink); font-size: 14px; outline: none; box-sizing: border-box; }
     .search-bar input::placeholder { color: var(--ink-soft); }
     .conversation-item {
-      height: 76px;
-      background: var(--bg);
+      height: 72px;
+      background: #131313;
       display: flex;
       align-items: center;
-      padding: 0 14px 0 16px;
-      gap: 8px;
+      padding: 12px 16px;
+      gap: 16px;
       cursor: pointer;
       border: 0;
       width: 100%;
@@ -467,9 +471,9 @@
       50% { background: #2A2A2A; }
     }
     .conversation-item .brand {
-      width: 44px; height: 44px;
-      flex: 0 0 44px;
-      border-radius: 8px;
+      width: 48px; height: 48px;
+      flex: 0 0 48px;
+      border-radius: 16px;
       overflow: visible;
       background: var(--panel);
       display: flex; align-items: center; justify-content: center;
@@ -571,7 +575,7 @@
       color: #111820;
     }
     .conversation-item .sub {
-      font-size: 13px; color: var(--ink-list-preview);
+      font-size: 14px; color: #b9cacb;
       margin-top: 4px;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
@@ -582,10 +586,10 @@
       display: flex;
       flex-direction: column;
       align-items: flex-end;
-      padding-top: 14px;
+      padding-top: 12px;
     }
     .conversation-item .time {
-      font-size: 12px; color: var(--ink-list-preview);
+      font-size: 12px; color: #b9cacb;
       flex-shrink: 0;
       text-align: right;
       white-space: nowrap;
@@ -7869,7 +7873,7 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
     const summaryMeta = todaySummary.attention.length > 0
       ? `今天有 ${todaySummary.attention.length} 个项目需要你关注`
       : `今天暂无待处理事项，已分析 ${todaySummary.projectCount} 个项目`;
-    summaryEntry.innerHTML = `<span class="work-summary-entry-copy"><span class="work-summary-entry-title">AI 工作摘要</span><span class="work-summary-entry-meta">${escapeHtml(summaryMeta)}</span></span><span class="work-summary-entry-action">查看详情 ›</span>`;
+    summaryEntry.innerHTML = `<span class="work-summary-entry-icon" aria-hidden="true">••</span><span class="work-summary-entry-copy"><span class="work-summary-entry-title-row"><span class="work-summary-entry-title">AI 工作摘要</span><span class="work-summary-entry-beta">Beta</span></span><span class="work-summary-entry-attention">${escapeHtml(summaryMeta)}</span><span class="work-summary-entry-meta">${todaySummary.attention.length} 条重要消息 · ${todaySummary.projectCount} 个待处理事项</span></span><span class="work-summary-entry-action">查看详情 ›</span>`;
     summaryEntry.addEventListener('click', openWorkSummaryPage);
     conversationList.appendChild(summaryEntry);
     allItems.forEach((item) => conversationList.appendChild(createContactRow(item)));
