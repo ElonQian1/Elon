@@ -265,11 +265,13 @@ internal object WebAiPrivateTransportCatalog {
             id = "android_chatgpt_native_response_read_aloud_v1",
             provider = "chatgpt",
             status = "implemented_device_pending",
-            verification = "targeted_chunking_and_message_action_tests_passed",
+            verification =
+                "targeted_chunk_sequence_stale_callback_failure_timeout_and_message_action_tests_passed_device_pending",
             productionDefault = true,
             runtimeEnabled = true,
             requestMode = "native_bounded_chunk_tts_for_current_response",
-            healthPolicy = "single_active_message_interruptible_full_text_chunk_sequence",
+            healthPolicy =
+                "single_active_message_generation_guarded_chunks_failure_recreate_and_bounded_watchdog",
             fallback = "official_message_actions_and_webview",
         ),
         Entry(

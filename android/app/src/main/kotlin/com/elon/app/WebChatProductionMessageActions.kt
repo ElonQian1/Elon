@@ -144,7 +144,10 @@ internal class WebChatProductionMessageActionCoordinator(
     private val openOfficialFallback: () -> Unit,
 ) {
     private val clipboard = ChatGptMessageClipboard(activity)
-    private val nativeReadAloud = WebChatNativeReadAloudController(activity)
+    private val nativeReadAloud = WebChatNativeReadAloudController(
+        context = activity,
+        onFailure = { showFeedback("朗读暂时不可用，请检查系统语音设置后重试") },
+    )
 
     fun handle(message: ChatMessage, action: WebChatMessageAction) {
         val metadata = message.webChatMessage ?: return

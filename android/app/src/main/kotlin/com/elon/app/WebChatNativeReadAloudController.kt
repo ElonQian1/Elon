@@ -58,15 +58,42 @@ internal object WebChatReadAloudChunkPolicy {
     private const val DEFAULT_MAX_CHARS = 180
 }
 
+internal interface WebChatReadAloudSpeaker {
+    fun speak(text: String, onDone: () -> Unit, onError: () -> Unit)
+    fun stop()
+    fun release()
+}
+
+internal fun interface WebChatReadAloudCancellation {
+    fun cancel()
+}
+
+internal interface WebChatReadAloudScheduler {
+    fun post(task: () -> Unit)
+    fun postDelayed(delayMs: Long, task: () -> Unit): WebChatReadAloudCancellation
+}
+
 internal class WebChatNativeReadAloudController(
-    context: android.content.Context,
-    private val main: Handler = Handler(Looper.getMainLooper()),
+    private val speakerFactory: () -> WebChatReadAloudSpeaker,
+    private val scheduler: WebChatReadAloudScheduler,
+    private val onFailure: () -> Unit = {},
 ) {
-    private val speakerDelegate = lazy { VoiceSpeaker(context, respectUserToggle = false) }
-    private val speaker by speakerDelegate
+    constructor(
+        context: android.content.Context,
+        main: Handler = Handler(Looper.getMainLooper()),
+        onFailure: () -> Unit = {},
+    ) : this(
+        speakerFactory = { AndroidWebChatReadAloudSpeaker(context) },
+        scheduler = HandlerWebChatReadAloudScheduler(main),
+        onFailure = onFailure,
+    )
+
+    private var speaker: WebChatReadAloudSpeaker? = null
     private var generation = 0
+    private var chunkGeneration = 0
     private var activeMessageId: String? = null
     private var pending = ArrayDeque<String>()
+    private var watchdog: WebChatReadAloudCancellation? = null
 
     fun isActive(messageId: String): Boolean = activeMessageId == messageId
 
@@ -88,25 +115,94 @@ internal class WebChatNativeReadAloudController(
 
     fun stop() {
         generation += 1
+        chunkGeneration += 1
         activeMessageId = null
         pending.clear()
-        if (speakerDelegate.isInitialized()) speaker.stop()
+        clearWatchdog()
+        speaker?.stop()
     }
 
     fun release() {
         stop()
-        if (speakerDelegate.isInitialized()) speaker.release()
+        speaker?.release()
+        speaker = null
     }
 
     private fun speakNext(token: Int) {
         if (token != generation || activeMessageId == null) return
         val next = pending.pollFirst()
         if (next == null) {
+            clearWatchdog()
             activeMessageId = null
             return
         }
-        speaker.speak(next, onDone = {
-            main.post { speakNext(token) }
-        })
+        val currentSpeaker = speaker ?: runCatching(speakerFactory).getOrElse {
+            fail(token, ++chunkGeneration)
+            return
+        }.also { speaker = it }
+        val chunkToken = ++chunkGeneration
+        clearWatchdog()
+        watchdog = scheduler.postDelayed(CHUNK_TIMEOUT_MS) {
+            settle(token, chunkToken, succeeded = false)
+        }
+        currentSpeaker.speak(
+            next,
+            onDone = { scheduler.post { settle(token, chunkToken, succeeded = true) } },
+            onError = { scheduler.post { settle(token, chunkToken, succeeded = false) } },
+        )
+    }
+
+    private fun settle(token: Int, chunkToken: Int, succeeded: Boolean) {
+        if (token != generation || chunkToken != chunkGeneration || activeMessageId == null) return
+        clearWatchdog()
+        if (succeeded) speakNext(token) else fail(token, chunkToken)
+    }
+
+    private fun fail(token: Int, chunkToken: Int) {
+        if (token != generation || chunkToken != chunkGeneration) return
+        generation += 1
+        chunkGeneration += 1
+        activeMessageId = null
+        pending.clear()
+        clearWatchdog()
+        val failedSpeaker = speaker
+        speaker = null
+        failedSpeaker?.release()
+        onFailure()
+    }
+
+    private fun clearWatchdog() {
+        watchdog?.cancel()
+        watchdog = null
+    }
+
+    private companion object {
+        const val CHUNK_TIMEOUT_MS = 180_000L
+    }
+}
+
+private class AndroidWebChatReadAloudSpeaker(context: android.content.Context) : WebChatReadAloudSpeaker {
+    private val delegate = VoiceSpeaker(context, respectUserToggle = false)
+
+    override fun speak(text: String, onDone: () -> Unit, onError: () -> Unit) {
+        delegate.speak(text, onDone = onDone, onError = onError)
+    }
+
+    override fun stop() = delegate.stop()
+
+    override fun release() = delegate.release()
+}
+
+private class HandlerWebChatReadAloudScheduler(
+    private val handler: Handler,
+) : WebChatReadAloudScheduler {
+    override fun post(task: () -> Unit) {
+        handler.post(task)
+    }
+
+    override fun postDelayed(delayMs: Long, task: () -> Unit): WebChatReadAloudCancellation {
+        val runnable = Runnable(task)
+        handler.postDelayed(runnable, delayMs)
+        return WebChatReadAloudCancellation { handler.removeCallbacks(runnable) }
     }
 }

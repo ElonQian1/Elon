@@ -205,8 +205,11 @@ Assistant response read-aloud no longer depends on the official message control 
 present in the current DOM snapshot. Every non-empty ChatGPT assistant message exposes a
 native action that uses the existing `VoiceSpeaker`, splits the complete answer into
 bounded sentence chunks, and supports an immediate second-tap stop without logging or
-persisting text. Unsupported official message actions remain available through the same
-menu and full WebView fallback. The stable capability is
+persisting text. Each chunk now has a unique completion token, so a late callback from a
+stopped utterance cannot advance a newer request. Initialization and playback failures
+settle the active action, rebuild the speaker on the next attempt, and a bounded watchdog
+prevents the UI from remaining stuck in the playing state. Unsupported official message
+actions remain available through the same menu and full WebView fallback. The stable capability is
 `android_chatgpt_native_response_read_aloud_v1`; device audio acceptance remains pending.
 
 Conversation rows expose a native project destination picker backed by the bounded

@@ -346,6 +346,26 @@ class WebAiPrivateTransportCatalogTest {
             imageGenerationStatus.getString("fallback"),
         )
 
+        val responseReadAloud = values.first {
+            it.getString("capability_id") ==
+                "android_chatgpt_native_response_read_aloud_v1"
+        }
+        assertEquals(
+            "implemented_device_pending",
+            responseReadAloud.getString("implementation_status"),
+        )
+        assertEquals(
+            "targeted_chunk_sequence_stale_callback_failure_timeout_and_message_action_tests_passed_device_pending",
+            responseReadAloud.getString("verification_status"),
+        )
+        assertTrue(responseReadAloud.getBoolean("production_default"))
+        assertTrue(responseReadAloud.getBoolean("runtime_enabled"))
+        assertFalse(responseReadAloud.getBoolean("direct_post_enabled"))
+        assertEquals(
+            "official_message_actions_and_webview",
+            responseReadAloud.getString("fallback"),
+        )
+
         val richContent = values.first {
             it.getString("capability_id") ==
                 "android_chatgpt_private_rich_content_native_view_v1"

@@ -38,11 +38,9 @@ internal class VoiceSpeaker(
     private val appContext: Context = context.applicationContext
     private var tts: TextToSpeech? = TextToSpeech(appContext, this)
     private var ready = false
-    private var pendingText: String? = null
-    private var pendingProfile: VoiceTtsProfile? = null
-    private var pendingDone: (() -> Unit)? = null
-    private var pendingVoiceIdOverride: String? = null
-    private var activeDone: (() -> Unit)? = null
+    private var released = false
+    private var pendingSpeech: PendingSpeech? = null
+    private val completionLedger = VoiceSpeakerCompletionLedger()
     private var preferredVoiceApplied = false
     private val serverTtsPlayer = VoiceServerTtsPlayer(appContext)
 
@@ -52,9 +50,22 @@ internal class VoiceSpeaker(
     override fun onInit(status: Int) {
         if (status != TextToSpeech.SUCCESS) {
             Log.w(TAG, "TTS 初始化失败 status=$status")
+            ready = false
+            tts?.shutdown()
+            tts = null
+            failPendingSpeech()
             return
         }
-        val engine = tts ?: return
+        val engine = tts ?: run {
+            failPendingSpeech()
+            return
+        }
+        if (released) {
+            engine.shutdown()
+            tts = null
+            failPendingSpeech()
+            return
+        }
         val result = engine.setLanguage(Locale.SIMPLIFIED_CHINESE)
         if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
             Log.w(TAG, "zh-CN 不可用，使用系统默认语言")
@@ -63,26 +74,24 @@ internal class VoiceSpeaker(
         applyPreferredVoice(engine)
         applyProfile(engine, VoiceTtsEmotion.profileFor(""))
         engine.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
-            override fun onStart(utteranceId: String?) {}
+            override fun onStart(utteranceId: String?) {
+                if (completionLedger.isActive(utteranceId)) Log.d(TAG, "TTS utterance started")
+            }
             override fun onDone(utteranceId: String?) {
-                finishSpeakCallback()
+                finishSpeakCallback(utteranceId, succeeded = true)
             }
             @Deprecated("Deprecated in API 21", ReplaceWith("onError(utteranceId, errorCode)"))
             override fun onError(utteranceId: String?) {
-                finishSpeakCallback()
+                finishSpeakCallback(utteranceId, succeeded = false)
+            }
+            override fun onError(utteranceId: String?, errorCode: Int) {
+                finishSpeakCallback(utteranceId, succeeded = false)
             }
         })
         ready = true
-        pendingText?.let { text ->
-            val profile = pendingProfile
-            val done = pendingDone
-            val voiceIdOverride = pendingVoiceIdOverride
-            pendingText = null
-            pendingProfile = null
-            pendingDone = null
-            pendingVoiceIdOverride = null
-            speak(text, profile, done, voiceIdOverride)
-        }
+        val pending = pendingSpeech
+        pendingSpeech = null
+        pending?.let { speak(it.text, it.profile, it.onDone, it.voiceIdOverride, it.onError) }
         Log.d(TAG, "TTS 初始化成功")
     }
 
@@ -94,7 +103,8 @@ internal class VoiceSpeaker(
         text: String,
         profile: VoiceTtsProfile? = null,
         onDone: (() -> Unit)? = null,
-        voiceIdOverride: String? = null
+        voiceIdOverride: String? = null,
+        onError: (() -> Unit)? = null,
     ) {
         if (respectUserToggle && !isTtsEnabled(appContext)) {
             onDone?.invoke()
@@ -107,24 +117,24 @@ internal class VoiceSpeaker(
         }
         val engine = tts
         if (!ready || engine == null) {
-            pendingText = content
-            pendingProfile = profile
-            pendingDone = onDone
-            pendingVoiceIdOverride = voiceIdOverride
+            if (engine == null || released) {
+                (onError ?: onDone)?.invoke()
+            } else {
+                pendingSpeech = PendingSpeech(content, profile, onDone, voiceIdOverride, onError)
+            }
             return
         }
-        pendingText = null
-        pendingProfile = null
-        pendingDone = null
-        pendingVoiceIdOverride = null
+        pendingSpeech = null
+        completionLedger.cancel()
         serverTtsPlayer.stop()
         if (tts?.isSpeaking == true) tts?.stop()
         val resolvedProfile = profile ?: VoiceTtsEmotion.profileFor(content)
         val effectiveVoiceId = resolveVoiceId(voiceIdOverride)
-        activeDone = onDone
+        val requestId = UUID.randomUUID().toString()
+        completionLedger.begin(requestId, onDone, onError)
         if (VoiceTtsVoiceCatalog.isSystemVoiceId(effectiveVoiceId)) {
             Log.d(TAG, "使用手机系统 TTS profile=${resolvedProfile.id}")
-            speakWithSystem(engine, content, resolvedProfile, onDone)
+            speakWithSystem(engine, content, resolvedProfile, requestId)
             return
         }
         Log.d(TAG, "尝试服务器情绪 TTS profile=${resolvedProfile.id}")
@@ -132,17 +142,18 @@ internal class VoiceSpeaker(
                 text = content,
                 profile = resolvedProfile,
                 voiceIdOverride = effectiveVoiceId,
-                onDone = { finishSpeakCallback() },
+                onDone = { finishSpeakCallback(requestId, succeeded = true) },
                 onFallback = {
+                    if (!completionLedger.isActive(requestId)) return@trySpeak
                     Log.w(TAG, "服务器情绪 TTS 不可用，降级系统 TTS profile=${resolvedProfile.id}")
-                    speakWithSystem(engine, content, resolvedProfile, onDone)
+                    speakWithSystem(engine, content, resolvedProfile, requestId)
                 }
             )
         ) {
             return
         }
         Log.w(TAG, "服务器情绪 TTS 被跳过，降级系统 TTS profile=${resolvedProfile.id}")
-        speakWithSystem(engine, content, resolvedProfile, onDone)
+        speakWithSystem(engine, content, resolvedProfile, requestId)
     }
 
     private fun resolveVoiceId(voiceIdOverride: String?): String =
@@ -155,33 +166,27 @@ internal class VoiceSpeaker(
         engine: TextToSpeech,
         content: String,
         profile: VoiceTtsProfile,
-        onDone: (() -> Unit)?
+        requestId: String,
     ) {
-        activeDone = onDone
         applyProfile(engine, profile)
         val params = Bundle()
-        val result = engine.speak(content, TextToSpeech.QUEUE_FLUSH, params, UUID.randomUUID().toString())
-        if (result == TextToSpeech.ERROR) finishSpeakCallback()
+        val result = engine.speak(content, TextToSpeech.QUEUE_FLUSH, params, requestId)
+        if (result == TextToSpeech.ERROR) finishSpeakCallback(requestId, succeeded = false)
     }
 
     /** 立即停止当前朗读（用户开始新一轮语音输入时调用）。 */
     fun stop() {
-        pendingText = null
-        pendingProfile = null
-        pendingDone = null
-        pendingVoiceIdOverride = null
-        activeDone = null
+        pendingSpeech = null
+        completionLedger.cancel()
         serverTtsPlayer.stop()
         if (tts?.isSpeaking == true) tts?.stop()
     }
 
     /** 释放资源（Activity onDestroy）。 */
     fun release() {
-        pendingText = null
-        pendingProfile = null
-        pendingDone = null
-        pendingVoiceIdOverride = null
-        activeDone = null
+        released = true
+        pendingSpeech = null
+        completionLedger.cancel()
         serverTtsPlayer.release()
         tts?.stop()
         tts?.shutdown()
@@ -190,10 +195,16 @@ internal class VoiceSpeaker(
         preferredVoiceApplied = false
     }
 
-    private fun finishSpeakCallback() {
-        val callback = activeDone
-        activeDone = null
-        callback?.invoke()
+    private fun finishSpeakCallback(requestId: String?, succeeded: Boolean) {
+        if (completionLedger.complete(requestId, succeeded)) {
+            Log.d(TAG, if (succeeded) "TTS utterance completed" else "TTS utterance failed")
+        }
+    }
+
+    private fun failPendingSpeech() {
+        val pending = pendingSpeech
+        pendingSpeech = null
+        pending?.fail()
     }
 
     private fun applyProfile(engine: TextToSpeech, profile: VoiceTtsProfile) {
@@ -230,4 +241,45 @@ internal class VoiceSpeaker(
         score -= voice.latency / 20
         return score
     }
+
+    private data class PendingSpeech(
+        val text: String,
+        val profile: VoiceTtsProfile?,
+        val onDone: (() -> Unit)?,
+        val voiceIdOverride: String?,
+        val onError: (() -> Unit)?,
+    ) {
+        fun fail() = (onError ?: onDone)?.invoke()
+    }
+}
+
+internal class VoiceSpeakerCompletionLedger {
+    private var active: Active? = null
+
+    @Synchronized
+    fun begin(requestId: String, onDone: (() -> Unit)?, onError: (() -> Unit)?) {
+        active = Active(requestId, onDone, onError)
+    }
+
+    @Synchronized
+    fun cancel() {
+        active = null
+    }
+
+    @Synchronized
+    fun isActive(requestId: String?): Boolean = requestId != null && active?.requestId == requestId
+
+    fun complete(requestId: String?, succeeded: Boolean): Boolean {
+        val completion = synchronized(this) {
+            active?.takeIf { requestId != null && it.requestId == requestId }?.also { active = null }
+        } ?: return false
+        if (succeeded) completion.onDone?.invoke() else (completion.onError ?: completion.onDone)?.invoke()
+        return true
+    }
+
+    private data class Active(
+        val requestId: String,
+        val onDone: (() -> Unit)?,
+        val onError: (() -> Unit)?,
+    )
 }
