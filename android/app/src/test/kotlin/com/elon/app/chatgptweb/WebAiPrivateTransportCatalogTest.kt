@@ -130,7 +130,7 @@ class WebAiPrivateTransportCatalogTest {
             projectMove.getString("implementation_status"),
         )
         assertEquals(
-            "direct_dom_activation_confirmation_and_scoped_refresh_tests_pending",
+            "targeted_dom_activation_confirmation_and_scoped_refresh_tests_passed_device_pending",
             projectMove.getString("verification_status"),
         )
         assertTrue(projectMove.getBoolean("production_default"))
@@ -150,7 +150,7 @@ class WebAiPrivateTransportCatalogTest {
         }
         assertEquals("completed", conversationManagement.getString("implementation_status"))
         assertEquals(
-            "targeted_action_policy_and_adaptive_control_tests_passed_device_mutations_pending",
+            "device_pin_round_trip_v1_1_1399_adapter_218_other_mutations_pending",
             conversationManagement.getString("verification_status"),
         )
         assertTrue(conversationManagement.getBoolean("production_default"))
@@ -165,14 +165,30 @@ class WebAiPrivateTransportCatalogTest {
             it.getString("capability_id") ==
                 "android_chatgpt_conversation_navigation_receipt_reconciliation_v1"
         }
-        assertEquals("implemented_device_pending", navigationReceipt.getString("implementation_status"))
+        assertEquals("completed", navigationReceipt.getString("implementation_status"))
         assertEquals(
-            "targeted_exact_identity_reconciliation_tests_passed",
+            "device_verified_v1_1_1399_adapter_218",
             navigationReceipt.getString("verification_status"),
         )
         assertTrue(navigationReceipt.getBoolean("production_default"))
         assertTrue(navigationReceipt.getBoolean("runtime_enabled"))
         assertFalse(navigationReceipt.getBoolean("direct_post_enabled"))
+
+        val nativeDictation = values.first {
+            it.getString("capability_id") == "android_chatgpt_native_dictation_v1"
+        }
+        assertEquals(
+            "implemented_device_pending",
+            nativeDictation.getString("implementation_status"),
+        )
+        assertEquals(
+            "targeted_explicit_two_mode_bridge_and_composer_tests_passed_device_pending",
+            nativeDictation.getString("verification_status"),
+        )
+        assertEquals(
+            "none_explicit_long_press_selection_only",
+            nativeDictation.getString("fallback"),
+        )
 
         val googleSnapshotCache = values.first {
             it.getString("capability_id") ==

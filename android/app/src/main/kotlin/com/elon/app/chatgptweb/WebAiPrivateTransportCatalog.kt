@@ -36,8 +36,8 @@ internal object WebAiPrivateTransportCatalog {
         Entry(
             id = "android_chatgpt_conversation_navigation_receipt_reconciliation_v1",
             provider = "chatgpt",
-            status = "implemented_device_pending",
-            verification = "targeted_exact_identity_reconciliation_tests_passed",
+            status = "completed",
+            verification = "device_verified_v1_1_1399_adapter_218",
             productionDefault = true,
             runtimeEnabled = true,
             requestMode = "exact_target_snapshot_navigation_receipt_reconciliation",
@@ -227,7 +227,7 @@ internal object WebAiPrivateTransportCatalog {
             id = "android_chatgpt_native_dictation_v1",
             provider = "chatgpt",
             status = "implemented_device_pending",
-            verification = "targeted_shared_bridge_composer_tests_pending",
+            verification = "targeted_explicit_two_mode_bridge_and_composer_tests_passed_device_pending",
             productionDefault = true,
             runtimeEnabled = true,
             requestMode = "existing_work_mode_agent_voice_bridge_to_current_draft",
@@ -265,7 +265,8 @@ internal object WebAiPrivateTransportCatalog {
             id = "android_chatgpt_native_conversation_project_move_v1",
             provider = "chatgpt",
             status = "implemented_device_pending",
-            verification = "direct_dom_activation_confirmation_and_scoped_refresh_tests_pending",
+            verification =
+                "targeted_dom_activation_confirmation_and_scoped_refresh_tests_passed_device_pending",
             productionDefault = true,
             runtimeEnabled = true,
             requestMode =
@@ -279,7 +280,7 @@ internal object WebAiPrivateTransportCatalog {
             provider = "chatgpt",
             status = "completed",
             verification =
-                "targeted_action_policy_and_adaptive_control_tests_passed_device_mutations_pending",
+                "device_pin_round_trip_v1_1_1399_adapter_218_other_mutations_pending",
             productionDefault = true,
             runtimeEnabled = true,
             requestMode =
