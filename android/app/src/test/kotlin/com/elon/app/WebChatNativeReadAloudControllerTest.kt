@@ -81,6 +81,29 @@ class WebChatNativeReadAloudControllerTest {
     }
 
     @Test
+    fun synchronousPlaybackFailureSettlesAndRebuildsTheSpeaker() {
+        val first = FakeSpeaker(throwOnNextSpeak = true)
+        val second = FakeSpeaker()
+        val speakers = ArrayDeque(listOf(first, second))
+        var failures = 0
+        val controller = WebChatNativeReadAloudController(
+            speakerFactory = { speakers.removeFirst() },
+            scheduler = FakeScheduler(),
+            onFailure = { failures += 1 },
+        )
+
+        controller.toggle("first", "第一次")
+
+        assertFalse(controller.isActive("first"))
+        assertEquals(1, failures)
+        assertEquals(1, first.releaseCount)
+
+        controller.toggle("second", "第二次")
+        assertTrue(controller.isActive("second"))
+        assertEquals(1, second.calls.size)
+    }
+
+    @Test
     fun secondToggleStopsTheSameMessage() {
         val speakers = mutableListOf<FakeSpeaker>()
         val controller = controller(speakers = speakers)
@@ -101,12 +124,18 @@ class WebChatNativeReadAloudControllerTest {
         onFailure = onFailure,
     )
 
-    private class FakeSpeaker : WebChatReadAloudSpeaker {
+    private class FakeSpeaker(
+        private var throwOnNextSpeak: Boolean = false,
+    ) : WebChatReadAloudSpeaker {
         val calls = mutableListOf<Call>()
         var stopCount = 0
         var releaseCount = 0
 
         override fun speak(text: String, onDone: () -> Unit, onError: () -> Unit) {
+            if (throwOnNextSpeak) {
+                throwOnNextSpeak = false
+                throw IllegalStateException("synthetic playback failure")
+            }
             calls += Call(text, onDone, onError)
         }
 

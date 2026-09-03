@@ -145,11 +145,15 @@ internal class WebChatNativeReadAloudController(
         watchdog = scheduler.postDelayed(CHUNK_TIMEOUT_MS) {
             settle(token, chunkToken, succeeded = false)
         }
-        currentSpeaker.speak(
-            next,
-            onDone = { scheduler.post { settle(token, chunkToken, succeeded = true) } },
-            onError = { scheduler.post { settle(token, chunkToken, succeeded = false) } },
-        )
+        runCatching {
+            currentSpeaker.speak(
+                next,
+                onDone = { scheduler.post { settle(token, chunkToken, succeeded = true) } },
+                onError = { scheduler.post { settle(token, chunkToken, succeeded = false) } },
+            )
+        }.onFailure {
+            scheduler.post { settle(token, chunkToken, succeeded = false) }
+        }
     }
 
     private fun settle(token: Int, chunkToken: Int, succeeded: Boolean) {

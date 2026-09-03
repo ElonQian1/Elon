@@ -266,7 +266,7 @@ internal object WebAiPrivateTransportCatalog {
             provider = "chatgpt",
             status = "implemented_device_pending",
             verification =
-                "targeted_chunk_sequence_stale_callback_failure_timeout_and_message_action_tests_passed_device_pending",
+                "targeted_chunk_sequence_stale_callback_sync_failure_timeout_and_message_action_tests_passed_device_pending",
             productionDefault = true,
             runtimeEnabled = true,
             requestMode = "native_bounded_chunk_tts_for_current_response",

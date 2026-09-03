@@ -355,7 +355,7 @@ class WebAiPrivateTransportCatalogTest {
             responseReadAloud.getString("implementation_status"),
         )
         assertEquals(
-            "targeted_chunk_sequence_stale_callback_failure_timeout_and_message_action_tests_passed_device_pending",
+            "targeted_chunk_sequence_stale_callback_sync_failure_timeout_and_message_action_tests_passed_device_pending",
             responseReadAloud.getString("verification_status"),
         )
         assertTrue(responseReadAloud.getBoolean("production_default"))
