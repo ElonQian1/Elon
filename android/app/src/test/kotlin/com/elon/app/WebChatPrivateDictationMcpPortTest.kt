@@ -48,10 +48,7 @@ class WebChatPrivateDictationMcpPortTest {
         private val current: WebChatNativeDictationState,
     ) : WebChatPrivateDictationPort {
         override fun ready() = true
-        override fun start(
-            onStateChanged: (WebChatNativeDictationState) -> Unit,
-            onUnavailableBeforeCapture: () -> Unit,
-        ) = true
+        override fun start(onStateChanged: (WebChatNativeDictationState) -> Unit) = true
         override fun submit() = true
         override fun cancel() = true
         override fun state() = current

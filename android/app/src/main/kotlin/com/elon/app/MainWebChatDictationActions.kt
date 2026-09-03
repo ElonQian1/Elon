@@ -8,10 +8,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 
 internal interface WebChatNativeDictationPort {
-    fun start(
-        onStateChanged: (WebChatNativeDictationState) -> Unit,
-        onUnavailableBeforeCapture: () -> Boolean = { false },
-    ): Boolean
+    fun start(onStateChanged: (WebChatNativeDictationState) -> Unit): Boolean
     fun submit(): Boolean
     fun cancel(): Boolean
     fun state(): WebChatNativeDictationState
@@ -26,7 +23,6 @@ internal class MainWebChatDictationActions(
     private val writeDraft: (String) -> Unit,
 ) : WebChatNativeDictationPort {
     private var stateListener: (WebChatNativeDictationState) -> Unit = {}
-    private var unavailableFallback: () -> Boolean = { false }
     private var unavailableUntilMs = 0L
     private val sessionDelegate = lazy {
         WebChatNativeDictationSession(
@@ -38,12 +34,8 @@ internal class MainWebChatDictationActions(
         )
     }
 
-    override fun start(
-        onStateChanged: (WebChatNativeDictationState) -> Unit,
-        onUnavailableBeforeCapture: () -> Boolean,
-    ): Boolean {
+    override fun start(onStateChanged: (WebChatNativeDictationState) -> Unit): Boolean {
         stateListener = onStateChanged
-        unavailableFallback = onUnavailableBeforeCapture
         if (ContextCompat.checkSelfPermission(activity, Manifest.permission.RECORD_AUDIO) !=
             PackageManager.PERMISSION_GRANTED
         ) {
@@ -83,7 +75,6 @@ internal class MainWebChatDictationActions(
     override fun destroy() {
         initializedSession()?.destroy()
         stateListener = {}
-        unavailableFallback = { false }
     }
 
     private fun initializedSession(): WebChatNativeDictationSession? =
@@ -92,29 +83,24 @@ internal class MainWebChatDictationActions(
     private fun onUnavailable(message: String) {
         val emptyRecognition = message == EMPTY_RECOGNITION
         if (!emptyRecognition) {
-            unavailableUntilMs = System.currentTimeMillis() + FALLBACK_COOLDOWN_MS
+            unavailableUntilMs = System.currentTimeMillis() + UNAVAILABLE_COOLDOWN_MS
         }
-        val fallback = unavailableFallback
-        unavailableFallback = { false }
-        val fallbackAccepted = !emptyRecognition && runCatching(fallback).getOrDefault(false)
         DebugTraceStore.record(
             "web_chat_dictation_shared_unavailable",
             mapOf(
                 "reason" to if (emptyRecognition) "empty_recognition" else "engine_unavailable",
-                "fallback_accepted" to fallbackAccepted,
+                "automatic_cross_mode_fallback" to false,
             ),
         )
-        if (!fallbackAccepted) {
-            Toast.makeText(
-                activity,
-                if (emptyRecognition) "没听清，请重试" else "语音输入暂时不可用，请稍后重试",
-                Toast.LENGTH_SHORT,
-            ).show()
-        }
+        Toast.makeText(
+            activity,
+            if (emptyRecognition) "没听清，请重试" else "工作语音输入暂时不可用，请稍后重试",
+            Toast.LENGTH_SHORT,
+        ).show()
     }
 
     private companion object {
         const val EMPTY_RECOGNITION = "没有识别到语音"
-        const val FALLBACK_COOLDOWN_MS = 60_000L
+        const val UNAVAILABLE_COOLDOWN_MS = 60_000L
     }
 }

@@ -394,17 +394,8 @@ internal class WebChatProductionVoiceControls(
         prepareDictationCapture()
         val accepted = when (mode) {
             WebChatDictationMode.PRIVATE -> privateDictation.ready() &&
-                privateDictation.start(
-                    onStateChanged = { onNativeStateChanged() },
-                    onUnavailableBeforeCapture = {
-                        showDictationFeedback("官网语音输入未能启动，请重试")
-                        onNativeStateChanged()
-                    },
-                )
-            WebChatDictationMode.SHARED -> sharedDictation.start(
-                onStateChanged = { onNativeStateChanged() },
-                onUnavailableBeforeCapture = { false },
-            )
+                privateDictation.start { onNativeStateChanged() }
+            WebChatDictationMode.SHARED -> sharedDictation.start { onNativeStateChanged() }
         }
         DebugTraceStore.record(
             "web_chat_dictation_explicit_start",

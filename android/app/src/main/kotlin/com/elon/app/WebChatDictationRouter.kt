@@ -48,10 +48,7 @@ internal class WebChatDictationModeSelector(
 
 internal interface WebChatPrivateDictationPort {
     fun ready(): Boolean
-    fun start(
-        onStateChanged: (WebChatNativeDictationState) -> Unit,
-        onUnavailableBeforeCapture: () -> Unit,
-    ): Boolean
+    fun start(onStateChanged: (WebChatNativeDictationState) -> Unit): Boolean
     fun submit(): Boolean
     fun cancel(): Boolean
     fun state(): WebChatNativeDictationState
@@ -63,10 +60,7 @@ internal interface WebChatPrivateDictationPort {
 internal object WebChatUnavailablePrivateDictationPort : WebChatPrivateDictationPort {
     override fun ready(): Boolean = false
 
-    override fun start(
-        onStateChanged: (WebChatNativeDictationState) -> Unit,
-        onUnavailableBeforeCapture: () -> Unit,
-    ): Boolean = false
+    override fun start(onStateChanged: (WebChatNativeDictationState) -> Unit): Boolean = false
 
     override fun submit(): Boolean = false
 

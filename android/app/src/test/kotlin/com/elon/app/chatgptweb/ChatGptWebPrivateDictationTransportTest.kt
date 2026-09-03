@@ -21,7 +21,7 @@ class ChatGptWebPrivateDictationTransportTest {
         )
 
         assertTrue(transport.ready())
-        assertTrue(transport.start({}, {}))
+        assertTrue(transport.start {})
         assertTrue(started)
         assertEquals(WebChatNativeDictationPhase.STARTING, transport.state().phase)
 
@@ -46,28 +46,28 @@ class ChatGptWebPrivateDictationTransportTest {
     }
 
     @Test
-    fun failureBeforeCaptureFallsBackButCapturedFailureDoesNot() {
-        var fallbackCount = 0
+    fun startFailuresStayInPrivateModeAndReportFailure() {
         val failures = mutableListOf<String>()
         val transport = transport(onFailure = failures::add)
 
-        transport.start({}, { fallbackCount += 1 })
+        transport.start {}
         transport.onCommandResult(
             ChatGptWebPrivateDictationTransport.START_ACTION,
             false,
             "before_capture:auth_missing",
         )
-        assertEquals(1, fallbackCount)
-        assertTrue(failures.isEmpty())
+        assertEquals(listOf("官网语音输入未能启动，请重试"), failures)
 
-        transport.start({}, { fallbackCount += 1 })
+        transport.start {}
         transport.onCommandResult(
             ChatGptWebPrivateDictationTransport.START_ACTION,
             false,
             "capture:start_failed",
         )
-        assertEquals(1, fallbackCount)
-        assertEquals(1, failures.size)
+        assertEquals(
+            listOf("官网语音输入未能启动，请重试", "语音输入未能启动，请重试"),
+            failures,
+        )
         assertEquals(WebChatNativeDictationPhase.IDLE, transport.state().phase)
     }
 
@@ -75,7 +75,7 @@ class ChatGptWebPrivateDictationTransportTest {
     fun touchDispatchCannotMovePrivateSessionToListening() {
         val transport = transport()
 
-        assertTrue(transport.start({}, {}))
+        assertTrue(transport.start {})
 
         assertEquals(WebChatNativeDictationPhase.STARTING, transport.state().phase)
         assertFalse(transport.state().phase == WebChatNativeDictationPhase.LISTENING)

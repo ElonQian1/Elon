@@ -26,7 +26,6 @@ internal class ChatGptWebPrivateDictationTransport(
     private var generation = 0
     private var originalDraft = ""
     private var stateListener: (WebChatNativeDictationState) -> Unit = {}
-    private var fallbackBeforeCapture: () -> Unit = {}
     private var transcriptLength = 0
     private var awaitingDraft = false
     private var timeoutTask: Runnable? = null
@@ -34,15 +33,11 @@ internal class ChatGptWebPrivateDictationTransport(
     override fun ready(): Boolean = enabled && !state.active && readyCheck() &&
         currentOfficialDraft() != null
 
-    override fun start(
-        onStateChanged: (WebChatNativeDictationState) -> Unit,
-        onUnavailableBeforeCapture: () -> Unit,
-    ): Boolean {
+    override fun start(onStateChanged: (WebChatNativeDictationState) -> Unit): Boolean {
         if (state.active) return true
         if (!ready()) return false
         val expectedOfficialDraft = currentOfficialDraft() ?: return false
         stateListener = onStateChanged
-        fallbackBeforeCapture = onUnavailableBeforeCapture
         originalDraft = readDraft()
         generation += 1
         val token = generation
@@ -104,7 +99,6 @@ internal class ChatGptWebPrivateDictationTransport(
         if (state.active) dispatchCancel()
         reset()
         stateListener = {}
-        fallbackBeforeCapture = {}
     }
 
     private fun handleStartResult(ok: Boolean, detail: String) {
@@ -114,14 +108,22 @@ internal class ChatGptWebPrivateDictationTransport(
             updateState(WebChatNativeDictationPhase.LISTENING)
             return
         }
-        val fallback = detail.startsWith(BEFORE_CAPTURE_PREFIX)
-        val callback = fallbackBeforeCapture
+        val unavailableBeforeCapture = detail.startsWith(BEFORE_CAPTURE_PREFIX)
         reset()
         trace(
             "web_chat_dictation_private_unavailable",
-            mapOf("before_capture" to fallback),
+            mapOf(
+                "before_capture" to unavailableBeforeCapture,
+                "automatic_cross_mode_fallback" to false,
+            ),
         )
-        if (fallback) callback() else onFailure("语音输入未能启动，请重试")
+        onFailure(
+            if (unavailableBeforeCapture) {
+                "官网语音输入未能启动，请重试"
+            } else {
+                "语音输入未能启动，请重试"
+            },
+        )
     }
 
     private fun handleSubmitResult(ok: Boolean, detail: String) {
@@ -171,7 +173,6 @@ internal class ChatGptWebPrivateDictationTransport(
         originalDraft = ""
         transcriptLength = 0
         awaitingDraft = false
-        fallbackBeforeCapture = {}
         updateState(WebChatNativeDictationPhase.IDLE)
     }
 
