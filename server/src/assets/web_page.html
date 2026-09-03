@@ -3817,8 +3817,7 @@
       right: auto;
       bottom: 24px;
       width: 337px;
-      transform: translateX(-50%) scale(var(--stitch-bottom-scale, 1));
-      transform-origin: center bottom;
+      transform: translateX(-50%);
       z-index: 20;
       background: transparent;
       display: flex;
@@ -5682,13 +5681,6 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
   const moreBtn = $('moreBtn');
   const searchBtn = $('searchBtn');
   const tabsBar = document.querySelector('.tabs-bar');
-  function syncStitchBottomNavScale() {
-    if (!tabsBar) return;
-    const viewportWidth = window.visualViewport?.width || window.innerWidth;
-    tabsBar.style.setProperty('--stitch-bottom-scale', String(Math.min(1, viewportWidth / 411)));
-  }
-  syncStitchBottomNavScale();
-  window.addEventListener('resize', syncStitchBottomNavScale);
   const tabChatBtn = $('tabChatBtn');
   const bottomMenuBtn = $('bottomMenuBtn');
   const bottomComposeBtn = $('bottomComposeBtn');
