@@ -178,6 +178,7 @@ internal object WebChatConversationProjectMoveTiming {
     const val CONTROL_REFRESH_POLL = 4
     const val CONVERSATION_OPTIONS_RETRY_POLL = 8
     const val DIRECTORY_REFRESH_POLL = 10
+    private const val FULL_DIRECTORY_REFRESH_POLL = DIRECTORY_REFRESH_POLL * 2
     private val NAVIGATION_RETRY_POLLS = setOf(20, 40)
 
     const val NAVIGATION_TIMEOUT_MS = POLL_INTERVAL_MS * NAVIGATION_POLL_LIMIT
@@ -197,6 +198,9 @@ internal object WebChatConversationProjectMoveTiming {
         attempt > 0 &&
             attempt < RECONCILIATION_POLL_LIMIT &&
             attempt % DIRECTORY_REFRESH_POLL == 0
+
+    fun shouldRefreshFullDirectory(attempt: Int): Boolean =
+        shouldRefreshDirectory(attempt) && attempt % FULL_DIRECTORY_REFRESH_POLL == 0
 
     fun shouldRetryNavigation(attempt: Int): Boolean = attempt in NAVIGATION_RETRY_POLLS
 }

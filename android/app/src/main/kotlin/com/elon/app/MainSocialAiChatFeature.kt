@@ -349,11 +349,8 @@ internal class MainSocialAiChatFeature(
         WebChatProductionCapabilityContract.describe(WebChatProviderRegistry.get(providerId()))
 
     fun isChatModeActive(): Boolean = modeController.isChatModeActive()
-
     fun webChatState(): String = activeController().stateWireValue()
-
     fun webChatModel(): String = activeController().currentModel()
-
     fun webChatAdapterVersion(): Int = activeController().adapterVersion()
 
     fun webChatAuthenticated(): Boolean = activeController().authenticated()
@@ -488,7 +485,10 @@ internal class MainSocialAiChatFeature(
 
     fun onHostResumed(resumeWorkChat: () -> Unit) {
         if (isChatModeActive()) {
-            activeController().onHostResumed()
+            run {
+                activeController().onHostResumed()
+                binding.root.post { productionConversationActions.recoverPending() }
+            }
             productionCapabilityPrewarmer.schedule(WebChatProviderRegistry.get(providerId()))
         } else {
             resumeWorkChat()

@@ -2,7 +2,9 @@
 
 $ErrorActionPreference = "Stop"
 $path = Join-Path $PSScriptRoot "smoke-chatgpt-web-project-move.ps1"
-$source = Get-Content -LiteralPath $path -Raw
+$observationPath = Join-Path $PSScriptRoot "chatgpt-web-project-move-write-observation.ps1"
+$source = (Get-Content -LiteralPath $path -Raw) + "`n" +
+    (Get-Content -LiteralPath $observationPath -Raw)
 
 function Assert-Contains([string]$Needle) {
     if (-not $source.Contains($Needle)) { throw "Missing project-move smoke contract: $Needle" }
@@ -10,11 +12,12 @@ function Assert-Contains([string]$Needle) {
 
 @(
     "[switch]`$ConfirmRoundTrip",
+    "[ValidateRange(30, 180)][int]`$TimeoutSec = 150",
     "[ValidateRange(0, 39)][int]`$TargetProjectOffset = 0",
     "Wait-ProductionReady",
     "Ensure-ProductionReady",
     "Invoke-ReadActionWithSurfaceRecovery",
-    'web_chat_mode_inactive|web_chat_not_ready',
+    'web_chat_mode_inactive|web_chat_not_ready|main_activity_not_bound',
     "The project sidebar did not settle after its background refresh.",
     "expectedByToken",
     "Open-ChatGptWebNativeChatSurface",
@@ -49,6 +52,11 @@ function Assert-Contains([string]$Needle) {
     "The moved conversation did not reopen before the restore operation.",
     "The moved conversation did not reopen for cleanup.",
     "Test-ProjectMoveWriteObserved",
+    "chatgpt-web-project-move-write-observation.ps1",
+    "web_chat_project_move_reconciliation",
+    "since_wall_time_ms",
+    "SinceWallTimeMs",
+    "Test-ProjectMoveWriteObserved -SinceWallTimeMs",
     "Get-ProjectMoveUiStage",
     "Dismiss-StalePreWriteMoveFailure",
     "dismiss stale pre-write project-move failure",
@@ -74,6 +82,16 @@ function Assert-Contains([string]$Needle) {
     "if (`$null -ne `$cleanupFailure) { throw `$cleanupFailure }",
     "CHATGPT_WEB_PROJECT_MOVE_STATUS=passed"
 ) | ForEach-Object { Assert-Contains $_ }
+
+$mainActionStart = $source.IndexOf("function Invoke-MainAction")
+$mainActionEnd = $source.IndexOf("function Wait-ProductionReady", $mainActionStart)
+if ($mainActionStart -lt 0 -or $mainActionEnd -le $mainActionStart) {
+    throw "Invoke-MainAction could not be inspected."
+}
+$mainAction = $source.Substring($mainActionStart, $mainActionEnd - $mainActionStart)
+if ($mainAction.Contains("EnsureMainActivity")) {
+    throw "Routine project-move actions must not restart MainActivity."
+}
 
 ${backAction} = '@("shell", "input", "keyevent", "4")'
 ${backMatches} = [regex]::Matches(${source}, [regex]::Escape(${backAction}))

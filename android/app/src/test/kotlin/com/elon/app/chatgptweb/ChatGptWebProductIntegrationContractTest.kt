@@ -128,6 +128,15 @@ class ChatGptWebProductIntegrationContractTest {
     }
 
     @Test
+    fun pendingProjectMoveRecoveryRunsOnEveryHostResume() {
+        val feature = read("android/app/src/main/kotlin/com/elon/app/MainSocialAiChatFeature.kt")
+        val hostResume = feature.substringAfter("fun onHostResumed")
+            .substringBefore("fun onHostPaused")
+
+        assertTrue(hostResume.contains("productionConversationActions.recoverPending()"))
+    }
+
+    @Test
     fun webChatProvidersReplayPrivateCachesBeforeStartingTheirWebViews() {
         val chatGpt = read(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptBackgroundSession.kt",

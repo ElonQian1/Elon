@@ -6,14 +6,14 @@ param(
     [Parameter(Mandatory = $true)][string]$DeviceSerial,
     [string]$ExpectedHardwareSerial = "",
     [ValidateRange(0, 9999)][int]$ExpectedAdapterVersion = 0,
-    [ValidateRange(30, 300)][int]$TimeoutSec = 150,
+    [ValidateRange(30, 180)][int]$TimeoutSec = 150,
     [ValidateRange(0, 39)][int]$TargetProjectOffset = 0,
     [switch]$ConfirmRoundTrip
 )
 
 $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "chatgpt-web-smoke-runtime.ps1")
-
+. (Join-Path $PSScriptRoot "chatgpt-web-project-move-write-observation.ps1")
 $ExpectedAdapterVersion = Resolve-ChatGptWebSmokeExpectedAdapterVersion `
     -ExpectedAdapterVersion $ExpectedAdapterVersion
 
@@ -40,7 +40,7 @@ function Invoke-MainAction {
     )
 
     return Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action $Action `
-        -Arguments $Arguments -EnsureMainActivity
+        -Arguments $Arguments
 }
 
 function Wait-ProductionReady {
@@ -93,7 +93,10 @@ function Invoke-ReadActionWithSurfaceRecovery {
     try {
         return Invoke-MainAction -Action $Action -Arguments $Arguments
     } catch {
-        if ([string]$_.Exception.Message -notmatch "web_chat_mode_inactive|web_chat_not_ready") {
+        if (
+            [string]$_.Exception.Message -notmatch
+                "web_chat_mode_inactive|web_chat_not_ready|main_activity_not_bound"
+        ) {
             throw
         }
         Ensure-ProductionReady | Out-Null
@@ -453,19 +456,6 @@ function Find-VisibleProjectConversation {
     throw "No visible project conversation is available for reversible acceptance."
 }
 
-function Test-ProjectMoveWriteObserved {
-    try {
-        return (Get-ProjectMoveUiStage) -in @(
-            "submitting",
-            "syncing",
-            "failed_after_write",
-            "completed"
-        )
-    } catch {
-        return $false
-    }
-}
-
 function Get-ProjectMoveUiStage {
     $texts = @(Get-UiNodes | ForEach-Object { [string]$_.text })
     if (@($texts | Where-Object { $_.Contains("当前输入框有未发送内容") }).Count -gt 0) {
@@ -508,6 +498,7 @@ function Wait-ConversationMembership {
         [Parameter(Mandatory = $true)][string]$SourceProjectId,
         [Parameter(Mandatory = $true)][ref]$DestinationProject,
         [Parameter(Mandatory = $true)][ref]$WriteSelected,
+        [Parameter(Mandatory = $true)][long]$WriteObservationStartMs,
         [switch]$AllowFallbackDestination
     )
 
@@ -560,6 +551,13 @@ function Wait-ConversationMembership {
         ) {
             $WriteSelected.Value = $true
         }
+        if (
+            -not $WriteSelected.Value -and
+            ($poll -eq 0 -or $poll % 4 -eq 0) -and
+            (Test-ProjectMoveWriteObserved -SinceWallTimeMs $WriteObservationStartMs)
+        ) {
+            $WriteSelected.Value = $true
+        }
         $navigation = Get-Navigation
         $current = @($navigation.conversations | Where-Object {
             [string]$_.id -eq $ConversationId
@@ -603,13 +601,15 @@ function Invoke-ProjectMove {
     if (-not $pickerOpened) {
         throw "The native move-to-project picker did not open after one safe retry."
     }
+    $writeObservationStartMs = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
     $null = Invoke-NativeSelector -Selector (
         "web-chat-conversation-project-destination:" + $destinationProjectId
     ) -Stage "project-destination"
     return Wait-ConversationMembership -ConversationId ([string]$Conversation.id) `
         -ConversationPath ([string]$Conversation.path) `
         -SourceProjectId $SourceProjectId -DestinationProject $DestinationProject `
-        -WriteSelected $WriteSelected -AllowFallbackDestination:$AllowFallbackDestination
+        -WriteSelected $WriteSelected -WriteObservationStartMs $writeObservationStartMs `
+        -AllowFallbackDestination:$AllowFallbackDestination
 }
 
 Start-ChatGptWebSmokeAwakeLease -Runtime $runtime | Out-Null

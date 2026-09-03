@@ -51,6 +51,16 @@ class WebChatConversationProjectMovePolicyTest {
     }
 
     @Test
+    fun fullDirectoryRefreshRunsLessOftenThanScopedReconciliation() {
+        assertFalse(WebChatConversationProjectMoveTiming.shouldRefreshFullDirectory(10))
+        assertTrue(WebChatConversationProjectMoveTiming.shouldRefreshFullDirectory(20))
+        assertFalse(WebChatConversationProjectMoveTiming.shouldRefreshFullDirectory(30))
+        assertTrue(WebChatConversationProjectMoveTiming.shouldRefreshFullDirectory(40))
+        assertFalse(WebChatConversationProjectMoveTiming.shouldRefreshFullDirectory(50))
+        assertFalse(WebChatConversationProjectMoveTiming.shouldRefreshFullDirectory(60))
+    }
+
+    @Test
     fun conversationNavigationRetriesOnlyTwiceBeforeAnyWrite() {
         assertFalse(WebChatConversationProjectMoveTiming.shouldRetryNavigation(0))
         assertFalse(WebChatConversationProjectMoveTiming.shouldRetryNavigation(19))

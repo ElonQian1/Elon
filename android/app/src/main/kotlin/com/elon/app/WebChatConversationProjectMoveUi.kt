@@ -90,6 +90,24 @@ internal class WebChatConversationProjectMoveUi(
         Toast.makeText(activity, "已移动到“${destination.title}”", Toast.LENGTH_SHORT).show()
     }
 
+    fun showNotApplied(
+        onOfficialFallback: () -> Unit,
+        onRetry: () -> Unit,
+    ) {
+        if (activity.isFinishing || activity.isDestroyed) return
+        dismissDestinationPicker()
+        dismissProgress()
+        trackDialog(
+            AlertDialog.Builder(activity)
+                .setTitle("移动未完成")
+                .setMessage("官网目录确认会话仍在原项目，本次没有移动。可以重试或在官网查看。")
+                .setPositiveButton("重试") { _, _ -> onRetry() }
+                .setNeutralButton("官网查看") { _, _ -> onOfficialFallback() }
+                .setNegativeButton("取消", null)
+                .create(),
+        )
+    }
+
     fun showDraftBlocked() {
         if (activity.isFinishing || activity.isDestroyed) return
         dismissDestinationPicker()

@@ -163,10 +163,9 @@ class WebChatConversationProjectMoveContractTest {
                 .containsMatchIn(choice),
         )
         assertTrue(choice.contains("onFailed = {"))
-        assertTrue(choice.contains("beginReadOnlyReconciliation(conversation, destination, port, epoch)"))
+        assertTrue(choice.contains("sourceProjectId(conversation)"))
         assertTrue(choice.contains("private fun beginReadOnlyReconciliation"))
-        assertTrue(choice.contains("requestMembershipReconciliation(conversation, destination)"))
-        assertTrue(choice.contains("pollReconciliation("))
+        assertTrue(choice.contains("reconciler.begin("))
         assertTrue(choice.split("port.invokeControl(choice.control.id").size - 1 == 1)
         assertFalse(choice.contains("onFailed = { fail(conversation, destination"))
     }
@@ -259,9 +258,7 @@ class WebChatConversationProjectMoveContractTest {
         val choice = source.substring(start, end)
 
         assertTrue(choice.contains("if (result.requestId.isNullOrBlank())"))
-        assertTrue(choice.contains(
-            "beginReadOnlyReconciliation(conversation, destination, port, epoch)",
-        ))
+        assertTrue(choice.contains("sourceProjectId(conversation)"))
         assertFalse(choice.contains("!result.accepted || result.requestId.isNullOrBlank()"))
     }
 
@@ -277,6 +274,7 @@ class WebChatConversationProjectMoveContractTest {
         val recovery = source.substring(start, end)
 
         assertTrue(recovery.contains("beginReadOnlyReconciliation("))
+        assertTrue(recovery.contains("sourceProjectId = record.sourceProjectId"))
         assertTrue(recovery.contains("allowConfirmation = false"))
         assertFalse(recovery.contains("invokeControl("))
         assertFalse(recovery.contains("armWrite("))
@@ -286,18 +284,52 @@ class WebChatConversationProjectMoveContractTest {
     fun readOnlyReconciliationUsesPrivateMembershipEvidenceBeforeDirectoryFallback() {
         val source = read(
             "android/app/src/main/kotlin/com/elon/app/" +
-                "WebChatProductionConversationProjectMove.kt",
+                "WebChatConversationProjectMoveReconciler.kt",
         )
         val start = source.indexOf("private fun requestMembershipReconciliation")
-        val end = source.indexOf("private fun updateProgress", start)
-        assertTrue(start >= 0 && end > start)
-        val reconciliation = source.substring(start, end)
+        assertTrue(start >= 0)
+        val reconciliation = source.substring(start)
 
         assertTrue(reconciliation.contains(
             "probeConversationProject(conversation.path, destination.id)",
         ))
         assertTrue(reconciliation.contains("refreshConversationIndex(destination.id)"))
+        assertTrue(reconciliation.contains("restartConversationRefreshGlobally()"))
+        assertTrue(reconciliation.contains("refreshConversationIndex(null)"))
         assertFalse(reconciliation.contains("invokeControl("))
+    }
+
+    @Test
+    fun authoritativeSourceMembershipClearsRecoveryAndOffersAUserRetry() {
+        val source = read(
+            "android/app/src/main/kotlin/com/elon/app/" +
+                "WebChatProductionConversationProjectMove.kt",
+        )
+        val start = source.indexOf("private fun settleNotApplied")
+        val end = source.indexOf("private fun fail", start)
+        assertTrue(start >= 0 && end > start)
+        val settlement = source.substring(start, end)
+
+        assertTrue(settlement.contains("writeAttempted = false"))
+        assertTrue(settlement.contains("recoveryActive = false"))
+        assertTrue(settlement.contains("recoveryStore.clear()"))
+        assertTrue(settlement.contains("ui.showNotApplied("))
+        assertTrue(settlement.contains("onRetry = { show(conversation) }"))
+        assertFalse(settlement.contains("invokeControl("))
+    }
+
+    @Test
+    fun reconciliationFailureCanRetryOnTheNextHostResume() {
+        val source = read(
+            "android/app/src/main/kotlin/com/elon/app/" +
+                "WebChatProductionConversationProjectMove.kt",
+        )
+        val start = source.indexOf("private fun fail(")
+        val end = source.indexOf("private fun blocksForDraft", start)
+        assertTrue(start >= 0 && end > start)
+        val failure = source.substring(start, end)
+
+        assertTrue(failure.contains("lastRecoveryAttemptKey = null"))
     }
 
     private fun read(relative: String): String =

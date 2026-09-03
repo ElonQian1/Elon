@@ -41,6 +41,23 @@ internal class WebChatProductionConversationProjectMoveCoordinator(
             fail(conversation, selected, "无法更新安全恢复记录", epoch)
         },
     )
+    private val reconciler = WebChatConversationProjectMoveReconciler(
+        host = host,
+        conversationIndex = conversationIndex,
+        probeConversationProject = probeConversationProject,
+        refreshConversationIndex = refreshConversationIndex,
+        suspendConversationRefresh = suspendConversationRefresh,
+        resumeConversationRefresh = resumeConversationRefresh,
+        readTransition = readTransition,
+        isCurrent = ::isCurrent,
+        requestConfirmation = { port, control, epoch, onSucceeded, onFailed ->
+            invokeAndWait(port, control, true, epoch, onSucceeded, onFailed)
+        },
+        updateProgress = ::updateProgress,
+        onCompleted = ::complete,
+        onNotApplied = ::settleNotApplied,
+        onFailed = ::fail,
+    )
     private var requestEpoch = 0
     private var writeAttempted = false
     private var conversationRefreshHeld = false
@@ -127,6 +144,7 @@ internal class WebChatProductionConversationProjectMoveCoordinator(
             destination,
             port,
             epoch,
+            sourceProjectId = record.sourceProjectId,
             allowConfirmation = false,
         )
         return true
@@ -429,7 +447,13 @@ internal class WebChatProductionConversationProjectMoveCoordinator(
                 return
             }
             if (result.requestId.isNullOrBlank()) {
-                beginReadOnlyReconciliation(conversation, destination, port, epoch)
+                beginReadOnlyReconciliation(
+                    conversation,
+                    destination,
+                    port,
+                    epoch,
+                    sourceProjectId(conversation),
+                )
                 return
             }
             waitForCommand(
@@ -438,12 +462,24 @@ internal class WebChatProductionConversationProjectMoveCoordinator(
                 epoch = epoch,
                 attempt = 0,
                 onSucceeded = {
-                    beginReadOnlyReconciliation(conversation, destination, port, epoch)
+                    beginReadOnlyReconciliation(
+                        conversation,
+                        destination,
+                        port,
+                        epoch,
+                        sourceProjectId(conversation),
+                    )
                 },
                 onFailed = {
                     // The official page may navigate while handling the project choice and lose
                     // its command receipt. Never replay the write; reconcile the observed owner.
-                    beginReadOnlyReconciliation(conversation, destination, port, epoch)
+                    beginReadOnlyReconciliation(
+                        conversation,
+                        destination,
+                        port,
+                        epoch,
+                        sourceProjectId(conversation),
+                    )
                 },
             )
             return
@@ -508,20 +544,18 @@ internal class WebChatProductionConversationProjectMoveCoordinator(
         destination: ChatGptWebProject,
         port: WebChatConsumerPort,
         epoch: Int,
+        sourceProjectId: String?,
         allowConfirmation: Boolean = true,
     ) {
         if (!isCurrent(epoch)) return
         releaseConversationRefresh()
-        updateProgress(destination, "正在同步会话目录")
-        requestMembershipReconciliation(conversation, destination)
-        pollReconciliation(
+        reconciler.begin(
             conversation,
             destination,
             port,
             epoch,
-            attempt = 0,
-            confirmationAttempted = false,
-            confirmationAllowed = allowConfirmation,
+            sourceProjectId = sourceProjectId,
+            allowConfirmation = allowConfirmation,
         )
     }
 
@@ -581,104 +615,6 @@ internal class WebChatProductionConversationProjectMoveCoordinator(
         }
     }
 
-    private fun pollReconciliation(
-        conversation: ChatGptWebConversation,
-        destination: ChatGptWebProject,
-        port: WebChatConsumerPort,
-        epoch: Int,
-        attempt: Int,
-        confirmationAttempted: Boolean,
-        confirmationAllowed: Boolean,
-    ) {
-        if (!isCurrent(epoch)) return
-        val index = conversationIndex()
-        val state = port.state()
-        if (
-            attempt == 0 ||
-            WebChatConversationProjectMoveTiming.shouldRefreshDirectory(attempt) ||
-            attempt >= MAX_RECONCILIATION_POLLS
-        ) {
-            WebChatConversationProjectMoveDiagnostics.recordReconciliation(
-                attempt,
-                index,
-                state,
-                conversation,
-                destination,
-            )
-        }
-        if (WebChatConversationProjectMovePolicy.reconciled(
-                index,
-                conversation,
-                destination,
-            )
-        ) {
-            complete(destination)
-            return
-        }
-        if (confirmationAllowed && !confirmationAttempted) {
-            val confirmation = WebChatConversationProjectMovePolicy.confirmation(
-                state,
-                conversation,
-            )
-            if (confirmation != null) {
-                updateProgress(destination, "正在确认移动")
-                invokeAndWait(
-                    port = port,
-                    control = confirmation,
-                    userConfirmed = true,
-                    epoch = epoch,
-                    onSucceeded = {
-                        updateProgress(destination, "正在同步会话目录")
-                        requestMembershipReconciliation(conversation, destination)
-                        pollReconciliation(
-                            conversation,
-                            destination,
-                            port,
-                            epoch,
-                            attempt = 0,
-                            confirmationAttempted = true,
-                            confirmationAllowed = true,
-                        )
-                    },
-                    onFailed = { fail(conversation, destination, "官网未确认移动结果", epoch) },
-                )
-                return
-            }
-            if (WebChatConversationProjectMoveTiming.shouldRefreshControls(attempt)) {
-                readTransition.refreshControls(port, epoch) {
-                    pollReconciliation(
-                        conversation,
-                        destination,
-                        port,
-                        epoch,
-                        attempt + 1,
-                        confirmationAttempted,
-                        confirmationAllowed,
-                    )
-                }
-                return
-            }
-        }
-        if (attempt >= MAX_RECONCILIATION_POLLS) {
-            fail(conversation, destination, "目录尚未确认移动结果", epoch)
-            return
-        }
-        if (WebChatConversationProjectMoveTiming.shouldRefreshDirectory(attempt)) {
-            requestMembershipReconciliation(conversation, destination)
-        }
-        host.postDelayed({
-            pollReconciliation(
-                conversation,
-                destination,
-                port,
-                epoch,
-                attempt + 1,
-                confirmationAttempted,
-                confirmationAllowed,
-            )
-        }, POLL_INTERVAL_MS)
-    }
-
     private fun readiness(targetPath: String): WebChatConversationActionReadiness =
         WebChatProductionConversationActionPolicy.evaluate(
             providerId = activeProvider(),
@@ -689,14 +625,6 @@ internal class WebChatProductionConversationProjectMoveCoordinator(
 
     private fun showProgress(destination: ChatGptWebProject, subtitle: String) {
         ui.showProgress(destination, subtitle)
-    }
-
-    private fun requestMembershipReconciliation(
-        conversation: ChatGptWebConversation,
-        destination: ChatGptWebProject,
-    ) {
-        probeConversationProject(conversation.path, destination.id)
-        refreshConversationIndex(destination.id)
     }
 
     private fun updateProgress(destination: ChatGptWebProject, subtitle: String) {
@@ -713,6 +641,21 @@ internal class WebChatProductionConversationProjectMoveCoordinator(
         releaseConversationRefresh()
     }
 
+    private fun settleNotApplied(conversation: ChatGptWebConversation, epoch: Int) {
+        if (!isCurrent(epoch)) return
+        writeAttempted = false
+        recoveryActive = false
+        lastRecoveryAttemptKey = null
+        navigationRequestId = null
+        recoveryStore.clear()
+        releaseConversationRefresh()
+        if (activity.isFinishing || activity.isDestroyed) return
+        ui.showNotApplied(
+            onOfficialFallback = openOfficialFallback,
+            onRetry = { show(conversation) },
+        )
+    }
+
     private fun fail(
         conversation: ChatGptWebConversation,
         destination: ChatGptWebProject,
@@ -725,6 +668,7 @@ internal class WebChatProductionConversationProjectMoveCoordinator(
         val attempted = writeAttempted
         navigationRequestId = null
         recoveryActive = false
+        lastRecoveryAttemptKey = null
         if (!attempted) recoveryStore.clear()
         ui.showFailure(
             attempted = attempted,
@@ -748,6 +692,10 @@ internal class WebChatProductionConversationProjectMoveCoordinator(
         cancelPending()
         if (!activity.isFinishing && !activity.isDestroyed) ui.showDraftBlocked()
     }
+
+    private fun sourceProjectId(conversation: ChatGptWebConversation): String? =
+        ChatGptWebConversationPath.canonicalProjectId(conversation.projectId)
+            ?: ChatGptWebConversationPath.projectId(conversation.path)
 
     private fun holdConversationRefresh() {
         if (conversationRefreshHeld) return
@@ -793,8 +741,6 @@ internal class WebChatProductionConversationProjectMoveCoordinator(
         const val MAX_NAVIGATION_POLLS = WebChatConversationProjectMoveTiming.NAVIGATION_POLL_LIMIT
         const val MAX_CONTROL_POLLS = WebChatConversationProjectMoveTiming.CONTROL_POLL_LIMIT
         const val MAX_COMMAND_POLLS = WebChatConversationProjectMoveTiming.COMMAND_POLL_LIMIT
-        const val MAX_RECONCILIATION_POLLS =
-            WebChatConversationProjectMoveTiming.RECONCILIATION_POLL_LIMIT
         const val MAX_READ_CONTROL_INVOKE_RETRIES = 1
     }
 }
