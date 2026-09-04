@@ -7663,7 +7663,7 @@
       "id": "esk-platform-sellback-requests-v1",
       "title": "正式 ESK 卖回申请、占用与本人取消",
       "summary": "独立正式来源的默认关闭申请流程；同快照额度、原子占用及幂等取消，主 APK 查询与结果未知恢复，不报价不成交不打款，不改旧账户/跨 APK 合同。",
-      "status": "implemented",
+      "status": "released",
       "priority": "p1",
       "requirement": {
         "path": "docs/requirements/esk-platform-sellback-requests-v1.md",
@@ -7786,28 +7786,28 @@
         },
         {
           "path": "docs/delivery/esk-platform-sellback-requests-v1.md",
-          "content_hash": "80b0d636e2202395f0ecb436c0e4733e47d6ca20f51ac48eba42a46af84f5b3e",
+          "content_hash": "df0f7da6b802264b18a36d72478b2050388357e959dd6e71b0fde3ba3cf07224",
           "locator": "",
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "bb87c8327c68c1d1be5d7769de914785c17e2b31",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "c94cf7432be94a1f10819b393ce8deb59411c6f7",
-            "state": "untracked"
+            "head_commit": "5768545efb8a74278cd67d1ea288b123f24f09aa",
+            "head_blob_oid": "c94cf7432be94a1f10819b393ce8deb59411c6f7",
+            "worktree_blob_oid": "66951fe7aa334eb3e6af127f35046db7f985c2cc",
+            "state": "tracked_modified"
           }
         },
         {
           "path": "docs/esk-platform-sellback-requests.md",
-          "content_hash": "2d7a3965f893d75c6c2b909c2a7c4a76715f07f215d106e487f205b405970f0c",
+          "content_hash": "05db26d0244f809ff1562fe7c16edd9abec20e97124dd96ac0bd6aa61d640900",
           "locator": "",
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "bb87c8327c68c1d1be5d7769de914785c17e2b31",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "8598a99438209d331fe8d2650d658bfb9a7e11b7",
-            "state": "index_only"
+            "head_commit": "5768545efb8a74278cd67d1ea288b123f24f09aa",
+            "head_blob_oid": "8598a99438209d331fe8d2650d658bfb9a7e11b7",
+            "worktree_blob_oid": "7ffc35501f3c9ebef3851d697507b30fc3aceb3e",
+            "state": "tracked_modified"
           }
         },
         {
@@ -7955,7 +7955,7 @@
         }
       ],
       "created_at_ms": 1788527300706,
-      "updated_at_ms": 1788530843689
+      "updated_at_ms": 1788533028613
     },
     {
       "id": "esk-sui-genesis-foundation-v1",
@@ -18093,36 +18093,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_361337d10b3548ddbc7e53686529b76f",
-      "feature_id": "esk-paper-quant-allocation-binding-v3",
-      "action": "transitioned",
-      "actor": "codex-desktop",
-      "reason": "依赖已发布，范围与验收标准完整，重新进入可认领状态。",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1788321191344
-    },
-    {
-      "id": "feature_event_f55ed5e20026483f9550f9dc644e2a3c",
-      "feature_id": "esk-paper-quant-allocation-binding-v3",
-      "action": "claimed",
-      "actor": "codex-desktop",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788321201927
-    },
-    {
-      "id": "feature_event_e416d1dbff41430cac12d8a13cff8ecb",
-      "feature_id": "esk-paper-quant-allocation-binding-v3",
-      "action": "transitioned",
-      "actor": "codex-desktop",
-      "reason": "恢复同一实现任务并登记最终验证证据。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788321214890
-    },
-    {
       "id": "feature_event_9bf4839121fc4b17bcf15051053b620f",
       "feature_id": "esk-paper-quant-allocation-binding-v3",
       "action": "evidence_recorded",
@@ -20091,6 +20061,36 @@
       "from_status": "in_progress",
       "to_status": "implemented",
       "at_ms": 1788530843689
+    },
+    {
+      "id": "feature_event_a7a72d2d3f5a4d6287bb38560fd8946b",
+      "feature_id": "esk-platform-sellback-requests-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-esk-sellback-root",
+      "reason": "",
+      "from_status": "implemented",
+      "to_status": "implemented",
+      "at_ms": 1788533023410
+    },
+    {
+      "id": "feature_event_ddb1c0a5ea184859a67d75311c185675",
+      "feature_id": "esk-platform-sellback-requests-v1",
+      "action": "transitioned",
+      "actor": "codex-esk-sellback-root",
+      "reason": "108 harness、26 生产 Router、224 Android 全绿。配套发布后 health/version、五动作未登录401及隐私头、公开PWA说明与完整APK下载摘要均验证；UI调试未连接故视觉延期。生产政策关闭，真实本人流程为独立上线验收，不标记真实成交兑付。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1788533026044
+    },
+    {
+      "id": "feature_event_5b82a3eb747d476b9dcff80bd6e4939d",
+      "feature_id": "esk-platform-sellback-requests-v1",
+      "action": "transitioned",
+      "actor": "codex-esk-sellback-root",
+      "reason": "源码5768545ef已推送，Server0.3.1727与主APK1.1.1515(1515)实际配套发布；公开APK39723699字节完整下载SHA匹配。released仅指默认关闭的申请切片部署，不代表真实用户开通、资金结算、量化占用合同或视觉验收。",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1788533028613
     }
   ]
 }

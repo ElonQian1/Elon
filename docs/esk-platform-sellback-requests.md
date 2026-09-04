@@ -10,6 +10,7 @@ owners: [platform-assets, android]
 需求及验收真源：[正式卖回申请与占用 V1](requirements/esk-platform-sellback-requests-v1.md)。
 本页解释独立合同与操作路径，不是生产开启公告。部署、实测与真实用户验收分别记录，
 不能因代码存在、页面可打开或合成测试通过，认定用户已可成交、提现或获得收益。
+版本、公开检查和待验收项见 [交付记录](delivery/esk-platform-sellback-requests-v1.md)。
 
 ## 用户看到什么
 
