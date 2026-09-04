@@ -6390,7 +6390,7 @@
       "id": "esk-platform-native-provider-v1",
       "title": "正式 ESK 原生摘要授权提供端 V1",
       "summary": "独立正式来源原生显式同意提供端，复用本人账本读取与会话门禁；不放宽 Paper，不传身份或凭据，量化接收端独立交付。",
-      "status": "in_progress",
+      "status": "verified",
       "priority": "p0",
       "requirement": {
         "path": "docs/requirements/esk-platform-native-provider-v1.md",
@@ -6427,15 +6427,218 @@
         "仅正式来源摘要且不含身份凭据",
         "测试、APK发布与接收端剩余缺口分别记录"
       ],
-      "implementation_evidence": [],
-      "claim": {
-        "claim_id": "claim_beb7c1c98f7f4c1e8816e9875beaf026",
-        "agent_id": "codex-esk-platform",
-        "claimed_at_ms": 1788516180185,
-        "expires_at_ms": 1788526980185
-      },
+      "implementation_evidence": [
+        {
+          "path": "android/app/src/main/AndroidManifest.xml",
+          "content_hash": "45bc2d838393c50e84bdb24f18a3f493e93e3fa971caba0d9f01a04cdba5a0cd",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "64f93af8b701090a6110a550b0ea8987609f3e41",
+            "head_blob_oid": "8b63b8494db9df5ffdafecfd197caaf73ce6fc8e",
+            "worktree_blob_oid": "ff7a16db000da125121f449911cd94fff11fda8b",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/esk/platform/EskPlatformAccountReader.kt",
+          "content_hash": "179dd3e86aec03109c8b97fa3def52feb26097a3e3a87a0788bb8e0caa82cad6",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "64f93af8b701090a6110a550b0ea8987609f3e41",
+            "head_blob_oid": "97f1500095b325e081024db4331ba7e253d2bd13",
+            "worktree_blob_oid": "97f1500095b325e081024db4331ba7e253d2bd13",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/esk/platform/EskPlatformRequestGate.kt",
+          "content_hash": "077c04afc5dbd97db4c9b8579536c1df89e53ceb8524b9969b0174342cd3bca7",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "64f93af8b701090a6110a550b0ea8987609f3e41",
+            "head_blob_oid": "95894cff029730c89b55228160fddac14fa06625",
+            "worktree_blob_oid": "95894cff029730c89b55228160fddac14fa06625",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/esk/platform/EskPlatformSessionStore.kt",
+          "content_hash": "904385ab3e8c89509be66b4aac4fd4010d4ea1a88be01ae3e9f51570c555cf95",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "64f93af8b701090a6110a550b0ea8987609f3e41",
+            "head_blob_oid": "302a64642607537dd564764862349135e1b8fb1b",
+            "worktree_blob_oid": "302a64642607537dd564764862349135e1b8fb1b",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/esk/platform/handoff/EskPlatformSnapshotCaller.kt",
+          "content_hash": "53d5505dbb1ad309a2fd7865524281a972036dd42a88ee4c4edb55ba86e3ca35",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "64f93af8b701090a6110a550b0ea8987609f3e41",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "f1a66656de4cf52681397489387abd7803cd5d21",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/esk/platform/handoff/EskPlatformSnapshotConsentActivity.kt",
+          "content_hash": "e4c5c888d3484d0c30aa60efa9a123a8b053b254a1106096e2c4037e24ca008f",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "64f93af8b701090a6110a550b0ea8987609f3e41",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "6f7dfcf390d193271730445862c1fde4ea1b7b1f",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/esk/platform/handoff/EskPlatformSnapshotConsentView.kt",
+          "content_hash": "1324ce1437ee427f8094011976f76cb5eb7497c46ed9dc296f405676aef24626",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "64f93af8b701090a6110a550b0ea8987609f3e41",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "1ff5a9b4c6d863a91ff249b744bb714d731f1827",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/esk/platform/handoff/EskPlatformSnapshotWire.kt",
+          "content_hash": "6017d427ed975e144a9311adf4eb8043e661bdc8c53bb62af18df4b39533ac17",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "64f93af8b701090a6110a550b0ea8987609f3e41",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "33d0cd37d079b35e541ec3591cee05833557717e",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/eskcontract/EskPlatformSnapshotContract.kt",
+          "content_hash": "e34f28e719beb8859eaf8dbcefd34a2a21329de20ceb61b2d0951770b6fb2b4b",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "64f93af8b701090a6110a550b0ea8987609f3e41",
+            "head_blob_oid": "f033328e4c7b65a83f168bc650af55013c97599a",
+            "worktree_blob_oid": "f033328e4c7b65a83f168bc650af55013c97599a",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "android/app/src/main/res/layout/esk_platform_consent_preview.xml",
+          "content_hash": "18336a6fca9d943bed50819a62a6ac60f1d5a4506efc835218919a51852e5956",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "64f93af8b701090a6110a550b0ea8987609f3e41",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "5a4fd841e73489ddeceb5d967bf4c2fa68351404",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/esk/platform/handoff/EskPlatformProviderWiringTest.kt",
+          "content_hash": "7a6e2a5c6f79afcfc53dca0c2bdb7a5f74936c69453a9e45f6980afea19ee211",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "64f93af8b701090a6110a550b0ea8987609f3e41",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "4ece932b31d7717490cfc4875004a603c14ea8b8",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/esk/platform/handoff/EskPlatformSnapshotCallerTest.kt",
+          "content_hash": "f3b628bd8556405258d1d24717d723baf04afd00d000e2e7ec989102a8ab70ac",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "64f93af8b701090a6110a550b0ea8987609f3e41",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "b6e52f6d49353fa02ca509f4b9ef1a34b682fd9c",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/esk/platform/handoff/EskPlatformSnapshotWireTest.kt",
+          "content_hash": "a2eaf14c606bd7820b52162c19c53096d205449b81b6651b22a30db89c84e2ae",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "64f93af8b701090a6110a550b0ea8987609f3e41",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "3a67de6de23d483ca7db56916ca786f2238d74d2",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/eskcontract/EskPlatformSnapshotContractTest.kt",
+          "content_hash": "ce3eebeff0d96c7c014ec9c7b62ffdaa1924a4bc6833cf3c4b6b8713c4f30b7c",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "64f93af8b701090a6110a550b0ea8987609f3e41",
+            "head_blob_oid": "e99c2a1f54308a6f180c7fdcacf400565008b886",
+            "worktree_blob_oid": "e99c2a1f54308a6f180c7fdcacf400565008b886",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "docs/contracts/esk-platform-android-snapshot-v1.md",
+          "content_hash": "d84ca846a4b924e9c777225985a1d63cf9199d051a784939eb4dd10a82b1fd49",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "64f93af8b701090a6110a550b0ea8987609f3e41",
+            "head_blob_oid": "6f3a62104f338cff36b6dc61bb1b95d72c84f1f4",
+            "worktree_blob_oid": "6f3a62104f338cff36b6dc61bb1b95d72c84f1f4",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/assets/web_page.html",
+          "content_hash": "d6d73412e5875d41df1fb241c452781d402f6dc4e42b72b0a5ef2f2164cf9c90",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "64f93af8b701090a6110a550b0ea8987609f3e41",
+            "head_blob_oid": "9f7e146bce21cdcfbd47e509cef7248dd51e0c19",
+            "worktree_blob_oid": "ccb07c7fc53dcf7bfe9d8fcf7ff3b3660be99365",
+            "state": "tracked_modified"
+          }
+        }
+      ],
       "created_at_ms": 1788516179636,
-      "updated_at_ms": 1788516223853
+      "updated_at_ms": 1788516936284
     },
     {
       "id": "esk-platform-profile-v1",
@@ -17107,36 +17310,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_95008b1fe0544fb0b6068be5233712fc",
-      "feature_id": "compute-federation-interactive-desktop-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1788304988562
-    },
-    {
-      "id": "feature_event_0f0eebfee00e4f20af99595fce86cf41",
-      "feature_id": "compute-federation-interactive-desktop-v1",
-      "action": "claimed",
-      "actor": "codex-task-24944-e65489fe",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788304996987
-    },
-    {
-      "id": "feature_event_d888749040d2493599af813052b7eafb",
-      "feature_id": "compute-federation-interactive-desktop-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788305003994
-    },
-    {
       "id": "feature_event_5213c4f0b13b47f5b360dea405235202",
       "feature_id": "compute-federation-interactive-desktop-v1",
       "action": "evidence_recorded",
@@ -19105,6 +19278,36 @@
       "from_status": "claimed",
       "to_status": "in_progress",
       "at_ms": 1788516223853
+    },
+    {
+      "id": "feature_event_fdae8be269ad481fa27f937262fb2944",
+      "feature_id": "esk-platform-native-provider-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-esk-platform",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788516935168
+    },
+    {
+      "id": "feature_event_1cb3a571bfbb48a3a4d8b108491f343d",
+      "feature_id": "esk-platform-native-provider-v1",
+      "action": "transitioned",
+      "actor": "codex-esk-platform",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1788516935710
+    },
+    {
+      "id": "feature_event_6302be6fcced4511837d6c87c759fca9",
+      "feature_id": "esk-platform-native-provider-v1",
+      "action": "transitioned",
+      "actor": "codex-esk-platform",
+      "reason": "",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1788516936284
     }
   ]
 }

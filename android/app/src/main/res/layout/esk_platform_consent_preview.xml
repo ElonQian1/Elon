@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/esk_platform_consent_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/elon_bg_app"
+    android:fillViewport="true">
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="24dp">
+
+    <TextView
+        android:id="@+id/esk_platform_consent_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="ESK 正式摘要授权"
+        android:textColor="@color/elon_text_primary"
+        android:textSize="24sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="一龙量化 · 本次主项目账户确认"
+        android:textColor="@color/elon_text_secondary"
+        android:textSize="15sp" />
+    <TextView
+        android:id="@+id/esk_platform_consent_account"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="24dp"
+        android:text="尚未确认账户"
+        android:textColor="@color/elon_text_primary"
+        android:textSize="24sp"
+        android:textStyle="bold" />
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
+        android:text="仅向本机已验证的一龙量化原生页面提供一次正式 ESK 登记总量和笔数。不传登录凭据、身份或流水；不登录量化网页，也不自动绑定其账户。"
+        android:textColor="@color/elon_text_secondary"
+        android:textSize="16sp"
+        android:lineSpacingExtra="4dp" />
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="平台登记 · 尚未上链。不包含 Paper 模拟资产；不代表付款自动核验、可交易、可提现或已产生收益。本次不会买卖、转账或授权交易。"
+        android:textColor="@color/elon_text_secondary"
+        android:textSize="15sp"
+        android:lineSpacingExtra="4dp" />
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="摘要最多显示 60 秒，不是实时余额。返回后无法远程撤回已交付摘要；量化页面离开或到期即清除。完整流水请在主项目个人中心查看。"
+        android:textColor="@color/elon_text_secondary"
+        android:textSize="13sp"
+        android:lineSpacingExtra="4dp" />
+    <TextView
+        android:id="@+id/esk_platform_consent_status"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
+        android:accessibilityLiveRegion="polite"
+        android:text="请核对账户。离开此页会取消授权。"
+        android:textColor="@color/elon_text_secondary"
+        android:textSize="15sp" />
+    <Button
+        android:id="@+id/esk_platform_consent_primary_action"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:minHeight="52dp"
+        android:layout_marginTop="16dp"
+        android:textSize="16sp"
+        android:enabled="false"
+        android:text="确认并读取正式摘要" />
+    <Button
+        android:id="@+id/esk_platform_consent_cancel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:minHeight="52dp"
+        android:layout_marginTop="16dp"
+        android:textSize="16sp"
+        android:text="取消并返回量化应用" />
+    </LinearLayout>
+</ScrollView>
