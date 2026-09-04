@@ -3,9 +3,10 @@
 ## Capability
 
 - ID: `android_chatgpt_private_conversation_project_move_v1`
-- Status: completed, production-default, device acceptance pending
+- Status: completed, production-default, device verified
 - Provider: ChatGPT Web
 - Adapter: `245`
+- Verified release: `v1.1.1514 (1514)`
 - Official fallback: existing context-bound project move menu
 
 ## Product behavior
@@ -42,6 +43,20 @@ command, consumer port, capability baseline, production action routing, native p
 and the explicit old-coordinator fallback. The focused suite, JavaScript tests, and Release
 build pass.
 
-Device round-trip acceptance is recorded separately. Until a device is available, the
-capability remains enabled from tested code but its verification string stays `device_pending`;
-no device result is inferred from offline tests.
+Release `v1.1.1514 (1514)`, adapter `245`, completed a reversible MCP-only device round trip
+with exactly one forward write and one restore write. Read-only reconciliation confirmed that
+the original project membership was restored, with no unknown recovery state, private-content
+output, Cookie clear, or app-data clear. The accepted source commit is `982154792`; the
+published APK SHA-256 is
+`d695476fc764417692ce35005fb21fb9961a9b94c4a0af514bebd3e4e30fd115`.
+
+The acceptance run also closed a timing mismatch exposed by the first safe attempt. A private
+mutation can spend about 30 seconds across page-local authentication, the single write, and
+read-only reconciliation, while command receipts previously expired after 20 seconds. Mutation
+receipts now retain a 35-second budget, the production coordinator polls for up to 40 seconds,
+and an exact correlated late result can settle a locally timed-out receipt. The smoke runner
+treats `timed_out` as terminal and never waits indefinitely or replays the write.
+
+This capability is complete and must not be re-researched or reimplemented without current
+regression evidence. The older DOM activation coordinator is retained only as an explicit
+compatibility and repair fallback; the native cached picker is shared by both paths.

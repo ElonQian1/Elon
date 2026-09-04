@@ -41,7 +41,8 @@ installed build; individual capability documents retain implementation evidence.
 | Official response read aloud bridge | ChatGPT | Implemented as a non-default fallback; live official control discovery plus semantic/menu tests passed | Manual official page or explicit system-read-aloud selection |
 | Android system response read aloud | ChatGPT | Implemented and enabled as an explicitly named alternate; audio start user-confirmed, stop acceptance pending | No automatic fallback |
 | Native conversation management | ChatGPT | Completed and enabled; pin, rename, and archive mutations device verified through adapter `244` | Context-bound official options for share, files, delete, and repair |
-| Native conversation project move | ChatGPT | Completed, enabled, and device verified on `v1.1.1493 (1493)`, adapter `239`; exact two-write round trip restored the original project | Official conversation project menu |
+| Native conversation project picker | ChatGPT | Completed, enabled, and device verified on `v1.1.1493 (1493)`, adapter `239`; the picker remains production UI and its previous DOM activation transaction is the compatibility fallback | Official conversation project menu |
+| Private conversation project move | ChatGPT | Completed, production-default, and device verified on `v1.1.1514 (1514)`, adapter `245`; exact one-forward/one-restore round trip restored the original project | Context-bound official project-move coordinator |
 | Acceptance evidence contract revisions | ChatGPT and Google Web AI | Completed, enabled, and installed-state migration verified on Release `v1.1.1393 (1414)`, adapter `212` | Retain implementation hashes as diagnostics without discarding accepted contracts |
 | Compact `Pro` model control classification | ChatGPT | Completed, enabled, and production-surface device verified on Release `v1.1.1394 (1415)`, adapter `213` | Official model menu remains authoritative |
 | Official feature sidebar trigger | ChatGPT | Completed, enabled, and production-surface device verified on Release `v1.1.1395 (1416)`, adapter `214` | Built-in native feature routes and the full official page |
@@ -275,6 +276,8 @@ reversible device round trip with exactly one forward and one restore write, no 
 write, no unknown recovery state, and the conversation restored to its original project.
 The completed, production-default capability is
 `android_chatgpt_native_conversation_project_move_v1`.
+Its native picker is reused by the private transaction below; the official DOM activation is a
+compatibility fallback, not a second default write path.
 
 Conversation pin/unpin, rename, and archive/unarchive now share one versioned page-local
 metadata transaction. Each explicit user action issues exactly one same-origin `PATCH`,
@@ -299,8 +302,13 @@ the result using read-only conversation metadata or the selected project directo
 never replays the write. The older context-bound DOM coordinator remains available only as the
 explicit official fallback. The completed, production-default implementation capability is
 `android_chatgpt_private_conversation_project_move_v1`, adapter `245`; targeted transaction,
-bridge, capability, and production UI tests plus the Release build passed, while reversible
-device acceptance remains explicitly pending. See
+bridge, capability, and production UI tests plus the Release build passed. Release
+`v1.1.1514 (1514)` then completed a reversible MCP-only device round trip with exactly one
+forward write and one restore write. Read-only reconciliation confirmed that the original
+project membership was restored, with no unknown recovery state, private-content output,
+Cookie clear, or app-data clear. The accepted receipt lifetime is 35 seconds and the production
+coordinator waits up to 40 seconds, covering the roughly 30-second worst-case private
+authentication/write/reconciliation budget without replaying the write. See
 `docs/chatgpt-private-conversation-project-move.md`.
 
 The Google conversation directory persists the timestamp of the last successful

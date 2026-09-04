@@ -182,7 +182,7 @@ class WebAiPrivateTransportCatalogTest {
         }
         assertEquals("completed", privateProjectMove.getString("implementation_status"))
         assertEquals(
-            "targeted_transaction_bridge_production_ui_and_release_build_passed_device_pending",
+            "device_round_trip_v1_1_1514_adapter_245_exact_two_writes_restored",
             privateProjectMove.getString("verification_status"),
         )
         assertTrue(privateProjectMove.getBoolean("production_default"))

@@ -335,7 +335,7 @@ internal object WebAiPrivateTransportCatalog {
             provider = "chatgpt",
             status = "completed",
             verification =
-                "targeted_transaction_bridge_production_ui_and_release_build_passed_device_pending",
+                "device_round_trip_v1_1_1514_adapter_245_exact_two_writes_restored",
             productionDefault = true,
             runtimeEnabled = BuildConfig.CHATGPT_PRIVATE_CONVERSATION_MUTATIONS_ENABLED,
             requestMode =
