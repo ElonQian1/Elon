@@ -7867,7 +7867,7 @@
       "id": "esk-platform-reconciliation-snapshot-v1",
       "title": "ESK 正式付款占用快照与预演接入",
       "summary": "从同一正式账本事务导出管理员只读付款占用快照，连接既有离线付款预演；含待审核和已登记、排除纯取消，不把正式范围完整冒充全历史完整，不产生入账权限。",
-      "status": "verified",
+      "status": "released",
       "priority": "p0",
       "requirement": {
         "path": "docs/requirements/esk-platform-reconciliation-snapshot-v1.md",
@@ -8180,7 +8180,7 @@
         }
       ],
       "created_at_ms": 1788541380728,
-      "updated_at_ms": 1788542958170
+      "updated_at_ms": 1788544623410
     },
     {
       "id": "esk-platform-recorded-assets-v1",
@@ -19173,16 +19173,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_549d02adfd404c209de7c6795bf92385",
-      "feature_id": "esk-paper-usdt-exchange-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "Rust 定向测试、跨端契约、PC 类型检查/生产构建、Android Debug 编译和移动 PWA 语法检查通过；隔离渲染器准备超时仅延期视觉截图。",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1788387252008
-    },
-    {
       "id": "feature_event_60ba7784818b4f33aed394e6da8efae0",
       "feature_id": "esk-paper-usdt-exchange-v1",
       "action": "transitioned",
@@ -21171,6 +21161,16 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1788542958170
+    },
+    {
+      "id": "feature_event_a7ac49da68f54e9b991e3953a051ca3f",
+      "feature_id": "esk-platform-reconciliation-snapshot-v1",
+      "action": "transitioned",
+      "actor": "codex-esk-platform-reconciliation",
+      "reason": "后端0.3.1728已由官方脚本发布源码419f24a17；2026-09-04T17:53:57Z独立匿名health200、版本/SHA一致、新路由401与禁缓存头通过，Server统一收尾FINALIZABLE=true。仅本切片后端发布；未读取真实付款/用户、未写余额，APK/私人使用/Sui另行验收。",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1788544623410
     }
   ]
 }
