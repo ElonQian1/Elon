@@ -5051,6 +5051,179 @@
       "updated_at_ms": 1788366843075
     },
     {
+      "id": "esk-native-snapshot-v1",
+      "title": "ESK 双 APK 原生只读快照授权 V1",
+      "summary": "在官方双 APK 间确认本人账户并展示短期 Paper ESK 快照，HTTP 私有请求失败关闭，不向 WebView 传凭据。",
+      "status": "verified",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/esk-native-snapshot-v1.md",
+        "content_hash": "d28c225b09fc14264072db3e3c852b1a179fa06e55ad66701025eecb412128a0",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "526511fc72e5a6dc18093ce8a9ee403c3779d392",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "f5840aa5466a7d540a9b6cf1e1a29461f2153ef1",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "platform-integration",
+      "tags": [
+        "esk",
+        "quant",
+        "android",
+        "read-only"
+      ],
+      "task_paths": [
+        "android/app/src/main/kotlin/com/elon/app/esk/handoff",
+        "docs/requirements/esk-native-snapshot-v1.md"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "双 APK 官方身份及一次性 nonce 校验",
+        "HTTP 零私有请求、HTTPS 不重定向并绑定会话",
+        "精确守恒金额及生命周期过期清空",
+        "双仓库合同、构建与独立验收证据"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/esk/handoff/EskSnapshotAccountParser.kt",
+          "content_hash": "7528884b8f9535f5f1a46e4b329977ae8419e98bff32c8c8c4a1ad7fea296441",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "526511fc72e5a6dc18093ce8a9ee403c3779d392",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "e6dd79efeb6a6ff12c6e493eb561b76b59489cc3",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/esk/handoff/EskSnapshotCaller.kt",
+          "content_hash": "1de7e2aaa24fa00138ab8cc9dad144d2bd378bab7f38fada32df695f8a8af58f",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "526511fc72e5a6dc18093ce8a9ee403c3779d392",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "61f62ba47d746fdafe7e275a9f942633d6a0aabd",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/esk/handoff/EskSnapshotConsentActivity.kt",
+          "content_hash": "135f16c300b8028c1ff5813dc30b2a1dbb09e52d00986f9da9877556fcaa603c",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "526511fc72e5a6dc18093ce8a9ee403c3779d392",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "bf0e8bf785127f4d57af365c98ff3bff3e6fc39e",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/esk/handoff/EskSnapshotHttpsReader.kt",
+          "content_hash": "e08b6550405f13ca062926108e9000d7ce377a12826bc76170ef8fac47d53959",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "526511fc72e5a6dc18093ce8a9ee403c3779d392",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "0b1f104f3739f0d567d87c8b134edd4193ae602d",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/esk/handoff/EskSnapshotRequest.kt",
+          "content_hash": "dbc5bc55d2d63a21f2c71e1610a85feee373b108b3bf88d04a20401d97eb3256",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "526511fc72e5a6dc18093ce8a9ee403c3779d392",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "44fd2694617d9b801a111099b64577cab14d20fe",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/eskcontract/EskSnapshotContract.kt",
+          "content_hash": "b82e513b7540897cee9c66903e3572994341736535c2a510fc3f1308452c747d",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "526511fc72e5a6dc18093ce8a9ee403c3779d392",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "8b3d4d7dafd1d5d40a9af482a1cdad357a435efd",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/esk/handoff/EskSnapshotHttpsReaderTest.kt",
+          "content_hash": "102e8773518d6fe862b70db54e48e0b4d3365e3d67baab32bde3ddc4f9692d93",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "526511fc72e5a6dc18093ce8a9ee403c3779d392",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "51ea8b4f1d162c0cdcdca4e3d4d3d6fb8f9a22b2",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/esk/handoff/EskSnapshotProviderTest.kt",
+          "content_hash": "91613c668110cf8def06c0399647f8dd423479078e0e612abd4dd9a122851f0c",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "526511fc72e5a6dc18093ce8a9ee403c3779d392",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "b05fa6bca03df6c8eb1fff23b088d0e789cf8627",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/eskcontract/EskSnapshotContractTest.kt",
+          "content_hash": "49f54f62a05335b2602b844cfb919b5eb60430619ea3c6647f7b6a82f3286e9b",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "526511fc72e5a6dc18093ce8a9ee403c3779d392",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "18dbcd87c7e5a115630e0f406b6ff7a3db39a168",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "scripts/test-esk-native-snapshot-contract.js",
+          "content_hash": "d032dd31bbb1386a1527ae119319cb089edebcf0b67d446f0dad75737241c00c",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "526511fc72e5a6dc18093ce8a9ee403c3779d392",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "d8599f65bc5ff5638622ed2a8d489abe493a86d2",
+            "state": "index_only"
+          }
+        }
+      ],
+      "created_at_ms": 1788506413742,
+      "updated_at_ms": 1788508366879
+    },
+    {
       "id": "esk-paid-user-reconciliation-preview-v1",
       "title": "ESK 历史付款与用户映射对账预演 V1",
       "summary": "补齐现有Paper批量登记之前的付款事实级去重、脱敏用户映射、用途/条款一致性预演；不联网、不写余额、不生成提交文件。",
@@ -16349,126 +16522,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_2a7762cef1ee48eba2f81d02a4a7e503",
-      "feature_id": "yilong-quant-paper-public-deployment-contract-sync-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-quant-public-deployment-sync-v1",
-      "reason": "最终 V9 同步文件已锁定，准备绑定文档与测试证据。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788293014394
-    },
-    {
-      "id": "feature_event_801a94ff46cf415bbe890a8679a31024",
-      "feature_id": "yilong-quant-paper-public-deployment-contract-sync-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-goal-quant-public-deployment-sync-v1",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788293042686
-    },
-    {
-      "id": "feature_event_29eea5ae30d14cca8a2f3f1c9ce3066a",
-      "feature_id": "yilong-quant-paper-public-deployment-contract-sync-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-quant-public-deployment-sync-v1",
-      "reason": "主项目 V9 接入文档、AI 导航和 planned 状态合同测试已实现并绑定。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1788293052210
-    },
-    {
-      "id": "feature_event_f601211a2cd0407388b8662938c017b8",
-      "feature_id": "yilong-quant-paper-public-deployment-contract-sync-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-quant-public-deployment-sync-v1",
-      "reason": "V9 同步合同、官方目录 planned 合同、源码体积与文档模块化门禁均通过；没有发布运行环境。",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1788293063213
-    },
-    {
-      "id": "feature_event_90a2fb58ccb445e08c435bdbe748ee73",
-      "feature_id": "yilong-quant-paper-public-deployment-contract-sync-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-quant-public-deployment-sync-v1",
-      "reason": "主项目文档提交 11387a04755985e35e1f5c075e8335124ea1a9c2 已推送 origin/main；本次不发布任何运行环境。",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1788293158845
-    },
-    {
-      "id": "feature_event_debe29d98a024d4ab16dae9223565ffd",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "evidence_recorded",
-      "actor": "Codex",
-      "reason": "",
-      "from_status": "blocked",
-      "to_status": "blocked",
-      "at_ms": 1788295841683
-    },
-    {
-      "id": "feature_event_7bd3fea8d59d4db4adef0a3c251835d4",
-      "feature_id": "compute-federation-interactive-desktop-v1",
-      "action": "registered",
-      "actor": "Codex",
-      "reason": "The product owner explicitly introduced paid cloud-PC/game-streaming supply and asked to integrate it with the existing distributed compute federation while preserving compatibility.",
-      "from_status": "",
-      "to_status": "accepted",
-      "at_ms": 1788296237836
-    },
-    {
-      "id": "feature_event_6d8a29f002db48f9836a31fe23056252",
-      "feature_id": "compute-federation-interactive-desktop-v1",
-      "action": "transitioned",
-      "actor": "Codex",
-      "reason": "Requirement is committed, current, accepted, and has no dependency blocker; begin the isolated source-contract tranche.",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1788296266677
-    },
-    {
-      "id": "feature_event_c22c0b06518f4f2ebee5aa1bbe264ce0",
-      "feature_id": "compute-federation-interactive-desktop-v1",
-      "action": "claimed",
-      "actor": "Codex:/root",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788296275006
-    },
-    {
-      "id": "feature_event_9dbbf3c107a34b388616e13fd1a1a364",
-      "feature_id": "compute-federation-interactive-desktop-v1",
-      "action": "transitioned",
-      "actor": "Codex",
-      "reason": "Implement the isolated source-contract tranche in the planned document and compute_federation module boundaries.",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788296285296
-    },
-    {
-      "id": "feature_event_1ce6eaee8493499098c8cfbfe7ecd99f",
-      "feature_id": "compute-federation-interactive-desktop-v1",
-      "action": "claim_released",
-      "actor": "Codex:/root",
-      "reason": "Requirement intentionally clarified product modes, licensed paid-market rights, and relay-only stranger safety before source evidence.",
-      "from_status": "in_progress",
-      "to_status": "blocked",
-      "at_ms": 1788298248837
-    },
-    {
-      "id": "feature_event_6c02530b5dcb4a9dbdd834fe82718653",
-      "feature_id": "compute-federation-interactive-desktop-v1",
-      "action": "requirement_rebound",
-      "actor": "Codex:/root",
-      "reason": "Rebind the intentionally reviewed requirement after adding product-mode, licensed-title, and relay-only safety boundaries.",
-      "from_status": "blocked",
-      "to_status": "proposed",
-      "at_ms": 1788298260915
-    },
-    {
       "id": "feature_event_7b0209158a904f1d978419b5aaa89970",
       "feature_id": "compute-federation-interactive-desktop-v1",
       "action": "transitioned",
@@ -18347,6 +18400,126 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1788505412947
+    },
+    {
+      "id": "feature_event_0879c8fb0d6241e6993d5ec64e8b818a",
+      "feature_id": "esk-native-snapshot-v1",
+      "action": "registered",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1788506413742
+    },
+    {
+      "id": "feature_event_35abf374ed434fdf95397a5904cb2f93",
+      "feature_id": "esk-native-snapshot-v1",
+      "action": "claimed",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788506422409
+    },
+    {
+      "id": "feature_event_a6c154df261c43dab40755df239a60a2",
+      "feature_id": "esk-native-snapshot-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "双仓库原生只读授权已确定边界，开始实现。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788506561695
+    },
+    {
+      "id": "feature_event_eb455ef4a29142628b6541280d02f4fd",
+      "feature_id": "esk-native-snapshot-v1",
+      "action": "evidence_recorded",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788508096130
+    },
+    {
+      "id": "feature_event_4e577a58bc38452cace8a897f82b2514",
+      "feature_id": "esk-native-snapshot-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "主原生确认、独立HTTPS只读解析与双仓协议实现完成。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1788508096695
+    },
+    {
+      "id": "feature_event_9b1cdc346160420696109cff85bba061",
+      "feature_id": "esk-native-snapshot-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "主端44项定向单元及Debug构建、双仓一致性通过；真实设备/私有HTTPS/资金另行验收。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1788508097215
+    },
+    {
+      "id": "feature_event_99891649857e45efa72f637d7a22d2e2",
+      "feature_id": "esk-native-snapshot-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "固定 LF 字节合同后重新绑定当前证据，语义不变。",
+      "from_status": "verified",
+      "to_status": "ready",
+      "at_ms": 1788508330159
+    },
+    {
+      "id": "feature_event_5ef38c433b8945a8955a59ef82d5344e",
+      "feature_id": "esk-native-snapshot-v1",
+      "action": "claimed",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788508330678
+    },
+    {
+      "id": "feature_event_120904c029a34f3ea24191b1e452f4e1",
+      "feature_id": "esk-native-snapshot-v1",
+      "action": "evidence_recorded",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "claimed",
+      "to_status": "claimed",
+      "at_ms": 1788508333571
+    },
+    {
+      "id": "feature_event_814d7b7106bd4c5cb6ff0bd25704af5b",
+      "feature_id": "esk-native-snapshot-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "规范 LF 后当前源码/测试证据已绑定，双仓一致性及本地构建测试通过；设备/私有HTTPS仍单列。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788508365809
+    },
+    {
+      "id": "feature_event_ad816449eae042fc829ba9515fa43b0b",
+      "feature_id": "esk-native-snapshot-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "规范 LF 后当前源码/测试证据已绑定，双仓一致性及本地构建测试通过；设备/私有HTTPS仍单列。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1788508366341
+    },
+    {
+      "id": "feature_event_aace9d8d99e44c3ba31c634c05e07573",
+      "feature_id": "esk-native-snapshot-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "规范 LF 后当前源码/测试证据已绑定，双仓一致性及本地构建测试通过；设备/私有HTTPS仍单列。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1788508366879
     }
   ]
 }

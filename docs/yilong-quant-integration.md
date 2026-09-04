@@ -79,7 +79,18 @@
 
 ## 尚未完成
 
-- 在真实 Android 设备完成项目广场下载、系统安装、签名兼容、打开 `/quant/`、返回/重试和公开 Paper 回测验收；当前正式 APK、主服务器发布回执和公网 HTTP 路径已通过离线及网络验证。独立量化 APK 的本人 ESK/仓位仍需后续安全应用绑定协议，V17 不传主项目 bearer、Paper grant 或 ESK 投影。
+### 原生 ESK 快照 V1 / 量化 V24
+
+双 APK 原生只读快照已实现：[需求](requirements/esk-native-snapshot-v1.md)、
+[17 字段合同](contracts/esk-android-snapshot-v1.md)。量化原生页面不接收主登录凭据，
+确认页只读取 HTTPS 主服务，HTTP 在读取 token 和创建请求前拒绝。
+双方使用当前正式签名、固定组件与一次性 nonce；快照只在内存展示最多 60 秒，
+后台/重建清空，金额守恒，当前只允许 Paper 平台登记、未上链、未移动资金。
+它不是网页登录，也不接通 HTTP 公共页面的本人仓位/投影接口。
+构建、发布和用户验收分别见 [交付记录](esk-native-snapshot-v1-delivery.md)。
+Android 签名认证及本机 Activity result 没有 Web 镜像；既有 PWA 资产卡与受控投影协议保持原样。
+
+- 在真实 Android 设备完成项目广场下载、系统安装、签名兼容、打开 `/quant/`、返回/重试和公开 Paper 回测验收；V24 原生快照仍需双正式 APK 与受保护主服务联调，V17/V20 已发布版本不传主项目 bearer、Paper grant 或 ESK 投影。
 - 本人 ESK/仓位、量化申请 accepted/released 回执等敏感能力仍需批准的加密传输和应用绑定方案；当前 HTTP `/quant/` 不得启用这些功能。随后还需完成主项目签名私钥托管和一次真实轮换演练。代码已支持量化端多 key 重叠、密钥级撤销和单 grant 跨重启撤销；当前用户 grant 仍只绑定 paper 模拟参与者，不证明付款、KYC、钱包或真实准入。
 - 经来源与许可评审、版本化落盘并用于可复现回测的真实公开历史行情、多策略比较、回测结果持久化和共享算力分片；V19 的 Binance Spot REST 数据只是按需公开展示快照，不写入研究 `market-data`、不进入回测或 NAV。
 - 将已付款用户数据经审核、脱敏、对账后导入生产系统；paper 子项目只允许脱敏标识和模拟锁定回执，继续禁止把聊天或付款截图写入代码。

@@ -77,6 +77,13 @@
         </activity>
 
         <activity
+            android:name=".esk.handoff.EskSnapshotConsentActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:allowTaskReparenting="false"
+            android:launchMode="standard" />
+
+        <activity
             android:name=".AiWorkSummaryActivity"
             android:exported="false"
             android:parentActivityName=".MainActivity" />
