@@ -6390,7 +6390,7 @@
       "id": "esk-platform-history-v1",
       "title": "正式 ESK 本人审核流水完整翻页",
       "summary": "为正式 ESK 原生资产页新增独立只读完整流水；按本人快照摘要分页，账本变化清空重读，保留原账户与双 APK 合同。",
-      "status": "verified",
+      "status": "released",
       "priority": "p1",
       "requirement": {
         "path": "docs/requirements/esk-platform-history-v1.md",
@@ -6659,7 +6659,7 @@
         }
       ],
       "created_at_ms": 1788520078318,
-      "updated_at_ms": 1788521624005
+      "updated_at_ms": 1788522780329
     },
     {
       "id": "esk-platform-native-provider-v1",
@@ -17585,16 +17585,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_2d4c2732495b4d9c835c8c3894dba03a",
-      "feature_id": "esk-paper-first-user-allocation-operations-v1",
-      "action": "transitioned",
-      "actor": "codex-root",
-      "reason": "批量预检、摘要确认、原子提交、追加式回执、运营脚本和测试均已实现。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1788308378286
-    },
-    {
       "id": "feature_event_c8081e44c7464875951b181606d2d164",
       "feature_id": "esk-paper-first-user-allocation-operations-v1",
       "action": "transitioned",
@@ -19583,6 +19573,16 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1788521624005
+    },
+    {
+      "id": "feature_event_d93569b224e145b39840cb290bc43184",
+      "feature_id": "esk-platform-history-v1",
+      "action": "transitioned",
+      "actor": "codex-esk-history-root",
+      "reason": "Published Server 0.3.1725 and mobile PWA from 13323a41d3faa2525b420cb703be0ff495cddf26; official APK publisher fast-forwarded docs-only to b1acb7433d1ad9533d444636b91c29dcd7f27824 and published 1.1.1511 (1511), SHA256 95ff7a66ee683363849ef3c1117ff31fcafcefa8643fcc3d18ff13616ca89978. Android 190, harness 58, router 11 tests passed. Public health 200 and unauthenticated history 401/no-store verified. Visual and actual paid-user acceptance remain deferred; no real funds or balances changed.",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1788522780329
     }
   ]
 }
