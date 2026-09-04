@@ -1,0 +1,8 @@
+INCLUDING DEPENDENCY MoveStdlib
+INCLUDING DEPENDENCY Sui
+BUILDING esk_currency
+Running Move unit tests
+[ PASS    ] esk_currency::esk_tests::decimals_match_genesis_manifest
+[ PASS    ] esk_currency::esk_tests::initializer_mints_once_and_consumes_treasury_cap
+[ PASS    ] esk_currency::esk_tests::supply_matches_genesis_manifest
+Test result: OK. Total tests: 3; passed: 3; failed: 0

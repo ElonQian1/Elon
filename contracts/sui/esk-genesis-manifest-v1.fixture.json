@@ -30,7 +30,7 @@
     "sui_source_commit": "46f18562f1f5af2438d35828e8b62d5e0b972db7",
     "move_edition": "2024",
     "verification_status": "verified",
-    "package_input_digest": "sha256:aaede98ca5312786fcfca8586865c3f2b83d2b9ae27eacb2c47eb58b7e5ebc7d",
+    "package_input_digest": "sha256:6266890971f1c4ee6be82e9441959ebf0d4588e0483113a99ec61e66ea208665",
     "move_source_digest": "sha256:c340a254e0bfa63b252401410fc9d2a8a9613a8aaf2bf3195de7d13950c2e42e",
     "move_test_source_digest": "sha256:b9d37147ff4c6207835f221b883e391985ad24bce36b22d7139865c507511055",
     "build_evidence_digest": "sha256:b1881cd12ebf1fae560f71f668cd768a2c8838f2e0298eeb2e95e273bfd97472",
