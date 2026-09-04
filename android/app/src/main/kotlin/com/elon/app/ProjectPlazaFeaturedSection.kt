@@ -46,7 +46,9 @@ internal class ProjectPlazaFeaturedSection(
         addView(label("左右滑动探索标杆", 11f, R.color.elon_plaza_text_quiet), LinearLayout.LayoutParams(
             0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f
         ).apply { marginStart = dp(9) })
-        addView(label("换一换 ↻", 12f, R.color.elon_plaza_signal), LinearLayout.LayoutParams(dp(72), dp(42)).apply {
+        addView(label("换一换 ↻", 12f, R.color.elon_plaza_signal).apply {
+            gravity = Gravity.END or Gravity.CENTER_VERTICAL
+        }, LinearLayout.LayoutParams(dp(72), dp(42)).apply {
             gravity = Gravity.CENTER_VERTICAL
         })
     }
@@ -191,14 +193,14 @@ internal class ProjectPlazaFeaturedSection(
     private fun cardHeightPx(): Int = dp(CARD_HEIGHT_DP)
 
     private companion object {
-        const val SIDE_MARGIN_DP = 20
+        const val SIDE_MARGIN_DP = 22
         const val TRAILING_PADDING_DP = 88
         const val SECTION_HEADING_HEIGHT_DP = 46
         const val CARD_GAP_DP = 14
         const val CARD_WIDTH_FRACTION = 0.72f
         const val CARD_HEIGHT_DP = 310
         const val CARD_RADIUS_DP = 24
-        const val CONTENT_PADDING_DP = 20
+        const val CONTENT_PADDING_DP = 23
         const val ACTION_BOTTOM_DP = 16
         const val COVER_SIZE_DP = 58
         const val COVER_RADIUS_DP = 16

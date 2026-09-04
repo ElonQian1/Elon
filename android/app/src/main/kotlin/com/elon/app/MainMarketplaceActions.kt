@@ -231,6 +231,13 @@ internal class MainMarketplaceActions(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 1f
             ))
+            addView(View(activity).apply {
+                setBackgroundColor(activity.elonColor(R.color.elon_plaza_border))
+                contentDescription = null
+            }, LinearLayout.LayoutParams(dp(1), dp(24)).apply {
+                marginStart = dp(8)
+                marginEnd = dp(8)
+            })
             addView(TextView(activity).apply {
                 text = "全部 ⌄"
                 includeFontPadding = false
@@ -238,7 +245,7 @@ internal class MainMarketplaceActions(
                 setTextColor(activity.elonColor(R.color.elon_plaza_text_primary))
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
                 contentDescription = null
-            }, LinearLayout.LayoutParams(dp(64), LinearLayout.LayoutParams.MATCH_PARENT))
+            }, LinearLayout.LayoutParams(dp(48), LinearLayout.LayoutParams.MATCH_PARENT))
         }
     }
 
@@ -336,7 +343,7 @@ internal class MainMarketplaceActions(
                 chip.layoutParams = params
             }
             chip.minWidth = 0
-            chip.setPadding(dp(16), 0, dp(16), 0)
+            chip.setPadding(dp(18), 0, dp(if (key == "joined") 15 else 18), 0)
         }
     }
 
@@ -426,7 +433,7 @@ internal class MainMarketplaceActions(
         orientation = LinearLayout.HORIZONTAL
         gravity = Gravity.CENTER_VERTICAL
         minimumHeight = dp(LIST_ROW_MIN_HEIGHT_DP)
-        setPadding(dp(16), dp(14), dp(8), dp(14))
+        setPadding(dp(18), dp(14), dp(8), dp(14))
         background = rect(activity.elonColor(R.color.elon_plaza_surface_card), LIST_ROW_RADIUS_DP, activity.elonColor(R.color.elon_plaza_border))
         isClickable = true
         foreground = selectableForeground()
@@ -577,20 +584,20 @@ internal class MainMarketplaceActions(
         const val FONT_PAGE_TITLE_SP = 16f
         const val SEARCH_HEIGHT_DP = 52
         const val SEARCH_RADIUS_DP = 26
-        const val PLAZA_SIDE_MARGIN_DP = 20
+        const val PLAZA_SIDE_MARGIN_DP = 22
         const val FILTER_SCROLLER_HEIGHT_DP = 58
         const val FILTER_CHIP_HEIGHT_DP = 36
         const val FILTER_CHIP_SELECTED_WIDTH_DP = 70
         const val FILTER_CHIP_RADIUS_DP = 24
-        const val FILTER_SIDE_PADDING_DP = 16
-        const val FILTER_ITEM_GAP_DP = 14
+        const val FILTER_SIDE_PADDING_DP = 22
+        const val FILTER_ITEM_GAP_DP = 9
         const val LIST_FIRST_ROW_TOP_DP = 2
         const val LIST_ROW_GAP_DP = 12
         const val LIST_ROW_MIN_HEIGHT_DP = 104
         const val LIST_ROW_RADIUS_DP = 18
-        const val LIST_COVER_SIZE_DP = 60
+        const val LIST_COVER_SIZE_DP = 52
         const val LIST_COVER_RADIUS_DP = 12
-        const val LIST_CHEVRON_DP = 16
+        const val LIST_CHEVRON_DP = 20
         const val LIST_CHEVRON_END_INSET_DP = 4
     }
 }
