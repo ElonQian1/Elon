@@ -1,7 +1,7 @@
 ---
 title: "ESK 首批用户交付阶段目标 V1"
 version_status: current
-reviewed_at: 2026-09-04
+reviewed_at: 2026-09-05
 owners: [platform-assets, protocol, quant]
 ---
 
@@ -39,10 +39,10 @@ ESK 保持同一种服务支付、治理和经批准利润快照参与资产；�
 
 | 阶段 | 当前证据 / 缺口 | 下一步及完成条件 |
 | --- | --- | --- |
-| 用户资产一致性 | 正式摘要、完整审核流水、跨 APK 合同及量化接收端源码已具备；正式占用和卖回申请已配套发布，生产默认关闭 | 完成批准政策下的本人验收及量化新版占用合同；Paper 不计正式资产，申请不等于成交或付款 |
+| 用户资产一致性 | 主个人资产、完整审核流水与卖回已具备；新版跨 APK 同快照额度/申请进度两端已实现；生产卖回政策默认关闭 | 完成新版正式子包和批准政策下的本人验收；Paper 不计正式资产，申请不等于成交或付款 |
 | 真实上链准备 | 固定供应 Move build/test 已完成；没有发布回执 | 独立只读观察器 → 全部发布/注册/分配验证 → 授权测试网发布和终局性同步 |
 | 历史用户交付 | 付款事实及实际映射不能由代码猜测 | dry-run 对账与去重 → 经审批的入账/claim → 可追溯结转，余额不双计 |
-| 量化与安装闭环 | 行情/Paper 基础复用；量化 V28 正式资产接收端和签名包已完成，待上传与双 APK 本人验收 | 主项目下载并打开新版子 APK、授权登录、本人资产和结果来源；QSHARE 对账独立验收 |
+| 量化与安装闭环 | 新版唯一“我的 ESK”接收端 0.5.0 源码已推送、69 项 Android 测试通过，未正式签名/上传；旧原生桥已退役 | 使用子项目受控签名和编辑者上传流程，完成广场安装与双 APK 本人验收；QSHARE 对账独立验收 |
 
 链上查询见 [发布只读观察器 V1](esk-sui-publication-observer-v1.md) 和
 [规范 Currency 与固定供应观察器 V1](esk-sui-currency-observer-v1.md)；
@@ -58,14 +58,16 @@ Android 授权前置身份切片见 [官方量化 APK 身份校验 V1](yilong-qu
 正式平台登记独立切片见 [经审核付款账本 V1](esk-platform-recorded-assets-v1.md) 与
 [服务接入边界](../esk-platform-recorded-assets.md)；代码与测试进展不等于生产入账或 APP 已接入。
 主项目个人中心独立正式来源接入见 [正式登记个人入口 V1](esk-platform-profile-v1.md)；
-当前 HTTP、真实付款审批与双 APK 正式合同仍分别验收，不把可见入口当作真实余额已送达。
-独立跨 APK 正式来源先交付 [原生摘要授权提供端](esk-platform-native-provider-v1.md)，
-量化 V28 接收端与 0.4.0 签名构建已完成，上传与双 APK 本人联调仍待验收；
-其仓库交接为 `docs/delivery/v28-formal-esk-native-consumer.md`，旧 Paper 协议不用于正式数量。
+公共 HTTP、私有安全连接、真实付款审批与双 APK 正式合同分别验收，不把可见入口当作真实余额已送达。
+用户 2026-09-05 明确取消旧版兼容；跨 APK 只维护
+[正式进度授权 V1](esk-platform-native-progress-v1.md)，主 1.1.1519 已完成正式发布流程，
+公开工件核验见其 [交付记录](../delivery/esk-platform-native-progress-v1.md)。
+量化 0.5.0 使用同一新版合同；旧 Paper 17 字段与正式摘要 21 字段原生桥及旧入口已退役，
+不得恢复为双轨产品。旧文档仅作历史，旧签名包不代表新版可上架；主账本和历史记录不删除。
 [完整审核流水分页](esk-platform-history-v1.md) 已建立；后续补齐
 [摘要会话同快照校验](esk-platform-account-snapshot-auth-v1.md)，
 部署与本人验收分别见其 [交付记录](../delivery/esk-platform-account-snapshot-auth-v1.md)。
-原账户 18 字段与双 APK 协议不变；正式占用和卖回使用独立合同，不套用 Paper 状态。
+原账户 HTTP 18 字段不变；双 APK 改用新版进度合同，不套用旧原生或 Paper 状态。
 [正式卖回申请与占用 V1](esk-platform-sellback-requests-v1.md) 已发布至 Server 0.3.1727
 和主 APK 1.1.1515，包含本人查询、申请、取消与结果未知恢复；生产政策默认关闭，
 不实现报价或付款。公开验证、视觉延期及真实本人验收边界见

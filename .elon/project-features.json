@@ -6875,7 +6875,7 @@
       "id": "esk-platform-native-progress-v1",
       "title": "ESK 正式额度与卖回进度跨 APK 只读交付",
       "summary": "唯一新版原生ESK入口：逐页主账户同意读取正式总量、占用、可申请量和卖回进度。旧17/21原生桥退役、不兼容；保留账本、主个人历史与卖回、公共行情和Paper后台。无跨APK写权限。",
-      "status": "implemented",
+      "status": "verified",
       "priority": "p0",
       "requirement": {
         "path": "docs/requirements/esk-platform-native-progress-v1.md",
@@ -7196,14 +7196,14 @@
         },
         {
           "path": "docs/delivery/esk-platform-native-progress-v1.md",
-          "content_hash": "c4fcdc4b9bdd9682390ec2c597c3b1577d3260abef2eae691b4da9f67437c346",
+          "content_hash": "b37bc19dfc612cafa6d8295d199c9d9db9063058079b808488968a6f5b096ea1",
           "locator": "",
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "50cd35f7b4c96807323b66f8442eb61e18b3cfa6",
-            "head_blob_oid": "37f78872b1000b08270a6829addeaff4756e551b",
-            "worktree_blob_oid": "854d71c16e81033cacbcfe175e3669c0236ea90a",
+            "head_commit": "21dac2f61e1e2798a51bdfcc2b71b7951c46141b",
+            "head_blob_oid": "854d71c16e81033cacbcfe175e3669c0236ea90a",
+            "worktree_blob_oid": "ce08d5986eefecf40df0c14a0e21a8e638d47232",
             "state": "tracked_modified"
           }
         },
@@ -7313,7 +7313,7 @@
         }
       ],
       "created_at_ms": 1788536023679,
-      "updated_at_ms": 1788539352042
+      "updated_at_ms": 1788540762220
     },
     {
       "id": "esk-platform-native-provider-v1",
@@ -8899,7 +8899,7 @@
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "0a9631c36226192e48986984be46a8b6dcfee5df",
+            "head_commit": "21dac2f61e1e2798a51bdfcc2b71b7951c46141b",
             "head_blob_oid": "6961c8955629e0bf34216be12127440b7615f270",
             "worktree_blob_oid": "6961c8955629e0bf34216be12127440b7615f270",
             "state": "tracked_clean"
@@ -8907,14 +8907,14 @@
         },
         {
           "path": "docs/requirements/esk-first-user-delivery-roadmap-v1.md",
-          "content_hash": "23d64980f0cc8d3df9b9eebd44674d58f07d859cf78ffe1dfdd3ba7ea0e17ea4",
+          "content_hash": "b5fd00d9d79e45cb5a3a26aff33be0475e1728e5b9ccdec54eaf3f08a45775df",
           "locator": "",
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "0a9631c36226192e48986984be46a8b6dcfee5df",
-            "head_blob_oid": "ed582b32359fe9879b0423a628756bef53368fad",
-            "worktree_blob_oid": "befa1c26f7d19adb3d69b9c5116a044206864382",
+            "head_commit": "21dac2f61e1e2798a51bdfcc2b71b7951c46141b",
+            "head_blob_oid": "befa1c26f7d19adb3d69b9c5116a044206864382",
+            "worktree_blob_oid": "12d54d582b72356bb300e5b9a3cb86032cbb5ca7",
             "state": "tracked_modified"
           }
         },
@@ -8925,7 +8925,7 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "0a9631c36226192e48986984be46a8b6dcfee5df",
+            "head_commit": "21dac2f61e1e2798a51bdfcc2b71b7951c46141b",
             "head_blob_oid": "423936b31f327ce0418a92ec88bd56112ef68177",
             "worktree_blob_oid": "423936b31f327ce0418a92ec88bd56112ef68177",
             "state": "tracked_clean"
@@ -8933,12 +8933,12 @@
         },
         {
           "path": "scripts/esk-sui-publication-observer/graphql.js",
-          "content_hash": "47dac683876f34d95ff1d526c417f35fb29ca2928118089fbc35ba786e550e4e",
+          "content_hash": "55abc9c4b229fac08582211ce6b3315ec48799ceb8ab10fd54555e7773f6f985",
           "locator": "",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "0a9631c36226192e48986984be46a8b6dcfee5df",
+            "head_commit": "21dac2f61e1e2798a51bdfcc2b71b7951c46141b",
             "head_blob_oid": "a99faea5f995103ce2054eafaba15077e20135d7",
             "worktree_blob_oid": "a99faea5f995103ce2054eafaba15077e20135d7",
             "state": "tracked_clean"
@@ -8951,7 +8951,7 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "0a9631c36226192e48986984be46a8b6dcfee5df",
+            "head_commit": "21dac2f61e1e2798a51bdfcc2b71b7951c46141b",
             "head_blob_oid": "7287174790c3d225cb3fef7a143e1b7fced3cc53",
             "worktree_blob_oid": "7287174790c3d225cb3fef7a143e1b7fced3cc53",
             "state": "tracked_clean"
@@ -8959,12 +8959,12 @@
         },
         {
           "path": "scripts/esk-sui-publication-observer/transport.js",
-          "content_hash": "be5d0b26658911b976d086828f36b8197ff253414d164694add85ebb8570c01b",
+          "content_hash": "5ef09bdad391173e487d753a3881c4628d5c461f493d5de9f5aa1e456a731270",
           "locator": "",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "0a9631c36226192e48986984be46a8b6dcfee5df",
+            "head_commit": "21dac2f61e1e2798a51bdfcc2b71b7951c46141b",
             "head_blob_oid": "fe2efc24e612cab67ed9280f4e137fd1a3b2770d",
             "worktree_blob_oid": "fe2efc24e612cab67ed9280f4e137fd1a3b2770d",
             "state": "tracked_clean"
@@ -8977,7 +8977,7 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "0a9631c36226192e48986984be46a8b6dcfee5df",
+            "head_commit": "21dac2f61e1e2798a51bdfcc2b71b7951c46141b",
             "head_blob_oid": "b38a269caea9a4bc94ad68777bcbad0481b7e229",
             "worktree_blob_oid": "b38a269caea9a4bc94ad68777bcbad0481b7e229",
             "state": "tracked_clean"
@@ -8985,12 +8985,12 @@
         },
         {
           "path": "scripts/test-esk-sui-observer-transport.js",
-          "content_hash": "a21a96309aa5a5ae842687e399471aba0a39a8a7dfc4862f8dda22c75a3035da",
+          "content_hash": "83389cfd5cf11c4e41eca2b953aec4e76f0b2fb9ffebf1b147a927d32106de36",
           "locator": "",
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "0a9631c36226192e48986984be46a8b6dcfee5df",
+            "head_commit": "21dac2f61e1e2798a51bdfcc2b71b7951c46141b",
             "head_blob_oid": "009039866d6e61c0da804508d53b916bb7da9b62",
             "worktree_blob_oid": "009039866d6e61c0da804508d53b916bb7da9b62",
             "state": "tracked_clean"
@@ -9003,7 +9003,7 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "0a9631c36226192e48986984be46a8b6dcfee5df",
+            "head_commit": "21dac2f61e1e2798a51bdfcc2b71b7951c46141b",
             "head_blob_oid": "dd248b0c1f607191443d93a448b695d6a9854652",
             "worktree_blob_oid": "dd248b0c1f607191443d93a448b695d6a9854652",
             "state": "tracked_clean"
@@ -9011,7 +9011,7 @@
         }
       ],
       "created_at_ms": 1788501859304,
-      "updated_at_ms": 1788534820414
+      "updated_at_ms": 1788540545290
     },
     {
       "id": "esk_paper_quant_allocation_request_v2",
@@ -18854,86 +18854,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_e7193539592f44f69bb3c43a64ede8f7",
-      "feature_id": "esk-asset-profile-first-screen-v2",
-      "action": "claimed",
-      "actor": "codex-desktop-root",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788361453832
-    },
-    {
-      "id": "feature_event_d107b70f2d3e44eea7cc071c0ac7ecb5",
-      "feature_id": "esk-asset-profile-first-screen-v2",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "开始实现个人中心 ESK 首屏可见与跨端同步。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788361470026
-    },
-    {
-      "id": "feature_event_59202aaff8c640cd991f8b23587dd94a",
-      "feature_id": "esk-asset-profile-first-screen-v2",
-      "action": "evidence_recorded",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788361921389
-    },
-    {
-      "id": "feature_event_7f7d29f470564801949e282b65b74716",
-      "feature_id": "esk-asset-profile-first-screen-v2",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "Android 与移动 Web ESK 首屏资产视图已实现，跨端静态合同与 Android Kotlin 编译通过。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1788361938468
-    },
-    {
-      "id": "feature_event_1e57356c6754491abfd0d7769d475c78",
-      "feature_id": "esk-asset-profile-first-screen-v2",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "ESK 首屏静态合同、既有 ESK 跨端合同、移动 PWA 脚本语法和 Android Kotlin 编译均通过；真机因无可用物理设备延期。",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1788361957309
-    },
-    {
-      "id": "feature_event_a5bae3c28c2e4a05b4f355af524d3a68",
-      "feature_id": "esk-asset-profile-first-screen-v2",
-      "action": "transitioned",
-      "actor": "codex-desktop ai助手",
-      "reason": "显式重新打开已验证功能，以接受需求文档结尾格式修正并重新绑定当前哈希。",
-      "from_status": "verified",
-      "to_status": "retired",
-      "at_ms": 1788362483652
-    },
-    {
-      "id": "feature_event_8bc0f48d10fd4f94ab4e679ac0f825be",
-      "feature_id": "esk-asset-profile-first-screen-v2",
-      "action": "transitioned",
-      "actor": "codex-desktop ai助手",
-      "reason": "重新打开功能并准备重绑当前需求哈希，避免已验证记录继续引用漂移版本。",
-      "from_status": "retired",
-      "to_status": "proposed",
-      "at_ms": 1788362495799
-    },
-    {
-      "id": "feature_event_d1c303adea83423a8a0f6e0795c2569d",
-      "feature_id": "esk-asset-profile-first-screen-v2",
-      "action": "requirement_rebound",
-      "actor": "codex-desktop ai助手",
-      "reason": "重绑无多余结尾空行的当前需求文档，并重新执行评审、实现和验证生命周期。",
-      "from_status": "proposed",
-      "to_status": "proposed",
-      "at_ms": 1788362508519
-    },
-    {
       "id": "feature_event_b3d49c8d187841dda5c3d8f836bab757",
       "feature_id": "esk-asset-profile-first-screen-v2",
       "action": "transitioned",
@@ -20852,6 +20772,86 @@
       "from_status": "in_progress",
       "to_status": "implemented",
       "at_ms": 1788539352042
+    },
+    {
+      "id": "feature_event_e9185aaf40c64af9a81e83720efcb1f8",
+      "feature_id": "esk-sui-publication-observer-v1",
+      "action": "transitioned",
+      "actor": "Codex",
+      "reason": "用户明确只保留新版 ESK 原生对接；仅更新本功能持有的首批用户路线图交接事实，观察器代码和验收范围不变，显式刷新文档证据。",
+      "from_status": "verified",
+      "to_status": "ready",
+      "at_ms": 1788540464544
+    },
+    {
+      "id": "feature_event_29d11df8d5664907b0bbbc16774a5fe9",
+      "feature_id": "esk-sui-publication-observer-v1",
+      "action": "claimed",
+      "actor": "codex-esk-retirement-roadmap",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788540465621
+    },
+    {
+      "id": "feature_event_d859cb4482674113a6797e9a7f613f15",
+      "feature_id": "esk-sui-publication-observer-v1",
+      "action": "evidence_recorded",
+      "actor": "Codex",
+      "reason": "",
+      "from_status": "claimed",
+      "to_status": "claimed",
+      "at_ms": 1788540524476
+    },
+    {
+      "id": "feature_event_5580583eb6b645b8b12b3957f2a84c7c",
+      "feature_id": "esk-sui-publication-observer-v1",
+      "action": "transitioned",
+      "actor": "Codex",
+      "reason": "维护首批用户路线图，已完成纯文档改动和观察器离线复验。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788540543796
+    },
+    {
+      "id": "feature_event_e3a6d20e47944d26be4b9dbc5cb911f3",
+      "feature_id": "esk-sui-publication-observer-v1",
+      "action": "transitioned",
+      "actor": "Codex",
+      "reason": "仅更新路线图为新版唯一入口及真实发布缺口；观察器源码与验收范围未变，证据已重绑。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1788540544535
+    },
+    {
+      "id": "feature_event_4fbef65a4d8f4387aedc394ce9676b83",
+      "feature_id": "esk-sui-publication-observer-v1",
+      "action": "transitioned",
+      "actor": "Codex",
+      "reason": "当前观察器65项、共享传输15项离线测试通过；路线图不再指导恢复旧原生桥。无网络写入或余额变更，不代表ESK真实发行验收。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1788540545290
+    },
+    {
+      "id": "feature_event_913c021d74104947965888acc9f44c80",
+      "feature_id": "esk-platform-native-progress-v1",
+      "action": "evidence_recorded",
+      "actor": "Codex",
+      "reason": "",
+      "from_status": "implemented",
+      "to_status": "implemented",
+      "at_ms": 1788540754767
+    },
+    {
+      "id": "feature_event_70f7afef37064524a2d189ee0d3b1da4",
+      "feature_id": "esk-platform-native-progress-v1",
+      "action": "transitioned",
+      "actor": "Codex",
+      "reason": "主198/量化69离线测试及共享5文件同字节通过，旧原生17/21已移除、账本保留。主1519/PWA已发布，独立下载签名/版本/真实Manifest验证通过。量化0.5仅源码/Debug、未正式签名上传；本人及视觉验收仍pending，不宣称全产品released。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1788540762220
     }
   ]
 }

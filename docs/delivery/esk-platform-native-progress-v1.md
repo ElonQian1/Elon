@@ -15,11 +15,11 @@ owners: [platform-assets, quant-android]
 
 | 能力 | 实现 | 验证 | 发布 | 用户验收 |
 |---|---|---|---|---|
-| 同快照额度/最多 20 条进度共享合同 | implemented | offline_passed | 主 1517 已发布 | pending |
-| 主 APK 当前账户逐页同意与只读提供 | implemented | offline_passed | 主 1517 工件已核验 | pending |
+| 同快照额度/最多 20 条进度共享合同 | implemented | offline_passed | 主 1519 已发布 | pending |
+| 主 APK 当前账户逐页同意与只读提供 | implemented | offline_passed | 主 1519 已发布 | pending |
 | 量化独立原生接收、清页与短期显示 | implemented | offline_passed | 未签名/未上传 | pending |
-| 唯一新版入口、退役旧原生桥 | implemented | 两仓离线复验通过 | 量化源码已推送；主待发布 | pending |
-| 网页新版 APK-only 说明 | implemented | offline_passed | 新措辞待发布 | pending |
+| 唯一新版入口、退役旧原生桥 | implemented | 两仓离线复验通过 | 量化源码已推送；主 1519 已发布 | pending |
+| 网页新版 APK-only 说明 | implemented | 公开 GET 已核验新措辞 | 已发布 | pending |
 
 ## 当前基线与职责
 
@@ -32,7 +32,7 @@ owners: [platform-assets, quant-android]
 单值 128 字符、UTF-8 合计 32768 字节。显示数量来自一次同快照响应，
 可申请量不是可兑付现金。每页重新确认主账户、使用新 nonce、先清旧页、不拼接。
 409/快照变化不自动去掉游标重试；60 秒以内失效，后台或重建清空。
-第一阶段保留旧原生协议；用户 2026-09-05 明确取消旧版兼容，当前继续退役旧 Paper
+第一阶段保留旧原生协议；用户 2026-09-05 明确取消旧版兼容，当前已退役旧 Paper
 17 字段和正式总量 21 字段原生桥。历史账本、主个人登记历史/卖回与公共行情不删除。
 新版不显示旧审核分录笔数，该数仍在主资产页；卖回申请数不能替代审核分录数。
 
@@ -41,7 +41,7 @@ owners: [platform-assets, quant-android]
 - Android：两仓各自 JUnit 包 `com.elon.eskcontract.*`；主端
   `com.elon.app.esk.*`；量化全部 Android 合同和生命周期测试。
 - `node scripts/check-esk-platform-progress-parity.js <独立量化根>`：两仓共享生产文件、
-  测试向量及旧协议逐字节核对，只是源码证据。
+  测试向量逐字节核对，并检查旧共享生产合同/专属测试不存在；只是源码证据。
 - `node scripts/test-esk-platform-progress-web-boundary.js` 和既有 sellback/profile/Web
   回归：正式入口仍是说明，没有网页 IPC、登录凭据或私有写操作。
 - 主项目正常发布入口根据本次范围使用移动 PWA 静态模板和主 APK；量化使用自身
@@ -79,7 +79,7 @@ owners: [platform-assets, quant-android]
 - 来源依据公开 `app/version.json` 与官方 receipt，不冒称 APK 内嵌 Git SHA 已验证。
   静态 PWA 来源同为 `50cd35f7`，运行时摘要
   `ffb1288ba42ae9a4a0cfe7fc31561dcb0b7ef34052645b3e62d8b91ab851c189`。
-- 该包证明第一阶段发布，不证明后续旧桥删除已发布；新候选需要再次构建和正式发布。
+- 该包仅证明第一阶段发布；旧桥删除的正式新工件另见下方 1519 记录。
 
 ### 旧原生桥退役后的验证
 
@@ -97,6 +97,36 @@ owners: [platform-assets, quant-android]
 - 量化功能提交 `a6a726a6f2bd5414c0b31310ceeffd13b9183f4f` 已推送；后续仅文档/登记
   提交到 `2a37b33d4aa044ce3ef152406d7220c2ecc44624`，没有正式0.5包或上传回执。
   新版源码交付不等于广场安装完成；仍需受控签名、上传和本人联调。
+- 主提交在真实 non-fast-forward 后仅 rebase 一次，得到正式发布源码
+  `21dac2f61e1e2798a51bdfcc2b71b7951c46141b`；新增上游不涉及本批 ESK 输入。
+  重验网页/个人资产/PWA/共享文件通过；受影响的 ChatGPT composite-answer、image-assets
+  和 tool-execution-smoke-contract 静态测试通过，没有真实发送消息或操作设备。
+- 首批用户路线图同步新版唯一入口；观察器源码未变，65 项观察器与 15 项传输离线测试
+  复验通过，显式重新登记文档证据，不代表 ESK 发布或余额资格验收。
+
+### 主 APK 1519 与当前广场工件
+
+- 官方 app-ui receipt 绑定 `21dac2f61e1e2798a51bdfcc2b71b7951c46141b`；
+  2026-09-05 00:43（UTC+08）两阶段 passed，总耗时 701 秒，含正常发布排队。
+  后续文档/功能登记提交不是 APK 的构建源码，不需重发相同业务包。
+- 00:50:24（UTC+08）独立实际下载公开 `com.elon.app 1.1.1519 (1519)`，HTTP 200，
+  39,715,943 字节，SHA-256
+  `36e9fb80a342a3d39adc157956ec21628c6ecf9a61eaaa9fb279bdcc59e25112`，
+  与本地 release 逐字节摘要/大小一致；aapt 确认包名和版本，apksigner 验证 v2 单签，
+  证书仍为 `f79567cf8a7e610e218aa4b7a1292be93a9623d9bc06a9bafbf47b030f99010c`。
+  公开版本清单与 receipt 的来源均为 `21dac2f6`，不冒称已验证 APK 内嵌源码 SHA。
+- 实际 APK Manifest 检查 35 个 activity/alias：新版 `EskPlatformProgressConsentActivity`
+  存在且唯一；旧 `EskSnapshotConsentActivity`、`EskPlatformSnapshotConsentActivity`
+  及指向它们的别名均为零；主个人资产、审核历史和正式卖回三个 Activity 各保留一份。
+  独立核验日志 `esk-retired-public-apk-1519-independent-20260905-004859-281` 为 passed、
+  85.1 秒；这证明公开安装包组成，不代表已安装或本人账户验收。
+- 公开 PWA 实际 GET 200，显示“新版量化仅保留‘我的 ESK’原生资产入口”、
+  “旧版原生接口不再支持”及新版子 APK 尚待正式签名/上传/双 APK 联调的说明。
+- 2026-09-05 00:33（UTC+08）实际下载项目广场子 APK 仍为
+  `com.elon.quant 0.2.0 (2)`，618588 字节，SHA-256
+  `c17ab5abe800547f41acc95594021abb6cec92fc14cb6de3b2db202ce4b94b89`；
+  HTTP 200/no-store，官方 v2 单签。没有把旧 0.4 包上传冒充新版，也未删除线上下载。
+- 本次收尾只更新两份命中文档，18 条 Markdown 相对链接通过；不全读或整理无关文档。
 
 ### 已确认的旧基线测试问题
 
@@ -111,7 +141,7 @@ V3 单申请授权，V20 公开 HTTP Paper 与 Android 已 available。相关脚
 
 ## 剩余验收与远程协作
 
-1. 本轮代码 Owner 完成并复核两仓功能，跑全部适用测试、push、主发布与合法子发布。
+1. 两仓代码已推送、主新版已发布；量化 Owner 接续受控正式签名与项目编辑者上传。
 2. 量化最低主版本为已真实发布的新协议首发 1517；后续退役旧桥不改变新协议。
 3. 子 APK 正式签名输入与现有项目编辑者上传凭据当前未安全注入；只查存在性布尔，
    不读取秘密文件，不借主管理员、SSH 或数据库绕过。0.5 Debug 不是正式上架包。
@@ -126,7 +156,8 @@ UI 工作台已绑定当前隔离根；目前 BOOTSTRAP、无连接，能力检�
 按发布先于可选视觉验收流程继续；未取到真实渲染帧，不宣称视觉验收或真实设备通过。
 1517 发布后的一次可选模拟器调用观察超时；随后只读状态仍 BOOTSTRAP、无帧/源码证明。
 没有重启或绕过工作台；完成门禁 businessDeliveryReady=false、completionReady=false、
-platformEvolutionPending=false。FIT_RUN_STATUS=NOT_REQUIRED_WITHOUT_CLEAN_TARGET；
+platformEvolutionPending=false；1519 发布后再次只读检查仍为同一准备缺口。
+FIT_RUN_STATUS=NOT_REQUIRED_WITHOUT_CLEAN_TARGET；
 FINAL_VISUAL_LOSS/VISUAL_ACCEPTANCE_THRESHOLD=unavailable；
 CROSS_PLATFORM_VISUAL_PARITY=unverified；REAL_DEVICE_STATUS=not_requested；
 ANDROID_RENDERER=VERIFICATION_DEFERRED；EVOLUTION_THREAD=none。仓库发布与视觉分开验收。
