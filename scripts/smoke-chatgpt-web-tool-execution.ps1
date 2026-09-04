@@ -70,72 +70,200 @@ function Invoke-ReceiptAction {
     param(
         [Parameter(Mandatory = $true)][string]$Action,
         [Parameter(Mandatory = $true)][string]$ExpectedAction,
-        [hashtable]$Arguments = @{}
+        [hashtable]$Arguments = @{},
+        [ValidateRange(5, 300)][int]$TimeoutSec = $ReadyTimeoutSec
     )
 
     $dispatch = Invoke-ChatGptWebSmokeReadyAction -Runtime $runtime `
-        -Action $Action -Arguments $Arguments -TimeoutSec $ReadyTimeoutSec
+        -Action $Action -Arguments $Arguments -TimeoutSec $TimeoutSec
     $requestId = [string]$dispatch.command_receipt.request_id
     if (-not $requestId) { throw "Missing command receipt for $Action." }
     return Wait-ChatGptCommandReceipt `
         -InvokeUiState { Invoke-ChatGptWebSmokeMcp -Runtime $runtime -Tool "ui_state" } `
         -RequestId $requestId -ExpectedAction $ExpectedAction `
-        -TimeoutSec $ReadyTimeoutSec -PollIntervalSec $PollIntervalSec
+        -TimeoutSec $TimeoutSec -PollIntervalSec $PollIntervalSec
+}
+
+function Wait-ProductionSendReceipt {
+    param(
+        [Parameter(Mandatory = $true)][long]$AfterObservedAtMs
+    )
+
+    $deadline = [DateTimeOffset]::UtcNow.AddSeconds($ReplyTimeoutSec)
+    do {
+        if (-not (Test-WebChatNativeChatSurfaceForeground -Runtime $runtime)) {
+            throw "ChatGPT tool execution lost the production chat foreground."
+        }
+        $main = Invoke-ChatGptWebSmokeMcp -Runtime $runtime -Tool "ui_state" -MainState
+        if (
+            [string]$main.active_surface -ne "social_ai" -or
+            [string]$main.social_chat.interaction_mode -ne "chat" -or
+            [string]$main.social_chat.web_chat_provider_id -ne "chatgpt_web"
+        ) {
+            throw "ChatGPT tool execution left the production chat surface before send confirmation."
+        }
+        $receipt = $main.social_chat.web_chat_last_send_command
+        if (
+            $null -ne $receipt -and
+            [string]$receipt.action -eq "send_prompt" -and
+            [long]$receipt.observed_at_ms -gt $AfterObservedAtMs
+        ) {
+            if ($receipt.ok -ne $true) {
+                $detail = ConvertTo-ChatGptWebSmokeSafeDiagnostic `
+                    -Value $receipt.detail -MaxLength 160
+                throw "ChatGPT production tool send failed: $detail"
+            }
+            return $receipt
+        }
+        Start-Sleep -Seconds $runtime.poll_interval_sec
+    } while ([DateTimeOffset]::UtcNow -lt $deadline)
+    throw "Timed out waiting for the ChatGPT production tool send receipt: $ToolId"
 }
 
 function Wait-ToolReply {
     param(
-        [Parameter(Mandatory = $true)][string]$RequestId,
-        [Parameter(Mandatory = $true)][long]$AfterMs,
-        [Parameter(Mandatory = $true)][int]$InitialMessageCount
+        [Parameter(Mandatory = $true)][int]$InitialMainMessageCount,
+        [Parameter(Mandatory = $true)][int]$InitialAdapterMessageCount
     )
 
     $deadline = [DateTimeOffset]::UtcNow.AddSeconds($ReplyTimeoutSec)
-    $lastReceipt = $null
+    $lastMainState = ""
+    $lastMainMessageCount = 0
+    $lastAdapterMessageCount = 0
     do {
-        $state = Invoke-ChatGptWebSmokeMcp -Runtime $runtime -Tool "ui_state"
-        $lastReceipt = @($state.command_requests) |
-            Where-Object { [string]$_.request_id -eq $RequestId } |
-            Select-Object -Last 1
-        if ($null -ne $lastReceipt -and [string]$lastReceipt.status -eq "failed") {
-            throw "ChatGPT tool prompt failed: $ToolId"
+        if (-not (Test-WebChatNativeChatSurfaceForeground -Runtime $runtime)) {
+            throw "ChatGPT tool execution lost the production chat foreground."
         }
-        $messages = @($state.conversation.messages)
-        $lastMessage = $messages | Select-Object -Last 1
+        $main = Invoke-ChatGptWebSmokeMcp -Runtime $runtime -Tool "ui_state" -MainState
         if (
-            $null -ne $lastReceipt -and
-            [string]$lastReceipt.expected_web_action -eq "send_prompt" -and
-            [string]$lastReceipt.status -eq "succeeded" -and
-            $lastReceipt.result.ok -eq $true -and
-            [long]$lastReceipt.completed_at_ms -gt $AfterMs -and
-            $state.streaming -eq $false -and
-            $messages.Count -ge ($InitialMessageCount + 2) -and
-            [string]$lastMessage.role -eq "assistant"
+            [string]$main.active_surface -ne "social_ai" -or
+            [string]$main.social_chat.interaction_mode -ne "chat" -or
+            [string]$main.social_chat.web_chat_provider_id -ne "chatgpt_web"
         ) {
-            return $state
+            throw "ChatGPT tool execution left the production chat surface while awaiting completion."
+        }
+        $lastMainState = [string]$main.social_chat.web_chat_state
+        $mainMessages = @($main.social_chat.messages)
+        $lastMainMessageCount = $mainMessages.Count
+        $lastMainMessage = $mainMessages | Select-Object -Last 1
+        $mainCompleted =
+            [string]$main.active_surface -eq "social_ai" -and
+            [string]$main.social_chat.interaction_mode -eq "chat" -and
+            [string]$main.social_chat.web_chat_provider_id -eq "chatgpt_web" -and
+            [string]$main.social_chat.web_chat_state -eq "ready" -and
+            $main.social_chat.web_chat_streaming -ne $true -and
+            $mainMessages.Count -ge ($InitialMainMessageCount + 2) -and
+            [string]$lastMainMessage.role -eq "friend"
+        if ($mainCompleted) {
+            $adapter = Invoke-ChatGptWebSmokeMcp -Runtime $runtime -Tool "ui_state"
+            $adapterMessages = @($adapter.conversation.messages)
+            $lastAdapterMessageCount = $adapterMessages.Count
+            $lastAdapterMessage = $adapterMessages | Select-Object -Last 1
+            if (
+                [string]$adapter.surface -eq "chatgpt_web" -and
+                [string]$adapter.bridge_state -eq "ready" -and
+                $adapter.adapter_current -eq $true -and
+                $adapter.streaming -ne $true -and
+                $adapterMessages.Count -ge ($InitialAdapterMessageCount + 2) -and
+                [string]$lastAdapterMessage.role -eq "assistant"
+            ) {
+                return $adapter
+            }
         }
         Start-Sleep -Seconds $runtime.poll_interval_sec
     } while ([DateTimeOffset]::UtcNow -lt $deadline)
-    throw "Timed out waiting for ChatGPT tool completion: $ToolId; receipt=$($lastReceipt.status)"
+    throw "Timed out waiting for ChatGPT tool completion: $ToolId; " +
+        "provider_state=$lastMainState main_messages=$lastMainMessageCount " +
+        "adapter_messages=$lastAdapterMessageCount"
 }
 
 function Get-ToolOption {
-    Invoke-ReceiptAction -Action "chatgpt_list_composer_options" `
-        -ExpectedAction "list_composer_tools" `
-        -Arguments @{ section = "tools" } | Out-Null
-    $navigation = Invoke-ChatGptWebSmokeAction -Runtime $runtime `
-        -Action "chatgpt_get_navigation" -Arguments @{ section = "tools" }
-    $option = @($navigation.composer_sections.tools) |
-        Where-Object { [string]$_.semantic -eq [string]$toolSpec.semantic } |
-        Select-Object -First 1
-    if ($null -eq $option) { throw "Requested ChatGPT composer tool is unavailable: $ToolId" }
-    return $option
+    $lastError = ""
+    foreach ($attempt in 1..3) {
+        try {
+            Invoke-ReceiptAction -Action "chatgpt_list_composer_options" `
+                -ExpectedAction "list_composer_tools" `
+                -Arguments @{ section = "tools" } `
+                -TimeoutSec ([Math]::Min($ReadyTimeoutSec, 45)) | Out-Null
+            $navigation = Invoke-ChatGptWebSmokeAction -Runtime $runtime `
+                -Action "chatgpt_get_navigation" -Arguments @{ section = "tools" }
+            $option = @($navigation.composer_sections.tools) |
+                Where-Object { [string]$_.semantic -eq [string]$toolSpec.semantic } |
+                Select-Object -First 1
+            if ($null -ne $option) { return $option }
+        } catch {
+            $lastError = ConvertTo-ChatGptWebSmokeSafeDiagnostic `
+                -Value $_.Exception.Message -MaxLength 120
+        }
+        if ($attempt -lt 3) {
+            Close-ComposerMenu
+            Start-Sleep -Seconds $runtime.poll_interval_sec
+        }
+    }
+    $suffix = if ($lastError) { "; last_error=$lastError" } else { "" }
+    throw "Requested ChatGPT composer tool was not observed after bounded refresh: $ToolId$suffix"
+}
+
+function Wait-ToolStructuralReply {
+    $expectedPartTypes = @($toolSpec.expected_parts)
+    $deadline = [DateTimeOffset]::UtcNow.AddSeconds([Math]::Min($ReplyTimeoutSec, 180))
+    $observedPartTypes = @()
+    do {
+        if (-not (Test-WebChatNativeChatSurfaceForeground -Runtime $runtime)) {
+            throw "ChatGPT tool execution lost the production chat foreground while awaiting rich output."
+        }
+        $replyState = Invoke-ChatGptWebSmokeMcp -Runtime $runtime -Tool "ui_state"
+        if (
+            [string]$replyState.surface -ne "chatgpt_web" -or
+            [string]$replyState.bridge_state -ne "ready" -or
+            $replyState.adapter_current -ne $true
+        ) {
+            Start-Sleep -Seconds ([Math]::Max(2, $runtime.poll_interval_sec))
+            continue
+        }
+        $messageCount = [int]$replyState.conversation.message_count
+        if ($messageCount -lt 1) {
+            Start-Sleep -Seconds ([Math]::Max(2, $runtime.poll_interval_sec))
+            continue
+        }
+        $context = Invoke-ChatGptWebSmokeAction -Runtime $runtime `
+            -Action "chatgpt_get_context" -Arguments @{
+                message_offset = [Math]::Max(0, $messageCount - 1)
+                message_limit = 1
+            }
+        $assistant = @($context.messages) | Select-Object -Last 1
+        $observedPartTypes = @(
+            $assistant.parts |
+                ForEach-Object { [string]$_.type } |
+                Where-Object { $_ } |
+                Sort-Object -Unique
+        )
+        $matchingPartCount = @(
+            $observedPartTypes | Where-Object { $_ -in $expectedPartTypes }
+        ).Count
+        if ($expectedPartTypes.Count -eq 0 -or $matchingPartCount -gt 0) {
+            return [pscustomobject]@{
+                reply = $replyState
+                observed_part_types = $observedPartTypes
+                matching_part_count = $matchingPartCount
+            }
+        }
+        Start-Sleep -Seconds ([Math]::Max(2, $runtime.poll_interval_sec))
+    } while ([DateTimeOffset]::UtcNow -lt $deadline)
+
+    $safeObserved = if ($observedPartTypes.Count) {
+        $observedPartTypes -join ","
+    } else {
+        "none"
+    }
+    throw "ChatGPT tool reply did not expose the expected structural output for $ToolId; " +
+        "observed_parts=$safeObserved"
 }
 
 function Close-ComposerMenu {
-    Invoke-ChatGptWebSmokeAdb -Runtime $runtime `
-        -Arguments @("shell", "input", "keyevent", "4") `
-        -TimeoutSec 5 -Label "close ChatGPT composer tool menu" | Out-Null
+    Invoke-ReceiptAction -Action "chatgpt_dismiss_composer_options" `
+        -ExpectedAction "dismiss_composer_menu" `
+        -TimeoutSec ([Math]::Min($ReadyTimeoutSec, 30)) | Out-Null
 }
 
 function Restore-ToolSelection {
@@ -153,49 +281,62 @@ function Restore-ToolSelection {
 }
 
 function Restore-Origin {
-    param([AllowEmptyString()][string]$ConversationPath)
+    param(
+        [AllowEmptyString()][string]$ConversationPath,
+        [AllowEmptyString()][string]$InputText
+    )
 
-    if ($ConversationPath) {
-        Invoke-ReceiptAction -Action "chatgpt_open_conversation" `
-            -ExpectedAction "open_conversation" `
-            -Arguments @{ conversation_path = $ConversationPath } | Out-Null
-        Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutSec `
-            -Description "original ChatGPT conversation restoration" -Predicate {
-                param($state)
-                [string]$state.conversation.url -like "*$ConversationPath*" -and
-                    $state.bridge_state -eq "ready"
-            }.GetNewClosure() | Out-Null
+    $restored = if ($ConversationPath) {
+        Restore-WebChatNativeConversation -Runtime $runtime `
+            -ProviderId "chatgpt_web" -ConversationPath $ConversationPath `
+            -TimeoutSec ([Math]::Min($ReadyTimeoutSec, 120))
     } else {
-        Invoke-ReceiptAction -Action "chatgpt_new_conversation" `
-            -ExpectedAction "new_conversation" | Out-Null
+        Invoke-ChatGptWebSmokeAction -Runtime $runtime `
+            -Action "start_new_web_chat_conversation" | Out-Null
+        $true
     }
+    if (-not $restored) { return $false }
+    Invoke-ChatGptWebSmokeAction -Runtime $runtime `
+        -Action "set_input_text" -Arguments @{ text = $InputText } | Out-Null
+    return $true
 }
 
 $result = $null
 $originPath = ""
+$originInputText = ""
 $originRestored = $false
 $enabledBySmoke = $false
 $toolStateRestored = $false
 Start-ChatGptWebSmokeAwakeLease -Runtime $runtime | Out-Null
 try {
-    Open-ChatGptWebSmokeSurface -Runtime $runtime | Out-Null
-    $origin = Wait-ChatGptWebSmokeAuthenticatedReady -Runtime $runtime `
-        -TimeoutSec $ReadyTimeoutSec -InitialWaitSec 20
+    $originMain = Open-WebChatNativeChatSurface -Runtime $runtime `
+        -ProviderId "chatgpt_web" -TimeoutSec $ReadyTimeoutSec
+    $origin = Invoke-ChatGptWebSmokeMcp -Runtime $runtime -Tool "ui_state"
     Assert-ChatGptWebSmokeAdapterVersion -State $origin `
         -ExpectedAdapterVersion $ExpectedAdapterVersion
-    $originPath = [regex]::Match(
-        [string]$origin.conversation.url,
-        '/c/[A-Za-z0-9_-]{1,160}'
-    ).Value
+    $originPath = [string]$originMain.social_chat.web_chat_conversation_path
+    $originInputText = [string]$originMain.input.text
 
-    Invoke-ReceiptAction -Action "chatgpt_new_conversation" `
-        -ExpectedAction "new_conversation" | Out-Null
+    Invoke-ChatGptWebSmokeAction -Runtime $runtime `
+        -Action "start_new_web_chat_conversation" | Out-Null
+    Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutSec -MainState `
+        -Description "isolated blank production tool conversation" -Predicate {
+            param($state)
+            [string]$state.social_chat.web_chat_provider_id -eq "chatgpt_web" -and
+                [string]$state.social_chat.web_chat_state -eq "ready" -and
+                $state.social_chat.web_chat_composer_ready -eq $true -and
+                [int]$state.social_chat.message_count -eq 0
+        } | Out-Null
     Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutSec `
         -Description "isolated blank tool conversation" -Predicate {
             param($state)
-            [int]$state.conversation.message_count -eq 0 -and
+            [string]$state.surface -eq "chatgpt_web" -and
+                [string]$state.bridge_state -eq "ready" -and
+                $state.adapter_current -eq $true -and
+                [int]$state.conversation.message_count -eq 0 -and
                 $state.composer_ready -eq $true -and
-                $state.streaming -eq $false
+                $state.streaming -eq $false -and
+                [int]$state.input.official_draft_length -eq 0
         } | Out-Null
 
     $tool = Get-ToolOption
@@ -213,40 +354,42 @@ try {
 
     $marker = "ELON-CHATGPT-TOOL-$([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())"
     $prompt = ([string]$toolSpec.prompt).Replace("{marker}", $marker)
+    $beforeMain = Invoke-ChatGptWebSmokeMcp -Runtime $runtime -Tool "ui_state" -MainState
+    if (
+        [string]$beforeMain.active_surface -ne "social_ai" -or
+        [string]$beforeMain.social_chat.interaction_mode -ne "chat" -or
+        [string]$beforeMain.social_chat.web_chat_provider_id -ne "chatgpt_web"
+    ) {
+        throw "ChatGPT production tool surface changed before the prompt could be sent."
+    }
+    $previousReceipt = $beforeMain.social_chat.web_chat_last_send_command
+    $previousReceiptAtMs = if ($null -ne $previousReceipt) {
+        [long]$previousReceipt.observed_at_ms
+    } else {
+        0L
+    }
+    $beforeSend = Invoke-ChatGptWebSmokeMcp -Runtime $runtime -Tool "ui_state"
     Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "set_input_text" `
         -Arguments @{ text = $prompt } | Out-Null
-    $beforeSend = Invoke-ChatGptWebSmokeMcp -Runtime $runtime -Tool "ui_state"
-    $send = Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "send_input"
-    $sendRequestId = [string]$send.command_receipt.request_id
-    if (-not $sendRequestId) { throw "ChatGPT tool prompt did not return a receipt id." }
-    $reply = Wait-ToolReply -RequestId $sendRequestId `
-        -AfterMs ([long]$beforeSend.last_command.observed_at_ms) `
-        -InitialMessageCount ([int]$beforeSend.conversation.message_count)
-    $context = Invoke-ChatGptWebSmokeAction -Runtime $runtime `
-        -Action "chatgpt_get_context" -Arguments @{
-            message_offset = [Math]::Max(0, [int]$reply.conversation.message_count - 1)
-            message_limit = 1
-        }
-    $assistant = @($context.messages) | Select-Object -Last 1
-    $observedPartTypes = @(
-        $assistant.parts |
-            ForEach-Object { [string]$_.type } |
-            Where-Object { $_ } |
-            Sort-Object -Unique
-    )
-    $matchingPartCount = @(
-        $observedPartTypes | Where-Object { $_ -in @($toolSpec.expected_parts) }
-    ).Count
-    if (@($toolSpec.expected_parts).Count -gt 0 -and $matchingPartCount -lt 1) {
-        throw "ChatGPT tool reply did not expose the expected structural output for $ToolId."
-    }
+    Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "send_input" | Out-Null
+    Wait-ProductionSendReceipt -AfterObservedAtMs $previousReceiptAtMs | Out-Null
+    $reply = Wait-ToolReply `
+        -InitialMainMessageCount ([int]$beforeMain.social_chat.message_count) `
+        -InitialAdapterMessageCount ([int]$beforeSend.conversation.message_count)
+    $structuralReply = Wait-ToolStructuralReply
+    $reply = $structuralReply.reply
+    $observedPartTypes = @($structuralReply.observed_part_types)
+    $matchingPartCount = [int]$structuralReply.matching_part_count
 
     Restore-ToolSelection
     $toolStateRestored = $true
-    Restore-Origin -ConversationPath $originPath
-    $originRestored = $true
+    $originRestored = Restore-Origin -ConversationPath $originPath `
+        -InputText $originInputText
+    if (-not $originRestored) {
+        throw "Unable to restore the original ChatGPT production conversation."
+    }
     $result = [ordered]@{
-        schema = "elon.chatgpt_web.tool_execution_acceptance.v2"
+        schema = "elon.chatgpt_web.tool_execution_acceptance.v3"
         passed = $true
         tool_id = $ToolId
         tool_semantic = [string]$toolSpec.semantic
@@ -254,6 +397,7 @@ try {
         isolated_conversation = $true
         tool_selection_observed = $true
         send_receipt_observed = $true
+        production_send_receipt_observed = $true
         assistant_completed = $true
         expected_structural_part_types = @($toolSpec.expected_parts)
         observed_structural_part_types = $observedPartTypes
@@ -267,7 +411,7 @@ try {
     }
     Register-ChatGptWebVerificationCases -Runtime $runtime `
         -CaseIds @([string]$toolSpec.case_id) `
-        -ExpectedAdapterVersion $ExpectedAdapterVersion | Out-Null
+        -ExpectedAdapterVersion $ExpectedAdapterVersion -ProductionSurface | Out-Null
 } finally {
     if (-not $toolStateRestored -and $enabledBySmoke) {
         try {
@@ -279,7 +423,8 @@ try {
     }
     if (-not $originRestored) {
         try {
-            Restore-Origin -ConversationPath $originPath
+            $originRestored = Restore-Origin -ConversationPath $originPath `
+                -InputText $originInputText
         } catch {
             Write-Warning "Unable to restore the original ChatGPT view after a failed tool smoke."
         }
