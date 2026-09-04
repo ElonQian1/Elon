@@ -13,7 +13,6 @@
   'use strict';
 
   const VERSION = 1;
-  const AUTH_TIMEOUT_MS = 5000;
   const TRANSCRIBE_TIMEOUT_MS = 30000;
   const MAX_CAPTURE_MS = 120000;
   const STORAGE_KEY = 'elon.chatgpt.private.dictation.health.v1';
@@ -130,14 +129,13 @@
   async function acquireRequestHeaders() {
     const inherited = inheritedHeaders();
     if (authorizationHeader(inherited)) return Object.assign({ Accept: 'application/json' }, inherited);
-    const response = await fetchWithTimeout('/api/auth/session', {
-      method: 'GET', credentials: 'include', cache: 'no-store', headers: { Accept: 'application/json' }
-    }, AUTH_TIMEOUT_MS);
-    if (!response || !response.ok) throw new Error('auth_http_' + Number(response && response.status));
-    const payload = await response.json();
-    const accessToken = payload && typeof payload.accessToken === 'string' ? payload.accessToken : '';
-    if (!accessToken) throw new Error('auth_missing');
-    return Object.assign({ Accept: 'application/json', Authorization: 'Bearer ' + accessToken }, inherited);
+    const authContext = root.__elonChatGptPrivateAuthContext;
+    if (!authContext || typeof authContext.acquireRequestHeaders !== 'function') {
+      throw new Error('auth_context_unavailable');
+    }
+    const warmed = sanitizedHeaders(await authContext.acquireRequestHeaders());
+    if (!authorizationHeader(warmed)) throw new Error('auth_missing');
+    return Object.assign({ Accept: 'application/json' }, warmed, inherited);
   }
 
   function selectedMimeType() {
@@ -297,6 +295,12 @@
       return outcome(true, 'transcript_ready', true, { transcript, transcriptLength: transcript.length });
     } catch (error) {
       const message = String(error && error.message || 'network');
+      if (/^http_40[13]$/.test(message)) {
+        const authContext = root.__elonChatGptPrivateAuthContext;
+        if (authContext && typeof authContext.invalidate === 'function') {
+          authContext.invalidate('auth_rejected');
+        }
+      }
       recordFailure(message, /http_40[13]|auth/.test(message));
       reset();
       return outcome(false, 'capture:transcribe_failed', true);

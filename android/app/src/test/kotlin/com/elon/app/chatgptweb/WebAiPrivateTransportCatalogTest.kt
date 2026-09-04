@@ -17,6 +17,7 @@ class WebAiPrivateTransportCatalogTest {
             .toSet()
         assertTrue("android_chatgpt_private_conversation_project_directory_v1" in enabledIds)
         assertTrue("android_chatgpt_private_conversation_prefetch_v1" in enabledIds)
+        assertTrue("android_chatgpt_page_local_auth_context_v1" in enabledIds)
         assertTrue("android_chatgpt_conversation_navigation_receipt_reconciliation_v1" in enabledIds)
         assertTrue("android_chatgpt_private_send_dispatch_observer_v1" in enabledIds)
         assertTrue("android_chatgpt_private_stream_observer_v1" in enabledIds)
@@ -120,6 +121,29 @@ class WebAiPrivateTransportCatalogTest {
         assertEquals(
             "none_explicit_long_press_shared_work_mode_selection",
             privateDictation.getString("fallback"),
+        )
+
+        val pageLocalAuth = values.first {
+            it.getString("capability_id") == "android_chatgpt_page_local_auth_context_v1"
+        }
+        assertEquals(
+            "completed",
+            pageLocalAuth.getString("implementation_status"),
+        )
+        assertEquals(
+            "device_same_origin_auth_and_conversation_refresh_verified",
+            pageLocalAuth.getString("verification_status"),
+        )
+        assertTrue(pageLocalAuth.getBoolean("production_default"))
+        assertEquals(
+            BuildConfig.CHATGPT_PRIVATE_CONVERSATION_PREFETCH_ENABLED ||
+                BuildConfig.CHATGPT_PRIVATE_DICTATION_ENABLED ||
+                BuildConfig.CHATGPT_PRIVATE_READ_ALOUD_ENABLED,
+            pageLocalAuth.getBoolean("runtime_enabled"),
+        )
+        assertEquals(
+            "observed_official_request_context_and_persistent_identity_webview",
+            pageLocalAuth.getString("fallback"),
         )
 
         val projectMove = values.first {

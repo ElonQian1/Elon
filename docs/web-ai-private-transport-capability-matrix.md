@@ -10,6 +10,7 @@ installed build; individual capability documents retain implementation evidence.
 |---|---|---|---|
 | Conversation and project directory | ChatGPT | Completed and enabled | Official DOM directory |
 | Conversation body prefetch | ChatGPT | Completed and enabled | Official WebView navigation |
+| Page-local identity context prewarm | ChatGPT | Completed and enabled; same-origin auth plus conversation refresh device verified | Observed official request context and persistent identity WebView |
 | Conversation navigation receipt reconciliation | ChatGPT | Completed, enabled, and device verified on `v1.1.1399 (1420)`, adapter `218` | Official WebView navigation without write replay |
 | Send dispatch acknowledgement | ChatGPT | Completed and enabled | Official DOM confirmation |
 | Streaming reply observer | ChatGPT | Completed and enabled; completion and sparse-watchdog timer/bridge device verified | Official DOM snapshot |
@@ -34,7 +35,8 @@ installed build; individual capability documents retain implementation evidence.
 | Native private-response rich content | ChatGPT | Completed, enabled, and structurally device verified on Release `v1.1.1379 (1400)` for finance and line-chart cards | Official WebView rich content |
 | Private composer dictation | ChatGPT | Completed and enabled; page-local identity, synthetic-audio endpoint proof, strict capture ownership, buffered transcription, draft reconciliation, timeout/circuit protection, and targeted integration tests passed | No automatic fallback; idle long press explicitly selects work-mode dictation |
 | Selectable work-mode composer dictation | ChatGPT | Completed and enabled by direct reuse of the unchanged work-mode `AgentVoiceBridge`; explicit private/work selection user-verified on `v1.1.1483 (1483)` | No cross-mode fallback; idle long press switches back to private dictation |
-| Official response read aloud bridge | ChatGPT | Implemented, enabled, and production-default; live official control discovery plus semantic/menu tests passed; device audio acceptance pending | Manual official page or explicit system-read-aloud selection |
+| Private response read aloud | ChatGPT | Completed and production-default; same-origin streaming synthesis start/stop device verified on `v1.1.1498 (1498)`, adapter `241` | Official DOM read-aloud bridge or manual official page |
+| Official response read aloud bridge | ChatGPT | Implemented as a non-default fallback; live official control discovery plus semantic/menu tests passed | Manual official page or explicit system-read-aloud selection |
 | Android system response read aloud | ChatGPT | Implemented and enabled as an explicitly named alternate; audio start user-confirmed, stop acceptance pending | No automatic fallback |
 | Native conversation management | ChatGPT | Completed and enabled; reversible pin round trip device verified on `v1.1.1399 (1420)`, adapter `218`; other mutation acceptance pending | Context-bound official conversation options without automatic write replay |
 | Native conversation project move | ChatGPT | Implemented and enabled; direct DOM activation, optional confirmation, scoped refresh, and reversible device round trip pending | Official conversation project menu |
@@ -46,6 +48,21 @@ All web-account transports keep the official page authoritative. They do not exp
 cookies, credentials, request headers, or private conversation content outside the
 device. Every observer is bounded and emits nothing on malformed or unsuccessful
 responses.
+
+ChatGPT private reads, private dictation, and private read-aloud now share one page-local
+identity context instead of waiting for an incidental official conversation request or each
+fetching the session independently. The context prewarms `/api/auth/session` asynchronously at
+document start, keeps authorization only in the WebView JavaScript closure, refreshes before
+expiry, accepts newer authorization observed from official requests, and applies single-flight,
+five-second timeout, and bounded circuit-breaker rules. It never persists or bridges the token.
+On the authenticated Xiaomi WebView, a hot-injected production-path probe completed identity
+prewarm plus the current project-conversation refresh in about 2.8 seconds, produced a native
+message snapshot, and preserved the current route without a DOM read or write. The previous
+one-second cold refresh ceiling was below the observed 2.2-2.7 second endpoint latency; the
+bounded refresh budget is now 3-5 seconds while the existing native cache remains immediately
+visible. The completed, production-default capability is
+`android_chatgpt_page_local_auth_context_v1`; observed official request context and the
+persistent identity WebView remain the fallback.
 
 Device acceptance evidence is versioned by its user-visible case contract rather than by
 every implementation or test-harness hash. The APK packages revisions for all 46 unique

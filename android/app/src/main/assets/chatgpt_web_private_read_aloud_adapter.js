@@ -6,7 +6,8 @@
   function create(scheduleSnapshot) {
     const transport = window.__elonChatGptPrivateReadAloudTransport;
     if (!transport || typeof transport.state !== 'function') return null;
-    let unsubscribe = null;
+    let unsubscribeTransport = null;
+    let unsubscribeAuth = null;
 
     function addSnapshotFields(event) {
       const state = transport.state();
@@ -35,13 +36,20 @@
     }
 
     function subscribe() {
-      if (unsubscribe || typeof transport.subscribe !== 'function') return;
-      unsubscribe = transport.subscribe(() => scheduleSnapshot(true));
+      if (!unsubscribeTransport && typeof transport.subscribe === 'function') {
+        unsubscribeTransport = transport.subscribe(() => scheduleSnapshot(true));
+      }
+      const authContext = window.__elonChatGptPrivateAuthContext;
+      if (!unsubscribeAuth && authContext && typeof authContext.subscribe === 'function') {
+        unsubscribeAuth = authContext.subscribe(() => scheduleSnapshot(true));
+      }
     }
 
     function dispose() {
-      if (typeof unsubscribe === 'function') unsubscribe();
-      unsubscribe = null;
+      if (typeof unsubscribeTransport === 'function') unsubscribeTransport();
+      if (typeof unsubscribeAuth === 'function') unsubscribeAuth();
+      unsubscribeTransport = null;
+      unsubscribeAuth = null;
     }
 
     return Object.freeze({ addSnapshotFields, handle, subscribe, dispose });

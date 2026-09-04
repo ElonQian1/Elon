@@ -4,7 +4,7 @@
   const existingTransport = window.__elonChatGptPrivateTransport;
   const prefetchEnabled = window.__elonChatGptPrivateConversationPrefetchEnabled === true;
   const researchEnabled = window.__elonChatGptPrivateResearchEnabled === true;
-  if ((existingTransport && Number(existingTransport.version) >= 15) ||
+  if ((existingTransport && Number(existingTransport.version) >= 16) ||
       (!prefetchEnabled && !researchEnabled) ||
       location.origin !== 'https://chatgpt.com') return;
 
@@ -15,6 +15,7 @@
   const inheritedHeaders = new Map();
   const activeConversationRequests = new Map();
   const activeMembershipRequests = new Map();
+  const authContext = window.__elonChatGptPrivateAuthContext;
   const privateConversationDirectory = window.__elonChatGptPrivateConversationDirectory;
   const delegateFetch = typeof window.fetch === 'function' ? window.fetch.bind(window) : null;
   let privateFetchDepth = 0;
@@ -32,6 +33,23 @@
     now: Date.now,
     storage: optionalSessionStorage()
   });
+  let acceptedAuthSuccessAt = 0;
+
+  function acceptAuthHealth(state) {
+    const value = state && typeof state === 'object' ? state : {};
+    const successAt = Math.max(0, Number(value.lastSuccessAt) || 0);
+    if (value.ready !== true || value.lastOutcome !== 'session_ready' ||
+        successAt <= acceptedAuthSuccessAt) return;
+    acceptedAuthSuccessAt = successAt;
+    policy.recordOfficial(200, Math.max(0, Number(value.lastLatencyMs) || 0));
+  }
+
+  if (authContext && typeof authContext.subscribe === 'function') {
+    authContext.subscribe(acceptAuthHealth);
+  }
+  if (authContext && typeof authContext.state === 'function') {
+    try { acceptAuthHealth(authContext.state()); } catch (_) {}
+  }
 
   function requestUrl(input) {
     try {
@@ -77,7 +95,12 @@
       const startedAt = officialDetail ? Date.now() : 0;
       if (officialDetail) {
         const entries = headerEntries(input, init);
-        if (entries.size) inheritedHeaders.set('conversation_content', entries);
+        if (entries.size) {
+          inheritedHeaders.set('conversation_content', entries);
+          if (authContext && typeof authContext.acceptObservedHeaders === 'function') {
+            authContext.acceptObservedHeaders(entries);
+          }
+        }
       }
       let result;
       try {
@@ -112,14 +135,32 @@
     const copied = probe && typeof probe.copyRequestContext === 'function'
       ? probe.copyRequestContext('conversation_content')
       : null;
-    return copied && typeof copied === 'object' && Object.keys(copied).length
-      ? new Map(Object.entries(copied))
+    if (copied && typeof copied === 'object' && Object.keys(copied).length) {
+      return new Map(Object.entries(copied));
+    }
+    const warmed = authContext && typeof authContext.copyRequestHeaders === 'function'
+      ? authContext.copyRequestHeaders()
+      : null;
+    return warmed && typeof warmed === 'object' && Object.keys(warmed).length
+      ? new Map(Object.entries(warmed))
       : null;
   }
 
+  async function acquireRequestHeaders() {
+    const copied = copiedRequestHeaders();
+    if (copied) return copied;
+    if (!authContext || typeof authContext.acquireRequestHeaders !== 'function') {
+      throw new Error('missing_context');
+    }
+    const acquired = await authContext.acquireRequestHeaders();
+    if (!acquired || typeof acquired !== 'object' || !Object.keys(acquired).length) {
+      throw new Error('missing_context');
+    }
+    return new Map(Object.entries(acquired));
+  }
+
   async function fetchConversation(id, freshMembership) {
-    const inherited = copiedRequestHeaders();
-    if (!inherited) throw new Error('missing_context');
+    const inherited = await acquireRequestHeaders();
     const startedAt = Date.now();
     let timedOut = false;
     const controller = typeof AbortController === 'function' ? new AbortController() : null;
@@ -144,6 +185,11 @@
       if (!response || !response.ok) throw new Error('http_' + Number(response && response.status));
       return { payload: await response.json(), elapsedMs: Date.now() - startedAt };
     } catch (error) {
+      if (/^http_(401|403)$/.test(String(error && error.message || ''))) {
+        if (authContext && typeof authContext.invalidate === 'function') {
+          authContext.invalidate('auth_rejected');
+        }
+      }
       if (timedOut) throw new Error('timeout');
       throw error;
     } finally {
@@ -232,6 +278,13 @@
     return result;
   }
 
+  async function acquireSameOriginRequestHeaders() {
+    const copied = await acquireRequestHeaders();
+    const result = {};
+    copied.forEach((value, name) => { result[String(name)] = String(value); });
+    return result;
+  }
+
   function conversationProjectId(payload) {
     const normalized = normalizedConversationPayload(payload);
     const values = [
@@ -314,14 +367,16 @@
   }
 
   function conversationPrefetchReady() {
-    return policy.canAttempt(Boolean(copiedRequestHeaders()));
+    const canAcquire = authContext && typeof authContext.canAcquire === 'function' &&
+      authContext.canAcquire();
+    return policy.canAttempt(Boolean(copiedRequestHeaders()) || canAcquire);
   }
 
   function failureKind(error) {
     const message = String(error && error.message || 'network');
     if (message === 'timeout') return 'timeout';
     if (message === 'missing_context') return 'context';
-    if (/^http_(401|403)$/.test(message)) return 'auth';
+    if (/^(?:auth_http_|http_)(401|403)$/.test(message) || /^auth_/.test(message)) return 'auth';
     if (/^http_/.test(message)) return 'http';
     if (/json|parse/i.test(message)) return 'parse';
     return 'network';
@@ -458,7 +513,7 @@
   }
 
   window.__elonChatGptPrivateTransport = Object.freeze({
-    version: 15,
+    version: 16,
     conversationPrefetchEnabled: prefetchEnabled,
     conversationPrefetchAvailable: true,
     experimentalConversationPrefetchAvailable: true,
@@ -467,6 +522,7 @@
     refreshCurrentConversation,
     probeConversationProject,
     copySameOriginRequestHeaders,
+    acquireSameOriginRequestHeaders,
     health: policy.snapshot
   });
 })();

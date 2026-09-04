@@ -29,7 +29,8 @@ function createContext(
   researchEnabled = true,
   prefetchEnabled = true,
   storage = new MemoryStorage(),
-  directoryRows = []
+  directoryRows = [],
+  authContext = null
 ) {
   const timers = new Set();
   const outcomes = [];
@@ -60,6 +61,7 @@ function createContext(
     },
     clearTimeout: (id) => { clearTimeout(id); timers.delete(id); }
   };
+  if (authContext) window.__elonChatGptPrivateAuthContext = authContext;
   if (researchEnabled) {
     window.__elonChatGptPrivateResearchProbe = {
       recordPrivateOutcome: (outcome, messageCount, elapsedMs) => {
@@ -128,7 +130,7 @@ const detailPayload = {
   assert.equal(disabled.window.__elonChatGptPrivateTransport, undefined);
 
   const gated = createContext(async () => jsonResponse(detailPayload), true, false);
-  assert.equal(gated.window.__elonChatGptPrivateTransport.version, 14);
+  assert.equal(gated.window.__elonChatGptPrivateTransport.version, 16);
   assert.equal(gated.window.__elonChatGptPrivateTransport.conversationPrefetchEnabled, false);
   assert.equal(gated.window.__elonChatGptPrivateTransport.conversationPrefetchReady(), false);
 
@@ -140,7 +142,7 @@ const detailPayload = {
     return jsonResponse(detailPayload);
   }, false, true);
   const transport = detail.window.__elonChatGptPrivateTransport;
-  assert.equal(transport.version, 14);
+  assert.equal(transport.version, 16);
   assert.equal(transport.conversationPrefetchEnabled, true);
   assert.equal(transport.conversationPrefetchAvailable, true);
   assert.equal(transport.experimentalConversationPrefetchAvailable, true);
@@ -176,6 +178,49 @@ const detailPayload = {
     Array.from(snapshots[0].messages, (value) => [value.role, value.content]),
     [['user', 'hello'], ['assistant', 'hi']]
   );
+
+  let warmedAcquisitions = 0;
+  const warmedRequests = [];
+  const warmedSnapshots = [];
+  const warmed = createContext(
+    async (url, options) => {
+      warmedRequests.push({ url, options });
+      return jsonResponse(detailPayload);
+    },
+    false,
+    true,
+    new MemoryStorage(),
+    [],
+    {
+      canAcquire: () => true,
+      state: () => ({
+        ready: true,
+        lastOutcome: 'session_ready',
+        lastSuccessAt: Date.now(),
+        lastLatencyMs: 120
+      }),
+      subscribe: () => () => {},
+      copyRequestHeaders: () => ({ Authorization: 'Bearer warmed-page-context' }),
+      acquireRequestHeaders: async () => {
+        warmedAcquisitions += 1;
+        return { Authorization: 'Bearer warmed-page-context' };
+      },
+      acceptObservedHeaders: () => false,
+      invalidate: () => {}
+    }
+  );
+  const warmedTransport = warmed.window.__elonChatGptPrivateTransport;
+  assert.equal(warmedTransport.conversationPrefetchReady(), true);
+  assert.equal(warmedTransport.prefetchConversation(
+    '/c/warmed-chat',
+    (event) => warmedSnapshots.push(event),
+    () => {}
+  ), true);
+  await flush();
+  assert.equal(warmedAcquisitions, 0);
+  assert.equal(warmedRequests.length, 1);
+  assert.equal(warmedRequests[0].options.headers.Authorization, 'Bearer warmed-page-context');
+  assert.equal(warmedSnapshots.length, 1);
 
   detail.window.location.pathname = '/c/voice-chat';
   assert.equal(transport.refreshCurrentConversation(
@@ -226,6 +271,8 @@ const detailPayload = {
     '/c/voice-chat',
     () => assert.fail('a duplicate refresh must reuse the active request')
   ), true);
+  await Promise.resolve();
+  await Promise.resolve();
   assert.equal(singleFlightCalls, 2);
   resolveSingleFlight(jsonResponse(detailPayload));
   await flush();

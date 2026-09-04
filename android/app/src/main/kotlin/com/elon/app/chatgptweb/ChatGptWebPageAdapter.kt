@@ -28,6 +28,17 @@ internal class ChatGptWebPageAdapter(
         UNSUPPORTED,
     }
 
+    private val privateEarlyTransportEnabled =
+        BuildConfig.CHATGPT_PRIVATE_CONVERSATION_PREFETCH_ENABLED ||
+            BuildConfig.CHATGPT_PRIVATE_STREAM_OBSERVER_ENABLED ||
+            BuildConfig.CHATGPT_PRIVATE_TEXT_TRANSACTIONS_ENABLED ||
+            BuildConfig.CHATGPT_PRIVATE_DICTATION_ENABLED ||
+            BuildConfig.CHATGPT_PRIVATE_READ_ALOUD_ENABLED
+    private val privateAuthContextScript =
+        context.assets.open(PRIVATE_AUTH_CONTEXT_ASSET).use { input ->
+            input.reader(StandardCharsets.UTF_8).readText()
+        }
+
     private val adapterScript = """
         (function () {
             window.__elonChatGptAdapterTargetVersion = $ADAPTER_VERSION;
@@ -50,17 +61,22 @@ internal class ChatGptWebPageAdapter(
                     "doc_android_" + Math.random().toString(36).slice(2) + Date.now().toString(36);
             }
         })();
-    """.trimIndent() + "\n" + ADAPTER_ASSETS.joinToString("\n") { asset ->
-        context.assets.open(asset).use { input ->
-            input.reader(StandardCharsets.UTF_8).readText()
+    """.trimIndent() + "\n" + privateAuthContextScript + "\n" +
+        ADAPTER_ASSETS.joinToString("\n") { asset ->
+            context.assets.open(asset).use { input ->
+                input.reader(StandardCharsets.UTF_8).readText()
+            }
         }
-    }
     private val privateEarlyTapScript = """
+        window.__elonChatGptPrivateAuthContextEnabled =
+            ${BuildConfig.CHATGPT_PRIVATE_CONVERSATION_PREFETCH_ENABLED ||
+                BuildConfig.CHATGPT_PRIVATE_DICTATION_ENABLED ||
+                BuildConfig.CHATGPT_PRIVATE_READ_ALOUD_ENABLED};
         window.__elonChatGptPrivateStreamObserverEnabled =
             ${BuildConfig.CHATGPT_PRIVATE_STREAM_OBSERVER_ENABLED};
         window.__elonChatGptPrivateTextTransactionsEnabled =
             ${BuildConfig.CHATGPT_PRIVATE_TEXT_TRANSACTIONS_ENABLED};
-    """.trimIndent() + "\n" + listOf(
+    """.trimIndent() + "\n" + privateAuthContextScript + "\n" + listOf(
         PRIVATE_FETCH_TAP_ASSET,
         PRIVATE_TEXT_TRANSACTION_POLICY_ASSET,
         PRIVATE_TEXT_TRANSACTION_RELAY_ASSET,
@@ -148,10 +164,7 @@ internal class ChatGptWebPageAdapter(
             )
         }
         if (
-            (
-                BuildConfig.CHATGPT_PRIVATE_STREAM_OBSERVER_ENABLED ||
-                    BuildConfig.CHATGPT_PRIVATE_TEXT_TRANSACTIONS_ENABLED
-            ) &&
+            privateEarlyTransportEnabled &&
             WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)
         ) {
             WebViewCompat.addDocumentStartJavaScript(
@@ -580,7 +593,7 @@ internal class ChatGptWebPageAdapter(
         origin.scheme == "https" && origin.host == "chatgpt.com" && origin.port == -1
 
     companion object {
-        internal const val ADAPTER_VERSION = 241
+        internal const val ADAPTER_VERSION = 242
 
         private val ADAPTER_ASSETS = listOf(
             "chatgpt_web_adapter_bootstrap.js",
@@ -646,6 +659,7 @@ internal class ChatGptWebPageAdapter(
         )
         private const val BRIDGE_OBJECT = "elonChatGptNative"
         private const val ALLOWED_ORIGIN = "https://chatgpt.com"
+        private const val PRIVATE_AUTH_CONTEXT_ASSET = "chatgpt_web_private_auth_context.js"
         private const val PRIVATE_FETCH_TAP_ASSET = "chatgpt_web_private_fetch_tap.js"
         private const val PRIVATE_SOCKET_TAP_ASSET = "chatgpt_web_private_socket_tap.js"
         private const val PRIVATE_TEXT_TRANSACTION_POLICY_ASSET =

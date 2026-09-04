@@ -34,6 +34,20 @@ internal object WebAiPrivateTransportCatalog {
             fallback = "official_webview_navigation",
         ),
         Entry(
+            id = "android_chatgpt_page_local_auth_context_v1",
+            provider = "chatgpt",
+            status = "completed",
+            verification = "device_same_origin_auth_and_conversation_refresh_verified",
+            productionDefault = true,
+            runtimeEnabled =
+                BuildConfig.CHATGPT_PRIVATE_CONVERSATION_PREFETCH_ENABLED ||
+                    BuildConfig.CHATGPT_PRIVATE_DICTATION_ENABLED ||
+                    BuildConfig.CHATGPT_PRIVATE_READ_ALOUD_ENABLED,
+            requestMode = "same_origin_session_prewarm_and_official_header_refresh",
+            healthPolicy = "memory_only_singleflight_expiry_timeout_and_circuit_breaker",
+            fallback = "observed_official_request_context_and_persistent_identity_webview",
+        ),
+        Entry(
             id = "android_chatgpt_conversation_navigation_receipt_reconciliation_v1",
             provider = "chatgpt",
             status = "completed",

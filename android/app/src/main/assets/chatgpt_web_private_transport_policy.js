@@ -110,8 +110,8 @@
 
     function attemptBudgetMs() {
       const baseline = state.privateLatencyMs || state.officialLatencyMs || 500;
-      const maximum = state.successes > 0 ? 1200 : 1000;
-      return finite((baseline * 1.35) + 100, 700, 350, maximum);
+      const maximum = state.successes > 0 ? 4000 : 5000;
+      return finite((baseline * 1.35) + 2200, 3500, 3000, maximum);
     }
 
     function recordSuccess(elapsedMs) {

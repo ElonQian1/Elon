@@ -73,8 +73,17 @@ function createRoot(options) {
   const config = options || {};
   const requests = [];
   let microphoneRequests = 0;
+  let authRequests = 0;
   const root = {
     __elonChatGptPrivateDictationEnabled: true,
+    __elonChatGptPrivateAuthContext: {
+      acquireRequestHeaders: async () => {
+        authRequests += 1;
+        if (config.authFailure) throw new Error('auth_http_401');
+        return { Authorization: 'Bearer page-local-token' };
+      },
+      invalidate: () => {}
+    },
     location: { origin: 'https://chatgpt.com' },
     navigator: {
       language: 'zh-CN',
@@ -96,14 +105,16 @@ function createRoot(options) {
     clearTimeout,
     fetch: async (url, init) => {
       requests.push({ url, init });
-      if (url === '/api/auth/session') {
-        return config.authFailure ? response(401, {}) : response(200, { accessToken: 'page-local-token' });
-      }
       if (url === '/backend-api/transcribe') return response(200, { text: 'hello' });
       return response(404, {});
     }
   };
-  return { root, requests, microphoneRequests: () => microphoneRequests };
+  return {
+    root,
+    requests,
+    authRequests: () => authRequests,
+    microphoneRequests: () => microphoneRequests
+  };
 }
 
 async function privateTransportCompletesBufferedTranscription() {
@@ -114,6 +125,7 @@ async function privateTransportCompletesBufferedTranscription() {
   const started = await transport.start();
   assert.deepStrictEqual(started, { ok: true, code: 'capture_started', captured: true });
   assert.strictEqual(fixture.microphoneRequests(), 1);
+  assert.strictEqual(fixture.authRequests(), 1);
   assert.strictEqual(transport.snapshot().phase, 'capturing');
 
   const submitted = await transport.submit();
@@ -125,6 +137,7 @@ async function privateTransportCompletesBufferedTranscription() {
   assert(request);
   assert.strictEqual(request.init.method, 'POST');
   assert.strictEqual(request.init.headers.Authorization.startsWith('Bearer '), true);
+  assert.strictEqual(fixture.requests.some((entry) => entry.url === '/api/auth/session'), false);
   assert.deepStrictEqual(
     request.init.body.entries.map((entry) => entry.name),
     ['file', 'dictation_session_id', 'attempt_id', 'language', 'duration_ms']
@@ -140,6 +153,7 @@ async function authenticationFailureNeverStartsMicrophone() {
   assert.strictEqual(started.captured, false);
   assert.strictEqual(started.code.startsWith('before_capture:'), true);
   assert.strictEqual(fixture.microphoneRequests(), 0);
+  assert.strictEqual(fixture.authRequests(), 1);
   assert.strictEqual(transport.snapshot().phase, 'idle');
 }
 

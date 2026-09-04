@@ -17,7 +17,7 @@ assert.equal(policy.canAttempt(true), false);
 policy.recordOfficial(200, 400);
 assert.equal(policy.canAttempt(false), false);
 assert.equal(policy.canAttempt(true), true);
-assert.equal(policy.attemptBudgetMs(), 640);
+assert.equal(policy.attemptBudgetMs(), 3000);
 
 policy.recordOfficial(0, 50);
 assert.equal(policy.canAttempt(true), true, 'cancelled navigation must not cool down healthy transport');
@@ -28,7 +28,7 @@ let health = policy.snapshot();
 assert.equal(health.successes, 1);
 assert.equal(health.privateLatencyMs, 500);
 assert.equal(health.lastOutcome, 'success');
-assert.equal(health.attemptBudgetMs, 775);
+assert.equal(health.attemptBudgetMs, 3000);
 
 policy.recordFailure('timeout');
 health = policy.snapshot();
@@ -55,8 +55,8 @@ assert.equal(disabled.canAttempt(true), false);
 const slowStorage = new MemoryStorage();
 const slow = policyModule.create({ enabled: true, now: () => now, storage: slowStorage });
 slow.recordOfficial(200, 1000);
-assert.equal(slow.attemptBudgetMs(), 1000);
+assert.equal(slow.attemptBudgetMs(), 3550);
 slow.recordSuccess(1000);
-assert.equal(slow.attemptBudgetMs(), 1200);
+assert.equal(slow.attemptBudgetMs(), 3550);
 
 console.log('CHATGPT_WEB_PRIVATE_TRANSPORT_POLICY_TESTS=passed');

@@ -4,7 +4,7 @@
   if (window.__elonChatGptPrivateReadAloudEnabled !== true) return;
   if (location.origin !== 'https://chatgpt.com') return;
   const existing = window.__elonChatGptPrivateReadAloudTransport;
-  if (existing && Number(existing.version) >= 2) return;
+  if (existing && Number(existing.version) >= 3) return;
 
   const privateTransport = window.__elonChatGptPrivateTransport;
   if (!privateTransport || typeof privateTransport.copySameOriginRequestHeaders !== 'function' ||
@@ -433,13 +433,19 @@
     if (!targetConversationId) return recordFailure(contextId, 'conversation_unavailable');
     const messageId = assistantMessageId(contextId);
     if (!messageId) return recordFailure(contextId, 'message_identity_unavailable');
-    const headers = privateTransport.copySameOriginRequestHeaders();
+    releaseAudio();
+    const operation = ++generation;
+    setState('loading', contextId, '');
+    let headers = privateTransport.copySameOriginRequestHeaders();
+    if ((!headers || typeof headers !== 'object') &&
+        typeof privateTransport.acquireSameOriginRequestHeaders === 'function') {
+      try { headers = await privateTransport.acquireSameOriginRequestHeaders(); }
+      catch (_) { headers = null; }
+    }
+    if (operation !== generation) return { ok: true, detail: 'playback_stopped' };
     if (!headers || typeof headers !== 'object') {
       return recordFailure(contextId, 'runtime_authorization_unavailable');
     }
-
-    releaseAudio();
-    const operation = ++generation;
     controller = new AbortController();
     let stalled = false;
     const abortForStall = () => {
@@ -447,8 +453,6 @@
       if (controller) controller.abort();
     };
     armRequestTimer(REQUEST_TIMEOUT_MS, abortForStall);
-    setState('loading', contextId, '');
-
     const query = new URLSearchParams({
       message_id: messageId,
       conversation_id: targetConversationId,
@@ -511,7 +515,7 @@
 
   installSettingsObserver();
   window.__elonChatGptPrivateReadAloudTransport = Object.freeze({
-    version: 2,
+    version: 3,
     enabled: true,
     state,
     toggle,
