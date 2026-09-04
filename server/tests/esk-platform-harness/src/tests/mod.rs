@@ -2,6 +2,7 @@ use crate::{esk_asset::platform::*, platform_migration, store::Store};
 use rusqlite::{params, Connection};
 use std::{fs, path::PathBuf};
 
+mod account_snapshot_auth;
 mod auth;
 mod cancellation;
 mod history;
@@ -99,7 +100,7 @@ impl Fixture {
         assert_eq!(self.count("esk_platform_ledger_entries"), 0);
         assert_eq!(
             self.store
-                .esk_platform_account("alice", 20)
+                .esk_platform_account("alice", &token("alice"), 20)
                 .unwrap()
                 .total_base_units,
             0

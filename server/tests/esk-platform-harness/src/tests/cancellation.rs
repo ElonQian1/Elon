@@ -85,7 +85,7 @@ fn canceled_payment_can_be_prepared_with_corrected_user_and_amount_then_recorded
     assert_eq!(
         fixture
             .store
-            .esk_platform_account("alice", 20)
+            .esk_platform_account("alice", &token("alice"), 20)
             .unwrap()
             .total_base_units,
         0
@@ -93,7 +93,7 @@ fn canceled_payment_can_be_prepared_with_corrected_user_and_amount_then_recorded
     assert_eq!(
         fixture
             .store
-            .esk_platform_account("bob", 20)
+            .esk_platform_account("bob", &token("bob"), 20)
             .unwrap()
             .total_base_units,
         20000000

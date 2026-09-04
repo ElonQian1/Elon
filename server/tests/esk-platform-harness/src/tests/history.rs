@@ -76,7 +76,10 @@ fn every_page_retains_full_totals_ranges_and_strict_same_timestamp_id_order() {
         .collect();
     assert_eq!(ids.len(), 7);
     assert!(ids.windows(2).all(|pair| pair[0] > pair[1]));
-    let account = fixture.store.esk_platform_account("alice", 100).unwrap();
+    let account = fixture
+        .store
+        .esk_platform_account("alice", &token("alice"), 100)
+        .unwrap();
     assert_eq!(
         ids,
         account

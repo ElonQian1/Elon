@@ -4,74 +4,27 @@ use rusqlite::{params, Connection, OptionalExtension};
 use crate::{
     esk_asset::platform::{
         validate_prepared_input, PlatformAccount, PlatformAllocationInput,
-        PlatformAllocationRecord, PlatformEntry, PlatformError, PlatformPolicy,
+        PlatformAllocationRecord, PlatformError, PlatformPolicy,
     },
     store::Store,
 };
 
-use super::{ensure_active_user, policy_on};
-
 impl Store {
+    /// Keep V1's summary shape while using the same authenticated, fully
+    /// validated SQLite snapshot as the complete history reader.
     pub(crate) fn esk_platform_account(
         &self,
         user_id: &str,
+        session_token: &str,
         limit: usize,
     ) -> Result<PlatformAccount> {
-        let mut conn = self.conn()?;
-        let tx = conn.transaction()?;
-        ensure_active_user(&tx, user_id)?;
-        ensure_recording_integrity(&tx)?;
-        let policy = policy_on(&tx)?;
-        let mut statement = tx.prepare(
-            "SELECT entry_id, allocation_id, amount_base_units, created_at
-               FROM esk_platform_ledger_entries WHERE user_id = ?1
-              ORDER BY created_at DESC, entry_id DESC",
-        )?;
-        let mut rows = statement.query(params![user_id])?;
-        let mut account = PlatformAccount {
-            total_base_units: 0,
-            entry_count: 0,
-            updated_at: None,
-            entries: Vec::new(),
-        };
-        while let Some(row) = rows.next()? {
-            let entry = PlatformEntry {
-                entry_id: row.get(0)?,
-                allocation_id: row.get(1)?,
-                amount_base_units: row.get(2)?,
-                created_at: row.get(3)?,
-            };
-            let policy = policy.as_ref().ok_or(PlatformError::CorruptLedger)?;
-            let allocation = record_on(&tx, &entry.allocation_id, policy)?
-                .ok_or(PlatformError::CorruptLedger)?;
-            if allocation.input.user_id != user_id
-                || allocation.input.amount_base_units != entry.amount_base_units
-                || allocation.recorded_at.as_deref() != Some(entry.created_at.as_str())
-            {
-                return Err(PlatformError::CorruptLedger.into());
-            }
-            account.total_base_units = account
-                .total_base_units
-                .checked_add(entry.amount_base_units)
-                .ok_or(PlatformError::CorruptLedger)?;
-            account.entry_count = account
-                .entry_count
-                .checked_add(1)
-                .ok_or(PlatformError::CorruptLedger)?;
-            if account.total_base_units > policy.issuance_limit_base_units {
-                return Err(PlatformError::CorruptLedger.into());
-            }
-            if account.updated_at.is_none() {
-                account.updated_at = Some(entry.created_at.clone());
-            }
-            if account.entries.len() < limit.clamp(1, 100) {
-                account.entries.push(entry);
-            }
-        }
-        drop(rows);
-        drop(statement);
-        tx.commit()?;
-        Ok(account)
+        let page = self.esk_platform_history(user_id, session_token, limit.clamp(1, 100), None)?;
+        Ok(PlatformAccount {
+            total_base_units: page.total_base_units,
+            entry_count: page.entry_count,
+            updated_at: page.updated_at,
+            entries: page.entries,
+        })
     }
 }
 

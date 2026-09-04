@@ -215,8 +215,8 @@ fn missing_disabled_or_virtual_recipient_is_never_created_or_credited() {
             PlatformError::UserUnavailable,
         );
         assert_error(
-            fixture.store.esk_platform_account(user, 20),
-            PlatformError::UserUnavailable,
+            fixture.store.esk_platform_account(user, &token(user), 20),
+            PlatformError::Unauthorized,
         );
     }
     assert_eq!(fixture.count("users"), before);

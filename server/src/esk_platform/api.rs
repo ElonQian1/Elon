@@ -235,7 +235,7 @@ pub(super) async fn get_my_account(
     headers: HeaderMap,
     query: Result<Query<AccountQuery>, QueryRejection>,
 ) -> Response {
-    let (user, _) = match real_user(&state, &headers) {
+    let (user, token) = match real_user(&state, &headers) {
         Ok(value) => value,
         Err(response) => return response,
     };
@@ -246,7 +246,10 @@ pub(super) async fn get_my_account(
     if !(1..=100).contains(&query.limit) {
         return domain_error(PlatformError::InvalidInput.into());
     }
-    match state.store.esk_platform_account(&user.id, query.limit) {
+    match state
+        .store
+        .esk_platform_account(&user.id, token, query.limit)
+    {
         Ok(account) => Json(json!({
             "schema": "yilong.esk.platform_account.v1",
             "asset_id": "esk", "symbol": "ESK", "decimals": 6,

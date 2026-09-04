@@ -6387,6 +6387,216 @@
       "updated_at_ms": 1788389637404
     },
     {
+      "id": "esk-platform-account-snapshot-auth-v1",
+      "title": "正式 ESK 摘要会话同快照验证",
+      "summary": "修复正式账户摘要入口鉴权与只按用户读取之间的竞态；复用已验证完整流水快照，保留旧账户及双 APK 响应合同。",
+      "status": "verified",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/esk-platform-account-snapshot-auth-v1.md",
+        "content_hash": "569f6649f41713e58a6a271a418872f7f8f16110f61513f5ced8fed7a52765e2",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "a4fd333061f898895974cc845d5453d274e39087",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "c10d2c24c01ba401f2aca2352b50423c1775dd2f",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "platform-assets",
+      "tags": [],
+      "task_paths": [
+        "server/src/esk_platform/account_snapshot_http_tests.rs",
+        "server/src/esk_platform/api.rs",
+        "server/src/store/common/esk_platform_assets/read.rs",
+        "server/tests/esk-platform-harness/src/tests"
+      ],
+      "dependencies": [
+        "esk-platform-history-v1"
+      ],
+      "acceptance_criteria": [
+        "基线复现入口鉴权后会话撤销仍可读；修复后同事务复核并拒绝失效或跨用户会话。",
+        "旧账户JSON、总额/前N条、Paper与双APK合同保持；账户与history同源完整性验证。",
+        "harness与实际Router测试、后端发布、未登录线上smoke分开记录；不写资金或真实用户。"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "docs/requirements/esk-platform-account-snapshot-auth-v1.md",
+          "content_hash": "569f6649f41713e58a6a271a418872f7f8f16110f61513f5ced8fed7a52765e2",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "a4fd333061f898895974cc845d5453d274e39087",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "c10d2c24c01ba401f2aca2352b50423c1775dd2f",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/src/esk_platform/account_snapshot_http_tests.rs",
+          "content_hash": "c84b949d07ea31c156da2d0fb27e3b5c622ee74e2d1c4721987988ee4afdc8f2",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "a4fd333061f898895974cc845d5453d274e39087",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "26de428ac007095c40f37f4678ae8c547c6bd56c",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/src/esk_platform/api.rs",
+          "content_hash": "67d286d9a19169a01e54dd22980144f6b5f2adbe301101ff72d01ade8b2f0615",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "a4fd333061f898895974cc845d5453d274e39087",
+            "head_blob_oid": "6467a431ebb657546b62c5e9163846dd8109d0a2",
+            "worktree_blob_oid": "26bdc55ad9a80ecc3ea71c7484c41857caacb4e7",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/esk_platform/http_tests.rs",
+          "content_hash": "0fce7454f8b5d10c5db7e964dc0adfc685ebe393c6c73797d07efb523f5c270c",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "a4fd333061f898895974cc845d5453d274e39087",
+            "head_blob_oid": "42d3d7924fa6341aaee1208972f66212fc7e56b9",
+            "worktree_blob_oid": "3951621d0e3562dd67c05ed6e04360ee2961966f",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/store/common/esk_platform_assets/history.rs",
+          "content_hash": "3a926de049dabb7d9370d9fc120dd76dd6900df2da47ccd7aeb5bd7a1d377d94",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "a4fd333061f898895974cc845d5453d274e39087",
+            "head_blob_oid": "0f752d3d2653c4ebac74f7bcbcd7d2c132c1b68f",
+            "worktree_blob_oid": "0f752d3d2653c4ebac74f7bcbcd7d2c132c1b68f",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/store/common/esk_platform_assets/read.rs",
+          "content_hash": "d2d5508717797ca102b51760f1096d00a93a077f79f4e5e394e69a590e397baf",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "a4fd333061f898895974cc845d5453d274e39087",
+            "head_blob_oid": "c0e9d828c2db27b3400a897c852bf57e1b565588",
+            "worktree_blob_oid": "50b70da869c099fea53f770502ffeaa4af878a74",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/tests/esk-platform-harness/src/tests/account_snapshot_auth.rs",
+          "content_hash": "c3e90332b8993649f27d4fb43078b87b9d8cebaaf5df8f6cb569c9c549fc6903",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "a4fd333061f898895974cc845d5453d274e39087",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "658119720a395b6faa0f15d244c5e79d57ab6525",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/tests/esk-platform-harness/src/tests/auth.rs",
+          "content_hash": "1cef55f1d6dc89269c567b98c50b7f98075abbb0527c4eadac1c5c3c0e296d8f",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "a4fd333061f898895974cc845d5453d274e39087",
+            "head_blob_oid": "f889a211c763b2db62217b8e4c5ebbf83b669a2d",
+            "worktree_blob_oid": "f674fb4b13a7a0ebd6c4bda0ced9b622955dd041",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/tests/esk-platform-harness/src/tests/cancellation.rs",
+          "content_hash": "dc494954b543ecbb9fda45a9c128b0306574e4c029703b127fd1d5f2db946345",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "a4fd333061f898895974cc845d5453d274e39087",
+            "head_blob_oid": "60efbaa782fa25749426163e5520120f93893224",
+            "worktree_blob_oid": "2aacdbc06c059e67f0e7760b00d2d2c541c5952d",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/tests/esk-platform-harness/src/tests/history.rs",
+          "content_hash": "530d01e48aab23fecbc809d43a4ea9ec73fe673da71022e34901c0ef7f0f77f4",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "a4fd333061f898895974cc845d5453d274e39087",
+            "head_blob_oid": "565d4c6f17d042fb37330bcd7bf780483f14b55a",
+            "worktree_blob_oid": "4267f6080d6d8e99d76bc33f986798e93162f40a",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/tests/esk-platform-harness/src/tests/mod.rs",
+          "content_hash": "ecc1053b841b22ce0c96bdb00f2867a960586a61cee25b83693264c62bcb61d0",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "a4fd333061f898895974cc845d5453d274e39087",
+            "head_blob_oid": "0c213f1ea3223fc81002866461cd03cc68352c34",
+            "worktree_blob_oid": "5aefbedf4536306d15fdac24a4cd285bfb3067e7",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/tests/esk-platform-harness/src/tests/recovery.rs",
+          "content_hash": "4e47166e5d3982c4c414f1545282f1cb84f1adf3bb97e54d8606a35f850de787",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "a4fd333061f898895974cc845d5453d274e39087",
+            "head_blob_oid": "5390b7f20ae2c4febc4fccaa6503b5bee5baa1ea",
+            "worktree_blob_oid": "318469b19dec579082a789955f7efd5280fcf998",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/tests/esk-platform-harness/src/tests/transactions.rs",
+          "content_hash": "19c4730de27b0e065cf9b84457b9b34fd0953be73e6624cf1923854031fba534",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "a4fd333061f898895974cc845d5453d274e39087",
+            "head_blob_oid": "d62f27921bff9a234c290d3b31f5a391fc62ec3c",
+            "worktree_blob_oid": "61b9fb28a9a11571b2570b8c3976fe8b13d7c4ac",
+            "state": "tracked_modified"
+          }
+        }
+      ],
+      "created_at_ms": 1788523348357,
+      "updated_at_ms": 1788524568212
+    },
+    {
       "id": "esk-platform-history-v1",
       "title": "正式 ESK 本人审核流水完整翻页",
       "summary": "为正式 ESK 原生资产页新增独立只读完整流水；按本人快照摘要分页，账本变化清空重读，保留原账户与双 APK 合同。",
@@ -17585,126 +17795,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_c8081e44c7464875951b181606d2d164",
-      "feature_id": "esk-paper-first-user-allocation-operations-v1",
-      "action": "transitioned",
-      "actor": "codex-root",
-      "reason": "全部 10 项 ESK 回归、生产服务端 check/build、PowerShell 解析和临时真实 HTTP 两用户端到端均通过。",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1788308397936
-    },
-    {
-      "id": "feature_event_90f71445ce704645939b8cbe0b6d2025",
-      "feature_id": "compute-federation-interactive-desktop-v1",
-      "action": "requirement_rebound",
-      "actor": "codex/root/interactive-authority-c1",
-      "reason": "Bind the reviewed C1 authority-kernel requirement after source commits and migration renumbering.",
-      "from_status": "blocked",
-      "to_status": "proposed",
-      "at_ms": 1788309263518
-    },
-    {
-      "id": "feature_event_2172887cf4ac4fdcaafc8736a3a7165d",
-      "feature_id": "compute-federation-interactive-desktop-v1",
-      "action": "metadata_updated",
-      "actor": "codex/root/interactive-authority-c1",
-      "reason": "Review the C1 fail-closed authority-kernel scope after rebase and V283 allocation.",
-      "from_status": "proposed",
-      "to_status": "proposed",
-      "at_ms": 1788309263653
-    },
-    {
-      "id": "feature_event_6d8fd05529644f6297c8456b6e4efb77",
-      "feature_id": "compute-federation-interactive-desktop-v1",
-      "action": "transitioned",
-      "actor": "codex/root/interactive-authority-c1",
-      "reason": "C1 requirement and fail-closed acceptance criteria reviewed.",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1788309263795
-    },
-    {
-      "id": "feature_event_0ce0271fdeb643e8ae77b6aaba11b3d1",
-      "feature_id": "compute-federation-interactive-desktop-v1",
-      "action": "transitioned",
-      "actor": "codex/root/interactive-authority-c1",
-      "reason": "C1 has no feature dependency blocker; implementation evidence will remain source-only.",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1788309264251
-    },
-    {
-      "id": "feature_event_c187488e868e45d4beb9c0b5fa7dd31e",
-      "feature_id": "compute-federation-interactive-desktop-v1",
-      "action": "claimed",
-      "actor": "codex/root/interactive-authority-c1",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788309264446
-    },
-    {
-      "id": "feature_event_db4fbf9643904cc99833e991fb6af074",
-      "feature_id": "compute-federation-interactive-desktop-v1",
-      "action": "transitioned",
-      "actor": "codex/root/interactive-authority-c1",
-      "reason": "Bind the completed source-only C1 tranche without claiming runtime readiness.",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788309264679
-    },
-    {
-      "id": "feature_event_4abf963bbe45436cb9b63cccb0715945",
-      "feature_id": "compute-federation-interactive-desktop-v1",
-      "action": "evidence_recorded",
-      "actor": "codex/root/interactive-authority-c1",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788309269317
-    },
-    {
-      "id": "feature_event_dab482d04dd94b27821a7fd11a47b9b9",
-      "feature_id": "compute-federation-interactive-desktop-v1",
-      "action": "transitioned",
-      "actor": "codex/root/interactive-authority-c1",
-      "reason": "C1 is source-only and uncompiled/unrun. V283, SQLite, Store and runtime checks were not executed. Profile, independent HostConsent, Viewer, Relay, typed termination, WebRTC, capture, input, metering and billing remain unavailable.",
-      "from_status": "in_progress",
-      "to_status": "blocked",
-      "at_ms": 1788309269498
-    },
-    {
-      "id": "feature_event_64d2f484b3dd45679cbd38be2957e18e",
-      "feature_id": "esk_paper_quant_allocation_request_v2",
-      "action": "registered",
-      "actor": "codex-ai",
-      "reason": "ESK 展示与卖回已发布；下一安全纵向切片需要建立主项目 Paper 量化占用及版本化跨仓库只读合同。",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1788310321752
-    },
-    {
-      "id": "feature_event_66a8990c127e41548ef07bdadc84d879",
-      "feature_id": "esk_paper_quant_allocation_request_v2",
-      "action": "claimed",
-      "actor": "codex-desktop",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788310328483
-    },
-    {
-      "id": "feature_event_497314f236fd4ab7a11ec9adcca2693c",
-      "feature_id": "esk_paper_quant_allocation_request_v2",
-      "action": "transitioned",
-      "actor": "codex-ai",
-      "reason": "隔离 worktree 已建立，开始测试优先实现主项目 Paper 占用、V2 投影和 PC 用户流程。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788310339557
-    },
-    {
       "id": "feature_event_da64104e2280468d89d20c2a93e623bf",
       "feature_id": "esk_paper_quant_allocation_request_v2",
       "action": "claim_released",
@@ -19583,6 +19673,126 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1788522780329
+    },
+    {
+      "id": "feature_event_5b2367ffca4b411495df38cf64a157e6",
+      "feature_id": "esk-platform-account-snapshot-auth-v1",
+      "action": "registered",
+      "actor": "codex-esk-account-auth-root",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1788523348357
+    },
+    {
+      "id": "feature_event_4cdf9a5255e5483c963c6fb6c68a4603",
+      "feature_id": "esk-platform-account-snapshot-auth-v1",
+      "action": "claimed",
+      "actor": "codex-esk-account-auth-root",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788523349010
+    },
+    {
+      "id": "feature_event_6274e01989854d68b4f08b590441d26f",
+      "feature_id": "esk-platform-account-snapshot-auth-v1",
+      "action": "transitioned",
+      "actor": "codex-esk-account-auth-root",
+      "reason": "Confirmed separate preflight/session and account-read transactions plus empty-account policy validation gap. Assigned harness regression and production Router coverage independently; root reuses existing authenticated history snapshot.",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788523395086
+    },
+    {
+      "id": "feature_event_f33bf6b2834f4ec5b14570b3d9dfef41",
+      "feature_id": "esk-platform-account-snapshot-auth-v1",
+      "action": "claim_released",
+      "actor": "codex-esk-account-auth-root",
+      "reason": "Clarify preserved existing auth last_seen bookkeeping before accepting regression evidence; no scope expansion or global auth change.",
+      "from_status": "in_progress",
+      "to_status": "ready",
+      "at_ms": 1788523478301
+    },
+    {
+      "id": "feature_event_37ed753af24446828f76b3591c791cef",
+      "feature_id": "esk-platform-account-snapshot-auth-v1",
+      "action": "requirement_rebound",
+      "actor": "codex-esk-account-auth-root",
+      "reason": "Clarify Store strict readonly vs preserved existing HTTP authentication last_seen bookkeeping. No changes to global authentication, session permissions, ownership, expiry or revocation.",
+      "from_status": "ready",
+      "to_status": "proposed",
+      "at_ms": 1788523479143
+    },
+    {
+      "id": "feature_event_7febadf004fb4c77af89880ddf98a5b0",
+      "feature_id": "esk-platform-account-snapshot-auth-v1",
+      "action": "transitioned",
+      "actor": "codex-esk-account-auth-root",
+      "reason": "Reviewed compatibility clarification against actual production authentication source; same bounded account snapshot fix.",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1788523480095
+    },
+    {
+      "id": "feature_event_4dc0ceecc9e340b1b51e22adc3e9318c",
+      "feature_id": "esk-platform-account-snapshot-auth-v1",
+      "action": "transitioned",
+      "actor": "codex-esk-account-auth-root",
+      "reason": "Reviewed compatibility clarification against actual production authentication source; same bounded account snapshot fix.",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1788523480730
+    },
+    {
+      "id": "feature_event_fdaf61aa6a3a48f2b7db6b770ca17559",
+      "feature_id": "esk-platform-account-snapshot-auth-v1",
+      "action": "claimed",
+      "actor": "codex-esk-account-auth-root",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788523481336
+    },
+    {
+      "id": "feature_event_f704927e75aa4be89f6431b41e2b8349",
+      "feature_id": "esk-platform-account-snapshot-auth-v1",
+      "action": "transitioned",
+      "actor": "codex-esk-account-auth-root",
+      "reason": "Proceeding with red regression proof, shared authenticated read implementation and Router compatibility coverage.",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788523481983
+    },
+    {
+      "id": "feature_event_1aae9d17b8f84154b3bc806af8d3cda6",
+      "feature_id": "esk-platform-account-snapshot-auth-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-esk-account-auth-root",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788524566767
+    },
+    {
+      "id": "feature_event_ada148f36ea54537a81a6d1d1637e84e",
+      "feature_id": "esk-platform-account-snapshot-auth-v1",
+      "action": "transitioned",
+      "actor": "codex-esk-account-auth-root",
+      "reason": "Account requires session token and projects the existing authenticated history transaction; old18-field JSON unchanged; no migrations, funds, APK or IPC changes.",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1788524567523
+    },
+    {
+      "id": "feature_event_61377484789d4e97ba7a195a1618dbba",
+      "feature_id": "esk-platform-account-snapshot-auth-v1",
+      "action": "transitioned",
+      "actor": "codex-esk-account-auth-root",
+      "reason": "Baseline two red tests reproduced real SQLite flaws; repaired harness65 and production Router16 passed, zero failures; independent review no new P1/P2. Real paid-user acceptance remains pending.",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1788524568212
     }
   ]
 }

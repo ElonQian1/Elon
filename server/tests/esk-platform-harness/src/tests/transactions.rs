@@ -13,7 +13,10 @@ fn prepare_confirm_and_owner_read_use_actual_sql_without_changing_paper() {
     let recorded = record(&fixture, &policy, &prepared);
     assert!(recorded.recorded_at.is_some());
     assert!(!recorded.replayed);
-    let alice = fixture.store.esk_platform_account("alice", 20).unwrap();
+    let alice = fixture
+        .store
+        .esk_platform_account("alice", &token("alice"), 20)
+        .unwrap();
     assert_eq!(alice.total_base_units, 10000000);
     assert_eq!(alice.entry_count, 1);
     assert_eq!(alice.entries[0].allocation_id, prepared.allocation_id);
@@ -21,7 +24,7 @@ fn prepare_confirm_and_owner_read_use_actual_sql_without_changing_paper() {
     assert_eq!(
         fixture
             .store
-            .esk_platform_account("bob", 20)
+            .esk_platform_account("bob", &token("bob"), 20)
             .unwrap()
             .total_base_units,
         0
@@ -191,7 +194,7 @@ fn cumulative_policy_limit_is_enforced_at_record_not_by_pending_balance() {
     assert_eq!(
         fixture
             .store
-            .esk_platform_account("bob", 20)
+            .esk_platform_account("bob", &token("bob"), 20)
             .unwrap()
             .total_base_units,
         0
@@ -212,7 +215,10 @@ fn read_entry_limit_does_not_truncate_balance_totals() {
             .unwrap();
         record(&fixture, &policy, &prepared);
     }
-    let account = fixture.store.esk_platform_account("alice", 1).unwrap();
+    let account = fixture
+        .store
+        .esk_platform_account("alice", &token("alice"), 1)
+        .unwrap();
     assert_eq!(account.total_base_units, 30000000);
     assert_eq!(account.entry_count, 3);
     assert_eq!(account.entries.len(), 1);

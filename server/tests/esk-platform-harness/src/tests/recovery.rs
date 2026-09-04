@@ -37,7 +37,7 @@ fn independent_connections_confirm_once_under_concurrency() {
     assert_eq!(
         fixture
             .store
-            .esk_platform_account("alice", 20)
+            .esk_platform_account("alice", &token("alice"), 20)
             .unwrap()
             .total_base_units,
         10000000
@@ -230,7 +230,10 @@ fn reopened_database_and_repeated_migration_keep_receipts_and_totals() {
     let policy = policy(100000000);
     let prepared = prepare(&fixture, &policy);
     let recorded = record(&fixture, &policy, &prepared);
-    let before = fixture.store.esk_platform_account("alice", 20).unwrap();
+    let before = fixture
+        .store
+        .esk_platform_account("alice", &token("alice"), 20)
+        .unwrap();
     let reopened = Store {
         path: fixture.path.clone(),
     };
@@ -245,7 +248,9 @@ fn reopened_database_and_repeated_migration_keep_receipts_and_totals() {
             &token("admin-1"),
         )
         .unwrap();
-    let after = reopened.esk_platform_account("alice", 20).unwrap();
+    let after = reopened
+        .esk_platform_account("alice", &token("alice"), 20)
+        .unwrap();
     assert!(replay.replayed);
     assert_eq!(recorded.recorded_at, replay.recorded_at);
     assert_eq!(before.total_base_units, after.total_base_units);
@@ -265,7 +270,9 @@ fn orphan_approval_is_detected_as_corruption_not_available_balance() {
         params![prepared.allocation_id, prepared.input.request_digest],
     ).unwrap();
     assert_error(
-        fixture.store.esk_platform_account("alice", 20),
+        fixture
+            .store
+            .esk_platform_account("alice", &token("alice"), 20),
         PlatformError::CorruptLedger,
     );
     assert_error(
@@ -326,7 +333,7 @@ fn maximum_account_plus_one_micro_unit_is_rejected_without_wraparound() {
     assert_eq!(
         fixture
             .store
-            .esk_platform_account("alice", 20)
+            .esk_platform_account("alice", &token("alice"), 20)
             .unwrap()
             .total_base_units,
         i64::MAX
