@@ -1,10 +1,14 @@
 ---
 version_status: current
-reviewed_at: 2026-09-04
+reviewed_at: 2026-09-05
 owner: android-platform
 ---
 
 # 官方量化 APK 身份校验 V1
+
+> **当前版本门禁：** 本文最初审核 `versionCode=2` 时建立的是包名、Activity 和发布
+> 证书身份基线。当前产品已由[新版唯一公共下载 V2](yilong-quant-android-public-download-v2.md)
+> 把最低版本提高到 `versionCode=5`；除历史版本阈值外，本文的身份与启动约束继续有效。
 
 ## 目标与范围
 
@@ -22,8 +26,10 @@ owner: android-platform
   `019a3d95366fb4c6fe578c1f7f26fb96e462dc54f41b9a7c7b5a715052e418bb`。
   来源：量化 Git `a80fbe845b5e307722d38dc189998d98d880e5ec` 的 `AI_CURRENT.md`，
   已发布 `0.2.0 (2)` / `rel_5b6250972a7c45f093ace0a5e82db212`；不是从 HTTP 下载响应学习证书。
-- 最低支持版本为 `versionCode=2`。首次安装也必须校验；拒绝不同包名、空证书、
-  不匹配证书、多签、仅历史签名匹配和低于基线的旧版。轮换须独立审核并更新主 APK。
+- 首次审核的历史最低版本为 `versionCode=2`，只用于说明既有发布证书的来源，不是
+  当前兼容承诺。当前最低版本以 V2 的 `versionCode=5` 为准；首次安装也必须校验，
+  拒绝不同包名、空证书、不匹配证书、多签、仅历史签名匹配和所有低于当前门禁的
+  旧版。轮换须独立审核并更新主 APK。
 - Android 28+ 使用 APK **当前内容签名者**，不把历史签名集合交集当成官方身份。
   旧 Android 使用当前 `PackageInfo.signatures`。原通用升级兼容检查仍保留。
 - 每次打开重新读取已安装包身份、版本和明确 Activity 的可用/导出状态；

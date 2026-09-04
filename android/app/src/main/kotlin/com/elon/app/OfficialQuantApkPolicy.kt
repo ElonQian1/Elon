@@ -6,7 +6,7 @@ internal object OfficialQuantApkPolicy {
     const val PACKAGE_NAME = "com.elon.quant"
     const val ACTIVITY_NAME = "com.elon.quant.MainActivity"
     const val SIGNER_SHA256 = "019a3d95366fb4c6fe578c1f7f26fb96e462dc54f41b9a7c7b5a715052e418bb"
-    private const val MIN_VERSION_CODE = 2L
+    private const val MIN_VERSION_CODE = 5L
 
     fun appliesTo(projectId: String?): Boolean = projectId?.trim() == PROJECT_ID
 

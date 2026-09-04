@@ -227,7 +227,8 @@ internal fun openProjectApkDownload(
     projectId: String? = null,
     projectName: String? = null,
     apkIdentity: String? = null,
-    apkUpdatedAt: String? = null
+    apkUpdatedAt: String? = null,
+    officialServerUrl: String = BuildConfig.SERVER_URL,
 ) {
     if (!projectId.isNullOrBlank() && !projectName.isNullOrBlank() &&
         !hasProjectApkUpdate(activity, projectId, projectName, apkIdentity, apkUpdatedAt) &&
@@ -240,10 +241,20 @@ internal fun openProjectApkDownload(
         Toast.makeText(activity, "暂无可安装 APK", Toast.LENGTH_SHORT).show()
         return
     }
-    val token = AuthManager.token(activity)?.trim().orEmpty()
-    if (token.isBlank()) {
+    val officialQuant = OfficialQuantApkPolicy.appliesTo(projectId)
+    val token = if (officialQuant) null else AuthManager.token(activity)?.trim()
+    if (!officialQuant && token.isNullOrBlank()) {
         Toast.makeText(activity, "请先登录后安装 APK", Toast.LENGTH_SHORT).show()
         return
     }
-    openProjectApkInstall(activity, url, token, projectId, projectName, apkIdentity, apkUpdatedAt)
+    openProjectApkInstall(
+        activity,
+        url,
+        token,
+        projectId,
+        projectName,
+        apkIdentity,
+        apkUpdatedAt,
+        officialServerUrl,
+    )
 }

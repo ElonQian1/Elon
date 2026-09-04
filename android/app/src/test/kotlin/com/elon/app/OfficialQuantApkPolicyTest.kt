@@ -14,12 +14,12 @@ class OfficialQuantApkPolicyTest {
     private fun accepted(
         packageName: String? = OfficialQuantApkPolicy.PACKAGE_NAME,
         signers: Set<String> = officialSigner,
-        versionCode: Long? = 2L,
+        versionCode: Long? = 5L,
     ) = OfficialQuantApkPolicy.accepts(packageName, signers, versionCode)
 
-    @Test fun acceptsPublishedBaselineAndNewerVersions() {
+    @Test fun acceptsNewOnlyBaselineAndNewerVersions() {
         assertTrue(accepted())
-        assertTrue(accepted(versionCode = 3L))
+        assertTrue(accepted(versionCode = 6L))
     }
 
     @Test fun rejectsOtherPackagesIncludingDebugAndWhitespace() {
@@ -40,7 +40,9 @@ class OfficialQuantApkPolicyTest {
     }
 
     @Test fun rejectsUnsupportedOrUnknownVersions() {
-        listOf(null, -1L, 0L, 1L).forEach { assertFalse(accepted(versionCode = it)) }
+        listOf(null, -1L, 0L, 1L, 2L, 3L, 4L).forEach {
+            assertFalse(accepted(versionCode = it))
+        }
     }
 
     @Test fun officialProjectSelectionNeverUsesDisplayName() {
@@ -73,7 +75,7 @@ class OfficialQuantApkPolicyTest {
         val decision = projectApkSignatureDecision(ProjectApkSignatureCompatibility.OFFICIAL_IDENTITY_MISMATCH)
         assertFalse(decision.allowed)
         assertFalse(ProjectApkSignatureInspection(
-            ProjectApkSignatureCompatibility.OFFICIAL_IDENTITY_MISMATCH, "com.elon.quant", 2L,
+            ProjectApkSignatureCompatibility.OFFICIAL_IDENTITY_MISMATCH, "com.elon.quant", 4L,
         ).allowed)
     }
 }

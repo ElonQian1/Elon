@@ -30,6 +30,7 @@ pub(crate) use crate::project_space_task_control::{
 const DOCS_CHANNEL_KIND: &str = "docs";
 const CHANNEL_AI_CANCEL_MESSAGE: &str = "用户已停止 AI 开发任务。";
 
+mod apk_delivery;
 mod channel_ai;
 mod channel_ai_resume;
 mod channel_ai_spawn;
@@ -503,9 +504,14 @@ fn latest_project_apk_delivery(
 ) -> Option<LatestProjectApkDelivery> {
     match state.store.latest_project_apk_delivery(&project.id) {
         Ok(Some((task_id, apk_url, updated_at))) => {
+            let release = apk_delivery::published_release_presentation(
+                &project.id,
+                &state.public_url,
+                &apk_url,
+            );
             return Some(LatestProjectApkDelivery {
-                url: apk_url.clone(),
-                identity: format!("task:{}:{}:{}", task_id, updated_at, apk_url),
+                url: release.download_url,
+                identity: format!("task:{}:{}:{}", task_id, updated_at, release.identity_url),
                 updated_at: Some(updated_at),
             });
         }

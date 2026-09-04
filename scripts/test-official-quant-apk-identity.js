@@ -18,6 +18,8 @@ const sources = Object.fromEntries(Object.entries(files).map(([key, file]) => [
 sources.paths = read('android/app/src/main/res/xml/file_paths.xml')
 sources.manifest = read('android/app/src/main/AndroidManifest.xml')
 sources.catalog = read('server/src/official_project_catalog/mod.rs')
+sources.projectSpace = read('server/src/project_space.rs')
+sources.apkDelivery = read('server/src/project_space/apk_delivery.rs')
 const pin = '019a3d95366fb4c6fe578c1f7f26fb96e462dc54f41b9a7c7b5a715052e418bb'
 const stripComments = source => source.replace(/<!--[\s\S]*?-->/g, '').replace(
   /("(?:\\.|[^"\\])*"|\/\/[^\n]*|\/\*[\s\S]*?\*\/)/g,
@@ -42,7 +44,7 @@ function verify(raw) {
     PROJECT_ID: 'yilong-quant', PACKAGE_NAME: 'com.elon.quant',
     ACTIVITY_NAME: 'com.elon.quant.MainActivity', SIGNER_SHA256: pin,
   })) assert.ok(s.policy.includes(`const val ${name} = "${value}"`), `fixed identity ${name}`)
-  assert.match(s.policy, /MIN_VERSION_CODE\s*=\s*2L\b/, 'minimum reviewed version')
+  assert.match(s.policy, /MIN_VERSION_CODE\s*=\s*5L\b/, 'new-only minimum reviewed version')
   assert.match(s.policy, /projectId\?\.trim\(\)\s*==\s*PROJECT_ID/, 'stable project ID only')
   assert.match(s.policy, /packageName\s*==\s*PACKAGE_NAME\s*&&/, 'exact official package')
   assert.match(s.policy, /currentSigners\s*==\s*setOf\(SIGNER_SHA256\)\s*&&/, 'exact single current signer')
@@ -87,14 +89,47 @@ function verify(raw) {
   assert.match(open, /if \(OfficialQuantApkPolicy\.appliesTo\(projectId\)\) return openOfficialQuantApp\(activity\)/)
   before(open, 'return openOfficialQuantApp(activity)', 'resolveInstalledProjectApp(', 'official launch bypasses generic resolution')
   const resolve = functionSource(s.actions, 'resolveInstalledProjectApp')
-  assert.match(resolve, /if \(OfficialQuantApkPolicy\.appliesTo\(projectId\)\)\s*\{\s*return resolveInstalledPackage\(activity, OfficialQuantApkPolicy\.PACKAGE_NAME\)\s*\}/)
+  assert.match(resolve, /readInstalledPackageInfo\([\s\S]*OfficialQuantApkPolicy\.PACKAGE_NAME/)
+  assert.match(resolve, /OfficialQuantApkPolicy\.accepts\([\s\S]*currentPackageSignerSha256\(installed\)[\s\S]*installed\.projectApkVersionCode\(\)/, 'installed-state UI must reject old or wrongly signed quant apps')
   before(resolve, 'OfficialQuantApkPolicy.PACKAGE_NAME', 'resolveStoredPackage(', 'official discovery bypasses stored package')
   before(resolve, 'OfficialQuantApkPolicy.PACKAGE_NAME', 'resolveInstalledAppByLabel(', 'official discovery bypasses display name')
   assert.match(s.download, /openInstalledProjectApp\(activity, projectId, projectName\)/, 'project page launch is wired')
   assert.match(s.actions, /projectId\s*=\s*projectId/, 'project identity reaches downloader')
   assert.match(s.catalog, /INSERT OR IGNORE INTO projects\s*\(\s*id, name,[\s\S]*?VALUES \(\?1,[\s\S]*?params!\[\s*project\.id,\s*project\.name,/, 'catalog ID persists as project ID')
   assert.match(s.store, /fun parseStoreProject\(obj: JSONObject\) = StoreProject\(\s*id = obj\.getString\("id"\)/, 'Android retains server project ID')
-  assert.match(s.controller, /downloadProjectApk = \{\s*val space = activeSpace\s*openProjectApkDownload\(\s*activity,\s*space\?\.latestApkUrl,\s*space\?\.project\?\.id,/, 'project space passes stable ID into installation')
+  assert.match(s.controller, /downloadProjectApk = \{\s*val space = activeSpace\s*openProjectApkDownload\(\s*activity,\s*space\?\.latestApkUrl,\s*space\?\.project\?\.id,[\s\S]*officialServerUrl = serverUrl,/, 'project space passes stable ID and its active server into installation')
+  assert.match(s.apkDelivery, /project_id == OFFICIAL_QUANT_PROJECT_ID[\s\S]*android_download_route\(public_url, project_id\)/, 'published official release projects to the fixed public route')
+  assert.match(s.apkDelivery, /identity_url:\s*release_url\.to_owned\(\)/, 'release identity keeps the actual release URL')
+  assert.match(s.projectSpace, /apk_delivery::published_release_presentation\([\s\S]*&project\.id,[\s\S]*&state\.public_url,[\s\S]*&apk_url,[\s\S]*\)/, 'project space invokes the release projection')
+  assert.match(s.projectSpace, /url:\s*release\.download_url,[\s\S]*identity:\s*format!\("task:\{\}:\{\}:\{\}", task_id, updated_at, release\.identity_url\)/, 'project space exposes the stable URL while retaining release identity')
+
+  const target = functionSource(s.actions, 'resolveProjectApkDownloadTarget')
+  assert.match(target, /OfficialQuantApkPolicy\.appliesTo\(projectId\)/, 'public branch uses stable project ID')
+  assert.match(target, /officialServerUrl:\s*String\s*=\s*BuildConfig\.SERVER_URL/, 'official origin comes from the configured server')
+  assert.match(target, /val expectedUrl = officialQuantPublicApkUrl\(officialServerUrl\) \?: return null/, 'official route is derived from the trusted origin')
+  assert.match(target, /return ProjectApkDownloadTarget\(expectedUrl, isPublic = true\)/, 'catalog paths are replaced by the trusted tokenless route')
+  assert.match(target, /token\?\.trim\(\)\?\.takeIf\(String::isNotEmpty\) \?: return null/, 'private branch still requires token')
+  assert.match(target, /projectApkUrlWithToken\(cleanUrl, cleanToken\)/, 'private branch still appends token')
+  before(target, 'return ProjectApkDownloadTarget(expectedUrl, isPublic = true)', 'projectApkUrlWithToken(cleanUrl, cleanToken)', 'official return must precede private token assembly')
+  const publicUrl = functionSource(s.actions, 'officialQuantPublicApkUrl')
+  assert.match(publicUrl, /uri\.scheme\.equals\("http", ignoreCase = true\)[\s\S]*uri\.scheme\.equals\("https", ignoreCase = true\)/, 'trusted server only allows HTTP or HTTPS')
+  for (const gate of ['uri.host.isNullOrBlank()', 'uri.userInfo != null', 'uri.rawQuery != null', 'uri.rawFragment != null',
+    'uri.rawPath.orEmpty().isNotEmpty()']) assert.ok(publicUrl.includes(gate), `trusted server gate: ${gate}`)
+  assert.match(publicUrl, /return cleanBase \+ OFFICIAL_QUANT_PUBLIC_APK_PATH/, 'trusted server receives only the fixed route')
+  const client = functionSource(s.actions, 'projectApkDownloadClient')
+  assert.match(client, /if \(!target\.isPublic\) return authenticatedClient/, 'private downloads keep their authenticated client')
+  assert.match(client, /OkHttpClient\.Builder\(\)[\s\S]*followRedirects\(false\)[\s\S]*followSslRedirects\(false\)/, 'public client drops interceptors and redirects')
+  const download = functionSource(s.download, 'openProjectApkDownload')
+  assert.match(download, /officialServerUrl:\s*String\s*=\s*BuildConfig\.SERVER_URL/, 'download entry accepts the active trusted server')
+  assert.match(download, /val officialQuant = OfficialQuantApkPolicy\.appliesTo\(projectId\)/)
+  assert.match(download, /if \(officialQuant\) null else AuthManager\.token\(activity\)\?\.trim\(\)/, 'official branch must not read a login token')
+  assert.match(download, /if \(!officialQuant && token\.isNullOrBlank\(\)\)/, 'only private downloads require login')
+  assert.match(download, /openProjectApkInstall\([\s\S]*officialServerUrl,[\s\S]*\)/, 'active trusted server reaches installer')
+  const install = functionSource(s.actions, 'openProjectApkInstall')
+  assert.match(install, /resolveProjectApkDownloadTarget\(\s*apkUrl,\s*projectId,\s*token,\s*officialServerUrl,\s*\)/, 'download target policy receives the active trusted server')
+  assert.match(install, /url = target\.url/, 'installer must use the policy result')
+  assert.match(install, /http = projectApkDownloadClient\(http, target\)/, 'installer must use the isolated public client')
+  assert.doesNotMatch(install, /url = projectApkUrlWithToken\(/, 'installer cannot append token outside the policy')
 
   const launch = functionSource(s.launcher, 'openOfficialQuantApp')
   assert.match(launch, /readInstalledPackageInfo\(manager, OfficialQuantApkPolicy\.PACKAGE_NAME\)/)
@@ -120,18 +155,27 @@ verify(sources)
 let mutations = 0
 for (const [key, from, to] of [
   ['policy', pin, '0'.repeat(64)],
-  ['policy', 'MIN_VERSION_CODE = 2L', 'MIN_VERSION_CODE = 1L'],
+  ['policy', 'MIN_VERSION_CODE = 5L', 'MIN_VERSION_CODE = 2L'],
   ['policy', 'currentSigners == setOf(SIGNER_SHA256)', 'currentSigners.contains(SIGNER_SHA256)'],
   ['guard', 'info.signingInfo?.apkContentsSigners', 'info.signingInfo?.signingCertificateHistory'],
   ['installer', 'inspectProjectApkSignature(activity, apkFile, projectId)', 'inspectProjectApkSignature(activity, apkFile)'],
   ['actions', 'return openOfficialQuantApp(activity)', 'openOfficialQuantApp(activity)'],
-  ['actions', 'return resolveInstalledPackage(activity, OfficialQuantApkPolicy.PACKAGE_NAME)', 'resolveInstalledPackage(activity, OfficialQuantApkPolicy.PACKAGE_NAME)'],
+  ['actions', 'currentPackageSignerSha256(installed)', 'setOf(OfficialQuantApkPolicy.SIGNER_SHA256)'],
   ['launcher', 'currentPackageSignerSha256(installed)', 'setOf(OfficialQuantApkPolicy.SIGNER_SHA256)'],
   ['launcher', 'setComponent(component)', 'setComponent(component)\nputExtra("credential", "value")'],
   ['launcher', '!target.exported', 'false'],
   ['installer', 'createOfficialQuantApkFile(activity.cacheDir)', 'createOfficialQuantApkFile(activity.getExternalFilesDir(null))'],
   ['installer', 'check(apkFile.setReadOnly())', 'apkFile.setReadOnly()'],
   ['paths', 'path="official-quant-apk/"', 'path="."'],
+  ['actions', 'return ProjectApkDownloadTarget(expectedUrl, isPublic = true)', 'return ProjectApkDownloadTarget(cleanUrl, isPublic = true)'],
+  ['actions', 'uri.host.isNullOrBlank()', 'false'],
+  ['actions', 'uri.scheme.equals("https", ignoreCase = true)', 'uri.scheme.equals("ftp", ignoreCase = true)'],
+  ['actions', '.followRedirects(false)', '.followRedirects(true)'],
+  ['actions', 'http = projectApkDownloadClient(http, target)', 'http = http'],
+  ['download', 'if (officialQuant) null else AuthManager.token(activity)?.trim()', 'AuthManager.token(activity)?.trim()'],
+  ['controller', 'officialServerUrl = serverUrl', 'officialServerUrl = BuildConfig.SERVER_URL'],
+  ['apkDelivery', 'project_id == OFFICIAL_QUANT_PROJECT_ID', 'false'],
+  ['projectSpace', 'release.identity_url', 'release.download_url'],
 ]) {
   assert.ok(sources[key].includes(from), `mutation anchor missing: ${key}`)
   assert.throws(() => verify({ ...sources, [key]: sources[key].replace(from, to) }), `regression undetected: ${key}`)

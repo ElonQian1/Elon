@@ -42,7 +42,7 @@ ESK 保持同一种服务支付、治理和经批准利润快照参与资产；�
 | 用户资产一致性 | 主个人资产、完整审核流水与卖回已具备；新版跨 APK 同快照额度/申请进度两端已实现；生产卖回政策默认关闭 | 完成新版正式子包和批准政策下的本人验收；Paper 不计正式资产，申请不等于成交或付款 |
 | 真实上链准备 | Currency 3/3、Participation 13/13 Move 回归通过；发布、Currency、六桶分配三个只读观察器代码已验证；只有无关公开 schema 探测，没有真实 ESK 发布回执 | 批准真实参数与职责地址并明确授权 testnet → 发布/注册/分配 → 三观察器双源正向复核 → 地址控制、源码与终局性 Evidence/Manifest V2 |
 | 历史用户交付 | 付款事实及实际映射不能由代码猜测 | dry-run 对账与去重 → 经审批的入账/claim → 可追溯结转，余额不双计 |
-| 量化与安装闭环 | 新版唯一“我的 ESK”接收端 0.5.0 源码已推送、69 项 Android 测试通过，未正式签名/上传；旧原生桥已退役 | 使用子项目受控签名和编辑者上传流程，完成广场安装与双 APK 本人验收；QSHARE 对账独立验收 |
+| 量化与安装闭环 | 新版唯一“我的 ESK”接收端 0.5.0 源码已推送；主端公开下载已改为无登录、无 bearer，且只接受 versionCode 5 及以上；旧原生桥和旧包兼容均已退役，0.5 仍未正式签名/上传 | 先用子项目既有证书受控签名并由项目编辑者上传 0.5，再同步目录/服务器并发布主 APK，最后完成广场安装与双 APK 本人验收；QSHARE 对账独立验收 |
 
 链上查询见 [发布只读观察器 V1](esk-sui-publication-observer-v1.md) 和
 [规范 Currency 与固定供应观察器 V1](esk-sui-currency-observer-v1.md)；
@@ -56,6 +56,9 @@ ESK 保持同一种服务支付、治理和经批准利润快照参与资产；�
 唯一 Cap、Lamport 版本与守恒，但所有认证、余额和 manifest 晋级标志仍固定为 false。
 Android 授权前置身份切片见 [官方量化 APK 身份校验 V1](yilong-quant-android-identity-v1.md)；
 该切片不等于本人资产授权已经接通，实际验证与发布见其交付记录。
+[新版唯一公共下载 V2](yilong-quant-android-public-download-v2.md)已经移除官方量化的
+登录前置和 URL bearer，并把最低版本固定为 5；源码验证和仍待完成的正式发布顺序见
+其[交付记录](../delivery/yilong-quant-android-public-download-v2.md)。
 主项目资产现状入口：`server/src/esk_asset/service.rs`、
 `server/src/store/common/esk_assets.rs`、
 `android/app/src/main/kotlin/com/elon/app/esk/EskAssetApi.kt`。

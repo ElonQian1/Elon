@@ -108,7 +108,7 @@ internal class ProjectSpaceController(
                 space?.project?.id,
                 space?.project?.name,
                 space?.latestApkIdentity,
-                space?.latestApkUpdatedAt
+                space?.latestApkUpdatedAt, officialServerUrl = serverUrl,
             )
         },
         replaceProjectPreviewImage = { space, slot -> replaceProjectPreviewImage(space, slot) }

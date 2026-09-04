@@ -8,11 +8,20 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import okhttp3.OkHttpClient
 import java.io.File
+import java.net.URI
 import java.net.URLEncoder
 import java.time.Instant
 import java.util.Locale
 
 internal fun isAndroidApkInstallSupported(): Boolean = Build.VERSION.SDK_INT > 0
+
+private const val OFFICIAL_QUANT_PUBLIC_APK_PATH =
+    "/api/store/projects/yilong-quant/downloads/android"
+
+internal data class ProjectApkDownloadTarget(
+    val url: String,
+    val isPublic: Boolean,
+)
 
 internal fun cleanProjectApkUrl(apkUrl: String?): String? {
     val trimmedUrl = apkUrl?.trim().orEmpty()
@@ -50,14 +59,58 @@ internal fun projectApkUrlWithToken(apkUrl: String, token: String): String {
     return "$trimmedUrl${separator}token=$encodedToken"
 }
 
+internal fun resolveProjectApkDownloadTarget(
+    apkUrl: String?,
+    projectId: String?,
+    token: String?,
+    officialServerUrl: String = BuildConfig.SERVER_URL,
+): ProjectApkDownloadTarget? {
+    val cleanUrl = cleanProjectApkUrl(apkUrl) ?: return null
+    if (OfficialQuantApkPolicy.appliesTo(projectId)) {
+        val expectedUrl = officialQuantPublicApkUrl(officialServerUrl) ?: return null
+        return ProjectApkDownloadTarget(expectedUrl, isPublic = true)
+    }
+    val cleanToken = token?.trim()?.takeIf(String::isNotEmpty) ?: return null
+    return ProjectApkDownloadTarget(
+        projectApkUrlWithToken(cleanUrl, cleanToken),
+        isPublic = false,
+    )
+}
+
+private fun officialQuantPublicApkUrl(serverUrl: String): String? {
+    val cleanBase = cleanProjectApkUrl(serverUrl)?.trimEnd('/') ?: return null
+    val uri = runCatching { URI(cleanBase) }.getOrNull() ?: return null
+    val allowedScheme = uri.scheme.equals("http", ignoreCase = true) ||
+        uri.scheme.equals("https", ignoreCase = true)
+    if (!allowedScheme || uri.host.isNullOrBlank() || uri.userInfo != null ||
+        uri.rawQuery != null || uri.rawFragment != null ||
+        uri.rawPath.orEmpty().isNotEmpty()
+    ) {
+        return null
+    }
+    return cleanBase + OFFICIAL_QUANT_PUBLIC_APK_PATH
+}
+
+internal fun projectApkDownloadClient(
+    authenticatedClient: OkHttpClient,
+    target: ProjectApkDownloadTarget,
+): OkHttpClient {
+    if (!target.isPublic) return authenticatedClient
+    return OkHttpClient.Builder()
+        .followRedirects(false)
+        .followSslRedirects(false)
+        .build()
+}
+
 internal fun openProjectApkInstall(
     activity: AppCompatActivity,
     apkUrl: String,
-    token: String,
+    token: String?,
     projectId: String? = null,
     projectName: String? = null,
     apkIdentity: String? = null,
     apkUpdatedAt: String? = null,
+    officialServerUrl: String = BuildConfig.SERVER_URL,
     http: OkHttpClient = OkHttpClient()
 ) {
     if (!isAndroidApkInstallSupported()) {
@@ -69,15 +122,26 @@ internal fun openProjectApkInstall(
         Toast.makeText(activity, "这个项目还没有可安装 APK", Toast.LENGTH_SHORT).show()
         return
     }
-    if (token.isBlank()) {
-        Toast.makeText(activity, "请先登录后安装 APK", Toast.LENGTH_SHORT).show()
+    val target = resolveProjectApkDownloadTarget(
+        apkUrl,
+        projectId,
+        token,
+        officialServerUrl,
+    )
+    if (target == null) {
+        val message = if (!OfficialQuantApkPolicy.appliesTo(projectId) && token.isNullOrBlank()) {
+            "请先登录后安装 APK"
+        } else {
+            "APK 下载地址不符合安全要求"
+        }
+        Toast.makeText(activity, message, Toast.LENGTH_SHORT).show()
         return
     }
 
     ApkChatInstaller.downloadAndInstall(
         activity = activity,
-        url = projectApkUrlWithToken(cleanUrl, token),
-        http = http,
+        url = target.url,
+        http = projectApkDownloadClient(http, target),
         projectId = projectId,
         projectName = projectName,
         apkIdentity = apkIdentity,
@@ -224,6 +288,18 @@ private fun resolveInstalledProjectApp(
     projectName: String
 ): InstalledProjectApp? {
     if (OfficialQuantApkPolicy.appliesTo(projectId)) {
+        val installed = readInstalledPackageInfo(
+            activity.packageManager,
+            OfficialQuantApkPolicy.PACKAGE_NAME,
+        ) ?: return null
+        if (!OfficialQuantApkPolicy.accepts(
+                installed.packageName,
+                currentPackageSignerSha256(installed),
+                installed.projectApkVersionCode(),
+            )
+        ) {
+            return null
+        }
         return resolveInstalledPackage(activity, OfficialQuantApkPolicy.PACKAGE_NAME)
     }
     if (projectId.isNotBlank()) {
