@@ -98,6 +98,14 @@
 
 ### 原生 ESK 快照 V1 / 量化 V24
 
+正式额度与卖回进度采用[独立 V1 需求](requirements/esk-platform-native-progress-v1.md)和
+[35+6N 字符串协议](contracts/esk-platform-android-progress-v1.md)，不扩展下述旧 17 字段或
+正式总量 21 字段协议。主端复用现成 sellback page，量化逐页明确授权后临时展示，
+无跨页拼接、网页登录绑定或写权限；当前状态与剩余工作见
+[交付记录](delivery/esk-platform-native-progress-v1.md)。量化仓库使用同名需求和共享 Kotlin 合同；
+复核命令为 `node scripts/check-esk-platform-progress-parity.js <独立量化根>`，只证明源码字节一致，
+不能代替 Android 生命周期、公开安装包或本人验收。
+
 双 APK 原生只读快照已实现：[需求](requirements/esk-native-snapshot-v1.md)、
 [17 字段合同](contracts/esk-android-snapshot-v1.md)。量化原生页面不接收主登录凭据，
 确认页只读取 HTTPS 主服务，HTTP 在读取 token 和创建请求前拒绝。

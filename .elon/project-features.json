@@ -6872,6 +6872,347 @@
       "updated_at_ms": 1788522780329
     },
     {
+      "id": "esk-platform-native-progress-v1",
+      "title": "ESK 正式额度与卖回进度跨 APK 只读交付",
+      "summary": "独立原生只读协议逐页授权同快照总量、占用、可申请量和卖回进度；冻结旧协议，无资金操作。",
+      "status": "implemented",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/esk-platform-native-progress-v1.md",
+        "content_hash": "28be14cf8526769afb7455ecaa4abaef680ee6b75cfc57964bbd05b73dd165b6",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "77e4e13176e0cd930fb821c274e47f956c18d0d3",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "0fe69d2e127bf5247e8a2122ad4accaf640357ec",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "platform-assets",
+      "tags": [],
+      "task_paths": [
+        "android/app/src/main/kotlin/com/elon/app/esk/platform/progress",
+        "android/app/src/main/kotlin/com/elon/eskcontract",
+        "docs/contracts/esk-platform-android-progress-v1.md"
+      ],
+      "dependencies": [
+        "esk-platform-native-provider-v1",
+        "esk-platform-sellback-requests-v1"
+      ],
+      "acceptance_criteria": [
+        "同快照额度与最多20条申请，严格字段与分页验证",
+        "官方签名/组件、逐页同意、短TTL、清页、无凭据与写授权",
+        "旧17/21兼容与两仓同字节合同",
+        "两端构建发布和真实本人验收分轴记录"
+      ],
+      "implementation_evidence": [
+        {
+          "path": ".gitattributes",
+          "content_hash": "17f3b1d0d162f96f8b1993690b9da8242c5b3a73514a115e2bbcfeca95545b01",
+          "locator": "",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "77e4e13176e0cd930fb821c274e47f956c18d0d3",
+            "head_blob_oid": "74150f9f7357af1922dfaec778b5f837e6724b15",
+            "worktree_blob_oid": "5409279077ba81f93370cf889c5ae69e7be66ffb",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/main/AndroidManifest.xml",
+          "content_hash": "6a8bb6603355d625bdb34497cb60dd97211baa3d53139c6a241cc48600e06313",
+          "locator": "",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "77e4e13176e0cd930fb821c274e47f956c18d0d3",
+            "head_blob_oid": "3b96863709cc4696558d2c387b150596eb8979a0",
+            "worktree_blob_oid": "5edf7ceefd6a8266595fb42353acbef9e6d4fe65",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/esk/platform/progress/EskPlatformProgressCaller.kt",
+          "content_hash": "b438542559eeaa7af8a3693bdbf406c1df1e1fea8da13a57247ed2b5338e1f23",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "77e4e13176e0cd930fb821c274e47f956c18d0d3",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "48011561d6fe23614b9af7dc39bd3a1e7e8dfda6",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/esk/platform/progress/EskPlatformProgressConsentActivity.kt",
+          "content_hash": "846989447483cc780b6a3e83b0003005022bbec4cd42aba18099c017497578d7",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "77e4e13176e0cd930fb821c274e47f956c18d0d3",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "f04821019be7a8ce826d1d81cc9384e4a66214b9",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/esk/platform/progress/EskPlatformProgressConsentView.kt",
+          "content_hash": "c576451b5671a96b5163d1a699e956d7b1009475718a76886910289dca1f46b1",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "77e4e13176e0cd930fb821c274e47f956c18d0d3",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "c7692b0cf4ec2a789d34deff80ae8e7480c29761",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/esk/platform/progress/EskPlatformProgressWire.kt",
+          "content_hash": "5a9d24c91253f902b8abfb7a615cfd6bf888370546839a212bdce2623229a06d",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "77e4e13176e0cd930fb821c274e47f956c18d0d3",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "3b5a68ba59bbf66e08f277bfff82c0eeb605babc",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/eskcontract/EskPlatformProgressContract.kt",
+          "content_hash": "241cedbc40992d8559b68d9baf042064d124544383a9fe43c001026f2e70a9a0",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "77e4e13176e0cd930fb821c274e47f956c18d0d3",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "fc3d9342b89f35ba350f9d8b4c68b2f9d3f8224f",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/eskcontract/EskPlatformProgressRows.kt",
+          "content_hash": "3eec4ca250c6f4497b17536fa16f58f15daae644f2182c1f7411e0b2d48deca8",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "77e4e13176e0cd930fb821c274e47f956c18d0d3",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "60ad35a7038703dca57d06b3355769c1cd762de8",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/main/res/layout/esk_platform_progress_consent_preview.xml",
+          "content_hash": "d181024e11759c5eb9872b39d7d0a5e9fc91dec5cbf0eb3a1500770faa55f93c",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "77e4e13176e0cd930fb821c274e47f956c18d0d3",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "faa37412e4c9ea8f78e56a7605779921937461fa",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/esk/platform/progress/EskPlatformProgressCallerTest.kt",
+          "content_hash": "f13fbba995a9944a17c482c2cb79f014910e2a66391a380e73bc244ff9129246",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "77e4e13176e0cd930fb821c274e47f956c18d0d3",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "835d6a94f64f2869bdec2fb6ae47912613609f20",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/esk/platform/progress/EskPlatformProgressProviderWiringTest.kt",
+          "content_hash": "bdc5f1b4719796019766564fbea1b1f429ae4356a39db62147847cabaeb7aab0",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "77e4e13176e0cd930fb821c274e47f956c18d0d3",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "dcd96e305820b5224039d09c63d202d4b926398f",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/esk/platform/progress/EskPlatformProgressWireTest.kt",
+          "content_hash": "656659dc13d19a08d26f03d5d442db6db414ad86f50ea1c78c4e2c4e9375df47",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "77e4e13176e0cd930fb821c274e47f956c18d0d3",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "bf47e16bb1421ffee757156167604e24fabe989a",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/eskcontract/EskPlatformProgressContractTest.kt",
+          "content_hash": "bb4f4a13bcd25634b000f005c85743b6cc0eed6990ae454d1c5bce23a4c308bf",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "77e4e13176e0cd930fb821c274e47f956c18d0d3",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "879dfd6d2ecee114872953736aa0699305203da9",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/eskcontract/EskPlatformProgressFixtures.kt",
+          "content_hash": "df60026f52e1a77ec159441d12730f762b7e026c64310f9377d9fe92045465d1",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "77e4e13176e0cd930fb821c274e47f956c18d0d3",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "d6e51adef0cd522ffcb3297acb9722654a938c82",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/eskcontract/EskPlatformProgressRowsTest.kt",
+          "content_hash": "f99447f37dfb256e992e16a8df6a1f3abb3ed179d2880798546edfc3c8a95b86",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "77e4e13176e0cd930fb821c274e47f956c18d0d3",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "d9db9eae1819c60712689d307e7bec510d5d85ed",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/eskcontract/EskPlatformSnapshotContractTest.kt",
+          "content_hash": "ce3eebeff0d96c7c014ec9c7b62ffdaa1924a4bc6833cf3c4b6b8713c4f30b7c",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "77e4e13176e0cd930fb821c274e47f956c18d0d3",
+            "head_blob_oid": "e99c2a1f54308a6f180c7fdcacf400565008b886",
+            "worktree_blob_oid": "e99c2a1f54308a6f180c7fdcacf400565008b886",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/eskcontract/EskSnapshotContractTest.kt",
+          "content_hash": "49f54f62a05335b2602b844cfb919b5eb60430619ea3c6647f7b6a82f3286e9b",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "77e4e13176e0cd930fb821c274e47f956c18d0d3",
+            "head_blob_oid": "18dbcd87c7e5a115630e0f406b6ff7a3db39a168",
+            "worktree_blob_oid": "18dbcd87c7e5a115630e0f406b6ff7a3db39a168",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "docs/contracts/esk-platform-android-progress-v1.md",
+          "content_hash": "9834411e7fac463a5803baae269ea59d96390088ffe0f477c75b5c90b42fc706",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "77e4e13176e0cd930fb821c274e47f956c18d0d3",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "2834d934802311bdbbf562fcfbb09385269def62",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "docs/delivery/esk-platform-native-progress-v1.md",
+          "content_hash": "27f4eabdb77b3fcd986a4d86e1eb17c8cea9bc6f2b46c70d26de4fbfef904512",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "77e4e13176e0cd930fb821c274e47f956c18d0d3",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "37f78872b1000b08270a6829addeaff4756e551b",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/check-esk-platform-progress-parity.js",
+          "content_hash": "420e0a54be70d866848054313786da8e7a1604a0cbda6a8a101004dc9c5b20d3",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "77e4e13176e0cd930fb821c274e47f956c18d0d3",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "7cb4feb21a97decf5d1a0698cd0ecf3937cc65af",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/test-esk-platform-progress-web-boundary.js",
+          "content_hash": "1fdc3e67a1e7f5fbfe0c1da750ac52ed52b7c86e1c6523c33cd507d6d4a16de5",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "77e4e13176e0cd930fb821c274e47f956c18d0d3",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "a3e0699b7c9550f39ad8555f804ade3785c91333",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/test-esk-platform-sellback-web-boundary.js",
+          "content_hash": "5f50238dde6bb05805ae9061621c2cd5f28ffbce05f4ef9c0f58e7c392b98019",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "77e4e13176e0cd930fb821c274e47f956c18d0d3",
+            "head_blob_oid": "ecb60f7e51e53cd30a8371dbd42ff0ba7f7f38c5",
+            "worktree_blob_oid": "ecb60f7e51e53cd30a8371dbd42ff0ba7f7f38c5",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/assets/web_page.html",
+          "content_hash": "bc24c2948e7e28d799151af52f6da5820acac966b5c1ee22a0e2f80f0b5f26d1",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "77e4e13176e0cd930fb821c274e47f956c18d0d3",
+            "head_blob_oid": "f0fd20a1183b61d9e0c95497db3b60c95893518b",
+            "worktree_blob_oid": "48ce3c05fb6e216681b1035c057605974e790d7c",
+            "state": "tracked_modified"
+          }
+        }
+      ],
+      "created_at_ms": 1788536023679,
+      "updated_at_ms": 1788537333040
+    },
+    {
       "id": "esk-platform-native-provider-v1",
       "title": "正式 ESK 原生摘要授权提供端 V1",
       "summary": "独立正式来源原生显式同意提供端，复用本人账本读取与会话门禁；不放宽 Paper，不传身份或凭据，量化接收端独立交付。",
@@ -18410,66 +18751,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_9fbf6604abb04d72a87a0123cba6826b",
-      "feature_id": "esk-paper-quant-cross-repo-interoperability-v4",
-      "action": "transitioned",
-      "actor": "codex-root-esk-interop-v4",
-      "reason": "Fixed vector, main serializer/verifier tests, and offline two-repository runner are implemented.",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1788334743460
-    },
-    {
-      "id": "feature_event_17d97a9111f54488b04c542c4f2b475a",
-      "feature_id": "esk-paper-quant-cross-repo-interoperability-v4",
-      "action": "evidence_recorded",
-      "actor": "Codex",
-      "reason": "",
-      "from_status": "implemented",
-      "to_status": "implemented",
-      "at_ms": 1788335876488
-    },
-    {
-      "id": "feature_event_3b3a346643ea487199fc363587e74cda",
-      "feature_id": "esk-paper-quant-cross-repo-interoperability-v4",
-      "action": "transitioned",
-      "actor": "Codex",
-      "reason": "Clean two-repository offline runner passed 4 main and 1 quant interoperability tests; full validation evidence is recorded.",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1788335895219
-    },
-    {
-      "id": "feature_event_aafcbe7a53aa4e44aecabadd4f7ff3d4",
-      "feature_id": "esk-paper-quant-cross-repo-interoperability-v4",
-      "action": "transitioned",
-      "actor": "Codex",
-      "reason": "Verified implementation and acceptance documentation are ready for the shared main branch; this release does not claim environment deployment.",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1788335912192
-    },
-    {
-      "id": "feature_event_fd579b069a264f829b76ef3811d4d17e",
-      "feature_id": "esk-paper-quant-cross-repo-asset-view-v5",
-      "action": "registered",
-      "actor": "Codex",
-      "reason": "The persistent Paper-only goal explicitly prioritizes a verified main-to-quant user-visible ESK balance flow.",
-      "from_status": "",
-      "to_status": "accepted",
-      "at_ms": 1788336989115
-    },
-    {
-      "id": "feature_event_0ab397adf3e24a4e804ba276a14a05c2",
-      "feature_id": "esk-paper-quant-cross-repo-asset-view-v5",
-      "action": "transitioned",
-      "actor": "Codex",
-      "reason": "Requirement and non-goals are reviewed; V4 dependency is released and the file boundary is independent.",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1788337009387
-    },
-    {
       "id": "feature_event_269f7fdc4f184c46a996ec1be17d4139",
       "feature_id": "esk-paper-quant-cross-repo-asset-view-v5",
       "action": "claimed",
@@ -20408,6 +20689,66 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1788535097440
+    },
+    {
+      "id": "feature_event_1e0cadce4ca14a07ba1480295611abf8",
+      "feature_id": "esk-platform-native-progress-v1",
+      "action": "registered",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1788536023679
+    },
+    {
+      "id": "feature_event_485a6250e9934acfb43f9b22c9408b94",
+      "feature_id": "esk-platform-native-progress-v1",
+      "action": "claimed",
+      "actor": "codex-esk-progress",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788536024184
+    },
+    {
+      "id": "feature_event_3d8c1033eb1245ce8cd5e5c3afcd9ec7",
+      "feature_id": "esk-platform-native-progress-v1",
+      "action": "transitioned",
+      "actor": "codex-esk-progress",
+      "reason": "主/量化现有源码核实缺口，双仓协议及职责已明确",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788536033039
+    },
+    {
+      "id": "feature_event_33e7ee06a0c841c7af55108b90f28b2c",
+      "feature_id": "esk-platform-native-progress-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-esk-progress",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788537285930
+    },
+    {
+      "id": "feature_event_f45a44d2ddc345b88c2cd7c6003f308d",
+      "feature_id": "esk-platform-native-progress-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-esk-progress",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788537288571
+    },
+    {
+      "id": "feature_event_681d7710f14f436d904c6b225059faeb",
+      "feature_id": "esk-platform-native-progress-v1",
+      "action": "transitioned",
+      "actor": "codex-esk-progress",
+      "reason": "当前主提供端和共享合同已实现；270 Android及网页边界通过，量化155 Android通过；发布/最低主版本/本人验收分轴待办",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1788537333040
     }
   ]
 }

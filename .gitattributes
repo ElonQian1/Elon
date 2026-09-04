@@ -13,3 +13,9 @@ docs/contracts/esk-android-snapshot-v1.md text eol=lf
 android/app/src/main/kotlin/com/elon/eskcontract/EskPlatformSnapshotContract.kt text eol=lf
 android/app/src/test/kotlin/com/elon/eskcontract/EskPlatformSnapshotContractTest.kt text eol=lf
 docs/contracts/esk-platform-android-snapshot-v1.md text eol=lf
+# Formal progress contract and synthetic vectors are shared byte-for-byte.
+android/app/src/main/kotlin/com/elon/eskcontract/EskPlatformProgressContract.kt text eol=lf
+android/app/src/main/kotlin/com/elon/eskcontract/EskPlatformProgressRows.kt text eol=lf
+android/app/src/test/kotlin/com/elon/eskcontract/EskPlatformProgressContractTest.kt text eol=lf
+android/app/src/test/kotlin/com/elon/eskcontract/EskPlatformProgressRowsTest.kt text eol=lf
+android/app/src/test/kotlin/com/elon/eskcontract/EskPlatformProgressFixtures.kt text eol=lf
