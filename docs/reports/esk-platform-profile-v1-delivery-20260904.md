@@ -14,7 +14,7 @@ owners: [platform-assets, android]
 
 | 能力 | implementation_status | verification_status | delivery_status | acceptance_status |
 | --- | --- | --- | --- | --- |
-| 个人中心独立正式入口与原生数量/最近流水 | implemented | offline_passed | deployed（APK 1.1.1506） | deferred：实际账户待验收 |
+| 个人中心独立正式入口与原生数量/最近流水 | implemented | offline_passed | deployed（APK 1.1.1507） | deferred：实际账户待验收 |
 | 严格来源、金额与历史校验 | implemented | offline_passed（32 项） | deployed | pending：仅合成数据验证 |
 | 私有传输、会话/请求代次与清除 | implemented | offline_passed（25 项） | deployed | deferred：Android 生命周期实测待补 |
 | Web 对应正式来源说明/主 APK 下载入口 | implemented | environment_passed（公开入口） | deployed | pending：不读取正式私有余额 |
@@ -93,7 +93,18 @@ runtime、capability 和 Views scaffold；无 TARGET_DESIGN，未伪造参考图
 - 日志：`esk-platform-ui-publish-20260904-173541-375`。自动 ADB 安装明确 disabled；
   publisher 的附带 worktree 清理出现 Branch 属性 warning，后续统一 finish 单独验收。
 - 发布后把 Web 下载链接复用既有块级 `profile-row`（76px 触控），不改变 Android 生产输入；
-  对应静态模板补发及新增 AuthManager revision 接线测试在本报告后续提交记录。
+  发布器将 Android 单测也纳入输入范围，因此按正式流程重新封装，并未绕过来源检查。
+- **最终版本**：APK `1.1.1507` / build `1507`，来源
+  `3012c5fbd717bd8db862590fe5c240a6099c9225`，39,665,591 字节，SHA-256
+  `be960d17660e84ffb5498b39292febbf5bfc3f7dcd607da666fdfa70e35562ab`。
+  公开 version.json、实际本地文件哈希和正式签名均核对通过；签名证书 SHA-256
+  `f79567cf8a7e610e218aa4b7a1292be93a9623d9bc06a9bafbf47b030f99010c`。
+- 最终 PWA 静态模板与 APK 两阶段均 passed，日志
+  `esk-platform-final-publish-20260904-174548-451`，耗时 310.9 秒。
+  公网页面 HTTP 200，再次检出正式入口、块级下载、原生私有说明与 HTTP 不可用提示。
+
+本批按路由读取约 19 份入口、需求和领域规范（粗估约 24k 文本 token）；未全读
+docs、Prompt、Agent、Skill 目录，未把历史讨论或报告提升为需求真源。
 
 安全传输仍待用户选择；未安装证书、未更改 HTTP 服务，也未读取真实登录凭据。
 历史用户仍需核对付款、映射、用途和审核后才可登记。当前量化 V24 的正式签名 APK

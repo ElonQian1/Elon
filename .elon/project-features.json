@@ -6390,7 +6390,7 @@
       "id": "esk-platform-profile-v1",
       "title": "主项目正式 ESK 平台登记个人入口 V1",
       "summary": "原生独立只读正式平台数量与最近流水，严格来源和会话隔离；网页标注原生入口，保留 Paper 和 IPC。",
-      "status": "verified",
+      "status": "released",
       "priority": "p0",
       "requirement": {
         "path": "docs/requirements/esk-platform-profile-v1.md",
@@ -6678,13 +6678,13 @@
         }
       ],
       "created_at_ms": 1788513355363,
-      "updated_at_ms": 1788515068015
+      "updated_at_ms": 1788515527722
     },
     {
       "id": "esk-platform-recorded-assets-v1",
       "title": "ESK 经审核付款的平台登记账本 V1",
       "summary": "补齐真实管理员准备、摘要确认和付款键唯一正式平台登记，独立本人来源读取；旧 Paper 不变，生产写入默认关闭，未上链且不执行资金操作。",
-      "status": "verified",
+      "status": "released",
       "priority": "p0",
       "requirement": {
         "path": "docs/requirements/esk-platform-recorded-assets-v1.md",
@@ -6918,7 +6918,7 @@
         }
       ],
       "created_at_ms": 1788509896487,
-      "updated_at_ms": 1788511959680
+      "updated_at_ms": 1788515528242
     },
     {
       "id": "esk-sui-genesis-foundation-v1",
@@ -17056,26 +17056,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_e4b3ea7cc9e74d2b87d0c17161c77d5c",
-      "feature_id": "yilong-quant-esk-paper-asset-projection-v1",
-      "action": "evidence_recorded",
-      "actor": "codex/root",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788304675180
-    },
-    {
-      "id": "feature_event_fc1fc0517fcd44c383bd874fd6dbc96c",
-      "feature_id": "yilong-quant-esk-paper-asset-projection-v1",
-      "action": "transitioned",
-      "actor": "codex/root",
-      "reason": "主项目签发、能力协商、exact-origin 投递、官方目录同步和契约测试已实现。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1788304724124
-    },
-    {
       "id": "feature_event_6dc3c4e3fbfe493a90ec345ff48bce95",
       "feature_id": "yilong-quant-esk-paper-asset-projection-v1",
       "action": "transitioned",
@@ -19054,6 +19034,26 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1788515068015
+    },
+    {
+      "id": "feature_event_c69eb23239bd429fb6c721ada78a6ed8",
+      "feature_id": "esk-platform-profile-v1",
+      "action": "transitioned",
+      "actor": "codex-esk-first-user",
+      "reason": "正式APK1.1.1507/source3012c5fbd717bd8db862590fe5c240a6099c9225及Web静态模板已发布；104项通过，版本/签名/sha256/公开入口验证。真实私有账户、视觉帧与资金入账仍单列未验收，不代表长期Goal完成。",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1788515527722
+    },
+    {
+      "id": "feature_event_15393bb8718d4d55b0d74155d6a70d4b",
+      "feature_id": "esk-platform-recorded-assets-v1",
+      "action": "transitioned",
+      "actor": "codex-esk-first-user",
+      "reason": "补记既有主服务0.3.1724/5fc7869b5b2560417af26b33f0b09ca749fc9bb1正式发布事实，当前公开版本再次核对一致；上一批42+4测试和四路由401/no-store已通过。不启用写入或代表真实用户入账。",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1788515528242
     }
   ]
 }
