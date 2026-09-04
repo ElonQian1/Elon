@@ -16,12 +16,16 @@ owners: [platform-assets, protocol]
 | 能力 | implementation_status | verification_status | delivery_status | acceptance_status |
 | --- | --- | --- | --- | --- |
 | 原发布观察器共享传输兼容 | implemented | integration_passed | pushed | accepted：内存传输合同，不是 ESK 发行 |
-| 规范 Currency/历史注册/固定供应双源观察 | implemented | integration_passed | not_started | pending：真实 ESK 参数与双源 |
-| 非 ESK 官方公开 schema 检查 | implemented | environment_passed | not_started | accepted：仅公开 schema，不替代 ESK 验收 |
+| 规范 Currency/历史注册/固定供应双源观察 | implemented | integration_passed | pushed | pending：真实 ESK 参数与双源 |
+| 非 ESK 官方公开 schema 检查 | implemented | environment_passed | pushed | accepted：仅公开 schema，不替代 ESK 验收 |
 | 主项目/量化用户资产上线验收 | partial：复用前批交付 | user_action_required | 本批不发布 | deferred：审批/受保护登录/安装授权 |
 
 纯传输抽取已独立提交并推送：`0a9631c36226192e48986984be46a8b6dcfee5df`。
-新能力代码与正式证据收尾尚待本批推送，后续状态更新不得仅凭此段认定已上线。
+新能力源码、锁定依赖、测试及需求已提交并推送至 main：
+`17d9fc49f39c4dea03053a05c0039026dd533c21`。
+本批是 `CodePushed`，没有服务器/APK 改动，不重发应用；真实 ESK 上线仍未验收。
+工具状态按本批测试显式登记为 verified，含义是本需求限定的只读工具已验证，
+不是 ESK 实际发行已完成。文档/注册表收尾提交通过正常 Git 流程保留。
 
 ## 已执行验证
 
@@ -61,7 +65,8 @@ owners: [platform-assets, protocol]
 
 原 `esk-sui-publication-observer-v1` 的旧证据绑定含被本轮纯抽取修改的文件，
 路线图也经历后续资产交付。已明确重开并重新认领以回归验证当前合同，随后通过
-工具重绑实际源码和测试；不手改旧哈希，不假称旧证明自动覆盖新源码。
+工具重绑 9 条实际源码/测试/文档证据，恢复 verified 且漂移检查为 0；
+不手改旧哈希，不假称旧证明自动覆盖新源码。
 新功能登记为 `esk-sui-currency-observer-v1`。两者不声明完整链上发行已验收。
 
 ## 剩余缺口与下一步
