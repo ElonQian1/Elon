@@ -1,5 +1,5 @@
 use anyhow::Result;
-use rusqlite::params;
+use rusqlite::{params, Connection};
 use sha2::{Digest, Sha256};
 
 use crate::{
@@ -31,103 +31,114 @@ impl Store {
         let cursor = cursor.map(PlatformHistoryCursor::parse).transpose()?;
         let mut conn = self.conn()?;
         let tx = conn.transaction()?;
-        ensure_session(&tx, user_id, session_token, false)?;
-        ensure_recording_integrity(&tx)?;
-        let policy = policy_on(&tx)?;
-        if let Some(policy) = policy.as_ref() {
-            validate_policy_integrity(policy).map_err(|_| PlatformError::CorruptLedger)?;
-        }
-        let mut fingerprint = SnapshotFingerprint::new(
-            user_id,
-            policy.as_ref().map(|value| value.policy_digest.as_str()),
-        );
-        let mut page = PlatformHistoryPage {
-            snapshot_digest: String::new(),
-            total_base_units: 0,
-            entry_count: 0,
-            range_start: 0,
-            range_end: 0,
-            updated_at: None,
-            entries: Vec::with_capacity(limit),
-            has_more: false,
-            next_cursor: None,
-        };
-        let mut statement = tx.prepare(
-            "SELECT entry_id, allocation_id, amount_base_units, created_at
-               FROM esk_platform_ledger_entries WHERE user_id = ?1
-              ORDER BY created_at DESC, entry_id DESC",
-        )?;
-        let mut rows = statement.query(params![user_id])?;
-        let mut anchor_position = None;
-        while let Some(row) = rows.next()? {
-            let entry = PlatformEntry {
-                entry_id: row.get(0)?,
-                allocation_id: row.get(1)?,
-                amount_base_units: row.get(2)?,
-                created_at: row.get(3)?,
-            };
-            let policy = policy.as_ref().ok_or(PlatformError::CorruptLedger)?;
-            let allocation = record_on(&tx, &entry.allocation_id, policy)?
-                .ok_or(PlatformError::CorruptLedger)?;
-            if !valid_history_entry_id(&entry.entry_id)
-                || entry.amount_base_units <= 0
-                || allocation.input.user_id != user_id
-                || allocation.input.amount_base_units != entry.amount_base_units
-                || allocation.recorded_at.as_deref() != Some(entry.created_at.as_str())
-            {
-                return Err(PlatformError::CorruptLedger.into());
-            }
-            page.total_base_units = page
-                .total_base_units
-                .checked_add(entry.amount_base_units)
-                .ok_or(PlatformError::CorruptLedger)?;
-            page.entry_count = page
-                .entry_count
-                .checked_add(1)
-                .ok_or(PlatformError::CorruptLedger)?;
-            if page.total_base_units > policy.issuance_limit_base_units {
-                return Err(PlatformError::CorruptLedger.into());
-            }
-            if page.updated_at.is_none() {
-                page.updated_at = Some(entry.created_at.clone());
-            }
-            fingerprint.entry(&entry);
-            // Keep scanning after the page fills: an off-page change or corrupt
-            // record must invalidate the complete snapshot, not become invisible.
-            let after_anchor = cursor.is_none() || anchor_position.is_some();
-            if after_anchor && page.entries.len() < limit {
-                if page.entries.is_empty() {
-                    page.range_start = page.entry_count;
-                }
-                page.range_end = page.entry_count;
-                page.entries.push(entry.clone());
-            }
-            if cursor
-                .as_ref()
-                .is_some_and(|value| value.after_entry_id == entry.entry_id)
-            {
-                anchor_position = Some(page.entry_count);
-            }
-        }
-        drop(rows);
-        drop(statement);
-        page.snapshot_digest = fingerprint.finish();
-        if let Some(cursor) = cursor {
-            if cursor.snapshot_digest != page.snapshot_digest
-                || anchor_position.is_none()
-                || anchor_position == Some(page.entry_count)
-            {
-                return Err(PlatformError::HistoryChanged.into());
-            }
-        }
-        page.has_more = page.range_end < page.entry_count;
-        if page.has_more {
-            let last = page.entries.last().ok_or(PlatformError::CorruptLedger)?;
-            page.next_cursor = Some(format!("ephp1.{}.{}", page.snapshot_digest, last.entry_id));
-        }
+        let page =
+            scan_authenticated_history_on(&tx, user_id, session_token, limit, cursor.as_ref())?;
         tx.commit()?;
         Ok(page)
     }
+}
+
+/// The caller owns the transaction; scanning never opens another connection.
+/// Every use still validates the real session in that same SQLite snapshot.
+pub(super) fn scan_authenticated_history_on(
+    conn: &Connection,
+    user_id: &str,
+    session_token: &str,
+    limit: usize,
+    cursor: Option<&PlatformHistoryCursor>,
+) -> Result<PlatformHistoryPage> {
+    ensure_session(conn, user_id, session_token, false)?;
+    ensure_recording_integrity(conn)?;
+    let policy = policy_on(conn)?;
+    if let Some(policy) = policy.as_ref() {
+        validate_policy_integrity(policy).map_err(|_| PlatformError::CorruptLedger)?;
+    }
+    let mut fingerprint = SnapshotFingerprint::new(
+        user_id,
+        policy.as_ref().map(|value| value.policy_digest.as_str()),
+    );
+    let mut page = PlatformHistoryPage {
+        snapshot_digest: String::new(),
+        total_base_units: 0,
+        entry_count: 0,
+        range_start: 0,
+        range_end: 0,
+        updated_at: None,
+        entries: Vec::with_capacity(limit),
+        has_more: false,
+        next_cursor: None,
+    };
+    let mut statement = conn.prepare(
+        "SELECT entry_id, allocation_id, amount_base_units, created_at
+               FROM esk_platform_ledger_entries WHERE user_id = ?1
+              ORDER BY created_at DESC, entry_id DESC",
+    )?;
+    let mut rows = statement.query(params![user_id])?;
+    let mut anchor_position = None;
+    while let Some(row) = rows.next()? {
+        let entry = PlatformEntry {
+            entry_id: row.get(0)?,
+            allocation_id: row.get(1)?,
+            amount_base_units: row.get(2)?,
+            created_at: row.get(3)?,
+        };
+        let policy = policy.as_ref().ok_or(PlatformError::CorruptLedger)?;
+        let allocation =
+            record_on(conn, &entry.allocation_id, policy)?.ok_or(PlatformError::CorruptLedger)?;
+        if !valid_history_entry_id(&entry.entry_id)
+            || entry.amount_base_units <= 0
+            || allocation.input.user_id != user_id
+            || allocation.input.amount_base_units != entry.amount_base_units
+            || allocation.recorded_at.as_deref() != Some(entry.created_at.as_str())
+        {
+            return Err(PlatformError::CorruptLedger.into());
+        }
+        page.total_base_units = page
+            .total_base_units
+            .checked_add(entry.amount_base_units)
+            .ok_or(PlatformError::CorruptLedger)?;
+        page.entry_count = page
+            .entry_count
+            .checked_add(1)
+            .ok_or(PlatformError::CorruptLedger)?;
+        if page.total_base_units > policy.issuance_limit_base_units {
+            return Err(PlatformError::CorruptLedger.into());
+        }
+        if page.updated_at.is_none() {
+            page.updated_at = Some(entry.created_at.clone());
+        }
+        fingerprint.entry(&entry);
+        // Keep scanning after the page fills: an off-page change or corrupt
+        // record must invalidate the complete snapshot, not become invisible.
+        let after_anchor = cursor.is_none() || anchor_position.is_some();
+        if after_anchor && page.entries.len() < limit {
+            if page.entries.is_empty() {
+                page.range_start = page.entry_count;
+            }
+            page.range_end = page.entry_count;
+            page.entries.push(entry.clone());
+        }
+        if cursor.is_some_and(|value| value.after_entry_id == entry.entry_id) {
+            anchor_position = Some(page.entry_count);
+        }
+    }
+    drop(rows);
+    drop(statement);
+    page.snapshot_digest = fingerprint.finish();
+    if let Some(cursor) = cursor {
+        if cursor.snapshot_digest != page.snapshot_digest
+            || anchor_position.is_none()
+            || anchor_position == Some(page.entry_count)
+        {
+            return Err(PlatformError::HistoryChanged.into());
+        }
+    }
+    page.has_more = page.range_end < page.entry_count;
+    if page.has_more {
+        let last = page.entries.last().ok_or(PlatformError::CorruptLedger)?;
+        page.next_cursor = Some(format!("ephp1.{}.{}", page.snapshot_digest, last.entry_id));
+    }
+    Ok(page)
 }
 
 /// v1 encoding: domain, user, policy marker [+ digest], then four text fields
