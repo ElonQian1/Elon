@@ -6387,6 +6387,57 @@
       "updated_at_ms": 1788389637404
     },
     {
+      "id": "esk-platform-native-provider-v1",
+      "title": "正式 ESK 原生摘要授权提供端 V1",
+      "summary": "独立正式来源原生显式同意提供端，复用本人账本读取与会话门禁；不放宽 Paper，不传身份或凭据，量化接收端独立交付。",
+      "status": "in_progress",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/esk-platform-native-provider-v1.md",
+        "content_hash": "ba99c035babb42f4cf3a9db7a8c71a3d6f78ecada454b60e41f1b617398ab0a2",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "278bec4fe027bda49e4d03d7526c17d08f6b4142",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "6ffea4f5362d496d83a7b51e18aa13c35b32632e",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "platform-assets",
+      "tags": [
+        "esk",
+        "android",
+        "formal-platform"
+      ],
+      "task_paths": [
+        "android/app/src/main/kotlin/com/elon/app/esk/platform/handoff",
+        "android/app/src/main/kotlin/com/elon/eskcontract/EskPlatformSnapshotContract.kt",
+        "android/app/src/test/kotlin/com/elon/app/esk/platform/handoff",
+        "docs/requirements/esk-platform-native-provider-v1.md"
+      ],
+      "dependencies": [
+        "esk-platform-profile-v1"
+      ],
+      "acceptance_criteria": [
+        "新协议严格校验并保持 Paper 不变",
+        "可信调用方、显式同意和会话变更失败关闭",
+        "仅正式来源摘要且不含身份凭据",
+        "测试、APK发布与接收端剩余缺口分别记录"
+      ],
+      "implementation_evidence": [],
+      "claim": {
+        "claim_id": "claim_beb7c1c98f7f4c1e8816e9875beaf026",
+        "agent_id": "codex-esk-platform",
+        "claimed_at_ms": 1788516180185,
+        "expires_at_ms": 1788526980185
+      },
+      "created_at_ms": 1788516179636,
+      "updated_at_ms": 1788516223853
+    },
+    {
       "id": "esk-platform-profile-v1",
       "title": "主项目正式 ESK 平台登记个人入口 V1",
       "summary": "原生独立只读正式平台数量与最近流水，严格来源和会话隔离；网页标注原生入口，保留 Paper 和 IPC。",
@@ -17056,36 +17107,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_6dc3c4e3fbfe493a90ec345ff48bce95",
-      "feature_id": "yilong-quant-esk-paper-asset-projection-v1",
-      "action": "transitioned",
-      "actor": "codex/root",
-      "reason": "主项目生产 Rust check、PC TypeScript/Vite build、ESK/项目目录契约、量化完整 validate 与扩展 Paper E2E 已通过；主项目完整 test target 的既有 SQLite VFS 编译阻塞已留证。",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1788304732296
-    },
-    {
-      "id": "feature_event_da90151c20264ebd88725d377038e83e",
-      "feature_id": "compute-federation-interactive-desktop-v1",
-      "action": "requirement_rebound",
-      "actor": "codex",
-      "reason": "Rebind the requirement after the C0 source-contract hardening clarified the exact SessionReservation and authority-head invariants; no runtime or production effects are opened.",
-      "from_status": "blocked",
-      "to_status": "proposed",
-      "at_ms": 1788304968985
-    },
-    {
-      "id": "feature_event_d6e32303f1374bce84d092f5a4520016",
-      "feature_id": "compute-federation-interactive-desktop-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1788304981659
-    },
-    {
       "id": "feature_event_95008b1fe0544fb0b6068be5233712fc",
       "feature_id": "compute-federation-interactive-desktop-v1",
       "action": "transitioned",
@@ -19054,6 +19075,36 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1788515528242
+    },
+    {
+      "id": "feature_event_5edf5e5271634dd4b727ab5005c2d761",
+      "feature_id": "esk-platform-native-provider-v1",
+      "action": "registered",
+      "actor": "codex-esk-platform",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1788516179636
+    },
+    {
+      "id": "feature_event_aa93d28e39234cf1bc4cb46ffe9544ee",
+      "feature_id": "esk-platform-native-provider-v1",
+      "action": "claimed",
+      "actor": "codex-esk-platform",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788516180186
+    },
+    {
+      "id": "feature_event_d17dbc9f6c0c4a31b66a9173e53e952b",
+      "feature_id": "esk-platform-native-provider-v1",
+      "action": "transitioned",
+      "actor": "codex-esk-platform",
+      "reason": "",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788516223853
     }
   ]
 }
