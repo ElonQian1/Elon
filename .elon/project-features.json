@@ -15677,7 +15677,7 @@
       "id": "yilong-quant-android-identity-v1",
       "title": "官方量化 APK 安装与打开身份校验 V1",
       "summary": "官方项目固定包名、当前发布证书和显式启动入口，安装与打开均校验；不传凭据或资产，是后续本人 ESK APK 授权的身份基础。",
-      "status": "verified",
+      "status": "released",
       "priority": "p0",
       "requirement": {
         "path": "docs/requirements/yilong-quant-android-identity-v1.md",
@@ -15837,7 +15837,7 @@
         }
       ],
       "created_at_ms": 1788504334294,
-      "updated_at_ms": 1788505057339
+      "updated_at_ms": 1788505412947
     },
     {
       "id": "yilong-quant-android-main-hosting-v6",
@@ -16348,16 +16348,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_581f8ea04829490da191042a0353a424",
-      "feature_id": "yilong-quant-paper-public-deployment-contract-sync-v1",
-      "action": "claimed",
-      "actor": "codex-goal-quant-public-deployment-sync-v1",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788292997973
-    },
     {
       "id": "feature_event_2a7762cef1ee48eba2f81d02a4a7e503",
       "feature_id": "yilong-quant-paper-public-deployment-contract-sync-v1",
@@ -18347,6 +18337,16 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1788505057339
+    },
+    {
+      "id": "feature_event_ca6b883b6f8f43ad868c540c9a3a64d4",
+      "feature_id": "yilong-quant-android-identity-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "Main APK 1.1.1500 (1500) published from a8f4f052d; online metadata SHA matches signed local APK. Device deferred, no account handoff or funds; Goal remains active.",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1788505412947
     }
   ]
 }
