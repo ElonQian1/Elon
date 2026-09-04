@@ -1,7 +1,7 @@
 ---
 title: "ESK Sui 六桶分配只读观察器 V1"
 status: accepted
-implementation_status: planned
+implementation_status: verified
 owner: platform-assets, protocol
 priority: p0
 reviewed_at: 2026-09-05
@@ -16,8 +16,9 @@ decision_refs:
 ## 用户结果
 
 项目方和独立复核者可以只凭公开 Sui testnet GraphQL 数据，核对一笔 ESK 创世分配
-交易是否按已批准参数消费一次性能力和完整供应 Coin，生成唯一冻结回执、五枚普通
-用途 Coin 与一个团队锁仓对象，并在指定 checkpoint 复核团队锁仓仍满足守恒。
+交易是否按已批准参数消费一次性能力和完整供应 Coin，生成唯一冻结回执、四枚新建
+用途 Coin、一个变更后的安全储备 Coin 与一个团队锁仓对象，并在指定 checkpoint
+复核团队锁仓仍满足守恒。
 
 观察成功只表示两个不同公共 GraphQL 主机报告了相同的链上对象事实。它不签名、不
 广播、不移动资金，也不证明地址私钥控制、源码匹配、委员会签名终局性、用户余额、
@@ -75,11 +76,15 @@ decision_refs:
 每个来源在一次固定查询中读取：
 
 1. chain identifier；
-2. participation package、发布交易及其成功 checkpoint；
-3. allocation 交易的 sender、effects digest、成功状态、时间、checkpoint 与完整
+2. participation package，以及发布交易的 effects digest、Lamport version、成功
+   checkpoint 与完整 `objectChanges(first: 50)`；
+3. allocation 交易的 sender、effects digest、Lamport version、成功状态、时间、checkpoint 与完整
    `objectChanges(first: 50)`；`hasNextPage=true` 或 `hasPreviousPage=true` 均失败；
-4. cap 在参与包发布交易中的创建变化；
-5. 指定 observation checkpoint 及该时点的冻结回执和团队锁仓对象。
+4. 指定 observation checkpoint 的时间及该时点的冻结回执和团队锁仓对象。
+
+两笔交易的每个 object change 都必须具有完整 flags、地址和至少一个可识别状态；每个
+非空状态必须能明确分类为 Move object 或 Move package，并具有版本、digest、previous
+transaction 与对应内容。未知、空缺或不可分类节点整体失败，不能借“无关对象”忽略。
 
 allocation checkpoint 必须与交易 effects 完全一致；observation checkpoint 必须与
 输入摘要一致且序号不小于 allocation checkpoint。checkpoint 被称为“RPC 观察到”，
@@ -91,7 +96,9 @@ allocation checkpoint 必须与交易 effects 完全一致；observation checkpo
    合法 32 字节 Base58 摘要。
 2. `GenesisAllocationCap` 的 ID 与 BCS 内 UID 一致；它在 participation package 发布
    交易中唯一创建，在 allocation 输入态由 `allocator` 持有，并在同一交易中
-   `idDeleted=true`、`outputState=null`。
+   `idDeleted=true`、`outputState=null`。创建版本必须等于发布交易 Lamport version；
+   消费输入版本不得早于创建版本且必须小于 allocation Lamport version，同版本时
+   digest、previous transaction、BCS 和 owner 必须仍等于创建态。
 3. 初始供应对象是精确的 `0x2::coin::Coin<currency::esk::ESK>`，BCS 余额等于完整
    固定供应，allocation 输入态 owner 为 `allocator`。
 4. 冻结 `GenesisAllocationReceipt` 在 allocation 中创建，类型精确属于 participation
@@ -104,6 +111,8 @@ allocation checkpoint 必须与交易 effects 完全一致；observation checkpo
    Coin 是新建输出；团队结果是新建锁仓对象。
 7. 安全储备不是新 Coin：其对象 ID 必须等于初始供应 Coin ID，变化必须同时具有
    输入与输出、不能标为创建或删除；输出 BCS 余额为安全储备金额且 owner 为 treasury。
+   输入版本必须小于输出版本，输出版本等于 allocation Lamport version；同一交易
+   新建的回执、团队锁仓和四枚用途 Coin 也必须等于该 Lamport version。
 8. 五个普通 Coin/安全储备只核验 allocation 交易的历史输出，不要求在以后仍存在、
    仍保持原余额或仍由原地址持有。当前持仓和用户余额必须由另一项分页余额投影实现。
 9. allocation 交易中若出现额外 ESK Coin、额外 Receipt、额外 TeamVesting 或额外
@@ -119,8 +128,10 @@ allocation checkpoint 必须与交易 effects 完全一致；observation checkpo
    total 和时间表不得变化，版本不得早于创建态。
 4. 当前态允许已经领取，但必须满足 `0 <= claimed <= total` 且
    `claimed + remaining == total`。
-5. 回执 `executed_at_ms <= start_ms`；交易/checkpoint 时间必须是有效 RFC3339，且不
-   早于回执执行时间。观察器不根据本机时间推算应领取量。
+5. 回执 `executed_at_ms <= start_ms`；交易与 observation checkpoint 时间必须是严格
+   有效的 UTC RFC3339 日历时间，且都不早于回执执行时间；observation 时间不得早于
+   allocation 交易时间。同一 checkpoint 的两个时间必须精确落在同一毫秒。观察器
+   不根据本机时间推算应领取量。
 
 ## BCS 解码边界
 
@@ -159,8 +170,9 @@ JavaScript number 精度损失。证据只输出 BCS SHA-256，不回显原始 B
 4. 固定 query 不含 mutation、simulate 或 execute，所有变量来自严格规范化输入，并
    继续使用既有安全 transport。
 5. CLI 坏参数在零网络请求下退出 1；`--help` 明确只读边界；成功/失败输出可机器读。
-6. 官方 testnet 只运行非 ESK schema smoke，证明固定 query 仍被当前 GraphQL schema
-   接受并确认非 ESK 样本被拒绝；不得把它写成真实 ESK 验收。
+6. 官方 testnet 只运行无关公开样本的 schema smoke，证明固定 query 仍被当前 GraphQL
+   schema 接受并确认该样本被完整领域校验拒绝；拒绝原因可以先落在 owner 等前置边界，
+   不得把它写成 ESK 类型证明或真实 ESK 验收。
 7. 回归现有 publication、currency、六桶静态验证和固定版本 Move 测试。
 
 ## 明确不做

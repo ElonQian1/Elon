@@ -8724,7 +8724,7 @@
       "id": "esk-sui-allocation-observer-v1",
       "title": "ESK Sui 六桶分配只读观察器 V1",
       "summary": "以两个不同公共 Sui testnet GraphQL 来源，失败关闭地复核参与包发布、分配交易、一次性能力销毁、冻结总回执、六桶历史输出和指定 checkpoint 的团队锁仓守恒；只产出 RPC 观察证据，不认证源码、地址控制、用户余额或发布状态。",
-      "status": "proposed",
+      "status": "claimed",
       "priority": "p0",
       "requirement": {
         "path": "docs/requirements/esk-sui-allocation-observer-v1.md",
@@ -8733,10 +8733,10 @@
         "evidence_kind": "document",
         "git_identity": {
           "schema": "elon.project_context_git_identity.v1",
-          "head_commit": "1c49848863418bba4f52443bba8ef540ca7823e4",
-          "head_blob_oid": "",
+          "head_commit": "b70d1cd029760c7bb4ee0a157fbc3d25cd68350f",
+          "head_blob_oid": "9e79948245132be34d45a797c83603a4b5285506",
           "worktree_blob_oid": "9e79948245132be34d45a797c83603a4b5285506",
-          "state": "untracked"
+          "state": "tracked_clean"
         }
       },
       "knowledge_node_id": "",
@@ -8768,8 +8768,14 @@
         "合成正负测试、官方非 ESK schema smoke 及既有 publication/currency/allocation 回归通过，真实 ESK 正向验收明确未执行。"
       ],
       "implementation_evidence": [],
+      "claim": {
+        "claim_id": "claim_9d2f9662b93b474298832492c27d30f6",
+        "agent_id": "codex-root-01a05b8d",
+        "claimed_at_ms": 1788549586420,
+        "expires_at_ms": 1788592786420
+      },
       "created_at_ms": 1788549534611,
-      "updated_at_ms": 1788549534611
+      "updated_at_ms": 1788549586420
     },
     {
       "id": "esk-sui-allocation-vesting-v1",
@@ -19486,46 +19492,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_5445eb7d61f44860a32b7cd1b2e97627",
-      "feature_id": "esk-sui-genesis-foundation-v1",
-      "action": "evidence_recorded",
-      "actor": "Codex Desktop",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788460217830
-    },
-    {
-      "id": "feature_event_178df2c877bf48008145732843b59265",
-      "feature_id": "esk-sui-genesis-foundation-v1",
-      "action": "transitioned",
-      "actor": "Codex Desktop",
-      "reason": "跨平台规范化摘要修复已实现，最新主线全部八项证据已重新绑定。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1788460236077
-    },
-    {
-      "id": "feature_event_2ab71568032a471cbe22d5f2b2798c09",
-      "feature_id": "esk-sui-genesis-foundation-v1",
-      "action": "transitioned",
-      "actor": "Codex Desktop",
-      "reason": "最新主线复测通过 Node 语义/负例、AJV 2020、ESK 回归及源码/文档门禁；Windows CRLF 与 Git LF 现产生相同规范化摘要。",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1788460247007
-    },
-    {
-      "id": "feature_event_048a81b7288541acade7087278c9906e",
-      "feature_id": "esk-sui-genesis-foundation-v1",
-      "action": "transitioned",
-      "actor": "Codex Desktop",
-      "reason": "ESK Sui 本地创世基础源码与验证证据已安全推送至远程 main；released 仅表示代码交付，不表示测试网或主网发币、资金接入或生产密钥启用。",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1788460650761
-    },
-    {
       "id": "feature_event_8c5a2571756142b0b71e800f12798a20",
       "feature_id": "esk-sui-publication-observer-v1",
       "action": "registered",
@@ -21484,6 +21450,46 @@
       "from_status": "",
       "to_status": "proposed",
       "at_ms": 1788549534611
+    },
+    {
+      "id": "feature_event_0e0734d113c94942ac74b4d1b7ea4997",
+      "feature_id": "esk-sui-allocation-observer-v1",
+      "action": "requirement_rebound",
+      "actor": "codex-root-01a05b8d",
+      "reason": "需求与功能登记已提交，重新绑定当前 Git 身份后进入评审。",
+      "from_status": "proposed",
+      "to_status": "proposed",
+      "at_ms": 1788549584154
+    },
+    {
+      "id": "feature_event_0d65cde311dc43cc9337afcdc6da6a5c",
+      "feature_id": "esk-sui-allocation-observer-v1",
+      "action": "transitioned",
+      "actor": "codex-root-01a05b8d",
+      "reason": "三路只读审查确认缺口、边界和验收矩阵，无旧版兼容要求。",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1788549584976
+    },
+    {
+      "id": "feature_event_4c2c530a85ba410bb6756a5e4d220eb1",
+      "feature_id": "esk-sui-allocation-observer-v1",
+      "action": "transitioned",
+      "actor": "codex-root-01a05b8d",
+      "reason": "依赖均已验证，输入、输出和真实验收前置项完整。",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1788549585678
+    },
+    {
+      "id": "feature_event_0609518bc6714501acf5791f4174e3bf",
+      "feature_id": "esk-sui-allocation-observer-v1",
+      "action": "claimed",
+      "actor": "codex-root-01a05b8d",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788549586421
     }
   ]
 }

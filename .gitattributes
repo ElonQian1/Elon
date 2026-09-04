@@ -6,6 +6,8 @@
 *.rs         text eol=lf
 *.tsv        text eol=lf
 contracts/quant/*.json text eol=lf
+# Raw Sui verification receipts are hashed byte-for-byte and must be cross-platform stable.
+contracts/sui/**/evidence/*.txt text eol=lf
 # Native ESK contract copies must remain byte-identical across repositories.
 docs/contracts/esk-android-snapshot-v1.md text eol=lf
 docs/contracts/esk-platform-android-snapshot-v1.md text eol=lf

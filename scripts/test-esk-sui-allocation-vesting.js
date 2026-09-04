@@ -35,8 +35,9 @@ const genesisSource = read(genesisSourcePath)
 const vestingSource = read(vestingSourcePath)
 const genesisTests = read(genesisTestsPath)
 const vestingTests = read(vestingTestsPath)
-const moveTestEvidence = read(moveTestEvidencePath)
-const currencyTestEvidence = read(currencyTestEvidencePath)
+// Git stores evidence as LF. Canonicalize Windows checkout bytes before raw receipt checks.
+const moveTestEvidence = canonicalBytes(fs.readFileSync(fromRoot(moveTestEvidencePath))).toString('utf8')
+const currencyTestEvidence = canonicalBytes(fs.readFileSync(fromRoot(currencyTestEvidencePath))).toString('utf8')
 const requirement = read(requirementPath)
 const decision = read(decisionPath)
 

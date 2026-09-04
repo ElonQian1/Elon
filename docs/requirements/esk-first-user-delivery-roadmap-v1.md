@@ -40,7 +40,7 @@ ESK 保持同一种服务支付、治理和经批准利润快照参与资产；�
 | 阶段 | 当前证据 / 缺口 | 下一步及完成条件 |
 | --- | --- | --- |
 | 用户资产一致性 | 主个人资产、完整审核流水与卖回已具备；新版跨 APK 同快照额度/申请进度两端已实现；生产卖回政策默认关闭 | 完成新版正式子包和批准政策下的本人验收；Paper 不计正式资产，申请不等于成交或付款 |
-| 真实上链准备 | 固定供应 Move build/test 已完成；没有发布回执 | 独立只读观察器 → 全部发布/注册/分配验证 → 授权测试网发布和终局性同步 |
+| 真实上链准备 | Currency 3/3、Participation 13/13 Move 回归通过；发布、Currency、六桶分配三个只读观察器代码已验证；只有无关公开 schema 探测，没有真实 ESK 发布回执 | 批准真实参数与职责地址并明确授权 testnet → 发布/注册/分配 → 三观察器双源正向复核 → 地址控制、源码与终局性 Evidence/Manifest V2 |
 | 历史用户交付 | 付款事实及实际映射不能由代码猜测 | dry-run 对账与去重 → 经审批的入账/claim → 可追溯结转，余额不双计 |
 | 量化与安装闭环 | 新版唯一“我的 ESK”接收端 0.5.0 源码已推送、69 项 Android 测试通过，未正式签名/上传；旧原生桥已退役 | 使用子项目受控签名和编辑者上传流程，完成广场安装与双 APK 本人验收；QSHARE 对账独立验收 |
 
@@ -49,6 +49,11 @@ ESK 保持同一种服务支付、治理和经批准利润快照参与资产；�
 后者绑定历史注册创建记录与当前供应，公开非 ESK schema 检查不算 ESK 实际发行，
 也不解锁链余额或清单迁移。实际状态与后续参数缺口见其
 [交付记录](../delivery/esk-sui-currency-observer-v1.md)。
+创世六桶和团队锁仓的完整历史/当前快照见
+[六桶分配观察器 V1](esk-sui-allocation-observer-v1.md)、
+[使用手册](../esk-sui-allocation-observer.md)及其
+[交付记录](../delivery/esk-sui-allocation-observer-v1.md)。该工具证明完整对象变化、
+唯一 Cap、Lamport 版本与守恒，但所有认证、余额和 manifest 晋级标志仍固定为 false。
 Android 授权前置身份切片见 [官方量化 APK 身份校验 V1](yilong-quant-android-identity-v1.md)；
 该切片不等于本人资产授权已经接通，实际验证与发布见其交付记录。
 主项目资产现状入口：`server/src/esk_asset/service.rs`、
@@ -63,7 +68,8 @@ Android 授权前置身份切片见 [官方量化 APK 身份校验 V1](yilong-qu
 [正式进度授权 V1](esk-platform-native-progress-v1.md)，主 1.1.1519 已完成正式发布流程，
 公开工件核验见其 [交付记录](../delivery/esk-platform-native-progress-v1.md)。
 量化 0.5.0 使用同一新版合同；旧 Paper 17 字段与正式摘要 21 字段原生桥及旧入口已退役，
-不得恢复为双轨产品。旧文档仅作历史，旧签名包不代表新版可上架；主账本和历史记录不删除。
+不得恢复为双轨产品。旧文档只可作为审计历史，不能形成兼容要求；旧签名包不代表新版
+可上架。为保持账务可追溯，既有主账本事实不物理删除，但任何新版运行时不得消费旧桥。
 [完整审核流水分页](esk-platform-history-v1.md) 已建立；后续补齐
 [摘要会话同快照校验](esk-platform-account-snapshot-auth-v1.md)，
 部署与本人验收分别见其 [交付记录](../delivery/esk-platform-account-snapshot-auth-v1.md)。
