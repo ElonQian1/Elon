@@ -47,6 +47,7 @@ class HomeActionMenuContractTest {
         )
 
         assertTrue(layout.contains("android:id=\"@+id/bottomActionPlusIcon\""))
+        assertTrue(layout.contains("android:background=\"@drawable/bg_bottom_nav_compose_surface\""))
         assertTrue(layout.contains("android:src=\"@drawable/ic_bottom_action_plus\""))
         assertTrue(layout.contains("android:layout_width=\"24dp\""))
         assertTrue(layout.contains("android:layout_height=\"24dp\""))

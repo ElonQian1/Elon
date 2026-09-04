@@ -105,6 +105,11 @@
     <color name="elon_nav_active_bg">#20262E</color>
     <color name="elon_nav_glass_overlay">#73353A42</color>
     <color name="elon_nav_glass_border">#1FFFFFFF</color>
+    <!-- Stitch home bottom navigation: opaque, code-native surfaces avoid raster scaling. -->
+    <color name="elon_stitch_nav_surface">#201F1F</color>
+    <color name="elon_stitch_nav_compose_surface">#353534</color>
+    <color name="elon_stitch_nav_selected_surface">#DBFCFF</color>
+    <color name="elon_stitch_nav_border">#1AFFFFFF</color>
 
     <color name="elon_store_detail_bg">#07090D</color>
     <color name="elon_store_detail_text_primary">#F0F8F7F4</color>

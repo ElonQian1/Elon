@@ -31,6 +31,8 @@ class BottomNavigationInsetsContractTest {
     @Test
     fun androidBottomMenuMatchesStitchGeometryWhileKeepingExistingIcons() {
         val dimens = readRepositoryFile("android/app/src/main/res/values/dimens.xml")
+        assertTrue(dimens.contains("name=\"main_bottom_menu_height\">48dp</dimen>"))
+        assertTrue(dimens.contains("name=\"main_bottom_menu_outer_height\">64dp</dimen>"))
         assertTrue(dimens.contains("name=\"main_bottom_menu_content_width\">337dp</dimen>"))
         assertTrue(dimens.contains("name=\"main_bottom_menu_edge_gap\">24dp</dimen>"))
         assertTrue(dimens.contains("name=\"main_bottom_menu_selection_width\">56dp</dimen>"))
@@ -63,7 +65,11 @@ class BottomNavigationInsetsContractTest {
         assertTrue(layout.contains("@drawable/ic_bottom_nav_project_selector"))
         assertTrue(layout.contains("@drawable/ic_bottom_nav_profile_selector"))
         assertTrue(layout.contains("@drawable/ic_bottom_nav_menu_selector"))
-        assertTrue(layout.contains("android:background=\"@drawable/bg_bottom_nav_compose\""))
+        assertTrue(layout.contains("android:background=\"@drawable/bg_bottom_nav_compose_surface\""))
+        assertTrue(!layout.contains("android:background=\"@drawable/bg_bottom_nav_compose\""))
+        val selectedState = readRepositoryFile("android/app/src/main/res/drawable/bg_bottom_nav_item_selector.xml")
+        assertTrue(selectedState.contains("@drawable/bg_bottom_nav_selected_surface"))
+        assertTrue(!selectedState.contains("@drawable/bg_bottom_nav_selected\""))
         val controller = readRepositoryFile("android/app/src/main/kotlin/com/elon/app/MainBottomNavigationController.kt")
         assertTrue(!controller.contains("binding.pageTabs.width / designViewport"))
     }
@@ -75,6 +81,10 @@ class BottomNavigationInsetsContractTest {
             Regex("""\.tabs-bar\s*\{[^}]*width:\s*337px;""", RegexOption.DOT_MATCHES_ALL)
                 .containsMatchIn(web)
         )
+        assertTrue(
+            Regex("""\.tabs-bar\s*\{[^}]*height:\s*64px;[^}]*padding:\s*8px\s+16px;[^}]*border-radius:\s*32px;[^}]*background:\s*#201f1f;""", RegexOption.DOT_MATCHES_ALL)
+                .containsMatchIn(web)
+        )
         assertTrue(!web.contains("--stitch-bottom-scale"))
         assertTrue(
             Regex(
@@ -82,12 +92,17 @@ class BottomNavigationInsetsContractTest {
                 RegexOption.DOT_MATCHES_ALL
             ).containsMatchIn(web)
         )
+        assertTrue(Regex("""\.tab-selection\s*\{[^}]*display:\s*none;""", RegexOption.DOT_MATCHES_ALL).containsMatchIn(web))
         assertTrue(
-            Regex("""\.tab-selection\s*\{[^}]*width:\s*56px;[^}]*height:\s*48px;""", RegexOption.DOT_MATCHES_ALL)
+            Regex("""\.tab\.active::before\s*\{[^}]*width:\s*56px;[^}]*height:\s*48px;[^}]*border-radius:\s*24px;[^}]*background:\s*#dbfcff;""", RegexOption.DOT_MATCHES_ALL)
                 .containsMatchIn(web)
         )
         assertTrue(
-            Regex("""\.tabs-panel\s*>\s*\.tab:first-child\s+\.tab-selection\s*\{[^}]*left:\s*0;""", RegexOption.DOT_MATCHES_ALL)
+            Regex("""\.tabs-panel\s*>\s*\.tab:first-child\.active::before\s*\{[^}]*left:\s*0;""", RegexOption.DOT_MATCHES_ALL)
+                .containsMatchIn(web)
+        )
+        assertTrue(
+            Regex("""\.bottom-compose-button\s*\{[^}]*width:\s*48px;[^}]*height:\s*48px;[^}]*border-radius:\s*50%;[^}]*background:\s*#353534;""", RegexOption.DOT_MATCHES_ALL)
                 .containsMatchIn(web)
         )
         val menuButton = Regex(
@@ -144,6 +159,19 @@ class BottomNavigationInsetsContractTest {
         assertTrue(Regex("""\.tabs-bar\s*\{[^}]*background:\s*#201f1f;""").containsMatchIn(theme))
         assertTrue(!Regex("""\.tabs-panel\s*\{[^}]*linear-gradient""", RegexOption.DOT_MATCHES_ALL).containsMatchIn(theme))
         assertTrue(!Regex("""\.bottom-compose-button\s*\{[^}]*linear-gradient""", RegexOption.DOT_MATCHES_ALL).containsMatchIn(theme))
+
+        val colors = readRepositoryFile("android/app/src/main/res/values/colors.xml")
+        val containerSurface = readRepositoryFile("android/app/src/main/res/drawable/bg_bottom_nav_stitch_container.xml")
+        val composeSurface = readRepositoryFile("android/app/src/main/res/drawable/bg_bottom_nav_compose_surface.xml")
+        val selectedSurface = readRepositoryFile("android/app/src/main/res/drawable/bg_bottom_nav_selected_surface.xml")
+        assertTrue(colors.contains("<color name=\"elon_stitch_nav_surface\">#201F1F</color>"))
+        assertTrue(colors.contains("<color name=\"elon_stitch_nav_compose_surface\">#353534</color>"))
+        assertTrue(colors.contains("<color name=\"elon_stitch_nav_selected_surface\">#DBFCFF</color>"))
+        assertTrue(containerSurface.contains("android:color=\"@color/elon_stitch_nav_surface\""))
+        assertTrue(composeSurface.contains("android:shape=\"oval\""))
+        assertTrue(composeSurface.contains("android:color=\"@color/elon_stitch_nav_compose_surface\""))
+        assertTrue(selectedSurface.contains("android:radius=\"24dp\""))
+        assertTrue(selectedSurface.contains("android:color=\"@color/elon_stitch_nav_selected_surface\""))
     }
 
     @Test

@@ -1554,7 +1554,7 @@
                     android:layout_width="@dimen/main_bottom_menu_height"
                     android:layout_height="@dimen/main_bottom_menu_height"
                     android:clickable="true"
-                    android:background="@drawable/bg_bottom_nav_compose"
+                    android:background="@drawable/bg_bottom_nav_compose_surface"
                     android:contentDescription="打开新建菜单"
                     android:focusable="true"
                     android:foreground="?attr/selectableItemBackgroundBorderless">
