@@ -8,6 +8,7 @@ mod cancellation;
 mod history;
 mod history_boundaries;
 mod recovery;
+mod sellback;
 mod transactions;
 mod validation;
 
@@ -60,6 +61,7 @@ impl Fixture {
             .unwrap();
         }
         platform_migration::migration_v287(&conn).unwrap();
+        crate::sellback_migration::migration_v288(&conn).unwrap();
         crate::paper_migration::migration_v281(&conn).unwrap();
         conn.execute(
             "INSERT INTO esk_asset_ledger_entries(entry_id,user_id,amount_base_units,

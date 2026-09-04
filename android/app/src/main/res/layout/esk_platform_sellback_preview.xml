@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/esk_platform_sellback_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/elon_bg_app"
+    android:fillViewport="true">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="vertical" android:padding="20dp">
+
+    <TextView
+        android:id="@+id/esk_platform_sellback_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="正式 ESK 卖回申请与占用"
+        android:textColor="@color/elon_text_primary"
+        android:textSize="24sp"
+        android:textStyle="bold" />
+
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="12dp" android:text="正式平台登记 · 尚未上链 · 申请不等于成交"
+        android:textColor="@color/elon_status_project" android:textSize="13sp" />
+    <TextView android:id="@+id/esk_sellback_account"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="24dp" android:text="当前账户"
+        android:textColor="@color/elon_text_secondary" android:textSize="15sp" />
+    <TextView android:id="@+id/esk_sellback_total"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="12dp" android:text="正式总量  — ESK"
+        android:textColor="@color/elon_text_primary" android:textSize="17sp" />
+    <TextView android:id="@+id/esk_sellback_reserved"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="8dp" android:text="申请占用  — ESK"
+        android:textColor="@color/elon_text_secondary" android:textSize="17sp" />
+    <TextView android:id="@+id/esk_sellback_available"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="8dp" android:text="可申请量  — ESK"
+        android:textColor="@color/elon_text_primary" android:textSize="17sp" />
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="8dp" android:text="可申请量不是可提现金额；不包含 Paper 模拟资产。"
+        android:textColor="@color/elon_text_secondary" android:textSize="13sp" />
+    <TextView android:id="@+id/esk_sellback_status"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="20dp" android:accessibilityLiveRegion="polite"
+        android:text="读取本人的额度、公开条款与申请进度。"
+        android:textColor="@color/elon_text_secondary" android:textSize="15sp" />
+    <Button
+        android:id="@+id/esk_platform_sellback_primary_action"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:minHeight="52dp"
+        android:layout_marginTop="16dp"
+        android:text="重新读取本人申请" android:textSize="16sp" />
+    <TextView android:id="@+id/esk_sellback_terms"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="20dp" android:lineSpacingExtra="4dp"
+        android:text="新申请是否开放及具体条款，以本次服务器返回为准。"
+        android:textColor="@color/elon_text_secondary" android:textSize="15sp" />
+    <EditText android:id="@+id/esk_sellback_amount"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="16dp" android:minHeight="52dp"
+        android:hint="输入申请 ESK 数量（最多六位小数）"
+        android:inputType="numberDecimal" android:maxLength="20" android:singleLine="true"
+        android:enabled="false" android:saveEnabled="false"
+        android:contentDescription="正式 ESK 卖回申请数量"
+        android:textColor="@color/elon_text_primary" android:textColorHint="@color/elon_text_secondary"
+        android:textSize="16sp" />
+    <Button android:id="@+id/esk_sellback_submit"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="12dp" android:minHeight="52dp" android:enabled="false"
+        android:text="核对数量与条款" android:textSize="16sp" />
+    <Button android:id="@+id/esk_sellback_retry"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="12dp" android:minHeight="52dp" android:visibility="gone"
+        android:text="用原内容核对重试" android:textSize="16sp" />
+    <Button android:id="@+id/esk_sellback_reviewed"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="12dp" android:minHeight="52dp" android:visibility="gone"
+        android:text="我已核对本人记录" android:textSize="16sp" />
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="24dp" android:text="本人申请记录"
+        android:textColor="@color/elon_text_primary" android:textSize="17sp" />
+    <LinearLayout android:id="@+id/esk_sellback_requests"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="vertical" />
+    <Button android:id="@+id/esk_sellback_next"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="16dp" android:minHeight="52dp" android:visibility="gone"
+        android:text="下一页申请" android:textSize="16sp" />
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="24dp" android:lineSpacingExtra="4dp"
+        android:text="提交后占用申请量；本人取消仅解除申请占用，不返币、不付款。没有自动到期或成交；未设置价格、手续费或收益承诺。网络中断不代表服务器未执行，请先核对记录，不要重复新建。"
+        android:textColor="@color/elon_text_secondary" android:textSize="13sp" />
+    <Button android:id="@+id/esk_sellback_back"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="20dp" android:minHeight="52dp"
+        android:text="返回正式资产" android:textSize="16sp" />
+    </LinearLayout>
+</ScrollView>

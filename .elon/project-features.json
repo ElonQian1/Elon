@@ -7660,6 +7660,304 @@
       "updated_at_ms": 1788515528242
     },
     {
+      "id": "esk-platform-sellback-requests-v1",
+      "title": "正式 ESK 卖回申请、占用与本人取消",
+      "summary": "独立正式来源的默认关闭申请流程；同快照额度、原子占用及幂等取消，主 APK 查询与结果未知恢复，不报价不成交不打款，不改旧账户/跨 APK 合同。",
+      "status": "implemented",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/esk-platform-sellback-requests-v1.md",
+        "content_hash": "72fcc7c25984086daf343844aafa521fb69fdcf135a184bd68b6fd5fa05a519e",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "bb87c8327c68c1d1be5d7769de914785c17e2b31",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "c6028c5f5d9c197eefc51b51a2702ae2e8a0ec40",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "platform-assets",
+      "tags": [],
+      "task_paths": [
+        "android/app/src/main/AndroidManifest.xml",
+        "android/app/src/main/kotlin/com/elon/app/esk/platform",
+        "android/app/src/main/res/layout/esk_platform_sellback_preview.xml",
+        "android/app/src/test/kotlin/com/elon/app/esk/platform",
+        "scripts/test-esk-platform-sellback-web-boundary.js",
+        "server/src/assets/web_page.html",
+        "server/src/esk_platform/http_tests.rs",
+        "server/src/esk_platform/mod.rs",
+        "server/src/esk_platform/sellback",
+        "server/src/store/common/esk_platform_assets/history.rs",
+        "server/src/store/common/esk_platform_assets/mod.rs",
+        "server/src/store/common/esk_platform_assets/sellback",
+        "server/src/store_migrations.rs",
+        "server/tests/esk-platform-harness"
+      ],
+      "dependencies": [
+        "esk-platform-account-snapshot-auth-v1"
+      ],
+      "acceptance_criteria": [
+        "完整验证正式持有量及追加请求/取消，同快照总量/占用/可申请量；并发不超占，取消不新增ESK且故障回滚。",
+        "真实会话本人隔离，幂等及结果未知查回，当前政策缺失/关闭不困住合法旧取消；生产默认关闭，无报价和资金移动。",
+        "主APK独立原生页面及网页说明同步；旧18/21/17字段合同不改，定向Store/Router/Android回归、实际发布身份与真实用户验收分报。"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/esk/platform/sellback/EskPlatformSellbackActivity.kt",
+          "content_hash": "691a411b80ac69022858c4b0464cc237a01c9dd3ed6373141ff21e7152554590",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "bb87c8327c68c1d1be5d7769de914785c17e2b31",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "848bbf4607176ed707477f6461469782eb9190dc",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/esk/platform/sellback/EskPlatformSellbackRecovery.kt",
+          "content_hash": "0226d0a20e42967d596d026a40218a03e30d91ab2b2267a55fc7655a059cbc6c",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "bb87c8327c68c1d1be5d7769de914785c17e2b31",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "b5c6219f3311908adec1e5cc977bf126bee1e204",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/esk/platform/sellback/EskPlatformSellbackClientTest.kt",
+          "content_hash": "204234a1b4037637ce38112e39d1e55964df262d9c44f2739aa3b9aac3167b93",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "bb87c8327c68c1d1be5d7769de914785c17e2b31",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "1c0064a045e65adba0a3b0a6d7dfa75893893267",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/esk/platform/sellback/EskPlatformSellbackParserTest.kt",
+          "content_hash": "da5db443c7d16f1c70402bb91712df7ec8cd1f484aa977121f0eafdb05e92f87",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "bb87c8327c68c1d1be5d7769de914785c17e2b31",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "23ff33dce4523c8c318ce7b19ca06afeed9769f4",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/esk/platform/sellback/EskPlatformSellbackStateTest.kt",
+          "content_hash": "4b8ffcfcfd49a655e266ccfc125d653368e09f024e1e2912f7b777080a966aec",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "bb87c8327c68c1d1be5d7769de914785c17e2b31",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "2ea2d6bdeeb35ee7eebd784a2ea29642d966891a",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/esk/platform/sellback/EskPlatformSellbackWiringTest.kt",
+          "content_hash": "76ba7477ed69e3b5b26f63e651beb58f3e9fac3171dbd8c34cca8d2997c82ea2",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "bb87c8327c68c1d1be5d7769de914785c17e2b31",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "915e7ac9d9b8b0df39d50e0c0c1e039b137cb916",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "docs/delivery/esk-platform-sellback-requests-v1.md",
+          "content_hash": "80b0d636e2202395f0ecb436c0e4733e47d6ca20f51ac48eba42a46af84f5b3e",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "bb87c8327c68c1d1be5d7769de914785c17e2b31",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "c94cf7432be94a1f10819b393ce8deb59411c6f7",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "docs/esk-platform-sellback-requests.md",
+          "content_hash": "2d7a3965f893d75c6c2b909c2a7c4a76715f07f215d106e487f205b405970f0c",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "bb87c8327c68c1d1be5d7769de914785c17e2b31",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "8598a99438209d331fe8d2650d658bfb9a7e11b7",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "scripts/test-esk-platform-sellback-web-boundary.js",
+          "content_hash": "26e112979e26edb64dceb91b75e86f9c1bd077c38e8e8c0c179bb2612e06ee66",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "bb87c8327c68c1d1be5d7769de914785c17e2b31",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "ecb60f7e51e53cd30a8371dbd42ff0ba7f7f38c5",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/src/esk_platform/sellback/api.rs",
+          "content_hash": "ac89998980431f9b6292662ca1ecb29e21cbea3435bec77520884a62d33a8f03",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "bb87c8327c68c1d1be5d7769de914785c17e2b31",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "da16c73cb34082e10adf04e6a1145c3dc2bfafa0",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/esk_platform/sellback/http_boundary_tests.rs",
+          "content_hash": "48c2a694aa650f1577c2fd9d0a1b985b5d158460d032909bbf8f5a7cd3d97e1c",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "bb87c8327c68c1d1be5d7769de914785c17e2b31",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "46760b9446b3c042d24dbb7804e34bf889d80067",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/esk_platform/sellback/http_tests.rs",
+          "content_hash": "e83253738562d7d6988aafe5fd92517110618a1859ba8ca643359308761ba99f",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "bb87c8327c68c1d1be5d7769de914785c17e2b31",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "26180c912a5fdbb6b9b5f7e763ef3181e11786d5",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/esk_platform/sellback/migration.rs",
+          "content_hash": "42e15a3561bba0196d33e5f762b8abf5a9cfcc67c1eee7167029e89ed53339d1",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "bb87c8327c68c1d1be5d7769de914785c17e2b31",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "2a77003e2a48565d9b75a7e7173d7e39285a39d9",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/esk_platform/sellback/policy.rs",
+          "content_hash": "d97534e92ca92c70429e7daf6832fb77ad234737cec2f5e5b119b36ac06bbea0",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "bb87c8327c68c1d1be5d7769de914785c17e2b31",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "c85feb1d34a628b9bff2df6c63ded062aa4fe406",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/store/common/esk_platform_assets/sellback/snapshot.rs",
+          "content_hash": "dff7093d3fad689303961887dca918b70ab3d736de24dba7a1a68fdb1a63f6a5",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "bb87c8327c68c1d1be5d7769de914785c17e2b31",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "f340cde886fd3364247ad752c055560186ad88e2",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/store/common/esk_platform_assets/sellback/write.rs",
+          "content_hash": "205bd256b1eb574068be5c4b0b1841015ae704c757dbf99ac1708478a7ae0c14",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "bb87c8327c68c1d1be5d7769de914785c17e2b31",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "0f02338a82770e918789d3b1fcc5d9cd4083212e",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/tests/esk-platform-harness/src/tests/sellback/concurrency.rs",
+          "content_hash": "d8c46d30c69e33eaa176d8a00fae6c270794e7de165dfb28790c41ff9bc59e00",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "bb87c8327c68c1d1be5d7769de914785c17e2b31",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "b1e50151fd7a60f7d151de76de858e44a1fe2d0a",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/tests/esk-platform-harness/src/tests/sellback/integrity.rs",
+          "content_hash": "324423b9b642bca9c04831139fd7993f6b6b38fa8916714ecb72e12cbc0d7462",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "bb87c8327c68c1d1be5d7769de914785c17e2b31",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "9210b02c2c1d0bfdf2050578794f6c814697dd07",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/tests/esk-platform-harness/src/tests/sellback/migration.rs",
+          "content_hash": "953d50d989b147d9ee756e46c30b02a47d4ebcab4594bf15bf319caa1b5d890a",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "bb87c8327c68c1d1be5d7769de914785c17e2b31",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "4be71efcb6fae26441669caa5dbafb34ffaa037a",
+            "state": "untracked"
+          }
+        }
+      ],
+      "created_at_ms": 1788527300706,
+      "updated_at_ms": 1788530843689
+    },
+    {
       "id": "esk-sui-genesis-foundation-v1",
       "title": "ESK Sui 创世基础与可验证发行门禁 V1",
       "summary": "固定 ESK 上 Sui 的创世参数、供应守恒、阶段证据与历史付费用户映射门禁，并交付固定供应 Currency 源码和自动验证；本轮不签名、不广播、不移动真实资金。",
@@ -17795,156 +18093,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_75c69459ccac4b1caa2c08a1eb3ba1e5",
-      "feature_id": "esk_paper_quant_allocation_request_v2",
-      "action": "requirement_rebound",
-      "actor": "codex-desktop",
-      "reason": "",
-      "from_status": "blocked",
-      "to_status": "proposed",
-      "at_ms": 1788314133709
-    },
-    {
-      "id": "feature_event_f2acef72b91e48feb120594d56c2ac2f",
-      "feature_id": "esk_paper_quant_allocation_request_v2",
-      "action": "transitioned",
-      "actor": "codex-desktop",
-      "reason": "Reviewed the verified Paper-only requirement update; scope and acceptance boundaries are unchanged.",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1788314148900
-    },
-    {
-      "id": "feature_event_e195ffee62464c07b30fac92f3d718ea",
-      "feature_id": "esk_paper_quant_allocation_request_v2",
-      "action": "transitioned",
-      "actor": "codex-desktop",
-      "reason": "Requirement review complete and dependencies are internal to this claimed delivery.",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1788314155408
-    },
-    {
-      "id": "feature_event_ec85825e923f4fa6a21d83157caebac7",
-      "feature_id": "esk_paper_quant_allocation_request_v2",
-      "action": "claimed",
-      "actor": "codex-desktop",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788314163187
-    },
-    {
-      "id": "feature_event_8cf86f48627644e3a617867ec51e20d3",
-      "feature_id": "esk_paper_quant_allocation_request_v2",
-      "action": "transitioned",
-      "actor": "codex-desktop",
-      "reason": "Implementation and cross-repository verification are complete; binding final evidence.",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788314170263
-    },
-    {
-      "id": "feature_event_943d6cba1c294e9892c3eb73c6a3872e",
-      "feature_id": "esk_paper_quant_allocation_request_v2",
-      "action": "evidence_recorded",
-      "actor": "codex-desktop",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788314194181
-    },
-    {
-      "id": "feature_event_cd0d5ebfabf44db7b0eafa016920944e",
-      "feature_id": "esk_paper_quant_allocation_request_v2",
-      "action": "transitioned",
-      "actor": "codex-desktop",
-      "reason": "Account V2, quant request lifecycle, PC UI and signed projection V2 are implemented with recorded evidence.",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1788314203259
-    },
-    {
-      "id": "feature_event_30548492845f442bb5e6e236a4eb00b3",
-      "feature_id": "esk_paper_quant_allocation_request_v2",
-      "action": "transitioned",
-      "actor": "codex-desktop",
-      "reason": "Production binary/build, PC build, static contracts, temporary HTTP E2E and quant full validation passed; existing unrelated SQLite VFS test-target blocker is documented.",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1788314210966
-    },
-    {
-      "id": "feature_event_2177250826d34da3ac7d048997ff4ba9",
-      "feature_id": "esk_paper_quant_allocation_request_v2",
-      "action": "transitioned",
-      "actor": "codex-desktop",
-      "reason": "Main commit 3d7b568f45d1bc3710dfa4708f142ab37d500865 is published as v0.3.1715 with matching remote health/version smoke; quant compatibility commits are on main.",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1788315316771
-    },
-    {
-      "id": "feature_event_be73c6481fc24f8bb9a9fc88a8094ed0",
-      "feature_id": "esk-paper-quant-allocation-binding-v3",
-      "action": "registered",
-      "actor": "codex-desktop",
-      "reason": "Extend released V2 reservation requests with a Paper-only quant acceptance and release receipt lifecycle.",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1788315967384
-    },
-    {
-      "id": "feature_event_c1785549564f4f8caaa900969d8d7516",
-      "feature_id": "esk-paper-quant-allocation-binding-v3",
-      "action": "claimed",
-      "actor": "codex-desktop",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788315977552
-    },
-    {
-      "id": "feature_event_f8c2cac7ba4e4e90b7584c587863f63f",
-      "feature_id": "esk-paper-quant-allocation-binding-v3",
-      "action": "transitioned",
-      "actor": "codex-desktop",
-      "reason": "Implement the accepted cross-repository Paper authorization and signed receipt lifecycle.",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788315987154
-    },
-    {
-      "id": "feature_event_c8c0f0bc5cf044c59e695ad48813f155",
-      "feature_id": "esk-paper-quant-allocation-binding-v3",
-      "action": "claim_released",
-      "actor": "codex-desktop",
-      "reason": "需求状态元数据随实现完成更新，先释放认领以重新绑定当前需求哈希。",
-      "from_status": "in_progress",
-      "to_status": "blocked",
-      "at_ms": 1788321158694
-    },
-    {
-      "id": "feature_event_e118c7e4161f443faad38cc28223bc0e",
-      "feature_id": "esk-paper-quant-allocation-binding-v3",
-      "action": "requirement_rebound",
-      "actor": "codex-desktop",
-      "reason": "重新绑定实现完成后的权威需求文档哈希并重新评审。",
-      "from_status": "blocked",
-      "to_status": "proposed",
-      "at_ms": 1788321169719
-    },
-    {
-      "id": "feature_event_79a5e37ee5004a49acbff62be5373d2e",
-      "feature_id": "esk-paper-quant-allocation-binding-v3",
-      "action": "transitioned",
-      "actor": "codex-desktop",
-      "reason": "重新审阅实现状态更新；范围、Paper 边界和验收标准未改变。",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1788321180533
-    },
-    {
       "id": "feature_event_361337d10b3548ddbc7e53686529b76f",
       "feature_id": "esk-paper-quant-allocation-binding-v3",
       "action": "transitioned",
@@ -19793,6 +19941,156 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1788526409003
+    },
+    {
+      "id": "feature_event_5efaf7c7ea144a63b95efff57a9a2ed0",
+      "feature_id": "esk-platform-sellback-requests-v1",
+      "action": "registered",
+      "actor": "codex-esk-sellback-root",
+      "reason": "",
+      "from_status": "",
+      "to_status": "proposed",
+      "at_ms": 1788527300706
+    },
+    {
+      "id": "feature_event_00a844685c4041e3aefbcc0899da2b2b",
+      "feature_id": "esk-platform-sellback-requests-v1",
+      "action": "transitioned",
+      "actor": "codex-esk-sellback-root",
+      "reason": "落实用户Goal中正式占用/官方申请方向；只默认关闭实现与合成验证，候选商业条款另行明确批准后方可生产启用，不推定资金权限。",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1788527301531
+    },
+    {
+      "id": "feature_event_dd6b43920980425abe4b019cee58678f",
+      "feature_id": "esk-platform-sellback-requests-v1",
+      "action": "transitioned",
+      "actor": "codex-esk-sellback-root",
+      "reason": "落实用户Goal中正式占用/官方申请方向；只默认关闭实现与合成验证，候选商业条款另行明确批准后方可生产启用，不推定资金权限。",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1788527302343
+    },
+    {
+      "id": "feature_event_4dde0fdacfd1471a96ce9931a2855a29",
+      "feature_id": "esk-platform-sellback-requests-v1",
+      "action": "claimed",
+      "actor": "codex-esk-sellback-root",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788527303123
+    },
+    {
+      "id": "feature_event_eb0abcff57bc4edf8e6160885635b4ef",
+      "feature_id": "esk-platform-sellback-requests-v1",
+      "action": "transitioned",
+      "actor": "codex-esk-sellback-root",
+      "reason": "已按源文件/迁移/主APK/Paper/跨APK合同查重，先抽取同连接完整读取，再按责任实现申请Store/API/原生页面。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788527304177
+    },
+    {
+      "id": "feature_event_594d1b88e7c642729645d7005e550b92",
+      "feature_id": "esk-platform-sellback-requests-v1",
+      "action": "claim_released",
+      "actor": "codex-esk-sellback-root",
+      "reason": "Review explicit recovery refinement: readonly key lookup and foreground-only consent; retain same owned slice and rebind intentional requirement edits.",
+      "from_status": "in_progress",
+      "to_status": "blocked",
+      "at_ms": 1788528351416
+    },
+    {
+      "id": "feature_event_37b60a81a4984c1fb3c5dad027d11fbc",
+      "feature_id": "esk-platform-sellback-requests-v1",
+      "action": "requirement_rebound",
+      "actor": "codex-esk-sellback-root",
+      "reason": "Explicitly reviewed newly specified readonly key lookup, process-only opaque recovery hint and default-closed config names; no new funds or production authority.",
+      "from_status": "blocked",
+      "to_status": "proposed",
+      "at_ms": 1788528352363
+    },
+    {
+      "id": "feature_event_2b55476c64cd41838576757785edf9ec",
+      "feature_id": "esk-platform-sellback-requests-v1",
+      "action": "metadata_updated",
+      "actor": "codex-esk-sellback-root",
+      "reason": "Include existing Router fixture submodule wiring and native/Web explanatory regression owned by this slice.",
+      "from_status": "proposed",
+      "to_status": "proposed",
+      "at_ms": 1788528352893
+    },
+    {
+      "id": "feature_event_cdc3b04d8ebd4f3c914862af84ea656d",
+      "feature_id": "esk-platform-sellback-requests-v1",
+      "action": "transitioned",
+      "actor": "codex-esk-sellback-root",
+      "reason": "Reviewed explicit readonly recovery and production-default-closed boundaries against unchanged acceptance criteria; all owners aligned.",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1788528366063
+    },
+    {
+      "id": "feature_event_477641b8574843ad8f84f9c1bf44b36e",
+      "feature_id": "esk-platform-sellback-requests-v1",
+      "action": "transitioned",
+      "actor": "codex-esk-sellback-root",
+      "reason": "Reviewed explicit readonly recovery and production-default-closed boundaries against unchanged acceptance criteria; all owners aligned.",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1788528366615
+    },
+    {
+      "id": "feature_event_f8b3cef90d314caca85629ea6944de15",
+      "feature_id": "esk-platform-sellback-requests-v1",
+      "action": "claimed",
+      "actor": "codex-esk-sellback-root",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788528367156
+    },
+    {
+      "id": "feature_event_268eff38dc9b45ea82df48aa40a4ff6a",
+      "feature_id": "esk-platform-sellback-requests-v1",
+      "action": "transitioned",
+      "actor": "codex-esk-sellback-root",
+      "reason": "Resume same owned backend/native slice after intentional requirement re-review; preserve pure history baseline tests and commit.",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788528367696
+    },
+    {
+      "id": "feature_event_85cc790ac5124c35b7ee1ea3c3e09c71",
+      "feature_id": "esk-platform-sellback-requests-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-esk-sellback-root",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788530811796
+    },
+    {
+      "id": "feature_event_f6250ead7e3145f5b23c8c802adbbb27",
+      "feature_id": "esk-platform-sellback-requests-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-esk-sellback-root",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788530843095
+    },
+    {
+      "id": "feature_event_19f349d5c431465fb90a3c683a35a7f4",
+      "feature_id": "esk-platform-sellback-requests-v1",
+      "action": "transitioned",
+      "actor": "codex-esk-sellback-root",
+      "reason": "独立正式账本卖回申请与占用、默认关闭政策、追加式本人取消和只读恢复已实现；108 harness、26 Router、224 Android 与 PWA 边界门禁通过。待实际配套发布及用户验收，未开启生产申请或资金操作。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1788530843689
     }
   ]
 }

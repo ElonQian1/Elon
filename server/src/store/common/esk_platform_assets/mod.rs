@@ -11,6 +11,7 @@ use super::{hash_token, new_id, now};
 mod cancel;
 mod history;
 mod read;
+mod sellback;
 mod write;
 
 fn ensure_admin(conn: &Connection, actor_user_id: &str, session_token: &str) -> Result<()> {

@@ -43,6 +43,10 @@ internal class EskPlatformAssetsView(activity: Activity, onBack: () -> Unit, onR
         refresh.isEnabled = false
     }
 
+    fun attachSellback(onOpen: () -> Unit) {
+        styleButton(root.findViewById(R.id.esk_platform_sellback_open), false, onOpen)
+    }
+
     fun loading() {
         clear()
         status.text = "正在读取正式平台登记，请保持此页打开…"

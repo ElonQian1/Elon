@@ -14,6 +14,7 @@ mod history_model;
 pub(crate) mod migration;
 mod model;
 mod payment_identity;
+pub(crate) mod sellback;
 mod validation;
 
 pub(crate) use history_model::*;
@@ -22,6 +23,7 @@ pub(crate) use validation::{validate_policy_integrity, validate_prepared_input};
 
 pub(crate) fn routes() -> Router<Arc<AppState>> {
     Router::new()
+        .merge(sellback::routes())
         .route("/api/me/assets/esk/platform", get(api::get_my_account))
         .route(
             "/api/me/assets/esk/platform/history",

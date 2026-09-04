@@ -4,6 +4,8 @@ pub(crate) mod history_model;
 pub(crate) mod model;
 #[path = "../../../src/esk_platform/payment_identity.rs"]
 pub(crate) mod payment_identity;
+#[path = "../../../src/esk_platform/sellback/domain.rs"]
+pub(crate) mod sellback;
 #[path = "../../../src/esk_platform/validation.rs"]
 pub(crate) mod validation;
 pub(crate) use history_model::*;

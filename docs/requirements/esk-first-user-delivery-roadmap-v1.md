@@ -62,6 +62,8 @@ Android 授权前置身份切片见 [官方量化 APK 身份校验 V1](yilong-qu
 [摘要会话同快照校验](esk-platform-account-snapshot-auth-v1.md)，
 部署与本人验收分别见其 [交付记录](../delivery/esk-platform-account-snapshot-auth-v1.md)。
 原账户 18 字段与双 APK 协议不变；正式占用、卖回仍需独立切片，不套用 Paper 状态。
+当前开发切片为 [正式卖回申请与占用 V1](esk-platform-sellback-requests-v1.md)，
+包含本人查询、申请、取消和网络结果未知恢复；生产政策默认关闭，不实现报价或付款。
 
 ## 协作与权威边界
 

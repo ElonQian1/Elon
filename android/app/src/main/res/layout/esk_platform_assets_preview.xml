@@ -87,6 +87,14 @@
             android:minHeight="52dp"
             android:text="查看完整审核流水"
             android:textSize="16sp" />
+        <Button
+            android:id="@+id/esk_platform_sellback_open"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:minHeight="52dp"
+            android:text="卖回申请与占用"
+            android:textSize="16sp" />
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

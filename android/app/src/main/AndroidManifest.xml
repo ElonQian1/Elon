@@ -89,6 +89,13 @@
             android:launchMode="standard" />
 
         <activity
+            android:name=".esk.platform.sellback.EskPlatformSellbackActivity"
+            android:exported="false"
+            android:allowTaskReparenting="false"
+            android:launchMode="standard"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
             android:name=".esk.platform.handoff.EskPlatformSnapshotConsentActivity"
             android:exported="true"
             android:excludeFromRecents="true"

@@ -24,6 +24,9 @@ class EskPlatformAssetsActivity : Activity() {
         page = EskPlatformAssetsView(this, ::finish, ::refresh) {
             startActivity(Intent(this, EskPlatformHistoryActivity::class.java))
         }
+        page.attachSellback {
+            startActivity(Intent(this, com.elon.app.esk.platform.sellback.EskPlatformSellbackActivity::class.java))
+        }
     }
 
     override fun onResume() {

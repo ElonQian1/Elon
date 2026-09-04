@@ -9,6 +9,8 @@ pub(crate) mod esk_asset;
 pub(crate) mod paper_migration;
 #[path = "../../../src/esk_platform/migration.rs"]
 pub(crate) mod platform_migration;
+#[path = "../../../src/esk_platform/sellback/migration.rs"]
+pub(crate) mod sellback_migration;
 
 pub(crate) mod store;
 
