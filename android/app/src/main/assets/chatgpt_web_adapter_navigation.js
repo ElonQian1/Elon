@@ -151,18 +151,18 @@
   }
 
   function requestList(emitEvent, result) {
-    const existing = emitSnapshot(emitEvent);
-    const hasVisibleOfficialFeature = lastFeatures.some((feature) =>
-      feature.node && isVisible(feature.node)
-    );
-    if (existing.length && hasVisibleOfficialFeature) {
-      return result('list_navigation', true, '');
-    }
     const open = sidebarButton(true);
     if (open) {
       if (!emitTouchRequest('list_navigation', open, emitEvent)) {
         return result('list_navigation', false, '官网功能侧栏入口当前不可见。');
       }
+      return result('list_navigation', true, '');
+    }
+    const existing = emitSnapshot(emitEvent);
+    const hasVisibleOfficialFeature = lastFeatures.some((feature) =>
+      feature.node && isVisible(feature.node)
+    );
+    if (existing.length && hasVisibleOfficialFeature) {
       return result('list_navigation', true, '');
     }
     const layout = window.__elonChatGptLayout;

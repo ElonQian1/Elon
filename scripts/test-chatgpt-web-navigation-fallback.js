@@ -21,9 +21,32 @@ const openSidebarButton = {
     return { left: 8, top: 8, right: 48, bottom: 48, width: 40, height: 40 };
   }
 };
+const persistentFeature = {
+  textContent: 'Health',
+  getAttribute(name) {
+    if (name === 'href') return '/health';
+    return null;
+  },
+  getBoundingClientRect() {
+    return { left: 16, top: 120, right: 200, bottom: 168, width: 184, height: 48 };
+  },
+  closest() {
+    return null;
+  }
+};
+const persistentNavigation = {
+  getBoundingClientRect() {
+    return { left: 0, top: 0, right: 400, bottom: 800, width: 400, height: 800 };
+  },
+  querySelectorAll() {
+    return [persistentFeature];
+  }
+};
 global.document = {
   querySelectorAll(selector) {
-    return selector === 'button' ? [openSidebarButton] : [];
+    if (selector === 'button') return [openSidebarButton];
+    if (selector.includes('aside')) return [persistentNavigation];
+    return [];
   }
 };
 global.window = {
@@ -44,7 +67,7 @@ const result = (action, ok, error) => results.push({ action, ok, error });
 
 window.__elonChatGptNavigation.requestList(emitEvent, result);
 if (!events.some((event) => event.type === 'web_touch_request' && event.purpose === 'list_navigation')) {
-  throw new Error('built-in fallback suppressed the official sidebar trigger');
+  throw new Error('persistent page navigation suppressed the official sidebar trigger');
 }
 if (!results.some((entry) => entry.action === 'list_navigation' && entry.ok)) {
   throw new Error('official sidebar request did not succeed');
@@ -52,10 +75,10 @@ if (!results.some((entry) => entry.action === 'list_navigation' && entry.ok)) {
 
 window.__elonChatGptNavigation.collectList(emitEvent, result);
 const snapshot = events.find((event) => event.type === 'navigation_snapshot');
-if (!snapshot || snapshot.features.length !== 1) {
+if (!snapshot || snapshot.features.length !== 2) {
   throw new Error('built-in image feature was not published');
 }
-const imageFeature = snapshot.features[0];
+const imageFeature = snapshot.features.find((feature) => feature.kind === 'images');
 if (imageFeature.kind !== 'images' || imageFeature.label !== '图像') {
   throw new Error('built-in image feature metadata is invalid');
 }

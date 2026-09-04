@@ -44,7 +44,7 @@ class ChatGptWebNavigationContractTest {
         assertTrue(layoutAdapter.contains("function requestSemanticTouch"))
         val requestList = adapter.substringAfter("function requestList")
             .substringBefore("function collectList")
-        assertTrue(requestList.indexOf("emitSnapshot") < requestList.indexOf("sidebarButton(true)"))
+        assertTrue(requestList.indexOf("sidebarButton(true)") < requestList.indexOf("emitSnapshot"))
         assertTrue(requestList.contains("hasVisibleOfficialFeature"))
         assertTrue(requestList.contains("feature.node && isVisible(feature.node)"))
         listOf("document.cookie", "fetch(", "XMLHttpRequest", "WebSocket", "Authorization").forEach {
@@ -60,11 +60,14 @@ class ChatGptWebNavigationContractTest {
         val background = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptBackgroundSession.kt",
         )
+        val touchRequestHandler = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebTouchRequestHandler.kt",
+        )
 
         assertTrue(coordinator.contains("openOfficialFallback"))
         assertTrue(coordinator.contains("打开官方页"))
         assertTrue(background.contains("ChatGptWebEvent.FeatureNavigation"))
-        assertTrue(background.contains("adapter::collectFeatures"))
+        assertTrue(touchRequestHandler.contains("adapter::collectFeatures"))
     }
 
     @Test
