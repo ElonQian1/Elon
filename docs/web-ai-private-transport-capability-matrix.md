@@ -13,7 +13,7 @@ installed build; individual capability documents retain implementation evidence.
 | Page-local identity context prewarm | ChatGPT | Completed and enabled; same-origin auth plus conversation refresh device verified | Observed official request context and persistent identity WebView |
 | Conversation navigation receipt reconciliation | ChatGPT | Completed, enabled, and device verified on `v1.1.1399 (1420)`, adapter `218` | Official WebView navigation without write replay |
 | Conversation pin transaction | ChatGPT | Completed, enabled, and device verified on `v1.1.1504 (1504)`, adapter `243`; formally shipped in `v1.1.1505 (1505)` | Official conversation options after explicit user choice |
-| Conversation metadata mutations | ChatGPT | Completed, enabled, and device verified on `v1.1.1506 (1506)`, adapter `244`; rename round trip, archive restore, and explicit directory tombstone passed | Official conversation options after explicit user choice |
+| Conversation metadata mutations | ChatGPT | Completed and enabled; device verified on `v1.1.1506 (1506)`, adapter `244`, and formally shipped in `v1.1.1510 (1510)` | Official conversation options after explicit user choice |
 | Send dispatch acknowledgement | ChatGPT | Completed and enabled | Official DOM confirmation |
 | Streaming reply observer | ChatGPT | Completed and enabled; completion and sparse-watchdog timer/bridge device verified | Official DOM snapshot |
 | Private stream completion settlement | ChatGPT | Completed, enabled, and device verified on `v1.1.1302 (1312)` | Official DOM snapshot |
@@ -289,7 +289,9 @@ official activation transaction. The completed capability is
 adapter `244`, completed unarchive, rename-forward, rename-restore, archive-restore, and
 explicit-tombstone acceptance on a dedicated test conversation. The title and archived
 state were restored, the app returned to conversation home, and no message, Cookie clear,
-or app-data clear occurred. See `docs/chatgpt-private-conversation-metadata-mutations.md`.
+or app-data clear occurred. Formal APK `v1.1.1510 (1510)` was then installed without clearing
+data; MCP confirmed adapter `244`, a ready authenticated bridge and composer, and restored
+conversation home. See `docs/chatgpt-private-conversation-metadata-mutations.md`.
 
 The Google conversation directory persists the timestamp of the last successful
 official directory response. Cached rows render immediately; a legacy or expired cache

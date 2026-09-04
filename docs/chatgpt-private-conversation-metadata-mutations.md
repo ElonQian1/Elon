@@ -7,6 +7,7 @@
 - Provider: ChatGPT Web
 - Adapter: `244`
 - Device acceptance: APK `v1.1.1506 (1506)`
+- Formal release: APK `v1.1.1510 (1510)`, source `fb3e29ca8`
 
 ## Product behavior
 
@@ -36,4 +37,5 @@ dedicated archived test conversation was unarchived, renamed, restored to its or
 and archived again. Every mutation received a confirmed receipt; the final archive produced
 the expected native directory tombstone. The original title and archived state were restored,
 the app returned to conversation home, and no message was sent. Cookies and app data were not
-cleared.
+cleared. The formal APK was then installed as a data-preserving upgrade; MCP confirmed adapter
+`244`, a ready authenticated bridge and composer, and restored the app to conversation home.
