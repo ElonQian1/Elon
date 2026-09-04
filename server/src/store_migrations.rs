@@ -387,6 +387,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (284, "ESK Paper 量化分配申请与独立占用", crate::esk_asset_migration::migration_v284),
     (285, "ESK Paper 量化接收与释放签名回执", crate::esk_asset_migration::migration_v285),
     (286, "ESK 与 USDT Paper 双向兑换追加式结算", crate::esk_asset_migration::migration_v286),
+    (287, "ESK 经审核付款独立平台登记", crate::esk_asset::platform::migration::migration_v287),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {

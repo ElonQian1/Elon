@@ -122,6 +122,10 @@ jobs:
         shell: pwsh
         run: scripts\check-rust-warning-budget.ps1 -MaxWarnings 0
 
+      - name: ESK Platform Ledger Tests
+        shell: pwsh
+        run: scripts\validate-rust.ps1 -- test --manifest-path server\tests\esk-platform-harness\Cargo.toml
+
       - name: Cargo Test
         id: cargo-test
         shell: pwsh

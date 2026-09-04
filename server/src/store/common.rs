@@ -12,6 +12,7 @@ use uuid::Uuid;
 mod esk_asset_batches;
 mod esk_assets;
 mod esk_exchange;
+mod esk_platform_assets;
 mod esk_quant_allocations;
 
 #[cfg(not(test))]

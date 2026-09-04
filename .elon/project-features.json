@@ -6387,6 +6387,246 @@
       "updated_at_ms": 1788389637404
     },
     {
+      "id": "esk-platform-recorded-assets-v1",
+      "title": "ESK 经审核付款的平台登记账本 V1",
+      "summary": "补齐真实管理员准备、摘要确认和付款键唯一正式平台登记，独立本人来源读取；旧 Paper 不变，生产写入默认关闭，未上链且不执行资金操作。",
+      "status": "verified",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/esk-platform-recorded-assets-v1.md",
+        "content_hash": "3102de15702799b4b670173580179518f77a5f5f3dd2c6874ad781a3ae37a289",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "df4a2b3a1cf23fdae081f6f0b30f3df7121918e3",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "8de05803865c46aa1d639fb070fa37ba3ab66f92",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "platform-assets",
+      "tags": [
+        "esk",
+        "platform-recorded",
+        "paid-users"
+      ],
+      "task_paths": [
+        "docs/requirements/esk-platform-recorded-assets-v1.md",
+        "server/src/esk_platform",
+        "server/src/store/common/esk_platform_assets",
+        "server/tests/esk-platform-harness"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "真实会话 admin/owner 与 active 用户复核；虚拟 owner/静态管理员令牌不得入账",
+        "付款规范键、不可变请求与两阶段确认，重放/并发恰好一次记账",
+        "事务回滚、额度守恒、不可变分录、重启和升级验证",
+        "本人来源读取与 Paper 完全隔离；模式关闭仍可读取已有正式记录",
+        "生产写入默认关闭、无真实用户数据/上链/资金操作；部署和用户验收独立报告"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "server/src/esk_platform/api.rs",
+          "content_hash": "292fa5b06395079e6adcc514cd9185072dab42b68753b59d7d249aa218eab27b",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "df4a2b3a1cf23fdae081f6f0b30f3df7121918e3",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "ce482dfe159da8d13028d121ed455ec191ff1d3f",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/src/esk_platform/http_tests.rs",
+          "content_hash": "2d7c040c2fbd7e071bcd7ee6f6af01626d1afb9585afd585dbecfc0163868d75",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "df4a2b3a1cf23fdae081f6f0b30f3df7121918e3",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "4eab0f77bd3d82ffde05492ae3fa25924bb76bec",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/src/esk_platform/migration.rs",
+          "content_hash": "fe4331f236940760eb0c0c731c9eb4e5f0d585a6ddf4d61899dcc1ba75fc3b07",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "df4a2b3a1cf23fdae081f6f0b30f3df7121918e3",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "fbee30b21887b8a111248a0c952202f38f406220",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/src/esk_platform/model.rs",
+          "content_hash": "71728337a389ced0685a2de2816f69b64d830640df341ad67649b048fc34ac35",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "df4a2b3a1cf23fdae081f6f0b30f3df7121918e3",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "af0013c40f9185f25ac1c8d7e59ded937e766cae",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/src/esk_platform/payment_identity.rs",
+          "content_hash": "2bc45a642de81f4bb1a9226c3770a316dc9d78be53fe705b08f3835f94a3f911",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "df4a2b3a1cf23fdae081f6f0b30f3df7121918e3",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "f50a8860066cd19d2a0e6e379f3c1f6f84dc5af8",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/src/esk_platform/validation.rs",
+          "content_hash": "6c9a188180841a5ee1d9290f43bbeb53c99262235d16e66c2d684e4ae51770a6",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "df4a2b3a1cf23fdae081f6f0b30f3df7121918e3",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "aa00822a8a5edfafee687f905503e647833c6f8e",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/src/store/common/esk_platform_assets/cancel.rs",
+          "content_hash": "d5bbd00b49d0bca415fe8a6062b3237b6f6106afe920aad8702d421260ac1dde",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "df4a2b3a1cf23fdae081f6f0b30f3df7121918e3",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "b5f89dc2c13323badb9b8b7b6c530e163a9faea8",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/src/store/common/esk_platform_assets/mod.rs",
+          "content_hash": "c9b6feb3c20fffd2304ed83ee1ad145ef81b19716ba69c4128093432b5fa29cc",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "df4a2b3a1cf23fdae081f6f0b30f3df7121918e3",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "6c300c2e495972a48df02cacff979f2e6c3bbc09",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/src/store/common/esk_platform_assets/read.rs",
+          "content_hash": "02d145c03d71d7b732828842c8d199e36f649c45a0c7cd82b5a4057ac3df5d25",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "df4a2b3a1cf23fdae081f6f0b30f3df7121918e3",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "c0e9d828c2db27b3400a897c852bf57e1b565588",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/src/store/common/esk_platform_assets/write.rs",
+          "content_hash": "bf5863cfda64dbda2c467d54e01b64b164849922108fd3769640b8be2beec136",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "df4a2b3a1cf23fdae081f6f0b30f3df7121918e3",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "31c17ae003a460b1d4837f21a85a39a6f601e618",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/tests/esk-platform-harness/src/tests/auth.rs",
+          "content_hash": "2227c633f168db403575e92bb3a0226413922c4c861dd25df19902033d85ef5d",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "df4a2b3a1cf23fdae081f6f0b30f3df7121918e3",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "f889a211c763b2db62217b8e4c5ebbf83b669a2d",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/tests/esk-platform-harness/src/tests/cancellation.rs",
+          "content_hash": "41bbcbd58e593d270edc34d66274ce6e0a41505c9a4f0bc45fa2cda7ff88d502",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "df4a2b3a1cf23fdae081f6f0b30f3df7121918e3",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "60efbaa782fa25749426163e5520120f93893224",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/tests/esk-platform-harness/src/tests/recovery.rs",
+          "content_hash": "28433de4822721c76d2c23252f06d6635315d18878e292d9d4f5c13cd78d43d9",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "df4a2b3a1cf23fdae081f6f0b30f3df7121918e3",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "5390b7f20ae2c4febc4fccaa6503b5bee5baa1ea",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/tests/esk-platform-harness/src/tests/transactions.rs",
+          "content_hash": "98c852300844e857cb4c5870b06d20e5cbda8109e5f50cf476391ab6722b34cb",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "df4a2b3a1cf23fdae081f6f0b30f3df7121918e3",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "d62f27921bff9a234c290d3b31f5a391fc62ec3c",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/tests/esk-platform-harness/src/tests/validation.rs",
+          "content_hash": "c48fb76505ee9ee8ee688e14eb63bd246bd2fc229f4716aee972e07023959286",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "df4a2b3a1cf23fdae081f6f0b30f3df7121918e3",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "5c2694f7f4fb8cbb495dd6b07d19856fe12b623f",
+            "state": "index_only"
+          }
+        }
+      ],
+      "created_at_ms": 1788509896487,
+      "updated_at_ms": 1788511959680
+    },
+    {
       "id": "esk-sui-genesis-foundation-v1",
       "title": "ESK Sui 创世基础与可验证发行门禁 V1",
       "summary": "固定 ESK 上 Sui 的创世参数、供应守恒、阶段证据与历史付费用户映射门禁，并交付固定供应 Currency 源码和自动验证；本轮不签名、不广播、不移动真实资金。",
@@ -16522,126 +16762,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_7b0209158a904f1d978419b5aaa89970",
-      "feature_id": "compute-federation-interactive-desktop-v1",
-      "action": "transitioned",
-      "actor": "Codex:/root",
-      "reason": "Reviewed the clarified product modes, licensed-title market boundary, relay-only stranger rule, and source-contract-only scope.",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1788298393395
-    },
-    {
-      "id": "feature_event_152dcdd0af984324be665769bb89cc5f",
-      "feature_id": "compute-federation-interactive-desktop-v1",
-      "action": "transitioned",
-      "actor": "Codex:/root",
-      "reason": "The clarified C0 scope is accepted, dependency-free, and ready for isolated contract implementation with runtime and economic gates closed.",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1788298402144
-    },
-    {
-      "id": "feature_event_cbbf37446b5a4a18b4cf0fa6dfc91bc5",
-      "feature_id": "compute-federation-interactive-desktop-v1",
-      "action": "claimed",
-      "actor": "Codex:/root",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788298422804
-    },
-    {
-      "id": "feature_event_540a0b7b107c4f04bf7478d013fc81b6",
-      "feature_id": "compute-federation-interactive-desktop-v1",
-      "action": "transitioned",
-      "actor": "Codex:/root",
-      "reason": "Implement and statically review the isolated interactive-desktop contract tranche; runtime, media, input, billing, and production effects remain closed.",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788298430882
-    },
-    {
-      "id": "feature_event_d6c8f4d06e2b4e2da3322984139b3f46",
-      "feature_id": "compute-federation-interactive-desktop-v1",
-      "action": "evidence_recorded",
-      "actor": "Codex:/root",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788299267146
-    },
-    {
-      "id": "feature_event_300fa9ac5b5a46a58b7be36b129767f1",
-      "feature_id": "compute-federation-interactive-desktop-v1",
-      "action": "transitioned",
-      "actor": "Codex:/root",
-      "reason": "C0 requirements, architecture, source contracts, negative test source, size/document/ownership/registry guards, and two independent static reviews are complete. The active tranche explicitly forbids compile/runtime validation and leaves migrations, APIs, signaling, TURN/media/input, billing, and production activation closed; therefore it is recorded as blocked rather than implemented.",
-      "from_status": "in_progress",
-      "to_status": "blocked",
-      "at_ms": 1788299278785
-    },
-    {
-      "id": "feature_event_a669827ef7f246b481e8ec61cf210a69",
-      "feature_id": "compute-federation-interactive-desktop-v1",
-      "action": "evidence_recorded",
-      "actor": "Codex:/root",
-      "reason": "",
-      "from_status": "blocked",
-      "to_status": "blocked",
-      "at_ms": 1788299508659
-    },
-    {
-      "id": "feature_event_beee0ba9d4734305886954259e11dfeb",
-      "feature_id": "esk-paper-asset-account-v1",
-      "action": "registered",
-      "actor": "codex-root",
-      "reason": "重放 ESK 功能登记到最新远端注册表，保留并发协作者的权威记录。",
-      "from_status": "",
-      "to_status": "proposed",
-      "at_ms": 1788300027572
-    },
-    {
-      "id": "feature_event_8a6f5b9535d84f41aafbc6e3bd86f0d8",
-      "feature_id": "esk-paper-asset-account-v1",
-      "action": "transitioned",
-      "actor": "codex-root",
-      "reason": "重放后复核范围仍为站内 Paper 资产账户和卖回申请，不上链、不移动资金、不承诺价格或收益。",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1788300045862
-    },
-    {
-      "id": "feature_event_d931d0743eba4424a9ba952482ccb5e6",
-      "feature_id": "esk-paper-asset-account-v1",
-      "action": "transitioned",
-      "actor": "codex-root",
-      "reason": "需求、任务边界、六项验收标准和 Paper 安全门禁均已明确。",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1788300058952
-    },
-    {
-      "id": "feature_event_ff89470eaf14496a974468db14853590",
-      "feature_id": "esk-paper-asset-account-v1",
-      "action": "claimed",
-      "actor": "codex-root",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788300071029
-    },
-    {
-      "id": "feature_event_7f3e9356525a4d2eb7de6e4b97bcb3e3",
-      "feature_id": "esk-paper-asset-account-v1",
-      "action": "transitioned",
-      "actor": "codex-root",
-      "reason": "在最新远端基线重新绑定当前实现与测试证据。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788300084267
-    },
-    {
       "id": "feature_event_5957d4353a044ae7823567080d9862e6",
       "feature_id": "esk-paper-asset-account-v1",
       "action": "evidence_recorded",
@@ -18520,6 +18640,126 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1788508366879
+    },
+    {
+      "id": "feature_event_b7f1d2a5c2ad48b0b42923893fcfad6f",
+      "feature_id": "esk-platform-recorded-assets-v1",
+      "action": "registered",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1788509896487
+    },
+    {
+      "id": "feature_event_ffd169d3c819481db7ee2fa9f0c531f4",
+      "feature_id": "esk-platform-recorded-assets-v1",
+      "action": "claimed",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788509897011
+    },
+    {
+      "id": "feature_event_d106dc00c1fc4f6d9f60e5a24d6da1a2",
+      "feature_id": "esk-platform-recorded-assets-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "确认 Paper 不能承载正式权益；新增独立、默认关闭的经审核付款记账与本人来源链路，不执行生产入账。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788509945924
+    },
+    {
+      "id": "feature_event_8ad6b1923e434583ac3464574b9bb280",
+      "feature_id": "esk-platform-recorded-assets-v1",
+      "action": "claim_released",
+      "actor": "codex-root",
+      "reason": "实现审查发现错误准备需显式取消恢复，不可永久占死付款；补充需求后重新认领，同根同owner。",
+      "from_status": "in_progress",
+      "to_status": "ready",
+      "at_ms": 1788510567517
+    },
+    {
+      "id": "feature_event_63de050f1b8b4f2abe7019277a118274",
+      "feature_id": "esk-platform-recorded-assets-v1",
+      "action": "requirement_rebound",
+      "actor": "codex-root",
+      "reason": "补齐错误准备的显式取消恢复，所有历史保持追加，不允许取消已入账。",
+      "from_status": "ready",
+      "to_status": "proposed",
+      "at_ms": 1788510568320
+    },
+    {
+      "id": "feature_event_bc62c0cd1c4147e7ba8aac41198978df",
+      "feature_id": "esk-platform-recorded-assets-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "恢复路径属于同一正式平台登记链路，不放宽审批、付款唯一或资金操作边界。",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1788510568914
+    },
+    {
+      "id": "feature_event_748247819a2d4417b352391acaed0ab7",
+      "feature_id": "esk-platform-recorded-assets-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "恢复路径属于同一正式平台登记链路，不放宽审批、付款唯一或资金操作边界。",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1788510569563
+    },
+    {
+      "id": "feature_event_ecb6bc705f97489f91ada6432d206edf",
+      "feature_id": "esk-platform-recorded-assets-v1",
+      "action": "claimed",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788510570113
+    },
+    {
+      "id": "feature_event_dec42707fe9a44b2bed0b2d09e68c446",
+      "feature_id": "esk-platform-recorded-assets-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "继续独立服务端切片，包含未入账申请的明确取消和重新准备验收。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788510570652
+    },
+    {
+      "id": "feature_event_c30ebc01c4ec4daea03632e73d1ab334",
+      "feature_id": "esk-platform-recorded-assets-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788511651045
+    },
+    {
+      "id": "feature_event_918ee0791d1840d7b77249b51da275c4",
+      "feature_id": "esk-platform-recorded-assets-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "独立正式平台账本、真实会话门禁、两阶段审核、取消纠错及本人只读接口已实现；42项独立测试和4项生产HTTP通过，警告清理后的最终HTTP复核进行中，未执行生产入账。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1788511651598
+    },
+    {
+      "id": "feature_event_96370a60b5884dfaa615bc9091e8dd39",
+      "feature_id": "esk-platform-recorded-assets-v1",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "最终版本42项生产源码复用账本测试、4项真实完整Store/Router HTTP测试全部通过，JS付款键向量同值、CI91项规则、源码体积/归属/文档/格式门禁通过。仅代码验证：没有生产入账或实际用户验收，服务发布独立记录。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1788511959680
     }
   ]
 }

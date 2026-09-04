@@ -13,6 +13,8 @@ mod batch_api;
 #[path = "../esk_exchange/mod.rs"]
 pub(crate) mod exchange;
 mod model;
+#[path = "../esk_platform/mod.rs"]
+pub(crate) mod platform;
 mod quant_allocation;
 mod quant_allocation_api;
 mod service;
@@ -33,6 +35,7 @@ pub(crate) use quant_allocation::{
 
 pub(crate) fn routes() -> Router<Arc<AppState>> {
     Router::new()
+        .merge(platform::routes())
         .route("/api/me/assets/esk", get(api::get_my_account))
         .route(
             "/api/me/assets/esk/sellback-requests",

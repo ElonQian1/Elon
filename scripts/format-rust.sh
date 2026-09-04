@@ -63,12 +63,14 @@ manifests=(
   "server/Cargo.toml"
   "server/pc-dev-runtime/Cargo.toml"
   "server/homecli-proto/Cargo.toml"
+  "server/tests/esk-platform-harness/Cargo.toml"
 )
 
 roots=(
   "server"
   "server/pc-dev-runtime"
   "server/homecli-proto"
+  "server/tests/esk-platform-harness"
 )
 
 manifest_edition() {

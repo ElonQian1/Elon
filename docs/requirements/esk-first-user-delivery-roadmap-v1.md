@@ -51,6 +51,8 @@ Android 授权前置身份切片见 [官方量化 APK 身份校验 V1](yilong-qu
 `server/src/store/common/esk_assets.rs`、
 `android/app/src/main/kotlin/com/elon/app/esk/EskAssetApi.kt`。
 整合边界见 [量化集成](../yilong-quant-integration.md)。
+正式平台登记独立切片见 [经审核付款账本 V1](esk-platform-recorded-assets-v1.md) 与
+[服务接入边界](../esk-platform-recorded-assets.md)；代码与测试进展不等于生产入账或 APP 已接入。
 
 ## 协作与权威边界
 

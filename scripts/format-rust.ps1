@@ -46,6 +46,7 @@ $crates = @(
     @{ Root = "server"; Manifest = "server/Cargo.toml" },
     @{ Root = "server/pc-dev-runtime"; Manifest = "server/pc-dev-runtime/Cargo.toml" },
     @{ Root = "server/homecli-proto"; Manifest = "server/homecli-proto/Cargo.toml" },
+    @{ Root = "server/tests/esk-platform-harness"; Manifest = "server/tests/esk-platform-harness/Cargo.toml" },
     @{ Root = "tools/esk-paper-contract-tests"; Manifest = "tools/esk-paper-contract-tests/Cargo.toml" }
 )
 
