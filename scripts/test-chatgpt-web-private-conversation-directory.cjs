@@ -28,6 +28,9 @@ assert(source.includes("method !== 'GET'"));
 assert(source.includes('const PROJECT_REFRESH_TIMEOUT_MS = 4000'));
 assert(source.includes('acceptConversationMembership'));
 assert(source.includes('acceptPinnedState'));
+assert(source.includes('acceptTitleState'));
+assert(source.includes('acceptArchivedState'));
+assert(source.includes('removedConversationIds'));
 assert(source.includes('const PIN_OVERRIDE_TTL_MS = 120000'));
 assert(source.includes('window.setTimeout(() =>'));
 assert(directoryRequestsSource.includes('privateDirectory.setListener(() => emitSnapshot(null))'));
@@ -163,7 +166,7 @@ async function flush() {
 (async () => {
   const directory = window.__elonChatGptPrivateConversationDirectory;
   assert(directory);
-  assert.strictEqual(directory.version, 6);
+  assert.strictEqual(directory.version, 7);
   let notifications = 0;
   directory.setListener(() => { notifications += 1; });
 
@@ -212,6 +215,32 @@ async function flush() {
     '移动后立即可见',
     'not-a-project'
   ), false);
+  assert.strictEqual(directory.acceptTitleState(
+    'membership-chat-12345',
+    '已重命名会话'
+  ), true);
+  assert.strictEqual(
+    directory.snapshot().conversations.find(
+      (row) => row.id === 'membership-chat-12345'
+    ).title,
+    '已重命名会话'
+  );
+  assert.strictEqual(directory.acceptArchivedState(
+    'membership-chat-12345',
+    true
+  ), true);
+  assert(!directory.snapshot().conversations.some(
+    (row) => row.id === 'membership-chat-12345'
+  ));
+  assert(directory.snapshot().removedConversationIds.includes('membership-chat-12345'));
+  assert.strictEqual(directory.acceptArchivedState(
+    'membership-chat-12345',
+    false
+  ), true);
+  assert(directory.snapshot().conversations.some(
+    (row) => row.id === 'membership-chat-12345' && row.title === '已重命名会话'
+  ));
+  assert(!directory.snapshot().removedConversationIds.includes('membership-chat-12345'));
 
   const notificationsBeforePin = notifications;
   assert.strictEqual(directory.acceptPinnedState('global-chat-12345', false), true);

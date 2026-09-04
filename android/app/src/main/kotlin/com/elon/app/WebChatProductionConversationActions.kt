@@ -49,7 +49,7 @@ internal class WebChatProductionConversationActionsCoordinator(
 ) {
     private var requestEpoch = 0
     private var activeSheet: WebChatActionSheetHandle? = null
-    private val pinnedMutation = WebChatConversationPinnedMutationCoordinator(
+    private val conversationMutation = WebChatConversationMutationCoordinator(
         activity = activity,
         host = host,
         activeProvider = activeProvider,
@@ -85,9 +85,21 @@ internal class WebChatProductionConversationActionsCoordinator(
         val items = buildList {
             add(WebChatActionSheetItem(
                 id = ACTION_SET_PINNED,
-                title = WebChatConversationPinnedMutationPolicy.actionTitle(conversation),
+                title = WebChatConversationMutationPolicy.pinnedActionTitle(conversation),
                 subtitle = "后台确认官网结果，不切换会话",
                 contentDescription = "web-chat-conversation-action-set-pinned",
+            ))
+            add(WebChatActionSheetItem(
+                id = ACTION_RENAME,
+                title = "重命名",
+                subtitle = "直接更新官网会话名称",
+                contentDescription = "web-chat-conversation-action-rename",
+            ))
+            add(WebChatActionSheetItem(
+                id = ACTION_ARCHIVE,
+                title = "归档",
+                subtitle = "从会话列表隐藏，可在官网恢复",
+                contentDescription = "web-chat-conversation-action-archive",
             ))
             if (canMove) add(WebChatActionSheetItem(
                 id = ACTION_MOVE_TO_PROJECT,
@@ -98,7 +110,7 @@ internal class WebChatProductionConversationActionsCoordinator(
             add(WebChatActionSheetItem(
                 id = ACTION_MORE_SETTINGS,
                 title = "更多会话设置",
-                subtitle = "重命名、归档、分享或删除",
+                subtitle = "分享、查看文件、删除及其他设置",
                 contentDescription = "web-chat-conversation-action-more-settings",
             ))
         }
@@ -132,10 +144,51 @@ internal class WebChatProductionConversationActionsCoordinator(
         conversation: ChatGptWebConversation,
     ) {
         when (actionId) {
-            ACTION_SET_PINNED -> pinnedMutation.start(conversation)
+            ACTION_SET_PINNED -> conversationMutation.start(
+                conversation,
+                WebChatConversationMutationIntent.Pinned(
+                    WebChatConversationMutationPolicy.desiredPinned(conversation),
+                ),
+            )
+            ACTION_RENAME -> showRenameDialog(conversation)
+            ACTION_ARCHIVE -> showArchiveConfirmation(conversation)
             ACTION_MOVE_TO_PROJECT -> projectMove.show(conversation)
             ACTION_MORE_SETTINGS -> showPageActionsFor(conversation)
         }
+    }
+
+    fun showCurrent(): Boolean {
+        if (activeProvider() != WebChatProviderId.CHATGPT_WEB) return false
+        val identity = ChatGptWebConversationPath.identity(currentConversationPath()) ?: return false
+        val conversation = conversationIndex().conversations.firstOrNull {
+            ChatGptWebConversationPath.identity(it.path) == identity
+        } ?: return false
+        show(conversation)
+        return true
+    }
+
+    private fun showRenameDialog(conversation: ChatGptWebConversation) {
+        WebChatConversationRenameDialog.show(activity, conversation) { title ->
+            conversationMutation.start(
+                conversation,
+                WebChatConversationMutationIntent.Renamed(title),
+            )
+        }
+    }
+
+    private fun showArchiveConfirmation(conversation: ChatGptWebConversation) {
+        if (activity.isFinishing || activity.isDestroyed) return
+        AlertDialog.Builder(activity)
+            .setTitle("归档会话")
+            .setMessage("归档后会从当前会话列表隐藏，不会删除聊天内容。")
+            .setPositiveButton("归档") { _, _ ->
+                conversationMutation.start(
+                    conversation,
+                    WebChatConversationMutationIntent.Archived(true),
+                )
+            }
+            .setNegativeButton("取消", null)
+            .show()
     }
 
     private fun showPageActionsFor(conversation: ChatGptWebConversation) {
@@ -167,7 +220,7 @@ internal class WebChatProductionConversationActionsCoordinator(
         val sheet = activeSheet
         activeSheet = null
         sheet?.dismiss()
-        pinnedMutation.cancelPending()
+        conversationMutation.cancelPending()
         projectMove.cancelPending()
     }
 
@@ -253,6 +306,8 @@ internal class WebChatProductionConversationActionsCoordinator(
 
     private companion object {
         const val ACTION_SET_PINNED = "set-pinned"
+        const val ACTION_RENAME = "rename"
+        const val ACTION_ARCHIVE = "archive"
         const val ACTION_MOVE_TO_PROJECT = "move-to-project"
         const val ACTION_MORE_SETTINGS = "more-settings"
         const val ACTION_SHEET_HANDOFF_SETTLE_MS = 48L

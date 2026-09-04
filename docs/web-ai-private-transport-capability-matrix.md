@@ -13,6 +13,7 @@ installed build; individual capability documents retain implementation evidence.
 | Page-local identity context prewarm | ChatGPT | Completed and enabled; same-origin auth plus conversation refresh device verified | Observed official request context and persistent identity WebView |
 | Conversation navigation receipt reconciliation | ChatGPT | Completed, enabled, and device verified on `v1.1.1399 (1420)`, adapter `218` | Official WebView navigation without write replay |
 | Conversation pin transaction | ChatGPT | Completed, enabled, and device verified on `v1.1.1504 (1504)`, adapter `243`; formally shipped in `v1.1.1505 (1505)` | Official conversation options after explicit user choice |
+| Conversation metadata mutations | ChatGPT | Completed, enabled, and device verified on `v1.1.1506 (1506)`, adapter `244`; rename round trip, archive restore, and explicit directory tombstone passed | Official conversation options after explicit user choice |
 | Send dispatch acknowledgement | ChatGPT | Completed and enabled | Official DOM confirmation |
 | Streaming reply observer | ChatGPT | Completed and enabled; completion and sparse-watchdog timer/bridge device verified | Official DOM snapshot |
 | Private stream completion settlement | ChatGPT | Completed, enabled, and device verified on `v1.1.1302 (1312)` | Official DOM snapshot |
@@ -39,8 +40,8 @@ installed build; individual capability documents retain implementation evidence.
 | Private response read aloud | ChatGPT | Completed and production-default; same-origin streaming synthesis start/stop device verified on `v1.1.1498 (1498)`, adapter `241` | Official DOM read-aloud bridge or manual official page |
 | Official response read aloud bridge | ChatGPT | Implemented as a non-default fallback; live official control discovery plus semantic/menu tests passed | Manual official page or explicit system-read-aloud selection |
 | Android system response read aloud | ChatGPT | Implemented and enabled as an explicitly named alternate; audio start user-confirmed, stop acceptance pending | No automatic fallback |
-| Native conversation management | ChatGPT | Completed and enabled; reversible pin round trip device verified on `v1.1.1399 (1420)`, adapter `218`; other mutation acceptance pending | Context-bound official conversation options without automatic write replay |
-| Native conversation project move | ChatGPT | Implemented and enabled; direct DOM activation, optional confirmation, scoped refresh, and reversible device round trip pending | Official conversation project menu |
+| Native conversation management | ChatGPT | Completed and enabled; pin, rename, and archive mutations device verified through adapter `244` | Context-bound official options for share, files, delete, and repair |
+| Native conversation project move | ChatGPT | Completed, enabled, and device verified on `v1.1.1493 (1493)`, adapter `239`; exact two-write round trip restored the original project | Official conversation project menu |
 | Acceptance evidence contract revisions | ChatGPT and Google Web AI | Completed, enabled, and installed-state migration verified on Release `v1.1.1393 (1414)`, adapter `212` | Retain implementation hashes as diagnostics without discarding accepted contracts |
 | Compact `Pro` model control classification | ChatGPT | Completed, enabled, and production-surface device verified on Release `v1.1.1394 (1415)`, adapter `213` | Official model menu remains authoritative |
 | Official feature sidebar trigger | ChatGPT | Completed, enabled, and production-surface device verified on Release `v1.1.1395 (1416)`, adapter `214` | Built-in native feature routes and the full official page |
@@ -275,20 +276,20 @@ write, no unknown recovery state, and the conversation restored to its original 
 The completed, production-default capability is
 `android_chatgpt_native_conversation_project_move_v1`.
 
-Other conversation management actions use the existing context-bound official controls
-through native sheets and typed adaptive forms. Rename, pin or unpin, archive or unarchive,
-and delete stay scoped to the exact conversation identity; destructive or state-changing
-controls require explicit user confirmation. Stale controls are rejected and write
-operations are never replayed automatically. Sharing and any unsupported flow continue in
-the official conversation options. The completed capability is
-`android_chatgpt_native_conversation_management_v1`. Release `v1.1.1399 (1420)`,
-adapter `218`, completed the reversible device acceptance: the exact conversation menu
-opened, pin state changed and was restored, the production surface remained active, and
-no message, Cookie clear, or app-data clear occurred. Navigation success is now settled
-only by an exact target snapshot, commands stay bound to their observed document token,
-and the smoke closes the hidden official menu through its context-bound trigger instead
-of backing out of the production chat. This control path must not be duplicated without
-current regression evidence.
+Conversation pin/unpin, rename, and archive/unarchive now share one versioned page-local
+metadata transaction. Each explicit user action issues exactly one same-origin `PATCH`,
+then settles through bounded read-only directory reconciliation; timeouts never replay the
+write. A confirmed archive installs an explicit native directory tombstone immediately so
+a stale cached row cannot reappear while the official directory refresh is in flight. The
+production current-conversation entry resolves the native conversation identity first and
+uses the same coordinator as a directory row. Sharing, files, delete, and repair remain in
+the exact context-bound official options; project move retains its separately verified
+official activation transaction. The completed capability is
+`android_chatgpt_private_conversation_metadata_mutations_v1`. APK `v1.1.1506 (1506)`,
+adapter `244`, completed unarchive, rename-forward, rename-restore, archive-restore, and
+explicit-tombstone acceptance on a dedicated test conversation. The title and archived
+state were restored, the app returned to conversation home, and no message, Cookie clear,
+or app-data clear occurred. See `docs/chatgpt-private-conversation-metadata-mutations.md`.
 
 The Google conversation directory persists the timestamp of the last successful
 official directory response. Cached rows render immediately; a legacy or expired cache

@@ -6,34 +6,56 @@ import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.chatgptweb.ChatGptWebConversation
 import com.elon.app.chatgptweb.ChatGptWebConversationPath
 
-internal enum class WebChatConversationPinnedMutationProgress {
+internal enum class WebChatConversationMutationProgress {
     WAITING,
     SUCCEEDED,
     NEEDS_OFFICIAL_CONFIRMATION,
 }
 
-internal object WebChatConversationPinnedMutationPolicy {
+internal sealed interface WebChatConversationMutationIntent {
+    data class Pinned(val value: Boolean) : WebChatConversationMutationIntent
+    data class Archived(val value: Boolean) : WebChatConversationMutationIntent
+    data class Renamed(val title: String) : WebChatConversationMutationIntent
+}
+
+internal object WebChatConversationMutationPolicy {
+    const val MAX_TITLE_LENGTH = 160
+
     fun desiredPinned(conversation: ChatGptWebConversation): Boolean = conversation.pinned != true
 
-    fun actionTitle(conversation: ChatGptWebConversation): String =
+    fun pinnedActionTitle(conversation: ChatGptWebConversation): String =
         if (desiredPinned(conversation)) "置顶" else "取消置顶"
 
-    fun progressTitle(pinned: Boolean): String = if (pinned) "正在置顶" else "正在取消置顶"
+    fun normalizedTitle(value: String): String? = value
+        .replace(Regex("\\s+"), " ")
+        .trim()
+        .takeIf { it.isNotBlank() && it.length <= MAX_TITLE_LENGTH }
 
-    fun completedMessage(pinned: Boolean): String = if (pinned) "已置顶" else "已取消置顶"
-
-    fun progress(status: WebChatConsumerCommandStatus?): WebChatConversationPinnedMutationProgress =
+    fun progress(status: WebChatConsumerCommandStatus?): WebChatConversationMutationProgress =
         when (status) {
-            WebChatConsumerCommandStatus.SUCCEEDED ->
-                WebChatConversationPinnedMutationProgress.SUCCEEDED
+            WebChatConsumerCommandStatus.SUCCEEDED -> WebChatConversationMutationProgress.SUCCEEDED
             WebChatConsumerCommandStatus.FAILED,
             WebChatConsumerCommandStatus.TIMED_OUT,
-            -> WebChatConversationPinnedMutationProgress.NEEDS_OFFICIAL_CONFIRMATION
+            -> WebChatConversationMutationProgress.NEEDS_OFFICIAL_CONFIRMATION
             WebChatConsumerCommandStatus.PENDING,
             WebChatConsumerCommandStatus.UNKNOWN,
             null,
-            -> WebChatConversationPinnedMutationProgress.WAITING
+            -> WebChatConversationMutationProgress.WAITING
         }
+
+    fun progressTitle(intent: WebChatConversationMutationIntent): String = when (intent) {
+        is WebChatConversationMutationIntent.Pinned ->
+            if (intent.value) "正在置顶" else "正在取消置顶"
+        is WebChatConversationMutationIntent.Archived ->
+            if (intent.value) "正在归档" else "正在恢复会话"
+        is WebChatConversationMutationIntent.Renamed -> "正在重命名"
+    }
+
+    fun completedMessage(intent: WebChatConversationMutationIntent): String = when (intent) {
+        is WebChatConversationMutationIntent.Pinned -> if (intent.value) "已置顶" else "已取消置顶"
+        is WebChatConversationMutationIntent.Archived -> if (intent.value) "已归档" else "已恢复会话"
+        is WebChatConversationMutationIntent.Renamed -> "已重命名"
+    }
 
     fun failureMessage(detail: String?): String = when {
         detail == "mutation_auth_unavailable" -> "网页身份正在恢复，官网尚未确认这次操作。"
@@ -46,7 +68,7 @@ internal object WebChatConversationPinnedMutationPolicy {
     }
 }
 
-internal class WebChatConversationPinnedMutationCoordinator(
+internal class WebChatConversationMutationCoordinator(
     private val activity: AppCompatActivity,
     private val host: android.view.View,
     private val activeProvider: () -> WebChatProviderId?,
@@ -57,24 +79,33 @@ internal class WebChatConversationPinnedMutationCoordinator(
     private var requestEpoch = 0
     private var activeSheet: WebChatActionSheetHandle? = null
 
-    fun start(conversation: ChatGptWebConversation) {
+    fun start(
+        conversation: ChatGptWebConversation,
+        intent: WebChatConversationMutationIntent,
+    ) {
         cancelPending()
         val path = ChatGptWebConversationPath.normalize(conversation.path)
-            ?: return showFailure(conversation, null)
+            ?: return showFailure(conversation, intent, null)
         val port = consumerPort()
             ?.takeIf { activeProvider() == WebChatProviderId.CHATGPT_WEB }
-            ?: return showFailure(conversation, "mutation_unavailable")
-        val pinned = WebChatConversationPinnedMutationPolicy.desiredPinned(conversation)
+            ?: return showFailure(conversation, intent, "mutation_unavailable")
         val epoch = requestEpoch
-        showProgress(conversation, pinned)
-        val command = port.setConversationPinned(path, pinned, userConfirmed = true)
+        showProgress(conversation, intent)
+        val command = when (intent) {
+            is WebChatConversationMutationIntent.Pinned ->
+                port.setConversationPinned(path, intent.value, userConfirmed = true)
+            is WebChatConversationMutationIntent.Archived ->
+                port.setConversationArchived(path, intent.value, userConfirmed = true)
+            is WebChatConversationMutationIntent.Renamed ->
+                port.renameConversation(path, intent.title, userConfirmed = true)
+        }
         val requestId = command.requestId
         if (!command.accepted || requestId.isNullOrBlank()) {
             refreshConversationIndex(null)
-            showFailure(conversation, command.error)
+            showFailure(conversation, intent, command.error)
             return
         }
-        poll(conversation, pinned, port, requestId, epoch, attempt = 0)
+        poll(conversation, intent, port, requestId, epoch, attempt = 0)
     }
 
     fun cancelPending() {
@@ -86,7 +117,7 @@ internal class WebChatConversationPinnedMutationCoordinator(
 
     private fun poll(
         conversation: ChatGptWebConversation,
-        pinned: Boolean,
+        intent: WebChatConversationMutationIntent,
         port: WebChatConsumerPort,
         requestId: String,
         epoch: Int,
@@ -94,47 +125,50 @@ internal class WebChatConversationPinnedMutationCoordinator(
     ) {
         if (epoch != requestEpoch) return
         val request = port.state().commandRequests.lastOrNull { it.id == requestId }
-        when (WebChatConversationPinnedMutationPolicy.progress(request?.status)) {
-            WebChatConversationPinnedMutationProgress.SUCCEEDED -> {
+        when (WebChatConversationMutationPolicy.progress(request?.status)) {
+            WebChatConversationMutationProgress.SUCCEEDED -> {
                 dismissProgress()
                 Toast.makeText(
                     activity,
-                    WebChatConversationPinnedMutationPolicy.completedMessage(pinned),
+                    WebChatConversationMutationPolicy.completedMessage(intent),
                     Toast.LENGTH_SHORT,
                 ).show()
             }
-            WebChatConversationPinnedMutationProgress.NEEDS_OFFICIAL_CONFIRMATION -> {
+            WebChatConversationMutationProgress.NEEDS_OFFICIAL_CONFIRMATION -> {
                 refreshConversationIndex(null)
-                showFailure(conversation, request?.detail)
+                showFailure(conversation, intent, request?.detail)
             }
-            WebChatConversationPinnedMutationProgress.WAITING -> {
+            WebChatConversationMutationProgress.WAITING -> {
                 if (attempt >= MAX_POLL_ATTEMPTS) {
                     refreshConversationIndex(null)
-                    showFailure(conversation, "mutation_timeout")
+                    showFailure(conversation, intent, "mutation_timeout")
                     return
                 }
                 host.postDelayed(
-                    { poll(conversation, pinned, port, requestId, epoch, attempt + 1) },
+                    { poll(conversation, intent, port, requestId, epoch, attempt + 1) },
                     POLL_INTERVAL_MS,
                 )
             }
         }
     }
 
-    private fun showProgress(conversation: ChatGptWebConversation, pinned: Boolean) {
+    private fun showProgress(
+        conversation: ChatGptWebConversation,
+        intent: WebChatConversationMutationIntent,
+    ) {
         activeSheet = WebChatActionSheet.showUpdatable(
             activity = activity,
-            title = WebChatConversationPinnedMutationPolicy.progressTitle(pinned),
+            title = WebChatConversationMutationPolicy.progressTitle(intent),
             items = listOf(WebChatActionSheetItem(
-                id = "conversation-pinned-progress",
+                id = "conversation-mutation-progress",
                 title = conversation.title,
                 subtitle = "正在等待官网确认",
                 enabled = false,
-                contentDescription = "web-chat-conversation-pinned-progress",
+                contentDescription = "web-chat-conversation-mutation-progress",
             )),
             footerActions = listOf(WebChatActionSheetFooterAction(
                 label = "官网确认",
-                contentDescription = "web-chat-conversation-pinned-official",
+                contentDescription = "web-chat-conversation-mutation-official",
                 action = {
                     requestEpoch += 1
                     openOfficialFallback(conversation)
@@ -151,13 +185,17 @@ internal class WebChatConversationPinnedMutationCoordinator(
         sheet?.dismiss()
     }
 
-    private fun showFailure(conversation: ChatGptWebConversation, detail: String?) {
+    private fun showFailure(
+        conversation: ChatGptWebConversation,
+        intent: WebChatConversationMutationIntent,
+        detail: String?,
+    ) {
         dismissProgress()
         if (activity.isFinishing || activity.isDestroyed) return
         AlertDialog.Builder(activity)
             .setTitle("会话操作未确认")
-            .setMessage(WebChatConversationPinnedMutationPolicy.failureMessage(detail))
-            .setNeutralButton("重试") { _, _ -> start(conversation) }
+            .setMessage(WebChatConversationMutationPolicy.failureMessage(detail))
+            .setNeutralButton("重试") { _, _ -> start(conversation, intent) }
             .setPositiveButton("官网确认") { _, _ -> openOfficialFallback(conversation) }
             .setNegativeButton("取消", null)
             .show()

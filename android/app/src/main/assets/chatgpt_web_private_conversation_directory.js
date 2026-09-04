@@ -2,7 +2,7 @@
   'use strict';
 
   const existing = window.__elonChatGptPrivateConversationDirectory;
-  if (existing && Number(existing.version) >= 6) return;
+  if (existing && Number(existing.version) >= 7) return;
   if (location.origin !== 'https://chatgpt.com') return;
 
   const originalFetch = typeof window.fetch === 'function' ? window.fetch.bind(window) : null;
@@ -14,6 +14,8 @@
   const projects = new Map();
   const projectRefreshes = new Map();
   const pinnedStateOverrides = new Map();
+  const archivedConversations = new Map();
+  const removedConversationIds = new Set();
   let listener = null;
   let revision = 0;
   const MAX_CONVERSATIONS = 200;
@@ -185,6 +187,59 @@
     return true;
   }
 
+  function acceptTitleState(rawId, rawTitle) {
+    const id = cleanText(rawId);
+    const title = cleanText(rawTitle);
+    if (!SAFE_ID.test(id) || !title) return false;
+    const source = conversations.get(id) || archivedConversations.get(id);
+    if (!source) return false;
+    const next = Object.freeze(Object.assign({}, source, { title }));
+    if (conversations.has(id)) conversations.set(id, next);
+    if (archivedConversations.has(id)) archivedConversations.set(id, next);
+    if (source.title !== title) notify();
+    return true;
+  }
+
+  function acceptArchivedState(rawId, archived, metadata) {
+    const id = cleanText(rawId);
+    if (!SAFE_ID.test(id) || typeof archived !== 'boolean') return false;
+    if (archived) {
+      const previous = conversations.get(id);
+      if (previous) archivedConversations.set(id, previous);
+      conversations.delete(id);
+      removedConversationIds.add(id);
+      trimMap(archivedConversations, MAX_CONVERSATIONS);
+      trimSet(removedConversationIds, MAX_CONVERSATIONS);
+      notify();
+      return true;
+    }
+    const source = archivedConversations.get(id);
+    const title = cleanText(metadata && metadata.title) || (source && source.title) || '';
+    if (!source && !title) return false;
+    const projectId = projectIdFrom(metadata, source && source.projectId);
+    const path = projectId ? '/g/' + projectId + '/c/' + id : '/c/' + id;
+    conversations.set(id, Object.freeze(Object.assign({}, source || {}, {
+      id,
+      title,
+      path,
+      active: location.pathname === path,
+      pinned: source && typeof source.pinned === 'boolean' ? source.pinned : null,
+      groupLabel: source && source.groupLabel || '',
+      projectId: projectId || null,
+      projectTitle: source && source.projectTitle || null,
+      projectPath: projectId ? '/g/' + projectId + '/project' : null,
+      activityDates: source && Array.isArray(source.activityDates)
+        ? source.activityDates.slice(0, 32)
+        : [],
+      order: source && Number.isFinite(source.order) ? source.order : conversations.size
+    })));
+    archivedConversations.delete(id);
+    removedConversationIds.delete(id);
+    trimMap(conversations, MAX_CONVERSATIONS);
+    notify();
+    return true;
+  }
+
   function projectTitle(value) {
     const gizmo = value && value.gizmo && typeof value.gizmo === 'object' ? value.gizmo : null;
     const display = value && value.display && typeof value.display === 'object' ? value.display : null;
@@ -232,6 +287,10 @@
     while (values.size > maximum) values.delete(values.keys().next().value);
   }
 
+  function trimSet(values, maximum) {
+    while (values.size > maximum) values.delete(values.values().next().value);
+  }
+
   function notify(emitListener) {
     revision += 1;
     if (emitListener !== false && typeof listener === 'function') listener();
@@ -250,6 +309,8 @@
     } else {
       if (!candidateArrays(payload).length) return false;
       collectConversations(payload, metadata.projectId).forEach((row) => {
+        archivedConversations.delete(row.id);
+        removedConversationIds.delete(row.id);
         conversations.set(row.id, row);
         changed = true;
       });
@@ -267,6 +328,10 @@
       if (row && row.projectId === projectId) conversations.delete(id);
     });
     rows.forEach((row) => conversations.set(row.id, row));
+    rows.forEach((row) => {
+      archivedConversations.delete(row.id);
+      removedConversationIds.delete(row.id);
+    });
     trimMap(conversations, MAX_CONVERSATIONS);
     return true;
   }
@@ -360,16 +425,19 @@
       revision,
       conversations: conversationRows,
       projects: projectRows,
+      removedConversationIds: Array.from(removedConversationIds),
       complete: false
     });
   }
 
   window.__elonChatGptPrivateConversationDirectory = Object.freeze({
-    version: 6,
+    version: 7,
     snapshot,
     refreshProject,
     acceptConversationMembership,
     acceptPinnedState,
+    acceptTitleState,
+    acceptArchivedState,
     setListener: (value) => { listener = typeof value === 'function' ? value : null; }
   });
 })();

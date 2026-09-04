@@ -1,7 +1,7 @@
 (function (root, factory) {
   'use strict';
 
-  const exported = Object.freeze({ version: 2, create: factory });
+  const exported = Object.freeze({ version: 3, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (!root || !root.location || root.location.origin !== 'https://chatgpt.com') return;
   const current = root.__elonChatGptPrivateConversationMutation;
@@ -14,7 +14,7 @@
 })(typeof window === 'object' ? window : globalThis, function (root, dependencies) {
   'use strict';
 
-  const VERSION = 2;
+  const VERSION = 3;
   const WRITE_TIMEOUT_MS = 9000;
   const RECONCILE_TIMEOUT_MS = 4000;
   const UNCERTAIN_RECONCILE_WINDOW_MS = 16000;
@@ -22,6 +22,7 @@
   const RETRY_COOLDOWN_MS = 5000;
   const CIRCUIT_COOLDOWN_MS = 45000;
   const MAX_FAILURES = 2;
+  const MAX_TITLE_LENGTH = 160;
   const BLOCKED_INHERITED_HEADERS = new Set([
     'connection',
     'content-length',
@@ -55,6 +56,11 @@
       /^(?:\/c\/([A-Za-z0-9_-]{1,160})|\/g\/g-p-[A-Za-z0-9_-]{1,160}\/c\/([A-Za-z0-9_-]{1,160}))$/
     );
     return match ? Object.freeze({ path, id: match[1] || match[2] }) : null;
+  }
+
+  function titleFromInput(rawTitle) {
+    const title = String(rawTitle || '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
+    return title && title.length <= MAX_TITLE_LENGTH ? title : '';
   }
 
   function supported() {
@@ -151,31 +157,71 @@
     return Object.freeze({ known: pinned || !hasMore, pinned });
   }
 
+  function conversationCandidates(payload) {
+    return [
+      payload,
+      payload && payload.conversation,
+      payload && payload.data,
+      payload && payload.data && payload.data.conversation,
+      payload && payload.result,
+      payload && payload.result && payload.result.conversation
+    ].filter((value) => value && typeof value === 'object' && !Array.isArray(value));
+  }
+
+  function conversationStateFromPayload(payload) {
+    const candidates = conversationCandidates(payload);
+    const titleSource = candidates.find((value) => typeof value.title === 'string');
+    const archiveSource = candidates.find((value) => typeof value.is_archived === 'boolean');
+    return Object.freeze({
+      titleKnown: Boolean(titleSource),
+      title: titleSource ? titleFromInput(titleSource.title) : '',
+      archivedKnown: Boolean(archiveSource),
+      archived: archiveSource ? archiveSource.is_archived : false,
+      metadata: titleSource || archiveSource || candidates[0] || null
+    });
+  }
+
   function acceptPinnedState(conversationId, pinned) {
     if (!directory || typeof directory.acceptPinnedState !== 'function') return false;
     try { return directory.acceptPinnedState(conversationId, pinned); }
     catch (_) { return false; }
   }
 
-  async function reconcilePinned(conversationId, expectedPinned, headers, timeoutMs) {
+  function acceptTitleState(conversationId, title) {
+    if (!directory || typeof directory.acceptTitleState !== 'function') return false;
+    try { return directory.acceptTitleState(conversationId, title); }
+    catch (_) { return false; }
+  }
+
+  function acceptArchivedState(conversationId, archived, metadata) {
+    if (!directory || typeof directory.acceptArchivedState !== 'function') return false;
+    try { return directory.acceptArchivedState(conversationId, archived, metadata); }
+    catch (_) { return false; }
+  }
+
+  async function readJson(url, headers, timeoutMs, transportLabel) {
     let response;
     try {
-      response = await fetchWithTimeout('/backend-api/pins', {
+      response = await fetchWithTimeout(url, {
         method: 'GET',
         credentials: 'include',
         cache: 'no-store',
         headers,
-        __elonPrivateTransport: 'conversation_pin_reconcile_v1'
+        __elonPrivateTransport: transportLabel
       }, Math.max(250, Number(timeoutMs) || RECONCILE_TIMEOUT_MS));
     } catch (_) {
-      return Object.freeze({ confirmed: false, known: false });
+      return null;
     }
-    if (!response || !response.ok || typeof response.json !== 'function') {
-      return Object.freeze({ confirmed: false, known: false });
-    }
-    let payload;
-    try { payload = await response.json(); }
-    catch (_) { return Object.freeze({ confirmed: false, known: false }); }
+    if (!response || !response.ok || typeof response.json !== 'function') return null;
+    try { return await response.json(); }
+    catch (_) { return null; }
+  }
+
+  async function reconcilePinned(conversationId, expectedPinned, headers, timeoutMs) {
+    const payload = await readJson(
+      '/backend-api/pins', headers, timeoutMs, 'conversation_pin_reconcile_v1'
+    );
+    if (!payload) return Object.freeze({ confirmed: false, known: false });
     const observed = pinStateFromPayload(payload, conversationId);
     if (observed.known && observed.pinned === expectedPinned) {
       acceptPinnedState(conversationId, observed.pinned);
@@ -186,7 +232,32 @@
     });
   }
 
-  async function reconcileUncertainWrite(conversationId, expectedPinned, headers) {
+  async function reconcileConversation(conversationId, mutation, headers, timeoutMs) {
+    const payload = await readJson(
+      '/backend-api/conversations/' + encodeURIComponent(conversationId),
+      headers,
+      timeoutMs,
+      'conversation_metadata_reconcile_v1'
+    );
+    if (!payload) return Object.freeze({ confirmed: false, known: false });
+    const observed = conversationStateFromPayload(payload);
+    if (mutation.kind === 'rename') {
+      const confirmed = observed.titleKnown && observed.title === mutation.title;
+      if (confirmed) acceptTitleState(conversationId, observed.title);
+      return Object.freeze({ confirmed, known: observed.titleKnown });
+    }
+    const confirmed = observed.archivedKnown && observed.archived === mutation.archived;
+    if (confirmed) acceptArchivedState(conversationId, observed.archived, observed.metadata);
+    return Object.freeze({ confirmed, known: observed.archivedKnown });
+  }
+
+  function reconcileMutation(conversationId, mutation, headers, timeoutMs) {
+    return mutation.kind === 'pin'
+      ? reconcilePinned(conversationId, mutation.pinned, headers, timeoutMs)
+      : reconcileConversation(conversationId, mutation, headers, timeoutMs);
+  }
+
+  async function reconcileUncertainWrite(conversationId, mutation, headers) {
     const deadline = now() + UNCERTAIN_RECONCILE_WINDOW_MS;
     let known = false;
     for (const delayMs of UNCERTAIN_RECONCILE_BACKOFF_MS) {
@@ -195,16 +266,14 @@
       await sleep(Math.min(delayMs, beforeDelay));
       const remaining = deadline - now();
       if (remaining <= 0) break;
-      const observed = await reconcilePinned(
+      const observed = await reconcileMutation(
         conversationId,
-        expectedPinned,
+        mutation,
         headers,
         Math.min(RECONCILE_TIMEOUT_MS, remaining)
       );
       known = known || observed.known;
-      if (observed.confirmed) {
-        return Object.freeze({ confirmed: true, known: true });
-      }
+      if (observed.confirmed) return Object.freeze({ confirmed: true, known: true });
     }
     return Object.freeze({ confirmed: false, known });
   }
@@ -239,7 +308,13 @@
     });
   }
 
-  async function executePinned(target, pinned) {
+  function acknowledgeMutation(target, mutation) {
+    if (mutation.kind === 'pin') return acceptPinnedState(target.id, mutation.pinned);
+    if (mutation.kind === 'rename') return acceptTitleState(target.id, mutation.title);
+    return acceptArchivedState(target.id, mutation.archived, null);
+  }
+
+  async function executeMutation(target, mutation) {
     let headers;
     try {
       headers = await acquireHeaders();
@@ -257,15 +332,15 @@
           credentials: 'include',
           cache: 'no-store',
           headers,
-          body: JSON.stringify({ is_starred: pinned }),
-          __elonPrivateTransport: 'conversation_pin_v1'
+          body: JSON.stringify(mutation.body),
+          __elonPrivateTransport: mutation.transport
         },
         WRITE_TIMEOUT_MS
       );
     } catch (error) {
       const code = failureCode(error);
       if (code === 'mutation_timeout' || code === 'mutation_network_failure') {
-        const reconciliation = await reconcileUncertainWrite(target.id, pinned, headers);
+        const reconciliation = await reconcileUncertainWrite(target.id, mutation, headers);
         if (reconciliation.confirmed) {
           recordSuccess(now() - startedAt);
           return Object.freeze({
@@ -280,7 +355,7 @@
         recordFailure(code === 'mutation_timeout' ? 'timeout' : 'network');
         return rejected(code, true, reconciliation.known);
       }
-      recordFailure(code === 'mutation_auth_unavailable' ? 'auth' : code === 'mutation_timeout' ? 'timeout' : 'network');
+      recordFailure(code === 'mutation_auth_unavailable' ? 'auth' : 'network');
       return rejected(code, true);
     }
     if (!response || !response.ok) {
@@ -295,8 +370,10 @@
       return rejected('mutation_http_' + status, true);
     }
     recordSuccess(now() - startedAt);
-    acceptPinnedState(target.id, pinned);
-    const reconciliation = await reconcilePinned(target.id, pinned, headers);
+    acknowledgeMutation(target, mutation);
+    const reconciliation = await reconcileMutation(
+      target.id, mutation, headers, RECONCILE_TIMEOUT_MS
+    );
     return Object.freeze({
       ok: true,
       code: reconciliation.confirmed ? 'mutation_confirmed' : 'mutation_server_acknowledged',
@@ -305,35 +382,86 @@
     });
   }
 
-  function setPinned(rawPath, pinned) {
+  function startMutation(rawPath, mutation) {
     const target = targetFromPath(rawPath);
-    if (!target || typeof pinned !== 'boolean') return Promise.resolve(rejected('invalid_mutation', false));
+    if (!target || !mutation) return Promise.resolve(rejected('invalid_mutation', false));
     if (!supported()) return Promise.resolve(rejected('mutation_unavailable', false));
     if (active) return Promise.resolve(rejected('mutation_busy', false));
     if (cooldownUntil > now()) return Promise.resolve(rejected('mutation_circuit_open', false));
-    const request = executePinned(target, pinned).finally(() => {
+    const request = executeMutation(target, mutation).finally(() => {
       if (active === request) active = null;
     });
     active = request;
     return request;
   }
 
+  function setPinned(rawPath, pinned) {
+    if (typeof pinned !== 'boolean') return Promise.resolve(rejected('invalid_mutation', false));
+    return startMutation(rawPath, Object.freeze({
+      kind: 'pin',
+      pinned,
+      body: { is_starred: pinned },
+      transport: 'conversation_pin_v1'
+    }));
+  }
+
+  function setArchived(rawPath, archived) {
+    if (typeof archived !== 'boolean') return Promise.resolve(rejected('invalid_mutation', false));
+    return startMutation(rawPath, Object.freeze({
+      kind: 'archive',
+      archived,
+      body: { is_archived: archived },
+      transport: 'conversation_archive_v1'
+    }));
+  }
+
+  function rename(rawPath, rawTitle) {
+    const title = titleFromInput(rawTitle);
+    if (!title) return Promise.resolve(rejected('invalid_mutation', false));
+    return startMutation(rawPath, Object.freeze({
+      kind: 'rename',
+      title,
+      body: { title },
+      transport: 'conversation_rename_v1'
+    }));
+  }
+
+  function commandMutation(action, command) {
+    if (action === 'set_conversation_pinned') {
+      return { run: () => setPinned(String(command && command.value || ''), command && command.selected) };
+    }
+    if (action === 'set_conversation_archived') {
+      return { run: () => setArchived(String(command && command.value || ''), command && command.selected) };
+    }
+    if (action === 'rename_conversation') {
+      return { run: () => rename(String(command && command.value || ''), command && command.title) };
+    }
+    return null;
+  }
+
   function handle(action, command, respond, scheduleSnapshot, directoryRequests) {
-    if (action !== 'set_conversation_pinned') return false;
-    setPinned(String(command && command.value || ''), command && command.selected)
-      .then((outcome) => {
-        const value = outcome && typeof outcome === 'object' ? outcome : {};
-        if (value.ok === true) {
-          if (directoryRequests && typeof directoryRequests.emitSnapshot === 'function') {
-            directoryRequests.emitSnapshot(null);
-          }
-          if (typeof scheduleSnapshot === 'function') scheduleSnapshot(true);
+    const mutation = commandMutation(action, command);
+    if (!mutation) return false;
+    mutation.run().then((outcome) => {
+      const value = outcome && typeof outcome === 'object' ? outcome : {};
+      if (value.ok === true) {
+        if (directoryRequests && typeof directoryRequests.emitSnapshot === 'function') {
+          directoryRequests.emitSnapshot(null);
         }
-        respond(action, value.ok === true, String(value.code || 'mutation_failed'));
-      })
-      .catch(() => respond(action, false, 'mutation_failed'));
+        if (typeof scheduleSnapshot === 'function') scheduleSnapshot(true);
+      }
+      respond(action, value.ok === true, String(value.code || 'mutation_failed'));
+    }).catch(() => respond(action, false, 'mutation_failed'));
     return true;
   }
 
-  return Object.freeze({ version: VERSION, enabled, setPinned, handle, state });
+  return Object.freeze({
+    version: VERSION,
+    enabled,
+    setPinned,
+    setArchived,
+    rename,
+    handle,
+    state
+  });
 });

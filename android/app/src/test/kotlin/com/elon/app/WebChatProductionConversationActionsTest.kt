@@ -16,29 +16,42 @@ class WebChatProductionConversationActionsTest {
         )
         val pinned = unknown.copy(pinned = true)
 
-        assertTrue(WebChatConversationPinnedMutationPolicy.desiredPinned(unknown))
-        assertEquals("置顶", WebChatConversationPinnedMutationPolicy.actionTitle(unknown))
-        assertFalse(WebChatConversationPinnedMutationPolicy.desiredPinned(pinned))
-        assertEquals("取消置顶", WebChatConversationPinnedMutationPolicy.actionTitle(pinned))
+        assertTrue(WebChatConversationMutationPolicy.desiredPinned(unknown))
+        assertEquals("置顶", WebChatConversationMutationPolicy.pinnedActionTitle(unknown))
+        assertFalse(WebChatConversationMutationPolicy.desiredPinned(pinned))
+        assertEquals("取消置顶", WebChatConversationMutationPolicy.pinnedActionTitle(pinned))
     }
 
     @Test
     fun pinnedMutationRequiresACompletedReceiptBeforeShowingSuccess() {
         assertEquals(
-            WebChatConversationPinnedMutationProgress.WAITING,
-            WebChatConversationPinnedMutationPolicy.progress(null),
+            WebChatConversationMutationProgress.WAITING,
+            WebChatConversationMutationPolicy.progress(null),
         )
         assertEquals(
-            WebChatConversationPinnedMutationProgress.WAITING,
-            WebChatConversationPinnedMutationPolicy.progress(WebChatConsumerCommandStatus.PENDING),
+            WebChatConversationMutationProgress.WAITING,
+            WebChatConversationMutationPolicy.progress(WebChatConsumerCommandStatus.PENDING),
         )
         assertEquals(
-            WebChatConversationPinnedMutationProgress.SUCCEEDED,
-            WebChatConversationPinnedMutationPolicy.progress(WebChatConsumerCommandStatus.SUCCEEDED),
+            WebChatConversationMutationProgress.SUCCEEDED,
+            WebChatConversationMutationPolicy.progress(WebChatConsumerCommandStatus.SUCCEEDED),
         )
         assertEquals(
-            WebChatConversationPinnedMutationProgress.NEEDS_OFFICIAL_CONFIRMATION,
-            WebChatConversationPinnedMutationPolicy.progress(WebChatConsumerCommandStatus.FAILED),
+            WebChatConversationMutationProgress.NEEDS_OFFICIAL_CONFIRMATION,
+            WebChatConversationMutationPolicy.progress(WebChatConsumerCommandStatus.FAILED),
+        )
+    }
+
+    @Test
+    fun renameTitlesAreNormalizedAndBoundedBeforeDispatch() {
+        assertEquals(
+            "新的 会话标题",
+            WebChatConversationMutationPolicy.normalizedTitle("  新的   会话标题  "),
+        )
+        assertEquals(null, WebChatConversationMutationPolicy.normalizedTitle("   "))
+        assertEquals(
+            null,
+            WebChatConversationMutationPolicy.normalizedTitle("x".repeat(161)),
         )
     }
 

@@ -579,7 +579,12 @@ internal object ChatGptWebFeatureBaseline {
             id = "conversation_management",
             group = "history",
             delivery = Delivery.ADAPTIVE_NATIVE,
-            mcpActions = listOf("chatgpt_invoke_control"),
+            mcpActions = listOf(
+                "chatgpt_set_conversation_pinned",
+                "chatgpt_set_conversation_archived",
+                "chatgpt_rename_conversation",
+                "chatgpt_invoke_control",
+            ),
             semantics = setOf(
                 "conversation_files",
                 "rename",
@@ -593,9 +598,15 @@ internal object ChatGptWebFeatureBaseline {
         feature(
             id = "conversation_mutations",
             group = "history",
-            delivery = Delivery.OFFICIAL_WEB_WITH_NATIVE_ENTRY,
+            delivery = Delivery.ADAPTIVE_NATIVE,
             acceptance = Acceptance.USER_DRIVEN_DEVICE,
-            mcpActions = listOf("chatgpt_invoke_control", "chatgpt_select_view"),
+            mcpActions = listOf(
+                "chatgpt_set_conversation_pinned",
+                "chatgpt_set_conversation_archived",
+                "chatgpt_rename_conversation",
+                "chatgpt_invoke_control",
+                "chatgpt_select_view",
+            ),
             semantics = setOf("rename", "pin", "archive", "share", "delete"),
             verificationGap = "conversation_mutation_device_acceptance",
         ),

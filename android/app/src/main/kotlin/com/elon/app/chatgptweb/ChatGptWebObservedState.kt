@@ -34,11 +34,13 @@ internal class ChatGptWebObservedState(
                         observed = event.conversations,
                         projectId = projectId,
                         collectionComplete = event.collection.isComplete,
+                        removedConversationIds = event.removedConversationIds,
                     )
                 } ?: ChatGptWebConversationIndex.mergeOfficialHistory(
                     previous = conversations,
                     observed = event.conversations,
                     collectionComplete = event.collection.isComplete,
+                    removedConversationIds = event.removedConversationIds,
                 )
                 projects = ChatGptWebConversationIndex.mergeObservedProjects(
                     conversations,

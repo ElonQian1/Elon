@@ -164,6 +164,26 @@ internal class ChatGptWebConsumerPortAdapter(
         .put("pinned", pinned)
         .put("user_confirmed", userConfirmed))
 
+    override fun setConversationArchived(
+        conversationPath: String,
+        archived: Boolean,
+        userConfirmed: Boolean,
+    ): WebChatConsumerCommandResult = execute(JSONObject()
+        .put("action", "chatgpt_set_conversation_archived")
+        .put("conversation_path", conversationPath)
+        .put("archived", archived)
+        .put("user_confirmed", userConfirmed))
+
+    override fun renameConversation(
+        conversationPath: String,
+        title: String,
+        userConfirmed: Boolean,
+    ): WebChatConsumerCommandResult = execute(JSONObject()
+        .put("action", "chatgpt_rename_conversation")
+        .put("conversation_path", conversationPath)
+        .put("title", title)
+        .put("user_confirmed", userConfirmed))
+
     override fun updateControl(
         controlId: String,
         mutation: WebChatConsumerControlMutation,

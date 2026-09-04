@@ -42,6 +42,14 @@ function fixture(fetchImpl, enabled = true, rootOverrides = {}) {
     acceptPinnedState: (id, pinned) => {
       accepted.push({ id, pinned });
       return true;
+    },
+    acceptTitleState: (id, title) => {
+      accepted.push({ id, title });
+      return true;
+    },
+    acceptArchivedState: (id, archived) => {
+      accepted.push({ id, archived });
+      return true;
     }
   };
   return {
@@ -105,6 +113,54 @@ async function concurrentIntentNeverCreatesASecondWrite() {
   pending.resolve(response(200, {}));
   await first;
   assert.strictEqual(test.calls.length, 2);
+}
+
+async function renameUsesOnePatchAndReadOnlyReconciliation() {
+  const test = fixture(async (url) => url === '/backend-api/conversations/conversation-123'
+    ? response(200, { id: 'conversation-123', title: '新标题', is_archived: false })
+    : response(200, {}));
+
+  const result = await test.transport.rename('/c/conversation-123', '  新标题  ');
+
+  assert.deepStrictEqual(result, {
+    ok: true,
+    code: 'mutation_confirmed',
+    attempted: true,
+    reconciled: true
+  });
+  assert.strictEqual(test.calls.length, 2);
+  assert.strictEqual(test.calls[0].url, '/backend-api/conversation/conversation-123');
+  assert.strictEqual(test.calls[0].init.method, 'PATCH');
+  assert.deepStrictEqual(JSON.parse(test.calls[0].init.body), { title: '新标题' });
+  assert.strictEqual(test.calls[1].init.method, 'GET');
+  assert.strictEqual(test.calls[1].url, '/backend-api/conversations/conversation-123');
+  assert.deepStrictEqual(test.accepted, [
+    { id: 'conversation-123', title: '新标题' },
+    { id: 'conversation-123', title: '新标题' }
+  ]);
+}
+
+async function archiveUsesOnePatchAndProjectsRemovalIntoTheDirectory() {
+  const test = fixture(async (url) => url === '/backend-api/conversations/conversation-123'
+    ? response(200, { conversation: {
+      id: 'conversation-123', title: '归档目标', is_archived: true
+    } })
+    : response(200, {}));
+
+  const result = await test.transport.setArchived('/g/g-p-demo/c/conversation-123', true);
+
+  assert.deepStrictEqual(result, {
+    ok: true,
+    code: 'mutation_confirmed',
+    attempted: true,
+    reconciled: true
+  });
+  assert.strictEqual(test.calls.length, 2);
+  assert.deepStrictEqual(JSON.parse(test.calls[0].init.body), { is_archived: true });
+  assert.deepStrictEqual(test.accepted, [
+    { id: 'conversation-123', archived: true },
+    { id: 'conversation-123', archived: true }
+  ]);
 }
 
 async function successfulWriteIsNotRolledBackByLaggingPinIndex() {
@@ -202,6 +258,9 @@ async function disabledOrInvalidMutationIsSideEffectFree() {
   const invalid = await fixture(async () => response(200, {})).transport
     .setPinned('/auth/login', true);
   assert.strictEqual(invalid.code, 'invalid_mutation');
+  const emptyTitle = await fixture(async () => response(200, {})).transport
+    .rename('/c/conversation-123', '   ');
+  assert.strictEqual(emptyTitle.code, 'invalid_mutation');
 }
 
 async function adapterHandlerReportsTheCorrelatedResultAndRefreshesOnlyAfterSuccess() {
@@ -228,11 +287,31 @@ async function adapterHandlerReportsTheCorrelatedResultAndRefreshesOnlyAfterSucc
   assert.deepStrictEqual(directoryRequests, [null]);
   assert.deepStrictEqual(snapshots, [true]);
   assert.strictEqual(test.transport.handle('unrelated_action', {}, () => {}), false);
+
+  const renameTest = fixture(async (url) => url.includes('/conversations/')
+    ? response(200, { title: '新的会话标题' })
+    : response(200, {}));
+  const renameResult = new Promise((resolve) => {
+    assert.strictEqual(renameTest.transport.handle(
+      'rename_conversation',
+      { value: '/c/conversation-123', title: '新的会话标题' },
+      (action, ok, detail) => resolve({ action, ok, detail }),
+      () => {},
+      { emitSnapshot: () => {} }
+    ), true);
+  });
+  assert.deepStrictEqual(await renameResult, {
+    action: 'rename_conversation',
+    ok: true,
+    detail: 'mutation_confirmed'
+  });
 }
 
 (async () => {
   await successfulWriteIsSingleAndReconciled();
   await concurrentIntentNeverCreatesASecondWrite();
+  await renameUsesOnePatchAndReadOnlyReconciliation();
+  await archiveUsesOnePatchAndProjectsRemovalIntoTheDirectory();
   await successfulWriteIsNotRolledBackByLaggingPinIndex();
   await timedOutWriteIsReconciledWithoutWriteReplay();
   await serverFailureIsNotRetriedOrOptimisticallyApplied();

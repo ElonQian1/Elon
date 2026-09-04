@@ -288,6 +288,20 @@ internal class ChatGptWebPageAdapter(
         selected = pinned,
     )
 
+    fun setConversationArchived(path: String, archived: Boolean, requestId: String) = runCommand(
+        action = "set_conversation_archived",
+        value = path.take(MAX_CONVERSATION_PATH_LENGTH),
+        requestId = requestId,
+        selected = archived,
+    )
+
+    fun renameConversation(path: String, title: String, requestId: String) = runCommand(
+        action = "rename_conversation",
+        value = path.take(MAX_CONVERSATION_PATH_LENGTH),
+        title = title.take(MAX_CONVERSATION_TITLE_LENGTH),
+        requestId = requestId,
+    )
+
     fun startNewConversation() = runCommand("new_conversation")
 
     fun startNewConversation(requestId: String) = runCommand("new_conversation", requestId = requestId)
@@ -551,6 +565,7 @@ internal class ChatGptWebPageAdapter(
         choiceIndex: Int? = null,
         numericValue: Double? = null,
         expanded: Boolean? = null,
+        title: String? = null,
         allowPrivateTextTransaction: Boolean? = null,
         projectHints: List<ChatGptWebProject> = emptyList(),
         projectScopeId: String? = null,
@@ -569,6 +584,7 @@ internal class ChatGptWebPageAdapter(
                 if (choiceIndex != null) put("choiceIndex", choiceIndex)
                 if (numericValue != null && numericValue.isFinite()) put("numericValue", numericValue)
                 if (expanded != null) put("expanded", expanded)
+                if (title != null) put("title", title)
                 if (allowPrivateTextTransaction != null) {
                     put("allowPrivateTextTransaction", allowPrivateTextTransaction)
                 }
@@ -604,7 +620,7 @@ internal class ChatGptWebPageAdapter(
         origin.scheme == "https" && origin.host == "chatgpt.com" && origin.port == -1
 
     companion object {
-        internal const val ADAPTER_VERSION = 243
+        internal const val ADAPTER_VERSION = 244
 
         private val ADAPTER_ASSETS = listOf(
             "chatgpt_web_adapter_bootstrap.js",
@@ -690,6 +706,7 @@ internal class ChatGptWebPageAdapter(
             "chatgpt_web_attachment_transport_observer.js"
         private const val MAX_PROMPT_LENGTH = 20_000
         private const val MAX_CONVERSATION_PATH_LENGTH = 256
+        private const val MAX_CONVERSATION_TITLE_LENGTH = 160
         private const val MAX_PROJECT_HINTS = 40
         private const val MAX_PROJECT_TITLE_LENGTH = 160
         private const val MAX_OPTION_ID_LENGTH = 64

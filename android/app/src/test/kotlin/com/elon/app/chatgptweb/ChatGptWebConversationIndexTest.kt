@@ -178,6 +178,24 @@ class ChatGptWebConversationIndexTest {
     }
 
     @Test
+    fun explicitRemovalDropsOnlyTheArchivedConversationDuringPartialRefresh() {
+        val archived = conversation("archived", "昨天", null)
+        val retained = conversation("retained", "今天", null)
+        val project = conversation("project", "昨天", "g-p-demo").copy(
+            path = "/g/g-p-demo/c/project",
+        )
+
+        val merged = ChatGptWebConversationIndex.mergeOfficialHistory(
+            previous = listOf(archived, retained, project),
+            observed = listOf(archived, retained),
+            collectionComplete = false,
+            removedConversationIds = setOf("archived"),
+        )
+
+        assertEquals(listOf("retained", "project"), merged.map { it.id })
+    }
+
+    @Test
     fun projectRefreshReassignsAnObservedConversationWithoutLeavingTheOldMembership() {
         val original = conversation("shared", "昨天", "g-p-old").copy(
             path = "/g/g-p-old/c/shared",

@@ -346,15 +346,30 @@ internal object WebAiPrivateTransportCatalog {
             directPostEnabled = BuildConfig.CHATGPT_PRIVATE_CONVERSATION_MUTATIONS_ENABLED,
         ),
         Entry(
+            id = "android_chatgpt_private_conversation_metadata_mutations_v1",
+            provider = "chatgpt",
+            status = "completed",
+            verification =
+                "device_verified_v1_1_1506_adapter_244_rename_round_trip_archive_restore_and_explicit_tombstone",
+            productionDefault = true,
+            runtimeEnabled = BuildConfig.CHATGPT_PRIVATE_CONVERSATION_MUTATIONS_ENABLED,
+            requestMode =
+                "single_same_origin_patch_for_pin_archive_or_title_then_bounded_read_only_reconciliation",
+            healthPolicy =
+                "single_active_write_page_local_auth_timeout_circuit_explicit_removal_tombstone_and_no_write_replay",
+            fallback = "official_conversation_options_after_explicit_user_choice",
+            directPostEnabled = BuildConfig.CHATGPT_PRIVATE_CONVERSATION_MUTATIONS_ENABLED,
+        ),
+        Entry(
             id = "android_chatgpt_native_conversation_management_v1",
             provider = "chatgpt",
             status = "completed",
             verification =
-                "device_pin_round_trip_v1_1_1399_adapter_218_other_mutations_pending",
+                "device_metadata_mutations_v1_1_1506_adapter_244_pin_rename_archive_verified",
             productionDefault = true,
             runtimeEnabled = true,
             requestMode =
-                "context_bound_official_controls_with_native_adaptive_forms",
+                "native_private_pin_rename_archive_with_context_bound_official_fallbacks",
             healthPolicy =
                 "conversation_identity_scope_stale_control_rejection_confirmation_and_no_write_replay",
             fallback = "official_conversation_options",

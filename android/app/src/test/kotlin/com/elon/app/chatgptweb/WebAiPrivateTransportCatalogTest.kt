@@ -37,6 +37,7 @@ class WebAiPrivateTransportCatalogTest {
         assertTrue("android_chatgpt_private_dictation_transport_v1" in enabledIds)
         assertTrue("android_chatgpt_native_conversation_project_move_v1" in enabledIds)
         assertTrue("android_chatgpt_private_conversation_pin_v1" in enabledIds)
+        assertTrue("android_chatgpt_private_conversation_metadata_mutations_v1" in enabledIds)
         assertTrue("android_chatgpt_native_conversation_management_v1" in enabledIds)
         assertTrue("android_chatgpt_realtime_voice_background_overlay_v1" in enabledIds)
 
@@ -70,6 +71,7 @@ class WebAiPrivateTransportCatalogTest {
                     "android_chatgpt_same_origin_text_transaction_v1",
                     "android_chatgpt_private_dictation_transport_v1",
                     "android_chatgpt_private_conversation_pin_v1",
+                    "android_chatgpt_private_conversation_metadata_mutations_v1",
                 )
             ) {
                 assertFalse(row.getBoolean("direct_post_enabled"))
@@ -197,13 +199,39 @@ class WebAiPrivateTransportCatalogTest {
             conversationPin.getString("fallback"),
         )
 
+        val conversationMetadata = values.first {
+            it.getString("capability_id") ==
+                "android_chatgpt_private_conversation_metadata_mutations_v1"
+        }
+        assertEquals(
+            "completed",
+            conversationMetadata.getString("implementation_status"),
+        )
+        assertEquals(
+            "device_verified_v1_1_1506_adapter_244_rename_round_trip_archive_restore_and_explicit_tombstone",
+            conversationMetadata.getString("verification_status"),
+        )
+        assertTrue(conversationMetadata.getBoolean("production_default"))
+        assertEquals(
+            BuildConfig.CHATGPT_PRIVATE_CONVERSATION_MUTATIONS_ENABLED,
+            conversationMetadata.getBoolean("runtime_enabled"),
+        )
+        assertEquals(
+            BuildConfig.CHATGPT_PRIVATE_CONVERSATION_MUTATIONS_ENABLED,
+            conversationMetadata.getBoolean("direct_post_enabled"),
+        )
+        assertEquals(
+            "official_conversation_options_after_explicit_user_choice",
+            conversationMetadata.getString("fallback"),
+        )
+
         val conversationManagement = values.first {
             it.getString("capability_id") ==
                 "android_chatgpt_native_conversation_management_v1"
         }
         assertEquals("completed", conversationManagement.getString("implementation_status"))
         assertEquals(
-            "device_pin_round_trip_v1_1_1399_adapter_218_other_mutations_pending",
+            "device_metadata_mutations_v1_1_1506_adapter_244_pin_rename_archive_verified",
             conversationManagement.getString("verification_status"),
         )
         assertTrue(conversationManagement.getBoolean("production_default"))

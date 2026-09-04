@@ -224,7 +224,10 @@ internal class ChatGptWebMcpActions(
             "chatgpt_toggle_private_read_aloud" ->
                 ChatGptWebPrivateReadAloudMcpAction.dispatch(args, snapshot(), commands, ::dispatch)
                     ?.let { return error(action, it) }
-            "chatgpt_set_conversation_pinned" ->
+            "chatgpt_set_conversation_pinned",
+            "chatgpt_set_conversation_archived",
+            "chatgpt_rename_conversation",
+            ->
                 ChatGptWebConversationMutationMcpAction.dispatch(args, commands, ::dispatch)
                     ?.let { return error(action, it) }
             "chatgpt_start_dictation" -> {

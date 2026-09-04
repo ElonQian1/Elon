@@ -85,6 +85,31 @@ class ChatGptConversationDirectoryTest {
         )
     }
 
+    @Test
+    fun explicitArchivedConversationRemovalIsAppliedToRestoredCache() {
+        val directory = ChatGptConversationDirectory(
+            restored = ChatGptConversationHistoryCache(
+                conversations = listOf(
+                    conversation("archived", null),
+                    conversation("retained", null),
+                ),
+                savedAtMs = 500L,
+            ),
+            nowMs = { 900L },
+        )
+
+        directory.accept(ChatGptWebEvent.ConversationList(
+            conversations = listOf(conversation("archived", null)),
+            collection = ChatGptWebConversationCollection(
+                reachedEnd = false,
+                observedCount = 1,
+            ),
+            removedConversationIds = setOf("archived"),
+        ))
+
+        assertEquals(listOf("retained"), directory.index().conversations.map { it.id })
+    }
+
     private fun project(id: String, title: String) =
         ChatGptWebProject(id, title, "/g/$id/project")
 

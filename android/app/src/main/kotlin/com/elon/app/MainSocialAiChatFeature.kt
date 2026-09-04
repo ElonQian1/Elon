@@ -230,7 +230,7 @@ internal class MainSocialAiChatFeature(
             currentConversationPath = ::activeConversationPath,
             openConversationSettings = {
                 prioritizeConsumerInteraction()
-                productionPageActions.show(WebChatProviderRegistry.get(providerId()))
+                if (!productionConversationActions.showCurrent()) productionPageActions.show(WebChatProviderRegistry.get(providerId()))
             },
             openOfficialFallback = ::openOfficialFallback,
             interactionCache = webChatInteractionCache,

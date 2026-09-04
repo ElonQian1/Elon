@@ -142,15 +142,18 @@ internal object ChatGptWebConversationIndex {
         previous: List<ChatGptWebConversation>,
         observed: List<ChatGptWebConversation>,
         collectionComplete: Boolean,
+        removedConversationIds: Set<String> = emptySet(),
     ): List<ChatGptWebConversation> {
-        if (!collectionComplete) return merge(previous, observed, retainMissing = true)
+        val retainedPrevious = withoutConversationIds(previous, removedConversationIds)
+        val retainedObserved = withoutConversationIds(observed, removedConversationIds)
+        if (!collectionComplete) return merge(retainedPrevious, retainedObserved, retainMissing = true)
 
-        val merged = merge(previous, observed, retainMissing = false)
+        val merged = merge(retainedPrevious, retainedObserved, retainMissing = false)
         // A complete global sidebar scan is not authoritative for conversations owned by projects.
-        val observedIdentities = observed.mapNotNullTo(linkedSetOf()) {
+        val observedIdentities = retainedObserved.mapNotNullTo(linkedSetOf()) {
             ChatGptWebConversationPath.identity(it.path)
         }
-        val cachedProjectConversations = collapse(previous)
+        val cachedProjectConversations = collapse(retainedPrevious)
             .filterKeys { it !in observedIdentities }
             .values
             .filter { it.projectId != null }
@@ -163,14 +166,16 @@ internal object ChatGptWebConversationIndex {
         observed: List<ChatGptWebConversation>,
         projectId: String,
         collectionComplete: Boolean,
+        removedConversationIds: Set<String> = emptySet(),
     ): List<ChatGptWebConversation> {
         val canonicalId = ChatGptWebConversationPath.canonicalProjectId(projectId) ?: return previous
-        val cachedProject = previous.filter { it.projectId == canonicalId }
-        val scopedObserved = observed
+        val retainedPrevious = withoutConversationIds(previous, removedConversationIds)
+        val cachedProject = retainedPrevious.filter { it.projectId == canonicalId }
+        val scopedObserved = withoutConversationIds(observed, removedConversationIds)
             .map(::sanitize)
             .filter { it.projectId == canonicalId }
         val observedIdentities = scopedObserved.mapTo(linkedSetOf(), ::identityOf)
-        val outsideProject = previous.filter {
+        val outsideProject = retainedPrevious.filter {
             it.projectId != canonicalId && identityOf(it) !in observedIdentities
         }
         val projectValues = merge(
@@ -179,6 +184,15 @@ internal object ChatGptWebConversationIndex {
             retainMissing = !collectionComplete,
         )
         return outsideProject + projectValues
+    }
+
+    private fun withoutConversationIds(
+        values: List<ChatGptWebConversation>,
+        removedConversationIds: Set<String>,
+    ): List<ChatGptWebConversation> = if (removedConversationIds.isEmpty()) {
+        values
+    } else {
+        values.filterNot { identityOf(it) in removedConversationIds }
     }
 
     fun sanitize(value: ChatGptWebConversation): ChatGptWebConversation {

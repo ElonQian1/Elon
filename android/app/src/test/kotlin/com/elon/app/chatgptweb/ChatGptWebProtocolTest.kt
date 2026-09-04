@@ -370,6 +370,7 @@ class ChatGptWebProtocolTest {
               "event":{
                 "type":"conversation_snapshot",
                 "scopeProjectId":"g-p-demo",
+                "removedConversationIds":["archived-one","bad id","archived-one"],
                 "collection":{
                   "scrollerFound":true,
                   "scrolled":true,
@@ -404,6 +405,7 @@ class ChatGptWebProtocolTest {
         )
         assertEquals("g-p-demo", event.conversations.last().projectId)
         assertEquals("g-p-demo", event.scopeProjectId)
+        assertEquals(setOf("archived-one"), event.removedConversationIds)
         assertTrue(event.collection.scrollerFound)
         assertTrue(event.collection.scrolled)
         assertTrue(event.collection.scrollRestored)

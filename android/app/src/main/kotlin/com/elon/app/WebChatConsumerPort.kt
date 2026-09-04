@@ -81,6 +81,18 @@ internal interface WebChatConsumerPort {
         userConfirmed: Boolean,
     ): WebChatConsumerCommandResult =
         WebChatConsumerCommandResult(false, "unsupported_consumer_command")
+    fun setConversationArchived(
+        conversationPath: String,
+        archived: Boolean,
+        userConfirmed: Boolean,
+    ): WebChatConsumerCommandResult =
+        WebChatConsumerCommandResult(false, "unsupported_consumer_command")
+    fun renameConversation(
+        conversationPath: String,
+        title: String,
+        userConfirmed: Boolean,
+    ): WebChatConsumerCommandResult =
+        WebChatConsumerCommandResult(false, "unsupported_consumer_command")
     fun updateControl(
         controlId: String,
         mutation: WebChatConsumerControlMutation,

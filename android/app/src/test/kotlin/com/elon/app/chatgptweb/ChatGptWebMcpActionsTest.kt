@@ -297,6 +297,11 @@ class ChatGptWebMcpActionsTest {
                 .put("conversation_path", "/c/demo")
                 .put("pinned", true)
                 .put("user_confirmed", true) to "set_conversation_pinned",
+            JSONObject().put("action", "chatgpt_set_conversation_archived").put("conversation_path", "/c/demo")
+                .put("archived", true).put("user_confirmed", true) to "set_conversation_archived",
+            JSONObject().put("action", "chatgpt_rename_conversation").put("conversation_path", "/c/demo")
+                .put("title", "新标题")
+                .put("user_confirmed", true) to "rename_conversation",
         )
 
         commands.forEach { (args, expectedAction) ->
@@ -720,6 +725,8 @@ class ChatGptWebMcpActionsTest {
         onRequestFeatures: () -> Unit = {},
         onSelectFeature: (String) -> Unit = {},
         onSetConversationPinned: (String, Boolean) -> Unit = { _, _ -> },
+        onSetConversationArchived: (String, Boolean) -> Unit = { _, _ -> },
+        onRenameConversation: (String, String) -> Unit = { _, _ -> },
         onDispatch: (String, String) -> Unit = { _, _ -> },
     ): ChatGptWebMcpActions {
         val snapshot = ChatGptWebSnapshot(
@@ -981,6 +988,8 @@ class ChatGptWebMcpActionsTest {
                 onRequestFeatures = onRequestFeatures,
                 onSelectFeature = onSelectFeature,
                 onSetConversationPinned = onSetConversationPinned,
+                onSetConversationArchived = onSetConversationArchived,
+                onRenameConversation = onRenameConversation,
                 onDispatch = onDispatch,
             ),
             refresh = {},

@@ -103,6 +103,7 @@ internal class ChatGptConversationDirectory(
                 conversations,
                 event.conversations,
                 collectionComplete = event.collection.isComplete,
+                removedConversationIds = event.removedConversationIds,
             )
         } else {
             ChatGptWebConversationIndex.mergeProjectHistory(
@@ -110,6 +111,7 @@ internal class ChatGptConversationDirectory(
                 observed = event.conversations,
                 projectId = scopeProjectId,
                 collectionComplete = event.collection.isComplete,
+                removedConversationIds = event.removedConversationIds,
             )
         }
         projects = ChatGptWebConversationIndex.mergeObservedProjects(

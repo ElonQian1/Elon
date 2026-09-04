@@ -26,15 +26,24 @@
       const conversations = projectId
         ? value.conversations.filter((item) => item && item.projectId === projectId)
         : value.conversations;
+      const removedConversationIds = Array.isArray(value.removedConversationIds)
+        ? value.removedConversationIds.slice(0, 200)
+        : [];
       const complete = Boolean(projectId && scopedComplete === true);
       const scopeKey = projectId || 'global';
-      const fingerprint = JSON.stringify({ conversations, projects: value.projects, complete });
+      const fingerprint = JSON.stringify({
+        conversations,
+        projects: value.projects,
+        removedConversationIds,
+        complete
+      });
       if (fingerprint === lastSnapshots.get(scopeKey)) return;
       lastSnapshots.set(scopeKey, fingerprint);
       emitEvent({
         type: 'conversation_snapshot',
         conversations,
         projects: value.projects,
+        removedConversationIds,
         scopeProjectId: projectId || null,
         collection: {
           scrollerFound: false,

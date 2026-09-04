@@ -20,6 +20,8 @@ internal object ChatGptWebMcpActionCatalog {
         "chatgpt_regenerate_response",
         "chatgpt_toggle_private_read_aloud",
         "chatgpt_set_conversation_pinned",
+        "chatgpt_set_conversation_archived",
+        "chatgpt_rename_conversation",
         "chatgpt_start_dictation",
         "chatgpt_prepare_realtime_voice",
         "chatgpt_start_realtime_voice",
