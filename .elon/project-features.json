@@ -6387,6 +6387,58 @@
       "updated_at_ms": 1788389637404
     },
     {
+      "id": "esk-platform-profile-v1",
+      "title": "主项目正式 ESK 平台登记个人入口 V1",
+      "summary": "原生独立只读正式平台数量与最近流水，严格来源和会话隔离；网页标注原生入口，保留 Paper 和 IPC。",
+      "status": "in_progress",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/esk-platform-profile-v1.md",
+        "content_hash": "2b06952e8f9bf3610f50d5ed16352e49af29eb46c3af74a75fd4881a6c02aa03",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "67ef950561a7caffcbc199a07f6a0dd576a2cef9",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "ee846ee91e40807ddc21b2271b9da6779ed060e4",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "platform-assets",
+      "tags": [
+        "esk",
+        "android",
+        "formal-platform"
+      ],
+      "task_paths": [
+        "android/app/src/main/kotlin/com/elon/app/MainProfileQuickActions.kt",
+        "android/app/src/main/kotlin/com/elon/app/esk/platform",
+        "android/app/src/test/kotlin/com/elon/app/esk/platform",
+        "docs/requirements/esk-platform-profile-v1.md",
+        "server/src/assets/web_page.html"
+      ],
+      "dependencies": [
+        "esk-platform-recorded-assets-v1"
+      ],
+      "acceptance_criteria": [
+        "Formal source distinct from Paper and not onchain",
+        "HTTP rejects before credential/network access",
+        "Strict parser and account lifecycle isolation tests pass",
+        "APK and Web mirror entry delivered with truthful pending actual-user acceptance"
+      ],
+      "implementation_evidence": [],
+      "claim": {
+        "claim_id": "claim_552a7651a38749f7865fb5abccdb6105",
+        "agent_id": "codex-esk-first-user",
+        "claimed_at_ms": 1788513362202,
+        "expires_at_ms": 1788527762202
+      },
+      "created_at_ms": 1788513355363,
+      "updated_at_ms": 1788513376156
+    },
+    {
       "id": "esk-platform-recorded-assets-v1",
       "title": "ESK 经审核付款的平台登记账本 V1",
       "summary": "补齐真实管理员准备、摘要确认和付款键唯一正式平台登记，独立本人来源读取；旧 Paper 不变，生产写入默认关闭，未上链且不执行资金操作。",
@@ -16762,36 +16814,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_5957d4353a044ae7823567080d9862e6",
-      "feature_id": "esk-paper-asset-account-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-root",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788300109345
-    },
-    {
-      "id": "feature_event_7f06c8181f4e42d087c9813e9d33fc16",
-      "feature_id": "esk-paper-asset-account-v1",
-      "action": "transitioned",
-      "actor": "codex-root",
-      "reason": "ESK 服务端、PC、Android 与治理文档已在最新远端基线上无源码冲突重放完成。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1788300122801
-    },
-    {
-      "id": "feature_event_f79056f128774f2f9cf90dc73d3c0734",
-      "feature_id": "esk-paper-asset-account-v1",
-      "action": "transitioned",
-      "actor": "codex-root",
-      "reason": "此前生产构建、临时库 HTTP Paper 流程、PC 构建/ESLint、Android Kotlin 编译和跨端契约均通过；重放仅涉及注册表冲突，源码无冲突。Android 像素验证仍因无空闲模拟器延期。",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1788300136729
-    },
-    {
       "id": "feature_event_45759048ec4c49579056643f3d618f8e",
       "feature_id": "esk-paper-asset-account-v1",
       "action": "transitioned",
@@ -18760,6 +18782,36 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1788511959680
+    },
+    {
+      "id": "feature_event_9941ba6d42f84168b2999e6eae4ec1d7",
+      "feature_id": "esk-platform-profile-v1",
+      "action": "registered",
+      "actor": "codex-esk-first-user",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1788513355363
+    },
+    {
+      "id": "feature_event_f64e15b71a804eb2aaa1e5fc2a5145c0",
+      "feature_id": "esk-platform-profile-v1",
+      "action": "claimed",
+      "actor": "codex-esk-first-user",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788513362203
+    },
+    {
+      "id": "feature_event_f56f483870934a7b85346e92eeb28d89",
+      "feature_id": "esk-platform-profile-v1",
+      "action": "transitioned",
+      "actor": "codex-esk-first-user",
+      "reason": "实现正式来源原生只读入口、严格模型/传输/账户隔离与 Web 原生入口说明。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788513376156
     }
   ]
 }

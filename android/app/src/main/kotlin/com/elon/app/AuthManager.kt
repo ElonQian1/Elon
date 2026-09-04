@@ -92,6 +92,7 @@ object AuthManager {
 
     fun saveSession(ctx: Context, token: String, userId: String, account: String?, nickname: String?, expiresAt: Long?) {
         prefs(ctx).edit().apply {
+            putString("auth_session_revision", UUID.randomUUID().toString())
             putString(KEY_AUTH_TOKEN, token)
             putString(KEY_AUTH_USER_ID, userId)
             putString(KEY_AUTH_ACCOUNT, account.orEmpty())
@@ -103,6 +104,7 @@ object AuthManager {
 
     fun clear(ctx: Context) {
         prefs(ctx).edit().apply {
+            putString("auth_session_revision", UUID.randomUUID().toString())
             remove(KEY_AUTH_TOKEN)
             remove(KEY_AUTH_USER_ID)
             remove(KEY_AUTH_ACCOUNT)
