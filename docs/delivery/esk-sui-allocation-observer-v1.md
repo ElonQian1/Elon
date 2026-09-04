@@ -15,15 +15,18 @@ owners: [platform-assets, protocol]
 
 | 能力 | implementation_status | verification_status | delivery_status | acceptance_status |
 | --- | --- | --- | --- | --- |
-| 双公共源创世分配观察 | implemented | 98 项离线测试通过 | 等待本批推送 | pending：缺真实 ESK 参数 |
-| 发布 Cap 唯一性与一次消费 | implemented | synthetic/integration passed | 等待本批推送 | pending：缺真实发布/分配交易 |
-| 六桶历史输出与团队锁仓快照 | implemented | synthetic/integration passed | 等待本批推送 | pending：缺真实对象/checkpoint |
-| 官方 testnet 固定查询兼容 | implemented | environment passed | 等待本批推送 | accepted：仅无关公开样本 |
+| 双公共源创世分配观察 | implemented | 98 项离线测试通过 | pushed | pending：缺真实 ESK 参数 |
+| 发布 Cap 唯一性与一次消费 | implemented | synthetic/integration passed | pushed | pending：缺真实发布/分配交易 |
+| 六桶历史输出与团队锁仓快照 | implemented | synthetic/integration passed | pushed | pending：缺真实对象/checkpoint |
+| 官方 testnet 固定查询兼容 | implemented | environment passed | pushed | accepted：仅无关公开样本 |
 | 平台余额或 manifest 晋级 | deliberately disabled | fixed-false tested | 本批不交付 | not authorized |
 
 这里的 `implemented/verified` 只描述本需求限定的只读工具。真实 ESK 正向观察、链上
 发行、地址控制、用户余额和终局性仍未验收。本项目只继续新版冻结总回执合同，不读取、
 迁移或恢复旧 Paper/原生桥、旧六回执 manifest 或 `vesting_policy_ref` 双轨。
+
+实现提交 `0da99c8b1eed9d95462fdb53babfe6da1671729f` 已推送至远程 `main`。
+该提交只交付源码、测试和文档，不是 testnet 发布或用户资产验收。
 
 ## 已执行验证
 
@@ -78,4 +81,5 @@ worktree 中漂移。本批把 `contracts/sui/**/evidence/*.txt` 固定为 LF，
 4. 地址控制、源码对应性和委员会终局性仍需独立证据；观察器报告的八个认证/余额/
    迁移标志继续固定为 `false`。
 
-本文件初建时源码推送尚待执行；最终提交与推送结果由本批统一 Git/finish 回执补记。
+功能注册表在本记录更新后重新绑定全部当前证据；最终文档/注册表提交和工作树状态由
+本批统一 Git/finish 回执报告。

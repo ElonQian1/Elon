@@ -8724,18 +8724,18 @@
       "id": "esk-sui-allocation-observer-v1",
       "title": "ESK Sui 六桶分配只读观察器 V1",
       "summary": "以两个不同公共 Sui testnet GraphQL 来源，失败关闭地复核参与包发布、分配交易、一次性能力销毁、冻结总回执、六桶历史输出和指定 checkpoint 的团队锁仓守恒；只产出 RPC 观察证据，不认证源码、地址控制、用户余额或发布状态。",
-      "status": "claimed",
+      "status": "in_progress",
       "priority": "p0",
       "requirement": {
         "path": "docs/requirements/esk-sui-allocation-observer-v1.md",
-        "content_hash": "0a742348e77b29367aea18438dc541a75f18fc14dfd2e0dece3da5457e0912fb",
+        "content_hash": "b1d8559c2d899ff6526256767ec1c7b755c8a7cad513f5fd7ab414144ed96f56",
         "locator": "",
         "evidence_kind": "document",
         "git_identity": {
           "schema": "elon.project_context_git_identity.v1",
-          "head_commit": "b70d1cd029760c7bb4ee0a157fbc3d25cd68350f",
-          "head_blob_oid": "9e79948245132be34d45a797c83603a4b5285506",
-          "worktree_blob_oid": "9e79948245132be34d45a797c83603a4b5285506",
+          "head_commit": "0da99c8b1eed9d95462fdb53babfe6da1671729f",
+          "head_blob_oid": "6129c945b05096a811e0b77e5b384b58f0961d88",
+          "worktree_blob_oid": "6129c945b05096a811e0b77e5b384b58f0961d88",
           "state": "tracked_clean"
         }
       },
@@ -8769,13 +8769,13 @@
       ],
       "implementation_evidence": [],
       "claim": {
-        "claim_id": "claim_9d2f9662b93b474298832492c27d30f6",
+        "claim_id": "claim_0d2c434f728d4a918071b4b864acfa39",
         "agent_id": "codex-root-01a05b8d",
-        "claimed_at_ms": 1788549586420,
-        "expires_at_ms": 1788592786420
+        "claimed_at_ms": 1788552578191,
+        "expires_at_ms": 1788595778191
       },
       "created_at_ms": 1788549534611,
-      "updated_at_ms": 1788549586420
+      "updated_at_ms": 1788552579047
     },
     {
       "id": "esk-sui-allocation-vesting-v1",
@@ -19492,126 +19492,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_8c5a2571756142b0b71e800f12798a20",
-      "feature_id": "esk-sui-publication-observer-v1",
-      "action": "registered",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1788501859304
-    },
-    {
-      "id": "feature_event_d67c0ed7650244b1817a4fe4d0a8ac06",
-      "feature_id": "esk-sui-publication-observer-v1",
-      "action": "claimed",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788501871038
-    },
-    {
-      "id": "feature_event_fe1d23a086ea45c4b204cebcb2728c8e",
-      "feature_id": "esk-sui-publication-observer-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788501887306
-    },
-    {
-      "id": "feature_event_38db4fc0692544809395794f51c4bc91",
-      "feature_id": "esk-sui-publication-observer-v1",
-      "action": "evidence_recorded",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788502490122
-    },
-    {
-      "id": "feature_event_3826a294e6df4caeb07d5541cc3203d7",
-      "feature_id": "esk-sui-publication-observer-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "CLI, shared roadmap and runbook implemented without modifying Paper or publication gates.",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1788502523789
-    },
-    {
-      "id": "feature_event_ecda6cff1d4d4107b2e2a89a9a3c58e5",
-      "feature_id": "esk-sui-publication-observer-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "65 offline tests and existing genesis/asset/profile tests passed; official non-ESK single-source network smoke passed. Actual ESK dual-source environment acceptance remains deferred.",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1788502524347
-    },
-    {
-      "id": "feature_event_a758ae1716634bd9b0dc69afd39fea90",
-      "feature_id": "esk-paid-user-reconciliation-preview-v1",
-      "action": "registered",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1788503035535
-    },
-    {
-      "id": "feature_event_27b58177b8474b868c57168907a06669",
-      "feature_id": "esk-paid-user-reconciliation-preview-v1",
-      "action": "claimed",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788503053565
-    },
-    {
-      "id": "feature_event_44e26513a51541d8b98647e3840fde71",
-      "feature_id": "esk-paid-user-reconciliation-preview-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788503054103
-    },
-    {
-      "id": "feature_event_bc2d447bc77340cfa2def4a9dc25b6af",
-      "feature_id": "esk-paid-user-reconciliation-preview-v1",
-      "action": "evidence_recorded",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788503643560
-    },
-    {
-      "id": "feature_event_99fad61a97c8492ca704dc0a01e566ae",
-      "feature_id": "esk-paid-user-reconciliation-preview-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "Completed strict input, payment identity, exact reconciliation preview, stdin CLI, synthetic fixture and operator runbook; no production API or balance changes.",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1788503644092
-    },
-    {
-      "id": "feature_event_1f761bdfbbff4a9ba32b7a2bf6f0c3ff",
-      "feature_id": "esk-paid-user-reconciliation-preview-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "80 new offline tests, existing asset/genesis and 65 Sui observer tests passed; independent review found no blocking issues. Real payment authenticity and production user acceptance are not performed.",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1788503644581
-    },
-    {
       "id": "feature_event_e0ffb90dcdf84a228a7d2bc5cd776dc9",
       "feature_id": "yilong-quant-android-identity-v1",
       "action": "registered",
@@ -21490,6 +21370,126 @@
       "from_status": "ready",
       "to_status": "claimed",
       "at_ms": 1788549586421
+    },
+    {
+      "id": "feature_event_34ca026ccc754834a1ac22551ef9dd19",
+      "feature_id": "esk-sui-allocation-observer-v1",
+      "action": "claim_released",
+      "actor": "codex-root-01a05b8d",
+      "reason": "实现已完成且需求有意强化，先释放旧摘要认领，再重绑并重新评审新版合同。",
+      "from_status": "claimed",
+      "to_status": "blocked",
+      "at_ms": 1788552451408
+    },
+    {
+      "id": "feature_event_aa810729185046108c7dc3148f54f6ce",
+      "feature_id": "esk-sui-allocation-observer-v1",
+      "action": "requirement_rebound",
+      "actor": "codex-root-01a05b8d",
+      "reason": "新版观察器实现完成后，需求补充完整 objectChanges、严格时间与 Lamport/version 失败关闭约束；重新绑定已推送实现提交。",
+      "from_status": "blocked",
+      "to_status": "proposed",
+      "at_ms": 1788552459427
+    },
+    {
+      "id": "feature_event_e3bba42667ac491eb0d5b9cbac868254",
+      "feature_id": "esk-sui-allocation-observer-v1",
+      "action": "transitioned",
+      "actor": "codex-root-01a05b8d",
+      "reason": "三路独立后审确认新版-only 合同、完整对象变化、严格时间与 Lamport/version 约束一致，无剩余正确性阻断。",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1788552475431
+    },
+    {
+      "id": "feature_event_47588c55e86445f3b27277a819cf4bc4",
+      "feature_id": "esk-sui-allocation-observer-v1",
+      "action": "transitioned",
+      "actor": "codex-root-01a05b8d",
+      "reason": "三个依赖均为 verified，源码、测试、手册、交付记录和真实验收边界齐备。",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1788552476220
+    },
+    {
+      "id": "feature_event_5fc917af3d1b459bbc311869f2ff011f",
+      "feature_id": "esk-sui-allocation-observer-v1",
+      "action": "claimed",
+      "actor": "codex-root-01a05b8d",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788552476951
+    },
+    {
+      "id": "feature_event_9ee549ac874945d4a8785be95afb6245",
+      "feature_id": "esk-sui-allocation-observer-v1",
+      "action": "transitioned",
+      "actor": "codex-root-01a05b8d",
+      "reason": "已完成并推送实现提交，进入哈希证据登记与最终验证收口。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788552477724
+    },
+    {
+      "id": "feature_event_cee59d91b6874c14a9987514524d629b",
+      "feature_id": "esk-sui-allocation-observer-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-root-01a05b8d",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788552513009
+    },
+    {
+      "id": "feature_event_46a77cdfd9cf417c87c6f05eb31d5d7e",
+      "feature_id": "esk-sui-allocation-observer-v1",
+      "action": "transitioned",
+      "actor": "codex-root-01a05b8d",
+      "reason": "新版-only 双源分配观察器、严格 BCS、完整对象变化、Lamport/version、时间和 CLI 已实现，16 项当前 Git 证据已绑定。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1788552523181
+    },
+    {
+      "id": "feature_event_20783bace5ac40f0aef2b1d37e9eee66",
+      "feature_id": "esk-sui-allocation-observer-v1",
+      "action": "transitioned",
+      "actor": "codex-root-01a05b8d",
+      "reason": "离线 98/98、覆盖率 95.38%、官方 testnet 无关样本 schema smoke、publication 65/65、currency 312/312、静态分配门禁与 Move 3/3+13/13 均通过；真实 ESK 正向验收仍未执行。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1788552523933
+    },
+    {
+      "id": "feature_event_79f09a1b3c624a858f0578de5cc326a7",
+      "feature_id": "esk-sui-allocation-observer-v1",
+      "action": "transitioned",
+      "actor": "codex-root-01a05b8d",
+      "reason": "实现提交已推送，显式重新打开以把真实 commit/push 回执写入交付文档并重新绑定全部证据。",
+      "from_status": "verified",
+      "to_status": "ready",
+      "at_ms": 1788552556096
+    },
+    {
+      "id": "feature_event_03cb009ee01040878023edbbc2708227",
+      "feature_id": "esk-sui-allocation-observer-v1",
+      "action": "claimed",
+      "actor": "codex-root-01a05b8d",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788552578192
+    },
+    {
+      "id": "feature_event_61552763105945ddb3e8036331e7448a",
+      "feature_id": "esk-sui-allocation-observer-v1",
+      "action": "transitioned",
+      "actor": "codex-root-01a05b8d",
+      "reason": "实现提交已推送，交付文档写入实际 commit 回执后重新绑定全部证据。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788552579047
     }
   ]
 }
