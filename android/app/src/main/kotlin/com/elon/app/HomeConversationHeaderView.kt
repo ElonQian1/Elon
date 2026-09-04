@@ -4,9 +4,7 @@ import android.graphics.Color
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Path
-import android.graphics.RadialGradient
 import android.graphics.RectF
-import android.graphics.Shader
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.content.Context
@@ -225,16 +223,18 @@ internal class HomeConversationHeaderView(
         var summaryCard: View? = null
 
         private val radius = 12f * density
+        private val haloPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.rgb(19, 19, 19)
+            setShadowLayer(30f * density, 0f, 0f, Color.argb(38, 0, 240, 255))
+        }
         private val glassFill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.argb(102, 26, 26, 26)
-            setShadowLayer(30f * density, 0f, 0f, Color.argb(38, 0, 240, 255))
         }
         private val glassEdge = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE
             strokeWidth = density
             color = Color.argb(26, 255, 255, 255)
         }
-        private val ambientGlow = Paint(Paint.ANTI_ALIAS_FLAG)
 
         init {
             setWillNotDraw(false)
@@ -250,25 +250,8 @@ internal class HomeConversationHeaderView(
                 card.right.toFloat(),
                 card.bottom.toFloat()
             )
+            canvas.drawRoundRect(rect, radius, radius, haloPaint)
             canvas.drawRoundRect(rect, radius, radius, glassFill)
-
-            val cardPath = Path().apply {
-                addRoundRect(rect, radius, radius, Path.Direction.CW)
-            }
-            val checkpoint = canvas.save()
-            canvas.clipPath(cardPath)
-            val centerX = rect.right - 24f * density
-            val centerY = rect.top + 24f * density
-            ambientGlow.shader = RadialGradient(
-                centerX,
-                centerY,
-                128f * density,
-                intArrayOf(Color.argb(26, 219, 252, 255), Color.TRANSPARENT),
-                floatArrayOf(0f, 1f),
-                Shader.TileMode.CLAMP
-            )
-            canvas.drawCircle(centerX, centerY, 128f * density, ambientGlow)
-            canvas.restoreToCount(checkpoint)
 
             val left = rect.left + density / 2f
             val top = rect.top + density / 2f
