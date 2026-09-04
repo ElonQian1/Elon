@@ -102,7 +102,7 @@ vm.runInNewContext(assetSource, {
       pageAdapterSource.indexOf('chatgpt_web_adapter_messages.js'),
     'image assets must register before message extraction'
   );
-  assert.match(pageAdapterSource, /ADAPTER_VERSION = 208/);
+  assert.match(pageAdapterSource, /ADAPTER_VERSION = 247/);
   console.log('chatgpt web image asset tests passed');
 })().catch((error) => {
   console.error(error);

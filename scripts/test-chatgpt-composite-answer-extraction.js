@@ -32,7 +32,13 @@ class ElementNode {
     this.speakerHeading = options.speakerHeading || null;
     this.querySelectorMap = options.querySelectorMap || {};
     this.querySelectorAllMap = options.querySelectorAllMap || {};
+    this.closestMap = options.closestMap || {};
     this.id = options.id || '';
+    this.naturalWidth = options.naturalWidth || 0;
+    this.naturalHeight = options.naturalHeight || 0;
+    this.width = options.width || 0;
+    this.height = options.height || 0;
+    this.currentSrc = options.currentSrc || '';
   }
 
   get textContent() {
@@ -58,7 +64,10 @@ class ElementNode {
     return [];
   }
   getBoundingClientRect() { return this.visible ? { width: 400, height: 40 } : { width: 0, height: 0 }; }
-  closest() { return this.actionContainer ? this : null; }
+  closest(selector) {
+    if (Object.hasOwn(this.closestMap, selector)) return this.closestMap[selector];
+    return this.actionContainer ? this : null;
+  }
   contains(other) {
     for (let current = other && other.parentElement; current; current = current.parentElement) {
       if (current === this) return true;
@@ -69,6 +78,16 @@ class ElementNode {
 
 const window = {
   getComputedStyle: () => ({ display: 'block', visibility: 'visible' }),
+  __elonChatGptImageAssets: {
+    describe(node) {
+      if (!node.currentSrc) return {};
+      return {
+        assetHandle: 'image_0123456789abcdef',
+        imageWidth: node.naturalWidth,
+        imageHeight: node.naturalHeight,
+      };
+    },
+  },
 };
 const context = {
   window,
@@ -210,5 +229,44 @@ assert.equal(
   '',
   'accessible speaker heading and private-use cursor must not become answer text',
 );
+
+const generatedImageLink = new ElementNode('', {
+  tagName: 'A',
+  attributes: { href: 'https://chatgpt.com/backend-api/files/generated-image' },
+});
+const generatedImage = new ElementNode('', {
+  tagName: 'IMG',
+  attributes: { alt: '生成的图片' },
+  currentSrc: 'https://images.example/generated-image.png',
+  naturalWidth: 1024,
+  naturalHeight: 1024,
+  closestMap: { 'a[href]': generatedImageLink },
+});
+const generatedTurn = new ElementNode('', {
+  attributes: {
+    'data-message-author-role': 'assistant',
+    'data-testid': 'conversation-turn-generated-image',
+  },
+  candidates: [new ElementNode('')],
+  querySelectorAllMap: {
+    'a[href]': [generatedImageLink],
+    img: [generatedImage],
+  },
+});
+const generatedMain = {
+  querySelectorAll(selector) {
+    if (selector === '[data-testid^="conversation-turn-"]') return [generatedTurn];
+    return [];
+  },
+};
+context.document.querySelector = (selector) => selector === 'main' ? generatedMain : null;
+const generatedMessages = messages.readMessages(false);
+assert.equal(generatedMessages.length, 1);
+assert.equal(
+  generatedMessages[0].content.map((part) => part.type).join(','),
+  'markdown,image',
+  'a large generated-image preview wrapped in an official link remains native image media',
+);
+assert.equal(generatedMessages[0].content[1].assetHandle, 'image_0123456789abcdef');
 
 console.log('CHATGPT_COMPOSITE_ANSWER_EXTRACTION=passed');

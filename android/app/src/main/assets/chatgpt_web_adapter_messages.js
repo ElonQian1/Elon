@@ -290,6 +290,29 @@
     return (direct || cleanText(nested && nested.getAttribute('type')).toLowerCase()).slice(0, 96);
   }
 
+  function contentImage(node) {
+    const preview = imageAssets && typeof imageAssets.describe === 'function'
+      ? imageAssets.describe(node)
+      : {};
+    const link = node.closest('a[href]');
+    if (link) {
+      const rect = node.getBoundingClientRect();
+      const width = Math.max(Number(preview.imageWidth) || 0, Number(node.naturalWidth) || 0,
+        Number(node.width) || 0, Number(rect.width) || 0);
+      const height = Math.max(Number(preview.imageHeight) || 0, Number(node.naturalHeight) || 0,
+        Number(node.height) || 0, Number(rect.height) || 0);
+      // Generated-image previews are links so the official page can open or download them.
+      // Keep small linked icons as citations, but treat a cacheable preview as answer media.
+      if (!preview.assetHandle || width < 120 || height < 120) return null;
+    }
+    return {
+      node,
+      link,
+      label: structuredLabel(node, '图片'),
+      metadata: Object.assign({ kind: 'image', mediaType: mediaType(node) }, preview)
+    };
+  }
+
   function codeMetadata(node) {
     const code = node.querySelector('code') || node;
     const match = String(code.className || '').match(/language-([A-Za-z0-9_+.#-]+)/);
@@ -342,19 +365,17 @@
       lastStructuredTypes.add(type);
       if (COMPLEX_PART_TYPES.has(type)) lastComplexOutput = true;
     }
+    const images = Array.from(content.querySelectorAll('img'))
+      .map(contentImage)
+      .filter(Boolean);
+    const imageLinks = new Set(images.map((image) => image.link).filter(Boolean));
     Array.from(content.querySelectorAll('a[href]')).forEach((node) => {
+      if (imageLinks.has(node)) return;
       const part = linkPart(node);
       if (part) add(part.type, part.text, node, part.metadata);
     });
-    Array.from(content.querySelectorAll('img')).forEach((node) => {
-      if (node.closest('a[href]')) return;
-      const preview = imageAssets && typeof imageAssets.describe === 'function'
-        ? imageAssets.describe(node)
-        : {};
-      add('image', structuredLabel(node, '图片'), node, Object.assign(
-        { kind: 'image', mediaType: mediaType(node) },
-        preview
-      ));
+    images.forEach((image) => {
+      add('image', image.label, image.node, image.metadata);
     });
     Array.from(content.querySelectorAll('pre')).forEach((node) => {
       const metadata = codeMetadata(node);
