@@ -428,10 +428,6 @@
     return directSelection(node);
   }
 
-  function webSearchComposerSelection() {
-    return composerSemanticSelection('web_search');
-  }
-
   function collectOptions(section, baseline) {
     const seen = new Map();
     const candidates = visibleOptionNodes().filter((node) => isNewOrChangedOption(node, baseline)).map((node) => {
@@ -671,17 +667,22 @@
       return result(action, false, '官网选项当前不可见。');
     }
     if (!target.opensSubmenu) {
-      if (section === 'tools' && target.semantic === 'web_search') {
+      if (
+        section === 'tools' &&
+        ['web_search', 'image_generation'].includes(target.semantic)
+      ) {
         const desiredSelected = !target.selected;
         if (!composerToolSelectionAdapter ||
             typeof composerToolSelectionAdapter.select !== 'function') {
-          return result(action, false, '网页搜索状态适配器尚未就绪。');
+          return result(action, false, '官网工具状态适配器尚未就绪。');
         }
         composerToolSelectionAdapter.select({
+          semantic: target.semantic,
+          toolLabel: target.semantic === 'image_generation' ? '创建图片' : '网页搜索',
           optionNode: target.node,
           desiredSelected,
           directSelection,
-          composerSelection: webSearchComposerSelection,
+          composerSelection: () => composerSemanticSelection(target.semantic),
           menuSettled: () => !target.node || !target.node.isConnected || !isOptionVisible(target.node),
           menuSettledFor: (node) => !node || !node.isConnected || !isOptionVisible(node),
           openVerificationMenu: (onReady, onTimeout) => {
@@ -698,7 +699,7 @@
           ),
           complete: (ok, detail) => {
             if (ok && composerToolSelection) {
-              composerToolSelection.observe('web_search', desiredSelected);
+              composerToolSelection.observe(target.semantic, desiredSelected);
             }
             result('select_composer_tool', ok, detail);
             scheduleSnapshot();

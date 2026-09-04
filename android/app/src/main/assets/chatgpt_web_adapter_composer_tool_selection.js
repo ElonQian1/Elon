@@ -12,6 +12,10 @@
   const OBSERVATION_INTERVAL_MS = 120;
   const MAX_TOUCH_ATTEMPTS = 2;
 
+  function toolLabel(context) {
+    return String(context && context.toolLabel || '官网工具');
+  }
+
   function completeWhenObserved(context, attempt, confirmations, touchAttempt) {
     const menuSettled = context.menuSettled();
     const optionSelection = context.directSelection(context.optionNode);
@@ -30,7 +34,7 @@
       attempt >= REQUIRED_CONFIRMATIONS
     ) {
       if (touchAttempt >= MAX_TOUCH_ATTEMPTS || !context.retryTouch(context.optionNode)) {
-        return context.complete(false, '官网网页搜索状态未发生预期变化。');
+        return context.complete(false, toolLabel(context) + '状态未发生预期变化。');
       }
       window.setTimeout(
         () => completeWhenObserved(context, 1, 0, touchAttempt + 1),
@@ -52,13 +56,13 @@
 
   function verifyInMenu(context, touchAttempt) {
     context.openVerificationMenu((options) => {
-      const target = options.find((option) => option.semantic === 'web_search');
+      const target = options.find((option) => option.semantic === context.semantic);
       if (!target || !target.directStateKnown) {
-        return context.complete(false, '官网没有提供可验证的网页搜索状态。');
+        return context.complete(false, '官网没有提供可验证的' + toolLabel(context) + '状态。');
       }
       if (target.selected === context.desiredSelected) return context.complete(true, '');
       if (touchAttempt >= MAX_TOUCH_ATTEMPTS || !context.retryTouch(target.node)) {
-        return context.complete(false, '官网网页搜索状态未发生预期变化。');
+        return context.complete(false, toolLabel(context) + '状态未发生预期变化。');
       }
       const retryContext = Object.assign({}, context, {
         optionNode: target.node,
@@ -68,7 +72,7 @@
         () => completeWhenObserved(retryContext, 1, 0, touchAttempt + 1),
         OBSERVATION_INTERVAL_MS
       );
-    }, () => context.complete(false, '官网网页搜索状态无法复核。'));
+    }, () => context.complete(false, toolLabel(context) + '状态无法复核。'));
   }
 
   function select(context) {

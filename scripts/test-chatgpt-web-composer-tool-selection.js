@@ -24,6 +24,8 @@ function drain(limit = 128) {
 function context(overrides = {}) {
   const calls = [];
   const value = {
+    semantic: 'web_search',
+    toolLabel: '网页搜索',
     optionNode: {},
     desiredSelected: true,
     directSelection: () => ({ known: false, selected: false }),
@@ -48,6 +50,27 @@ function context(overrides = {}) {
   const test = context();
   selection.select(test.value);
   drain();
+  assert.deepEqual(test.calls, [{ ok: true, detail: '' }]);
+}
+
+{
+  let observations = 0;
+  const test = context({
+    semantic: 'image_generation',
+    toolLabel: '创建图片',
+    composerSelection() {
+      observations += 1;
+      return observations < 3
+        ? { known: false, selected: false }
+        : { known: true, selected: true };
+    },
+    openVerificationMenu() {
+      assert.fail('delayed composer state should settle without reopening the menu');
+    }
+  });
+  selection.select(test.value);
+  drain();
+  assert.ok(observations >= 6);
   assert.deepEqual(test.calls, [{ ok: true, detail: '' }]);
 }
 
@@ -123,14 +146,16 @@ function context(overrides = {}) {
 
 {
   const test = context({
+    semantic: 'image_generation',
+    toolLabel: '创建图片',
     openVerificationMenu(ready) {
-      ready([{ semantic: 'web_search', directStateKnown: false, selected: false, node: {} }]);
+      ready([{ semantic: 'image_generation', directStateKnown: false, selected: false, node: {} }]);
     }
   });
   selection.select(test.value);
   drain();
   assert.equal(test.calls[0].ok, false);
-  assert.match(test.calls[0].detail, /可验证/);
+  assert.match(test.calls[0].detail, /可验证的创建图片状态/);
 }
 
 process.stdout.write('CHATGPT_COMPOSER_TOOL_SELECTION=passed\n');
