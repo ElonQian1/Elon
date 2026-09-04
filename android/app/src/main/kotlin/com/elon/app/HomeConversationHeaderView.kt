@@ -2,13 +2,14 @@ package com.elon.app
 
 import android.graphics.Color
 import android.graphics.Canvas
-import android.graphics.ColorFilter
 import android.graphics.Paint
-import android.graphics.PixelFormat
+import android.graphics.Path
+import android.graphics.RadialGradient
 import android.graphics.RectF
+import android.graphics.Shader
 import android.graphics.Typeface
-import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
+import android.content.Context
 import android.view.Gravity
 import android.view.View
 import android.widget.ImageView
@@ -38,14 +39,19 @@ internal class HomeConversationHeaderView(
         counts: HomeConversationCounts,
         onSelect: (HomeListFilterMode) -> Unit,
         onOpenSummary: () -> Unit,
-    ): View = LinearLayout(activity).apply {
-        orientation = LinearLayout.VERTICAL
-        clipChildren = false
-        clipToPadding = false
-        setBackgroundColor(Color.parseColor("#131313"))
-        addView(createFilters(selected, counts, onSelect))
-        addView(createSummaryCard(counts, onOpenSummary))
-        addView(createRecentHeader())
+    ): View {
+        val root = SummaryHeaderLayout(activity, activity.resources.displayMetrics.density).apply {
+            orientation = LinearLayout.VERTICAL
+            clipChildren = false
+            clipToPadding = false
+            setBackgroundColor(Color.parseColor("#131313"))
+            addView(createFilters(selected, counts, onSelect))
+            val card = createSummaryCard(counts, onOpenSummary)
+            summaryCard = card
+            addView(card)
+            addView(createRecentHeader())
+        }
+        return root
     }
 
     private fun createFilters(
@@ -124,9 +130,8 @@ internal class HomeConversationHeaderView(
         layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(192)).apply {
             marginStart = dp(16); marginEnd = dp(16)
         }
-        setLayerType(View.LAYER_TYPE_SOFTWARE, null)
-        background = SummaryGlowDrawable(activity.resources.displayMetrics.density)
-        gravity = Gravity.CENTER_VERTICAL
+        background = null
+        gravity = Gravity.TOP
         orientation = LinearLayout.HORIZONTAL
         setPadding(dp(20), dp(20), dp(20), dp(20))
         addView(ImageView(activity).apply {
@@ -164,7 +169,7 @@ internal class HomeConversationHeaderView(
                 text = "今天有${counts.projects}个项目需要你关注"
                 textSize = 16f
                 typeface = medium
-                maxLines = 1
+                maxLines = 2
                 setTextColor(Color.parseColor("#E5E2E1"))
             }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(12) })
             addView(TextView(activity).apply {
@@ -172,7 +177,7 @@ internal class HomeConversationHeaderView(
                 text = "${counts.unread}条重要消息 · ${counts.projects}个待处理事项"
                 textSize = 14f
                 typeface = regular
-                maxLines = 1
+                maxLines = 2
                 setTextColor(Color.parseColor("#B9CACB"))
             }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(8) })
         }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { marginStart = dp(16) })
@@ -216,28 +221,68 @@ internal class HomeConversationHeaderView(
             strokeColor?.let { setStroke(dp(1), Color.parseColor(it)) }
         }
 
-    private class SummaryGlowDrawable(density: Float) : Drawable() {
+    private class SummaryHeaderLayout(context: Context, private val density: Float) : LinearLayout(context) {
+        var summaryCard: View? = null
+
         private val radius = 12f * density
-        private val inset = 1f * density
-        private val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#CC1A1A1A")
-            setShadowLayer(30f * density, 0f, 0f, Color.parseColor("#2600F0FF"))
+        private val glassFill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb(102, 26, 26, 26)
+            setShadowLayer(30f * density, 0f, 0f, Color.argb(38, 0, 240, 255))
         }
-        private val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        private val glassEdge = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE
             strokeWidth = density
-            color = Color.parseColor("#1AFFFFFF")
+            color = Color.argb(26, 255, 255, 255)
+        }
+        private val ambientGlow = Paint(Paint.ANTI_ALIAS_FLAG)
+
+        init {
+            setWillNotDraw(false)
+            setLayerType(View.LAYER_TYPE_SOFTWARE, null)
         }
 
-        override fun draw(canvas: Canvas) {
-            val rect = RectF(bounds).apply { inset(inset, inset) }
-            canvas.drawRoundRect(rect, radius, radius, fill)
-            canvas.drawRoundRect(rect, radius, radius, stroke)
-        }
+        override fun onDraw(canvas: Canvas) {
+            super.onDraw(canvas)
+            val card = summaryCard ?: return
+            val rect = RectF(
+                card.left.toFloat(),
+                card.top.toFloat(),
+                card.right.toFloat(),
+                card.bottom.toFloat()
+            )
+            canvas.drawRoundRect(rect, radius, radius, glassFill)
 
-        override fun setAlpha(alpha: Int) { fill.alpha = alpha }
-        override fun setColorFilter(colorFilter: ColorFilter?) { fill.colorFilter = colorFilter }
-        @Deprecated("Deprecated in Android")
-        override fun getOpacity(): Int = PixelFormat.TRANSLUCENT
+            val cardPath = Path().apply {
+                addRoundRect(rect, radius, radius, Path.Direction.CW)
+            }
+            val checkpoint = canvas.save()
+            canvas.clipPath(cardPath)
+            val centerX = rect.right - 24f * density
+            val centerY = rect.top + 24f * density
+            ambientGlow.shader = RadialGradient(
+                centerX,
+                centerY,
+                128f * density,
+                intArrayOf(Color.argb(26, 219, 252, 255), Color.TRANSPARENT),
+                floatArrayOf(0f, 1f),
+                Shader.TileMode.CLAMP
+            )
+            canvas.drawCircle(centerX, centerY, 128f * density, ambientGlow)
+            canvas.restoreToCount(checkpoint)
+
+            val left = rect.left + density / 2f
+            val top = rect.top + density / 2f
+            val right = rect.right - density / 2f
+            val bottom = rect.bottom - density / 2f
+            val edgePath = Path().apply {
+                moveTo(left + radius, bottom)
+                arcTo(RectF(left, bottom - 2f * radius, left + 2f * radius, bottom), 90f, 90f)
+                lineTo(left, top + radius)
+                arcTo(RectF(left, top, left + 2f * radius, top + 2f * radius), 180f, 90f)
+                lineTo(right - radius, top)
+                arcTo(RectF(right - 2f * radius, top, right, top + 2f * radius), 270f, 90f)
+            }
+            canvas.drawPath(edgePath, glassEdge)
+        }
     }
 }
