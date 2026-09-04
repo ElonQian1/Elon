@@ -34,11 +34,11 @@ Store 严格只读；HTTP 既有鉴权可能节流更新 `last_seen_at`，本修
 | 维度 | 当前状态 | 未完成项 |
 | --- | --- | --- |
 | implementation_status | implemented：正式摘要 token 传递及同源快照投影 | 无资金或卖回功能新增 |
-| verification_status | 基线 2 项实际失败；修复后 harness 65 项与实际 Router 16 项通过 | 线上公开 smoke、真实本人验收 |
-| delivery_status | not_started | 提交、推送、Server 发布、公开 smoke |
+| verification_status | environment_passed：本机 81 项通过，线上身份、健康及未登录保护检查通过 | 真实本人验收另列，不以本机测试或公开 smoke 冒充用户验收 |
+| delivery_status | deployed：源码已推送，Server 官方发布及独立线上核验通过 | 本轮未重发 APK；量化上传单独交接 |
 | acceptance_status | pending | 真实用户、受保护连接、付款审核入账 |
 
-最终验证计数、源码/发布身份及线上只读结果在实际完成后更新，不提前宣称交付。
+本轮 81 项通过；基线 2 项失败是修复前的复现证据，不计入通过总数。
 不更改 Android/PWA 画面、共享 IPC、数据库迁移、生产政策、真实用户或任何资金。
 上一轮主 APK `1.1.1511` 无需因该后端兼容修复重新构建；实时版本以公开清单为准。
 
@@ -47,9 +47,9 @@ Store 严格只读；HTTP 既有鉴权可能节流更新 `last_seen_at`，本修
 - 修复后 harness：`65 passed / 0 failed`，指纹
   `d7a5c88dddc85fa9182a038d7cf90f4011c33a958bf718969a5a77009a1744cc`；
   日志名 `esk-account-auth-harness-20260904-201000-193`，实际测试正文已复核。
-- 完整正式模块 Router：`16 passed / 0 failed / 2333 filtered`（新增 5 项），指纹
+- 本机生产代码进程内 Router：`16 passed / 0 failed / 2333 filtered`（新增 5 项），指纹
   `66e71c96d1c4761a02d06393331283995b420517a80822b43cb9527c25685686`；
-  日志名 `esk-account-auth-production-router-20260904-201129-978`，含真实 Server 编译，
+  日志名 `esk-account-auth-production-router-20260904-201129-978`，含完整 Server 源码编译，
   整个命令 610.8 秒、实际测试 38.08 秒，期间沿同一进程等待，未重复启动。
 - 回归通过当前生产 Store/Router 和真实临时 SQLite，不以字符串检查代替会话边界。
 - 验证空、分页、不同用户、会话撤销/到期/重绑、政策及页面外分录损坏。
@@ -62,19 +62,47 @@ Store 严格只读；HTTP 既有鉴权可能节流更新 `last_seen_at`，本修
 - 历史 released 功能保留原发布快照证据，不能手改旧回执或自动洗掉指纹漂移。
   本修复有意更新的签名与摘要实现以该新 Feature、完整回归及发布证据继续追溯。
 
+## 发布身份与线上只读验证
+
+功能源码 `53a32b33b598765cf5a8c082dc63f9622944e6ed` 已推送 `origin/main`。
+首次推送实际 non-fast-forward 后，按流程 rebase；上游仅有底部导航变更，
+本轮 ESK 源码和测试与原提交 `271e07f35` 逐字节一致，13 项证据均有效。
+
+官方 Server 发布版本 `0.3.1726`，源 SHA 与上述提交一致；
+日志名 `esk-account-auth-publish-server-20260904-202528-502`，
+结果 `passed`，1495.5 秒，`timed_out=false`、`stalled=false`；
+同一编译进程等待至结束，没有重复启动，优化构建耗时 24 分 02 秒。
+发布器输出 `SERVER_RELEASE_STATUS=published`，版本由服务器分配，未手改 Git 版本。
+
+2026-09-04 12:52:30 UTC 独立无凭据检查：
+`/api/server/version` 返回 200，`versionName=0.3.1726`、`gitSha=53a32b33…` 精确匹配；
+`/health` 返回 200，正文 `OK`。
+12:51:03 UTC，正式摘要和 history 路由均对未登录请求返回 401，
+具有 `Cache-Control: no-store`、`Pragma: no-cache`、`Referrer-Policy: no-referrer`，
+错误仅为“需要真实用户登录”。公开 smoke 不查询私有账户，也不证明本人余额已送达。
+
+本轮使用 `publish-server.ps1 -SkipPcFrontend`，未重发 APK 或 PC 前端，
+未更改 Android/PWA 源码、数据库迁移、生产政策、真实余额或任何资金。
+既有 HTTP 公开源保持原样；没有配置证书或放宽私有读取的传输保护。
+所有线上身份是本批时间点快照，后续发布应重新核验，不能拿旧回执冒充最新版本。
+
 ## 构建、本机与交接
 
-复用项目共享 Rust 缓存；doctor 的源码/安装/启动器/Skill 一致且无活跃 Cargo 写者。
+复用项目共享 Rust 缓存；验证开始前 doctor 检查时，源码/安装/启动器/Skill 一致，
+且没有活跃 Cargo 写者；此结果不代表后续发布期间没有编译进程。
 项目 `elon-cli`，domain `agent-validation`，共享验证分区 `validation-heavy`；
 缓存平台指纹 `ceee6c6eb858eb0ebdbc4b13c8457147a223d66fd295288e089d75b6157685a8`。
 磁盘余量约 8.73% 告警；本轮没有 GC、系统配置变更或未知文件处置。
 临时任务根由正式预检分配，主同步 checkout 原有改动保持不动。
 最终仓库收尾以本报告推送后的 `finish-ai-task.ps1 -Kind Server` 回执为准。
+本次交接文档修订限定上述交付记录和首批用户路线图；相对 Markdown 链接检查通过。
+当前工具未提供 `project_docs_test_retrieval`，不宣称已完成该检索验收。
 
 ## 下一步仍以首批用户闭环为目标
 
 - 广场公开量化下载经本轮无凭据完整字节验证仍是 V20 `0.2.0 (2)`；
   V28 `0.4.0 (4)` 签名包存在但未上传，需要现有项目编辑者发布凭据的安全注入。
+  本轮仅检查当前进程是否已配置 `YILONG_PROJECT_RELEASE_TOKEN`，结果为 false；未读取值。
   不能在后续文档提交上冒充 APK 内嵌源码；不得重做已完成的正式摘要接收端。
 - 正式卖回申请/占用/取消尚未实现，Paper 占用不能计入正式可售额。
   入账 history 摘要不包含未来占用事件，不能拿它证明可售额度未变；

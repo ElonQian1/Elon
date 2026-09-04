@@ -6390,7 +6390,7 @@
       "id": "esk-platform-account-snapshot-auth-v1",
       "title": "正式 ESK 摘要会话同快照验证",
       "summary": "修复正式账户摘要入口鉴权与只按用户读取之间的竞态；复用已验证完整流水快照，保留旧账户及双 APK 响应合同。",
-      "status": "verified",
+      "status": "released",
       "priority": "p1",
       "requirement": {
         "path": "docs/requirements/esk-platform-account-snapshot-auth-v1.md",
@@ -6594,7 +6594,7 @@
         }
       ],
       "created_at_ms": 1788523348357,
-      "updated_at_ms": 1788524568212
+      "updated_at_ms": 1788526409003
     },
     {
       "id": "esk-platform-history-v1",
@@ -17795,16 +17795,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_da64104e2280468d89d20c2a93e623bf",
-      "feature_id": "esk_paper_quant_allocation_request_v2",
-      "action": "claim_released",
-      "actor": "codex-desktop",
-      "reason": "Requirement status updated after implementation verification; release before rebinding evidence.",
-      "from_status": "in_progress",
-      "to_status": "blocked",
-      "at_ms": 1788314127203
-    },
-    {
       "id": "feature_event_75c69459ccac4b1caa2c08a1eb3ba1e5",
       "feature_id": "esk_paper_quant_allocation_request_v2",
       "action": "requirement_rebound",
@@ -19793,6 +19783,16 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1788524568212
+    },
+    {
+      "id": "feature_event_46016a65b00a4863b5cae2579578a0d4",
+      "feature_id": "esk-platform-account-snapshot-auth-v1",
+      "action": "transitioned",
+      "actor": "codex-esk-account-auth-root",
+      "reason": "源码53a32b33已推送，65 SQLite harness+16生产代码Router通过；官方Server0.3.1726发布passed，1495.5秒。独立公开版本/源码/健康200匹配，未登录摘要及history401和3项隐私头通过。不改APK、数据库迁移或真实资金；本人资产验收仍pending。",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1788526409003
     }
   ]
 }

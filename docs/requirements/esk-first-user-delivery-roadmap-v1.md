@@ -39,10 +39,10 @@ ESK 保持同一种服务支付、治理和经批准利润快照参与资产；�
 
 | 阶段 | 当前证据 / 缺口 | 下一步及完成条件 |
 | --- | --- | --- |
-| 用户资产一致性 | 主项目资产卡、Paper 流水及占用已存在；旧合同固定 not_deployed | 新版来源合同、两端兼容与本人身份验证；平台记录不冒充链上币 |
+| 用户资产一致性 | 正式摘要、完整审核流水、跨 APK 合同及量化接收端源码已具备；正式占用和卖回尚未实现 | 分别完成正式占用/卖回切片和本人验收；Paper 状态不计入正式资产，平台记录不冒充链上币 |
 | 真实上链准备 | 固定供应 Move build/test 已完成；没有发布回执 | 独立只读观察器 → 全部发布/注册/分配验证 → 授权测试网发布和终局性同步 |
 | 历史用户交付 | 付款事实及实际映射不能由代码猜测 | dry-run 对账与去重 → 经审批的入账/claim → 可追溯结转，余额不双计 |
-| 量化与安装闭环 | 行情/Paper 基础复用，独立 APK 本人资产绑定待完成 | 主项目下载并打开子 APK、授权登录、本人资产和结果来源；QSHARE 对账独立验收 |
+| 量化与安装闭环 | 行情/Paper 基础复用；量化 V28 正式资产接收端和签名包已完成，待上传与双 APK 本人验收 | 主项目下载并打开新版子 APK、授权登录、本人资产和结果来源；QSHARE 对账独立验收 |
 
 链上查询当前切片见 [只读观察器 V1](esk-sui-publication-observer-v1.md)。
 Android 授权前置身份切片见 [官方量化 APK 身份校验 V1](yilong-quant-android-identity-v1.md)；
@@ -58,8 +58,10 @@ Android 授权前置身份切片见 [官方量化 APK 身份校验 V1](yilong-qu
 独立跨 APK 正式来源先交付 [原生摘要授权提供端](esk-platform-native-provider-v1.md)，
 量化 V28 接收端与 0.4.0 签名构建已完成，上传与双 APK 本人联调仍待验收；
 其仓库交接为 `docs/delivery/v28-formal-esk-native-consumer.md`，旧 Paper 协议不用于正式数量。
-本轮正式本人查账推进 [完整审核流水分页](esk-platform-history-v1.md)，
-原账户与双 APK 协议不变；正式占用、卖回结算仍需独立切片，不套用 Paper 状态。
+[完整审核流水分页](esk-platform-history-v1.md) 已建立；后续补齐
+[摘要会话同快照校验](esk-platform-account-snapshot-auth-v1.md)，
+部署与本人验收分别见其 [交付记录](../delivery/esk-platform-account-snapshot-auth-v1.md)。
+原账户 18 字段与双 APK 协议不变；正式占用、卖回仍需独立切片，不套用 Paper 状态。
 
 ## 协作与权威边界
 
