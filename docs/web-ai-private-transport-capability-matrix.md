@@ -12,7 +12,7 @@ installed build; individual capability documents retain implementation evidence.
 | Conversation body prefetch | ChatGPT | Completed and enabled | Official WebView navigation |
 | Page-local identity context prewarm | ChatGPT | Completed and enabled; same-origin auth plus conversation refresh device verified | Observed official request context and persistent identity WebView |
 | Conversation navigation receipt reconciliation | ChatGPT | Completed, enabled, and device verified on `v1.1.1399 (1420)`, adapter `218` | Official WebView navigation without write replay |
-| Conversation pin transaction | ChatGPT | Implemented and enabled; device server acknowledgement pending | Official conversation options after explicit user choice |
+| Conversation pin transaction | ChatGPT | Completed, enabled, and device verified on `v1.1.1504 (1504)`, adapter `243`; formally shipped in `v1.1.1505 (1505)` | Official conversation options after explicit user choice |
 | Send dispatch acknowledgement | ChatGPT | Completed and enabled | Official DOM confirmation |
 | Streaming reply observer | ChatGPT | Completed and enabled; completion and sparse-watchdog timer/bridge device verified | Official DOM snapshot |
 | Private stream completion settlement | ChatGPT | Completed, enabled, and device verified on `v1.1.1302 (1312)` | Official DOM snapshot |
