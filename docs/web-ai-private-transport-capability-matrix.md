@@ -190,9 +190,13 @@ asset queue reports preview preparation or bounded preview failure. Once streami
 ended and the preview queue is idle, the transient banner disappears while the selected
 tool remains visible in its existing chip. Attachment progress keeps higher priority, and
 unsupported or ambiguous states fall back to the official composer and `/images` page.
-The completed capability is `android_chatgpt_native_image_generation_status_v1`; its
-consolidated device UI acceptance remains pending and the state flow must not be
-reimplemented without current regression evidence.
+The completed capability is `android_chatgpt_native_image_generation_status_v1`. Xiaomi
+production-surface acceptance on `v1.1.1518` / adapter `247` selected the official image
+tool, sent exactly one isolated prompt, observed a completed assistant turn with a native
+opaque `image` part, restored the original tool/conversation/draft state, and recorded the
+verification case. Linked official image previews are classified as answer media instead
+of citations, while small linked icons remain excluded. This flow must not be
+reimplemented or retested without current regression evidence.
 
 ChatGPT private response rich content now crosses the existing passive observer only as
 the versioned `yilong.rich-content.v1` projection. Android accepts only bounded finance

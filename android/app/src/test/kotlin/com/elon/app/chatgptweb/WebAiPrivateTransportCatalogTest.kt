@@ -444,7 +444,7 @@ class WebAiPrivateTransportCatalogTest {
         }
         assertEquals("completed", imageGenerationStatus.getString("implementation_status"))
         assertEquals(
-            "targeted_lifecycle_tests_passed_device_ui_pending",
+            "device_verified_v1_1_1518_adapter_247",
             imageGenerationStatus.getString("verification_status"),
         )
         assertTrue(imageGenerationStatus.getBoolean("production_default"))

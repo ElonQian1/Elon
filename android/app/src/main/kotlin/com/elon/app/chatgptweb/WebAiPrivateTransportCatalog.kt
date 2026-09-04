@@ -227,7 +227,7 @@ internal object WebAiPrivateTransportCatalog {
             id = "android_chatgpt_native_image_generation_status_v1",
             provider = "chatgpt",
             status = "completed",
-            verification = "targeted_lifecycle_tests_passed_device_ui_pending",
+            verification = "device_verified_v1_1_1518_adapter_247",
             productionDefault = true,
             runtimeEnabled = true,
             requestMode =
