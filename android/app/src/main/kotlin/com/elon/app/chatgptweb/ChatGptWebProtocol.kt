@@ -582,12 +582,14 @@ internal object ChatGptWebProtocol {
     ): ChatGptWebConversationCollection {
         val collection = event.optJSONObject("collection")
             ?: return ChatGptWebConversationCollection.official(conversationCount)
+        val rawConversationCount = event.optJSONArray("conversations")?.length() ?: conversationCount
         return ChatGptWebConversationCollection(
             scrollerFound = collection.optBoolean("scrollerFound"),
             scrolled = collection.optBoolean("scrolled"),
             scrollRestored = !collection.has("scrollRestored") || collection.optBoolean("scrollRestored"),
             reachedEnd = collection.optBoolean("reachedEnd"),
-            truncated = collection.optBoolean("truncated"),
+            truncated = collection.optBoolean("truncated") ||
+                rawConversationCount > MAX_CONVERSATIONS,
             timedOut = collection.optBoolean("timedOut"),
             observedCount = conversationCount,
             steps = collection.optInt("steps", 0).coerceIn(0, MAX_CONVERSATION_COLLECTION_STEPS),
@@ -680,7 +682,7 @@ internal object ChatGptWebProtocol {
     private const val MAX_MESSAGE_LENGTH = 40_000
     private const val MAX_CONTENT_PARTS = 20
     private const val MAX_DRAFT_LENGTH = 20_000
-    private const val MAX_CONVERSATIONS = 100
+    private const val MAX_CONVERSATIONS = 200
     private const val MAX_PROJECTS = 40
     private const val MAX_PROJECT_ID_LENGTH = 166
     private const val MAX_GROUP_LABEL_LENGTH = 80

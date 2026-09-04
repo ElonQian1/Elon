@@ -418,6 +418,20 @@ class ChatGptWebProtocolTest {
     }
 
     @Test
+    fun keepsThePrivateDirectoryWindowAndReportsProtocolTruncation() {
+        val conversations = (1..205).joinToString(",") { index ->
+            """{"id":"chat-$index","title":"Chat $index","path":"/c/chat-$index"}"""
+        }
+        val event = ChatGptWebProtocol.parse(
+            """{"schema":"yilong.ai.ui.v1","event":{"type":"conversation_snapshot","collection":{"source":"official_private","truncated":false},"conversations":[$conversations]}}""",
+        ) as ChatGptWebEvent.ConversationList
+
+        assertEquals(200, event.conversations.size)
+        assertEquals(200, event.collection.observedCount)
+        assertTrue(event.collection.truncated)
+    }
+
+    @Test
     fun rejectsUnknownConversationCollectionSources() {
         val event = ChatGptWebProtocol.parse(
             """{"schema":"yilong.ai.ui.v1","event":{"type":"conversation_snapshot","conversations":[],"projects":[],"collection":{"source":"untrusted"}}}""",

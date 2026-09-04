@@ -703,11 +703,9 @@ Add-Check "conversation_collection_timeout" (
 ) "reached_end=$($conversationCollection.reached_end),truncated=$($conversationCollection.truncated)"
 
 $requiredSelectors = @(
-    "web-chat-composer-input:chatgpt_web",
     "web-chat-attachment:chatgpt_web",
     "web-chat-composer-tools:chatgpt_web",
-    "web-chat-page-actions:chatgpt_web",
-    "web-chat-send"
+    "web-chat-page-actions:chatgpt_web"
 )
 $visibleSelectors = Wait-VisibleProductionSelectors -RequiredPrefixes $requiredSelectors `
     -TimeoutSec $ReadyTimeoutSec
@@ -715,6 +713,27 @@ foreach ($prefix in $requiredSelectors) {
     $match = @($visibleSelectors | Where-Object { $_.StartsWith($prefix) })
     Add-Check "production_selector_$($prefix.Replace(':', '_'))" ($match.Count -gt 0) ($match -join ",")
 }
+$composerEntryPrefixes = @(
+    "web-chat-composer-input:chatgpt_web",
+    "web-chat-composer-command:chatgpt_web:"
+)
+$composerActionPrefixes = @(
+    "web-chat-send",
+    "web-chat-stop-generation",
+    "web-chat-composer-command:chatgpt_web:"
+)
+$composerEntrySelectors = @($visibleSelectors | Where-Object {
+    $selector = $_
+    @($composerEntryPrefixes | Where-Object { $selector.StartsWith($_) }).Count -gt 0
+})
+$composerActionSelectors = @($visibleSelectors | Where-Object {
+    $selector = $_
+    @($composerActionPrefixes | Where-Object { $selector.StartsWith($_) }).Count -gt 0
+})
+Add-Check "production_selector_composer_entry" `
+    ($composerEntrySelectors.Count -gt 0) ($composerEntrySelectors -join ",")
+Add-Check "production_selector_composer_action" `
+    ($composerActionSelectors.Count -gt 0) ($composerActionSelectors -join ",")
 
 $failed = @($checks | Where-Object { -not $_.passed })
 $summary = [ordered]@{

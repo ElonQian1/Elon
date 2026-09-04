@@ -4,7 +4,7 @@ function Get-ChatGptNativeSelectorsFromXml {
     param([Parameter(Mandatory = $true)][string]$UiXml)
 
     return @(
-        [regex]::Matches($UiXml, 'content-desc="([^"]*chatgpt-native:[^"]*)"') |
+        [regex]::Matches($UiXml, 'content-desc="([^"]*(?:chatgpt-native:|web-chat-)[^"]*)"') |
             ForEach-Object { $_.Groups[1].Value } |
             Sort-Object -Unique
     )
@@ -30,9 +30,14 @@ function Get-ChatGptConversationCollectionCoverage {
     $safeSourceCount = [Math]::Max(0, $SourceCount)
     $observedCount = [Math]::Max(0, [int]$Collection.observed_count)
     $requiredCount = [Math]::Min($safeSourceCount, $MaximumObservedCount)
+    $sourceWindowComplete =
+        [string]$Collection.source -eq "official_private" -and
+        $safeSourceCount -gt 0 -and
+        $observedCount -ge $safeSourceCount
     $terminal =
         $Collection.reached_end -eq $true -or
         $Collection.truncated -eq $true -or
+        $sourceWindowComplete -or
         $safeSourceCount -eq 0
     $passed =
         $Collection.timed_out -ne $true -and
@@ -45,6 +50,7 @@ function Get-ChatGptConversationCollectionCoverage {
         source_count = $safeSourceCount
         required_count = $requiredCount
         terminal = $terminal
+        source_window_complete = $sourceWindowComplete
         truncated = $Collection.truncated -eq $true
     }
 }

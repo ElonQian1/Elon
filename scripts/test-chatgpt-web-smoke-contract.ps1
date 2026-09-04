@@ -54,6 +54,9 @@ Assert-Contains '$navigationCloseCount = [int]$navigationMatrix.observed_semanti
 Assert-Contains 'Add-Check "navigation_overlay_open" ($navigationCloseCount -gt 0)'
 Assert-Contains '$visibleSelectors = Wait-VisibleProductionSelectors -RequiredPrefixes $requiredSelectors'
 Assert-Contains 'web-chat-composer-input:chatgpt_web'
+Assert-Contains 'web-chat-composer-command:chatgpt_web:'
+Assert-Contains 'Add-Check "production_selector_composer_entry"'
+Assert-Contains 'Add-Check "production_selector_composer_action"'
 Assert-Contains 'web-chat-page-actions:chatgpt_web'
 Assert-Contains '$beforeListState = Invoke-ApkMcp -Tool "ui_state"'
 Assert-Contains '$beforeList = [long]$beforeListState.last_command.observed_at_ms'
@@ -180,8 +183,24 @@ $nonTerminalCollection = Get-ChatGptConversationCollectionCoverage `
 if ($nonTerminalCollection.passed -eq $true) {
     throw "Non-terminal conversation history was accepted."
 }
+$privateWindowCollection = Get-ChatGptConversationCollectionCoverage `
+    -Collection ([pscustomobject]@{
+        observed_count = 161
+        reached_end = $false
+        truncated = $false
+        timed_out = $false
+        source = "official_private"
+    }) `
+    -SourceCount 161
+if (
+    $privateWindowCollection.passed -ne $true -or
+    $privateWindowCollection.source_window_complete -ne $true
+) {
+    throw "Complete private conversation source window was not accepted."
+}
 
-$uiXml = '<node resource-id="com.elon.app:id/chatGptWebView" content-desc="chatgpt-native:send:ready" />'
+$uiXml = '<node resource-id="com.elon.app:id/chatGptWebView" content-desc="chatgpt-native:send:ready" />' +
+    '<node content-desc="web-chat-composer-command:chatgpt_web:start-realtime-voice" />'
 if (-not (Test-ChatGptResourceVisible -UiXml $uiXml -ResourceId "chatGptWebView")) {
     throw "Visible ChatGPT WebView resource id was not detected."
 }
@@ -189,7 +208,12 @@ if (Test-ChatGptResourceVisible -UiXml $uiXml -ResourceId "chatGptWebToolbar") {
     throw "Hidden ChatGPT chrome was reported as visible."
 }
 $selectors = @(Get-ChatGptNativeSelectorsFromXml -UiXml $uiXml)
-if ($selectors.Count -ne 1) {
+if (
+    "web-chat-composer-command:chatgpt_web:start-realtime-voice" -notin $selectors
+) {
+    throw "Production Web Chat selector was not extracted."
+}
+if ($selectors.Count -ne 2 -or "chatgpt-native:send:ready" -notin $selectors) {
     throw "Stable native selector extraction failed: count=$($selectors.Count), values=$($selectors -join ','), xml=$uiXml"
 }
 
