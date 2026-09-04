@@ -47,6 +47,12 @@ internal class ChatGptWebMcpCommandAdapter(
         pageAdapter.setConversationArchived(path, archived, requestId)
     override fun renameConversation(path: String, title: String, requestId: String) =
         pageAdapter.renameConversation(path, title, requestId)
+    override fun moveConversationToProject(
+        path: String,
+        conversationTitle: String,
+        projectId: String,
+        requestId: String,
+    ) = pageAdapter.moveConversationToProject(path, conversationTitle, projectId, requestId)
     override fun startDictation(
         nativeDraft: String,
         expectedOfficialDraft: String,

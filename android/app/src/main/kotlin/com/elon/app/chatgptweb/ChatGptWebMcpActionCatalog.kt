@@ -22,6 +22,7 @@ internal object ChatGptWebMcpActionCatalog {
         "chatgpt_set_conversation_pinned",
         "chatgpt_set_conversation_archived",
         "chatgpt_rename_conversation",
+        "chatgpt_move_conversation_to_project",
         "chatgpt_start_dictation",
         "chatgpt_prepare_realtime_voice",
         "chatgpt_start_realtime_voice",

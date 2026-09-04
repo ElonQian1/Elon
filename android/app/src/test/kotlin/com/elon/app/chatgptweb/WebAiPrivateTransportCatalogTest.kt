@@ -36,6 +36,7 @@ class WebAiPrivateTransportCatalogTest {
         assertTrue("android_chatgpt_private_rich_content_native_view_v1" in enabledIds)
         assertTrue("android_chatgpt_private_dictation_transport_v1" in enabledIds)
         assertTrue("android_chatgpt_native_conversation_project_move_v1" in enabledIds)
+        assertTrue("android_chatgpt_private_conversation_project_move_v1" in enabledIds)
         assertTrue("android_chatgpt_private_conversation_pin_v1" in enabledIds)
         assertTrue("android_chatgpt_private_conversation_metadata_mutations_v1" in enabledIds)
         assertTrue("android_chatgpt_native_conversation_management_v1" in enabledIds)
@@ -72,6 +73,7 @@ class WebAiPrivateTransportCatalogTest {
                     "android_chatgpt_private_dictation_transport_v1",
                     "android_chatgpt_private_conversation_pin_v1",
                     "android_chatgpt_private_conversation_metadata_mutations_v1",
+                    "android_chatgpt_private_conversation_project_move_v1",
                 )
             ) {
                 assertFalse(row.getBoolean("direct_post_enabled"))
@@ -172,6 +174,33 @@ class WebAiPrivateTransportCatalogTest {
         assertEquals(
             "official_conversation_project_menu",
             projectMove.getString("fallback"),
+        )
+
+        val privateProjectMove = values.first {
+            it.getString("capability_id") ==
+                "android_chatgpt_private_conversation_project_move_v1"
+        }
+        assertEquals("completed", privateProjectMove.getString("implementation_status"))
+        assertEquals(
+            "targeted_transaction_bridge_production_ui_and_release_build_passed_device_pending",
+            privateProjectMove.getString("verification_status"),
+        )
+        assertTrue(privateProjectMove.getBoolean("production_default"))
+        assertEquals(
+            BuildConfig.CHATGPT_PRIVATE_CONVERSATION_MUTATIONS_ENABLED,
+            privateProjectMove.getBoolean("runtime_enabled"),
+        )
+        assertEquals(
+            BuildConfig.CHATGPT_PRIVATE_CONVERSATION_MUTATIONS_ENABLED,
+            privateProjectMove.getBoolean("direct_post_enabled"),
+        )
+        assertEquals(
+            "single_same_origin_patch_gizmo_id_then_bounded_read_only_project_reconciliation",
+            privateProjectMove.getString("request_mode"),
+        )
+        assertEquals(
+            "official_conversation_project_menu_after_explicit_user_choice",
+            privateProjectMove.getString("fallback"),
         )
 
         val conversationPin = values.first {

@@ -17,7 +17,7 @@ function deferred() {
   return { promise, resolve };
 }
 
-function fixture(fetchImpl, enabled = true, rootOverrides = {}) {
+function fixture(fetchImpl, enabled = true, rootOverrides = {}, directoryOverrides = {}) {
   const calls = [];
   const accepted = [];
   const root = Object.assign({
@@ -38,7 +38,7 @@ function fixture(fetchImpl, enabled = true, rootOverrides = {}) {
       'oai-device-id': 'page-local-device'
     })
   };
-  const directory = {
+  const directory = Object.assign({
     acceptPinnedState: (id, pinned) => {
       accepted.push({ id, pinned });
       return true;
@@ -50,8 +50,14 @@ function fixture(fetchImpl, enabled = true, rootOverrides = {}) {
     acceptArchivedState: (id, archived) => {
       accepted.push({ id, archived });
       return true;
-    }
-  };
+    },
+    acceptConversationMembership: (id, title, projectId) => {
+      accepted.push({ id, title, projectId });
+      return true;
+    },
+    refreshProject: async () => false,
+    snapshot: () => ({ conversations: [] })
+  }, directoryOverrides);
   return {
     calls,
     accepted,
@@ -163,6 +169,82 @@ async function archiveUsesOnePatchAndProjectsRemovalIntoTheDirectory() {
   ]);
 }
 
+async function projectMoveUsesOnePatchAndReadOnlyReconciliation() {
+  const projectId = 'g-p-0123456789abcdef0123456789abcdef';
+  const test = fixture(async (url) => url === '/backend-api/conversations/conversation-123'
+    ? response(200, {
+      id: 'conversation-123',
+      title: '项目会话',
+      gizmo_id: projectId
+    })
+    : response(200, {}));
+
+  const result = await test.transport.moveToProject(
+    '/c/conversation-123',
+    projectId + '-client-suffix',
+    '项目会话'
+  );
+
+  assert.deepStrictEqual(result, {
+    ok: true,
+    code: 'mutation_confirmed',
+    attempted: true,
+    reconciled: true
+  });
+  assert.strictEqual(test.calls.length, 2);
+  assert.strictEqual(test.calls[0].url, '/backend-api/conversation/conversation-123');
+  assert.strictEqual(test.calls[0].init.method, 'PATCH');
+  assert.deepStrictEqual(JSON.parse(test.calls[0].init.body), { gizmo_id: projectId });
+  assert.strictEqual(test.calls[1].url, '/backend-api/conversations/conversation-123');
+  assert.strictEqual(test.calls[1].init.method, 'GET');
+  assert.deepStrictEqual(test.accepted, [
+    { id: 'conversation-123', title: '项目会话', projectId },
+    { id: 'conversation-123', title: '项目会话', projectId }
+  ]);
+}
+
+async function projectMoveCanConfirmFromTargetDirectoryWithoutWriteReplay() {
+  const projectId = 'g-p-0123456789abcdef0123456789abcdef';
+  let refreshCount = 0;
+  const test = fixture(async (url, init) => {
+    if (url === '/backend-api/conversation/conversation-123') {
+      return new Promise((resolve, reject) => {
+        init.signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true });
+      });
+    }
+    return response(200, { id: 'conversation-123', title: '项目会话' });
+  }, true, {
+    setTimeout: (callback) => setImmediate(callback),
+    clearTimeout: (id) => clearImmediate(id)
+  }, {
+    refreshProject: async (target) => {
+      assert.strictEqual(target, projectId);
+      refreshCount += 1;
+      return true;
+    },
+    snapshot: () => ({
+      conversations: [{ id: 'conversation-123', title: '项目会话', projectId }]
+    })
+  });
+
+  const result = await test.transport.moveToProject(
+    '/c/conversation-123',
+    projectId,
+    '项目会话'
+  );
+  assert.deepStrictEqual(result, {
+    ok: true,
+    code: 'mutation_confirmed_after_timeout',
+    attempted: true,
+    reconciled: true
+  });
+  assert.strictEqual(test.calls.filter((call) => call.init.method === 'PATCH').length, 1);
+  assert.strictEqual(refreshCount, 1);
+  assert.deepStrictEqual(test.accepted, [
+    { id: 'conversation-123', title: '项目会话', projectId }
+  ]);
+}
+
 async function successfulWriteIsNotRolledBackByLaggingPinIndex() {
   const test = fixture(async (url) => url === '/backend-api/pins'
     ? response(200, { items: [] })
@@ -261,6 +343,14 @@ async function disabledOrInvalidMutationIsSideEffectFree() {
   const emptyTitle = await fixture(async () => response(200, {})).transport
     .rename('/c/conversation-123', '   ');
   assert.strictEqual(emptyTitle.code, 'invalid_mutation');
+  const invalidProject = fixture(async () => response(200, {}));
+  const invalidProjectResult = await invalidProject.transport.moveToProject(
+    '/c/conversation-123',
+    'not-a-project',
+    '项目会话'
+  );
+  assert.strictEqual(invalidProjectResult.code, 'invalid_mutation');
+  assert.strictEqual(invalidProject.calls.length, 0);
 }
 
 async function adapterHandlerReportsTheCorrelatedResultAndRefreshesOnlyAfterSuccess() {
@@ -305,6 +395,29 @@ async function adapterHandlerReportsTheCorrelatedResultAndRefreshesOnlyAfterSucc
     ok: true,
     detail: 'mutation_confirmed'
   });
+
+  const projectId = 'g-p-0123456789abcdef0123456789abcdef';
+  const projectTest = fixture(async (url) => url.includes('/conversations/')
+    ? response(200, { title: '项目会话', gizmo_id: projectId })
+    : response(200, {}));
+  const projectResult = new Promise((resolve) => {
+    assert.strictEqual(projectTest.transport.handle(
+      'move_conversation_to_project',
+      {
+        value: '/c/conversation-123',
+        title: '项目会话',
+        projectScopeId: projectId
+      },
+      (action, ok, detail) => resolve({ action, ok, detail }),
+      () => {},
+      { emitSnapshot: () => {} }
+    ), true);
+  });
+  assert.deepStrictEqual(await projectResult, {
+    action: 'move_conversation_to_project',
+    ok: true,
+    detail: 'mutation_confirmed'
+  });
 }
 
 (async () => {
@@ -312,6 +425,8 @@ async function adapterHandlerReportsTheCorrelatedResultAndRefreshesOnlyAfterSucc
   await concurrentIntentNeverCreatesASecondWrite();
   await renameUsesOnePatchAndReadOnlyReconciliation();
   await archiveUsesOnePatchAndProjectsRemovalIntoTheDirectory();
+  await projectMoveUsesOnePatchAndReadOnlyReconciliation();
+  await projectMoveCanConfirmFromTargetDirectoryWithoutWriteReplay();
   await successfulWriteIsNotRolledBackByLaggingPinIndex();
   await timedOutWriteIsReconciledWithoutWriteReplay();
   await serverFailureIsNotRetriedOrOptimisticallyApplied();

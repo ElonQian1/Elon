@@ -152,6 +152,12 @@ class ChatGptWebConsumerPortAdapterTest {
         val prepareRealtimeVoice = port.executeSessionCommand("chatgpt_prepare_realtime_voice")
         val realtimeVoice = port.executeSessionCommand("chatgpt_start_realtime_voice")
         val dismissed = port.dismissComposerOptions()
+        val moved = port.moveConversationToProject(
+            conversationPath = "/c/demo",
+            conversationTitle = "项目会话",
+            projectId = "g-p-demo",
+            userConfirmed = true,
+        )
         val unsupported = port.executeSessionCommand("chatgpt_delete_account")
 
         assertEquals("chatgpt_list_composer_options", requests[0].getString("action"))
@@ -176,6 +182,11 @@ class ChatGptWebConsumerPortAdapterTest {
         assertEquals("chatgpt_prepare_realtime_voice", requests[13].getString("action"))
         assertEquals("chatgpt_start_realtime_voice", requests[14].getString("action"))
         assertEquals("chatgpt_dismiss_composer_options", requests[15].getString("action"))
+        assertEquals("chatgpt_move_conversation_to_project", requests[16].getString("action"))
+        assertEquals("/c/demo", requests[16].getString("conversation_path"))
+        assertEquals("项目会话", requests[16].getString("conversation_title"))
+        assertEquals("g-p-demo", requests[16].getString("project_id"))
+        assertTrue(requests[16].getBoolean("user_confirmed"))
         assertTrue(requested.accepted)
         assertTrue(selected.accepted)
         assertTrue(features.accepted)
@@ -192,6 +203,7 @@ class ChatGptWebConsumerPortAdapterTest {
         assertEquals("mcp_1", prepareRealtimeVoice.requestId)
         assertEquals("mcp_1", realtimeVoice.requestId)
         assertTrue(dismissed.accepted)
+        assertTrue(moved.accepted)
         assertFalse(unsupported.accepted)
         assertEquals("unsupported_consumer_command", unsupported.error)
         assertNull(unsupported.requestId)

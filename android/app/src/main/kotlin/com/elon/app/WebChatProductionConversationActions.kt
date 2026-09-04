@@ -72,6 +72,23 @@ internal class WebChatProductionConversationActionsCoordinator(
         resumeConversationRefresh = resumeConversationRefresh,
         openOfficialFallback = openOfficialFallback,
     )
+    private val privateProjectMove = WebChatPrivateConversationProjectMoveCoordinator(
+        activity = activity,
+        host = host,
+        conversationIndex = conversationIndex,
+        refreshConversationIndex = refreshConversationIndex,
+        startMutation = { conversation, destination ->
+            conversationMutation.start(
+                conversation,
+                WebChatConversationMutationIntent.Moved(
+                    projectId = destination.id,
+                    projectTitle = destination.title,
+                ),
+                officialFallback = projectMove::show,
+            )
+        },
+        openOfficialFallback = projectMove::show,
+    )
 
     fun show(conversation: ChatGptWebConversation) {
         cancelPending()
@@ -152,7 +169,7 @@ internal class WebChatProductionConversationActionsCoordinator(
             )
             ACTION_RENAME -> showRenameDialog(conversation)
             ACTION_ARCHIVE -> showArchiveConfirmation(conversation)
-            ACTION_MOVE_TO_PROJECT -> projectMove.show(conversation)
+            ACTION_MOVE_TO_PROJECT -> privateProjectMove.show(conversation)
             ACTION_MORE_SETTINGS -> showPageActionsFor(conversation)
         }
     }
@@ -221,6 +238,7 @@ internal class WebChatProductionConversationActionsCoordinator(
         activeSheet = null
         sheet?.dismiss()
         conversationMutation.cancelPending()
+        privateProjectMove.cancelPending()
         projectMove.cancelPending()
     }
 

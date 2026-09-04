@@ -20,6 +20,7 @@ internal class ChatGptWebMcpTestCommandPort(
     private val onSetConversationPinned: (String, Boolean) -> Unit = { _, _ -> },
     private val onSetConversationArchived: (String, Boolean) -> Unit = { _, _ -> },
     private val onRenameConversation: (String, String) -> Unit = { _, _ -> },
+    private val onMoveConversationToProject: (String, String, String) -> Unit = { _, _, _ -> },
     private val onDispatch: (String, String) -> Unit = { _, _ -> },
     private val onSetDraft: (String, String) -> Unit = { _, _ -> },
 ) : ChatGptWebMcpCommandPort {
@@ -144,6 +145,16 @@ internal class ChatGptWebMcpTestCommandPort(
     override fun renameConversation(path: String, title: String, requestId: String) {
         onRenameConversation(path, title)
         dispatch("rename_conversation", requestId)
+    }
+
+    override fun moveConversationToProject(
+        path: String,
+        conversationTitle: String,
+        projectId: String,
+        requestId: String,
+    ) {
+        onMoveConversationToProject(path, conversationTitle, projectId)
+        dispatch("move_conversation_to_project", requestId)
     }
 
     private fun dispatch(action: String, requestId: String) = onDispatch(action, requestId)

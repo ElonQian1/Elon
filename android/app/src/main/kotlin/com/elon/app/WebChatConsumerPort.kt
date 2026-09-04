@@ -93,6 +93,13 @@ internal interface WebChatConsumerPort {
         userConfirmed: Boolean,
     ): WebChatConsumerCommandResult =
         WebChatConsumerCommandResult(false, "unsupported_consumer_command")
+    fun moveConversationToProject(
+        conversationPath: String,
+        conversationTitle: String,
+        projectId: String,
+        userConfirmed: Boolean,
+    ): WebChatConsumerCommandResult =
+        WebChatConsumerCommandResult(false, "unsupported_consumer_command")
     fun updateControl(
         controlId: String,
         mutation: WebChatConsumerControlMutation,

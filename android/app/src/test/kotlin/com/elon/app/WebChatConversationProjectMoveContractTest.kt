@@ -10,6 +10,27 @@ import org.junit.Test
 
 class WebChatConversationProjectMoveContractTest {
     @Test
+    fun productionProjectMoveUsesPrivateTransactionBeforeTheExistingOfficialFallback() {
+        val actions = read(
+            "android/app/src/main/kotlin/com/elon/app/" +
+                "WebChatProductionConversationActions.kt",
+        )
+        val coordinator = read(
+            "android/app/src/main/kotlin/com/elon/app/" +
+                "WebChatPrivateConversationProjectMoveCoordinator.kt",
+        )
+
+        assertTrue(actions.contains(
+            "ACTION_MOVE_TO_PROJECT -> privateProjectMove.show(conversation)",
+        ))
+        assertTrue(actions.contains("WebChatConversationMutationIntent.Moved("))
+        assertTrue(actions.contains("officialFallback = projectMove::show"))
+        assertTrue(coordinator.contains("WebChatConversationProjectMovePolicy.destinations("))
+        assertTrue(coordinator.contains("startMutation(conversation, destination)"))
+        assertFalse(coordinator.contains("invokeControl("))
+    }
+
+    @Test
     fun pendingDraftIsProtectedBeforeRecoveryOrOfficialNavigationStarts() {
         val source = read(
             "android/app/src/main/kotlin/com/elon/app/" +

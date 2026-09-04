@@ -184,6 +184,18 @@ internal class ChatGptWebConsumerPortAdapter(
         .put("title", title)
         .put("user_confirmed", userConfirmed))
 
+    override fun moveConversationToProject(
+        conversationPath: String,
+        conversationTitle: String,
+        projectId: String,
+        userConfirmed: Boolean,
+    ): WebChatConsumerCommandResult = execute(JSONObject()
+        .put("action", "chatgpt_move_conversation_to_project")
+        .put("conversation_path", conversationPath)
+        .put("conversation_title", conversationTitle)
+        .put("project_id", projectId)
+        .put("user_confirmed", userConfirmed))
+
     override fun updateControl(
         controlId: String,
         mutation: WebChatConsumerControlMutation,

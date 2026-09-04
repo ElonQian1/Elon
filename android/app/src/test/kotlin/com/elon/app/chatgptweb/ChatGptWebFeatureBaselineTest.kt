@@ -668,6 +668,7 @@ class ChatGptWebFeatureBaselineTest {
             "chatgpt_set_conversation_pinned",
             "chatgpt_set_conversation_archived",
             "chatgpt_rename_conversation",
+            "chatgpt_move_conversation_to_project",
             "chatgpt_start_dictation",
             "chatgpt_start_realtime_voice",
             "chatgpt_remove_attachment",

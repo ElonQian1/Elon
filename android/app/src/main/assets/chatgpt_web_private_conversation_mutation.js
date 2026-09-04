@@ -1,7 +1,7 @@
 (function (root, factory) {
   'use strict';
 
-  const exported = Object.freeze({ version: 3, create: factory });
+  const exported = Object.freeze({ version: 4, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (!root || !root.location || root.location.origin !== 'https://chatgpt.com') return;
   const current = root.__elonChatGptPrivateConversationMutation;
@@ -14,7 +14,7 @@
 })(typeof window === 'object' ? window : globalThis, function (root, dependencies) {
   'use strict';
 
-  const VERSION = 3;
+  const VERSION = 4;
   const WRITE_TIMEOUT_MS = 9000;
   const RECONCILE_TIMEOUT_MS = 4000;
   const UNCERTAIN_RECONCILE_WINDOW_MS = 16000;
@@ -23,6 +23,8 @@
   const CIRCUIT_COOLDOWN_MS = 45000;
   const MAX_FAILURES = 2;
   const MAX_TITLE_LENGTH = 160;
+  const SAFE_PROJECT_ID = /^g-p-[A-Za-z0-9_-]{1,160}$/;
+  const PRODUCTION_PROJECT_ID = /^(g-p-[A-Fa-f0-9]{32})(?:-[A-Za-z0-9_-]{1,124})?$/;
   const BLOCKED_INHERITED_HEADERS = new Set([
     'connection',
     'content-length',
@@ -61,6 +63,13 @@
   function titleFromInput(rawTitle) {
     const title = String(rawTitle || '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
     return title && title.length <= MAX_TITLE_LENGTH ? title : '';
+  }
+
+  function projectIdFromInput(rawProjectId) {
+    const projectId = String(rawProjectId || '').trim();
+    if (!SAFE_PROJECT_ID.test(projectId)) return '';
+    const production = projectId.match(PRODUCTION_PROJECT_ID);
+    return production ? production[1] : projectId;
   }
 
   function supported() {
@@ -172,11 +181,36 @@
     const candidates = conversationCandidates(payload);
     const titleSource = candidates.find((value) => typeof value.title === 'string');
     const archiveSource = candidates.find((value) => typeof value.is_archived === 'boolean');
+    let projectKnown = false;
+    let projectId = '';
+    candidates.some((value) => {
+      const gizmo = value.gizmo && typeof value.gizmo === 'object' ? value.gizmo : null;
+      const project = value.project && typeof value.project === 'object' ? value.project : null;
+      const fields = [
+        ['project_id', value.project_id],
+        ['projectId', value.projectId],
+        ['gizmo_id', value.gizmo_id],
+        ['gizmo.id', gizmo && gizmo.id],
+        ['project.id', project && project.id],
+        ['project.project_id', project && project.project_id]
+      ];
+      const present = fields.find(([name]) => {
+        const topLevelName = name.split('.')[0];
+        return Object.prototype.hasOwnProperty.call(value, topLevelName);
+      });
+      if (!present) return false;
+      projectKnown = true;
+      projectId = fields.map(([, candidate]) => projectIdFromInput(candidate))
+        .find(Boolean) || '';
+      return true;
+    });
     return Object.freeze({
       titleKnown: Boolean(titleSource),
       title: titleSource ? titleFromInput(titleSource.title) : '',
       archivedKnown: Boolean(archiveSource),
       archived: archiveSource ? archiveSource.is_archived : false,
+      projectKnown,
+      projectId,
       metadata: titleSource || archiveSource || candidates[0] || null
     });
   }
@@ -196,6 +230,12 @@
   function acceptArchivedState(conversationId, archived, metadata) {
     if (!directory || typeof directory.acceptArchivedState !== 'function') return false;
     try { return directory.acceptArchivedState(conversationId, archived, metadata); }
+    catch (_) { return false; }
+  }
+
+  function acceptProjectState(conversationId, title, projectId) {
+    if (!directory || typeof directory.acceptConversationMembership !== 'function') return false;
+    try { return directory.acceptConversationMembership(conversationId, title, projectId); }
     catch (_) { return false; }
   }
 
@@ -239,13 +279,44 @@
       timeoutMs,
       'conversation_metadata_reconcile_v1'
     );
-    if (!payload) return Object.freeze({ confirmed: false, known: false });
-    const observed = conversationStateFromPayload(payload);
+    const observed = payload ? conversationStateFromPayload(payload) : Object.freeze({
+      titleKnown: false,
+      title: '',
+      archivedKnown: false,
+      archived: false,
+      projectKnown: false,
+      projectId: '',
+      metadata: null
+    });
     if (mutation.kind === 'rename') {
       const confirmed = observed.titleKnown && observed.title === mutation.title;
       if (confirmed) acceptTitleState(conversationId, observed.title);
       return Object.freeze({ confirmed, known: observed.titleKnown });
     }
+    if (mutation.kind === 'project') {
+      const directConfirmed = observed.projectKnown && observed.projectId === mutation.projectId;
+      if (directConfirmed) {
+        acceptProjectState(conversationId, observed.title, observed.projectId);
+        return Object.freeze({ confirmed: true, known: true });
+      }
+      if (directory && typeof directory.refreshProject === 'function' &&
+          typeof directory.snapshot === 'function') {
+        try {
+          const refreshed = await directory.refreshProject(mutation.projectId);
+          const snapshot = refreshed ? directory.snapshot() : null;
+          const row = snapshot && Array.isArray(snapshot.conversations)
+            ? snapshot.conversations.find((value) => value && value.id === conversationId &&
+              projectIdFromInput(value.projectId) === mutation.projectId)
+            : null;
+          if (row) {
+            acceptProjectState(conversationId, row.title || observed.title, mutation.projectId);
+            return Object.freeze({ confirmed: true, known: true });
+          }
+        } catch (_) {}
+      }
+      return Object.freeze({ confirmed: false, known: observed.projectKnown });
+    }
+    if (!payload) return Object.freeze({ confirmed: false, known: false });
     const confirmed = observed.archivedKnown && observed.archived === mutation.archived;
     if (confirmed) acceptArchivedState(conversationId, observed.archived, observed.metadata);
     return Object.freeze({ confirmed, known: observed.archivedKnown });
@@ -311,6 +382,9 @@
   function acknowledgeMutation(target, mutation) {
     if (mutation.kind === 'pin') return acceptPinnedState(target.id, mutation.pinned);
     if (mutation.kind === 'rename') return acceptTitleState(target.id, mutation.title);
+    if (mutation.kind === 'project') {
+      return acceptProjectState(target.id, mutation.conversationTitle, mutation.projectId);
+    }
     return acceptArchivedState(target.id, mutation.archived, null);
   }
 
@@ -426,6 +500,18 @@
     }));
   }
 
+  function moveToProject(rawPath, rawProjectId, rawConversationTitle) {
+    const projectId = projectIdFromInput(rawProjectId);
+    if (!projectId) return Promise.resolve(rejected('invalid_mutation', false));
+    return startMutation(rawPath, Object.freeze({
+      kind: 'project',
+      projectId,
+      conversationTitle: titleFromInput(rawConversationTitle),
+      body: { gizmo_id: projectId },
+      transport: 'conversation_project_move_v1'
+    }));
+  }
+
   function commandMutation(action, command) {
     if (action === 'set_conversation_pinned') {
       return { run: () => setPinned(String(command && command.value || ''), command && command.selected) };
@@ -435,6 +521,13 @@
     }
     if (action === 'rename_conversation') {
       return { run: () => rename(String(command && command.value || ''), command && command.title) };
+    }
+    if (action === 'move_conversation_to_project') {
+      return { run: () => moveToProject(
+        String(command && command.value || ''),
+        command && command.projectScopeId,
+        command && command.title
+      ) };
     }
     return null;
   }
@@ -461,6 +554,7 @@
     setPinned,
     setArchived,
     rename,
+    moveToProject,
     handle,
     state
   });

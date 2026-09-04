@@ -16,6 +16,8 @@ internal sealed interface WebChatConversationMutationIntent {
     data class Pinned(val value: Boolean) : WebChatConversationMutationIntent
     data class Archived(val value: Boolean) : WebChatConversationMutationIntent
     data class Renamed(val title: String) : WebChatConversationMutationIntent
+    data class Moved(val projectId: String, val projectTitle: String) :
+        WebChatConversationMutationIntent
 }
 
 internal object WebChatConversationMutationPolicy {
@@ -49,12 +51,14 @@ internal object WebChatConversationMutationPolicy {
         is WebChatConversationMutationIntent.Archived ->
             if (intent.value) "正在归档" else "正在恢复会话"
         is WebChatConversationMutationIntent.Renamed -> "正在重命名"
+        is WebChatConversationMutationIntent.Moved -> "正在移动到“${intent.projectTitle}”"
     }
 
     fun completedMessage(intent: WebChatConversationMutationIntent): String = when (intent) {
         is WebChatConversationMutationIntent.Pinned -> if (intent.value) "已置顶" else "已取消置顶"
         is WebChatConversationMutationIntent.Archived -> if (intent.value) "已归档" else "已恢复会话"
         is WebChatConversationMutationIntent.Renamed -> "已重命名"
+        is WebChatConversationMutationIntent.Moved -> "已移动到“${intent.projectTitle}”"
     }
 
     fun failureMessage(detail: String?): String = when {
@@ -82,15 +86,16 @@ internal class WebChatConversationMutationCoordinator(
     fun start(
         conversation: ChatGptWebConversation,
         intent: WebChatConversationMutationIntent,
+        officialFallback: (ChatGptWebConversation) -> Unit = openOfficialFallback,
     ) {
         cancelPending()
         val path = ChatGptWebConversationPath.normalize(conversation.path)
-            ?: return showFailure(conversation, intent, null)
+            ?: return showFailure(conversation, intent, null, officialFallback)
         val port = consumerPort()
             ?.takeIf { activeProvider() == WebChatProviderId.CHATGPT_WEB }
-            ?: return showFailure(conversation, intent, "mutation_unavailable")
+            ?: return showFailure(conversation, intent, "mutation_unavailable", officialFallback)
         val epoch = requestEpoch
-        showProgress(conversation, intent)
+        showProgress(conversation, intent, officialFallback)
         val command = when (intent) {
             is WebChatConversationMutationIntent.Pinned ->
                 port.setConversationPinned(path, intent.value, userConfirmed = true)
@@ -98,14 +103,29 @@ internal class WebChatConversationMutationCoordinator(
                 port.setConversationArchived(path, intent.value, userConfirmed = true)
             is WebChatConversationMutationIntent.Renamed ->
                 port.renameConversation(path, intent.title, userConfirmed = true)
+            is WebChatConversationMutationIntent.Moved ->
+                port.moveConversationToProject(
+                    path,
+                    conversation.title,
+                    intent.projectId,
+                    userConfirmed = true,
+                )
         }
         val requestId = command.requestId
         if (!command.accepted || requestId.isNullOrBlank()) {
             refreshConversationIndex(null)
-            showFailure(conversation, intent, command.error)
+            showFailure(conversation, intent, command.error, officialFallback)
             return
         }
-        poll(conversation, intent, port, requestId, epoch, attempt = 0)
+        poll(
+            conversation,
+            intent,
+            port,
+            requestId,
+            epoch,
+            attempt = 0,
+            officialFallback = officialFallback,
+        )
     }
 
     fun cancelPending() {
@@ -122,6 +142,7 @@ internal class WebChatConversationMutationCoordinator(
         requestId: String,
         epoch: Int,
         attempt: Int,
+        officialFallback: (ChatGptWebConversation) -> Unit,
     ) {
         if (epoch != requestEpoch) return
         val request = port.state().commandRequests.lastOrNull { it.id == requestId }
@@ -136,16 +157,26 @@ internal class WebChatConversationMutationCoordinator(
             }
             WebChatConversationMutationProgress.NEEDS_OFFICIAL_CONFIRMATION -> {
                 refreshConversationIndex(null)
-                showFailure(conversation, intent, request?.detail)
+                showFailure(conversation, intent, request?.detail, officialFallback)
             }
             WebChatConversationMutationProgress.WAITING -> {
                 if (attempt >= MAX_POLL_ATTEMPTS) {
                     refreshConversationIndex(null)
-                    showFailure(conversation, intent, "mutation_timeout")
+                    showFailure(conversation, intent, "mutation_timeout", officialFallback)
                     return
                 }
                 host.postDelayed(
-                    { poll(conversation, intent, port, requestId, epoch, attempt + 1) },
+                    {
+                        poll(
+                            conversation,
+                            intent,
+                            port,
+                            requestId,
+                            epoch,
+                            attempt + 1,
+                            officialFallback,
+                        )
+                    },
                     POLL_INTERVAL_MS,
                 )
             }
@@ -155,6 +186,7 @@ internal class WebChatConversationMutationCoordinator(
     private fun showProgress(
         conversation: ChatGptWebConversation,
         intent: WebChatConversationMutationIntent,
+        officialFallback: (ChatGptWebConversation) -> Unit,
     ) {
         activeSheet = WebChatActionSheet.showUpdatable(
             activity = activity,
@@ -171,7 +203,7 @@ internal class WebChatConversationMutationCoordinator(
                 contentDescription = "web-chat-conversation-mutation-official",
                 action = {
                     requestEpoch += 1
-                    openOfficialFallback(conversation)
+                    officialFallback(conversation)
                 },
             )),
             onCancelled = { requestEpoch += 1 },
@@ -189,14 +221,15 @@ internal class WebChatConversationMutationCoordinator(
         conversation: ChatGptWebConversation,
         intent: WebChatConversationMutationIntent,
         detail: String?,
+        officialFallback: (ChatGptWebConversation) -> Unit,
     ) {
         dismissProgress()
         if (activity.isFinishing || activity.isDestroyed) return
         AlertDialog.Builder(activity)
             .setTitle("会话操作未确认")
             .setMessage(WebChatConversationMutationPolicy.failureMessage(detail))
-            .setNeutralButton("重试") { _, _ -> start(conversation, intent) }
-            .setPositiveButton("官网确认") { _, _ -> openOfficialFallback(conversation) }
+            .setNeutralButton("重试") { _, _ -> start(conversation, intent, officialFallback) }
+            .setPositiveButton("官网确认") { _, _ -> officialFallback(conversation) }
             .setNegativeButton("取消", null)
             .show()
     }

@@ -227,6 +227,7 @@ internal class ChatGptWebMcpActions(
             "chatgpt_set_conversation_pinned",
             "chatgpt_set_conversation_archived",
             "chatgpt_rename_conversation",
+            "chatgpt_move_conversation_to_project",
             ->
                 ChatGptWebConversationMutationMcpAction.dispatch(args, commands, ::dispatch)
                     ?.let { return error(action, it) }

@@ -583,6 +583,7 @@ internal object ChatGptWebFeatureBaseline {
                 "chatgpt_set_conversation_pinned",
                 "chatgpt_set_conversation_archived",
                 "chatgpt_rename_conversation",
+                "chatgpt_move_conversation_to_project",
                 "chatgpt_invoke_control",
             ),
             semantics = setOf(
@@ -590,6 +591,7 @@ internal object ChatGptWebFeatureBaseline {
                 "rename",
                 "pin",
                 "archive",
+                "save_to_project",
                 "share",
                 "delete",
             ),
@@ -604,10 +606,11 @@ internal object ChatGptWebFeatureBaseline {
                 "chatgpt_set_conversation_pinned",
                 "chatgpt_set_conversation_archived",
                 "chatgpt_rename_conversation",
+                "chatgpt_move_conversation_to_project",
                 "chatgpt_invoke_control",
                 "chatgpt_select_view",
             ),
-            semantics = setOf("rename", "pin", "archive", "share", "delete"),
+            semantics = setOf("rename", "pin", "archive", "save_to_project", "share", "delete"),
             verificationGap = "conversation_mutation_device_acceptance",
         ),
         feature(

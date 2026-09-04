@@ -56,6 +56,23 @@ class WebChatProductionConversationActionsTest {
     }
 
     @Test
+    fun projectMoveUsesTheDestinationInProgressAndCompletionCopy() {
+        val intent = WebChatConversationMutationIntent.Moved(
+            projectId = "g-p-demo",
+            projectTitle = "家庭成员健康",
+        )
+
+        assertEquals(
+            "正在移动到“家庭成员健康”",
+            WebChatConversationMutationPolicy.progressTitle(intent),
+        )
+        assertEquals(
+            "已移动到“家庭成员健康”",
+            WebChatConversationMutationPolicy.completedMessage(intent),
+        )
+    }
+
+    @Test
     fun readyTargetConversationShowsActionsImmediately() {
         assertEquals(
             WebChatConversationActionReadiness.SHOW,

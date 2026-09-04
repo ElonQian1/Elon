@@ -331,6 +331,21 @@ internal object WebAiPrivateTransportCatalog {
             fallback = "official_conversation_project_menu",
         ),
         Entry(
+            id = "android_chatgpt_private_conversation_project_move_v1",
+            provider = "chatgpt",
+            status = "completed",
+            verification =
+                "targeted_transaction_bridge_production_ui_and_release_build_passed_device_pending",
+            productionDefault = true,
+            runtimeEnabled = BuildConfig.CHATGPT_PRIVATE_CONVERSATION_MUTATIONS_ENABLED,
+            requestMode =
+                "single_same_origin_patch_gizmo_id_then_bounded_read_only_project_reconciliation",
+            healthPolicy =
+                "canonical_project_id_single_active_write_timeout_circuit_target_directory_confirmation_and_no_write_replay",
+            fallback = "official_conversation_project_menu_after_explicit_user_choice",
+            directPostEnabled = BuildConfig.CHATGPT_PRIVATE_CONVERSATION_MUTATIONS_ENABLED,
+        ),
+        Entry(
             id = "android_chatgpt_private_conversation_pin_v1",
             provider = "chatgpt",
             status = "completed",

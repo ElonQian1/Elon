@@ -19,6 +19,12 @@ internal interface ChatGptWebMcpCommandPort {
     fun setConversationPinned(path: String, pinned: Boolean, requestId: String) = Unit
     fun setConversationArchived(path: String, archived: Boolean, requestId: String) = Unit
     fun renameConversation(path: String, title: String, requestId: String) = Unit
+    fun moveConversationToProject(
+        path: String,
+        conversationTitle: String,
+        projectId: String,
+        requestId: String,
+    ) = Unit
     fun startDictation(nativeDraft: String, expectedOfficialDraft: String, requestId: String)
     fun cancelDictation(requestId: String)
     fun submitDictation(requestId: String)

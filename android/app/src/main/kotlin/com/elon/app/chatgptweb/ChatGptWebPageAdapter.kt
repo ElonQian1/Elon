@@ -302,6 +302,19 @@ internal class ChatGptWebPageAdapter(
         requestId = requestId,
     )
 
+    fun moveConversationToProject(
+        path: String,
+        conversationTitle: String,
+        projectId: String,
+        requestId: String,
+    ) = runCommand(
+        action = "move_conversation_to_project",
+        value = path.take(MAX_CONVERSATION_PATH_LENGTH),
+        title = conversationTitle.take(MAX_CONVERSATION_TITLE_LENGTH),
+        projectScopeId = projectId,
+        requestId = requestId,
+    )
+
     fun startNewConversation() = runCommand("new_conversation")
 
     fun startNewConversation(requestId: String) = runCommand("new_conversation", requestId = requestId)
@@ -620,7 +633,7 @@ internal class ChatGptWebPageAdapter(
         origin.scheme == "https" && origin.host == "chatgpt.com" && origin.port == -1
 
     companion object {
-        internal const val ADAPTER_VERSION = 244
+        internal const val ADAPTER_VERSION = 245
 
         private val ADAPTER_ASSETS = listOf(
             "chatgpt_web_adapter_bootstrap.js",

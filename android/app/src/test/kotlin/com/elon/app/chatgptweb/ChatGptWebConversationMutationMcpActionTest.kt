@@ -3,6 +3,7 @@ package com.elon.app.chatgptweb
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -84,5 +85,56 @@ class ChatGptWebConversationMutationMcpActionTest {
             assertEquals("invalid_title", result.getString("error"))
         }
         assertEquals(0, dispatchCount)
+    }
+
+    @Test
+    fun projectMoveRejectsInvalidProjectIdsBeforeDispatch() {
+        var dispatchCount = 0
+        val commands = ChatGptWebMcpTestCommandPort(
+            onMoveConversationToProject = { _, _, _ -> dispatchCount += 1 },
+        )
+
+        listOf("", "project-demo", "g-p-unsafe/value").forEach { projectId ->
+            val result = ChatGptWebConversationMutationMcpAction.dispatch(JSONObject()
+                .put("action", "chatgpt_move_conversation_to_project")
+                .put("conversation_path", "/c/demo")
+                .put("conversation_title", "项目会话")
+                .put("project_id", projectId)
+                .put("user_confirmed", true), commands) { _, _ -> dispatchCount += 1 }
+            assertEquals("invalid_project_id", result)
+        }
+        assertEquals(0, dispatchCount)
+    }
+
+    @Test
+    fun projectMoveCanonicalizesAndDispatchesTheTypedCommand() {
+        var movedTarget: Triple<String, String, String>? = null
+        var expectedAction: String? = null
+        val commands = ChatGptWebMcpTestCommandPort(
+            onMoveConversationToProject = { path, title, projectId ->
+                movedTarget = Triple(path, title, projectId)
+            },
+        )
+
+        val result = ChatGptWebConversationMutationMcpAction.dispatch(JSONObject()
+            .put("action", "chatgpt_move_conversation_to_project")
+            .put("conversation_path", "/c/demo")
+            .put("conversation_title", "项目会话")
+            .put("project_id", "g-p-0123456789abcdef0123456789abcdef-client")
+            .put("user_confirmed", true), commands) { action, run ->
+            expectedAction = action
+            run("mcp_project_move")
+        }
+
+        assertNull(result)
+        assertEquals("move_conversation_to_project", expectedAction)
+        assertEquals(
+            Triple(
+                "/c/demo",
+                "项目会话",
+                "g-p-0123456789abcdef0123456789abcdef",
+            ),
+            movedTarget,
+        )
     }
 }

@@ -293,6 +293,16 @@ or app-data clear occurred. Formal APK `v1.1.1510 (1510)` was then installed wit
 data; MCP confirmed adapter `244`, a ready authenticated bridge and composer, and restored
 conversation home. See `docs/chatgpt-private-conversation-metadata-mutations.md`.
 
+Conversation project move now reuses the same versioned page-local mutation boundary. The
+native cached project picker submits one same-origin project-membership `PATCH`, then confirms
+the result using read-only conversation metadata or the selected project directory. A timeout
+never replays the write. The older context-bound DOM coordinator remains available only as the
+explicit official fallback. The completed, production-default implementation capability is
+`android_chatgpt_private_conversation_project_move_v1`, adapter `245`; targeted transaction,
+bridge, capability, and production UI tests plus the Release build passed, while reversible
+device acceptance remains explicitly pending. See
+`docs/chatgpt-private-conversation-project-move.md`.
+
 The Google conversation directory persists the timestamp of the last successful
 official directory response. Cached rows render immediately; a legacy or expired cache
 is then refreshed in the background, while a recently verified cache does not trigger

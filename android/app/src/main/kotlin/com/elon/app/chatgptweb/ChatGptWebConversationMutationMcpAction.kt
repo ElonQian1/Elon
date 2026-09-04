@@ -31,6 +31,21 @@ internal object ChatGptWebConversationMutationMcpAction {
                     commands.renameConversation(path, title, requestId)
                 }
             }
+            "chatgpt_move_conversation_to_project" -> {
+                val projectId = ChatGptWebConversationPath.canonicalProjectId(
+                    args.optString("project_id"),
+                ) ?: return "invalid_project_id"
+                val conversationTitle = args.optString("conversation_title").trim()
+                if (conversationTitle.length > MAX_TITLE_LENGTH) return "invalid_title"
+                dispatchCommand("move_conversation_to_project") { requestId ->
+                    commands.moveConversationToProject(
+                        path,
+                        conversationTitle,
+                        projectId,
+                        requestId,
+                    )
+                }
+            }
             else -> return "unsupported_conversation_mutation"
         }
         return null
