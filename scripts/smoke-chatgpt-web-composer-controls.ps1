@@ -13,6 +13,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "chatgpt-web-smoke-runtime.ps1")
+. (Join-Path $PSScriptRoot "chatgpt-web-smoke-evidence.ps1")
+. (Join-Path $PSScriptRoot "chatgpt-web-smoke-supervised-runtime.ps1")
 $ExpectedAdapterVersion = Resolve-ChatGptWebSmokeExpectedAdapterVersion $ExpectedAdapterVersion
 
 $runtime = New-ChatGptWebSmokeRuntime -Adb $Adb -DeviceSerial $DeviceSerial `
@@ -104,78 +106,121 @@ $origin = Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutS
 Assert-ChatGptWebSmokeAdapterVersion -State $origin `
     -ExpectedAdapterVersion $ExpectedAdapterVersion
 
-$dictationResult = [ordered]@{ skipped = $true; reason = "user_assisted_audio_capture" }
-if (-not $SkipDictation) {
-    $dictationStart = Invoke-ReceiptAction -Action "chatgpt_start_dictation" `
-        -ExpectedAction "start_dictation"
-    $active = Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutSec `
-        -Description "active ChatGPT dictation" -RequireChatGptForeground `
-        -Predicate { param($state) $state.dictation_active -eq $true }
-    $dictationCancel = Invoke-ReceiptAction -Action "chatgpt_cancel_dictation" `
-        -ExpectedAction "cancel_dictation"
-    $inactive = Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutSec `
-        -Description "stopped ChatGPT dictation" -RequireChatGptForeground `
-        -Predicate { param($state) $state.dictation_active -eq $false }
-    Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "set_input_text" `
-        -Arguments @{ text = "" } | Out-Null
-    $dictationResult = [ordered]@{
-        skipped = $false
-        start_receipt = [string]$dictationStart.receipt.status
-        active = [bool]$active.dictation_active
-        cancel_receipt = [string]$dictationCancel.receipt.status
-        stopped = -not [bool]$inactive.dictation_active
-        input_cleared = $true
-    }
+$originConversationPath = Get-ChatGptWebSmokeConversationPath `
+    -Url ([string]$origin.conversation.url)
+if ([int]$origin.input.text_length -gt 0) {
+    throw "Composer control smoke will not replace a non-empty ChatGPT draft."
+}
+if (-not $originConversationPath -and [string]$origin.page_kind -ne "home") {
+    throw "The current ChatGPT page has no safe MCP restoration route."
+}
+if ($origin.dictation_active -eq $true -or $origin.streaming -eq $true) {
+    throw "Composer control smoke will not interrupt active ChatGPT work."
 }
 
-$search = Get-WebSearchOption
-$initialSearchSelected = $search.selected -eq $true
+$dictationResult = [ordered]@{ skipped = $true; reason = "user_assisted_audio_capture" }
+$isolationRequested = $false
+$originRestored = $false
+$dictationStarted = $false
 $restoreSearch = $false
 try {
-    $toggleOn = Invoke-ReceiptAction -Action "chatgpt_select_composer_option" `
-        -ExpectedAction "select_composer_tool" -Arguments @{
-            section = "tools"
-            option_id = [string]$search.id
+    $isolationRequested = $true
+    $isolation = Start-ChatGptWebSmokeIsolatedConversation -Runtime $runtime `
+        -OriginState $origin -TimeoutSec $ReadyTimeoutSec
+    Assert-ChatGptWebSmokeAdapterVersion -State $isolation.isolated_state `
+        -ExpectedAdapterVersion $ExpectedAdapterVersion
+
+    if (-not $SkipDictation) {
+        $dictationStart = Invoke-ReceiptAction -Action "chatgpt_start_dictation" `
+            -ExpectedAction "start_dictation"
+        $dictationStarted = $true
+        $active = Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutSec `
+            -Description "active ChatGPT dictation" -RequireChatGptForeground `
+            -Predicate { param($state) $state.dictation_active -eq $true }
+        $dictationCancel = Invoke-ReceiptAction -Action "chatgpt_cancel_dictation" `
+            -ExpectedAction "cancel_dictation"
+        $dictationStarted = $false
+        $inactive = Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutSec `
+            -Description "stopped ChatGPT dictation" -RequireChatGptForeground `
+            -Predicate { param($state) $state.dictation_active -eq $false }
+        Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "set_input_text" `
+            -Arguments @{ text = "" } | Out-Null
+        $dictationResult = [ordered]@{
+            skipped = $false
+            start_receipt = [string]$dictationStart.receipt.status
+            active = [bool]$active.dictation_active
+            cancel_receipt = [string]$dictationCancel.receipt.status
+            stopped = -not [bool]$inactive.dictation_active
+            input_cleared = $true
         }
-    $restoreSearch = $true
-    $toggled = Get-WebSearchOption
-    if (($toggled.selected -eq $true) -eq $initialSearchSelected) {
-        throw "ChatGPT web search selection did not toggle."
     }
-    $toggleOff = Invoke-ReceiptAction -Action "chatgpt_select_composer_option" `
-        -ExpectedAction "select_composer_tool" -Arguments @{
-            section = "tools"
-            option_id = [string]$toggled.id
-        }
-    $restoreSearch = $false
-    $restored = Get-WebSearchOption
-    if (($restored.selected -eq $true) -ne $initialSearchSelected) {
-        throw "ChatGPT web search selection was not restored."
+
+    $search = Get-WebSearchOption
+    if ($search.selected -eq $true) {
+        throw "The isolated ChatGPT conversation inherited an active web search tool."
     }
-} finally {
-    if ($restoreSearch) {
-        try {
-            $current = Get-WebSearchOption
-            if (($current.selected -eq $true) -ne $initialSearchSelected) {
-                Invoke-ReceiptAction -Action "chatgpt_select_composer_option" `
-                    -ExpectedAction "select_composer_tool" -Arguments @{
-                        section = "tools"
-                        option_id = [string]$current.id
-                    } | Out-Null
+    try {
+        $toggleOn = Invoke-ReceiptAction -Action "chatgpt_select_composer_option" `
+            -ExpectedAction "select_composer_tool" -Arguments @{
+                section = "tools"
+                option_id = [string]$search.id
             }
-        } catch {
-            Write-Warning "ChatGPT web search test state could not be restored automatically."
+        $restoreSearch = $true
+        $toggled = Get-WebSearchOption
+        if ($toggled.selected -ne $true) {
+            throw "ChatGPT web search selection did not turn on."
         }
+        $toggleOff = Invoke-ReceiptAction -Action "chatgpt_select_composer_option" `
+            -ExpectedAction "select_composer_tool" -Arguments @{
+                section = "tools"
+                option_id = [string]$toggled.id
+            }
+        $restoreSearch = $false
+        $restored = Get-WebSearchOption
+        if ($restored.selected -eq $true) {
+            throw "ChatGPT web search selection did not turn off."
+        }
+    } finally {
+        if ($restoreSearch) {
+            try {
+                $current = Get-WebSearchOption
+                if ($current.selected -eq $true) {
+                    Invoke-ReceiptAction -Action "chatgpt_select_composer_option" `
+                        -ExpectedAction "select_composer_tool" -Arguments @{
+                            section = "tools"
+                            option_id = [string]$current.id
+                        } | Out-Null
+                }
+            } catch {
+                Write-Warning "ChatGPT isolated web search state could not be reset automatically."
+            }
+        }
+    }
+
+    $observedTools = @(Get-ComposerTools)
+    $observedToolSemantics = @(
+        $observedTools |
+            ForEach-Object { [string]$_.semantic } |
+            Where-Object { $composerToolDiscoveryCases.Contains($_) } |
+            Sort-Object -Unique
+    )
+} finally {
+    if ($dictationStarted) {
+        try {
+            Invoke-ReceiptAction -Action "chatgpt_cancel_dictation" `
+                -ExpectedAction "cancel_dictation" | Out-Null
+        } catch {
+            Write-Warning "ChatGPT isolated dictation could not be cancelled automatically."
+        }
+    }
+    if ($isolationRequested) {
+        Restore-ChatGptWebSmokeOrigin -Runtime $runtime `
+            -ConversationPath $originConversationPath `
+            -TimeoutSec $ReadyTimeoutSec | Out-Null
+        $originRestored = $true
     }
 }
 
-$observedTools = @(Get-ComposerTools)
-$observedToolSemantics = @(
-    $observedTools |
-        ForEach-Object { [string]$_.semantic } |
-        Where-Object { $composerToolDiscoveryCases.Contains($_) } |
-        Sort-Object -Unique
-)
 $discoveryCases = @(
     $observedToolSemantics | ForEach-Object { $composerToolDiscoveryCases[$_] }
 )
@@ -185,11 +230,13 @@ Register-ChatGptWebVerificationCases -Runtime $runtime `
     -ExpectedAdapterVersion $ExpectedAdapterVersion | Out-Null
 
 [ordered]@{
-    schema = "elon.chatgpt_web.composer_control_smoke.v1"
+    schema = "elon.chatgpt_web.composer_control_smoke.v2"
     passed = $true
     device_serial = $DeviceSerial
     sent_messages = 0
     uploaded_attachments = 0
+    isolated_conversation = $true
+    origin_restored = [bool]$originRestored
     dictation = $dictationResult
     web_search = [ordered]@{
         enable_receipt = [string]$toggleOn.receipt.status
