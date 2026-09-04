@@ -236,6 +236,6 @@ internal class WebChatConversationMutationCoordinator(
 
     private companion object {
         const val POLL_INTERVAL_MS = 250L
-        const val MAX_POLL_ATTEMPTS = 140
+        const val MAX_POLL_ATTEMPTS = 160
     }
 }

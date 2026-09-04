@@ -230,6 +230,48 @@ class ChatGptWebObservedStateTest {
     }
 
     @Test
+    fun conversationMutationUsesItsBoundedReconciliationBudget() {
+        var now = 10_000L
+        val state = ChatGptWebObservedState { now }
+        val request = state.beginCommand("move_conversation_to_project")
+
+        now += 20_000L
+        assertEquals(
+            ChatGptWebObservedState.CommandRequest.PENDING,
+            state.snapshot().commandRequests.single().status,
+        )
+
+        now += 15_000L
+        val expired = state.snapshot().commandRequests.single { it.id == request.id }
+        assertEquals(ChatGptWebObservedState.CommandRequest.TIMED_OUT, expired.status)
+    }
+
+    @Test
+    fun correlatedLateResultSettlesAnExpiredRequest() {
+        var now = 10_000L
+        val state = ChatGptWebObservedState { now }
+        val request = state.beginCommand("invoke_ui_control")
+        now += 20_000L
+        assertEquals(
+            ChatGptWebObservedState.CommandRequest.TIMED_OUT,
+            state.snapshot().commandRequests.single().status,
+        )
+
+        now += 1_000L
+        state.accept(ChatGptWebEvent.CommandResult(
+            action = "invoke_ui_control",
+            ok = true,
+            detail = "late_confirmation",
+            requestId = request.id,
+        ))
+
+        val settled = state.snapshot().commandRequests.single()
+        assertEquals(ChatGptWebObservedState.CommandRequest.SUCCEEDED, settled.status)
+        assertEquals("late_confirmation", settled.result?.detail)
+        assertEquals(now, settled.completedAtMs)
+    }
+
+    @Test
     fun pageGenerationKeepsFreshDirectoryAndFailsPendingDocumentCommands() {
         var now = 30_000L
         val state = ChatGptWebObservedState { now }

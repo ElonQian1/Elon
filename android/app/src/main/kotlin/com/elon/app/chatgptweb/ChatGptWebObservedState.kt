@@ -256,7 +256,7 @@ internal class ChatGptWebObservedState(
     ) {
         val requestId = event.requestId ?: return
         val index = commandRequests.indexOfFirst {
-            it.status == CommandRequest.PENDING &&
+            (it.status == CommandRequest.PENDING || it.status == CommandRequest.TIMED_OUT) &&
                 it.id == requestId &&
                 it.expectedAction == event.action
         }
@@ -286,7 +286,7 @@ internal class ChatGptWebObservedState(
         commandRequests = commandRequests.map { request ->
             if (
                 request.status == CommandRequest.PENDING &&
-                now - request.startedAtMs >= COMMAND_TIMEOUT_MS
+                now - request.startedAtMs >= commandTimeoutMs(request.expectedAction)
             ) {
                 changed = true
                 request.copy(status = CommandRequest.TIMED_OUT, completedAtMs = now)
@@ -358,9 +358,23 @@ internal class ChatGptWebObservedState(
         const val MAX_COMMAND_REQUESTS = 20
         const val MAX_RECENT_COMMAND_ACTIONS = 20
         const val COMMAND_TIMEOUT_MS = 20_000L
+        const val CONVERSATION_MUTATION_COMMAND_TIMEOUT_MS = 35_000L
+        val CONVERSATION_MUTATION_ACTIONS = setOf(
+            "set_conversation_pinned",
+            "set_conversation_archived",
+            "rename_conversation",
+            "move_conversation_to_project",
+        )
         const val PAGE_GENERATION_CHANGED = "page_generation_changed"
         const val OPEN_CONVERSATION = "open_conversation"
         const val OPEN_CONVERSATION_CONFIRMED_BY_SNAPSHOT = "navigation_confirmed_by_snapshot"
         const val OPEN_CONVERSATION_SUPERSEDED = "navigation_superseded"
+
+        fun commandTimeoutMs(action: String): Long =
+            if (action in CONVERSATION_MUTATION_ACTIONS) {
+                CONVERSATION_MUTATION_COMMAND_TIMEOUT_MS
+            } else {
+                COMMAND_TIMEOUT_MS
+            }
     }
 }

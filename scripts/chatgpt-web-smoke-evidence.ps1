@@ -150,8 +150,11 @@ function Wait-ChatGptCommandReceipt {
         $receipt = @($state.command_requests) |
             Where-Object { [string]$_.request_id -eq $RequestId } |
             Select-Object -Last 1
-        if ($null -ne $receipt -and [string]$receipt.status -eq "failed") {
-            throw "ChatGPT command failed: $ExpectedAction"
+        if (
+            $null -ne $receipt -and
+            [string]$receipt.status -in @("failed", "timed_out")
+        ) {
+            throw "ChatGPT command ended without success: $ExpectedAction status=$($receipt.status)"
         }
         if (
             $null -ne $receipt -and
