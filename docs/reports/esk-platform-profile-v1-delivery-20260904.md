@@ -14,10 +14,10 @@ owners: [platform-assets, android]
 
 | 能力 | implementation_status | verification_status | delivery_status | acceptance_status |
 | --- | --- | --- | --- | --- |
-| 个人中心独立正式入口与原生数量/最近流水 | implemented | 编译及源码接线通过 | 待正式发布回执 | 实际账户待验收 |
-| 严格来源、金额与历史校验 | implemented | 32 项解析测试通过 | 待 APK 发布 | 合成数据已验证 |
-| 私有传输、会话/请求代次与清除 | implemented | 25 项逻辑/替身测试通过 | 待 APK 发布 | Android 生命周期实测待补 |
-| Web 对应正式来源说明/主 APK 下载入口 | implemented | 语法与接线通过 | 待静态模板发布 | 不读取正式私有余额 |
+| 个人中心独立正式入口与原生数量/最近流水 | implemented | offline_passed | deployed（APK 1.1.1506） | deferred：实际账户待验收 |
+| 严格来源、金额与历史校验 | implemented | offline_passed（32 项） | deployed | pending：仅合成数据验证 |
+| 私有传输、会话/请求代次与清除 | implemented | offline_passed（25 项） | deployed | deferred：Android 生命周期实测待补 |
+| Web 对应正式来源说明/主 APK 下载入口 | implemented | environment_passed（公开入口） | deployed | pending：不读取正式私有余额 |
 | 真实资金、正式入账、双 APK 正式余额 | 非本批实现 | 未操作 | 未启用 | 需独立审批与验收 |
 
 ## 源码边界
@@ -33,19 +33,20 @@ owners: [platform-assets, android]
 
 ## 验证证据
 
-2026-09-04，定向 Gradle `:app:testDebugUnitTest`：**103 项，0 失败，0 错误**。
+2026-09-04，定向 Gradle `:app:testDebugUnitTest`：**104 项，0 失败，0 错误**。
 
 | 测试组 | 数量 |
 | --- | ---: |
 | 平台解析/边界 | 32 |
 | 平台独立 reader | 9 |
 | SessionStore / RequestGate | 16 |
-| 平台 APK/Web 源码接线 | 8 |
+| 平台 APK/Web 源码接线 | 9 |
 | 既有 Paper reader / provider / 17 字段合同 / 登录到期 | 38 |
 
 命令选取 `com.elon.app.esk.platform.*`、`com.elon.app.esk.handoff.*`、
 `com.elon.eskcontract.*`、`com.elon.app.AuthManagerExpiryTest`；没有访问生产账户。
-日志：`esk-platform-jvm-final-20260904-172848-852`（Git 元数据 ai-command-logs）。
+首次完整通过 103 项：`esk-platform-jvm-final-20260904-172848-852`；新增修订写入接线断言后
+最终 104 项：`esk-platform-final-wiring-20260904-174159-885`（Git 元数据 ai-command-logs）。
 `node scripts/check-mobile-pwa-source.js` 通过；Preview-first Views 资源编译通过。
 
 初始本机 JDK 在旧短名 TEMP 路径创建 socket 时失败；仅把本次进程 TEMP/TMP 设为
@@ -61,7 +62,38 @@ runtime、capability 和 Views scaffold；无 TARGET_DESIGN，未伪造参考图
 能力检测为 PREPARATION_REQUIRED，仅缺真实 runtime 构建验证；不是平台能力缺口。
 本批默认不触碰物理手机，APK 发布使用任务本地的禁用自动安装配置。
 
-发布后补充版本、提交、线上模板证据及最终工作台门禁。无真实帧不得称“视觉已验收”。
+发布后工作台仍为 BOOTSTRAP/disconnected；未返回可用 rendererResourceId 或空闲租约。
+遵照先容量后准备规则，未启动、抢占或安装模拟器（preparation attempts=0）。
+门禁显示 PREPARATION_REQUIRED，不能用正式 APK 构建替代工作台真帧证据。
+
+| UI 字段 | 实际状态 |
+| --- | --- |
+| FIT_RUN_STATUS | NOT_REQUIRED_WITHOUT_CLEAN_TARGET（没有提供目标图） |
+| FINAL_VISUAL_LOSS | unavailable |
+| VISUAL_ACCEPTANCE_THRESHOLD | unavailable |
+| CROSS_PLATFORM_VISUAL_PARITY | deferred；Web 仅原生入口说明，未宣称完整界面一致 |
+| BUSINESS_DELIVERY_READY | false（工作台缺 runtime/sourceProof） |
+| PLATFORM_EVOLUTION_PENDING | false |
+| EVOLUTION_THREAD | none（没有创建平台进化任务） |
+| REAL_DEVICE_STATUS / ANDROID_RENDERER | not_requested / verification_deferred |
+
+业务 APK/Web 已发布，视觉验证延期；不宣称视觉或真实用户验收通过。
+
+## 发布回执
+
+- 正式代码：`1314be7148b6563bfbbf3a611d9fa998efd8989d`；模型/传输基础
+  `8bbfaf63c179d01855a0b3724f534d01cdb9eb14`。主线并发只有一条无关 Android 文档更新，
+  实际 non-fast-forward 后 rebase 无冲突；原测试源内容不变。
+- APK：`1.1.1506` / build `1506`，39,665,591 字节，SHA-256
+  `ac3302061d2501d17278ca2f1b2bf2d2a00ad50a5bc54d5b4eff5a6a0d4ea5fc`。
+- 下载：[主项目 APK](http://43.139.149.158:8080/app/ElonSpeed-latest.apk)。公开 version.json
+  返回以上精确版本、Git SHA、大小与哈希，正式 publisher 完成远端文件原地哈希校验。
+- PWA 静态模板先发布（7.6 秒），APK 后发布（233.4 秒）；共 242.5 秒，无 Rust 重建。
+  根页面 HTTP 200，正式来源说明、主 APK 下载和 HTTP 不可用提示均检出。
+- 日志：`esk-platform-ui-publish-20260904-173541-375`。自动 ADB 安装明确 disabled；
+  publisher 的附带 worktree 清理出现 Branch 属性 warning，后续统一 finish 单独验收。
+- 发布后把 Web 下载链接复用既有块级 `profile-row`（76px 触控），不改变 Android 生产输入；
+  对应静态模板补发及新增 AuthManager revision 接线测试在本报告后续提交记录。
 
 安全传输仍待用户选择；未安装证书、未更改 HTTP 服务，也未读取真实登录凭据。
 历史用户仍需核对付款、映射、用途和审核后才可登记。当前量化 V24 的正式签名 APK

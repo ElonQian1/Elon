@@ -15,6 +15,15 @@ import org.junit.Test
 /** Source wiring regression checks, not Android lifecycle or device acceptance evidence. */
 class EskPlatformWiringTest {
     @Test
+    fun saveAndClearRotateRevisionWithinTheSameSessionEdit() {
+        val auth = kotlin("AuthManager.kt")
+        listOf("saveSession", "clear").forEach { name ->
+            ordered(method(auth, name), "prefs(ctx).edit().apply {",
+                "putString(\"auth_session_revision\", UUID.randomUUID().toString())", "}.apply()")
+        }
+    }
+
+    @Test
     fun nativeFormalPageIsNonExportedAndDoesNotReturnPrivateData() {
         val manifest = read("android/app/src/main/AndroidManifest.xml")
         val xml = DocumentBuilderFactory.newInstance().apply {
@@ -130,6 +139,8 @@ class EskPlatformWiringTest {
         listOf("本网页暂不读取正式私有余额", "Paper 模拟资产不包含正式登记数量", "当前 HTTP 不可用",
             "href=\"/app/ElonSpeed-latest.apk\"").forEach { assertTrue(section.single().value.contains(it)) }
         assertFalse(section.single().value.contains("<script"))
+        assertTrue(section.single().value.contains("<a class=\"profile-row\""))
+        assertTrue(web.contains("min-height: 76px;"))
         ordered(web, "id=\"profileEskTotal\"", "id=\"profileEskPlatformEntry\"", "<h3>Token 额度</h3>")
         assertFalse(web.contains("/api/me/assets/esk/platform"))
         assertFalse(web.contains("yilong.esk.platform_account.v1"))

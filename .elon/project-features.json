@@ -6431,25 +6431,25 @@
       "implementation_evidence": [
         {
           "path": "android/app/src/main/AndroidManifest.xml",
-          "content_hash": "fb769efe0f4cd156c07a0529d48a1c14789d635930a0b9d4608bcf66ae8848ff",
+          "content_hash": "87b0beda05b0e77b56d342e38b512702115d06817be54a32cf9fa42b0df5da62",
           "locator": "",
           "evidence_kind": "configuration",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "84c36be53376c1854e58464367c94219e494e60f",
-            "head_blob_oid": "77a19de5fe7751ed97b56fffd34392c1e58c5e0d",
+            "head_commit": "1314be7148b6563bfbbf3a611d9fa998efd8989d",
+            "head_blob_oid": "8b63b8494db9df5ffdafecfd197caaf73ce6fc8e",
             "worktree_blob_oid": "8b63b8494db9df5ffdafecfd197caaf73ce6fc8e",
-            "state": "tracked_modified"
+            "state": "tracked_clean"
           }
         },
         {
           "path": "android/app/src/main/kotlin/com/elon/app/AuthManager.kt",
-          "content_hash": "999fa029a476a761d196b4ca9122ea4cc6c9be0c9fad65078cef1f90d91196ae",
+          "content_hash": "559a2a1e57fd2fb02aad16c0592fa1cbee2742e749159cfc634e57c291e02965",
           "locator": "",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "84c36be53376c1854e58464367c94219e494e60f",
+            "head_commit": "1314be7148b6563bfbbf3a611d9fa998efd8989d",
             "head_blob_oid": "a6fc8fd61a49ea8daec7d8e1923f3fc6a35e9fa7",
             "worktree_blob_oid": "a6fc8fd61a49ea8daec7d8e1923f3fc6a35e9fa7",
             "state": "tracked_clean"
@@ -6457,25 +6457,25 @@
         },
         {
           "path": "android/app/src/main/kotlin/com/elon/app/MainProfileQuickActions.kt",
-          "content_hash": "f5bc13ef3bf2b2ecc0a254a957c0433c1da05e1fe1f3c5e6802404a7a4ecfcbc",
+          "content_hash": "e05b4ecf1e13cdd064f4bc5da6e12c25db06e21b9c8d77ce836211848db50cfe",
           "locator": "",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "84c36be53376c1854e58464367c94219e494e60f",
-            "head_blob_oid": "0bd8eb95e9fced3c394280a2aae0224307e931ad",
+            "head_commit": "1314be7148b6563bfbbf3a611d9fa998efd8989d",
+            "head_blob_oid": "095850475db3fc32dceb73075f7a29420702828d",
             "worktree_blob_oid": "095850475db3fc32dceb73075f7a29420702828d",
-            "state": "tracked_modified"
+            "state": "tracked_clean"
           }
         },
         {
           "path": "android/app/src/main/kotlin/com/elon/app/esk/platform/EskPlatformAccount.kt",
-          "content_hash": "5c11818ae52b07f5e232a0ce1d55c5fd7de3909d6d52ba32acfa999a62ca5cfc",
+          "content_hash": "93e0ec6d453ede0acce2af6cf9f07986549c21207c073ef1cf3e0c7d0160ec59",
           "locator": "",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "84c36be53376c1854e58464367c94219e494e60f",
+            "head_commit": "1314be7148b6563bfbbf3a611d9fa998efd8989d",
             "head_blob_oid": "98a96f32b40e0f3cada1acf7b163bfaa1a293065",
             "worktree_blob_oid": "98a96f32b40e0f3cada1acf7b163bfaa1a293065",
             "state": "tracked_clean"
@@ -6483,12 +6483,12 @@
         },
         {
           "path": "android/app/src/main/kotlin/com/elon/app/esk/platform/EskPlatformAccountParser.kt",
-          "content_hash": "9b387b6361225c328ae7fdbd68f20d155190a9be8e75d0e04dc119955494c82c",
+          "content_hash": "e9d0188f08f7170a651b9b8f63240ee149558a1cc1c8773ed111104a1c947ccd",
           "locator": "",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "84c36be53376c1854e58464367c94219e494e60f",
+            "head_commit": "1314be7148b6563bfbbf3a611d9fa998efd8989d",
             "head_blob_oid": "e88e7921a13d592ed4c7cf0517526e34d47d4d9a",
             "worktree_blob_oid": "e88e7921a13d592ed4c7cf0517526e34d47d4d9a",
             "state": "tracked_clean"
@@ -6496,12 +6496,12 @@
         },
         {
           "path": "android/app/src/main/kotlin/com/elon/app/esk/platform/EskPlatformAccountReader.kt",
-          "content_hash": "bf87dc7ba2da83fb1d3084c97c42944508d5c51363e9080d889365081ec415a2",
+          "content_hash": "179dd3e86aec03109c8b97fa3def52feb26097a3e3a87a0788bb8e0caa82cad6",
           "locator": "",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "84c36be53376c1854e58464367c94219e494e60f",
+            "head_commit": "1314be7148b6563bfbbf3a611d9fa998efd8989d",
             "head_blob_oid": "97f1500095b325e081024db4331ba7e253d2bd13",
             "worktree_blob_oid": "97f1500095b325e081024db4331ba7e253d2bd13",
             "state": "tracked_clean"
@@ -6509,51 +6509,51 @@
         },
         {
           "path": "android/app/src/main/kotlin/com/elon/app/esk/platform/EskPlatformAssetsActivity.kt",
-          "content_hash": "69b67fdf07c9c00a7279d50d7058167ca9e626c4f1746f752ae07c0621b6654f",
+          "content_hash": "d573b6111de87cf1247bc81c168eac42b06f2aa82306e26d9839eb776d512c25",
           "locator": "",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "84c36be53376c1854e58464367c94219e494e60f",
-            "head_blob_oid": "",
+            "head_commit": "1314be7148b6563bfbbf3a611d9fa998efd8989d",
+            "head_blob_oid": "f8c2085a49718f3c63d25b9486d279541acd5b2b",
             "worktree_blob_oid": "f8c2085a49718f3c63d25b9486d279541acd5b2b",
-            "state": "untracked"
+            "state": "tracked_clean"
           }
         },
         {
           "path": "android/app/src/main/kotlin/com/elon/app/esk/platform/EskPlatformAssetsView.kt",
-          "content_hash": "8a297fadbc865351df2f7ad036669930901d2e9f0b873537eb588dcd898086cb",
+          "content_hash": "4370a5d98678ed9df646198784870e20cf2a03fdaa437c21af8c6af7af76c92d",
           "locator": "",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "84c36be53376c1854e58464367c94219e494e60f",
-            "head_blob_oid": "",
+            "head_commit": "1314be7148b6563bfbbf3a611d9fa998efd8989d",
+            "head_blob_oid": "2872641e1235e5fa6d90a954d7289c46e24e6044",
             "worktree_blob_oid": "2872641e1235e5fa6d90a954d7289c46e24e6044",
-            "state": "untracked"
+            "state": "tracked_clean"
           }
         },
         {
           "path": "android/app/src/main/kotlin/com/elon/app/esk/platform/EskPlatformProfileEntry.kt",
-          "content_hash": "2c7446d69828573988fb89eaaddf081f0cb2b08186143183d027729dbb67a0e6",
+          "content_hash": "a430270f8e8a668b208c6f2fb2910325fd7432f7a4a615cdea23c69fe68bf412",
           "locator": "",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "84c36be53376c1854e58464367c94219e494e60f",
-            "head_blob_oid": "",
+            "head_commit": "1314be7148b6563bfbbf3a611d9fa998efd8989d",
+            "head_blob_oid": "b4d61e2fc5785411c53e915274bf7a04898108dc",
             "worktree_blob_oid": "b4d61e2fc5785411c53e915274bf7a04898108dc",
-            "state": "untracked"
+            "state": "tracked_clean"
           }
         },
         {
           "path": "android/app/src/main/kotlin/com/elon/app/esk/platform/EskPlatformRequestGate.kt",
-          "content_hash": "f18a471411e3913195a3a78b7062e9d720463279278b5c45bbecd6a4cd3e82f6",
+          "content_hash": "077c04afc5dbd97db4c9b8579536c1df89e53ceb8524b9969b0174342cd3bca7",
           "locator": "",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "84c36be53376c1854e58464367c94219e494e60f",
+            "head_commit": "1314be7148b6563bfbbf3a611d9fa998efd8989d",
             "head_blob_oid": "95894cff029730c89b55228160fddac14fa06625",
             "worktree_blob_oid": "95894cff029730c89b55228160fddac14fa06625",
             "state": "tracked_clean"
@@ -6561,12 +6561,12 @@
         },
         {
           "path": "android/app/src/main/kotlin/com/elon/app/esk/platform/EskPlatformSessionStore.kt",
-          "content_hash": "aed0c22763aa6595d0642ee369d273ddbe14ed5b9c80d16885163cb7b8a94dcc",
+          "content_hash": "904385ab3e8c89509be66b4aac4fd4010d4ea1a88be01ae3e9f51570c555cf95",
           "locator": "",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "84c36be53376c1854e58464367c94219e494e60f",
+            "head_commit": "1314be7148b6563bfbbf3a611d9fa998efd8989d",
             "head_blob_oid": "302a64642607537dd564764862349135e1b8fb1b",
             "worktree_blob_oid": "302a64642607537dd564764862349135e1b8fb1b",
             "state": "tracked_clean"
@@ -6574,25 +6574,25 @@
         },
         {
           "path": "android/app/src/main/res/layout/esk_platform_assets_preview.xml",
-          "content_hash": "c5a5ef9f19cafb9ac08250da9e57fe45babea1dc962d5de2b28bef29b8060155",
+          "content_hash": "9d1d71896b86086fd59e2472fd16eac6a0eefb0bcef337710f6e30a8dcd3e420",
           "locator": "",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "84c36be53376c1854e58464367c94219e494e60f",
-            "head_blob_oid": "",
+            "head_commit": "1314be7148b6563bfbbf3a611d9fa998efd8989d",
+            "head_blob_oid": "5042cfb30af1c8a2108dd451737142ef2dbb08ce",
             "worktree_blob_oid": "5042cfb30af1c8a2108dd451737142ef2dbb08ce",
-            "state": "untracked"
+            "state": "tracked_clean"
           }
         },
         {
           "path": "android/app/src/test/kotlin/com/elon/app/esk/platform/EskPlatformAccountParserBoundaryTest.kt",
-          "content_hash": "2f5c8a95e8bfc25e9c426c6eee44f37bb389d6235553ac5696fdc1360162a065",
+          "content_hash": "92bdee51d534c4db3ddb25a7700d2292ed5e52e7acf99b4c76ccdfd97c11f9a4",
           "locator": "",
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "84c36be53376c1854e58464367c94219e494e60f",
+            "head_commit": "1314be7148b6563bfbbf3a611d9fa998efd8989d",
             "head_blob_oid": "f92eece8cbcd28d59f491ba361d043988268fe29",
             "worktree_blob_oid": "f92eece8cbcd28d59f491ba361d043988268fe29",
             "state": "tracked_clean"
@@ -6600,12 +6600,12 @@
         },
         {
           "path": "android/app/src/test/kotlin/com/elon/app/esk/platform/EskPlatformAccountParserTest.kt",
-          "content_hash": "6d2d139dc55498dd467aeb0ce07b4ef51117fa708bbbee2246b27efabe60ecd9",
+          "content_hash": "0e976abb95f592f409bd34d9c9746db91e4c92300c5d0d1b02ae1f38916027f7",
           "locator": "",
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "84c36be53376c1854e58464367c94219e494e60f",
+            "head_commit": "1314be7148b6563bfbbf3a611d9fa998efd8989d",
             "head_blob_oid": "2faea80c777773fa8585b1b52ac953bd513f9ace",
             "worktree_blob_oid": "2faea80c777773fa8585b1b52ac953bd513f9ace",
             "state": "tracked_clean"
@@ -6613,12 +6613,12 @@
         },
         {
           "path": "android/app/src/test/kotlin/com/elon/app/esk/platform/EskPlatformAccountReaderTest.kt",
-          "content_hash": "e30cddb1462e141018c4fd261a7ee3d6009a2bfcb86add998cc8264e016f6996",
+          "content_hash": "ca653c289d59712360279c0122c47576d8cc8e77ebd68059f78afc09fa069c45",
           "locator": "",
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "84c36be53376c1854e58464367c94219e494e60f",
+            "head_commit": "1314be7148b6563bfbbf3a611d9fa998efd8989d",
             "head_blob_oid": "69fa10b01d86e5baa5c9f5191d6184036e00f735",
             "worktree_blob_oid": "69fa10b01d86e5baa5c9f5191d6184036e00f735",
             "state": "tracked_clean"
@@ -6626,12 +6626,12 @@
         },
         {
           "path": "android/app/src/test/kotlin/com/elon/app/esk/platform/EskPlatformRequestGateTest.kt",
-          "content_hash": "c72d74b8de9ab11a2f3f727f16b7fa731f6664f20d0ddf7f2a36fff1df73d87f",
+          "content_hash": "74a5fb1f1059f132ab6f594d721d41ab9d3025d0a6b140d313bab82890066a74",
           "locator": "",
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "84c36be53376c1854e58464367c94219e494e60f",
+            "head_commit": "1314be7148b6563bfbbf3a611d9fa998efd8989d",
             "head_blob_oid": "4804cb5336d45f158bd157718446c3679da6703b",
             "worktree_blob_oid": "4804cb5336d45f158bd157718446c3679da6703b",
             "state": "tracked_clean"
@@ -6639,12 +6639,12 @@
         },
         {
           "path": "android/app/src/test/kotlin/com/elon/app/esk/platform/EskPlatformSessionStoreTest.kt",
-          "content_hash": "657de1532e5cc13a8af8099c297a0e9429ed832dd4e3a750542819418946be53",
+          "content_hash": "22fccf57db61a244803d23498036d3f078c8c0d4f9ed41c6d6b37e4170bec271",
           "locator": "",
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "84c36be53376c1854e58464367c94219e494e60f",
+            "head_commit": "1314be7148b6563bfbbf3a611d9fa998efd8989d",
             "head_blob_oid": "51ef36a18cb81ea6a68f65abe4b23be63361a46a",
             "worktree_blob_oid": "51ef36a18cb81ea6a68f65abe4b23be63361a46a",
             "state": "tracked_clean"
@@ -6652,33 +6652,33 @@
         },
         {
           "path": "android/app/src/test/kotlin/com/elon/app/esk/platform/EskPlatformWiringTest.kt",
-          "content_hash": "2349aa1b06faa64228fbc50171dc3eb3bfdbceb2466c6e58efc3d72546b75172",
+          "content_hash": "764c337443c5961197a4c24bcbaafe5f55fe9e4fcb897a05968e6bca992f688b",
           "locator": "",
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "84c36be53376c1854e58464367c94219e494e60f",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "85bd2541c906608a8e7a431c0a74efefe46bb6b7",
-            "state": "untracked"
+            "head_commit": "1314be7148b6563bfbbf3a611d9fa998efd8989d",
+            "head_blob_oid": "85bd2541c906608a8e7a431c0a74efefe46bb6b7",
+            "worktree_blob_oid": "b3267b84248cba4e5f23e9c1f5ef7d5c3ec0974d",
+            "state": "tracked_modified"
           }
         },
         {
           "path": "server/src/assets/web_page.html",
-          "content_hash": "956dd34a33ddd339cf031679f644e9a27f282a92d8fcf62683e93067206af053",
+          "content_hash": "2644f38339e18c5f96de3b59461bd72974441ae3e630f666a9dab0786365da49",
           "locator": "",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "84c36be53376c1854e58464367c94219e494e60f",
-            "head_blob_oid": "74a1ca3f998f26fcde5b9a3b97231675d1d022e0",
-            "worktree_blob_oid": "cce3ad6cccaf7e93c066625c6ffa3a190788aa47",
+            "head_commit": "1314be7148b6563bfbbf3a611d9fa998efd8989d",
+            "head_blob_oid": "cce3ad6cccaf7e93c066625c6ffa3a190788aa47",
+            "worktree_blob_oid": "9f7e146bce21cdcfbd47e509cef7248dd51e0c19",
             "state": "tracked_modified"
           }
         }
       ],
       "created_at_ms": 1788513355363,
-      "updated_at_ms": 1788514470571
+      "updated_at_ms": 1788515068015
     },
     {
       "id": "esk-platform-recorded-assets-v1",
@@ -17056,76 +17056,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_8498db64333b4066a009173f395dffac",
-      "feature_id": "compute-capacity-future-settlement-lineage-bridge-v1",
-      "action": "transitioned",
-      "actor": "Codex:/root",
-      "reason": "已取得最新注册表上的独占认领；重放已经完成的 source-only owner splice 修复与文档证据。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788301379067
-    },
-    {
-      "id": "feature_event_5c7cb98436bf4bf6b1989bb8aab59bc6",
-      "feature_id": "compute-capacity-future-settlement-lineage-bridge-v1",
-      "action": "transitioned",
-      "actor": "Codex:/root",
-      "reason": "source/document 合同及静态守卫已落地；按架构铺设阶段约束未运行 Cargo、rustfmt、Rust 测试、SQLite、migration、服务或真实流程，compiled=0、run=0、passed=0、failed=0，动态证据明确延期。",
-      "from_status": "in_progress",
-      "to_status": "blocked",
-      "at_ms": 1788301389281
-    },
-    {
-      "id": "feature_event_ecd53787feb7455596a4307a1801f396",
-      "feature_id": "compute-capacity-future-settlement-lineage-bridge-v1",
-      "action": "evidence_recorded",
-      "actor": "Codex:/root",
-      "reason": "",
-      "from_status": "blocked",
-      "to_status": "blocked",
-      "at_ms": 1788301413755
-    },
-    {
-      "id": "feature_event_727672316ebf471b8615fd948e28d557",
-      "feature_id": "compute-capacity-future-settlement-lineage-bridge-v1",
-      "action": "evidence_recorded",
-      "actor": "Codex:/root",
-      "reason": "",
-      "from_status": "blocked",
-      "to_status": "blocked",
-      "at_ms": 1788301562743
-    },
-    {
-      "id": "feature_event_d0830d48561c44e19fc353bfd9a9ddf3",
-      "feature_id": "yilong-quant-esk-paper-asset-projection-v1",
-      "action": "registered",
-      "actor": "codex-root-esk-projection",
-      "reason": "用户优先需要在量化子项目看到主项目 ESK，现有 ESK 账户已 released，且远端不存在投影功能。",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1788302491486
-    },
-    {
-      "id": "feature_event_87162b83174847a097c7e994abfcfeb6",
-      "feature_id": "yilong-quant-esk-paper-asset-projection-v1",
-      "action": "claimed",
-      "actor": "codex-root-esk-projection",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788302499372
-    },
-    {
-      "id": "feature_event_0064361558224a5cb3c4054c7ebd3791",
-      "feature_id": "yilong-quant-esk-paper-asset-projection-v1",
-      "action": "transitioned",
-      "actor": "codex-root-esk-projection",
-      "reason": "跨仓库正式需求已建立，进入实现。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788302507752
-    },
-    {
       "id": "feature_event_e4b3ea7cc9e74d2b87d0c17161c77d5c",
       "feature_id": "yilong-quant-esk-paper-asset-projection-v1",
       "action": "evidence_recorded",
@@ -19054,6 +18984,76 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1788514470571
+    },
+    {
+      "id": "feature_event_5aa2d63ac3f84c30af281547e607fce6",
+      "feature_id": "esk-platform-profile-v1",
+      "action": "transitioned",
+      "actor": "codex-esk-first-user",
+      "reason": "补齐同一需求的Web下载链接块级48px触控验收；Android生产代码不变，沿用已发布APK。",
+      "from_status": "verified",
+      "to_status": "ready",
+      "at_ms": 1788514914867
+    },
+    {
+      "id": "feature_event_3c35ffe58372480cb36f2ed9fca95267",
+      "feature_id": "esk-platform-profile-v1",
+      "action": "claimed",
+      "actor": "codex-esk-first-user",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788514916904
+    },
+    {
+      "id": "feature_event_b569d36a1df84c95b483645510d33a32",
+      "feature_id": "esk-platform-profile-v1",
+      "action": "transitioned",
+      "actor": "codex-esk-first-user",
+      "reason": "复用原有profile-row下载触控尺寸，补会话revision接线断言与正式发布回执。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788514917904
+    },
+    {
+      "id": "feature_event_9f0d315dbc854ddc9aa4aed8d6e9eea5",
+      "feature_id": "esk-platform-profile-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-esk-first-user",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788515065485
+    },
+    {
+      "id": "feature_event_4ad14006aa23456c9fbae98c237f4afe",
+      "feature_id": "esk-platform-profile-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-esk-first-user",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788515066765
+    },
+    {
+      "id": "feature_event_8effd0bfd47a4f4b99107204f85c46ed",
+      "feature_id": "esk-platform-profile-v1",
+      "action": "transitioned",
+      "actor": "codex-esk-first-user",
+      "reason": "Web下载入口复用76px profile-row，补AuthManager同editor修订写入接线断言；无Android生产输入变化。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1788515067422
+    },
+    {
+      "id": "feature_event_b87c9a08920442c8ac9f1c1e4f07ac11",
+      "feature_id": "esk-platform-profile-v1",
+      "action": "transitioned",
+      "actor": "codex-esk-first-user",
+      "reason": "最终104项定向测试全部通过，PWA语法通过。APK1.1.1506已发布且生产输入不变；Web触控补发待执行，UI实际帧与真实账户仍待验收。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1788515068015
     }
   ]
 }
