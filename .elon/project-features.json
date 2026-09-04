@@ -6225,6 +6225,141 @@
       "updated_at_ms": 1788460650761
     },
     {
+      "id": "esk-sui-publication-observer-v1",
+      "title": "ESK Sui 发布只读观察器 V1",
+      "summary": "交付双端点测试网公开发布证据观察 CLI，保持平台 Paper 合同和完整发布门禁不变；固化首批用户阶段路线图。",
+      "status": "verified",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/esk-sui-publication-observer-v1.md",
+        "content_hash": "c75fcd6289a2e4246ddeedcad71af0a6991eda359e7cb13ffeb143dcaa9df8c7",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "892c6d378dc3ca5bff18c7134ef3fc7c2b2cafdc",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "1cac423e84522ef2d6f7a77b58b59debd993d3c1",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "platform-assets,protocol",
+      "tags": [],
+      "task_paths": [
+        "docs/esk-sui-publication-observer.md",
+        "docs/requirements/esk-first-user-delivery-roadmap-v1.md",
+        "docs/requirements/esk-sui-publication-observer-v1.md",
+        "scripts/esk-sui-publication-observer",
+        "scripts/observe-esk-sui-publication.js",
+        "scripts/test-esk-sui-publication-observer.js"
+      ],
+      "dependencies": [
+        "esk-sui-genesis-foundation-v1"
+      ],
+      "acceptance_criteria": [
+        "双端点读取链/包创建交易/checkpoint，错误或矛盾失败关闭",
+        "不签名、不广播、不改余额、不允许清单发布状态推进",
+        "离线边界测试及旧创世/资产兼容测试通过",
+        "共享阶段目标和无密钥运行手册可供远程代理接续"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "docs/esk-sui-publication-observer.md",
+          "content_hash": "568cd4073a1effbd2b8b1eb30062f99392cc097bcf52a5ab9c0f95c74d6ee83e",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "892c6d378dc3ca5bff18c7134ef3fc7c2b2cafdc",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "6961c8955629e0bf34216be12127440b7615f270",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "docs/requirements/esk-first-user-delivery-roadmap-v1.md",
+          "content_hash": "73157619e436df31af5cdb739c770370cdd5e6e9aa02ca4428f133d24b9e6831",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "892c6d378dc3ca5bff18c7134ef3fc7c2b2cafdc",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "1a32c42cd0fe6c3d87be7b65d4e0985cbb2334e9",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/esk-sui-publication-observer/contract.js",
+          "content_hash": "de1871125f3af15b133e2e86892e01d9d775eacdc2d1f37907f5d88c2f843251",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "892c6d378dc3ca5bff18c7134ef3fc7c2b2cafdc",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "423936b31f327ce0418a92ec88bd56112ef68177",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/esk-sui-publication-observer/graphql.js",
+          "content_hash": "3270d043786e79d6697c5fd4a8a5b46b741419e9e888c1933d3d628d85b6313d",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "892c6d378dc3ca5bff18c7134ef3fc7c2b2cafdc",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "8da4082ef7331e3293841bffd28358bee6b084d5",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/esk-sui-publication-observer/observe.js",
+          "content_hash": "bcd714cf9bd0e5b42ceb9a49fd0dc2f29e4e992aa45fe52a109e14da50568688",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "892c6d378dc3ca5bff18c7134ef3fc7c2b2cafdc",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "7287174790c3d225cb3fef7a143e1b7fced3cc53",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/observe-esk-sui-publication.js",
+          "content_hash": "55e75cbc0c2542c2bc8dc6a14737b3710de6f418a83c76f0eafc5ba575cff17e",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "892c6d378dc3ca5bff18c7134ef3fc7c2b2cafdc",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "b38a269caea9a4bc94ad68777bcbad0481b7e229",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/test-esk-sui-publication-observer.js",
+          "content_hash": "e11f2cd4bd2f2e48915cee680218ecf3bce2fb842309dd215158d844ca8eebb4",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "892c6d378dc3ca5bff18c7134ef3fc7c2b2cafdc",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "dd248b0c1f607191443d93a448b695d6a9854652",
+            "state": "untracked"
+          }
+        }
+      ],
+      "created_at_ms": 1788501859304,
+      "updated_at_ms": 1788502524347
+    },
+    {
       "id": "esk_paper_quant_allocation_request_v2",
       "title": "ESK Paper 量化分配申请与只读占用投影 V2",
       "summary": "用户可在主项目把可用 ESK 提交为可取消的 Paper 量化分配申请；主项目分别核算卖回、量化与总占用，并通过最长五分钟签名 V2 投影让量化 PWA 只读展示，不自动建仓、交易或产生收益。",
@@ -15899,66 +16034,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_687c8e47e31346b9badd1d709c755fd6",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "claimed",
-      "actor": "codex-q18-rebase",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788291389937
-    },
-    {
-      "id": "feature_event_c0b0bb4b4db44fb2ac879ca60f88f974",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex-q18-rebase",
-      "reason": "Bind the completed Q18 source-only tranche and current static evidence on the rebased commit.",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788291401647
-    },
-    {
-      "id": "feature_event_14a191ac3e054a3787da24bfe4d56150",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-q18-rebase",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788291439100
-    },
-    {
-      "id": "feature_event_7bdc176122304d2d8837033da935abe7",
-      "feature_id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
-      "action": "transitioned",
-      "actor": "codex-q18-rebase",
-      "reason": "Q18 source, catalog, contracts, and static evidence are current; remaining quotient manifests, 19-artifact refresh, compilation, and process-isolated Windows execution stay deferred by the active Goal, with production and economic effects closed.",
-      "from_status": "in_progress",
-      "to_status": "blocked",
-      "at_ms": 1788291452639
-    },
-    {
-      "id": "feature_event_969b1480a18043b5b552ef683754c57a",
-      "feature_id": "yilong-quant-paper-public-deployment-contract-sync-v1",
-      "action": "registered",
-      "actor": "codex-goal-quant-public-deployment-sync-v1",
-      "reason": "",
-      "from_status": "",
-      "to_status": "accepted",
-      "at_ms": 1788292671946
-    },
-    {
-      "id": "feature_event_d004e77cc0484df3b4fcfcfa096aa76b",
-      "feature_id": "yilong-quant-paper-public-deployment-contract-sync-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-quant-public-deployment-sync-v1",
-      "reason": "量化 V9 已在独立仓库验证并推送，主项目同步范围明确且无运行代码依赖。",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1788292681479
-    },
-    {
       "id": "feature_event_1d13bff21a1f464bbbcc513365d9551a",
       "feature_id": "yilong-quant-paper-public-deployment-contract-sync-v1",
       "action": "claimed",
@@ -17897,6 +17972,66 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1788460650761
+    },
+    {
+      "id": "feature_event_8c5a2571756142b0b71e800f12798a20",
+      "feature_id": "esk-sui-publication-observer-v1",
+      "action": "registered",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1788501859304
+    },
+    {
+      "id": "feature_event_d67c0ed7650244b1817a4fe4d0a8ac06",
+      "feature_id": "esk-sui-publication-observer-v1",
+      "action": "claimed",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788501871038
+    },
+    {
+      "id": "feature_event_fe1d23a086ea45c4b204cebcb2728c8e",
+      "feature_id": "esk-sui-publication-observer-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788501887306
+    },
+    {
+      "id": "feature_event_38db4fc0692544809395794f51c4bc91",
+      "feature_id": "esk-sui-publication-observer-v1",
+      "action": "evidence_recorded",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788502490122
+    },
+    {
+      "id": "feature_event_3826a294e6df4caeb07d5541cc3203d7",
+      "feature_id": "esk-sui-publication-observer-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "CLI, shared roadmap and runbook implemented without modifying Paper or publication gates.",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1788502523789
+    },
+    {
+      "id": "feature_event_ecda6cff1d4d4107b2e2a89a9a3c58e5",
+      "feature_id": "esk-sui-publication-observer-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "65 offline tests and existing genesis/asset/profile tests passed; official non-ESK single-source network smoke passed. Actual ESK dual-source environment acceptance remains deferred.",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1788502524347
     }
   ]
 }
