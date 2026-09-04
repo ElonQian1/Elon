@@ -5,7 +5,7 @@ import java.util.Locale
 
 internal object ChatGptWebResearchResourceShape {
     private val VOICE_PATH_HINT = Regex(
-        "voice|audio|speech|dictat|transcri|realtime|webrtc|rtc",
+        "voice|audio|speech|synth|read.?aloud|dictat|transcri|realtime|webrtc|rtc",
         RegexOption.IGNORE_CASE,
     )
     private val UUID_SEGMENT = Regex("^[0-9a-f]{8}-[0-9a-f-]{20,}$", RegexOption.IGNORE_CASE)

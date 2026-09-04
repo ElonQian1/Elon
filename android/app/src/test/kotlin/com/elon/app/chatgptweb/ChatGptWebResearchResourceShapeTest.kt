@@ -52,5 +52,13 @@ class ChatGptWebResearchResourceShapeTest {
                 contentType = "application/json",
             ),
         )
+        assertEquals(
+            "v1|resource-start|get|chatgpt|/backend-api/synthesize|none",
+            ChatGptWebResearchResourceShape.from(
+                method = "GET",
+                rawUrl = "https://chatgpt.com/backend-api/synthesize?message_id=private",
+                contentType = null,
+            ),
+        )
     }
 }

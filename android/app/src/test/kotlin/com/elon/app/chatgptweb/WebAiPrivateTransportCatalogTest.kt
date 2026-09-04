@@ -346,6 +346,23 @@ class WebAiPrivateTransportCatalogTest {
             imageGenerationStatus.getString("fallback"),
         )
 
+        val privateResponseReadAloud = values.first {
+            it.getString("capability_id") ==
+                "android_chatgpt_private_response_read_aloud_v1"
+        }
+        assertEquals("completed", privateResponseReadAloud.getString("implementation_status"))
+        assertEquals(
+            "device_verified_v1_1_1498_adapter_241_stream_start_stop",
+            privateResponseReadAloud.getString("verification_status"),
+        )
+        assertTrue(privateResponseReadAloud.getBoolean("production_default"))
+        assertTrue(privateResponseReadAloud.getBoolean("runtime_enabled"))
+        assertFalse(privateResponseReadAloud.getBoolean("direct_post_enabled"))
+        assertEquals(
+            "official_dom_read_aloud_or_manual_official_page",
+            privateResponseReadAloud.getString("fallback"),
+        )
+
         val officialResponseReadAloud = values.first {
             it.getString("capability_id") ==
                 "android_chatgpt_official_response_read_aloud_bridge_v1"
@@ -358,7 +375,7 @@ class WebAiPrivateTransportCatalogTest {
             "live_official_control_discovered_and_targeted_semantic_menu_tests_passed_device_audio_pending",
             officialResponseReadAloud.getString("verification_status"),
         )
-        assertTrue(officialResponseReadAloud.getBoolean("production_default"))
+        assertFalse(officialResponseReadAloud.getBoolean("production_default"))
         assertTrue(officialResponseReadAloud.getBoolean("runtime_enabled"))
         assertFalse(officialResponseReadAloud.getBoolean("direct_post_enabled"))
         assertEquals(

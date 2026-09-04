@@ -39,6 +39,8 @@ internal class ChatGptWebMcpCommandAdapter(
     override fun verifyPrivateStreamWatchdog(requestId: String) =
         pageAdapter.verifyPrivateStreamWatchdog(requestId)
     override fun regenerateResponse(requestId: String) = pageAdapter.regenerateResponse(requestId)
+    override fun togglePrivateReadAloud(contextId: String, requestId: String) =
+        pageAdapter.togglePrivateReadAloud(contextId, requestId)
     override fun startDictation(
         nativeDraft: String,
         expectedOfficialDraft: String,

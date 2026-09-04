@@ -8,6 +8,7 @@ import android.webkit.WebChromeClient
 import android.webkit.WebSettings
 import android.webkit.WebView
 import androidx.appcompat.app.AppCompatActivity
+import com.elon.app.BuildConfig
 import com.elon.app.configureWebChatBackgroundSurface
 
 @SuppressLint("SetJavaScriptEnabled")
@@ -27,7 +28,9 @@ internal fun createChatGptBackgroundWebView(
         setSupportMultipleWindows(false)
         mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
         safeBrowsingEnabled = true
-        mediaPlaybackRequiresUserGesture = true
+        // The explicit native action starts playback only after its authenticated fetch,
+        // when Chromium's original gesture token is no longer available.
+        mediaPlaybackRequiresUserGesture = !BuildConfig.CHATGPT_PRIVATE_READ_ALOUD_ENABLED
         builtInZoomControls = false
         displayZoomControls = false
     }

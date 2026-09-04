@@ -43,6 +43,8 @@ internal class ChatGptWebPageAdapter(
                 ${BuildConfig.CHATGPT_PRIVATE_TEXT_TRANSACTIONS_ENABLED};
             window.__elonChatGptPrivateDictationEnabled =
                 ${BuildConfig.CHATGPT_PRIVATE_DICTATION_ENABLED};
+            window.__elonChatGptPrivateReadAloudEnabled =
+                ${BuildConfig.CHATGPT_PRIVATE_READ_ALOUD_ENABLED};
             if (!/^doc_[a-z0-9_]{3,80}$/.test(String(window.__elonChatGptDocumentToken || ""))) {
                 window.__elonChatGptDocumentToken =
                     "doc_android_" + Math.random().toString(36).slice(2) + Date.now().toString(36);
@@ -253,6 +255,12 @@ internal class ChatGptWebPageAdapter(
 
     fun regenerateResponse(requestId: String) = runCommand(
         "regenerate_response",
+        requestId = requestId,
+    )
+
+    fun togglePrivateReadAloud(contextId: String, requestId: String) = runCommand(
+        action = "toggle_private_read_aloud",
+        value = contextId.take(MAX_MESSAGE_CONTEXT_ID_LENGTH),
         requestId = requestId,
     )
 
@@ -572,7 +580,7 @@ internal class ChatGptWebPageAdapter(
         origin.scheme == "https" && origin.host == "chatgpt.com" && origin.port == -1
 
     companion object {
-        internal const val ADAPTER_VERSION = 240
+        internal const val ADAPTER_VERSION = 241
 
         private val ADAPTER_ASSETS = listOf(
             "chatgpt_web_adapter_bootstrap.js",
@@ -623,6 +631,7 @@ internal class ChatGptWebPageAdapter(
             "chatgpt_web_realtime_voice_research.js",
             "chatgpt_web_private_transport_policy.js",
             "chatgpt_web_private_transport.js",
+            "chatgpt_web_private_read_aloud_transport.js",
             "chatgpt_web_private_dictation_transport.js",
             "chatgpt_web_private_dictation_orchestrator.js",
             "chatgpt_web_private_text_transaction_policy.js",
@@ -659,6 +668,7 @@ internal class ChatGptWebPageAdapter(
         private const val MAX_OPTION_ID_LENGTH = 64
         private const val MAX_UI_CONTROL_ID_LENGTH = 72
         private const val MAX_IMAGE_ASSET_HANDLE_LENGTH = 32
+        private const val MAX_MESSAGE_CONTEXT_ID_LENGTH = 160
         private val REQUEST_ID = Regex("mcp_[a-z0-9]{1,32}")
     }
 }

@@ -15,6 +15,7 @@
   const streamWatchdogAcceptanceModule = window.__elonChatGptStreamWatchdogAcceptance;
   const skinAdapter = window.__elonChatGptSkin;
   const privateTransport = window.__elonChatGptPrivateTransport;
+  const privateReadAloudTransport = window.__elonChatGptPrivateReadAloudTransport;
   const privateDictationTransport = window.__elonChatGptPrivateDictationTransport;
   const privateDictationOrchestratorModule = window.__elonChatGptPrivateDictationOrchestrator;
   const textTransactionOrchestratorModule = window.__elonChatGptTextTransactionOrchestrator;
@@ -34,6 +35,7 @@
   let observer = null;
   let snapshotScheduler = null;
   let privateStreamUnsubscribe = null;
+  let privateReadAloudUnsubscribe = null;
   let privateStreamRevision = 0;
   let streamingSnapshotMode = false;
   let privateStreamingSnapshotMode = false;
@@ -278,6 +280,12 @@
       typeof privateStreamTransport.current === 'function'
       ? privateStreamTransport.current(location.pathname)
       : null);
+    const privateReadAloud = optional(
+      { ready: false, state: 'idle', contextId: '' },
+      () => privateReadAloudTransport && typeof privateReadAloudTransport.state === 'function'
+        ? privateReadAloudTransport.state()
+        : { ready: false, state: 'idle', contextId: '' }
+    );
     const privateStreamState = ['streaming', 'completed'].includes(
       String(privateStream && privateStream.state || '')
     ) ? String(privateStream.state) : 'idle';
@@ -325,6 +333,9 @@
       dictationActive,
       dictationCaptureActive,
       dictationCapturePending,
+      privateReadAloudReady: privateReadAloud.ready === true,
+      privateReadAloudState: String(privateReadAloud.state || 'idle'),
+      privateReadAloudContextId: String(privateReadAloud.contextId || '').slice(0, 160),
       capabilities: optional([], () => detectCapabilities(composer))
     };
     const fingerprint = JSON.stringify(event);
@@ -457,6 +468,21 @@
       }
       return imageAssets.request(String(command.value || ''), emitEvent).then((outcome) => {
         respond(action, outcome && outcome.ok === true, outcome && outcome.error || '');
+      });
+    }
+    if (action === 'toggle_private_read_aloud') {
+      if (!privateReadAloudTransport || typeof privateReadAloudTransport.toggle !== 'function') {
+        return respond(action, false, 'private_read_aloud_unavailable');
+      }
+      return Promise.resolve(
+        privateReadAloudTransport.toggle(String(command.value || '').slice(0, 160))
+      ).then((outcome) => {
+        const value = outcome && typeof outcome === 'object' ? outcome : {};
+        respond(action, value.ok === true, String(value.detail || '').slice(0, 80));
+        scheduleSnapshot(true);
+      }).catch(() => {
+        respond(action, false, 'private_read_aloud_failed');
+        scheduleSnapshot(true);
       });
     }
     if (action === 'set_skin_mode') {
@@ -736,6 +762,8 @@
     if (snapshotScheduler) snapshotScheduler.dispose();
     if (typeof privateStreamUnsubscribe === 'function') privateStreamUnsubscribe();
     privateStreamUnsubscribe = null;
+    if (typeof privateReadAloudUnsubscribe === 'function') privateReadAloudUnsubscribe();
+    privateReadAloudUnsubscribe = null;
     if (privateConversationDirectory &&
         typeof privateConversationDirectory.setListener === 'function') {
       privateConversationDirectory.setListener(null);
@@ -768,6 +796,10 @@
       privateStreamRevision += 1;
       scheduleSnapshot(true);
     })
+    : null);
+  privateReadAloudUnsubscribe = optional(null, () => privateReadAloudTransport &&
+    typeof privateReadAloudTransport.subscribe === 'function'
+    ? privateReadAloudTransport.subscribe(() => scheduleSnapshot(true))
     : null);
   if (conversationDirectoryRequests) conversationDirectoryRequests.installListener();
   observer = new MutationObserver(scheduleSnapshot);

@@ -42,6 +42,9 @@ internal data class ChatGptWebSnapshot(
     val observedMessageCount: Int = messages.size,
     val dictationCaptureActive: Boolean = false,
     val dictationCapturePending: Boolean = false,
+    val privateReadAloudReady: Boolean = false,
+    val privateReadAloudState: String = "idle",
+    val privateReadAloudContextId: String = "",
 )
 
 internal data class ChatGptWebComposerOption(
@@ -295,6 +298,14 @@ internal object ChatGptWebProtocol {
             observedMessageCount = observedMessageCount,
             dictationCaptureActive = event.optBoolean("dictationCaptureActive"),
             dictationCapturePending = event.optBoolean("dictationCapturePending"),
+            privateReadAloudReady = event.optBoolean("privateReadAloudReady"),
+            privateReadAloudState = event.optString("privateReadAloudState")
+                .takeIf { it in PRIVATE_READ_ALOUD_STATES }
+                ?: "idle",
+            privateReadAloudContextId = event.optString("privateReadAloudContextId")
+                .take(MAX_ID_LENGTH)
+                .takeIf(UI_CONTEXT_ID::matches)
+                .orEmpty(),
         )
     }
 
@@ -637,6 +648,13 @@ internal object ChatGptWebProtocol {
     private val ACCESS_SOURCES = setOf("visible_page", "private_response")
     private const val MAX_PRIVATE_STREAM_REVISION = 1_000_000_000L
     private val PRIVATE_STREAM_STATES = setOf("idle", "streaming", "completed")
+    private val PRIVATE_READ_ALOUD_STATES = setOf(
+        "idle",
+        "loading",
+        "playing",
+        "cooldown",
+        "failed",
+    )
     private val SUPPORTED_TOUCH_PURPOSES = setOf(
         "list_model_options",
         "list_composer_tools",

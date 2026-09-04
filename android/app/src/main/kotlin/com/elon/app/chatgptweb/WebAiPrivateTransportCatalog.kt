@@ -262,12 +262,26 @@ internal object WebAiPrivateTransportCatalog {
             directPostEnabled = BuildConfig.CHATGPT_PRIVATE_DICTATION_ENABLED,
         ),
         Entry(
+            id = "android_chatgpt_private_response_read_aloud_v1",
+            provider = "chatgpt",
+            status = "completed",
+            verification =
+                "device_verified_v1_1_1498_adapter_241_stream_start_stop",
+            productionDefault = true,
+            runtimeEnabled = BuildConfig.CHATGPT_PRIVATE_READ_ALOUD_ENABLED,
+            requestMode =
+                "same_origin_runtime_authorized_synthesis_stream_in_persistent_identity_webview",
+            healthPolicy =
+                "single_active_context_header_and_stream_stall_timeouts_playback_start_timeout_and_circuit_breaker",
+            fallback = "official_dom_read_aloud_or_manual_official_page",
+        ),
+        Entry(
             id = "android_chatgpt_official_response_read_aloud_bridge_v1",
             provider = "chatgpt",
             status = "implemented_device_pending",
             verification =
                 "live_official_control_discovered_and_targeted_semantic_menu_tests_passed_device_audio_pending",
-            productionDefault = true,
+            productionDefault = false,
             runtimeEnabled = true,
             requestMode =
                 "context_bound_official_read_aloud_control_via_persistent_identity_webview",

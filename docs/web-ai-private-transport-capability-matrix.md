@@ -205,14 +205,23 @@ removed. Research builds now observe only bounded session-profile and data-chann
 shapes so the actual official dictation mode can be distinguished without recording audio
 or recognized text.
 
-Assistant response read-aloud now exposes two explicit native actions instead of silently
-substituting Android TTS for the website capability. `Official read aloud` is first and is the
-production default. It opens the exact context-bound official message menu in the persistent
-identity WebView, discovers the official `read_aloud` control with bounded polling, and invokes
-that control directly from the native sheet. A missing transient DOM node is shown only as
-preparation and is never reported as an absent website capability. The stable capability is
-`android_chatgpt_official_response_read_aloud_bridge_v1`. It is an official-control bridge,
-not yet a claimed private audio endpoint; device audio acceptance remains pending.
+Assistant response read-aloud now exposes the same-origin website voice as the first native
+action instead of silently substituting Android TTS. The stable production capability is
+`android_chatgpt_private_response_read_aloud_v1`. The persistent identity WebView copies its
+page-local runtime authorization only into a same-origin `GET /backend-api/synthesize` request;
+credentials and headers never cross into Android. The response body is consumed as a bounded
+stream and appended to `MediaSource`, so playback starts after the first usable audio blocks
+instead of waiting for the entire answer. The transport owns one context at a time, supports
+immediate stop, uses separate response-header, stream-stall, buffer, and playback-start
+timeouts, and opens a short circuit after repeated failures. Release `v1.1.1498 (1498)`, adapter
+`241`, started playback in about 4.5 seconds through the production MCP path and stopped in
+under one second; the following typed snapshot reconciled to `idle`.
+
+The previous `android_chatgpt_official_response_read_aloud_bridge_v1` remains a non-default
+fallback. It opens the exact context-bound official message menu in the persistent identity
+WebView, discovers the official `read_aloud` control with bounded polling, and invokes it. A
+missing transient DOM node is shown only as preparation and is never reported as an absent
+website capability. The manual official page remains the final repair path.
 
 `System read aloud` remains a separately named, non-default alternate backed by the existing
 `VoiceSpeaker`. It splits the complete answer into bounded sentence chunks, supports stop,

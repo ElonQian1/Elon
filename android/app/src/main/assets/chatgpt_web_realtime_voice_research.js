@@ -11,7 +11,7 @@
   let expiresAt = startedAt + observationLifetimeMs;
   const maxObservationsPerWindow = 96;
   const maxVoiceWindows = 12;
-  const voicePathHint = /(voice|realtime|webrtc|rtc|audio|speech|\/backend-api\/f\/conversation\/prepare|\/backend-api\/sentinel\/[^/]+\/(prepare|finalize))/i;
+  const voicePathHint = /(voice|realtime|webrtc|rtc|audio|speech|synth|read.?aloud|\/backend-api\/f\/conversation\/prepare|\/backend-api\/sentinel\/[^/]+\/(prepare|finalize))/i;
   const sensitiveKeyHint = /(token|secret|credential|authorization|cookie|proof|sdp|candidate)/i;
   let observationCount = 0;
   let windowObservationCount = 0;

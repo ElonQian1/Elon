@@ -90,6 +90,9 @@ internal class ChatGptWebConsumerPortAdapter(
             dictationCaptureActive = current?.dictationCaptureActive == true,
             dictationCapturePending = current?.dictationCapturePending == true,
             draftPresent = current?.draft?.isNotBlank() == true,
+            privateReadAloudReady = current?.privateReadAloudReady == true,
+            privateReadAloudState = current?.privateReadAloudState ?: "idle",
+            privateReadAloudContextId = current?.privateReadAloudContextId.orEmpty(),
         )
     }
 
@@ -144,6 +147,11 @@ internal class ChatGptWebConsumerPortAdapter(
         .put("control_id", controlId)
         .put("user_confirmed", userConfirmed)
         .put("after_touch_miss", true))
+
+    override fun toggleOfficialReadAloud(contextId: String): WebChatConsumerCommandResult =
+        execute(JSONObject()
+            .put("action", "chatgpt_toggle_private_read_aloud")
+            .put("context_id", contextId))
 
     override fun updateControl(
         controlId: String,

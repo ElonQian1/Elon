@@ -173,6 +173,17 @@ internal class WebChatProductionMessageActionCoordinator(
         context = activity,
         onFailure = { showFeedback("朗读暂时不可用，请检查系统语音设置后重试") },
     )
+    private val privateReadAloud = WebChatProductionPrivateReadAloudCoordinator(
+        host = activity.window.decorView,
+        consumerPort = consumerPort,
+        onFeedback = ::showFeedback,
+        onFailure = {
+            showOfficialFallback(
+                title = "官网朗读",
+                message = "官网声音暂时无法播放。可以在官方页面继续。",
+            )
+        },
+    )
     private var requestEpoch = 0
     private var activeSheet: WebChatActionSheetHandle? = null
     private var actionById = emptyMap<String, WebChatContextAction>()
@@ -197,6 +208,7 @@ internal class WebChatProductionMessageActionCoordinator(
 
     fun release() {
         cancelPending()
+        privateReadAloud.release()
         nativeReadAloud.release()
     }
 
@@ -209,17 +221,24 @@ internal class WebChatProductionMessageActionCoordinator(
             state?.controls.orEmpty(),
             contextId,
         )
+        val privateAction = WebChatProductionReadAloudActionPolicy.privateAction(
+            contextId = message.sourceMessageId,
+            state = state,
+        )
+        val resolved = privateAction?.let { action ->
+            listOf(action) + observed.filterNot(WebChatProductionReadAloudActionPolicy::isOfficial)
+        } ?: observed
         val overflow = state?.let {
             WebChatProductionMessageActionControls.messageOverflowControl(it.controls, contextId)
         }
         val needsOfficialPreparation =
             WebChatProductionReadAloudActionPolicy.needsOfficialPreparation(
-                actions = observed,
+                actions = resolved,
                 portAvailable = port != null,
             )
         val epoch = requestEpoch
-        presentMoreSheet(chatMessage, contextId, observed, needsOfficialPreparation)
-        if (port == null || observed.any(WebChatProductionReadAloudActionPolicy::isOfficial)) return
+        presentMoreSheet(chatMessage, contextId, resolved, needsOfficialPreparation)
+        if (port == null || resolved.any(WebChatProductionReadAloudActionPolicy::isOfficial)) return
 
         val request = overflow?.let { port.invokeControl(it.control.id, userConfirmed = false) }
             ?: port.requestControls()
@@ -345,6 +364,12 @@ internal class WebChatProductionMessageActionCoordinator(
             toggleSystemReadAloud(message)
             return
         }
+        if (WebChatProductionReadAloudActionPolicy.isPrivate(action)) {
+            nativeReadAloud.stop()
+            WebChatProductionReadAloudActionPolicy.privateContextId(action)
+                ?.let(privateReadAloud::toggle)
+            return
+        }
         if (WebChatProductionReadAloudActionPolicy.isOfficial(action)) nativeReadAloud.stop()
         if (!action.requiresUserConfirmation) {
             invoke(action, userConfirmed = false)
@@ -427,6 +452,10 @@ internal class WebChatProductionMessageActionCoordinator(
             WebChatProductionReadAloudActionPolicy.isOfficial(action) &&
                 WebChatProductionReadAloudActionPolicy.isStopLabel(action.label)
         } ?: return
+        WebChatProductionReadAloudActionPolicy.privateContextId(stopAction)?.let { contextId ->
+            privateReadAloud.stopIfActive(contextId)
+            return
+        }
         consumerPort()?.invokeControl(stopAction.controlId, userConfirmed = false)
     }
 

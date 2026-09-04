@@ -90,6 +90,9 @@ class ChatGptWebProtocolTest {
                 "dictationActive":true,
                 "dictationCaptureActive":true,
                 "dictationCapturePending":false,
+                "privateReadAloudReady":true,
+                "privateReadAloudState":"playing",
+                "privateReadAloudContextId":"a1",
                 "observedMessageCount":43,
                 "messageWindowStart":40,
                 "attachments":[
@@ -131,6 +134,9 @@ class ChatGptWebProtocolTest {
         assertTrue(event.value.dictationActive)
         assertTrue(event.value.dictationCaptureActive)
         assertFalse(event.value.dictationCapturePending)
+        assertTrue(event.value.privateReadAloudReady)
+        assertEquals("playing", event.value.privateReadAloudState)
+        assertEquals("a1", event.value.privateReadAloudContextId)
         assertEquals("需求.txt", event.value.attachments.single().name)
         assertTrue(event.value.attachments.single().removable)
         assertEquals(2, event.value.messages.size)

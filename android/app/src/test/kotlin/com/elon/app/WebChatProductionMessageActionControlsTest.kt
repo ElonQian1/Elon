@@ -120,6 +120,27 @@ class WebChatProductionMessageActionControlsTest {
                 portAvailable = true,
             ),
         )
+        val privateAction = WebChatProductionReadAloudActionPolicy.privateAction(
+            contextId = "message-1",
+            state = WebChatConsumerState(
+                streaming = false,
+                dictationActive = false,
+                composerSections = emptyMap(),
+                pageKind = "conversation",
+                pageUrl = "https://chatgpt.com/c/example",
+                features = emptyList(),
+                commandRequests = emptyList(),
+                privateReadAloudReady = true,
+                privateReadAloudState = "playing",
+                privateReadAloudContextId = "message-1",
+            ),
+        )
+        assertEquals("停止官网朗读", privateAction?.label)
+        assertEquals(true, privateAction?.let(WebChatProductionReadAloudActionPolicy::isPrivate))
+        assertEquals(
+            "message-1",
+            privateAction?.let(WebChatProductionReadAloudActionPolicy::privateContextId),
+        )
     }
 
     @Test

@@ -141,6 +141,10 @@ def chatGptPrivateDictationEnabled =
     project.findProperty("ELON_CHATGPT_PRIVATE_DICTATION")
         ?.toString()
         ?.toBoolean() ?: true
+def chatGptPrivateReadAloudEnabled =
+    project.findProperty("ELON_CHATGPT_PRIVATE_READ_ALOUD")
+        ?.toString()
+        ?.toBoolean() ?: true
 def googleWebPrivateResearchEnabled =
     project.findProperty("ELON_GOOGLE_WEB_PRIVATE_RESEARCH")
         ?.toString()
@@ -227,6 +231,7 @@ android {
         buildConfigField "boolean", "CHATGPT_PRIVATE_STREAM_OBSERVER_ENABLED", "${chatGptPrivateStreamObserverEnabled}"
         buildConfigField "boolean", "CHATGPT_PRIVATE_TEXT_TRANSACTIONS_ENABLED", "${chatGptPrivateTextTransactionsEnabled}"
         buildConfigField "boolean", "CHATGPT_PRIVATE_DICTATION_ENABLED", "${chatGptPrivateDictationEnabled}"
+        buildConfigField "boolean", "CHATGPT_PRIVATE_READ_ALOUD_ENABLED", "${chatGptPrivateReadAloudEnabled}"
         buildConfigField "boolean", "GOOGLE_WEB_PRIVATE_RESEARCH_ENABLED", "${googleWebPrivateResearchEnabled}"
         manifestPlaceholders += [
             elonAppLabel        : "@string/app_name",

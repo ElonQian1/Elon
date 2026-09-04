@@ -15,6 +15,7 @@ internal interface ChatGptWebMcpCommandPort {
     fun stopGeneration(requestId: String)
     fun verifyPrivateStreamWatchdog(requestId: String)
     fun regenerateResponse(requestId: String)
+    fun togglePrivateReadAloud(contextId: String, requestId: String) = Unit
     fun startDictation(nativeDraft: String, expectedOfficialDraft: String, requestId: String)
     fun cancelDictation(requestId: String)
     fun submitDictation(requestId: String)

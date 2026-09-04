@@ -53,6 +53,9 @@ class ChatGptWebConsumerPortAdapterTest {
                     pageKind = "health",
                     url = "https://chatgpt.com/health",
                     draft = "pending",
+                    privateReadAloudReady = true,
+                    privateReadAloudState = "playing",
+                    privateReadAloudContextId = "assistant-1",
                 )
             },
             uiManifest = { manifest() },
@@ -68,6 +71,9 @@ class ChatGptWebConsumerPortAdapterTest {
         assertTrue(state.dictationCaptureActive)
         assertFalse(state.dictationCapturePending)
         assertTrue(state.draftPresent)
+        assertTrue(state.privateReadAloudReady)
+        assertEquals("playing", state.privateReadAloudState)
+        assertEquals("assistant-1", state.privateReadAloudContextId)
         assertEquals("health", state.pageKind)
         assertEquals("https://chatgpt.com/health", state.pageUrl)
         assertEquals("search", state.composerSections.getValue("tools").single().id)
@@ -135,6 +141,7 @@ class ChatGptWebConsumerPortAdapterTest {
         val revealed = port.revealProjectChoice("Project Alpha")
         val invoked = port.invokeControl("temporary", userConfirmed = false)
         val retried = port.invokeControlAfterTouchMiss("temporary", userConfirmed = false)
+        val readAloud = port.toggleOfficialReadAloud("assistant-1")
         val updated = port.updateControl(
             "temporary",
             WebChatConsumerControlMutation.Selected(true),
@@ -159,14 +166,16 @@ class ChatGptWebConsumerPortAdapterTest {
         assertEquals("temporary", requests[6].getString("control_id"))
         assertEquals("chatgpt_invoke_control", requests[7].getString("action"))
         assertTrue(requests[7].getBoolean("after_touch_miss"))
-        assertEquals("chatgpt_set_control_selected", requests[8].getString("action"))
-        assertTrue(requests[8].getBoolean("selected"))
-        assertEquals("chatgpt_start_dictation", requests[9].getString("action"))
-        assertEquals("chatgpt_cancel_dictation", requests[10].getString("action"))
-        assertEquals("chatgpt_submit_dictation", requests[11].getString("action"))
-        assertEquals("chatgpt_prepare_realtime_voice", requests[12].getString("action"))
-        assertEquals("chatgpt_start_realtime_voice", requests[13].getString("action"))
-        assertEquals("chatgpt_dismiss_composer_options", requests[14].getString("action"))
+        assertEquals("chatgpt_toggle_private_read_aloud", requests[8].getString("action"))
+        assertEquals("assistant-1", requests[8].getString("context_id"))
+        assertEquals("chatgpt_set_control_selected", requests[9].getString("action"))
+        assertTrue(requests[9].getBoolean("selected"))
+        assertEquals("chatgpt_start_dictation", requests[10].getString("action"))
+        assertEquals("chatgpt_cancel_dictation", requests[11].getString("action"))
+        assertEquals("chatgpt_submit_dictation", requests[12].getString("action"))
+        assertEquals("chatgpt_prepare_realtime_voice", requests[13].getString("action"))
+        assertEquals("chatgpt_start_realtime_voice", requests[14].getString("action"))
+        assertEquals("chatgpt_dismiss_composer_options", requests[15].getString("action"))
         assertTrue(requested.accepted)
         assertTrue(selected.accepted)
         assertTrue(features.accepted)
@@ -175,6 +184,7 @@ class ChatGptWebConsumerPortAdapterTest {
         assertTrue(revealed.accepted)
         assertTrue(invoked.accepted)
         assertTrue(retried.accepted)
+        assertTrue(readAloud.accepted)
         assertTrue(updated.accepted)
         assertEquals("mcp_1", dictation.requestId)
         assertEquals("mcp_1", cancelDictation.requestId)
@@ -195,6 +205,9 @@ class ChatGptWebConsumerPortAdapterTest {
         pageKind: String = "unknown",
         url: String = "https://chatgpt.com/",
         draft: String = "",
+        privateReadAloudReady: Boolean = false,
+        privateReadAloudState: String = "idle",
+        privateReadAloudContextId: String = "",
     ) = ChatGptWebSnapshot(
         title = "",
         url = url,
@@ -208,6 +221,9 @@ class ChatGptWebConsumerPortAdapterTest {
         dictationActive = dictationActive,
         dictationCaptureActive = dictationCaptureActive,
         dictationCapturePending = dictationCapturePending,
+        privateReadAloudReady = privateReadAloudReady,
+        privateReadAloudState = privateReadAloudState,
+        privateReadAloudContextId = privateReadAloudContextId,
         capabilities = ChatGptWebCapabilities.EMPTY,
         pageKind = pageKind,
     )

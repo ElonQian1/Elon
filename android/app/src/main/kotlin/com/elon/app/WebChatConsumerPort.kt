@@ -46,6 +46,9 @@ internal data class WebChatConsumerState(
     val dictationCaptureActive: Boolean = false,
     val dictationCapturePending: Boolean = false,
     val draftPresent: Boolean = false,
+    val privateReadAloudReady: Boolean = false,
+    val privateReadAloudState: String = "idle",
+    val privateReadAloudContextId: String = "",
 )
 
 internal data class WebChatConsumerCommandResult(
@@ -69,6 +72,8 @@ internal interface WebChatConsumerPort {
         controlId: String,
         userConfirmed: Boolean,
     ): WebChatConsumerCommandResult = invokeControl(controlId, userConfirmed)
+    fun toggleOfficialReadAloud(contextId: String): WebChatConsumerCommandResult =
+        WebChatConsumerCommandResult(false, "unsupported_consumer_command")
     fun updateControl(
         controlId: String,
         mutation: WebChatConsumerControlMutation,
