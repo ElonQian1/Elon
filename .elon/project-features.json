@@ -8724,7 +8724,7 @@
       "id": "esk-sui-allocation-observer-v1",
       "title": "ESK Sui 六桶分配只读观察器 V1",
       "summary": "以两个不同公共 Sui testnet GraphQL 来源，失败关闭地复核参与包发布、分配交易、一次性能力销毁、冻结总回执、六桶历史输出和指定 checkpoint 的团队锁仓守恒；只产出 RPC 观察证据，不认证源码、地址控制、用户余额或发布状态。",
-      "status": "in_progress",
+      "status": "verified",
       "priority": "p0",
       "requirement": {
         "path": "docs/requirements/esk-sui-allocation-observer-v1.md",
@@ -8767,15 +8767,218 @@
         "所有认证、地址控制、余额启用和 manifest 自动迁移标志固定为 false；CLI 不读取钱包、不签名、不广播、不移动资金。",
         "合成正负测试、官方非 ESK schema smoke 及既有 publication/currency/allocation 回归通过，真实 ESK 正向验收明确未执行。"
       ],
-      "implementation_evidence": [],
-      "claim": {
-        "claim_id": "claim_0d2c434f728d4a918071b4b864acfa39",
-        "agent_id": "codex-root-01a05b8d",
-        "claimed_at_ms": 1788552578191,
-        "expires_at_ms": 1788595778191
-      },
+      "implementation_evidence": [
+        {
+          "path": ".gitattributes",
+          "content_hash": "36eecf6c3c56593bf8ff510f98040ef43b7bcc9ce28f8ddc13d25b2a4fedbe9c",
+          "locator": "raw Sui evidence fixed to LF",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "87295f1c43635143b64ab11af08ca31bd1a2e90a",
+            "head_blob_oid": "20cbe3b4e9334d3e84b7709cfb705e5b09aa46ab",
+            "worktree_blob_oid": "20cbe3b4e9334d3e84b7709cfb705e5b09aa46ab",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "docs/delivery/esk-sui-allocation-observer-v1.md",
+          "content_hash": "1004ee02d005aababadc48daaf44c2379949dfc39236baa3b03fb3be65cf8255",
+          "locator": "pushed commit, verification, non-authorization and next-step record",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "87295f1c43635143b64ab11af08ca31bd1a2e90a",
+            "head_blob_oid": "7ba17f11e68fdf610803d8b69db772fdd1eadcbe",
+            "worktree_blob_oid": "7ba17f11e68fdf610803d8b69db772fdd1eadcbe",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "scripts/esk-sui-allocation-observer/bcs.js",
+          "content_hash": "f8d85ab41618c1b54131e2fb83a64fcc6520056f4a8fb5062e95a1dfcd5c55d4",
+          "locator": "strict canonical V1 BCS decoders",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "87295f1c43635143b64ab11af08ca31bd1a2e90a",
+            "head_blob_oid": "c55c5838dc2ebc2ad780a0bcf7be80d6ccfad65a",
+            "worktree_blob_oid": "c55c5838dc2ebc2ad780a0bcf7be80d6ccfad65a",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "scripts/esk-sui-allocation-observer/change-set.js",
+          "content_hash": "feb64195ace3a204dc00678e64fd62f60b1dadb92c8f76c01ca3638641ab6d28",
+          "locator": "complete unique object-change classification and target set",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "87295f1c43635143b64ab11af08ca31bd1a2e90a",
+            "head_blob_oid": "fc7de0c61dac3ce0c0c4a533c3732b9e1dbe0ac9",
+            "worktree_blob_oid": "fc7de0c61dac3ce0c0c4a533c3732b9e1dbe0ac9",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "scripts/esk-sui-allocation-observer/contract.js",
+          "content_hash": "9c421abcf92afc87b11c888610879fb3cddb4932f5d29b9a67ab6dbe9c4a94ad",
+          "locator": "strict 20-field V1 input and bounded errors",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "87295f1c43635143b64ab11af08ca31bd1a2e90a",
+            "head_blob_oid": "284ef840c4d3d8279a63aef10871dc555a7d4845",
+            "worktree_blob_oid": "284ef840c4d3d8279a63aef10871dc555a7d4845",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "scripts/esk-sui-allocation-observer/evidence.js",
+          "content_hash": "750745f66d6bdbc91c9fe61be7f867c0e84ecbf71cafe6e90651ae9a63b31055",
+          "locator": "deterministic public evidence projection",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "87295f1c43635143b64ab11af08ca31bd1a2e90a",
+            "head_blob_oid": "d3ea408225d419262fd12376891587b2e90abb69",
+            "worktree_blob_oid": "d3ea408225d419262fd12376891587b2e90abb69",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "scripts/esk-sui-allocation-observer/graphql.js",
+          "content_hash": "38e6b1f7d4f17543be642cfc2b298feb028344ccbb368e1cd2409fd5ce0709e1",
+          "locator": "fixed read-only dual-source GraphQL query",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "87295f1c43635143b64ab11af08ca31bd1a2e90a",
+            "head_blob_oid": "71a948fe049048b292acb08c09bd7445b10ae817",
+            "worktree_blob_oid": "71a948fe049048b292acb08c09bd7445b10ae817",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "scripts/esk-sui-allocation-observer/observe.js",
+          "content_hash": "5140f697f1ec99848371f4b138ee62cd669efd03be615b5fdff0123bfb335365",
+          "locator": "two-source fail-closed orchestration and fixed false flags",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "87295f1c43635143b64ab11af08ca31bd1a2e90a",
+            "head_blob_oid": "9e6363910fb4a5d8a979bec29a9e5e56f7250913",
+            "worktree_blob_oid": "9e6363910fb4a5d8a979bec29a9e5e56f7250913",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "scripts/esk-sui-allocation-observer/state.js",
+          "content_hash": "4326e38e8112a4c2aabbeb9fab008dc03f71503f3e77a88f652a3e83715fba05",
+          "locator": "strict chain state, ID and RFC3339 validation",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "87295f1c43635143b64ab11af08ca31bd1a2e90a",
+            "head_blob_oid": "375926d02b9f07c3f795e1132507cef57b24523c",
+            "worktree_blob_oid": "375926d02b9f07c3f795e1132507cef57b24523c",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "scripts/esk-sui-allocation-observer/tests/observe.test.js",
+          "content_hash": "ff56f12fecc175c8aea4d72997a663441132a4ca534ebb8f486358b740c04bef",
+          "locator": "dual-source and CLI acceptance",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "87295f1c43635143b64ab11af08ca31bd1a2e90a",
+            "head_blob_oid": "ddefb33234d388d57926a21775af19d6fdce2538",
+            "worktree_blob_oid": "ddefb33234d388d57926a21775af19d6fdce2538",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "scripts/esk-sui-allocation-observer/tests/public-schema-smoke.js",
+          "content_hash": "622dccd804b870a8be10f93af5a715e04d2678d3618a9cc67b7fb2b340961936",
+          "locator": "opt-in official testnet unrelated-sample schema smoke",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "87295f1c43635143b64ab11af08ca31bd1a2e90a",
+            "head_blob_oid": "040b6ffbd50b6847e05574e43d9371192a03a839",
+            "worktree_blob_oid": "040b6ffbd50b6847e05574e43d9371192a03a839",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "scripts/esk-sui-allocation-observer/tests/validation.test.js",
+          "content_hash": "edf5f8cf9895c83b835ebf0e3bdff9c1518c33cecc8af0f659d9d4f6195f3b09",
+          "locator": "positive and failure-closed allocation matrix",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "87295f1c43635143b64ab11af08ca31bd1a2e90a",
+            "head_blob_oid": "b79b366e26fa3c05125a79ced4ab21f1f1a148e3",
+            "worktree_blob_oid": "b79b366e26fa3c05125a79ced4ab21f1f1a148e3",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "scripts/esk-sui-allocation-observer/validation.js",
+          "content_hash": "714dc87e3b0f4aebb23f18591f0c90c812b66b197825caecafc2c10db317d9cb",
+          "locator": "cap, supply, receipt, buckets and vesting invariants",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "87295f1c43635143b64ab11af08ca31bd1a2e90a",
+            "head_blob_oid": "8900bc4d1bd956b23890a7d3807cc56c404be604",
+            "worktree_blob_oid": "8900bc4d1bd956b23890a7d3807cc56c404be604",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "scripts/observe-esk-sui-allocation.js",
+          "content_hash": "36d34a3c0f01dad4b596e329c5b2a2ac30000788bcd863c625fb3b0b33de3299",
+          "locator": "bounded read-only CLI",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "87295f1c43635143b64ab11af08ca31bd1a2e90a",
+            "head_blob_oid": "e8410d2f9c370085006a952ea844a8c8329beae4",
+            "worktree_blob_oid": "e8410d2f9c370085006a952ea844a8c8329beae4",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "scripts/test-esk-sui-allocation-observer.js",
+          "content_hash": "d0719512a1a6af852c2b64f236b676b3a349fb64ef2aea452b5b203e0260b6f4",
+          "locator": "98/98 offline suite entry",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "87295f1c43635143b64ab11af08ca31bd1a2e90a",
+            "head_blob_oid": "d2021d18b522e843bc91407079fa62b1427b6e68",
+            "worktree_blob_oid": "d2021d18b522e843bc91407079fa62b1427b6e68",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "scripts/test-esk-sui-allocation-vesting.js",
+          "content_hash": "25687980662d5b595d339118dc9b8cf956e61126b731f1891855674420fdd955",
+          "locator": "cross-platform 13/13 and 3/3 receipt regression gate",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "87295f1c43635143b64ab11af08ca31bd1a2e90a",
+            "head_blob_oid": "1a8b949b745584c89634afda9017593553958966",
+            "worktree_blob_oid": "1a8b949b745584c89634afda9017593553958966",
+            "state": "tracked_clean"
+          }
+        }
+      ],
       "created_at_ms": 1788549534611,
-      "updated_at_ms": 1788552579047
+      "updated_at_ms": 1788552645888
     },
     {
       "id": "esk-sui-allocation-vesting-v1",
@@ -19492,36 +19695,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_e0ffb90dcdf84a228a7d2bc5cd776dc9",
-      "feature_id": "yilong-quant-android-identity-v1",
-      "action": "registered",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1788504334294
-    },
-    {
-      "id": "feature_event_745a1afc9a9a4c0997f2e85cff699e4b",
-      "feature_id": "yilong-quant-android-identity-v1",
-      "action": "claimed",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788504334820
-    },
-    {
-      "id": "feature_event_d2ce0a627a07498dade3eed31a10d18a",
-      "feature_id": "yilong-quant-android-identity-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788504335382
-    },
-    {
       "id": "feature_event_69100d88a6124b96a238fcc76470fd69",
       "feature_id": "yilong-quant-android-identity-v1",
       "action": "evidence_recorded",
@@ -21490,6 +21663,36 @@
       "from_status": "claimed",
       "to_status": "in_progress",
       "at_ms": 1788552579047
+    },
+    {
+      "id": "feature_event_d1eb7b7ea433463088bb03f90ede0afb",
+      "feature_id": "esk-sui-allocation-observer-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-root-01a05b8d",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788552644174
+    },
+    {
+      "id": "feature_event_783ecc85b86c47a8b7829812bb982fdc",
+      "feature_id": "esk-sui-allocation-observer-v1",
+      "action": "transitioned",
+      "actor": "codex-root-01a05b8d",
+      "reason": "推送回执已提交，16 项源码、测试、文档和配置证据重新绑定到当前 Git 状态。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1788552645098
+    },
+    {
+      "id": "feature_event_f9917e3f9096402f8d3c265026c88911",
+      "feature_id": "esk-sui-allocation-observer-v1",
+      "action": "transitioned",
+      "actor": "codex-root-01a05b8d",
+      "reason": "离线 98/98、覆盖率 95.38%、官方 testnet 无关样本 schema smoke、publication 65/65、currency 312/312、静态分配门禁与 Move 3/3+13/13 均通过；真实 ESK 正向验收仍未执行。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1788552645888
     }
   ]
 }
