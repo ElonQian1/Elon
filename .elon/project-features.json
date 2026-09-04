@@ -6390,7 +6390,7 @@
       "id": "esk-platform-native-provider-v1",
       "title": "正式 ESK 原生摘要授权提供端 V1",
       "summary": "独立正式来源原生显式同意提供端，复用本人账本读取与会话门禁；不放宽 Paper，不传身份或凭据，量化接收端独立交付。",
-      "status": "verified",
+      "status": "released",
       "priority": "p0",
       "requirement": {
         "path": "docs/requirements/esk-platform-native-provider-v1.md",
@@ -6638,7 +6638,7 @@
         }
       ],
       "created_at_ms": 1788516179636,
-      "updated_at_ms": 1788516936284
+      "updated_at_ms": 1788517613613
     },
     {
       "id": "esk-platform-profile-v1",
@@ -17310,16 +17310,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_5213c4f0b13b47f5b360dea405235202",
-      "feature_id": "compute-federation-interactive-desktop-v1",
-      "action": "evidence_recorded",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788305033522
-    },
-    {
       "id": "feature_event_90a94c5854c8416687c4bb69d6146f13",
       "feature_id": "compute-federation-interactive-desktop-v1",
       "action": "transitioned",
@@ -19308,6 +19298,16 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1788516936284
+    },
+    {
+      "id": "feature_event_0947f922434b4eaab9c85ea26f2aa658",
+      "feature_id": "esk-platform-native-provider-v1",
+      "action": "transitioned",
+      "actor": "codex-esk-platform",
+      "reason": "145 targeted JVM tests passed; APK 1.1.1508 / 94746f8b5939e207d9e9882d96804b3e850780db and static Web disclosure published and identity checked. Provider slice only; renderer, quant consumer and real-account acceptance deferred.",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1788517613613
     }
   ]
 }
