@@ -18,6 +18,7 @@ class ChatGptWebControlInvocationPolicyTest {
             "edit",
             "feedback",
             "logout",
+            ChatGptWebUiSemantics.OPEN_LINK,
             "personalization",
             "pin",
             "plan",

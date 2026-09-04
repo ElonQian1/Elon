@@ -140,33 +140,18 @@ function Restore-Origin {
         [string]$Path
     )
 
-    $deadline = Get-StepDeadline -TimeoutSec ([Math]::Min(45, $ReadyTimeoutSec))
-    $nextBackAt = [DateTimeOffset]::MinValue
-    $backAttempts = 0
-    $last = $null
-    do {
-        $remaining = Get-RemainingSeconds -Deadline $deadline -Minimum 10 -Maximum 30
-        if ($remaining -eq 0) { break }
-        $last = Wait-ChatGptWebSmokeAuthenticatedReady -Runtime $runtime `
-            -TimeoutSec $remaining -InitialWaitSec ([Math]::Min(5, $remaining))
-        $currentPath = Get-ObservedPath -State $last
-        $pathMatches = -not $Path -or $currentPath -eq $Path
-        if (
-            $last.bridge_state -eq "ready" -and
-            [string]$last.page_kind -eq $PageKind -and
-            $pathMatches
-        ) {
-            return
-        }
-        if ([DateTimeOffset]::UtcNow -ge $nextBackAt -and $backAttempts -lt 3) {
-            Invoke-ChatGptWebSmokeAdb -Runtime $runtime -Arguments @("shell", "input", "keyevent", "4") `
-                -TimeoutSec 10 -Label "restore ChatGPT origin" | Out-Null
-            $backAttempts += 1
-            $nextBackAt = [DateTimeOffset]::UtcNow.AddSeconds(5)
-        }
-        Start-Sleep -Seconds $runtime.poll_interval_sec
-    } while ([DateTimeOffset]::UtcNow -lt $deadline)
-    throw "Timed out restoring the original ChatGPT page. Last page=$($last.page_kind)."
+    $restore = if ($Path) {
+        Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_open_conversation" `
+            -Arguments @{ conversation_path = $Path }
+    } elseif ($PageKind -eq "home") {
+        Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "chatgpt_new_conversation"
+    } else {
+        throw "The original ChatGPT page has no safe MCP restoration route."
+    }
+    $requestId = [string]$restore.command_receipt.request_id
+    if (-not $requestId) { throw "ChatGPT origin restoration returned no request receipt." }
+    Wait-CommandAndPage -RequestId $requestId -PageKind $PageKind `
+        -Description "original ChatGPT page restoration" | Out-Null
 }
 
 Write-Output "CHATGPT_FEATURE_PAGE_PHASE phase=bootstrap"
@@ -180,6 +165,13 @@ Assert-ChatGptWebSmokeAdapterVersion -State $origin `
     -ExpectedAdapterVersion $ExpectedAdapterVersion
 $originPageKind = [string]$origin.page_kind
 $originPath = Get-ObservedPath -State $origin
+if (
+    -not $originPath -and
+    $originPageKind -eq "home" -and
+    [int]$origin.input.text_length -gt 0
+) {
+    throw "Feature-page smoke will not replace a non-empty ChatGPT draft."
+}
 
 $initial = Wait-FeatureList
 $availableKinds = @(

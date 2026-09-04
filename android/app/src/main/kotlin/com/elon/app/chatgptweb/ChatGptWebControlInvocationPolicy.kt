@@ -53,6 +53,7 @@ internal object ChatGptWebControlInvocationPolicy {
         "edit",
         "feedback",
         "logout",
+        ChatGptWebUiSemantics.OPEN_LINK,
         "personalization",
         "pin",
         "plan",

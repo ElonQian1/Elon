@@ -419,12 +419,13 @@ internal object ChatGptWebProtocol {
                 val id = item.optString("id").take(MAX_UI_CONTROL_ID_LENGTH)
                 val label = item.optString("label").trim().take(MAX_UI_CONTROL_LABEL_LENGTH)
                 val region = item.optString("region").takeIf { it in UI_REGIONS } ?: continue
-                val semantic = normalizeControlSemantic(
+                val role = item.optString("role").takeIf { it in UI_ROLES } ?: "button"
+                val semantic = ChatGptWebControlSemanticNormalizer.normalize(
                     item.optString("semantic"),
                     label,
                     region,
+                    role,
                 )
-                val role = item.optString("role").takeIf { it in UI_ROLES } ?: "button"
                 val inputKind = item.optString("inputKind")
                     .takeIf { it.isNotBlank() && it in UI_INPUT_KINDS }
                 val writable = item.optBoolean("writable") &&
@@ -492,19 +493,6 @@ internal object ChatGptWebProtocol {
                 rawControlCount > MAX_UI_CONTROLS ||
                 discoveredControlCount > rawControlCount,
         )
-    }
-
-    private fun normalizeControlSemantic(raw: String, label: String, region: String): String {
-        val semantic = raw.takeIf { it in ChatGptWebUiSemantics.KNOWN }
-            ?: ChatGptWebUiSemantics.GENERIC_ACTION
-        if (
-            semantic == ChatGptWebUiSemantics.GENERIC_ACTION &&
-            region == ChatGptWebUiRegion.COMPOSER &&
-            WEB_SEARCH_LABEL.matches(label.trim())
-        ) {
-            return ChatGptWebUiSemantics.WEB_SEARCH
-        }
-        return semantic
     }
 
     private fun parseConversations(event: JSONObject): List<ChatGptWebConversation> {
@@ -793,8 +781,4 @@ internal object ChatGptWebProtocol {
     private val UI_PAGE_KINDS = setOf("home", "conversation", "feature", "auth", "unknown")
     private val UI_COMPATIBILITY = setOf("healthy", "partial", "fallback_required")
     private val REQUEST_ID = Regex("mcp_[a-z0-9]{1,32}")
-    private val WEB_SEARCH_LABEL = Regex(
-        "^(?:search|搜索|search the web|web search|browse|网页搜索|联网搜索)$",
-        RegexOption.IGNORE_CASE,
-    )
 }

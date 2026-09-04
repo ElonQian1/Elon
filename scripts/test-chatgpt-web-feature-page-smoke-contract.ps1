@@ -113,11 +113,14 @@ Assert-Contains $smoke '[string]$last.manifest.compatibility -eq "healthy"' `
 Assert-Contains $smoke '$matrix = Wait-FeatureMatrix -Kind $kind' `
     "Feature-page smoke must audit the settled current feature manifest."
 Assert-Contains $smoke 'function Restore-Origin' "Feature-page smoke must restore the original page."
-Assert-Contains $smoke 'Invoke-ChatGptWebSmokeAdb' `
-    "Feature-page smoke must use the bounded adb helper for back navigation."
-if ($smoke.Contains('chatgpt_new_conversation')) {
-    throw "Feature-page smoke must not replace or discard the user's current conversation."
-}
+Assert-Contains $smoke 'chatgpt_open_conversation' `
+    "Feature-page smoke must restore a saved conversation through the stable MCP route."
+Assert-Contains $smoke 'conversation_path = $Path' `
+    "Feature-page smoke must restore the exact original conversation path."
+Assert-Contains $smoke '[int]$origin.input.text_length -gt 0' `
+    "Feature-page smoke must preserve a non-empty draft instead of replacing it."
+Assert-Contains $smoke 'Wait-CommandAndPage -RequestId $requestId -PageKind $PageKind' `
+    "Feature-page smoke must await the durable restoration receipt and route."
 
 . $policyPath
 $healthy = [pscustomobject]@{

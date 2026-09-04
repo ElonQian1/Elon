@@ -46,11 +46,22 @@ installed build; individual capability documents retain implementation evidence.
 | Acceptance evidence contract revisions | ChatGPT and Google Web AI | Completed, enabled, and installed-state migration verified on Release `v1.1.1393 (1414)`, adapter `212` | Retain implementation hashes as diagnostics without discarding accepted contracts |
 | Compact `Pro` model control classification | ChatGPT | Completed, enabled, and production-surface device verified on Release `v1.1.1394 (1415)`, adapter `213` | Official model menu remains authoritative |
 | Official feature sidebar trigger | ChatGPT | Completed, enabled, and production-surface device verified on Release `v1.1.1395 (1416)`, adapter `214` | Built-in native feature routes and the full official page |
+| Role-aware official link classification | ChatGPT | Completed, enabled, and production-surface device verified on Release candidate `v1.1.1523 (1523)`, adapter `247` | Confirmation-gated official link invocation |
 
 All web-account transports keep the official page authoritative. They do not export
 cookies, credentials, request headers, or private conversation content outside the
 device. Every observer is bounded and emits nothing on malformed or unsuccessful
 responses.
+
+Ordinary anchors that the official page reports with the generic `action` semantic are
+now normalized to `open_link` only when their role is `link`. They remain confirmation
+gated and have no placement in the consumer "current page operations" menu. An unknown
+button keeps the generic `action` semantic and therefore still requests adapter review.
+Three settled production-conversation samples on Release candidate `v1.1.1523 (1523)`,
+adapter `247`, each reported 32 controls, eight classified links, zero generic controls,
+zero unknown semantics, and no adaptation review. The completed capability is
+`android_chatgpt_web_link_semantic_classification_v1`; it must not be reimplemented
+without current regression evidence.
 
 ChatGPT private reads, private dictation, and private read-aloud now share one page-local
 identity context instead of waiting for an incidental official conversation request or each

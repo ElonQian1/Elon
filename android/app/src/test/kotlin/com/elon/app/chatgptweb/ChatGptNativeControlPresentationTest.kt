@@ -206,6 +206,24 @@ class ChatGptNativeControlPresentationTest {
     }
 
     @Test
+    fun keepsOrdinaryWebLinksOutOfTheCurrentPageOperationsMenu() {
+        val link = control(
+            id = "source-link",
+            semantic = ChatGptWebUiSemantics.OPEN_LINK,
+            label = "Source",
+            region = ChatGptWebUiRegion.OVERLAY,
+        )
+
+        val coverage = ChatGptNativeControlPresentation.describe(listOf(link)).getValue(link.id)
+
+        assertEquals("menu", coverage.kind.wireName)
+        assertEquals(
+            WebChatConsumerPageActionPlacement.NONE,
+            ChatGptNativeControlPresentation.pageActionPlacement(link),
+        )
+    }
+
+    @Test
     fun preservesTheFullProtocolControlBoundaryWithoutGivingUnknownControlsPlacement() {
         val controls = (1..512).map { index ->
             control(

@@ -5,6 +5,7 @@ internal object ChatGptWebUiSemantics {
     const val DICTATION = "dictation"
     const val WEB_SEARCH = "web_search"
     const val IMAGE_GENERATION = "image_generation"
+    const val OPEN_LINK = "open_link"
 
     val KNOWN = setOf(
         "navigation",
@@ -30,6 +31,7 @@ internal object ChatGptWebUiSemantics {
         "previous_response",
         "next_response",
         "open_media",
+        OPEN_LINK,
         "reasoning_details",
         "branch",
         "delete",

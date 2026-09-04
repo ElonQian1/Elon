@@ -87,6 +87,27 @@ class ChatGptWebCapabilityMatrixTest {
     }
 
     @Test
+    fun knownLinksRemainConfirmableWithoutTriggeringAdapterReview() {
+        val linkManifest = manifest("healthy", ChatGptWebUiSemantics.OPEN_LINK).copy(
+            controls = manifest("healthy", ChatGptWebUiSemantics.OPEN_LINK).controls.map {
+                it.copy(region = ChatGptWebUiRegion.OVERLAY, role = "link")
+            },
+        )
+        val matrix = ChatGptWebCapabilityMatrix.build(
+            snapshot = snapshot(emptySet()),
+            manifest = linkManifest,
+            bridgeState = ChatGptWebPageAdapter.State.READY,
+            mode = ChatGptWebPresentationMode.NATIVE,
+        )
+
+        assertEquals(0, matrix.getJSONObject("manifest").getInt("generic_control_count"))
+        assertFalse(matrix.getJSONObject("adaptation_review").getBoolean("required"))
+        val control = matrix.getJSONArray("control_coverage").getJSONObject(0)
+        assertEquals("user_confirmation", control.getString("invocation_risk"))
+        assertTrue(control.getBoolean("requires_user_confirmation"))
+    }
+
+    @Test
     fun reportsUnknownOfficialCapabilitiesAndSemanticsForTheNextAdapterPass() {
         val matrix = ChatGptWebCapabilityMatrix.build(
             snapshot = snapshot(setOf("future_official_capability")),

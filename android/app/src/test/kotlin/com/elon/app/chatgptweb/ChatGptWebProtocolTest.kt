@@ -520,6 +520,31 @@ class ChatGptWebProtocolTest {
     }
 
     @Test
+    fun classifiesUnmappedAnchorsAsLinksWithoutHidingUnknownButtons() {
+        val event = ChatGptWebProtocol.parse(
+            """
+            {
+              "schema":"yilong.ai.ui.v1",
+              "event":{
+                "type":"ui_manifest_snapshot",
+                "version":8,
+                "pageKind":"conversation",
+                "title":"ChatGPT",
+                "compatibility":"healthy",
+                "controls":[
+                  {"id":"control_link_ab12","semantic":"action","label":"Source","region":"overlay","role":"link"},
+                  {"id":"control_action_cd34","semantic":"action","label":"Future action","region":"overlay","role":"button"}
+                ]
+              }
+            }
+            """.trimIndent(),
+        ) as ChatGptWebEvent.UiManifest
+
+        assertEquals(ChatGptWebUiSemantics.OPEN_LINK, event.value.controls[0].semantic)
+        assertEquals(ChatGptWebUiSemantics.GENERIC_ACTION, event.value.controls[1].semantic)
+    }
+
+    @Test
     fun parsesWritableFormControlsWithoutAllowingCredentialInjection() {
         val event = ChatGptWebProtocol.parse(
             """
