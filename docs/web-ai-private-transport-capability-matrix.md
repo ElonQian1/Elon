@@ -20,7 +20,7 @@ installed build; individual capability documents retain implementation evidence.
 | Realtime voice transcript refresh | ChatGPT | Completed and enabled; supervised voice exit pending | Retained native transcript and official DOM snapshot |
 | Realtime voice managed native relay | ChatGPT | Completed and enabled; single native audio plus data-channel device verified | Official page-created WebRTC |
 | Realtime voice live transcript stream | ChatGPT | Completed and production-default with native RTC; device event-shape acceptance pending | Same-origin conversation refresh and official DOM snapshot |
-| Realtime voice background continuity | ChatGPT | Completed, enabled, and consumer default; native UI + persistent background WebView identity + native WebRTC media | Official page-created WebRTC, full-screen WebView voice, and foreground notification |
+| Realtime voice background continuity | ChatGPT | Completed, enabled, and consumer default; native UI + persistent background WebView identity + native WebRTC media; foreground/background overlay controls device verified on `v1.1.1521 (1521)` | Official page-created WebRTC, full-screen WebView voice, and foreground notification |
 | Server API realtime voice experiment | 一龙 AI / OpenAI API | Implemented but disabled and hidden from consumer UI | Native UI + persistent background WebView identity + official WebRTC |
 | Conversation directory | Google Web AI | Completed and enabled | Local cache and official page |
 | Visited conversation body cache | Google Web AI | Completed, enabled, and device verified | Official WebView navigation |
@@ -501,8 +501,11 @@ native chat orb is shown only while the owning ChatGPT conversation surface is a
 otherwise a system overlay and foreground notification provide continuity. Audio focus
 automatically pauses for other media and resumes afterward. No WebRTC credential is
 persisted or replayed. Device acceptance verified first-start handoff, Settings and
-provider round trips, continuous recording, and media-focus pause/resume; direct human
-touches on the system overlay pause and hang-up actions remain supervised acceptance.
+provider round trips, continuous recording, and media-focus pause/resume. On
+`v1.1.1521 (1521)`, real production-surface controls also verified the foreground orb
+expand and hang-up path plus the background system orb expand, pause, resume, return-to-app,
+and hang-up paths. Both hang-up paths reached a terminal native peer state and stopped the
+microphone foreground service without clearing app data or login state.
 An unconfirmed official hang-up remains an ongoing call, receives one bounded automatic
 retry, and collapses to the non-blocking native orb instead of being misreported as a
 connection failure or leaving a large action card over the conversation. Existing

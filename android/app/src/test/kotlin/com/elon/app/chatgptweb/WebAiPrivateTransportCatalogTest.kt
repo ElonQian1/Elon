@@ -344,7 +344,7 @@ class WebAiPrivateTransportCatalogTest {
         }
         assertEquals("completed", voiceOverlay.getString("implementation_status"))
         assertEquals(
-            "device_handoff_verified_manual_overlay_actions_pending",
+            "device_v1_1_1521_overlay_pause_resume_open_and_hangup_verified",
             voiceOverlay.getString("verification_status"),
         )
 

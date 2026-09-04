@@ -394,7 +394,7 @@ internal object WebAiPrivateTransportCatalog {
             id = "android_chatgpt_realtime_voice_background_overlay_v1",
             provider = "chatgpt",
             status = "completed",
-            verification = "device_handoff_verified_manual_overlay_actions_pending",
+            verification = "device_v1_1_1521_overlay_pause_resume_open_and_hangup_verified",
             productionDefault = true,
             runtimeEnabled = true,
             requestMode = "official_webrtc_foreground_service_and_local_overlay",
