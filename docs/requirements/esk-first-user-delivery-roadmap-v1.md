@@ -44,7 +44,11 @@ ESK 保持同一种服务支付、治理和经批准利润快照参与资产；�
 | 历史用户交付 | 付款事实及实际映射不能由代码猜测 | dry-run 对账与去重 → 经审批的入账/claim → 可追溯结转，余额不双计 |
 | 量化与安装闭环 | 行情/Paper 基础复用；量化 V28 正式资产接收端和签名包已完成，待上传与双 APK 本人验收 | 主项目下载并打开新版子 APK、授权登录、本人资产和结果来源；QSHARE 对账独立验收 |
 
-链上查询当前切片见 [只读观察器 V1](esk-sui-publication-observer-v1.md)。
+链上查询见 [发布只读观察器 V1](esk-sui-publication-observer-v1.md) 和
+[规范 Currency 与固定供应观察器 V1](esk-sui-currency-observer-v1.md)；
+后者绑定历史注册创建记录与当前供应，公开非 ESK schema 检查不算 ESK 实际发行，
+也不解锁链余额或清单迁移。实际状态与后续参数缺口见其
+[交付记录](../delivery/esk-sui-currency-observer-v1.md)。
 Android 授权前置身份切片见 [官方量化 APK 身份校验 V1](yilong-quant-android-identity-v1.md)；
 该切片不等于本人资产授权已经接通，实际验证与发布见其交付记录。
 主项目资产现状入口：`server/src/esk_asset/service.rs`、

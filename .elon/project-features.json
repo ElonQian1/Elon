@@ -7958,6 +7958,55 @@
       "updated_at_ms": 1788533028613
     },
     {
+      "id": "esk-sui-currency-observer-v1",
+      "title": "ESK Sui 规范 Currency 与固定供应只读观察器",
+      "summary": "双公开测试网来源绑定发布证明、规范 Currency 派生地址、注册创建输出、6 位精度和固定供应；不签名、不认证余额、不迁移清单。",
+      "status": "in_progress",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/esk-sui-currency-observer-v1.md",
+        "content_hash": "e79a8adb23cdf1cd7beb2263f5e5eb4e447155b1248bfb72a7ddf798dbb548e3",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "11d75ddac36b545ba1b010e134f91b8e5d093832",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "ea6daae49876c766c864ad93637b31fa89da320b",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "platform-assets",
+      "tags": [],
+      "task_paths": [
+        "docs/delivery/esk-sui-currency-observer-v1.md",
+        "docs/esk-sui-currency-observer.md",
+        "scripts/esk-sui-currency-observer",
+        "scripts/esk-sui-publication-observer/graphql.js",
+        "scripts/esk-sui-publication-observer/transport.js",
+        "scripts/observe-esk-sui-currency.js",
+        "scripts/test-esk-sui-currency-observer.js",
+        "scripts/test-esk-sui-observer-transport.js"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "两源一致绑定规范 Currency 注册创建交易和历史版本。",
+        "ESK 类型、6 位精度、正 u64 精确供应和 FIXED 历史/当前状态全部匹配。",
+        "固定测试网只读查询复用公共传输保护，错误脱敏且失败关闭。",
+        "认证/余额/清单迁移标志始终 false；旧发布及创世回归保持通过。"
+      ],
+      "implementation_evidence": [],
+      "claim": {
+        "claim_id": "claim_fad2c24bde9743e182fe8377dab906d7",
+        "agent_id": "codex-esk-currency-observer",
+        "claimed_at_ms": 1788533970816,
+        "expires_at_ms": 1788548370816
+      },
+      "created_at_ms": 1788533961027,
+      "updated_at_ms": 1788533979587
+    },
+    {
       "id": "esk-sui-genesis-foundation-v1",
       "title": "ESK Sui 创世基础与可验证发行门禁 V1",
       "summary": "固定 ESK 上 Sui 的创世参数、供应守恒、阶段证据与历史付费用户映射门禁，并交付固定供应 Currency 源码和自动验证；本轮不签名、不广播、不移动真实资金。",
@@ -8159,98 +8208,124 @@
       "implementation_evidence": [
         {
           "path": "docs/esk-sui-publication-observer.md",
-          "content_hash": "568cd4073a1effbd2b8b1eb30062f99392cc097bcf52a5ab9c0f95c74d6ee83e",
+          "content_hash": "fc99545b2bce05c41a51bdc623b71f365c2bb5c1be5a42ffe9f2fa93a4f715b2",
           "locator": "",
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "892c6d378dc3ca5bff18c7134ef3fc7c2b2cafdc",
-            "head_blob_oid": "",
+            "head_commit": "0a9631c36226192e48986984be46a8b6dcfee5df",
+            "head_blob_oid": "6961c8955629e0bf34216be12127440b7615f270",
             "worktree_blob_oid": "6961c8955629e0bf34216be12127440b7615f270",
-            "state": "untracked"
+            "state": "tracked_clean"
           }
         },
         {
           "path": "docs/requirements/esk-first-user-delivery-roadmap-v1.md",
-          "content_hash": "73157619e436df31af5cdb739c770370cdd5e6e9aa02ca4428f133d24b9e6831",
+          "content_hash": "23d64980f0cc8d3df9b9eebd44674d58f07d859cf78ffe1dfdd3ba7ea0e17ea4",
           "locator": "",
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "892c6d378dc3ca5bff18c7134ef3fc7c2b2cafdc",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "1a32c42cd0fe6c3d87be7b65d4e0985cbb2334e9",
-            "state": "untracked"
+            "head_commit": "0a9631c36226192e48986984be46a8b6dcfee5df",
+            "head_blob_oid": "ed582b32359fe9879b0423a628756bef53368fad",
+            "worktree_blob_oid": "befa1c26f7d19adb3d69b9c5116a044206864382",
+            "state": "tracked_modified"
           }
         },
         {
           "path": "scripts/esk-sui-publication-observer/contract.js",
-          "content_hash": "de1871125f3af15b133e2e86892e01d9d775eacdc2d1f37907f5d88c2f843251",
+          "content_hash": "3e22e48a5adac3c74983a863b15e53364a875fd7c90f767cc918e7460e6bfa7d",
           "locator": "",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "892c6d378dc3ca5bff18c7134ef3fc7c2b2cafdc",
-            "head_blob_oid": "",
+            "head_commit": "0a9631c36226192e48986984be46a8b6dcfee5df",
+            "head_blob_oid": "423936b31f327ce0418a92ec88bd56112ef68177",
             "worktree_blob_oid": "423936b31f327ce0418a92ec88bd56112ef68177",
-            "state": "untracked"
+            "state": "tracked_clean"
           }
         },
         {
           "path": "scripts/esk-sui-publication-observer/graphql.js",
-          "content_hash": "3270d043786e79d6697c5fd4a8a5b46b741419e9e888c1933d3d628d85b6313d",
+          "content_hash": "47dac683876f34d95ff1d526c417f35fb29ca2928118089fbc35ba786e550e4e",
           "locator": "",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "892c6d378dc3ca5bff18c7134ef3fc7c2b2cafdc",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "8da4082ef7331e3293841bffd28358bee6b084d5",
-            "state": "untracked"
+            "head_commit": "0a9631c36226192e48986984be46a8b6dcfee5df",
+            "head_blob_oid": "a99faea5f995103ce2054eafaba15077e20135d7",
+            "worktree_blob_oid": "a99faea5f995103ce2054eafaba15077e20135d7",
+            "state": "tracked_clean"
           }
         },
         {
           "path": "scripts/esk-sui-publication-observer/observe.js",
-          "content_hash": "bcd714cf9bd0e5b42ceb9a49fd0dc2f29e4e992aa45fe52a109e14da50568688",
+          "content_hash": "71f77a38cd58c643ed7c0617915b5422cd934127cb240fe73f9436bda345d11d",
           "locator": "",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "892c6d378dc3ca5bff18c7134ef3fc7c2b2cafdc",
-            "head_blob_oid": "",
+            "head_commit": "0a9631c36226192e48986984be46a8b6dcfee5df",
+            "head_blob_oid": "7287174790c3d225cb3fef7a143e1b7fced3cc53",
             "worktree_blob_oid": "7287174790c3d225cb3fef7a143e1b7fced3cc53",
-            "state": "untracked"
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "scripts/esk-sui-publication-observer/transport.js",
+          "content_hash": "be5d0b26658911b976d086828f36b8197ff253414d164694add85ebb8570c01b",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "0a9631c36226192e48986984be46a8b6dcfee5df",
+            "head_blob_oid": "fe2efc24e612cab67ed9280f4e137fd1a3b2770d",
+            "worktree_blob_oid": "fe2efc24e612cab67ed9280f4e137fd1a3b2770d",
+            "state": "tracked_clean"
           }
         },
         {
           "path": "scripts/observe-esk-sui-publication.js",
-          "content_hash": "55e75cbc0c2542c2bc8dc6a14737b3710de6f418a83c76f0eafc5ba575cff17e",
+          "content_hash": "8f2b23b1e0e0612391bc47841f47d514e069ef53c6ab98676b680b0519d990c7",
           "locator": "",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "892c6d378dc3ca5bff18c7134ef3fc7c2b2cafdc",
-            "head_blob_oid": "",
+            "head_commit": "0a9631c36226192e48986984be46a8b6dcfee5df",
+            "head_blob_oid": "b38a269caea9a4bc94ad68777bcbad0481b7e229",
             "worktree_blob_oid": "b38a269caea9a4bc94ad68777bcbad0481b7e229",
-            "state": "untracked"
+            "state": "tracked_clean"
           }
         },
         {
-          "path": "scripts/test-esk-sui-publication-observer.js",
-          "content_hash": "e11f2cd4bd2f2e48915cee680218ecf3bce2fb842309dd215158d844ca8eebb4",
+          "path": "scripts/test-esk-sui-observer-transport.js",
+          "content_hash": "a21a96309aa5a5ae842687e399471aba0a39a8a7dfc4862f8dda22c75a3035da",
           "locator": "",
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "892c6d378dc3ca5bff18c7134ef3fc7c2b2cafdc",
-            "head_blob_oid": "",
+            "head_commit": "0a9631c36226192e48986984be46a8b6dcfee5df",
+            "head_blob_oid": "009039866d6e61c0da804508d53b916bb7da9b62",
+            "worktree_blob_oid": "009039866d6e61c0da804508d53b916bb7da9b62",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "scripts/test-esk-sui-publication-observer.js",
+          "content_hash": "36b73404835baf3017567cbc7c84a5594452ab87ba3f166eb7b5de691bc62000",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "0a9631c36226192e48986984be46a8b6dcfee5df",
+            "head_blob_oid": "dd248b0c1f607191443d93a448b695d6a9854652",
             "worktree_blob_oid": "dd248b0c1f607191443d93a448b695d6a9854652",
-            "state": "untracked"
+            "state": "tracked_clean"
           }
         }
       ],
       "created_at_ms": 1788501859304,
-      "updated_at_ms": 1788502524347
+      "updated_at_ms": 1788534820414
     },
     {
       "id": "esk_paper_quant_allocation_request_v2",
@@ -18093,106 +18168,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_9bf4839121fc4b17bcf15051053b620f",
-      "feature_id": "esk-paper-quant-allocation-binding-v3",
-      "action": "evidence_recorded",
-      "actor": "codex-desktop",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788321248751
-    },
-    {
-      "id": "feature_event_418f3af017514d04af43cb0c2937434a",
-      "feature_id": "esk-paper-quant-allocation-binding-v3",
-      "action": "transitioned",
-      "actor": "codex-desktop",
-      "reason": "主项目授权、验签、V285 追加事件、PC 同步与状态机实现完成。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1788321265231
-    },
-    {
-      "id": "feature_event_353fea58549d48e18c719dcc9cb48540",
-      "feature_id": "esk-paper-quant-allocation-binding-v3",
-      "action": "transitioned",
-      "actor": "codex-desktop",
-      "reason": "主程序编译、6 项 ESK 状态机测试、授权/回执专项、PC 构建、静态合同和双仓哈希均通过。",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1788321279149
-    },
-    {
-      "id": "feature_event_88fa621b873a45af9c5d7ced8fb35020",
-      "feature_id": "esk-paper-quant-allocation-binding-v3",
-      "action": "transitioned",
-      "actor": "codex/root",
-      "reason": "Main server and PC frontend published as v0.3.1716 at commit 00e5756d1; quant child code is on origin/main at 424b530 while independent public HTTPS remains explicitly deferred.",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1788322411689
-    },
-    {
-      "id": "feature_event_163f033d7eb64d06a312cc292143ac12",
-      "feature_id": "esk-paper-quant-cross-repo-interoperability-v4",
-      "action": "registered",
-      "actor": "codex-root-esk-interop-v4",
-      "reason": "Close the remaining byte-level interoperability gap after released V3 binding.",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1788323364987
-    },
-    {
-      "id": "feature_event_db11c99943014b098651236d4f8aaaaa",
-      "feature_id": "esk-paper-quant-cross-repo-interoperability-v4",
-      "action": "claimed",
-      "actor": "codex-root-esk-interop-v4",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788323374679
-    },
-    {
-      "id": "feature_event_b8df5df3751e4f58867c40db371962eb",
-      "feature_id": "esk-paper-quant-cross-repo-interoperability-v4",
-      "action": "transitioned",
-      "actor": "codex-root-esk-interop-v4",
-      "reason": "Implement the accepted fixed-vector cross-repository Paper interoperability slice.",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788323385658
-    },
-    {
-      "id": "feature_event_d771d11724b64e9bb8b7af8dec339534",
-      "feature_id": "esk-paper-quant-cross-repo-interoperability-v4",
-      "action": "claim_released",
-      "actor": "codex-root-esk-interop-v4",
-      "reason": "Temporarily release claim to rebind the reviewed cross-platform newline clarification.",
-      "from_status": "in_progress",
-      "to_status": "blocked",
-      "at_ms": 1788334360557
-    },
-    {
-      "id": "feature_event_acb4db7aaf1848cdac0f40f0fc4d5010",
-      "feature_id": "esk-paper-quant-cross-repo-interoperability-v4",
-      "action": "requirement_rebound",
-      "actor": "codex-root-esk-interop-v4",
-      "reason": "Bind the reviewed cross-platform newline clarification; signed fixture bytes remain exact.",
-      "from_status": "blocked",
-      "to_status": "proposed",
-      "at_ms": 1788334379506
-    },
-    {
-      "id": "feature_event_903f756adf894371a3eada553498be13",
-      "feature_id": "esk-paper-quant-cross-repo-interoperability-v4",
-      "action": "transitioned",
-      "actor": "codex-root-esk-interop-v4",
-      "reason": "Reviewed newline-only portability clarification; scope and safety boundaries are unchanged.",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1788334399378
-    },
-    {
       "id": "feature_event_5270900e0d174025902c65b7f3f901c3",
       "feature_id": "esk-paper-quant-cross-repo-interoperability-v4",
       "action": "transitioned",
@@ -20091,6 +20066,106 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1788533028613
+    },
+    {
+      "id": "feature_event_5691210baac2476faadfd422801c3238",
+      "feature_id": "esk-sui-currency-observer-v1",
+      "action": "registered",
+      "actor": "codex-esk-currency-observer",
+      "reason": "",
+      "from_status": "",
+      "to_status": "accepted",
+      "at_ms": 1788533961027
+    },
+    {
+      "id": "feature_event_1fe7935ce235464080125315d2450fb9",
+      "feature_id": "esk-sui-currency-observer-v1",
+      "action": "transitioned",
+      "actor": "codex-esk-currency-observer",
+      "reason": "",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1788533970243
+    },
+    {
+      "id": "feature_event_138adaafca104b82b26a7d36d599b08a",
+      "feature_id": "esk-sui-currency-observer-v1",
+      "action": "claimed",
+      "actor": "codex-esk-currency-observer",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788533970817
+    },
+    {
+      "id": "feature_event_be62d99fd67e469da0bda1b6e34ce8a6",
+      "feature_id": "esk-sui-currency-observer-v1",
+      "action": "transitioned",
+      "actor": "codex-esk-currency-observer",
+      "reason": "",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788533979587
+    },
+    {
+      "id": "feature_event_dced2231bc0b4ceb949b70e68120edc3",
+      "feature_id": "esk-sui-publication-observer-v1",
+      "action": "transitioned",
+      "actor": "codex-esk-currency-observer",
+      "reason": "保持合同不变地抽取共享传输并完成原65项和新15项回归；显式重开以绑定当前源码证据，移除漂移旧证据，不改变发行或余额状态。",
+      "from_status": "verified",
+      "to_status": "ready",
+      "at_ms": 1788534659925
+    },
+    {
+      "id": "feature_event_73d1f1f512d44e6f94f627c06bba914c",
+      "feature_id": "esk-sui-publication-observer-v1",
+      "action": "claimed",
+      "actor": "codex-esk-currency-observer",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788534673067
+    },
+    {
+      "id": "feature_event_a061a5bf1739478592eb8ae2849b2ab3",
+      "feature_id": "esk-sui-publication-observer-v1",
+      "action": "transitioned",
+      "actor": "codex-esk-currency-observer",
+      "reason": "",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788534673588
+    },
+    {
+      "id": "feature_event_c510c36ab9ae46469f3176b6442b35b5",
+      "feature_id": "esk-sui-publication-observer-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-esk-currency-observer",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788534819330
+    },
+    {
+      "id": "feature_event_d35b7c2b6f0a46d0a5755368105668a7",
+      "feature_id": "esk-sui-publication-observer-v1",
+      "action": "transitioned",
+      "actor": "codex-esk-currency-observer",
+      "reason": "纯传输抽取0a9631c36已推送，原65项与新15项回归通过；当前证据显式重绑，不代表链上ESK验收。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1788534819869
+    },
+    {
+      "id": "feature_event_18694f72463e4e9388f214229db27792",
+      "feature_id": "esk-sui-publication-observer-v1",
+      "action": "transitioned",
+      "actor": "codex-esk-currency-observer",
+      "reason": "保持旧固定查询/导出/同步错误语义，双源失败关闭；65+15项回归通过，真实ESK及完整发行认证仍未执行。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1788534820414
     }
   ]
 }

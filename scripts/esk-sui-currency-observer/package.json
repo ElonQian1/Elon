@@ -1,0 +1,9 @@
+{
+  "name": "@yilong/esk-sui-currency-observer",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Read-only testnet Currency evidence; no wallet or transaction execution",
+  "engines": { "node": ">=22" },
+  "scripts": { "test": "node ../test-esk-sui-currency-observer.js" },
+  "dependencies": { "@mysten/sui": "2.29.0" }
+}
