@@ -1,11 +1,16 @@
 ---
 title: "ESK Android 本机只读快照协议 V1"
-version_status: current
-reviewed_at: 2026-09-04
+version_status: superseded
+reviewed_at: 2026-09-05
 owners: [platform-assets, quant-android]
 ---
 
 # ESK Android 本机只读快照协议 V1
+
+> 2026-09-05 退役：用户明确取消旧版兼容。本协议及对应旧 Paper 原生组件已由
+> [正式额度与卖回进度跨 APK 只读交付](../requirements/esk-platform-native-progress-v1.md) 替代。
+> 以下正文仅保留历史设计，不再要求实现、维护或恢复旧桥；原发布与测试记录仍为历史证据。
+> 此次只退役原生桥，不删除或迁移后端 Paper 账本，也不改变主项目个人资产业务。
 
 本协议只描述主 APK 与量化 APK 的本机只读余额快照，不是网络 API、链上凭证或资产发行证明。
 当前 Android [合同源码](../../android/app/src/main/kotlin/com/elon/eskcontract/EskSnapshotContract.kt)

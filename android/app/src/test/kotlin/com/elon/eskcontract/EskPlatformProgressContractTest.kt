@@ -168,27 +168,32 @@ class EskPlatformProgressContractTest {
         assertFalse(contract.validSnapshot(nearMax, NONCE, "", Long.MAX_VALUE - 60000, Long.MAX_VALUE))
     }
 
-    @Test fun legacyProtocolsMutuallyRejectEvenWithRetagging() {
-        val formal = page().filterKeys { it in EskPlatformSnapshotContract.KEYS } + mapOf(
-            "protocol" to EskPlatformSnapshotContract.PROTOCOL, "entry_count" to "1")
-        val paper = mapOf("protocol" to EskSnapshotContract.PROTOCOL, "nonce" to NONCE, "asset_id" to "esk", "symbol" to "ESK",
+    @Test fun retiredProtocolPayloadsAreRejectedWithoutKeepingTheirImplementations() {
+        val formalProtocol = "yilong.esk.platform_android_snapshot.v1"
+        val paperProtocol = "yilong.esk.android_snapshot.v1"
+        val formal = mapOf("protocol" to formalProtocol, "nonce" to NONCE,
+            "asset_id" to "esk", "symbol" to "ESK", "decimals" to "6", "source" to "platform_recorded",
+            "chain_status" to "not_deployed", "simulated" to "false", "funds_moved" to "false",
+            "verification_basis" to "authenticated_operator_review", "external_payment_verified" to "false",
+            "total" to "1.000000", "total_base_units" to "1000000", "entry_count" to "1",
+            "observed_elapsed_ms" to "2000", "expires_elapsed_ms" to "62000", "service_spending" to "false",
+            "quant_subscription" to "false", "sellback_settlement" to "false", "onchain_transfer" to "false", "chain_migration" to "false")
+        val paper = mapOf("protocol" to paperProtocol, "nonce" to NONCE, "asset_id" to "esk", "symbol" to "ESK",
             "mode" to "paper", "issuance_mode" to "paper_recorded", "chain_status" to "not_deployed", "simulated" to "true",
             "funds_moved" to "false", "total" to "1.000000", "available" to "1.000000", "reserved_for_sellback" to "0.000000",
             "reserved_for_quant" to "0.000000", "reserved_total" to "0.000000", "revision" to "1",
             "observed_elapsed_ms" to "2000", "expires_elapsed_ms" to "62000")
-        assertTrue(EskPlatformSnapshotContract.validSnapshot(formal, NONCE, 1000, 3000))
-        assertTrue(EskSnapshotContract.validSnapshot(paper, NONCE, 1000, 3000))
+        assertEquals(21, formal.size)
+        assertEquals(17, paper.size)
         for (old in listOf(formal, paper)) {
             assertFalse(accepts(old))
             assertFalse(accepts(old + ("protocol" to contract.PROTOCOL)))
             assertFalse(contract.validRequest(old.filterKeys { it in setOf("protocol", "nonce") }))
         }
-        assertFalse(EskPlatformSnapshotContract.validSnapshot(page(), NONCE, 1000, 3000))
-        assertFalse(EskSnapshotContract.validSnapshot(page(), NONCE, 1000, 3000))
-        assertFalse(EskPlatformSnapshotContract.validSnapshot(page() + ("protocol" to EskPlatformSnapshotContract.PROTOCOL), NONCE, 1000, 3000))
-        assertFalse(EskSnapshotContract.validSnapshot(page() + ("protocol" to EskSnapshotContract.PROTOCOL), NONCE, 1000, 3000))
-        assertFalse(EskPlatformSnapshotContract.validRequest(request()))
-        assertFalse(EskSnapshotContract.validRequest(request()))
+        for (protocol in listOf(formalProtocol, paperProtocol)) {
+            assertFalse(accepts(page() + ("protocol" to protocol)))
+            assertFalse(contract.validRequest(request() + ("protocol" to protocol)))
+        }
     }
 
     @Test fun validationIsPureAndCannotAuthenticateOrConsumeConsent() {

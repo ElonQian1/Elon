@@ -14,7 +14,7 @@ for (const label of [
   '申请不代表报价、成交或付款', '本网页暂不读取正式私有余额',
   '不提供正式卖回申请', 'Paper 模拟资产不包含正式登记数量',
   '可申请量不是现金或即时兑付承诺', '当前 HTTP 不可用',
-  '量化 0.4.0 接收端已构建，尚待上传与双 APK 联调',
+  '新版子 APK 尚待正式签名、上传与双 APK 联调',
 ]) assert.ok(content.includes(label), `Missing truthful boundary: ${label}`)
 
 assert.match(content, /href="\/app\/ElonSpeed-latest\.apk"/)

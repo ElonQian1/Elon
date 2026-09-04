@@ -1,13 +1,14 @@
 ---
 title: "ESK Android 正式进度协议 V1"
 version_status: current
-reviewed_at: 2026-09-04
+reviewed_at: 2026-09-05
 owners: [platform-assets, android, quant-integration]
 ---
 
 # ESK Android 正式进度协议 V1
 
-独立于 Paper 17 字段和正式总量 21 字段协议；不得扩充、放宽或替代旧合同。
+本协议是新版唯一原生 ESK 资产入口。按用户 2026-09-05 要求，旧 Paper 17 字段和
+正式总量 21 字段原生接口退役，不保留组件别名或兼容回退；固定旧载荷仅用于拒绝测试。
 依据：[正式进度需求](../requirements/esk-platform-native-progress-v1.md)。
 
 ## 请求与身份

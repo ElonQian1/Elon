@@ -96,21 +96,7 @@
             android:windowSoftInputMode="adjustResize" />
 
         <activity
-            android:name=".esk.platform.handoff.EskPlatformSnapshotConsentActivity"
-            android:exported="true"
-            android:excludeFromRecents="true"
-            android:allowTaskReparenting="false"
-            android:launchMode="standard" />
-
-        <activity
             android:name=".esk.platform.progress.EskPlatformProgressConsentActivity"
-            android:exported="true"
-            android:excludeFromRecents="true"
-            android:allowTaskReparenting="false"
-            android:launchMode="standard" />
-
-        <activity
-            android:name=".esk.handoff.EskSnapshotConsentActivity"
             android:exported="true"
             android:excludeFromRecents="true"
             android:allowTaskReparenting="false"

@@ -25,7 +25,13 @@ class EskPlatformProgressProviderWiringTest {
         val aliases = manifest.getElementsByTagName("activity-alias")
         for (i in 0 until aliases.length) assertFalse(attr(aliases.item(i) as Element, "targetActivity").contains("EskPlatformProgress"))
         val oldNames = listOf(".esk.platform.handoff.EskPlatformSnapshotConsentActivity", ".esk.handoff.EskSnapshotConsentActivity")
-        oldNames.forEach { name -> assertEquals(1, (0 until nodes.length).count { attr(nodes.item(it) as Element, "name") == name }) }
+        oldNames.forEach { name ->
+            assertEquals(0, (0 until nodes.length).count { attr(nodes.item(it) as Element, "name") == name })
+            for (i in 0 until aliases.length) {
+                val target = attr(aliases.item(i) as Element, "targetActivity")
+                assertFalse(target.endsWith(name.substringAfterLast('.')))
+            }
+        }
     }
 
     @Test fun creationChecksOsCallerRequestAndHttpsBeforeReadingAnyAccountOrCredential() {

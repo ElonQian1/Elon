@@ -1,4 +1,16 @@
+---
+title: "ESK Android 本机只读快照授权 V1"
+version_status: superseded
+reviewed_at: 2026-09-05
+owners: [platform-assets, android, quant-integration]
+---
+
 # ESK Android 本机只读快照授权 V1
+
+> 2026-09-05 退役：用户明确取消旧版兼容。旧 Paper 原生提供端与接收端已由
+> [正式额度与卖回进度跨 APK 只读交付](esk-platform-native-progress-v1.md) 替代。
+> 以下正文（含当时的实施状态）仅保留历史设计，不再要求维护或恢复 17 字段原生桥。
+> 原交付证据保留；后端 Paper 账本、授权 API、公共预览及主项目个人资产业务不在退役范围。
 
 状态：实施中。范围：主项目与量化正式 APK，不改变服务器、支付或发行状态。
 承接：[首批用户路线图](esk-first-user-delivery-roadmap-v1.md)。

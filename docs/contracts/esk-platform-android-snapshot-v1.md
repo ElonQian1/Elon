@@ -1,11 +1,16 @@
 ---
 title: "ESK Android 正式平台登记摘要协议 V1"
-version_status: current
-reviewed_at: 2026-09-04
+version_status: superseded
+reviewed_at: 2026-09-05
 owners: [platform-assets, android, quant-integration]
 ---
 
 # ESK Android 正式平台登记摘要协议 V1
+
+> 2026-09-05 退役：用户明确取消旧版兼容。本协议及对应旧正式摘要原生组件已由
+> [正式额度与卖回进度跨 APK 只读交付](../requirements/esk-platform-native-progress-v1.md) 替代。
+> 以下正文仅保留历史设计，不再要求实现、维护或恢复旧桥；原发布与测试记录仍为历史证据。
+> 此次只退役原生桥，不改变后端正式账本、主项目个人资产、审核流水或卖回业务。
 
 本协议只投影主项目经审核的平台登记总量，不是发行证明、链上凭证、付款自动核验、
 投资份额、即时余额或兑付授权。依据是[提供端需求](../requirements/esk-platform-native-provider-v1.md)。

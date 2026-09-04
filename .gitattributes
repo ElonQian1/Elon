@@ -7,11 +7,7 @@
 *.tsv        text eol=lf
 contracts/quant/*.json text eol=lf
 # Native ESK contract copies must remain byte-identical across repositories.
-android/app/src/main/kotlin/com/elon/eskcontract/EskSnapshotContract.kt text eol=lf
-android/app/src/test/kotlin/com/elon/eskcontract/EskSnapshotContractTest.kt text eol=lf
 docs/contracts/esk-android-snapshot-v1.md text eol=lf
-android/app/src/main/kotlin/com/elon/eskcontract/EskPlatformSnapshotContract.kt text eol=lf
-android/app/src/test/kotlin/com/elon/eskcontract/EskPlatformSnapshotContractTest.kt text eol=lf
 docs/contracts/esk-platform-android-snapshot-v1.md text eol=lf
 # Formal progress contract and synthetic vectors are shared byte-for-byte.
 android/app/src/main/kotlin/com/elon/eskcontract/EskPlatformProgressContract.kt text eol=lf

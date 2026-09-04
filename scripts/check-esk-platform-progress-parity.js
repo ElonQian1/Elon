@@ -11,6 +11,10 @@ const areas = [
   'android/app/src/main/kotlin/com/elon/eskcontract',
   'android/app/src/test/kotlin/com/elon/eskcontract',
 ];
+const expectedNames = [
+  ['EskPlatformProgressContract.kt', 'EskPlatformProgressRows.kt'],
+  ['EskPlatformProgressContractTest.kt', 'EskPlatformProgressFixtures.kt', 'EskPlatformProgressRowsTest.kt'],
+];
 
 function boundedFile(root, relative) {
   const candidate = path.join(root, relative);
@@ -36,12 +40,19 @@ function check(quantRoot) {
   const receipts = [];
   for (const [index, area] of areas.entries()) {
     const names = newFiles(mainRoot, area);
+    assert.deepEqual(names, expectedNames[index], 'EXACT_PROGRESS_SOURCE_SET_REQUIRED');
     assert.deepEqual(names, newFiles(quantRoot, area), 'PROGRESS_SOURCE_SET_MISMATCH');
-    assert.ok(names.includes(index === 0 ? 'EskPlatformProgressContract.kt' : 'EskPlatformProgressContractTest.kt'));
-    const legacy = index === 0
+    const retired = index === 0
       ? ['EskSnapshotContract.kt', 'EskPlatformSnapshotContract.kt']
       : ['EskSnapshotContractTest.kt', 'EskPlatformSnapshotContractTest.kt'];
-    for (const name of [...names, ...legacy]) {
+    for (const root of [mainRoot, quantRoot]) {
+      for (const name of retired) {
+        // lstat also rejects a dangling symlink instead of treating it as absent.
+        assert.equal(fs.lstatSync(path.join(root, area, name), { throwIfNoEntry: false }), undefined,
+          'RETIRED_SHARED_SOURCE_MUST_BE_ABSENT');
+      }
+    }
+    for (const name of names) {
       const relative = `${area}/${name}`;
       const main = boundedFile(mainRoot, relative);
       const quant = boundedFile(quantRoot, relative);
@@ -52,7 +63,7 @@ function check(quantRoot) {
   }
   return { schema: 'yilong.esk.platform_progress_source_parity.v1', status: 'passed',
     scope: 'byte_identity_only', runtime_verified: false, user_acceptance: false,
-    financial_authority: false, files: receipts };
+    financial_authority: false, retired_shared_sources_absent: true, files: receipts };
 }
 
 try {

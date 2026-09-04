@@ -1,11 +1,16 @@
 ---
 title: "正式 ESK 原生摘要授权提供端 V1"
-version_status: current
-reviewed_at: 2026-09-04
+version_status: superseded
+reviewed_at: 2026-09-05
 owners: [platform-assets, android, quant-integration]
 ---
 
 # 正式 ESK 原生摘要授权提供端 V1
+
+> 2026-09-05 退役：用户明确取消旧版兼容。旧正式摘要原生提供端已由
+> [正式额度与卖回进度跨 APK 只读交付](esk-platform-native-progress-v1.md) 替代。
+> 以下正文仅为历史设计与验收范围，不再要求保留旧组件或 21 字段原生桥。
+> 原交付证据保留；后端正式账本及主项目个人资产、审核流水、卖回页面不在退役范围。
 
 ## 本批范围
 

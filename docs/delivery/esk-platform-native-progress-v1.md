@@ -1,7 +1,7 @@
 ---
 title: "ESK 正式进度跨 APK V1 交付证据"
 version_status: current
-reviewed_at: 2026-09-04
+reviewed_at: 2026-09-05
 owners: [platform-assets, quant-android]
 ---
 
@@ -15,10 +15,11 @@ owners: [platform-assets, quant-android]
 
 | 能力 | 实现 | 验证 | 发布 | 用户验收 |
 |---|---|---|---|---|
-| 同快照额度/最多 20 条进度共享合同 | implemented | offline_passed | not_started | pending |
-| 主 APK 当前账户逐页同意与只读提供 | implemented | offline_passed | not_started | pending |
-| 量化独立原生接收、清页与短期显示 | partial（待实际最低主版本） | offline_passed | not_started | pending |
-| 网页 APK-only 说明、无私有网页写入 | implemented | offline_passed | not_started | pending |
+| 同快照额度/最多 20 条进度共享合同 | implemented | offline_passed | 主 1517 已发布 | pending |
+| 主 APK 当前账户逐页同意与只读提供 | implemented | offline_passed | 主 1517 工件已核验 | pending |
+| 量化独立原生接收、清页与短期显示 | implemented | offline_passed | 未签名/未上传 | pending |
+| 唯一新版入口、退役旧原生桥 | implemented | 两仓离线复验通过 | 量化源码已推送；主待发布 | pending |
+| 网页新版 APK-only 说明 | implemented | offline_passed | 新措辞待发布 | pending |
 
 ## 当前基线与职责
 
@@ -31,7 +32,9 @@ owners: [platform-assets, quant-android]
 单值 128 字符、UTF-8 合计 32768 字节。显示数量来自一次同快照响应，
 可申请量不是可兑付现金。每页重新确认主账户、使用新 nonce、先清旧页、不拼接。
 409/快照变化不自动去掉游标重试；60 秒以内失效，后台或重建清空。
-旧 Paper 17 字段与正式总量 21 字段生产合同及共享测试保持不变。
+第一阶段保留旧原生协议；用户 2026-09-05 明确取消旧版兼容，当前继续退役旧 Paper
+17 字段和正式总量 21 字段原生桥。历史账本、主个人登记历史/卖回与公共行情不删除。
+新版不显示旧审核分录笔数，该数仍在主资产页；卖回申请数不能替代审核分录数。
 
 ## 验证入口
 
@@ -45,7 +48,7 @@ owners: [platform-assets, quant-android]
   `scripts/validate.ps1` / `scripts/validate-android.ps1` / `scripts/publish-android-to-yilong.ps1`。
   两个项目分别保存实际源码 SHA、版本、大小、SHA-256 与正式签名回执。
 
-实际结果：
+第一阶段实际结果（旧桥删除后的验证另记，不能沿用此测试数量）：
 
 - 主 Android XML 共 270 项通过，0 失败、0 错误、0 跳过，包含新增共享 27 项及
   新提供端 19 项；保留原 224 项。Debug APK 构建通过，整轮 170.7 秒。
@@ -53,7 +56,8 @@ owners: [platform-assets, quant-android]
   子进程指定 `.ai-tmp/java-sockets` 后重跑通过，没有修改全局环境或应用传输保护。
 - 量化自身全验为 162 Rust、42 前端通过，生产 PWA 构建通过；Android XML 为
   155 项通过（原 91 + 共享 27 + 接收端 37）、0 失败/错误/跳过，Debug 构建通过。
-  未配置正式参数时 Release 仍按预期拒绝。最低主版本待分配，不能签名发布占位配置。
+  未配置正式参数时 Release 仍按预期拒绝。最低主版本已按实际发布固定为 1517，
+  再次完整运行 Android 155 项和 Debug 构建通过，19 秒；不是待替换占位配置。
 - 九份两仓新旧合同/测试逐字节一致，其中新生产 Contract SHA-256 为
   `241cedbc40992d8559b68d9baf042064d124544383a9fe43c001026f2e70a9a0`，Rows 为
   `3eec4ca250c6f4497b17536fa16f58f15daae644f2182c1f7411e0b2d48deca8`。
@@ -61,8 +65,38 @@ owners: [platform-assets, quant-android]
   另官方目录与 PC 项目首页两项通过。
 - 独立审阅没有发现新增可复现 P1/P2；这不替代真实 Android 系统验收。
 
-发布与公开验证待后续实际结果补记。所有 fixture 为合成数据，未查询真实用户、
+所有 fixture 为合成数据，未查询真实用户、
 未执行真实钱包签名或交易；APK 构建签名不是资金签名。
+
+### 已发布的第一阶段主 APK（尚含旧桥）
+
+- `com.elon.app 1.1.1517 (1517)`，代码 `50cd35f7b4c96807323b66f8442eb61e18b3cfa6`
+  已推送主线；官方 app-ui receipt 的 mobile_pwa/apk 两阶段均 passed，总耗时 259.7 秒。
+- 实际独立下载公开 APK 并与本地 release 对比：39,734,007 字节，SHA-256
+  `b746c2bce77530a4461055b21b5f50ecaa43542254af988436f0f570e7406ede`。
+  aapt 确认包名与版本；apksigner 验证 v2、单签，证书 SHA-256
+  `f79567cf8a7e610e218aa4b7a1292be93a9623d9bc06a9bafbf47b030f99010c`。
+- 来源依据公开 `app/version.json` 与官方 receipt，不冒称 APK 内嵌 Git SHA 已验证。
+  静态 PWA 来源同为 `50cd35f7`，运行时摘要
+  `ffb1288ba42ae9a4a0cfe7fc31561dcb0b7ef34052645b3e62d8b91ab851c189`。
+- 该包证明第一阶段发布，不证明后续旧桥删除已发布；新候选需要再次构建和正式发布。
+
+### 旧原生桥退役后的验证
+
+- 主端精确删除21个旧native源码、布局及专属测试/脚本；新增4项退役保护测试。
+  正式 Android 验证168.8秒退出0，实际XML为198/198、0失败/错误/跳过，Debug构建通过。
+  测试数由270减去已退役76项再加4项；没有把旧测试数量冒充新版证据。
+- 主个人正式资产、登记历史/卖回、正式/Paper后端账本目录相对此前提交无差异；
+  新测试覆盖这些入口仍存在、旧组件/别名和生产合同缺席、新协议拒绝旧字面载荷。
+- 量化删除20个旧native文件，首页只有“我的 ESK”；官方Android为69/69、0失败/错误/
+  跳过，Gradle20秒，Debug及默认Release拒绝通过。Rust162/前端42输入不变，复用既有验证。
+- 新版5份共享文件跨仓字节一致，旧共享4文件不存在；ContractTest SHA-256 为
+  `a7c4eb501798690f7b8c207a839f5403546f852d0cc49794ff0499036eebd73e`。
+- 新/旧网页边界、个人资产可见性、PWA源码、官方目录和PC项目首页六项通过；
+  暂存源码尺寸和文档模块化门禁通过，AI_CURRENT接近大小上限仅告警。
+- 量化功能提交 `a6a726a6f2bd5414c0b31310ceeffd13b9183f4f` 已推送；后续仅文档/登记
+  提交到 `2a37b33d4aa044ce3ef152406d7220c2ecc44624`，没有正式0.5包或上传回执。
+  新版源码交付不等于广场安装完成；仍需受控签名、上传和本人联调。
 
 ### 已确认的旧基线测试问题
 
@@ -78,9 +112,9 @@ V3 单申请授权，V20 公开 HTTP Paper 与 Android 已 available。相关脚
 ## 剩余验收与远程协作
 
 1. 本轮代码 Owner 完成并复核两仓功能，跑全部适用测试、push、主发布与合法子发布。
-2. 量化最低主版本必须使用实际分配并发布的新提供端版本；未分配时失败关闭，
-   不把占位值当作可用配置或发布工件。
-3. 子 APK 上传依赖现有项目编辑者凭据与受保护连接，不借主管理员、SSH 或数据库绕过。
+2. 量化最低主版本为已真实发布的新协议首发 1517；后续退役旧桥不改变新协议。
+3. 子 APK 正式签名输入与现有项目编辑者上传凭据当前未安全注入；只查存在性布尔，
+   不读取秘密文件，不借主管理员、SSH 或数据库绕过。0.5 Debug 不是正式上架包。
 4. 私有主连接依然 HTTPS-before-token；公共主 HTTP 和 Paper 页面不变。
    未具备连接时只显示不可用，不能证明用户数量已送达。
 5. 双正式 APK 经项目广场下载、安装、升级和官方签名兼容后，由本人逐页查看、
@@ -90,3 +124,9 @@ V3 单申请授权，V20 公开 HTTP Paper 与 Android 已 available。相关脚
 UI 工作台已绑定当前隔离根；目前 BOOTSTRAP、无连接，能力检查为
 `PREPARATION_REQUIRED / DEBUG_RUNTIME_NOT_CONNECTED`，无平台能力缺陷证据。
 按发布先于可选视觉验收流程继续；未取到真实渲染帧，不宣称视觉验收或真实设备通过。
+1517 发布后的一次可选模拟器调用观察超时；随后只读状态仍 BOOTSTRAP、无帧/源码证明。
+没有重启或绕过工作台；完成门禁 businessDeliveryReady=false、completionReady=false、
+platformEvolutionPending=false。FIT_RUN_STATUS=NOT_REQUIRED_WITHOUT_CLEAN_TARGET；
+FINAL_VISUAL_LOSS/VISUAL_ACCEPTANCE_THRESHOLD=unavailable；
+CROSS_PLATFORM_VISUAL_PARITY=unverified；REAL_DEVICE_STATUS=not_requested；
+ANDROID_RENDERER=VERIFICATION_DEFERRED；EVOLUTION_THREAD=none。仓库发布与视觉分开验收。

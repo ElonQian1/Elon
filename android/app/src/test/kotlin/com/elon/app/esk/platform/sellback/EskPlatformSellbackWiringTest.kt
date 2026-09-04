@@ -1,7 +1,6 @@
 package com.elon.app.esk.platform.sellback
 
-import com.elon.eskcontract.EskPlatformSnapshotContract
-import com.elon.eskcontract.EskSnapshotContract
+import com.elon.eskcontract.EskPlatformProgressContract
 import java.io.ByteArrayInputStream
 import java.nio.file.Files
 import java.nio.file.Path
@@ -133,18 +132,17 @@ class EskPlatformSellbackWiringTest {
         assertFalse(layout.contains("0.000000")); assertFalse(layout.contains("WebView"))
     }
 
-    @Test fun account18Formal21AndPaper17ContractsAreNotExpanded() {
-        assertEquals(21, EskPlatformSnapshotContract.KEYS.size); assertEquals(17, EskSnapshotContract.KEYS.size)
-        for (contract in listOf(EskPlatformSnapshotContract.KEYS, EskSnapshotContract.KEYS)) {
-            assertFalse("requests" in contract); assertFalse("idempotency_key" in contract)
-            assertFalse("new_requests_enabled" in contract)
-        }
+    @Test fun account18RemainsIndependentFromReadOnlyProgressAndItsRequestCounts() {
+        assertEquals(35, EskPlatformProgressContract.TOP_KEYS.size)
+        for (field in listOf("idempotency_key", "new_requests_enabled", "entry_count", "policy"))
+            assertFalse(field in EskPlatformProgressContract.TOP_KEYS)
         val parser = platform("EskPlatformAccountParser")
         val keys = Regex("private val rootKeys = setOf\\(([\\s\\S]*?)\\)").find(parser)!!.groupValues[1]
         assertEquals(18, Regex("\"[^\"]+\"").findAll(keys).count())
         assertTrue(parser.contains("capabilities.values.all { it == false }"))
-        val formal = read("android/app/src/main/kotlin/com/elon/eskcontract/EskPlatformSnapshotContract.kt")
-        assertTrue(formal.contains("\"sellback_settlement\" to \"false\""))
+        val progress = read("android/app/src/main/kotlin/com/elon/eskcontract/EskPlatformProgressContract.kt")
+        for (capability in listOf("sellback_settlement", "submit_request", "cancel_request"))
+            assertTrue(progress.contains("\"$capability\" to \"false\""))
     }
 
     private fun source(suffix: String) = read("android/app/src/main/kotlin/com/elon/app/esk/platform/sellback/EskPlatformSellback$suffix.kt")

@@ -5,8 +5,6 @@ import com.elon.app.esk.platform.sellback.SellbackPolicy
 import com.elon.app.esk.platform.sellback.SellbackRecord
 import com.elon.app.esk.platform.sellback.SellbackSummary
 import com.elon.eskcontract.EskPlatformProgressContract as Contract
-import com.elon.eskcontract.EskPlatformSnapshotContract
-import com.elon.eskcontract.EskSnapshotContract
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -84,14 +82,14 @@ class EskPlatformProgressWireTest {
         invalid.forEach { assertThrows(IllegalArgumentException::class.java) { compose(it) } }
     }
 
-    @Test fun rejectsWrongNonceExpiredWindowAndBothOldProtocols() {
+    @Test fun rejectsWrongNonceExpiredWindowAndRetiredProtocolNames() {
         assertThrows(IllegalArgumentException::class.java) { compose(n = "A".repeat(64)) }
         assertThrows(IllegalArgumentException::class.java) { compose(observed = 121000, expires = 181000) }
         assertThrows(IllegalArgumentException::class.java) { compose(expires = 62001) }
-        assertFalse(EskSnapshotContract.validSnapshot(compose(), nonce, 1000, 3000))
-        assertFalse(EskPlatformSnapshotContract.validSnapshot(compose(), nonce, 1000, 3000))
-        assertEquals(17, EskSnapshotContract.KEYS.size)
-        assertEquals(21, EskPlatformSnapshotContract.KEYS.size)
+        for (protocol in listOf("yilong.esk.android_snapshot.v1", "yilong.esk.platform_android_snapshot.v1")) {
+            assertFalse(Contract.validSnapshot(compose() + ("protocol" to protocol), nonce, "", 1000, 3000))
+            assertFalse(Contract.validRequest(mapOf("protocol" to protocol, "nonce" to nonce, "cursor" to "")))
+        }
     }
 
     @Test fun latestClockAfterIdentityMustRejectAnExpiredShortSnapshotOrRequestWindow() {

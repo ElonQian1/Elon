@@ -79,9 +79,10 @@
 
 ## 尚未完成
 
-### 正式登记原生摘要提供端 V1
+### 已退役的正式登记摘要 V1（历史）
 
-主项目已另设 [正式摘要授权需求](requirements/esk-platform-native-provider-v1.md) 和
+下述为旧实现历史，不是当前兼容承诺；2026-09-05 用户要求只交付新版，旧原生
+提供端与消费者退役。历史 [正式摘要授权需求](requirements/esk-platform-native-provider-v1.md) 和
 [21 字段合同](contracts/esk-platform-android-snapshot-v1.md)，复用正式账本本人读取，
 不放宽下述 Paper 协议。它只向新的官方量化原生组件返回本次确认账户的短期总量/笔数，
 不传身份、凭据或流水，不自动绑定量化网页登录账户，也不授予交易或持续读取权。
@@ -90,23 +91,23 @@
 签名构建完成但仍缺项目发布凭据，尚未上传，不能当作项目广场已可安装。
 量化仓交接入口为 `docs/delivery/v28-formal-esk-native-consumer.md`；
 提供端发布见 [交付记录](reports/esk-platform-native-provider-v1-delivery-20260904.md)。
-两端本人授权联调、受保护主服务连接及已核对付款审批仍分别验收。
+旧 0.4 包不再作为待发布候选；当前只推进下述新版的签名、上传与本人验收。
 
 主项目正式账户 V1 保持最近记录摘要；完整审核流水另设
 [分页 V1](requirements/esk-platform-history-v1.md) 与 [交付证据](delivery/esk-platform-history-v1.md)。
 翻页绑定本人完整账本摘要，账本变化要求重读；全历史不进入任何双 APK 摘要协议。
 
-### 原生 ESK 快照 V1 / 量化 V24
+### 当前唯一原生 ESK 入口：正式资产与进度 V1
 
 正式额度与卖回进度采用[独立 V1 需求](requirements/esk-platform-native-progress-v1.md)和
-[35+6N 字符串协议](contracts/esk-platform-android-progress-v1.md)，不扩展下述旧 17 字段或
-正式总量 21 字段协议。主端复用现成 sellback page，量化逐页明确授权后临时展示，
+[35+6N 字符串协议](contracts/esk-platform-android-progress-v1.md)，替代旧 17/21 字段原生接口。
+量化只显示一个“我的 ESK”入口；主端复用现成 sellback page，量化逐页明确授权后临时展示，
 无跨页拼接、网页登录绑定或写权限；当前状态与剩余工作见
 [交付记录](delivery/esk-platform-native-progress-v1.md)。量化仓库使用同名需求和共享 Kotlin 合同；
 复核命令为 `node scripts/check-esk-platform-progress-parity.js <独立量化根>`，只证明源码字节一致，
 不能代替 Android 生命周期、公开安装包或本人验收。
 
-双 APK 原生只读快照已实现：[需求](requirements/esk-native-snapshot-v1.md)、
+旧 Paper 原生快照已退役，下述仅为历史：[需求](requirements/esk-native-snapshot-v1.md)、
 [17 字段合同](contracts/esk-android-snapshot-v1.md)。量化原生页面不接收主登录凭据，
 确认页只读取 HTTPS 主服务，HTTP 在读取 token 和创建请求前拒绝。
 双方使用当前正式签名、固定组件与一次性 nonce；快照只在内存展示最多 60 秒，
@@ -115,7 +116,7 @@
 构建、发布和用户验收分别见 [交付记录](esk-native-snapshot-v1-delivery.md)。
 Android 签名认证及本机 Activity result 没有 Web 镜像；既有 PWA 资产卡与受控投影协议保持原样。
 
-- 在真实 Android 设备完成项目广场下载、系统安装、签名兼容、打开 `/quant/`、返回/重试和公开 Paper 回测验收；V24 原生快照仍需双正式 APK 与受保护主服务联调，V17/V20 已发布版本不传主项目 bearer、Paper grant 或 ESK 投影。
+- 在实际 Android 环境完成项目广场下载、系统安装、官方签名升级、打开 `/quant/`、返回/重试和公开 Paper 回测验收；仅新版正式进度进行双正式 APK 与受保护主服务联调，旧 V24/V28 不再验收或作为回退。
 - 本人 ESK/仓位、量化申请 accepted/released 回执等敏感能力仍需批准的加密传输和应用绑定方案；当前 HTTP `/quant/` 不得启用这些功能。随后还需完成主项目签名私钥托管和一次真实轮换演练。代码已支持量化端多 key 重叠、密钥级撤销和单 grant 跨重启撤销；当前用户 grant 仍只绑定 paper 模拟参与者，不证明付款、KYC、钱包或真实准入。
 - 经来源与许可评审、版本化落盘并用于可复现回测的真实公开历史行情、多策略比较、回测结果持久化和共享算力分片；V19 的 Binance Spot REST 数据只是按需公开展示快照，不写入研究 `market-data`、不进入回测或 NAV。
 - 将已付款用户数据经审核、脱敏、对账后导入生产系统；paper 子项目只允许脱敏标识和模拟锁定回执，继续禁止把聊天或付款截图写入代码。

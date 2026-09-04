@@ -1,6 +1,5 @@
 package com.elon.app.esk.platform
 
-import com.elon.eskcontract.EskSnapshotContract
 import java.io.ByteArrayInputStream
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
@@ -184,44 +183,15 @@ class EskPlatformWiringTest {
     }
 
     @Test
-    fun originalSeventeenFieldIpcCannotCarryFormalPlatformBalances() {
-        val nonce = "a".repeat(64)
-        val paper = mapOf(
-            "protocol" to EskSnapshotContract.PROTOCOL,
-            "nonce" to nonce,
-            "asset_id" to "esk",
-            "symbol" to "ESK",
-            "mode" to "paper",
-            "issuance_mode" to "paper_recorded",
-            "chain_status" to "not_deployed",
-            "simulated" to "true",
-            "funds_moved" to "false",
-            "total" to "1.000000",
-            "available" to "1.000000",
-            "reserved_for_sellback" to "0.000000",
-            "reserved_for_quant" to "0.000000",
-            "reserved_total" to "0.000000",
-            "revision" to "1",
-            "observed_elapsed_ms" to "2000",
-            "expires_elapsed_ms" to "62000",
-        )
-        fun accepts(fields: Map<String, String>) =
-            EskSnapshotContract.validSnapshot(fields, nonce, 1000L, 3000L)
-        assertEquals("yilong.esk.android_snapshot.v1", EskSnapshotContract.PROTOCOL)
-        assertEquals(17, EskSnapshotContract.KEYS.size)
-        assertEquals(paper.keys, EskSnapshotContract.KEYS)
-        assertTrue(accepts(paper))
-        assertFalse(accepts(paper + ("mode" to "platform_recorded")))
-        assertFalse(accepts(paper + ("issuance_mode" to "platform_recorded")))
-        assertFalse(accepts(paper + ("simulated" to "false")))
-        assertFalse(accepts(paper + ("source" to "platform_recorded")))
-
-        val reader = kotlin("esk/handoff/EskSnapshotHttpsReader.kt")
-        val parser = kotlin("esk/handoff/EskSnapshotAccountParser.kt")
-        assertTrue(reader.contains("encodedPath(\"/api/me/assets/esk\")"))
-        assertFalse(reader.contains("/api/me/assets/esk/platform"))
-        assertTrue(parser.contains("yilong.esk.asset_account.v2"))
-        assertFalse(parser.contains("yilong.esk.platform_account.v1"))
+    fun retiredNativeSnapshotProvidersAreAbsentWithoutRemovingPersonalAssets() {
+        val manifest = read("android/app/src/main/AndroidManifest.xml")
+        assertFalse(manifest.contains(".esk.handoff.EskSnapshotConsentActivity"))
+        assertFalse(manifest.contains(".esk.platform.handoff.EskPlatformSnapshotConsentActivity"))
+        assertTrue(manifest.contains(".esk.platform.EskPlatformAssetsActivity"))
+        assertTrue(manifest.contains(".esk.platform.progress.EskPlatformProgressConsentActivity"))
+        val reader = kotlin("esk/platform/EskPlatformAccountReader.kt")
+        assertTrue(reader.contains("encodedPath(\"/api/me/assets/esk/platform\")"))
+        assertTrue(kotlin("esk/EskAssetApi.kt").contains("yilong.esk.asset_account.v2"))
     }
 
     private fun kotlin(relative: String): String =
