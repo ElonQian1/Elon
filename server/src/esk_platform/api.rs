@@ -44,7 +44,7 @@ pub(super) async fn private_no_store(request: Request<Body>, next: Next) -> Resp
     response
 }
 
-fn real_user<'a>(
+pub(super) fn real_user<'a>(
     state: &AppState,
     headers: &'a HeaderMap,
 ) -> Result<(PublicUser, &'a str), Response> {
@@ -278,7 +278,7 @@ pub(super) async fn get_my_account(
     }
 }
 
-fn domain_error(error: anyhow::Error) -> Response {
+pub(super) fn domain_error(error: anyhow::Error) -> Response {
     let Some(kind) = error.downcast_ref::<PlatformError>() else {
         // SQL errors may carry data; never echo or log their text.
         tracing::warn!(
@@ -294,9 +294,10 @@ fn domain_error(error: anyhow::Error) -> Response {
         PlatformError::Disabled | PlatformError::InvalidPolicy => StatusCode::SERVICE_UNAVAILABLE,
         PlatformError::Unauthorized => StatusCode::FORBIDDEN,
         PlatformError::UserUnavailable | PlatformError::NotFound => StatusCode::NOT_FOUND,
-        PlatformError::Conflict | PlatformError::PolicyChanged | PlatformError::LimitExceeded => {
-            StatusCode::CONFLICT
-        }
+        PlatformError::Conflict
+        | PlatformError::PolicyChanged
+        | PlatformError::HistoryChanged
+        | PlatformError::LimitExceeded => StatusCode::CONFLICT,
         PlatformError::InvalidInput => StatusCode::BAD_REQUEST,
         PlatformError::CorruptLedger => StatusCode::INTERNAL_SERVER_ERROR,
     };

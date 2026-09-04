@@ -1,6 +1,7 @@
 package com.elon.app.esk.platform
 
 import android.app.Activity
+import android.content.Intent
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -20,7 +21,9 @@ class EskPlatformAssetsActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
-        page = EskPlatformAssetsView(this, ::finish, ::refresh)
+        page = EskPlatformAssetsView(this, ::finish, ::refresh) {
+            startActivity(Intent(this, EskPlatformHistoryActivity::class.java))
+        }
     }
 
     override fun onResume() {

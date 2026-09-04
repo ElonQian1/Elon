@@ -85,8 +85,16 @@
 [21 字段合同](contracts/esk-platform-android-snapshot-v1.md)，复用正式账本本人读取，
 不放宽下述 Paper 协议。它只向新的官方量化原生组件返回本次确认账户的短期总量/笔数，
 不传身份、凭据或流水，不自动绑定量化网页登录账户，也不授予交易或持续读取权。
-量化接收端与签名 APK 联调仍待交付；提供端发布及测试见
-[本批交付记录](reports/esk-platform-native-provider-v1-delivery-20260904.md)。
+量化接收端 V28 已推送：实现 `e009c164bd04076d97d9481bf77b88110758fd62`，
+证据 `72ed8eac1edd06f2be5e7ab08bf5c622600d55cf`；`com.elon.quant 0.4.0 (4)`
+签名构建完成但仍缺项目发布凭据，尚未上传，不能当作项目广场已可安装。
+量化仓交接入口为 `docs/delivery/v28-formal-esk-native-consumer.md`；
+提供端发布见 [交付记录](reports/esk-platform-native-provider-v1-delivery-20260904.md)。
+两端本人授权联调、受保护主服务连接及已核对付款审批仍分别验收。
+
+主项目正式账户 V1 保持最近记录摘要；完整审核流水另设
+[分页 V1](requirements/esk-platform-history-v1.md) 与 [交付证据](delivery/esk-platform-history-v1.md)。
+翻页绑定本人完整账本摘要，账本变化要求重读；全历史不进入任何双 APK 摘要协议。
 
 ### 原生 ESK 快照 V1 / 量化 V24
 

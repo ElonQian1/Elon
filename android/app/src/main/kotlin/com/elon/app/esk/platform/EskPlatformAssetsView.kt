@@ -11,7 +11,7 @@ import android.widget.TextView
 import com.elon.app.R
 
 /** One native source only; this page never receives or adds a Paper balance. */
-internal class EskPlatformAssetsView(activity: Activity, onBack: () -> Unit, onRefresh: () -> Unit) {
+internal class EskPlatformAssetsView(activity: Activity, onBack: () -> Unit, onRefresh: () -> Unit, onHistory: () -> Unit) {
     private val context = activity
     private val root = LayoutInflater.from(activity).inflate(R.layout.esk_platform_assets_preview, null)
     private val total = root.findViewById<TextView>(R.id.esk_platform_total)
@@ -28,6 +28,7 @@ internal class EskPlatformAssetsView(activity: Activity, onBack: () -> Unit, onR
             insets
         }
         styleButton(refresh, true, onRefresh)
+        styleButton(root.findViewById(R.id.esk_platform_history_open), false, onHistory)
         styleButton(root.findViewById(R.id.esk_platform_back), false, onBack)
         disableState(root)
         activity.setContentView(root)

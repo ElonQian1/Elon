@@ -4,6 +4,8 @@ use std::{fs, path::PathBuf};
 
 mod auth;
 mod cancellation;
+mod history;
+mod history_boundaries;
 mod recovery;
 mod transactions;
 mod validation;

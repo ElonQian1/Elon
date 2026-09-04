@@ -6387,6 +6387,281 @@
       "updated_at_ms": 1788389637404
     },
     {
+      "id": "esk-platform-history-v1",
+      "title": "正式 ESK 本人审核流水完整翻页",
+      "summary": "为正式 ESK 原生资产页新增独立只读完整流水；按本人快照摘要分页，账本变化清空重读，保留原账户与双 APK 合同。",
+      "status": "verified",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/esk-platform-history-v1.md",
+        "content_hash": "91c5894e47ceec2a69c1355a63bb93d506361222427a7800af6caf3d255b1130",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "2ea65cd419a5e60882b615224a3b9c9e91df1369",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "07d6994b93079c5ca692060b38bdd530956eebc9",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "esk-platform",
+      "tags": [],
+      "task_paths": [
+        "android/app/src/main/kotlin/com/elon/app/esk/platform",
+        "docs/delivery/esk-platform-history-v1.md",
+        "server/src/esk_platform",
+        "server/src/store/common/esk_platform_assets"
+      ],
+      "dependencies": [
+        "esk-platform-profile-v1"
+      ],
+      "acceptance_criteria": [
+        "本人合成账本完整分页，摘要/范围/金额守恒，更新或跨用户游标409失败关闭",
+        "严格认证/no-store/API与Android合同及会话隐私回归通过",
+        "保持账户 V1、Paper 与双 APK 摘要兼容，发布状态与真实验收分报"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/esk/platform/EskPlatformHistory.kt",
+          "content_hash": "8cd005b2020cda16dc4beb3f772e6f63fe94dce2e7a77416264c6cd8db8f4559",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e70efff451f3a425a7ce6563b3157b1dff9b1480",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "430e33eb9d79828c81cc400c2996a4c98e663c56",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/esk/platform/EskPlatformHistoryActivity.kt",
+          "content_hash": "6ba7695b819a3c2086f1229e5e0ba589bd2703ce600b0bb01999edab52942bc2",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e70efff451f3a425a7ce6563b3157b1dff9b1480",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "bb3a82a99ca99f273c2fbabd05bac412ada34a87",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/esk/platform/EskPlatformHistoryPageState.kt",
+          "content_hash": "b3c56ce2a1fc8f682bb81e8e94a83ec2c27bd6ad0bb905b5cccbf211776713df",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e70efff451f3a425a7ce6563b3157b1dff9b1480",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "f4fe3f5668fe895e9b6762ff230621b70ba60d36",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/esk/platform/EskPlatformHistoryParser.kt",
+          "content_hash": "af6ed3d64489367bce9372a11a46943e408cd3609d9f04f3ee9cf3f7c8ac2e84",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e70efff451f3a425a7ce6563b3157b1dff9b1480",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "4e40e302f5e48eb35030bc504501ddca7357244f",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/esk/platform/EskPlatformHistoryReader.kt",
+          "content_hash": "db5d7e828aee477bbcc41f11f832cdf948703bb76c929deb883f01b09230f47f",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e70efff451f3a425a7ce6563b3157b1dff9b1480",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "7b7ee24089d60199d4f9d0a066f961417c96af97",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/esk/platform/EskPlatformHistoryView.kt",
+          "content_hash": "a8537d64f19102386ff88d749a82726635c09c108be4b798405b4f1277e675a2",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e70efff451f3a425a7ce6563b3157b1dff9b1480",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "df6d056d73b3a6d07432537e39b00a2255902643",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/esk/platform/EskPlatformJson.kt",
+          "content_hash": "3452e8f6b76d789c4c83f967ea6cb5c543ce210c4ce6fb9e7186015f3b8ad7a0",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e70efff451f3a425a7ce6563b3157b1dff9b1480",
+            "head_blob_oid": "748a50b692f5ac1ec082b29ba872d9e6602183f1",
+            "worktree_blob_oid": "748a50b692f5ac1ec082b29ba872d9e6602183f1",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/esk/platform/EskPlatformHistoryPageStateTest.kt",
+          "content_hash": "32540ea7d258a9b1ec64d44b87831b5dd1bd19f5ed915e453e04164db6cbc197",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e70efff451f3a425a7ce6563b3157b1dff9b1480",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "250219f4240a181c622b324ff456564e527879b6",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/esk/platform/EskPlatformHistoryParserBoundaryTest.kt",
+          "content_hash": "4b176a742113c59b935af76a2c72fd98eb5bb2c9bcff21648a8f76625c967a3b",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e70efff451f3a425a7ce6563b3157b1dff9b1480",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "5641cc368e6cd64adf9bd99236c3ea956da5aca8",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/esk/platform/EskPlatformHistoryParserTest.kt",
+          "content_hash": "fbc85b85c76fee33163f04263a3dd840f676b61720db811e3057dc1dcc9617e3",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e70efff451f3a425a7ce6563b3157b1dff9b1480",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "af29cf743e8284b849522f2f6d297137612c5a2d",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/esk/platform/EskPlatformHistoryReaderTest.kt",
+          "content_hash": "df6c5436fa743e141c7b7cb9c32347802c788f369eaa7efca575110b8c1f8faf",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e70efff451f3a425a7ce6563b3157b1dff9b1480",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "b637934117ce0c911665bc9848e3d6635bfaeb51",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/esk/platform/EskPlatformHistoryWiringTest.kt",
+          "content_hash": "58a51aefb96fe37517e9ccb3ec137dbbcf2d041108b95d9ad2ffc10a92c7d412",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e70efff451f3a425a7ce6563b3157b1dff9b1480",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "398a2c1af6f7f92ffd99a5fef8d4c7766bd79c06",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/esk_platform/history_api.rs",
+          "content_hash": "decbda32a12ad0a5daa3b15110b3e0611d955d5bee5f830003744c8503afd82d",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e70efff451f3a425a7ce6563b3157b1dff9b1480",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "5a7a51205091e39b350fecb5fe597851086b6529",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/src/esk_platform/history_http_tests.rs",
+          "content_hash": "c6ab887f9f36f35804b91449ac3e5315d2eeeebe07640eb3edc57c6c039e79ca",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e70efff451f3a425a7ce6563b3157b1dff9b1480",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "61d0bca9d69a467ac807436cbafd37229e053b3d",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/src/esk_platform/history_model.rs",
+          "content_hash": "cf5b591cfb38a0f5976811203b9588583f512c990b18a7415143d51202218db5",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e70efff451f3a425a7ce6563b3157b1dff9b1480",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "8236f54153a5ed19641bfe599ca263b0d1727abf",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/src/store/common/esk_platform_assets/history.rs",
+          "content_hash": "3a926de049dabb7d9370d9fc120dd76dd6900df2da47ccd7aeb5bd7a1d377d94",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e70efff451f3a425a7ce6563b3157b1dff9b1480",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "0f752d3d2653c4ebac74f7bcbcd7d2c132c1b68f",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/tests/esk-platform-harness/src/tests/history.rs",
+          "content_hash": "9eebaafd0173cd661d0c6a0eebbde19689b555f9fe5b8ab48d5f0ef75b5ed7ee",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e70efff451f3a425a7ce6563b3157b1dff9b1480",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "565d4c6f17d042fb37330bcd7bf780483f14b55a",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/tests/esk-platform-harness/src/tests/history_boundaries.rs",
+          "content_hash": "3adef81eff43f9bc41eb0be4cb2815c752f04606602c82c7c700b81724296caa",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e70efff451f3a425a7ce6563b3157b1dff9b1480",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "8fad277d683055bd4c4a4f2a675c6e5670b13054",
+            "state": "index_only"
+          }
+        }
+      ],
+      "created_at_ms": 1788520078318,
+      "updated_at_ms": 1788521624005
+    },
+    {
       "id": "esk-platform-native-provider-v1",
       "title": "正式 ESK 原生摘要授权提供端 V1",
       "summary": "独立正式来源原生显式同意提供端，复用本人账本读取与会话门禁；不放宽 Paper，不传身份或凭据，量化接收端独立交付。",
@@ -17310,76 +17585,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_90a94c5854c8416687c4bb69d6146f13",
-      "feature_id": "compute-federation-interactive-desktop-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "C0 source contracts are hardened, but this tranche is explicitly uncompiled and unrun (passed=0, failed=0). Canonical digest recomputation, owner/issuer resolution, Store CAS unique authority head, common usage authority/interval, persistence/API/node runtime/WebRTC/input/security/billing remain closed before any playable or economic release.",
-      "from_status": "in_progress",
-      "to_status": "blocked",
-      "at_ms": 1788305044753
-    },
-    {
-      "id": "feature_event_d7750a856952468bac75d497bde472dd",
-      "feature_id": "yilong-quant-esk-paper-asset-projection-v1",
-      "action": "transitioned",
-      "actor": "codex/root",
-      "reason": "主项目 00920f77a619eed52744efa854d8d360a5a42641 已推送并发布 Server v0.3.1713/PC；量化 3efcd23 与 f4c9666 已推送，公开量化环境仍 planned。",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1788305520651
-    },
-    {
-      "id": "feature_event_d18c19e4cdfe45beba5fc87de76f325b",
-      "feature_id": "esk-paper-first-user-allocation-operations-v1",
-      "action": "registered",
-      "actor": "codex-root",
-      "reason": "用户急需把首批已付款用户安全映射到可见的 ESK Paper 余额；先建立可审计、可重放且不接触真实资产的运营闭环。",
-      "from_status": "",
-      "to_status": "accepted",
-      "at_ms": 1788306010546
-    },
-    {
-      "id": "feature_event_482e45d27e74418f9935195b0ba88193",
-      "feature_id": "esk-paper-first-user-allocation-operations-v1",
-      "action": "transitioned",
-      "actor": "codex-root",
-      "reason": "需求边界、Paper-only 安全约束、两阶段提交和验收标准已评审接受，可以进入实现。",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1788306036129
-    },
-    {
-      "id": "feature_event_1a398bcfc86745bcbca21d3cfd97ea95",
-      "feature_id": "esk-paper-first-user-allocation-operations-v1",
-      "action": "claimed",
-      "actor": "codex-root-4364-4cbd3eee",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788306051642
-    },
-    {
-      "id": "feature_event_1de0037b02db40afa2eafea4ccc8bb3e",
-      "feature_id": "esk-paper-first-user-allocation-operations-v1",
-      "action": "transitioned",
-      "actor": "codex-root",
-      "reason": "已完成查重和独占认领，开始按测试驱动实现批量预检与原子提交。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788306070950
-    },
-    {
-      "id": "feature_event_1fd2b02e01a44c4798d1c0a3aa8f62ad",
-      "feature_id": "esk-paper-first-user-allocation-operations-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-root",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788308355058
-    },
-    {
       "id": "feature_event_2d4c2732495b4d9c835c8c3894dba03a",
       "feature_id": "esk-paper-first-user-allocation-operations-v1",
       "action": "transitioned",
@@ -19308,6 +19513,76 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1788517613613
+    },
+    {
+      "id": "feature_event_a04b2884b8ed4936ad647e40543a2fee",
+      "feature_id": "esk-platform-history-v1",
+      "action": "registered",
+      "actor": "codex-esk-history-root",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1788520078318
+    },
+    {
+      "id": "feature_event_d80833a2e9be4051a0daacf469a74dca",
+      "feature_id": "esk-platform-history-v1",
+      "action": "claimed",
+      "actor": "codex-esk-history-root",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788520078904
+    },
+    {
+      "id": "feature_event_9782ce20d348441f90339b6ddb49ee2a",
+      "feature_id": "esk-platform-history-v1",
+      "action": "transitioned",
+      "actor": "codex-esk-history-root",
+      "reason": "",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788520088478
+    },
+    {
+      "id": "feature_event_25269ba54c3b43f591833614fff5a693",
+      "feature_id": "esk-platform-history-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-esk-history-root",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788521348793
+    },
+    {
+      "id": "feature_event_1ec61ea93c534681bd5461dc2c8e15ad",
+      "feature_id": "esk-platform-history-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-esk-history-root",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788521351710
+    },
+    {
+      "id": "feature_event_eaea1d384e694113ba7b689554e17484",
+      "feature_id": "esk-platform-history-v1",
+      "action": "transitioned",
+      "actor": "codex-esk-history-root",
+      "reason": "独立只读后端与原生流水纵向切片已完成，兼容源与合成测试已绑定；真实用户和发布状态单独记录。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1788521623409
+    },
+    {
+      "id": "feature_event_7c744e9a7a684b56b1ba71591589a825",
+      "feature_id": "esk-platform-history-v1",
+      "action": "transitioned",
+      "actor": "codex-esk-history-root",
+      "reason": "Android XML复核190项零失败，账本58项与完整正式模块路由验证通过，独立源码审查通过；视觉和真实本人验收仍deferred。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1788521624005
     }
   ]
 }

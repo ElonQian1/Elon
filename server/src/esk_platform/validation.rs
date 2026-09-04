@@ -129,7 +129,7 @@ pub(crate) fn load_policy() -> Result<PlatformPolicy> {
     policy_from_values(mode.as_deref(), policy.as_deref())
 }
 
-fn validate_policy_integrity(policy: &PlatformPolicy) -> Result<()> {
+pub(crate) fn validate_policy_integrity(policy: &PlatformPolicy) -> Result<()> {
     let actual = validate_policy(PolicyBody {
         source: policy.source.clone(),
         issuance_limit_base_units: policy.issuance_limit_base_units.to_string(),

@@ -1,4 +1,7 @@
 //! Full production Store/session/Router tests; no production accounts or network.
+#[path = "history_http_tests.rs"]
+mod history_http_tests;
+
 use std::{cell::RefCell, path::PathBuf, sync::Arc};
 
 use axum::{

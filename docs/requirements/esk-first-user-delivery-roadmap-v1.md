@@ -56,7 +56,10 @@ Android 授权前置身份切片见 [官方量化 APK 身份校验 V1](yilong-qu
 主项目个人中心独立正式来源接入见 [正式登记个人入口 V1](esk-platform-profile-v1.md)；
 当前 HTTP、真实付款审批与双 APK 正式合同仍分别验收，不把可见入口当作真实余额已送达。
 独立跨 APK 正式来源先交付 [原生摘要授权提供端](esk-platform-native-provider-v1.md)，
-量化接收端与签名 APK 安装联调随后验收；旧 Paper 协议不用于正式数量。
+量化 V28 接收端与 0.4.0 签名构建已完成，上传与双 APK 本人联调仍待验收；
+其仓库交接为 `docs/delivery/v28-formal-esk-native-consumer.md`，旧 Paper 协议不用于正式数量。
+本轮正式本人查账推进 [完整审核流水分页](esk-platform-history-v1.md)，
+原账户与双 APK 协议不变；正式占用、卖回结算仍需独立切片，不套用 Paper 状态。
 
 ## 协作与权威边界
 

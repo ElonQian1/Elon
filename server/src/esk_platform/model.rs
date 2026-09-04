@@ -122,6 +122,7 @@ pub(crate) enum PlatformError {
     LimitExceeded,
     NotFound,
     CorruptLedger,
+    HistoryChanged,
 }
 
 impl std::fmt::Display for PlatformError {
@@ -137,6 +138,7 @@ impl std::fmt::Display for PlatformError {
             Self::LimitExceeded => "ESK_PLATFORM_LIMIT_EXCEEDED",
             Self::NotFound => "ESK_PLATFORM_NOT_FOUND",
             Self::CorruptLedger => "ESK_PLATFORM_LEDGER_INCONSISTENT",
+            Self::HistoryChanged => "ESK_PLATFORM_HISTORY_CHANGED",
         })
     }
 }

@@ -188,7 +188,7 @@ class EskPlatformProviderWiringTest {
         val entry = Regex("<section\\b[^>]*id=\"profileEskPlatformEntry\"[^>]*>[\\s\\S]*?</section>")
             .findAll(web).toList()
         assertEquals(1, entry.size)
-        listOf("本网页暂不读取正式私有余额", "正式摘要授权仅供原生 APK", "量化接收端仍待接入",
+        listOf("本网页暂不读取正式私有余额", "正式摘要授权仅供原生 APK", "量化 0.4.0 接收端已构建", "尚待上传与双 APK 联调",
             "不会自动绑定网页账户", "href=\"/app/ElonSpeed-latest.apk\"",
         ).forEach { assertTrue(entry.single().value.contains(it)) }
         listOf("READ_ESK_PLATFORM_SNAPSHOT", "platform_android_snapshot.v1", "/api/me/assets/esk/platform")

@@ -83,6 +83,12 @@
             android:launchMode="standard" />
 
         <activity
+            android:name=".esk.platform.EskPlatformHistoryActivity"
+            android:exported="false"
+            android:allowTaskReparenting="false"
+            android:launchMode="standard" />
+
+        <activity
             android:name=".esk.platform.handoff.EskPlatformSnapshotConsentActivity"
             android:exported="true"
             android:excludeFromRecents="true"
