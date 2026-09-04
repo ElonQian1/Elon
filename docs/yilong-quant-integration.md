@@ -50,6 +50,12 @@
 - 量化项目属于第二类，因此不会显示 ERP 安装动作。
 - 子仓库自身的 `.elon/project-landing.json` 仍是后续同步更新的内容真源；官方目录快照变更必须与它保持一致。
 - Android 主服务器托管 V6/V17 要求公开下载路由只直接返回 `DATA_DIR/project-releases` 下且大小和 SHA-256 与发布记录一致的 APK；服务器启动同步官方目录后重新叠加最新 release。当前 `com.elon.quant 0.1.0 (1)` 已由 Server `v0.3.1721 / 725f91f0a` 托管，目录下载地址非空且真实下载摘要与发布回执一致；真机安装/打开仍待验收，详见 `docs/yilong-quant-android-main-hosting-v6-acceptance.md`。
+- 2026-09-04 再次公开下载核对：量化实际 APK 为 `com.elon.quant 0.2.0 (2)`，
+  SHA-256 `c17ab5abe800547f41acc95594021abb6cec92fc14cb6de3b2db202ce4b94b89`，
+  与量化仓已发布回执一致；上述 V6/V17 是历史托管证据，不是最新 APK 版本。
+  [官方量化 APK 身份校验 V1](requirements/yilong-quant-android-identity-v1.md)
+  为主 APK 增加安装与打开的固定身份门禁；它不传账号凭据，不代表独立 APK 已有本人资产。
+  验证、发布和剩余授权接缝见 [交付记录](yilong-quant-android-identity-v1-delivery.md)。
 - 子仓库 `77ff21c6ce3d0984273ad6e3ad526faff0d46b7c` 已验证版本化研究行情和单机可复现回测 V1；主项目只同步净化后的能力摘要与文档入口，不接收行情数据、策略代码、订单或回测结果。
 - 子仓库 `25ee7df69fecabb696e7b8329fd388bc8a19da11` 已新增只读、脱敏的 Paper 部署配置预检：`scripts/check-paper-deployment.ps1` 检查本机绑定、非零固定端口、绝对数据库路径、主项目 HTTPS 来源、grant 验签公钥和操作员令牌等必需配置。输出不包含密钥或令牌，执行时不绑定端口、不打开数据库、不访问外部网络，因此只证明配置是否就绪，不证明目标环境已部署。
 - 子仓库 `effef80b65647b2341cb902e64bd9aa171fdb613` 已实现受独立运营令牌保护的 `yilong.quant.paper_operations_snapshot.v1`：它只汇总模拟仓位状态、精确金额、NAV 修订、SQLite 事件头和导入批次，不返回参与者标识。主项目不复制或直接修改该账本，快照也不证明真实付款、NET 锁定、官方 NAV 或可提现余额。

@@ -58,7 +58,8 @@ internal object ApkChatInstaller {
                     if (!resp.isSuccessful) error("HTTP ${resp.code}")
                     val body = resp.body ?: error("空响应体")
                     val totalBytes = body.contentLength()
-                    val apkFile = File(
+                    val officialQuant = OfficialQuantApkPolicy.appliesTo(projectId)
+                    val apkFile = if (officialQuant) createOfficialQuantApkFile(activity.cacheDir) else File(
                         activity.getExternalFilesDir(null),
                         projectApkFileName(projectId, projectName)
                     )
@@ -82,9 +83,10 @@ internal object ApkChatInstaller {
                             }
                         }
                     }
+                    if (officialQuant) check(apkFile.setReadOnly()) { "无法保护官方量化安装文件" }
                     activity.runOnUiThread {
                         progressDialog.dismiss()
-                        val signatureInspection = inspectProjectApkSignature(activity, apkFile)
+                        val signatureInspection = inspectProjectApkSignature(activity, apkFile, projectId)
                         val signatureDecision = projectApkSignatureDecision(
                             signatureInspection.compatibility
                         )

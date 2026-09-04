@@ -15674,6 +15674,172 @@
       "updated_at_ms": 1787431017596
     },
     {
+      "id": "yilong-quant-android-identity-v1",
+      "title": "官方量化 APK 安装与打开身份校验 V1",
+      "summary": "官方项目固定包名、当前发布证书和显式启动入口，安装与打开均校验；不传凭据或资产，是后续本人 ESK APK 授权的身份基础。",
+      "status": "verified",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/yilong-quant-android-identity-v1.md",
+        "content_hash": "0844df7af55effdf4ff5a36daf857366487ea26476cd8af830c577bf31ec9aee",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "2ca616077f779e64846d530cc593ebfe76bb05b4",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "1a97311b2d1e4e3648d2fa7b33ae65aeb553144e",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "android-platform",
+      "tags": [
+        "quant",
+        "android",
+        "identity",
+        "signature",
+        "read-only"
+      ],
+      "task_paths": [
+        "android/app/src/main/kotlin/com/elon/app/ApkChatInstaller.kt",
+        "android/app/src/main/kotlin/com/elon/app/OfficialQuantApkLauncher.kt",
+        "android/app/src/main/kotlin/com/elon/app/OfficialQuantApkPolicy.kt",
+        "android/app/src/main/kotlin/com/elon/app/ProjectApkInstallActions.kt",
+        "android/app/src/main/kotlin/com/elon/app/ProjectApkSignatureGuard.kt",
+        "android/app/src/test/kotlin/com/elon/app/OfficialQuantApkPolicyTest.kt"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "已发布官方包唯一当前签名及版本通过安装/打开",
+        "拒绝同名/错包/错证书/多签/历史命中/旧版",
+        "非官方项目和原通用升级兼容行为保持",
+        "Android 单元及接线合同构建验证",
+        "启动无凭据或资产；发布和设备验收单独记录"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/ApkChatInstaller.kt",
+          "content_hash": "04b3d1abcf43f6471f160fecc324c8e6d03a3c83cc9001a352caae3b37661841",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "2ca616077f779e64846d530cc593ebfe76bb05b4",
+            "head_blob_oid": "3f95f465ccb1e44c4e899f0b906bf6b5b47bbf69",
+            "worktree_blob_oid": "68a97df657ba002f36d6e332a6f89bce6462373a",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/OfficialQuantApkFile.kt",
+          "content_hash": "b37fb9ffb204d406ba26ffdcb46d770005fe21deee3728f02a1af126917a1040",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "2ca616077f779e64846d530cc593ebfe76bb05b4",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "4b14bb519868118443c74e092258b7220183b025",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/OfficialQuantApkLauncher.kt",
+          "content_hash": "7aaa626e8d23dc3ee2004e36cfd39501f5347f53ec9eebaa4ce031f9e1dcfe2d",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "2ca616077f779e64846d530cc593ebfe76bb05b4",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "f74b578fd9d67b7e8883e090d8d5a1c400f27890",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/OfficialQuantApkPolicy.kt",
+          "content_hash": "99d0d56d51f886df518be156b60c35916c1d64903d62d8c27049ef0c3012c1b6",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "2ca616077f779e64846d530cc593ebfe76bb05b4",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "ef5c135c6dd4100d13b6090168750f247c779cf2",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/ProjectApkInstallActions.kt",
+          "content_hash": "6201861e2190dc8fcab541dcc7acd13e3b12aecdd338ac5d136a0872d379d873",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "2ca616077f779e64846d530cc593ebfe76bb05b4",
+            "head_blob_oid": "bfa30e832fe1d7f5a87ff779798fadf13b532b0d",
+            "worktree_blob_oid": "e9be3534c9940b43e6955b7c7438c852f6350031",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/ProjectApkSignatureGuard.kt",
+          "content_hash": "225af9c0ca074e0218b0b85bf4febd654617640279e56428c7a56c7cf59f4f21",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "2ca616077f779e64846d530cc593ebfe76bb05b4",
+            "head_blob_oid": "839cbe5833b7acfd091ac897cb206e983cf6c8de",
+            "worktree_blob_oid": "3baeea756e4711569ca8477c4def9d3f08220799",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/main/res/xml/file_paths.xml",
+          "content_hash": "aeee39ad9c9c9687d537ff21dde11b4a89cda6bfe517e11d72d2030acc8be919",
+          "locator": "",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "2ca616077f779e64846d530cc593ebfe76bb05b4",
+            "head_blob_oid": "9df3b311b7f9b32d7574cea55cdbd2ff0a7155e5",
+            "worktree_blob_oid": "ee3d95ede2512e0d098adb3fec27ccc962185080",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/OfficialQuantApkPolicyTest.kt",
+          "content_hash": "efe7d97ee221cc55b984b707cf36ec05c1af6d9be12c63c9d8289b96e071638a",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "2ca616077f779e64846d530cc593ebfe76bb05b4",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "923419e178e8407cbf96637b53f69499b9f65339",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/test-official-quant-apk-identity.js",
+          "content_hash": "7fcf3ba7ffcd995222456687b8b3738c130519d312c2dd0da6b41ad44efe93b6",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "2ca616077f779e64846d530cc593ebfe76bb05b4",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "e633707fe48b7ebd2cdb7b7058a84c7841cf9be8",
+            "state": "untracked"
+          }
+        }
+      ],
+      "created_at_ms": 1788504334294,
+      "updated_at_ms": 1788505057339
+    },
+    {
       "id": "yilong-quant-android-main-hosting-v6",
       "title": "一龙量化 Android 客户端与主服务器 APK 托管",
       "summary": "主 APK 继续显示用户 ESK Paper 资产并作为项目广场入口；主服务器安全托管正式量化 APK，量化 APK 连接同机独立 HTTPS Paper 服务。",
@@ -16182,66 +16348,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_7725e421d169434fb0db5ef809101d5b",
-      "feature_id": "yilong-quant-paper-public-deployment-contract-sync-v1",
-      "action": "claimed",
-      "actor": "codex-goal-quant-public-deployment-sync-v1",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788292772249
-    },
-    {
-      "id": "feature_event_2a2d8f142639461da749655fd0a56a9c",
-      "feature_id": "yilong-quant-paper-public-deployment-contract-sync-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-quant-public-deployment-sync-v1",
-      "reason": "已认领主项目 V9 文档和合同测试责任区。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788292781191
-    },
-    {
-      "id": "feature_event_e18d556830354a80b165f61f6a5f5379",
-      "feature_id": "yilong-quant-paper-public-deployment-contract-sync-v1",
-      "action": "claim_released",
-      "actor": "codex-goal-quant-public-deployment-sync-v1",
-      "reason": "同步文档与合同测试已通过，更新正式需求实现状态后重绑最终正文。",
-      "from_status": "in_progress",
-      "to_status": "blocked",
-      "at_ms": 1788292956762
-    },
-    {
-      "id": "feature_event_2c2484ec743648c6a778371f62153653",
-      "feature_id": "yilong-quant-paper-public-deployment-contract-sync-v1",
-      "action": "requirement_rebound",
-      "actor": "codex-goal-quant-public-deployment-sync-v1",
-      "reason": "文档与合同验证完成，正式需求实现元数据更新为 verified。",
-      "from_status": "blocked",
-      "to_status": "proposed",
-      "at_ms": 1788292965666
-    },
-    {
-      "id": "feature_event_d18bbacd6bbf473e8361662503e60aed",
-      "feature_id": "yilong-quant-paper-public-deployment-contract-sync-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-quant-public-deployment-sync-v1",
-      "reason": "最终需求正文、三态边界和测试范围已复核，真实环境仍 deferred。",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1788292974858
-    },
-    {
-      "id": "feature_event_10543e8b236b4718845d5786ebc064fc",
-      "feature_id": "yilong-quant-paper-public-deployment-contract-sync-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-quant-public-deployment-sync-v1",
-      "reason": "最终 V9 同步需求已接受且无依赖阻塞。",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1788292985004
-    },
     {
       "id": "feature_event_581f8ea04829490da191042a0353a424",
       "feature_id": "yilong-quant-paper-public-deployment-contract-sync-v1",
@@ -18181,6 +18287,66 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1788503644581
+    },
+    {
+      "id": "feature_event_e0ffb90dcdf84a228a7d2bc5cd776dc9",
+      "feature_id": "yilong-quant-android-identity-v1",
+      "action": "registered",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1788504334294
+    },
+    {
+      "id": "feature_event_745a1afc9a9a4c0997f2e85cff699e4b",
+      "feature_id": "yilong-quant-android-identity-v1",
+      "action": "claimed",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788504334820
+    },
+    {
+      "id": "feature_event_d2ce0a627a07498dade3eed31a10d18a",
+      "feature_id": "yilong-quant-android-identity-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788504335382
+    },
+    {
+      "id": "feature_event_69100d88a6124b96a238fcc76470fd69",
+      "feature_id": "yilong-quant-android-identity-v1",
+      "action": "evidence_recorded",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788505055992
+    },
+    {
+      "id": "feature_event_3fc57e7ba0524657b199b3e6b4732bb7",
+      "feature_id": "yilong-quant-android-identity-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "Official quant install and public launch guards wired; private unique archive path closes reviewed TOCTOU.",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1788505056812
+    },
+    {
+      "id": "feature_event_47aa5096fc4d4a4baed1500b96792773",
+      "feature_id": "yilong-quant-android-identity-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "14 Android unit tests and assembleDebug passed; source contract with 13 mutations and public APK signing identity verified. APK publication pending; device deferred.",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1788505057339
     }
   ]
 }

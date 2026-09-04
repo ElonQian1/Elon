@@ -45,6 +45,8 @@ ESK 保持同一种服务支付、治理和经批准利润快照参与资产；�
 | 量化与安装闭环 | 行情/Paper 基础复用，独立 APK 本人资产绑定待完成 | 主项目下载并打开子 APK、授权登录、本人资产和结果来源；QSHARE 对账独立验收 |
 
 链上查询当前切片见 [只读观察器 V1](esk-sui-publication-observer-v1.md)。
+Android 授权前置身份切片见 [官方量化 APK 身份校验 V1](yilong-quant-android-identity-v1.md)；
+该切片不等于本人资产授权已经接通，实际验证与发布见其交付记录。
 主项目资产现状入口：`server/src/esk_asset/service.rs`、
 `server/src/store/common/esk_assets.rs`、
 `android/app/src/main/kotlin/com/elon/app/esk/EskAssetApi.kt`。

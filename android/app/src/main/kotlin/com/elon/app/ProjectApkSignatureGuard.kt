@@ -12,6 +12,7 @@ internal enum class ProjectApkSignatureCompatibility {
     COMPATIBLE_UPDATE,
     SIGNATURE_CONFLICT,
     UNVERIFIABLE,
+    OFFICIAL_IDENTITY_MISMATCH,
 }
 
 internal data class ProjectApkSignatureInspection(
@@ -80,11 +81,18 @@ internal fun projectApkSignatureDecision(
         title = "无法验证安装包",
         message = "无法读取安装包或已安装应用的签名信息。为避免安装错误版本，本次安装已停止。",
     )
+    ProjectApkSignatureCompatibility.OFFICIAL_IDENTITY_MISMATCH -> ProjectApkSignatureDecision(
+        compatibility,
+        title = "不是受信任的官方量化版本",
+        message = "安装包的包名、当前发布证书或版本不符合官方量化要求，已停止安装。" +
+            "请从一龙项目广场重新获取官方版本；不要卸载现有应用或提交账户凭据。",
+    )
 }
 
 internal fun inspectProjectApkSignature(
     activity: AppCompatActivity,
     apkFile: File,
+    projectId: String? = null,
 ): ProjectApkSignatureInspection {
     val archive = readArchivePackageInfo(activity.packageManager, apkFile)
         ?: return ProjectApkSignatureInspection(
@@ -93,6 +101,15 @@ internal fun inspectProjectApkSignature(
             versionCode = null,
         )
     val packageName = archive.packageName?.trim()?.takeIf(String::isNotBlank)
+    if (OfficialQuantApkPolicy.appliesTo(projectId) && !OfficialQuantApkPolicy.accepts(
+            archive.packageName, currentPackageSignerSha256(archive), archive.projectApkVersionCode(),
+        )
+    ) {
+        return ProjectApkSignatureInspection(
+            ProjectApkSignatureCompatibility.OFFICIAL_IDENTITY_MISMATCH, packageName,
+            archive.projectApkVersionCode(),
+        )
+    }
     val archiveSigners = packageSignerSha256(archive)
     val installed = packageName?.let { readInstalledPackageInfo(activity.packageManager, it) }
     val compatibility = evaluateProjectApkSignatureCompatibility(
@@ -122,7 +139,7 @@ private fun readArchivePackageInfo(packageManager: PackageManager, apkFile: File
 }
 
 @Suppress("DEPRECATION")
-private fun readInstalledPackageInfo(packageManager: PackageManager, packageName: String): PackageInfo? {
+internal fun readInstalledPackageInfo(packageManager: PackageManager, packageName: String): PackageInfo? {
     val flags = projectApkSigningFlags()
     return runCatching {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -160,12 +177,23 @@ private fun packageSignerSha256(info: PackageInfo): Set<String> {
         .toSet()
 }
 
-private fun PackageInfo.projectApkVersionCode(): Long = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+internal fun PackageInfo.projectApkVersionCode(): Long = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
     longVersionCode
 } else {
     @Suppress("DEPRECATION")
     versionCode.toLong()
 }
+
+/** Current contents signer only; never use signingCertificateHistory as an identity pin. */
+@Suppress("DEPRECATION")
+internal fun currentPackageSignerSha256(info: PackageInfo): Set<String> = runCatching {
+    val signatures = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+        info.signingInfo?.apkContentsSigners
+    } else {
+        info.signatures
+    }
+    signatures.orEmpty().map { sha256Hex(it.toByteArray()) }.toSet()
+}.getOrDefault(emptySet())
 
 private fun sha256Hex(value: ByteArray): String = MessageDigest.getInstance("SHA-256")
     .digest(value)

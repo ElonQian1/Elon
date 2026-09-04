@@ -131,6 +131,7 @@ internal fun openInstalledProjectApp(
     projectId: String,
     projectName: String
 ): Boolean {
+    if (OfficialQuantApkPolicy.appliesTo(projectId)) return openOfficialQuantApp(activity)
     val target = resolveInstalledProjectApp(activity, projectId, projectName) ?: return false
     val launchIntent = activity.packageManager.getLaunchIntentForPackage(target.packageName) ?: return false
     return runCatching {
@@ -222,6 +223,9 @@ private fun resolveInstalledProjectApp(
     projectId: String,
     projectName: String
 ): InstalledProjectApp? {
+    if (OfficialQuantApkPolicy.appliesTo(projectId)) {
+        return resolveInstalledPackage(activity, OfficialQuantApkPolicy.PACKAGE_NAME)
+    }
     if (projectId.isNotBlank()) {
         resolveStoredPackage(activity, projectId)?.let { return it }
     }
