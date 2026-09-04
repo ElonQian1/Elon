@@ -5,6 +5,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import com.elon.app.esk.EskAssetCard
+import com.elon.app.esk.platform.EskPlatformProfileEntry
 import com.elon.app.databinding.ActivityMainBinding
 import com.elon.app.update.AppUpdateManager
 import okhttp3.OkHttpClient
@@ -94,6 +95,7 @@ internal class MainProfileQuickActions(
             )
             tokenUsageCard.attachAndRefresh()
             eskAssetCard.attachAndRefresh()
+            EskPlatformProfileEntry.attach(activity, binding)
             renderNodeResourcePanel()
             if (nodeResourceExpanded) {
                 refreshNodeResourceCards()

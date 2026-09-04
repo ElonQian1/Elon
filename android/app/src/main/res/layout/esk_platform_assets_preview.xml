@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/esk_platform_assets_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/elon_bg_app"
+    android:fillViewport="true">
+    <LinearLayout
+        android:id="@+id/esk_platform_assets_content"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+        <TextView
+            android:id="@+id/esk_platform_assets_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="ESK 平台登记"
+            android:textColor="@color/elon_text_primary"
+            android:textSize="24sp"
+            android:textStyle="bold" />
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="正式平台登记 · 尚未上链"
+            android:textColor="@color/elon_status_project"
+            android:textSize="13sp" />
+        <TextView
+            android:id="@+id/esk_platform_account_label"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="当前账户"
+            android:textColor="@color/elon_text_secondary"
+            android:textSize="15sp" />
+        <TextView
+            android:id="@+id/esk_platform_total"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="— ESK"
+            android:textColor="@color/elon_text_primary"
+            android:textSize="24sp"
+            android:textStyle="bold" />
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="经审核登记数量；不包含 Paper 模拟余额"
+            android:textColor="@color/elon_text_secondary"
+            android:textSize="13sp" />
+        <TextView
+            android:id="@+id/esk_platform_status"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:accessibilityLiveRegion="polite"
+            android:text="读取后显示本人的登记数量与最近流水。"
+            android:textColor="@color/elon_text_secondary"
+            android:textSize="15sp" />
+        <Button
+            android:id="@+id/esk_platform_assets_primary_action"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:minHeight="52dp"
+            android:text="刷新正式登记"
+            android:textSize="16sp" />
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="最近审核入账"
+            android:textColor="@color/elon_text_primary"
+            android:textSize="17sp" />
+        <LinearLayout
+            android:id="@+id/esk_platform_entries"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" />
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:lineSpacingExtra="4dp"
+            android:text="此记录由管理员审核，不代表系统已自动验证付款，也不代表已上链、可提现或已产生收益。正式卖回结算暂未开放；模拟卖回不适用于此数量。"
+            android:textColor="@color/elon_text_secondary"
+            android:textSize="13sp" />
+        <Button
+            android:id="@+id/esk_platform_back"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:minHeight="52dp"
+            android:text="返回个人中心"
+            android:textSize="16sp" />
+    </LinearLayout>
+</ScrollView>
