@@ -8721,6 +8721,57 @@
       "updated_at_ms": 1788533028613
     },
     {
+      "id": "esk-sui-allocation-observer-v1",
+      "title": "ESK Sui 六桶分配只读观察器 V1",
+      "summary": "以两个不同公共 Sui testnet GraphQL 来源，失败关闭地复核参与包发布、分配交易、一次性能力销毁、冻结总回执、六桶历史输出和指定 checkpoint 的团队锁仓守恒；只产出 RPC 观察证据，不认证源码、地址控制、用户余额或发布状态。",
+      "status": "proposed",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/esk-sui-allocation-observer-v1.md",
+        "content_hash": "0a742348e77b29367aea18438dc541a75f18fc14dfd2e0dece3da5457e0912fb",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "1c49848863418bba4f52443bba8ef540ca7823e4",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "9e79948245132be34d45a797c83603a4b5285506",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "platform-assets",
+      "tags": [
+        "esk",
+        "sui",
+        "allocation",
+        "observer",
+        "testnet"
+      ],
+      "task_paths": [
+        "docs/delivery/esk-sui-allocation-observer-v1.md",
+        "docs/esk-sui-allocation-observer.md",
+        "scripts/esk-sui-allocation-observer",
+        "scripts/observe-esk-sui-allocation.js",
+        "scripts/test-esk-sui-allocation-observer.js"
+      ],
+      "dependencies": [
+        "esk-sui-allocation-vesting-v1",
+        "esk-sui-currency-observer-v1",
+        "esk-sui-publication-observer-v1"
+      ],
+      "acceptance_criteria": [
+        "双公共 GraphQL 来源对参与包发布、allocation 成功交易、checkpoint 和规范化证据完全一致，任一失败或分页未尽即 unverified。",
+        "严格 BCS 解码并互证冻结 Receipt、cap 创建与销毁、完整供应输入、四枚新 Coin、原供应 Coin 的安全储备 mutation 及六桶守恒。",
+        "团队锁仓创建态与指定 checkpoint 当前态保持 beneficiary、total、时间表不变且 claimed + remaining == total。",
+        "所有认证、地址控制、余额启用和 manifest 自动迁移标志固定为 false；CLI 不读取钱包、不签名、不广播、不移动资金。",
+        "合成正负测试、官方非 ESK schema smoke 及既有 publication/currency/allocation 回归通过，真实 ESK 正向验收明确未执行。"
+      ],
+      "implementation_evidence": [],
+      "created_at_ms": 1788549534611,
+      "updated_at_ms": 1788549534611
+    },
+    {
       "id": "esk-sui-allocation-vesting-v1",
       "title": "ESK Sui 六桶分配与团队锁仓 V1",
       "summary": "以独立 yilong_participation Move 包原子拆分六桶并执行不可撤销的团队线性锁仓；同时对被固定 Sui 编译器拒绝的 ESK 核心依赖表做等价语法规范化，并重新生成本地验证证据，不触碰代币语义、真实钱包、资金或链交易。",
@@ -19435,16 +19486,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_241fcfc6ec004d3aa115c02d8764b00d",
-      "feature_id": "esk-sui-genesis-foundation-v1",
-      "action": "transitioned",
-      "actor": "Codex Desktop",
-      "reason": "开始对最新主线上的规范化摘要实现重新登记证据并完成验证。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788460200733
-    },
-    {
       "id": "feature_event_5445eb7d61f44860a32b7cd1b2e97627",
       "feature_id": "esk-sui-genesis-foundation-v1",
       "action": "evidence_recorded",
@@ -21433,6 +21474,16 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1788548624712
+    },
+    {
+      "id": "feature_event_1538285d48f246bfbec0b123d5dd7cd8",
+      "feature_id": "esk-sui-allocation-observer-v1",
+      "action": "registered",
+      "actor": "codex-root-01a05b8d",
+      "reason": "",
+      "from_status": "",
+      "to_status": "proposed",
+      "at_ms": 1788549534611
     }
   ]
 }
