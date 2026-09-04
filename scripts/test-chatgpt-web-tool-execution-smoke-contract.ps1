@@ -36,6 +36,7 @@ foreach ($required in @(
     'Restore-WebChatNativeConversation -Runtime $runtime',
     '-InputText $originInputText',
     'production_send_receipt_observed = $true',
+    'restored ChatGPT bridge before evidence registration',
     'production_surface_preserved = Test-ChatGptWebSmokeActivityForeground',
     'private_content_emitted = $false',
     'cleared_cookies = $false',

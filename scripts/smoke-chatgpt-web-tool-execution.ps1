@@ -409,6 +409,13 @@ try {
         cleared_cookies = $false
         cleared_app_data = $false
     }
+    Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutSec `
+        -Description "restored ChatGPT bridge before evidence registration" -Predicate {
+            param($state)
+            [string]$state.surface -eq "chatgpt_web" -and
+                [string]$state.bridge_state -eq "ready" -and
+                $state.adapter_current -eq $true
+        } | Out-Null
     Register-ChatGptWebVerificationCases -Runtime $runtime `
         -CaseIds @([string]$toolSpec.case_id) `
         -ExpectedAdapterVersion $ExpectedAdapterVersion -ProductionSurface | Out-Null
