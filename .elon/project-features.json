@@ -5051,6 +5051,155 @@
       "updated_at_ms": 1788366843075
     },
     {
+      "id": "esk-paid-user-reconciliation-preview-v1",
+      "title": "ESK 历史付款与用户映射对账预演 V1",
+      "summary": "补齐现有Paper批量登记之前的付款事实级去重、脱敏用户映射、用途/条款一致性预演；不联网、不写余额、不生成提交文件。",
+      "status": "verified",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/esk-paid-user-reconciliation-preview-v1.md",
+        "content_hash": "55f6ac7ba4412c6686102f8eccbe1e9a10203abc4cca4cac2030c1ed30708e39",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "72e91931aff64e44c5b5962143f7b26cfa587c76",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "8b68c8ffe01f40f654ed8cc32a05bc3d7876b225",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "platform-assets",
+      "tags": [],
+      "task_paths": [
+        "contracts/assets/esk-paid-reconciliation-v1.fixture.json",
+        "docs/esk-paid-reconciliation-preview.md",
+        "docs/requirements/esk-paid-user-reconciliation-preview-v1.md",
+        "scripts/esk-paid-reconciliation",
+        "scripts/preview-esk-paid-reconciliation.js",
+        "scripts/test-esk-paid-reconciliation.js"
+      ],
+      "dependencies": [
+        "esk-paper-first-user-allocation-operations-v1",
+        "esk-sui-genesis-foundation-v1"
+      ],
+      "acceptance_criteria": [
+        "付款事实级批内/历史去重，不受批次/用户/数量改变影响",
+        "用户映射、用途、精确条款数量及快照缺口可复核",
+        "标准输入只读、重复键/敏感字段/上限失败关闭，报告无原始凭据",
+        "独立回归与旧ESK合同通过，文档明确真实验收未执行"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "contracts/assets/esk-paid-reconciliation-v1.fixture.json",
+          "content_hash": "bf1ce5dd76263d9a7955e3302920717f4fefd3900fb9fb2c8a1a314879bb30fa",
+          "locator": "",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "72e91931aff64e44c5b5962143f7b26cfa587c76",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "70532bb27d7d2ae0ca75046e6eedcf99aa176a39",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "docs/esk-paid-reconciliation-preview.md",
+          "content_hash": "7123fd934abf64f6cef67d9946df9385704f32cd403841aedce46d6c4094aed6",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "72e91931aff64e44c5b5962143f7b26cfa587c76",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "7a613886c912b5085ce3b60930c5afa532466278",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/esk-paid-reconciliation/identity.js",
+          "content_hash": "e5086cd07ab480a4c8ec7524294f0252894801356d85086bc586f6590106c18e",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "72e91931aff64e44c5b5962143f7b26cfa587c76",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "b0890fbcc5a75191b7b697987d23db1682963301",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/esk-paid-reconciliation/input.js",
+          "content_hash": "3864b7756e364f7df9dcde6246d1a3ff1c52a57834cde9fb901d957a83e068a5",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "72e91931aff64e44c5b5962143f7b26cfa587c76",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "1e2a0e6bd4f92f1ef88b7f0381356d2350d84bfc",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/esk-paid-reconciliation/preview.js",
+          "content_hash": "e0abe0ed505074330797ddce29eb23a96589bb1727fc338cbb902ef0e1567080",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "72e91931aff64e44c5b5962143f7b26cfa587c76",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "47dddfd22fdc9e758929c86c43e451720cbe6972",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/esk-paid-reconciliation/strict-json.js",
+          "content_hash": "020f97a8da221cafa943532324717419df078d5ae4d18c725b4fd723f878b3e8",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "72e91931aff64e44c5b5962143f7b26cfa587c76",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "ccd684a291b6a7de55e12d86f3e270d5dd164c83",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/preview-esk-paid-reconciliation.js",
+          "content_hash": "2c7144a7fe145c4bfc8930e1f8a6b454f1f7b7cef8db3c4a766541ded63a9e12",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "72e91931aff64e44c5b5962143f7b26cfa587c76",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "4e2cfca4284e00b3e0f517add8fbe6cc0dd06679",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/test-esk-paid-reconciliation.js",
+          "content_hash": "b006981ad47ae6b29877064c2ac6310a073ddb2a74a8e4cf13e4a8c6c31a9bb7",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "72e91931aff64e44c5b5962143f7b26cfa587c76",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "8725363e2ed5371b8165f9c97897a94b2c73f950",
+            "state": "untracked"
+          }
+        }
+      ],
+      "created_at_ms": 1788503035535,
+      "updated_at_ms": 1788503644581
+    },
+    {
       "id": "esk-paper-asset-account-v1",
       "title": "ESK Paper 资产账户与卖回申请 V1",
       "summary": "主项目建立 ESK 唯一余额真源、精确用户资产视图、管理员幂等 Paper 登记与追加式卖回申请；PC/Android 明确未上链、未移动资金，量化接入另走版本化投影。",
@@ -16034,66 +16183,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_1d13bff21a1f464bbbcc513365d9551a",
-      "feature_id": "yilong-quant-paper-public-deployment-contract-sync-v1",
-      "action": "claimed",
-      "actor": "codex-goal-quant-public-deployment-sync-v1",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788292691071
-    },
-    {
-      "id": "feature_event_e7474ef0ee9d47d6b3587d5c69bd2416",
-      "feature_id": "yilong-quant-paper-public-deployment-contract-sync-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-quant-public-deployment-sync-v1",
-      "reason": "已认领量化 V9 主项目文档同步责任区。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788292700667
-    },
-    {
-      "id": "feature_event_b6f35129252440e19c21892247209b10",
-      "feature_id": "yilong-quant-paper-public-deployment-contract-sync-v1",
-      "action": "claim_released",
-      "actor": "codex-goal-quant-public-deployment-sync-v1",
-      "reason": "在实现前补入可重复的跨仓库文案与 catalog planned 状态合同测试路径。",
-      "from_status": "in_progress",
-      "to_status": "ready",
-      "at_ms": 1788292735735
-    },
-    {
-      "id": "feature_event_b1af0da85f9f4aeba49032a6cd603c4f",
-      "feature_id": "yilong-quant-paper-public-deployment-contract-sync-v1",
-      "action": "metadata_updated",
-      "actor": "codex-goal-quant-public-deployment-sync-v1",
-      "reason": "新增可重复验证量化提交、三态语义和官方目录 planned 状态的合同测试。",
-      "from_status": "ready",
-      "to_status": "proposed",
-      "at_ms": 1788292745836
-    },
-    {
-      "id": "feature_event_079f00e3f76c45a7b95f2d58ae5f8023",
-      "feature_id": "yilong-quant-paper-public-deployment-contract-sync-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-quant-public-deployment-sync-v1",
-      "reason": "已复核新增测试只固化现有 V9 文档与 planned 边界，不引入运行代码或部署动作。",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1788292754780
-    },
-    {
-      "id": "feature_event_7eebdd8cfdcd4bd1a3d7140b4bfdd017",
-      "feature_id": "yilong-quant-paper-public-deployment-contract-sync-v1",
-      "action": "transitioned",
-      "actor": "codex-goal-quant-public-deployment-sync-v1",
-      "reason": "文档与合同测试范围已接受，无依赖阻塞。",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1788292763470
-    },
-    {
       "id": "feature_event_7725e421d169434fb0db5ef809101d5b",
       "feature_id": "yilong-quant-paper-public-deployment-contract-sync-v1",
       "action": "claimed",
@@ -18032,6 +18121,66 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1788502524347
+    },
+    {
+      "id": "feature_event_a758ae1716634bd9b0dc69afd39fea90",
+      "feature_id": "esk-paid-user-reconciliation-preview-v1",
+      "action": "registered",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1788503035535
+    },
+    {
+      "id": "feature_event_27b58177b8474b868c57168907a06669",
+      "feature_id": "esk-paid-user-reconciliation-preview-v1",
+      "action": "claimed",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788503053565
+    },
+    {
+      "id": "feature_event_44e26513a51541d8b98647e3840fde71",
+      "feature_id": "esk-paid-user-reconciliation-preview-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788503054103
+    },
+    {
+      "id": "feature_event_bc2d447bc77340cfa2def4a9dc25b6af",
+      "feature_id": "esk-paid-user-reconciliation-preview-v1",
+      "action": "evidence_recorded",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788503643560
+    },
+    {
+      "id": "feature_event_99fad61a97c8492ca704dc0a01e566ae",
+      "feature_id": "esk-paid-user-reconciliation-preview-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "Completed strict input, payment identity, exact reconciliation preview, stdin CLI, synthetic fixture and operator runbook; no production API or balance changes.",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1788503644092
+    },
+    {
+      "id": "feature_event_1f761bdfbbff4a9ba32b7a2bf6f0c3ff",
+      "feature_id": "esk-paid-user-reconciliation-preview-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "80 new offline tests, existing asset/genesis and 65 Sui observer tests passed; independent review found no blocking issues. Real payment authenticity and production user acceptance are not performed.",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1788503644581
     }
   ]
 }

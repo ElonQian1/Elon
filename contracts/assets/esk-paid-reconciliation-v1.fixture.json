@@ -1,0 +1,51 @@
+{
+  "schema": "yilong.esk.paid_reconciliation_input.v1",
+  "batch_id": "synthetic-preview-only",
+  "as_of": "2026-09-04T06:00:00.000Z",
+  "source": {
+    "namespace": "fixture.operator-ledger",
+    "network": "synthetic",
+    "asset_symbol": "USDT",
+    "asset_reference": "fixture-usdt-contract",
+    "decimals": 6,
+    "reference_format": "hex32"
+  },
+  "snapshot": {
+    "snapshot_id": "synthetic-snapshot",
+    "observed_at": "2026-09-04T05:00:00.000Z",
+    "source_fingerprint": "6f7b787b0f4451feba5ea00e4d1cf5be6f039ff026ae470768155afb0c902a64",
+    "history_complete": true,
+    "used_payment_keys": []
+  },
+  "users": [
+    {
+      "opaque_subject": "1111111111111111111111111111111111111111111111111111111111111111",
+      "target_user_ref": "2222222222222222222222222222222222222222222222222222222222222222"
+    }
+  ],
+  "sale_batches": [
+    {
+      "sale_batch_id": "synthetic-sale",
+      "payment_base_units_per_lot": "2000000",
+      "esk_base_units_per_lot": "1000000",
+      "disclosure_revision": "synthetic-disclosure",
+      "terms_digest": "3333333333333333333333333333333333333333333333333333333333333333"
+    }
+  ],
+  "rows": [
+    {
+      "row_id": "synthetic-row-1",
+      "external_payment_reference": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "transfer_index": 0,
+      "payment_amount": "20.000000",
+      "opaque_subject": "1111111111111111111111111111111111111111111111111111111111111111",
+      "payment_status": "confirmed",
+      "commercial_purpose": "esk_purchase",
+      "esk_base_units": "10000000",
+      "sale_batch_id": "synthetic-sale",
+      "disclosure_revision": "synthetic-disclosure",
+      "consent_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+      "approval_digest": "5555555555555555555555555555555555555555555555555555555555555555"
+    }
+  ]
+}
