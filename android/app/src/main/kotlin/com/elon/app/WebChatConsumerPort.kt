@@ -31,6 +31,7 @@ internal enum class WebChatConsumerCommandStatus {
 internal data class WebChatConsumerCommandRequest(
     val id: String,
     val status: WebChatConsumerCommandStatus,
+    val detail: String? = null,
 )
 
 internal data class WebChatConsumerState(
@@ -73,6 +74,12 @@ internal interface WebChatConsumerPort {
         userConfirmed: Boolean,
     ): WebChatConsumerCommandResult = invokeControl(controlId, userConfirmed)
     fun toggleOfficialReadAloud(contextId: String): WebChatConsumerCommandResult =
+        WebChatConsumerCommandResult(false, "unsupported_consumer_command")
+    fun setConversationPinned(
+        conversationPath: String,
+        pinned: Boolean,
+        userConfirmed: Boolean,
+    ): WebChatConsumerCommandResult =
         WebChatConsumerCommandResult(false, "unsupported_consumer_command")
     fun updateControl(
         controlId: String,

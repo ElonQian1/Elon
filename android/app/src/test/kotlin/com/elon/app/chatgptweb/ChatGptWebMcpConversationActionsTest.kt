@@ -18,6 +18,7 @@ class ChatGptWebMcpConversationActionsTest {
             projectTitle = "安卓项目",
             projectPath = "/g/g-p-demo/project",
             activityDates = setOf("2026-08-14"),
+            pinned = true,
         )
         var nextCommandId = 0
         val actions = ChatGptWebMcpActions(
@@ -69,6 +70,7 @@ class ChatGptWebMcpConversationActionsTest {
         assertEquals("g-p-demo", item.getString("project_id"))
         assertEquals("今天", item.getString("group_label"))
         assertEquals("2026-08-14", item.getJSONArray("activity_dates").getString(0))
+        assertEquals(true, item.getBoolean("pinned"))
 
         actions.control(JSONObject()
             .put("action", "chatgpt_open_conversation")

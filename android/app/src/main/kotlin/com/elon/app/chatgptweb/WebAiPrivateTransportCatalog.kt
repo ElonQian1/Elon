@@ -41,6 +41,7 @@ internal object WebAiPrivateTransportCatalog {
             productionDefault = true,
             runtimeEnabled =
                 BuildConfig.CHATGPT_PRIVATE_CONVERSATION_PREFETCH_ENABLED ||
+                    BuildConfig.CHATGPT_PRIVATE_CONVERSATION_MUTATIONS_ENABLED ||
                     BuildConfig.CHATGPT_PRIVATE_DICTATION_ENABLED ||
                     BuildConfig.CHATGPT_PRIVATE_READ_ALOUD_ENABLED,
             requestMode = "same_origin_session_prewarm_and_official_header_refresh",
@@ -328,6 +329,21 @@ internal object WebAiPrivateTransportCatalog {
             healthPolicy =
                 "request_receipt_target_directory_reconciliation_and_no_ambiguous_replay",
             fallback = "official_conversation_project_menu",
+        ),
+        Entry(
+            id = "android_chatgpt_private_conversation_pin_v1",
+            provider = "chatgpt",
+            status = "completed",
+            verification =
+                "device_verified_v1_1_1504_adapter_243_single_write_round_trip_and_stale_directory_reconciliation",
+            productionDefault = true,
+            runtimeEnabled = BuildConfig.CHATGPT_PRIVATE_CONVERSATION_MUTATIONS_ENABLED,
+            requestMode =
+                "single_same_origin_patch_is_starred_then_bounded_delayed_read_only_pin_reconciliation",
+            healthPolicy =
+                "single_active_write_header_gate_timeout_circuit_breaker_stale_directory_override_and_no_write_replay",
+            fallback = "official_conversation_options_after_explicit_user_choice",
+            directPostEnabled = BuildConfig.CHATGPT_PRIVATE_CONVERSATION_MUTATIONS_ENABLED,
         ),
         Entry(
             id = "android_chatgpt_native_conversation_management_v1",

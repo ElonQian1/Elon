@@ -7,6 +7,42 @@ import org.junit.Test
 
 class WebChatProductionConversationActionsTest {
     @Test
+    fun pinnedActionUsesObservedStateAndNeverAssumesUnknownItemsArePinned() {
+        val unknown = com.elon.app.chatgptweb.ChatGptWebConversation(
+            id = "unknown",
+            title = "未知状态",
+            path = "/c/unknown",
+            active = false,
+        )
+        val pinned = unknown.copy(pinned = true)
+
+        assertTrue(WebChatConversationPinnedMutationPolicy.desiredPinned(unknown))
+        assertEquals("置顶", WebChatConversationPinnedMutationPolicy.actionTitle(unknown))
+        assertFalse(WebChatConversationPinnedMutationPolicy.desiredPinned(pinned))
+        assertEquals("取消置顶", WebChatConversationPinnedMutationPolicy.actionTitle(pinned))
+    }
+
+    @Test
+    fun pinnedMutationRequiresACompletedReceiptBeforeShowingSuccess() {
+        assertEquals(
+            WebChatConversationPinnedMutationProgress.WAITING,
+            WebChatConversationPinnedMutationPolicy.progress(null),
+        )
+        assertEquals(
+            WebChatConversationPinnedMutationProgress.WAITING,
+            WebChatConversationPinnedMutationPolicy.progress(WebChatConsumerCommandStatus.PENDING),
+        )
+        assertEquals(
+            WebChatConversationPinnedMutationProgress.SUCCEEDED,
+            WebChatConversationPinnedMutationPolicy.progress(WebChatConsumerCommandStatus.SUCCEEDED),
+        )
+        assertEquals(
+            WebChatConversationPinnedMutationProgress.NEEDS_OFFICIAL_CONFIRMATION,
+            WebChatConversationPinnedMutationPolicy.progress(WebChatConsumerCommandStatus.FAILED),
+        )
+    }
+
+    @Test
     fun readyTargetConversationShowsActionsImmediately() {
         assertEquals(
             WebChatConversationActionReadiness.SHOW,

@@ -462,6 +462,7 @@
       });
     }
     if (privateReadAloudAdapter?.handle(action, command, respond)) return;
+    if (window.__elonChatGptPrivateConversationMutation?.handle(action, command, respond, scheduleSnapshot, conversationDirectoryRequests)) return;
     if (action === 'set_skin_mode') {
       if (!skinAdapter || typeof skinAdapter.setEnabled !== 'function') {
         return respond(action, false, '网页皮肤模块尚未就绪。');

@@ -382,7 +382,7 @@ class ChatGptWebProtocolTest {
                   "source":"official_private"
                 },
                 "conversations":[
-                  {"id":"one","title":"第一场会话","path":"/c/one","active":true,"groupLabel":"今天","activityDates":["2026-08-14"],"providerUrl":"https://www.google.com/search?q=one&udm=50&csuir=thread-one"},
+                  {"id":"one","title":"第一场会话","path":"/c/one","active":true,"groupLabel":"今天","activityDates":["2026-08-14"],"providerUrl":"https://www.google.com/search?q=one&udm=50&csuir=thread-one","pinned":true},
                   {"id":"project-chat","title":"项目会话","path":"/g/g-p-demo/c/project-chat","projectId":"g-p-demo","projectTitle":"安卓项目","projectPath":"/g/g-p-demo/project","activityDates":["2026-08-13"]},
                   {"id":"bad","title":"越界地址","path":"https://example.com/c/bad"},
                   {"id":"blank","title":"  ","path":"/c/blank"}
@@ -397,6 +397,7 @@ class ChatGptWebProtocolTest {
         assertTrue(event.conversations.first().active)
         assertEquals("今天", event.conversations.first().groupLabel)
         assertEquals(setOf("2026-08-14"), event.conversations.first().activityDates)
+        assertEquals(true, event.conversations.first().pinned)
         assertEquals(
             "https://www.google.com/search?q=one&udm=50&csuir=thread-one",
             event.conversations.first().providerUrl,
@@ -433,6 +434,7 @@ class ChatGptWebProtocolTest {
         assertEquals("", conversation.groupLabel)
         assertNull(conversation.projectId)
         assertNull(conversation.projectTitle)
+        assertNull(conversation.pinned)
     }
 
     @Test

@@ -33,6 +33,14 @@ assert.match(
   buildGradle,
   /buildConfigField "boolean", "CHATGPT_PRIVATE_CONVERSATION_PREFETCH_ENABLED"/
 );
+assert.match(
+  buildGradle,
+  /findProperty\("ELON_CHATGPT_PRIVATE_CONVERSATION_MUTATIONS"\)[\s\S]*?\?\.toBoolean\(\) \?: true/
+);
+assert.match(
+  buildGradle,
+  /buildConfigField "boolean", "CHATGPT_PRIVATE_CONVERSATION_MUTATIONS_ENABLED"/
+);
 assert.doesNotMatch(
   buildGradle,
   /private conversation prefetch requires ELON_CHATGPT_PRIVATE_RESEARCH=true/
@@ -52,6 +60,10 @@ assert.match(
 assert.match(
   pageAdapter,
   /window\.__elonChatGptPrivateConversationPrefetchEnabled =[\s\S]*?BuildConfig\.CHATGPT_PRIVATE_CONVERSATION_PREFETCH_ENABLED/
+);
+assert.match(
+  pageAdapter,
+  /window\.__elonChatGptPrivateConversationMutationsEnabled =[\s\S]*?BuildConfig\.CHATGPT_PRIVATE_CONVERSATION_MUTATIONS_ENABLED/
 );
 
 function response(status, contentType) {
@@ -104,7 +116,7 @@ async function run(enabled) {
   });
   await window.fetch('https://chatgpt.com/backend-api/conversation/123e4567-e89b-12d3-a456-426614174000', {
     method: 'POST',
-    body: 'must-not-be-observed'
+    body: JSON.stringify({ is_starred: true, title: 'must-not-be-observed' })
   });
   await window.fetch('https://chatgpt.com/backend-api/f/conversation', {
     method: 'POST',
@@ -148,8 +160,8 @@ async function run(enabled) {
 
   const enabled = await run(true);
   assert.equal(enabled.requests.length, 6);
-  assert.equal(enabled.events.length, 17);
-  assert.equal(enabled.window.__elonChatGptPrivateResearchProbe.version, 10);
+  assert.equal(enabled.events.length, 19);
+  assert.equal(enabled.window.__elonChatGptPrivateResearchProbe.version, 11);
   assert.equal(
     enabled.window.__elonChatGptPrivateResearchProbe
       .copyRequestContext('conversation_content').Authorization,
@@ -159,26 +171,34 @@ async function run(enabled) {
   assert.match(enabled.events[1].detail, /^v1\|headers\|\/backend-api\/conversations\/\{id\}\|authorization$/);
   assert.match(enabled.events[2].detail, /^v1\|fetch\|GET\|\/backend-api\/conversations\/\{id\}\|200\|json\|\d+$/);
   assert.match(enabled.events[3].detail, /^v1\|private_prefetch\|GET\|\/backend-api\/conversations\/\{id\}\|200\|json\|\d+$/);
-  assert.match(enabled.events[4].detail, /^v1\|fetch\|POST\|\/backend-api\/conversation\/\{id\}\|200\|json\|\d+$/);
-  assert.match(enabled.events[5].detail, /^v1\|headers\|\/backend-api\/f\/conversation\|content-type\.openai-sentinel-proof-token$/);
-  assert.match(enabled.events[6].detail, /^v1\|body\|\/backend-api\/f\/conversation\|action\.messages\.model$/);
-  assert.match(enabled.events[7].detail, /^v1\|message\|\/backend-api\/f\/conversation\|author\.content\.id$/);
-  assert.match(enabled.events[8].detail, /^v1\|content\|\/backend-api\/f\/conversation\|content_type\.parts$/);
-  assert.match(enabled.events[9].detail, /^v1\|fetch\|POST\|\/backend-api\/f\/conversation\|200\|json\|\d+$/);
-  assert.equal(enabled.events[10].detail, 'v1|private_outcome|success|12|345');
-  assert.equal(enabled.events[11].detail, 'v1|private_stream|first|1|123');
-  assert.equal(enabled.events[12].detail, 'v1|private_stream|success|4|456');
   assert.equal(
-    enabled.events[13].detail,
+    enabled.events[4].detail,
+    'v1|mutation_body|/backend-api/conversation/{id}|is_starred.title'
+  );
+  assert.equal(
+    enabled.events[5].detail,
+    'v1|mutation_types|/backend-api/conversation/{id}|is_starred:boolean.title:string'
+  );
+  assert.match(enabled.events[6].detail, /^v1\|fetch\|POST\|\/backend-api\/conversation\/\{id\}\|200\|json\|\d+$/);
+  assert.match(enabled.events[7].detail, /^v1\|headers\|\/backend-api\/f\/conversation\|content-type\.openai-sentinel-proof-token$/);
+  assert.match(enabled.events[8].detail, /^v1\|body\|\/backend-api\/f\/conversation\|action\.messages\.model$/);
+  assert.match(enabled.events[9].detail, /^v1\|message\|\/backend-api\/f\/conversation\|author\.content\.id$/);
+  assert.match(enabled.events[10].detail, /^v1\|content\|\/backend-api\/f\/conversation\|content_type\.parts$/);
+  assert.match(enabled.events[11].detail, /^v1\|fetch\|POST\|\/backend-api\/f\/conversation\|200\|json\|\d+$/);
+  assert.equal(enabled.events[12].detail, 'v1|private_outcome|success|12|345');
+  assert.equal(enabled.events[13].detail, 'v1|private_stream|first|1|123');
+  assert.equal(enabled.events[14].detail, 'v1|private_stream|success|4|456');
+  assert.equal(
+    enabled.events[15].detail,
     'v1|private_stream_shape|t:delta/k:data.type/dt:model_response/dk:delta.type/mk:none/ck:none'
   );
   assert.equal(
-    enabled.events[14].detail,
+    enabled.events[16].detail,
     'v1|private_stream_shape|compact/c:patch/o:replace/p:/messages/{index}/content/v:object/vk:text'
   );
-  assert.equal(enabled.events[15].detail, 'v1|private_keys|0|data');
+  assert.equal(enabled.events[17].detail, 'v1|private_keys|0|data');
   assert.equal(
-    enabled.events[16].detail,
+    enabled.events[18].detail,
     'v1|private_shape|data_conversation|2|0|0|0|0|0'
   );
   const emitted = JSON.stringify(enabled.events);

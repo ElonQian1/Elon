@@ -170,6 +170,7 @@ def navigationCaseInputs = filesMatching([
     "android/app/src/main/kotlin/com/elon/app/chatgptweb/*Feature*.kt",
     "android/app/src/main/kotlin/com/elon/app/chatgptweb/*Navigation*.kt",
     "android/app/src/main/assets/chatgpt_web_adapter_conversation*.js",
+    "android/app/src/main/assets/chatgpt_web_private_conversation*.js",
     "android/app/src/main/assets/chatgpt_web_adapter_navigation*.js",
     "android/app/src/main/assets/chatgpt_web_adapter_page_semantic_policy.js",
     "android/app/src/main/res/layout/*chatgpt_conversation*.xml",

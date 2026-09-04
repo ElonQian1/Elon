@@ -92,6 +92,23 @@ class ChatGptWebConversationIndexTest {
     }
 
     @Test
+    fun partialRefreshPreservesKnownPinnedStateUntilTheServerReportsANewValue() {
+        val cached = conversation("one", "今天", null).copy(pinned = true)
+
+        val unknown = ChatGptWebConversationIndex.merge(
+            listOf(cached),
+            listOf(cached.copy(pinned = null)),
+        ).single()
+        val unpinned = ChatGptWebConversationIndex.merge(
+            listOf(cached),
+            listOf(cached.copy(pinned = false)),
+        ).single()
+
+        assertEquals(true, unknown.pinned)
+        assertEquals(false, unpinned.pinned)
+    }
+
+    @Test
     fun partialOfficialRefreshDoesNotEraseCachedDailyConversations() {
         val previous = listOf(
             conversation("one", "今天", null).copy(activityDates = setOf("2026-08-14")),

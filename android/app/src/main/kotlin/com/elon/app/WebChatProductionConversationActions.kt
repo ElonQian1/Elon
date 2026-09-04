@@ -49,6 +49,14 @@ internal class WebChatProductionConversationActionsCoordinator(
 ) {
     private var requestEpoch = 0
     private var activeSheet: WebChatActionSheetHandle? = null
+    private val pinnedMutation = WebChatConversationPinnedMutationCoordinator(
+        activity = activity,
+        host = host,
+        activeProvider = activeProvider,
+        consumerPort = consumerPort,
+        refreshConversationIndex = refreshConversationIndex,
+        openOfficialFallback = ::showPageActionsFor,
+    )
     private val projectMove = WebChatProductionConversationProjectMoveCoordinator(
         activity = activity,
         host = host,
@@ -75,6 +83,12 @@ internal class WebChatProductionConversationActionsCoordinator(
             conversation,
         ).isNotEmpty()
         val items = buildList {
+            add(WebChatActionSheetItem(
+                id = ACTION_SET_PINNED,
+                title = WebChatConversationPinnedMutationPolicy.actionTitle(conversation),
+                subtitle = "后台确认官网结果，不切换会话",
+                contentDescription = "web-chat-conversation-action-set-pinned",
+            ))
             if (canMove) add(WebChatActionSheetItem(
                 id = ACTION_MOVE_TO_PROJECT,
                 title = "移动到项目",
@@ -84,7 +98,7 @@ internal class WebChatProductionConversationActionsCoordinator(
             add(WebChatActionSheetItem(
                 id = ACTION_MORE_SETTINGS,
                 title = "更多会话设置",
-                subtitle = "重命名、置顶、归档、分享或删除",
+                subtitle = "重命名、归档、分享或删除",
                 contentDescription = "web-chat-conversation-action-more-settings",
             ))
         }
@@ -118,6 +132,7 @@ internal class WebChatProductionConversationActionsCoordinator(
         conversation: ChatGptWebConversation,
     ) {
         when (actionId) {
+            ACTION_SET_PINNED -> pinnedMutation.start(conversation)
             ACTION_MOVE_TO_PROJECT -> projectMove.show(conversation)
             ACTION_MORE_SETTINGS -> showPageActionsFor(conversation)
         }
@@ -152,6 +167,7 @@ internal class WebChatProductionConversationActionsCoordinator(
         val sheet = activeSheet
         activeSheet = null
         sheet?.dismiss()
+        pinnedMutation.cancelPending()
         projectMove.cancelPending()
     }
 
@@ -236,6 +252,7 @@ internal class WebChatProductionConversationActionsCoordinator(
     }
 
     private companion object {
+        const val ACTION_SET_PINNED = "set-pinned"
         const val ACTION_MOVE_TO_PROJECT = "move-to-project"
         const val ACTION_MORE_SETTINGS = "more-settings"
         const val ACTION_SHEET_HANDOFF_SETTLE_MS = 48L

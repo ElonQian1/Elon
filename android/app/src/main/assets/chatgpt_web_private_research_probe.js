@@ -4,7 +4,7 @@
   if (window.__elonChatGptPrivateResearchEnabled !== true) return;
   if (location.origin !== 'https://chatgpt.com') return;
   const existingProbe = window.__elonChatGptPrivateResearchProbe;
-  if (existingProbe && Number(existingProbe.version) >= 10) return;
+  if (existingProbe && Number(existingProbe.version) >= 11) return;
 
   const nativeBridge = window.elonChatGptNative;
   const adapterVersion = Number(window.__elonChatGptAdapterTargetVersion || 0);
@@ -91,6 +91,39 @@
       .slice(0, 16);
   }
 
+  function safeValueTypes(value) {
+    return safeKeys(value, 24).map((key) => {
+      const current = value[key];
+      const type = Array.isArray(current)
+        ? 'array'
+        : current === null ? 'null' : typeof current;
+      return key + ':' + (/^(?:array|null|boolean|number|string|object)$/.test(type)
+        ? type
+        : 'other');
+    });
+  }
+
+  function mutationCandidate(url, method) {
+    const verb = String(method || 'GET').toUpperCase();
+    if (!/^(?:POST|PATCH|PUT|DELETE)$/.test(verb)) return false;
+    return /^\/backend-api\/conversation\/[A-Za-z0-9_-]{1,160}(?:\/[A-Za-z0-9_-]{1,40})?$/.test(
+      url.pathname
+    ) || /^\/backend-api\/gizmos\/g-p-[A-Za-z0-9_-]{1,160}\/conversations$/.test(
+      url.pathname
+    );
+  }
+
+  function observeMutationBody(url, body) {
+    if (typeof body !== 'string' || !body || body.length > 65536) return;
+    try {
+      const parsed = JSON.parse(body);
+      emitShape('mutation_body', url, safeKeys(parsed, 24));
+      emitShape('mutation_types', url, safeValueTypes(parsed));
+    } catch (_) {
+      // Only JSON key names and primitive types are eligible for research output.
+    }
+  }
+
   function requestFamily(url) {
     if (/^\/backend-api\/conversations\/[A-Za-z0-9_-]{1,160}$/.test(url.pathname)) {
       return 'conversation_content';
@@ -141,9 +174,22 @@
     }));
   }
 
-  function observeRequestShape(input, init, url) {
+  function observeRequestShape(input, init, url, method) {
     captureRequestContext(input, init, url);
     const headers = safeHeaderNames(init && init.headers || input && input.headers);
+    if (mutationCandidate(url, method)) {
+      emitShape('headers', url, headers);
+      if (init && init.body != null) {
+        observeMutationBody(url, init.body);
+      } else if (input && typeof input.clone === 'function') {
+        try {
+          Promise.resolve(input.clone().text())
+            .then((body) => observeMutationBody(url, body))
+            .catch(() => {});
+        } catch (_) {}
+      }
+      return;
+    }
     if (/^\/backend-api\/[A-Za-z0-9_-]{17,160}$/.test(url.pathname) ||
         /^\/backend-api\/conversations\/[A-Za-z0-9_-]{1,160}$/.test(url.pathname) ||
         /^\/backend-api\/gizmos\/.+\/conversations$/.test(url.pathname) ||
@@ -358,7 +404,7 @@
       const privateKind = String(
         init.__elonPrivateTransport || init.__elonPrivateResearch || ''
       );
-      observeRequestShape(input, init, url);
+      observeRequestShape(input, init, url, method);
       const requestStartedAt = nowMs();
       try {
         return Promise.resolve(originalFetch.apply(this, args)).then(
@@ -404,6 +450,9 @@
     xhrPrototype.send = function () {
       const metadata = xhrMetadata.get(this);
       if (metadata && endpointCandidate(metadata.url)) {
+        if (mutationCandidate(metadata.url, metadata.method)) {
+          observeMutationBody(metadata.url, arguments[0]);
+        }
         const requestStartedAt = nowMs();
         this.addEventListener('loadend', () => {
           const contentType = String(this.getResponseHeader('content-type') || '').toLowerCase();
@@ -418,7 +467,7 @@
   }
 
   window.__elonChatGptPrivateResearchProbe = Object.freeze({
-    version: 10,
+    version: 11,
     enabled: true,
     expiresAt,
     observationCount: () => observationCount,

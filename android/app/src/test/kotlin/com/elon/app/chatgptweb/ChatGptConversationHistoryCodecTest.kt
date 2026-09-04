@@ -18,6 +18,7 @@ class ChatGptConversationHistoryCodecTest {
                         active = true,
                         groupLabel = "今天",
                         activityDates = setOf("2026-08-14"),
+                        pinned = true,
                     ),
                     ChatGptWebConversation("two", "第二场会话", "/c/two", active = false),
                 ),
@@ -33,6 +34,7 @@ class ChatGptConversationHistoryCodecTest {
         assertFalse(decoded.conversations.any { it.active })
         assertEquals("今天", decoded.conversations.first().groupLabel)
         assertEquals(setOf("2026-08-14"), decoded.conversations.first().activityDates)
+        assertEquals(true, decoded.conversations.first().pinned)
         assertEquals(mapOf("g-p-demo" to 1200L), decoded.projectCachedAtMs)
     }
 
@@ -44,6 +46,7 @@ class ChatGptConversationHistoryCodecTest {
 
         assertEquals("", decoded.conversations.single().groupLabel)
         assertNull(decoded.conversations.single().projectTitle)
+        assertNull(decoded.conversations.single().pinned)
     }
 
     @Test

@@ -84,6 +84,7 @@ internal class ChatGptWebConsumerPortAdapter(
                 WebChatConsumerCommandRequest(
                     id = request.id,
                     status = request.status.toConsumerStatus(),
+                    detail = request.result?.detail?.takeIf(String::isNotBlank),
                 )
             },
             adapterCurrent = observed.adapterCurrent,
@@ -152,6 +153,16 @@ internal class ChatGptWebConsumerPortAdapter(
         execute(JSONObject()
             .put("action", "chatgpt_toggle_private_read_aloud")
             .put("context_id", contextId))
+
+    override fun setConversationPinned(
+        conversationPath: String,
+        pinned: Boolean,
+        userConfirmed: Boolean,
+    ): WebChatConsumerCommandResult = execute(JSONObject()
+        .put("action", "chatgpt_set_conversation_pinned")
+        .put("conversation_path", conversationPath)
+        .put("pinned", pinned)
+        .put("user_confirmed", userConfirmed))
 
     override fun updateControl(
         controlId: String,

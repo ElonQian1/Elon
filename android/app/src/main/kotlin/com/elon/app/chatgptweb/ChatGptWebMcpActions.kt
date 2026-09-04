@@ -224,6 +224,9 @@ internal class ChatGptWebMcpActions(
             "chatgpt_toggle_private_read_aloud" ->
                 ChatGptWebPrivateReadAloudMcpAction.dispatch(args, snapshot(), commands, ::dispatch)
                     ?.let { return error(action, it) }
+            "chatgpt_set_conversation_pinned" ->
+                ChatGptWebConversationMutationMcpAction.dispatch(args, commands, ::dispatch)
+                    ?.let { return error(action, it) }
             "chatgpt_start_dictation" -> {
                 val current = snapshot()
                 if (current?.dictationActive == true) return error(action, "dictation_already_active")
@@ -534,22 +537,7 @@ internal class ChatGptWebMcpActions(
             .put("has_more", page.hasMore)
             .put("conversations", JSONArray().apply {
                 matches.drop(page.offset).take(page.limit).forEach { conversation ->
-                    put(JSONObject()
-                        .put("id", conversation.id)
-                        .put("title", conversation.title)
-                        .put("path", conversation.path)
-                        .put("active", conversation.active)
-                        .put("group_label", conversation.groupLabel)
-                        .put("project_id", conversation.projectId ?: JSONObject.NULL)
-                        .put("project_title", conversation.projectTitle ?: JSONObject.NULL)
-                        .put("project_path", conversation.projectPath ?: JSONObject.NULL)
-                        .put("activity_dates", JSONArray(conversation.activityDates.sorted()))
-                        .put("native_action", "chatgpt_open_conversation")
-                        .put(
-                            "native_adb_content_description",
-                            ChatGptNativeNavigationSelector.conversation(conversation),
-                        )
-                    )
+                    put(ChatGptWebConversationJson.encode(conversation))
                 }
             })
     }

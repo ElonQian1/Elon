@@ -17,6 +17,7 @@ internal class ChatGptWebMcpTestCommandPort(
     private val onRequestFeatures: () -> Unit = {},
     private val onSelectFeature: (String) -> Unit = {},
     private val onOpenConversation: (String) -> Unit = {},
+    private val onSetConversationPinned: (String, Boolean) -> Unit = { _, _ -> },
     private val onDispatch: (String, String) -> Unit = { _, _ -> },
     private val onSetDraft: (String, String) -> Unit = { _, _ -> },
 ) : ChatGptWebMcpCommandPort {
@@ -126,6 +127,11 @@ internal class ChatGptWebMcpTestCommandPort(
     override fun openConversation(path: String, requestId: String) {
         onOpenConversation(path)
         dispatch("open_conversation", requestId)
+    }
+
+    override fun setConversationPinned(path: String, pinned: Boolean, requestId: String) {
+        onSetConversationPinned(path, pinned)
+        dispatch("set_conversation_pinned", requestId)
     }
 
     private fun dispatch(action: String, requestId: String) = onDispatch(action, requestId)

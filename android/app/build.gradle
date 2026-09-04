@@ -129,6 +129,10 @@ def chatGptPrivateConversationPrefetchEnabled =
     project.findProperty("ELON_CHATGPT_PRIVATE_CONVERSATION_PREFETCH")
         ?.toString()
         ?.toBoolean() ?: true
+def chatGptPrivateConversationMutationsEnabled =
+    project.findProperty("ELON_CHATGPT_PRIVATE_CONVERSATION_MUTATIONS")
+        ?.toString()
+        ?.toBoolean() ?: true
 def chatGptPrivateStreamObserverEnabled =
     project.findProperty("ELON_CHATGPT_PRIVATE_STREAM_OBSERVER")
         ?.toString()
@@ -228,6 +232,7 @@ android {
         buildConfigField "boolean", "CHATGPT_PRIVATE_RESEARCH_ENABLED", "${chatGptPrivateResearchEnabled}"
         buildConfigField "boolean", "CHATGPT_PRIVATE_VOICE_NATIVE_RTC_ENABLED", "${chatGptPrivateVoiceNativeRtcEnabled}"
         buildConfigField "boolean", "CHATGPT_PRIVATE_CONVERSATION_PREFETCH_ENABLED", "${chatGptPrivateConversationPrefetchEnabled}"
+        buildConfigField "boolean", "CHATGPT_PRIVATE_CONVERSATION_MUTATIONS_ENABLED", "${chatGptPrivateConversationMutationsEnabled}"
         buildConfigField "boolean", "CHATGPT_PRIVATE_STREAM_OBSERVER_ENABLED", "${chatGptPrivateStreamObserverEnabled}"
         buildConfigField "boolean", "CHATGPT_PRIVATE_TEXT_TRANSACTIONS_ENABLED", "${chatGptPrivateTextTransactionsEnabled}"
         buildConfigField "boolean", "CHATGPT_PRIVATE_DICTATION_ENABLED", "${chatGptPrivateDictationEnabled}"

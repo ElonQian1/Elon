@@ -27,6 +27,8 @@ assert(source.includes("url.origin !== location.origin"));
 assert(source.includes("method !== 'GET'"));
 assert(source.includes('const PROJECT_REFRESH_TIMEOUT_MS = 4000'));
 assert(source.includes('acceptConversationMembership'));
+assert(source.includes('acceptPinnedState'));
+assert(source.includes('const PIN_OVERRIDE_TTL_MS = 120000'));
 assert(source.includes('window.setTimeout(() =>'));
 assert(directoryRequestsSource.includes('privateDirectory.setListener(() => emitSnapshot(null))'));
 assert(directoryRequestsSource.includes('privateDirectory.refreshProject(projectId)'));
@@ -48,7 +50,7 @@ assert(
 const responses = new Map([
   ['/backend-api/conversations', JSON.stringify({
     items: [
-      { id: 'global-chat-12345', title: '普通聊天', is_pinned: true },
+      { id: 'global-chat-12345', title: '普通聊天', is_starred: true },
       { id: 'bad id', title: '忽略无效 ID' }
     ]
   })],
@@ -161,7 +163,7 @@ async function flush() {
 (async () => {
   const directory = window.__elonChatGptPrivateConversationDirectory;
   assert(directory);
-  assert.strictEqual(directory.version, 4);
+  assert.strictEqual(directory.version, 6);
   let notifications = 0;
   directory.setListener(() => { notifications += 1; });
 
@@ -177,11 +179,14 @@ async function flush() {
   assert.strictEqual(snapshot.projects[0].active, true);
   assert.strictEqual(snapshot.conversations.length, 2);
   assert(snapshot.conversations.some((row) => row.path === '/c/global-chat-12345'));
+  const global = snapshot.conversations.find((row) => row.id === 'global-chat-12345');
+  assert.strictEqual(global.pinned, true);
   const project = snapshot.conversations.find((row) => row.id === 'project-chat-12345');
   assert(project);
   assert.strictEqual(project.path, '/g/g-p-health123/c/project-chat-12345');
   assert.strictEqual(project.projectTitle, '家庭健康');
   assert.strictEqual(project.active, true);
+  assert.strictEqual(project.pinned, null);
   assert(notifications >= 3);
   assert.strictEqual(fetchCalls.length, 3);
   assert.strictEqual(cloneCount, 3);
@@ -207,6 +212,32 @@ async function flush() {
     '移动后立即可见',
     'not-a-project'
   ), false);
+
+  const notificationsBeforePin = notifications;
+  assert.strictEqual(directory.acceptPinnedState('global-chat-12345', false), true);
+  assert.strictEqual(
+    directory.snapshot().conversations.find((row) => row.id === 'global-chat-12345').pinned,
+    false
+  );
+  assert.strictEqual(notifications, notificationsBeforePin + 1);
+  assert.strictEqual(directory.acceptPinnedState('missing-chat', true), false);
+
+  await window.fetch('https://chatgpt.com/backend-api/conversations?offset=0&limit=28');
+  await flush();
+  assert.strictEqual(
+    directory.snapshot().conversations.find((row) => row.id === 'global-chat-12345').pinned,
+    false,
+    'a stale directory response must not overwrite a recently reconciled pin state'
+  );
+  responses.set('/backend-api/conversations', JSON.stringify({
+    items: [{ id: 'global-chat-12345', title: '普通聊天', is_starred: false }]
+  }));
+  await window.fetch('https://chatgpt.com/backend-api/conversations?offset=0&limit=28');
+  await flush();
+  assert.strictEqual(
+    directory.snapshot().conversations.find((row) => row.id === 'global-chat-12345').pinned,
+    false
+  );
 
   responses.set('/backend-api/gizmos/g-p-health123/conversations', JSON.stringify({
     data: { conversations: [

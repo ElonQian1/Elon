@@ -12,6 +12,7 @@ installed build; individual capability documents retain implementation evidence.
 | Conversation body prefetch | ChatGPT | Completed and enabled | Official WebView navigation |
 | Page-local identity context prewarm | ChatGPT | Completed and enabled; same-origin auth plus conversation refresh device verified | Observed official request context and persistent identity WebView |
 | Conversation navigation receipt reconciliation | ChatGPT | Completed, enabled, and device verified on `v1.1.1399 (1420)`, adapter `218` | Official WebView navigation without write replay |
+| Conversation pin transaction | ChatGPT | Implemented and enabled; device server acknowledgement pending | Official conversation options after explicit user choice |
 | Send dispatch acknowledgement | ChatGPT | Completed and enabled | Official DOM confirmation |
 | Streaming reply observer | ChatGPT | Completed and enabled; completion and sparse-watchdog timer/bridge device verified | Official DOM snapshot |
 | Private stream completion settlement | ChatGPT | Completed, enabled, and device verified on `v1.1.1302 (1312)` | Official DOM snapshot |
@@ -84,6 +85,18 @@ identity matches. An unrelated, expired, explicitly failed, or superseded reques
 failed or pending; no write or navigation command is replayed automatically. The stable
 capability is `android_chatgpt_conversation_navigation_receipt_reconciliation_v1`.
 Its targeted lifecycle tests pass and consolidated device acceptance is pending.
+
+Conversation pinning now has a dedicated native transaction instead of navigating to the
+target conversation and searching its visible menu. The page-local transport issues one
+same-origin `PATCH` carrying only the desired starred state, waits for an HTTP success, and
+then performs a read-only pin-directory reconciliation. Android changes the cached pin state
+only after that acknowledgement; a transport timeout enters bounded read-only pin reconciliation
+and never triggers an automatic write replay. A short authoritative pin override prevents stale
+conversation-directory responses from reversing a confirmed result. The production menu
+keeps the official conversation options as an explicit repair path. The stable capability ID
+is `android_chatgpt_private_conversation_pin_v1`. Targeted transaction and UI policy tests pass;
+the single-write pin/unpin round trip and stale-directory protection were verified on the
+production friend-chat surface with APK `v1.1.1504`, adapter `243`.
 
 Reopening the already-active ChatGPT or Google production friend-chat surface now keeps
 the warm identity transport alive. Native composer, toolbar, and capability bindings are

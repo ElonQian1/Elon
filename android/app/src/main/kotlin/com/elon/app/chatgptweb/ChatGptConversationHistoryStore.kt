@@ -73,8 +73,11 @@ internal class ChatGptConversationHistoryStore(
 }
 
 internal object ChatGptConversationHistoryCodec {
-    private const val SCHEMA = "elon.chatgpt_web.conversation_index.v2"
-    private const val LEGACY_SCHEMA = "elon.chatgpt_web.conversation_index.v1"
+    private const val SCHEMA = "elon.chatgpt_web.conversation_index.v3"
+    private val LEGACY_SCHEMAS = setOf(
+        "elon.chatgpt_web.conversation_index.v2",
+        "elon.chatgpt_web.conversation_index.v1",
+    )
     private const val MAX_ITEMS = 200
     private const val MAX_PROJECTS = 80
     private const val MAX_ID_LENGTH = 160
@@ -93,6 +96,7 @@ internal object ChatGptConversationHistoryCodec {
                     .put("project_id", conversation.projectId ?: JSONObject.NULL)
                     .put("project_title", conversation.projectTitle ?: JSONObject.NULL)
                     .put("project_path", conversation.projectPath ?: JSONObject.NULL)
+                    .put("pinned", conversation.pinned ?: JSONObject.NULL)
                     .put("activity_dates", JSONArray(conversation.activityDates.sorted()))
                 )
             }
@@ -117,7 +121,7 @@ internal object ChatGptConversationHistoryCodec {
 
     fun decode(raw: String): ChatGptConversationHistoryCache? {
         val root = runCatching { JSONObject(raw) }.getOrNull() ?: return null
-        if (root.optString("schema") !in setOf(SCHEMA, LEGACY_SCHEMA)) return null
+        if (root.optString("schema") !in LEGACY_SCHEMAS + SCHEMA) return null
         val savedAtMs = root.optLong("saved_at_ms", -1L)
         if (savedAtMs < 0L) return null
         val values = root.optJSONArray("conversations") ?: return null
@@ -151,6 +155,7 @@ internal object ChatGptConversationHistoryCodec {
                             dates.optString(dateIndex).takeIf(ACTIVITY_DATE::matches)?.let(::add)
                         }
                     },
+                    pinned = value.optionalBoolean("pinned"),
                 )))
             }
         }.let { ChatGptWebConversationIndex.merge(emptyList(), it) }
@@ -187,6 +192,12 @@ internal object ChatGptConversationHistoryCodec {
             ?.toString()
             ?.trim()
             ?.takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
+
+    private fun JSONObject.optionalBoolean(key: String): Boolean? = when (opt(key)) {
+        true -> true
+        false -> false
+        else -> null
+    }
 
     private const val MAX_GROUP_LABEL_LENGTH = 80
     private val PROJECT_ID = Regex("g-p-[A-Za-z0-9_-]{1,160}")

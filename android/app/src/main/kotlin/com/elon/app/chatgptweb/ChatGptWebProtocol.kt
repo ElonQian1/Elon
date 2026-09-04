@@ -536,6 +536,7 @@ internal object ChatGptWebProtocol {
                         activityDates = parseActivityDates(item),
                         providerUrl = item.optionalString("providerUrl")
                             ?.take(MAX_PROVIDER_URL_LENGTH),
+                        pinned = item.optionalBoolean("pinned"),
                     )),
                 )
             }
@@ -576,6 +577,12 @@ internal object ChatGptWebProtocol {
             ?.toString()
             ?.trim()
             ?.takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
+
+    private fun JSONObject.optionalBoolean(key: String): Boolean? = when (opt(key)) {
+        true -> true
+        false -> false
+        else -> null
+    }
 
     private fun parseConversationCollection(
         event: JSONObject,

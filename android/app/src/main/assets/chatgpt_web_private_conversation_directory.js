@@ -2,7 +2,7 @@
   'use strict';
 
   const existing = window.__elonChatGptPrivateConversationDirectory;
-  if (existing && Number(existing.version) >= 4) return;
+  if (existing && Number(existing.version) >= 6) return;
   if (location.origin !== 'https://chatgpt.com') return;
 
   const originalFetch = typeof window.fetch === 'function' ? window.fetch.bind(window) : null;
@@ -13,6 +13,7 @@
   const conversations = new Map();
   const projects = new Map();
   const projectRefreshes = new Map();
+  const pinnedStateOverrides = new Map();
   let listener = null;
   let revision = 0;
   const MAX_CONVERSATIONS = 200;
@@ -22,6 +23,7 @@
   const SAFE_ID = /^[A-Za-z0-9_-]{1,160}$/;
   const SAFE_PROJECT_ID = /^g-p-[A-Za-z0-9_-]{1,160}$/;
   const PROJECT_REFRESH_TIMEOUT_MS = 4000;
+  const PIN_OVERRIDE_TTL_MS = 120000;
 
   function cleanText(value) {
     return String(value || '').replace(/\s+/g, ' ').trim().slice(0, MAX_TITLE_LENGTH);
@@ -78,6 +80,34 @@
       .find((candidate) => SAFE_PROJECT_ID.test(candidate)) || '';
   }
 
+  function explicitPinnedState(value) {
+    if (!value || typeof value !== 'object') return null;
+    const keys = ['is_starred', 'is_pinned', 'pinned'];
+    for (const key of keys) {
+      if (Object.prototype.hasOwnProperty.call(value, key) && typeof value[key] === 'boolean') {
+        return value[key];
+      }
+    }
+    return null;
+  }
+
+  function resolvedPinnedState(id, observed) {
+    const override = pinnedStateOverrides.get(id);
+    if (override) {
+      if (override.expiresAt <= Date.now()) {
+        pinnedStateOverrides.delete(id);
+      } else {
+        if (typeof observed === 'boolean' && observed === override.pinned) {
+          pinnedStateOverrides.delete(id);
+        }
+        return override.pinned;
+      }
+    }
+    if (typeof observed === 'boolean') return observed;
+    const previous = conversations.get(id);
+    return previous && typeof previous.pinned === 'boolean' ? previous.pinned : null;
+  }
+
   function conversationFrom(value, fallbackProjectId, order) {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
     const id = cleanText(value.id || value.conversation_id || value.conversationId);
@@ -89,7 +119,7 @@
       title,
       path: projectId ? '/g/' + projectId + '/c/' + id : '/c/' + id,
       active: false,
-      pinned: value.is_pinned === true || value.pinned === true,
+      pinned: resolvedPinnedState(id, explicitPinnedState(value)),
       groupLabel: '',
       projectId: projectId || null,
       projectTitle: null,
@@ -124,7 +154,7 @@
       title,
       path,
       active: location.pathname === path,
-      pinned: previous ? previous.pinned === true : false,
+      pinned: previous && typeof previous.pinned === 'boolean' ? previous.pinned : null,
       groupLabel: previous && previous.groupLabel || '',
       projectId,
       projectTitle: project ? project.title : null,
@@ -137,6 +167,21 @@
     conversations.set(id, next);
     trimMap(conversations, MAX_CONVERSATIONS);
     if (!previous || previous.path !== next.path || previous.title !== next.title) notify();
+    return true;
+  }
+
+  function acceptPinnedState(rawId, pinned) {
+    const id = cleanText(rawId);
+    const previous = conversations.get(id);
+    if (!SAFE_ID.test(id) || !previous || typeof pinned !== 'boolean') return false;
+    pinnedStateOverrides.set(id, Object.freeze({
+      pinned,
+      expiresAt: Date.now() + PIN_OVERRIDE_TTL_MS
+    }));
+    trimMap(pinnedStateOverrides, MAX_CONVERSATIONS);
+    if (previous.pinned === pinned) return true;
+    conversations.set(id, Object.freeze(Object.assign({}, previous, { pinned })));
+    notify();
     return true;
   }
 
@@ -320,10 +365,11 @@
   }
 
   window.__elonChatGptPrivateConversationDirectory = Object.freeze({
-    version: 4,
+    version: 6,
     snapshot,
     refreshProject,
     acceptConversationMembership,
+    acceptPinnedState,
     setListener: (value) => { listener = typeof value === 'function' ? value : null; }
   });
 })();

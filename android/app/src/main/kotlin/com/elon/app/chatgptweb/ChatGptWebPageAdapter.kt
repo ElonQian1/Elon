@@ -29,7 +29,8 @@ internal class ChatGptWebPageAdapter(
     }
 
     private val privateEarlyTransportEnabled =
-        BuildConfig.CHATGPT_PRIVATE_CONVERSATION_PREFETCH_ENABLED ||
+            BuildConfig.CHATGPT_PRIVATE_CONVERSATION_PREFETCH_ENABLED ||
+            BuildConfig.CHATGPT_PRIVATE_CONVERSATION_MUTATIONS_ENABLED ||
             BuildConfig.CHATGPT_PRIVATE_STREAM_OBSERVER_ENABLED ||
             BuildConfig.CHATGPT_PRIVATE_TEXT_TRANSACTIONS_ENABLED ||
             BuildConfig.CHATGPT_PRIVATE_DICTATION_ENABLED ||
@@ -48,6 +49,8 @@ internal class ChatGptWebPageAdapter(
                 ${BuildConfig.CHATGPT_PRIVATE_VOICE_NATIVE_RTC_ENABLED};
             window.__elonChatGptPrivateConversationPrefetchEnabled =
                 ${BuildConfig.CHATGPT_PRIVATE_CONVERSATION_PREFETCH_ENABLED};
+            window.__elonChatGptPrivateConversationMutationsEnabled =
+                ${BuildConfig.CHATGPT_PRIVATE_CONVERSATION_MUTATIONS_ENABLED};
             window.__elonChatGptPrivateStreamObserverEnabled =
                 ${BuildConfig.CHATGPT_PRIVATE_STREAM_OBSERVER_ENABLED};
             window.__elonChatGptPrivateTextTransactionsEnabled =
@@ -70,6 +73,7 @@ internal class ChatGptWebPageAdapter(
     private val privateEarlyTapScript = """
         window.__elonChatGptPrivateAuthContextEnabled =
             ${BuildConfig.CHATGPT_PRIVATE_CONVERSATION_PREFETCH_ENABLED ||
+                BuildConfig.CHATGPT_PRIVATE_CONVERSATION_MUTATIONS_ENABLED ||
                 BuildConfig.CHATGPT_PRIVATE_DICTATION_ENABLED ||
                 BuildConfig.CHATGPT_PRIVATE_READ_ALOUD_ENABLED};
         window.__elonChatGptPrivateStreamObserverEnabled =
@@ -275,6 +279,13 @@ internal class ChatGptWebPageAdapter(
         action = "toggle_private_read_aloud",
         value = contextId.take(MAX_MESSAGE_CONTEXT_ID_LENGTH),
         requestId = requestId,
+    )
+
+    fun setConversationPinned(path: String, pinned: Boolean, requestId: String) = runCommand(
+        action = "set_conversation_pinned",
+        value = path.take(MAX_CONVERSATION_PATH_LENGTH),
+        requestId = requestId,
+        selected = pinned,
     )
 
     fun startNewConversation() = runCommand("new_conversation")
@@ -593,7 +604,7 @@ internal class ChatGptWebPageAdapter(
         origin.scheme == "https" && origin.host == "chatgpt.com" && origin.port == -1
 
     companion object {
-        internal const val ADAPTER_VERSION = 242
+        internal const val ADAPTER_VERSION = 243
 
         private val ADAPTER_ASSETS = listOf(
             "chatgpt_web_adapter_bootstrap.js",
@@ -644,6 +655,7 @@ internal class ChatGptWebPageAdapter(
             "chatgpt_web_realtime_voice_research.js",
             "chatgpt_web_private_transport_policy.js",
             "chatgpt_web_private_transport.js",
+            "chatgpt_web_private_conversation_mutation.js",
             "chatgpt_web_private_read_aloud_transport.js",
             "chatgpt_web_private_read_aloud_adapter.js",
             "chatgpt_web_private_dictation_transport.js",

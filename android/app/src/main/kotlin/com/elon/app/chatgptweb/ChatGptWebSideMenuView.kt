@@ -471,6 +471,7 @@ internal class ChatGptWebSideMenuView(
                 setTextColor(Color.parseColor(if (conversation.active) "#B4C5E3" else "#F8F7F4"))
             })
             val metadata = conversation.projectTitle.orEmpty().takeIf { it.isNotBlank() }
+                ?: "已置顶".takeIf { conversation.pinned == true }
             if (metadata != null) addView(TextView(activity).apply {
                 includeFontPadding = false
                 maxLines = 1

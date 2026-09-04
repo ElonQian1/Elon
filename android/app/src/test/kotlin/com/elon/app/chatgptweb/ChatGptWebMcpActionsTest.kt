@@ -293,6 +293,10 @@ class ChatGptWebMcpActionsTest {
                 .put("feature_id", "feature_library") to "select_navigation",
             JSONObject().put("action", "chatgpt_open_conversation")
                 .put("conversation_path", "/c/demo") to "open_conversation",
+            JSONObject().put("action", "chatgpt_set_conversation_pinned")
+                .put("conversation_path", "/c/demo")
+                .put("pinned", true)
+                .put("user_confirmed", true) to "set_conversation_pinned",
         )
 
         commands.forEach { (args, expectedAction) ->
@@ -553,7 +557,7 @@ class ChatGptWebMcpActionsTest {
     }
 
     @Test
-    fun directDictationStartRequiresCapabilityAndReturnsAReceipt() {
+    fun directDictationStartAllowsAStableComposerAndReturnsAReceipt() {
         var starts = 0
         var dispatchedRequestId = ""
         val supported = actions(
@@ -577,9 +581,15 @@ class ChatGptWebMcpActionsTest {
             dispatchedRequestId,
         )
 
-        val unsupported = actions().control(JSONObject().put("action", "chatgpt_start_dictation"))
-        assertFalse(unsupported.getBoolean("control_ok"))
-        assertEquals("dictation_unavailable", unsupported.getString("error"))
+        val temporarilyUnobserved = actions().control(
+            JSONObject().put("action", "chatgpt_start_dictation"),
+        )
+        assertTrue(temporarilyUnobserved.getBoolean("control_ok"))
+        assertEquals(
+            "start_dictation",
+            temporarilyUnobserved.getJSONObject("command_receipt")
+                .getString("expected_web_action"),
+        )
 
         val manifestSupported = actions(
             includeDictationControl = true,
@@ -709,6 +719,7 @@ class ChatGptWebMcpActionsTest {
         onSelectComposerOption: (String, String) -> Unit = { _, _ -> },
         onRequestFeatures: () -> Unit = {},
         onSelectFeature: (String) -> Unit = {},
+        onSetConversationPinned: (String, Boolean) -> Unit = { _, _ -> },
         onDispatch: (String, String) -> Unit = { _, _ -> },
     ): ChatGptWebMcpActions {
         val snapshot = ChatGptWebSnapshot(
@@ -969,6 +980,7 @@ class ChatGptWebMcpActionsTest {
                 onSelectComposerOption = onSelectComposerOption,
                 onRequestFeatures = onRequestFeatures,
                 onSelectFeature = onSelectFeature,
+                onSetConversationPinned = onSetConversationPinned,
                 onDispatch = onDispatch,
             ),
             refresh = {},
