@@ -353,7 +353,7 @@ class WebAiPrivateTransportCatalogTest {
         }
         assertEquals("completed", sendCoordinator.getString("implementation_status"))
         assertEquals(
-            "all_send_entry_points_targeted_tests_passed_device_pending",
+            "device_verified_v1_1_1520_chatgpt_adapter_247_google_adapter_40",
             sendCoordinator.getString("verification_status"),
         )
         assertTrue(sendCoordinator.getBoolean("production_default"))

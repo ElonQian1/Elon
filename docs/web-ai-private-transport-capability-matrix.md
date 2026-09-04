@@ -27,13 +27,13 @@ installed build; individual capability documents retain implementation evidence.
 | Stable conversation URL lifecycle | Google Web AI | Completed, enabled, and device verified on `v1.1.1317 (1327)` | Blank AI Mode plus native draft recovery |
 | Reply stream and completion observer | Google Web AI | Completed, enabled, and stream-to-completion device verified on `v1.1.1303 (1313)` | Official DOM snapshot |
 | Background navigation continuity | ChatGPT and Google Web AI | Completed, enabled, and device verified | Bounded official WebView recovery |
-| Unified native send ledger | ChatGPT and Google Web AI | Completed and enabled; stable request-ID reconciliation targeted tests passed, device regression pending | Official-page reconciliation without automatic write replay |
+| Unified native send ledger | ChatGPT and Google Web AI | Completed, enabled, and device verified on `v1.1.1520 (1520)` with ChatGPT adapter `247` and Google adapter `40` | Official-page reconciliation without automatic write replay |
 | Same-origin text transaction | ChatGPT | Completed, enabled, and device verified on `v1.1.1365 (1386)`, adapter `206`; current dynamic proof selects immediate official fallback | Official-page transaction without automatic write replay |
 | Interaction presets and deferred chat actions | ChatGPT | Completed, enabled, and device verified on research build `v1.1.1367 (1388)` | Current official control and WebView navigation |
 | Attachment upload reconciliation | ChatGPT | Completed, enabled, and device verified on published Release `v1.1.1374 (1395)`, adapter `207` | Official DOM attachment snapshot and bounded timeout |
-| Native attachment upload progress | ChatGPT | Implemented and enabled; monotonic count propagation and presentation tests passed, device UI acceptance pending | Indeterminate native status and official DOM attachment snapshot |
+| Native attachment upload progress | ChatGPT | Completed, enabled, and device verified on `v1.1.1491 (1491)`, adapter `239` | Indeterminate native status and official DOM attachment snapshot |
 | Native image assets and cache-first gallery | ChatGPT | Completed, enabled, and device verified on Release candidate `v1.1.1375 (1396)`, adapter `208` | Bounded local image cache and official `/images` fallback |
-| Native image-generation operation status | ChatGPT | Completed and enabled; generation, preview preparation, preview failure, and terminal-hide lifecycle tests passed; consolidated device UI acceptance pending | Official composer and `/images` page |
+| Native image-generation operation status | ChatGPT | Completed, enabled, and device verified on `v1.1.1518 (1518)`, adapter `247` | Official composer and `/images` page |
 | Native private-response rich content | ChatGPT | Completed, enabled, and structurally device verified on Release `v1.1.1379 (1400)` for finance and line-chart cards | Official WebView rich content |
 | Private composer dictation | ChatGPT | Completed and enabled; page-local identity, synthetic-audio endpoint proof, strict capture ownership, buffered transcription, draft reconciliation, timeout/circuit protection, and targeted integration tests passed | No automatic fallback; idle long press explicitly selects work-mode dictation |
 | Selectable work-mode composer dictation | ChatGPT | Completed and enabled by direct reuse of the unchanged work-mode `AgentVoiceBridge`; explicit private/work selection user-verified on `v1.1.1483 (1483)` | No cross-mode fallback; idle long press switches back to private dictation |
@@ -410,6 +410,13 @@ controllers retain only provider-specific readiness messages and rendering callb
 Page command results settle only the matching request ID, so a delayed receipt cannot settle
 a newer message. Observable page/reply evidence must still be newer than the pre-send
 snapshot, so an older identical prompt cannot settle a repeated send.
+
+Production device acceptance on `v1.1.1520 (1520)` exercised the native friend-chat surface
+against ChatGPT adapter `247` and Google adapter `40`. Each provider created an isolated
+conversation, dispatched exactly one marker prompt through `set_input_text` plus `send_input`,
+observed one completed assistant turn, and restored the original conversation. Both reports
+confirmed that cookies and application data were preserved and no private conversation
+content was emitted.
 
 The coordinator never retries a write by issuing a second request. A queued command without
 a receipt moves to `unknown/reconciling`, performs bounded read-only reconciliation, and then
