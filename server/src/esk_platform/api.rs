@@ -74,7 +74,7 @@ pub(super) fn real_user<'a>(
     Ok((user, token))
 }
 
-fn administrator<'a>(
+pub(super) fn administrator<'a>(
     state: &AppState,
     headers: &'a HeaderMap,
 ) -> Result<(PublicUser, &'a str), Response> {

@@ -3,6 +3,8 @@
 mod account_snapshot_http_tests;
 #[path = "history_http_tests.rs"]
 mod history_http_tests;
+#[path = "reconciliation_http_tests.rs"]
+mod reconciliation_http_tests;
 #[path = "sellback/http_tests.rs"]
 mod sellback_http_tests;
 

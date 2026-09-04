@@ -5266,111 +5266,111 @@
       "implementation_evidence": [
         {
           "path": "contracts/assets/esk-paid-reconciliation-v1.fixture.json",
-          "content_hash": "bf1ce5dd76263d9a7955e3302920717f4fefd3900fb9fb2c8a1a314879bb30fa",
+          "content_hash": "84b4ac9c83b0055810b49e53781617a20966870dbfe729f040f75f11b7f23433",
           "locator": "",
           "evidence_kind": "configuration",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "72e91931aff64e44c5b5962143f7b26cfa587c76",
-            "head_blob_oid": "",
+            "head_commit": "9f83e1ff86027af5c7480db6112de2d1e73aca27",
+            "head_blob_oid": "70532bb27d7d2ae0ca75046e6eedcf99aa176a39",
             "worktree_blob_oid": "70532bb27d7d2ae0ca75046e6eedcf99aa176a39",
-            "state": "untracked"
+            "state": "tracked_clean"
           }
         },
         {
           "path": "docs/esk-paid-reconciliation-preview.md",
-          "content_hash": "7123fd934abf64f6cef67d9946df9385704f32cd403841aedce46d6c4094aed6",
+          "content_hash": "6ea58906f6da97aa97a827219c2f9a5d28be63bd35445b6e545a09c83fa7d6a4",
           "locator": "",
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "72e91931aff64e44c5b5962143f7b26cfa587c76",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "7a613886c912b5085ce3b60930c5afa532466278",
-            "state": "untracked"
+            "head_commit": "9f83e1ff86027af5c7480db6112de2d1e73aca27",
+            "head_blob_oid": "7a613886c912b5085ce3b60930c5afa532466278",
+            "worktree_blob_oid": "b17ce40b57140dc5cca0241c894079e3733a8cc0",
+            "state": "tracked_modified"
           }
         },
         {
           "path": "scripts/esk-paid-reconciliation/identity.js",
-          "content_hash": "e5086cd07ab480a4c8ec7524294f0252894801356d85086bc586f6590106c18e",
+          "content_hash": "98b3b2e16bf84e650805a3f01e9cd6e5350b43767c46ed1f215b87f30d8ebde5",
           "locator": "",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "72e91931aff64e44c5b5962143f7b26cfa587c76",
-            "head_blob_oid": "",
+            "head_commit": "9f83e1ff86027af5c7480db6112de2d1e73aca27",
+            "head_blob_oid": "b0890fbcc5a75191b7b697987d23db1682963301",
             "worktree_blob_oid": "b0890fbcc5a75191b7b697987d23db1682963301",
-            "state": "untracked"
+            "state": "tracked_clean"
           }
         },
         {
           "path": "scripts/esk-paid-reconciliation/input.js",
-          "content_hash": "3864b7756e364f7df9dcde6246d1a3ff1c52a57834cde9fb901d957a83e068a5",
+          "content_hash": "e5afd048008e2a2c3314a41e57be7409ed7e5b0199dd354c0248437d07c86636",
           "locator": "",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "72e91931aff64e44c5b5962143f7b26cfa587c76",
-            "head_blob_oid": "",
+            "head_commit": "9f83e1ff86027af5c7480db6112de2d1e73aca27",
+            "head_blob_oid": "1e2a0e6bd4f92f1ef88b7f0381356d2350d84bfc",
             "worktree_blob_oid": "1e2a0e6bd4f92f1ef88b7f0381356d2350d84bfc",
-            "state": "untracked"
+            "state": "tracked_clean"
           }
         },
         {
           "path": "scripts/esk-paid-reconciliation/preview.js",
-          "content_hash": "e0abe0ed505074330797ddce29eb23a96589bb1727fc338cbb902ef0e1567080",
+          "content_hash": "84415d307872b84ecc497c5f7d2d33b711cf1988bac92811a5f6f4915b90ae72",
           "locator": "",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "72e91931aff64e44c5b5962143f7b26cfa587c76",
-            "head_blob_oid": "",
+            "head_commit": "9f83e1ff86027af5c7480db6112de2d1e73aca27",
+            "head_blob_oid": "47dddfd22fdc9e758929c86c43e451720cbe6972",
             "worktree_blob_oid": "47dddfd22fdc9e758929c86c43e451720cbe6972",
-            "state": "untracked"
+            "state": "tracked_clean"
           }
         },
         {
           "path": "scripts/esk-paid-reconciliation/strict-json.js",
-          "content_hash": "020f97a8da221cafa943532324717419df078d5ae4d18c725b4fd723f878b3e8",
+          "content_hash": "c2a35f02da5a4fb753de9fb5a45fd85a4be4828a3b8d7f7d49942387748eacc5",
           "locator": "",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "72e91931aff64e44c5b5962143f7b26cfa587c76",
-            "head_blob_oid": "",
+            "head_commit": "9f83e1ff86027af5c7480db6112de2d1e73aca27",
+            "head_blob_oid": "ccd684a291b6a7de55e12d86f3e270d5dd164c83",
             "worktree_blob_oid": "ccd684a291b6a7de55e12d86f3e270d5dd164c83",
-            "state": "untracked"
+            "state": "tracked_clean"
           }
         },
         {
           "path": "scripts/preview-esk-paid-reconciliation.js",
-          "content_hash": "2c7144a7fe145c4bfc8930e1f8a6b454f1f7b7cef8db3c4a766541ded63a9e12",
+          "content_hash": "a9e56a3eea93b44abe199c7d57776cb7103809f3cf0816ce6ea1cdb904c51fe4",
           "locator": "",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "72e91931aff64e44c5b5962143f7b26cfa587c76",
-            "head_blob_oid": "",
+            "head_commit": "9f83e1ff86027af5c7480db6112de2d1e73aca27",
+            "head_blob_oid": "4e2cfca4284e00b3e0f517add8fbe6cc0dd06679",
             "worktree_blob_oid": "4e2cfca4284e00b3e0f517add8fbe6cc0dd06679",
-            "state": "untracked"
+            "state": "tracked_clean"
           }
         },
         {
           "path": "scripts/test-esk-paid-reconciliation.js",
-          "content_hash": "b006981ad47ae6b29877064c2ac6310a073ddb2a74a8e4cf13e4a8c6c31a9bb7",
+          "content_hash": "d85d95704d82060c6d70b8e4938de9de985b7edd4c6cd92d5719c662834d20cf",
           "locator": "",
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "72e91931aff64e44c5b5962143f7b26cfa587c76",
-            "head_blob_oid": "",
+            "head_commit": "9f83e1ff86027af5c7480db6112de2d1e73aca27",
+            "head_blob_oid": "8725363e2ed5371b8165f9c97897a94b2c73f950",
             "worktree_blob_oid": "8725363e2ed5371b8165f9c97897a94b2c73f950",
-            "state": "untracked"
+            "state": "tracked_clean"
           }
         }
       ],
       "created_at_ms": 1788503035535,
-      "updated_at_ms": 1788503644581
+      "updated_at_ms": 1788542423402
     },
     {
       "id": "esk-paper-asset-account-v1",
@@ -7862,6 +7862,325 @@
       ],
       "created_at_ms": 1788513355363,
       "updated_at_ms": 1788515527722
+    },
+    {
+      "id": "esk-platform-reconciliation-snapshot-v1",
+      "title": "ESK 正式付款占用快照与预演接入",
+      "summary": "从同一正式账本事务导出管理员只读付款占用快照，连接既有离线付款预演；含待审核和已登记、排除纯取消，不把正式范围完整冒充全历史完整，不产生入账权限。",
+      "status": "verified",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/esk-platform-reconciliation-snapshot-v1.md",
+        "content_hash": "dffd87b3ebe02123ee4fcd81563824625ee00bc06522713268fad7c7bef10272",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "9f83e1ff86027af5c7480db6112de2d1e73aca27",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "3ebc3aaaec63f599c918ee718d889ac026e060f0",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "platform-assets",
+      "tags": [],
+      "task_paths": [
+        "scripts/esk-paid-reconciliation/platform-preview.js",
+        "scripts/esk-paid-reconciliation/platform-snapshot.js",
+        "scripts/preview-esk-platform-reconciliation.js",
+        "scripts/test-esk-platform-reconciliation.js",
+        "server/src/esk_platform/reconciliation_api.rs",
+        "server/src/esk_platform/reconciliation_snapshot.rs",
+        "server/src/store/common/esk_platform_assets/reconciliation.rs"
+      ],
+      "dependencies": [
+        "esk-paid-user-reconciliation-preview-v1",
+        "esk-platform-recorded-assets-v1"
+      ],
+      "acceptance_criteria": [
+        "同一真实管理员会话只读事务导出固定政策/未取消付款键，最多10000，损坏或超量不返回假完整",
+        "正式快照与原人工历史合并进入现有预演，来源/摘要/时限/外部完整性不放宽",
+        "真实Store到JS CLI合成端到端覆盖准备/登记/取消/重放和跨来源，无余额副作用",
+        "生产Router/本地TCP、后端发布与公开未授权检查分轴记录；无真实用户操作"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "docs/esk-platform-reconciliation-snapshot.md",
+          "content_hash": "dbb1009e2430a29fd391777ffa85566472e3b22ac9a887695a2658614cb6e49c",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9f83e1ff86027af5c7480db6112de2d1e73aca27",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "8c3f0f7648866418eb76e04683568806dab14bb6",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "scripts/esk-paid-reconciliation/platform-preview.js",
+          "content_hash": "5c11ea7c90791d94b1d66388db47972db413d446cb514b4ddd7c91181df667fd",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9f83e1ff86027af5c7480db6112de2d1e73aca27",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "b7a56ef474e4e89310686001377912a6ba9e88a0",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "scripts/esk-paid-reconciliation/platform-snapshot.js",
+          "content_hash": "5d34048f8d32f3dfe6bcefeecf043ce6b5480c534ed5152028dfae058de2b5b5",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9f83e1ff86027af5c7480db6112de2d1e73aca27",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "20d97c5885f8441be882272ef791723c60155113",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "scripts/preview-esk-platform-reconciliation.js",
+          "content_hash": "8b3c0b09f0127e574e090ef7baaa11805b132b695ee93e6882ad937ffa9f0dd4",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9f83e1ff86027af5c7480db6112de2d1e73aca27",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "ea23d5f05f8e889e440c7ec224e3b08f859050d5",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "scripts/test-esk-platform-reconciliation.js",
+          "content_hash": "3a78454c7b854748c7b8cec4180a0900eac6cbf4dc57be106f80bd552ee0a042",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9f83e1ff86027af5c7480db6112de2d1e73aca27",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "415b6fcdc5fd9df1a8990341478dfdb337181986",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/src/esk_platform/api.rs",
+          "content_hash": "d86ff7f38136e84570e841415c00228e3676ecbae1ba83d72cfbb7ffb0e9f218",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9f83e1ff86027af5c7480db6112de2d1e73aca27",
+            "head_blob_oid": "26bdc55ad9a80ecc3ea71c7484c41857caacb4e7",
+            "worktree_blob_oid": "4b701e027d65b6422b7c335fa5324182ff86e6d3",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/esk_platform/http_tests.rs",
+          "content_hash": "35c3c658b959aab48ebf5c8b9bdb807c9115be25a8c39cfd91ed8afbc01fe16a",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9f83e1ff86027af5c7480db6112de2d1e73aca27",
+            "head_blob_oid": "d39bfc5e5574ce66591704a104e4be22ade13e27",
+            "worktree_blob_oid": "2c6439cbe7e765bf38d2fee4651de1a23b173a45",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/esk_platform/mod.rs",
+          "content_hash": "15765485c380967659ab1d70b47a7c00726b11b8c80350e3b0645b01aaf0e233",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9f83e1ff86027af5c7480db6112de2d1e73aca27",
+            "head_blob_oid": "1c64d2a713df06e6a0e9f42738c23b84dfbd0e53",
+            "worktree_blob_oid": "cb15cf6b77193b621b96356697b28473691d2563",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/esk_platform/reconciliation_api.rs",
+          "content_hash": "2d0855dde909d9454ec270d1dd78d320a6f2bbaf0fd723b0f4ac9fe42ba9fad2",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9f83e1ff86027af5c7480db6112de2d1e73aca27",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "6843a3b105ef61b20823ce294042999c65ade6a0",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/src/esk_platform/reconciliation_auth_http_tests.rs",
+          "content_hash": "2824cc60b27eedfa4b03addec2da80f7356e074e66051c4fb8f5053ffedc5e53",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9f83e1ff86027af5c7480db6112de2d1e73aca27",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "d403625036d945f542c84bd92048938744abb301",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/src/esk_platform/reconciliation_http_support.rs",
+          "content_hash": "209208c26f674f2b8c8ad1eb6ca5bbeb82cb0d53b16fbc9037f69b59cea5db86",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9f83e1ff86027af5c7480db6112de2d1e73aca27",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "0507b765e04e9a1018c9684a98c03358b506969a",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/src/esk_platform/reconciliation_http_tests.rs",
+          "content_hash": "4cffca28bdebfc20e94f34df0e62762ea4eb6f58a8f64043c3a4f9272b5029f5",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9f83e1ff86027af5c7480db6112de2d1e73aca27",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "9f96fac9c326cd77299e483d5ec419d2f7b8a19e",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/src/esk_platform/reconciliation_snapshot.rs",
+          "content_hash": "510dddbcf161707c41646e161bab37cf94eeb9afb7ec35f41609f4bcad82f2da",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9f83e1ff86027af5c7480db6112de2d1e73aca27",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "fc05b02833c330bdfa21ff3413397e54356dd4e3",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/src/store/common/esk_platform_assets/mod.rs",
+          "content_hash": "744803010a22fc66d252290f7faaeea0b8d799ab10aaaf7091549b5055133449",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9f83e1ff86027af5c7480db6112de2d1e73aca27",
+            "head_blob_oid": "4e6f6ea9b850ec9002bef0ae8eedf28834a3d776",
+            "worktree_blob_oid": "7b59cab3256154b2d286f4de344b14e0561c3047",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/store/common/esk_platform_assets/reconciliation.rs",
+          "content_hash": "7a1d3653812a481d5b7715e346ec2032a88d2c6d1588421d3bc263e42b372c11",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9f83e1ff86027af5c7480db6112de2d1e73aca27",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "47ca7364ce23a43dd65fd3db27ff5e0994214afe",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/tests/esk-platform-harness/Cargo.lock",
+          "content_hash": "78fc829208fdcf219cfcd3474fde415204aec14f6c3701cf312cb14d37a2e12f",
+          "locator": "",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9f83e1ff86027af5c7480db6112de2d1e73aca27",
+            "head_blob_oid": "531340335bb898d881fc8062c18e3c31d2aa106a",
+            "worktree_blob_oid": "c0644e0119c65a26da340982367b4e189f1d1351",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/tests/esk-platform-harness/Cargo.toml",
+          "content_hash": "4253cf4b59d7ef14c58f67303d6d220804b886c148121e5ca6007e413c890644",
+          "locator": "",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9f83e1ff86027af5c7480db6112de2d1e73aca27",
+            "head_blob_oid": "dd3b265e28c92bc5f7990ecb8d6c2cb8e582fa75",
+            "worktree_blob_oid": "ee4a325daced58160b404443488842527751b58b",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/tests/esk-platform-harness/src/platform.rs",
+          "content_hash": "a94c82521ceea1e1ac71801471ee747e1824625f018d1825e1d9046c7b20b664",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9f83e1ff86027af5c7480db6112de2d1e73aca27",
+            "head_blob_oid": "cec5eda15ce0eddf34ad38c4f66d33a35d9ee67e",
+            "worktree_blob_oid": "fd9ae220f7b058b2278593df6df9a1e4d85c914a",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/tests/esk-platform-harness/src/tests/mod.rs",
+          "content_hash": "4b94d0a1a3ca7567535b982362b4179cbc87a79223572a0b5d7b10cefd91ea32",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9f83e1ff86027af5c7480db6112de2d1e73aca27",
+            "head_blob_oid": "c2abbb3d17ab9d5c5e6f102f61391531860bb730",
+            "worktree_blob_oid": "e24223886d0716ff5c24e4fb259edca8cd8b543e",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/tests/esk-platform-harness/src/tests/reconciliation_snapshot.rs",
+          "content_hash": "98125f6686c264f5de1a7205411e9059c331873378eab243fd8097a4f1f37b27",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9f83e1ff86027af5c7480db6112de2d1e73aca27",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "30df0b933a32e5952909e6fb026789433732c1a3",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/tests/esk-platform-harness/src/tests/reconciliation_snapshot_support.rs",
+          "content_hash": "d9c8bfed8284ddbe7bdb77628e0aee4d5ae0e8fad268c81ffb77085daa8f60a3",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9f83e1ff86027af5c7480db6112de2d1e73aca27",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "0bda75ec9d07a17f011e9f5583222313f3c34352",
+            "state": "index_only"
+          }
+        }
+      ],
+      "created_at_ms": 1788541380728,
+      "updated_at_ms": 1788542958170
     },
     {
       "id": "esk-platform-recorded-assets-v1",
@@ -18854,136 +19173,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_b3d49c8d187841dda5c3d8f836bab757",
-      "feature_id": "esk-asset-profile-first-screen-v2",
-      "action": "transitioned",
-      "actor": "codex-desktop ai助手",
-      "reason": "需求范围与安全边界复审通过。",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1788362660669
-    },
-    {
-      "id": "feature_event_bf6161e09d6a42ffb2a060f1b6cf5886",
-      "feature_id": "esk-asset-profile-first-screen-v2",
-      "action": "transitioned",
-      "actor": "codex-desktop ai助手",
-      "reason": "依赖为空且验收标准可执行，进入实现准备。",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1788362660856
-    },
-    {
-      "id": "feature_event_0e88c3dbba5041b8bce260da20e19621",
-      "feature_id": "esk-asset-profile-first-screen-v2",
-      "action": "claimed",
-      "actor": "codex-desktop ai助手",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788362661049
-    },
-    {
-      "id": "feature_event_be81d30a5a054b10a61a75d5980acb38",
-      "feature_id": "esk-asset-profile-first-screen-v2",
-      "action": "transitioned",
-      "actor": "codex-desktop ai助手",
-      "reason": "继续已完成的个人中心资产实现与发布验证。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788362661227
-    },
-    {
-      "id": "feature_event_ea75533c517d46d5a82e2501fd7d513b",
-      "feature_id": "esk-asset-profile-first-screen-v2",
-      "action": "evidence_recorded",
-      "actor": "codex-desktop ai助手",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788362662778
-    },
-    {
-      "id": "feature_event_9ed3e7abf9b94643a804b1821aa3c751",
-      "feature_id": "esk-asset-profile-first-screen-v2",
-      "action": "transitioned",
-      "actor": "codex-desktop ai助手",
-      "reason": "Android 与移动 Web 资产首屏实现完成，定向合同和编译已通过。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1788362662927
-    },
-    {
-      "id": "feature_event_9d191048de2b48d5bf7289c00a3cacae",
-      "feature_id": "esk-asset-profile-first-screen-v2",
-      "action": "transitioned",
-      "actor": "codex-desktop ai助手",
-      "reason": "定向静态合同、现有 ESK 合同与 Android Kotlin 编译验证通过；真机状态单独记录为 deferred。",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1788362663102
-    },
-    {
-      "id": "feature_event_b2b5fd7c51df45d49b25993a767ce1b8",
-      "feature_id": "esk-asset-profile-first-screen-v2",
-      "action": "transitioned",
-      "actor": "codex-desktop ai助手",
-      "reason": "主服务 v0.3.1718 与主 APK v1.1.1412 (1433) 已发布并回读同一源码提交 a8f7ea9817e6321aabb23ee66154775687ace400。",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1788366843075
-    },
-    {
-      "id": "feature_event_cd15e26da8a143f0a13f30374d46b69c",
-      "feature_id": "esk-paper-usdt-exchange-v1",
-      "action": "registered",
-      "actor": "codex-root",
-      "reason": "用户要求 USDT 与 ESK 随时兑换并收取手续费；先交付安全、可验证、可发布的 Paper 结算闭环。",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1788385089794
-    },
-    {
-      "id": "feature_event_f28509db8729426bb9da4faffcbe48d5",
-      "feature_id": "esk-paper-usdt-exchange-v1",
-      "action": "claimed",
-      "actor": "codex-root",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788385100862
-    },
-    {
-      "id": "feature_event_bfddd633aa3a43189469297429101c78",
-      "feature_id": "esk-paper-usdt-exchange-v1",
-      "action": "transitioned",
-      "actor": "codex-root",
-      "reason": "正式需求和依赖已确认，开始实现 Paper 兑换垂直闭环。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788385110847
-    },
-    {
-      "id": "feature_event_c74096bfaa08461e92c5f84ebafb02c1",
-      "feature_id": "esk-paper-usdt-exchange-v1",
-      "action": "evidence_recorded",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788387222174
-    },
-    {
-      "id": "feature_event_0d74ee083fd3456f8f9ec2b2e4a8cceb",
-      "feature_id": "esk-paper-usdt-exchange-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "后端原子账本、三端报价确认界面和跨端协议已实现，定向编译与测试通过。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1788387242447
-    },
-    {
       "id": "feature_event_549d02adfd404c209de7c6795bf92385",
       "feature_id": "esk-paper-usdt-exchange-v1",
       "action": "transitioned",
@@ -20852,6 +21041,136 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1788540762220
+    },
+    {
+      "id": "feature_event_4abcaecd7fd641fd9ab2b763c7558f1f",
+      "feature_id": "esk-platform-reconciliation-snapshot-v1",
+      "action": "registered",
+      "actor": "Codex",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1788541380728
+    },
+    {
+      "id": "feature_event_02da0e1207834396b74205c5ad86b239",
+      "feature_id": "esk-platform-reconciliation-snapshot-v1",
+      "action": "claimed",
+      "actor": "codex-esk-platform-reconciliation",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788541381507
+    },
+    {
+      "id": "feature_event_44dd7c0113bd4bebbfd0ce4953d5dd30",
+      "feature_id": "esk-platform-reconciliation-snapshot-v1",
+      "action": "transitioned",
+      "actor": "Codex",
+      "reason": "核对现有正式防重已具备，独立审查确认预演缺少权威付款占用快照；按已冻结模型与只读API/CLI纵向实现。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788541382325
+    },
+    {
+      "id": "feature_event_d10bd152a4de42539545941470d81abf",
+      "feature_id": "esk-paid-user-reconciliation-preview-v1",
+      "action": "transitioned",
+      "actor": "codex-esk-platform-reconciliation",
+      "reason": "有意更新操作手册，链接新增正式账本只读快照；原算法/协议不变，重跑原80项测试后重新绑定全部原证据。",
+      "from_status": "verified",
+      "to_status": "ready",
+      "at_ms": 1788542119425
+    },
+    {
+      "id": "feature_event_b35286bb4bac4131bb684471be43aa7b",
+      "feature_id": "esk-paid-user-reconciliation-preview-v1",
+      "action": "claimed",
+      "actor": "codex-esk-platform-reconciliation",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788542120789
+    },
+    {
+      "id": "feature_event_f345a08099e44ad8b730e8691a29fabe",
+      "feature_id": "esk-paid-user-reconciliation-preview-v1",
+      "action": "transitioned",
+      "actor": "codex-esk-platform-reconciliation",
+      "reason": "只更新操作手册链接及真实状态，随后刷新原有证据。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788542141556
+    },
+    {
+      "id": "feature_event_6d8b1a202557414698a4c7fb3dc4e0cc",
+      "feature_id": "esk-paid-user-reconciliation-preview-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-esk-platform-reconciliation",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788542421065
+    },
+    {
+      "id": "feature_event_9c13b1bb10be49339f474cd9bed9d5da",
+      "feature_id": "esk-paid-user-reconciliation-preview-v1",
+      "action": "transitioned",
+      "actor": "codex-esk-platform-reconciliation",
+      "reason": "手册已链接正式快照与正式账本，原CLI80项、资产合同和Sui基础静态回归通过；未声称真实付款核验。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1788542422599
+    },
+    {
+      "id": "feature_event_a3040283351e48d98ea0a8d9d19ca2d0",
+      "feature_id": "esk-paid-user-reconciliation-preview-v1",
+      "action": "transitioned",
+      "actor": "codex-esk-platform-reconciliation",
+      "reason": "原80项离线测试、资产合同与Sui基础静态回归通过；原8项源码/配置/测试/手册证据重新绑定。扩展的HTTP发布属于独立快照功能。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1788542423402
+    },
+    {
+      "id": "feature_event_3a02eb951a2b44f899a465294728e350",
+      "feature_id": "esk-platform-reconciliation-snapshot-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-esk-platform-reconciliation",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788542627114
+    },
+    {
+      "id": "feature_event_26b27f84978047e0abcfc547c50e7b33",
+      "feature_id": "esk-platform-reconciliation-snapshot-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-esk-platform-reconciliation",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788542629684
+    },
+    {
+      "id": "feature_event_f4b46f90bd954df1b62a266f9610e536",
+      "feature_id": "esk-platform-reconciliation-snapshot-v1",
+      "action": "transitioned",
+      "actor": "codex-esk-platform-reconciliation",
+      "reason": "Store/HTTP/离线桥接已实现；独立harness120项、桥接41项和原预演80项通过，生产platform整组测试通过，含真实Router及loopback。尚未发布和真实私人验收。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1788542957523
+    },
+    {
+      "id": "feature_event_7d94f2eef1e448c6a3e26dc8543b2110",
+      "feature_id": "esk-platform-reconciliation-snapshot-v1",
+      "action": "transitioned",
+      "actor": "codex-esk-platform-reconciliation",
+      "reason": "官方Rust验证成功；合成真实Store到实际CLI、权限/故障/上限与生产HTTP路径回归通过。21项实现证据当前。仅代码与合成验证，真实付款/账户/资金未操作。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1788542958170
     }
   ]
 }

@@ -11,6 +11,7 @@ use super::{hash_token, new_id, now};
 mod cancel;
 mod history;
 mod read;
+mod reconciliation;
 mod sellback;
 mod write;
 

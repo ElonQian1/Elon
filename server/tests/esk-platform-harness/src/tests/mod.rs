@@ -7,6 +7,8 @@ mod auth;
 mod cancellation;
 mod history;
 mod history_boundaries;
+mod reconciliation_snapshot;
+mod reconciliation_snapshot_support;
 mod recovery;
 mod sellback;
 mod transactions;

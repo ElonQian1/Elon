@@ -1,7 +1,7 @@
 ---
 title: "ESK 历史付款对账预演操作手册"
 version_status: current
-reviewed_at: 2026-09-04
+reviewed_at: 2026-09-05
 owners: [platform-assets]
 ---
 
@@ -66,7 +66,9 @@ Base58/提供商资产标识保留大小写。接入方必须事先规定正确�
 
 `sourceFingerprint(source)` 绑定来源配置，包括精度和引用编码；运营工具应调用
 该函数构造历史快照的来源摘要。变更来源配置时必须重新取得匹配的历史快照，
-不能只重新计算摘要使旧快照看似有效。快照由人工提供，目前无可信数据库导出适配器。
+不能只重新计算摘要使旧快照看似有效。原 CLI 仍接收人工历史快照；正式平台账本的
+占用记录现由 [只读快照接入](esk-platform-reconciliation-snapshot.md) 补充。
+该接入不核实外部到账，也不能替代旧系统、其他产品和外部付款历史的覆盖核对。
 
 USDT 金额按声明的 0..18 位精度转换为整数，最大 u128。ESK 单条和单用户拟分配
 不超过主项目 i64 base units；合计只使用 BigInt。销售比率必须整除到 ESK 最小单位，
@@ -111,7 +113,9 @@ node scripts/test-esk-sui-genesis-foundation.js
 服务器部署、APK 发布、真实付款核验或余额写入。共享 Feature Registry 绑定当前
 需求、源码和测试；准确推送身份以提交及统一收尾回执为准。
 
-下一轮：可信来源的历史付款快照导出、运营用户映射查询和正式入账审批合同。
+当前扩展：[正式付款占用快照与预演接入](esk-platform-reconciliation-snapshot.md)，
+已有 [正式登记账本](esk-platform-recorded-assets.md)。本手册原 CLI 的离线属性不变。
+待完成：外部历史来源覆盖、运营用户映射核实，以及授权后的真实付款与逐笔审批验收。
 实际写入必须在服务端事务中再次检查付款唯一性、用途、当前余额与审批，不能只信任
 离线 `review_ready`；随后才是地址绑定、claim、迁移反向结转与两端资产来源展示。
 ESK 销售和 QSHARE 申购不能共用同一笔付款，不能据本报告自动进量化仓位。
