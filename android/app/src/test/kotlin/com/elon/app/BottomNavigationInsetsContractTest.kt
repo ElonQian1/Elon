@@ -75,6 +75,25 @@ class BottomNavigationInsetsContractTest {
     }
 
     @Test
+    fun selectedBackgroundsRemainFullyVisibleInsideNarrowNavigationSlots() {
+        val layout = readRepositoryFile("android/app/src/main/res/layout/activity_main.xml")
+        val navigationRow = childOpeningTag(layout, "bottomNavPrimaryPanel", "LinearLayout")
+        assertTrue(navigationRow.contains("android:clipChildren=\"false\""))
+        assertTrue(navigationRow.contains("android:clipToPadding=\"false\""))
+        listOf("tabProjectWrap", "tabProfileWrap").forEach { id ->
+            val slot = openingTag(layout, "FrameLayout", id)
+            assertTrue(slot.contains("android:clipChildren=\"false\""))
+            assertTrue(slot.contains("android:clipToPadding=\"false\""))
+        }
+
+        val web = readRepositoryFile("server/src/assets/web_page.html")
+        assertTrue(
+            Regex("""\.tabs-panel\s*\{[^}]*overflow:\s*visible;""", RegexOption.DOT_MATCHES_ALL)
+                .containsMatchIn(web)
+        )
+    }
+
+    @Test
     fun webMirrorUsesTheSameStitchGeometry() {
         val web = readRepositoryFile("server/src/assets/web_page.html")
         assertTrue(
@@ -236,6 +255,28 @@ class BottomNavigationInsetsContractTest {
         require(start >= 0) { "Missing $id" }
         val end = layout.indexOf(">", layout.indexOf(marker))
         require(end >= 0) { "Unclosed $id" }
+        return layout.substring(start, end)
+    }
+
+    private fun openingTag(layout: String, tag: String, id: String): String {
+        val marker = "android:id=\"@+id/$id\""
+        val markerIndex = layout.indexOf(marker)
+        require(markerIndex >= 0) { "Missing $id" }
+        val start = layout.lastIndexOf("<$tag", markerIndex)
+        require(start >= 0) { "Missing $tag for $id" }
+        val end = layout.indexOf(">", markerIndex)
+        require(end >= 0) { "Unclosed $id" }
+        return layout.substring(start, end)
+    }
+
+    private fun childOpeningTag(layout: String, parentId: String, childTag: String): String {
+        val marker = "android:id=\"@+id/$parentId\""
+        val parentIndex = layout.indexOf(marker)
+        require(parentIndex >= 0) { "Missing $parentId" }
+        val start = layout.indexOf("<$childTag", parentIndex)
+        require(start >= 0) { "Missing $childTag child in $parentId" }
+        val end = layout.indexOf(">", start)
+        require(end >= 0) { "Unclosed $childTag child in $parentId" }
         return layout.substring(start, end)
     }
 

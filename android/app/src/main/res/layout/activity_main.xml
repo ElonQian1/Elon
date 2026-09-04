@@ -1399,6 +1399,8 @@
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
+                        android:clipChildren="false"
+                        android:clipToPadding="false"
                         android:orientation="horizontal">
 
                     <FrameLayout
@@ -1456,7 +1458,9 @@
                         android:id="@+id/tabProjectWrap"
                         android:layout_width="48dp"
                         android:layout_height="match_parent"
-                        android:layout_marginStart="8dp">
+                        android:layout_marginStart="8dp"
+                        android:clipChildren="false"
+                        android:clipToPadding="false">
 
                         <ImageView
                             android:id="@+id/tabProjectSelection"
@@ -1490,7 +1494,9 @@
                         android:id="@+id/tabProfileWrap"
                         android:layout_width="48dp"
                         android:layout_height="match_parent"
-                        android:layout_marginStart="8dp">
+                        android:layout_marginStart="8dp"
+                        android:clipChildren="false"
+                        android:clipToPadding="false">
 
                         <ImageView
                             android:id="@+id/tabProfileSelection"
