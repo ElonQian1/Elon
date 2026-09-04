@@ -176,9 +176,7 @@ internal class ChatGptBackgroundSession(
     private val webExecution: ChatGptBackgroundExecutionController =
         chatGptBackgroundExecutionController({ webView }) {
             surfaceMode.isSkin() || realtimeVoiceBacking.isActive() ||
-                latestSnapshot?.streaming == true ||
-                latestSnapshot?.privateReadAloudState == "loading" ||
-                latestSnapshot?.privateReadAloudState == "playing" ||
+                latestSnapshot.keepsBackgroundExecutionActive() ||
                 conversationNavigation.hasPending() || sendOwner.hasAttachmentSend()
         }
     private val privateDictation = ChatGptBackgroundPrivateDictation(

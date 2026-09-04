@@ -46,16 +46,8 @@ internal class ChatGptWebMcpActions(
             .put("composer_ready", current?.composerReady ?: false)
             .put("dictation_active", current?.dictationActive ?: false)
             .put("streaming", current?.streaming ?: false)
-            .put("private_stream_observer", JSONObject()
-                .put("observed", current?.privateStreamObserved ?: false)
-                .put("revision", current?.privateStreamRevision ?: 0L)
-                .put("state", current?.privateStreamState ?: "idle")
-            )
-            .put("private_read_aloud", JSONObject()
-                .put("ready", current?.privateReadAloudReady ?: false)
-                .put("state", current?.privateReadAloudState ?: "idle")
-                .put("context_id", current?.privateReadAloudContextId.orEmpty())
-            )
+            .put("private_stream_observer", ChatGptWebPrivateMcpStatus.stream(current))
+            .put("private_read_aloud", ChatGptWebPrivateMcpStatus.readAloud(current))
             .put("conversation", conversationJson(current))
             .put("input", JSONObject()
                 .put("text", inputText().take(MAX_INPUT_CHARS))
@@ -132,9 +124,7 @@ internal class ChatGptWebMcpActions(
                         uiManifest()?.controls.orEmpty(),
                     )?.let { return error(action, it) }
                 }
-                if (control.semantic == "read_aloud") {
-                    ChatGptWebPrivateResearchEventRecorder.beginVoiceWindow()
-                }
+                ChatGptWebPrivateMcpStatus.observeOfficialControl(control.semantic)
                 dispatch(if (afterTouchMiss) "invoke_ui_control_after_touch_miss" else "invoke_ui_control") { requestId ->
                     if (afterTouchMiss) commands.invokeControlAfterTouchMiss(controlId, requestId)
                     else commands.invokeControl(controlId, requestId)
@@ -231,25 +221,9 @@ internal class ChatGptWebMcpActions(
                 }
                 dispatch("regenerate_response", commands::regenerateResponse)
             }
-            "chatgpt_toggle_private_read_aloud" -> {
-                val current = snapshot()
-                if (current?.privateReadAloudReady != true) {
-                    return error(action, "private_read_aloud_not_ready")
-                }
-                val contextId = args.optString("context_id").trim()
-                if (!MESSAGE_CONTEXT_ID.matches(contextId)) {
-                    return error(action, "invalid_context_id")
-                }
-                val message = current.messages.firstOrNull { it.id == contextId }
-                    ?: return error(action, "stale_message_id")
-                if (message.role != "assistant" || message.state != "completed") {
-                    return error(action, "read_aloud_unavailable")
-                }
-                ChatGptWebPrivateResearchEventRecorder.beginVoiceWindow()
-                dispatch("toggle_private_read_aloud") { requestId ->
-                    commands.togglePrivateReadAloud(contextId, requestId)
-                }
-            }
+            "chatgpt_toggle_private_read_aloud" ->
+                ChatGptWebPrivateReadAloudMcpAction.dispatch(args, snapshot(), commands, ::dispatch)
+                    ?.let { return error(action, it) }
             "chatgpt_start_dictation" -> {
                 val current = snapshot()
                 if (current?.dictationActive == true) return error(action, "dictation_already_active")
@@ -814,7 +788,6 @@ internal class ChatGptWebMcpActions(
         const val NAVIGATION_SCHEMA = "elon.chatgpt_web.navigation.v2"
         const val CONVERSATION_SUMMARY_SCHEMA = "elon.chatgpt_web.conversation_summary.v2"
         val CONTROL_ID = Regex("control_[a-z0-9_]{1,63}")
-        val MESSAGE_CONTEXT_ID = Regex("[A-Za-z0-9_.:-]{1,160}")
         val COMPOSER_SECTIONS = setOf("model", "tools")
         val LOCAL_ACTIONS = setOf(
             "state",

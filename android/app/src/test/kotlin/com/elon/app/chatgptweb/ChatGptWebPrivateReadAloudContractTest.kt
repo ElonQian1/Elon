@@ -15,14 +15,17 @@ class ChatGptWebPrivateReadAloudContractTest {
             "android/app/src/main/assets/chatgpt_web_private_read_aloud_transport.js",
         )
         val adapter = read("android/app/src/main/assets/chatgpt_web_adapter.js")
+        val adapterModule = read(
+            "android/app/src/main/assets/chatgpt_web_private_read_aloud_adapter.js",
+        )
         val pageAdapter = read(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebPageAdapter.kt",
         )
         val backgroundWebView = read(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptBackgroundWebViewFactory.kt",
         )
-        val backgroundSession = read(
-            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptBackgroundSession.kt",
+        val backgroundExecution = read(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptBackgroundExecutionController.kt",
         )
 
         assertTrue(transport.contains("privateTransport.copySameOriginRequestHeaders()"))
@@ -41,14 +44,16 @@ class ChatGptWebPrivateReadAloudContractTest {
         assertTrue(transport.contains("URL.revokeObjectURL(objectUrl)"))
         assertFalse(transport.contains("Cookie"))
         assertFalse(transport.contains("postMessage(JSON.stringify(headers"))
-        assertTrue(adapter.contains("privateReadAloudTransport.toggle"))
-        assertTrue(adapter.contains("privateReadAloudState"))
+        assertTrue(adapter.contains("privateReadAloudAdapter?.handle"))
+        assertTrue(adapterModule.contains("transport.toggle"))
+        assertTrue(adapterModule.contains("event.privateReadAloudState"))
         assertTrue(pageAdapter.contains("chatgpt_web_private_read_aloud_transport.js"))
+        assertTrue(pageAdapter.contains("chatgpt_web_private_read_aloud_adapter.js"))
         assertTrue(backgroundWebView.contains(
             "mediaPlaybackRequiresUserGesture = !BuildConfig.CHATGPT_PRIVATE_READ_ALOUD_ENABLED",
         ))
-        assertTrue(backgroundSession.contains(
-            "latestSnapshot?.privateReadAloudState == \"playing\"",
+        assertTrue(backgroundExecution.contains(
+            "this?.privateReadAloudState == \"playing\"",
         ))
     }
 

@@ -92,6 +92,11 @@ internal fun webChatBackgroundExecutionController(
 
 internal typealias ChatGptBackgroundExecutionController = WebChatBackgroundExecutionController
 
+internal fun ChatGptWebSnapshot?.keepsBackgroundExecutionActive(): Boolean =
+    this?.streaming == true ||
+        this?.privateReadAloudState == "loading" ||
+        this?.privateReadAloudState == "playing"
+
 internal fun chatGptBackgroundExecutionController(
     webView: () -> WebView?,
     isBusy: () -> Boolean,

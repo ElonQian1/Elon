@@ -632,6 +632,7 @@ internal class ChatGptWebPageAdapter(
             "chatgpt_web_private_transport_policy.js",
             "chatgpt_web_private_transport.js",
             "chatgpt_web_private_read_aloud_transport.js",
+            "chatgpt_web_private_read_aloud_adapter.js",
             "chatgpt_web_private_dictation_transport.js",
             "chatgpt_web_private_dictation_orchestrator.js",
             "chatgpt_web_private_text_transaction_policy.js",
