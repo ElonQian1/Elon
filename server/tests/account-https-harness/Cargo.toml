@@ -1,0 +1,18 @@
+[package]
+name = "elon-account-https-harness"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[workspace]
+
+[dependencies]
+anyhow = "1"
+axum = { version = "0.7", features = ["ws", "multipart", "macros"] }
+hex = "0.4"
+serde_json = "1"
+sha2 = "0.10"
+thiserror = "1"
+tokio = { version = "1", features = ["full"] }
+tower = { version = "0.4", features = ["util"] }
+uuid = { version = "1", features = ["v4"] }

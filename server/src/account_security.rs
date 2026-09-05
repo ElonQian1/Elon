@@ -17,6 +17,8 @@ use crate::{
     types::AppState,
 };
 
+pub(crate) mod https;
+
 #[path = "openai_chatkit_api.rs"]
 pub(crate) mod openai_chatkit_api;
 
