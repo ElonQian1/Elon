@@ -628,15 +628,7 @@
       }
       return conversationAdapter.requestList(command, emitEvent, respond);
     }
-    if (action === 'cancel_conversation_directory') {
-      if (conversationDirectoryRequests) conversationDirectoryRequests.cancel();
-      return respond(action, true, '');
-    }
-    if (action === 'probe_conversation_project') {
-      if (conversationDirectoryRequests &&
-          conversationDirectoryRequests.probeMembership(command, respond)) return;
-      return respond(action, false, 'membership_probe_unavailable');
-    }
+    if (conversationDirectoryRequests && conversationDirectoryRequests.handleCommand(command, respond)) return;
     if (action === 'refresh_current_conversation') {
       if (privateTransport && privateTransport.conversationPrefetchEnabled === true &&
           typeof privateTransport.refreshCurrentConversation === 'function') {

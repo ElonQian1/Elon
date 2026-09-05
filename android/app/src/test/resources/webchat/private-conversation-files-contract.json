@@ -1,0 +1,25 @@
+{
+  "input": {
+    "current_node": "answer",
+    "mapping": {
+      "question": { "parent": null, "message": {
+        "id": "user-1", "author": { "role": "user" },
+        "content": { "parts": ["Read the test file."] },
+        "metadata": { "attachments": [{ "name": "fixture.txt", "mime_type": "text/plain",
+          "id": "secret-file-id", "download_url": "https://example.com/?token=secret" }] }
+      } },
+      "answer": { "parent": "question", "message": {
+        "id": "assistant-1", "author": { "role": "assistant" }, "channel": "final",
+        "content": { "parts": [{ "content_type": "image_asset_pointer", "asset_pointer": "file-service://secret" }] }
+      } }
+    }
+  },
+  "event": {
+    "type": "conversation_files_snapshot", "conversationPath": "/c/fixture", "requestId": "mcp_f1",
+    "files": [
+      { "id": "user-1:0", "messageId": "user-1", "role": "user", "name": "fixture.txt", "kind": "file", "mediaType": "text/plain" },
+      { "id": "assistant-1:0", "messageId": "assistant-1", "role": "assistant", "name": "\u56fe\u7247", "kind": "image", "mediaType": "" }
+    ],
+    "truncated": false
+  }
+}

@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 1, create: factory });
+  const exported = Object.freeze({ version: 2, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root) root.__elonChatGptPrivateHistoryProjection = exported;
 })(typeof window === 'object' ? window : null, function (dependencies) {
@@ -31,26 +31,29 @@
   function orderedNodes(payload) {
     const mapping = object(payload.mapping);
     if (!mapping) {
-      return (payload.messages || payload.linear_conversation || payload.items || [])
-        .slice(-MAX_NODES).map((node, index) => ({ node, fallbackId: 'private-history-' + index }));
+      const linear = ([payload.messages, payload.linear_conversation, payload.items].find(Array.isArray) || [])
+        .slice(-MAX_NODES);
+      if (linear.some((node) => !object(node))) return null;
+      return linear.map((node, index) => ({ node, fallbackId: 'private-history-' + index }));
     }
     const keys = Object.keys(mapping);
-    if (keys.length > MAX_NODES) return [];
+    if (!keys.length) return [];
+    if (keys.length > MAX_NODES) return null;
     let cursor = clean(payload.current_node || payload.currentNode, 180);
     if (!cursor) {
       // Only a unique leaf identifies a branch without guessing which regeneration was selected.
       const parents = new Set(keys.map((key) => clean(mapping[key] && mapping[key].parent, 180)));
       const leaves = keys.filter((key) => !parents.has(key));
-      if (leaves.length !== 1) return [];
+      if (leaves.length !== 1) return null;
       cursor = leaves[0];
     }
     const seen = new Set();
     const nodes = [];
     while (cursor) {
-      if (!Object.prototype.hasOwnProperty.call(mapping, cursor) || seen.has(cursor)) return [];
+      if (!Object.prototype.hasOwnProperty.call(mapping, cursor) || seen.has(cursor)) return null;
       seen.add(cursor);
       const node = object(mapping[cursor]);
-      if (!node) return [];
+      if (!node) return null;
       nodes.push({ node, fallbackId: cursor });
       cursor = clean(node.parent, 180);
     }
@@ -77,7 +80,7 @@
       .map((value) => clean(value, MAX_TEXT)).filter(Boolean).join('\n').slice(0, MAX_TEXT);
   }
 
-  function mediaParts(message) {
+  function mediaParts(message, bounded = true) {
     const parts = [];
     const content = object(message.content);
     (content && Array.isArray(content.parts) ? content.parts : []).slice(0, MAX_PARTS)
@@ -102,7 +105,7 @@
       if (/^[A-Za-z0-9.+-]{1,63}\/[A-Za-z0-9.+-]{1,63}$/.test(mime)) value.mediaType = mime;
       parts.push(value);
     });
-    return parts.slice(0, MAX_PARTS - 1);
+    return bounded ? parts.slice(0, MAX_PARTS - 1) : parts;
   }
 
   function projectMessage(entry) {
@@ -136,8 +139,37 @@
   }
 
   function project(payload) {
-    return orderedNodes(normalize(payload)).map(projectMessage).filter(Boolean).slice(-MAX_MESSAGES);
+    return (orderedNodes(normalize(payload)) || []).map(projectMessage).filter(Boolean).slice(-MAX_MESSAGES);
   }
 
-  return Object.freeze({ normalize, project });
+  function files(payload) {
+    const normalized = normalize(payload);
+    if (!Object.keys(normalized).length) return null;
+    const nodes = orderedNodes(normalized);
+    if (!nodes) return null;
+    const rows = [];
+    const linear = [normalized.messages, normalized.linear_conversation, normalized.items].find(Array.isArray);
+    let truncated = !object(normalized.mapping) && Boolean(linear && linear.length > MAX_NODES);
+    // Scan the selected branch, not only the 80-message native display window.
+    nodes.forEach((entry) => {
+      const node = object(entry.node);
+      const message = node && object(node.message || node);
+      if (!message || !visible(message)) return;
+      const id = clean(message.id || node.id, 180) || entry.fallbackId;
+      const parts = mediaParts(message, false);
+      const rawAttachments = message.metadata && message.metadata.attachments;
+      if (Array.isArray(rawAttachments) && rawAttachments.length > MAX_PARTS) truncated = true;
+      const rawParts = message.content && message.content.parts;
+      if (Array.isArray(rawParts) && rawParts.length > MAX_PARTS) truncated = true;
+      parts.forEach((part, index) => {
+        if (rows.length >= 100) { truncated = true; return; }
+        rows.push({ id: id + ':' + index, messageId: id,
+          role: message.author && message.author.role || message.role,
+          name: part.text, kind: part.type, mediaType: part.mediaType || '' });
+      });
+    });
+    return { files: rows, truncated };
+  }
+
+  return Object.freeze({ normalize, project, files });
 });

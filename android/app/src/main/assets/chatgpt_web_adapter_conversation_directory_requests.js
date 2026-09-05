@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  if (window.__elonChatGptConversationDirectoryRequests) return;
+  if (Number(window.__elonChatGptConversationDirectoryRequests?.version) >= 2) return;
 
   const PROJECT_ID = /^g-p-[A-Za-z0-9_-]{1,160}$/;
   const CONVERSATION_PATH = /^\/(?:c\/[A-Za-z0-9_-]{1,160}|g\/g-p-[A-Za-z0-9_-]{1,160}\/c\/[A-Za-z0-9_-]{1,160})$/;
@@ -111,8 +111,25 @@
       emitSnapshot(null);
     }
 
-    return Object.freeze({ cancel, emitSnapshot, installListener, probeMembership, requestList });
+    function handleCommand(command, respond) {
+      const action = command.action;
+      if (action === 'cancel_conversation_directory') {
+        cancel();
+        respond(action, true, '');
+      } else if (action === 'probe_conversation_project') {
+        if (!probeMembership(command, respond)) respond(action, false, 'membership_probe_unavailable');
+      } else if (action === 'list_conversation_files') {
+        if (!privateTransport || typeof privateTransport.listConversationFiles !== 'function') {
+          respond(action, false, 'files_not_ready');
+        } else {
+          privateTransport.listConversationFiles(command.value, command.requestId, emitEvent, respond);
+        }
+      } else return false;
+      return true;
+    }
+
+    return Object.freeze({ cancel, emitSnapshot, handleCommand, installListener, probeMembership, requestList });
   }
 
-  window.__elonChatGptConversationDirectoryRequests = Object.freeze({ create });
+  window.__elonChatGptConversationDirectoryRequests = Object.freeze({ version: 2, create });
 })();
