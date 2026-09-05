@@ -164,6 +164,9 @@ if (-not $evidenceSource.Contains('message_cursor = [string]$first.next_message_
     throw "Context paging evidence must follow the next MCP cursor."
 }
 foreach ($required in @(
+    'function Wait-ChatGptWebSmokeComposerBaseline',
+    '$stableSamples -ge 2',
+    '$state.composer_ready -eq $true',
     'function Wait-ChatGptWebSmokeComposerOptions',
     '$receipt = @($state.command_requests)',
     '[string]$_.request_id -eq $RequestId',
@@ -175,6 +178,20 @@ foreach ($required in @(
     if (-not $composerSource.Contains($required)) {
         throw "ChatGPT Web composer smoke helper is missing: $required"
     }
+}
+
+$script:composerBaselinePolls = 0
+$stableComposer = Wait-ChatGptWebSmokeComposerBaseline -TimeoutSec 1 `
+    -PollIntervalMilliseconds 10 -InvokeUiState {
+        $script:composerBaselinePolls++
+        [pscustomobject]@{
+            bridge_state = "ready"
+            composer_ready = $true
+            ui_manifest = [pscustomobject]@{ controls = @() }
+        }
+    }
+if ($null -eq $stableComposer -or $script:composerBaselinePolls -ne 2) {
+    throw "Composer baseline helper did not require two stable samples."
 }
 
 $completeCollection = Get-ChatGptConversationCollectionCoverage `

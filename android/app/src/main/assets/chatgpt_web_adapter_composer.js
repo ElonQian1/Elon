@@ -170,6 +170,7 @@
   }
 
   function findToolsButton(composer) {
+    if (!composer) return null;
     const scope = composerScope(composer);
     const selectors = [
       '#composer-plus-btn',
@@ -200,6 +201,7 @@
   }
 
   function findModelButton(composer) {
+    if (!composer) return null;
     const scope = composerScope(composer);
     const directSelectors = [
       '[data-testid="model-switcher"]',
@@ -555,6 +557,7 @@
     }
     const trigger = triggerFor(section, composer);
     if (!trigger) {
+      if (!composer) return result(action, false, '官网输入区正在恢复，请稍后重试。');
       if (section !== 'model') return result(action, false, '官网当前没有可用入口。');
       emitOptions(section, [], composer, emitEvent);
       return result(action, true, '官网当前由系统自动选择模型。');

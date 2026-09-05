@@ -79,6 +79,8 @@ class ChatGptWebComposerContractTest {
         assertTrue(textTransactionOrchestrator.contains("function waitForSendAccepted"))
         assertTrue(textTransactionOrchestrator.contains("官方网页已确认发送"))
         assertTrue(adapter.contains("#upload-fast-tools-files"))
+        assertTrue(adapter.contains("if (!composer) return null"))
+        assertTrue(adapter.contains("官网输入区正在恢复，请稍后重试。"))
         assertTrue(adapter.contains("#composer-plus-btn"))
         assertTrue(adapter.contains("layout.findSemanticNode('attachment', 'composer')"))
         assertTrue(adapter.contains("scope.querySelectorAll('button, [role=\"button\"]')"))
