@@ -9,6 +9,8 @@ mod history_http_tests;
 mod reconciliation_http_tests;
 #[path = "sellback/http_tests.rs"]
 mod sellback_http_tests;
+#[path = "sui_address_binding/http_tests.rs"]
+mod sui_address_binding_http_tests;
 
 use std::{cell::RefCell, path::PathBuf, sync::Arc};
 

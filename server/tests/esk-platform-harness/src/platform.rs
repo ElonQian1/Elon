@@ -8,6 +8,8 @@ pub(crate) mod payment_identity;
 pub(crate) mod reconciliation_snapshot;
 #[path = "../../../src/esk_platform/sellback/domain.rs"]
 pub(crate) mod sellback;
+#[path = "sui_address_binding.rs"]
+pub(crate) mod sui_address_binding;
 #[path = "../../../src/esk_platform/validation.rs"]
 pub(crate) mod validation;
 pub(crate) use access_projection::*;

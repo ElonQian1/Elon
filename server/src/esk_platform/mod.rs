@@ -19,6 +19,7 @@ mod payment_identity;
 mod reconciliation_api;
 mod reconciliation_snapshot;
 pub(crate) mod sellback;
+pub(crate) mod sui_address_binding;
 mod validation;
 
 pub(crate) use access_projection::*;
@@ -30,6 +31,7 @@ pub(crate) use validation::{validate_policy_integrity, validate_prepared_input};
 pub(crate) fn routes() -> Router<Arc<AppState>> {
     Router::new()
         .merge(access::routes())
+        .merge(sui_address_binding::routes())
         .merge(sellback::routes())
         .route(
             "/api/admin/assets/esk/platform-reconciliation-snapshot",

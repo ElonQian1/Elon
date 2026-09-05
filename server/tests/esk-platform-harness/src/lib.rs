@@ -11,6 +11,8 @@ pub(crate) mod paper_migration;
 pub(crate) mod platform_migration;
 #[path = "../../../src/esk_platform/sellback/migration.rs"]
 pub(crate) mod sellback_migration;
+#[path = "../../../src/esk_platform/sui_address_binding/migration.rs"]
+pub(crate) mod sui_address_binding_migration;
 
 pub(crate) mod store;
 

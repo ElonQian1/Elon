@@ -15,6 +15,7 @@ mod history;
 mod read;
 mod reconciliation;
 mod sellback;
+mod sui_address_binding;
 mod write;
 
 fn ensure_admin(conn: &Connection, actor_user_id: &str, session_token: &str) -> Result<()> {

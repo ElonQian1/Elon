@@ -1,7 +1,7 @@
 ---
 title: "ESK 平台认证 Sui 地址绑定 V2"
 status: accepted
-implementation_status: planned
+implementation_status: verified
 owner: platform-assets, protocol
 priority: p0
 reviewed_at: 2026-09-05
@@ -73,6 +73,14 @@ decision_refs:
 会话及并发第二写入均失败关闭。V2 不提供换绑、解绑或覆盖更新；未来恢复政策必须另立
 需求并保留旧绑定审计链。
 
+这里的“并发第二写入”指不得产生第二条账本记录：完全相同响应的竞争请求可以返回同一
+绑定并标记为幂等回放；响应不同的竞争请求固定冲突失败。
+
+为限制追加式账本增长，同一用户和地址存在未过期挑战时直接返回原挑战，不追加新行；
+每个用户最多同时保留 3 个未过期挑战，并且任意滚动 24 小时最多新建 20 个挑战。
+超过任一上限固定返回 `429 ESK_PLATFORM_SUI_BINDING_RATE_LIMITED`，不泄漏当前计数。
+这些上限在创建挑战的同一写事务中复核，不能只依赖进程内限流器。
+
 ### 查询本人绑定
 
 `GET /api/me/assets/esk/platform/sui-address-binding`
@@ -89,6 +97,37 @@ decision_refs:
 - `balance_eligible=false`；
 - `manifest_transition_allowed=false`。
 
+创建、完成和查询成功统一返回 HTTP 200。创建响应就是 V1 challenge 的 12 个精确
+字段。完成和已绑定查询统一返回下列精确公共合同；未绑定查询仅返回相同 schema 与
+`status=unbound`：
+
+- `schema=yilong.esk.sui.platform_address_binding.v2`；
+- `status=bound`、`network=testnet`、`address`、`signature_scheme`、`bound_at`；
+- `binding_receipt_sha256=sha256:<64 lowercase hex>`；
+- 上述七个真实性布尔值。
+
+`binding_id` 只在私有账本使用：对 UTF-8 文本
+`YILONG_ESK_SUI_PLATFORM_BINDING_ID_V2\nchallenge_id=<id>\nresponse_digest=<digest>`
+执行 SHA-256，取前 32 位小写十六进制并加前缀 `eskpsb_`。绑定回执摘要对下列固定
+顺序、LF 分隔、无尾随换行的 UTF-8 文本执行 SHA-256：
+
+```text
+YILONG_ESK_SUI_PLATFORM_BINDING_RECEIPT_V2
+binding_id=<private binding id>
+challenge_id=<V1 challenge id>
+subject_commitment=<private subject commitment>
+address=<canonical testnet address>
+network=testnet
+message_sha256=<digest>
+signature_scheme=<ed25519|secp256k1|secp256r1>
+signature_sha256=<digest>
+response_digest=<digest>
+verified_at=<UTC RFC3339 milliseconds Z>
+bound_at=<UTC RFC3339 milliseconds Z>
+```
+
+只有摘要通过 HTTP 返回；原文及其中的私有字段不出服务端。
+
 ## 私有追加式账本
 
 新增三类表：
@@ -97,7 +136,8 @@ decision_refs:
 2. 不可变短时挑战；
 3. 同时充当 challenge consumption 的不可变地址绑定。
 
-挑战、绑定和 subject 映射禁止 UPDATE/DELETE。绑定表对 `challenge_id`、`user_id` 和
+挑战、绑定和 subject 映射禁止 UPDATE、DELETE 和命中既有唯一键的
+`INSERT OR REPLACE`。绑定表对 `challenge_id`、`user_id` 和
 `address` 分别唯一，并用外键和插入触发器核对 challenge 的 user、subject、address、
 message digest 与有效时间。完整 wallet response 仅保存在私有账本供之后证据复核；
 HTTP 和日志不得回显。数据库错误只投影固定错误码。
@@ -120,7 +160,8 @@ HTTP 和日志不得回显。数据库错误只投影固定错误码。
 2. 服务端生成的挑战与 V1 固定消息、challenge ID 和 digest 完全一致；客户端无法选择
    subject commitment、nonce、时间、用户或 challenge ID。
 3. SQLite 合成测试覆盖首次绑定、精确幂等重放、篡改重放、过期、未来时间、会话撤销、
-   跨用户、用户/地址唯一性、并发消费及 UPDATE/DELETE 失败。
+   跨用户、用户/地址唯一性、并发消费、同地址未过期复用、3 个并发上限、滚动 24 小时
+   上限及 UPDATE/DELETE/INSERT OR REPLACE 失败。
 4. 进程内 HTTP 测试覆盖未登录、静态管理员 token、停用用户、未知字段、超限 body、
    创建/完成/本人读取和 no-store；响应不泄漏私有字段。
 5. 完成绑定前后正式 ESK 账户余额和 `platform_recorded/not_deployed` 投影完全不变。

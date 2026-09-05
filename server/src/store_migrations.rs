@@ -390,6 +390,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (287, "ESK 经审核付款独立平台登记", crate::esk_asset::platform::migration::migration_v287),
     (288, "ESK 正式卖回申请与追加式占用取消", crate::esk_asset::platform::sellback::migration::migration_v288),
     (289, "账号绑定的可撤销只读资产授权", crate::esk_asset::platform::access::migration::migration_v289),
+    (290, "ESK 平台认证 Sui 地址一次性绑定", crate::esk_asset::platform::sui_address_binding::migration::migration_v290),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {
