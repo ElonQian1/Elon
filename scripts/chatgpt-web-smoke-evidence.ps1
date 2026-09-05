@@ -55,6 +55,27 @@ function Get-ChatGptConversationCollectionCoverage {
     }
 }
 
+function Wait-ChatGptConversationCollectionCoverage {
+    param(
+        [Parameter(Mandatory = $true)][scriptblock]$InvokePage,
+        [Parameter(Mandatory = $true)][int]$TimeoutSec,
+        [Parameter(Mandatory = $true)][int]$PollIntervalSec
+    )
+
+    $deadline = [DateTimeOffset]::UtcNow.AddSeconds($TimeoutSec)
+    $last = $null
+    do {
+        $last = & $InvokePage
+        $coverage = Get-ChatGptConversationCollectionCoverage `
+            -Collection $last.collection `
+            -SourceCount ([int]$last.source_count)
+        if ($last.control_ok -eq $true -and $coverage.passed -eq $true) { return $last }
+        if ($last.collection.timed_out -eq $true) { return $last }
+        Start-Sleep -Seconds $PollIntervalSec
+    } while ([DateTimeOffset]::UtcNow -lt $deadline)
+    return $last
+}
+
 function Get-ChatGptContextPagingEvidence {
     param(
         [Parameter(Mandatory = $true)][scriptblock]$InvokeUiAction,

@@ -15,6 +15,7 @@
     const signal = normalize(value);
     if (!signal) return false;
     if (/^(pro|自动|快速|思考|低|中|高|极高)(?:\s+\1)*$/.test(signal)) return true;
+    if (/^\d+(?:\.\d+)*\s+pro$/.test(signal)) return true;
     return /\b(?:gpt|o\d|auto|thinking|instant|sol)\b/i.test(signal) ||
       /\b\d+(?:\.\d+)+\b/.test(signal) ||
       /model|模型|能力|推理|思考强度|极速/.test(signal) ||

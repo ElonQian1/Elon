@@ -686,7 +686,9 @@ $beforeList = [long]$beforeListState.last_command.observed_at_ms
 Invoke-UiAction -Action "chatgpt_list_conversations" | Out-Null
 $listState = Wait-CommandResult -Action "list_conversations" -AfterMs $beforeList -TimeoutSec $ReadyTimeoutSec
 Add-Check "conversation_list" ($listState.last_command.ok -eq $true) ([string]$listState.last_command.detail)
-$conversationPage = Invoke-UiAction -Action "chatgpt_get_conversations" -Arguments @{ offset = 0; limit = 10 }
+$conversationPage = Wait-ChatGptConversationCollectionCoverage `
+    -TimeoutSec $ReadyTimeoutSec -PollIntervalSec $PollIntervalSec `
+    -InvokePage { Invoke-UiAction -Action "chatgpt_get_conversations" -Arguments @{ offset = 0; limit = 10 } }
 Add-Check "conversation_query" ($conversationPage.control_ok -eq $true) "returned=$(@($conversationPage.conversations).Count)"
 $conversationCollection = $conversationPage.collection
 $conversationCoverage = Get-ChatGptConversationCollectionCoverage `

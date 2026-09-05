@@ -7,6 +7,7 @@ for (const label of [
   'GPT-5.6 Sol',
   '5.6 Terra 中',
   '5.5 Pro',
+  '6 Pro',
   'Pro',
   '极速',
   '自动',

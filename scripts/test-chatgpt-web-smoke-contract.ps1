@@ -16,6 +16,13 @@ function Assert-Contains {
     }
 }
 
+function Assert-EvidenceContains {
+    param([Parameter(Mandatory = $true)][string]$Needle)
+    if (-not $evidenceSource.Contains($Needle)) {
+        throw "ChatGPT Web smoke evidence contract is missing: $Needle"
+    }
+}
+
 Assert-Contains 'Invoke-UiAction -Action "chatgpt_list_features"'
 Assert-Contains 'ExpectedHardwareSerial'
 Assert-Contains 'ExpectedAdapterVersion'
@@ -31,6 +38,9 @@ Assert-Contains 'foreach ($attempt in 1..3)'
 Assert-Contains 'UIAutomator dump failed after 3 attempts.'
 Assert-Contains 'function Wait-AccountMenuReady'
 Assert-Contains 'function Wait-AccountMenuClosed'
+Assert-EvidenceContains 'function Wait-ChatGptConversationCollectionCoverage'
+Assert-Contains '$conversationPage = Wait-ChatGptConversationCollectionCoverage'
+Assert-EvidenceContains 'if ($last.collection.timed_out -eq $true) { return $last }'
 Assert-Contains 'Invoke-ChatGptWebSmokeComposerOptions -Section $Section'
 Assert-Contains 'function Wait-NewConversationReady'
 Assert-Contains '$command.action -eq "collect_navigation"'
@@ -197,6 +207,29 @@ if (
     $privateWindowCollection.source_window_complete -ne $true
 ) {
     throw "Complete private conversation source window was not accepted."
+}
+$script:conversationCoverageAttempts = 0
+$settledConversationPage = Wait-ChatGptConversationCollectionCoverage `
+    -TimeoutSec 1 -PollIntervalSec 0 -InvokePage {
+        $script:conversationCoverageAttempts++
+        $observed = if ($script:conversationCoverageAttempts -eq 1) { 28 } else { 116 }
+        [pscustomobject]@{
+            control_ok = $true
+            source_count = 116
+            collection = [pscustomobject]@{
+                observed_count = $observed
+                reached_end = $false
+                truncated = $false
+                timed_out = $false
+                source = "official_private"
+            }
+        }
+    }
+if (
+    $script:conversationCoverageAttempts -ne 2 -or
+    [int]$settledConversationPage.collection.observed_count -ne 116
+) {
+    throw "Conversation coverage wait did not settle the asynchronous private directory."
 }
 
 $uiXml = '<node resource-id="com.elon.app:id/chatGptWebView" content-desc="chatgpt-native:send:ready" />' +
