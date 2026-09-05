@@ -2,12 +2,13 @@
 
 const assert = require('node:assert/strict');
 const mutationModule = require('../android/app/src/main/assets/chatgpt_web_private_conversation_mutation.js');
+const jsonRequest = require('../android/app/src/main/assets/chatgpt_web_private_json_request.js');
 
 function response(status, payload) {
   return {
     status,
     ok: status >= 200 && status < 300,
-    json: async () => payload
+    text: async () => JSON.stringify(payload)
   };
 }
 
@@ -21,6 +22,7 @@ function fixture(fetchImpl, enabled = true, rootOverrides = {}, directoryOverrid
   const calls = [];
   const accepted = [];
   const root = Object.assign({
+    __elonChatGptPrivateJsonRequest: jsonRequest,
     location: { origin: 'https://chatgpt.com' },
     AbortController,
     setTimeout,
@@ -315,6 +317,7 @@ async function serverFailureIsNotRetriedOrOptimisticallyApplied() {
 async function missingAuthorizationNeverAttemptsAWrite() {
   const test = fixture(async () => { throw new Error('fetch must not run'); });
   test.transport = mutationModule.create({
+    __elonChatGptPrivateJsonRequest: jsonRequest,
     location: { origin: 'https://chatgpt.com' },
     AbortController,
     setTimeout,

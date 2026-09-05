@@ -1,6 +1,6 @@
 # Remaining private-native batch
 
-Current implementation audit: 2026-09-05. This is a work list, not a declaration
+Current implementation audit: 2026-09-06. This is a work list, not a declaration
 that every private protocol has been reproduced. Reuse completed capabilities in
 [the capability matrix](web-ai-private-transport-capability-matrix.md).
 
@@ -21,11 +21,14 @@ for website functionality. Persistent WebView identity remains intentional.
 | Content-only refresh preserves current composer/voice state | Implemented | Targeted Android tests passed | Await combined APK |
 | Bounded/coalesced image requests and no false empty-library success | Implemented | Targeted JS passed | Await combined APK |
 | Private conversation attachment index, cache and native file sheet | Implemented | Shared JS/Android contract and targeted production tests passed | Await combined APK |
+| End-to-end private read deadlines, body limits and late project response isolation | Implemented | Lifecycle and existing JS consumer suites passed | Await combined APK |
 
 Root cause, exact modules, and check results are in
 [the history contract](chatgpt-private-history-native-contract.md).
 The attachment-index scope and acceptance are in
 [the file index contract](chatgpt-private-conversation-files.md).
+Request ownership and the confirmed baseline failures are in
+[the request lifetime contract](chatgpt-private-request-lifetime.md).
 Five legacy source-location assertions also fail on the unchanged baseline;
 their exact scope is recorded there. They are not a full-suite pass or a reason
 to repeat already-verified private transports.

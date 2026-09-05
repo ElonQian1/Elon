@@ -2,12 +2,13 @@
 
 const assert = require('node:assert/strict');
 const authModule = require('../android/app/src/main/assets/chatgpt_web_private_auth_context.js');
+const jsonRequest = require('../android/app/src/main/assets/chatgpt_web_private_json_request.js');
 
 function response(status, payload) {
   return {
     status,
     ok: status >= 200 && status < 300,
-    json: async () => payload
+    text: async () => JSON.stringify(payload)
   };
 }
 
@@ -24,6 +25,7 @@ function deferred() {
 function createRoot(fetchImpl, enabled = true) {
   const requests = [];
   const root = {
+    __elonChatGptPrivateJsonRequest: jsonRequest,
     __elonChatGptPrivateAuthContextEnabled: enabled,
     location: { origin: 'https://chatgpt.com' },
     AbortController,

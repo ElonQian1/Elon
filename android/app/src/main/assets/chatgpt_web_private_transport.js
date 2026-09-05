@@ -4,7 +4,7 @@
   const existingTransport = window.__elonChatGptPrivateTransport;
   const prefetchEnabled = window.__elonChatGptPrivateConversationPrefetchEnabled === true;
   const researchEnabled = window.__elonChatGptPrivateResearchEnabled === true;
-  if ((existingTransport && Number(existingTransport.version) >= 18) ||
+  if ((existingTransport && Number(existingTransport.version) >= 19) ||
       (!prefetchEnabled && !researchEnabled) ||
       location.origin !== 'https://chatgpt.com') return;
 
@@ -172,39 +172,31 @@
   async function fetchConversationUnshared(id, freshMembership) {
     const inherited = await acquireRequestHeaders();
     const startedAt = Date.now();
-    let timedOut = false;
-    const controller = typeof AbortController === 'function' ? new AbortController() : null;
-    const timeout = controller ? window.setTimeout(() => {
-      timedOut = true;
-      controller.abort();
-    }, policy.attemptBudgetMs()) : null;
+    const request = window.__elonChatGptPrivateJsonRequest;
+    if (!request) throw new Error('request_unavailable');
     const headers = { Accept: 'application/json' };
     inherited.forEach((value, name) => { headers[name] = value; });
     try {
       privateFetchDepth += 1;
-      const response = await window.fetch('/backend-api/conversations/' + encodeURIComponent(id), {
+      const response = await request.request(window, '/backend-api/conversations/' + encodeURIComponent(id), {
         method: 'GET',
         credentials: 'include',
         cache: freshMembership === true ? 'no-store' : 'default',
         headers,
-        signal: controller ? controller.signal : undefined,
         __elonPrivateTransport: freshMembership === true
           ? 'conversation_membership'
           : 'conversation_prefetch'
-      });
-      if (!response || !response.ok) throw new Error('http_' + Number(response && response.status));
-      return { payload: await response.json(), elapsedMs: Date.now() - startedAt };
+      }, { timeoutMs: policy.attemptBudgetMs(), maxBytes: 4 * 1024 * 1024 });
+      return { payload: response.payload, elapsedMs: Date.now() - startedAt };
     } catch (error) {
       if (/^http_(401|403)$/.test(String(error && error.message || ''))) {
         if (authContext && typeof authContext.invalidate === 'function') {
           authContext.invalidate('auth_rejected');
         }
       }
-      if (timedOut) throw new Error('timeout');
       throw error;
     } finally {
       privateFetchDepth = Math.max(0, privateFetchDepth - 1);
-      if (timeout !== null) window.clearTimeout(timeout);
     }
   }
 
@@ -494,7 +486,7 @@
   }
 
   window.__elonChatGptPrivateTransport = Object.freeze({
-    version: 18,
+    version: 19,
     conversationPrefetchEnabled: prefetchEnabled,
     conversationPrefetchAvailable: true,
     experimentalConversationPrefetchAvailable: true,

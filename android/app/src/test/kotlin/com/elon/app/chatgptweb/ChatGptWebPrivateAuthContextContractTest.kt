@@ -39,6 +39,9 @@ class ChatGptWebPrivateAuthContextContractTest {
         assertTrue(readAloud.contains("privateTransport.acquireSameOriginRequestHeaders()"))
 
         assertTrue(pageAdapter.contains("privateAuthContextScript"))
+        assertTrue(pageAdapter.contains("\"chatgpt_web_private_json_request.js\", PRIVATE_AUTH_CONTEXT_ASSET"))
+        assertTrue(auth.contains("request.request(root, AUTH_PATH"))
+        assertTrue(conversation.contains("request.request(window,"))
         assertTrue(pageAdapter.contains("PRIVATE_AUTH_CONTEXT_ASSET"))
         assertTrue(pageAdapter.contains("WebViewCompat.addDocumentStartJavaScript"))
     }

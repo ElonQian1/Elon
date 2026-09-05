@@ -20,6 +20,8 @@ function runtime(fetchImpl, ready = true) {
   class Clock extends Date { static now() { return now; } }
   const context = { URL, AbortController, Date: Clock, Map, Set, Promise, console };
   const window = {
+    __elonChatGptPrivateJsonRequest: require(path.join(assets, 'chatgpt_web_private_json_request.js')),
+    AbortController,
     __elonChatGptPrivateConversationPrefetchEnabled: true,
     __elonChatGptPrivateResearchEnabled: false,
     __elonChatGptPrivateAuthContext: {
@@ -41,7 +43,7 @@ function runtime(fetchImpl, ready = true) {
   }
   return { window, transport: window.__elonChatGptPrivateTransport, timers, advance: ms => { now += ms; } };
 }
-const response = (payload) => ({ ok: true, status: 200, json: async () => payload });
+const response = (payload) => ({ ok: true, status: 200, text: async () => JSON.stringify(payload) });
 const plain = (value) => JSON.parse(JSON.stringify(value));
 
 (async () => {

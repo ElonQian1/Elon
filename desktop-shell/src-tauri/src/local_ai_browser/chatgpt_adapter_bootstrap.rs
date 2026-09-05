@@ -30,6 +30,8 @@ const PRIVATE_FETCH_TAP: &str =
     include_str!("../../../../android/app/src/main/assets/chatgpt_web_private_fetch_tap.js");
 const PRIVATE_SOCKET_TAP: &str =
     include_str!("../../../../android/app/src/main/assets/chatgpt_web_private_socket_tap.js");
+const PRIVATE_JSON_REQUEST: &str =
+    include_str!("../../../../android/app/src/main/assets/chatgpt_web_private_json_request.js");
 const PRIVATE_CONVERSATION_DIRECTORY: &str = include_str!(
     "../../../../android/app/src/main/assets/chatgpt_web_private_conversation_directory.js"
 );
@@ -305,6 +307,7 @@ pub(super) fn initialization_script() -> String {
   window.__elonChatGptPrivateStreamObserverEnabled = true;
   window.__elonChatGptPrivateConversationPrefetchEnabled = true;
   window.__elonChatGptPrivateTextTransactionsEnabled = true;
+  __PRIVATE_JSON_REQUEST__
   window.__elonChatGptBootstrapStage = 'chatgpt_web_private_fetch_tap.js';
   __PRIVATE_FETCH_TAP__
   window.__elonChatGptBootstrapStage = 'chatgpt_web_private_socket_tap.js';
@@ -426,6 +429,7 @@ pub(super) fn initialization_script() -> String {
 "#
     .replace("__ALLOWED_ORIGIN__", ALLOWED_ORIGIN)
     .replace("__ADAPTER_VERSION__", &ADAPTER_VERSION.to_string())
+    .replace("__PRIVATE_JSON_REQUEST__", PRIVATE_JSON_REQUEST)
     .replace("__PRIVATE_FETCH_TAP__", PRIVATE_FETCH_TAP)
     .replace("__PRIVATE_SOCKET_TAP__", PRIVATE_SOCKET_TAP)
     .replace(

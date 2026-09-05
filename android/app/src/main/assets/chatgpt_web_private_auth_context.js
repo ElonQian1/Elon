@@ -1,7 +1,7 @@
 (function (root, factory) {
   'use strict';
 
-  const exported = Object.freeze({ version: 1, create: factory });
+  const exported = Object.freeze({ version: 2, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (!root || !root.location || root.location.origin !== 'https://chatgpt.com') return;
   const current = root.__elonChatGptPrivateAuthContext;
@@ -12,7 +12,7 @@
 })(typeof window === 'object' ? window : globalThis, function (root) {
   'use strict';
 
-  const VERSION = 1;
+  const VERSION = 2;
   const AUTH_PATH = '/api/auth/session';
   const REQUEST_TIMEOUT_MS = 5000;
   const FALLBACK_TTL_MS = 10 * 60 * 1000;
@@ -164,22 +164,16 @@
 
   async function fetchSession() {
     const startedAt = now();
-    const controller = typeof root.AbortController === 'function' ? new root.AbortController() : null;
-    let timedOut = false;
-    const timer = controller ? root.setTimeout(() => {
-      timedOut = true;
-      controller.abort();
-    }, REQUEST_TIMEOUT_MS) : null;
+    const request = root.__elonChatGptPrivateJsonRequest;
+    if (!request) throw new Error('auth_unavailable');
     try {
-      const response = await root.fetch(AUTH_PATH, {
+      const response = await request.request(root, AUTH_PATH, {
         method: 'GET',
         credentials: 'include',
         cache: 'no-store',
         headers: { Accept: 'application/json' },
-        signal: controller ? controller.signal : undefined
-      });
-      if (!response || !response.ok) throw new Error('auth_http_' + Number(response && response.status));
-      const payload = await response.json();
+      }, { timeoutMs: REQUEST_TIMEOUT_MS, maxBytes: 256 * 1024 });
+      const payload = response.payload;
       const accessToken = payload && typeof payload.accessToken === 'string' ? payload.accessToken : '';
       if (!acceptAuthorization(
         'Bearer ' + accessToken,
@@ -191,10 +185,8 @@
       }
       return copyRequestHeaders();
     } catch (error) {
-      if (timedOut) throw new Error('timeout');
+      if (/^http_\d+$/.test(String(error && error.message))) throw new Error('auth_' + error.message);
       throw error;
-    } finally {
-      if (timer !== null) root.clearTimeout(timer);
     }
   }
 

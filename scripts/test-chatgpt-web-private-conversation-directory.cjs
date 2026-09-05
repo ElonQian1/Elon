@@ -32,11 +32,12 @@ assert(source.includes('acceptTitleState'));
 assert(source.includes('acceptArchivedState'));
 assert(source.includes('removedConversationIds'));
 assert(source.includes('const PIN_OVERRIDE_TTL_MS = 120000'));
-assert(source.includes('window.setTimeout(() =>'));
+assert(source.includes('timeoutMs: PROJECT_REFRESH_TIMEOUT_MS'));
 assert(directoryRequestsSource.includes('privateDirectory.setListener(() => emitSnapshot(null))'));
 assert(directoryRequestsSource.includes('privateDirectory.refreshProject(projectId)'));
 assert(directoryRequestsSource.includes('conversationAdapter.requestList(command, emitEvent, respond)'));
-assert(adapterSource.includes("action === 'probe_conversation_project'"));
+assert(adapterSource.includes('conversationDirectoryRequests.handleCommand(command, respond)'));
+assert(directoryRequestsSource.includes("action === 'probe_conversation_project'"));
 assert(directoryRequestsSource.includes("source: 'official_private'"));
 assert(directoryRequestsSource.includes("scopeProjectId: projectId || null"));
 assert(directoryRequestsSource.includes('emitSnapshot(projectId, true)'));
@@ -73,6 +74,7 @@ let cloneCount = 0;
 class FakeResponse {
   constructor(status, text) {
     this.status = status;
+    this.ok = status >= 200 && status < 300;
     this.value = text;
   }
   clone() {
@@ -136,6 +138,8 @@ const location = {
   pathname: '/g/g-p-health123/c/project-chat-12345'
 };
 const window = {
+  __elonChatGptPrivateJsonRequest: require('../android/app/src/main/assets/chatgpt_web_private_json_request.js'),
+  AbortController,
   fetch: originalFetch,
   XMLHttpRequest: FakeXhr,
   setTimeout: scheduledTimeout,
@@ -166,7 +170,7 @@ async function flush() {
 (async () => {
   const directory = window.__elonChatGptPrivateConversationDirectory;
   assert(directory);
-  assert.strictEqual(directory.version, 7);
+  assert.strictEqual(directory.version, 8);
   let notifications = 0;
   directory.setListener(() => { notifications += 1; });
 

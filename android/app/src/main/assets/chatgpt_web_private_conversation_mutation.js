@@ -1,7 +1,7 @@
 (function (root, factory) {
   'use strict';
 
-  const exported = Object.freeze({ version: 4, create: factory });
+  const exported = Object.freeze({ version: 5, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (!root || !root.location || root.location.origin !== 'https://chatgpt.com') return;
   const current = root.__elonChatGptPrivateConversationMutation;
@@ -14,7 +14,7 @@
 })(typeof window === 'object' ? window : globalThis, function (root, dependencies) {
   'use strict';
 
-  const VERSION = 4;
+  const VERSION = 5;
   const WRITE_TIMEOUT_MS = 9000;
   const RECONCILE_TIMEOUT_MS = 4000;
   const UNCERTAIN_RECONCILE_WINDOW_MS = 16000;
@@ -74,6 +74,7 @@
 
   function supported() {
     return Boolean(enabled && root && typeof root.fetch === 'function' && privateTransport &&
+      root.__elonChatGptPrivateJsonRequest &&
       typeof privateTransport.acquireSameOriginRequestHeaders === 'function');
   }
 
@@ -113,23 +114,12 @@
     return value;
   }
 
-  async function fetchWithTimeout(url, options, timeoutMs) {
-    const controller = typeof root.AbortController === 'function' ? new root.AbortController() : null;
-    let timedOut = false;
-    const timer = controller ? root.setTimeout(() => {
-      timedOut = true;
-      controller.abort();
-    }, timeoutMs) : null;
-    try {
-      return await root.fetch(url, Object.assign({}, options, {
-        signal: controller ? controller.signal : undefined
-      }));
-    } catch (error) {
-      if (timedOut) throw new Error('timeout');
-      throw error;
-    } finally {
-      if (timer !== null) root.clearTimeout(timer);
-    }
+  function fetchWithTimeout(url, options, timeoutMs, mode) {
+    const request = root.__elonChatGptPrivateJsonRequest;
+    if (!request) return Promise.reject(new Error('request_unavailable'));
+    return request.request(root, url, options, {
+      timeoutMs, maxBytes: 4 * 1024 * 1024, mode: mode || 'none'
+    });
   }
 
   function candidateArrays(payload) {
@@ -248,13 +238,11 @@
         cache: 'no-store',
         headers,
         __elonPrivateTransport: transportLabel
-      }, Math.max(250, Number(timeoutMs) || RECONCILE_TIMEOUT_MS));
+      }, Math.max(250, Number(timeoutMs) || RECONCILE_TIMEOUT_MS), 'json');
     } catch (_) {
       return null;
     }
-    if (!response || !response.ok || typeof response.json !== 'function') return null;
-    try { return await response.json(); }
-    catch (_) { return null; }
+    return response && response.ok ? response.payload : null;
   }
 
   async function reconcilePinned(conversationId, expectedPinned, headers, timeoutMs) {
@@ -397,9 +385,8 @@
       return rejected(failureCode(error), false);
     }
     const startedAt = now();
-    let response;
     try {
-      response = await fetchWithTimeout(
+      await fetchWithTimeout(
         '/backend-api/conversation/' + encodeURIComponent(target.id),
         {
           method: 'PATCH',
@@ -412,6 +399,18 @@
         WRITE_TIMEOUT_MS
       );
     } catch (error) {
+      const http = String(error && error.message || '').match(/^http_(\d+)$/);
+      if (http) {
+        const status = Number(http[1]);
+        if (status === 401 || status === 403) {
+          const authContext = root.__elonChatGptPrivateAuthContext;
+          if (authContext && typeof authContext.invalidate === 'function') {
+            authContext.invalidate('conversation_mutation_rejected');
+          }
+        }
+        recordFailure(status === 401 || status === 403 ? 'auth' : 'http');
+        return rejected('mutation_http_' + status, true);
+      }
       const code = failureCode(error);
       if (code === 'mutation_timeout' || code === 'mutation_network_failure') {
         const reconciliation = await reconcileUncertainWrite(target.id, mutation, headers);
@@ -431,17 +430,6 @@
       }
       recordFailure(code === 'mutation_auth_unavailable' ? 'auth' : 'network');
       return rejected(code, true);
-    }
-    if (!response || !response.ok) {
-      const status = Math.max(0, Number(response && response.status) || 0);
-      if (status === 401 || status === 403) {
-        const authContext = root.__elonChatGptPrivateAuthContext;
-        if (authContext && typeof authContext.invalidate === 'function') {
-          authContext.invalidate('conversation_mutation_rejected');
-        }
-      }
-      recordFailure(status === 401 || status === 403 ? 'auth' : 'http');
-      return rejected('mutation_http_' + status, true);
     }
     recordSuccess(now() - startedAt);
     acknowledgeMutation(target, mutation);

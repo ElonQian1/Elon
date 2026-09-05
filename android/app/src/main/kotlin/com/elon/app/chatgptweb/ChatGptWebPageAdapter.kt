@@ -35,10 +35,13 @@ internal class ChatGptWebPageAdapter(
             BuildConfig.CHATGPT_PRIVATE_TEXT_TRANSACTIONS_ENABLED ||
             BuildConfig.CHATGPT_PRIVATE_DICTATION_ENABLED ||
             BuildConfig.CHATGPT_PRIVATE_READ_ALOUD_ENABLED
-    private val privateAuthContextScript =
-        context.assets.open(PRIVATE_AUTH_CONTEXT_ASSET).use { input ->
+    private val privateAuthContextScript = listOf(
+        "chatgpt_web_private_json_request.js", PRIVATE_AUTH_CONTEXT_ASSET,
+    ).joinToString("\n") { asset ->
+        context.assets.open(asset).use { input ->
             input.reader(StandardCharsets.UTF_8).readText()
         }
+    }
 
     private val adapterScript = """
         (function () {
@@ -625,7 +628,7 @@ internal class ChatGptWebPageAdapter(
         origin.scheme == "https" && origin.host == "chatgpt.com" && origin.port == -1
 
     companion object {
-        internal const val ADAPTER_VERSION = 262
+        internal const val ADAPTER_VERSION = 263
 
         private val ADAPTER_ASSETS = listOf(
             "chatgpt_web_adapter_bootstrap.js",

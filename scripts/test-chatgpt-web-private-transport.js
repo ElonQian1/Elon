@@ -15,7 +15,7 @@ const policySource = fs.readFileSync(path.join(
 ), 'utf8');
 
 function jsonResponse(value) {
-  return { ok: true, status: 200, json: async () => value };
+  return { ok: true, status: 200, text: async () => JSON.stringify(value) };
 }
 
 class MemoryStorage {
@@ -42,6 +42,8 @@ function createContext(
     href: 'https://chatgpt.com/'
   };
   const window = {
+    __elonChatGptPrivateJsonRequest: require('../android/app/src/main/assets/chatgpt_web_private_json_request.js'),
+    AbortController,
     __elonChatGptPrivateResearchEnabled: researchEnabled,
     __elonChatGptPrivateConversationPrefetchEnabled: prefetchEnabled,
     fetch: fetchImpl,
@@ -135,7 +137,7 @@ const detailPayload = {
   assert.equal(disabled.window.__elonChatGptPrivateTransport, undefined);
 
   const gated = createContext(async () => jsonResponse(detailPayload), true, false);
-  assert.equal(gated.window.__elonChatGptPrivateTransport.version, 18);
+  assert.equal(gated.window.__elonChatGptPrivateTransport.version, 19);
   assert.equal(gated.window.__elonChatGptPrivateTransport.conversationPrefetchEnabled, false);
   assert.equal(gated.window.__elonChatGptPrivateTransport.conversationPrefetchReady(), false);
 
@@ -147,7 +149,7 @@ const detailPayload = {
     return jsonResponse(detailPayload);
   }, false, true);
   const transport = detail.window.__elonChatGptPrivateTransport;
-  assert.equal(transport.version, 18);
+  assert.equal(transport.version, 19);
   assert.equal(transport.conversationPrefetchEnabled, true);
   assert.equal(transport.conversationPrefetchAvailable, true);
   assert.equal(transport.experimentalConversationPrefetchAvailable, true);

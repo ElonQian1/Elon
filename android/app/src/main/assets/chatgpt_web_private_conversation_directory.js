@@ -2,7 +2,7 @@
   'use strict';
 
   const existing = window.__elonChatGptPrivateConversationDirectory;
-  if (existing && Number(existing.version) >= 7) return;
+  if (existing && Number(existing.version) >= 8) return;
   if (location.origin !== 'https://chatgpt.com') return;
 
   const originalFetch = typeof window.fetch === 'function' ? window.fetch.bind(window) : null;
@@ -376,33 +376,21 @@
 
   function refreshProject(rawProjectId) {
     const projectId = cleanText(rawProjectId);
-    if (!originalFetch || !SAFE_PROJECT_ID.test(projectId)) return Promise.resolve(false);
+    const jsonRequest = window.__elonChatGptPrivateJsonRequest;
+    if (!originalFetch || !jsonRequest || !SAFE_PROJECT_ID.test(projectId)) return Promise.resolve(false);
     const active = projectRefreshes.get(projectId);
     if (active) return active;
-    const fetchResult = Promise.resolve().then(() => originalFetch(
+    const request = jsonRequest.request({
+      fetch: originalFetch, AbortController: window.AbortController,
+      setTimeout: window.setTimeout.bind(window), clearTimeout: window.clearTimeout.bind(window)
+    },
       '/backend-api/gizmos/' + encodeURIComponent(projectId) + '/conversations',
-      { method: 'GET', credentials: 'same-origin', cache: 'no-store' }
-    )).then((response) => {
-      if (!response || response.status < 200 || response.status >= 300 ||
-          typeof response.text !== 'function') return false;
-      return response.text().then((text) => replaceProjectConversations(projectId, text));
-    }).catch(() => false);
-    const request = new Promise((resolve) => {
-      let settled = false;
-      const timeout = window.setTimeout(() => {
-        if (settled) return;
-        settled = true;
-        resolve(false);
-      }, PROJECT_REFRESH_TIMEOUT_MS);
-      fetchResult.then((value) => {
-        if (settled) return;
-        settled = true;
-        window.clearTimeout(timeout);
-        resolve(value);
+      { method: 'GET', credentials: 'same-origin', cache: 'no-store' },
+      { timeoutMs: PROJECT_REFRESH_TIMEOUT_MS, maxBytes: MAX_RESPONSE_BYTES, mode: 'text' }
+    ).then((response) => replaceProjectConversations(projectId, response.text))
+      .catch(() => false).finally(() => {
+        if (projectRefreshes.get(projectId) === request) projectRefreshes.delete(projectId);
       });
-    }).finally(() => {
-      if (projectRefreshes.get(projectId) === request) projectRefreshes.delete(projectId);
-    });
     projectRefreshes.set(projectId, request);
     return request;
   }
@@ -431,7 +419,7 @@
   }
 
   window.__elonChatGptPrivateConversationDirectory = Object.freeze({
-    version: 7,
+    version: 8,
     snapshot,
     refreshProject,
     acceptConversationMembership,

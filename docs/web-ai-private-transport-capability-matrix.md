@@ -11,6 +11,8 @@ and separates content refresh from live interaction state. See the
 completed labels do not mean those remaining private protocols are implemented.
 The unshipped batch also adds a [private conversation attachment index](chatgpt-private-conversation-files.md)
 with a native cache-first file sheet. This does not make upload/download private-owned.
+The [request lifetime repair](chatgpt-private-request-lifetime.md) bounds private response
+consumption and prevents timed-out project reads from replacing newer results.
 
 ## Production defaults
 
