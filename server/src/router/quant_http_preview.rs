@@ -1,6 +1,6 @@
 //! Credential-free HTTP Paper preview hosted by the main Yilong server.
 //!
-//! This route intentionally exposes only public runtime and deterministic research data. It never
+//! This route exposes public runtime, research and approved team asset summaries. It never
 //! forwards cookies, authorization headers, user grants, ESK projections, or operator endpoints.
 
 use std::{path::Path, sync::OnceLock, time::Duration};
@@ -25,6 +25,9 @@ const MAX_BACKTEST_REQUEST_BYTES: usize = 32 * 1024;
 const MAX_PUBLIC_QUERY_BYTES: usize = 2 * 1024;
 const MAX_UPSTREAM_RESPONSE_BYTES: u64 = 2 * 1024 * 1024;
 
+#[path = "quant_team_assets.rs"]
+mod team_assets;
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum PublicQuantEndpoint {
     Health,
@@ -32,15 +35,18 @@ enum PublicQuantEndpoint {
     MarketOverview,
     ResearchSnapshots,
     ResearchBacktests,
+    TeamAssets,
 }
 
 impl PublicQuantEndpoint {
     fn method(self) -> Method {
         match self {
             Self::ResearchBacktests => Method::POST,
-            Self::Health | Self::Runtime | Self::MarketOverview | Self::ResearchSnapshots => {
-                Method::GET
-            }
+            Self::Health
+            | Self::Runtime
+            | Self::MarketOverview
+            | Self::ResearchSnapshots
+            | Self::TeamAssets => Method::GET,
         }
     }
 
@@ -51,6 +57,7 @@ impl PublicQuantEndpoint {
             Self::MarketOverview => "/api/v1/markets/spot/overview",
             Self::ResearchSnapshots => "/api/v1/research/snapshots",
             Self::ResearchBacktests => "/api/v1/research/backtests",
+            Self::TeamAssets => "/api/v1/team-assets/summary",
         }
     }
 }
@@ -109,6 +116,10 @@ where
         .nest_service("/quant/assets", immutable_assets)
         .route("/quant/api/health", get(proxy_health))
         .route("/quant/api/v1/runtime", get(proxy_runtime))
+        .route(
+            "/quant/api/v1/team-assets/summary",
+            on(MethodFilter::GET, team_assets::handle).layer(DefaultBodyLimit::max(0)),
+        )
         .route(
             "/quant/api/v1/markets/spot/overview",
             on(MethodFilter::GET, proxy_market_overview),
@@ -202,6 +213,14 @@ async fn proxy(
             return unavailable();
         }
     };
+    let bytes = if endpoint == PublicQuantEndpoint::TeamAssets {
+        let Some(public) = team_assets::public_body(&bytes, status) else {
+            return unavailable();
+        };
+        public
+    } else {
+        bytes
+    };
     let mut response = Response::new(Body::from(bytes));
     *response.status_mut() = status;
     response.headers_mut().insert(
@@ -283,13 +302,14 @@ mod tests {
     use tower::ServiceExt;
 
     #[test]
-    fn public_allowlist_contains_only_credential_free_research_endpoints() {
+    fn public_allowlist_contains_only_credential_free_public_endpoints() {
         let endpoints = [
             PublicQuantEndpoint::Health,
             PublicQuantEndpoint::Runtime,
             PublicQuantEndpoint::MarketOverview,
             PublicQuantEndpoint::ResearchSnapshots,
             PublicQuantEndpoint::ResearchBacktests,
+            PublicQuantEndpoint::TeamAssets,
         ];
         let paths = endpoints.map(PublicQuantEndpoint::path);
         assert_eq!(
@@ -300,6 +320,7 @@ mod tests {
                 "/api/v1/markets/spot/overview",
                 "/api/v1/research/snapshots",
                 "/api/v1/research/backtests",
+                "/api/v1/team-assets/summary",
             ]
         );
         assert!(paths.iter().all(|path| {

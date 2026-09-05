@@ -14058,6 +14058,97 @@
       "updated_at_ms": 1786877700639
     },
     {
+      "id": "team-assets-public-preview-v1",
+      "title": "量化团队资产公开汇总转发V1",
+      "summary": "仅增加精确GET公开团队币安现货估值与成功时间；不转发任何凭据或开放个人资产及运营API",
+      "status": "implemented",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/team-assets-public-preview-v1.md",
+        "content_hash": "2570a26a0a67e4061c9770320504c88f4d7bfb1879f572cc109e6ebe56cb7466",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "f9956fe67439be2bb2b7a19cf670521015833650",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "bc6f4519d3d127df01df18a9d4ba6c762e45c9c6",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "platform-public-preview, quant-team-assets",
+      "tags": [],
+      "task_paths": [
+        "docs/reports/team-assets-public-preview-v1.md",
+        "docs/requirements/team-assets-public-preview-v1.md",
+        "server/src/router/quant_http_preview.rs",
+        "server/src/router/quant_team_assets.rs"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "仅允许团队汇总精确GET且拒绝查询参数",
+        "保持无凭据转发及个人和运营路径隔离",
+        "源码测试与真正发布接入状态分别报告"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "docs/reports/team-assets-public-preview-v1.md",
+          "content_hash": "d7bf2ab3c1ed03c275d6024fa172897c9271ca87348ae9699611e8ff5bf68610",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "f9956fe67439be2bb2b7a19cf670521015833650",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "f5cc4d9d5109fc0b67b08cdbc23912ec66d1bce4",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/router/quant_http_preview.rs",
+          "content_hash": "f333f557fa55330f7dbca4f08da29fdd90dff392b65670b86863635fef9afaee",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "f9956fe67439be2bb2b7a19cf670521015833650",
+            "head_blob_oid": "f9aabb7746371f959db85024299bb879bbaf4752",
+            "worktree_blob_oid": "cb7cb3a459239ce8c0f7e0a765319e68b4269c5e",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/router/quant_team_assets.rs",
+          "content_hash": "9532569b474d76dadee8cbb49b9884320abdb620cb3303510a04d50a5ea6c06e",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "f9956fe67439be2bb2b7a19cf670521015833650",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "38b8e3ac997049ab139d5f9a900f90c98a76f684",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/router/quant_team_assets.rs",
+          "content_hash": "9532569b474d76dadee8cbb49b9884320abdb620cb3303510a04d50a5ea6c06e",
+          "locator": "tests",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "f9956fe67439be2bb2b7a19cf670521015833650",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "38b8e3ac997049ab139d5f9a900f90c98a76f684",
+            "state": "untracked"
+          }
+        }
+      ],
+      "created_at_ms": 1788616522579,
+      "updated_at_ms": 1788618083152
+    },
+    {
       "id": "unified-account-asset-access-v1",
       "title": "统一主账号与可撤销只读资产授权 V1",
       "summary": "复用主账号和正式资产真源，以独立客户端授权代替逐页主APK确认；新只读凭据绑定用户、客户端、范围、原会话和期限，Android/Web/AI消费统一投影。原0.5发布与入口切换单独协调。",
@@ -20861,56 +20952,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_5691210baac2476faadfd422801c3238",
-      "feature_id": "esk-sui-currency-observer-v1",
-      "action": "registered",
-      "actor": "codex-esk-currency-observer",
-      "reason": "",
-      "from_status": "",
-      "to_status": "accepted",
-      "at_ms": 1788533961027
-    },
-    {
-      "id": "feature_event_1fe7935ce235464080125315d2450fb9",
-      "feature_id": "esk-sui-currency-observer-v1",
-      "action": "transitioned",
-      "actor": "codex-esk-currency-observer",
-      "reason": "",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1788533970243
-    },
-    {
-      "id": "feature_event_138adaafca104b82b26a7d36d599b08a",
-      "feature_id": "esk-sui-currency-observer-v1",
-      "action": "claimed",
-      "actor": "codex-esk-currency-observer",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788533970817
-    },
-    {
-      "id": "feature_event_be62d99fd67e469da0bda1b6e34ce8a6",
-      "feature_id": "esk-sui-currency-observer-v1",
-      "action": "transitioned",
-      "actor": "codex-esk-currency-observer",
-      "reason": "",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788533979587
-    },
-    {
-      "id": "feature_event_dced2231bc0b4ceb949b70e68120edc3",
-      "feature_id": "esk-sui-publication-observer-v1",
-      "action": "transitioned",
-      "actor": "codex-esk-currency-observer",
-      "reason": "保持合同不变地抽取共享传输并完成原65项和新15项回归；显式重开以绑定当前源码证据，移除漂移旧证据，不改变发行或余额状态。",
-      "from_status": "verified",
-      "to_status": "ready",
-      "at_ms": 1788534659925
-    },
-    {
       "id": "feature_event_73d1f1f512d44e6f94f627c06bba914c",
       "feature_id": "esk-sui-publication-observer-v1",
       "action": "claimed",
@@ -22859,6 +22900,56 @@
       "from_status": "in_progress",
       "to_status": "in_progress",
       "at_ms": 1788610260540
+    },
+    {
+      "id": "feature_event_e5756196c745433383b561fffbae31a7",
+      "feature_id": "team-assets-public-preview-v1",
+      "action": "registered",
+      "actor": "codex-team-assets",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1788616522579
+    },
+    {
+      "id": "feature_event_02740d8c23d948298a0da8acbff2d8d4",
+      "feature_id": "team-assets-public-preview-v1",
+      "action": "claimed",
+      "actor": "codex-team-assets",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788616523020
+    },
+    {
+      "id": "feature_event_ab7529649d7d4506801fa03eca1dd834",
+      "feature_id": "team-assets-public-preview-v1",
+      "action": "transitioned",
+      "actor": "codex-team-assets",
+      "reason": "独立精确公开路由接入，量化团队汇总模块并行实现",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788616523231
+    },
+    {
+      "id": "feature_event_1553af5a7ab54abbb2db5b2d78659109",
+      "feature_id": "team-assets-public-preview-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-team-assets",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788618083006
+    },
+    {
+      "id": "feature_event_415c9df3fd784564864a7cb22669fcbc",
+      "feature_id": "team-assets-public-preview-v1",
+      "action": "transitioned",
+      "actor": "codex-team-assets",
+      "reason": "精确公开汇总转发已实现，10项本地测试通过；生产发布与真实同步待验收",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1788618083152
     }
   ]
 }
