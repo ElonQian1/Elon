@@ -113,7 +113,6 @@ function Wait-ChatGptState {
 
     $deadline = [DateTimeOffset]::UtcNow.AddSeconds($TimeoutSec)
     $last = $null
-    $nextOpenAttemptAt = [DateTimeOffset]::UtcNow.AddSeconds(3)
     do {
         $last = Invoke-ApkMcp -Tool "ui_state"
         if (& $Predicate $last) { return $last }
@@ -219,6 +218,7 @@ function Wait-NavigationReady {
 
     $deadline = [DateTimeOffset]::UtcNow.AddSeconds($TimeoutSec)
     $last = $null
+    $nextOpenAttemptAt = [DateTimeOffset]::UtcNow.AddSeconds(3)
     do {
         $last = Invoke-ApkMcp -Tool "ui_state"
         $command = $last.last_command
@@ -228,7 +228,8 @@ function Wait-NavigationReady {
         $features = @($navigation.features | Where-Object { $null -ne $_ })
         $cachedSnapshot = $navigation.control_ok -eq $true -and $features.Count -gt 0
         $matrix = Invoke-UiAction -Action "chatgpt_get_capability_matrix"
-        $overlayOpen = [int]$matrix.observed_semantics.close -gt 0
+        $expandedNavigation = @($last.ui_manifest.controls | Where-Object { $_.semantic -eq "navigation" -and $_.expanded -eq $true }).Count -gt 0
+        $overlayOpen = [int]$matrix.observed_semantics.close -gt 0 -or $expandedNavigation
         if ($fresh -and ($collected -or $cachedSnapshot) -and $overlayOpen) {
             return [pscustomobject]@{
                 command_state = $last
@@ -481,7 +482,8 @@ $navigationMatrix = Invoke-UiAction -Action "chatgpt_get_capability_matrix"
 $navigationAdaptationRequired = $navigationMatrix.adaptation_review.required -eq $true
 $navigationAdaptationReasons = @($navigationMatrix.adaptation_review.reasons)
 $navigationCloseCount = [int]$navigationMatrix.observed_semantics.close
-Add-Check "navigation_overlay_open" ($navigationCloseCount -gt 0) ([string]$navigationCloseCount)
+$navigationExpandedCount = @($featuresState.command_state.ui_manifest.controls | Where-Object { $_.semantic -eq "navigation" -and $_.expanded -eq $true }).Count
+Add-Check "navigation_overlay_open" ($navigationCloseCount + $navigationExpandedCount -gt 0) "close=$navigationCloseCount expanded=$navigationExpandedCount"
 Add-Check "navigation_adaptation_review" (
     -not $navigationAdaptationRequired
 ) ($navigationAdaptationReasons -join ",")

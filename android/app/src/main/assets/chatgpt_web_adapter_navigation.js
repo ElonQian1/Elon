@@ -122,13 +122,17 @@
   }
 
   function sidebarButton(open) {
-    const needles = open
-      ? ['open sidebar', '打开边栏', '打开侧边栏']
-      : ['close sidebar', '关闭边栏', '关闭侧边栏'];
+    const openNeedles = ['open sidebar', '打开边栏', '打开侧边栏'];
+    const closeNeedles = ['close sidebar', '关闭边栏', '关闭侧边栏'];
     return Array.from(document.querySelectorAll('button')).find((button) => {
       if (!isVisible(button)) return false;
       const label = nodeLabel(button).toLowerCase();
-      return needles.some((needle) => label.includes(needle));
+      const expanded = button.getAttribute('aria-expanded') === 'true';
+      const hasOpenLabel = openNeedles.some((needle) => label.includes(needle));
+      const hasCloseLabel = closeNeedles.some((needle) => label.includes(needle));
+      return open
+        ? hasOpenLabel && !expanded
+        : hasCloseLabel || (hasOpenLabel && expanded);
     }) || null;
   }
 

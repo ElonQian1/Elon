@@ -5,6 +5,7 @@ const policy = require(
 );
 
 let assignedPath = '';
+let sidebarExpanded = false;
 global.location = {
   origin: 'https://chatgpt.com',
   pathname: '/',
@@ -15,7 +16,9 @@ global.location = {
 const openSidebarButton = {
   textContent: '',
   getAttribute(name) {
-    return name === 'aria-label' ? 'Open sidebar' : null;
+    if (name === 'aria-label') return 'Open sidebar';
+    if (name === 'aria-expanded') return sidebarExpanded ? 'true' : 'false';
+    return null;
   },
   getBoundingClientRect() {
     return { left: 8, top: 8, right: 48, bottom: 48, width: 40, height: 40 };
@@ -71,6 +74,21 @@ if (!events.some((event) => event.type === 'web_touch_request' && event.purpose 
 }
 if (!results.some((entry) => entry.action === 'list_navigation' && entry.ok)) {
   throw new Error('official sidebar request did not succeed');
+}
+
+sidebarExpanded = true;
+events.length = 0;
+results.length = 0;
+window.__elonChatGptNavigation.requestList(emitEvent, result);
+if (events.some((event) => event.type === 'web_touch_request')) {
+  throw new Error('expanded sidebar toggle was touched again');
+}
+window.__elonChatGptNavigation.dismiss(emitEvent, result);
+if (!events.some((event) => event.type === 'web_touch_request' && event.purpose === 'dismiss_navigation')) {
+  throw new Error('expanded sidebar toggle was not reused to dismiss navigation');
+}
+if (!results.some((entry) => entry.action === 'dismiss_navigation' && entry.ok)) {
+  throw new Error('expanded sidebar dismiss did not succeed');
 }
 
 window.__elonChatGptNavigation.collectList(emitEvent, result);
