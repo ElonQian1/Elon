@@ -18,9 +18,9 @@ Sui 发布、任何地址已经获得 ESK、平台余额已经迁移、真实用
 | --- | --- | --- |
 | 需求与实现 | implemented | 真实平台会话、V1 挑战、三种单签本地复核、一次消费和本人查询已组合 |
 | 定向验证 | passed | 最终生产源码快照上的 harness 17/17、服务目标 14/14、旧 V1 58/58 通过 |
-| Feature Registry | in_progress | 证据与最终状态在提交前统一登记 |
-| Git 推送 | pending | 本文件写入时尚未推送，不能把工作区实现冒充主线交付 |
-| 后端部署 | pending | 本文件写入时尚未发布服务器 |
+| Feature Registry | released | 当前源码、测试与发布证据登记后按状态机完成；仅表示本功能服务发布 |
+| Git 推送 | pushed | 实现与首版证据已推送至主线提交 `dadcd45fd6d5f3a1f129b4d8fe08c33fccd3c26f` |
+| 后端部署 | deployed | 官方流程发布 Server `0.3.1733`，线上 health、版本和源码 SHA 一致 |
 | 真实用户验收 | not_performed | 未使用真实钱包、真实地址、生产会话或真实用户数据 |
 | Sui 发币/链终局 | not_performed | 无 RPC、交易构建、签名、广播、包 ID、对象 ID 或 checkpoint 证据 |
 
@@ -76,6 +76,19 @@ Sui 发布、任何地址已经获得 ESK、平台余额已经迁移、真实用
 既有 `node_agent_compute_plugin_host` 编译问题阻断；本功能没有修改那些文件。随后按
 生产二进制 `--bin elon-server` 精确限定，正式组合目标通过。此背景问题不得写成 V2
 失败，也不得把定向通过扩大成全仓库全部目标通过。
+
+## 推送与部署证据
+
+- 主线实现与重构后证据提交为
+  `dadcd45fd6d5f3a1f129b4d8fe08c33fccd3c26f`；推送前源码规模门禁检查 23 个相关文件，
+  文档模块化与项目入口门禁通过。
+- 标准 `scripts/publish-server.ps1 -SkipPcFrontend` 完成交叉编译、上传、互斥锁内原子替换、
+  服务重启与 smoke；服务器分配版本 `0.3.1733`，`/health` 返回正常，版本接口返回完整
+  源码 SHA `dadcd45fd6d5f3a1f129b4d8fe08c33fccd3c26f`，发布状态为 `published`。
+- 本次没有发布 PC 前端或 APK，也没有修改服务器 TLS/证书配置。普通健康检查仍使用既有 HTTP
+  服务；本功能的私有会话接口在没有真实受信 HTTPS 连接时失败关闭，不能据此宣称用户已经可在
+  公网完成地址绑定。
+- 此处 `released` 只表示地址绑定后端代码已发布，不表示 ESK 已发行、已铸造、已分配或已迁移。
 
 ## 安全与后续边界
 

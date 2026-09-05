@@ -8724,7 +8724,7 @@
       "id": "esk-platform-sui-address-binding-v2",
       "title": "ESK 平台认证 Sui 地址绑定 V2",
       "summary": "把 V1 Sui 个人消息挑战接入真实平台会话，服务端本地重验三种单签并在同一 SQLite 事务中记录一次消费与不可变用户/地址绑定；只支持 testnet，不改余额、不上链、不执行资金操作。",
-      "status": "in_progress",
+      "status": "released",
       "priority": "p0",
       "requirement": {
         "path": "docs/requirements/esk-platform-sui-address-binding-v2.md",
@@ -8772,15 +8772,218 @@
         "绑定前后正式 ESK 余额与 platform_recorded/not_deployed 投影不变；无 RPC、签名、广播、真实数据或资金操作。",
         "定向 harness、HTTP、迁移、旧 V1 Sui 合同、源码规模、文档和 registry 漂移门禁通过，推送/部署/本人验收分报。"
       ],
-      "implementation_evidence": [],
-      "claim": {
-        "claim_id": "claim_e549f247995a4bf4859638b1ead673f7",
-        "agent_id": "codex-root",
-        "claimed_at_ms": 1788642596209,
-        "expires_at_ms": 1788685796209
-      },
+      "implementation_evidence": [
+        {
+          "path": "docs/delivery/esk-platform-sui-address-binding-v2.md",
+          "content_hash": "58ad6fc787936720b990a099d832c983969c5188cc5bb573df794f0b665f6e4b",
+          "locator": "验证、推送、部署与安全边界",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "dadcd45fd6d5f3a1f129b4d8fe08c33fccd3c26f",
+            "head_blob_oid": "4a2dd66918edf0ec7ea2f26c39bb3494ec124fb5",
+            "worktree_blob_oid": "cec7d21d0f0af7f47308485fe439230107d40118",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "docs/requirements/esk-platform-sui-address-binding-v2.md",
+          "content_hash": "55f8e45168acbb52e5125c52582b5f77dfbb2dd99496d92fcb2e2136b3d865b4",
+          "locator": "完整需求与验收边界",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "dadcd45fd6d5f3a1f129b4d8fe08c33fccd3c26f",
+            "head_blob_oid": "d55612262e3d378fcfb7deaa6bb373fa16aa31a9",
+            "worktree_blob_oid": "d55612262e3d378fcfb7deaa6bb373fa16aa31a9",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "scripts/test-esk-sui-address-binding.js",
+          "content_hash": "169dfee186f7aaaaa379314ad176c3686cf9c73637fb9e58f618f2803d7d0014",
+          "locator": "V1 58 项兼容与无网络合同",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "dadcd45fd6d5f3a1f129b4d8fe08c33fccd3c26f",
+            "head_blob_oid": "b742b2662785125463716d168f17bb6eb95c4d4a",
+            "worktree_blob_oid": "b742b2662785125463716d168f17bb6eb95c4d4a",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/esk_platform/sui_address_binding/api.rs",
+          "content_hash": "154d1324d3c57b0d1d0f12c3a13d56d60c1a9122abc3041f61332ac388275e10",
+          "locator": "认证 create/complete/read 路由",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "dadcd45fd6d5f3a1f129b4d8fe08c33fccd3c26f",
+            "head_blob_oid": "0256f73c0631824c99322a374b0dbfd386f32a0f",
+            "worktree_blob_oid": "0256f73c0631824c99322a374b0dbfd386f32a0f",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/esk_platform/sui_address_binding/challenge.rs",
+          "content_hash": "f8a6cfb975f27a143f5178f7c7ed76d278bd16952c18ef1247c0bbd106bf71bb",
+          "locator": "V1 canonical challenge",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "dadcd45fd6d5f3a1f129b4d8fe08c33fccd3c26f",
+            "head_blob_oid": "86903a42d2f55e28cb417ffa6563b4ef6b1e33ac",
+            "worktree_blob_oid": "86903a42d2f55e28cb417ffa6563b4ef6b1e33ac",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/esk_platform/sui_address_binding/crypto.rs",
+          "content_hash": "385e63a7975a7c82ecca99081524405bbc06a0af4f5bf6f3deea51494551e8c6",
+          "locator": "三种 Sui 单签离线验签",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "dadcd45fd6d5f3a1f129b4d8fe08c33fccd3c26f",
+            "head_blob_oid": "0e2c5994a680aa70e4e7b8d0f5f86b1526d60f4f",
+            "worktree_blob_oid": "0e2c5994a680aa70e4e7b8d0f5f86b1526d60f4f",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/esk_platform/sui_address_binding/crypto_vector_tests.rs",
+          "content_hash": "25d99395587abcc26767dfab5836d23211a3a74be6f5b75923e6d0a73fb7c66a",
+          "locator": "跨方案密码学向量",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "dadcd45fd6d5f3a1f129b4d8fe08c33fccd3c26f",
+            "head_blob_oid": "b7f1bb2f16427f0a43ca0ac8c78e45962e6ce13f",
+            "worktree_blob_oid": "b7f1bb2f16427f0a43ca0ac8c78e45962e6ce13f",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/esk_platform/sui_address_binding/http_tests.rs",
+          "content_hash": "d94f042f134860bcde094be60e81a4fed83df9d38dc42d9ac575d900e4c3015e",
+          "locator": "真实 Router HTTP 隐私与认证合同",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "dadcd45fd6d5f3a1f129b4d8fe08c33fccd3c26f",
+            "head_blob_oid": "cb6e47a5e7cd4f67f86e4e6ae8878f5f29f4a218",
+            "worktree_blob_oid": "cb6e47a5e7cd4f67f86e4e6ae8878f5f29f4a218",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/esk_platform/sui_address_binding/migration.rs",
+          "content_hash": "dff3418e4f45bca6d5308dbdbb343f3d72b5e9f5bea9deb4b5225271e03d9dab",
+          "locator": "V290 追加式 WITHOUT ROWID 迁移",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "dadcd45fd6d5f3a1f129b4d8fe08c33fccd3c26f",
+            "head_blob_oid": "2277664976a875fc10f09d9f15cb81a8b66bf5f0",
+            "worktree_blob_oid": "2277664976a875fc10f09d9f15cb81a8b66bf5f0",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/esk_platform/sui_address_binding/wire.rs",
+          "content_hash": "ca3ce3df52b074938a8fa27f19fc1d645cda37ac3c7ccab508d35db2bc6cc047",
+          "locator": "私有字段排除与真实性投影",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "dadcd45fd6d5f3a1f129b4d8fe08c33fccd3c26f",
+            "head_blob_oid": "047cb00f7d3c1b34c49b25d900295f4c0eb8265f",
+            "worktree_blob_oid": "047cb00f7d3c1b34c49b25d900295f4c0eb8265f",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/store/common/esk_platform_assets/sui_address_binding/mod.rs",
+          "content_hash": "7cfbd10d743809a9344bb81da7d70e05ff741e4dca9f8c132f3c9c4f20371479",
+          "locator": "会话与事务绑定协调",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "dadcd45fd6d5f3a1f129b4d8fe08c33fccd3c26f",
+            "head_blob_oid": "3055e6db22dcc1dd5541e0361b79c5b05cb886ae",
+            "worktree_blob_oid": "3055e6db22dcc1dd5541e0361b79c5b05cb886ae",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/store/common/esk_platform_assets/sui_address_binding/read.rs",
+          "content_hash": "143140fefb95ed8a934cdbbf8d68ad89aff2f2e8d73f16c48d202a007ad4b500",
+          "locator": "本人读取与完整性重验",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "dadcd45fd6d5f3a1f129b4d8fe08c33fccd3c26f",
+            "head_blob_oid": "851b776285cbaee03a0b9762d7b34eed08014352",
+            "worktree_blob_oid": "851b776285cbaee03a0b9762d7b34eed08014352",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/store/common/esk_platform_assets/sui_address_binding/write.rs",
+          "content_hash": "58a37c4ba14ff22edec7d65bd00f2e5231b5e1b90b0647789aca47dfe3e6a4db",
+          "locator": "挑战创建、消费、幂等与限流",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "dadcd45fd6d5f3a1f129b4d8fe08c33fccd3c26f",
+            "head_blob_oid": "c5c0225243c4ce44828f7a7e881f94c47ada84ca",
+            "worktree_blob_oid": "c5c0225243c4ce44828f7a7e881f94c47ada84ca",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/store_migrations.rs",
+          "content_hash": "0b1d177c1bcb60078417f67fa5458aca681afa519dc238702aad02388359a4dc",
+          "locator": "V290 正式注册",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "dadcd45fd6d5f3a1f129b4d8fe08c33fccd3c26f",
+            "head_blob_oid": "e6a0fd410472063cb206e830408613833985db7f",
+            "worktree_blob_oid": "e6a0fd410472063cb206e830408613833985db7f",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/tests/esk-platform-harness/src/tests/sui_address_binding.rs",
+          "content_hash": "38d5fc9a1e13bc6574f9f0f350d1dd1ee85674b85b903224242471f4f24b5b1b",
+          "locator": "隔离 Store 组合验证",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "dadcd45fd6d5f3a1f129b4d8fe08c33fccd3c26f",
+            "head_blob_oid": "2d7f6429982124f0ad7e1c66d3f2ca8ef578de74",
+            "worktree_blob_oid": "2d7f6429982124f0ad7e1c66d3f2ca8ef578de74",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/tests/esk-platform-harness/src/tests/sui_address_binding/append_only.rs",
+          "content_hash": "91d6f343dceaed01ad282b3db0084f08d2a85ea8a6e78b640d07e20765712053",
+          "locator": "OR REPLACE 与 hidden rowid 回归",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "dadcd45fd6d5f3a1f129b4d8fe08c33fccd3c26f",
+            "head_blob_oid": "bde27c5f011bb85be72df86f4bbcb9e59cfd8a9c",
+            "worktree_blob_oid": "bde27c5f011bb85be72df86f4bbcb9e59cfd8a9c",
+            "state": "tracked_clean"
+          }
+        }
+      ],
       "created_at_ms": 1788642559294,
-      "updated_at_ms": 1788642606767
+      "updated_at_ms": 1788644133938
     },
     {
       "id": "esk-sui-address-control-proof-v1",
@@ -21014,46 +21217,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_8e5383f91ac5491f95ac0cb790d5b291",
-      "feature_id": "esk-sui-currency-observer-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-esk-currency-observer",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788535094986
-    },
-    {
-      "id": "feature_event_1a07eac7fc6e411889f236fd6fd89069",
-      "feature_id": "esk-sui-currency-observer-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-esk-currency-observer",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788535096265
-    },
-    {
-      "id": "feature_event_2a7c063b727644bc93994ee75e347fda",
-      "feature_id": "esk-sui-currency-observer-v1",
-      "action": "transitioned",
-      "actor": "codex-esk-currency-observer",
-      "reason": "17d9fc49f已推送；312项离线+65旧发布+15传输及创世回归通过，官方单源非ESK schema smoke通过；真实ESK双源验收仍待公开参数。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1788535096868
-    },
-    {
-      "id": "feature_event_e506b8dc533449dd94d946df7d06313d",
-      "feature_id": "esk-sui-currency-observer-v1",
-      "action": "transitioned",
-      "actor": "codex-esk-currency-observer",
-      "reason": "绑定19条当前证据；已实际运行312项离线测试和公开非ESK schema负向完整性检查。认证/余额/清单迁移位始终false，无签名或资金操作；不宣称ESK实际上链。",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1788535097440
-    },
-    {
       "id": "feature_event_1e0cadce4ca14a07ba1480295611abf8",
       "feature_id": "esk-platform-native-progress-v1",
       "action": "registered",
@@ -23012,6 +23175,46 @@
       "from_status": "claimed",
       "to_status": "in_progress",
       "at_ms": 1788642606767
+    },
+    {
+      "id": "feature_event_49729f34ab104afdba01c9320b5740bc",
+      "feature_id": "esk-platform-sui-address-binding-v2",
+      "action": "evidence_recorded",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788644093577
+    },
+    {
+      "id": "feature_event_c377be75a3cd4e4fa157cb42dfe2d8ea",
+      "feature_id": "esk-platform-sui-address-binding-v2",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "认证路由、三方案离线验签、V290 追加式账本和本人读取已实现；不含 RPC、签名、广播或资金操作。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1788644108567
+    },
+    {
+      "id": "feature_event_69a9427cb7d2438a8e747a462d593cda",
+      "feature_id": "esk-platform-sui-address-binding-v2",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "重构后同一源码快照 a96e99e0 上 harness 17/17（ec19e95d）与 elon-server 14/14（3349125b）通过；V1 58/58、规模和文档门禁通过。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1788644121962
+    },
+    {
+      "id": "feature_event_138bcf8ff3cf48309c2b13efca35df54",
+      "feature_id": "esk-platform-sui-address-binding-v2",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "官方 Server 发布 0.3.1733，health 与版本接口确认源码 dadcd45fd；未配置 TLS、未做真实用户绑定，released 不代表 ESK 上链发行。",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1788644133938
     }
   ]
 }
