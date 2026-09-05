@@ -58,6 +58,7 @@
     try {
       await delay(500);
       const handles = await collect();
+      if (!handles.length) throw new Error('gallery_not_ready');
       const pending = handles.filter((handle) => !cachedHandles.has(handle)).slice(0, 24);
       let exportedCount = 0;
       for (const handle of pending) {

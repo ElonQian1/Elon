@@ -4,6 +4,12 @@ This document is the human-readable boundary for the runtime inventory exposed b
 `elon.chatgpt_web.capability_matrix.v4`. The runtime catalog is authoritative for the
 installed build; individual capability documents retain implementation evidence.
 
+The current unshipped batch repairs a confirmed private-history/native wire mismatch
+and separates content refresh from live interaction state. See the
+[repair contract](chatgpt-private-history-native-contract.md) and
+[remaining private-native work](web-ai-private-native-remaining-batch.md). Prior
+completed labels do not mean those remaining private protocols are implemented.
+
 ## Production defaults
 
 | Capability | Provider | Result | Fallback |

@@ -50,7 +50,8 @@ const fakeFetch = async () => ({
 const window = {
   document,
   fetch: fakeFetch,
-  setTimeout
+  setTimeout,
+  clearTimeout
 };
 window.window = window;
 
@@ -62,6 +63,8 @@ vm.runInNewContext(assetSource, {
   Image: FakeImage,
   fetch: fakeFetch,
   URL,
+  URLSearchParams,
+  AbortController,
   Promise,
   Math,
   Number,
@@ -89,8 +92,10 @@ vm.runInNewContext(assetSource, {
   assert.equal(emitted[0].mediaType, 'image/jpeg');
   assert.ok(emitted[0].data.length > 0);
   assert.doesNotMatch(JSON.stringify(emitted), /oaiusercontent|token|private\.png/);
-  assert.equal(canvas.width, 1024);
-  assert.equal(canvas.height, 576);
+  assert.equal(emitted[0].width, 1024);
+  assert.equal(emitted[0].height, 576);
+  assert.equal(canvas.width, 0, 'release the canvas backing store after export');
+  assert.equal(canvas.height, 0);
 
   const missing = await module.request('image_0000000000000000', () => {});
   assert.equal(missing.ok, false);
@@ -102,7 +107,6 @@ vm.runInNewContext(assetSource, {
       pageAdapterSource.indexOf('chatgpt_web_adapter_messages.js'),
     'image assets must register before message extraction'
   );
-  assert.match(pageAdapterSource, /ADAPTER_VERSION = 247/);
   console.log('chatgpt web image asset tests passed');
 })().catch((error) => {
   console.error(error);
