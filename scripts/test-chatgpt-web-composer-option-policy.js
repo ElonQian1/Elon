@@ -51,6 +51,17 @@ assert.deepEqual(policy.filter('tools', [
   option('网页搜索')
 ]).map((value) => value.label), ['网页搜索']);
 
+assert.deepEqual(policy.filter('model', [
+  option('设置'),
+  option('自动', 'menuitemradio'),
+  option('退出登录')
+]).map((value) => value.label), ['自动']);
+assert.deepEqual(policy.filter('tools', [
+  option('个人资料'),
+  option('网页搜索'),
+  option('帮助')
+]).map((value) => value.label), ['网页搜索']);
+
 assert.equal(policy.accepts('model', option('帮助')), false);
 assert.equal(policy.accepts('tools', option('', 'menuitem')), false);
 

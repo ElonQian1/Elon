@@ -181,7 +181,9 @@ class ChatGptWebComposerContractTest {
         assertTrue(optionPolicy.contains("modelLabelPolicy.isModelLabel(label)"))
         assertTrue(optionPolicy.contains("capabilit(?:y|ies)"))
         assertTrue(optionPolicy.contains("isForeignMenuLabel"))
-        assertTrue(optionPolicy.contains("return []"))
+        assertFalse(optionPolicy.contains(
+            "if (values.some((candidate) => isForeignMenuLabel(candidate && candidate.label))) return []",
+        ))
         assertTrue(adapter.contains("readAttachments"))
         assertTrue(adapter.contains("removeAttachment"))
         assertTrue(adapter.contains("attachmentPolicy.isRemoveActionLabel"))
