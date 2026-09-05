@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://yilong.invalid/contracts/sui/esk-address-binding-challenge-v1.schema.json",
+  "title": "ESK Sui address binding challenge V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema", "challenge_id", "network", "purpose", "subject_commitment",
+    "address", "ttl_seconds", "nonce_base64", "issued_at", "expires_at",
+    "message_base64", "message_sha256"
+  ],
+  "properties": {
+    "schema": { "const": "yilong.esk.sui.address_binding_challenge.v1" },
+    "challenge_id": { "type": "string", "pattern": "^eab1_[0-9a-f]{32}$" },
+    "network": { "const": "testnet" },
+    "purpose": { "const": "user_asset_migration" },
+    "subject_commitment": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "not": { "const": "sha256:0000000000000000000000000000000000000000000000000000000000000000" }
+    },
+    "address": {
+      "type": "string",
+      "pattern": "^0x[0-9a-f]{64}$",
+      "not": { "const": "0x0000000000000000000000000000000000000000000000000000000000000000" }
+    },
+    "ttl_seconds": { "type": "integer", "minimum": 120, "maximum": 900 },
+    "nonce_base64": {
+      "type": "string",
+      "minLength": 44,
+      "maxLength": 44,
+      "pattern": "^(?:[A-Za-z0-9+/]{4}){10}[A-Za-z0-9+/]{2}[AEIMQUYcgkosw048]=$"
+    },
+    "issued_at": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$"
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$"
+    },
+    "message_base64": {
+      "type": "string",
+      "minLength": 4,
+      "maxLength": 2732,
+      "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/][AQgw]==|[A-Za-z0-9+/]{2}[AEIMQUYcgkosw048]=)?$"
+    },
+    "message_sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+  }
+}

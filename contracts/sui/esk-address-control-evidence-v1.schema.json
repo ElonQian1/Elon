@@ -1,0 +1,117 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://yilong.invalid/contracts/sui/esk-address-control-evidence-v1.schema.json",
+  "title": "ESK Sui address control evidence V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema", "status", "challenge", "wallet_response", "address",
+    "subject_commitment", "signature_scheme", "message_sha256", "signature_sha256",
+    "verified_at", "address_control_verified", "platform_subject_authenticated",
+    "challenge_single_use_recorded", "chain_finality_verified", "asset_identity_verified",
+    "balance_eligible", "manifest_transition_allowed", "evidence_sha256"
+  ],
+  "$defs": {
+    "challenge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema", "challenge_id", "network", "purpose", "subject_commitment",
+        "address", "ttl_seconds", "nonce_base64", "issued_at", "expires_at",
+        "message_base64", "message_sha256"
+      ],
+      "properties": {
+        "schema": { "const": "yilong.esk.sui.address_binding_challenge.v1" },
+        "challenge_id": { "type": "string", "pattern": "^eab1_[0-9a-f]{32}$" },
+        "network": { "const": "testnet" },
+        "purpose": { "const": "user_asset_migration" },
+        "subject_commitment": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "not": { "const": "sha256:0000000000000000000000000000000000000000000000000000000000000000" }
+        },
+        "address": {
+          "type": "string",
+          "pattern": "^0x[0-9a-f]{64}$",
+          "not": { "const": "0x0000000000000000000000000000000000000000000000000000000000000000" }
+        },
+        "ttl_seconds": { "type": "integer", "minimum": 120, "maximum": 900 },
+        "nonce_base64": {
+          "type": "string",
+          "minLength": 44,
+          "maxLength": 44,
+          "pattern": "^(?:[A-Za-z0-9+/]{4}){10}[A-Za-z0-9+/]{2}[AEIMQUYcgkosw048]=$"
+        },
+        "issued_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$"
+        },
+        "expires_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$"
+        },
+        "message_base64": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 2732,
+          "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/][AQgw]==|[A-Za-z0-9+/]{2}[AEIMQUYcgkosw048]=)?$"
+        },
+        "message_sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+      }
+    }
+  },
+  "properties": {
+    "schema": { "const": "yilong.esk.sui.address_control_evidence.v1" },
+    "status": { "const": "verified_candidate" },
+    "challenge": { "$ref": "#/$defs/challenge" },
+    "wallet_response": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema", "challenge_id", "message_base64", "signature"],
+      "properties": {
+        "schema": { "const": "yilong.esk.sui.address_binding_wallet_response.v1" },
+        "challenge_id": { "type": "string", "pattern": "^eab1_[0-9a-f]{32}$" },
+        "message_base64": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 2732,
+          "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/][AQgw]==|[A-Za-z0-9+/]{2}[AEIMQUYcgkosw048]=)?$"
+        },
+        "signature": {
+          "type": "string",
+          "minLength": 132,
+          "maxLength": 132,
+          "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/][AQgw]==|[A-Za-z0-9+/]{2}[AEIMQUYcgkosw048]=)?$"
+        }
+      }
+    },
+    "address": {
+      "type": "string",
+      "pattern": "^0x[0-9a-f]{64}$",
+      "not": { "const": "0x0000000000000000000000000000000000000000000000000000000000000000" }
+    },
+    "subject_commitment": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "not": { "const": "sha256:0000000000000000000000000000000000000000000000000000000000000000" }
+    },
+    "signature_scheme": { "enum": ["ed25519", "secp256k1", "secp256r1"] },
+    "message_sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "signature_sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "verified_at": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$"
+    },
+    "address_control_verified": { "const": true },
+    "platform_subject_authenticated": { "const": false },
+    "challenge_single_use_recorded": { "const": false },
+    "chain_finality_verified": { "const": false },
+    "asset_identity_verified": { "const": false },
+    "balance_eligible": { "const": false },
+    "manifest_transition_allowed": { "const": false },
+    "evidence_sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+  }
+}

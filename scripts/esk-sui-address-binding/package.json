@@ -1,0 +1,9 @@
+{
+  "name": "@yilong/esk-sui-address-binding",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Offline Sui personal-message address-control proof; no wallet, RPC or transaction execution",
+  "engines": { "node": ">=22" },
+  "scripts": { "test": "node ../test-esk-sui-address-binding.js" },
+  "dependencies": { "@mysten/sui": "2.29.0" }
+}

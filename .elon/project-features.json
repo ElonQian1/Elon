@@ -8721,6 +8721,273 @@
       "updated_at_ms": 1788533028613
     },
     {
+      "id": "esk-sui-address-control-proof-v1",
+      "title": "ESK Sui 用户地址控制证明 V1",
+      "summary": "生成绑定匿名平台主体承诺与用户 Sui testnet 地址的短时个人消息挑战，离线验证三种官方单签并输出自包含候选证据；不认证平台会话、不防跨实例重放、不启用余额或清单晋级。",
+      "status": "verified",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/esk-sui-address-control-proof-v1.md",
+        "content_hash": "e11dd3670ebde469860157730766f3c7ed40c9b694dfa348e4cd40903a3d2672",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "cb3aa1111bc029684eefbea08604e472e0cb4087",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "8c003769bf446d5496c1c39669cdab3ce274730a",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "platform-assets,protocol",
+      "tags": [
+        "esk",
+        "sui",
+        "address-binding",
+        "personal-message",
+        "testnet",
+        "offline"
+      ],
+      "task_paths": [
+        "AI_CURRENT.md",
+        "AI_INDEX.md",
+        "contracts/sui/esk-address-binding-challenge-v1.schema.json",
+        "contracts/sui/esk-address-control-evidence-v1.schema.json",
+        "docs/delivery/esk-sui-address-control-proof-v1.md",
+        "docs/esk-sui-address-control-proof.md",
+        "docs/requirements/esk-first-user-delivery-roadmap-v1.md",
+        "docs/requirements/esk-sui-address-control-proof-v1.md",
+        "scripts/esk-sui-address-binding",
+        "scripts/prepare-esk-sui-address-binding.js",
+        "scripts/test-esk-sui-address-binding.js"
+      ],
+      "dependencies": [
+        "esk-paid-user-reconciliation-preview-v1",
+        "esk-sui-genesis-foundation-v1"
+      ],
+      "acceptance_criteria": [
+        "三种允许单签均以官方 SDK 运行时正向验证，错误地址、签名、消息与 intent 拒绝。",
+        "挑战、消息和 ID 可复算；随机 nonce、严格字段、地址、Base64、时间、TTL 与文件上限均有测试。",
+        "过期/未来/漂移挑战及 MultiSig、zkLogin、Passkey、未知方案在零网络请求下失败关闭。",
+        "证据自包含可复验；账户认证、一次消费、资产、终局性、余额和 manifest 晋级标志固定为 false。",
+        "SDK 和 lock 完整性固定；无 RPC、钱包、交易、私钥或环境秘密读取。",
+        "CLI 正反例、固定错误投影、无输入泄漏及既有 Sui 回归通过。"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "contracts/sui/esk-address-binding-challenge-v1.schema.json",
+          "content_hash": "44aca762ce10e8d892d8d4a2332ba6f470cf24e0bcb1dcd19e6802320141f60d",
+          "locator": "challenge-v1",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "cb3aa1111bc029684eefbea08604e472e0cb4087",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "843baf5439efeb68b790b6bbfbb1384bce292dc1",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "contracts/sui/esk-address-control-evidence-v1.schema.json",
+          "content_hash": "eb736fccc50d61b8144e05024daa3092c3815a7dbbe4aad76de9b7f7641c7678",
+          "locator": "evidence-v1",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "cb3aa1111bc029684eefbea08604e472e0cb4087",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "e24187765cb14b7503c10e4536188b86efa20099",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "docs/esk-sui-address-control-proof.md",
+          "content_hash": "4ab5658e475ce94a7a25804f94486adfc0199baf72b6b438e0ec8e21bb6f1ba6",
+          "locator": "operator-and-agent-handoff",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "cb3aa1111bc029684eefbea08604e472e0cb4087",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "b8d4222609d5c09ef41a02ba46b508ad6823bf5e",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/esk-sui-address-binding/challenge.js",
+          "content_hash": "c712f56ed83564f4e3f0017eb5c931de4aead3d703b4bf25142a3ff5f4af89ac",
+          "locator": "challenge-construction",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "cb3aa1111bc029684eefbea08604e472e0cb4087",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "883ccdfabd24223ea66bf200231b1b683b88aad8",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/esk-sui-address-binding/cli.js",
+          "content_hash": "8b48777121abebcf223e6a809dabdce0e276b987ce1df054d3246b6416cc4863",
+          "locator": "bounded-local-cli",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "cb3aa1111bc029684eefbea08604e472e0cb4087",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "a291a31e55d5bc251a28e273758364c6faed0354",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/esk-sui-address-binding/contract.js",
+          "content_hash": "a5171ff165074758820c3026f630e99ebe8b21e571bf16dcf056e7ad9f923f88",
+          "locator": "strict-contract",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "cb3aa1111bc029684eefbea08604e472e0cb4087",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "06abd03b1445275e714043a246975b884bd455ba",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/esk-sui-address-binding/json.js",
+          "content_hash": "cacca673e5a981b6e566d7e274bacc9b72261cc1bdb08adab451d08f1d5d65b7",
+          "locator": "unique-json",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "cb3aa1111bc029684eefbea08604e472e0cb4087",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "645838504069a254d6630438b4e8618c288872e7",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/esk-sui-address-binding/package-lock.json",
+          "content_hash": "17671ecadcecc8471328e86a775ce229a549950ca8cf4049e41dca014912967e",
+          "locator": "mysten-sui-2.29.0",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "cb3aa1111bc029684eefbea08604e472e0cb4087",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "c7c26423ca4b5d628ad7442b61fca246c6a6120f",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/esk-sui-address-binding/tests/cli.test.js",
+          "content_hash": "52ee7d5df54ba4037cd29350bf278c219b50dca9082a6adca86c289c2f779ed7",
+          "locator": "cli-files-and-errors",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "cb3aa1111bc029684eefbea08604e472e0cb4087",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "09e4a50b5c24e98fb478690a176afa3324cc16b9",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/esk-sui-address-binding/tests/golden.test.js",
+          "content_hash": "11b5c72396d628996e254ff63f28aec9ea2de5ecfe057cb59cd76223aa32d9c6",
+          "locator": "cross-implementation-vectors",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "cb3aa1111bc029684eefbea08604e472e0cb4087",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "37ebbefc09eed1f3098cd97396ec0b8b8e588095",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/esk-sui-address-binding/tests/json.test.js",
+          "content_hash": "0f6c20ab670421c745a5309cf0e3d7b7e8ecd0d235cd7180f472408113a10f5b",
+          "locator": "duplicate-key-rejection",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "cb3aa1111bc029684eefbea08604e472e0cb4087",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "d3ee31028f12b644c586d61ab719b85982e0d4a9",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/esk-sui-address-binding/tests/static.test.js",
+          "content_hash": "276d1cf7524f6a0a8483c6ec43f47609a6ead898770462b3f016ccb694a05928",
+          "locator": "dependency-schema-no-network",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "cb3aa1111bc029684eefbea08604e472e0cb4087",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "0b3f881562d7f9e903fd0ac95267b28e4858e2e5",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/esk-sui-address-binding/tests/verify.test.js",
+          "content_hash": "535c3d02beb5b1a9a01d54214bbaa281e594980c55f202cff786faff56b6f099",
+          "locator": "three-schemes-and-time",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "cb3aa1111bc029684eefbea08604e472e0cb4087",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "db864d2604e5848083440ac6a53540544d43fd78",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/esk-sui-address-binding/verify.js",
+          "content_hash": "d9f2cb0ae35c225647c3262e39caa5d910031520aff82e00b546a0afb19a623d",
+          "locator": "offline-verification",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "cb3aa1111bc029684eefbea08604e472e0cb4087",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "088b7fc659acaba0fd8632b6bba17ea524c3a9bd",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/prepare-esk-sui-address-binding.js",
+          "content_hash": "ed6dbc4d753bdc69b059b243f1358b9d60d28e80fd8aa50835a92a077549d4c3",
+          "locator": "command-entry",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "cb3aa1111bc029684eefbea08604e472e0cb4087",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "6e771b92baa8e226653560ad9082dbdaaf72a2fa",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/test-esk-sui-address-binding.js",
+          "content_hash": "bb94be836ca113e950f1f9bb5014c71e445e911da5cabf2d8efc0ca7576ffdf0",
+          "locator": "58-tests-offline-guard",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "cb3aa1111bc029684eefbea08604e472e0cb4087",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "b742b2662785125463716d168f17bb6eb95c4d4a",
+            "state": "untracked"
+          }
+        }
+      ],
+      "created_at_ms": 1788565326711,
+      "updated_at_ms": 1788567975270
+    },
+    {
       "id": "esk-sui-allocation-observer-v1",
       "title": "ESK Sui 六桶分配只读观察器 V1",
       "summary": "以两个不同公共 Sui testnet GraphQL 来源，失败关闭地复核参与包发布、分配交易、一次性能力销毁、冻结总回执、六桶历史输出和指定 checkpoint 的团队锁仓守恒；只产出 RPC 观察证据，不认证源码、地址控制、用户余额或发布状态。",
@@ -19929,206 +20196,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_f56f483870934a7b85346e92eeb28d89",
-      "feature_id": "esk-platform-profile-v1",
-      "action": "transitioned",
-      "actor": "codex-esk-first-user",
-      "reason": "实现正式来源原生只读入口、严格模型/传输/账户隔离与 Web 原生入口说明。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788513376156
-    },
-    {
-      "id": "feature_event_834d51e013cf4cbfbaa9aff62bce45b1",
-      "feature_id": "esk-platform-profile-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-esk-first-user",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788514445320
-    },
-    {
-      "id": "feature_event_2f9accce80d542d7be4d372985ac9be9",
-      "feature_id": "esk-platform-profile-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-esk-first-user",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788514469404
-    },
-    {
-      "id": "feature_event_27bac66f53b948deae1e2726af4e435c",
-      "feature_id": "esk-platform-profile-v1",
-      "action": "transitioned",
-      "actor": "codex-esk-first-user",
-      "reason": "独立正式个人入口实现完成；103项定向JVM验证通过；实际用户与视觉验证单列待验收。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1788514469995
-    },
-    {
-      "id": "feature_event_f3f0e8c9b82a4a808b16f5ea6e761ddd",
-      "feature_id": "esk-platform-profile-v1",
-      "action": "transitioned",
-      "actor": "codex-esk-first-user",
-      "reason": "103项定向测试0失败（65项正式来源+38项既有回归），Preview资源编译及PWA语法通过；尚未发布APK，不等于实际用户验收。",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1788514470571
-    },
-    {
-      "id": "feature_event_5aa2d63ac3f84c30af281547e607fce6",
-      "feature_id": "esk-platform-profile-v1",
-      "action": "transitioned",
-      "actor": "codex-esk-first-user",
-      "reason": "补齐同一需求的Web下载链接块级48px触控验收；Android生产代码不变，沿用已发布APK。",
-      "from_status": "verified",
-      "to_status": "ready",
-      "at_ms": 1788514914867
-    },
-    {
-      "id": "feature_event_3c35ffe58372480cb36f2ed9fca95267",
-      "feature_id": "esk-platform-profile-v1",
-      "action": "claimed",
-      "actor": "codex-esk-first-user",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788514916904
-    },
-    {
-      "id": "feature_event_b569d36a1df84c95b483645510d33a32",
-      "feature_id": "esk-platform-profile-v1",
-      "action": "transitioned",
-      "actor": "codex-esk-first-user",
-      "reason": "复用原有profile-row下载触控尺寸，补会话revision接线断言与正式发布回执。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788514917904
-    },
-    {
-      "id": "feature_event_9f0d315dbc854ddc9aa4aed8d6e9eea5",
-      "feature_id": "esk-platform-profile-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-esk-first-user",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788515065485
-    },
-    {
-      "id": "feature_event_4ad14006aa23456c9fbae98c237f4afe",
-      "feature_id": "esk-platform-profile-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-esk-first-user",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788515066765
-    },
-    {
-      "id": "feature_event_8effd0bfd47a4f4b99107204f85c46ed",
-      "feature_id": "esk-platform-profile-v1",
-      "action": "transitioned",
-      "actor": "codex-esk-first-user",
-      "reason": "Web下载入口复用76px profile-row，补AuthManager同editor修订写入接线断言；无Android生产输入变化。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1788515067422
-    },
-    {
-      "id": "feature_event_b87c9a08920442c8ac9f1c1e4f07ac11",
-      "feature_id": "esk-platform-profile-v1",
-      "action": "transitioned",
-      "actor": "codex-esk-first-user",
-      "reason": "最终104项定向测试全部通过，PWA语法通过。APK1.1.1506已发布且生产输入不变；Web触控补发待执行，UI实际帧与真实账户仍待验收。",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1788515068015
-    },
-    {
-      "id": "feature_event_c69eb23239bd429fb6c721ada78a6ed8",
-      "feature_id": "esk-platform-profile-v1",
-      "action": "transitioned",
-      "actor": "codex-esk-first-user",
-      "reason": "正式APK1.1.1507/source3012c5fbd717bd8db862590fe5c240a6099c9225及Web静态模板已发布；104项通过，版本/签名/sha256/公开入口验证。真实私有账户、视觉帧与资金入账仍单列未验收，不代表长期Goal完成。",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1788515527722
-    },
-    {
-      "id": "feature_event_15393bb8718d4d55b0d74155d6a70d4b",
-      "feature_id": "esk-platform-recorded-assets-v1",
-      "action": "transitioned",
-      "actor": "codex-esk-first-user",
-      "reason": "补记既有主服务0.3.1724/5fc7869b5b2560417af26b33f0b09ca749fc9bb1正式发布事实，当前公开版本再次核对一致；上一批42+4测试和四路由401/no-store已通过。不启用写入或代表真实用户入账。",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1788515528242
-    },
-    {
-      "id": "feature_event_5edf5e5271634dd4b727ab5005c2d761",
-      "feature_id": "esk-platform-native-provider-v1",
-      "action": "registered",
-      "actor": "codex-esk-platform",
-      "reason": "",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1788516179636
-    },
-    {
-      "id": "feature_event_aa93d28e39234cf1bc4cb46ffe9544ee",
-      "feature_id": "esk-platform-native-provider-v1",
-      "action": "claimed",
-      "actor": "codex-esk-platform",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788516180186
-    },
-    {
-      "id": "feature_event_d17dbc9f6c0c4a31b66a9173e53e952b",
-      "feature_id": "esk-platform-native-provider-v1",
-      "action": "transitioned",
-      "actor": "codex-esk-platform",
-      "reason": "",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788516223853
-    },
-    {
-      "id": "feature_event_fdae8be269ad481fa27f937262fb2944",
-      "feature_id": "esk-platform-native-provider-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-esk-platform",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788516935168
-    },
-    {
-      "id": "feature_event_1cb3a571bfbb48a3a4d8b108491f343d",
-      "feature_id": "esk-platform-native-provider-v1",
-      "action": "transitioned",
-      "actor": "codex-esk-platform",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1788516935710
-    },
-    {
-      "id": "feature_event_6302be6fcced4511837d6c87c759fca9",
-      "feature_id": "esk-platform-native-provider-v1",
-      "action": "transitioned",
-      "actor": "codex-esk-platform",
-      "reason": "",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1788516936284
-    },
-    {
       "id": "feature_event_0947f922434b4eaab9c85ea26f2aa658",
       "feature_id": "esk-platform-native-provider-v1",
       "action": "transitioned",
@@ -21927,6 +21994,206 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1788557816996
+    },
+    {
+      "id": "feature_event_c9d46d15ddee4da299eb1665efdb2f85",
+      "feature_id": "esk-sui-address-control-proof-v1",
+      "action": "registered",
+      "actor": "codex:/root",
+      "reason": "",
+      "from_status": "",
+      "to_status": "proposed",
+      "at_ms": 1788565326711
+    },
+    {
+      "id": "feature_event_ec0d5a808d0a45b19f68f8f732d706e0",
+      "feature_id": "esk-sui-address-control-proof-v1",
+      "action": "transitioned",
+      "actor": "codex:/root",
+      "reason": "共享路线图与 Sui ADR 已接受地址绑定方向；本需求把用户单签、离线验证和所有非授权边界逐项固化。",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1788565338568
+    },
+    {
+      "id": "feature_event_e96ab8dfd10343209bec2fdbe7313f61",
+      "feature_id": "esk-sui-address-control-proof-v1",
+      "action": "transitioned",
+      "actor": "codex:/root",
+      "reason": "两个依赖均已 verified/released，输入、输出、失败模式、测试矩阵与无资金/无链写入边界完整。",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1788565348480
+    },
+    {
+      "id": "feature_event_8150e910e2d0490a864346cd2182dce3",
+      "feature_id": "esk-sui-address-control-proof-v1",
+      "action": "claimed",
+      "actor": "codex:/root",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788565357834
+    },
+    {
+      "id": "feature_event_e51644bb6387488291b1c57fe4f1c0a9",
+      "feature_id": "esk-sui-address-control-proof-v1",
+      "action": "transitioned",
+      "actor": "codex:/root",
+      "reason": "开始按失败测试、版本化合同、离线 SDK 验签、CLI 和文档纵向实施。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788565368572
+    },
+    {
+      "id": "feature_event_15808c9935f24dc19955c9bd550526e6",
+      "feature_id": "esk-sui-address-control-proof-v1",
+      "action": "claim_released",
+      "actor": "codex:/root",
+      "reason": "需求头实现状态已按真实进展更新；先显式释放旧哈希认领，再重绑并重新评审认领。",
+      "from_status": "in_progress",
+      "to_status": "blocked",
+      "at_ms": 1788566763176
+    },
+    {
+      "id": "feature_event_ae0124d63f544990b9d0181113a42845",
+      "feature_id": "esk-sui-address-control-proof-v1",
+      "action": "requirement_rebound",
+      "actor": "codex:/root",
+      "reason": "实现与安全审计完成后，将正式需求头状态更新为 verified，并显式重绑当前需求哈希。",
+      "from_status": "blocked",
+      "to_status": "proposed",
+      "at_ms": 1788566772632
+    },
+    {
+      "id": "feature_event_684a316eba4c4df5aea7f930a881bd16",
+      "feature_id": "esk-sui-address-control-proof-v1",
+      "action": "transitioned",
+      "actor": "codex:/root",
+      "reason": "重新阅读当前完整需求；仅实现离线 testnet 单签候选证明，所有平台认证、一次消费、资产、终局和余额晋级边界保持关闭。",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1788566783664
+    },
+    {
+      "id": "feature_event_b558f82b3672439fac525b818f285f8c",
+      "feature_id": "esk-sui-address-control-proof-v1",
+      "action": "transitioned",
+      "actor": "codex:/root",
+      "reason": "依赖已 verified/released，需求边界与任务路径完整，可重新认领当前实现。",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1788566793009
+    },
+    {
+      "id": "feature_event_961207451bc248719ae5592ff14c1fd4",
+      "feature_id": "esk-sui-address-control-proof-v1",
+      "action": "claimed",
+      "actor": "codex:/root",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788566801897
+    },
+    {
+      "id": "feature_event_89bde9c12f184defa9454f216c2ec3a2",
+      "feature_id": "esk-sui-address-control-proof-v1",
+      "action": "transitioned",
+      "actor": "codex:/root",
+      "reason": "重新认领当前需求哈希；继续完成安全审计、回归、证据登记与 Git 交付。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788566812780
+    },
+    {
+      "id": "feature_event_3fd59dc13f2c49769b42fb6fb47cf9f8",
+      "feature_id": "esk-sui-address-control-proof-v1",
+      "action": "claim_released",
+      "actor": "codex:/root",
+      "reason": "独立安全审计要求补齐跨实现摘要算法；需求已显式完善，释放旧哈希认领以重新评审。",
+      "from_status": "in_progress",
+      "to_status": "blocked",
+      "at_ms": 1788567845591
+    },
+    {
+      "id": "feature_event_52c4c3692e4344909f9a705b1a2fc4e1",
+      "feature_id": "esk-sui-address-control-proof-v1",
+      "action": "requirement_rebound",
+      "actor": "codex:/root",
+      "reason": "显式纳入 challenge ID、message/evidence SHA-256 精确编码算法与 golden vector，并澄清 help 输出例外。",
+      "from_status": "blocked",
+      "to_status": "proposed",
+      "at_ms": 1788567858674
+    },
+    {
+      "id": "feature_event_01af1168c1e34714a0d82069fd42ab19",
+      "feature_id": "esk-sui-address-control-proof-v1",
+      "action": "transitioned",
+      "actor": "codex:/root",
+      "reason": "已重新阅读全文和 golden vector；新增算法说明只消除互操作歧义，不放宽任何授权或资产边界。",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1788567870434
+    },
+    {
+      "id": "feature_event_3571805dde7243ab9430405917cd1b9d",
+      "feature_id": "esk-sui-address-control-proof-v1",
+      "action": "transitioned",
+      "actor": "codex:/root",
+      "reason": "当前需求已接受，依赖完成，精确算法与测试路径可执行。",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1788567880626
+    },
+    {
+      "id": "feature_event_768523b24b4c49e2ac277780cace690f",
+      "feature_id": "esk-sui-address-control-proof-v1",
+      "action": "claimed",
+      "actor": "codex:/root",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788567890297
+    },
+    {
+      "id": "feature_event_70305bc9e39a49b9915b1db5fba9e87f",
+      "feature_id": "esk-sui-address-control-proof-v1",
+      "action": "transitioned",
+      "actor": "codex:/root",
+      "reason": "当前需求哈希重新认领；定向 58/58 与既有 Sui 回归已通过，准备绑定实现证据。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788567902097
+    },
+    {
+      "id": "feature_event_da82d98eb0694e59ac72100fbd691f0b",
+      "feature_id": "esk-sui-address-control-proof-v1",
+      "action": "evidence_recorded",
+      "actor": "codex:/root",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788567943595
+    },
+    {
+      "id": "feature_event_9acf8a102a114d7eae5e46e837879ec3",
+      "feature_id": "esk-sui-address-control-proof-v1",
+      "action": "transitioned",
+      "actor": "codex:/root",
+      "reason": "严格挑战、三签名离线验证、无歧义 JSON、受限本地文件读取、内部 schema 与使用文档均已实现并绑定当前证据。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1788567963769
+    },
+    {
+      "id": "feature_event_aa5609dfc5974a2aa11ac25430a6ed88",
+      "feature_id": "esk-sui-address-control-proof-v1",
+      "action": "transitioned",
+      "actor": "codex:/root",
+      "reason": "58/58 地址证明测试及 publication 65、Currency 312、allocation 98、共享传输、创世与归属声明回归通过；独立安全审计无代码阻塞。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1788567975270
     }
   ]
 }
