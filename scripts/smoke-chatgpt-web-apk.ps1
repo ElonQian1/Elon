@@ -21,7 +21,8 @@ $invokeMcp = Join-Path $PSScriptRoot "invoke-apk-mcp.ps1"
 $evidenceHelper = Join-Path $PSScriptRoot "chatgpt-web-smoke-evidence.ps1"
 $composerHelper = Join-Path $PSScriptRoot "chatgpt-web-smoke-composer.ps1"
 $runtimeHelper = Join-Path $PSScriptRoot "chatgpt-web-smoke-runtime.ps1"
-foreach ($helper in @($invokeMcp, $evidenceHelper, $composerHelper, $runtimeHelper)) {
+$navigationHelper = Join-Path $PSScriptRoot "chatgpt-web-smoke-navigation.ps1"
+foreach ($helper in @($invokeMcp, $evidenceHelper, $composerHelper, $runtimeHelper, $navigationHelper)) {
     if (-not (Test-Path -LiteralPath $helper -PathType Leaf)) {
         throw "Missing ChatGPT Web smoke helper: $helper"
     }
@@ -29,6 +30,7 @@ foreach ($helper in @($invokeMcp, $evidenceHelper, $composerHelper, $runtimeHelp
 . $evidenceHelper
 . $composerHelper
 . $runtimeHelper
+. $navigationHelper
 $ExpectedAdapterVersion = Resolve-ChatGptWebSmokeExpectedAdapterVersion $ExpectedAdapterVersion
 if (-not (Test-Path -LiteralPath $Adb -PathType Leaf)) {
     throw "adb not found: $Adb"
@@ -494,32 +496,39 @@ $profileControls = @(
 )
 Add-Check "account_menu_entry" ($profileControls.Count -gt 0) ([string]$profileControls.Count)
 $accountMenuMatrix = $null
-if ($profileControls.Count -gt 0) {
-    $accountMenuOpen = Invoke-UiAction -Action "chatgpt_invoke_control" -Arguments @{
-        control_id = [string]$profileControls[0].control_id
+try {
+    if ($profileControls.Count -gt 0) {
+        $accountMenuOpen = Invoke-UiAction -Action "chatgpt_invoke_control" -Arguments @{
+            control_id = [string]$profileControls[0].control_id
+        }
+        Add-Check "account_menu_open" ($accountMenuOpen.control_ok -eq $true) ([string]$accountMenuOpen.action)
+        $accountMenuMatrix = Wait-AccountMenuReady -TimeoutSec $ReadyTimeoutSec
+        $accountMenuReasons = @($accountMenuMatrix.adaptation_review.reasons)
+        Add-Check "account_menu_settings" (
+            [int]$accountMenuMatrix.observed_semantics.settings -gt 0
+        ) ([string]$accountMenuMatrix.observed_semantics.settings)
+        Add-Check "account_menu_logout" (
+            [int]$accountMenuMatrix.observed_semantics.logout -gt 0
+        ) ([string]$accountMenuMatrix.observed_semantics.logout)
+        Add-Check "account_menu_generic_controls" (
+            [int]$accountMenuMatrix.manifest.generic_control_count -eq 0
+        ) ([string]$accountMenuMatrix.manifest.generic_control_count)
+        Add-Check "account_menu_adaptation_review" (
+            $accountMenuMatrix.adaptation_review.required -ne $true
+        ) ($accountMenuReasons -join ",")
+        $accountMenuClose = Invoke-UiAction -Action "chatgpt_invoke_control" -Arguments @{
+            control_id = [string]$profileControls[0].control_id
+        }
+        Add-Check "account_menu_close" (
+            $accountMenuClose.control_ok -eq $true
+        ) ([string]$accountMenuClose.action)
+        Wait-AccountMenuClosed -TimeoutSec $ReadyTimeoutSec | Out-Null
     }
-    Add-Check "account_menu_open" ($accountMenuOpen.control_ok -eq $true) ([string]$accountMenuOpen.action)
-    $accountMenuMatrix = Wait-AccountMenuReady -TimeoutSec $ReadyTimeoutSec
-    $accountMenuReasons = @($accountMenuMatrix.adaptation_review.reasons)
-    Add-Check "account_menu_settings" (
-        [int]$accountMenuMatrix.observed_semantics.settings -gt 0
-    ) ([string]$accountMenuMatrix.observed_semantics.settings)
-    Add-Check "account_menu_logout" (
-        [int]$accountMenuMatrix.observed_semantics.logout -gt 0
-    ) ([string]$accountMenuMatrix.observed_semantics.logout)
-    Add-Check "account_menu_generic_controls" (
-        [int]$accountMenuMatrix.manifest.generic_control_count -eq 0
-    ) ([string]$accountMenuMatrix.manifest.generic_control_count)
-    Add-Check "account_menu_adaptation_review" (
-        $accountMenuMatrix.adaptation_review.required -ne $true
-    ) ($accountMenuReasons -join ",")
-    $accountMenuClose = Invoke-UiAction -Action "chatgpt_invoke_control" -Arguments @{
-        control_id = [string]$profileControls[0].control_id
-    }
-    Add-Check "account_menu_close" (
-        $accountMenuClose.control_ok -eq $true
-    ) ([string]$accountMenuClose.action)
-    Wait-AccountMenuClosed -TimeoutSec $ReadyTimeoutSec | Out-Null
+} finally {
+    $navigationDismiss = Close-ChatGptWebSmokeNavigation -TimeoutSec $ReadyTimeoutSec `
+        -InvokeAction { Invoke-UiAction -Action "chatgpt_dismiss_features" } `
+        -InvokeUiState { Invoke-ApkMcp -Tool "ui_state" }
+    Add-Check "navigation_overlay_close" $navigationDismiss.passed $navigationDismiss.detail
 }
 
 $composerOptionsOriginPath = ""

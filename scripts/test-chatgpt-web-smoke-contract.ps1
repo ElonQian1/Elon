@@ -3,11 +3,13 @@ $ErrorActionPreference = "Stop"
 $sourcePath = Join-Path $PSScriptRoot "smoke-chatgpt-web-apk.ps1"
 $evidencePath = Join-Path $PSScriptRoot "chatgpt-web-smoke-evidence.ps1"
 $composerPath = Join-Path $PSScriptRoot "chatgpt-web-smoke-composer.ps1"
+$navigationPath = Join-Path $PSScriptRoot "chatgpt-web-smoke-navigation.ps1"
 $source = Get-Content -LiteralPath $sourcePath -Raw
 $evidenceSource = Get-Content -LiteralPath $evidencePath -Raw
 $composerSource = Get-Content -LiteralPath $composerPath -Raw
 . $evidencePath
 . $composerPath
+. $navigationPath
 
 function Assert-Contains {
     param([Parameter(Mandatory = $true)][string]$Needle)
@@ -61,6 +63,10 @@ Assert-Contains 'Add-Check "account_menu_adaptation_review"'
 Assert-Contains 'Add-Check "account_menu_close"'
 Assert-Contains 'control_id = [string]$profileControls[0].control_id'
 Assert-Contains 'Wait-AccountMenuClosed -TimeoutSec $ReadyTimeoutSec'
+Assert-Contains 'Close-ChatGptWebSmokeNavigation -TimeoutSec $ReadyTimeoutSec'
+Assert-Contains '$navigationHelper = Join-Path $PSScriptRoot "chatgpt-web-smoke-navigation.ps1"'
+Assert-Contains 'Invoke-UiAction -Action "chatgpt_dismiss_features"'
+Assert-Contains 'Add-Check "navigation_overlay_close"'
 Assert-Contains '$navigationCloseCount = [int]$navigationMatrix.observed_semantics.close'
 Assert-Contains '$navigationExpandedCount = @($featuresState.command_state.ui_manifest.controls | Where-Object { $_.semantic -eq "navigation" -and $_.expanded -eq $true }).Count'
 Assert-Contains 'Add-Check "navigation_overlay_open" ($navigationCloseCount + $navigationExpandedCount -gt 0)'
@@ -325,6 +331,27 @@ $streamingStopEvidence = New-ChatGptStreamingStopEvidence `
 if (-not $streamingStopEvidence.stop_receipt_succeeded -or -not $streamingStopEvidence.streaming_stopped) {
     throw "Streaming stop evidence did not preserve its structural result."
 }
+$navigationPolls = 0
+$closedNavigation = Close-ChatGptWebSmokeNavigation -TimeoutSec 1 -PollIntervalMilliseconds 10 `
+    -InvokeAction { [pscustomobject]@{ control_ok = $true; action = "dismiss_features" } } `
+    -InvokeUiState {
+        $script:navigationPolls++
+        [pscustomobject]@{ ui_manifest = [pscustomobject]@{ controls = @(
+            [pscustomobject]@{
+                semantic = "navigation"
+                expanded = $script:navigationPolls -lt 2
+            }
+        ) } }
+    }
+if ($closedNavigation.passed -ne $true -or $navigationPolls -ne 2) {
+    throw "Navigation cleanup helper did not wait for the expanded sidebar to close."
+}
+$rejectedNavigation = Close-ChatGptWebSmokeNavigation -TimeoutSec 1 `
+    -InvokeAction { [pscustomobject]@{ control_ok = $false; action = "dismiss_features" } } `
+    -InvokeUiState { throw "must not poll after a rejected dismiss" }
+if ($rejectedNavigation.passed -eq $true) {
+    throw "Navigation cleanup helper accepted a rejected dismiss action."
+}
 $commandReceipt = Wait-ChatGptCommandReceipt -RequestId "request-stop" `
     -ExpectedAction "stop_generation" -TimeoutSec 1 -PollIntervalSec 1 -InvokeUiState {
         [pscustomobject]@{
@@ -368,6 +395,7 @@ $openIndex = $source.IndexOf('Invoke-UiAction -Action "open_chatgpt_official_fal
 $returnIndex = $source.IndexOf('Invoke-Adb shell input keyevent 4', $openIndex)
 $productionIndex = $source.IndexOf('$state = Open-ChatGptWebSmokeSurface -Runtime $smokeRuntime', $returnIndex)
 $modelIndex = $source.IndexOf('Get-ComposerOptions -Section "model"')
+$dismissNavigationIndex = $source.IndexOf('Invoke-UiAction -Action "chatgpt_dismiss_features"')
 $toolsIndex = $source.IndexOf('Get-ComposerOptions -Section "tools"')
 $selectorsIndex = $source.IndexOf('$visibleSelectors = Wait-VisibleProductionSelectors')
 if (-not ($openIndex -lt $returnIndex -and $returnIndex -lt $productionIndex -and $productionIndex -lt $featuresIndex)) {
@@ -375,6 +403,9 @@ if (-not ($openIndex -lt $returnIndex -and $returnIndex -lt $productionIndex -an
 }
 if (-not ($featuresIndex -lt $modelIndex -and $modelIndex -lt $toolsIndex)) {
     throw "Composer contamination smoke must open the sidebar before model and tools checks."
+}
+if (-not ($featuresIndex -lt $dismissNavigationIndex -and $dismissNavigationIndex -lt $modelIndex)) {
+    throw "Composer smoke must close the official sidebar before opening model options."
 }
 if (-not ($toolsIndex -lt $selectorsIndex)) {
     throw "Production selectors must be audited only after adapter checks complete."

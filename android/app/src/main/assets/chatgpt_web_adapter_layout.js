@@ -14,6 +14,7 @@
   const temporaryChatAdapter = window.__elonChatGptTemporaryChat;
   const realtimeVoicePolicy = window.__elonChatGptRealtimeVoicePolicy;
   const overlayPolicy = window.__elonChatGptOverlayPolicy; const contextMenuPolicy = window.__elonChatGptContextMenuPolicy;
+  const sidebarControlPolicy = window.__elonChatGptSidebarControlPolicy;
   const projectChoiceReveal = window.__elonChatGptProjectChoiceReveal;
   const defaultLabel = window.__elonChatGptControlLabels.defaultLabel;
   let controlsById = new Map();
@@ -100,6 +101,7 @@
   }
 
   function labelOf(node, fallback) {
+    if (sidebarControlPolicy && sidebarControlPolicy.isTrackedAccountTrigger(node)) return defaultLabel('profile');
     const form = formAdapter && formAdapter.describe(node);
     const candidates = [
       node.innerText,
@@ -187,6 +189,7 @@
     : null;
 
   function semanticFor(node, region, index) {
+    if (sidebarControlPolicy && sidebarControlPolicy.isTrackedAccountTrigger(node)) return 'profile';
     const form = formAdapter && formAdapter.describe(node);
     const path = relatedSameOriginPath(node);
     const signal = cleanText([
@@ -465,6 +468,7 @@
     controlMetadataById = new Map();
     const controls = [];
     const used = new Set(); used.nodes = new WeakSet();
+    const sidebarAccounts = sidebarControlPolicy ? sidebarControlPolicy.findAccountTriggers(document, isVisible, window.innerWidth, window.innerHeight) : [];
     const header = headerRoot();
     const composer = composerRoot();
     addRegionControls(controls, header, 'header', used);
@@ -484,6 +488,7 @@
             overlayPolicy.contextMenuSignature(overlay, isVisible, actionableNodes))
         : ''
     ));
+    sidebarAccounts.forEach((node) => addRegionControls(controls, node.parentElement, 'overlay', used, (candidate) => candidate === node));
     addMessageControls(controls, used);
     addPageContentControls(controls, used, [header, composer, suggestions].concat(overlays));
     return {

@@ -5,6 +5,7 @@
 
   const navigationPolicy = window.__elonChatGptNavigationPolicy;
   if (!navigationPolicy) return;
+  const sidebarControlPolicy = window.__elonChatGptSidebarControlPolicy;
 
   const MAX_FEATURES = 60;
   let lastFeatures = [];
@@ -87,7 +88,10 @@
           seen.add(node);
           const label = nodeLabel(node).slice(0, 120);
           const path = sameOriginPath(node);
-          if (!label || isExcludedLabel(label) || isConversationNode(node, path)) return;
+          if (
+            !label || isExcludedLabel(label) || isConversationNode(node, path) ||
+            (sidebarControlPolicy && sidebarControlPolicy.isAccountTrigger(node, root))
+          ) return;
           const kind = navigationPolicy.classify(label, path);
           const routeCandidate = path && path !== '/' && !path.startsWith('/auth');
           if (kind === 'navigation' && !routeCandidate) return;

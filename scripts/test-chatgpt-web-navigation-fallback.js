@@ -3,6 +3,9 @@
 const policy = require(
   '../android/app/src/main/assets/chatgpt_web_adapter_navigation_policy.js'
 );
+const sidebarControlPolicy = require(
+  '../android/app/src/main/assets/chatgpt_web_adapter_sidebar_control_policy.js'
+);
 
 let assignedPath = '';
 let sidebarExpanded = false;
@@ -37,12 +40,27 @@ const persistentFeature = {
     return null;
   }
 };
+const accountTrigger = {
+  id: '',
+  textContent: 'Private account name',
+  getAttribute(name) {
+    if (name === 'data-testid') return 'accounts-profile-button';
+    if (name === 'aria-haspopup') return 'menu';
+    return null;
+  },
+  getBoundingClientRect() {
+    return { left: 16, top: 720, right: 200, bottom: 768, width: 184, height: 48 };
+  },
+  closest() {
+    return null;
+  }
+};
 const persistentNavigation = {
   getBoundingClientRect() {
     return { left: 0, top: 0, right: 400, bottom: 800, width: 400, height: 800 };
   },
   querySelectorAll() {
-    return [persistentFeature];
+    return [persistentFeature, accountTrigger];
   }
 };
 global.document = {
@@ -54,6 +72,7 @@ global.document = {
 };
 global.window = {
   __elonChatGptNavigationPolicy: policy,
+  __elonChatGptSidebarControlPolicy: sidebarControlPolicy,
   innerHeight: 800,
   innerWidth: 400,
   getComputedStyle() {

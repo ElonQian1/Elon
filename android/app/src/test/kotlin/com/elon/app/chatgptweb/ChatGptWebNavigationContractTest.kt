@@ -17,12 +17,20 @@ class ChatGptWebNavigationContractTest {
         val layoutAdapter = readRepositoryFile(
             "android/app/src/main/assets/chatgpt_web_adapter_layout.js",
         )
+        val sidebarControlPolicy = readRepositoryFile(
+            "android/app/src/main/assets/chatgpt_web_adapter_sidebar_control_policy.js",
+        )
         val core = readRepositoryFile("android/app/src/main/assets/chatgpt_web_adapter.js")
         val pageAdapter = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebPageAdapter.kt",
         )
 
         assertTrue(pageAdapter.contains("chatgpt_web_adapter_navigation.js"))
+        assertTrue(pageAdapter.contains("chatgpt_web_adapter_sidebar_control_policy.js"))
+        assertTrue(
+            pageAdapter.indexOf("chatgpt_web_adapter_sidebar_control_policy.js") <
+                pageAdapter.indexOf("chatgpt_web_adapter_navigation.js"),
+        )
         assertTrue(core.contains("navigationAdapter.capabilities()"))
         assertTrue(core.contains("action === 'list_navigation'"))
         assertTrue(core.contains("action === 'select_navigation'"))
@@ -42,6 +50,10 @@ class ChatGptWebNavigationContractTest {
         assertTrue(dismiss.contains("'overlay'"))
         assertTrue(dismiss.contains("result('dismiss_navigation', false"))
         assertTrue(layoutAdapter.contains("function requestSemanticTouch"))
+        assertTrue(layoutAdapter.contains("sidebarControlPolicy.findAccountTriggers"))
+        assertTrue(layoutAdapter.contains("sidebarControlPolicy.isTrackedAccountTrigger(node)"))
+        assertTrue(sidebarControlPolicy.contains("findAccountTriggers"))
+        assertTrue(sidebarControlPolicy.contains("isConversationPath"))
         val requestList = adapter.substringAfter("function requestList")
             .substringBefore("function collectList")
         assertTrue(requestList.indexOf("sidebarButton(true)") < requestList.indexOf("emitSnapshot"))
