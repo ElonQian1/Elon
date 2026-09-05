@@ -26,10 +26,10 @@ implementation_status: verified
 
 | 能力 | 实现 | 验证 | 当前交付状态 |
 | --- | --- | --- | --- |
-| 上传前元数据与 APK 结构门禁 | implemented | passed | 代码待随本批推送/部署 |
+| 上传前元数据与 APK 结构门禁 | implemented | passed | 已随 Server 0.3.1729 部署 |
 | 版本单调、同工件幂等、冲突拒绝 | implemented | passed | SQLite 事务内执行 |
-| 旧量化发布退出列表/latest/下载/同步 | implemented | passed | 静态目录已改为 planned |
-| PC 正式发布操作面与回执展示 | implemented | passed | 生产构建通过 |
+| 旧量化发布退出列表/latest/下载/同步 | implemented | passed | 线上项目投影已无旧 APK |
+| PC 正式发布操作面与回执展示 | implemented | passed | server_bundle 已发布 |
 | 正式量化 `0.5.0 (5)` APK | not_provided | not_run | 仍需既有证书签名和编辑者上传 |
 | 项目广场真实安装与双 APK 本人验收 | not_performed | not_run | 等待正式新版工件 |
 
@@ -66,6 +66,16 @@ implementation_status: verified
 
 隔离 harness 只临时引用本批真实 Rust 模块并使用临时 SQLite；验证后已删除，不进入
 仓库或产品。全量测试目标的基线债务没有被伪装成通过，也没有在本功能中顺手改写。
+
+## 线上发布回执
+
+- 主服务器 `0.3.1729` 已从提交
+  `5d2abd409736a58a9fa41ca937bd44e56b74ab1e` 发布，`/health`、服务器版本接口、
+  PC `server_bundle` 发布标记与 React 页面均通过检查。
+- 公开项目列表中 `yilong-quant.latest_apk_url = null`；`has_apk=true` 的可安装筛选不
+  包含一龙量化。因此旧包已退出实际项目广场，而不是只修改说明文字。
+- 这份回执证明新版准入门禁已经上线，不代表正式量化 APK 已经上传。当前继续显示
+  “暂无可安装新版”是预期结果。
 
 ## 发布与边界
 

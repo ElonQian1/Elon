@@ -11268,7 +11268,7 @@
       "id": "official-quant-release-admission-v1",
       "title": "官方量化 APK 新版发布准入 V1",
       "summary": "主服务器只接受 com.elon.quant versionCode>=5、规范版本名、paper 渠道、源码 Git SHA 与本次 APK 工件证明完整绑定的实际新版；旧版从所有用户入口退出，幂等重传可修复原托管工件。",
-      "status": "verified",
+      "status": "released",
       "priority": "p0",
       "requirement": {
         "path": "docs/requirements/official-quant-release-admission-v1.md",
@@ -11537,7 +11537,7 @@
         }
       ],
       "created_at_ms": 1788568720483,
-      "updated_at_ms": 1788574867882
+      "updated_at_ms": 1788576247834
     },
     {
       "id": "open-commerce-consumer-order-closure-v1",
@@ -20471,16 +20471,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_37ed753af24446828f76b3591c791cef",
-      "feature_id": "esk-platform-account-snapshot-auth-v1",
-      "action": "requirement_rebound",
-      "actor": "codex-esk-account-auth-root",
-      "reason": "Clarify Store strict readonly vs preserved existing HTTP authentication last_seen bookkeeping. No changes to global authentication, session permissions, ownership, expiry or revocation.",
-      "from_status": "ready",
-      "to_status": "proposed",
-      "at_ms": 1788523479143
-    },
-    {
       "id": "feature_event_7febadf004fb4c77af89880ddf98a5b0",
       "feature_id": "esk-platform-account-snapshot-auth-v1",
       "action": "transitioned",
@@ -22469,6 +22459,16 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1788574867882
+    },
+    {
+      "id": "feature_event_0d919563bdea4f428bb394aaf637de29",
+      "feature_id": "official-quant-release-admission-v1",
+      "action": "transitioned",
+      "actor": "codex:/root",
+      "reason": "主服务器 0.3.1729 与 PC server_bundle 已从提交 5d2abd409736a58a9fa41ca937bd44e56b74ab1e 发布；health、版本/PC SHA、React shell 通过，公开项目投影 latest_apk_url=null 且可安装筛选不含旧量化包。",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1788576247834
     }
   ]
 }
