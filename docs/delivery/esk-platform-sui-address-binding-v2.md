@@ -50,16 +50,19 @@ Sui 发布、任何地址已经获得 ESK、平台余额已经迁移、真实用
 
 - Rust harness：17/17 通过，覆盖密码学向量、挑战重构、认证、过期/未来时间、撤销、
   幂等、篡改、用户/地址唯一性、限流、并发消费、迁移重入、余额不变和追加式门禁。
-  验证指纹 `3ebc93ddadcbe4610fc77fc44f9a842889b634394b88ea85afc4b67ae9d10bc1`，
+  重构到 `origin/main` 后的最终验证指纹
+  `ec19e95d2849cd0fab270a44dd7a6fbff3732fb7f78fceda094bed03028417e2`，结果为
+  `17 passed / 0 failed / 142 filtered`，
   回执 `6bd4a7ee0f2ee2b0636033a493aeb3eaaeb31d65ec5b57eb3d54685ab51ce90a`。
 - 正式 `elon-server` 目标：14/14 通过，包含五项进程内 HTTP 合同与九项密码学/Store
-  单元验证。验证指纹 `92fddf2f0ff91617a00b0250ae3ab4c31b4cb0289a9b6298572783a0035dc016`，
+  单元验证。重构后的最终验证指纹
+  `3349125b113fac8466aceeabe6c23deac2f29c88cdb56766bf975f3010b32bd7`，结果为
+  `14 passed / 0 failed / 2420 filtered`，
   回执 `308aa611ed7fe26671cad48a4929c1be094edd6029926317a503cd2aef3cdc72`。
 - 两份 Rust 回执均绑定 PowerShell 5.1 权威验证入口计算的最终源码快照
-  `17a9b73a88e8f3a49613a9b69964c77c25d5c874114b2e158a114937dcb91968`，
-  使用 locked/offline Cargo 路径；源码规模门禁通过，检查 7 个相关文件。
-- 旧 V1 Node 合同 58/58 通过，并明确输出网络请求、钱包或私钥读取均为 none，真实用户
-  验收为 not performed。
+  `a96e99e0151b983b6a169e85e4a43f2d36f1afd3e24a1caa7ca76706076d36a8`，
+  使用 locked/offline Cargo 路径。重构后重新执行的旧 V1 Node 合同 58/58 通过，并明确
+  输出网络请求、钱包或私钥读取均为 none，真实用户验收为 not performed。
 - TDD 先复现两类真实缺陷：普通 `INSERT OR REPLACE` 覆盖失败指纹
   `9dc5f5892644dcf95ddf705eda8ca25030641c0ed51001ab2e47771c98858d5a`；显式隐藏
   `rowid` 替换失败指纹

@@ -8721,6 +8721,68 @@
       "updated_at_ms": 1788533028613
     },
     {
+      "id": "esk-platform-sui-address-binding-v2",
+      "title": "ESK 平台认证 Sui 地址绑定 V2",
+      "summary": "把 V1 Sui 个人消息挑战接入真实平台会话，服务端本地重验三种单签并在同一 SQLite 事务中记录一次消费与不可变用户/地址绑定；只支持 testnet，不改余额、不上链、不执行资金操作。",
+      "status": "in_progress",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/esk-platform-sui-address-binding-v2.md",
+        "content_hash": "55f8e45168acbb52e5125c52582b5f77dfbb2dd99496d92fcb2e2136b3d865b4",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "e4beb4715d17659f5fb8e685aaa5dafdec45787d",
+          "head_blob_oid": "d55612262e3d378fcfb7deaa6bb373fa16aa31a9",
+          "worktree_blob_oid": "d55612262e3d378fcfb7deaa6bb373fa16aa31a9",
+          "state": "tracked_clean"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "platform-assets,protocol",
+      "tags": [
+        "esk",
+        "sui",
+        "address-binding",
+        "authenticated-session",
+        "single-use",
+        "testnet"
+      ],
+      "task_paths": [
+        "docs/delivery/esk-platform-sui-address-binding-v2.md",
+        "docs/requirements/esk-platform-sui-address-binding-v2.md",
+        "server/Cargo.toml",
+        "server/src/esk_platform/mod.rs",
+        "server/src/esk_platform/sui_address_binding",
+        "server/src/store/common/esk_platform_assets/mod.rs",
+        "server/src/store/common/esk_platform_assets/sui_address_binding",
+        "server/src/store_migrations.rs",
+        "server/tests/esk-platform-harness"
+      ],
+      "dependencies": [
+        "esk-platform-recorded-assets-v1",
+        "esk-sui-address-control-proof-v1"
+      ],
+      "acceptance_criteria": [
+        "三种允许单签用跨实现向量通过，错误方案、长度、地址、消息、签名、高 S 和非规范 Base64 失败关闭。",
+        "服务端从真实会话派生私有 subject 映射并生成 V1 精确挑战，客户端不能选择用户、commitment、nonce、时间或 challenge ID。",
+        "同一事务复核会话、有效期、未消费、用户和地址唯一性；精确响应幂等，篡改、跨用户、撤销会话和并发第二写入拒绝。",
+        "本人只读查询不泄漏 user/session/nonce/signature/subject，成功仍固定链终局、资产身份、余额资格和 manifest 晋级为 false。",
+        "绑定前后正式 ESK 余额与 platform_recorded/not_deployed 投影不变；无 RPC、签名、广播、真实数据或资金操作。",
+        "定向 harness、HTTP、迁移、旧 V1 Sui 合同、源码规模、文档和 registry 漂移门禁通过，推送/部署/本人验收分报。"
+      ],
+      "implementation_evidence": [],
+      "claim": {
+        "claim_id": "claim_e549f247995a4bf4859638b1ead673f7",
+        "agent_id": "codex-root",
+        "claimed_at_ms": 1788642596209,
+        "expires_at_ms": 1788685796209
+      },
+      "created_at_ms": 1788642559294,
+      "updated_at_ms": 1788642606767
+    },
+    {
       "id": "esk-sui-address-control-proof-v1",
       "title": "ESK Sui 用户地址控制证明 V1",
       "summary": "生成绑定匿名平台主体承诺与用户 Sui testnet 地址的短时个人消息挑战，离线验证三种官方单签并输出自包含候选证据；不认证平台会话、不防跨实例重放、不启用余额或清单晋级。",
@@ -20952,56 +21014,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_73d1f1f512d44e6f94f627c06bba914c",
-      "feature_id": "esk-sui-publication-observer-v1",
-      "action": "claimed",
-      "actor": "codex-esk-currency-observer",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788534673067
-    },
-    {
-      "id": "feature_event_a061a5bf1739478592eb8ae2849b2ab3",
-      "feature_id": "esk-sui-publication-observer-v1",
-      "action": "transitioned",
-      "actor": "codex-esk-currency-observer",
-      "reason": "",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788534673588
-    },
-    {
-      "id": "feature_event_c510c36ab9ae46469f3176b6442b35b5",
-      "feature_id": "esk-sui-publication-observer-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-esk-currency-observer",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788534819330
-    },
-    {
-      "id": "feature_event_d35b7c2b6f0a46d0a5755368105668a7",
-      "feature_id": "esk-sui-publication-observer-v1",
-      "action": "transitioned",
-      "actor": "codex-esk-currency-observer",
-      "reason": "纯传输抽取0a9631c36已推送，原65项与新15项回归通过；当前证据显式重绑，不代表链上ESK验收。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1788534819869
-    },
-    {
-      "id": "feature_event_18694f72463e4e9388f214229db27792",
-      "feature_id": "esk-sui-publication-observer-v1",
-      "action": "transitioned",
-      "actor": "codex-esk-currency-observer",
-      "reason": "保持旧固定查询/导出/同步错误语义，双源失败关闭；65+15项回归通过，真实ESK及完整发行认证仍未执行。",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1788534820414
-    },
-    {
       "id": "feature_event_8e5383f91ac5491f95ac0cb790d5b291",
       "feature_id": "esk-sui-currency-observer-v1",
       "action": "evidence_recorded",
@@ -22950,6 +22962,56 @@
       "from_status": "in_progress",
       "to_status": "implemented",
       "at_ms": 1788618083152
+    },
+    {
+      "id": "feature_event_0fe5a4c9ea1545eab292c14484ea6a69",
+      "feature_id": "esk-platform-sui-address-binding-v2",
+      "action": "registered",
+      "actor": "codex-root",
+      "reason": "非快进变基后以主线注册表为基准重新登记已审阅 V2，避免手工合并注册表",
+      "from_status": "",
+      "to_status": "proposed",
+      "at_ms": 1788642559294
+    },
+    {
+      "id": "feature_event_1b4e74e8715c4fa3888cfd6e7762c848",
+      "feature_id": "esk-platform-sui-address-binding-v2",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "变基后重新核对需求正文、上游账号授权边界与无链上无资金范围",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1788642573651
+    },
+    {
+      "id": "feature_event_7de9046bab4f43e3a6238db0e8211500",
+      "feature_id": "esk-platform-sui-address-binding-v2",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "依赖均完成且变基后合并范围清晰，可执行冲突影响验证",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1788642586245
+    },
+    {
+      "id": "feature_event_549d90d2c7c54485b91faf5be80d6dfb",
+      "feature_id": "esk-platform-sui-address-binding-v2",
+      "action": "claimed",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788642596210
+    },
+    {
+      "id": "feature_event_a7288ce9b50a4befb78ec7e8e9394ccc",
+      "feature_id": "esk-platform-sui-address-binding-v2",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "执行非快进变基后的路由、迁移、依赖和测试受影响验证",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788642606767
     }
   ]
 }
