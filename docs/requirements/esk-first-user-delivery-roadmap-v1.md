@@ -42,7 +42,7 @@ ESK 保持同一种服务支付、治理和经批准利润快照参与资产；�
 | 用户资产一致性 | 主个人资产、完整审核流水与卖回已具备；新版跨 APK 同快照额度/申请进度两端已实现；生产卖回政策默认关闭 | 完成新版正式子包和批准政策下的本人验收；Paper 不计正式资产，申请不等于成交或付款 |
 | 真实上链准备 | Currency 3/3、Participation 13/13 Move 回归通过；三个只读观察器及离线单签地址控制候选证明代码已验证；没有真实 ESK 发布回执、平台账户绑定、一次消费或终局证据 | 先做已认证会话的一次性地址绑定 V2；批准真实参数与职责地址并明确授权 testnet → 发布/注册/分配 → 三观察器双源正向复核 → 源码与终局性 Evidence/Manifest V2 |
 | 历史用户交付 | 付款事实及实际映射不能由代码猜测 | dry-run 对账与去重 → 经审批的入账/claim → 可追溯结转，余额不双计 |
-| 量化与安装闭环 | 新版唯一“我的 ESK”接收端 0.5.0 源码已推送；主端只接受 versionCode 5 及以上；服务器新版发布门禁、幂等/降级阻断、PC 发布页和旧 0.2 安装入口退役已实现并验证，0.5 仍未正式签名/上传 | 先用子项目既有证书受控签名并由项目编辑者上传 0.5，取得服务器计算的摘要与发布回执，再发布主 APK并完成广场安装与双 APK 本人验收；QSHARE 对账独立验收 |
+| 量化与安装闭环 | 新版唯一“我的 ESK”接收端 0.5.0 源码已推送；主端只接受 versionCode 5 及以上；服务器新版发布门禁、幂等/降级阻断、PC 发布页和旧 0.2 安装入口退役已实现并验证；没有合格工件时固定公开地址已改为明确非缓存 404，0.5 仍未正式签名/上传 | 先用子项目既有证书受控签名并由项目编辑者上传 0.5，取得服务器计算的摘要与发布回执，再验证固定地址匿名 200，发布主 APK并完成广场安装与双 APK 本人验收；QSHARE 对账独立验收 |
 
 链上查询见 [发布只读观察器 V1](esk-sui-publication-observer-v1.md) 和
 [规范 Currency 与固定供应观察器 V1](esk-sui-currency-observer-v1.md)；
@@ -67,6 +67,9 @@ Android 授权前置身份切片见 [官方量化 APK 身份校验 V1](yilong-qu
 [新版发布准入 V1](official-quant-release-admission-v1.md)进一步使服务器、PC 发布页、
 latest、下载与首页同步只承认合格新版；旧 0.2 只保留审计记录，不再提供安装入口，
 实现与仍待签名上传的边界见其[交付记录](../delivery/official-quant-release-admission-v1.md)。
+[公开空状态 V3](yilong-quant-android-public-empty-v3.md)使固定匿名地址在没有合格新版时
+返回非缓存 `404` 而不是成员 token 错误；实现与发布证据见其
+[交付记录](../delivery/yilong-quant-android-public-empty-v3.md)。
 主项目资产现状入口：`server/src/esk_asset/service.rs`、
 `server/src/store/common/esk_assets.rs`、
 `android/app/src/main/kotlin/com/elon/app/esk/EskAssetApi.kt`。

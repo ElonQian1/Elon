@@ -13,6 +13,10 @@ use crate::{
     types::AppState,
 };
 
+#[cfg(test)]
+#[path = "apk_tests.rs"]
+mod empty_state_tests;
+
 pub(crate) fn decorate_public_projects(state: &AppState, projects: &mut [PublicProjectItem]) {
     decorate_projects(state, projects, true);
 }
@@ -79,7 +83,11 @@ pub(crate) async fn download_project_android(
             }
             return redirect_without_credentials(&target);
         }
-        Ok(None) => {}
+        Ok(None) => {
+            if let Some(response) = official_quant_empty_download_response(&project_id) {
+                return response;
+            }
+        }
         Err(error) => {
             tracing::warn!(project_id = %project_id, error = %error, "读取公开项目 Android 下载失败");
             return json_error(StatusCode::INTERNAL_SERVER_ERROR, "APK 下载入口暂时不可用");
@@ -101,6 +109,16 @@ pub(crate) async fn download_project_android(
             json_error(StatusCode::INTERNAL_SERVER_ERROR, "APK 下载入口暂时不可用")
         }
     }
+}
+
+fn official_quant_empty_download_response(project_id: &str) -> Option<Response> {
+    crate::project_releases::admission::is_official_quant_project(project_id).then(|| {
+        let mut response = json_error(StatusCode::NOT_FOUND, "这个项目暂无可安装新版 APK");
+        response
+            .headers_mut()
+            .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+        response
+    })
 }
 
 async fn serve_managed_public_release(
