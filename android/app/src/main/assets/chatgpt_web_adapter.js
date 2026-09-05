@@ -580,7 +580,7 @@
       return composerAdapter.removeAttachment(String(command.value || ''), emitEvent, respond);
     }
     if (action === 'dismiss_composer_menu' && composerAdapter) {
-      return composerAdapter.dismissOpenMenu(respond);
+      return composerAdapter.dismissOpenMenu(findComposer(), emitEvent, respond);
     }
     if (action === 'list_navigation' && navigationAdapter) {
       return navigationAdapter.requestList(emitEvent, respond);

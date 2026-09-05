@@ -38,10 +38,6 @@ internal class ChatGptComposerOptionRequestCoordinator(
         return true
     }
 
-    fun onMenuDismissed() {
-        dispatchQueuedRequest()
-    }
-
     fun scheduleCollection(section: String): Boolean {
         if (section != activeSection) return false
         cancelScheduledCollection()

@@ -235,18 +235,14 @@
       null;
   }
 
-  function hasVisibleComposer() {
-    const selectors = [
-      '[data-testid="prompt-textarea"]',
-      'form [contenteditable="true"]',
-      'form textarea',
-      'main [contenteditable="true"]',
-      'textarea[placeholder]'
-    ];
-    return selectors.some((selector) =>
-      Array.from(document.querySelectorAll(selector)).some(isVisible)
-    );
+  function findPromptInput() {
+    return Array.from(document.querySelectorAll(
+      '[data-testid="prompt-textarea"], form [contenteditable="true"], form textarea, ' +
+      'main [contenteditable="true"], textarea[placeholder]'
+    )).find(isVisible) || null;
   }
+
+  function hasVisibleComposer() { return !!findPromptInput(); }
 
   function dictationSessionNodes() {
     const seen = new Set();
@@ -563,12 +559,18 @@
       emitOptions(section, [], composer, emitEvent);
       return result(action, true, '官网当前由系统自动选择模型。');
     }
-    const alreadyOpen = trigger.getAttribute('aria-expanded') === 'true'
-      ? collectOptions(section, null)
-      : [];
+    const expanded = trigger.getAttribute('aria-expanded') === 'true';
+    const alreadyOpen = expanded ? collectOptions(section, null) : [];
     if (alreadyOpen.length > 0) {
       emitOptions(section, alreadyOpen, composer, emitEvent);
       return result(action, true, '');
+    }
+    if (expanded) {
+      waitForOptions(section, null, (options) => {
+        emitOptions(section, options, composer, emitEvent);
+        result(action, true, '');
+      }, () => result(action, false, '官网菜单尚未返回可用选项，请稍后重试。'));
+      return;
     }
     replacePendingOptions(section, {
       baseline: captureOptionBaseline(),
@@ -746,10 +748,21 @@
     result(action, true, '');
   }
 
-  function dismissOpenMenu(result) {
+  function dismissOpenMenu(composer, emitEvent, result) {
+    const expandedSection = ['model', 'tools'].find((section) => {
+      const trigger = triggerFor(section, composer);
+      return trigger && trigger.getAttribute('aria-expanded') === 'true';
+    });
+    const expandedTrigger = expandedSection && triggerFor(expandedSection, composer);
+    const menuKnown = expandedTrigger || lastOptions.model.length || lastOptions.tools.length;
+    const touched = expandedTrigger
+      ? emitTriggerTouch(expandedSection, 'dismiss_composer_menu', expandedTrigger, emitEvent)
+      : menuKnown && emitVisibleNodeTouch('dismiss_composer_menu', findPromptInput(), emitEvent);
     const target = document.activeElement || document;
-    target.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true }));
-    target.dispatchEvent(new KeyboardEvent('keyup', { key: 'Escape', code: 'Escape', bubbles: true }));
+    if (!touched) {
+      target.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true }));
+      target.dispatchEvent(new KeyboardEvent('keyup', { key: 'Escape', code: 'Escape', bubbles: true }));
+    }
     lastOptions = { model: [], tools: [] };
     settlePendingOptions('model', false, '官网菜单已关闭。');
     settlePendingOptions('tools', false, '官网菜单已关闭。');

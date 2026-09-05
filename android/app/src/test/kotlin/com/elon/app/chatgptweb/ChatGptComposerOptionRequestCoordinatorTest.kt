@@ -38,13 +38,14 @@ class ChatGptComposerOptionRequestCoordinatorTest {
     }
 
     @Test
-    fun officialDismissReceiptOpensWithoutWaitingForTheFallbackDelay() {
+    fun requestHonorsTheCloseSettleDelayBeforeOpening() {
         val fixture = Fixture()
 
         fixture.coordinator.request("model", "model-1")
-        fixture.coordinator.onMenuDismissed()
 
-        assertTrue(fixture.scheduled.isEmpty())
+        assertEquals(1, fixture.scheduled.size)
+        assertEquals(80L, fixture.scheduled.single().delayMs)
+        fixture.runNext()
         assertEquals("dispatch:model:model-1", fixture.events.last())
     }
 

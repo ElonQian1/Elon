@@ -96,6 +96,10 @@ internal class ChatGptWebTouchRequestHandler(
                 adapter::requestSnapshot,
                 ChatGptWebInteractionTimings.COMPOSER_MENU_SETTLE_MS,
             )
+            "dismiss_composer_menu" -> view.postDelayed(
+                adapter::requestSnapshot,
+                ChatGptWebInteractionTimings.COMPOSER_MENU_SETTLE_MS,
+            )
             "start_dictation" -> DICTATION_START_SNAPSHOT_DELAYS_MS.forEach { delay ->
                 view.postDelayed(adapter::requestSnapshot, delay)
             }

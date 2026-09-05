@@ -648,7 +648,6 @@ internal class ChatGptBackgroundSession(
                 if (event.section == "model") onComposerOptions(event.options)
             }
             is ChatGptWebEvent.CommandResult -> {
-                if (event.action == "dismiss_composer_menu") composerOptionRequests.onMenuDismissed()
                 chatGptComposerSectionForAction(event.action)?.let { section ->
                     composerOptionInteraction.release()
                     composerOptionRequests.complete(section)
