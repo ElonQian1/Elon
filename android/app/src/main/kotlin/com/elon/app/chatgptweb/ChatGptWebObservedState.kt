@@ -14,6 +14,7 @@ internal class ChatGptWebObservedState(
         ChatGptWebConversationCollection.cached(it.conversations.size, it.savedAtMs)
     } ?: ChatGptWebConversationCollection()
     private var features: List<ChatGptWebFeature> = emptyList()
+    private val conversationFiles = ChatGptWebConversationFileCache()
     private var composerSections: Map<String, List<ChatGptWebComposerOption>> = emptyMap()
     private var lastCommand: ChatGptWebEvent.CommandResult? = null
     private var lastCommandObservedAtMs: Long? = null
@@ -27,6 +28,17 @@ internal class ChatGptWebObservedState(
     fun accept(event: ChatGptWebEvent) {
         val observedAtMs = nowMs()
         when (event) {
+            is ChatGptWebEvent.ConversationFiles -> {
+                expirePendingCommands(observedAtMs)
+                val value = event.value
+                val identity = ChatGptWebConversationPath.identity(value.path)
+                val request = commandRequests.lastOrNull {
+                    it.expectedAction == ChatGptWebConversationFiles.ACTION &&
+                        ChatGptWebConversationPath.identity(it.targetConversationPath) == identity
+                }
+                if (request?.id != value.requestId || request.status != CommandRequest.PENDING) return
+                conversationFiles.accept(value, observedAtMs)
+            }
             is ChatGptWebEvent.ConversationList -> {
                 conversations = event.scopeProjectId?.let { projectId ->
                     ChatGptWebConversationIndex.mergeProjectHistory(
@@ -94,6 +106,13 @@ internal class ChatGptWebObservedState(
     }
 
     fun clearConversationHistory() {
+        conversationFiles.clear()
+        commandRequests = commandRequests.map { request ->
+            if (request.expectedAction == ChatGptWebConversationFiles.ACTION && request.status == CommandRequest.PENDING) {
+                request.copy(status = CommandRequest.FAILED, completedAtMs = nowMs(),
+                    result = ChatGptWebEvent.CommandResult(request.expectedAction, false, "history_cleared", request.id))
+            } else request
+        }
         conversations = emptyList()
         projects = emptyList()
         conversationCollection = ChatGptWebConversationCollection()
@@ -152,6 +171,11 @@ internal class ChatGptWebObservedState(
             startedAt = startedAt,
         )
     }
+
+    fun beginConversationFilesCommand(path: String): CommandRequest = beginCommand(
+        expectedAction = ChatGptWebConversationFiles.ACTION,
+        targetConversationPath = requireNotNull(ChatGptWebConversationPath.normalize(path)),
+    )
 
     private fun beginCommand(
         expectedAction: String,
@@ -247,6 +271,7 @@ internal class ChatGptWebObservedState(
             pageGeneration = pageGeneration,
             adapterGeneration = adapterGeneration,
             conversationCollection = conversationCollection,
+            conversationFiles = conversationFiles.snapshot(),
         )
     }
 
@@ -312,6 +337,7 @@ internal class ChatGptWebObservedState(
             observedCount = conversations.size,
         ),
         val projects: List<ChatGptWebProject> = emptyList(),
+        val conversationFiles: Map<String, com.elon.app.WebChatConversationFileIndex> = emptyMap(),
     ) {
         val adapterCurrent: Boolean
             get() = pageGeneration > 0 && adapterGeneration == pageGeneration

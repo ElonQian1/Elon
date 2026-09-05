@@ -49,6 +49,9 @@ internal class WebChatProductionConversationActionsCoordinator(
 ) {
     private var requestEpoch = 0
     private var activeSheet: WebChatActionSheetHandle? = null
+    private val files = WebChatConversationFilesCoordinator(
+        activity, host, consumerPort, ::openFilesConversation, ::showPageActionsFor,
+    )
     private val conversationMutation = WebChatConversationMutationCoordinator(
         activity = activity,
         host = host,
@@ -125,9 +128,14 @@ internal class WebChatProductionConversationActionsCoordinator(
                 contentDescription = "web-chat-conversation-action-move-to-project",
             ))
             add(WebChatActionSheetItem(
+                id = ACTION_FILES,
+                title = "会话附件",
+                contentDescription = "web-chat-conversation-action-files",
+            ))
+            add(WebChatActionSheetItem(
                 id = ACTION_MORE_SETTINGS,
                 title = "更多会话设置",
-                subtitle = "分享、查看文件、删除及其他设置",
+                subtitle = "分享、删除及其他设置",
                 contentDescription = "web-chat-conversation-action-more-settings",
             ))
         }
@@ -171,6 +179,7 @@ internal class WebChatProductionConversationActionsCoordinator(
             ACTION_ARCHIVE -> showArchiveConfirmation(conversation)
             ACTION_MOVE_TO_PROJECT -> privateProjectMove.show(conversation)
             ACTION_MORE_SETTINGS -> showPageActionsFor(conversation)
+            ACTION_FILES -> files.show(conversation)
         }
     }
 
@@ -237,12 +246,25 @@ internal class WebChatProductionConversationActionsCoordinator(
         val sheet = activeSheet
         activeSheet = null
         sheet?.dismiss()
+        files.cancel()
         conversationMutation.cancelPending()
         privateProjectMove.cancelPending()
         projectMove.cancelPending()
     }
 
     fun recoverPending(): Boolean = projectMove.recoverPending()
+
+    private fun openFilesConversation(conversation: ChatGptWebConversation) {
+        if (activeProvider() != WebChatProviderId.CHATGPT_WEB) return
+        if (ChatGptWebConversationPath.identity(conversation.path) ==
+            ChatGptWebConversationPath.identity(currentConversationPath())) return
+        if (WebChatConversationDraftNavigation.blocks(conversation.path, currentConversationPath(),
+                consumerPort()?.state()?.draftPresent == true)) {
+            showDraftBlocked()
+        } else if (!openConversationTracked(conversation.path).accepted) {
+            showRecovery(conversation)
+        }
+    }
 
     private fun poll(
         conversation: ChatGptWebConversation,
@@ -328,6 +350,7 @@ internal class WebChatProductionConversationActionsCoordinator(
         const val ACTION_ARCHIVE = "archive"
         const val ACTION_MOVE_TO_PROJECT = "move-to-project"
         const val ACTION_MORE_SETTINGS = "more-settings"
+        const val ACTION_FILES = "files"
         const val ACTION_SHEET_HANDOFF_SETTLE_MS = 48L
         const val POLL_INTERVAL_MS = 250L
         const val MAX_POLL_ATTEMPTS = 24

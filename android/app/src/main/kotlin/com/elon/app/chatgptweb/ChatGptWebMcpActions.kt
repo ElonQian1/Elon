@@ -26,6 +26,9 @@ internal class ChatGptWebMcpActions(
     private val beginOpenConversationCommand: (String) -> ChatGptWebObservedState.CommandRequest = {
         beginCommand("open_conversation")
     },
+    private val beginConversationFilesCommand: (String) -> ChatGptWebObservedState.CommandRequest = {
+        beginCommand(ChatGptWebConversationFiles.ACTION)
+    },
 ) : WebChatSocialMcpPort {
     override fun uiState(): JSONObject {
         val observed = observedState()
@@ -48,7 +51,7 @@ internal class ChatGptWebMcpActions(
             .put("streaming", current?.streaming ?: false)
             .put("private_stream_observer", ChatGptWebPrivateMcpStatus.stream(current))
             .put("private_read_aloud", ChatGptWebPrivateMcpStatus.readAloud(current))
-            .put("conversation", conversationJson(current))
+            .put("conversation", ChatGptWebMcpSnapshotJson.conversation(current))
             .put("input", JSONObject()
                 .put("text", inputText().take(MAX_INPUT_CHARS))
                 .put("text_length", inputText().length)
@@ -56,7 +59,7 @@ internal class ChatGptWebMcpActions(
             )
             .put("audio", ChatGptWebAudioPermissionJson.encode(audioPermissionState()))
             .put("ui_manifest", manifestJson(currentManifest))
-            .put("navigation", navigationSummary(observed))
+            .put("navigation", ChatGptWebMcpSnapshotJson.navigation(observed))
             .put("last_command", ChatGptWebCommandReceipts.lastResultJson(observed))
             .put(
                 "last_project_membership_probe",
@@ -90,6 +93,13 @@ internal class ChatGptWebMcpActions(
             dispatchRequest(beginCommand(expectedAction), block)
         }
         when (action) {
+            "chatgpt_list_conversation_files" -> {
+                val path = ChatGptWebConversationPath.normalize(args.optString("conversation_path"))
+                    ?: return error(action, "invalid_conversation_path")
+                dispatchRequest(beginConversationFilesCommand(path)) { requestId ->
+                    commands.listConversationFiles(path, requestId)
+                }
+            }
             "state", "open_chatgpt_web" -> Unit
             "set_input_text", "chatgpt_set_page_input_text" -> {
                 val text = args.optString("text").take(MAX_INPUT_CHARS)
@@ -585,58 +595,6 @@ internal class ChatGptWebMcpActions(
             })
     }
 
-    private fun conversationJson(value: ChatGptWebSnapshot?): Any {
-        if (value == null) return JSONObject.NULL
-        val exportedMessages = value.messages.takeLast(MAX_MESSAGES)
-        val exportedStart = value.messageWindowStart + value.messages.size - exportedMessages.size
-        val windowEnd = value.messageWindowStart + value.messages.size
-        return JSONObject()
-            .put("schema", CONVERSATION_SUMMARY_SCHEMA)
-            .put("title", value.title)
-            .put("url", value.url)
-            .put("current_model", value.currentModel)
-            .put("message_count", value.observedMessageCount)
-            .put("available_message_count", value.messages.size)
-            .put("message_window_start", value.messageWindowStart)
-            .put("message_window_end", windowEnd)
-            .put("history_truncated", value.messageWindowStart > 0)
-            .put(
-                "context_complete",
-                value.messageWindowStart == 0 && windowEnd >= value.observedMessageCount,
-            )
-            .put("exported_message_count", exportedMessages.size)
-            .put("exported_message_offset", exportedStart)
-            .put(
-                "messages_truncated",
-                exportedMessages.size < value.messages.size || windowEnd < value.observedMessageCount,
-            )
-            .put("context_action", "chatgpt_get_context")
-            .put("messages", ChatGptWebMessageJson.encode(
-                exportedMessages,
-                exportedStart,
-                MAX_MESSAGE_CHARS,
-            ))
-            .put("attachments", JSONArray().apply {
-                value.attachments.forEach { attachment ->
-                    put(JSONObject()
-                        .put("id", attachment.id)
-                        .put("name", attachment.name)
-                        .put("state", attachment.state)
-                    )
-                }
-            })
-    }
-
-    private fun navigationSummary(value: ChatGptWebObservedState.Snapshot): JSONObject = JSONObject()
-        .put("conversation_count", value.conversations.size)
-        .put(
-            "conversation_collection",
-            ChatGptWebConversationCollectionJson.encode(value.conversationCollection),
-        )
-        .put("feature_count", value.features.size)
-        .put("composer_sections", JSONArray(value.composerSections.keys.sorted()))
-        .put("cached_at_ms", value.updatedAtMs)
-
     private fun manifestJson(value: ChatGptWebUiManifest?): Any {
         if (value == null) return JSONObject.NULL
         val presentations = ChatGptNativeControlPresentation.describe(value.controls)
@@ -763,8 +721,6 @@ internal class ChatGptWebMcpActions(
             val hasMore: Boolean,
         )
 
-        const val MAX_MESSAGES = 50
-        const val MAX_MESSAGE_CHARS = 30_000
         const val MAX_CONTEXT_MESSAGE_CHARS = 40_000
         const val MAX_CONTEXT_CURSOR_CHARS = 80
         const val MAX_MESSAGE_ID_CHARS = 200
@@ -778,7 +734,6 @@ internal class ChatGptWebMcpActions(
         const val DEFAULT_LIST_PAGE_SIZE = 30
         const val MAX_LIST_PAGE_SIZE = 50
         const val NAVIGATION_SCHEMA = "elon.chatgpt_web.navigation.v2"
-        const val CONVERSATION_SUMMARY_SCHEMA = "elon.chatgpt_web.conversation_summary.v2"
         val CONTROL_ID = Regex("control_[a-z0-9_]{1,63}")
         val COMPOSER_SECTIONS = setOf("model", "tools")
         val LOCAL_ACTIONS = setOf(

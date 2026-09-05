@@ -121,7 +121,8 @@ class ChatGptWebConversationContractTest {
         )
 
         assertTrue(directoryRequests.contains("generation += 1"))
-        assertTrue(adapter.contains("action === 'cancel_conversation_directory'"))
+        assertTrue(adapter.contains("conversationDirectoryRequests.handleCommand(command, respond)"))
+        assertTrue(directoryRequests.contains("action === 'cancel_conversation_directory'"))
         assertTrue(directoryRequests.contains("if (!current()) return;"))
         assertTrue(session.contains("ChatGptConversationRefreshSession(conversationRefresh)"))
         assertTrue(session.contains("conversationRefreshSession.suspend"))

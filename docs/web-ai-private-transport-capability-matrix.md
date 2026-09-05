@@ -9,6 +9,8 @@ and separates content refresh from live interaction state. See the
 [repair contract](chatgpt-private-history-native-contract.md) and
 [remaining private-native work](web-ai-private-native-remaining-batch.md). Prior
 completed labels do not mean those remaining private protocols are implemented.
+The unshipped batch also adds a [private conversation attachment index](chatgpt-private-conversation-files.md)
+with a native cache-first file sheet. This does not make upload/download private-owned.
 
 ## Production defaults
 

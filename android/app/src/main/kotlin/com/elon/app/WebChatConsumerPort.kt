@@ -60,6 +60,9 @@ internal data class WebChatConsumerCommandResult(
 
 internal interface WebChatConsumerPort {
     fun state(): WebChatConsumerState
+    fun conversationFiles(path: String): WebChatConversationFileIndex? = null
+    fun requestConversationFiles(path: String): WebChatConsumerCommandResult =
+        WebChatConsumerCommandResult(false, "unsupported_consumer_command")
     fun requestComposerOptions(section: String): WebChatConsumerCommandResult
     fun dismissComposerOptions(): WebChatConsumerCommandResult
     fun selectComposerOption(section: String, optionId: String): WebChatConsumerCommandResult

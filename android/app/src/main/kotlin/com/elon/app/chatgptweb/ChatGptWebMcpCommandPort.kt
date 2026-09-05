@@ -32,6 +32,7 @@ internal interface ChatGptWebMcpCommandPort {
     fun refreshControls(requestId: String)
     fun revealProjectChoice(label: String, requestId: String) = Unit
     fun listConversations(requestId: String)
+    fun listConversationFiles(path: String, requestId: String) = Unit
     fun requestComposerOptions(section: String, requestId: String)
     fun dismissComposerOptions(requestId: String)
     fun selectComposerOption(section: String, optionId: String, requestId: String)

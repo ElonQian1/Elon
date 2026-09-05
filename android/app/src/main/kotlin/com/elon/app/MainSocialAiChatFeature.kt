@@ -247,7 +247,7 @@ internal class MainSocialAiChatFeature(
         )
     }
     private val productionCapabilityPrewarmer by productionCapabilityPrewarmerDelegate
-    private val productionConversationActions by lazy {
+    private val productionConversationActionsDelegate = lazy {
         WebChatProductionConversationActionsCoordinator(
             activity, binding.root,
             activeProvider = ::activeProviderOrNull,
@@ -267,6 +267,7 @@ internal class MainSocialAiChatFeature(
             openOfficialFallback = ::openOfficialFallback,
         )
     }
+    private val productionConversationActions by productionConversationActionsDelegate
     private val modeController: SocialAiChatModeController by lazy {
         SocialAiChatModeController(
             activity = activity,
@@ -510,6 +511,7 @@ internal class MainSocialAiChatFeature(
     }
 
     fun destroy() {
+        cancelProductionActionSheets()
         composerDrafts.rememberCurrent()
         flushProviderDrafts()
         if (productionCapabilityPrewarmerDelegate.isInitialized()) {
@@ -534,15 +536,10 @@ internal class MainSocialAiChatFeature(
         if (releaseComposerDraft) composerDrafts.release()
         clearComposerOperationFeedback()
         activeQuickComposerAction = null
-        if (productionComposerToolsDelegate.isInitialized()) productionComposerTools.cancelPending()
+        cancelProductionActionSheets()
         if (productionVoiceControlsDelegate.isInitialized()) {
             productionVoiceControls.restoreLocalVoiceInput()
         }
-        if (productionFeatureNavigationDelegate.isInitialized()) {
-            productionFeatureNavigation.cancelPending()
-        }
-        if (productionHeaderActionsDelegate.isInitialized()) productionHeaderActions.cancelPending()
-        if (productionPageActionsDelegate.isInitialized()) productionPageActions.cancelPending()
         if (productionCapabilityPrewarmerDelegate.isInitialized()) {
             productionCapabilityPrewarmer.cancel()
         }
@@ -573,18 +570,21 @@ internal class MainSocialAiChatFeature(
         if (realtimeVoicesDelegate.isInitialized()) realtimeVoices.onActiveSurfaceChanged()
     }
 
+    private fun cancelProductionActionSheets() {
+        if (productionConversationActionsDelegate.isInitialized()) productionConversationActions.cancelPending()
+        if (productionComposerToolsDelegate.isInitialized()) productionComposerTools.cancelPending()
+        if (productionFeatureNavigationDelegate.isInitialized()) productionFeatureNavigation.cancelPending()
+        if (productionHeaderActionsDelegate.isInitialized()) productionHeaderActions.cancelPending()
+        if (productionPageActionsDelegate.isInitialized()) productionPageActions.cancelPending()
+    }
+
     private fun activateChatProvider(provider: WebChatProviderIdentity) {
         suspendWorkFriend()
         renderToolbarVoiceAction(webChatModeActive = true)
         clearComposerOperationFeedback()
         activeQuickComposerAction = null
         composerDrafts.activateProvider(provider.id)
-        if (productionComposerToolsDelegate.isInitialized()) productionComposerTools.cancelPending()
-        if (productionFeatureNavigationDelegate.isInitialized()) {
-            productionFeatureNavigation.cancelPending()
-        }
-        if (productionHeaderActionsDelegate.isInitialized()) productionHeaderActions.cancelPending()
-        if (productionPageActionsDelegate.isInitialized()) productionPageActions.cancelPending()
+        cancelProductionActionSheets()
         binding.modelButton.tag = WEB_CHAT_MODEL_BUTTON_OWNER
         val controller = controllerFor(provider.id)
         if (!controller.isActive()) {

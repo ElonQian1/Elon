@@ -43,6 +43,9 @@ internal class ChatGptWebMcpCommandAdapter(
         pageAdapter.togglePrivateReadAloud(contextId, requestId)
     override fun setConversationPinned(path: String, pinned: Boolean, requestId: String) =
         pageAdapter.setConversationPinned(path, pinned, requestId)
+
+    override fun listConversationFiles(path: String, requestId: String) =
+        pageAdapter.listConversationFiles(path, requestId)
     override fun setConversationArchived(path: String, archived: Boolean, requestId: String) =
         pageAdapter.setConversationArchived(path, archived, requestId)
     override fun renameConversation(path: String, title: String, requestId: String) =

@@ -86,6 +86,7 @@ internal class ChatGptWebPortFactory(
             selectMode = selectMode,
             revealMessage = revealMessage,
             beginOpenConversationCommand = observedState::beginOpenConversationCommand,
+            beginConversationFilesCommand = observedState::beginConversationFilesCommand,
         )
         return ChatGptWebNativeVoiceResearchMcpPort(
             delegate = officialPort,

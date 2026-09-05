@@ -334,6 +334,10 @@ internal class ChatGptWebPageAdapter(
 
     fun cancelConversationDirectoryWork() = runCommand("cancel_conversation_directory")
 
+    fun listConversationFiles(path: String, requestId: String) = runCommand(
+        action = "list_conversation_files", value = path, requestId = requestId,
+    )
+
     fun probeConversationProject(path: String, projectId: String): Boolean {
         val normalizedPath = ChatGptWebConversationPath.normalize(path) ?: return false
         val normalizedProjectId = ChatGptWebConversationPath.canonicalProjectId(projectId)
@@ -621,7 +625,7 @@ internal class ChatGptWebPageAdapter(
         origin.scheme == "https" && origin.host == "chatgpt.com" && origin.port == -1
 
     companion object {
-        internal const val ADAPTER_VERSION = 261
+        internal const val ADAPTER_VERSION = 262
 
         private val ADAPTER_ASSETS = listOf(
             "chatgpt_web_adapter_bootstrap.js",

@@ -32,6 +32,7 @@ internal object ChatGptWebMcpActionCatalog {
         "chatgpt_refresh",
         "chatgpt_refresh_controls",
         "chatgpt_list_conversations",
+        "chatgpt_list_conversation_files",
         "chatgpt_list_composer_options",
         "chatgpt_dismiss_composer_options",
         "chatgpt_select_composer_option",

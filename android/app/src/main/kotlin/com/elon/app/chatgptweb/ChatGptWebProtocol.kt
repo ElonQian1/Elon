@@ -163,6 +163,8 @@ internal sealed interface ChatGptWebEvent {
         val value: ChatGptWebImageGallerySnapshot,
     ) : ChatGptWebEvent
 
+    data class ConversationFiles(val value: com.elon.app.WebChatConversationFileIndex) : ChatGptWebEvent
+
     data class CommandResult(
         val action: String,
         val ok: Boolean,
@@ -214,6 +216,8 @@ internal object ChatGptWebProtocol {
                 "attachment_transport" -> parseAttachmentTransport(event)
                 "image_asset" -> ChatGptWebImageAssetProtocol.parseAsset(event)
                     ?.let { ChatGptWebEvent.ImageAsset(it) }
+                "conversation_files_snapshot" -> ChatGptWebConversationFiles.parse(event)
+                    ?.let { ChatGptWebEvent.ConversationFiles(it) }
                 "image_gallery_snapshot" -> ChatGptWebImageAssetProtocol.parseGallery(event)
                     ?.let { ChatGptWebEvent.ImageGallerySnapshot(it) }
                 else -> null

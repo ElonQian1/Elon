@@ -18,6 +18,13 @@ internal class ChatGptWebConsumerPortAdapter(
     private val observedState: () -> ChatGptWebObservedState.Snapshot,
     private val executeControl: (JSONObject) -> JSONObject,
 ) : WebChatConsumerPort {
+    override fun conversationFiles(path: String): com.elon.app.WebChatConversationFileIndex? =
+        ChatGptWebConversationPath.identity(path)?.let { observedState().conversationFiles[it] }
+
+    override fun requestConversationFiles(path: String): WebChatConsumerCommandResult =
+        execute(JSONObject().put("action", "chatgpt_list_conversation_files")
+            .put("conversation_path", path))
+
     override fun state(): WebChatConsumerState {
         val observed = observedState()
         val current = snapshot().takeIf { observed.adapterCurrent }
