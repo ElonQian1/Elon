@@ -3,6 +3,7 @@ capability_id: android_chatgpt_same_origin_text_transaction_v1
 implementation_status: completed
 verification_status: device_verified_v1_1_1365_adapter_206
 production_default: true
+direct_private_post_status: not_device_verified_current_contract
 repeat_implementation: forbidden_without_current_regression_evidence
 ---
 
@@ -23,8 +24,10 @@ background WebView remains the identity and authoritative page runtime.
   request that would fail or wait for a long network timeout.
 - Unknown completion never causes an automatic write replay. Read-only page reconciliation
   decides whether the native command settled.
-- Internal requests time out after 15 seconds. Two failures open a 45-second cooldown.
-  Explicit user stop remains distinct from transport timeout.
+- Response headers have a 15-second deadline. Accepted streams replace that deadline
+  with a bounded ten-minute stream deadline; a healthy long answer is not aborted at
+  15 seconds. Two failures open a 45-second cooldown. Explicit user stop remains
+  distinct from transport timeout.
 - Attachments, files, images, media, content references, unsafe routes, stale templates,
   and changed conversation context always use the official page path.
 
@@ -43,3 +46,31 @@ This evidence completes the transaction coordinator and its safe fallback. It do
 claim that the current dynamic-proof ChatGPT Web contract supports direct private POST.
 Revisit direct dispatch only if a current official request is proven reusable or a fresh
 proof transaction can be obtained without exporting credentials or splitting page state.
+
+## Current contract audit (2026-09-05)
+
+A production-composer send on research Release `1.1.1538`, adapter `259`, observed
+successful `conversation/init`, `f/conversation/prepare`, and sentinel preparation,
+followed by HTTP 200 `text/event-stream` from `f/conversation`. That write included
+`openai-sentinel-chat-requirements-prepare-token`, in addition to proof and turnstile
+headers. Header names and response metadata were observed, never their values.
+The first send chose `official_fallback:template_unavailable`; the exact-marker
+reply assertion failed, so the two-turn smoke is not counted as passed. Its finally
+block restored the prior blank conversation and input.
+
+Relay revision 16 / policy revision 12 / adapter 260 harden the existing owner:
+
+- All nonempty `openai-sentinel-*` request headers make a template non-reusable,
+  including new header names; no dynamic proof is stripped or replayed.
+- A new official write immediately revokes old eligibility. Asynchronous cloning
+  cannot restore a template after a newer write, invalidation, or disposal.
+- Early stream receipts are retained only while that request is being captured.
+  An old assistant or another conversation cannot settle the pending turn.
+- A synchronous exception after entering fetch is an indeterminate write, not
+  permission to send it again through the official composer.
+- Late responses cannot reverse a timeout or penalize a newer transaction.
+
+Focused executable coverage is in `test-chatgpt-web-text-transaction-lifecycle.js`;
+the original transaction, send-settlement, and private-stream suites remain in use.
+These changes harden dispatch eligibility and recovery, not a claimed successful
+replacement for the current fresh-proof official send transaction.

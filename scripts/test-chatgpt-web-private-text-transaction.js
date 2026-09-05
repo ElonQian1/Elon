@@ -204,7 +204,7 @@ assert.match(streamSource, /finishPrivateSend/);
 
   const fixture = createContext(true);
   const relay = fixture.window.__elonChatGptPrivateTextTransactionRelay;
-  assert.equal(relay.version, 15);
+  assert.equal(relay.version, 16);
   assert.equal(relay.state().state, 'template_unavailable');
 
   const officialBody = {
@@ -233,11 +233,12 @@ assert.match(streamSource, /finishPrivateSend/);
     .createStreamReceipt(streamFirstValue, '/c/conversation-one', Date.now());
   assert.notEqual(streamReceipt, null);
   assert.equal(JSON.stringify(streamReceipt).includes(streamFirstValue.text), false);
-  assert.equal(streamFirstRelay.observeStream(streamFirstValue), false);
-  await streamFirstFixture.window.fetch('/backend-api/f/conversation', {
+  const streamFirstRequest = streamFirstFixture.window.fetch('/backend-api/f/conversation', {
     method: 'POST',
     body: JSON.stringify(officialBody)
   });
+  assert.equal(streamFirstRelay.observeStream(streamFirstValue), false);
+  await streamFirstRequest;
   await tick();
   assert.equal(
     streamFirstRelay.state().state,

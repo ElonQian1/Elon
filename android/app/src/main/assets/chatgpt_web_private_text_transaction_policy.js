@@ -2,7 +2,7 @@
   'use strict';
 
   const existing = window.__elonChatGptPrivateTextTransactionPolicy;
-  if (existing && Number(existing.version) >= 11) return;
+  if (existing && Number(existing.version) >= 12) return;
 
   const MAX_PROMPT_LENGTH = 20000;
   const MAX_MESSAGES = 8;
@@ -178,6 +178,10 @@
       stream.conversationId || template && template.conversationId || pathConversationId(path)
     );
     if (!conversationId) return 'conversation_id';
+    if (template && template.conversationId && template.conversationId !== conversationId) {
+      return 'template_conversation_mismatch';
+    }
+    if (template && template.parentMessageId === assistantId) return 'previous_assistant';
     const timestamp = Number(observedAt);
     if (!Number.isFinite(timestamp) || timestamp <= 0) return 'timestamp';
     const pathConversationIdValue = pathConversationId(path);
@@ -204,6 +208,7 @@
 
   function acceptStream(template, stream, pagePath, observedAt) {
     if (!template) return null;
+    if (streamRejectionCode(template, stream, pagePath, observedAt)) return null;
     const receipt = createStreamReceipt(
       stream,
       pagePath,
@@ -317,7 +322,7 @@
   }
 
   window.__elonChatGptPrivateTextTransactionPolicy = Object.freeze({
-    version: 11,
+    version: 12,
     acceptStream,
     buildBody,
     buildRegenerateBody,

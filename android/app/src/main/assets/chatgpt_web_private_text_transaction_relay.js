@@ -4,7 +4,8 @@
   if (window.__elonChatGptPrivateTextTransactionsEnabled !== true) return;
   if (location.origin !== 'https://chatgpt.com') return;
   const existing = window.__elonChatGptPrivateTextTransactionRelay;
-  if (existing && Number(existing.version) >= 15) return;
+  if (existing && Number(existing.version) >= 16) return;
+  if (existing && typeof existing.dispose === 'function') existing.dispose();
   const policy = window.__elonChatGptPrivateTextTransactionPolicy;
   const delegateFetch = typeof window.fetch === 'function' ? window.fetch : null;
   if (!policy || !delegateFetch || typeof Request !== 'function' ||
@@ -14,10 +15,12 @@
   const MAX_FAILURES = 2;
   const FAILURE_COOLDOWN_MS = 45 * 1000;
   const ACTIVE_TTL_MS = 15 * 1000;
+  const STREAM_TTL_MS = 10 * 60 * 1000;
   const PENDING_STREAM_TTL_MS = 20 * 1000;
   const NON_REUSABLE_REQUEST_HEADERS = [
     'openai-sentinel-arkose-token',
     'openai-sentinel-chat-requirements-token',
+    'openai-sentinel-chat-requirements-prepare-token',
     'openai-sentinel-proof-token',
     'openai-sentinel-turnstile-token'
   ];
@@ -26,6 +29,8 @@
   let lastTurn = null;
   let active = null;
   let generation = 0;
+  let captureGeneration = 0;
+  let capturePending = false;
   let consecutiveFailures = 0;
   let cooldownUntil = 0;
   let disposed = false;
@@ -66,27 +71,44 @@
 
   function hasNonReusableProof(request) {
     const headers = request && request.headers;
-    if (!headers || typeof headers.get !== 'function') return false;
+    if (!headers || typeof headers.get !== 'function') return true;
+    let protectedHeader = false;
+    if (typeof headers.forEach === 'function') {
+      headers.forEach((value, name) => {
+        if (value && /^openai-sentinel-/i.test(String(name))) protectedHeader = true;
+      });
+    }
+    if (protectedHeader) return true;
     return NON_REUSABLE_REQUEST_HEADERS.some((name) => Boolean(headers.get(name)));
   }
 
   function captureTemplate(input, init) {
     if (disposed || isPrivate(init) || !isConversationPost(input, init)) return;
+    const previous = { template, lastTurn };
+    clearContext();
+    const capturedGeneration = captureGeneration;
     const url = requestUrl(input);
     const request = requestClone(input, init, url);
-    if (!request || !request.body) return;
+    if (!request || !request.body) {
+      lastCaptureCode = 'request_unavailable';
+      return;
+    }
     if (hasNonReusableProof(request)) {
       template = null;
       lastCaptureCode = 'dynamic_proof';
       return;
     }
     const pagePath = location.pathname;
+    const capturedAt = Date.now();
+    capturePending = true;
     Promise.resolve(request.clone().text()).then((text) => {
-      if (disposed || !text || text.length > MAX_BODY_BYTES) return;
+      if (disposed || capturedGeneration !== captureGeneration) return;
+      capturePending = false;
+      lastCaptureCode = 'invalid_body';
+      if (!text || text.length > MAX_BODY_BYTES) return;
       let body;
       try { body = JSON.parse(text); }
       catch (_) { return; }
-      const capturedAt = Date.now();
       const captured = policy.createTemplate(body, pagePath, capturedAt);
       if (captured) {
         template = { contract: captured, request };
@@ -97,14 +119,20 @@
       }
       const regenerate = policy.createRegenerateTemplate(body, pagePath, capturedAt);
       if (regenerate) {
+        template = previous.template;
+        lastTurn = previous.lastTurn;
         regenerateTemplate = { contract: regenerate, request };
+        lastCaptureCode = '';
+        reconcilePendingStream();
         return;
       }
       lastCaptureCode = typeof policy.templateRejectionCode === 'function'
         ? String(policy.templateRejectionCode(body, pagePath, capturedAt) || '')
         : '';
     }).catch(function () {
-      // The official request remains authoritative when its body is not cloneable.
+      if (disposed || capturedGeneration !== captureGeneration) return;
+      capturePending = false;
+      lastCaptureCode = 'invalid_body';
     });
   }
 
@@ -133,6 +161,7 @@
     if (disposed) return 'disposed';
     if (active) return 'busy';
     if (Date.now() < cooldownUntil) return 'cooldown';
+    if (capturePending) return 'capture_pending';
     if (!template) return lastCaptureCode ? 'capture_' + lastCaptureCode : 'template_unavailable';
     if (policy.ready(template.contract, location.pathname, Date.now())) return 'ready';
     return lastStreamCode ? 'stream_' + lastStreamCode : 'stream_not_confirmed';
@@ -144,6 +173,8 @@
   }
 
   function clearContext() {
+    captureGeneration += 1;
+    capturePending = false;
     template = null;
     regenerateTemplate = null;
     lastTurn = null;
@@ -154,6 +185,8 @@
   }
 
   function invalidateContext() {
+    captureGeneration += 1;
+    capturePending = false;
     regenerateTemplate = null;
     lastTurn = null;
     if (active) {
@@ -172,14 +205,14 @@
     return true;
   }
 
-  function armActiveTimeout(token, controller, markTimedOut) {
+  function armActiveTimeout(token, controller, markTimedOut, delay = ACTIVE_TTL_MS) {
     return window.setTimeout(() => {
       if (!active || active.token !== token) return;
       markTimedOut();
       controller.abort();
       clearActive(token);
       recordFailure();
-    }, ACTIVE_TTL_MS);
+    }, delay);
   }
 
   function dispatchRequest(requestTemplate, body, command, kind, userMessageId) {
@@ -211,16 +244,24 @@
         __elonPrivateTransport: 'text_transaction_v1'
       }));
     } catch (_) {
+      controller.abort();
       clearActive(token);
       recordFailure();
-      return Object.freeze({ dispatched: false, code: 'synchronous_failure' });
+      // Once fetch is invoked, a wrapper may throw after submitting the write.
+      return Object.freeze({ dispatched: true, code: 'queued', kind, userMessageId,
+        completion: Promise.resolve(Object.freeze({ status: 'unknown', code: 'synchronous_failure' })) });
     }
     const completion = responsePromise.then((response) => {
+      if (timedOut) return Object.freeze({ status: 'unknown', code: 'timeout' });
       const result = policy.classifyResponse(response);
-      if (result.accepted) {
+      if (result.accepted && active && active.token === token) {
         consecutiveFailures = 0;
         cooldownUntil = 0;
-      } else {
+        window.clearTimeout(active.timeoutId);
+        active.timeoutId = armActiveTimeout(
+          token, controller, () => { timedOut = true; }, STREAM_TTL_MS
+        );
+      } else if (!result.accepted && active && active.token === token) {
         clearActive(token);
         recordFailure();
       }
@@ -230,8 +271,8 @@
       });
     }).catch((error) => {
       const stopped = error && error.name === 'AbortError';
-      clearActive(token);
-      if (!stopped) recordFailure();
+      const owned = clearActive(token);
+      if (owned && !stopped && !timedOut) recordFailure();
       return Object.freeze({
         status: stopped && !timedOut ? 'accepted' : 'unknown',
         code: timedOut ? 'timeout' : stopped ? 'stopped' : 'network'
@@ -333,13 +374,14 @@
   }
 
   function observeStream(stream) {
+    if (disposed) return false;
     const pagePath = location.pathname;
     const observedAt = Date.now();
     if (!template) {
       const receipt = typeof policy.createStreamReceipt === 'function'
         ? policy.createStreamReceipt(stream, pagePath, observedAt)
         : null;
-      if (receipt) {
+      if (receipt && capturePending) {
         pendingStream = receipt;
         lastStreamCode = 'awaiting_template';
       } else {
@@ -374,7 +416,7 @@
   }
 
   window.__elonChatGptPrivateTextTransactionRelay = Object.freeze({
-    version: 15,
+    version: 16,
     dispatch,
     dispatchRegenerate,
     invalidateContext,
