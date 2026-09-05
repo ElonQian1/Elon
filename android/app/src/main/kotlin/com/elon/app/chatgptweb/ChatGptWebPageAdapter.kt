@@ -144,7 +144,9 @@ internal class ChatGptWebPageAdapter(
             val wasCurrent = documentSession.snapshot().adapterCurrent
             val document = documentSession.accept(token) ?: return@addWebMessageListener
             if (!wasCurrent) onDocumentChanged(document)
-            if (parsed.event.completesHandshake()) handshake.acknowledge()
+            if (ChatGptWebHandshakeCompletionPolicy.completes(parsed.event)) {
+                handshake.acknowledge()
+            }
             onEvent(parsed.event)
         }
         if (
@@ -554,20 +556,6 @@ internal class ChatGptWebPageAdapter(
         }
     }
 
-    private fun ChatGptWebEvent.completesHandshake(): Boolean = when (this) {
-        is ChatGptWebEvent.AdapterReady -> true
-        is ChatGptWebEvent.Snapshot -> value.authenticated || value.composerReady || value.dictationActive
-        is ChatGptWebEvent.ConversationList,
-        is ChatGptWebEvent.ComposerControls,
-        is ChatGptWebEvent.FeatureNavigation,
-        is ChatGptWebEvent.UiManifest,
-        is ChatGptWebEvent.WebTouchRequest,
-        is ChatGptWebEvent.AttachmentTransport,
-        is ChatGptWebEvent.ImageAsset,
-        is ChatGptWebEvent.ImageGallerySnapshot,
-        is ChatGptWebEvent.CommandResult -> true
-    }
-
     private fun runCommand(
         action: String,
         value: String? = null,
@@ -633,7 +621,7 @@ internal class ChatGptWebPageAdapter(
         origin.scheme == "https" && origin.host == "chatgpt.com" && origin.port == -1
 
     companion object {
-        internal const val ADAPTER_VERSION = 258
+        internal const val ADAPTER_VERSION = 259
 
         private val ADAPTER_ASSETS = listOf(
             "chatgpt_web_adapter_bootstrap.js",
