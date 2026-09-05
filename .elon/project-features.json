@@ -20091,7 +20091,7 @@
       "id": "yilong-quant-android-public-empty-v3",
       "title": "官方量化 APK 公开空状态 V3",
       "summary": "精确官方量化项目在没有合格新版时匿名返回明确 404，不回落成员 token；合格发布仍匿名返回受管且摘要复核的 APK。",
-      "status": "verified",
+      "status": "released",
       "priority": "p0",
       "requirement": {
         "path": "docs/requirements/yilong-quant-android-public-empty-v3.md",
@@ -20138,41 +20138,41 @@
       "implementation_evidence": [
         {
           "path": "docs/delivery/yilong-quant-android-public-empty-v3.md",
-          "content_hash": "3e9b8174df4f9218807a2479635ed590d98749c8c8383eb9461c5b6968463a56",
-          "locator": "implementation and verification evidence",
+          "content_hash": "5a1bfa3dda21c0dd6e2768297713f38849206c9d045ec5148878ed33b1788f60",
+          "locator": "implementation tests and Server 0.3.1730 runtime receipt",
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "d782a01d324983d9f53375ea44df8260583510d6",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "bf53d6ace826e0a7b7e256d83a6119d9df62327a",
-            "state": "untracked"
-          }
-        },
-        {
-          "path": "docs/requirements/esk-first-user-delivery-roadmap-v1.md",
-          "content_hash": "cddd9333648d38f0bc53e5709423d1cb3447c1674ed072ffb513f443ad883041",
-          "locator": "quant installation closure status",
-          "evidence_kind": "document",
-          "git_identity": {
-            "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "d782a01d324983d9f53375ea44df8260583510d6",
-            "head_blob_oid": "8c3cc01ed1ba842ec3df36032a0b94d293cba1ae",
-            "worktree_blob_oid": "d69ae504c94255de65e6b8d0c0aab94ea0fb4422",
+            "head_commit": "fbcde10e2905e5f5239623214fd631aee2424f89",
+            "head_blob_oid": "bf53d6ace826e0a7b7e256d83a6119d9df62327a",
+            "worktree_blob_oid": "1ed250eca7411b625c0851137d3e5286085f6a63",
             "state": "tracked_modified"
           }
         },
         {
+          "path": "docs/requirements/esk-first-user-delivery-roadmap-v1.md",
+          "content_hash": "60f6b2e75987bb1bebc94dca90b6b97c1ba2a2628fbc670353aae82508e6ef13",
+          "locator": "quant installation closure status",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "fbcde10e2905e5f5239623214fd631aee2424f89",
+            "head_blob_oid": "d69ae504c94255de65e6b8d0c0aab94ea0fb4422",
+            "worktree_blob_oid": "d69ae504c94255de65e6b8d0c0aab94ea0fb4422",
+            "state": "tracked_clean"
+          }
+        },
+        {
           "path": "docs/requirements/yilong-quant-android-public-empty-v3.md",
-          "content_hash": "d8b395a10fef586291afdb3b1fe02e4140567c66c6176697fad78cf8d609c43a",
+          "content_hash": "61c9a261de32c1151deaa167ebe2a07316d6a721b4987add40cbd0b38fae7e63",
           "locator": "behavior contract and acceptance criteria",
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "d782a01d324983d9f53375ea44df8260583510d6",
-            "head_blob_oid": "",
+            "head_commit": "fbcde10e2905e5f5239623214fd631aee2424f89",
+            "head_blob_oid": "8eacf74e7dd8bb3aa9560aadd688462ac9298cbc",
             "worktree_blob_oid": "8eacf74e7dd8bb3aa9560aadd688462ac9298cbc",
-            "state": "untracked"
+            "state": "tracked_clean"
           }
         },
         {
@@ -20182,10 +20182,10 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "d782a01d324983d9f53375ea44df8260583510d6",
-            "head_blob_oid": "aaf94c6b98ce822a3c572ac2903797ca82e7e3ef",
+            "head_commit": "fbcde10e2905e5f5239623214fd631aee2424f89",
+            "head_blob_oid": "a57470ccf4ad30cf98bd66c880d87587b0fdcf2e",
             "worktree_blob_oid": "a57470ccf4ad30cf98bd66c880d87587b0fdcf2e",
-            "state": "tracked_modified"
+            "state": "tracked_clean"
           }
         },
         {
@@ -20195,15 +20195,15 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "d782a01d324983d9f53375ea44df8260583510d6",
-            "head_blob_oid": "",
+            "head_commit": "fbcde10e2905e5f5239623214fd631aee2424f89",
+            "head_blob_oid": "9f54b60c71641237c48d429ef0a2c5cc8db964e0",
             "worktree_blob_oid": "9f54b60c71641237c48d429ef0a2c5cc8db964e0",
-            "state": "untracked"
+            "state": "tracked_clean"
           }
         }
       ],
       "created_at_ms": 1788578101629,
-      "updated_at_ms": 1788593708530
+      "updated_at_ms": 1788594605146
     },
     {
       "id": "yilong-quant-esk-paper-asset-projection-v1",
@@ -20588,76 +20588,6 @@
     }
   ],
   "audit_log": [
-    {
-      "id": "feature_event_5efaf7c7ea144a63b95efff57a9a2ed0",
-      "feature_id": "esk-platform-sellback-requests-v1",
-      "action": "registered",
-      "actor": "codex-esk-sellback-root",
-      "reason": "",
-      "from_status": "",
-      "to_status": "proposed",
-      "at_ms": 1788527300706
-    },
-    {
-      "id": "feature_event_00a844685c4041e3aefbcc0899da2b2b",
-      "feature_id": "esk-platform-sellback-requests-v1",
-      "action": "transitioned",
-      "actor": "codex-esk-sellback-root",
-      "reason": "落实用户Goal中正式占用/官方申请方向；只默认关闭实现与合成验证，候选商业条款另行明确批准后方可生产启用，不推定资金权限。",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1788527301531
-    },
-    {
-      "id": "feature_event_dd6b43920980425abe4b019cee58678f",
-      "feature_id": "esk-platform-sellback-requests-v1",
-      "action": "transitioned",
-      "actor": "codex-esk-sellback-root",
-      "reason": "落实用户Goal中正式占用/官方申请方向；只默认关闭实现与合成验证，候选商业条款另行明确批准后方可生产启用，不推定资金权限。",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1788527302343
-    },
-    {
-      "id": "feature_event_4dde0fdacfd1471a96ce9931a2855a29",
-      "feature_id": "esk-platform-sellback-requests-v1",
-      "action": "claimed",
-      "actor": "codex-esk-sellback-root",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788527303123
-    },
-    {
-      "id": "feature_event_eb0abcff57bc4edf8e6160885635b4ef",
-      "feature_id": "esk-platform-sellback-requests-v1",
-      "action": "transitioned",
-      "actor": "codex-esk-sellback-root",
-      "reason": "已按源文件/迁移/主APK/Paper/跨APK合同查重，先抽取同连接完整读取，再按责任实现申请Store/API/原生页面。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788527304177
-    },
-    {
-      "id": "feature_event_594d1b88e7c642729645d7005e550b92",
-      "feature_id": "esk-platform-sellback-requests-v1",
-      "action": "claim_released",
-      "actor": "codex-esk-sellback-root",
-      "reason": "Review explicit recovery refinement: readonly key lookup and foreground-only consent; retain same owned slice and rebind intentional requirement edits.",
-      "from_status": "in_progress",
-      "to_status": "blocked",
-      "at_ms": 1788528351416
-    },
-    {
-      "id": "feature_event_37b60a81a4984c1fb3c5dad027d11fbc",
-      "feature_id": "esk-platform-sellback-requests-v1",
-      "action": "requirement_rebound",
-      "actor": "codex-esk-sellback-root",
-      "reason": "Explicitly reviewed newly specified readonly key lookup, process-only opaque recovery hint and default-closed config names; no new funds or production authority.",
-      "from_status": "blocked",
-      "to_status": "proposed",
-      "at_ms": 1788528352363
-    },
     {
       "id": "feature_event_2b55476c64cd41838576757785edf9ec",
       "feature_id": "esk-platform-sellback-requests-v1",
@@ -22587,6 +22517,76 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1788593708530
+    },
+    {
+      "id": "feature_event_4f5b26865d4147a4a39a7eddee900ff4",
+      "feature_id": "yilong-quant-android-public-empty-v3",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "Rebinding the delivery document to the completed production runtime receipt.",
+      "from_status": "verified",
+      "to_status": "ready",
+      "at_ms": 1788594603680
+    },
+    {
+      "id": "feature_event_9dc1641c5f004297853c5d19182c1968",
+      "feature_id": "yilong-quant-android-public-empty-v3",
+      "action": "claimed",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788594603914
+    },
+    {
+      "id": "feature_event_9d8b0f4c01a44d6b8d22e12a012b0c9f",
+      "feature_id": "yilong-quant-android-public-empty-v3",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "Recording the actual Server 0.3.1730 anonymous HTTP acceptance receipt.",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788594603940
+    },
+    {
+      "id": "feature_event_ef7d082572b7468aba3f3fd534632732",
+      "feature_id": "yilong-quant-android-public-empty-v3",
+      "action": "evidence_recorded",
+      "actor": "codex-root",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788594605053
+    },
+    {
+      "id": "feature_event_2d83a7e5cc614d2bb5e2a3ca18e616d4",
+      "feature_id": "yilong-quant-android-public-empty-v3",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "Current source and delivery evidence are bound after production acceptance.",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1788594605082
+    },
+    {
+      "id": "feature_event_ca358df495ed4829ba0afee630acb6b2",
+      "feature_id": "yilong-quant-android-public-empty-v3",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "Handler and module regressions passed; independent review closed; delivery receipt matches deployed source.",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1788594605111
+    },
+    {
+      "id": "feature_event_f457505288f9435a8b7854120112569f",
+      "feature_id": "yilong-quant-android-public-empty-v3",
+      "action": "transitioned",
+      "actor": "codex-root",
+      "reason": "Server 0.3.1730 serves the exact anonymous route as non-cacheable 404 with source fbcde10e2; public catalog remains null until a compliant APK is uploaded.",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1788594605146
     }
   ]
 }
