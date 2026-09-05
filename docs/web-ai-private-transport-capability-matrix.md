@@ -27,6 +27,7 @@ installed build; individual capability documents retain implementation evidence.
 | Stable conversation URL lifecycle | Google Web AI | Completed, enabled, and device verified on `v1.1.1317 (1327)` | Blank AI Mode plus native draft recovery |
 | Reply stream and completion observer | Google Web AI | Completed, enabled, and stream-to-completion device verified on `v1.1.1303 (1313)` | Official DOM snapshot |
 | Background navigation continuity | ChatGPT and Google Web AI | Completed, enabled, and device verified | Bounded official WebView recovery |
+| Snapshot-authoritative bridge handshake | ChatGPT | Completed, enabled, and device verified on `v1.1.1536 (1536)`, adapter `259` | Bounded official WebView session recovery |
 | Unified native send ledger | ChatGPT and Google Web AI | Completed, enabled, and device verified on `v1.1.1520 (1520)` with ChatGPT adapter `247` and Google adapter `40` | Official-page reconciliation without automatic write replay |
 | Same-origin text transaction | ChatGPT | Completed, enabled, and device verified on `v1.1.1365 (1386)`, adapter `206`; current dynamic proof selects immediate official fallback | Official-page transaction without automatic write replay |
 | Interaction presets and deferred chat actions | ChatGPT | Completed, enabled, and device verified on research build `v1.1.1367 (1388)` | Current official control and WebView navigation |

@@ -27,6 +27,7 @@ class WebAiPrivateTransportCatalogTest {
         assertTrue("android_google_web_conversation_snapshot_cache_v1" in enabledIds)
         assertTrue("android_google_web_private_reply_observer_v1" in enabledIds)
         assertTrue("android_web_ai_background_navigation_continuity_v1" in enabledIds)
+        assertTrue("android_chatgpt_snapshot_authoritative_handshake_v1" in enabledIds)
         assertTrue("android_web_ai_unified_send_coordinator_v1" in enabledIds)
         assertTrue("android_chatgpt_same_origin_text_transaction_v1" in enabledIds)
         assertTrue("android_chatgpt_attachment_transport_reconciliation_v1" in enabledIds)
@@ -66,6 +67,17 @@ class WebAiPrivateTransportCatalogTest {
             "official_dom_stream_snapshot",
             streamObserver.getString("fallback"),
         )
+
+        val snapshotHandshake = values.first {
+            it.getString("capability_id") ==
+                "android_chatgpt_snapshot_authoritative_handshake_v1"
+        }
+        assertEquals("completed", snapshotHandshake.getString("implementation_status"))
+        assertEquals(
+            "device_verified_v1_1_1536_adapter_259_without_manual_resume",
+            snapshotHandshake.getString("verification_status"),
+        )
+        assertTrue(snapshotHandshake.getBoolean("production_default"))
 
         values.forEach { row ->
             if (row.getString("capability_id") !in setOf(
