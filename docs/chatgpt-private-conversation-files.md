@@ -3,7 +3,7 @@
 ## Scope
 
 Capability: `android_chatgpt_private_conversation_files_v1`.
-Code is implemented in the pending combined APK batch, not yet device verified.
+Code is published and installed in `v1.1.1540`, not yet device UI verified.
 Candidate adapter: `262`; history transport: `18`; directory requests module: `2`.
 This is an attachment **index**, not a private uploader or file downloader.
 
@@ -55,7 +55,8 @@ the JavaScript producer test and the real Android bridge parser test.
 - Android release-source compile and first shared-state/parser regression batch:
   88 tests passed. Runtime inventory follow-up: 6 tests passed. Final production
   attachment, cache, receipt, lifecycle and catalog batch: 24 tests passed.
-- APK build, install and device acceptance: deferred to the combined batch.
+- Grouped APK build, release and data-preserving installation passed on `v1.1.1540`.
+  Device UI acceptance remains pending; see [delivery evidence](web-ai-private-native-remaining-batch.md#grouped-release).
 
 Two broader legacy source-contract classes ran 26 tests with five failures.
 Their exact failing predicates are also false on the untouched baseline

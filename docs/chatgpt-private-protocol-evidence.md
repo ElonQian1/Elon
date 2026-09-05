@@ -1,6 +1,6 @@
 # Bounded private protocol evidence
 
-Status: code candidate, 2026-09-06. This is diagnostic infrastructure, not a
+Status: published/installed `v1.1.1540`, 2026-09-06. This is diagnostic infrastructure, not a
 completed uploader, downloader, private sender, or share/delete implementation.
 The outstanding contracts remain in [the batch work list](web-ai-private-native-remaining-batch.md).
 
@@ -66,10 +66,11 @@ validation, ordinary receipt bounds, MCP dispatch and document-generation gates.
 2026-09-06 checks: 21 Node checks passed (20 focused cases plus the existing
 research-probe suite); Android Kotlin compilation and 33 targeted unit tests
 passed across evidence validation, MCP, existing protocol and file-index receipt
-tests. No APK assembly, release, installation or microphone test was performed.
+tests. The subsequent grouped Release build, publish and data-preserving install
+passed on `v1.1.1540`; no microphone or actual protocol capture was performed.
 
 These tests use synthetic fixtures and do not establish current vendor request
-contracts. Device capture and a grouped APK install remain pending. Endpoint
+contracts. Device capture remains pending; see [delivery evidence](web-ai-private-native-remaining-batch.md#grouped-release). Endpoint
 field types alone are not sufficient to implement credential issuance, upload
 finalization, idempotency or transaction ownership; verify those semantics before
 replacing any working production path.

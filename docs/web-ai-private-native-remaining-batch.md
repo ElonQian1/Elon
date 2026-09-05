@@ -17,12 +17,12 @@ for website functionality. Persistent WebView identity remains intentional.
 
 | Work | Code | Verification | Delivery |
 |---|---|---|---|
-| Private history to native wire format, citations, file/image descriptors | Implemented | JS and shared Android fixture passed | Await combined APK |
-| Content-only refresh preserves current composer/voice state | Implemented | Targeted Android tests passed | Await combined APK |
-| Bounded/coalesced image requests and no false empty-library success | Implemented | Targeted JS passed | Await combined APK |
-| Private conversation attachment index, cache and native file sheet | Implemented | Shared JS/Android contract and targeted production tests passed | Await combined APK |
-| End-to-end private read deadlines, body limits and late project response isolation | Implemented | Lifecycle and existing JS consumer suites passed | Await combined APK |
-| Bounded request-shape capture through native MCP, reusing the page observer | Implemented diagnostic only | 21 Node checks and 33 Android tests passed; Kotlin compilation passed | Await combined APK and actual protocol capture |
+| Private history to native wire format, citations, file/image descriptors | Implemented | JS and shared Android fixture passed | Published/installed 1540; device UI acceptance pending |
+| Content-only refresh preserves current composer/voice state | Implemented | Targeted Android tests passed | Published/installed 1540; device UI acceptance pending |
+| Bounded/coalesced image requests and no false empty-library success | Implemented | Targeted JS passed | Published/installed 1540; device UI acceptance pending |
+| Private conversation attachment index, cache and native file sheet | Implemented | Shared JS/Android contract and targeted production tests passed | Published/installed 1540; device UI acceptance pending |
+| End-to-end private read deadlines, body limits and late project response isolation | Implemented | Lifecycle and existing JS consumer suites passed | Published/installed 1540; device acceptance pending |
+| Bounded request-shape capture through native MCP, reusing the page observer | Implemented diagnostic only | 21 Node checks and 33 Android tests passed; Kotlin compilation passed | Published/installed 1540; actual protocol capture pending |
 
 Root cause, exact modules, and check results are in
 [the history contract](chatgpt-private-history-native-contract.md).
@@ -36,6 +36,29 @@ a replacement for any missing business protocol below.
 Five legacy source-location assertions also fail on the unchanged baseline;
 their exact scope is recorded there. They are not a full-suite pass or a reason
 to repeat already-verified private transports.
+
+## Grouped release
+
+On 2026-09-06, `publish-apk.ps1` built and published `v1.1.1540` (code `1540`)
+from `ccc76ed37e31364f02c03af333a13a63b30c4bdf`. Remote version, size and SHA-256
+were verified. APK SHA-256:
+`ef29913013d10a170e16a1ce7d8a2648377495edabeb3f0c6fb62c26eb67755c`.
+The standard whitelisted-device postflight used `adb install -r` and read back
+build `1540` on Xiaomi 14 Pro. Cookies and application data were preserved.
+
+Installation is not production UI or protocol acceptance. MCP health initially
+responded after the update, but later health calls timed out and a plain ADB
+process query returned `error: closed`. Both existing command helpers experienced
+failures at different times, so there is no confirmed helper-specific defect.
+No protocol-capture lease, synthetic upload, new message, or microphone test was
+started. Browser navigation also timed out; it supplied no protocol evidence.
+
+Next use this installed build to capture the attachment prepare/upload/finalize
+contract and its composer association with the existing synthetic fixture and
+bounded MCP command. First confirm a healthy transport and preserve the current
+draft, conversation and voice state. Do not rebuild this unchanged candidate,
+add another probe framework, guess an endpoint, or repeatedly restart the app
+because the debugging connection is unavailable. The Goal remains active.
 
 ## Protocol gaps
 

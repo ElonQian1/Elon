@@ -57,7 +57,8 @@ The shared owner closes those gaps without replaying any request.
 - Android release-source compilation and all 11 identity/file-index targeted
   tests passed (zero failures or skipped tests). Results are recorded in the
   task's `private-request-lifetime-android` logged command receipt.
-- Full APK, Windows binary build, device latency and battery/temperature evidence
-  are deferred. This does not claim measured cooling or faster successful TLS.
-- Delivery is code-only for the combined APK acceptance batch. Remaining protocol
-  work is in [the current work list](web-ai-private-native-remaining-batch.md).
+- Full APK release and data-preserving installation passed on `v1.1.1540`.
+  Windows binary build, device latency and battery/temperature evidence remain
+  deferred. This does not claim measured cooling or faster successful TLS.
+- [The current work list](web-ai-private-native-remaining-batch.md) records grouped
+  delivery evidence and the separate outstanding protocol work.

@@ -4,13 +4,13 @@ This document is the human-readable boundary for the runtime inventory exposed b
 `elon.chatgpt_web.capability_matrix.v4`. The runtime catalog is authoritative for the
 installed build; individual capability documents retain implementation evidence.
 
-The current unshipped batch repairs a confirmed private-history/native wire mismatch
+The batch published in `v1.1.1540` repairs a private-history/native wire mismatch
 and separates content refresh from live interaction state. See the
 [repair contract](chatgpt-private-history-native-contract.md) and
 [remaining private-native work](web-ai-private-native-remaining-batch.md). Prior
 completed labels do not mean those remaining private protocols are implemented.
-The unshipped batch also adds a [private conversation attachment index](chatgpt-private-conversation-files.md)
-with a native cache-first file sheet. This does not make upload/download private-owned.
+It also adds a [private conversation attachment index](chatgpt-private-conversation-files.md)
+with a cache-first file sheet; device acceptance and private upload/download remain pending.
 The [request lifetime repair](chatgpt-private-request-lifetime.md) bounds private response
 consumption and prevents timed-out project reads from replacing newer results.
 

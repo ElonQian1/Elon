@@ -8,8 +8,9 @@ not a second history transport. The baseline is `680e96e75`; candidate adapter i
 
 - Code: implemented; targeted JavaScript tests passed.
 - Android release-source compile and targeted unit verification: passed, 33 tests.
-- APK release and device acceptance: deferred to the combined feature batch.
-- Existing installed release `1.1.1539` does not contain these changes.
+- APK release: published and installed in `v1.1.1540`; device UI acceptance pending.
+- [Grouped delivery evidence](web-ai-private-native-remaining-batch.md#grouped-release)
+  records the source/hash and separates installation from protocol acceptance.
 
 ## Confirmed gaps
 
