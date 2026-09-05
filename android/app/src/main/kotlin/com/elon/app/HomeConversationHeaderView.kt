@@ -231,8 +231,6 @@ internal class HomeConversationHeaderView(
             color = Color.argb(102, 26, 26, 26)
         }
         private val glassEdge = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.STROKE
-            strokeWidth = density
             color = Color.argb(26, 255, 255, 255)
         }
 
@@ -253,17 +251,21 @@ internal class HomeConversationHeaderView(
             canvas.drawRoundRect(rect, radius, radius, haloPaint)
             canvas.drawRoundRect(rect, radius, radius, glassFill)
 
-            val left = rect.left + density / 2f
-            val top = rect.top + density / 2f
-            val right = rect.right - density / 2f
-            val bottom = rect.bottom - density / 2f
+            // CSS has a 1px top/left border and zero right/bottom border. Fill the
+            // area between its outer and inner rounded boxes, not an open stroke:
+            // the unequal inner radii taper the two ends to zero without cut caps.
+            val innerRadius = (radius - density).coerceAtLeast(0f)
             val edgePath = Path().apply {
-                moveTo(left + radius, bottom)
-                arcTo(RectF(left, bottom - 2f * radius, left + 2f * radius, bottom), 90f, 90f)
-                lineTo(left, top + radius)
-                arcTo(RectF(left, top, left + 2f * radius, top + 2f * radius), 180f, 90f)
-                lineTo(right - radius, top)
-                arcTo(RectF(right - 2f * radius, top, right, top + 2f * radius), 270f, 90f)
+                fillType = Path.FillType.EVEN_ODD
+                addRoundRect(rect, radius, radius, Path.Direction.CW)
+                addRoundRect(
+                    RectF(rect.left + density, rect.top + density, rect.right, rect.bottom),
+                    floatArrayOf(
+                        innerRadius, innerRadius, radius, innerRadius,
+                        radius, radius, innerRadius, radius
+                    ),
+                    Path.Direction.CW
+                )
             }
             canvas.drawPath(edgePath, glassEdge)
         }

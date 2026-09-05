@@ -369,6 +369,8 @@
     .home-filter-count { min-width: 20px; height: 18px; margin-left: 8px; padding: 0 8px; border-radius: 999px; background: #353534; color: #b9cacb; display: inline-grid; place-items: center; box-sizing: border-box; font-size: 12px; line-height: 1; font-variant-numeric: tabular-nums; }
     .home-filter-tab.active .home-filter-count { background: rgba(219,252,255,.2); color:#dbfcff; }
     .home-filter-tab:focus-visible { outline: 2px solid #9cbad5; outline-offset: -2px; border-radius: 8px; }
+    /* Keep native asymmetric CSS border geometry: border thickness tapers to zero
+       at the right/bottom ends. Android mirrors this filled ring, not a stroke. */
     .work-summary-entry { position:relative; overflow:hidden; min-height:192px; margin: 0 16px 32px; padding: 20px; border: 0; border-top: 1px solid rgba(255,255,255,.1); border-left: 1px solid rgba(255,255,255,.1); border-radius: 12px; background: rgba(26,26,26,.4); box-shadow:0 0 30px rgba(0,240,255,.15); color: #e5e2e1; width: calc(100% - 32px); box-sizing:border-box; text-align: left; display: flex; align-items: flex-start; gap: 16px; }
     .work-summary-entry-icon { width:48px; height:48px; flex:none; border-radius:12px; background:#2a2a2a; display:grid; place-items:center; color:#b9cacb; font-size:20px; }
     .work-summary-entry-icon img { width:32px; height:32px; object-fit:contain; }
