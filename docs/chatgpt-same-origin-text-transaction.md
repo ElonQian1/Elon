@@ -1,7 +1,7 @@
 ---
 capability_id: android_chatgpt_same_origin_text_transaction_v1
 implementation_status: completed
-verification_status: device_verified_v1_1_1365_adapter_206
+verification_status: device_verified_v1_1_1539_adapter_260
 production_default: true
 direct_private_post_status: not_device_verified_current_contract
 repeat_implementation: forbidden_without_current_regression_evidence
@@ -74,3 +74,23 @@ Focused executable coverage is in `test-chatgpt-web-text-transaction-lifecycle.j
 the original transaction, send-settlement, and private-stream suites remain in use.
 These changes harden dispatch eligibility and recovery, not a claimed successful
 replacement for the current fresh-proof official send transaction.
+
+## Published hardening acceptance
+
+Release `1.1.1539 (1539)`, source `c5873cdeb`, adapter `260`, was published and
+installed with data preserved. APK SHA-256:
+`64b266c05d535ba871d5599a3789e72f77095a51500e1ba7e8ab89ce0851a28e`.
+Research mode and Android debug mode are disabled in this artifact.
+
+The production `social_ai` composer sent one synthetic arithmetic question and
+received one matching answer in 18.654 seconds. The receipt was
+`official_fallback:template_unavailable`, the provider returned to ready with
+streaming false, and the original blank conversation and empty draft were restored.
+This verifies the native UI and official transaction remain usable after hardening;
+it is not a direct-private-send latency or performance result.
+
+All 11 lifecycle regressions fail against source `9c38249a6` and pass after the
+fix. The original text transaction, send settlement, and private stream transport
+suites also pass. Android Release compilation, vital lint, publication, and
+whitelisted-device replacement installation succeeded. Direct private POST with
+the current fresh-proof contract remains unverified and is not marked complete.
