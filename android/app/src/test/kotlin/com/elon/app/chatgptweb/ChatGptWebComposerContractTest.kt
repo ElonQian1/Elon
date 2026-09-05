@@ -29,6 +29,9 @@ class ChatGptWebComposerContractTest {
         val actionTargetPolicy = readRepositoryFile(
             "android/app/src/main/assets/chatgpt_web_adapter_action_target_policy.js",
         )
+        val dismissPolicy = readRepositoryFile(
+            "android/app/src/main/assets/chatgpt_web_adapter_composer_dismiss_policy.js",
+        )
         val attachmentPolicy = readRepositoryFile(
             "android/app/src/main/assets/chatgpt_web_adapter_attachment_policy.js",
         )
@@ -57,6 +60,7 @@ class ChatGptWebComposerContractTest {
         val toolStateAsset = pageAdapter.indexOf("chatgpt_web_adapter_composer_tool_state_policy.js")
         val toolSelectionAsset = pageAdapter.indexOf("chatgpt_web_adapter_composer_tool_selection.js")
         val actionTargetAsset = pageAdapter.indexOf("chatgpt_web_adapter_action_target_policy.js")
+        val dismissPolicyAsset = pageAdapter.indexOf("chatgpt_web_adapter_composer_dismiss_policy.js")
         val dictationSessionAsset = pageAdapter.indexOf("chatgpt_web_adapter_dictation_session_policy.js")
         val dictationActionsAsset = pageAdapter.indexOf("chatgpt_web_adapter_dictation_actions.js")
         val modelLabelAsset = pageAdapter.indexOf("chatgpt_web_adapter_model_label_policy.js")
@@ -67,7 +71,8 @@ class ChatGptWebComposerContractTest {
         assertTrue(toolStateAsset > submenuAsset)
         assertTrue(toolSelectionAsset > toolStateAsset)
         assertTrue(actionTargetAsset > toolSelectionAsset)
-        assertTrue(dictationSessionAsset > actionTargetAsset)
+        assertTrue(dismissPolicyAsset > actionTargetAsset)
+        assertTrue(dictationSessionAsset > dismissPolicyAsset)
         assertTrue(dictationActionsAsset > dictationSessionAsset)
         assertTrue(composerAsset > dictationActionsAsset)
         assertTrue(dictationActions.contains("confirmed === true ? 'capture_started'"))
@@ -175,6 +180,10 @@ class ChatGptWebComposerContractTest {
         assertFalse(adapter.contains("documents?"))
         assertFalse(adapter.contains("|文档|"))
         assertTrue(adapter.contains("dismiss_composer_menu"))
+        assertTrue(adapter.contains("composerDismissPolicy.emitTouch(document, window, emitEvent)"))
+        assertTrue(dismissPolicy.contains("documentRef.elementFromPoint"))
+        assertTrue(dismissPolicy.contains("INTERACTIVE_SELECTOR"))
+        assertTrue(dismissPolicy.contains("OVERLAY_SELECTOR"))
         assertTrue(adapter.contains("emitTriggerTouch(expandedSection, 'dismiss_composer_menu'"))
         assertTrue(adapter.contains("emitVisibleNodeTouch('dismiss_composer_menu', findPromptInput()"))
         assertTrue(core.contains("dismissOpenMenu(findComposer(), emitEvent, respond)"))

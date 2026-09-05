@@ -7,6 +7,7 @@
   const optionPolicy = window.__elonChatGptComposerOptionPolicy;
   const composerSubmenu = window.__elonChatGptComposerSubmenu;
   const actionTargetPolicy = window.__elonChatGptActionTargetPolicy;
+  const composerDismissPolicy = window.__elonChatGptComposerDismissPolicy;
   const attachmentPolicy = window.__elonChatGptAttachmentPolicy;
   const modelLabelPolicy = window.__elonChatGptModelLabelPolicy;
   const dictationSessionPolicy = window.__elonChatGptDictationSessionPolicy;
@@ -758,9 +759,10 @@
     });
     const expandedTrigger = expandedSection && triggerFor(expandedSection, composer);
     const menuKnown = expandedTrigger || lastOptions.model.length || lastOptions.tools.length;
-    const touched = expandedTrigger
+    const outsideTouched = composerDismissPolicy && composerDismissPolicy.emitTouch(document, window, emitEvent);
+    const touched = outsideTouched || (expandedTrigger
       ? emitTriggerTouch(expandedSection, 'dismiss_composer_menu', expandedTrigger, emitEvent)
-      : menuKnown && emitVisibleNodeTouch('dismiss_composer_menu', findPromptInput(), emitEvent);
+      : menuKnown && emitVisibleNodeTouch('dismiss_composer_menu', findPromptInput(), emitEvent));
     const target = document.activeElement || document;
     if (!touched) {
       target.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true }));
