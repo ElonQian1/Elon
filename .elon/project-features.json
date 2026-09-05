@@ -10390,7 +10390,7 @@
       "id": "esk-sui-reproducible-toolchain-ci-v1",
       "title": "ESK Sui 可复现工具链与 CI V1",
       "summary": "固定官方 Sui testnet-v1.79.0 工具链的下载与双摘要校验，在独立 CI 中以 warnings-as-errors 重建 ESK Currency 与 Participation Move 包，精确验证 3+13 项测试和生产字节码证据；不创建钱包、RPC、交易、签名、广播或链状态。",
-      "status": "accepted",
+      "status": "in_progress",
       "priority": "p0",
       "requirement": {
         "path": "docs/requirements/esk-sui-reproducible-toolchain-ci-v1.md",
@@ -10433,8 +10433,14 @@
         "GitHub Actions 独立 Sui job、精确缓存键和只读权限由守卫测试固定，现有 job 不回归。"
       ],
       "implementation_evidence": [],
+      "claim": {
+        "claim_id": "claim_61de2931814442668d969ee327c41594",
+        "agent_id": "codex-sui-ci",
+        "claimed_at_ms": 1788646015396,
+        "expires_at_ms": 1788660415396
+      },
       "created_at_ms": 1788645947311,
-      "updated_at_ms": 1788645947311
+      "updated_at_ms": 1788646026666
     },
     {
       "id": "esk_paper_quant_allocation_request_v2",
@@ -21267,36 +21273,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_485a6250e9934acfb43f9b22c9408b94",
-      "feature_id": "esk-platform-native-progress-v1",
-      "action": "claimed",
-      "actor": "codex-esk-progress",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788536024184
-    },
-    {
-      "id": "feature_event_3d8c1033eb1245ce8cd5e5c3afcd9ec7",
-      "feature_id": "esk-platform-native-progress-v1",
-      "action": "transitioned",
-      "actor": "codex-esk-progress",
-      "reason": "主/量化现有源码核实缺口，双仓协议及职责已明确",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788536033039
-    },
-    {
-      "id": "feature_event_33e7ee06a0c841c7af55108b90f28b2c",
-      "feature_id": "esk-platform-native-progress-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-esk-progress",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788537285930
-    },
-    {
       "id": "feature_event_f45a44d2ddc345b88c2cd7c6003f308d",
       "feature_id": "esk-platform-native-progress-v1",
       "action": "evidence_recorded",
@@ -23265,6 +23241,36 @@
       "from_status": "",
       "to_status": "accepted",
       "at_ms": 1788645947311
+    },
+    {
+      "id": "feature_event_70977c57a7054c3ea6874ccf7b7d71da",
+      "feature_id": "esk-sui-reproducible-toolchain-ci-v1",
+      "action": "transitioned",
+      "actor": "codex-sui-ci",
+      "reason": "需求已提交且依赖均完成；范围明确限定为离线工具链、Move 验证与 CI，不含任何链上动作。",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1788646004425
+    },
+    {
+      "id": "feature_event_adfe1727209648f68c6fa843d71e37f4",
+      "feature_id": "esk-sui-reproducible-toolchain-ci-v1",
+      "action": "claimed",
+      "actor": "codex-sui-ci",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788646015397
+    },
+    {
+      "id": "feature_event_5895e1de173e4532ba8a32c25f3e8116",
+      "feature_id": "esk-sui-reproducible-toolchain-ci-v1",
+      "action": "transitioned",
+      "actor": "codex-sui-ci",
+      "reason": "开始实现固定工具链安装、Move 验证封装、CI 门禁与无链上副作用合同测试。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788646026666
     }
   ]
 }
