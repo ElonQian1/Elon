@@ -16,13 +16,34 @@
     '[role="button"]', '[role="menuitem"]', '[role="option"]', '[role="slider"]'
   ].join(', ');
   const CANDIDATE_RATIOS = [
-    [0.5, 0.24], [0.25, 0.3], [0.75, 0.3], [0.5, 0.45],
-    [0.12, 0.5], [0.88, 0.5], [0.5, 0.12]
+    [0.5, 0.12], [0.12, 0.18], [0.88, 0.18], [0.5, 0.24],
+    [0.25, 0.3], [0.75, 0.3], [0.12, 0.5], [0.88, 0.5]
   ];
 
-  function blocked(hit) {
+  function interactive(hit) {
     if (!hit || typeof hit.closest !== 'function') return true;
-    return !!hit.closest(OVERLAY_SELECTOR) || !!hit.closest(INTERACTIVE_SELECTOR);
+    return !!hit.closest(INTERACTIVE_SELECTOR);
+  }
+
+  function coversViewport(node, view) {
+    if (!node || typeof node.getBoundingClientRect !== 'function') return false;
+    const rect = node.getBoundingClientRect();
+    const width = Math.max(1, Number(view.innerWidth) || 0);
+    const height = Math.max(1, Number(view.innerHeight) || 0);
+    return Number(rect.width) >= width * 0.82 && Number(rect.height) >= height * 0.82;
+  }
+
+  function isBackdropPoint(hit, view) {
+    if (interactive(hit)) return false;
+    const overlay = hit.closest(OVERLAY_SELECTOR);
+    if (!overlay) return false;
+    let current = hit;
+    while (current) {
+      if (coversViewport(current, view)) return true;
+      if (current === overlay) break;
+      current = current.parentElement;
+    }
+    return coversViewport(overlay, view);
   }
 
   function safePoint(documentRef, view) {
@@ -30,9 +51,14 @@
     const width = Math.max(1, Number(view.innerWidth) || 0);
     const height = Math.max(1, Number(view.innerHeight) || 0);
     for (const [xRatio, yRatio] of CANDIDATE_RATIOS) {
-      if (!blocked(documentRef.elementFromPoint(width * xRatio, height * yRatio))) {
+      const hit = documentRef.elementFromPoint(width * xRatio, height * yRatio);
+      if (!interactive(hit) && !hit.closest(OVERLAY_SELECTOR)) {
         return { xRatio, yRatio };
       }
+    }
+    for (const [xRatio, yRatio] of CANDIDATE_RATIOS) {
+      const hit = documentRef.elementFromPoint(width * xRatio, height * yRatio);
+      if (isBackdropPoint(hit, view)) return { xRatio, yRatio };
     }
     return null;
   }

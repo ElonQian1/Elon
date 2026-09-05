@@ -70,6 +70,7 @@ internal class ChatGptWebTouchDispatcher(
             "invoke_ui_control",
             "regenerate_open_menu",
             "regenerate_retry",
+            "dismiss_composer_menu",
         )
     }
 }
