@@ -14,6 +14,7 @@ internal interface ChatGptWebMcpCommandPort {
     fun newConversation(requestId: String)
     fun stopGeneration(requestId: String)
     fun verifyPrivateStreamWatchdog(requestId: String)
+    fun privateProtocolProbe(mode: String, requestId: String) = Unit
     fun regenerateResponse(requestId: String)
     fun togglePrivateReadAloud(contextId: String, requestId: String) = Unit
     fun setConversationPinned(path: String, pinned: Boolean, requestId: String) = Unit

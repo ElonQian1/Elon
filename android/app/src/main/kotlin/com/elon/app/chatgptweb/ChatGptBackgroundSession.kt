@@ -557,6 +557,7 @@ internal class ChatGptBackgroundSession(
     private fun handleEvent(event: ChatGptWebEvent) {
         if (ChatGptWebPrivateResearchEventRecorder.record(event)) return
         observedMcpState.accept(event)
+        if (event is ChatGptWebEvent.CommandResult && event.action == "private_protocol_probe") return
         when (event) {
             is ChatGptWebEvent.Snapshot -> {
                 if (!conversationNavigation.shouldAccept(event.value)) return

@@ -1,10 +1,10 @@
 (function () {
   'use strict';
 
-  if (window.__elonChatGptPrivateResearchEnabled !== true) return;
+  const legacyEnabled = window.__elonChatGptPrivateResearchEnabled === true;
   if (location.origin !== 'https://chatgpt.com') return;
   const existingProbe = window.__elonChatGptPrivateResearchProbe;
-  if (existingProbe && Number(existingProbe.version) >= 11) return;
+  if (existingProbe && Number(existingProbe.version) >= 12) return;
 
   const nativeBridge = window.elonChatGptNative;
   const adapterVersion = Number(window.__elonChatGptAdapterTargetVersion || 0);
@@ -52,6 +52,9 @@
       .slice(0, 96);
     return value || '/';
   }
+
+  const evidence = window.__elonChatGptPrivateProtocolEvidence?.create(window, safePath);
+  if (!legacyEnabled && !evidence) return;
 
   function responseKind(response) {
     if (!response || !response.headers || typeof response.headers.get !== 'function') return 'unknown';
@@ -161,6 +164,7 @@
   }
 
   function emitShape(kind, url, names) {
+    if (!legacyEnabled) return;
     if (Date.now() > expiresAt || observationCount >= maxObservations) return;
     if (!endpointCandidate(url) || !names.length) return;
     observationCount += 1;
@@ -213,6 +217,7 @@
   }
 
   function emit(transport, method, url, status, kind, elapsedMs) {
+    if (!legacyEnabled) return;
     if (Date.now() > expiresAt || observationCount >= maxObservations) return;
     if (!endpointCandidate(url)) return;
     observationCount += 1;
@@ -236,6 +241,7 @@
   }
 
   function emitPrivate(kind, method, url, status, responseType, elapsedMs) {
+    if (!legacyEnabled) return;
     if (Date.now() > expiresAt || privateObservationCount >= 64) return;
     if (kind !== 'conversation_prefetch' || !endpointCandidate(url)) return;
     privateObservationCount += 1;
@@ -258,6 +264,7 @@
   }
 
   function emitPrivateOutcome(outcome, messageCount, elapsedMs) {
+    if (!legacyEnabled) return;
     if (Date.now() > expiresAt || privateObservationCount >= 64) return;
     const safeOutcome = String(outcome || '').toLowerCase();
     if (!/^(success|empty|timeout|auth|context|http|network|parse)$/.test(safeOutcome)) return;
@@ -279,6 +286,7 @@
   }
 
   function emitPrivateStreamOutcome(outcome, frameCount, elapsedMs) {
+    if (!legacyEnabled) return;
     if (Date.now() > expiresAt || privateObservationCount >= 64) return;
     const safeOutcome = String(outcome || '').toLowerCase();
     if (!/^(first|success|empty|error)$/.test(safeOutcome)) return;
@@ -300,6 +308,7 @@
   }
 
   function emitPrivateStreamShape(shape) {
+    if (!legacyEnabled) return;
     if (Date.now() > expiresAt || privateObservationCount >= 64 ||
         privateStreamShapes.size >= 16) return;
     const safeShape = String(shape || '').toLowerCase();
@@ -317,6 +326,7 @@
   }
 
   function emitPrivatePayloadShape(payload) {
+    if (!legacyEnabled) return;
     if (Date.now() > expiresAt || privateObservationCount >= 32) return;
     const candidates = [
       ['root', payload],
@@ -391,6 +401,7 @@
   if (originalFetch) {
     window.fetch = function () {
       const args = arguments;
+      if (!legacyEnabled && !evidence?.active()) return originalFetch.apply(this, args);
       const input = args[0];
       const init = args[1] || {};
       let url;
@@ -404,13 +415,16 @@
       const privateKind = String(
         init.__elonPrivateTransport || init.__elonPrivateResearch || ''
       );
-      observeRequestShape(input, init, url, method);
+      if (legacyEnabled) observeRequestShape(input, init, url, method);
+      let observation = null;
+      try { observation = evidence?.begin(input, init, url, method, 'fetch'); } catch (_) {}
       const requestStartedAt = nowMs();
       try {
         return Promise.resolve(originalFetch.apply(this, args)).then(
           (response) => {
-            emit('fetch', method, url, response.status, responseKind(response), nowMs() - requestStartedAt);
-            emitPrivate(
+            try { evidence?.response(observation, response); } catch (_) {}
+            if (legacyEnabled) emit('fetch', method, url, response.status, responseKind(response), nowMs() - requestStartedAt);
+            if (legacyEnabled) emitPrivate(
               privateKind,
               method,
               url,
@@ -421,14 +435,16 @@
             return response;
           },
           (error) => {
-            emit('fetch', method, url, 0, 'error', nowMs() - requestStartedAt);
-            emitPrivate(privateKind, method, url, 0, 'error', nowMs() - requestStartedAt);
+            try { evidence?.xhrResponse(observation, 0, '', null); } catch (_) {}
+            if (legacyEnabled) emit('fetch', method, url, 0, 'error', nowMs() - requestStartedAt);
+            if (legacyEnabled) emitPrivate(privateKind, method, url, 0, 'error', nowMs() - requestStartedAt);
             throw error;
           }
         );
       } catch (error) {
-        emit('fetch', method, url, 0, 'error', nowMs() - requestStartedAt);
-        emitPrivate(privateKind, method, url, 0, 'error', nowMs() - requestStartedAt);
+        try { evidence?.xhrResponse(observation, 0, '', null); } catch (_) {}
+        if (legacyEnabled) emit('fetch', method, url, 0, 'error', nowMs() - requestStartedAt);
+        if (legacyEnabled) emitPrivate(privateKind, method, url, 0, 'error', nowMs() - requestStartedAt);
         throw error;
       }
     };
@@ -440,6 +456,10 @@
   const xhrMetadata = new WeakMap();
   if (originalOpen && originalSend) {
     xhrPrototype.open = function (method, rawUrl) {
+      if (!legacyEnabled && !evidence?.active()) {
+        xhrMetadata.delete(this);
+        return originalOpen.apply(this, arguments);
+      }
       try {
         xhrMetadata.set(this, { method, url: new URL(rawUrl, location.href) });
       } catch (_) {
@@ -449,17 +469,24 @@
     };
     xhrPrototype.send = function () {
       const metadata = xhrMetadata.get(this);
-      if (metadata && endpointCandidate(metadata.url)) {
-        if (mutationCandidate(metadata.url, metadata.method)) {
+      if ((legacyEnabled || evidence?.active()) && metadata && endpointCandidate(metadata.url)) {
+        if (legacyEnabled && mutationCandidate(metadata.url, metadata.method)) {
           observeMutationBody(metadata.url, arguments[0]);
         }
+        let observation = null;
+        try { observation = evidence?.begin(null, { body: arguments[0] }, metadata.url, metadata.method, 'xhr'); } catch (_) {}
         const requestStartedAt = nowMs();
         this.addEventListener('loadend', () => {
           const contentType = String(this.getResponseHeader('content-type') || '').toLowerCase();
           const kind = contentType.includes('text/event-stream')
             ? 'sse'
             : contentType.includes('json') ? 'json' : contentType.startsWith('text/') ? 'text' : 'unknown';
-          emit('xhr', metadata.method, metadata.url, this.status, kind, nowMs() - requestStartedAt);
+          try {
+            evidence?.xhrResponse(observation, this.status, contentType,
+              contentType.includes('json') && (!this.responseType || this.responseType === 'text')
+                ? this.responseText : null);
+          } catch (_) {}
+          if (legacyEnabled) emit('xhr', metadata.method, metadata.url, this.status, kind, nowMs() - requestStartedAt);
         }, { once: true });
       }
       return originalSend.apply(this, arguments);
@@ -467,8 +494,14 @@
   }
 
   window.__elonChatGptPrivateResearchProbe = Object.freeze({
-    version: 11,
-    enabled: true,
+    version: 12,
+    enabled: legacyEnabled,
+    handle: (action, command, respond) => {
+      if (action !== 'private_protocol_probe') return false;
+      const detail = evidence?.command(String(command.value || ''));
+      respond(action, typeof detail === 'string', detail || 'protocol_probe_unavailable');
+      return true;
+    },
     expiresAt,
     observationCount: () => observationCount,
     privateObservationCount: () => privateObservationCount,

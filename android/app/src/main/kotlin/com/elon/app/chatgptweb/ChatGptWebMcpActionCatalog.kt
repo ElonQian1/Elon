@@ -16,6 +16,7 @@ internal object ChatGptWebMcpActionCatalog {
         "chatgpt_new_conversation",
         "chatgpt_stop_generation",
         "chatgpt_verify_private_stream_watchdog",
+        "chatgpt_private_protocol_probe",
         "chatgpt_copy_last_response",
         "chatgpt_regenerate_response",
         "chatgpt_toggle_private_read_aloud",

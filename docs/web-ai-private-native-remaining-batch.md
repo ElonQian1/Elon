@@ -22,6 +22,7 @@ for website functionality. Persistent WebView identity remains intentional.
 | Bounded/coalesced image requests and no false empty-library success | Implemented | Targeted JS passed | Await combined APK |
 | Private conversation attachment index, cache and native file sheet | Implemented | Shared JS/Android contract and targeted production tests passed | Await combined APK |
 | End-to-end private read deadlines, body limits and late project response isolation | Implemented | Lifecycle and existing JS consumer suites passed | Await combined APK |
+| Bounded request-shape capture through native MCP, reusing the page observer | Implemented diagnostic only | 21 Node checks and 33 Android tests passed; Kotlin compilation passed | Await combined APK and actual protocol capture |
 
 Root cause, exact modules, and check results are in
 [the history contract](chatgpt-private-history-native-contract.md).
@@ -29,6 +30,9 @@ The attachment-index scope and acceptance are in
 [the file index contract](chatgpt-private-conversation-files.md).
 Request ownership and the confirmed baseline failures are in
 [the request lifetime contract](chatgpt-private-request-lifetime.md).
+The opt-in research command and its limits are in
+[the protocol evidence contract](chatgpt-private-protocol-evidence.md). It is not
+a replacement for any missing business protocol below.
 Five legacy source-location assertions also fail on the unchanged baseline;
 their exact scope is recorded there. They are not a full-suite pass or a reason
 to repeat already-verified private transports.

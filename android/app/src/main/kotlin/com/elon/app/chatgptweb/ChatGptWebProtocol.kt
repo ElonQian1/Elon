@@ -226,7 +226,7 @@ internal object ChatGptWebProtocol {
             "command_result" -> ChatGptWebEvent.CommandResult(
                 action = payload.optString("action").take(40),
                 ok = payload.optBoolean("ok"),
-                detail = payload.optString("detail").take(160),
+                detail = ChatGptWebPrivateProtocolEvidence.detail(payload.optString("action"), payload.optString("detail")),
                 requestId = payload.optString("requestId")
                     .take(MAX_REQUEST_ID_LENGTH)
                     .takeIf(REQUEST_ID::matches),

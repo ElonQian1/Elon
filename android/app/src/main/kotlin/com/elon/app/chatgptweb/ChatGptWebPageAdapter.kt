@@ -273,6 +273,10 @@ internal class ChatGptWebPageAdapter(
         requestId = requestId,
     )
 
+    fun privateProtocolProbe(mode: String, requestId: String) = runCommand(
+        action = "private_protocol_probe", value = mode, requestId = requestId,
+    )
+
     fun regenerateResponse() = runCommand("regenerate_response")
 
     fun regenerateResponse(requestId: String) = runCommand(
@@ -628,7 +632,7 @@ internal class ChatGptWebPageAdapter(
         origin.scheme == "https" && origin.host == "chatgpt.com" && origin.port == -1
 
     companion object {
-        internal const val ADAPTER_VERSION = 263
+        internal const val ADAPTER_VERSION = 264
 
         private val ADAPTER_ASSETS = listOf(
             "chatgpt_web_adapter_bootstrap.js",
@@ -675,6 +679,7 @@ internal class ChatGptWebPageAdapter(
             "chatgpt_web_adapter_skin.js",
             "chatgpt_web_adapter_realtime_voice_policy.js",
             "chatgpt_web_adapter_layout.js",
+            "chatgpt_web_private_protocol_evidence.js",
             "chatgpt_web_private_research_probe.js",
             "chatgpt_web_private_voice_relay.js",
             "chatgpt_web_realtime_data_channel_research.js",

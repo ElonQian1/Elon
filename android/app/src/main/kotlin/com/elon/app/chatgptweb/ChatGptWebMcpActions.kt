@@ -93,6 +93,11 @@ internal class ChatGptWebMcpActions(
             dispatchRequest(beginCommand(expectedAction), block)
         }
         when (action) {
+            "chatgpt_private_protocol_probe" -> {
+                val mode = args.optString("mode")
+                if (mode !in ChatGptWebPrivateProtocolEvidence.MODES) return error(action, "invalid_probe_mode")
+                dispatch("private_protocol_probe") { commands.privateProtocolProbe(mode, it) }
+            }
             "chatgpt_list_conversation_files" -> {
                 val path = ChatGptWebConversationPath.normalize(args.optString("conversation_path"))
                     ?: return error(action, "invalid_conversation_path")

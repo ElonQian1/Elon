@@ -453,6 +453,7 @@
     const respond = (resultAction, ok, detail) => result(resultAction, ok, detail, requestId);
     respond.requestId = requestId;
     if (action === 'snapshot') return snapshot();
+    if (window.__elonChatGptPrivateResearchProbe?.handle?.(action, command, respond)) return;
     if (action === 'request_image_asset') {
       if (!imageAssets || typeof imageAssets.request !== 'function') {
         return respond(action, false, 'image_asset_unavailable');
