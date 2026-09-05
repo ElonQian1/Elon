@@ -11,13 +11,31 @@ internal data class ChatGptConversationAutoRefreshDecision(
     enum class Action { NONE, AFTER_CURRENT, IF_IDLE }
 }
 
+internal enum class ChatGptConversationRefreshSuspension {
+    CONVERSATION_ACTION,
+    COMPOSER_OPTIONS,
+}
+
 internal class ChatGptConversationRefreshSession(
     private val coordinator: ChatGptConversationRefreshCoordinator,
 ) {
     private var pendingProjectId: String? = null
-    private var suspended = false
+    private var pendingRefresh = false
+    private val suspensions = mutableSetOf<ChatGptConversationRefreshSuspension>()
+
+    private val suspended: Boolean
+        get() = suspensions.isNotEmpty()
+
+    fun onSucceeded() {
+        if (!suspended) coordinator.onSucceeded()
+    }
+
+    fun onFailed() {
+        if (!suspended) coordinator.onFailed()
+    }
 
     fun request(projectId: String?): Boolean {
+        pendingRefresh = true
         pendingProjectId = ChatGptConversationRefreshScopePolicy.select(
             pendingProjectId = pendingProjectId,
             requestedProjectId = ChatGptWebConversationPath.canonicalProjectId(projectId),
@@ -29,21 +47,31 @@ internal class ChatGptConversationRefreshSession(
 
     fun beginDispatch(): ChatGptConversationRefreshDispatch? {
         if (suspended) return null
+        pendingRefresh = false
         return ChatGptConversationRefreshDispatch(pendingProjectId).also {
             pendingProjectId = null
         }
     }
 
-    fun suspend(onSuspended: () -> Unit) {
-        if (suspended) return
-        suspended = true
-        pendingProjectId = null
+    fun suspend(
+        owner: ChatGptConversationRefreshSuspension,
+        preserveInterruptedRefresh: Boolean = false,
+        onSuspended: () -> Unit,
+    ) {
+        if (!suspensions.add(owner)) return
+        if (preserveInterruptedRefresh && coordinator.isBusy) pendingRefresh = true
+        if (!preserveInterruptedRefresh) {
+            pendingRefresh = false
+            pendingProjectId = null
+        }
+        if (suspensions.size > 1) return
         coordinator.reset()
         onSuspended()
     }
 
-    fun resume() {
-        suspended = false
+    fun resume(owner: ChatGptConversationRefreshSuspension) {
+        if (!suspensions.remove(owner) || suspended) return
+        if (pendingRefresh) coordinator.requestAfterCurrent()
     }
 
     fun yieldToUserNavigation() {
@@ -53,7 +81,8 @@ internal class ChatGptConversationRefreshSession(
 
     fun reset() {
         pendingProjectId = null
-        suspended = false
+        pendingRefresh = false
+        suspensions.clear()
         coordinator.reset()
     }
 

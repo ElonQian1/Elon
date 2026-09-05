@@ -186,6 +186,27 @@ class ChatGptConversationRefreshCoordinatorTest {
     }
 
     @Test
+    fun resumedRefreshStartsAfterTheSuppressedInflightCompletionArrives() {
+        val scheduled = mutableListOf<Scheduled>()
+        var dispatches = 0
+        val coordinator = coordinator(scheduled) {
+            dispatches += 1
+            true
+        }
+
+        assertTrue(coordinator.requestNow())
+        coordinator.yieldToUserNavigation()
+        assertTrue(coordinator.requestAfterCurrent())
+        assertEquals(1, dispatches)
+
+        coordinator.onFailed()
+
+        assertEquals(2, dispatches)
+        assertTrue(coordinator.isBusy)
+        assertTrue(scheduled.isEmpty())
+    }
+
+    @Test
     fun scopedProjectRefreshSurvivesAConcurrentGenericRefresh() {
         assertEquals(
             "g-p-target",
@@ -214,7 +235,7 @@ class ChatGptConversationRefreshCoordinatorTest {
     }
 
     @Test
-    fun suspendedSessionKeepsTheRequestWithoutDispatchingUntilExplicitlyResumed() {
+    fun suspendedSessionDispatchesItsQueuedRequestWhenResumed() {
         val scheduled = mutableListOf<Scheduled>()
         var dispatches = 0
         lateinit var session: ChatGptConversationRefreshSession
@@ -224,19 +245,66 @@ class ChatGptConversationRefreshCoordinatorTest {
         }
         session = ChatGptConversationRefreshSession(coordinator)
 
-        session.suspend({})
+        session.suspend(ChatGptConversationRefreshSuspension.CONVERSATION_ACTION, onSuspended = {})
         assertTrue(session.request("g-p-target"))
         assertEquals(0, dispatches)
 
-        session.resume()
-        assertTrue(session.request("g-p-target"))
+        session.resume(ChatGptConversationRefreshSuspension.CONVERSATION_ACTION)
         assertEquals(1, dispatches)
+    }
+
+    @Test
+    fun composerAndConversationSuspensionsMustBothReleaseBeforeRefreshResumes() {
+        val scheduled = mutableListOf<Scheduled>()
+        var dispatches = 0
+        lateinit var session: ChatGptConversationRefreshSession
+        val coordinator = coordinator(scheduled) {
+            dispatches += 1
+            session.beginDispatch() != null
+        }
+        session = ChatGptConversationRefreshSession(coordinator)
+
+        session.suspend(ChatGptConversationRefreshSuspension.CONVERSATION_ACTION, onSuspended = {})
+        session.suspend(ChatGptConversationRefreshSuspension.COMPOSER_OPTIONS, onSuspended = {})
+        session.request(null)
+
+        session.resume(ChatGptConversationRefreshSuspension.COMPOSER_OPTIONS)
+        assertEquals(0, dispatches)
+        session.resume(ChatGptConversationRefreshSuspension.CONVERSATION_ACTION)
+        assertEquals(1, dispatches)
+    }
+
+    @Test
+    fun composerSuspensionResumesAnInterruptedBackgroundRefreshOnce() {
+        val scheduled = mutableListOf<Scheduled>()
+        var dispatches = 0
+        lateinit var session: ChatGptConversationRefreshSession
+        val coordinator = coordinator(scheduled) {
+            dispatches += 1
+            session.beginDispatch() != null
+        }
+        session = ChatGptConversationRefreshSession(coordinator)
+
+        assertTrue(session.request(null))
+        assertEquals(1, dispatches)
+        session.suspend(
+            ChatGptConversationRefreshSuspension.COMPOSER_OPTIONS,
+            preserveInterruptedRefresh = true,
+            onSuspended = {},
+        )
+        session.onFailed()
+        assertTrue(scheduled.isEmpty())
+        session.resume(ChatGptConversationRefreshSuspension.COMPOSER_OPTIONS)
+
+        assertEquals(2, dispatches)
+        coordinator.onSucceeded()
+        assertFalse(coordinator.isBusy)
     }
 
     @Test
     fun autoRefreshDecisionSuppressesBackgroundWorkDuringAUserAction() {
         val session = ChatGptConversationRefreshSession(coordinator(mutableListOf()) { true })
-        session.suspend({})
+        session.suspend(ChatGptConversationRefreshSuspension.CONVERSATION_ACTION, onSuspended = {})
 
         assertEquals(
             ChatGptConversationAutoRefreshDecision.Action.NONE,
@@ -247,7 +315,7 @@ class ChatGptConversationRefreshCoordinatorTest {
                 officialRefreshNeeded = true,
             ).action,
         )
-        session.resume()
+        session.resume(ChatGptConversationRefreshSuspension.CONVERSATION_ACTION)
         val decision = session.autoRefreshDecision(
             postVoiceRefresh = true,
             supported = true,

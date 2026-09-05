@@ -96,12 +96,16 @@ internal class ChatGptBackgroundSession(
     }
     private val sessionContinuityHandler = Handler(Looper.getMainLooper())
     private val recoveryHandler = Handler(Looper.getMainLooper())
-    private val conversationRefresh = ChatGptConversationRefreshCoordinator(
-        dispatch = ::dispatchConversationIndexRequest,
-        schedule = { task, delayMs -> conversationRefreshHandler.postDelayed(task, delayMs) },
-        cancel = conversationRefreshHandler::removeCallbacks,
+    private val conversationRefresh = ChatGptConversationRefreshRuntime(
+        directory = conversationDirectory,
+        pageAdapter = { pageAdapter },
+        isReady = { state == State.READY },
+        onIndexChanged = { onConversationIndexChanged(conversationIndex()) },
+        scheduleRefresh = { task, delayMs -> conversationRefreshHandler.postDelayed(task, delayMs) },
+        cancelRefresh = conversationRefreshHandler::removeCallbacks,
+        scheduleComposerRelease = { task, delayMs -> composerOptionHandler.postDelayed(task, delayMs) },
+        cancelComposerRelease = composerOptionHandler::removeCallbacks,
     )
-    private val conversationRefreshSession = ChatGptConversationRefreshSession(conversationRefresh)
     private val composerOptionRequests = ChatGptComposerOptionRequestCoordinator(
         dismissMenu = composerOptionInteraction::dismiss,
         dispatchRequest = composerOptionInteraction::dispatch,
@@ -189,7 +193,7 @@ internal class ChatGptBackgroundSession(
             { surfaceMode.isSkin() || realtimeVoiceBacking.isActive() },
             { kind, action -> backgroundInteractionLease.run(kind, action) },
             webExecution::interactionRequested,
-            composerOptionRequests::dismiss,
+            { dismissComposerOptions() },
             { composerOptionRequests.scheduleCollection("model") },
             { composerOptionRequests.scheduleCollection("tools") },
             { onStateChanged(state, "官网控件操作未就绪") },
@@ -208,9 +212,9 @@ internal class ChatGptBackgroundSession(
             presentationMode = ::presentationMode,
             verificationEvidenceStore = verificationEvidenceStore,
             requestComposerOptions = { section, requestId ->
-                composerOptionRequests.request(section, requestId)
+                requestComposerOptions(section, requestId)
             },
-            dismissComposerOptions = composerOptionRequests::dismiss,
+            dismissComposerOptions = ::dismissComposerOptionsRequest,
             refresh = { webView?.reload() },
             realtimeVoiceBacking = realtimeVoiceBacking,
         )
@@ -245,7 +249,7 @@ internal class ChatGptBackgroundSession(
             },
             { latestSnapshot }, { snapshot -> latestSnapshot = snapshot; onSnapshot(snapshot) },
             { updateState(State.LOADING) }, ::ensureInitialized,
-            conversationRefreshSession::yieldToUserNavigation,
+            conversationRefresh::yieldToUserNavigation,
             newConversationRecovery::cancel, newConversationRecovery::schedule,
             conversationNavigation,
         )
@@ -295,36 +299,16 @@ internal class ChatGptBackgroundSession(
     fun warmSessionAvailable(): Boolean = warmSessionAvailable
     fun conversationNavigationActive(): Boolean = conversationNavigation.isNavigating()
     fun conversationIndex(): ChatGptWebConversationIndexState = conversationDirectory.index()
-    fun requestConversationIndex(projectId: String? = null): Boolean =
-        conversationRefreshSession.request(projectId)
+    fun requestConversationIndex(projectId: String? = null): Boolean = conversationRefresh.request(projectId)
 
     fun probeConversationProject(path: String, projectId: String): Boolean {
         if (state != State.READY) return false
         return pageAdapter?.probeConversationProject(path, projectId) == true
     }
 
-    fun suspendConversationRefreshForUserAction() {
-        conversationRefreshSession.suspend({
-            conversationDirectory.failRefresh()
-            onConversationIndexChanged(conversationIndex())
-            pageAdapter?.cancelConversationDirectoryWork()
-        })
-    }
+    fun suspendConversationRefreshForUserAction() = conversationRefresh.suspendForConversationAction()
 
-    fun resumeConversationRefreshAfterUserAction() = conversationRefreshSession.resume()
-
-    private fun dispatchConversationIndexRequest(): Boolean {
-        val adapter = pageAdapter ?: return false
-        if (state != State.READY) return false
-        val dispatch = conversationRefreshSession.beginDispatch() ?: return false
-        val refreshRequest = conversationDirectory.beginRefresh(dispatch.projectId)
-        onConversationIndexChanged(conversationIndex())
-        adapter.listConversations(
-            projectHints = refreshRequest.projectHints,
-            scopeProjectId = refreshRequest.scopeProjectId,
-        )
-        return true
-    }
+    fun resumeConversationRefreshAfterUserAction() = conversationRefresh.resumeAfterConversationAction()
 
     fun state(): State = state
 
@@ -350,12 +334,23 @@ internal class ChatGptBackgroundSession(
 
     fun pendingAttachmentCount(): Int = sendOwner.pendingAttachmentCount()
 
-    fun requestModelOptions(): Boolean {
-        if (state != State.READY) return false
-        return composerOptionRequests.request("model")
+    fun requestModelOptions(): Boolean =
+        state == State.READY && requestComposerOptions("model")
+
+    fun dismissComposerOptions() = dismissComposerOptionsRequest(null)
+
+    private fun requestComposerOptions(section: String, requestId: String? = null): Boolean {
+        conversationRefresh.acquireForComposer()
+        return composerOptionRequests.request(section, requestId).also { accepted ->
+            if (!accepted) conversationRefresh.releaseAfterComposerQuietPeriod()
+        }
     }
 
-    fun dismissComposerOptions() = composerOptionRequests.dismiss()
+    private fun dismissComposerOptionsRequest(requestId: String?) {
+        conversationRefresh.acquireForComposer()
+        composerOptionRequests.dismiss(requestId)
+        conversationRefresh.releaseAfterComposerQuietPeriod()
+    }
 
     fun selectModel(id: String) {
         pageAdapter?.selectModelOption(id)
@@ -437,11 +432,11 @@ internal class ChatGptBackgroundSession(
         newConversationRecovery.cancel()
         conversationNavigation.clear()
         navigationActions.clearDeferred()
+        conversationRefresh.reset()
         composerOptionRequests.reset()
         pageAdapter?.dispose()
         sendOwner.dispose()
         sendHandler.removeCallbacksAndMessages(null)
-        conversationRefreshSession.reset()
         forceConversationRefreshAfterVoice = false
         conversationOpenRecovery.cancel()
         conversationRefreshHandler.removeCallbacksAndMessages(null)
@@ -624,7 +619,7 @@ internal class ChatGptBackgroundSession(
                         recovery.onReady()
                         updateState(State.READY)
                         forceConversationRefreshAfterVoice =
-                            conversationRefreshSession.refreshOnReady(
+                            conversationRefresh.refreshOnReady(
                             postVoiceRefresh = forceConversationRefreshAfterVoice,
                             supported = snapshot.capabilities.supports(
                                 ChatGptWebCapabilityId.CONVERSATION_LIST,
@@ -651,6 +646,10 @@ internal class ChatGptBackgroundSession(
                 chatGptComposerSectionForAction(event.action)?.let { section ->
                     composerOptionInteraction.release()
                     composerOptionRequests.complete(section)
+                    if (!event.ok) conversationRefresh.releaseAfterComposerQuietPeriod()
+                }
+                if (event.action == "dismiss_composer_menu") {
+                    conversationRefresh.releaseAfterComposerQuietPeriod()
                 }
                 onCommandResult(event, sendOwner.acceptCommandResult(event))
                 if (event.ok) {

@@ -39,7 +39,10 @@ internal class ChatGptConversationRefreshCoordinator(
     }
 
     fun onSucceeded() {
-        if (consumeSuppressedCompletion()) return
+        if (consumeSuppressedCompletion()) {
+            dispatchQueuedRefresh()
+            return
+        }
         inFlight = false
         retryIndex = 0
         cancelScheduledRetry()
@@ -47,7 +50,10 @@ internal class ChatGptConversationRefreshCoordinator(
     }
 
     fun onFailed() {
-        if (consumeSuppressedCompletion()) return
+        if (consumeSuppressedCompletion()) {
+            dispatchQueuedRefresh()
+            return
+        }
         inFlight = false
         if (!dispatchQueuedRefresh()) scheduleNextRetry()
     }
