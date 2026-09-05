@@ -87,12 +87,22 @@ pub(crate) async fn sync_pc_agent_apk_after_success(
     if explicit_apk_sync {
         let _ = tx.send(WsMessage::progress("正在同步 PC 构建产物，准备安装入口。").to_json());
     }
+    let project_id = project_id_from_download_base(download_base);
+    if project_id.is_some_and(crate::project_releases::admission::is_official_quant_project) {
+        let _ = tx.send(
+            WsMessage::progress(
+                "一龙量化新版必须在项目正式发布页上传并通过准入；任务同步不会生成安装入口。",
+            )
+            .to_json(),
+        );
+        return None;
+    }
     match sync_pc_agent_apk_artifact(
         state,
         agent_id,
         pc_workspace,
         artifact_workspace,
-        project_id_from_download_base(download_base),
+        project_id,
         fresh_after_unix_secs,
         explicit_apk_sync,
     )

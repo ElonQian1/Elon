@@ -502,25 +502,27 @@ fn latest_project_apk_delivery(
     state: &AppState,
     project: &crate::store::ProjectAccess,
 ) -> Option<LatestProjectApkDelivery> {
-    match state.store.latest_project_apk_delivery(&project.id) {
-        Ok(Some((task_id, apk_url, updated_at))) => {
-            let release = apk_delivery::published_release_presentation(
-                &project.id,
-                &state.public_url,
-                &apk_url,
-            );
-            return Some(LatestProjectApkDelivery {
-                url: release.download_url,
-                identity: format!("task:{}:{}:{}", task_id, updated_at, release.identity_url),
-                updated_at: Some(updated_at),
-            });
+    if !crate::project_releases::admission::is_official_quant_project(&project.id) {
+        match state.store.latest_project_apk_delivery(&project.id) {
+            Ok(Some((task_id, apk_url, updated_at))) => {
+                let release = apk_delivery::published_release_presentation(
+                    &project.id,
+                    &state.public_url,
+                    &apk_url,
+                );
+                return Some(LatestProjectApkDelivery {
+                    url: release.download_url,
+                    identity: format!("task:{}:{}:{}", task_id, updated_at, release.identity_url),
+                    updated_at: Some(updated_at),
+                });
+            }
+            Ok(None) => {}
+            Err(error) => tracing::warn!(
+                project_id = %project.id,
+                error = %error,
+                "读取项目历史 APK 交付记录失败"
+            ),
         }
-        Ok(None) => {}
-        Err(error) => tracing::warn!(
-            project_id = %project.id,
-            error = %error,
-            "读取项目历史 APK 交付记录失败"
-        ),
     }
     match state.store.project_android_download(&project.id) {
         Ok(Some((external_url, updated_at))) => Some(LatestProjectApkDelivery {

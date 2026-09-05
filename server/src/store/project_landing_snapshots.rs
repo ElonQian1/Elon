@@ -41,7 +41,16 @@ impl Store {
                 Ok((row.get(0)?, row.get(1)?))
             })
             .optional()?;
-        let Some((Some(landing_json), updated_at)) = row else {
+        let Some((landing_json, updated_at)) = row else {
+            return Ok(None);
+        };
+        drop(conn);
+        if crate::project_releases::admission::is_official_quant_project(project_id) {
+            return Ok(self
+                .latest_project_release(project_id)?
+                .map(|release| (release.apk_url, release.updated_at)));
+        }
+        let Some(landing_json) = landing_json else {
             return Ok(None);
         };
         let snapshot = parse_snapshot(&landing_json)?;

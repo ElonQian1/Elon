@@ -64,4 +64,5 @@ export interface ProjectRelease {
   source_worktree?: string | null
   created_at?: string
   updated_at?: string
+  installable?: boolean
 }

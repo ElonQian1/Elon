@@ -123,7 +123,7 @@
 | PC 前端迁移规则 | `.github/instructions/pc-frontend-migration.instructions.md`、`docs/pc-frontend-migration.md` |
 | 代码归属与 legacy 迁移规则 | `docs/architecture/source-of-truth.md`、`docs/architecture/legacy-inventory.md`、`docs/architecture/feature-parity-matrix.md`、`scripts/check-source-ownership.ps1` |
 | 项目广场/项目主页脚本 | `server/src/assets/project_*.js` |
-| 一龙量化接入、ESK Paper 投影、申请绑定、双仓可见余额、Android 托管与主服务 `/quant/` 预览 | `docs/yilong-quant-integration.md`、`docs/yilong-quant-esk-allocation-binding-v1.md`、`docs/esk-paper-quant-cross-repo-interoperability-v4-acceptance.md`、`docs/esk-paper-quant-cross-repo-asset-view-v5-acceptance.md`、`docs/requirements/yilong-quant-android-main-hosting-v6.md`、`server/src/router/quant_http_preview.rs` |
+| 一龙量化、ESK、Android 新版准入 | `docs/yilong-quant-integration.md`、`docs/requirements/official-quant-release-admission-v1.md` |
 | ESK 单币服务支付、治理、团队利润参与及 QSHARE 会计边界 | `docs/decisions/esk-consumable-economic-participation-v1.md`、`docs/requirements/esk-consumable-economic-participation-v1.md`、`docs/decisions/esk-asset-naming-v1.md`、`docs/yilong-quant-integration.md` |
 | ESK 原生额度与卖回进度 | `docs/requirements/esk-platform-native-progress-v1.md` |
 | ESK Sui 离线地址候选证明 V1 | `docs/esk-sui-address-control-proof.md` |

@@ -101,14 +101,14 @@
       "id": "yilong-quant",
       "name": "yilong-quant",
       "display_name": "一龙量化交易",
-      "description": "面向全球加密资产交易者的量化技术测试子项目；当前提供基金式 Paper 产品展示、免凭据公共行情和可复现研究回测。",
+      "description": "面向全球加密资产交易者的量化技术测试子项目；当前提供基金式 Paper 产品展示、免凭据公共行情和可复现研究回测，新版 Android 客户端待正式发布。",
       "repo_url": "git@github.com:ElonQian1/yilong-quant.git",
       "branch": "main",
       "landing": {
         "schema_version": 1,
         "title": "一龙量化交易",
         "tagline": "面向全球加密资产交易者的量化交易技术测试平台",
-        "summary": "当前已开放基金式 Web 与 Android Paper 测试入口：首页展示一项可复现 BTC 基准研究组合、区间模拟变化和最大回撤，并提供免凭据公共行情。它不是可申购基金，不接收或移动真实用户资金，也不连接实盘。",
+        "summary": "当前已开放基金式 Web Paper 测试入口：首页展示一项可复现 BTC 基准研究组合、区间模拟变化和最大回撤，并提供免凭据公共行情。旧 Android 包已退出安装入口，新版通过发布门禁后再开放。它不是可申购基金，不接收或移动真实用户资金，也不连接实盘。",
         "highlights": [
           "基金式首页、产品、行情、持仓、我的五栏已上线；研究产品与规划中产品明确分开",
           "BTC/USDT 等公共行情由后端固定白名单读取，Canvas K 线支持低频增量刷新且不需要交易所密钥",
@@ -138,14 +138,8 @@
           "android": {
             "label": "Android 客户端",
             "kind": "mobile_client",
-            "version": "0.2.0",
-            "version_code": 2,
-            "url": "http://43.139.149.158:8080/api/store/projects/yilong-quant/downloads/android",
-            "size_label": "604 KB",
-            "sha256": "c17ab5abe800547f41acc95594021abb6cec92fc14cb6de3b2db202ce4b94b89",
-            "source_git_sha": "9b0d9170d532072db02500130ea02359e8c84a74",
-            "status": "available",
-            "note": "Android 8.0 及以上；V20 HTTP Paper 测试版已由独立证书签名并取得主服务器发布回执，不支持账号、授权、钱包、资金或实盘操作"
+            "status": "planned",
+            "note": "旧 0.2.0 (2) 已退出安装入口；等待 com.elon.quant、paper 渠道、0.5.0 (5) 或更高版本通过主服务器门禁后恢复下载"
           }
         },
         "system_requirements": [
@@ -153,9 +147,9 @@
           "本地开发需要 Rust 1.97、Node.js 22 和 PowerShell 7"
         ],
         "recent_updates": [
+          "旧 Android 0.2.0 (2) 已退出安装和下载路径；新版 0.5.0 (5) 或更高版本须通过主服务器发布门禁后才会成为可安装版本",
           "V20 基金式 Paper 产品页已发布：产品卡直接显示短区间模拟/回测及时间范围，详情保留策略、来源、摘要和风险边界",
-          "V19 免凭据 Binance Spot 公共行情与低功耗 Canvas K 线已随 Web/Android 发布",
-          "Web 与 Android 0.2.0 (2) 已绑定同一源码提交发布；APK 使用独立证书签名并由主服务器托管",
+          "V19 免凭据 Binance Spot 公共行情与低功耗 Canvas K 线仍由 Web Paper 入口提供；历史 Android 工件不再作为安装入口",
           "新增独立 Android Paper 客户端源码与主服务器发布合同：正式包只加载指定 HTTPS 量化站点，APK 托管和量化服务部署分别验收",
           "新增一龙 ESK 只读资产卡片：验签主项目短期投影并绑定同次用户授权，无量化仓位时也可显示且不保存余额副本",
           "新增单个 Paper 授权持久撤销：用户可结束当前授权，SQLite 重启后仍拒绝旧授权且不保存 token 或 participant",

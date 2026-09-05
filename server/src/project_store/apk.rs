@@ -23,7 +23,9 @@ pub(crate) fn decorate_joined_projects(state: &AppState, projects: &mut [PublicP
 
 fn decorate_projects(state: &AppState, projects: &mut [PublicProjectItem], public_only: bool) {
     for project in projects {
-        if project.latest_apk_url.is_some() {
+        let official_quant =
+            crate::project_releases::admission::is_official_quant_project(&project.id);
+        if !official_quant && project.latest_apk_url.is_some() {
             continue;
         }
         let download = if public_only {
@@ -36,12 +38,21 @@ fn decorate_projects(state: &AppState, projects: &mut [PublicProjectItem], publi
                 project.latest_apk_url =
                     Some(android_download_route(&state.public_url, &project.id));
             }
-            Ok(None) => {}
-            Err(error) => tracing::warn!(
-                project_id = %project.id,
-                error = %error,
-                "读取项目 Android 下载入口失败"
-            ),
+            Ok(None) => {
+                if official_quant {
+                    project.latest_apk_url = None;
+                }
+            }
+            Err(error) => {
+                if official_quant {
+                    project.latest_apk_url = None;
+                }
+                tracing::warn!(
+                    project_id = %project.id,
+                    error = %error,
+                    "读取项目 Android 下载入口失败"
+                );
+            }
         }
     }
 }
@@ -172,7 +183,7 @@ async fn serve_managed_public_release(
     Some(response)
 }
 
-fn verify_release_payload(
+pub(crate) fn verify_release_payload(
     data: &[u8],
     expected_size: Option<i64>,
     expected_sha256: Option<&str>,

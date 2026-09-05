@@ -57,14 +57,17 @@ assert.equal(
 )
 assert.equal(quantProject.landing.downloads.web.status, 'available')
 assert.equal(quantProject.landing.downloads.web.url, 'http://43.139.149.158:8080/quant/')
-assert.equal(quantProject.landing.downloads.android.status, 'available')
-assert.equal(quantProject.landing.downloads.android.version, '0.2.0')
-assert.equal(quantProject.landing.downloads.android.version_code, 2)
-assert.equal(quantProject.landing.downloads.android.source_git_sha, '9b0d9170d532072db02500130ea02359e8c84a74')
-assert.equal(quantProject.landing.downloads.android.sha256, 'c17ab5abe800547f41acc95594021abb6cec92fc14cb6de3b2db202ce4b94b89')
-assert.match(quantProject.landing.downloads.android.note, /独立证书签名/)
-assert.match(quantProject.landing.downloads.android.note, /主服务器发布回执/)
-assert.match(quantProject.landing.recent_updates[0], /V20 基金式 Paper/)
+assert.equal(quantProject.landing.downloads.android.status, 'planned')
+for (const retiredField of ['url', 'version', 'version_code', 'source_git_sha', 'sha256', 'size_label']) {
+  assert.equal(
+    Object.hasOwn(quantProject.landing.downloads.android, retiredField),
+    false,
+    `retired Android catalog entry must not keep ${retiredField}`,
+  )
+}
+assert.match(quantProject.landing.downloads.android.note, /旧 0\.2\.0 \(2\) 已退出安装入口/)
+assert.match(quantProject.landing.downloads.android.note, /0\.5\.0 \(5\)/)
+assert.match(quantProject.landing.recent_updates[0], /退出安装和下载路径/)
 assert.ok(quantProject.landing.recent_updates.some((item) => /只读资产卡片/.test(item)))
 assert.match(quantProject.landing.summary, /可复现 BTC 基准研究组合/)
 assert.match(quantProject.landing.summary, /不是可申购基金/)

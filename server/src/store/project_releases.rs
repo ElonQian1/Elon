@@ -5,6 +5,9 @@ use serde_json::{json, Map, Value};
 
 use super::{clean_optional, new_id, now, Store};
 
+#[path = "project_releases/admission.rs"]
+mod admission;
+
 #[derive(Debug, Clone, Serialize)]
 pub struct ProjectRelease {
     pub id: String,
@@ -53,8 +56,30 @@ pub struct ProjectReleaseWrite<'a> {
     pub metadata_json: Option<&'a str>,
 }
 
+#[derive(Debug)]
+pub(crate) struct ProjectReleaseAdmissionOutcome {
+    pub release: ProjectRelease,
+    pub idempotent_replay: bool,
+}
+
 impl Store {
     pub fn create_project_release(&self, write: ProjectReleaseWrite<'_>) -> Result<ProjectRelease> {
+        Ok(self
+            .create_project_release_with_admission(write, None)?
+            .release)
+    }
+
+    pub(crate) fn create_project_release_with_admission(
+        &self,
+        write: ProjectReleaseWrite<'_>,
+        official_apk: Option<&crate::project_releases::admission::ValidatedOfficialQuantApk>,
+    ) -> Result<ProjectReleaseAdmissionOutcome> {
+        if crate::project_releases::admission::is_official_quant_project(write.project_id) {
+            let official_apk = official_apk.ok_or(
+                crate::project_releases::admission::OfficialQuantReleaseError::InvalidApkStructure,
+            )?;
+            return admission::create_official_quant_release(self, write, official_apk);
+        }
         let id = clean_optional(write.id)
             .map(ToOwned::to_owned)
             .unwrap_or_else(|| new_id("rel"));
@@ -117,7 +142,10 @@ impl Store {
                 "failed to sync project release into landing snapshot"
             );
         }
-        Ok(release)
+        Ok(ProjectReleaseAdmissionOutcome {
+            release,
+            idempotent_replay: false,
+        })
     }
 
     pub fn project_release(&self, release_id: &str) -> Result<ProjectRelease> {
@@ -128,6 +156,9 @@ impl Store {
     }
 
     pub fn latest_project_release(&self, project_id: &str) -> Result<Option<ProjectRelease>> {
+        if crate::project_releases::admission::is_official_quant_project(project_id) {
+            return admission::latest_installable_official_quant_release(self);
+        }
         let sql = format!(
             "{PROJECT_RELEASE_SELECT} WHERE project_id = ?1 AND status = 'published'
                AND file_path IS NOT NULL AND TRIM(file_path) != ''
@@ -169,17 +200,33 @@ impl Store {
             "{PROJECT_RELEASE_SELECT} WHERE project_id = ?1 AND file_name = ?2
              AND status = 'published'
              AND file_path IS NOT NULL AND TRIM(file_path) != ''
-             ORDER BY COALESCE(release_number, 0) DESC, updated_at DESC, created_at DESC LIMIT 1"
+             ORDER BY COALESCE(release_number, 0) DESC, updated_at DESC, created_at DESC"
         );
-        self.conn()?
-            .query_row(
-                &sql,
-                params![project_id, filename],
-                project_release_from_row,
-            )
-            .optional()
-            .map_err(Into::into)
+        let conn = self.conn()?;
+        if crate::project_releases::admission::is_official_quant_project(project_id) {
+            let mut statement = conn.prepare(&sql)?;
+            let releases =
+                statement.query_map(params![project_id, filename], project_release_from_row)?;
+            for release in releases {
+                let release = release?;
+                if official_quant_release_is_installable(&release) {
+                    return Ok(Some(release));
+                }
+            }
+            return Ok(None);
+        }
+        conn.query_row(
+            &sql,
+            params![project_id, filename],
+            project_release_from_row,
+        )
+        .optional()
+        .map_err(Into::into)
     }
+}
+
+pub(crate) fn official_quant_release_is_installable(release: &ProjectRelease) -> bool {
+    admission::official_quant_release_is_installable(release)
 }
 
 pub(super) fn insert_task_apk_release_locked(
@@ -207,6 +254,12 @@ pub(super) fn insert_task_apk_release_locked(
     else {
         return Ok(());
     };
+    // Official quant releases are admitted only through the authenticated upload
+    // contract. A completed task may bind other projects, but it cannot clone or
+    // synthesize an installable official quant APK.
+    if crate::project_releases::admission::is_official_quant_project(&project_id) {
+        return Ok(());
+    }
     let now = now();
     if let Some(release_id) = conn
         .query_row(
@@ -339,6 +392,11 @@ impl Store {
         release: &ProjectRelease,
     ) -> Result<()> {
         if release.status != "published" || clean_optional(release.file_path.as_deref()).is_none() {
+            return Ok(());
+        }
+        if crate::project_releases::admission::is_official_quant_project(&release.project_id)
+            && !official_quant_release_is_installable(release)
+        {
             return Ok(());
         }
 
@@ -582,6 +640,16 @@ fn project_release_android_download(release: &ProjectRelease) -> Value {
 
 fn project_release_display_version(release: &ProjectRelease) -> Option<String> {
     let version_name = clean_optional(release.version_name.as_deref());
+    if crate::project_releases::admission::is_official_quant_project(&release.project_id) {
+        return match (version_name, release.version_code) {
+            (Some(version_name), Some(version_code)) => {
+                Some(format!("{version_name} ({version_code})"))
+            }
+            (Some(version_name), None) => Some(version_name.to_string()),
+            (None, Some(version_code)) => Some(format!("version code {version_code}")),
+            (None, None) => None,
+        };
+    }
     match (version_name, release.release_number) {
         (Some(version_name), Some(release_number)) => {
             Some(format!("{version_name} (build {release_number})"))

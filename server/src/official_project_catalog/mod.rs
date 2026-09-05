@@ -351,7 +351,7 @@ mod tests {
     }
 
     #[test]
-    fn yilong_quant_android_official_catalog_reapplies_latest_release() {
+    fn yilong_quant_android_official_catalog_uses_only_admitted_latest_release() {
         let catalog = parse_catalog().unwrap();
         let quant = catalog
             .projects
@@ -364,33 +364,45 @@ mod tests {
             .unwrap();
         ensure_project(&store, &owner.id, quant).unwrap();
         ensure_landing(&store, &owner.id, quant).unwrap();
+        assert!(store
+            .project_android_download("yilong-quant")
+            .unwrap()
+            .is_none());
 
         let release_sha256 = "0".repeat(64);
         let source_git_sha = "1".repeat(40);
+        let proof = crate::project_releases::admission::validated_apk_for_test(
+            release_sha256.clone(),
+            1024,
+        );
         let release = store
-            .create_project_release(crate::store::project_releases::ProjectReleaseWrite {
-                id: Some("rel_quant_android_v16"),
-                project_id: "yilong-quant",
-                task_id: None,
-                uploaded_by: Some(&owner.id),
-                version_name: Some("0.1.0"),
-                package_name: Some("com.elon.quant"),
-                version_code: Some(1),
-                channel: Some("paper"),
-                status: Some("published"),
-                apk_url:
-                    "https://main.example/api/projects/yilong-quant/download/ElonSpeed-latest.apk",
-                file_name: "YilongQuant-release.apk",
-                file_path: Some("/managed/project-releases/yilong-quant/release.apk"),
-                sha256: Some(&release_sha256),
-                size_bytes: Some(1024),
-                changelog: Some("Paper Android V16"),
-                build_started_at: None,
-                source_git_sha: Some(&source_git_sha),
-                source_worktree: None,
-                metadata_json: None,
-            })
+            .create_project_release_with_admission(
+                crate::store::project_releases::ProjectReleaseWrite {
+                    id: Some("rel_quant_android_v5"),
+                    project_id: "yilong-quant",
+                    task_id: None,
+                    uploaded_by: Some(&owner.id),
+                    version_name: Some("0.5.0"),
+                    package_name: Some("com.elon.quant"),
+                    version_code: Some(5),
+                    channel: Some("paper"),
+                    status: Some("published"),
+                    apk_url:
+                        "https://main.example/api/projects/yilong-quant/download/ElonSpeed-latest.apk",
+                    file_name: "YilongQuant-release.apk",
+                    file_path: Some("/managed/project-releases/yilong-quant/release.apk"),
+                    sha256: Some(&release_sha256),
+                    size_bytes: Some(1024),
+                    changelog: Some("Paper Android 0.5.0 (5)"),
+                    build_started_at: None,
+                    source_git_sha: Some(&source_git_sha),
+                    source_worktree: None,
+                    metadata_json: None,
+                },
+                Some(&proof),
+            )
             .unwrap();
+        let release = release.release;
         assert!(store
             .project_android_download("yilong-quant")
             .unwrap()
@@ -400,7 +412,7 @@ mod tests {
         assert!(store
             .project_android_download("yilong-quant")
             .unwrap()
-            .is_none());
+            .is_some());
         store
             .sync_project_landing_download_from_release(&release)
             .unwrap();

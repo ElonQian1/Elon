@@ -11265,6 +11265,281 @@
       "updated_at_ms": 1786879547042
     },
     {
+      "id": "official-quant-release-admission-v1",
+      "title": "官方量化 APK 新版发布准入 V1",
+      "summary": "主服务器只接受 com.elon.quant versionCode>=5、规范版本名、paper 渠道、源码 Git SHA 与本次 APK 工件证明完整绑定的实际新版；旧版从所有用户入口退出，幂等重传可修复原托管工件。",
+      "status": "verified",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/official-quant-release-admission-v1.md",
+        "content_hash": "129d59825883da52f743fc9db6808a21d340ba44a5fbe73eb2b2149729f3c835",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "e6d72462a59024ed23791e58bb93cedc27cd2c9a",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "5011017a06a4c2b685be4e5339564e528a9b580b",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "project-marketplace,backend",
+      "tags": [
+        "quant",
+        "android",
+        "apk",
+        "release-admission",
+        "new-only"
+      ],
+      "task_paths": [
+        "AI_CURRENT.md",
+        "AI_INDEX.md",
+        "docs/delivery/official-quant-release-admission-v1.md",
+        "docs/requirements/esk-first-user-delivery-roadmap-v1.md",
+        "docs/requirements/official-quant-release-admission-v1.md",
+        "pc-frontend/package.json",
+        "pc-frontend/src/features/projects",
+        "scripts/test-official-project-catalog.js",
+        "scripts/test-official-quant-release-admission.js",
+        "scripts/test-pc-project-release-upload.js",
+        "server/src/ai_cli/ai_cli_apk_sync.rs",
+        "server/src/official_project_catalog",
+        "server/src/project_downloads.rs",
+        "server/src/project_releases",
+        "server/src/project_releases.rs",
+        "server/src/project_releases_tests.rs",
+        "server/src/project_space.rs",
+        "server/src/project_store/apk.rs",
+        "server/src/store/project_landing_snapshots.rs",
+        "server/src/store/project_releases",
+        "server/src/store/project_releases.rs",
+        "server/src/store/projects"
+      ],
+      "dependencies": [
+        "yilong-quant-android-public-download-v2"
+      ],
+      "acceptance_criteria": [
+        "官方量化只接受固定项目/包名、versionCode>=5、规范版本名、paper 渠道、源码 SHA，以及和本次 APK 摘要/大小精确绑定的服务器结构准入证明。",
+        "合格版本单调；同版本同工件幂等复用且可恢复损坏/丢失的原工件，同版本异工件、降级、借用证明和同工件改报版本拒绝。",
+        "旧量化记录不进入用户发布列表、latest、可安装筛选、任一下载或首页/任务同步入口；其他项目的既有列表、build 标签和下载行为不变。",
+        "无效输入写盘前拒绝；HTTP 区分 409 冲突、422 合同错误，托管根与下载时大小/SHA 复核失败关闭且不泄漏内部路径。",
+        "Rust 定向与项目广场/PC 生产构建回归通过；代码、服务部署、正式 APK 上传和真实设备验收分轴报告。"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "pc-frontend/src/features/projects/ProjectReleasesTab.tsx",
+          "content_hash": "58815b20483bd9351f3a484c623d43406f4ba35b28ed51c3aa305afa835976df",
+          "locator": "official upload/latest/authenticated download",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e6d72462a59024ed23791e58bb93cedc27cd2c9a",
+            "head_blob_oid": "315313c9be78558312a4b650315f24295300c36d",
+            "worktree_blob_oid": "a105aa3bd9ed70b40da5ffcebba09b9e78e64efa",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "scripts/test-official-quant-release-admission.js",
+          "content_hash": "00954aa9d9b9a87dae762ad255b19599504d5f2d30346ef64955721aebcc0392",
+          "locator": "server new-only admission source contract",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e6d72462a59024ed23791e58bb93cedc27cd2c9a",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "e0ab7c852033a04845a82753e9d9a39af110ff01",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/test-pc-project-release-upload.js",
+          "content_hash": "1dd498a4718f782d4ad3924c24943bb57225896f7815f5ee0a9a34f516cc90df",
+          "locator": "PC release upload/download source contract",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e6d72462a59024ed23791e58bb93cedc27cd2c9a",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "0d005b860f02eaff918bd1f7b5f643670f932095",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/ai_cli/ai_cli_apk_sync.rs",
+          "content_hash": "003aecf8fc5b3dfeef410cd3cdc1314fffefa9af9b5b4355df79cf7558cd20fd",
+          "locator": "official project task-sync stop gate",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e6d72462a59024ed23791e58bb93cedc27cd2c9a",
+            "head_blob_oid": "29b5f0254a98f0a1a06cd8ce1d2da5993adc23b9",
+            "worktree_blob_oid": "479766a6a6af9272393fe5ed15a03d23e6eb1eaa",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/official_project_catalog/catalog.json",
+          "content_hash": "4d2d1174879008213f149bef170f3a224fcecb5d9e572867475dca6476ec7692",
+          "locator": "yilong-quant Android planned entry",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e6d72462a59024ed23791e58bb93cedc27cd2c9a",
+            "head_blob_oid": "870149c558bfd1bc9cfb897d2e24e2eb4b0445f5",
+            "worktree_blob_oid": "eacf7112f0b80f66fe779c1e5e3402644e743c13",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/project_downloads.rs",
+          "content_hash": "b3aa587d037e86a7651230fa3bccce5332f85539d4d11674b72ce842f683d85f",
+          "locator": "serve_official_quant_apk",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e6d72462a59024ed23791e58bb93cedc27cd2c9a",
+            "head_blob_oid": "3ba44c546e0c78187be6a903efe6f652c01dd159",
+            "worktree_blob_oid": "6aee52485ef7f9d05afd07a9f9671239badcbcb9",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/project_releases.rs",
+          "content_hash": "966fb8e78e1f1ec3cc701ef30646445da92779f6cba9fddc59dda7d5a038665f",
+          "locator": "upload/list/release download/idempotent artifact restore",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e6d72462a59024ed23791e58bb93cedc27cd2c9a",
+            "head_blob_oid": "c31de9a018a7957f319076cd98e732b7ceea35f8",
+            "worktree_blob_oid": "8cfc31ef3e9310da3ac6111e5827a69daad0fc44",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/project_releases/admission.rs",
+          "content_hash": "ab1458a2d139f2e1511544951ded0b9a13d4eb02f6b15694d29d892564345629",
+          "locator": "mod tests: signing block decoys and declarations",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e6d72462a59024ed23791e58bb93cedc27cd2c9a",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "faf3c493292f230764e1e868f0f8538e38a60b6d",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/project_releases/admission.rs",
+          "content_hash": "ab1458a2d139f2e1511544951ded0b9a13d4eb02f6b15694d29d892564345629",
+          "locator": "validate_apk_payload + ValidatedOfficialQuantApk",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e6d72462a59024ed23791e58bb93cedc27cd2c9a",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "faf3c493292f230764e1e868f0f8538e38a60b6d",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/project_space.rs",
+          "content_hash": "f86b68051a606cc0d25c82136b034be98189dda07e6eecb4510bd0b58fb64df4",
+          "locator": "latest_project_apk_delivery",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e6d72462a59024ed23791e58bb93cedc27cd2c9a",
+            "head_blob_oid": "70dd1e63584ef75eb4223a5d5c290ebeb1867c44",
+            "worktree_blob_oid": "699078c3a7f8f511f333724aa871fc5efe2a3b89",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/project_store/apk.rs",
+          "content_hash": "4d4f42c92724c9dab2dd6ea97db9403277ff5e9be14a84144140b563d74faa9b",
+          "locator": "decorate_projects + managed public release",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e6d72462a59024ed23791e58bb93cedc27cd2c9a",
+            "head_blob_oid": "e402344a95509eb0054cb975102e4f82e87167a7",
+            "worktree_blob_oid": "aaf94c6b98ce822a3c572ac2903797ca82e7e3ef",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/store/project_landing_snapshots.rs",
+          "content_hash": "efda92a45d1ef942d98d28bc2ed3bc5076f8b337b6c8d565d0db6c93b89f09c4",
+          "locator": "project_android_download_with_visibility",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e6d72462a59024ed23791e58bb93cedc27cd2c9a",
+            "head_blob_oid": "bb79ce92f100df3b710128b01e2d637907f03a81",
+            "worktree_blob_oid": "e111746587a73eefc1259d0ff075cb59c5e885ea",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/store/project_releases/admission.rs",
+          "content_hash": "5564d24bef86fc70f16aec2c6916df12f7e25d308196c85a0413e22c88839d4a",
+          "locator": "create_official_quant_release + installability receipt",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e6d72462a59024ed23791e58bb93cedc27cd2c9a",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "073675772064e81aefba8eae750fadd60d8f2092",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/store/project_releases/admission.rs",
+          "content_hash": "5564d24bef86fc70f16aec2c6916df12f7e25d308196c85a0413e22c88839d4a",
+          "locator": "mod tests: monotonic/idempotent/conflict/proof binding",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e6d72462a59024ed23791e58bb93cedc27cd2c9a",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "073675772064e81aefba8eae750fadd60d8f2092",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/store/projects/installable_apk.rs",
+          "content_hash": "9bdd0cf82b1d9fc2826775ab03ae5b5ff10193c2dced3ccc6eccc8f80e5801af",
+          "locator": "EXISTS_SQL official quant branch",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e6d72462a59024ed23791e58bb93cedc27cd2c9a",
+            "head_blob_oid": "36e6f881632430cdff810e1ce30ab260c0c86a64",
+            "worktree_blob_oid": "afd0f5ff6d520c67f5eeb612cd1e765beaadcf73",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/store/projects/installable_apk_tests.rs",
+          "content_hash": "c1b39b8302411ed3ed026b0d501c07d6bbd8b6fa2f5a9a91ca83bee61044ceca",
+          "locator": "official_quant_filter_ignores_legacy_downloads",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e6d72462a59024ed23791e58bb93cedc27cd2c9a",
+            "head_blob_oid": "b4950c47fc3c0118110a80b767b95e6c9468967e",
+            "worktree_blob_oid": "f4933f3892cb65450b2c6b9b3b643b54a9263798",
+            "state": "tracked_modified"
+          }
+        }
+      ],
+      "created_at_ms": 1788568720483,
+      "updated_at_ms": 1788574867882
+    },
+    {
       "id": "open-commerce-consumer-order-closure-v1",
       "title": "消费者订单闭环视图 V1",
       "summary": "为消费者本人及其 AI 只读聚合同一终态 Invocation 的商户订单声明、最新 ERP 衔接结果与零资金计量边界。",
@@ -20196,136 +20471,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_0947f922434b4eaab9c85ea26f2aa658",
-      "feature_id": "esk-platform-native-provider-v1",
-      "action": "transitioned",
-      "actor": "codex-esk-platform",
-      "reason": "145 targeted JVM tests passed; APK 1.1.1508 / 94746f8b5939e207d9e9882d96804b3e850780db and static Web disclosure published and identity checked. Provider slice only; renderer, quant consumer and real-account acceptance deferred.",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1788517613613
-    },
-    {
-      "id": "feature_event_a04b2884b8ed4936ad647e40543a2fee",
-      "feature_id": "esk-platform-history-v1",
-      "action": "registered",
-      "actor": "codex-esk-history-root",
-      "reason": "",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1788520078318
-    },
-    {
-      "id": "feature_event_d80833a2e9be4051a0daacf469a74dca",
-      "feature_id": "esk-platform-history-v1",
-      "action": "claimed",
-      "actor": "codex-esk-history-root",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788520078904
-    },
-    {
-      "id": "feature_event_9782ce20d348441f90339b6ddb49ee2a",
-      "feature_id": "esk-platform-history-v1",
-      "action": "transitioned",
-      "actor": "codex-esk-history-root",
-      "reason": "",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788520088478
-    },
-    {
-      "id": "feature_event_25269ba54c3b43f591833614fff5a693",
-      "feature_id": "esk-platform-history-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-esk-history-root",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788521348793
-    },
-    {
-      "id": "feature_event_1ec61ea93c534681bd5461dc2c8e15ad",
-      "feature_id": "esk-platform-history-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-esk-history-root",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788521351710
-    },
-    {
-      "id": "feature_event_eaea1d384e694113ba7b689554e17484",
-      "feature_id": "esk-platform-history-v1",
-      "action": "transitioned",
-      "actor": "codex-esk-history-root",
-      "reason": "独立只读后端与原生流水纵向切片已完成，兼容源与合成测试已绑定；真实用户和发布状态单独记录。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1788521623409
-    },
-    {
-      "id": "feature_event_7c744e9a7a684b56b1ba71591589a825",
-      "feature_id": "esk-platform-history-v1",
-      "action": "transitioned",
-      "actor": "codex-esk-history-root",
-      "reason": "Android XML复核190项零失败，账本58项与完整正式模块路由验证通过，独立源码审查通过；视觉和真实本人验收仍deferred。",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1788521624005
-    },
-    {
-      "id": "feature_event_d93569b224e145b39840cb290bc43184",
-      "feature_id": "esk-platform-history-v1",
-      "action": "transitioned",
-      "actor": "codex-esk-history-root",
-      "reason": "Published Server 0.3.1725 and mobile PWA from 13323a41d3faa2525b420cb703be0ff495cddf26; official APK publisher fast-forwarded docs-only to b1acb7433d1ad9533d444636b91c29dcd7f27824 and published 1.1.1511 (1511), SHA256 95ff7a66ee683363849ef3c1117ff31fcafcefa8643fcc3d18ff13616ca89978. Android 190, harness 58, router 11 tests passed. Public health 200 and unauthenticated history 401/no-store verified. Visual and actual paid-user acceptance remain deferred; no real funds or balances changed.",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1788522780329
-    },
-    {
-      "id": "feature_event_5b2367ffca4b411495df38cf64a157e6",
-      "feature_id": "esk-platform-account-snapshot-auth-v1",
-      "action": "registered",
-      "actor": "codex-esk-account-auth-root",
-      "reason": "",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1788523348357
-    },
-    {
-      "id": "feature_event_4cdf9a5255e5483c963c6fb6c68a4603",
-      "feature_id": "esk-platform-account-snapshot-auth-v1",
-      "action": "claimed",
-      "actor": "codex-esk-account-auth-root",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788523349010
-    },
-    {
-      "id": "feature_event_6274e01989854d68b4f08b590441d26f",
-      "feature_id": "esk-platform-account-snapshot-auth-v1",
-      "action": "transitioned",
-      "actor": "codex-esk-account-auth-root",
-      "reason": "Confirmed separate preflight/session and account-read transactions plus empty-account policy validation gap. Assigned harness regression and production Router coverage independently; root reuses existing authenticated history snapshot.",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788523395086
-    },
-    {
-      "id": "feature_event_f33bf6b2834f4ec5b14570b3d9dfef41",
-      "feature_id": "esk-platform-account-snapshot-auth-v1",
-      "action": "claim_released",
-      "actor": "codex-esk-account-auth-root",
-      "reason": "Clarify preserved existing auth last_seen bookkeeping before accepting regression evidence; no scope expansion or global auth change.",
-      "from_status": "in_progress",
-      "to_status": "ready",
-      "at_ms": 1788523478301
-    },
-    {
       "id": "feature_event_37ed753af24446828f76b3591c791cef",
       "feature_id": "esk-platform-account-snapshot-auth-v1",
       "action": "requirement_rebound",
@@ -22194,6 +22339,136 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1788567975270
+    },
+    {
+      "id": "feature_event_78fa82c91b8e4e21913784765a9aad93",
+      "feature_id": "official-quant-release-admission-v1",
+      "action": "registered",
+      "actor": "codex:/root",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1788568720483
+    },
+    {
+      "id": "feature_event_70c03cd4bdf8431bb3d40e0ad3425aa0",
+      "feature_id": "official-quant-release-admission-v1",
+      "action": "claimed",
+      "actor": "codex:/root",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788568732798
+    },
+    {
+      "id": "feature_event_893b8f71b1e24b34b754d1b431482a23",
+      "feature_id": "official-quant-release-admission-v1",
+      "action": "transitioned",
+      "actor": "codex:/root",
+      "reason": "已核对新版公共下载 V2、现有发布写入/读取/目录同步路径及历史旧包缺口，开始实现服务端新版唯一发布准入。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788568744004
+    },
+    {
+      "id": "feature_event_7330cacac98748efab0885e54ee6f10b",
+      "feature_id": "official-quant-release-admission-v1",
+      "action": "claim_released",
+      "actor": "codex:/root",
+      "reason": "Update the requirement and task scope to the user-approved new-only product contract and actual implementation paths.",
+      "from_status": "in_progress",
+      "to_status": "blocked",
+      "at_ms": 1788574262741
+    },
+    {
+      "id": "feature_event_9e0515e30d8c42daa807cf5c593521a6",
+      "feature_id": "official-quant-release-admission-v1",
+      "action": "requirement_rebound",
+      "actor": "codex:/root",
+      "reason": "Bind the reviewed new-only requirement, exact artifact proof, all download gates, recovery behavior, and task-sync policy.",
+      "from_status": "blocked",
+      "to_status": "proposed",
+      "at_ms": 1788574272825
+    },
+    {
+      "id": "feature_event_72455fe821f6465a88b671579f203b99",
+      "feature_id": "official-quant-release-admission-v1",
+      "action": "metadata_updated",
+      "actor": "codex:/root",
+      "reason": "Replace stale planning paths and old-visible wording with the reviewed implementation scope.",
+      "from_status": "proposed",
+      "to_status": "proposed",
+      "at_ms": 1788574320880
+    },
+    {
+      "id": "feature_event_db7785230aa943d98d02a9e0d9b7e1fb",
+      "feature_id": "official-quant-release-admission-v1",
+      "action": "transitioned",
+      "actor": "codex:/root",
+      "reason": "Reviewed the updated new-only requirement and exact implementation scope against the user decision and final code review.",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1788574339868
+    },
+    {
+      "id": "feature_event_3056938fa21746e39f59e533a48efc41",
+      "feature_id": "official-quant-release-admission-v1",
+      "action": "transitioned",
+      "actor": "codex:/root",
+      "reason": "Requirement and task paths are current, reviewed, and dependency-complete.",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1788574354729
+    },
+    {
+      "id": "feature_event_4f668aca9d1949b8a2a282a8e885fd33",
+      "feature_id": "official-quant-release-admission-v1",
+      "action": "claimed",
+      "actor": "codex:/root",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788574369805
+    },
+    {
+      "id": "feature_event_a8f2892a4b984633923757f208087d5b",
+      "feature_id": "official-quant-release-admission-v1",
+      "action": "transitioned",
+      "actor": "codex:/root",
+      "reason": "Implement and verify the reviewed exact scope.",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788574386909
+    },
+    {
+      "id": "feature_event_8722e7b3b782467aba4da8179689d103",
+      "feature_id": "official-quant-release-admission-v1",
+      "action": "evidence_recorded",
+      "actor": "codex:/root",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788574612678
+    },
+    {
+      "id": "feature_event_c66acb36db074e33ae486e405a63f66d",
+      "feature_id": "official-quant-release-admission-v1",
+      "action": "transitioned",
+      "actor": "codex:/root",
+      "reason": "完成实际新版唯一准入及用户旧版入口关闭，当前源码与测试证据已登记。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1788574844545
+    },
+    {
+      "id": "feature_event_cafe41fa2991415fa62b7cb6ea10cba4",
+      "feature_id": "official-quant-release-admission-v1",
+      "action": "transitioned",
+      "actor": "codex:/root",
+      "reason": "服务器定向校验、独立解析器与存储测试、项目广场前端测试及生产构建全部通过；全量服务器测试的既有 node-agent VFS 基线阻塞已独立记录。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1788574867882
     }
   ]
 }
