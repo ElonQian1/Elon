@@ -480,6 +480,7 @@
       return label.length >= 2 && label.length <= 120 && node.getBoundingClientRect().top > window.innerHeight * 0.45;
     });
     addRegionControls(controls, composer, 'composer', used);
+    sidebarAccounts.forEach((node) => addRegionControls(controls, node.parentElement, 'overlay', used, (candidate) => candidate === node));
     const overlays = visibleOverlayRoots();
     if (overlayOwnership && !overlays.length) overlayOwnership.observeNoOverlay(ownershipPageKey());
     overlays.forEach((overlay) => addRegionControls(
@@ -488,7 +489,6 @@
             overlayPolicy.contextMenuSignature(overlay, isVisible, actionableNodes))
         : ''
     ));
-    sidebarAccounts.forEach((node) => addRegionControls(controls, node.parentElement, 'overlay', used, (candidate) => candidate === node));
     addMessageControls(controls, used);
     addPageContentControls(controls, used, [header, composer, suggestions].concat(overlays));
     return {

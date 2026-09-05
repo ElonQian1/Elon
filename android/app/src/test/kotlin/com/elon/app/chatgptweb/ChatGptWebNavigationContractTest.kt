@@ -52,6 +52,10 @@ class ChatGptWebNavigationContractTest {
         assertTrue(layoutAdapter.contains("function requestSemanticTouch"))
         assertTrue(layoutAdapter.contains("sidebarControlPolicy.findAccountTriggers"))
         assertTrue(layoutAdapter.contains("sidebarControlPolicy.isTrackedAccountTrigger(node)"))
+        assertTrue(
+            layoutAdapter.indexOf("sidebarAccounts.forEach") <
+                layoutAdapter.indexOf("const overlays = visibleOverlayRoots()"),
+        )
         assertTrue(sidebarControlPolicy.contains("findAccountTriggers"))
         assertTrue(sidebarControlPolicy.contains("isConversationPath"))
         val requestList = adapter.substringAfter("function requestList")

@@ -36,6 +36,10 @@ assert.match(
   /used\.nodes\.has\(node\)/,
   'layout exports a nested overlay control only once'
 );
+assert.ok(
+  layoutSource.indexOf('sidebarAccounts.forEach') < layoutSource.indexOf('const overlays = visibleOverlayRoots()'),
+  'the stable account trigger id is reserved before account-menu overlay items are discovered'
+);
 
 function control(role = 'textbox') {
   const descendants = new Set();
