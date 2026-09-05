@@ -4,13 +4,12 @@
   const existingTransport = window.__elonChatGptPrivateTransport;
   const prefetchEnabled = window.__elonChatGptPrivateConversationPrefetchEnabled === true;
   const researchEnabled = window.__elonChatGptPrivateResearchEnabled === true;
-  if ((existingTransport && Number(existingTransport.version) >= 16) ||
+  if ((existingTransport && Number(existingTransport.version) >= 17) ||
       (!prefetchEnabled && !researchEnabled) ||
       location.origin !== 'https://chatgpt.com') return;
 
   const policyModule = window.__elonChatGptPrivateTransportPolicy;
   if (!policyModule || typeof policyModule.create !== 'function') return;
-  const MAX_MESSAGES = 80;
   const SAFE_PROJECT_ID = /^g-p-[A-Za-z0-9_-]{1,160}$/;
   const inheritedHeaders = new Map();
   const activeConversationRequests = new Map();
@@ -198,63 +197,10 @@
     }
   }
 
-  function textParts(content) {
-    if (typeof content === 'string') return [content];
-    if (!content || typeof content !== 'object') return [];
-    const values = Array.isArray(content.parts) ? content.parts : [];
-    return values.map((value) => {
-      if (typeof value === 'string') return value;
-      if (!value || typeof value !== 'object') return '';
-      return typeof value.text === 'string' ? value.text :
-        (typeof value.content === 'string' ? value.content : '');
-    }).map((value) => String(value || '').trim()).filter(Boolean);
-  }
-
-  function messageFrom(node) {
-    const message = node && (node.message || node);
-    if (!message || typeof message !== 'object') return null;
-    const role = cleanText(message.author && message.author.role || message.role, 20).toLowerCase();
-    if (role !== 'user' && role !== 'assistant') return null;
-    const content = textParts(message.content).join('\n').trim().slice(0, 20000);
-    if (!content) return null;
-    return {
-      id: cleanText(message.id || node.id, 160) || role,
-      role,
-      content,
-      state: message.status === 'in_progress' ? 'streaming' : 'completed',
-      parts: []
-    };
-  }
-
   function conversationMessages(payload) {
-    const mapping = payload && payload.mapping;
-    if (!mapping || typeof mapping !== 'object') {
-      const arrays = [
-        payload && payload.messages,
-        payload && payload.linear_conversation,
-        payload && payload.items,
-        payload && payload.data && payload.data.messages,
-        payload && payload.data && payload.data.linear_conversation,
-        payload && payload.result && payload.result.messages
-      ];
-      const messages = arrays.find(Array.isArray) || [];
-      return messages.map(messageFrom).filter(Boolean).slice(-MAX_MESSAGES);
-    }
-    const ordered = [];
-    const seen = new Set();
-    let cursor = cleanText(payload.current_node || payload.currentNode, 180);
-    while (cursor && mapping[cursor] && !seen.has(cursor) && ordered.length < MAX_MESSAGES * 3) {
-      seen.add(cursor);
-      ordered.push(mapping[cursor]);
-      cursor = cleanText(mapping[cursor].parent, 180);
-    }
-    const nodes = ordered.length
-      ? ordered.reverse()
-      : Object.values(mapping).sort((left, right) =>
-        Number(left && left.message && left.message.create_time || 0) -
-        Number(right && right.message && right.message.create_time || 0)
-      );
-    return nodes.map(messageFrom).filter(Boolean).slice(-MAX_MESSAGES);
+    const projection = window.__elonChatGptPrivateHistoryProjection;
+    if (!projection || typeof projection.create !== 'function') return [];
+    return projection.create({ streamPolicy: window.__elonChatGptPrivateStreamPolicy }).project(payload);
   }
 
   function normalizedConversationPayload(payload) {
@@ -266,8 +212,9 @@
       payload && payload.result,
       payload && payload.result && payload.result.conversation
     ];
-    return values.find((value) => value && typeof value === 'object' &&
-      value.mapping && typeof value.mapping === 'object') || payload;
+    return values.find((value) => value && typeof value === 'object' && (
+      value.mapping && typeof value.mapping === 'object' || Array.isArray(value.messages) ||
+      Array.isArray(value.linear_conversation) || Array.isArray(value.items))) || payload;
   }
 
   function copySameOriginRequestHeaders() {
@@ -418,6 +365,7 @@
     recordPrivateOutcome('success', messages.length, result.elapsedMs);
     emitEvent({
       type: 'message_snapshot',
+      snapshotScope: 'content',
       title: cleanText(payload && payload.title, 120),
       url: location.origin + target.path,
       draft: '',
@@ -428,7 +376,7 @@
       pageKind: 'conversation',
       loginRequired: false,
       composerReady: false,
-      streaming: false,
+      streaming: messages.some((message) => message.state === 'streaming'),
       currentModel: cleanText(payload && (payload.default_model_slug || payload.model), 80),
       attachments: [],
       dictationActive: false,
@@ -513,7 +461,7 @@
   }
 
   window.__elonChatGptPrivateTransport = Object.freeze({
-    version: 16,
+    version: 17,
     conversationPrefetchEnabled: prefetchEnabled,
     conversationPrefetchAvailable: true,
     experimentalConversationPrefetchAvailable: true,

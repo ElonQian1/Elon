@@ -45,6 +45,7 @@ internal data class ChatGptWebSnapshot(
     val privateReadAloudReady: Boolean = false,
     val privateReadAloudState: String = "idle",
     val privateReadAloudContextId: String = "",
+    val contentOnly: Boolean = false,
 )
 
 internal data class ChatGptWebComposerOption(
@@ -277,6 +278,7 @@ internal object ChatGptWebProtocol {
             messageWindowStart + messages.size,
         ).coerceIn(messageWindowStart + messages.size, MAX_OBSERVED_MESSAGES)
         return ChatGptWebSnapshot(
+            contentOnly = event.optString("snapshotScope") == "content",
             title = event.optString("title").trim().take(120),
             url = event.optString("url").take(2_048),
             draft = event.optString("draft").take(MAX_DRAFT_LENGTH),

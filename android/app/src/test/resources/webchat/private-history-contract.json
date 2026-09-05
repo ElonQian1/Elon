@@ -1,0 +1,71 @@
+{
+  "input": {
+    "title": "Synthetic history contract",
+    "current_node": "answer",
+    "mapping": {
+      "question": {
+        "parent": null,
+        "message": {
+          "id": "history-user",
+          "author": { "role": "user" },
+          "content": { "parts": ["Read the test file."] },
+          "metadata": { "attachments": [{ "name": "fixture.txt", "mime_type": "text/plain" }] }
+        }
+      },
+      "answer": {
+        "parent": "question",
+        "message": {
+          "id": "history-assistant",
+          "author": { "role": "assistant" },
+          "channel": "final",
+          "status": "finished_successfully",
+          "content": { "content_type": "text", "parts": ["Reference [ref]."] },
+          "metadata": {
+            "content_references": [{
+              "type": "grouped_webpages",
+              "start_idx": 10,
+              "end_idx": 15,
+              "matched_text": "[ref]",
+              "items": [{ "title": "Example", "url": "https://example.com/source?session=synthetic" }]
+            }]
+          }
+        }
+      }
+    }
+  },
+  "event": {
+    "type": "message_snapshot",
+    "snapshotScope": "content",
+    "url": "https://chatgpt.com/c/history-contract",
+    "title": "Synthetic history contract",
+    "pageKind": "conversation",
+    "authenticated": true,
+    "composerReady": false,
+    "streaming": false,
+    "capabilities": ["conversation_history"],
+    "messages": [
+      {
+        "id": "history-user",
+        "role": "user",
+        "state": "completed",
+        "content": [
+          { "type": "text", "text": "Read the test file." },
+          { "type": "file", "text": "fixture.txt", "kind": "file", "mediaType": "text/plain" }
+        ]
+      },
+      {
+        "id": "history-assistant",
+        "role": "assistant",
+        "state": "completed",
+        "content": [
+          { "type": "markdown", "text": "Reference [Example](https://example.com/source)." },
+          {
+            "type": "citation", "text": "Example", "url": "https://example.com/source",
+            "markerText": "Example", "citationId": "private-ref-0", "groupSize": 1,
+            "targetHost": "example.com"
+          }
+        ]
+      }
+    ]
+  }
+}

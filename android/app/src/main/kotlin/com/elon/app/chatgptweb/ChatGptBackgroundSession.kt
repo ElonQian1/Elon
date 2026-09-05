@@ -560,7 +560,9 @@ internal class ChatGptBackgroundSession(
         when (event) {
             is ChatGptWebEvent.Snapshot -> {
                 if (!conversationNavigation.shouldAccept(event.value)) return
-                val reconciliation = sessionContinuity.reconcileWithDecision(event.value)
+                val reconciliation = sessionContinuity.reconcileWithDecision(
+                    ChatGptWebContentSnapshotPolicy.reconcile(latestSnapshot, event.value),
+                )
                 val previous = latestSnapshot
                 val previousIdentity = ChatGptWebConversationPath.fromUrl(previous?.url)
                     ?.let(ChatGptWebConversationPath::identity)

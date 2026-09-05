@@ -92,6 +92,11 @@ function createContext(
   vm.runInNewContext(policySource, context, {
     filename: 'chatgpt_web_private_transport_policy.js'
   });
+  for (const asset of ['chatgpt_web_private_history_projection.js', 'chatgpt_web_private_stream_policy.js']) {
+    vm.runInNewContext(fs.readFileSync(path.join(
+      __dirname, '..', 'android', 'app', 'src', 'main', 'assets', asset
+    ), 'utf8'), context, { filename: asset });
+  }
   vm.runInNewContext(source, context, { filename: 'chatgpt_web_private_transport.js' });
   return { window, timers, storage, outcomes, shapes, membershipAccepts };
 }
@@ -130,7 +135,7 @@ const detailPayload = {
   assert.equal(disabled.window.__elonChatGptPrivateTransport, undefined);
 
   const gated = createContext(async () => jsonResponse(detailPayload), true, false);
-  assert.equal(gated.window.__elonChatGptPrivateTransport.version, 16);
+  assert.equal(gated.window.__elonChatGptPrivateTransport.version, 17);
   assert.equal(gated.window.__elonChatGptPrivateTransport.conversationPrefetchEnabled, false);
   assert.equal(gated.window.__elonChatGptPrivateTransport.conversationPrefetchReady(), false);
 
@@ -142,7 +147,7 @@ const detailPayload = {
     return jsonResponse(detailPayload);
   }, false, true);
   const transport = detail.window.__elonChatGptPrivateTransport;
-  assert.equal(transport.version, 16);
+  assert.equal(transport.version, 17);
   assert.equal(transport.conversationPrefetchEnabled, true);
   assert.equal(transport.conversationPrefetchAvailable, true);
   assert.equal(transport.experimentalConversationPrefetchAvailable, true);
@@ -170,14 +175,17 @@ const detailPayload = {
   assert.equal(requests[1].options.headers.Authorization, 'page-scoped-value');
   assert.equal(requests[1].options.__elonPrivateTransport, 'conversation_prefetch');
   assert.equal(snapshots[0].composerReady, false);
+  assert.equal(snapshots[0].snapshotScope, 'content');
   assert.equal(transport.health().successes, 1);
   assert.equal(transport.health().lastOutcome, 'success');
   assert.equal(detail.outcomes.length, 0);
   assert.equal(detail.shapes.length, 0);
   assert.deepEqual(
-    Array.from(snapshots[0].messages, (value) => [value.role, value.content]),
+    Array.from(snapshots[0].messages, (value) => [value.role, value.content[0].text]),
     [['user', 'hello'], ['assistant', 'hi']]
   );
+  assert.ok(snapshots[0].messages.every((value) => Array.isArray(value.content)),
+    'private snapshots must use the same content-array contract as the native parser');
 
   let warmedAcquisitions = 0;
   const warmedRequests = [];

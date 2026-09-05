@@ -765,6 +765,7 @@
     financePartsFromMetadata,
     mergeMessages,
     packedFinanceWidgets,
-    progressFrame
+    progressFrame,
+    visibleContentText
   });
 });
