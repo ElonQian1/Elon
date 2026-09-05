@@ -10387,6 +10387,56 @@
       "updated_at_ms": 1788540545290
     },
     {
+      "id": "esk-sui-reproducible-toolchain-ci-v1",
+      "title": "ESK Sui 可复现工具链与 CI V1",
+      "summary": "固定官方 Sui testnet-v1.79.0 工具链的下载与双摘要校验，在独立 CI 中以 warnings-as-errors 重建 ESK Currency 与 Participation Move 包，精确验证 3+13 项测试和生产字节码证据；不创建钱包、RPC、交易、签名、广播或链状态。",
+      "status": "accepted",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/esk-sui-reproducible-toolchain-ci-v1.md",
+        "content_hash": "e482574dbb3f1c6d79383d04563200bb1d6dc43e695dcae0fa0d5329b1a64ee1",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "fdf653c929884a44ab5e8a99a5dcf29b14171866",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "b4f8661d8bf2d2ad88e9f4bef02a723eae903ea2",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "protocol-ci",
+      "tags": [
+        "esk",
+        "sui",
+        "move",
+        "ci",
+        "reproducible"
+      ],
+      "task_paths": [
+        ".github/workflows/ci.yml",
+        "docs/delivery/esk-sui-reproducible-toolchain-ci-v1.md",
+        "scripts/esk-sui-toolchain-ci/**",
+        "scripts/install-esk-sui-toolchain.ps1",
+        "scripts/validate-esk-sui-move.ps1"
+      ],
+      "dependencies": [
+        "esk-sui-allocation-vesting-v1",
+        "esk-sui-genesis-foundation-v1"
+      ],
+      "acceptance_criteria": [
+        "固定官方 release archive 与解包后 CLI 双 SHA-256 及精确版本校验，损坏缓存或错误版本失败关闭。",
+        "固定工具链以 warnings-as-errors 完成 esk_currency 3/3 与 yilong_participation 13/13 Move build/test。",
+        "复算 Currency esk.mv 与 Participation production_bytecode_bundle_v1，并与当前 manifest/policy 证据一致。",
+        "验证与合同测试不读取钱包、不连接 RPC、不生成交易、不签名、不广播、不移动资金。",
+        "GitHub Actions 独立 Sui job、精确缓存键和只读权限由守卫测试固定，现有 job 不回归。"
+      ],
+      "implementation_evidence": [],
+      "created_at_ms": 1788645947311,
+      "updated_at_ms": 1788645947311
+    },
+    {
       "id": "esk_paper_quant_allocation_request_v2",
       "title": "ESK Paper 量化分配申请与只读占用投影 V2",
       "summary": "用户可在主项目把可用 ESK 提交为可取消的 Paper 量化分配申请；主项目分别核算卖回、量化与总占用，并通过最长五分钟签名 V2 投影让量化 PWA 只读展示，不自动建仓、交易或产生收益。",
@@ -21217,16 +21267,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_1e0cadce4ca14a07ba1480295611abf8",
-      "feature_id": "esk-platform-native-progress-v1",
-      "action": "registered",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1788536023679
-    },
-    {
       "id": "feature_event_485a6250e9934acfb43f9b22c9408b94",
       "feature_id": "esk-platform-native-progress-v1",
       "action": "claimed",
@@ -23215,6 +23255,16 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1788644133938
+    },
+    {
+      "id": "feature_event_9158ec9112e9462788dd65d6366f669c",
+      "feature_id": "esk-sui-reproducible-toolchain-ci-v1",
+      "action": "registered",
+      "actor": "codex-sui-ci",
+      "reason": "",
+      "from_status": "",
+      "to_status": "accepted",
+      "at_ms": 1788645947311
     }
   ]
 }
