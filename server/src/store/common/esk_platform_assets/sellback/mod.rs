@@ -11,6 +11,8 @@ mod records;
 mod snapshot;
 mod write;
 
+pub(super) use snapshot::scan_delegated_on;
+
 fn authenticate(conn: &Connection, user_id: &str, token: &str) -> Result<()> {
     ensure_session(conn, user_id, token, false).map_err(platform_error)
 }

@@ -59,6 +59,7 @@ pub(super) fn build(
         router
     };
     router
+        .merge(super::asset_access::routes(&state.public_url))
         .layer(DefaultBodyLimit::max(64 * 1024))
         .layer(Extension(peer_address))
         .layer(Extension(slot))

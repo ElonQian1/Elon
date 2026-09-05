@@ -389,6 +389,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (286, "ESK 与 USDT Paper 双向兑换追加式结算", crate::esk_asset_migration::migration_v286),
     (287, "ESK 经审核付款独立平台登记", crate::esk_asset::platform::migration::migration_v287),
     (288, "ESK 正式卖回申请与追加式占用取消", crate::esk_asset::platform::sellback::migration::migration_v288),
+    (289, "账号绑定的可撤销只读资产授权", crate::esk_asset::platform::access::migration::migration_v289),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {

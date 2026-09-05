@@ -1,0 +1,74 @@
+{
+  "metadata": { "synthetic": true, "clock": "2030-01-01T00:00:00Z", "description": "Public test vectors; every identity, credential and amount is invented. No real account or asset is represented." },
+  "valid": {
+    "token": {
+      "schema": "yilong.asset_access.token.v1",
+      "access_token": "aat_0000000000000000000000000000000000000000000000000000000000000000",
+      "token_type": "Bearer", "audience": "yilong-quant", "subject": "aas_2222222222222222222222222222222222222222222222222222222222222222",
+      "client_id": "quant.web", "grant_id": "aag_33333333333333333333333333333333", "expires_in": 900,
+      "expires_at": "2030-01-01T00:15:00Z",
+      "scopes": ["esk.summary.read", "esk.progress.read", "profile.read"]
+    },
+    "identity": {
+      "schema": "yilong.asset_access.identity.v1", "audience": "yilong-quant",
+      "subject": "aas_2222222222222222222222222222222222222222222222222222222222222222", "client_id": "quant.web", "grant_id": "aag_33333333333333333333333333333333",
+      "expires_at": "2030-01-01T00:15:00Z",
+      "scopes": ["esk.summary.read", "esk.progress.read", "profile.read"], "nickname": "Synthetic example"
+    },
+    "asset_first": {
+      "schema": "yilong.esk.delegated_asset_page.v1", "subject": "aas_2222222222222222222222222222222222222222222222222222222222222222",
+      "client_id": "quant.web", "expires_at": "2030-01-01T00:15:00Z",
+      "asset": { "asset_id": "esk", "symbol": "ESK", "decimals": 6, "source": "platform_recorded", "simulated": false, "chain_status": "not_deployed", "funds_moved": false },
+      "balance": { "total_base_units": "9007199254740995", "reserved_base_units": "2", "available_base_units": "9007199254740993" },
+      "snapshot_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "progress": {
+        "request_count": "2", "open_count": "1", "range_start": "1", "range_end": "1",
+        "requests": [{ "request_id": "eskpsr_44444444444444444444444444444444", "amount_base_units": "2", "status": "submitted", "created_at": "2029-12-31T20:00:00Z", "canceled_at": null }],
+        "has_more": true, "next_cursor": "esbr1.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.eskpsr_44444444444444444444444444444444"
+      }
+    },
+    "asset_second": {
+      "schema": "yilong.esk.delegated_asset_page.v1", "subject": "aas_2222222222222222222222222222222222222222222222222222222222222222",
+      "client_id": "quant.web", "expires_at": "2030-01-01T00:15:00Z",
+      "asset": { "asset_id": "esk", "symbol": "ESK", "decimals": 6, "source": "platform_recorded", "simulated": false, "chain_status": "not_deployed", "funds_moved": false },
+      "balance": { "total_base_units": "9007199254740995", "reserved_base_units": "2", "available_base_units": "9007199254740993" },
+      "snapshot_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "progress": {
+        "request_count": "2", "open_count": "1", "range_start": "2", "range_end": "2",
+        "requests": [{ "request_id": "eskpsr_55555555555555555555555555555555", "amount_base_units": "5", "status": "canceled", "created_at": "2029-12-30T12:00:00Z", "canceled_at": "2029-12-30T13:00:00Z" }],
+        "has_more": false, "next_cursor": null
+      }
+    },
+    "asset_zero": {
+      "schema": "yilong.esk.delegated_asset_page.v1", "subject": "aas_2222222222222222222222222222222222222222222222222222222222222222",
+      "client_id": "quant.web", "expires_at": "2030-01-01T00:15:00Z",
+      "asset": { "asset_id": "esk", "symbol": "ESK", "decimals": 6, "source": "platform_recorded", "simulated": false, "chain_status": "not_deployed", "funds_moved": false },
+      "balance": { "total_base_units": "0", "reserved_base_units": "0", "available_base_units": "0" },
+      "snapshot_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "progress": { "request_count": "0", "open_count": "0", "range_start": "0", "range_end": "0", "requests": [], "has_more": false, "next_cursor": null }
+    },
+    "asset_summary": {
+      "schema": "yilong.esk.delegated_asset_page.v1", "subject": "aas_2222222222222222222222222222222222222222222222222222222222222222",
+      "client_id": "quant.web", "expires_at": "2030-01-01T00:15:00Z",
+      "asset": { "asset_id": "esk", "symbol": "ESK", "decimals": 6, "source": "platform_recorded", "simulated": false, "chain_status": "not_deployed", "funds_moved": false },
+      "balance": { "total_base_units": "9223372036854775807", "reserved_base_units": "0", "available_base_units": "9223372036854775807" },
+      "snapshot_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    },
+    "revoked": { "schema": "yilong.asset_access.revoked.v1", "revoked": true, "funds_moved": false }
+  },
+  "invalid_assets": [
+    { "name": "wrong-schema", "path": ["schema"], "value": "yilong.esk.delegated_asset_page.v2" },
+    { "name": "wrong-subject", "path": ["subject"], "value": "another-synthetic-subject" },
+    { "name": "wrong-client", "path": ["client_id"], "value": "quant.ai" },
+    { "name": "numeric-money", "path": ["balance", "total_base_units"], "value": 9007199254740996 },
+    { "name": "overflow", "path": ["balance", "total_base_units"], "value": "9223372036854775808" },
+    { "name": "negative-money", "path": ["balance", "reserved_base_units"], "value": "-1" },
+    { "name": "noncanonical-money", "path": ["balance", "reserved_base_units"], "value": "02" },
+    { "name": "fractional-money", "path": ["balance", "reserved_base_units"], "value": "2.0" },
+    { "name": "unbalanced", "path": ["balance", "available_base_units"], "value": "9007199254740994" },
+    { "name": "invented-chain-proof", "path": ["asset", "chain_status"], "value": "confirmed" },
+    { "name": "claims-money-moved", "path": ["asset", "funds_moved"], "value": true },
+    { "name": "inconsistent-page", "path": ["progress", "range_end"], "value": "2" },
+    { "name": "unknown-private-field", "path": ["user_id"], "value": "must-not-be-exposed" }
+  ]
+}

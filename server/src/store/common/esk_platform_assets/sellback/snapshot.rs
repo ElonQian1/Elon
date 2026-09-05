@@ -2,7 +2,9 @@ use anyhow::Result;
 use rusqlite::Connection;
 use sha2::{Digest, Sha256};
 
-use crate::esk_asset::platform::{sellback::*, PlatformPolicy};
+use crate::esk_asset::platform::{sellback::*, PlatformHistoryPage, PlatformPolicy};
+
+use super::super::{access::AuthorizedAssetRead, history::scan_history_on};
 
 use super::{add, platform_error, policy_on, records::visit_on, scan_authenticated_history_on};
 
@@ -39,6 +41,36 @@ pub(super) fn scan_on(
 ) -> Result<Snapshot> {
     let formal_page =
         scan_authenticated_history_on(conn, user, token, 1, None).map_err(platform_error)?;
+    scan_core_on(conn, user, config, selection, formal_page)
+}
+
+/// The capability can only come from the delegated verifier on the caller's
+/// SQLite snapshot. No public bare-user read path is added.
+pub(in super::super) fn scan_delegated_on(
+    conn: &Connection,
+    access: &AuthorizedAssetRead,
+    config: &SellbackConfiguration,
+    limit: usize,
+    cursor: Option<&SellbackCursor>,
+) -> Result<SellbackPage> {
+    let formal_page = scan_history_on(conn, access.user_id(), 1, None).map_err(platform_error)?;
+    Ok(scan_core_on(
+        conn,
+        access.user_id(),
+        config,
+        Selection::Page(limit, cursor),
+        formal_page,
+    )?
+    .page)
+}
+
+fn scan_core_on(
+    conn: &Connection,
+    user: &str,
+    config: &SellbackConfiguration,
+    selection: Selection<'_>,
+    formal_page: PlatformHistoryPage,
+) -> Result<Snapshot> {
     let formal = policy_on(conn).map_err(platform_error)?;
     let mut hash = Fingerprint::new(user, &formal_page.snapshot_digest, config);
     let mut page = SellbackPage {

@@ -14058,6 +14058,278 @@
       "updated_at_ms": 1786877700639
     },
     {
+      "id": "unified-account-asset-access-v1",
+      "title": "统一主账号与可撤销只读资产授权 V1",
+      "summary": "复用主账号和正式资产真源，以独立客户端授权代替逐页主APK确认；新只读凭据绑定用户、客户端、范围、原会话和期限，Android/Web/AI消费统一投影。原0.5发布与入口切换单独协调。",
+      "status": "in_progress",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/unified-account-asset-access-v1.md",
+        "content_hash": "5c0ae89d5f0d43de84a6cd2ecc781447cdba3ec06707f8e7ecd32e461b43d79b",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "9c38249a6091ebacfce4b4f3eefedae4fabc5877",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "761e0bdba91f351ef42dca4e81e8a98717609270",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "platform-account-access, quant-client",
+      "tags": [],
+      "task_paths": [
+        "android/app/asset-access.gradle",
+        "android/app/build.gradle",
+        "android/app/src/main/AndroidManifest.xml",
+        "android/app/src/main/kotlin/com/elon/app/esk/platform/access",
+        "android/app/src/test/kotlin/com/elon/app/esk/platform/access",
+        "contracts/assets",
+        "docs/contracts/unified-account-asset-access-v1.md",
+        "sdk/asset-access",
+        "server/src/esk_platform/access",
+        "server/src/esk_platform/access_projection.rs",
+        "server/src/esk_platform/http_tests.rs",
+        "server/src/esk_platform/mod.rs",
+        "server/src/node_endpoint_transport.rs",
+        "server/src/node_endpoint_transport/asset_access.rs",
+        "server/src/node_endpoint_transport/secure_router.rs",
+        "server/src/store/common/esk_platform_assets/access",
+        "server/src/store/common/esk_platform_assets/access_projection.rs",
+        "server/src/store/common/esk_platform_assets/history.rs",
+        "server/src/store/common/esk_platform_assets/mod.rs",
+        "server/src/store/common/esk_platform_assets/sellback",
+        "server/src/store_migrations.rs",
+        "server/tests/esk-platform-harness"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "首次明确同意后PKCE一次性兑换，在权限有效期内连续本人资产翻页刷新",
+        "应用授权及主会话撤销、过期、换属或用户停用后读取拒绝",
+        "授权验证与正式账本及占用进度同一SQLite快照，旧写路由不接受受限凭据",
+        "Android/Web/AI使用同一精确只读模型，敏感传输拒绝公网HTTP"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/esk/platform/access/AssetAccessConsentActivity.kt",
+          "content_hash": "18b263acaec57681d96f9801a50f1b8e31e1893fd7d23472356f0186ab384010",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9c38249a6091ebacfce4b4f3eefedae4fabc5877",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "3fb40a5aa7545560ecdf6e675301abfe9be7a941",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/esk/platform/access/AssetAccessRequestTest.kt",
+          "content_hash": "2335f802098dd7f962386d28554f479067527eb05d31756996a794bf334ddc11",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9c38249a6091ebacfce4b4f3eefedae4fabc5877",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "4c0bbed1fd01c585910f8c3bb65f87516a43cd98",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "docs/contracts/unified-account-asset-access-v1.md",
+          "content_hash": "88b5d632a2c1a2710b75fe2bd6d12bdb5c22287ad3d6618ff287372f9baaaccf",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9c38249a6091ebacfce4b4f3eefedae4fabc5877",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "f31dad7c7d5822c86a4244ddd5cfea84ff676fed",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "docs/reports/unified-account-asset-access-v1.md",
+          "content_hash": "25572fae888d88711dbfde22cf9d4e10780aa1fc01567652b929ebbf8d54afe9",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9c38249a6091ebacfce4b4f3eefedae4fabc5877",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "e868240701a32e878f6585e861ac5f9bff516381",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "sdk/asset-access/src/client.js",
+          "content_hash": "855a7be59fce53ab017da17c09dab309124ea6558e6bf92a6421482e2600c609",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9c38249a6091ebacfce4b4f3eefedae4fabc5877",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "2323c381a428d323d389e860704c203791648aff",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "sdk/asset-access/test/client.test.js",
+          "content_hash": "28c671302ab469560eb1d370945b1f986e4ba99dd3cb2bdc7f735be293eb1eb8",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9c38249a6091ebacfce4b4f3eefedae4fabc5877",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "f6aed63e85087a480355c3872f6e4227bf85c6e8",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/esk_platform/access/migration.rs",
+          "content_hash": "9cfc5ae6ca9b94bc0ea022d2e566c6704cc5d2fcb2e44cb5cd443efb78b4114f",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9c38249a6091ebacfce4b4f3eefedae4fabc5877",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "3a0360139417f3e3a68a169a21d2c6bcd6572eb5",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/esk_platform/access/mod.rs",
+          "content_hash": "fac6e14216e6bfcf11b0289946d2a97ed6ab6dd057d471b397e61b28ef7e788e",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9c38249a6091ebacfce4b4f3eefedae4fabc5877",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "a64dc63a4b94a76e8960c745ac0c61c5e1b1e106",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/esk_platform/access/tests_http.rs",
+          "content_hash": "e31e4ac8de0565d7d0a5fda89bbd9bc0295730fcad537dd33719f5ce11351b8f",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9c38249a6091ebacfce4b4f3eefedae4fabc5877",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "7997b9114156f31acdd79789af42de4230d308be",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/node_endpoint_transport/asset_access.rs",
+          "content_hash": "d96d57b28695122ca5835cd8c4e72faad3300cd702b1179a8e7f0651f2fe0376",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9c38249a6091ebacfce4b4f3eefedae4fabc5877",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "642a194a088b4bc517fa33c861305c6c2387c84a",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/store/common/esk_platform_assets/access/issue.rs",
+          "content_hash": "a4a6cb70062839488441c996caaca0399f45998ce467f09276b125cb10150da8",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9c38249a6091ebacfce4b4f3eefedae4fabc5877",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "8368fe9276519f6390f535774122c8162cb646a5",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/store/common/esk_platform_assets/access/read.rs",
+          "content_hash": "22a5e6c59e86e091bd91ddae25084d73494fdea833f588f9e9b7f72ba03959f6",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9c38249a6091ebacfce4b4f3eefedae4fabc5877",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "f97d76d8574cde604da5928b2d7fe822d6175acf",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/store/common/esk_platform_assets/access/tests.rs",
+          "content_hash": "3744f0434b281ba7fef907bea4d6d201534cdff52c97dbd7dc8f4e9f172997c3",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9c38249a6091ebacfce4b4f3eefedae4fabc5877",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "505ad92aa83f5ec55e28f31ebe5492c42cc97f9b",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/store/common/esk_platform_assets/access_projection.rs",
+          "content_hash": "c2a0b0c64367570ff54d57d18561341938da6cef1901625c93d463a5c561f651",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9c38249a6091ebacfce4b4f3eefedae4fabc5877",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "a2c9bbff2aa346357bc61945606300be4a7155e0",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/tests/esk-platform-harness/src/tests/sellback/access_projection.rs",
+          "content_hash": "040f28cbcc7a174d77e8b1048d3292ce6ad685c6b4a19ff03439eb0f1b2ac658",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9c38249a6091ebacfce4b4f3eefedae4fabc5877",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "2738a6124c138dbbe16ad8dab2b684edb75a71d3",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/tests/esk-platform-harness/src/tests/sellback/access_wire_export.rs",
+          "content_hash": "4db431ff2b5f4aca7e15e1191dc2046c5b568ecb5480d1b575c56aa8faecd660",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9c38249a6091ebacfce4b4f3eefedae4fabc5877",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "89a8da53ae00eccc37291c014433a7094fb09490",
+            "state": "untracked"
+          }
+        }
+      ],
+      "claim": {
+        "claim_id": "claim_75b3203e19094355a053b648b97d9671",
+        "agent_id": "codex-account-asset-access",
+        "claimed_at_ms": 1788609185084,
+        "expires_at_ms": 1788623585084
+      },
+      "created_at_ms": 1788606214400,
+      "updated_at_ms": 1788610260540
+    },
+    {
       "id": "win-ai-child-webview-capability-v1",
       "title": "Win 官方 AI 子 WebView 权限绑定 V1",
       "summary": "修复官方 AI 子 WebView 按宿主窗口匹配 capability 导致语义事件 IPC 被拒绝、原生输入与新会话永久禁用的问题。",
@@ -20589,116 +20861,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_2b55476c64cd41838576757785edf9ec",
-      "feature_id": "esk-platform-sellback-requests-v1",
-      "action": "metadata_updated",
-      "actor": "codex-esk-sellback-root",
-      "reason": "Include existing Router fixture submodule wiring and native/Web explanatory regression owned by this slice.",
-      "from_status": "proposed",
-      "to_status": "proposed",
-      "at_ms": 1788528352893
-    },
-    {
-      "id": "feature_event_cdc3b04d8ebd4f3c914862af84ea656d",
-      "feature_id": "esk-platform-sellback-requests-v1",
-      "action": "transitioned",
-      "actor": "codex-esk-sellback-root",
-      "reason": "Reviewed explicit readonly recovery and production-default-closed boundaries against unchanged acceptance criteria; all owners aligned.",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1788528366063
-    },
-    {
-      "id": "feature_event_477641b8574843ad8f84f9c1bf44b36e",
-      "feature_id": "esk-platform-sellback-requests-v1",
-      "action": "transitioned",
-      "actor": "codex-esk-sellback-root",
-      "reason": "Reviewed explicit readonly recovery and production-default-closed boundaries against unchanged acceptance criteria; all owners aligned.",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1788528366615
-    },
-    {
-      "id": "feature_event_f8b3cef90d314caca85629ea6944de15",
-      "feature_id": "esk-platform-sellback-requests-v1",
-      "action": "claimed",
-      "actor": "codex-esk-sellback-root",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788528367156
-    },
-    {
-      "id": "feature_event_268eff38dc9b45ea82df48aa40a4ff6a",
-      "feature_id": "esk-platform-sellback-requests-v1",
-      "action": "transitioned",
-      "actor": "codex-esk-sellback-root",
-      "reason": "Resume same owned backend/native slice after intentional requirement re-review; preserve pure history baseline tests and commit.",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788528367696
-    },
-    {
-      "id": "feature_event_85cc790ac5124c35b7ee1ea3c3e09c71",
-      "feature_id": "esk-platform-sellback-requests-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-esk-sellback-root",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788530811796
-    },
-    {
-      "id": "feature_event_f6250ead7e3145f5b23c8c802adbbb27",
-      "feature_id": "esk-platform-sellback-requests-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-esk-sellback-root",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788530843095
-    },
-    {
-      "id": "feature_event_19f349d5c431465fb90a3c683a35a7f4",
-      "feature_id": "esk-platform-sellback-requests-v1",
-      "action": "transitioned",
-      "actor": "codex-esk-sellback-root",
-      "reason": "独立正式账本卖回申请与占用、默认关闭政策、追加式本人取消和只读恢复已实现；108 harness、26 Router、224 Android 与 PWA 边界门禁通过。待实际配套发布及用户验收，未开启生产申请或资金操作。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1788530843689
-    },
-    {
-      "id": "feature_event_a7a72d2d3f5a4d6287bb38560fd8946b",
-      "feature_id": "esk-platform-sellback-requests-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-esk-sellback-root",
-      "reason": "",
-      "from_status": "implemented",
-      "to_status": "implemented",
-      "at_ms": 1788533023410
-    },
-    {
-      "id": "feature_event_ddb1c0a5ea184859a67d75311c185675",
-      "feature_id": "esk-platform-sellback-requests-v1",
-      "action": "transitioned",
-      "actor": "codex-esk-sellback-root",
-      "reason": "108 harness、26 生产 Router、224 Android 全绿。配套发布后 health/version、五动作未登录401及隐私头、公开PWA说明与完整APK下载摘要均验证；UI调试未连接故视觉延期。生产政策关闭，真实本人流程为独立上线验收，不标记真实成交兑付。",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1788533026044
-    },
-    {
-      "id": "feature_event_5b82a3eb747d476b9dcff80bd6e4939d",
-      "feature_id": "esk-platform-sellback-requests-v1",
-      "action": "transitioned",
-      "actor": "codex-esk-sellback-root",
-      "reason": "源码5768545ef已推送，Server0.3.1727与主APK1.1.1515(1515)实际配套发布；公开APK39723699字节完整下载SHA匹配。released仅指默认关闭的申请切片部署，不代表真实用户开通、资金结算、量化占用合同或视觉验收。",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1788533028613
-    },
-    {
       "id": "feature_event_5691210baac2476faadfd422801c3238",
       "feature_id": "esk-sui-currency-observer-v1",
       "action": "registered",
@@ -22587,6 +22749,116 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1788594605146
+    },
+    {
+      "id": "feature_event_1b08eaac7d66461bbf90e54cc855e9ae",
+      "feature_id": "unified-account-asset-access-v1",
+      "action": "registered",
+      "actor": "codex-account-asset-access",
+      "reason": "用户2026-09-05明确优先实现并授权向原任务发送分工通知；新增模块独立开发，共同入口切换先协调。",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1788606214401
+    },
+    {
+      "id": "feature_event_e9bc9561fabf42dea9afe314e841896a",
+      "feature_id": "unified-account-asset-access-v1",
+      "action": "claimed",
+      "actor": "codex-account-asset-access",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788606255877
+    },
+    {
+      "id": "feature_event_8d19b05f9ef646f19ab78b15ef7b09a4",
+      "feature_id": "unified-account-asset-access-v1",
+      "action": "transitioned",
+      "actor": "codex-account-asset-access",
+      "reason": "",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788606736092
+    },
+    {
+      "id": "feature_event_a338cbac26144b49a5d8ef44dd6e4666",
+      "feature_id": "unified-account-asset-access-v1",
+      "action": "claim_released",
+      "actor": "codex-account-asset-access",
+      "reason": "有意澄清服务器会话结束与既有本机退出的区别，先释放认领再重新评审绑定。",
+      "from_status": "in_progress",
+      "to_status": "blocked",
+      "at_ms": 1788609180406
+    },
+    {
+      "id": "feature_event_730b834c568940bca6abebdbe8e039e5",
+      "feature_id": "unified-account-asset-access-v1",
+      "action": "requirement_rebound",
+      "actor": "codex-account-asset-access",
+      "reason": "只读及服务器撤销标准不变，显式记录共享主APK本地退出不等于服务器撤销；不提前宣称换号验收。",
+      "from_status": "blocked",
+      "to_status": "proposed",
+      "at_ms": 1788609182125
+    },
+    {
+      "id": "feature_event_71db3a8f08b84e1198ecef27ced51760",
+      "feature_id": "unified-account-asset-access-v1",
+      "action": "metadata_updated",
+      "actor": "codex-account-asset-access",
+      "reason": "补充本批独立授权模块的装配、真实测试、主原生同意页与独立TLS配置路径；不接管旧入口。",
+      "from_status": "proposed",
+      "to_status": "proposed",
+      "at_ms": 1788609182697
+    },
+    {
+      "id": "feature_event_e8463b0b079f4480af27299d45603093",
+      "feature_id": "unified-account-asset-access-v1",
+      "action": "transitioned",
+      "actor": "codex-account-asset-access",
+      "reason": "已复核明确授权、只读、账号隔离、服务器会话约束与分工；HTTPS和旧共享退出/入口迁移分报。",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1788609183588
+    },
+    {
+      "id": "feature_event_283dca21724448ea8391db84562fdc3d",
+      "feature_id": "unified-account-asset-access-v1",
+      "action": "transitioned",
+      "actor": "codex-account-asset-access",
+      "reason": "独立目录和主装配边界明确；保留原发布树及旧入口，现有代码验证继续。",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1788609184434
+    },
+    {
+      "id": "feature_event_ca34cc6a4ee24f939264ca28cd78e31a",
+      "feature_id": "unified-account-asset-access-v1",
+      "action": "claimed",
+      "actor": "codex-account-asset-access",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788609185088
+    },
+    {
+      "id": "feature_event_ba60b0e889e04ce187570918e9135b92",
+      "feature_id": "unified-account-asset-access-v1",
+      "action": "transitioned",
+      "actor": "codex-account-asset-access",
+      "reason": "",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788609204764
+    },
+    {
+      "id": "feature_event_a3d3e5b826e249cf90fa63e4d50b87a3",
+      "feature_id": "unified-account-asset-access-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-account-asset-access",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788610260540
     }
   ]
 }

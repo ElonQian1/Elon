@@ -1,0 +1,9 @@
+{
+  "name": "@yilong/asset-access",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": { "types": "./src/client.d.ts", "default": "./src/client.js" } },
+  "engines": { "node": ">=20" },
+  "scripts": { "test": "node --test test/*.test.js" }
+}

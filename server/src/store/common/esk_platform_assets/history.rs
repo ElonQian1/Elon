@@ -48,6 +48,17 @@ pub(super) fn scan_authenticated_history_on(
     cursor: Option<&PlatformHistoryCursor>,
 ) -> Result<PlatformHistoryPage> {
     ensure_session(conn, user_id, session_token, false)?;
+    scan_history_on(conn, user_id, limit, cursor)
+}
+
+/// Private scan core. Callers must validate their session or delegated read
+/// authority on this connection inside the same transaction before entering.
+pub(super) fn scan_history_on(
+    conn: &Connection,
+    user_id: &str,
+    limit: usize,
+    cursor: Option<&PlatformHistoryCursor>,
+) -> Result<PlatformHistoryPage> {
     ensure_recording_integrity(conn)?;
     let policy = policy_on(conn)?;
     if let Some(policy) = policy.as_ref() {

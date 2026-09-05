@@ -8,6 +8,8 @@ use std::sync::Arc;
 
 use crate::types::AppState;
 
+pub(crate) mod access;
+mod access_projection;
 mod api;
 mod history_api;
 mod history_model;
@@ -19,6 +21,7 @@ mod reconciliation_snapshot;
 pub(crate) mod sellback;
 mod validation;
 
+pub(crate) use access_projection::*;
 pub(crate) use history_model::*;
 pub(crate) use model::*;
 pub(crate) use reconciliation_snapshot::*;
@@ -26,6 +29,7 @@ pub(crate) use validation::{validate_policy_integrity, validate_prepared_input};
 
 pub(crate) fn routes() -> Router<Arc<AppState>> {
     Router::new()
+        .merge(access::routes())
         .merge(sellback::routes())
         .route(
             "/api/admin/assets/esk/platform-reconciliation-snapshot",

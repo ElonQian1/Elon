@@ -5,7 +5,7 @@ plugins {
 
 apply from: rootProject.file("gradle/windows-unicode-test-classpath.gradle")
 apply from: rootProject.file("gradle/chatgpt-web-input-fingerprint.gradle")
-
+apply from: "asset-access.gradle"
 def localProperties = new Properties()
 def localPropertiesFile = rootProject.file("local.properties")
 if (localPropertiesFile.exists()) {

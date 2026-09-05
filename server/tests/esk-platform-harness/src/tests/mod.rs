@@ -64,6 +64,7 @@ impl Fixture {
         }
         platform_migration::migration_v287(&conn).unwrap();
         crate::sellback_migration::migration_v288(&conn).unwrap();
+        crate::esk_asset::platform::access::migration::migration_v289(&conn).unwrap();
         crate::paper_migration::migration_v281(&conn).unwrap();
         conn.execute(
             "INSERT INTO esk_asset_ledger_entries(entry_id,user_id,amount_base_units,

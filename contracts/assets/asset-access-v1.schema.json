@@ -1,0 +1,191 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://yilong.invalid/contracts/assets/asset-access-v1.schema.json",
+  "title": "Yilong delegated read-only asset access V1",
+  "description": "Wire contract. Integer bounds, balance equality, scope binding, expiry and cross-page snapshot invariants are also checked by consumers. All examples are synthetic.",
+  "oneOf": [
+    { "$ref": "#/$defs/authorizationRequest" },
+    { "$ref": "#/$defs/authorizationCode" },
+    { "$ref": "#/$defs/tokenRequest" },
+    { "$ref": "#/$defs/token" },
+    { "$ref": "#/$defs/assetPage" },
+    { "$ref": "#/$defs/revokeRequest" },
+    { "$ref": "#/$defs/identity" },
+    { "$ref": "#/$defs/revoked" }
+  ],
+  "$defs": {
+    "clientId": { "enum": ["quant.android", "quant.web", "quant.ai"] },
+    "scopes": {
+      "type": "array", "minItems": 1, "maxItems": 3, "uniqueItems": true,
+      "items": { "enum": ["esk.summary.read", "esk.progress.read", "profile.read"] },
+      "contains": { "const": "esk.summary.read" }
+    },
+    "instant": { "type": "string", "format": "date-time", "maxLength": 40 },
+    "id": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "amount": {
+      "type": "string", "pattern": "^(0|[1-9][0-9]{0,18})$",
+      "description": "Canonical nonnegative decimal integer no greater than 9223372036854775807; never a JSON number."
+    },
+    "state": { "type": "string", "minLength": 32, "maxLength": 128, "pattern": "^[A-Za-z0-9._~-]+$" },
+    "redirect": { "type": "string", "format": "uri", "maxLength": 2048 },
+    "callbackBinding": {
+      "description": "Client-specific registered callback. quant.web origin must additionally equal the configured HTTPS public_url. AI loopback port must additionally be 1024..65535.",
+      "allOf": [
+        { "if": { "properties": { "client_id": { "const": "quant.android" } }, "required": ["client_id"] },
+          "then": { "properties": { "redirect_uri": { "const": "com.elon.quant:/asset-access/callback" } } } },
+        { "if": { "properties": { "client_id": { "const": "quant.web" } }, "required": ["client_id"] },
+          "then": { "properties": { "redirect_uri": { "pattern": "^https://[^/?#@]+/quant/asset-access/callback$" } } } },
+        { "if": { "properties": { "client_id": { "const": "quant.ai" } }, "required": ["client_id"] },
+          "then": { "properties": { "redirect_uri": { "pattern": "^http://127\\.0\\.0\\.1:[0-9]{4,5}/asset-access/callback$" } } } }
+      ]
+    },
+    "authorizationRequest": {
+      "type": "object", "additionalProperties": false,
+      "allOf": [{ "$ref": "#/$defs/callbackBinding" }],
+      "required": ["schema", "client_id", "redirect_uri", "state", "code_challenge", "code_challenge_method", "scopes", "expires_in", "explicit_consent", "confirmation"],
+      "properties": {
+        "schema": { "const": "yilong.asset_access.authorize.v1" },
+        "client_id": { "$ref": "#/$defs/clientId" },
+        "redirect_uri": { "$ref": "#/$defs/redirect" },
+        "state": { "$ref": "#/$defs/state" },
+        "code_challenge": { "type": "string", "pattern": "^[A-Za-z0-9_-]{43}$" },
+        "code_challenge_method": { "const": "S256" },
+        "scopes": { "$ref": "#/$defs/scopes" },
+        "expires_in": { "type": "integer", "minimum": 1, "maximum": 3600 },
+        "explicit_consent": { "const": true },
+        "confirmation": { "const": "授权量化只读我的资产" }
+      }
+    },
+    "authorizationCode": {
+      "type": "object", "additionalProperties": false,
+      "allOf": [{ "$ref": "#/$defs/callbackBinding" }],
+      "required": ["schema", "code", "state", "client_id", "redirect_uri", "code_expires_at", "grant_id", "expires_at", "scopes"],
+      "properties": {
+        "schema": { "const": "yilong.asset_access.authorization_code.v1" },
+        "code": { "type": "string", "pattern": "^aac_[0-9a-f]{64}$" },
+        "state": { "$ref": "#/$defs/state" },
+        "client_id": { "$ref": "#/$defs/clientId" },
+        "redirect_uri": { "$ref": "#/$defs/redirect" },
+        "code_expires_at": { "$ref": "#/$defs/instant" },
+        "grant_id": { "$ref": "#/$defs/id" },
+        "expires_at": { "$ref": "#/$defs/instant" },
+        "scopes": { "$ref": "#/$defs/scopes" }
+      }
+    },
+    "tokenRequest": {
+      "type": "object", "additionalProperties": false,
+      "allOf": [{ "$ref": "#/$defs/callbackBinding" }],
+      "required": ["schema", "grant_type", "client_id", "redirect_uri", "state", "code", "code_verifier"],
+      "properties": {
+        "schema": { "const": "yilong.asset_access.token_request.v1" },
+        "grant_type": { "const": "authorization_code" },
+        "client_id": { "$ref": "#/$defs/clientId" },
+        "redirect_uri": { "$ref": "#/$defs/redirect" },
+        "state": { "$ref": "#/$defs/state" },
+        "code": { "$ref": "#/$defs/id" },
+        "code_verifier": { "type": "string", "minLength": 43, "maxLength": 128, "pattern": "^[A-Za-z0-9._~-]+$" }
+      }
+    },
+    "token": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schema", "access_token", "token_type", "audience", "subject", "client_id", "grant_id", "expires_in", "expires_at", "scopes"],
+      "properties": {
+        "schema": { "const": "yilong.asset_access.token.v1" },
+        "access_token": { "type": "string", "pattern": "^aat_[0-9a-f]{64}$" },
+        "token_type": { "const": "Bearer" },
+        "audience": { "const": "yilong-quant" },
+        "subject": { "$ref": "#/$defs/id" },
+        "client_id": { "$ref": "#/$defs/clientId" },
+        "grant_id": { "$ref": "#/$defs/id" },
+        "expires_in": { "type": "integer", "minimum": 1, "maximum": 3600 },
+        "expires_at": { "$ref": "#/$defs/instant" },
+        "scopes": { "$ref": "#/$defs/scopes" }
+      }
+    },
+    "asset": {
+      "type": "object", "additionalProperties": false,
+      "required": ["asset_id", "symbol", "decimals", "source", "simulated", "chain_status", "funds_moved"],
+      "properties": {
+        "asset_id": { "const": "esk" }, "symbol": { "const": "ESK" },
+        "decimals": { "const": 6 }, "source": { "const": "platform_recorded" },
+        "simulated": { "const": false }, "chain_status": { "const": "not_deployed" },
+        "funds_moved": { "const": false }
+      }
+    },
+    "balance": {
+      "type": "object", "additionalProperties": false,
+      "required": ["total_base_units", "reserved_base_units", "available_base_units"],
+      "properties": {
+        "total_base_units": { "$ref": "#/$defs/amount" },
+        "reserved_base_units": { "$ref": "#/$defs/amount" },
+        "available_base_units": { "$ref": "#/$defs/amount" }
+      }
+    },
+    "request": {
+      "type": "object", "additionalProperties": false,
+      "required": ["request_id", "amount_base_units", "status", "created_at", "canceled_at"],
+      "properties": {
+        "request_id": { "$ref": "#/$defs/id" },
+        "amount_base_units": { "$ref": "#/$defs/amount" },
+        "status": { "enum": ["submitted", "canceled"] },
+        "created_at": { "$ref": "#/$defs/instant" },
+        "canceled_at": { "anyOf": [{ "$ref": "#/$defs/instant" }, { "type": "null" }] }
+      }
+    },
+    "progress": {
+      "type": "object", "additionalProperties": false,
+      "required": ["request_count", "open_count", "range_start", "range_end", "requests", "has_more", "next_cursor"],
+      "properties": {
+        "request_count": { "$ref": "#/$defs/amount" }, "open_count": { "$ref": "#/$defs/amount" },
+        "range_start": { "$ref": "#/$defs/amount" }, "range_end": { "$ref": "#/$defs/amount" },
+        "requests": { "type": "array", "maxItems": 20, "items": { "$ref": "#/$defs/request" } },
+        "has_more": { "type": "boolean" },
+        "next_cursor": { "anyOf": [{ "type": "string", "minLength": 1, "maxLength": 160 }, { "type": "null" }] }
+      }
+    },
+    "assetPage": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schema", "subject", "client_id", "expires_at", "asset", "balance", "snapshot_digest"],
+      "properties": {
+        "schema": { "const": "yilong.esk.delegated_asset_page.v1" },
+        "subject": { "$ref": "#/$defs/id" }, "client_id": { "$ref": "#/$defs/clientId" },
+        "expires_at": { "$ref": "#/$defs/instant" },
+        "asset": { "$ref": "#/$defs/asset" }, "balance": { "$ref": "#/$defs/balance" },
+        "snapshot_digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "progress": { "$ref": "#/$defs/progress" }
+      }
+    },
+    "assetQuery": {
+      "type": "object", "additionalProperties": false,
+      "description": "GET query parameters represented as their parsed types; absent limit defaults to 20 and absent include_progress defaults to false.",
+      "properties": {
+        "limit": { "type": "integer", "minimum": 1, "maximum": 20 },
+        "include_progress": { "type": "boolean" },
+        "cursor": { "type": "string", "minLength": 1, "maxLength": 160 }
+      },
+      "if": { "required": ["cursor"] },
+      "then": { "required": ["include_progress"], "properties": { "include_progress": { "const": true } } }
+    },
+    "identity": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schema", "audience", "subject", "client_id", "grant_id", "expires_at", "scopes"],
+      "properties": {
+        "schema": { "const": "yilong.asset_access.identity.v1" }, "audience": { "const": "yilong-quant" },
+        "subject": { "$ref": "#/$defs/id" }, "client_id": { "$ref": "#/$defs/clientId" },
+        "grant_id": { "$ref": "#/$defs/id" }, "expires_at": { "$ref": "#/$defs/instant" },
+        "scopes": { "$ref": "#/$defs/scopes" }, "nickname": { "type": "string", "maxLength": 256 }
+      },
+      "if": { "properties": { "scopes": { "contains": { "const": "profile.read" } } } },
+      "then": { "required": ["nickname"] },
+      "else": { "not": { "required": ["nickname"] } }
+    },
+    "revoked": {
+      "type": "object", "additionalProperties": false, "required": ["schema", "revoked", "funds_moved"],
+      "properties": { "schema": { "const": "yilong.asset_access.revoked.v1" }, "revoked": { "const": true }, "funds_moved": { "const": false } }
+    },
+    "revokeRequest": {
+      "type": "object", "additionalProperties": false, "required": ["schema", "confirmation"],
+      "properties": { "schema": { "const": "yilong.asset_access.revoke.v1" }, "confirmation": { "const": "撤销只读资产授权" } }
+    }
+  }
+}

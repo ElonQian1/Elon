@@ -10,9 +10,14 @@ pub(crate) mod reconciliation_snapshot;
 pub(crate) mod sellback;
 #[path = "../../../src/esk_platform/validation.rs"]
 pub(crate) mod validation;
+pub(crate) use access_projection::*;
 pub(crate) use history_model::*;
 pub(crate) use model::*;
 pub(crate) use reconciliation_snapshot::*;
 pub(crate) use validation::{
     prepare_input, validate_policy, validate_policy_integrity, validate_prepared_input,
 };
+#[path = "access.rs"]
+pub(crate) mod access;
+#[path = "../../../src/esk_platform/access_projection.rs"]
+pub(crate) mod access_projection;

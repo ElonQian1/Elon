@@ -1,4 +1,6 @@
 //! Full production Store/session/Router tests; no production accounts or network.
+#[path = "access/tests_http.rs"]
+mod access_http_tests;
 #[path = "account_snapshot_http_tests.rs"]
 mod account_snapshot_http_tests;
 #[path = "history_http_tests.rs"]

@@ -1,0 +1,10 @@
+// Independent verified TLS ingress. Empty keeps delegated asset access unavailable.
+def assetAccessOrigin = System.getenv('ELON_ASSET_ACCESS_ORIGIN') ?: ''
+if (assetAccessOrigin) {
+    def uri = new URI(assetAccessOrigin)
+    if (uri.scheme != 'https' || !uri.host || uri.rawUserInfo || uri.rawQuery || uri.rawFragment ||
+        !(uri.rawPath in ['', '/']) || uri.port == 0 || assetAccessOrigin != assetAccessOrigin.trim()) {
+        throw new GradleException('ELON_ASSET_ACCESS_ORIGIN must be a pure HTTPS origin')
+    }
+}
+android.defaultConfig.buildConfigField 'String', 'ASSET_ACCESS_ORIGIN', '"' + assetAccessOrigin + '"'

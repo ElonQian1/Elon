@@ -13,6 +13,7 @@ use tracing::info;
 
 use crate::types::AppState;
 
+pub(crate) mod asset_access;
 mod config;
 mod direct_tls;
 mod endpoint_session;

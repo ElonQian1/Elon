@@ -1,6 +1,8 @@
 use super::{history, policy, token, Fixture};
 use crate::esk_asset::platform::{sellback::*, PlatformPolicy};
 
+mod access_projection;
+mod access_wire_export;
 mod auth;
 mod boundaries;
 mod concurrency;
