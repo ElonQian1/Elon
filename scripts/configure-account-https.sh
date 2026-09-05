@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Account-only Rust TLS, independently switchable from legacy HTTP ingress.
 set -euo pipefail
+# Certificate operations must not inherit unrelated local proxy configuration.
+unset HTTP_PROXY HTTPS_PROXY ALL_PROXY http_proxy https_proxy all_proxy PIP_PROXY
 MODE="${1:-}"
 IP="${2:-}"
 ENV_FILE="/root/Elon/server/.env"
@@ -41,7 +43,8 @@ if [[ "$MODE" == prepare ]]; then
   [[ -z "$(ss -H -ltn 'sport = :80')" ]] || fail "port 80 must be free for standalone ACME"
   if [[ ! -x "$CERTBOT" ]]; then
     python3 -m venv /opt/elon-account-certbot
-    timeout 240 /opt/elon-account-certbot/bin/pip install --disable-pip-version-check \
+    timeout 240 /opt/elon-account-certbot/bin/pip --isolated install \
+      --index-url https://pypi.org/simple --disable-pip-version-check \
       --no-cache-dir --timeout 30 --retries 1 'certbot==5.4.0'
   fi
   "$CERTBOT" --version
