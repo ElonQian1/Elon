@@ -34,14 +34,17 @@
     previous.result('list_model_options', false, '模型请求已被新的操作替代。');
   }
 
-  function emitCatalog(binding, value, emit) {
+  function emitCatalog(binding, value, emit, view = 'presets') {
     serial += 1;
     const choices = value.choices.map((item, index) => ({ ...item, id: PREFIX + serial + '_' + index }));
     const advanced = PREFIX + serial + '_advanced';
-    owned = { binding, ...value, choices, advanced, emit };
-    emit([...choices.map(item => ({ id: item.id, label: item.label, selected: item.selected,
-      semantic: 'model', kind: 'menuitemradio', opensSubmenu: false })),
-    { id: advanced, label: '高级', selected: false, semantic: 'model', kind: 'menuitem', opensSubmenu: true }]);
+    const back = PREFIX + serial + '_back', official = PREFIX + serial + '_official';
+    owned = { binding, ...value, choices, advanced, back, official, emit, view };
+    const navigation = (id, label) => ({ id, label, selected: false, semantic: 'model', kind: 'menuitem', opensSubmenu: true });
+    emit([...(view === 'advanced' && value.canGoBack !== false ? [navigation(back, '返回档位')] : []),
+      ...choices.map(item => ({ id: item.id, label: item.label, selected: item.selected,
+        semantic: item.semantic || 'model', kind: 'menuitemradio', opensSubmenu: false })),
+      view === 'advanced' ? navigation(official, '其他官网模型') : navigation(advanced, '高级')]);
   }
 
   function request(getTrigger, emit, result, fallback) {
@@ -58,10 +61,13 @@
       if (pending !== request) return;
       pending = null;
       if (!contract.current(binding)) return result('list_model_options', false, '会话已经变化，请重新选择模型。');
-      let value;
-      try { value = contract.catalog(binding, modules); } catch (_) { /* Unknown is not unavailable. */ }
+      let value, view = 'presets';
+      try {
+        value = contract.catalog(binding, modules);
+        if (!value) { value = contract.advancedCatalog(binding, modules); view = 'advanced'; }
+      } catch (_) { /* Unknown is not unavailable. */ }
       if (!value) return fallback();
-      emitCatalog(binding, value, emit);
+      emitCatalog(binding, value, emit, view);
       result('list_model_options', true, '');
     }
     if (modules) complete(); else void load().then(complete);
@@ -71,19 +77,38 @@
   function select(id, result, snapshot, advanced) {
     if (typeof id !== 'string' || !id.startsWith(PREFIX)) return false;
     const menu = owned;
-    if (id === menu?.advanced && contract.current(menu.binding)) {
-      dismiss(); advanced(); return true;
+    const navigation = menu && (menu.view === 'presets' ? id === menu.advanced :
+      id === menu.official || menu.canGoBack !== false && id === menu.back);
+    if (navigation && contract.current(menu.binding)) {
+      receipt = null;
+      if (id === menu.official) { dismiss(); advanced(); return true; }
+      let value;
+      try {
+        value = id === menu.advanced ? contract.advancedCatalog(menu.binding, modules) : contract.catalog(menu.binding, modules);
+      } catch (_) { /* An unknown extended contract does not replace existing models. */ }
+      if (!value && id === menu.advanced) { dismiss(); advanced(); return true; }
+      if (value) emitCatalog(menu.binding, value, menu.emit, id === menu.advanced ? 'advanced' : 'presets');
+      else { owned = null; receipt = null; }
+      result('select_model_option', !!value, value ? '' : '档位状态仍在更新，请重新打开选择。');
+      snapshot(); return true;
     }
     const target = menu?.choices.find(item => item.id === id);
     let ok = false;
     try {
-      if (!target && receipt?.id === id) ok = contract.matches(contract.read(receipt.binding, modules), receipt.selection);
+      if (!target && receipt?.id === id) ok = receipt.advancedState
+        ? contract.matchesAdvanced(receipt.binding, modules, receipt.advancedState)
+        : contract.matches(contract.read(receipt.binding, modules), receipt.selection);
       else if (target) {
-        ok = contract.apply(menu.binding, modules, target.selection, menu.live, menu.version);
+        const advancedState = menu.view === 'advanced'
+          ? contract.applyAdvanced(menu.binding, modules, target.selection, menu.live) : null;
+        ok = menu.view === 'advanced' ? !!advancedState
+          : contract.apply(menu.binding, modules, target.selection, menu.live, menu.version);
         if (ok) {
-          receipt = { id, binding: menu.binding, selection: target.selection };
-          const updated = contract.catalog(menu.binding, modules);
-          if (updated) emitCatalog(menu.binding, updated, menu.emit);
+          receipt = { id, binding: menu.binding, selection: target.selection, advancedState };
+          const updated = menu.view === 'advanced' ? contract.advancedCatalog(menu.binding, modules)
+            : contract.catalog(menu.binding, modules);
+          if (updated) emitCatalog(menu.binding, updated, menu.emit, menu.view);
+          else owned = null;
         }
       }
     } catch (_) { /* Never replay a possibly applied preference/model mutation through DOM. */ }

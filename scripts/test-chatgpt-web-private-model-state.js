@@ -10,7 +10,8 @@ const flush = async () => { for (let i = 0; i < 30; i++) await Promise.resolve()
 
 function fixture(options = {}) {
   const writes = [], events = [], results = [], timers = new Set();
-  let model = 'fixture-fast', effort = 'low', tier, account = 'Bearer fixture-not-a-credential', loaded = true, work = false;
+  let model = 'fixture-fast', effort = 'low', tier, serviceTier, version = 'fixture-version';
+  let account = 'Bearer fixture-not-a-credential', loaded = true, work = false;
   const conversation = { serverId$: () => CID };
   const fast = { id: 'fixture-fast' }, thinking = { id: 'fixture-thinking' };
   const menu = { conversation, modelSwitcherDenialsBySlug: {},
@@ -34,12 +35,25 @@ function fixture(options = {}) {
     getBoundingClientRect: () => ({ width: 80, height: 40, left: 0, top: 0 }) };
   const store = { conversationThinkingEffort$: () => effort,
     setThinkingEffort(value, slug) { writes.push(['effort', value, slug]); effort = value; } };
+  const tierStore = { getDraftServiceTier: () => tier, conversationServiceTier$: () => serviceTier,
+    setServiceTier(value) { writes.push(['tier', value]); tier = serviceTier = value; } };
+  const baseSelections = menu.composerIntelligencePickerState.bucketSelections;
+  const nextSelections = baseSelections.slice(0, 2).map(item => ({ ...item, modelSlug: item.modelSlug + '-v2',
+    modelConfig: { id: item.modelSlug + '-v2' }, thinkingEffortLane: item.category.modelLane }));
+  function syncPicker() {
+    if (!options.extended) return;
+    const state = menu.composerIntelligencePickerState;
+    state.selectedVersionEntry = menu.modelsData.versions.find(item => item.id === version);
+    state.bucketSelections = version === 'fixture-version' ? baseSelections : nextSelections;
+    state.currentSelection = state.bucketSelections.find(item => item.modelSlug === model && item.thinkingEffort === effort);
+    state.currentBucket = state.currentSelection?.bucket;
+  }
   const modules = {
     shared: { M$: fn => fn(), uo: () => work, t4: { PRO: 'pro' },
       RW: () => ({ mutate: data => writes.push(['preference', data]) }) },
     conversation: {
-      Nrn: () => ({ id: model }), yRt: () => store, l0: () => ({ getDraftServiceTier: () => tier }),
-      Grn(conv, value) { assert.equal(conv, conversation); writes.push(['model', value]); model = value; },
+      Nrn: () => ({ id: model }), yRt: () => store, l0: () => tierStore,
+      Grn(conv, value) { assert.equal(conv, conversation); writes.push(['model', value]); model = value; syncPicker(); },
       vRt: () => ['low', 'high', 'max'],
       p8t: ({ modelSlug, modelSwitcherDenialsBySlug: denials }) => ({ status: denials[modelSlug] ? 'unavailable' : 'available' }),
       M1t: () => ({ mutate: data => writes.push(['pro-preference', data]) }),
@@ -50,6 +64,43 @@ function fixture(options = {}) {
       command.applyModelSelection(command.conversation, command.modelId);
     } }
   };
+  if (options.extended) {
+    nextSelections.forEach(item => menu.modelsData.models.set(item.modelSlug, item.modelConfig));
+    for (const item of [...baseSelections, ...nextSelections]) {
+      item.serviceTierOptions = [{ service_tier: 'standard' }, { service_tier: 'fast' }];
+      item.defaultServiceTier = 'standard';
+    }
+    menu.modelsData.versions = [
+      { id: 'fixture-version', displayText: 'Version 1', slugs: [fast.id, thinking.id], intelligencePresets: baseSelections },
+      { id: 'fixture-version-v2', displayText: 'Version 2', slugs: nextSelections.map(item => item.modelSlug), intelligencePresets: nextSelections }
+    ];
+    menu.modelsData.categories = [...baseSelections.slice(0, 2), ...nextSelections].map(item =>
+      ({ ...item.category, defaultModel: item.modelSlug, supportedModels: [item.modelSlug] }));
+    modules.shared.t4 = { PRO: 'pro', AUTO: 'auto', INSTANT: 'instant' };
+    modules.shared.IX = (data, slug) => data.categories.find(item => item.supportedModels.includes(slug));
+    Object.assign(modules.conversation, {
+      Rrn: () => ({ conversationVersion$: () => version,
+        setConversationVersion(value) { writes.push(['version', value]); version = value; } }),
+      win: (data, version) => data.categories.filter(item => version.slugs.includes(item.defaultModel)),
+      Ein: value => value.displayText, ay: value => value.intelligencePresets,
+      iy: ({ autoSwitcherEnabled, getModelAvailability, intelligencePresets, selectedVersionEntry }) => {
+        assert.equal(typeof autoSwitcherEnabled, 'boolean');
+        assert.equal(menu.modelsData.versions.find(item => item.id === selectedVersionEntry.id), selectedVersionEntry);
+        return intelligencePresets.map(item => ({ ...item, availability: getModelAvailability(item.modelSlug) }));
+      },
+      ry: ({ bucketSelections, currentBucket, currentLane }) => {
+        const available = bucketSelections.filter(item => item.availability.status === 'available');
+        return available.find(item => item.bucket === currentBucket && item.category.modelLane === currentLane) ??
+          available.find(item => item.category.modelLane === currentLane) ?? available[0];
+      },
+      Jrn: () => ({ juices: { pro: 'max' } }), Hrn: () => true,
+      f8t: input => modules.conversation.p8t(input).status === 'available',
+      c0: ({ configuredServiceTier, defaultServiceTier, serviceTierOptions }) =>
+        serviceTierOptions.some(item => item.service_tier === configuredServiceTier) ? configuredServiceTier :
+          serviceTierOptions.some(item => item.service_tier === defaultServiceTier) ? defaultServiceTier : serviceTierOptions[0]?.service_tier,
+    });
+    syncPicker();
+  }
   const page = { location: { href: 'https://chatgpt.com/c/' + CID },
     __elonChatGptDocumentToken: 'doc_fixture_1',
     __elonChatGptPrivateTransport: { copySameOriginRequestHeaders: () => ({ Authorization: account }) },
@@ -67,10 +118,12 @@ function fixture(options = {}) {
   const request = () => runtime.request(getTrigger, emit, result, () => { fallback++; });
   const select = id => runtime.select(id, result, () => { snapshots++; }, () => { advanced++; });
   return { page, node, host, top, ancestor, props, menu, modules, writes, events, results, timers,
-    conversation, contract, runtime, getTrigger, request, select,
+    conversation, contract, runtime, getTrigger, request, select, syncPicker, tierStore,
     choice: label => events.at(-1).find(item => item.label === label),
-    get model() { return model; }, set model(v) { model = v; },
-    get effort() { return effort; }, set effort(v) { effort = v; },
+    get model() { return model; }, set model(v) { model = v; syncPicker(); },
+    get effort() { return effort; }, set effort(v) { effort = v; syncPicker(); },
+    get version() { return version; }, set version(v) { version = v; syncPicker(); },
+    get serviceTier() { return serviceTier; }, set serviceTier(v) { serviceTier = v; },
     set tier(v) { tier = v; }, set account(v) { account = v; }, set loaded(v) { loaded = v; }, set work(v) { work = v; },
     get imports() { return imports; }, get fallback() { return fallback; },
     get advanced() { return advanced; }, get snapshots() { return snapshots; } };
@@ -174,6 +227,127 @@ test('advanced models keep the existing native menu path without selecting a mod
   assert.equal(f.runtime.dismiss(), false);
 });
 
+async function openAdvanced(f = fixture({ extended: true })) {
+  f.request(); await flush(); f.select(f.choice('高级').id); return f;
+}
+
+test('advanced version preserves the current bucket and uses official version/model stores exactly once', async () => {
+  const f = fixture({ extended: true }); f.model = 'fixture-thinking'; f.effort = 'high';
+  f.tier = f.serviceTier = 'fast'; await openAdvanced(f);
+  assert.equal(f.choice('Version 2').semantic, 'model_version');
+  assert.equal(f.choice('快速响应速度').semantic, 'service_tier');
+  const id = f.choice('Version 2').id; f.select(id);
+  assert.equal(f.results.at(-1)[1], true); assert.equal(f.choice('Version 2').selected, true);
+  assert.equal(f.model, 'fixture-thinking-v2'); assert.equal(f.effort, 'high');
+  assert.equal(f.serviceTier, 'fast'); assert.equal(f.advanced, 0);
+  assert.deepEqual(f.writes, [['version', 'fixture-version-v2'], ['effort', 'high', 'fixture-thinking-v2'],
+    ['official-model-action', 'fixture-thinking-v2', 'high'], ['model', 'fixture-thinking-v2']]);
+  const count = f.writes.length; f.select(id);
+  assert.equal(f.results.at(-1)[1], true); assert.equal(f.writes.length, count);
+  f.select(f.choice('返回档位').id);
+  assert.equal(f.choice('High').selected, true); assert.equal(f.imports, 3);
+  f.select(id); assert.equal(f.results.at(-1)[1], false); assert.equal(f.writes.length, count);
+});
+
+test('response speed writes conversation and draft tiers without changing the model or effort', async () => {
+  const f = await openAdvanced();
+  assert.equal(f.choice('标准响应速度').selected, true);
+  const id = f.choice('快速响应速度').id; f.select(id);
+  assert.deepEqual(f.writes, [['tier', 'fast']]); assert.equal(f.results.at(-1)[1], true);
+  assert.equal(f.choice('快速响应速度').selected, true); assert.equal(f.choice('标准响应速度').selected, false);
+  assert.equal(f.model, 'fixture-fast'); assert.equal(f.effort, 'low');
+  f.select(id); assert.equal(f.results.at(-1)[1], true); assert.equal(f.writes.length, 1);
+  f.serviceTier = 'standard'; f.select(id);
+  assert.equal(f.results.at(-1)[1], false); assert.equal(f.writes.length, 1);
+  assert.doesNotMatch(JSON.stringify([f.events, f.results]), /Bearer|headers|fixture-fast|00000000/);
+});
+
+test('advanced back and other official models remain reachable without a state mutation', async () => {
+  const f = await openAdvanced();
+  assert.equal(f.events.at(-1).filter(item => item.opensSubmenu).length, 2);
+  f.select(f.choice('返回档位').id); assert.ok(f.choice('High'));
+  f.select(f.choice('高级').id); f.select(f.choice('其他官网模型').id);
+  assert.equal(f.advanced, 1); assert.equal(f.writes.length, 0); assert.equal(f.runtime.dismiss(), false);
+});
+
+for (const [name, mutate] of Object.entries({
+  account: f => { f.account = 'Bearer different-fixture-account'; },
+  conversation: f => { f.menu.conversation = { serverId$: () => CID }; },
+  document: f => { f.page.__elonChatGptDocumentToken = 'doc_other'; },
+  route: f => { f.page.location.href = 'https://chatgpt.com/'; },
+  effort: f => { f.effort = 'max'; },
+  tier: f => { f.serviceTier = 'fast'; },
+  pending: f => { f.menu.composerIntelligencePickerState.selectedVersionEntry = { id: 'not-current' }; },
+  permission: f => { f.menu.modelSwitcherDenialsBySlug['fixture-fast-v2'] = [{}];
+    f.menu.modelSwitcherDenialsBySlug['fixture-thinking-v2'] = [{}]; },
+  disabled: f => { f.menu.modelsData.versions[1].disabled = true; },
+  work: f => { f.work = true; }
+})) test('advanced version rejects changed ' + name + ' without a second transport', async () => {
+  const f = await openAdvanced(), id = f.choice('Version 2').id;
+  mutate(f); f.select(id);
+  assert.equal(f.results.at(-1)[1], false); assert.equal(f.writes.length, 0);
+  assert.equal(f.fallback, 0); assert.equal(f.advanced, 0);
+});
+
+test('version with no intelligence presets resolves an available lane from the official catalog', async () => {
+  const f = await openAdvanced(); f.menu.modelsData.versions[1].intelligencePresets = undefined;
+  f.select(f.choice('Version 2').id);
+  assert.equal(f.results.at(-1)[1], true); assert.equal(f.model, 'fixture-fast-v2');
+  assert.deepEqual(f.writes, [['version', 'fixture-version-v2'],
+    ['official-model-action', 'fixture-fast-v2', undefined], ['model', 'fixture-fast-v2']]);
+});
+
+test('restricted picker exposes available versions directly without a nonexistent back entry', async () => {
+  const f = fixture({ extended: true }), picker = f.menu.composerIntelligencePickerState;
+  picker.bucketSelections = null; picker.currentSelection = undefined; picker.isRestrictedModelPickerState = true;
+  f.request(); await flush();
+  assert.equal(f.results.at(-1)[1], true); assert.equal(f.choice('返回档位'), undefined);
+  assert.equal(f.choice('Version 1').selected, false); assert.ok(f.choice('其他官网模型'));
+  f.select(f.choice('Version 2').id);
+  assert.equal(f.results.at(-1)[1], true); assert.equal(f.model, 'fixture-fast-v2');
+});
+
+for (const [name, mutate] of Object.entries({
+  hidden: f => { f.menu.hideServiceTier = true; },
+  upgrade: f => { f.menu.lockedUpgradePreview = {}; },
+  absent: f => { f.menu.composerIntelligencePickerState.currentSelection.serviceTierOptions = []; },
+  duplicate: f => { f.menu.composerIntelligencePickerState.currentSelection.serviceTierOptions.push({ service_tier: 'fast' }); },
+  stale: f => { f.menu.composerIntelligencePickerState.currentSelection = { modelSlug: 'different' }; }
+})) test('response speed is not offered for ' + name + ' official state', async () => {
+  const f = fixture({ extended: true }); mutate(f); await openAdvanced(f);
+  assert.ok(f.choice('Version 2')); assert.equal(f.choice('快速响应速度'), undefined); assert.equal(f.writes.length, 0);
+});
+
+test('unknown advanced helpers and malformed versions keep existing advanced access', async () => {
+  for (const mutate of [f => { delete f.modules.conversation.ry; },
+    f => { f.menu.modelsData.versions.push(f.menu.modelsData.versions[0]); },
+    f => { f.menu.modelsData.versions[0].slugs = ['invalid slug']; }]) {
+    const f = fixture({ extended: true }); mutate(f); await openAdvanced(f);
+    assert.equal(f.advanced, 1); assert.equal(f.writes.length, 0);
+  }
+});
+
+for (const mode of ['version ignored', 'model ignored', 'model applied then throws', 'tier ignored', 'tier applied then throws']) {
+  test('advanced ' + mode + ' does not report success or replay through DOM', async () => {
+    const f = await openAdvanced();
+    if (mode === 'version ignored') f.modules.conversation.Rrn = () =>
+      ({ conversationVersion$: () => f.version, setConversationVersion() {} });
+    else if (mode.startsWith('model')) {
+      const apply = f.modules.composer.Ih;
+      f.modules.composer.Ih = command => {
+        if (mode.endsWith('throws')) { apply(command); throw new Error('fixture'); }
+      };
+    } else {
+      const apply = f.tierStore.setServiceTier;
+      f.tierStore.setServiceTier = value => {
+        if (mode.endsWith('throws')) { apply(value); throw new Error('fixture'); }
+      };
+    }
+    f.select(f.choice(mode.startsWith('tier') ? '快速响应速度' : 'Version 2').id);
+    assert.equal(f.results.at(-1)[1], false); assert.equal(f.advanced, 0); assert.equal(f.fallback, 0);
+  });
+}
+
 test('missing modules and restricted picker remain unknown instead of an unsupported error', async () => {
   const f = fixture(); f.loaded = false;
   assert.equal(f.request(), false); assert.equal(f.results.length, 0);
@@ -222,7 +396,7 @@ test('blocked presets are never writable and allowed presets remain available', 
 });
 
 test('production model request/select/dismiss is registered and does not emit webpage touches', async () => {
-  const f = fixture(), events = [], results = [], page = f.page;
+  const f = fixture({ extended: true }), events = [], results = [], page = f.page;
   page.document.querySelector = name => name === '[data-testid="model-switcher"]' ? f.node : null;
   page.document.querySelectorAll = () => [];
   page.getComputedStyle = () => ({ display: 'block', visibility: 'visible' });
@@ -239,6 +413,12 @@ test('production model request/select/dismiss is registered and does not emit we
   composer.selectOption('model', events.at(-1).options.find(item => item.label === 'High').id, input, emit, result, () => {});
   assert.equal(f.model, 'fixture-thinking'); assert.equal(f.effort, 'high');
   assert.equal(results.at(-1)[1], true);
+  const select = label => composer.selectOption('model', events.at(-1).options.find(item => item.label === label).id,
+    input, emit, result, () => {});
+  select('高级'); select('Version 2'); select('快速响应速度');
+  assert.equal(f.model, 'fixture-thinking-v2'); assert.equal(f.serviceTier, 'fast');
+  assert.equal(results.at(-1)[1], true);
+  assert.ok(events.at(-1).options.some(item => item.semantic === 'service_tier' && item.selected));
   composer.dismissOpenMenu(input, emit, result);
   assert.equal(results.at(-1)[0], 'dismiss_composer_menu');
   assert.equal(events.some(event => event.type === 'web_touch_request'), false);

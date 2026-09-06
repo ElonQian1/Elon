@@ -1,18 +1,21 @@
-# ChatGPT private model preset state
+# ChatGPT private model selection state
 
 ## Status and scope
 
 - Capability: `android_chatgpt_private_model_preset_state_v1`.
+- Extensions: `android_chatgpt_private_model_version_state_v1` and
+  `android_chatgpt_private_service_tier_state_v1`.
 - Status: implemented, source-only candidate; not `completed` or device accepted.
 - Contract version: 1. Production native model selection reuses the current
   official picker state and its model/effort mutators when the guards pass.
-- Scope: the account's available presets in the currently selected model
-  version, including explicit thinking effort. Advanced models remain accessible
-  through the existing native menu path.
+- Scope: available normal-chat presets and thinking effort, available model
+  versions, and the official standard/fast response tier when offered for the
+  current selection. Internal/special models retain the existing menu path.
 - This is a page-runtime private state bridge, not an independent Android HTTP
   sender. WebView still owns identity and the live official conversation.
-- This batch does not replace temporary-chat mutation, advanced/version/work
-  model selection, service-tier mutation or text/image generation POST.
+- This batch does not replace work-model selection, restricted-model effort
+  controls or text/image generation POST. Temporary chat has its separate
+  [guarded state transaction](chatgpt-private-temporary-chat.md).
 - Google stays last. Existing native official audio, captions, dictation and
   read-aloud are unchanged. No APK was built or installed for this source batch.
 
@@ -50,6 +53,27 @@ changes retain the official Pro-default mutator. These mutators own their
 requests. A successful local readback does not prove that their asynchronous
 server preference persistence has completed.
 
+### Version and response-tier extension
+
+The normal-chat Advanced view's `Tqn` filters model versions with `win` (version
+categories), `f8t` (availability), `IX` (category lookup), and `Ein` (official
+version label). The private view applies the same eligibility checks, including
+the restricted picker's catalog-model check. It does not invent version names.
+
+The inspected `Dqn` version action first matches the current bucket/model lane
+using `ay`, `iy`, and `ry`. It reads Auto switching through `Hrn` and Pro effort
+through `Jrn`, then falls back to an available model in that version if no preset
+matches. The adapter mirrors that sequence with the same pure helpers, writes
+`Rrn().setConversationVersion`, and calls the existing effort/model transaction.
+It does not invoke the hook-based picker or change service tiers during version
+selection. It confirms version, model, effort and unchanged tier after writing.
+
+`fqn` passes its service-tier callback to `Gv` (`E5i`). The latter exposes the
+normal-chat fast-mode switch only when standard and fast options both exist.
+The adapter uses the same `c0` resolver and `l0().setServiceTier`, then checks both
+conversation and draft tier. Hidden, upgrade-preview, stale or unrecognized
+tier state is not offered as an actionable private choice.
+
 ## Ownership and lifecycle
 
 1. Resolve one committed picker ancestor from the connected model trigger.
@@ -62,8 +86,8 @@ server preference persistence has completed.
    timeout and 10-second failure cooldown. Warm requests do not open a webpage
    menu or start recurring timers.
 4. Re-read the selected version, model permissions, allowed effort and current
-   model/effort before mutation. Compare the current draft service tier too;
-   this capability does not alter it or participate in work-mode selection.
+   model/effort before mutation. Version/tier actions also compare conversation
+   version and tier, and confirm the resulting state. Work mode is excluded.
 5. Use the existing official stores and actions, then read back the actual model
    and effort in the same conversation. Do not report a local label change as
    a successful selection. Unexpected post-write state fails confirmation.
@@ -75,12 +99,15 @@ server preference persistence has completed.
    conversation during import cannot fall back into the new conversation.
 8. Dismissal cancels pending private reads and invalidates options without
    synthetic touch or keyboard focus. Already-open official menus retain their
-   close path. The Advanced entry explicitly opens the existing model catalog.
+   close path. Advanced opens private version/tier choices when recognized;
+   Back returns to presets, and Other official models retains the old entry.
+   Navigation invalidates the previous selection receipt. Restricted pickers
+   without presets do not show a nonexistent Back entry.
 
 ## Implementation and validation
 
 - `chatgpt_web_private_model_contract.js`: source-pinned binding, schema,
-  eligibility, model/effort selection and readback.
+  eligibility, model/effort/version/tier selection and readback.
 - `chatgpt_web_private_model_state.js`: bounded module cache, catalog handles,
   selection receipt, cancellation and lifecycle.
 - `chatgpt_web_adapter_composer.js`: production request/select/dismiss wiring.
@@ -88,14 +115,26 @@ server preference persistence has completed.
   and lifecycle registration only; shared adapter-version edits are untouched.
 - `scripts/test-chatgpt-web-private-model-state.js`: synthetic contract and
   production-adapter tests, with no real accounts or network requests.
+- Native composer semantics distinguish `model`, `model_version` and
+  `service_tier`: only thinking presets form a slider. Version/speed choices
+  use their confirmed selected flags; both navigation entries remain visible.
+  The popup bounds its height and scrolls longer advanced lists.
 
 The 2026-09-07 focused Node run passed 108 cases covering this capability, tool-state integration, menu
 dismissal/submenus, attachment-composer bundle parsing and the send observer.
 These are fixture-based tests,
 not a live private transaction or an Android compilation result.
 
+The subsequent version/tier batch passed 122 focused Node cases across model
+state, temporary state and attachment-composer integration. It covers fresh and
+stale bindings, restricted/version fallback, permissions, navigation, duplicate
+selection, ignored/partially applied mutations and production command wiring.
+Native policy and semantic tests were added but have not been compiled or run in
+this source batch; include them in the grouped Android check.
+
 Grouped device acceptance still needs production native UI selection across
-model/effort presets, reopening the menu, switching chats, and one explicit test
-send to confirm the effective selected state. Also check Advanced and an unknown
-runtime case preserve existing functionality. No measured latency, heat or
+model/effort presets, versions and available response tiers, reopening the menu,
+switching chats, and one explicit test send to confirm the effective selected
+state. Check native scrolling, Back/Other navigation and an unknown runtime
+preserve existing functionality. No measured latency, heat or
 power improvement is claimed. Do not repeat already accepted unrelated work.
