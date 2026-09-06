@@ -754,6 +754,7 @@ internal class ChatGptWebPageAdapter(
             "chatgpt_web_private_stream_policy.js",
             "chatgpt_web_private_stream_transport.js",
             "chatgpt_web_private_send_observer.js",
+            "chatgpt_web_private_text_runtime_submit.js",
             "chatgpt_web_text_transaction_orchestrator.js",
             "chatgpt_web_attachment_transport_observer.js",
             "chatgpt_web_adapter.js",

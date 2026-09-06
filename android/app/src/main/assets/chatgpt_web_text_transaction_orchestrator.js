@@ -2,7 +2,7 @@
   'use strict';
 
   const existing = window.__elonChatGptTextTransactionOrchestrator;
-  if (existing && Number(existing.version) >= 1) return;
+  if (existing && Number(existing.version) >= 2) return;
 
   const SEND_BUTTON_POLL_MS = 60;
   const SEND_BUTTON_SETTLE_MS = 180;
@@ -18,6 +18,7 @@
     const privateTextTransactionRelay = window.__elonChatGptPrivateTextTransactionRelay;
     const privateStreamTransport = window.__elonChatGptPrivateStreamTransport;
     const privateSendObserver = window.__elonChatGptPrivateSendObserver;
+    const runtimeSubmit = window.__elonChatGptPrivateTextRuntimeSubmit;
 
     function safeCode(value, fallback) {
       const code = String(value || fallback).replace(/[^a-z_]/g, '').slice(0, 32);
@@ -136,12 +137,37 @@
       return { handled: true, code: '' };
     }
 
+    function tryRuntimeSend(composer, value, expectedDraft, assistantBeforeSend, respond) {
+      if (!runtimeSubmit || typeof runtimeSubmit.submit !== 'function') return false;
+      const transaction = runtimeSubmit.submit({
+        prompt: value, expectedDraft, composer, requestId: respond.requestId || '',
+        readDraft: () => options.composerValue(composer),
+        clearDraft: () => options.setComposerValue(composer, ''),
+        beforeSubmit: () => privateStreamTransport?.prepareSend?.()
+      });
+      if (!transaction?.handled) return false;
+      options.scheduleSnapshot(true);
+      Promise.resolve(transaction.completion).then(receipt => {
+        const accepted = receipt?.status === 'accepted';
+        if (accepted && options.streamingPolicy) options.streamingPolicy.begin(assistantBeforeSend);
+        respond('send_prompt', accepted, 'official_runtime_v1:' +
+          (accepted ? 'accepted' : receipt?.status === 'rejected' ? 'rejected:not_ready'
+            : 'unknown:' + safeCode(receipt?.code, 'unknown')));
+        options.scheduleSnapshot(true);
+      }).catch(() => {
+        respond('send_prompt', false, 'official_runtime_v1:unknown:completion_failed');
+        options.scheduleSnapshot(true);
+      });
+      return true;
+    }
+
     function sendPrompt(value, expectedDraft, respond, allowPrivateTextTransaction) {
       const composer = options.findComposer();
       const assistantBeforeSend = options.streamingPolicyModule &&
         options.streamingPolicyModule.messageObservation(options.messageAdapter);
       let privateFallbackCode = '';
       if (allowPrivateTextTransaction === true) {
+        if (tryRuntimeSend(composer, value, expectedDraft, assistantBeforeSend, respond)) return;
         const attempt = tryPrivateSend(
           composer, value, expectedDraft, assistantBeforeSend, respond
         );
@@ -234,5 +260,5 @@
     return Object.freeze({ sendPrompt, tryPrivateRegeneration, stopPrivate });
   }
 
-  window.__elonChatGptTextTransactionOrchestrator = Object.freeze({ version: 1, create });
+  window.__elonChatGptTextTransactionOrchestrator = Object.freeze({ version: 2, create });
 })();
