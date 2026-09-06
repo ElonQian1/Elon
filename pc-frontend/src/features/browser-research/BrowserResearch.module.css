@@ -1,0 +1,43 @@
+.page { height: 100%; min-width: 0; overflow: auto; background: #111618; color: #e8f0eb; }
+.header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 20px 24px; border-bottom: 1px solid #2b3832; background: #171e1c; }
+.heading { display: flex; align-items: center; gap: 13px; color: #80d7ad; }
+.heading span { font-size: 11px; letter-spacing: .06em; }.heading h1 { margin: 3px 0 0; color: #eef5f1; font-size: 23px; }
+.badge { display: inline-block; color: #92d8b5; border: 1px solid #355d49; background: #193428; border-radius: 20px; padding: 5px 9px; font-size: 11px; white-space: nowrap; }
+.intro { padding: 16px 24px 0; color: #adbbb3; font-size: 13px; line-height: 1.7; }
+.page button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 36px; border: 1px solid #3d4d44; border-radius: 7px; padding: 7px 11px; background: #242e29; color: #e3eee7; font-size: 12px; cursor: pointer; }
+.page button:hover { border-color: #72b997; background: #2b4033; }.page button:disabled { opacity: .48; cursor: not-allowed; }
+.page button:focus-visible, .page input:focus-visible, .page select:focus-visible { outline: 2px solid #8ee4b9; outline-offset: 3px; }
+.page .primary { background: #276548; border-color: #438764; color: #f0fff6; }
+.page label { display: flex; flex-direction: column; gap: 7px; color: #b4c4ba; font-size: 12px; }
+.page input, .page select { box-sizing: border-box; width: 100%; min-width: 0; min-height: 39px; padding: 9px 11px; border: 1px solid #3b4b42; border-radius: 7px; background: #111815; color: #e5eee8; font: inherit; }
+.projectForm { display: flex; align-items: flex-end; gap: 10px; padding: 18px 24px; border-bottom: 1px solid #2b3832; }
+.projectForm label { flex: 1; }.projectForm button { min-height: 39px; }
+.workspace { min-height: 540px; display: grid; grid-template-columns: 290px minmax(0, 1fr); }
+.sidebar { min-width: 0; padding: 17px; border-right: 1px solid #2a3830; background: #141b17; }
+.card { margin: 0 0 14px; padding: 14px; border: 1px solid #34443a; border-radius: 10px; background: #1a231e; }
+.card h2, .inspector h2 { margin: 0; font-size: 14px; }.card h2 { margin-bottom: 12px; }
+.sectionTitle { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }.sectionTitle h2 { margin: 0; }.sectionTitle > span { color: #90a69a; font-size: 11px; }
+.sectionTitle button { min-height: 29px; padding: 4px 7px; font-size: 11px; }
+.card > .primary { width: 100%; margin-top: 12px; }
+.help { color: #99afa1; font-size: 12px; line-height: 1.7; overflow-wrap: anywhere; }
+.url { color: #b8d9c6; font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.error, .notice { margin: 12px 20px; padding: 11px 14px; border: 1px solid #785650; border-radius: 7px; background: #33211f; color: #efb9ae; font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.notice { border-color: #626040; background: #2d2d1f; color: #d7d0a6; }.card .notice { margin: 10px 0 0; }
+.sessions { display: grid; gap: 8px; }.sessions button { display: flex; flex-direction: column; align-items: flex-start; text-align: left; }
+.sessions button[data-active="true"] { background: #204532; border-color: #589774; }.sessions span, .sessions small { color: #a2b5aa; font-size: 11px; overflow-wrap: anywhere; }.sessions small { font-size: 10px; }
+.facts { display: grid; grid-template-columns: auto 1fr; gap: 8px; font-size: 11px; line-height: 1.5; }.facts dt { color: #91a799; }.facts dd { margin: 0; text-align: right; }
+.actions { display: flex; gap: 7px; flex-wrap: wrap; }.actions button { flex: 1; }
+.waiting { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; color: #c4dacf; padding: 12px; font-size: 12px; }.waiting small { width: 100%; color: #94a49b; }
+.inspector { min-width: 0; padding: 18px 20px; }.toolbar { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.tabs { display: flex; gap: 6px; }.tabs button[aria-selected="true"] { background: #214b35; border-color: #4c9970; color: #b0efcb; }
+.searchForm { display: flex; align-items: flex-end; gap: 9px; margin: 18px 0; }.searchForm label { flex: 1; }.searchForm button { min-height: 39px; }
+.results { min-width: 0; }.resultList { border: 1px solid #314037; border-radius: 9px; padding: 14px; background: #171f1b; }
+.page .resultRow { display: flex; align-items: flex-start; flex-direction: column; width: 100%; text-align: left; min-width: 0; padding: 12px; margin-bottom: 8px; background: #1c2821; }
+.resultRow strong { font-size: 12px; font-weight: 500; overflow-wrap: anywhere; }.resultRow small { color: #87a393; font-size: 10px; overflow-wrap: anywhere; }.rowMeta { color: #a9c8b7; font-size: 10px; }
+.resultRow pre { box-sizing: border-box; max-width: 100%; padding: 8px; background: #111914; color: #bcd5c7; white-space: pre-wrap; overflow-wrap: anywhere; font: 11px/1.6 Consolas, monospace; }
+.pagination { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; padding-top: 9px; }.pagination span { margin-right: auto; color: #90a799; font-size: 11px; }
+.detail { min-width: 0; margin-top: 18px; padding: 16px; border: 1px solid #3b5d48; border-radius: 9px; background: #18241d; }.detail h3 { font-size: 12px; margin: 18px 0 5px; }.detail > button { margin: 8px 8px 0 0; }
+.code { max-height: 420px; overflow: auto; padding: 15px; border: 1px solid #293e30; border-radius: 7px; background: #0c130e; color: #cbe1d3; font: 12px/1.75 Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; tab-size: 2; }
+.empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 300px; padding: 30px; text-align: center; color: #81a38f; }.empty h2 { color: #c4d7cd; font-size: 17px; }.empty p { margin: 2px 0; max-width: 500px; font-size: 13px; line-height: 1.8; }
+@media (max-width: 1000px) { .workspace { grid-template-columns: 250px minmax(0, 1fr); }.sidebar { padding: 12px; }.inspector { padding: 14px; } }
+@media (max-width: 720px) { .header { padding: 16px; }.header > .badge { display: none; }.intro { padding: 14px 16px 0; }.projectForm { padding: 15px; flex-direction: column; align-items: stretch; }.workspace { display: block; }.sidebar { border-right: 0; border-bottom: 1px solid #2a3830; }.toolbar { flex-wrap: wrap; }.inspector { padding: 12px; }.tabs { flex-wrap: wrap; }.searchForm { align-items: stretch; flex-direction: column; }.code { padding: 10px; font-size: 11px; }.error, .notice { margin: 10px; } }

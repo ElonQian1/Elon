@@ -81,6 +81,7 @@ export const ADMIN_RAIL_ITEM: RailItem = {
 export const LOCAL_RAIL_ITEMS: RailItem[] = [
   { path: '/local-tasks', Icon: HardDrive, label: '本机任务', workspace: 'projects', ...colors.green },
   { path: '/codex-control', Icon: TerminalSquare, label: 'Codex 控制台', workspace: 'projects', ...colors.green },
+  { path: '/browser-research', Icon: Globe2, label: '浏览器研究', workspace: 'projects', ...colors.green },
   { path: '/ai', Icon: Bot, label: '一龙 AI', workspace: 'ai', ...colors.green },
   { path: '/user-browser', Icon: Globe2, label: '官方 AI', workspace: 'ai', ...colors.green },
 ]
@@ -128,6 +129,7 @@ const projectSections: NavSection[] = [
     items: [
       { path: '/git-worktrees', Icon: GitBranch, label: 'Git 现场' },
       { path: '/codex-control', Icon: TerminalSquare, label: 'Codex 控制台' },
+      { path: '/browser-research', Icon: Globe2, label: '浏览器研究' },
       { path: '/local-tasks', Icon: HardDrive, label: '本机任务' },
     ],
   },
@@ -225,6 +227,7 @@ export function workspaceForPath(pathname: string): WorkspaceKey {
   }
   if (pathname.startsWith('/workspace') || pathname.startsWith('/projects') || pathname.startsWith('/git-worktrees')
     || pathname.startsWith('/ui-tuner') || pathname.startsWith('/local-tasks') || pathname.startsWith('/codex-control')
+    || pathname.startsWith('/browser-research')
     || pathname.startsWith('/dev-tasks')) return 'projects'
   return 'ai'
 }

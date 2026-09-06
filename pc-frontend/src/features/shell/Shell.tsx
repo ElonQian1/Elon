@@ -14,6 +14,7 @@ import { useProjectOpenPrewarm } from '../conversation/useProjectOpenPrewarm'
 import { isLocalWorkbench } from '../../api/runtime'
 import styles from './Shell.module.css'
 import { useCodexControlBridge } from '../codex-control/useCodexControlBridge'
+import { useBrowserResearchBridge } from '../browser-research/useBrowserResearchBridge'
 
 const AuthDialog = lazy(() => import('../auth/AuthDialog'))
 
@@ -98,6 +99,7 @@ function DuplicateWorkbenchNotice() {
 
 export default function Shell() {
   useCodexControlBridge()
+  useBrowserResearchBridge()
   const duplicateTab = useWorkbenchTabCoordinator()
   const localMode = isLocalWorkbench()
   useNotifications(!localMode)
