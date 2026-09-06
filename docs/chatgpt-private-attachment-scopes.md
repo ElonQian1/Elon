@@ -6,7 +6,9 @@ Status: **implemented, offline verified, grouped Android and device acceptance
 pending**. Adapter 271 extends the existing private text/static-image upload into
 temporary chats. It is not a released APK, a real temporary-file transaction, or
 proof of backend retention behavior. Adapter 272 adds the separately scoped
-new-project candidate below; existing project conversations remain a code gap.
+new-project candidate below. The subsequent JavaScript-only batch adds existing
+project branch binding; actual runtime access and project upload acceptance
+remain pending, rather than being inferred from public source inspection.
 
 ## Current official contract
 
@@ -113,11 +115,54 @@ and ready-store receipts must retain the same project. Official `RGt` maps
 ready file and file specification unless persistence is temporary. The candidate
 now preserves this mapping rather than losing it at native association.
 
-Still unimplemented: existing project conversation branch/leaf ownership, read-only
-project-specific upload dispatch, and image retrieval-flag resolution for ingest
-projects. These cases keep the existing path before private writes. Do not infer
-the current leaf from the most recent server branch, request project writes from
-a cached directory, or mark all project attachments complete from these tests.
+Still unimplemented: read-only project-specific upload dispatch and image
+retrieval-flag resolution for ingest projects. These cases keep the existing path
+before private writes. Do not request project writes from a cached directory or
+mark all project attachments complete from these tests.
+
+## Existing project branches
+
+Capability: `android_chatgpt_private_existing_project_attachment_upload_v1`.
+Status: **implemented, offline verified, runtime/device acceptance pending**.
+It is not marked completed. No new upload endpoint or native send owner is added.
+
+The same inspected upload asset imports shared `XM` as `Ad` and `HM` as `zr`.
+Shared `sj`, exported as `XM`, resolves an official thread by server ID (including
+the existing new-thread ID mapping). Shared `Z`, exported as `HM`, provides
+`getGizmoId`, `getCurrentLeafId` and `hasNode`. The upload caller uses these
+selectors and passes the chosen leaf and server conversation ID to `WQr`,
+exported from the conversation asset as `H$`. `WQr` adds paired
+`origination_thread_id` and `origination_message_id` to the same project library
+metadata; `TGt` retains both fields in processing. The server's `current_node`
+is not evidence of the user's selected UI branch.
+
+The project helper binds only that exact, already-loaded shared module by dynamic
+import. A matching resource-timing entry or modulepreload is required first; it
+does not import guessed future asset names or create a copied official store.
+One page-local promise is reused, with a 1.5-second wait deadline. Unknown module
+exports, a loading/temporary thread, absent selected node or mismatched project
+leave the private path unconfirmed before any upload write.
+
+Existing `/c/<uuid>` and `/g/g-p-<32 hex>[-slug]/c/<uuid>` composers first read fresh
+conversation membership. Only bounded UUID node IDs are exposed by this read,
+not message bodies or the mapping itself. The official selected leaf must exist
+in that response, and fresh project write permission must also succeed. This
+candidate supports the same plain-text and non-ingest static-image subset as
+new-project uploads. Both processing metadata and the official ready-file store
+receive the same project, conversation and selected-leaf origin.
+
+After branch capture, the guard stays active during permission reads, native byte
+reads and upload processing. Changing branch, project, account, document or model
+cancels the old operation, including when the permission request also fails;
+there is no write replay through compatibility. Successful upload cleanup does
+not invalidate the already-associated file merely because its job signal is
+aborted. The current branch is captured after the fresh conversation read, not
+claimed to have been captured at the initial file-selection button press.
+
+Module versions are project `2`, protocol `5`, conversation transport `23`, and
+attachment composer/send `6`. The Kotlin adapter header remains `272`; the grouped
+APK must carry these newer assets. This source batch neither builds an APK nor
+proves that the inspected module is loaded and accessible on the handset.
 
 ## Verification
 
@@ -142,3 +187,13 @@ dependency chain parses as one bundle. No Android source compilation or device
 upload is implied. Grouped acceptance must additionally verify one synthetic
 project file is usable in its intended conversation and appears in the correct
 project, with no unintended personal-library entry or duplicate message.
+
+The existing-project extension passes 86 focused Node runner cases. These use
+synthetic official selectors and HTTP responses, and cover both route forms,
+selected versus server-latest leaf, missing nodes, stale branch cancellation,
+permission failure plus branch change, paired origin validation, timeout/abort,
+text/image association and ordinary/temporary regressions. The actual production
+asset dependency bundle also parses. This is not actual WebView module-import or
+real project-upload acceptance. When the handset returns, verify one existing
+project conversation with a synthetic attachment through production UI/MCP,
+including final reply use, exact project placement and no duplicate dispatch.
