@@ -1,10 +1,14 @@
 # Private conversation deletion
 
 Capability candidate: `android_chatgpt_private_conversation_delete_v1`.
-Implementation: **partial**, current and noncurrent selections use the evidenced
-legacy single-conversation branch; flagged endpoint selection remains open.
-Delivery: adapter 268 source candidate, no new APK or live deletion acceptance.
-Verification: 12 deletion JS cases and existing mutation/directory/attachment
+Implementation: current and noncurrent selections use the evidenced official
+single-conversation branches. Module version 3 now reads the current official
+flag before choosing DELETE or legacy PATCH. Runtime binding and deletion on a
+disposable conversation remain device-pending, not completed.
+Delivery: 1541 includes the legacy branch; version 3 awaits the grouped APK.
+Verification: the latest 18 deletion JS cases pass, including both branches,
+unknown configuration, timeouts, context changes and no cross-endpoint replay.
+Earlier verification: 12 deletion JS cases and existing mutation/directory/attachment
 composer regressions passed. Release source compilation and 90 targeted Android
 tests passed; the final cross-conversation send guard passed the affected 8-test
 lifecycle suite again. These counts overlap and are not 98 distinct tests.
@@ -21,10 +25,24 @@ Its `mYi` deletion mutation has two branches selected by flag `4177111012`:
 - `PATCH /backend-api/conversation/{conversation_id}` with `is_visible: false`
   in the legacy branch.
 
-This candidate implements the evidenced legacy single-conversation branch.
-It does not infer the runtime flag, switch endpoints after an error, or equate
-archive (`is_archived`) with deletion. The new DELETE branch and real account
-acceptance remain unverified. No private conversations were deleted for testing.
+The matching shared asset `4813494d-hrplraurzfyvxb10.js` has SHA-256
+`89c95d937bac1191e91d5ceb4872eb0c328d39a98ce05399093a663f18921aa0`.
+Its export `$3` is `H`, the gate reader used by `mYi`; export `t6` is `cs`,
+the same official Statsig client singleton. Its `getFeatureGate` carries value,
+name and evaluation details, unlike `checkGate`'s boolean-only result.
+
+The 2026-09-07 candidate reuses this exact already-loaded module, with a
+2-second module deadline. It requires a Ready client, the exact recognized
+gate and a boolean value without evaluation warnings. Unknown, unloaded,
+uninitialized and unrecognized values do not silently select legacy PATCH.
+Only the module namespace is cached; the gate is read for each explicitly
+confirmed deletion, not from a menu, a periodic poll or a second network client.
+No initialize/update-user/configuration-refresh method is called. Configuration
+failure is distinct from unsupported deletion and does not start a write.
+After this bounded read the owner rechecks document, account, route and draft.
+Errors never switch endpoints, and archive is still not deletion.
+Live runtime binding and deletion acceptance remain unverified. No private
+conversations were deleted for testing.
 
 ## Ownership and native path
 
@@ -100,5 +118,11 @@ Device acceptance must cover blocked deletion during active/paused voice, curren
 draft protection, one disposable current-chat deletion, no late reappearance, and
 starting voice in the subsequent new conversation. Direct manual operations inside
 the official fallback are not a replacement for production-native acceptance.
-Complete the flagged endpoint selection contract and official sharing separately.
-Do not mark this capability completed merely because the legacy branch compiles.
+The flagged endpoint code contract now passes targeted tests, including
+HTTP 204, refusal to PATCH after DELETE rejection, and one read-only
+reconciliation after an uncertain DELETE. The grouped Node run passes 73 runner
+cases, including complete production asset-bundle parsing and existing
+mutation/directory/file consumers. This is not a new Android build or live
+destructive acceptance. Confirm the actual account gate during disposable-chat
+acceptance. Official sharing remains separate. Do not mark this capability
+completed merely because both branches compile.

@@ -1,16 +1,18 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 2, create: factory });
+  const exported = Object.freeze({ version: 3, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com' && !root.__elonChatGptPrivateConversationDelete) {
     root.__elonChatGptPrivateConversationDelete = factory(root);
   }
-})(typeof window === 'object' ? window : null, function (root) {
+})(typeof window === 'object' ? window : null, function (root, options) {
   'use strict';
   const PATH = /^(?:\/c\/([A-Za-z0-9_-]{1,160})|\/g\/g-p-[A-Za-z0-9_-]{1,160}\/c\/([A-Za-z0-9_-]{1,160}))$/;
   const idFor = path => { const match = PATH.exec(path || ''); return match && (match[1] || match[2]); };
   const transport = root.__elonChatGptPrivateTransport;
   const directory = root.__elonChatGptPrivateConversationDirectory;
+  const RUNTIME_URL = 'https://chatgpt.com/cdn/assets/4813494d-hrplraurzfyvxb10.js';
+  let runtime;
   let active = null;
   let cooldownUntil = 0;
 
@@ -28,6 +30,31 @@
   }
 
   function result(ok, code, attempted) { return Object.freeze({ ok, code, attempted }); }
+
+  async function deleteEndpointMode() {
+    let timer, pending;
+    try {
+      if (!runtime) {
+        // Reuse the inspected official singleton, never load a different website build.
+        if (!root.performance?.getEntriesByName?.(RUNTIME_URL)?.length) return null;
+        const load = options?.loadRuntime || (url => import(url));
+        runtime = Promise.resolve().then(() => load(RUNTIME_URL));
+      }
+      pending = runtime;
+      const namespace = await Promise.race([pending, new Promise((_, reject) => {
+        timer = root.setTimeout(() => reject(new Error('configuration_timeout')), 2000);
+      })]);
+      const client = namespace.t6?.();
+      if (client?.loadingStatus !== 'Ready') return null;
+      const gate = client.getFeatureGate?.('4177111012', { disableExposureLog: true });
+      if (gate?.name !== '4177111012' || typeof gate.value !== 'boolean' ||
+          !/^[A-Za-z]+:Recognized$/.test(gate.details?.reason || '') || gate.details?.warnings?.length) return null;
+      return gate.value;
+    } catch (_) {
+      if (runtime === pending) runtime = null;
+      return null;
+    } finally { root.clearTimeout(timer); }
+  }
 
   function currentConversationRejection(job) {
     if (job.id !== idFor(root.location.pathname)) return '';
@@ -50,6 +77,9 @@
       ]).finally(() => root.clearTimeout(timer));
       if (!current(job)) return result(false, 'delete_context_changed', false);
       if (identity(source) !== job.account || !current(job)) return result(false, 'delete_auth_unavailable', false);
+      const useDelete = await deleteEndpointMode();
+      if (!current(job)) return result(false, 'delete_context_changed', false);
+      if (useDelete === null) return result(false, 'delete_configuration_unavailable', false);
       const rejection = currentConversationRejection(job);
       if (rejection) return result(false, rejection, false);
       const headers = { Accept: 'application/json', 'Content-Type': 'application/json' };
@@ -62,9 +92,10 @@
       }, { timeoutMs: 9000, maxBytes: 1024 * 1024, mode });
       attempted = true;
       try {
-        // Official mYi legacy deletion branch, not archive and never a bulk endpoint.
-        await request('/backend-api/conversation/' + encodeURIComponent(job.id), {
-          method: 'PATCH', body: JSON.stringify({ is_visible: false }),
+        // Official mYi selects one endpoint before dispatch; errors never switch branches.
+        await request('/backend-api/conversation/' + (useDelete ? 'id/' : '') + encodeURIComponent(job.id), {
+          method: useDelete ? 'DELETE' : 'PATCH',
+          ...(useDelete ? {} : { body: JSON.stringify({ is_visible: false }) }),
           __elonPrivateTransport: 'conversation_delete_v1',
         }, 'none');
       } catch (error) {
@@ -131,5 +162,5 @@
     return true;
   }
 
-  return Object.freeze({ version: 2, start, handle, busy: () => Boolean(active) });
+  return Object.freeze({ version: 3, start, handle, busy: () => Boolean(active) });
 });

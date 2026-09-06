@@ -8,9 +8,17 @@ const deletion = require('../android/app/src/main/assets/chatgpt_web_private_con
 const request = require('../android/app/src/main/assets/chatgpt_web_private_json_request.js');
 const asset = name => fs.readFileSync(path.join(__dirname, '../android/app/src/main/assets/', name), 'utf8');
 const deferred = () => { let resolve; const promise = new Promise(r => { resolve = r; }); return { promise, resolve }; };
+const RUNTIME_URL = 'https://chatgpt.com/cdn/assets/4813494d-hrplraurzfyvxb10.js';
 
 function fixture(fetcher = () => new Response('{}')) {
   const calls = [], accepted = [];
+  const gate = { name: '4177111012', value: false, details: { reason: 'Bootstrap:Recognized' } };
+  const client = { loadingStatus: 'Ready', getFeatureGate: (name, options) => {
+    assert.equal(name, gate.name);
+    assert.deepEqual(options, { disableExposureLog: true });
+    return gate;
+  } };
+  const runtime = { loadRuntime: async url => { assert.equal(url, RUNTIME_URL); return { t6: () => client }; } };
   let headers = { Authorization: 'Bearer local-fixture-token', Cookie: 'not-exported',
     'openai-sentinel-proof-token': 'not-replayed', 'chatgpt-account-id': 'fixture-account' };
   const root = {
@@ -27,9 +35,11 @@ function fixture(fetcher = () => new Response('{}')) {
       acquireSameOriginRequestHeaders: async () => headers,
     },
     AbortController, setTimeout, clearTimeout,
+    performance: { getEntriesByName: url => url === RUNTIME_URL ? [{}] : [] },
     fetch: async (url, init) => { calls.push({ url, init }); return fetcher(url, init); },
   };
-  return { root, calls, accepted, api: deletion.create(root), changeAccount: () => { headers = { Authorization: 'Bearer different-account' }; } };
+  return { root, calls, accepted, gate, client, runtime, api: deletion.create(root, runtime),
+    changeAccount: () => { headers = { Authorization: 'Bearer different-account' }; } };
 }
 
 test('one confirmed delete writes only is_visible and never forwards cookie or captured proof', async () => {
@@ -45,6 +55,102 @@ test('one confirmed delete writes only is_visible and never forwards cookie or c
   assert.equal(init.credentials, 'include');
   assert.equal(init.redirect, 'error');
   assert.deepEqual(f.accepted, ['target-chat']);
+});
+
+test('current official flag selects DELETE without a legacy request body', async () => {
+  const f = fixture(() => new Response(null, { status: 204 }));
+  f.gate.value = true;
+  assert.equal((await f.api.start('/c/target-chat', true)).ok, true);
+  assert.equal(f.calls.length, 1);
+  assert.equal(f.calls[0].url, '/backend-api/conversation/id/target-chat');
+  assert.equal(f.calls[0].init.method, 'DELETE');
+  assert.equal(f.calls[0].init.body, undefined);
+});
+
+test('unknown or unloaded official configuration never defaults to legacy deletion', async () => {
+  for (const reason of ['Uninitialized', 'NoValues', 'Network:Unrecognized', 'LocalOverride']) {
+    const f = fixture(); f.gate.details.reason = reason;
+    assert.equal((await f.api.start('/c/target-chat', true)).code, 'delete_configuration_unavailable');
+    assert.equal(f.calls.length, 0);
+    assert.equal(f.api.busy(), false);
+  }
+  for (const change of [f => { f.client.loadingStatus = 'Loading'; },
+    f => { f.gate.value = 'false'; }, f => { f.gate.details.warnings = ['NoCachedValues']; },
+    f => { f.root.performance.getEntriesByName = () => []; }]) {
+    const f = fixture(); change(f);
+    assert.equal((await f.api.start('/c/target-chat', true)).code, 'delete_configuration_unavailable');
+    assert.equal(f.calls.length, 0);
+  }
+});
+
+test('only a loaded exact module may be reused, and only its module namespace is cached', async () => {
+  const f = fixture(); let loads = 0;
+  f.runtime.loadRuntime = async () => { loads += 1; return { t6: () => f.client }; };
+  f.root.performance.getEntriesByName = () => [];
+  assert.equal((await f.api.start('/c/target-chat', true)).ok, false);
+  assert.equal(loads, 0);
+  f.root.performance.getEntriesByName = () => [{}];
+  await f.api.start('/c/target-chat', true);
+  f.gate.value = true;
+  await f.api.start('/c/target-chat', true);
+  assert.equal(loads, 1);
+  assert.deepEqual(f.calls.map(call => call.init.method), ['PATCH', 'DELETE']);
+});
+
+test('configuration wait is bounded, and context changes during it cannot write', async () => {
+  for (const change of [f => f.changeAccount(), f => { f.root.__elonChatGptDocumentToken = 'doc_changed_123'; },
+    f => { f.root.location.href = 'https://chatgpt.com/c/changed'; }]) {
+    const f = fixture(), pendingRuntime = deferred();
+    f.runtime.loadRuntime = () => pendingRuntime.promise;
+    const pending = f.api.start('/c/target-chat', true);
+    await new Promise(resolve => setImmediate(resolve));
+    change(f); pendingRuntime.resolve({ t6: () => f.client });
+    assert.equal((await pending).ok, false);
+    assert.equal(f.calls.length, 0);
+  }
+  const f = fixture(), pendingRuntime = deferred();
+  f.runtime.loadRuntime = () => pendingRuntime.promise;
+  f.root.setTimeout = (callback, ms) => setTimeout(callback, ms === 2000 ? 1 : ms);
+  assert.equal((await f.api.start('/c/target-chat', true)).code, 'delete_configuration_unavailable');
+  pendingRuntime.resolve({ t6: () => f.client });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(f.calls.length, 0);
+  assert.equal(f.api.busy(), false);
+});
+
+test('DELETE rejection or uncertainty never falls through to PATCH', async () => {
+  for (const fail of ['http', 'network']) {
+    const f = fixture((url, init) => {
+      if (init.method === 'DELETE') {
+        if (fail === 'network') throw new Error('network');
+        return new Response('{}', { status: 404 });
+      }
+      return new Response('{}', { status: 404 });
+    });
+    f.gate.value = true;
+    const result = await f.api.start('/c/target-chat', true);
+    assert.equal(result.ok, false);
+    assert.deepEqual(f.calls.map(call => call.init.method), fail === 'http' ? ['DELETE'] : ['DELETE', 'GET']);
+    assert.equal(f.accepted.length, 0);
+  }
+});
+
+test('configuration recovery preserves new drafts and never runs an abandoned deletion', async () => {
+  const f = fixture(), pendingRuntime = deferred(), snapshot = currentSnapshot(f);
+  f.runtime.loadRuntime = () => pendingRuntime.promise;
+  const pending = f.api.start('/c/target-chat', true, () => snapshot);
+  await new Promise(resolve => setImmediate(resolve));
+  snapshot.draft = 'new unsent text';
+  pendingRuntime.resolve({ t6: () => f.client });
+  assert.equal((await pending).code, 'delete_draft_present');
+  assert.equal(f.calls.length, 0);
+  const recover = fixture();
+  recover.runtime.loadRuntime = async () => { throw new Error('module unavailable'); };
+  assert.equal((await recover.api.start('/c/target-chat', true)).code, 'delete_configuration_unavailable');
+  recover.runtime.loadRuntime = async () => ({ t6: () => recover.client });
+  recover.gate.value = true;
+  assert.equal((await recover.api.start('/c/target-chat', true)).ok, true);
+  assert.deepEqual(recover.calls.map(call => call.init.method), ['DELETE']);
 });
 
 test('requires confirmation and exact cached target', async () => {
