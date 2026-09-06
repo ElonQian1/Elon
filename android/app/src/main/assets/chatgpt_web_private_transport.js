@@ -4,7 +4,7 @@
   const existingTransport = window.__elonChatGptPrivateTransport;
   const prefetchEnabled = window.__elonChatGptPrivateConversationPrefetchEnabled === true;
   const researchEnabled = window.__elonChatGptPrivateResearchEnabled === true;
-  if ((existingTransport && Number(existingTransport.version) >= 21) ||
+  if ((existingTransport && Number(existingTransport.version) >= 22) ||
       (!prefetchEnabled && !researchEnabled) ||
       location.origin !== 'https://chatgpt.com') return;
 
@@ -511,17 +511,18 @@
     const ids = [payload?.conversation_id, payload?.id].filter(value => value != null);
     if (!ids.length || ids.some(id => id !== target.id) ||
         typeof payload?.is_do_not_remember !== 'boolean' ||
+        payload.is_temporary_chat !== undefined && typeof payload.is_temporary_chat !== 'boolean' ||
         !(payload.gizmo_id === null || typeof payload.gizmo_id === 'string') ||
         target.path !== location.pathname) throw new Error('attachment_context_unavailable');
+    const unscoped = payload.gizmo_id === null && !conversationProjectId(result.payload) &&
+      (payload.context_scopes == null || Array.isArray(payload.context_scopes) && payload.context_scopes.length === 0);
     return Object.freeze({ conversationId: target.id,
-      ordinary: payload.is_do_not_remember === false && payload.gizmo_id === null &&
-        !conversationProjectId(result.payload) &&
-        (payload.context_scopes == null ||
-          Array.isArray(payload.context_scopes) && payload.context_scopes.length === 0) });
+      ordinary: unscoped && payload.is_do_not_remember === false && payload.is_temporary_chat !== true,
+      temporary: unscoped && payload.is_do_not_remember === true && payload.is_temporary_chat !== false });
   }
 
   window.__elonChatGptPrivateTransport = Object.freeze({
-    version: 21,
+    version: 22,
     conversationPrefetchEnabled: prefetchEnabled,
     conversationPrefetchAvailable: true,
     experimentalConversationPrefetchAvailable: true,

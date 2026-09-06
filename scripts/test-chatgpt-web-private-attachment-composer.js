@@ -48,7 +48,8 @@ function fixture() {
     documentToken: root.__elonChatGptDocumentToken, href: root.location.href,
     name: file.name, size: file.size, type: file.type };
   const result = binding => ({ ok: true, stage: 'processed', associated: false, binding,
-    fileId: 'file-synthetic', fileName: file.name, fileSize: file.size, mimeType: file.type, metadata: { fileTokenSize: 5 } });
+    fileId: 'file-synthetic', fileName: file.name, fileSize: file.size, mimeType: file.type,
+    isTemporaryChat: binding.isTemporaryChat, metadata: { fileTokenSize: 5 } });
   return { root, composer, store, input, fiber, file, descriptor, result,
     setAccount: next => { account = next; }, setModel: next => { model = next; } };
 }
@@ -66,8 +67,9 @@ test('ready file association uses the official callable store and deduplicates n
   assert.equal(f.store.files$().length, 0);
 });
 
-test('context selection rejects project routes, temporary routes, invalid ids and occupied composers', () => {
-  for (const path of ['/c/existing', '/g/g-p-example/project', '/?temporary-chat=true', '/?model=unknown']) {
+test('context selection rejects unconfirmed scopes, invalid ids and occupied composers', () => {
+  for (const path of ['/c/existing', '/g/g-p-example/project', '/?temporary-chat=false', '/?model=unknown',
+    '/?temporary-chat=true&model=unknown', '/?temporary-chat=true&temporary-chat=false', '/?temporary-chat=true#other']) {
     const f = fixture();
     f.root.location.href = 'https://chatgpt.com' + path;
     assert.equal(f.composer.available(), false);
@@ -75,6 +77,67 @@ test('context selection rejects project routes, temporary routes, invalid ids an
   const f = fixture();
   f.store.files$.set([{ tempId: 'user-owned', status: 'ready' }]);
   assert.equal(f.composer.available(), false);
+});
+
+test('new temporary chat keeps both private upload and ready attachment out of the personal library', async () => {
+  const f = fixture();
+  f.root.location.href += '?temporary-chat=true';
+  f.descriptor.href = f.root.location.href;
+  const p = pipeline(f);
+  await p.start();
+  assert.equal(p.fallbacks(), 0);
+  assert.equal(p.receipts[0][1], true);
+  const create = JSON.parse(p.requests[0].init.body), process = JSON.parse(p.requests[2].init.body);
+  assert.equal(create.store_in_library, false);
+  assert.equal(Object.hasOwn(create, 'library_persistence_mode'), false);
+  assert.equal(Object.hasOwn(process, 'library_persistence_mode'), false);
+  assert.equal(process.metadata.is_temporary_chat, true);
+  assert.equal(process.metadata.is_project_thread, false);
+  assert.equal(f.store.readyFiles$()[0].isTemporaryChat, true);
+  assert.equal(f.store.readyFiles$()[0].storeInLibrary, false);
+  assert.equal(p.requests.length, 3, 'no text send or extra copy to library');
+  assert.equal(f.composer.remove(f.composer.merge([])[0].id), true);
+});
+
+test('existing temporary chat requires matching server scope, never just the URL', async () => {
+  for (const scope of [{ ordinary: false, temporary: true }, { ordinary: true, temporary: false },
+    { ordinary: false, temporary: false }, { ordinary: false }]) {
+    const f = existingFixture();
+    f.root.location.href += '?temporary-chat=true';
+    f.descriptor.href = f.root.location.href;
+    f.root.__elonChatGptPrivateTransport.readAttachmentContext = async () => ({ conversationId: f.id, ...scope });
+    const p = pipeline(f);
+    await p.start();
+    const supported = scope.temporary === true;
+    assert.equal(p.requests.length, supported ? 3 : 0);
+    assert.equal(p.fallbacks(), supported ? 0 : 1);
+    assert.equal(f.store.readyFiles$().length, supported ? 1 : 0);
+  }
+});
+
+test('temporary intent changes while uploading cannot attach, retry or persist the result', async () => {
+  const f = fixture();
+  f.root.location.href += '?temporary-chat=true';
+  f.descriptor.href = f.root.location.href;
+  const p = pipeline(f, { request: async (url, init) => {
+    if (init.method === 'PUT') f.root.location.href = 'https://chatgpt.com/';
+    return url.endsWith('/files') ? { payload: { status: 'success', file_id: 'file-synthetic',
+      upload_url: 'https://uploads.oaiusercontent.com/fixture?sig=synthetic' } } : {};
+  } });
+  await p.start();
+  assert.equal(p.fallbacks(), 0);
+  assert.equal(p.requests.length, 2);
+  assert.equal(p.receipts[0][1], false);
+  assert.equal(f.store.files$().length, 0);
+});
+
+test('association rejects a receipt from a different persistence scope', () => {
+  const f = fixture();
+  f.root.location.href += '?temporary-chat=true';
+  const binding = f.composer.capture();
+  assert.throws(() => f.composer.associate(binding, f.file,
+    { ...f.result(binding), isTemporaryChat: false }, f.descriptor.leaseId), /association_invalid/);
+  assert.equal(f.store.files$().length, 0);
 });
 
 test('versioned reinjection cancels only the older owner and retains the current one', () => {
@@ -86,7 +149,7 @@ test('versioned reinjection cancels only the older owner and retains the current
     __elonChatGptPrivateAttachmentSend: { version: 1, cancel: () => { cancelled++; } } };
   vm.runInNewContext(source, { window: root });
   const current = root.__elonChatGptPrivateAttachmentSend;
-  assert.equal(current.version, 3);
+  assert.equal(current.version, 4);
   assert.equal(cancelled, 1);
   vm.runInNewContext(source, { window: root });
   assert.equal(root.__elonChatGptPrivateAttachmentSend, current);
@@ -125,25 +188,35 @@ test('existing conversation reuses the private upload and exact official store w
 });
 
 test('production image preparation, private upload and store association preserve image type and dimensions', async () => {
-  const f = existingFixture();
-  f.file = new File(['synthetic PNG'], 'fixture.png', { type: 'image/png' });
-  Object.assign(f.descriptor, { name: f.file.name, type: f.file.type, size: f.file.size, width: 320, height: 240 });
-  f.root.File = File;
-  let closed = 0;
-  f.root.createImageBitmap = async () => ({ width: 320, height: 240, close: () => { closed++; } });
-  f.root.__elonChatGptPrivateAttachmentImage = require('../android/app/src/main/assets/chatgpt_web_private_attachment_image.js');
-  const p = pipeline(f);
-  await p.start();
-  assert.equal(p.receipts[0][1], true);
-  assert.equal(p.fallbacks(), 0);
-  assert.equal(p.requests.length, 3);
-  const attachment = f.store.readyFiles$()[0];
-  assert.equal(attachment.fileSpec.mimeType, 'image/png');
-  assert.equal(attachment.fileSpec.width, 320);
-  assert.equal(attachment.fileSpec.height, 240);
-  assert.equal(attachment.file, f.file);
-  assert.equal(closed, 1);
-  assert.equal(f.composer.merge([])[0].name, 'fixture.png');
+  for (const temporary of [false, true]) {
+    const f = existingFixture();
+    if (temporary) f.root.location.href += '?temporary-chat=true';
+    f.descriptor.href = f.root.location.href;
+    f.root.__elonChatGptPrivateTransport.readAttachmentContext = async () =>
+      ({ conversationId: f.id, ordinary: !temporary, temporary });
+    f.file = new File(['synthetic PNG'], 'fixture.png', { type: 'image/png' });
+    Object.assign(f.descriptor, { name: f.file.name, type: f.file.type, size: f.file.size, width: 320, height: 240 });
+    f.root.File = File;
+    let closed = 0;
+    f.root.createImageBitmap = async () => ({ width: 320, height: 240, close: () => { closed++; } });
+    f.root.__elonChatGptPrivateAttachmentImage = require('../android/app/src/main/assets/chatgpt_web_private_attachment_image.js');
+    const p = pipeline(f);
+    await p.start();
+    assert.equal(p.receipts[0][1], true);
+    assert.equal(p.fallbacks(), 0);
+    assert.equal(p.requests.length, 3);
+    const attachment = f.store.readyFiles$()[0];
+    assert.equal(attachment.fileSpec.mimeType, 'image/png');
+    assert.equal(attachment.fileSpec.width, 320);
+    assert.equal(attachment.fileSpec.height, 240);
+    assert.equal(attachment.file, f.file);
+    assert.equal(attachment.isTemporaryChat, temporary);
+    const body = JSON.parse(p.requests[2].init.body);
+    assert.equal(body.use_case, 'multimodal');
+    assert.equal(body.metadata.is_temporary_chat, temporary);
+    assert.equal(closed, 1);
+    assert.equal(f.composer.merge([])[0].name, 'fixture.png');
+  }
 });
 
 test('unavailable image preparation selects compatibility before native byte reads', async () => {
@@ -172,32 +245,39 @@ test('cancellation during image preparation never creates a private upload or st
   assert.equal(p.receipts[0][1], false);
 });
 
-test('production conversation reader and attachment pipeline integrate without a substitute scope resolver', async () => {
-  const f = existingFixture(), requests = [];
-  const headers = f.root.__elonChatGptPrivateTransport.copySameOriginRequestHeaders;
-  delete f.root.__elonChatGptPrivateTransport;
-  f.root.__elonChatGptPrivateConversationPrefetchEnabled = true;
-  f.root.__elonChatGptPrivateTransportPolicy = require('../android/app/src/main/assets/chatgpt_web_private_transport_policy.js');
-  f.root.__elonChatGptPrivateJsonRequest = require('../android/app/src/main/assets/chatgpt_web_private_json_request.js');
-  f.root.__elonChatGptPrivateAuthContext = { canAcquire: () => true, copyRequestHeaders: headers };
-  f.root.location.pathname = '/c/' + f.id;
-  f.root.fetch = async (url, init) => {
-    requests.push({ url, init });
-    return { ok: true, status: 200, text: async () => JSON.stringify({ conversation_id: f.id,
-      is_do_not_remember: false, gizmo_id: null, mapping: {} }) };
-  };
-  const fs = require('node:fs'), path = require('node:path');
-  require('node:vm').runInNewContext(fs.readFileSync(path.join(__dirname,
-    '../android/app/src/main/assets/chatgpt_web_private_transport.js'), 'utf8'),
-  { window: f.root, location: f.root.location, URL });
-  const p = pipeline(f);
-  await p.start();
-  assert.equal(requests.length, 1);
-  assert.equal(requests[0].url, '/backend-api/conversations/' + f.id);
-  assert.equal(requests[0].init.method, 'GET');
-  assert.equal(p.requests.length, 3);
-  assert.equal(p.receipts[0][1], true);
-  assert.equal(f.composer.merge([])[0].state, 'ready');
+test('production reader integrates ordinary and temporary attachments without a substitute scope resolver', async () => {
+  for (const temporary of [false, true]) {
+    const f = existingFixture(), requests = [];
+    if (temporary) {
+      f.root.location.href += '?temporary-chat=true';
+      f.descriptor.href = f.root.location.href;
+    }
+    const headers = f.root.__elonChatGptPrivateTransport.copySameOriginRequestHeaders;
+    delete f.root.__elonChatGptPrivateTransport;
+    f.root.__elonChatGptPrivateConversationPrefetchEnabled = true;
+    f.root.__elonChatGptPrivateTransportPolicy = require('../android/app/src/main/assets/chatgpt_web_private_transport_policy.js');
+    f.root.__elonChatGptPrivateJsonRequest = require('../android/app/src/main/assets/chatgpt_web_private_json_request.js');
+    f.root.__elonChatGptPrivateAuthContext = { canAcquire: () => true, copyRequestHeaders: headers };
+    f.root.location.pathname = '/c/' + f.id;
+    f.root.fetch = async (url, init) => {
+      requests.push({ url, init });
+      return { ok: true, status: 200, text: async () => JSON.stringify({ conversation_id: f.id,
+        is_do_not_remember: temporary, gizmo_id: null, mapping: {} }) };
+    };
+    const fs = require('node:fs'), path = require('node:path');
+    require('node:vm').runInNewContext(fs.readFileSync(path.join(__dirname,
+      '../android/app/src/main/assets/chatgpt_web_private_transport.js'), 'utf8'),
+    { window: f.root, location: f.root.location, URL });
+    const p = pipeline(f);
+    await p.start();
+    assert.equal(requests.length, 1);
+    assert.equal(requests[0].url, '/backend-api/conversations/' + f.id);
+    assert.equal(requests[0].init.method, 'GET');
+    assert.equal(p.requests.length, 3);
+    assert.equal(p.receipts[0][1], true);
+    assert.equal(f.composer.merge([])[0].state, 'ready');
+    assert.equal(f.store.readyFiles$()[0].isTemporaryChat, temporary);
+  }
 });
 
 test('known project or temporary metadata selects compatibility before reading bytes or writing', async () => {
@@ -337,7 +417,7 @@ function pipeline(f, overrides = {}) {
       ...config, protocol,
       acquireHeaders: f.root.__elonChatGptPrivateTransport.acquireSameOriginRequestHeaders,
       request: async (_, url, init) => {
-        requests.push({ url, method: init.method });
+        requests.push({ url, method: init.method, init });
         if (overrides.request) return overrides.request(url, init);
         return url.endsWith('/files') ? { payload: { status: 'success', file_id: 'file-synthetic',
           upload_url: 'https://uploads.oaiusercontent.com/fixture?sig=synthetic' } } :

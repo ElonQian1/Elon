@@ -106,10 +106,11 @@ This path is documented but intentionally not implemented by the candidate.
 - Result says `associated=false`. A processed file is not a sent message.
   Signed URLs and identity headers are not included in completion/diagnostic
   receipts. Unknown server error details are reduced to a stable error code.
-- Project/temporary contexts, custom upload headers, multipart, Estuary and
+- Project contexts, custom upload headers, multipart, Estuary and
   unknown storage hosts are rejected explicitly. Static image integration is
   now a separate [adapter 270 source candidate](chatgpt-private-image-upload.md),
-  not device acceptance inferred from the successful small-text trial.
+  and temporary uploads are an [adapter 271 source candidate](chatgpt-private-attachment-scopes.md),
+  neither device-accepted by inference from the successful small-text trial.
 
 ## Next integration
 
@@ -217,3 +218,8 @@ lease and private transaction. Its image-specific source contract, size handling
 test results and pending device checks live in
 [private image upload](chatgpt-private-image-upload.md). The plain-text transaction
 and send-owner behavior are reused, not replaced.
+
+Adapter 271 extends the same transaction into temporary new/existing chats with
+explicit non-library upload metadata and scope-bound ready-file association.
+Its source evidence, project-upload checkpoint and pending live acceptance are
+in [attachment scopes](chatgpt-private-attachment-scopes.md).

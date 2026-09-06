@@ -137,7 +137,7 @@ const detailPayload = {
   assert.equal(disabled.window.__elonChatGptPrivateTransport, undefined);
 
   const gated = createContext(async () => jsonResponse(detailPayload), true, false);
-  assert.equal(gated.window.__elonChatGptPrivateTransport.version, 21);
+  assert.equal(gated.window.__elonChatGptPrivateTransport.version, 22);
   assert.equal(gated.window.__elonChatGptPrivateTransport.conversationPrefetchEnabled, false);
   assert.equal(gated.window.__elonChatGptPrivateTransport.conversationPrefetchReady(), false);
 
@@ -149,7 +149,7 @@ const detailPayload = {
     return jsonResponse(detailPayload);
   }, false, true);
   const transport = detail.window.__elonChatGptPrivateTransport;
-  assert.equal(transport.version, 21);
+  assert.equal(transport.version, 22);
   assert.equal(transport.conversationPrefetchEnabled, true);
   assert.equal(transport.conversationPrefetchAvailable, true);
   assert.equal(transport.experimentalConversationPrefetchAvailable, true);
@@ -456,8 +456,18 @@ const detailPayload = {
     scopePayload = { ...ordinaryPayload, ...patch };
     assert.equal((await reader.readAttachmentContext(attachmentPath)).ordinary, false);
   }
+  for (const patch of [{}, { is_temporary_chat: true }, { is_temporary_chat: false },
+    { gizmo_id: 'g-p-project' }, { project_id: 'g-p-conflicting' }, { context_scopes: ['HEALTH'] }]) {
+    scopePayload = { ...ordinaryPayload, is_do_not_remember: true, ...patch };
+    const receipt = await reader.readAttachmentContext(attachmentPath);
+    assert.equal(receipt.ordinary, false);
+    assert.equal(receipt.temporary, !patch.gizmo_id && !patch.project_id && !patch.context_scopes && patch.is_temporary_chat !== false);
+    assert.equal(Object.hasOwn(receipt, 'mapping'), false);
+  }
+  scopePayload = { ...ordinaryPayload, is_temporary_chat: true };
+  assert.equal((await reader.readAttachmentContext(attachmentPath)).ordinary, false);
   for (const patch of [{ conversation_id: 'wrong' }, { id: 'conflicting' }, { gizmo_id: undefined },
-    { is_do_not_remember: undefined }, { is_do_not_remember: 'false' }]) {
+    { is_do_not_remember: undefined }, { is_do_not_remember: 'false' }, { is_temporary_chat: 'true' }]) {
     scopePayload = { ...ordinaryPayload, ...patch };
     await assert.rejects(reader.readAttachmentContext(attachmentPath), /attachment_context_unavailable/);
     assert.equal(reader.health().cooldownRemainingMs, 0, 'unknown upload scope cannot break history prefetch');

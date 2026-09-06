@@ -25,11 +25,15 @@
         typeof file.slice !== 'function') throw new Error('invalid_file');
     if (typeof file.name !== 'string' || !file.name.trim() || file.name.length > 120 ||
         /[\x00-\x1f\x7f/\\]/.test(file.name)) throw new Error('invalid_file_name');
+    const temporary = context?.isTemporaryChat === true;
     if (!context || !USE_CASES.has(context.useCase) || typeof context.storeInLibrary !== 'boolean' ||
-        context.libraryPersistenceMode !== 'required' || typeof context.indexForRetrieval !== 'boolean') {
+        context.libraryPersistenceMode !== (temporary ? undefined : 'required') ||
+        typeof context.indexForRetrieval !== 'boolean' ||
+        context.isTemporaryChat !== undefined && typeof context.isTemporaryChat !== 'boolean' ||
+        temporary && (context.storeInLibrary || context.indexForRetrieval)) {
       throw new Error('unsupported_upload_context');
     }
-    if (context.isProjectThread || context.isTemporaryChat || context.gizmoId || context.directoryId) {
+    if (context.isProjectThread || context.gizmoId || context.directoryId) {
       throw new Error('unsupported_upload_context');
     }
     if (/^image\//i.test(file.type)) {
@@ -47,7 +51,8 @@
       file_name: file.name, file_size: file.size, use_case: context.useCase,
       timezone_offset_min: new Date().getTimezoneOffset(), reset_rate_limits: false,
       supports_direct_azure_multipart: false, mime_type: file.type, entry_surface: 'chat_composer',
-      store_in_library: context.storeInLibrary, library_persistence_mode: context.libraryPersistenceMode,
+      store_in_library: context.storeInLibrary,
+      ...(context.libraryPersistenceMode == null ? {} : { library_persistence_mode: context.libraryPersistenceMode }),
     };
   }
 
@@ -78,8 +83,9 @@
     return {
       file_id: fileId, file_name: file.name, use_case: context.useCase,
       index_for_retrieval: context.indexForRetrieval, entry_surface: 'chat_composer',
-      library_persistence_mode: context.libraryPersistenceMode,
-      metadata: { store_in_library: context.storeInLibrary, is_temporary_chat: false, is_project_thread: false },
+      ...(context.libraryPersistenceMode == null ? {} : { library_persistence_mode: context.libraryPersistenceMode }),
+      metadata: { store_in_library: context.storeInLibrary,
+        is_temporary_chat: context.isTemporaryChat === true, is_project_thread: false },
     };
   }
 
@@ -120,5 +126,5 @@
     return { metadata, eventCount: count, events };
   }
 
-  return { version: 2, maxFileBytes: MAX_BYTES, prepare, destination, processBody, processed, imageDimensions };
+  return { version: 3, maxFileBytes: MAX_BYTES, prepare, destination, processBody, processed, imageDimensions };
 });

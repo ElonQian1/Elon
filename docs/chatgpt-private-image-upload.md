@@ -62,7 +62,8 @@ Unavailable local preparation can select the original compatible route before
 byte reading or private writes. Cancellation, a changed context or a failure
 after private dispatch cannot automatically launch another upload or send.
 Projects, temporary chats, GIF/SVG, PDF, multipart and image-library persistence
-are not enabled by this change.
+were not enabled by adapter 270. Adapter 271 subsequently connects temporary
+chats through the same image pipeline; see [attachment scopes](chatgpt-private-attachment-scopes.md).
 
 ## Verification and next acceptance
 

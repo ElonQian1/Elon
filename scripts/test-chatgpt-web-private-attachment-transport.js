@@ -46,7 +46,7 @@ test('prepare uses the verified legacy route contract without enabling multipart
   assert.equal(result.store_in_library, false);
 });
 
-test('reject untyped images, project and temporary contexts before any request', async () => {
+test('reject untyped images, projects and conflicting temporary persistence before any request', async () => {
   for (const patch of [{ isProjectThread: true }, { isTemporaryChat: true }, { gizmoId: 'project' },
     { directoryId: 'folder' }, { useCase: 'guessed' }, { libraryPersistenceMode: 'guessed' }]) {
     const f = fixture();
@@ -54,6 +54,37 @@ test('reject untyped images, project and temporary contexts before any request',
     assert.equal(f.calls.length, 0);
   }
   assert.throws(() => protocol.prepare(new File(['x'], 'x.png', { type: 'image/png' }), selected()));
+});
+
+test('temporary private uploads omit persistence mode and preserve explicit privacy metadata', async () => {
+  const f = fixture();
+  const result = await f.upload({ ...selected(), isTemporaryChat: true, libraryPersistenceMode: undefined });
+  assert.equal(result.ok, true);
+  assert.equal(result.isTemporaryChat, true);
+  const created = JSON.parse(f.calls[0].init.body), processed = JSON.parse(f.calls[2].init.body);
+  assert.equal(created.store_in_library, false);
+  assert.equal(Object.hasOwn(created, 'library_persistence_mode'), false);
+  assert.equal(Object.hasOwn(processed, 'library_persistence_mode'), false);
+  assert.deepEqual(processed.metadata, { store_in_library: false, is_temporary_chat: true, is_project_thread: false });
+  for (const patch of [{ storeInLibrary: true }, { indexForRetrieval: true },
+    { isTemporaryChat: 'true' }, { libraryPersistenceMode: 'opportunistic' }]) {
+    const other = fixture();
+    const receipt = await other.upload({ ...selected(), libraryPersistenceMode: undefined,
+      isTemporaryChat: true, ...patch });
+    assert.equal(receipt.ok, false);
+    assert.equal(other.calls.length, 0);
+  }
+});
+
+test('temporary processing cannot confirm an unexpected library-persistence receipt or replay it', async () => {
+  const f = fixture({ respond: async url => url.endsWith('/files') ? { payload: prepared() } :
+    url.endsWith('/process_upload_stream') ? { text: JSON.stringify({ event: 'file.processing.completed',
+      file_id: 'file-synthetic', progress: 100, extra: { library_persistence_result: 'library' } }) } : {} });
+  const result = await f.upload({ ...selected(), isTemporaryChat: true, libraryPersistenceMode: undefined });
+  assert.equal(result.ok, false);
+  assert.equal(result.code, 'processing_metadata_mismatch');
+  assert.equal(f.calls.length, 3);
+  assert.equal(result.mayHaveSideEffects, true);
 });
 
 test('multimodal create/process and ready metadata retain the prepared image dimensions', async () => {

@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 3, create: factory });
+  const exported = Object.freeze({ version: 4, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateAttachmentComposer = exported;
 })(typeof window === 'object' ? window : null, function (root, options) {
@@ -45,11 +45,20 @@
     return root.__elonChatGptComposer?.currentModel?.(root.document.querySelector('#prompt-textarea')) || '';
   }
 
+  function route() {
+    const url = new URL(root.location.href);
+    const supported = url.pathname === '/' || /^\/c\/[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(url.pathname);
+    const query = Array.from(url.searchParams.entries());
+    // This is the official temporary-chat signal's source, not a cached UI label.
+    const isTemporaryChat = query.length === 1 && query[0][0] === 'temporary-chat' && query[0][1] === 'true';
+    if (url.origin !== 'https://chatgpt.com' || url.username || url.password || !supported ||
+        url.hash || query.length && !isTemporaryChat) throw new Error('composer_context_unavailable');
+    return { path: url.pathname, conversationId: url.pathname === '/' ? null : url.pathname.slice(3), isTemporaryChat };
+  }
+
   function available() {
     try {
-      const url = new URL(root.location.href);
-      const ordinaryRoute = url.pathname === '/' || /^\/c\/[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(url.pathname);
-      if (url.origin !== 'https://chatgpt.com' || !ordinaryRoute || url.search || url.hash) return false;
+      route();
       const store = resolveStore();
       const files = store?.files$();
       return !!store && store.skipChatAttachmentLimits !== true && Array.isArray(files) &&
@@ -62,9 +71,8 @@
     const token = root.__elonChatGptDocumentToken;
     const account = identity();
     if (!/^doc_[a-z0-9_]{3,80}$/.test(token || '') || !account) throw new Error('composer_context_unavailable');
-    const path = new URL(root.location.href).pathname;
     const binding = Object.freeze({ store: resolveStore(), href: root.location.href, token, account,
-      model: model(), path, conversationId: path === '/' ? null : path.slice(3) });
+      model: model(), ...route() });
     if (binding.conversationId === null) confirmed.add(binding);
     return binding;
   }
@@ -85,10 +93,11 @@
         }),
       ]);
       if (!current(binding) || signal?.aborted || !available()) throw new Error('composer_changed');
-      if (context?.conversationId !== binding.conversationId || typeof context.ordinary !== 'boolean') {
+      const supported = binding.isTemporaryChat ? context?.temporary : context?.ordinary;
+      if (context?.conversationId !== binding.conversationId || typeof supported !== 'boolean') {
         throw new Error('composer_context_unavailable');
       }
-      if (!context.ordinary) return false;
+      if (!supported) return false;
       confirmed.add(binding);
       return true;
     } catch (error) {
@@ -112,7 +121,7 @@
 
   function associate(binding, file, result, leaseId) {
     if (!current(binding) || !confirmed.has(binding) || result?.ok !== true || result.associated !== false ||
-        result.binding !== binding || result.stage !== 'processed' ||
+        result.binding !== binding || result.stage !== 'processed' || result.isTemporaryChat !== binding.isTemporaryChat ||
         !/^[A-Za-z0-9_-]{1,160}$/.test(result.fileId || '') || result.fileSize !== file.size ||
         result.fileName !== file.name || result.mimeType !== file.type) throw new Error('association_invalid');
     const store = binding.store;
@@ -124,11 +133,12 @@
       Object.assign(spec, root.__elonChatGptPrivateAttachmentProtocol.imageDimensions(result.imageDimensions));
     }
     if (Number.isSafeInteger(metadata.fileTokenSize)) spec.fileTokenSize = metadata.fileTokenSize;
+    if (metadata.libraryPersistenceResult === 'temporary') spec.libraryPersistenceResult = 'temporary';
     const attached = {
       tempId, file, fileSignature: JSON.stringify({ name: file.name, size: file.size,
         lastModified: file.lastModified, type: file.type }),
       status: 'ready', progress: 100, fileId: result.fileId, cdnUrl: null, fileSpec: spec,
-      source: 'local', storeInLibrary: false, isTemporaryChat: false, isProjectThread: false,
+      source: 'local', storeInLibrary: false, isTemporaryChat: binding.isTemporaryChat, isProjectThread: false,
     };
     store.files$.set([attached]);
     const ready = store.readyFiles$();
@@ -173,5 +183,5 @@
     return true;
   }
 
-  return Object.freeze({ version: 3, available, capture, prepare, current, associate, merge, remove });
+  return Object.freeze({ version: 4, available, capture, prepare, current, associate, merge, remove });
 });

@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 3, create: factory });
+  const exported = Object.freeze({ version: 4, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       !(Number(root.__elonChatGptPrivateAttachmentSend?.version) >= exported.version)) {
@@ -70,7 +70,8 @@
       job.attempted = true;
       const result = await job.transport.upload(file, {
         useCase: imageDimensions ? 'multimodal' : 'ace_upload', storeInLibrary: false,
-        libraryPersistenceMode: 'required', indexForRetrieval: false, imageDimensions,
+        libraryPersistenceMode: binding.isTemporaryChat ? undefined : 'required',
+        isTemporaryChat: binding.isTemporaryChat, indexForRetrieval: false, imageDimensions,
       }, binding);
       if (!result.ok) throw new Error(result.code);
       if (job.controller.signal.aborted) throw new Error('cancelled');
@@ -98,6 +99,6 @@
     return true;
   }
 
-  return Object.freeze({ version: 3, start, cancel, remove,
+  return Object.freeze({ version: 4, start, cancel, remove,
     merge: dom => composer?.merge(dom) || dom });
 });
