@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 5, create: factory });
+  const exported = Object.freeze({ version: 6, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateAttachmentComposer = exported;
 })(typeof window === 'object' ? window : null, function (root, options) {
@@ -49,14 +49,15 @@
 
   function route() {
     const url = new URL(root.location.href);
-    const projectId = project?.projectId(url.pathname) || null;
-    const supported = projectId || url.pathname === '/' || /^\/c\/[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(url.pathname);
+    const existing = /^(?:\/g\/(g-p-[a-f0-9]{32})(?:-[A-Za-z0-9_-]{1,124})?)?\/c\/([a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12})$/i.exec(url.pathname);
+    const projectId = project?.projectId(url.pathname) || existing?.[1] || null;
+    const supported = projectId || url.pathname === '/' || existing;
     const query = Array.from(url.searchParams.entries());
     // This is the official temporary-chat signal's source, not a cached UI label.
     const isTemporaryChat = query.length === 1 && query[0][0] === 'temporary-chat' && query[0][1] === 'true';
     if (url.origin !== 'https://chatgpt.com' || url.username || url.password || !supported ||
         url.hash || query.length && (!isTemporaryChat || projectId)) throw new Error('composer_context_unavailable');
-    return { path: url.pathname, conversationId: projectId || url.pathname === '/' ? null : url.pathname.slice(3),
+    return { path: url.pathname, conversationId: existing?.[2] || null,
       isTemporaryChat, projectId };
   }
 
@@ -84,7 +85,7 @@
   async function prepare(binding, signal, descriptor) {
     if (!current(binding) || signal?.aborted) throw new Error('composer_changed');
     if (confirmed.has(binding)) return true;
-    const read = binding.projectId ? () => project.read(binding, signal)
+    const read = binding.projectId && !binding.conversationId ? () => project?.read(binding, signal)
       : root.__elonChatGptPrivateTransport?.readAttachmentContext;
     if (typeof read !== 'function') return null;
     let timer, abort;
@@ -98,12 +99,27 @@
         }),
       ]);
       if (!current(binding) || signal?.aborted || !available()) throw new Error('composer_changed');
-      if (binding.projectId) {
+      if (binding.projectId && !binding.conversationId) {
         if (!context || !project.supports(context, descriptor)) return context === false ? false : null;
         projects.set(binding, context);
         confirmed.add(binding);
         return true;
       }
+      if (context?.conversationId !== binding.conversationId) throw new Error('composer_context_unavailable');
+      if (context?.projectId) {
+        if (!project || binding.isTemporaryChat || binding.projectId && binding.projectId !== context.projectId) return null;
+        const thread = await project.captureThread(binding, context.projectId, signal);
+        if (!Array.isArray(context.nodeIds) || !context.nodeIds.includes(thread.leafId)) return null;
+        // Keep the branch guard active even when the permission request fails.
+        projects.set(binding, Object.freeze({ projectId: context.projectId, thread }));
+        const scope = await project.read({ ...binding, projectId: context.projectId }, signal);
+        if (!current(binding) || signal?.aborted || !available() || !thread.current()) throw new Error('composer_changed');
+        if (!scope || !project.supports(scope, descriptor)) return scope === false ? false : null;
+        projects.set(binding, Object.freeze({ ...scope, thread }));
+        confirmed.add(binding);
+        return true;
+      }
+      if (binding.projectId) return null;
       const supported = binding.isTemporaryChat ? context?.temporary : context?.ordinary;
       if (context?.conversationId !== binding.conversationId || typeof supported !== 'boolean') {
         throw new Error('composer_context_unavailable');
@@ -112,7 +128,7 @@
       confirmed.add(binding);
       return true;
     } catch (error) {
-      if (!current(binding) || signal?.aborted || !available()) throw error;
+      if (error?.message === 'composer_changed' || !current(binding) || signal?.aborted || !available()) throw error;
       // Unknown metadata cannot authorize a private write, nor remove the
       // existing upload capability. The caller may select compatibility now.
       return null;
@@ -126,22 +142,25 @@
     try {
       return !!binding && root.location.href === binding.href &&
         root.__elonChatGptDocumentToken === binding.token && identity() === binding.account &&
-        (!checkModel || model() === binding.model) && resolveStore() === binding.store;
+        (!checkModel || model() === binding.model && projects.get(binding)?.thread?.current() !== false) &&
+        resolveStore() === binding.store;
     } catch (_) { return false; }
   }
 
   function uploadContext(binding, file, imageDimensions) {
     if (!current(binding) || !confirmed.has(binding)) throw new Error('composer_changed');
-    if (binding.projectId) return project.uploadContext(projects.get(binding), file, imageDimensions);
+    if (projects.has(binding)) return project.uploadContext(projects.get(binding), file, imageDimensions);
     return { useCase: imageDimensions ? 'multimodal' : 'ace_upload', storeInLibrary: false,
       libraryPersistenceMode: binding.isTemporaryChat ? undefined : 'required',
       isTemporaryChat: binding.isTemporaryChat, indexForRetrieval: false, imageDimensions };
   }
 
   function associate(binding, file, result, leaseId) {
+    const scope = projects.get(binding);
+    const projectId = scope?.projectId || binding.projectId;
     if (!current(binding) || !confirmed.has(binding) || result?.ok !== true || result.associated !== false ||
         result.binding !== binding || result.stage !== 'processed' || result.isTemporaryChat !== binding.isTemporaryChat ||
-        (result.projectId || null) !== binding.projectId ||
+        (result.projectId || null) !== projectId ||
         !/^[A-Za-z0-9_-]{1,160}$/.test(result.fileId || '') || result.fileSize !== file.size ||
         result.fileName !== file.name || result.mimeType !== file.type) throw new Error('association_invalid');
     const store = binding.store;
@@ -161,9 +180,9 @@
       tempId, file, fileSignature: JSON.stringify({ name: file.name, size: file.size,
         lastModified: file.lastModified, type: file.type }),
       status: 'ready', progress: 100, fileId: result.fileId, cdnUrl: null, fileSpec: spec,
-      source: 'local', storeInLibrary: false, isTemporaryChat: binding.isTemporaryChat, isProjectThread: !!binding.projectId,
-      ...(binding.projectId ? { projectGizmoId: binding.projectId,
-        libraryFileInfo: project.uploadContext(projects.get(binding), file, result.imageDimensions).libraryFileInfo } : {}),
+      source: 'local', storeInLibrary: false, isTemporaryChat: binding.isTemporaryChat, isProjectThread: !!projectId,
+      ...(projectId ? { projectGizmoId: projectId,
+        libraryFileInfo: project.uploadContext(scope, file, result.imageDimensions).libraryFileInfo } : {}),
       ...(spec.libraryFileId ? { libraryFileId: spec.libraryFileId } : {}),
     };
     store.files$.set([attached]);
@@ -209,5 +228,5 @@
     return true;
   }
 
-  return Object.freeze({ version: 5, available, capture, prepare, current, uploadContext, associate, merge, remove });
+  return Object.freeze({ version: 6, available, capture, prepare, current, uploadContext, associate, merge, remove });
 });

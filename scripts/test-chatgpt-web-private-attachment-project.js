@@ -10,6 +10,9 @@ const protocol = require(assets + 'chatgpt_web_private_attachment_protocol.js');
 const jsonRequest = require(assets + 'chatgpt_web_private_json_request.js');
 const PROJECT = 'g-p-0123456789abcdef0123456789abcdef';
 const OTHER = 'g-p-fedcba9876543210fedcba9876543210';
+const CONVERSATION = '01234567-89ab-4cde-8123-456789abcdef';
+const LEAF = '11111111-2222-4333-8444-555555555555';
+const OTHER_LEAF = '99999999-2222-4333-8444-555555555555';
 
 function fixture(options = {}) {
   let values = [], reads = 0, fallbacks = 0, account = 'Bearer synthetic-page-token';
@@ -21,13 +24,21 @@ function fixture(options = {}) {
   const input = { isConnected: true, __reactFiber$fixture: { memoizedProps: { value: store } } };
   const headers = () => ({ authorization: account, 'chatgpt-account-id': 'synthetic-account' });
   const payload = { gizmo: { id: PROJECT, current_user_permission: { can_write: true }, use_injest_path: false } };
+  const thread = { isLoading: false, is_do_not_remember: false, projectId: PROJECT, leaf: LEAF };
   const root = {
-    location: { origin: 'https://chatgpt.com', href: 'https://chatgpt.com/g/' + PROJECT + '-synthetic/project' },
+    location: { origin: 'https://chatgpt.com', href: 'https://chatgpt.com' + (options.existingPath || '/g/' + PROJECT + '-synthetic/project') },
     document: { querySelector: selector => selector === '#upload-files' ? input : {} },
     __elonChatGptDocumentToken: 'doc_synthetic_project',
     __elonChatGptComposer: { currentModel: () => 'synthetic-model' },
-    __elonChatGptPrivateTransport: { copySameOriginRequestHeaders: headers, acquireSameOriginRequestHeaders: async () => headers() },
-    __elonChatGptPrivateAttachmentProject: projectModule,
+    __elonChatGptPrivateTransport: { copySameOriginRequestHeaders: headers, acquireSameOriginRequestHeaders: async () => headers(),
+      readAttachmentContext: async () => options.context || { conversationId: CONVERSATION, projectId: PROJECT,
+        nodeIds: [LEAF, OTHER_LEAF], ordinary: false, temporary: false } },
+    __elonChatGptPrivateAttachmentProject: { create: env => projectModule.create(env, {
+      loadRuntime: async () => ({ XM: id => id === CONVERSATION ? thread : undefined,
+        HM: { getGizmoId: value => value.projectId, getCurrentLeafId: value => value.leaf,
+          hasNode: (_, id) => [LEAF, OTHER_LEAF].includes(id) } }),
+    }) },
+    performance: { getEntriesByName: () => [{}] },
     __elonChatGptPrivateAttachmentTransport: transportModule,
     __elonChatGptPrivateAttachmentProtocol: protocol,
     __elonChatGptPrivateJsonRequest: jsonRequest,
@@ -37,7 +48,8 @@ function fixture(options = {}) {
       if (options.fetch) return options.fetch(url, init);
       if (init.method === 'GET') {
         options.beforePermission?.(root);
-        return Response.json(payload);
+        options.mutateBranchAtPermission?.(thread);
+        return Response.json(payload, { status: options.permissionStatus || 200 });
       }
       if (url === '/backend-api/files') return Response.json({ status: 'success', file_id: 'file-synthetic',
         upload_url: 'https://uploads.oaiusercontent.com/fixture?sig=synthetic' });
@@ -55,13 +67,61 @@ function fixture(options = {}) {
     name: file.name, size: file.size, type: file.type };
   const composer = composerModule.create(root);
   const send = sendModule.create(root, { composer,
-    source: { read: async () => { reads++; return file; } },
+    source: { read: async () => { reads++; options.beforeBytes?.(thread); return file; } },
     image: { available: () => true, prepare: async () => ({ file, dimensions: { width: 12, height: 8 } }) },
   });
-  return { root, file, descriptor, payload, composer, send, store, calls, receipts,
+  return { root, file, descriptor, payload, thread, composer, send, store, calls, receipts,
     start: () => send.start(JSON.stringify(descriptor), (...args) => receipts.push(args), () => {}, () => { fallbacks++; }),
     reads: () => reads, fallbacks: () => fallbacks, setAccount: value => { account = value; } };
 }
+
+test('existing project conversations bind the selected leaf on both official route forms', async () => {
+  for (const existingPath of ['/c/' + CONVERSATION, '/g/' + PROJECT + '-synthetic/c/' + CONVERSATION]) {
+    const f = fixture({ existingPath });
+    await f.start();
+    assert.equal(f.fallbacks(), 0);
+    assert.equal(f.reads(), 1);
+    assert.deepEqual(f.receipts, [['request_attachment_upload', true, 'private_attachment_associated']]);
+    const process = JSON.parse(f.calls.find(call => call.url.endsWith('/process_upload_stream')).init.body);
+    assert.deepEqual(process.metadata.library_file_info, { gizmo_id: PROJECT, is_project: true,
+      should_upload_to_project: true, origination_thread_id: CONVERSATION, origination_message_id: LEAF });
+    assert.deepEqual(f.store.readyFiles$()[0].libraryFileInfo, process.metadata.library_file_info);
+    assert.equal(f.composer.merge([]).length, 1, 'upload cleanup does not hide the associated attachment');
+  }
+});
+
+test('a selected leaf absent from fresh conversation data does not authorize a write', async () => {
+  const f = fixture({ existingPath: '/c/' + CONVERSATION,
+    context: { conversationId: CONVERSATION, projectId: PROJECT, nodeIds: [OTHER_LEAF] } });
+  await f.start();
+  assert.equal(f.reads(), 0);
+  assert.equal(f.calls.length, 0);
+  assert.equal(f.fallbacks(), 1);
+});
+
+test('branch changes while checking permission or reading bytes cancel without compatibility replay', async () => {
+  for (const hooks of [{ mutateBranchAtPermission: thread => { thread.leaf = OTHER_LEAF; } },
+    { mutateBranchAtPermission: thread => { thread.leaf = OTHER_LEAF; }, permissionStatus: 503 },
+    { beforeBytes: thread => { thread.leaf = OTHER_LEAF; } }]) {
+    const f = fixture({ existingPath: '/c/' + CONVERSATION, ...hooks });
+    await f.start();
+    assert.equal(f.fallbacks(), 0);
+    assert.equal(f.calls.some(call => call.init.method === 'POST'), false);
+    assert.equal(f.receipts[0][1], false);
+    assert.equal(f.store.readyFiles$().length, 0);
+  }
+});
+
+test('existing project images retain multimodal dimensions and the selected thread origin', async () => {
+  const f = fixture({ existingPath: '/c/' + CONVERSATION,
+    file: new File(['synthetic pixels'], 'fixture.png', { type: 'image/png' }) });
+  await f.start();
+  const body = JSON.parse(f.calls.find(call => call.url.endsWith('/process_upload_stream')).init.body);
+  assert.equal(body.use_case, 'multimodal');
+  assert.equal(body.gizmo_id, undefined);
+  assert.equal(body.metadata.library_file_info.origination_message_id, LEAF);
+  assert.equal(f.store.readyFiles$()[0].fileSpec.width, 12);
+});
 
 test('new project private upload reads permission then binds create/process/ready-store to one project', async () => {
   const f = fixture();
@@ -126,8 +186,9 @@ test('changing project, identity, document or cancelling during permission read 
   }
 });
 
-test('project routes exclude existing branches, unknown IDs and combined temporary mode', () => {
-  for (const path of ['/g/' + PROJECT + '/c/00000000-0000-4000-8000-000000000000',
+test('project routes exclude malformed branches, unknown IDs and combined temporary mode', () => {
+  for (const path of ['/g/' + PROJECT + '/c/invalid',
+    '/g/' + PROJECT + '/c/' + CONVERSATION + '?temporary-chat=true',
     '/g/g-p-unconfirmed/project', '/g/' + PROJECT + '/project?temporary-chat=true',
     '/g/' + PROJECT + '/project?model=unknown']) {
     const f = fixture();
