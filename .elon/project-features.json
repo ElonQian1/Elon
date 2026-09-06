@@ -16294,7 +16294,7 @@
           "evidence_kind": "configuration",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "7a536efdea01ff51f97203ddc7622a61123bfcd1",
+            "head_commit": "b20ffe58359ea0a76982b570044aa5d443436d61",
             "head_blob_oid": "257b811cf5977addc26588debe34639e155ff41f",
             "worktree_blob_oid": "257b811cf5977addc26588debe34639e155ff41f",
             "state": "tracked_clean"
@@ -16302,14 +16302,14 @@
         },
         {
           "path": "desktop-shell/src-tauri/src/browser_research.rs",
-          "content_hash": "9f853d062983250407e6e2ba7a90ec786a7eb12c4ad583b74be686d20f62e212",
+          "content_hash": "8f27913cc73794c8d60c6c1bf102c45a9375565fcb7baab3d27cad4e5ebd047b",
           "locator": "",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "7a536efdea01ff51f97203ddc7622a61123bfcd1",
-            "head_blob_oid": "307e7379c42da0da586bfa58ec12bc02099788f4",
-            "worktree_blob_oid": "307e7379c42da0da586bfa58ec12bc02099788f4",
+            "head_commit": "b20ffe58359ea0a76982b570044aa5d443436d61",
+            "head_blob_oid": "d580e4f99d6650c7050998c63caeeb97059ec0c7",
+            "worktree_blob_oid": "d580e4f99d6650c7050998c63caeeb97059ec0c7",
             "state": "tracked_clean"
           }
         },
@@ -16320,7 +16320,7 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "7a536efdea01ff51f97203ddc7622a61123bfcd1",
+            "head_commit": "b20ffe58359ea0a76982b570044aa5d443436d61",
             "head_blob_oid": "ea0bc4879937b1d1dc6510c5dd2117ec68327094",
             "worktree_blob_oid": "ea0bc4879937b1d1dc6510c5dd2117ec68327094",
             "state": "tracked_clean"
@@ -16333,22 +16333,35 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "7a536efdea01ff51f97203ddc7622a61123bfcd1",
+            "head_commit": "b20ffe58359ea0a76982b570044aa5d443436d61",
             "head_blob_oid": "9dcb767b16e485aa2877dc343bda45a05a51cac9",
             "worktree_blob_oid": "9dcb767b16e485aa2877dc343bda45a05a51cac9",
             "state": "tracked_clean"
           }
         },
         {
-          "path": "desktop-shell/src-tauri/src/browser_research/runtime.rs",
-          "content_hash": "8d7260481f4012da2fed194249e10a3389b82b4ad262ad6fb55403f23a84f9b5",
+          "path": "desktop-shell/src-tauri/src/browser_research/ingest_queue.rs",
+          "content_hash": "24e15ac85d1bf305f9281b8dc360a0b5286c6c5df9a088c3a386ce048efc1820",
           "locator": "",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "7a536efdea01ff51f97203ddc7622a61123bfcd1",
-            "head_blob_oid": "4c2d600cf947e5c7535a2bbc4664eecdefaa3c68",
-            "worktree_blob_oid": "4c2d600cf947e5c7535a2bbc4664eecdefaa3c68",
+            "head_commit": "b20ffe58359ea0a76982b570044aa5d443436d61",
+            "head_blob_oid": "c0e11b38a0d0bdb8c27ffd3a118e8b4a6b9836e8",
+            "worktree_blob_oid": "c0e11b38a0d0bdb8c27ffd3a118e8b4a6b9836e8",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "desktop-shell/src-tauri/src/browser_research/runtime.rs",
+          "content_hash": "247c464ed033db3d22a8bfaff91af4e35cdfc6d726003c0d2fb5ad4a1bd10460",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "b20ffe58359ea0a76982b570044aa5d443436d61",
+            "head_blob_oid": "73a503cc0a61349ccfe50316d20c3f0dd8534e43",
+            "worktree_blob_oid": "73a503cc0a61349ccfe50316d20c3f0dd8534e43",
             "state": "tracked_clean"
           }
         },
@@ -16359,7 +16372,7 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "7a536efdea01ff51f97203ddc7622a61123bfcd1",
+            "head_commit": "b20ffe58359ea0a76982b570044aa5d443436d61",
             "head_blob_oid": "ef8f92fbcbcfb0653207f8667a629df3c1d82acc",
             "worktree_blob_oid": "ef8f92fbcbcfb0653207f8667a629df3c1d82acc",
             "state": "tracked_clean"
@@ -16372,7 +16385,7 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "7a536efdea01ff51f97203ddc7622a61123bfcd1",
+            "head_commit": "b20ffe58359ea0a76982b570044aa5d443436d61",
             "head_blob_oid": "eec9624dbd02cbd6079ca16b4e103cd8a3d4b27c",
             "worktree_blob_oid": "eec9624dbd02cbd6079ca16b4e103cd8a3d4b27c",
             "state": "tracked_clean"
@@ -16385,22 +16398,35 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "7a536efdea01ff51f97203ddc7622a61123bfcd1",
+            "head_commit": "b20ffe58359ea0a76982b570044aa5d443436d61",
             "head_blob_oid": "59ae9d5b4275dd24aee335a6ff95b9c47f12d951",
             "worktree_blob_oid": "59ae9d5b4275dd24aee335a6ff95b9c47f12d951",
             "state": "tracked_clean"
           }
         },
         {
-          "path": "docs/reports/win-browser-research-mcp-v1-20260907.md",
-          "content_hash": "515cfa61c7497ecaa14be44dafeab3b915af396955b40f5e57c11cab7f8aa86d",
+          "path": "docs/reports/binance-futures-grid-source-discovery-20260907.md",
+          "content_hash": "60fa0294f14823bfe92aba2504ef18a1088f22573d8b3fec11635591b2453a58",
           "locator": "",
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "7a536efdea01ff51f97203ddc7622a61123bfcd1",
-            "head_blob_oid": "9f6886dc515dfa9aee981e8376947ff69fdc510a",
-            "worktree_blob_oid": "9f6886dc515dfa9aee981e8376947ff69fdc510a",
+            "head_commit": "b20ffe58359ea0a76982b570044aa5d443436d61",
+            "head_blob_oid": "1eac17f544cf07c3a689fc28e5aea18f5f701d31",
+            "worktree_blob_oid": "1eac17f544cf07c3a689fc28e5aea18f5f701d31",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "docs/reports/win-browser-research-mcp-v1-20260907.md",
+          "content_hash": "100c99cda7d6e134293f83f3b87d73d867120dc936b449617bb3d3b3f7b43a92",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "b20ffe58359ea0a76982b570044aa5d443436d61",
+            "head_blob_oid": "38d3cd18392f190d26b043c134e955b13b1f51fa",
+            "worktree_blob_oid": "38d3cd18392f190d26b043c134e955b13b1f51fa",
             "state": "tracked_clean"
           }
         },
@@ -16411,7 +16437,7 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "7a536efdea01ff51f97203ddc7622a61123bfcd1",
+            "head_commit": "b20ffe58359ea0a76982b570044aa5d443436d61",
             "head_blob_oid": "949cc08f2455ca20495bead20c95a0d94a554d9f",
             "worktree_blob_oid": "949cc08f2455ca20495bead20c95a0d94a554d9f",
             "state": "tracked_clean"
@@ -16424,7 +16450,7 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "7a536efdea01ff51f97203ddc7622a61123bfcd1",
+            "head_commit": "b20ffe58359ea0a76982b570044aa5d443436d61",
             "head_blob_oid": "99e1b513d6873de21458f20ba6c6ba54a8193c8d",
             "worktree_blob_oid": "99e1b513d6873de21458f20ba6c6ba54a8193c8d",
             "state": "tracked_clean"
@@ -16437,7 +16463,7 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "7a536efdea01ff51f97203ddc7622a61123bfcd1",
+            "head_commit": "b20ffe58359ea0a76982b570044aa5d443436d61",
             "head_blob_oid": "76c0c9ffa4b73bd8dfc5e3e5043cd99ddb9c99c9",
             "worktree_blob_oid": "76c0c9ffa4b73bd8dfc5e3e5043cd99ddb9c99c9",
             "state": "tracked_clean"
@@ -16450,7 +16476,7 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "7a536efdea01ff51f97203ddc7622a61123bfcd1",
+            "head_commit": "b20ffe58359ea0a76982b570044aa5d443436d61",
             "head_blob_oid": "d86843ddea92dedd839d5101c2f58883b7d7f488",
             "worktree_blob_oid": "d86843ddea92dedd839d5101c2f58883b7d7f488",
             "state": "tracked_clean"
@@ -16464,7 +16490,7 @@
         "expires_at_ms": 1788742539105
       },
       "created_at_ms": 1788728866806,
-      "updated_at_ms": 1788734552894
+      "updated_at_ms": 1788736415141
     },
     {
       "id": "win-chatgpt-composite-answer-extraction-v1",
@@ -22758,16 +22784,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_0d919563bdea4f428bb394aaf637de29",
-      "feature_id": "official-quant-release-admission-v1",
-      "action": "transitioned",
-      "actor": "codex:/root",
-      "reason": "主服务器 0.3.1729 与 PC server_bundle 已从提交 5d2abd409736a58a9fa41ca937bd44e56b74ab1e 发布；health、版本/PC SHA、React shell 通过，公开项目投影 latest_apk_url=null 且可安装筛选不含旧量化包。",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1788576247834
-    },
-    {
       "id": "feature_event_c6c0e91b32bc4001a42f892af62f69cf",
       "feature_id": "yilong-quant-android-public-empty-v3",
       "action": "registered",
@@ -24756,6 +24772,16 @@
       "from_status": "in_progress",
       "to_status": "in_progress",
       "at_ms": 1788734552894
+    },
+    {
+      "id": "feature_event_ae3b64a6d0d14d3498972a358635c013",
+      "feature_id": "win-browser-research-mcp-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-grid-research",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788736415141
     }
   ]
 }
