@@ -1,6 +1,7 @@
 import { AssetAccessError, makeTransport, registeredRedirect } from './transport.js';
 import { CLIENTS, authorizationCode, tokenResponse, identityResponse, assetResponse,
   revokedResponse, scopes, freezeCopy } from './contract.js';
+import { PaginationChain } from './pagination.js';
 
 export { AssetAccessError } from './transport.js';
 
@@ -18,6 +19,7 @@ class AssetAccessClient {
   #clientId; #clock; #transport; #origin; #pending = null; #token = null;
   #snapshot = null; #epoch = 0; #controller = null; #status = 'unauthenticated';
   #expires = 0; #effectiveExpiry = null;
+  #pagination = new PaginationChain();
 
   constructor(options) {
     if (!options || !CLIENTS.includes(options.clientId) ||
@@ -60,6 +62,7 @@ class AssetAccessClient {
     this.#expires = 0;
     this.#effectiveExpiry = null;
     this.#snapshot = null;
+    this.#pagination.clear();
     this.#status = 'unauthenticated';
   }
 
@@ -173,6 +176,7 @@ class AssetAccessClient {
         restarted = true;
         page = await load(null);
       }
+      this.#pagination.accept(page, restarted ? null : cursor);
       this.#snapshot = page;
       return Object.freeze({ page, restarted });
     } catch (error) {
@@ -182,7 +186,10 @@ class AssetAccessClient {
   }
 
   async revoke() {
-    const token = this.#credential();
+    let token;
+    // Withdrawal also cancels pending consent or exchange before a token exists.
+    // Capture an existing token when possible, but always invalidate the old epoch.
+    try { token = this.#credential(); } finally { this.clear(); }
     const operation = this.#begin();
     try {
       const data = await this.#transport('revoke', { token: token.access_token,
@@ -202,6 +209,7 @@ class AssetAccessClient {
     this.#effectiveExpiry = new Date(expires).toISOString();
     this.#token = freezeCopy({ ...this.#token, expires_at: this.#effectiveExpiry });
     this.#snapshot = null;
+    this.#pagination.clear();
     return true;
   }
 }

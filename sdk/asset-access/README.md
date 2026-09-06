@@ -57,10 +57,21 @@ a BFF and use its protected session. The SDK does not install a popup or cross-o
   whether the grant has `esk.progress.read`. Only the previous returned cursor is accepted.
   HTTP 409 `asset_access_snapshot_changed` or a changed response digest resets pagination
   and reads page one once. A second failure stops; consumers must replace old pages on restart.
+  Within one pagination chain, duplicate request IDs (including non-adjacent pages) and repeated
+  cursors are invalid responses. A fresh first page, snapshot restart, reduced grant deadline or
+  local clear resets this tracking. The SDK tracks at most 10,000 request IDs per chain; exceeding
+  that memory bound rejects with `pagination_limit` and clears local authorization. This is a
+  client resource limit, not a claim that the server has no further records or a change to its
+  total-count contract. Do not display a partial traversal as a complete history.
 - A resource response may shorten the original grant deadline when the parent session was
   shortened. The SDK only reduces its deadline, clears earlier cached pages, and restarts an
   in-progress pagination from page one. A later response cannot restore the longer deadline.
-- `revoke()` confirms server revocation and always clears locally. If the server request fails,
+- `revoke()` immediately clears locally, aborts any in-flight read and sends an independent
+  revocation request using the captured old credential. A late read cannot restore the cleared
+  authorization; a later authorization cannot be erased by that older revocation finishing.
+  If authorization or code exchange has not produced a token yet, it still cancels that local
+  flow and blocks late tokens, rejects with `authorization_required`, and sends no revoke HTTP.
+  Only a valid successful response confirms server revocation. If the server request fails,
   the method rejects; local clearing alone does not prove the remote grant was revoked. Use
   the main account's owner-only grant/revoke API when the SDK has lost its credential; the
   main APK's visual authorization manager is not connected in this version.
@@ -74,6 +85,13 @@ Access tokens have no refresh mechanism in V1. Any failed read clears the local 
 snapshot, except the one bounded snapshot restart. Expiration and 401/403 require new explicit
 authorization; network errors are errors, never successful zero balances. Reads are serialized:
 overlapping calls reject with `request_in_progress`; they do not cancel an already valid read.
+An explicit revocation has priority over those reads and never waits for them to finish.
+
+Transport responses use bounded strict JSON decoding before field and identity validation.
+Duplicate keys, including escaped-equivalent names, dangerous object keys, invalid UTF-8/BOM,
+lone surrogate values and nesting beyond 32 containers reject with `invalid_response`.
+Errors do not contain the received document. Valid Unicode text and normal JSON numbers remain
+supported; exact asset quantities still use canonical integer strings and `BigInt` validation.
 
 Amounts and counts are canonical nonnegative integer strings, bounded by signed i64. The SDK
 checks them using `BigInt`, verifies `total = reserved + available`, and retains strings in
@@ -105,7 +123,7 @@ it does not itself prove possession of that application's code or signature.
 
 ## Verification
 
-Run `node --test sdk/asset-access/test/client.test.js` from the repository root. Tests execute
+Run `node --test sdk/asset-access/test/*.test.js` from the repository root. Tests execute
 PKCE exchange, fixed HTTP routing, real streamed responses, consent reuse across pagination,
 revocation, expiry, subject changes, large integers, malformed input, timeout and clearing races
 against synthetic data. They do not authenticate a real user or prove production HTTPS is ready.
@@ -113,9 +131,10 @@ against synthetic data. They do not authenticate a real user or prove production
 For actual Rust-to-SDK interoperability, set `ELON_ASSET_ACCESS_WIRE_OUTPUT` to a new temporary
 JSON path, then run the harness test
 `synthetic_delegated_wire_export_matches_formal_truth_without_credentials` through
-`scripts/validate-rust.ps1 -- test --manifest-path server/tests/esk-platform-harness/Cargo.toml`.
+`scripts/validate-rust.ps1 -Force -- test --manifest-path server/tests/esk-platform-harness/Cargo.toml synthetic_delegated_wire_export_matches_formal_truth_without_credentials -- --test-threads=1`.
+`-Force` reruns the exporter rather than reusing a validation receipt without creating the file.
 Keep the same environment variable when running
-`node --test sdk/asset-access/test/client.test.js sdk/asset-access/test/rust-wire.test.js`.
+`node --test sdk/asset-access/test/*.test.js`.
 The export contains synthetic identity/asset JSON only. The exporter refuses to overwrite an
 existing file. Without the variable the SDK wire test is skipped, so that run cannot prove
 cross-language interoperability.

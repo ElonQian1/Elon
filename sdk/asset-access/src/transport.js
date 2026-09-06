@@ -1,4 +1,6 @@
 /** Fixed-endpoint JSON transport. No arbitrary authenticated request surface is exported. */
+import { decodeStrictJson } from './strict-json.js';
+
 export class AssetAccessError extends Error {
   constructor(code, status = 0) {
     super(`Asset access: ${code}`);
@@ -74,7 +76,7 @@ async function boundedJson(response, maxBytes, signal) {
   const bytes = new Uint8Array(total);
   let offset = 0;
   for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
-  try { return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)); }
+  try { return decodeStrictJson(bytes); }
   catch { throw new AssetAccessError('invalid_response'); }
 }
 
