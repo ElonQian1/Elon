@@ -16243,6 +16243,54 @@
       "updated_at_ms": 1787228653680
     },
     {
+      "id": "win-browser-research-mcp-v1",
+      "title": "Win 通用网页研究与 MCP V1",
+      "summary": "复用 Win WebView2、隔离 Profile、本地资料存储与项目 MCP，建设站点无关的资源和网络研究内核；新网站以版本化清单和可选业务适配器接入，币安网格作为首个业务验证对象。完整业务资料本地保留，AI 按需搜索读取，取消反复手动导出。",
+      "status": "ready",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/win-browser-research-mcp-v1.md",
+        "content_hash": "9adeb3b107fe4bd5f35d60e3ddc6d7a7ed3615152391c0f7d032df147d066630",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "add03c6c9019036c897490da773f92dddc03e1cf",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "0a792980a40c5fed016d030c790dff3b858dbb50",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "win-browser-research",
+      "tags": [
+        "win",
+        "mcp",
+        "webview2",
+        "research",
+        "site-adapter"
+      ],
+      "task_paths": [
+        "contracts/browser-research",
+        "desktop-shell/src-tauri/src/browser_research",
+        "docs/decisions/win-browser-research-mcp-v1.md",
+        "docs/requirements/win-browser-research-mcp-v1.md",
+        "pc-frontend/src/features/browser-research",
+        "server/src/node_agent_browser_research_mcp.rs"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "同一 Win 研究会话完成资源采集、本地搜索及 MCP 按范围读取，无手动导出。",
+        "业务接口路径、字段和值按授权完整保留；凭据不进入常规日志、Git 和通用 MCP 返回。",
+        "新网站仅登记 SiteManifest 即可执行通用研究；币安和异构无交易站点复用相同内核及 MCP。",
+        "接口结论绑定源码哈希/位置与实际请求证据，静态候选、HTTP 状态和业务成功分开。",
+        "跨账户、站点、代次与过期访问失败关闭；验证 Rust、MCP、索引行为和真实 WebView2 链路。"
+      ],
+      "implementation_evidence": [],
+      "created_at_ms": 1788728866806,
+      "updated_at_ms": 1788728924892
+    },
+    {
       "id": "win-chatgpt-composite-answer-extraction-v1",
       "title": "Win ChatGPT 组合回答原生提取 V1",
       "summary": "修复 ChatGPT 新版同回合行情卡、正文和反馈控件组合结构被错误提取为‘提供反馈’，保持原生聊天前台并阻止不完整回答误报完整同步。",
@@ -22534,46 +22582,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_aa5609dfc5974a2aa11ac25430a6ed88",
-      "feature_id": "esk-sui-address-control-proof-v1",
-      "action": "transitioned",
-      "actor": "codex:/root",
-      "reason": "58/58 地址证明测试及 publication 65、Currency 312、allocation 98、共享传输、创世与归属声明回归通过；独立安全审计无代码阻塞。",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1788567975270
-    },
-    {
-      "id": "feature_event_78fa82c91b8e4e21913784765a9aad93",
-      "feature_id": "official-quant-release-admission-v1",
-      "action": "registered",
-      "actor": "codex:/root",
-      "reason": "",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1788568720483
-    },
-    {
-      "id": "feature_event_70c03cd4bdf8431bb3d40e0ad3425aa0",
-      "feature_id": "official-quant-release-admission-v1",
-      "action": "claimed",
-      "actor": "codex:/root",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788568732798
-    },
-    {
-      "id": "feature_event_893b8f71b1e24b34b754d1b431482a23",
-      "feature_id": "official-quant-release-admission-v1",
-      "action": "transitioned",
-      "actor": "codex:/root",
-      "reason": "已核对新版公共下载 V2、现有发布写入/读取/目录同步路径及历史旧包缺口，开始实现服务端新版唯一发布准入。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788568744004
-    },
-    {
       "id": "feature_event_7330cacac98748efab0885e54ee6f10b",
       "feature_id": "official-quant-release-admission-v1",
       "action": "claim_released",
@@ -24532,6 +24540,46 @@
       "from_status": "implemented",
       "to_status": "implemented",
       "at_ms": 1788726050592
+    },
+    {
+      "id": "feature_event_16c8b4cd5beb42f1a75ca4d9db573e94",
+      "feature_id": "win-browser-research-mcp-v1",
+      "action": "registered",
+      "actor": "codex-grid-research",
+      "reason": "用户改为通用 Win 研究工具与 MCP 路线；仅登记已接受需求，新能力尚未实现。",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1788728866806
+    },
+    {
+      "id": "feature_event_9ec59b3fdb204d069ca12ff06fc167dd",
+      "feature_id": "win-browser-research-mcp-v1",
+      "action": "requirement_rebound",
+      "actor": "codex-grid-research",
+      "reason": "独立评审明确完整业务数据与凭据留在浏览器的边界，重新评审需求。",
+      "from_status": "ready",
+      "to_status": "proposed",
+      "at_ms": 1788728924158
+    },
+    {
+      "id": "feature_event_b5a80ed380034962a36a30eda49e4203",
+      "feature_id": "win-browser-research-mcp-v1",
+      "action": "transitioned",
+      "actor": "codex-grid-research",
+      "reason": "用户授权通用 Win 研究路线；完整业务资料与凭据边界评审通过。",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1788728924504
+    },
+    {
+      "id": "feature_event_0bd494c08fd844d3b748783a4318b14a",
+      "feature_id": "win-browser-research-mcp-v1",
+      "action": "transitioned",
+      "actor": "codex-grid-research",
+      "reason": "站点无关内核、站点清单、可选适配器与跨站验收范围已确定；尚未实现。",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1788728924892
     }
   ]
 }
