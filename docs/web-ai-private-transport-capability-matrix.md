@@ -41,8 +41,8 @@ consumption and prevents timed-out project reads from replacing newer results.
 | Unified native send ledger | ChatGPT and Google Web AI | Completed, enabled, and device verified on `v1.1.1520 (1520)` with ChatGPT adapter `247` and Google adapter `40` | Official-page reconciliation without automatic write replay |
 | Same-origin text transaction coordinator | ChatGPT | Completed and enabled; native send/reply verified on `v1.1.1539 (1539)`, adapter `260`; current proof-bearing writes still use the official transaction. Direct private POST is not device verified | Official-page transaction without automatic write replay; [current contract and lifecycle evidence](chatgpt-same-origin-text-transaction.md) |
 | Interaction presets and deferred chat actions | ChatGPT | Completed, enabled, and device verified on research build `v1.1.1367 (1388)` | Current official control and WebView navigation |
-| Attachment upload reconciliation | ChatGPT | Completed, enabled, and device verified on published Release `v1.1.1374 (1395)`, adapter `207` | Official DOM attachment snapshot and bounded timeout |
-| Native attachment upload progress | ChatGPT | Completed, enabled, and device verified on `v1.1.1491 (1491)`, adapter `239` | Indeterminate native status and official DOM attachment snapshot |
+| Attachment upload reconciliation | ChatGPT | Existing capability retained; reservation false-completion regression corrected in source, grouped device acceptance pending | Official DOM attachment snapshot and bounded timeout |
+| Native attachment upload progress | ChatGPT | Existing UI retained; only ready attachments count after the reservation regression correction | Indeterminate native status and official DOM attachment snapshot |
 | Native image assets and cache-first gallery | ChatGPT | Completed, enabled, and device verified on Release candidate `v1.1.1375 (1396)`, adapter `208` | Bounded local image cache and official `/images` fallback |
 | Native image-generation operation status | ChatGPT | Completed, enabled, and device verified on `v1.1.1518 (1518)`, adapter `247` | Official composer and `/images` page |
 | Native private-response rich content | ChatGPT | Completed, enabled, and structurally device verified on Release `v1.1.1379 (1400)` for finance and line-chart cards | Official WebView rich content |
@@ -167,30 +167,28 @@ no consumer entry. The runtime inventory exposes both transport IDs, layers, vis
 default state, and conversation scopes so future agents cannot conflate them. Details are in
 `docs/native-realtime-voice-transport.md`.
 
-Native attachments keep the official page as the upload owner. Adapter `207` arms a
-document-start, same-origin observer only after the native picker is requested. It emits
-only a version, monotonic sequence, state, and completed count. A successful completion
-may release the already-reserved single send slot when the current official snapshot is
-composer-ready and not streaming; DOM attachment chips remain valid evidence and the
-existing timeout remains the fallback. This closes the official-upload/hidden-chip false
-timeout without copying cookies into Android HTTP, replaying uploads, or exporting file
-metadata. Device acceptance on `v1.1.1373 (1394)` completed one fixed-fixture upload and
-reply, restored the original conversation, and registered
-`supervised/attachment_lifecycle`. The completed capability is
-`android_chatgpt_attachment_transport_reconciliation_v1` and must not be reimplemented
-without current regression evidence.
+Native attachments keep the official page as the upload owner and reuse
+`android_chatgpt_attachment_transport_reconciliation_v1`. Historical acceptance on
+`v1.1.1373 (1394)` registered `supervised/attachment_lifecycle`. Current evidence on
+2026-09-06 found that a successful upload reservation could be counted as a completed
+file and prematurely release the text send. Observer revision 2 removes that inference;
+the tracker rejects legacy network counts and waits for new ready composer attachments,
+an available composer and no active generation. It also excludes pre-dispatch messages
+from acknowledgement. This scoped regression fix is source-only until the next grouped
+APK and device round. See [the evidence](chatgpt-private-protocol-evidence.md#reservation-completion-regression).
+It does not implement private upload/finalization. No cookies, requests or files are replayed.
 
-The production composer now projects that existing redacted observer into a determinate
-native upload status. Completed counts are monotonic, clamped to the locally selected total,
-and refreshed without waiting for a full conversation snapshot. The sending phase is shown
+The production composer retains its existing native upload status. Completed counts now
+come only from ready attachment snapshots and are clamped to the locally selected total;
+network reservation success is only a progress hint. The sending phase is shown
 separately from upload progress, so a stable official-page gate cannot look like a stalled
 upload. Missing or malformed evidence keeps the previous indeterminate native status and the
 official DOM attachment snapshot remains authoritative. This UI-only slice is registered as
 `android_chatgpt_native_attachment_progress_v1`; filenames, bytes, credentials, and request
 headers do not cross this progress contract. Release `v1.1.1491 (1491)`, adapter `239`,
 completed a supervised fixed-fixture upload with visible native progress, one settled send,
-and restoration of the original conversation. The capability is completed and remains
-production-default.
+and restoration of the original conversation. The UI remains production-default; that
+historical result does not verify the reservation regression correction above.
 
 Native image content keeps the official page as the identity, byte-fetch, generation,
 and conversation authority. Adapter `208` maps allowlisted same-origin image content to

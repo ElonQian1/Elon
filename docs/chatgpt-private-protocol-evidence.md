@@ -130,3 +130,35 @@ protocol, a private native uploader, or a private text sender. No credential or
 challenge result was replayed. The capture also identified `/ces/v1/t` statistics
 as additional budget pressure; its exact exclusion joins the source-only fix
 for the next grouped build, with the same 23 focused cases and observer suite.
+
+## Reservation completion regression
+
+The recovered-network trace exposed a source-level bug in the existing official
+upload owner: observer revision 1 treated any successful `POST /backend-api/files/`
+child route as a completed file after 650 ms. The observed response only reserved
+an upload URL. `ChatGptWebAttachmentSendTracker` then allowed that count to release
+the text send without any new ready attachment in the composer. The prior native
+acknowledgement therefore cannot certify attachment delivery or file processing.
+
+Observer revision 2 retains wire schema 1 but emits progress hints only; generic
+HTTP success never increments `completedCount` or schedules completion. Upgrade
+cancels the old observer and reinjection is idempotent. The native tracker also
+rejects legacy network completion counts, requires new ready attachments and an
+available non-streaming composer, and excludes messages observed before dispatch
+from send acknowledgement. Existing cancellation and bounded timeout remain.
+
+The focused Node test reproduced the incorrect `completed` event before the fix
+and passes with the corrected observer. Release Kotlin compilation and all 12
+attachment tracker tests passed, covering multiple reservation receipts, old
+attachments, pre-dispatch messages and composer gates. The attachment policy
+suite also passed.
+
+The existing native smoke previously asked the model to echo a supplied marker;
+it now also requires the first line read from the synthetic file, without placing
+that expected file content in the prompt. Its offline PowerShell contract rejects
+prompt-only echoes, user messages and fragments spread across separate replies.
+The same test verifies fixture agreement and Markdown escaping. All passed.
+No new device send, microphone operation or APK publication was performed in this
+correction round. This is a correction to the existing upload path and acceptance,
+not a new private uploader or proof of the complete prepare/upload/finalize protocol.
+It is source-only pending the next grouped APK and synthetic-file device acceptance.

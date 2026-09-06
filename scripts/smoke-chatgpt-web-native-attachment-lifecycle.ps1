@@ -92,6 +92,21 @@ function Get-NativeState {
     return Get-ChatGptWebNativeChatState -Runtime $runtime
 }
 
+function Test-NativeAttachmentFileReply {
+    param([object[]]$Messages, [string]$Marker)
+
+    if ([string]::IsNullOrWhiteSpace($Marker)) { return $false }
+    foreach ($message in $Messages) {
+        if ([string]$message.role -ne "friend") { continue }
+        $content = ([string]$message.content).Replace('\_', '_')
+        if ($content.Contains($Marker) -and
+            $content.Contains('ELON_CHATGPT_ATTACHMENT_FIXTURE_V1=ready')) {
+            return $true
+        }
+    }
+    return $false
+}
+
 function Wait-NativeState {
     param(
         [Parameter(Mandatory = $true)][scriptblock]$Predicate,
@@ -283,7 +298,7 @@ try {
                 }
                 Assert-FixtureState -State $ready -Expected $true
                 Invoke-NativeAction -Action "set_input_text" -Arguments @{
-                    text = "Read the attached test file and reply only with: $marker"
+                    text = "Read the attached test file. Reply with $marker on the first line and copy the file's first line on the second line. Use plain text. If the file is unavailable, say so instead of guessing."
                 } | Out-Null
                 $checkpoint.phase = "send_dispatching"
                 $checkpoint.updated_utc = [DateTimeOffset]::UtcNow.ToString("o")
@@ -297,12 +312,9 @@ try {
                 $completed = Wait-NativeState -Description "native attachment reply" -Predicate {
                     param($state)
                     $messages = @($state.social_chat.messages)
-                    $reply = $messages | Where-Object {
-                        [string]$_.role -eq "friend" -and [string]$_.content -like "*$marker*"
-                    } | Select-Object -Last 1
                     [string]$state.social_chat.web_chat_attachment_phase -eq "completed" -and
                         [int]$state.social_chat.web_chat_pending_attachment_count -eq 0 -and
-                        $null -ne $reply
+                        (Test-NativeAttachmentFileReply -Messages $messages -Marker $marker)
                 }.GetNewClosure()
             } catch {
                 $failureState = Get-NativeState
@@ -333,6 +345,7 @@ try {
                 passed = $true
                 native_chat_surface = $true
                 fixed_fixture_uploaded = 1
+                fixture_first_line_verified = $true
                 assistant_completed = $true
                 original_conversation_restored = [string]::IsNullOrWhiteSpace(
                     [string]$checkpoint.origin_conversation_path

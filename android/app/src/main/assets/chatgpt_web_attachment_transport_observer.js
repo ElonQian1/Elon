@@ -3,16 +3,15 @@
 
   if (location.origin !== 'https://chatgpt.com') return;
   const existing = window.__elonChatGptAttachmentTransportObserver;
-  if (existing && Number(existing.version) >= 1) return;
+  if (existing && Number(existing.version) >= 2) return;
+  if (existing && typeof existing.cancel === 'function') existing.cancel();
 
   const transportVersion = 1;
   const armLifetimeMs = 120000;
-  const settleDelayMs = 650;
   let operation = 0;
   let armedUntil = 0;
   let sequence = 0;
   let started = false;
-  const completedPaths = new Set();
 
   function isArmed() {
     return operation > 0 && Date.now() <= armedUntil;
@@ -42,7 +41,7 @@
         transportVersion,
         sequence,
         state,
-        completedCount: Math.min(10, completedPaths.size)
+        completedCount: 0
       }
     }));
   }
@@ -52,7 +51,6 @@
     armedUntil = Date.now() + armLifetimeMs;
     sequence = 0;
     started = false;
-    completedPaths.clear();
     emit('armed');
     return operation;
   }
@@ -61,7 +59,6 @@
     operation += 1;
     armedUntil = 0;
     started = false;
-    completedPaths.clear();
   }
 
   function requestMetadata(input, init) {
@@ -93,18 +90,11 @@
       emit('failed');
       return;
     }
-    if (metadata.kind === 'sentinel') {
-      if (!started) {
-        started = true;
-        emit('started');
-      }
-      return;
+    // A successful reservation also matches /files/<segment>; it proves no file upload.
+    if (!started) {
+      started = true;
+      emit('started');
     }
-    if (completedPaths.has(metadata.path)) return;
-    completedPaths.add(metadata.path);
-    window.setTimeout(() => {
-      if (expectedOperation === operation && isArmed()) emit('completed');
-    }, settleDelayMs);
   }
 
   const delegateFetch = typeof window.fetch === 'function' ? window.fetch : null;
@@ -157,7 +147,7 @@
   }
 
   window.__elonChatGptAttachmentTransportObserver = Object.freeze({
-    version: transportVersion,
+    version: 2,
     arm,
     cancel,
     isArmed

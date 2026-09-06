@@ -4,11 +4,11 @@ $path = Join-Path $PSScriptRoot "smoke-chatgpt-web-native-attachment-lifecycle.p
 $source = Get-Content -LiteralPath $path -Raw
 $tokens = $null
 $errors = $null
-[System.Management.Automation.Language.Parser]::ParseFile(
+$ast = [System.Management.Automation.Language.Parser]::ParseFile(
     $path,
     [ref]$tokens,
     [ref]$errors
-) | Out-Null
+)
 if (@($errors).Count -gt 0) {
     throw "Native attachment lifecycle smoke has PowerShell parse errors."
 }
@@ -43,6 +43,8 @@ foreach ($required in @(
     'Native attachment upload failed; fixed fixture removed.',
     'web_chat_attachment_phase -eq "completed"',
     'web_chat_pending_attachment_count -eq 0',
+    'Test-NativeAttachmentFileReply -Messages $messages -Marker $marker',
+    'fixture_first_line_verified = $true',
     'Restore-Origin -Checkpoint $checkpoint',
     'Register-ChatGptWebVerificationCases',
     '-CaseIds @("supervised/attachment_lifecycle")',
@@ -86,6 +88,50 @@ if (@([regex]::Matches($source, 'Invoke-NativeAction -Action "send_input"')).Cou
 $lineCount = @($source -split "`n").Count
 if ($lineCount -gt 430) {
     throw "Native attachment lifecycle smoke exceeded its modular size budget: $lineCount"
+}
+
+$replyFunction = $ast.Find({
+    param($node)
+    $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+        $node.Name -eq 'Test-NativeAttachmentFileReply'
+}, $true)
+. ([scriptblock]::Create($replyFunction.Extent.Text))
+$marker = 'ELON-NATIVE-ATTACHMENT-synthetic'
+$fileLine = 'ELON_CHATGPT_ATTACHMENT_FIXTURE_V1=ready'
+$fixtureSource = Get-Content -LiteralPath (Join-Path $PSScriptRoot `
+    '../android/app/src/main/kotlin/com/elon/app/ChatGptWebAcceptanceAttachmentFixture.kt') -Raw
+if (-not $fixtureSource.Contains($fileLine)) {
+    throw 'The reply check no longer matches the synthetic fixture.'
+}
+foreach ($messages in @(
+    @(@{ role = 'friend'; content = $marker }),
+    @(@{ role = 'friend'; content = $fileLine }),
+    @(@{ role = 'user'; content = "$marker`n$fileLine" }),
+    @(@{ role = 'friend'; content = $marker }, @{ role = 'friend'; content = $fileLine })
+)) {
+    if (Test-NativeAttachmentFileReply -Messages $messages -Marker $marker) {
+        throw 'An echoed prompt, different reply or user message must not prove file delivery.'
+    }
+}
+$valid = @(@{ role = 'friend'; content = "$marker`n$fileLine" })
+if (-not (Test-NativeAttachmentFileReply -Messages $valid -Marker $marker)) {
+    throw 'The synthetic file-content reply should pass.'
+}
+if (Test-NativeAttachmentFileReply -Messages $valid -Marker '') {
+    throw 'A missing request marker must not prove file delivery.'
+}
+$escaped = @(@{ role = 'friend'; content = "$marker`n$($fileLine.Replace('_', '\_'))" })
+if (-not (Test-NativeAttachmentFileReply -Messages $escaped -Marker $marker)) {
+    throw 'Markdown escaping must not reject a correct file-content reply.'
+}
+$prompt = $ast.Find({
+    param($node)
+    $node -is [System.Management.Automation.Language.ExpandableStringExpressionAst] -and
+        $node.Value.StartsWith('Read the attached test file.')
+}, $true)
+if ($null -eq $prompt -or $prompt.Value.Contains($fileLine) -or
+    $prompt.Value -match '\$fileLine|\$expected') {
+    throw 'The expected file content must not be provided in the prompt.'
 }
 
 Write-Output "CHATGPT_WEB_NATIVE_ATTACHMENT_CONTRACT=passed"

@@ -4,10 +4,9 @@ internal class ChatGptWebAttachmentSendTracker private constructor(
     val prompt: String,
     val localAttachmentCount: Int,
     private val baselineAttachmentIds: Set<String>,
-    private val baselineUserMessageIds: Set<String>,
+    private val baselineUserMessageIds: MutableSet<String>,
 ) {
     private var transportSequence = 0L
-    private var transportCompletedCount = 0
     private var domCompletedCount = 0
 
     enum class Phase(val wireValue: String) {
@@ -27,13 +26,17 @@ internal class ChatGptWebAttachmentSendTracker private constructor(
         private set
 
     val completedAttachmentCount: Int
-        get() = maxOf(domCompletedCount, transportCompletedCount)
-            .coerceIn(0, localAttachmentCount)
+        get() = domCompletedCount.coerceIn(0, localAttachmentCount)
 
     fun observe(snapshot: ChatGptWebSnapshot): Observation {
-        newUserMessage(snapshot)?.let { return Observation.Complete(it.id) }
+        if (phase == Phase.SENDING) {
+            return newUserMessage(snapshot)?.let { Observation.Complete(it.id) } ?: Observation.Wait
+        }
         if (phase != Phase.UPLOADING) return Observation.Wait
 
+        snapshot.messages.asSequence()
+            .filter { it.role == "user" }
+            .mapTo(baselineUserMessageIds, ChatGptWebMessage::id)
         val uploaded = snapshot.attachments.filterNot { it.id in baselineAttachmentIds }
         domCompletedCount = maxOf(domCompletedCount, uploaded.count { it.state == "ready" })
         if (uploaded.any { it.state == "error" }) {
@@ -41,9 +44,7 @@ internal class ChatGptWebAttachmentSendTracker private constructor(
             return Observation.Failed("附件上传失败，请重试或打开官网功能。")
         }
         val domReady = uploaded.size >= localAttachmentCount && uploaded.none { it.state != "ready" }
-        val transportReady = transportCompletedCount >= localAttachmentCount &&
-            snapshot.composerReady && !snapshot.streaming
-        if (!domReady && !transportReady) {
+        if (!domReady || !snapshot.composerReady || snapshot.streaming) {
             return Observation.Wait
         }
         phase = Phase.SENDING
@@ -55,9 +56,8 @@ internal class ChatGptWebAttachmentSendTracker private constructor(
             return Observation.Wait
         }
         transportSequence = evidence.sequence
-        if (evidence.state == ChatGptWebAttachmentTransportState.COMPLETED) {
-            transportCompletedCount = maxOf(transportCompletedCount, evidence.completedCount)
-        }
+        // Version 1 counted reservation responses as completed files, without an upload proof.
+        // Retain the hint for snapshot reconciliation, but never advance progress or dispatch.
         return Observation.Wait
     }
 

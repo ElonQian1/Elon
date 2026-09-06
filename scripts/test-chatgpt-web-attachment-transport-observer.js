@@ -58,7 +58,10 @@ function createContext(options = {}) {
     window.elonChatGptNative = { postMessage: (payload) => events.push(JSON.parse(payload)) };
   }
   window.window = window;
-  vm.runInNewContext(observerSource, {
+  if (options.existingObserver) {
+    window.__elonChatGptAttachmentTransportObserver = options.existingObserver;
+  }
+  const globals = {
     window,
     location,
     URL,
@@ -72,10 +75,16 @@ function createContext(options = {}) {
     Set,
     String,
     WeakMap
-  }, { filename: 'chatgpt_web_attachment_transport_observer.js' });
+  };
+  const inject = () => vm.runInNewContext(observerSource, globals, {
+    filename: 'chatgpt_web_attachment_transport_observer.js'
+  });
+  inject();
   return {
     window,
     events,
+    inject,
+    timerCount: () => timers.length,
     setStatus: (status) => { nextStatus = status; },
     flushTimers: () => {
       while (timers.length) timers.shift()();
@@ -100,11 +109,9 @@ assert.match(adapterSource, /attachmentTransportObserver\.arm\(\)/);
 (async () => {
   const context = createContext();
   const observer = context.window.__elonChatGptAttachmentTransportObserver;
-  assert.equal(observer.version, 1);
 
   const early = createContext({ early: true });
   const earlyObserver = early.window.__elonChatGptAttachmentTransportObserver;
-  assert.equal(earlyObserver.version, 1, 'the observer installs before the native bridge exists');
   early.window.__elonChatGptAdapterTargetVersion = 207;
   early.window.__elonChatGptDocumentToken = 'doc_attachment_early';
   early.window.elonChatGptNative = {
@@ -114,7 +121,8 @@ assert.match(adapterSource, /attachmentTransportObserver\.arm\(\)/);
   assert.equal(transportEvents(early).at(-1).state, 'armed');
   await early.window.fetch('/backend-api/files/early-file', { method: 'POST' });
   early.flushTimers();
-  assert.equal(transportEvents(early).at(-1).state, 'completed');
+  assert.equal(transportEvents(early).at(-1).state, 'started');
+  assert.equal(transportEvents(early).at(-1).completedCount, 0);
 
   await context.window.fetch('/backend-api/files/unarmed', { method: 'POST' });
   context.flushTimers();
@@ -139,18 +147,19 @@ assert.match(adapterSource, /attachmentTransportObserver\.arm\(\)/);
   });
   context.flushTimers();
   let events = transportEvents(context);
-  assert.equal(events.at(-1).state, 'completed');
-  assert.equal(events.at(-1).completedCount, 1);
+  assert.equal(events.at(-1).state, 'started');
+  assert.equal(events.at(-1).completedCount, 0,
+    'HTTP success for a file reservation cannot prove uploaded or attached bytes');
   assert.doesNotMatch(JSON.stringify(events), /Authorization|synthetic body|file-one/);
 
   await context.window.fetch('/backend-api/files/file-one', { method: 'POST' });
   context.flushTimers();
-  assert.equal(transportEvents(context).length, events.length, 'a repeated file completion is deduplicated');
+  assert.equal(transportEvents(context).length, events.length, 'repeated progress is deduplicated');
 
   await context.window.fetch('/backend-api/files/file-two', { method: 'POST' });
   context.flushTimers();
   events = transportEvents(context);
-  assert.equal(events.at(-1).completedCount, 2, 'multi-file completion is monotonic');
+  assert.equal(events.at(-1).completedCount, 0, 'several reservations still prove no completed file');
 
   observer.arm();
   context.setStatus(503);
@@ -165,13 +174,31 @@ assert.match(adapterSource, /attachmentTransportObserver\.arm\(\)/);
   xhr.send('body is intentionally opaque');
   xhr.finish(200);
   context.flushTimers();
-  assert.equal(transportEvents(context).at(-1).state, 'completed');
-  assert.equal(transportEvents(context).at(-1).completedCount, 1);
+  assert.equal(transportEvents(context).at(-1).state, 'started');
+  assert.equal(transportEvents(context).at(-1).completedCount, 0);
+
+  assert.equal(observer.version, 2);
+  assert.equal(earlyObserver.version, 2, 'the observer installs before the native bridge exists');
+  assert.equal(context.timerCount(), 0, 'HTTP success must not schedule guessed completion');
+  const installedFetch = context.window.fetch;
+  context.inject();
+  assert.equal(context.window.fetch, installedFetch, 'reinjection cannot accumulate fetch wrappers');
+  assert.equal(context.window.__elonChatGptAttachmentTransportObserver, observer);
+
+  let legacyCancelled = false;
+  const upgraded = createContext({
+    existingObserver: { version: 1, cancel: () => { legacyCancelled = true; } }
+  });
+  assert.equal(legacyCancelled, true, 'upgrading cancels pending legacy completion callbacks');
+  upgraded.window.__elonChatGptAttachmentTransportObserver.arm();
+  await upgraded.window.fetch('/backend-api/files/reservation', { method: 'POST' });
+  assert.deepEqual(transportEvents(upgraded).map((item) => item.state), ['armed', 'started']);
+  assert.equal(upgraded.timerCount(), 0);
 
   observer.cancel();
   await context.window.fetch('/backend-api/files/after-cancel', { method: 'POST' });
   context.flushTimers();
-  assert.equal(transportEvents(context).at(-1).completedCount, 1);
+  assert.equal(transportEvents(context).at(-1).completedCount, 0);
 
   console.log('ChatGPT attachment transport observer contract passed.');
 })().catch((error) => {

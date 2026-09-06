@@ -55,35 +55,38 @@ class ChatGptWebAttachmentSendTrackerTest {
     }
 
     @Test
-    fun transportCompletionWaitsForAStableOfficialSnapshotBeforeSending() {
+    fun legacyTransportCompletionCannotReleaseThePromptWithoutReadyAttachments() {
         val tracker = ChatGptWebAttachmentSendTracker.begin("分析附件", 1, snapshot())
 
         assertTrue(tracker.observeTransport(transport(1, "completed", 1)) is
             ChatGptWebAttachmentSendTracker.Observation.Wait)
         assertTrue(tracker.observe(snapshot(composerReady = false)) is
             ChatGptWebAttachmentSendTracker.Observation.Wait)
-        assertTrue(tracker.observe(snapshot()) is ChatGptWebAttachmentSendTracker.Observation.SendPrompt)
+        assertTrue(tracker.observe(snapshot()) is ChatGptWebAttachmentSendTracker.Observation.Wait)
+        assertEquals(0, tracker.completedAttachmentCount)
+        assertTrue(tracker.observe(snapshot(attachments = listOf(attachment("a", "ready")))) is
+            ChatGptWebAttachmentSendTracker.Observation.SendPrompt)
         assertEquals(ChatGptWebAttachmentSendTracker.Phase.SENDING, tracker.phase)
     }
 
     @Test
-    fun transportCompletionIsMonotonicForMultipleFiles() {
+    fun severalReservationReceiptsDoNotCountAsCompletedFiles() {
         val tracker = ChatGptWebAttachmentSendTracker.begin("分析附件", 2, snapshot())
 
         tracker.observeTransport(transport(2, "completed", 1))
-        assertEquals(1, tracker.completedAttachmentCount)
+        assertEquals(0, tracker.completedAttachmentCount)
         assertTrue(tracker.observe(snapshot()) is ChatGptWebAttachmentSendTracker.Observation.Wait)
         tracker.observeTransport(transport(1, "completed", 2))
-        assertEquals(1, tracker.completedAttachmentCount)
+        assertEquals(0, tracker.completedAttachmentCount)
         assertTrue(tracker.observe(snapshot()) is ChatGptWebAttachmentSendTracker.Observation.Wait)
         tracker.observeTransport(transport(3, "completed", 2))
 
-        assertEquals(2, tracker.completedAttachmentCount)
-        assertTrue(tracker.observe(snapshot()) is ChatGptWebAttachmentSendTracker.Observation.SendPrompt)
+        assertEquals(0, tracker.completedAttachmentCount)
+        assertTrue(tracker.observe(snapshot()) is ChatGptWebAttachmentSendTracker.Observation.Wait)
     }
 
     @Test
-    fun completedProgressUsesMonotonicDomAndTransportEvidenceWithinTheLocalTotal() {
+    fun completedProgressUsesReadyAttachmentsNotUnverifiedTransportCounters() {
         val tracker = ChatGptWebAttachmentSendTracker.begin("分析附件", 2, snapshot())
 
         tracker.observe(snapshot(attachments = listOf(attachment("a", "ready"))))
@@ -92,7 +95,48 @@ class ChatGptWebAttachmentSendTrackerTest {
         assertEquals(1, tracker.completedAttachmentCount)
         tracker.observeTransport(transport(3, "completed", 9))
 
-        assertEquals(2, tracker.completedAttachmentCount)
+        assertEquals(1, tracker.completedAttachmentCount)
+    }
+
+    @Test
+    fun readyFilesWaitForAnAvailableComposerAndNoActiveGeneration() {
+        val tracker = ChatGptWebAttachmentSendTracker.begin("分析附件", 1, snapshot())
+        val readyFiles = listOf(attachment("a", "ready"))
+
+        assertTrue(tracker.observe(snapshot(attachments = readyFiles, composerReady = false)) is
+            ChatGptWebAttachmentSendTracker.Observation.Wait)
+        assertTrue(tracker.observe(snapshot(attachments = readyFiles, streaming = true)) is
+            ChatGptWebAttachmentSendTracker.Observation.Wait)
+        assertTrue(tracker.observe(snapshot(attachments = readyFiles)) is
+            ChatGptWebAttachmentSendTracker.Observation.SendPrompt)
+    }
+
+    @Test
+    fun matchingTextBeforeUploadReadinessDoesNotCompleteTheAttachmentOperation() {
+        val tracker = ChatGptWebAttachmentSendTracker.begin("分析附件", 1, snapshot())
+        tracker.observeTransport(transport(1, "completed", 1))
+
+        assertTrue(tracker.observe(snapshot(messages = listOf(message("u-early", "user", "分析附件")))) is
+            ChatGptWebAttachmentSendTracker.Observation.Wait)
+        assertEquals(ChatGptWebAttachmentSendTracker.Phase.UPLOADING, tracker.phase)
+
+        assertTrue(tracker.observe(snapshot(attachments = listOf(attachment("a", "ready")))) is
+            ChatGptWebAttachmentSendTracker.Observation.SendPrompt)
+        assertTrue(tracker.observe(snapshot(messages = listOf(message("u-early", "user", "分析附件")))) is
+            ChatGptWebAttachmentSendTracker.Observation.Wait)
+        val completed = tracker.observe(snapshot(messages = listOf(message("u-new", "user", "分析附件"))))
+        assertEquals("u-new", (completed as ChatGptWebAttachmentSendTracker.Observation.Complete).userMessageId)
+    }
+
+    @Test
+    fun oldReadyFilesCannotSatisfyANewUploadEvenWithNetworkSuccess() {
+        val oldFiles = listOf(attachment("old", "ready"))
+        val tracker = ChatGptWebAttachmentSendTracker.begin("分析附件", 1, snapshot(attachments = oldFiles))
+        tracker.observeTransport(transport(1, "completed", 1))
+
+        assertTrue(tracker.observe(snapshot(attachments = oldFiles)) is
+            ChatGptWebAttachmentSendTracker.Observation.Wait)
+        assertEquals(0, tracker.completedAttachmentCount)
     }
 
     @Test
@@ -133,6 +177,7 @@ class ChatGptWebAttachmentSendTrackerTest {
         messages: List<ChatGptWebMessage> = emptyList(),
         attachments: List<ChatGptWebAttachment> = emptyList(),
         composerReady: Boolean = true,
+        streaming: Boolean = false,
     ) = ChatGptWebSnapshot(
         title = "",
         url = "https://chatgpt.com/",
@@ -140,7 +185,7 @@ class ChatGptWebAttachmentSendTrackerTest {
         messages = messages,
         authenticated = true,
         composerReady = composerReady,
-        streaming = false,
+        streaming = streaming,
         currentModel = "极速",
         attachments = attachments,
         dictationActive = false,

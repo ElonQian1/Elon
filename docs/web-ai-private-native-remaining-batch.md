@@ -23,6 +23,7 @@ for website functionality. Persistent WebView identity remains intentional.
 | Private conversation attachment index, cache and native file sheet | Implemented | Shared JS/Android contract and targeted production tests passed | Published/installed 1540; device UI acceptance pending |
 | End-to-end private read deadlines, body limits and late project response isolation | Implemented | Lifecycle and existing JS consumer suites passed | Published/installed 1540; device acceptance pending |
 | Bounded request-shape capture through native MCP, reusing the page observer | Implemented diagnostic only | Node/Android checks passed; actual reservation JSON and conversation SSE capture observed | Published/installed 1540; telemetry-budget follow-up is source-only |
+| Reservation responses cannot prematurely release attachment sends | Implemented regression correction | Node red-to-green, 12 Android tracker tests and file-content smoke contract passed | Source-only; grouped APK and synthetic-file acceptance pending |
 
 Root cause, exact modules, and check results are in
 [the history contract](chatgpt-private-history-native-contract.md).
@@ -67,7 +68,9 @@ an empty draft and no pending attachment; details and limits are in the
 
 Next complete the attachment prepare/upload/finalize contract and its composer
 association, reusing this real evidence, the existing synthetic fixture and
-bounded MCP command. First confirm a healthy transport and preserve the current
+bounded MCP command. The subsequent [reservation regression](chatgpt-private-protocol-evidence.md#reservation-completion-regression)
+invalidates generic HTTP completion as upload proof; include that correction in
+the next grouped candidate before accepting attachment delivery. First confirm a healthy transport and preserve the current
 draft, conversation and voice state. Do not rebuild this unchanged candidate,
 add another probe framework, guess an endpoint, or repeatedly restart the app
 because the debugging connection is unavailable. The Goal is not complete.
