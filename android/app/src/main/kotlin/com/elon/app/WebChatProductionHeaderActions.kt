@@ -40,8 +40,7 @@ internal object WebChatProductionHeaderActionPolicy {
             .map(WebChatConsumerControlDescriptor::control)
             .firstOrNull { control ->
                 control.semantic == TEMPORARY_CHAT &&
-                    control.enabled &&
-                    control.supportsSelectedState
+                    control.enabled
             },
         conversationSettingsAvailable = state.pageKind.equals("conversation", ignoreCase = true) &&
             ChatGptWebConversationPath.normalize(currentConversationPath) != null,
@@ -62,8 +61,15 @@ internal object WebChatProductionHeaderActionPolicy {
         observation: WebChatProductionObservationState,
     ) = WebChatActionSheetItem(
         id = TEMPORARY_ITEM_ID,
-        title = if (control?.selected == true) "关闭临时聊天" else "临时聊天",
+        title = when {
+            control != null && !control.supportsSelectedState ->
+                if (control.selected) "临时聊天已开启" else "临时聊天状态同步中"
+            control?.selected == true -> "关闭临时聊天"
+            else -> "临时聊天"
+        },
         subtitle = when {
+            control != null && !control.supportsSelectedState ->
+                if (control.selected) "当前会话保持临时模式" else "正在确认当前会话状态"
             control?.selected == true -> "已开启，本次对话不会出现在历史记录中"
             control != null -> "开启后，本次对话不会出现在历史记录中"
             observation == WebChatProductionObservationState.TEMPORARILY_UNOBSERVED ->
@@ -71,6 +77,7 @@ internal object WebChatProductionHeaderActionPolicy {
             else -> "点按后连接官网并开启，状态将在后台确认"
         },
         selected = control?.selected == true,
+        enabled = control == null || control.supportsSelectedState,
         contentDescription = ChatGptNativeNavigationSelector.TEMPORARY_CHAT,
     )
 
@@ -218,6 +225,11 @@ internal class WebChatProductionHeaderActionsCoordinator(
             cachedState(provider.id, port.state()),
             currentConversationPath(),
         ).temporaryChat
+        if (control != null && !control.supportsSelectedState) {
+            onStateChanged()
+            Toast.makeText(activity, "当前状态不可直接切换，请新建会话或等待状态同步", Toast.LENGTH_SHORT).show()
+            return
+        }
         val desiredSelected = control?.selected?.not() ?: true
         if (!temporaryChatIntent.begin(desiredSelected)) {
             Toast.makeText(activity, "临时聊天正在切换", Toast.LENGTH_SHORT).show()

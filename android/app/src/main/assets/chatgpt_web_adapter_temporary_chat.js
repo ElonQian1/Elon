@@ -7,17 +7,29 @@
 })(typeof window !== 'undefined' ? window : null, function () {
   'use strict';
 
+  let privateAdapter;
+  function privateState() {
+    if (!privateAdapter && typeof window === 'object') {
+      privateAdapter = window.__elonChatGptPrivateTemporaryChat?.create(window);
+    }
+    return privateAdapter;
+  }
+
   function describe(pageSemanticPolicy, input) {
     if (!pageSemanticPolicy || typeof pageSemanticPolicy.temporaryChatState !== 'function') {
       return null;
     }
-    return pageSemanticPolicy.temporaryChatState(input);
+    const state = pageSemanticPolicy.temporaryChatState(input);
+    const current = state && privateState()?.observe(input && input.node);
+    return current ? Object.freeze({ ...state, ...current }) : state;
   }
 
   function setSelected(input) {
     const values = input || {};
     const control = values.control;
     if (!control || control.semantic !== 'temporary_chat') return false;
+    if (!values.skipPrivate && privateState()?.setSelected(values,
+      () => setSelected({ ...values, skipPrivate: true }))) return true;
     const policy = values.pageSemanticPolicy;
     const plan = policy && typeof policy.planTemporaryChatSelection === 'function'
       ? policy.planTemporaryChatSelection(control.selected, values.desiredSelected)

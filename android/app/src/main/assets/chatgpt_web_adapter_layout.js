@@ -350,6 +350,7 @@
       const disclosure = disclosureAdapter && disclosureAdapter.describe(node);
       const semanticState = temporaryChatAdapter
         ? temporaryChatAdapter.describe(window.__elonChatGptPageSemanticPolicy, {
+            node,
             signal: [
               node.id,
               node.getAttribute('data-testid'),

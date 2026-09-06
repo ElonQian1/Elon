@@ -56,6 +56,7 @@ class WebChatTemporaryChatIntentQueueTest {
     private fun control(
         selected: Boolean,
         id: String = "temporary",
+        stateSettable: Boolean = true,
     ) = ChatGptWebUiControl(
         id = id,
         label = "临时聊天",
@@ -64,6 +65,23 @@ class WebChatTemporaryChatIntentQueueTest {
         role = "button",
         enabled = true,
         selected = selected,
-        stateSettable = true,
+        stateSettable = stateSettable,
     )
+
+    @Test
+    fun waitsForMutationPermissionButCanConfirmReadOnlyState() {
+        assertTrue(queue.begin(desiredSelected = true))
+        assertEquals(
+            WebChatTemporaryChatIntentDecision.AwaitingControl,
+            queue.evaluate(control(selected = false, stateSettable = false)),
+        )
+        assertEquals(
+            WebChatTemporaryChatIntentDecision.Apply("temporary", true),
+            queue.evaluate(control(selected = false)),
+        )
+        assertEquals(
+            WebChatTemporaryChatIntentDecision.Confirmed(true),
+            queue.evaluate(control(selected = true, stateSettable = false)),
+        )
+    }
 }

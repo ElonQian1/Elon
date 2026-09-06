@@ -32,7 +32,7 @@ internal class WebChatTemporaryChatIntentQueue {
         if (control.selected == desired) {
             return WebChatTemporaryChatIntentDecision.Confirmed(desired)
         }
-        if (control.id == rejectedControlId) {
+        if (control.id == rejectedControlId || !control.supportsSelectedState) {
             return WebChatTemporaryChatIntentDecision.AwaitingControl
         }
         if (mutationIssued) return WebChatTemporaryChatIntentDecision.AwaitingConfirmation

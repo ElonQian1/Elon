@@ -52,18 +52,37 @@ class WebChatProductionHeaderActionsTest {
     }
 
     @Test
-    fun rejectsDisabledOrNonSettableTemporaryControls() {
+    fun rejectsDisabledControlsButPreservesObservedReadOnlyTemporaryState() {
         val disabled = temporaryControl(selected = false, enabled = false)
-        val nonSettable = temporaryControl(selected = false, stateSettable = false)
+        val nonSettable = temporaryControl(selected = true, stateSettable = false)
 
         assertNull(WebChatProductionHeaderActionPolicy.resolve(
             state("home", disabled),
             null,
         ).temporaryChat)
-        assertNull(WebChatProductionHeaderActionPolicy.resolve(
+        val resolved = WebChatProductionHeaderActionPolicy.resolve(
             state("home", nonSettable),
             null,
-        ).temporaryChat)
+        )
+        assertNotNull(resolved.temporaryChat)
+        assertTrue(resolved.temporaryChatSelected)
+        val item = WebChatProductionHeaderActionPolicy.temporaryChatItem(
+            resolved.temporaryChat,
+            WebChatProductionObservationState.AVAILABLE,
+        )
+        assertTrue(item.selected)
+        assertFalse(item.enabled)
+        assertEquals("临时聊天已开启", item.title)
+    }
+
+    @Test
+    fun doesNotOfferAnotherToggleWhileTheCurrentStateIsBeingConfirmed() {
+        val item = WebChatProductionHeaderActionPolicy.temporaryChatItem(
+            temporaryControl(selected = false, stateSettable = false),
+            WebChatProductionObservationState.SYNCING,
+        )
+        assertFalse(item.enabled)
+        assertEquals("临时聊天状态同步中", item.title)
     }
 
     @Test

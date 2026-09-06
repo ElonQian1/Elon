@@ -707,6 +707,7 @@ internal class ChatGptWebPageAdapter(
             "chatgpt_web_adapter_sidebar_control_policy.js",
             "chatgpt_web_adapter_navigation.js",
             "chatgpt_web_adapter_page_semantic_policy.js",
+            "chatgpt_web_private_temporary_chat.js",
             "chatgpt_web_adapter_temporary_chat.js",
             "chatgpt_web_adapter_form_controls.js",
             "chatgpt_web_adapter_control_ownership_policy.js",
