@@ -4,7 +4,7 @@ use std::{
     path::PathBuf,
     sync::{
         atomic::{AtomicBool, AtomicU64, Ordering},
-        Arc,
+        Arc, Mutex,
     },
 };
 
@@ -76,6 +76,7 @@ pub(super) struct Control {
     pub closed: AtomicBool,
     pub expires_at_ms: u64,
     pub sink: HostSink,
+    pub handshake: Mutex<super::handshake::Handshake>,
 }
 
 impl HostHandle {
@@ -302,6 +303,7 @@ mod tests {
                 closed: AtomicBool::new(false),
                 expires_at_ms: now_ms() + 60000,
                 sink: Arc::new(|_| {}),
+                handshake: Mutex::default(),
             }),
         };
         assert!(handle.accepts(1));

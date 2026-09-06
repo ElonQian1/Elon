@@ -80,7 +80,40 @@ pub fn accept(session: &mut Session, root: &Path, event: HostEvent) -> Result<()
         return files::save_session(root, session);
     }
     match event.kind.as_str() {
+        "phase" => {
+            if session.active {
+                if let Some(stage) = event.resource_type.as_deref().filter(|stage| {
+                    matches!(
+                        *stage,
+                        "native_dispatch"
+                            | "native_create"
+                            | "native_attached"
+                            | "page_enable"
+                            | "frame_tree"
+                            | "runtime_reset"
+                            | "runtime_enable"
+                            | "debugger_reset"
+                            | "network_enable"
+                            | "debugger_safe_mode"
+                            | "debugger_enable"
+                    )
+                }) {
+                    session.generation = event.generation;
+                    session.host_stage = Some(stage.into());
+                }
+            }
+            return files::save_session(root, session);
+        }
+        "failed" => {
+            session.generation = event.generation;
+            session.active = false;
+            session.phase = "host_unavailable".into();
+            return files::save_session(root, session);
+        }
         "navigation" => {
+            if !session.active {
+                return Ok(());
+            }
             session.generation = event.generation;
             session.phase = if event.error_code.as_deref()
                 == Some("identity_navigation_not_captured")

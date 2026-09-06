@@ -1,5 +1,6 @@
 use super::{files, host::HostEvent, ingest, model::*, privacy, query};
 use serde_json::json;
+mod lifecycle;
 use std::{
     fs,
     path::PathBuf,
@@ -41,6 +42,7 @@ impl Fixture {
             generation: 1,
             expires_at_ms: now_ms() + 60000,
             phase: "observing".into(),
+            host_stage: None,
             bytes: 0,
             resources: vec![],
             requests: vec![],

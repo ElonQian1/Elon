@@ -127,6 +127,7 @@ fn restoring_metadata_never_changes_owner_project_or_revives_expiry() {
         generation: 7,
         expires_at_ms: 1,
         phase: "observing".into(),
+        host_stage: None,
         bytes: 0,
         resources: vec![],
         requests: vec![],

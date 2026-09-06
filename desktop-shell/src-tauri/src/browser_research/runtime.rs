@@ -168,13 +168,11 @@ impl ResearchRuntime {
                 return Err("research_session_expired".into());
             }
             let session = core.sessions.get_mut(id).ok_or("session_not_found")?;
+            // Reject callbacks already queued before this explicit pause/resume.
+            session.generation = handle.generation() + 1;
+            session.host_stage = None;
             session.active = command.kind == "resume";
-            session.phase = if session.active {
-                "observing"
-            } else {
-                "paused"
-            }
-            .into();
+            session.phase = if session.active { "resuming" } else { "paused" }.into();
             let result =
                 json!({"schema":RESULT_SCHEMA,"kind":command.kind,"session":session.summary()});
             files::save_session(&scope.root, session)?;
@@ -182,7 +180,17 @@ impl ResearchRuntime {
             if command.kind == "pause" {
                 host::pause(&handle);
             } else {
-                host::resume(app, &handle)?;
+                if let Err(code) = host::resume(app, &handle) {
+                    if let Ok(mut core) = self.inner.lock() {
+                        if let Some(session) = core.sessions.get_mut(id) {
+                            session.active = false;
+                            session.phase = "host_unavailable".into();
+                            session.gap(&code);
+                            let _ = files::save_session(&scope.root, session);
+                        }
+                    }
+                    return Err(code);
+                }
             }
             return Ok(result);
         }
@@ -241,6 +249,7 @@ impl ResearchRuntime {
             generation: 0,
             expires_at_ms: now_ms() + SESSION_DURATION,
             phase: "opening".into(),
+            host_stage: None,
             bytes: 0,
             resources: vec![],
             requests: vec![],

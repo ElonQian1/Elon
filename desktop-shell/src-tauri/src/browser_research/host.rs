@@ -1,4 +1,5 @@
 //! Native, read-only observation of a new, independently profiled research window.
+mod handshake;
 mod types;
 #[cfg(windows)]
 mod windows;

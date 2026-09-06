@@ -130,6 +130,8 @@ pub struct Session {
     pub generation: u64,
     pub expires_at_ms: u64,
     pub phase: String,
+    #[serde(default)]
+    pub host_stage: Option<String>,
     pub bytes: u64,
     pub resources: Vec<Resource>,
     pub requests: Vec<Request>,
@@ -140,7 +142,7 @@ impl Session {
     pub fn summary(&self) -> Value {
         serde_json::json!({"id":self.id,"site_id":self.site.id,
             "active":self.active && now_ms()<self.expires_at_ms,"generation":self.generation,
-            "expires_at_ms":self.expires_at_ms,"phase":self.phase,
+            "expires_at_ms":self.expires_at_ms,"phase":self.phase,"host_stage":self.host_stage,
             "resource_count":self.resources.len(),"request_count":self.requests.len(),
             "gaps":self.gaps,"trading_enabled":false})
     }

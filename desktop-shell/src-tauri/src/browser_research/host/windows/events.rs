@@ -69,6 +69,7 @@ fn within_document(context: &Context, value: &Value) {
         event.error_code = Some("identity_navigation_not_captured".into());
     }
     (handle.control.sink)(event);
+    handle.navigation_during_handshake();
 }
 
 fn frame(context: &Context, value: &Value) {
@@ -85,8 +86,10 @@ fn frame(context: &Context, value: &Value) {
         state.frame = Some(id);
         state.document_url = url;
         state.loader = text(frame, "loaderId", 256);
-        (state.ready && state.config.allows_document(&state.document_url))
-            .then(|| HostEvent::new(state.generation, "ready", ""))
+        (state.ready
+            && !state.handle.handshake_pending()
+            && state.config.allows_document(&state.document_url))
+        .then(|| HostEvent::new(state.generation, "ready", ""))
     };
     if let Some(event) = ready {
         emit(context, event);

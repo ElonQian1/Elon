@@ -12,8 +12,12 @@ use webview2_com::Microsoft::Web::WebView2::Win32::{
     ICoreWebView2, ICoreWebView2DevToolsProtocolEventReceiver,
 };
 
-use super::types::{now_ms, Control, HostConfig, HostEvent, HostHandle, HostSink};
+use super::{
+    handshake::Stage,
+    types::{now_ms, Control, HostConfig, HostEvent, HostHandle, HostSink},
+};
 mod cdp;
+mod enable;
 mod events;
 mod reads;
 
@@ -84,8 +88,58 @@ pub(super) fn open(
             closed: AtomicBool::new(false),
             expires_at_ms: config.expires_at_ms,
             sink,
+            handshake: std::sync::Mutex::default(),
         }),
     };
+    let generation = handle.begin_handshake(false);
+    if start_deadline_poll(app, &handle).is_err() {
+        handle.fail_handshake(generation, "browser_research_deadline_unavailable");
+        return Err("browser_research_deadline_unavailable".into());
+    }
+    let app = app.clone();
+    let dispatcher = app.clone();
+    let install_handle = handle.clone();
+    let (attached_tx, attached_rx) = std::sync::mpsc::sync_channel(1);
+    // Creating a window off-thread only queues Tauri's native creation. Keep build
+    // and installation in this one UI task so WithWebview cannot overtake it.
+    dispatcher
+        .run_on_main_thread(move || {
+            if !install_handle.handshake_stage(generation, Stage::NativeCreate) {
+                let _ = attached_tx.try_send(Err("host_attach_cancelled"));
+                return;
+            }
+            let result = open_on_main(&app, config, &install_handle, generation);
+            if let Err(code) = result {
+                install_handle.fail_handshake(generation, code);
+            }
+            let _ = attached_tx.try_send(result);
+        })
+        .map_err(|_| {
+            handle.fail_handshake(generation, "browser_research_host_dispatch_failed");
+            "browser_research_host_dispatch_failed".to_string()
+        })?;
+    // Do not publish a handle before the manager/native view exists: a subsequent
+    // status call would legitimately prune it as closed. This wait never runs CDP.
+    match attached_rx.recv_timeout(std::time::Duration::from_secs(16)) {
+        Ok(Ok(())) if handle.active() => Ok(handle),
+        Ok(Ok(())) => Err("host_attach_cancelled".into()),
+        Ok(Err(code)) => Err(code.into()),
+        Err(_) => {
+            handle.fail_handshake(generation, "host_attach_timed_out");
+            Err("host_attach_timed_out".into())
+        }
+    }
+}
+
+fn open_on_main(
+    app: &tauri::AppHandle,
+    config: HostConfig,
+    handle: &HostHandle,
+    generation: u64,
+) -> Result<(), &'static str> {
+    if app.get_webview(&config.label).is_some() {
+        return Err("browser_research_window_exists");
+    }
     let navigation_config = config.clone();
     let navigation_handle = handle.clone();
     let window = WebviewWindowBuilder::new(
@@ -126,6 +180,7 @@ pub(super) fn open(
                 event.error_code = Some("identity_navigation_not_captured".into());
             }
             (navigation_handle.control.sink)(event);
+            navigation_handle.navigation_during_handshake();
         }
         allowed
     })
@@ -133,6 +188,9 @@ pub(super) fn open(
     .on_new_window(|_, _| tauri::webview::NewWindowResponse::Deny)
     .build()
     .map_err(|_| "browser_research_window_unavailable")?;
+    if !handle.handshake_current(generation) {
+        return Ok(());
+    }
     let closed_handle = handle.clone();
     window.on_window_event(move |event| {
         if matches!(event, tauri::WindowEvent::Destroyed) {
@@ -150,11 +208,17 @@ pub(super) fn open(
         }
     });
     let install_handle = handle.clone();
+    let installed = Arc::new(AtomicBool::new(false));
+    let entered = installed.clone();
     window
         .with_webview(move |platform| {
+            entered.store(true, Ordering::SeqCst);
+            if !install_handle.handshake_stage(generation, Stage::NativeAttached) {
+                return;
+            }
             let core = unsafe { platform.controller().CoreWebView2() };
             let Ok(core) = core else {
-                gap(&install_handle, "host_core_unavailable");
+                install_handle.fail_handshake(generation, "host_core_unavailable");
                 return;
             };
             let context = Rc::new(RefCell::new(Capture {
@@ -180,17 +244,18 @@ pub(super) fn open(
                     .insert(install_handle.label.clone(), context.clone());
             });
             if cdp::subscribe(&context).is_err() {
-                gap(&install_handle, "host_subscription_unavailable");
+                install_handle.fail_handshake(generation, "host_subscription_unavailable");
                 return;
             }
-            cdp::enable(&context, true);
+            enable::run(&context, generation, true);
         })
         .map_err(|_| "browser_research_host_dispatch_failed")?;
-    if start_deadline_poll(app, &handle).is_err() {
-        handle.pause();
-        gap(&handle, "browser_research_deadline_unavailable");
+    // On the main thread Tauri dispatches synchronously; a missing native ID
+    // silently skips the closure, so an explicit receipt is essential.
+    if !installed.load(Ordering::SeqCst) {
+        return Err("host_native_not_attached");
     }
-    Ok(handle)
+    Ok(())
 }
 
 fn start_deadline_poll(app: &tauri::AppHandle, handle: &HostHandle) -> Result<(), String> {
@@ -208,6 +273,11 @@ fn start_deadline_poll(app: &tauri::AppHandle, handle: &HostHandle) -> Result<()
             if control.closed.load(Ordering::SeqCst) {
                 break;
             }
+            HostHandle {
+                label: label.clone(),
+                control: control.clone(),
+            }
+            .poll_handshake();
             let expired = now_ms() >= control.expires_at_ms;
             let target = label.clone();
             if app
@@ -235,25 +305,30 @@ pub(super) fn resume(app: &tauri::AppHandle, handle: &HostHandle) -> Result<(), 
     if handle.control.closed.load(Ordering::SeqCst) || now_ms() >= handle.control.expires_at_ms {
         return Err("browser_research_session_inactive".into());
     }
-    let window = app
-        .get_webview(&handle.label)
-        .ok_or("browser_research_window_unavailable")?;
+    if app.get_webview(&handle.label).is_none() {
+        return Err("browser_research_window_unavailable".into());
+    }
+    let generation = handle.begin_handshake(true);
     let handle = handle.clone();
-    window
-        .with_webview(move |_| {
-            CAPTURES.with(|states| {
-                let context = states.borrow().get(&handle.label).cloned();
-                if let Some(context) = context {
-                    handle.control.generation.fetch_add(1, Ordering::SeqCst);
-                    handle.control.active.store(true, Ordering::SeqCst);
-                    context.borrow_mut().synchronize();
-                    cdp::enable(&context, false);
-                } else {
-                    gap(&handle, "host_session_unavailable");
-                }
-            });
-        })
-        .map_err(|_| "browser_research_host_dispatch_failed".to_string())
+    let failure_handle = handle.clone();
+    app.run_on_main_thread(move || {
+        if !handle.handshake_stage(generation, Stage::NativeAttached) {
+            return;
+        }
+        CAPTURES.with(|states| {
+            let context = states.borrow().get(&handle.label).cloned();
+            if let Some(context) = context {
+                context.borrow_mut().synchronize();
+                enable::run(&context, generation, false);
+            } else {
+                handle.fail_handshake(generation, "host_session_unavailable");
+            }
+        });
+    })
+    .map_err(|_| {
+        failure_handle.fail_handshake(generation, "browser_research_host_dispatch_failed");
+        "browser_research_host_dispatch_failed".to_string()
+    })
 }
 
 fn gap(handle: &HostHandle, code: &str) {
