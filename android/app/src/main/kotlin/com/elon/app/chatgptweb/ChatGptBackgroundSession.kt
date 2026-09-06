@@ -57,25 +57,11 @@ internal class ChatGptBackgroundSession(
     private val sendHandler = Handler(Looper.getMainLooper())
     private val conversationRefreshHandler = Handler(Looper.getMainLooper())
     private val composerOptionHandler = Handler(Looper.getMainLooper())
-    private val imageAssetHandler = Handler(Looper.getMainLooper())
-    private val imageAssetStore = ChatGptWebImageAssetStore(activity.applicationContext)
-    private val imageAssets = ChatGptWebImageAssetCoordinator(
-        store = imageAssetStore,
-        request = { handle ->
-            pageAdapter?.let { adapter ->
-                adapter.requestImageAsset(handle)
-                true
-            } ?: false
-        },
-        schedule = { task, delayMs -> imageAssetHandler.postDelayed(task, delayMs) },
-        cancel = imageAssetHandler::removeCallbacks,
-        dispatch = { task -> imageAssetHandler.post(task) },
+    private val imageSession = ChatGptWebImageSession(
+        activity, host, { pageAdapter },
         onChanged = { latestSnapshot?.let(onSnapshot) },
     )
-    private val imageGalleryDelegate = lazy(LazyThreadSafetyMode.NONE) {
-        ChatGptWebImageGalleryController(activity, host, imageAssetStore)
-    }
-    private val imageGallery by imageGalleryDelegate
+    private val imageAssets get() = imageSession.assets
     private val surfaceMode: ChatGptWebSurfaceModeController by lazy(LazyThreadSafetyMode.NONE) {
         ChatGptWebSurfaceModeController(
             { webView }, { pageAdapter }, { webExecution.interactionRequested() }, ::ensureInitialized,
@@ -290,7 +276,7 @@ internal class ChatGptBackgroundSession(
     fun imagePreviewState(): ChatGptWebImagePreviewState = imageAssets.state()
     fun retryImagePreview(handle: String) = imageAssets.retry(handle)
     fun retryMissingImagePreviews() = imageAssets.retryMissing(latestSnapshot)
-    fun showImageGallery(onCreateImage: () -> Unit): Boolean = imageGallery.show(onCreateImage)
+    fun showImageGallery(onCreateImage: () -> Unit): Boolean = imageSession.show(onCreateImage)
     fun warmSessionAvailable(): Boolean = warmSessionAvailable
     fun conversationNavigationActive(): Boolean = conversationNavigation.isNavigating()
     fun conversationIndex(): ChatGptWebConversationIndexState = conversationDirectory.index()
@@ -418,7 +404,7 @@ internal class ChatGptBackgroundSession(
     }
 
     fun destroy() {
-        if (imageGalleryDelegate.isInitialized()) imageGallery.destroy()
+        imageSession.dismissGallery()
         realtimeVoiceBacking.release()
         composerOptionInteraction.release()
         recovery.dispose()
@@ -436,8 +422,7 @@ internal class ChatGptBackgroundSession(
         conversationRefreshHandler.removeCallbacksAndMessages(null)
         composerOptionHandler.removeCallbacksAndMessages(null)
         sessionContinuityHandler.removeCallbacksAndMessages(null)
-        imageAssets.reset()
-        imageAssetHandler.removeCallbacksAndMessages(null)
+        imageSession.resetAssets()
         pageAdapter = null
         touchDispatcher = null
         webView?.apply {
