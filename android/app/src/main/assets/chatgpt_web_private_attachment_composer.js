@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 4, create: factory });
+  const exported = Object.freeze({ version: 5, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateAttachmentComposer = exported;
 })(typeof window === 'object' ? window : null, function (root, options) {
@@ -8,6 +8,8 @@
   options = options || {};
   let owned = null;
   const confirmed = new WeakSet();
+  const projects = new WeakMap();
+  const project = root.__elonChatGptPrivateAttachmentProject?.create(root);
 
   function storeFromInput() {
     const input = root.document.querySelector('#upload-files');
@@ -47,13 +49,15 @@
 
   function route() {
     const url = new URL(root.location.href);
-    const supported = url.pathname === '/' || /^\/c\/[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(url.pathname);
+    const projectId = project?.projectId(url.pathname) || null;
+    const supported = projectId || url.pathname === '/' || /^\/c\/[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(url.pathname);
     const query = Array.from(url.searchParams.entries());
     // This is the official temporary-chat signal's source, not a cached UI label.
     const isTemporaryChat = query.length === 1 && query[0][0] === 'temporary-chat' && query[0][1] === 'true';
     if (url.origin !== 'https://chatgpt.com' || url.username || url.password || !supported ||
-        url.hash || query.length && !isTemporaryChat) throw new Error('composer_context_unavailable');
-    return { path: url.pathname, conversationId: url.pathname === '/' ? null : url.pathname.slice(3), isTemporaryChat };
+        url.hash || query.length && (!isTemporaryChat || projectId)) throw new Error('composer_context_unavailable');
+    return { path: url.pathname, conversationId: projectId || url.pathname === '/' ? null : url.pathname.slice(3),
+      isTemporaryChat, projectId };
   }
 
   function available() {
@@ -73,14 +77,15 @@
     if (!/^doc_[a-z0-9_]{3,80}$/.test(token || '') || !account) throw new Error('composer_context_unavailable');
     const binding = Object.freeze({ store: resolveStore(), href: root.location.href, token, account,
       model: model(), ...route() });
-    if (binding.conversationId === null) confirmed.add(binding);
+    if (binding.conversationId === null && !binding.projectId) confirmed.add(binding);
     return binding;
   }
 
-  async function prepare(binding, signal) {
+  async function prepare(binding, signal, descriptor) {
     if (!current(binding) || signal?.aborted) throw new Error('composer_changed');
     if (confirmed.has(binding)) return true;
-    const read = root.__elonChatGptPrivateTransport?.readAttachmentContext;
+    const read = binding.projectId ? () => project.read(binding, signal)
+      : root.__elonChatGptPrivateTransport?.readAttachmentContext;
     if (typeof read !== 'function') return null;
     let timer, abort;
     try {
@@ -93,6 +98,12 @@
         }),
       ]);
       if (!current(binding) || signal?.aborted || !available()) throw new Error('composer_changed');
+      if (binding.projectId) {
+        if (!context || !project.supports(context, descriptor)) return context === false ? false : null;
+        projects.set(binding, context);
+        confirmed.add(binding);
+        return true;
+      }
       const supported = binding.isTemporaryChat ? context?.temporary : context?.ordinary;
       if (context?.conversationId !== binding.conversationId || typeof supported !== 'boolean') {
         throw new Error('composer_context_unavailable');
@@ -119,9 +130,18 @@
     } catch (_) { return false; }
   }
 
+  function uploadContext(binding, file, imageDimensions) {
+    if (!current(binding) || !confirmed.has(binding)) throw new Error('composer_changed');
+    if (binding.projectId) return project.uploadContext(projects.get(binding), file, imageDimensions);
+    return { useCase: imageDimensions ? 'multimodal' : 'ace_upload', storeInLibrary: false,
+      libraryPersistenceMode: binding.isTemporaryChat ? undefined : 'required',
+      isTemporaryChat: binding.isTemporaryChat, indexForRetrieval: false, imageDimensions };
+  }
+
   function associate(binding, file, result, leaseId) {
     if (!current(binding) || !confirmed.has(binding) || result?.ok !== true || result.associated !== false ||
         result.binding !== binding || result.stage !== 'processed' || result.isTemporaryChat !== binding.isTemporaryChat ||
+        (result.projectId || null) !== binding.projectId ||
         !/^[A-Za-z0-9_-]{1,160}$/.test(result.fileId || '') || result.fileSize !== file.size ||
         result.fileName !== file.name || result.mimeType !== file.type) throw new Error('association_invalid');
     const store = binding.store;
@@ -133,12 +153,18 @@
       Object.assign(spec, root.__elonChatGptPrivateAttachmentProtocol.imageDimensions(result.imageDimensions));
     }
     if (Number.isSafeInteger(metadata.fileTokenSize)) spec.fileTokenSize = metadata.fileTokenSize;
-    if (metadata.libraryPersistenceResult === 'temporary') spec.libraryPersistenceResult = 'temporary';
+    if (['temporary', 'library'].includes(metadata.libraryPersistenceResult)) {
+      spec.libraryPersistenceResult = metadata.libraryPersistenceResult;
+    }
+    if (metadata.libraryPersistenceResult !== 'temporary' && metadata.libraryFileId) spec.libraryFileId = metadata.libraryFileId;
     const attached = {
       tempId, file, fileSignature: JSON.stringify({ name: file.name, size: file.size,
         lastModified: file.lastModified, type: file.type }),
       status: 'ready', progress: 100, fileId: result.fileId, cdnUrl: null, fileSpec: spec,
-      source: 'local', storeInLibrary: false, isTemporaryChat: binding.isTemporaryChat, isProjectThread: false,
+      source: 'local', storeInLibrary: false, isTemporaryChat: binding.isTemporaryChat, isProjectThread: !!binding.projectId,
+      ...(binding.projectId ? { projectGizmoId: binding.projectId,
+        libraryFileInfo: project.uploadContext(projects.get(binding), file, result.imageDimensions).libraryFileInfo } : {}),
+      ...(spec.libraryFileId ? { libraryFileId: spec.libraryFileId } : {}),
     };
     store.files$.set([attached]);
     const ready = store.readyFiles$();
@@ -183,5 +209,5 @@
     return true;
   }
 
-  return Object.freeze({ version: 4, available, capture, prepare, current, associate, merge, remove });
+  return Object.freeze({ version: 5, available, capture, prepare, current, uploadContext, associate, merge, remove });
 });

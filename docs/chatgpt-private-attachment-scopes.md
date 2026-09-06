@@ -5,7 +5,8 @@ Capability: `android_chatgpt_private_temporary_attachment_upload_v1`.
 Status: **implemented, offline verified, grouped Android and device acceptance
 pending**. Adapter 271 extends the existing private text/static-image upload into
 temporary chats. It is not a released APK, a real temporary-file transaction, or
-proof of backend retention behavior. Project uploads remain a separate code gap.
+proof of backend retention behavior. Adapter 272 adds the separately scoped
+new-project candidate below; existing project conversations remain a code gap.
 
 ## Current official contract
 
@@ -63,6 +64,10 @@ the result to the new context. The existing draft and text sender are not replac
 
 ## Project checkpoint
 
+Capability: `android_chatgpt_private_new_project_attachment_upload_v1`.
+Status: **implemented, offline verified, grouped Android/device acceptance pending**.
+It is deliberately not a completed capability or a claim about every project scope.
+
 Project attachments cannot safely be enabled by changing `isProjectThread` alone:
 
 - `BQr`/`HQr` in the conversation asset checks
@@ -74,10 +79,45 @@ Project attachments cannot safely be enabled by changing `isProjectThread` alone
   ID, but keeps a project image as `multimodal`. `wGt` in the upload asset also
   derives retrieval indexing from `projectUsesInjestPath` and file type.
 
-Next connect current permission/identity and originating leaf evidence to these
-options, then the create/process bodies and ready-store association. Do not
-infer write access from a sidebar project title, use a stale directory cache,
-or claim project completion from temporary/ordinary tests.
+The same shared asset's `xR.getGizmo` reads `/gizmos/{gizmo_id_or_short_url}`
+through the authenticated backend client (`https://chatgpt.com/backend-api`).
+The project's `mZ`/`qDt` store exposes that response as `gizmo$()`; permission is
+`gizmo.current_user_permission.can_write`, not a conversation-directory title.
+The upload asset imports shared `EEt` as `Cie` and `TEt` as `gg`: the former tests
+`xls/xlsx/csv` suffixes; the latter tests image suffixes. With `use_injest_path`,
+spreadsheet suffixes select retrieval, images depend on flag `2031707412`, and
+other files do not select retrieval. This corrects any assumption that all
+project text uploads require retrieval indexing.
+
+The candidate connects `chatgpt_web_private_attachment_project.js` to the existing
+composer, native byte lease, upload transport and ready-file association. It accepts
+only an empty new-project composer at `/g/g-p-<32 hex>[-slug]/project`, without query
+parameters. An explicit user upload reads fresh project permission with `no-store`,
+a 7-second deadline, a 1 MiB body limit and cancellation. Project ID and boolean
+permission must match. Unknown/read-only permission retains the previous compatible
+route before bytes or writes; account, document and URL changes fail without replay.
+No permission polling or cached sidebar authorization is introduced.
+
+Plain text uses `use_case=gizmo` with that project ID. Non-ingest static images
+keep `multimodal` and dimensions without putting a gizmo ID in the top-level
+create/process fields. Both put the exact confirmed project into
+`metadata.library_file_info` with `is_project=true` and
+`should_upload_to_project=true`. They do not invent an originating thread or leaf
+for a new conversation. Personal-library preference stays explicitly false.
+The existing proven legacy `required` persistence policy is retained as a candidate
+combination, not claimed to have passed a real project upload.
+
+The transport snapshots nested project metadata before authentication; processing
+and ready-store receipts must retain the same project. Official `RGt` maps
+`extra.metadata_object_id` to `libraryFileId`; `uploadCompleted` retains it on the
+ready file and file specification unless persistence is temporary. The candidate
+now preserves this mapping rather than losing it at native association.
+
+Still unimplemented: existing project conversation branch/leaf ownership, read-only
+project-specific upload dispatch, and image retrieval-flag resolution for ingest
+projects. These cases keep the existing path before private writes. Do not infer
+the current leaf from the most recent server branch, request project writes from
+a cached directory, or mark all project attachments complete from these tests.
 
 ## Verification
 
@@ -93,3 +133,12 @@ must use a synthetic file/image in new and existing temporary conversations,
 confirm one upload and one requested reply, verify no new personal-library entry,
 then check cancellation and switching back to ordinary chat. This does not
 require repeating completed audio, subtitles, dictation or read-aloud research.
+
+Adapter 272 passes 75 focused Node runner cases, including the actual bounded
+JSON reader with synthetic responses, new-project create/PUT/process/association,
+permission revocation between uploads, non-ingest image handling, scope changes,
+nested metadata snapshots and exact library-file metadata. The production asset
+dependency chain parses as one bundle. No Android source compilation or device
+upload is implied. Grouped acceptance must additionally verify one synthetic
+project file is usable in its intended conversation and appears in the correct
+project, with no unintended personal-library entry or duplicate message.

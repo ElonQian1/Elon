@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 4, create: factory });
+  const exported = Object.freeze({ version: 5, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       !(Number(root.__elonChatGptPrivateAttachmentSend?.version) >= exported.version)) {
@@ -56,7 +56,7 @@
       timer = root.setInterval(() => { if (!composer.current(binding)) cancel(); }, 500);
       // Compatibility selection for unknown/unsupported scope precedes byte reads
       // and private writes. Cancelled or stale bindings throw instead of replaying.
-      if (!await composer.prepare(binding, job.controller.signal)) return fallback();
+      if (!await composer.prepare(binding, job.controller.signal, descriptor)) return fallback();
       let file = await source.read(descriptor, job.controller.signal);
       let imageDimensions;
       if (/^image\//.test(file.type)) {
@@ -68,11 +68,7 @@
       job.transport = createTransport({ isCurrent: candidate => candidate === binding &&
         !job.controller.signal.aborted && composer.current(binding) });
       job.attempted = true;
-      const result = await job.transport.upload(file, {
-        useCase: imageDimensions ? 'multimodal' : 'ace_upload', storeInLibrary: false,
-        libraryPersistenceMode: binding.isTemporaryChat ? undefined : 'required',
-        isTemporaryChat: binding.isTemporaryChat, indexForRetrieval: false, imageDimensions,
-      }, binding);
+      const result = await job.transport.upload(file, composer.uploadContext(binding, file, imageDimensions), binding);
       if (!result.ok) throw new Error(result.code);
       if (job.controller.signal.aborted) throw new Error('cancelled');
       composer.associate(binding, file, result, descriptor.leaseId);
@@ -99,6 +95,6 @@
     return true;
   }
 
-  return Object.freeze({ version: 4, start, cancel, remove,
+  return Object.freeze({ version: 5, start, cancel, remove,
     merge: dom => composer?.merge(dom) || dom });
 });

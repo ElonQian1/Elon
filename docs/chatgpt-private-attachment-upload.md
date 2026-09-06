@@ -106,11 +106,11 @@ This path is documented but intentionally not implemented by the candidate.
 - Result says `associated=false`. A processed file is not a sent message.
   Signed URLs and identity headers are not included in completion/diagnostic
   receipts. Unknown server error details are reduced to a stable error code.
-- Project contexts, custom upload headers, multipart, Estuary and
+- Existing-project and unsupported new-project contexts, custom upload headers, multipart, Estuary and
   unknown storage hosts are rejected explicitly. Static image integration is
   now a separate [adapter 270 source candidate](chatgpt-private-image-upload.md),
-  and temporary uploads are an [adapter 271 source candidate](chatgpt-private-attachment-scopes.md),
-  neither device-accepted by inference from the successful small-text trial.
+  and temporary/new-project uploads are [adapter 271/272 source candidates](chatgpt-private-attachment-scopes.md),
+  none device-accepted by inference from the successful small-text trial.
 
 ## Next integration
 

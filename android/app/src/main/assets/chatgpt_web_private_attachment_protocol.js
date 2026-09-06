@@ -9,7 +9,7 @@
   'use strict';
   const MAX_BYTES = 8 * 1024 * 1024;
   const FILE_ID = /^[A-Za-z0-9_-]{1,160}$/;
-  const USE_CASES = new Set(['ace_upload', 'my_files', 'multimodal']);
+  const USE_CASES = new Set(['ace_upload', 'my_files', 'multimodal', 'gizmo']);
   const IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
   function imageDimensions(value) {
@@ -18,6 +18,20 @@
       throw new Error('unsupported_upload_context');
     }
     return Object.freeze({ width: value.width, height: value.height });
+  }
+
+  function projectInfo(context) {
+    const value = context?.libraryFileInfo;
+    if (!context?.isProjectThread) {
+      if (context?.gizmoId || value || context?.useCase === 'gizmo') throw new Error('unsupported_upload_context');
+      return null;
+    }
+    if (context.isProjectThread !== true || context.isTemporaryChat ||
+        !/^g-p-[a-f0-9]{32}$/i.test(value?.gizmo_id || '') || value.is_project !== true ||
+        value.should_upload_to_project !== true || Object.keys(value).length !== 3 ||
+        (context.useCase === 'gizmo' ? context.gizmoId !== value.gizmo_id :
+          context.useCase !== 'multimodal' || context.gizmoId != null)) throw new Error('unsupported_upload_context');
+    return Object.freeze({ gizmo_id: value.gizmo_id, is_project: true, should_upload_to_project: true });
   }
 
   function prepare(file, context) {
@@ -33,9 +47,10 @@
         temporary && (context.storeInLibrary || context.indexForRetrieval)) {
       throw new Error('unsupported_upload_context');
     }
-    if (context.isProjectThread || context.gizmoId || context.directoryId) {
+    if (context.directoryId) {
       throw new Error('unsupported_upload_context');
     }
+    const project = projectInfo(context);
     if (/^image\//i.test(file.type)) {
       if (!IMAGE_TYPES.has(file.type) || context.useCase !== 'multimodal' || context.indexForRetrieval) {
         throw new Error('unsupported_upload_context');
@@ -52,6 +67,7 @@
       timezone_offset_min: new Date().getTimezoneOffset(), reset_rate_limits: false,
       supports_direct_azure_multipart: false, mime_type: file.type, entry_surface: 'chat_composer',
       store_in_library: context.storeInLibrary,
+      ...(project && context.useCase === 'gizmo' ? { gizmo_id: project.gizmo_id } : {}),
       ...(context.libraryPersistenceMode == null ? {} : { library_persistence_mode: context.libraryPersistenceMode }),
     };
   }
@@ -80,12 +96,15 @@
 
   function processBody(fileId, file, context) {
     if (!FILE_ID.test(fileId)) throw new Error('invalid_file_id');
+    const project = projectInfo(context);
     return {
       file_id: fileId, file_name: file.name, use_case: context.useCase,
       index_for_retrieval: context.indexForRetrieval, entry_surface: 'chat_composer',
+      ...(project && context.useCase === 'gizmo' ? { gizmo_id: project.gizmo_id } : {}),
       ...(context.libraryPersistenceMode == null ? {} : { library_persistence_mode: context.libraryPersistenceMode }),
       metadata: { store_in_library: context.storeInLibrary,
-        is_temporary_chat: context.isTemporaryChat === true, is_project_thread: false },
+        is_temporary_chat: context.isTemporaryChat === true, is_project_thread: !!project,
+        ...(project ? { library_file_info: project } : {}) },
     };
   }
 
@@ -126,5 +145,5 @@
     return { metadata, eventCount: count, events };
   }
 
-  return { version: 3, maxFileBytes: MAX_BYTES, prepare, destination, processBody, processed, imageDimensions };
+  return { version: 4, maxFileBytes: MAX_BYTES, prepare, destination, processBody, processed, imageDimensions, projectInfo };
 });

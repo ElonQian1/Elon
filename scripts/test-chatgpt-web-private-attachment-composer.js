@@ -13,7 +13,7 @@ test('production asset loader includes the dependency chain and the complete bun
   const declaration = adapter.slice(adapter.indexOf('private val ADAPTER_ASSETS = listOf('));
   const assets = [...declaration.slice(0, declaration.indexOf('\n        )')).matchAll(/"([^"\n]+\.js)"/g)].map(match => match[1]);
   const required = ['chatgpt_web_private_transport.js', 'chatgpt_web_private_attachment_protocol.js',
-    'chatgpt_web_private_attachment_transport.js', 'chatgpt_web_native_attachment_source.js',
+    'chatgpt_web_private_attachment_transport.js', 'chatgpt_web_native_attachment_source.js', 'chatgpt_web_private_attachment_project.js',
     'chatgpt_web_private_attachment_composer.js', 'chatgpt_web_private_attachment_image.js',
     'chatgpt_web_private_attachment_send.js', 'chatgpt_web_adapter.js'];
   for (let index = 0; index < required.length; index++) {
@@ -149,7 +149,7 @@ test('versioned reinjection cancels only the older owner and retains the current
     __elonChatGptPrivateAttachmentSend: { version: 1, cancel: () => { cancelled++; } } };
   vm.runInNewContext(source, { window: root });
   const current = root.__elonChatGptPrivateAttachmentSend;
-  assert.equal(current.version, 4);
+  assert.equal(current.version, 5);
   assert.equal(cancelled, 1);
   vm.runInNewContext(source, { window: root });
   assert.equal(root.__elonChatGptPrivateAttachmentSend, current);

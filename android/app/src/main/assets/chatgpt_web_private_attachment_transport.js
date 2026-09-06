@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 3, create: factory });
+  const exported = Object.freeze({ version: 4, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root && root.location?.origin === 'https://chatgpt.com') {
     root.__elonChatGptPrivateAttachmentTransport = exported;
@@ -68,6 +68,7 @@
       assertCurrent(job);
       // Snapshot caller-owned options before any await; model/project changes cannot rewrite a pending upload.
       const selected = Object.freeze({ ...context,
+        ...(context.libraryFileInfo == null ? {} : { libraryFileInfo: protocol.projectInfo(context) }),
         ...(context.imageDimensions == null ? {} : { imageDimensions: protocol.imageDimensions(context.imageDimensions) }) });
       const body = protocol.prepare(file, selected);
       const abort = new Promise((_, reject) => {
@@ -106,6 +107,7 @@
         ok: true, stage: 'processed', binding, fileId: destination.fileId,
         fileName: file.name, fileSize: file.size, mimeType: file.type,
         isTemporaryChat: selected.isTemporaryChat === true,
+        projectId: selected.libraryFileInfo?.gizmo_id || null,
         metadata: result.metadata, eventCount: result.eventCount, events: result.events,
         ...(selected.imageDimensions ? { imageDimensions: selected.imageDimensions } : {}),
         // Upload completion is not composer association or message-send acknowledgement.
@@ -126,6 +128,6 @@
   }
 
   function cancel() { if (active) active.controller.abort(); }
-  function snapshot() { return { version: 3, stage: active?.stage || 'idle', cooldown: cooldownUntil > Date.now() }; }
-  return Object.freeze({ version: 3, upload, cancel, dispose: cancel, snapshot });
+  function snapshot() { return { version: 4, stage: active?.stage || 'idle', cooldown: cooldownUntil > Date.now() }; }
+  return Object.freeze({ version: 4, upload, cancel, dispose: cancel, snapshot });
 });
