@@ -17,7 +17,7 @@ $observerChanges = @(git -C $observerRepo status --porcelain -- tools/binance-gr
 if ($LASTEXITCODE -ne 0 -or $observerChanges.Count -gt 0) { throw 'Commit extension and packaging sources before creating an identified artifact.' }
 $observerCommit = (git -C $observerRepo rev-parse HEAD).Trim()
 if ($LASTEXITCODE -ne 0 -or $observerCommit -notmatch '^[0-9a-f]{40}$') { throw 'Source commit unavailable.' }
-$observerManifest = Get-Content -LiteralPath (Join-Path $observerSource 'manifest.json') -Raw | ConvertFrom-Json
+$observerManifest = Get-Content -LiteralPath (Join-Path $observerSource 'manifest.json') -Raw -Encoding UTF8 | ConvertFrom-Json
 New-Item -ItemType Directory -Path $observerOutput | Out-Null
 $observerExtension = Join-Path $observerOutput 'extension'
 New-Item -ItemType Directory -Path $observerExtension | Out-Null

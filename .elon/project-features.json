@@ -1548,15 +1548,15 @@
         },
         {
           "path": "scripts/package-binance-grid-observer.ps1",
-          "content_hash": "2198e859e2db1db364abff85b7bdf8d1909d501060ac14a7d413dd40328f26bd",
+          "content_hash": "30c0bf1fda5490283f8a3a5b88105eb2ea77494dae949a0d033b5fe52be65e07",
           "locator": "",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "2fecf4012cfeb38517c2c3b7a1480b9d73b7e259",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "46ec95b7a406f01e7c6c901be491471a9e070cea",
-            "state": "untracked"
+            "head_commit": "e4735d306fda17b10e44ed8083eaebcdad7f838e",
+            "head_blob_oid": "46ec95b7a406f01e7c6c901be491471a9e070cea",
+            "worktree_blob_oid": "7a4d76e0c36689076692bf642b87ad7b41b22845",
+            "state": "tracked_modified"
           }
         },
         {
@@ -1730,7 +1730,7 @@
         }
       ],
       "created_at_ms": 1788724675619,
-      "updated_at_ms": 1788725904609
+      "updated_at_ms": 1788726050592
     },
     {
       "id": "compute-attempt-final-usage-fence-verification-v1",
@@ -22534,16 +22534,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_9acf8a102a114d7eae5e46e837879ec3",
-      "feature_id": "esk-sui-address-control-proof-v1",
-      "action": "transitioned",
-      "actor": "codex:/root",
-      "reason": "严格挑战、三签名离线验证、无歧义 JSON、受限本地文件读取、内部 schema 与使用文档均已实现并绑定当前证据。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1788567963769
-    },
-    {
       "id": "feature_event_aa5609dfc5974a2aa11ac25430a6ed88",
       "feature_id": "esk-sui-address-control-proof-v1",
       "action": "transitioned",
@@ -24532,6 +24522,16 @@
       "from_status": "implemented",
       "to_status": "implemented",
       "at_ms": 1788725904609
+    },
+    {
+      "id": "feature_event_1cef472589a54612b8f34840070f7161",
+      "feature_id": "binance-grid-observer-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-grid-root",
+      "reason": "",
+      "from_status": "implemented",
+      "to_status": "implemented",
+      "at_ms": 1788726050592
     }
   ]
 }
