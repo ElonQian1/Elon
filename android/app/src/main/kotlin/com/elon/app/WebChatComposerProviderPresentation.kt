@@ -1,9 +1,31 @@
 package com.elon.app
 
 import android.widget.TextView
+import android.view.View
 import androidx.core.content.ContextCompat
 
 internal object WebChatComposerProviderPresentation {
+    fun restoreWorkControls(
+        views: MainInputComposerViews,
+        modelButton: TextView,
+        modelWidth: Int,
+        clearQuickAction: () -> Unit,
+        showWorkModelSelector: () -> Unit,
+    ) {
+        views.activeWebToolChip.render(null, clearQuickAction)
+        views.modelButtonShell.tag = null
+        views.modelButtonShell.layoutParams = views.modelButtonShell.layoutParams.apply {
+            width = modelWidth
+        }
+        views.planModeButton.visibility = View.VISIBLE
+        views.webToolsButton.visibility = View.GONE
+        views.webToolsButton.setOnClickListener(null)
+        views.attachmentButton.visibility = View.VISIBLE
+        views.attachmentButton.contentDescription = WebChatProductionSelectors.WORK_ATTACHMENT
+        views.modelButtonShell.setOnClickListener { showWorkModelSelector() }
+        modelButton.setOnClickListener { showWorkModelSelector() }
+    }
+
     fun apply(
         button: TextView,
         provider: WebChatProviderIdentity,

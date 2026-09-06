@@ -552,18 +552,10 @@ internal class MainSocialAiChatFeature(
         binding.inputEdit.contentDescription = null
         binding.inputEdit.hint = "输入内容"
         inputComposerViews()?.let { views ->
-            views.activeWebToolChip.render(null, ::clearQuickComposerAction)
-            views.modelButtonShell.tag = null
-            views.modelButtonShell.layoutParams = views.modelButtonShell.layoutParams.apply {
-                width = dp(MODEL_BUTTON_WORK_WIDTH_DP)
-            }
-            views.planModeButton.visibility = View.VISIBLE
-            views.webToolsButton.visibility = View.GONE
-            views.webToolsButton.setOnClickListener(null)
-            views.attachmentButton.visibility = View.VISIBLE
-            views.attachmentButton.contentDescription = WebChatProductionSelectors.WORK_ATTACHMENT
-            views.modelButtonShell.setOnClickListener { showWorkModelSelector() }
-            binding.modelButton.setOnClickListener { showWorkModelSelector() }
+            WebChatComposerProviderPresentation.restoreWorkControls(
+                views, binding.modelButton, dp(MODEL_BUTTON_WORK_WIDTH_DP),
+                ::clearQuickComposerAction, showWorkModelSelector,
+            )
         }
         updateWorkModel()
         refreshInputComposerVisual()
