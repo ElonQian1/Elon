@@ -2,6 +2,7 @@
 title: "ESK Sui 六桶分配与团队线性锁仓 V1"
 status: accepted
 decided_at: 2026-09-05
+reviewed_at: 2026-09-06
 owners:
   - project
   - platform-assets
@@ -124,17 +125,29 @@ published。若未来要求货币初始化器在类型层直接绑定分配包�
 
 2026-09-05 使用官方 `sui 1.79.0-46f18562f1f5` 和固定提交
 `46f18562f1f5af2438d35828e8b62d5e0b972db7` 的依赖源码，以
-`--warnings-are-errors` 构建并测试。参与包 13/13 通过，货币核心回归 3/3 通过；
-`esk.mv` 仍为原摘要，证明本轮仅规范化依赖 TOML 并加入锁文件，没有改变货币字节码。
+`--warnings-are-errors` 构建并测试。参与包 13/13 通过，货币核心回归 3/3 通过；但当时
+在 `move test` 之后取样构建目录，不能据此证明生产字节码没有变化。
 
 参与包 `move_build.evidence_digest` 使用 `production_bytecode_bundle_v1`：只包含
 `genesis_allocation.mv` 与 `team_vesting.mv`，按模块名排序，对每个写入
-`模块名 + NUL + 原始字节 + NUL` 后计算 SHA-256。`move_test.evidence_digest` 使用
-`raw_stdout_sha256_v1`，即最终测试标准输出日志原始字节的 SHA-256。工具链二进制、
-源码归档、包输入以及 187/187 Git blob 对照结果均写入 synthetic fixture。
+`模块名 + NUL + 原始字节 + NUL` 后计算 SHA-256。`move_test.evidence_kind` 为
+`canonical_test_receipt_sha256_v1`：CI 只从运行输出提取白名单测试行、规范化 ANSI 与
+CRLF，并精确忽略 Sui 1.79 对显式依赖的一条固定提示，再与受管 evidence 字节及摘要
+对比。任何其他输出都失败关闭。工具链合同与 synthetic fixture 共同绑定工具链二进制、
+官方源码归档、包输入、唯一归档根、187 个允许文件及其规范内容集合摘要；不使用 live
+`.git` 依赖缓存。
 
-验证使用不含密钥的隔离配置和不可达的本地 RPC，仅允许编译器确定协议版本回退；
-未读取真实钱包、未签名、未广播、未生成 package/object/transaction/checkpoint 证据。
+2026-09-06 的可复现 CI 复核发现，原 `dded0663...` 在 `move test` 覆盖构建目录后
+取样，虽只挑出两个生产模块名，模块本身仍是 test-mode 字节码，因此不能证明将要
+发布的生产包。CI 现于 `move build` 完成后、运行测试前冻结精确两个生产模块，纠正后
+`production_bytecode_bundle_v1` 为
+`fa691e2e7d7c1c347b8fd88a2dc9f3ca2590ee56813c0bb313ef2ea8d477d3ef`。这不改变源码、
+13 项测试或链状态；后续发布只能引用纠正后的摘要。
+
+验证使用空 keystore、`envs: []` 的显式 client 配置和独立 `MOVE_HOME`；固定
+`--build-env testnet` 只选择构建环境，不创建 Sui RPC client，也不向任何链端点发起
+请求。冷缓存只允许从 GitHub 获取上述固定源码归档。未读取真实钱包、未签名、未广播、未
+生成 package/object/transaction/checkpoint 证据。
 
 ## 正式参数门禁
 

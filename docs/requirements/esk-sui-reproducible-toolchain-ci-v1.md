@@ -30,40 +30,69 @@ Sui RPC，也不移动 SUI、ESK、USDT 或任何资金。
    `46f18562f1f5af2438d35828e8b62d5e0b972db7`。
 2. Windows x86_64 官方 release archive 固定为
    `sui-testnet-v1.79.0-windows-x86_64.tgz`；安装前校验 GitHub Release 公布的 archive
-   SHA-256，解包后再校验 fixture 已绑定的 `sui.exe` SHA-256。任一不符立即失败。
-3. 两个 `Move.toml` 和 `Move.lock` 必须继续固定同一 Framework 提交；禁止 CI 自动更新
-   lockfile、追踪浮动分支或把 testnet 证据复用于 mainnet。
-4. 创世 manifest 与六桶 allocation policy 是当前本地验证证据真源；synthetic 总量、
+   大小与 SHA-256；归档中作为安装候选的 `sui.exe` 必须恰好一个且位于根目录
+   `./sui.exe`，其他随官方归档发布的工具不解包、不安装；解包后再校验 fixture 已绑定的
+   `sui.exe` 大小与 SHA-256。任一不符立即失败。
+3. Framework/MoveStdlib 源码输入固定为官方 codeload 归档
+   `https://codeload.github.com/MystenLabs/sui/tar.gz/46f18562f1f5af2438d35828e8b62d5e0b972db7`：
+   大小必须为 `87498700` 字节，SHA-256 必须为
+   `9046fce263794cca6772c59aacd328706d42522dd7408c0dcb4a7f2613016afd`，唯一归档根必须为
+   `sui-46f18562f1f5af2438d35828e8b62d5e0b972db7`。只允许
+   `crates/sui-framework/packages/move-stdlib` 与
+   `crates/sui-framework/packages/sui-framework` 下精确 187 个文件；相对路径统一为 `/`
+   并按 Ordinal 排序，以 UTF-8 路径、NUL、原始文件字节、NUL 逐项绑定后的摘要必须为
+   `sha256:017e6a38b5d976c87b710e02b39d26988691d101bf914a42e6509c82d62e027b`。
+4. 仓库中的两个 `Move.toml`、`Move.lock` 和全部 Move 源码/测试仍是受管输入，不得被
+   验证器改写。CI 不缓存、不检出也不执行 live `.git` 依赖仓库，不追踪浮动分支；
+   testnet 工具链或证据不得复用于 mainnet。
+5. 创世 manifest 与六桶 allocation policy 是当前本地验证证据真源；synthetic 总量、
    比例、日期和 holder 仍不是正式发行参数。
 
 ## 安装与缓存合同
 
 1. `scripts/install-esk-sui-toolchain.ps1` 只安装到调用方传入的明确目录。命中缓存时仍
    重算 CLI 摘要并核对版本；缓存污染不得静默复用。
-2. 下载只允许固定的官方 HTTPS URL，不接受镜像、重定向后参数、环境变量覆盖 URL 或
-   “latest”标签。归档写入隔离临时目录，摘要通过后才解包并原子提升为可用工具链。
-3. CI 缓存键必须包含 release、平台和官方 archive SHA-256；不得缓存钱包、keystore、
-   client 配置、RPC 响应或仓库构建产物。
-4. 安装脚本的离线合同测试使用合成归档和合成可执行文件，不联网，也不冒充真实 Sui
+2. 下载只允许固定的官方 GitHub HTTPS URL，最多跟随 3 次官方 GitHub release asset
+   HTTPS 重定向，不接受镜像、环境变量覆盖 URL 或“latest”标签。重定向中的短期签名
+   参数不作为信任依据，最终归档必须通过固定 SHA-256 后才解包并原子提升为可用工具链。
+3. Framework 源码只允许上述精确 codeload URL，不能通过 Git remote、clone、fetch、
+   submodule、环境变量或调用方 URL 取得。归档在解包前校验大小和 SHA-256；解包后再次
+   校验唯一根、187 个允许文件及规范内容摘要。缓存对象只能是固定归档或由其验证得到的
+   只读源码，不得是含 `.git` 的活动仓库。
+4. 固定工具链缓存键必须同时包含 release、平台、CLI 归档 SHA-256 和 Framework 源码
+   归档 SHA-256，且不得使用部分 restore key。缓存目录只保存固定 CLI 与源码归档，
+   不得缓存钱包、keystore、client 配置、RPC 响应、临时 `Move.lock`、live `.git` 或仓库
+   构建产物；任何缓存命中仍须重新验证其绑定摘要。
+5. 安装脚本的离线合同测试使用合成归档和合成可执行文件，不联网，也不冒充真实 Sui
    工具链验证。
 
 ## Move 验证合同
 
 1. `scripts/validate-esk-sui-move.ps1` 只接受显式 CLI 路径，先核对版本和二进制摘要，
    再运行现有 Node 合同验证与两个 Move 包的 build/test。
-2. build/test 均启用 `--warnings-are-errors`。必须得到 `esk_currency` 3/3、
+2. 验证器把两个包复制到一次性工作目录，把副本的 Sui/MoveStdlib 依赖改为已验证源码
+   归档中的本地路径，并删除副本中临时生成或继承的 `Move.lock` 后再构建。验证结束删除
+   整个一次性工作目录；不得执行或向缓存写入 live `.git`，不得改写仓库内 lockfile。
+3. build/test 均启用 `--warnings-are-errors`，test 固定单线程。必须得到 `esk_currency` 3/3、
    `yilong_participation` 13/13，任何失败、警告、测试数变化或意外输出均失败关闭。
-3. 货币核心 `esk.mv` SHA-256 必须匹配 genesis manifest；参与包按既有
-   `production_bytecode_bundle_v1` 规则复算全部生产模块并匹配 allocation policy。
-4. 测试输出按规范 UTF-8/LF 重算并与受管 evidence 对比；验证完成后受管源码、lockfile、
-   fixture 和 evidence 不得被改写。
-5. 子进程使用隔离的空 Sui 配置目录。验证入口不得执行 `sui client`、生成 key、读取
-   用户配置、查询 RPC、构建发布交易、签名或广播。
+4. 货币核心 `esk.mv` SHA-256 必须匹配 genesis manifest；参与包按既有
+   `production_bytecode_bundle_v1` 规则复算全部生产模块并匹配 allocation policy。生产
+   模块必须在 build 后、test 前复制到隔离目录，防止 test-mode 字节码覆盖证据。
+5. 测试输出移除 ANSI、规范为 UTF-8/LF，只允许固定构建/测试行及 Sui 1.79 的一条精确
+   依赖提示；提示不进入回执，任何其他输出失败关闭。回执与受管 evidence 逐字节及摘要
+   对比；该摘要是 `canonical_test_receipt_sha256_v1`，不是原始 stdout 摘要。验证完成后
+   受管源码、lockfile、fixture 和 evidence 不得被改写。
+6. 子进程使用显式空 keystore、`envs: []` client 配置和独立 `MOVE_HOME`。每次命令都
+   显式传入 client 配置与 `--build-env testnet`；验证入口不得执行 `sui client`、生成
+   key、读取用户配置、配置或查询 Sui RPC、构建发布交易、签名或广播。冷缓存网络只
+   允许固定 GitHub release asset 及上述 codeload 源码归档，不得把这种源码下载写成
+   “全程无网络”，也不得把 `--build-env testnet` 冒充链查询或测试网发布。
 
 ## CI 门禁
 
-在 `.github/workflows/ci.yml` 增加独立 Windows `sui-move` job：检出源码、恢复固定工具链
-缓存、执行安装/完整验证，并在失败时上传不含秘密的诊断输出。CI 输出必须明确区分：
+在 `.github/workflows/ci.yml` 增加固定 `windows-2025` 的独立 `sui-move` job：检出项目
+源码、恢复固定 CLI/官方源码归档缓存、执行安装/完整验证，并在失败时上传不含秘密的诊断输出。不得
+缓存或执行 Sui 源码 live `.git`。CI 输出必须明确区分：
 
 - `toolchain_verified`：官方 archive、CLI 摘要和版本匹配；
 - `move_verified`：两个包 build/test 与字节码/测试证据匹配；
@@ -71,15 +100,17 @@ Sui RPC，也不移动 SUI、ESK、USDT 或任何资金。
 
 ## 验收标准
 
-1. 正确缓存和全新安装路径都通过双摘要与精确版本校验；损坏归档、损坏缓存、错误版本
-   和多个候选 `sui.exe` 均失败关闭。
-2. 两个 Move 包在固定工具链下以 warnings-as-errors 完成 build/test，测试数精确为
+1. 合成可执行文件的离线测试覆盖正确缓存和全新安装路径；损坏归档、损坏缓存、错误
+   版本、非根目录和多个候选 `sui.exe` 均失败关闭。官方归档另以固定双摘要实测安装。
+2. 官方源码归档的错误大小、摘要、根目录、越界条目、文件集合或内容摘要均失败关闭；
+   验证与 CI 不创建、缓存或执行 live `.git` 依赖仓库。
+3. 两个 Move 包在固定工具链及归档内本地依赖下以 warnings-as-errors 完成 build/test，测试数精确为
    3/3 与 13/13，生产字节码摘要匹配现有证据。
-3. 修改 Move 源码、依赖提交、fixture 摘要、受管测试 evidence 或 CLI 摘要都会让门禁
+4. 修改 Move 源码、依赖提交、fixture 摘要、受管测试 evidence 或 CLI 摘要都会让门禁
    失败，不会自动刷新“正确答案”。
-4. 合同测试证明安装器只接受官方固定 URL、所有写入留在明确根目录，且验证入口没有
+5. 合同测试证明安装器只接受官方固定 URL、所有写入留在明确根目录，且验证入口没有
    钱包、RPC、签名、广播和资金操作命令。
-5. CI 配置由守卫测试固定 job、缓存键、安装入口、完整验证入口与只读权限；现有 Rust、
+6. CI 配置由守卫测试固定 job、缓存键、安装入口、完整验证入口与只读权限；现有 Rust、
    PC 前端和 Android job 不受影响。
 
 ## 明确不在本功能内

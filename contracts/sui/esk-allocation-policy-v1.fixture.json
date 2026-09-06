@@ -94,11 +94,11 @@
     "move_build": {
       "status": "passed",
       "evidence_kind": "production_bytecode_bundle_v1",
-      "evidence_digest": "sha256:dded066357305b827bdc11cb6765c4def72f7ed21fa7a47ac4e493c79be1986f"
+      "evidence_digest": "sha256:fa691e2e7d7c1c347b8fd88a2dc9f3ca2590ee56813c0bb313ef2ea8d477d3ef"
     },
     "move_test": {
       "status": "passed",
-      "evidence_kind": "raw_stdout_sha256_v1",
+      "evidence_kind": "canonical_test_receipt_sha256_v1",
       "evidence_digest": "sha256:2a404f6feeda16125e79a35063285e268919c94b4dfbf0817ec230ac741f4d9e",
       "total": 13,
       "passed": 13,

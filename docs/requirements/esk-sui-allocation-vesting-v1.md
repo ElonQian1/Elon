@@ -4,7 +4,7 @@ status: accepted
 implementation_status: local_verified
 owner: platform-assets, protocol
 priority: p0
-reviewed_at: 2026-09-05
+reviewed_at: 2026-09-06
 decision_refs:
   - "docs/requirements/esk-sui-genesis-foundation-v1.md"
   - "docs/decisions/esk-sui-economic-foundation-v1.md"
@@ -129,12 +129,17 @@ decision_refs:
 2026-09-05 使用官方 `sui 1.79.0-46f18562f1f5`、固定提交
 `46f18562f1f5af2438d35828e8b62d5e0b972db7` 的 Sui Framework 源码执行构建与测试，
 并启用 `--warnings-are-errors`。参与包 13 项测试全部通过；货币核心 3 项回归测试全部
-通过，生成的 `esk.mv` 摘要与原验证记录一致。
+通过。2026-09-06 复核确认旧摘要是在测试覆盖构建目录后取样的 test-mode 字节码；
+生产摘要现由可复现 CI 在 build 后、test 前冻结并核对，不能再用测试模块或测试模式
+生产模块冒充发布字节码。
 
 参与包构建摘要按 `production_bytecode_bundle_v1` 计算：按模块名排序，把
-`模块名 + NUL + 原始 .mv 字节 + NUL` 依次输入 SHA-256；测试摘要是测试标准输出文件
-原始字节的 SHA-256。依赖缓存中的 187 个 Framework/MoveStdlib 文件逐一与固定提交的
-官方 Git blob SHA 对照，187/187 匹配，无额外文件。
+`模块名 + NUL + 原始 .mv 字节 + NUL` 依次输入 SHA-256。CI 把测试输出规范化为受限
+测试回执后与受管 evidence 逐字节及摘要对照；未知提示不会被静默忽略。Framework
+输入固定为官方 codeload 归档的大小与 SHA-256、唯一归档根、两个允许目录下精确
+187 个文件及规范内容集合摘要；验证和缓存中不存在、也不执行 live `.git` 依赖仓库。
 
-这些事实只证明源码本地可编译且合成场景通过。没有读取或创建真实钱包，没有签名、
-广播、资金移动或链上对象；所有发布证据继续为空。
+这些事实只证明源码可由固定工具链重复编译且合成场景通过。验证使用空 keystore、
+无链端点的显式配置和独立 `MOVE_HOME`，没有创建 Sui RPC client、读取或创建真实钱包，
+没有签名、广播、资金移动或链上对象；冷缓存仅允许从 GitHub 获取上述固定源码归档，所有
+发布证据继续为空。

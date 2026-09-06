@@ -2,6 +2,7 @@
 title: "ESK Sui 结算层与固定供应货币核心 V1"
 status: accepted
 decided_at: 2026-09-04
+reviewed_at: 2026-09-06
 owners:
   - project
   - platform-assets
@@ -179,9 +180,16 @@ chain identifier、`sui client verify-source` 结果和独立只读端点复核�
 2026-09-04 使用官方 `sui 1.79.0-46f18562f1f5` 和从相同提交提取的 Sui Framework
 执行 `sui move build` 与 `sui move test`。构建无编译警告，三个合同测试全部通过，其中
 初始化场景验证总供应 Coin 与 MetadataCap 的交付，并验证没有 TreasuryCap 存活；
-生成的 `esk.mv` SHA-256 为
-`b1881cd12ebf1fae560f71f668cd768a2c8838f2e0298eeb2e95e273bfd97472`，测试输出
-SHA-256 为 `e1f934234dd2b6d9236d8e46a1430c732836962787067234368dc1a84212244a`。
+三个合同测试全部通过，受限规范化测试回执 SHA-256 为
+`e1f934234dd2b6d9236d8e46a1430c732836962787067234368dc1a84212244a`。
+
+2026-09-06 的可复现 CI 复核发现，原先记录的 `b1881cd1...` 是 `move test`
+覆盖构建目录后的 test-mode `esk.mv`，包含 `#[test_only]` 入口，不能充当生产发布
+字节码证据。CI 改为在 `move build` 后、`move test` 前冻结生产模块；当前生产
+`esk.mv` SHA-256 为
+`314273ecd53a54793c8b70f35e4a1e853fdc7c6751c20dc0baf0628907b03ca7`。
+该修正不改变 Move 源码、测试结果、供应参数或任何链状态；旧摘要只保留为历史错误
+说明，后续发布计划不得引用它。
 
 这些证据只把清单推进到 `local_verified`。package ID、type tag、交易摘要、checkpoint
 和对象 ID 仍全部为空；没有执行签名、广播、测试网发布或主网发布。
@@ -193,8 +201,11 @@ SHA-256 为 `e1f934234dd2b6d9236d8e46a1430c732836962787067234368dc1a84212244a`�
 测试网发布功能必须先实现在线查询、chain identifier 复核、逐桶对象复算和第二端点
 复核，主网功能还要固定主网兼容包并核验门禁材料，才能认证对应状态。
 
-本轮已完成工具链验证；尚未完成的是把相同固定版本安装、依赖缓存和验证命令封装进
-仓库 CI。后续代理不得把已完成的 build/test 重复列为待实现能力。
+仓库现已提供固定版本安装、双摘要校验、隔离 Move 依赖缓存、生产字节码冻结和独立
+Windows CI job。验证配置显式使用空 keystore、无 Sui 环境的 client 配置与独立
+`MOVE_HOME`；build/test 不创建 Sui RPC client，也不读取默认用户配置。冷缓存允许
+GitHub 获取固定提交的 Move 依赖，这不构成链查询。后续代理不得把已完成的本地
+build/test 或 CI 封装重复列为待实现能力；远程 CI 运行结果仍须按具体提交单独记录。
 
 ## 后果
 

@@ -140,6 +140,63 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  sui-move:
+    name: ESK Sui Move
+    runs-on: windows-2025
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22.12.0
+
+      - name: Sui Toolchain Contract Guard
+        run: node scripts/test-esk-sui-toolchain-ci.js
+
+      - name: Cache Fixed Sui Toolchain
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ${{ runner.tool_cache }}\yilong-sui\testnet-v1.79.0\windows-x86_64
+          key: sui-toolchain-v2-testnet-v1.79.0-windows-x86_64-9d8442bad8fd516116a76ff52213cdfd43b98857c3f7fbbde124ed5e2041a558-9046fce263794cca6772c59aacd328706d42522dd7408c0dcb4a7f2613016afd
+
+      - name: Install Fixed Sui Toolchain
+        shell: pwsh
+        run: |
+          $installRoot = "${{ runner.tool_cache }}\yilong-sui"
+          $frameworkArchivePath = Join-Path $installRoot "testnet-v1.79.0\windows-x86_64\framework-source.tar.gz"
+          scripts\install-esk-sui-toolchain.ps1 -InstallRoot $installRoot -FrameworkArchivePath $frameworkArchivePath
+
+      - name: Verify ESK Move Packages
+        shell: pwsh
+        run: |
+          $suiPath = "${{ runner.tool_cache }}\yilong-sui\testnet-v1.79.0\windows-x86_64\sui.exe"
+          $frameworkArchivePath = "${{ runner.tool_cache }}\yilong-sui\testnet-v1.79.0\windows-x86_64\framework-source.tar.gz"
+          $evidence = "${{ runner.temp }}\esk-sui-move-evidence"
+          $moveHome = Join-Path "${{ runner.temp }}" "esk-sui-move-home-$([guid]::NewGuid().ToString('N'))"
+          scripts\validate-esk-sui-move.ps1 -SuiPath $suiPath -FrameworkArchivePath $frameworkArchivePath -EvidenceDirectory $evidence -MoveHome $moveHome
+
+      - name: Upload Sui Validation Evidence
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: esk-sui-move-validation-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}\esk-sui-move-evidence\artifact-verification.log
+            ${{ runner.temp }}\esk-sui-move-evidence\esk_currency-build.log
+            ${{ runner.temp }}\esk-sui-move-evidence\esk_currency-test.log
+            ${{ runner.temp }}\esk-sui-move-evidence\test-esk-sui-allocation-vesting.log
+            ${{ runner.temp }}\esk-sui-move-evidence\test-esk-sui-genesis-foundation.log
+            ${{ runner.temp }}\esk-sui-move-evidence\validation-status.log
+            ${{ runner.temp }}\esk-sui-move-evidence\yilong_participation-build.log
+            ${{ runner.temp }}\esk-sui-move-evidence\yilong_participation-test.log
+          if-no-files-found: warn
+          retention-days: 7
+
   pc-frontend:
     name: PC Frontend
     runs-on: ubuntu-latest

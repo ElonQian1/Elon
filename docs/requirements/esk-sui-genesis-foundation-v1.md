@@ -4,7 +4,7 @@ status: accepted
 implementation_status: local_verified
 owner: platform-assets, protocol
 priority: p0
-reviewed_at: 2026-09-04
+reviewed_at: 2026-09-06
 decision_refs:
   - "docs/decisions/esk-asset-naming-v1.md"
   - "docs/decisions/esk-consumable-economic-participation-v1.md"
@@ -205,15 +205,15 @@ V21 的 QSHARE 份额、NAV、申赎、资本瀑布或链投影。
 |---|---|---|
 | 创世 Schema 与 fixture | `local_verified` | 结构、守恒、权限、迁移、前序链和 fail-closed 状态规则通过本地验证 |
 | `esk_currency` Move 包 | `local_verified` | 官方固定版本 Sui CLI 已完成 build 和 3 项 Move 测试 |
-| 可复现工具链 | `local_verified` | 版本、源码提交和输入摘要已固定；仓库 CI/封装仍待补充 |
+| 可复现工具链 | `implemented_local_verified` | 固定安装、双摘要、隔离缓存和独立 Windows CI job 已实现；远程 CI 按具体提交另记 |
 | 治理/在线证据验证器 | `not_started` | V1 离线验证器拒绝全部 mainnet 和测试网 `published` 声明，不把随机值当证据 |
 | 测试网发行 | `not_started` | 没有 package、交易、checkpoint、逐桶回执或对象证据 |
 | 主网发行和用户迁移 | `not_started` | 没有签名、广播、真实资金移动或 claim 开放 |
 
 ## 后续功能
 
-1. `esk-sui-reproducible-toolchain-ci-v1`：把已完成的固定版本本地验证封装为可重复安装、
-   缓存和 CI 检查，不重复声称工具链尚未验证。
+1. `esk-sui-reproducible-toolchain-ci-v1`：已把固定版本本地验证封装为可重复安装、缓存、
+   生产字节码冻结和 CI 检查；具体远程运行证据见该功能交付记录。
 2. `esk-sui-testnet-publication-v1`：多签演练、在线链证据验证器、测试网发布、Currency
    最终注册、逐桶对象复算和独立端点复核。
 3. `esk-paid-user-migration-v1`：对账队列、用途确认、地址证明、审批和批量领取回执。
