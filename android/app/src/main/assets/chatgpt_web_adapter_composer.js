@@ -546,8 +546,10 @@
     }
   }
 
-  function requestOptions(section, composer, emitEvent, result) {
+  function requestOptions(section, composer, emitEvent, result, skipPrivate = false) {
     const action = section === 'model' ? 'list_model_options' : 'list_composer_tools';
+    if (section === 'tools' && !skipPrivate && composerToolSelectionAdapter?.requestPrivateOptions?.(
+      options => emitOptions(section, options, composer, emitEvent), result, () => requestOptions(section, composer, emitEvent, result, true))) return;
     if (section === 'tools' && composerToolSelection) {
       ['web_search', 'image_generation'].forEach((semantic) => {
         const composerSelection = composerSemanticSelection(semantic);
@@ -634,6 +636,7 @@
   }
 
   function selectOption(section, id, composer, emitEvent, result, scheduleSnapshot) {
+    if (section === 'tools' && composerToolSelectionAdapter?.selectPrivate?.(id, result, scheduleSnapshot)) return;
     const action = section === 'model' ? 'select_model_option' : 'select_composer_tool';
     if (!lastOptions[section].some((option) => option.id === id)) {
       return result(action, false, '选项已过期，请重新打开列表。');
@@ -758,6 +761,7 @@
       return trigger && trigger.getAttribute('aria-expanded') === 'true';
     });
     const expandedTrigger = expandedSection && triggerFor(expandedSection, composer);
+    if (!expandedSection && !lastOptions.model.length && composerToolSelectionAdapter?.dismissPrivateOptions?.()) { lastOptions.tools = []; return result('dismiss_composer_menu', true, ''); }
     const menuKnown = expandedTrigger || lastOptions.model.length || lastOptions.tools.length;
     const outsideTouched = composerDismissPolicy && composerDismissPolicy.emitTouch(document, window, emitEvent);
     const touched = outsideTouched || (expandedTrigger
