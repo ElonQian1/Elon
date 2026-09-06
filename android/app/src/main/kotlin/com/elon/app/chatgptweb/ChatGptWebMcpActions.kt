@@ -254,6 +254,7 @@ internal class ChatGptWebMcpActions(
             "chatgpt_set_conversation_pinned",
             "chatgpt_set_conversation_archived",
             "chatgpt_delete_conversation",
+            "chatgpt_share_conversation",
             "chatgpt_rename_conversation",
             "chatgpt_move_conversation_to_project",
             ->

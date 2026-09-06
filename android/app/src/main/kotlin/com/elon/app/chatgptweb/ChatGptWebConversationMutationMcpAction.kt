@@ -14,6 +14,12 @@ internal object ChatGptWebConversationMutationMcpAction {
             ?: return "invalid_conversation_path"
         if (!args.optBoolean("user_confirmed", false)) return "user_confirmation_required"
         when (args.optString("action")) {
+            "chatgpt_share_conversation" -> {
+                if (snapshot == null || ChatGptWebConversationPath.identity(snapshot.url) !=
+                    ChatGptWebConversationPath.identity(path)) return "share_context_unavailable"
+                if (snapshot.streaming) return "share_conversation_busy"
+                dispatchCommand("share_conversation") { requestId -> commands.shareConversation(path, requestId) }
+            }
             "chatgpt_delete_conversation" -> {
                 val id = ChatGptWebConversationPath.identity(path)
                 if (snapshot == null) return "delete_context_unavailable"

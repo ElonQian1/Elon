@@ -189,6 +189,10 @@ internal class ChatGptWebConsumerPortAdapter(
         .put("archived", archived)
         .put("user_confirmed", userConfirmed))
 
+    override fun shareConversation(conversationPath: String, userConfirmed: Boolean): WebChatConsumerCommandResult =
+        execute(JSONObject().put("action", "chatgpt_share_conversation")
+            .put("conversation_path", conversationPath).put("user_confirmed", userConfirmed))
+
     override fun renameConversation(
         conversationPath: String,
         title: String,

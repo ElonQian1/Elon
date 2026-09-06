@@ -20,6 +20,7 @@ internal interface ChatGptWebMcpCommandPort {
     fun setConversationPinned(path: String, pinned: Boolean, requestId: String) = Unit
     fun setConversationArchived(path: String, archived: Boolean, requestId: String) = Unit
     fun deleteConversation(path: String, requestId: String) = Unit
+    fun shareConversation(path: String, requestId: String) = Unit
     fun renameConversation(path: String, title: String, requestId: String) = Unit
     fun moveConversationToProject(
         path: String,

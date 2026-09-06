@@ -394,6 +394,7 @@ internal class ChatGptWebObservedState(
             "set_conversation_pinned",
             "set_conversation_archived",
             "delete_conversation",
+            "share_conversation",
             "rename_conversation",
             "move_conversation_to_project",
         )
