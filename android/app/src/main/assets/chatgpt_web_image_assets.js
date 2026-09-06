@@ -3,7 +3,7 @@
 
   if (location.origin !== 'https://chatgpt.com') return;
   const existing = window.__elonChatGptImageAssets;
-  if (existing && Number(existing.version) >= 2) return;
+  if (existing && Number(existing.version) >= 3) return;
   if (existing && typeof existing.dispose === 'function') existing.dispose();
 
   const MAX_ENTRIES = 96;
@@ -82,6 +82,15 @@
     };
   }
 
+  function registerPrivate(identity, resolveSource, isCurrent) {
+    if (disposed || typeof identity !== 'string' || !identity || identity.length > 70000 ||
+        typeof resolveSource !== 'function' || typeof isCurrent !== 'function') return '';
+    const handle = handleFor('private-gallery:' + identity);
+    remember(handle, '', null);
+    Object.assign(entries.get(handle), { resolveSource, isCurrent });
+    return handle;
+  }
+
   function imageNodes(root) {
     return Array.from((root || document).querySelectorAll('img')).filter((node) => {
       const source = sourceFor(node);
@@ -149,14 +158,22 @@
     let bitmap = null;
     let canvas = null;
     try {
-      const parsed = new URL(entry.source, location.origin);
-      const response = await fetch(entry.source, {
+      if (entry.isCurrent && !entry.isCurrent()) throw new Error('cancelled');
+      const source = entry.resolveSource ? await entry.resolveSource(job.controller?.signal) : entry.source;
+      if (job.done || entry.isCurrent && !entry.isCurrent()) throw new Error('cancelled');
+      const parsed = new URL(source, location.origin);
+      if (entry.resolveSource && (parsed.protocol !== 'https:' || parsed.username || parsed.password ||
+          parsed.port || parsed.hash || !/(^|\.)oaiusercontent\.com$/.test(parsed.hostname))) {
+        throw new Error('invalid_source');
+      }
+      const response = await fetch(source, {
         credentials: parsed.origin === location.origin ? 'include' : 'omit',
         cache: 'force-cache',
-        redirect: 'follow',
+        redirect: entry.resolveSource ? 'error' : 'follow',
         signal: job.controller ? job.controller.signal : undefined
       });
       if (job.done) return;
+      if (entry.isCurrent && !entry.isCurrent()) throw new Error('cancelled');
       if (!response.ok) throw new Error('http_error');
       const declaredLength = Number(response.headers.get('content-length') || 0);
       if (declaredLength > MAX_SOURCE_BYTES) throw new Error('source_too_large');
@@ -177,6 +194,7 @@
       context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
       const encoded = canvas.toDataURL('image/jpeg', 0.84).split(',')[1] || '';
       if (!encoded || encoded.length > MAX_PREVIEW_BASE64) throw new Error('preview_too_large');
+      if (entry.isCurrent && !entry.isCurrent()) throw new Error('cancelled');
       finish(job, { ok: true, error: '' }, {
         type: 'image_asset',
         handle,
@@ -255,5 +273,12 @@
     entries.clear();
   }
 
-  window.__elonChatGptImageAssets = Object.freeze({ version: 2, describe, request, scan, dispose });
+  function cancel(handle, listener) {
+    const job = pending.get(handle);
+    if (!job) return;
+    job.listeners.delete(listener);
+    if (!job.listeners.size) finish(job, { ok: false, error: 'cancelled' });
+  }
+
+  window.__elonChatGptImageAssets = Object.freeze({ version: 3, describe, request, scan, dispose, registerPrivate, cancel });
 })();

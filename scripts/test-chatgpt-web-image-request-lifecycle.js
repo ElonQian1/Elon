@@ -111,5 +111,33 @@ function harness(fetchImpl = async () => response()) {
   await flush();
   assert.equal(bodyEvents.length, 1);
   assert.equal(slowBody.bitmapCloses(), 0);
+
+  const privateAssets = harness();
+  let resolved = 0;
+  const privateHandle = privateAssets.api.registerPrivate('scoped-image', async () => {
+    resolved++;
+    return 'https://files.oaiusercontent.com/preview?sig=ephemeral';
+  }, () => true);
+  assert.equal(resolved, 0, 'registering a catalog must not eagerly resolve image URLs');
+  assert.equal((await privateAssets.api.request(privateHandle, () => {})).ok, true);
+  assert.equal(resolved, 1);
+  assert.equal(privateAssets.requests[0][1].credentials, 'omit');
+  assert.equal(privateAssets.requests[0][1].redirect, 'error');
+  const untrusted = privateAssets.api.registerPrivate('bad-source', async () => 'https://example.com/image', () => true);
+  assert.equal((await privateAssets.api.request(untrusted, () => {})).ok, false);
+  assert.equal(privateAssets.requests.length, 1);
+
+  const sharedPending = deferred(), cancellable = harness(() => sharedPending.promise);
+  const sharedHandle = cancellable.handle('https://chatgpt.com/image?id=cancel-subscriber');
+  const removed = [], retained = [];
+  const removedListener = event => removed.push(event);
+  const sharedResult = cancellable.api.request(sharedHandle, removedListener);
+  cancellable.api.request(sharedHandle, event => retained.push(event));
+  cancellable.api.cancel(sharedHandle, removedListener);
+  assert.equal(cancellable.requests[0][1].signal.aborted, false);
+  sharedPending.resolve(response());
+  await sharedResult;
+  assert.equal(removed.length, 0);
+  assert.equal(retained.length, 1);
   console.log('IMAGE_REQUEST_LIFECYCLE_TESTS=passed');
 })().catch((error) => { console.error(error); process.exitCode = 1; });
