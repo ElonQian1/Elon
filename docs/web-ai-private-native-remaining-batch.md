@@ -180,7 +180,7 @@ The offline implementation itself did not operate the absent phone.
 | Model/effort/tools/temporary mode | Native presets/cache and official controls | Apply the chosen state through a confirmed private contract; cached menu labels alone are not proof of server selection. |
 | Attachment upload | Earlier small-text private upload verified; production text-file delivery passed on 1541; native byte handoff and ordinary/temporary/writable-project image/PDF transactions packaged; ingest-project images, read-only project chat uploads and [common documents](chatgpt-private-document-upload.md) now implemented in source | Confirm integrated private-route provenance, image/PDF/Office reading, official model/branch/flag-runtime access, read-only file placement and temporary/project library behavior; finish remaining MIME categories and multipart/reservation/direct-library variants. Production file delivery is not a private-route pass. See [upload contract](chatgpt-private-attachment-upload.md), [PDF extension](chatgpt-private-pdf-upload.md) and [scope contract](chatgpt-private-attachment-scopes.md). |
 | Images | Native gallery/previews/cache; private generated-catalog pagination and scoped previews now implemented; official creation preserved | Accept the [private gallery candidate](chatgpt-private-image-gallery.md) on the device, cover remaining pointer scopes, and implement the confirmed generation transaction. Do not repeat catalog discovery or count source tests as live API success. |
-| Share/delete/conversation files | Native pin/rename/archive/move; private file index plus ordinary/project/library-linked download candidates; guarded flag-selected private delete and current-chat reset | Verify saved-file downloads, live flag binding and current/noncurrent deletion. Complete shared-library/connector/image download scope and official sharing. Do not substitute system sharing for official features. |
+| Share/delete/conversation files | Native pin/rename/archive/move; private file index plus ordinary/project/library-linked and [simple image-pointer download candidates](chatgpt-private-image-download.md); guarded flag-selected private delete and current-chat reset | Verify saved-file downloads, live flag binding and current/noncurrent deletion. Complete shared-library/connector/parameterized-image download scope and official sharing. Do not substitute system sharing for official features. |
 | Google direct send (last) | Native cache and private response observer; official submit | Deferred until remaining ChatGPT private work is ready. Then reproduce the submit contract and transaction ownership; observed reply endpoints do not imply a working private sender. |
 
 An unknown protocol remains a documented code gap. No guessed endpoint, fake
@@ -219,3 +219,9 @@ the unsampled consumer of that store. The existing PC browser bridge failed its
 bounded retry, so no additional live caller or request was observed and no share
 link was created. Continue from that consumer when browser access is available;
 do not repeat the already-inspected message-slice or project-member paths.
+
+On 2026-09-07 the in-app browser opened the guest homepage, whose loaded
+`unauth-mweb` assets did not expose that authenticated modal consumer. The
+existing Chrome connection timed out. No new share writer was confirmed and
+no share link was created; image download implementation progressed separately
+using the already verified public asset contract above.

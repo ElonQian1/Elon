@@ -22,9 +22,11 @@ selection registry and one active authorization request. It registers only
 ordinary conversation attachment descriptors with an explicit simple file ID
 from the selected history response; it does not assume a particular ID prefix.
 Module version 2 additionally registers confirmed project and library-linked
-attachment descriptors as described below. Shared-library, connector and
-image-pointer variants remain unclaimed until their separate resolvers are
-covered.
+attachment descriptors as described below. Version 3 adds scoped
+[conversation image-pointer downloads](chatgpt-private-image-download.md) and
+rejects attachment-level context scopes and `library_download_id` lanes.
+Shared-library, connector and parameterized image-pointer variants remain
+unclaimed until their separate resolvers are covered.
 
 The native index receives random opaque selection handles, not private file
 IDs or signed URLs. Registration uses the selected history branch, preserving
@@ -97,7 +99,8 @@ The version 2 candidate accepts `/c/<id>` and
 `/g/g-p-<32 hex>[-slug]/c/<id>`. Project IDs in the route, selected conversation
 and attachment must be canonical and agree. Extra context scopes, conflicting
 projects, unknown library IDs, shared-library fields, connectors and image
-pointers do not receive a private download handle. Registration snapshots the
+pointer variants did not receive a private download handle in version 2; the
+simple image-pointer extension is described above. Registration snapshots the
 IDs, so a mutable history payload cannot retarget an existing selection.
 
 Ordinary non-library files retain the original one-request contract. Project
