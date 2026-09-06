@@ -3,6 +3,7 @@ package com.elon.app.chatgptweb
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.json.JSONObject
 
 class ChatGptWebNativeAttachmentPolicyTest {
     @Test fun acceptsAlreadyNormalizedPhotosAndText() {
@@ -19,7 +20,6 @@ class ChatGptWebNativeAttachmentPolicyTest {
         assertFalse(ChatGptWebNativeAttachmentPolicy.supports("image/png", 1024, Int.MAX_VALUE, Int.MAX_VALUE))
         assertFalse(ChatGptWebNativeAttachmentPolicy.supports("image/gif", 1024, 100, 100))
         assertFalse(ChatGptWebNativeAttachmentPolicy.supports("application/octet-stream", 1024, null, null))
-        assertFalse(ChatGptWebNativeAttachmentPolicy.supports("application/msword", 1024, null, null))
     }
 
     @Test fun acceptsPdfBytesWithoutImageMetadataButKeepsTheSameSizeLimit() {
@@ -33,5 +33,23 @@ class ChatGptWebNativeAttachmentPolicyTest {
         assertFalse(ChatGptWebNativeAttachmentPolicy.supports("text/plain", 0, null, null))
         assertFalse(ChatGptWebNativeAttachmentPolicy.supports("image/png", 8 * 1024 * 1024L + 1, 100, 100))
         assertTrue(ChatGptWebNativeAttachmentPolicy.supports("image/png", 8 * 1024 * 1024L, 2000, 2000))
+    }
+
+    @Test fun commonDocumentsShareTheNativeAndPageContractWithoutImageConversion() {
+        val fixture = JSONObject(requireNotNull(javaClass.classLoader?.getResourceAsStream(
+            "chatgpt_private_attachment_documents.json"
+        )).bufferedReader().use { it.readText() })
+        val documents = fixture.getJSONArray("documents")
+        for (index in 0 until documents.length()) {
+            val type = documents.getJSONObject(index).getString("type")
+            assertTrue(type, ChatGptWebNativeAttachmentPolicy.supports(type, 140000, null, null))
+            assertFalse(type, ChatGptWebNativeAttachmentPolicy.supports(type, 0, null, null))
+            assertFalse(type, ChatGptWebNativeAttachmentPolicy.supports(type, 8 * 1024 * 1024L + 1, null, null))
+        }
+        val unsupported = fixture.getJSONArray("unsupported")
+        for (index in 0 until unsupported.length()) {
+            val type = unsupported.getJSONObject(index).getString("type")
+            assertFalse(type, ChatGptWebNativeAttachmentPolicy.supports(type, 1024, null, null))
+        }
     }
 }
