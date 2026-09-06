@@ -89,6 +89,45 @@ test('multipart records field types, not bytes, filenames or strings', () => {
   assert.doesNotMatch(JSON.stringify(f.command('stop')), /private-/);
 });
 
+test('observed telemetry bursts do not read bodies or crowd out attachment evidence', () => {
+  const f = fixture(); f.command('start');
+  const input = { clone: () => assert.fail('must not clone telemetry') };
+  const init = { get body() { assert.fail('must not read telemetry body'); } };
+  for (let i = 0; i < 30; i++) {
+    for (const path of ['/ces/v1/rgstr', '/ces/v1/telemetry/intake/']) {
+      assert.equal(f.probe.begin(input, init,
+        new URL('https://chatgpt.com' + path + '?token=hidden'), 'POST', 'fetch'), null);
+    }
+  }
+  const record = f.begin({ body: '{"requires_gizmo_id":false}' });
+  assert.equal(record.id, 1);
+  assert.deepEqual(record.requestFields, ['$:object', '$.requires_gizmo_id:boolean']);
+  const result = f.command('stop');
+  assert.equal(result.records.length, 1);
+  assert.equal(result.dropped, 0);
+});
+
+test('telemetry is ignored after saturation and for XHR without changing drop counts', () => {
+  const f = fixture(); f.command('start');
+  for (let i = 0; i < 12; i++) f.begin();
+  const record = f.probe.begin(null, {},
+    new URL('https://chatgpt.com/ces/v1/rgstr'), 'POST', 'xhr');
+  assert.equal(record, null);
+  f.probe.xhrResponse(record, 200, 'application/json', '{"private":"ignored"}');
+  assert.equal(f.command('read').dropped, 0);
+  assert.equal(f.begin(), null);
+  assert.equal(f.command('stop').dropped, 1);
+});
+
+test('telemetry exclusion is exact and preserves unknown protocol routes', () => {
+  const f = fixture(); f.command('start');
+  for (const path of ['/backend-api/rgstr', '/api/telemetry/intake',
+    '/ces/v1/rgstr/other', '/ces/v1/telemetry/intake-other', '/ces/v2/rgstr']) {
+    assert.ok(f.probe.begin(null, {}, new URL('https://chatgpt.com' + path), 'POST', 'fetch'));
+  }
+  assert.equal(f.command('stop').records.length, 5);
+});
+
 test('Request-object JSON clone leaves the original body usable', async () => {
   const f = fixture(); f.command('start');
   const request = new Request('https://chatgpt.com/backend-api/files', {

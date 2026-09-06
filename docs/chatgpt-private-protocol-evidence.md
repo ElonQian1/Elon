@@ -38,6 +38,9 @@ request, selects a file, starts recording, sends a message, or changes a login.
 
 - Default inactive, with no capture timer or body read.
 - Only same-origin `/backend-api/`, `/api/`, and `/ces/` fetch/XHR requests.
+- Excludes the observed `/ces/v1/rgstr` and `/ces/v1/telemetry/intake` statistics
+  routes before reading bodies or spending the 12-record budget. Other routes
+  remain observable. This follow-up is source-only until the next grouped APK.
 - Reuses the existing path sanitizer; removes query strings and normalizes
   encoded segments and long identifiers. Paths are structural diagnostics, not
   a credential source or proof that an endpoint is safe to replay.
@@ -74,3 +77,29 @@ contracts. Device capture remains pending; see [delivery evidence](web-ai-privat
 field types alone are not sufficient to implement credential issuance, upload
 finalization, idempotency or transaction ownership; verify those semantics before
 replacing any working production path.
+
+## First device capture, 2026-09-06
+
+On installed `v1.1.1540` / adapter `264`, the production native composer staged
+the synthetic `fixed_ascii_text_v1` fixture and invoked `send_input` once. Its
+receipt entered `uploading`; no text-send receipt or new conversation was observed.
+The 60-second capture recorded one JSON `POST /backend-api/files/{id}` with fields
+`intended_use_case`, `entry_surface`, `requires_gizmo_id`, `store_in_library` and
+`library_persistence_mode`. The path is sanitized, not a replayable endpoint.
+All response records remained status `0` and became `cancelled` when the capture
+lease expired. This does not establish an HTTP error or an upload contract.
+
+The 12-record budget was also saturated by the two statistics routes above.
+Their exact exclusion is covered by focused tests for body-read avoidance,
+fetch/XHR, saturated budgets and preservation of unrelated routes. No additional
+requests or retries are introduced. All 23 focused Node cases, the existing
+research-probe suite and source-size checks passed; this follow-up was not
+separately compiled or installed.
+
+Device network checks found validated Wi-Fi but no active VPN and timeouts to
+both vendor sites. The user then reported accelerator startup crashes. Crash
+logs on accelerator `1.0.139 (140)` showed `UnsatisfiedLinkError` for
+`ProxyCoreNative.nativeRestoreFakeIpState`. The existing accelerator task owns
+that JNI/package repair; no proxy code or settings were changed by this task.
+Resume protocol acceptance only after network recovery. Do not replay the
+pending write automatically or mark attachment prepare/upload/finalize complete.
