@@ -159,6 +159,9 @@ jobs:
         with:
           node-version: 22.12.0
 
+      - name: Sui Publication Preflight Contract Guard
+        run: node scripts/test-esk-sui-testnet-publication-preflight.js
+
       - name: Sui Toolchain Contract Guard
         run: node scripts/test-esk-sui-toolchain-ci.js
 

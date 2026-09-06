@@ -10852,6 +10852,277 @@
       "updated_at_ms": 1788653597653
     },
     {
+      "id": "esk-sui-testnet-publication-preflight-v1",
+      "title": "ESK Sui 测试网发行离线预检 V1",
+      "summary": "离线冻结 ESK testnet 发布候选合同并生成可复算的无签名仪式计划；严格保留钱包、RPC、交易构造、签名、广播、资金和链状态为未执行，并把两年早期团队兜底意向作为未决商业政策而非已批准承诺。",
+      "status": "verified",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/esk-sui-testnet-publication-preflight-v1.md",
+        "content_hash": "74af80fd8f68337fee512cf3264e39c59d3fe5f2d3d9d21dd7ee696bb0fa5039",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "20e4ec7d14320bfb822eb4163a2c292ac511be4c",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "babe4a94e54c2430b8a5bb142c40d81aa58cc499",
+          "state": "index_only"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "platform-assets-protocol-ci",
+      "tags": [
+        "esk",
+        "sui",
+        "testnet",
+        "publication",
+        "preflight"
+      ],
+      "task_paths": [
+        ".github/workflows/ci.yml",
+        "contracts/sui/esk-testnet-publication-candidate-v1.schema.json",
+        "contracts/sui/esk-testnet-publication-candidate-v1.template.json",
+        "contracts/sui/esk-testnet-publication-preflight-v1.schema.json",
+        "docs/delivery/esk-sui-testnet-publication-preflight-v1.md",
+        "docs/requirements/esk-sui-testnet-publication-preflight-v1.md",
+        "scripts/esk-sui-testnet-publication-preflight/**",
+        "scripts/prepare-esk-sui-testnet-publication.js",
+        "scripts/test-esk-sui-testnet-publication-preflight.js",
+        "scripts/test-esk-sui-toolchain-ci.js"
+      ],
+      "dependencies": [
+        "esk-platform-sui-address-binding-v2",
+        "esk-sui-allocation-observer-v1",
+        "esk-sui-allocation-vesting-v1",
+        "esk-sui-currency-observer-v1",
+        "esk-sui-genesis-foundation-v1",
+        "esk-sui-publication-observer-v1",
+        "esk-sui-reproducible-toolchain-ci-v1"
+      ],
+      "acceptance_criteria": [
+        "模板、合成向量和完整候选生成确定性计划摘要，语义漂移失败关闭。",
+        "固定工具链、源码与两包生产摘要必须匹配当前仓库。",
+        "供应、六桶、职责地址、时间、升级策略、批准证据与 Gas 上限严格验证。",
+        "两年早期团队兜底意向保持 clarification_required；旧版或样例不得晋级，QSHARE 不自动适用，售币与资金自动化保持关闭。",
+        "计划精确包含两包顺序、重绑定重建、注册、分配、能力交接、三观察器和三 verifier 及 V2 证据 DAG。",
+        "所有链输出为空且执行授权、钱包、RPC、签名、广播、资金、售币激活和余额资格固定为 false。",
+        "既有 Sui 合同回归、源码规模、文档与登记漂移门禁通过。"
+      ],
+      "implementation_evidence": [
+        {
+          "path": ".github/workflows/ci.yml",
+          "content_hash": "84245013191695ee5a73c15f168ef7663cb08564f58ba595fe5a1ef5b0c92fdd",
+          "locator": "Sui Publication Preflight Contract Guard",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "20e4ec7d14320bfb822eb4163a2c292ac511be4c",
+            "head_blob_oid": "692389f6315455d75fb7f2eb47b621a95e950906",
+            "worktree_blob_oid": "0d14bdb962519e58233dfe36690cc7bf8f2c446f",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "contracts/sui/esk-testnet-publication-candidate-v1.schema.json",
+          "content_hash": "eebfefa27e515078a140180c5c0cb18829a283716f098605dcaef1219cfb2357",
+          "locator": "strict release candidate contract",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "20e4ec7d14320bfb822eb4163a2c292ac511be4c",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "d9d45505e61ce1ea5b23a8229836af27a24e57ce",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "contracts/sui/esk-testnet-publication-candidate-v1.template.json",
+          "content_hash": "473b21c380edb94dcdc6dfaec539634d9f8b5cc38d2233ac091a4c68abbdab06",
+          "locator": "public inert candidate template",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "20e4ec7d14320bfb822eb4163a2c292ac511be4c",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "692b33926efd6d67071f588154d622710ef9283c",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "contracts/sui/esk-testnet-publication-preflight-v1.schema.json",
+          "content_hash": "982152866b066615719ce1206205a3973f402ba654385e4b73c21af352318e70",
+          "locator": "strict preflight output contract",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "20e4ec7d14320bfb822eb4163a2c292ac511be4c",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "979275f1fe13a7b321748fe7930b9909f1c8acc6",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "docs/delivery/esk-sui-testnet-publication-preflight-v1.md",
+          "content_hash": "dd80f07d330b63f7d0a8bdd296eef4def5b69f9695fed0bb21fbf200e0131d00",
+          "locator": "verification and boundary matrix",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "20e4ec7d14320bfb822eb4163a2c292ac511be4c",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "ce995bb9fe61ddada10399069252d4e518c21d49",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "docs/requirements/esk-sui-testnet-publication-preflight-v1.md",
+          "content_hash": "74af80fd8f68337fee512cf3264e39c59d3fe5f2d3d9d21dd7ee696bb0fa5039",
+          "locator": "accepted requirement",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "20e4ec7d14320bfb822eb4163a2c292ac511be4c",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "babe4a94e54c2430b8a5bb142c40d81aa58cc499",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "scripts/esk-sui-testnet-publication-preflight/contract.js",
+          "content_hash": "53f32b69b5765618506a928eb6b57815c1affbbda4c69b1accc4db1b66a4336c",
+          "locator": "fixed protocol constants",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "20e4ec7d14320bfb822eb4163a2c292ac511be4c",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "c22ccae2888f2ebd2431034846fb81164c647531",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "scripts/esk-sui-testnet-publication-preflight/execution-contract.js",
+          "content_hash": "5d8951c5be19607221d6eb6055f39c493a76782c0bb769d38e4471153055d41c",
+          "locator": "sponsored transaction and ABI contract",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "20e4ec7d14320bfb822eb4163a2c292ac511be4c",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "fd60e09353da784d359b6e87e04477bdefd0b3ba",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "scripts/esk-sui-testnet-publication-preflight/files.js",
+          "content_hash": "84c25470af3a81c9453568f5592532d042b8ab55c82ee25e566352256f4d336e",
+          "locator": "safe candidate file boundary",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "20e4ec7d14320bfb822eb4163a2c292ac511be4c",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "9661674c97365813a029896e36d958dc793d035d",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "scripts/esk-sui-testnet-publication-preflight/plan.js",
+          "content_hash": "0c8539c8e3337bfd3a32e1cee90aa07cdcd6bcf1cd5d4f1cc4afadb8f0922053",
+          "locator": "deterministic inert eight-stage plan",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "20e4ec7d14320bfb822eb4163a2c292ac511be4c",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "7694b42bac1b04306208ebbccf4df02b31563d1d",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "scripts/esk-sui-testnet-publication-preflight/repository.js",
+          "content_hash": "31e0e81eea4c9b175a537494fe74d1eb869d6282b9642d4d190e3f321472fc48",
+          "locator": "fixed source and toolchain binding",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "20e4ec7d14320bfb822eb4163a2c292ac511be4c",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "217d4e8ea47414041907730d709a3a3c95cab097",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "scripts/esk-sui-testnet-publication-preflight/tests/plan.test.js",
+          "content_hash": "00b3a037f5fbc8ebff3ec97d75e75c84ac255a587c3fb2d6a9a827bd9856b62b",
+          "locator": "DAG safety commercial and recovery tests",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "20e4ec7d14320bfb822eb4163a2c292ac511be4c",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "916f4826b0a21a227b71d404f55c61ab7b78802b",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "scripts/esk-sui-testnet-publication-preflight/validate.js",
+          "content_hash": "09c61c516203ba3d4567e2f8afe62f74faccaf0174c95743e183e065e169d589",
+          "locator": "fail-closed candidate validation",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "20e4ec7d14320bfb822eb4163a2c292ac511be4c",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "126b765d75ce90ad4f06c0efd630d85ad471d2fe",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "scripts/prepare-esk-sui-testnet-publication.js",
+          "content_hash": "32d65a84171eccb0d8d2f10ce5f5e415528f8835ebdac190d87ffe769a22d347",
+          "locator": "offline CLI entry",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "20e4ec7d14320bfb822eb4163a2c292ac511be4c",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "b92a7358614e8e2b9b2abe1ffab0dbee2d36af2f",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "scripts/test-esk-sui-testnet-publication-preflight.js",
+          "content_hash": "000d8e9b3b5e5bc3733748acb1f169a802b5219a1a0cec8cbc7ad53131c220f0",
+          "locator": "45-test entry",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "20e4ec7d14320bfb822eb4163a2c292ac511be4c",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "14016e06c5b8d3ea1d1654258eb5f7ab4879702a",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "scripts/test-esk-sui-toolchain-ci.js",
+          "content_hash": "28528420efc0fbd3882e29de79a8f9260a4fd89871c06ffafc52e30f4d880fd7",
+          "locator": "exact CI workflow contract guard",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "20e4ec7d14320bfb822eb4163a2c292ac511be4c",
+            "head_blob_oid": "cfb687381d08e8b97ecae524f3a6305709a057fa",
+            "worktree_blob_oid": "20caf99cf9a28f867fafa84697ca5b0598796818",
+            "state": "tracked_modified"
+          }
+        }
+      ],
+      "created_at_ms": 1788663760191,
+      "updated_at_ms": 1788663769347
+    },
+    {
       "id": "esk_paper_quant_allocation_request_v2",
       "title": "ESK Paper 量化分配申请与只读占用投影 V2",
       "summary": "用户可在主项目把可用 ESK 提交为可取消的 Paper 量化分配申请；主项目分别核算卖回、量化与总占用，并通过最长五分钟签名 V2 投影让量化 PWA 只读展示，不自动建仓、交易或产生收益。",
@@ -21682,86 +21953,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_3c543e67697b4ca5ba948153739e3f37",
-      "feature_id": "yilong-quant-android-public-download-v2",
-      "action": "metadata_updated",
-      "actor": "codex/root",
-      "reason": "纳入活动服务器可信来源透传、published release 稳定 store 路由及纵向测试后的最终实现范围。",
-      "from_status": "proposed",
-      "to_status": "proposed",
-      "at_ms": 1788557473369
-    },
-    {
-      "id": "feature_event_57ba5c5ef83b4ebe84dae0a881200524",
-      "feature_id": "yilong-quant-android-public-download-v2",
-      "action": "transitioned",
-      "actor": "codex/root",
-      "reason": "已复核最终需求：新版唯一、固定活动来源、published release 稳态路由与私有项目回归边界明确。",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1788557482470
-    },
-    {
-      "id": "feature_event_5e9db40a979b4123836cfc5231444f07",
-      "feature_id": "yilong-quant-android-public-download-v2",
-      "action": "transitioned",
-      "actor": "codex/root",
-      "reason": "依赖已满足，任务路径与验收标准完整，进入可认领状态。",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1788557491141
-    },
-    {
-      "id": "feature_event_876106483e73464abc8833a7f32c7367",
-      "feature_id": "yilong-quant-android-public-download-v2",
-      "action": "claimed",
-      "actor": "codex/root",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788557499558
-    },
-    {
-      "id": "feature_event_1d820db4734a4c59bb4cb1d432622f64",
-      "feature_id": "yilong-quant-android-public-download-v2",
-      "action": "transitioned",
-      "actor": "codex/root",
-      "reason": "已按最终范围完成实现，进入证据登记与验收收口。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788557562416
-    },
-    {
-      "id": "feature_event_570b0f24792b497b8148873143817d25",
-      "feature_id": "yilong-quant-android-public-download-v2",
-      "action": "evidence_recorded",
-      "actor": "codex/root",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788557594686
-    },
-    {
-      "id": "feature_event_cf650ad77cca408cb81223d95ffe35c7",
-      "feature_id": "yilong-quant-android-public-download-v2",
-      "action": "transitioned",
-      "actor": "codex/root",
-      "reason": "Android 新版唯一公共下载、已安装身份复核及服务端 published release 稳态路由均已实现并登记当前证据。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1788557604679
-    },
-    {
-      "id": "feature_event_d406f2de3cc348b19ab0064e05501de3",
-      "feature_id": "yilong-quant-android-public-download-v2",
-      "action": "transitioned",
-      "actor": "codex/root",
-      "reason": "Android 定向 19/19、Rust 路由 2/2、源码合同 22/22 与 Debug 构建通过；全量 Android 27 个既有基线失败另行如实记录。",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1788557614385
-    },
-    {
       "id": "feature_event_856cb3cd9af9481b9b43dcc683a6cd4d",
       "feature_id": "yilong-quant-android-identity-v1",
       "action": "transitioned",
@@ -23680,6 +23871,86 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1788663352122
+    },
+    {
+      "id": "feature_event_5ba91a4bda6b439281318cd76d5ddd13",
+      "feature_id": "esk-sui-testnet-publication-preflight-v1",
+      "action": "registered",
+      "actor": "codex-sui-preflight",
+      "reason": "rebase 冲突采用上游注册表为底，并通过官方工作流恢复已验证的离线 preflight 功能。",
+      "from_status": "",
+      "to_status": "proposed",
+      "at_ms": 1788663760192
+    },
+    {
+      "id": "feature_event_8c7b2a3c1cb241118d6d65033813a8cb",
+      "feature_id": "esk-sui-testnet-publication-preflight-v1",
+      "action": "transitioned",
+      "actor": "codex-sui-preflight",
+      "reason": "原需求边界和三路独立复审结论保持不变。",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1788663760814
+    },
+    {
+      "id": "feature_event_477651bc257e49fc81477ca647ee6359",
+      "feature_id": "esk-sui-testnet-publication-preflight-v1",
+      "action": "transitioned",
+      "actor": "codex-sui-preflight",
+      "reason": "全部依赖在合并后的上游注册表中仍已完成。",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1788663761418
+    },
+    {
+      "id": "feature_event_e63c43ee4e064f3697fa85e2a86b0690",
+      "feature_id": "esk-sui-testnet-publication-preflight-v1",
+      "action": "claimed",
+      "actor": "codex-sui-preflight",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788663762001
+    },
+    {
+      "id": "feature_event_ffef5dd32862476bbd196fce558c900e",
+      "feature_id": "esk-sui-testnet-publication-preflight-v1",
+      "action": "transitioned",
+      "actor": "codex-sui-preflight",
+      "reason": "恢复 rebase 后的哈希证据绑定。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788663762558
+    },
+    {
+      "id": "feature_event_debc69d11d0841c68d18df9781db55a1",
+      "feature_id": "esk-sui-testnet-publication-preflight-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-sui-preflight",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788663768125
+    },
+    {
+      "id": "feature_event_017a94fcd1e6499395056ea476913e72",
+      "feature_id": "esk-sui-testnet-publication-preflight-v1",
+      "action": "transitioned",
+      "actor": "codex-sui-preflight",
+      "reason": "离线候选合同、仪式计划、失败关闭门禁和 CI 接线均已实现。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1788663768758
+    },
+    {
+      "id": "feature_event_13efd6203ee34eda89d3ad4ff3c68667",
+      "feature_id": "esk-sui-testnet-publication-preflight-v1",
+      "action": "transitioned",
+      "actor": "codex-sui-preflight",
+      "reason": "45 项专项、相关 Sui 回归、静态质量门禁和三路独立复审均通过。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1788663769347
     }
   ]
 }

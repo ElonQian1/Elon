@@ -294,6 +294,7 @@ assert.deepEqual(workflowStepIdentities(suiJob), [
   'name:Enable Git Long Paths',
   'uses:actions/checkout@11d5960a326750d5838078e36cf38b85af677262',
   'name:Set up Node',
+  'name:Sui Publication Preflight Contract Guard',
   'name:Sui Toolchain Contract Guard',
   'name:Cache Fixed Sui Toolchain',
   'name:Install Fixed Sui Toolchain',
@@ -333,6 +334,14 @@ const guardStep = extractWorkflowStep(suiJob, 'Sui Toolchain Contract Guard')
 assertExactWorkflowStep(guardStep, [
   '      - name: Sui Toolchain Contract Guard',
   '        run: node scripts/test-esk-sui-toolchain-ci.js',
+])
+const publicationPreflightGuardStep = extractWorkflowStep(
+  suiJob,
+  'Sui Publication Preflight Contract Guard',
+)
+assertExactWorkflowStep(publicationPreflightGuardStep, [
+  '      - name: Sui Publication Preflight Contract Guard',
+  '        run: node scripts/test-esk-sui-testnet-publication-preflight.js',
 ])
 const cacheStep = extractWorkflowStep(suiJob, 'Cache Fixed Sui Toolchain')
 assert.equal((suiJob.match(

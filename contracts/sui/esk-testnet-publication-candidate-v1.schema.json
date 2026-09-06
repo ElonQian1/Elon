@@ -1,0 +1,411 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:yilong:contracts:sui:esk-testnet-publication-candidate:v1",
+  "title": "Yilong ESK Sui testnet publication candidate V1",
+  "$comment": "Offline candidate only. This contract does not authorize wallet access, RPC, transaction construction, signing, broadcast, publication, or funds movement. Repository semantic validation remains mandatory.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "candidate_id",
+    "scope",
+    "repository",
+    "toolchain",
+    "packages",
+    "asset",
+    "commercial_policy_revision",
+    "allocations",
+    "roles",
+    "team_vesting",
+    "upgrade_policies",
+    "gas_budgets",
+    "approvals"
+  ],
+  "properties": {
+    "schema": { "const": "yilong.esk.sui.testnet_publication_candidate.v1" },
+    "candidate_id": {
+      "type": "string",
+      "pattern": "^esk-sui-testnet-[a-z0-9-]{3,48}-v[1-9][0-9]*$"
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["network", "mode", "synthetic", "reviewed_at"],
+      "properties": {
+        "network": { "const": "testnet" },
+        "mode": { "enum": ["template", "synthetic_test", "release_candidate"] },
+        "synthetic": { "type": "boolean" },
+        "reviewed_at": { "$ref": "#/$defs/optionalRfc3339" }
+      }
+    },
+    "repository": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["baseline_commit"],
+      "properties": {
+        "baseline_commit": { "$ref": "#/$defs/optionalCommit" }
+      }
+    },
+    "toolchain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sui_release",
+        "sui_cli_version",
+        "sui_source_commit",
+        "sui_cli_sha256",
+        "framework_source_archive_sha256",
+        "framework_tracked_content_sha256"
+      ],
+      "properties": {
+        "sui_release": { "const": "testnet-v1.79.0" },
+        "sui_cli_version": { "const": "sui 1.79.0-46f18562f1f5" },
+        "sui_source_commit": { "const": "46f18562f1f5af2438d35828e8b62d5e0b972db7" },
+        "sui_cli_sha256": { "const": "sha256:d9b7ff7b4bb3cbbf3f327ddf5998b388773956ce30c897798b56a6c0db9fee7f" },
+        "framework_source_archive_sha256": { "const": "sha256:9046fce263794cca6772c59aacd328706d42522dd7408c0dcb4a7f2613016afd" },
+        "framework_tracked_content_sha256": { "const": "sha256:017e6a38b5d976c87b710e02b39d26988691d101bf914a42e6509c82d62e027b" }
+      }
+    },
+    "packages": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["currency", "participation"],
+      "properties": {
+        "currency": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["package_id", "source_path", "package_input_digest", "production_bytecode_digest"],
+          "properties": {
+            "package_id": { "const": "esk_currency" },
+            "source_path": { "const": "contracts/sui/esk_currency" },
+            "package_input_digest": { "const": "sha256:6266890971f1c4ee6be82e9441959ebf0d4588e0483113a99ec61e66ea208665" },
+            "production_bytecode_digest": { "const": "sha256:314273ecd53a54793c8b70f35e4a1e853fdc7c6751c20dc0baf0628907b03ca7" }
+          }
+        },
+        "participation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["package_id", "source_path", "package_input_digest", "production_bytecode_digest", "dependency_binding"],
+          "properties": {
+            "package_id": { "const": "yilong_participation" },
+            "source_path": { "const": "contracts/sui/yilong_participation" },
+            "package_input_digest": { "const": "sha256:7ca8100f358f179b9d937a091373d4dbcdefd2cd6b78c0de223409e07f5f0038" },
+            "production_bytecode_digest": { "const": "sha256:fa691e2e7d7c1c347b8fd88a2dc9f3ca2590ee56813c0bb313ef2ea8d477d3ef" },
+            "dependency_binding": { "const": "local_0x0_not_publishable" }
+          }
+        }
+      }
+    },
+    "asset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["asset_id", "symbol", "name", "decimals", "total_display_units", "total_base_units"],
+      "properties": {
+        "asset_id": { "const": "esk" },
+        "symbol": { "const": "ESK" },
+        "name": { "const": "Yilong ESK" },
+        "decimals": { "const": 6 },
+        "total_display_units": { "const": "1000000000" },
+        "total_base_units": { "const": "1000000000000000" }
+      }
+    },
+    "commercial_policy_revision": {
+      "const": {
+        "schema": "yilong.esk.commercial_policy_revision.v1",
+        "status": "clarification_required",
+        "scope": "esk_sale_proceeds_team_investment",
+        "known_intent": "team_considers_two_year_loss_backstop",
+        "intended_term_months": 24,
+        "qshare_application": "not_automatic",
+        "unresolved_terms": [
+          "protected_amount_scope",
+          "term_start_basis",
+          "settlement_asset",
+          "responsible_entity",
+          "loss_cover_funding_source",
+          "return_calculation_and_distribution_policy",
+          "transfer_effect_on_protection_right",
+          "service_consumption_effect_on_protection_right",
+          "early_exit_terms",
+          "maturity_settlement_terms",
+          "investment_loss_and_team_top_up_accounting"
+        ],
+        "approved_policy_digest": null,
+        "legacy_no_protection_terms_promotable": false,
+        "sample_terms_promotable": false,
+        "public_sale_activation_allowed": false,
+        "technical_testnet_preflight_allowed": true,
+        "funds_acceptance_investment_or_return_automation_allowed": false
+      }
+    },
+    "allocations": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "prefixItems": [
+        { "$ref": "#/$defs/userMigrationAllocation" },
+        { "$ref": "#/$defs/teamVestingAllocation" },
+        { "$ref": "#/$defs/projectTreasuryAllocation" },
+        { "$ref": "#/$defs/liquidityAllocation" },
+        { "$ref": "#/$defs/communityAllocation" },
+        { "$ref": "#/$defs/securityReserveAllocation" }
+      ],
+      "items": false
+    },
+    "roles": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "distribution",
+        "treasury",
+        "liquidity",
+        "team_beneficiary",
+        "metadata",
+        "currency_upgrade",
+        "participation_upgrade",
+        "pause",
+        "gas_sponsor",
+        "deployer"
+      ],
+      "properties": {
+        "distribution": { "$ref": "#/$defs/optionalRoleAddress" },
+        "treasury": { "$ref": "#/$defs/optionalRoleAddress" },
+        "liquidity": { "$ref": "#/$defs/optionalRoleAddress" },
+        "team_beneficiary": { "$ref": "#/$defs/optionalRoleAddress" },
+        "metadata": { "$ref": "#/$defs/optionalRoleAddress" },
+        "currency_upgrade": { "$ref": "#/$defs/optionalRoleAddress" },
+        "participation_upgrade": { "$ref": "#/$defs/optionalRoleAddress" },
+        "pause": { "$ref": "#/$defs/optionalRoleAddress" },
+        "gas_sponsor": { "$ref": "#/$defs/optionalRoleAddress" },
+        "deployer": { "$ref": "#/$defs/optionalRoleAddress" }
+      }
+    },
+    "team_vesting": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "model",
+        "beneficiary_role",
+        "start_ms",
+        "cliff_ms",
+        "end_ms",
+        "revocable",
+        "recoverable",
+        "beneficiary_changeable",
+        "early_unlock",
+        "admin_claim"
+      ],
+      "properties": {
+        "model": { "const": "linear_floor_u128" },
+        "beneficiary_role": { "const": "team_beneficiary" },
+        "start_ms": { "$ref": "#/$defs/optionalTimestampMs" },
+        "cliff_ms": { "$ref": "#/$defs/optionalTimestampMs" },
+        "end_ms": { "$ref": "#/$defs/optionalTimestampMs" },
+        "revocable": { "const": false },
+        "recoverable": { "const": false },
+        "beneficiary_changeable": { "const": false },
+        "early_unlock": { "const": false },
+        "admin_claim": { "const": false }
+      }
+    },
+    "upgrade_policies": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["currency", "participation"],
+      "properties": {
+        "currency": { "$ref": "#/$defs/upgradePolicy" },
+        "participation": { "$ref": "#/$defs/upgradePolicy" }
+      }
+    },
+    "gas_budgets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "currency_publish",
+        "currency_registry_finalize",
+        "participation_publish",
+        "genesis_allocation",
+        "capability_handoff"
+      ],
+      "properties": {
+        "currency_publish": { "$ref": "#/$defs/optionalGasBudget" },
+        "currency_registry_finalize": { "$ref": "#/$defs/optionalGasBudget" },
+        "participation_publish": { "$ref": "#/$defs/optionalGasBudget" },
+        "genesis_allocation": { "$ref": "#/$defs/optionalGasBudget" },
+        "capability_handoff": { "$ref": "#/$defs/optionalGasBudget" }
+      }
+    },
+    "approvals": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "economic_parameters",
+        "role_controls",
+        "multisig_recovery",
+        "release_candidate_review"
+      ],
+      "properties": {
+        "economic_parameters": { "$ref": "#/$defs/approval" },
+        "role_controls": { "$ref": "#/$defs/approval" },
+        "multisig_recovery": { "$ref": "#/$defs/approval" },
+        "release_candidate_review": { "$ref": "#/$defs/approval" }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "scope": { "properties": { "mode": { "const": "template" } } } } },
+      "then": {
+        "properties": {
+          "scope": { "properties": { "synthetic": { "const": false }, "reviewed_at": { "type": "null" } } },
+          "repository": { "properties": { "baseline_commit": { "type": "null" } } },
+          "roles": { "properties": {
+            "distribution": { "type": "null" }, "treasury": { "type": "null" },
+            "liquidity": { "type": "null" }, "team_beneficiary": { "type": "null" },
+            "metadata": { "type": "null" }, "currency_upgrade": { "type": "null" },
+            "participation_upgrade": { "type": "null" }, "pause": { "type": "null" },
+            "gas_sponsor": { "type": "null" }, "deployer": { "type": "null" }
+          } },
+          "team_vesting": { "properties": { "start_ms": { "type": "null" }, "cliff_ms": { "type": "null" }, "end_ms": { "type": "null" } } },
+          "upgrade_policies": { "properties": { "currency": { "const": "pending" }, "participation": { "const": "pending" } } },
+          "gas_budgets": { "properties": {
+            "currency_publish": { "type": "null" }, "currency_registry_finalize": { "type": "null" },
+            "participation_publish": { "type": "null" }, "genesis_allocation": { "type": "null" },
+            "capability_handoff": { "type": "null" }
+          } },
+          "approvals": { "properties": {
+            "economic_parameters": { "$ref": "#/$defs/templateApproval" },
+            "role_controls": { "$ref": "#/$defs/templateApproval" },
+            "multisig_recovery": { "$ref": "#/$defs/templateApproval" },
+            "release_candidate_review": { "$ref": "#/$defs/templateApproval" }
+          } }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "scope": { "properties": { "mode": { "const": "synthetic_test" } } } } },
+      "then": { "$ref": "#/$defs/syntheticCandidate" }
+    },
+    {
+      "if": { "properties": { "scope": { "properties": { "mode": { "const": "release_candidate" } } } } },
+      "then": { "$ref": "#/$defs/releaseCandidate" }
+    }
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "not": { "const": "sha256:0000000000000000000000000000000000000000000000000000000000000000" }
+    },
+    "commit": { "type": "string", "pattern": "^[0-9a-f]{40}$", "not": { "const": "0000000000000000000000000000000000000000" } },
+    "optionalCommit": { "type": ["string", "null"], "pattern": "^[0-9a-f]{40}$", "not": { "const": "0000000000000000000000000000000000000000" } },
+    "rfc3339": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-([0-2][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]\\.[0-9]{3}Z$"
+    },
+    "optionalRfc3339": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-([0-2][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]\\.[0-9]{3}Z$"
+    },
+    "timestampMs": { "type": "string", "pattern": "^[1-9][0-9]{12,15}$" },
+    "optionalTimestampMs": { "type": ["string", "null"], "pattern": "^[1-9][0-9]{12,15}$" },
+    "realAddress": {
+      "type": "string",
+      "pattern": "^0x[0-9a-f]{64}$",
+      "not": { "const": "0x0000000000000000000000000000000000000000000000000000000000000000" }
+    },
+    "syntheticAddress": {
+      "type": "string",
+      "pattern": "^synthetic:sui:0x[0-9a-f]{64}$",
+      "not": { "const": "synthetic:sui:0x0000000000000000000000000000000000000000000000000000000000000000" }
+    },
+    "optionalRoleAddress": { "type": ["string", "null"], "pattern": "^(0x[0-9a-f]{64}|synthetic:sui:0x[0-9a-f]{64})$" },
+    "upgradePolicy": { "enum": ["pending", "compatible", "additive", "dep_only", "immutable"] },
+    "approvedUpgradePolicy": { "enum": ["compatible", "additive", "dep_only", "immutable"] },
+    "optionalGasBudget": { "type": ["integer", "null"], "minimum": 1, "maximum": 1000000000 },
+    "gasBudget": { "type": "integer", "minimum": 1, "maximum": 1000000000 },
+    "approval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["digest", "approved_at", "expires_at"],
+      "properties": {
+        "digest": { "type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$" },
+        "approved_at": { "$ref": "#/$defs/optionalRfc3339" },
+        "expires_at": { "$ref": "#/$defs/optionalRfc3339" }
+      }
+    },
+    "completedApproval": { "properties": {
+      "digest": { "$ref": "#/$defs/sha256" },
+      "approved_at": { "$ref": "#/$defs/rfc3339" },
+      "expires_at": { "$ref": "#/$defs/rfc3339" }
+    } },
+    "allocationBase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bucket_id", "base_units", "basis_points", "recipient_role"],
+      "properties": {
+        "bucket_id": { "type": "string" },
+        "base_units": { "type": "string", "pattern": "^[1-9][0-9]*$" },
+        "basis_points": { "type": "integer", "minimum": 1, "maximum": 10000 },
+        "recipient_role": { "enum": ["distribution", "treasury", "liquidity", "team_vesting"] }
+      }
+    },
+    "userMigrationAllocation": { "allOf": [{ "$ref": "#/$defs/allocationBase" }, { "properties": { "bucket_id": { "const": "user_migration_and_ecosystem" }, "base_units": { "const": "250000000000000" }, "basis_points": { "const": 2500 }, "recipient_role": { "const": "distribution" } } }] },
+    "teamVestingAllocation": { "allOf": [{ "$ref": "#/$defs/allocationBase" }, { "properties": { "bucket_id": { "const": "team_vesting" }, "base_units": { "const": "200000000000000" }, "basis_points": { "const": 2000 }, "recipient_role": { "const": "team_vesting" } } }] },
+    "projectTreasuryAllocation": { "allOf": [{ "$ref": "#/$defs/allocationBase" }, { "properties": { "bucket_id": { "const": "project_treasury" }, "base_units": { "const": "250000000000000" }, "basis_points": { "const": 2500 }, "recipient_role": { "const": "treasury" } } }] },
+    "liquidityAllocation": { "allOf": [{ "$ref": "#/$defs/allocationBase" }, { "properties": { "bucket_id": { "const": "liquidity" }, "base_units": { "const": "150000000000000" }, "basis_points": { "const": 1500 }, "recipient_role": { "const": "liquidity" } } }] },
+    "communityAllocation": { "allOf": [{ "$ref": "#/$defs/allocationBase" }, { "properties": { "bucket_id": { "const": "community_contributors" }, "base_units": { "const": "100000000000000" }, "basis_points": { "const": 1000 }, "recipient_role": { "const": "distribution" } } }] },
+    "securityReserveAllocation": { "allOf": [{ "$ref": "#/$defs/allocationBase" }, { "properties": { "bucket_id": { "const": "security_operations_reserve" }, "base_units": { "const": "50000000000000" }, "basis_points": { "const": 500 }, "recipient_role": { "const": "treasury" } } }] },
+    "templateApproval": { "properties": { "digest": { "type": "null" }, "approved_at": { "type": "null" }, "expires_at": { "type": "null" } } },
+    "syntheticCandidate": {
+      "properties": {
+        "scope": { "properties": { "synthetic": { "const": true }, "reviewed_at": { "$ref": "#/$defs/rfc3339" } } },
+        "repository": { "properties": { "baseline_commit": { "$ref": "#/$defs/commit" } } },
+        "roles": { "properties": {
+          "distribution": { "$ref": "#/$defs/syntheticAddress" }, "treasury": { "$ref": "#/$defs/syntheticAddress" },
+          "liquidity": { "$ref": "#/$defs/syntheticAddress" }, "team_beneficiary": { "$ref": "#/$defs/syntheticAddress" },
+          "metadata": { "$ref": "#/$defs/syntheticAddress" }, "currency_upgrade": { "$ref": "#/$defs/syntheticAddress" },
+          "participation_upgrade": { "$ref": "#/$defs/syntheticAddress" }, "pause": { "$ref": "#/$defs/syntheticAddress" },
+          "gas_sponsor": { "$ref": "#/$defs/syntheticAddress" }, "deployer": { "$ref": "#/$defs/syntheticAddress" }
+        } },
+        "team_vesting": { "properties": { "start_ms": { "$ref": "#/$defs/timestampMs" }, "cliff_ms": { "$ref": "#/$defs/timestampMs" }, "end_ms": { "$ref": "#/$defs/timestampMs" } } },
+        "upgrade_policies": { "properties": { "currency": { "$ref": "#/$defs/approvedUpgradePolicy" }, "participation": { "$ref": "#/$defs/approvedUpgradePolicy" } } },
+        "gas_budgets": { "properties": {
+          "currency_publish": { "$ref": "#/$defs/gasBudget" }, "currency_registry_finalize": { "$ref": "#/$defs/gasBudget" },
+          "participation_publish": { "$ref": "#/$defs/gasBudget" }, "genesis_allocation": { "$ref": "#/$defs/gasBudget" },
+          "capability_handoff": { "$ref": "#/$defs/gasBudget" }
+        } },
+        "approvals": { "properties": {
+          "economic_parameters": { "$ref": "#/$defs/completedApproval" }, "role_controls": { "$ref": "#/$defs/completedApproval" },
+          "multisig_recovery": { "$ref": "#/$defs/completedApproval" }, "release_candidate_review": { "$ref": "#/$defs/completedApproval" }
+        } }
+      }
+    },
+    "releaseCandidate": {
+      "properties": {
+        "scope": { "properties": { "synthetic": { "const": false }, "reviewed_at": { "$ref": "#/$defs/rfc3339" } } },
+        "repository": { "properties": { "baseline_commit": { "$ref": "#/$defs/commit" } } },
+        "roles": { "properties": {
+          "distribution": { "$ref": "#/$defs/realAddress" }, "treasury": { "$ref": "#/$defs/realAddress" },
+          "liquidity": { "$ref": "#/$defs/realAddress" }, "team_beneficiary": { "$ref": "#/$defs/realAddress" },
+          "metadata": { "$ref": "#/$defs/realAddress" }, "currency_upgrade": { "$ref": "#/$defs/realAddress" },
+          "participation_upgrade": { "$ref": "#/$defs/realAddress" }, "pause": { "$ref": "#/$defs/realAddress" },
+          "gas_sponsor": { "$ref": "#/$defs/realAddress" }, "deployer": { "$ref": "#/$defs/realAddress" }
+        } },
+        "team_vesting": { "properties": { "start_ms": { "$ref": "#/$defs/timestampMs" }, "cliff_ms": { "$ref": "#/$defs/timestampMs" }, "end_ms": { "$ref": "#/$defs/timestampMs" } } },
+        "upgrade_policies": { "properties": { "currency": { "$ref": "#/$defs/approvedUpgradePolicy" }, "participation": { "$ref": "#/$defs/approvedUpgradePolicy" } } },
+        "gas_budgets": { "properties": {
+          "currency_publish": { "$ref": "#/$defs/gasBudget" }, "currency_registry_finalize": { "$ref": "#/$defs/gasBudget" },
+          "participation_publish": { "$ref": "#/$defs/gasBudget" }, "genesis_allocation": { "$ref": "#/$defs/gasBudget" },
+          "capability_handoff": { "$ref": "#/$defs/gasBudget" }
+        } },
+        "approvals": { "properties": {
+          "economic_parameters": { "$ref": "#/$defs/completedApproval" }, "role_controls": { "$ref": "#/$defs/completedApproval" },
+          "multisig_recovery": { "$ref": "#/$defs/completedApproval" }, "release_candidate_review": { "$ref": "#/$defs/completedApproval" }
+        } }
+      }
+    }
+  }
+}
