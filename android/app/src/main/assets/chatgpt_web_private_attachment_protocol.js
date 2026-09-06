@@ -28,10 +28,19 @@
     }
     if (context.isProjectThread !== true || context.isTemporaryChat ||
         !/^g-p-[a-f0-9]{32}$/i.test(value?.gizmo_id || '') || value.is_project !== true ||
-        value.should_upload_to_project !== true || Object.keys(value).length !== 3 ||
+        value.should_upload_to_project !== true ||
+        Object.keys(value).some(key => !['gizmo_id', 'is_project', 'should_upload_to_project',
+          'origination_thread_id', 'origination_message_id'].includes(key)) ||
         (context.useCase === 'gizmo' ? context.gizmoId !== value.gizmo_id :
           context.useCase !== 'multimodal' || context.gizmoId != null)) throw new Error('unsupported_upload_context');
-    return Object.freeze({ gizmo_id: value.gizmo_id, is_project: true, should_upload_to_project: true });
+    const hasOrigin = value.origination_thread_id !== undefined || value.origination_message_id !== undefined;
+    const uuid = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
+    if (hasOrigin && (!uuid.test(value.origination_thread_id || '') || !uuid.test(value.origination_message_id || ''))) {
+      throw new Error('unsupported_upload_context');
+    }
+    return Object.freeze({ gizmo_id: value.gizmo_id, is_project: true, should_upload_to_project: true,
+      ...(hasOrigin ? { origination_thread_id: value.origination_thread_id,
+        origination_message_id: value.origination_message_id } : {}) });
   }
 
   function prepare(file, context) {
@@ -145,5 +154,5 @@
     return { metadata, eventCount: count, events };
   }
 
-  return { version: 4, maxFileBytes: MAX_BYTES, prepare, destination, processBody, processed, imageDimensions, projectInfo };
+  return { version: 5, maxFileBytes: MAX_BYTES, prepare, destination, processBody, processed, imageDimensions, projectInfo };
 });
