@@ -91,7 +91,9 @@ where
             let file = match custody {
                 ManagedSqliteRegistryPinnedFileCustody::Main { .. } => {
                     #[cfg(all(test, windows))]
-                    observed_custody = ObservedCustody::Main;
+                    {
+                        observed_custody = ObservedCustody::Main;
+                    }
                     return Err(
                         ManagedSqliteRegistryPinnedFileOperationRejection::UnsupportedFileRole,
                     );
@@ -103,7 +105,9 @@ where
                 }
                 ManagedSqliteRegistryPinnedFileCustody::WalMain { file, .. } => {
                     #[cfg(all(test, windows))]
-                    observed_custody = ObservedCustody::WalMain;
+                    {
+                        observed_custody = ObservedCustody::WalMain;
+                    }
                     file
                 }
             };
@@ -111,7 +115,9 @@ where
                 return Err(ManagedSqliteRegistryPinnedFileOperationRejection::ShmDetached);
             };
             #[cfg(all(test, windows))]
-            observed_shm_present = true;
+            {
+                observed_shm_present = true;
+            }
             operation(shm).map_err(ManagedSqliteRegistryPinnedFileOperationRejection::Shm)
         })();
         #[cfg(all(test, windows))]

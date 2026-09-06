@@ -1,0 +1,4 @@
+[[permission]]
+identifier = "browser-research"
+description = "允许主窗口为项目绑定的本机研究会话采集、索引和读取授权网页资料。没有交易或任意脚本执行动作。"
+commands.allow = ["run_browser_research"]

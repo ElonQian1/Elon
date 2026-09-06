@@ -839,6 +839,7 @@ name = "elon-desktop"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "regex",
  "serde",
  "serde_json",
  "sha2",
@@ -847,6 +848,8 @@ dependencies = [
  "tauri-plugin-global-shortcut",
  "tauri-plugin-notification",
  "tauri-plugin-single-instance",
+ "webview2-com",
+ "windows",
  "windows-sys 0.59.0",
 ]
 

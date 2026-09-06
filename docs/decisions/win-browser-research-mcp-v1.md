@@ -1,7 +1,7 @@
 ---
 version_status: current
 reviewed_at: 2026-09-07
-implementation_status: not_implemented
+implementation_status: in_progress
 ---
 
 # Win 浏览器研究架构 V1
@@ -10,7 +10,7 @@ implementation_status: not_implemented
 
 网页前端代码分析与实际网络观察共同作为研究依据。一龙 Win 提供本机采集、资料索引和 MCP 查询，AI 从索引定位少量相关源码，再核对现场请求。省 token 主要来自内容哈希去重、增量索引与按需读取，不来自删除业务字段。
 
-这份决定承接 [正式需求](../requirements/win-browser-research-mcp-v1.md)。当前仅确定实现方向，尚未实现新 MCP、币安 WebView2 或资源采集。
+这份决定承接 [正式需求](../requirements/win-browser-research-mcp-v1.md)。实现入口为 `desktop-shell/src-tauri/src/browser_research.rs`、`server/src/node_agent_browser_research_mcp.rs` 和 `pc-frontend/src/features/browser-research/`；当前处于实现与验证阶段，部署、登录与币安现场证据必须另行验收。[运行说明](../win-browser-research-mcp.md)记录实际合同与限制。
 
 ## 已有代码与缺口
 
@@ -55,7 +55,7 @@ Profile 按 owner、站点和 profileId 隔离；独立研究会话共享同一�
 
 ## MCP 接口方向
 
-使用独立 `browser_research` profile 和按 action 发现的紧凑 schema，复用当前项目绑定、短期令牌与回执机制。下表为拟定接口，不是现有可调用工具。
+使用独立 `browser_research` profile 和按 action 发现的紧凑 schema，复用当前项目绑定、短期令牌与回执机制。以下查询已接入源码，须部署匹配的节点、Win 宿主和前端后才能调用；`correlate` 的独立业务分析动作仍为后续方向，当前只保存发起脚本和请求关联元数据。
 
 | 动作 | 输出 |
 |---|---|
@@ -64,7 +64,7 @@ Profile 按 owner、站点和 profileId 隔离；独立研究会话共享同一�
 | `search` | 关键词命中窗口、资源 ID 与精确位置；限制总返回字节 |
 | `read_resource` | 指定资源 ID 和范围的内容，不接受任意本地路径 |
 | `requests` / `read_request` | 实际观察请求的索引与指定业务样本，按页或范围读取 |
-| `correlate` | 资源位置、调用链候选、请求样本及不确定项 |
+| 关联元数据 | 资源位置、脚本 ID 与请求样本；独立 `correlate` 动作未实现 |
 | `pause` / `resume` | 在当前授权范围及有效会话内暂停或恢复采集 |
 
 首次目录默认只回元数据。完整业务资料保留本地，不等于每次全部发送给模型；但也不再强制只返回字段类型。MCP 承载的网页资料一律是数据，不能据此提升项目权限、跨账户读取或创建执行动作。

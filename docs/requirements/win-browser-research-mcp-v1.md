@@ -1,7 +1,7 @@
 ---
 version_status: current
 reviewed_at: 2026-09-07
-implementation_status: not_implemented
+implementation_status: in_progress
 ---
 
 # Win 浏览器研究 MCP V1 需求
@@ -10,7 +10,7 @@ implementation_status: not_implemented
 
 在一龙 Win 内复用 WebView2 宿主，建立可以由 AI 通过 MCP 读取的网页研究工作台。首个对象是用户授权的币安 U 本位合约网格：研究本人策略列表、详情、创建参数、修改与结束流程，不研究推荐或跟单。用户不需要反复导出、传递摘要；网页实际加载的资源与观察到的业务请求直接进入本机研究库。
 
-该需求替代继续扩展 Chrome 手动摘要交接的方向；既有 Chrome 观察工具保留为过渡工具，其工件与登录页不作修改。本需求尚未实现，不表示已接入币安或获得可执行接口。
+该需求替代继续扩展 Chrome 手动摘要交接的方向；既有 Chrome 观察工具保留为过渡工具，其工件与登录页不作修改。采集、内容库、MCP 与界面正在实现与验证；现场验收完成前不表示已接入币安或获得可执行接口。使用方式和当前边界见[运行说明](../win-browser-research-mcp.md)。
 
 ## 范围
 

@@ -111,6 +111,14 @@ pub(crate) fn descriptor_for_project_win_control(
     create_descriptor(&root, None, host_port, DescriptorProfile::WinControl)
 }
 
+pub(crate) fn descriptor_for_project_browser_research(
+    project_root: &str,
+    host_port: u16,
+) -> Result<Value> {
+    let root = validate_project_root(project_root)?;
+    create_descriptor(&root, None, host_port, DescriptorProfile::BrowserResearch)
+}
+
 pub(crate) fn descriptor_for_vault(vault_id: &str, host_port: u16) -> Result<Value> {
     let vault = crate::project_document_vault::resolve_or_create(vault_id)?;
     create_descriptor(
@@ -297,6 +305,12 @@ async fn handle_request_for_profile(
                 crate::node_agent_win_codex_control_mcp::handle_request(
                     runtime, workspace, &request,
                 )
+            })
+    } else if crate::node_agent_browser_research_mcp::handles(profile) {
+        runtime
+            .ok_or_else(|| anyhow!("browser_research_requires_local_node"))
+            .and_then(|runtime| {
+                crate::node_agent_browser_research_mcp::handle_request(runtime, workspace, &request)
             })
     } else if !matches!(profile, None | Some("governance")) {
         Err(anyhow!("未知项目文档 MCP profile"))

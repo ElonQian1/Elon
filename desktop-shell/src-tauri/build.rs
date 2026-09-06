@@ -1,6 +1,7 @@
 fn main() {
     tauri_build::try_build(tauri_build::Attributes::new().app_manifest(
         tauri_build::AppManifest::new().commands(&[
+            "run_browser_research",
             "list_local_ai_web_providers",
             "open_local_ai_web_session",
             "present_local_ai_web_session_embedded",

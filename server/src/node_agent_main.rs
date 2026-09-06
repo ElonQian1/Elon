@@ -229,6 +229,8 @@ mod node_agent_task_resume_sidecar_tests;
 mod node_agent_task_runtime_status;
 mod node_agent_tts;
 pub use node_agent_tts::run_tts_synthesis;
+mod node_agent_browser_research;
+mod node_agent_browser_research_mcp;
 #[cfg(test)]
 mod node_agent_project_docs_mcp_tests;
 mod node_agent_tool_approval;

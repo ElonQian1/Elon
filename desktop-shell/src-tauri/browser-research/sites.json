@@ -1,0 +1,12 @@
+[
+  {
+    "schema": "yilong.browser-research.site.v1",
+    "id": "binance",
+    "name": "币安合约网格",
+    "entry_url": "https://www.binance.com/zh-CN/trading-bots/futures/grid/MARSCOINUSDT",
+    "navigation_origins": ["https://www.binance.com"],
+    "resource_origins": ["https://bin.bnbstatic.com", "https://public.bnbstatic.com"],
+    "api_origins": ["https://www.binance.com", "https://fapi.binance.com"],
+    "identity_origins": ["https://accounts.binance.com"]
+  }
+]

@@ -79,6 +79,82 @@ Assert-Contains $shContent "full_format_clean" "Shell full apply must verify con
 Assert-Contains $shContent "for pass in 1 2 3" "Shell full apply must retry until idempotent."
 Assert-Contains $shContent "git status --porcelain=v1 --untracked-files=all" "Shell full apply must require a clean worktree."
 
+# Exercise the real entry point in isolated minimal crates. The desktop child
+# remains deliberately unformatted to prove both default-scope exclusion and
+# skip_children protection without touching any developer's Rust files.
+$fixtureRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("elon-rustfmt-directed-" + [guid]::NewGuid().ToString("N"))
+$fixtureFullPath = [System.IO.Path]::GetFullPath($fixtureRoot)
+$tempPrefix = [System.IO.Path]::GetFullPath([System.IO.Path]::GetTempPath()).TrimEnd('\', '/') + [System.IO.Path]::DirectorySeparatorChar
+$utf8 = New-Object System.Text.UTF8Encoding($false)
+function Write-FixtureFile {
+    param([string]$Relative, [string]$Text)
+    $target = Join-Path $fixtureFullPath $Relative
+    [System.IO.Directory]::CreateDirectory((Split-Path $target -Parent)) | Out-Null
+    [System.IO.File]::WriteAllText($target, $Text, $utf8)
+}
+function Invoke-FixtureFormat {
+    param([string[]]$FormatArguments = @())
+    return Invoke-Captured -Command "powershell" -Arguments (@(
+        "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", (Join-Path $fixtureFullPath "scripts/format-rust.ps1")
+    ) + $FormatArguments)
+}
+try {
+    Write-FixtureFile "scripts/format-rust.ps1" $psContent
+    Write-FixtureFile ".rustfmt-version" (Get-Content -Raw -LiteralPath (Join-Path $repoRoot ".rustfmt-version"))
+    Write-FixtureFile "rust-toolchain.toml" (Get-Content -Raw -LiteralPath (Join-Path $repoRoot "rust-toolchain.toml"))
+    $defaultRoots = @("server", "server/pc-dev-runtime", "server/homecli-proto", "server/tests/esk-platform-harness", "server/tests/account-https-harness", "tools/esk-paper-contract-tests")
+    $allFixtureRoots = @($defaultRoots) + @("desktop-shell/src-tauri")
+    for ($index = 0; $index -lt $allFixtureRoots.Count; $index++) {
+        $root = $allFixtureRoots[$index]
+        Write-FixtureFile "$root/Cargo.toml" "[package]`nname = `"format_fixture_$index`"`nversion = `"0.1.0`"`nedition = `"2021`"`n`n[workspace]`n"
+        Write-FixtureFile "$root/src/lib.rs" "pub fn baseline() {}`n"
+    }
+    $desktopFile = "desktop-shell/src-tauri/src/lib.rs"
+    $childFile = Join-Path $fixtureFullPath "desktop-shell/src-tauri/src/nested.rs"
+    Write-FixtureFile $desktopFile "mod nested;pub async fn ready()->u8{1}`n"
+    Write-FixtureFile "desktop-shell/src-tauri/src/nested.rs" "pub fn untouched()->u8{2}`n"
+    $childBefore = [System.IO.File]::ReadAllText($childFile)
+
+    $directedCheck = Invoke-FixtureFormat -FormatArguments @("-Files", $desktopFile)
+    if ($directedCheck.ExitCode -ne 1) { throw "Desktop check must report formatting differences with exit 1.`n$($directedCheck.Text)" }
+    Assert-Contains $directedCheck.Text "edition 2021" "Desktop edition must come from its manifest."
+    $directedApply = Invoke-FixtureFormat -FormatArguments @("-Apply", "-Files", $desktopFile)
+    if ($directedApply.ExitCode -ne 0) { throw "Explicit desktop formatting failed.`n$($directedApply.Text)" }
+    if ([System.IO.File]::ReadAllText($childFile) -ne $childBefore) { throw "Directed desktop formatting changed an unrequested child module." }
+    $directedClean = Invoke-FixtureFormat -FormatArguments @("-Files", (Join-Path $fixtureFullPath $desktopFile))
+    if ($directedClean.ExitCode -ne 0) { throw "Directed desktop format check must accept an absolute in-repository path.`n$($directedClean.Text)" }
+
+    $defaultCheck = Invoke-FixtureFormat
+    if ($defaultCheck.ExitCode -ne 0) { throw "Default check must retain its existing crate scope.`n$($defaultCheck.Text)" }
+    foreach ($root in $defaultRoots) { Assert-Contains $defaultCheck.Text "Checking $root/Cargo.toml" "Default format scope lost a crate." }
+    if ($defaultCheck.Text.Contains("desktop-shell")) { throw "Default format scope unexpectedly included desktop-shell." }
+
+    $outside = Invoke-FixtureFormat -FormatArguments @("-Files", "../outside.rs")
+    if ($outside.ExitCode -eq 0) { throw "Directed formatter accepted a path outside the repository." }
+    Assert-Contains $outside.Text "outside repository" "Directed formatter must preserve the repository path boundary."
+    Write-FixtureFile "desktop-shell/other/src/lib.rs" "pub fn outside_crate() {}`n"
+    $unknown = Invoke-FixtureFormat -FormatArguments @("-Files", "desktop-shell/other/src/lib.rs")
+    if ($unknown.ExitCode -eq 0) { throw "Directed formatter accepted an unregistered desktop crate." }
+    Assert-Contains $unknown.Text "not under a known crate" "Desktop support must remain limited to src-tauri."
+
+    Write-FixtureFile "desktop-shell/src-tauri/Cargo.toml" "[package]`nname = `"format_fixture_desktop`"`nversion = `"0.1.0`"`n"
+    $missingEdition = Invoke-FixtureFormat -FormatArguments @("-Files", $desktopFile)
+    if ($missingEdition.ExitCode -eq 0) { throw "Directed desktop format accepted a missing explicit edition." }
+    Assert-Contains $missingEdition.Text "missing an explicit edition" "Desktop format must preserve the manifest edition gate."
+    Write-FixtureFile ".rustfmt-version" "intentionally-incompatible-test-version"
+    $wrongVersion = Invoke-FixtureFormat -FormatArguments @("-Files", $desktopFile)
+    if ($wrongVersion.ExitCode -eq 0) { throw "Directed desktop format accepted an unlocked formatter version." }
+    Assert-Contains $wrongVersion.Text "rustfmt version mismatch" "Desktop format must preserve the formatter version gate."
+} finally {
+    Set-Location $repoRoot
+    if (-not $fixtureFullPath.StartsWith($tempPrefix, [System.StringComparison]::OrdinalIgnoreCase) -or
+        (Split-Path $fixtureFullPath -Leaf) -notmatch '^elon-rustfmt-directed-[a-f0-9]{32}$') {
+        throw "Refusing to remove an unexpected format-test fixture path."
+    }
+    if (Test-Path -LiteralPath $fixtureFullPath) { Remove-Item -LiteralPath $fixtureFullPath -Recurse -Force }
+}
+Write-Host "PASS directed desktop format checks (edition, version, paths, skip_children, default scope)"
+
 $fullCheck = Invoke-Captured -Command "powershell" -Arguments @(
     "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $psScript
 )

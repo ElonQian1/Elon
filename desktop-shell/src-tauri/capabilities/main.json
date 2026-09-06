@@ -18,6 +18,7 @@
     "core:window:allow-close",
     "core:window:allow-is-maximized",
     "local-ai-web-session",
+    "browser-research",
     "codex-semantic-bridge"
   ]
 }

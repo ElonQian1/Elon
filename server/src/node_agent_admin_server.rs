@@ -101,6 +101,7 @@ pub(super) async fn spawn_admin_server(runtime: Arc<NodeRuntime>, port: u16) {
             .merge(node_agent_task_journal_api::routes())
             .merge(node_agent_local_tasks::routes())
             .merge(node_agent_win_codex_control::routes())
+            .merge(crate::node_agent_browser_research::routes())
             .route(
                 "/api/project-folder/pick",
                 axum::routing::post(node_agent_project_picker::pick_local_project_folder),

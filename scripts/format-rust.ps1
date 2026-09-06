@@ -51,6 +51,12 @@ $crates = @(
     @{ Root = "tools/esk-paper-contract-tests"; Manifest = "tools/esk-paper-contract-tests/Cargo.toml" }
 )
 
+# These crates are available only for explicit file requests. Keep the default
+# and -All baseline above unchanged until a dedicated format-baseline migration.
+$fileOnlyCrates = @(
+    @{ Root = "desktop-shell/src-tauri"; Manifest = "desktop-shell/src-tauri/Cargo.toml" }
+)
+
 function Get-CrateEdition {
     param([string]$Manifest)
 
@@ -135,12 +141,20 @@ if ($requestedFiles.Count -gt 0) {
             throw "Rust file not found: $relative"
         }
 
-        $crate = $crates |
+        $crate = @($crates) + @($fileOnlyCrates) |
             Sort-Object { $_["Root"].Length } -Descending |
             Where-Object { $relative -eq $_["Root"] -or $relative.StartsWith("$($_["Root"])/", [System.StringComparison]::Ordinal) } |
             Select-Object -First 1
         if (-not $crate) {
             throw "Rust file is not under a known crate: $relative"
+        }
+
+        if (-not $crate.ContainsKey("Edition")) {
+            $manifest = $crate["Manifest"]
+            if (-not (Test-Path -LiteralPath $manifest -PathType Leaf)) {
+                throw "Rust manifest not found: $manifest"
+            }
+            $crate["Edition"] = Get-CrateEdition $manifest
         }
 
         $edition = $crate["Edition"]

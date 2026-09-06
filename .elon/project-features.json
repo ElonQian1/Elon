@@ -16246,19 +16246,19 @@
       "id": "win-browser-research-mcp-v1",
       "title": "Win 通用网页研究与 MCP V1",
       "summary": "复用 Win WebView2、隔离 Profile、本地资料存储与项目 MCP，建设站点无关的资源和网络研究内核；新网站以版本化清单和可选业务适配器接入，币安网格作为首个业务验证对象。完整业务资料本地保留，AI 按需搜索读取，取消反复手动导出。",
-      "status": "ready",
+      "status": "in_progress",
       "priority": "p1",
       "requirement": {
         "path": "docs/requirements/win-browser-research-mcp-v1.md",
-        "content_hash": "9adeb3b107fe4bd5f35d60e3ddc6d7a7ed3615152391c0f7d032df147d066630",
+        "content_hash": "ddb93f14c19c623b3e63b182d47dc8628b64f1a0a2b7450a02ac512939342a67",
         "locator": "",
         "evidence_kind": "document",
         "git_identity": {
           "schema": "elon.project_context_git_identity.v1",
-          "head_commit": "add03c6c9019036c897490da773f92dddc03e1cf",
-          "head_blob_oid": "",
-          "worktree_blob_oid": "0a792980a40c5fed016d030c790dff3b858dbb50",
-          "state": "untracked"
+          "head_commit": "9c587d4e38c46cacd55b0a63e2dcded10fc67c3a",
+          "head_blob_oid": "0a792980a40c5fed016d030c790dff3b858dbb50",
+          "worktree_blob_oid": "3698e5a0f4f6a275e0588f9a94f6895ba00fa785",
+          "state": "tracked_modified"
         }
       },
       "knowledge_node_id": "",
@@ -16286,9 +16286,159 @@
         "接口结论绑定源码哈希/位置与实际请求证据，静态候选、HTTP 状态和业务成功分开。",
         "跨账户、站点、代次与过期访问失败关闭；验证 Rust、MCP、索引行为和真实 WebView2 链路。"
       ],
-      "implementation_evidence": [],
+      "implementation_evidence": [
+        {
+          "path": "desktop-shell/src-tauri/browser-research/sites.json",
+          "content_hash": "83a19a671ad6428c443ab89f73acc91746889bc6f7416c4ba5dc20ee1c91ff13",
+          "locator": "",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9c587d4e38c46cacd55b0a63e2dcded10fc67c3a",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "257b811cf5977addc26588debe34639e155ff41f",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "desktop-shell/src-tauri/src/browser_research.rs",
+          "content_hash": "9f853d062983250407e6e2ba7a90ec786a7eb12c4ad583b74be686d20f62e212",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9c587d4e38c46cacd55b0a63e2dcded10fc67c3a",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "307e7379c42da0da586bfa58ec12bc02099788f4",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "desktop-shell/src-tauri/src/browser_research/host/windows.rs",
+          "content_hash": "bcf9597f0ff62298924094a84ef0308f173cd9bd454231cd9ae410bc31dd9146",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9c587d4e38c46cacd55b0a63e2dcded10fc67c3a",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "f30e36a1e5407d2a674afe1da45ccf6c6554af5d",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "desktop-shell/src-tauri/src/browser_research/runtime.rs",
+          "content_hash": "0048252d99174437c0f50e0c6c7dec8aefce95821de8c649ffd38c210a9d5178",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9c587d4e38c46cacd55b0a63e2dcded10fc67c3a",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "1c44d098ec4b4fe10ffdae6b3c98f3061f74948c",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "desktop-shell/src-tauri/src/browser_research/tests.rs",
+          "content_hash": "9638580f0a10e34f119c23074b76fb8a2ac1817f0649df68e7bb286b1f930647",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9c587d4e38c46cacd55b0a63e2dcded10fc67c3a",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "d8fe5a3e3f59c78c9e5dfa7dbec210720e042557",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "desktop-shell/tests/browser-research-fixture.mjs",
+          "content_hash": "00b85f399b54568abcb395a6e4cf60b09ddca3bfa88d5c23753c38d5c9db346c",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9c587d4e38c46cacd55b0a63e2dcded10fc67c3a",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "59ae9d5b4275dd24aee335a6ff95b9c47f12d951",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "docs/reports/win-browser-research-mcp-v1-20260907.md",
+          "content_hash": "7ccb6704a8d1816af8da71cbf1dc3785f5c108d86b48141137497c65929c399c",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9c587d4e38c46cacd55b0a63e2dcded10fc67c3a",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "628c1da78940a8a09d729aff68e0f5766b35dc78",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/browser-research/BrowserResearchPage.tsx",
+          "content_hash": "84afb1d40d306ff5cb07eceebdb898335cdff27d41e93a9d5e0b90b2f0456fa6",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9c587d4e38c46cacd55b0a63e2dcded10fc67c3a",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "b66e5f36899576dd1ad0a9daaa388490ee89464f",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/browser-research/browserResearch.test.cjs",
+          "content_hash": "4ce05aa3c36ef3876a0c9c0770cca38adfcb0c3addbf55135d82e76c11104f44",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9c587d4e38c46cacd55b0a63e2dcded10fc67c3a",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "8906bd9fe7d9c1f2a8079abadd75c7de9989aa13",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/src/node_agent_browser_research_mcp.rs",
+          "content_hash": "0795d8be2944e02e246e74e2d2d2c0577ae8506be83f50a9d96a1f88ab992909",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9c587d4e38c46cacd55b0a63e2dcded10fc67c3a",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "76c0c9ffa4b73bd8dfc5e3e5043cd99ddb9c99c9",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/tests/browser-research-harness/src/http_tests.rs",
+          "content_hash": "dda5baacc04f26e8bab3b3e1236d2094072ed53d3d42163e3fccdb40bffd8f91",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9c587d4e38c46cacd55b0a63e2dcded10fc67c3a",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "d86843ddea92dedd839d5101c2f58883b7d7f488",
+            "state": "index_only"
+          }
+        }
+      ],
+      "claim": {
+        "claim_id": "claim_d600bc11caae4dea9780ca1065bccc22",
+        "agent_id": "codex-grid-research",
+        "claimed_at_ms": 1788731739105,
+        "expires_at_ms": 1788742539105
+      },
       "created_at_ms": 1788728866806,
-      "updated_at_ms": 1788728924892
+      "updated_at_ms": 1788731990383
     },
     {
       "id": "win-chatgpt-composite-answer-extraction-v1",
@@ -22582,96 +22732,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_7330cacac98748efab0885e54ee6f10b",
-      "feature_id": "official-quant-release-admission-v1",
-      "action": "claim_released",
-      "actor": "codex:/root",
-      "reason": "Update the requirement and task scope to the user-approved new-only product contract and actual implementation paths.",
-      "from_status": "in_progress",
-      "to_status": "blocked",
-      "at_ms": 1788574262741
-    },
-    {
-      "id": "feature_event_9e0515e30d8c42daa807cf5c593521a6",
-      "feature_id": "official-quant-release-admission-v1",
-      "action": "requirement_rebound",
-      "actor": "codex:/root",
-      "reason": "Bind the reviewed new-only requirement, exact artifact proof, all download gates, recovery behavior, and task-sync policy.",
-      "from_status": "blocked",
-      "to_status": "proposed",
-      "at_ms": 1788574272825
-    },
-    {
-      "id": "feature_event_72455fe821f6465a88b671579f203b99",
-      "feature_id": "official-quant-release-admission-v1",
-      "action": "metadata_updated",
-      "actor": "codex:/root",
-      "reason": "Replace stale planning paths and old-visible wording with the reviewed implementation scope.",
-      "from_status": "proposed",
-      "to_status": "proposed",
-      "at_ms": 1788574320880
-    },
-    {
-      "id": "feature_event_db7785230aa943d98d02a9e0d9b7e1fb",
-      "feature_id": "official-quant-release-admission-v1",
-      "action": "transitioned",
-      "actor": "codex:/root",
-      "reason": "Reviewed the updated new-only requirement and exact implementation scope against the user decision and final code review.",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1788574339868
-    },
-    {
-      "id": "feature_event_3056938fa21746e39f59e533a48efc41",
-      "feature_id": "official-quant-release-admission-v1",
-      "action": "transitioned",
-      "actor": "codex:/root",
-      "reason": "Requirement and task paths are current, reviewed, and dependency-complete.",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1788574354729
-    },
-    {
-      "id": "feature_event_4f668aca9d1949b8a2a282a8e885fd33",
-      "feature_id": "official-quant-release-admission-v1",
-      "action": "claimed",
-      "actor": "codex:/root",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788574369805
-    },
-    {
-      "id": "feature_event_a8f2892a4b984633923757f208087d5b",
-      "feature_id": "official-quant-release-admission-v1",
-      "action": "transitioned",
-      "actor": "codex:/root",
-      "reason": "Implement and verify the reviewed exact scope.",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788574386909
-    },
-    {
-      "id": "feature_event_8722e7b3b782467aba4da8179689d103",
-      "feature_id": "official-quant-release-admission-v1",
-      "action": "evidence_recorded",
-      "actor": "codex:/root",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788574612678
-    },
-    {
-      "id": "feature_event_c66acb36db074e33ae486e405a63f66d",
-      "feature_id": "official-quant-release-admission-v1",
-      "action": "transitioned",
-      "actor": "codex:/root",
-      "reason": "完成实际新版唯一准入及用户旧版入口关闭，当前源码与测试证据已登记。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1788574844545
-    },
-    {
       "id": "feature_event_cafe41fa2991415fa62b7cb6ea10cba4",
       "feature_id": "official-quant-release-admission-v1",
       "action": "transitioned",
@@ -24580,6 +24640,96 @@
       "from_status": "accepted",
       "to_status": "ready",
       "at_ms": 1788728924892
+    },
+    {
+      "id": "feature_event_de151b0d34384b2ab50e239b5b2ebf12",
+      "feature_id": "win-browser-research-mcp-v1",
+      "action": "claimed",
+      "actor": "codex-grid-research",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788729516215
+    },
+    {
+      "id": "feature_event_9f74a8b3a1ee4a7e8cfc07809efd8623",
+      "feature_id": "win-browser-research-mcp-v1",
+      "action": "transitioned",
+      "actor": "codex-grid-research",
+      "reason": "通用Win采集、站点清单、研究资料库、MCP队列及界面已开始接线；尚未编译或现场验收。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788730291997
+    },
+    {
+      "id": "feature_event_f4816b81c5fe4782a5c384dc73b4ab41",
+      "feature_id": "win-browser-research-mcp-v1",
+      "action": "claim_released",
+      "actor": "codex-grid-research",
+      "reason": "需求状态更新为实施中并链接实际运行合同，重绑同一验收范围",
+      "from_status": "in_progress",
+      "to_status": "blocked",
+      "at_ms": 1788731738169
+    },
+    {
+      "id": "feature_event_5ef25b861cff4736b58264ae355182b0",
+      "feature_id": "win-browser-research-mcp-v1",
+      "action": "requirement_rebound",
+      "actor": "codex-grid-research",
+      "reason": "同一用户要求的实现状态与运行说明更新，不改变验收目标",
+      "from_status": "blocked",
+      "to_status": "proposed",
+      "at_ms": 1788731738588
+    },
+    {
+      "id": "feature_event_556a250a460d4083b16ea6f3c8795657",
+      "feature_id": "win-browser-research-mcp-v1",
+      "action": "transitioned",
+      "actor": "codex-grid-research",
+      "reason": "复核需求和原验收范围一致，继续已授权实现",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1788731738759
+    },
+    {
+      "id": "feature_event_c4d6b032716c470d84b65c983af7892a",
+      "feature_id": "win-browser-research-mcp-v1",
+      "action": "transitioned",
+      "actor": "codex-grid-research",
+      "reason": "复核需求和原验收范围一致，继续已授权实现",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1788731738925
+    },
+    {
+      "id": "feature_event_b6c93ee585aa45578053c4a276df1896",
+      "feature_id": "win-browser-research-mcp-v1",
+      "action": "claimed",
+      "actor": "codex-grid-research",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788731739106
+    },
+    {
+      "id": "feature_event_9a2bf9f4e1e2495692ac5897f5b1b2f2",
+      "feature_id": "win-browser-research-mcp-v1",
+      "action": "transitioned",
+      "actor": "codex-grid-research",
+      "reason": "实现已接线，继续编译与实际WebView2联调",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788731739287
+    },
+    {
+      "id": "feature_event_2a7a1b6c120649fab9e871e675ddd9d5",
+      "feature_id": "win-browser-research-mcp-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-grid-research",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788731990383
     }
   ]
 }

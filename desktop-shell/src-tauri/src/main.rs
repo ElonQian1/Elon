@@ -25,6 +25,7 @@
 )]
 
 mod autostart;
+mod browser_research;
 mod codex_semantic_bridge;
 mod external_navigation;
 mod internal_browser;
@@ -140,8 +141,10 @@ fn main() {
     tauri::Builder::default()
         .manage(codex_semantic_bridge::CodexSemanticBridge::default())
         .manage(internal_browser::InternalBrowserRuntime::default())
+        .manage(browser_research::ResearchRuntime::default())
         .manage(local_ai_browser::LocalAiBrowserRuntime::default())
         .invoke_handler(tauri::generate_handler![
+            browser_research::run_browser_research,
             local_ai_browser::list_local_ai_web_providers,
             local_ai_browser::resolve_local_ai_guest_owner_identity,
             local_ai_browser::open_local_ai_web_session,
