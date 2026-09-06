@@ -2,7 +2,7 @@
   'use strict';
 
   const existing = window.__elonChatGptPrivateConversationDirectory;
-  if (existing && Number(existing.version) >= 8) return;
+  if (existing && Number(existing.version) >= 9) return;
   if (location.origin !== 'https://chatgpt.com') return;
 
   const originalFetch = typeof window.fetch === 'function' ? window.fetch.bind(window) : null;
@@ -16,6 +16,7 @@
   const pinnedStateOverrides = new Map();
   const archivedConversations = new Map();
   const removedConversationIds = new Set();
+  const deletedConversationIds = new Set();
   let listener = null;
   let revision = 0;
   const MAX_CONVERSATIONS = 200;
@@ -114,7 +115,7 @@
     if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
     const id = cleanText(value.id || value.conversation_id || value.conversationId);
     const title = cleanText(value.title || value.name);
-    if (!SAFE_ID.test(id) || !title) return null;
+    if (!SAFE_ID.test(id) || !title || deletedConversationIds.has(id)) return null;
     const projectId = projectIdFrom(value, fallbackProjectId);
     return Object.freeze({
       id,
@@ -148,7 +149,7 @@
     const projectId = cleanText(rawProjectId);
     const previous = conversations.get(id);
     const title = cleanText(rawTitle) || (previous && previous.title) || '';
-    if (!SAFE_ID.test(id) || !SAFE_PROJECT_ID.test(projectId) || !title) return false;
+    if (!SAFE_ID.test(id) || !SAFE_PROJECT_ID.test(projectId) || !title || deletedConversationIds.has(id)) return false;
     const path = '/g/' + projectId + '/c/' + id;
     const project = projects.get(projectId);
     const next = Object.freeze({
@@ -202,7 +203,7 @@
 
   function acceptArchivedState(rawId, archived, metadata) {
     const id = cleanText(rawId);
-    if (!SAFE_ID.test(id) || typeof archived !== 'boolean') return false;
+    if (!SAFE_ID.test(id) || typeof archived !== 'boolean' || deletedConversationIds.has(id)) return false;
     if (archived) {
       const previous = conversations.get(id);
       if (previous) archivedConversations.set(id, previous);
@@ -236,6 +237,20 @@
     archivedConversations.delete(id);
     removedConversationIds.delete(id);
     trimMap(conversations, MAX_CONVERSATIONS);
+    notify();
+    return true;
+  }
+
+  function acceptDeletedState(rawId) {
+    const id = cleanText(rawId);
+    if (!SAFE_ID.test(id)) return false;
+    conversations.delete(id);
+    archivedConversations.delete(id);
+    pinnedStateOverrides.delete(id);
+    removedConversationIds.add(id);
+    deletedConversationIds.add(id);
+    trimSet(removedConversationIds, MAX_CONVERSATIONS);
+    trimSet(deletedConversationIds, MAX_CONVERSATIONS);
     notify();
     return true;
   }
@@ -414,18 +429,20 @@
       conversations: conversationRows,
       projects: projectRows,
       removedConversationIds: Array.from(removedConversationIds),
+      deletedConversationIds: Array.from(deletedConversationIds),
       complete: false
     });
   }
 
   window.__elonChatGptPrivateConversationDirectory = Object.freeze({
-    version: 8,
+    version: 9,
     snapshot,
     refreshProject,
     acceptConversationMembership,
     acceptPinnedState,
     acceptTitleState,
     acceptArchivedState,
+    acceptDeletedState,
     setListener: (value) => { listener = typeof value === 'function' ? value : null; }
   });
 })();

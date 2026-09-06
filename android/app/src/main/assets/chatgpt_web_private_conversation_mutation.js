@@ -1,7 +1,7 @@
 (function (root, factory) {
   'use strict';
 
-  const exported = Object.freeze({ version: 5, create: factory });
+  const exported = Object.freeze({ version: 6, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (!root || !root.location || root.location.origin !== 'https://chatgpt.com') return;
   const current = root.__elonChatGptPrivateConversationMutation;
@@ -14,7 +14,7 @@
 })(typeof window === 'object' ? window : globalThis, function (root, dependencies) {
   'use strict';
 
-  const VERSION = 5;
+  const VERSION = 6;
   const WRITE_TIMEOUT_MS = 9000;
   const RECONCILE_TIMEOUT_MS = 4000;
   const UNCERTAIN_RECONCILE_WINDOW_MS = 16000;
@@ -449,6 +449,7 @@
     if (!target || !mutation) return Promise.resolve(rejected('invalid_mutation', false));
     if (!supported()) return Promise.resolve(rejected('mutation_unavailable', false));
     if (active) return Promise.resolve(rejected('mutation_busy', false));
+    if (root.__elonChatGptPrivateConversationDelete?.busy?.()) return Promise.resolve(rejected('mutation_busy', false));
     if (cooldownUntil > now()) return Promise.resolve(rejected('mutation_circuit_open', false));
     const request = executeMutation(target, mutation).finally(() => {
       if (active === request) active = null;
@@ -521,6 +522,9 @@
   }
 
   function handle(action, command, respond, scheduleSnapshot, directoryRequests) {
+    if (root.__elonChatGptPrivateConversationDelete?.handle(
+      action, command, respond, scheduleSnapshot, directoryRequests
+    )) return true;
     const mutation = commandMutation(action, command);
     if (!mutation) return false;
     mutation.run().then((outcome) => {

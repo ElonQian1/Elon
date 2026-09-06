@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  if (Number(window.__elonChatGptConversationDirectoryRequests?.version) >= 3) return;
+  if (Number(window.__elonChatGptConversationDirectoryRequests?.version) >= 4) return;
 
   const PROJECT_ID = /^g-p-[A-Za-z0-9_-]{1,160}$/;
   const CONVERSATION_PATH = /^\/(?:c\/[A-Za-z0-9_-]{1,160}|g\/g-p-[A-Za-z0-9_-]{1,160}\/c\/[A-Za-z0-9_-]{1,160})$/;
@@ -19,7 +19,7 @@
       if (!privateDirectory || typeof privateDirectory.snapshot !== 'function') return;
       const value = optional(null, () => privateDirectory.snapshot());
       if (!value || !Array.isArray(value.conversations) || !Array.isArray(value.projects) ||
-          (!value.conversations.length && !value.projects.length)) return;
+          (!value.conversations.length && !value.projects.length && !value.removedConversationIds?.length)) return;
       const projectId = PROJECT_ID.test(String(requestedProjectId || ''))
         ? String(requestedProjectId)
         : '';
@@ -29,12 +29,15 @@
       const removedConversationIds = Array.isArray(value.removedConversationIds)
         ? value.removedConversationIds.slice(0, 200)
         : [];
+      const deletedConversationIds = Array.isArray(value.deletedConversationIds)
+        ? value.deletedConversationIds.slice(0, 200) : [];
       const complete = Boolean(projectId && scopedComplete === true);
       const scopeKey = projectId || 'global';
       const fingerprint = JSON.stringify({
         conversations,
         projects: value.projects,
         removedConversationIds,
+        deletedConversationIds,
         complete
       });
       if (fingerprint === lastSnapshots.get(scopeKey)) return;
@@ -44,6 +47,7 @@
         conversations,
         projects: value.projects,
         removedConversationIds,
+        deletedConversationIds,
         scopeProjectId: projectId || null,
         collection: {
           scrollerFound: false,
@@ -135,5 +139,5 @@
     return Object.freeze({ cancel, emitSnapshot, handleCommand, installListener, probeMembership, requestList });
   }
 
-  window.__elonChatGptConversationDirectoryRequests = Object.freeze({ version: 3, create });
+  window.__elonChatGptConversationDirectoryRequests = Object.freeze({ version: 4, create });
 })();
