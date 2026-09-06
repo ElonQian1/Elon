@@ -168,6 +168,84 @@ function existingFixture() {
   return { ...f, id };
 }
 
+function pdfFixture(temporary = false) {
+  const f = fixture();
+  if (temporary) f.root.location.href += '?temporary-chat=true';
+  f.file = new File(['%PDF-1.7\nsynthetic fixture'], 'fixture.pdf', { type: 'application/pdf' });
+  Object.assign(f.descriptor, { href: f.root.location.href, name: f.file.name, size: f.file.size, type: f.file.type });
+  const props = { conversation: {}, onCreateNewCompletion() {}, currentModelId: 'synthetic-selected-model',
+    currentModelConfig: { id: 'synthetic-default-model' } };
+  const top = { stateNode: {} };
+  top.stateNode.current = top;
+  f.fiber.return = { memoizedProps: props, return: top };
+  return { ...f, props };
+}
+
+test('PDF attachment uses the official composer model id, not the localized button label', async () => {
+  for (const temporary of [false, true]) {
+    for (const explicit of [false, true]) {
+      const f = pdfFixture(temporary);
+      if (!explicit) f.props.currentModelId = null;
+      f.setModel('\u81ea\u52a8');
+      const p = pipeline(f);
+      await p.start();
+      assert.equal(p.fallbacks(), 0);
+      assert.equal(p.receipts[0][1], true);
+      assert.equal(p.requests[0].init.headers['x-oai-model-slug'], explicit
+        ? 'synthetic-selected-model' : 'synthetic-default-model');
+      assert.equal(f.store.readyFiles$()[0].fileSpec.mimeType, 'application/pdf');
+      assert.equal(f.store.readyFiles$()[0].isTemporaryChat, temporary);
+    }
+  }
+});
+
+test('missing, invalid or ambiguous PDF model binding stays unknown before reading bytes', async () => {
+  for (const mutate of [f => { f.fiber.return = null; }, f => { f.props.currentModelId = '\u6781\u9ad8'; },
+    f => { f.props.onCreateNewCompletion = null; }, f => { f.props.conversation = null; },
+    f => { f.fiber.return.return.stateNode.current = {}; },
+    f => { f.fiber.return.return = { memoizedProps: { ...f.props, currentModelId: 'other-model' },
+      return: f.fiber.return.return }; }]) {
+    const f = pdfFixture();
+    mutate(f);
+    const p = pipeline(f, { options: { source: { read: () => assert.fail('no PDF bytes before model binding') } } });
+    await p.start();
+    assert.equal(p.fallbacks(), 1);
+    assert.equal(p.requests.length, 0);
+    assert.equal(p.receipts.length, 0, 'missing runtime state is not an unsupported-PDF error');
+  }
+});
+
+test('PDF model binding ignores stale React props and follows only a confirmed current alternate', async () => {
+  const f = pdfFixture();
+  const previous = f.fiber.return.return;
+  const current = { stateNode: previous.stateNode };
+  previous.stateNode.current = current;
+  f.fiber.alternate = { return: { memoizedProps: { ...f.props, currentModelId: 'committed-model' }, return: current } };
+  const p = pipeline(f);
+  await p.start();
+  assert.equal(p.receipts[0][1], true);
+  assert.equal(p.requests[0].init.headers['x-oai-model-slug'], 'committed-model');
+});
+
+test('actual PDF model changes cancel even when the displayed effort label stays unchanged', async () => {
+  for (const afterWrite of [false, true]) {
+    const f = pdfFixture();
+    const p = pipeline(f, afterWrite ? { request: async () => {
+      f.props.currentModelId = 'synthetic-other-model';
+      return { payload: { status: 'success', file_id: 'file-synthetic',
+        upload_url: 'https://uploads.oaiusercontent.com/fixture?sig=synthetic' } };
+    } } : { options: { source: { read: async () => {
+      f.props.currentModelId = 'synthetic-other-model';
+      return f.file;
+    } } } });
+    await p.start();
+    assert.equal(p.fallbacks(), 0);
+    assert.equal(p.requests.length, afterWrite ? 1 : 0);
+    assert.equal(p.receipts[0][1], false);
+    assert.equal(f.store.readyFiles$().length, 0);
+  }
+});
+
 test('existing ordinary conversation requires positive scope confirmation before association', async () => {
   const f = existingFixture(), binding = f.composer.capture();
   assert.equal(f.composer.available(), true);

@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 4, create: factory });
+  const exported = Object.freeze({ version: 5, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root && root.location?.origin === 'https://chatgpt.com') {
     root.__elonChatGptPrivateAttachmentTransport = exported;
@@ -71,6 +71,7 @@
         ...(context.libraryFileInfo == null ? {} : { libraryFileInfo: protocol.projectInfo(context) }),
         ...(context.imageDimensions == null ? {} : { imageDimensions: protocol.imageDimensions(context.imageDimensions) }) });
       const body = protocol.prepare(file, selected);
+      const creationHeaders = protocol.creationHeaders(file, selected);
       const abort = new Promise((_, reject) => {
         abortListener = () => reject(new Error('cancelled'));
         job.controller.signal.addEventListener('abort', abortListener, { once: true });
@@ -82,7 +83,7 @@
       assertCurrent(job);
       change(job, 'preparing');
       const prepared = await dispatch(job, '/backend-api/files', {
-        method: 'POST', credentials: 'include', headers, body: JSON.stringify(body),
+        method: 'POST', credentials: 'include', headers: { ...headers, ...creationHeaders }, body: JSON.stringify(body),
       }, 'json', 15000);
       job.fileId = prepared.payload?.file_id || null;
       const destination = protocol.destination(prepared.payload, file.type);
@@ -128,6 +129,6 @@
   }
 
   function cancel() { if (active) active.controller.abort(); }
-  function snapshot() { return { version: 4, stage: active?.stage || 'idle', cooldown: cooldownUntil > Date.now() }; }
-  return Object.freeze({ version: 4, upload, cancel, dispose: cancel, snapshot });
+  function snapshot() { return { version: 5, stage: active?.stage || 'idle', cooldown: cooldownUntil > Date.now() }; }
+  return Object.freeze({ version: 5, upload, cancel, dispose: cancel, snapshot });
 });

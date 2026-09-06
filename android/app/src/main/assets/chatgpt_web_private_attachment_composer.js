@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 6, create: factory });
+  const exported = Object.freeze({ version: 7, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateAttachmentComposer = exported;
 })(typeof window === 'object' ? window : null, function (root, options) {
@@ -47,6 +47,31 @@
     return root.__elonChatGptComposer?.currentModel?.(root.document.querySelector('#prompt-textarea')) || '';
   }
 
+  function modelSlug() {
+    const input = root.document.querySelector('#upload-files');
+    if (!input?.isConnected) return null;
+    const key = Object.keys(input).find(name => name.startsWith('__reactFiber$'));
+    const candidates = new Set();
+    // The host node can still reference React's previous alternate. Accept only
+    // a branch that reaches its root's current pointer, never work-in-progress props.
+    for (const start of [input[key], input[key]?.alternate]) {
+      const ancestors = [];
+      for (let fiber = start; fiber && ancestors.length < 90; fiber = fiber.return) ancestors.push(fiber);
+      const top = ancestors.at(-1);
+      if (!top || top.return || top.stateNode?.current !== top) continue;
+      for (const fiber of ancestors) {
+        const props = fiber.memoizedProps;
+        if (!props?.conversation || typeof props.conversation !== 'object' ||
+            typeof props.onCreateNewCompletion !== 'function') continue;
+        // Official file-drop handler receives currentModelId ?? currentModelConfig.id.
+        const slug = props.currentModelId ?? props.currentModelConfig?.id;
+        if (typeof slug !== 'string' || !/^[a-z0-9][a-z0-9._-]{0,127}$/i.test(slug)) return null;
+        candidates.add(slug);
+      }
+    }
+    return candidates.size === 1 ? candidates.values().next().value : null;
+  }
+
   function route() {
     const url = new URL(root.location.href);
     const existing = /^(?:\/g\/(g-p-[a-f0-9]{32})(?:-[A-Za-z0-9_-]{1,124})?)?\/c\/([a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12})$/i.exec(url.pathname);
@@ -77,13 +102,14 @@
     const account = identity();
     if (!/^doc_[a-z0-9_]{3,80}$/.test(token || '') || !account) throw new Error('composer_context_unavailable');
     const binding = Object.freeze({ store: resolveStore(), href: root.location.href, token, account,
-      model: model(), ...route() });
+      model: model(), modelSlug: modelSlug(), ...route() });
     if (binding.conversationId === null && !binding.projectId) confirmed.add(binding);
     return binding;
   }
 
   async function prepare(binding, signal, descriptor) {
     if (!current(binding) || signal?.aborted) throw new Error('composer_changed');
+    if (root.__elonChatGptPrivateAttachmentProtocol?.isPdf(descriptor) && !binding.modelSlug) return null;
     if (confirmed.has(binding)) return true;
     const read = binding.projectId && !binding.conversationId ? () => project?.read(binding, signal)
       : root.__elonChatGptPrivateTransport?.readAttachmentContext;
@@ -142,17 +168,19 @@
     try {
       return !!binding && root.location.href === binding.href &&
         root.__elonChatGptDocumentToken === binding.token && identity() === binding.account &&
-        (!checkModel || model() === binding.model && projects.get(binding)?.thread?.current() !== false) &&
+        (!checkModel || model() === binding.model && modelSlug() === binding.modelSlug &&
+          projects.get(binding)?.thread?.current() !== false) &&
         resolveStore() === binding.store;
     } catch (_) { return false; }
   }
 
   function uploadContext(binding, file, imageDimensions) {
     if (!current(binding) || !confirmed.has(binding)) throw new Error('composer_changed');
-    if (projects.has(binding)) return project.uploadContext(projects.get(binding), file, imageDimensions);
-    return { useCase: imageDimensions ? 'multimodal' : 'ace_upload', storeInLibrary: false,
+    const context = projects.has(binding) ? project.uploadContext(projects.get(binding), file, imageDimensions)
+      : { useCase: imageDimensions ? 'multimodal' : 'ace_upload', storeInLibrary: false,
       libraryPersistenceMode: binding.isTemporaryChat ? undefined : 'required',
       isTemporaryChat: binding.isTemporaryChat, indexForRetrieval: false, imageDimensions };
+    return { ...context, modelSlug: binding.modelSlug ?? undefined };
   }
 
   function associate(binding, file, result, leaseId) {
@@ -228,5 +256,5 @@
     return true;
   }
 
-  return Object.freeze({ version: 6, available, capture, prepare, current, uploadContext, associate, merge, remove });
+  return Object.freeze({ version: 7, available, capture, prepare, current, uploadContext, associate, merge, remove });
 });

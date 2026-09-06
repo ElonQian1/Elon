@@ -46,6 +46,45 @@ test('prepare uses the verified legacy route contract without enabling multipart
   assert.equal(result.store_in_library, false);
 });
 
+test('PDF creation binds the selected model only to the official create request', async () => {
+  for (const type of ['application/pdf', 'text/plain']) {
+    const pdf = new File(['%PDF-1.7\nsynthetic'], 'fixture.PDF', { type });
+    const f = fixture({ respond: async url => url.endsWith('/files') ? { payload: prepared() } :
+      url.endsWith('/process_upload_stream') ? { text: stream().replace('text/plain', type) } : {} });
+    const context = { ...selected(), modelSlug: 'synthetic-selected-model' };
+    const result = await f.instance.upload(pdf, context, f.binding);
+    assert.equal(result.ok, true);
+    assert.equal(f.calls[0].init.headers['x-oai-model-slug'], context.modelSlug);
+    assert.equal(f.calls[1].init.headers['x-oai-model-slug'], undefined);
+    assert.equal(f.calls[2].init.headers['x-oai-model-slug'], undefined);
+    assert.equal(f.calls[1].init.body, pdf, 'document bytes are not image-normalized or re-encoded');
+    assert.equal(JSON.parse(f.calls[0].init.body).mime_type, type);
+    assert.equal(result.metadata.mimeType, type);
+    assert.equal(result.associated, false);
+  }
+});
+
+test('PDF model ownership is validated and snapshotted before asynchronous authentication', async () => {
+  const pdf = new File(['%PDF-1.7'], 'fixture.pdf', { type: 'application/pdf' });
+  for (const modelSlug of [undefined, '', 'High effort', '\u6781\u9ad8', 'm\r\nheader: value', 'a'.repeat(129), {}]) {
+    const f = fixture();
+    const result = await f.instance.upload(pdf, { ...selected(), modelSlug }, f.binding);
+    assert.equal(result.ok, false);
+    assert.equal(f.calls.length, 0);
+  }
+  let release;
+  const f = fixture({ options: { acquireHeaders: () => new Promise(resolve => { release = resolve; }) } });
+  const context = { ...selected(), modelSlug: 'synthetic-first' };
+  const pending = f.instance.upload(pdf, context, f.binding);
+  context.modelSlug = 'synthetic-other';
+  release({ Authorization: 'Bearer synthetic-token', 'x-oai-model-slug': 'untrusted-cached-model' });
+  await pending;
+  assert.equal(f.calls[0].init.headers['x-oai-model-slug'], 'synthetic-first');
+  const text = fixture();
+  await text.upload({ ...selected(), modelSlug: 'synthetic-first' });
+  assert.equal(text.calls[0].init.headers['x-oai-model-slug'], undefined);
+});
+
 test('reject untyped images, projects and conflicting temporary persistence before any request', async () => {
   for (const patch of [{ isProjectThread: true }, { isTemporaryChat: true }, { gizmoId: 'project' },
     { directoryId: 'folder' }, { useCase: 'guessed' }, { libraryPersistenceMode: 'guessed' }]) {

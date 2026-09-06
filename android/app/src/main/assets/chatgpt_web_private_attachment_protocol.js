@@ -12,6 +12,20 @@
   const USE_CASES = new Set(['ace_upload', 'my_files', 'multimodal', 'gizmo']);
   const IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
+  function isPdf(file) {
+    return file?.type === 'application/pdf' || /\.pdf$/i.test(file?.name || '');
+  }
+
+  function creationHeaders(file, context) {
+    if (!isPdf(file)) return {};
+    const slug = context?.modelSlug;
+    if (typeof slug !== 'string' || !/^[a-z0-9][a-z0-9._-]{0,127}$/i.test(slug)) {
+      throw new Error('unsupported_upload_context');
+    }
+    // The official PDF create request carries the composer model, not its UI label.
+    return { 'x-oai-model-slug': slug };
+  }
+
   function imageDimensions(value) {
     if (!Number.isSafeInteger(value?.width) || !Number.isSafeInteger(value?.height) ||
         value.width < 1 || value.height < 1 || value.width > 2048 || value.height > 2048) {
@@ -154,5 +168,6 @@
     return { metadata, eventCount: count, events };
   }
 
-  return { version: 5, maxFileBytes: MAX_BYTES, prepare, destination, processBody, processed, imageDimensions, projectInfo };
+  return { version: 6, maxFileBytes: MAX_BYTES, prepare, destination, processBody, processed,
+    imageDimensions, projectInfo, isPdf, creationHeaders };
 });
