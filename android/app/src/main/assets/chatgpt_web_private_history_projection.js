@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 2, create: factory });
+  const exported = Object.freeze({ version: 3, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root) root.__elonChatGptPrivateHistoryProjection = exported;
 })(typeof window === 'object' ? window : null, function (dependencies) {
@@ -80,7 +80,7 @@
       .map((value) => clean(value, MAX_TEXT)).filter(Boolean).join('\n').slice(0, MAX_TEXT);
   }
 
-  function mediaParts(message, bounded = true) {
+  function mediaParts(message, bounded = true, withSource = false) {
     const parts = [];
     const content = object(message.content);
     (content && Array.isArray(content.parts) ? content.parts : []).slice(0, MAX_PARTS)
@@ -101,6 +101,7 @@
       const name = clean(attachment && attachment.name, 180);
       if (!name) return;
       const value = { type: 'file', text: name, kind: 'file' };
+      if (withSource) value.source = attachment;
       const mime = clean(attachment.mime_type, 96);
       if (/^[A-Za-z0-9.+-]{1,63}\/[A-Za-z0-9.+-]{1,63}$/.test(mime)) value.mediaType = mime;
       parts.push(value);
@@ -171,5 +172,22 @@
     return { files: rows, truncated };
   }
 
-  return Object.freeze({ normalize, project, files });
+  function fileSource(payload, itemId) {
+    const match = /^([A-Za-z0-9_-]{1,180}):([0-9]{1,3})$/.exec(String(itemId || ''));
+    if (!match) return null;
+    const normalized = normalize(payload);
+    const matches = (orderedNodes(normalized) || []).filter(entry => {
+      const message = object(entry.node.message || entry.node);
+      return message && visible(message) &&
+        (clean(message.id || entry.node.id, 180) || entry.fallbackId) === match[1];
+    });
+    if (matches.length !== 1) return null;
+    const message = matches[0].node.message || matches[0].node;
+    const part = mediaParts(message, false, true)[Number(match[2])];
+    // Only the private download owner sees the raw descriptor, never the native index.
+    return part?.source ? { attachment: part.source, name: part.text,
+      projectId: normalized.gizmo_id || normalized.project_id || '' } : null;
+  }
+
+  return Object.freeze({ normalize, project, files, fileSource });
 });
