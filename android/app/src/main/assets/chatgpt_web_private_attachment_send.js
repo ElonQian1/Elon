@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 9, create: factory });
+  const exported = Object.freeze({ version: 10, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       !(Number(root.__elonChatGptPrivateAttachmentSend?.version) >= exported.version)) {
@@ -15,12 +15,17 @@
   const image = options.image || root.__elonChatGptPrivateAttachmentImage?.create(root);
   const createTransport = options.createTransport || (config => root.__elonChatGptPrivateAttachmentTransport.create(root, config));
   let active = null;
+  const selections = root.__elonChatGptPrivateAttachmentSelection?.create(root, {
+    composer, createTransport, busy: () => !!active,
+  });
 
-  function cancel() {
+  function suspend() {
     if (!active) return;
     active.controller.abort();
     active.transport?.cancel();
   }
+
+  function cancel() { selections?.cancel(); suspend(); }
 
   async function start(raw, respond, changed, fallback) {
     if (active) return respond('request_attachment_upload', false, '附件上传尚未结束。');
@@ -28,8 +33,8 @@
     try { descriptor = JSON.parse(raw); } catch (_) {}
     // Compatibility selection is before any private write, never an automatic replay.
     if (!descriptor || !composer?.available() || !source || !root.__elonChatGptPrivateTransport ||
-        !root.__elonChatGptPrivateAttachmentTransport) return fallback();
-    if (/^image\//.test(descriptor.type) && !image?.available(descriptor)) return fallback();
+        !root.__elonChatGptPrivateAttachmentTransport) { selections?.cancel(); return fallback(); }
+    if (/^image\//.test(descriptor.type) && !image?.available(descriptor)) { selections?.cancel(); return fallback(); }
     const job = { controller: new root.AbortController(), transport: null, attempted: false };
     active = job;
     let timer;
@@ -50,16 +55,18 @@
         if (abortListener) job.controller.signal.removeEventListener('abort', abortListener);
       }
       if (job.controller.signal.aborted) throw new Error('cancelled');
-      const binding = composer.capture();
+      const selected = selections?.take(descriptor);
+      if (selected) { job.controller.abort(); job.controller = selected.controller; job.transport = selected.transport; }
+      const binding = selected?.binding || composer.capture();
       if (descriptor.documentToken !== binding.token || descriptor.href !== binding.href) throw new Error('context_changed');
       // One low-frequency guard only while an explicit upload is in flight.
       timer = root.setInterval(() => { if (!composer.current(binding)) cancel(); }, 500);
       // Compatibility selection for unknown/unsupported scope precedes byte reads
       // and private writes. Cancelled or stale bindings throw instead of replaying.
-      if (!await composer.prepare(binding, job.controller.signal, descriptor)) return fallback();
-      job.transport = createTransport({ isCurrent: candidate => candidate === binding &&
+      if (!await composer.prepare(binding, job.controller.signal, descriptor, !!selected)) return fallback();
+      job.transport = job.transport || createTransport({ isCurrent: candidate => candidate === binding &&
         !job.controller.signal.aborted && composer.current(binding) });
-      job.transport.prefetch?.(composer.reservationContext?.(binding, descriptor), binding, job.controller.signal);
+      if (!selected) job.transport.prefetch?.(composer.reservationContext?.(binding, descriptor), binding, job.controller.signal);
       let file = await source.read(descriptor, job.controller.signal);
       let imageDimensions;
       if (/^image\//.test(file.type)) {
@@ -81,6 +88,7 @@
         : '附件连接尚未就绪或会话已变化，请重试。');
     } finally {
       root.clearInterval(timer);
+      selections?.cancel(descriptor.selectionId);
       job.controller.abort();
       job.transport?.dispose();
       if (active === job) active = null;
@@ -96,6 +104,7 @@
     return true;
   }
 
-  return Object.freeze({ version: 9, start, cancel, remove,
+  return Object.freeze({ version: 10, start, cancel, suspend, remove,
+    beginSelection: raw => selections?.begin(raw) === true, cancelSelection: id => selections?.cancel(id),
     merge: dom => composer?.merge(dom) || dom });
 });

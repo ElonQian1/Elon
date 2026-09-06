@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 10, create: factory });
+  const exported = Object.freeze({ version: 11, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateAttachmentComposer = exported;
 })(typeof window === 'object' ? window : null, function (root, options) {
@@ -107,9 +107,10 @@
     return binding;
   }
 
-  async function prepare(binding, signal, descriptor) {
+  async function prepare(binding, signal, descriptor, refreshScope = false) {
     if (!current(binding) || signal?.aborted) throw new Error('composer_changed');
     if (root.__elonChatGptPrivateAttachmentProtocol?.isPdf(descriptor) && !binding.modelSlug) return null;
+    if (refreshScope && binding.conversationId) { confirmed.delete(binding); projects.delete(binding); }
     if (confirmed.has(binding)) return true;
     const read = binding.projectId && !binding.conversationId ? () => project?.read(binding, signal, descriptor)
       : root.__elonChatGptPrivateTransport?.readAttachmentContext;
@@ -189,7 +190,13 @@
         descriptor.size > root.__elonChatGptPrivateAttachmentProtocol.maxFileBytes) return null;
     const image = ['image/jpeg', 'image/png', 'image/webp'].includes(descriptor.type);
     if (!image && !root.__elonChatGptPrivateAttachmentProtocol.isDocument(descriptor)) return null;
-    return Object.freeze({ useCase: image ? 'multimodal' : 'ace_upload', storeInLibrary: false,
+    return pickerReservationContext(binding, image ? 'image' : 'document');
+  }
+
+  function pickerReservationContext(binding, kind) {
+    if (!['image', 'document'].includes(kind) || !current(binding) || !confirmed.has(binding) ||
+        binding.isTemporaryChat || projects.has(binding) || binding.projectId) return null;
+    return Object.freeze({ useCase: kind === 'image' ? 'multimodal' : 'ace_upload', storeInLibrary: false,
       libraryPersistenceMode: 'required', isTemporaryChat: false, modelSlug: binding.modelSlug ?? undefined });
   }
 
@@ -268,5 +275,5 @@
     return true;
   }
 
-  return Object.freeze({ version: 10, available, capture, prepare, current, uploadContext, reservationContext, associate, merge, remove });
+  return Object.freeze({ version: 11, available, capture, prepare, current, uploadContext, reservationContext, pickerReservationContext, associate, merge, remove });
 });
