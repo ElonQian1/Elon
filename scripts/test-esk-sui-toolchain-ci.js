@@ -291,6 +291,7 @@ assert.doesNotMatch(suiJob, /^    permissions:/m,
 assert.doesNotMatch(suiJob,
   /\bsui(?:\.exe)?\s+(?:client|keytool|genesis|start)\b|\bmove\s+publish\b/i)
 assert.deepEqual(workflowStepIdentities(suiJob), [
+  'name:Enable Git Long Paths',
   'uses:actions/checkout@11d5960a326750d5838078e36cf38b85af677262',
   'name:Set up Node',
   'name:Sui Toolchain Contract Guard',
@@ -306,6 +307,12 @@ assert.deepEqual([...suiJob.matchAll(/^        uses: ([^\s#]+)(?:\s+#.*)?$/gm)]
   'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02',
 ])
 
+const gitLongPathsStep = extractWorkflowStep(suiJob, 'Enable Git Long Paths')
+assertExactWorkflowStep(gitLongPathsStep, [
+  '      - name: Enable Git Long Paths',
+  '        shell: pwsh',
+  '        run: git config --global core.longpaths true',
+])
 const checkoutStep = extractWorkflowStep(suiJob,
   'actions/checkout@11d5960a326750d5838078e36cf38b85af677262')
 assertExactWorkflowStep(checkoutStep, [
