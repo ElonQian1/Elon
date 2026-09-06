@@ -4,7 +4,7 @@
   const existingTransport = window.__elonChatGptPrivateTransport;
   const prefetchEnabled = window.__elonChatGptPrivateConversationPrefetchEnabled === true;
   const researchEnabled = window.__elonChatGptPrivateResearchEnabled === true;
-  if ((existingTransport && Number(existingTransport.version) >= 22) ||
+  if ((existingTransport && Number(existingTransport.version) >= 23) ||
       (!prefetchEnabled && !researchEnabled) ||
       location.origin !== 'https://chatgpt.com') return;
 
@@ -489,7 +489,7 @@
 
   async function readAttachmentContext(path) {
     const target = conversationTarget(path);
-    if (!target || !/^\/c\/[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(target.path) ||
+    if (!target || !/^(?:\/g\/g-p-[a-f0-9]{32}(?:-[A-Za-z0-9_-]{1,124})?)?\/c\/[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(target.path) ||
         target.path !== location.pathname || !prefetchEnabled || policy.snapshot().cooldownRemainingMs > 0) {
       throw new Error('attachment_context_unavailable');
     }
@@ -514,15 +514,26 @@
         payload.is_temporary_chat !== undefined && typeof payload.is_temporary_chat !== 'boolean' ||
         !(payload.gizmo_id === null || typeof payload.gizmo_id === 'string') ||
         target.path !== location.pathname) throw new Error('attachment_context_unavailable');
-    const unscoped = payload.gizmo_id === null && !conversationProjectId(result.payload) &&
-      (payload.context_scopes == null || Array.isArray(payload.context_scopes) && payload.context_scopes.length === 0);
+    const noAdditionalScope = payload.context_scopes == null ||
+      Array.isArray(payload.context_scopes) && payload.context_scopes.length === 0;
+    const membership = conversationProjectId(result.payload);
+    const unscoped = payload.gizmo_id === null && !membership && noAdditionalScope;
+    const projectId = /^g-p-[a-f0-9]{32}$/i.test(payload.gizmo_id || '') && membership === payload.gizmo_id &&
+      noAdditionalScope && payload.is_do_not_remember === false && payload.is_temporary_chat !== true
+      ? payload.gizmo_id : null;
+    const mapping = payload.mapping;
+    const nodes = projectId && mapping && !Array.isArray(mapping) && typeof mapping === 'object'
+      ? Object.entries(mapping) : [];
+    const nodeIds = nodes.length <= 20000 ? nodes.filter(([id, value]) => value?.id === id &&
+      /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(id)).map(([id]) => id) : [];
     return Object.freeze({ conversationId: target.id,
       ordinary: unscoped && payload.is_do_not_remember === false && payload.is_temporary_chat !== true,
-      temporary: unscoped && payload.is_do_not_remember === true && payload.is_temporary_chat !== false });
+      temporary: unscoped && payload.is_do_not_remember === true && payload.is_temporary_chat !== false,
+      ...(projectId ? { projectId, nodeIds: Object.freeze(nodeIds) } : {}) });
   }
 
   window.__elonChatGptPrivateTransport = Object.freeze({
-    version: 22,
+    version: 23,
     conversationPrefetchEnabled: prefetchEnabled,
     conversationPrefetchAvailable: true,
     experimentalConversationPrefetchAvailable: true,

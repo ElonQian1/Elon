@@ -137,7 +137,7 @@ const detailPayload = {
   assert.equal(disabled.window.__elonChatGptPrivateTransport, undefined);
 
   const gated = createContext(async () => jsonResponse(detailPayload), true, false);
-  assert.equal(gated.window.__elonChatGptPrivateTransport.version, 22);
+  assert.equal(gated.window.__elonChatGptPrivateTransport.version, 23);
   assert.equal(gated.window.__elonChatGptPrivateTransport.conversationPrefetchEnabled, false);
   assert.equal(gated.window.__elonChatGptPrivateTransport.conversationPrefetchReady(), false);
 
@@ -149,7 +149,7 @@ const detailPayload = {
     return jsonResponse(detailPayload);
   }, false, true);
   const transport = detail.window.__elonChatGptPrivateTransport;
-  assert.equal(transport.version, 22);
+  assert.equal(transport.version, 23);
   assert.equal(transport.conversationPrefetchEnabled, true);
   assert.equal(transport.conversationPrefetchAvailable, true);
   assert.equal(transport.experimentalConversationPrefetchAvailable, true);
@@ -471,6 +471,38 @@ const detailPayload = {
     scopePayload = { ...ordinaryPayload, ...patch };
     await assert.rejects(reader.readAttachmentContext(attachmentPath), /attachment_context_unavailable/);
     assert.equal(reader.health().cooldownRemainingMs, 0, 'unknown upload scope cannot break history prefetch');
+  }
+  const attachmentProject = 'g-p-0123456789abcdef0123456789abcdef';
+  const attachmentLeaf = '11111111-2222-4333-8444-555555555555';
+  const differentLeaf = '99999999-2222-4333-8444-555555555555';
+  const projectPayload = { ...ordinaryPayload, gizmo_id: attachmentProject, current_node: differentLeaf,
+    mapping: { [attachmentLeaf]: { id: attachmentLeaf },
+      [differentLeaf]: { id: differentLeaf }, invalid: { id: 'invalid' },
+      [attachmentId]: { id: differentLeaf } } };
+  for (const projectPath of [attachmentPath, '/g/' + attachmentProject + '-synthetic' + attachmentPath]) {
+    scope.window.location.pathname = projectPath;
+    scope.window.location.href = 'https://chatgpt.com' + projectPath;
+    scopePayload = projectPayload;
+    const receipt = await reader.readAttachmentContext(projectPath);
+    assert.equal(receipt.projectId, attachmentProject);
+    assert.deepEqual(Array.from(receipt.nodeIds), [attachmentLeaf, differentLeaf]);
+    assert.equal(receipt.ordinary, false);
+    assert.equal(receipt.temporary, false);
+    assert.equal(Object.hasOwn(receipt, 'mapping'), false);
+    assert.equal(Object.hasOwn(receipt, 'current_node'), false, 'server current_node is not the UI branch');
+    assert.equal(Object.isFrozen(receipt.nodeIds), true);
+    assert.equal(scopeRequests.at(-1).options.cache, 'no-store');
+  }
+  scope.window.location.pathname = attachmentPath;
+  scope.window.location.href = 'https://chatgpt.com' + attachmentPath;
+  for (const patch of [{ project_id: 'g-p-fedcba9876543210fedcba9876543210' },
+    { is_do_not_remember: true }, { is_temporary_chat: true }, { context_scopes: ['HEALTH'] }]) {
+    scopePayload = { ...projectPayload, ...patch };
+    assert.equal((await reader.readAttachmentContext(attachmentPath)).projectId, undefined);
+  }
+  for (const mapping of [null, [], {}, { invalid: { id: 'invalid' } }]) {
+    scopePayload = { ...projectPayload, mapping };
+    assert.deepEqual(Array.from((await reader.readAttachmentContext(attachmentPath)).nodeIds), []);
   }
   scopePayload = { data: { conversation: ordinaryPayload } };
   assert.equal((await reader.readAttachmentContext(attachmentPath)).ordinary, true);
