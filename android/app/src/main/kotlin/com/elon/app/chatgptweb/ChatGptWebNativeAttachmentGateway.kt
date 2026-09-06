@@ -102,7 +102,9 @@ internal class ChatGptWebNativeAttachmentGateway(
     fun cancel() {
         val previous = lease ?: return
         lease = null
-        previous.reader.close()
+        if (reading === previous) reading = null
+        previous.reader.revoke()
+        if (ioDelegate.isInitialized()) io.execute { previous.reader.close() }
         val token = JSONObject.quote(previous.documentToken)
         webView.evaluateJavascript(
             "if(window.__elonChatGptDocumentToken===$token)window.__elonChatGptPrivateAttachmentSend?.cancel();",
@@ -117,7 +119,8 @@ internal class ChatGptWebNativeAttachmentGateway(
         if (installed) WebViewCompat.removeWebMessageListener(webView, BRIDGE)
         installed = false
         // No executor is created unless a file was actually read.
-        if (ioDelegate.isInitialized()) io.shutdownNow()
+        // Drain queued revocation cleanup; shutdownNow would discard those closes.
+        if (ioDelegate.isInitialized()) io.shutdown()
     }
 
     private fun isCurrent(value: Lease): Boolean {
