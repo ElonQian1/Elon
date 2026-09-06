@@ -6,7 +6,7 @@ implementation_status: in_progress
 
 # Win 浏览器研究 MCP V1 验证记录
 
-本报告记录实现证据，不能代替[需求](../requirements/win-browser-research-mcp-v1.md)。截至 2026-09-07，首批代码及离线验证已完成，匹配的 PC 前端、节点和 desktop 已发布，本机节点已激活；控制通道已实际走通，资源采集现场验收仍未通过。当前不能宣告功能完成；没有执行真实金融交易。
+本报告记录实现证据，不能代替[需求](../requirements/win-browser-research-mcp-v1.md)。截至 2026-09-07，真实 Windows WebView2 已完成无交易样例的自动采集、MCP 搜索/正文读取和暂停恢复，并读出币安实际加载脚本里的 U 本位网格私有接口候选。本人币安首次登录及认证后的列表业务回执仍待验证，因此整体需求保持进行中；没有执行真实金融交易。
 
 ## 已验证
 
@@ -15,6 +15,8 @@ implementation_status: in_progress
 | `elon-pc-node` 正式入口 check | 通过 | `browser-research-node-check-final-20260907-055710-734` |
 | `elon-desktop` 研究模块测试 | 27/27，通过实际 Windows 编译 | `browser-research-desktop-tests-final-20260907-055554-355` |
 | 宿主初始化修复后的强制 Windows 编译 / 研究测试 | 32/32，未复用旧验证结果 | `browser-research-native-handshake-forced-tests-20260907-063540-929` |
+| 短 Profile、SPA 状态及有界突发队列回归 | 41/41，实际 Windows 编译 | `browser-research-live-fixes-tests-20260907-070715-724` |
+| 桌面构建输入变更使缓存失效 | 36 项指纹断言通过 | `browser-research-validation-fingerprint-20260907-063842-676` |
 | 独立 HTTP/MCP/队列 harness | 12/12 | `browser-research-harness-tests-final-20260907-055328-209` |
 | 前端行为测试 | 17/17 | `browser-research-owner-error-tests-20260907-055059-147` |
 | 初始化状态回执 / 前端回归 | 18/18，定向 lint 和生产构建通过 | `browser-research-handshake-ui-tests-20260907-063307-810`、`browser-research-handshake-ui-lint-20260907-063344-684`、`browser-research-handshake-ui-build-20260907-063321-127` |
@@ -37,21 +39,25 @@ implementation_status: in_progress
 
 ## 现场验收状态
 
-当前已发布提交为 `1ddff582e75693e6a7827d7f404a3ef332807ef7`，涵盖 PC 前端、节点和 desktop。本机节点 `0.3.69` 已处于 activated 状态。MCP `register_site`、`open`、`status`、`pause`、`resume` 已实际执行，证明控制消息能穿过节点队列与 Win 桥接通道；不能据此推导资源或请求正文已采集成功。
+先前安装提交 `680b4d247603c8f36e3727a9848b83567e4fd99c` 已完成 PC、节点与 desktop 发布及本机激活，但现场仍报告 `host_native_not_attached`。其 Profile 路径长达 236 字符，WebView2 只生成启动标记，未建立正常资料目录；缩短为三个范围的完整 SHA-256 目录后，同一真实链路随即成功。旧目录未删除或搬移。
+
+以下成功证据来自正式验证入口构建并直接运行的 Windows 开发候选；最终安装包发布/激活状态以统一发布和收尾回执为准，不能将开发候选等同于已经安装的版本。
 
 | 项目 | 当前现场状态 |
 |---|---|
-| PC 前端、节点及 desktop 发布 | 已发布至上述提交 |
-| 本机节点激活 | `0.3.69` 已 activated |
+| PC 前端、节点及 desktop 初次发布 | 上述已发布版本及激活已确认；最终修复另行发布 |
 | MCP 站点登记与会话控制通道 | `register_site`、`open`、`status`、`pause`、`resume` 已实际走通 |
-| 原生研究窗口就绪及采集握手 | 未通过；fixture 会话持续 `opening` |
-| 无交易异构站点，经 MCP 自动采集、搜索、读取 | 未通过；fixture 资源和请求采集数均为零，尚无正文闭环证据 |
-| 币安网页加载 JS 经 MCP 读取 | 待验证 |
+| 原生研究窗口就绪及采集握手 | 短目录候选已通过，明确 ACK 后进入 observing |
+| 无交易异构站点，经 MCP 自动采集、搜索、读取 | 稳定候选会话 `91fc7b666038d0f21bf54efe453c77b86ff1459b8fab3e5a5d06ff9c986c746a`：18 资源、1 POST；源码标记、业务路径、未知集合、ESK、12.3400、中文值及凭据排除全部通过 |
+| 暂停恢复 | 先前成功会话代次 2→3 paused→4 resuming→observing；资源 18→30，读取仍通过 |
+| 币安网页加载 JS 经 MCP 读取 | 已通过；首次成功会话采集 133 资源、29 请求，读出带源码哈希的 13 项接口候选，见独立报告 |
 | Win 独立 Profile 的本人币安登录 | 待验证 |
 | U 本位网格列表真实路径、参数、响应 | 待验证 |
-| 创建、修改、结束各自业务合同 | 未验证 |
+| 创建、修改、结束各自业务合同 | 已有静态候选；认证调用及业务合同未验证 |
 
-当前修复方向为主线程窗口创建与宿主握手 ACK；修复后的发布、窗口就绪、fixture 自动采集以及 MCP 搜索和正文读取尚待复验。不能将 `open` 返回会话、控制命令完成或离线测试通过记为现场采集成功；零样本也不能解释为网站没有资源、请求或网格。
+首次币安采集出现 `event_queue_full`，已改为 256 件/32 MiB 双上限入口并补 7 项背压、断开及并发回归；SPA 同文档跳转也补就绪回执。稳定候选币安会话 `23d2d1c82ba3fbb59e6f7b63ce32e54b4da04cec9db0220141097d52c2824c64` 进入 observing，采集 181 资源/34 请求，无队列溢出，并再次经 MCP 命中 `update-grid-range`。仍如实报告 `observed_request_failed`、`body_not_available`，不声称每个网站请求都成功。固定覆盖提示 `coverage_top_frame_text_only_no_workers_websockets` 表示 V1 未覆盖 Worker/WebSocket，不等于工具未启动。
+
+[币安 U 本位网格源码线索](binance-futures-grid-source-discovery-20260907.md)记录实际脚本资源、哈希、位置与候选方法。本机合成验收回执保存在 `.ai-tmp/fixture-verification-short-profile.json` 和 `.ai-tmp/fixture-verification-stable.json`，没有手动导出网页或把账号资料写入仓库。认证后的列表仍待用户在独立 Win Profile 登录，不用公共推荐策略冒充本人网格。
 
 ## 资源定位证据的边界
 
