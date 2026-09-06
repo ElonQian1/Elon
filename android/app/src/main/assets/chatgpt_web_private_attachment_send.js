@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 6, create: factory });
+  const exported = Object.freeze({ version: 7, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       !(Number(root.__elonChatGptPrivateAttachmentSend?.version) >= exported.version)) {
@@ -95,6 +95,6 @@
     return true;
   }
 
-  return Object.freeze({ version: 6, start, cancel, remove,
+  return Object.freeze({ version: 7, start, cancel, remove,
     merge: dom => composer?.merge(dom) || dom });
 });

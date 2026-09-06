@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 2, create: factory });
+  const exported = Object.freeze({ version: 3, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateAttachmentProject = exported;
 })(typeof window === 'object' ? window : null, function (root, options) {
@@ -80,7 +80,7 @@
 
   function supports(scope, file) {
     if (!PROJECT.test(scope?.projectId || '')) return false;
-    if (file?.type === 'text/plain') return true;
+    if (['text/plain', 'application/pdf'].includes(file?.type)) return true;
     // Image indexing under the ingest path is controlled by an account feature flag.
     // Until that flag is bound to current identity, retain the existing upload path.
     return ['image/jpeg', 'image/png', 'image/webp'].includes(file?.type) && !scope.usesInjestPath;
@@ -101,5 +101,5 @@
     });
   }
 
-  return Object.freeze({ version: 2, projectId, read, captureThread, supports, uploadContext });
+  return Object.freeze({ version: 3, projectId, read, captureThread, supports, uploadContext });
 });

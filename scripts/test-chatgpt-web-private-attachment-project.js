@@ -21,7 +21,11 @@ function fixture(options = {}) {
   files$.set = value => { values = value; };
   const store = { files$, readyFiles$: () => values.filter(file => file.status === 'ready'),
     hasUploadInProgress$: () => values.some(file => file.status === 'uploading') };
-  const input = { isConnected: true, __reactFiber$fixture: { memoizedProps: { value: store } } };
+  const committedRoot = { stateNode: {} };
+  committedRoot.stateNode.current = committedRoot;
+  const input = { isConnected: true, __reactFiber$fixture: { memoizedProps: { value: store },
+    return: { memoizedProps: { conversation: {}, onCreateNewCompletion() {}, currentModelId: 'synthetic-project-model' },
+      return: committedRoot } } };
   const headers = () => ({ authorization: account, 'chatgpt-account-id': 'synthetic-account' });
   const payload = { gizmo: { id: PROJECT, current_user_permission: { can_write: true }, use_injest_path: false } };
   const thread = { isLoading: false, is_do_not_remember: false, projectId: PROJECT, leaf: LEAF };
@@ -121,6 +125,34 @@ test('existing project images retain multimodal dimensions and the selected thre
   assert.equal(body.gizmo_id, undefined);
   assert.equal(body.metadata.library_file_info.origination_message_id, LEAF);
   assert.equal(f.store.readyFiles$()[0].fileSpec.width, 12);
+});
+
+test('new and existing project PDFs keep model, scope and branch ownership without image indexing', async () => {
+  for (const existingPath of [undefined, '/c/' + CONVERSATION]) {
+    for (const ingest of [false, true]) {
+      const f = fixture({ existingPath,
+        file: new File(['%PDF-1.7\nsynthetic project fixture'], 'fixture.pdf', { type: 'application/pdf' }) });
+      f.payload.gizmo.use_injest_path = ingest;
+      await f.start();
+      assert.equal(f.fallbacks(), 0);
+      assert.equal(f.receipts[0][1], true);
+      assert.equal(f.calls.length, 4);
+      const create = f.calls[1], process = JSON.parse(f.calls[3].init.body);
+      assert.equal(create.init.headers['x-oai-model-slug'], 'synthetic-project-model');
+      assert.equal(JSON.parse(create.init.body).use_case, 'gizmo');
+      assert.equal(JSON.parse(create.init.body).gizmo_id, PROJECT);
+      assert.equal(process.index_for_retrieval, false);
+      assert.equal(process.metadata.library_file_info.origination_message_id, existingPath ? LEAF : undefined);
+      assert.equal(f.calls[2].init.body, f.file);
+      assert.equal(f.store.readyFiles$()[0].fileSpec.mimeType, 'application/pdf');
+    }
+  }
+  const denied = fixture({ file: new File(['%PDF-1.7'], 'fixture.pdf', { type: 'application/pdf' }) });
+  denied.payload.gizmo.current_user_permission.can_write = false;
+  await denied.start();
+  assert.equal(denied.reads(), 0);
+  assert.equal(denied.calls.length, 1);
+  assert.equal(denied.fallbacks(), 1);
 });
 
 test('new project private upload reads permission then binds create/process/ready-store to one project', async () => {

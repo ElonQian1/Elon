@@ -149,7 +149,7 @@ test('versioned reinjection cancels only the older owner and retains the current
     __elonChatGptPrivateAttachmentSend: { version: 1, cancel: () => { cancelled++; } } };
   vm.runInNewContext(source, { window: root });
   const current = root.__elonChatGptPrivateAttachmentSend;
-  assert.equal(current.version, 6);
+  assert.equal(current.version, 7);
   assert.equal(cancelled, 1);
   vm.runInNewContext(source, { window: root });
   assert.equal(root.__elonChatGptPrivateAttachmentSend, current);
@@ -225,6 +225,30 @@ test('PDF model binding ignores stale React props and follows only a confirmed c
   await p.start();
   assert.equal(p.receipts[0][1], true);
   assert.equal(p.requests[0].init.headers['x-oai-model-slug'], 'committed-model');
+});
+
+test('PDF native byte bridge, private transport and official ready store form one production pipeline', async () => {
+  const f = pdfFixture(), bytes = Buffer.from(await f.file.arrayBuffer());
+  f.root.File = File;
+  f.root.atob = atob;
+  const bridge = { onmessage: null, postMessage: raw => {
+    const request = JSON.parse(raw);
+    assert.equal(request.leaseId, f.descriptor.leaseId);
+    assert.equal(request.documentToken, f.descriptor.documentToken);
+    queueMicrotask(() => bridge.onmessage({ data: JSON.stringify({ requestId: request.requestId,
+      offset: request.offset, data: bytes.subarray(request.offset, request.offset + 65536).toString('base64') }) }));
+  } };
+  f.root.elonChatGptAttachmentSource = bridge;
+  const source = require('../android/app/src/main/assets/chatgpt_web_native_attachment_source.js').create(f.root);
+  const p = pipeline(f, { options: { source } });
+  await p.start();
+  assert.equal(p.receipts[0][1], true);
+  assert.equal(p.fallbacks(), 0);
+  assert.equal(p.requests.length, 3);
+  assert.deepEqual(Buffer.from(await p.requests[1].init.body.arrayBuffer()), bytes);
+  assert.equal(f.store.readyFiles$()[0].fileSpec.mimeType, 'application/pdf');
+  assert.equal(f.composer.merge([]).length, 1);
+  assert.equal(bridge.onmessage, null);
 });
 
 test('actual PDF model changes cancel even when the displayed effort label stays unchanged', async () => {
