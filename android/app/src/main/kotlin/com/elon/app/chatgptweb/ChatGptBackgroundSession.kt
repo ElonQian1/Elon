@@ -276,7 +276,10 @@ internal class ChatGptBackgroundSession(
     fun imagePreviewState(): ChatGptWebImagePreviewState = imageAssets.state()
     fun retryImagePreview(handle: String) = imageAssets.retry(handle)
     fun retryMissingImagePreviews() = imageAssets.retryMissing(latestSnapshot)
-    fun showImageGallery(onCreateImage: () -> Unit): Boolean = imageSession.show(onCreateImage)
+    fun showImageGallery(onCreateImage: () -> Unit): Boolean {
+        ensureInitialized()
+        return imageSession.show(onCreateImage)
+    }
     fun warmSessionAvailable(): Boolean = warmSessionAvailable
     fun conversationNavigationActive(): Boolean = conversationNavigation.isNavigating()
     fun conversationIndex(): ChatGptWebConversationIndexState = conversationDirectory.index()
@@ -684,8 +687,9 @@ internal class ChatGptBackgroundSession(
                 sendOwner.acceptAttachmentTransport(event.evidence)
                 pageAdapter?.requestSnapshot()
             }
-            is ChatGptWebEvent.ImageAsset -> imageAssets.accept(event.value)
-            is ChatGptWebEvent.ImageGallerySnapshot, is ChatGptWebEvent.ConversationFiles -> Unit
+            is ChatGptWebEvent.ImageAsset -> imageSession.acceptAsset(event.value)
+            is ChatGptWebEvent.ImageGallerySnapshot -> imageSession.acceptGallery(event.value)
+            is ChatGptWebEvent.ConversationFiles -> Unit
             is ChatGptWebEvent.AdapterReady,
             is ChatGptWebEvent.FeatureNavigation -> Unit
             is ChatGptWebEvent.WebTouchRequest -> touchRequestHandler.handle(event)

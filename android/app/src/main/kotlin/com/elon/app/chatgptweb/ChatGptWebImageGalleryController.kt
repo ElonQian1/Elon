@@ -3,6 +3,7 @@ package com.elon.app.chatgptweb
 import android.app.Dialog
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
+import android.os.SystemClock
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -26,14 +27,27 @@ internal class ChatGptWebImageGalleryController(
     private val activity: AppCompatActivity,
     private val host: FrameLayout,
     private val store: ChatGptWebImageAssetStore,
+    private val requestPage: (String, String, Set<String>) -> Boolean,
+    private val cancelPage: (String) -> Unit,
 ) {
     private var dialog: Dialog? = null
     private var statusView: TextView? = null
     private var grid: GridLayout? = null
-    private var sync: ChatGptWebImageGallerySync? = null
+    private var activeRequestId: String? = null
+    private var dispatchAttempt: Runnable? = null
+    private var pageSnapshot: ChatGptWebImageGallerySnapshot? = null
+    private var previousPage: ImageButton? = null
+    private var nextPage: ImageButton? = null
+    private var pageLabel: TextView? = null
     private var syncState = ChatGptWebImageGallerySnapshot.STATE_LOADING
+    private val syncTimeout = Runnable {
+        activeRequestId?.let(cancelPage)
+        activeRequestId = null
+        dispatchAttempt?.let(host::removeCallbacks)
+        syncState = ChatGptWebImageGallerySnapshot.STATE_FAILED
+        renderStatus()
+    }
     private val renderStoreChanges = Runnable {
-        recordSuccessfulSyncIfUsable()
         renderEntries()
         renderStatus()
     }
@@ -78,14 +92,18 @@ internal class ChatGptWebImageGalleryController(
                     1f,
                 ))
             }
+            addView(pagination())
             addView(footer(nextDialog, onCreateImage))
         }
         nextDialog.setContentView(root)
         nextDialog.setOnDismissListener {
             store.removeListener(storeListener)
             host.removeCallbacks(renderStoreChanges)
-            sync?.cancel()
-            sync = null
+            cancelSync()
+            pageSnapshot = null
+            previousPage = null
+            nextPage = null
+            pageLabel = null
             dialog = null
             statusView = null
             grid = null
@@ -98,18 +116,12 @@ internal class ChatGptWebImageGalleryController(
             ViewGroup.LayoutParams.MATCH_PARENT,
         )
         renderEntries()
-        if (store.handles().isNotEmpty() && store.hasFreshGallerySync()) {
-            syncState = ChatGptWebImageGallerySnapshot.STATE_READY
-            renderStatus()
-        } else {
-            startSync()
-        }
+        startSync("open")
         return true
     }
 
     fun destroy() {
-        sync?.cancel()
-        sync = null
+        cancelSync()
         dialog?.dismiss()
         dialog = null
     }
@@ -161,46 +173,91 @@ internal class ChatGptWebImageGalleryController(
         }, LinearLayout.LayoutParams(0, dp(52), 1f).apply { marginStart = dp(8) })
     }
 
-    private fun startSync() {
-        sync?.cancel()
-        syncState = ChatGptWebImageGallerySnapshot.STATE_LOADING
-        val current = store.entries().size
-        statusView?.text = if (current > 0) {
-            "$current 张图片 · 正在后台同步"
-        } else {
-            "正在同步图像…"
-        }
-        sync = ChatGptWebImageGallerySync(activity, host, store, ::renderSyncState).also {
-            it.start()
-        }
+    private fun pagination(): View = LinearLayout(activity).apply {
+        gravity = Gravity.CENTER
+        previousPage = ImageButton(context).apply {
+            setImageResource(R.drawable.ic_toolbar_back_custom)
+            contentDescription = "上一页"
+            setBackgroundColor(Color.TRANSPARENT)
+            setColorFilter(ContextCompat.getColor(context, R.color.elon_icon_primary))
+            setOnClickListener { startSync("previous") }
+        }.also { addView(it, LinearLayout.LayoutParams(dp(48), dp(48))) }
+        pageLabel = TextView(context).apply {
+            gravity = Gravity.CENTER
+            setTextColor(ContextCompat.getColor(context, R.color.elon_text_secondary))
+            textSize = 14f
+        }.also { addView(it, LinearLayout.LayoutParams(dp(100), dp(48))) }
+        nextPage = ImageButton(context).apply {
+            setImageResource(R.drawable.ic_toolbar_back_custom)
+            rotation = 180f
+            contentDescription = "下一页"
+            setBackgroundColor(Color.TRANSPARENT)
+            setColorFilter(ContextCompat.getColor(context, R.color.elon_icon_primary))
+            setOnClickListener { startSync("next") }
+        }.also { addView(it, LinearLayout.LayoutParams(dp(48), dp(48))) }
     }
 
-    private fun renderSyncState(state: ChatGptWebImageGallerySnapshot) {
+    private fun cancelSync() {
+        activeRequestId?.let(cancelPage)
+        activeRequestId = null
+        host.removeCallbacks(syncTimeout)
+        dispatchAttempt?.let(host::removeCallbacks)
+        dispatchAttempt = null
+    }
+
+    private fun startSync(operation: String = "refresh") {
+        cancelSync()
+        syncState = ChatGptWebImageGallerySnapshot.STATE_LOADING
+        renderStatus()
+        val id = "mcp_gallery" + SystemClock.elapsedRealtimeNanos().toString(36)
+        activeRequestId = id
+        host.postDelayed(syncTimeout, 40_000L)
+        val cachedHandles = store.handles()
+        dispatchAttempt = object : Runnable {
+            override fun run() {
+                if (activeRequestId != id || dialog == null) return
+                if (!requestPage(id, operation, cachedHandles)) host.postDelayed(this, 500L)
+            }
+        }
+        dispatchAttempt?.run()
+    }
+
+    fun accept(state: ChatGptWebImageGallerySnapshot) {
+        if (dialog == null || state.requestId == null || state.requestId != activeRequestId) return
         syncState = state.state
-        recordSuccessfulSyncIfUsable()
+        if (state.handles != null) pageSnapshot = state
+        if (state.state != ChatGptWebImageGallerySnapshot.STATE_LOADING) host.removeCallbacks(syncTimeout)
         renderStatus()
         renderEntries()
     }
 
-    private fun recordSuccessfulSyncIfUsable() {
-        if (syncState == ChatGptWebImageGallerySnapshot.STATE_READY && store.handles().isNotEmpty()) {
-            store.markGallerySynced()
-        }
+    fun accept(asset: ChatGptWebImageAsset) {
+        if (dialog != null && asset.galleryRequestId == activeRequestId && asset.ready &&
+            asset.handle in pageSnapshot?.handles.orEmpty()) store.save(asset) {}
     }
 
     private fun renderStatus() {
-        val cached = store.entries().size
+        val page = pageSnapshot
+        val visibleHandles = page?.handles.orEmpty().toSet()
+        val cached = store.handles().count(visibleHandles::contains)
+        val loading = syncState == ChatGptWebImageGallerySnapshot.STATE_LOADING
+        previousPage?.isEnabled = !loading && page?.hasPrevious == true
+        nextPage?.isEnabled = !loading && page?.hasNext == true
+        previousPage?.alpha = if (previousPage?.isEnabled == true) 1f else 0.35f
+        nextPage?.alpha = if (nextPage?.isEnabled == true) 1f else 0.35f
+        pageLabel?.text = page?.let { "第 ${it.pageIndex + 1} 页" }.orEmpty()
         statusView?.text = when (syncState) {
             ChatGptWebImageGallerySnapshot.STATE_LOADING -> if (cached > 0) {
                 "$cached 张图片 · 正在后台同步"
             } else {
                 "正在同步图像…"
             }
-            ChatGptWebImageGallerySnapshot.STATE_READY -> if (cached > 0) {
-                "已同步 $cached 张图片"
+            ChatGptWebImageGallerySnapshot.STATE_READY -> if ((page?.observedCount ?: 0) > 0) {
+                "本页 ${page?.observedCount} 张图片"
             } else {
-                "还没有同步到图片，可创建图片或稍后重试"
+                "还没有创建的图片"
             }
+            ChatGptWebImageGallerySnapshot.STATE_PARTIAL -> "已加载 $cached 张图片，部分图片暂未加载"
             else -> if (cached > 0) {
                 "同步失败，已显示 $cached 张本地图片"
             } else {
@@ -211,16 +268,18 @@ internal class ChatGptWebImageGalleryController(
 
     private fun renderEntries() {
         val target = grid ?: return
-        val entries = store.entries()
+        val entries = store.entries().associateBy { it.handle }
         target.removeAllViews()
-        entries.forEachIndexed { index, entry ->
+        pageSnapshot?.handles.orEmpty().forEachIndexed { index, handle ->
+            val entry = entries[handle]
             val image = ImageView(activity).apply {
                 scaleType = ImageView.ScaleType.CENTER_CROP
                 setBackgroundColor(ContextCompat.getColor(context, R.color.elon_surface_card))
                 setImageResource(R.drawable.ic_attach_photos)
                 contentDescription = "图像 ${index + 1}"
-                tag = entry.localPath
+                tag = entry?.localPath
                 setOnClickListener {
+                    if (entry == null) return@setOnClickListener
                     ChatImageViewer.show(
                         activity,
                         ChatAttachment(
@@ -234,7 +293,7 @@ internal class ChatGptWebImageGalleryController(
                     )
                 }
             }
-            ChatImagePreviewLoader.loadSampled(
+            if (entry != null) ChatImagePreviewLoader.loadSampled(
                 activity,
                 entry.localPath,
                 GALLERY_PREVIEW_MAX_PIXELS,

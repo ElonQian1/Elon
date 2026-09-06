@@ -156,8 +156,11 @@
         throw new Error('transport_unavailable');
       }
       const scope = JSON.stringify([job.account, job.token]);
-      if (cacheIdentity !== scope || Date.now() - cacheTime >= TTL_MS || job.operation === 'refresh') {
+      if (cacheIdentity !== scope || job.operation === 'refresh') {
         clearCache(); cacheIdentity = scope;
+      } else if (Date.now() - cacheTime >= TTL_MS) {
+        // Keep the user's cursor position; only cached page payloads have expired.
+        pages.clear(); cacheTime = 0;
       }
       job.index = job.operation === 'next' ? pageIndex + 1 : job.operation === 'previous' ? pageIndex - 1 : pageIndex;
       if (job.index < 0 || job.index >= cursors.length || job.index >= 256) throw new Error('page_unavailable');
@@ -212,7 +215,9 @@
       href: root.location.href, token: root.__elonChatGptDocumentToken, account: null,
       controller: new root.AbortController(), pending: new Set(), emit: emitEvent,
       assets: root.__elonChatGptImageAssets };
-    job.assetListener = event => { if (current(job)) emitEvent(event); };
+    job.assetListener = event => {
+      if (current(job)) emitEvent({ ...event, source: 'private_image_gallery_v1', requestId: job.id });
+    };
     active = job;
     job.timer = root.setTimeout(() => { emit(job, job.page ? 'partial' : 'failed', job.page); cancel(job.id); }, 35000);
     emit(job, 'loading');

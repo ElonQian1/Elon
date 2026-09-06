@@ -567,6 +567,15 @@ internal class ChatGptWebPageAdapter(
 
     fun requestConversationRefresh() = runCommand("refresh_current_conversation")
 
+    fun syncImageGallery(requestId: String, operation: String, cachedHandles: Set<String>): Boolean {
+        if (!documentSession.snapshot().adapterCurrent) return false
+        runCommand("sync_private_image_gallery", requestId = requestId, value = JSONObject()
+            .put("operation", operation).put("cachedHandles", org.json.JSONArray(cachedHandles.toList())).toString())
+        return true
+    }
+
+    fun cancelImageGallery(requestId: String) = runCommand("cancel_private_image_gallery", value = requestId)
+
     fun markReady() {
         if (documentSession.snapshot().adapterCurrent) onStateChanged(State.READY)
     }
@@ -661,7 +670,7 @@ internal class ChatGptWebPageAdapter(
         origin.scheme == "https" && origin.host == "chatgpt.com" && origin.port == -1
 
     companion object {
-        internal const val ADAPTER_VERSION = 272
+        internal const val ADAPTER_VERSION = 273
 
         private val ADAPTER_ASSETS = listOf(
             "chatgpt_web_adapter_bootstrap.js",
@@ -678,6 +687,7 @@ internal class ChatGptWebPageAdapter(
             "chatgpt_web_adapter_message_action_policy.js",
             "chatgpt_web_adapter_message_portal_policy.js",
             "chatgpt_web_image_assets.js",
+            "chatgpt_web_private_image_gallery.js",
             "chatgpt_web_adapter_messages.js",
             "chatgpt_web_adapter_model_label_policy.js",
             "chatgpt_web_adapter_composer_option_policy.js",

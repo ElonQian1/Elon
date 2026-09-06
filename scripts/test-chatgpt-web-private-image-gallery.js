@@ -193,3 +193,49 @@ test('identity unavailability does not fall through to DOM or a guessed unauthen
   assert.equal(h.calls.length, 0);
   assert.equal(h.snapshots().at(-1).state, 'failed');
 });
+
+test('catalog expiry revalidates without losing the selected cursor', async () => {
+  const h = harness([{ items: [row(1)], cursor: '1' }, { items: [row(2)], cursor: null }]);
+  await h.run();
+  const originalNow = Date.now, future = originalNow() + 120001;
+  try {
+    Date.now = () => future;
+    assert.equal((await h.run('next')).ok, true);
+    assert.equal(h.catalogCalls().at(-1).url.searchParams.get('after'), '1');
+    assert.equal(h.snapshots().at(-1).pageIndex, 1);
+  } finally { Date.now = originalNow; }
+});
+
+test('bounded deadline and disposal cancel active reads without late events', async () => {
+  for (const mode of ['timeout', 'dispose']) {
+    const pending = deferred(), h = harness([() => pending.promise]);
+    const result = h.run();
+    await Promise.resolve(); await Promise.resolve();
+    if (mode === 'timeout') [...h.timers.values()].find(t => t.ms === 35000).fn();
+    else h.api.dispose();
+    const count = h.events.length;
+    assert.equal(h.calls[0].init.signal.aborted, true);
+    pending.resolve({ items: [row(1)], cursor: null });
+    assert.equal((await result).ok, false);
+    assert.equal(h.events.length, count);
+    assert.equal(h.timers.size, 0);
+  }
+});
+
+test('production integration keeps gallery receipts separate and removes the extra WebView path', () => {
+  const fs = require('node:fs'), path = require('node:path');
+  const base = path.join(__dirname, '../android/app/src/main');
+  const read = (file, kotlin = false) => fs.readFileSync(path.join(base,
+    kotlin ? 'kotlin/com/elon/app/chatgptweb' : 'assets', file), 'utf8');
+  const adapter = read('chatgpt_web_adapter.js');
+  assert.match(adapter, /PrivateImageGallery\?\.handle\(action, command, respond, emitEvent\)/);
+  assert.match(adapter, /PrivateImageGallery\?\.dispose\(\)/);
+  assert.match(read('chatgpt_web_adapter_bootstrap.js'), /'__elonChatGptPrivateImageGallery'/);
+  assert.match(read('ChatGptWebPageAdapter.kt', true), /"chatgpt_web_private_image_gallery.js"/);
+  const controller = read('ChatGptWebImageGalleryController.kt', true);
+  assert.doesNotMatch(controller, /ChatGptWebImageGallerySync\(/);
+  assert.match(controller, /state.requestId != activeRequestId/);
+  assert.match(controller, /asset.galleryRequestId == activeRequestId/);
+  assert.match(controller, /pageSnapshot\?\.handles.orEmpty\(\).forEachIndexed/);
+  assert.match(read('ChatGptWebImageSession.kt', true), /if \(asset.galleryRequestId == null\) assets.accept\(asset\)/);
+});

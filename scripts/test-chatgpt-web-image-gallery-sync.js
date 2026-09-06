@@ -14,6 +14,8 @@ async function runScenario(requestResult) {
   const events = [];
   const requests = [];
   let scans = 0;
+  let complete;
+  const completion = new Promise(resolve => { complete = resolve; });
   const document = {
     querySelectorAll: () => [],
     scrollingElement: { scrollHeight: 2000, clientHeight: 600, scrollTo() {} }
@@ -22,7 +24,11 @@ async function runScenario(requestResult) {
     document,
     setTimeout: (callback) => setTimeout(callback, 0),
     elonChatGptImageGalleryNative: {
-      postMessage: (payload) => events.push(JSON.parse(payload).event)
+      postMessage: (payload) => {
+        const event = JSON.parse(payload).event;
+        events.push(event);
+        if (event.type === 'image_gallery_snapshot' && event.state !== 'loading') complete();
+      }
     },
     __elonChatGptAdapterTargetVersion: 208,
     __elonChatGptCachedImageHandles: ['image_0000000000000001'],
@@ -55,7 +61,12 @@ async function runScenario(requestResult) {
     Error
   }, { filename: 'chatgpt_web_image_gallery_sync.js' });
 
-  await new Promise((resolve) => setTimeout(resolve, 80));
+  let deadline;
+  try {
+    await Promise.race([completion, new Promise((_, reject) => {
+      deadline = setTimeout(() => reject(new Error('gallery_completion_timeout')), 5000);
+    })]);
+  } finally { clearTimeout(deadline); }
   return { events, requests, scans };
 }
 

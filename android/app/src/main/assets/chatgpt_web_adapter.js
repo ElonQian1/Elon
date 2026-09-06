@@ -1,6 +1,5 @@
 (function () {
   'use strict';
-
   if (window.__elonChatGptBridge || location.origin !== 'https://chatgpt.com') return;
   const nativeBridge = window.elonChatGptNative;
   if (!nativeBridge || typeof nativeBridge.postMessage !== 'function') return;
@@ -457,6 +456,7 @@
     respond.requestId = requestId;
     if (action === 'snapshot') return snapshot();
     if (window.__elonChatGptPrivateResearchProbe?.handle?.(action, command, respond)) return;
+    if (window.__elonChatGptPrivateImageGallery?.handle(action, command, respond, emitEvent)) return;
     if (action === 'request_image_asset') {
       if (!imageAssets || typeof imageAssets.request !== 'function') {
         return respond(action, false, 'image_asset_unavailable');
@@ -741,6 +741,7 @@
     privateStreamUnsubscribe = null;
     if (privateReadAloudAdapter) privateReadAloudAdapter.dispose();
     if (privateAttachments) privateAttachments.cancel();
+    window.__elonChatGptPrivateImageGallery?.dispose();
     if (privateConversationDirectory &&
         typeof privateConversationDirectory.setListener === 'function') {
       privateConversationDirectory.setListener(null);
@@ -748,7 +749,6 @@
     if (observer) observer.disconnect();
     window.removeEventListener('popstate', scheduleSnapshot);
   }
-
   window.__elonChatGptBridge = Object.freeze({
     version: adapterVersion,
     command: runCommand,

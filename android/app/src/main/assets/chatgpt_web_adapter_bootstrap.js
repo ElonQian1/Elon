@@ -24,6 +24,7 @@
     '__elonChatGptMessageActionPolicy',
     '__elonChatGptMessagePortalPolicy',
     '__elonChatGptImageAssets',
+    '__elonChatGptPrivateImageGallery',
     '__elonChatGptMessages',
     '__elonChatGptComposerOptionPolicy',
     '__elonChatGptComposerSubmenu',

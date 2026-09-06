@@ -27,11 +27,23 @@ internal class ChatGptWebImageSession(
         onChanged = onChanged,
     )
     private val galleryDelegate = lazy(LazyThreadSafetyMode.NONE) {
-        ChatGptWebImageGalleryController(activity, host, store)
+        ChatGptWebImageGalleryController(activity, host, store,
+            requestPage = { id, operation, handles -> pageAdapter()?.syncImageGallery(id, operation, handles) == true },
+            cancelPage = { id -> pageAdapter()?.cancelImageGallery(id) },
+        )
     }
     private val gallery by galleryDelegate
 
     fun show(onCreateImage: () -> Unit): Boolean = gallery.show(onCreateImage)
+
+    fun acceptGallery(snapshot: ChatGptWebImageGallerySnapshot) {
+        if (galleryDelegate.isInitialized()) gallery.accept(snapshot)
+    }
+
+    fun acceptAsset(asset: ChatGptWebImageAsset) {
+        if (asset.galleryRequestId == null) assets.accept(asset)
+        else if (galleryDelegate.isInitialized()) gallery.accept(asset)
+    }
 
     fun dismissGallery() {
         if (galleryDelegate.isInitialized()) gallery.destroy()
