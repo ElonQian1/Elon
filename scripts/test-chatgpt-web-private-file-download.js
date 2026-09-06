@@ -66,8 +66,9 @@ test('native descriptors contain opaque expiring handles, not file IDs or author
   assert.match(f.register()[0].downloadHandle, /^download_[a-f0-9]{32}$/);
 });
 
-test('project, library, connector, image pointer and unknown file identifiers stay unclaimed', () => {
+test('unknown project/library scopes, connectors, image pointers and invalid IDs stay unclaimed', () => {
   for (const patch of [{ id: '../x' }, { id: 'file-x?scope=other' }, { library_file_id: 'library-1' },
+    { library_file_id: false }, { library_file_id: 0 }, { library_file_id: [] },
     { gizmo_id: 'g-p-test' }, { context_connector: {} }, { source_url: 'https://external.test' }]) {
     const f = fixture();
     Object.assign(f.payload.messages[0].metadata.attachments[0], patch);
@@ -82,6 +83,138 @@ test('project, library, connector, image pointer and unknown file identifiers st
   const rows = f.register();
   assert.equal(rows[0].downloadHandle, undefined);
   assert.match(rows[1].downloadHandle, /^download_/);
+});
+
+const PROJECT = 'g-p-0123456789abcdef0123456789abcdef';
+const OTHER_PROJECT = 'g-p-fedcba9876543210fedcba9876543210';
+const LIBRARY = 'libfile_synthetic';
+
+test('project files use the selected conversation scope on both official route forms', async () => {
+  for (const path of ['/c/source', '/g/' + PROJECT + '-synthetic/c/source']) {
+    const f = fixture();
+    f.payload.gizmo_id = PROJECT;
+    await f.run(f.descriptor(f.register(path), path));
+    assert.equal(f.calls.length, 1);
+    const url = new URL(f.calls[0].url);
+    assert.equal(url.searchParams.get('gizmo_id'), PROJECT);
+    assert.equal(url.searchParams.get('check_context_scopes_for_conversation_id'), 'source');
+    assert.equal(url.searchParams.has('conversation_id'), false);
+    assert.equal(url.searchParams.get('download_intent'), 'true');
+    assert.equal(f.queued.length, 1);
+  }
+});
+
+function libraryFixture(info, projectId = PROJECT) {
+  const f = fixture(), downloadFetch = f.root.fetch;
+  f.payload.gizmo_id = projectId;
+  f.payload.messages[0].metadata.attachments[0].library_file_id = LIBRARY;
+  f.root.fetch = async (url, init) => {
+    if (new URL(url).pathname.endsWith('/simple')) {
+      f.calls.push({ url, init });
+      return Response.json(info);
+    }
+    return downloadFetch(url, init);
+  };
+  return f;
+}
+
+test('library downloads resolve actual personal or project ownership before authorization', async () => {
+  for (const [info, expected] of [
+    [{ is_project: true, gizmo_id: OTHER_PROJECT }, OTHER_PROJECT],
+    [{ is_project: true, gizmo_id: null }, PROJECT],
+    [{ is_project: false, gizmo_id: null }, null],
+    [{ gizmo_id: OTHER_PROJECT }, OTHER_PROJECT],
+  ]) {
+    const f = libraryFixture({ is_library_file: true, library_file_id: LIBRARY, ...info });
+    await f.run();
+    assert.equal(f.calls.length, 2);
+    const metadata = new URL(f.calls[0].url), authorization = new URL(f.calls[1].url);
+    assert.equal(metadata.pathname, '/backend-api/files/file-synthetic/simple');
+    assert.equal(metadata.searchParams.get('gizmo_id'), PROJECT);
+    assert.equal(metadata.searchParams.get('conversation_id'), 'source');
+    assert.equal(authorization.searchParams.get('gizmo_id'), expected);
+    assert.equal(authorization.searchParams.get('check_context_scopes_for_conversation_id'), 'source');
+    assert.equal(authorization.searchParams.has('conversation_id'), false);
+    assert.ok(f.calls.every(call => call.init.method === 'GET' && call.init.cache === 'no-store'));
+    assert.equal(f.queued.length, 1);
+    assert.deepEqual(Object.keys(f.queued[0]).sort(), ['documentToken', 'leaseId', 'url']);
+  }
+  const personal = libraryFixture({ is_library_file: true, library_file_id: LIBRARY, is_project: false }, null);
+  await personal.run();
+  assert.equal(new URL(personal.calls[0].url).searchParams.has('gizmo_id'), false);
+  assert.equal(personal.queued.length, 1);
+});
+
+test('unknown or contradictory library metadata cannot fall through to broad download scope', async () => {
+  for (const patch of [{ is_library_file: false }, { library_file_id: 'libfile_other' },
+    { is_library_file: 'true' }, { is_project: 'true' }, { gizmo_id: 'g-p-unconfirmed' },
+    { file_id: 'file-other' }]) {
+    const f = libraryFixture({ is_library_file: true, library_file_id: LIBRARY, is_project: true,
+      gizmo_id: PROJECT, ...patch });
+    await f.run();
+    assert.equal(f.calls.length, 1);
+    assert.equal(f.queued.length, 0);
+    assert.equal(f.receipts[0][1], false);
+    assert.equal(f.cancelled.length, 1);
+  }
+});
+
+test('library resolution failures, cancellation and late context changes never enqueue', async () => {
+  for (const mutate of [f => f.service.cancel(), f => f.setAccount('Bearer changed-account'),
+    f => { f.root.location.href += '-changed'; }, f => { f.root.__elonChatGptDocumentToken = 'doc_changed_2'; }]) {
+    const f = libraryFixture({ is_library_file: true, library_file_id: LIBRARY, is_project: true, gizmo_id: PROJECT });
+    const fetch = f.root.fetch;
+    f.root.fetch = async (...args) => { const result = await fetch(...args); mutate(f); return result; };
+    await f.run();
+    assert.equal(f.calls.length, 1);
+    assert.equal(f.queued.length, 0);
+  }
+  const failed = libraryFixture({});
+  failed.root.fetch = async (url, init) => { failed.calls.push({ url, init }); return new Response('', { status: 503 }); };
+  await failed.run();
+  assert.equal(failed.calls.length, 1);
+  assert.equal(failed.queued.length, 0);
+});
+
+test('library metadata has its own bounded read and retains the operation deadline', async () => {
+  const f = libraryFixture({});
+  f.root.setTimeout = (callback, delay) => setTimeout(callback, delay === 6000 ? 10 : delay);
+  f.root.fetch = () => new Promise(() => {});
+  await f.run();
+  assert.equal(f.queued.length, 0);
+  assert.equal(f.receipts[0][1], false);
+  assert.equal(f.cancelled.length, 1);
+  const large = libraryFixture({});
+  large.root.fetch = async () => new Response('x'.repeat(65537));
+  await large.run();
+  assert.equal(large.queued.length, 0);
+  assert.equal(large.receipts[0][1], false);
+});
+
+test('registered project and library targets cannot be changed by a mutable history response', async () => {
+  const f = libraryFixture({ is_library_file: true, library_file_id: LIBRARY, is_project: true, gizmo_id: PROJECT });
+  const descriptor = f.descriptor();
+  f.payload.gizmo_id = OTHER_PROJECT;
+  Object.assign(f.payload.messages[0].metadata.attachments[0], { id: 'file-other', library_file_id: 'libfile_other' });
+  await f.run(descriptor);
+  assert.equal(new URL(f.calls[0].url).pathname, '/backend-api/files/file-synthetic/simple');
+  assert.equal(new URL(f.calls[0].url).searchParams.get('gizmo_id'), PROJECT);
+  assert.equal(new URL(f.calls[1].url).pathname, '/backend-api/files/download/file-synthetic');
+  assert.equal(f.queued.length, 1);
+});
+
+test('conflicting projects and extra context scopes cannot create download handles', () => {
+  for (const patch of [{ project_id: OTHER_PROJECT }, { context_scopes: ['HEALTH'] },
+    { context_scopes: {} }]) {
+    const f = fixture();
+    Object.assign(f.payload, { gizmo_id: PROJECT }, patch);
+    assert.equal(f.register()[0].downloadHandle, undefined);
+  }
+  const f = fixture();
+  f.payload.gizmo_id = PROJECT;
+  assert.equal(f.register('/g/' + OTHER_PROJECT + '/c/source')[0].downloadHandle, undefined);
+  f.payload.messages[0].metadata.attachments[0].gizmo_id = OTHER_PROJECT;
+  assert.equal(f.register()[0].downloadHandle, undefined);
 });
 
 test('selection handles cannot be retargeted, reused after refresh or crossed between accounts/documents', async () => {

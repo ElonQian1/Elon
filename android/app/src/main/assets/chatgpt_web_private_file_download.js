@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 1, create: factory });
+  const exported = Object.freeze({ version: 2, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       Number(root.__elonChatGptPrivateFileDownload?.version || 0) < exported.version) {
@@ -10,7 +10,9 @@
 })(typeof window === 'object' ? window : null, function (root) {
   'use strict';
   const entries = new Map();
-  const PATH = /^\/c\/([A-Za-z0-9_-]{1,160})$/;
+  const PATH = /^(?:\/g\/(g-p-[a-f0-9]{32})(?:-[A-Za-z0-9_-]{1,124})?)?\/c\/([A-Za-z0-9_-]{1,160})$/i;
+  const PROJECT = /^g-p-[a-f0-9]{32}$/i;
+  const LIBRARY = /^libfile[_-][A-Za-z0-9_-]{1,152}$/;
   const HANDLE = /^download_[a-f0-9]{32}$/;
   const ACTION = 'download_conversation_file';
   let active = null;
@@ -24,17 +26,55 @@
     return JSON.stringify(['authorization', 'chatgpt-account-id', 'oai-device-id'].map(key => values[key] || ''));
   }
 
-  function target(path, source) {
+  function authorizationUrl(entry, projectId) {
+    const url = new URL('/backend-api/files/download/' + encodeURIComponent(entry.fileId), root.location.origin);
+    if (projectId) url.searchParams.set('gizmo_id', projectId);
+    url.searchParams.set(entry.projectId || entry.libraryFileId
+      ? 'check_context_scopes_for_conversation_id' : 'conversation_id', entry.conversationId);
+    url.searchParams.set('download_intent', 'true');
+    return url.href;
+  }
+
+  function target(path, source, scope) {
     const conversation = PATH.exec(path || '');
     const file = source?.attachment;
-    if (!conversation || source?.projectId || !/^[A-Za-z0-9_-]{1,160}$/.test(file?.id || '')) return null;
-    // Library, project, shared and connector files have additional official scope resolution.
-    if (['gizmo_id', 'project_id', 'library_file_id', 'shared_library_file_id', 'source_url',
+    if (!conversation || !/^[A-Za-z0-9_-]{1,160}$/.test(file?.id || '')) return null;
+    // Shared-library and connector lanes have separate content resolvers.
+    if (['shared_library_file_id', 'source_url',
       'context_connector', 'connector_id', 'context_connector_info'].some(key => file[key] != null && file[key] !== '')) return null;
-    const url = new URL('/backend-api/files/download/' + encodeURIComponent(file.id), root.location.origin);
-    url.searchParams.set('conversation_id', conversation[1]);
-    url.searchParams.set('download_intent', 'true');
-    return { url: url.href, fileId: file.id };
+    if (scope?.context_scopes != null && (!Array.isArray(scope.context_scopes) || scope.context_scopes.length)) return null;
+    const projects = [conversation[1], source.projectId, scope?.gizmo_id, scope?.project_id,
+      file.gizmo_id, file.project_id].filter(value => value != null && value !== '');
+    if (projects.some(value => typeof value !== 'string' || !PROJECT.test(value)) || new Set(projects).size > 1) return null;
+    const libraryFileId = file.library_file_id == null || file.library_file_id === '' ? null : file.library_file_id;
+    if (libraryFileId !== null && (typeof libraryFileId !== 'string' || !LIBRARY.test(libraryFileId))) return null;
+    return Object.freeze({ conversationId: conversation[2], fileId: file.id,
+      projectId: projects[0] || null, libraryFileId });
+  }
+
+  async function resolveAuthorization(job, request) {
+    const entry = job.entry;
+    if (!entry.libraryFileId) return authorizationUrl(entry, entry.projectId);
+    // Official WTt/KTt/DX resolve a library file's effective project before dEt.
+    const url = new URL('/backend-api/files/' + encodeURIComponent(entry.fileId) + '/simple', root.location.origin);
+    if (entry.projectId) url.searchParams.set('gizmo_id', entry.projectId);
+    url.searchParams.set('conversation_id', entry.conversationId);
+    const result = await request.request(root, url.href, {
+      method: 'GET', credentials: 'same-origin', cache: 'no-store', redirect: 'error',
+      headers: root.__elonChatGptPrivateTransport.copySameOriginRequestHeaders(), signal: job.controller.signal,
+    }, { timeoutMs: 6000, maxBytes: 65536 });
+    if (!current(job)) throw new Error('download_cancelled');
+    const info = result.payload;
+    if (info?.is_library_file !== true || info.library_file_id !== entry.libraryFileId ||
+        info.file_id != null && info.file_id !== entry.fileId ||
+        info.is_project !== undefined && typeof info.is_project !== 'boolean' ||
+        info.gizmo_id != null && (typeof info.gizmo_id !== 'string' || !PROJECT.test(info.gizmo_id))) {
+      throw new Error('download_scope_unconfirmed');
+    }
+    const projectId = info.is_project === true || PROJECT.test(info.gizmo_id || '')
+      ? info.gizmo_id || entry.projectId : null;
+    if (info.is_project === true && !projectId) throw new Error('download_scope_unconfirmed');
+    return authorizationUrl(entry, projectId);
   }
 
   function register(path, payload, index) {
@@ -43,10 +83,11 @@
     }
     const account = identity(), token = root.__elonChatGptDocumentToken;
     const projection = root.__elonChatGptPrivateHistoryProjection?.create({});
+    const scope = projection?.normalize?.(payload);
     return index.files.map(row => {
       if (disposed || !account || !/^doc_[a-z0-9_]{3,80}$/.test(token || '') ||
-          !root.elonChatGptFileDownload || !projection?.fileSource) return row;
-      const request = target(path, projection.fileSource(payload, row.id));
+          !root.elonChatGptFileDownload || !projection?.fileSource || !projection?.normalize) return row;
+      const request = target(path, projection.fileSource(payload, row.id), scope);
       if (!request) return row;
       const bytes = root.crypto.getRandomValues(new Uint8Array(16));
       const handle = 'download_' + Array.from(bytes, value => value.toString(16).padStart(2, '0')).join('');
@@ -133,7 +174,9 @@
     try {
       const request = root.__elonChatGptPrivateJsonRequest;
       if (!request?.request || !current(job)) throw new Error('download_cancelled');
-      const result = await request.request(root, entry.url, {
+      const url = await resolveAuthorization(job, request);
+      if (!current(job)) throw new Error('download_cancelled');
+      const result = await request.request(root, url, {
         method: 'GET', credentials: 'same-origin', cache: 'no-store', redirect: 'error',
         headers: root.__elonChatGptPrivateTransport.copySameOriginRequestHeaders(), signal: job.controller.signal,
       }, { timeoutMs: 8000, maxBytes: 65536 });
@@ -162,5 +205,5 @@
 
   function cancel() { active?.controller.abort(); }
   function dispose() { disposed = true; cancel(); entries.clear(); }
-  return Object.freeze({ version: 1, register, start, cancel, dispose });
+  return Object.freeze({ version: 2, register, start, cancel, dispose });
 });
