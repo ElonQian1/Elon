@@ -27,7 +27,7 @@
   function target(path, source) {
     const conversation = PATH.exec(path || '');
     const file = source?.attachment;
-    if (!conversation || source?.projectId || !/^file-[A-Za-z0-9_-]{1,155}$/.test(file?.id || '')) return null;
+    if (!conversation || source?.projectId || !/^[A-Za-z0-9_-]{1,160}$/.test(file?.id || '')) return null;
     // Library, project, shared and connector files have additional official scope resolution.
     if (['gizmo_id', 'project_id', 'library_file_id', 'shared_library_file_id', 'source_url',
       'context_connector', 'connector_id', 'context_connector_info'].some(key => file[key] != null && file[key] !== '')) return null;
@@ -103,15 +103,28 @@
     });
   }
 
+  function abandon(descriptor) {
+    if (!/^[a-f0-9-]{36}$/.test(descriptor?.leaseId || '')) return;
+    try {
+      root.elonChatGptFileDownload?.postMessage(JSON.stringify({ leaseId: descriptor.leaseId,
+        documentToken: descriptor.documentToken, cancel: true }));
+    } catch (_) {}
+  }
+
   async function start(raw, respond) {
     let descriptor;
     try { descriptor = JSON.parse(raw); } catch (_) { return respond(ACTION, false, 'invalid_file_request'); }
-    if (active) return respond(ACTION, false, 'download_busy');
+    if (active && !current(active)) { active.controller.abort(); active = null; }
+    if (active) {
+      if (descriptor?.leaseId !== active.descriptor.leaseId) abandon(descriptor);
+      return respond(ACTION, false, 'download_busy');
+    }
     const entry = entries.get(descriptor?.downloadHandle);
     if (disposed || !HANDLE.test(descriptor?.downloadHandle || '') || !entry ||
         descriptor.version !== 1 || descriptor.path !== entry.path || descriptor.name !== entry.name ||
         descriptor.documentToken !== entry.token || descriptor.href !== root.location.href ||
         !/^[a-f0-9-]{36}$/.test(descriptor.leaseId || '') || entry.expiresAt <= Date.now() || identity() !== entry.account) {
+      abandon(descriptor);
       return respond(ACTION, false, 'download_selection_expired');
     }
     const job = { descriptor, entry, controller: new root.AbortController() };
@@ -131,6 +144,7 @@
         throw new Error('download_authorization_failed');
       }
       await enqueue(job, downloadUrl(payload.download_url));
+      job.queued = true;
       respond(ACTION, true, 'download_queued');
     } catch (error) {
       const reason = String(error?.message || '');
@@ -141,6 +155,7 @@
     } finally {
       root.clearTimeout(timer);
       job.controller.abort();
+      if (!job.queued) abandon(descriptor);
       if (active === job) active = null;
     }
   }

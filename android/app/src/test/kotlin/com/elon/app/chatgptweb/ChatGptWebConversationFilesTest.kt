@@ -7,6 +7,14 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class ChatGptWebConversationFilesTest {
+    @Test fun downloadSelectionAcceptsOnlyOpaqueHandlesWithoutChangingExistingDescriptors() {
+        val source = fixture()
+        val row = source.getJSONArray("files").getJSONObject(0)
+        row.put("downloadHandle", "download_" + "a".repeat(32))
+        assertEquals("download_" + "a".repeat(32), requireNotNull(ChatGptWebConversationFiles.parse(source)).files[0].downloadHandle)
+        row.put("downloadHandle", "https://files.oaiusercontent.com/a?sig=secret")
+        assertEquals("", requireNotNull(ChatGptWebConversationFiles.parse(source)).files[0].downloadHandle)
+    }
     private fun fixture(): JSONObject = JSONObject(requireNotNull(javaClass.classLoader?.getResourceAsStream(
         "webchat/private-conversation-files-contract.json")).bufferedReader().use { it.readText() }).getJSONObject("event")
 

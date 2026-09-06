@@ -63,6 +63,8 @@ internal interface WebChatConsumerPort {
     fun conversationFiles(path: String): WebChatConversationFileIndex? = null
     fun requestConversationFiles(path: String): WebChatConsumerCommandResult =
         WebChatConsumerCommandResult(false, "unsupported_consumer_command")
+    fun downloadConversationFile(path: String, fileId: String, downloadHandle: String): WebChatConsumerCommandResult =
+        WebChatConsumerCommandResult(false, "unsupported_consumer_command")
     fun requestComposerOptions(section: String): WebChatConsumerCommandResult
     fun dismissComposerOptions(): WebChatConsumerCommandResult
     fun selectComposerOption(section: String, optionId: String): WebChatConsumerCommandResult

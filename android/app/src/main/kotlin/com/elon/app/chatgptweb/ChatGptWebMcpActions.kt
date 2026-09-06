@@ -93,6 +93,16 @@ internal class ChatGptWebMcpActions(
             dispatchRequest(beginCommand(expectedAction), block)
         }
         when (action) {
+            "chatgpt_download_conversation_file" -> {
+                val path = ChatGptWebConversationPath.normalize(args.optString("conversation_path"))
+                    ?: return error(action, "invalid_conversation_path")
+                val index = observedAtDispatch.conversationFiles[ChatGptWebConversationPath.identity(path)]
+                val file = index?.files?.singleOrNull { it.id == args.optString("file_id") }
+                    ?: return error(action, "download_selection_expired")
+                if (!ChatGptWebFileDownloadPolicy.HANDLE.matches(file.downloadHandle)) return error(action, "download_not_supported")
+                if (args.optString("download_handle") != file.downloadHandle) return error(action, "download_selection_expired")
+                dispatch("download_conversation_file") { commands.downloadConversationFile(path, file, it) }
+            }
             "chatgpt_private_protocol_probe" -> {
                 val mode = args.optString("mode")
                 if (mode !in ChatGptWebPrivateProtocolEvidence.MODES) return error(action, "invalid_probe_mode")

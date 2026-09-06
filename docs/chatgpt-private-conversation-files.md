@@ -5,7 +5,8 @@
 Capability: `android_chatgpt_private_conversation_files_v1`.
 Code is published and installed in `v1.1.1540`, not yet device UI verified.
 Candidate adapter: `262`; history transport: `18`; directory requests module: `2`.
-This is an attachment **index**, not a private uploader or file downloader.
+The original published capability is an attachment **index**, not an uploader
+or downloader. Adapter 266 adds a source-only [private download candidate](chatgpt-private-file-download.md).
 
 The production conversation action sheet now exposes `Conversation attachments`
 through `web-chat-conversation-action-files`. It reads the selected conversation
@@ -35,10 +36,12 @@ required to list files. Concurrent history/index reads share one HTTP request.
   cached descriptors with an explicit retry. No automatic write replay or
   automatic official-page navigation is added.
 
-Only descriptors enter the native index: message ID, file name, role, kind and
-MIME type. Private file handles, signed download URLs and credentials remain in
-the page. Selecting an item shows metadata and offers its original conversation;
-it does not pretend to download a file. Opening the already-current conversation
+Only descriptors enter the native index: message ID, file name, role, kind,
+MIME type, and (in the source candidate) an opaque expiring download-selection
+handle. Private file IDs and credentials remain in the page; a signed URL reaches
+only the one-use native transfer gateway. Selecting an item shows metadata,
+offers its original conversation, and exposes Download only for supported
+descriptors. Queue acceptance is not transfer completion. Opening the already-current conversation
 is a no-op, preserving its draft and voice state. Navigating to another one uses
 the existing draft guard and tracked navigation.
 
@@ -72,5 +75,5 @@ Device acceptance should open files from another conversation while keeping an
 unsent draft, reopen from cache, fail one refresh without losing cached rows,
 then dismiss during a read and verify no late dialog. Use synthetic attachments.
 No device latency, battery or temperature improvement is claimed from offline
-tests. Upload prepare/finalize, download authorization, generated-image library
-pagination, share and delete remain separate protocol gaps.
+tests. Upload variants, download scope variants/device acceptance, generated-image
+library pagination, share and delete remain separate protocol gaps.

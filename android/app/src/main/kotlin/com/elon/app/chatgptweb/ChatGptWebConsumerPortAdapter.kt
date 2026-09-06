@@ -25,6 +25,10 @@ internal class ChatGptWebConsumerPortAdapter(
         execute(JSONObject().put("action", "chatgpt_list_conversation_files")
             .put("conversation_path", path))
 
+    override fun downloadConversationFile(path: String, fileId: String, downloadHandle: String): WebChatConsumerCommandResult =
+        execute(JSONObject().put("action", "chatgpt_download_conversation_file")
+            .put("conversation_path", path).put("file_id", fileId).put("download_handle", downloadHandle))
+
     override fun state(): WebChatConsumerState {
         val observed = observedState()
         val current = snapshot().takeIf { observed.adapterCurrent }

@@ -22,12 +22,19 @@ class ChatGptWebConversationFilesMcpTest {
         state.updateDocument(WebBridgeDocumentSession.Snapshot(1, 1, "doc_test"))
         var calledPath = ""
         var calledRequest = ""
+        var downloadPath = ""
+        var downloadRequest = ""
         val commands = object : ChatGptWebMcpCommandPort by ChatGptWebMcpTestCommandPort(
             onOpenConversation = { fail("file listing must not navigate") },
         ) {
             override fun listConversationFiles(path: String, requestId: String) {
                 calledPath = path
                 calledRequest = requestId
+            }
+            override fun downloadConversationFile(path: String, file: com.elon.app.WebChatConversationFile, requestId: String) {
+                downloadPath = path
+                downloadRequest = requestId
+                assertEquals("download_" + "a".repeat(32), file.downloadHandle)
             }
         }
         val actions = ChatGptWebMcpActions(
@@ -48,9 +55,20 @@ class ChatGptWebConversationFilesMcpTest {
         assertNull(consumer.conversationFiles("/c/unknown"))
         val fixture = JSONObject(requireNotNull(javaClass.classLoader?.getResourceAsStream(
             "webchat/private-conversation-files-contract.json")).bufferedReader().use { it.readText() }).getJSONObject("event")
+        fixture.getJSONArray("files").getJSONObject(0).put("downloadHandle", "download_" + "a".repeat(32))
         state.accept(ChatGptWebEvent.ConversationFiles(requireNotNull(ChatGptWebConversationFiles.parse(
             fixture.put("requestId", result.requestId)))))
         assertEquals(2, consumer.conversationFiles(calledPath)?.files?.size)
         assertEquals(consumer.conversationFiles(calledPath), consumer.conversationFiles("/c/fixture"))
+        val file = requireNotNull(consumer.conversationFiles(calledPath)).files.first()
+        assertFalse(consumer.downloadConversationFile(calledPath, file.id, "download_" + "b".repeat(32)).accepted)
+        assertEquals("", downloadRequest)
+        val requested = consumer.downloadConversationFile("/c/fixture", file.id, file.downloadHandle)
+        assertTrue(requested.accepted)
+        assertEquals("/c/fixture", downloadPath)
+        assertEquals(requested.requestId, downloadRequest)
+        state.accept(ChatGptWebEvent.CommandResult("download_conversation_file", true, "download_queued", requested.requestId))
+        assertEquals(com.elon.app.WebChatConsumerCommandStatus.SUCCEEDED,
+            consumer.state().commandRequests.single { it.id == requested.requestId }.status)
     }
 }

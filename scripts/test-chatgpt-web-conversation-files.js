@@ -121,6 +121,21 @@ const plain = (value) => JSON.parse(JSON.stringify(value));
     assert.equal(events.filter(e => e.type === 'conversation_files_snapshot').length, 2);
     assert.equal(events.filter(e => e.type === 'message_snapshot').length, 1);
   });
+  await test('file read attaches download selection through the private owner without an extra request', async () => {
+    const events = []; let count = 0;
+    const { window, transport } = runtime(async () => { count++; return response(fixture.input); });
+    window.__elonChatGptPrivateFileDownload = { register: (path, payload, index) => {
+      assert.equal(path, '/c/fixture');
+      assert.deepEqual(plain(payload), fixture.input);
+      return index.files.map(row => ({ ...row, downloadHandle: 'download_' + 'a'.repeat(32) }));
+    } };
+    await transport.listConversationFiles('/c/fixture', 'mcp_f1', event => events.push(event), () => {});
+    assert.equal(count, 1);
+    assert.equal(events[0].files[0].downloadHandle, 'download_' + 'a'.repeat(32));
+    window.__elonChatGptPrivateFileDownload.register = () => { throw new Error('optional owner unavailable'); };
+    await transport.listConversationFiles('/c/fixture', 'mcp_f2', event => events.push(event), () => {});
+    assert.deepEqual(plain(events[1].files), fixture.event.files);
+  });
   await test('missing identity and invalid requests do not navigate or fetch', async () => {
     const { transport } = runtime(() => assert.fail('must not fetch'), false);
     const receipts = []; const emit = () => assert.fail('must not publish');
@@ -163,12 +178,18 @@ const plain = (value) => JSON.parse(JSON.stringify(value));
     assert.equal(directory.handleCommand({ action: 'send_prompt' }, reply), false);
     assert.deepEqual(calls, [['/c/test', 'mcp_x'], 'cancel']);
     assert.equal(receipts[1][2], 'membership_probe_unavailable');
+    window.__elonChatGptPrivateFileDownload = { start: (value, respond) => {
+      assert.equal(value, 'synthetic-descriptor');
+      respond('download_conversation_file', true, 'download_queued');
+    } };
+    assert.equal(directory.handleCommand({ action: 'download_conversation_file', value: 'synthetic-descriptor' }, reply), true);
+    assert.deepEqual(receipts.at(-1), ['download_conversation_file', true, 'download_queued']);
   });
   await test('directory module upgrades an already-injected older factory', () => {
     const window = { __elonChatGptConversationDirectoryRequests: { create: () => ({}) } };
     vm.runInNewContext(fs.readFileSync(path.join(assets,
       'chatgpt_web_adapter_conversation_directory_requests.js'), 'utf8'), { window });
-    assert.equal(window.__elonChatGptConversationDirectoryRequests.version, 2);
+    assert.equal(window.__elonChatGptConversationDirectoryRequests.version, 3);
     assert.equal(typeof window.__elonChatGptConversationDirectoryRequests.create({}).handleCommand, 'function');
   });
   console.log('PASS conversation files: ' + cases + ' cases');

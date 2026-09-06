@@ -49,6 +49,8 @@ internal class ChatGptWebMcpCommandAdapter(
 
     override fun listConversationFiles(path: String, requestId: String) =
         pageAdapter.listConversationFiles(path, requestId)
+    override fun downloadConversationFile(path: String, file: com.elon.app.WebChatConversationFile, requestId: String) =
+        pageAdapter.downloadConversationFile(path, file, requestId)
     override fun setConversationArchived(path: String, archived: Boolean, requestId: String) =
         pageAdapter.setConversationArchived(path, archived, requestId)
     override fun renameConversation(path: String, title: String, requestId: String) =

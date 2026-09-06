@@ -7,6 +7,7 @@ internal data class WebChatConversationFile(
     val kind: String,
     val role: String,
     val mediaType: String,
+    val downloadHandle: String = "",
 )
 
 internal data class WebChatConversationFileIndex(

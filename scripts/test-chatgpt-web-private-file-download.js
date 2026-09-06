@@ -8,11 +8,12 @@ const request = require('../android/app/src/main/assets/chatgpt_web_private_json
 
 function fixture() {
   let account = 'Bearer synthetic-file-download';
-  const calls = [], queued = [], receipts = [];
+  const calls = [], queued = [], receipts = [], cancelled = [];
   const payload = { messages: [{ id: 'message-1', author: { role: 'user' },
     content: { parts: ['test'] }, metadata: { attachments: [{ id: 'file-synthetic', name: 'fixture.txt', mime_type: 'text/plain' }] } }] };
   const bridge = { onmessage: null, postMessage(raw) {
     const value = JSON.parse(raw);
+    if (value.cancel === true) { cancelled.push(value); return; }
     queued.push(value);
     queueMicrotask(() => bridge.onmessage?.({ data: JSON.stringify({ leaseId: value.leaseId, state: 'queued' }) }));
   } };
@@ -35,7 +36,7 @@ function fixture() {
     leaseId: '00000000-0000-4000-8000-000000000001', documentToken: root.__elonChatGptDocumentToken,
     href: root.location.href, path, name: 'fixture.txt', downloadHandle: rows[0]?.downloadHandle });
   const run = value => service.start(JSON.stringify(value || descriptor()), (...args) => receipts.push(args));
-  return { root, calls, queued, receipts, payload, bridge, service, register, descriptor, run,
+  return { root, calls, queued, receipts, cancelled, payload, bridge, service, register, descriptor, run,
     setAccount: value => { account = value; } };
 }
 
@@ -61,6 +62,8 @@ test('native descriptors contain opaque expiring handles, not file IDs or author
   assert.ok(!JSON.stringify(rows).includes('file-synthetic'));
   assert.ok(!JSON.stringify(rows).includes('Bearer'));
   assert.equal(projection.create({}).files(f.payload).files[0].downloadHandle, undefined);
+  f.payload.messages[0].metadata.attachments[0].id = 'file_000000synthetic';
+  assert.match(f.register()[0].downloadHandle, /^download_[a-f0-9]{32}$/);
 });
 
 test('project, library, connector, image pointer and unknown file identifiers stay unclaimed', () => {
@@ -123,6 +126,8 @@ test('retry, wrong file, expired file and invalid signed origins never report a 
   f.root.fetch = async () => new Response('', { status: 404 });
   await f.run();
   assert.equal(f.receipts[0][2], 'download_file_unavailable');
+  assert.equal(f.cancelled.length, 1);
+  assert.equal(f.cancelled[0].cancel, true);
 });
 
 test('single-flight, cancellation and oversized authorization responses are bounded with no write replay', async () => {
@@ -132,6 +137,7 @@ test('single-flight, cancellation and oversized authorization responses are boun
   const d = f.descriptor(), first = f.run(d);
   await f.run(d);
   assert.equal(f.receipts[0][2], 'download_busy');
+  assert.equal(f.cancelled.length, 0);
   f.service.cancel();
   await first;
   resolve(new Response(JSON.stringify({ status: 'success' })));
@@ -143,6 +149,12 @@ test('single-flight, cancellation and oversized authorization responses are boun
 });
 
 test('registry is bounded, expires old selections and dispose restores pending bridge listener', async () => {
+  const expired = fixture(), selection = expired.descriptor(), now = Date.now;
+  try {
+    Date.now = () => now() + 120001;
+    await expired.run(selection);
+    assert.equal(expired.receipts[0][2], 'download_selection_expired');
+  } finally { Date.now = now; }
   const f = fixture(), d = f.descriptor();
   for (let index = 0; index < 801; index++) f.register('/c/other-' + index);
   await f.run(d);
@@ -153,4 +165,16 @@ test('registry is bounded, expires old selections and dispose restores pending b
   await g.run();
   assert.equal(g.bridge.onmessage, original);
   assert.equal(g.receipts[0][1], false);
+});
+
+test('a new context retires its old pending authorization instead of waiting for the old timeout', async () => {
+  const f = fixture(), fetch = f.root.fetch;
+  f.root.fetch = () => new Promise(() => {});
+  const old = f.run();
+  f.root.location.href = 'https://chatgpt.com/c/replacement';
+  f.root.fetch = fetch;
+  await f.run();
+  await old;
+  assert.equal(f.queued.length, 1);
+  assert.equal(f.receipts.filter(item => item[1]).length, 1);
 });

@@ -20,7 +20,8 @@ internal object ChatGptWebConversationFiles {
                 val kind = item.optString("kind").takeIf { it == "image" || it == "file" } ?: continue
                 val role = item.optString("role").takeIf { it == "user" || it == "assistant" } ?: continue
                 add(WebChatConversationFile(id, messageId, name, kind, role,
-                    item.optString("mediaType").takeIf { MIME.matches(it) }.orEmpty()))
+                    item.optString("mediaType").takeIf { MIME.matches(it) }.orEmpty(),
+                    item.optString("downloadHandle").takeIf(ChatGptWebFileDownloadPolicy.HANDLE::matches).orEmpty()))
             }
         }.distinctBy { it.id }
         // Malformed descriptors cannot be advertised as a complete empty file list.
