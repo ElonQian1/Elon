@@ -10855,7 +10855,7 @@
       "id": "esk-sui-testnet-publication-preflight-v1",
       "title": "ESK Sui 测试网发行离线预检 V1",
       "summary": "离线冻结 ESK testnet 发布候选合同并生成可复算的无签名仪式计划；严格保留钱包、RPC、交易构造、签名、广播、资金和链状态为未执行，并把两年早期团队兜底意向作为未决商业政策而非已批准承诺。",
-      "status": "verified",
+      "status": "released",
       "priority": "p0",
       "requirement": {
         "path": "docs/requirements/esk-sui-testnet-publication-preflight-v1.md",
@@ -11120,7 +11120,7 @@
         }
       ],
       "created_at_ms": 1788663760191,
-      "updated_at_ms": 1788664030994
+      "updated_at_ms": 1788664263413
     },
     {
       "id": "esk_paper_quant_allocation_request_v2",
@@ -21953,16 +21953,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_7ec53da9be4446cc8c20edb4785d8a85",
-      "feature_id": "yilong-quant-android-identity-v1",
-      "action": "claimed",
-      "actor": "codex/root",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788557748951
-    },
-    {
       "id": "feature_event_62e731fd80684431a443d83ffbf334bd",
       "feature_id": "yilong-quant-android-identity-v1",
       "action": "transitioned",
@@ -23951,6 +23941,16 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1788664030994
+    },
+    {
+      "id": "feature_event_2ac0584b55634adb8b79409eadb03750",
+      "feature_id": "esk-sui-testnet-publication-preflight-v1",
+      "action": "transitioned",
+      "actor": "codex-sui-preflight",
+      "reason": "代码与交付证据均已推送，Quality Gates #2238 和 #2239 的 ESK Sui Move 作业成功；离线预检 V1 发布完成，真实链执行仍未授权且未发生。",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1788664263413
     }
   ]
 }
