@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 1, create: factory });
+  const exported = Object.freeze({ version: 2, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root && root.location?.origin === 'https://chatgpt.com') {
     root.__elonChatGptPrivateAttachmentTransport = exported;
@@ -67,7 +67,8 @@
     try {
       assertCurrent(job);
       // Snapshot caller-owned options before any await; model/project changes cannot rewrite a pending upload.
-      const selected = Object.freeze({ ...context });
+      const selected = Object.freeze({ ...context,
+        ...(context.imageDimensions == null ? {} : { imageDimensions: protocol.imageDimensions(context.imageDimensions) }) });
       const body = protocol.prepare(file, selected);
       const abort = new Promise((_, reject) => {
         abortListener = () => reject(new Error('cancelled'));
@@ -95,18 +96,22 @@
         body: JSON.stringify(protocol.processBody(destination.fileId, file, selected)),
       }, 'text', 30000);
       const result = protocol.processed(processed.text, destination.fileId);
+      if (selected.imageDimensions && result.metadata.mimeType && result.metadata.mimeType !== file.type) {
+        throw new Error('processing_metadata_mismatch');
+      }
       change(job, 'processed');
       assertCurrent(job);
       return {
         ok: true, stage: 'processed', binding, fileId: destination.fileId,
         fileName: file.name, fileSize: file.size, mimeType: file.type,
         metadata: result.metadata, eventCount: result.eventCount, events: result.events,
+        ...(selected.imageDimensions ? { imageDimensions: selected.imageDimensions } : {}),
         // Upload completion is not composer association or message-send acknowledgement.
         associated: false,
       };
     } catch (error) {
       const raw = String(error?.message || 'request_failed');
-      const code = /^(?:http_\d{3}|invalid_(?:file|file_name|mime_type|prepare_response|upload_url|file_id|process_stream)|unsupported_(?:upload_context|upload_route)|processing_(?:failed|unconfirmed)|process_file_mismatch|auth_(?:unavailable|timeout)|response_too_large|invalid_json|cancelled|timeout|context_changed)$/.test(raw)
+      const code = /^(?:http_\d{3}|invalid_(?:file|file_name|mime_type|prepare_response|upload_url|file_id|process_stream)|unsupported_(?:upload_context|upload_route)|processing_(?:failed|unconfirmed|metadata_mismatch)|process_file_mismatch|auth_(?:unavailable|timeout)|response_too_large|invalid_json|cancelled|timeout|context_changed)$/.test(raw)
         ? raw : 'request_failed';
       if (job.dispatched && !['cancelled', 'context_changed'].includes(code)) cooldownUntil = Date.now() + 45000;
       return { ok: false, code, stage: job.stage, mayHaveSideEffects: job.dispatched > 0, hasFileId: !!job.fileId };
@@ -119,6 +124,6 @@
   }
 
   function cancel() { if (active) active.controller.abort(); }
-  function snapshot() { return { version: 1, stage: active?.stage || 'idle', cooldown: cooldownUntil > Date.now() }; }
-  return Object.freeze({ version: 1, upload, cancel, dispose: cancel, snapshot });
+  function snapshot() { return { version: 2, stage: active?.stage || 'idle', cooldown: cooldownUntil > Date.now() }; }
+  return Object.freeze({ version: 2, upload, cancel, dispose: cancel, snapshot });
 });

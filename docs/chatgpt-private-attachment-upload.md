@@ -106,9 +106,10 @@ This path is documented but intentionally not implemented by the candidate.
 - Result says `associated=false`. A processed file is not a sent message.
   Signed URLs and identity headers are not included in completion/diagnostic
   receipts. Unknown server error details are reduced to a stable error code.
-- Images, project/temporary contexts, custom upload headers, multipart, Estuary
-  and unknown storage hosts are rejected explicitly. Do not infer support for
-  these variants from the successful small-text trial.
+- Project/temporary contexts, custom upload headers, multipart, Estuary and
+  unknown storage hosts are rejected explicitly. Static image integration is
+  now a separate [adapter 270 source candidate](chatgpt-private-image-upload.md),
+  not device acceptance inferred from the successful small-text trial.
 
 ## Next integration
 
@@ -208,5 +209,11 @@ with 47 test-runner cases on 2026-09-06. They include the real production
 conversation-reader module connected to the attachment pipeline with synthetic
 HTTP responses, unknown versus unsupported scope, context changes during the
 read, cancellation, timeout, reinjection and exact ready-store association. The
-new native-code change is only the adapter version constant; Android compilation
+adapter 269 native-code change is only the version constant; Android compilation
 and device checks remain for the grouped build, not claimed from Node tests.
+
+Adapter 270 additionally connects normalized static images through the same native
+lease and private transaction. Its image-specific source contract, size handling,
+test results and pending device checks live in
+[private image upload](chatgpt-private-image-upload.md). The plain-text transaction
+and send-owner behavior are reused, not replaced.

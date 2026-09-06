@@ -46,7 +46,7 @@ test('prepare uses the verified legacy route contract without enabling multipart
   assert.equal(result.store_in_library, false);
 });
 
-test('reject unsupported images, project and temporary contexts before any request', async () => {
+test('reject untyped images, project and temporary contexts before any request', async () => {
   for (const patch of [{ isProjectThread: true }, { isTemporaryChat: true }, { gizmoId: 'project' },
     { directoryId: 'folder' }, { useCase: 'guessed' }, { libraryPersistenceMode: 'guessed' }]) {
     const f = fixture();
@@ -54,6 +54,57 @@ test('reject unsupported images, project and temporary contexts before any reque
     assert.equal(f.calls.length, 0);
   }
   assert.throws(() => protocol.prepare(new File(['x'], 'x.png', { type: 'image/png' }), selected()));
+});
+
+test('multimodal create/process and ready metadata retain the prepared image dimensions', async () => {
+  for (const type of ['image/jpeg', 'image/png', 'image/webp']) {
+    const f = fixture({ respond: async url => url.endsWith('/files') ? { payload: prepared() } :
+      url.endsWith('/process_upload_stream') ? { text: stream().replace('text/plain', type) } : {} });
+    const image = new File(['image bytes'], 'image.png', { type });
+    const result = await f.instance.upload(image, { ...selected(), useCase: 'multimodal',
+      imageDimensions: { width: 320, height: 240 } }, f.binding);
+    assert.equal(result.ok, true);
+    assert.deepEqual(result.imageDimensions, { width: 320, height: 240 });
+    assert.equal(result.associated, false);
+    assert.equal(JSON.parse(f.calls[0].init.body).use_case, 'multimodal');
+    assert.equal(JSON.parse(f.calls[2].init.body).use_case, 'multimodal');
+    assert.equal(f.calls[1].init.body, image);
+    assert.equal(f.calls[1].init.headers['Content-Type'], type);
+    assert.equal(f.calls[1].init.headers.authorization, undefined);
+  }
+});
+
+test('image dimensions are copied before async auth and cannot drift during upload', async () => {
+  let release;
+  const f = fixture({ options: { acquireHeaders: () => new Promise(resolve => { release = resolve; }) },
+    respond: async url => url.endsWith('/files') ? { payload: prepared() } :
+      url.endsWith('/process_upload_stream') ? { text: stream().replace('text/plain', 'image/png') } : {} });
+  const dimensions = { width: 320, height: 240 };
+  const pending = f.instance.upload(new File(['x'], 'x.png', { type: 'image/png' }),
+    { ...selected(), useCase: 'multimodal', imageDimensions: dimensions }, f.binding);
+  dimensions.width = 9999;
+  release({ Authorization: 'Bearer synthetic-auth-token' });
+  const result = await pending;
+  assert.equal(result.ok, true);
+  assert.equal(result.imageDimensions.width, 320);
+});
+
+test('wrong image metadata and an image sent as a generic file cannot become ready', async () => {
+  const image = new File(['x'], 'x.png', { type: 'image/png' });
+  for (const patch of [{ imageDimensions: undefined }, { imageDimensions: { width: 9000, height: 20 } },
+    { useCase: 'ace_upload' }, { indexForRetrieval: true }]) {
+    const f = fixture();
+    const result = await f.instance.upload(image, { ...selected(), useCase: 'multimodal',
+      imageDimensions: { width: 320, height: 240 }, ...patch }, f.binding);
+    assert.equal(result.ok, false);
+    assert.equal(f.calls.length, 0);
+  }
+  const f = fixture();
+  const mismatch = await f.instance.upload(image, { ...selected(), useCase: 'multimodal',
+    imageDimensions: { width: 320, height: 240 } }, f.binding);
+  assert.equal(mismatch.code, 'processing_metadata_mismatch');
+  assert.equal(mismatch.ok, false);
+  assert.equal(f.calls.length, 3, 'no automatic repeat after processing');
 });
 
 test('reject invalid file sizes, names and MIME types', () => {

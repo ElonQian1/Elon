@@ -9,7 +9,16 @@
   'use strict';
   const MAX_BYTES = 8 * 1024 * 1024;
   const FILE_ID = /^[A-Za-z0-9_-]{1,160}$/;
-  const USE_CASES = new Set(['ace_upload', 'my_files']);
+  const USE_CASES = new Set(['ace_upload', 'my_files', 'multimodal']);
+  const IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+
+  function imageDimensions(value) {
+    if (!Number.isSafeInteger(value?.width) || !Number.isSafeInteger(value?.height) ||
+        value.width < 1 || value.height < 1 || value.width > 2048 || value.height > 2048) {
+      throw new Error('unsupported_upload_context');
+    }
+    return Object.freeze({ width: value.width, height: value.height });
+  }
 
   function prepare(file, context) {
     if (!file || !Number.isSafeInteger(file.size) || file.size < 1 || file.size > MAX_BYTES ||
@@ -20,8 +29,17 @@
         context.libraryPersistenceMode !== 'required' || typeof context.indexForRetrieval !== 'boolean') {
       throw new Error('unsupported_upload_context');
     }
-    if (context.isProjectThread || context.isTemporaryChat || context.gizmoId || context.directoryId ||
-        /^image\//i.test(file.type)) throw new Error('unsupported_upload_context');
+    if (context.isProjectThread || context.isTemporaryChat || context.gizmoId || context.directoryId) {
+      throw new Error('unsupported_upload_context');
+    }
+    if (/^image\//i.test(file.type)) {
+      if (!IMAGE_TYPES.has(file.type) || context.useCase !== 'multimodal' || context.indexForRetrieval) {
+        throw new Error('unsupported_upload_context');
+      }
+      imageDimensions(context.imageDimensions);
+    } else if (context.useCase === 'multimodal' || context.imageDimensions != null) {
+      throw new Error('unsupported_upload_context');
+    }
     if (typeof file.type !== 'string' || !/^[\w.+-]+\/[\w.+-]+$/.test(file.type)) {
       throw new Error('invalid_mime_type');
     }
@@ -102,5 +120,5 @@
     return { metadata, eventCount: count, events };
   }
 
-  return { version: 1, maxFileBytes: MAX_BYTES, prepare, destination, processBody, processed };
+  return { version: 2, maxFileBytes: MAX_BYTES, prepare, destination, processBody, processed, imageDimensions };
 });

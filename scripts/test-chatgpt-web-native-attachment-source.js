@@ -30,10 +30,20 @@ test('native bytes cross the bridge in bounded sequential chunks without file pa
 });
 
 test('invalid sizes and MIME types are rejected without native reads', async () => {
-  for (const patch of [{ size: 0 }, { size: 8 * 1024 * 1024 + 1 }, { type: 'image/png' }, { version: 2 }]) {
+  for (const patch of [{ size: 0 }, { size: 8 * 1024 * 1024 + 1 }, { type: 'image/svg+xml' }, { version: 2 }]) {
     const f = fixture();
     await assert.rejects(f.source.read({ ...f.descriptor, ...patch }));
     assert.equal(f.requests.length, 0);
+  }
+});
+
+test('native normalized image bytes use the same bounded handoff as text', async () => {
+  for (const type of ['image/jpeg', 'image/png', 'image/webp']) {
+    const f = fixture(140000);
+    const file = await f.source.read({ ...f.descriptor, type });
+    assert.equal(file.type, type);
+    assert.deepEqual(Buffer.from(await file.arrayBuffer()), f.bytes);
+    assert.equal(f.requests.length, 3);
   }
 });
 

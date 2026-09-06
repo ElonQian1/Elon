@@ -14,7 +14,8 @@ test('production asset loader includes the dependency chain and the complete bun
   const assets = [...declaration.slice(0, declaration.indexOf('\n        )')).matchAll(/"([^"\n]+\.js)"/g)].map(match => match[1]);
   const required = ['chatgpt_web_private_transport.js', 'chatgpt_web_private_attachment_protocol.js',
     'chatgpt_web_private_attachment_transport.js', 'chatgpt_web_native_attachment_source.js',
-    'chatgpt_web_private_attachment_composer.js', 'chatgpt_web_private_attachment_send.js', 'chatgpt_web_adapter.js'];
+    'chatgpt_web_private_attachment_composer.js', 'chatgpt_web_private_attachment_image.js',
+    'chatgpt_web_private_attachment_send.js', 'chatgpt_web_adapter.js'];
   for (let index = 0; index < required.length; index++) {
     assert.equal(assets.filter(item => item === required[index]).length, 1);
     if (index) assert.ok(assets.indexOf(required[index - 1]) < assets.indexOf(required[index]));
@@ -37,6 +38,7 @@ function fixture() {
     __elonChatGptDocumentToken: 'doc_synthetic_1',
     __elonChatGptPrivateTransport: { copySameOriginRequestHeaders: headers, acquireSameOriginRequestHeaders: async () => headers() },
     __elonChatGptPrivateAttachmentTransport: transportModule,
+    __elonChatGptPrivateAttachmentProtocol: protocol,
     __elonChatGptComposer: { currentModel: () => model },
     AbortController, setTimeout, clearTimeout, setInterval, clearInterval,
   };
@@ -84,7 +86,7 @@ test('versioned reinjection cancels only the older owner and retains the current
     __elonChatGptPrivateAttachmentSend: { version: 1, cancel: () => { cancelled++; } } };
   vm.runInNewContext(source, { window: root });
   const current = root.__elonChatGptPrivateAttachmentSend;
-  assert.equal(current.version, 2);
+  assert.equal(current.version, 3);
   assert.equal(cancelled, 1);
   vm.runInNewContext(source, { window: root });
   assert.equal(root.__elonChatGptPrivateAttachmentSend, current);
@@ -120,6 +122,54 @@ test('existing conversation reuses the private upload and exact official store w
   assert.deepEqual(p.receipts, [['request_attachment_upload', true, 'private_attachment_associated']]);
   assert.equal(f.store.readyFiles$()[0].isProjectThread, false);
   assert.equal(f.store.readyFiles$()[0].isTemporaryChat, false);
+});
+
+test('production image preparation, private upload and store association preserve image type and dimensions', async () => {
+  const f = existingFixture();
+  f.file = new File(['synthetic PNG'], 'fixture.png', { type: 'image/png' });
+  Object.assign(f.descriptor, { name: f.file.name, type: f.file.type, size: f.file.size, width: 320, height: 240 });
+  f.root.File = File;
+  let closed = 0;
+  f.root.createImageBitmap = async () => ({ width: 320, height: 240, close: () => { closed++; } });
+  f.root.__elonChatGptPrivateAttachmentImage = require('../android/app/src/main/assets/chatgpt_web_private_attachment_image.js');
+  const p = pipeline(f);
+  await p.start();
+  assert.equal(p.receipts[0][1], true);
+  assert.equal(p.fallbacks(), 0);
+  assert.equal(p.requests.length, 3);
+  const attachment = f.store.readyFiles$()[0];
+  assert.equal(attachment.fileSpec.mimeType, 'image/png');
+  assert.equal(attachment.fileSpec.width, 320);
+  assert.equal(attachment.fileSpec.height, 240);
+  assert.equal(attachment.file, f.file);
+  assert.equal(closed, 1);
+  assert.equal(f.composer.merge([])[0].name, 'fixture.png');
+});
+
+test('unavailable image preparation selects compatibility before native byte reads', async () => {
+  const f = fixture();
+  f.descriptor.type = 'image/png';
+  const p = pipeline(f, { options: { source: { read: () => assert.fail('must not read') } } });
+  await p.start();
+  assert.equal(p.fallbacks(), 1);
+  assert.equal(p.requests.length, 0);
+});
+
+test('cancellation during image preparation never creates a private upload or starts a chooser', async () => {
+  const f = fixture();
+  f.file = new File(['x'], 'fixture.png', { type: 'image/png' });
+  f.descriptor.type = f.file.type;
+  let release;
+  const p = pipeline(f, { options: { image: { available: () => true,
+    prepare: () => new Promise(resolve => { release = resolve; }) } } });
+  const pending = p.start();
+  await new Promise(resolve => setImmediate(resolve));
+  p.send.cancel();
+  release({ file: f.file, dimensions: { width: 1, height: 1 } });
+  await pending;
+  assert.equal(p.requests.length, 0);
+  assert.equal(p.fallbacks(), 0);
+  assert.equal(p.receipts[0][1], false);
 });
 
 test('production conversation reader and attachment pipeline integrate without a substitute scope resolver', async () => {

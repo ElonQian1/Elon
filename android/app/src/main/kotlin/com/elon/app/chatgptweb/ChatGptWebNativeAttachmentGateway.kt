@@ -80,7 +80,7 @@ internal class ChatGptWebNativeAttachmentGateway(
         val state = document()
         val href = webView.url ?: return null
         if (!state.adapterCurrent || uri.scheme != "content" || uri.authority != authority ||
-            file.mimeType != "text/plain" || file.file.length() !in 1..ChatGptWebNativeAttachmentReader.MAX_BYTES.toLong() ||
+            !ChatGptWebNativeAttachmentPolicy.supports(file.mimeType, file.file.length(), file.imageWidth, file.imageHeight) ||
             Uri.parse(href).let { it.scheme != "https" || it.host != "chatgpt.com" || it.port != -1 }
         ) return null
         cancel()
@@ -95,7 +95,8 @@ internal class ChatGptWebNativeAttachmentGateway(
         return JSONObject().put("version", 1).put("leaseId", next.id)
             .put("documentToken", next.documentToken).put("href", href)
             .put("name", ChatGptWebUploadPolicy.stagedName(file.displayName, file.fileName, 0))
-            .put("size", size).put("type", file.mimeType).toString()
+            .put("size", size).put("type", file.mimeType)
+            .put("width", file.imageWidth).put("height", file.imageHeight).toString()
     }
 
     fun cancel() {

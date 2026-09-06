@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 2, create: factory });
+  const exported = Object.freeze({ version: 3, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateAttachmentComposer = exported;
 })(typeof window === 'object' ? window : null, function (root, options) {
@@ -120,6 +120,9 @@
     const tempId = 'native_upload_' + leaseId;
     const metadata = result.metadata || {};
     const spec = { name: file.name, id: result.fileId, size: file.size, isBigPaste: false, mimeType: file.type };
+    if (/^image\//.test(file.type)) {
+      Object.assign(spec, root.__elonChatGptPrivateAttachmentProtocol.imageDimensions(result.imageDimensions));
+    }
     if (Number.isSafeInteger(metadata.fileTokenSize)) spec.fileTokenSize = metadata.fileTokenSize;
     const attached = {
       tempId, file, fileSignature: JSON.stringify({ name: file.name, size: file.size,
@@ -170,5 +173,5 @@
     return true;
   }
 
-  return Object.freeze({ version: 2, available, capture, prepare, current, associate, merge, remove });
+  return Object.freeze({ version: 3, available, capture, prepare, current, associate, merge, remove });
 });

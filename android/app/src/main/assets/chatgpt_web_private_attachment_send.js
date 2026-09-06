@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 2, create: factory });
+  const exported = Object.freeze({ version: 3, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       !(Number(root.__elonChatGptPrivateAttachmentSend?.version) >= exported.version)) {
@@ -12,6 +12,7 @@
   options = options || {};
   const composer = options.composer || root.__elonChatGptPrivateAttachmentComposer?.create(root);
   const source = options.source || root.__elonChatGptNativeAttachmentSource?.create(root);
+  const image = options.image || root.__elonChatGptPrivateAttachmentImage?.create(root);
   const createTransport = options.createTransport || (config => root.__elonChatGptPrivateAttachmentTransport.create(root, config));
   let active = null;
 
@@ -28,6 +29,7 @@
     // Compatibility selection is before any private write, never an automatic replay.
     if (!descriptor || !composer?.available() || !source || !root.__elonChatGptPrivateTransport ||
         !root.__elonChatGptPrivateAttachmentTransport) return fallback();
+    if (/^image\//.test(descriptor.type) && !image?.available(descriptor)) return fallback();
     const job = { controller: new root.AbortController(), transport: null, attempted: false };
     active = job;
     let timer;
@@ -55,13 +57,20 @@
       // Compatibility selection for unknown/unsupported scope precedes byte reads
       // and private writes. Cancelled or stale bindings throw instead of replaying.
       if (!await composer.prepare(binding, job.controller.signal)) return fallback();
-      const file = await source.read(descriptor, job.controller.signal);
+      let file = await source.read(descriptor, job.controller.signal);
+      let imageDimensions;
+      if (/^image\//.test(file.type)) {
+        const prepared = await image.prepare(file, descriptor, job.controller.signal);
+        file = prepared.file;
+        imageDimensions = prepared.dimensions;
+      }
       if (job.controller.signal.aborted || !composer.current(binding)) throw new Error('context_changed');
       job.transport = createTransport({ isCurrent: candidate => candidate === binding &&
         !job.controller.signal.aborted && composer.current(binding) });
       job.attempted = true;
       const result = await job.transport.upload(file, {
-        useCase: 'ace_upload', storeInLibrary: false, libraryPersistenceMode: 'required', indexForRetrieval: false,
+        useCase: imageDimensions ? 'multimodal' : 'ace_upload', storeInLibrary: false,
+        libraryPersistenceMode: 'required', indexForRetrieval: false, imageDimensions,
       }, binding);
       if (!result.ok) throw new Error(result.code);
       if (job.controller.signal.aborted) throw new Error('cancelled');
@@ -89,6 +98,6 @@
     return true;
   }
 
-  return Object.freeze({ version: 2, start, cancel, remove,
+  return Object.freeze({ version: 3, start, cancel, remove,
     merge: dom => composer?.merge(dom) || dom });
 });
