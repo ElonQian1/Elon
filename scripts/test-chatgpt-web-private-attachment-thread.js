@@ -37,7 +37,7 @@ test('the current official leaf, not a server latest-node guess, binds project m
   assert.equal(thread.leafId, LEAF);
   assert.equal(thread.current(), true);
   const file = new File(['synthetic'], 'fixture.txt', { type: 'text/plain' });
-  const context = f.project.uploadContext({ projectId: PROJECT, usesInjestPath: false, thread }, file);
+  const context = f.project.uploadContext({ projectId: PROJECT, canWrite: true, usesInjestPath: false, thread }, file);
   const body = protocol.processBody('file-fixture', file, context);
   assert.deepEqual(body.metadata.library_file_info, { gizmo_id: PROJECT, is_project: true,
     should_upload_to_project: true, origination_thread_id: CONVERSATION, origination_message_id: LEAF });
@@ -98,7 +98,7 @@ test('late module completion cannot bind a replacement page', async () => {
 
 test('project origins are a strict pair and cannot add unrelated processing fields', () => {
   const file = new File(['synthetic'], 'fixture.txt', { type: 'text/plain' });
-  const f = fixture(), base = f.project.uploadContext({ projectId: PROJECT, usesInjestPath: false }, file);
+  const f = fixture(), base = f.project.uploadContext({ projectId: PROJECT, canWrite: true, usesInjestPath: false }, file);
   for (const patch of [{ origination_thread_id: CONVERSATION }, { origination_message_id: LEAF },
     { origination_thread_id: '../other', origination_message_id: LEAF }, { hidden_field: true }]) {
     assert.throws(() => protocol.processBody('file-fixture', file,

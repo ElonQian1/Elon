@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 8, create: factory });
+  const exported = Object.freeze({ version: 9, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateAttachmentComposer = exported;
 })(typeof window === 'object' ? window : null, function (root, options) {
@@ -189,6 +189,7 @@
     if (!current(binding) || !confirmed.has(binding) || result?.ok !== true || result.associated !== false ||
         result.binding !== binding || result.stage !== 'processed' || result.isTemporaryChat !== binding.isTemporaryChat ||
         (result.projectId || null) !== projectId ||
+        (scope && result.projectWriteRequested !== scope.canWrite) ||
         !/^[A-Za-z0-9_-]{1,160}$/.test(result.fileId || '') || result.fileSize !== file.size ||
         result.fileName !== file.name || result.mimeType !== file.type) throw new Error('association_invalid');
     const store = binding.store;
@@ -204,13 +205,14 @@
       spec.libraryPersistenceResult = metadata.libraryPersistenceResult;
     }
     if (metadata.libraryPersistenceResult !== 'temporary' && metadata.libraryFileId) spec.libraryFileId = metadata.libraryFileId;
+    const libraryFileInfo = scope ? project.uploadContext(scope, file, result.imageDimensions).libraryFileInfo : undefined;
     const attached = {
       tempId, file, fileSignature: JSON.stringify({ name: file.name, size: file.size,
         lastModified: file.lastModified, type: file.type }),
       status: 'ready', progress: 100, fileId: result.fileId, cdnUrl: null, fileSpec: spec,
       source: 'local', storeInLibrary: false, isTemporaryChat: binding.isTemporaryChat, isProjectThread: !!projectId,
-      ...(projectId ? { projectGizmoId: projectId,
-        libraryFileInfo: project.uploadContext(scope, file, result.imageDimensions).libraryFileInfo } : {}),
+      ...(scope?.canWrite ? { projectGizmoId: projectId } : {}),
+      ...(libraryFileInfo ? { libraryFileInfo } : {}),
       ...(spec.libraryFileId ? { libraryFileId: spec.libraryFileId } : {}),
     };
     store.files$.set([attached]);
@@ -256,5 +258,5 @@
     return true;
   }
 
-  return Object.freeze({ version: 8, available, capture, prepare, current, uploadContext, associate, merge, remove });
+  return Object.freeze({ version: 9, available, capture, prepare, current, uploadContext, associate, merge, remove });
 });

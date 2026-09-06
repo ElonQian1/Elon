@@ -157,12 +157,13 @@ test('new and existing project PDFs keep model, scope and branch ownership witho
       assert.equal(f.store.readyFiles$()[0].fileSpec.mimeType, 'application/pdf');
     }
   }
-  const denied = fixture({ file: new File(['%PDF-1.7'], 'fixture.pdf', { type: 'application/pdf' }) });
-  denied.payload.gizmo.current_user_permission.can_write = false;
-  await denied.start();
-  assert.equal(denied.reads(), 0);
-  assert.equal(denied.calls.length, 1);
-  assert.equal(denied.fallbacks(), 1);
+  const readOnly = fixture({ file: new File(['%PDF-1.7'], 'fixture.pdf', { type: 'application/pdf' }) });
+  readOnly.payload.gizmo.current_user_permission.can_write = false;
+  await readOnly.start();
+  assert.equal(readOnly.reads(), 1);
+  assert.equal(readOnly.calls.length, 4);
+  assert.equal(readOnly.fallbacks(), 0);
+  assert.equal(JSON.parse(readOnly.calls[1].init.body).use_case, 'ace_upload');
 });
 
 test('new project private upload reads permission then binds create/process/ready-store to one project', async () => {
@@ -196,9 +197,9 @@ test('new project private upload reads permission then binds create/process/read
   assert.equal(f.calls.length, 4, 'no implicit text send, duplicate upload or remote delete');
 });
 
-test('read-only, unknown or mismatched project evidence selects compatibility before reading bytes', async () => {
+test('unknown or mismatched project evidence selects compatibility before reading bytes', async () => {
   for (const gizmo of [null, {}, { id: OTHER, current_user_permission: { can_write: true } },
-    { id: PROJECT }, { id: PROJECT, current_user_permission: { can_write: false } },
+    { id: PROJECT },
     { id: PROJECT, current_user_permission: { can_write: 'true' } },
     { id: PROJECT, current_user_permission: { can_write: true }, use_injest_path: 'true' }]) {
     const f = fixture();
@@ -258,7 +259,7 @@ test('project image keeps multimodal dimensions without inventing an unobserved 
 });
 
 test('project retrieval follows observed spreadsheet suffix rules and exact permission is refreshed per upload', async () => {
-  const scope = { projectId: PROJECT, usesInjestPath: true }, project = projectModule.create({});
+  const scope = { projectId: PROJECT, canWrite: true, usesInjestPath: true }, project = projectModule.create({});
   for (const [name, indexed] of [['fixture.txt', false], ['fixture.CSV', true], ['fixture.xlsx', true], ['fixture.pdf', false]]) {
     const options = project.uploadContext(scope, { name, type: 'text/plain' });
     assert.equal(options.indexForRetrieval, indexed);
@@ -269,13 +270,14 @@ test('project retrieval follows observed spreadsheet suffix rules and exact perm
   f.payload.gizmo.current_user_permission.can_write = false;
   await f.start();
   assert.equal(f.calls.filter(call => call.init.method === 'GET').length, 2);
-  assert.equal(f.calls.filter(call => call.init.method === 'POST').length, 2);
-  assert.equal(f.fallbacks(), 1);
+  assert.equal(f.calls.filter(call => call.init.method === 'POST').length, 4);
+  assert.equal(f.fallbacks(), 0);
+  assert.equal(JSON.parse(f.calls.at(-1).init.body).gizmo_id, undefined);
 });
 
 test('project protocol rejects cross-project and incompatible privacy metadata before any write', () => {
   const f = fixture(), project = projectModule.create(f.root);
-  const options = project.uploadContext({ projectId: PROJECT, usesInjestPath: false }, f.file);
+  const options = project.uploadContext({ projectId: PROJECT, canWrite: true, usesInjestPath: false }, f.file);
   for (const override of [{ gizmoId: OTHER }, { isTemporaryChat: true }, { useCase: 'ace_upload' },
     { isProjectThread: false }, { libraryFileInfo: { ...options.libraryFileInfo, origination_thread_id: 'unconfirmed' } }]) {
     assert.throws(() => protocol.prepare(f.file, { ...options, ...override }), /unsupported_upload_context/);
@@ -297,6 +299,8 @@ test('pending transport snapshots project metadata and association rejects a dif
   assert.equal(result.projectId, PROJECT);
   assert.equal(JSON.parse(f.calls.at(-1).init.body).metadata.library_file_info.gizmo_id, PROJECT);
   assert.throws(() => f.composer.associate(binding, f.file, { ...result, projectId: OTHER }, f.descriptor.leaseId), /association_invalid/);
+  assert.throws(() => f.composer.associate(binding, f.file,
+    { ...result, projectWriteRequested: false }, f.descriptor.leaseId), /association_invalid/);
   assert.equal(f.store.files$().length, 0);
 });
 
@@ -401,10 +405,86 @@ test('each image upload refreshes flag value but does not reload the official ru
 
 test('retrieval enabled images remain rejected outside a confirmed project upload scope', () => {
   const project = projectModule.create({}), file = imageFile();
-  const context = project.uploadContext({ projectId: PROJECT, usesInjestPath: true,
+  const context = project.uploadContext({ projectId: PROJECT, canWrite: true, usesInjestPath: true,
     imageIndexForRetrieval: true }, file, { width: 12, height: 8 });
   assert.equal(protocol.prepare(file, context).use_case, 'multimodal');
   assert.equal(protocol.processBody('file-synthetic', file, context).index_for_retrieval, true);
   assert.throws(() => protocol.prepare(file, { ...context, isProjectThread: false, libraryFileInfo: undefined }),
     /unsupported_upload_context/);
+});
+
+test('production upload selection accepts text, image and PDF in read-only project chats without project writes', async () => {
+  for (const existingPath of [undefined, '/c/' + CONVERSATION]) {
+    for (const file of [new File(['synthetic text'], 'fixture.txt', { type: 'text/plain' }), imageFile(),
+      new File(['%PDF-1.7'], 'fixture.pdf', { type: 'application/pdf' })]) {
+      const f = fixture({ file, existingPath, gate: gate(true) });
+      f.payload.gizmo.current_user_permission.can_write = false;
+      f.payload.gizmo.use_injest_path = true;
+      await f.start();
+      assert.equal(f.fallbacks(), 0);
+      assert.equal(f.reads(), 1);
+      assert.deepEqual(f.receipts, [['request_attachment_upload', true, 'private_attachment_associated']]);
+      assert.equal(f.calls.length, 4);
+      const create = JSON.parse(f.calls[1].init.body), process = JSON.parse(f.calls[3].init.body);
+      assert.equal(create.use_case, file.type === 'image/png' ? 'multimodal' : 'ace_upload');
+      assert.equal(process.use_case, create.use_case);
+      assert.equal(create.gizmo_id, undefined);
+      assert.equal(process.gizmo_id, undefined);
+      assert.equal(process.index_for_retrieval, file.type === 'image/png');
+      assert.equal(process.metadata.is_project_thread, true);
+      const origin = existingPath ? { origination_thread_id: CONVERSATION, origination_message_id: LEAF } : undefined;
+      assert.deepEqual(process.metadata.library_file_info, origin);
+      const ready = f.store.readyFiles$()[0];
+      assert.equal(ready.isProjectThread, true);
+      assert.equal(Object.hasOwn(ready, 'projectGizmoId'), false);
+      assert.deepEqual(ready.libraryFileInfo, origin);
+      assert.equal(f.composer.merge([]).length, 1);
+      assert.equal(f.composer.remove(f.composer.merge([])[0].id), true);
+      assert.equal(f.calls.length, 4, 'removal is local, no extra upload or automatic message');
+    }
+  }
+});
+
+test('chat-only project association rejects a receipt claiming a different project or project write', async () => {
+  const f = fixture({ existingPath: '/c/' + CONVERSATION });
+  f.payload.gizmo.current_user_permission.can_write = false;
+  const binding = f.composer.capture();
+  assert.equal(await f.composer.prepare(binding, undefined, f.descriptor), true);
+  const selected = f.composer.uploadContext(binding, f.file);
+  const transport = transportModule.create(f.root, { isCurrent: () => f.composer.current(binding) });
+  const result = await transport.upload(f.file, selected, binding);
+  assert.equal(result.ok, true);
+  assert.equal(result.projectId, PROJECT);
+  assert.equal(result.projectWriteRequested, false);
+  for (const override of [{ projectId: OTHER }, { projectWriteRequested: true }, { projectWriteRequested: undefined }]) {
+    assert.throws(() => f.composer.associate(binding, f.file, { ...result, ...override }, f.descriptor.leaseId),
+      /association_invalid/);
+    assert.equal(f.store.files$().length, 0);
+  }
+  assert.deepEqual(f.composer.associate(binding, f.file, result, f.descriptor.leaseId), { associated: true });
+});
+
+test('read-only attachment reads still enforce selected branch and current account without replay', async () => {
+  for (const change of ['branch', 'account', 'cancel']) {
+    let f;
+    f = fixture({ existingPath: '/c/' + CONVERSATION, beforeBytes: thread => {
+      if (change === 'branch') thread.leaf = OTHER_LEAF;
+      if (change === 'account') f.setAccount('Bearer replaced-synthetic-token');
+      if (change === 'cancel') f.send.cancel();
+    } });
+    f.payload.gizmo.current_user_permission.can_write = false;
+    await f.start();
+    assert.equal(f.reads(), 1);
+    assert.equal(f.calls.length, 1);
+    assert.equal(f.fallbacks(), 0);
+    assert.equal(f.receipts[0][1], false);
+    assert.equal(f.store.files$().length, 0);
+  }
+});
+
+test('missing project permission does not default to writable or chat-only', () => {
+  const project = projectModule.create({});
+  for (const canWrite of [undefined, null, 'false', 0]) {
+    assert.equal(project.supports({ projectId: PROJECT, usesInjestPath: false, canWrite }, { type: 'text/plain' }), false);
+  }
 });

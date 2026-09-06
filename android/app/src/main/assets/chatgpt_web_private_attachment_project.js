@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 4, create: factory });
+  const exported = Object.freeze({ version: 5, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateAttachmentProject = exported;
 })(typeof window === 'object' ? window : null, function (root, options) {
@@ -27,8 +27,8 @@
     const gizmo = result.payload?.gizmo;
     if (!gizmo || gizmo.id !== id || typeof gizmo.current_user_permission?.can_write !== 'boolean' ||
         gizmo.use_injest_path !== undefined && typeof gizmo.use_injest_path !== 'boolean') return null;
-    // Do not turn an unreadable permission or a read-only member into a project write.
-    if (!gizmo.current_user_permission.can_write) return false;
+    // Read-only members may upload to their chat, but not to the project file collection.
+    const canWrite = gizmo.current_user_permission.can_write;
     const usesInjestPath = gizmo.use_injest_path === true;
     let imageIndexForRetrieval = false;
     if (usesInjestPath && /^image\//.test(file?.type || '') && IMAGE.test(file.name)) {
@@ -42,7 +42,7 @@
           !/^[A-Za-z]+:Recognized$/.test(gate.details?.reason || '') || gate.details?.warnings?.length) return null;
       imageIndexForRetrieval = gate.value;
     }
-    return Object.freeze({ projectId: id, usesInjestPath, imageIndexForRetrieval });
+    return Object.freeze({ projectId: id, canWrite, usesInjestPath, imageIndexForRetrieval });
   }
 
   async function loadedRuntime(signal) {
@@ -97,7 +97,7 @@
   }
 
   function supports(scope, file) {
-    if (!PROJECT.test(scope?.projectId || '')) return false;
+    if (!PROJECT.test(scope?.projectId || '') || typeof scope.canWrite !== 'boolean') return false;
     if (['text/plain', 'application/pdf'].includes(file?.type)) return true;
     return ['image/jpeg', 'image/png', 'image/webp'].includes(file?.type) &&
       (!scope.usesInjestPath || typeof scope.imageIndexForRetrieval === 'boolean');
@@ -105,19 +105,23 @@
 
   function uploadContext(scope, file, imageDimensions) {
     if (!supports(scope, file)) throw new Error('unsupported_upload_context');
+    const libraryFileInfo = {
+      ...(scope.canWrite ? { gizmo_id: scope.projectId, is_project: true, should_upload_to_project: true } : {}),
+      ...(scope.thread ? { origination_thread_id: scope.thread.conversationId,
+        origination_message_id: scope.thread.leafId } : {}),
+    };
     return Object.freeze({
-      useCase: imageDimensions ? 'multimodal' : 'gizmo',
-      gizmoId: imageDimensions ? undefined : scope.projectId,
+      useCase: imageDimensions ? 'multimodal' : scope.canWrite ? 'gizmo' : 'ace_upload',
+      gizmoId: scope.canWrite && !imageDimensions ? scope.projectId : undefined,
+      projectScopeId: scope.projectId,
       isProjectThread: true, isTemporaryChat: false, storeInLibrary: false,
       libraryPersistenceMode: 'required',
       indexForRetrieval: scope.usesInjestPath && (/\.(?:xls|xlsx|csv)$/i.test(file.name) ||
         IMAGE.test(file.name) && scope.imageIndexForRetrieval === true),
-      libraryFileInfo: Object.freeze({ gizmo_id: scope.projectId, is_project: true, should_upload_to_project: true,
-        ...(scope.thread ? { origination_thread_id: scope.thread.conversationId,
-          origination_message_id: scope.thread.leafId } : {}) }),
+      ...(Object.keys(libraryFileInfo).length ? { libraryFileInfo: Object.freeze(libraryFileInfo) } : {}),
       imageDimensions,
     });
   }
 
-  return Object.freeze({ version: 4, projectId, read, captureThread, supports, uploadContext });
+  return Object.freeze({ version: 5, projectId, read, captureThread, supports, uploadContext });
 });
