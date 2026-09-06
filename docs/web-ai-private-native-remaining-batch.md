@@ -28,6 +28,7 @@ for website functionality. Persistent WebView identity remains intentional.
 | Private static-image attachment upload | Native normalized JPEG/PNG/WebP handoff, bounded image preparation, multimodal private upload and ready-store dimensions implemented | 60 focused Node cases passed with synthetic decoder/HTTP; grouped Android and real image-reading acceptance pending | Adapter 270 source candidate; [image contract and acceptance](chatgpt-private-image-upload.md) |
 | Private temporary-chat attachments | New/existing temporary scope, non-library processing intent and exact text/image ready-store association implemented | 67 focused Node runner cases passed with synthetic HTTP/decoder; grouped Android and live upload/library checks pending | Adapter 271 source candidate; [scope contract and remaining project work](chatgpt-private-attachment-scopes.md) |
 | Private new-project attachments | Fresh permission read, scoped text/non-ingest-image upload and library-file ready-store metadata implemented for new project chats | 75 focused Node cases passed; grouped Android and project/library acceptance pending | Adapter 272 source candidate; existing project branches, read-only and ingest-image flag still open; [exact scope](chatgpt-private-attachment-scopes.md#project-checkpoint) |
+| Attachment cancellation without UI-thread I/O | Immediate byte-lease revocation, off-thread file cleanup and stale-read exclusion implemented | All 6 native reader tests passed, including blocked-read/EOF cancellation; grouped Android 32/32 passed | Source-only; include in the grouped attachment candidate, not a separate APK |
 | Private conversation file download authorization and native transfer | Implemented scoped private GET, expiring selections and production Download action | Official current source contract, targeted JS, Release source compilation and 22 Android tests passed; device transfer pending | Adapter 266 source candidate; [scope and contract](chatgpt-private-file-download.md) |
 | Private single-conversation deletion | Partial: evidenced legacy PATCH, current/noncurrent native confirmation, voice/send exclusion and exact cache invalidation | 12 deletion JS cases, existing regressions, Release source compilation and 90 Android tests passed; final send guard rechecked in the affected 8-test suite; live deletion pending | Adapter 268 source candidate; [scope and remaining work](chatgpt-private-conversation-delete.md) |
 
@@ -72,14 +73,41 @@ dispatch. The probe was cleared and the UI restored to conversation home with
 an empty draft and no pending attachment; details and limits are in the
 [recovered-network capture](chatgpt-private-protocol-evidence.md#recovered-network-capture).
 
-Next complete the attachment prepare/upload/finalize contract and its composer
-association, reusing this real evidence, the existing synthetic fixture and
-bounded MCP command. The subsequent [reservation regression](chatgpt-private-protocol-evidence.md#reservation-completion-regression)
+The source candidates above now implement the narrow prepare/upload/finalize and
+composer-association contract. Next accept that integrated path using the existing
+synthetic fixture and bounded production MCP command; do not implement it again.
+The [reservation regression](chatgpt-private-protocol-evidence.md#reservation-completion-regression)
 invalidates generic HTTP completion as upload proof; include that correction in
-the next grouped candidate before accepting attachment delivery. First confirm a healthy transport and preserve the current
+the grouped candidate before accepting attachment delivery. First confirm a healthy transport and preserve the current
 draft, conversation and voice state. Do not rebuild this unchanged candidate,
 add another probe framework, guess an endpoint, or repeatedly restart the app
 because the debugging connection is unavailable. The Goal is not complete.
+
+## Offline lifecycle checkpoint
+
+The 2026-09-06 evening round reconnected Xiaomi over wireless ADB. The user then
+took the handset away, so installation, fixture upload and UI acceptance were
+deferred; successful ADB connection is not functional acceptance. The grouped
+JavaScript runner passed 76 cases without a phone. The first Android check was
+terminated by the command wrapper's 180-second no-output threshold during Kotlin
+compilation, not a reported source compilation error; its result is not a pass.
+The subsequent run compiled Release production and unit-test sources, then
+identified one pre-existing attachment-panel test that still asserted obsolete
+button labels. That test now checks stable selectors bound to the actual camera,
+photo and file handlers. The final grouped run passed all 32 targeted Android
+tests (tracker 12, download policy 5, native byte reader 6, native MIME/image
+policy 3, fixture/native actions 5, production panel contract 1). This is not a
+full-suite, rendered UI, upload protocol or thermal acceptance claim. No APK was
+packaged, published or installed in this offline checkpoint.
+
+Review found that the native byte gateway synchronously called a synchronized
+reader close from the main thread. A slow read could therefore delay cancellation
+or conversation switching. Revocation now invalidates the lease immediately;
+file close drains on the existing I/O executor, including disposal. Blocked reads
+reject revocation, and the gateway rejects late bytes from an expired lease; a
+revoked reader cannot reopen the file. The upload endpoints, identity
+ownership, voice modules and provider fallback policy are unchanged. Include this
+fix in the next grouped APK and verify it through the production chat surface.
 
 ## Protocol gaps
 

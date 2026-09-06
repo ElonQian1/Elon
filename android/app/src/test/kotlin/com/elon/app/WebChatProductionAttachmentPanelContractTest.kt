@@ -15,9 +15,14 @@ class WebChatProductionAttachmentPanelContractTest {
 
         assertTrue(input.contains("binding.modelButton.tag != WEB_CHAT_MODEL_BUTTON_OWNER"))
         assertTrue(panel.contains("uiDesignAction?.visibility"))
-        assertTrue(panel.contains("createAttachmentAction(\"拍照\""))
-        assertTrue(panel.contains("createAttachmentAction(\"图片\""))
-        assertTrue(panel.contains("createAttachmentAction(\"文件\""))
+        for ((selector, handler) in listOf(
+            "attachment-action-camera" to "openCameraAttachment",
+            "attachment-action-photos" to "openPhotoAttachment",
+            "attachment-action-files" to "openDocumentAttachment",
+        )) {
+            val binding = Regex("\"${Regex.escape(selector)}\"\\s*\\)\\s*\\{\\s*${Regex.escape(handler)}\\(\\)")
+            assertTrue("Missing attachment action binding: $selector", binding.containsMatchIn(panel))
+        }
     }
 
     private fun read(relativePath: String): String =
