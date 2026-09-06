@@ -3,8 +3,9 @@
 Capability: `android_chatgpt_private_upload_reservations_v1`.
 Status: production upload integration implemented and offline verified on
 2026-09-07; grouped APK build and device acceptance pending. Not `completed`.
-The current native trigger overlaps reservation creation with file-byte reading
-and image preparation. It does not yet prewarm while the system picker is open.
+The native camera/photo/file actions now start a bounded reservation preparation
+when opening the system picker. Matching selected files reuse it on send; the
+existing post-selection byte/image preparation overlap remains available.
 
 ## Confirmed source contract
 
@@ -41,10 +42,23 @@ These are public source observations, not a new successful live claim capture.
 - `chatgpt_web_private_attachment_reservation.js` owns the version-1 ephemeral
   slot, experiment check, exact allocation and final claim shape. It does not
   own native UI, file reading, WebView identity, audio, or message sending.
-- The existing sender resolves the current conversation scope first, then
-  starts transport prefetch before native byte reads and image preparation.
-  It does not await the prefetch. The existing upload transport takes a slot
-  exactly once when it would otherwise create a file.
+- `chatgpt_web_private_attachment_selection.js` owns one picker selection. It
+  uses already available page identity and a current composer, with a 5-second
+  context deadline and a 120-second lifetime. Unknown, temporary or project
+  scope does not authorize allocation. The picker never waits for this work.
+- `ChatGptWebAttachmentPickerPreparation` binds the selection ID to its page
+  generation, document token, route and the exact prepared native file object,
+  length and modification time. Empty/multiple selections, expired files,
+  launch failure, provider deactivation and page replacement cancel it. No
+  file path, bytes, credentials or signed destination enter the selection command.
+- On send, the same current binding and transport transfer once. Existing
+  conversation membership is freshly confirmed, since moving a chat into a
+  project need not change its URL. Changed scope cannot claim an ordinary slot.
+  The transport takes a ready compatible slot exactly once instead of creating
+  a file. A pending allocation never adds waiting or starts another allocation.
+- Without a matching picker slot, the existing sender still starts prefetch
+  before byte reads and image preparation. Unsupported or changed file types
+  select the established private create route; selection is not an upload.
 - A ready slot replaces only file creation and the final processing endpoint.
   Bytes still use the existing signed PUT or same-origin Estuary module.
   Processing must finish for the exact file ID before the existing official
@@ -64,21 +78,37 @@ These are public source observations, not a new successful live claim capture.
   failed final processing. Private credentials go only to the official origin;
   signed blob destinations receive no account headers or page credentials.
 
-Native module versions: composer 10, sender 9, transport 8, reservation 1;
-page adapter 274. The production asset loader registers the reservation before
-the transport. No duplicate picker, sender, polling loop or system fallback was
-introduced.
+Native module versions: composer 11, sender 10, selection 1, transport 8,
+reservation 1; page adapter 275. The loader registers reservation before
+transport and selection before sender. No duplicate picker, sender, polling
+loop or system fallback was introduced. The production composer passes a typed
+preparation port to its existing attachment actions; work/Google defaults stay
+unchanged and no Activity-level event bus was added.
+
+Host-pause bridge cleanup cancels active byte uploads but preserves the bounded,
+file-independent selection. Full cancellation still cancels both; provider/page
+changes and gateway destruction retain full cancellation. The sender survives
+same-version reinjection. Retiring an older native byte lease no longer cancels
+a newly opened selection. WebView pause behavior itself is unchanged;
+[Android documents](https://developer.android.com/reference/android/webkit/WebView#onPause())
+that `onPause()` does not pause JavaScript. No persistent execution lease or
+background polling was added for picker prewarm.
 
 ## Verification and remaining work
 
-170 focused Node tests passed with no failures or skips across reservation,
+183 focused Node tests passed with no failures or skips across selection, reservation,
 production integration, byte routes, transport, composer, image, project,
 selected-thread, read-only project, document and native-byte-source suites.
-The new contract suite has 13 tests; the new integration suite has 9. Integration
+The reservation contract suite has 13 tests; integration has 17, and the new
+selection lifecycle suite has 5. Integration
 uses the production modules and bounded request helper with synthetic Fetch
 responses, including PDF/image claims, Estuary byte forwarding, no-wait legacy
 selection, incomplete/wrong-file processing, cancellation and current-owner
-changes. Existing attachment behavior remains covered. Source-size checks pass.
+changes, picker-open ordering, suspension/reinjection, replacement selection,
+fresh membership and real production wiring. Existing attachment behavior
+remains covered. Source-size checks pass. Six new Kotlin owner tests cover
+exact-file selection, edits/replacements, cancellation/multiple/expiry,
+late callbacks, document changes and background pause; they have not run yet.
 
 No Android build, installation or live reservation/claim ran in this batch.
 The grouped device round must retain actual request/association provenance and
@@ -87,8 +117,8 @@ An account outside the current official experiment is an unobserved reservation
 case, not a reason to force the experiment or claim a successful private route.
 Actual latency, heat and energy improvement remains unmeasured.
 
-Still unfinished: prewarm from opening the native system picker, the temporary
-reservation persistence contract, direct-library hash/reuse, remaining file
+Still unfinished: the temporary reservation persistence contract,
+direct-library hash/reuse, remaining file
 categories and grouped acceptance. Temporary and project attachments continue
 using their established scoped private upload paths; they are not silently
 converted to ordinary reservations. A conversation at an ordinary `/c/` route

@@ -80,8 +80,8 @@ If the server does not select a route, record that case as unobserved rather
 than manufacturing a production response or calling it verified.
 
 Reservation prefetch/claim is now [integrated in source](chatgpt-private-upload-reservations.md),
-overlapping byte preparation without waiting; picker-open prewarm, temporary
-reservation persistence, direct-library reuse and remaining file categories
+including bounded native picker-open prewarm and byte preparation overlap without
+waiting; temporary reservation persistence, direct-library reuse and remaining file categories
 are still separate gaps. Existing [native integration](chatgpt-private-attachment-upload.md)
 and [scope rules](chatgpt-private-attachment-scopes.md) are reused. Do not repeat
 protocol implementation merely because live acceptance remains pending. Actual
