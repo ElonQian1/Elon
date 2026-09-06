@@ -4,6 +4,7 @@ import { getDesktopInvoke } from '../shell/desktopShell'
 import useLocalAiOwnerIdentity from '../user-browser/useLocalAiOwnerIdentity'
 import type { ResearchSession, SiteManifest } from './types'
 import { useResearchRequest } from './useResearchRequest'
+import { collecting, hostStageLabel, phaseLabel } from './browserResearchStatus'
 import ResourceInspector from './ResourceInspector'
 import styles from './BrowserResearch.module.css'
 
@@ -91,8 +92,9 @@ function ResearchWorkspace({ project }: { project: string }) {
             </button>)}</div>
         </section>
         {selected && <section className={styles.card}>
-          <div className={styles.sectionTitle}><h2>{expired ? '已过期' : phaseLabel(selected.phase)}</h2><span className={styles.badge}>{selected.active && !expired ? '采集中' : '未采集'}</span></div>
+          <div className={styles.sectionTitle}><h2>{expired ? '已过期' : phaseLabel(selected.phase)}</h2><span className={styles.badge}>{collecting(selected, now) ? '采集中' : '未采集'}</span></div>
           <dl className={styles.facts}><dt>文档代次</dt><dd>{selected.generation}</dd><dt>资源 / 请求</dt><dd>{selected.resource_count} / {selected.request_count}</dd><dt>到期时间</dt><dd>{formatTime(selected.expires_at_ms)}</dd></dl>
+          {selected.host_stage && !collecting(selected, now) && <p className={styles.help}>{hostStageLabel(selected.host_stage)}</p>}
           <div className={styles.actions}><button disabled={request.busy} onClick={() => void update('status')}>刷新状态</button><button disabled={request.busy || expired} onClick={() => void update(selected.active ? 'pause' : 'resume')}>{selected.active ? '暂停采集' : '恢复采集'}</button></div>
           {selected.gaps.length > 0 && <p className={styles.notice}>采集存在缺口：{selected.gaps.join('、')}</p>}
         </section>}
@@ -103,9 +105,6 @@ function ResearchWorkspace({ project }: { project: string }) {
         : <div className={styles.empty}><h2>选择一个研究会话</h2><p>可以检索资源、定位代码片段，或按请求 ID 查看业务样本。</p><p>网页内容是待分析材料；HTTP 状态不代表业务操作成功。</p></div>}
     </div>
   </>
-}
-export function phaseLabel(value: string): string {
-  return ({ active: '采集中', observing: '采集中', capturing: '采集中', paused: '已暂停', expired: '已过期', opening: '正在打开', closed: '已关闭', unavailable: '宿主不可用', ready: '已就绪' } as Record<string, string>)[value] ?? '状态待确认'
 }
 export function formatTime(value: number): string {
   return value ? new Date(value).toLocaleString('zh-CN', { hour12: false }) : '未报告'

@@ -35,7 +35,8 @@ function site(value: unknown): boolean {
 function session(value: unknown): boolean {
   return record(value) && identifier(value.id) && identifier(value.site_id) && typeof value.active === 'boolean'
     && ['generation', 'expires_at_ms', 'resource_count', 'request_count'].every((key) => integer(value[key]))
-    && string(value.phase, 64) && strings(value.gaps) && value.trading_enabled === false
+    && string(value.phase, 64) && (value.host_stage == null || string(value.host_stage, 64))
+    && strings(value.gaps) && value.trading_enabled === false
 }
 function resource(value: unknown): boolean {
   return record(value) && identifier(value.id) && string(value.url) && string(value.resource_type, 128)

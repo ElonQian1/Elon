@@ -34,6 +34,7 @@ export interface ResearchSession {
   resource_count: number
   request_count: number
   phase: string
+  host_stage?: string | null
   gaps: string[]
   trading_enabled: false
 }

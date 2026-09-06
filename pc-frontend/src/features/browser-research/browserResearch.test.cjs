@@ -22,10 +22,22 @@ function load(name) {
 const { parseResearchResult, parseResearchAction, createResearchEpoch, researchErrorMessage } = load('browserResearchModel')
 const { createResearchExecutor } = load('browserResearchExecutor')
 const { nativeResearchErrorCode, receiptErrorCode, RESEARCH_FAILURE_CODES } = load('browserResearchErrors')
+const { collecting, phaseLabel } = load('browserResearchStatus')
 const schema = 'yilong.browser-research.result.v1'
 const result = { schema, kind: 'sites', items: [], total: 0, offset: 0, next_offset: null }
 const action = (id = 'research_1') => ({ action_id: id, project_key: 'a'.repeat(64), command: { kind: 'sites' }, requested_at_ms: 100, expires_at_ms: 1000, status: 'queued' })
 const resource = { id: 'resource_1', url: 'https://example.org/app.js', resource_type: 'Script', mime: 'text/javascript', size_bytes: 11, sha256: 'b'.repeat(64), generation: 2, truncated: false, redacted: true }
+
+test('opening or resuming is not displayed as collecting until host acknowledgement', () => {
+  const session = { id: 'session_1', site_id: 'example', active: true, generation: 1, expires_at_ms: 500, resource_count: 0, request_count: 0, phase: 'opening', gaps: [], trading_enabled: false }
+  for (const phase of ['opening', 'resuming', 'host_unavailable', 'login']) assert.equal(collecting({ ...session, phase }, 100), false)
+  assert.equal(collecting({ ...session, phase: 'observing' }, 100), true)
+  assert.equal(collecting({ ...session, phase: 'observing' }, 500), false)
+  assert.equal(collecting({ ...session, phase: 'observing', active: false }, 100), false)
+  assert.equal(phaseLabel('host_unavailable'), '采集连接失败')
+  assert.equal(parseResearchResult({ schema, kind: 'status', session: { ...session, host_stage: 'native_attached' } }, { kind: 'status' }).session.host_stage, 'native_attached')
+  assert.throws(() => parseResearchResult({ schema, kind: 'status', session: { ...session, host_stage: {} } }, { kind: 'status' }))
+})
 
 test('version, command kind, item ID, and page movement are validated before display', () => {
   assert.equal(parseResearchResult(result, { kind: 'sites' }).total, 0)
