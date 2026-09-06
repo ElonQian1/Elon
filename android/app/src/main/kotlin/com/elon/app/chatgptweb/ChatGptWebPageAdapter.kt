@@ -316,6 +316,10 @@ internal class ChatGptWebPageAdapter(
         requestId = requestId, selected = true,
     )
 
+    fun shareConversation(path: String, requestId: String) = runCommand(
+        action = "share_conversation", value = path.take(MAX_CONVERSATION_PATH_LENGTH), requestId = requestId, selected = true,
+    )
+
     fun renameConversation(path: String, title: String, requestId: String) = runCommand(
         action = "rename_conversation",
         value = path.take(MAX_CONVERSATION_PATH_LENGTH),
@@ -739,6 +743,8 @@ internal class ChatGptWebPageAdapter(
             "chatgpt_web_private_attachment_send.js",
             "chatgpt_web_private_conversation_mutation.js",
             "chatgpt_web_private_conversation_delete.js",
+            "chatgpt_web_private_conversation_share_contract.js",
+            "chatgpt_web_private_conversation_share.js",
             "chatgpt_web_private_read_aloud_transport.js",
             "chatgpt_web_private_read_aloud_adapter.js",
             "chatgpt_web_private_dictation_transport.js",

@@ -449,7 +449,9 @@
     if (!target || !mutation) return Promise.resolve(rejected('invalid_mutation', false));
     if (!supported()) return Promise.resolve(rejected('mutation_unavailable', false));
     if (active) return Promise.resolve(rejected('mutation_busy', false));
-    if (root.__elonChatGptPrivateConversationDelete?.busy?.()) return Promise.resolve(rejected('mutation_busy', false));
+    if (root.__elonChatGptPrivateConversationDelete?.busy?.() || root.__elonChatGptPrivateConversationShare?.busy?.()) {
+      return Promise.resolve(rejected('mutation_busy', false));
+    }
     if (cooldownUntil > now()) return Promise.resolve(rejected('mutation_circuit_open', false));
     const request = executeMutation(target, mutation).finally(() => {
       if (active === request) active = null;
@@ -522,6 +524,7 @@
   }
 
   function handle(action, command, respond, scheduleSnapshot, directoryRequests, readSnapshot) {
+    if (root.__elonChatGptPrivateConversationShare?.handle(action, command, respond, readSnapshot)) return true;
     if (root.__elonChatGptPrivateConversationDelete?.handle(
       action, command, respond, scheduleSnapshot, directoryRequests, readSnapshot
     )) return true;

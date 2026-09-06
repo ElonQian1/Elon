@@ -135,7 +135,8 @@
     if (!directory.snapshot().conversations.some(row => row.id === id)) {
       return Promise.resolve(result(false, 'delete_selection_expired', false));
     }
-    if (active || root.__elonChatGptPrivateConversationMutation?.state?.().state === 'busy') {
+    if (active || root.__elonChatGptPrivateConversationShare?.busy?.() ||
+        root.__elonChatGptPrivateConversationMutation?.state?.().state === 'busy') {
       return Promise.resolve(result(false, 'delete_busy', false));
     }
     if (Date.now() < cooldownUntil) return Promise.resolve(result(false, 'delete_cooldown', false));
