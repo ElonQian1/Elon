@@ -75,7 +75,7 @@
     }
     const project = projectInfo(context);
     if (/^image\//i.test(file.type)) {
-      if (!IMAGE_TYPES.has(file.type) || context.useCase !== 'multimodal' || context.indexForRetrieval) {
+      if (!IMAGE_TYPES.has(file.type) || context.useCase !== 'multimodal' || context.indexForRetrieval && !project) {
         throw new Error('unsupported_upload_context');
       }
       imageDimensions(context.imageDimensions);
@@ -168,6 +168,6 @@
     return { metadata, eventCount: count, events };
   }
 
-  return { version: 6, maxFileBytes: MAX_BYTES, prepare, destination, processBody, processed,
+  return { version: 7, maxFileBytes: MAX_BYTES, prepare, destination, processBody, processed,
     imageDimensions, projectInfo, isPdf, creationHeaders };
 });

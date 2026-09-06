@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 7, create: factory });
+  const exported = Object.freeze({ version: 8, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateAttachmentComposer = exported;
 })(typeof window === 'object' ? window : null, function (root, options) {
@@ -111,7 +111,7 @@
     if (!current(binding) || signal?.aborted) throw new Error('composer_changed');
     if (root.__elonChatGptPrivateAttachmentProtocol?.isPdf(descriptor) && !binding.modelSlug) return null;
     if (confirmed.has(binding)) return true;
-    const read = binding.projectId && !binding.conversationId ? () => project?.read(binding, signal)
+    const read = binding.projectId && !binding.conversationId ? () => project?.read(binding, signal, descriptor)
       : root.__elonChatGptPrivateTransport?.readAttachmentContext;
     if (typeof read !== 'function') return null;
     let timer, abort;
@@ -138,7 +138,7 @@
         if (!Array.isArray(context.nodeIds) || !context.nodeIds.includes(thread.leafId)) return null;
         // Keep the branch guard active even when the permission request fails.
         projects.set(binding, Object.freeze({ projectId: context.projectId, thread }));
-        const scope = await project.read({ ...binding, projectId: context.projectId }, signal);
+        const scope = await project.read({ ...binding, projectId: context.projectId }, signal, descriptor);
         if (!current(binding) || signal?.aborted || !available() || !thread.current()) throw new Error('composer_changed');
         if (!scope || !project.supports(scope, descriptor)) return scope === false ? false : null;
         projects.set(binding, Object.freeze({ ...scope, thread }));
@@ -256,5 +256,5 @@
     return true;
   }
 
-  return Object.freeze({ version: 7, available, capture, prepare, current, uploadContext, associate, merge, remove });
+  return Object.freeze({ version: 8, available, capture, prepare, current, uploadContext, associate, merge, remove });
 });

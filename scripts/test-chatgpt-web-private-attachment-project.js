@@ -16,7 +16,8 @@ const OTHER_LEAF = '99999999-2222-4333-8444-555555555555';
 
 function fixture(options = {}) {
   let values = [], reads = 0, fallbacks = 0, account = 'Bearer synthetic-page-token';
-  const calls = [], receipts = [];
+  const calls = [], receipts = [], gateReads = [];
+  let runtimeLoads = 0;
   const files$ = () => values;
   files$.set = value => { values = value; };
   const store = { files$, readyFiles$: () => values.filter(file => file.status === 'ready'),
@@ -31,22 +32,30 @@ function fixture(options = {}) {
   const thread = { isLoading: false, is_do_not_remember: false, projectId: PROJECT, leaf: LEAF };
   const root = {
     location: { origin: 'https://chatgpt.com', href: 'https://chatgpt.com' + (options.existingPath || '/g/' + PROJECT + '-synthetic/project') },
-    document: { querySelector: selector => selector === '#upload-files' ? input : {} },
+    document: { querySelector: selector => selector === '#upload-files' ? input :
+      selector === '#prompt-textarea' ? {} : null },
     __elonChatGptDocumentToken: 'doc_synthetic_project',
     __elonChatGptComposer: { currentModel: () => 'synthetic-model' },
     __elonChatGptPrivateTransport: { copySameOriginRequestHeaders: headers, acquireSameOriginRequestHeaders: async () => headers(),
       readAttachmentContext: async () => options.context || { conversationId: CONVERSATION, projectId: PROJECT,
         nodeIds: [LEAF, OTHER_LEAF], ordinary: false, temporary: false } },
     __elonChatGptPrivateAttachmentProject: { create: env => projectModule.create(env, {
-      loadRuntime: async () => ({ XM: id => id === CONVERSATION ? thread : undefined,
+      loadRuntime: async () => { runtimeLoads++; return options.loadRuntime ? options.loadRuntime() : {
+        t6: () => ({ loadingStatus: options.configurationStatus || 'Ready', getFeatureGate: (name, config) => {
+          gateReads.push({ name, config });
+          options.beforeGate?.(root, thread);
+          return options.gate;
+        } }),
+        XM: id => id === CONVERSATION ? thread : undefined,
         HM: { getGizmoId: value => value.projectId, getCurrentLeafId: value => value.leaf,
-          hasNode: (_, id) => [LEAF, OTHER_LEAF].includes(id) } }),
+          hasNode: (_, id) => [LEAF, OTHER_LEAF].includes(id) } }; },
     }) },
-    performance: { getEntriesByName: () => [{}] },
+    performance: { getEntriesByName: () => options.runtimeMissing ? [] : [{}] },
     __elonChatGptPrivateAttachmentTransport: transportModule,
     __elonChatGptPrivateAttachmentProtocol: protocol,
     __elonChatGptPrivateJsonRequest: jsonRequest,
-    AbortController, setTimeout, clearTimeout, setInterval, clearInterval,
+    AbortController, setTimeout: (fn, ms) => setTimeout(fn, ms === 1500 && options.shortTimeout ? 20 : ms),
+    clearTimeout, setInterval, clearInterval,
     fetch: async (url, init) => {
       calls.push({ url, init });
       if (options.fetch) return options.fetch(url, init);
@@ -74,7 +83,8 @@ function fixture(options = {}) {
     source: { read: async () => { reads++; options.beforeBytes?.(thread); return file; } },
     image: { available: () => true, prepare: async () => ({ file, dimensions: { width: 12, height: 8 } }) },
   });
-  return { root, file, descriptor, payload, thread, composer, send, store, calls, receipts,
+  return { root, file, descriptor, payload, thread, composer, send, store, calls, receipts, gateReads,
+    runtimeLoads: () => runtimeLoads,
     start: () => send.start(JSON.stringify(descriptor), (...args) => receipts.push(args), () => {}, () => { fallbacks++; }),
     reads: () => reads, fallbacks: () => fallbacks, setAccount: value => { account = value; } };
 }
@@ -288,4 +298,113 @@ test('pending transport snapshots project metadata and association rejects a dif
   assert.equal(JSON.parse(f.calls.at(-1).init.body).metadata.library_file_info.gizmo_id, PROJECT);
   assert.throws(() => f.composer.associate(binding, f.file, { ...result, projectId: OTHER }, f.descriptor.leaseId), /association_invalid/);
   assert.equal(f.store.files$().length, 0);
+});
+
+const imageFile = () => new File(['synthetic project pixels'], 'fixture.PNG', { type: 'image/png' });
+const gate = value => ({ name: '2031707412', value, details: { reason: 'Network:Recognized', warnings: [] } });
+
+test('ingest project image uploads follow the recognized flag in new and existing conversations', async () => {
+  for (const existingPath of [undefined, '/c/' + CONVERSATION]) {
+    for (const enabled of [false, true]) {
+      const f = fixture({ file: imageFile(), existingPath, gate: gate(enabled) });
+      f.payload.gizmo.use_injest_path = true;
+      await f.start();
+      assert.equal(f.fallbacks(), 0);
+      assert.equal(f.receipts[0][1], true);
+      assert.equal(f.calls.length, 4);
+      const create = JSON.parse(f.calls[1].init.body), process = JSON.parse(f.calls[3].init.body);
+      assert.equal(create.use_case, 'multimodal');
+      assert.equal(create.gizmo_id, undefined);
+      assert.equal(process.index_for_retrieval, enabled);
+      assert.equal(process.metadata.library_file_info.gizmo_id, PROJECT);
+      assert.equal(process.metadata.library_file_info.origination_message_id, existingPath ? LEAF : undefined);
+      assert.equal(f.store.readyFiles$()[0].fileSpec.width, 12);
+      assert.equal(f.runtimeLoads(), 1, 'branch and configuration share one already-loaded module');
+      assert.deepEqual(f.gateReads, [{ name: '2031707412', config: { disableExposureLog: true } }]);
+    }
+  }
+});
+
+test('unknown, defaulted, loading or malformed image flags cannot authorize an indexed upload', async () => {
+  for (const options of [{ gate: undefined }, { gate: gate('true') },
+    { gate: { ...gate(true), name: 'another-flag' } },
+    { gate: { ...gate(true), details: { reason: 'Unrecognized' } } },
+    { gate: { ...gate(true), details: { reason: 'Network:Recognized', warnings: ['stale'] } } },
+    { gate: gate(true), configurationStatus: 'Loading' }, { gate: gate(true), runtimeMissing: true }]) {
+    const f = fixture({ file: imageFile(), ...options });
+    f.payload.gizmo.use_injest_path = true;
+    await f.start();
+    assert.equal(f.calls.length, 1);
+    assert.equal(f.reads(), 0);
+    assert.equal(f.fallbacks(), 1);
+    assert.equal(f.store.files$().length, 0);
+  }
+});
+
+test('image flag timeout or module failure keeps compatibility before native bytes or writes', async () => {
+  for (const loadRuntime of [() => new Promise(() => {}), () => { throw new Error('module_unavailable'); }]) {
+    const f = fixture({ file: imageFile(), loadRuntime, shortTimeout: true });
+    f.payload.gizmo.use_injest_path = true;
+    await f.start();
+    assert.equal(f.calls.length, 1);
+    assert.equal(f.reads(), 0);
+    assert.equal(f.fallbacks(), 1);
+  }
+});
+
+test('switching identity, document, route, branch or cancelling while resolving the flag cannot replay', async () => {
+  for (const change of ['identity', 'document', 'route', 'branch', 'cancel']) {
+    let f;
+    f = fixture({ file: imageFile(), existingPath: '/c/' + CONVERSATION, gate: gate(true),
+      beforeGate: (root, thread) => {
+        if (change === 'identity') f.setAccount('Bearer changed-synthetic-token');
+        if (change === 'document') root.__elonChatGptDocumentToken = 'doc_changed';
+        if (change === 'route') root.location.href += '?changed=true';
+        if (change === 'branch') thread.leaf = OTHER_LEAF;
+        if (change === 'cancel') f.send.cancel();
+      } });
+    f.payload.gizmo.use_injest_path = true;
+    await f.start();
+    assert.equal(f.reads(), 0);
+    assert.equal(f.calls.length, 1);
+    assert.equal(f.fallbacks(), 0);
+    assert.equal(f.receipts[0][1], false);
+  }
+});
+
+test('non-ingest images and PDF/text uploads do not wait for unrelated image configuration', async () => {
+  for (const file of [imageFile(), new File(['text'], 'fixture.txt', { type: 'text/plain' }),
+    new File(['%PDF-1.7'], 'fixture.pdf', { type: 'application/pdf' })]) {
+    const f = fixture({ file, runtimeMissing: true });
+    f.payload.gizmo.use_injest_path = file.type !== 'image/png';
+    await f.start();
+    assert.equal(f.fallbacks(), 0);
+    assert.equal(f.receipts[0][1], true);
+    assert.equal(f.gateReads.length, 0);
+    assert.equal(f.runtimeLoads(), 0);
+  }
+});
+
+test('each image upload refreshes flag value but does not reload the official runtime', async () => {
+  const configuration = gate(true), f = fixture({ file: imageFile(), gate: configuration });
+  f.payload.gizmo.use_injest_path = true;
+  await f.start();
+  f.composer.remove(f.composer.merge([])[0].id);
+  configuration.value = false;
+  await f.start();
+  assert.equal(f.fallbacks(), 0);
+  assert.equal(f.runtimeLoads(), 1);
+  assert.equal(f.gateReads.length, 2);
+  assert.deepEqual(f.calls.filter(call => call.url.endsWith('/process_upload_stream'))
+    .map(call => JSON.parse(call.init.body).index_for_retrieval), [true, false]);
+});
+
+test('retrieval enabled images remain rejected outside a confirmed project upload scope', () => {
+  const project = projectModule.create({}), file = imageFile();
+  const context = project.uploadContext({ projectId: PROJECT, usesInjestPath: true,
+    imageIndexForRetrieval: true }, file, { width: 12, height: 8 });
+  assert.equal(protocol.prepare(file, context).use_case, 'multimodal');
+  assert.equal(protocol.processBody('file-synthetic', file, context).index_for_retrieval, true);
+  assert.throws(() => protocol.prepare(file, { ...context, isProjectThread: false, libraryFileInfo: undefined }),
+    /unsupported_upload_context/);
 });
