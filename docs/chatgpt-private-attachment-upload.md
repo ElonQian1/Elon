@@ -6,6 +6,11 @@ implemented, grouped-device acceptance pending**. This is not yet an accepted
 end-to-end attachment-chat capability. Do not repeat the confirmed protocol
 acquisition or isolated small-text upload. Continue at the integration gaps below.
 
+Later source extensions cover [static images](chatgpt-private-image-upload.md),
+[temporary and project scopes](chatgpt-private-attachment-scopes.md), and
+[PDF model-bound upload](chatgpt-private-pdf-upload.md). Their candidate status
+does not upgrade the historical device results below to integrated acceptance.
+
 ## Current evidence
 
 On 2026-09-06, an isolated Release research build based on `99d5437cc` was
