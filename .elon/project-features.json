@@ -5249,6 +5249,229 @@
       "updated_at_ms": 1788663352122
     },
     {
+      "id": "esk-economic-ledger-preview-v1",
+      "title": "ESK 离线资金用途一致性检查 V1",
+      "summary": "由当前主任务负责新工作；复用购币对账和政策草案，对声明资金来源、投资、准备金、待定义务及利润提案进行有界离线一致性检查，不写正式余额或执行资金操作。",
+      "status": "verified",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/esk-economic-ledger-preview-v1.md",
+        "content_hash": "6e17bb61789a69ace50aa90eaf37e8a307b6914b7a0e7e2efe410ad9969f90a1",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "fe488268647165d95d64ae61b91cf83900c0f799",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "23aed7c7ae1dbed9c0d501f9e275cf30444d77c6",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "esk-primary",
+      "tags": [],
+      "task_paths": [
+        "contracts/esk/economic-ledger-preview-v1.fixture.json",
+        "contracts/esk/economic-ledger-preview-v1.schema.json",
+        "docs/delivery/esk-economic-ledger-preview-v1.md",
+        "docs/requirements/esk-economic-ledger-preview-v1.md",
+        "scripts/esk-economic-ledger"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "复用既有购币及政策检查并保留 PENDING，真实执行及证明标志全部为 false。",
+        "按同一付款身份核对来源分类和金额，拒绝重复资金及错误义务关联。",
+        "活动用途守恒，禁止本金分配，严格幂等、顺序、取消和数量边界。",
+        "独立风险测试与 CLI 测试通过，源码及交付证据推送主线并运行正式收尾。"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "contracts/esk/economic-ledger-preview-v1.fixture.json",
+          "content_hash": "0d7bdd149621a4d5f2db196cb48eeb2178f99ff8eaff4c2479c554806ecdbf35",
+          "locator": "",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "fe488268647165d95d64ae61b91cf83900c0f799",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "349d2ec1b8318267ae77813600a33306dc692a78",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "contracts/esk/economic-ledger-preview-v1.schema.json",
+          "content_hash": "eb3aa9db58c1e5854abfd6bca6c26f1e1cf274e9f5118fda44db32b5723adf40",
+          "locator": "",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "fe488268647165d95d64ae61b91cf83900c0f799",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "2fcb510bf9d73970bc97e7e55c25009a82fe8197",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "docs/delivery/esk-economic-ledger-preview-v1.md",
+          "content_hash": "7277eedb608ae6d3f0c5e4b129ab564ace47d9e615899aaf9462fc6b64e4a56f",
+          "locator": "验证与交付",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "fe488268647165d95d64ae61b91cf83900c0f799",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "17f26276c328570598f3ae235fccb00080767160",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "scripts/esk-economic-ledger/cli.js",
+          "content_hash": "41f5fa09aecf04b22152a134f22eb6f5aa6882ce57a244309b3f7087ada253d2",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "fe488268647165d95d64ae61b91cf83900c0f799",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "ca69392dc981ca76d656016bc61958e048600d8f",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "scripts/esk-economic-ledger/input.js",
+          "content_hash": "8e81d982c501f7b122274392a65a033b6fe85693df86db6e8ae15e8cc976f29f",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "fe488268647165d95d64ae61b91cf83900c0f799",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "367844a04d52f2e7efa058381f39ed1da654d6b0",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "scripts/esk-economic-ledger/journal.js",
+          "content_hash": "902d97ac3975b90877c79e9271d07b5862728c0e47f90b92f9dea41b882bb5e2",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "fe488268647165d95d64ae61b91cf83900c0f799",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "6482250e2d8c03ab9ac6766738c3469cdefc4e87",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "scripts/esk-economic-ledger/preview.js",
+          "content_hash": "65e3a45852654fe3b08ad09f9dc141e126751f0bcc143193588c013ba38a9fe4",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "fe488268647165d95d64ae61b91cf83900c0f799",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "90ccac59b379538745a77d8aacbe73e98411a542",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "scripts/esk-economic-ledger/sources.js",
+          "content_hash": "a7e31d33b3e2c05b8214df4df178f5861e1fd86d3e6ef3efeb5fc09b9c9411dd",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "fe488268647165d95d64ae61b91cf83900c0f799",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "3d5b373ca031a8a61ad4aa3d1f36400f7f87c52e",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "scripts/esk-economic-ledger/tests/cli.test.js",
+          "content_hash": "8132e2b9be8a4357262111b91dab0020131da232048e9648e15a124eaf3ef988",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "fe488268647165d95d64ae61b91cf83900c0f799",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "660b55b53fe4b4f3e840bb0405b53059e9768e62",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "scripts/esk-economic-ledger/tests/helpers.js",
+          "content_hash": "fb13c1817d645b3bc9bfb88ffa71735a614a81f40ad56269d8fd01ba8aab3a43",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "fe488268647165d95d64ae61b91cf83900c0f799",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "b5c9dc9f8f445b214c4fa418fb72cd577916ea3b",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "scripts/esk-economic-ledger/tests/input.test.js",
+          "content_hash": "1b2fa04e9907b732f650842b8db8705ef392ea5b240d3444c5e69e30054afad3",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "fe488268647165d95d64ae61b91cf83900c0f799",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "671c94e5a72686769f2283e70b9a934746439137",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "scripts/esk-economic-ledger/tests/journal.test.js",
+          "content_hash": "c205016178ab03c9979194e92dd0c9c4708b784d9aa574fd665ef69518a12b29",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "fe488268647165d95d64ae61b91cf83900c0f799",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "9d659c985b21c3aa251046039fb6e7664855822f",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "scripts/esk-economic-ledger/tests/public-schema.test.js",
+          "content_hash": "68046dc7d5c947e5f569620f324fb637a380890bf20b9004e99b2906c2fd5145",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "fe488268647165d95d64ae61b91cf83900c0f799",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "a9f21f58ae152c7c41a132d2742cee6174f97c14",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "scripts/esk-economic-ledger/tests/sources-policy.test.js",
+          "content_hash": "10462f853edf0150ec05e60c83a38dac7141482c884b4f0ea97b4d66ba6f9e08",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "fe488268647165d95d64ae61b91cf83900c0f799",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "51a91ffa621afb8378e1937fe88e3dc093043e53",
+            "state": "index_only"
+          }
+        }
+      ],
+      "created_at_ms": 1788685952505,
+      "updated_at_ms": 1788686920070
+    },
+    {
       "id": "esk-native-snapshot-v1",
       "title": "ESK 双 APK 原生只读快照授权 V1",
       "summary": "在官方双 APK 间确认本人账户并展示短期 Paper ESK 快照，HTTP 私有请求失败关闭，不向 WebView 传凭据。",
@@ -21953,66 +22176,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_62e731fd80684431a443d83ffbf334bd",
-      "feature_id": "yilong-quant-android-identity-v1",
-      "action": "transitioned",
-      "actor": "codex/root",
-      "reason": "按当前新版唯一门禁重新核验现行身份基础。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788557774212
-    },
-    {
-      "id": "feature_event_8d0d5c4b25b54270ad59e1932c156f15",
-      "feature_id": "yilong-quant-android-identity-v1",
-      "action": "evidence_recorded",
-      "actor": "codex/root",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788557793755
-    },
-    {
-      "id": "feature_event_acf889075f174003ad0004c1e46bf368",
-      "feature_id": "yilong-quant-android-identity-v1",
-      "action": "transitioned",
-      "actor": "codex/root",
-      "reason": "当前身份基础已与新版唯一 versionCode 5 门禁一致，已安装状态、安装与打开接线均具备当前证据。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1788557806981
-    },
-    {
-      "id": "feature_event_5f1f61e97eea4d64b076cefc4507641c",
-      "feature_id": "yilong-quant-android-identity-v1",
-      "action": "transitioned",
-      "actor": "codex/root",
-      "reason": "官方身份 9 项、相关调用方 4 项、公开下载 6 项与 22 项源码突变合同通过，Debug 构建通过。",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1788557816996
-    },
-    {
-      "id": "feature_event_c9d46d15ddee4da299eb1665efdb2f85",
-      "feature_id": "esk-sui-address-control-proof-v1",
-      "action": "registered",
-      "actor": "codex:/root",
-      "reason": "",
-      "from_status": "",
-      "to_status": "proposed",
-      "at_ms": 1788565326711
-    },
-    {
-      "id": "feature_event_ec0d5a808d0a45b19f68f8f732d706e0",
-      "feature_id": "esk-sui-address-control-proof-v1",
-      "action": "transitioned",
-      "actor": "codex:/root",
-      "reason": "共享路线图与 Sui ADR 已接受地址绑定方向；本需求把用户单签、离线验证和所有非授权边界逐项固化。",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1788565338568
-    },
-    {
       "id": "feature_event_e96ab8dfd10343209bec2fdbe7313f61",
       "feature_id": "esk-sui-address-control-proof-v1",
       "action": "transitioned",
@@ -23951,6 +24114,66 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1788664263413
+    },
+    {
+      "id": "feature_event_f99a6dee47014babaf68d578d11fe7f9",
+      "feature_id": "esk-economic-ledger-preview-v1",
+      "action": "registered",
+      "actor": "esk-primary",
+      "reason": "用户已授权当前任务负责新工作；仅认领可独立验证的离线工程批次，经济政策仍未决。",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1788685952505
+    },
+    {
+      "id": "feature_event_7178571639d9454a9bf7248a148f42cf",
+      "feature_id": "esk-economic-ledger-preview-v1",
+      "action": "claimed",
+      "actor": "esk-primary",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788685962893
+    },
+    {
+      "id": "feature_event_6416dbfea0da464987a49004ba16b50f",
+      "feature_id": "esk-economic-ledger-preview-v1",
+      "action": "transitioned",
+      "actor": "esk-primary",
+      "reason": "查重与需求已完成，分配独立实现及风险测试。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788685975063
+    },
+    {
+      "id": "feature_event_8e8ee2c4467146f6b3f0b391e132ee67",
+      "feature_id": "esk-economic-ledger-preview-v1",
+      "action": "evidence_recorded",
+      "actor": "esk-primary",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788686881185
+    },
+    {
+      "id": "feature_event_da422811a5c0494a90b560619e5f31d5",
+      "feature_id": "esk-economic-ledger-preview-v1",
+      "action": "transitioned",
+      "actor": "esk-primary",
+      "reason": "离线源码、合成合同、独立审查和46项不同测试已有通过证据；仅验证离线工程，不批准真实经济操作。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1788686919876
+    },
+    {
+      "id": "feature_event_ca0ed9ae2063406db711732397340403",
+      "feature_id": "esk-economic-ledger-preview-v1",
+      "action": "transitioned",
+      "actor": "esk-primary",
+      "reason": "离线源码、合成合同、独立审查和46项不同测试已有通过证据；仅验证离线工程，不批准真实经济操作。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1788686920070
     }
   ]
 }

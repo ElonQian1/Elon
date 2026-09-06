@@ -1,0 +1,158 @@
+{
+  "schema": "elon.esk.economic_ledger_preview_input.v1",
+  "mode": "offline_draft",
+  "policy_draft": {
+    "schema": "elon.esk.early_support_policy_draft.v1",
+    "policy_status": "draft",
+    "asset": "ESK",
+    "confirmed_intent": {
+      "sale_proceeds_invested": true,
+      "investment_returns_intended": true,
+      "early_support_intended": true,
+      "policy_duration_years": 2
+    },
+    "decisions": {
+      "protection_scope": null,
+      "principal_denomination": null,
+      "term_basis": null,
+      "program_start_at": null,
+      "program_end_at": null,
+      "guarantor_id": null,
+      "funding_source": null,
+      "funding_description": null,
+      "redemption_rule": null,
+      "transfer_rule": null,
+      "consumption_rule": null,
+      "redemption_token_rule": null,
+      "prior_returns_rule": null,
+      "anniversary_rule": null,
+      "minimum_return_terms": null
+    }
+  },
+  "paid_reconciliation": {
+    "schema": "yilong.esk.paid_reconciliation_input.v1",
+    "batch_id": "synthetic-batch",
+    "as_of": "2026-09-06T00:00:00.000Z",
+    "source": {
+      "namespace": "synthetic-fixture",
+      "network": "offline",
+      "asset_symbol": "USDT",
+      "asset_reference": "synthetic-usdt",
+      "decimals": 6,
+      "reference_format": "opaque"
+    },
+    "snapshot": {
+      "snapshot_id": "synthetic-snapshot",
+      "observed_at": "2026-09-06T00:00:00.000Z",
+      "source_fingerprint": "479c7b02466ba0c736aab791baba21f0d0ffc8a8bec6918bfec4ce4f28ad1662",
+      "history_complete": true,
+      "used_payment_keys": []
+    },
+    "users": [
+      {
+        "opaque_subject": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "target_user_ref": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+      }
+    ],
+    "sale_batches": [
+      {
+        "sale_batch_id": "synthetic-sale",
+        "payment_base_units_per_lot": "2",
+        "esk_base_units_per_lot": "1",
+        "disclosure_revision": "synthetic-disclosure",
+        "terms_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      }
+    ],
+    "rows": [
+      {
+        "row_id": "synthetic-purchase-row",
+        "external_payment_reference": "synthetic-purchase-payment",
+        "transfer_index": 0,
+        "payment_amount": "0.000100",
+        "opaque_subject": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "payment_status": "confirmed",
+        "commercial_purpose": "esk_purchase",
+        "esk_base_units": "50",
+        "sale_batch_id": "synthetic-sale",
+        "disclosure_revision": "synthetic-disclosure",
+        "consent_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "approval_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      }
+    ]
+  },
+  "funding_lots": [
+    {
+      "lot_id": "synthetic-purchase",
+      "origin": "esk_purchase",
+      "external_payment_reference": "synthetic-purchase-payment",
+      "transfer_index": 0,
+      "amount_base_units": "100"
+    },
+    {
+      "lot_id": "synthetic-capital",
+      "origin": "sponsor_capital",
+      "external_payment_reference": "synthetic-capital-payment",
+      "transfer_index": 0,
+      "amount_base_units": "50"
+    },
+    {
+      "lot_id": "synthetic-profit",
+      "origin": "realized_profit",
+      "external_payment_reference": "synthetic-profit-payment",
+      "transfer_index": 0,
+      "amount_base_units": "30"
+    }
+  ],
+  "obligation_links": [
+    {
+      "obligation_id": "synthetic-obligation",
+      "purchase_lot_id": "synthetic-purchase",
+      "policy_digest": "171d1383f07606af37f152feb1705c21e71a2d50d4cf6c8bd004228f40a50041",
+      "status": "PENDING",
+      "protected_principal_base_units": null,
+      "minimum_return_base_units": null
+    }
+  ],
+  "journal": [
+    {
+      "sequence": 1,
+      "event_id": "synthetic-event-1",
+      "idempotency_key": "synthetic-key-1",
+      "operation": "propose",
+      "request_id": "synthetic-request-1",
+      "lot_id": "synthetic-purchase",
+      "purpose": "investment",
+      "amount_base_units": "80"
+    },
+    {
+      "sequence": 2,
+      "event_id": "synthetic-event-2",
+      "idempotency_key": "synthetic-key-2",
+      "operation": "propose",
+      "request_id": "synthetic-request-2",
+      "lot_id": "synthetic-purchase",
+      "purpose": "guarantee_reserve",
+      "amount_base_units": "20"
+    },
+    {
+      "sequence": 3,
+      "event_id": "synthetic-event-3",
+      "idempotency_key": "synthetic-key-3",
+      "operation": "propose",
+      "request_id": "synthetic-request-3",
+      "lot_id": "synthetic-capital",
+      "purpose": "guarantee_reserve",
+      "amount_base_units": "50"
+    },
+    {
+      "sequence": 4,
+      "event_id": "synthetic-event-4",
+      "idempotency_key": "synthetic-key-4",
+      "operation": "propose",
+      "request_id": "synthetic-request-4",
+      "lot_id": "synthetic-profit",
+      "purpose": "profit_distribution",
+      "amount_base_units": "10"
+    }
+  ]
+}

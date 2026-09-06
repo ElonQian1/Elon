@@ -1,0 +1,162 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "elon.esk.economic_ledger_preview.v1",
+  "title": "ESK offline economic ledger batch consistency input V1",
+  "$comment": "The root validates input shape only. Use #/$defs/report for successful reports and #/$defs/error for error reports. Runtime additionally validates delegated documents, Unicode scalar values, actual u128 bounds, source-dependent payment reference format and all batch consistency rules. No external evidence is verified.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "mode", "policy_draft", "paid_reconciliation", "funding_lots", "obligation_links", "journal"],
+  "properties": {
+    "schema": { "const": "elon.esk.economic_ledger_preview_input.v1" },
+    "mode": { "const": "offline_draft" },
+    "policy_draft": {
+      "type": "object",
+      "$comment": "Delegated without redefining economic policy to scripts/esk-early-support-policy/contract.js evaluatePolicyBuffer and contracts/esk/early-support-policy-draft-v1.schema.json; its 64 KiB bound and cross-field checks still apply."
+    },
+    "paid_reconciliation": {
+      "type": "object",
+      "$comment": "Delegated to scripts/esk-paid-reconciliation/preview.js preview and input.js validateInput. No standalone paid JSON Schema exists. Only its one USDT source and precision may be used. Returned invalid_input is a structural error; needs_review blocks this whole report."
+    },
+    "funding_lots": { "type": "array", "maxItems": 200, "items": { "$ref": "#/$defs/fundingLot" } },
+    "obligation_links": { "type": "array", "maxItems": 200, "items": { "$ref": "#/$defs/obligationLink" } },
+    "journal": { "type": "array", "maxItems": 500, "items": { "oneOf": [{ "$ref": "#/$defs/propose" }, { "$ref": "#/$defs/cancel" }] } }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9._:-]{1,80}(?![\\s\\S])" },
+    "key": { "type": "string", "pattern": "^[A-Za-z0-9._:-]{1,128}(?![\\s\\S])" },
+    "digest": { "type": "string", "pattern": "^[0-9a-f]{64}(?![\\s\\S])" },
+    "amount": {
+      "type": "string", "maxLength": 39, "pattern": "^[1-9][0-9]*(?![\\s\\S])",
+      "$comment": "Positive USDT base units, interpreted with paid_reconciliation.source.decimals. Runtime enforces <= 340282366920938463463374607431768211455; aggregate overflow blocks totals."
+    },
+    "totalAmount": { "type": "string", "maxLength": 39, "pattern": "^(?:0|[1-9][0-9]*)(?![\\s\\S])" },
+    "fundingLot": {
+      "type": "object", "additionalProperties": false,
+      "required": ["lot_id", "origin", "external_payment_reference", "transfer_index", "amount_base_units"],
+      "properties": {
+        "lot_id": { "$ref": "#/$defs/id" },
+        "origin": { "enum": ["esk_purchase", "sponsor_capital", "realized_profit"] },
+        "external_payment_reference": { "$ref": "#/$defs/key" },
+        "transfer_index": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
+        "amount_base_units": { "$ref": "#/$defs/amount" }
+      },
+      "$comment": "Runtime applies the existing source-specific opaque/hex32 spelling and paymentKey. Every origin is checked against all current paid rows, all other funding lots and snapshot.used_payment_keys as applicable. Origin is not evidence of authenticity."
+    },
+    "obligationLink": {
+      "type": "object", "additionalProperties": false,
+      "required": ["obligation_id", "purchase_lot_id", "policy_digest", "status", "protected_principal_base_units", "minimum_return_base_units"],
+      "properties": {
+        "obligation_id": { "$ref": "#/$defs/id" },
+        "purchase_lot_id": { "$ref": "#/$defs/id" },
+        "policy_digest": { "$ref": "#/$defs/digest" },
+        "status": { "const": "PENDING" },
+        "protected_principal_base_units": { "const": null },
+        "minimum_return_base_units": { "const": null }
+      },
+      "$comment": "A draft linkage only. Unknown liability amounts stay null; no actual liability is established or calculated."
+    },
+    "propose": {
+      "type": "object", "additionalProperties": false,
+      "required": ["sequence", "event_id", "idempotency_key", "operation", "request_id", "lot_id", "purpose", "amount_base_units"],
+      "properties": {
+        "sequence": { "type": "integer", "minimum": 1, "maximum": 500 },
+        "event_id": { "$ref": "#/$defs/id" }, "idempotency_key": { "$ref": "#/$defs/key" },
+        "operation": { "const": "propose" }, "request_id": { "$ref": "#/$defs/id" },
+        "lot_id": { "$ref": "#/$defs/id" },
+        "purpose": { "enum": ["investment", "guarantee_reserve", "profit_distribution"] },
+        "amount_base_units": { "$ref": "#/$defs/amount" }
+      }
+    },
+    "cancel": {
+      "type": "object", "additionalProperties": false,
+      "required": ["sequence", "event_id", "idempotency_key", "operation", "request_id"],
+      "properties": {
+        "sequence": { "type": "integer", "minimum": 1, "maximum": 500 },
+        "event_id": { "$ref": "#/$defs/id" }, "idempotency_key": { "$ref": "#/$defs/key" },
+        "operation": { "const": "cancel" }, "request_id": { "$ref": "#/$defs/id" }
+      },
+      "$comment": "Cancels an existing PENDING proposal in this input batch only. It cannot unlock actual funds or undo an earlier consistency issue."
+    },
+    "issue": {
+      "enum": [
+        "POLICY_NEEDS_CORRECTION", "POLICY_MINIMUM_RETURN_SCOPE_UNDECIDED", "POLICY_MINIMUM_RETURN_TERMS_NOT_APPLICABLE",
+        "PAID_RECONCILIATION_NEEDS_REVIEW", "FUNDING_LOTS_EMPTY", "JOURNAL_NO_PROPOSALS",
+        "DUPLICATE_LOT_ID", "DUPLICATE_PAYMENT_KEY", "PAYMENT_ALREADY_USED",
+        "PURCHASE_PAYMENT_NOT_FOUND", "PURCHASE_PAYMENT_NOT_REVIEW_READY", "PURCHASE_AMOUNT_MISMATCH",
+        "NON_PURCHASE_REUSES_PAID_PAYMENT", "OBLIGATION_DUPLICATE_ID", "OBLIGATION_PURCHASE_INVALID",
+        "OBLIGATION_DUPLICATE_PURCHASE", "OBLIGATION_MISSING", "OBLIGATION_POLICY_MISMATCH",
+        "EVENT_ID_CONFLICT", "IDEMPOTENCY_CONFLICT", "EVENT_SEQUENCE_INVALID", "REQUEST_ID_CONFLICT",
+        "PROPOSAL_LOT_UNKNOWN", "PROFIT_SOURCE_INVALID", "LOT_OVERALLOCATED", "CANCEL_REQUEST_UNKNOWN",
+        "REQUEST_ALREADY_CANCELED", "TOTAL_OVERFLOW"
+      ]
+    },
+    "counts": {
+      "type": "object", "additionalProperties": false,
+      "required": ["funding_lots", "obligation_links", "journal_entries", "unique_events", "replayed_events", "proposals", "pending_proposals", "canceled_proposals"],
+      "properties": {
+        "funding_lots": { "type": "integer", "minimum": 0, "maximum": 200 },
+        "obligation_links": { "type": "integer", "minimum": 0, "maximum": 200 },
+        "journal_entries": { "type": "integer", "minimum": 0, "maximum": 500 },
+        "unique_events": { "type": "integer", "minimum": 0, "maximum": 500 },
+        "replayed_events": { "type": "integer", "minimum": 0, "maximum": 500 },
+        "proposals": { "type": "integer", "minimum": 0, "maximum": 500 },
+        "pending_proposals": { "type": "integer", "minimum": 0, "maximum": 500 },
+        "canceled_proposals": { "type": "integer", "minimum": 0, "maximum": 500 }
+      },
+      "$comment": "Proposal counts refer to entries successfully projected in memory. Unique events exclude duplicate event IDs and idempotency conflicts; exact replay counts before sequence checks. Counts are diagnostic, never evidence of execution."
+    },
+    "totals": {
+      "type": "object", "additionalProperties": false,
+      "required": ["funding_total_base_units", "esk_purchase_base_units", "sponsor_capital_base_units", "realized_profit_base_units", "investment_base_units", "guarantee_reserve_base_units", "profit_distribution_base_units", "unallocated_base_units"],
+      "properties": {
+        "funding_total_base_units": { "$ref": "#/$defs/totalAmount" },
+        "esk_purchase_base_units": { "$ref": "#/$defs/totalAmount" },
+        "sponsor_capital_base_units": { "$ref": "#/$defs/totalAmount" },
+        "realized_profit_base_units": { "$ref": "#/$defs/totalAmount" },
+        "investment_base_units": { "$ref": "#/$defs/totalAmount" },
+        "guarantee_reserve_base_units": { "$ref": "#/$defs/totalAmount" },
+        "profit_distribution_base_units": { "$ref": "#/$defs/totalAmount" },
+        "unallocated_base_units": { "$ref": "#/$defs/totalAmount" }
+      }
+    },
+    "report": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schema", "review_status", "policy_status", "input_digest", "policy_digest", "policy_review_status", "policy_missing_decisions", "issues", "asset_symbol", "decimals", "source_fingerprint", "counts", "totals", "evidence_basis", "production_authorized", "funding_verified", "profit_realization_verified", "coverage_verified", "funds_moved", "balances_written"],
+      "properties": {
+        "schema": { "const": "elon.esk.economic_ledger_preview_report.v1" },
+        "review_status": { "enum": ["consistent", "needs_review"] }, "policy_status": { "const": "PENDING" },
+        "input_digest": { "$ref": "#/$defs/digest" }, "policy_digest": { "$ref": "#/$defs/digest" },
+        "policy_review_status": { "enum": ["needs_decisions", "needs_correction", "ready_for_policy_review"] },
+        "policy_missing_decisions": {
+          "type": "array", "maxItems": 15, "uniqueItems": true,
+          "items": { "enum": ["protection_scope", "principal_denomination", "term_basis", "program_start_at", "program_end_at", "guarantor_id", "funding_source", "funding_description", "redemption_rule", "transfer_rule", "consumption_rule", "redemption_token_rule", "prior_returns_rule", "anniversary_rule", "minimum_return_terms"] }
+        },
+        "issues": { "type": "array", "maxItems": 28, "uniqueItems": true, "items": { "$ref": "#/$defs/issue" } },
+        "asset_symbol": { "const": "USDT" }, "decimals": { "type": "integer", "minimum": 0, "maximum": 18 },
+        "source_fingerprint": { "$ref": "#/$defs/digest" }, "counts": { "$ref": "#/$defs/counts" },
+        "totals": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/totals" }] },
+        "evidence_basis": { "const": "operator_declared_consistency_only" },
+        "production_authorized": { "const": false }, "funding_verified": { "const": false },
+        "profit_realization_verified": { "const": false }, "coverage_verified": { "const": false },
+        "funds_moved": { "const": false }, "balances_written": { "const": false }
+      },
+      "if": { "properties": { "review_status": { "const": "consistent" } } },
+      "then": { "properties": { "issues": { "maxItems": 0 }, "totals": { "$ref": "#/$defs/totals" } } },
+      "else": { "properties": { "issues": { "minItems": 1 }, "totals": { "type": "null" } } }
+    },
+    "error": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schema", "policy_status", "error", "production_authorized", "funding_verified", "profit_realization_verified", "coverage_verified", "funds_moved", "balances_written"],
+      "properties": {
+        "schema": { "const": "elon.esk.economic_ledger_preview_error.v1" }, "policy_status": { "const": "PENDING" },
+        "error": {
+          "type": "object", "additionalProperties": false, "required": ["code"],
+          "properties": { "code": { "enum": ["INVALID_INPUT", "INVALID_STRUCTURE", "INVALID_VALUE", "INVALID_AMOUNT", "INVALID_POLICY_DRAFT", "INVALID_PAID_RECONCILIATION", "INVALID_ARGUMENTS", "UNSAFE_KEY", "INTERNAL_ERROR", "INVALID_JSON", "DUPLICATE_JSON_KEY", "INPUT_TOO_LARGE", "INVALID_UTF8", "INPUT_TOO_DEEP", "INPUT_TIMEOUT"] } }
+        },
+        "production_authorized": { "const": false }, "funding_verified": { "const": false },
+        "profit_realization_verified": { "const": false }, "coverage_verified": { "const": false },
+        "funds_moved": { "const": false }, "balances_written": { "const": false }
+      }
+    }
+  }
+}
