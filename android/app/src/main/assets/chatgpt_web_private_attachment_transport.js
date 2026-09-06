@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 5, create: factory });
+  const exported = Object.freeze({ version: 6, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root && root.location?.origin === 'https://chatgpt.com') {
     root.__elonChatGptPrivateAttachmentTransport = exported;
@@ -108,7 +108,8 @@
         ok: true, stage: 'processed', binding, fileId: destination.fileId,
         fileName: file.name, fileSize: file.size, mimeType: file.type,
         isTemporaryChat: selected.isTemporaryChat === true,
-        projectId: selected.libraryFileInfo?.gizmo_id || null,
+        projectId: selected.projectScopeId || selected.libraryFileInfo?.gizmo_id || null,
+        projectWriteRequested: selected.libraryFileInfo?.should_upload_to_project === true,
         metadata: result.metadata, eventCount: result.eventCount, events: result.events,
         ...(selected.imageDimensions ? { imageDimensions: selected.imageDimensions } : {}),
         // Upload completion is not composer association or message-send acknowledgement.
@@ -129,6 +130,6 @@
   }
 
   function cancel() { if (active) active.controller.abort(); }
-  function snapshot() { return { version: 5, stage: active?.stage || 'idle', cooldown: cooldownUntil > Date.now() }; }
-  return Object.freeze({ version: 5, upload, cancel, dispose: cancel, snapshot });
+  function snapshot() { return { version: 6, stage: active?.stage || 'idle', cooldown: cooldownUntil > Date.now() }; }
+  return Object.freeze({ version: 6, upload, cancel, dispose: cancel, snapshot });
 });

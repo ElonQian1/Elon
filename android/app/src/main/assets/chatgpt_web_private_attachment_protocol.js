@@ -9,6 +9,7 @@
   'use strict';
   const MAX_BYTES = 8 * 1024 * 1024;
   const FILE_ID = /^[A-Za-z0-9_-]{1,160}$/;
+  const PROJECT_ID = /^g-p-[a-f0-9]{32}$/i;
   const USE_CASES = new Set(['ace_upload', 'my_files', 'multimodal', 'gizmo']);
   const IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
@@ -34,27 +35,47 @@
     return Object.freeze({ width: value.width, height: value.height });
   }
 
+  function originInfo(value) {
+    const hasOrigin = value?.origination_thread_id !== undefined || value?.origination_message_id !== undefined;
+    const uuid = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
+    if (hasOrigin && (!uuid.test(value.origination_thread_id || '') || !uuid.test(value.origination_message_id || ''))) {
+      throw new Error('unsupported_upload_context');
+    }
+    return hasOrigin ? { origination_thread_id: value.origination_thread_id,
+      origination_message_id: value.origination_message_id } : {};
+  }
+
   function projectInfo(context) {
     const value = context?.libraryFileInfo;
     if (!context?.isProjectThread) {
-      if (context?.gizmoId || value || context?.useCase === 'gizmo') throw new Error('unsupported_upload_context');
+      if (context?.gizmoId || value || context?.projectScopeId || context?.useCase === 'gizmo') {
+        throw new Error('unsupported_upload_context');
+      }
       return null;
     }
     if (context.isProjectThread !== true || context.isTemporaryChat ||
-        !/^g-p-[a-f0-9]{32}$/i.test(value?.gizmo_id || '') || value.is_project !== true ||
+        context.projectScopeId !== undefined && !PROJECT_ID.test(context.projectScopeId)) {
+      throw new Error('unsupported_upload_context');
+    }
+    // Official chat-only project uploads keep conversation origins, not project-write metadata.
+    if (value?.gizmo_id == null) {
+      if (!PROJECT_ID.test(context.projectScopeId || '') || context.gizmoId != null ||
+          !['ace_upload', 'multimodal'].includes(context.useCase) || value != null &&
+          (typeof value !== 'object' || Array.isArray(value) || Object.keys(value).some(key =>
+            !['origination_thread_id', 'origination_message_id'].includes(key)))) {
+        throw new Error('unsupported_upload_context');
+      }
+      return Object.freeze(originInfo(value));
+    }
+    if (!PROJECT_ID.test(value.gizmo_id) || value.is_project !== true ||
+        context.projectScopeId !== undefined && context.projectScopeId !== value.gizmo_id ||
         value.should_upload_to_project !== true ||
         Object.keys(value).some(key => !['gizmo_id', 'is_project', 'should_upload_to_project',
           'origination_thread_id', 'origination_message_id'].includes(key)) ||
         (context.useCase === 'gizmo' ? context.gizmoId !== value.gizmo_id :
           context.useCase !== 'multimodal' || context.gizmoId != null)) throw new Error('unsupported_upload_context');
-    const hasOrigin = value.origination_thread_id !== undefined || value.origination_message_id !== undefined;
-    const uuid = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
-    if (hasOrigin && (!uuid.test(value.origination_thread_id || '') || !uuid.test(value.origination_message_id || ''))) {
-      throw new Error('unsupported_upload_context');
-    }
     return Object.freeze({ gizmo_id: value.gizmo_id, is_project: true, should_upload_to_project: true,
-      ...(hasOrigin ? { origination_thread_id: value.origination_thread_id,
-        origination_message_id: value.origination_message_id } : {}) });
+      ...originInfo(value) });
   }
 
   function prepare(file, context) {
@@ -127,7 +148,7 @@
       ...(context.libraryPersistenceMode == null ? {} : { library_persistence_mode: context.libraryPersistenceMode }),
       metadata: { store_in_library: context.storeInLibrary,
         is_temporary_chat: context.isTemporaryChat === true, is_project_thread: !!project,
-        ...(project ? { library_file_info: project } : {}) },
+        ...(project && Object.keys(project).length ? { library_file_info: project } : {}) },
     };
   }
 
@@ -168,6 +189,6 @@
     return { metadata, eventCount: count, events };
   }
 
-  return { version: 7, maxFileBytes: MAX_BYTES, prepare, destination, processBody, processed,
+  return { version: 8, maxFileBytes: MAX_BYTES, prepare, destination, processBody, processed,
     imageDimensions, projectInfo, isPdf, creationHeaders };
 });
