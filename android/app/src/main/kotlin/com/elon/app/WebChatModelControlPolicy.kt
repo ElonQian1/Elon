@@ -26,7 +26,7 @@ internal object WebChatModelControlPolicy {
         val selectable = options.filter { it.id.isNotBlank() && it.label.isNotBlank() }
         val advanced = selectable.firstOrNull { it.opensSubmenu }
             ?: parentOption(selectable)
-        val direct = selectable.filterNot(WebChatConsumerOption::opensSubmenu)
+        val direct = selectable.filterNot { it.id == advanced?.id }
         val levels = direct.takeIf(::looksLikeLevelScale).orEmpty()
         val selectedIndex = levels.indexOfFirst(WebChatConsumerOption::selected)
             .takeIf { it >= 0 }
@@ -40,6 +40,10 @@ internal object WebChatModelControlPolicy {
             listOptions = if (levels.isEmpty()) direct else emptyList(),
         )
     }
+
+    fun isSelected(option: WebChatConsumerOption, currentModel: String): Boolean =
+        option.selected || (!option.opensSubmenu && option.semantic == "model" &&
+            compactLabel(option.label) == compactLabel(currentModel))
 
     fun compactLabel(raw: String): String {
         val cleaned = raw.trim().replace(Regex("\\s+"), " ")
@@ -61,7 +65,8 @@ internal object WebChatModelControlPolicy {
         if (options.size !in 2..6) return false
         return options.all { option ->
             val label = option.label.trim()
-            label.length <= MAX_LEVEL_LABEL_LENGTH || levelToken.containsMatchIn(label)
+            !option.opensSubmenu && option.semantic == "model" &&
+                (label.length <= MAX_LEVEL_LABEL_LENGTH || levelToken.containsMatchIn(label))
         }
     }
 

@@ -74,6 +74,24 @@ class WebChatModelControlPolicyTest {
         assertEquals("快速", WebChatModelControlPolicy.compactLabel("GPT-5 Fast"))
     }
 
+    @Test
+    fun versionAndSpeedChoicesStayDiscreteAndKeepBothNavigationEntries() {
+        val versions = listOf(
+            option("back", "返回档位", opensSubmenu = true),
+            option("v1", "5.1").copy(semantic = "model_version"),
+            option("v2", "5.2", selected = true).copy(semantic = "model_version"),
+            option("speed", "快速").copy(semantic = "service_tier"),
+            option("other", "其他官网模型", opensSubmenu = true),
+        )
+        val presentation = WebChatModelControlPolicy.resolve(versions, "快速")
+        assertFalse(presentation.usesLevelSlider)
+        assertEquals("back", presentation.advanced?.id)
+        assertEquals(listOf("v1", "v2", "speed", "other"), presentation.listOptions.map { it.id })
+        assertFalse(WebChatModelControlPolicy.isSelected(versions[3], "快速"))
+        assertTrue(WebChatModelControlPolicy.isSelected(versions[2], "快速"))
+        assertFalse(WebChatModelControlPolicy.resolve(versions.subList(1, 3), "5.2").usesLevelSlider)
+    }
+
     private fun option(
         id: String,
         label: String,

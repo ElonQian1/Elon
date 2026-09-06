@@ -7,6 +7,14 @@ import org.junit.Test
 
 class ChatGptWebComposerOptionSemanticsTest {
     @Test
+    fun modelVersionAndServiceTierKeepDistinctProtocolSemantics() {
+        assertTrue("model_version" in ChatGptWebComposerOptionSemantics.KNOWN)
+        assertTrue("service_tier" in ChatGptWebComposerOptionSemantics.KNOWN)
+        assertFalse(ChatGptWebComposerOptionSemantics.isAttachment("model_version"))
+        assertFalse(ChatGptWebComposerOptionSemantics.isAttachment("service_tier"))
+    }
+
+    @Test
     fun attachmentSemanticsAreStableAndIndependentFromDisplayedLabels() {
         listOf(
             ChatGptWebComposerOptionSemantics.ATTACHMENT_CAMERA,

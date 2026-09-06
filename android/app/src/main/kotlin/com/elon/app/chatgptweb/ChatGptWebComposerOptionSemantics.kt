@@ -2,6 +2,8 @@ package com.elon.app.chatgptweb
 
 internal object ChatGptWebComposerOptionSemantics {
     const val MODEL = "model"
+    const val MODEL_VERSION = "model_version"
+    const val SERVICE_TIER = "service_tier"
     const val ATTACHMENT_CAMERA = "attachment_camera"
     const val ATTACHMENT_PHOTOS = "attachment_photos"
     const val ATTACHMENT_FILE = "attachment_file"
@@ -15,6 +17,8 @@ internal object ChatGptWebComposerOptionSemantics {
 
     val KNOWN = setOf(
         MODEL,
+        MODEL_VERSION,
+        SERVICE_TIER,
         ATTACHMENT_CAMERA,
         ATTACHMENT_PHOTOS,
         ATTACHMENT_FILE,

@@ -11,6 +11,7 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.PopupWindow
+import android.widget.ScrollView
 import android.widget.SeekBar
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
@@ -64,8 +65,12 @@ internal class WebChatModelControlPopupRenderer(
         contentDescription = MODEL_CONTROL_SELECTOR
         elevation = dp(8).toFloat()
     }
+    private val scroll = ScrollView(activity).apply {
+        isFillViewport = true
+        addView(panel)
+    }
     private val popup = PopupWindow(
-        panel,
+        scroll,
         popupWidth,
         ViewGroup.LayoutParams.WRAP_CONTENT,
         true,
@@ -78,6 +83,16 @@ internal class WebChatModelControlPopupRenderer(
 
     fun show(options: List<WebChatConsumerOption>, currentModel: String) {
         render(options, currentModel)
+        positionPopup(show = true)
+        panel.alpha = 0f
+        panel.scaleX = 0.97f
+        panel.scaleY = 0.97f
+        panel.pivotX = popupWidth.toFloat()
+        panel.pivotY = popup.height.toFloat()
+        panel.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(120L).start()
+    }
+
+    private fun positionPopup(show: Boolean) {
         panel.measure(
             View.MeasureSpec.makeMeasureSpec(popupWidth, View.MeasureSpec.EXACTLY),
             View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
@@ -87,14 +102,12 @@ internal class WebChatModelControlPopupRenderer(
         val screenWidth = activity.resources.displayMetrics.widthPixels
         val x = (location[0] + anchor.width - popupWidth)
             .coerceIn(dp(12), screenWidth - popupWidth - dp(12))
-        val y = (location[1] - panel.measuredHeight - dp(10)).coerceAtLeast(dp(72))
-        popup.showAtLocation(anchor, Gravity.NO_GRAVITY, x, y)
-        panel.alpha = 0f
-        panel.scaleX = 0.97f
-        panel.scaleY = 0.97f
-        panel.pivotX = popupWidth.toFloat()
-        panel.pivotY = panel.measuredHeight.toFloat()
-        panel.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(120L).start()
+        val height = panel.measuredHeight.coerceAtMost((location[1] - dp(82)).coerceAtLeast(dp(100)))
+        val y = (location[1] - height - dp(10)).coerceAtLeast(dp(72))
+        if (show) {
+            popup.height = height
+            popup.showAtLocation(anchor, Gravity.NO_GRAVITY, x, y)
+        } else popup.update(x, y, popupWidth, height)
     }
 
     fun render(options: List<WebChatConsumerOption>, currentModel: String) {
@@ -125,7 +138,8 @@ internal class WebChatModelControlPopupRenderer(
             popup.dismiss()
             onProviderSwitch()
         })
-        popup.update()
+        scroll.scrollTo(0, 0)
+        if (popup.isShowing) positionPopup(show = false)
     }
 
     fun dismiss() = popup.dismiss()
@@ -177,10 +191,7 @@ internal class WebChatModelControlPopupRenderer(
     private fun optionRow(option: WebChatConsumerOption, currentModel: String): View = actionRow(
         label = option.label,
         selector = option.nativeSelector.ifBlank { "web-chat-model-option:${option.id}" },
-        trailing = if (
-            option.selected || WebChatModelControlPolicy.compactLabel(option.label) ==
-            WebChatModelControlPolicy.compactLabel(currentModel)
-        ) "✓" else null,
+        trailing = if (WebChatModelControlPolicy.isSelected(option, currentModel)) "✓" else null,
         showChevron = option.opensSubmenu,
     ) {
         onOptionSelected(option)
