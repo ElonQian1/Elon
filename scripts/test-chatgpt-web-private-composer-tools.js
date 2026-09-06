@@ -240,6 +240,7 @@ test('production composer delegates request, selection and dismiss without a syn
         dismissPrivateOptions() { calls.push('dismiss'); return true; }
       },
       __elonChatGptDictationActions: { create: () => ({}) },
+      __elonChatGptComposerDismissPolicy: require(path.join(assets, 'chatgpt_web_adapter_composer_dismiss_policy.js')),
       __elonChatGptComposerSubmenu: { createRecovery: () => ({}) }
     } };
   vm.runInNewContext(fs.readFileSync(path.join(assets, 'chatgpt_web_adapter_composer.js'), 'utf8'), sandbox);
@@ -260,6 +261,7 @@ test('production composer uses actual private binding, updates selection and dis
   f.node.getBoundingClientRect = () => ({ width: 40, height: 40, left: 0, top: 0 });
   page.__elonChatGptDictationActions = { create: () => ({}) };
   page.__elonChatGptComposerSubmenu = { createRecovery: () => ({}) };
+  page.__elonChatGptComposerDismissPolicy = require(path.join(assets, 'chatgpt_web_adapter_composer_dismiss_policy.js'));
   page.__elonChatGptComposerToolSelection = f.runtime;
   const input = { closest: () => page.document };
   vm.runInNewContext(fs.readFileSync(path.join(assets, 'chatgpt_web_adapter_composer.js'), 'utf8'), {

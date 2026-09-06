@@ -78,4 +78,25 @@ function createEnvironment() {
 
 assert.equal(policy.emitTouch(null, { innerWidth: 400, innerHeight: 800 }, () => {}), false);
 
+for (const mode of ['private', 'trigger', 'prompt', 'escape']) {
+  const calls = [];
+  const trigger = { getAttribute: () => 'true' };
+  const context = {
+    composer: {}, documentRef: { dispatchEvent: event => calls.push(event.type) }, view: {},
+    lastOptions: { model: [], tools: mode === 'prompt' ? [{}] : [] },
+    triggerFor: section => mode === 'trigger' && section === 'tools' ? trigger : null,
+    dismissPrivate: () => mode === 'private',
+    emitTriggerTouch: () => { calls.push('trigger'); return true; },
+    emitVisibleNodeTouch: () => { calls.push('prompt'); return true; },
+    findPromptInput: () => ({}), emitEvent: () => assert.fail('unexpected backdrop touch'),
+    keyboardEvent: type => ({ type }),
+    clearOptions: () => calls.push('clear'),
+    settlePendingOptions: section => calls.push('settle:' + section),
+    result: (action, ok) => { assert.equal(action, 'dismiss_composer_menu'); assert.equal(ok, true); calls.push('result'); }
+  };
+  policy.dismissMenu(context);
+  assert.deepEqual(calls, mode === 'private' ? ['result']
+    : [...(mode === 'escape' ? ['keydown', 'keyup'] : [mode]), 'clear', 'settle:model', 'settle:tools', 'result']);
+}
+
 process.stdout.write('CHATGPT_WEB_COMPOSER_DISMISS_POLICY=passed\n');

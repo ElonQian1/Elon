@@ -756,26 +756,13 @@
   }
 
   function dismissOpenMenu(composer, emitEvent, result) {
-    const expandedSection = ['model', 'tools'].find((section) => {
-      const trigger = triggerFor(section, composer);
-      return trigger && trigger.getAttribute('aria-expanded') === 'true';
+    return composerDismissPolicy.dismissMenu({
+      composer, emitEvent, result, documentRef: document, view: window, lastOptions,
+      triggerFor, emitTriggerTouch, emitVisibleNodeTouch, findPromptInput, settlePendingOptions,
+      dismissPrivate: () => composerToolSelectionAdapter?.dismissPrivateOptions?.(),
+      keyboardEvent: (type, init) => new KeyboardEvent(type, init),
+      clearOptions: () => { lastOptions = { model: [], tools: [] }; }
     });
-    const expandedTrigger = expandedSection && triggerFor(expandedSection, composer);
-    if (!expandedSection && !lastOptions.model.length && composerToolSelectionAdapter?.dismissPrivateOptions?.()) { lastOptions.tools = []; return result('dismiss_composer_menu', true, ''); }
-    const menuKnown = expandedTrigger || lastOptions.model.length || lastOptions.tools.length;
-    const outsideTouched = composerDismissPolicy && composerDismissPolicy.emitTouch(document, window, emitEvent);
-    const touched = outsideTouched || (expandedTrigger
-      ? emitTriggerTouch(expandedSection, 'dismiss_composer_menu', expandedTrigger, emitEvent)
-      : menuKnown && emitVisibleNodeTouch('dismiss_composer_menu', findPromptInput(), emitEvent));
-    const target = document.activeElement || document;
-    if (!touched) {
-      target.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true }));
-      target.dispatchEvent(new KeyboardEvent('keyup', { key: 'Escape', code: 'Escape', bubbles: true }));
-    }
-    lastOptions = { model: [], tools: [] };
-    settlePendingOptions('model', false, '官网菜单已关闭。');
-    settlePendingOptions('tools', false, '官网菜单已关闭。');
-    result('dismiss_composer_menu', true, '');
   }
 
   window.__elonChatGptComposer = Object.freeze({

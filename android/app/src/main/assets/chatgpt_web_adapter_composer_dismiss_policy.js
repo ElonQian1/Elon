@@ -76,5 +76,32 @@
     return true;
   }
 
-  return Object.freeze({ emitTouch, safePoint });
+  function dismissMenu(context) {
+    const { composer, emitEvent, result, documentRef, view, lastOptions } = context;
+    const expandedSection = ['model', 'tools'].find(section => {
+      const trigger = context.triggerFor(section, composer);
+      return trigger && trigger.getAttribute('aria-expanded') === 'true';
+    });
+    const expandedTrigger = expandedSection && context.triggerFor(expandedSection, composer);
+    if (!expandedSection && !lastOptions.model.length && context.dismissPrivate()) {
+      lastOptions.tools = [];
+      return result('dismiss_composer_menu', true, '');
+    }
+    const menuKnown = expandedTrigger || lastOptions.model.length || lastOptions.tools.length;
+    const outsideTouched = emitTouch(documentRef, view, emitEvent);
+    const touched = outsideTouched || (expandedTrigger
+      ? context.emitTriggerTouch(expandedSection, 'dismiss_composer_menu', expandedTrigger, emitEvent)
+      : menuKnown && context.emitVisibleNodeTouch('dismiss_composer_menu', context.findPromptInput(), emitEvent));
+    const target = documentRef.activeElement || documentRef;
+    if (!touched) {
+      target.dispatchEvent(context.keyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true }));
+      target.dispatchEvent(context.keyboardEvent('keyup', { key: 'Escape', code: 'Escape', bubbles: true }));
+    }
+    context.clearOptions();
+    context.settlePendingOptions('model', false, '官网菜单已关闭。');
+    context.settlePendingOptions('tools', false, '官网菜单已关闭。');
+    result('dismiss_composer_menu', true, '');
+  }
+
+  return Object.freeze({ emitTouch, safePoint, dismissMenu });
 });
