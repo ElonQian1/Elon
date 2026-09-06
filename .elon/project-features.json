@@ -1499,6 +1499,240 @@
       "updated_at_ms": 1787461920923
     },
     {
+      "id": "binance-grid-observer-v1",
+      "title": "币安网格被动观察工具",
+      "summary": "复用已登录Chrome的独立MV3扩展，被动观察网格候选请求并导出有界脱敏结构；真实账号现场采样独立验收。",
+      "status": "implemented",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/binance-grid-observer-v1.md",
+        "content_hash": "51fd2c378a713e9ed543e5f1c1af5903cd2a81b387811a3e3c23134f1bd8fa5d",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "2fecf4012cfeb38517c2c3b7a1480b9d73b7e259",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "52a122cd84a77337b27b55859f774a3fac1e5a3a",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "codex-grid-root",
+      "tags": [],
+      "task_paths": [
+        "docs/binance-grid-observer-v1.md",
+        "docs/reports/binance-grid-observer-v1.md",
+        "scripts/test-binance-grid-observer*",
+        "tools/binance-grid-observer"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "仅用户显式启用当前币安页面，不刷新或关闭既有登录页，不发送或重放交易",
+        "扩展只保存有界脱敏结构，代次隔离、停止、去重与透明性有测试",
+        "可加载工件与使用说明齐备；真实Chrome/币安现场采样单独标记待验收"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "docs/reports/binance-grid-observer-v1.md",
+          "content_hash": "e5b0845013f155f6b77b49091146ea38b94198c2b4809a2ed82ddb94039449fd",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "2fecf4012cfeb38517c2c3b7a1480b9d73b7e259",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "dd4023dd306a871dc44c79d2bd0d633c7a8cb504",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/package-binance-grid-observer.ps1",
+          "content_hash": "2198e859e2db1db364abff85b7bdf8d1909d501060ac14a7d413dd40328f26bd",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "2fecf4012cfeb38517c2c3b7a1480b9d73b7e259",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "46ec95b7a406f01e7c6c901be491471a9e070cea",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/test-binance-grid-observer-core.cjs",
+          "content_hash": "ecd0120f31b1111171d1fa39e2e262a01f653d6596c75445bcc76ea0e427d965",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "2fecf4012cfeb38517c2c3b7a1480b9d73b7e259",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "4c2036740b886e7d1f4f661e6ecdb2351146794e",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/test-binance-grid-observer-extension.cjs",
+          "content_hash": "911f79b8d47bd293ab5453d7a311f69b9b8af033f3723aea43cc4f63afb5365e",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "2fecf4012cfeb38517c2c3b7a1480b9d73b7e259",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "11a640702f55a7f24ce532fa307adaeecd0e84d1",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/test-binance-grid-observer-popup.cjs",
+          "content_hash": "a2c1b1de728299762c48c159c7e89f50b6180562e886f6db96329716588dc991",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "2fecf4012cfeb38517c2c3b7a1480b9d73b7e259",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "aea41089ae67e7b615dead679f1637e4b90f2444",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "tools/binance-grid-observer/README.md",
+          "content_hash": "967518393270925f7fb11a764b6448cfd5f010cd491109321e0933e72add1277",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "2fecf4012cfeb38517c2c3b7a1480b9d73b7e259",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "d248b463cf910865bdaa87f531a43f1b7ab26221",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "tools/binance-grid-observer/bridge.js",
+          "content_hash": "c16d8686d790af31dcec4876b505b829e78827df351bdf39a0eb9dd573a3d6fa",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "2fecf4012cfeb38517c2c3b7a1480b9d73b7e259",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "4e0097d8e521de5f9c73e33bd8c58f34477d5bdc",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "tools/binance-grid-observer/manifest.json",
+          "content_hash": "3daa95591e789a59337d2ca2ef60d6623c82a01c1d9698555508224f6a5116d0",
+          "locator": "",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "2fecf4012cfeb38517c2c3b7a1480b9d73b7e259",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "703343a9d3750d122adabdd09e19bf199b6f9e3b",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "tools/binance-grid-observer/observer.js",
+          "content_hash": "7f704bfe2c7898cb18ac1451ab8a4c64e8cda9775afdcfa6dd16b2c673e032b0",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "2fecf4012cfeb38517c2c3b7a1480b9d73b7e259",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "cd85ecab2bb01f68310db960439d128681b2eff6",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "tools/binance-grid-observer/popup.css",
+          "content_hash": "394ff64baf9eae336537c8e5026e25a9ea2791359ae45a60b502921112c1c42a",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "2fecf4012cfeb38517c2c3b7a1480b9d73b7e259",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "f3ca9d05317a81f8d9dce22e4b48cca03dd33bf2",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "tools/binance-grid-observer/popup.html",
+          "content_hash": "734f9f373710af8cfb20c1740d468e6155d06f7d2b34800a6517bdf710fa69cf",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "2fecf4012cfeb38517c2c3b7a1480b9d73b7e259",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "d7beb36e9b9016a18d675abf45833cc7b3ba489d",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "tools/binance-grid-observer/popup.js",
+          "content_hash": "ef6abc5503b8937e1979a6b9595f5ad5fe8cbf4dcf88a8f3ef2d9a388398fbbc",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "2fecf4012cfeb38517c2c3b7a1480b9d73b7e259",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "6e3ab4701189a8c48005387ec0092cdeeb818a9a",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "tools/binance-grid-observer/sanitize.js",
+          "content_hash": "e18e816b70db40731cb14e3ab305a711de6be175ac68814668b804f470be59a7",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "2fecf4012cfeb38517c2c3b7a1480b9d73b7e259",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "a56ef4d0dcfe17c4c2657ad659514372745bc6d6",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "tools/binance-grid-observer/store.js",
+          "content_hash": "9cd7cd160f611caf8a5e6a0ce0314a1f1ea4d5641e001939a5e3242a1d5bc647",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "2fecf4012cfeb38517c2c3b7a1480b9d73b7e259",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "3dd90a48c8671253a886f58fbe6a19302137369b",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "tools/binance-grid-observer/worker.js",
+          "content_hash": "ab8f0fd18bb5c28d4ff728c391f55c7b834ee97cbd477d7e7cb99de2f0889bad",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "2fecf4012cfeb38517c2c3b7a1480b9d73b7e259",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "8b83136f9badbd5d02bccc6661701de7cd662a47",
+            "state": "untracked"
+          }
+        }
+      ],
+      "created_at_ms": 1788724675619,
+      "updated_at_ms": 1788725643590
+    },
+    {
       "id": "compute-attempt-final-usage-fence-verification-v1",
       "title": "Attempt 最终声明用量栅栏动态验收 V1",
       "summary": "动态验证 V226 在终态候选处原子封口 Provider 声明用量流，并阻止下游消费过时流头。",
@@ -22300,56 +22534,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_52c4c3692e4344909f9a705b1a2fc4e1",
-      "feature_id": "esk-sui-address-control-proof-v1",
-      "action": "requirement_rebound",
-      "actor": "codex:/root",
-      "reason": "显式纳入 challenge ID、message/evidence SHA-256 精确编码算法与 golden vector，并澄清 help 输出例外。",
-      "from_status": "blocked",
-      "to_status": "proposed",
-      "at_ms": 1788567858674
-    },
-    {
-      "id": "feature_event_01af1168c1e34714a0d82069fd42ab19",
-      "feature_id": "esk-sui-address-control-proof-v1",
-      "action": "transitioned",
-      "actor": "codex:/root",
-      "reason": "已重新阅读全文和 golden vector；新增算法说明只消除互操作歧义，不放宽任何授权或资产边界。",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1788567870434
-    },
-    {
-      "id": "feature_event_3571805dde7243ab9430405917cd1b9d",
-      "feature_id": "esk-sui-address-control-proof-v1",
-      "action": "transitioned",
-      "actor": "codex:/root",
-      "reason": "当前需求已接受，依赖完成，精确算法与测试路径可执行。",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1788567880626
-    },
-    {
-      "id": "feature_event_768523b24b4c49e2ac277780cace690f",
-      "feature_id": "esk-sui-address-control-proof-v1",
-      "action": "claimed",
-      "actor": "codex:/root",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788567890297
-    },
-    {
-      "id": "feature_event_70305bc9e39a49b9915b1db5fba9e87f",
-      "feature_id": "esk-sui-address-control-proof-v1",
-      "action": "transitioned",
-      "actor": "codex:/root",
-      "reason": "当前需求哈希重新认领；定向 58/58 与既有 Sui 回归已通过，准备绑定实现证据。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788567902097
-    },
-    {
       "id": "feature_event_da82d98eb0694e59ac72100fbd691f0b",
       "feature_id": "esk-sui-address-control-proof-v1",
       "action": "evidence_recorded",
@@ -24298,6 +24482,56 @@
       "from_status": "in_progress",
       "to_status": "ready",
       "at_ms": 1788690756183
+    },
+    {
+      "id": "feature_event_dab82ee456c44c60b3cc548af666342c",
+      "feature_id": "binance-grid-observer-v1",
+      "action": "registered",
+      "actor": "codex-grid-root",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1788724675620
+    },
+    {
+      "id": "feature_event_057597dbf4714e51b1056b6360429a01",
+      "feature_id": "binance-grid-observer-v1",
+      "action": "claimed",
+      "actor": "codex-grid-root",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788724686823
+    },
+    {
+      "id": "feature_event_57fa1c07ef0d452fb21b080b96bcdf99",
+      "feature_id": "binance-grid-observer-v1",
+      "action": "transitioned",
+      "actor": "codex-grid-root",
+      "reason": "独立Chrome被动观察工具开始实现；只读采样与现场验收分开",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788725002347
+    },
+    {
+      "id": "feature_event_21fdcb85f40d4329942bb257827e4293",
+      "feature_id": "binance-grid-observer-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-grid-root",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788725627745
+    },
+    {
+      "id": "feature_event_03d3a062d3ca4eb4bc302167be950488",
+      "feature_id": "binance-grid-observer-v1",
+      "action": "transitioned",
+      "actor": "codex-grid-root",
+      "reason": "独立MV3观察工具及包装完成，36项离线测试通过；真实Chrome/币安采样待现场验收，不标记verified或released",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1788725643590
     }
   ]
 }

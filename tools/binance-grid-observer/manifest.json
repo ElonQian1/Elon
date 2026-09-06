@@ -1,0 +1,11 @@
+{
+  "manifest_version": 3,
+  "name": "币安网格观察助手",
+  "version": "0.1.0",
+  "minimum_chrome_version": "106",
+  "description": "手动启用后，在当前币安页面被动提取网格请求的脱敏结构。不会发起交易。",
+  "permissions": ["activeTab", "scripting", "storage"],
+  "background": { "service_worker": "worker.js" },
+  "action": { "default_popup": "popup.html", "default_title": "币安网格观察助手" },
+  "content_security_policy": { "extension_pages": "script-src 'self'; object-src 'none'" }
+}

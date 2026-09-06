@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>币安网格观察</title>
+  <link rel="stylesheet" href="popup.css">
+  <script src="popup.js" defer></script>
+</head>
+<body>
+  <main>
+    <header class="heading">
+      <div><p class="eyebrow">本地研究工具</p><h1>币安网格观察</h1></div>
+      <span class="read-only">被动观察</span>
+    </header>
+
+    <section class="status-card" aria-labelledby="state-title">
+      <div class="status-heading"><h2 id="state-title"><span id="status-dot" class="status-dot" aria-hidden="true"></span><span id="status-label">正在读取状态</span></h2>
+        <button id="refresh" class="text-button" type="button" disabled>更新状态</button></div>
+      <p id="status-detail">正在确认当前标签页的观察状态。</p>
+      <p id="countdown" class="countdown" hidden></p>
+      <dl class="counts">
+        <div><dt>去重摘要</dt><dd id="record-count">—</dd></div>
+        <div><dt>观察样本</dt><dd id="observation-count">—</dd></div>
+        <div><dt>丢弃计数</dt><dd id="dropped-count">—</dd></div>
+      </dl>
+    </section>
+
+    <p id="feedback" class="feedback" role="status" aria-live="polite" hidden></p>
+
+    <section class="controls" aria-label="观察操作">
+      <button id="start" class="primary" type="button" disabled>启用观察</button>
+      <button id="stop" class="secondary" type="button" disabled>停止观察</button>
+      <button id="clear" class="secondary" type="button" disabled>清除摘要</button>
+      <button id="export" class="secondary" type="button" disabled>导出摘要</button>
+    </section>
+
+    <p class="start-note">启用会清除上一轮摘要，只观察此后发出的请求，不刷新页面。<strong>15 分钟后自动停止。</strong></p>
+
+    <section class="notes" aria-labelledby="notes-title">
+      <h2 id="notes-title">如何使用</h2>
+      <ol><li>保持已登录的币安合约或合约网格页面打开。</li><li>启用后，在官网查看运行中或历史网格列表。</li><li>停止观察，再导出脱敏摘要用于研究。</li></ol>
+      <p><strong>零样本不代表没有网格。</strong>启用前的请求、WebSocket、Worker 或其他传输可能不可见。</p>
+      <p>仅保留接口结构与计数，不展示持仓数值。摘要暂存于当前浏览器会话，只有手动导出才生成文件。</p>
+    </section>
+    <footer>本工具不发起、修改或结束交易；页面观察不能证明接口已接通。</footer>
+  </main>
+</body>
+</html>
