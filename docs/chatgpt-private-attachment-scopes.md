@@ -115,10 +115,46 @@ and ready-store receipts must retain the same project. Official `RGt` maps
 ready file and file specification unless persistence is temporary. The candidate
 now preserves this mapping rather than losing it at native association.
 
-Still unimplemented: read-only project-specific upload dispatch and image
-retrieval-flag resolution for ingest projects. These cases keep the existing path
-before private writes. Do not request project writes from a cached directory or
-mark all project attachments complete from these tests.
+Read-only project-specific upload dispatch remains unimplemented. The original
+candidate also excluded ingest-project images; the source extension below now
+resolves their retrieval flag. Do not request project writes from a cached
+directory or mark all project attachments complete from source tests.
+
+## Ingest project images
+
+Capability: `android_chatgpt_private_ingest_project_image_upload_v1`.
+Implementation: **implemented**. Verification: **offline verified, device pending**.
+Delivery: **source-only for the grouped APK**, not completed or installed.
+
+The same inspected upload asset's `wGt` uses spreadsheet suffixes first, then
+image suffixes and official gate `2031707412` when `projectUsesInjestPath` is true.
+Shared `TEt` uses a case-insensitive suffix list; it does not classify by MIME
+alone. Shared `cs`, exported as `t6`, exposes the current configuration client.
+No new endpoint or copied credentials are introduced.
+
+The project helper reuses its already-loaded, exact-version official module for
+both selected-branch binding and configuration. After fresh write permission,
+an ingest-image upload accepts the gate only when the client is Ready and the
+gate has the exact name, boolean value, recognized evaluation reason and no
+warnings. A recognized false value is supported, not a missing capability.
+Unknown/loading/missing configurations retain the compatible path before native
+byte reads or upload writes. The module wait remains bounded to 1.5 seconds.
+
+New and existing project images retain `use_case=multimodal`, dimensions and
+exact project/branch library metadata, without a top-level gizmo ID. The process
+request's `index_for_retrieval` follows the confirmed flag. Indexed images still
+require a validated project scope; ordinary and temporary images cannot opt in.
+Each explicit upload reads the current local gate value, but reuses the module
+promise. Text/PDF and non-ingest images do not wait for this unrelated gate.
+Account, route, document, selected-branch and cancellation guards remain active.
+
+Project module version 4, composer 8 and protocol 7 pass **101 targeted Node
+cases** across seven attachment suites, including production asset-bundle parsing.
+The new feature cases first failed against the unchanged implementation and then
+passed. This round did not run Gradle, package/publish/install an APK, access the
+handset or prove a live indexed-image upload. Grouped acceptance must confirm
+the actual account gate/module and one synthetic image's intended project
+association and usable reply without duplicate dispatch.
 
 ## Existing project branches
 
