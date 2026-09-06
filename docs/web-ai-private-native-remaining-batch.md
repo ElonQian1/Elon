@@ -23,17 +23,17 @@ for website functionality. Persistent WebView identity remains intentional.
 | Private conversation attachment index, cache and native file sheet | Implemented | Shared JS/Android contract and targeted production tests passed | Published/installed 1540; device UI acceptance pending |
 | End-to-end private read deadlines, body limits and late project response isolation | Implemented | Lifecycle and existing JS consumer suites passed | Published/installed 1540; device acceptance pending |
 | Bounded request-shape capture through native MCP, reusing the page observer | Implemented diagnostic only | Node/Android checks passed; actual reservation JSON and conversation SSE capture observed | Published/installed 1540; telemetry-budget follow-up is source-only |
-| Reservation responses cannot prematurely release attachment sends | Implemented regression correction | Node red-to-green, 12 Android tracker tests and file-content smoke contract passed | Source-only; grouped APK and synthetic-file acceptance pending |
-| Private file create/blob upload/process transaction | Implemented transport and native byte/store integration for one plain-text file in an empty ordinary new-chat or existing-chat composer, with confirmed conversation scope | One real 78-byte private upload processed; earlier Release compilation and 26 Android tests passed; adapter 269 JS checks passed; integrated device acceptance pending | Adapter 269 source candidate; no integration APK release yet; [scope and contract](chatgpt-private-attachment-upload.md) |
-| Private static-image attachment upload | Native normalized JPEG/PNG/WebP handoff, bounded image preparation, multimodal private upload and ready-store dimensions implemented | 60 focused Node cases passed with synthetic decoder/HTTP; grouped Android and real image-reading acceptance pending | Adapter 270 source candidate; [image contract and acceptance](chatgpt-private-image-upload.md) |
-| Private temporary-chat attachments | New/existing temporary scope, non-library processing intent and exact text/image ready-store association implemented | 67 focused Node runner cases passed with synthetic HTTP/decoder; grouped Android and live upload/library checks pending | Adapter 271 source candidate; [scope contract and remaining project work](chatgpt-private-attachment-scopes.md) |
-| Private new-project attachments | Fresh permission read, scoped text/non-ingest-image upload and library-file ready-store metadata implemented for new project chats | 75 focused Node cases passed; grouped Android and project/library acceptance pending | Adapter 272 source candidate; read-only and ingest-image flag still open; [exact scope](chatgpt-private-attachment-scopes.md#project-checkpoint) |
-| Private existing-project attachments | Fresh membership plus official selected-branch binding; scoped text/non-ingest-image processing and ready-store origins implemented | 86 focused Node cases passed with synthetic runtime/HTTP, including permission failure plus branch change; actual module access and project upload pending | Source-only JS extension beyond the adapter 272 baseline; no additional APK or handset operation; [branch contract](chatgpt-private-attachment-scopes.md#existing-project-branches) |
-| Private PDF attachments | Existing native byte lease, model-bound create request and ordinary/temporary/writable-project association extended to PDF | 96 focused attachment Node runner cases passed, including binary bridge-to-ready-store integration; native policy JUnit added but not run in this batch | Source-only beyond adapter 272; grouped Android and actual PDF acceptance pending; [protocol and scope](chatgpt-private-pdf-upload.md) |
-| Attachment cancellation without UI-thread I/O | Immediate byte-lease revocation, off-thread file cleanup and stale-read exclusion implemented | All 6 native reader tests passed, including blocked-read/EOF cancellation; grouped Android 32/32 passed | Source-only; include in the grouped attachment candidate, not a separate APK |
-| Private conversation file download authorization and native transfer | Implemented scoped private GET, expiring selections and production Download action | Official current source contract, targeted JS, Release source compilation and 22 Android tests passed; device transfer pending | Adapter 266 source candidate; [scope and contract](chatgpt-private-file-download.md) |
-| Project/library-linked conversation attachment downloads | Existing native Download action now resolves confirmed project scope and library file metadata before private authorization | 48 focused Node runner cases passed with synthetic HTTP; actual saved bytes and live scope acceptance pending | Source-only download module 2 beyond adapter 272 baseline; no separate build/install; [scope extension](chatgpt-private-file-download.md#project-and-library-extension) |
-| Private single-conversation deletion | Partial: evidenced legacy PATCH, current/noncurrent native confirmation, voice/send exclusion and exact cache invalidation | 12 deletion JS cases, existing regressions, Release source compilation and 90 Android tests passed; final send guard rechecked in the affected 8-test suite; live deletion pending | Adapter 268 source candidate; [scope and remaining work](chatgpt-private-conversation-delete.md) |
+| Reservation responses cannot prematurely release attachment sends | Implemented regression correction | Node red-to-green, 12 Android tracker tests passed; 1541 production reply read the actual file content | Published/installed 1541; no early-send symptom in the single fixture test |
+| Private file create/blob upload/process transaction | Implemented transport and native byte/store integration for one plain-text file in an empty ordinary new-chat or existing-chat composer, with confirmed conversation scope | One earlier 78-byte private upload processed; grouped checks passed; 1541 production file-content acceptance passed, but private-association provenance was not retained | Published/installed 1541; integrated private-route confirmation pending; [scope and contract](chatgpt-private-attachment-upload.md) |
+| Private static-image attachment upload | Native normalized JPEG/PNG/WebP handoff, bounded image preparation, multimodal private upload and ready-store dimensions implemented | Included in 96 Node cases and grouped Release build; actual image-reading acceptance pending | Published/installed 1541; [image contract and acceptance](chatgpt-private-image-upload.md) |
+| Private temporary-chat attachments | New/existing temporary scope, non-library processing intent and exact text/image ready-store association implemented | Included in 96 Node cases and grouped Release build; live upload/library checks pending | Published/installed 1541; [scope contract and remaining project work](chatgpt-private-attachment-scopes.md) |
+| Private new-project attachments | Fresh permission read, scoped text/non-ingest-image upload and library-file ready-store metadata implemented for new project chats | Included in 96 Node cases and grouped Release build; project/library acceptance pending | Published/installed 1541; read-only and ingest-image flag still open; [exact scope](chatgpt-private-attachment-scopes.md#project-checkpoint) |
+| Private existing-project attachments | Fresh membership plus official selected-branch binding; scoped text/non-ingest-image processing and ready-store origins implemented | Included in 96 Node cases and grouped Release build; actual module access and project upload pending | Published/installed 1541; [branch contract](chatgpt-private-attachment-scopes.md#existing-project-branches) |
+| Private PDF attachments | Existing native byte lease, model-bound create request and ordinary/temporary/writable-project association extended to PDF | 96 Node cases and 33 grouped Android tests passed, including PDF MIME/size policy; actual PDF acceptance pending | Published/installed 1541; [protocol and scope](chatgpt-private-pdf-upload.md) |
+| Attachment cancellation without UI-thread I/O | Immediate byte-lease revocation, off-thread file cleanup and stale-read exclusion implemented | All 6 native reader tests passed, including blocked-read/EOF cancellation; grouped Android 33/33 passed | Published/installed 1541; live slow-read cancellation not exercised |
+| Private conversation file download authorization and native transfer | Implemented scoped private GET, expiring selections and production Download action | Official current source contract, targeted JS, Release compilation and Android checks passed; device transfer pending | Published/installed 1541; [scope and contract](chatgpt-private-file-download.md) |
+| Project/library-linked conversation attachment downloads | Existing native Download action now resolves confirmed project scope and library file metadata before private authorization | 48 focused Node cases passed with synthetic HTTP; actual saved bytes and live scope acceptance pending | Published/installed 1541; [scope extension](chatgpt-private-file-download.md#project-and-library-extension) |
+| Private single-conversation deletion | Partial: evidenced legacy PATCH, current/noncurrent native confirmation, voice/send exclusion and exact cache invalidation | 12 deletion JS cases, existing regressions, Release source compilation and 90 Android tests passed; final send guard rechecked in the affected 8-test suite; live deletion pending | Published/installed 1541; [scope and remaining work](chatgpt-private-conversation-delete.md) |
 
 Root cause, exact modules, and check results are in
 [the history contract](chatgpt-private-history-native-contract.md).
@@ -49,6 +49,42 @@ their exact scope is recorded there. They are not a full-suite pass or a reason
 to repeat already-verified private transports.
 
 ## Grouped release
+
+### Current 1541 acceptance
+
+On 2026-09-06 after the handset returned, the grouped Release production and
+unit-test compilation passed all **33 tests across seven attachment suites**,
+with zero failures, errors or skipped cases. The latest focused Node run passed
+96 cases. These are targeted checks, not a full regression or thermal A/B.
+
+`publish-apk.ps1` published `v1.1.1541` (code `1541`) from `ac2f1662f` and verified
+the remote APK size and SHA-256:
+`15e20f7cda24e0bfc2a9b7c67fb2884141c2d159cddec95463328488f4a0ef4a`.
+The whitelisted postflight installed it on Xiaomi 14 Pro using replacement
+installation and read back build 1541. Cookies and application data were kept.
+Both ChatGPT and Google returned HTTP 200 in the APK network check before the
+grouped acceptance. No accelerator configuration or core was changed.
+
+The production social-AI chat successfully staged and removed the fixed text
+fixture, then sent it **once**. The native attachment state reached `completed`,
+pending count became zero, and the assistant reply contained both the unique
+request marker and the fixture's first line, which was not supplied in the
+prompt. The initial assertion stopped on a PowerShell closure failing to resolve
+its named helper, not an APK upload failure. Capturing the helper scriptblock
+fixed that boundary; the contract test now executes the real predicate across
+a module boundary. Resuming the persisted `reply_requested` checkpoint verified
+the existing reply without dispatching another message. The fixture was removed,
+the production acceptance case registered, and the phone returned to its original
+conversation-home surface. No microphone was used.
+
+This proves the production file-delivery workflow, **not** which upload route
+ran: its private-association receipt was not retained, and the latest command
+had already advanced to send/skin state. Do not count it as integrated private
+upload, image, PDF, project or saved-download acceptance. Collect existing
+semantic receipts during the next scoped check; do not repeat protocol research
+or rebuild the unchanged APK merely to recover that missing evidence.
+
+### Earlier 1540 checkpoint
 
 On 2026-09-06, `publish-apk.ps1` built and published `v1.1.1540` (code `1540`)
 from `ccc76ed37e31364f02c03af333a13a63b30c4bdf`. Remote version, size and SHA-256
@@ -76,9 +112,10 @@ dispatch. The probe was cleared and the UI restored to conversation home with
 an empty draft and no pending attachment; details and limits are in the
 [recovered-network capture](chatgpt-private-protocol-evidence.md#recovered-network-capture).
 
-The source candidates above now implement the narrow prepare/upload/finalize and
-composer-association contract. Next accept that integrated path using the existing
-synthetic fixture and bounded production MCP command; do not implement it again.
+The candidates implemented the narrow prepare/upload/finalize and
+composer-association contract and are now included in 1541 above. Continue the
+remaining route-specific acceptance with bounded production MCP commands; do not
+implement the same transport again.
 The [reservation regression](chatgpt-private-protocol-evidence.md#reservation-completion-regression)
 invalidates generic HTTP completion as upload proof; include that correction in
 the grouped candidate before accepting attachment delivery. First confirm a healthy transport and preserve the current
@@ -120,8 +157,9 @@ absent handset. The preceding 32 Android tests do not establish live acceptance
 of this later JavaScript extension. Reuse this implementation for grouped testing;
 read-only project dispatch, ingest-image flags and multipart remain gaps. The
 subsequent [PDF extension](chatgpt-private-pdf-upload.md) is now implemented and
-included in the 96-case focused Node run; its Kotlin and actual runtime model
-binding still require grouped acceptance. It did not operate the absent phone.
+included in the 96-case focused Node run. Its Kotlin checks subsequently passed
+in the 1541 grouped build above; actual runtime model binding remains pending.
+The offline implementation itself did not operate the absent phone.
 
 ## Protocol gaps
 
@@ -129,7 +167,7 @@ binding still require grouped acceptance. It did not operate the absent phone.
 |---|---|---|
 | Text send/regenerate | Native send ledger and official transaction; streaming observer | Fresh proof-bound private dispatch is not verified. Do not replay captured proof headers or declare official fallback a private POST success. |
 | Model/effort/tools/temporary mode | Native presets/cache and official controls | Apply the chosen state through a confirmed private contract; cached menu labels alone are not proof of server selection. |
-| Attachment upload | Verified small-text private upload; native byte handoff, store association, ordinary/temporary and writable new/existing-project scopes, static-image and model-bound PDF transactions connected in source | Accept integrated text/images/PDF, official model/branch-runtime access and temporary/project library behavior; finish read-only permission variants, ingest images, other documents and multipart. No integrated-device pass is claimed. See [upload contract](chatgpt-private-attachment-upload.md), [PDF extension](chatgpt-private-pdf-upload.md) and [scope contract](chatgpt-private-attachment-scopes.md). |
+| Attachment upload | Earlier small-text private upload verified; production text-file delivery passed on 1541; native byte handoff and ordinary/temporary/writable-project image/PDF transactions packaged | Confirm integrated private-route provenance, images/PDF, official model/branch-runtime access and temporary/project library behavior; finish read-only permission variants, ingest images, other documents and multipart. Production file delivery is not a private-route pass. See [upload contract](chatgpt-private-attachment-upload.md), [PDF extension](chatgpt-private-pdf-upload.md) and [scope contract](chatgpt-private-attachment-scopes.md). |
 | Images | Native gallery/previews/cache; official creation and library sync | Confirm private library pagination and generation transaction. Download queue improvements do not replace these endpoints. |
 | Share/delete/conversation files | Native pin/rename/archive/move; private file index plus ordinary/project/library-linked download candidates; guarded legacy private delete and current-chat reset | Verify saved-file downloads and current/noncurrent deletion. Complete flagged delete endpoint selection, shared-library/connector/image download scope, and official sharing. Do not substitute system sharing for official features. |
 | Google direct send | Native cache and private response observer; official submit | Reproduce the current submit contract and transaction ownership; observed reply endpoints do not imply a working private sender. |

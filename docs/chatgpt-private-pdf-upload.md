@@ -1,8 +1,8 @@
 # ChatGPT private PDF attachment upload
 
 Capability scope: `android_chatgpt_private_pdf_attachment_upload_v1`.
-Status: **implemented in source; focused Node checks passed; grouped Android
-compilation and production-device acceptance pending**. Reuse this extension of
+Status: **implemented, compiled and published in 1541; focused Node/Android
+checks passed; PDF production-device acceptance pending**. Reuse this extension of
 [the existing upload transaction](chatgpt-private-attachment-upload.md); do not
 build another uploader. It does not complete the whole attachment capability.
 
@@ -53,8 +53,8 @@ reservation claims and multipart variants are not enabled by this PDF change.
 
 Module versions: protocol 6, transport 5, composer 7, native byte source 3,
 project 3, send owner 7. The send-owner version invalidates its older captured
-dependencies on adapter reinjection. This is source beyond adapter 272, not an
-additional packaged APK or a completed runtime rollout.
+dependencies on adapter reinjection. These extensions are packaged in
+`v1.1.1541` (adapter 272); installation does not establish PDF runtime acceptance.
 
 ## Verification and next acceptance
 
@@ -65,10 +65,18 @@ branches, binary chunk boundaries, native-byte-source through private transport
 to ready-store association, temporary privacy, and new/existing project scope.
 HTTP, file-picker context and project runtime are synthetic in these tests.
 
-The native policy JUnit test now includes PDF size/MIME boundaries but was not
-run in this source batch. No Android compilation, packaging, installation,
-handset command, microphone use or actual PDF transfer occurred while the phone
-was away. Include this code in the existing grouped candidate.
+After the phone returned on 2026-09-06, the grouped Release production/unit-test
+compilation and all 33 tests across seven attachment suites passed, including
+the PDF MIME/size policy. `publish-apk.ps1` then published `v1.1.1541` from
+`ac2f1662f` and installed it without clearing data on the authorized Xiaomi.
+See [the grouped release record](web-ai-private-native-remaining-batch.md#grouped-release)
+for its artifact digest and acceptance limits.
+
+One plain-text production attachment send completed and its reply correctly
+read the fixture's first line. It was not a PDF test, and a private-association
+receipt was not retained, so it does not prove the integrated private PDF route.
+No microphone was used. Actual PDF transfer and current runtime model binding
+remain pending; do not rerun the unchanged compilation to address that gap.
 
 For acceptance, use a small non-private PDF through the production chat's File
 action. Check private create/blob/final processing and exact ready association,
