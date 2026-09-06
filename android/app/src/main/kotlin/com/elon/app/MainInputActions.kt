@@ -203,11 +203,11 @@ internal class MainInputActions(
         speechInputActions().showVoiceAttachmentActions(message, attachment)
     }
 
-    private fun attachPickedImages(kind: String, uris: List<android.net.Uri>, fallbackNames: List<String?>) {
+    private fun attachPickedImages(kind: String, uris: List<android.net.Uri>, fallbackNames: List<String?>): List<PendingAttachment> {
         val available = MAX_PENDING_ATTACHMENTS - pendingAttachments.size
         if (available <= 0) {
             Toast.makeText(activity, "一次最多发送 $MAX_PENDING_ATTACHMENTS 个附件", Toast.LENGTH_SHORT).show()
-            return
+            return emptyList()
         }
         val selectedUris = uris.take(available)
         if (uris.size > available) {
@@ -221,8 +221,9 @@ internal class MainInputActions(
                 attachmentIndex = pendingAttachments.size + index + 1
             )
         }
-        if (prepared.isEmpty()) return
+        if (prepared.isEmpty()) return emptyList()
         pendingAttachmentActions.addPreparedAttachments(prepared)
+        return prepared
     }
 
     private fun openImageEditor(index: Int) {
@@ -364,11 +365,13 @@ internal class MainInputActions(
             activity = activity,
             activeConversation = projectStateActions()::activeConversation,
             attachPickedFile = { kind, uri, fallbackName ->
-                pendingAttachmentActions.attachPickedFile(kind, uri, fallbackName)
+                listOfNotNull(pendingAttachmentActions.preparePickedAttachment(kind, uri, fallbackName)
+                    ?.also(pendingAttachmentActions::addPreparedAttachment))
             },
             attachPickedImages = { kind, uris, fallbackNames ->
                 attachPickedImages(kind, uris, fallbackNames)
-            }
+            },
+            preparationPort = { inputComposerViews?.attachmentPreparation },
         )
     }
 

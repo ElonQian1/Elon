@@ -552,6 +552,7 @@ internal class MainSocialAiChatFeature(
         binding.inputEdit.contentDescription = null
         binding.inputEdit.hint = "输入内容"
         inputComposerViews()?.let { views ->
+            views.attachmentPreparation = null
             WebChatComposerProviderPresentation.restoreWorkControls(
                 views, binding.modelButton, dp(MODEL_BUTTON_WORK_WIDTH_DP),
                 ::clearQuickComposerAction, showWorkModelSelector,
@@ -596,6 +597,7 @@ internal class MainSocialAiChatFeature(
             }
         }
         inputComposerViews()?.let { views ->
+            views.attachmentPreparation = WebChatAttachmentPreparationPort(controller::beginAttachmentSelection)
             views.modelButtonShell.tag = WEB_CHAT_MODEL_BUTTON_OWNER
             views.modelButtonShell.layoutParams = views.modelButtonShell.layoutParams.apply {
                 width = dp(

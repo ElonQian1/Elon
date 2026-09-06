@@ -26,6 +26,7 @@ internal interface WebChatSocialController {
     fun prewarm(): Boolean = false
     fun streaming(): Boolean
     fun attachmentSupported(): Boolean
+    fun beginAttachmentSelection(kind: WebChatAttachmentSelectionKind): WebChatAttachmentSelection? = null
     fun attachmentSendPhase(): String
     fun pendingAttachmentCount(): Int
     fun completedAttachmentCount(): Int = 0

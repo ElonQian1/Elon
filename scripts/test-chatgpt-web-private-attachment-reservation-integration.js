@@ -9,6 +9,7 @@ const bytes = require(base + 'chatgpt_web_private_attachment_bytes.js');
 const transport = require(base + 'chatgpt_web_private_attachment_transport.js');
 const composerModule = require(base + 'chatgpt_web_private_attachment_composer.js');
 const send = require(base + 'chatgpt_web_private_attachment_send.js');
+const selection = require(base + 'chatgpt_web_private_attachment_selection.js');
 const request = require(base + 'chatgpt_web_private_json_request.js');
 const tick = () => new Promise(resolve => setImmediate(resolve));
 const file = () => new File(['synthetic integration fixture'], 'fixture.txt', { type: 'text/plain' });
@@ -38,6 +39,7 @@ function fixture(options = {}) {
         Cookie: 'never-forward', 'x-oai-model-slug': 'stale-model', 'openai-sentinel-proof-token': 'never-forward' }) },
     __elonChatGptComposer: { currentModel: () => model },
     __elonChatGptPrivateAttachmentProtocol: protocol, __elonChatGptPrivateAttachmentTransport: transport,
+    __elonChatGptPrivateAttachmentSelection: selection,
     __elonChatGptPrivateAttachmentBytes: bytes, __elonChatGptPrivateJsonRequest: request,
     __elonChatGptPrivateAttachmentReservation: { version: 1, create: (host, config) => reservation.create(host, {
       ...config, loadRuntime: async () => ({ t6: () => ({ loadingStatus: 'Ready',
@@ -77,6 +79,10 @@ function fixture(options = {}) {
     documentToken: root.__elonChatGptDocumentToken, href: root.location.href,
     leaseId: '00000000-0000-4000-8000-000000000000' };
   return { root, instance, store, requests, receipts, events, composer, descriptor,
+    begin: (kind = 'document', id = 'selection_' + 'a'.repeat(32)) => {
+      descriptor.selectionId = id;
+      return instance.beginSelection(JSON.stringify({ id, kind, documentToken: descriptor.documentToken, href: descriptor.href }));
+    },
     setAccount: value => { account = value; }, setModel: value => { model = value; },
     start: () => instance.start(JSON.stringify(descriptor), (...value) => receipts.push(value),
       () => events.push('changed'), () => { fallbacks++; }), fallbacks: () => fallbacks };
@@ -91,6 +97,7 @@ test('production asset bundle loads reservation before transport and retains one
   assert.equal(assets.filter(value => value === name).length, 1);
   assert.ok(assets.indexOf('chatgpt_web_private_attachment_bytes.js') < assets.indexOf(name));
   assert.ok(assets.indexOf(name) < assets.indexOf('chatgpt_web_private_attachment_transport.js'));
+  assert.ok(assets.indexOf('chatgpt_web_private_attachment_selection.js') < assets.indexOf('chatgpt_web_private_attachment_send.js'));
   new vm.Script(assets.map(value => fs.readFileSync(path.join(__dirname, base, value), 'utf8')).join('\n'));
 });
 
@@ -229,4 +236,129 @@ test('reservation intent excludes unconfirmed and hidden project membership, not
   f.root.__elonChatGptPrivateTransport.readAttachmentContext = async () => ({ conversationId: id, ordinary: true });
   assert.equal(await f.composer.prepare(binding, new AbortController().signal, f.descriptor), true);
   assert.equal(f.composer.reservationContext(binding, f.descriptor).useCase, 'ace_upload');
+});
+
+test('picker-open prewarm precedes all bytes, survives host suspension and is consumed once', async t => {
+  for (const type of ['text/plain', 'image/png']) {
+    const f = fixture({ file: new File(['synthetic bytes'], type === 'text/plain' ? 'fixture.txt' : 'image.png', { type }) });
+    t.after(() => f.instance.cancel());
+    assert.equal(f.begin(type === 'text/plain' ? 'document' : 'image'), true);
+    await tick();
+    assert.deepEqual(f.events, ['reserve']);
+    f.instance.suspend();
+    f.root.__elonChatGptPrivateAttachmentSend = f.instance;
+    vm.runInNewContext(fs.readFileSync(path.join(__dirname, base, 'chatgpt_web_private_attachment_send.js'), 'utf8'), { window: f.root });
+    assert.equal(f.root.__elonChatGptPrivateAttachmentSend, f.instance);
+    await f.start();
+    assert.equal(f.receipts[0][1], true);
+    assert.equal(f.requests.filter(value => value.url.endsWith('/upload_reservations')).length, 1);
+    assert.equal(f.requests.filter(value => value.url.endsWith('/claim_and_finish')).length, 1);
+    assert.equal(f.requests.some(value => value.url.endsWith('/files')), false);
+    assert.equal(f.store.files$().length, 1);
+  }
+});
+
+test('picker cancellation cannot upload bytes, and stale cancellation cannot cancel a replacement', async t => {
+  const f = fixture();
+  t.after(() => f.instance.cancel());
+  f.begin(); await tick();
+  const oldId = f.descriptor.selectionId;
+  f.instance.cancelSelection(oldId);
+  assert.equal(f.requests[0].init.signal.aborted, true);
+  assert.equal(f.store.files$().length, 0);
+  assert.deepEqual(f.events, ['reserve']);
+  f.begin('document', 'selection_' + 'b'.repeat(32)); await tick();
+  f.instance.cancelSelection(oldId);
+  await f.start();
+  assert.equal(f.receipts[0][1], true);
+  assert.equal(f.requests.filter(value => value.url.endsWith('/claim_and_finish')).length, 1);
+});
+
+test('selection mismatch and changed account/model discard prewarm before a regular scoped upload', async () => {
+  for (const mode of ['selection', 'account', 'model']) {
+    const f = fixture(); f.begin(); await tick();
+    if (mode === 'selection') f.descriptor.selectionId = 'selection_' + 'c'.repeat(32);
+    if (mode === 'account') f.setAccount('Bearer account-replacement');
+    if (mode === 'model') f.setModel('model-replacement');
+    await f.start();
+    assert.equal(f.requests[0].init.signal.aborted, true);
+    assert.equal(f.receipts[0][1], true);
+    assert.equal(f.requests.filter(value => value.url.endsWith('/upload_reservations')).length, 2);
+    assert.equal(f.store.files$().length, 1);
+  }
+});
+
+test('document picker selecting an image does not reuse the document reservation', async () => {
+  const f = fixture({ file: new File(['synthetic image'], 'image.png', { type: 'image/png' }) });
+  f.begin('document'); await tick(); await f.start();
+  assert.equal(f.receipts[0][1], true);
+  assert.equal(f.requests.filter(value => value.url.endsWith('/files')).length, 1);
+  assert.equal(f.requests.some(value => value.url.endsWith('/claim_and_finish')), false);
+});
+
+test('unconfirmed or temporary picker context never allocates a reservation', async () => {
+  const temporary = fixture({ temporary: true });
+  assert.equal(temporary.begin(), false);
+  assert.equal(temporary.requests.length, 0);
+  const f = fixture();
+  const id = '00000000-0000-4000-8000-000000000001';
+  f.root.location.href = 'https://chatgpt.com/c/' + id;
+  f.descriptor.href = f.root.location.href;
+  f.root.__elonChatGptPrivateTransport.readAttachmentContext = async () => ({ conversationId: id,
+    projectId: 'g-p-' + 'a'.repeat(32) });
+  assert.equal(f.begin(), true); await tick();
+  assert.equal(f.requests.length, 0);
+  f.instance.cancel();
+});
+
+test('a pending picker reservation is abandoned without adding another wait or allocation', async () => {
+  let release;
+  const f = fixture({ respond: url => url.endsWith('/upload_reservations')
+    ? new Promise(resolve => { release = resolve; }) : null });
+  f.begin(); await tick(); await f.start();
+  assert.equal(f.requests[0].init.signal.aborted, true);
+  assert.equal(f.requests.filter(value => value.url.endsWith('/upload_reservations')).length, 1);
+  assert.equal(f.requests.filter(value => value.url.endsWith('/files')).length, 1);
+  assert.equal(f.receipts[0][1], true);
+  release(Response.json({ eligible: true })); await tick();
+  assert.equal(f.store.files$().length, 1);
+});
+
+test('existing chat scope is revalidated after picking, even when its URL did not change', async t => {
+  const f = fixture(); t.after(() => f.instance.cancel());
+  const id = '00000000-0000-4000-8000-000000000001';
+  f.root.location.href = 'https://chatgpt.com/c/' + id;
+  f.descriptor.href = f.root.location.href;
+  let reads = 0;
+  f.root.__elonChatGptPrivateTransport.readAttachmentContext = async () => {
+    reads++;
+    return reads === 1 ? { conversationId: id, ordinary: true }
+      : { conversationId: id, projectId: 'g-p-' + 'a'.repeat(32) };
+  };
+  f.begin(); await tick();
+  assert.deepEqual(f.events, ['reserve']);
+  await f.start();
+  assert.equal(reads, 2);
+  assert.equal(f.fallbacks(), 1);
+  assert.deepEqual(f.events, ['reserve']);
+  assert.equal(f.store.files$().length, 0);
+});
+
+test('production picker and background lifecycle are connected to the scoped reservation owner', () => {
+  const readNative = name => fs.readFileSync(path.join(__dirname, '../android/app/src/main/kotlin/com/elon/app/', name), 'utf8');
+  const picker = readNative('MainAttachmentPickerActions.kt');
+  for (const launcher of ['cameraAttachmentLauncher', 'photoAttachmentLauncher', 'documentAttachmentLauncher']) {
+    assert.match(picker, new RegExp('beginSelection\\(WebChatAttachmentSelectionKind\\.(IMAGE|DOCUMENT)\\)[\\s\\S]*?' + launcher + '\\.launch'));
+  }
+  assert.match(picker, /finishSelection\(if \(uris.size == 1\) files else emptyList\(\)\)/);
+  assert.match(readNative('MainInputActions.kt'), /preparationPort = \{ inputComposerViews\?\.attachmentPreparation \}/);
+  assert.match(readNative('MainSocialAiChatFeature.kt'), /WebChatAttachmentPreparationPort\(controller::beginAttachmentSelection\)/);
+  const gateway = readNative('chatgptweb/ChatGptWebNativeAttachmentGateway.kt');
+  assert.match(gateway, /val selectionId = pickerPreparation.take\(file\)\s+revokeLease\(preserveSelection = true\)/);
+  assert.match(gateway, /\.put\("selectionId", selectionId\)/);
+  const adapter = fs.readFileSync(path.join(__dirname, base, 'chatgpt_web_adapter.js'), 'utf8');
+  const dispose = adapter.slice(adapter.indexOf('  function dispose()'), adapter.indexOf('  window.__elonChatGptBridge ='));
+  assert.match(dispose, /privateAttachments.suspend\(\)/);
+  assert.doesNotMatch(dispose, /privateAttachments.cancel\(\)/);
+  assert.match(readNative('chatgptweb/ChatGptBackgroundSession.kt'), /fun deactivate\(\) \{\s+pageAdapter\?\.cancelAttachmentSelection\(\)/);
 });

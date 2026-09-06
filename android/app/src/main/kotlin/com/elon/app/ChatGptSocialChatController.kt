@@ -351,6 +351,8 @@ internal class ChatGptSocialChatController(
     override fun mcpPort(): WebChatSocialMcpPort = socialMcpPort
 
     override fun consumerPort(): WebChatConsumerPort = socialConsumerPort
+    override fun beginAttachmentSelection(kind: WebChatAttachmentSelectionKind): WebChatAttachmentSelection? =
+        if (active) session.beginAttachmentSelection(kind) else null
 
     fun privateDictationPort(): WebChatPrivateDictationPort = privateDictation
 

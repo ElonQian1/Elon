@@ -740,7 +740,7 @@
     if (typeof privateStreamUnsubscribe === 'function') privateStreamUnsubscribe();
     privateStreamUnsubscribe = null;
     if (privateReadAloudAdapter) privateReadAloudAdapter.dispose();
-    if (privateAttachments) privateAttachments.cancel();
+    if (privateAttachments) privateAttachments.suspend();
     window.__elonChatGptPrivateImageGallery?.dispose();
     if (privateConversationDirectory &&
         typeof privateConversationDirectory.setListener === 'function') {

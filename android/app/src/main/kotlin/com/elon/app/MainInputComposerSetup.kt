@@ -45,7 +45,9 @@ internal data class MainInputComposerViews(
     val expandEditorButton: ImageButton,
     val ttsSpeakerButton: ImageButton,
     val toggleLocalVoiceMode: () -> Unit,
-)
+) {
+    var attachmentPreparation: WebChatAttachmentPreparationPort? = null
+}
 
 internal class MainInputComposerSetup(
     private val activity: AppCompatActivity,

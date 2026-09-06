@@ -8,6 +8,7 @@ import android.widget.FrameLayout
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.BuildConfig
 import com.elon.app.PendingAttachment
+import com.elon.app.WebChatAttachmentSelectionKind
 import com.elon.app.WebChatBackgroundInteractionLease
 import com.elon.app.WebChatConsumerPort
 import com.elon.app.WebChatManagedRealtimeVoiceState
@@ -246,6 +247,7 @@ internal class ChatGptBackgroundSession(
         resumeRecovery()
     }
     fun deactivate() {
+        pageAdapter?.cancelAttachmentSelection()
         if (realtimeVoiceBacking.isActive()) {
             webExecution.interactionRequested()
             cookieManager.flush()
@@ -272,6 +274,8 @@ internal class ChatGptBackgroundSession(
     fun retryConnection(): Boolean = recovery.retryNow()
     fun onHostPaused() = if (realtimeVoiceBacking.isActive()) cookieManager.flush() else pauseSession()
     fun currentSnapshot(): ChatGptWebSnapshot? = latestSnapshot
+    fun beginAttachmentSelection(kind: WebChatAttachmentSelectionKind) =
+        if (canSend()) pageAdapter?.beginAttachmentSelection(kind) else null
     fun imagePreviewPath(handle: String): String? = imageAssets.resolvePath(handle)
     fun imagePreviewState(): ChatGptWebImagePreviewState = imageAssets.state()
     fun retryImagePreview(handle: String) = imageAssets.retry(handle)

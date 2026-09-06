@@ -10,6 +10,7 @@ import androidx.webkit.WebViewFeature
 import com.elon.app.BuildConfig
 import com.elon.app.PendingAttachment
 import com.elon.app.WebBridgeDocumentSession
+import com.elon.app.WebChatAttachmentSelectionKind
 import java.nio.charset.StandardCharsets
 import org.json.JSONArray
 import org.json.JSONObject
@@ -415,6 +416,8 @@ internal class ChatGptWebPageAdapter(
     )
 
     fun requestAttachmentUpload() = runCommand("request_attachment_upload")
+    fun beginAttachmentSelection(kind: WebChatAttachmentSelectionKind) = nativeAttachments.pickerPreparation.begin(kind)
+    fun cancelAttachmentSelection() = nativeAttachments.pickerPreparation.cancel()
 
     fun requestNativeAttachmentUpload(files: List<PendingAttachment>, uris: List<Uri>, requestId: String): Boolean {
         val descriptor = nativeAttachments.prepare(files, uris) ?: return false
@@ -674,7 +677,7 @@ internal class ChatGptWebPageAdapter(
         origin.scheme == "https" && origin.host == "chatgpt.com" && origin.port == -1
 
     companion object {
-        internal const val ADAPTER_VERSION = 274
+        internal const val ADAPTER_VERSION = 275
 
         private val ADAPTER_ASSETS = listOf(
             "chatgpt_web_adapter_bootstrap.js",
@@ -742,6 +745,7 @@ internal class ChatGptWebPageAdapter(
             "chatgpt_web_private_attachment_project.js",
             "chatgpt_web_private_attachment_composer.js",
             "chatgpt_web_private_attachment_image.js",
+            "chatgpt_web_private_attachment_selection.js",
             "chatgpt_web_private_attachment_send.js",
             "chatgpt_web_private_conversation_mutation.js",
             "chatgpt_web_private_conversation_delete.js",
