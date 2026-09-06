@@ -94,7 +94,7 @@ test('observed telemetry bursts do not read bodies or crowd out attachment evide
   const input = { clone: () => assert.fail('must not clone telemetry') };
   const init = { get body() { assert.fail('must not read telemetry body'); } };
   for (let i = 0; i < 30; i++) {
-    for (const path of ['/ces/v1/rgstr', '/ces/v1/telemetry/intake/']) {
+    for (const path of ['/ces/v1/rgstr', '/ces/v1/telemetry/intake/', '/ces/v1/t']) {
       assert.equal(f.probe.begin(input, init,
         new URL('https://chatgpt.com' + path + '?token=hidden'), 'POST', 'fetch'), null);
     }
@@ -122,10 +122,11 @@ test('telemetry is ignored after saturation and for XHR without changing drop co
 test('telemetry exclusion is exact and preserves unknown protocol routes', () => {
   const f = fixture(); f.command('start');
   for (const path of ['/backend-api/rgstr', '/api/telemetry/intake',
-    '/ces/v1/rgstr/other', '/ces/v1/telemetry/intake-other', '/ces/v2/rgstr']) {
+    '/ces/v1/rgstr/other', '/ces/v1/telemetry/intake-other', '/ces/v2/rgstr',
+    '/ces/v1/t/other', '/ces/v1/transaction']) {
     assert.ok(f.probe.begin(null, {}, new URL('https://chatgpt.com' + path), 'POST', 'fetch'));
   }
-  assert.equal(f.command('stop').records.length, 5);
+  assert.equal(f.command('stop').records.length, 7);
 });
 
 test('Request-object JSON clone leaves the original body usable', async () => {

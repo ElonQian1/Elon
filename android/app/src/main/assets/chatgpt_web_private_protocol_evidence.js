@@ -125,7 +125,7 @@
   function begin(input, init, url, method, transport) {
     if (!active()) return null;
     // Observed telemetry bursts must not consume the bounded business capture.
-    if (/^\/ces\/v1\/(?:rgstr|telemetry\/intake)\/?$/.test(url.pathname)) return null;
+    if (/^\/ces\/v1\/(?:rgstr|t|telemetry\/intake)\/?$/.test(url.pathname)) return null;
     if (records.length >= MAX_RECORDS) { dropped = Math.min(999, dropped + 1); return null; }
     const verb = String(method || 'GET').toUpperCase();
     if (!/^(GET|POST|PUT|PATCH|DELETE)$/.test(verb)) return null;

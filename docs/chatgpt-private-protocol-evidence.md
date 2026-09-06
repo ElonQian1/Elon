@@ -38,7 +38,7 @@ request, selects a file, starts recording, sends a message, or changes a login.
 
 - Default inactive, with no capture timer or body read.
 - Only same-origin `/backend-api/`, `/api/`, and `/ces/` fetch/XHR requests.
-- Excludes the observed `/ces/v1/rgstr` and `/ces/v1/telemetry/intake` statistics
+- Excludes the observed `/ces/v1/rgstr`, `/ces/v1/t` and `/ces/v1/telemetry/intake` statistics
   routes before reading bodies or spending the 12-record budget. Other routes
   remain observable. This follow-up is source-only until the next grouped APK.
 - Reuses the existing path sanitizer; removes query strings and normalizes
@@ -70,10 +70,11 @@ validation, ordinary receipt bounds, MCP dispatch and document-generation gates.
 research-probe suite); Android Kotlin compilation and 33 targeted unit tests
 passed across evidence validation, MCP, existing protocol and file-index receipt
 tests. The subsequent grouped Release build, publish and data-preserving install
-passed on `v1.1.1540`; no microphone or actual protocol capture was performed.
+passed on `v1.1.1540`; no microphone or actual protocol capture was performed
+during that initial installation round. Later device results follow below.
 
 These tests use synthetic fixtures and do not establish current vendor request
-contracts. Device capture remains pending; see [delivery evidence](web-ai-private-native-remaining-batch.md#grouped-release). Endpoint
+contracts. See subsequent [delivery evidence](web-ai-private-native-remaining-batch.md#grouped-release). Endpoint
 field types alone are not sufficient to implement credential issuance, upload
 finalization, idempotency or transaction ownership; verify those semantics before
 replacing any working production path.
@@ -103,3 +104,29 @@ logs on accelerator `1.0.139 (140)` showed `UnsatisfiedLinkError` for
 that JNI/package repair; no proxy code or settings were changed by this task.
 Resume protocol acceptance only after network recovery. Do not replay the
 pending write automatically or mark attachment prepare/upload/finalize complete.
+
+## Recovered-network capture
+
+The accelerator owner installed `1.0.140 (141)` and confirmed cold-start survival,
+the previously failing JNI restore, VPN operation and connectivity. This task
+then resumed the existing `v1.1.1540` production UI without reinstalling it or
+changing login state. The earlier upload owner was idle, no fixture was staged,
+the exact synthetic draft was preserved, and no conversation had been created.
+
+One new authorized native fixture/send attempt completed with no pending
+attachments and an empty composer. A new conversation and non-streaming native
+assistant acknowledgement were observed. The file reservation returned HTTP 200
+with typed fields `eligible`, `reservation_id`, `upload_url`,
+`upload_url_expires_at` and `reservation_expires_at`; no values were retained.
+Official `/backend-api/f/conversation/prepare` and the conversation SSE request
+both returned 200. The lease was stopped and cleared. The test conversation was
+retained, and the UI returned through an empty new-chat state to conversation
+home, with an empty draft, zero pending files and attachment owner `idle`.
+
+This verifies the diagnostic on real requests and a working native-to-official
+send/stream path after recovery. An acknowledgement alone does not prove file
+contents were processed. It does not verify the complete upload/finalization
+protocol, a private native uploader, or a private text sender. No credential or
+challenge result was replayed. The capture also identified `/ces/v1/t` statistics
+as additional budget pressure; its exact exclusion joins the source-only fix
+for the next grouped build, with the same 23 focused cases and observer suite.

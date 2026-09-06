@@ -22,7 +22,7 @@ for website functionality. Persistent WebView identity remains intentional.
 | Bounded/coalesced image requests and no false empty-library success | Implemented | Targeted JS passed | Published/installed 1540; device UI acceptance pending |
 | Private conversation attachment index, cache and native file sheet | Implemented | Shared JS/Android contract and targeted production tests passed | Published/installed 1540; device UI acceptance pending |
 | End-to-end private read deadlines, body limits and late project response isolation | Implemented | Lifecycle and existing JS consumer suites passed | Published/installed 1540; device acceptance pending |
-| Bounded request-shape capture through native MCP, reusing the page observer | Implemented diagnostic only | 21 Node checks and 33 Android tests passed; Kotlin compilation passed | Published/installed 1540; actual protocol capture pending |
+| Bounded request-shape capture through native MCP, reusing the page observer | Implemented diagnostic only | Node/Android checks passed; actual reservation JSON and conversation SSE capture observed | Published/installed 1540; telemetry-budget follow-up is source-only |
 
 Root cause, exact modules, and check results are in
 [the history contract](chatgpt-private-history-native-contract.md).
@@ -51,14 +51,26 @@ responded after the update, but later health calls timed out and a plain ADB
 process query returned `error: closed`. Both existing command helpers experienced
 failures at different times, so there is no confirmed helper-specific defect.
 No protocol-capture lease, synthetic upload, new message, or microphone test was
-started. Browser navigation also timed out; it supplied no protocol evidence.
+started in that initial installation round. Browser navigation also timed out;
+it supplied no protocol evidence.
 
-Next use this installed build to capture the attachment prepare/upload/finalize
-contract and its composer association with the existing synthetic fixture and
+The resumed round reconnected the same handset. Its accelerator `1.0.139 (140)`
+crashed on a missing JNI restore method; the accelerator owner fixed and
+installed `1.0.140 (141)` without this task changing proxy code or settings.
+After network recovery, one new synthetic attachment attempt through production
+`send_input` completed and produced a native streaming acknowledgement. The
+capture observed HTTP 200 reservation JSON and official conversation SSE. It
+did not establish the complete upload/finalize protocol or independent private
+dispatch. The probe was cleared and the UI restored to conversation home with
+an empty draft and no pending attachment; details and limits are in the
+[recovered-network capture](chatgpt-private-protocol-evidence.md#recovered-network-capture).
+
+Next complete the attachment prepare/upload/finalize contract and its composer
+association, reusing this real evidence, the existing synthetic fixture and
 bounded MCP command. First confirm a healthy transport and preserve the current
 draft, conversation and voice state. Do not rebuild this unchanged candidate,
 add another probe framework, guess an endpoint, or repeatedly restart the app
-because the debugging connection is unavailable. The Goal remains active.
+because the debugging connection is unavailable. The Goal is not complete.
 
 ## Protocol gaps
 
