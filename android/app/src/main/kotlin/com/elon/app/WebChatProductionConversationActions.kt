@@ -49,6 +49,9 @@ internal class WebChatProductionConversationActionsCoordinator(
 ) {
     private var requestEpoch = 0
     private var activeSheet: WebChatActionSheetHandle? = null
+    private val sharing = WebChatConversationShareCoordinator(
+        activity, host, activeProvider, consumerPort, openConversationTracked, ::showPageActionsFor,
+    )
     private val files = WebChatConversationFilesCoordinator(
         activity, host, consumerPort, ::openFilesConversation, ::showPageActionsFor,
     )
@@ -135,8 +138,11 @@ internal class WebChatProductionConversationActionsCoordinator(
             add(WebChatActionSheetItem(
                 id = ACTION_MORE_SETTINGS,
                 title = "更多会话设置",
-                subtitle = "分享及其他设置",
                 contentDescription = "web-chat-conversation-action-more-settings",
+            ))
+            add(WebChatActionSheetItem(
+                id = ACTION_SHARE, title = "分享会话",
+                contentDescription = "web-chat-conversation-action-share",
             ))
             add(WebChatActionSheetItem(
                 id = ACTION_DELETE,
@@ -186,6 +192,7 @@ internal class WebChatProductionConversationActionsCoordinator(
             ACTION_MOVE_TO_PROJECT -> privateProjectMove.show(conversation)
             ACTION_MORE_SETTINGS -> showPageActionsFor(conversation)
             ACTION_FILES -> files.show(conversation)
+            ACTION_SHARE -> sharing.show(conversation)
         }
     }
 
@@ -263,6 +270,7 @@ internal class WebChatProductionConversationActionsCoordinator(
         activeSheet = null
         sheet?.dismiss()
         files.cancel()
+        sharing.cancel()
         conversationMutation.cancelPending()
         privateProjectMove.cancelPending()
         projectMove.cancelPending()
@@ -368,6 +376,7 @@ internal class WebChatProductionConversationActionsCoordinator(
         const val ACTION_MOVE_TO_PROJECT = "move-to-project"
         const val ACTION_MORE_SETTINGS = "more-settings"
         const val ACTION_FILES = "files"
+        const val ACTION_SHARE = "share"
         const val ACTION_SHEET_HANDOFF_SETTLE_MS = 48L
         const val POLL_INTERVAL_MS = 250L
         const val MAX_POLL_ATTEMPTS = 24
