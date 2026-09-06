@@ -10917,10 +10917,10 @@
           "evidence_kind": "configuration",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "20e4ec7d14320bfb822eb4163a2c292ac511be4c",
-            "head_blob_oid": "692389f6315455d75fb7f2eb47b621a95e950906",
+            "head_commit": "c30edcb644b7da1408dabce6c29d6a4b4155d857",
+            "head_blob_oid": "0d14bdb962519e58233dfe36690cc7bf8f2c446f",
             "worktree_blob_oid": "0d14bdb962519e58233dfe36690cc7bf8f2c446f",
-            "state": "tracked_modified"
+            "state": "tracked_clean"
           }
         },
         {
@@ -10930,10 +10930,10 @@
           "evidence_kind": "configuration",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "20e4ec7d14320bfb822eb4163a2c292ac511be4c",
-            "head_blob_oid": "",
+            "head_commit": "c30edcb644b7da1408dabce6c29d6a4b4155d857",
+            "head_blob_oid": "d9d45505e61ce1ea5b23a8229836af27a24e57ce",
             "worktree_blob_oid": "d9d45505e61ce1ea5b23a8229836af27a24e57ce",
-            "state": "index_only"
+            "state": "tracked_clean"
           }
         },
         {
@@ -10943,10 +10943,10 @@
           "evidence_kind": "configuration",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "20e4ec7d14320bfb822eb4163a2c292ac511be4c",
-            "head_blob_oid": "",
+            "head_commit": "c30edcb644b7da1408dabce6c29d6a4b4155d857",
+            "head_blob_oid": "692b33926efd6d67071f588154d622710ef9283c",
             "worktree_blob_oid": "692b33926efd6d67071f588154d622710ef9283c",
-            "state": "index_only"
+            "state": "tracked_clean"
           }
         },
         {
@@ -10956,23 +10956,23 @@
           "evidence_kind": "configuration",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "20e4ec7d14320bfb822eb4163a2c292ac511be4c",
-            "head_blob_oid": "",
+            "head_commit": "c30edcb644b7da1408dabce6c29d6a4b4155d857",
+            "head_blob_oid": "979275f1fe13a7b321748fe7930b9909f1c8acc6",
             "worktree_blob_oid": "979275f1fe13a7b321748fe7930b9909f1c8acc6",
-            "state": "index_only"
+            "state": "tracked_clean"
           }
         },
         {
           "path": "docs/delivery/esk-sui-testnet-publication-preflight-v1.md",
-          "content_hash": "dd80f07d330b63f7d0a8bdd296eef4def5b69f9695fed0bb21fbf200e0131d00",
-          "locator": "verification and boundary matrix",
+          "content_hash": "72bec86df8b807fba13329c960d5cafeb4150b8b0e812f5c8c7ed0f595a2e15e",
+          "locator": "pushed commit and successful ESK Sui Move job",
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "20e4ec7d14320bfb822eb4163a2c292ac511be4c",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "ce995bb9fe61ddada10399069252d4e518c21d49",
-            "state": "index_only"
+            "head_commit": "c30edcb644b7da1408dabce6c29d6a4b4155d857",
+            "head_blob_oid": "ce995bb9fe61ddada10399069252d4e518c21d49",
+            "worktree_blob_oid": "c23649c5029ce367118c115ec380b263d3e1e0a3",
+            "state": "tracked_modified"
           }
         },
         {
@@ -10982,10 +10982,10 @@
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "20e4ec7d14320bfb822eb4163a2c292ac511be4c",
-            "head_blob_oid": "",
+            "head_commit": "c30edcb644b7da1408dabce6c29d6a4b4155d857",
+            "head_blob_oid": "babe4a94e54c2430b8a5bb142c40d81aa58cc499",
             "worktree_blob_oid": "babe4a94e54c2430b8a5bb142c40d81aa58cc499",
-            "state": "index_only"
+            "state": "tracked_clean"
           }
         },
         {
@@ -10995,10 +10995,10 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "20e4ec7d14320bfb822eb4163a2c292ac511be4c",
-            "head_blob_oid": "",
+            "head_commit": "c30edcb644b7da1408dabce6c29d6a4b4155d857",
+            "head_blob_oid": "c22ccae2888f2ebd2431034846fb81164c647531",
             "worktree_blob_oid": "c22ccae2888f2ebd2431034846fb81164c647531",
-            "state": "index_only"
+            "state": "tracked_clean"
           }
         },
         {
@@ -11008,10 +11008,10 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "20e4ec7d14320bfb822eb4163a2c292ac511be4c",
-            "head_blob_oid": "",
+            "head_commit": "c30edcb644b7da1408dabce6c29d6a4b4155d857",
+            "head_blob_oid": "fd60e09353da784d359b6e87e04477bdefd0b3ba",
             "worktree_blob_oid": "fd60e09353da784d359b6e87e04477bdefd0b3ba",
-            "state": "index_only"
+            "state": "tracked_clean"
           }
         },
         {
@@ -11021,10 +11021,10 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "20e4ec7d14320bfb822eb4163a2c292ac511be4c",
-            "head_blob_oid": "",
+            "head_commit": "c30edcb644b7da1408dabce6c29d6a4b4155d857",
+            "head_blob_oid": "9661674c97365813a029896e36d958dc793d035d",
             "worktree_blob_oid": "9661674c97365813a029896e36d958dc793d035d",
-            "state": "index_only"
+            "state": "tracked_clean"
           }
         },
         {
@@ -11034,10 +11034,10 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "20e4ec7d14320bfb822eb4163a2c292ac511be4c",
-            "head_blob_oid": "",
+            "head_commit": "c30edcb644b7da1408dabce6c29d6a4b4155d857",
+            "head_blob_oid": "7694b42bac1b04306208ebbccf4df02b31563d1d",
             "worktree_blob_oid": "7694b42bac1b04306208ebbccf4df02b31563d1d",
-            "state": "index_only"
+            "state": "tracked_clean"
           }
         },
         {
@@ -11047,10 +11047,10 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "20e4ec7d14320bfb822eb4163a2c292ac511be4c",
-            "head_blob_oid": "",
+            "head_commit": "c30edcb644b7da1408dabce6c29d6a4b4155d857",
+            "head_blob_oid": "217d4e8ea47414041907730d709a3a3c95cab097",
             "worktree_blob_oid": "217d4e8ea47414041907730d709a3a3c95cab097",
-            "state": "index_only"
+            "state": "tracked_clean"
           }
         },
         {
@@ -11060,10 +11060,10 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "20e4ec7d14320bfb822eb4163a2c292ac511be4c",
-            "head_blob_oid": "",
+            "head_commit": "c30edcb644b7da1408dabce6c29d6a4b4155d857",
+            "head_blob_oid": "916f4826b0a21a227b71d404f55c61ab7b78802b",
             "worktree_blob_oid": "916f4826b0a21a227b71d404f55c61ab7b78802b",
-            "state": "index_only"
+            "state": "tracked_clean"
           }
         },
         {
@@ -11073,10 +11073,10 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "20e4ec7d14320bfb822eb4163a2c292ac511be4c",
-            "head_blob_oid": "",
+            "head_commit": "c30edcb644b7da1408dabce6c29d6a4b4155d857",
+            "head_blob_oid": "126b765d75ce90ad4f06c0efd630d85ad471d2fe",
             "worktree_blob_oid": "126b765d75ce90ad4f06c0efd630d85ad471d2fe",
-            "state": "index_only"
+            "state": "tracked_clean"
           }
         },
         {
@@ -11086,10 +11086,10 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "20e4ec7d14320bfb822eb4163a2c292ac511be4c",
-            "head_blob_oid": "",
+            "head_commit": "c30edcb644b7da1408dabce6c29d6a4b4155d857",
+            "head_blob_oid": "b92a7358614e8e2b9b2abe1ffab0dbee2d36af2f",
             "worktree_blob_oid": "b92a7358614e8e2b9b2abe1ffab0dbee2d36af2f",
-            "state": "index_only"
+            "state": "tracked_clean"
           }
         },
         {
@@ -11099,10 +11099,10 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "20e4ec7d14320bfb822eb4163a2c292ac511be4c",
-            "head_blob_oid": "",
+            "head_commit": "c30edcb644b7da1408dabce6c29d6a4b4155d857",
+            "head_blob_oid": "14016e06c5b8d3ea1d1654258eb5f7ab4879702a",
             "worktree_blob_oid": "14016e06c5b8d3ea1d1654258eb5f7ab4879702a",
-            "state": "index_only"
+            "state": "tracked_clean"
           }
         },
         {
@@ -11112,15 +11112,15 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "20e4ec7d14320bfb822eb4163a2c292ac511be4c",
-            "head_blob_oid": "cfb687381d08e8b97ecae524f3a6305709a057fa",
+            "head_commit": "c30edcb644b7da1408dabce6c29d6a4b4155d857",
+            "head_blob_oid": "20caf99cf9a28f867fafa84697ca5b0598796818",
             "worktree_blob_oid": "20caf99cf9a28f867fafa84697ca5b0598796818",
-            "state": "tracked_modified"
+            "state": "tracked_clean"
           }
         }
       ],
       "created_at_ms": 1788663760191,
-      "updated_at_ms": 1788663769347
+      "updated_at_ms": 1788664030994
     },
     {
       "id": "esk_paper_quant_allocation_request_v2",
@@ -21953,66 +21953,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_856cb3cd9af9481b9b43dcc683a6cd4d",
-      "feature_id": "yilong-quant-android-identity-v1",
-      "action": "transitioned",
-      "actor": "codex/root",
-      "reason": "旧版最低版本表述已被新版唯一门禁替代，显式重新打开需求以修正文档后复验现行身份合同。",
-      "from_status": "released",
-      "to_status": "retired",
-      "at_ms": 1788557638121
-    },
-    {
-      "id": "feature_event_bf71ba555f754f84a8b9565f49149835",
-      "feature_id": "yilong-quant-android-identity-v1",
-      "action": "transitioned",
-      "actor": "codex/root",
-      "reason": "重新评审 V1 身份基础与 V2 新版唯一版本阈值的关系。",
-      "from_status": "retired",
-      "to_status": "proposed",
-      "at_ms": 1788557649116
-    },
-    {
-      "id": "feature_event_9a98c65a9ae14c79a82d0d3b5b3e7294",
-      "feature_id": "yilong-quant-android-identity-v1",
-      "action": "requirement_rebound",
-      "actor": "codex/root",
-      "reason": "绑定消除 V1 历史 versionCode=2 与当前 V2 versionCode=5 冲突后的需求正文。",
-      "from_status": "proposed",
-      "to_status": "proposed",
-      "at_ms": 1788557663329
-    },
-    {
-      "id": "feature_event_9d44a37317434575bf924d515d768adb",
-      "feature_id": "yilong-quant-android-identity-v1",
-      "action": "metadata_updated",
-      "actor": "codex/root",
-      "reason": "同步当前 V2 新版唯一门禁后的身份基础元数据与源码合同测试路径。",
-      "from_status": "proposed",
-      "to_status": "proposed",
-      "at_ms": 1788557682892
-    },
-    {
-      "id": "feature_event_4fd5bc24058c4b0c9c522827b567c035",
-      "feature_id": "yilong-quant-android-identity-v1",
-      "action": "transitioned",
-      "actor": "codex/root",
-      "reason": "已复核：历史 versionCode 2 仅说明证书来源，当前 versionCode 5 门禁与 V2 一致，其他身份约束不变。",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1788557694042
-    },
-    {
-      "id": "feature_event_05d250fb091849e1b1f23279cbd30d39",
-      "feature_id": "yilong-quant-android-identity-v1",
-      "action": "transitioned",
-      "actor": "codex/root",
-      "reason": "当前实现路径和验收证据范围完整，可重新认领复验。",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1788557705249
-    },
-    {
       "id": "feature_event_7ec53da9be4446cc8c20edb4785d8a85",
       "feature_id": "yilong-quant-android-identity-v1",
       "action": "claimed",
@@ -23951,6 +23891,66 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1788663769347
+    },
+    {
+      "id": "feature_event_00d6293c771d4fa78c845cdc6ba6975b",
+      "feature_id": "esk-sui-testnet-publication-preflight-v1",
+      "action": "transitioned",
+      "actor": "codex-sui-preflight",
+      "reason": "补录已推送提交和远端 ESK Sui Move 成功证据，显式刷新交付文档哈希。",
+      "from_status": "verified",
+      "to_status": "ready",
+      "at_ms": 1788664022971
+    },
+    {
+      "id": "feature_event_47912ee0e8304314b701fca8018107fa",
+      "feature_id": "esk-sui-testnet-publication-preflight-v1",
+      "action": "claimed",
+      "actor": "codex-sui-preflight",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788664023547
+    },
+    {
+      "id": "feature_event_5e3710400a924d8aab4676d2870790ea",
+      "feature_id": "esk-sui-testnet-publication-preflight-v1",
+      "action": "transitioned",
+      "actor": "codex-sui-preflight",
+      "reason": "更新远端交付证据。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788664024121
+    },
+    {
+      "id": "feature_event_606903996c5c4e6293f8d6188413f1c9",
+      "feature_id": "esk-sui-testnet-publication-preflight-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-sui-preflight",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788664029804
+    },
+    {
+      "id": "feature_event_4569c587e424449ab4187b2ceddb24a7",
+      "feature_id": "esk-sui-testnet-publication-preflight-v1",
+      "action": "transitioned",
+      "actor": "codex-sui-preflight",
+      "reason": "远端交付证据已写入文档，代码语义未变化。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1788664030371
+    },
+    {
+      "id": "feature_event_49f8a40145ea4c8489d787f94d0c3257",
+      "feature_id": "esk-sui-testnet-publication-preflight-v1",
+      "action": "transitioned",
+      "actor": "codex-sui-preflight",
+      "reason": "本地验证与远端 ESK Sui Move 作业均通过，证据当前。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1788664030994
     }
   ]
 }

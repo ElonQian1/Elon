@@ -2,8 +2,8 @@
 title: "ESK Sui 测试网发行离线预检 V1 交付"
 status: current
 implementation_status: implemented
-verification_status: integration_passed
-delivery_status: not_started
+verification_status: local_and_sui_ci_passed
+delivery_status: pushed
 acceptance_status: accepted
 owner: platform-assets-protocol-ci
 reviewed_at: 2026-09-06
@@ -25,11 +25,11 @@ requirement: docs/requirements/esk-sui-testnet-publication-preflight-v1.md
 
 | 能力 | 实现 | 验证 | 交付 | 验收 | 当前证据 | 剩余缺口 |
 |---|---|---|---|---|---|---|
-| 严格候选合同与公开模板 | implemented | integration_passed | not_started | accepted | 45 项专项与三种候选模式 Schema 通过 | 远端 CI |
-| 固定源码和工具链绑定 | implemented | integration_passed | not_started | accepted | 固定 Sui 版本、递归源码清单、两包输入和生产摘要均失败关闭 | 远端 CI |
-| 无签名八阶段发行计划 | implemented | integration_passed | not_started | accepted | 赞助交易、Publish、完整 ObjectRef、Registry/allocation ABI 和 Clock 已锁定 | 远端 CI |
-| 部分成功恢复与发布后证据交接 | implemented | integration_passed | not_started | accepted | 追加式 journal、三观察器及能力/源码对应/委员会终局 verifier 门禁已进入计划 | 三个新增证据生产器属于后续发行功能 |
-| 两年早期团队兜底政策边界 | implemented | integration_passed | not_started | accepted | 候选固定显示 `clarification_required`、11 项未决条款、QSHARE 不自动适用及四类资金/售币关闭标志 | 项目方回答范围、起算、资产、主体、资金来源及退出/结算等问题后另发政策合同 |
+| 严格候选合同与公开模板 | implemented | remote_passed | pushed | accepted | 45 项专项与三种候选模式 Schema 通过 | 无 |
+| 固定源码和工具链绑定 | implemented | remote_passed | pushed | accepted | 固定 Sui 版本、递归源码清单、两包输入和生产摘要均失败关闭 | 无 |
+| 无签名八阶段发行计划 | implemented | remote_passed | pushed | accepted | 赞助交易、Publish、完整 ObjectRef、Registry/allocation ABI 和 Clock 已锁定 | 无 |
+| 部分成功恢复与发布后证据交接 | implemented | remote_passed | pushed | accepted | 追加式 journal、三观察器及能力/源码对应/委员会终局 verifier 门禁已进入计划 | 三个新增证据生产器属于后续发行功能 |
+| 两年早期团队兜底政策边界 | implemented | remote_passed | pushed | accepted | 候选固定显示 `clarification_required`、11 项未决条款、QSHARE 不自动适用及四类资金/售币关闭标志 | 项目方回答范围、起算、资产、主体、资金来源及退出/结算等问题后另发政策合同 |
 | 真实 Sui 测试网发行 | not_started | not_run | not_started | deferred | `publication_status=not_performed` | 独立功能、正式参数、钱包、Gas 和逐步明确授权 |
 
 状态轴彼此独立：本地测试通过不会变成真实发行，代码推送也不会变成链上验收。
@@ -125,6 +125,8 @@ dry-run、Gas、钱包或多签、签名、广播和发布后观察器验证。�
 - 三路独立复审：最终快照均为 P0=0、P1=0、P2=0；“考虑兜底”措辞、决策中立动作和
   候选对象快照问题已在复审中修正并加入回归。
 - 固定 Sui Move 构建与测试：工具链合同、本地无钱包/无 RPC 边界及 CI 接线守卫通过；
-  本批仍需远端 CI 复核。
-- Git 提交与远端分支：尚未产生。
+  远端 [Quality Gates #2238 / ESK Sui Move](https://github.com/ElonQian1/Elon/actions/runs/34008064356/job/101418809788)
+  已通过。
+- Git 提交与远端分支：[`c30edcb644b7da1408dabce6c29d6a4b4155d857`](https://github.com/ElonQian1/Elon/commit/c30edcb644b7da1408dabce6c29d6a4b4155d857)
+  已推送到 `main`。
 - Sui 网络、钱包、签名、广播、资金和真实用户验收：均未执行。
